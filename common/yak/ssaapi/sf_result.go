@@ -2,14 +2,18 @@ package ssaapi
 
 import (
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 type SyntaxFlowResult struct {
 	// result
 	memResult *sfvm.SFFrameResult
-
+	dbResult  *ssadb.AuditResult
+	// for create value
+	programs map[string]*Program
 	//from db
 	rule *schema.SyntaxFlowRule
 	// cache
@@ -29,6 +33,21 @@ func createEmptyResult() *SyntaxFlowResult {
 	return &SyntaxFlowResult{
 		symbol: make(map[string]Values),
 	}
+}
+
+func CreateResultByID(resultID string) (*SyntaxFlowResult, error) {
+	res := createEmptyResult()
+	result, err := ssadb.GetResultByID(resultID)
+	if err != nil {
+		return nil, err
+	}
+	res.dbResult = result
+	rule, err := sfdb.GetRule(result.RuleName)
+	if err != nil {
+		return nil, err
+	}
+	res.rule = rule
+	return res, nil
 }
 
 func CreateResultFromQuery(res *sfvm.SFFrameResult) *SyntaxFlowResult {
@@ -58,7 +77,9 @@ func (r *SyntaxFlowResult) Name() string {
 	if r.memResult != nil {
 		return r.memResult.Name()
 	}
-
+	if r.dbResult != nil {
+		return r.dbResult.ResultID
+	}
 	return ""
 }
 
@@ -76,6 +97,8 @@ func (r *SyntaxFlowResult) GetErrors() []string {
 	}
 	if r.memResult != nil {
 		return r.memResult.Errors
+	} else if r.dbResult != nil {
+		return r.dbResult.Errors
 	}
 	return nil
 }
@@ -85,10 +108,6 @@ func (r *SyntaxFlowResult) GetCheckMsg() []string {
 		return nil
 	}
 
-	if r.checkMsg != nil {
-		return r.checkMsg
-	}
-
 	if r.memResult != nil {
 		msgs := make([]string, 0)
 		for _, name := range r.memResult.CheckParams {
@@ -96,8 +115,9 @@ func (r *SyntaxFlowResult) GetCheckMsg() []string {
 				msgs = append(msgs, msg)
 			}
 		}
-		r.checkMsg = msgs
 		return msgs
+	} else if r.dbResult != nil {
+		return r.dbResult.CheckMsg
 	}
 
 	return nil

@@ -1,8 +1,12 @@
 package ssaapi
 
 import (
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 // ======================================== All Value/Variable ========================================
@@ -35,6 +39,28 @@ func (r *SyntaxFlowResult) GetAllVariable() *orderedmap.OrderedMap {
 		for name := range r.memResult.AlertSymbolTable {
 			if v, ok := r.variable.Get(name); ok && v.(int) > 0 {
 				r.alertVariable = append(r.alertVariable, name)
+			}
+		}
+	}
+
+	if r.dbResult != nil {
+		res, err := ssadb.GetResultVariableByID(ssadb.GetDB(), r.dbResult.ResultID)
+		if err != nil {
+			log.Errorf("err: %v", err)
+			return nil
+		}
+		for _, v := range res {
+			if v.Name == "_" {
+				continue
+			}
+			r.variable.Set(v.Name, int(v.ValueNum))
+			if v.Alert != "" {
+				r.alertVariable = append(r.alertVariable, v.Name)
+			}
+		}
+		for _, name := range r.dbResult.UnValueVariable {
+			if _, ok := r.variable.Get(name); !ok {
+				r.variable.Set(name, 0)
 			}
 		}
 	}
@@ -79,6 +105,11 @@ func (r *SyntaxFlowResult) GetValues(name string) Values {
 			return vs
 		}
 	}
+	if r.dbResult != nil {
+		vs := r.getValueFromDB(name)
+		r.symbol[name] = vs
+		return vs
+	}
 	return nil
 }
 
@@ -104,6 +135,46 @@ func (r *SyntaxFlowResult) GetUnNameValues() Values {
 	if r.memResult != nil {
 		// memory
 		r.unName = SyntaxFlowVariableToValues(sfvm.NewValues(r.memResult.UnNameValue))
+	} else if r.dbResult != nil {
+		// database
+		r.unName = r.getValueFromDB("_")
 	}
 	return r.unName
+}
+
+func (r *SyntaxFlowResult) GetResultID() string {
+	if r == nil || r.dbResult == nil {
+		return ""
+	}
+	return r.dbResult.ResultID
+}
+
+func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
+	resValueID, err := ssadb.GetResultValueByVariable(ssadb.GetDB(), r.dbResult.ResultID, name)
+	if err != nil {
+		return nil
+	}
+	vs := lo.Map(resValueID, func(id int64, _ int) *Value {
+		return r.newValue(id)
+	})
+	return vs
+}
+
+func (r *SyntaxFlowResult) newValue(valueID int64) *Value {
+	node, err := ssa.NewLazyInstruction(valueID)
+	if err != nil {
+		log.Errorf("GetValues new lazy instruction: %v", err)
+		return nil
+	}
+	progName := node.GetProgramName()
+	prog, ok := r.programs[progName]
+	if !ok {
+		prog, err = FromDatabase(progName)
+		if err != nil {
+			log.Errorf("newValue getProgram [%s] from DB err: %v", progName, err)
+			return nil
+		}
+	}
+
+	return prog.NewValue(node)
 }

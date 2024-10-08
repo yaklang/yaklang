@@ -37,7 +37,81 @@ func SendURL(local ypb.YakClient, program, path string, body string) ([]*ypb.Yak
 		return nil, err
 	}
 	return res.Resources, nil
+}
 
+func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode string, checkHandler func([]*ypb.YakURLResource)) {
+	var resultID string
+	{
+		// send memory query
+		url := &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema:   "syntaxflow",
+				Location: programName,
+				Path:     path,
+				Query: []*ypb.KVPair{
+					{
+						// save to database
+						Key:   "save_result",
+						Value: "true",
+					},
+				},
+			},
+			Body: []byte(sfCode),
+		}
+
+		res, err := local.RequestYakURL(context.Background(), url)
+		assert.NoError(t, err)
+		t.Log("checkHandler in memory query ")
+
+		resultIDRes := res.Resources[len(res.Resources)-1]
+		assert.Equal(t, resultIDRes.ResourceType, "message")
+		assert.Equal(t, resultIDRes.VerboseType, "result_id")
+		// got result
+		resultID = resultIDRes.ResourceName
+
+		checkHandler(res.Resources[:len(res.Resources)-1])
+	}
+
+	{
+
+		// send memory query
+		url := &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema:   "syntaxflow",
+				Location: programName,
+				Path:     path,
+				Query: []*ypb.KVPair{
+					{
+						// get from database
+						Key:   "result_id",
+						Value: resultID,
+					},
+				},
+			},
+		}
+		res, err := local.RequestYakURL(context.Background(), url)
+		assert.NoError(t, err)
+		t.Log("checkHandler in database query ")
+
+		resultIDRes := res.Resources[len(res.Resources)-1]
+		assert.Equal(t, resultIDRes.ResourceType, "message")
+		assert.Equal(t, resultIDRes.VerboseType, "result_id")
+		// got result
+		gotResultID := resultIDRes.ResourceName
+		assert.Equal(t, resultID, gotResultID)
+
+		checkHandler(res.Resources[:len(res.Resources)-1])
+	}
+}
+
+func checkVariable(t *testing.T, res []*ypb.YakURLResource, want []string) {
+	got := lo.FilterMap(res, func(r *ypb.YakURLResource, _ int) (string, bool) {
+		return r.ResourceName, r.ResourceType == "variable"
+	})
+	assert.Len(t, got, len(want))
+	assert.Equal(t, want, got)
 }
 
 func TestSFURl(t *testing.T) {
@@ -88,21 +162,22 @@ func TestSFURl(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, prog)
 
-	checkVariable := func(t *testing.T, res []*ypb.YakURLResource, want []string) {
-		got := lo.FilterMap(res, func(r *ypb.YakURLResource, _ int) (string, bool) {
-			return r.ResourceName, r.ResourceType == "variable"
-		})
-		assert.Len(t, got, len(want))
-		assert.Equal(t, got, want)
-	}
-
 	t.Run("check syntaxflow variable", func(t *testing.T) {
-		res, err := SendURL(local, progID, "/", `
-		target2(* #-> as $a)
-		`)
-		assert.NoError(t, err)
-		spew.Dump(res)
-		checkVariable(t, res, []string{"a", "_"})
+		CheckSSAURL(t, local, progID, "/",
+			`target2(* #-> as $a)`,
+			func(res []*ypb.YakURLResource) {
+				checkVariable(t, res, []string{"a", "_"})
+			},
+		)
+	})
+
+	t.Run("check _", func(t *testing.T) {
+		CheckSSAURL(t, local, progID, "/", `target*`, func(res []*ypb.YakURLResource) {
+			checkVariable(t, res, []string{"_"})
+		})
+		CheckSSAURL(t, local, progID, "/_", `target*`, func(res []*ypb.YakURLResource) {
+			assert.Equal(t, 2, len(res))
+		})
 	})
 
 	t.Run("check syntaxflow variable no data", func(t *testing.T) {
@@ -115,42 +190,42 @@ func TestSFURl(t *testing.T) {
 	})
 
 	t.Run("check syntaxflow variable with alert", func(t *testing.T) {
-		res, err := SendURL(local, progID, "/", `
+		CheckSSAURL(t, local, progID, "/", `
 		target2(* #-> as $a) 
 		target1() as $target1
 		alert $target1 for "alert information"
-		`)
-		assert.NoError(t, err)
-		spew.Dump(res)
-		checkVariable(t, res, []string{"target1", "a", "_"})
-		target1 := res[0]
-		assert.Equal(t, target1.VerboseName, `alert information`)
-		assert.Equal(t, target1.ResourceType, "variable")
-		assert.Equal(t, target1.VerboseType, "alert")
+		`, func(res []*ypb.YakURLResource) {
+			spew.Dump(res)
+			checkVariable(t, res, []string{"target1", "a", "_"})
+			target1 := res[0]
+			assert.Equal(t, target1.VerboseName, "alert information")
+			assert.Equal(t, target1.ResourceType, "variable")
+			assert.Equal(t, target1.VerboseType, "alert")
+		})
 	})
 
 	t.Run("check syntaxflow variable with check params", func(t *testing.T) {
-		res, err := SendURL(local, progID, "/", `
+		CheckSSAURL(t, local, progID, "/", `
 		target2(* #-> as $a) 
 		$a?{!(opcode: const)} as $not_const_parameter 
 		$a?{(opcode: const)} as $const_parameter
 
 		check $not_const_parameter then "has not-const parameter" else "no not-const parameter"
 		check $const_parameter then "has const parameter" else "no const parameter"
-		`)
-		assert.NoError(t, err)
-		spew.Dump(res)
-		checkVariable(t, res, []string{"a", "not_const_parameter", "const_parameter", "_"})
+		`, func(res []*ypb.YakURLResource) {
+			spew.Dump(res)
+			checkVariable(t, res, []string{"a", "not_const_parameter", "const_parameter", "_"})
 
-		errMsg := res[0]
-		assert.Equal(t, errMsg.ResourceType, "message")
-		assert.Equal(t, errMsg.VerboseType, "error")
-		assert.Equal(t, errMsg.VerboseName, "no not-const parameter")
+			errMsg := res[0]
+			assert.Equal(t, errMsg.ResourceType, "message")
+			assert.Equal(t, errMsg.VerboseType, "error")
+			assert.Equal(t, errMsg.VerboseName, "no not-const parameter")
 
-		infoMsg := res[1]
-		assert.Equal(t, infoMsg.ResourceType, "message")
-		assert.Equal(t, infoMsg.VerboseType, "info")
-		assert.Equal(t, infoMsg.VerboseName, "has const parameter")
+			infoMsg := res[1]
+			assert.Equal(t, infoMsg.ResourceType, "message")
+			assert.Equal(t, infoMsg.VerboseType, "info")
+			assert.Equal(t, infoMsg.VerboseName, "has const parameter")
+		})
 	})
 
 	t.Run("check syntaxflow value", func(t *testing.T) {
@@ -161,19 +236,14 @@ func TestSFURl(t *testing.T) {
 		}->
 		`, "`*  as $a`")
 
-		{
+		CheckSSAURL(t, local, progID, "/", query, func(yu []*ypb.YakURLResource) {
+			spew.Dump(yu)
+			checkVariable(t, yu, []string{"target", "a", "_"})
+		})
 
-			res, err := SendURL(local, progID, "/", query)
-			assert.NoError(t, err)
+		CheckSSAURL(t, local, progID, "/a", query, func(res []*ypb.YakURLResource) {
 			spew.Dump(res)
-			checkVariable(t, res, []string{"target", "a", "_"})
-		}
-
-		{
-			res, err := SendURL(local, progID, "/a", query)
-			assert.NoError(t, err)
-			spew.Dump(res)
-		}
+		})
 	})
 
 	t.Run("check syntaxflow information", func(t *testing.T) {
@@ -183,8 +253,8 @@ func TestSFURl(t *testing.T) {
 			hook: %s
 		}-> as $para_top_def)
 		`, "`*  as $a`")
-		{
-			res, err := SendURL(local, progID, "/a/0", query)
+		CheckSSAURL(t, local, progID, "/a/0", query, func(res []*ypb.YakURLResource) {
+
 			assert.NoError(t, err)
 			spew.Dump(res)
 			check := func(path string) {
@@ -241,14 +311,7 @@ func TestSFURl(t *testing.T) {
 				}
 			}
 			assert.True(t, found)
-		}
+		})
 	})
-	t.Run("check _", func(t *testing.T) {
-		query := fmt.Sprintf(`target*`)
-		{
-			res, err := SendURL(local, progID, "/_", query)
-			assert.NoError(t, err)
-			assert.Len(t, res, 2)
-		}
-	})
+
 }
