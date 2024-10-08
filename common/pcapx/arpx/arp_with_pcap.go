@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -84,8 +83,7 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 
 						buf, err := newArpARPPacket(ifaceIns, p)
 						if err != nil {
-							xx, _ := codec.GB18030ToUtf8([]byte(err.Error()))
-							log.Errorf("new arp packet failed: %s", xx)
+							log.Errorf("new arp packet failed: %s", err)
 							return
 						}
 						count := 2
@@ -105,8 +103,7 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 							time.Sleep(5 * time.Millisecond) // some ms delay for write
 							senderMutex.Unlock()
 							if err != nil {
-								xx, _ := codec.GB18030ToUtf8([]byte(err.Error()))
-								log.Errorf("write packet failed: %s", xx)
+								log.Errorf("new arp packet failed: %s", err)
 								return
 							}
 
