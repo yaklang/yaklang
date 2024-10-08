@@ -1,0 +1,108 @@
+desc(
+    title: "Find SpringBoot RestController Basic XSS",
+    type: vuln,
+)
+
+<include('java-spring-param')>?{<typeName>?{have: String}} as $params;
+
+RestController.__ref__<getMembers>?{.annotation.*Mapping} as $entryMethods;
+$entryMethods<getReturns> as $sink;
+$sink #{
+    until: `* & $params as $source`,
+}->;
+$source<dataflow(<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $haveCall;
+
+$source - $haveCall as $withoutCall;
+alert $withoutCall for {
+    level: high,
+    type: vuln,
+};
+
+// (?i)(sanitiz|encod(e|ing)|entit(y|ies)|escap(e|ing)|replace|regex|normaliz|canonical|anti|safe|purif|purg|pure|validate|strip|clean|clear|special|convert|remov)
+$haveCall<dataflow(<<<CODE
+* - $haveCall as $other;
+$other?{opcode: call && !opcode: param} as $calls;
+$calls?{<getCaller><name>?{have: /(?i)(sanitiz|encod(e|ing)|entit(y|ies)|escap(e|ing)|replace|regex|normaliz|canonical|anti|safe|purif|purg|pure|validate|strip|clean|clear|special|convert|remov)/}} as $__next__;
+<delete(call)>
+<delete(other)>
+CODE)> as $filteredSink;
+
+$haveCall - $filteredSink as $unsafeFilteredSink;
+alert $unsafeFilteredSink for {
+    level: mid,
+    type: vuln,
+};
+alert $filteredSink for {
+    level: low,
+    type: audit,
+    message: "The String or Content Filter is used. It is recommended to use the filter to prevent XSS.",
+};
+
+
+// *sanitiz*
+// *encode*
+// *encoding*
+// *entities*
+// *entity*
+// *escape*
+// *escaping*
+// *replace*
+// *regex*
+// *normaliz*
+// *canonical*
+// *anti*
+// *safe*
+// *purif*
+// *purge*
+// *pure*
+// *validate*
+// *strip*
+// *clean*
+// *clear*
+// *special*
+// *convert*
+// *remov*
+// *strip*
+
+desc(
+lang: java,
+alert_min: 3,
+alert_low: 1,
+'file://b.java': <<<UNSAFE
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.util.HtmlUtils;
+
+@RestController
+@RequestMapping("/xss")
+public class XSSController {
+
+    @GetMapping
+    public ModelAndView showForm() {
+        return new ModelAndView("xssForm");
+    }
+
+    @PostMapping("/submit")
+    public String handleSubmit(@RequestParam("userInput") String userInput) {
+        return "处理后的输入: " + userInput;
+    }
+
+    @PostMapping("/submit1")
+    public String handleSubmit1(@RequestParam("userInput") String safeInput) {
+        // 对用户输入进行 HTML 转义以防止 XSS
+        String sanitizedInput = HtmlUtils.htmlEscape(safeInput);
+        return "处理后的输入: " + sanitizedInput;
+    }
+
+    @PostMapping("/submit2")
+    public String handleSubmit2(@RequestParam("userInput") String abc) {
+        // 对用户输入进行 HTML 转义以防止 XSS
+        String input = callbysomeother(abc);
+        return "处理后的输入: " + input;
+    }
+}
+UNSAFE
+)
+
