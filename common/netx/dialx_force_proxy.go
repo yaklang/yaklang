@@ -3,6 +3,7 @@ package netx
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/systemproxy"
 	"net"
 	"net/url"
 	"os"
@@ -36,6 +37,9 @@ func FixProxy(i string) string {
 }
 
 func getProxyFromEnv() string {
+	if setting, err := systemproxy.Get(); err == nil && setting.Enabled && setting.DefaultServer != "" {
+		return setting.DefaultServer
+	}
 	for _, k := range []string{
 		"YAK_PROXY", "yak_proxy",
 		"HTTP_PROXY", "http_proxy",
