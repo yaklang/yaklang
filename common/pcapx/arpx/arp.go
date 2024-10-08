@@ -237,7 +237,7 @@ func newArpARPPacket(iface *net.Interface, ip string) ([]byte, error) {
 		DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 		EthernetType: layers.EthernetTypeARP,
 	}
-	arp := &layers.ARP{
+	arpFrame := &layers.ARP{
 		AddrType:          layers.LinkTypeEthernet,
 		Protocol:          layers.EthernetTypeIPv4,
 		HwAddressSize:     6,
@@ -253,7 +253,7 @@ func newArpARPPacket(iface *net.Interface, ip string) ([]byte, error) {
 		FixLengths:       true,
 		ComputeChecksums: true,
 	}
-	err = gopacket.SerializeLayers(buf, opts, eth, arp)
+	err = gopacket.SerializeLayers(buf, opts, eth, arpFrame)
 	if err != nil {
 		return nil, errors.Errorf("serialize arpx packet failed: %s", err)
 	}
