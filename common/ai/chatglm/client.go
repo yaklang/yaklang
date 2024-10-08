@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
+	"strings"
 )
 
 type GLMClient struct {
@@ -32,6 +33,9 @@ func (g *GLMClient) LoadOption(opt ...aispec.AIConfigOption) {
 			g.targetUrl = "http://" + config.Domain
 		} else {
 			g.targetUrl = "https://" + config.Domain
+		}
+		if !strings.Contains(config.Domain, "/") {
+			g.targetUrl += "/api/paas/v4/chat/completions"
 		}
 	} else {
 		g.targetUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
