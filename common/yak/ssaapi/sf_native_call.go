@@ -130,9 +130,14 @@ const (
 
 	// NativeCall_VersionIn is used to get the version in
 	NativeCall_VersionIn = "versionIn"
+
+	// NativeCall_IsSanitizeName checks for potential sanitization function names
+	NativeCall_IsSanitizeName = "isSanitizeName"
 )
 
 func init() {
+	registerNativeCall(NativeCall_IsSanitizeName, nc_func(nativeCallSanitizeNames), nc_desc("检查是否为潜在的过滤函数名称"))
+
 	registerNativeCall(NativeCall_VersionIn, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		gt := params.GetString("greaterThan")  // <
 		ge := params.GetString("greaterEqual") // <=
