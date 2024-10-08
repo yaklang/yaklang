@@ -1,9 +1,34 @@
 package sfvm
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/log"
 )
+
+type OpCodes []*SFI
+
+func ToOpCodes(code string) OpCodes {
+	var opcodes OpCodes
+	if err := json.Unmarshal([]byte(code), &opcodes); err != nil {
+		log.Errorf("to opcode fail: %s", err)
+		return OpCodes{}
+	} else {
+		return opcodes
+	}
+}
+func (p OpCodes) ToString() string {
+	var result string
+	if jsonBytes, err := json.Marshal(p); err == nil {
+		result = string(jsonBytes)
+	} else {
+		log.Errorf("opcode to string fail: %s", err)
+		result = fmt.Sprintf("%v", p)
+	}
+	return result
+}
 
 type SFVMOpCode int
 
