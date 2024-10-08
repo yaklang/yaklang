@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils/spacengine/base"
@@ -790,4 +792,52 @@ func TestLoadThirdPartyConfig(t *testing.T) {
 	assert.Equal(t, "APIKey", spaceEngineConfig.APIKey)
 	assert.Equal(t, "Domain", spaceEngineConfig.Domain)
 	assert.Equal(t, "UserIdentifier", spaceEngineConfig.UserIdentifier)
+}
+
+func TestCallPluginTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+	defer cancel()
+	client, err := NewLocalClient(true)
+	require.Nil(t, err, "new local client error")
+
+	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	require.NoError(t, err)
+
+	defaultBytes, _ := json.Marshal(config)
+	defer yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(defaultBytes))
+
+	config.CallPluginTimeout = 70
+	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+	require.NoError(t, err)
+
+	host, port := utils.DebugMockHTTP([]byte("Hello"))
+	token := utils.RandStringBytes(20)
+	code := fmt.Sprintf(`mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    time.sleep(65)
+    yakit.StatusCard("%s", "%s")
+}`, token, token)
+
+	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code:       code,
+		PluginType: "mitm",
+		Input:      utils.HostPort(host, port),
+	})
+	require.NoError(t, err)
+
+	checkOk := false
+	for {
+		exec, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Warn(err)
+		}
+		if exec.IsMessage && strings.Contains(string(exec.Message), token) {
+			checkOk = true
+			break
+		}
+	}
+
+	require.True(t, checkOk, "call plugin timeout failed")
 }
