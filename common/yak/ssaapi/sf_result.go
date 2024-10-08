@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -33,21 +32,6 @@ func createEmptyResult() *SyntaxFlowResult {
 	return &SyntaxFlowResult{
 		symbol: make(map[string]Values),
 	}
-}
-
-func CreateResultByID(resultID string) (*SyntaxFlowResult, error) {
-	res := createEmptyResult()
-	result, err := ssadb.GetResultByID(resultID)
-	if err != nil {
-		return nil, err
-	}
-	res.dbResult = result
-	rule, err := sfdb.GetRule(result.RuleName)
-	if err != nil {
-		return nil, err
-	}
-	res.rule = rule
-	return res, nil
 }
 
 func CreateResultFromQuery(res *sfvm.SFFrameResult) *SyntaxFlowResult {

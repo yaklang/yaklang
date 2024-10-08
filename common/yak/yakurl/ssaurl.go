@@ -130,12 +130,8 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 
 	// save result to db
 	if saveResult {
-		prog, err := a.getProgram(programName)
-		if err != nil {
-			prog = nil
-		}
 		resultID = uuid.NewString()
-		result.Save(resultID, "", nil, prog)
+		result.Save(resultID, "")
 		a.ResultIDCache.Set(resultID, result)
 	}
 
