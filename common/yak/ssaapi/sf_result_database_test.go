@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"golang.org/x/exp/slices"
@@ -39,7 +40,7 @@ func queryAndSave(t *testing.T) (func(), *ssaapi.SyntaxFlowResult) {
 
 	// save result
 	resultID := uuid.NewString()
-	err = res.Save(resultID, "", nil, prog)
+	err = res.Save(resultID, "")
 	require.NoError(t, err)
 	return func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programName)
@@ -113,4 +114,99 @@ func TestGetResultFromDB(t *testing.T) {
 	slices.Sort(wnatValueID)
 	slices.Sort(gotValueID)
 	require.Equal(t, wnatValueID, gotValueID)
+}
+
+func TestRuleAlertMsg(t *testing.T) {
+	code := `
+	print("a")
+	print(f())
+	`
+	progName := uuid.NewString()
+	prog, err := ssaapi.Parse(code,
+		ssaapi.WithLanguage(consts.Yak),
+		ssaapi.WithProgramName(progName),
+	)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+	require.NoError(t, err)
+
+	syntaxFlowCode := ` 
+	print(* as $para)
+	$para ?{! opcode: const} as $target
+	alert $target for {
+		"msg": "target is not const",
+		"level": "warning",
+		"type": "security",
+	}
+	`
+	check := func(result *ssaapi.SyntaxFlowResult) {
+		require.Equal(t, result.GetVariableNum(), 2)
+		variables := make([]string, 2)
+
+		result.GetAllVariable().ForEach(func(key string, value any) {
+			variables = append(variables, key)
+		})
+		require.Contains(t, variables, "target")
+
+		require.Contains(t, result.GetAlertVariables(), "target")
+		require.NotNil(t, result.GetValues("target"))
+
+		info, ok := result.GetAlertEx("target")
+		log.Infof("info: %v", info)
+		require.True(t, ok)
+		require.Equal(t, "target is not const", info.ExtraInfo["msg"])
+		require.Equal(t, "middle", string(info.Level))
+		require.Equal(t, "security", string(info.Purpose))
+	}
+
+	// rule  db/memory  * result db/memory = 4
+
+	t.Run("rule memory, result memory", func(t *testing.T) {
+		res, err := prog.SyntaxFlowWithError(syntaxFlowCode)
+		require.NoError(t, err)
+		check(res)
+	})
+
+	t.Run("rule memory, result db", func(t *testing.T) {
+		res, err := prog.SyntaxFlowWithError(syntaxFlowCode)
+		require.NoError(t, err)
+
+		resultID := uuid.NewString()
+		err = res.Save(resultID, "")
+		defer ssadb.DeleteResultByID(resultID)
+		require.NoError(t, err)
+
+		resFromDB, err := ssaapi.CreateResultByID(resultID)
+		require.NoError(t, err)
+		check(resFromDB)
+	})
+
+	t.Run("rule db, result memory", func(t *testing.T) {
+		ruleName := uuid.NewString() + ".sf"
+		err := sfdb.SaveSyntaxFlowRule(ruleName, "yak", syntaxFlowCode)
+		defer sfdb.DeleteRuleByRuleName(ruleName)
+		require.NoError(t, err)
+
+		res, err := prog.SyntaxFlowRuleName(ruleName)
+		require.NoError(t, err)
+		check(res)
+	})
+
+	t.Run("rule db, result db", func(t *testing.T) {
+		ruleName := uuid.NewString() + ".sf"
+		err := sfdb.SaveSyntaxFlowRule(ruleName, "yak", syntaxFlowCode)
+		defer sfdb.DeleteRuleByRuleName(ruleName)
+		require.NoError(t, err)
+
+		res, err := prog.SyntaxFlowRuleName(ruleName)
+		require.NoError(t, err)
+
+		resultID := uuid.NewString()
+		err = res.Save(resultID, "")
+		defer ssadb.DeleteResultByID(resultID)
+		require.NoError(t, err)
+
+		resFromDB, err := ssaapi.CreateResultByID(resultID)
+		require.NoError(t, err)
+		check(resFromDB)
+	})
 }
