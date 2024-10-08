@@ -260,6 +260,14 @@ func (lz *LazyInstruction) IsParameter() bool {
 	return lz.ir.Opcode == int64(SSAOpcodeParameter)
 }
 
+func (lz *LazyInstruction) GetProgramName() string {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return ""
+	}
+	return lz.ir.ProgramName
+}
+
 func (lz *LazyInstruction) GetFunc() *Function {
 	lz.check()
 	if lz.Instruction == nil {

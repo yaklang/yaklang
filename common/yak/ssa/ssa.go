@@ -33,6 +33,7 @@ type Instruction interface {
 	SetBlock(*BasicBlock)
 	// program
 	GetProgram() *Program
+	GetProgramName() string
 	SetProgram(*Program)
 
 	GetName() string

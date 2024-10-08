@@ -124,6 +124,13 @@ func (a *anInstruction) GetProgram() *Program {
 	return a.prog
 }
 
+func (a *anInstruction) GetProgramName() string {
+	if a.prog == nil {
+		return ""
+	}
+	return a.prog.Name
+}
+
 func (a *anInstruction) SetProgram(prog *Program) {
 	a.prog = prog
 }
