@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -313,7 +314,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	mitmPluginCaller.SetDividedContext(true)
 	mitmPluginCaller.SetConcurrent(20)
 	mitmPluginCaller.SetLoadPluginTimeout(10)
-	mitmPluginCaller.SetCallPluginTimeout(60)
+	mitmPluginCaller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 	if downstreamProxy != "" {
 		mitmPluginCaller.SetProxy(downstreamProxy)
 	}
