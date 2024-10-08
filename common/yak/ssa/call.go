@@ -43,7 +43,6 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	c.handlerObjectMethod()
 	c.handlerReturnType()
 	c.handleCalleeFunction()
-	//f.handleSideEffect(c)
 	return c
 }
 
@@ -363,18 +362,6 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 			}
 			// other code will mark error in function call-site
 			c.NewError(Error, SSATAG, BindingNotFoundInCall(fv.GetName()))
-		}
-	}
-}
-
-func (f *FunctionBuilder) handleSideEffect(c *Call) {
-	if parentBuilder := f.parentBuilder; parentBuilder != nil {
-		name := c.Method.GetName()
-		scope := parentBuilder.CurrentBlock.ScopeTable
-		if funCallee := ReadVariableFromScope(scope, name); funCallee != nil {
-			if fc, ok := funCallee.Value.(*Function); ok {
-				f.SideEffects = append(f.SideEffects, fc.SideEffects...)
-			}
 		}
 	}
 }
