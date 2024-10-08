@@ -160,7 +160,6 @@ func (c *config) parseProject() (Programs, error) {
 	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
 
-
 	}
 	return progs, nil
 }

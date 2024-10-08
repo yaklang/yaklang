@@ -18,6 +18,7 @@ type Program struct {
 	// DBCache *ssa.Cache
 	config *config
 
+	enableDatabase bool
 	// come from database will affect search operation
 	comeFromDatabase bool
 }
@@ -53,8 +54,9 @@ func (p *Program) GetType(name string) *Type {
 
 func NewProgram(prog *ssa.Program, config *config) *Program {
 	p := &Program{
-		Program: prog,
-		config:  config,
+		Program:        prog,
+		config:         config,
+		enableDatabase: config.ProgramName != "",
 	}
 
 	// if config.DatabaseProgramName == "" {

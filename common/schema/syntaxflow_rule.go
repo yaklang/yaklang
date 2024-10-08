@@ -3,9 +3,10 @@ package schema
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -160,7 +161,7 @@ func (s *SyntaxFlowRule) GetAlertInfo(msg string) (string, bool) {
 		if info.OnlyMsg {
 			return info.Msg, true
 		}
-		return codec.AnyToString(info), false
+		return codec.AnyToString(info), true
 	}
 	return "", false
 }
