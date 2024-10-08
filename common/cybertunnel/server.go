@@ -2,6 +2,7 @@ package cybertunnel
 
 import (
 	"context"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -20,7 +21,7 @@ type TunnelServer struct {
 	tpb.TunnelServer
 
 	ExternalIP   string
-	DNSLogDomain string
+	DNSLogDomain []string
 
 	// 二级密码是用来分别
 	SecondaryPassword string
@@ -76,7 +77,7 @@ func (s *TunnelServer) InitialReverseTrigger() error {
 		}
 	})
 
-	defaultHTTPTrigger, err = NewHTTPTrigger(s.ExternalIP, s.DNSLogDomain)
+	defaultHTTPTrigger, err = NewHTTPTrigger(s.ExternalIP, s.DNSLogDomain...)
 	if err != nil {
 		return utils.Errorf("create http trigger failed: %s", err)
 	}
@@ -97,9 +98,19 @@ func (s *TunnelServer) InitialReverseTrigger() error {
 }
 
 func NewTunnelServer(dnslogDomain, externalIPConfigged string) (*TunnelServer, error) {
+	domainsRaw := strings.Trim(strings.TrimSpace(strings.ToLower(dnslogDomain)), ".")
+	var domains []string
+	if strings.Contains(domainsRaw, ",") {
+		domains = strings.Split(domainsRaw, ",")
+	} else {
+		domains = []string{domainsRaw}
+	}
+	domains = lo.Map(domains, func(item string, index int) string {
+		return strings.TrimSpace(item)
+	})
 	s := &TunnelServer{
 		ExternalIP:   externalIPConfigged,
-		DNSLogDomain: strings.Trim(strings.TrimSpace(strings.ToLower(dnslogDomain)), "."),
+		DNSLogDomain: domains,
 	}
 	if s.ExternalIP == "" {
 		i, err := GetExternalIP()

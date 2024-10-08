@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
+	"math/rand"
 	"net"
 	"strings"
 	"sync"
@@ -23,7 +24,7 @@ type HTTPTrigger struct {
 	httpListener                      net.Listener
 	tlsListener                       net.Listener
 
-	dnslogDomain string
+	dnslogDomain []string
 	externalIP   string
 
 	responseFetcherCache *utils.Cache[func([]byte) []byte]
@@ -32,7 +33,7 @@ type HTTPTrigger struct {
 
 var defaultHTTPTrigger *HTTPTrigger
 
-func NewHTTPTrigger(external string, dnslogDomain string) (*HTTPTrigger, error) {
+func NewHTTPTrigger(external string, dnslogDomain ...string) (*HTTPTrigger, error) {
 	trigger := &HTTPTrigger{
 		dnslogDomain:         dnslogDomain,
 		externalIP:           external,
@@ -55,19 +56,22 @@ func (t *HTTPTrigger) serveRequest(isTls bool, req []byte, conn net.Conn) error 
 
 	logMsg := bytes.NewBufferString(fmt.Sprintf("[%v] %v body: %v", method, uStr, utils.ByteSize(uint64(reqBodyLen))))
 	var token = strings.ToLower(host)
-	if t.dnslogDomain != "" {
-		domainLower := strings.ToLower(t.dnslogDomain)
-		before, _, ok := strings.Cut(token, domainLower)
-		if !ok {
-			log.Info(logMsg)
-			return nil
-		}
-		before = strings.TrimSpace(before)
-		before = strings.Trim(before, ".")
-		token = before
-		idx := strings.LastIndex(before, ".")
-		if idx > 0 {
-			token = before[idx+1:]
+	if len(t.dnslogDomain) > 0 {
+		for _, expectedDomain := range t.dnslogDomain {
+			domainLower := strings.ToLower(expectedDomain)
+			before, _, ok := strings.Cut(token, domainLower)
+			if !ok {
+				log.Info(logMsg)
+				continue
+			}
+			before = strings.TrimSpace(before)
+			before = strings.Trim(before, ".")
+			token = before
+			idx := strings.LastIndex(before, ".")
+			if idx > 0 {
+				token = before[idx+1:]
+			}
+			break
 		}
 	}
 	log.Infof("found token: %v from: %v", token, uStr)
@@ -122,9 +126,8 @@ func (t *HTTPTrigger) Register(token string, response func([]byte) []byte) ([]st
 
 	t.responseFetcherCache.Set(token, response)
 	var results []string
-	if t.dnslogDomain != "" {
-		t.dnslogDomain = strings.Trim(t.dnslogDomain, ".")
-		domain := fmt.Sprintf("%v.%v", token, t.dnslogDomain)
+	if len(t.dnslogDomain) > 0 {
+		domain := fmt.Sprintf("%v.%v", token, t.dnslogDomain[rand.Intn(len(t.dnslogDomain))])
 		results = append(results, domain)
 		results = append(results, "https://"+domain)
 		results = append(results, "http://"+domain)
