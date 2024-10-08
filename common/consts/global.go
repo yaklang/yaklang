@@ -1,6 +1,7 @@
 package consts
 
 import (
+	"go.uber.org/atomic"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -43,12 +44,22 @@ var (
 	OnceYakitHome = new(sync.Once)
 
 	GLOBAL_DB_SAVE_SYNC = utils.NewBool(false)
+
+	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT = atomic.NewFloat64(60)
 )
 
 const (
 	YAK_PROJECT_DATA_DB_NAME_RECOVERED   = "default-yakit.db"
 	YAK_PROFILE_PLUGIN_DB_NAME_RECOVERED = "yakit-profile-plugin.db"
 )
+
+func GetGlobalCallerCallPluginTimeout() float64 {
+	return GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()
+}
+
+func SetGlobalCallerCallPluginTimeout(i float64) {
+	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Store(i)
+}
 
 func GetCurrentYakitPluginID() string {
 	return utils.EscapeInvalidUTF8Byte([]byte(os.Getenv(YAKIT_PLUGIN_ID)))
