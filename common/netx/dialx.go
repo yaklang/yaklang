@@ -51,8 +51,8 @@ RETRY:
 	// not need to upgrade
 	var conn net.Conn
 
-	if len(config.Proxy) == 0 && config.EnableSystemProxyFromEnv && FixProxy(getProxyFromEnv()) != "" {
-		config.Proxy = append(config.Proxy, FixProxy(getProxyFromEnv()))
+	if len(config.Proxy) == 0 && config.EnableSystemProxyFromEnv && utils.FixProxy(utils.GetProxyFromEnv()) != "" {
+		config.Proxy = append(config.Proxy, utils.FixProxy(utils.GetProxyFromEnv()))
 	}
 
 	if len(config.Proxy) <= 0 || config.ForceDisableProxy {
