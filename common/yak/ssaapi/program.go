@@ -13,7 +13,8 @@ import (
 type Program struct {
 	// TODO: one program may have multiple program,
 	// 	 	 only one Application and multiple Library
-	Program *ssa.Program
+	ProgramID int
+	Program   *ssa.Program
 	// DBCache *ssa.Cache
 	config *config
 

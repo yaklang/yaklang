@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -18,15 +19,17 @@ import (
 )
 
 type SyntaxFlowAction struct {
-	ProgramCache *utils.CacheWithKey[string, *ssaapi.Program]          // name - program
-	QueryCache   *utils.CacheWithKey[string, *ssaapi.SyntaxFlowResult] // hash - result
+	ProgramCache  *utils.CacheWithKey[string, *ssaapi.Program]          // name - program
+	QueryCache    *utils.CacheWithKey[string, *ssaapi.SyntaxFlowResult] // hash - result
+	ResultIDCache *utils.CacheWithKey[string, *ssaapi.SyntaxFlowResult] // result_id - result
 }
 
 func NewSyntaxFlowAction() *SyntaxFlowAction {
 	ttl := 5 * time.Minute
 	ret := &SyntaxFlowAction{
-		ProgramCache: utils.NewTTLCacheWithKey[string, *ssaapi.Program](ttl),
-		QueryCache:   utils.NewTTLCacheWithKey[string, *ssaapi.SyntaxFlowResult](ttl),
+		ProgramCache:  utils.NewTTLCacheWithKey[string, *ssaapi.Program](ttl),
+		QueryCache:    utils.NewTTLCacheWithKey[string, *ssaapi.SyntaxFlowResult](ttl),
+		ResultIDCache: utils.NewTTLCacheWithKey[string, *ssaapi.SyntaxFlowResult](ttl),
 	}
 	return ret
 }
@@ -63,34 +66,36 @@ func (a *SyntaxFlowAction) querySF(programName, code string) (*ssaapi.SyntaxFlow
 	return res, nil
 }
 
-var _ Action = (*SyntaxFlowAction)(nil)
+type QuerySyntaxFlow struct {
+	// query
+	variable string
+	index    int64
 
-/*
-Get SyntaxFlowAction
+	// extra info
+	programName string
+	ResultID    string
 
-	Request :
-		url : "syntaxflow://program_id/variable/index"
-		body: syntaxflow code
-	Response:
-		1. "syntaxflow://program_id/" :
-			* ResourceType: message / variable
-			all variable names
-		2. "syntaxflow://program_id/variable_name" :
-			* ResourceType: value
-			all values in this variable
-		3. "syntaxflow://program_id/variable_name/index" :
-			* ResourceType: information
-			this value information, contain message && graph && node-info
-*/
-func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	url := params.GetUrl()
-	programName := url.GetLocation()
-	syntaxFlowCode := string(params.GetBody())
-	path := url.Path
+	// result
+	Result *ssaapi.SyntaxFlowResult
+}
+
+func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyntaxFlow, error) {
+	u := params.GetUrl()
+
+	// query
+	query := make(map[string]string)
+	for _, v := range u.GetQuery() {
+		query[v.GetKey()] = v.GetValue()
+	}
+
+	// get resultID from query
+	resultID, useResultID := query["result_id"]
+	_, saveResult := query["save_result"]
+
 	// Parse variable and index from path
+	path := u.Path
 	variable := ""
 	var index int64 = -1
-
 	if path != "" {
 		parts := strings.Split(path, "/")
 		if len(parts) > 1 {
@@ -105,11 +110,81 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		}
 	}
 
-	result, err := a.querySF(programName, syntaxFlowCode)
+	// get program
+	programName := u.GetLocation()
+	// get result
+	var result *ssaapi.SyntaxFlowResult
+	var err error
+	if useResultID {
+		// get db result by ResultID
+		result, err = ssaapi.CreateResultByID(resultID)
+		a.ResultIDCache.Set(resultID, result)
+	} else {
+		// query sf get memory result
+		syntaxFlowCode := string(params.GetBody())
+		result, err = a.querySF(programName, syntaxFlowCode)
+	}
 	if err != nil {
 		return nil, err
 	}
-	_ = result
+
+	// save result to db
+	if saveResult {
+		prog, err := a.getProgram(programName)
+		if err != nil {
+			prog = nil
+		}
+		resultID = uuid.NewString()
+		result.Save(resultID, "", nil, prog)
+		a.ResultIDCache.Set(resultID, result)
+	}
+
+	return &QuerySyntaxFlow{
+		variable: variable,
+		index:    index,
+
+		ResultID:    resultID,
+		programName: programName,
+
+		Result: result,
+	}, nil
+}
+
+var _ Action = (*SyntaxFlowAction)(nil)
+
+/*
+Get SyntaxFlowAction
+
+	Request :
+		url : "syntaxflow://program_id/variable/index"
+		body: syntaxflow code // if set this will query result with this syntaxflow code
+		query:
+			result_id	string  // if set this, will get result from database
+			save_result exist?  // if set this, will save result to database, the response will contain result_id
+	Response:
+		1. "syntaxflow://program_id/" :
+			* ResourceType: message / variable
+			all variable names
+		2. "syntaxflow://program_id/variable_name" :
+			* ResourceType: value
+			all values in this variable
+		3. "syntaxflow://program_id/variable_name/index" :
+			* ResourceType: information
+			this value information, contain message && graph && node-info
+*/
+func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+
+	query, err := a.GetResult(params)
+	if err != nil {
+		return nil, err
+	}
+
+	variable := query.variable
+	index := query.index
+	result := query.Result
+	programName := query.programName
+	url := params.GetUrl()
+
 	var resources []*ypb.YakURLResource
 
 	switch {
@@ -149,6 +224,14 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		resources = append(resources, res)
 	}
 
+	// result_id
+	if query.ResultID != "" {
+		res := createNewRes(url, 0, []extra{})
+		res.ResourceType = "message"
+		res.VerboseType = "result_id"
+		res.ResourceName = query.ResultID
+		resources = append(resources, res)
+	}
 	// res.CheckParams
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
@@ -355,7 +438,7 @@ func createNewRes(originParam *ypb.YakURL, size int, extra []extra) *ypb.YakURLR
 	res := &ypb.YakURLResource{
 		Size:              int64(size),
 		ModifiedTimestamp: time.Now().Unix(),
-		Path:              originParam.GetPass(),
+		Path:              originParam.Path,
 		YakURLVerbose:     "",
 		Url:               yakURL,
 	}
