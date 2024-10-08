@@ -3,6 +3,7 @@ package yakurl
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -277,6 +278,9 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 			}
 		})
 	}
+	sort.Slice(normalRes, func(i, j int) bool {
+		return normalRes[i].ResourceName < normalRes[j].ResourceName
+	})
 	resources = append(resources, normalRes...)
 
 	// last add unName values

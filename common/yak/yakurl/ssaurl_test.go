@@ -214,7 +214,7 @@ func TestSFURl(t *testing.T) {
 		check $const_parameter then "has const parameter" else "no const parameter"
 		`, func(res []*ypb.YakURLResource) {
 			spew.Dump(res)
-			checkVariable(t, res, []string{"a", "not_const_parameter", "const_parameter", "_"})
+			checkVariable(t, res, []string{"a", "const_parameter", "not_const_parameter", "_"})
 
 			errMsg := res[0]
 			assert.Equal(t, errMsg.ResourceType, "message")
@@ -238,7 +238,7 @@ func TestSFURl(t *testing.T) {
 
 		CheckSSAURL(t, local, progID, "/", query, func(yu []*ypb.YakURLResource) {
 			spew.Dump(yu)
-			checkVariable(t, yu, []string{"target", "a", "_"})
+			checkVariable(t, yu, []string{"a", "target", "_"})
 		})
 
 		CheckSSAURL(t, local, progID, "/a", query, func(res []*ypb.YakURLResource) {
