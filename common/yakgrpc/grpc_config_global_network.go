@@ -167,7 +167,7 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 		case "chatglm":
 			verbose = "ChatGLM"
 			extTag["model"] = "default:glm-3-turbo"
-			extTag["domain"] = "default:open.bigmodel.cn"
+			extTag["domain"] = "default:open.bigmodel.cn/api/paas/v4/chat/completions"
 		case "comate":
 			verbose = "Comate"
 			extTag["api_key"] = "required:false"
