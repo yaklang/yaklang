@@ -382,21 +382,36 @@ func (y *SyntaxFlowVisitor) VisitNumberLiteral(raw sf.INumberLiteralContext) int
 	return -1
 }
 
-func (y *SyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(raw sf.IStringLiteralWithoutStarGroupContext) []string {
+func (y *SyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(raw sf.IStringLiteralWithoutStarGroupContext) []func() (string, int) {
+	var result []func() (string, int)
 	if y == nil || raw == nil {
-		return []string{}
+		return result
 	}
 
 	i, _ := raw.(*sf.StringLiteralWithoutStarGroupContext)
 	if i == nil {
-		return []string{}
+		return result
 	}
 
-	res := make([]string, 0, len(i.AllStringLiteralWithoutStar()))
 	for _, s := range i.AllStringLiteralWithoutStar() {
-		res = append(res, s.GetText())
+		star := s.(*sf.StringLiteralWithoutStarContext)
+		result = append(result, func() (string, int) {
+			var (
+				mode = ExactConditionFilter
+				text = star.GetText()
+			)
+
+			if star.RegexpLiteral() != nil {
+				mode = RegexpConditionFilter
+				text = strings.TrimSuffix(strings.TrimPrefix(star.RegexpLiteral().GetText(), "/"), "/")
+			} else if glob, b := y.FormatStringOrGlob(star.GetText()); b {
+				text = glob
+				mode = GlobalConditionFilter
+			}
+			return text, mode
+		})
 	}
-	return res
+	return result
 }
 
 func (y *SyntaxFlowVisitor) VisitVersionInExpression(raw sf.IVersionInExpressionContext) {
