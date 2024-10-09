@@ -314,6 +314,25 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	// 	// only one type
 	var typ ssa.Type
 	className := i.TypeIdentifier().GetText()
+	//wrapper class
+	switch className {
+	case "Boolean":
+		typ = ssa.CreateBooleanType()
+		typ.AddFullTypeName(className)
+		return typ
+	case "Byte":
+		typ = ssa.CreateBytesType()
+		typ.AddFullTypeName(className)
+		return typ
+	case "Integer", "Long", "Float", "Double":
+		typ = ssa.CreateNumberType()
+		typ.AddFullTypeName(className)
+		return typ
+	case "String", "Character":
+		typ = ssa.CreateStringType()
+		typ.AddFullTypeName(className)
+		return typ
+	}
 	if class := y.GetClassBluePrint(className); class != nil {
 		typ = class
 		if len(typ.GetFullTypeNames()) == 0 {
