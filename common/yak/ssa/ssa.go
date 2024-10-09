@@ -292,6 +292,16 @@ type Function struct {
 	hasEllipsis bool
 	// generic
 	isGeneric bool
+	// runtime function return type
+	currentReturnType Type
+}
+
+func (f *Function) SetCurrentReturnType(t Type) {
+	f.currentReturnType = t
+}
+
+func (f *Function) GetCurrentReturnType() Type {
+	return f.currentReturnType
 }
 
 func (f *Function) SetMethodName(name string) {

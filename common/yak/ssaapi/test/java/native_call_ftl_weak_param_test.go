@@ -48,7 +48,7 @@ spring.freemarker.suffix=.ftl
 `)
 	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'string'}}<freeMarkerSink>  as  $a")
+		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'String'}}<freeMarkerSink>  as  $a")
 		assert.Equal(t, 1, sink.Len())
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
@@ -90,7 +90,7 @@ public class FreeMakerDemo {
 
 	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'string'}}<freeMarkerSink>  as  $a")
+		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'String'}}<freeMarkerSink>  as  $a")
 		assert.Equal(t, 1, sink.Len())
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
@@ -137,7 +137,7 @@ spring.freemarker.suffix=.html
 
 	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'string'}}<freeMarkerSink>  as  $a")
+		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'String'}}<freeMarkerSink>  as  $a")
 		assert.Equal(t, 1, sink.Len())
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))

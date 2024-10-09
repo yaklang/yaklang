@@ -1020,6 +1020,9 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		// 处理 return 语句
 		if ret.Expression() != nil {
 			value := y.VisitExpression(ret.Expression())
+			if funcTyp := y.GetCurrentReturnType(); funcTyp != nil {
+				value.SetType(funcTyp)
+			}
 			y.EmitReturn([]ssa.Value{value})
 		} else {
 			y.EmitReturn(nil)

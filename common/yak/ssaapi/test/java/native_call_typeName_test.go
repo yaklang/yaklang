@@ -611,3 +611,27 @@ c = a();
 		return utils.Error("forbid native call is not finished")
 	})
 }
+
+func TestNativeCall_Java_ReturnType(t *testing.T) {
+	code := `
+class Main{
+	public String foo(string param){
+		return param;
+	}
+	public Integer bar(){
+		return xxx;
+	}
+	public Long test(){
+		return call();
+	}
+}
+`
+	ssatest.CheckSyntaxFlow(t, code, `foo<getReturns><typeName> as $f; bar<getReturns><typeName> as $b;
+	test<getReturns><typeName> as $t;`,
+		map[string][]string{
+			"f": {"\"String\""},
+			"b": {"\"Integer\""},
+			"t": {"\"Long\""},
+		}, ssaapi.WithLanguage(consts.JAVA),
+	)
+}
