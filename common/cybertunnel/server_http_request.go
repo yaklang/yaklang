@@ -12,7 +12,7 @@ func (t *TunnelServer) RequireHTTPRequestTrigger(ctx context.Context, req *tpb.R
 	if defaultHTTPTrigger == nil {
 		return nil, utils.Error("http trigger not started")
 	}
-	var token = strings.ToLower(utils.RandStringBytes(40))
+	var token = strings.ToLower(utils.RandStringBytes(12))
 	results, err := defaultHTTPTrigger.Register(token, func(bytes []byte) []byte {
 		rsp := req.GetExpectedHTTPResponse()
 		if len(rsp) > 0 {
