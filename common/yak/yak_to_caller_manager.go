@@ -883,7 +883,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		originFunc, ok := i.(func(target string, opts ...yakit.RiskParamsOpt))
 		if ok {
 			return func(target string, opts ...yakit.RiskParamsOpt) {
-				opts = append(opts, yakit.WithRiskParam_YakitPluginName(pluginName), yakit.WithRiskParam_YakScriptUUID(pluginUUID))
+				opts = append(opts, yakit.WithRiskParam_FromScript(pluginName), yakit.WithRiskParam_YakScriptUUID(pluginUUID))
 				if runtimeId != "" {
 					opts = append(opts, yakit.WithRiskParam_RuntimeId(runtimeId))
 				}
