@@ -9,7 +9,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -61,12 +61,13 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 		}
 
 		res, err := local.RequestYakURL(context.Background(), url)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		t.Log("checkHandler in memory query ")
+		spew.Dump(res)
 
 		resultIDRes := res.Resources[len(res.Resources)-1]
-		assert.Equal(t, resultIDRes.ResourceType, "message")
-		assert.Equal(t, resultIDRes.VerboseType, "result_id")
+		require.Equal(t, resultIDRes.ResourceType, "message")
+		require.Equal(t, resultIDRes.VerboseType, "result_id")
 		// got result
 		resultID = resultIDRes.ResourceName
 
@@ -92,15 +93,16 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 			},
 		}
 		res, err := local.RequestYakURL(context.Background(), url)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		t.Log("checkHandler in database query ")
+		spew.Dump(res)
 
 		resultIDRes := res.Resources[len(res.Resources)-1]
-		assert.Equal(t, resultIDRes.ResourceType, "message")
-		assert.Equal(t, resultIDRes.VerboseType, "result_id")
+		require.Equal(t, resultIDRes.ResourceType, "message")
+		require.Equal(t, resultIDRes.VerboseType, "result_id")
 		// got result
 		gotResultID := resultIDRes.ResourceName
-		assert.Equal(t, resultID, gotResultID)
+		require.Equal(t, resultID, gotResultID)
 
 		checkHandler(res.Resources[:len(res.Resources)-1])
 	}
@@ -110,8 +112,8 @@ func checkVariable(t *testing.T, res []*ypb.YakURLResource, want []string) {
 	got := lo.FilterMap(res, func(r *ypb.YakURLResource, _ int) (string, bool) {
 		return r.ResourceName, r.ResourceType == "variable"
 	})
-	assert.Len(t, got, len(want))
-	assert.Equal(t, want, got)
+	require.Len(t, got, len(want))
+	require.Equal(t, want, got)
 }
 
 func TestSFURl(t *testing.T) {
@@ -159,8 +161,8 @@ func TestSFURl(t *testing.T) {
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), progID)
 	}()
-	assert.NoError(t, err)
-	assert.NotNil(t, prog)
+	require.NoError(t, err)
+	require.NotNil(t, prog)
 
 	t.Run("check syntaxflow variable", func(t *testing.T) {
 		CheckSSAURL(t, local, progID, "/",
@@ -176,7 +178,7 @@ func TestSFURl(t *testing.T) {
 			checkVariable(t, res, []string{"_"})
 		})
 		CheckSSAURL(t, local, progID, "/_", `target*`, func(res []*ypb.YakURLResource) {
-			assert.Equal(t, 2, len(res))
+			require.Equal(t, 2, len(res))
 		})
 	})
 
@@ -184,7 +186,7 @@ func TestSFURl(t *testing.T) {
 		res, err := SendURL(local, progID, "/", `
 		dddd as $a
 		`)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		spew.Dump(res)
 		checkVariable(t, res, []string{"a"})
 	})
@@ -198,9 +200,9 @@ func TestSFURl(t *testing.T) {
 			spew.Dump(res)
 			checkVariable(t, res, []string{"target1", "a", "_"})
 			target1 := res[0]
-			assert.Equal(t, target1.VerboseName, "alert information")
-			assert.Equal(t, target1.ResourceType, "variable")
-			assert.Equal(t, target1.VerboseType, "alert")
+			require.Equal(t, target1.VerboseName, "alert information")
+			require.Equal(t, target1.ResourceType, "variable")
+			require.Equal(t, target1.VerboseType, "alert")
 		})
 	})
 
@@ -217,14 +219,14 @@ func TestSFURl(t *testing.T) {
 			checkVariable(t, res, []string{"a", "const_parameter", "not_const_parameter", "_"})
 
 			errMsg := res[0]
-			assert.Equal(t, errMsg.ResourceType, "message")
-			assert.Equal(t, errMsg.VerboseType, "error")
-			assert.Equal(t, errMsg.VerboseName, "no not-const parameter")
+			require.Equal(t, errMsg.ResourceType, "message")
+			require.Equal(t, errMsg.VerboseType, "error")
+			require.Equal(t, errMsg.VerboseName, "no not-const parameter")
 
 			infoMsg := res[1]
-			assert.Equal(t, infoMsg.ResourceType, "message")
-			assert.Equal(t, infoMsg.VerboseType, "info")
-			assert.Equal(t, infoMsg.VerboseName, "has const parameter")
+			require.Equal(t, infoMsg.ResourceType, "message")
+			require.Equal(t, infoMsg.VerboseType, "info")
+			require.Equal(t, infoMsg.VerboseName, "has const parameter")
 		})
 	})
 
@@ -255,12 +257,12 @@ func TestSFURl(t *testing.T) {
 		`, "`*  as $a`")
 		CheckSSAURL(t, local, progID, "/a/0", query, func(res []*ypb.YakURLResource) {
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			spew.Dump(res)
 			check := func(path string) {
 				log.Infof("check path: %s", path)
 				_, err := ssadb.NewIrSourceFs().Stat(path)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			found := false
@@ -300,7 +302,7 @@ func TestSFURl(t *testing.T) {
 					if err := json.Unmarshal([]byte(extra.Value), &res); err != nil {
 						t.Error(err)
 					}
-					assert.Greater(t, len(res), 0)
+					require.Greater(t, len(res), 0)
 					for _, resItem := range res {
 						for _, item := range resItem {
 							if _, ok := graphInfoMap[item]; !ok {
@@ -310,7 +312,7 @@ func TestSFURl(t *testing.T) {
 					}
 				}
 			}
-			assert.True(t, found)
+			require.True(t, found)
 		})
 	})
 

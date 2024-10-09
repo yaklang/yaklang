@@ -39,9 +39,9 @@ func queryAndSave(t *testing.T) (func(), *ssaapi.SyntaxFlowResult) {
 	require.NotNil(t, res)
 
 	// save result
-	resultID := uuid.NewString()
-	err = res.Save(resultID, "")
+	resultID, err := res.Save()
 	require.NoError(t, err)
+	_ = resultID
 	return func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	}, res
@@ -170,8 +170,7 @@ func TestRuleAlertMsg(t *testing.T) {
 		res, err := prog.SyntaxFlowWithError(syntaxFlowCode)
 		require.NoError(t, err)
 
-		resultID := uuid.NewString()
-		err = res.Save(resultID, "")
+		resultID, err := res.Save()
 		defer ssadb.DeleteResultByID(resultID)
 		require.NoError(t, err)
 
@@ -200,8 +199,7 @@ func TestRuleAlertMsg(t *testing.T) {
 		res, err := prog.SyntaxFlowRuleName(ruleName)
 		require.NoError(t, err)
 
-		resultID := uuid.NewString()
-		err = res.Save(resultID, "")
+		resultID, err := res.Save()
 		defer ssadb.DeleteResultByID(resultID)
 		require.NoError(t, err)
 

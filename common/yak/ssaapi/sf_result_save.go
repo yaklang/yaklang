@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func CreateResultByID(resultID string) (*SyntaxFlowResult, error) {
+func CreateResultByID(resultID uint) (*SyntaxFlowResult, error) {
 	res := createEmptyResult()
 	result, err := ssadb.GetResultByID(resultID)
 	if err != nil {
@@ -35,18 +35,16 @@ func CreateResultByID(resultID string) (*SyntaxFlowResult, error) {
 	return res, nil
 }
 
-func (r *SyntaxFlowResult) Save(ResultID, TaskID string) error {
+func (r *SyntaxFlowResult) Save(TaskIDs ...string) (uint, error) {
 	if r == nil || r.memResult == nil {
-		return utils.Error("result is nil")
+		return 0, utils.Error("result is nil")
 	}
 	// result
-	db := ssadb.GetDB()
-	result := &ssadb.AuditResult{
-		TaskID:   TaskID,
-		ResultID: ResultID,
-		CheckMsg: r.GetCheckMsg(),
-		Errors:   r.GetErrors(),
-	}
+	result := ssadb.CreateResult(TaskIDs...)
+	result.CheckMsg = r.GetCheckMsg()
+	result.Errors = r.GetErrors()
+
+	// rule
 	rule := r.memResult.GetRule()
 	if rule.ID > 0 {
 		// can get from database
@@ -64,11 +62,11 @@ func (r *SyntaxFlowResult) Save(ResultID, TaskID string) error {
 	if err := r.saveValue(result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}
-	if err := db.Save(result).Error; err != nil {
+	if err := ssadb.SaveResult(result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}
 	r.dbResult = result
-	return errs
+	return result.ID, errs
 }
 
 func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
@@ -82,7 +80,7 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 		// task
 		OptionSaveValue_TaskID(result.TaskID),
 		// result
-		OptionSaveValue_ResultID(result.ResultID),
+		OptionSaveValue_ResultID(result.ID),
 		// rule
 		OptionSaveValue_RuleName(result.RuleName),
 		OptionSaveValue_RuleTitle(result.RuleTitle),

@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -59,13 +60,16 @@ func (r *SyntaxFlowResult) Name() string {
 	if r == nil {
 		return ""
 	}
-	if r.memResult != nil {
-		return r.memResult.Name()
+
+	checkAndHandler := func(str ...string) string {
+		for _, s2 := range str {
+			if s2 != "" {
+				return s2
+			}
+		}
+		return ""
 	}
-	if r.dbResult != nil {
-		return r.dbResult.ResultID
-	}
-	return ""
+	return checkAndHandler(r.rule.Title, r.rule.TitleZh, r.rule.Description, utils.ShrinkString(r.String(), 40))
 }
 
 func (r *SyntaxFlowResult) GetAlertInfo(name string) (string, bool) {

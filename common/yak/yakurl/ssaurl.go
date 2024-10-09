@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -22,7 +21,7 @@ import (
 type SyntaxFlowAction struct {
 	ProgramCache  *utils.CacheWithKey[string, *ssaapi.Program]          // name - program
 	QueryCache    *utils.CacheWithKey[string, *ssaapi.SyntaxFlowResult] // hash - result
-	ResultIDCache *utils.CacheWithKey[string, *ssaapi.SyntaxFlowResult] // result_id - result
+	ResultIDCache *utils.CacheWithKey[uint, *ssaapi.SyntaxFlowResult]   // result_id - result
 }
 
 func NewSyntaxFlowAction() *SyntaxFlowAction {
@@ -30,7 +29,7 @@ func NewSyntaxFlowAction() *SyntaxFlowAction {
 	ret := &SyntaxFlowAction{
 		ProgramCache:  utils.NewTTLCacheWithKey[string, *ssaapi.Program](ttl),
 		QueryCache:    utils.NewTTLCacheWithKey[string, *ssaapi.SyntaxFlowResult](ttl),
-		ResultIDCache: utils.NewTTLCacheWithKey[string, *ssaapi.SyntaxFlowResult](ttl),
+		ResultIDCache: utils.NewTTLCacheWithKey[uint, *ssaapi.SyntaxFlowResult](ttl),
 	}
 	return ret
 }
@@ -74,7 +73,7 @@ type QuerySyntaxFlow struct {
 
 	// extra info
 	programName string
-	ResultID    string
+	ResultID    uint
 
 	// result
 	Result *ssaapi.SyntaxFlowResult
@@ -90,7 +89,21 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 	}
 
 	// get resultID from query
-	resultID, useResultID := query["result_id"]
+	var resultID uint
+	resultIDRaw, useResultID := query["result_id"]
+	if useResultID {
+		// parse result_id
+		if res, err := strconv.ParseUint(resultIDRaw, 10, 64); err == nil {
+			resultID = uint(res)
+		} else {
+			return nil, utils.Errorf("parse result_id %s failed: %v", resultIDRaw, err)
+		}
+		// check result_id
+		if resultID == 0 {
+			return nil, utils.Errorf("result_id can not be 0")
+		}
+	}
+
 	_, saveResult := query["save_result"]
 
 	// Parse variable and index from path
@@ -131,8 +144,10 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 
 	// save result to db
 	if saveResult {
-		resultID = uuid.NewString()
-		result.Save(resultID, "")
+		resultID, err = result.Save()
+		if err != nil {
+			return nil, err
+		}
 		a.ResultIDCache.Set(resultID, result)
 	}
 
@@ -222,11 +237,11 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 	}
 
 	// result_id
-	if query.ResultID != "" {
+	if query.ResultID != 0 {
 		res := createNewRes(url, 0, []extra{})
 		res.ResourceType = "message"
 		res.VerboseType = "result_id"
-		res.ResourceName = query.ResultID
+		res.ResourceName = strconv.FormatUint(uint64(query.ResultID), 10)
 		resources = append(resources, res)
 	}
 	// res.CheckParams
