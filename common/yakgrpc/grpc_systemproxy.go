@@ -2,12 +2,12 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/systemproxy"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) GetSystemProxy(ctx context.Context, req *ypb.Empty) (*ypb.GetSystemProxyResult, error) {
-	p, err := systemproxy.Get()
+	p, err := netx.GetSystemProxy()
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +19,7 @@ func (s *Server) GetSystemProxy(ctx context.Context, req *ypb.Empty) (*ypb.GetSy
 
 func (s *Server) SetSystemProxy(ctx context.Context, req *ypb.SetSystemProxyRequest) (*ypb.Empty, error) {
 	if !req.GetEnable() {
-		err := systemproxy.Set(systemproxy.Settings{
+		err := netx.SetSystemProxy(netx.SystemProxySetting{
 			Enabled:       false,
 			DefaultServer: "",
 		})
@@ -28,7 +28,7 @@ func (s *Server) SetSystemProxy(ctx context.Context, req *ypb.SetSystemProxyRequ
 		}
 		return &ypb.Empty{}, nil
 	}
-	err := systemproxy.Set(systemproxy.Settings{
+	err := netx.SetSystemProxy(netx.SystemProxySetting{
 		Enabled:       true,
 		DefaultServer: req.GetHttpProxy(),
 	})

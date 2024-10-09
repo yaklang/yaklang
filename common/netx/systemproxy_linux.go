@@ -1,19 +1,19 @@
-package systemproxy
+package netx
 
 import "os"
 
 /*
 Get returns the current systemwide proxy settings.
 */
-func Get() (Settings, error) {
+func GetSystemProxy() (SystemProxySetting, error) {
 	var result = os.Getenv("http_proxy")
 	if result == "" {
-		return Settings{
+		return SystemProxySetting{
 			Enabled:       false,
 			DefaultServer: "",
 		}, nil
 	}
-	return Settings{
+	return SystemProxySetting{
 		Enabled:       true,
 		DefaultServer: result,
 	}, nil
@@ -22,7 +22,7 @@ func Get() (Settings, error) {
 /*
 Set updates systemwide proxy settings.
 */
-func Set(s Settings) error {
+func SetSystemProxy(s SystemProxySetting) error {
 	if !s.Enabled {
 		os.Setenv("http_proxy", "")
 		return nil
