@@ -48,6 +48,77 @@ func CreateCyberTunnelLocalClient(domain string) (tpb.TunnelClient, tpb.TunnelSe
 	return client, s
 }
 
+func TestHTTPTrigger_RegisterMultiDomains(t *testing.T) {
+	trigger, err := NewHTTPTrigger("127.0.0.1", "test", "test2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	httpPort := utils.GetRandomAvailableTCPPort()
+	httpsPort := utils.GetRandomAvailableTCPPort()
+	trigger.SetHTTPPort(httpPort)
+	trigger.SetHTTPSPort(httpsPort)
+
+	client, server := CreateCyberTunnelLocalClient("test,test2")
+	_ = server
+	go func() {
+		trigger.Serve()
+	}()
+	err = utils.WaitConnect("127.0.0.1:"+fmt.Sprint(httpPort), 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaultHTTPTrigger = trigger
+	uid := uuid.New().String()
+	rsp, err := client.RequireHTTPRequestTrigger(
+		context.Background(),
+		&tpb.RequireHTTPRequestTriggerParams{
+			ExpectedHTTPResponse: []byte("HTTP/1.1 302 Found\r\n" + "Location: " + uid + "\r\nContent-Length: 0\r\n\r\n"),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rsp.Urls) <= 0 {
+		t.Fatal("no urls")
+	}
+	u := rsp.Urls[0]
+	if strings.HasPrefix(u, "https://") {
+		u = "http://" + u[8:]
+	}
+	httpResponse, _, err := poc.DoGET(
+		u, poc.WithHost("127.0.0.1"), poc.WithPort(httpPort),
+		poc.WithNoRedirect(true),
+	)
+	if err != nil {
+		log.Warnf("GET %v failed: %v", u, err)
+		t.Fatal(err)
+	}
+	_ = httpResponse
+	token := rsp.GetToken()
+	spew.Dump(token)
+	notifResponse, err := client.QueryExistedHTTPRequestTrigger(context.Background(), &tpb.QueryExistedHTTPRequestTriggerRequest{Token: token})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns := notifResponse.GetNotifications()
+	if len(ns) <= 0 {
+		t.Fatal("no notifications")
+	}
+	packet := string(httpResponse.RawPacket)
+	if !strings.Contains(packet, "Location: "+uid+"\r\n") {
+		t.Fatal("no uid included")
+	}
+
+	notifResponse, err = client.QueryExistedHTTPRequestTrigger(context.Background(), &tpb.QueryExistedHTTPRequestTriggerRequest{Token: uuid.New().String()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notifResponse.Notifications) > 0 {
+		t.Fatal("should be empty")
+	}
+}
+
 func TestHTTPTrigger_Register(t *testing.T) {
 	trigger, err := NewHTTPTrigger("127.0.0.1", "test")
 	if err != nil {
