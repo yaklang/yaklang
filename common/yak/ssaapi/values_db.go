@@ -24,7 +24,7 @@ func OptionSaveValue_TaskID(taskID string) SaveValueOption {
 	}
 }
 
-func OptionSaveValue_ResultID(resultID string) SaveValueOption {
+func OptionSaveValue_ResultID(resultID uint) SaveValueOption {
 	return func(c *saveValueCtx) {
 		c.ResultId = resultID
 	}

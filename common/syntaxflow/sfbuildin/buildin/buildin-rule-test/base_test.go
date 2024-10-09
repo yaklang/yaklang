@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -76,7 +75,6 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 					t.Fatal("no program found")
 				}
 				for _, prog := range programs {
-					resultID := uuid.New().String()
 					result, err := prog.SyntaxFlowWithError(r.Content)
 					if !c.NegativeTest {
 						if err != nil || result.GetErrors() != nil {
@@ -132,6 +130,8 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 								}
 							}
 							programName := ""
+							result := ssadb.CreateResult()
+							defer ssadb.DeleteResultByID(result.ID)
 							val.Recursive(func(operator sfvm.ValueOperator) error {
 								switch ret := operator.(type) {
 								case *ssaapi.Value:
@@ -141,7 +141,7 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 									programName = ret.GetProgramName()
 									return ssaapi.SaveValue(
 										ret,
-										ssaapi.OptionSaveValue_ResultID(resultID),
+										ssaapi.OptionSaveValue_ResultID(result.ID),
 										ssaapi.OptionSaveValue_RuleTitle(r.Title),
 										ssaapi.OptionSaveValue_ProgramName(programName),
 										ssaapi.OptionSaveValue_RuleName(r.RuleName),
@@ -150,7 +150,7 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 								return nil
 							})
 							count := 0
-							for node := range ssadb.YieldAuditNodeByResultId(ssadb.GetDB(), resultID) {
+							for node := range ssadb.YieldAuditNodeByResultId(ssadb.GetDB(), result.ID) {
 								count++
 								_ = node
 							}
