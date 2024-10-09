@@ -51,7 +51,9 @@ func TestFunction_Value(t *testing.T) {
 			"Function-add(1,2)",
 		}, t)
 	})
+}
 
+func TestFunction_GlobalValue(t *testing.T) {
 	t.Run("global value", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -76,14 +78,14 @@ func TestFunction_Value(t *testing.T) {
 				println(count) // 2
 			}
 
-			println(count) // phi(count)[1,2]
+			println(count) // phi(count)[2,1]
 		}
 		`, []string{
-			"2", "phi(count)[1,2]",
+			"2", "phi(count)[2,1]",
 		}, t)
 	})
 
-	t.Run("global value phi-scope", func(t *testing.T) {
+	t.Run("global value phi scope", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 	
 		var count = 1
@@ -95,14 +97,58 @@ func TestFunction_Value(t *testing.T) {
 				println(count) // 3
 			}
 
-			println(count) // phi(count)[1,3]
+			println(count) // phi(count)[3,1]
 		}
 		`, []string{
-			"3", "phi(count)[1,3]",
+			"3", "phi(count)[3,1]",
 		}, t)
 	})
 
-	/*t.Run("global value phi-scope EX", func(t *testing.T) {
+	t.Run("global value phi scope sub", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+	
+		var count = 1
+	
+		func main(){
+			if true {
+			    count = 2
+				{
+					count = 3
+				}
+				println(count) // 3
+			}
+
+			println(count) // phi(count)[3,1]
+		}
+		`, []string{
+			"3", "phi(count)[3,1]",
+		}, t)
+	})
+
+	t.Run("global value phi merge", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		var count = 1
+
+		func main(){
+			count = 2
+			if true {
+			    count = 3
+			}else{
+			    count = 4
+			}
+			println(count) // phi(count)[3,4]
+		}
+
+		func main2(){
+		    println(count) // phi(count)[1,phi(count)[3,4]]
+		}
+		`, []string{
+			"phi(count)[3,4]", "phi(count)[1,phi(count)[3,4]]",
+		}, t)
+	})
+
+	t.Run("global value phi mergeEX", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
 		var count = 1
@@ -123,9 +169,9 @@ func TestFunction_Value(t *testing.T) {
 		`, []string{
 			"5", "phi(count)[1,5]",
 		}, t)
-	})*/
+	})
 
-	t.Run("global value phi-function", func(t *testing.T) {
+	t.Run("global value phi function", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 	
 		var count = 1
@@ -142,10 +188,63 @@ func TestFunction_Value(t *testing.T) {
 			}else{
 			    count = 4
 			}
-			println(count) // phi(count)[phi(count)[phi(count)[1,2],3],4]
+			println(count) // phi(count)[3,4]
 		}
 		`, []string{
-			"2", "phi(count)[1,2]", "phi(count)[phi(count)[phi(count)[1,2],3],4]",
+			"2", "phi(count)[1,2]", "phi(count)[3,4]",
+		}, t)
+	})
+
+	t.Run("global value phi function-if", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+	
+		var count = 1
+	
+		func f1(){
+			count = 2
+			println(count) // 2
+		}
+
+		func f2(){
+			if true {
+			    count = 3
+			}
+			println(count) // phi(count)[3,phi(count)[1,2]]
+		}
+
+		func main(){
+			println(count) // phi(count)[phi(count)[1,2],phi(count)[3,phi(count)[1,2]]]
+		}	
+
+		`, []string{
+			"2", "phi(count)[3,phi(count)[1,2]]",
+			"phi(count)[phi(count)[1,2],phi(count)[3,phi(count)[1,2]]]",
+		}, t)
+	})
+
+	t.Run("global value phi function-loop", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+	
+		var count = 1
+	
+		func f1(){
+			count = 2
+			println(count) // 2
+		}
+
+		func f2(){
+			for count = 3; count > 0; count-- {
+			}
+			println(count) // phi(count)[3,sub(count, 1)]
+		}
+
+		func main(){
+			println(count) // phi(count)[phi(count)[1,2],phi(count)[3,sub(count, 1)]]
+		}	
+
+		`, []string{
+			"2", "phi(count)[3,sub(count, 1)]",
+			"phi(count)[phi(count)[1,2],phi(count)[3,sub(count, 1)]]",
 		}, t)
 	})
 }
