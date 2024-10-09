@@ -583,6 +583,7 @@ func (y *builder) VisitMethodDeclaration(
 			y.MarkedThisClassBlueprint = class
 			y.VisitFormalParameters(i.FormalParameters())
 			y.VisitMethodBody(i.MethodBody())
+			y.SetCurrentReturnType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
@@ -615,6 +616,7 @@ func (y *builder) VisitMethodDeclaration(
 		y.MarkedThisClassBlueprint = class
 		this := y.NewParam("this", raw)
 		this.SetType(class)
+		y.SetCurrentReturnType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 		y.VisitFormalParameters(i.FormalParameters())
 		y.VisitMethodBody(i.MethodBody())
 		y.Finish()
