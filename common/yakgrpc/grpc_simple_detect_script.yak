@@ -893,8 +893,6 @@ if aliveHostCount != 0 {
     hostCountSec = len(aliveHostCountList)
 }
 
-
-
 yakit.Info("cvebaseline start")
 updateStatus("等待CVE基线检查完成")
 cveBaseLineWg.Wait()
@@ -903,6 +901,26 @@ updateStatus("等待爆破完成")
 
 yakit.Info("brute end success!")
 updateStatus("等待插件执行完成")
+
+if hostCountSec != 0 {
+    // 根据存活 ip + (加载成功的插件数 * 2s)/concurrent  + 开放端口数
+    // 定时器，超过一定时间，就扫描结束
+    waitTimeSec = hostCountSec + (loadPluginFinished * 2) / 20 + OpenPortCount
+    yakit.Info("waitTimeSec %v", waitTimeSec)
+    if waitTimeSec < 10 {
+        waitTimeSec = 60
+    }
+
+    time.AfterFunc(
+        waitTimeSec * 1000 * 1000 * 1000,
+        func() {
+            yakit.SetProgress(1)
+            yakit.Info("AfterFunc 本次扫描任务已完成。")
+            os.Exit(0)
+        }
+    )
+}
+
 manager.Wait()
 yakit.SetProgress(1)
 yakit.Info("本次扫描任务已完成。")
