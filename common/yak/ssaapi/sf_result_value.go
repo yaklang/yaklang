@@ -44,7 +44,7 @@ func (r *SyntaxFlowResult) GetAllVariable() *orderedmap.OrderedMap {
 	}
 
 	if r.dbResult != nil {
-		res, err := ssadb.GetResultVariableByID(ssadb.GetDB(), r.dbResult.ResultID)
+		res, err := ssadb.GetResultVariableByID(ssadb.GetDB(), r.GetResultID())
 		if err != nil {
 			log.Errorf("err: %v", err)
 			return nil
@@ -142,15 +142,15 @@ func (r *SyntaxFlowResult) GetUnNameValues() Values {
 	return r.unName
 }
 
-func (r *SyntaxFlowResult) GetResultID() string {
+func (r *SyntaxFlowResult) GetResultID() uint {
 	if r == nil || r.dbResult == nil {
-		return ""
+		return 0
 	}
-	return r.dbResult.ResultID
+	return r.dbResult.ID
 }
 
 func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
-	resValueID, err := ssadb.GetResultValueByVariable(ssadb.GetDB(), r.dbResult.ResultID, name)
+	resValueID, err := ssadb.GetResultValueByVariable(ssadb.GetDB(), r.GetResultID(), name)
 	if err != nil {
 		return nil
 	}

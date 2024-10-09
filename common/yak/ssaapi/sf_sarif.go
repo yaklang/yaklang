@@ -207,40 +207,40 @@ func (s *SarifContext) GetArtifactIdFromEditor(editor *memedit.MemEditor) int {
 	return id
 }
 
-func convertSyntaxFlowFrameToSarifRun(root *SarifContext, frame *sfvm.SFFrameResult) []*sarif.Run {
+func convertSyntaxFlowFrameToSarifRun(root *SarifContext, frameResult *sfvm.SFFrameResult) []*sarif.Run {
 	var results []*sarif.Result
 	var ctxs []*SarifContext
 
 	haveResult := false
-	if frame.AlertSymbolTable == nil {
-		frame.AlertSymbolTable = make(map[string]sfvm.ValueOperator)
+	if frameResult.AlertSymbolTable == nil {
+		frameResult.AlertSymbolTable = make(map[string]sfvm.ValueOperator)
 	}
 
-	ruleId := codec.Sha256(frame.Rule)
+	ruleId := codec.Sha256(frameResult.Rule)
 
-	rule := sarif.NewRule(ruleId).WithName(frame.Name()).WithDescription(frame.GetDescription())
-	rule.WithFullDescription(sarif.NewMultiformatMessageString(frame.Rule))
+	rule := sarif.NewRule(ruleId).WithName(frameResult.Name()).WithDescription(frameResult.GetDescription())
+	rule.WithFullDescription(sarif.NewMultiformatMessageString(frameResult.Rule))
 
-	if len(frame.AlertSymbolTable) == 0 {
-		for _, name := range frame.CheckParams {
-			checkResult, ok := frame.SymbolTable.Get(name)
+	if len(frameResult.AlertSymbolTable) == 0 {
+		for _, name := range frameResult.CheckParams {
+			checkResult, ok := frameResult.SymbolTable.Get(name)
 			if !ok {
 				continue
 			}
-			frame.AlertSymbolTable[name] = checkResult
+			frameResult.AlertSymbolTable[name] = checkResult
 		}
 	}
 
 	var defaultEditor *memedit.MemEditor = nil
 
-	for k, v := range frame.AlertSymbolTable {
+	for k, v := range frameResult.AlertSymbolTable {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			sctx := root.CreateSubSarifContext()
 			if raw, ok := operator.(*Value); ok {
 				if utils.IsNil(defaultEditor) {
 					defaultEditor = raw.GetRange().GetEditor()
 				}
-				if m := frame.GetRule().AlertDesc[k]; m != nil {
+				if m := frameResult.GetRule().AlertDesc[k]; m != nil {
 					if m.OnlyMsg {
 						sctx.AddSSAValue(raw, m.Msg)
 					} else {
@@ -261,8 +261,8 @@ func convertSyntaxFlowFrameToSarifRun(root *SarifContext, frame *sfvm.SFFrameRes
 	if !haveResult {
 		return nil
 	}
-	msgRaw, _ := frame.Description.MarshalJSON()
-	result, ok := frame.Description.Get("title")
+	msgRaw, _ := frameResult.Description.MarshalJSON()
+	result, ok := frameResult.Description.Get("title")
 	if ok {
 		msgRaw = []byte(result)
 	}
@@ -283,7 +283,7 @@ func convertSyntaxFlowFrameToSarifRun(root *SarifContext, frame *sfvm.SFFrameRes
 		results = append(results, sarif.NewRuleResult(
 			ruleId,
 		).WithMessage(
-			sarif.NewTextMessage(frame.Rule),
+			sarif.NewTextMessage(frameResult.Rule),
 		).WithCodeFlows(
 			sctx.codeFlows,
 		).WithLocations(

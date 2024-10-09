@@ -9,8 +9,6 @@ type AuditResult struct {
 	gorm.Model
 
 	TaskID string `json:"task_id" gorm:"index"`
-	// syntaxflow result
-	ResultID string `json:"result_id" gorm:"index"`
 	// rule
 	RuleName     string                                      `json:"rule_name"`
 	RuleTitle    string                                      `json:"rule_title"`
@@ -25,14 +23,30 @@ type AuditResult struct {
 	UnValueVariable StringSlice `json:"un_value_variable" gorm:"type:text"`
 }
 
-func GetResultByID(resultID string) (*AuditResult, error) {
+func GetResultByID(resultID uint) (*AuditResult, error) {
 	var result AuditResult
-	if err := GetDB().Where("result_id = ?", resultID).First(&result).Error; err != nil {
+	if err := GetDB().Where("id = ?", resultID).First(&result).Error; err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
-func DeleteResultByID(resultID string) error {
-	return GetDB().Where("result_id = ?", resultID).Unscoped().Delete(&AuditResult{}).Error
+func DeleteResultByID(resultID uint) error {
+	return GetDB().Where("id = ?", resultID).Unscoped().Delete(&AuditResult{}).Error
+}
+
+func CreateResult(TaskIDs ...string) *AuditResult {
+	var taskID string
+	if len(TaskIDs) > 0 {
+		taskID = TaskIDs[0]
+	}
+	ret := &AuditResult{
+		TaskID: taskID,
+	}
+	GetDB().Create(ret)
+	return ret
+}
+
+func SaveResult(result *AuditResult) error {
+	return GetDB().Save(result).Error
 }

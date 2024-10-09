@@ -12,7 +12,7 @@ type AuditNodeStatus struct {
 	// task
 	TaskId string `json:"task_id" gorm:"index"`
 	// syntaxflow result
-	ResultId       string `json:"result_id" gorm:"index"`
+	ResultId       uint   `json:"result_id" gorm:"index"`
 	ResultVariable string `json:"result_variable"` // syntaxflow result variable name
 	ResultAlertMsg string `json:"result_alert_msg"`
 	// rule  info
@@ -38,7 +38,7 @@ type ResultVariable struct {
 	ValueNum int    `json:"num"`
 }
 
-func GetResultVariableByID(db *gorm.DB, resultID string) ([]*ResultVariable, error) {
+func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error) {
 	// db = db.Debug()
 	// get andit node by result_id, unique by result_variable, and get number of result_variable
 	var items []*ResultVariable
@@ -63,7 +63,7 @@ func GetResultVariableByID(db *gorm.DB, resultID string) ([]*ResultVariable, err
 	return items, nil
 }
 
-func GetResultValueByVariable(db *gorm.DB, resultID, resultVariable string) ([]int64, error) {
+func GetResultValueByVariable(db *gorm.DB, resultID uint, resultVariable string) ([]int64, error) {
 	// db = db.Debug()
 	// get andit node by result_id, unique by result_variable, and get number of result_variable
 	var items []int64
@@ -134,8 +134,8 @@ func (n *AuditNode) CreatePredecessorEdge(progName string, to int64, step int64,
 	return ae
 }
 
-func YieldAuditNodeByResultId(DB *gorm.DB, runtimeId string) chan *AuditNode {
-	db := DB.Model(&AuditNode{}).Where("result_id = ?", runtimeId)
+func YieldAuditNodeByResultId(DB *gorm.DB, resultId uint) chan *AuditNode {
+	db := DB.Model(&AuditNode{}).Where("result_id = ?", resultId)
 	return yieldAuditNode(db, context.Background())
 }
 
