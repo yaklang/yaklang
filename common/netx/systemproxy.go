@@ -1,4 +1,4 @@
-package systemproxy
+package netx
 
 import (
 	"errors"
@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// Settings represents systemwide proxy settings.
-type Settings struct {
+// SystemProxySetting represents systemwide proxy settings.
+type SystemProxySetting struct {
 	// Enabled is true if static (i.e. non-PAC) proxy is enabled
 	Enabled bool
 
@@ -22,7 +22,7 @@ type Settings struct {
 var ErrNotImpl = errors.New(fmt.Sprintf("systemproxy not implemented on this platform: %v", runtime.GOOS))
 
 func GetProxyFromEnv() string {
-	if setting, err := Get(); err == nil && setting.Enabled && setting.DefaultServer != "" {
+	if setting, err := GetSystemProxy(); err == nil && setting.Enabled && setting.DefaultServer != "" {
 		return setting.DefaultServer
 	}
 	for _, k := range []string{

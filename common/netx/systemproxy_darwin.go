@@ -1,9 +1,8 @@
-package systemproxy
+package netx
 
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"os/exec"
 	"regexp"
@@ -19,7 +18,7 @@ var httpEnableRegexp = regexp.MustCompile(`(?i)HTTPEnable\s*:\s*([01])`)
 var httpProxyRegexp = regexp.MustCompile(`(?i)HTTPProxy\s*:\s*([^\s\r\n]*)`)
 var httpPortRegexp = regexp.MustCompile(`(?i)HTTPPort\s*:\s*([\d]*)`)
 
-func Get() (Settings, error) {
+func GetSystemProxy() (SystemProxySetting, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("fetch scutil proxy from darwin failed: %s", err)
@@ -28,7 +27,7 @@ func Get() (Settings, error) {
 	cmd := exec.Command("scutil", "--proxy")
 	raw, err := cmd.CombinedOutput()
 	if err != nil {
-		return Settings{}, err
+		return SystemProxySetting{}, err
 	}
 	_ = raw
 	if result := httpEnableRegexp.FindSubmatch(raw); len(result) > 1 {
@@ -50,15 +49,15 @@ func Get() (Settings, error) {
 			}
 
 			if host != "" && port > 0 {
-				return Settings{Enabled: true, DefaultServer: utils.HostPort(host, port)}, nil
+				return SystemProxySetting{Enabled: true, DefaultServer: utils.HostPort(host, port)}, nil
 			}
 		}
-		return Settings{
+		return SystemProxySetting{
 			Enabled:       false,
 			DefaultServer: "",
 		}, nil
 	}
-	return Settings{}, utils.Errorf("scutil result empty...")
+	return SystemProxySetting{}, utils.Errorf("scutil result empty...")
 }
 
 /*
@@ -67,7 +66,7 @@ Set updates systemwide proxy settings.
 // osascript -c 'shell "" with administrator privileges'
 // osascript -e 'do shell script "echo 123" with administrator privileges'
 */
-func Set(s Settings) error {
+func SetSystemProxy(s SystemProxySetting) error {
 	if s.Enabled && s.DefaultServer != "" {
 		host, port, err := utils.ParseStringToHostPort(s.DefaultServer)
 		if err != nil {
@@ -78,7 +77,7 @@ func Set(s Settings) error {
 		}
 		if !utils.IsIPv4(host) && !utils.IsIPv6(host) {
 
-			if addr := netx.LookupFirst(host, netx.WithTimeout(5*time.Second)); addr == "" {
+			if addr := LookupFirst(host, WithTimeout(5*time.Second)); addr == "" {
 				return utils.Errorf("cannot set proxy for %s for (DNSFailed)", s.DefaultServer)
 			}
 		}
@@ -92,7 +91,7 @@ func Set(s Settings) error {
 		}
 		return nil
 	} else {
-		result, _ := Get()
+		result, _ := GetSystemProxy()
 		if !result.Enabled {
 			return nil
 		}

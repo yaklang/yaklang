@@ -1,4 +1,4 @@
-package systemproxy
+package netx
 
 import (
 	"golang.org/x/sys/windows/registry"
@@ -12,8 +12,8 @@ const (
 /*
 Get returns the current systemwide proxy settings.
 */
-func Get() (Settings, error) {
-	var s Settings
+func GetSystemProxy() (SystemProxySetting, error) {
+	var s SystemProxySetting
 
 	k, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.QUERY_VALUE)
 	if err != nil {
@@ -38,7 +38,7 @@ func Get() (Settings, error) {
 /*
 Set updates systemwide proxy settings.
 */
-func Set(s Settings) error {
+func SetSystemProxy(s SystemProxySetting) error {
 	k, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.QUERY_VALUE|registry.SET_VALUE)
 	if err != nil {
 		return proxyErr{err}
