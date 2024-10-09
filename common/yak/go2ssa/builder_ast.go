@@ -55,6 +55,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 		if builder != nil {
 			builder.SetBuildSupport(b.FunctionBuilder)
+			builder.SetEditor(prog.GetApplication().GetCurrentEditor())
 			currentBuilder := b.FunctionBuilder
 			b.FunctionBuilder = builder
 			defer func() {
