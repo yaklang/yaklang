@@ -282,6 +282,36 @@ func NewCustomValue(stringFun func(funcCtx *FunctionContext) string, typeFunc fu
 	}
 }
 
+type DoWhileStatement struct {
+	ConditionValue JavaValue
+	Body           []Statement
+}
+
+func NewDoWhileStatement(condition JavaValue, body []Statement) *DoWhileStatement {
+	return &DoWhileStatement{
+		ConditionValue: condition,
+		Body:           body,
+	}
+}
+func (w *DoWhileStatement) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("do{\n%s\n}while(%s)", StatementsString(w.Body, funcCtx), w.ConditionValue.String(funcCtx))
+}
+
+type WhileStatement struct {
+	ConditionValue JavaValue
+	Body           []Statement
+}
+
+func NewWhileStatement(condition JavaValue, body []Statement) *WhileStatement {
+	return &WhileStatement{
+		ConditionValue: condition,
+		Body:           body,
+	}
+}
+func (w *WhileStatement) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("while(%s) {\n%s\n}", w.ConditionValue.String(funcCtx), StatementsString(w.Body, funcCtx))
+}
+
 type CustomStatement struct {
 	Name       string
 	Info       any
