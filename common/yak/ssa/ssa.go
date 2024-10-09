@@ -177,7 +177,6 @@ type ProgramKind string
 const (
 	Application ProgramKind = "application"
 	Library                 = "library"
-	ChildAPP                = "child_application"
 )
 
 // both instruction and value
@@ -196,8 +195,7 @@ type Program struct {
 	// if no database, this is filename and file content
 	ExtraFile map[string]string
 
-	Application      *Program   // current Application
-	ChildApplication []*Program //childApplication
+	Application *Program // current Application
 	// program relationship
 	DownStream map[string]*Program
 	UpStream   map[string]*Program
@@ -215,19 +213,22 @@ type Program struct {
 
 	// function list
 	Funcs map[string]*Function
-
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
-	ExprotValue    map[string]Value
-	ExprotType     map[string]Type
+	// for import/export
+	importValue map[string]Value
+	importType  map[string]Type
+	ExportValue map[string]Value
+	ExportType  map[string]Type
 
 	// offset
 	OffsetMap         map[int]*OffsetItem
 	OffsetSortedSlice []int
 
 	// package Loader
-	Loader *ssautil.PackageFileLoader
-	Build  Build
+	Loader      *ssautil.PackageFileLoader
+	Build       Build
+	_preHandler bool
 
 	errors SSAErrors
 
@@ -246,6 +247,7 @@ type Program struct {
 // implement Value
 type Function struct {
 	anValue
+	lazyBuilder
 
 	isMethod   bool
 	methodName string

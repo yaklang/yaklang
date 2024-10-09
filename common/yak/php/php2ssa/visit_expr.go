@@ -120,26 +120,17 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		defer func() {
 			y.isFunction = tmp
 		}()
-		functionBuilder := func(funcname string, defaultValue ssa.Value) ssa.Value {
-			if function, ok := y.GetProgram().Funcs[funcname]; ok {
-				return function.Build()
+		target := y.VisitExpression(ret.Expression())
+		if !strings.HasPrefix(strings.ToLower(target.GetName()), "anonymousfunc") && !target.IsExtern() {
+			if tmpValue := y.GetProgram().GetFunction(target.GetName()); tmpValue != nil {
+				target = tmpValue
 			}
-			return defaultValue
-		}
-		fname := y.VisitExpression(ret.Expression())
-		//todo: class have pro
-		if !strings.HasPrefix(strings.ToLower(fname.GetName()), "anonymousfunc") && !fname.IsExtern() {
-			tmpValue := functionBuilder(fname.GetName(), fname)
-			if fname == tmpValue {
-				if undefind, b := ssa.ToUndefined(tmpValue); b && !tmpValue.IsObject() {
-					fname = y.ReadValue(undefind.GetName())
-				}
-			} else {
-				fname = tmpValue
+			if undefind, ok := ssa.ToUndefined(target); ok && !target.IsObject() {
+				target = y.ReadValue(undefind.GetName())
 			}
 		}
 		args, ellipsis := y.VisitArguments(ret.Arguments())
-		callInst := y.NewCall(fname, args)
+		callInst := y.NewCall(target, args)
 		if ellipsis {
 			callInst.IsEllipsis = true
 		}

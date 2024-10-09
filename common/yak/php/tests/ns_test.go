@@ -9,8 +9,6 @@ import (
 )
 
 func TestNamespace(t *testing.T) {
-	// TODO: this php namespace bug will fixup in: https://github.com/yaklang/yaklang/pull/1911
-	t.Skip()
 	t.Run("namespace mock", func(t *testing.T) {
 		code := `<?php
 namespace test{
@@ -24,9 +22,9 @@ namespace{
 `
 		ssatest.MockSSA(t, code)
 	})
-	t.Run("namespace variables", func(t *testing.T) {
+	t.Run("namespace variables assign and read both in unname", func(t *testing.T) {
 		code := `<?php
-namespace test{
+namespace {
 	$a = 1;
 }
 
@@ -34,6 +32,18 @@ namespace{
 	println($a);
 }`
 		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+	t.Run("namespace variables", func(t *testing.T) {
+		code := `<?php
+namespace test{
+	$a = 1;
+	println($a);
+}
+
+namespace{
+	println($a);
+}`
+		ssatest.CheckPrintlnValue(code, []string{"1", "1"}, t)
 	})
 	t.Run("more namespace variable", func(t *testing.T) {
 		code := `<?php
@@ -201,14 +211,14 @@ namespace a {
 
     use function b\aa;
 
-    function t($a)
+    function t()
     {
-        return $a;
+        return 1;
     }
 
-    function b($b)
+    function b()
     {
-        return aa($b);
+        return aa();
     }
 }
 
@@ -216,14 +226,14 @@ namespace b {
 
     use function a\t;
 
-    function aa($c)
+    function aa()
     {
-        return t($c);
+        return t();
     }
 }
 
 namespace {
-    $a = a\b(1);
+    $a = a\b();
     println($a);
 }`
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})

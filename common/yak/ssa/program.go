@@ -17,7 +17,6 @@ import (
 
 func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
 	prog := &Program{
-		ChildApplication:        make([]*Program, 0),
 		Name:                    ProgramName,
 		ProgramKind:             kind,
 		LibraryFile:             make(map[string][]string),
@@ -80,12 +79,12 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 	return subProg
 }
 
-func (prog *Program) NewChildProgram(name string, add bool, path ...string) *Program {
-	program := prog.createSubProgram(name, ChildAPP, path...)
-	if add {
-		prog.ChildApplication = append(prog.ChildApplication, program)
+func (prog *Program) GetSubProgram(name string, path ...string) *Program {
+	child, ok := prog.UpStream[name]
+	if !ok {
+		child = prog.createSubProgram(name, Library, path...)
 	}
-	return program
+	return child
 }
 
 func (prog *Program) NewLibrary(name string, path []string) *Program {
@@ -142,9 +141,9 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	return p, hasFile(p)
 }
 
-func (prog *Program) AddUpStream(p *Program) {
-	prog.UpStream[p.Name] = p
-	p.DownStream[prog.Name] = prog
+func (prog *Program) AddUpStream(sub *Program) {
+	prog.UpStream[sub.Name] = sub
+	sub.DownStream[prog.Name] = prog
 }
 
 func (prog *Program) GetProgramName() string {
@@ -190,7 +189,13 @@ func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string
 
 func (p *Program) GetFunction(name string) *Function {
 	if f, ok := p.Funcs[name]; ok {
+		if !p.PreHandler() {
+			f.Build()
+		}
 		return f
+	}
+	if importedF, ok := p.importValue[name].(*Function); ok {
+		return importedF
 	}
 	return nil
 }
@@ -211,6 +216,11 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 
 	for _, f := range prog.Funcs {
 		handFunc(f)
+	}
+	for _, up := range prog.UpStream {
+		for _, f := range up.Funcs {
+			handFunc(f)
+		}
 	}
 }
 
@@ -254,11 +264,8 @@ func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 }
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {
-	p.PushEditorex(e, true)
-}
-func (p *Program) PushEditorex(e *memedit.MemEditor, store bool) {
 	p.editorStack.Push(e)
-	if store {
+	if p.PreHandler() {
 		p.editorMap.Set(p.GetCurrentEditor().GetFilename(), p.GetCurrentEditor())
 	}
 }
@@ -315,32 +322,4 @@ func (p *Program) GetType(name string) Type {
 		return t
 	}
 	return nil
-}
-
-func (p *Program) GetExprotType(name string) Type {
-	if p.ExprotType[name] != nil {
-		return p.ExprotType[name]
-	}
-	return nil
-}
-
-func (p *Program) GetExprotValue(name string) Value {
-	if p.ExprotValue[name] != nil {
-		return p.ExprotValue[name]
-	}
-	return nil
-}
-
-func (p *Program) SetExprotType(name string, t Type) {
-	if p.ExprotType == nil {
-		p.ExprotType = make(map[string]Type)
-	}
-	p.ExprotType[name] = t
-}
-
-func (p *Program) SetExprotValue(name string, v Value) {
-	if p.ExprotValue == nil {
-		p.ExprotValue = make(map[string]Value)
-	}
-	p.ExprotValue[name] = v
 }

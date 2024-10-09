@@ -29,8 +29,9 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	variable := y.CreateVariable(funcName)
 	y.AssignVariable(variable, newFunction)
 	//todo: maybe need assign in this scope
-	y.GetProgram().Funcs[funcName] = newFunction
-	newFunction.SetOrdinalBuild(func() ssa.Value {
+	// y.GetProgram().Funcs[funcName] = newFunction
+	y.GetProgram().SetExportValue(funcName, newFunction)
+	newFunction.SetLazyBuilder(func() {
 		y.SetMarkedFunction(funcName)
 		y.FunctionBuilder = y.FunctionBuilder.PushFunction(newFunction)
 		{
@@ -42,7 +43,6 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 		y.FunctionBuilder = y.PopFunction()
 		variable := y.CreateVariable(funcName)
 		y.AssignVariable(variable, newFunction)
-		return newFunction
 	})
 	return nil
 }

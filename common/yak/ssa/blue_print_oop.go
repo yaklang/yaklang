@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -24,9 +25,14 @@ func (pkg *Program) GetClassBluePrint(name string) *ClassBluePrint {
 		return nil
 	}
 	if c, ok := pkg.ClassBluePrint[name]; ok {
+		if !pkg.PreHandler() {
+			c.Build()
+		}
 		return c
 	}
-	// log.Errorf("GetClassBluePrint: not this class: %s", name)
+	if importedC, ok := pkg.importType[name].(*ClassBluePrint); ok {
+		return importedC
+	}
 	return nil
 }
 
