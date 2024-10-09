@@ -160,9 +160,11 @@ func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 		build.CurrentRange = newFunc.R
 	}
 
-	for i, m := range build.GetProgram().GlobalScope.GetAllMember() {
-		variable := build.CreateLocalVariable(i.String())
-		build.AssignVariable(variable, m)
+	if global := build.GetProgram().GlobalScope; global != nil {
+		for i, m := range global.GetAllMember() {
+			variable := build.CreateLocalVariable(i.String())
+			build.AssignVariable(variable, m)
+		}
 	}
 
 	return build
@@ -170,7 +172,7 @@ func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 
 func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 	if global := b.GetProgram().GlobalScope; global != nil {
-		for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
+		for i, m := range global.GetAllMember() {
 			name := i.String()
 			value := b.EmitPhi(name, []Value{m, b.PeekValue(name)})
 			global.SetStringMember(name, value)
