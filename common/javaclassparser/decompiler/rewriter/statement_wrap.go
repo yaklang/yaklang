@@ -14,12 +14,14 @@ type RewriterContext struct {
 	currentNodeId int
 	checkPoint    map[int][]int
 	ifChildSet    map[int]*utils.Set[*core.Node]
+	BlockStack    *utils.Stack[any]
 }
 
 func NewRewriterContext() *RewriterContext {
 	return &RewriterContext{
 		checkPoint: map[int][]int{},
 		ifChildSet: map[int]*utils.Set[*core.Node]{},
+		BlockStack: utils.NewStack[any](),
 	}
 }
 
@@ -35,6 +37,7 @@ func NewStatementManager(node *core.Node, parent *StatementManager) *StatementMa
 	manager.RewriterContext = parent.RewriterContext
 	return manager
 }
+
 func NewRootStatementManager(node *core.Node) *StatementManager {
 	if node == nil {
 		return nil
@@ -53,23 +56,32 @@ func NewRootStatementManager(node *core.Node) *StatementManager {
 		}
 		return nil
 	})
-	core.WalkGraph[*core.Node](manager.RootNode, func(node *core.Node) ([]*core.Node, error) {
-		for _, set := range manager.RewriterContext.ifChildSet {
-			set.Add(node)
-		}
-		if _, ok := node.Statement.(*core.ConditionStatement); ok {
-			if manager.RewriterContext.ifChildSet[node.Id] == nil {
-				manager.RewriterContext.ifChildSet[node.Id] = utils.NewSet[*core.Node]()
-				manager.RewriterContext.ifChildSet[node.Id].Add(node)
-				return node.Next[1:], nil
-			}
-			manager.RewriterContext.ifChildSet[node.Id].Add(node)
-		}
-		return node.Next, nil
-	})
+	//manager.GenerateIfChildSet()
 	return manager
 }
 
+//	func (s *StatementManager) GenerateIfChildSet() {
+//		stack := utils.NewStack[*core.Node]()
+//		visited := utils.NewSet[any]()
+//		stack.Push(s.RootNode)
+//		for stack.Len() > 0 {
+//			current := stack.Pop()
+//			if visited.Has(current) {
+//				continue
+//			}
+//			visited.Add(current)
+//			if _, ok := current.Statement.(*core.ConditionStatement); ok {
+//				s.RewriterContext.ifChildSet[current.Id] = utils.NewSet[*core.Node]()
+//				stack.Push(current.Next[1])
+//				stack.Push(current.Next[0])
+//			} else {
+//				for _, n := range current.Next {
+//					stack.Push(n)
+//				}
+//			}
+//		}
+//		return
+//	}
 func (s *StatementManager) SetId(id int) {
 	s.RewriterContext.currentNodeId = id
 }
@@ -139,7 +151,9 @@ func (s *StatementManager) ToStatements(stopCheck func(node *core.Node) bool) ([
 			break
 		}
 		visited.Add(current)
-		result = append(result, current)
+		if _, ok := current.Statement.(*core.MiddleStatement); !ok {
+			result = append(result, current)
+		}
 		if len(current.Next) == 0 {
 			break
 		}
@@ -185,7 +199,7 @@ func (s *StatementManager) generateIdToNodeMap() {
 	})
 }
 func (s *StatementManager) Rewrite() error {
-	rewritersOrder := []int{IfWriter}
+	rewritersOrder := []int{LoopRewriterFlag, DoWhileReWriterFlag, IfRewriterFlag, BreakRewriterFlag}
 	//visited := utils.NewSet[any]()
 	for _, flag := range rewritersOrder {
 		rewriter, ok := rewriters[flag]
@@ -199,13 +213,17 @@ func (s *StatementManager) Rewrite() error {
 		for _, key := range keys {
 			flags := s.RewriterContext.checkPoint[key]
 			if utils.IntArrayContains(flags, flag) {
-				s.RewriterContext.checkPoint[key] = funk.Filter(flags, func(item int) bool {
-					return item != flag
-				}).([]int)
-				err := rewriter.rewriterFunc(s, s.GetNodeById(key))
+				node := s.GetNodeById(key)
+				if node == nil {
+					continue
+				}
+				err := rewriter.rewriterFunc(s, node)
 				if err != nil {
 					return err
 				}
+				s.RewriterContext.checkPoint[key] = funk.Filter(flags, func(item int) bool {
+					return item != flag
+				}).([]int)
 			}
 		}
 	}
