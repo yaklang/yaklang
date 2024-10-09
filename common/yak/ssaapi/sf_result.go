@@ -30,7 +30,8 @@ type SyntaxFlowResult struct {
 
 func createEmptyResult() *SyntaxFlowResult {
 	return &SyntaxFlowResult{
-		symbol: make(map[string]Values),
+		symbol:   make(map[string]Values),
+		programs: make(map[string]*Program),
 	}
 }
 
