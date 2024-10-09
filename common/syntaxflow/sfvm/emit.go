@@ -136,32 +136,45 @@ func (v *SyntaxFlowVisitor) EmitCompareOpcode(i []string) {
 }
 
 const (
-	CompareStringAnyMode  int = 0
-	CompareStringHaveMode     = 1
+	CompareStringAnyMode = iota << 1
+	CompareStringHaveMode
+
+	ExactConditionFilter
+	RegexpConditionFilter
+	GlobalConditionFilter
 )
 
-func (v *SyntaxFlowVisitor) EmitCompareString(i []string, mode int) {
-	v.codes = append(v.codes, &SFI{
-		OpCode: OpCompareString,
-		Values: lo.Map(i, func(item string, index int) string {
-			if strings.HasPrefix(item, "'") && strings.HasSuffix(item, "'") {
-				result, err := yakunquote.Unquote(item)
-				if err != nil {
-					return item
-				}
-				return result
-			} else if strings.HasPrefix(item, `"`) && strings.HasSuffix(item, `"`) {
-				result, err := yakunquote.Unquote(item)
-				if err != nil {
-					return item
-				}
-				return result
-			} else {
+func (v *SyntaxFlowVisitor) EmitCompareString(i []func() (string, int), compareMode int) {
+	s := &SFI{
+		OpCode:   OpCompareString,
+		UnaryInt: compareMode,
+	}
+	s.Values = make([]string, len(i))
+	s.MultiOperator = make([]int, len(i))
+	handler := func(item string) string {
+		if strings.HasPrefix(item, "'") && strings.HasSuffix(item, "'") {
+			result, err := yakunquote.Unquote(item)
+			if err != nil {
 				return item
 			}
-		}),
-		UnaryInt: mode,
+			return result
+		} else if strings.HasPrefix(item, `"`) && strings.HasSuffix(item, `"`) {
+			result, err := yakunquote.Unquote(item)
+			if err != nil {
+				return item
+			}
+			return result
+		} else {
+			return item
+		}
+	}
+	lo.ForEach(i, func(item func() (string, int), index int) {
+		s2, i2 := item()
+		s.Values[index] = handler(s2)
+		s.MultiOperator[index] = i2
 	})
+	v.codes = append(v.codes, s)
+
 }
 
 func (v *SyntaxFlowVisitor) EmitCondition() {
@@ -176,9 +189,9 @@ func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	case int:
 	}
 }
-func (y *SyntaxFlowVisitor) EmitVersionIn( results ...*RecursiveConfigItem) {
+func (y *SyntaxFlowVisitor) EmitVersionIn(results ...*RecursiveConfigItem) {
 	y.codes = append(y.codes, &SFI{
-		OpCode: OpVersionIn,
+		OpCode:           OpVersionIn,
 		SyntaxFlowConfig: results,
 	})
 }

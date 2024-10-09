@@ -147,6 +147,7 @@ type SFI struct {
 	UnaryInt             int
 	UnaryStr             string
 	Values               []string
+	MultiOperator        []int
 	SyntaxFlowConfig     []*RecursiveConfigItem
 	FileFilterMethodItem map[string]string
 	Iter                 *IterIndex
