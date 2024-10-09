@@ -554,7 +554,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 
 	{
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
-		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		if typeps := fun.TypeParameters(); typeps != nil {
 			b.tpHandler[funcName] = b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
@@ -566,7 +565,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 
 		handleFunctionType(b.Function)
 
-		b.FunctionBuilder = b.PopFunction()
 		if hitDefinedFunction {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
 		}
@@ -591,11 +589,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 			}
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
-
-		/*for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
-			variable := b.CreateLocalVariable(i.String())
-			b.AssignVariable(variable, m)
-		}*/
 
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
@@ -642,7 +635,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 
 	{
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
-		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		if recove := fun.Receiver(); recove != nil {
 			ssatyp := b.buildReceiver(recove.(*gol.ReceiverContext))
@@ -659,7 +651,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 
 		handleFunctionType(b.Function)
 
-		b.FunctionBuilder = b.PopFunction()
 		if hitDefinedFunction {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
 		}
@@ -683,11 +674,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 			}
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
-
-		/*for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
-			variable := b.CreateLocalVariable(i.String())
-			b.AssignVariable(variable, m)
-		}*/
 
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
