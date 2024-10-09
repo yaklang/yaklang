@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -950,12 +951,67 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrapf(CriticalError, "compare string failed: invalid mode %v", mode)
 		}
 		res := make([]bool, 0, ValuesLen(values))
+		var (
+			conditionCache = make(map[string]any)
+		)
+
+		matchFunc := func(index int, str, raw string) bool {
+			if len(i.MultiOperator) <= index {
+				log.Errorf("sfi values or mutiOperator out size %v", index)
+				return false
+			}
+			condition, exit := conditionCache[codec.Md5(str)]
+			conditionMode := i.MultiOperator[index]
+			switch conditionMode {
+			case GlobalConditionFilter:
+				var global glob.Glob
+				if exit {
+					if _global, ok := condition.(glob.Glob); ok {
+						global = _global
+					}
+				}
+				if global == nil {
+					compile, err := glob.Compile(str)
+					if err != nil {
+						log.Errorf("global compile fail: %s", err)
+						return false
+					}
+					conditionCache[codec.Md5(str)] = compile
+					global = compile
+				}
+				return global.Match(raw)
+			case RegexpConditionFilter:
+				var regexpCondition *regexp.Regexp
+				if exit {
+					if r, ok := condition.(*regexp.Regexp); ok {
+						regexpCondition = r
+					}
+				}
+				if regexpCondition == nil {
+					compile, err := regexp.Compile(str)
+					if err != nil {
+						log.Errorf("regexp compile fail: %s", err)
+						return false
+					}
+					conditionCache[codec.Md5(str)] = compile
+					regexpCondition = compile
+				}
+				result := regexpCondition.MatchString(raw)
+				return result
+			case ExactConditionFilter:
+				result := strings.Contains(raw, str)
+				return result
+			default:
+				return false
+			}
+
+		}
 		_ = values.Recursive(func(vo ValueOperator) error {
 			raw := vo.String()
 			if mode == CompareStringAnyMode {
 				match := false
-				for _, v := range i.Values {
-					if strings.Contains(raw, v) {
+				for index, v := range i.Values {
+					if matchFunc(index, v, yakunquote.TryUnquote(raw)) {
 						match = true
 						break
 					}
@@ -964,8 +1020,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			}
 			if mode == CompareStringHaveMode {
 				match := true
-				for _, v := range i.Values {
-					if !strings.Contains(raw, v) {
+				for index, v := range i.Values {
+					if !matchFunc(index, v, yakunquote.TryUnquote(raw)) {
 						match = false
 						break
 					}

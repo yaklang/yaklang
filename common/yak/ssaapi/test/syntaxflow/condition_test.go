@@ -1,6 +1,7 @@
 package syntaxflow
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -170,5 +171,64 @@ func Test_Condition_FilterExpr(t *testing.T) {
 				"target2": {"Parameter-a1", "Parameter-a2"},
 				"target3": {"Parameter-a1", "Parameter-a2"},
 			})
+	})
+}
+func TestConditionFilter(t *testing.T) {
+	code := `
+		f = (a1, a2, a3) => {
+			a1 = "abc"
+			b2 = "anc123"
+			b3 = "anc"
+			b4 = "anc1anc"
+			a3 = 12
+		}
+`
+	t.Run("test regexp condition", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+a* as $target
+$target?{have: /^[0-9]+$/} as $output
+`, map[string][]string{
+			"output": {`12`},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+	t.Run("test global condition", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+b* as $target
+$target?{have: anc1*} as $output
+`, map[string][]string{
+			"output": {`"anc123"`, `"anc1anc"`},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+	t.Run("test exact condition", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+a* as $target
+$target?{have: abc} as $output
+`, map[string][]string{
+			"output": {`"abc"`},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+	t.Run("test global and exact", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+b* as $target
+$target?{have: anc,*123} as $output
+`, map[string][]string{
+			"output": []string{`"anc123"`},
+		})
+	})
+	t.Run("test exact and regexp", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+b* as $target
+$target?{have: anc,/[0-9]+$/} as $output
+`, map[string][]string{
+			"output": {`"anc123"`},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+	t.Run("test global and regex", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+b* as $target
+$target?{have: anc*,/[0-9]+$/} as $output
+`, map[string][]string{
+			"output": {`"anc123"`},
+		})
 	})
 }
