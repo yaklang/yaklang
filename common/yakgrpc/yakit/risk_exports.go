@@ -89,42 +89,88 @@ func RiskTypeToVerbose(i string) string {
 	return "其他"
 }
 
+// payload 是一个选项参数，用于指定漏洞记录的载荷(payload)
+// Example:
+// ```
+// risk.NewRisk(target, risk.payload("payload"))
+// ```
 func WithRiskParam_Payload(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.Payload = strconv.Quote(i)
 	}
 }
 
+// title 是一个选项参数，用于指定漏洞记录的标题
+// Example:
+// ```
+// risk.NewRisk(target, risk.title(title))
+// ```
 func WithRiskParam_Title(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.Title = i
 	}
 }
 
+// titleVerbose 是一个选项参数，用于指定漏洞记录的详细标题
+// Example:
+// ```
+// risk.NewRisk(target, risk.titleVerbose(verbose_title))
+// ```
 func WithRiskParam_TitleVerbose(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.TitleVerbose = i
 	}
 }
 
+// description 是一个选项参数，用于指定漏洞记录的描述
+// Example:
+// ```
+// risk.NewRisk(target, risk.description(description))
+// ```
 func WithRiskParam_Description(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.Description = i
 	}
 }
 
-func WithRiskParam_YakitPluginName(i string) RiskParamsOpt {
-	return func(r *schema.Risk) {
-		r.FromYakScript = i
-	}
-}
-
+// solution 是一个选项参数，用于指定漏洞记录的解决方案
+// Example:
+// ```
+// risk.NewRisk(target, risk.description(description), risk.solution(solution))
+// ```
 func WithRiskParam_Solution(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.Solution = i
 	}
 }
 
+// type 是一个选项参数，用于指定风险类型，可用的风险类型:
+// SQL 注入: sqli​,sqlinj​,sql-inj,sqlinjection​,sql-injection​
+// 跨站脚本:xss​
+// 远程执行: rce​,rce-command,rce-code​
+// 文件操作: lfi​,file-read​,file-download​,rfi​,file-write​,file-upload​
+// 其他注入类型: xxe​,ssti​
+// 序列化问题: unserialize​,deserialization​
+// 访问控制: unauth-access​
+// 未授权访问​: auth-bypass​,authentication-bypass​,privilege-escalation​
+// 信息泄露: path-traversal​,info-exposure​,information-exposure​
+// 配置与凭证问题: insecure-default​,weak-pass​,weak-password​,weak-credential​
+// 逻辑漏洞: logic​
+// 安全测试: compliance-test​,cve-baseline​
+// 服务端请求伪造: ssrf​
+// 跨站请求伪造 : csrf​
+// 反连检测: random-port-trigger[tcp]​,random-port-trigger[udp]​,reverse​,reverse-​,reverse-tcp​,reverse-tls​,reverse-rmi​,reverse-rmi-handshake​,reverse-http​,reverse-https​,reverse-dns​,reverse-ldap
+// Example:
+// ```
+// risk.NewRisk(
+// addr,
+// risk.title("CVE-2021-22145"),
+// risk.severity("low"),
+// risk.titleVerbose("CVE-2021-22145 Elasticsearch 敏感信息泄漏漏洞"),
+// risk.type("info-exposure"),
+// risk.cve("CVE-2021-22145"),
+// )
+// ```
 func WithRiskParam_RiskType(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.RiskType = i
@@ -132,18 +178,33 @@ func WithRiskParam_RiskType(i string) RiskParamsOpt {
 	}
 }
 
+// typeVerbose 是一个选项参数，用于指定风险类型的详细描述
+// Example:
+// ```
+// risk.NewRisk(target, risk.typeVerbose("SQL注入漏洞"))
+// ```
 func WithRiskParam_RiskVerbose(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.RiskTypeVerbose = i
 	}
 }
 
+// parameter 是一个选项参数，用于指定风险记录的参数
+// Example:
+// ```
+// risk.NewRisk(target, risk.parameter("param"))
+// ```
 func WithRiskParam_Parameter(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.Parameter = i
 	}
 }
 
+// token 是一个选项参数，用于指定风险记录的反连 token
+// Example:
+// ```
+// risk.NewRisk(target, risk.token("token"))
+// ```
 func WithRiskParam_Token(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.ReverseToken = i
@@ -176,6 +237,11 @@ func limitSize(s string, maxSize int) string {
 	return string(temp) + "..."
 }
 
+// request 是一个选项参数，用于指定风险记录的原始请求报文
+// Example:
+// ```
+// risk.NewRisk(target, risk.request(req))
+// ```
 func WithRiskParam_Request(i interface{}) RiskParamsOpt {
 	data := utils.InterfaceToString(i)
 	data = limitSize(data, MaxSize)
@@ -184,6 +250,11 @@ func WithRiskParam_Request(i interface{}) RiskParamsOpt {
 	}
 }
 
+// response 是一个选项参数，用于指定风险记录的原始响应报文
+// Example:
+// ```
+// risk.NewRisk(target, risk.response(resp))
+// ```
 func WithRiskParam_Response(i interface{}) RiskParamsOpt {
 	data := utils.InterfaceToString(i)
 	data = limitSize(data, MaxSize)
@@ -192,6 +263,11 @@ func WithRiskParam_Response(i interface{}) RiskParamsOpt {
 	}
 }
 
+// details 是一个选项参数，用于指定风险记录的详细信息
+// Example:
+// ```
+// risk.NewRisk(target, risk.details({"message": message, "ohter_message": message}))
+// ```
 func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		if i == nil {
@@ -267,6 +343,11 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 	}
 }
 
+// runtimeId 是一个选项参数，用于指定风险记录的运行时 ID
+// Example:
+// ```
+// risk.NewRisk(target, risk.runtimeId(runtime_id))
+// ```
 func WithRiskParam_RuntimeId(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.RuntimeId = i
@@ -279,12 +360,23 @@ func WithRiskParam_Potential(i bool) RiskParamsOpt {
 	}
 }
 
+// cve 是一个选项参数，用于指定风险记录的 CVE 编号
+// Example:
+// ```
+// risk.NewRisk(target, risk.cve("CVE-2021-22145"))
+// ```
 func WithRiskParam_CVE(s string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.CVE = s
 	}
 }
 
+// severity 是一个选项参数，用于指定风险记录的严重程度
+// 可用的严重程度有: critical, high, warning, info, low
+// Example:
+// ```
+// risk.NewRisk(target, risk.severity("high"))
+// ```
 func WithRiskParam_Severity(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		switch strings.TrimSpace(strings.ToLower(i)) {
@@ -310,6 +402,11 @@ func WithRiskParam_YakScriptUUID(i string) RiskParamsOpt {
 	}
 }
 
+// fromScript 是一个选项参数，用于指定风险记录的来源插件名
+// Example:
+// ```
+// risk.NewRisk(target, risk.fromScript("plugin_name"))
+// ```
 func WithRiskParam_FromScript(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.FromYakScript = i
@@ -322,6 +419,12 @@ func WithRiskParam_Ignore(i bool) RiskParamsOpt {
 	}
 }
 
+// CreateRisk 创建漏洞记录结构体，但是并不会保存到数据库，第一个参数是目标URL，后面可以传入零个或多个选项参数，用于指定 risk 的结构，其通常与 Save 一起使用
+// Example:
+// ```
+// r = risk.CreateRisk("http://example.com", risk.title("SQL注入漏洞"), risk.type("sqli"), risk.severity("high"), risk.description(""), risk.solution(""))
+// risk.Save(r)
+// ```
 func CreateRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
 	return _createRisk(u, opts...)
 }
@@ -383,6 +486,12 @@ func NewRisk(u string, opts ...RiskParamsOpt) (*schema.Risk, error) {
 	return r, _saveRisk(r)
 }
 
+// Save 将漏洞记录结构体保存到数据库中其通常与 CreateRisk 一起使用
+// Example:
+// ```
+// r = risk.CreateRisk("http://example.com", risk.title("SQL注入漏洞"), risk.type("sqli"), risk.severity("high"))
+// risk.Save(r)
+// ```
 func SaveRisk(r *schema.Risk) error {
 	return _saveRisk(r)
 }
@@ -491,6 +600,13 @@ func NewLocalReverseProtoUrl(proto string) func(opts ...RiskParamsOpt) string {
 	}
 }
 
+// HaveReverseRisk 通过轮询检查是否存在对应token的反连记录，重试最多5次，每次等待1秒， 如果存在返回true，否则返回false
+// Example:
+// ```
+// if risk.HaveReverseRisk("token") { // 轮询检查是否存在反连风险，会阻塞
+// println("have reverse risk")
+// }
+// ```
 func HaveReverseRisk(token string) bool {
 	if token == "" {
 		return false
@@ -560,6 +676,11 @@ func NewDNSLogDomainWithContext(ctx context.Context) (domain string, token strin
 	}
 }
 
+// NewDNSLogDomain 返回一个公网 Bridge 的 DNSLog 域名，返回的第一个值是域名，第二个值是 token，第三个值是错误
+// Example:
+// ```
+// domain, token = risk.NewDNSLogDomain()~
+// ```
 func NewDNSLogDomain() (domain string, token string, _ error) {
 	counter := 0
 	for {
@@ -576,6 +697,11 @@ func NewDNSLogDomain() (domain string, token string, _ error) {
 	}
 }
 
+// NewHTTPLog 返回一个公网 Bridge 的 HTTPLog 域名，返回的第一个值是域名，第二个值是 token，第三个值是错误
+// Example:
+// ```
+// domain, token = risk.NewHTTPLog()~
+// ```
 func NewHTTPLog(i ...any) (domain string, token string, _ error) {
 	counter := 0
 	for {
@@ -647,6 +773,13 @@ func CheckHTTPLogByToken(token string, runtimeId string, timeout ...float64) ([]
 	}
 }
 
+// CheckHTTPLogByToken 通过 token 检查 HTTPLog 事件，返回的第一个值是 HTTPLogEvent 列表，第二个值是错误
+// Example:
+// ```
+// domain, token = risk.NewHTTPLog()~
+// ...
+// events = risk.CheckHTTPLogByToken(token)~
+// ```
 func YakitNewCheckHTTPLogByToken(runtimeID string) func(token string, timeout ...float64) ([]*tpb.HTTPRequestTriggerNotification, error) {
 	return func(token string, timeout ...float64) ([]*tpb.HTTPRequestTriggerNotification, error) {
 		return CheckHTTPLogByToken(token, runtimeID, timeout...)
@@ -681,12 +814,24 @@ func CheckDNSLogByToken(token string, runtimeId string, timeout ...float64) ([]*
 	return events, nil
 }
 
+// CheckDNSLogByToken 通过 token 检查 DNSLog 事件，返回的第一个值是 DNSLogEvent 列表，第二个值是错误
+// Example:
+// ```
+// domain, token = risk.NewDNSLogDomain()~
+// ...
+// events = risk.CheckDNSLogByToken(token)~
+// ```
 func YakitNewCheckDNSLogByToken(runtimeID string) func(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 	return func(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 		return CheckDNSLogByToken(token, runtimeID, timeout...)
 	}
 }
 
+// NewRandomPortTrigger 返回一个公网 Bridge 的随机端口反连检测地址，返回的第一个值是 token，第二个值是检测地址，第三个值是错误
+// Example:
+// ```
+// token, addr = risk.NewRandomPortTrigger()~
+// ```
 func NewRandomPortTrigger(opt ...RiskParamsOpt) (token string, addr string, _ error) {
 	token = utils.RandStringBytes(8)
 	addr, secret, err := _fetBridgeAddrAndSecret()
@@ -743,6 +888,13 @@ func CheckICMPTriggerByLength(i int, runtimeID string) (*tpb.ICMPTriggerNotifica
 	return event, nil
 }
 
+// CheckRandomTriggerByToken 通过 token 检查端口反连事件，返回的第一个值是 RandomPortTriggerEvent，第二个值是错误
+// Example:
+// ```
+// token, addr = risk.NewRandomPortTrigger()~
+// ...
+// event = risk.CheckRandomTriggerByToken(token)~
+// ```
 func YakitNewCheckRandomTriggerByToken(runtimeID string) func(t string) (*tpb.RandomPortTriggerEvent, error) {
 	return func(t string) (*tpb.RandomPortTriggerEvent, error) {
 		return CheckRandomTriggerByToken(t, runtimeID)
@@ -787,6 +939,12 @@ func CheckRandomTriggerByToken(t string, runtimeID string) (*tpb.RandomPortTrigg
 	return event, nil
 }
 
+// CheckServerReachable 通过 Bridge 检查目标是否可达，第一个参数为上下文，第二个参数为目标地址，第三个参数为是否进行 http 检测，返回的第一个值是 CheckServerReachableResponse，第二个值是错误
+// Example:
+// ```
+// resp = risk.CheckServerReachable(context.Background(), "example.com", false)~
+// print(resp.Reachable) // 是否可达
+// ```
 func CheckServerReachable(ctx context.Context, target string, httpCheck bool) (*tpb.CheckServerReachableResponse, error) {
 	ctx, client, conn, err := cybertunnel.GetClient(ctx, consts.GetDefaultPublicReverseServer(), consts.GetDefaultPublicReverseServerPassword())
 	if err != nil {

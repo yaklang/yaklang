@@ -321,6 +321,16 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 	filename, line := function.FileLine(0)
 	splitFuncName := strings.Split(function.Name(), ".")
 	funcName := splitFuncName[len(splitFuncName)-1]
+	fixedForInstanceFuncDoc := false
+	// is returned instance func, fix for doc
+	if strings.HasPrefix(funcName, "func") {
+		funcName = funcName[4:]
+		if _, err := strconv.Atoi(funcName); err == nil {
+			funcName = splitFuncName[len(splitFuncName)-2]
+			fixedForInstanceFuncDoc = true
+		}
+	}
+
 	if strings.HasSuffix(funcName, "-fm") {
 		return nil, ErrIsInstanceMethod
 	}
@@ -353,7 +363,13 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 			continue
 		}
 		position := fset.Position(theFunc.Decl.Pos())
-		if position.Line != line {
+		if position.Line != line && !fixedForInstanceFuncDoc {
+			continue
+		}
+
+		// only fix for doc
+		if fixedForInstanceFuncDoc {
+			document = theFunc.Doc
 			continue
 		}
 

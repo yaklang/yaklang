@@ -2,6 +2,8 @@ package yakit
 
 import (
 	"context"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -9,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"time"
 )
 
 func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
@@ -99,7 +100,7 @@ func DeleteRiskByID(db *gorm.DB, ids ...int64) error {
 	}
 
 	if db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids).Unscoped().Delete(&schema.Risk{}); db.Error != nil {
-		return utils.Errorf("delete id(s) failed: %v", db.Error)
+		return utils.Errorf("delete risk by id(s) failed: %v", db.Error)
 	}
 
 	return nil
@@ -160,7 +161,7 @@ func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB,
 		"title", "title_verbose",
 	}, params.GetTitle(), false)
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.GetIds())
-	//db = bizhelper.ExactQueryString(db, "reverse_token", params.GetToken())
+	// db = bizhelper.ExactQueryString(db, "reverse_token", params.GetToken())
 	return db, nil
 }
 
@@ -203,7 +204,7 @@ func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginato
 	return paging, ret, nil
 }
 
-func DeleteRiskByTarget(db *gorm.DB, target string) {
+func DeleteRiskByTarget(db *gorm.DB, target string) error {
 	db = db.Model(&schema.Risk{})
 	host, port, _ := utils.ParseStringToHostPort(target)
 	if port > 0 {
@@ -216,9 +217,9 @@ func DeleteRiskByTarget(db *gorm.DB, target string) {
 	}
 
 	if db := db.Unscoped().Delete(&schema.Risk{}); db.Error != nil {
-		log.Errorf("delete risks failed: %s", db.Error)
+		return utils.Wrap(db.Error, "delete risks by target failed")
 	}
-	log.Infof("delete risk by targets: %s finished", target)
+	return nil
 }
 
 func YieldRisksByTarget(db *gorm.DB, ctx context.Context, target string) chan *schema.Risk {
