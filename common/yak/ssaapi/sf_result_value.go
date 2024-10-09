@@ -174,6 +174,7 @@ func (r *SyntaxFlowResult) newValue(valueID int64) *Value {
 			log.Errorf("newValue getProgram [%s] from DB err: %v", progName, err)
 			return nil
 		}
+		r.programs[progName] = prog
 	}
 
 	return prog.NewValue(node)
