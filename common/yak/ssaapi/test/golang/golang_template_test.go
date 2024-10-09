@@ -30,7 +30,7 @@ func Test_Template(t *testing.T) {
 		`
 		ssatest.CheckSyntaxFlowEx(t, code, `
 		println(* #-> as $a)
-		`, true,map[string][]string{
+		`, true, map[string][]string{
 			"a": {"1"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
@@ -56,7 +56,7 @@ func Test_Template(t *testing.T) {
 		`
 		ssatest.CheckSyntaxFlowEx(t, code, `
 		println(* #-> as $a)
-		`, true,map[string][]string{
+		`, true, map[string][]string{
 			"a": {"1", "\"1\"", "true"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})

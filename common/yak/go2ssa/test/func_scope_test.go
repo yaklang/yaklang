@@ -305,7 +305,7 @@ func TestClosu_Value(t *testing.T) {
 		}
 
 		`, []string{
-			"1", "phi(count)[1,2]", "phi(count)[1,2]",
+			"1", "phi(count)[phi(count)[1,2],1]", "phi(count)[phi(count)[1,2],1]",
 		}, t)
 	})
 }

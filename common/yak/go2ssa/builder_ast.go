@@ -553,25 +553,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		hitDefinedFunction = true
 	}
 
-	{
-		recoverRange := b.SetRange(fun.BaseParserRuleContext)
-
-		if typeps := fun.TypeParameters(); typeps != nil {
-			b.tpHandler[funcName] = b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
-		}
-
-		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
-			params, result = b.buildSignature(para)
-		}
-
-		handleFunctionType(b.Function)
-
-		if hitDefinedFunction {
-			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
-		}
-		recoverRange()
-	}
-
 	if funcName != "" {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		defer recoverRange()
@@ -590,6 +571,20 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 			}
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
+
+		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
+			params, result = b.buildSignature(para)
+		}
+
+		if typeps := fun.TypeParameters(); typeps != nil {
+			b.tpHandler[funcName] = b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
+		}
+
+		handleFunctionType(b.Function)
+
+		if hitDefinedFunction {
+			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
+		}
 
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
@@ -634,8 +629,24 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 		hitDefinedFunction = true
 	}
 
-	{
+	if funcName != "" {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
+		defer recoverRange()
+
+		variable := b.CreateLocalVariable(funcName)
+		b.AssignVariable(variable, newFunc)
+	}
+
+	newFunc.SetOrdinalBuild(func() ssa.Value {
+		recoverRange := b.SetRange(fun.BaseParserRuleContext)
+		defer func() {
+			recoverRange()
+			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
+				tph()
+				delete(b.tpHandler, newFunc.GetName())
+			}
+		}()
+		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		if recove := fun.Receiver(); recove != nil {
 			ssatyp := b.buildReceiver(recove.(*gol.ReceiverContext))
@@ -655,26 +666,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 		if hitDefinedFunction {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
 		}
-		recoverRange()
-	}
-
-	if funcName != "" {
-		recoverRange := b.SetRange(fun.BaseParserRuleContext)
-		defer recoverRange()
-
-		variable := b.CreateLocalVariable(funcName)
-		b.AssignVariable(variable, newFunc)
-	}
-	newFunc.SetOrdinalBuild(func() ssa.Value {
-		recoverRange := b.SetRange(fun.BaseParserRuleContext)
-		defer func() {
-			recoverRange()
-			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
-				tph()
-				delete(b.tpHandler, newFunc.GetName())
-			}
-		}()
-		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
