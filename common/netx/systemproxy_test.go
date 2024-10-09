@@ -1,4 +1,4 @@
-package systemproxy
+package netx
 
 import (
 	"github.com/davecgh/go-spew/spew"
@@ -22,7 +22,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestSet2(t *testing.T) {
-	Set(Settings{
+	Set(SystemProxySetting{
 		Enabled:       false,
 		DefaultServer: "http://127.0.0.1:7890",
 	})

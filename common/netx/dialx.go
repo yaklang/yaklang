@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/systemproxy"
 	"net"
 	"sync/atomic"
 	"time"
@@ -52,8 +51,8 @@ RETRY:
 	// not need to upgrade
 	var conn net.Conn
 
-	if len(config.Proxy) == 0 && config.EnableSystemProxyFromEnv && systemproxy.FixProxy(systemproxy.GetProxyFromEnv()) != "" {
-		config.Proxy = append(config.Proxy, systemproxy.FixProxy(systemproxy.GetProxyFromEnv()))
+	if len(config.Proxy) == 0 && config.EnableSystemProxyFromEnv && FixProxy(GetProxyFromEnv()) != "" {
+		config.Proxy = append(config.Proxy, FixProxy(GetProxyFromEnv()))
 	}
 
 	if len(config.Proxy) <= 0 || config.ForceDisableProxy {
