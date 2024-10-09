@@ -72,24 +72,34 @@ func broadcastRaw(data *ypb.DuplexConnectionResponse) {
 	}
 }
 
-func BroadcastData(typeString string, data any) {
+func BroadcastData(typeString string, msg any) {
 	broadcastWithTypeMutex.Lock()
 	defer broadcastWithTypeMutex.Unlock()
 
-	Data := &ypb.DuplexConnectionResponse{
-		Data:        utils.Jsonify(data),
+	jsonMsg := utils.Jsonify(msg)
+	data := &ypb.DuplexConnectionResponse{
+		Data:        jsonMsg,
 		MessageType: typeString,
 		Timestamp:   time.Now().UnixNano(),
 	}
+	switch msg.(type) {
+	case string:
+	default:
+		// if complex object, broadcast now, no need to throttle
+		broadcastRaw(data)
+		return
+	}
 
-	if caller, ok := broadcastTypeCallerTable[typeString]; ok {
+	hash := utils.CalcMd5(typeString, jsonMsg)
+
+	if caller, ok := broadcastTypeCallerTable[hash]; ok {
 		caller(func() {
-			broadcastRaw(Data)
+			broadcastRaw(data)
 		})
 	} else {
-		broadcastTypeCallerTable[typeString] = utils.NewThrottle(1)
-		broadcastTypeCallerTable[typeString](func() {
-			broadcastRaw(Data)
+		broadcastTypeCallerTable[hash] = utils.NewThrottle(1)
+		broadcastTypeCallerTable[hash](func() {
+			broadcastRaw(data)
 		})
 	}
 }
