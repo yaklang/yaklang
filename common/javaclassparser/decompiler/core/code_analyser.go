@@ -774,6 +774,10 @@ func (d *Decompiler) ParseStatement() error {
 		})
 	}
 	d.RootNode = nodes[0]
+	//err = d.SplitConditionNode()
+	//if err != nil {
+	//	return err
+	//}
 	return nil
 }
 

@@ -197,6 +197,14 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 				}
 				statementToString = func(statement core.Statement) (statementStr string) {
 					switch ret := statement.(type) {
+					case *core.WhileStatement:
+						statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
+							"%s\n"+
+							c.GetTabString()+"}", ret.ConditionValue.String(funcCtx), statementListToString(ret.Body))
+					case *core.DoWhileStatement:
+						statementStr = fmt.Sprintf(c.GetTabString()+"do{\n"+
+							"%s\n"+
+							c.GetTabString()+"} while (%s)", statementListToString(ret.Body), ret.ConditionValue.String(funcCtx))
 					case *core.SwitchStatement:
 						getBody := func(caseItems []*core.CaseItem) string {
 							var res []string
