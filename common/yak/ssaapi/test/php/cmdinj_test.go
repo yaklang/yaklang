@@ -106,3 +106,20 @@ test($_GET[1]);`
 		map[string][]string{"param": {"Undefined-_GET", "Undefined-_GET.1(valid)"}},
 		ssaapi.WithLanguage(ssaapi.PHP))
 }
+func TestDataflow(t *testing.T) {
+	/*
+		<include('php-param')> as $start;
+		<include('php-filter-function')> as $filter;
+		mysql_query(* as $param);
+		$param #{
+		include: `<self> & $start`,
+		exclude: `<self> & $filter`
+		}->  as $output
+	*/
+	code := `<?php
+    $llink=addslashes($_GET['1']);
+    $query = "SELECT * FROM nav WHERE link='$llink'";
+    $result = mysql_query($query) or die('SQL语句有误：'.mysql_error());
+    $navs = mysql_fetch_array($result);`
+	ssatest.CheckSyntaxFlow(t, code, "<include('php-param')> as $start;\n<include('php-filter-function')> as $filter;\nmysql_query(* as $param);\n$param #{\ninclude: `<self> & $start`,\nexclude: `<self> & $filter`\n}->  as $output", map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+}
