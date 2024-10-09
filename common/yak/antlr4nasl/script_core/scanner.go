@@ -3,6 +3,9 @@ package script_core
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,8 +13,6 @@ import (
 	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"os"
-	"strings"
 )
 
 func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) chan *NaslKBs {
@@ -59,7 +60,7 @@ func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) chan *NaslKB
 			yakit.WithRiskParam_Title(title),
 			yakit.WithRiskParam_RiskType(riskType),
 			yakit.WithRiskParam_Severity("low"),
-			yakit.WithRiskParam_YakitPluginName(source),
+			yakit.WithRiskParam_FromScript(source),
 			yakit.WithRiskParam_Description(summary),
 			yakit.WithRiskParam_Solution(solution),
 			yakit.WithRiskParam_Details(map[string]any{
