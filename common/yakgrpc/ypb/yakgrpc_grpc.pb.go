@@ -404,6 +404,8 @@ const (
 	Yak_UpdateSyntaxFlowRule_FullMethodName                       = "/ypb.Yak/UpdateSyntaxFlowRule"
 	Yak_DeleteSyntaxFlowRule_FullMethodName                       = "/ypb.Yak/DeleteSyntaxFlowRule"
 	Yak_QuerySyntaxFlowRuleGroup_FullMethodName                   = "/ypb.Yak/QuerySyntaxFlowRuleGroup"
+	Yak_SyntaxFlowScan_FullMethodName                             = "/ypb.Yak/SyntaxFlowScan"
+	Yak_QuerySyntaxFlowResult_FullMethodName                      = "/ypb.Yak/QuerySyntaxFlowResult"
 )
 
 // YakClient is the client API for Yak service.
@@ -908,6 +910,10 @@ type YakClient interface {
 	UpdateSyntaxFlowRule(ctx context.Context, in *UpdateSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteSyntaxFlowRule(ctx context.Context, in *DeleteSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QuerySyntaxFlowRuleGroup(ctx context.Context, in *QuerySyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowRuleGroupResponse, error)
+	// syntaxflow scan
+	SyntaxFlowScan(ctx context.Context, opts ...grpc.CallOption) (Yak_SyntaxFlowScanClient, error)
+	// query result
+	QuerySyntaxFlowResult(ctx context.Context, in *QuerySyntaxFlowResultRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowResultResponse, error)
 }
 
 type yakClient struct {
@@ -5914,6 +5920,46 @@ func (c *yakClient) QuerySyntaxFlowRuleGroup(ctx context.Context, in *QuerySynta
 	return out, nil
 }
 
+func (c *yakClient) SyntaxFlowScan(ctx context.Context, opts ...grpc.CallOption) (Yak_SyntaxFlowScanClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[67], Yak_SyntaxFlowScan_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &yakSyntaxFlowScanClient{stream}
+	return x, nil
+}
+
+type Yak_SyntaxFlowScanClient interface {
+	Send(*SyntaxFlowScanRequest) error
+	Recv() (*SyntaxFlowScanResponse, error)
+	grpc.ClientStream
+}
+
+type yakSyntaxFlowScanClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakSyntaxFlowScanClient) Send(m *SyntaxFlowScanRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *yakSyntaxFlowScanClient) Recv() (*SyntaxFlowScanResponse, error) {
+	m := new(SyntaxFlowScanResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *yakClient) QuerySyntaxFlowResult(ctx context.Context, in *QuerySyntaxFlowResultRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowResultResponse, error) {
+	out := new(QuerySyntaxFlowResultResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySyntaxFlowResult_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -6416,6 +6462,10 @@ type YakServer interface {
 	UpdateSyntaxFlowRule(context.Context, *UpdateSyntaxFlowRuleRequest) (*DbOperateMessage, error)
 	DeleteSyntaxFlowRule(context.Context, *DeleteSyntaxFlowRuleRequest) (*DbOperateMessage, error)
 	QuerySyntaxFlowRuleGroup(context.Context, *QuerySyntaxFlowRuleGroupRequest) (*QuerySyntaxFlowRuleGroupResponse, error)
+	// syntaxflow scan
+	SyntaxFlowScan(Yak_SyntaxFlowScanServer) error
+	// query result
+	QuerySyntaxFlowResult(context.Context, *QuerySyntaxFlowResultRequest) (*QuerySyntaxFlowResultResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -7577,6 +7627,12 @@ func (UnimplementedYakServer) DeleteSyntaxFlowRule(context.Context, *DeleteSynta
 }
 func (UnimplementedYakServer) QuerySyntaxFlowRuleGroup(context.Context, *QuerySyntaxFlowRuleGroupRequest) (*QuerySyntaxFlowRuleGroupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QuerySyntaxFlowRuleGroup not implemented")
+}
+func (UnimplementedYakServer) SyntaxFlowScan(Yak_SyntaxFlowScanServer) error {
+	return status.Errorf(codes.Unimplemented, "method SyntaxFlowScan not implemented")
+}
+func (UnimplementedYakServer) QuerySyntaxFlowResult(context.Context, *QuerySyntaxFlowResultRequest) (*QuerySyntaxFlowResultResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySyntaxFlowResult not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -14772,6 +14828,50 @@ func _Yak_QuerySyntaxFlowRuleGroup_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_SyntaxFlowScan_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(YakServer).SyntaxFlowScan(&yakSyntaxFlowScanServer{stream})
+}
+
+type Yak_SyntaxFlowScanServer interface {
+	Send(*SyntaxFlowScanResponse) error
+	Recv() (*SyntaxFlowScanRequest, error)
+	grpc.ServerStream
+}
+
+type yakSyntaxFlowScanServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakSyntaxFlowScanServer) Send(m *SyntaxFlowScanResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *yakSyntaxFlowScanServer) Recv() (*SyntaxFlowScanRequest, error) {
+	m := new(SyntaxFlowScanRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func _Yak_QuerySyntaxFlowResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySyntaxFlowResultRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySyntaxFlowResult(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySyntaxFlowResult_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySyntaxFlowResult(ctx, req.(*QuerySyntaxFlowResultRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -16051,6 +16151,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "QuerySyntaxFlowRuleGroup",
 			Handler:    _Yak_QuerySyntaxFlowRuleGroup_Handler,
 		},
+		{
+			MethodName: "QuerySyntaxFlowResult",
+			Handler:    _Yak_QuerySyntaxFlowResult_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -16397,6 +16501,12 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "FetchPortAssetFromSpaceEngine",
 			Handler:       _Yak_FetchPortAssetFromSpaceEngine_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "SyntaxFlowScan",
+			Handler:       _Yak_SyntaxFlowScan_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "yakgrpc.proto",
