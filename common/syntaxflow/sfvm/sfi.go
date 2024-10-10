@@ -143,14 +143,14 @@ const (
 )
 
 type SFI struct {
-	OpCode               SFVMOpCode
-	UnaryInt             int
-	UnaryStr             string
-	Values               []string
-	MultiOperator        []int
-	SyntaxFlowConfig     []*RecursiveConfigItem
-	FileFilterMethodItem map[string]string
-	Iter                 *IterIndex
+	OpCode               SFVMOpCode             `json:"op_code"`
+	UnaryInt             int                    `json:"unary_int"`
+	UnaryStr             string                 `json:"unary_str"`
+	Values               []string               `json:"values"`
+	MultiOperator        []int                  `json:"multi_operator"`
+	SyntaxFlowConfig     []*RecursiveConfigItem `json:"syntax_flow_config"`
+	FileFilterMethodItem map[string]string      `json:"file_filter_method_item"`
+	Iter                 *IterIndex             `json:"iter"`
 }
 
 func (s *SFI) IsIterOpcode() bool {
@@ -228,7 +228,7 @@ func (s *SFI) String() string {
 	case OpCompareOpcode:
 		return fmt.Sprintf(verboseLen+" %v", "compare opcode", s.Values)
 	case OpCompareString:
-		return fmt.Sprintf(verboseLen+" %v", "compare string", s.Values)
+		return fmt.Sprintf(verboseLen+" %v [%d] mul:%v", "compare string", s.Values, s.UnaryInt, s.MultiOperator)
 	case OpCondition:
 		return fmt.Sprintf(verboseLen+" %v", "condition", s.UnaryStr)
 	case OpEq:

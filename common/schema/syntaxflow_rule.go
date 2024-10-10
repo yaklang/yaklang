@@ -3,9 +3,10 @@ package schema
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -144,7 +145,7 @@ type SyntaxFlowRule struct {
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {
-	s.Hash = utils.CalcSha256(s.RuleName, s.Content, s.Tag)
+	s.Hash = utils.CalcSha256(s.RuleName, s.Content, s.Tag, s.OpCodes)
 	return s.Hash
 }
 

@@ -10,7 +10,7 @@ $resource #{
     hook: `*?{opcode: param || have: '.append(' || have: 'add('} as $calc`
 }->
 check $calc;
-alert $resource;
+alert $calc;
 
 desc(
     lang: java,

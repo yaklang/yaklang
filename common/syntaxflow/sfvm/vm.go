@@ -71,6 +71,8 @@ func (s *SyntaxFlowVirtualMachine) ForEachFrame(h func(frame *SFFrame)) {
 func (s *SyntaxFlowVirtualMachine) Load(rule *schema.SyntaxFlowRule) (*SFFrame, error) {
 	frame := newSfFrameEx(s.vars, rule.Content, ToOpCodes(rule.OpCodes), rule, s.config)
 	frame.config = s.config
+	frame.vm = s
+	s.frames = append(s.frames, frame)
 	return frame, nil
 }
 
