@@ -1,0 +1,38 @@
+desc(
+    title: "Find Config for Thymeleaf (Java Class Config)",
+    type: audit,
+    severity: low,
+)
+
+SpringResourceTemplateResolver() as $templateResolver;
+alert $templateResolver for "SpringResourceTemplateResolver is used";
+$templateResolver.set*(*?{opcode: const} as $params);
+alert $params for {
+    message: "SpringResourceTemplateResolver is used with some params",
+};
+
+desc(
+lang: java,
+alert_min: 3,
+'file://config.java': <<<EOF
+@Configuration
+public class ThymeleafConfig {
+    @Bean
+    public SpringTemplateEngine templateEngine() {
+        SpringTemplateEngine templateEngine = new SpringTemplateEngine();
+        templateEngine.setTemplateResolver(templateResolver());
+        return templateEngine;
+    }
+
+    @Bean
+    public SpringResourceTemplateResolver templateResolver() {
+        SpringResourceTemplateResolver templateResolver = new SpringResourceTemplateResolver();
+        templateResolver.setPrefix("classpath:/templates/");
+        templateResolver.setSuffix(".html");
+        templateResolver.setTemplateMode(TemplateMode.HTML);
+        return templateResolver;
+    }
+}
+EOF
+)
+
