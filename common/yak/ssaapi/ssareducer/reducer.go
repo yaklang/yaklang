@@ -58,7 +58,7 @@ func ReducerCompile(base string, opts ...Option) error {
 			if errors.Is(err, SkippedError) {
 				return nil
 			}
-			log.Warnf("Compile error: %v", err)
+			log.Errorf("Compile error: %v", err)
 		}
 		for _, result := range results {
 			visited.Insert(result)
@@ -86,7 +86,9 @@ func ReducerCompile(base string, opts ...Option) error {
 		}
 		if !isDir {
 			// file
-			handler(path)
+			if err := handler(path); err != nil {
+				return err
+			}
 			return nil
 		}
 		folder, name := c.fs.PathSplit(path)
