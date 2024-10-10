@@ -805,7 +805,7 @@ func (t *LabelBuilder) Finish() {
 
 func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 	parent := s.GetParent()
-	end := parent.CreateShadowScope()
+	end := parent.CreateSubScope()
 	b.CurrentBlock.SetScope(end)
 
 	names := parent.GetAllVariableNames()
