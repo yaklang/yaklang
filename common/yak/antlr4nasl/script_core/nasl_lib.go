@@ -1679,7 +1679,7 @@ func init() {
 			return iface.HardwareAddr.String(), nil
 		},
 		"pingHost": func(ctx *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error) {
-			result := pingutil.PingAuto(ctx.Host, "", time.Second*5, ctx.Proxies...)
+			result := pingutil.PingAuto(ctx.Host, pingutil.WithDefaultTcpPort(""), pingutil.WithTimeout(5), pingutil.WithProxies(ctx.Proxies...))
 			return result.Ok, nil
 		},
 		"call_yak_method": func(ctx *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error) {

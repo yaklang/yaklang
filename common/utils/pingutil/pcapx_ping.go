@@ -61,6 +61,10 @@ func PingAuto2(target string, config *PingConfig) *PingResult {
 }
 
 func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
+	if config.Ctx == nil {
+		config.Ctx = context.Background()
+	}
+	parentCtx := config.Ctx
 	ip := target
 	if !utils.IsIPv4(target) && !utils.IsIPv6(target) {
 		host, _, _ := utils.ParseStringToHostPort(target)
@@ -104,7 +108,7 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 	isAlive := utils.NewBool(false)
 	ttl := 0
 
-	ctx, cancel := context.WithTimeout(context.Background(), config.timeout)
+	ctx, cancel := context.WithTimeout(parentCtx, config.timeout)
 	defer cancel()
 	go func() {
 		defer func() {
