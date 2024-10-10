@@ -272,3 +272,52 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	}
 	return nil, utils.Error("unknown tls strategy error, BUG here!")
 }
+
+// dialPlainUdpConn get abstract udp conn, with global netx config (disallow address, etc)
+func dialPlainUdpConn(target string, config *dialXConfig) (*net.UDPConn, error) {
+	host, port, err := utils.ParseStringToHostPort(target)
+	if err != nil {
+		return nil, utils.Errorf("invalid target %#v, cannot find host:port", target)
+	}
+
+	host = utils.FixForParseIP(host)
+	ipIns := net.ParseIP(host)
+	if ipIns == nil {
+		// not valid ip
+		host = LookupFirst(host, config.DNSOpts...)
+		if ipIns = net.ParseIP(host); ipIns == nil {
+			return nil, utils.Errorf("cannot resolve %v", target)
+		}
+	}
+
+	// handle ip address
+	if config.DisallowAddress != nil {
+		if config.DisallowAddress.Contains(host) {
+			return nil, utils.Errorf("disallow address %v by config(check your yakit system/network config)", host)
+		}
+	}
+
+	return net.DialUDP("udp", config.LocalAddr, &net.UDPAddr{
+		IP:   ipIns,
+		Port: port,
+	})
+}
+
+func DialUdpX(target string, opt ...DialXOption) (*net.UDPConn, error) {
+	config := &dialXConfig{
+		DisallowAddress: utils.NewHostsFilter(),
+	}
+
+	// default init
+	defaultDialXOptionsMutex.Lock()
+	for _, o := range defaultDialXOptions {
+		o(config)
+	}
+	defaultDialXOptionsMutex.Unlock()
+
+	// user init
+	for _, o := range opt {
+		o(config)
+	}
+	return dialPlainUdpConn(target, config)
+}

@@ -2,6 +2,7 @@ package netx
 
 import (
 	"crypto/tls"
+	"net"
 	"sync"
 	"time"
 
@@ -49,6 +50,8 @@ type dialXConfig struct {
 
 	// ClientHelloSpec
 	ClientHelloSpec *utls.ClientHelloSpec
+
+	LocalAddr *net.UDPAddr
 }
 
 type DialXOption func(c *dialXConfig)
@@ -230,6 +233,12 @@ func DialX_WithEnableSystemProxyFromEnv(b bool) DialXOption {
 func DialX_WithClientHelloSpec(spec *utls.ClientHelloSpec) DialXOption {
 	return func(c *dialXConfig) {
 		c.ClientHelloSpec = spec
+	}
+}
+
+func DialX_WithLocalAddr(addr *net.UDPAddr) DialXOption {
+	return func(c *dialXConfig) {
+		c.LocalAddr = addr
 	}
 }
 
