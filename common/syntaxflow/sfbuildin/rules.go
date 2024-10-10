@@ -2,13 +2,13 @@ package sfbuildin
 
 import (
 	"embed"
+	"github.com/yaklang/yaklang/common/log"
 	"io/fs"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -55,13 +55,21 @@ func init() {
 				}
 				tags = append(tags, block)
 			}
-			err = sfdb.ImportRuleWithoutValid(name, string(raw), true, tags...)
+			content := string(raw)
+			// import builtin rule
+			err = sfdb.ImportRuleWithoutValid(name, content, true, tags...)
 			if err != nil {
 				log.Warnf("import rule %s error: %s", name, err)
+				return err
+			}
+			//builtin rule use language,purpose,severity as group name
+			err = sfdb.ImportRuleDefaultGroupName(name, content)
+			if err != nil {
 				return err
 			}
 			return nil
 		}))
 		return utils.Wrapf(err, "init builtin rules error")
 	})
+
 }

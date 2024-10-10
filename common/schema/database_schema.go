@@ -53,10 +53,12 @@ var ProfileTables = []interface{}{
 	&WebFuzzerLabel{},
 	&PluginGroup{},
 	&CodecFlow{},
-	&SyntaxFlowRule{},
 	&SSAProgram{},
 	//general rule
 	&GeneralRule{},
+	//syntaxFlow rule
+	&SyntaxFlowRule{},
+	&SyntaxFlowRuleGroup{},
 }
 
 var databaseSchemas = map[uint8][]any{

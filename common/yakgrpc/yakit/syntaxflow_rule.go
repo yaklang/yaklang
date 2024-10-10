@@ -6,11 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"sync"
 )
-
-var syntaxFlowOpLock = new(sync.Mutex)
 
 func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*bizhelper.Paginator, []*schema.SyntaxFlowRule, error) {
 	if params == nil {
@@ -40,44 +36,72 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 	if params == nil {
 		return db
 	}
-	if params.RuleName != "" {
-		db = db.Where("rule_name = ?", params.RuleName)
-	}
-	if len(params.Language) > 0 {
-		db = bizhelper.ExactQueryStringArrayOr(db, "language", params.Language)
-	}
-	if len(params.Purpose) > 0 {
-		db = bizhelper.ExactQueryStringArrayOr(db, "purpose", params.Purpose)
-	}
-	if len(params.Severity) > 0 {
-		db = bizhelper.ExactQueryStringArrayOr(db, "severity", params.Severity)
+	if len(params.GetGroupNames()) == 1 && params.GetGroupNames()[0] == "" {
+		db = db.Joins("LEFT JOIN syntax_flow_rule_groups P ON syntax_flow_rules.rule_name = P.rule_name")
+		db = db.Where("P.group_name IS NULL")
+	} else if len(params.GetGroupNames()) > 0 {
+		db = db.Joins("LEFT JOIN syntax_flow_rule_groups P ON syntax_flow_rules.rule_name = P.rule_name")
+		db = bizhelper.ExactQueryStringArrayOr(db, "`group_name`", params.GetGroupNames())
 	}
 
-	tags := utils.StringArrayFilterEmpty(params.GetTag())
-	if len(tags) > 0 {
-		db = bizhelper.FuzzQueryStringArrayOrLike(db, "tag", tags)
+	if len(params.GetRuleNames()) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", params.GetRuleNames())
 	}
-	if params.Verified {
-		db = bizhelper.QueryByBool(db, "is_general_module", true)
+	if len(params.GetLanguage()) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "language", params.GetLanguage())
 	}
-	if params.IsBuildInRule {
-		db = bizhelper.QueryByBool(db, "is_build_in", true)
+	if len(params.GetPurpose()) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", params.GetPurpose())
 	}
-	if params.AllowIncluded {
-		db = bizhelper.QueryByBool(db, "allow_included", true)
+	if len(params.GetTag()) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", params.GetTag())
 	}
+
 	if params.GetKeyword() != "" {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 			"rule_name", "title", "title_zh", "description", "content", "tag",
-		}, strings.Split(params.GetKeyword(), ","), false)
+		}, []string{params.GetKeyword()}, false)
 	}
+
 	return db
 }
 
-func DeleteSyntaxFlowRuleByFilter(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter) (int64, error) {
-	db = FilterSyntaxFlowRule(db, filter)
-	if db = db.Unscoped().Delete(&schema.SyntaxFlowRule{}); db.Error != nil {
-		return 0, utils.Errorf("delete syntax flow rule failed: %s", db.Error)
+func CreateSyntaxFlowRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
+	if rule == nil {
+		return utils.Errorf("create syntaxFlow rule failed: rule is nil")
 	}
-	return db.RowsAffected, nil
+	if rule.RuleName == "" {
+		return utils.Errorf("create syntaxFlow rule failed: rule name is empty")
+	}
+
+	db = db.Model(&schema.SyntaxFlowRule{})
+	if err := db.Create(rule).Error; err != nil {
+		return utils.Errorf("create syntaxFlow rule failed: %s", err)
+	}
+	return nil
+}
+
+func UpdateSyntaxFlowRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
+	if rule == nil {
+		return utils.Errorf("update syntaxFlow rule failed: rule is nil")
+	}
+	if rule.RuleName == "" {
+		return utils.Errorf("update syntaxFlow rule failed: rule name is empty")
+	}
+
+	db = db.Model(&schema.SyntaxFlowRule{})
+	if err := db.Where("rule_name = ?", rule.RuleName).Update(rule).Error; err != nil {
+		return utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+	return nil
+}
+
+func DeleteSyntaxFlowRule(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest) (int64, error) {
+	db = db.Model(&schema.SyntaxFlowRule{})
+	if params == nil || params.Filter == nil {
+		return 0, utils.Errorf("delete syntaxFlow rule failed: synatx flow filter is nil")
+	}
+	db = FilterSyntaxFlowRule(db, params.Filter)
+	db = db.Unscoped().Delete(&schema.SyntaxFlowRule{})
+	return db.RowsAffected, db.Error
 }
