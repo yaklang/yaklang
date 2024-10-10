@@ -1,0 +1,21 @@
+programName := uuid()
+prog, err := ssa.Parse(`println("a")`, ssa.withProgramName(programName))
+if err !=nil{
+    die("parse failt: %s" % err)
+}
+
+prog, err = ssa.NewFromProgramName(programName)
+if err !=nil {
+    die("new failt: %s" % err)
+}
+
+taskID = uuid()
+yakit.Info("start task: %s", taskID)
+for rule := range syntaxflow.QuerySyntaxFlowRules("java-sca"){
+    yakit.Info("rule: %s", rule.RuleName)
+    res, err := syntaxflow.ExecRule(rule, prog, syntaxflow.withExecTaskID(taskID))
+    if err !=nil{
+        die("exec rule failt: %s" % err)
+        continue
+    }
+}
