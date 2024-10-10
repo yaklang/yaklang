@@ -3,10 +3,9 @@ package schema
 import (
 	"database/sql/driver"
 	"encoding/json"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -145,7 +144,7 @@ type SyntaxFlowRule struct {
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {
-	s.Hash = utils.CalcSha256(s.Content, s.Tag)
+	s.Hash = utils.CalcSha256(s.RuleName, s.Content, s.Tag)
 	return s.Hash
 }
 
@@ -166,24 +165,23 @@ func (s *SyntaxFlowRule) GetAlertInfo(msg string) (string, bool) {
 	return "", false
 }
 
-func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRuleData {
-	sfRule := &ypb.SyntaxFlowRuleData{
-		IsBuildInRule:        s.IsBuildInRule,
-		Language:             s.Language,
-		RuleName:             s.RuleName,
-		Title:                s.Title,
-		TitleZh:              s.TitleZh,
-		Description:          s.Description,
-		Type:                 string(s.Type),
-		Severity:             string(s.Severity),
-		Content:              s.Content,
-		Purpose:              string(s.Purpose),
-		TypicalHitFileSystem: s.TypicalHitFileSystem,
-		Verified:             s.Verified,
-		AllowIncluded:        s.AllowIncluded,
-		IncludedName:         s.IncludedName,
-		Hash:                 s.Hash,
-		Tag:                  s.Tag,
+func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
+	sfRule := &ypb.SyntaxFlowRule{
+		IsBuildInRule: s.IsBuildInRule,
+		Language:      s.Language,
+		RuleName:      s.RuleName,
+		Title:         s.Title,
+		TitleZh:       s.TitleZh,
+		Description:   s.Description,
+		Type:          string(s.Type),
+		Severity:      string(s.Severity),
+		Content:       s.Content,
+		Purpose:       string(s.Purpose),
+		Verified:      s.Verified,
+		AllowIncluded: s.AllowIncluded,
+		IncludedName:  s.IncludedName,
+		Hash:          s.Hash,
+		Tag:           s.Tag,
 	}
 	return sfRule
 }
