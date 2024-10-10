@@ -8,10 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
-	"sync"
 )
-
-var syntaxFlowOpLock = new(sync.Mutex)
 
 type SyntaxFlowGroupResult struct {
 	RuleName      string
@@ -51,19 +48,9 @@ func FilterSyntaxFlowGroup(db *gorm.DB, filter *ypb.SyntaxFlowRuleGroupFilter) *
 }
 
 func AddSyntaxFlowRulesGroup(db *gorm.DB, i *schema.SyntaxFlowRuleGroup) error {
-	syntaxFlowOpLock.Lock()
-	defer syntaxFlowOpLock.Unlock()
 	db = db.Model(&schema.SyntaxFlowRuleGroup{})
 	if i.RuleName == "" {
 		return utils.Error("add syntax flow rule group failed:rule name is empty")
-	}
-	if i.GroupName == "" {
-		return utils.Error("add syntax flow rule group failed:group name is empty")
-	}
-	hash := i.CalcHash()
-	var data schema.SyntaxFlowRuleGroup
-	if err := db.Where("hash = ?", hash).Find(&data).Error; err == nil {
-		return utils.Error("add syntax flow rule group failed: this rule already belongs to this group")
 	}
 	if db := db.Create(i); db.Error != nil {
 		return utils.Errorf("create SyntaxFlowGroup failed: %s", db.Error)
@@ -72,31 +59,18 @@ func AddSyntaxFlowRulesGroup(db *gorm.DB, i *schema.SyntaxFlowRuleGroup) error {
 }
 
 func UpdateSyntaxFlowRulesGroup(db *gorm.DB, i *schema.SyntaxFlowRuleGroup) error {
-	syntaxFlowOpLock.Lock()
-	defer syntaxFlowOpLock.Unlock()
 	db = db.Model(&schema.SyntaxFlowRuleGroup{})
 	if i.RuleName == "" {
 		return utils.Error("add syntax flow rule group failed:rule name is empty")
 	}
-	if i.GroupName == "" {
-		return utils.Error("add syntax flow rule group failed:group name is empty")
-	}
-	if err := db.Where("rule_name = ?", i.RuleName).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.Errorf("update syntax flow rule group failed:the rule name %s not found", i.RuleName)
-		} else {
-			return utils.Errorf("update syntax flow rule group failed: %s", err)
-		}
-	}
-	if db := db.Model(&schema.SyntaxFlowRuleGroup{}).Where("rule_name = ?", i.RuleName).Update(i); db.Error != nil {
-		return utils.Errorf("update SyntaxFlowGroup failed: %s", db.Error)
+	hash := i.CalcHash()
+	if err := db.Where("hash = ?", hash).Update(i).Error; err != nil {
+		return utils.Errorf("update SyntaxFlowGroup failed: %s", err)
 	}
 	return nil
 }
 
 func DeleteSyntaxFlowRuleGroup(db *gorm.DB, i *schema.SyntaxFlowRuleGroup) error {
-	syntaxFlowOpLock.Lock()
-	defer syntaxFlowOpLock.Unlock()
 	db = db.Model(&schema.SyntaxFlowRuleGroup{})
 	hash := i.CalcHash()
 	if err := db.Where("hash = ?", hash).Error; err != nil {

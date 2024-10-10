@@ -1,7 +1,6 @@
 package yakit
 
 import (
-	"errors"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -43,7 +42,7 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 	}
 	if params.GetUnsetGroup() {
 		db = db.Joins("LEFT JOIN syntax_flow_rule_groups P ON syntax_flow_rules.rule_name = P.rule_name")
-		db = db.Where("P.rule_name IS NULL")
+		db = db.Where("P.group_name IS NULL")
 	} else if params.GetGroupName() != nil {
 		db = db.Joins("LEFT JOIN syntax_flow_rule_groups P ON syntax_flow_rules.rule_name = P.rule_name")
 		db = bizhelper.ExactQueryStringArrayOr(db, "`group_name`", params.GetGroupName())
@@ -93,17 +92,13 @@ func CreateSyntaxFlowRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
 		return utils.Errorf("create syntaxFlow rule failed: rule name is empty")
 	}
 
-	var findRule schema.SyntaxFlowRule
 	db = db.Model(&schema.SyntaxFlowRule{})
-	if err := db.First(&findRule, "rule_name = ?", rule.RuleName).Error; err == nil {
-		return utils.Errorf("create syntaxFlow rule failed: rule name %s already exists", rule.RuleName)
-	}
-
 	if err := db.Create(rule).Error; err != nil {
 		return utils.Errorf("create syntaxFlow rule failed: %s", err)
 	}
 	return nil
 }
+
 func UpdateSyntaxFlowRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
 	if rule == nil {
 		return utils.Errorf("update syntaxFlow rule failed: rule is nil")
@@ -112,17 +107,8 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
 		return utils.Errorf("update syntaxFlow rule failed: rule name is empty")
 	}
 
-	findRule := schema.SyntaxFlowRule{}
 	db = db.Model(&schema.SyntaxFlowRule{})
-	db = db.First(&findRule, "rule_name = ?", rule.RuleName)
-	if err := db.Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.Errorf("update syntaxFlow rule failed: rule name %s not found", rule.RuleName)
-		} else {
-			return utils.Errorf("update syntaxFlow rule failed: %s", err)
-		}
-	}
-	if err := db.Model(findRule).Update(rule).Error; err != nil {
+	if err := db.Where("rule_name = ?", rule.RuleName).Update(rule).Error; err != nil {
 		return utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
 	return nil
