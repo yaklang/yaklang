@@ -175,7 +175,7 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 		defer close(synResults)
 		for result := range res {
 			if !result.Ok {
-				log.Errorf("%v is may not alive.", result.IP)
+				log.Debugf("%v is may not alive.", result.IP)
 				continue
 			}
 
