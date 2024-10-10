@@ -1,0 +1,113 @@
+desc(
+    title: "Spring Controller Template Path SSTI",
+    type: vuln,
+    level: high,
+)
+
+<include('java-spring-param')>?{<typeName>?{have: String}} as $params;
+
+Controller.__ref__<getMembers>?{.annotation.*Mapping} as $entryMethods;
+$entryMethods<getReturns>?{<typeName>?{have: String}} as $sink;
+$sink #{
+    until: `* & $params as $source`,
+    exclude: `*?{opcode: phi}`,
+}->;
+$source<dataflow(<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $haveCall;
+
+$source - $haveCall as $withoutCall;
+alert $withoutCall for {
+    message: "Template Path Injection(Direct Use of User Input)",
+    level: high,
+    type: vuln,
+};
+
+$haveCall<dataflow(<<<CODE
+* - $haveCall as $other;
+$other?{opcode: call && !opcode: param} as $calls;
+$calls?{<getCaller><name><isSanitizeName>} as $__next__;
+<delete(call)>
+<delete(other)>
+CODE)> as $filteredSink;
+
+$haveCall - $filteredSink as $unsafeFilteredSink;
+alert $unsafeFilteredSink for {
+    message: "Template Path Injection(Filtered Use of User Input)",
+    level: mid,
+    type: vuln,
+};
+alert $filteredSink for {
+    message: "The String or Content Filter is used. It is recommended to use the filter to prevent SSTI.",
+    level: low,
+    type: audit,
+};
+
+
+
+desc(
+    lang: java,
+    alert_min: 3,
+    'file://demo.java': <<<EOF
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import java.util.Arrays;
+import java.util.List;
+
+@Controller
+public class VulnerableController {
+
+    @GetMapping("/view")
+    public String viewPage(@RequestParam String page, Model model) {
+        // 这里直接使用用户提供的参数作为模板名，这是不安全的
+        return page;
+    }
+
+    @GetMapping("/view2")
+    public String viewPage2(@RequestParam String page, Model model) {
+        // 这里试图通过简单的字符串检查来防御，但仍然不安全
+        if (page.contains("blackword")) {
+            return "error";
+        }
+        return page;
+    }
+
+    @GetMapping("/view3")
+    public String viewPage3(@RequestParam String page, Model model) {
+        // 这里尝试通过移除某些字符来"净化"输入，但仍然不安全
+        String cleanedPage = page.replaceAll("[^a-zA-Z0-9]", "");
+        return cleanedPage;
+    }
+
+    @GetMapping("/view4")
+    public String viewPage4(@RequestParam String page, Model model) {
+        // 这里尝试通过白名单来限制页面，但实现不当
+        List<String> allowedPages = Arrays.asList("home", "about", "contact");
+        if (allowedPages.contains(page.toLowerCase())) {
+            return page; // 注意这里返回的是原始的 page，而不是小写版本
+        }
+        return "error";
+    }
+
+    @GetMapping("/view5")
+    public String viewPage5(@RequestParam String page, Model model) {
+        // 这里尝试通过长度限制来防御，但仍然不安全
+        if (page.length() > 20) {
+            return "error";
+        }
+        return page;
+    }
+
+    @GetMapping("/view6")
+    public String viewPage6(@RequestParam String page, Model model) {
+        // 这里尝试通过前缀检查来限制模板，但实现不当
+        if (!page.startsWith("safe_")) {
+            return "error";
+        }
+        return page.substring(5); // 移除 "safe_" 前缀
+    }
+}
+EOF
+)
