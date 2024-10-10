@@ -1,6 +1,7 @@
 package bruteutils
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
@@ -177,6 +178,9 @@ func newRDPClient(host string, logLevel glog.LEVEL) *rdpClient {
 }
 
 func (g *rdpClient) Login(domain, user, pwd string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	defer cancel()
+
 	conn, err := defaultDialer.DialTCPContext(utils.TimeoutContext(defaultTimeout), "tcp", g.Host)
 	if err != nil {
 		return fmt.Errorf("dial error: %v", err)
@@ -193,14 +197,10 @@ func (g *rdpClient) Login(domain, user, pwd string) error {
 	g.sec.SetUser(user)
 	g.sec.SetPwd(pwd)
 	g.sec.SetDomain(domain)
-	// g.sec.SetClientAutoReconnect()
 
 	g.tpkt.SetFastPathListener(g.sec)
 	g.sec.SetFastPathListener(g.pdu)
 	g.pdu.SetFastPathSender(g.tpkt)
-
-	// g.x224.SetRequestedProtocol(x224.PROTOCOL_SSL)
-	// g.x224.SetRequestedProtocol(x224.PROTOCOL_RDP)
 
 	err = g.x224.Connect()
 	if err != nil {
@@ -208,7 +208,7 @@ func (g *rdpClient) Login(domain, user, pwd string) error {
 	}
 	glog.Info("wait connect ok")
 	wg := &sync.WaitGroup{}
-	breakFlag := false
+	var doneOnce sync.Once
 	wg.Add(1)
 
 	g.pdu.On("error", func(e error) {
@@ -234,11 +234,18 @@ func (g *rdpClient) Login(domain, user, pwd string) error {
 		log.Infof("on update: %v", spew.Sdump(rectangles))
 	})
 	g.pdu.On("done", func() {
-		if breakFlag == false {
-			breakFlag = true
+		doneOnce.Do(func() {
 			wg.Done()
-		}
+		})
 	})
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			// 如果在超时时间内没有收到任何事件，说明可能协议不对
+			g.pdu.Emit("error", errors.New("protocol error"))
+		}
+	}()
 
 	wg.Wait()
 	return err
