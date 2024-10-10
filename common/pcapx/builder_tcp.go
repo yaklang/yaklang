@@ -161,7 +161,7 @@ func WithTCP_Options(optionType any, data []byte) TCPOption {
 		}
 		if optionType == nil {
 			config.Options = nil
-		}else {
+		} else {
 			config.Options = append(config.Options, layers.TCPOption{
 				OptionType:   layers.TCPOptionKind(utils.InterfaceToInt(optionType)),
 				OptionLength: uint8(len(data)) + 2,
