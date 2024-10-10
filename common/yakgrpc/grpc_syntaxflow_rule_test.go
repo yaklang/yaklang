@@ -34,15 +34,13 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 	}
 
 	deleteRuleByNames := func(names []string) {
-		for _, name := range names {
-			req := &ypb.DeleteSyntaxFlowRuleRequest{
-				Filter: &ypb.SyntaxFlowRuleFilter{
-					Rule: &ypb.SyntaxFlowRule{RuleName: name},
-				},
-			}
-			_, err = client.DeleteSyntaxFlowRule(context.Background(), req)
-			require.NoError(t, err)
+		req := &ypb.DeleteSyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: names,
+			},
 		}
+		_, err = client.DeleteSyntaxFlowRule(context.Background(), req)
+		require.NoError(t, err)
 	}
 
 	updateRuleByNames := func(names []string) {
@@ -114,7 +112,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 
 		queryReq := &ypb.QuerySyntaxFlowRuleRequest{
 			Filter: &ypb.SyntaxFlowRuleFilter{
-				KeyWord: "这是一个测试文件",
+				Keyword: "这是一个测试文件",
 			},
 		}
 

@@ -7,10 +7,9 @@ import (
 
 type SyntaxFlowRuleGroup struct {
 	gorm.Model
-	RuleName      string `gorm:"index"`
-	GroupName     string `gorm:"index"`
-	Hash          string `gorm:"unique_index"`
-	IsBuildInRule bool
+	RuleName  string `gorm:"index"`
+	GroupName string `gorm:"index"`
+	Hash      string `gorm:"unique_index"`
 }
 
 func (s *SyntaxFlowRuleGroup) BeforeSave() error {

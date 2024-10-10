@@ -171,9 +171,8 @@ func ImportRuleDefaultGroupName(ruleName string, content string) error {
 	}
 	saveSfGroup := func(groupName string) error {
 		saveData := &schema.SyntaxFlowRuleGroup{
-			RuleName:      ruleName,
-			GroupName:     groupName,
-			IsBuildInRule: true,
+			RuleName:  ruleName,
+			GroupName: groupName,
 		}
 		hash := saveData.CalcHash()
 		return CreateOrUpdateSyntaxFlowGroup(hash, saveData)
