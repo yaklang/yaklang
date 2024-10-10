@@ -1,15 +1,16 @@
 desc(
   title: 'checking [Servlet Web Parameters Finding]',
   type: audit,
-  lib: 'servlet-param'
+  lib: 'java-servlet-param'
 )
 
 /(do(Get|Post|Delete|Filter|[A-Z]\w+))|(service)/(*?{!have: this && opcode: param } as $req);
 $req.getParameter() as $directParam;
 $req -{
   hook: `*.getParameter() as $indirectParam`
-}->
-$directParam + $indirectParam as $output;
+}->;
+.getInputStream?{<getObject><typeName>?{have: *Http*Request*}}() as $getInputStream;
+$directParam + $indirectParam + $getInputStream as $output;
 
 
 

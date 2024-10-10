@@ -4,7 +4,7 @@ desc(
     level: high,
 )
 
-<include('servlet-param')> as $source;
+<include('java-servlet-param')> as $source;
 check $source;
 
 <include('runtime-exec-sink')> as $sink;

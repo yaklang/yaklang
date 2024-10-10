@@ -1,0 +1,100 @@
+desc(
+    title: "Find Java Native Deserialization Vulnerability via ObjectInputStream",
+    type: vuln,
+    lang: java,
+)
+
+.readObject?{<getObject>?{<typeName>?{have: ObjectInputStream}}<var(input)> } as $readObject;
+$readObject() as $sink;
+alert $sink for {
+    message: "Deserialization Vulnerability via ObjectInputStream",
+    level: mid,
+    type: audit,
+};
+
+check $readObject;
+
+<include('java-spring-param')> as $params;
+<include('java-servlet-param')> as $params;
+$readObject<getObject>#{
+    until: `* & $params<var(source)> as $__next__`,
+}->;
+alert $source for {
+    message: "Deserialization vulnerability: Spring parameter reaches ObjectInputStream.readObject()",
+    level: high,
+    type: audit,
+};
+
+
+
+desc(
+lang: java,
+alert_middle: 3,
+alert_min: 5,
+'file://demo.java': <<<EOF
+import java.io.*;
+
+public class VulnerableClass {
+    public static void main(String[] args) {
+        try {
+            ObjectInputStream ois = new ObjectInputStream(new FileInputStream("data.bin"));
+            Object obj = ois.readObject();
+            ois.close();
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();    
+        }
+    }
+}
+EOF,
+'file://demo2.java': <<<EOF
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import java.io.*;
+
+@RestController
+public class VulnerableController {
+
+    @PostMapping("/deserialize")
+    public String deserializeObject(@RequestBody byte[] data) {
+        try {
+            ByteArrayInputStream bis = new ByteArrayInputStream(data);
+            ObjectInputStream ois = new ObjectInputStream(bis);
+            Object obj = ois.readObject();
+            ois.close();
+            return "Deserialization successful: " + obj.toString();
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+            return "Error during deserialization: " + e.getMessage();
+        }
+    }
+}
+EOF,
+
+'file://demo3.java': <<<EOF
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.*;
+
+@WebServlet("/vulnerable")
+public class VulnerableServlet extends HttpServlet {
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        try {
+            ObjectInputStream ois = new ObjectInputStream(request.getInputStream());
+            Object obj = ois.readObject();
+            ois.close();
+            
+            response.getWriter().println("Deserialization successful: " + obj.toString());
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+            response.getWriter().println("Error during deserialization: " + e.getMessage());
+        }
+    }
+}
+EOF
+)
