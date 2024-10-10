@@ -17,7 +17,7 @@ func TestMustPassDebug(t *testing.T) {
 
 	yakit.RegisterLowHTTPSaveCallback()
 
-	debugName := "suricata_match_group.yak"
+	debugName := "syntaxflow.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {

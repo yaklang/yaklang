@@ -364,6 +364,7 @@ func (p *Program) Feed(code io.Reader) error {
 	return p.config.feed(p.Program, memedit.NewMemEditor(string(raw)))
 }
 
+// FromDatabase get program from database by program name
 func FromDatabase(programName string, opts ...Option) (*Program, error) {
 	config := defaultConfig()
 	for _, opt := range opts {
@@ -375,8 +376,9 @@ func FromDatabase(programName string, opts ...Option) (*Program, error) {
 }
 
 var Exports = map[string]any{
-	"Parse":             Parse,
-	"ParseLocalProject": ParseProjectFromPath,
+	"Parse":              Parse,
+	"ParseLocalProject":  ParseProjectFromPath,
+	"NewFromProgramName": FromDatabase,
 
 	"withLanguage":      WithRawLanguage,
 	"withExternLib":     WithExternLib,

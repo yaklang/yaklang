@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/syntaxflow"
 	"github.com/yaklang/yaklang/common/twofa"
 
 	"github.com/yaklang/yaklang/common/ai"
@@ -297,6 +298,7 @@ func initYaklangLib() {
 
 	// ssa
 	yaklang.Import("ssa", ssaapi.Exports)
+	yaklang.Import("syntaxflow", syntaxflow.Exports)
 
 	// openapi
 	yaklang.Import("openapi", openapi.Exports)
