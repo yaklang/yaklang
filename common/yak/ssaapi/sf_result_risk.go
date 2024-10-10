@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID string) {
@@ -60,5 +61,14 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID strin
 	risk.Variable = variable
 	if err := yakit.SaveRisk(risk); err != nil {
 		log.Errorf("save risk failed: %s", err)
+		return
 	}
+	r.risk = append(r.risk, risk.ToGRPCModel())
+}
+
+func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.Risk {
+	if r == nil {
+		return nil
+	}
+	return r.risk
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func CreateResultByID(resultID uint) (*SyntaxFlowResult, error) {
@@ -65,6 +66,7 @@ func (r *SyntaxFlowResult) Save(TaskIDs ...string) (uint, error) {
 	if err := r.saveValue(result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}
+	result.RiskCount = uint64(len(r.risk))
 	if err := ssadb.SaveResult(result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}
@@ -115,4 +117,11 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 	})
 	saveVariable("_", r.GetUnNameValues())
 	return err
+}
+
+func (r *SyntaxFlowResult) GetGRPCModelResult() *ypb.SyntaxFlowResult {
+	if r == nil || r.dbResult == nil {
+		return nil
+	}
+	return r.dbResult.ToGRPCModel()
 }
