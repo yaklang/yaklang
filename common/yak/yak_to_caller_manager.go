@@ -1231,7 +1231,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		funcValue := reflect.ValueOf(f)
 		funcType := funcValue.Type()
 		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
-			bruteOpt := []tools.BruteOpt{tools.WithRuntimeId(runtimeId), tools.WithCtx(streamContext)}
+			bruteOpt := []tools.BruteOpt{tools.WithBruteRuntimeId(runtimeId), tools.WithBruteCtx(streamContext)}
 			index := len(args) - 1 // 获取 option 参数的 index
 			interfaceValue := args[index].Interface()
 			args = args[:index]
@@ -1250,32 +1250,31 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 
 	nIns.GetVM().RegisterMapMemberCallHandler("brute", "New", hookBruteFunc)
 
-	// TODO
-	//hookPingScanFunc := func(f interface{}) interface{} {
-	//	funcValue := reflect.ValueOf(f)
-	//	funcType := funcValue.Type()
-	//	hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
-	//		pingScanOpt := []yaklib.PingOpt{yaklib.WithRuntimeId(runtimeId), yaklib.WithCtx(streamContext)}
-	//		index := len(args) - 1 // 获取 option 参数的 index
-	//		interfaceValue := args[index].Interface()
-	//		args = args[:index]
-	//		pingScanExtraOpts, ok := interfaceValue.([]yaklib.PingOpt)
-	//		if ok {
-	//			pingScanExtraOpts = append(pingScanOpt, pingScanExtraOpts...)
-	//		}
-	//		for _, p := range pingScanExtraOpts {
-	//			args = append(args, reflect.ValueOf(p))
-	//		}
-	//		res := funcValue.Call(args)
-	//		return res
-	//	})
-	//	return hookFunc.Interface()
-	//}
-	//
-	//PingScanFuncList := []string{"Scan", "ScanFromPing"}
-	//for _, funcName := range PingScanFuncList {
-	//	nIns.GetVM().RegisterMapMemberCallHandler("ping", funcName, hookPingScanFunc)
-	//}
+	hookPingScanFunc := func(f interface{}) interface{} {
+		funcValue := reflect.ValueOf(f)
+		funcType := funcValue.Type()
+		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+			pingScanOpt := []tools.PingConfigOpt{tools.WithPingRuntimeId(runtimeId), tools.WithPingCtx(streamContext)}
+			index := len(args) - 1 // 获取 option 参数的 index
+			interfaceValue := args[index].Interface()
+			args = args[:index]
+			pingScanExtraOpts, ok := interfaceValue.([]tools.PingConfigOpt)
+			if ok {
+				pingScanExtraOpts = append(pingScanOpt, pingScanExtraOpts...)
+			}
+			for _, p := range pingScanExtraOpts {
+				args = append(args, reflect.ValueOf(p))
+			}
+			res := funcValue.Call(args)
+			return res
+		})
+		return hookFunc.Interface()
+	}
+
+	PingScanFuncList := []string{"Scan", "Ping"}
+	for _, funcName := range PingScanFuncList {
+		nIns.GetVM().RegisterMapMemberCallHandler("ping", funcName, hookPingScanFunc)
+	}
 }
 
 func (y *YakToCallerManager) AddForYakit(

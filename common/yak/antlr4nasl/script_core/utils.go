@@ -25,11 +25,11 @@ func Ping(ctx *ExecContext) {
 	dnsTimeout := 3 * time.Second
 	proxies := ctx.Proxies
 	if utils.IsIPv4(target) || utils.IsIPv6(target) {
-		ok = pingutil.PingAuto(target, tcpPingPort, timeout, proxies...).Ok
+		ok = pingutil.PingAuto(target, pingutil.WithDefaultTcpPort(tcpPingPort), pingutil.WithTimeout(timeout), pingutil.WithProxies(proxies...)).Ok
 	} else {
 		result := netx.LookupFirst(target, netx.WithTimeout(dnsTimeout))
 		if result != "" && (utils.IsIPv4(result) || utils.IsIPv6(result)) {
-			ok = pingutil.PingAuto(result, tcpPingPort, timeout, proxies...).Ok
+			ok = pingutil.PingAuto(result, pingutil.WithDefaultTcpPort(tcpPingPort), pingutil.WithTimeout(timeout), pingutil.WithProxies(proxies...)).Ok
 		}
 	}
 }

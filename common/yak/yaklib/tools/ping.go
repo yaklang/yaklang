@@ -1,4 +1,4 @@
-package yaklib
+package tools
 
 import (
 	"context"
@@ -13,6 +13,8 @@ import (
 )
 
 type _pingConfig struct {
+	Ctx                context.Context
+	RuntimeId          string
 	dnsTimeout         time.Duration
 	timeout            time.Duration
 	dnsServers         []string
@@ -26,21 +28,43 @@ type _pingConfig struct {
 	_onResult          func(result *pingutil.PingResult)
 }
 
-type _pingConfigOpt func(config *_pingConfig)
+func NewDefaultPingConfig() *_pingConfig {
+	return &_pingConfig{
+		Ctx:        context.Background(),
+		dnsTimeout: 5 * time.Second,
+		timeout:    5 * time.Second,
+		scanCClass: false,
+		concurrent: 50,
+	}
+}
 
-func _pingConfigOpt_skipped(i bool) _pingConfigOpt {
+type PingConfigOpt func(config *_pingConfig)
+
+func WithPingCtx(ctx context.Context) PingConfigOpt {
+	return func(cfg *_pingConfig) {
+		cfg.Ctx = ctx
+	}
+}
+
+func WithPingRuntimeId(id string) PingConfigOpt {
+	return func(cfg *_pingConfig) {
+		cfg.RuntimeId = id
+	}
+}
+
+func _pingConfigOpt_skipped(i bool) PingConfigOpt {
 	return func(config *_pingConfig) {
 		config.skipped = i
 	}
 }
 
-func _pingConfigOpt_tcpPingPorts(i string) _pingConfigOpt {
+func _pingConfigOpt_tcpPingPorts(i string) PingConfigOpt {
 	return func(c *_pingConfig) {
 		c.tcpPingPort = i
 	}
 }
 
-func _pingConfigOpt_proxy(i ...string) _pingConfigOpt {
+func _pingConfigOpt_proxy(i ...string) PingConfigOpt {
 	return func(config *_pingConfig) {
 		if len(utils.StringArrayFilterEmpty(i)) <= 0 {
 			return
@@ -49,49 +73,44 @@ func _pingConfigOpt_proxy(i ...string) _pingConfigOpt {
 	}
 }
 
-func _pingConfigOpt_withDNSTimeout(i float64) _pingConfigOpt {
+func _pingConfigOpt_withDNSTimeout(i float64) PingConfigOpt {
 	return func(config *_pingConfig) {
 		config.dnsTimeout = utils.FloatSecondDuration(i)
 	}
 }
 
-func _pingConfigOpt_withTimeout(i float64) _pingConfigOpt {
+func _pingConfigOpt_withTimeout(i float64) PingConfigOpt {
 	return func(config *_pingConfig) {
 		config.timeout = utils.FloatSecondDuration(i)
 	}
 }
 
-func _pingConfigOpt_dnsServers(i ...string) _pingConfigOpt {
+func _pingConfigOpt_dnsServers(i ...string) PingConfigOpt {
 	return func(config *_pingConfig) {
 		config.dnsServers = i
 	}
 }
 
-func _pingConfigOpt_concurrent(i int) _pingConfigOpt {
+func _pingConfigOpt_concurrent(i int) PingConfigOpt {
 	return func(config *_pingConfig) {
 		config.concurrent = i
 	}
 }
 
-func _pingConfigOpt_scanCClass(i bool) _pingConfigOpt {
+func _pingConfigOpt_scanCClass(i bool) PingConfigOpt {
 	return func(config *_pingConfig) {
 		config.scanCClass = i
 	}
 }
 
-func _pingConfigOpt_cancel(f func()) _pingConfigOpt {
+func _pingConfigOpt_cancel(f func()) PingConfigOpt {
 	return func(config *_pingConfig) {
 		config._cancel = f
 	}
 }
 
-func _pingScan(target string, opts ..._pingConfigOpt) chan *pingutil.PingResult {
-	config := &_pingConfig{
-		dnsTimeout: 5 * time.Second,
-		timeout:    5 * time.Second,
-		scanCClass: false,
-		concurrent: 50,
-	}
+func _pingScan(target string, opts ...PingConfigOpt) chan *pingutil.PingResult {
+	config := NewDefaultPingConfig()
 
 	for _, r := range opts {
 		r(config)
@@ -101,11 +120,11 @@ func _pingScan(target string, opts ..._pingConfigOpt) chan *pingutil.PingResult 
 		target = network.ParseStringToCClassHosts(target)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(config.Ctx)
 	config._cancel = cancel
 	opts = append(opts, _pingConfigOpt_cancel(config._cancel))
 
-	var resultChan = make(chan *pingutil.PingResult, 100)
+	resultChan := make(chan *pingutil.PingResult, 100)
 	go func() {
 		defer close(resultChan)
 
@@ -121,7 +140,10 @@ func _pingScan(target string, opts ..._pingConfigOpt) chan *pingutil.PingResult 
 			targetHost := host
 			go func() {
 				defer swg.Done()
-
+				if ctx.Err() != nil {
+					log.Error("cancel pingscan from context")
+					return
+				}
 				if config.skipped || config.IsFiltered(targetHost) {
 					resultChan <- &pingutil.PingResult{
 						IP:     hostOrigin,
@@ -132,10 +154,6 @@ func _pingScan(target string, opts ..._pingConfigOpt) chan *pingutil.PingResult 
 				}
 
 				result := _ping(targetHost, opts...)
-				//if utils.MatchAnyOfRegexp(result.Reason, "(?i)operation not permitted") {
-				//	// 权限不足
-				//	cancel()
-				//}
 				if config._onResult != nil {
 					config._onResult(result)
 				}
@@ -143,7 +161,9 @@ func _pingScan(target string, opts ..._pingConfigOpt) chan *pingutil.PingResult 
 					if result.IP != hostOrigin {
 						result.IP = hostOrigin
 					}
-					resultChan <- result
+					if ctx.Err() == nil {
+						resultChan <- result
+					}
 				}
 			}()
 		}
@@ -153,7 +173,7 @@ func _pingScan(target string, opts ..._pingConfigOpt) chan *pingutil.PingResult 
 	return resultChan
 }
 
-func _ping(target string, opts ..._pingConfigOpt) *pingutil.PingResult {
+func _ping(target string, opts ...PingConfigOpt) *pingutil.PingResult {
 	config := &_pingConfig{
 		dnsTimeout: time.Second * 5,
 		timeout:    5 * time.Second,
@@ -164,7 +184,12 @@ func _ping(target string, opts ..._pingConfigOpt) *pingutil.PingResult {
 	}
 
 	if utils.IsIPv4(target) || utils.IsIPv6(target) {
-		return pingutil.PingAuto(target, config.tcpPingPort, config.timeout, config.proxies...)
+		return pingutil.PingAuto(target,
+			pingutil.WithPingContext(config.Ctx),
+			pingutil.WithDefaultTcpPort(config.tcpPingPort),
+			pingutil.WithTimeout(config.timeout),
+			pingutil.WithProxies(config.proxies...),
+		)
 	} else if strings.HasPrefix(
 		target, "https://") || strings.HasPrefix(
 		target, "http://") {
@@ -181,7 +206,12 @@ func _ping(target string, opts ..._pingConfigOpt) *pingutil.PingResult {
 	} else {
 		result := netx.LookupFirst(target, netx.WithTimeout(config.dnsTimeout), netx.WithDNSServers(config.dnsServers...))
 		if result != "" && (utils.IsIPv4(result) || utils.IsIPv6(result)) {
-			return pingutil.PingAuto(result, config.tcpPingPort, config.timeout, config.proxies...)
+			return pingutil.PingAuto(result,
+				pingutil.WithPingContext(config.Ctx),
+				pingutil.WithDefaultTcpPort(config.tcpPingPort),
+				pingutil.WithTimeout(config.timeout),
+				pingutil.WithProxies(config.proxies...),
+			)
 		}
 		return &pingutil.PingResult{
 			IP:     target,
@@ -192,13 +222,13 @@ func _ping(target string, opts ..._pingConfigOpt) *pingutil.PingResult {
 	}
 }
 
-func _pingConfigOpt_onResult(i func(result *pingutil.PingResult)) _pingConfigOpt {
+func _pingConfigOpt_onResult(i func(result *pingutil.PingResult)) PingConfigOpt {
 	return func(config *_pingConfig) {
 		config._onResult = i
 	}
 }
 
-func _pingConfigOpt_excludeHosts(host string) _pingConfigOpt {
+func _pingConfigOpt_excludeHosts(host string) PingConfigOpt {
 	return func(config *_pingConfig) {
 		if host == "" {
 			return

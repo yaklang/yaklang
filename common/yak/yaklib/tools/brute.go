@@ -66,13 +66,13 @@ type yakBruter struct {
 
 type BruteOpt func(bruter *yakBruter)
 
-func WithCtx(ctx context.Context) BruteOpt {
+func WithBruteCtx(ctx context.Context) BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.Ctx = ctx
 	}
 }
 
-func WithRuntimeId(id string) BruteOpt {
+func WithBruteRuntimeId(id string) BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.RuntimeId = id
 	}

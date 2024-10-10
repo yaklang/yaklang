@@ -23,16 +23,18 @@ type PingResult struct {
 
 var promptICMPNotAvailableOnce = new(sync.Once)
 
-func PingAutoConfig(ip string, config *PingConfig) *PingResult {
-	var (
-		defaultTcpPort = config.defaultTcpPort
-		timeout        = config.timeout
-		proxies        = config.proxies
-	)
-
-	if defaultTcpPort == "" {
-		defaultTcpPort = "22,80,443"
+func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
+	config := NewPingConfig()
+	for _, f := range opts {
+		f(config)
 	}
+	if config.Ctx == nil {
+		config.Ctx = context.Background()
+	}
+	defaultTcpPort := config.defaultTcpPort
+	proxies := config.proxies
+	timeout := config.timeout
+	parentCtx := config.Ctx
 
 	start := time.Now()
 	defer func() {
@@ -62,7 +64,7 @@ func PingAutoConfig(ip string, config *PingConfig) *PingResult {
 	// tcp ping
 	wg := new(sync.WaitGroup)
 	isAlive := utils.NewBool(false)
-	ctx, cancel := context.WithTimeout(context.Background(), config.timeout)
+	ctx, cancel := context.WithTimeout(parentCtx, config.timeout)
 	defer cancel()
 	for _, p := range testPorts {
 		p := p
@@ -102,12 +104,8 @@ func PingAutoConfig(ip string, config *PingConfig) *PingResult {
 	}
 }
 
-func PingAuto(ip string, defaultTcpPort string, timeout time.Duration, proxies ...string) *PingResult {
-	return PingAutoConfig(ip, &PingConfig{
-		defaultTcpPort: defaultTcpPort,
-		timeout:        timeout,
-		proxies:        proxies,
-	})
+func PingAuto(ip string, opts ...PingConfigOpt) *PingResult {
+	return PingAutoConfig(ip, opts...)
 }
 
 var icmpPingIsNotAvailable = utils.NewBool(false)

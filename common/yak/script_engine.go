@@ -184,7 +184,7 @@ func initYaklangLib() {
 	yaklang.Import("dns", yaklib.DnsExports)
 
 	// ping
-	yaklang.Import("ping", yaklib.PingExports)
+	yaklang.Import("ping", tools.PingExports)
 
 	// traceroute
 	yaklang.Import("traceroute", yaklib.TracerouteExports)
