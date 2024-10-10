@@ -63,32 +63,19 @@ func connectUdp(target string, portRaw any, opts ...udpClientOption) (*udpConnec
 	if port <= 0 {
 		return nil, utils.Errorf("un-specific port: %v %v", target, portRaw)
 	}
-	target = utils.HostPort(host, port)
 
-	var conn net.Conn
-	remoteAddr, err := net.ResolveUDPAddr("udp", target)
+	target = utils.HostPort(host, port)
+	netxOpt := []netx.DialXOption{
+		netx.DialX_WithTimeout(config.timeoutSeconds),
+	}
+	if config.localAddr != nil {
+		netx.DialX_WithLocalAddr(config.localAddr)
+	}
+	uc, err := netx.DialUdpX(target, netxOpt...)
 	if err != nil {
 		return nil, err
 	}
-
-	if config.localAddr != nil {
-		conn, err = net.DialUDP("udp", config.localAddr, remoteAddr)
-		if err != nil {
-			return nil, utils.Errorf("dial udp[%s] failed: %s", target, err)
-		}
-	} else {
-		conn, err = net.Dial("udp", remoteAddr.String())
-		if err != nil {
-			return nil, utils.Errorf("dial udp[%s] failed: %s", target, err)
-		}
-	}
-
-	uc, ok := conn.(*net.UDPConn)
-	if !ok {
-		return nil, utils.Errorf("BUG: not a net.UDPConn instead of %v", reflect.TypeOf(conn))
-	}
-
-	return &udpConnection{UDPConn: uc, timeoutSeconds: config.timeoutSeconds, remoteAddr: remoteAddr}, nil
+	return &udpConnection{UDPConn: uc, timeoutSeconds: config.timeoutSeconds, remoteAddr: uc.RemoteAddr()}, nil
 }
 
 func (t *udpConnection) SetTimeout(seconds float64) {
