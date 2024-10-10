@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -474,6 +475,147 @@ func checkFunctionEx(
 	return nil
 }
 
+func checkResult(frame *sfvm.SFFrame, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult) (errs error) {
+	if len(result.GetErrors()) > 0 {
+		for _, e := range result.GetErrors() {
+			errs = utils.JoinErrors(errs, utils.Errorf("syntax flow failed: %v", e))
+		}
+		return utils.Errorf("syntax flow failed: %v", strings.Join(result.GetErrors(), "\n"))
+	}
+	if len(result.GetAlertVariables()) <= 0 {
+		errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is empty"))
+		return errs
+	}
+	if rule.AllowIncluded {
+		libOutput := result.GetValues("output")
+		if libOutput == nil {
+			errs = utils.JoinErrors(errs, utils.Errorf("lib: %v is not exporting output in `alert`", result.Name()))
+		}
+		if len(libOutput) <= 0 {
+			errs = utils.JoinErrors(errs, utils.Errorf("lib: %v is not exporting output in `alert` (empty result)", result.Name()))
+		}
+	}
+	var (
+		alertCount = 0
+		alert_high = 0
+		alert_mid  = 0
+		alert_info = 0
+	)
+
+	for _, name := range result.GetAlertVariables() {
+		alertCount += len(result.GetValues(name))
+		if info, b := result.GetAlertEx(name); b {
+			switch info.Level {
+			case "mid", "m", "middle":
+				alert_mid++
+			case "high", "h":
+				alert_high++
+			case "info", "low":
+				alert_info++
+			}
+		}
+	}
+	if alertCount <= 0 {
+		errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is empty"))
+		return
+	}
+	result.Show()
+
+	ret := frame.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin")
+	if ret > 0 {
+		if alertCount < frame.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin") {
+			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is less than alert_min config: %v actual got: %v", ret, alertCount))
+			return
+		}
+	}
+	high := frame.GetExtraInfoInt("alert_high", "alertHigh", "vulnHigh")
+	if high > 0 {
+		if alert_high < high {
+			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is less than alert_high config: %v, actual got: %v", high, alert_high))
+			return
+		}
+	}
+	mid := frame.GetExtraInfoInt("alert_mid", "alertMid", "vulnMid")
+	if mid > 0 {
+		if alert_mid < mid {
+			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is less than alert_mid config: %v, actual got: %v", mid, alert_mid))
+			return
+		}
+	}
+	low := frame.GetExtraInfoInt("alert_low", "alertMid", "vulnMid", "alert_info")
+	if low > 0 {
+		if alert_info < low {
+			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is less than alert_low config: %v, actual got: %v", low, alert_info))
+			return
+		}
+	}
+	return
+}
+func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T) error {
+	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
+	if err != nil {
+		return err
+	}
+	l, vfs, err := frame.ExtractVerifyFilesystemAndLanguage()
+	if err != nil {
+		return err
+	}
+
+	CheckWithFS(vfs, t, func(p ssaapi.Programs) error {
+		result, err := p.SyntaxFlowWithError(rule.Content)
+		if err != nil {
+			return utils.Errorf("syntax flow content failed: %v", err)
+		}
+		if err := checkResult(frame, rule, result); err != nil {
+			return err
+		}
+
+		// in db
+		result2, err := p.SyntaxFlowRule(rule)
+		if err != nil {
+			return utils.Errorf("syntax flow rule failed: %v", err)
+		}
+		if err := checkResult(frame, rule, result2); err != nil {
+			return err
+		}
+
+		return nil
+	}, ssaapi.WithLanguage(l))
+
+	check := func(result *ssaapi.SyntaxFlowResult) error {
+		if len(result.GetAlertVariables()) > 0 {
+			for _, name := range result.GetAlertVariables() {
+				vals := result.GetValues(name)
+				return utils.Errorf("alert symbol table not empty, have: %v: %v", name, vals)
+			}
+		}
+		return nil
+	}
+
+	l, vfs, _ = frame.ExtractNegativeFilesystemAndLanguage()
+	if vfs != nil && l != "" {
+		CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+			result, err := programs.SyntaxFlowWithError(rule.Content, sfvm.WithEnableDebug())
+			if err != nil {
+				return err
+			}
+			if err := check(result); err != nil {
+				return err
+			}
+			result2, err := programs.SyntaxFlowRuleName(rule.RuleName, sfvm.WithEnableDebug())
+			if err != nil {
+				return err
+			}
+			if err := check(result2); err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+
+	return nil
+}
+
 func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(i)
 	if err != nil {
@@ -484,90 +626,20 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 		return err
 	}
 
-	var errs []error
+	var errs error
 	CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug(false))
 		if err != nil {
-			errs = append(errs, err)
+			errs = utils.JoinErrors(errs, err)
 			return err
 		}
-		if len(result.GetErrors()) > 0 {
-			for _, e := range result.GetErrors() {
-				errs = append(errs, utils.Errorf("syntax flow failed: %v", e))
-			}
-			return utils.Errorf("syntax flow failed: %v", strings.Join(result.GetErrors(), "\n"))
-		}
-		if len(result.GetAlertVariables()) <= 0 {
-			errs = append(errs, utils.Errorf("alert symbol table is empty"))
-			return err
-		}
-		if frame.GetRule().AllowIncluded {
-			libOutput := result.GetValues("output")
-			if libOutput == nil {
-				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert`", result.Name()))
-			}
-			if len(libOutput) <= 0 {
-				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert` (empty result)", result.Name()))
-			}
-		}
-		var (
-			alertCount = 0
-			alert_high = 0
-			alert_mid  = 0
-			alert_info = 0
-		)
-
-		for _, name := range result.GetAlertVariables() {
-			alertCount += len(result.GetValues(name))
-			if info, b := result.GetAlertEx(name); b {
-				switch info.Level {
-				case "mid", "m", "middle":
-					alert_mid++
-				case "high", "h":
-					alert_high++
-				case "info", "low":
-					alert_info++
-				}
-			}
-		}
-		if alertCount <= 0 {
-			errs = append(errs, utils.Errorf("alert symbol table is empty"))
-			return nil
-		}
-		result.Show()
-
-		ret := frame.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin")
-		if ret > 0 {
-			if alertCount < frame.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin") {
-				errs = append(errs, utils.Errorf("alert symbol table is less than alert_min config: %v actual got: %v", ret, alertCount))
-				return nil
-			}
-		}
-		high := frame.GetExtraInfoInt("alert_high", "alertHigh", "vulnHigh")
-		if high > 0 {
-			if alert_high < high {
-				errs = append(errs, utils.Errorf("alert symbol table is less than alert_high config: %v, actual got: %v", high, alert_high))
-				return nil
-			}
-		}
-		mid := frame.GetExtraInfoInt("alert_mid", "alertMid", "vulnMid")
-		if mid > 0 {
-			if alert_mid < mid {
-				errs = append(errs, utils.Errorf("alert symbol table is less than alert_mid config: %v, actual got: %v", mid, alert_mid))
-				return nil
-			}
-		}
-		low := frame.GetExtraInfoInt("alert_low", "alertMid", "vulnMid", "alert_info")
-		if low > 0 {
-			if alert_info < low {
-				errs = append(errs, utils.Errorf("alert symbol table is less than alert_low config: %v, actual got: %v", low, alert_info))
-				return nil
-			}
+		if err := checkResult(frame, frame.GetRule(), result); err != nil {
+			errs = utils.JoinErrors(errs, err)
 		}
 		return nil
 	}, ssaapi.WithLanguage(l))
-	if len(errs) > 0 {
-		return utils.JoinErrors(errs...)
+	if (errs) != nil {
+		return errs
 	}
 
 	l, vfs, _ = frame.ExtractNegativeFilesystemAndLanguage()
@@ -576,7 +648,7 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 			result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug(false))
 			if err != nil {
 				if errors.Is(err, sfvm.CriticalError) {
-					errs = append(errs, err)
+					errs = utils.JoinErrors(errs, err)
 					return err
 				}
 			}
@@ -587,7 +659,7 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 				if len(result.GetAlertVariables()) > 0 {
 					for _, name := range result.GetAlertVariables() {
 						vals := result.GetValues(name)
-						errs = append(errs, utils.Errorf("alert symbol table not empty, have: %v: %v", name, vals))
+						errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table not empty, have: %v: %v", name, vals))
 					}
 				}
 			}
@@ -595,8 +667,8 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 		})
 	}
 
-	if len(errs) > 0 {
-		return utils.JoinErrors(errs...)
+	if errs != nil {
+		return errs
 	}
 
 	return nil

@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strings"
-	"testing"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -150,7 +151,7 @@ func TestVerifiedRule(t *testing.T) {
 		if len(f.VerifyFs) > 0 || len(f.NegativeFs) > 0 {
 			t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
 				t.Log("Start to verify: " + rule.RuleName)
-				err := ssatest.EvaluateVerifyFilesystem(rule.Content, t)
+				err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -172,7 +173,7 @@ func TestBuildInRule_DEBUG(t *testing.T) {
 		return
 	}
 
-	var name = "SAXReader 基础检查(安全)"
+	var name = "php-custom_param.sf"
 
 	for i := 0; i < len(Cases); i++ {
 		c := Cases[i]
@@ -191,7 +192,8 @@ func TestBuildInRule_Verify_DEBUG(t *testing.T) {
 		return
 	}
 
-	ruleName := "java-servlet-n-spring-concat-command-injection.sf"
+	yakit.InitialDatabase()
+	ruleName := "java-reflection-for-class-unsafe.sf"
 
 	rule, err := sfdb.GetRule(ruleName)
 	if err != nil {
@@ -205,7 +207,7 @@ func TestBuildInRule_Verify_DEBUG(t *testing.T) {
 	if len(f.VerifyFs) > 0 || len(f.NegativeFs) > 0 {
 		t.Run(rule.RuleName, func(t *testing.T) {
 			t.Log("Start to verify: " + rule.RuleName)
-			err := ssatest.EvaluateVerifyFilesystem(rule.Content, t)
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t)
 			if err != nil {
 				t.Fatal(err)
 			}

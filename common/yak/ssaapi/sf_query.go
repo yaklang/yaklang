@@ -77,8 +77,26 @@ func (p *Program) SyntaxFlowRuleName(ruleName string, opts ...sfvm.Option) (*Syn
 	return SyntaxFlowRule(p, rule, opts...)
 }
 
+func (ps Programs) SyntaxFlowRuleName(ruleName string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
+	rule, err := sfdb.GetRule(ruleName)
+	if err != nil {
+		return nil, err
+	}
+	return SyntaxFlowRule(
+		sfvm.NewValues(lo.Map(ps, func(p *Program, _ int) sfvm.ValueOperator { return p })),
+		rule, opts...,
+	)
+}
+
 func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
 	return SyntaxFlowRule(p, rule, opts...)
+}
+
+func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
+	return SyntaxFlowRule(
+		sfvm.NewValues(lo.Map(ps, func(p *Program, _ int) sfvm.ValueOperator { return p })),
+		rule, opts...,
+	)
 }
 
 func SyntaxFlowRule(p sfvm.ValueOperator, rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
