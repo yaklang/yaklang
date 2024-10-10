@@ -531,7 +531,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		funcName = Name.GetText()
 	}
 
-	b.SupportClosure = false
 	newFunc := b.NewFunc(funcName)
 
 	hitDefinedFunction := false
@@ -606,7 +605,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 		funcName = Name.GetText()
 	}
 
-	b.SupportClosure = false
 	newFunc := b.NewFunc(funcName)
 	newFunc.SetMethodName(funcName)
 
@@ -647,6 +645,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 			}
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
+		b.SupportClosure = false
 
 		if recove := fun.Receiver(); recove != nil {
 			ssatyp := b.buildReceiver(recove.(*gol.ReceiverContext))

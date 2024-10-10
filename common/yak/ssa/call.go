@@ -43,7 +43,6 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	c.handlerObjectMethod()
 	c.handlerReturnType()
 	c.handleCalleeFunction()
-
 	return c
 }
 
@@ -227,11 +226,18 @@ func (c *Call) handleCalleeFunction() {
 	// get function type
 	funcTyp, ok := ToFunctionType(c.Method.GetType())
 	if !ok {
+		if param, ok := ToParameter(c.Method); ok {
+			caller := param.GetFunc()
+			callee := caller.anValue.GetFunc()
+			caller.SideEffects = append(caller.SideEffects, callee.SideEffects...)
+
+		}
 		return
 	}
 
 	{
-		builder := c.GetFunc().builder
+		function := c.GetFunc()
+		builder := function.builder
 		recoverBuilder := builder.SetCurrent(c)
 		currentScope := c.GetBlock().ScopeTable
 
@@ -277,6 +283,11 @@ func (c *Call) handleCalleeFunction() {
 		for _, se := range funcTyp.SideEffects {
 			var variable *Variable
 			if se.MemberCallKind == NoMemberCall {
+				if funCallee := se.Modify.GetFunc(); funCallee != nil {
+					if se.Variable != nil && !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
+						function.SideEffects = append(function.SideEffects, se)
+					}
+				}
 				// side-effect only create in scope that lower or same than modify's scope
 				if !se.forceCreate && !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
 					continue
