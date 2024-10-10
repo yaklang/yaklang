@@ -714,7 +714,8 @@ service Yak {
 
   // SyntaxFlow Rule
   rpc QuerySyntaxFlowRule(QuerySyntaxFlowRuleRequest) returns (QuerySyntaxFlowRuleResponse);
-  rpc SaveSyntaxFlowRule(SaveSyntaxFlowRuleRequest) returns (DbOperateMessage);
+  rpc CreateSyntaxFlowRule(CreateSyntaxFlowRuleRequest) returns (DbOperateMessage);
+  rpc UpdateSyntaxFlowRule(UpdateSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc DeleteSyntaxFlowRule(DeleteSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc QuerySyntaxFlowRuleGroup(QuerySyntaxFlowRuleGroupRequest)returns (QuerySyntaxFlowRuleGroupResponse);
 }
@@ -5412,73 +5413,79 @@ message QuerySyntaxFlowRuleRequest{
   SyntaxFlowRuleFilter Filter = 2;
 }
 
-message QuerySyntaxFlowRuleResponse{
-  Paging Pagination = 1;
-  DbOperateMessage DbMessage= 2;
-  repeated SyntaxFlowRuleData Data = 3;
+message SyntaxFlowRule{
+  string RuleName =1;
+  string Content = 2;
+
+  string Language = 3;
+  string Type = 4;
+  string Severity = 5;
+  string Purpose = 6;
+  bool IsBuildInRule =7;
+
+  string Title = 8;
+  string TitleZh = 9;
+  string Description = 10;
+  bool Verified = 11;
+  bool AllowIncluded = 12;
+  string IncludedName = 13;
+  string Tag = 14;
+  string AlertDesc = 15;
+
+  string Hash = 16;
+
+  repeated string GroupName = 17;
 }
 
-message SyntaxFlowRuleFilter {
-  string RuleName = 1;
-  string Keyword = 2;
-  repeated string Language = 3;
-  repeated string Severity = 4;
-  repeated string Purpose = 5;
-  repeated string Tag = 6;
-  bool Verified =7;
-  bool IsBuildInRule = 8;
-  bool AllowIncluded = 9;
-}
-
-message SyntaxFlowRuleData{
-  bool IsBuildInRule = 1;
-  string Language = 2;
-  string RuleName =3;
-  string Title = 4;
-  string TitleZh = 5;
-  string Description = 6;
-  string Type = 7;
-  string Severity = 8;
-  string Content = 9;
-  string Purpose = 10;
-  bytes TypicalHitFileSystem = 11;
-  bool Verified = 12;
-  bool AllowIncluded = 13;
-  string IncludedName = 14;
-  string Hash = 15;
-  string Tag = 16;
-  string AlertDesc = 17;
-}
-
-message SaveSyntaxFlowRuleRequest{
+message  SyntaxFlowRuleInput{
   string RuleName = 1;
   string Content = 2;
   string Language = 3;
   repeated string Tags = 4;
 }
 
+message SyntaxFlowRuleFilter {
+  SyntaxFlowRule rule = 1;
+  string KeyWord = 2;
+  repeated string GroupName = 3;
+  bool All = 4;
+  bool UnsetGroup = 5;
+}
+
+message CreateSyntaxFlowRuleRequest{
+  SyntaxFlowRuleInput SyntaxFlowInput =1;
+}
+
+message UpdateSyntaxFlowRuleRequest{
+  SyntaxFlowRuleInput SyntaxFlowInput =1;
+}
+
+message QuerySyntaxFlowRuleResponse{
+  Paging Pagination = 1;
+  DbOperateMessage DbMessage= 2;
+  repeated SyntaxFlowRule Rule = 3;
+}
+
 message DeleteSyntaxFlowRuleRequest{
   SyntaxFlowRuleFilter Filter = 1;
 }
 
-message QuerySyntaxFlowRuleGroupRequest{
+message SyntaxFlowRuleGroupFilter {
   bool All = 1;
   bool IsBuiltinRule = 2;
-  string GroupName = 3;
+  // for fuzzing search
+  string KeyWord = 3;
+}
+
+message SyntaxFlowGroup{
+  string GroupName = 1;
+  int32  Count = 2;
+}
+
+message QuerySyntaxFlowRuleGroupRequest{
+    SyntaxFlowRuleGroupFilter Filter = 1;
 }
 
 message QuerySyntaxFlowRuleGroupResponse{
-  repeated SyntaxFlowRuleGroupNormalized Group = 1;
-}
-
-message SyntaxFlowRuleGroupNormalized {
-  string GroupName = 1; // 归一化分组名,目前支持"language","severity","purpose"
-  int64 Count = 2;
-  bool IsBuildInRule = 3;
-}
-
-message SyntaxFlowRuleGroup{
-  string Language =1;
-  string Severity = 2;
-  string Purpose = 3;
+  repeated SyntaxFlowGroup Group = 1;
 }
