@@ -288,6 +288,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				s.idx = end
 				continue
 			}
+			s.debugLog("next value: %v", ValuesLen(vs))
 			s.stack.Push(vs)
 		case OpIterLatch:
 			if s.stack.IsEmpty() {

@@ -89,6 +89,8 @@ func (s *SFFrame) IterEnd() error {
 	if iter == nil {
 		return utils.Error("BUG: iterContext is nil")
 	}
-	s.conditionStack.Push(iter.results)
+	results := iter.results
+	s.debugSubLog("<< push condition results[len: %v]", results)
+	s.conditionStack.Push(results)
 	return nil
 }
