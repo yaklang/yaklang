@@ -54,7 +54,11 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
             for pre in prefix {
                 payload := buildSqlPayload(pre, suf)
                 result, err := p.Fuzz(payload).ExecFirst()
-                if err != nil { continue }
+                if err != nil { 
+                    dump(err)
+                    continue
+                }
+                printf("response Time(ms): %d t + 3000(ms): %d\n", result.ServerDurationMs, t+3000)
                 if  result.ServerDurationMs > t + 3000 {
                     risk.NewRisk(
                         url,
