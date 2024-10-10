@@ -5,7 +5,7 @@ programName := cli.String("programName",
     cli.setRequired(true),
     cli.setVerboseName("项目名")
 )
-language = cli.StringSlice("language", 
+languages = cli.StringSlice("language", 
     cli.setMultipleSelect(false), 
     cli.setSelectOption("Java", "java"), 
     cli.setSelectOption("PHP", "php"), 
@@ -18,27 +18,7 @@ path = cli.FolderName("ProgramPath",
     cli.setVerboseName("项目路径"),
     cli.setRequired(true),
 ) 
-// }}
 
-// {{ 项目额外信息
-description := cli.Text("description", 
-    cli.setVerboseName("项目描述"),
-    cli.setCliGroup("information"),
-    cli.setRequired(false),
-)
-// }}
-
-// {{ database 
-dbPaths := cli.FileNames("dbPath", 
-    cli.setVerboseName("数据库路径"),
-    cli.setCliGroup("database"),
-    cli.setRequired(false),
-)
-reCompile := cli.Bool("re-compile", 
-    cli.setVerboseName("是否重新编译"),
-    cli.setCliGroup("database"),
-    cli.setDefault(true),
-)
 // }}
 
 // {{ compile option 
@@ -46,14 +26,43 @@ entry := cli.FileNames("entry",
     cli.setVerboseName("项目入口文件"),
     cli.setCliGroup("compile"),
 )
+strictMode = cli.Bool("StrictMode", 
+    cli.setVerboseName("严格模式"), 
+    cli.setHelp("如果取消严格模式将会忽略编译错误的文件。将可能导致编译结果缺失部分文件。"),
+    cli.setCliGroup("compile"),
+    cli.setDefault(true), 
+)
+reCompile := cli.Bool("re-compile", 
+    cli.setVerboseName("是否重新编译"),
+    cli.setCliGroup("compile"),
+    cli.setDefault(true),
+)
+// }}
+
+// {{ 项目额外信息
+description := cli.Text("description", 
+    cli.setVerboseName("项目描述"),
+    cli.setCliGroup("information"),
+)
 // }}
 
 
+// {{ database 
+dbPaths := cli.FileNames("dbPath", 
+    cli.setVerboseName("数据库路径"),
+    cli.setCliGroup("database"),
+)
+// }}
 
 cli.check()
 dbPath  = ""
 if len(dbPaths) > 0 {
     dbPath = dbPaths[0]
+}
+
+var language
+if len(languages) == 1 {
+    language = languages[0]
 }
 
 opts = [
@@ -63,8 +72,9 @@ opts = [
         yakit.Info("%s: %f",msg, process)
         log.info("%s: %f",msg, process)
     }), 
-    ssa.withLanguage(language[0]), 
+    ssa.withLanguage(language), 
     ssa.withReCompile(reCompile), 
+    ssa.withStrictMode(strictMode),
     ssa.withDescription(description),
     ssa.withDatabasePath(dbPath),
     ssa.withSaveToProfile(true),
@@ -77,5 +87,8 @@ if len(entry) != 0{
 
 progs, err := ssa.ParseLocalProject(path, opts...)
 if err != nil {
-    yakit.Error("ssa compile error: %v", err)
+     yakit.Text("编译错误信息:\n" + err.Error())
+    yakit.Error("路径： %s", path)
+    yakit.Error("语言： %s", language)
+    yakit.Error("项目名：%s", programName)
 }
