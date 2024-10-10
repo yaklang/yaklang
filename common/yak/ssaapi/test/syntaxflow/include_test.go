@@ -146,7 +146,7 @@ func TestLib_ServletParam(t *testing.T) {
 	vfs := createTestVFS()
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		results := prog.SyntaxFlowChain(`<include('servlet-param')> as $params`)
+		results := prog.SyntaxFlowChain(`<include('java-servlet-param')> as $params`)
 		results.Show()
 		assert.Greater(t, len(results), 7)
 		return nil
@@ -157,16 +157,16 @@ func Test_Include_HitCache(t *testing.T) {
 	programName := uuid.NewString()
 	vfs := createTestVFS()
 	prog, err := ssaapi.ParseProject(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.JAVA))
-	defer 	ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	require.NoError(t, err)
 	require.NotNil(t, prog)
 
 	start := time.Now()
-	prog.SyntaxFlowWithError(`<include('servlet-param')>`)
+	prog.SyntaxFlowWithError(`<include('java-servlet-param')>`)
 	elapsed := time.Since(start)
 
 	start = time.Now()
-	prog.SyntaxFlowWithError(`<include('servlet-param')>`)
+	prog.SyntaxFlowWithError(`<include('java-servlet-param')>`)
 	elapsed2 := time.Since(start)
 
 	log.Infof("elapsed: %v, elapsed2: %v", elapsed, elapsed2)
