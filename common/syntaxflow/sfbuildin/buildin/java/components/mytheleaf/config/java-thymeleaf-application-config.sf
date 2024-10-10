@@ -1,0 +1,22 @@
+desc(
+    title: "Find Thymeleaf Config in SpringBoot Application Config",
+    type: audit,
+    severity: low,
+)
+
+${*.properties}.regexp(/spring\.(thymeleaf\.\S*)/) as $regex;
+alert $regex
+
+
+desc(
+    lang: java,
+    alert_min: 3,
+    'file://application.properties': <<<EOF
+spring.thymeleaf.cache=false
+spring.thymeleaf.prefix=classpath:/templates/
+spring.thymeleaf.suffix=.html
+spring.thymeleaf.mode=HTML
+spring.thymeleaf.encoding=UTF-8
+spring.thymeleaf.content-type=text/html
+EOF,
+)
