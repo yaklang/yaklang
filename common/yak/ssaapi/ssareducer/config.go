@@ -43,6 +43,13 @@ func WithProgramName(name string) Option {
 		config.ProgramName = name
 	}
 }
+
+func WithStrictMode(b bool) Option {
+	return func(config *Config) {
+		config.stopAtCompileError = b
+	}
+}
+
 func WithFileSystem(fs fi.FileSystem) Option {
 	return func(config *Config) {
 		config.fs = fs
