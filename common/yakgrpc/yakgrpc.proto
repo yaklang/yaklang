@@ -5445,11 +5445,13 @@ message  SyntaxFlowRuleInput{
 }
 
 message SyntaxFlowRuleFilter {
-  SyntaxFlowRule rule = 1;
-  string KeyWord = 2;
-  repeated string GroupName = 3;
-  bool All = 4;
-  bool UnsetGroup = 5;
+  repeated string RuleNames = 1;
+  repeated string Language = 2;
+  repeated string GroupNames =3;
+  repeated string Severity = 4;
+  repeated string Purpose = 5;
+  repeated string Tag = 6;
+  string Keyword = 7;
 }
 
 message CreateSyntaxFlowRuleRequest{
@@ -5471,10 +5473,8 @@ message DeleteSyntaxFlowRuleRequest{
 }
 
 message SyntaxFlowRuleGroupFilter {
-  bool All = 1;
-  bool IsBuiltinRule = 2;
   // for fuzzing search
-  string KeyWord = 3;
+  string KeyWord = 1;
 }
 
 message SyntaxFlowGroup{

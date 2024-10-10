@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*bizhelper.Paginator, []*schema.SyntaxFlowRule, error) {
@@ -37,48 +36,31 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 	if params == nil {
 		return db
 	}
-	if params.GetAll() {
-		return db
-	}
-	if params.GetUnsetGroup() {
+	if len(params.GetGroupNames()) == 1 && params.GetGroupNames()[0] == "" {
 		db = db.Joins("LEFT JOIN syntax_flow_rule_groups P ON syntax_flow_rules.rule_name = P.rule_name")
 		db = db.Where("P.group_name IS NULL")
-	} else if params.GetGroupName() != nil {
+	} else if len(params.GetGroupNames()) > 0 {
 		db = db.Joins("LEFT JOIN syntax_flow_rule_groups P ON syntax_flow_rules.rule_name = P.rule_name")
-		db = bizhelper.ExactQueryStringArrayOr(db, "`group_name`", params.GetGroupName())
-	}
-	rule := params.GetRule()
-	keyWord := params.GetKeyWord()
-
-	if rule.GetRuleName() != "" {
-		db = db.Where("rule_name = ?", rule.GetRuleName())
-	}
-	if len(rule.GetLanguage()) > 0 {
-		db = db.Where("language = ?", rule.GetLanguage())
-	}
-	if len(rule.GetPurpose()) > 0 {
-		db = db.Where("purpose = ?", rule.GetPurpose())
-	}
-	if len(rule.GetSeverity()) > 0 {
-		db = db.Where("severity = ?", rule.GetSeverity())
+		db = bizhelper.ExactQueryStringArrayOr(db, "`group_name`", params.GetGroupNames())
 	}
 
-	if rule.GetTag() != "" {
-		db = bizhelper.FuzzQuery(db, "tag", rule.GetTag())
+	if len(params.GetRuleNames()) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", params.GetRuleNames())
 	}
-	if rule.GetVerified() {
-		db = bizhelper.QueryByBool(db, "verified", true)
+	if len(params.GetLanguage()) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "language", params.GetLanguage())
 	}
-	if rule.GetIsBuildInRule() {
-		db = bizhelper.QueryByBool(db, "is_build_in", true)
+	if len(params.GetPurpose()) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", params.GetPurpose())
 	}
-	if rule.GetAllowIncluded() {
-		db = bizhelper.QueryByBool(db, "allow_included", true)
+	if len(params.GetTag()) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", params.GetTag())
 	}
-	if keyWord != "" {
+
+	if params.GetKeyword() != "" {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 			"rule_name", "title", "title_zh", "description", "content", "tag",
-		}, strings.Split(keyWord, ","), false)
+		}, []string{params.GetKeyword()}, false)
 	}
 
 	return db

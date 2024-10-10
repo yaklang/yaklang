@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 type SyntaxFlowGroupResult struct {
@@ -33,16 +32,10 @@ func FilterSyntaxFlowGroup(db *gorm.DB, filter *ypb.SyntaxFlowRuleGroupFilter) *
 	if filter == nil {
 		return db
 	}
-	if filter.GetAll() {
-		return db
-	}
-	if filter.GetIsBuiltinRule() {
-		db = bizhelper.QueryByBool(db, "is_build_in", true)
-	}
 	if filter.GetKeyWord() != "" {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 			"rule_name", "group_name",
-		}, strings.Split(filter.GetKeyWord(), ","), false)
+		}, []string{filter.GetKeyWord()}, false)
 	}
 	return db
 }
