@@ -151,16 +151,38 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	rule.Language = string(language)
 	rule.Tag = strings.Join(tags, "|")
 	rule.IsBuildInRule = buildin
-
-	//if frame.AllowIncluded != "" {
-	//	rule.AllowIncluded = true
-	//	rule.IncludedName = frame.AllowIncluded
-	//	rule.Title = frame.AllowIncluded
-	//	// _ = DeleteRuleByLibName(frame.AllowIncluded)
-	//}
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
 		return utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
+	}
+	return nil
+}
+
+// ImportRuleDefaultGroupName 导入规则默认分组，默认使用language,purpose,severity作为分组名
+func ImportRuleDefaultGroupName(ruleName string, content string) error {
+	languageRaw, _, _ := strings.Cut(ruleName, "-")
+	language, err := CheckSyntaxFlowLanguage(languageRaw)
+	if err != nil {
+		return err
+	}
+	rule, err := CheckSyntaxFlowRuleContent(content)
+	if err != nil {
+		return err
+	}
+	saveSfGroup := func(groupName string) error {
+		saveData := &schema.SyntaxFlowRuleGroup{
+			RuleName:      ruleName,
+			GroupName:     groupName,
+			IsBuildInRule: true,
+		}
+		hash := saveData.CalcHash()
+		return CreateOrUpdateSyntaxFlowGroup(hash, saveData)
+	}
+	for _, n := range []string{string(language), string(rule.Purpose), string(rule.Severity)} {
+		err = saveSfGroup(n)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -236,7 +258,7 @@ func CheckSyntaxFlowRuleContent(content string) (*schema.SyntaxFlowRule, error) 
 	return rule, nil
 }
 
-func SaveSyntaxFlowRule(ruleName,language,content string,tags ...string) error {
+func SaveSyntaxFlowRule(ruleName, language, content string, tags ...string) error {
 	languageType, err := CheckSyntaxFlowLanguage(language)
 	if err != nil {
 		return err
@@ -245,7 +267,7 @@ func SaveSyntaxFlowRule(ruleName,language,content string,tags ...string) error {
 	if err != nil {
 		return err
 	}
-	rule,err:=CheckSyntaxFlowRuleContent(content)
+	rule, err := CheckSyntaxFlowRuleContent(content)
 	if err != nil {
 		return err
 	}
@@ -392,7 +414,8 @@ func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxF
 	return outC
 }
 
-func YieldSyntaxFlowRulesWithoutLib(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
+func YieldSyntaxFlowRulesWithoutLib(ctx context.Context) chan *schema.SyntaxFlowRule {
+	db := consts.GetGormProfileDatabase()
 	outC := make(chan *schema.SyntaxFlowRule)
 	db = db.Where("allow_included = false")
 	go func() {
