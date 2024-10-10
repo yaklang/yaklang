@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type SyntaxFlowResult struct {
@@ -27,6 +28,8 @@ type SyntaxFlowResult struct {
 	checkMsg []string
 
 	unName Values
+
+	risk []*ypb.Risk
 }
 
 func createEmptyResult() *SyntaxFlowResult {
