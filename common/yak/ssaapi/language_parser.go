@@ -117,6 +117,9 @@ func (c *config) parseProject() (Programs, error) {
 		ssareducer.WithFileSystem(c.fs),
 		ssareducer.WithProgramName(c.ProgramName),
 		ssareducer.WithEntryFiles(c.entryFile...),
+		ssareducer.WithContext(c.ctx),
+		ssareducer.WithStrictMode(c.strictMode),
+		// ssareducer.with
 		ssareducer.WithCompileMethod(func(path string, raw string) (includeFiles []string, err error) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -130,7 +133,8 @@ func (c *config) parseProject() (Programs, error) {
 
 			// check
 			if err := c.checkLanguage(path); err != nil {
-				return nil, err
+				log.Errorf("parse file %s error: %v", path, err)
+				return nil, nil
 			}
 
 			// build
@@ -145,7 +149,6 @@ func (c *config) parseProject() (Programs, error) {
 			}
 			return exclude, nil
 		}),
-		ssareducer.WithContext(c.ctx),
 	)
 	if err != nil {
 		return nil, utils.Wrap(err, "parse project error")

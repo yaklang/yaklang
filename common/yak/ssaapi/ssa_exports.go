@@ -34,6 +34,7 @@ type config struct {
 	feedCode        bool
 	ignoreSyntaxErr bool
 	reCompile       bool
+	strictMode      bool
 	databasePath    string
 
 	// input, code or project path
@@ -97,6 +98,12 @@ func WithProcess(process ProcessFunc) Option {
 func WithReCompile(b bool) Option {
 	return func(c *config) {
 		c.reCompile = b
+	}
+}
+
+func WithStrictMode(b bool) Option {
+	return func(c *config) {
+		c.strictMode = b
 	}
 }
 
@@ -380,6 +387,7 @@ var Exports = map[string]any{
 	"withProcess":       WithProcess,
 	"withEntryFile":     WithFileSystemEntry,
 	"withReCompile":     WithReCompile,
+	"withStrictMode":    WithStrictMode,
 	"withSaveToProfile": WithSaveToProfile,
 	"withContext":       WithContext,
 	// "": with,
