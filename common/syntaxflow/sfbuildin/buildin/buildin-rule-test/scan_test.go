@@ -258,7 +258,7 @@ alert $output;
 }
 
 func TestImport(t *testing.T) {
-	err := sfdb.ImportRuleWithoutValid("test.sf", `
+	_,err := sfdb.ImportRuleWithoutValid("test.sf", `
 desc(
 	title: "import test",
 	level: "high",
