@@ -35,6 +35,12 @@ func WithPingContext(ctx context.Context) PingConfigOpt {
 	}
 }
 
+func WithForceTcpPing() PingConfigOpt {
+	return func(cfg *PingConfig) {
+		cfg.forceTcpPing = true
+	}
+}
+
 func WithPingNativeHandler(f func(ip string, timeout time.Duration) *PingResult) PingConfigOpt {
 	return func(cfg *PingConfig) {
 		cfg.pingNativeHandler = f
