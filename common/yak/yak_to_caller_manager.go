@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/synscanx"
 
 	"github.com/yaklang/yaklang/common/fp"
@@ -48,7 +49,7 @@ import (
 const HOOK_CLAER = "clear"
 
 type YakFunctionCaller struct {
-	Handler func(args ...interface{})
+	Handler func(callback func(*yakvm.Frame), args ...interface{})
 }
 
 func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
@@ -230,7 +231,7 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 
 		nIns := ins
 		fTable[funcName] = &YakFunctionCaller{
-			Handler: func(args ...interface{}) {
+			Handler: func(callback func(*yakvm.Frame), args ...interface{}) {
 				defer func() {
 					if err := recover(); err != nil {
 						y.Err = utils.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
@@ -244,7 +245,7 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 
 				subCtx, _ := context.WithTimeout(pluginContext.Ctx, y.callTimeout)
 				subCtx = context.WithValue(subCtx, "pluginName", scriptName)
-				_, err = nIns.CallYakFunctionNative(subCtx, f, args...)
+				_, err = nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
 				if err != nil && !errors.Is(err, context.Canceled) {
 					log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
 				}
@@ -276,6 +277,59 @@ type YakToCallerManager struct {
 	vulFilter          filter.Filterable
 	ContextCancelFuncs *sync.Map
 	Err                error
+}
+
+type CallConfig struct {
+	runtimeCtx context.Context
+	callback   func()
+	pluginId   string
+	items      []interface{}
+	itemFuncs  []func() interface{}
+	forceSync  bool
+}
+
+func NewCallConfig() *CallConfig {
+	return &CallConfig{
+		runtimeCtx: context.Background(),
+	}
+}
+
+type CallOpt func(*CallConfig)
+
+func WithCallConfigRuntimeCtx(ctx context.Context) CallOpt {
+	return func(c *CallConfig) {
+		c.runtimeCtx = ctx
+	}
+}
+
+func WithCallConfigForceSync(forceSync bool) CallOpt {
+	return func(c *CallConfig) {
+		c.forceSync = forceSync
+	}
+}
+
+func WithCallConfigPluginId(pluginId string) CallOpt {
+	return func(c *CallConfig) {
+		c.pluginId = pluginId
+	}
+}
+
+func WithCallConfigCallback(callback func()) CallOpt {
+	return func(c *CallConfig) {
+		c.callback = callback
+	}
+}
+
+func WithCallConfigItems(items ...interface{}) CallOpt {
+	return func(c *CallConfig) {
+		c.items = items
+	}
+}
+
+func WithCallConfigItemFuncs(itemFuncs ...func() interface{}) CallOpt {
+	return func(c *CallConfig) {
+		c.itemFuncs = itemFuncs
+	}
 }
 
 func (c *YakToCallerManager) GetWaitingEventCount() int {
@@ -585,7 +639,7 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 
 	ins := &Caller{
 		Core: &YakFunctionCaller{
-			Handler: func(args ...interface{}) {
+			Handler: func(callback func(*yakvm.Frame), args ...interface{}) {
 				defer func() {
 					if err := recover(); err != nil {
 						log.Errorf("call go native code failed: %s", err)
@@ -1461,10 +1515,6 @@ func (y *YakToCallerManager) CallByNameWithCallback(name string, callback func()
 	y.CallPluginKeyByNameWithCallback("", name, callback, items...)
 }
 
-func (y *YakToCallerManager) CallByNameEx(name string, items ...func() interface{}) {
-	y.CallPluginKeyByNameEx("", name, nil, items...)
-}
-
 func (y *YakToCallerManager) CallByNameExSync(name string, items ...func() interface{}) {
 	y.SyncCallPluginKeyByNameEx("", name, nil, items...)
 }
@@ -1494,14 +1544,44 @@ func (y *YakToCallerManager) CallPluginKeyByNameSyncWithCallback(pluginId string
 }
 
 func (y *YakToCallerManager) SyncCallPluginKeyByNameEx(pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
-	y.CallPluginKeyByNameExWithAsync(true, pluginId, name, callback, itemsFuncs...)
+	y.CallPluginKeyByNameExWithAsync(context.Background(), true, pluginId, name, callback, itemsFuncs...)
 }
 
 func (y *YakToCallerManager) CallPluginKeyByNameEx(pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
-	y.CallPluginKeyByNameExWithAsync(false, pluginId, name, callback, itemsFuncs...)
+	y.CallPluginKeyByNameExWithAsync(context.Background(), false, pluginId, name, callback, itemsFuncs...)
 }
 
-func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
+func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(runtimeCtx context.Context, forceSync bool, pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
+	y.Call(name,
+		WithCallConfigRuntimeCtx(runtimeCtx),
+		WithCallConfigForceSync(forceSync),
+		WithCallConfigPluginId(pluginId),
+		WithCallConfigCallback(callback),
+		WithCallConfigItemFuncs(itemsFuncs...),
+	)
+}
+
+func (y *YakToCallerManager) Call(name string, opts ...CallOpt) {
+	config := NewCallConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+	var (
+		runtimeCtx = config.runtimeCtx
+		forceSync  = config.forceSync
+		pluginId   = config.pluginId
+		callback   = config.callback
+		items      = config.items
+		itemsFuncs = config.itemFuncs
+	)
+	if len(itemsFuncs) == 0 && len(items) > 0 {
+		itemsFuncs = lo.Map(items, func(i any, _ int) func() any {
+			return func() any {
+				return i
+			}
+		})
+	}
+
 	if y.table == nil {
 		y.table = new(sync.Map)
 		return
@@ -1543,7 +1623,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 		return
 	}
 
-	call := func(i *Caller) {
+	call := func(pluginRuntimeID string, i *Caller) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("call failed: \n%v", err)
@@ -1556,11 +1636,16 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 				items = append(items, i())
 			}
 			log.Debugf("call %v.%v(params...)", i.Id, name)
-			i.Core.Handler(items...)
+			i.Core.Handler(
+				func(frame *yakvm.Frame) {
+					frame.GlobalVariables = frame.GlobalVariables.Clone()
+					frame.GlobalVariables.Store(consts.PLUGIN_CONTEXT_KEY_RUNTIME_ID, pluginRuntimeID)
+				}, items...)
 			return
 		}
 	}
 
+	pluginRuntimeID := utils.InterfaceToString(runtimeCtx.Value(consts.PLUGIN_CONTEXT_KEY_RUNTIME_ID))
 	for _, iRaw := range ins {
 		verbose := iRaw.Verbose
 		if iRaw.Id != verbose {
@@ -1570,7 +1655,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 		// 没有设置并发控制，就直接顺序执行，需要处理上下文
 		if isSync {
 			log.Debugf("Start Call Plugin: %v", verbose)
-			call(iRaw)
+			call(pluginRuntimeID, iRaw)
 			continue
 		} else {
 			taskWG.Add(1)
@@ -1591,7 +1676,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 				if verbose != "" {
 					log.Debugf("Start to Call Async Verbose: %v", verbose)
 				}
-				call(i)
+				call(pluginRuntimeID, i)
 				if verbose != "" {
 					log.Debugf("Finished Calling Async Verbose: %v", verbose)
 				}

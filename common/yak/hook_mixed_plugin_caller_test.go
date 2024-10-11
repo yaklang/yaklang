@@ -3,11 +3,12 @@ package yak
 import (
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
-	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
