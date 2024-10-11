@@ -3,10 +3,11 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"strings"
 )
 
 func (r *SyntaxFlowResult) GetAlertValues() *omap.OrderedMap[string, Values] {

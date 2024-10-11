@@ -88,6 +88,7 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 		OptionSaveValue_RuleName(result.RuleName),
 		OptionSaveValue_RuleTitle(result.RuleTitle),
 		// program
+		// program
 		OptionSaveValue_ProgramName(result.ProgramName),
 	}
 	saveVariable := func(name string, values Values) {
