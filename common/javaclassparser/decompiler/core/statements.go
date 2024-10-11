@@ -15,7 +15,7 @@ type ConditionStatement struct {
 }
 
 func (r *ConditionStatement) String(funcCtx *FunctionContext) string {
-	return fmt.Sprintf("if %s goto %d", r.Condition.String(funcCtx), r.ToStatement)
+	return fmt.Sprintf("if %s", r.Condition.String(funcCtx))
 }
 
 func NewConditionStatement(cmp JavaValue, op string) *ConditionStatement {
