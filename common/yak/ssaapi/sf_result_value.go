@@ -166,16 +166,5 @@ func (r *SyntaxFlowResult) newValue(valueID int64) *Value {
 		log.Errorf("GetValues new lazy instruction: %v", err)
 		return nil
 	}
-	progName := node.GetProgramName()
-	prog, ok := r.programs[progName]
-	if !ok {
-		prog, err = FromDatabase(progName)
-		if err != nil {
-			log.Errorf("newValue getProgram [%s] from DB err: %v", progName, err)
-			return nil
-		}
-		r.programs[progName] = prog
-	}
-
-	return prog.NewValue(node)
+	return r.program.NewValue(node)
 }

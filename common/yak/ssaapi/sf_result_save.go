@@ -26,18 +26,22 @@ func CreateResultByID(resultID uint) (*SyntaxFlowResult, error) {
 		rule = &schema.SyntaxFlowRule{
 			Title:       result.RuleTitle,
 			Severity:    schema.SyntaxFlowSeverity(result.RuleSeverity),
-			Type:        schema.SyntaxFlowRuleType(result.RuleType),
 			Description: result.RuleDesc,
 			AlertDesc:   result.AlertDesc,
 		}
 	}
 	res.rule = rule
+	prog, err := FromDatabase(result.ProgramName)
+	if err != nil {
+		return nil, err
+	}
+	res.program = prog
 	return res, nil
 }
 
 func (r *SyntaxFlowResult) Save(TaskIDs ...string) (uint, error) {
-	if r == nil || r.memResult == nil {
-		return 0, utils.Error("result is nil")
+	if r == nil || r.memResult == nil || r.program == nil {
+		return 0, utils.Error("result or program  is nil")
 	}
 	// result
 	result := ssadb.CreateResult(TaskIDs...)
@@ -49,14 +53,14 @@ func (r *SyntaxFlowResult) Save(TaskIDs ...string) (uint, error) {
 	if rule.ID > 0 {
 		// can get from database
 		result.RuleName = rule.RuleName
-	} else {
-		// save info in result
-		result.RuleTitle = rule.Title
-		result.RuleSeverity = string(rule.Severity)
-		result.RuleType = string(rule.Type)
-		result.RuleDesc = rule.Description
-		result.AlertDesc = rule.AlertDesc
 	}
+	// save info in result
+	result.RuleTitle = rule.Title
+	result.RuleSeverity = string(rule.Severity)
+	result.RuleDesc = rule.Description
+	result.AlertDesc = rule.AlertDesc
+	// program
+	result.ProgramName = r.program.GetProgramName()
 	// value
 	var errs error
 	if err := r.saveValue(result); err != nil {
@@ -84,6 +88,8 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 		// rule
 		OptionSaveValue_RuleName(result.RuleName),
 		OptionSaveValue_RuleTitle(result.RuleTitle),
+		// program
+		OptionSaveValue_ProgramName(result.ProgramName),
 	}
 	saveVariable := func(name string, values Values) {
 		opts := append(opts, OptionSaveValue_ResultVariable(name))
@@ -97,7 +103,6 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 		}
 		// save variable that has value
 		for _, v := range values {
-			opts := append(opts, OptionSaveValue_ProgramName(v.GetProgramName()))
 			e := SaveValue(v, opts...)
 			err = utils.JoinErrors(err, e)
 		}

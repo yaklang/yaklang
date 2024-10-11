@@ -13,7 +13,7 @@ type SyntaxFlowResult struct {
 	memResult *sfvm.SFFrameResult
 	dbResult  *ssadb.AuditResult
 	// for create value
-	programs map[string]*Program
+	program *Program
 	//from db
 	rule *schema.SyntaxFlowRule
 	// cache
@@ -31,8 +31,7 @@ type SyntaxFlowResult struct {
 
 func createEmptyResult() *SyntaxFlowResult {
 	return &SyntaxFlowResult{
-		symbol:   make(map[string]Values),
-		programs: make(map[string]*Program),
+		symbol: make(map[string]Values),
 	}
 }
 
