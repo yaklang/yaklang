@@ -101,6 +101,9 @@ func (d *Decompiler) ScanJmp() error {
 			}
 			visitNodeRecord.Add(opcode)
 			pre = opcode
+			if opcode.Id == 39 {
+				print()
+			}
 			switch opcode.Instr.OpCode {
 			case OP_RETURN:
 				opcode.Target = []*OpCode{endOp}
@@ -758,12 +761,20 @@ func (d *Decompiler) ParseStatement() error {
 		idToOpcode[opcode.Id] = opcode
 	}
 	for _, node := range nodes {
-		for _, code := range idToOpcode[node.Id].Target {
+		node := node
+		if node.Id == 39 {
+			print()
+		}
+		opcode := idToOpcode[node.Id]
+		for _, code := range opcode.Target {
 			id := getStatementNextIdByOpcodeId(code.Id)
 			if id == -1 {
 				continue
 			}
 			node.Next = append(node.Next, idToNode[id])
+			if opcode.Jmp == code.Id {
+				node.JmpNode = idToNode[id]
+			}
 			idToNode[id].Source = append(idToNode[id].Source, node)
 		}
 	}
@@ -774,11 +785,62 @@ func (d *Decompiler) ParseStatement() error {
 		})
 	}
 	d.RootNode = nodes[0]
-	//err = d.SplitConditionNode()
+	err = d.StandardStatement()
+	if err != nil {
+		return err
+	}
+	err = d.ReGenerateNodeId()
+	if err != nil {
+		return err
+	}
+	//err = d.ScanIfStatementInfo()
 	//if err != nil {
 	//	return err
 	//}
 	return nil
+}
+
+func (d *Decompiler) ReGenerateNodeId() error {
+	id := 0
+	return WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
+		node.Id = id
+		id++
+		return node.Next, nil
+	})
+}
+func (d *Decompiler) StandardStatement() error {
+	return WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
+		for _, n := range node.Next {
+			if _, ok := n.Statement.(*GOTOStatement); ok {
+				gotoNext := n.Next[0]
+				node.ReplaceNext(n, gotoNext)
+				gotoNext.RemoveSource(n)
+				gotoNext.AddSource(node)
+				//n.RemoveAllNext()
+				//n.RemoveAllSource()
+			}
+		}
+		if _, ok := node.Statement.(*ConditionStatement); ok {
+			if node.Id == 39 {
+				print()
+			}
+			var trueIndex, falseIndex int
+			if node.Next[0] == node.JmpNode {
+				trueIndex = 0
+				falseIndex = 1
+			} else {
+				trueIndex = 1
+				falseIndex = 0
+			}
+			node.TrueNode = func() *Node {
+				return node.Next[trueIndex]
+			}
+			node.FalseNode = func() *Node {
+				return node.Next[falseIndex]
+			}
+		}
+		return node.Next, nil
+	})
 }
 
 type IfScope struct {

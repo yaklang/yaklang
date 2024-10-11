@@ -9,7 +9,45 @@ import (
 
 type rewriterFunc func(statementManager *StatementManager, node *core.Node) error
 
-func RewriteIf(statementManager *StatementManager, node *core.Node) error {
+func RewriteIf(manager *StatementManager, node *core.Node) error {
+	for _, ifNode := range manager.IfNodes {
+		ifNode := ifNode
+		ifStatement := core.NewIfStatement(ifNode.Statement.(*core.ConditionStatement).Condition, nil, nil)
+		ifNode.Statement = ifStatement
+		trueNode := ifNode.TrueNode()
+		falseNode := ifNode.FalseNode()
+		ifNode.RemoveAllNext()
+		if !manager.LoopOccupiedNodes.Has(ifNode.MergeNode) {
+			ifNode.AddNext(ifNode.MergeNode)
+		}
+		manager.AddFinalAction(func() error {
+			trueBody, err := manager.ToStatementsFromNode(trueNode, func(node *core.Node) bool {
+				if node == ifNode.MergeNode {
+					return false
+				}
+				return true
+			})
+			if err != nil {
+				return err
+			}
+			falseBody, err := manager.ToStatementsFromNode(falseNode, func(node *core.Node) bool {
+				if node == ifNode.MergeNode {
+					return false
+				}
+				return true
+			})
+			if err != nil {
+				return err
+			}
+			ifStatement.IfBody = utils2.NodesToStatements(trueBody)
+			ifStatement.ElseBody = utils2.NodesToStatements(falseBody)
+			return nil
+		})
+		//ifNode.AddNext(ifNode.MergeNode)
+	}
+	return nil
+}
+func _1RewriteIf(statementManager *StatementManager, node *core.Node) error {
 	ifNode := node
 	if _, ok := ifNode.Statement.(*core.ConditionStatement); !ok {
 		return nil
