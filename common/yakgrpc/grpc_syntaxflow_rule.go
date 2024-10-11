@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 func (s *Server) QuerySyntaxFlowRule(ctx context.Context, req *ypb.QuerySyntaxFlowRuleRequest) (*ypb.QuerySyntaxFlowRuleResponse, error) {
@@ -24,9 +25,8 @@ func (s *Server) QuerySyntaxFlowRule(ctx context.Context, req *ypb.QuerySyntaxFl
 		},
 		Total: uint64(p.TotalRecord),
 		DbMessage: &ypb.DbOperateMessage{
-			TableName:  "syntax_flow_rule",
-			Operation:  DbOperationQuery,
-			EffectRows: int64(p.TotalRecord),
+			TableName: "syntax_flow_rule",
+			Operation: DbOperationQuery,
 		},
 	}
 	for _, d := range data {
@@ -92,5 +92,3 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.Tag = strings.Join(ruleInput.Tags, "|")
 	return rule, nil
 }
-
-

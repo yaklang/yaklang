@@ -1,8 +1,13 @@
 package ssadb
 
 import (
+	"context"
+
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type AuditResult struct {
@@ -55,4 +60,53 @@ func CreateResult(TaskIDs ...string) *AuditResult {
 
 func SaveResult(result *AuditResult) error {
 	return GetDB().Save(result).Error
+}
+
+func YieldAuditResults(DB *gorm.DB, ctx context.Context) chan *AuditResult {
+	db := DB.Model(&AuditResult{})
+
+	outC := make(chan *AuditResult)
+
+	go func() {
+		var page = 1
+		for {
+			var items []*AuditResult
+			if _, b := bizhelper.Paging(db, page, 100, &items); b.Error != nil {
+				log.Errorf("paging failed: %s", b.Error)
+				return
+			}
+
+			page++
+			for _, d := range items {
+				select {
+				case <-ctx.Done():
+					return
+				case outC <- d:
+				}
+			}
+
+			if len(items) < 100 {
+				return
+			}
+		}
+	}()
+	return outC
+}
+
+func (r *AuditResult) ToGRPCModel() *ypb.SyntaxFlowResult {
+	res := &ypb.SyntaxFlowResult{
+		ResultID:    uint64(r.ID),
+		TaskID:      r.TaskID,
+		RuleName:    r.RuleName,
+		Title:       r.RuleTitle,
+		TitleZh:     r.RuleTitleZh,
+		Description: r.RuleDesc,
+		Severity:    r.RuleSeverity,
+		Purpose:     r.RulePurpose,
+		ProgramName: r.ProgramName,
+		Language:    r.Language,
+		RiskCount:   r.RiskCount,
+	}
+	return res
+
 }

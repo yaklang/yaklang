@@ -5534,8 +5534,13 @@ message SyntaxFlowResultFilter {
 
   string Keyword = 5;
 
-  uint64 MinMatchedValue = 6;
-  uint64 MaxMatchedValue = 7;
+
+  bool OnlyRisk = 6;
+
+  int64 AfterID = 7; 
+  int64 BeforeID = 8;
+
+  repeated string Severity = 9; 
 }
 
 message QuerySyntaxFlowResultRequest{
@@ -5547,6 +5552,7 @@ message QuerySyntaxFlowResultResponse{
   Paging Pagination = 1;
   DbOperateMessage DbMessage= 2;
   repeated SyntaxFlowResult Results = 3;
+  uint64 Total = 4; 
 }
 
 
