@@ -57,13 +57,13 @@ func init() {
 			}
 			content := string(raw)
 			// import builtin rule
-			err = sfdb.ImportRuleWithoutValid(name, content, true, tags...)
+			rule,err := sfdb.ImportRuleWithoutValid(name, content, true, tags...)
 			if err != nil {
 				log.Warnf("import rule %s error: %s", name, err)
 				return err
 			}
 			//builtin rule use language,purpose,severity as group name
-			err = sfdb.ImportRuleDefaultGroupName(name, content)
+			err = sfdb.ImportRuleDefaultGroupName(rule)
 			if err != nil {
 				return err
 			}
