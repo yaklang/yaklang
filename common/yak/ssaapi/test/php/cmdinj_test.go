@@ -3,6 +3,9 @@ package php
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -106,20 +109,58 @@ test($_GET[1]);`
 		map[string][]string{"param": {"Undefined-_GET", "Undefined-_GET.1(valid)"}},
 		ssaapi.WithLanguage(ssaapi.PHP))
 }
-func TestDataflow(t *testing.T) {
-	/*
-		<include('php-param')> as $start;
-		<include('php-filter-function')> as $filter;
-		mysql_query(* as $param);
-		$param #{
-		include: `<self> & $start`,
-		exclude: `<self> & $filter`
-		}->  as $output
-	*/
-	code := `<?php
+func TestPhp_SQLI_With_Filter(t *testing.T) {
+	rule := `
+<include('php-param')> as $start;
+<include('php-filter-function')> as $filterFunc;
+mysql_query(* as $param);
+
+$param #{
+	include: <<<INCLUDE
+		<self> & $start
+INCLUDE}-> as $tmp;
+
+$param #{
+	include: <<<INCLUDE
+		<self> & $start
+INCLUDE,
+	exclude: <<<EXCLUDE
+		<self> & $filterFunc
+EXCLUDE,
+}->  as $output`
+	t.Run("test filter func is undefined", func(t *testing.T) {
+		code := `<?php
     $llink=addslashes($_GET['1']);
     $query = "SELECT * FROM nav WHERE link='$llink'";
     $result = mysql_query($query) or die('SQL语句有误：'.mysql_error());
     $navs = mysql_fetch_array($result);`
-	ssatest.CheckSyntaxFlow(t, code, "<include('php-param')> as $start;\n<include('php-filter-function')> as $filter;\nmysql_query(* as $param);\n$param #{\ninclude: `<self> & $start`,\nexclude: `<self> & $filter`\n}->  as $output", map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			res, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			require.Contains(t, res.GetValues("filterFunc").String(), "Undefined-addslashes(Undefined-_GET.1(valid))")
+			require.Contains(t, res.GetValues("tmp").String(), "Undefined-_GET")
+			require.Equal(t, 0, res.GetValues("output").Len())
+			return nil
+		}, ssaapi.WithLanguage(consts.PHP))
+	})
+	t.Run("test existed  filter  func ", func(t *testing.T) {
+		code := `<?php
+	function addslashes($a){
+		return $a;
+	}
+    $llink=addslashes($_GET['1']);
+    $query = "SELECT * FROM nav WHERE link='$llink'";
+    $result = mysql_query($query) or die('SQL语句有误：'.mysql_error());
+    $navs = mysql_fetch_array($result);`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		res, err := prog.SyntaxFlowWithError(rule,sfvm.WithEnableDebug(true))
+		require.NoError(t, err)
+		require.Contains(t, res.GetValues("filterFunc").String(), "Function-addslashes")
+		require.Contains(t, res.GetValues("tmp").String(), "Undefined-_GET")
+		require.Equal(t, 0, res.GetValues("output").Len())
+		return nil
+	}, ssaapi.WithLanguage(consts.PHP))
+	})
 }
+

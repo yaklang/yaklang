@@ -20,7 +20,7 @@ alert $high for {
 
 
 $root?{<dataflow(<<<CODE
-*?{opcode: call && <self><getCaller> & $filter} as $__next__;
+*?{opcode: call && <self>& $filter} as $__next__;
 CODE)>} as $low;
 
 alert $low for {

@@ -232,6 +232,8 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeFunction])
 			case "+", "-", "*", "/", "%":
 				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeBinOp]+"["+text+"]")
+			case "undefined":
+				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeUndefined])
 			default:
 				log.Errorf("unknown opcode: %s", opcode.GetText())
 			}
