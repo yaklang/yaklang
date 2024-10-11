@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,20 +22,7 @@ func (t *IrType) CalcHash() string {
 	return utils.CalcSha1(t.Kind, t.String, t.ExtraInformation)
 }
 
-func (t *IrType) BeforeUpdate() error {
-	t.Hash = t.CalcHash()
-	return nil
-}
-
-func (t *IrType) BeforeSave() error {
-	t.Hash = t.CalcHash()
-	return nil
-}
-
-func (t *IrType) BeforeCreate() error {
-	t.Hash = t.CalcHash()
-	return nil
-}
+var lock sync.Mutex
 
 func SaveType(kind int, str string, extra string) int {
 	start := time.Now()
@@ -42,15 +30,27 @@ func SaveType(kind int, str string, extra string) int {
 		atomic.AddUint64(&_SSASaveTypeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	}()
 
-	db := GetDB()
-	irType := &IrType{
+	irType := IrType{
 		Kind:             kind,
 		String:           str,
 		ExtraInformation: extra,
 	}
-	if db := db.Where(irType).FirstOrCreate(irType); db.Error != nil {
-		log.Errorf("SaveType error: %v", db.Error)
-		return -1
+	irType.Hash = irType.CalcHash()
+
+	lock.Lock()
+	defer lock.Unlock()
+
+	rawDB := GetDB().Model(&IrType{})
+	if queryDB := rawDB.Where("hash = ? ", irType.Hash).First(&irType); queryDB.Error != nil {
+		if queryDB.RecordNotFound() {
+			if saveDB := rawDB.Save(&irType); saveDB.Error != nil {
+				log.Errorf("SaveType error: %v", saveDB.Error)
+				return -1
+			}
+		} else {
+			log.Errorf("SaveType error: %v", queryDB.Error)
+			return -1
+		}
 	}
 	return int(irType.ID)
 }
