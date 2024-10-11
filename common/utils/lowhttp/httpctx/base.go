@@ -293,6 +293,8 @@ const (
 	REQUEST_CONTEXT_KEY_WebsocketRequestHash         = "websocketRequestHash"
 	REQUEST_CONTEXT_KEY_RequestProxyProtocol         = "requestProxyProtocol"
 	REQUEST_CONTEXT_KEY_IsWebsocketRequest           = "isWebsocketRequest"
+	REQUEST_CONTEXT_KEY_PluginContext                = "pluginContext"
+	REQUEST_CONTEXT_KEY_PluginContextCancelFunc      = "pluginContextCancelFunc"
 )
 
 func SetRequestProxyProtocol(req *http.Request, p string) {
@@ -670,4 +672,19 @@ func GetIsWebWebsocketRequest(r *http.Request) bool {
 
 func SetIsWebWebsocketRequest(r *http.Request) {
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsWebsocketRequest, true)
+}
+
+func SetPluginContext(r *http.Request, ctx context.Context) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_PluginContext, ctx)
+}
+
+func GetPluginContext(r *http.Request) context.Context {
+	ctx := GetContextAnyFromRequest(r, REQUEST_CONTEXT_KEY_PluginContext)
+	if ctx == nil {
+		return nil
+	}
+	if c, ok := ctx.(context.Context); ok {
+		return c
+	}
+	return nil
 }

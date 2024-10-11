@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/segmentio/ksuid"
@@ -639,6 +640,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	defer req.Body.Close()
 
 	httpctx.SetMITMFrontendReadWriter(req, brw)
+	httpctx.SetPluginContext(req, consts.NewPluginContext())
 
 	session := ctx.Session()
 	ctx, err := withSession(session)

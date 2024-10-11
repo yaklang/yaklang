@@ -1,6 +1,7 @@
 package ssa_option
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -19,6 +20,7 @@ func MitmGetTypeSSAOpt() []ssaapi.Option {
 	// mitm
 	valueTable := make(map[string]interface{})
 	valueTable["MITM_PLUGIN"] = ""
+	valueTable[consts.PLUGIN_CONTEXT_KEY_RUNTIME_ID] = ""
 	valueTable["MITM_PARAMS"] = make(map[string]string)
 	ret = append(ret, ssaapi.WithExternValue(valueTable))
 

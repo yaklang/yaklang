@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -455,6 +456,32 @@ defer m.`, token), &ypb.Range{
 			Code: "m.", StartLine: 2, StartColumn: 7, EndLine: 8, EndColumn: 9,
 		}, id,
 			labelsContainsCallback(t, []string{"Delete", "Keys", token}),
+		)
+	})
+
+	t.Run("mitm pluginType completion", func(t *testing.T) {
+		t.Parallel()
+		code := `hijackSaveHTTPFlow = func(flow, modify, drop) {
+println(PLUGIN_RUNTIME_ID)
+
+}
+		`
+		checkMITMCompletionWithCallbacks(t, code, &ypb.Range{
+			Code:        "",
+			StartLine:   3,
+			StartColumn: 1,
+			EndLine:     3,
+			EndColumn:   1,
+		},
+			labelsContainsCallback(t, []string{"print", consts.PLUGIN_CONTEXT_KEY_RUNTIME_ID, "MITM_PARAMS"}),
+			func(suggestions []*ypb.SuggestionDescription) {
+				item := getExactSuggestion(t, suggestions, consts.PLUGIN_CONTEXT_KEY_RUNTIME_ID)
+				require.Equal(t, "Variable", item.Kind)
+				require.Equal(t, "string", item.Description)
+				item = getExactSuggestion(t, suggestions, "MITM_PARAMS")
+				require.Equal(t, "Variable", item.Kind)
+				require.Equal(t, "map[string]string", item.Description)
+			},
 		)
 	})
 }
