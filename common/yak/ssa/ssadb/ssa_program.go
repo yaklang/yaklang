@@ -71,6 +71,9 @@ func AllSSAPrograms() []*schema.SSAProgram {
 		log.Errorf("get all ssa programs error: %s", err)
 	}
 	for _, p := range programs {
+		if p == nil {
+			continue
+		}
 		Programs[p.Name] = p
 	}
 
