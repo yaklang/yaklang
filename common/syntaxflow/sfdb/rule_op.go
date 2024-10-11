@@ -132,7 +132,7 @@ func DeleteRuleByTitle(name string) error {
 	return db.Where("title = ? or title_zh = ?", name, name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
-func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) error {
+func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
 	language, err := CheckSyntaxFlowLanguage(languageRaw)
 	if err != nil {
@@ -144,7 +144,7 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	}
 	rule, err := CheckSyntaxFlowRuleContent(content)
 	if err != nil {
-		return err
+		return nil,err
 	}
 	rule.Type = ruleType
 	rule.RuleName = ruleName
@@ -153,23 +153,18 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	rule.IsBuildInRule = buildin
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
-		return utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
+		return nil,utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
 	}
-	return nil
+	return rule,nil
 }
 
 // ImportRuleDefaultGroupName 导入规则默认分组，默认使用language,purpose,severity作为分组名
-func ImportRuleDefaultGroupName(ruleName string, content string) error {
-	languageRaw, _, _ := strings.Cut(ruleName, "-")
-	language, err := CheckSyntaxFlowLanguage(languageRaw)
-	if err != nil {
-		return err
-	}
-	rule, err := CheckSyntaxFlowRuleContent(content)
-	if err != nil {
-		return err
-	}
+func ImportRuleDefaultGroupName(rule *schema.SyntaxFlowRule) error {
+	ruleName := rule.RuleName
 	saveSfGroup := func(groupName string) error {
+		if groupName == ""{
+			return nil
+		}
 		saveData := &schema.SyntaxFlowRuleGroup{
 			RuleName:  ruleName,
 			GroupName: groupName,
@@ -177,8 +172,8 @@ func ImportRuleDefaultGroupName(ruleName string, content string) error {
 		hash := saveData.CalcHash()
 		return CreateOrUpdateSyntaxFlowGroup(hash, saveData)
 	}
-	for _, n := range []string{string(language), string(rule.Purpose), string(rule.Severity)} {
-		err = saveSfGroup(n)
+	for _, n := range []string{string(rule.RuleName), string(rule.Purpose), string(rule.Severity)} {
+		err := saveSfGroup(n)
 		if err != nil {
 			return err
 		}
