@@ -182,13 +182,11 @@ var CVEUtilCommands = []*cli.Command{
 			go func() {
 				defer wg.Done()
 				log.Infof("start to save cve data from database: %v", cvePath)
-				if !c.Bool("cache") {
-					err := cvequeryops.DownLoad(cvePath)
-					if err != nil {
-						log.Errorf("download failed: %s", err)
-						downloadFailed = true
-						return
-					}
+				err := cvequeryops.DownLoad(cvePath, c.Bool("cache"))
+				if err != nil {
+					log.Errorf("download failed: %s", err)
+					downloadFailed = true
+					return
 				}
 			}()
 			go func() {

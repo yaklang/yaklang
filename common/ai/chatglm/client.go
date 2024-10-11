@@ -23,7 +23,7 @@ func (g *GLMClient) LoadOption(opt ...aispec.AIConfigOption) {
 	g.config = config
 
 	if g.config.Model == "" {
-		g.config.Model = "glm-3-turbo"
+		g.config.Model = "glm-4-flash"
 	}
 
 	if config.BaseURL != "" {
