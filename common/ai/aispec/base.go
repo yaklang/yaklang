@@ -109,6 +109,10 @@ func ExtractFromResult(result string, fields map[string]any) (map[string]any, er
 		}
 	}
 
+	if strings.Contains(result, "，") {
+		return ExtractFromResult(strings.ReplaceAll(result, "，", ","), fields)
+	}
+
 	return nil, utils.Errorf("cannot extractjson: \n%v\n", string(result))
 }
 

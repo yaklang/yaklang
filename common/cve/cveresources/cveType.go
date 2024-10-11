@@ -358,7 +358,8 @@ func CreateOrUpdateCVE(db *gorm.DB, id string, cve *CVE) error {
 }
 
 func YieldCVEs(db *gorm.DB, ctx context.Context) chan *CVE {
-	outC := make(chan *CVE)
+	limit := 500
+	outC := make(chan *CVE, 5000)
 	go func() {
 		defer close(outC)
 
@@ -368,7 +369,7 @@ func YieldCVEs(db *gorm.DB, ctx context.Context) chan *CVE {
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
-				Limit: 1000,
+				Limit: limit,
 			}, &items); b.Error != nil {
 				log.Errorf("paging failed: %s", b.Error)
 				return
@@ -384,7 +385,7 @@ func YieldCVEs(db *gorm.DB, ctx context.Context) chan *CVE {
 				}
 			}
 
-			if len(items) < 1000 {
+			if len(items) < limit {
 				return
 			}
 		}
