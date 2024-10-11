@@ -3,8 +3,9 @@ package yakvm
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/limitedmap"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils/limitedmap"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -74,7 +75,7 @@ func (v *VirtualMachine) AddBreakPoint(fun BreakPointFactoryFun) {
 
 func (n *VirtualMachine) GetExternalVariableNames() []string {
 	vs := []string{}
-	var result = make(map[string]struct{})
+	result := make(map[string]struct{})
 	n.globalVar.ForEachKey(func(_ any, key string) error {
 		_, existed := result[key]
 		if existed {
@@ -238,6 +239,10 @@ func (n *VirtualMachine) GetDebugger() *Debugger {
 }
 
 func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args map[int]*Value, flags ...ExecFlag) (interface{}, error) {
+	return v.ExecYakFunctionEx(ctx, f, args, nil, flags...)
+}
+
+func (v *VirtualMachine) ExecYakFunctionEx(ctx context.Context, f *Function, args map[int]*Value, frameCallback func(*Frame), flags ...ExecFlag) (interface{}, error) {
 	var value interface{}
 	finalFlags := []ExecFlag{Sub}
 	if len(flags) > 0 {
@@ -257,11 +262,11 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 		// if v.config.GetClosureSupport() {
 		frame.scope = f.scope
 		frame.CreateAndSwitchSubScope(f.symbolTable)
-		//} else {
-		//	frame.scope = NewScope(f.symbolTable)
-		//}
 		for id, arg := range args {
 			frame.CurrentScope().NewValueByID(id, arg)
+		}
+		if frameCallback != nil {
+			frameCallback(frame)
 		}
 		frame.Exec(f.codes)
 		if frame.lastStackValue != nil {

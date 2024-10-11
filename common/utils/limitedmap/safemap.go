@@ -1,9 +1,11 @@
 package limitedmap
 
 import (
+	"sync"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
+	"golang.org/x/exp/maps"
 )
 
 type SafeMap struct {
@@ -20,6 +22,15 @@ func NewSafeMap(a map[string]any) *SafeMap {
 		m:    a,
 		lock: new(sync.RWMutex),
 	}
+}
+
+func (sm *SafeMap) Clone() *SafeMap {
+	sm.lock.RLock()
+	defer sm.lock.RUnlock()
+
+	nsm := NewSafeMap(maps.Clone(sm.m))
+	nsm.parent = sm.parent
+	return nsm
 }
 
 func (sm *SafeMap) Append(l map[string]any) *SafeMap {
@@ -112,7 +123,7 @@ func (sm *SafeMap) Flat() map[string]any {
 		item = append(item, key)
 		return nil
 	})
-	var m = make(map[string]any)
+	m := make(map[string]any)
 	for _, k := range item {
 		raw, ok := sm.Load(k)
 		if ok {

@@ -492,7 +492,8 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 	return nil
 }
 
-func (m *MixPluginCaller) CallHijackRequest(
+func (m *MixPluginCaller) CallHijackRequestWithCtx(
+	runtimeCtx context.Context,
 	isHttps bool, u string, getRequest func() interface{},
 	reject func() interface{},
 	drop func() interface{},
@@ -503,21 +504,28 @@ func (m *MixPluginCaller) CallHijackRequest(
 	}
 	callers := m.callers
 	if callers.ShouldCallByName(HOOK_HijackHTTPRequest) {
-		callers.CallByNameExSync(
+		callers.Call(
 			HOOK_HijackHTTPRequest,
-			func() interface{} {
-				return isHttps
-			},
-			func() interface{} {
-				return u
-			},
-			getRequest,
-			reject, drop,
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigItemFuncs(
+				func() any { return isHttps },
+				func() any { return u },
+				getRequest, reject, drop,
+			),
 		)
 	}
 }
 
-func (m *MixPluginCaller) CallHijackResponse(
+func (m *MixPluginCaller) CallHijackRequest(
+	isHttps bool, u string, getRequest func() interface{},
+	reject func() interface{},
+	drop func() interface{},
+) {
+	m.CallHijackRequestWithCtx(context.Background(), isHttps, u, getRequest, reject, drop)
+}
+
+func (m *MixPluginCaller) CallHijackResponseWithCtx(
+	runtimeCtx context.Context,
 	isHttps bool, u string, getResponse,
 	reject, drop func() interface{},
 ) {
@@ -527,15 +535,27 @@ func (m *MixPluginCaller) CallHijackResponse(
 	}
 	callers := m.callers
 	if callers.ShouldCallByName(HOOK_HijackHTTPResponse) {
-		callers.CallByNameExSync(
+		callers.Call(
 			HOOK_HijackHTTPResponse,
-			func() interface{} { return isHttps },
-			func() interface{} { return u }, getResponse, reject, drop,
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigItemFuncs(
+				func() any { return isHttps },
+				func() any { return u },
+				getResponse, reject, drop,
+			),
 		)
 	}
 }
 
-func (m *MixPluginCaller) CallHijackResponseEx(
+func (m *MixPluginCaller) CallHijackResponse(
+	isHttps bool, u string, getResponse,
+	reject, drop func() interface{},
+) {
+	m.CallHijackResponseWithCtx(context.Background(), isHttps, u, getResponse, reject, drop)
+}
+
+func (m *MixPluginCaller) CallHijackResponseExWithCtx(
+	runtimeCtx context.Context,
 	isHttps bool, u string, getRequest, getResponse,
 	reject, drop func() interface{},
 ) {
@@ -545,12 +565,22 @@ func (m *MixPluginCaller) CallHijackResponseEx(
 	}
 	callers := m.callers
 	if callers.ShouldCallByName(HOOK_HijackHTTPResponseEx) {
-		callers.CallByNameExSync(
-			HOOK_HijackHTTPResponseEx,
-			func() interface{} { return isHttps },
-			func() interface{} { return u }, getRequest, getResponse, reject, drop,
+		callers.Call(HOOK_HijackHTTPResponseEx,
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigItemFuncs(
+				func() any { return isHttps },
+				func() any { return u },
+				getRequest, getResponse, reject, drop,
+			),
 		)
 	}
+}
+
+func (m *MixPluginCaller) CallHijackResponseEx(
+	isHttps bool, u string, getRequest, getResponse,
+	reject, drop func() interface{},
+) {
+	m.CallHijackResponseExWithCtx(context.Background(), isHttps, u, getRequest, getResponse, reject, drop)
 }
 
 func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []byte) string {
@@ -653,126 +683,19 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 	wg.Wait()
 }
 
+func (m *MixPluginCaller) MirrorHTTPFlowWithCtx(
+	runtimeCtx context.Context,
+	isHttps bool, u string, req, rsp, body []byte,
+	filters ...bool,
+) {
+	m.mirrorHTTPFlow(runtimeCtx, false, true, isHttps, u, req, rsp, body, filters...)
+}
+
 func (m *MixPluginCaller) MirrorHTTPFlow(
 	isHttps bool, u string, req, rsp, body []byte,
 	filters ...bool,
 ) {
-	if !m.IsPassed(u) {
-		log.Infof("call MirrorHTTPFlow error: url[%v] not passed", u)
-		return
-	}
-	m.MirrorHTTPFlowEx(true, isHttps, u, req, rsp, body, filters...)
-}
-
-func (m *MixPluginCaller) MirrorHTTPFlowExSync(
-	scanPort bool,
-	isHttps bool, u string, req, rsp, body []byte,
-	filters ...bool,
-) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("panic from mirror httpflow ex: %s", err)
-		}
-	}()
-	callers := m.callers
-
-	if !utils.IsHttpOrHttpsUrl(u) {
-		host, port, _ := utils.ParseStringToHostPort(u)
-		if host == "" {
-			host = u
-		}
-		if port == 443 {
-			u = fmt.Sprintf("https://%s", host)
-		} else {
-			u = fmt.Sprintf("http://%s", host)
-		}
-	}
-	if callers.ShouldCallByName(HOOK_MirrorHTTPFlow) {
-		callers.CallByNameSync(HOOK_MirrorHTTPFlow, isHttps, u, req, rsp, body)
-	}
-
-	urlObj, err := url.Parse(u)
-	if err != nil {
-		yaklib.GetYakitClientInstance().YakitInfo("解析 URL 失败：%v 原因: %v", u, err)
-	}
-	if urlObj != nil {
-		host, port, _ := utils.ParseStringToHostPort(u)
-		websiteHash := calcNewWebsiteHash(urlObj, host, port, req)
-		websitePathHash := calcWebsitePathHash(urlObj, host, port, req)
-		websitePathParamsHash := calcWebsitePathParamsHash(urlObj, host, port, req)
-		if !m.websiteFilter.Exist(websiteHash) {
-			m.websiteFilter.Insert(websiteHash)
-			if callers.ShouldCallByName(HOOK_MirrorNewWebsite) {
-				callers.CallByNameSync(HOOK_MirrorNewWebsite, isHttps, u, req, rsp, body)
-			}
-
-			if callers.ShouldCallByName(HOOK_PortScanHandle) {
-				var (
-					matchResult *fp.MatchResult = &fp.MatchResult{State: fp.OPEN}
-					err         error
-				)
-				host, port, _ = utils.ParseStringToHostPort(u)
-				if host != "" && port > 0 {
-					m.swg.Add()
-					go func() {
-						defer m.swg.Done()
-						if scanPort {
-							addr := utils.HostPort(host, port)
-							log.Debugf("(port/mitm) start to match %v", addr)
-							matchResult, err = m.GetFingerprintMatcher().Match(
-								host, port, fp.WithCache(m.cache), fp.WithDatabaseCache(true),
-								fp.WithProxy(m.proxy),
-							)
-							if err != nil {
-								return
-							}
-							log.Debugf("%v", matchResult.String())
-						}
-						callers.CallByNameSync(HOOK_PortScanHandle, matchResult)
-					}()
-				}
-			}
-
-			// 异步+并发限制执行 Nuclei
-			if callers.ShouldCallByName(HOOK_NucleiScanHandle) {
-				m.swg.Add()
-				go func() {
-					defer m.swg.Done()
-					callers.CallByNameSync(HOOK_NucleiScanHandle, urlObj.String())
-				}()
-			}
-			if callers.ShouldCallByName(HOOK_NaslScanHandle) {
-				m.swg.Add()
-				go func() {
-					defer m.swg.Done()
-					callers.CallByNameSync(HOOK_NaslScanHandle, urlObj.String())
-				}()
-			}
-		}
-
-		if !m.websitePathFilter.Exist(websitePathHash) {
-			m.websitePathFilter.Insert(websitePathHash)
-			if callers.ShouldCallByName(HOOK_MirrorNewWebsitePath) {
-				callers.CallByNameSync(HOOK_MirrorNewWebsitePath, isHttps, u, req, rsp, body)
-			}
-		}
-
-		if !m.websiteParamsFilter.Exist(websitePathParamsHash) {
-			m.websiteParamsFilter.Insert(websitePathParamsHash)
-			if callers.ShouldCallByName(HOOK_MirrorNewWebsitePathParams) {
-				callers.CallByNameSync(HOOK_MirrorNewWebsitePathParams, isHttps, u, req, rsp, body)
-			}
-		}
-	}
-
-	for _, i := range filters {
-		if !i {
-			return
-		}
-	}
-	if callers.ShouldCallByName(HOOK_MirrorFilteredHTTPFlow) {
-		callers.CallByNameSync(HOOK_MirrorFilteredHTTPFlow, isHttps, u, req, rsp, body)
-	}
+	m.mirrorHTTPFlow(context.Background(), false, true, isHttps, u, req, rsp, body, filters...)
 }
 
 func (m *MixPluginCaller) MirrorHTTPFlowEx(
@@ -780,10 +703,29 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 	isHttps bool, u string, req, rsp, body []byte,
 	filters ...bool,
 ) {
+	m.mirrorHTTPFlow(context.Background(), false, scanPort, isHttps, u, req, rsp, body, filters...)
+}
+
+func (m *MixPluginCaller) MirrorHTTPFlowExSync(
+	scanPort bool,
+	isHttps bool, u string, req, rsp, body []byte,
+	filters ...bool,
+) {
+	m.mirrorHTTPFlow(context.Background(), true, scanPort, isHttps, u, req, rsp, body, filters...)
+}
+
+func (m *MixPluginCaller) mirrorHTTPFlow(
+	runtimeCtx context.Context,
+	forceSync bool,
+	scanPort bool,
+	isHttps bool, u string, req, rsp, body []byte,
+	filters ...bool,
+) {
 	if !m.IsPassed(u) {
-		log.Infof("call MirrorHTTPFlowEx error: url[%v] not passed", u)
+		log.Infof("call MirrorHTTPFlow error: url[%v] not passed", u)
 		return
 	}
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic from mirror httpflow ex: %s", err)
@@ -803,7 +745,11 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 		}
 	}
 	if callers.ShouldCallByName(HOOK_MirrorHTTPFlow) {
-		callers.CallByName(HOOK_MirrorHTTPFlow, isHttps, u, req, rsp, body)
+		callers.Call(HOOK_MirrorHTTPFlow,
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigForceSync(forceSync),
+			WithCallConfigItems(isHttps, u, req, rsp, body),
+		)
 	}
 
 	urlObj, err := url.Parse(u)
@@ -818,7 +764,11 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 		if !m.websiteFilter.Exist(websiteHash) {
 			m.websiteFilter.Insert(websiteHash)
 			if callers.ShouldCallByName(HOOK_MirrorNewWebsite) {
-				callers.CallByName(HOOK_MirrorNewWebsite, isHttps, u, req, rsp, body)
+				callers.Call(HOOK_MirrorNewWebsite,
+					WithCallConfigRuntimeCtx(runtimeCtx),
+					WithCallConfigForceSync(forceSync),
+					WithCallConfigItems(isHttps, u, req, rsp, body),
+				)
 			}
 
 			if callers.ShouldCallByName(HOOK_PortScanHandle) {
@@ -843,7 +793,11 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 							}
 							log.Debugf("%v", matchResult.String())
 						}
-						callers.CallByName(HOOK_PortScanHandle, matchResult)
+						callers.Call(HOOK_PortScanHandle,
+							WithCallConfigRuntimeCtx(runtimeCtx),
+							WithCallConfigForceSync(forceSync),
+							WithCallConfigItems(matchResult),
+						)
 					}()
 				}
 			}
@@ -853,14 +807,22 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 				m.swg.Add()
 				go func() {
 					defer m.swg.Done()
-					callers.CallByName(HOOK_NucleiScanHandle, urlObj.String())
+					callers.Call(HOOK_NucleiScanHandle,
+						WithCallConfigRuntimeCtx(runtimeCtx),
+						WithCallConfigForceSync(forceSync),
+						WithCallConfigItems(urlObj.String()),
+					)
 				}()
 			}
 			if callers.ShouldCallByName(HOOK_NaslScanHandle) {
 				m.swg.Add()
 				go func() {
 					defer m.swg.Done()
-					callers.CallByName(HOOK_NaslScanHandle, urlObj.String())
+					callers.Call(HOOK_NaslScanHandle,
+						WithCallConfigRuntimeCtx(runtimeCtx),
+						WithCallConfigForceSync(forceSync),
+						WithCallConfigItems(urlObj.String()),
+					)
 				}()
 			}
 		}
@@ -868,14 +830,22 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 		if !m.websitePathFilter.Exist(websitePathHash) {
 			m.websitePathFilter.Insert(websitePathHash)
 			if callers.ShouldCallByName(HOOK_MirrorNewWebsitePath) {
-				callers.CallByName(HOOK_MirrorNewWebsitePath, isHttps, u, req, rsp, body)
+				callers.Call(HOOK_MirrorNewWebsitePath,
+					WithCallConfigRuntimeCtx(runtimeCtx),
+					WithCallConfigForceSync(forceSync),
+					WithCallConfigItems(isHttps, u, req, rsp, body),
+				)
 			}
 		}
 
 		if !m.websiteParamsFilter.Exist(websitePathParamsHash) {
 			m.websiteParamsFilter.Insert(websitePathParamsHash)
 			if callers.ShouldCallByName(HOOK_MirrorNewWebsitePathParams) {
-				callers.CallByName(HOOK_MirrorNewWebsitePathParams, isHttps, u, req, rsp, body)
+				callers.Call(HOOK_MirrorNewWebsitePathParams,
+					WithCallConfigRuntimeCtx(runtimeCtx),
+					WithCallConfigForceSync(forceSync),
+					WithCallConfigItems(isHttps, u, req, rsp, body),
+				)
 			}
 		}
 	}
@@ -886,7 +856,11 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 		}
 	}
 	if callers.ShouldCallByName(HOOK_MirrorFilteredHTTPFlow) {
-		callers.CallByName(HOOK_MirrorFilteredHTTPFlow, isHttps, u, req, rsp, body)
+		callers.Call(HOOK_MirrorFilteredHTTPFlow,
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigForceSync(forceSync),
+			WithCallConfigItems(isHttps, u, req, rsp, body),
+		)
 	}
 }
 
@@ -900,13 +874,18 @@ func (m *MixPluginCaller) HijackSaveHTTPFlow(flow *schema.HTTPFlow, reject func(
 	}
 }
 
-func (m *MixPluginCaller) HijackSaveHTTPFlowWithCallback(flow *schema.HTTPFlow, callback func(), reject func(httpFlow *schema.HTTPFlow), drop func()) {
+func (m *MixPluginCaller) HijackSaveHTTPFlowEx(runtimeCtx context.Context, flow *schema.HTTPFlow, callback func(), reject func(httpFlow *schema.HTTPFlow), drop func()) {
 	if !m.IsPassed(flow.Url) {
 		log.Infof("call HijackSaveHTTPFlow error: url[%v] not passed", flow.Url)
 		return
 	}
 	if m.callers.ShouldCallByName(HOOK_hijackSaveHTTPFlow, callback) {
-		m.callers.CallByNameWithCallback(HOOK_hijackSaveHTTPFlow, callback, flow, reject, drop)
+		m.callers.Call(
+			HOOK_hijackSaveHTTPFlow,
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigCallback(callback),
+			WithCallConfigItems(flow, reject, drop),
+		)
 	}
 }
 

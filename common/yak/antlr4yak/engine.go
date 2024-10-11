@@ -3,12 +3,13 @@ package antlr4yak
 import (
 	"context"
 	"fmt"
+	"os"
+	"sort"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"os"
-	"sort"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -48,6 +49,7 @@ func (e *Engine) RuntimeInfo(infoType string, params ...any) (res any, err error
 	}
 	return getInfoFun.(func(string, ...any) (any, error))(infoType, params...)
 }
+
 func (e *Engine) SetStrictMode(b bool) {
 	if e == nil {
 		return
@@ -144,6 +146,17 @@ func (n *Engine) CallYakFunctionNative(ctx context.Context, function *yakvm.Func
 		paramsValue[i] = yakvm.NewAutoValue(v)
 	}
 	return n.vm.ExecYakFunction(ctx, function, yakvm.YakVMValuesToFunctionMap(function, paramsValue, n.vm.GetConfig().GetFunctionNumberCheck()), yakvm.None)
+}
+
+func (n *Engine) CallYakFunctionNativeWithFrameCallback(ctx context.Context, frameCallback func(*yakvm.Frame), function *yakvm.Function, params ...interface{}) (interface{}, error) {
+	if function == nil {
+		return nil, utils.Error("no function")
+	}
+	paramsValue := make([]*yakvm.Value, len(params))
+	for i, v := range params {
+		paramsValue[i] = yakvm.NewAutoValue(v)
+	}
+	return n.vm.ExecYakFunctionEx(ctx, function, yakvm.YakVMValuesToFunctionMap(function, paramsValue, n.vm.GetConfig().GetFunctionNumberCheck()), frameCallback, yakvm.None)
 }
 
 func (n *Engine) SafeCallYakFunction(ctx context.Context, funcName string, params []interface{}) (result interface{}, err error) {

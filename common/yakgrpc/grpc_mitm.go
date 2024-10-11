@@ -815,7 +815,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		dropped := utils.NewBool(false)
-		mitmPluginCaller.CallHijackResponseEx(isHttps, urlStr, func() interface{} {
+		pluginCtx := httpctx.GetPluginContext(req)
+		mitmPluginCaller.CallHijackResponseExWithCtx(pluginCtx, isHttps, urlStr, func() interface{} {
 			return plainRequest
 		}, func() interface{} {
 			return plainResponse
@@ -831,7 +832,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// dropped.
 		if !dropped.IsSet() {
 			// legacy code
-			mitmPluginCaller.CallHijackResponse(isHttps, urlStr, func() interface{} {
+			mitmPluginCaller.CallHijackResponseWithCtx(pluginCtx, isHttps, urlStr, func() interface{} {
 				if httpctx.GetResponseIsModified(req) {
 					return httpctx.GetHijackedResponseBytes(req)
 				} else {
@@ -1252,8 +1253,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			modifiedByRule = true
 			setModifiedRequest("yakit.mitm.replacer", req1)
 		}
+		pluginCtx := httpctx.GetPluginContext(originReqIns)
 
-		mitmPluginCaller.CallHijackRequest(isHttps, urlStr,
+		mitmPluginCaller.CallHijackRequestWithCtx(pluginCtx, isHttps, urlStr,
 			func() interface{} {
 				if modifiedByRule {
 					return httpctx.GetHijackedRequestBytes(originReqIns)
@@ -1480,8 +1482,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		if isFiltered {
 			return
 		}
+		pluginCtx := httpctx.GetPluginContext(req)
 		go func() {
-			mitmPluginCaller.MirrorHTTPFlow(isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
+			mitmPluginCaller.MirrorHTTPFlowWithCtx(pluginCtx, isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
 		}()
 
 		saveBarePacketHandler := func(id uint) {
@@ -1560,7 +1563,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		isDroppedSaveFlow := utils.NewBool(false)
 
 		pluginFinishCh := make(chan struct{})
-		mitmPluginCaller.HijackSaveHTTPFlowWithCallback(
+		mitmPluginCaller.HijackSaveHTTPFlowEx(
+			pluginCtx,
 			flow,
 			func() {
 				close(pluginFinishCh)
