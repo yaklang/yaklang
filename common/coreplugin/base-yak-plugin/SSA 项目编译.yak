@@ -30,7 +30,7 @@ strictMode = cli.Bool("StrictMode",
     cli.setVerboseName("严格模式"), 
     cli.setHelp("如果取消严格模式将会忽略编译错误的文件。将可能导致编译结果缺失部分文件。"),
     cli.setCliGroup("compile"),
-    cli.setDefault(true), 
+    cli.setDefault(false), 
 )
 reCompile := cli.Bool("re-compile", 
     cli.setVerboseName("是否重新编译"),
