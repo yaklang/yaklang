@@ -21,6 +21,8 @@ func ReducerCompile(base string, opts ...Option) error {
 		return utils.Errorf("file system is nil")
 	}
 
+	cancel := c.GetCancelFunc()
+
 	if c.compileMethod == nil {
 		return utils.Errorf("compile method is nil")
 	}
@@ -52,13 +54,13 @@ func ReducerCompile(base string, opts ...Option) error {
 
 		results, err := c.compileMethod(path, content)
 		if err != nil {
-			if c.stopAtCompileError {
-				return err
-			}
 			if errors.Is(err, SkippedError) {
 				return nil
 			}
-			log.Errorf("Compile error: %v", err)
+			if c.stopAtCompileError {
+				cancel()
+			}
+			return err
 		}
 		for _, result := range results {
 			visited.Insert(result)

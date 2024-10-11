@@ -79,3 +79,13 @@ func WithContext(ctx context.Context) Option {
 		config.ctx = ctx
 	}
 }
+
+func (c *Config) GetCancelFunc() context.CancelFunc {
+	var cancelFunc context.CancelFunc
+	if c.ctx == nil {
+		c.ctx, cancelFunc = context.WithCancel(context.Background())
+	} else {
+		c.ctx, cancelFunc = context.WithCancel(c.ctx)
+	}
+	return cancelFunc
+}
