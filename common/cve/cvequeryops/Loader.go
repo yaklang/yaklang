@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -76,12 +77,14 @@ func LoadCVE(fileDir, DbPath string, years ...int) {
 		fileName = path.Join(fileDir, fileName)
 		startTime := time.Now()
 		log.Infof("LoadCVE begin: " + fileName)
-		_, err := LoadCVEByFileName(fileName, manager)
+		exitNow, err := LoadCVEByFileName(fileName, manager)
+		if err != nil {
+			log.Errorf("LoadCVE: %v failed: %v", fileName, err)
+		}
 		endTime := time.Now()
 		log.Infof("handle %v cost %v (%v/%v)", fileName, endTime.Sub(startTime).String(), count, total)
-		if err != nil {
-			log.Errorf("handle %v failed: %v", fileName, err)
-			continue
+		if exitNow {
+			break
 		}
 	}
 }
@@ -89,27 +92,43 @@ func LoadCVE(fileDir, DbPath string, years ...int) {
 func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (shouldExit bool, err error) {
 	CVEContext, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		log.Error(err)
+		return false, err
 	}
 
 	var cveFile cveresources.CVEYearFile
 	err = json.Unmarshal(CVEContext, &cveFile)
 	if err != nil {
-		log.Error(err)
+		var tail string
+		if len(CVEContext) > 20 {
+			tail = string(CVEContext[len(CVEContext)-20:])
+		} else {
+			tail = string(CVEContext)
+		}
+		err = errors.Errorf("tail of [%v] context: %#v, with err: %v", fileName, tail, err)
+		os.Remove(fileName)
+		return false, err
+
 	}
 
 	for _, record := range cveFile.CVERecords {
 		manager.SaveCVERecord(&record)
 	}
 
-	return true, nil
+	return false, nil
 }
 
 // DownLoad 从NVD下载CVE json数据到本地
-func DownLoad(dir string) error {
+func DownLoad(dir string, cached bool) error {
 	for name, url := range CveDataFeed {
+		fileName := filepath.Join(dir, name)
+		if cached {
+			if utils.GetFirstExistedFile(fileName) != "" {
+				log.Infof("skip %v", fileName)
+				continue
+			}
+		}
 		log.Infof("start to download from: %v", url)
-		resp, _, err := poc.DoGET(url)
+		resp, _, err := poc.DoGET(url, poc.WithRetryTimes(3))
 		if err != nil {
 			log.Error(err)
 			continue
@@ -121,11 +140,10 @@ func DownLoad(dir string) error {
 			log.Error(err)
 			continue
 		}
-		f := filepath.Join(dir, name)
-		log.Infof("start to save to local file: %v", f)
-		dstFile, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE, 0o666)
+		log.Infof("start to save to local file: %v", fileName)
+		dstFile, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0o666)
 		if err != nil {
-			return utils.Errorf("open %v failed; %v", f, err)
+			return utils.Errorf("open %v failed; %v", fileName, err)
 		}
 		_, err = io.Copy(dstFile, rawData)
 		if err != nil {

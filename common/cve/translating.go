@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -129,10 +130,10 @@ func Translating(aiGatewayType string, noCritical bool, concurrent int, cveResou
 		concurrent = 10
 	}
 
-	if os.Getenv("R") != "" {
-		db = db.Order("published_date desc")
-	} else {
+	if os.Getenv("ASC") != "" {
 		db = db.Order("published_date asc")
+	} else {
+		db = db.Order("published_date desc")
 	}
 	var count int64
 	db.Count(&count)
@@ -140,30 +141,39 @@ func Translating(aiGatewayType string, noCritical bool, concurrent int, cveResou
 		log.Infof("rest total: %v", count)
 	}
 	swg := utils.NewSizedWaitGroup(concurrent)
-	current := 0
+	var current int64 = 0
 
 	aiClient := ai.GetAI(aiGatewayType, opts...)
 
 	for c := range cveresources.YieldCVEs(db, context.Background()) {
-		current++
+		atomic.AddInt64(&current, 1)
+
 		lowlevel := c.BaseCVSSv2Score <= 6.0 && c.ImpactScore <= 6.0 && c.ExploitabilityScore <= 6.0
 		if !((lowlevel && noCritical) || (!lowlevel && !noCritical)) {
 			continue
 		}
-
 		c := c
 		swg.Add()
-		go func() {
+		go func(idx int64) {
 			defer func() {
 				swg.Done()
 			}()
 			start := time.Now()
-			err := MakeOpenAIWorking(c, aiClient)
-			log.Infof(
-				"%6d/%-6d save [%v] chinese desc finished: cost: %v",
-				current, count, c.CVE, time.Now().Sub(start).String(),
-			)
 
+			err := MakeOpenAIWorking(c, aiClient)
+			cost := time.Now().Sub(start)
+			if cost.Seconds() > 2 {
+				log.Infof(
+					"%6d/%-6d save [%v] chinese cve desc finished: cost: %v",
+					idx, count, c.CVE, cost.String(),
+				)
+			} else {
+				log.Infof(
+					"%6d/%-6d save [%v] chinese cve desc finished: cost: %v: %v",
+					idx, count, c.CVE, cost.String(),
+					c.TitleZh,
+				)
+			}
 			if err != nil {
 				if !strings.Contains(err.Error(), `translating existed`) {
 					log.Errorf("make openai working failed: %s", err)
@@ -180,7 +190,7 @@ func Translating(aiGatewayType string, noCritical bool, concurrent int, cveResou
 			} else {
 				time.Sleep(time.Duration(math.Floor(float64(3)-dur.Seconds())+1) * time.Second)
 			}
-		}()
+		}(atomic.LoadInt64(&current))
 	}
 	swg.Wait()
 	return nil
