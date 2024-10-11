@@ -144,7 +144,7 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	}
 	rule, err := CheckSyntaxFlowRuleContent(content)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 	rule.Type = ruleType
 	rule.RuleName = ruleName
@@ -153,16 +153,16 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	rule.IsBuildInRule = buildin
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
-		return nil,utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
+		return nil, utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
 	}
-	return rule,nil
+	return rule, nil
 }
 
 // ImportRuleDefaultGroupName 导入规则默认分组，默认使用language,purpose,severity作为分组名
 func ImportRuleDefaultGroupName(rule *schema.SyntaxFlowRule) error {
 	ruleName := rule.RuleName
 	saveSfGroup := func(groupName string) error {
-		if groupName == ""{
+		if groupName == "" {
 			return nil
 		}
 		saveData := &schema.SyntaxFlowRuleGroup{
@@ -172,7 +172,7 @@ func ImportRuleDefaultGroupName(rule *schema.SyntaxFlowRule) error {
 		hash := saveData.CalcHash()
 		return CreateOrUpdateSyntaxFlowGroup(hash, saveData)
 	}
-	for _, n := range []string{string(rule.RuleName), string(rule.Purpose), string(rule.Severity)} {
+	for _, n := range []string{string(rule.Language), string(rule.Purpose), string(rule.Severity)} {
 		err := saveSfGroup(n)
 		if err != nil {
 			return err
