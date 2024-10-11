@@ -95,7 +95,7 @@ func ReducerCompile(base string, opts ...Option) error {
 		}
 		folder, name := c.fs.PathSplit(path)
 		// if test or .git, skip
-		if name == "test" || name == ".git" {
+		if name == "test" || name == ".git" || name == ".svn" || name == ".vscode" || name == ".idea" {
 			return filesys.SkipDir
 		}
 		// if have Database, save folder
