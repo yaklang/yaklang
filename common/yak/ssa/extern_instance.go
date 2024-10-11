@@ -157,16 +157,18 @@ func (prog *Program) BuildValueFromAny(b *FunctionBuilder, id string, v any) (va
 		return nil
 	}
 	str := id
-	if handler, ok := prog.externBuildValueHandler[id]; ok {
+	if handler, ok := prog.externBuildValueHandler[id]; ok && b != nil {
 		value = handler(b, id, v)
 	} else {
 		switch itype.Kind() {
 		case reflect.Func:
 			f := NewFunctionWithType(str, prog.CoverReflectFunctionType(itype, 0))
-			f.SetRange(b.CurrentRange)
 			value = f
 		default:
 			value = NewUndefined(str)
+			value.SetType(prog.handlerType(itype, 0))
+		}
+		if b != nil {
 			value.SetRange(b.CurrentRange)
 		}
 	}
