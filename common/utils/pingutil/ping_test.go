@@ -13,7 +13,7 @@ import (
 type pingTestCase struct {
 	name   string
 	ip     string
-	config PingConfig
+	config []PingConfigOpt
 	expect bool
 }
 
@@ -22,58 +22,50 @@ func TestPingAutoConfig(t *testing.T) {
 		{
 			name: "tcp timeout err test case",
 			ip:   "127.0.0.1",
-			config: PingConfig{
-				defaultTcpPort: "",
-				timeout:        5 * time.Second,
-				proxies:        nil,
-				forceTcpPing:   true,
-				tcpDialHandler: tcpTimeoutHandlerMaker(getTestTimeout("timeout")),
+			config: []PingConfigOpt{
+				WithTimeout(5 * time.Second),
+				WithForceTcpPing(),
+				WithTcpDialHandler(tcpTimeoutHandlerMaker(getTestTimeout("timeout"))),
 			},
 			expect: false,
 		},
 		{
 			name: "tcp attempt failed err test case",
 			ip:   "127.0.0.1",
-			config: PingConfig{
-				defaultTcpPort: "",
-				timeout:        5 * time.Second,
-				proxies:        nil,
-				forceTcpPing:   true,
-				tcpDialHandler: tcpTimeoutHandlerMaker(getTestTimeout("attempt failed")),
+			config: []PingConfigOpt{
+				WithTimeout(5 * time.Second),
+				WithForceTcpPing(),
+				WithTcpDialHandler(tcpTimeoutHandlerMaker(getTestTimeout("attempt failed"))),
 			},
 			expect: false,
 		},
 		{
 			name: "tcp refused err test case",
 			ip:   "127.0.0.1",
-			config: PingConfig{
-				defaultTcpPort: "",
-				timeout:        5 * time.Second,
-				proxies:        nil,
-				forceTcpPing:   true,
-				tcpDialHandler: tcpTimeoutHandlerMaker(getTestTimeout("refused")),
+			config: []PingConfigOpt{
+				WithTimeout(5 * time.Second),
+				WithForceTcpPing(),
+				WithTcpDialHandler(tcpTimeoutHandlerMaker(getTestTimeout("refused"))),
 			},
 			expect: true,
 		},
 		{
 			name: "global timeout test case",
 			ip:   "127.0.0.1",
-			config: PingConfig{
-				defaultTcpPort:    "",
-				timeout:           5 * time.Second,
-				proxies:           nil,
-				pingNativeHandler: pingSleepHandlerMaker(),
-				tcpDialHandler:    tcpSleepHandlerMaker(),
+			config: []PingConfigOpt{
+				WithTimeout(5 * time.Second),
+				WithPingNativeHandler(pingSleepHandlerMaker()),
+				WithTcpDialHandler(tcpSleepHandlerMaker()),
 			},
 			expect: false,
 		},
 	}
 	for _, test := range testCase {
 		start := time.Now()
-		res := PingAutoConfig("127.0.0.1", &test.config)
+		res := PingAutoConfig("127.0.0.1", test.config...)
 		useTime := time.Since(start).Seconds()
-		if math.Floor(useTime) > math.Floor(test.config.timeout.Seconds()) {
-			t.Fatalf("timeout is %v,but use %v[%v]", test.config.timeout.Seconds(), useTime, test.name)
+		if math.Floor(useTime) > math.Floor(5*time.Second.Seconds()) {
+			t.Fatalf("timeout is 5s,but use %v[%v]", useTime, test.name)
 		}
 		if res.Ok != test.expect {
 			t.Fatalf("Expect %v but get %v at [%v]", test.expect, res.Ok, test.name)
