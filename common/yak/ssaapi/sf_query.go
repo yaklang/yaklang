@@ -50,7 +50,11 @@ func SyntaxFlowWithError(p sfvm.ValueOperator, sfCode string, opts ...sfvm.Optio
 		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", sfCode, err)
 	}
 	res, err := frame.Feed(p)
-	return CreateResultFromQuery(res), err
+	ret := CreateResultFromQuery(res)
+	if prog, ok := p.(*Program); ok {
+		ret.program = prog
+	}
+	return ret, err
 }
 
 func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config) (*SyntaxFlowResult, error) {
@@ -66,7 +70,11 @@ func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm
 	//暂时未启用，后续如果config需要使用外部变量可以启用 context
 	frame.WithContext(sfResult)
 	res, err := frame.Feed(p)
-	return CreateResultFromQuery(res), err
+	ret := CreateResultFromQuery(res)
+	if prog, ok := p.(*Program); ok {
+		ret.program = prog
+	}
+	return ret, err
 }
 
 func (p *Program) SyntaxFlowRuleName(ruleName string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
@@ -109,5 +117,9 @@ func SyntaxFlowRule(p sfvm.ValueOperator, rule *schema.SyntaxFlowRule, opts ...s
 		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", rule.OpCodes, err)
 	}
 	feed, err := frame.Feed(p)
-	return CreateResultFromQuery(feed), err
+	ret := CreateResultFromQuery(feed)
+	if prog, ok := p.(*Program); ok {
+		ret.program = prog
+	}
+	return ret, err
 }
