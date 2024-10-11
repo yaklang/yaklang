@@ -315,6 +315,9 @@ func TestBasic_Variable_InIf(t *testing.T) {
 				"phi(a)[2,3,1]",
 			}, t)
 	})
+}
+
+func TestBasic_Variable_If_Return(t *testing.T) {
 	t.Run("test with return, no DoneBlock", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -322,6 +325,7 @@ func TestBasic_Variable_InIf(t *testing.T) {
     		a := 1
 			println(a) // 1
 			if c {
+				a = 2
 				return 
 			}
 			println(a) // phi(a)[Undefined-a,1]

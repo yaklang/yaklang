@@ -806,7 +806,8 @@ func (t *LabelBuilder) Finish() {
 func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 	parent := s.GetParent()
 	end := parent.CreateSubScope()
-	b.CurrentBlock.SetScope(end)
+	// 更新CurrentBlock.ScopeTable为空scope,避免影响后续PeekValue
+	b.CurrentBlock.ScopeTable = end
 
 	names := parent.GetAllVariableNames()
 	for name, _ := range names {
