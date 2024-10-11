@@ -124,9 +124,10 @@ func (c *config) parseProject() (Programs, error) {
 			defer func() {
 				if r := recover(); r != nil {
 					// ret = nil
-					includeFiles = nil
-					err = utils.Errorf("parse error with panic : %v", r)
-					log.Errorf("parse [%s] error %v  ", path, err)
+					includeFiles = prog.GetIncludeFiles()
+					// TODO: panic shuold be upload
+					// err = utils.Errorf("parse error with panic : %v", r)
+					log.Errorf("parse [%s] error %v  ", path, r)
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
