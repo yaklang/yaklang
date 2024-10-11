@@ -10,16 +10,22 @@ type AuditResult struct {
 
 	TaskID string `json:"task_id" gorm:"index"`
 	// rule
-	RuleName     string                                      `json:"rule_name"`
-	RuleTitle    string                                      `json:"rule_title"`
-	RuleSeverity string                                      `json:"rule_severity"`
-	RuleType     string                                      `json:"rule_type"`
-	RuleDesc     string                                      `json:"rule_desc"`
-	AlertDesc    schema.MapEx[string, *schema.ExtraDescInfo] `gorm:"type:text"`
+	RuleName     string `json:"rule_name"`
+	RuleTitle    string `json:"rule_title"`
+	RuleTitleZh  string `json:"rule_title_zh"`
+	RulePurpose  string `json:"purpose"`
+	RuleSeverity string `json:"rule_severity"`
+	RuleDesc     string `json:"rule_desc"`
 
-	CheckMsg StringSlice `json:"check_msg" gorm:"type:text"`
-	Errors   StringSlice `json:"errors" gorm:"type:text"`
+	AlertDesc schema.MapEx[string, *schema.ExtraDescInfo] `gorm:"type:text"`
 
+	// Program
+	ProgramName string `json:"program_name"`
+	Language    string `json:"language"`
+
+	RiskCount       uint64      `json:"risk_count"`
+	CheckMsg        StringSlice `json:"check_msg" gorm:"type:text"`
+	Errors          StringSlice `json:"errors" gorm:"type:text"`
 	UnValueVariable StringSlice `json:"un_value_variable" gorm:"type:text"`
 }
 
