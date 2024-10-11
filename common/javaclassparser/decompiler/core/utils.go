@@ -69,6 +69,9 @@ const (
 	SHL  = "<<"
 	SHR  = ">>"
 	USHR = ">>>"
+
+	LOGICAL_AND = "&&"
+	LOGICAL_OR  = "||"
 )
 const (
 	T_BOOLEAN = "boolean"
@@ -101,6 +104,24 @@ func GetPrimerArrayType(id int) JavaType {
 		return JavaLong
 	default:
 		panic(fmt.Sprintf("unknow primer array type: %d", id))
+	}
+}
+func GetReverseOp(op string) string {
+	switch op {
+	case EQ:
+		return NE
+	case NE:
+		return EQ
+	case LT:
+		return GTE
+	case GTE:
+		return LT
+	case GT:
+		return LTE
+	case LTE:
+		return GT
+	default:
+		panic(fmt.Sprintf("unknow opcode: %s", op))
 	}
 }
 func GetNotOp(code *OpCode) string {

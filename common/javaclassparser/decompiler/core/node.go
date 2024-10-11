@@ -1,11 +1,24 @@
 package core
 
+import "github.com/yaklang/yaklang/common/utils"
+
 type Node struct {
 	Id                  int
 	Statement           Statement
 	Source              []*Node
 	Next                []*Node
-	TrueNode, FalseNode *Node
+	TrueNode, FalseNode func() *Node
+	JmpNode             *Node
+	MergeNode           *Node
+	IsCircle            bool
+	IsMerge             bool
+	IsIf                bool
+	OutPointMergeNode   *Node
+	ConditionNode       []*Node
+	CircleNodesSet      *utils.Set[*Node]
+	//CircleRoute         *SubNodeMap
+	//PreNodeMap          *SubNodeMap
+	//AllPreNodeMaps       []*SubNodeMap
 }
 
 func (n *Node) RemoveAllSource() {
@@ -21,7 +34,21 @@ func (n *Node) RemoveAllNext() {
 		n.RemoveNext(node)
 	}
 }
+func (n *Node) ReplaceNext(node1, node2 *Node) {
+	if node2.Id == 14 {
+		print()
+	}
+	for i, next := range n.Next {
+		if next == node1 {
+			n.Next[i] = node2
+			break
+		}
+	}
+}
 func (n *Node) RemoveNext(node *Node) {
+	if n.Id == 22 {
+		print()
+	}
 	for i, next := range n.Next {
 		if next == node {
 			n.Next = append(n.Next[:i], n.Next[i+1:]...)
