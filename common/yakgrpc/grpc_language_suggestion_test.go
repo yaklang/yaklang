@@ -39,26 +39,35 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	getCompletion := func(t *testing.T, code string, r *ypb.Range, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
+	getCompletion := func(t *testing.T, code string, r *ypb.Range, pluginType string, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
 		var id string
 		if len(ids) == 0 {
 			id = uuid.NewString()
 		} else {
 			id = ids[0]
 		}
-		// if strings.HasSuffix(code, ".") {
-		// 	tmpCode := strings.TrimSuffix(code, ".")
-		// 	GetSuggestion(local, "completion", "yak", t, tmpCode, Range, id)
-		// }
-		return GetSuggestion(local, COMPLETION, "yak", t, code, r, id)
+		return GetSuggestion(local, COMPLETION, pluginType, t, code, r, id)
 	}
 	type callbackTyp func(suggestions []*ypb.SuggestionDescription)
+
+	checkMITMCompletionWithCallbacks := func(t *testing.T, code string, r *ypb.Range, callbacks ...callbackTyp) {
+		t.Helper()
+		var id string
+
+		res := getCompletion(t, code, r, "mitm", id)
+		if len(res.SuggestionMessage) == 0 {
+			t.Fatal("should get completion but not")
+		}
+		for _, callback := range callbacks {
+			callback(res.SuggestionMessage)
+		}
+	}
 
 	checkCompletionWithCallbacks := func(t *testing.T, code string, r *ypb.Range, callbacks ...callbackTyp) {
 		t.Helper()
 		var id string
 
-		res := getCompletion(t, code, r, id)
+		res := getCompletion(t, code, r, "yak", id)
 		if len(res.SuggestionMessage) == 0 {
 			t.Fatal("should get completion but not")
 		}
@@ -69,7 +78,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 
 	checkCompletionWithIDCallbacks := func(t *testing.T, code string, r *ypb.Range, id string, callbacks ...callbackTyp) {
 		t.Helper()
-		res := getCompletion(t, code, r, id)
+		res := getCompletion(t, code, r, "yak", id)
 		if len(res.SuggestionMessage) == 0 {
 			t.Fatal("should get completion but not")
 		}
@@ -224,7 +233,7 @@ a.`, &ypb.Range{
 			StartColumn: 1,
 			EndLine:     1,
 			EndColumn:   5,
-		})
+		}, "yak")
 		if len(res.SuggestionMessage) == 0 {
 			t.Fatal("code `cli.` should get completion but not")
 		}
@@ -441,7 +450,7 @@ rsp.`,
 			StartColumn: 1,
 			EndLine:     2,
 			EndColumn:   5,
-		})
+		}, "yak")
 		if len(res.SuggestionMessage) == 0 {
 			t.Fatal("code `cli.` should get completion but not")
 		}

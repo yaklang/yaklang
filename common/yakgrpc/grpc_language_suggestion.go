@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -47,6 +48,8 @@ var (
 		"bool", "float", "float64", "double", "string", "omap", "var",
 		"any",
 	}
+
+	externValueSuggestionsMap = utils.NewTTLCache[[]*ypb.SuggestionDescription](15 * time.Minute)
 
 	standardLibrarySuggestions = make([]*ypb.SuggestionDescription, 0)
 	yakKeywordSuggestions      = make([]*ypb.SuggestionDescription, 0)
@@ -726,24 +729,25 @@ func completionYakLanguageBasicType() (ret []*ypb.SuggestionDescription) {
 	return getLanguageBasicTypeSuggestions()
 }
 
-func completionUserDefinedVariable(prog *ssaapi.Program, rng memedit.RangeIf) (ret []*ypb.SuggestionDescription) {
+func completionUserDefinedVariable(prog *ssaapi.Program, rng memedit.RangeIf, filterMap map[string]struct{}) (ret []*ypb.SuggestionDescription) {
 	if prog == nil || prog.Program == nil {
 		return
 	}
 
 	ret = make([]*ypb.SuggestionDescription, 0)
 	// 自定义变量补全
-	uniqMap := make(map[string]struct{})
 	// 需要反转，因为是按 offset 顺序排列的
 	for _, item := range lo.Reverse(prog.GetAllOffsetItemsBefore(rng.GetEndOffset())) {
 		variable := item.GetVariable()
 		varName := variable.GetName()
-		if _, ok := uniqMap[varName]; ok {
+		if _, ok := filterMap[varName]; ok {
 			continue
 		}
-		uniqMap[varName] = struct{}{}
+		filterMap[varName] = struct{}{}
 		bareValue := item.GetValue()
 		v := prog.NewValue(bareValue)
+		bareTyp := ssaapi.GetBareType(v.GetType())
+		typStr := _getGolangTypeStringBySSAType(bareTyp)
 
 		// 不应该再补全标准库函数和标准库
 		if _, ok := doc.GetDefaultDocumentHelper().Functions[varName]; ok {
@@ -766,7 +770,7 @@ func completionUserDefinedVariable(prog *ssaapi.Program, rng memedit.RangeIf) (r
 		}
 		ret = append(ret, &ypb.SuggestionDescription{
 			Label:       varName,
-			Description: "",
+			Description: typStr,
 			InsertText:  insertText,
 			Kind:        vKind,
 		})
@@ -774,16 +778,45 @@ func completionUserDefinedVariable(prog *ssaapi.Program, rng memedit.RangeIf) (r
 	return
 }
 
-func completionYakGlobalFunctions() (ret []*ypb.SuggestionDescription) {
-	ret = make([]*ypb.SuggestionDescription, 0, len(doc.GetDefaultDocumentHelper().Functions))
-	// 全局函数补全
-	for funcName, funcDecl := range doc.GetDefaultDocumentHelper().Functions {
-		ret = append(ret, &ypb.SuggestionDescription{
-			Label:       funcName,
-			Description: funcDecl.Document,
-			InsertText:  funcDecl.VSCodeSnippets,
-			Kind:        "Function",
-		})
+func completionExternValues(prog *ssaapi.Program, filterMap map[string]struct{}) (ret []*ypb.SuggestionDescription) {
+	functions := doc.GetDefaultDocumentHelper().Functions
+	ret = make([]*ypb.SuggestionDescription, 0, len(functions))
+
+	for name, value := range prog.Program.ExternInstance {
+		if strings.HasPrefix(name, "$") {
+			continue
+		}
+		filterMap[name] = struct{}{}
+		if funcDecl, ok := functions[name]; ok {
+			ret = append(ret, &ypb.SuggestionDescription{
+				Label:       name,
+				Description: funcDecl.Document,
+				InsertText:  funcDecl.VSCodeSnippets,
+				Kind:        "Function",
+			})
+		} else {
+			bareValue := prog.Program.BuildValueFromAny(nil, name, value)
+			v := prog.NewValue(bareValue)
+
+			insertText := name
+			desc := ""
+			vKind := "Variable"
+
+			if !v.IsNil() && v.IsFunction() {
+				vKind = "Function"
+				funcTyp, _ := ssa.ToFunctionType(bareValue.GetType())
+				insertText = getSSAFunctionVscodeSnippets(name, funcTyp)
+			} else {
+				bareTyp := ssaapi.GetBareType(v.GetType())
+				desc = _getGolangTypeStringBySSAType(bareTyp)
+			}
+			ret = append(ret, &ypb.SuggestionDescription{
+				Label:       name,
+				Description: desc,
+				InsertText:  insertText,
+				Kind:        vKind,
+			})
+		}
 	}
 	return
 }
@@ -961,7 +994,7 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 	return
 }
 
-func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng memedit.RangeIf, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
+func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng memedit.RangeIf, scriptType string, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("Language completion error: %v", r)
@@ -971,8 +1004,9 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng meme
 		ret = append(ret, completionYakStandardLibrary()...)
 		ret = append(ret, completionYakLanguageKeyword()...)
 		ret = append(ret, completionYakLanguageBasicType()...)
-		ret = append(ret, completionUserDefinedVariable(prog, rng)...)
-		ret = append(ret, completionYakGlobalFunctions()...)
+		filterMap := make(map[string]struct{})
+		ret = append(ret, completionExternValues(prog, filterMap)...)
+		ret = append(ret, completionUserDefinedVariable(prog, rng, filterMap)...)
 	} else {
 		ret = append(ret, completionYakStandardLibraryChildren(v, word)...)
 		ret = append(ret, completionYakTypeBuiltinMethod(rng, v)...)
@@ -983,7 +1017,7 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng meme
 		// so try to get the value before and complete again
 		v = v.GetObject()
 		if !v.IsNil() {
-			return OnCompletion(prog, word, containPoint, rng, v)
+			return OnCompletion(prog, word, containPoint, rng, scriptType, v)
 		}
 	}
 	return ret
@@ -997,6 +1031,7 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 		return ret, err
 	}
 	prog, word, containPoint, ssaRange, v := result.Program, result.Word, result.ContainPoint, result.Range, result.Value
+	scriptType := req.GetYakScriptType()
 
 	if v == nil {
 		return ret, nil
@@ -1005,7 +1040,7 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	// todo: 处理YakScriptType，不同语言的补全、提示可能有不同
 	switch req.InspectType {
 	case COMPLETION:
-		ret.SuggestionMessage = OnCompletion(prog, word, containPoint, ssaRange, v)
+		ret.SuggestionMessage = OnCompletion(prog, word, containPoint, ssaRange, scriptType, v)
 	case HOVER:
 		ret.SuggestionMessage = OnHover(prog, word, containPoint, ssaRange, v)
 	case SIGNATURE:
