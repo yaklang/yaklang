@@ -73,7 +73,7 @@ func (c *config) parseProject() (Programs, error) {
 	prog.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
 		log.Infof("parsed file: %v", prog.GetIncludeFiles())
-		handled := prog.GetIncludeFileNum()
+		handled := len(prog.FileList)
 		if c.process != nil {
 			c.process(msg, float64(handled)/float64(totalSize))
 		} else {
@@ -283,7 +283,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	}
 	application.Build = func(
 		filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
-	) error {
+	) (err error) {
 		application.ProcessInfof("start to compile : %v", filePath)
 		start := time.Now()
 		defer func() {
@@ -335,7 +335,11 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		defer func() {
 			// recover source code context
 			fb.SetEditor(originEditor)
-			application.PopEditor()
+			save := true
+			if c.strictMode && err != nil {
+				save = false
+			}
+			application.PopEditor(save)
 		}()
 
 		if ret := fb.GetEditor(); ret != nil {
