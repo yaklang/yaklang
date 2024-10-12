@@ -39,6 +39,8 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 		return utils.Errorf("file system is nil")
 	}
 
+	var lastErr error // if stop return last error
+
 	var fileCount int64
 	var dirCount int64
 	var totalCount int64
@@ -98,8 +100,7 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			if c.RecursiveDirectory {
 				err := walkDir(path)
 				if err != nil {
-					log.Warnf("walk dir %s failed: %v", path, err)
-					//return err
+					return err
 				}
 			}
 
@@ -117,7 +118,6 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 					return err
 				}
 			}
-
 		}
 		return nil
 	}
@@ -129,10 +129,11 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 		}
 		for _, d := range dirs {
 			if c.isStop() {
-				break
+				return lastErr
 			}
 			targetFile := c.fileSystem.Join(path, d.Name())
 			if err := walkSingleFile(targetFile); err != nil {
+				lastErr = err
 				log.Errorf("walk file %s failed: %v", targetFile, err)
 				//return err
 			}
