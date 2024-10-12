@@ -55,6 +55,11 @@ func Test_CompileError(t *testing.T) {
 		check(t, vf)
 	})
 
+	t.Run("test compile error in single file in dir", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("a.yak", "print('Hello,')")
+		vf.AddFile("bb/b.yak", "print('Hello, ")
+		check(t, vf)
 	})
 
 	t.Run("test compile error without fast fail  ", func(t *testing.T) {

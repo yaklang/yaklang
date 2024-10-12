@@ -2,8 +2,9 @@ package filesys
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -128,14 +129,14 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			return err
 		}
 		for _, d := range dirs {
-			if c.isStop() {
-				return lastErr
-			}
 			targetFile := c.fileSystem.Join(path, d.Name())
 			if err := walkSingleFile(targetFile); err != nil {
 				lastErr = err
 				log.Errorf("walk file %s failed: %v", targetFile, err)
 				//return err
+			}
+			if c.isStop() {
+				return lastErr
 			}
 		}
 		if c.onDirWalkEnd != nil {
