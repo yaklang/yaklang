@@ -51,7 +51,9 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		// if editor := p.getCurrentEditor(); editor != nil {
 		// 	f.SetRangeInit(editor)
 		// } else {
-		log.Warnf("the program must contains a editor to init function range: %v", p.Name)
+		if f.GetParent() != nil {
+			log.Warnf("the program must contains a editor to init function range: %v", p.Name)
+		}
 		// }
 	}
 
