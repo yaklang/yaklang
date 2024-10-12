@@ -5,17 +5,25 @@ keyword = cli.String("url-keyword", cli.setRequired(false), cli.setCliGroup("前
 
 cli.check()
 
-
+m = {}
+lock = sync.NewRWMutex()
 
 hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
     if !url.Contains(keyword) {
         return
-     }
+    }
+    lock.Lock()
+    m[PLUGIN_RUNTIME_ID] = true 
+    lock.Unlock()
+
     forward(poc.ReplaceHTTPPacketCookie(req, key, val))
 }
 hijackSaveHTTPFlow = func(flow , modify, drop) {
-     if !flow.Url.Contains(keyword) {
-        return
-     }
-     flow.FromPlugin="修改 HTTP 请求 Cookie"
+    lock.RLock()
+    ok = PLUGIN_RUNTIME_ID in m
+    lock.RUnlock()
+    if !ok {
+        return 
+    }
+    flow.FromPlugin="修改 HTTP 请求 Cookie"
 }
