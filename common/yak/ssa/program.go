@@ -157,15 +157,6 @@ func (prog *Program) GetAndCreateFunction(pkgName string, funcName string) *Func
 	if fun == nil {
 		fun = prog.NewFunction(funcName)
 	}
-
-	if fun.GetRange() == nil {
-		// if editor := prog.getCurrentEditor(); editor != nil {
-		// 	fun.SetRangeInit(editor)
-		// } else {
-		log.Warnf("the program must contains a editor to init function range: %v", prog.Name)
-		// }
-	}
-
 	return fun
 }
 
