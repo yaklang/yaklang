@@ -60,16 +60,29 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	var codeRange memedit.RangeIf
 	if ret := inst.GetRange(); ret != nil {
 		codeRange = ret
-	} else if ret := inst.GetFunc().GetRange(); ret != nil {
-		log.Warnf("Fallback, the %v is not set range, use its function instance' ", inst.GetName())
-		inst.SetRange(ret)
-		codeRange = ret
+	} else if ret := inst.GetBlock(); ret != nil {
+		block, ok := ToBasicBlock(ret)
+		if ok && block != nil && block.GetRange() != nil {
+			codeRange = block.GetRange()
+			log.Warnf("Fallback, the %v is not set range, use its basic_block instance' ", inst.GetName())
+		}
 	}
+
 	if codeRange == nil {
-		log.Warnf("Range not found for %s", inst.GetName())
+		if ret := inst.GetFunc().GetRange(); ret != nil {
+			log.Warnf("Fallback, the %v is not set range, use its function instance' ", inst.GetName())
+			inst.SetRange(ret)
+			codeRange = ret
+		}
+	}
+
+	if codeRange == nil {
+		log.Errorf("Range not found for %s", inst.GetName())
 	} else {
+		inst.SetRange(codeRange)
 		fitRange(ir, codeRange)
 	}
+
 	if fun := inst.GetFunc(); fun != nil {
 		ir.CurrentFunction = fun.GetId()
 	}

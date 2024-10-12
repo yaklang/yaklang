@@ -72,7 +72,11 @@ func (c *config) parseProject() (Programs, error) {
 	totalSize := 0
 	prog.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
-		log.Infof("parsed file: %v", prog.GetIncludeFiles())
+		if ret := prog.GetIncludeFiles(); len(ret) > 0 {
+			for idx, fileName := range ret {
+				log.Infof("parsed file[%v]: %v", idx, fileName)
+			}
+		}
 		handled := len(prog.FileList)
 		if c.process != nil {
 			c.process(msg, float64(handled)/float64(totalSize))
@@ -284,6 +288,12 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	application.Build = func(
 		filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
 	) (err error) {
+		if fb.GetEditor() == nil && src != nil {
+			fb.SetEditor(src)
+			if fb.EnterBlock != nil && fb.EnterBlock.GetRange() == nil {
+				fb.EnterBlock.SetRange(src.GetFullRange())
+			}
+		}
 		application.ProcessInfof("start to compile : %v", filePath)
 		start := time.Now()
 		defer func() {
