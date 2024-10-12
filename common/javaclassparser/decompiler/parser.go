@@ -11,7 +11,7 @@ func ParseBytesCode(decompiler *core.Decompiler) ([]core.Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	//println(utils.DumpOpcodesToDotExp(decompiler.OpCodeRoot))
+	println(utils.DumpOpcodesToDotExp(decompiler.OpCodeRoot))
 	println(utils.DumpNodesToDotExp(decompiler.RootNode))
 	err = rewriter.CheckNodesIsValid(decompiler.RootNode)
 	if err != nil {

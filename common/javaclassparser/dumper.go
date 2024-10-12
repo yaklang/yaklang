@@ -204,7 +204,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					case *core.DoWhileStatement:
 						statementStr = fmt.Sprintf(c.GetTabString()+"do{\n"+
 							"%s\n"+
-							c.GetTabString()+"} while (%s)", statementListToString(ret.Body), ret.ConditionValue.String(funcCtx))
+							c.GetTabString()+"} while (%s);", statementListToString(ret.Body), ret.ConditionValue.String(funcCtx))
 					case *core.SwitchStatement:
 						getBody := func(caseItems []*core.CaseItem) string {
 							var res []string
@@ -221,22 +221,13 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 							"%s\n"+
 							c.GetTabString()+"}", ret.Value.String(funcCtx), getBody(ret.Cases))
 					case *core.IfStatement:
-						getBody := func(sts []core.Statement) string {
-							c.Tab()
-							defer c.UnTab()
-							var res []string
-							for _, st := range sts {
-								res = append(res, c.GetTabString()+st.String(funcCtx))
-							}
-							return strings.Join(res, "\n")
-						}
 						statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
 							"%s\n"+
-							c.GetTabString()+"}", ret.Condition.String(funcCtx), getBody(ret.IfBody))
+							c.GetTabString()+"}", ret.Condition.String(funcCtx), statementListToString(ret.IfBody))
 						if len(ret.ElseBody) > 0 {
 							statementStr += fmt.Sprintf("else{\n"+
 								"%s\n"+
-								c.GetTabString()+"}", getBody(ret.ElseBody))
+								c.GetTabString()+"}", statementListToString(ret.ElseBody))
 						}
 					case *core.ExpressionStatement:
 						if funcCtx.FunctionName == "<init>" {
