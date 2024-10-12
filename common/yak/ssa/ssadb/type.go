@@ -1,7 +1,6 @@
 package ssadb
 
 import (
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,8 +21,6 @@ func (t *IrType) CalcHash() string {
 	return utils.CalcSha1(t.Kind, t.String, t.ExtraInformation)
 }
 
-var lock sync.Mutex
-
 func SaveType(kind int, str string, extra string) int {
 	start := time.Now()
 	defer func() {
@@ -37,21 +34,24 @@ func SaveType(kind int, str string, extra string) int {
 	}
 	irType.Hash = irType.CalcHash()
 
-	lock.Lock()
-	defer lock.Unlock()
-
-	rawDB := GetDB().Model(&IrType{})
-	if queryDB := rawDB.Where("hash = ? ", irType.Hash).First(&irType); queryDB.Error != nil {
-		if queryDB.RecordNotFound() {
-			if saveDB := rawDB.Save(&irType); saveDB.Error != nil {
-				log.Errorf("SaveType error: %v", saveDB.Error)
-				return -1
+	err := utils.GormTransaction(GetDB(), func(tx *gorm.DB) error {
+		rawDB := tx.Model(&IrType{})
+		if queryDB := rawDB.Where("hash = ? ", irType.Hash).First(&irType); queryDB.Error != nil {
+			if queryDB.RecordNotFound() {
+				if saveDB := rawDB.Save(&irType); saveDB.Error != nil {
+					return saveDB.Error
+				}
+			} else {
+				return queryDB.Error
 			}
-		} else {
-			log.Errorf("SaveType error: %v", queryDB.Error)
-			return -1
 		}
+		return nil
+	})
+	if err != nil {
+		log.Errorf("SaveType error: %v", err)
+		return -1
 	}
+
 	return int(irType.ID)
 }
 
