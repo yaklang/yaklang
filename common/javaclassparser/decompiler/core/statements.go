@@ -9,9 +9,8 @@ type Statement interface {
 	String(funcCtx *FunctionContext) string
 }
 type ConditionStatement struct {
-	Condition   JavaValue
-	Op          string
-	ToStatement int
+	Condition JavaValue
+	Op        string
 }
 
 func (r *ConditionStatement) String(funcCtx *FunctionContext) string {
