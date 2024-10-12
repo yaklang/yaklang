@@ -156,6 +156,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			for _, statement := range i.AllClassStatement() {
 				y.VisitClassStatement(statement, class)
 			}
+			class.BuildConstructor()
 		}
 	} else {
 		// as interface
@@ -230,7 +231,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		_ = isRef
 
 		methodName := y.VisitIdentifier(ret.Identifier())
-		funcName := fmt.Sprintf("%s_%s", class.Name, &methodName)
+		funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
 		newFunction := y.NewFunc(funcName)
 		newFunction.SetMethodName(methodName)
 		newFunction.SetLazyBuilder(func() {
@@ -245,7 +246,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			y.FunctionBuilder = y.PopFunction()
 		})
 
-		switch funcName {
+		switch methodName {
 		case "__construct":
 			class.Constructor = newFunction
 		case "__destruct":
@@ -254,7 +255,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			if isStatic {
 				variable := y.GetStaticMember(class.Name, newFunction.GetName())
 				y.AssignVariable(variable, newFunction)
-				class.AddStaticMethod(funcName, newFunction)
+				class.AddStaticMethod(methodName, newFunction)
 			} else {
 				defer func() {
 					if msg := recover(); msg != nil {
@@ -263,7 +264,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 						panic(newFunction)
 					}
 				}()
-				class.AddMethod(funcName, newFunction)
+				class.AddMethod(methodName, newFunction)
 			}
 		}
 	case *phpparser.ConstContext:

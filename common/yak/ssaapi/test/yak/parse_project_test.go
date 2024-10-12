@@ -35,7 +35,7 @@ func TestParseProject(t *testing.T) {
 
 		valuesB := prog.Ref("b")
 		valuesB.Show()
-		require.Len(t, valuesB, 2, "valuesB should be 1")
+		require.Len(t, valuesB, 1, "valuesB should be 1")
 
 		valueB := valuesB[0]
 		require.Equal(t, "3", valueB.String(), "valueB should be 3")

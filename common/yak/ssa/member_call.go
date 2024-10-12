@@ -574,6 +574,13 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 		} else if value, ok := blueprint.StaticMember[key.String()]; ok {
 			return value
 		}
+
+		for _, method := range blueprint.Method {
+			if key.String() == method.GetMethodName() {
+				return method
+			}
+		}
+
 		return nil
 	}, func() bool {
 		return b.SupportClassStaticModifier

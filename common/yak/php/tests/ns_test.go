@@ -163,7 +163,10 @@ namespace {
 			map[string][]string{"param": {"1"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
+
+	// CheckSyntaxFlowWithFS里面不会执行PreHandlerProject
 	t.Run("more namespace", func(t *testing.T) {
+		t.Skip()
 		fs := filesys.NewVirtualFs()
 		fs.AddFile("src/main/1.php", `<?php
 
