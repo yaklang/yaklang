@@ -63,7 +63,8 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 
 	subProg.LibraryFile = prog.LibraryFile
 	subProg.FileList = prog.FileList
-	subProg.editorStack = prog.editorStack
+	subProg.editorStack = prog.editorStack.Copy()
+	// subProg.editorStack = prog.editorStack
 	subProg.externType = prog.externType
 	subProg.externBuildValueHandler = prog.externBuildValueHandler
 	subProg.ExternInstance = prog.ExternInstance
@@ -281,12 +282,12 @@ func (p *Program) GetCurrentEditor() *memedit.MemEditor {
 	return v
 }
 
-func (p *Program) PopEditor() {
+func (p *Program) PopEditor(save bool) {
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
 		return
 	}
 	e := p.editorStack.Pop()
-	if e != nil {
+	if save && e != nil {
 		p.FileList[e.GetFilename()] = e.SourceCodeMd5()
 	}
 }
