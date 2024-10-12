@@ -146,7 +146,7 @@ func (p *FuzzParam) Fuzz(values ...string) *FuzzParam {
 		case lowhttp.PosCookieBase64Json:
 			req.FuzzCookieBase64JsonPath(p.param, p.path, i)
 		case lowhttp.PosPostJson:
-			req.FuzzPostJson(p.param, i)
+			req.FuzzPostJson(p.path, i)
 		case lowhttp.PosPostQuery:
 			req.FuzzPostParams(p.param, i)
 		case lowhttp.PosPostQueryBase64:
