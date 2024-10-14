@@ -5,19 +5,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"reflect"
-	"strings"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"reflect"
+	"strings"
 
 	"github.com/corpix/uarand"
 	"github.com/davecgh/go-spew/spew"
@@ -554,6 +554,74 @@ func _post(url string, options ...http_struct.HttpOption) (*http_struct.YakHttpR
 	return httpRequest("POST", url, options...)
 }
 
+func CalcFaviconHash(urlRaw string, options ...http_struct.HttpOption) (string, error) {
+	resp, err := _get(urlRaw, options...)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return utils.Mmh3Hash32(utils.StandBase64(lowhttp.GetHTTPPacketBody(resp.Raw()))), nil
+	} else {
+		return "", utils.Errorf("status code: %v", resp.StatusCode)
+	}
+}
+
+func _getBody(urlRaw string, options ...http_struct.HttpOption) ([]byte, error) {
+	resp, err := _get(urlRaw, options...)
+	if err != nil {
+		return nil, err
+	}
+	return lowhttp.GetHTTPPacketBody(resp.Raw()), nil
+}
+
+func requestToMd5(urlRaw string, options ...http_struct.HttpOption) (string, error) {
+	body, err := _getBody(urlRaw, options...)
+	if err != nil {
+		return "", err
+	}
+	return codec.Md5(body), nil
+}
+
+func requestToSha1(urlRaw string, options ...http_struct.HttpOption) (string, error) {
+	body, err := _getBody(urlRaw, options...)
+	if err != nil {
+		return "", err
+	}
+	return codec.Sha1(body), nil
+}
+
+func requestToSha256(urlRaw string, options ...http_struct.HttpOption) (string, error) {
+	body, err := _getBody(urlRaw, options...)
+	if err != nil {
+		return "", err
+	}
+	return codec.Sha256(body), nil
+}
+
+func requestToSha512(urlRaw string, options ...http_struct.HttpOption) (string, error) {
+	body, err := _getBody(urlRaw, options...)
+	if err != nil {
+		return "", err
+	}
+	return codec.Sha512(body), nil
+}
+
+func requestToMMH3Hash128(urlRaw string, options ...http_struct.HttpOption) (string, error) {
+	body, err := _getBody(urlRaw, options...)
+	if err != nil {
+		return "", err
+	}
+	return codec.MMH3Hash128(body), nil
+}
+
+func requestToMMH3Hash128x64(urlRaw string, options ...http_struct.HttpOption) (string, error) {
+	body, err := _getBody(urlRaw, options...)
+	if err != nil {
+		return "", err
+	}
+	return codec.MMH3Hash128x64(body), nil
+}
+
 var HttpExports = map[string]interface{}{
 	// 获取原生 Raw 请求包
 	"Raw": rawRequest,
@@ -566,6 +634,13 @@ var HttpExports = map[string]interface{}{
 	// Do 和 Request 组合发起请求
 	"Do":         Do,
 	"NewRequest": NewHttpNewRequest,
+
+	"RequestFaviconHash":      CalcFaviconHash,
+	"RequestToMD5":            requestToMd5,
+	"RequestToSha1":           requestToSha1,
+	"RequestToMMH3Hash128":    requestToMMH3Hash128,
+	"RequestToMMH3Hash128x64": requestToMMH3Hash128x64,
+	"RequestToSha256":         requestToSha256,
 
 	// 获取响应内容的 response
 	"GetAllBody": GetAllBody,
