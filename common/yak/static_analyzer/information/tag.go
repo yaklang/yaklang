@@ -1,6 +1,7 @@
 package information
 
 import (
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -50,4 +51,17 @@ func GetLastRef(vs ssaapi.Values) *ssaapi.Value {
 		}
 	})
 	return ret
+}
+
+func GetHTTPRequestCount(prog *ssaapi.Program) int {
+	res, err := prog.SyntaxFlowWithError(`
+http./^(Raw|Get|Post|Request|Do)$/() as $target
+httpool.Pool() as $target
+poc./^(Get|Post|Head|Delete|Options|Do|Websocket|HTTP|HTTPEx)$/() as $target
+fuzz./^(HTTPRequest|MustHTTPRequest)$/() as $target
+`, sfvm.WithEnableDebug(true))
+	if err == nil {
+		return res.GetValues("target").Len()
+	}
+	return 0
 }
