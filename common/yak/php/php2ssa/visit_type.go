@@ -60,7 +60,14 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.ClassBluePri
 			return bluePrint, i.QualifiedNamespaceName().GetText()
 		}
 		name, s := y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
+		namespace := y.GetProgram().CurrentNameSpace
 		if library, _ := y.GetProgram().GetApplication().GetLibrary(strings.Join(name, ".")); !utils.IsNil(library) {
+			if bluePrint := library.GetClassBluePrint(s); !utils.IsNil(bluePrint) {
+				return bluePrint, s
+			} else {
+				log.Errorf("not found this class: %s in namespace", i.QualifiedNamespaceName().GetText())
+			}
+		} else if library, _ := y.GetProgram().GetApplication().GetLibrary(namespace + strings.Join(name, ".")); !utils.IsNil(library) {
 			if bluePrint := library.GetClassBluePrint(s); !utils.IsNil(bluePrint) {
 				return bluePrint, s
 			} else {

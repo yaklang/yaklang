@@ -257,7 +257,7 @@ func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {
 	p.editorStack.Push(e)
-	if p.PreHandler() {
+	if !p.PreHandler() {
 		p.editorMap.Set(p.GetCurrentEditor().GetFilename(), p.GetCurrentEditor())
 	}
 }
