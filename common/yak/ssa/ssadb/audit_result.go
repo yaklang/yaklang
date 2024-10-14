@@ -110,3 +110,19 @@ func (r *AuditResult) ToGRPCModel() *ypb.SyntaxFlowResult {
 	return res
 
 }
+
+func (r *AuditResult) AfterUpdate(tx *gorm.DB) (err error) {
+	schema.GetBroadCast_Data().Call("syntaxflow_result", map[string]string{
+		"task_id": r.TaskID,
+		"action":  "update",
+	})
+	return nil
+}
+
+func (r *AuditResult) AfterDelete(tx *gorm.DB) (err error) {
+	schema.GetBroadCast_Data().Call("syntaxflow_result", map[string]string{
+		"task_id": r.TaskID,
+		"action":  "delete",
+	})
+	return nil
+}
