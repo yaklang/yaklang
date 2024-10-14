@@ -245,7 +245,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 }`,
 			err:       "冒烟测试失败",
 			codeTyp:   "mitm",
-			zeroScore: true,
+			zeroScore: false, // has request check will not check httpflow count,so score is not 0
 		})
 	})
 
@@ -307,6 +307,19 @@ handle = result => {
 			codeTyp:   "port-scan",
 			err:       "forbid command exec library",
 			zeroScore: true,
+		})
+	})
+
+	t.Run("has send http request check", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	println("1")
+}
+`,
+			err:       "",
+			codeTyp:   "mitm",
+			zeroScore: false,
 		})
 	})
 }
