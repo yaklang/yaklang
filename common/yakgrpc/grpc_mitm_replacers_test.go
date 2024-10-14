@@ -5,14 +5,15 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -712,7 +713,7 @@ func TestGRPCMUSTPASS_HookColorTimeout(t *testing.T) {
 		return
 	}
 	defer yakit.DelKey(consts.GetGormProfileDatabase(), MITMReplacerKeyRecords)
-	var mockHost, mockPort = utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\r\nContent-length:10000\r\n\r\n" + strings.Repeat("a", 10000))
 	})
 	testReq := []byte(`POST / HTTP/1.1
@@ -833,4 +834,53 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	tags = ""
 	replacer.WaitTasks()
 	assert.Equal(t, "[重发]|YAKIT_COLOR_red", tags)
+}
+
+func TestGRPCMUSTPASS_HookColorWithNoColorBefore(t *testing.T) {
+	replacer := NewMITMReplacer()
+	replacer.SetRules(
+		&ypb.MITMContentReplacer{
+			Rule:             `example.com`,
+			NoReplace:        true,
+			Result:           ``,
+			Color:            "",
+			EnableForRequest: true,
+			EnableForHeader:  true,
+			EnableForBody:    true,
+			Index:            0,
+			ExtraTag:         []string{"example"},
+			Disabled:         false,
+			VerboseName:      "",
+		},
+		&ypb.MITMContentReplacer{
+			Rule:             `file=`,
+			NoReplace:        false,
+			Result:           `replaced=`,
+			Color:            "red",
+			EnableForRequest: true,
+			EnableForHeader:  true,
+			EnableForBody:    true,
+			Index:            0,
+			ExtraTag:         nil,
+			Disabled:         false,
+			VerboseName:      "",
+		},
+	)
+	requestBytes := []byte(`GET /file=a.txt HTTP/1.1
+Host: example.com
+`)
+	req, err := lowhttp.ParseBytesToHttpRequest(requestBytes)
+	require.NoError(t, err)
+	flow := &schema.HTTPFlow{}
+	matchRules, modifiedBytes, isDrop := replacer.hook(true, false, requestBytes)
+	require.False(t, isDrop)
+	require.Len(t, matchRules, 1)
+	require.Equal(t, "file=", matchRules[0].Rule)
+	require.Contains(t, string(modifiedBytes), "replaced=")
+	// 模拟 hook替换完成后，添加tag
+	httpctx.SetMatchedRule(req, matchRules)
+
+	extractedData := replacer.hookColor(requestBytes, []byte(""), req, flow)
+	require.Len(t, extractedData, 1)
+	require.Equal(t, "YAKIT_COLOR_RED|example", flow.Tags)
 }
