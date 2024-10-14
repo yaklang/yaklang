@@ -2,14 +2,50 @@ package openapi3
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestExtraSiblingsInRemoteRef(t *testing.T) {
-	spec := []byte(`
-openapi: 3.0.1
+	hostname, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		urlins, err := lowhttp.ExtractURLFromHTTPRequest(request, false)
+		if err != nil {
+			return
+		}
+		host := urlins.Host
+		if strings.Contains(request.RequestURI, `/store/categories.json`) {
+			writer.Write([]byte(`{
+    "$id": "http://schemas.sentex.io/store/categories.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "array of category strings",
+    "type": "array",
+    "items": {
+    "allOf": [
+        {
+        "$ref": "http://` + host + `/store/category.json"
+        }
+    ]
+    }
+}`))
+		} else if strings.Contains(request.RequestURI, `/store/category.json`) {
+			writer.Write([]byte(`{
+  "$id": "http://schemas.sentex.io/store/category.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "category name for products",
+  "type": "string",
+  "pattern": "^[A-Za-z0-9\\-]+$",
+  "minimum": 1,
+  "maximum": 30
+}`))
+		}
+	})
+	host := utils.HostPort(hostname, port)
+	spec := []byte(`openapi: 3.0.1
 servers:
 - url: http://localhost:5000
 info:
@@ -30,8 +66,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: http://schemas.sentex.io/store/categories.json
-`[1:])
+                $ref: http://` + host + `/store/categories.json
+`)
 
 	// When that site fails to respond:
 	// see https://github.com/getkin/kin-openapi/issues/495

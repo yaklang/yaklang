@@ -16,8 +16,9 @@ package swag
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -142,6 +143,14 @@ func LoadStrategy(pth string, local, remote func(string) ([]byte, error)) func(s
 func loadHTTPBytes(timeout time.Duration) func(path string) ([]byte, error) {
 	return func(path string) ([]byte, error) {
 		client := &http.Client{Timeout: timeout}
+		host, port, err := utils.ParseStringToHostPort(path)
+		if err != nil {
+			return nil, err
+		}
+		_ = port
+		if host != "127.0.0.1" && strings.ToLower(host) != "localhost" {
+			return nil, fmt.Errorf("only localhost is allowed, got: %v", host)
+		}
 		req, err := http.NewRequest(http.MethodGet, path, nil) //nolint:noctx
 		if err != nil {
 			return nil, err
@@ -159,7 +168,7 @@ func loadHTTPBytes(timeout time.Duration) func(path string) ([]byte, error) {
 		defer func() {
 			if resp != nil {
 				if e := resp.Body.Close(); e != nil {
-					log.Println(e)
+					log.Info(e)
 				}
 			}
 		}()
