@@ -195,6 +195,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	)
 
 	var hasParameter bool
+	var hasHttpRequest bool
 	if pluginType != "nuclei" {
 		prog, err := static_analyzer.SSAParse(pluginCode, pluginType)
 		if err != nil {
@@ -204,6 +205,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		if len(parameters) > 0 {
 			hasParameter = true
 		}
+		hasHttpRequest = information.GetHTTPRequestCount(prog) > 0
 	}
 	// static analyze
 	if slices.Contains([]string{
@@ -290,7 +292,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 			if err != nil {
 				log.Errorf("delete plugin testing risk error: %v", err)
 			}
-		} else { //  if not negative alarm, check plugin sent request
+		} else if hasHttpRequest { //  if not negative alarm, check plugin sent request
 			wantCount := 1
 			if pluginType == "mitm" {
 				wantCount = 2 // mitm plugin need rsp, so there will have a default request
