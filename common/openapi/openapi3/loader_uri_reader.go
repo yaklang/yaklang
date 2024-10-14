@@ -3,11 +3,13 @@ package openapi3
 import (
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -52,7 +54,15 @@ func ReadFromHTTP(cl *http.Client) ReadFromURIFunc {
 		if location.Scheme == "" || location.Host == "" {
 			return nil, ErrURINotSupported
 		}
-		req, err := http.NewRequest("GET", location.String(), nil)
+		locRef := location.String()
+
+		host, _, _ := utils.ParseStringToHostPort(locRef)
+		host = strings.ToLower(host)
+		if host != "localhost" && host != "127.0.0.1" {
+			return nil, fmt.Errorf("only localhost is allowed, got: %v", host)
+		}
+
+		req, err := http.NewRequest("GET", locRef, nil)
 		if err != nil {
 			return nil, err
 		}
