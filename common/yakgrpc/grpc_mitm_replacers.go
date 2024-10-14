@@ -535,7 +535,6 @@ func (m *mitmReplacer) GetHijackingRules() []*ypb.MITMContentReplacer {
 }
 
 func stringForSettingColor(s string, extraTag []string, flow *schema.HTTPFlow) {
-	flow.AddTag(extraTag...)
 	log.Debugf("set color[%v] for %v", s, flow.Url)
 	switch strings.ToLower(s) {
 	case "red":
@@ -555,19 +554,15 @@ func stringForSettingColor(s string, extraTag []string, flow *schema.HTTPFlow) {
 	case "grey":
 		flow.Grey()
 	}
+	flow.AddTag(extraTag...)
 	return
 }
 
 func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *schema.HTTPFlow) []*schema.ExtractedData {
-	var colorName string
-	var tagNames []string
-	applyStringForSettingColor := func() {
-		stringForSettingColor(colorName, tagNames, flow)
+	if m == nil {
+		return nil
 	}
-	stringForSettingColorPrepare := func(s string, extraTag []string, flow *schema.HTTPFlow) {
-		colorName = s
-		tagNames = append(tagNames, extraTag...) // merge tag name
-	}
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
@@ -575,25 +570,19 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 	}()
 
 	var (
-		// packetInfo      *yakit.PacketInfo
+		colorName string
+		tagNames  []string
 		extracted []*schema.ExtractedData
 
 		err error
 	)
+
 	defer func() {
-		applyStringForSettingColor()
+		stringForSettingColor(colorName, tagNames, flow)
 		for _, extractedData := range extracted {
 			extractedData.TraceId = flow.CalcHash()
 		}
 	}()
-	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
-		lastElement := ret[len(ret)-1]
-		stringForSettingColorPrepare(lastElement.Color, lastElement.ExtraTag, flow)
-		//return nil
-	}
-	if m == nil {
-		return nil
-	}
 
 	for _, rule := range m._mirrorRules {
 		matchResults := make([]*yakit.MatchResult, 0)
@@ -622,6 +611,10 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 		if len(matchResults) <= 0 {
 			continue
 		}
+		if rule.Color != "" {
+			colorName = rule.Color
+		}
+		tagNames = append(tagNames, rule.ExtraTag...) // merge tag name
 
 		for _, match := range matchResults {
 			ret := ""
@@ -639,7 +632,6 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 				continue
 			}
 
-			stringForSettingColorPrepare(rule.Color, rule.ExtraTag, flow)
 			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
 				"",
 				rule.VerboseName,
@@ -648,6 +640,14 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 				rule.String(),
 			))
 		}
+	}
+	// 将替换的规则提前，因为一般来说比较重要
+	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
+		lastRule := ret[len(ret)-1]
+		if lastRule.Color != "" {
+			colorName = lastRule.Color
+		}
+		tagNames = append(lastRule.ExtraTag, tagNames...) // merge tag name
 	}
 	return extracted
 }
