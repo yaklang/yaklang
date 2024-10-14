@@ -79,7 +79,7 @@ func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type 
 	}
 
 	typStr := typName
-	if ft, ok := y.fullTypeNameMap[typName]; ok {
+	if ft, ok := y.importClassMap[typName]; ok {
 		typStr = strings.Join(ft, ".")
 		for i := len(ft) - 1; i > 0; i-- {
 			version := y.GetPkgSCAVersion(strings.Join(ft[:i], "."))
@@ -131,8 +131,8 @@ func (y *builder) AddFullTypeNameForAllImport(typName string, typ ssa.Type) ssa.
 			typ.AddFullTypeName(typStr)
 		}
 	}
-	if len(y.selfPkgPath) != 0 {
-		typStr := strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], ".")
+	if len(y.selfPkgPathSlice) != 0 {
+		typStr := strings.Join(y.selfPkgPathSlice[:len(y.selfPkgPathSlice)-1], ".")
 		typStr = fmt.Sprintf("%s.%s", typStr, typName)
 		typ.AddFullTypeName(typStr)
 	}

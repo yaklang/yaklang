@@ -208,16 +208,16 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 				if library, _ := prog.GetLibrary(strings.Join(path, ".")); library != nil {
 					//一个类的情况
 					if bluePrint := library.GetClassBluePrint(old); !utils.IsNil(bluePrint) {
-						y.SetClassBluePrint(alias, bluePrint)
+						y.SetClassBluePrint("", alias, bluePrint)
 					} else {
 						log.Warnf("lib get class: %s fail", old)
 					}
 				}
 				if library, _ := prog.GetLibrary(strings.Join(append(path, old), ".")); library != nil {
 					//todo: 可能会和常量重名
-					for _, bluePrint := range library.ClassBluePrint {
+					for _, bluePrint := range library.GetAllClassBluePrint() {
 						name := fmt.Sprintf("%s\\%s", old, bluePrint.Name)
-						y.SetClassBluePrint(name, bluePrint)
+						y.SetClassBluePrint("", name, bluePrint)
 					}
 					for _, function := range library.Funcs {
 						y.AssignVariable(y.CreateVariable(fmt.Sprintf("%s\\%s", old, function.GetName())), function)

@@ -25,7 +25,7 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 			if all {
 				y.allImportPkgSlice = append(y.allImportPkgSlice, pkgNames)
 			} else {
-				y.fullTypeNameMap[pkgNames[len(pkgNames)-1]] = pkgNames
+				y.importClassMap[pkgNames[len(pkgNames)-1]] = pkgNames
 			}
 		}
 
@@ -33,9 +33,11 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 
 		var prog *ssa.Program
 		var className string
+		var pkgName string
 		// found package
 		for i := len(pkgNames) - 1; i > 0; i-- {
 			className = strings.Join(pkgNames[i:], ".")
+			pkgName = strings.Join(pkgNames[:i], ".")
 			if lib, _ := y.GetProgram().GetLibrary(strings.Join(pkgNames[:i], ".")); lib != nil {
 				prog = lib
 				break
@@ -54,11 +56,9 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 
 		// get class
 		if all {
-			for _, class := range prog.ClassBluePrint {
-				y.SetClassBluePrint(class.Name, class)
-			}
-		} else if class := prog.GetClassBluePrint(className); class != nil {
-			y.SetClassBluePrint(className, class)
+			y.SetClassBluePrintDualMap(prog.GetClassBluePrintDualMap())
+		} else if class := prog.GetClassBluePrintWithPkgName(className, pkgName); class != nil {
+			y.SetClassBluePrint(pkgName, className, class)
 		} else {
 			log.Warnf("BUG: Import  class %s but not found in package %v", className, prog.Name)
 		}

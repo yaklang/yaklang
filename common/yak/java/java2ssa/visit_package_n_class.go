@@ -75,24 +75,23 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		return y.EmitEmptyContainer()
 	}
 	var mergedTemplate []string
-	// 声明的类为外部类情况
+
 	var class *ssa.ClassBluePrint
+	var className string
 	if outClass == nil {
-		className := i.Identifier().GetText()
-		class = y.CreateClassBluePrint(className)
+		// outer class
+		className = i.Identifier().GetText()
+		class = y.CreateClassBluePrintWithPkgName(y.GetProgramName(), className)
 	} else {
-		var builder strings.Builder
-		builder.WriteString(outClass.Name)
-		builder.WriteString(".")
-		builder.WriteString(i.Identifier().GetText())
-		className := builder.String()
-		class = y.CreateClassBluePrint(className)
+		// inner class
+		className = fmt.Sprintf("%s$%s", outClass.Name, i.Identifier().GetText())
+		class = y.CreateClassBluePrintWithPkgName(y.GetProgramName(), className)
 	}
-	// set full type name for class's self
-	if len(y.selfPkgPath) != 0 {
-		ftRaw := fmt.Sprintf("%s.%s", strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
+	if len(y.selfPkgPathSlice) != 0 {
+		ftRaw := fmt.Sprintf("%s.%s", y.GetProgramName(), className)
 		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.ClassBluePrint)
 	}
+
 	if ret := i.TypeParameters(); ret != nil {
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
@@ -145,10 +144,10 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	//}
 
 	for _, parentClass := range mergedTemplate {
-		if parent := y.GetClassBluePrint(parentClass); parent != nil {
+		if parent := y.GetClassBluePrintWithPkgName(parentClass, y.GetProgramName()); parent != nil {
 			class.AddParentClass(parent)
 		} else {
-			parentBP := y.CreateClassBluePrint(parentClass)
+			parentBP := y.CreateClassBluePrintWithPkgName(y.GetProgramName(), parentClass)
 			y.AddFullTypeNameForAllImport(parentClass, parentBP)
 			class.AddParentClass(parentBP)
 		}
@@ -314,6 +313,8 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	// 	// only one type
 	var typ ssa.Type
 	className := i.TypeIdentifier().GetText()
+	pkgName := y.GetPkgNameByClassName(className)
+
 	//wrapper class
 	switch className {
 	case "Boolean":
@@ -333,17 +334,17 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 		typ.AddFullTypeName(className)
 		return typ
 	}
-	if class := y.GetClassBluePrint(className); class != nil {
+
+	// try get import class
+	if class := y.GetClassBluePrintWithPkgName(className, pkgName); class != nil {
 		typ = class
-		if len(typ.GetFullTypeNames()) == 0 {
-			typ = y.AddFullTypeNameFromMap(className, typ)
-		}
-		return typ
 	} else {
-		typ = ssa.NewClassBluePrint()
-		typ = y.AddFullTypeNameFromMap(className, typ)
-		return typ
+		typ = y.NewClassBluePrint()
 	}
+	if len(typ.GetFullTypeNames()) == 0 {
+		typ = y.AddFullTypeNameFromMap(className, typ)
+	}
+	return typ
 }
 
 func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
@@ -386,7 +387,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 
 	enumName := i.Identifier().GetText()
 	if class == nil {
-		class = y.CreateClassBluePrint(enumName)
+		class = y.CreateClassBluePrintWithPkgName(y.GetProgramName(), enumName)
 	}
 
 	if i.IMPLEMENTS() != nil {
@@ -394,10 +395,10 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 	}
 
 	for _, parentClass := range mergedTemplate {
-		if parent := y.GetClassBluePrint(parentClass); parent != nil {
+		if parent := y.GetClassBluePrintWithPkgName(parentClass, y.GetProgramName()); parent != nil {
 			class.AddParentClass(parent)
 		} else {
-			class.AddParentClass(y.CreateClassBluePrint(parentClass))
+			class.AddParentClass(y.CreateClassBluePrintWithPkgName(y.GetProgramName(), parentClass))
 		}
 	}
 

@@ -1652,7 +1652,7 @@ func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClas
 	builder.WriteString(i.Identifier().GetText())
 	className := builder.String()
 
-	class := y.GetClassBluePrint(className)
+	class := y.GetClassBluePrintWithPkgName(className, y.GetProgramName())
 	if class == nil {
 		return nil
 	}
@@ -1718,8 +1718,9 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 	}
 
 	className := strings.Join(createdName, ".")
+	pkgName := y.GetPkgNameByClassName(className)
 	if ret := i.ClassCreatorRest(); ret != nil {
-		class := y.GetClassBluePrint(className)
+		class := y.GetClassBluePrintWithPkgName(className, pkgName)
 		obj := y.EmitUndefined(className)
 		if class == nil {
 			log.Warnf("class %v instantiation failed. maybe the origin (package) is not loaded? (dependency missed) ", className)
@@ -1790,7 +1791,7 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 		className := uuid.NewString()
 		class := y.CreateClassBluePrint(className)
 		if oldClassName != "" {
-			class.AddParentClass(y.GetClassBluePrint(oldClassName))
+			class.AddParentClass(y.GetClassBluePrintWithPkgName(oldClassName, y.GetProgramName()))
 		}
 		y.VisitClassBody(i.ClassBody(), class)
 	}
@@ -1993,4 +1994,15 @@ func (y *builder) VisitResource(raw javaparser.IResourceContext) ssa.Value {
 	}
 	y.AssignVariable(variable, value)
 	return value
+}
+
+func (y *builder) GetPkgNameByClassName(className string) string {
+	if y == nil {
+		return ""
+	}
+	pkgPath, ok := y.importClassMap[className]
+	if ok {
+		return strings.Join(pkgPath[:len(pkgPath)-1], ".")
+	}
+	return ""
 }

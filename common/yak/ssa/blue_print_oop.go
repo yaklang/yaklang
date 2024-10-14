@@ -19,55 +19,130 @@ const (
 	Readonly
 )
 
-func (pkg *Program) GetClassBluePrint(name string) *ClassBluePrint {
+func (pkg *Program) GetClassBluePrint(ClassName string) *ClassBluePrint {
+	return pkg.getClassBluePrintEx(ClassName, "")
+}
+
+func (pkg *Program) GetClassBluePrintWithPkgName(ClassName string, PkgName string) *ClassBluePrint {
+	return pkg.getClassBluePrintEx(ClassName, PkgName)
+}
+
+func (pkg *Program) getClassBluePrintEx(className, pkgName string) *ClassBluePrint {
 	if pkg == nil {
 		return nil
 	}
-	if c, ok := pkg.ClassBluePrint[name]; ok {
-		return c
+	dualMap := pkg.ClassBluePrint
+	if pkgMap, ok := dualMap.ClassName2PkgMap[className]; !ok {
+		return nil
+	} else if len(pkgMap) == 1 {
+		for _, c := range pkgMap {
+			return c
+		}
+	} else {
+		if c, ok := pkgMap[pkgName]; ok {
+			return c
+		}
 	}
-	// log.Errorf("GetClassBluePrint: not this class: %s", name)
 	return nil
 }
 
-func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) {
-	p := b.prog
-	if _, ok := p.ClassBluePrint[name]; ok {
-		log.Errorf("SetClassBluePrint: this class redeclare")
+func (pkg *Program) GetAllClassBluePrint() []*ClassBluePrint {
+	var result []*ClassBluePrint
+	for _, v := range pkg.ClassBluePrint.ClassName2PkgMap {
+		for _, c := range v {
+			result = append(result, c)
+		}
 	}
-	p.ClassBluePrint[name] = class
+	return result
 }
 
-// CreateClassBluePrint will create object template (maybe class)
+func (pkg *Program) GetClassBluePrintDualMap() *ClassBlueprintDualMap {
+	return pkg.ClassBluePrint
+}
+
+func (b *FunctionBuilder) SetClassBluePrint(packageName, className string, class *ClassBluePrint) {
+	p := b.GetProgram()
+
+	if p.ClassBluePrint.Pkg2ClassNameMap[packageName] == nil {
+		p.ClassBluePrint.Pkg2ClassNameMap[packageName] = make(map[string]*ClassBluePrint)
+	}
+	if p.ClassBluePrint.ClassName2PkgMap[className] == nil {
+		p.ClassBluePrint.ClassName2PkgMap[className] = make(map[string]*ClassBluePrint)
+	}
+
+	pkg2Class := p.ClassBluePrint.Pkg2ClassNameMap[packageName]
+	if _, ok := pkg2Class[packageName]; ok {
+		log.Errorf("SetClassBluePrint: this class redeclare")
+	}
+	pkg2Class[className] = class
+
+	class2Pkg := p.ClassBluePrint.ClassName2PkgMap[className]
+	if _, ok := class2Pkg[packageName]; ok {
+		log.Errorf("SetClassBluePrint: this class redeclare")
+	}
+	class2Pkg[packageName] = class
+}
+
+func (b *FunctionBuilder) SetClassBluePrintDualMap(dualMap *ClassBlueprintDualMap) {
+	p := b.GetProgram()
+	p.ClassBluePrint = dualMap
+}
+
+func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
+	return b.createClassBluePrintEx("", name, tokenizer...)
+}
+
+func (b *FunctionBuilder) CreateClassBluePrintWithPkgName(pkgName, className string, tokenizer ...CanStartStopToken) *ClassBluePrint {
+	return b.createClassBluePrintEx(pkgName, className, tokenizer...)
+}
+
+func (b *FunctionBuilder) NewClassBluePrint() *ClassBluePrint {
+	return NewClassBluePrint()
+}
+
+// createClassBluePrintEx will create object template (maybe class)
 // in dynamic and classless language, we can create object without class
 // but because of the 'this/super', we will still keep the concept 'Class'
 // for ref the method/function, the blueprint is a container too,
 // saving the static variables and util methods.
-func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
-	// p := b.GetProgram()
-	p := b.prog
+func (b *FunctionBuilder) createClassBluePrintEx(packageName string, className string, tokenizer ...CanStartStopToken) *ClassBluePrint {
 	c := NewClassBluePrint()
-	if _, ok := p.ClassBluePrint[name]; ok {
-		log.Errorf("CreateClassBluePrint: this class redeclare")
-	}
-	p.ClassBluePrint[name] = c
-	c.Name = name
+	b.SetClassBluePrint(packageName, className, c)
+	c.Name = className
 
-	log.Infof("start to create class container variable for saving static member: %s", name)
-	klassVar := b.CreateVariable(name, tokenizer...)
+	// init class container
+	log.Infof("start to create class container variable for saving static member: %s", className)
+	klassVar := b.CreateVariable(className, tokenizer...)
 	klassContainer := b.EmitEmptyContainer()
 	b.AssignVariable(klassVar, klassContainer)
 	err := c.InitializeWithContainer(klassContainer)
 	if err != nil {
-		log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
+		log.Errorf("CreateClassBluePrint.InitializeClassContainer error: %s", err)
 	}
+
+	//bind the class container to the package container
+	//className.__pkg__=packageName
+	if packageName == "" {
+		return c
+	}
+	pkgBindVal := b.CreateMemberCallVariable(klassContainer, b.EmitConstInst("__pkg__"))
+	b.AssignVariable(pkgBindVal, b.EmitConstInst(packageName))
 	return c
 }
 
 func (b *FunctionBuilder) GetClassBluePrint(name string) *ClassBluePrint {
-	// p := b.GetProgram()
-	p := b.prog
+	p := b.GetProgram()
 	return p.GetClassBluePrint(name)
+}
+
+func (b *FunctionBuilder) GetClassBluePrintWithPkgName(className string, pkgName string) *ClassBluePrint {
+	p := b.GetProgram()
+	return p.GetClassBluePrintWithPkgName(className, pkgName)
+}
+
+func (b *FunctionBuilder) GetClassBluePrintDualMap() *ClassBlueprintDualMap {
+	p := b.GetProgram()
+	return p.GetClassBluePrintDualMap()
 }
 
 func (c *ClassBluePrint) GetMemberAndStaticMember(key string, supportStatic bool) Value {

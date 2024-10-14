@@ -28,7 +28,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
 		Funcs:                   make(map[string]*Function),
-		ClassBluePrint:          make(map[string]*ClassBluePrint),
+		ClassBluePrint:          newBlueprintDualMap(),
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		FileList:                make(map[string]string),
@@ -48,6 +48,13 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ssautil.WithBasePath(programPath),
 	)
 	return prog
+}
+
+func newBlueprintDualMap() *ClassBlueprintDualMap {
+	return &ClassBlueprintDualMap{
+		Pkg2ClassNameMap: make(map[string]map[string]*ClassBluePrint),
+		ClassName2PkgMap: make(map[string]map[string]*ClassBluePrint),
+	}
 }
 
 func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...string) *Program {
@@ -149,6 +156,20 @@ func (prog *Program) AddUpStream(p *Program) {
 
 func (prog *Program) GetProgramName() string {
 	return prog.Name
+}
+
+func (prog *Program)GetLibraryName()string  {
+	if prog == nil {
+		return ""
+	}
+	return prog.Name
+}
+
+func (prog *Program)SetLibraryName(name string)  {
+	if prog== nil {
+		return
+	}
+	prog.Name = name
 }
 
 func (prog *Program) GetAndCreateFunction(pkgName string, funcName string) *Function {

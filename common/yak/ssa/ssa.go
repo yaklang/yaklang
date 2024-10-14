@@ -216,10 +216,11 @@ type Program struct {
 	// function list
 	Funcs map[string]*Function
 
-	// class blue print
-	ClassBluePrint map[string]*ClassBluePrint
-	ExprotValue    map[string]Value
-	ExprotType     map[string]Type
+	//Mapping of package name and class name to class blue-print
+	ClassBluePrint *ClassBlueprintDualMap
+
+	ExprotValue map[string]Value
+	ExprotType  map[string]Type
 
 	// offset
 	OffsetMap         map[int]*OffsetItem
@@ -241,6 +242,11 @@ type Program struct {
 	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)
 	ExternInstance          map[string]any
 	ExternLib               map[string]map[string]any
+}
+
+type ClassBlueprintDualMap struct {
+	Pkg2ClassNameMap map[string]map[string]*ClassBluePrint
+	ClassName2PkgMap map[string]map[string]*ClassBluePrint
 }
 
 // implement Value
