@@ -2,17 +2,13 @@ package utils
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"golang.org/x/net/html"
 	"hash"
-	"io/ioutil"
-	"net/http"
 	"strings"
-	"time"
 )
 
 import (
@@ -30,7 +26,7 @@ func Mmh3Hash32(raw []byte) string {
 	}
 }
 
-func standBase64(braw []byte) []byte {
+func StandBase64(braw []byte) []byte {
 	bckd := base64.StdEncoding.EncodeToString(braw)
 	var buffer bytes.Buffer
 	for i := 0; i < len(bckd); i++ {
@@ -43,36 +39,6 @@ func standBase64(braw []byte) []byte {
 	buffer.WriteByte('\n')
 	return buffer.Bytes()
 
-}
-
-func CalcFaviconHash(urlRaw string) (string, error) {
-	timeout := time.Duration(8 * time.Second)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := http.Client{
-		Timeout:   timeout,
-		Transport: tr,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse /* 不进入重定向 */
-		},
-	}
-	resp, err := client.Get(urlRaw)
-	if err != nil {
-		//log.Println("favicon client error:", err)
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			//log.Println("favicon file read error: ", err)
-			return "", err
-		}
-		return Mmh3Hash32(standBase64(body)), nil
-	} else {
-		return "", Errorf("status code: %v", resp.StatusCode)
-	}
 }
 
 // ExtractFaviconURL will receive a site url and html content return the favicon url
