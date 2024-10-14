@@ -807,7 +807,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		})
 		return hookFunc.Interface()
 	}
-	httpFuncList := []string{"Get", "Post", "Request", "NewRequest"}
+	httpFuncList := []string{"Get", "Post", "Request", "NewRequest", "RequestFaviconHash", "RequestToMD5", "RequestToSha1", "RequestToMMH3Hash128", "RequestToMMH3Hash128x64", "RequestToSha256"}
 	for _, funcName := range httpFuncList {
 		nIns.GetVM().RegisterMapMemberCallHandler("http", funcName, hookHTTPFunc)
 	}
