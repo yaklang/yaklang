@@ -221,6 +221,9 @@ type Program struct {
 	ExportValue map[string]Value
 	ExportType  map[string]Type
 
+	// namespace
+	CurrentNameSpace string
+
 	// offset
 	OffsetMap         map[int]*OffsetItem
 	OffsetSortedSlice []int

@@ -150,3 +150,17 @@ func (c *ClassBluePrint) SetFullTypeNames(names []string) {
 func (c *ClassBluePrint) GetNormalMember(name string) *BluePrintMember {
 	return c.NormalMember[name]
 }
+
+func (c *ClassBluePrint) BuildConstructor() {
+	for _, p := range c.ParentClass {
+		p.BuildConstructor()
+	}
+
+	if c.Constructor != nil {
+		c.Constructor.GetFunc().Build()
+	}
+
+	for _, m := range c.Method {
+		m.Build()
+	}
+}

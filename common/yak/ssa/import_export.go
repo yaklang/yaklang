@@ -97,10 +97,10 @@ func (p *Program) ImportAll(lib *Program) error {
 		return err
 	}
 
-	for name, v := range p.ExportValue {
+	for name, v := range lib.ExportValue {
 		p.setImportValue(name, v)
 	}
-	for name, t := range p.ExportType {
+	for name, t := range lib.ExportType {
 		p.setImportType(name, t)
 	}
 

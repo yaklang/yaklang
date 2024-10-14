@@ -190,19 +190,22 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 		path, aliasMap := y.VisitNamespaceNameList(listContext)
 		namespace := getNamespace(path...)
 		if namespace == nil {
-			log.Errorf("namespace %s not found", path)
-			continue
+			log.Warnf("namespace %s not found", path)
 		}
+
 		for realName, currentName := range aliasMap {
 			switch opmode {
 			case "const", "function":
 				//todo const
+
 				if function := y.GetProgram().GetFunction(currentName); !utils.IsNil(function) {
 					log.Warnf("current builder has function: %s", function.GetName())
 					continue
 				}
-				if _, err := prog.ImportValue(namespace, realName); err != nil {
-					log.Errorf("get namespace value fail: %s", err)
+				if namespace != nil {
+					if _, err := prog.ImportValue(namespace, realName); err != nil {
+						log.Errorf("get namespace value fail: %s", err)
+					}
 				}
 			default:
 				//有两种情况，class或者整个命名空间
@@ -210,14 +213,18 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					log.Warnf("current builder has classblue: %s", cls)
 					continue
 				}
-				if _, err := prog.ImportType(namespace, realName); err != nil {
-					log.Errorf("get namespace type fail: %s", err)
+				if namespace != nil {
+					if _, err := prog.ImportType(namespace, realName); err != nil {
+						log.Errorf("get namespace type fail: %s", err)
+					}
 				}
 
 				if namespace := getNamespace(append(path, realName)...); namespace != nil {
+					y.GetProgram().CurrentNameSpace = strings.Join(path, ".") + "."
 					if err := prog.ImportAll(namespace); err != nil {
 						log.Errorf("get namespace all fail: %s", err)
 					}
+					return namespace
 				}
 			}
 		}

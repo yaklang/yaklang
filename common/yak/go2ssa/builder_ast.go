@@ -570,6 +570,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 			}
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
+		b.SupportClosure = false
 
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
