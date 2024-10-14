@@ -74,8 +74,10 @@ func (f *Function) GetType() Type {
 func (f *Function) SetType(t Type) {
 	if funTyp, ok := ToFunctionType(t); ok {
 		f.Type = funTyp
+	} else if t.GetTypeKind() == AnyTypeKind {
+		log.Info("skip any type for Function: %v alias: %v", f.name, f.verboseName)
 	} else if t != nil {
-		log.Warnf("ssa.Function type cannot covnert to FunctionType: %v", t)
+		log.Warnf("ssa.Function type cannot be set type from: %v", t)
 	}
 }
 

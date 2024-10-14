@@ -1,6 +1,10 @@
 package ssa
 
-import "golang.org/x/exp/slices"
+import (
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"golang.org/x/exp/slices"
+)
 
 type Opcode int
 
@@ -64,8 +68,61 @@ var SSAOpcode2Name = map[Opcode]string{
 	SSAOpcodeFunction:        "Function",
 }
 
-func (i *Function) GetOpcode() Opcode        { return SSAOpcodeFunction }
-func (i *BasicBlock) GetOpcode() Opcode      { return SSAOpcodeBasicBlock }
+func (i *Function) GetOpcode() Opcode   { return SSAOpcodeFunction }
+func (i *BasicBlock) GetOpcode() Opcode { return SSAOpcodeBasicBlock }
+func (i *BasicBlock) _GetRange() memedit.RangeIf {
+	if i == nil || i.anValue.id <= 0 {
+		return nil
+	}
+	if i.anValue.R != nil {
+		return i.anValue.R
+	}
+	if len(i.Insts) == 1 {
+		return i.Insts[0].GetRange()
+	} else if len(i.Insts) > 1 {
+		first := i.Insts[0]
+		last := i.Insts[len(i.Insts)-1]
+		firstRange := first.GetRange()
+		lastRange := last.GetRange()
+		if firstRange != nil && lastRange != nil {
+			return first.GetRange().GetEditor().GetRangeOffset(firstRange.GetStartOffset(), lastRange.GetEndOffset())
+		}
+	}
+	return nil
+}
+func (i *BasicBlock) GetRange() memedit.RangeIf {
+	result := i._GetRange()
+	if result != nil && i.anValue.R == nil {
+		i.SetRange(result)
+	}
+	return result
+}
+
+func (i *Function) _GetRange() memedit.RangeIf {
+	if i == nil || i.anValue.id <= 0 {
+		return nil
+	}
+
+	if i.anValue.R != nil {
+		return i.anValue.R
+	}
+
+	if i.EnterBlock != nil {
+		log.Warnf("funcion: %v's range is not set, use the entry_block's range fallback", i.GetName())
+		return i.EnterBlock.GetRange()
+	}
+
+	return nil
+}
+
+func (i *Function) GetRange() memedit.RangeIf {
+	result := i._GetRange()
+	if result != nil && i.anValue.R == nil {
+		i.SetRange(result)
+	}
+	return result
+}
+
 func (i *ParameterMember) GetOpcode() Opcode { return SSAOpcodeParameterMember }
 func (i *Parameter) GetOpcode() Opcode {
 	if i.IsFreeValue {

@@ -12,9 +12,16 @@ func SaveValueOffset(inst Instruction) {
 		return
 	}
 
+	if block, ok := ToBasicBlock(inst); ok {
+		if len(block.Preds) == 0 && len(block.Succs) == 0 && len(block.Insts) == 0 {
+			return
+		}
+	}
+
 	rng := inst.GetRange()
 	if utils.IsNil(rng) || utils.IsNil(rng.GetEditor()) {
-		log.Errorf("CreateOffset: rng or editor is nil")
+		inst.GetRange()
+		log.Errorf("%v: CreateOffset: rng or editor is nil", inst.GetVerboseName())
 		return
 	}
 	irOffset := ssadb.CreateOffset(rng)
