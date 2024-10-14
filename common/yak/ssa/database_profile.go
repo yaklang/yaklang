@@ -61,7 +61,7 @@ func ShowDatabaseCacheCost() {
 		return li[i].count > li[j].count
 	})
 	for _, k := range li {
-		log.Infof("File %v compile count: %v", k.fileName, k.count)
+		log.Infof("file %v include count: %v", k.fileName, k.count)
 	}
 
 	for _, cb := range _CostCallback {
