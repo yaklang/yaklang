@@ -77,11 +77,24 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	if codeRange == nil {
-		log.Errorf("Range not found for %s", inst.GetName())
-	} else {
-		inst.SetRange(codeRange)
-		fitRange(ir, codeRange)
+		switch ret := inst.(type) {
+		case *BasicBlock:
+			if len(ret.Insts) > 0 {
+				codeRange = ret.Insts[0].GetRange()
+			}
+		case *Function:
+			if len(ret.Blocks) > 0 {
+				codeRange = ret.Blocks[0].GetRange()
+			}
+		}
 	}
+
+	if codeRange == nil {
+		log.Errorf("Range not found for %s", inst.GetName())
+	}
+
+	inst.SetRange(codeRange)
+	fitRange(ir, codeRange)
 
 	if fun := inst.GetFunc(); fun != nil {
 		ir.CurrentFunction = fun.GetId()

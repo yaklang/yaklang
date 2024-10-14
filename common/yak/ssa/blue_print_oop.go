@@ -160,7 +160,7 @@ func (c *ClassBluePrint) GetMemberEx(key string, get func(*ClassBluePrint) bool)
 			return true
 		}
 	}
-	log.Errorf("VisitClassMember: this class: %s no this member %s", c.String(), key)
+	// log.Errorf("VisitClassMember: this class: %s no this member %s", c.String(), key)
 	return false
 }
 

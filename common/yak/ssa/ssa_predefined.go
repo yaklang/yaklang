@@ -156,7 +156,12 @@ func (a *anInstruction) GetBlock() *BasicBlock {
 }
 
 // source code position
-func (c *anInstruction) GetRange() memedit.RangeIf { return c.R }
+func (c *anInstruction) GetRange() memedit.RangeIf {
+	if c.R != nil {
+		return c.R
+	}
+	return nil
+}
 
 func (c *anInstruction) SetRange(pos memedit.RangeIf) {
 	// if c.Pos == nil {
