@@ -23,6 +23,22 @@ func (b *astbuilder) handlerWs(ws *yak.WsContext) {
 
 // entry point
 func (b *astbuilder) build(ast *yak.ProgramContext) {
+	prog := b.GetProgram()
+	currentEditor := prog.GetCurrentEditor()
+	hasFile := func(p *ssa.Program) bool {
+		if hash, ok := p.FileList[currentEditor.GetFilename()]; ok {
+			if hash == currentEditor.SourceCodeMd5() {
+				return true
+			}
+		}
+		return false
+	}
+
+	skip := hasFile(prog)
+	if skip {
+		return
+	}
+
 	for _, ws := range ast.AllWs() {
 		b.handlerWs(ws.(*yak.WsContext))
 	}
