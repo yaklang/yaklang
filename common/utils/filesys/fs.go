@@ -132,7 +132,7 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			targetFile := c.fileSystem.Join(path, d.Name())
 			if err := walkSingleFile(targetFile); err != nil {
 				lastErr = err
-				log.Errorf("walk file %s failed: %v", targetFile, err)
+				log.Warnf("walk file %s failed: %v", targetFile, err)
 				//return err
 			}
 			if c.isStop() {

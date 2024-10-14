@@ -74,6 +74,7 @@ func (c *config) parseProject() (Programs, error) {
 		msg := fmt.Sprintf(s, v...)
 		if ret := prog.GetIncludeFiles(); len(ret) > 0 {
 			for idx, fileName := range ret {
+				ssa.HitCompileFile(fileName)
 				log.Infof("parsed file[%v]: %v", idx, fileName)
 			}
 		}
@@ -138,7 +139,7 @@ func (c *config) parseProject() (Programs, error) {
 
 			// check
 			if err := c.checkLanguage(path); err != nil {
-				log.Errorf("parse file %s error: %v", path, err)
+				log.Warnf("parse file %s error: %v", path, err)
 				return nil, nil
 			}
 
