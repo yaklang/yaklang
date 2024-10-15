@@ -5,7 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (pkg *Program) GetBluePrint(name string) *BluePrint {
+func (pkg *Program) GetBluePrint(name string) *Blueprint {
 	if pkg == nil {
 		return nil
 	}
@@ -16,12 +16,12 @@ func (pkg *Program) GetBluePrint(name string) *BluePrint {
 	return nil
 }
 
-func (b *FunctionBuilder) GetBluePrint(name string) *BluePrint {
+func (b *FunctionBuilder) GetBluePrint(name string) *Blueprint {
 	p := b.prog
 	return p.GetBluePrint(name)
 }
 
-func (b *FunctionBuilder) SetClassBluePrint(name string, class *BluePrint) {
+func (b *FunctionBuilder) SetClassBluePrint(name string, class *Blueprint) {
 	p := b.prog
 	if _, ok := p.ClassBluePrint[name]; ok {
 		log.Errorf("SetClassBluePrint: this class redeclare")
@@ -35,13 +35,13 @@ func (b *FunctionBuilder) SetClassBluePrint(name string, class *BluePrint) {
 // for ref the method/function, the blueprint is a container too,
 // saving the static variables and util methods.
 
-func (b *FunctionBuilder) CreateBluePrint(name string, tokenizer ...CanStartStopToken) *BluePrint {
+func (b *FunctionBuilder) CreateBluePrint(name string, tokenizer ...CanStartStopToken) *Blueprint {
 	p := b.prog
 	cls := b.createBlurPrintEx(name, tokenizer...)
 	p.ClassBluePrint[name] = cls
 	return cls
 }
-func (b *FunctionBuilder) createBlurPrintEx(name string, tokenizer ...CanStartStopToken) *BluePrint {
+func (b *FunctionBuilder) createBlurPrintEx(name string, tokenizer ...CanStartStopToken) *Blueprint {
 	c := NewClassBluePrint(name)
 	c.GeneralUndefined = func(s string) *Undefined {
 		return b.EmitUndefined(s)

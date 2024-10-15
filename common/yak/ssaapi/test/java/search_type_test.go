@@ -40,8 +40,8 @@ func TestSimpleSearchType(t *testing.T) {
 			Expect: map[string][]string{
 				"target": {
 					"1",
-					"Undefined-B(Undefined-B)",
-					"Undefined-B(Undefined-B)",
+					"Undefined-B-constructor(Undefined-B)",
+					"Undefined-B-constructor(Undefined-B)",
 				},
 			},
 		})
@@ -54,8 +54,8 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: true,
 			Expect: map[string][]string{
 				"target": {
-					"Undefined-B(Undefined-B)",
-					"Undefined-B(Undefined-B)",
+					"Undefined-B-constructor(Undefined-B)",
+					"Undefined-B-constructor(Undefined-B)",
 				},
 			},
 		})
@@ -68,8 +68,8 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: true,
 			Expect: map[string][]string{
 				"target": {
-					"Undefined-B(Undefined-B)",
-					"Undefined-B(Undefined-B)",
+					"Undefined-B-constructor(Undefined-B)",
+					"Undefined-B-constructor(Undefined-B)",
 				},
 			},
 		})
@@ -97,7 +97,7 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: false,
 			Expect: map[string][]string{
 				"target": {
-					"Undefined-b1.methodB(valid)(Undefined-B(Undefined-B),1)",
+					"Undefined-b1.methodB(valid)(Undefined-B-constructor(Undefined-B),1)",
 				},
 			},
 		})
@@ -110,8 +110,7 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: false,
 			Expect: map[string][]string{
 				"target": {
-					"Undefined-b1.methodB(valid)(Undefined-B(Undefined-B),1)",
-					"Undefined-b2.methodB(valid)(Undefined-B(Undefined-B),2)",
+					"Undefined-b1.methodB(valid)(Undefined-B-constructor(Undefined-B),1)", "Undefined-b2.methodB(valid)(Undefined-B-constructor(Undefined-B),2)",
 				},
 			},
 		})

@@ -5,18 +5,18 @@ import (
 )
 
 // normal member
-func (c *BluePrint) RegisterNormalMember(name string, val Value) {
+func (c *Blueprint) RegisterNormalMember(name string, val Value) {
 	c.storeInContainer(name, val, BluePrintNormalMember)
 	c.NormalMember[name] = val
 }
-func (c *BluePrint) RegisterNormalConst(name string, val Value) {
+func (c *Blueprint) RegisterNormalConst(name string, val Value) {
 	c.storeInContainer(name, val, BluePrintConstMember)
 	c.ConstValue[name] = val
 }
 
-func (c *BluePrint) GetNormalMember(name string) Value {
+func (c *Blueprint) GetNormalMember(name string) Value {
 	var member Value
-	c.getFieldWithParent(func(bluePrint *BluePrint) bool {
+	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if value, ok := bluePrint.NormalMember[name]; ok {
 			member = value
 			return true
@@ -27,14 +27,14 @@ func (c *BluePrint) GetNormalMember(name string) Value {
 }
 
 // static member
-func (c *BluePrint) RegisterStaticMember(name string, val Value) {
+func (c *Blueprint) RegisterStaticMember(name string, val Value) {
 	c.storeInContainer(name, val, BluePrintStaticMember)
 	c.StaticMember[name] = val
 }
 
-func (c *BluePrint) GetStaticMember(name string) Value {
+func (c *Blueprint) GetStaticMember(name string) Value {
 	var member Value
-	c.getFieldWithParent(func(bluePrint *BluePrint) bool {
+	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if value := bluePrint.StaticMember[name]; !utils.IsNil(value) {
 			member = value
 			return true
@@ -45,12 +45,12 @@ func (c *BluePrint) GetStaticMember(name string) Value {
 }
 
 // const member
-func (c *BluePrint) RegisterConstMember(name string, val Value) {
+func (c *Blueprint) RegisterConstMember(name string, val Value) {
 	c.ConstValue[name] = val
 }
-func (c *BluePrint) GetConstMember(key string) Value {
+func (c *Blueprint) GetConstMember(key string) Value {
 	var val Value
-	c.getFieldWithParent(func(bluePrint *BluePrint) bool {
+	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if value, ok := bluePrint.ConstValue[key]; ok {
 			val = value
 			return true

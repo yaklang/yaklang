@@ -61,7 +61,7 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 	return container
 }
 
-func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *ssa.BluePrint) interface{} {
+func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *ssa.Blueprint) interface{} {
 	if y == nil || c == nil || y.IsStop() {
 		return nil
 	}

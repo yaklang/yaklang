@@ -9,28 +9,28 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type BluePrintMagicMethodKind string
+type BlueprintMagicMethodKind string
 
 const (
-	Constructor BluePrintMagicMethodKind = "constructor"
+	Constructor BlueprintMagicMethodKind = "constructor"
 	Destructor                           = "destructor"
 )
 
 // magic
-func (c *BluePrint) IsMagicMethodName(name BluePrintMagicMethodKind) bool {
+func (c *Blueprint) IsMagicMethodName(name BlueprintMagicMethodKind) bool {
 	return slices.Contains(c._container.GetProgram().magicMethodName, string(name))
 }
 
-func (c *BluePrint) RegisterMagicMethod(name BluePrintMagicMethodKind, val *Function) {
+func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val *Function) {
 	if !c.IsMagicMethodName(name) {
 		log.Warnf("register magic method fail: not magic method")
 		return
 	}
 	c.MagicMethod[name] = val
 }
-func (c *BluePrint) GetMagicMethod(name BluePrintMagicMethodKind) Value {
+func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 	var _method Value
-	c.getFieldWithParent(func(bluePrint *BluePrint) bool {
+	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		switch name {
 		case Constructor:
 			if utils.IsNil(bluePrint.Constructor) {
@@ -75,7 +75,7 @@ func (c *BluePrint) GetMagicMethod(name BluePrintMagicMethodKind) Value {
 }
 
 // normal method
-func (c *BluePrint) RegisterNormalMethod(name string, val *Function, store ...bool) {
+func (c *Blueprint) RegisterNormalMethod(name string, val *Function, store ...bool) {
 	if len(store) == 0 || store[0] == true {
 		c.storeInContainer(name, val, BluePrintNormalMethod)
 	}
@@ -89,9 +89,9 @@ func (c *BluePrint) RegisterNormalMethod(name string, val *Function, store ...bo
 	c.NormalMethod[name] = val
 }
 
-func (c *BluePrint) GetNormalMethod(key string) Value {
+func (c *Blueprint) GetNormalMethod(key string) Value {
 	var f Value
-	c.getFieldWithParent(func(bluePrint *BluePrint) bool {
+	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if function, ok := bluePrint.NormalMethod[key]; ok {
 			f = function
 			return true
@@ -102,13 +102,13 @@ func (c *BluePrint) GetNormalMethod(key string) Value {
 }
 
 // static method
-func (c *BluePrint) RegisterStaticMethod(name string, val *Function) {
+func (c *Blueprint) RegisterStaticMethod(name string, val *Function) {
 	c.StaticMethod[name] = val
 }
 
-func (c *BluePrint) GetStaticMethod(key string) Value {
+func (c *Blueprint) GetStaticMethod(key string) Value {
 	var f Value
-	c.getFieldWithParent(func(bluePrint *BluePrint) bool {
+	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if function, ok := bluePrint.StaticMethod[key]; ok {
 			f = function
 			return true
@@ -118,8 +118,8 @@ func (c *BluePrint) GetStaticMethod(key string) Value {
 	return f
 }
 
-func (c *BluePrint) FinishClassFunction() {
-	lo.ForEach(c.ParentClass, func(item *BluePrint, index int) {
+func (c *Blueprint) FinishClassFunction() {
+	lo.ForEach(c.ParentClass, func(item *Blueprint, index int) {
 		item.FinishClassFunction()
 	})
 	syntaxHandler := func(functions ...map[string]*Function) {

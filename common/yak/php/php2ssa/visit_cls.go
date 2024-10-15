@@ -160,7 +160,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	return nil
 }
 
-func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, class *ssa.BluePrint) {
+func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -446,7 +446,7 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	return nil
 }
 
-func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.BluePrint {
+func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Blueprint {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -490,7 +490,7 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.BlueP
 	return nil
 }
 
-func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) (*ssa.BluePrint, string) {
+func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) (*ssa.Blueprint, string) {
 	if y == nil || raw == nil {
 		return nil, ""
 	}
@@ -506,7 +506,7 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 	return bluePrint, key
 }
 
-func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.BluePrint, string) {
+func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.Blueprint, string) {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil, ""
 	}

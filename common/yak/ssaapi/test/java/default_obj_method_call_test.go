@@ -171,7 +171,7 @@ class A {
 }
 
 `, `staticValue as $entry;`, map[string][]string{
-		"entry": []string{"\"abc\"", "\"ddd\"", "\"eee\"", "phi(staticValue)[\"eee\",\"abc\"]"},
+		"entry": []string{"\"abc\"", "\"ddd\"", "\"eee\"", "Undefined-A.staticValue(valid)", "phi(staticValue)[\"eee\",\"abc\"]"},
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
 
@@ -260,7 +260,7 @@ class A {
 		assert.Equal(t, 1, callA.Len())
 		callB := prog.SyntaxFlow(`.toString2(* as $param)`).GetValues("param")
 		assert.Equal(t, 1, callB.Len())
-		assert.Contains(t, callB.String(), "Undefined-b.getBody(valid)(Undefined-B(Undefined-B),Parameter-p)")
+		assert.Contains(t, callB.String(), "Undefined-b.getBody(valid)(Undefined-B-constructor(Undefined-B),Parameter-p)")
 		callB.Show()
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
@@ -287,11 +287,11 @@ public class B{
 
 		result1 := prog.SyntaxFlow(`a.a() as $a;`).GetValues("a")
 		result1.Show()
-		assert.Equal(t, "Undefined-a.a(valid)(Undefined-A(Undefined-A))", result1[0].String())
-		assert.Equal(t, "Undefined-a.a(valid)(Undefined-A(Undefined-A))", result1[1].String())
+		assert.Equal(t, "Undefined-a.a(valid)(Undefined-A-constructor(Undefined-A))", result1[0].String())
+		assert.Equal(t, "Undefined-a.a(valid)(Undefined-A-constructor(Undefined-A))", result1[1].String())
 		result2 := prog.SyntaxFlow(`a.b() as $b;`).GetValues("b")
-		assert.Equal(t, "Undefined-a.b(Undefined-A(Undefined-A))", result2[0].String())
-		assert.Equal(t, "Undefined-a.b(Undefined-A(Undefined-A))", result2[1].String())
+		assert.Equal(t, "Undefined-a.b(Undefined-A-constructor(Undefined-A))", result2[0].String())
+		assert.Equal(t, "Undefined-a.b(Undefined-A-constructor(Undefined-A))", result2[1].String())
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 
@@ -316,8 +316,8 @@ public class B{
 `, func(prog *ssaapi.Program) error {
 		prog.Show()
 		result1 := prog.SyntaxFlow(`a* as $a;`).GetValues("a")
-		assert.Equal(t, "Function-A_a()", result1[0].String())
-		assert.Equal(t, "Function-A_a()", result1[1].String())
+		assert.Equal(t, "Function-a()", result1[0].String())
+		assert.Equal(t, "Function-a()", result1[1].String())
 		result2 := prog.SyntaxFlow(`b* as $b;`).GetValues("b")
 		assert.Equal(t, "Undefined-A.b", result2[0].String())
 		assert.Equal(t, "Undefined-A.b(Undefined-A)", result2[1].String())
@@ -347,12 +347,12 @@ public class B{
 `, func(prog *ssaapi.Program) error {
 		prog.Show()
 		result1 := prog.SyntaxFlow(`a* as $a;`).GetValues("a")
-		assert.Equal(t, "Function-A_a()", result1[0].String())
-		assert.Equal(t, "Function-A_a()", result1[1].String())
+		assert.Equal(t, "Function-a()", result1[0].String())
+		assert.Equal(t, "Function-a()", result1[1].String())
 		result2 := prog.SyntaxFlow(`b* as $b;`).GetValues("b")
 		assert.Equal(t, "Undefined-object.b", result2[0].String())
-		assert.Equal(t, "Undefined-object.b(Undefined-A(Undefined-A))", result2[1].String())
-		assert.Equal(t, "Undefined-object.b(Undefined-A(Undefined-A))", result2[2].String())
+		assert.Equal(t, "Undefined-object.b(Undefined-A-constructor(Undefined-A))", result2[1].String())
+		assert.Equal(t, "Undefined-object.b(Undefined-A-constructor(Undefined-A))", result2[2].String())
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 }

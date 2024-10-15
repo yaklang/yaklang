@@ -64,7 +64,7 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 
 }
 
-func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.BluePrint) ssa.Value {
+func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.Blueprint) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return y.EmitEmptyContainer()
 	}
@@ -76,7 +76,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	}
 	var mergedTemplate []string
 	// 声明的类为外部类情况
-	var class *ssa.BluePrint
+	var class *ssa.Blueprint
 	if outClass == nil {
 		className := i.Identifier().GetText()
 		class = y.CreateBluePrint(className)
@@ -91,7 +91,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	// set full type name for class's self
 	if len(y.selfPkgPath) != 0 {
 		ftRaw := fmt.Sprintf("%s.%s", strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
-		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.BluePrint)
+		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.Blueprint)
 	}
 	if ret := i.TypeParameters(); ret != nil {
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
@@ -163,7 +163,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	return container
 }
 
-func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.BluePrint) interface{} {
+func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Blueprint) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -209,7 +209,7 @@ func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext)
 
 }
 
-func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.BluePrint) func() {
+func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.Blueprint) func() {
 	if y == nil || raw == nil || y.IsStop() {
 		return func() {}
 	}
@@ -371,7 +371,7 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	return t
 }
 
-func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.BluePrint) interface{} {
+func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.Blueprint) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -418,7 +418,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 	return nil
 }
 
-func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class *ssa.BluePrint) {
+func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -457,7 +457,7 @@ func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class
 
 }
 
-func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.BluePrint) {
+func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -481,7 +481,7 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 	return
 }
 
-func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarationsContext, class *ssa.BluePrint) {
+func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarationsContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -501,7 +501,7 @@ func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarations
 
 func (y *builder) VisitClassBodyDeclaration(
 	raw javaparser.IClassBodyDeclarationContext,
-	class *ssa.BluePrint,
+	class *ssa.Blueprint,
 ) func() {
 	if y == nil || raw == nil || y.IsStop() {
 		return func() {}
@@ -554,7 +554,7 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 
 func (y *builder) VisitMethodDeclaration(
 	raw javaparser.IMethodDeclarationContext,
-	class *ssa.BluePrint, isStatic bool,
+	class *ssa.Blueprint, isStatic bool,
 	annotationFunc []func(ssa.Value),
 	defCallback []func(ssa.Value),
 ) func() {
@@ -846,7 +846,7 @@ func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContex
 
 }
 
-func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclarationContext, class *ssa.BluePrint) {
+func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclarationContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
