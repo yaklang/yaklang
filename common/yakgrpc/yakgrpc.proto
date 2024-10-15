@@ -5475,6 +5475,7 @@ message QuerySyntaxFlowRuleResponse{
   Paging Pagination = 1;
   DbOperateMessage DbMessage= 2;
   repeated SyntaxFlowRule Rule = 3;
+  uint64 Total = 4;
 }
 
 message DeleteSyntaxFlowRuleRequest{
