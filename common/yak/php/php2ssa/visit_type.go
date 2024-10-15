@@ -40,29 +40,29 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	return ssa.GetAnyType()
 }
 
-func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.ClassBluePrint, string) {
+func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.BluePrint, string) {
 	if y == nil || raw == nil || y.IsStop() {
 		log.Errorf("[BUG]: TypeRef is nil")
-		return y.CreateClassBluePrint(raw.GetText()), raw.GetText()
+		return y.CreateBluePrint(raw.GetText()), raw.GetText()
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TypeRefContext)
 	if i == nil {
-		return y.CreateClassBluePrint(raw.GetText()), raw.GetText()
+		return y.CreateBluePrint(raw.GetText()), raw.GetText()
 	}
 	if i.FlexiVariable() != nil {
 		//todo: flexivariable
 	}
 	if i.QualifiedNamespaceName() != nil {
-		if bluePrint := y.GetClassBluePrint(strings.TrimSpace(i.QualifiedNamespaceName().GetText())); bluePrint != nil {
+		if bluePrint := y.GetBluePrint(strings.TrimSpace(i.QualifiedNamespaceName().GetText())); bluePrint != nil {
 			return bluePrint, i.QualifiedNamespaceName().GetText()
 		}
 		name, s := y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
 		//namespace := y.GetProgram().CurrentNameSpace
 		if library, _ := y.GetProgram().GetApplication().GetLibrary(strings.Join(name, ".")); !utils.IsNil(library) {
-			if bluePrint := library.GetClassBluePrint(s); !utils.IsNil(bluePrint) {
+			if bluePrint := library.GetBluePrint(s); !utils.IsNil(bluePrint) {
 				return bluePrint, s
 			} else {
 				log.Errorf("not found this class: %s in namespace", i.QualifiedNamespaceName().GetText())
@@ -76,10 +76,10 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.ClassBluePri
 	} else if i.PrimitiveType() != nil {
 
 	} else if i.Static() != nil {
-		y.GetClassBluePrint(i.Static().GetText())
+		y.GetBluePrint(i.Static().GetText())
 	}
 	log.Warnf("[BUG]: fix it")
-	return y.CreateClassBluePrint(raw.GetText()), raw.GetText()
+	return y.CreateBluePrint(raw.GetText()), raw.GetText()
 }
 
 func (y *builder) VisitPrimitiveType(raw phpparser.IPrimitiveTypeContext) ssa.Type {
@@ -148,7 +148,7 @@ func (y *builder) VisitCastOperation(raw phpparser.ICastOperationContext) ssa.Ty
 	}
 	return nil
 }
-func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) *ssa.ClassBluePrint {
+func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) *ssa.BluePrint {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -162,15 +162,15 @@ func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticType
 	if i.QualifiedNamespaceName() != nil {
 		path, name := y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
 		if library, _ := y.GetProgram().GetLibrary(strings.Join(path, ".")); !utils.IsNil(library) {
-			if cls := library.GetClassBluePrint(name); cls != nil {
+			if cls := library.GetBluePrint(name); cls != nil {
 				return cls
 			}
 		} else {
-			if bluePrint := y.GetProgram().GetClassBluePrint(name); !utils.IsNil(bluePrint) {
+			if bluePrint := y.GetProgram().GetBluePrint(name); !utils.IsNil(bluePrint) {
 				return bluePrint
 			}
 		}
 	}
 	log.Warnf("classBlue print not found")
-	return y.CreateClassBluePrint(uuid.NewString())
+	return y.CreateBluePrint(uuid.NewString())
 }

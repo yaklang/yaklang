@@ -64,7 +64,7 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 
 }
 
-func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.ClassBluePrint) ssa.Value {
+func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.BluePrint) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return y.EmitEmptyContainer()
 	}
@@ -76,10 +76,10 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	}
 	var mergedTemplate []string
 	// 声明的类为外部类情况
-	var class *ssa.ClassBluePrint
+	var class *ssa.BluePrint
 	if outClass == nil {
 		className := i.Identifier().GetText()
-		class = y.CreateClassBluePrint(className)
+		class = y.CreateBluePrint(className)
 		y.GetProgram().SetExportType(className, class)
 	} else {
 		var builder strings.Builder
@@ -87,12 +87,12 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		builder.WriteString(".")
 		builder.WriteString(i.Identifier().GetText())
 		className := builder.String()
-		class = y.CreateClassBluePrint(className)
+		class = y.CreateBluePrint(className)
 	}
 	// set full type name for class's self
 	if len(y.selfPkgPath) != 0 {
 		ftRaw := fmt.Sprintf("%s.%s", strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
-		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.ClassBluePrint)
+		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.BluePrint)
 	}
 	if ret := i.TypeParameters(); ret != nil {
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
@@ -146,10 +146,10 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	//}
 
 	for _, parentClass := range mergedTemplate {
-		if parent := y.GetClassBluePrint(parentClass); parent != nil {
+		if parent := y.GetBluePrint(parentClass); parent != nil {
 			class.AddParentClass(parent)
 		} else {
-			parentBP := y.CreateClassBluePrint(parentClass)
+			parentBP := y.CreateBluePrint(parentClass)
 			y.AddFullTypeNameForAllImport(parentClass, parentBP)
 			class.AddParentClass(parentBP)
 		}
@@ -164,7 +164,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	return container
 }
 
-func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.ClassBluePrint) interface{} {
+func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.BluePrint) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -210,7 +210,7 @@ func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext)
 
 }
 
-func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.ClassBluePrint) func() {
+func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.BluePrint) func() {
 	if y == nil || raw == nil || y.IsStop() {
 		return func() {}
 	}
@@ -334,7 +334,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 		typ.AddFullTypeName(className)
 		return typ
 	}
-	if class := y.GetClassBluePrint(className); class != nil {
+	if class := y.GetBluePrint(className); class != nil {
 		typ = class
 		if len(typ.GetFullTypeNames()) == 0 {
 			typ = y.AddFullTypeNameFromMap(className, typ)
@@ -372,7 +372,7 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	return t
 }
 
-func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.ClassBluePrint) interface{} {
+func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.BluePrint) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -387,7 +387,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 
 	enumName := i.Identifier().GetText()
 	if class == nil {
-		class = y.CreateClassBluePrint(enumName)
+		class = y.CreateBluePrint(enumName)
 	}
 
 	if i.IMPLEMENTS() != nil {
@@ -395,10 +395,10 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 	}
 
 	for _, parentClass := range mergedTemplate {
-		if parent := y.GetClassBluePrint(parentClass); parent != nil {
+		if parent := y.GetBluePrint(parentClass); parent != nil {
 			class.AddParentClass(parent)
 		} else {
-			class.AddParentClass(y.CreateClassBluePrint(parentClass))
+			class.AddParentClass(y.CreateBluePrint(parentClass))
 		}
 	}
 
@@ -419,7 +419,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 	return nil
 }
 
-func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class *ssa.ClassBluePrint) {
+func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class *ssa.BluePrint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -458,7 +458,7 @@ func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class
 
 }
 
-func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.ClassBluePrint) {
+func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.BluePrint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -482,7 +482,7 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 	return
 }
 
-func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarationsContext, class *ssa.ClassBluePrint) {
+func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarationsContext, class *ssa.BluePrint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -502,7 +502,7 @@ func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarations
 
 func (y *builder) VisitClassBodyDeclaration(
 	raw javaparser.IClassBodyDeclarationContext,
-	class *ssa.ClassBluePrint,
+	class *ssa.BluePrint,
 ) func() {
 	if y == nil || raw == nil || y.IsStop() {
 		return func() {}
@@ -555,7 +555,7 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 
 func (y *builder) VisitMethodDeclaration(
 	raw javaparser.IMethodDeclarationContext,
-	class *ssa.ClassBluePrint, isStatic bool,
+	class *ssa.BluePrint, isStatic bool,
 	annotationFunc []func(ssa.Value),
 	defCallback []func(ssa.Value),
 ) func() {
@@ -847,7 +847,7 @@ func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContex
 
 }
 
-func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclarationContext, class *ssa.ClassBluePrint) {
+func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclarationContext, class *ssa.BluePrint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -867,13 +867,14 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		newFunction := y.NewFunc(funcName)
 		y.FunctionBuilder = y.PushFunction(newFunction)
 		{
-			obj := y.EmitUndefined(class.Name)
-			obj.SetType(class)
-			this := y.NewParam("this")
-			this.SetType(class)
+			y.NewParam("$this")
+			container := y.EmitEmptyContainer()
+			variable := y.CreateVariable("this")
+			y.AssignVariable(variable, container)
+			container.SetType(class)
 			y.VisitFormalParameters(i.FormalParameters())
 			y.VisitBlock(i.Block())
-			y.EmitReturn([]ssa.Value{obj})
+			y.EmitReturn([]ssa.Value{container})
 			y.Finish()
 		}
 		y.FunctionBuilder = y.PopFunction()
