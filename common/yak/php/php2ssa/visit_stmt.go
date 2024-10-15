@@ -238,7 +238,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 						}
 					}
 					for _, t := range namespace.ExportType {
-						if bluePrint, ok := t.(*ssa.ClassBluePrint); ok {
+						if bluePrint, ok := t.(*ssa.Blueprint); ok {
 							prog.ClassBluePrint[fmt.Sprintf("%s\\%s", currentName, bluePrint.Name)] = bluePrint
 						}
 					}

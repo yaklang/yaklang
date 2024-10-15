@@ -40,7 +40,7 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	return ssa.GetAnyType()
 }
 
-func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.BluePrint, string) {
+func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.Blueprint, string) {
 	if y == nil || raw == nil || y.IsStop() {
 		log.Errorf("[BUG]: TypeRef is nil")
 		return y.CreateBluePrint(raw.GetText()), raw.GetText()
@@ -148,7 +148,7 @@ func (y *builder) VisitCastOperation(raw phpparser.ICastOperationContext) ssa.Ty
 	}
 	return nil
 }
-func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) *ssa.BluePrint {
+func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) *ssa.Blueprint {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}

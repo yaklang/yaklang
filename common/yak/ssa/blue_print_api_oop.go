@@ -5,23 +5,19 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (pkg *Program) GetBluePrint(name string) *BluePrint {
+func (pkg *Program) GetBluePrint(name string) *Blueprint {
 	if pkg == nil {
 		return nil
 	}
-	if c, ok := pkg.ClassBluePrint[name]; ok {
-		return c
-	}
-	// log.Errorf("GetClassBluePrint: not this class: %s", name)
-	return nil
+	return pkg.GetClassBlueprintEx(name, "")
 }
 
-func (b *FunctionBuilder) GetBluePrint(name string) *BluePrint {
+func (b *FunctionBuilder) GetBluePrint(name string) *Blueprint {
 	p := b.prog
 	return p.GetBluePrint(name)
 }
 
-func (b *FunctionBuilder) SetClassBluePrint(name string, class *BluePrint) {
+func (b *FunctionBuilder) SetClassBluePrint(name string, class *Blueprint) {
 	p := b.prog
 	if _, ok := p.ClassBluePrint[name]; ok {
 		log.Errorf("SetClassBluePrint: this class redeclare")
@@ -35,22 +31,26 @@ func (b *FunctionBuilder) SetClassBluePrint(name string, class *BluePrint) {
 // for ref the method/function, the blueprint is a container too,
 // saving the static variables and util methods.
 
-func (b *FunctionBuilder) CreateBluePrint(name string, tokenizer ...CanStartStopToken) *BluePrint {
-	p := b.prog
-	cls := b.createBlurPrintEx(name, tokenizer...)
-	p.ClassBluePrint[name] = cls
-	return cls
-}
-func (b *FunctionBuilder) createBlurPrintEx(name string, tokenizer ...CanStartStopToken) *BluePrint {
-	c := NewClassBluePrint(name)
-	c.GeneralUndefined = func(s string) *Undefined {
+func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...CanStartStopToken) *Blueprint {
+	prog := b.prog
+	blueprint := NewClassBluePrint(name)
+	if prog.ClassBluePrint == nil {
+		prog.ClassBluePrint = make(map[string]*Blueprint)
+	}
+	blueprint.GeneralUndefined = func(s string) *Undefined {
 		return b.EmitUndefined(s)
 	}
-	klassVar := b.CreateVariable(name, tokenizer...)
+	prog.ClassBluePrint[name] = blueprint
+	klassvar := b.CreateVariable(name, tokenizer...)
 	klassContainer := b.EmitEmptyContainer()
-	b.AssignVariable(klassVar, klassContainer)
-	_ = c.InitializeWithContainer(klassContainer)
-	return c
+	b.AssignVariable(klassvar, klassContainer)
+	if err := blueprint.InitializeWithContainer(klassContainer); err != nil {
+		log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
+	}
+	return blueprint
+}
+func (b *FunctionBuilder) CreateBluePrint(name string, tokenizer ...CanStartStopToken) *Blueprint {
+	return b.CreateBluePrintWithPkgName(name, tokenizer...)
 }
 
 // ReadSelfMember  用于读取当前类成员，包括静态成员和普通成员和方法。

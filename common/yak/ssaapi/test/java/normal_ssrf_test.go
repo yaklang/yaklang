@@ -7,6 +7,9 @@ import (
 
 func Test_HTTP_SSRF(t *testing.T) {
 	t.Run("aTaintCase023", func(t *testing.T) {
+		/*
+			sf: .createDefault().execute(* #-> * as $target)
+		*/
 		tt := &TestCase{
 			Name: "aTaintCase023",
 			Code: `
@@ -32,7 +35,7 @@ func Test_HTTP_SSRF(t *testing.T) {
 			Contain: true,
 			Expect: map[string][]string{
 				"target": {
-					"Parameter-param", "Parameter-url", "Parameter-url", "Undefined-HttpClients",
+					"Parameter-url", "Parameter-url", "Undefined-HttpClients",
 					"Undefined-HttpClients", "Undefined-HttpGet", "Undefined-HttpGet", "Undefined-HttpPost",
 					"Undefined-HttpPost", "Undefined-URIBuilder", "Undefined-URIBuilder", "nil",
 				},
@@ -62,7 +65,7 @@ func Test_HTTP_SSRF(t *testing.T) {
 			Contain: true,
 			Expect: map[string][]string{
 				"target": {
-					"Parameter-param", "Parameter-url", "Parameter-url", "Undefined-HttpClients",
+					"Parameter-url", "Parameter-url", "Undefined-HttpClients",
 					"Undefined-HttpClients", "Undefined-HttpGet", "Undefined-HttpGet", "Undefined-HttpPost",
 					"Undefined-HttpPost", "Undefined-URIBuilder", "Undefined-URIBuilder", "nil",
 				}},

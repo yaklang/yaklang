@@ -25,7 +25,7 @@ func (prog *Program) getTypeEx(name, pkg string) Type {
 	return nil
 }
 
-func (p *Program) GetClassBlueprintEx(name string, pkg string) *ClassBluePrint {
+func (p *Program) GetClassBlueprintEx(name string, pkg string) *Blueprint {
 	if p == nil {
 		return nil
 	}
@@ -47,7 +47,7 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string) *ClassBluePrint {
 		p.ReadImportType,
 		getInCurrent,
 	); ok {
-		if c, ok := typ.(*ClassBluePrint); ok {
+		if c, ok := typ.(*Blueprint); ok {
 			if !p.PreHandler() {
 				c.Build()
 			}

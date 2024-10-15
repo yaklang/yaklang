@@ -65,7 +65,7 @@ type FunctionBuilder struct {
 
 	MarkedVariable           *Variable
 	MarkedThisObject         Value
-	MarkedThisClassBlueprint *BluePrint
+	MarkedThisClassBlueprint *Blueprint
 
 	MarkedMemberCallWantMethod bool
 	parentBuilder              *FunctionBuilder
@@ -245,7 +245,7 @@ func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 func (b *FunctionBuilder) ReferenceParameter(name string) {
 	b.RefParameter[name] = struct{}{}
 }
-func (b *FunctionBuilder) ClassConstructor(bluePrint *BluePrint, args []Value) Value {
+func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) Value {
 	method := bluePrint.GetMagicMethod(Constructor)
 	constructor := b.NewCall(method, args)
 	b.EmitCall(constructor)
@@ -254,6 +254,6 @@ func (b *FunctionBuilder) ClassConstructor(bluePrint *BluePrint, args []Value) V
 	b.EmitDefer(call)
 	return constructor
 }
-func (b *FunctionBuilder) GetStaticMember(classname *BluePrint, field string) *Variable {
+func (b *FunctionBuilder) GetStaticMember(classname *Blueprint, field string) *Variable {
 	return b.CreateVariable(fmt.Sprintf("%s_%s", classname.Name, strings.TrimPrefix(field, "$")))
 }
