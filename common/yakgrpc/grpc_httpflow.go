@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/mutate"
 	"io"
 	"os"
 	"path"
@@ -344,13 +345,25 @@ func (s *Server) HTTPFlowsFieldGroup(ctx context.Context, req *ypb.HTTPFlowsFiel
 
 func (s *Server) GetHTTPPacketBody(ctx context.Context, req *ypb.GetHTTPPacketBodyRequest) (*ypb.Bytes, error) {
 	if req.GetPacketRaw() != nil {
-		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req.GetPacketRaw())
+		packetRaw := req.GetPacketRaw()
+		if req.GetForceRenderFuzztag() {
+			if fuzztagRes := mutate.InterfaceToFuzzResults(packetRaw); len(fuzztagRes) > 0 {
+				packetRaw = []byte(fuzztagRes[0])
+			}
+		}
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packetRaw)
 		if body == nil {
 			return nil, utils.Error("empty body from packet raw")
 		}
 		return &ypb.Bytes{Raw: body}, nil
 	}
-	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket([]byte(req.GetPacket()))
+	packet := req.GetPacket()
+	if req.GetForceRenderFuzztag() {
+		if fuzztagRes := mutate.InterfaceToFuzzResults(packet); len(fuzztagRes) > 0 {
+			packet = fuzztagRes[0]
+		}
+	}
+	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket([]byte(packet))
 	if body == nil {
 		return nil, utils.Error("empty body")
 	}
