@@ -554,6 +554,12 @@ func _post(url string, options ...http_struct.HttpOption) (*http_struct.YakHttpR
 	return httpRequest("POST", url, options...)
 }
 
+// RequestFaviconHash 根据指定的 URL 发起 GET 请求，并计算响应体hash，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置请求体，设置超时时间等
+// 返回响应主体(body)的base64编码的mmh3 hash的结果<响应状态码码为2xx时>与错误，常用于计算网站的favicon hash
+// Example:
+// ```
+// rsp, err = http.RequestFaviconHash("http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
+// ```
 func CalcFaviconHash(urlRaw string, options ...http_struct.HttpOption) (string, error) {
 	resp, err := _get(urlRaw, options...)
 	if err != nil {
@@ -574,6 +580,12 @@ func _getBody(urlRaw string, options ...http_struct.HttpOption) ([]byte, error) 
 	return lowhttp.GetHTTPPacketBody(resp.Raw()), nil
 }
 
+// RequestToMD5 根据指定的 URL 发起 GET 请求，并计算响应体hash，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置请求体，设置超时时间等
+// 返回响应主体(body)的md5 hash的结果与错误
+// Example:
+// ```
+// rsp, err = http.RequestToMD5("http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
+// ```
 func requestToMd5(urlRaw string, options ...http_struct.HttpOption) (string, error) {
 	body, err := _getBody(urlRaw, options...)
 	if err != nil {
@@ -582,6 +594,12 @@ func requestToMd5(urlRaw string, options ...http_struct.HttpOption) (string, err
 	return codec.Md5(body), nil
 }
 
+// RequestToSha1 根据指定的 URL 发起 GET 请求，并计算响应体hash，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置请求体，设置超时时间等
+// 返回响应主体(body)的sha1 hash的结果与错误
+// Example:
+// ```
+// rsp, err = http.RequestToSha1("http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
+// ```
 func requestToSha1(urlRaw string, options ...http_struct.HttpOption) (string, error) {
 	body, err := _getBody(urlRaw, options...)
 	if err != nil {
@@ -590,6 +608,12 @@ func requestToSha1(urlRaw string, options ...http_struct.HttpOption) (string, er
 	return codec.Sha1(body), nil
 }
 
+// RequestToSha256 根据指定的 URL 发起 GET 请求，并计算响应体hash，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置请求体，设置超时时间等
+// 返回响应主体(body)的sha256 hash的结果与错误
+// Example:
+// ```
+// rsp, err = http.RequestToSha256("http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
+// ```
 func requestToSha256(urlRaw string, options ...http_struct.HttpOption) (string, error) {
 	body, err := _getBody(urlRaw, options...)
 	if err != nil {
@@ -598,6 +622,12 @@ func requestToSha256(urlRaw string, options ...http_struct.HttpOption) (string, 
 	return codec.Sha256(body), nil
 }
 
+// RequestToSha512 根据指定的 URL 发起 GET 请求，并计算响应体hash，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置请求体，设置超时时间等
+// 返回响应主体(body)的sha512 hash的结果与错误
+// Example:
+// ```
+// rsp, err = http.RequestToSha512("http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
+// ```
 func requestToSha512(urlRaw string, options ...http_struct.HttpOption) (string, error) {
 	body, err := _getBody(urlRaw, options...)
 	if err != nil {
@@ -606,6 +636,12 @@ func requestToSha512(urlRaw string, options ...http_struct.HttpOption) (string, 
 	return codec.Sha512(body), nil
 }
 
+// RequestToMMH3Hash128 根据指定的 URL 发起 GET 请求，并计算响应体hash，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置请求体，设置超时时间等
+// 返回响应主体(body)的mmh3 hash<128>的结果与错误
+// Example:
+// ```
+// rsp, err = http.RequestToMMH3Hash128("http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
+// ```
 func requestToMMH3Hash128(urlRaw string, options ...http_struct.HttpOption) (string, error) {
 	body, err := _getBody(urlRaw, options...)
 	if err != nil {
@@ -614,6 +650,12 @@ func requestToMMH3Hash128(urlRaw string, options ...http_struct.HttpOption) (str
 	return codec.MMH3Hash128(body), nil
 }
 
+// RequestToMMH3Hash128x64 根据指定的 URL 发起 GET 请求，并计算响应体hash，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置请求体，设置超时时间等
+// 返回响应主体(body)的mmh3 hash<128x64>的结果与错误
+// Example:
+// ```
+// rsp, err = http.RequestToMMH3Hash128x64("http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
+// ```
 func requestToMMH3Hash128x64(urlRaw string, options ...http_struct.HttpOption) (string, error) {
 	body, err := _getBody(urlRaw, options...)
 	if err != nil {
@@ -641,6 +683,7 @@ var HttpExports = map[string]interface{}{
 	"RequestToMMH3Hash128":    requestToMMH3Hash128,
 	"RequestToMMH3Hash128x64": requestToMMH3Hash128x64,
 	"RequestToSha256":         requestToSha256,
+	"RequestToSha512":         requestToSha512,
 
 	// 获取响应内容的 response
 	"GetAllBody": GetAllBody,
