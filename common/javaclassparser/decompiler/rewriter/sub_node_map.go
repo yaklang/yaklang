@@ -5,21 +5,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type SubNodeMap struct {
+type NodeRoute struct {
 	ConditionNode *core.Node
-	Parent        []*SubNodeMap
+	Parent        []*NodeRoute
 	NodeMap       *utils.Set[*core.Node]
 }
 
-func (s *SubNodeMap) AddParent(nodeMap *SubNodeMap) {
+func (s *NodeRoute) AddParent(nodeMap *NodeRoute) {
 	s.Parent = append(s.Parent, nodeMap)
 }
-func (s *SubNodeMap) Add(node *core.Node) {
+func (s *NodeRoute) Add(node *core.Node) {
 	s.NodeMap.Add(node)
 }
-func (s *SubNodeMap) getMapList() []*SubNodeMap {
-	list := []*SubNodeMap{}
-	stack := utils.NewStack[*SubNodeMap]()
+func (s *NodeRoute) getMapList() []*NodeRoute {
+	list := []*NodeRoute{}
+	stack := utils.NewStack[*NodeRoute]()
 	stack.Push(s)
 	for stack.Len() > 0 {
 		current := stack.Pop()
@@ -30,7 +30,7 @@ func (s *SubNodeMap) getMapList() []*SubNodeMap {
 	}
 	return list
 }
-func (s *SubNodeMap) GetFirstSameParentCondition(m *SubNodeMap) *core.Node {
+func (s *NodeRoute) GetFirstSameParentCondition(m *NodeRoute) *core.Node {
 	list := s.getMapList()
 	parentMap := map[*core.Node]bool{}
 	for _, n := range m.getMapList() {
@@ -46,8 +46,8 @@ func (s *SubNodeMap) GetFirstSameParentCondition(m *SubNodeMap) *core.Node {
 	}
 	return nil
 }
-func (s *SubNodeMap) Has(node *core.Node) (*SubNodeMap, bool) {
-	stack := utils.NewStack[*SubNodeMap]()
+func (s *NodeRoute) Has(node *core.Node) (*NodeRoute, bool) {
+	stack := utils.NewStack[*NodeRoute]()
 	stack.Push(s)
 	for stack.Len() > 0 {
 		current := stack.Pop()
@@ -60,14 +60,14 @@ func (s *SubNodeMap) Has(node *core.Node) (*SubNodeMap, bool) {
 	}
 	return nil, false
 }
-func NewRootSubNodeMap() *SubNodeMap {
-	return &SubNodeMap{
+func NewRootNodeRoute() *NodeRoute {
+	return &NodeRoute{
 		NodeMap: utils.NewSet[*core.Node](),
 	}
 }
-func (s *SubNodeMap) NewChild(conditionNode *core.Node) *SubNodeMap {
-	m := NewRootSubNodeMap()
-	m.Parent = []*SubNodeMap{s}
+func (s *NodeRoute) NewChild(conditionNode *core.Node) *NodeRoute {
+	m := NewRootNodeRoute()
+	m.Parent = []*NodeRoute{s}
 	m.ConditionNode = conditionNode
 	return m
 }
@@ -82,12 +82,12 @@ func _CheckIsPreNode(checked *utils.Set[*core.Node], infoGetter func(node *core.
 	if pre == node {
 		return true
 	}
-	for _, nodeMap := range infoGetter(node).AllPreNodeMaps {
+	for _, nodeMap := range infoGetter(node).AllPreNodeRoute {
 		if _, ok := nodeMap.Has(pre); ok {
 			return true
 		}
 	}
-	for _, nodeMap := range infoGetter(node).AllPreNodeMaps {
+	for _, nodeMap := range infoGetter(node).AllPreNodeRoute {
 		if _CheckIsPreNode(checked, infoGetter, nodeMap.ConditionNode, pre) {
 			return true
 		}

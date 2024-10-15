@@ -4,41 +4,28 @@ import (
 	"errors"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/maps"
 )
 
-type GuessIsBreak func(getPoint func() int, resolve func(), reject func())
-type RewriterContext struct {
-	labelId       int
-	currentNodeId int
-	checkPoint    map[int][]int
-	ifChildSet    map[int]*utils.Set[*core.Node]
-	BlockStack    *utils.Stack[any]
-}
-
-func NewRewriterContext() *RewriterContext {
-	return &RewriterContext{
-		checkPoint: map[int][]int{},
-		ifChildSet: map[int]*utils.Set[*core.Node]{},
-		BlockStack: utils.NewStack[any](),
-	}
-}
-
 type StatementManager struct {
-	RewriterContext *RewriterContext
-	RootNode        *core.Node
-	PreNode         *core.Node
-	idToNode        map[int]*core.Node
-	CirclePoint     []*core.Node
+	currentNodeId int
+	RootNode      *core.Node
+	PreNode       *core.Node
+	idToNode      map[int]*core.Node
+	CirclePoint   []*core.Node
 	//MergePoint      []*core.Node
 	IfNodes           []*core.Node
 	FinalActions      []func() error
 	LoopOccupiedNodes *utils.Set[*core.Node]
+
+	nodeSet *utils.Set[*core.Node]
+	edgeSet *utils.Set[[2]*core.Node]
 }
 
 func NewStatementManager(node *core.Node, parent *StatementManager) *StatementManager {
 	manager := NewRootStatementManager(node)
-	manager.RewriterContext = parent.RewriterContext
 	return manager
 }
 
@@ -47,21 +34,11 @@ func NewRootStatementManager(node *core.Node) *StatementManager {
 		return nil
 	}
 	manager := &StatementManager{
-		RewriterContext:   NewRewriterContext(),
 		RootNode:          node,
 		idToNode:          map[int]*core.Node{},
 		LoopOccupiedNodes: utils.NewSet[*core.Node](),
 	}
 	manager.generateIdToNodeMap()
-	manager.ScanStatementSimple(func(node *core.Node) error {
-		for k, rewriter := range rewriters {
-			if rewriter.checkStartNode(node, manager) {
-				manager.RewriterContext.checkPoint[node.Id] = append(manager.RewriterContext.checkPoint[node.Id], k)
-			}
-		}
-		return nil
-	})
-	//manager.GenerateIfChildSet()
 	return manager
 }
 
@@ -88,16 +65,16 @@ func NewRootStatementManager(node *core.Node) *StatementManager {
 //		return
 //	}
 func (s *StatementManager) SetId(id int) {
-	s.RewriterContext.currentNodeId = id
+	s.currentNodeId = id
 }
-func (s *StatementManager) NewNode(st core.Statement) *core.Node {
+func (s *StatementManager) NewNode(st statements.Statement) *core.Node {
 	node := core.NewNode(st)
 	node.Id = s.GetNewNodeId()
 	return node
 }
 func (s *StatementManager) GetNewNodeId() int {
-	s.RewriterContext.currentNodeId++
-	return s.RewriterContext.currentNodeId
+	s.currentNodeId++
+	return s.currentNodeId
 }
 func (s *StatementManager) SetRootNode(node *core.Node) {
 	s.RootNode = node
@@ -157,7 +134,7 @@ func (s *StatementManager) ToStatementsFromNode(node *core.Node, stopCheck func(
 			break
 		}
 		visited.Add(current)
-		if _, ok := current.Statement.(*core.MiddleStatement); !ok {
+		if _, ok := current.Statement.(*statements.MiddleStatement); !ok {
 			result = append(result, current)
 		}
 		if len(current.Next) == 0 {
@@ -176,7 +153,7 @@ func (s *StatementManager) ToStatementsFromNode(node *core.Node, stopCheck func(
 func (s *StatementManager) ToStatements(stopCheck func(node *core.Node) bool) ([]*core.Node, error) {
 	return s.ToStatementsFromNode(s.RootNode, stopCheck)
 }
-func (s *StatementManager) InsertStatementAfterId(id int, statement core.Statement) {
+func (s *StatementManager) InsertStatementAfterId(id int, statement statements.Statement) {
 	defer s.generateIdToNodeMap()
 	preNode := s.GetNodeById(id)
 	node := core.NewNode(statement)
@@ -209,12 +186,46 @@ func (s *StatementManager) generateIdToNodeMap() {
 }
 
 type NodeExtInfo struct {
-	CircleRoute    *SubNodeMap
-	PreNodeMap     *SubNodeMap
-	AllPreNodeMaps []*SubNodeMap
+	PreNodeRoute    *NodeRoute
+	AllPreNodeRoute []*NodeRoute
+}
+type Block struct {
+	StartNode *core.Node
+	EndNode   *core.Node
+	Source    []*Block
 }
 
+func NewBlock(startNode *core.Node) *Block {
+	return &Block{
+		StartNode: startNode,
+	}
+}
+
+//	func (s *StatementManager) scanIf() error {
+//		edgeSet := utils.NewSet[[2]*core.Node]()
+//		stack := utils.NewStack[[2]*core.Node]()
+//		stack.Push([2]*core.Node{nil, s.RootNode})
+//		for {
+//			if stack.Len() == 0 {
+//				break
+//			}
+//			edge := stack.Pop()
+//			if edgeSet.Has(edge) {
+//				continue
+//			}
+//			edgeSet.Add(edge)
+//			_, to := edge[0], edge[1]
+//			for _, n := range to.Next {
+//				stack.Push([2]*core.Node{to, n})
+//			}
+//		}
+//		return nil
+//	}
 func (s *StatementManager) ScanCoreInfo() error {
+	//err := s.scanIf()
+	//if err != nil {
+	//	return err
+	//}
 	nodeExtInfo := map[*core.Node]*NodeExtInfo{}
 	getNodeInfo := func(node *core.Node) *NodeExtInfo {
 		if info, ok := nodeExtInfo[node]; ok {
@@ -225,39 +236,37 @@ func (s *StatementManager) ScanCoreInfo() error {
 		return info
 	}
 	stack := utils.NewStack[*core.Node]()
-	//visited := NewRootSubNodeMap()
+	//visited := NewRootNodeRoute()
 	circleNodes := []*core.Node{}
 	ifNodes := []*core.Node{}
 	mergeNodesSet := utils.NewSet[*core.Node]()
-	var walkIfStatement func(node *core.Node, subNodeMap *SubNodeMap)
-	walkIfStatement = func(node *core.Node, subNodeMap *SubNodeMap) {
-		getNodeInfo(node).PreNodeMap = subNodeMap
+
+	var walkIfStatement func(node *core.Node, subNodeRoute *NodeRoute)
+	walkIfStatement = func(node *core.Node, subNodeRoute *NodeRoute) {
+		getNodeInfo(node).PreNodeRoute = subNodeRoute
 		stack.Push(node)
 		for stack.Len() > 0 {
 			current := stack.Pop()
-			getNodeInfo(current).AllPreNodeMaps = append(getNodeInfo(current).AllPreNodeMaps, subNodeMap)
-			if m, ok := getNodeInfo(node).PreNodeMap.Has(current); ok {
+			getNodeInfo(current).AllPreNodeRoute = append(getNodeInfo(current).AllPreNodeRoute, subNodeRoute)
+			if m, ok := getNodeInfo(node).PreNodeRoute.Has(current); ok {
 				current.IsCircle = true
-				current.IsIf = false
 				circleNodes = append(circleNodes, current)
-				getNodeInfo(current).CircleRoute = getNodeInfo(node).PreNodeMap
 				_ = m
-				continue
+				//continue
 			}
-			skip := len(getNodeInfo(current).AllPreNodeMaps) > 1
-			//allIfNodes := map[*core.Node]struct{}{}
-			getNodeInfo(node).PreNodeMap.Add(current)
+			skip := len(getNodeInfo(current).AllPreNodeRoute) > 1
+			getNodeInfo(node).PreNodeRoute.Add(current)
 			if skip {
 				mergeNodesSet.Add(current)
 				current.IsMerge = true
 				continue
 			}
 
-			if _, ok := current.Statement.(*core.ConditionStatement); ok {
+			if _, ok := current.Statement.(*statements.ConditionStatement); ok {
 				current.IsIf = true
 				ifNodes = append(ifNodes, current)
 				for _, n := range current.Next {
-					walkIfStatement(n, subNodeMap.NewChild(current))
+					walkIfStatement(n, subNodeRoute.NewChild(current))
 				}
 				continue
 			} else {
@@ -267,10 +276,16 @@ func (s *StatementManager) ScanCoreInfo() error {
 			}
 		}
 	}
-	subNodeMap := NewRootSubNodeMap()
-	walkIfStatement(s.RootNode, subNodeMap)
+	subNodeRoute := NewRootNodeRoute()
+	walkIfStatement(s.RootNode, subNodeRoute)
+	//for _, node := range circleNodes {
+	//	//mergeNode := funk.Filter(node.Next, func(item *core.Node) bool {
+	//	//	return !node.CircleNodesSet.Has(item)
+	//	//}).([]*core.Node)
+	//	node.MergeNode = node.FalseNode()
+	//}
 	for _, current := range mergeNodesSet.List() {
-		for _, nodeMap := range getNodeInfo(current).AllPreNodeMaps {
+		for _, nodeMap := range getNodeInfo(current).AllPreNodeRoute {
 			if nodeMap.ConditionNode == nil {
 				continue
 			}
@@ -294,36 +309,109 @@ func (s *StatementManager) ScanCoreInfo() error {
 	//	}
 	//}
 	for _, circleNodeEntry := range circleNodes {
-		outPoint := []*core.Node{}
+		outPointMap := map[*core.Node]*core.Node{}
 		circleNodeEntry.CircleNodesSet = utils.NewSet[*core.Node]()
+		inCircleSource := []*core.Node{}
+		for _, node := range circleNodeEntry.Source {
+			for _, n := range circleNodeEntry.Next {
+				if CheckIsPreNode(getNodeInfo, node, n) {
+					inCircleSource = append(inCircleSource, node)
+					break
+				}
+			}
+		}
+
 		core.WalkGraph(circleNodeEntry, func(node *core.Node) ([]*core.Node, error) {
 			next := funk.Filter(node.Next, func(n *core.Node) bool {
-				_, ok := getNodeInfo(circleNodeEntry).CircleRoute.Has(n)
-				if !ok {
-					outPoint = append(outPoint, node)
+				var isInCircle bool
+				for _, node := range inCircleSource {
+					for _, route := range getNodeInfo(node).AllPreNodeRoute {
+						if _, ok := route.Has(n); ok {
+							isInCircle = true
+						}
+					}
+					if isInCircle {
+						break
+					}
 				}
-				return ok
+				if !isInCircle {
+					outPointMap[node] = n
+					//outPoint = append(outPoint, n)
+				}
+				return isInCircle
 			}).([]*core.Node)
 			circleNodeEntry.CircleNodesSet.Add(node)
 			return next, nil
 		})
-		var outPointMergeNode *core.Node
-		for _, node := range outPoint {
-			if outPointMergeNode != nil {
-				if outPointMergeNode != node.MergeNode {
-					return errors.New("invalid break")
-				}
-			} else {
-				outPointMergeNode = node.MergeNode
-			}
-			circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, node)
+		if len(outPointMap) == 0 {
+			return errors.New("invalid circle")
 		}
-		circleNodeEntry.OutPointMergeNode = outPointMergeNode
+		//mergeNode := outPointMap[circleNodeEntry]
+		var mergeNode *core.Node
+		if len(outPointMap) == 1 {
+			mergeNode = maps.Values(outPointMap)[0]
+		} else {
+			edgeSet := utils.NewSet[*core.Node]()
+			values := maps.Values(outPointMap)
+			core.WalkGraph[*core.Node](values[0], func(node *core.Node) ([]*core.Node, error) {
+				edgeSet.Add(node)
+				return node.Next, nil
+			})
+			core.WalkGraph[*core.Node](values[1], func(node *core.Node) ([]*core.Node, error) {
+				if edgeSet.Has(node) {
+					mergeNode = node
+					return nil, nil
+				}
+				return node.Next, nil
+			})
+		}
+
+		//for _, node1 := range outPointMap {
+		//	ok := true
+		//	for c, node2 := range outPointMap {
+		//		if node1 == node2 {
+		//			continue
+		//		}
+		//		if !CheckIsPreNode(getNodeInfo, node1, c) {
+		//			ok = false
+		//			break
+		//		}
+		//	}
+		//	if ok {
+		//		mergeNode = node1
+		//	}
+		//}
+		if mergeNode == nil {
+			return errors.New("invalid circle")
+		}
+		for c, _ := range outPointMap {
+			circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, c)
+		}
+		//var outPointMergeNode *core.Node
+		//for conditionNode, node := range outPointMap {
+		//	if outPointMergeNode != nil {
+		//		if outPointMergeNode != node {
+		//			return errors.New("invalid break")
+		//		}
+		//	} else {
+		//		outPointMergeNode = node
+		//	}
+		//	circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, conditionNode)
+		//}
+		//if outPointMergeNode == nil {
+		//	return utils.Errorf("found circle break node from code graph failed, circle start node id: %d", circleNodeEntry.Id)
+		//}
+		circleNodeEntry.OutPointMergeNode = mergeNode
 	}
 	s.CirclePoint = circleNodes
 	s.IfNodes = funk.Filter(ifNodes, func(item *core.Node) bool {
-		return item.IsIf
+		return item.IsIf && item.IsCircle == false
 	}).([]*core.Node)
+	//for _, node := range s.IfNodes {
+	//	if node.MergeNode == nil {
+	//		return utils.Errorf("if node merge node is nil, node id: %d", node.Id)
+	//	}
+	//}
 	return nil
 }
 func (s *StatementManager) Rewrite() error {
@@ -331,56 +419,10 @@ func (s *StatementManager) Rewrite() error {
 	if err != nil {
 		return err
 	}
-	//rewritersOrder := []int{LoopRewriterFlag, DoWhileReWriterFlag, IfRewriterFlag, BreakRewriterFlag}
-	rewritersOrder := []int{LoopRewriterFlag, IfRewriterFlag}
-	//visited := utils.NewSet[any]()
-	for _, flag := range rewritersOrder {
-		rewriter, ok := rewriters[flag]
-		if !ok {
-			continue
-		}
-		rewriter.rewriterFunc(s, nil)
-		//keys := maps.Keys(s.RewriterContext.checkPoint)
-		//keys = funk.Filter(keys, func(item int) bool {
-		//	return item >= s.RootNode.Id
-		//}).([]int)
-		//for _, key := range keys {
-		//	flags := s.RewriterContext.checkPoint[key]
-		//	if utils.IntArrayContains(flags, flag) {
-		//		node := s.GetNodeById(key)
-		//		if node == nil {
-		//			continue
-		//		}
-		//		err := rewriter.rewriterFunc(s, node)
-		//		if err != nil {
-		//			return err
-		//		}
-		//		s.RewriterContext.checkPoint[key] = funk.Filter(flags, func(item int) bool {
-		//			return item != flag
-		//		}).([]int)
-		//	}
-		//}
+	rewriters := []rewriterFunc{LoopRewriter, IfRewriter}
+	for _, rewriter := range rewriters {
+		rewriter(s)
 	}
-	//err := s.ScanStatement(func(node *core.Node) (error, bool) {
-	//	if visited.Has(node) {
-	//		return nil, false
-	//	}
-	//	visited.Add(node)
-	//	s.PreNode = node
-	//	for _, rewriter := range rewriters {
-	//		err := rewriter(s, node)
-	//		if err != nil {
-	//			return err, true
-	//		}
-	//	}
-	//	if !stopCheck(node) {
-	//		return nil, false
-	//	}
-	//	return nil, true
-	//})
-	//if err != nil {
-	//	return err
-	//}
 	for _, action := range s.FinalActions {
 		err := action()
 		if err != nil {

@@ -3,6 +3,10 @@ package javaclassparser
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
@@ -14,7 +18,7 @@ const attrTemplate = `%s %s %s {%s}`
 type ClassObjectDumper struct {
 	imports       map[string]struct{}
 	obj           *ClassObject
-	FuncCtx       *core.FunctionContext
+	FuncCtx       *class_context.FunctionContext
 	ClassName     string
 	PackageName   string
 	CurrentMethod *MemberInfo
@@ -57,7 +61,7 @@ func (c *ClassObjectDumper) UnTab() {
 }
 func (c *ClassObjectDumper) DumpClass() (string, error) {
 	result := classTemplate
-	funcCtx := &core.FunctionContext{
+	funcCtx := &class_context.FunctionContext{
 		ClassName:   c.ClassName,
 		PackageName: c.PackageName,
 		BuildInLibs: []string{
@@ -135,7 +139,7 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		fieldType, err := core.ParseDescriptor(descriptor)
+		fieldType, err := types.ParseDescriptor(descriptor)
 		if err != nil {
 			return nil, err
 		}
@@ -162,31 +166,35 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		paramsTypes, returnType, err := core.ParseMethodDescriptor(descriptor)
+		methodType, err := types.ParseMethodDescriptor(descriptor)
 		if err != nil {
 			return nil, err
 		}
 		paramsNewStrList := []string{}
-		for _, paramsType := range paramsTypes {
+		for _, paramsType := range methodType.ParamTypes {
 			paramsNewStrList = append(paramsNewStrList, paramsType.String(c.FuncCtx))
 		}
-		returnTypeStr := returnType.String(c.FuncCtx)
+		returnTypeStr := methodType.ReturnType.String(c.FuncCtx)
 		paramsNewStr := strings.Join(paramsNewStrList, ", ")
 		code := ""
 		c.Tab()
 		c.CurrentMethod = method
 		funcCtx := c.FuncCtx
 		funcCtx.FunctionName = name
+		println(name)
+		//if name != "foriWithIfBreak" {
+		//	continue
+		//}
 		for _, attribute := range method.Attributes {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
-				statements, err := ParseBytesCode(c, codeAttr)
+				statementList, err := ParseBytesCode(c, codeAttr)
 				if err != nil {
 					return nil, err
 				}
 				sourceCode := "\n"
-				var statementToString func(statement core.Statement) string
-				var statementListToString func(statements []core.Statement) string
-				statementListToString = func(statements []core.Statement) string {
+				var statementToString func(statement statements.Statement) string
+				var statementListToString func(statements []statements.Statement) string
+				statementListToString = func(statements []statements.Statement) string {
 					c.Tab()
 					defer c.UnTab()
 					var res []string
@@ -195,18 +203,18 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					}
 					return strings.Join(res, "\n")
 				}
-				statementToString = func(statement core.Statement) (statementStr string) {
+				statementToString = func(statement statements.Statement) (statementStr string) {
 					switch ret := statement.(type) {
-					case *core.WhileStatement:
+					case *statements.WhileStatement:
 						statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
 							"%s\n"+
 							c.GetTabString()+"}", ret.ConditionValue.String(funcCtx), statementListToString(ret.Body))
-					case *core.DoWhileStatement:
+					case *statements.DoWhileStatement:
 						statementStr = fmt.Sprintf(c.GetTabString()+"do{\n"+
 							"%s\n"+
 							c.GetTabString()+"} while (%s);", statementListToString(ret.Body), ret.ConditionValue.String(funcCtx))
-					case *core.SwitchStatement:
-						getBody := func(caseItems []*core.CaseItem) string {
+					case *statements.SwitchStatement:
+						getBody := func(caseItems []*statements.CaseItem) string {
 							var res []string
 							for _, st := range caseItems {
 								if st.IsDefault {
@@ -220,7 +228,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 						statementStr = fmt.Sprintf(c.GetTabString()+"switch (%s){\n"+
 							"%s\n"+
 							c.GetTabString()+"}", ret.Value.String(funcCtx), getBody(ret.Cases))
-					case *core.IfStatement:
+					case *statements.IfStatement:
 						statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
 							"%s\n"+
 							c.GetTabString()+"}", ret.Condition.String(funcCtx), statementListToString(ret.IfBody))
@@ -229,21 +237,21 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 								"%s\n"+
 								c.GetTabString()+"}", statementListToString(ret.ElseBody))
 						}
-					case *core.ExpressionStatement:
+					case *statements.ExpressionStatement:
 						if funcCtx.FunctionName == "<init>" {
-							if v, ok := ret.Expression.(*core.FunctionCallExpression); ok {
+							if v, ok := ret.Expression.(*values.FunctionCallExpression); ok {
 								if IsJavaSupperRef(v.Object) && v.FunctionName == "<init>" {
 									return statementStr
 								}
 							}
 						}
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
-					case *core.ReturnStatement:
+					case *statements.ReturnStatement:
 						if funcCtx.FunctionName == "<init>" {
 							return
 						}
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
-					case *core.ForStatement:
+					case *statements.ForStatement:
 						datas := []string{}
 						datas = append(datas, ret.InitVar.String(funcCtx))
 						datas = append(datas, fmt.Sprintf("%s", ret.Condition.String(funcCtx)))
@@ -259,7 +267,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					}
 					return statementStr
 				}
-				for _, statement := range statements {
+				for _, statement := range statementList {
 					statementStr := statementToString(statement)
 					sourceCode += fmt.Sprintf("%s\n", statementStr)
 				}

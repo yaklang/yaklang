@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"strings"
 )
 
@@ -18,7 +19,7 @@ func DumpNodesToDotExp(code *core.Node) string {
 		visited[node] = true
 		toString := func(node *core.Node) string {
 			//return strconv.Quote(node.Statement.String(&FunctionContext{}))
-			s := strings.Replace(node.Statement.String(&core.FunctionContext{}), "\"", "", -1)
+			s := strings.Replace(node.Statement.String(&class_context.FunctionContext{}), "\"", "", -1)
 			s = strings.Replace(s, "\n", " ", -1)
 			return s
 		}

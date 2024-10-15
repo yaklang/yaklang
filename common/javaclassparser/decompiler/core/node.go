@@ -1,10 +1,13 @@
 package core
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 type Node struct {
 	Id                  int
-	Statement           Statement
+	Statement           statements.Statement
 	Source              []*Node
 	Next                []*Node
 	TrueNode, FalseNode func() *Node
@@ -17,8 +20,8 @@ type Node struct {
 	ConditionNode       []*Node
 	CircleNodesSet      *utils.Set[*Node]
 	//CircleRoute         *SubNodeMap
-	//PreNodeMap          *SubNodeMap
-	//AllPreNodeMaps       []*SubNodeMap
+	//PreNodeRoute          *SubNodeMap
+	//AllPreNodeRoute       []*SubNodeMap
 }
 
 func (n *Node) RemoveAllSource() {
@@ -66,9 +69,6 @@ func (n *Node) AddSource(node *Node) {
 	node.AddNext(n)
 }
 func (n *Node) AddNext(node *Node) {
-	if n.Id == 68 {
-		print()
-	}
 	var found bool
 	for _, next := range n.Next {
 		if next == node {
@@ -90,6 +90,6 @@ func (n *Node) AddNext(node *Node) {
 		node.Source = append(node.Source, n)
 	}
 }
-func NewNode(statement Statement) *Node {
+func NewNode(statement statements.Statement) *Node {
 	return &Node{Statement: statement}
 }

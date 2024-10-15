@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"strings"
 )
 
@@ -26,7 +29,7 @@ func showOpcodes(codes []*core.OpCode) {
 	}
 }
 
-func GetValueFromCP(pool []ConstantInfo, index int) core.JavaValue {
+func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	indexFromPool := func(i int) ConstantInfo {
 		return pool[i-1]
 	}
@@ -36,10 +39,10 @@ func GetValueFromCP(pool []ConstantInfo, index int) core.JavaValue {
 		nameInfo := indexFromPool(int(classInfo.NameIndex)).(*ConstantUtf8Info)
 		return nameInfo.Value
 	}
-	convertMemberInfo := func(classMemberInfo *ConstantMemberrefInfo) core.JavaValue {
+	convertMemberInfo := func(classMemberInfo *ConstantMemberrefInfo) values.JavaValue {
 		className := getClassName(classMemberInfo.ClassIndex)
 		name, desc := getNameAndType(pool, classMemberInfo.NameAndTypeIndex)
-		return core.NewJavaClassMember(className, name, desc)
+		return values.NewJavaClassMember(className, name, desc)
 	}
 	switch ret := constant.(type) {
 	case *ConstantMemberrefInfo:
@@ -56,7 +59,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) core.JavaValue {
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
-		classIns := core.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value)
+		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value)
 		return classIns
 	case *ConstantMethodrefInfo:
 		classInfo := indexFromPool(int(ret.ClassIndex)).(*ConstantClassInfo)
@@ -67,26 +70,26 @@ func GetValueFromCP(pool []ConstantInfo, index int) core.JavaValue {
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
-		classIns := core.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value)
+		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value)
 		return classIns
 	case *ConstantClassInfo:
 		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
-		return core.NewJavaClass(typeName)
+		return types.NewJavaClass(typeName)
 	default:
 		panic("failed")
 	}
 }
-func GetLiteralFromCP(pool []ConstantInfo, index int) *core.JavaLiteral {
+func GetLiteralFromCP(pool []ConstantInfo, index int) *values.JavaLiteral {
 	constant := pool[index-1]
 	switch ret := constant.(type) {
 	case *ConstantStringInfo:
-		return core.NewJavaLiteral(pool[ret.StringIndex-1].(*ConstantUtf8Info).Value, core.JavaString)
+		return values.NewJavaLiteral(pool[ret.StringIndex-1].(*ConstantUtf8Info).Value, types.JavaString)
 	case *ConstantLongInfo:
-		return core.NewJavaLiteral(ret.Value, core.JavaLong)
+		return values.NewJavaLiteral(ret.Value, types.JavaLong)
 	case *ConstantIntegerInfo:
-		return core.NewJavaLiteral(ret.Value, core.JavaInteger)
+		return values.NewJavaLiteral(ret.Value, types.JavaInteger)
 	default:
 		panic("failed")
 	}
@@ -94,15 +97,15 @@ func GetLiteralFromCP(pool []ConstantInfo, index int) *core.JavaLiteral {
 
 type VarMap struct {
 	id  int
-	val core.JavaValue
+	val values.JavaValue
 }
 
-func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute) ([]core.Statement, error) {
+func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute) ([]statements.Statement, error) {
 	pool := dumper.ConstantPool
-	parser := core.NewDecompiler(codeAttr.Code, func(id int) core.JavaValue {
+	parser := core.NewDecompiler(codeAttr.Code, func(id int) values.JavaValue {
 		return GetValueFromCP(dumper.ConstantPool, id)
 	})
-	parser.ConstantPoolLiteralGetter = func(id int) *core.JavaLiteral {
+	parser.ConstantPoolLiteralGetter = func(id int) *values.JavaLiteral {
 		return GetLiteralFromCP(dumper.ConstantPool, id)
 	}
 	parser.ConstantPoolInvokeDynamicInfo = func(index int) (string, string) {
