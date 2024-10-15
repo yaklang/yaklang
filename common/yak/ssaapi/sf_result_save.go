@@ -94,6 +94,7 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 		opts := append(opts, OptionSaveValue_ResultVariable(name))
 		if msg, ok := r.GetAlertInfo(name); ok {
 			opts = append(opts, OptionSaveValue_ResultAlert(msg))
+			r.SaveRisk(name, result.ID, result.TaskID)
 		}
 		// save un value variable
 		if len(values) == 0 {
