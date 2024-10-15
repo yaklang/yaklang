@@ -23,12 +23,11 @@ func CreateResultByID(resultID uint) (*SyntaxFlowResult, error) {
 		}
 	} else {
 		// create rule
-		rule = &schema.SyntaxFlowRule{
-			Title:       result.RuleTitle,
-			Severity:    schema.SyntaxFlowSeverity(result.RuleSeverity),
-			Description: result.RuleDesc,
-			AlertDesc:   result.AlertDesc,
-		}
+		rule = &schema.SyntaxFlowRule{}
+		rule.Title = result.RuleTitle
+		rule.Severity = schema.SyntaxFlowSeverity(result.RuleSeverity)
+		rule.Description = result.RuleDesc
+		rule.AlertDesc = result.AlertDesc
 	}
 	res.rule = rule
 	prog, err := FromDatabase(result.ProgramName)

@@ -26,7 +26,7 @@ type SyntaxFlowVisitor struct {
 func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
 	sfv := &SyntaxFlowVisitor{
 		rule: &schema.SyntaxFlowRule{
-			AlertDesc: make(schema.MapEx[string, *schema.ExtraDescInfo]),
+			AlertDesc: make(schema.MapEx[string, *schema.SyntaxFlowDescInfo]),
 		},
 		verifyFilesystem:   make(map[string]string),
 		negativeFilesystem: make(map[string]string),

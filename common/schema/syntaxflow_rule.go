@@ -97,12 +97,23 @@ func (s *SlicesEx[K]) Value() (driver.Value, error) {
 	return json.Marshal(s)
 }
 
-type ExtraDescInfo struct {
-	Level     SyntaxFlowSeverity
-	Purpose   SyntaxFlowRulePurposeType
-	Msg       string
-	OnlyMsg   bool
-	ExtraInfo map[string]string
+// for describe the rule and create risk
+type SyntaxFlowDescInfo struct {
+	Title       string `json:"title"`
+	TitleZh     string `json:"title_zh"`
+	Description string `json:"description"`
+	Solution    string `json:"solution"`
+	Tag         string `json:"tag"`
+	// info / warning / critical
+	Severity SyntaxFlowSeverity `json:"severity"`
+	// Purpose is the purpose of the rule.
+	// audit / vuln / config / security / information
+	Purpose SyntaxFlowRulePurposeType `json:"purpose"`
+
+	OnlyMsg   bool              `json:"only_msg"`
+	Msg       string            `json:"msg"`
+	CVE       string            `json:"cve"`
+	ExtraInfo map[string]string `json:"extra_info"`
 }
 
 type SyntaxFlowRule struct {
@@ -119,7 +130,8 @@ type SyntaxFlowRule struct {
 	TitleZh     string
 	Description string
 	Tag         string
-	AlertDesc   MapEx[string, *ExtraDescInfo] `gorm:"type:text"`
+	AlertDesc   MapEx[string, *SyntaxFlowDescInfo] `gorm:"type:text"`
+	CVE         string
 	// yak or sf
 	Type     SyntaxFlowRuleType
 	Severity SyntaxFlowSeverity
