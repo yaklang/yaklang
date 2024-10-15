@@ -215,7 +215,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 				}
 			default:
 				//有两种情况，cls、整个命名空间和下面的
-				if cls := y.GetProgram().GetClassBluePrint(currentName); !utils.IsNil(cls) {
+				if cls := y.GetProgram().GetBluePrint(currentName); !utils.IsNil(cls) {
 					log.Warnf("current builder has classblue: %s", cls)
 					continue
 				}

@@ -5,7 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (pkg *Program) GetClassBluePrint(name string) *ClassBluePrint {
+func (pkg *Program) GetBluePrint(name string) *BluePrint {
 	if pkg == nil {
 		return nil
 	}
@@ -15,13 +15,13 @@ func (pkg *Program) GetClassBluePrint(name string) *ClassBluePrint {
 	// log.Errorf("GetClassBluePrint: not this class: %s", name)
 	return nil
 }
-func (b *FunctionBuilder) GetClassBluePrint(name string) *ClassBluePrint {
-	// p := b.GetProgram()
+
+func (b *FunctionBuilder) GetBluePrint(name string) *BluePrint {
 	p := b.prog
-	return p.GetClassBluePrint(name)
+	return p.GetBluePrint(name)
 }
 
-func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) {
+func (b *FunctionBuilder) SetClassBluePrint(name string, class *BluePrint) {
 	p := b.prog
 	if _, ok := p.ClassBluePrint[name]; ok {
 		log.Errorf("SetClassBluePrint: this class redeclare")
@@ -34,21 +34,15 @@ func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) 
 // but because of the 'this/super', we will still keep the concept 'Class'
 // for ref the method/function, the blueprint is a container too,
 // saving the static variables and util methods.
-func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
-	// p := b.GetProgram()
+
+func (b *FunctionBuilder) CreateBluePrint(name string, tokenizer ...CanStartStopToken) *BluePrint {
 	p := b.prog
-	c := b.createClassBluePrintEx(name, tokenizer...)
-	p.ClassBluePrint[name] = c
-	return c
+	cls := b.createBlurPrintEx(name, tokenizer...)
+	p.ClassBluePrint[name] = cls
+	return cls
 }
-func (b *FunctionBuilder) CreateClassBluePrintWithoutAdd(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
-	return b.createClassBluePrintEx(name, tokenizer...)
-}
-func (b *FunctionBuilder) createClassBluePrintEx(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
+func (b *FunctionBuilder) createBlurPrintEx(name string, tokenizer ...CanStartStopToken) *BluePrint {
 	c := NewClassBluePrint(name)
-	c.GeneralPhi = func(s string) *Phi {
-		return b.EmitPhi(s, nil)
-	}
 	c.GeneralUndefined = func(s string) *Undefined {
 		return b.EmitUndefined(s)
 	}
@@ -62,7 +56,17 @@ func (b *FunctionBuilder) createClassBluePrintEx(name string, tokenizer ...CanSt
 // ReadSelfMember  用于读取当前类成员，包括静态成员和普通成员和方法。
 // 其中使用MarkedThisClassBlueprint标识当前在哪个类中。
 func (b *FunctionBuilder) ReadSelfMember(name string) Value {
+	var value Value
+	defer func() {
+		if !utils.IsNil(value) {
+			b.AssignVariable(b.CreateVariable(name), value)
+		}
+	}()
 	if class := b.MarkedThisClassBlueprint; class != nil {
+		variable := b.GetStaticMember(class, name)
+		if _value := b.PeekValueByVariable(variable); _value != nil {
+			return _value
+		}
 		if val := class.GetStaticMember(name); !utils.IsNil(val) {
 			return val
 		}

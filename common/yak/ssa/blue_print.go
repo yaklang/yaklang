@@ -36,7 +36,7 @@ const (
 )
 
 // ClassBluePrint is a class blue print, it is used to create a new class
-type ClassBluePrint struct {
+type BluePrint struct {
 	Name string
 
 	NormalMethod map[string]*Function
@@ -44,7 +44,7 @@ type ClassBluePrint struct {
 	MagicMethod  map[BluePrintMagicMethodKind]*Function
 
 	NormalMember map[string]Value
-	StaticMember map[string]*Phi
+	StaticMember map[string]Value
 	ConstValue   map[string]Value
 
 	CallBack []func()
@@ -53,15 +53,12 @@ type ClassBluePrint struct {
 	Constructor Value
 	Destructor  Value
 
-	// _container is an inner ssa.Value
-	// the container can ref to the class member
-	// _container in this scope
+	// _container is an inner ssa.Valueorigin cls container
 	_container Value
 
-	GeneralPhi       func(string) *Phi
 	GeneralUndefined func(string) *Undefined
 
-	ParentClass []*ClassBluePrint
+	ParentClass []*BluePrint
 	// full Type Name
 	fullTypeName []string
 
@@ -69,11 +66,11 @@ type ClassBluePrint struct {
 	lazyBuilder
 }
 
-func NewClassBluePrint(name string) *ClassBluePrint {
-	class := &ClassBluePrint{
+func NewClassBluePrint(name string) *BluePrint {
+	class := &BluePrint{
 		Name:         name,
 		NormalMember: make(map[string]Value),
-		StaticMember: make(map[string]*Phi),
+		StaticMember: make(map[string]Value),
 		ConstValue:   make(map[string]Value),
 
 		NormalMethod: make(map[string]*Function),
@@ -87,13 +84,13 @@ func NewClassBluePrint(name string) *ClassBluePrint {
 
 // ======================= class blue print
 // AddParentClass is used to add a parent class to the class,
-func (c *ClassBluePrint) AddParentClass(parent *ClassBluePrint) {
+func (c *BluePrint) AddParentClass(parent *BluePrint) {
 	if parent == nil {
 		return
 	}
 	c.ParentClass = append(c.ParentClass, parent)
 	for name, f := range parent.NormalMethod {
-		c.RegisterNormalMethod(name, f)
+		c.RegisterNormalMethod(name, f, false)
 	}
 	for name, f := range parent.StaticMethod {
 		c.RegisterStaticMethod(name, f)
@@ -111,7 +108,7 @@ func (c *ClassBluePrint) AddParentClass(parent *ClassBluePrint) {
 		c.RegisterConstMember(name, value)
 	}
 }
-func (c *ClassBluePrint) CheckExtendBy(kls string) bool {
+func (c *BluePrint) CheckExtendBy(kls string) bool {
 	for _, class := range c.ParentClass {
 		if strings.EqualFold(class.Name, kls) {
 			return true
@@ -120,7 +117,7 @@ func (c *ClassBluePrint) CheckExtendBy(kls string) bool {
 	return false
 }
 
-func (c *ClassBluePrint) getFieldWithParent(get func(bluePrint *ClassBluePrint) bool) bool {
+func (c *BluePrint) getFieldWithParent(get func(bluePrint *BluePrint) bool) bool {
 	// if current class can get this field, just return true
 	if ok := get(c); ok {
 		return true
@@ -138,28 +135,24 @@ func (c *ClassBluePrint) getFieldWithParent(get func(bluePrint *ClassBluePrint) 
 }
 
 // storeInContainer store static in global container
-func (c *ClassBluePrint) storeInContainer(name string, val Value, _type BluePrintFieldKind) {
+func (c *BluePrint) storeInContainer(name string, val Value, _type BluePrintFieldKind) {
 	if utils.IsNil(c._container) || utils.IsNil(c._container.GetFunc()) {
 		return
 	}
 	createVariable := func(builder *FunctionBuilder, variable *Variable) {
 		builder.AssignVariable(variable, val)
 	}
-	switch _type {
-	case BluePrintStaticMethod, BluePrintStaticMember:
-	default:
-		builder := c._container.GetFunc().builder
-		createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(name)))
-	}
+	builder := c._container.GetFunc().builder
+	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(name)))
 }
-func (b *ClassBluePrint) InitializeWithContainer(con *Make) error {
+func (b *BluePrint) InitializeWithContainer(con *Make) error {
 	if b._container != nil {
 		return utils.Errorf("the container is already initialized id:(%v)", b._container.GetId())
 	}
 	b._container = con
 	return nil
 }
-func (b *ClassBluePrint) GetClassContainer() Value {
+func (b *BluePrint) GetClassContainer() Value {
 	return b._container
 }
 
