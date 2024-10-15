@@ -22,6 +22,7 @@ func (s *Server) QuerySyntaxFlowRule(ctx context.Context, req *ypb.QuerySyntaxFl
 			Order:    req.Pagination.Order,
 			RawOrder: req.Pagination.RawOrder,
 		},
+		Total: uint64(p.TotalRecord),
 		DbMessage: &ypb.DbOperateMessage{
 			TableName:  "syntax_flow_rule",
 			Operation:  DbOperationQuery,
