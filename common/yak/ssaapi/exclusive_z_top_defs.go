@@ -278,7 +278,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	case *ssa.ParameterMember:
 		var vals Values
 		getParameter := func() Values {
-			log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
 			fun := i.GetFunction()
 			switch inst.MemberCallKind {
 			case ssa.ParameterMemberCall:
@@ -298,7 +297,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			calledInstance, ok := ssa.ToCall(called.node)
 			if !ok {
-				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
+				log.Warnf("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
 			}
 			var actualParam ssa.Value
