@@ -438,6 +438,7 @@ var SSACompilerCommands = []*cli.Command{
 			return nil
 		},
 	},
+	SSACompilerSyntaxFlowCommand,
 	{
 		Name:    "ssa-query",
 		Aliases: []string{"sf", "syntaxFlow", "sf-scan"},
