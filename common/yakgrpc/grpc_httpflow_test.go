@@ -746,3 +746,34 @@ func TestGRPCMUSTPASS_GetHTTPFlowBodyById(t *testing.T) {
 		require.Equal(t, 2, count, "should only have 2 messages")
 	})
 }
+
+func TestGetHTTPPacketBody(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Second)
+	defer cancel()
+
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+
+	packet := []byte(`HTTP/1.1 200 OK
+Content-Type: text/plain; charset=utf-8
+Content-Length: 19
+
+{{unquote("\x41")}}`)
+
+	t.Run("not render fuzztag", func(t *testing.T) {
+		packetBody, err := client.GetHTTPPacketBody(ctx, &ypb.GetHTTPPacketBodyRequest{
+			PacketRaw: packet,
+		})
+		require.NoError(t, err)
+		require.Equal(t, []byte("{{unquote(\"\\x41\")}}"), packetBody.GetRaw())
+	})
+
+	t.Run("render fuzztag", func(t *testing.T) {
+		packetBody, err := client.GetHTTPPacketBody(ctx, &ypb.GetHTTPPacketBodyRequest{
+			PacketRaw:          packet,
+			ForceRenderFuzztag: true,
+		})
+		require.NoError(t, err)
+		require.Equal(t, []byte("A"), packetBody.GetRaw())
+	})
+}
