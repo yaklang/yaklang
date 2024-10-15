@@ -33,6 +33,10 @@ var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 			names = append(names, udef.GetShortVerboseName())
 			names = append(names, udef.GetMethodName())
 		}
+		if call, b := ssa.ToCall(val.GetSSAValue()); b {
+			names = append(names, call.Method.GetName())
+			//todo: args?
+		}
 
 		filter := make(map[string]struct{})
 		for _, name := range names {
