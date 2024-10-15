@@ -39,10 +39,15 @@ var SSACompilerCommands = []*cli.Command{
 						log.Infof("Start to delete program: %v", name)
 						ssadb.DeleteProgram(ssadb.GetDB(), name)
 					}
+					for _, name := range ssadb.GetProfileSSAProgram() {
+						log.Infof("Start to delete profile database program: %v", name)
+						_ = ssadb.DeleteSSAProgram(name)
+					}
 					break
 				}
 				log.Infof("Start to delete program: %v", name)
 				ssadb.DeleteProgram(ssadb.GetDB(), name)
+				_ = ssadb.DeleteSSAProgram(name)
 			}
 		},
 	},
@@ -140,7 +145,7 @@ var SSACompilerCommands = []*cli.Command{
 				}
 			}
 
-			if saveProfile && slices.Contains(ssadb.GetProfileSSAProgram(consts.GetGormProfileDatabase()), programName) {
+			if saveProfile && slices.Contains(ssadb.GetProfileSSAProgram(), programName) {
 				if !reCompile {
 					return utils.Errorf(
 						"program name %v existed in other database, please use `re-compile` flag to re-compile or change program name",
