@@ -1,7 +1,6 @@
 package ssadb
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -80,7 +79,8 @@ func AllSSAPrograms() []*schema.SSAProgram {
 	return programs
 }
 
-func GetProfileSSAProgram(db *gorm.DB) []string {
+func GetProfileSSAProgram() []string {
+	db := consts.GetGormProfileDatabase()
 	var programs []string
 	db.Model(&schema.SSAProgram{}).Select("DISTINCT(name)").Pluck("name", &programs)
 	return programs
