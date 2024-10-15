@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -63,8 +64,7 @@ class Main{
 		}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
+			"Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]", "Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -89,8 +89,7 @@ class Main{
 		}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]", "Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -132,9 +131,7 @@ func TestJava_Extend_Class(t *testing.T) {
 	}
 }
 		`, []string{
-			// TODO: this error
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
+			"Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]", "Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -160,8 +157,7 @@ func TestJava_Extend_Class(t *testing.T) {
 			}
 		}
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]", "Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -184,7 +180,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-a.getNum(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -412,7 +408,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-a.getNum(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -445,14 +441,34 @@ public class Main{
 		`
 		ssatest.CheckPrintlnValue(code, []string{
 			// TODO: this error
-			"Undefined-a.getNum1(Function-com.example.A_A_A(Undefined-A,1,2))",
-			"Undefined-a.getNum2(Function-com.example.A_A_A(Undefined-A,1,2))",
+			"Undefined-a.getNum1(valid)(Function-com.example.A_A_A(Undefined-A,1,2)) member[side-effect(Parameter-num1, #15.num1)]", "Undefined-a.getNum2(valid)(Function-com.example.A_A_A(Undefined-A,1,2)) member[side-effect(Parameter-num2, #15.num2)]",
 			// "Undefined-a.getNum1(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]",
 			// "Undefined-a.getNum2(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)
 	})
 }
 
+func TestConstruct(t *testing.T) {
+	code := `package com.example.demo1;
+
+class Main {
+    public int a = 1;
+
+    public Main(int a) {
+        this.a = a;
+    }
+}
+class Test{
+    public static void main(){
+        Main main = new Main(2);
+        println(main.a);
+    }
+}`
+	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-a, #12.a)"}, t)
+	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
+		"param": {"2"},
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
 func TestJava_Instantiation(t *testing.T) {
 	t.Run("Instantiate a non-existent object", func(t *testing.T) {
 		code := `
@@ -479,7 +495,7 @@ public class Main{
     }
 }`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-File(Undefined-File)",
+			"Undefined-File-constructor(Undefined-File)",
 		}, t)
 	})
 	t.Run("test undefind function call", func(t *testing.T) {

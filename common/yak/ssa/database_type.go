@@ -28,7 +28,7 @@ func SaveTypeToDB(typ Type) int {
 		param["name"] = t.name
 		param["kind"] = t.Kind
 		param["fullTypeName"] = t.GetFullTypeNames()
-	case *BluePrint:
+	case *Blueprint:
 		param["name"] = t.Name
 		param["fullTypeName"] = t.GetFullTypeNames()
 	default:
@@ -100,7 +100,7 @@ func GetTypeFromDB(id int) Type {
 		typ.Kind = TypeKind(kind)
 		return typ
 	case ClassBluePrintTypeKind:
-		typ := &BluePrint{}
+		typ := &Blueprint{}
 		typ.Name = getParamStr("name")
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		return typ

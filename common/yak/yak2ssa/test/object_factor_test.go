@@ -414,4 +414,19 @@ func Test_Object_Assign(t *testing.T) {
 			},
 		})
 	})
+
+	//todo: se
+
+	//	t.Run("side effect", func(t *testing.T) {
+	//		code := `
+	//a = map[string]string
+	//f = () =>{
+	// obj = map[string]string
+	// obj.a = 1
+	// a = obj
+	//}
+	//f()
+	//println(a.a)`
+	//		test.CheckPrintlnValue(code, []string{"side-effect(1, #3.a)"}, t)
+	//	})
 }

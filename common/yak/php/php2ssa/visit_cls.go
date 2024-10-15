@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) handlerClassConstructor(class *ssa.ClassBluePrint, args []ssa.Value, ellipsis bool) *ssa.Call {
+func (y *builder) handlerClassConstructor(class *ssa.Blueprint, args []ssa.Value, ellipsis bool) *ssa.Call {
 	// constructorFunc
 	constructorFunc := class.GetMagicMethod(ssa.Constructor)
 	call := y.NewCall(constructorFunc, args)
@@ -98,6 +98,9 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, bluePrint)
 	}
+	bluePrint.Build()
+	obj := y.EmitMakeWithoutType(nil, nil)
+	obj.SetType(bluePrint)
 	args := []ssa.Value{obj}
 	ellipsis := false
 	if i.Arguments() != nil {
@@ -178,7 +181,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	return nil
 }
 
-func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, class *ssa.BluePrint) {
+func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -247,7 +250,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
 				var param ssa.Value
-				if funcName == "__construct" {
+				if methodName == "__construct" {
 					y.NewParam("0this")
 					param = y.EmitEmptyContainer()
 					y.AssignVariable(y.CreateVariable("$this"), param)
@@ -258,13 +261,12 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				}
 				y.VisitFormalParameterList(ret.FormalParameterList())
 				y.VisitMethodBody(ret.MethodBody())
-				if funcName == "__construct" {
+				if methodName == "__construct" {
 					y.EmitReturn([]ssa.Value{param})
 				}
 			}
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
-			return newFunction
 		})
 
 		switch methodName {
@@ -277,7 +279,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			if isStatic {
 				member := y.GetStaticMember(class, newFunction.GetName())
 				_ = member.Assign(newFunction)
-				class.RegisterStaticMethod(methodname, newFunction)
+				class.RegisterStaticMethod(methodName, newFunction)
 				//variable := y.GetStaticMember(class.Name, newFunction.GetName())
 				//y.AssignVariable(variable, newFunction)
 				//class.RegisterStaticMethod(funcName, newFunction)
@@ -475,7 +477,7 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	return nil
 }
 
-func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.BluePrint {
+func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Blueprint {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -519,7 +521,7 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.BlueP
 	return nil
 }
 
-func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) (*ssa.BluePrint, string) {
+func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) (*ssa.Blueprint, string) {
 	if y == nil || raw == nil {
 		return nil, ""
 	}
@@ -535,7 +537,7 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 	return bluePrint, key
 }
 
-func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.BluePrint, string) {
+func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.Blueprint, string) {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil, ""
 	}

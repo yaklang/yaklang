@@ -58,7 +58,7 @@ type builder struct {
 	*ssa.FunctionBuilder
 	ast            javaparser.ICompilationUnitContext
 	constMap       map[string]ssa.Value
-	bluePrintStack *utils.Stack[*ssa.BluePrint]
+	bluePrintStack *utils.Stack[*ssa.Blueprint]
 
 	// for full type name
 	fullTypeNameMap   map[string][]string
@@ -66,21 +66,21 @@ type builder struct {
 	selfPkgPath       []string
 }
 
-func (b *builder) PushBluePrint(bp *ssa.BluePrint) {
+func (b *builder) PushBluePrint(bp *ssa.Blueprint) {
 	if b.bluePrintStack == nil {
-		b.bluePrintStack = utils.NewStack[*ssa.BluePrint]()
+		b.bluePrintStack = utils.NewStack[*ssa.Blueprint]()
 	}
 	b.bluePrintStack.Push(bp)
 }
 
-func (b *builder) PeekCurrentBluePrint() *ssa.BluePrint {
+func (b *builder) PeekCurrentBluePrint() *ssa.Blueprint {
 	if b.bluePrintStack == nil {
 		return nil
 	}
 	return b.bluePrintStack.Peek()
 }
 
-func (b *builder) PopBluePrint() *ssa.BluePrint {
+func (b *builder) PopBluePrint() *ssa.Blueprint {
 	if b.bluePrintStack == nil {
 		return nil
 	}

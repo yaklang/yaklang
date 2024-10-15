@@ -1,9 +1,6 @@
 package ssa
 
 import (
-	"fmt"
-
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 )
@@ -35,13 +32,13 @@ const (
 	Readonly
 )
 
-// ClassBluePrint is a class blue print, it is used to create a new class
-type BluePrint struct {
+// Blueprint is a class blueprint, it is used to create a new class
+type Blueprint struct {
 	Name string
 
 	NormalMethod map[string]*Function
 	StaticMethod map[string]*Function
-	MagicMethod  map[BluePrintMagicMethodKind]*Function
+	MagicMethod  map[BlueprintMagicMethodKind]*Function
 
 	NormalMember map[string]Value
 	StaticMember map[string]Value
@@ -58,7 +55,7 @@ type BluePrint struct {
 
 	GeneralUndefined func(string) *Undefined
 
-	ParentClass []*BluePrint
+	ParentClass []*Blueprint
 	// full Type Name
 	fullTypeName []string
 
@@ -66,8 +63,8 @@ type BluePrint struct {
 	lazyBuilder
 }
 
-func NewClassBluePrint(name string) *BluePrint {
-	class := &BluePrint{
+func NewClassBluePrint(name string) *Blueprint {
+	class := &Blueprint{
 		Name:         name,
 		NormalMember: make(map[string]Value),
 		StaticMember: make(map[string]Value),
@@ -75,7 +72,7 @@ func NewClassBluePrint(name string) *BluePrint {
 
 		NormalMethod: make(map[string]*Function),
 		StaticMethod: make(map[string]*Function),
-		MagicMethod:  make(map[BluePrintMagicMethodKind]*Function),
+		MagicMethod:  make(map[BlueprintMagicMethodKind]*Function),
 
 		fullTypeName: make([]string, 0),
 	}
@@ -84,7 +81,7 @@ func NewClassBluePrint(name string) *BluePrint {
 
 // ======================= class blue print
 // AddParentClass is used to add a parent class to the class,
-func (c *BluePrint) AddParentClass(parent *BluePrint) {
+func (c *Blueprint) AddParentClass(parent *Blueprint) {
 	if parent == nil {
 		return
 	}
@@ -108,7 +105,7 @@ func (c *BluePrint) AddParentClass(parent *BluePrint) {
 		c.RegisterConstMember(name, value)
 	}
 }
-func (c *BluePrint) CheckExtendBy(kls string) bool {
+func (c *Blueprint) CheckExtendBy(kls string) bool {
 	for _, class := range c.ParentClass {
 		if strings.EqualFold(class.Name, kls) {
 			return true
@@ -117,7 +114,7 @@ func (c *BluePrint) CheckExtendBy(kls string) bool {
 	return false
 }
 
-func (c *BluePrint) getFieldWithParent(get func(bluePrint *BluePrint) bool) bool {
+func (c *Blueprint) getFieldWithParent(get func(bluePrint *Blueprint) bool) bool {
 	// if current class can get this field, just return true
 	if ok := get(c); ok {
 		return true
@@ -135,7 +132,7 @@ func (c *BluePrint) getFieldWithParent(get func(bluePrint *BluePrint) bool) bool
 }
 
 // storeInContainer store static in global container
-func (c *BluePrint) storeInContainer(name string, val Value, _type BluePrintFieldKind) {
+func (c *Blueprint) storeInContainer(name string, val Value, _type BluePrintFieldKind) {
 	if utils.IsNil(c._container) || utils.IsNil(c._container.GetFunc()) {
 		return
 	}
@@ -145,18 +142,18 @@ func (c *BluePrint) storeInContainer(name string, val Value, _type BluePrintFiel
 	builder := c._container.GetFunc().builder
 	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(name)))
 }
-func (b *BluePrint) InitializeWithContainer(con *Make) error {
+func (b *Blueprint) InitializeWithContainer(con *Make) error {
 	if b._container != nil {
 		return utils.Errorf("the container is already initialized id:(%v)", b._container.GetId())
 	}
 	b._container = con
 	return nil
 }
-func (b *BluePrint) GetClassContainer() Value {
+func (b *Blueprint) GetClassContainer() Value {
 	return b._container
 }
 
-func (c *ClassBluePrint) BuildConstructorAndDestructor() {
+func (c *Blueprint) BuildConstructorAndDestructor() {
 	for _, p := range c.ParentClass {
 		p.BuildConstructorAndDestructor()
 	}
@@ -167,7 +164,7 @@ func (c *ClassBluePrint) BuildConstructorAndDestructor() {
 			function.Build()
 		}
 	}
-	for _, m := range c.Method {
+	for _, m := range c.NormalMethod {
 		m.Build()
 	}
 	for _, function := range c.StaticMethod {

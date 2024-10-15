@@ -49,7 +49,7 @@ println(Foo::$my_static . PHP_EOL);
 
 ?>    
 	`, []string{
-			"add(Undefined-Foo.my_static(valid), Undefined-PHP_EOL)",
+			"add(Undefined-Foo_my_static, Undefined-PHP_EOL)",
 		}, t)
 	})
 
@@ -84,7 +84,7 @@ if ($a) {
 println(Foo::$my_static);
 `
 		ssatest.CheckPrintlnValue(code, []string{
-			"phi(Foo_my_static)[\"foo\",\"bar\"]",
+			"phi(Foo.my_static)[\"foo\",\"bar\"]",
 		}, t)
 	})
 
@@ -251,8 +251,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-$a) member[1]",
+			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
+			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -341,8 +341,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-$a) member[1]",
+			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
+			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -364,8 +364,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-$a) member[side-effect(Parameter-$par, $this.a)]",
+			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
+			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -383,7 +383,7 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-$a) member[0]",
+			"Undefined-$a.getNum(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -401,7 +401,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-$a) member[side-effect(Parameter-$num, $this.num)]",
+			"Undefined-$a.getNum(valid)(Function-A___construct(Undefined-A,1)) member[side-effect(Parameter-$num, #22.num)]",
 		}, t)
 	})
 }
@@ -437,7 +437,7 @@ $c = new class("2"){
     }
 };
 println($c->a);`
-	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #18.a)"}, t)
 }
 
 //func TestOOP_custom_member(t *testing.T) {
@@ -459,7 +459,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A();
 		println($a);`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a",
+			"Undefined-A-constructor(Undefined-A)",
 		}, t)
 	})
 
@@ -475,7 +475,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A(); 
 		println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-$a) member[0]",
+			"Undefined-$a.getNum(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
 		}, t)
 	})
 }
@@ -560,7 +560,7 @@ class childB extends b{
 $a = new childB(1);
 println($a->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #19.a)"}, t)
 	})
 
 	t.Run("no impl __construct and get parent custom member", func(t *testing.T) {
@@ -723,7 +723,7 @@ class b
 	$c = new class("2") extends a {
 	};
 	println($c->a);`
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #19.a)"}, t)
 	})
 	t.Run("class const", func(t *testing.T) {
 		code := `<?php
@@ -806,6 +806,37 @@ class a
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 
+	t.Run("test oop construct", func(t *testing.T) {
+		code := `<?php
+
+class a{
+    public $a = 1;
+    public function __construct($a){
+        $this->a = $a;
+    }
+}
+$a = new a(2);
+println($a->a);`
+		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"2"}}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test oop return", func(t *testing.T) {
+		code := `<?php
+class A{
+    public $a =1;
+}
+function test(){
+    $a = new A();
+    $a->a = 2;
+    return $a;
+}
+
+$b = test();
+println($b->a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(2, #20.a)"}, t)
+	})
+	//todo: visit if condition
+	//
 	//	t.Run("test", func(t *testing.T) {
 	//		code := `<?php
 	//   function _Include($a)
