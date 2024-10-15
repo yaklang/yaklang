@@ -260,7 +260,7 @@ alert $output;
 }
 
 func TestImport(t *testing.T) {
-	_,err := sfdb.ImportRuleWithoutValid("test.sf", `
+	_, err := sfdb.ImportRuleWithoutValid("test.sf", `
 desc(
 	title: "import test",
 	level: "high",
@@ -273,13 +273,13 @@ alert $param for {"level": "high"}
 	require.NoError(t, err)
 	rule, err := sfdb.GetRule("test.sf")
 	require.NoError(t, err)
-	var m map[string]*schema.ExtraDescInfo
+	var m map[string]*schema.SyntaxFlowDescInfo
 	fmt.Println(rule.AlertDesc)
 	err = json.Unmarshal(codec.AnyToBytes(rule.AlertDesc), &m)
 	require.NoError(t, err)
 	info, ok := m["param"]
 	require.True(t, ok)
-	require.True(t, info.Level == schema.SFR_SEVERITY_HIGH)
+	require.True(t, info.Severity == schema.SFR_SEVERITY_HIGH)
 	err = sfdb.DeleteRuleByRuleName("test.sf")
 	require.NoError(t, err)
 }

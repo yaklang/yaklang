@@ -153,8 +153,8 @@ func TestRuleAlertMsg(t *testing.T) {
 		info, ok := result.GetAlertEx("target")
 		log.Infof("info: %v", info)
 		require.True(t, ok)
-		require.Equal(t, "target is not const", info.ExtraInfo["msg"])
-		require.Equal(t, "middle", string(info.Level))
+		require.Equal(t, "target is not const", info.Msg)
+		require.Equal(t, "middle", string(info.Severity))
 		require.Equal(t, "security", string(info.Purpose))
 	}
 

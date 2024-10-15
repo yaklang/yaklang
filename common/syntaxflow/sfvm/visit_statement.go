@@ -1,9 +1,10 @@
 package sfvm
 
 import (
-	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -98,6 +99,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 					y.rule.Severity = schema.ValidSeverityType(value)
 				case "language", "lang":
 					y.rule.Language = value
+				case "cve":
+					y.rule.CVE = value
 				default:
 					if strings.Contains(keyLower, "://") {
 						urlIns, _ := url.Parse(keyLower)
@@ -139,16 +142,12 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 	}
 	ref := i.RefVariable().GetText()
 	ref = strings.TrimLeft(ref, "$")
-	var extra = &schema.ExtraDescInfo{
-		ExtraInfo: make(map[string]string),
-	}
-	info := y.rule.AlertDesc[ref]
-	if info != nil {
-		extra = info
-	} else {
+	extra := y.rule.AlertDesc[ref]
+	if extra == nil {
+		extra = &schema.SyntaxFlowDescInfo{}
 		y.rule.AlertDesc[ref] = extra
 	}
-	if len(extra.ExtraInfo) <= 0 {
+	if extra.ExtraInfo == nil {
 		extra.ExtraInfo = make(map[string]string)
 	}
 	if i.DescriptionItems() != nil {
@@ -166,11 +165,21 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 					}
 				}
 				if value != "" {
-					switch key {
-					case "level":
-						extra.Level = schema.ValidSeverityType(value)
-					case "type":
+					switch keyLower := strings.ToLower(key); keyLower {
+					case "title":
+						extra.Title = value
+					case "title_zh":
+						extra.TitleZh = value
+					case "description", "desc", "note":
+						extra.Description = value
+					case "type", "purpose":
 						extra.Purpose = schema.ValidPurpose(value)
+					case "level", "severity", "sev":
+						extra.Severity = schema.ValidSeverityType(value)
+					case "message", "msg":
+						extra.Msg = value
+					case "cve":
+						extra.CVE = value
 					default:
 						extra.ExtraInfo[key] = value
 					}

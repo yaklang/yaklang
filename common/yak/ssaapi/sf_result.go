@@ -74,7 +74,7 @@ func (r *SyntaxFlowResult) Name() string {
 func (r *SyntaxFlowResult) GetAlertInfo(name string) (string, bool) {
 	return r.rule.GetAlertInfo(name)
 }
-func (r *SyntaxFlowResult) GetAlertEx(name string) (*schema.ExtraDescInfo, bool) {
+func (r *SyntaxFlowResult) GetAlertEx(name string) (*schema.SyntaxFlowDescInfo, bool) {
 	info, ok := r.rule.AlertDesc[name]
 	return info, ok
 }
