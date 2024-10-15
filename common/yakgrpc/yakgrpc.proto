@@ -1803,6 +1803,7 @@ message RegisterFacadesHTTPResponse {
 message GetHTTPPacketBodyRequest {
   string Packet = 1;
   bytes PacketRaw = 2;
+  bool ForceRenderFuzztag =3;
 }
 
 message DownloadBodyByHTTPFlowIDRequest {
