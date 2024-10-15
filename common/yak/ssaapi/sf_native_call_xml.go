@@ -63,7 +63,7 @@ var nativeCallMybatixXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 	var vals []sfvm.ValueOperator
 
 	for name, value := range prog.Program.ExtraFile {
-		log.Infof("start to handling: %v len: %v", name, len(value))
+		log.Debugf("start to handling: %v len: %v", name, len(value))
 
 		if len(value) <= 128 {
 			editor, _ := ssadb.GetIrSourceFromHash(value)

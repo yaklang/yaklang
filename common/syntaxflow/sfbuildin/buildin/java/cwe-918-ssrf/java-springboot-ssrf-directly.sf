@@ -8,16 +8,16 @@ desc(
 <include("java-http-sink")> as $sink;
 
 $source -{
-    until: `* & $sink`,
-}-> as $result;
+    until: `* & $sink as $result`,
+}->;
 
 $result & $sink as $output;
 
 $result<dataflow(<<<CODE
 *<show>?{!opcode: call} as $__next__;
-CODE)> as $output;
+CODE)> as $directly;
 
-alert $output;
+alert $directly;
 
 desc(
 lang: java,

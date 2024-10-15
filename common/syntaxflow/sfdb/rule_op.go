@@ -411,7 +411,7 @@ func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxF
 func YieldSyntaxFlowRulesWithoutLib(ctx context.Context) chan *schema.SyntaxFlowRule {
 	db := consts.GetGormProfileDatabase()
 	outC := make(chan *schema.SyntaxFlowRule)
-	db = db.Where("allow_included = false")
+	db = db.Where("allow_included = ?", false)
 	go func() {
 		defer close(outC)
 
