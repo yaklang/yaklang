@@ -1,42 +1,38 @@
-package core
+package values
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"strings"
-)
-
-const (
-	ADD = "add"
-	INC = "inc"
-	New = "new"
 )
 
 type NewExpression struct {
 	IsArray bool
-	JavaType
+	types.JavaType
 }
 
-func NewNewArrayExpression(typ JavaType) *NewExpression {
+func NewNewArrayExpression(typ types.JavaType) *NewExpression {
 	return &NewExpression{
 		JavaType: typ,
 		IsArray:  true,
 	}
 }
-func NewNewExpression(typ JavaType) *NewExpression {
+func NewNewExpression(typ types.JavaType) *NewExpression {
 	return &NewExpression{
 		JavaType: typ,
 	}
 }
-func (n *NewExpression) Type() JavaType {
+func (n *NewExpression) Type() types.JavaType {
 	return n.JavaType
 }
 
-func (n *NewExpression) String(funcCtx *FunctionContext) string {
+func (n *NewExpression) String(funcCtx *class_context.FunctionContext) string {
 	if n.IsArray {
-		typ := n.JavaType.(*JavaArrayType)
+		typ := n.JavaType.(*types.JavaArrayType)
 		s := fmt.Sprintf("new %s", typ.JavaType.String(funcCtx))
 		for _, l := range typ.Length {
-			s += fmt.Sprintf("[%v]", l.String(funcCtx))
+			s += fmt.Sprintf("[%v]", l.(JavaValue).String(funcCtx))
 		}
 		return s
 	}
@@ -48,11 +44,11 @@ type JavaExpression struct {
 	Op     string
 }
 
-func (j *JavaExpression) Type() JavaType {
+func (j *JavaExpression) Type() types.JavaType {
 	return j.Values[0].Type()
 }
 
-func (j *JavaExpression) String(funcCtx *FunctionContext) string {
+func (j *JavaExpression) String(funcCtx *class_context.FunctionContext) string {
 	vs := []string{}
 	for _, value := range j.Values {
 		vs = append(vs, value.String(funcCtx))
@@ -61,12 +57,11 @@ func (j *JavaExpression) String(funcCtx *FunctionContext) string {
 	case ADD:
 		return fmt.Sprintf("(%s) + (%s)", vs[0], vs[1])
 	case INC:
-		return fmt.Sprintf("(%s) += (%s)", vs[0], vs[1])
+		return fmt.Sprintf("%s++", vs[0])
 	case GT, SUB:
 		return fmt.Sprintf("(%s) %s (%s)", vs[0], j.Op, vs[1])
 	default:
 		return fmt.Sprintf("(%s) %s (%s)", vs[0], j.Op, vs[1])
-		//return fmt.Sprintf("%s(%s)", j.Op, strings.Join(vs, ","))
 	}
 }
 
@@ -78,19 +73,19 @@ func NewBinaryExpression(value1, value2 JavaValue, op string) *JavaExpression {
 }
 
 type FunctionCallExpression struct {
-	JavaType     JavaType
+	JavaType     types.JavaType
 	IsStatic     bool
 	Object       JavaValue
 	FunctionName string
 	Arguments    []JavaValue
-	FuncType     *JavaFuncType
+	FuncType     *types.JavaFuncType
 }
 
-func (f *FunctionCallExpression) Type() JavaType {
+func (f *FunctionCallExpression) Type() types.JavaType {
 	return f.FuncType.ReturnType
 }
 
-func (f *FunctionCallExpression) String(funcCtx *FunctionContext) string {
+func (f *FunctionCallExpression) String(funcCtx *class_context.FunctionContext) string {
 	paramStrs := []string{}
 	for _, arg := range f.Arguments {
 		paramStrs = append(paramStrs, arg.String(funcCtx))
@@ -101,32 +96,10 @@ func (f *FunctionCallExpression) String(funcCtx *FunctionContext) string {
 	return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
 }
 
-func NewFunctionCallExpression(object JavaValue, name string, funcType *JavaFuncType) *FunctionCallExpression {
+func NewFunctionCallExpression(object JavaValue, name string, funcType *types.JavaFuncType) *FunctionCallExpression {
 	return &FunctionCallExpression{
 		FuncType:     funcType,
 		Object:       object,
 		FunctionName: name,
-	}
-}
-
-type TernaryExpression struct {
-	Condition  JavaValue
-	TrueValue  JavaValue
-	FalseValue JavaValue
-}
-
-func (t *TernaryExpression) Type() JavaType {
-	return t.TrueValue.Type()
-}
-
-func (t *TernaryExpression) String(funcCtx *FunctionContext) string {
-	return fmt.Sprintf("%s ? %s : %s", t.Condition.String(funcCtx), t.TrueValue.String(funcCtx), t.FalseValue.String(funcCtx))
-}
-
-func NewTernaryExpression(condition, trueValue, falseValue JavaValue) *TernaryExpression {
-	return &TernaryExpression{
-		Condition:  condition,
-		TrueValue:  trueValue,
-		FalseValue: falseValue,
 	}
 }

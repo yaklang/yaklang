@@ -2,19 +2,20 @@ package rewriter
 
 import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 )
 
 func SynchronizedRewriter(manager *StatementManager, node *core.Node) error {
 	if err := manager.ScanStatementSimple(func(node *core.Node) error {
-		cStem, ok := node.Statement.(*core.CustomStatement)
+		cStem, ok := node.Statement.(*statements.CustomStatement)
 		if !ok {
 			return nil
 		}
 		if cStem.Name != "monitor_enter" {
 			return nil
 		}
-		monitorValue := cStem.Info.(core.JavaValue)
+		monitorValue := cStem.Info.(values.JavaValue)
 		monitorManger := NewStatementManager(node.Next[0], manager)
 		var exitNode *core.Node
 		err := monitorManger.Rewrite()
@@ -29,7 +30,7 @@ func SynchronizedRewriter(manager *StatementManager, node *core.Node) error {
 				return true
 			}
 			nextNode := node.Next[0]
-			cStem, ok := nextNode.Statement.(*core.CustomStatement)
+			cStem, ok := nextNode.Statement.(*statements.CustomStatement)
 			if ok && cStem.Name == "monitor_exit" {
 				exitNode = nextNode
 				return false
@@ -39,9 +40,9 @@ func SynchronizedRewriter(manager *StatementManager, node *core.Node) error {
 		if err != nil {
 			return err
 		}
-		node.Statement = core.NewSynchronizedStatement(monitorValue, utils.NodesToStatements(body))
+		node.Statement = statements.NewSynchronizedStatement(monitorValue, core.NodesToStatements(body))
 		node.Next = exitNode.Next
-		if _, ok := exitNode.Next[0].Statement.(*core.GOTOStatement); ok {
+		if _, ok := exitNode.Next[0].Statement.(*statements.GOTOStatement); ok {
 			node.Next = exitNode.Next[0].Next
 		}
 		return nil
