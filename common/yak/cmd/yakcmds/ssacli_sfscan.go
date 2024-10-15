@@ -12,7 +12,8 @@ import (
 )
 
 var SSACompilerSyntaxFlowCommand = &cli.Command{
-	Name: "sfscan",
+	Name:    "code-scan",
+	Aliases: []string{"sfscan"},
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "program,p",
