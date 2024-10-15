@@ -441,7 +441,7 @@ var SSACompilerCommands = []*cli.Command{
 	SSACompilerSyntaxFlowCommand,
 	{
 		Name:    "ssa-query",
-		Aliases: []string{"sf", "syntaxFlow", "sf-scan"},
+		Aliases: []string{"sf", "syntaxFlow"},
 		Usage:   "Use SyntaxFlow query SSA OpCodes from database",
 		Flags: []cli.Flag{
 			cli.StringFlag{Name: "log", Usage: "log level"},
