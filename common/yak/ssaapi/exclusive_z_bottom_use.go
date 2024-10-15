@@ -90,8 +90,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	if ins, ok := ssa.ToLazyInstruction(v.node); ok {
 		v.node, ok = ins.Self().(ssa.Value)
 		if !ok {
-			log.Debugf("BUG: (lazy instruction) unknown instruction: %v - %v - %v", v.String(), v.GetVerboseName())
-			return Values{v}
+			log.Debugf("BUG: (lazy instruction) unknown instruction: %v - %v - ID:%v", v.String(), v.GetVerboseName(), v.GetId())
+			return Values{}
 		}
 		return v.getBottomUses(actx, opt...)
 	}
