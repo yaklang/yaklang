@@ -72,6 +72,10 @@ func (f *Function) GetType() Type {
 }
 
 func (f *Function) SetType(t Type) {
+	if t == nil {
+		return
+	}
+	
 	if funTyp, ok := ToFunctionType(t); ok {
 		f.Type = funTyp
 	} else if t.GetTypeKind() == AnyTypeKind {
