@@ -50,7 +50,7 @@ func CreateUrlFromString(raw string) (*ypb.YakURL, error) {
 	}
 
 	yu.Path = utils.EscapeInvalidUTF8Byte([]byte(u.EscapedPath()))
-	if len(yu.Path) >= 2 {
+	if len(yu.Path) > 2 {
 		if yu.Path[2] == ':' {
 			yu.Path = strings.TrimPrefix(yu.Path, "/")
 		}
