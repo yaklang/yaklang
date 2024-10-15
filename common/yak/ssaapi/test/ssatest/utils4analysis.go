@@ -505,7 +505,7 @@ func checkResult(frame *sfvm.SFFrame, rule *schema.SyntaxFlowRule, result *ssaap
 	for _, name := range result.GetAlertVariables() {
 		alertCount += len(result.GetValues(name))
 		if info, b := result.GetAlertEx(name); b {
-			switch info.Level {
+			switch info.Severity {
 			case "mid", "m", "middle":
 				alert_mid++
 			case "high", "h":

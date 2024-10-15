@@ -17,7 +17,7 @@ type AuditResult struct {
 	RuleSeverity string `json:"rule_severity"`
 	RuleDesc     string `json:"rule_desc"`
 
-	AlertDesc schema.MapEx[string, *schema.ExtraDescInfo] `gorm:"type:text"`
+	AlertDesc schema.MapEx[string, *schema.SyntaxFlowDescInfo] `gorm:"type:text"`
 
 	// Program
 	ProgramName string `json:"program_name"`
@@ -42,7 +42,7 @@ func DeleteResultByID(resultID uint) error {
 }
 
 func CreateResult(TaskIDs ...string) *AuditResult {
-	var taskID string
+	taskID := ""
 	if len(TaskIDs) > 0 {
 		taskID = TaskIDs[0]
 	}
