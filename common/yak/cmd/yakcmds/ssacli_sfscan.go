@@ -50,6 +50,10 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 		for _, result := range results {
 			fmt.Println("-----------------------------------------")
 			fmt.Println(result.Dump(c.Bool("code")))
+			_, err := result.Save()
+			if err != nil {
+				log.Warnf("save result into database failed: %s", err)
+			}
 		}
 
 		return nil
