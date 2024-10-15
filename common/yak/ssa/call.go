@@ -16,14 +16,15 @@ func NewCall(target Value, args []Value, binding map[string]Value, block *BasicB
 	}
 
 	c := &Call{
-		anValue:     NewValue(),
-		Method:      target,
-		Args:        args,
-		Binding:     binding,
-		Async:       false,
-		Unpack:      false,
-		IsDropError: false,
-		IsEllipsis:  false,
+		anValue:         NewValue(),
+		Method:          target,
+		Args:            args,
+		Binding:         binding,
+		Async:           false,
+		Unpack:          false,
+		IsDropError:     false,
+		IsEllipsis:      false,
+		SideEffectValue: map[string]Value{},
 	}
 	return c
 }
@@ -279,9 +280,9 @@ func (c *Call) handleCalleeFunction() {
 			break
 		}
 
-		// handle side effect
 		for _, se := range funcTyp.SideEffects {
 			var variable *Variable
+			// is object
 			if se.MemberCallKind == NoMemberCall {
 				if funCallee := se.Modify.GetFunc(); funCallee != nil {
 					if se.Variable != nil && !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
@@ -309,6 +310,7 @@ func (c *Call) handleCalleeFunction() {
 			if sideEffect != nil {
 				builder.AssignVariable(variable, sideEffect)
 				sideEffect.SetVerboseName(se.VerboseName)
+				c.SideEffectValue[se.VerboseName] = sideEffect
 			}
 		}
 		recoverBuilder()
