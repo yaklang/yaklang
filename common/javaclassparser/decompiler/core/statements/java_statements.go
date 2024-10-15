@@ -1,26 +1,26 @@
-package core
+package statements
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"strings"
 )
 
-type Statement interface {
-	String(funcCtx *FunctionContext) string
-}
 type ConditionStatement struct {
-	Condition JavaValue
+	Condition values.JavaValue
 	Op        string
 }
 
-func (r *ConditionStatement) String(funcCtx *FunctionContext) string {
+func (r *ConditionStatement) String(funcCtx *class_context.FunctionContext) string {
 	return fmt.Sprintf("if %s", r.Condition.String(funcCtx))
 }
 
-func NewConditionStatement(cmp JavaValue, op string) *ConditionStatement {
-	if v, ok := cmp.(*JavaCompare); ok {
+func NewConditionStatement(cmp values.JavaValue, op string) *ConditionStatement {
+	if v, ok := cmp.(*values.JavaCompare); ok {
 		return &ConditionStatement{
-			Condition: NewBinaryExpression(v.JavaValue1, v.JavaValue2, op),
+			Condition: values.NewBinaryExpression(v.JavaValue1, v.JavaValue2, op),
 			Op:        op,
 		}
 	} else {
@@ -32,10 +32,10 @@ func NewConditionStatement(cmp JavaValue, op string) *ConditionStatement {
 }
 
 type ReturnStatement struct {
-	JavaValue JavaValue
+	JavaValue values.JavaValue
 }
 
-func (r *ReturnStatement) String(funcCtx *FunctionContext) string {
+func (r *ReturnStatement) String(funcCtx *class_context.FunctionContext) string {
 	if r.JavaValue == nil {
 		return "return"
 	}
@@ -43,7 +43,7 @@ func (r *ReturnStatement) String(funcCtx *FunctionContext) string {
 	return fmt.Sprintf("return %s", r.JavaValue.String(funcCtx))
 }
 
-func NewReturnStatement(value JavaValue) *ReturnStatement {
+func NewReturnStatement(value values.JavaValue) *ReturnStatement {
 	return &ReturnStatement{
 		JavaValue: value,
 	}
@@ -51,14 +51,14 @@ func NewReturnStatement(value JavaValue) *ReturnStatement {
 
 type DeclareStatement struct {
 	Id       int
-	JavaType JavaType
+	JavaType types.JavaType
 }
 
-func (a *DeclareStatement) String(funcCtx *FunctionContext) string {
+func (a *DeclareStatement) String(funcCtx *class_context.FunctionContext) string {
 	return fmt.Sprintf("%s var%d", a.JavaType.String(funcCtx), a.Id)
 }
 
-func NewDeclareStatement(id int, typ JavaType) *DeclareStatement {
+func NewDeclareStatement(id int, typ types.JavaType) *DeclareStatement {
 	return &DeclareStatement{
 		Id:       id,
 		JavaType: typ,
@@ -67,13 +67,13 @@ func NewDeclareStatement(id int, typ JavaType) *DeclareStatement {
 
 type StackAssignStatement struct {
 	Id        int
-	JavaValue JavaValue
+	JavaValue values.JavaValue
 }
 
-func (a *StackAssignStatement) String(funcCtx *FunctionContext) string {
+func (a *StackAssignStatement) String(funcCtx *class_context.FunctionContext) string {
 	return a.JavaValue.String(funcCtx)
 }
-func NewStackAssignStatement(id int, value JavaValue) *StackAssignStatement {
+func NewStackAssignStatement(id int, value values.JavaValue) *StackAssignStatement {
 	return &StackAssignStatement{
 		Id:        id,
 		JavaValue: value,
@@ -81,13 +81,13 @@ func NewStackAssignStatement(id int, value JavaValue) *StackAssignStatement {
 }
 
 type AssignStatement struct {
-	LeftValue   JavaValue
-	ArrayMember *JavaArrayMember
-	JavaValue   JavaValue
+	LeftValue   values.JavaValue
+	ArrayMember *values.JavaArrayMember
+	JavaValue   values.JavaValue
 	IsFirst     bool
 }
 
-func (a *AssignStatement) String(funcCtx *FunctionContext) string {
+func (a *AssignStatement) String(funcCtx *class_context.FunctionContext) string {
 	if a.ArrayMember != nil {
 		return fmt.Sprintf("%s = %s", a.ArrayMember.String(funcCtx), a.JavaValue.String(funcCtx))
 	}
@@ -115,7 +115,7 @@ func NewForStatement(subStatements []Statement) *ForStatement {
 		SubStatements: subStatements[2 : len(subStatements)-2],
 	}
 }
-func (f *ForStatement) String(funcCtx *FunctionContext) string {
+func (f *ForStatement) String(funcCtx *class_context.FunctionContext) string {
 	datas := []string{}
 	datas = append(datas, f.InitVar.String(funcCtx))
 	datas = append(datas, fmt.Sprintf("%s %s %s", f.Condition.String(funcCtx)))
@@ -132,14 +132,14 @@ func (f *ForStatement) String(funcCtx *FunctionContext) string {
 	return s
 }
 
-func NewArrayMemberAssignStatement(m *JavaArrayMember, value JavaValue) *AssignStatement {
+func NewArrayMemberAssignStatement(m *values.JavaArrayMember, value values.JavaValue) *AssignStatement {
 	return &AssignStatement{
 		ArrayMember: m,
 		JavaValue:   value,
 	}
 }
 
-func NewAssignStatement(leftVal, value JavaValue, isFirst bool) *AssignStatement {
+func NewAssignStatement(leftVal, value values.JavaValue, isFirst bool) *AssignStatement {
 	return &AssignStatement{
 		LeftValue: leftVal,
 		JavaValue: value,
@@ -148,12 +148,12 @@ func NewAssignStatement(leftVal, value JavaValue, isFirst bool) *AssignStatement
 }
 
 type IfStatement struct {
-	Condition JavaValue
+	Condition values.JavaValue
 	IfBody    []Statement
 	ElseBody  []Statement
 }
 
-func (g *IfStatement) String(funcCtx *FunctionContext) string {
+func (g *IfStatement) String(funcCtx *class_context.FunctionContext) string {
 	getBody := func(sts []Statement) string {
 		var res []string
 		for _, st := range sts {
@@ -167,7 +167,7 @@ func (g *IfStatement) String(funcCtx *FunctionContext) string {
 		"%s\n"+
 		"}", g.Condition.String(funcCtx), getBody(g.IfBody), getBody(g.ElseBody))
 }
-func NewIfStatement(condition JavaValue, ifBody, elseBody []Statement) *IfStatement {
+func NewIfStatement(condition values.JavaValue, ifBody, elseBody []Statement) *IfStatement {
 	return &IfStatement{
 		Condition: condition,
 		IfBody:    ifBody,
@@ -179,7 +179,7 @@ type GOTOStatement struct {
 	ToStatement int
 }
 
-func (g *GOTOStatement) String(funcCtx *FunctionContext) string {
+func (g *GOTOStatement) String(funcCtx *class_context.FunctionContext) string {
 	return fmt.Sprintf("goto: %d", g.ToStatement)
 }
 func NewGOTOStatement() *GOTOStatement {
@@ -187,28 +187,28 @@ func NewGOTOStatement() *GOTOStatement {
 }
 
 type NewStatement struct {
-	Class *JavaClass
+	Class *types.JavaClass
 }
 
-func (a *NewStatement) String(funcCtx *FunctionContext) string {
+func (a *NewStatement) String(funcCtx *class_context.FunctionContext) string {
 	return fmt.Sprintf("new %s()", a.Class.Name)
 }
 
-func NewNewStatement(class *JavaClass) *NewStatement {
+func NewNewStatement(class *types.JavaClass) *NewStatement {
 	return &NewStatement{
 		Class: class,
 	}
 }
 
 type ExpressionStatement struct {
-	Expression JavaValue
+	Expression values.JavaValue
 }
 
-func (a *ExpressionStatement) String(funcCtx *FunctionContext) string {
+func (a *ExpressionStatement) String(funcCtx *class_context.FunctionContext) string {
 	return a.Expression.String(funcCtx)
 }
 
-func NewExpressionStatement(v JavaValue) *ExpressionStatement {
+func NewExpressionStatement(v values.JavaValue) *ExpressionStatement {
 	return &ExpressionStatement{
 		Expression: v,
 	}
@@ -228,11 +228,11 @@ func NewCaseItem(v int, body []Statement) *CaseItem {
 }
 
 type SwitchStatement struct {
-	Value JavaValue
+	Value values.JavaValue
 	Cases []*CaseItem
 }
 
-func (a *SwitchStatement) String(funcCtx *FunctionContext) string {
+func (a *SwitchStatement) String(funcCtx *class_context.FunctionContext) string {
 	casesStrs := []string{}
 	for _, c := range a.Cases {
 		if c.IsDefault {
@@ -244,7 +244,7 @@ func (a *SwitchStatement) String(funcCtx *FunctionContext) string {
 	return fmt.Sprintf("switch(%s) {\n%s\n}", a.Value.String(funcCtx), strings.Join(casesStrs, "\n"))
 }
 
-func NewSwitchStatement(value JavaValue, cases []*CaseItem) *SwitchStatement {
+func NewSwitchStatement(value values.JavaValue, cases []*CaseItem) *SwitchStatement {
 	return &SwitchStatement{
 		Value: value,
 		Cases: cases,
@@ -260,8 +260,8 @@ type MiddleStatement struct {
 	Flag string
 }
 
-func (a *MiddleStatement) String(funcCtx *FunctionContext) string {
-	return "<middle statement>"
+func (a *MiddleStatement) String(funcCtx *class_context.FunctionContext) string {
+	panic("middle statement should not be printed")
 }
 
 func NewMiddleStatement(flag string, d any) *MiddleStatement {
@@ -272,14 +272,14 @@ func NewMiddleStatement(flag string, d any) *MiddleStatement {
 }
 
 type SynchronizedStatement struct {
-	Argument JavaValue
+	Argument values.JavaValue
 	Body     []Statement
 }
 
-func NewSynchronizedStatement(val JavaValue, body []Statement) *SynchronizedStatement {
+func NewSynchronizedStatement(val values.JavaValue, body []Statement) *SynchronizedStatement {
 	return &SynchronizedStatement{Argument: val, Body: body}
 }
 
-func (s *SynchronizedStatement) String(funcCtx *FunctionContext) string {
+func (s *SynchronizedStatement) String(funcCtx *class_context.FunctionContext) string {
 	return fmt.Sprintf("synchronized(%s) {\n%s\n}", s.Argument.String(funcCtx), StatementsString(s.Body, funcCtx))
 }

@@ -2,29 +2,31 @@ package rewriter
 
 import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"golang.org/x/exp/maps"
 	"sort"
 )
 
 func SwitchRewriter(manager *StatementManager, node *core.Node) error {
-	if v, ok := node.Statement.(*core.MiddleStatement); ok && v.Flag == core.MiddleSwitch {
+	if v, ok := node.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleSwitch {
 		rewriteSwitch(node, manager)
 	}
 	return nil
 }
 
 func rewriteSwitch(node *core.Node, manager *StatementManager) {
-	middleStatement := node.Statement.(*core.MiddleStatement)
+	middleStatement := node.Statement.(*statements.MiddleStatement)
 	switchData := middleStatement.Data.([]any)
 	caseMap := switchData[0].(map[int]int)
-	data := switchData[1].(core.JavaValue)
+	data := switchData[1].(values.JavaValue)
 	defaultCase := caseMap[-1]
 	delete(caseMap, -1)
 	_ = defaultCase
 	caseMapKeys := maps.Keys(caseMap)
 	sort.Ints(caseMapKeys)
-	caseItems := []*core.CaseItem{}
+	caseItems := []*statements.CaseItem{}
 	// case start node source must content switch node
 	breakNode := map[int]*core.Node{}
 	replaceBreakCB := []func(){}
@@ -39,8 +41,8 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) {
 			}
 			return manager.GetNodeById(caseMap[caseMapKeys[i+1]])
 		}
-		parseCaseBody := func() (*core.CaseItem, bool) {
-			bodyStatements := []core.Statement{}
+		parseCaseBody := func() (*statements.CaseItem, bool) {
+			bodyStatements := []statements.Statement{}
 			var hasBreak bool
 			caseManager := NewStatementManager(caseNode, manager)
 			//var preNode *core.Node
@@ -70,12 +72,12 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) {
 			if err != nil {
 				return nil, false
 			}
-			bodyStatements = utils.NodesToStatements(resStats)
-			item := core.NewCaseItem(key, bodyStatements)
+			bodyStatements = core.NodesToStatements(resStats)
+			item := statements.NewCaseItem(key, bodyStatements)
 			if hasBreak {
 				//replaceBreakCB = append(replaceBreakCB, func() {
 				//	if len(item.Body) > 0 {
-				//		item.Body = append(item.Body, NewCustomStatement(func(funcCtx *FunctionContext) string {
+				//		item.Body = append(item.Body, NewCustomStatement(func(funcCtx *class_context.FunctionContext) string {
 				//			return "break"
 				//		}))
 				//	}
@@ -137,22 +139,22 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) {
 	for _, f := range replaceBreakCB {
 		f()
 	}
-	newBreakStatement := func() core.Statement {
-		return core.NewCustomStatement(func(funcCtx *core.FunctionContext) string {
+	newBreakStatement := func() statements.Statement {
+		return statements.NewCustomStatement(func(funcCtx *class_context.FunctionContext) string {
 			return "break"
 		})
 	}
 	if preNode != nil {
-		switchStatement := core.NewSwitchStatement(data, caseItems)
+		switchStatement := statements.NewSwitchStatement(data, caseItems)
 		node.Statement = switchStatement
 		preNode.Source = []*core.Node{node}
 		node.Next = []*core.Node{preNode}
-		defaultCaseNode := core.NewCaseItem(-1, []core.Statement{})
+		defaultCaseNode := statements.NewCaseItem(-1, []statements.Statement{})
 		defaultCaseNode.IsDefault = true
 		defaultCaseNodeStart := manager.GetNodeById(defaultCase)
 		if defaultCaseNodeStart == preNode {
-			core.VisitBody(switchStatement, func(statement core.Statement) core.Statement {
-				if gotoStat, ok := statement.(*core.GOTOStatement); ok {
+			core.VisitBody(switchStatement, func(statement statements.Statement) statements.Statement {
+				if gotoStat, ok := statement.(*statements.GOTOStatement); ok {
 					if gotoStat.ToStatement == preNode.Id {
 						return newBreakStatement()
 					}
@@ -175,10 +177,10 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) {
 		if err != nil {
 			return
 		}
-		defaultCaseNode.Body = utils.NodesToStatements(defaultBodySts)
+		defaultCaseNode.Body = core.NodesToStatements(defaultBodySts)
 		switchStatement.Cases = append(switchStatement.Cases, defaultCaseNode)
-		core.VisitBody(switchStatement, func(statement core.Statement) core.Statement {
-			if gotoStat, ok := statement.(*core.GOTOStatement); ok {
+		core.VisitBody(switchStatement, func(statement statements.Statement) statements.Statement {
+			if gotoStat, ok := statement.(*statements.GOTOStatement); ok {
 				if gotoStat.ToStatement == preNode.Id {
 					return newBreakStatement()
 				}
@@ -186,10 +188,10 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) {
 			return statement
 		})
 	} else {
-		switchStatement := core.NewSwitchStatement(data, caseItems)
+		switchStatement := statements.NewSwitchStatement(data, caseItems)
 		node.Statement = switchStatement
 		node.Next = nil
-		defaultCaseNode := core.NewCaseItem(-1, []core.Statement{})
+		defaultCaseNode := statements.NewCaseItem(-1, []statements.Statement{})
 		defaultCaseNode.IsDefault = true
 		defaultManager := NewStatementManager(manager.GetNodeById(defaultCase), manager)
 		err := defaultManager.Rewrite()
@@ -202,7 +204,7 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) {
 		if err != nil {
 			return
 		}
-		defaultCaseNode.Body = utils.NodesToStatements(sts)
+		defaultCaseNode.Body = core.NodesToStatements(sts)
 		switchStatement.Cases = append(switchStatement.Cases, defaultCaseNode)
 		//VisitBody(switchStatement, func(statement Statement) Statement {
 		//	if gotoStat, ok := statement.(*GOTOStatement); ok {
@@ -214,46 +216,3 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) {
 		//})
 	}
 }
-
-//func ScanSingleRoute(node *core.Node, hanlde func(node2 *core.Node) bool) {
-//	if node == nil {
-//		return
-//	}
-//	if !hanlde(node) {
-//		return
-//	}
-//	if len(node.Next) != 1 {
-//		return
-//	}
-//	for _, next := range node.Next {
-//		ScanSingleRoute(next, hanlde)
-//	}
-//}
-//func CheckSourceNode(node *core.Node, source []*core.Node) bool {
-//	if node == nil {
-//		return false
-//	}
-//	if len(node.Source) != len(source) {
-//		return false
-//	}
-//	for i, v := range source {
-//		if node.Source[i] != v {
-//			return false
-//		}
-//	}
-//	return true
-//}
-//
-////func CheckSingleRouteToNode(start, end *core.Node) bool {
-////	if node == nil {
-////		return false
-////	}
-////	if len(node.Next) == 0 {
-////		return true
-////	}
-////	if len(node.Next) > 1 {
-////		return false
-////	}
-////	return CheckSingleRouteToNode(node.Next[0])
-////
-////}
