@@ -12,6 +12,8 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"golang.org/x/exp/slices"
 )
 
@@ -207,4 +209,56 @@ func TestRuleAlertMsg(t *testing.T) {
 		require.NoError(t, err)
 		check(resFromDB)
 	})
+}
+
+func TestRuleRisk(t *testing.T) {
+	code := `
+	print("a")
+	print(f())
+	`
+	progName := uuid.NewString()
+	prog, err := ssaapi.Parse(code,
+		ssaapi.WithLanguage(consts.Yak),
+		ssaapi.WithProgramName(progName),
+	)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+	require.NoError(t, err)
+
+	syntaxFlowCode := ` 
+	desc (
+		title: "check print variable",
+	)
+	print(* as $para)
+	$para ?{! opcode: const} as $target
+	alert $target for {
+		"msg": "target is not const",
+		"level": "warning",
+		"type": "security",
+	}
+	`
+	ruleName := uuid.NewString() + ".sf"
+	err = sfdb.SaveSyntaxFlowRule(ruleName, "yak", syntaxFlowCode)
+	defer sfdb.DeleteRuleByRuleName(ruleName)
+	require.NoError(t, err)
+
+	res, err := prog.SyntaxFlowRuleName(ruleName)
+	require.NoError(t, err)
+
+	taskID := uuid.NewString()
+	resultID, err := res.Save(taskID)
+	defer ssadb.DeleteResultByID(resultID)
+	defer yakit.DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
+		RuntimeId: taskID,
+	})
+	require.NoError(t, err)
+
+	_, risks, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
+		RuntimeId: taskID,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(risks))
+	risk := risks[0]
+	require.Contains(t, risk.Details, "target is not const")
+	require.Equal(t, "warning", risk.Severity)
+	require.Equal(t, "check print variable", risk.Title)
 }

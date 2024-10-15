@@ -64,6 +64,11 @@ type Risk struct {
 	CveAccessVector     string `json:"cve_access_vector"`
 	CveAccessComplexity string `json:"cve_access_complexity"`
 	Tags                string `json:"tags"`
+
+	// SyntaxFlow
+	ResultID    uint   `json:"result_id"`
+	Variable    string `json:"variable"`
+	ProgramName string `json:"program_name"`
 }
 
 func (p *Risk) ColorizedShow() {
@@ -142,6 +147,10 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 		IsRead:    p.IsRead,
 
 		YakScriptUUID: p.YakScriptUUID,
+		// for syntaxflow risk
+		ResultID:           uint64(p.ResultID),
+		ProgramName:        p.ProgramName,
+		SyntaxFlowVariable: p.Variable,
 	}
 }
 

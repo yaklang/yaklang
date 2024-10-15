@@ -2990,6 +2990,10 @@ message Risk {
   string TaskName = 26;
   string Tags = 27;
   bool IsRead = 28;
+
+  uint64 ResultID = 30;
+  string SyntaxFlowVariable = 31;
+  string ProgramName  = 32;
 }
 
 message QueryRisksRequest {
