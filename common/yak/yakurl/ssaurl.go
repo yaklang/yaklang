@@ -211,10 +211,11 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		for index, v := range values {
 			_ = v
 			_ = index
-			codeRange, _ := coverCodeRange(programName, v.GetRange())
+			codeRange, source := coverCodeRange(programName, v.GetRange())
 			res := createNewRes(url, 0, []extra{
 				{"index", index},
 				{"code_range", codeRange},
+				{"source", source},
 			})
 			res.ResourceType = "value"
 			res.ResourceName = v.String()
