@@ -22,9 +22,7 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID strin
 		yakit.WithRiskParam_Description(rule.Description),
 		yakit.WithRiskParam_Severity(string(rule.Severity)),
 		yakit.WithRiskParam_CVE(rule.CVE),
-
-		// TODO: syntaxflow rule set  risk type
-		// yakit.WithRiskParam_RiskType(string(rule.Purpose)),
+		yakit.WithRiskParam_RiskType(string(rule.RiskType)),
 	}
 
 	// modify info by alertMsg
@@ -41,8 +39,7 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID strin
 			opts = append(opts, yakit.WithRiskParam_CVE(alertMsg.CVE))
 		}
 		if alertMsg.Purpose != "" {
-			// TODO: syntaxflow rule set  risk type
-			// risk.RiskType = string(alertMsg.Purpose)
+			opts = append(opts, yakit.WithRiskParam_RiskType(string(rule.RiskType)))
 		}
 		if alertMsg.Title != "" {
 			opts = append(opts, yakit.WithRiskParam_Title(alertMsg.Title))
