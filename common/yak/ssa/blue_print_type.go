@@ -5,43 +5,43 @@ import (
 	"github.com/samber/lo"
 )
 
-var _ Type = (*BluePrint)(nil)
+var _ Type = (*Blueprint)(nil)
 
 /// ============= implement type interface
 
-func (c *BluePrint) String() string {
+func (c *Blueprint) String() string {
 	str := fmt.Sprintf("ClassBluePrint: %s", c.Name)
 	return str
 }
 
-func (c *BluePrint) PkgPathString() string {
+func (c *Blueprint) PkgPathString() string {
 	return ""
 }
 
-func (c *BluePrint) RawString() string {
+func (c *Blueprint) RawString() string {
 	return ""
 }
 
-func (c *BluePrint) GetTypeKind() TypeKind {
+func (c *Blueprint) GetTypeKind() TypeKind {
 	return ClassBluePrintTypeKind
 }
 
-func (c *BluePrint) SetMethod(m map[string]*Function) {
+func (c *Blueprint) SetMethod(m map[string]*Function) {
 	c.NormalMethod = m
 }
 
-func (c *BluePrint) AddMethod(key string, fun *Function) {
+func (c *Blueprint) AddMethod(key string, fun *Function) {
 	c.RegisterNormalMethod(key, fun)
 }
 
-func (c *BluePrint) GetMethod() map[string]*Function {
+func (c *Blueprint) GetMethod() map[string]*Function {
 	return c.NormalMethod
 }
 
-func (c *BluePrint) SetMethodGetter(f func() map[string]*Function) {
+func (c *Blueprint) SetMethodGetter(f func() map[string]*Function) {
 }
 
-func (c *BluePrint) AddFullTypeName(name string) {
+func (c *Blueprint) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
@@ -50,14 +50,14 @@ func (c *BluePrint) AddFullTypeName(name string) {
 	}
 }
 
-func (c *BluePrint) GetFullTypeNames() []string {
+func (c *Blueprint) GetFullTypeNames() []string {
 	if c == nil {
 		return nil
 	}
 	return c.fullTypeName
 }
 
-func (c *BluePrint) SetFullTypeNames(names []string) {
+func (c *Blueprint) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}

@@ -42,7 +42,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	return
 }
 
-func (c *BluePrint) Apply(obj Value) Type {
+func (c *Blueprint) Apply(obj Value) Type {
 	if c == nil {
 		log.Error("BUG: ClassBluePrint is nil")
 		log.Error("BUG: ClassBluePrint is nil")
