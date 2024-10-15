@@ -2,7 +2,6 @@ package pingutil
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"time"
 )
@@ -53,18 +52,9 @@ func WithTcpDialHandler(f func(ctx context.Context, addr string, proxies ...stri
 	}
 }
 
-func WithTimeout(timeout any) PingConfigOpt {
+func WithTimeout(timeout time.Duration) PingConfigOpt {
 	return func(cfg *PingConfig) {
-		switch v := timeout.(type) {
-		case float64:
-			cfg.timeout = utils.FloatSecondDuration(v)
-		case int:
-			cfg.timeout = utils.FloatSecondDuration(float64(v))
-		case time.Duration:
-			cfg.timeout = v
-		default:
-			cfg.timeout = 5 * time.Second
-		}
+		cfg.timeout = timeout
 	}
 }
 
