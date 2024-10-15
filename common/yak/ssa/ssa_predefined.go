@@ -368,7 +368,7 @@ func (n *anValue) SetType(typ Type) {
 	}
 
 	switch t := typ.(type) {
-	case *ClassBluePrint:
+	case *BluePrint:
 		n.typ = t.Apply(getThis())
 	case *FunctionType:
 		n.typ = typ

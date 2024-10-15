@@ -15,7 +15,7 @@ func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext)
 	i, _ := raw.(*javaparser.ArrayInitializerContext)
 	if i == nil {
 		return nil
-	}
+}
 
 	allVariableInitializer := i.AllVariableInitializer()
 	if len(allVariableInitializer) == 0 {
@@ -24,7 +24,7 @@ func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext)
 			y.EmitConstInst(0), y.EmitConstInst(0),
 		)
 	}
-	obj := y.BuildObjectAddFieldBuild(len(allVariableInitializer),
+	obj := y.InterfaceAddFieldBuild(len(allVariableInitializer),
 		func(i int) ssa.Value { return y.EmitConstInst(i) },
 		func(i int) ssa.Value {
 			return y.VisitVariableInitializer(allVariableInitializer[i])

@@ -2,59 +2,62 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 )
 
-var _ Type = (*ClassBluePrint)(nil)
+var _ Type = (*BluePrint)(nil)
 
 /// ============= implement type interface
 
-func (c *ClassBluePrint) String() string {
+func (c *BluePrint) String() string {
 	str := fmt.Sprintf("ClassBluePrint: %s", c.Name)
 	return str
 }
 
-func (c *ClassBluePrint) PkgPathString() string {
+func (c *BluePrint) PkgPathString() string {
 	return ""
 }
 
-func (c *ClassBluePrint) RawString() string {
+func (c *BluePrint) RawString() string {
 	return ""
 }
 
-func (c *ClassBluePrint) GetTypeKind() TypeKind {
+func (c *BluePrint) GetTypeKind() TypeKind {
 	return ClassBluePrintTypeKind
 }
 
-func (c *ClassBluePrint) SetMethod(m map[string]*Function) {
+func (c *BluePrint) SetMethod(m map[string]*Function) {
 	c.NormalMethod = m
 }
 
-func (c *ClassBluePrint) AddMethod(key string, fun *Function) {
+func (c *BluePrint) AddMethod(key string, fun *Function) {
 	c.RegisterNormalMethod(key, fun)
 }
 
-func (c *ClassBluePrint) GetMethod() map[string]*Function {
+func (c *BluePrint) GetMethod() map[string]*Function {
 	return c.NormalMethod
 }
 
-func (c *ClassBluePrint) SetMethodGetter(f func() map[string]*Function) {
+func (c *BluePrint) SetMethodGetter(f func() map[string]*Function) {
 }
 
-func (c *ClassBluePrint) AddFullTypeName(name string) {
+func (c *BluePrint) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = append(c.fullTypeName, name)
+	if !lo.Contains(c.fullTypeName, name) {
+		c.fullTypeName = append(c.fullTypeName, name)
+	}
 }
 
-func (c *ClassBluePrint) GetFullTypeNames() []string {
+func (c *BluePrint) GetFullTypeNames() []string {
 	if c == nil {
 		return nil
 	}
 	return c.fullTypeName
 }
 
-func (c *ClassBluePrint) SetFullTypeNames(names []string) {
+func (c *BluePrint) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}

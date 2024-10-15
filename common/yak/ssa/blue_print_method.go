@@ -17,20 +17,20 @@ const (
 )
 
 // magic
-func (c *ClassBluePrint) IsMagicMethodName(name BluePrintMagicMethodKind) bool {
+func (c *BluePrint) IsMagicMethodName(name BluePrintMagicMethodKind) bool {
 	return slices.Contains(c._container.GetProgram().magicMethodName, string(name))
 }
 
-func (c *ClassBluePrint) RegisterMagicMethod(name BluePrintMagicMethodKind, val *Function) {
+func (c *BluePrint) RegisterMagicMethod(name BluePrintMagicMethodKind, val *Function) {
 	if !c.IsMagicMethodName(name) {
 		log.Warnf("register magic method fail: not magic method")
 		return
 	}
 	c.MagicMethod[name] = val
 }
-func (c *ClassBluePrint) GetMagicMethod(name BluePrintMagicMethodKind) Value {
+func (c *BluePrint) GetMagicMethod(name BluePrintMagicMethodKind) Value {
 	var _method Value
-	c.getFieldWithParent(func(bluePrint *ClassBluePrint) bool {
+	c.getFieldWithParent(func(bluePrint *BluePrint) bool {
 		switch name {
 		case Constructor:
 			if utils.IsNil(bluePrint.Constructor) {
@@ -75,8 +75,10 @@ func (c *ClassBluePrint) GetMagicMethod(name BluePrintMagicMethodKind) Value {
 }
 
 // normal method
-func (c *ClassBluePrint) RegisterNormalMethod(name string, val *Function) {
-	c.storeInContainer(name, val, BluePrintNormalMethod)
+func (c *BluePrint) RegisterNormalMethod(name string, val *Function, store ...bool) {
+	if len(store) == 0 || store[0] == true {
+		c.storeInContainer(name, val, BluePrintNormalMethod)
+	}
 	if f, ok := ToFunction(val); ok {
 		f.SetMethod(true, c)
 	}
@@ -87,9 +89,9 @@ func (c *ClassBluePrint) RegisterNormalMethod(name string, val *Function) {
 	c.NormalMethod[name] = val
 }
 
-func (c *ClassBluePrint) GetNormalMethod(key string) Value {
+func (c *BluePrint) GetNormalMethod(key string) Value {
 	var f Value
-	c.getFieldWithParent(func(bluePrint *ClassBluePrint) bool {
+	c.getFieldWithParent(func(bluePrint *BluePrint) bool {
 		if function, ok := bluePrint.NormalMethod[key]; ok {
 			f = function
 			return true
@@ -100,13 +102,13 @@ func (c *ClassBluePrint) GetNormalMethod(key string) Value {
 }
 
 // static method
-func (c *ClassBluePrint) RegisterStaticMethod(name string, val *Function) {
+func (c *BluePrint) RegisterStaticMethod(name string, val *Function) {
 	c.StaticMethod[name] = val
 }
 
-func (c *ClassBluePrint) GetStaticMethod(key string) Value {
+func (c *BluePrint) GetStaticMethod(key string) Value {
 	var f Value
-	c.getFieldWithParent(func(bluePrint *ClassBluePrint) bool {
+	c.getFieldWithParent(func(bluePrint *BluePrint) bool {
 		if function, ok := bluePrint.StaticMethod[key]; ok {
 			f = function
 			return true
@@ -116,8 +118,8 @@ func (c *ClassBluePrint) GetStaticMethod(key string) Value {
 	return f
 }
 
-func (c *ClassBluePrint) FinishClassFunction() {
-	lo.ForEach(c.ParentClass, func(item *ClassBluePrint, index int) {
+func (c *BluePrint) FinishClassFunction() {
+	lo.ForEach(c.ParentClass, func(item *BluePrint, index int) {
 		item.FinishClassFunction()
 	})
 	syntaxHandler := func(functions ...map[string]*Function) {

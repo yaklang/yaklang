@@ -53,11 +53,11 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	}
 	if class == nil {
 		log.Warnf("class %v instantiation failed, checking the dependency package is loaded already?", name)
-		obj.SetType(ssa.GetAnyType())
 		variable := y.CreateVariable(name)
+		obj.SetType(ssa.GetAnyType())
 		defaultClassFullback := y.EmitUndefined(name)
 		y.AssignVariable(variable, defaultClassFullback)
-		args := []ssa.Value{}
+		args := []ssa.Value{obj}
 		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
 		args = append(args, tmp...)
 		call := y.NewCall(defaultClassFullback, args)
@@ -66,15 +66,15 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		return y.EmitCall(call)
 	}
 	obj.SetType(class)
-
 	ellipsis := false
-	args := []ssa.Value{}
+	args := []ssa.Value{obj}
 	if i.Arguments() != nil {
 		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
 		ellipsis = hasEllipsis
 		args = append(args, tmp...)
 	}
-	return y.handlerClassConstructor(class, args, ellipsis)
+	_ = ellipsis
+	return y.ClassConstructor(class, args)
 }
 
 func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.Value {
@@ -89,7 +89,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 		return nil
 	}
 	cname := uuid.NewString()
-	bluePrint := y.CreateClassBluePrint(cname)
+	bluePrint := y.CreateBluePrint(cname)
 	if i.QualifiedStaticTypeRef() != nil {
 		if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
 			bluePrint.AddParentClass(ref)
@@ -105,7 +105,8 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 		ellipsis = hasEllipsis
 		args = append(args, tmp...)
 	}
-	return y.handlerClassConstructor(bluePrint, args, ellipsis)
+	_ = ellipsis
+	return y.ClassConstructor(bluePrint, args)
 }
 
 func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) interface{} {
@@ -154,9 +155,9 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 				parentClassName = i.QualifiedStaticTypeRef().GetText()
 			}
 
-			class := y.CreateClassBluePrint(className)
+			class := y.CreateBluePrint(className)
 			y.GetProgram().SetExportType(className, class)
-			if parentClass := y.GetClassBluePrint(parentClassName); parentClass != nil {
+			if parentClass := y.GetBluePrint(parentClassName); parentClass != nil {
 				//感觉在ssa-classBlue中做更好，暂时修复
 				class.AddParentClass(parentClass)
 			}
@@ -177,7 +178,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	return nil
 }
 
-func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, class *ssa.ClassBluePrint) {
+func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, class *ssa.BluePrint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -199,6 +200,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 
 			if isStatic {
 				class.RegisterStaticMember(name, value)
+				variable := y.GetStaticMember(class, name)
+				y.AssignVariable(variable, value)
 			} else {
 				class.RegisterNormalMember(name, value)
 			}
@@ -243,16 +246,25 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		newFunction.SetLazyBuilder(func() {
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
-				this := y.NewParam("$this")
-				this.SetType(class)
+				var param ssa.Value
+				if funcName == "__construct" {
+					y.NewParam("0this")
+					param = y.EmitEmptyContainer()
+					y.AssignVariable(y.CreateVariable("$this"), param)
+					param.SetType(class)
+				} else {
+					param = y.NewParam("$this")
+					param.SetType(class)
+				}
 				y.VisitFormalParameterList(ret.FormalParameterList())
 				y.VisitMethodBody(ret.MethodBody())
 				if funcName == "__construct" {
-					y.EmitReturn([]ssa.Value{undefined})
+					y.EmitReturn([]ssa.Value{param})
 				}
 			}
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
+			return newFunction
 		})
 
 		switch methodName {
@@ -263,19 +275,14 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			class.Destructor = newFunction
 		default:
 			if isStatic {
-				class.RegisterStaticMethod(methodName, newFunction)
+				member := y.GetStaticMember(class, newFunction.GetName())
+				_ = member.Assign(newFunction)
+				class.RegisterStaticMethod(methodname, newFunction)
 				//variable := y.GetStaticMember(class.Name, newFunction.GetName())
 				//y.AssignVariable(variable, newFunction)
 				//class.RegisterStaticMethod(funcName, newFunction)
 			} else {
-				defer func() {
-					if msg := recover(); msg != nil {
-						fmt.Println("msg:	", msg)
-						fmt.Println("source:	", y.GetSourceCode())
-						panic(newFunction)
-					}
-				}()
-				class.AddMethod(methodName, newFunction)
+				class.RegisterNormalMethod(methodName, newFunction)
 			}
 		}
 	case *phpparser.ConstContext:
@@ -468,7 +475,7 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	return nil
 }
 
-func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.ClassBluePrint {
+func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.BluePrint {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -502,17 +509,17 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Class
 		if bp, ok := ssa.ToClassBluePrintType(value.GetType()); ok {
 			return bp
 		}
-		if bp := y.GetClassBluePrint(value.String()); bp != nil {
+		if bp := y.GetBluePrint(value.String()); bp != nil {
 			return bp
 		}
 	}
 	if className != "" {
-		return y.GetClassBluePrint(className)
+		return y.GetBluePrint(className)
 	}
 	return nil
 }
 
-func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) (*ssa.ClassBluePrint, string) {
+func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) (*ssa.BluePrint, string) {
 	if y == nil || raw == nil {
 		return nil, ""
 	}
@@ -528,7 +535,7 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 	return bluePrint, key
 }
 
-func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.ClassBluePrint, string) {
+func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.BluePrint, string) {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil, ""
 	}
@@ -539,7 +546,11 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 		return nil, "'"
 	}
 
-	key := y.VisitRightValue(i.FlexiVariable()).GetName()
+	value := y.VisitRightValue(i.FlexiVariable())
+	key := value.GetName()
+	if key == "" {
+		key = value.String()
+	}
 	bluePrint := y.VisitStaticClass(i.StaticClass())
 	if strings.HasPrefix(key, "$") {
 		key = key[1:]
@@ -556,6 +567,10 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 	if i, ok := raw.(*phpparser.StaticClassExprContext); ok {
 		if i.StaticClassExprFunctionMember() != nil {
 			if bluePrint, key := y.VisitStaticClassExprFunctionMember(i.StaticClassExprFunctionMember()); bluePrint != nil {
+				member := y.GetStaticMember(bluePrint, key)
+				if value := y.PeekValueByVariable(member); !utils.IsNil(value) {
+					return value
+				}
 				if method := bluePrint.GetStaticMethod(key); !utils.IsNil(method) {
 					return method
 				} else if member := bluePrint.GetConstMember(key); !utils.IsNil(member) {
@@ -566,7 +581,13 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 		}
 		if i.StaticClassExprVariableMember() != nil {
 			if bluePrint, key := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember()); bluePrint != nil {
-				return bluePrint.GetStaticMember(key)
+				variable := y.GetStaticMember(bluePrint, key)
+				if val := y.PeekValueByVariable(variable); !utils.IsNil(val) {
+					return val
+				}
+				if member := bluePrint.GetStaticMember(key); !utils.IsNil(member) {
+					return member
+				}
 			}
 		}
 		return y.EmitUndefined(raw.GetText())
@@ -668,7 +689,11 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 	if i.Variable() != nil {
 		name := y.VisitVariable(i.Variable())
 		value := y.ReadValue(name)
-		return y.EmitConstInst(value.String())
+		if value.IsUndefined() {
+			return y.EmitConstInst(strings.TrimPrefix(value.GetName(), "$"))
+		} else {
+			return y.EmitConstInst(value.String())
+		}
 	}
 
 	if i.String_() != nil {
@@ -704,7 +729,7 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 	if b {
 		if function := library.Funcs[identifier]; !utils.IsNil(function) {
 			return function
-		} else if cls := library.GetClassBluePrint(identifier); !utils.IsNil(cls) {
+		} else if cls := library.GetBluePrint(identifier); !utils.IsNil(cls) {
 			inst := y.EmitConstInst("")
 			inst.SetType(cls)
 			return inst

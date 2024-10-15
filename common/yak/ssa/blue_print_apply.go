@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -41,7 +42,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	return
 }
 
-func (c *ClassBluePrint) Apply(obj Value) Type {
+func (c *BluePrint) Apply(obj Value) Type {
 	if c == nil {
 		log.Error("BUG: ClassBluePrint is nil")
 		log.Error("BUG: ClassBluePrint is nil")
@@ -72,7 +73,8 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 			continue
 		}
 		parent.Apply(obj)
-		c.fullTypeName = append(c.fullTypeName, parent.fullTypeName...)
+		_, i := lo.Difference(c.fullTypeName, parent.fullTypeName)
+		c.fullTypeName = append(c.fullTypeName, i...)
 	}
 
 	if prog != nil || prog.Cache != nil {
@@ -118,7 +120,7 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 		// classBluePrint only create by `class` keyword.
 		// in this case, member can be set nil, just declare the type.
 		if utils.IsNil(value) {
-			value := builder.ReadMemberCallValue(obj, key)
+			value := builder.ReadMemberCallVariable(obj, key)
 			value.SetType(typ)
 		} else {
 			builder.AssignVariable(

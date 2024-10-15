@@ -74,7 +74,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 	case *phpparser.MemerCallExpressionContext:
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitMemberCallKey(ret.MemberCallKey())
-		return y.ReadMemberCallValue(obj, key)
+		return y.ReadMemberCallVariable(obj, key)
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
 	case *phpparser.FullyQualifiedNamespaceExpressionContext:
@@ -85,14 +85,14 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		if key == nil {
 			return obj
 		}
-		return y.ReadMemberCallValue(obj, key)
+		return y.ReadMemberCallVariable(obj, key)
 	case *phpparser.IndexLegacyCallExpressionContext: // $a{1}
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
 		if key == nil {
 			return obj
 		}
-		return y.ReadMemberCallValue(obj, key)
+		return y.ReadMemberCallVariable(obj, key)
 	case *phpparser.FunctionCallExpressionContext:
 		tmp := y.isFunction
 		y.isFunction = true
@@ -451,11 +451,17 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		}
 
 	case *phpparser.StaticClassAccessExpressionContext:
-		return y.VisitStaticClassExpr(ret.StaticClassExpr())
+		if expr := y.VisitStaticClassExpr(ret.StaticClassExpr()); utils.IsNil(expr) {
+			return y.EmitUndefined(ret.GetText())
+		} else {
+			return expr
+		}
 
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
 		rightValue := y.VisitExpression(ret.Expression())
 		if bluePrint, key := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember()); bluePrint != nil {
+			member := y.GetStaticMember(bluePrint, key)
+			y.AssignVariable(member, rightValue)
 			bluePrint.RegisterStaticMember(key, rightValue)
 		}
 		return rightValue
@@ -521,11 +527,16 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 		return y.VisitRightValue(i.FlexiVariable())
 	} else {
 		member, key := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-		if staticMember := member.GetStaticMember(key); utils.IsNil(staticMember) {
-			return y.EmitUndefined(key)
-		} else {
-			return staticMember
+		if member != nil {
+			variable := y.GetStaticMember(member, key)
+			if value := y.PeekValueByVariable(variable); !utils.IsNil(value) {
+				return value
+			}
+			if staticMember := member.GetStaticMember(key); !utils.IsNil(staticMember) {
+				return staticMember
+			}
 		}
+		return y.EmitUndefined(key)
 	}
 }
 
@@ -1181,15 +1192,15 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	case *phpparser.IndexVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
-		return y.ReadMemberCallMethod(obj, key)
+		return y.ReadMemberCallVariable(obj, key)
 	case *phpparser.IndexLegacyCallVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
-		return y.ReadMemberCallMethod(obj, key)
+		return y.ReadMemberCallVariable(obj, key)
 	case *phpparser.MemberVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitMemberCallKey(i.MemberCallKey())
-		return y.ReadMemberCallMethod(obj, key)
+		return y.ReadMemberCallVariable(obj, key)
 	default:
 		return y.EmitUndefined(raw.GetText())
 	}
