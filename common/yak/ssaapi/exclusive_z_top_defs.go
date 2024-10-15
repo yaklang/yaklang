@@ -113,11 +113,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return i.visitedDefs(actx, opt...)
 			}
 			obj.AppendDependOn(apiValue)
-			crossSuccess := actx.CrossProcess(i, obj)
+			actx.PushCrossProcess(i, obj, nil)
 			ret := obj.getTopDefs(actx, opt...)
-			if crossSuccess {
-				actx.RecoverCrossProcess()
-			}
+			defer actx.PopCrossProcess()
 			if !ValueCompare(i, actx.Self) {
 				ret = append(ret, i)
 			}
@@ -159,10 +157,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			callee := i.NewValue(fun)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 			callee.AppendEffectOn(i)
-			crossSuccess := actx.CrossProcess(i, callee)
-			if crossSuccess {
-				defer actx.RecoverCrossProcess()
-			}
+
+			actx.PushCrossProcess(i, callee, i)
+			defer actx.PopCrossProcess()
 			// inherit return index
 			val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
 			if ok {
@@ -313,24 +310,22 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return Values{traced}
 			}
 		}
-		called := actx.GetCallFromLastCrossProcess()
-		if called != nil {
-			hash, reverseSuccess := actx.ReverseProcessWithDirection(i, called)
+		called := actx.GetLastCallStackCall()
+		if called != nil && !actx.HaveTheCrossProcess(i, called) {
+			actx.PushCrossProcess(i, called, nil)
 			calledByValue := getCalledByValue(called)
-			if reverseSuccess {
-				actx.RecoverReverseProcess(hash)
-			}
+			actx.PopCrossProcess()
 			vals = append(vals, calledByValue...)
 		}
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				fun.GetCalledBy().ForEach(func(call *Value) {
-					hash, reverseSuccess := actx.ReverseProcessWithDirection(i, call)
-					if !reverseSuccess {
+					if actx.HaveTheCrossProcess(i, call) {
 						return
 					}
+					actx.PushCrossProcess(i, call, nil)
 					val := getCalledByValue(call)
-					actx.RecoverReverseProcess(hash)
+					actx.PopCrossProcess()
 					vals = append(vals, val...)
 				})
 			}
@@ -388,17 +383,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 		var vals Values
-		called := actx.GetCallFromLastCrossProcess()
-		if called != nil {
+		called := actx.GetLastCallStackCall()
+		if called != nil && !actx.HaveTheCrossProcess(i, called) {
 			if !called.IsCall() {
 				log.Infof("parent function is not called by any other function, skip (%T)", called)
 				return Values{i}
 			}
-			hash, reverseSuccess := actx.ReverseProcess()
+			actx.PushCrossProcess(i, called, nil)
 			calledByValue := getCalledByValue(called)
-			if reverseSuccess {
-				actx.RecoverReverseProcess(hash)
-			}
+			actx.PopCrossProcess()
 			vals = append(vals, calledByValue...)
 		}
 
@@ -408,12 +401,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if fun != nil {
 				call2fun := fun.GetCalledBy()
 				call2fun.ForEach(func(call *Value) {
-					hash, reverseSuccess := actx.ReverseProcessWithDirection(i, call)
-					if !reverseSuccess {
+					if actx.HaveTheCrossProcess(i, call) {
 						return
 					}
+					actx.PushCrossProcess(i, call, nil)
 					val := getCalledByValue(call)
-					actx.RecoverReverseProcess(hash)
+					actx.PopCrossProcess()
 					vals = append(vals, val...)
 				})
 			}
@@ -432,10 +425,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if callIns != nil {
 			call := i.NewValue(callIns).AppendEffectOn(i)
 			v := i.NewValue(inst.Value).AppendEffectOn(i)
-			crossSuccess := actx.CrossProcess(call, v)
-			if crossSuccess {
-				defer actx.RecoverCrossProcess()
-			}
+			actx.PushCrossProcess(call, v, call)
+			defer actx.PopCrossProcess()
 			return v.getTopDefs(actx, opt...)
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
