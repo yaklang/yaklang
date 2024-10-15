@@ -218,7 +218,7 @@ type Program struct {
 	Funcs map[string]*Function
 
 	// class blue print
-	ClassBluePrint map[string]*ClassBluePrint
+	ClassBluePrint map[string]*BluePrint
 	ExprotValue    map[string]Value
 	ExprotType     map[string]Type
 
@@ -295,6 +295,7 @@ type Function struct {
 	isGeneric bool
 	// runtime function return type
 	currentReturnType Type
+	// static CallBack
 }
 
 func (f *Function) SetCurrentReturnType(t Type) {
@@ -492,6 +493,8 @@ const (
 	NoMemberCall ParameterMemberCallKind = iota
 	ParameterMemberCall
 	FreeValueMemberCall
+	CallMemberCall
+	SideEffectMemberCall
 )
 
 type parameterMemberInner struct {
@@ -531,6 +534,11 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 	case FreeValueMemberCall:
 		obj, ok = c.Binding[p.MemberCallObjectName]
 		return obj, ok
+	case CallMemberCall:
+		return c, true
+	case SideEffectMemberCall:
+		value, ok := c.SideEffectValue[p.MemberCallObjectName]
+		return value, ok
 	}
 	return
 }
@@ -687,8 +695,9 @@ type Call struct {
 	// caller
 	// caller Value
 	// ~ drop error
-	IsDropError bool
-	IsEllipsis  bool
+	IsDropError     bool
+	IsEllipsis      bool
+	SideEffectValue map[string]Value
 }
 
 var (
