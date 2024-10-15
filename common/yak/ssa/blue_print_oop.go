@@ -96,7 +96,7 @@ func (b *FunctionBuilder) CreateClassBluePrintWithPkgName(pkgName, className str
 	return b.createClassBluePrintEx(pkgName, className, tokenizer...)
 }
 
-func (b *FunctionBuilder) NewClassBluePrint() *ClassBluePrint {
+func (b *FunctionBuilder) CreateEmptyClassBluePrint() *ClassBluePrint {
 	return NewClassBluePrint()
 }
 

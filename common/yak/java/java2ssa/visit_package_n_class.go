@@ -339,7 +339,9 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	if class := y.GetClassBluePrintWithPkgName(className, pkgName); class != nil {
 		typ = class
 	} else {
-		typ = y.NewClassBluePrint()
+		//create empty blueprint only for setting type name,
+		//and it does not affect the creation and search mechanism of the other blueprints.
+		typ = y.CreateEmptyClassBluePrint()
 	}
 	if len(typ.GetFullTypeNames()) == 0 {
 		typ = y.AddFullTypeNameFromMap(className, typ)
