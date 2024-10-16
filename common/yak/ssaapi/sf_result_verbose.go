@@ -133,8 +133,8 @@ func (r *SyntaxFlowResult) Dump(showCode bool) string {
 						line("CWE: %v", cwe)
 					}
 
-					if extra.Level != "" {
-						line("Level: %v", extra.Level)
+					if extra.Severity != "" {
+						line("Level: %v", extra.Severity)
 					}
 
 				}
