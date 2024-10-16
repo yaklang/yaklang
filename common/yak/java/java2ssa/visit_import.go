@@ -54,13 +54,10 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 
 		// get class
 		if all {
-			for _, class := range prog.ClassBluePrint {
-				y.SetClassBluePrint(class.Name, class)
-			}
-		} else if class := prog.GetClassBluePrint(className); class != nil {
-			y.SetClassBluePrint(className, class)
+			_ = y.GetProgram().ImportAll(prog)
 		} else {
-			log.Warnf("BUG: Import  class %s but not found in package %v", className, prog.Name)
+			//if class := prog.GetClassBluePrint(className); class != nil
+			_, _ = y.GetProgram().ImportTypeFromLib(prog, className)
 		}
 	}
 }
