@@ -8,9 +8,9 @@ import (
 
 const emptyStackHash = "__EmptyStack__"
 
-// callStackInfo 保存跨过程中调用栈信息
+// CallStackInfo 保存跨过程中调用栈信息
 // 包括用于防止递归的valueVisited和objectVisited，以及实现跨过程的调用call
-type callStackInfo struct {
+type CallStackInfo struct {
 	valueVisited  map[int64]struct{}
 	objectVisited map[int64]struct{}
 	call          *Value
@@ -21,14 +21,14 @@ type callStackInfo struct {
 // crossProcessMap保存哈希值到调用栈信息的映射
 type crossProcessVisitedTable struct {
 	crossProcessStack *utils.Stack[string]
-	crossProcessMap   *omap.OrderedMap[string, *callStackInfo]
+	crossProcessMap   *omap.OrderedMap[string, *CallStackInfo]
 	_recursiveCounter int64
 }
 
 func newCrossProcessTable() *crossProcessVisitedTable {
 	c := &crossProcessVisitedTable{
 		crossProcessStack: utils.NewStack[string](),
-		crossProcessMap:   omap.NewEmptyOrderedMap[string, *callStackInfo](),
+		crossProcessMap:   omap.NewEmptyOrderedMap[string, *CallStackInfo](),
 	}
 	// init cross process stack status
 	c.crossProcessStack.Push(emptyStackHash)
@@ -36,8 +36,8 @@ func newCrossProcessTable() *crossProcessVisitedTable {
 	return c
 }
 
-func newValueVisited(call *Value) *callStackInfo {
-	return &callStackInfo{
+func newValueVisited(call *Value) *CallStackInfo {
+	return &CallStackInfo{
 		valueVisited:  make(map[int64]struct{}),
 		objectVisited: make(map[int64]struct{}),
 		call:          call,
@@ -64,21 +64,32 @@ func (c *crossProcessVisitedTable) pushCrossProcess(from *Value, to *Value, call
 	}
 }
 
-func (c *crossProcessVisitedTable) popCrossProcess() {
+func (c *crossProcessVisitedTable) pushCrossProcessWithHash(hash string, info *CallStackInfo,) {
+	if hash == ""{
+		return
+	}
+	c.crossProcessStack.Push(hash)
+	c.crossProcessMap.Set(hash, info)
+}
+
+func (c *crossProcessVisitedTable) popCrossProcess()(string, *CallStackInfo) {
 	if c.crossProcessStack.Len() == 1 {
 		log.Errorf("BUG:Pop CrossProcess fail.The cross process table is empty")
 	}
 	hash := c.crossProcessStack.Pop()
-	if c.crossProcessMap.Have(hash) {
+	info,ok:=c.crossProcessMap.Get(hash)
+	if ok{
 		c.crossProcessMap.Delete(hash)
+		return hash,info
 	}
+	return "",nil
 }
 
-func (c *crossProcessVisitedTable) getValueVisitedTable() *omap.OrderedMap[string, *callStackInfo] {
+func (c *crossProcessVisitedTable) getValueVisitedTable() *omap.OrderedMap[string, *CallStackInfo] {
 	return c.crossProcessMap
 }
 
-func (c *crossProcessVisitedTable) getCurrentVisited() (*callStackInfo, bool) {
+func (c *crossProcessVisitedTable) getCurrentVisited() (*CallStackInfo, bool) {
 	if c.crossProcessStack.Len() == 0 {
 		log.Errorf("BUG:The cross process table is empty")
 		return nil, false

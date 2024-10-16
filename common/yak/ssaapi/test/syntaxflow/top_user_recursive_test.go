@@ -96,7 +96,7 @@ func TestParameter_TopDef_Recursive(t *testing.T) {
 		`, `
 		target #-> * as $target
 		`, map[string][]string{
-			"target": {"Parameter-a1"},
+			"target": {"Parameter-a2"},
 		})
 	})
 	t.Run("parameter top def recursive 2 ", func(t *testing.T) {
