@@ -2067,3 +2067,43 @@ http:
 	require.True(t, ok)
 	require.Equal(t, 2, n)
 }
+
+func TestHttpTplCookieReuse(t *testing.T) {
+	token := utils.RandStringBytes(10)
+	cookieCheck := false
+	server, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if bytes.Contains(req, []byte(token)) {
+			cookieCheck = true
+		}
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nSet-Cookie: Test=%s; \r\n\r\n", token))
+	})
+	spew.Dump(server, port)
+
+	demo := `
+id: test1
+info:
+  name: test1
+  author: v1ll4n
+
+http:
+- method: GET
+  path:
+  - '{{RootURL}}/'
+  - '{{RootURL}}/1'
+  headers: {}
+
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+`
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
+	require.NoError(t, err)
+
+	_, err = ytpl.Exec(
+		nil, false,
+		[]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"),
+		lowhttp.WithHost(server), lowhttp.WithPort(port),
+	)
+	require.NoError(t, err)
+	require.True(t, cookieCheck)
+}
