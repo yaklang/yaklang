@@ -5540,7 +5540,7 @@ message SyntaxFlowResultFilter {
   int64 AfterID = 7; 
   int64 BeforeID = 8;
 
-  repeated string Severity = 9; 
+  repeated string Severity = 9;  //  "info", "low", "middle", "critical", "high"
 }
 
 message QuerySyntaxFlowResultRequest{
@@ -5566,7 +5566,7 @@ message SyntaxFlowResult {
   string Title = 4;
   string TitleZh = 5;
   string Description = 6;
-  string Severity = 7;
+  string Severity = 7; //  "info", "low", "middle", "critical", "high"
   string Purpose = 8;
 
   // target info 
