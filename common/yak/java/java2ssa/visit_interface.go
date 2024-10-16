@@ -21,7 +21,7 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 
 	ifaceName := i.Identifier().GetText()
 	interfaceClass := y.CreateClassBluePrint(ifaceName)
-
+	y.GetProgram().SetExportType(ifaceName, interfaceClass)
 	var callbacks []func(ssa.Value)
 	var inherits []string
 	if i.EXTENDS() != nil {
