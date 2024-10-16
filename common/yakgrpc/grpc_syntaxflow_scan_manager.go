@@ -18,11 +18,13 @@ import (
 
 type SyntaxFlowScanStatus string
 
+// "executing" | "done" | "paused" | "error"
+
 const (
-	Running  SyntaxFlowScanStatus = "running"
-	Paused                        = "paused"
-	Stopped                       = "stopped"
-	Finished                      = "finished"
+	Executing SyntaxFlowScanStatus = "executing"
+	Paused                         = "paused"
+	Done                           = "done"
+	Error                          = "error"
 )
 
 type SyntaxFlowScanManager struct {
@@ -48,7 +50,7 @@ type SyntaxFlowScanManager struct {
 func CreateSyntaxFlowScanManager(ctx context.Context, stream ypb.Yak_SyntaxFlowScanServer) *SyntaxFlowScanManager {
 	taskID := uuid.NewString()
 	m := &SyntaxFlowScanManager{
-		status: Running,
+		status: Executing,
 		taskID: taskID,
 		ctx:    ctx,
 		stream: stream,
@@ -114,6 +116,9 @@ func (m *SyntaxFlowScanManager) Query(programName string) error {
 
 func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	m.currentQuery++
+	if m.currentQuery == m.totalQuery {
+		m.status = Done
+	}
 	m.client.YakitSetProgress(float64(m.currentQuery) / float64(m.totalQuery))
 	m.stream.Send(&ypb.SyntaxFlowScanResponse{
 		TaskID: m.taskID,
