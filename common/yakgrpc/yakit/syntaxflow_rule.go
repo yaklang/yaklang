@@ -42,18 +42,10 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 		db = bizhelper.ExactQueryStringArrayOr(db, "`group_name`", params.GetGroupNames())
 	}
 
-	if len(params.GetRuleNames()) > 0 {
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", params.GetRuleNames())
-	}
-	if len(params.GetLanguage()) > 0 {
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "language", params.GetLanguage())
-	}
-	if len(params.GetPurpose()) > 0 {
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", params.GetPurpose())
-	}
-	if len(params.GetTag()) > 0 {
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", params.GetTag())
-	}
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", params.GetRuleNames())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", params.GetLanguage())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", params.GetPurpose())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", params.GetTag())
 
 	if params.GetKeyword() != "" {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
