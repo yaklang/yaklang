@@ -20,6 +20,13 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	if y.PreHandler() && len(i.AllNamespaceDeclaration()) == 0 {
 		return nil
 	}
+	if !y.PreHandler() {
+		for _, context := range i.AllNamespaceDeclaration() {
+			y.VisitNamespaceOnlyUse(context)
+		}
+	}
+
+	//syntax use for lib
 	for _, namespace := range i.AllNamespaceDeclaration() {
 		y.VisitNamespaceDeclaration(namespace)
 	}
