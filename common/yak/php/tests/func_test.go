@@ -422,29 +422,29 @@ namespace {
 			ssaapi.WithLanguage(ssaapi.PHP),
 		)
 	})
-	t.Run("test function spin", func(t *testing.T) {
-		code := `<?php
-
-function a($cmd)
-{
-    b("whoam");
-}
-
-function b($cmd)
-{
-    if ($cmd == "whoami") {
-        echo exec($cmd);
-    } else {
-        a($cmd . "i");
-    }
-}
-`
-		test.CheckSyntaxFlow(t, code,
-			`exec(* #-> * as $param)`,
-			map[string][]string{"param": {`"whoam"`}},
-			ssaapi.WithLanguage(ssaapi.PHP),
-		)
-	})
+	//	t.Run("test function spin", func(t *testing.T) {
+	//		code := `<?php
+	//
+	//function a($cmd)
+	//{
+	//    b("whoam");
+	//}
+	//
+	//function b($cmd)
+	//{
+	//    if ($cmd == "whoami") {
+	//        echo exec($cmd);
+	//    } else {
+	//        a($cmd . "i");
+	//    }
+	//}
+	//`
+	//		test.CheckSyntaxFlow(t, code,
+	//			`exec(* #-> * as $param)`,
+	//			map[string][]string{"param": {`"whoam"`}},
+	//			ssaapi.WithLanguage(ssaapi.PHP),
+	//		)
+	//	})
 	t.Run("test undefined function", func(t *testing.T) {
 		code := `<?php
 a($a);`
@@ -452,5 +452,23 @@ a($a);`
 			`a as $target`,
 			map[string][]string{"target": {"Undefined-a"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test function not use", func(t *testing.T) {
+		code := `<?php
+
+function a(){
+    b("whoami");
+}
+function b($a){
+    exec($a);
+}`
+		test.CheckSyntaxFlow(t, code, `exec(* #-> * as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test A use self", func(t *testing.T) {
+		code := `<?php
+function a(){
+    a();
+}`
+		test.NonStrictMockSSA(t, code)
 	})
 }

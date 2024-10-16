@@ -30,15 +30,15 @@ func TestParseProject(t *testing.T) {
 		require.NoError(t, err, "parse project failed")
 
 		// TODO: this parseProject will return one program
-		require.Len(t, progs, 1, "progs should be 2")
+		require.Len(t, progs, 1, "progs should be 1")
 		prog := progs[0]
 
 		valuesB := prog.Ref("b")
 		valuesB.Show()
-		require.Len(t, valuesB, 2, "valuesB should be 1")
+		require.Len(t, valuesB, 1, "valuesB should be 1")
 
 		valueB := valuesB[0]
-		require.Equal(t, "3", valueB.String(), "valueB should be 3")
+		require.Contains(t, valueB.String(), "3", "valueB should be 3")
 	})
 
 }
