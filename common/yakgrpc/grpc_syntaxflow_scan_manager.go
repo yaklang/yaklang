@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	_ "embed"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
