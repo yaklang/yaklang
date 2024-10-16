@@ -312,11 +312,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		called := actx.GetLastCallStackCall()
 		if called != nil && !actx.HaveTheCrossProcess(i, called) {
-			hash, info := actx.PopCrossProcessStackInfo()
+			recoverProcess := actx.PopCrossProcess()
 			calledByValue := getCalledByValue(called)
-			if info != nil {
-				actx.PushCrossProcessWithHash(hash, info)
-			}
+			recoverProcess()
 			vals = append(vals, calledByValue...)
 		}
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
@@ -391,11 +389,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				log.Infof("parent function is not called by any other function, skip (%T)", called)
 				return Values{i}
 			}
-			hash, info := actx.PopCrossProcessStackInfo()
+			recoverProcess := actx.PopCrossProcess()
 			calledByValue := getCalledByValue(called)
-			if info != nil {
-				actx.PushCrossProcessWithHash(hash, info)
-			}
+			recoverProcess()
 			vals = append(vals, calledByValue...)
 		}
 

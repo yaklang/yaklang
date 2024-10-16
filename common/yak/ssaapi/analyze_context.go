@@ -88,16 +88,11 @@ func (a *AnalyzeContext) PushCrossProcess(from *Value, to *Value, call *Value) {
 	a.crossProcessVisitedTable.pushCrossProcess(from, to, call)
 }
 
-func (a *AnalyzeContext) PushCrossProcessWithHash(hash string, c *CallStackInfo) {
-	a.crossProcessVisitedTable.pushCrossProcessWithHash(hash, c)
-}
-
-func (a *AnalyzeContext) PopCrossProcess() {
-	a.crossProcessVisitedTable.popCrossProcess()
-}
-
-func (a *AnalyzeContext) PopCrossProcessStackInfo() (string, *CallStackInfo) {
-	return a.crossProcessVisitedTable.popCrossProcess()
+func (a *AnalyzeContext) PopCrossProcess() func() {
+	hash, info := a.crossProcessVisitedTable.popCrossProcess()
+	return func() {
+		a.crossProcessVisitedTable.pushCrossProcessWithInfo(hash, info)
+	}
 }
 
 // GetLastCallStackCall get the last call stack's call
