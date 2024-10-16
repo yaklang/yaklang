@@ -156,7 +156,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			for _, statement := range i.AllClassStatement() {
 				y.VisitClassStatement(statement, class)
 			}
-			class.BuildConstructor()
 		}
 	} else {
 		// as interface
@@ -204,9 +203,15 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				class.AddNormalMember(name, value)
 			}
 		}
-
+		ClassBlock := y.CurrentBlock
 		class.SetLazyBuilder(func() {
 			// handle variable name
+			CurrentBlock := y.CurrentBlock
+			y.CurrentBlock = ClassBlock
+			defer func() {
+				y.CurrentBlock = CurrentBlock
+			}()
+
 			for _, va := range ret.AllVariableInitializer() {
 				name, value := y.VisitVariableInitializer(va)
 				if strings.HasPrefix(name, "$") {
@@ -214,6 +219,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				}
 				setMember(name, value)
 			}
+			class.BuildConstructorAndDestructor()
 		})
 
 		return
@@ -253,7 +259,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			class.Destructor = newFunction
 		default:
 			if isStatic {
-				variable := y.GetStaticMember(class.Name, newFunction.GetName())
+				variable := y.GetStaticMember(class.Name, newFunction.GetMethodName())
 				y.AssignVariable(variable, newFunction)
 				class.AddStaticMethod(methodName, newFunction)
 			} else {
@@ -576,6 +582,8 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	}
 	if class == "" {
 		return nil, "", ""
+	} else {
+		y.GetProgram().GetClassBluePrint(class)
 	}
 	if strings.HasPrefix(key, "$") {
 		// variable
@@ -780,7 +788,7 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 	program := y.GetProgram()
 	library, b := program.GetLibrary(strings.Join(pkgPath, "."))
 	if b {
-		if function := library.GetFunction(identifier); !utils.IsNil(function) {
+		if function := library.Funcs[identifier]; !utils.IsNil(function) {
 			return function
 		} else if cls := library.GetClassBluePrint(identifier); !utils.IsNil(cls) {
 			inst := y.EmitConstInst("")
