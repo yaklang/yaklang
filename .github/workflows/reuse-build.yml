@@ -8,6 +8,7 @@ on:
         required: true
         type: choice
         options:
+          - windows7
           - windows
           - macos-amd64 
           - macos-arm64
@@ -39,7 +40,16 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.20.3
+          go-version: 1.22
+
+      - name: Go Patch for Win7
+        if: inputs.os == 'windows7'
+        run: |
+          cd $(go env GOROOT)
+          Get-Content "${{ github.workspace }}\.github\patch_go122\693def151adff1af707d82d28f55dba81ceb08e1.diff" | patch --verbose -R -p 1 
+          Get-Content "${{ github.workspace }}\.github\patch_go122\7c1157f9544922e96945196b47b95664b1e39108.diff" | patch --verbose -R -p 1
+          Get-Content "${{ github.workspace }}\.github\patch_go122\48042aa09c2f878c4faa576948b07fe625c4707a.diff" | patch --verbose -R -p 1
+          cd ${{ github.workspace }}
 
       - name: Get Repo tags
         run: |

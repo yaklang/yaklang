@@ -8,6 +8,7 @@ on:
         required: true
         type: choice
         options:
+          - windows7
           - windows
           - macos-amd64 
           - macos-arm64
