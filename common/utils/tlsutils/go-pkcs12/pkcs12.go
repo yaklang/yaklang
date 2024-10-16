@@ -136,7 +136,7 @@ func unmarshal(in []byte, out interface{}) error {
 // ToPEM converts all "safe bags" contained in pfxData to PEM blocks.
 // DO NOT USE THIS FUNCTION. ToPEM creates invalid PEM blocks; private keys
 // are encoded as raw RSA or EC private keys rather than PKCS#8 despite being
-// labeled "PRIVATE KEY".  To decode a PKCS#12 file, use DecodeChain instead,
+// labeled "PRIVATE KEY".  ToOpcode decode a PKCS#12 file, use DecodeChain instead,
 // and use the encoding/pem package to convert to PEM if necessary.
 func ToPEM(pfxData []byte, password string) ([]*pem.Block, error) {
 	encodedPassword, err := bmpString(password)
