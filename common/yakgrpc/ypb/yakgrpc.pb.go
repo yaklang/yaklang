@@ -42580,7 +42580,7 @@ type SyntaxFlowResultFilter struct {
 	OnlyRisk     bool     `protobuf:"varint,6,opt,name=OnlyRisk,proto3" json:"OnlyRisk,omitempty"`
 	AfterID      int64    `protobuf:"varint,7,opt,name=AfterID,proto3" json:"AfterID,omitempty"`
 	BeforeID     int64    `protobuf:"varint,8,opt,name=BeforeID,proto3" json:"BeforeID,omitempty"`
-	Severity     []string `protobuf:"bytes,9,rep,name=Severity,proto3" json:"Severity,omitempty"`
+	Severity     []string `protobuf:"bytes,9,rep,name=Severity,proto3" json:"Severity,omitempty"` //  "info", "low", "middle", "critical", "high"
 }
 
 func (x *SyntaxFlowResultFilter) Reset() {
@@ -42817,7 +42817,7 @@ type SyntaxFlowResult struct {
 	Title       string `protobuf:"bytes,4,opt,name=Title,proto3" json:"Title,omitempty"`
 	TitleZh     string `protobuf:"bytes,5,opt,name=TitleZh,proto3" json:"TitleZh,omitempty"`
 	Description string `protobuf:"bytes,6,opt,name=Description,proto3" json:"Description,omitempty"`
-	Severity    string `protobuf:"bytes,7,opt,name=Severity,proto3" json:"Severity,omitempty"`
+	Severity    string `protobuf:"bytes,7,opt,name=Severity,proto3" json:"Severity,omitempty"` //  "info", "low", "middle", "critical", "high"
 	Purpose     string `protobuf:"bytes,8,opt,name=Purpose,proto3" json:"Purpose,omitempty"`
 	// target info
 	ProgramName string `protobuf:"bytes,9,opt,name=ProgramName,proto3" json:"ProgramName,omitempty"`
