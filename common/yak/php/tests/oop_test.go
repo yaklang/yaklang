@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
@@ -830,4 +831,85 @@ class a
 	//<self>?{opcode: call && !<self & $filter} as $__next__;
 	//CODE)>} as $low;`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
 	//	})
+}
+
+func TestOOP_unuse(t *testing.T) {
+	t.Run("test oop function unuse", func(t *testing.T) {
+		code := `<?php
+
+class a {
+    public $file;
+
+    public function test()
+    {
+		exec("unuse");
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{"param": {"\"unuse\""}},
+			ssaapi.WithLanguage(ssaapi.PHP),
+		)
+	})
+	t.Run("test oop construct unuse", func(t *testing.T) {
+		code := `<?php
+
+class a {
+    public $file;
+
+    public function __construct()
+    {
+		exec("unuse");
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{"param": {"\"unuse\""}},
+			ssaapi.WithLanguage(ssaapi.PHP),
+		)
+	})
+
+	t.Run("test oop destruct unuse", func(t *testing.T) {
+		code := `<?php
+
+class a {
+    public $file;
+
+    public function __destruct()
+    {
+		exec("unuse");
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{"param": {"\"unuse\""}},
+			ssaapi.WithLanguage(ssaapi.PHP),
+		)
+	})
+
+	t.Run("test oop extend construct unuse", func(t *testing.T) {
+		code := `<?php
+
+class a {
+    public $file;
+
+    public function __construct()
+    {
+		exec("unuse");
+    }
+}
+
+class b extends a{
+	
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{"param": {"\"unuse\""}},
+			ssaapi.WithLanguage(ssaapi.PHP),
+		)
+	})
 }

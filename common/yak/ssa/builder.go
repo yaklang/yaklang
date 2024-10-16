@@ -181,6 +181,10 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 	return b.parentBuilder
 }
 
+func (b *FunctionBuilder) GetParentFunction() *FunctionBuilder {
+	return b.parentBuilder
+}
+
 // handler current function
 
 // function param

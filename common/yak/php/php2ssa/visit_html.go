@@ -24,6 +24,15 @@ func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interfac
 		y.VisitHtmlDocumentElement(el)
 	}
 
+	if !y.PreHandler() {
+		for _, f := range y.GetProgram().Funcs {
+			f.Build()
+		}
+		for _, c := range y.GetProgram().ClassBluePrint {
+			c.Build()
+		}
+	}
+
 	return nil
 }
 

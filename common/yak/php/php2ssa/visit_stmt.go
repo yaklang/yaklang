@@ -110,8 +110,8 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	nameSpacePath := y.VisitNamespacePath(i.NamespacePath())
 	namespaceName := strings.Join(nameSpacePath, ".")
 	switchToNamespace := func() (*ssa.Program, func()) {
-		library, ok := prog.GetLibrary(namespaceName)
-		if library == nil || !ok {
+		library, skip := prog.GetLibrary(namespaceName)
+		if library == nil || skip {
 			library = prog.NewLibrary(namespaceName, []string{prog.Loader.GetBasePath()})
 		}
 		//if custom syntax, only syntax it
@@ -180,8 +180,8 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 	}
 	getNamespace := func(name ...string) *ssa.Program {
 		namespaceName := strings.Join(name, ".")
-		namespace, ok := prog.GetLibrary(namespaceName)
-		if namespace == nil || !ok {
+		namespace, _ := prog.GetLibrary(namespaceName)
+		if namespace == nil {
 			return nil
 		}
 		return namespace

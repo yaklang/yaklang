@@ -24,7 +24,20 @@ func TestParseSSA_SyntaxPhp(t *testing.T) {
 		code := `<html><?php ?></html>`
 		test.MockSSA(t, code)
 	})
-	t.Run("test", func(t *testing.T) {
+	t.Run("test-4", func(t *testing.T) {
+		code := `<?php for ($i=0; $i < 5; $i++) { ?>
+<script>echo 1;</script>
+<?php echo $i;}?>`
+		test.CheckError(t, test.TestCase{
+			Code: code,
+		})
+		test.MockSSA(t, code)
+	})
+	t.Run("test-5", func(t *testing.T) {
+		code := `<?php for ($i=0; $i < 5; $i++){ ?><?php }?>`
+		test.MockSSA(t, code)
+	})
+	t.Run("test-6", func(t *testing.T) {
 		code := `
 		<?php 
 		function f() {
@@ -37,19 +50,6 @@ func TestParseSSA_SyntaxPhp(t *testing.T) {
 		}
 		`
 
-		test.MockSSA(t, code)
-	})
-	t.Run("test-4", func(t *testing.T) {
-		code := `<?php for ($i=0; $i < 5; $i++) { ?>
-<script>echo 1;</script>
-<?php echo $i;}?>`
-		test.CheckError(t, test.TestCase{
-			Code: code,
-		})
-		test.MockSSA(t, code)
-	})
-	t.Run("test-5", func(t *testing.T) {
-		code := `<?php for ($i=0; $i < 5; $i++){ ?><?php }?>`
 		test.MockSSA(t, code)
 	})
 }

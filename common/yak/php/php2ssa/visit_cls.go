@@ -156,7 +156,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			for _, statement := range i.AllClassStatement() {
 				y.VisitClassStatement(statement, class)
 			}
-			class.BuildConstructor()
 		}
 	} else {
 		// as interface
@@ -205,8 +204,15 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			}
 		}
 
+		ClassBlock := y.CurrentBlock
 		class.SetLazyBuilder(func() {
 			// handle variable name
+			CurrentBlock := y.CurrentBlock
+			y.CurrentBlock = ClassBlock
+			defer func() {
+				y.CurrentBlock = CurrentBlock
+			}()
+
 			for _, va := range ret.AllVariableInitializer() {
 				name, value := y.VisitVariableInitializer(va)
 				if strings.HasPrefix(name, "$") {
@@ -214,6 +220,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				}
 				setMember(name, value)
 			}
+			class.BuildConstructor()
 		})
 
 		return
@@ -231,8 +238,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		_ = isRef
 
 		methodName := y.VisitIdentifier(ret.Identifier())
-		funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
-		newFunction := y.NewFunc(funcName)
+		//funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
+		newFunction := y.NewFunc(methodName)
 		newFunction.SetMethodName(methodName)
 		newFunction.SetLazyBuilder(func() {
 			y.FunctionBuilder = y.PushFunction(newFunction)
@@ -577,6 +584,9 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	if class == "" {
 		return nil, "", ""
 	}
+	if bp := y.GetProgram().ClassBluePrint[class]; bp != nil {
+		bp.Build()
+	}
 	if strings.HasPrefix(key, "$") {
 		// variable
 		key = key[1:]
@@ -778,8 +788,8 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 	//获取最后一个identifier
 	identifier := y.VisitIdentifier(i.Identifier(len(i.AllIdentifier()) - 1))
 	program := y.GetProgram()
-	library, b := program.GetLibrary(strings.Join(pkgPath, "."))
-	if b {
+	library, _ := program.GetLibrary(strings.Join(pkgPath, "."))
+	if library != nil {
 		if function := library.GetFunction(identifier); !utils.IsNil(function) {
 			return function
 		} else if cls := library.GetClassBluePrint(identifier); !utils.IsNil(cls) {

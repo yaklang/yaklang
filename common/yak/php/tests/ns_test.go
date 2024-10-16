@@ -163,10 +163,7 @@ namespace {
 			map[string][]string{"param": {"1"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
-
-	// CheckSyntaxFlowWithFS里面不会执行PreHandlerProject
 	t.Run("more namespace", func(t *testing.T) {
-		t.Skip()
 		fs := filesys.NewVirtualFs()
 		fs.AddFile("src/main/1.php", `<?php
 
@@ -189,12 +186,6 @@ namespace c\b {
 
 `)
 		fs.AddFile("src/main/2.php", `<?php
-namespace a\b\c {
-    class c
-    {
-        public static $a;
-    }
-}
 namespace {
     use function \a\b\c\testt;
     $a = testt();
@@ -207,7 +198,7 @@ namespace {
 			false,
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
-	t.Run("namepsace references each other", func(t *testing.T) {
+	t.Run("namespace references each other", func(t *testing.T) {
 		code := `<?php
 
 namespace a {

@@ -465,12 +465,15 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		if _, exit := y.GetProgram().ExternInstance[strings.ToLower(y.VisitIdentifier(ret.Identifier()))]; exit {
 			_value = strings.ToLower(_value)
 			return y.ReadValue(_value)
-		} else {
-			val := y.EmitUndefined(y.VisitIdentifier(ret.Identifier()))
-			y.AssignVariable(y.CreateVariable(y.VisitIdentifier(ret.Identifier())), val)
-			return val
+		} else if p := y.GetParentFunction(); p != nil {
+			if v := p.PeekValue(_value); v != nil {
+				return v
+			}
 		}
 
+		val := y.EmitUndefined(y.VisitIdentifier(ret.Identifier()))
+		y.AssignVariable(y.CreateVariable(y.VisitIdentifier(ret.Identifier())), val)
+		return val
 	case *phpparser.StaticClassAccessExpressionContext:
 		return y.VisitStaticClassExpr(ret.StaticClassExpr())
 

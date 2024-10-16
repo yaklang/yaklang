@@ -152,12 +152,11 @@ func (c *ClassBluePrint) GetNormalMember(name string) *BluePrintMember {
 }
 
 func (c *ClassBluePrint) BuildConstructor() {
-	for _, p := range c.ParentClass {
-		p.BuildConstructor()
-	}
-
 	if c.Constructor != nil {
 		c.Constructor.GetFunc().Build()
+	}
+	if c.Destructor != nil {
+		c.Destructor.GetFunc().Build()
 	}
 
 	for _, m := range c.Method {
