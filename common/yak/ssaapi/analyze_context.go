@@ -84,8 +84,8 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	return actx
 }
 
-func (a *AnalyzeContext) PushCrossProcess(from *Value, to *Value, call *Value) {
-	a.crossProcessVisitedTable.pushCrossProcess(from, to, call)
+func (a *AnalyzeContext) PushCrossProcess(from *Value, to *Value, call *Value)bool {
+	return a.crossProcessVisitedTable.pushCrossProcess(from, to, call)
 }
 
 func (a *AnalyzeContext) PopCrossProcess() func() {

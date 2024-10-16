@@ -311,7 +311,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 		}
 		called := actx.GetLastCallStackCall()
-		if called != nil && !actx.HaveTheCrossProcess(i, called) {
+		if called != nil {
 			recoverProcess := actx.PopCrossProcess()
 			calledByValue := getCalledByValue(called)
 			recoverProcess()
@@ -320,10 +320,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				fun.GetCalledBy().ForEach(func(call *Value) {
-					if actx.HaveTheCrossProcess(i, call) {
+					ok := actx.PushCrossProcess(i, call, nil)
+					if !ok {
 						return
 					}
-					actx.PushCrossProcess(i, call, nil)
 					val := getCalledByValue(call)
 					actx.PopCrossProcess()
 					vals = append(vals, val...)
@@ -401,10 +401,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if fun != nil {
 				call2fun := fun.GetCalledBy()
 				call2fun.ForEach(func(call *Value) {
-					if actx.HaveTheCrossProcess(i, call) {
+					ok := actx.PushCrossProcess(i, call, nil)
+					if !ok {
 						return
 					}
-					actx.PushCrossProcess(i, call, nil)
 					val := getCalledByValue(call)
 					actx.PopCrossProcess()
 					vals = append(vals, val...)

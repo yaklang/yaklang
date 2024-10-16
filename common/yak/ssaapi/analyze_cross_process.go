@@ -47,28 +47,30 @@ func newProcessInfo(call *Value) *processStackInfo {
 // crossProcess用于记录跨过程行为
 // 使用跨过程前和跨过程后的节点做哈希作为唯一一次跨过程行为
 // 如果跨过程行为是由call发起的，则是正向跨过程；如果call为nil，则为反向跨过程。
-func (c *crossProcessVisitedTable) pushCrossProcess(from *Value, to *Value, call *Value) {
+func (c *crossProcessVisitedTable) pushCrossProcess(from *Value, to *Value, call *Value)bool {
 	if from == nil || to == nil {
-		return
+		return false
 	}
 	hash := calcCrossProcessHash(from, to)
 	//log.Infof("cross process from:%s(id:%d)to:%s(id:%d)  call:%s", from.String(), from.GetId(), to.String(), to.GetId(), call.String())
 	info := newProcessInfo(call)
 	if call != nil && !call.IsCall() {
 		log.Errorf("BUG: Cross process behavior is not initiated by a call,but by:%s", call.String())
-		return
+		return false
 	}
-	c.pushCrossProcessWithInfo(hash, info)
+	return c.pushCrossProcessWithInfo(hash, info)
 }
 
-func (c *crossProcessVisitedTable) pushCrossProcessWithInfo(hash string, info *processStackInfo) {
+func (c *crossProcessVisitedTable) pushCrossProcessWithInfo(hash string, info *processStackInfo)bool {
 	if hash == "" {
-		return
+		return false
 	}
 	if !c.crossProcessMap.Have(hash) {
 		c.crossProcessStack.Push(hash)
 		c.crossProcessMap.Set(hash, info)
+		return  true
 	}
+	return false
 }
 
 func (c *crossProcessVisitedTable) popCrossProcess() (string, *processStackInfo) {

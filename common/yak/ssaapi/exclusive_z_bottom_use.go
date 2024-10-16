@@ -115,14 +115,15 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			return v.visitUserFallback(actx, opt...)
 		}
 		funcValue := v.NewValue(f).AppendDependOn(v)
-		if actx.HaveTheCrossProcess(v, funcValue) {
-			return v.visitUserFallback(actx, opt...)
-		}
 		if ValueCompare(funcValue, actx.Self) {
 			return v.visitUserFallback(actx, opt...)
 		}
-		actx.PushCrossProcess(v, funcValue, v)
-		defer actx.PopCrossProcess()
+		ok = actx.PushCrossProcess(v, funcValue, v)
+		if !ok{
+			return v.visitUserFallback(actx, opt...)
+		}else{
+			defer actx.PopCrossProcess()
+		}
 		// try to find formal param index from call
 		// v is calling instruction
 		// funcValue is the function
