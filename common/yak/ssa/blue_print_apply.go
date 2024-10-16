@@ -1,7 +1,7 @@
 package ssa
 
 import (
-
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -13,15 +13,14 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	if !this.IsObject() {
 		return
 	}
-	blue := NewClassBluePrint()
-	// blue.SetObjectType(objectTyp)
+	blue := NewClassBluePrint("")
 
 	for key, member := range this.GetAllMember() {
 		// if not function , just append this field to normal field
 		typ := member.GetType()
 		if typ.GetTypeKind() != FunctionTypeKind {
 			// blue.NormalMember[key.String()] = member
-			blue.AddNormalMember(key.String(), member)
+			blue.RegisterNormalMember(key.String(), member)
 			continue
 		}
 
@@ -33,7 +32,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 			}
 		}
 
-		blue.AddNormalMember(key.String(), member)
+		blue.RegisterNormalMember(key.String(), member)
 	}
 
 	if len(blue.GetMethod()) != 0 {
@@ -43,7 +42,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	return
 }
 
-func (c *ClassBluePrint) Apply(obj Value) Type {
+func (c *Blueprint) Apply(obj Value) Type {
 	if c == nil {
 		log.Error("BUG: ClassBluePrint is nil")
 		log.Error("BUG: ClassBluePrint is nil")
@@ -74,13 +73,15 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 			continue
 		}
 		parent.Apply(obj)
-		c.fullTypeName = append(c.fullTypeName, parent.fullTypeName...)
+		_, i := lo.Difference(c.fullTypeName, parent.fullTypeName)
+		c.fullTypeName = append(c.fullTypeName, i...)
 	}
 
 	if prog != nil || prog.Cache != nil {
 		prog.Cache.AddClassInstance(c.Name, obj)
 	}
 
+	// if this builder support class, just return the class
 	if builder.SupportClass {
 		return c
 	}
@@ -95,8 +96,8 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	}
 
 	for rawKey, member := range c.NormalMember {
-		typ := member.Type
-		value := member.Value
+		typ := member.GetType()
+		value := member
 		key := builder.EmitConstInst(rawKey)
 		log.Infof("apply key: %s, member: %v", key, member)
 

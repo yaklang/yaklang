@@ -15,7 +15,7 @@ func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext)
 	i, _ := raw.(*javaparser.ArrayInitializerContext)
 	if i == nil {
 		return nil
-	}
+}
 
 	allVariableInitializer := i.AllVariableInitializer()
 	if len(allVariableInitializer) == 0 {

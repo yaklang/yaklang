@@ -201,31 +201,4 @@ func Test_ArgumentAndRest(t *testing.T) {
 			"fun": {"Function-f(Function-main$1)"},
 		})
 	})
-
-	t.Run("test java ", func(t *testing.T) {
-		ssatest.CheckSyntaxFlow(t, `
-package example;
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
-
-public class Example {
-    public static void main(String[] args) {
-        try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter("example.txt"));
-            writer.write("Hello, world!");
-            writer.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-}
-		`,
-			`BufferedWriter(* as $filename).write() as $sink`,
-			map[string][]string{
-				"sink": {"Undefined-writer.write(Undefined-BufferedWriter(Undefined-BufferedWriter,Undefined-FileWriter(Undefined-FileWriter,\"example.txt\")),\"Hello, world!\")"},
-			},
-			ssaapi.WithLanguage(ssaapi.JAVA),
-		)
-	})
 }

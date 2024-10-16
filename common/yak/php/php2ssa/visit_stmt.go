@@ -106,6 +106,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		library.PushEditor(prog.GetCurrentEditor())
 		functionBuilder := library.GetAndCreateFunctionBuilder(pkgname, "init")
 		functionBuilder.SetEditor(y.FunctionBuilder.GetEditor())
+		// functionBuilder.SetMainbuilder(y.GetMainBuilder())
 		if functionBuilder != nil {
 			functionBuilder.SetBuildSupport(y.FunctionBuilder)
 			currentBuilder := y.FunctionBuilder
@@ -201,13 +202,13 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 				}
 				//有两种情况，class或者整个命名空间
 			default:
-				if cls := y.GetProgram().GetClassBluePrint(alias); !utils.IsNil(cls) {
+				if cls := y.GetProgram().GetBluePrint(alias); !utils.IsNil(cls) {
 					log.Warnf("current builder has classblue: %s", cls)
 					continue
 				}
 				if library, _ := prog.GetLibrary(strings.Join(path, ".")); library != nil {
 					//一个类的情况
-					if bluePrint := library.GetClassBluePrint(old); !utils.IsNil(bluePrint) {
+					if bluePrint := library.GetBluePrint(old); !utils.IsNil(bluePrint) {
 						y.SetClassBluePrint(alias, bluePrint)
 					} else {
 						log.Warnf("lib get class: %s fail", old)

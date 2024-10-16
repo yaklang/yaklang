@@ -87,6 +87,7 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	if err != nil {
 		return err
 	}
+	log.Infof("parse AST FrontEnd success: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	b.WithExternValue(phpBuildIn)
 	startParse := func(functionBuilder *ssa.FunctionBuilder) {
 		functionBuilder.SupportClassStaticModifier = true
@@ -112,6 +113,7 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 			build.GetProgram().GetApplication().LibraryFile[str] = files
 		}
 		build.VisitHtmlDocument(ast)
+		build.Finish()
 	}
 	if b.IncludeStack.Len() <= 0 {
 		var program *ssa.Program

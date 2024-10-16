@@ -57,7 +57,7 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 			for _, class := range prog.ClassBluePrint {
 				y.SetClassBluePrint(class.Name, class)
 			}
-		} else if class := prog.GetClassBluePrint(className); class != nil {
+		} else if class := prog.GetBluePrint(className); class != nil {
 			y.SetClassBluePrint(className, class)
 		} else {
 			log.Warnf("BUG: Import  class %s but not found in package %v", className, prog.Name)
