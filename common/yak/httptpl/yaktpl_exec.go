@@ -2,6 +2,7 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"net/url"
 	"strings"
 	"sync/atomic"
@@ -155,6 +156,7 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 		for _, reqSeq := range y.GenerateRequestSequences(u, true) {
 			swg.Add()
 			go func(ret *RequestBulk, payload map[string][]string) {
+				session := uuid.New().String()
 				defer swg.Done()
 				rsps, allResult, extracted, reqCount := y.handleRequestSequences(config, ret.RequestConfig, ret.Requests, payload, func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error) {
 					if config.BeforeSendPackage != nil {
@@ -174,6 +176,11 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 						lowhttp.WithRedirectTimes(redictTimes),
 						lowhttp.WithTimeout(req.Timeout),
 					)
+
+					if req.Origin.CookieInherit {
+						packetOpt = append(packetOpt, lowhttp.WithSession(session))
+					}
+
 					if req.OverrideHost != "" {
 						packetOpt = append(packetOpt, lowhttp.WithHost(req.OverrideHost))
 					}
