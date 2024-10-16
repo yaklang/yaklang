@@ -47,7 +47,7 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 		function.CheckAndFinishBuild()
 		function.FixSpinUdChain()
 	}
-	for _, bluePrint := range y.GetProgram().ClassBluePrint {
+	for _, bluePrint := range y.GetProgram().GetAllClassBluePrint() {
 		bluePrint.SyntaxMethods()
 	}
 	return nil

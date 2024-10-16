@@ -20,7 +20,7 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 	}
 
 	ifaceName := i.Identifier().GetText()
-	interfaceClass := y.CreateClassBluePrint(ifaceName)
+	interfaceClass := y.CreateClassBluePrintWithPkgName(y.GetProgramName(), ifaceName)
 
 	var callbacks []func(ssa.Value)
 	var inherits []string

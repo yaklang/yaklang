@@ -35,9 +35,9 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		FunctionBuilder:   b,
 		ast:               ast,
 		constMap:          make(map[string]ssa.Value),
-		fullTypeNameMap:   make(map[string][]string),
+		importClassMap:    make(map[string][]string),
 		allImportPkgSlice: make([][]string, 0),
-		selfPkgPath:       make([]string, 0),
+		selfPkgPathSlice:  make([]string, 0),
 	}
 	build.SupportClassStaticModifier = true
 	build.VisitCompilationUnit(ast)
@@ -60,10 +60,12 @@ type builder struct {
 	constMap       map[string]ssa.Value
 	bluePrintStack *utils.Stack[*ssa.ClassBluePrint]
 
-	// for full type name
-	fullTypeNameMap   map[string][]string
+	//import class name->package path
+	importClassMap map[string][]string
+	//import all class name's package path
 	allImportPkgSlice [][]string
-	selfPkgPath       []string
+	//current package path
+	selfPkgPathSlice []string
 }
 
 func (b *builder) PushBluePrint(bp *ssa.ClassBluePrint) {
