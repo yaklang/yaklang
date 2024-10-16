@@ -238,8 +238,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		_ = isRef
 
 		methodName := y.VisitIdentifier(ret.Identifier())
-		//funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
-		newFunction := y.NewFunc(methodName)
+		funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
+		newFunction := y.NewFunc(funcName)
 		newFunction.SetMethodName(methodName)
 		newFunction.SetLazyBuilder(func() {
 			y.FunctionBuilder = y.PushFunction(newFunction)
@@ -260,7 +260,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			class.Destructor = newFunction
 		default:
 			if isStatic {
-				variable := y.GetStaticMember(class.Name, newFunction.GetName())
+				variable := y.CreateVariable(newFunction.GetName())
 				y.AssignVariable(variable, newFunction)
 				class.AddStaticMethod(methodName, newFunction)
 			} else {
@@ -584,9 +584,7 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	if class == "" {
 		return nil, "", ""
 	}
-	if bp := y.GetProgram().ClassBluePrint[class]; bp != nil {
-		bp.Build()
-	}
+	y.GetProgram().GetClassBluePrint(class) // build class
 	if strings.HasPrefix(key, "$") {
 		// variable
 		key = key[1:]

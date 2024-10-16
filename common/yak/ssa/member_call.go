@@ -575,10 +575,8 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 			return value
 		}
 
-		for _, method := range blueprint.Method {
-			if key.String() == method.GetMethodName() {
-				return method
-			}
+		if method := blueprint.Method[key.String()]; method != nil {
+			return method
 		}
 
 		return nil

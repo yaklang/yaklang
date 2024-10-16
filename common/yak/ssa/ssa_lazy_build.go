@@ -10,7 +10,7 @@ type lazyBuilder struct {
 func (n *lazyBuilder) SetLazyBuilder(Builder func()) {
 	once := sync.Once{}
 	n._build = func() { once.Do(Builder) }
-	n.isBuild = false
+	n.isBuild = false // 防止死锁
 }
 
 func (n *lazyBuilder) Build() {
