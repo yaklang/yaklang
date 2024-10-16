@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -8,31 +9,6 @@ import (
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
-
-func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interface{} {
-	if y == nil || raw == nil || y.IsStop() {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.TopStatementContext)
-	if i == nil {
-		return nil
-	}
-	//custom file not syntax
-	if y.PreHandler() && i.NamespaceDeclaration() == nil {
-		return nil
-	}
-	y.VisitNamespaceDeclaration(i.NamespaceDeclaration())
-	y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
-	y.VisitUseDeclaration(i.UseDeclaration())
-	y.VisitFunctionDeclaration(i.FunctionDeclaration())
-	y.VisitEnumDeclaration(i.EnumDeclaration())
-	y.VisitClassDeclaration(i.ClassDeclaration())
-	y.VisitStatement(i.Statement())
-	return nil
-}
 
 func (y *builder) VisitEnumDeclaration(raw phpparser.IEnumDeclarationContext) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
@@ -64,8 +40,43 @@ func (y *builder) VisitGlobalConstantDeclaration(raw phpparser.IGlobalConstantDe
 	for _, initializerContext := range i.AllIdentifierInitializer() {
 		name, value := y.VisitIdentifierInitializer(initializerContext)
 		y.AssignConst(name, value)
+		y.GetProgram().SetExportValue(name, value)
 	}
 	return nil
+}
+func (y *builder) VisitNamespaceOnlyUse(raw phpparser.INamespaceDeclarationContext) {
+	if y == nil || raw == nil || y.IsStop() {
+		return
+	}
+	i, _ := raw.(*phpparser.NamespaceDeclarationContext)
+	if i == nil {
+		return
+	}
+	usedeclHanlder := func() {
+		for _, statementContext := range i.AllNamespaceStatement() {
+			stmt, ok := statementContext.(*phpparser.NamespaceStatementContext)
+			if ok {
+				y.VisitUseDeclaration(stmt.UseDeclaration())
+			}
+		}
+	}
+	prog := y.GetProgram().GetApplication() //拿到主app
+	nameSpacePath := y.VisitNamespacePath(i.NamespacePath())
+	namespaceName := strings.Join(nameSpacePath, ".")
+	if len(nameSpacePath) == 0 {
+		usedeclHanlder()
+		return
+	}
+	library, b := prog.GetLibrary(namespaceName)
+	if b {
+		functionBuilder := library.GetAndCreateFunctionBuilder(namespaceName, "init")
+		currentBuilder := y.FunctionBuilder
+		y.FunctionBuilder = functionBuilder
+		usedeclHanlder()
+		defer func() {
+			y.FunctionBuilder = currentBuilder
+		}()
+	}
 }
 
 func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationContext) interface{} {
@@ -86,11 +97,11 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 			}
 		}
 	}
-	UseStatement := func() {
-		nameSpaceStmt(func(nsc *phpparser.NamespaceStatementContext) {
-			y.VisitUseDeclaration(nsc.UseDeclaration())
-		})
-	}
+	//UseStatement := func() {
+	//	nameSpaceStmt(func(nsc *phpparser.NamespaceStatementContext) {
+	//		y.VisitUseDeclaration(nsc.UseDeclaration())
+	//	})
+	//}
 	normalStatement := func() {
 		nameSpaceStmt(func(nsc *phpparser.NamespaceStatementContext) {
 			y.VisitStatement(nsc.Statement())
@@ -138,7 +149,6 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		normalStatement()
 		namespaceProg, f := switchToNamespace()
 		defer f()
-		UseStatement()
 		for _, fun := range namespaceProg.Funcs {
 			fun.Build()
 		}
@@ -147,9 +157,8 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		}
 	case !hasName && !y.PreHandler():
 		// build this un-name namespace
-		UseStatement()
-		normalStatement()
 		declareStatement()
+		normalStatement()
 	}
 
 	return nil
@@ -197,34 +206,42 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 			switch opmode {
 			case "const", "function":
 				//todo const
-
-				if function := y.GetProgram().GetFunction(currentName); !utils.IsNil(function) {
+				if function := y.GetProgram().GetFunction(currentName, ""); !utils.IsNil(function) {
 					log.Warnf("current builder has function: %s", function.GetName())
 					continue
 				}
-				if namespace != nil {
-					if _, err := prog.ImportValue(namespace, realName); err != nil {
-						log.Errorf("get namespace value fail: %s", err)
-					}
+				if _, err := prog.ImportValueFromLib(namespace, realName); err != nil {
+					log.Errorf("get namespace value fail: %s", err)
 				}
 			default:
-				//有两种情况，class或者整个命名空间
+				//有两种情况，cls、整个命名空间和下面的
 				if cls := y.GetProgram().GetClassBluePrint(currentName); !utils.IsNil(cls) {
 					log.Warnf("current builder has classblue: %s", cls)
 					continue
 				}
 				if namespace != nil {
-					if _, err := prog.ImportType(namespace, realName); err != nil {
+					if _, err := prog.ImportTypeFromLib(namespace, realName); err != nil {
 						log.Errorf("get namespace type fail: %s", err)
 					}
 				}
 
 				if namespace := getNamespace(append(path, realName)...); namespace != nil {
-					y.GetProgram().CurrentNameSpace = strings.Join(path, ".") + "."
 					if err := prog.ImportAll(namespace); err != nil {
 						log.Errorf("get namespace all fail: %s", err)
+						return nil
 					}
-					return namespace
+					for _, value := range namespace.ExportValue {
+						if function, b := ssa.ToFunction(value); b {
+							prog.Funcs[fmt.Sprintf("%s\\%s", currentName, function.GetName())] = function
+						}
+					}
+					for _, t := range namespace.ExportType {
+						if bluePrint, ok := t.(*ssa.ClassBluePrint); ok {
+							prog.ClassBluePrint[fmt.Sprintf("%s\\%s", currentName, bluePrint.Name)] = bluePrint
+						}
+					}
+
+					return nil
 				}
 			}
 		}

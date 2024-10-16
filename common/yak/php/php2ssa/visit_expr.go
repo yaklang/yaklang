@@ -122,7 +122,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}()
 		target := y.VisitExpression(ret.Expression())
 		if !strings.HasPrefix(strings.ToLower(target.GetName()), "anonymousfunc") && !target.IsExtern() {
-			if tmpValue := y.GetProgram().GetFunction(target.GetName()); tmpValue != nil {
+			if tmpValue := y.GetFunc(target.GetName(), ""); tmpValue != nil {
 				target = tmpValue
 			}
 			if undefind, ok := ssa.ToUndefined(target); ok && !target.IsObject() {
