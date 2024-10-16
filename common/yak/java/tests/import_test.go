@@ -71,5 +71,46 @@ public class MDCAccessServletFilter implements Filter {
 		require.Contains(t, result.String(), "src/main/java/io/github/talelin/latticy/module/log/MDCAccessServletFilter.java")
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
-
+}
+func TestImportWithInterface(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/java/A.java", `
+package src.main.java;
+public interface HomeDao {
+    List<PmsBrand> getRecommendBrandList(@Param("offset") Integer off,@Param("limit") Integer limit);
+}`)
+	vf.AddFile("src/main/org/B.java", `
+package src.main.org;
+import src.main.java.HomeDao;
+class A{
+	@Autowired
+    private HomeDao homeDao;
+	public void BB(){
+		homeDao.getRecommendBrandList(1,2);
+}
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `off #-> * as $param`, map[string][]string{"param": {"1"}}, false, ssaapi.WithLanguage(ssaapi.JAVA))
+}
+func TestImportClass(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("com/example/demo1/A.java", `
+package com.example.demo1;
+class A {
+    public static int a = 1;
+	public static void test(){
+		return 1;
+	}
+}
+`)
+	fs.AddFile("com/example/demo2/test.java", `
+package com.example.demo2;
+import com.example.demo1.A;
+class test {
+    public static void main(String[] args) {
+        println(A.test());
+    }
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{"param": {"1"}}, false, ssaapi.WithLanguage(ssaapi.JAVA))
 }

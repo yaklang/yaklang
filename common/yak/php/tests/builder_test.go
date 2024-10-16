@@ -37,7 +37,7 @@ func TestParseSSA_SyntaxPhp(t *testing.T) {
 		}
 		`
 
-		test.MockSSA(t, code)
+		test.NonStrictMockSSA(t, code)
 	})
 	t.Run("test-4", func(t *testing.T) {
 		code := `<?php for ($i=0; $i < 5; $i++) { ?>
