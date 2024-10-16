@@ -151,16 +151,21 @@ func (c *ClassBluePrint) GetNormalMember(name string) *BluePrintMember {
 	return c.NormalMember[name]
 }
 
-func (c *ClassBluePrint) BuildConstructor() {
+func (c *ClassBluePrint) BuildConstructorAndDestructor() {
 	for _, p := range c.ParentClass {
-		p.BuildConstructor()
+		p.BuildConstructorAndDestructor()
 	}
 
 	if c.Constructor != nil {
-		c.Constructor.GetFunc().Build()
+		c.Constructor.GetFunc()
+		if function, b := ToFunction(c.Constructor); b {
+			function.Build()
+		}
 	}
-
 	for _, m := range c.Method {
 		m.Build()
+	}
+	for _, function := range c.StaticMethod {
+		function.Build()
 	}
 }

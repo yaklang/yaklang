@@ -1,11 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
-
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -211,18 +209,19 @@ type Program struct {
 
 	Cache *Cache
 
+	//consts
+	Consts map[string]Value
 	// function list
 	Funcs map[string]*Function
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
-	// for import/export
-	importValue map[string]Value
-	importType  map[string]Type
+	//clsName、pkgName、value
+	importValue map[string]map[string]Value
 	ExportValue map[string]Value
-	ExportType  map[string]Type
 
-	// namespace
-	CurrentNameSpace string
+	//clsName、pkgName、value
+	importType map[string]map[string]Type
+	ExportType map[string]Type
 
 	// offset
 	OffsetMap         map[int]*OffsetItem
@@ -245,6 +244,11 @@ type Program struct {
 	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)
 	ExternInstance          map[string]any
 	ExternLib               map[string]map[string]any
+
+	//if lib use packageName,such as go,enable it
+	pkgName             string
+	ImportValueCallback func(name, pkg string, val Value, prog *Program)
+	ImportTypeCallback  func(name, pkg string, _type Type, prog *Program)
 }
 
 // implement Value

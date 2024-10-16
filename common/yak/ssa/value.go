@@ -67,7 +67,6 @@ func (b *FunctionBuilder) readValueEx(
 ) Value {
 	scope := b.CurrentBlock.ScopeTable
 	program := b.GetProgram()
-
 	if ret := ReadVariableFromScope(scope, name); ret != nil {
 		if b.CurrentRange != nil {
 			ret.AddRange(b.CurrentRange, false)
@@ -114,9 +113,6 @@ func (b *FunctionBuilder) readValueEx(
 		if b.parentScope != nil {
 			return b.BuildFreeValue(name)
 		}
-	}
-	if v := b.GetProgram().getImportValue(name); v != nil {
-		return v
 	}
 	if create {
 		return b.writeUndefine(name)
