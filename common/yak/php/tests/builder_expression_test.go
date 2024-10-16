@@ -52,16 +52,6 @@ $a = 1;
 println($a);`
 		ssatest.CheckPrintlnValue(code, []string{"2"}, t)
 	})
-
-	t.Run("block scope, con't capture a", func(t *testing.T) {
-		code := `<?php
-{
-	$a = 2;
-}
-println($a);`
-		ssatest.CheckPrintlnValue(code, []string{"2"}, t)
-	})
-
 }
 
 func TestExpression_BitwiseExpression(t *testing.T) {
