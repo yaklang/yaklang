@@ -36,6 +36,7 @@ jobs:
       - name: Install libpcap (macOS)
         run: |
           brew install libpcap
+          git --help
         if: runner.os == 'macOS'
 
       - name: Init Module
