@@ -10,18 +10,37 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func (y *SyntaxFlowVisitor) EmitExitStatement() {
-	y.codes = append(y.codes, &SFI{
-		OpCode: OpExitStatement,
-	})
-}
-
-func (y *SyntaxFlowVisitor) EmitEnterStatement() {
-	y.codes = append(y.codes, &SFI{
+func (y *SyntaxFlowVisitor) EmitEnterStatement() *SFI {
+	code := &SFI{
 		OpCode: OpEnterStatement,
+	}
+	y.codes = append(y.codes, code)
+	return code
+}
+
+func (y *SyntaxFlowVisitor) EmitExitStatement(c *SFI) {
+	idx := len(y.codes)
+	c.UnaryInt = idx
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpExitStatement,
+		UnaryInt: idx,
 	})
 }
 
+func (y *SyntaxFlowVisitor) EmitFilterExprEnter() *SFI {
+	code := &SFI{OpCode: OpFilterExprEnter}
+	y.codes = append(y.codes, code)
+	return code
+}
+
+func (y *SyntaxFlowVisitor) EmitFilterExprExit(c *SFI) {
+	idx := len(y.codes)
+	c.UnaryInt = idx
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpFilterExprExit,
+		UnaryInt: idx,
+	})
+}
 func (y *SyntaxFlowVisitor) EmitNewRef(i string) {
 	y.codes = append(y.codes, &SFI{
 		OpCode:   OpNewRef,
@@ -370,20 +389,6 @@ func (v *SyntaxFlowVisitor) EmitIterEnd(i *IterIndex) {
 	v.codes = append(v.codes, code)
 }
 
-func (y *SyntaxFlowVisitor) EmitFilterExprEnter() *SFI {
-	code := &SFI{OpCode: OpFilterExprEnter}
-	y.codes = append(y.codes, code)
-	return code
-}
-
-func (y *SyntaxFlowVisitor) EmitFilterExprExit(c *SFI) {
-	idx := len(y.codes)
-	c.UnaryInt = idx
-	y.codes = append(y.codes, &SFI{
-		OpCode:   OpFilterExprExit,
-		UnaryInt: idx,
-	})
-}
 func (y *SyntaxFlowVisitor) EmitCheckStackTop() {
 	y.codes = append(y.codes, &SFI{
 		OpCode: OpCheckStackTop,

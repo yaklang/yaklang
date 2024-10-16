@@ -1,10 +1,11 @@
 package sfvm
 
 import (
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"reflect"
 	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
@@ -314,10 +315,10 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 
 	switch ret := i.(type) {
 	case *sf.AllParamContext:
-		y.EmitEnterStatement()
+		statement := y.EmitEnterStatement()
 		y.EmitPushAllCallArgs()
 		handlerStatement(ret.SingleParam())
-		y.EmitExitStatement()
+		y.EmitExitStatement(statement)
 	case *sf.EveryParamContext:
 		for i, paraI := range ret.AllActualParamFilter() {
 			para, ok := paraI.(*sf.ActualParamFilterContext)
@@ -328,16 +329,16 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 			if single == nil {
 				continue
 			}
-			y.EmitEnterStatement()
+			statement := y.EmitEnterStatement()
 			y.EmitPushCallArgs(i)
 			handlerStatement(single)
-			y.EmitExitStatement()
+			y.EmitExitStatement(statement)
 		}
 		if ret.SingleParam() != nil {
-			y.EmitEnterStatement()
+			statement := y.EmitEnterStatement()
 			y.EmitPushCallArgs(len(ret.AllActualParamFilter()))
 			handlerStatement(ret.SingleParam())
-			y.EmitExitStatement()
+			y.EmitExitStatement(statement)
 		}
 	default:
 		return utils.Errorf("BUG: ActualParamFilter type error: %s", reflect.TypeOf(ret))
