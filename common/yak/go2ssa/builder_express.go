@@ -416,8 +416,8 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			b.NewError(ssa.Warn, TAG, "cannot use _ as value")
 		}
 
-		if v := b.GetSpecialValueByStr(text); v != nil {
-			return v
+		if c, ok := b.CheckSpecialValueByStr(text); ok {
+			return b.EmitConstInst(c)
 		}
 
 		v := b.PeekValue(text)
