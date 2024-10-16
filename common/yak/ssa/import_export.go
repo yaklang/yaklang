@@ -1,9 +1,11 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 func (p *Program) GetExportType(name string) Type {
-	if t, ok := p.ExportType[name]; ok {
+	if t, ok := p.externType[name]; ok {
 		return t
 	}
 	return nil
@@ -41,54 +43,53 @@ func (p *Program) checkImportRelationship(lib *Program) error {
 	}
 	return nil
 }
-func (p *Program) getImportValue(name string) Value {
-	if p.importType == nil {
-		return nil
-	}
-	if v, ok := p.importValue[name]; ok {
-		return v
-	}
-	return nil
-}
 
-func (p *Program) setImportType(name string, t Type) {
+func (p *Program) setImportType(name, path string, t Type) {
 	if p.importType == nil {
-		p.importType = make(map[string]Type)
+		p.importType = make(map[string]map[string]Type)
 	}
-	p.importType[name] = t
+	if p.importType[path] == nil {
+		p.importType[path] = make(map[string]Type)
+	}
+	p.importType[path][name] = t
 }
-
-func (p *Program) setImportValue(name string, v Value) {
+func (p *Program) setImportValue(name, path string, v Value) {
 	if p.importValue == nil {
-		p.importValue = make(map[string]Value)
+		p.importValue = make(map[string]map[string]Value)
 	}
-	p.importValue[name] = v
+	if p.importValue[path] == nil {
+		p.importValue[path] = make(map[string]Value)
+	}
+	p.importValue[path][name] = v
 }
-
-func (p *Program) ImportType(lib *Program, name string) (Type, error) {
+func (p *Program) ImportTypeFromLib(lib *Program, name string) (Type, error) {
 	if err := p.checkImportRelationship(lib); err != nil {
 		return nil, err
 	}
-	t, ok := lib.ExportType[name]
-	if !ok {
-		return nil, utils.Errorf("library %s not contain type %s", lib.Name, name)
+	if t, ok := lib.ExportType[name]; !ok {
+		return nil, utils.Errorf("library %s not contain value %s", lib.Name, name)
+	} else {
+		p.setImportType(name, lib.pkgName, t)
+		if p.ImportValueCallback != nil {
+			p.ImportTypeCallback(name, lib.pkgName, t, p)
+		}
+		return t, nil
 	}
-	p.setImportType(name, t)
-	return t, nil
 }
 
-func (p *Program) ImportValue(lib *Program, name string) (Value, error) {
+func (p *Program) ImportValueFromLib(lib *Program, name string) (Value, error) {
 	if err := p.checkImportRelationship(lib); err != nil {
 		return nil, err
 	}
-
 	// get value
 	v, ok := lib.ExportValue[name]
 	if !ok {
 		return nil, utils.Errorf("library %s not contain value %s", lib.Name, name)
 	}
-
-	p.setImportValue(name, v)
+	p.setImportValue(name, lib.pkgName, v)
+	if p.ImportValueCallback != nil {
+		p.ImportValueCallback(name, lib.pkgName, v, p)
+	}
 	return v, nil
 }
 
@@ -96,13 +97,17 @@ func (p *Program) ImportAll(lib *Program) error {
 	if err := p.checkImportRelationship(lib); err != nil {
 		return err
 	}
-
 	for name, v := range lib.ExportValue {
-		p.setImportValue(name, v)
+		p.setImportValue(name, lib.pkgName, v)
+		if p.ImportValueCallback != nil {
+			p.ImportValueCallback(name, lib.pkgName, v, p)
+		}
 	}
 	for name, t := range lib.ExportType {
-		p.setImportType(name, t)
+		p.setImportType(name, lib.pkgName, t)
+		if p.ImportValueCallback != nil {
+			p.ImportTypeCallback(name, lib.pkgName, t, p)
+		}
 	}
-
 	return nil
 }
