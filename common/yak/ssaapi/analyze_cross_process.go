@@ -47,7 +47,7 @@ func newProcessInfo(call *Value) *processStackInfo {
 // crossProcess用于记录跨过程行为
 // 使用跨过程前和跨过程后的节点做哈希作为唯一一次跨过程行为
 // 如果跨过程行为是由call发起的，则是正向跨过程；如果call为nil，则为反向跨过程。
-func (c *crossProcessVisitedTable) pushCrossProcess(from *Value, to *Value, call *Value)bool {
+func (c *crossProcessVisitedTable) pushCrossProcess(from *Value, to *Value, call *Value) bool {
 	if from == nil || to == nil {
 		return false
 	}
@@ -61,14 +61,14 @@ func (c *crossProcessVisitedTable) pushCrossProcess(from *Value, to *Value, call
 	return c.pushCrossProcessWithInfo(hash, info)
 }
 
-func (c *crossProcessVisitedTable) pushCrossProcessWithInfo(hash string, info *processStackInfo)bool {
+func (c *crossProcessVisitedTable) pushCrossProcessWithInfo(hash string, info *processStackInfo) bool {
 	if hash == "" {
 		return false
 	}
 	if !c.crossProcessMap.Have(hash) {
 		c.crossProcessStack.Push(hash)
 		c.crossProcessMap.Set(hash, info)
-		return  true
+		return true
 	}
 	return false
 }
@@ -90,13 +90,37 @@ func (c *crossProcessVisitedTable) getValueVisitedTable() *omap.OrderedMap[strin
 	return c.crossProcessMap
 }
 
-func (c *crossProcessVisitedTable) getCurrentVisited() (*processStackInfo, bool) {
+func (c *crossProcessVisitedTable) getCurrentProcessInfo() (*processStackInfo, bool) {
 	if c.crossProcessStack.Len() == 0 {
 		log.Errorf("BUG:The cross process table is empty")
 		return nil, false
 	}
 	hash := c.crossProcessStack.Peek()
 	return c.crossProcessMap.Get(hash)
+}
+
+func (c *crossProcessVisitedTable) valueShould(v *Value) bool {
+	info, ok := c.getCurrentProcessInfo()
+	if !ok {
+		return false
+	}
+	if _, ok := info.valueVisited[v.GetId()]; !ok {
+		info.valueVisited[v.GetId()] = struct{}{}
+		return true
+	}
+	return false
+}
+
+func (c *crossProcessVisitedTable) memberShould(v *Value) bool {
+	info, ok := c.getCurrentProcessInfo()
+	if !ok {
+		return false
+	}
+	if _, ok := info.objectVisited[v.GetId()]; !ok {
+		info.objectVisited[v.GetId()] = struct{}{}
+		return true
+	}
+	return false
 }
 
 func calcCrossProcessHash(from *Value, to *Value) string {

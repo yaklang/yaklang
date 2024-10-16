@@ -84,7 +84,7 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	return actx
 }
 
-func (a *AnalyzeContext) PushCrossProcess(from *Value, to *Value, call *Value)bool {
+func (a *AnalyzeContext) PushCrossProcess(from *Value, to *Value, call *Value) bool {
 	return a.crossProcessVisitedTable.pushCrossProcess(from, to, call)
 }
 
@@ -119,28 +119,11 @@ func (a *AnalyzeContext) TheValueShouldBeVisited(i *Value) bool {
 	if i.IsFunction() {
 		return true
 	}
-	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
-	if !ok {
-		return false
-	}
-	if _, ok := valueVisited.valueVisited[i.GetId()]; !ok {
-		valueVisited.valueVisited[i.GetId()] = struct{}{}
-		return true
-	}
-	//log.Infof("value(%s) has been visited", i.String())
-	return false
+	return a.crossProcessVisitedTable.valueShould(i)
 }
 
 func (a *AnalyzeContext) TheMemberShouldBeVisited(i *Value) bool {
-	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
-	if !ok {
-		return false
-	}
-	if _, ok := valueVisited.objectVisited[i.GetId()]; !ok {
-		valueVisited.objectVisited[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
+	return a.crossProcessVisitedTable.memberShould(i)
 }
 
 func (a *AnalyzeContext) HaveTheCrossProcess(from *Value, to *Value) bool {
