@@ -25,7 +25,8 @@ const (
 )
 
 const (
-	SFR_SEVERITY_LOW      = "info"
+	SFR_SEVERITY_INFO     = "info"
+	SFR_SEVERITY_LOW      = "low"
 	SFR_SEVERITY_WARNING  = "middle"
 	SFR_SEVERITY_CRITICAL = "critical"
 	SFR_SEVERITY_HIGH     = "high"
@@ -49,16 +50,18 @@ func ValidRuleType(i any) SyntaxFlowRuleType {
 
 func ValidSeverityType(i any) SyntaxFlowSeverity {
 	switch strings.ToLower(yakunquote.TryUnquote(codec.AnyToString(i))) {
-	case "info", "i", "low", "verbose", "debug", "prompt":
-		return SFR_SEVERITY_LOW
+	case "info", "i", "verbose", "debug", "prompt":
+		return SFR_SEVERITY_INFO
 	case "warning", "w", "middle", "mid", "warn":
 		return SFR_SEVERITY_WARNING
 	case "critical", "c", "fatal", "e", "essential":
 		return SFR_SEVERITY_CRITICAL
 	case "high", "h", "error":
 		return SFR_SEVERITY_HIGH
-	default:
+	case "low":
 		return SFR_SEVERITY_LOW
+	default:
+		return SFR_SEVERITY_INFO
 	}
 }
 
