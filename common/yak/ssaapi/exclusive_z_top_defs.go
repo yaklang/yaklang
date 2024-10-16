@@ -101,38 +101,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 	}
 
-	getMemberCall := func(apiValue *Value, value ssa.Value, actx *AnalyzeContext) Values {
-		if value.HasValues() {
-			return i.visitedDefs(actx, opt...)
-		}
-		if value.IsMember() {
-			obj := i.NewValue(value.GetObject())
-			key := i.NewValue(value.GetKey())
-			if err := actx.PushObject(obj, key, i); err != nil {
-				log.Errorf("%v", err)
-				return i.visitedDefs(actx, opt...)
-			}
-			obj.AppendDependOn(apiValue)
-			actx.PushCrossProcess(i, obj, nil)
-			ret := obj.getTopDefs(actx, opt...)
-			defer actx.PopCrossProcess()
-			if !ValueCompare(i, actx.Self) {
-				ret = append(ret, i)
-			}
-			return ret
-		}
-		return i.visitedDefs(actx, opt...)
-	}
-
 	switch inst := i.node.(type) {
 	case *ssa.Undefined:
 		// ret[n]
-		return getMemberCall(i, inst, actx)
+		return i.getMemberCall(inst, actx, opt...)
 	case *ssa.ConstInst:
 		return i.visitedDefs(actx, opt...)
 	case *ssa.Phi:
 		conds := inst.GetControlFlowConditions()
-		result := getMemberCall(i, inst, actx)
+		result := i.getMemberCall(inst, actx, opt...)
 		for _, cond := range conds {
 			v := i.NewValue(cond)
 			ret := v.AppendEffectOn(i).getTopDefs(actx, opt...)
@@ -157,7 +134,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			callee := i.NewValue(fun)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 			callee.AppendEffectOn(i)
-
 			actx.PushCrossProcess(i, callee, i)
 			defer actx.PopCrossProcess()
 			// inherit return index
@@ -273,145 +249,13 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.ParameterMember:
-		var vals Values
-		getParameter := func() Values {
-			fun := i.GetFunction()
-			switch inst.MemberCallKind {
-			case ssa.ParameterMemberCall:
-				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
-					return para.getTopDefs(actx, opt...)
-				}
-			case ssa.FreeValueMemberCall:
-				if fv := fun.GetFreeValue(inst.MemberCallObjectName); fv != nil {
-					return fv.getTopDefs(actx, opt...)
-				}
-			}
-			return Values{i}
-		}
-		getCalledByValue := func(called *Value) Values {
-			if called == nil {
-				return nil
-			}
-			calledInstance, ok := ssa.ToCall(called.node)
-			if !ok {
-				log.Warnf("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
-				return Values{}
-			}
-			var actualParam ssa.Value
-			if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
-				return getParameter()
-			}
-			actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
-			traced := i.NewValue(actualParam).AppendEffectOn(called)
-			ret := traced.getTopDefs(actx, opt...)
-			if len(ret) > 0 {
-				return ret
-			} else {
-				return Values{traced}
-			}
-		}
-		called := actx.GetLastCallStackCall()
-		if called != nil {
-			recoverProcess := actx.PopCrossProcess()
-			calledByValue := getCalledByValue(called)
-			recoverProcess()
-			vals = append(vals, calledByValue...)
-		}
-		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
-			if fun := i.GetFunction(); fun != nil {
-				fun.GetCalledBy().ForEach(func(call *Value) {
-					ok := actx.PushCrossProcess(i, call, nil)
-					if !ok {
-						return
-					}
-					val := getCalledByValue(call)
-					actx.PopCrossProcess()
-					vals = append(vals, val...)
-				})
-			}
-		}
+		vals := i.getParamTopDef(actx, opt...)
 		if len(vals) == 0 {
-			return getParameter()
+			return i.getParamForParameterMember(actx, opt...)
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.Parameter:
-		// 查找被调用函数的TopDef
-		getCalledByValue := func(called *Value) Values {
-			if called == nil {
-				return nil
-			}
-			calledInstance, ok := ssa.ToCall(called.node)
-			if !ok {
-				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
-				return Values{}
-			}
-
-			thisFunc := i.GetFunction()
-			if !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) {
-				log.Errorf("call stack function %s(%d) not same with Parameter function %s(%d)",
-					calledInstance.Method.GetName(), calledInstance.Method.GetId(),
-					thisFunc.GetName(), thisFunc.GetId(),
-				)
-				return Values{}
-			}
-
-			var actualParam ssa.Value
-			if inst.IsFreeValue {
-				// free value
-				if tmp, ok := calledInstance.Binding[inst.GetName()]; ok {
-					actualParam = tmp
-				} else {
-					log.Errorf("free value: %v is not found in binding", inst.GetName())
-					return getMemberCall(i, i.node, actx)
-				}
-			} else {
-				// parameter
-				if inst.FormalParameterIndex >= len(calledInstance.Args) {
-					log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
-					return getMemberCall(i, i.node, actx)
-				}
-				actualParam = calledInstance.Args[inst.FormalParameterIndex]
-			}
-			traced := i.NewValue(actualParam).AppendEffectOn(called)
-			ret := traced.getTopDefs(actx, opt...)
-
-			if len(ret) > 0 {
-				return ret
-			} else {
-				return Values{traced}
-			}
-		}
-
-		var vals Values
-		called := actx.GetLastCallStackCall()
-		if called != nil {
-			if !called.IsCall() {
-				log.Infof("parent function is not called by any other function, skip (%T)", called)
-				return Values{i}
-			}
-			recoverProcess := actx.PopCrossProcess()
-			calledByValue := getCalledByValue(called)
-			recoverProcess()
-			vals = append(vals, calledByValue...)
-		}
-
-		// if not found in call stack, then find in called-by
-		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
-			fun := i.GetFunction()
-			if fun != nil {
-				call2fun := fun.GetCalledBy()
-				call2fun.ForEach(func(call *Value) {
-					ok := actx.PushCrossProcess(i, call, nil)
-					if !ok {
-						return
-					}
-					val := getCalledByValue(call)
-					actx.PopCrossProcess()
-					vals = append(vals, val...)
-				})
-			}
-		}
-
+		vals := i.getParamTopDef(actx, opt...)
 		if len(vals) == 0 {
 			if i.IsFreeValue() && inst.GetDefault() != nil {
 				vals = append(vals, i.NewValue(inst.GetDefault()))
@@ -445,5 +289,134 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return values
 	}
-	return getMemberCall(i, i.node, actx)
+	return i.getMemberCall(i.node, actx, opt...)
+}
+
+func (i *Value) getParamTopDef(actx *AnalyzeContext, opt ...OperationOption) Values {
+	var vals Values
+	called := actx.GetLastCallStackCall()
+	if called != nil {
+		if !called.IsCall() {
+			log.Infof("parent function is not called by any other function, skip (%T)", called)
+			return Values{i}
+		}
+		recoverProcess := actx.PopCrossProcess()
+		calledByValue := i.getCalledByValue(actx, called, opt...)
+		recoverProcess()
+		vals = append(vals, calledByValue...)
+	}
+	// if not found in call stack, then find in called-by
+	if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
+		fun := i.GetFunction()
+		if fun != nil {
+			call2fun := fun.GetCalledBy()
+			call2fun.ForEach(func(call *Value) {
+				ok := actx.PushCrossProcess(i, call, nil)
+				if !ok {
+					return
+				}
+				val := i.getCalledByValue(actx, call, opt...)
+				actx.PopCrossProcess()
+				vals = append(vals, val...)
+			})
+		}
+	}
+	return vals
+}
+
+func (i *Value) getCalledByValue(actx *AnalyzeContext, called *Value, opt ...OperationOption) Values {
+	if called == nil {
+		return nil
+	}
+	calledInstance, ok := ssa.ToCall(called.node)
+	if !ok {
+		log.Infof("BUG: Parameter/ParameterMember getCalledByValue called is not callInstruction %s", called.GetOpcode())
+		return Values{}
+	}
+
+	var actualParam ssa.Value
+	switch inst := i.node.(type) {
+	case *ssa.ParameterMember:
+		if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
+			return i.getParamForParameterMember(actx, opt...)
+		}
+		actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
+	case *ssa.Parameter:
+		thisFunc := i.GetFunction()
+		if !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) {
+			log.Errorf("call stack function %s(%d) not same with Parameter function %s(%d)",
+				calledInstance.Method.GetName(), calledInstance.Method.GetId(),
+				thisFunc.GetName(), thisFunc.GetId(),
+			)
+			return Values{}
+		}
+		if inst.IsFreeValue {
+			// free value
+			if tmp, ok := calledInstance.Binding[inst.GetName()]; ok {
+				actualParam = tmp
+			} else {
+				log.Errorf("free value: %v is not found in binding", inst.GetName())
+				return i.getMemberCall(i.node, actx, opt...)
+			}
+		} else {
+			// parameter
+			if inst.FormalParameterIndex >= len(calledInstance.Args) {
+				log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
+				return i.getMemberCall(i.node, actx, opt...)
+			}
+			actualParam = calledInstance.Args[inst.FormalParameterIndex]
+		}
+	default:
+		log.Warnf("BUG: %T is not *Parameter or *ParameterMember", i.node)
+		return Values{}
+	}
+	traced := i.NewValue(actualParam).AppendEffectOn(called)
+	ret := traced.getTopDefs(actx, opt...)
+	if len(ret) > 0 {
+		return ret
+	} else {
+		return Values{traced}
+	}
+}
+
+func (i *Value) getMemberCall(value ssa.Value, actx *AnalyzeContext, opt ...OperationOption) Values {
+	if value.HasValues() {
+		return i.visitedDefs(actx, opt...)
+	}
+	if value.IsMember() {
+		obj := i.NewValue(value.GetObject())
+		key := i.NewValue(value.GetKey())
+		if err := actx.PushObject(obj, key, i); err != nil {
+			log.Errorf("%v", err)
+			return i.visitedDefs(actx, opt...)
+		}
+		obj.AppendDependOn(i)
+		actx.PushCrossProcess(i, obj, nil)
+		ret := obj.getTopDefs(actx, opt...)
+		defer actx.PopCrossProcess()
+		if !ValueCompare(i, actx.Self) {
+			ret = append(ret, i)
+		}
+		return ret
+	}
+	return i.visitedDefs(actx, opt...)
+}
+
+func (i *Value) getParamForParameterMember(actx *AnalyzeContext, opt ...OperationOption) Values {
+	inst, ok := ssa.ToParameterMember(i.node)
+	if !ok {
+		return Values{}
+	}
+	fun := i.GetFunction()
+	switch inst.MemberCallKind {
+	case ssa.ParameterMemberCall:
+		if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
+			return para.getTopDefs(actx, opt...)
+		}
+	case ssa.FreeValueMemberCall:
+		if fv := fun.GetFreeValue(inst.MemberCallObjectName); fv != nil {
+			return fv.getTopDefs(actx, opt...)
+		}
+	}
+	return Values{i}
 }
