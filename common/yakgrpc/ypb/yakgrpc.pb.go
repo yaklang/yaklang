@@ -42493,7 +42493,7 @@ type SyntaxFlowScanResponse struct {
 
 	TaskID string `protobuf:"bytes,1,opt,name=TaskID,proto3" json:"TaskID,omitempty"`
 	// 扫描状态
-	Status     string      `protobuf:"bytes,2,opt,name=Status,proto3" json:"Status,omitempty"` // "running" "paused" "stopped" "finished"
+	Status     string      `protobuf:"bytes,2,opt,name=Status,proto3" json:"Status,omitempty"` // "executing" | "done" | "paused" | "error"
 	ExecResult *ExecResult `protobuf:"bytes,3,opt,name=ExecResult,proto3" json:"ExecResult,omitempty"`
 	// result
 	Result *SyntaxFlowResult `protobuf:"bytes,4,opt,name=Result,proto3" json:"Result,omitempty"`

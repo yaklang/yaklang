@@ -5516,7 +5516,7 @@ message SyntaxFlowScanRequest{
 message SyntaxFlowScanResponse{
   string TaskID = 1;
   // 扫描状态
-  string Status = 2; // "running" "paused" "stopped" "finished"
+  string Status = 2; // "executing" | "done" | "paused" | "error"
 
   ExecResult ExecResult = 3;
 
