@@ -48,7 +48,6 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 	)
 	return prog
 }
-
 func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...string) *Program {
 	fs := prog.Loader.GetFilesysFileSystem()
 	fullPath := prog.GetCurrentEditor().GetFilename()
@@ -68,6 +67,8 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 	subProg.externBuildValueHandler = prog.externBuildValueHandler
 	subProg.ExternInstance = prog.ExternInstance
 	subProg.ExternLib = prog.ExternLib
+	subProg.ImportTypeCallback = prog.ImportTypeCallback
+	subProg.ImportValueCallback = prog.ImportValueCallback
 
 	//todo: 这里需要加一个测试
 	subProg.GlobalScope = prog.GlobalScope
@@ -86,6 +87,9 @@ func (prog *Program) GetSubProgram(name string, path ...string) *Program {
 		child = prog.createSubProgram(name, Library, path...)
 	}
 	return child
+}
+
+func (prog *Program) storeProgram(name string) {
 }
 
 func (prog *Program) NewLibrary(name string, path []string) *Program {
@@ -152,7 +156,7 @@ func (prog *Program) GetProgramName() string {
 }
 
 func (prog *Program) GetAndCreateFunction(pkgName string, funcName string) *Function {
-	fun := prog.GetFunction(funcName)
+	fun := prog.GetFunction(funcName, pkgName)
 	if fun == nil {
 		fun = prog.NewFunction(funcName)
 	}
@@ -179,15 +183,21 @@ func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string
 	return builder
 }
 
-func (p *Program) GetFunction(name string) *Function {
-	if f, ok := p.Funcs[name]; ok {
-		if !p.PreHandler() {
-			f.Build()
+func (p *Program) GetFunction(name string, pkg string) *Function {
+	if p.importValue[pkg] != nil {
+		if value, ok := p.importValue[pkg][name]; ok {
+			if function, b := ToFunction(value); b {
+				return function
+			}
 		}
-		return f
 	}
-	if importedF, ok := p.importValue[name].(*Function); ok {
-		return importedF
+	if pkg == "" {
+		if f, ok := p.Funcs[name]; ok {
+			if !p.PreHandler() {
+				f.Build()
+			}
+			return f
+		}
 	}
 	return nil
 }
@@ -310,6 +320,15 @@ func (p *Program) GetApplication() *Program {
 }
 
 func (p *Program) GetType(name string) Type {
+	return p.getTypeEx(name, "")
+}
+func (p *Program) GetTypeWithPkgName(name, pkg string) Type {
+	return p.getTypeEx(name, pkg)
+}
+func (p *Program) getTypeEx(name, pkg string) Type {
+	if m := p.importType[pkg]; m != nil && m[name] != nil {
+		return m[name]
+	}
 	if t, ok := p.externType[name]; ok {
 		return t
 	}

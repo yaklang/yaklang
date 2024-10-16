@@ -105,6 +105,9 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 	f.builder = b
 	return b
 }
+func (b *FunctionBuilder) GetFunc(name, pkg string) *Function {
+	return b.GetProgram().GetFunction(name, pkg)
+}
 
 func (b *FunctionBuilder) SetBuildSupport(parent *FunctionBuilder) {
 	if parent == nil {
