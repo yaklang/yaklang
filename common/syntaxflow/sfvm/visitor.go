@@ -63,15 +63,17 @@ func (y *SyntaxFlowVisitor) VisitStatement(raw sf.IStatementContext) {
 
 	switch i := raw.(type) {
 	case *sf.FilterContext:
-		y.EmitEnterStatement()
+		statement := y.EmitEnterStatement()
 		y.VisitFilterStatement(i.FilterStatement())
-		y.EmitExitStatement()
+		y.EmitExitStatement(statement)
 	case *sf.CheckContext:
 		y.VisitCheckStatement(i.CheckStatement())
 	case *sf.DescriptionContext:
 		y.VisitDescriptionStatement(i.DescriptionStatement())
 	case *sf.AlertContext:
+		statement := y.EmitEnterStatement()
 		y.VisitAlertStatement(i.AlertStatement())
+		y.EmitExitStatement(statement)
 	case *sf.EmptyContext:
 		return
 	case *sf.FileFilterContentContext:

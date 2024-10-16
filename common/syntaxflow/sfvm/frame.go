@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -22,7 +23,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type filterExprContext struct {
+// skip  current statement or filter-expression when error
+type errorSkipContext struct {
 	start      int
 	end        int
 	stackDepth int
@@ -41,15 +43,20 @@ type SFFrame struct {
 	// install meta info and result info
 	result *SFFrameResult
 
-	idx             int
-	stack           *utils.Stack[ValueOperator]
-	filterExprStack *utils.Stack[*filterExprContext]
-	conditionStack  *utils.Stack[[]bool]
-	iterStack       *utils.Stack[*IterContext] // for loop
-	Text            string
-	Codes           []*SFI
-	toLeft          bool
-	debug           bool
+	idx int // current opcode index
+
+	stack          *utils.Stack[ValueOperator] // for filter
+	conditionStack *utils.Stack[[]bool]        // for condition
+	iterStack      *utils.Stack[*IterContext]  // for loop
+
+	// when cache err skip  statement/expr
+	statementStack  *utils.Stack[*errorSkipContext]
+	filterExprStack *utils.Stack[*errorSkipContext]
+
+	Text   string
+	Codes  []*SFI
+	toLeft bool
+	debug  bool
 
 	predCounter int
 	context     *SFFrameResult
@@ -169,7 +176,8 @@ func (s *SFFrame) Flush() {
 		s.result = NewSFResult(s.Text) // TODO: This code affects the reentrancy of the function
 	}
 	s.stack = utils.NewStack[ValueOperator]()
-	s.filterExprStack = utils.NewStack[*filterExprContext]()
+	s.statementStack = utils.NewStack[*errorSkipContext]()
+	s.filterExprStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
 	s.iterStack = utils.NewStack[*IterContext]()
 	s.idx = 0
@@ -223,7 +231,6 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			log.Infof("%+v", ret)
 		}
 	}()
-	statementStackDeepth := utils.NewStack[int]()
 	for {
 		if s.idx >= len(s.Codes) {
 			break
@@ -234,10 +241,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		s.debugLog(i.String())
 		switch i.OpCode {
 		case OpFilterExprEnter:
-			// if s.stack.Len() == 0 {
-			// 	return utils.Errorf("(BUG) stack top is empty")
-			// }
-			s.filterExprStack.Push(&filterExprContext{
+			s.filterExprStack.Push(&errorSkipContext{
 				start:      s.idx,
 				end:        i.UnaryInt,
 				stackDepth: s.stack.Len(),
@@ -258,9 +262,13 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				s.stack.Push(input)
 			}
 		case OpEnterStatement:
-			statementStackDeepth.Push(s.stack.Len())
+			s.statementStack.Push(&errorSkipContext{
+				start:      s.idx,
+				end:        i.UnaryInt,
+				stackDepth: s.stack.Len(),
+			})
 		case OpExitStatement:
-			checkLen := statementStackDeepth.Pop()
+			checkLen := s.statementStack.Pop().stackDepth
 			if s.stack.Len() != checkLen {
 				err := utils.Errorf("filter statement stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
 				log.Errorf("%v", err)
@@ -356,12 +364,15 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 					return err
 				}
 				// go to expression end
-				result := s.filterExprStack.Peek()
-				if result == nil {
-					return err
+				if result := s.filterExprStack.Peek(); result != nil {
+					s.idx = result.end
+					continue
 				}
-				s.idx = result.end
-				continue
+				if result := s.statementStack.Peek(); result != nil {
+					s.idx = result.end
+					continue
+				}
+				return err
 			}
 		}
 		s.idx++
@@ -1321,7 +1332,7 @@ func (s *SFFrame) debugLog(i string, item ...any) {
 		return
 	}
 
-	filterStackLen := s.filterExprStack.Len()
+	filterStackLen := s.statementStack.Len()
 
 	prefix := strings.Repeat(" ", filterStackLen)
 	prefix = "sf" + fmt.Sprintf("%4d", s.idx) + "| " + prefix
