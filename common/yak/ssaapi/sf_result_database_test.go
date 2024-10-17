@@ -213,7 +213,6 @@ func TestRuleAlertMsg(t *testing.T) {
 
 func TestRuleRisk(t *testing.T) {
 	code := `
-	print("a")
 	print(f())
 	`
 	progName := uuid.NewString()
@@ -229,10 +228,16 @@ func TestRuleRisk(t *testing.T) {
 		title: "check print variable",
 	)
 	print(* as $para)
-	$para ?{! opcode: const} as $target
+	$para ?{!opcode: const} as $target
+	$para ?{ opcode: const} as $target2
 	alert $target for {
 		"msg": "target is not const",
 		"level": "warning",
+		"type": "security",
+	}
+	alert $target2 for {
+		"msg": "target is const",
+		"level": "low",
 		"type": "security",
 	}
 	`
@@ -252,13 +257,21 @@ func TestRuleRisk(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// check result
+	resultDB, err := ssadb.GetResultByID(resultID)
+	require.NoError(t, err)
+	require.Equal(t, resultDB.RiskCount, uint64(1))
+
+	// check risk
 	_, risks, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
 		RuntimeId: taskID,
 	})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(risks))
+	require.Equal(t, resultDB.RiskCount, uint64(len(risks)))
 	risk := risks[0]
 	require.Contains(t, risk.Details, "target is not const")
 	require.Equal(t, "warning", risk.Severity)
 	require.Equal(t, "check print variable", risk.Title)
+
 }
