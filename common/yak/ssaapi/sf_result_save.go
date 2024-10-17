@@ -95,14 +95,14 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 	}
 	saveVariable := func(name string, values Values) {
 		opts := append(opts, OptionSaveValue_ResultVariable(name))
-		if msg, ok := r.GetAlertInfo(name); ok {
-			opts = append(opts, OptionSaveValue_ResultAlert(msg))
-			r.SaveRisk(name, result.ID, result.TaskID)
-		}
 		// save un value variable
 		if len(values) == 0 {
 			result.UnValueVariable = append(result.UnValueVariable, name)
 			return
+		}
+		if msg, ok := r.GetAlertInfo(name); ok {
+			opts = append(opts, OptionSaveValue_ResultAlert(msg))
+			r.SaveRisk(name, result)
 		}
 		// save variable that has value
 		for _, v := range values {

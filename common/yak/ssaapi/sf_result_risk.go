@@ -4,11 +4,12 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID string) {
+func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) {
 	alertMsg, ok := r.GetAlertEx(variable)
 	if !ok {
 		log.Infof("no alert msg for %s; skip", variable)
@@ -18,7 +19,7 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID strin
 	rule := r.rule
 	// risk := yakit.CreateRisk("",
 	opts := []yakit.RiskParamsOpt{
-		yakit.WithRiskParam_RuntimeId(taskID),
+		yakit.WithRiskParam_RuntimeId(result.TaskID),
 		yakit.WithRiskParam_FromScript(rule.RuleName),
 		yakit.WithRiskParam_Title(rule.Title),
 		yakit.WithRiskParam_TitleVerbose(rule.TitleZh),
@@ -54,13 +55,16 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID strin
 			opts = append(opts, yakit.WithRiskParam_Solution(alertMsg.Solution))
 		}
 		if alertMsg.Msg != "" {
-			opts = append(opts, yakit.WithRiskParam_Details(alertMsg.Msg))
+			opts = append(opts, yakit.WithRiskParam_Details(map[string]string{
+				"message": alertMsg.Msg,
+			}))
 		}
 	}
 
 	risk := yakit.CreateRisk("", opts...)
-	risk.ResultID = resultID
+	risk.ResultID = result.ID
 	risk.Variable = variable
+	risk.ProgramName = result.ProgramName
 	if err := yakit.SaveRisk(risk); err != nil {
 		log.Errorf("save risk failed: %s", err)
 		return
