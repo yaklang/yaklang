@@ -240,10 +240,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 			return nil, utils.Errorf("index out of range: %d", index)
 		}
 		value := vs[index]
-		msg := ""
-		if m, ok := result.GetAlertInfo(variable); ok {
-			msg = codec.AnyToString(m)
-		}
+		msg, _ := result.GetAlertMsg(variable)
 		res := Value2Response(programName, value, msg, url)
 		resources = append(resources, res)
 	}
@@ -295,7 +292,7 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 			res := createNewRes(url, valueNum, nil)
 			res.ResourceType = "variable"
 			res.ResourceName = variable
-			if msg, ok := result.GetAlertInfo(variable); ok {
+			if msg, ok := result.GetAlertMsg(variable); ok {
 				res.VerboseType = "alert"
 				res.VerboseName = codec.AnyToString(msg)
 				if risk := result.GetRisk(variable); risk != nil {
