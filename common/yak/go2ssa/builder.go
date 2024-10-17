@@ -87,11 +87,11 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 		"comparable": ssa.CreateAnyType(),
 		"error":      ssa.CreateErrorType(),
 	}
-	SpecialValue := map[string]ssa.Value{
-		"nil":   builder.EmitConstInstNil(),
-		"iota":  builder.EmitConstInst("iota"),
-		"true":  builder.EmitConstInst(true),
-		"false": builder.EmitConstInst(false),
+	SpecialValue := map[string]interface{}{
+		"nil":   nil,
+		"iota":  "iota",
+		"true":  true,
+		"false": false,
 	}
 
 	builder.SupportClosure = false
@@ -125,7 +125,7 @@ type astbuilder struct {
 	result         map[string][]string
 	tpHandler      map[string]func()
 	labels         map[string]*ssa.LabelBuilder
-	specialValues  map[string]ssa.Value
+	specialValues  map[string]interface{}
 	specialTypes   map[string]ssa.Type
 	pkgNameCurrent string
 }
@@ -288,9 +288,11 @@ func (b *astbuilder) GetSpecialTypeByStr(name string) ssa.Type {
 	return b.specialTypes[name]
 }
 
-func (b *astbuilder) GetSpecialValueByStr(name string) ssa.Value {
+func (b *astbuilder) CheckSpecialValueByStr(name string) (interface{}, bool) {
+	key := b.specialValues[name]
+	_ = key
 	if b.specialValues[name] == nil {
-		return nil
+		return key, false
 	}
-	return b.specialValues[name]
+	return key, true
 }
