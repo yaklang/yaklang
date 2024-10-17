@@ -177,7 +177,7 @@ func TestTLSConfigAuth2(t *testing.T) {
 	})
 
 	err = tlsConn.Handshake()
-	if !strings.Contains(err.Error(), "tls: bad certificate") {
+	if !strings.Contains(err.Error(), "tls: bad certificate") && !strings.Contains(err.Error(), "tls: certificate required") {
 		t.Fatal("cannot connect without cert")
 	}
 
