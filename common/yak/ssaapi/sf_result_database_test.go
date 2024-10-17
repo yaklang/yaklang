@@ -152,7 +152,7 @@ func TestRuleAlertMsg(t *testing.T) {
 		require.Contains(t, result.GetAlertVariables(), "target")
 		require.NotNil(t, result.GetValues("target"))
 
-		info, ok := result.GetAlertEx("target")
+		info, ok := result.GetAlertInfo("target")
 		log.Infof("info: %v", info)
 		require.True(t, ok)
 		require.Equal(t, "target is not const", info.Msg)

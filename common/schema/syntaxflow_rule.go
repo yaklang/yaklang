@@ -173,14 +173,11 @@ func (s *SyntaxFlowRule) BeforeSave() error {
 	s.Severity = ValidSeverityType(s.Severity)
 	return nil
 }
-func (s *SyntaxFlowRule) GetAlertInfo(msg string) (string, bool) {
+func (s *SyntaxFlowRule) GetAlertInfo(msg string) (*SyntaxFlowDescInfo, bool) {
 	if info, ok := s.AlertDesc[msg]; ok {
-		if info.OnlyMsg {
-			return info.Msg, true
-		}
-		return codec.AnyToString(info), true
+		return info, true
 	}
-	return "", false
+	return nil, false
 }
 
 func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
