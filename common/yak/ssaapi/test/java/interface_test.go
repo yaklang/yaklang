@@ -1,6 +1,7 @@
 package java
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -58,6 +59,6 @@ public class PmsPortalBrandServiceImpl implements PmsPortalBrandService {
 		"ParameterDef": {"1", "Parameter-pageNum", "Parameter-pageSize"},
 	},
 		false,
-		// ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaapi.JAVA),
 	)
 }

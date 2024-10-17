@@ -107,18 +107,18 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	var bpHandler = func() {
 		lib := b.GetProgram()
 		for structName, structType := range b.GetStructAll() {
-			lib.SetExprotType(structName, structType)
+			lib.SetExportType(structName, structType)
 		}
 		for aliasName, aliasType := range b.GetAliasAll() {
-			lib.SetExprotType(aliasName, aliasType)
+			lib.SetExportType(aliasName, aliasType)
 		}
 		for funcName, funcValue := range b.GetProgram().Funcs {
 			if !funcValue.IsMethod() && funcValue.GetName() != "@init" {
-				lib.SetExprotValue(funcName, funcValue)
+				lib.SetExportValue(funcName, funcValue)
 			}
 		}
 		for globalName, globalValue := range b.GetGlobalVariables() {
-			lib.SetExprotValue(globalName, globalValue)
+			lib.SetExportValue(globalName, globalValue)
 		}
 	}
 
@@ -560,7 +560,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		b.AssignVariable(variable, newFunc)
 	}
 
-	newFunc.SetOrdinalBuild(func() ssa.Value {
+	newFunc.SetLazyBuilder(func() {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		defer func() {
 			recoverRange()
@@ -570,6 +570,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 			}
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
+		b.SupportClosure = false
 
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
@@ -591,7 +592,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 
-		return newFunc
 	})
 	return newFunc
 }
@@ -635,7 +635,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 		b.AssignVariable(variable, newFunc)
 	}
 
-	newFunc.SetOrdinalBuild(func() ssa.Value {
+	newFunc.SetLazyBuilder(func() {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		defer func() {
 			recoverRange()
@@ -672,7 +672,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 
-		return newFunc
 	})
 	return newFunc
 }
@@ -1780,7 +1779,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 				b.NewError(ssa.Warn, TAG, PackageNotFind(qul.IDENTIFIER(0).GetText()))
 				ssatyp = ssa.CreateAnyType()
 			} else {
-				obj := lib.GetExprotType(qul.IDENTIFIER(1).GetText())
+				obj := lib.GetExportType(qul.IDENTIFIER(1).GetText())
 
 				if obj != nil {
 					ssatyp = obj

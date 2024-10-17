@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -19,15 +20,39 @@ const (
 	Readonly
 )
 
-func (pkg *Program) GetClassBluePrint(name string) *ClassBluePrint {
-	if pkg == nil {
+func (p *Program) GetClassBlueprintEx(name string, pkg string) *ClassBluePrint {
+	if p == nil {
 		return nil
 	}
-	if c, ok := pkg.ClassBluePrint[name]; ok {
+
+	//todo: this have error,refactor class pr after fix
+	m := p.importTypeToPkg[name]
+	if m != nil && len(m) > 0 {
+		entries := lo.Entries(m)
+		if bluePrint, ok := entries[0].Value.(*ClassBluePrint); ok {
+			return bluePrint
+		}
+	}
+	if p.importType[pkg] != nil {
+		if _type, ok := p.importType[pkg][name]; ok {
+			if bluePrint, ok1 := _type.(*ClassBluePrint); ok1 {
+				if !p.PreHandler() {
+					bluePrint.Build()
+				}
+				return bluePrint
+			}
+		}
+	}
+	if c, ok := p.ClassBluePrint[name]; ok {
+		if !p.PreHandler() {
+			c.Build()
+		}
 		return c
 	}
-	// log.Errorf("GetClassBluePrint: not this class: %s", name)
 	return nil
+}
+func (p *Program) GetClassBluePrint(name string) *ClassBluePrint {
+	return p.GetClassBlueprintEx(name, "")
 }
 
 func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) {
@@ -43,25 +68,24 @@ func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) 
 // but because of the 'this/super', we will still keep the concept 'Class'
 // for ref the method/function, the blueprint is a container too,
 // saving the static variables and util methods.
-func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
-	// p := b.GetProgram()
-	p := b.prog
-	c := NewClassBluePrint()
-	if _, ok := p.ClassBluePrint[name]; ok {
-		log.Errorf("CreateClassBluePrint: this class redeclare")
+func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
+	prog := b.prog
+	blueprint := NewClassBluePrint()
+	if prog.ClassBluePrint == nil {
+		prog.ClassBluePrint = make(map[string]*ClassBluePrint)
 	}
-	p.ClassBluePrint[name] = c
-	c.Name = name
-
-	log.Infof("start to create class container variable for saving static member: %s", name)
-	klassVar := b.CreateVariable(name, tokenizer...)
+	blueprint.Name = name
+	prog.ClassBluePrint[name] = blueprint
+	klassvar := b.CreateVariable(name, tokenizer...)
 	klassContainer := b.EmitEmptyContainer()
-	b.AssignVariable(klassVar, klassContainer)
-	err := c.InitializeWithContainer(klassContainer)
-	if err != nil {
+	b.AssignVariable(klassvar, klassContainer)
+	if err := blueprint.InitializeWithContainer(klassContainer); err != nil {
 		log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
 	}
-	return c
+	return blueprint
+}
+func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
+	return b.CreateBluePrintWithPkgName(name, tokenizer...)
 }
 
 func (b *FunctionBuilder) GetClassBluePrint(name string) *ClassBluePrint {
@@ -148,6 +172,7 @@ func (c *ClassBluePrint) getMethodEx(name string, get func(bluePrint *ClassBlueP
 }
 
 func (b *FunctionBuilder) GetStaticMember(class, key string) *Variable {
+	_ = b.GetProgram().GetClassBluePrint(class)
 	return b.CreateVariable(fmt.Sprintf("%s_%s", class, key))
 }
 

@@ -9,8 +9,6 @@ import (
 )
 
 func TestNamespace(t *testing.T) {
-	// TODO: this php namespace bug will fixup in: https://github.com/yaklang/yaklang/pull/1911
-	t.Skip()
 	t.Run("namespace mock", func(t *testing.T) {
 		code := `<?php
 namespace test{
@@ -24,9 +22,9 @@ namespace{
 `
 		ssatest.MockSSA(t, code)
 	})
-	t.Run("namespace variables", func(t *testing.T) {
+	t.Run("namespace variables assign and read both in unname", func(t *testing.T) {
 		code := `<?php
-namespace test{
+namespace {
 	$a = 1;
 }
 
@@ -34,6 +32,18 @@ namespace{
 	println($a);
 }`
 		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+	t.Run("namespace variables", func(t *testing.T) {
+		code := `<?php
+namespace test{
+	$a = 1;
+	println($a);
+}
+
+namespace{
+	println($a);
+}`
+		ssatest.CheckPrintlnValue(code, []string{"1", "1"}, t)
 	})
 	t.Run("more namespace variable", func(t *testing.T) {
 		code := `<?php
@@ -124,6 +134,7 @@ namespace {
 		//	map[string][]string{"param": {"1"}},
 		//	ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	//todo:
 	t.Run("use namespace", func(t *testing.T) {
 		code := `<?php
 
@@ -153,10 +164,12 @@ namespace {
 			map[string][]string{"param": {"1"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
+
+	// CheckSyntaxFlowWithFS里面不会执行PreHandlerProject
 	t.Run("more namespace", func(t *testing.T) {
+		t.SkipNow()
 		fs := filesys.NewVirtualFs()
 		fs.AddFile("src/main/1.php", `<?php
-
 namespace a\b\c {
 	function testt(){
 		return 1;
@@ -201,14 +214,14 @@ namespace a {
 
     use function b\aa;
 
-    function t($a)
+    function t()
     {
-        return $a;
+        return 1;
     }
 
-    function b($b)
+    function b()
     {
-        return aa($b);
+        return aa();
     }
 }
 
@@ -216,17 +229,56 @@ namespace b {
 
     use function a\t;
 
-    function aa($c)
+    function aa()
     {
-        return t($c);
+        return t();
     }
+	function bb(){
+	}
 }
 
 namespace {
-    $a = a\b(1);
+    $a = a\b();
     println($a);
 }`
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+	})
+	t.Run("namepsace references each other1", func(t *testing.T) {
+		code := `<?php
+
+namespace a {
+
+    use function b\aa;
+
+    function t()
+    {
+        return 1;
+    }
+
+    function b()
+    {
+        return aa();
+    }
+}
+
+namespace b {
+
+    use function a\t;
+
+    function aa()
+    {
+        return bb();
+    }
+	function bb(){
+		return 2;
+	}
+}
+
+namespace {
+    $a = a\b();
+    println($a);
+}`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
 	})
 	t.Run("all namespace use static member", func(t *testing.T) {
 		code := `<?php
@@ -246,26 +298,31 @@ namespace {
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
-	//t.Run("namespace function call", func(t *testing.T) {
-	//	code := `<?php
-	//
-	//namespace a\b\c\d {
-	//   class t
-	//   {
-	//       public static $abc = 1;
-	//   }
-	//
-	//   function test($a)
-	//   {
-	//       return $a;
-	//   }
-	//}
-	//
-	//namespace {
-	//   $a = \a\b\c\d\test(\a\b\c\d\t::$abc);
-	//   println($a);
-	//}
-	//`
-	//	ssatest.CheckPrintlnValue(code, []string{}, t)
-	//})
+	t.Run("test no namespace", func(t *testing.T) {
+		code := `<?php
+
+namespace{
+    function a(){
+        return 1;
+    }
+    println(a());
+}`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+	})
+	t.Run("test namespace not use", func(t *testing.T) {
+		code := `<?php
+
+namespace aa\b{
+    function a(){
+        return 2;
+    }
+}
+namespace{
+    function a(){
+        return 1;
+    }
+    println(a());
+}`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+	})
 }

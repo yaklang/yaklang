@@ -209,14 +209,6 @@ func (a *anInstruction) GetOpcode() Opcode { return SSAOpcodeUnKnow } // cover b
 
 var _ Instruction = (*anInstruction)(nil)
 
-type parserMode int
-
-const (
-	prePar parserMode = iota
-	Paring
-	ParEnd
-)
-
 type anValue struct {
 	anInstruction
 
@@ -236,50 +228,8 @@ type anValue struct {
 	pointer   Values // the pointer is point to this value
 	reference Value  // the value is pointed by this value
 
-	//parse value
-	parseMode parserMode //parse mode
-	spinValue Value
-	build     func() Value
-	this      Value
 }
 
-func (n *anValue) SetOrdinalBuild(Builder func() Value) {
-	n.build = Builder
-}
-func (n *anValue) Build() Value {
-	switch n.parseMode {
-	case prePar:
-		n.parseMode = Paring
-		val := n.build()
-		n.parseMode = ParEnd
-		n.this = val
-		return val
-	case Paring:
-		if utils.IsNil(n.spinValue) {
-			n.spinValue = n.GetFunc().builder.EmitConstInst("spin value")
-		}
-		return n.spinValue
-	case ParEnd:
-		return n.this
-	}
-	return nil
-}
-func (n *anValue) FixSpinUdChain() {
-	if !utils.IsNil(n.spinValue) {
-		if !utils.IsNil(n.this) {
-			ReplaceAllValue(n.spinValue, n.this)
-		} else {
-			ReplaceAllValue(n.spinValue, n.GetFunc().builder.EmitConstInst("unknown_replace_value"))
-		}
-	}
-}
-func (n *anValue) CheckAndFinishBuild() bool {
-	if n.parseMode == prePar {
-		n.Build()
-		return true
-	}
-	return false
-}
 func NewValue() anValue {
 	return anValue{
 		anInstruction: NewInstruction(),
@@ -291,11 +241,6 @@ func NewValue() anValue {
 
 		variables: omap.NewOrderedMap(map[string]*Variable{}),
 		mask:      omap.NewOrderedMap(map[string]Value{}),
-
-		parseMode: prePar,
-		build: func() Value {
-			return nil
-		},
 	}
 }
 

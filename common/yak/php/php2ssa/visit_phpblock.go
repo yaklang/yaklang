@@ -17,9 +17,17 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	}
 
 	//==================================================================== visitor
-	if y.PreHandler && len(i.AllNamespaceDeclaration()) == 0 {
+	if y.PreHandler() && len(i.AllNamespaceDeclaration()) == 0 {
 		return nil
 	}
+	if !y.PreHandler() {
+		//todo: fix function lz builder
+		for _, context := range i.AllNamespaceDeclaration() {
+			y.VisitNamespaceOnlyUse(context)
+		}
+	}
+
+	//syntax use for lib
 	for _, namespace := range i.AllNamespaceDeclaration() {
 		y.VisitNamespaceDeclaration(namespace)
 	}
@@ -40,15 +48,6 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	}
 	for _, enum := range i.AllEnumDeclaration() {
 		y.VisitEnumDeclaration(enum)
-	}
-
-	//=================================================================== builder
-	for _, function := range y.GetProgram().Funcs {
-		function.CheckAndFinishBuild()
-		function.FixSpinUdChain()
-	}
-	for _, bluePrint := range y.GetProgram().ClassBluePrint {
-		bluePrint.SyntaxMethods()
 	}
 	return nil
 }
