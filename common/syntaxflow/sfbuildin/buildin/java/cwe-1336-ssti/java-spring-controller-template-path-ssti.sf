@@ -6,7 +6,7 @@ desc(
 
 <include('java-spring-param')>?{<typeName>?{have: String}} as $params;
 
-Controller.__ref__<getMembers>?{.annotation.*Mapping} as $entryMethods;
+Controller.__ref__<getMembers>?{.annotation.*Mapping && !.annotation.ResponseBody} as $entryMethods;
 $entryMethods<getReturns>?{<typeName>?{have: String}} as $sink;
 $sink #{
     until: `* & $params as $source`,
@@ -48,6 +48,16 @@ alert $filteredSink for {
 desc(
     lang: java,
     alert_min: 3,
+    'safefile://safe.java': <<<SAFE
+@Controller
+public class VulnerableController1 {
+    @ResponseBody
+    @GetMapping("/safe/viewer")
+    public String viewPage3(@RequestParam String page, Model model) {
+        return page;
+    }
+}
+SAFE,
     'file://demo.java': <<<EOF
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
