@@ -7,17 +7,21 @@ on:
         required: true
         type: choice
         options:
-          - windows7
           - windows
+          - windows7
           - macos-amd64 
           - macos-arm64
           - linux-amd64
           - linux-arm64
+      ee:
+        type: boolean
+        description: whether to build ee version
+        default: false
 
 jobs:
   build:
     uses: ./.github/workflows/reuse-build.yml
     with:
       os: ${{ inputs.os }}
-      ee: false
+      ee: ${{ inputs.ee }}
     secrets: inherit

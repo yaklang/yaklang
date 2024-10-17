@@ -8,8 +8,8 @@ on:
         required: true
         type: choice
         options:
-          - windows7
           - windows
+          - windows7
           - macos-amd64 
           - macos-arm64
           - linux-amd64
@@ -30,7 +30,6 @@ on:
         description: whether to build ee version
         default: false 
 
-
 jobs:
   build_and_upload_asset:
     runs-on: ${{ contains(inputs.os, 'windows') && 'windows-latest' || 'macos-14' }}
@@ -38,9 +37,10 @@ jobs:
       - uses: actions/checkout@v2
       
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-          go-version: 1.22
+          go-version-file: "./go.mod"
+        id: go
 
       - name: Go Patch for Win7
         if: inputs.os == 'windows7'
@@ -80,65 +80,34 @@ jobs:
         if: inputs.ee
         run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
 
-      - name: Build For Linux(linux, amd64)
+      - name: Build for Windows
+        if: contains(inputs.os, 'windows')
         run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=x86_64-linux-gnu-gcc go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o "./yak_linux_amd64" -v common/yak/cmd/yak.go && ls
-        if: inputs.os == 'linux-amd64'
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          $outputName = if ("${{ inputs.os }}" -eq "windows7") { "yak_windows_legacy_amd64.exe" } else { "yak_windows_amd64.exe" }
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $outputName -v common/yak/cmd/yak.go
+          echo "OUTPUT_NAME=$outputName" >> $env:GITHUB_ENV
 
-      - name: Build For Linux(linux, arm64)
+      - name: Build for Non-Windows
+        if: ${{ !contains(inputs.os, 'windows') }}
         run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o "./yak_linux_arm64" -v common/yak/cmd/yak.go && ls
-        if: inputs.os == 'linux-arm64'
+          export GOOS=$(echo ${{ inputs.os }} | cut -d'-' -f1)
+          export GOARCH=$(echo ${{ inputs.os }} | cut -d'-' -f2)
+          export OUTPUT_NAME="yak_${GOOS}_${GOARCH}"
+          export CGO_ENABLED=1
+          if [ "${{ inputs.os }}" = "linux-amd64" ]; then
+            export CC=x86_64-linux-gnu-gcc
+          elif [ "${{ inputs.os }}" = "linux-arm64" ]; then
+            export CC=aarch64-linux-gnu-gcc
+          fi
 
-      - name: Build For MacOS(arm64)
-        run: |
-          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o "./yak_darwin_arm64" -v common/yak/cmd/yak.go && ls
-        if: inputs.os == 'macos-arm64'
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o "./yak_darwin_arm64" -v common/yak/cmd/yak.go && ls
 
-      - name: Build For MacOS(amd64)
-        run: |
-          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o "./yak_darwin_amd64" -v common/yak/cmd/yak.go && ls
-        if: inputs.os == 'macos-amd64'
+          echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
 
-      - name: Build For Windows
-        run: |
-          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o ./yak_windows_amd64.exe -v common/yak/cmd/yak.go
-        if: runner.os == 'Windows'
-
-      - name: Upload Artifacts Windows
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
-        if: runner.os == 'Windows'
         with:
-          name: yak_windows_amd64.exe
-          path: ./yak_windows_amd64.exe
-
-      - name: Upload Artifacts MacOS(amd64)
-        uses: actions/upload-artifact@v4
-        if: inputs.os == 'macos-amd64'
-        with:
-          name: yak_darwin_amd64
-          path: ./yak_darwin_amd64
-
-      - name: Upload Artifacts MacOS(arm64)
-        uses: actions/upload-artifact@v4
-        if: inputs.os == 'macos-arm64'
-        with:
-          name: yak_darwin_arm64
-          path: ./yak_darwin_arm64
-
-      - name: Upload Artifacts CrossBuild Linux(amd64)
-        uses: actions/upload-artifact@v4
-        if: inputs.os == 'linux-amd64'
-        with:
-          name: yak_linux_amd64
-          path: ./yak_linux_amd64
-
-      - name: Upload Artifacts CrossBuild Linux(arm64)
-        uses: actions/upload-artifact@v4
-        if: inputs.os == 'linux-arm64'
-        with:
-          name: yak_linux_arm64
-          path: ./yak_linux_arm64
-
-
-
+          name: ${{ env.OUTPUT_NAME }}
+          path: ./${{ env.OUTPUT_NAME }}
