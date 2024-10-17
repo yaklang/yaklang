@@ -118,6 +118,13 @@ func GetIrCodeById(db *gorm.DB, id int64) *IrCode {
 	return db.Model(&IrCode{}).Where("id = ?", id).First(&IrCode{}).Value.(*IrCode)
 }
 
+func GetIrCodeByIdAndProgramName(db *gorm.DB, id int64, programName string) *IrCode {
+	if id == -1 {
+		return nil
+	}
+	return db.Model(&IrCode{}).Where("id = ? AND program_name= ? ", id, programName).First(&IrCode{}).Value.(*IrCode)
+}
+
 func GetIrByVariable(db *gorm.DB, program, name string) []*IrCode {
 	// var irVariable IrIndex
 	ret := make([]*IrCode, 0)

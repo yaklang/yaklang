@@ -22,6 +22,11 @@ func queryAndSave(t *testing.T) (func(), *ssaapi.SyntaxFlowResult) {
 		f = (a) =>{
 			return a
 		}
+		if c {
+			target =1
+		}else{
+			target=2
+		}
 		target = f(1)
 		`
 	// parse code
@@ -36,6 +41,7 @@ func queryAndSave(t *testing.T) (func(), *ssaapi.SyntaxFlowResult) {
 	f(* as $target)
 	// no value variable 
 	bbbbbb as $a 
+	target #-> as $result;
 	`)
 	require.NoError(t, err)
 	require.NotNil(t, res)
@@ -44,6 +50,10 @@ func queryAndSave(t *testing.T) (func(), *ssaapi.SyntaxFlowResult) {
 	resultID, err := res.Save()
 	require.NoError(t, err)
 	_ = resultID
+	vls, _ := ssadb.GetAllResultValue(ssadb.GetDB(), resultID)
+	a, _ := ssadb.GetAuditValuesByIds(ssadb.GetDB(), vls, programName)
+	log.Infof(ssaapi.NewSFGraphWithAuditValues(a).DotGraph())
+
 	return func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	}, res
@@ -109,13 +119,13 @@ func TestGetResultFromDB(t *testing.T) {
 	// get value from db
 	wantValue := wantRes.GetValues("target")
 	gotValue := gotRes.GetValues("target")
-	wnatValueID := lo.Map(wantValue, func(v *ssaapi.Value, _ int) int64 { return v.GetId() })
+	wantValueID := lo.Map(wantValue, func(v *ssaapi.Value, _ int) int64 { return v.GetId() })
 	gotValueID := lo.Map(gotValue, func(v *ssaapi.Value, _ int) int64 { return v.GetId() })
 	require.Equal(t, 2, len(gotValue))
 	require.Equal(t, len(wantValue), len(gotValue))
-	slices.Sort(wnatValueID)
+	slices.Sort(wantValueID)
 	slices.Sort(gotValueID)
-	require.Equal(t, wnatValueID, gotValueID)
+	require.Equal(t, wantValueID, gotValueID)
 }
 
 func TestRuleAlertMsg(t *testing.T) {

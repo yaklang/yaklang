@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -242,8 +243,38 @@ func (v Values) DotGraphs() []string {
 }
 
 func (v Values) DotGraph() string {
-	vg := NewValueGraph(v...)
-	var buf bytes.Buffer
-	vg.GenerateDOT(&buf)
-	return buf.String()
+	var values ssadb.GraphValues
+	for _, val := range v {
+		values = append(values, val)
+	}
+	vg := NewSFGraph(values...)
+	return vg.DotGraph()
+}
+
+func (v *Value) GetEffectOnGraphValues() ssadb.GraphValues {
+	var values ssadb.GraphValues
+	for _, val := range v.EffectOn {
+		values = append(values, val)
+	}
+	return values
+}
+
+func (v *Value) GetDependOnGraphValues() ssadb.GraphValues {
+	var values ssadb.GraphValues
+	for _, val := range v.DependOn {
+		values = append(values, val)
+	}
+	return values
+}
+
+func (v *Value) GetGraphPredecessors() ssadb.GraphPredecessors {
+	var predecessors ssadb.GraphPredecessors
+	for _, val := range v.Predecessors {
+		predecessors = append(predecessors, &ssadb.GraphPredecessor{
+			GraphValue: val.Node,
+			Step:       val.Info.Step,
+			Label:      val.Info.Label,
+		})
+	}
+	return predecessors
 }
