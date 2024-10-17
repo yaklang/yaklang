@@ -8,8 +8,8 @@ jobs:
     strategy:
       matrix:
         os:
-          - windows7
           - windows
+          - windows7
           - macos-amd64 
           - macos-arm64
           - linux-amd64
