@@ -66,6 +66,40 @@ func (a *SyntaxFlowAction) querySF(programName, code string) (*ssaapi.SyntaxFlow
 	return res, nil
 }
 
+func (a *SyntaxFlowAction) getResult(programName, code string, resultID uint) (*ssaapi.SyntaxFlowResult, uint, error) {
+	// get result
+	if resultID != 0 {
+		if res, ok := a.ResultIDCache.Get(resultID); ok {
+			// get result from cache
+			return res, resultID, nil
+		}
+
+		// get db result by ResultID
+		result, err := ssaapi.CreateResultByID(resultID)
+		if err != nil {
+			return nil, 0, utils.Errorf("get result by id %d failed: %v", resultID, err)
+		}
+		a.ResultIDCache.Set(resultID, result)
+		return result, resultID, nil
+	}
+
+	// query sf get memory result
+	syntaxFlowCode := string(code)
+	result, err := a.querySF(programName, syntaxFlowCode)
+	if err != nil {
+		return nil, 0, utils.Errorf("query syntaxflow failed: %v", err)
+	}
+	// save result to db
+	resultID, err = result.Save()
+	if err != nil {
+		return nil, 0, utils.Errorf("save result failed: %v", err)
+	}
+	// save result to cache
+	a.ResultIDCache.Set(resultID, result)
+
+	return result, resultID, nil
+}
+
 type QuerySyntaxFlow struct {
 	// query
 	variable string
@@ -89,7 +123,7 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 	}
 
 	// get resultID from query
-	var resultID uint
+	var resultID uint = 0
 	resultIDRaw, useResultID := query["result_id"]
 	if useResultID {
 		// parse result_id
@@ -103,8 +137,6 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 			return nil, utils.Errorf("result_id can not be 0")
 		}
 	}
-
-	_, saveResult := query["save_result"]
 
 	// Parse variable and index from path
 	path := u.Path
@@ -126,29 +158,9 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 
 	// get program
 	programName := u.GetLocation()
-	// get result
-	var result *ssaapi.SyntaxFlowResult
-	var err error
-	if useResultID {
-		// get db result by ResultID
-		result, err = ssaapi.CreateResultByID(resultID)
-		a.ResultIDCache.Set(resultID, result)
-	} else {
-		// query sf get memory result
-		syntaxFlowCode := string(params.GetBody())
-		result, err = a.querySF(programName, syntaxFlowCode)
-	}
+	result, resultID, err := a.getResult(programName, string(params.GetBody()), resultID)
 	if err != nil {
 		return nil, err
-	}
-
-	// save result to db
-	if saveResult {
-		resultID, err = result.Save()
-		if err != nil {
-			return nil, err
-		}
-		a.ResultIDCache.Set(resultID, result)
 	}
 
 	return &QuerySyntaxFlow{
@@ -172,16 +184,15 @@ Get SyntaxFlowAction
 		body: syntaxflow code // if set this will query result with this syntaxflow code
 		query:
 			result_id	string  // if set this, will get result from database
-			save_result exist?  // if set this, will save result to database, the response will contain result_id
 	Response:
 		1. "syntaxflow://program_id/" :
-			* ResourceType: message / variable
+			* ResourceType: (message / variable) +  result_id
 			all variable names
 		2. "syntaxflow://program_id/variable_name" :
-			* ResourceType: value
+			* ResourceType: value +  result_id
 			all values in this variable
 		3. "syntaxflow://program_id/variable_name/index" :
-			* ResourceType: information
+			* ResourceType: information + result_id
 			this value information, contain message && graph && node-info
 */
 func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
