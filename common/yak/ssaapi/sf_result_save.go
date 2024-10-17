@@ -66,7 +66,7 @@ func (r *SyntaxFlowResult) Save(TaskIDs ...string) (uint, error) {
 	if err := r.saveValue(result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}
-	result.RiskCount = uint64(len(r.risk))
+	result.RiskCount = uint64(len(r.riskMap))
 	if err := ssadb.SaveResult(result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}

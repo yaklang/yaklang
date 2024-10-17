@@ -1,7 +1,9 @@
 package ssaapi
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -63,12 +65,27 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID strin
 		log.Errorf("save risk failed: %s", err)
 		return
 	}
-	r.risk = append(r.risk, risk.ToGRPCModel())
+	r.riskMap[variable] = risk
 }
 
 func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.Risk {
-	if r == nil {
+	if r == nil || len(r.riskMap) == 0 {
 		return nil
 	}
-	return r.risk
+	if len(r.riskGRPCCache) != len(r.riskMap) {
+		r.riskGRPCCache = lo.MapToSlice(r.riskMap, func(name string, risk *schema.Risk) *ypb.Risk {
+			return risk.ToGRPCModel()
+		})
+	}
+	return r.riskGRPCCache
+}
+
+func (r *SyntaxFlowResult) GetRisk(name string) *schema.Risk {
+	if r == nil || r.riskMap == nil {
+		return nil
+	}
+	if r, ok := r.riskMap[name]; ok {
+		return r
+	}
+	return nil
 }

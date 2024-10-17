@@ -298,6 +298,12 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 			if msg, ok := result.GetAlertInfo(variable); ok {
 				res.VerboseType = "alert"
 				res.VerboseName = codec.AnyToString(msg)
+				if risk := result.GetRisk(variable); risk != nil {
+					res.Extra = append(res.Extra, &ypb.KVPair{
+						Key:   "risk_hash",
+						Value: risk.Hash,
+					})
+				}
 				resources = append(resources, res)
 			} else {
 				res.VerboseType = "normal"
