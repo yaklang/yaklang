@@ -115,17 +115,14 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			return v.visitUserFallback(actx, opt...)
 		}
 		funcValue := v.NewValue(f).AppendDependOn(v)
-		if actx.TheCrossProcessVisited(v, funcValue) {
-			return v.visitUserFallback(actx, opt...)
-		}
 		if ValueCompare(funcValue, actx.Self) {
 			return v.visitUserFallback(actx, opt...)
 		}
-		crossSuccess := actx.CrossProcess(v, funcValue)
-		if !crossSuccess {
+		ok = actx.PushCrossProcess(v, funcValue, v)
+		if !ok{
 			return v.visitUserFallback(actx, opt...)
-		} else {
-			defer actx.RecoverCrossProcess()
+		}else{
+			defer actx.PopCrossProcess()
 		}
 		// try to find formal param index from call
 		// v is calling instruction
@@ -194,10 +191,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if f := ins.GetFunc(); f != nil {
 				v.NewValue(f).GetCalledBy().ForEach(func(value *Value) {
 					dep := value.AppendDependOn(v)
-					crossSuccess := actx.CrossProcess(v, dep)
-					if crossSuccess {
-						defer actx.RecoverCrossProcess()
-					}
+					actx.PushCrossProcess(v, dep, dep)
+					defer actx.PopCrossProcess()
 					results = append(results, dep.getBottomUses(actx, opt...)...)
 				})
 			}
@@ -222,11 +217,15 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			}
 		}
 
-		currentCallValue := actx.GetCallFromLastCrossProcess()
+		currentCallValue := actx.GetLastCallStackCall()
 		if currentCallValue == nil {
 			return fallback()
 		}
 		call, ok := ssa.ToCall(currentCallValue.node)
+		if !ok {
+			log.Warnf("BUG: (call's fun is not clean!) call stack's value is not call: %v", currentCallValue.String())
+			return fallback()
+		}
 		fun, ok := ssa.ToFunction(call.Method)
 		if !ok {
 			log.Warnf("BUG: (call's fun is not clean!) unknown function: %v", v.String())
