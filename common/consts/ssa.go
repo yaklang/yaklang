@@ -23,6 +23,10 @@ const (
 	GO   Language = "golang"
 )
 
+func GetAllSupportedLanguages() []Language {
+	return []Language{Yak, JS, PHP, JAVA, GO}
+}
+
 func ValidateLanguage(language string) (Language, error) {
 	switch strings.TrimSpace(strings.ToLower(language)) {
 	case "yak", "yaklang":
