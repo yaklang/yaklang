@@ -18,9 +18,9 @@ func CreateResultByID(resultID uint) (*SyntaxFlowResult, error) {
 	var rule *schema.SyntaxFlowRule
 	if result.RuleName != "" {
 		// load rule from db
-		rule, err = sfdb.GetRule(result.RuleName)
+		rule, err = sfdb.GetRulePure(result.RuleName)
 		if err != nil {
-			return nil, err
+			return nil, utils.Errorf("load rule %s error: %v", result.RuleName, err)
 		}
 	} else {
 		// create rule
@@ -33,7 +33,7 @@ func CreateResultByID(resultID uint) (*SyntaxFlowResult, error) {
 	res.rule = rule
 	prog, err := FromDatabase(result.ProgramName)
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("load program %s error: %v", result.ProgramName, err)
 	}
 	res.program = prog
 	return res, nil
