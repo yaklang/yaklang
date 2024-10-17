@@ -475,6 +475,10 @@ func TestGRPCMUSTPASS_MITM_HotPatch_HijackSaveHTTPFlow(t *testing.T) {
 			SetYakScript:     true,
 			YakScriptContent: `hijackSaveHTTPFlow = func(flow, modify, drop) {flow.Blue();modify(flow)}`,
 		})
+		stream.Send(&ypb.MITMRequest{
+			SetContentReplacers: true,
+			Replacers:           make([]*ypb.MITMContentReplacer, 0),
+		})
 	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
 		if msg.GetCurrentHook && len(msg.GetHooks()) > 0 {
 			// send packet

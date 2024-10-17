@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"math/rand"
 	"net/http"
@@ -323,19 +324,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	var beforeRequest func(https bool, originReq []byte, req []byte) []byte = nil
 	var afterRequest func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
 
-	cacheThrottle := utils.NewDebounce(1)
+	cacheDebounce, _ := lo.NewDebounce(1*time.Second, func() {
+		stream.Send(&ypb.MITMResponse{
+			HaveNotification:    true,
+			NotificationContent: []byte("MITM 插件去重缓存已重置"),
+		})
+	})
 
 	clearPluginHTTPFlowCache := func() {
 		if mitmPluginCaller != nil {
 			mitmPluginCaller.ResetFilter()
 		}
-
-		cacheThrottle(func() {
-			stream.Send(&ypb.MITMResponse{
-				HaveNotification:    true,
-				NotificationContent: []byte("MITM 插件去重缓存已重置"),
-			})
-		})
+		cacheDebounce()
 	}
 
 	controller := &hijackTaskController{
