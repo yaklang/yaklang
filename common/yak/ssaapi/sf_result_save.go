@@ -100,7 +100,7 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 			result.UnValueVariable = append(result.UnValueVariable, name)
 			return
 		}
-		if msg, ok := r.GetAlertInfo(name); ok {
+		if msg, ok := r.GetAlertMsg(name); ok {
 			opts = append(opts, OptionSaveValue_ResultAlert(msg))
 			r.SaveRisk(name, result)
 		}

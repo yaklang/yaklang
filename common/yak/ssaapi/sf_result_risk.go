@@ -10,7 +10,7 @@ import (
 )
 
 func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) {
-	alertMsg, ok := r.GetAlertEx(variable)
+	alertInfo, ok := r.GetAlertInfo(variable)
 	if !ok {
 		log.Infof("no alert msg for %s; skip", variable)
 		return
@@ -30,33 +30,33 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) 
 	}
 
 	// modify info by alertMsg
-	if alertMsg.OnlyMsg {
-		if alertMsg.Msg != "" {
-			opts = append(opts, yakit.WithRiskParam_Details(alertMsg.Msg))
+	if alertInfo.OnlyMsg {
+		if alertInfo.Msg != "" {
+			opts = append(opts, yakit.WithRiskParam_Details(alertInfo.Msg))
 		}
 	} else {
 		// cover info from alertMsg
-		if alertMsg.Severity != "" {
-			opts = append(opts, yakit.WithRiskParam_Severity(string(alertMsg.Severity)))
+		if alertInfo.Severity != "" {
+			opts = append(opts, yakit.WithRiskParam_Severity(string(alertInfo.Severity)))
 		}
-		if alertMsg.CVE != "" {
-			opts = append(opts, yakit.WithRiskParam_CVE(alertMsg.CVE))
+		if alertInfo.CVE != "" {
+			opts = append(opts, yakit.WithRiskParam_CVE(alertInfo.CVE))
 		}
-		if alertMsg.Purpose != "" {
+		if alertInfo.Purpose != "" {
 			opts = append(opts, yakit.WithRiskParam_RiskType(string(rule.RiskType)))
 		}
-		if alertMsg.Title != "" {
-			opts = append(opts, yakit.WithRiskParam_Title(alertMsg.Title))
+		if alertInfo.Title != "" {
+			opts = append(opts, yakit.WithRiskParam_Title(alertInfo.Title))
 		}
-		if alertMsg.Description != "" {
-			opts = append(opts, yakit.WithRiskParam_TitleVerbose(alertMsg.TitleZh))
+		if alertInfo.Description != "" {
+			opts = append(opts, yakit.WithRiskParam_TitleVerbose(alertInfo.TitleZh))
 		}
-		if alertMsg.Solution != "" {
-			opts = append(opts, yakit.WithRiskParam_Solution(alertMsg.Solution))
+		if alertInfo.Solution != "" {
+			opts = append(opts, yakit.WithRiskParam_Solution(alertInfo.Solution))
 		}
-		if alertMsg.Msg != "" {
+		if alertInfo.Msg != "" {
 			opts = append(opts, yakit.WithRiskParam_Details(map[string]string{
-				"message": alertMsg.Msg,
+				"message": alertInfo.Msg,
 			}))
 		}
 	}

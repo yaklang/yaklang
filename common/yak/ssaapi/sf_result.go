@@ -77,12 +77,14 @@ func (r *SyntaxFlowResult) Name() string {
 	return checkAndHandler(r.rule.Title, r.rule.TitleZh, r.rule.Description, utils.ShrinkString(r.String(), 40))
 }
 
-func (r *SyntaxFlowResult) GetAlertInfo(name string) (string, bool) {
-	return r.rule.GetAlertInfo(name)
+func (r *SyntaxFlowResult) GetAlertMsg(name string) (string, bool) {
+	if info, ok := r.rule.GetAlertInfo(name); ok {
+		return info.Msg, true
+	}
+	return "", false
 }
-func (r *SyntaxFlowResult) GetAlertEx(name string) (*schema.SyntaxFlowDescInfo, bool) {
-	info, ok := r.rule.AlertDesc[name]
-	return info, ok
+func (r *SyntaxFlowResult) GetAlertInfo(name string) (*schema.SyntaxFlowDescInfo, bool) {
+	return r.rule.GetAlertInfo(name)
 }
 
 func (r *SyntaxFlowResult) GetErrors() []string {
