@@ -12,21 +12,11 @@ func FilterSyntaxFlowResult(rawDB *gorm.DB, filter *ypb.SyntaxFlowResultFilter) 
 		return db
 	}
 
-	if len(filter.GetTaskIDs()) > 0 {
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "task_id", filter.GetTaskIDs())
-	}
-
-	if len(filter.GetResultIDs()) > 0 {
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "id", filter.GetResultIDs())
-	}
-
-	if len(filter.GetRuleNames()) > 0 {
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", filter.GetRuleNames())
-	}
-
-	if len(filter.GetProgramNames()) > 0 {
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramNames())
-	}
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "task_id", filter.GetTaskIDs())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "id", filter.GetResultIDs())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", filter.GetRuleNames())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramNames())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_severity", filter.GetSeverity())
 
 	if filter.GetAfterID() > 0 {
 		db = db.Where("id > ?", filter.GetAfterID())
@@ -37,10 +27,6 @@ func FilterSyntaxFlowResult(rawDB *gorm.DB, filter *ypb.SyntaxFlowResultFilter) 
 
 	if filter.GetOnlyRisk() {
 		db = db.Where("risk_count > 0")
-	}
-
-	if len(filter.GetSeverity()) > 0 {
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_severity", filter.GetSeverity())
 	}
 
 	if filter.GetKeyword() != "" {

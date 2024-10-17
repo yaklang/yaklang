@@ -3,8 +3,9 @@ package sfvm
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
@@ -40,7 +41,7 @@ func NewSFResult(rule string) *SFFrameResult {
 	}
 }
 
-func (s *SFFrameResult) GetAlertInfo(name string) (string, bool) {
+func (s *SFFrameResult) GetAlertInfo(name string) (*schema.SyntaxFlowDescInfo, bool) {
 	return s.rule.GetAlertInfo(name)
 }
 func (s *SFFrameResult) GetRule() *schema.SyntaxFlowRule {
@@ -137,7 +138,7 @@ func (s *SFFrameResult) String(opts ...ShowOption) string {
 		if len(s.AlertSymbolTable) > 0 {
 			for name, value := range s.AlertSymbolTable {
 				if info, b := s.GetAlertInfo(name); b {
-					buf.WriteString(fmt.Sprintf("value: %s description: %v\n", name, codec.AnyToString(info)))
+					buf.WriteString(fmt.Sprintf("value: %s description: %v\n", name, codec.AnyToString(info.Msg)))
 				}
 				showValueMap(buf, name, value, cfg)
 			}

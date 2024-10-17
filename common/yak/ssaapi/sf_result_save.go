@@ -18,9 +18,9 @@ func CreateResultByID(resultID uint) (*SyntaxFlowResult, error) {
 	var rule *schema.SyntaxFlowRule
 	if result.RuleName != "" {
 		// load rule from db
-		rule, err = sfdb.GetRule(result.RuleName)
+		rule, err = sfdb.GetRulePure(result.RuleName)
 		if err != nil {
-			return nil, err
+			return nil, utils.Errorf("load rule %s error: %v", result.RuleName, err)
 		}
 	} else {
 		// create rule
@@ -33,7 +33,7 @@ func CreateResultByID(resultID uint) (*SyntaxFlowResult, error) {
 	res.rule = rule
 	prog, err := FromDatabase(result.ProgramName)
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("load program %s error: %v", result.ProgramName, err)
 	}
 	res.program = prog
 	return res, nil
@@ -66,7 +66,7 @@ func (r *SyntaxFlowResult) Save(TaskIDs ...string) (uint, error) {
 	if err := r.saveValue(result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}
-	result.RiskCount = uint64(len(r.risk))
+	result.RiskCount = uint64(len(r.riskMap))
 	if err := ssadb.SaveResult(result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}
@@ -95,14 +95,14 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 	}
 	saveVariable := func(name string, values Values) {
 		opts := append(opts, OptionSaveValue_ResultVariable(name))
-		if msg, ok := r.GetAlertInfo(name); ok {
-			opts = append(opts, OptionSaveValue_ResultAlert(msg))
-			r.SaveRisk(name, result.ID, result.TaskID)
-		}
 		// save un value variable
 		if len(values) == 0 {
 			result.UnValueVariable = append(result.UnValueVariable, name)
 			return
+		}
+		if msg, ok := r.GetAlertMsg(name); ok {
+			opts = append(opts, OptionSaveValue_ResultAlert(msg))
+			r.SaveRisk(name, result)
 		}
 		// save variable that has value
 		for _, v := range values {

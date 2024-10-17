@@ -114,7 +114,7 @@ func (r *SyntaxFlowResult) Dump(showCode bool) string {
 
 				line("VALUE: %v", val)
 				increase()
-				if extra, ok := r.GetAlertEx(name); extra != nil && ok {
+				if extra, ok := r.GetAlertInfo(name); extra != nil && ok {
 					general := utils.InterfaceToGeneralMap(extra.ExtraInfo)
 					haveMsg := false
 					if extra.Msg != "" {

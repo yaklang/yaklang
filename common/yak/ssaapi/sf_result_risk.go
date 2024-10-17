@@ -1,13 +1,16 @@
 package ssaapi
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID string) {
-	alertMsg, ok := r.GetAlertEx(variable)
+func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) {
+	alertInfo, ok := r.GetAlertInfo(variable)
 	if !ok {
 		log.Infof("no alert msg for %s; skip", variable)
 		return
@@ -16,7 +19,7 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID strin
 	rule := r.rule
 	// risk := yakit.CreateRisk("",
 	opts := []yakit.RiskParamsOpt{
-		yakit.WithRiskParam_RuntimeId(taskID),
+		yakit.WithRiskParam_RuntimeId(result.TaskID),
 		yakit.WithRiskParam_FromScript(rule.RuleName),
 		yakit.WithRiskParam_Title(rule.Title),
 		yakit.WithRiskParam_TitleVerbose(rule.TitleZh),
@@ -27,48 +30,66 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, resultID uint, taskID strin
 	}
 
 	// modify info by alertMsg
-	if alertMsg.OnlyMsg {
-		if alertMsg.Msg != "" {
-			opts = append(opts, yakit.WithRiskParam_Details(alertMsg.Msg))
+	if alertInfo.OnlyMsg {
+		if alertInfo.Msg != "" {
+			opts = append(opts, yakit.WithRiskParam_Details(alertInfo.Msg))
 		}
 	} else {
 		// cover info from alertMsg
-		if alertMsg.Severity != "" {
-			opts = append(opts, yakit.WithRiskParam_Severity(string(alertMsg.Severity)))
+		if alertInfo.Severity != "" {
+			opts = append(opts, yakit.WithRiskParam_Severity(string(alertInfo.Severity)))
 		}
-		if alertMsg.CVE != "" {
-			opts = append(opts, yakit.WithRiskParam_CVE(alertMsg.CVE))
+		if alertInfo.CVE != "" {
+			opts = append(opts, yakit.WithRiskParam_CVE(alertInfo.CVE))
 		}
-		if alertMsg.Purpose != "" {
+		if alertInfo.Purpose != "" {
 			opts = append(opts, yakit.WithRiskParam_RiskType(string(rule.RiskType)))
 		}
-		if alertMsg.Title != "" {
-			opts = append(opts, yakit.WithRiskParam_Title(alertMsg.Title))
+		if alertInfo.Title != "" {
+			opts = append(opts, yakit.WithRiskParam_Title(alertInfo.Title))
 		}
-		if alertMsg.Description != "" {
-			opts = append(opts, yakit.WithRiskParam_TitleVerbose(alertMsg.TitleZh))
+		if alertInfo.Description != "" {
+			opts = append(opts, yakit.WithRiskParam_TitleVerbose(alertInfo.TitleZh))
 		}
-		if alertMsg.Solution != "" {
-			opts = append(opts, yakit.WithRiskParam_Solution(alertMsg.Solution))
+		if alertInfo.Solution != "" {
+			opts = append(opts, yakit.WithRiskParam_Solution(alertInfo.Solution))
 		}
-		if alertMsg.Msg != "" {
-			opts = append(opts, yakit.WithRiskParam_Details(alertMsg.Msg))
+		if alertInfo.Msg != "" {
+			opts = append(opts, yakit.WithRiskParam_Details(map[string]string{
+				"message": alertInfo.Msg,
+			}))
 		}
 	}
 
 	risk := yakit.CreateRisk("", opts...)
-	risk.ResultID = resultID
+	risk.ResultID = result.ID
 	risk.Variable = variable
+	risk.ProgramName = result.ProgramName
 	if err := yakit.SaveRisk(risk); err != nil {
 		log.Errorf("save risk failed: %s", err)
 		return
 	}
-	r.risk = append(r.risk, risk.ToGRPCModel())
+	r.riskMap[variable] = risk
 }
 
 func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.Risk {
-	if r == nil {
+	if r == nil || len(r.riskMap) == 0 {
 		return nil
 	}
-	return r.risk
+	if len(r.riskGRPCCache) != len(r.riskMap) {
+		r.riskGRPCCache = lo.MapToSlice(r.riskMap, func(name string, risk *schema.Risk) *ypb.Risk {
+			return risk.ToGRPCModel()
+		})
+	}
+	return r.riskGRPCCache
+}
+
+func (r *SyntaxFlowResult) GetRisk(name string) *schema.Risk {
+	if r == nil || r.riskMap == nil {
+		return nil
+	}
+	if r, ok := r.riskMap[name]; ok {
+		return r
+	}
+	return nil
 }

@@ -49,13 +49,6 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 				Schema:   "syntaxflow",
 				Location: programName,
 				Path:     path,
-				Query: []*ypb.KVPair{
-					{
-						// save to database
-						Key:   "save_result",
-						Value: "true",
-					},
-				},
 			},
 			Body: []byte(sfCode),
 		}
@@ -203,6 +196,13 @@ func TestSFURl(t *testing.T) {
 			require.Equal(t, target1.VerboseName, "alert information")
 			require.Equal(t, target1.ResourceType, "variable")
 			require.Equal(t, target1.VerboseType, "alert")
+			matchRisk := false
+			for _, extra := range target1.Extra {
+				if extra.Key == "risk_hash" && extra.Value != "" {
+					matchRisk = true
+				}
+			}
+			require.True(t, matchRisk)
 		})
 	})
 
