@@ -1,0 +1,118 @@
+desc(
+    title: "Java Hibernate create*Query SQL concatenation",
+    title_zh: "Java Hibernate create*Query SQL 拼接",
+    type: audit,
+    level: high,
+)
+
+.create*Query(,* as $query,);
+$query?{!opcode: const} as $mixQuery; <delete(query)>
+$mixQuery #{
+    until: `*?{opcode: param && !<typeName>?{any: /(?i)bool/,/(?i)float/,/(?i)double/,/(?i)int/} } as $params`,
+}->;
+$params<dataflow(<<<CODE
+*?{opcode: add} as $op;
+$op-> as $opParam;
+$op#> as $opParam;
+$opParam?{opcode: const} as $__next__;
+<delete(opParam)><delete(op)>
+CODE)> as $unsafeParams;
+
+alert $unsafeParams for {
+    message: "SQL concatenation is used in the query creation, which may lead to SQL injection vulnerabilities.",
+    type: audit,
+    level: high,
+}
+
+desc(
+lang: java,
+'fs://a.java': <<<CODE
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+import org.hibernate.query.Query;
+import java.util.List;
+
+public class UserManager {
+    private SessionFactory sessionFactory;
+
+    public UserManager() {
+        // 初始化Hibernate SessionFactory
+        try {
+            sessionFactory = new Configuration().configure().buildSessionFactory();
+        } catch (Throwable ex) {
+            System.err.println("Failed to create sessionFactory object." + ex);
+            throw new ExceptionInInitializerError(ex);
+        }
+    }
+
+    // 用户实体类
+    public static class User {
+        private int id;
+        private String username;
+        private String email;
+        private String role;
+
+        // 构造函数、getter和setter方法省略
+    }
+
+    // 不安全的用户搜索方法 - 存在SQL注入风险
+    public List<User> searchUsers(String searchTerm) {
+        Session session = sessionFactory.openSession();
+        try {
+            // 危险：直接拼接用户输入到HQL查询中
+            String hql = "FROM User WHERE username LIKE '%" + searchTerm + "%' OR email LIKE '%" + searchTerm + "%'";
+            Query<User> query = session.createQuery(hql, User.class);
+            return query.list();
+        } finally {
+            session.close();
+        }
+    }
+
+    // 不安全的用户更新方法 - 存在SQL注入风险
+    public void updateUserRole(int userId, String newRole) {
+        Session session = sessionFactory.openSession();
+        try {
+            session.beginTransaction();
+            // 危险：直接拼接用户输入到SQL查询中
+            String sql = "UPDATE User SET role = '" + newRole + "' WHERE id = " + userId;
+            session.createNativeQuery(sql).executeUpdate();
+            session.getTransaction().commit();
+        } catch (Exception e) {
+            if (session.getTransaction() != null) {
+                session.getTransaction().rollback();
+            }
+            e.printStackTrace();
+        } finally {
+            session.close();
+        }
+    }
+
+    // 不安全的动态排序方法 - 存在SQL注入风险
+    public List<User> getAllUsersSorted(String sortField, String sortOrder) {
+        Session session = sessionFactory.openSession();
+        try {
+            // 危险：直接拼接用户输入到HQL查询中
+            String hql = "FROM User ORDER BY " + sortField + " " + sortOrder;
+            Query<User> query = session.createQuery(hql, User.class);
+            return query.list();
+        } finally {
+            session.close();
+        }
+    }
+
+    // 看似安全但仍有潜在风险的方法
+    public User getUserByUsername(String username) {
+        Session session = sessionFactory.openSession();
+        try {
+            String hql = "FROM User WHERE username = :username";
+            Query<User> query = session.createQuery(hql, User.class);
+            query.setParameter("username", username);
+            return query.uniqueResult();
+        } finally {
+            session.close();
+        }
+    }
+}
+CODE
+)
