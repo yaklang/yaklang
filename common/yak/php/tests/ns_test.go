@@ -233,6 +233,8 @@ namespace b {
     {
         return t();
     }
+	function bb(){
+	}
 }
 
 namespace {
@@ -240,6 +242,43 @@ namespace {
     println($a);
 }`
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+	})
+	t.Run("namepsace references each other1", func(t *testing.T) {
+		code := `<?php
+
+namespace a {
+
+    use function b\aa;
+
+    function t()
+    {
+        return 1;
+    }
+
+    function b()
+    {
+        return aa();
+    }
+}
+
+namespace b {
+
+    use function a\t;
+
+    function aa()
+    {
+        return bb();
+    }
+	function bb(){
+		return 2;
+	}
+}
+
+namespace {
+    $a = a\b();
+    println($a);
+}`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
 	})
 	t.Run("all namespace use static member", func(t *testing.T) {
 		code := `<?php

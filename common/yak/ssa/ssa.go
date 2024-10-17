@@ -215,13 +215,21 @@ type Program struct {
 	Funcs map[string]*Function
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
-	//clsName、pkgName、value
+	//pkgName、name、value
 	importValue map[string]map[string]Value
+	//name、pkg、value
+	importValueToPkg map[string]map[string]Value
+
 	ExportValue map[string]Value
 
-	//clsName、pkgName、value
+	//pkg、cls、value
 	importType map[string]map[string]Type
-	ExportType map[string]Type
+	//cls、pkg、value
+	importTypeToPkg map[string]map[string]Type
+	ExportType      map[string]Type
+
+	//store origin import
+	ImportTable []string
 
 	// offset
 	OffsetMap         map[int]*OffsetItem
@@ -245,10 +253,7 @@ type Program struct {
 	ExternInstance          map[string]any
 	ExternLib               map[string]map[string]any
 
-	//if lib use packageName,such as go,enable it
-	pkgName             string
-	ImportValueCallback func(name, pkg string, val Value, prog *Program)
-	ImportTypeCallback  func(name, pkg string, _type Type, prog *Program)
+	PkgName string
 }
 
 // implement Value

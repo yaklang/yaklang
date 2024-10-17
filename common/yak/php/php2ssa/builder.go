@@ -29,21 +29,6 @@ func (s *SSABuild) Create() ssa.Builder {
 }
 func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 	s.InitHandlerOnce.Do(func() {
-		fb.GetProgram().Application.ImportTypeCallback = func(name, pkg string, _type ssa.Type, prog *ssa.Program) {
-			if _, ok := prog.ClassBluePrint[name]; ok {
-				return
-			}
-			if blueprint, ok := _type.(*ssa.ClassBluePrint); ok {
-				prog.ClassBluePrint[name] = blueprint
-			}
-		}
-		fb.GetProgram().Application.ImportValueCallback = func(name, pkg string, val ssa.Value, prog *ssa.Program) {
-			if function, b2 := ssa.ToFunction(val); b2 {
-				if _, ok := prog.Funcs[name]; !ok {
-					prog.Funcs[name] = function
-				}
-			}
-		}
 		fb.SetEmptyRange()
 		container := fb.EmitEmptyContainer()
 		fb.AssignVariable(fb.CreateVariable("global-container"), container)

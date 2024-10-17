@@ -21,6 +21,7 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 		return nil
 	}
 	if !y.PreHandler() {
+		//todo: fix function lz builder
 		for _, context := range i.AllNamespaceDeclaration() {
 			y.VisitNamespaceOnlyUse(context)
 		}
