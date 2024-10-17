@@ -303,6 +303,15 @@ func GetRule(ruleName string) (*schema.SyntaxFlowRule, error) {
 	return &rule, nil
 }
 
+func GetRulePure(ruleName string) (*schema.SyntaxFlowRule, error) {
+	db := consts.GetGormProfileDatabase()
+	var rule schema.SyntaxFlowRule
+	if err := db.Where("rule_name = ?", ruleName).First(&rule).Error; err != nil {
+		return nil, err
+	}
+	return &rule, nil
+}
+
 func GetAllRules() ([]*schema.SyntaxFlowRule, error) {
 	db := consts.GetGormProfileDatabase()
 	db = db.Where("allow_included = false")
