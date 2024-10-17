@@ -40,22 +40,6 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		selfPkgPath:       make([]string, 0),
 	}
 	build.SupportClassStaticModifier = true
-	prog := build.GetProgram()
-	prog.ImportValueCallback = func(name, pkg string, val ssa.Value, prog *ssa.Program) {
-		if function, b2 := ssa.ToFunction(val); b2 {
-			if _, ok := prog.Funcs[name]; !ok {
-				prog.Funcs[name] = function
-			}
-		}
-	}
-	prog.ImportTypeCallback = func(name, pkg string, _type ssa.Type, prog *ssa.Program) {
-		if _, ok := prog.ClassBluePrint[name]; ok {
-			return
-		}
-		if blueprint, ok := _type.(*ssa.ClassBluePrint); ok {
-			prog.ClassBluePrint[name] = blueprint
-		}
-	}
 	build.VisitCompilationUnit(ast)
 	return nil
 }
