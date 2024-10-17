@@ -143,6 +143,8 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		y.callback(namespaceName, y.FunctionBuilder.GetEditor().GetFilename())
 		_, f := switchToNamespace()
 		defer f()
+		program := y.GetProgram()
+		program.PkgName = namespaceName
 		declareStatement()
 	case hasName && !y.PreHandler():
 		// finish Function
@@ -156,6 +158,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 			cls.Build()
 		}
 	case !hasName && !y.PreHandler():
+		prog.PkgName = namespaceName
 		// build this un-name namespace
 		declareStatement()
 		normalStatement()
@@ -193,6 +196,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 		if namespace == nil || !ok {
 			return nil
 		}
+		y.GetProgram().ImportTable = append(y.GetProgram().ImportTable, namespaceName)
 		return namespace
 	}
 	for _, listContext := range list.AllNamespaceNameList() {

@@ -25,5 +25,7 @@ namespace{
     use a\b\c;
     println(A());
 }`
-	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
+		"param": {"1"},
+	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
