@@ -365,6 +365,25 @@ func (v *Frame) AutoConvertReflectValueByType(
 			*reflectValue = resValRef
 			return nil
 		}
+
+	case reflect.Map:
+		if srcKind == reflect.Map {
+			resValRef := reflect.MakeMap(targetType)
+			for _, key := range reflectValue.MapKeys() {
+				val := reflectValue.MapIndex(key)
+				err := v.AutoConvertReflectValueByType(&key, targetType.Key())
+				if err != nil {
+					return err
+				}
+				err = v.AutoConvertReflectValueByType(&val, targetType.Elem())
+				if err != nil {
+					return err
+				}
+				resValRef.SetMapIndex(key, val)
+			}
+			*reflectValue = resValRef
+			return nil
+		}
 	default:
 		if targetKind == srcKind || convertible(srcKind, targetKind) {
 			*reflectValue = reflectValue.Convert(targetType)
