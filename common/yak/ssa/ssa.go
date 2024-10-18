@@ -399,13 +399,13 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 	switch ret := jmp.(type) {
 	case *Jump:
 		if ret.To == nil {
-			log.Warnf("Jump ToOpcode is nil: %T", ret)
+			log.Warnf("Jump To is nil: %T", ret)
 			return nil, false
 		}
 
 		toBlock, ok := ToBasicBlock(ret.To)
 		if !ok {
-			log.Warnf("Jump ToOpcode is not *BasicBlock: %T", ret.To)
+			log.Warnf("Jump To is not *BasicBlock: %T", ret.To)
 			return nil, false
 		}
 

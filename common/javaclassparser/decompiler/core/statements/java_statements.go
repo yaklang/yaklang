@@ -13,7 +13,7 @@ type ConditionStatement struct {
 	Op        string
 }
 
-func (r *ConditionStatement) String(funcCtx *class_context.FunctionContext) string {
+func (r *ConditionStatement) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("if %s", r.Condition.String(funcCtx))
 }
 
@@ -35,7 +35,7 @@ type ReturnStatement struct {
 	JavaValue values.JavaValue
 }
 
-func (r *ReturnStatement) String(funcCtx *class_context.FunctionContext) string {
+func (r *ReturnStatement) String(funcCtx *class_context.ClassContext) string {
 	if r.JavaValue == nil {
 		return "return"
 	}
@@ -54,7 +54,7 @@ type DeclareStatement struct {
 	JavaType types.JavaType
 }
 
-func (a *DeclareStatement) String(funcCtx *class_context.FunctionContext) string {
+func (a *DeclareStatement) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("%s var%d", a.JavaType.String(funcCtx), a.Id)
 }
 
@@ -70,7 +70,7 @@ type StackAssignStatement struct {
 	JavaValue values.JavaValue
 }
 
-func (a *StackAssignStatement) String(funcCtx *class_context.FunctionContext) string {
+func (a *StackAssignStatement) String(funcCtx *class_context.ClassContext) string {
 	return a.JavaValue.String(funcCtx)
 }
 func NewStackAssignStatement(id int, value values.JavaValue) *StackAssignStatement {
@@ -87,7 +87,7 @@ type AssignStatement struct {
 	IsFirst     bool
 }
 
-func (a *AssignStatement) String(funcCtx *class_context.FunctionContext) string {
+func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 	if a.ArrayMember != nil {
 		return fmt.Sprintf("%s = %s", a.ArrayMember.String(funcCtx), a.JavaValue.String(funcCtx))
 	}
@@ -115,7 +115,7 @@ func NewForStatement(subStatements []Statement) *ForStatement {
 		SubStatements: subStatements[2 : len(subStatements)-2],
 	}
 }
-func (f *ForStatement) String(funcCtx *class_context.FunctionContext) string {
+func (f *ForStatement) String(funcCtx *class_context.ClassContext) string {
 	datas := []string{}
 	datas = append(datas, f.InitVar.String(funcCtx))
 	datas = append(datas, fmt.Sprintf("%s %s %s", f.Condition.String(funcCtx)))
@@ -153,7 +153,7 @@ type IfStatement struct {
 	ElseBody  []Statement
 }
 
-func (g *IfStatement) String(funcCtx *class_context.FunctionContext) string {
+func (g *IfStatement) String(funcCtx *class_context.ClassContext) string {
 	getBody := func(sts []Statement) string {
 		var res []string
 		for _, st := range sts {
@@ -179,7 +179,7 @@ type GOTOStatement struct {
 	ToStatement int
 }
 
-func (g *GOTOStatement) String(funcCtx *class_context.FunctionContext) string {
+func (g *GOTOStatement) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("goto: %d", g.ToStatement)
 }
 func NewGOTOStatement() *GOTOStatement {
@@ -190,7 +190,7 @@ type NewStatement struct {
 	Class *types.JavaClass
 }
 
-func (a *NewStatement) String(funcCtx *class_context.FunctionContext) string {
+func (a *NewStatement) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("new %s()", a.Class.Name)
 }
 
@@ -204,7 +204,7 @@ type ExpressionStatement struct {
 	Expression values.JavaValue
 }
 
-func (a *ExpressionStatement) String(funcCtx *class_context.FunctionContext) string {
+func (a *ExpressionStatement) String(funcCtx *class_context.ClassContext) string {
 	return a.Expression.String(funcCtx)
 }
 
@@ -232,7 +232,7 @@ type SwitchStatement struct {
 	Cases []*CaseItem
 }
 
-func (a *SwitchStatement) String(funcCtx *class_context.FunctionContext) string {
+func (a *SwitchStatement) String(funcCtx *class_context.ClassContext) string {
 	casesStrs := []string{}
 	for _, c := range a.Cases {
 		if c.IsDefault {
@@ -260,7 +260,7 @@ type MiddleStatement struct {
 	Flag string
 }
 
-func (a *MiddleStatement) String(funcCtx *class_context.FunctionContext) string {
+func (a *MiddleStatement) String(funcCtx *class_context.ClassContext) string {
 	panic("middle statement should not be printed")
 }
 
@@ -280,6 +280,6 @@ func NewSynchronizedStatement(val values.JavaValue, body []Statement) *Synchroni
 	return &SynchronizedStatement{Argument: val, Body: body}
 }
 
-func (s *SynchronizedStatement) String(funcCtx *class_context.FunctionContext) string {
+func (s *SynchronizedStatement) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("synchronized(%s) {\n%s\n}", s.Argument.String(funcCtx), StatementsString(s.Body, funcCtx))
 }

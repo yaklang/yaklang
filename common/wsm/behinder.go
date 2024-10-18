@@ -49,7 +49,7 @@ var defaultPHPEchoEncoder codecFunc = func(raw []byte) ([]byte, error) {
 }
 
 var defaultASPEchoEncoder codecFunc = func(raw []byte) ([]byte, error) {
-	aspCode := "Function Encrypt(data)\nkey=Session(\"k\")\nsize=len(data)\nFor i=1 ToOpcode size\nencryptResult=encryptResult&chrb(asc(mid(data,i,1)) Xor Asc(Mid(key,(i and 15)+1,1)))\nNext\nEncrypt=encryptResult\nEnd Function"
+	aspCode := "Function Encrypt(data)\nkey=Session(\"k\")\nsize=len(data)\nFor i=1 To size\nencryptResult=encryptResult&chrb(asc(mid(data,i,1)) Xor Asc(Mid(key,(i and 15)+1,1)))\nNext\nEncrypt=encryptResult\nEnd Function"
 	return []byte(aspCode), nil
 }
 

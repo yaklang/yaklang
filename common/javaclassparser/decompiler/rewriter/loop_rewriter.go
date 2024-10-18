@@ -47,7 +47,7 @@ func LoopRewriter(manager *StatementManager) error {
 				if !node.CircleNodesSet.Has(sourceNode) {
 					continue
 				}
-				continueNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.FunctionContext) string {
+				continueNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 					return "continue"
 				}))
 				sourceNode.ReplaceNext(conditionNode, continueNode)
@@ -58,7 +58,7 @@ func LoopRewriter(manager *StatementManager) error {
 		}
 		outMergeNodeSource := copyNodes(node.OutPointMergeNode.Source)
 		for _, sourceNode := range outMergeNodeSource {
-			continueNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.FunctionContext) string {
+			continueNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 				return "break"
 			}))
 			sourceNode.ReplaceNext(node.OutPointMergeNode, continueNode)
@@ -80,6 +80,7 @@ func LoopRewriter(manager *StatementManager) error {
 		}
 		var loopStatement statements.Statement
 		var setBody func([]statements.Statement)
+		isDoWhile := false
 		if _, ok := node.Statement.(*statements.ConditionStatement); ok {
 			whileStatement := statements.NewWhileStatement(loopCondition, nil)
 			setBody = func(body []statements.Statement) {
@@ -87,6 +88,7 @@ func LoopRewriter(manager *StatementManager) error {
 			}
 			loopStatement = whileStatement
 		} else {
+			isDoWhile = true
 			doWhileStatement := statements.NewDoWhileStatement(loopCondition, nil)
 			setBody = func(body []statements.Statement) {
 				doWhileStatement.Body = body
@@ -95,9 +97,11 @@ func LoopRewriter(manager *StatementManager) error {
 		}
 		originNodeNext := make([]*core.Node, len(node.Next))
 		copy(originNodeNext, node.Next)
+		firstSt := node.Statement
 		node.Statement = loopStatement
 		node.RemoveAllNext()
 		node.AddNext(node.OutPointMergeNode)
+		manager.LoopOccupiedNodes.Add(node)
 		manager.LoopOccupiedNodes.Add(node.OutPointMergeNode)
 		var firstNode *core.Node
 		for _, n := range originNodeNext {
@@ -111,7 +115,11 @@ func LoopRewriter(manager *StatementManager) error {
 			if err != nil {
 				return err
 			}
-			setBody(core.NodesToStatements(body))
+			bodyStat := core.NodesToStatements(body)
+			if isDoWhile {
+				bodyStat = append([]statements.Statement{firstSt}, bodyStat...)
+			}
+			setBody(bodyStat)
 			return nil
 		})
 	}

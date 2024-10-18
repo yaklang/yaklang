@@ -343,7 +343,7 @@ func (hc *halfConn) decrypt(b *block) (ok bool, prefixLen int, alertValue alert)
 			} else {
 				paddingLen, paddingGood = extractPadding(payload)
 
-				// ToOpcode protect against CBC padding oracles like Lucky13, the data
+				// To protect against CBC padding oracles like Lucky13, the data
 				// past paddingLen (which is secret) is passed to the MAC
 				// function as extra data, to be fed into the HMAC after
 				// computing the digest. This makes the MAC constant time as

@@ -14,7 +14,7 @@ func (j *JavaCompare) Type() types.JavaType {
 	return types.JavaBoolean
 }
 
-func (j *JavaCompare) String(funcCtx *class_context.FunctionContext) string {
+func (j *JavaCompare) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("%s compare %s", j.JavaValue1.String(funcCtx), j.JavaValue2.String(funcCtx))
 }
 
@@ -28,14 +28,14 @@ func NewJavaCompare(v1, v2 JavaValue) *JavaCompare {
 type LambdaFuncRef struct {
 	Id           int
 	JavaType     types.JavaType
-	LambdaRender func(funcCtx *class_context.FunctionContext) string
+	LambdaRender func(funcCtx *class_context.ClassContext) string
 }
 
 func (j *LambdaFuncRef) Type() types.JavaType {
 	return j.JavaType
 }
 
-func (j *LambdaFuncRef) String(funcCtx *class_context.FunctionContext) string {
+func (j *LambdaFuncRef) String(funcCtx *class_context.ClassContext) string {
 	if j.LambdaRender != nil {
 		return j.LambdaRender(funcCtx)
 	}

@@ -6,7 +6,7 @@ import (
 )
 
 type JavaValue interface {
-	String(funcCtx *class_context.FunctionContext) string
+	String(funcCtx *class_context.ClassContext) string
 	Type() types.JavaType
 }
 

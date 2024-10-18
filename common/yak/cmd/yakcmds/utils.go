@@ -385,7 +385,7 @@ var UtilsCommands = []*cli.Command{
 	// upload to oss
 	{
 		Name:  "upload-oss",
-		Usage: "(Inner command) Upload File ToOpcode Aliyun OSS",
+		Usage: "(Inner command) Upload File To Aliyun OSS",
 		Flags: []cli.Flag{
 			cli.StringFlag{Name: "file,f", Usage: "local_file_path:remote_file_path, splited by ;"},
 			cli.StringFlag{Name: "ak", Usage: "Aliyun Access Key"},

@@ -6,11 +6,42 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/javaclassparser/classes"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
 )
 
+func TestParseJar(t *testing.T) {
+	jarFs, err := NewJarFSFromLocal("/Users/z3/Code/idea/yak-yso/yak-yso/lib/ysoserial-for-woodpecker-0.5.2.jar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fs.WalkDir(jarFs, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if jarFs.Ext(path) != ".class" {
+			return nil
+		}
+		if path != "org/junit/rules/TemporaryFolder.class" {
+			return nil
+		}
+		data, err := jarFs.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("file: %s\n", path)
+		println(string(data))
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 func TestArrayAnfIfClass(t *testing.T) {
 	classesContent, err := classes.FS.ReadFile("test/array_if_test.class")
 	if err != nil {

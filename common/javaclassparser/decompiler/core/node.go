@@ -38,9 +38,6 @@ func (n *Node) RemoveAllNext() {
 	}
 }
 func (n *Node) ReplaceNext(node1, node2 *Node) {
-	if node2.Id == 14 {
-		print()
-	}
 	for i, next := range n.Next {
 		if next == node1 {
 			n.Next[i] = node2

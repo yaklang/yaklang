@@ -15248,7 +15248,7 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 	_parentState := p.GetState()
 	localctx = NewSingleExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx ISingleExpressionContext = localctx
-	var _ antlr.ParserRuleContext = _prevctx // TODO: ToOpcode prevent unused variable warning.
+	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 136
 	p.EnterRecursionRule(localctx, 136, JavaScriptParserRULE_singleExpression, _p)
 	var _la int
