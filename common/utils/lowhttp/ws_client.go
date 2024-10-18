@@ -161,7 +161,7 @@ type WebsocketClient struct {
 	Request             []byte
 	Response            []byte
 	ResponseInstance    *http.Response
-	FromServerOnce      *sync.Once
+	StartOnce           *sync.Once
 	FromServerHandler   func([]byte)
 	FromServerHandlerEx func(*WebsocketClient, []byte, []*Frame)
 	AllFrameHandler     func(*WebsocketClient, *Frame, []byte, func())
@@ -177,6 +177,9 @@ type WebsocketClient struct {
 }
 
 func (c *WebsocketClient) Wait() {
+	if c.StartOnce == nil {
+		panic("call Wait before Start")
+	}
 	if c.Context == nil {
 		return
 	}
@@ -200,21 +203,21 @@ func (c *WebsocketClient) Stop() {
 }
 
 func (c *WebsocketClient) Start() {
-	if c.FromServerOnce == nil {
-		c.FromServerOnce = new(sync.Once)
+	if c.StartOnce == nil {
+		c.StartOnce = new(sync.Once)
 	}
-	fromServerHandler := c.FromServerHandler
-	fromServerHandlerEx := c.FromServerHandlerEx
-	allFrameHandler := c.AllFrameHandler
 
-	go func() {
-		var (
-			plainTextBuffer             bytes.Buffer
-			remindBytesBuffer           bytes.Buffer // e.g. fragmented text message, utf8 remind buffer
-			fragmentFrames              = make([]*Frame, 0, 1)
-			inFragment, inCompressState = false, false
-		)
-		c.FromServerOnce.Do(func() {
+	c.StartOnce.Do(func() {
+		fromServerHandler := c.FromServerHandler
+		fromServerHandlerEx := c.FromServerHandlerEx
+		allFrameHandler := c.AllFrameHandler
+		go func() {
+			var (
+				plainTextBuffer             bytes.Buffer
+				remindBytesBuffer           bytes.Buffer // e.g. fragmented text message, utf8 remind buffer
+				fragmentFrames              = make([]*Frame, 0, 1)
+				inFragment, inCompressState = false, false
+			)
 			defer func() {
 				c.cancel()
 				c.conn.Close()
@@ -402,8 +405,8 @@ func (c *WebsocketClient) Start() {
 
 				fragmentFrames = fragmentFrames[:0]
 			}
-		})
-	}()
+		}()
+	})
 }
 
 func (c *WebsocketClient) HasExtensions() bool {
@@ -648,6 +651,7 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 
 	return client, nil
 }
+
 func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketClient, error) {
 	req, err := ParseBytesToHttpRequest(packet)
 	if err != nil {
