@@ -1,7 +1,7 @@
 package ssa
 
 func (p *Program) GetExportType(name string) (Type, bool) {
-	t, ok := p.externType[name]
+	t, ok := p.ExportType[name]
 	return t, ok
 }
 
