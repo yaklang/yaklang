@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yak/yakurl"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -96,6 +97,43 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 		// got result
 		gotResultID := resultIDRes.ResourceName
 		require.Equal(t, resultID, gotResultID)
+
+		checkHandler(res.Resources[:len(res.Resources)-1])
+	}
+
+	{
+		// send query from database
+		prog, err := ssaapi.FromDatabase(programName)
+		require.NoError(t, err)
+		result := prog.SyntaxFlow(sfCode)
+		resultID, err := result.Save()
+		require.NoError(t, err)
+		url := &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema:   "syntaxflow",
+				Location: programName,
+				Path:     path,
+				Query: []*ypb.KVPair{
+					{
+						// get from database
+						Key:   "result_id",
+						Value: codec.AnyToString(resultID),
+					},
+				},
+			},
+		}
+		res, err := local.RequestYakURL(context.Background(), url)
+		require.NoError(t, err)
+		t.Log("checkHandler in database query ")
+		spew.Dump(res)
+
+		resultIDRes := res.Resources[len(res.Resources)-1]
+		require.Equal(t, resultIDRes.ResourceType, "result_id")
+		require.Equal(t, resultIDRes.VerboseType, "result_id")
+		// got result
+		gotResultID := resultIDRes.ResourceName
+		require.Equal(t, codec.AnyToString(resultID), gotResultID)
 
 		checkHandler(res.Resources[:len(res.Resources)-1])
 	}
@@ -202,7 +240,7 @@ func TestSFURl(t *testing.T) {
 					matchRisk = true
 				}
 			}
-			require.True(t, matchRisk)
+			require.True(t, matchRisk, "should have risk hash")
 		})
 	})
 

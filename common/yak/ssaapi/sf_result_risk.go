@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -73,23 +74,49 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) 
 }
 
 func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.Risk {
-	if r == nil || len(r.riskMap) == 0 {
+	if r == nil {
 		return nil
 	}
+
+	// load risk from database
+	if r.dbResult != nil && len(r.riskMap) != len(r.dbResult.RiskHashs) {
+		for name, hash := range r.dbResult.RiskHashs {
+			risk, err := yakit.GetRiskByHash(consts.GetGormProjectDatabase(), hash)
+			if err != nil {
+				log.Errorf("get risk by hash failed: %s", err)
+				continue
+			}
+			r.riskMap[name] = risk
+		}
+	}
+	// transform to grpc model
 	if len(r.riskGRPCCache) != len(r.riskMap) {
 		r.riskGRPCCache = lo.MapToSlice(r.riskMap, func(name string, risk *schema.Risk) *ypb.Risk {
 			return risk.ToGRPCModel()
 		})
 	}
+	// return
 	return r.riskGRPCCache
 }
 
 func (r *SyntaxFlowResult) GetRisk(name string) *schema.Risk {
-	if r == nil || r.riskMap == nil {
+	if r == nil {
 		return nil
 	}
 	if r, ok := r.riskMap[name]; ok {
 		return r
+	}
+	// from db
+	if r.dbResult != nil {
+		if hash, ok := r.dbResult.RiskHashs[name]; ok {
+			risk, err := yakit.GetRiskByHash(consts.GetGormProjectDatabase(), hash)
+			if err != nil {
+				log.Errorf("get risk by hash failed: %s", err)
+				return nil
+			}
+			r.riskMap[name] = risk
+			return risk
+		}
 	}
 	return nil
 }

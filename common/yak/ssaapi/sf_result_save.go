@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
@@ -67,6 +68,9 @@ func (r *SyntaxFlowResult) Save(TaskIDs ...string) (uint, error) {
 		errs = utils.JoinErrors(errs, err)
 	}
 	result.RiskCount = uint64(len(r.riskMap))
+	result.RiskHashs = lo.MapValues(r.riskMap, func(risk *schema.Risk, name string) string {
+		return risk.Hash
+	})
 	if err := ssadb.SaveResult(result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}

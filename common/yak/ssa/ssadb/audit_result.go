@@ -28,7 +28,9 @@ type AuditResult struct {
 	ProgramName string `json:"program_name"`
 	Language    string `json:"language"`
 
-	RiskCount       uint64      `json:"risk_count"`
+	RiskCount uint64                       `json:"risk_count"`
+	RiskHashs schema.MapEx[string, string] `json:"risk_hashs" gorm:"type:text"`
+
 	CheckMsg        StringSlice `json:"check_msg" gorm:"type:text"`
 	Errors          StringSlice `json:"errors" gorm:"type:text"`
 	UnValueVariable StringSlice `json:"un_value_variable" gorm:"type:text"`
