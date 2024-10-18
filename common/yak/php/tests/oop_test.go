@@ -806,8 +806,6 @@ class a
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 
-	//todo: visit if condition
-	//
 	//	t.Run("test", func(t *testing.T) {
 	//		code := `<?php
 	//   function _Include($a)

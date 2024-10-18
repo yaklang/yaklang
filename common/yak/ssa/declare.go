@@ -48,6 +48,9 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string) *ClassBluePrint {
 		getInCurrent,
 	); ok {
 		if c, ok := typ.(*ClassBluePrint); ok {
+			if !p.PreHandler() {
+				c.Build()
+			}
 			return c
 		}
 	}
@@ -72,6 +75,10 @@ func (prog *Program) GetFunctionEx(name, pkg string) *Function {
 		getFunc,
 	); ok {
 		if fun, ok := ToFunction(val); ok {
+			//todo: fix se
+			if !prog.PreHandler() {
+				fun.Build()
+			}
 			return fun
 		}
 	}

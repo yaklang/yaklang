@@ -208,13 +208,10 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 		for realName, currentName := range aliasMap {
 			switch opmode {
 			case "const", "function":
-				//todo const
-				if function := y.GetProgram().GetFunction(currentName, ""); !utils.IsNil(function) {
-					log.Warnf("current builder has function: %s", function.GetName())
-					continue
-				}
-				if err := prog.ImportValueFromLib(namespace, realName); err != nil {
-					log.Errorf("get namespace value fail: %s", err)
+				if namespace != nil {
+					if err := prog.ImportValueFromLib(namespace, realName); err != nil {
+						log.Errorf("get namespace value fail: %s", err)
+					}
 				}
 			default:
 				//有两种情况，cls、整个命名空间和下面的
@@ -233,6 +230,8 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 						log.Errorf("get namespace all fail: %s", err)
 						return nil
 					}
+
+					//todo:
 					for _, value := range namespace.ExportValue {
 						if function, b := ssa.ToFunction(value); b {
 							prog.Funcs[fmt.Sprintf("%s\\%s", currentName, function.GetName())] = function
