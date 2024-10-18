@@ -323,12 +323,12 @@ func (cs *http2ClientStream) doRequest() error {
 			hdrs = hdrs[len(chunk):]
 			endHeaders := len(hdrs) == 0
 			if first {
-				endStream = endStream && endHeaders
-				err := frame.WriteHeaders(http2.HeadersFrameParam{
+				//endStream = endStream && endHeaders
+				err := frame.WriteHeaders(http2.HeadersFrameParam{ // some server not accept endStream flag in headers frame
 					StreamID:      streamID,
 					BlockFragment: chunk,
-					EndStream:     endStream,
-					EndHeaders:    endHeaders,
+					//EndStream:     endStream,
+					EndHeaders: endHeaders,
 				})
 				first = false
 				if err != nil {
@@ -345,9 +345,8 @@ func (cs *http2ClientStream) doRequest() error {
 		return nil
 	}
 
-	endRequestStream := len(body) <= 0
 	cs.h2Conn.frWriteMutex.Lock()
-	err := h2HeaderWriter(fr, cs.ID, endRequestStream, cs.h2Conn.maxFrameSize, hPackBuf.Bytes())
+	err := h2HeaderWriter(fr, cs.ID, false, cs.h2Conn.maxFrameSize, hPackBuf.Bytes())
 	cs.h2Conn.frWriteMutex.Unlock()
 	if err != nil {
 		cs.h2Conn.setClose()
@@ -370,14 +369,14 @@ func (cs *http2ClientStream) doRequest() error {
 			}
 		}
 	} else {
-		if !cs.sentEndStream {
-			cs.h2Conn.frWriteMutex.Lock()
-			dataFrameErr := fr.WriteData(cs.ID, true, nil)
-			cs.h2Conn.frWriteMutex.Unlock()
-			if dataFrameErr != nil {
-				return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", cs.ID)
-			}
+		//if !cs.sentEndStream {
+		cs.h2Conn.frWriteMutex.Lock()
+		dataFrameErr := fr.WriteData(cs.ID, true, []byte{})
+		cs.h2Conn.frWriteMutex.Unlock()
+		if dataFrameErr != nil {
+			return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", cs.ID)
 		}
+		//}
 	}
 	cs.sentEndStream = true
 	return nil
