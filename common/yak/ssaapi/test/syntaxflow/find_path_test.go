@@ -24,8 +24,10 @@ h = f + g
 `, func(prog *ssaapi.Program) error {
 		results := prog.SyntaxFlow("h as $start; $start #-> *?{<name>?{have: a}} as $end; alert $start; alert $end")
 		fmt.Println(results.Dump(false))
-		results.GetValues("start").ShowDot()
-		paths := results.GetPaths("start", "end")
+		start := results.GetValues("start")
+		start.ShowDot()
+		end := results.GetValues("end")
+		paths := start.GetPaths(end)
 		for _, item := range paths {
 			assert.Equal(t, item[0].GetSSAValue().GetOpcode(), ssa.SSAOpcodeBinOp)
 			assert.Equal(t, item[len(item)-1].GetSSAValue().GetOpcode(), ssa.SSAOpcodeConstInst)
