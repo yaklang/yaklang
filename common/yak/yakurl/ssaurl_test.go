@@ -59,7 +59,7 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 		spew.Dump(res)
 
 		resultIDRes := res.Resources[len(res.Resources)-1]
-		require.Equal(t, resultIDRes.ResourceType, "message")
+		require.Equal(t, resultIDRes.ResourceType, "result_id")
 		require.Equal(t, resultIDRes.VerboseType, "result_id")
 		// got result
 		resultID = resultIDRes.ResourceName
@@ -91,7 +91,7 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 		spew.Dump(res)
 
 		resultIDRes := res.Resources[len(res.Resources)-1]
-		require.Equal(t, resultIDRes.ResourceType, "message")
+		require.Equal(t, resultIDRes.ResourceType, "result_id")
 		require.Equal(t, resultIDRes.VerboseType, "result_id")
 		// got result
 		gotResultID := resultIDRes.ResourceName

@@ -248,7 +248,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 	// result_id
 	if query.ResultID != 0 {
 		res := createNewRes(url, 0, []extra{})
-		res.ResourceType = "message"
+		res.ResourceType = "result_id"
 		res.VerboseType = "result_id"
 		res.ResourceName = strconv.FormatUint(uint64(query.ResultID), 10)
 		resources = append(resources, res)
