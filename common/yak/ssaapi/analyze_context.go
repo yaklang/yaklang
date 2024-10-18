@@ -76,7 +76,7 @@ func (a *AnalyzeContext) EnterRecursive() {
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	actx := &AnalyzeContext{
-		crossProcessVisitedTable: newCrossProcessVisitedTable(),
+		crossProcessVisitedTable: newCrossProcessTable(),
 		_objectStack:             utils.NewStack[objectItem](),
 		config:                   NewOperations(opt...),
 		depth:                    -1,
@@ -84,74 +84,50 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	return actx
 }
 
-func (a *AnalyzeContext) CrossProcess(from *Value, to *Value) bool {
-	return a.crossProcessVisitedTable.crossProcess(from, to)
+func (a *AnalyzeContext) PushCrossProcess(from *Value, to *Value, call *Value) bool {
+	return a.crossProcessVisitedTable.pushCrossProcess(from, to, call)
 }
 
-func (a *AnalyzeContext) RecoverCrossProcess() {
-	a.crossProcessVisitedTable.recoverCrossProcess()
+func (a *AnalyzeContext) PopCrossProcess() func() {
+	hash, info := a.crossProcessVisitedTable.popCrossProcess()
+	return func() {
+		a.crossProcessVisitedTable.pushCrossProcessWithInfo(hash, info)
+	}
 }
 
-// ReverseProcess 逆向跨过程，如果正栈为空，将停止逆向过程
-func (a *AnalyzeContext) ReverseProcess() (string, bool) {
-	return a.crossProcessVisitedTable.reverseProcess(nil, nil)
-}
-
-// ReverseProcessWithDirection 逆向跨过程，如果正栈为空，继续往非正栈中继续逆向过程
-func (a *AnalyzeContext) ReverseProcessWithDirection(from *Value, to *Value) (string, bool) {
-	return a.crossProcessVisitedTable.reverseProcess(from, to)
-}
-
-func (a *AnalyzeContext) RecoverReverseProcess(hash string) {
-	a.crossProcessVisitedTable.recoverReverseProcess(hash)
-}
-
-func (a *AnalyzeContext) GetCallFromLastCrossProcess() *Value {
-	table := a.crossProcessVisitedTable.getValueVisitedTable()
-	if table.Len() <= 0 {
+// GetLastCallStackCall get the last call stack's call
+func (a *AnalyzeContext) GetLastCallStackCall() *Value {
+	table := a.crossProcessVisitedTable
+	if table == nil {
 		return nil
 	}
-	if a.crossProcessVisitedTable.positiveHashStack.Len() == 0 {
+	if table.crossProcessStack.Len() <= 0 {
 		return nil
 	}
-	hash := a.crossProcessVisitedTable.positiveHashStack.Peek()
-	visited, ok := table.Get(hash)
-	if ok {
-		if visited.to.IsCall() {
-			return visited.to
-		} else if visited.from.IsCall() {
-			return visited.from
-		}
+	hash := table.crossProcessStack.Peek()
+	if hash == emptyStackHash {
+		return nil
 	}
-	return nil
+	visited, ok := table.crossProcessMap.Get(hash)
+	if !ok {
+		return nil
+	}
+	return visited.call
 }
 
 func (a *AnalyzeContext) TheValueShouldBeVisited(i *Value) bool {
-	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
-	if !ok {
-		return false
-	}
-	if _, ok := valueVisited.visited[i.GetId()]; !ok {
-		valueVisited.visited[i.GetId()] = struct{}{}
+	if i.IsFunction() {
 		return true
 	}
-	return false
+	return a.crossProcessVisitedTable.valueShould(i)
 }
 
 func (a *AnalyzeContext) TheMemberShouldBeVisited(i *Value) bool {
-	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
-	if !ok {
-		return false
-	}
-	if _, ok := valueVisited.visitedObject[i.GetId()]; !ok {
-		valueVisited.visitedObject[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
+	return a.crossProcessVisitedTable.memberShould(i)
 }
 
-func (a *AnalyzeContext) TheCrossProcessVisited(from *Value, to *Value) bool {
-	visited := a.crossProcessVisitedTable.valueVisitedTable
+func (a *AnalyzeContext) HaveTheCrossProcess(from *Value, to *Value) bool {
+	visited := a.crossProcessVisitedTable.crossProcessMap
 	if visited == nil {
 		return false
 	}
@@ -161,14 +137,13 @@ func (a *AnalyzeContext) TheCrossProcessVisited(from *Value, to *Value) bool {
 		return true
 	}
 	return false
-
 }
 
 // ========================================== OBJECT STACK ==========================================
 
 func (g *AnalyzeContext) PushObject(obj, key, member *Value) error {
 	if !g.TheMemberShouldBeVisited(member) {
-		return utils.Errorf("This member(%d) visited, skip", member.GetId())
+		return utils.Errorf("This member(%d) valueVisited, skip", member.GetId())
 	}
 	if !obj.IsObject() {
 		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.node)
