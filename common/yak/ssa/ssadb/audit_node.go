@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"context"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -29,7 +28,8 @@ type AuditNode struct {
 	// is entry node
 	IsEntryNode bool `json:"is_entry_node"`
 	// value
-	IRCodeID int64 `json:"ir_code_id"`
+	IRCodeID    int64  `json:"ir_code_id"`
+	VerboseName string `json:"verbose_name"`
 }
 
 type ResultVariable struct {
@@ -75,6 +75,61 @@ func GetResultValueByVariable(db *gorm.DB, resultID uint, resultVariable string)
 	return items, nil
 }
 
+func GetAllResultValue(db *gorm.DB, resultID uint) ([]int64, error) {
+	var items []int64
+	if err := db.Model(&AuditNode{}).
+		Where("result_id = ? and is_entry_node = ?", resultID, true).
+		Pluck("ir_code_id", &items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func GetEdgeEffectOnByFromNodeId(db *gorm.DB, id int64, programName string) []int64 {
+	var effectOns []int64
+	db.Model(&AuditEdge{}).
+		Where(" from_node = ? AND edge_type = ? AND program_name = ? ", id, EdgeType_EffectsOn, programName).
+		Pluck("to_node", &effectOns)
+	return effectOns
+}
+
+func GetEdgeEffectOnByToNodeId(db *gorm.DB, id int64, programName string) []int64 {
+	var effectOns []int64
+	db.Model(&AuditEdge{}).
+		Where(" to_node = ? AND edge_type = ? AND program_name = ? ", id, EdgeType_DependsOn, programName).
+		Pluck("from_node", &effectOns)
+	return effectOns
+}
+
+func GetEdgeDependOnByToNodeId(db *gorm.DB, id int64, programName string) []int64 {
+	var effectOns []int64
+	db.Model(&AuditEdge{}).
+		Where(" to_node = ? AND edge_type = ? AND program_name = ? ", id, EdgeType_DependsOn, programName).
+		Pluck("from_node", &effectOns)
+	return effectOns
+}
+
+func GetEdgeDependOnByFromNodeId(db *gorm.DB, id int64, programName string) []int64 {
+	var dependOns []int64
+	db.Model(&AuditEdge{}).
+		Where("from_node =? AND edge_type = ? AND program_name", id, EdgeType_DependsOn, programName).
+		Pluck("to_node", &dependOns)
+	return dependOns
+}
+
+func GetEdgePredecessorByFromID(db *gorm.DB, fromId int64, programName string) []*AuditEdge {
+	var edges []*AuditEdge
+	db.Model(&AuditEdge{}).
+		Where("from_node = ? AND edge_type = ? And program_name =?", fromId, EdgeType_Predecessor, programName).Scan(&edges)
+	return edges
+}
+
+func GetAuditNodeVerboseNameById(db *gorm.DB, id int64, programName string) string {
+	var auditNode AuditNode
+	db.Model(&AuditNode{}).Where("ir_code_id = ? AND program_name=?", id, programName).First(&auditNode)
+	return auditNode.VerboseName
+}
+
 type AuditEdgeType string
 
 const (
@@ -112,20 +167,30 @@ func (n *AuditNode) CreateDependsOnEdge(progName string, to int64) *AuditEdge {
 	return ae
 }
 
-func (n *AuditNode) CreateEffectsOnEdge(progName string, to int64) *AuditEdge {
+func CreateEffectsOnEdge(progName string, from, to int64) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName: progName,
-		FromNode:    int64(n.ID),
+		FromNode:    from,
 		ToNode:      to,
 		EdgeType:    EdgeType_EffectsOn,
 	}
 	return ae
 }
 
-func (n *AuditNode) CreatePredecessorEdge(progName string, to int64, step int64, label string) *AuditEdge {
+func CreateDependsOnEdge(progName string, from, to int64) *AuditEdge {
+	ae := &AuditEdge{
+		ProgramName: progName,
+		FromNode:    from,
+		ToNode:      to,
+		EdgeType:    EdgeType_DependsOn,
+	}
+	return ae
+}
+
+func CreatePredecessorEdge(progName string, from, to, step int64, label string) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName:   progName,
-		FromNode:      int64(n.ID),
+		FromNode:      from,
 		ToNode:        to,
 		EdgeType:      EdgeType_Predecessor,
 		AnalysisStep:  step,
