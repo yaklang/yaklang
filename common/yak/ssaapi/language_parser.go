@@ -289,12 +289,6 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	application.Build = func(
 		filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
 	) (err error) {
-		if fb.GetEditor() == nil && src != nil {
-			fb.SetEditor(src)
-			if fb.EnterBlock != nil && fb.EnterBlock.GetRange() == nil {
-				fb.EnterBlock.SetRange(src.GetFullRange())
-			}
-		}
 		application.ProcessInfof("start to compile : %v", filePath)
 		start := time.Now()
 		defer func() {
@@ -336,11 +330,15 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		// include source code will change the context of the origin editor
 		newCodeEditor := src
 		newCodeEditor.SetUrl(filePath)
-		fb.SetEditor(newCodeEditor) // set for current builder
+		fb.SetEditor(newCodeEditor)
+		if originEditor == nil && newCodeEditor != nil {
+			if fb.EnterBlock != nil && fb.EnterBlock.GetRange() == nil {
+				fb.EnterBlock.SetRange(src.GetFullRange())
+			}
+		}
 		if originEditor != nil {
 			originEditor.PushSourceCodeContext(newCodeEditor.SourceCodeMd5())
 		}
-
 		// push into program for recording what code is compiling
 		application.PushEditor(newCodeEditor)
 		defer func() {
