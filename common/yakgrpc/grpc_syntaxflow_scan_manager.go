@@ -67,8 +67,8 @@ func CreateSyntaxFlowScanManager(ctx context.Context, stream ypb.Yak_SyntaxFlowS
 }
 
 func (m *SyntaxFlowScanManager) Start(req *ypb.SyntaxFlowScanRequest) error {
-	if req.GetFilter() == nil || len(req.GetProgramName()) == 0 {
-		return utils.Errorf("filter or program name is empty")
+	if len(req.GetProgramName()) == 0 {
+		return utils.Errorf("program name is empty")
 	}
 	m.programs = req.GetProgramName()
 
