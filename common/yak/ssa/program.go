@@ -36,10 +36,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		externBuildValueHandler: make(map[string]func(b *FunctionBuilder, id string, v any) (value Value)),
 		ExternInstance:          make(map[string]any),
 		ExternLib:               make(map[string]map[string]any),
-		importValue:             make(map[string]map[string]Value),
-		importType:              make(map[string]map[string]Type),
-		importTypeToPkg:         make(map[string]map[string]Type),
-		importValueToPkg:        make(map[string]map[string]Value),
+		importDeclares:          omap.NewOrderedMap(make(map[string]*importDeclareItem)),
 	}
 	if kind == Application {
 		prog.Application = prog
@@ -182,104 +179,6 @@ func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string
 	return builder
 }
 
-func (prog *Program) GetFunctionEx(name, pkg string, reverse, selfAsFirst bool) *Function {
-	var function *Function
-	defer func() {
-		if msg := recover(); msg != nil {
-			log.Errorf("get function fail: %s", msg)
-		} else {
-			if !utils.IsNil(function) {
-				if !prog.PreHandler() {
-					function.Build()
-				}
-			}
-		}
-		return
-	}()
-	selfasFirstCheck := func() (*Function, bool) {
-		_func, ok := prog.Funcs[name]
-		return _func, ok
-	}
-	//m: pkg:function
-	reversehandle := func(m map[string]Value) (*Function, bool) {
-		var fm = map[string]*Function{}
-		var keys []string
-		var pkgIndex int = -1
-		for key, fun := range m {
-			if _func, b := ToFunction(fun); b {
-				for i, _ := range prog.ImportTable {
-					if reverse {
-						currentIndex := len(prog.ImportTable) - i - 1
-						if prog.ImportTable[currentIndex] == key {
-							if currentIndex > pkgIndex {
-								pkgIndex = currentIndex
-							}
-						}
-					} else {
-						if prog.ImportTable[i] == key {
-							if pkgIndex == -1 {
-								pkgIndex = i
-							} else if i < pkgIndex {
-								pkgIndex = i
-							}
-						}
-					}
-				}
-				fm[key] = _func
-				keys = append(keys, key)
-			}
-		}
-		switch len(m) {
-		case 0:
-			return nil, false
-		case 1:
-			return fm[keys[0]], true
-		default:
-			s := prog.ImportTable[pkgIndex]
-			value, ok := m[s]
-			if ok {
-				_func, b := ToFunction(value)
-				return _func, b
-			}
-			return nil, false
-		}
-	}
-	//search lib
-	if pkg != "" {
-		if value, ok := prog.importValueToPkg[name][pkg]; !ok {
-			return nil
-		} else {
-			function, _ = ToFunction(value)
-			return function
-		}
-	} else {
-		switch {
-		case selfAsFirst:
-			if check, b := selfasFirstCheck(); b {
-				return check
-			}
-			if _func, b := reversehandle(prog.importValueToPkg[name]); b {
-				function = _func
-				return function
-			}
-		default:
-			if _func, b := reversehandle(prog.importValueToPkg[name]); b {
-				function = _func
-				return function
-			}
-			if check, b := selfasFirstCheck(); b {
-				function = check
-				return function
-			}
-		}
-	}
-	return nil
-}
-
-func (p *Program) GetFunction(name string, pkg string) *Function {
-	return p.GetFunctionEx(name, pkg, false, false)
-}
-
 func (prog *Program) EachFunction(handler func(*Function)) {
 	var handFunc func(*Function)
 	handFunc = func(f *Function) {
@@ -395,20 +294,4 @@ func (p *Program) GetApplication() *Program {
 		return nil
 	}
 	return p.Application
-}
-
-func (p *Program) GetType(name string) Type {
-	return p.getTypeEx(name, "")
-}
-func (p *Program) GetTypeWithPkgName(name, pkg string) Type {
-	return p.getTypeEx(name, pkg)
-}
-func (p *Program) getTypeEx(name, pkg string) Type {
-	if m := p.importType[pkg]; m != nil && m[name] != nil {
-		return m[name]
-	}
-	if t, ok := p.externType[name]; ok {
-		return t
-	}
-	return nil
 }

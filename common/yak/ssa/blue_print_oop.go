@@ -2,7 +2,7 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/samber/lo"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -20,37 +20,6 @@ const (
 	Readonly
 )
 
-func (p *Program) GetClassBlueprintEx(name string, pkg string) *ClassBluePrint {
-	if p == nil {
-		return nil
-	}
-
-	//todo: this have error,refactor class pr after fix
-	m := p.importTypeToPkg[name]
-	if m != nil && len(m) > 0 {
-		entries := lo.Entries(m)
-		if bluePrint, ok := entries[0].Value.(*ClassBluePrint); ok {
-			return bluePrint
-		}
-	}
-	if p.importType[pkg] != nil {
-		if _type, ok := p.importType[pkg][name]; ok {
-			if bluePrint, ok1 := _type.(*ClassBluePrint); ok1 {
-				if !p.PreHandler() {
-					bluePrint.Build()
-				}
-				return bluePrint
-			}
-		}
-	}
-	if c, ok := p.ClassBluePrint[name]; ok {
-		if !p.PreHandler() {
-			c.Build()
-		}
-		return c
-	}
-	return nil
-}
 func (p *Program) GetClassBluePrint(name string) *ClassBluePrint {
 	return p.GetClassBlueprintEx(name, "")
 }

@@ -196,7 +196,6 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 		if namespace == nil || !ok {
 			return nil
 		}
-		y.GetProgram().ImportTable = append(y.GetProgram().ImportTable, namespaceName)
 		return namespace
 	}
 	for _, listContext := range list.AllNamespaceNameList() {
@@ -214,7 +213,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					log.Warnf("current builder has function: %s", function.GetName())
 					continue
 				}
-				if _, err := prog.ImportValueFromLib(namespace, realName); err != nil {
+				if err := prog.ImportValueFromLib(namespace, realName); err != nil {
 					log.Errorf("get namespace value fail: %s", err)
 				}
 			default:
@@ -224,7 +223,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					continue
 				}
 				if namespace != nil {
-					if _, err := prog.ImportTypeFromLib(namespace, realName); err != nil {
+					if err := prog.ImportTypeFromLib(namespace, realName); err != nil {
 						log.Errorf("get namespace type fail: %s", err)
 					}
 				}
