@@ -59,7 +59,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
                     continue
                 }
                 printf("response Time(ms): %d t + 3000(ms): %d\n", result.ServerDurationMs, t+3000)
-                if  result.ServerDurationMs > t + 3000 {
+                if  result.ServerDurationMs >= t + 3000 {
                     risk.NewRisk(
                         url,
                         risk.severity("high"),
