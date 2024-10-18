@@ -44,7 +44,7 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 		}
 	}
 	if ifaceIns.Flags&net.FlagLoopback != 0 {
-		return nil, errors.New("loopback")
+		return nil, errors.New("arp on loopback interface is not supported")
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -99,11 +99,11 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 							}
 
 							senderMutex.Lock()
-							err = handle.WritePacketData(buf.Bytes())
+							err = handle.WritePacketData(buf)
 							time.Sleep(5 * time.Millisecond) // some ms delay for write
 							senderMutex.Unlock()
 							if err != nil {
-								log.Errorf("write packet failed: %s", err)
+								log.Errorf("new arp packet failed: %s", err)
 								return
 							}
 
