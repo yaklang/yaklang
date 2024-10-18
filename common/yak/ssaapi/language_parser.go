@@ -87,6 +87,7 @@ func (c *config) parseProject() (Programs, error) {
 	}
 	_ = totalSize
 
+	prog.SetPreHandler(true)
 	prog.ProcessInfof("parse project in fs: %v, path: %v", c.fs, programPath)
 	filesys.Recursive(programPath,
 		filesys.WithFileSystem(c.fs),
@@ -116,6 +117,7 @@ func (c *config) parseProject() (Programs, error) {
 		}),
 	)
 
+	prog.SetPreHandler(false)
 	// parse project
 	err = ssareducer.ReducerCompile(
 		programPath, // base
@@ -216,22 +218,20 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	}
 	c.LanguageBuilder = c.LanguageBuilder.Create()
 	prog, builder, err := c.init()
+	prog.SetPreHandler(true)
 	c.LanguageBuilder.InitHandler(builder)
-
 	// builder.SetRangeInit(r)
 	if err != nil {
 		return nil, err
 	}
 	c.LanguageBuilder.PreHandlerFile(r, builder)
 	// parse code
+	prog.SetPreHandler(false)
 	if err := prog.Build("", r, builder); err != nil {
 		return nil, err
 	}
 	builder.Finish()
 	ssa4analyze.RunAnalyzer(prog)
-	for _, program := range prog.ChildApplication {
-		ssa4analyze.RunAnalyzer(program)
-	}
 	return prog, nil
 }
 
@@ -289,14 +289,15 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	application.Build = func(
 		filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
 	) (err error) {
+		application.ProcessInfof("start to compile : %v", filePath)
+		start := time.Now()
 		if fb.GetEditor() == nil && src != nil {
 			fb.SetEditor(src)
 			if fb.EnterBlock != nil && fb.EnterBlock.GetRange() == nil {
 				fb.EnterBlock.SetRange(src.GetFullRange())
 			}
+			fb.SetEditor(nil)
 		}
-		application.ProcessInfof("start to compile : %v", filePath)
-		start := time.Now()
 		defer func() {
 			application.ProcessInfof(
 				"compile finish file: %s, cost: %v",
@@ -340,9 +341,8 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		if originEditor != nil {
 			originEditor.PushSourceCodeContext(newCodeEditor.SourceCodeMd5())
 		}
-
 		// push into program for recording what code is compiling
-		application.PushEditorex(newCodeEditor, !fb.PreHandler)
+		application.PushEditor(newCodeEditor)
 		defer func() {
 			// recover source code context
 			fb.SetEditor(originEditor)

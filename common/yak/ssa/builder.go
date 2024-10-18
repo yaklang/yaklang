@@ -37,7 +37,6 @@ type FunctionBuilder struct {
 	// Support obtaining static members and static method, even if the class is not instantiated.
 	SupportClassStaticModifier bool
 	SupportClass               bool
-	PreHandler                 bool
 	IncludeStack               *utils.Stack[string]
 
 	Included bool
@@ -105,6 +104,9 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 	}
 	f.builder = b
 	return b
+}
+func (b *FunctionBuilder) GetFunc(name, pkg string) *Function {
+	return b.GetProgram().GetFunction(name, pkg)
 }
 
 func (b *FunctionBuilder) SetBuildSupport(parent *FunctionBuilder) {

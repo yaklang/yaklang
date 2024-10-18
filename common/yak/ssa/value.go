@@ -67,7 +67,6 @@ func (b *FunctionBuilder) readValueEx(
 ) Value {
 	scope := b.CurrentBlock.ScopeTable
 	program := b.GetProgram()
-
 	if ret := ReadVariableFromScope(scope, name); ret != nil {
 		if b.CurrentRange != nil {
 			ret.AddRange(b.CurrentRange, false)

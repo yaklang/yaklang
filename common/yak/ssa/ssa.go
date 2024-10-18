@@ -1,11 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
-
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -177,7 +175,6 @@ type ProgramKind string
 const (
 	Application ProgramKind = "application"
 	Library                 = "library"
-	ChildAPP                = "child_application"
 )
 
 // both instruction and value
@@ -196,8 +193,7 @@ type Program struct {
 	// if no database, this is filename and file content
 	ExtraFile map[string]string
 
-	Application      *Program   // current Application
-	ChildApplication []*Program //childApplication
+	Application *Program // current Application
 	// program relationship
 	DownStream map[string]*Program
 	UpStream   map[string]*Program
@@ -213,21 +209,35 @@ type Program struct {
 
 	Cache *Cache
 
+	//consts
+	Consts map[string]Value
 	// function list
 	Funcs map[string]*Function
-
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
-	ExprotValue    map[string]Value
-	ExprotType     map[string]Type
+
+	ExportValue map[string]Value
+	ExportType  map[string]Type
+
+	//store import
+
+	// if importCoverInner is true, it will cover the inner import declare
+	// when multiple import declare with the same name value/type, the last one will be used
+	importCoverInner bool
+	// if importCoverOuter is true, it will cover current program value/type declare
+	// will use import value/type first, then use current program value/type
+	importCoverCurrent bool
+	// import declare
+	importDeclares *omap.OrderedMap[string, *importDeclareItem]
 
 	// offset
 	OffsetMap         map[int]*OffsetItem
 	OffsetSortedSlice []int
 
 	// package Loader
-	Loader *ssautil.PackageFileLoader
-	Build  Build
+	Loader      *ssautil.PackageFileLoader
+	Build       Build
+	_preHandler bool
 
 	errors SSAErrors
 
@@ -241,11 +251,14 @@ type Program struct {
 	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)
 	ExternInstance          map[string]any
 	ExternLib               map[string]map[string]any
+
+	PkgName string
 }
 
 // implement Value
 type Function struct {
 	anValue
+	lazyBuilder
 
 	isMethod   bool
 	methodName string

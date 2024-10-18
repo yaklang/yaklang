@@ -30,7 +30,6 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		return y.VisitAnonymousClass(i.AnonymousClass())
 	}
 	class, name := y.VisitTypeRef(i.TypeRef())
-	class.SyntaxMethods()
 	var obj ssa.Value
 	obj = y.EmitUndefined(name)
 	if utils.IsNil(obj) {
@@ -149,6 +148,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			}
 
 			class := y.CreateClassBluePrint(className)
+			y.GetProgram().SetExportType(className, class)
 			if parentClass := y.GetClassBluePrint(parentClassName); parentClass != nil {
 				//感觉在ssa-classBlue中做更好，暂时修复
 				class.AddParentClass(parentClass)
@@ -203,15 +203,24 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				class.AddNormalMember(name, value)
 			}
 		}
+		ClassBlock := y.CurrentBlock
+		class.SetLazyBuilder(func() {
+			// handle variable name
+			CurrentBlock := y.CurrentBlock
+			y.CurrentBlock = ClassBlock
+			defer func() {
+				y.CurrentBlock = CurrentBlock
+			}()
 
-		// handle variable name
-		for _, va := range ret.AllVariableInitializer() {
-			name, value := y.VisitVariableInitializer(va)
-			if strings.HasPrefix(name, "$") {
-				name = name[1:]
+			for _, va := range ret.AllVariableInitializer() {
+				name, value := y.VisitVariableInitializer(va)
+				if strings.HasPrefix(name, "$") {
+					name = name[1:]
+				}
+				setMember(name, value)
 			}
-			setMember(name, value)
-		}
+			class.BuildConstructorAndDestructor()
+		})
 
 		return
 	case *phpparser.FunctionContext:
@@ -227,9 +236,11 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		isRef := ret.Ampersand()
 		_ = isRef
 
-		funcName := y.VisitIdentifier(ret.Identifier())
+		methodName := y.VisitIdentifier(ret.Identifier())
+		funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
 		newFunction := y.NewFunc(funcName)
-		newFunction.SetOrdinalBuild(func() ssa.Value {
+		newFunction.SetMethodName(methodName)
+		newFunction.SetLazyBuilder(func() {
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
 				this := y.NewParam("$this")
@@ -239,19 +250,18 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			}
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
-			return newFunction
 		})
 
-		switch funcName {
+		switch methodName {
 		case "__construct":
 			class.Constructor = newFunction
 		case "__destruct":
 			class.Destructor = newFunction
 		default:
 			if isStatic {
-				variable := y.GetStaticMember(class.Name, newFunction.GetName())
+				variable := y.GetStaticMember(class.Name, newFunction.GetMethodName())
 				y.AssignVariable(variable, newFunction)
-				class.AddStaticMethod(funcName, newFunction)
+				class.AddStaticMethod(methodName, newFunction)
 			} else {
 				defer func() {
 					if msg := recover(); msg != nil {
@@ -260,7 +270,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 						panic(newFunction)
 					}
 				}()
-				class.AddMethod(funcName, newFunction)
+				class.AddMethod(methodName, newFunction)
 			}
 		}
 	case *phpparser.ConstContext:
@@ -572,6 +582,8 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	}
 	if class == "" {
 		return nil, "", ""
+	} else {
+		y.GetProgram().GetClassBluePrint(class)
 	}
 	if strings.HasPrefix(key, "$") {
 		// variable
@@ -735,7 +747,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, bluePrint)
 	}
-	bluePrint.SyntaxMethods()
+	bluePrint.Build()
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(bluePrint)
 	constructor := bluePrint.GetConstructOrDestruct("constructor")
@@ -776,7 +788,7 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 	program := y.GetProgram()
 	library, b := program.GetLibrary(strings.Join(pkgPath, "."))
 	if b {
-		if function := library.GetFunction(identifier); !utils.IsNil(function) {
+		if function := library.Funcs[identifier]; !utils.IsNil(function) {
 			return function
 		} else if cls := library.GetClassBluePrint(identifier); !utils.IsNil(cls) {
 			inst := y.EmitConstInst("")

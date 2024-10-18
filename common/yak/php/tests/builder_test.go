@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -22,6 +23,21 @@ func TestParseSSA_SyntaxPhp(t *testing.T) {
 	t.Run("test-3", func(t *testing.T) {
 		code := `<html><?php ?></html>`
 		test.MockSSA(t, code)
+	})
+	t.Run("test", func(t *testing.T) {
+		code := `
+		<?php 
+		function f() {
+		}
+		function d($a) {
+			$a();
+		}
+		function b() {
+			d(f);
+		}
+		`
+
+		test.NonStrictMockSSA(t, code)
 	})
 	t.Run("test-4", func(t *testing.T) {
 		code := `<?php for ($i=0; $i < 5; $i++) { ?>

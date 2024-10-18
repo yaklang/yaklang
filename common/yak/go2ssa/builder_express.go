@@ -221,7 +221,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			if exData := b.GetImportPackage(rv.GetName()); exData != nil {
-				if value := exData.GetExprotValue(test); value != nil {
+				if value := exData.GetExportValue(test); value != nil {
 					if fun, ok := value.(*ssa.Function); ok {
 						return b.ReadMemberCallVariable(b.ReadValue(rv.GetName()), fun), nil
 					} else {
@@ -432,11 +432,11 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			var names []string
 			var values []ssa.Value
 
-			for n, g := range exData.ExprotValue {
+			for n, g := range exData.ExportValue {
 				names = append(names, n)
 				values = append(values, g)
 			}
-			obj := b.InterfaceAddFieldBuild(len(exData.ExprotValue),
+			obj := b.InterfaceAddFieldBuild(len(exData.ExportValue),
 				func(i int) ssa.Value {
 					return b.EmitConstInst(names[i])
 				},

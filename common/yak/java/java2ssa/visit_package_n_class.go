@@ -80,6 +80,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	if outClass == nil {
 		className := i.Identifier().GetText()
 		class = y.CreateClassBluePrint(className)
+		y.GetProgram().SetExportType(className, class)
 	} else {
 		var builder strings.Builder
 		builder.WriteString(outClass.Name)
