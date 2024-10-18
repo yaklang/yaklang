@@ -20,16 +20,16 @@ var JWTExports = map[string]interface{}{
 	"ALG_PS512": "PS512",
 
 	"Parse": JwtParse,
-	"JWTGenerate": func(alg string, i interface{}, key []byte) (string, error) {
-		return JwtGenerate(alg, utils.InterfaceToMapInterface(i), "JWT", key)
+	"JWTGenerate": func(alg string, i map[string]any, key []byte) (string, error) {
+		return JwtGenerate(alg, i, "JWT", key)
 	},
-	"JWTGenerateEx": func(alg string, extraHeader, i interface{}, key []byte) (string, error) {
+	"JWTGenerateEx": func(alg string, extraHeader, i map[string]any, key []byte) (string, error) {
 		return JwtGenerateEx(alg, utils.InterfaceToMapInterface(extraHeader), utils.InterfaceToMapInterface(i), "JWT", key)
 	},
-	"JWSGenerate": func(alg string, i interface{}, key []byte) (string, error) {
+	"JWSGenerate": func(alg string, i map[string]any, key []byte) (string, error) {
 		return JwtGenerate(alg, utils.InterfaceToMapInterface(i), "JWS", key)
 	},
-	"JWSGenerateEx": func(alg string, extraHeader, i interface{}, key []byte) (string, error) {
+	"JWSGenerateEx": func(alg string, extraHeader, i map[string]any, key []byte) (string, error) {
 		return JwtGenerateEx(alg, utils.InterfaceToMapInterface(extraHeader), utils.InterfaceToMapInterface(i), "JWS", key)
 	},
 	"RemoveAlg": JwtChangeAlgToNone,
