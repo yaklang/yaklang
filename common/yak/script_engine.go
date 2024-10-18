@@ -590,7 +590,6 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 						}
 						runtimeId := utils.InterfaceToString(iruntimeId)
 						opts = append([]aispec.AIConfigOption{aispec.WithStreamAndConfigHandler(func(reader io.Reader, cfg *aispec.AIConfig) {
-							engine.GetVar("yakit")
 							client.Stream("ai", runtimeId, reader, map[string]any{
 								"ai-type":  cfg.Type,
 								"ai-model": cfg.Model,
