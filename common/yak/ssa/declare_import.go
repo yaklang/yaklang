@@ -3,6 +3,7 @@ package ssa
 import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"golang.org/x/exp/maps"
 )
 
 type importDeclareItem struct {
@@ -97,6 +98,8 @@ func (p *Program) checkImportRelationship(lib *Program) (*importDeclareItem, err
 	if !ok {
 		pkg = &importDeclareItem{
 			pkgName: lib.Name,
+			typ:     make(map[string]Type),
+			val:     make(map[string]Value),
 		}
 		importDecl.Set(lib.Name, pkg)
 	}
@@ -141,7 +144,8 @@ func (p *Program) ImportAll(lib *Program) error {
 	if err != nil {
 		return err
 	}
-	// pkg.all = true
+	maps.Copy(pkg.typ, lib.externType)
+	maps.Copy(pkg.val, lib.ExportValue)
 	_ = pkg
 	return nil
 }
