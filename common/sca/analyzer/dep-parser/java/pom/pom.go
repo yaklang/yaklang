@@ -261,7 +261,7 @@ func (d pomDependency) Resolve(props map[string]string, depManagement, rootDepMa
 // ToArtifact converts dependency to artifact.
 // It should be called after calling Resolve() so that variables can be evaluated.
 func (d pomDependency) ToArtifact(opts analysisOptions) artifact {
-	// ToOpcode avoid shadow adding exclusions to top pom's,
+	// To avoid shadow adding exclusions to top pom's,
 	// we need to initialize a new map for each new artifact
 	// See `exclusions in child` test for more information
 	exclusions := map[string]struct{}{}

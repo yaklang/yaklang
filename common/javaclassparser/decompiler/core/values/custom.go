@@ -6,17 +6,17 @@ import (
 )
 
 type CustomValue struct {
-	StringFunc func(funcCtx *class_context.FunctionContext) string
+	StringFunc func(funcCtx *class_context.ClassContext) string
 	TypeFunc   func() types.JavaType
 }
 
 func (v *CustomValue) Type() types.JavaType {
 	return v.TypeFunc()
 }
-func (v *CustomValue) String(funcCtx *class_context.FunctionContext) string {
+func (v *CustomValue) String(funcCtx *class_context.ClassContext) string {
 	return v.StringFunc(funcCtx)
 }
-func NewCustomValue(stringFun func(funcCtx *class_context.FunctionContext) string, typeFunc func() types.JavaType) *CustomValue {
+func NewCustomValue(stringFun func(funcCtx *class_context.ClassContext) string, typeFunc func() types.JavaType) *CustomValue {
 	return &CustomValue{
 		StringFunc: stringFun,
 		TypeFunc:   typeFunc,

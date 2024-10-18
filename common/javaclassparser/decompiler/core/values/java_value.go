@@ -9,7 +9,7 @@ import (
 type JavaRef struct {
 	Id       int
 	StackVar JavaValue
-
+	IsThis   bool
 	JavaType types.JavaType
 }
 
@@ -17,7 +17,10 @@ func (j *JavaRef) Type() types.JavaType {
 	return j.JavaType
 }
 
-func (j *JavaRef) String(funcCtx *class_context.FunctionContext) string {
+func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
+	if j.IsThis {
+		return "this"
+	}
 	if j.StackVar != nil {
 		return j.StackVar.String(funcCtx)
 	}
@@ -41,7 +44,7 @@ func (j *JavaArray) Type() types.JavaType {
 	return j.JavaType
 }
 
-func (j *JavaArray) String(funcCtx *class_context.FunctionContext) string {
+func (j *JavaArray) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("%s[%d]", j.Class.String(funcCtx), j.Length)
 }
 
@@ -62,7 +65,7 @@ func (j *JavaLiteral) Type() types.JavaType {
 	return j.JavaType
 }
 
-func (j *JavaLiteral) String(funcCtx *class_context.FunctionContext) string {
+func (j *JavaLiteral) String(funcCtx *class_context.ClassContext) string {
 	if j.JavaType.String(funcCtx) == "java.lang.String" || j.JavaType.String(funcCtx) == "String" {
 		return fmt.Sprintf(`"%s"`, j.Data)
 	} else {
@@ -88,10 +91,11 @@ func (j *JavaClassMember) Type() types.JavaType {
 	return j.JavaType
 }
 
-func (j *JavaClassMember) String(funcCtx *class_context.FunctionContext) string {
+func (j *JavaClassMember) String(funcCtx *class_context.ClassContext) string {
 	if j.Name == funcCtx.ClassName {
 		return j.Member
 	}
+	//name := funcCtx.ShortTypeName(j.Name)
 	name := funcCtx.ShortTypeName(j.Name)
 	return fmt.Sprintf("%s.%s", name, j.Member)
 }
@@ -122,25 +126,25 @@ func NewRefMember(id int, member string, typ types.JavaType) *RefMember {
 }
 
 type JavaArrayMember struct {
-	Ref   *JavaRef
-	Index JavaValue
+	Object JavaValue
+	Index  JavaValue
 }
 
 func (j *JavaArrayMember) Type() types.JavaType {
-	return j.Ref.Type().(*types.JavaArrayType).JavaType
+	return j.Object.Type().(*types.JavaArrayType).JavaType
 }
-func (j *JavaArrayMember) String(funcCtx *class_context.FunctionContext) string {
-	return fmt.Sprintf("var%d[%v]", j.Ref.Id, j.Index.String(funcCtx))
+func (j *JavaArrayMember) String(funcCtx *class_context.ClassContext) string {
+	return fmt.Sprintf("%s[%v]", j.Object.String(funcCtx), j.Index.String(funcCtx))
 }
 
-func NewJavaArrayMember(ref *JavaRef, index JavaValue) *JavaArrayMember {
+func NewJavaArrayMember(object JavaValue, index JavaValue) *JavaArrayMember {
 	return &JavaArrayMember{
-		Ref:   ref,
-		Index: index,
+		Object: object,
+		Index:  index,
 	}
 }
 
-func (j *RefMember) String(funcCtx *class_context.FunctionContext) string {
+func (j *RefMember) String(funcCtx *class_context.ClassContext) string {
 	if j.Id == 0 {
 		return j.Member
 	}

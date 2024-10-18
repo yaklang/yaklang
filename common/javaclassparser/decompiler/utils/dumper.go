@@ -18,8 +18,8 @@ func DumpNodesToDotExp(code *core.Node) string {
 		}
 		visited[node] = true
 		toString := func(node *core.Node) string {
-			//return strconv.Quote(node.Statement.String(&FunctionContext{}))
-			s := strings.Replace(node.Statement.String(&class_context.FunctionContext{}), "\"", "", -1)
+			//return strconv.Quote(node.Statement.String(&ClassContext{}))
+			s := strings.Replace(node.Statement.String(&class_context.ClassContext{}), "\"", "", -1)
 			s = strings.Replace(s, "\n", " ", -1)
 			return s
 		}

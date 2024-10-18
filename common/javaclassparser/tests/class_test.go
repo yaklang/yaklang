@@ -11,7 +11,7 @@ type A struct {
 }
 
 func TestDecompilerClass(t *testing.T) {
-	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/LoopTest.class")
+	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/target/classes/org/benf/cfr/reader/entityfactories/ContiguousEntityFactory.class")
 	cf, err := javaclassparser.Parse(classesContent)
 	if err != nil {
 		t.Fatal(err)

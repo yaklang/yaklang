@@ -25,7 +25,7 @@ var (
 	JavaVoid    = newJavaPrimer("void")
 )
 
-func (j *JavaPrimer) String(funcCtx *class_context.FunctionContext) string {
+func (j *JavaPrimer) String(funcCtx *class_context.ClassContext) string {
 	return j.Name
 }
 

@@ -156,7 +156,7 @@ func convertToJSONableObject(yamlObj interface{}, jsonTarget *reflect.Value) (in
 
 	// go-yaml v3 changed from v2 and now will provide map[string]interface{} by
 	// default and map[interface{}]interface{} when none of the keys strings.
-	// ToOpcode get around this, we run a pre-loop to convert the map.
+	// To get around this, we run a pre-loop to convert the map.
 	// JSON only supports strings as keys, so we must convert.
 
 	switch typedYAMLObj := yamlObj.(type) {

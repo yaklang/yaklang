@@ -150,7 +150,7 @@ func WalkGraph[T any](node T, next func(T) ([]T, error)) error {
 	return nil
 }
 
-func StatementsString(statements []statements.Statement, funcCtx *class_context.FunctionContext) string {
+func StatementsString(statements []statements.Statement, funcCtx *class_context.ClassContext) string {
 	var res string
 	for _, statement := range statements {
 		res += statement.String(funcCtx)
@@ -205,17 +205,18 @@ func SplitPackageClassName(s string) (string, string) {
 	return "", ""
 }
 
-func GetShortName(ctx *class_context.FunctionContext, name string) string {
-	libs := append(ctx.BuildInLibs, ctx.ClassName)
-	for _, lib := range libs {
-		pkg, className := SplitPackageClassName(lib)
-		fpkg, fclassName := SplitPackageClassName(name)
-		if fpkg == pkg && (className == "*" || fclassName == className) {
-			return fclassName
-		}
-	}
-	return name
-}
+//
+//func GetShortName(ctx *class_context.ClassContext, name string) string {
+//	libs := append(ctx.BuildInLibs, ctx.ClassName)
+//	for _, lib := range libs {
+//		pkg, className := SplitPackageClassName(lib)
+//		fpkg, fclassName := SplitPackageClassName(name)
+//		if fpkg == pkg && (className == "*" || fclassName == className) {
+//			return fclassName
+//		}
+//	}
+//	return name
+//}
 
 func NodesToStatements(nodes []*Node) []statements.Statement {
 	var result []statements.Statement

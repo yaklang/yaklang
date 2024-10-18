@@ -165,7 +165,7 @@ type VerifyOptions struct {
 	// KeyUsage specifies which Extended Key Usage values are acceptable.
 	// An empty list means ExtKeyUsageServerAuth. Key usage is considered a
 	// constraint down the chain which mirrors Windows CryptoAPI behavior,
-	// but not the spec. ToOpcode accept any key usage, include ExtKeyUsageAny.
+	// but not the spec. To accept any key usage, include ExtKeyUsageAny.
 	KeyUsages []ExtKeyUsage
 }
 

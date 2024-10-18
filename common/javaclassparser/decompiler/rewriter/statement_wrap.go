@@ -278,12 +278,14 @@ func (s *StatementManager) ScanCoreInfo() error {
 	}
 	subNodeRoute := NewRootNodeRoute()
 	walkIfStatement(s.RootNode, subNodeRoute)
+	circleNodes = utils.NewSet[*core.Node](circleNodes).List()
 	//for _, node := range circleNodes {
 	//	//mergeNode := funk.Filter(node.Next, func(item *core.Node) bool {
 	//	//	return !node.CircleNodesSet.Has(item)
 	//	//}).([]*core.Node)
 	//	node.MergeNode = node.FalseNode()
 	//}
+
 	for _, current := range mergeNodesSet.List() {
 		for _, nodeMap := range getNodeInfo(current).AllPreNodeRoute {
 			if nodeMap.ConditionNode == nil {

@@ -1,19 +1,50 @@
 package class_context
 
 import (
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"strings"
 )
 
-type FunctionContext struct {
-	ClassName    string
-	FunctionName string
-	PackageName  string
-	BuildInLibs  []string
+type ClassContext struct {
+	ClassName        string
+	FunctionName     string
+	PackageName      string
+	BuildInLibsMap   map[string][]string
+	Arguments        []string
+	GetTypeShortName func(rawName string) string
 }
 
-func (f *FunctionContext) ShortTypeName(s string) string {
-	return GetShortName(f, s)
+func (f *ClassContext) GetAllImported() []string {
+	imports := []string{}
+	for pkg, classes := range f.BuildInLibsMap {
+		for _, className := range classes {
+			imports = append(imports, pkg+"."+className)
+		}
+	}
+	return imports
+}
+func (f *ClassContext) Import(name string) {
+	if f.BuildInLibsMap == nil {
+		f.BuildInLibsMap = make(map[string][]string)
+	}
+	pkg, className := SplitPackageClassName(name)
+	f.BuildInLibsMap[pkg] = append(f.BuildInLibsMap[pkg], className)
+}
+func (f *ClassContext) ShortTypeName(name string) string {
+	if f.BuildInLibsMap == nil {
+		return name
+	}
+	pkg, className := SplitPackageClassName(name)
+	if pkg == "" {
+		return className
+	}
+	libs := f.BuildInLibsMap[pkg]
+	if len(libs) > 0 && (funk.Contains(libs, className) || libs[0] == "*") {
+		return className
+	}
+	f.BuildInLibsMap[pkg] = append(f.BuildInLibsMap[pkg], className)
+	return className
 }
 
 func SplitPackageClassName(s string) (string, string) {
@@ -25,14 +56,14 @@ func SplitPackageClassName(s string) (string, string) {
 	return "", ""
 }
 
-func GetShortName(ctx *FunctionContext, name string) string {
-	libs := append(ctx.BuildInLibs, ctx.ClassName)
-	for _, lib := range libs {
-		pkg, className := SplitPackageClassName(lib)
-		fpkg, fclassName := SplitPackageClassName(name)
-		if fpkg == pkg && (className == "*" || fclassName == className) {
-			return fclassName
-		}
-	}
-	return name
-}
+//func GetShortName(ctx *ClassContext, name string) string {
+//	libs := append(ctx.BuildInLibs, ctx.ClassName)
+//	for _, lib := range libs {
+//		pkg, className := SplitPackageClassName(lib)
+//		fpkg, fclassName := SplitPackageClassName(name)
+//		if fpkg == pkg && (className == "*" || fclassName == className) {
+//			return fclassName
+//		}
+//	}
+//	return name
+//}

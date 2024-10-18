@@ -883,7 +883,7 @@ func _marshallerTestWithCtx(i string, ctx context.Context, debug bool) {
 	}
 
 	if len(bytes) <= 0 {
-		panic("Consume Bytes ToOpcode SymbolTable n Codes failed: Empty Bytes")
+		panic("Consume Bytes To SymbolTable n Codes failed: Empty Bytes")
 	}
 
 	if symbolTable == nil {

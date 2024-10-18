@@ -222,7 +222,7 @@ func (z *ZipFS) ReadDir(name string) ([]fs.DirEntry, error) {
 			continue
 		}
 		entries = append(entries, &ZipDirEntry{
-			name: f.Name,
+			name: c.Name,
 			info: f.FileInfo(),
 		})
 	}

@@ -138,7 +138,7 @@ func HTTPRequestToHTTP2(schema string, host string, conn net.Conn, raw []byte, n
 
 				/**
 				case "cookie":
-					// Per 8.1.2.5 ToOpcode allow for better compression efficiency, the
+					// Per 8.1.2.5 To allow for better compression efficiency, the
 					// Cookie header field MAY be split into separate header fields,
 					// each with one or more cookie-pairs.
 					//      V1ll4n: 但是，多个 Cookie 对也可以生效，不冲突，可以选择不处理，那就不处理了！

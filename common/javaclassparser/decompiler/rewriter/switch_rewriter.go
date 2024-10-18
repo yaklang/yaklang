@@ -77,7 +77,7 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) {
 			if hasBreak {
 				//replaceBreakCB = append(replaceBreakCB, func() {
 				//	if len(item.Body) > 0 {
-				//		item.Body = append(item.Body, NewCustomStatement(func(funcCtx *class_context.FunctionContext) string {
+				//		item.Body = append(item.Body, NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 				//			return "break"
 				//		}))
 				//	}
@@ -140,7 +140,7 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) {
 		f()
 	}
 	newBreakStatement := func() statements.Statement {
-		return statements.NewCustomStatement(func(funcCtx *class_context.FunctionContext) string {
+		return statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 			return "break"
 		})
 	}

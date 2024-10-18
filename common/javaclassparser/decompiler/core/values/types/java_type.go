@@ -18,7 +18,7 @@ type JavaFuncType struct {
 	ReturnType JavaType
 }
 
-func (j JavaFuncType) String(funcCtx *class_context.FunctionContext) string {
+func (j JavaFuncType) String(funcCtx *class_context.ClassContext) string {
 	return j.Desc
 }
 
@@ -38,7 +38,7 @@ type JavaArrayType struct {
 	Length   []any
 }
 
-func (j *JavaArrayType) String(funcCtx *class_context.FunctionContext) string {
+func (j *JavaArrayType) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("%s%s", j.JavaType.String(funcCtx), strings.Repeat("[]", len(j.Length)))
 }
 
@@ -60,7 +60,7 @@ func (j javaNull) Type() JavaType {
 	return j
 }
 
-func (j javaNull) String(funcCtx *class_context.FunctionContext) string {
+func (j javaNull) String(funcCtx *class_context.ClassContext) string {
 	return "null"
 }
 
@@ -81,7 +81,7 @@ func (j *JavaClass) Type() JavaType {
 	return j
 }
 
-func (j *JavaClass) String(funcCtx *class_context.FunctionContext) string {
+func (j *JavaClass) String(funcCtx *class_context.ClassContext) string {
 	name := funcCtx.ShortTypeName(j.Name)
 	return fmt.Sprintf("%s", name)
 }
