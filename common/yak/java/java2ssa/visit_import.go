@@ -57,7 +57,7 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 			_ = y.GetProgram().ImportAll(prog)
 		} else {
 			//if class := prog.GetClassBluePrint(className); class != nil
-			_, _ = y.GetProgram().ImportTypeFromLib(prog, className)
+			_ = y.GetProgram().ImportTypeFromLib(prog, className)
 		}
 	}
 }
