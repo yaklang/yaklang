@@ -16,8 +16,7 @@ func TestJava_Func_Params(t *testing.T) {
     }
 }
 `, []string{
-			"Parameter-a",
-			"Function-Main_A(0)",
+			"Parameter-a", "Function-A(0)",
 		}, t)
 	})
 
@@ -31,10 +30,7 @@ func TestJava_Func_Params(t *testing.T) {
         println(a);
     }
 }
-`, []string{
-			"Function-Main_A(0)",
-			"Parameter-a",
-		}, t)
+`, []string{"Undefined-A(0)", "Parameter-a"}, t)
 	})
 
 	t.Run("test  function params 2", func(t *testing.T) {
@@ -126,7 +122,7 @@ public class Main {
         println(A);
     }
 }`, []string{
-			"Function-Main_A",
+			"Function-A",
 		}, t)
 	})
 

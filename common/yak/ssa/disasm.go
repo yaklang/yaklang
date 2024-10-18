@@ -173,7 +173,6 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	for _, b := range f.Blocks {
 		ShowBlock(b)
 	}
-	ShowBlock(f.DeferBlock)
 
 	return ret
 }

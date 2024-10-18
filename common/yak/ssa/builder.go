@@ -2,7 +2,9 @@ package ssa
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -64,7 +66,7 @@ type FunctionBuilder struct {
 
 	MarkedVariable           *Variable
 	MarkedThisObject         Value
-	MarkedThisClassBlueprint *ClassBluePrint
+	MarkedThisClassBlueprint *Blueprint
 
 	MarkedMemberCallWantMethod bool
 	parentBuilder              *FunctionBuilder
@@ -241,6 +243,15 @@ func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 func (b *FunctionBuilder) ReferenceParameter(name string) {
 	b.RefParameter[name] = struct{}{}
 }
-
-func (b *FunctionBuilder) name() {
+func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) Value {
+	method := bluePrint.GetMagicMethod(Constructor)
+	constructor := b.NewCall(method, args)
+	b.EmitCall(constructor)
+	desctructor := bluePrint.GetMagicMethod(Destructor)
+	call := b.NewCall(desctructor, []Value{constructor})
+	b.EmitDefer(call)
+	return constructor
+}
+func (b *FunctionBuilder) GetStaticMember(classname *Blueprint, field string) *Variable {
+	return b.CreateVariable(fmt.Sprintf("%s_%s", classname.Name, strings.TrimPrefix(field, "$")))
 }

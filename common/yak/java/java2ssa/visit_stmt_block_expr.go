@@ -1652,7 +1652,7 @@ func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClas
 	builder.WriteString(i.Identifier().GetText())
 	className := builder.String()
 
-	class := y.GetClassBluePrint(className)
+	class := y.GetBluePrint(className)
 	if class == nil {
 		return nil
 	}
@@ -1719,7 +1719,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 
 	className := strings.Join(createdName, ".")
 	if ret := i.ClassCreatorRest(); ret != nil {
-		class := y.GetClassBluePrint(className)
+		class := y.GetBluePrint(className)
 		obj := y.EmitUndefined(className)
 		if class == nil {
 			log.Warnf("class %v instantiation failed. maybe the origin (package) is not loaded? (dependency missed) ", className)
@@ -1730,7 +1730,6 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 				return obj, nil
 			}
 			y.AssignVariable(variable, defaultClassFullback)
-
 			var newCallTyp ssa.Type
 			args := []ssa.Value{obj}
 			arguments := y.VisitClassCreatorRest(ret, className)
@@ -1741,21 +1740,12 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 			call.SetType(newCallTyp)
 			return obj, call
 		}
-		constructor := class.Constructor
-		if constructor == nil {
-			log.Warnf("class %v is not found constructor, "+
-				"maybe it's a abstract class or interface, just make a default one", className)
-			undefinedConstructor := y.EmitUndefined(className)
-			undefinedConstructor.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.GetAnyType()}, class, true))
-			class.Constructor = undefinedConstructor
-			arguments := y.VisitClassCreatorRest(ret, className)
-			return obj, y.EmitCall(y.NewCall(undefinedConstructor, append([]ssa.Value{obj}, arguments...)))
-		}
-
+		obj.SetType(class)
 		args := []ssa.Value{obj}
 		arguments := y.VisitClassCreatorRest(ret, className)
 		args = append(args, arguments...)
-		return obj, y.EmitCall(y.NewCall(constructor, args))
+		return nil, y.ClassConstructor(class, args)
+		//return obj, y.EmitCall(y.NewCall(constructor, args))
 	}
 	//array init
 	if ret := i.ArrayCreatorRest(); ret != nil {
@@ -1788,9 +1778,9 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 	if i.ClassBody() != nil {
 		// 匿名类
 		className := uuid.NewString()
-		class := y.CreateClassBluePrint(className)
+		class := y.CreateBluePrint(className)
 		if oldClassName != "" {
-			class.AddParentClass(y.GetClassBluePrint(oldClassName))
+			class.AddParentClass(y.GetBluePrint(oldClassName))
 		}
 		y.VisitClassBody(i.ClassBody(), class)
 	}
@@ -1893,8 +1883,8 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 	}
 	//if in this class, return
 	if class := y.MarkedThisClassBlueprint; class != nil {
-		if value, ok := y.ReadClassConst(class.Name, name); ok {
-			return value
+		if method := class.GetStaticMethod(name); !utils.IsNil(method) {
+			return method
 		}
 		if class.GetNormalMember(name) != nil {
 			obj := y.PeekValue("this")

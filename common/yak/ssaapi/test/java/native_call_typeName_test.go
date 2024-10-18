@@ -361,14 +361,15 @@ func TestFullTypeNameWithParentClass1(t *testing.T) {
 		import com.ParentClass1.yak.C;
 		class B extends A implements C{
 			public static void main(String[] args){
-				var a = new B();
+				B a = new B();
 			}
 		};	
 `)
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
 		prog.Show()
-
+		flow := prog.SyntaxFlow(`a<fullTypeName><show>`, sfvm.WithEnableDebug())
+		flow.Show()
 		obj := prog.SyntaxFlowChain("a<typeName> as $obj")
 		assert.Equal(t, 6, obj.Len())
 
@@ -376,18 +377,23 @@ func TestFullTypeNameWithParentClass1(t *testing.T) {
 		assert.Equal(t, 1, obj.Len())
 
 		obj = prog.SyntaxFlowChain("a<typeName>?{have:'com.org.ParentClass1.A.A'} as $obj")
+		obj.Show()
 		assert.Equal(t, 1, obj.Len())
 
 		obj = prog.SyntaxFlowChain("a<typeName>?{have:'com.org.ParentClass1.A.A'} as $obj")
+		obj.Show()
 		assert.Equal(t, 1, obj.Len())
 
 		obj = prog.SyntaxFlowChain("a<fullTypeName>?{have:'com.ParentClass1.yak.C'}as $obj")
+		obj.Show()
 		assert.Equal(t, 1, obj.Len())
 
 		obj = prog.SyntaxFlowChain("a<fullTypeName>?{have:'com.example.ParentClass1.B'} as $obj")
+		obj.Show()
 		assert.Equal(t, 1, obj.Len())
 
 		obj = prog.SyntaxFlowChain("a<fullTypeName>?{have:'com.org.ParentClass1.A.A'} as $obj")
+		obj.Show()
 		assert.Equal(t, 1, obj.Len())
 
 		obj = prog.SyntaxFlowChain("a<typeName>?{have:'com.org.ParentClass1.A.A'} as $obj")

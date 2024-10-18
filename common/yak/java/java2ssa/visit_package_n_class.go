@@ -64,7 +64,7 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 
 }
 
-func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.ClassBluePrint) ssa.Value {
+func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.Blueprint) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return y.EmitEmptyContainer()
 	}
@@ -76,22 +76,22 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	}
 	var mergedTemplate []string
 	// 声明的类为外部类情况
-	var class *ssa.ClassBluePrint
+	var class *ssa.Blueprint
 	if outClass == nil {
 		className := i.Identifier().GetText()
-		class = y.CreateClassBluePrint(className)
+		class = y.CreateBluePrint(className)
 	} else {
 		var builder strings.Builder
 		builder.WriteString(outClass.Name)
 		builder.WriteString(".")
 		builder.WriteString(i.Identifier().GetText())
 		className := builder.String()
-		class = y.CreateClassBluePrint(className)
+		class = y.CreateBluePrint(className)
 	}
 	// set full type name for class's self
 	if len(y.selfPkgPath) != 0 {
 		ftRaw := fmt.Sprintf("%s.%s", strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
-		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.ClassBluePrint)
+		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.Blueprint)
 	}
 	if ret := i.TypeParameters(); ret != nil {
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
@@ -145,10 +145,10 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	//}
 
 	for _, parentClass := range mergedTemplate {
-		if parent := y.GetClassBluePrint(parentClass); parent != nil {
+		if parent := y.GetBluePrint(parentClass); parent != nil {
 			class.AddParentClass(parent)
 		} else {
-			parentBP := y.CreateClassBluePrint(parentClass)
+			parentBP := y.CreateBluePrint(parentClass)
 			y.AddFullTypeNameForAllImport(parentClass, parentBP)
 			class.AddParentClass(parentBP)
 		}
@@ -163,7 +163,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	return container
 }
 
-func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.ClassBluePrint) interface{} {
+func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Blueprint) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -209,7 +209,7 @@ func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext)
 
 }
 
-func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.ClassBluePrint) func() {
+func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.Blueprint) func() {
 	if y == nil || raw == nil || y.IsStop() {
 		return func() {}
 	}
@@ -230,9 +230,9 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
 		// 声明成员变量
-		setMember := class.AddNormalMember
+		setMember := class.RegisterNormalMember
 		if isStatic {
-			setMember = class.AddStaticMember
+			setMember = class.RegisterStaticMember
 		}
 		field := ret.(*javaparser.FieldDeclarationContext)
 
@@ -333,14 +333,14 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 		typ.AddFullTypeName(className)
 		return typ
 	}
-	if class := y.GetClassBluePrint(className); class != nil {
+	if class := y.GetBluePrint(className); class != nil {
 		typ = class
 		if len(typ.GetFullTypeNames()) == 0 {
 			typ = y.AddFullTypeNameFromMap(className, typ)
 		}
 		return typ
 	} else {
-		typ = ssa.NewClassBluePrint()
+		typ = ssa.NewClassBluePrint(className)
 		typ = y.AddFullTypeNameFromMap(className, typ)
 		return typ
 	}
@@ -371,7 +371,7 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	return t
 }
 
-func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.ClassBluePrint) interface{} {
+func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.Blueprint) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -386,7 +386,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 
 	enumName := i.Identifier().GetText()
 	if class == nil {
-		class = y.CreateClassBluePrint(enumName)
+		class = y.CreateBluePrint(enumName)
 	}
 
 	if i.IMPLEMENTS() != nil {
@@ -394,10 +394,10 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 	}
 
 	for _, parentClass := range mergedTemplate {
-		if parent := y.GetClassBluePrint(parentClass); parent != nil {
+		if parent := y.GetBluePrint(parentClass); parent != nil {
 			class.AddParentClass(parent)
 		} else {
-			class.AddParentClass(y.CreateClassBluePrint(parentClass))
+			class.AddParentClass(y.CreateBluePrint(parentClass))
 		}
 	}
 
@@ -418,7 +418,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 	return nil
 }
 
-func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class *ssa.ClassBluePrint) {
+func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -436,7 +436,7 @@ func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class
 	// 实例化enum里的常量
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(class)
-	setMember := class.AddNormalMember
+	setMember := class.RegisterNormalMember
 	for _, enumConstant := range allEnumConstant {
 		constant := enumConstant.(*javaparser.EnumConstantContext)
 		enumName := constant.Identifier().GetText()
@@ -457,7 +457,7 @@ func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class
 
 }
 
-func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.ClassBluePrint) {
+func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -472,7 +472,7 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 		_ = annotation
 	}
 
-	setMember := class.AddStaticMember
+	setMember := class.RegisterStaticMember
 
 	name := i.Identifier().GetText()
 	variable := y.CreateVariable(name)
@@ -481,7 +481,7 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 	return
 }
 
-func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarationsContext, class *ssa.ClassBluePrint) {
+func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarationsContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -501,7 +501,7 @@ func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarations
 
 func (y *builder) VisitClassBodyDeclaration(
 	raw javaparser.IClassBodyDeclarationContext,
-	class *ssa.ClassBluePrint,
+	class *ssa.Blueprint,
 ) func() {
 	if y == nil || raw == nil || y.IsStop() {
 		return func() {}
@@ -554,7 +554,7 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 
 func (y *builder) VisitMethodDeclaration(
 	raw javaparser.IMethodDeclarationContext,
-	class *ssa.ClassBluePrint, isStatic bool,
+	class *ssa.Blueprint, isStatic bool,
 	annotationFunc []func(ssa.Value),
 	defCallback []func(ssa.Value),
 ) func() {
@@ -569,7 +569,7 @@ func (y *builder) VisitMethodDeclaration(
 	}
 
 	key := i.Identifier().GetText()
-	funcName := fmt.Sprintf("%s_%s", class.Name, key)
+	funcName := fmt.Sprintf("%s", key)
 	methodName := key
 
 	if isStatic {
@@ -594,11 +594,12 @@ func (y *builder) VisitMethodDeclaration(
 			for _, def := range defCallback {
 				def(newFunction)
 			}
-			class.AddStaticMethod(key, newFunction)
+			class.RegisterStaticMethod(key, newFunction)
 			//y.AddToPackage(funcName)
 		}
+		class.RegisterConstMember(key, newFunction)
 
-		y.AssignClassConst(class.Name, key, newFunction)
+		//y.AssignClassConst(class.Name, key, newFunction)
 		if i.THROWS() != nil {
 			if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
 				y.VisitQualifiedNameList(qualifiedNameList)
@@ -628,7 +629,6 @@ func (y *builder) VisitMethodDeclaration(
 		for _, def := range defCallback {
 			def(newFunction)
 		}
-		//y.AddToPackage(funcName)
 	}
 
 	if i.THROWS() != nil {
@@ -642,7 +642,7 @@ func (y *builder) VisitMethodDeclaration(
 		prefix = "static "
 	}
 	log.Infof("start to build %vmethod: %v to %v", prefix, funcName, class.Name)
-	class.AddMethod(key, newFunction)
+	class.RegisterNormalMethod(key, newFunction)
 	return build
 }
 
@@ -846,7 +846,7 @@ func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContex
 
 }
 
-func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclarationContext, class *ssa.ClassBluePrint) {
+func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclarationContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -866,10 +866,14 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		newFunction := y.NewFunc(funcName)
 		y.FunctionBuilder = y.PushFunction(newFunction)
 		{
-			this := y.NewParam("this")
-			this.SetType(class)
+			y.NewParam("$this")
+			container := y.EmitEmptyContainer()
+			variable := y.CreateVariable("this")
+			y.AssignVariable(variable, container)
+			container.SetType(class)
 			y.VisitFormalParameters(i.FormalParameters())
 			y.VisitBlock(i.Block())
+			y.EmitReturn([]ssa.Value{container})
 			y.Finish()
 		}
 		y.FunctionBuilder = y.PopFunction()
