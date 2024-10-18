@@ -29,25 +29,40 @@ func (v *Value) GetGraphEffectOnNeighbors() Values {
 
 type dfsHandler func(start *Value, isEnd func(*Value) bool, visited map[*Value]struct{}, path Values, callback func(Values))
 
-func (r *SyntaxFlowResult) GetDependOnPaths(start, end string) []Values {
-	return r.getPathsWithHandler(start, end, r.dfsDependOn)
+func (v *Value) GetDependOnPaths(end Values) []Values {
+	vs := Values{v}
+	return vs.getPathsWithHandler(end, vs.dfsDependOn)
 }
 
-func (r *SyntaxFlowResult) GetEffectOnPaths(start, end string) []Values {
-	return r.getPathsWithHandler(start, end, r.dfsEffectOn)
+func (v *Value) GetEffectOnPaths(end Values) []Values {
+	vs := Values{v}
+	return vs.getPathsWithHandler(end, vs.dfsEffectOn)
 }
 
-func (r *SyntaxFlowResult) GetPaths(start, end string) []Values {
-	return append(r.GetDependOnPaths(start, end), r.GetEffectOnPaths(start, end)...)
+func (v *Value) GetPaths(end Values) []Values {
+	vs := Values{v}
+	return append(vs.GetDependOnPaths(end), vs.GetEffectOnPaths(end)...)
 }
 
-func (r *SyntaxFlowResult) getPathsWithHandler(start, end string, handle dfsHandler) []Values {
+func (vs Values) GetDependOnPaths(end Values) []Values {
+	return vs.getPathsWithHandler(end, vs.dfsDependOn)
+}
+
+func (vs Values) GetEffectOnPaths(end Values) []Values {
+	return vs.getPathsWithHandler(end, vs.dfsEffectOn)
+}
+
+func (vs Values) GetPaths(end Values) []Values {
+	return append(vs.GetDependOnPaths(end), vs.GetEffectOnPaths(end)...)
+}
+
+func (vs Values) getPathsWithHandler(end Values, handle dfsHandler) []Values {
 	var paths []Values
 
 	target := make(map[string]struct{})
 	idTarget := make(map[int64]struct{})
 
-	for _, endValue := range r.GetValues(end) {
+	for _, endValue := range end {
 		if endValue.GetId() > 0 {
 			idTarget[endValue.GetId()] = struct{}{}
 			continue
@@ -64,7 +79,7 @@ func (r *SyntaxFlowResult) getPathsWithHandler(start, end string, handle dfsHand
 	}
 
 	// get all paths from start to end
-	for _, start := range r.GetValues(start) {
+	for _, start := range vs {
 		handle(start, func(value *Value) bool {
 			_, ok := idTarget[value.GetId()]
 			if ok {
@@ -95,7 +110,7 @@ func (r *SyntaxFlowResult) getPathsWithHandler(start, end string, handle dfsHand
 	return paths
 }
 
-func (s *SyntaxFlowResult) dfsDependOn(start *Value, isEnd func(*Value) bool, visited map[*Value]struct{}, path Values, callback func(Values)) {
+func (vs Values) dfsDependOn(start *Value, isEnd func(*Value) bool, visited map[*Value]struct{}, path Values, callback func(Values)) {
 	visited[start] = struct{}{}
 	path = append(path, start)
 	if isEnd(start) {
@@ -103,14 +118,14 @@ func (s *SyntaxFlowResult) dfsDependOn(start *Value, isEnd func(*Value) bool, vi
 	} else {
 		for _, neighbor := range start.GetGraphDependOnNeighbors() {
 			if _, ok := visited[neighbor]; !ok {
-				s.dfsDependOn(neighbor, isEnd, visited, path, callback)
+				vs.dfsDependOn(neighbor, isEnd, visited, path, callback)
 			}
 		}
 	}
 	delete(visited, start)
 }
 
-func (s *SyntaxFlowResult) dfsEffectOn(start *Value, isEnd func(*Value) bool, visited map[*Value]struct{}, path Values, callback func(Values)) {
+func (vs Values) dfsEffectOn(start *Value, isEnd func(*Value) bool, visited map[*Value]struct{}, path Values, callback func(Values)) {
 	visited[start] = struct{}{}
 	path = append(path, start)
 	if isEnd(start) {
@@ -118,7 +133,7 @@ func (s *SyntaxFlowResult) dfsEffectOn(start *Value, isEnd func(*Value) bool, vi
 	} else {
 		for _, neighbor := range start.GetGraphEffectOnNeighbors() {
 			if _, ok := visited[neighbor]; !ok {
-				s.dfsEffectOn(neighbor, isEnd, visited, path, callback)
+				vs.dfsEffectOn(neighbor, isEnd, visited, path, callback)
 			}
 		}
 	}
