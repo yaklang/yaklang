@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -76,7 +75,7 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 	if ctx.ProgramName == "" {
 		return utils.Error("program info is empty")
 	}
-	return ctx.recursiveSaveValue(value, nil)
+	return ctx.recursiveSaveValue(value)
 }
 
 func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
@@ -84,6 +83,7 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 		AuditNodeStatus: s.AuditNodeStatus,
 		IsEntryNode:     ValueCompare(value, s.entryValue),
 		IRCodeID:        value.GetId(),
+		VerboseName:     value.GetVerboseName(),
 	}
 	if ret := s.db.Save(an).Error; ret != nil {
 		return nil, utils.Wrap(ret, "save AuditNode")
@@ -91,13 +91,45 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 	return an, nil
 }
 
-func (s *saveValueCtx) recursiveSaveValue(value *Value, callback func(next *ssadb.AuditNode) error) error {
+func (s *saveValueCtx) recursiveSaveValue(value *Value) error {
 	if s == nil {
 		return utils.Error("saveValueCtx is nil")
 	}
 
 	if value == nil {
 		return nil
+	}
+
+	var vals Values
+	vals = append(vals, value.DependOn...)
+	vals = append(vals, value.EffectOn...)
+
+	for _, i := range value.DependOn {
+		edge := ssadb.CreateEffectsOnEdge(s.ProgramName, value.GetId(), i.GetId())
+		edge.FromVerboseName = value.GetVerboseName()
+		edge.ToVerboseName = i.GetVerboseName()
+		s.db.Save(edge)
+	}
+
+	for _, i := range value.EffectOn {
+		edge := ssadb.CreateEffectsOnEdge(s.ProgramName, value.GetId(), i.GetId())
+		edge.FromVerboseName = value.GetVerboseName()
+		edge.ToVerboseName = i.GetVerboseName()
+		s.db.Save(edge)
+	}
+
+	for _, pred := range value.Predecessors {
+		var step int64
+		var label string
+		if info := pred.Info; info != nil {
+			step = int64(info.Step)
+			label = info.Label
+		}
+		edge := ssadb.CreatePEdge(s.ProgramName, value.GetId(),pred.Node.GetId(), step, label)
+		edge.FromVerboseName = value.GetVerboseName()
+		edge.ToVerboseName = pred.Node.GetVerboseName()
+		vals = append(vals, pred.Node)
+		s.db.Save(edge)
 	}
 
 	var id string
@@ -113,55 +145,13 @@ func (s *saveValueCtx) recursiveSaveValue(value *Value, callback func(next *ssad
 	}
 	s.visited[id] = struct{}{}
 
-	an, err := s.SaveNode(value)
+	_, err := s.SaveNode(value)
 	if err != nil {
 		return err
 	}
 
-	if callback != nil {
-		if err := callback(an); err != nil {
-			log.Errorf("callback failed: %v", err)
-		}
-	}
-
-	for _, i := range value.DependOn {
-		if err := s.recursiveSaveValue(i, func(next *ssadb.AuditNode) error {
-			edge := an.CreateDependsOnEdge(s.ProgramName, int64(next.ID))
-			if ret := s.db.Save(edge).Error; ret != nil {
-				return utils.Wrap(ret, "save AuditEdge")
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-	}
-	for _, i := range value.EffectOn {
-		if err := s.recursiveSaveValue(i, func(next *ssadb.AuditNode) error {
-			edge := an.CreateEffectsOnEdge(s.ProgramName, int64(next.ID))
-			if ret := s.db.Save(edge).Error; ret != nil {
-				return utils.Wrap(ret, "save AuditEdge")
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-	}
-	for _, pred := range value.Predecessors {
-		if err := s.recursiveSaveValue(pred.Node, func(next *ssadb.AuditNode) error {
-			var step int64
-			var label string
-			if info := pred.Info; info != nil {
-				step = int64(info.Step)
-				label = info.Label
-			}
-			edge := an.CreatePredecessorEdge(s.ProgramName, int64(next.ID), step, label)
-			if ret := s.db.Save(edge).Error; ret != nil {
-				return utils.Wrap(ret, "save AuditEdge")
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
+	for _, i := range vals {
+		_ = s.recursiveSaveValue(i)
 	}
 	return nil
 }

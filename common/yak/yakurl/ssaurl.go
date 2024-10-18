@@ -1,7 +1,6 @@
 package yakurl
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"strconv"
@@ -353,13 +352,17 @@ type NodeInfo struct {
 	CodeRange  *CodeRange `json:"code_range"`
 }
 
-func coverNodeInfos(graph *ssaapi.ValueGraph, programName string, nodeID int) []*NodeInfo {
+func coverNodeInfos(graph *ssaapi.SSAValueMappingGraph, programName string, nodeID int) []*NodeInfo {
 	res := make([]*NodeInfo, 0, len(graph.Node2Value))
-	for id, node := range graph.Node2Value {
-		codeRange, source := coverCodeRange(programName, node.GetRange())
+	for id, graphValue := range graph.Node2Value {
+		value, ok := graphValue.(*ssaapi.Value)
+		if !ok {
+			continue
+		}
+		codeRange, source := coverCodeRange(programName, value.GetRange())
 		ret := &NodeInfo{
 			NodeID:     dot.NodeName(id),
-			IRCode:     node.String(),
+			IRCode:     value.String(),
 			SourceCode: source,
 			CodeRange:  codeRange,
 		}
@@ -373,7 +376,7 @@ func coverNodeInfos(graph *ssaapi.ValueGraph, programName string, nodeID int) []
 type DeepFirst struct {
 	res     [][]string
 	current *orderedmap.OrderedMap // map[string]nil
-	graph   *ssaapi.ValueGraph
+	graph   *ssaapi.SSAValueMappingGraph
 }
 
 func (d *DeepFirst) deepFirst(nodeID int) {
@@ -404,7 +407,7 @@ func (d *DeepFirst) deepFirst(nodeID int) {
 	}
 }
 
-func DeepFirstGraph(graph *ssaapi.ValueGraph, nodeID int) [][]string {
+func DeepFirstGraph(graph *ssaapi.SSAValueMappingGraph, nodeID int) [][]string {
 	df := &DeepFirst{
 		res:     make([][]string, 0),
 		current: orderedmap.New(),
@@ -415,9 +418,9 @@ func DeepFirstGraph(graph *ssaapi.ValueGraph, nodeID int) [][]string {
 }
 
 func Value2Response(programName string, value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
-	valueGraph := ssaapi.NewValueGraph(value)
-	var buf bytes.Buffer
-	valueGraph.GenerateDOT(&buf)
+	sfGraph := ssaapi.NewSFGraph(value)
+	dotString := sfGraph.CreateDotGraph()
+	valueGraph := sfGraph.CreateSSAValueMappingGraph()
 
 	nodeID := valueGraph.Value2Node[value.GetId()]
 	nodeInfos := coverNodeInfos(valueGraph, programName, nodeID)
@@ -425,7 +428,7 @@ func Value2Response(programName string, value *ssaapi.Value, msg string, url *yp
 
 	res := createNewRes(url, 0, []extra{
 		{"node_id", dot.NodeName(nodeID)},
-		{"graph", buf.String()},
+		{"graph", dotString},
 		{"graph_info", nodeInfos},
 		{"message", msg},
 		{"graph_line", graphLines},

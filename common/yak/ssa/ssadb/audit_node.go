@@ -2,9 +2,9 @@ package ssadb
 
 import (
 	"context"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
@@ -29,7 +29,8 @@ type AuditNode struct {
 	// is entry node
 	IsEntryNode bool `json:"is_entry_node"`
 	// value
-	IRCodeID int64 `json:"ir_code_id"`
+	IRCodeID    int64  `json:"ir_code_id"`
+	VerboseName string `json:"verbose_name"`
 }
 
 type ResultVariable struct {
@@ -75,6 +76,68 @@ func GetResultValueByVariable(db *gorm.DB, resultID uint, resultVariable string)
 	return items, nil
 }
 
+func GetAllResultValue(db *gorm.DB, resultID uint) ([]int64, error) {
+	var items []int64
+	if err := db.Model(&AuditNode{}).
+		Where("result_id = ? and is_entry_node = ?", resultID, true).
+		Pluck("ir_code_id", &items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func GetEdgeEffectOnByFromNodeId(db *gorm.DB, id int64, programName string) []int64 {
+	var effectOns []int64
+	db.Model(&AuditEdge{}).
+		Where(" from_node = ? AND edge_type = ? AND program_name = ? ", id, EdgeType_EffectsOn, programName).
+		Pluck("to_node", &effectOns)
+	return effectOns
+}
+
+func GetEdgeDependOnByFromNodeId(db *gorm.DB, id int64, programName string) []int64 {
+	var dependOns []int64
+	db.Model(&AuditEdge{}).
+		Where("from_node =? AND edge_type = ? AND program_name", id, EdgeType_DependsOn, programName).
+		Pluck("to_node", &dependOns)
+	return dependOns
+}
+
+func GetEdgeDependOnByToNodeId(db *gorm.DB, id int64, programName string) []int64 {
+	var dependOns []int64
+	db.Model(&AuditEdge{}).
+		Where("to_node =? AND edge_type = ? AND program_name", id, EdgeType_DependsOn, programName).
+		Pluck("from_node", &dependOns)
+	return dependOns
+}
+
+func GetEdgeEffectOnByToNodeId(db *gorm.DB, id int64, programName string) []int64 {
+	var effectOns []int64
+	db.Model(&AuditEdge{}).
+		Where(" to_node = ? AND edge_type = ? AND program_name = ? ", id, EdgeType_EffectsOn, programName).
+		Pluck("from_node", &effectOns)
+	return effectOns
+}
+
+func GetEdgePredecessorByFromID(db *gorm.DB, fromId int64, programName string) []*AuditEdge {
+	var edges []*AuditEdge
+	db.Model(&AuditEdge{}).
+		Where("from_node = ? AND edge_type = ? And program_name =?", fromId, EdgeType_Predecessor, programName).Scan(&edges)
+	return edges
+}
+
+func GetEdgePredecessorByToID(db *gorm.DB, fromId int64, programName string) []*AuditEdge {
+	var edges []*AuditEdge
+	db.Model(&AuditEdge{}).
+		Where("to_node = ? AND edge_type = ? And program_name =?", fromId, EdgeType_Predecessor, programName).Scan(&edges)
+	return edges
+}
+
+func GetAuditNodeVerboseNameById(db *gorm.DB, id int64, programName string) string {
+	var auditNode AuditNode
+	db.Model(&AuditNode{}).Where("id = ? AND program_name=?", id, programName).First(&auditNode)
+	return auditNode.VerboseName
+}
+
 type AuditEdgeType string
 
 const (
@@ -88,8 +151,10 @@ const (
 type AuditEdge struct {
 	gorm.Model
 	// edge
-	FromNode int64
-	ToNode   int64
+	FromNode        int64
+	ToNode          int64
+	FromVerboseName string
+	ToVerboseName   string
 
 	// program
 	ProgramName string `json:"program_name"`
@@ -100,6 +165,16 @@ type AuditEdge struct {
 	// for predecessor
 	AnalysisStep  int64
 	AnalysisLabel string
+	Hash          string `gorm:"unique_index"`
+}
+
+func (n *AuditEdge) CalcHash() string {
+	n.Hash = utils.CalcSha1(n.ProgramName, n.FromNode, n.ToNode)
+	return n.Hash
+}
+
+func (n *AuditEdge) BeforeSave() {
+	n.CalcHash()
 }
 
 func (n *AuditNode) CreateDependsOnEdge(progName string, to int64) *AuditEdge {
@@ -112,12 +187,34 @@ func (n *AuditNode) CreateDependsOnEdge(progName string, to int64) *AuditEdge {
 	return ae
 }
 
-func (n *AuditNode) CreateEffectsOnEdge(progName string, to int64) *AuditEdge {
+func CreateEffectsOnEdge(progName string, from, to int64) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName: progName,
-		FromNode:    int64(n.ID),
+		FromNode:    from,
 		ToNode:      to,
 		EdgeType:    EdgeType_EffectsOn,
+	}
+	return ae
+}
+
+func CreateDependsOnEdge(progName string, from, to int64) *AuditEdge {
+	ae := &AuditEdge{
+		ProgramName: progName,
+		FromNode:    from,
+		ToNode:      to,
+		EdgeType:    EdgeType_DependsOn,
+	}
+	return ae
+}
+
+func CreatePEdge(progName string, from, to, step int64, label string) *AuditEdge {
+	ae := &AuditEdge{
+		ProgramName:   progName,
+		FromNode:      from,
+		ToNode:        to,
+		EdgeType:      EdgeType_Predecessor,
+		AnalysisStep:  step,
+		AnalysisLabel: label,
 	}
 	return ae
 }
