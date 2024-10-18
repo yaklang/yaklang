@@ -215,21 +215,20 @@ type Program struct {
 	Funcs map[string]*Function
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
-	//pkgName、name、value
-	importValue map[string]map[string]Value
-	//name、pkg、value
-	importValueToPkg map[string]map[string]Value
 
 	ExportValue map[string]Value
+	ExportType  map[string]Type
 
-	//pkg、cls、value
-	importType map[string]map[string]Type
-	//cls、pkg、value
-	importTypeToPkg map[string]map[string]Type
-	ExportType      map[string]Type
+	//store import
 
-	//store origin import
-	ImportTable []string
+	// if importCoverInner is true, it will cover the inner import declare
+	// when multiple import declare with the same name value/type, the last one will be used
+	importCoverInner bool
+	// if importCoverOuter is true, it will cover current program value/type declare
+	// will use import value/type first, then use current program value/type
+	importCoverCurrent bool
+	// import declare
+	importDeclares *omap.OrderedMap[string, *importDeclareItem]
 
 	// offset
 	OffsetMap         map[int]*OffsetItem

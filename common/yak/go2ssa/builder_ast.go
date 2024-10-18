@@ -1779,9 +1779,9 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 				b.NewError(ssa.Warn, TAG, PackageNotFind(qul.IDENTIFIER(0).GetText()))
 				ssatyp = ssa.CreateAnyType()
 			} else {
-				obj := lib.GetExportType(qul.IDENTIFIER(1).GetText())
+				obj, ok := lib.GetExportType(qul.IDENTIFIER(1).GetText())
 
-				if obj != nil {
+				if ok {
 					ssatyp = obj
 				} else { // 没有找到类型，可能来自于golang库
 					b.NewError(ssa.Warn, TAG, StructNotFind(qul.IDENTIFIER(1).GetText()))
