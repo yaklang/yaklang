@@ -33,6 +33,26 @@ func (sm *SafeMap) Clone() *SafeMap {
 	return nsm
 }
 
+// Deep1Clone deep clone the first level of the map
+func (sm *SafeMap) Deep1Clone() *SafeMap {
+	sm.lock.RLock()
+	defer sm.lock.RUnlock()
+
+	newMap := make(map[string]any, len(sm.m))
+
+	for k, v := range sm.m {
+		if vMap, ok := v.(map[string]any); ok {
+			newMap[k] = maps.Clone(vMap)
+		} else {
+			newMap[k] = v
+		}
+	}
+
+	nsm := NewSafeMap(newMap)
+	nsm.parent = sm.parent
+	return nsm
+}
+
 func (sm *SafeMap) Append(l map[string]any) *SafeMap {
 	if utils.IsNil(l) {
 		return sm

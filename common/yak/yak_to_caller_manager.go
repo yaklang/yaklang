@@ -1637,7 +1637,7 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) {
 			log.Debugf("call %v.%v(params...)", i.Id, name)
 			i.Core.Handler(
 				func(frame *yakvm.Frame) {
-					frame.GlobalVariables = frame.GlobalVariables.Clone()
+					frame.GlobalVariables = frame.GlobalVariables.Deep1Clone()
 					frame.GlobalVariables.Store(consts.PLUGIN_CONTEXT_KEY_RUNTIME_ID, pluginRuntimeID)
 				}, items...)
 			return
