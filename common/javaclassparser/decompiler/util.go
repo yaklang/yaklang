@@ -1,0 +1,5 @@
+package decompiler
+
+func CheckIf() {
+
+}
