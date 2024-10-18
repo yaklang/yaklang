@@ -916,7 +916,7 @@ func encryptDESCBC(content []byte) ([]byte, *encryptedContentInfo, error) {
 //
 // The algorithm used to perform encryption is determined by the current value
 // of the global ContentEncryptionAlgorithm package variable. By default, the
-// value is EncryptionAlgorithmDESCBC. ToOpcode use a different algorithm, change the
+// value is EncryptionAlgorithmDESCBC. To use a different algorithm, change the
 // value before calling Encrypt(). For example:
 //
 //	ContentEncryptionAlgorithm = EncryptionAlgorithmAES128GCM

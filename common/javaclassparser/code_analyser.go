@@ -105,6 +105,8 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute) ([]state
 	parser := core.NewDecompiler(codeAttr.Code, func(id int) values.JavaValue {
 		return GetValueFromCP(dumper.ConstantPool, id)
 	})
+	parser.FunctionType = dumper.MethodType
+	//parser.FunctionContext.FunctionName
 	parser.ConstantPoolLiteralGetter = func(id int) *values.JavaLiteral {
 		return GetLiteralFromCP(dumper.ConstantPool, id)
 	}

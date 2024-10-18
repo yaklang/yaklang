@@ -11,11 +11,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"maps"
 	"sort"
+	"strings"
 )
 
 type Decompiler struct {
-	FunctionContext               *class_context.FunctionContext
+	FunctionType                  *types.JavaFuncType
+	FunctionContext               *class_context.ClassContext
 	varTable                      map[int]*values.JavaRef
+	idToValue                     map[int]values.JavaValue
 	currentVarId                  int
 	bytecodes                     []byte
 	opCodes                       []*OpCode
@@ -31,12 +34,14 @@ type Decompiler struct {
 
 func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.JavaValue) *Decompiler {
 	return &Decompiler{
-		FunctionContext:     &class_context.FunctionContext{},
+		FunctionContext:     &class_context.ClassContext{},
 		bytecodes:           bytecodes,
 		constantPoolGetter:  constantPoolGetter,
 		offsetToOpcodeIndex: map[uint16]int{},
 		opcodeIndexToOffset: map[int]uint16{},
 		varTable:            map[int]*values.JavaRef{},
+		currentVarId:        -1,
+		idToValue:           map[int]values.JavaValue{},
 	}
 }
 
@@ -190,12 +195,23 @@ func (d *Decompiler) DropUnreachableOpcode() error {
 func (d *Decompiler) getPoolValue(index int) values.JavaValue {
 	return d.constantPoolGetter(index)
 }
-func (d *Decompiler) AssignVar(slot int, value values.JavaValue) (*values.JavaRef, bool) {
-	typ := value.Type()
+func (d *Decompiler) GetRealValue(value values.JavaValue) values.JavaValue {
+	if ref, ok := value.(*values.JavaRef); ok {
+		val := d.idToValue[ref.Id]
+		return d.GetRealValue(val)
+	}
+	return value
+}
+func (d *Decompiler) NewVar(val values.JavaValue) *values.JavaRef {
+	d.currentVarId++
+	newRef := values.NewJavaRef(d.currentVarId, val.Type())
+	d.idToValue[d.currentVarId] = val
+	return newRef
+}
+func (d *Decompiler) AssignVar(slot int, typ values.JavaValue) (*values.JavaRef, bool) {
 	ref, ok := d.varTable[slot]
 	if !ok || ref.String(d.FunctionContext) != typ.String(d.FunctionContext) {
-		d.currentVarId++
-		newRef := values.NewJavaRef(d.currentVarId, typ)
+		newRef := d.NewVar(typ)
 		d.varTable[slot] = newRef
 		return newRef, true
 	}
@@ -250,6 +266,25 @@ func (d *Decompiler) ParseStatement() error {
 		defer func() { lambdaIndex++ }()
 		return lambdaIndex
 	}
+	d.FunctionType.ParamTypes = append([]types.JavaType{types.NewJavaClass(d.FunctionContext.ClassName)}, d.FunctionType.ParamTypes...)
+	for i, paramType := range d.FunctionType.ParamTypes {
+		assignStackVar(values.NewJavaRef(stackVarIndex, paramType))
+		d.AssignVar(i, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+			return ""
+		}, func() types.JavaType {
+			return paramType
+		}))
+	}
+	d.GetVar(0).IsThis = true
+	//d.AssignVar(0, values.NewJavaRef(0,""))
+	checkAndConvertRef := func(value values.JavaValue) {
+		if _, ok := runtimeStackSimulation.Peek().(*values.JavaRef); !ok {
+			val := runtimeStackSimulation.Pop().(values.JavaValue)
+			ref := d.NewVar(val)
+			runtimeStackSimulation.Push(ref)
+			appendNode(statements.NewAssignStatement(ref, val, true))
+		}
+	}
 	parseOpcode := func(opcode *OpCode) {
 		//opcodeIndex := opcode.Id
 		statementsIndex = opcode.Id
@@ -261,7 +296,7 @@ func (d *Decompiler) ParseStatement() error {
 			runtimeStackSimulation.Push(d.GetVar(slot))
 			////return mkRetrieve(variableFactory);
 		case OP_ACONST_NULL:
-			assignStackVar(values.NewJavaLiteral(nil, types.JavaNull))
+			assignStackVar(values.NewJavaLiteral("null", types.JavaNull))
 		case OP_ICONST_M1:
 			assignStackVar(values.NewJavaLiteral(-1, types.JavaInteger))
 		case OP_ICONST_0:
@@ -340,7 +375,7 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_AASTORE, OP_IASTORE, OP_BASTORE, OP_CASTORE, OP_FASTORE, OP_LASTORE, OP_DASTORE, OP_SASTORE:
 			value := runtimeStackSimulation.Pop().(values.JavaValue)
 			index := runtimeStackSimulation.Pop().(values.JavaValue)
-			ref := runtimeStackSimulation.Pop().(*values.JavaRef)
+			ref := runtimeStackSimulation.Pop().(values.JavaValue)
 			appendNode(statements.NewArrayMemberAssignStatement(values.NewJavaArrayMember(ref, index), value))
 		case OP_LCMP, OP_DCMPG, OP_DCMPL, OP_FCMPG, OP_FCMPL:
 			var1 := runtimeStackSimulation.Pop().(values.JavaValue)
@@ -428,7 +463,7 @@ func (d *Decompiler) ParseStatement() error {
 				typ = types.JavaLong
 			}
 			arg := runtimeStackSimulation.Pop().(values.JavaValue)
-			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.FunctionContext) string {
+			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return fmt.Sprintf("(%s)%s", fname, arg.String(funcCtx))
 			}, func() types.JavaType {
 				return typ
@@ -436,7 +471,7 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_INSTANCEOF:
 			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*types.JavaClass)
 			value := runtimeStackSimulation.Pop().(values.JavaValue)
-			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.FunctionContext) string {
+			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return fmt.Sprintf("%s instanceof %s", value.String(funcCtx), classInfo.String(funcCtx))
 			}, func() types.JavaType {
 				return types.JavaBoolean
@@ -444,7 +479,7 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_CHECKCAST:
 			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*types.JavaClass)
 			arg := runtimeStackSimulation.Pop().(values.JavaValue)
-			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.FunctionContext) string {
+			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return fmt.Sprintf("(%s)(%s)", classInfo.String(funcCtx), arg.String(funcCtx))
 			}, func() types.JavaType {
 				return classInfo
@@ -453,7 +488,8 @@ func (d *Decompiler) ParseStatement() error {
 			classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
 			methodName := classInfo.Member
 			funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType) // 不push到栈中
-			funcCallValue.JavaType = classInfo.JavaType
+			//funcCallValue.JavaType = classInfo.JavaType
+			funcCallValue.Object = types.NewJavaClass(classInfo.Name)
 			funcCallValue.IsStatic = true
 			for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 				funcCallValue.Arguments = append(funcCallValue.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
@@ -482,6 +518,33 @@ func (d *Decompiler) ParseStatement() error {
 			funcCallValue.Object = runtimeStackSimulation.Pop().(values.JavaValue)
 			if funcCallValue.FuncType.ReturnType.String(funcCtx) != types.JavaVoid.String(funcCtx) {
 				runtimeStackSimulation.Push(funcCallValue)
+			} else {
+				var skip bool
+				func() {
+					if methodName != "<init>" {
+						return
+					}
+					if len(funcCallValue.Arguments) != 0 {
+						value := d.GetRealValue(funcCallValue.Object)
+						if value == nil {
+							return
+						}
+						if v, ok := value.(*values.NewExpression); ok {
+							v.ArgumentsGetter = func() string {
+								sts := funk.Map(funcCallValue.Arguments, func(arg values.JavaValue) string {
+									return arg.String(funcCtx)
+								}).([]string)
+								return strings.Join(sts, ",")
+							}
+							skip = true
+						}
+					} else {
+						skip = true
+					}
+				}()
+				if !skip {
+					appendNode(statements.NewExpressionStatement(funcCallValue))
+				}
 			}
 		case OP_INVOKEINTERFACE:
 			classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
@@ -576,7 +639,7 @@ func (d *Decompiler) ParseStatement() error {
 			//})
 		case OP_ATHROW:
 			val := runtimeStackSimulation.Pop().(values.JavaValue)
-			appendNode(statements.NewCustomStatement(func(funcCtx *class_context.FunctionContext) string {
+			appendNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 				return fmt.Sprintf("throw %v", val.String(funcCtx))
 			}))
 		case OP_IRETURN:
@@ -603,8 +666,10 @@ func (d *Decompiler) ParseStatement() error {
 			runtimeStackSimulation.Push(v1)
 			runtimeStackSimulation.Push(v2)
 		case OP_DUP:
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			runtimeStackSimulation.Push(runtimeStackSimulation.Peek())
 		case OP_DUP_X1:
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v1 := runtimeStackSimulation.Pop()
 			v2 := runtimeStackSimulation.Pop()
 			runtimeStackSimulation.Push(v1)
@@ -614,20 +679,26 @@ func (d *Decompiler) ParseStatement() error {
 			v1 := runtimeStackSimulation.Pop()
 			v2 := runtimeStackSimulation.Pop()
 			v3 := runtimeStackSimulation.Pop()
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			runtimeStackSimulation.Push(v1)
 			runtimeStackSimulation.Push(v3)
 			runtimeStackSimulation.Push(v2)
 			runtimeStackSimulation.Push(v1)
 		case OP_DUP2:
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v1 := runtimeStackSimulation.Pop()
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v2 := runtimeStackSimulation.Pop()
 			runtimeStackSimulation.Push(v2)
 			runtimeStackSimulation.Push(v1)
 			runtimeStackSimulation.Push(v2)
 			runtimeStackSimulation.Push(v1)
 		case OP_DUP2_X1:
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v1 := runtimeStackSimulation.Pop()
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v2 := runtimeStackSimulation.Pop()
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v3 := runtimeStackSimulation.Pop()
 			runtimeStackSimulation.Push(v2)
 			runtimeStackSimulation.Push(v1)
@@ -635,9 +706,13 @@ func (d *Decompiler) ParseStatement() error {
 			runtimeStackSimulation.Push(v2)
 			runtimeStackSimulation.Push(v1)
 		case OP_DUP2_X2:
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v1 := runtimeStackSimulation.Pop()
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v2 := runtimeStackSimulation.Pop()
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v3 := runtimeStackSimulation.Pop()
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v4 := runtimeStackSimulation.Pop()
 			runtimeStackSimulation.Push(v2)
 			runtimeStackSimulation.Push(v1)
@@ -654,14 +729,14 @@ func (d *Decompiler) ParseStatement() error {
 			runtimeStackSimulation.Push(v)
 		case OP_MONITORENTER:
 			v := runtimeStackSimulation.Pop().(values.JavaValue)
-			st := statements.NewCustomStatement(func(funcCtx *class_context.FunctionContext) string {
+			st := statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 				return fmt.Sprintf("synchronized (%s)", v.String(funcCtx))
 			})
 			st.Name = "monitor_enter"
 			st.Info = v
 			appendNode(st)
 		case OP_MONITOREXIT:
-			st := statements.NewCustomStatement(func(funcCtx *class_context.FunctionContext) string {
+			st := statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 				return ""
 			})
 			st.Name = "monitor_exit"
@@ -693,7 +768,7 @@ func (d *Decompiler) ParseStatement() error {
 			appendNode(values.NewBinaryExpression(ref, values.NewJavaLiteral(inc, types.JavaInteger), INC))
 		case OP_DNEG, OP_FNEG, OP_LNEG, OP_INEG:
 			v := runtimeStackSimulation.Pop().(values.JavaValue)
-			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.FunctionContext) string {
+			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return fmt.Sprintf("-%s", v.String(funcCtx))
 			}, func() types.JavaType {
 				return v.Type()
@@ -820,14 +895,47 @@ func (d *Decompiler) ReGenerateNodeId() error {
 }
 func (d *Decompiler) StandardStatement() error {
 	return WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
-		for _, n := range node.Next {
-			if _, ok := n.Statement.(*statements.GOTOStatement); ok {
-				gotoNext := n.Next[0]
-				node.ReplaceNext(n, gotoNext)
-				gotoNext.RemoveSource(n)
-				gotoNext.AddSource(node)
+		if _, ok := node.Statement.(*statements.GOTOStatement); ok {
+			for _, source := range node.Source {
+				source.ReplaceNext(node, node.Next[0])
 			}
+			source := node.Next[0].Source
+			for i, n := range node.Next[0].Source {
+				if n == node {
+					source = append(source[:i], source[i+1:]...)
+					break
+				}
+			}
+			node.Next[0].Source = source
+			for _, n := range node.Source {
+				node.Next[0].Source = append(node.Next[0].Source, n)
+			}
+
+			//if len(n.Next) == 0 {
+			//	println()
+			//}
+			//gotoNext := n.Next[0]
+			//if node.Id == 22 || gotoNext.Id == 22 || n.Id == 22 {
+			//	println()
+			//}
+			//node.ReplaceNext(n, gotoNext)
+			//gotoNext.RemoveSource(n)
+			//gotoNext.AddSource(node)
 		}
+		//for _, n := range node.Next {
+		//	if _, ok := n.Statement.(*statements.GOTOStatement); ok {
+		//		if len(n.Next) == 0 {
+		//			println()
+		//		}
+		//		gotoNext := n.Next[0]
+		//		if node.Id == 22 || gotoNext.Id == 22 || n.Id == 22 {
+		//			println()
+		//		}
+		//		node.ReplaceNext(n, gotoNext)
+		//		gotoNext.RemoveSource(n)
+		//		gotoNext.AddSource(node)
+		//	}
+		//}
 		if _, ok := node.Statement.(*statements.ConditionStatement); ok {
 			var trueIndex, falseIndex int
 			if node.Next[0] == node.JmpNode {

@@ -10,6 +10,7 @@ import (
 type NewExpression struct {
 	IsArray bool
 	types.JavaType
+	ArgumentsGetter func() string
 }
 
 func NewNewArrayExpression(typ types.JavaType) *NewExpression {
@@ -27,7 +28,7 @@ func (n *NewExpression) Type() types.JavaType {
 	return n.JavaType
 }
 
-func (n *NewExpression) String(funcCtx *class_context.FunctionContext) string {
+func (n *NewExpression) String(funcCtx *class_context.ClassContext) string {
 	if n.IsArray {
 		typ := n.JavaType.(*types.JavaArrayType)
 		s := fmt.Sprintf("new %s", typ.JavaType.String(funcCtx))
@@ -36,7 +37,11 @@ func (n *NewExpression) String(funcCtx *class_context.FunctionContext) string {
 		}
 		return s
 	}
-	return fmt.Sprintf("new %s()", n.JavaType.String(funcCtx))
+	var args string
+	if n.ArgumentsGetter != nil {
+		args = n.ArgumentsGetter()
+	}
+	return fmt.Sprintf("new %s(%s)", n.JavaType.String(funcCtx), args)
 }
 
 type JavaExpression struct {
@@ -48,7 +53,7 @@ func (j *JavaExpression) Type() types.JavaType {
 	return j.Values[0].Type()
 }
 
-func (j *JavaExpression) String(funcCtx *class_context.FunctionContext) string {
+func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 	vs := []string{}
 	for _, value := range j.Values {
 		vs = append(vs, value.String(funcCtx))
@@ -73,7 +78,6 @@ func NewBinaryExpression(value1, value2 JavaValue, op string) *JavaExpression {
 }
 
 type FunctionCallExpression struct {
-	JavaType     types.JavaType
 	IsStatic     bool
 	Object       JavaValue
 	FunctionName string
@@ -85,13 +89,23 @@ func (f *FunctionCallExpression) Type() types.JavaType {
 	return f.FuncType.ReturnType
 }
 
-func (f *FunctionCallExpression) String(funcCtx *class_context.FunctionContext) string {
+func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) string {
 	paramStrs := []string{}
 	for _, arg := range f.Arguments {
 		paramStrs = append(paramStrs, arg.String(funcCtx))
 	}
-	if f.IsStatic {
-		return fmt.Sprintf("%s.%s(%s)", f.JavaType.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
+	//if f.IsStatic {
+	//	return fmt.Sprintf("%s.%s(%s)", f.JavaType.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
+	//}
+	//var objName string
+	//if !reflect.ValueOf(f.Object).IsNil() {
+	//	objName = f.Object.String(funcCtx)
+	//}
+	//if objName == "" {
+	//	return fmt.Sprintf("%s(%s)", f.FunctionName, strings.Join(paramStrs, ","))
+	//}
+	if f.FunctionName == "<init>" {
+		return fmt.Sprintf("%s(%s)", f.Object.String(funcCtx), strings.Join(paramStrs, ","))
 	}
 	return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
 }

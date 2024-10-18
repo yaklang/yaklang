@@ -17,7 +17,7 @@ func NewDoWhileStatement(condition values.JavaValue, body []Statement) *DoWhileS
 		Body:           body,
 	}
 }
-func (w *DoWhileStatement) String(funcCtx *class_context.FunctionContext) string {
+func (w *DoWhileStatement) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("do{\n%s\n}while(%s)", StatementsString(w.Body, funcCtx), w.ConditionValue.String(funcCtx))
 }
 
@@ -32,6 +32,6 @@ func NewWhileStatement(condition values.JavaValue, body []Statement) *WhileState
 		Body:           body,
 	}
 }
-func (w *WhileStatement) String(funcCtx *class_context.FunctionContext) string {
+func (w *WhileStatement) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("while(%s) {\n%s\n}", w.ConditionValue.String(funcCtx), StatementsString(w.Body, funcCtx))
 }

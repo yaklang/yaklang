@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -18,12 +17,13 @@ const attrTemplate = `%s %s %s {%s}`
 type ClassObjectDumper struct {
 	imports       map[string]struct{}
 	obj           *ClassObject
-	FuncCtx       *class_context.FunctionContext
+	FuncCtx       *class_context.ClassContext
 	ClassName     string
 	PackageName   string
 	CurrentMethod *MemberInfo
 	ConstantPool  []ConstantInfo
 	deepStack     *utils.Stack[int]
+	MethodType    *types.JavaFuncType
 }
 
 func (c *ClassObjectDumper) GetConstructorMethodName() string {
@@ -61,19 +61,15 @@ func (c *ClassObjectDumper) UnTab() {
 }
 func (c *ClassObjectDumper) DumpClass() (string, error) {
 	result := classTemplate
-	funcCtx := &class_context.FunctionContext{
+	funcCtx := &class_context.ClassContext{
 		ClassName:   c.ClassName,
 		PackageName: c.PackageName,
-		BuildInLibs: []string{
-			"java.lang.*",
-			"java.io.*",
-		},
 	}
 	c.FuncCtx = funcCtx
 	accessFlagsVerbose := c.obj.AccessFlagsVerbose
-	if len(accessFlagsVerbose) < 1 {
-		return "", utils.Error("accessFlagsVerbose is empty")
-	}
+	//if len(accessFlagsVerbose) < 1 {
+	//	return "", utils.Error("accessFlagsVerbose is empty")
+	//}
 	accessFlags := strings.Join(accessFlagsVerbose, " ")
 	name := c.obj.GetClassName()
 	splits := strings.Split(name, "/")
@@ -81,6 +77,16 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	c.PackageName = packageName
 	className := splits[len(splits)-1]
 	c.ClassName = strings.Replace(name, "/", ".", -1)
+
+	buildInLib := []string{
+		c.PackageName + ".*",
+		"java.lang.*",
+		"java.io.*",
+	}
+	for _, s := range buildInLib {
+		funcCtx.Import(s)
+	}
+
 	packageSource := fmt.Sprintf("package %s;\n\n", packageName)
 	if className == "" {
 		return "", utils.Error("className is empty")
@@ -109,6 +115,12 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 	result = fmt.Sprintf(result, accessFlags, className, attrs)
 	importsStr := ""
+	for _, s := range funcCtx.GetAllImported() {
+		if utils.StringSliceContain(buildInLib, s) {
+			continue
+		}
+		importsStr += fmt.Sprintf("import %s;\n", s)
+	}
 	for lib, _ := range c.imports {
 		if strings.HasPrefix(lib, "java.lang") {
 			continue
@@ -171,9 +183,10 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 			return nil, err
 		}
 		paramsNewStrList := []string{}
-		for _, paramsType := range methodType.ParamTypes {
-			paramsNewStrList = append(paramsNewStrList, paramsType.String(c.FuncCtx))
+		for i, paramsType := range methodType.ParamTypes {
+			paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s var%d", paramsType.String(c.FuncCtx), i+1))
 		}
+		c.MethodType = methodType
 		returnTypeStr := methodType.ReturnType.String(c.FuncCtx)
 		paramsNewStr := strings.Join(paramsNewStrList, ", ")
 		code := ""
@@ -181,10 +194,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		c.CurrentMethod = method
 		funcCtx := c.FuncCtx
 		funcCtx.FunctionName = name
-		println(name)
-		//if name != "foriWithIfBreak" {
-		//	continue
-		//}
+		if name != "isLastElementInArray" {
+			continue
+		}
 		for _, attribute := range method.Attributes {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
 				statementList, err := ParseBytesCode(c, codeAttr)
@@ -237,19 +249,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 								"%s\n"+
 								c.GetTabString()+"}", statementListToString(ret.ElseBody))
 						}
-					case *statements.ExpressionStatement:
-						if funcCtx.FunctionName == "<init>" {
-							if v, ok := ret.Expression.(*values.FunctionCallExpression); ok {
-								if IsJavaSupperRef(v.Object) && v.FunctionName == "<init>" {
-									return statementStr
-								}
-							}
-						}
-						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
 					case *statements.ReturnStatement:
-						if funcCtx.FunctionName == "<init>" {
-							return
-						}
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
 					case *statements.ForStatement:
 						datas := []string{}

@@ -14,7 +14,7 @@ const (
 )
 
 type JavaType interface {
-	String(funcCtx *class_context.FunctionContext) string
+	String(funcCtx *class_context.ClassContext) string
 	IsJavaType()
 }
 

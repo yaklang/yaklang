@@ -2426,7 +2426,7 @@ func (p *SuricataRuleParser) ipv6part(_p int) (localctx IIpv6partContext) {
 	_parentState := p.GetState()
 	localctx = NewIpv6partContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IIpv6partContext = localctx
-	var _ antlr.ParserRuleContext = _prevctx // TODO: ToOpcode prevent unused variable warning.
+	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 28
 	p.EnterRecursionRule(localctx, 28, SuricataRuleParserRULE_ipv6part, _p)
 
