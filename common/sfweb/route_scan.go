@@ -43,6 +43,7 @@ type SyntaxFlowScanRisk struct {
 	Title     string `json:"title"`
 	Type      string `json:"type"`
 	VarName   string `json:"var_name"`
+	RiskHash  string `json:"risk_hash"`
 	ResultID  uint64 `json:"result_id"`
 	Timestamp int64  `json:"timestamp"`
 }
@@ -59,6 +60,7 @@ func ypbToSyntaxFlowScanRisk(risk *ypb.Risk, result *ypb.SyntaxFlowResult) *Synt
 		Title:     risk.Title,
 		Type:      risk.RiskType,
 		VarName:   risk.SyntaxFlowVariable,
+		RiskHash:  risk.Hash,
 	}
 }
 

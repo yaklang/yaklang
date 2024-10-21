@@ -29,6 +29,7 @@ func (s *SyntaxFlowWebServer) init() {
 	s.registerTemplateRoute()
 	s.registerYakURLRoute()
 	s.registerScanRoute()
+	s.registerReportRoute()
 }
 
 func NewSyntaxFlowWebServer(ctx context.Context, https bool, host string, port int, debug bool) (string, error) {
