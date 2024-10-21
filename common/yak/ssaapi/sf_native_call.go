@@ -263,17 +263,18 @@ func init() {
 		if mode == "" {
 			autoMode(rule)
 		}
-		if _, ok := v.(*Program); ok {
-			constHandler(v)
-		} else {
-			v.Recursive(func(operator sfvm.ValueOperator) error {
-				if operator.GetOpcode() != "ConstInst" {
-					return nil
+
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Program:
+				constHandler(ret)
+			case *Value:
+				if ret.IsConstInst() {
+					constHandler(ret)
 				}
-				constHandler(operator)
-				return nil
-			})
-		}
+			}
+			return nil
+		})
 		return true, sfvm.NewValues(results), nil
 	}))
 	registerNativeCall(NativeCall_DataFlow, nc_func(nativeCallDataFlow))
