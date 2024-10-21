@@ -44,3 +44,21 @@ func TestBadPanic2(t *testing.T) {
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
+
+//go:embed bad/bad_panic3.php
+var bad_panic3 string
+
+func TestBadPanic3(t *testing.T) {
+	ssatest.NonStrictMockSSA(t, bad_panic3)
+}
+
+func TestBaadCode(t *testing.T) {
+	code := `/*
+/*
+
+*/
+
+set a =1;
+*/`
+	ssatest.NonStrictMockSSA(t, code)
+}
