@@ -64,31 +64,31 @@
     JSON.parse(`{{ .userjson }}`).map(i => {
         const row = document.createElement('tr');
         let td = document.createElement('td');
-        td.appendChild(document.createTextNode(i.ID))
+        td.appendChild(document.createTextNode(i.id))
         row.appendChild(td)
 
         td = document.createElement('td');
-        td.appendChild(document.createTextNode(i.Username))
+        td.appendChild(document.createTextNode(i.username))
         row.appendChild(td)
 
         td = document.createElement('td');
-        td.appendChild(document.createTextNode(i.Age))
+        td.appendChild(document.createTextNode(i.age))
         row.appendChild(td)
 
         td = document.createElement('td');
-        td.appendChild(document.createTextNode(i.Role))
+        td.appendChild(document.createTextNode(i.role))
         row.appendChild(td)
 
         td = document.createElement('td');
-        td.appendChild(document.createTextNode(i.Remake))
+        td.appendChild(document.createTextNode(i.remake))
         row.appendChild(td)
 
         td = document.createElement('td');
-        td.appendChild(document.createTextNode(i.CreatedAt))
+        td.appendChild(document.createTextNode(i.created_at))
         row.appendChild(td)
 
         td = document.createElement('td');
-        td.appendChild(document.createTextNode(i.UpdatedAt))
+        td.appendChild(document.createTextNode(i.updated_at))
         row.appendChild(td)
 
         usersTable.appendChild(row)
