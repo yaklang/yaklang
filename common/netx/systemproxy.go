@@ -32,7 +32,7 @@ func GetProxyFromEnv() string {
 		"all_proxy", "all_proxy",
 		"proxy", "proxy",
 	} {
-		if p := strings.Trim(os.Getenv(k), `"`); p != "" {
+		if p := strings.Trim(os.Getenv(k), `"'`); p != "" {
 			return FixProxy(p)
 		}
 	}
