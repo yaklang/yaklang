@@ -1,6 +1,7 @@
 package netx
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -266,9 +267,20 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 			return nil, utils.Errorf("unknown tls strategy %v", strategy)
 		}
 	}
-
 	if len(errs) > 0 {
-		return nil, utils.Errorf("all tls strategy failed: %v", errs)
+		var suffix bytes.Buffer
+		suffix.WriteString(fmt.Sprintf(" target-addr: %v", target))
+		if config.ForceDisableProxy {
+			suffix.WriteString(fmt.Sprintf("disable-proxy: %v", config.ForceDisableProxy))
+		} else {
+			suffix.WriteString(fmt.Sprintf("enable-system-proxy: %v", config.EnableSystemProxyFromEnv))
+			if len(config.Proxy) > 0 {
+				suffix.WriteString(fmt.Sprintf(" with proxy: %v", config.Proxy))
+			}
+		}
+		suffix.WriteString(fmt.Sprintf(" with sni: %v(override: %v)", config.SNI, config.ShouldOverrideSNI))
+
+		return nil, utils.Errorf("all tls strategy failed: %v%v", errs, suffix.String())
 	}
 	return nil, utils.Error("unknown tls strategy error, BUG here!")
 }
