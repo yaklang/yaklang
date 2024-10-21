@@ -20,7 +20,21 @@ import (
 	"unicode/utf8"
 )
 
+const WIN_DEV_LOOP = "\\Device\\NPF_Loopback"
+
 func PcapInterfaceEqNetInterface(piface pcap.Interface, iface *net.Interface) bool {
+	// 如果 windows \Device\NPF_Loopback 网卡没 IP address，比如 npcap-1.60版本的，安装后默认没 IP address
+	// 同时安装完成后需要重启电脑，不然会报错\Device\NPF_Loopback: driver error: not enough memory to allocate the kernel buffer
+	// Mock IP addresses
+	if piface.Name == WIN_DEV_LOOP && len(piface.Addresses) == 0 {
+		piface.Addresses = append(piface.Addresses, pcap.InterfaceAddress{
+			IP: net.IPv4(127, 0, 0, 1),
+		})
+		piface.Addresses = append(piface.Addresses, pcap.InterfaceAddress{
+			IP: net.IPv6loopback,
+		})
+	}
+
 	addrs, err := iface.Addrs()
 	if err != nil {
 		log.Errorf("fetch iface[%v] addrs failed: %s", iface.Name, err)
@@ -102,10 +116,13 @@ func PcapIfaceNameToNetInterface(ifaceName string) (*net.Interface, error) {
 		if dev.Name == ifaceName {
 			// windows 下的 pcap dev name 与 net.Interface.Name 不一致
 			if runtime.GOOS == "windows" {
+				var ifaceIP string
 				if len(dev.Addresses) < 1 {
-					return nil, utils.Errorf("addresses length is too short: %s", ifaceName)
+					ifaceIP = net.IPv4(127, 0, 0, 1).String()
+				} else {
+					ifaceIP = dev.Addresses[0].IP.String()
 				}
-				iface, err := netutil.FindInterfaceByIP(dev.Addresses[0].IP.String())
+				iface, err := netutil.FindInterfaceByIP(ifaceIP)
 				if err != nil {
 					return nil, utils.Errorf("fetch net.Interface failed: %s", err)
 				}
