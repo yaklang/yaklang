@@ -2,12 +2,13 @@ package java
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -25,7 +26,7 @@ check $source then "XXE Attack" else "XXE Safe";
 `
 	check := func(t *testing.T, result *ssaapi.SyntaxFlowResult) {
 		source := result.GetValues("source")
-		//source.ShowDot()
+		// source.ShowDot()
 		if !utils.MatchAllOfSubString(
 			source.DotGraph(),
 			"fontcolor", "color",
@@ -54,7 +55,6 @@ check $source then "XXE Attack" else "XXE Safe";
 			fmt.Println(entryDot)
 			t.Fatal("failed to match all of the substring, bad dot graph")
 		}
-
 	}
 
 	t.Run("draw dot graph in memory", func(t *testing.T) {
@@ -83,7 +83,7 @@ check $source then "XXE Attack" else "XXE Safe";
 			ssadb.DeleteProgram(ssadb.GetDB(), programName)
 		}()
 
-		result, err := ssaapi.CreateResultByID(resultID)
+		result, err := ssaapi.LoadResultByID(resultID)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
