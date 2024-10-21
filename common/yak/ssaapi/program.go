@@ -135,11 +135,12 @@ func (p *Program) NewValue(n ssa.Value) *Value {
 	if utils.IsNil(n) {
 		return nil
 	}
-	return &Value{
+	v := &Value{
 		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
 		node:          n,
 		ParentProgram: p,
 	}
+	return v
 }
 
 // from ssa id  (IrCode)
