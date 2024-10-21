@@ -304,11 +304,9 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 			if _, ok := usedPassword.Load(i.Password); ok {
 				// 如果这个密码已经被用过了，就马上进入下一组
 				continue
-			} else {
-				// 如果这个密码没有被用过，则记录该密码，并下一个
-				usedPassword.Store(i.Password, 1)
 			}
 		}
+		usedPassword.Store(i.Password, 1) // should make record anyway
 
 		err := process.Swg.AddWithContext(currCtx)
 		if err != nil {
