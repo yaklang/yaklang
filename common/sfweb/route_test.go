@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sfweb"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
@@ -29,15 +30,15 @@ func debug() {
 	sfweb.SfWebLogger.SetLevel("debug")
 }
 
-func DoResponse(method, path string, data any, opts ...poc.PocConfigOption) error {
+func DoResponse(method, path string, data any, opts ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, error) {
 	rsp, _, err := poc.Do(method, fmt.Sprintf("%s%s", serverUrl, path), opts...)
 	if err != nil {
-		return err
+		return rsp, err
 	}
 	body := rsp.GetBody()
 	err = json.Unmarshal(body, data)
 	if err != nil {
-		return utils.Wrap(err, "unmarshal json error")
+		return rsp, utils.Wrap(err, "unmarshal json error")
 	}
-	return nil
+	return rsp, nil
 }

@@ -74,7 +74,7 @@ func (a *SyntaxFlowAction) getResult(programName, code string, resultID uint) (*
 		}
 
 		// get db result by ResultID
-		result, err := ssaapi.CreateResultByID(resultID)
+		result, err := ssaapi.LoadResultByID(resultID)
 		if err != nil {
 			return nil, 0, utils.Errorf("get result by id %d failed: %v", resultID, err)
 		}

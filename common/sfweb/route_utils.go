@@ -17,7 +17,7 @@ type ErrorResponse struct {
 
 func writeErrorJson(w http.ResponseWriter, err error) {
 	errBody, _ := json.Marshal(&ErrorResponse{err.Error()})
-	w.WriteHeader(500)
+	w.WriteHeader(http.StatusInternalServerError)
 	w.Write(errBody)
 }
 
