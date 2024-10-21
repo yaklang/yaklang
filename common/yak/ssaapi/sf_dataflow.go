@@ -185,20 +185,21 @@ func dataFlowFilter(
 		}
 	} else {
 		for _, v := range vs {
-			dataPath := v.GetDataFlowPath()
-			matchedConfigs := recursiveConfig.compileAndRun(dataPath)
+			dataPaths := v.GetDataFlowPath()
+			var excludeFlag = 0
+			for _, dataPath := range dataPaths {
+				matchedConfigs := recursiveConfig.compileAndRun(dataPath)
 
-			//log.Infof("v: %v", v)
-			//log.Infof("dataPath: %v", dataPath)
-			//log.Infof("code[%v]: %v", configKey, code)
-			//log.Infof("matchedConfig: %v", matchedConfigs)
-
-			if _, ok := matchedConfigs[sf.RecursiveConfig_Exclude]; ok {
-				delete(all, v)
+				if _, ok := matchedConfigs[sf.RecursiveConfig_Include]; ok {
+					ret = append(ret, v)
+					break
+				}
+				if _, ok := matchedConfigs[sf.RecursiveConfig_Exclude]; ok {
+					excludeFlag++
+				}
 			}
-
-			if _, ok := matchedConfigs[sf.RecursiveConfig_Include]; ok {
-				ret = append(ret, v)
+			if excludeFlag == len(dataPaths) {
+				delete(all, v)
 			}
 		}
 	}

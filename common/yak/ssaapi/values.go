@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -11,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"golang.org/x/exp/maps"
 )
 
 type Value struct {
@@ -68,40 +68,6 @@ func (v *Value) getEffectOnPath(m map[int64]struct{}) Values {
 	return vals
 }
 
-func (v *Value) getDataFlowPath(m map[int64]struct{}) Values {
-	idStr := v.GetId()
-	_, visited := m[idStr]
-	if visited {
-		return nil
-	}
-	m[idStr] = struct{}{}
-	var vals Values
-	vals = append(vals, v)
-	for _, i := range v.EffectOn {
-		vals = append(vals, i)
-	}
-	for _, i := range v.DependOn {
-		vals = append(vals, i)
-	}
-
-	for _, i := range v.EffectOn {
-		vals = append(vals, i.getEffectOnPath(m)...)
-	}
-	for _, i := range v.DependOn {
-		vals = append(vals, i.getDependOnPath(m)...)
-	}
-
-	return vals
-}
-
-func (v *Value) GetDataFlowPath() Values {
-	return v.getDataFlowPath(make(map[int64]struct{}))
-}
-
-func (v *Value) GetEffectOnPath() Values {
-	return v.getEffectOnPath(make(map[int64]struct{}))
-}
-
 func (v *Value) getDependOnPath(m map[int64]struct{}) Values {
 	idStr := v.GetId()
 	_, visited := m[idStr]
@@ -117,6 +83,46 @@ func (v *Value) getDependOnPath(m map[int64]struct{}) Values {
 		vals = append(vals, i.getDependOnPath(m)...)
 	}
 	return vals
+}
+func (v *Value) GetDataFlowPath() []Values {
+	m := make(map[int]struct{})
+	var result []Values
+	effectPath := append(v.GetEffectOnAllPath(m))
+	dependPath := append(v.GetDependOnAllPath(m))
+	if len(effectPath) == 0 {
+		return dependPath
+	}
+	if len(dependPath) == 0 {
+		return effectPath
+	}
+	for _, effect := range effectPath {
+		for _, depend := range dependPath {
+			result = append(result, append(effect, depend...))
+		}
+	}
+	return result
+}
+func (v *Value) GetEffectOnAllPath(m map[int]struct{}) []Values {
+	return v.getDataFlowAllPath(nil, Values{v}, func(i *Value) Values {
+		return i.EffectOn
+	}, m)
+}
+func (v *Value) GetDependOnAllPath(m map[int]struct{}) []Values {
+	return v.getDataFlowAllPath(nil, Values{v}, func(i *Value) Values {
+		return i.DependOn
+	}, m)
+}
+func (v *Value) getDataFlowAllPath(parentStack *utils.Stack[Values], path Values, get func(i *Value) Values, m map[int]struct{}) []Values {
+	if parentStack == nil {
+		parentStack = utils.NewStack[Values]()
+	}
+	if _, exit := m[int(v.GetId())]; exit {
+		return []Values{}
+	}
+	m[int(v.GetId())] = struct{}{}
+	values := get(v)
+	allPath := values.getDataFlowAllPath(parentStack, path, get, m)
+	return allPath
 }
 
 func (v *Value) GetDependOnPath() Values {
@@ -909,6 +915,46 @@ func (value Values) Ref(name string) Values {
 	return ret
 }
 
+func (v Values) GetEffectOnAllPath(m map[int]struct{}) []Values {
+	var paths []Values
+	for _, value := range v {
+		paths = append(paths, value.GetEffectOnAllPath(m)...)
+	}
+	return paths
+}
+func (v Values) GetDependOnAllPath(m map[int]struct{}) []Values {
+	var paths []Values
+	for _, value := range v {
+		paths = append(paths, value.GetDependOnAllPath(m)...)
+	}
+	return paths
+}
+func (v Values) getDataFlowAllPath(pathStack *utils.Stack[Values], path Values, get func(i *Value) Values, m map[int]struct{}) []Values {
+	if pathStack == nil {
+		pathStack = utils.NewStack[Values]()
+	}
+	var paths []Values
+	if v == nil || v.Len() == 0 {
+		paths = append(paths, path)
+		return paths
+	}
+	switch v.Len() {
+	case 1:
+		path = append(path, v...)
+		return v[0].getDataFlowAllPath(pathStack, path, get, m)
+	default:
+		pathStack.Push(path)
+		for _, value := range v {
+			mclone := maps.Clone(m)
+			path = append(path, value)
+			allPath := value.getDataFlowAllPath(pathStack, path, get, mclone)
+			path = pathStack.Peek()
+			paths = append(paths, allPath...)
+		}
+		path = pathStack.Pop()
+	}
+	return paths
+}
 func (v Values) StringEx(flag int) string {
 	if len(v) <= 0 {
 		return "Values: 0"

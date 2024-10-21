@@ -107,15 +107,6 @@ test($_GET[1]);`
 		ssaapi.WithLanguage(ssaapi.PHP))
 }
 func TestDataflow(t *testing.T) {
-	/*
-		<include('php-param')> as $start;
-		<include('php-filter-function')> as $filter;
-		mysql_query(* as $param);
-		$param #{
-		include: `<self> & $start`,
-		exclude: `<self> & $filter`
-		}->  as $output
-	*/
 	code := `<?php
 $a = $_GET[1];
 
@@ -125,17 +116,18 @@ if($c){
     $a = unsafe($a);
 }
 eval($a);`
-	ssatest.CheckSyntaxFlow(t, code, `
-<include('php-param')> as $start;
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		ssatest.CheckSyntaxFlow(t, code, `<include('php-param')> as $start;
 <include('php-filter-function')> as $filter;
 eval(* as $param);
-$param #{
-		include: <<<CODE
+$param#{
+include: <<<CODE
 <self> & $start
 CODE,
-		exclude: <<<CODE
-<self>?{opcode: call && <getCaller> & $filter}
+exclude: <<<CODE
+<self> & $filter
 CODE
-}->  as $output
-`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+}-> as $output`, map[string][]string{"output": {"Undefined-$a(valid)", "Undefined-_GET"}}, ssaapi.WithLanguage(ssaapi.PHP))
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
