@@ -34,8 +34,9 @@ func checkSSAURL(t *testing.T, programName, path, sfCode string, checkHandler fu
 		require.NoError(t, err)
 		var rsp sfweb.YakURLResponse
 
-		err = DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody(body, false))
+		rawRsp, err := DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody(body, false))
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
 
 		t.Log("checkHandler in memory query")
 		resultIDRes := rsp.Resources[len(rsp.Resources)-1]
@@ -58,8 +59,9 @@ func checkSSAURL(t *testing.T, programName, path, sfCode string, checkHandler fu
 		body, err := json.Marshal(req)
 		require.NoError(t, err)
 		var rsp sfweb.YakURLResponse
-		err = DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody(body, false))
+		rawRsp, err := DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody(body, false))
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
 
 		resultIDRes := rsp.Resources[len(rsp.Resources)-1]
 		require.Equal(t, resultIDRes.ResourceType, "message")
@@ -124,8 +126,9 @@ func TestYakURL(t *testing.T) {
 
 	t.Run("negative invalid request", func(t *testing.T) {
 		var rsp sfweb.ErrorResponse
-		err = DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody([]byte(`{`), false))
+		rawRsp, err := DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody([]byte(`{`), false))
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
 		require.Contains(t, rsp.Message, "unmarshal request error")
 	})
 
@@ -141,8 +144,9 @@ func TestYakURL(t *testing.T) {
 		// FromRaw
 		body, err := json.Marshal(req)
 		require.NoError(t, err)
-		err = DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody(body, false))
+		rawRsp, err := DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody(body, false))
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
 		require.Equal(t, sfweb.NewInvalidSchemeError(scheme).Error(), rsp.Message)
 
 		// Schema
@@ -150,8 +154,9 @@ func TestYakURL(t *testing.T) {
 		req.URL.Schema = "syntaxflow"
 		body, err = json.Marshal(req)
 		require.NoError(t, err)
-		err = DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody(body, false))
+		rawRsp, err = DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody(body, false))
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
 		require.Equal(t, sfweb.NewInvalidSchemeError(scheme).Error(), rsp.Message)
 	})
 

@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func CreateResultByID(resultID uint) (*SyntaxFlowResult, error) {
+func LoadResultByID(resultID uint) (*SyntaxFlowResult, error) {
 	res := createEmptyResult()
 	result, err := ssadb.GetResultByID(resultID)
 	if err != nil {

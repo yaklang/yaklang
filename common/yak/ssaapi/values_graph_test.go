@@ -15,7 +15,6 @@ import (
 )
 
 func TestGraph(t *testing.T) {
-
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
 		package com.example.apackage; 
@@ -71,12 +70,12 @@ HOOK
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), progID)
 	}()
-	result, err := ssaapi.CreateResultByID(resultID)
+	result, err := ssaapi.LoadResultByID(resultID)
 	require.NoError(t, err)
 
 	// memory
 	var memPath [][]string
-	//var memTime time.Duration
+	// var memTime time.Duration
 	{
 		start := time.Now()
 		valueMem := res.GetValues("para_top_def")
@@ -90,12 +89,12 @@ HOOK
 		log.Infof("memory graph time: %d", since)
 		log.Infof("dot graph: \n%v", dotStr)
 		memPath = graph.DeepFirstGraph(value.GetId())
-		//memTime = since
+		// memTime = since
 	}
 
 	// database
 	var dbPath [][]string
-	//var dbTime time.Duration
+	// var dbTime time.Duration
 	{
 		start := time.Now()
 		valueDB := result.GetValues("para_top_def")
@@ -108,12 +107,11 @@ HOOK
 		log.Infof("db graph time: %d", since)
 		log.Infof("dot graph from db: \n%v", dotStrDB)
 		dbPath = graphDB.DeepFirstGraph(value.GetId())
-		//dbTime = since
+		// dbTime = since
 	}
 
-	//require.True(t, memTime*20 > dbTime)
+	// require.True(t, memTime*20 > dbTime)
 	require.Equal(t, len(memPath), len(dbPath))
-
 }
 
 func TestGraph2(t *testing.T) {
@@ -171,7 +169,7 @@ public interface RemoteLogService
 	resultID, err := res.Save()
 	require.NoError(t, err)
 
-	result, err := ssaapi.CreateResultByID(resultID)
+	result, err := ssaapi.LoadResultByID(resultID)
 	require.NoError(t, err)
 	entrysDB := result.GetValues("entry")
 	require.Greater(t, len(entrysDB), 0)
@@ -183,5 +181,4 @@ public interface RemoteLogService
 	log.Infof("path from db: %v", pathDB)
 	dbDot := entryDB.DotGraph()
 	log.Infof("dot from db: \n%v", dbDot)
-
 }

@@ -90,7 +90,7 @@ func TestGetResultFromDB(t *testing.T) {
 	_ = wantRes
 
 	// get result from db
-	gotRes, err := ssaapi.CreateResultByID(wantRes.GetResultID())
+	gotRes, err := ssaapi.LoadResultByID(wantRes.GetResultID())
 	require.NoError(t, err)
 	_ = gotRes
 
@@ -176,7 +176,7 @@ func TestRuleAlertMsg(t *testing.T) {
 		defer ssadb.DeleteResultByID(resultID)
 		require.NoError(t, err)
 
-		resFromDB, err := ssaapi.CreateResultByID(resultID)
+		resFromDB, err := ssaapi.LoadResultByID(resultID)
 		require.NoError(t, err)
 		check(resFromDB)
 	})
@@ -205,7 +205,7 @@ func TestRuleAlertMsg(t *testing.T) {
 		defer ssadb.DeleteResultByID(resultID)
 		require.NoError(t, err)
 
-		resFromDB, err := ssaapi.CreateResultByID(resultID)
+		resFromDB, err := ssaapi.LoadResultByID(resultID)
 		require.NoError(t, err)
 		check(resFromDB)
 	})
@@ -275,5 +275,4 @@ func TestRuleRisk(t *testing.T) {
 	require.Equal(t, "sqli", risk.RiskType)
 	require.Equal(t, "warning", risk.Severity)
 	require.Equal(t, "check print variable", risk.Title)
-
 }
