@@ -11,10 +11,11 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type VirtualFS struct {
-	files    map[string]*VirtualFile
+	files    *omap.OrderedMap[string, *VirtualFile]
 	dirEntry []fs.DirEntry
 }
 
@@ -52,10 +53,10 @@ var _ fi.FileSystem = (*VirtualFS)(nil)
 
 func NewVirtualFs() *VirtualFS {
 	vs := &VirtualFS{
-		files: make(map[string]*VirtualFile),
+		files: omap.NewEmptyOrderedMap[string, *VirtualFile](),
 	}
 	dir := NewVirtualFileDirectory(".", vs)
-	vs.files["."] = dir
+	vs.files.Set(".", dir)
 	return vs
 }
 
@@ -77,7 +78,7 @@ func (f *VirtualFS) Open(name string) (fs.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, exist := vf.files[fileName]
+	file, exist := vf.files.Get(fileName)
 	if !exist {
 		return nil, fmt.Errorf("file [%v] not exist", name)
 	}
@@ -93,11 +94,11 @@ func (f *VirtualFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, 
 	if err != nil {
 		return nil, err
 	}
-	file, exist := vf.files[fileName]
+	file, exist := vf.files.Get(fileName)
 	if !exist {
 		if isCreate {
 			vf.AddFile(fileName, "")
-			file, exist = vf.files[fileName]
+			file, exist = vf.files.Get(fileName)
 		}
 	}
 	if !exist {
@@ -114,7 +115,7 @@ func (f *VirtualFS) Stat(name string) (fs.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, exist := vf.files[fileName]
+	file, exist := vf.files.Get(fileName)
 	if !exist {
 		return nil, fmt.Errorf("file [%v] not exist", name)
 	}
@@ -143,7 +144,7 @@ func (f *VirtualFS) AddFile(name, content string) {
 }
 
 func (f *VirtualFS) addFileByVirtualFile(vf *VirtualFile) {
-	f.files[vf.name] = vf
+	f.files.Set(vf.name, vf)
 	f.dirEntry = append(f.dirEntry, vf.info)
 }
 
@@ -152,8 +153,8 @@ func (f *VirtualFS) RemoveFileOrDir(name string) error {
 	if err != nil {
 		return err
 	}
-	if f, ok := vf.files[filename]; ok {
-		delete(vf.files, filename)
+	if f, ok := vf.files.Get(filename); ok {
+		vf.files.Delete(filename)
 		vf.dirEntry = utils.RemoveSliceItem(vf.dirEntry, fs.DirEntry(f.info))
 		return nil
 	}
@@ -165,7 +166,7 @@ func (f *VirtualFS) AddDir(dirName string) *VirtualFile {
 	var dir *VirtualFile
 	if filename == "" {
 		dir = NewVirtualFileDirectory("", f)
-		v.files[""] = dir
+		v.files.Set("", dir)
 	} else {
 		dir = NewVirtualFileDirectory(filename, NewVirtualFs())
 		v.addFileByVirtualFile(dir)
@@ -185,7 +186,7 @@ func (f *VirtualFS) get(create bool, names ...string) (*VirtualFS, string, error
 
 func (f *VirtualFS) getDir(create bool, dirs ...string) (*VirtualFS, error) {
 	get := func(v *VirtualFS, dir string) (*VirtualFS, error) {
-		vf, ok := v.files[dir]
+		vf, ok := v.files.Get(dir)
 		if !ok {
 			if !create {
 				return nil, utils.Errorf("directory [%s] not exists", dir)
