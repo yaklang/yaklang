@@ -126,16 +126,17 @@ func (a *AnalyzeContext) GetCallFromLastCrossProcess() *Value {
 	return nil
 }
 
-func (a *AnalyzeContext) TheValueShouldBeVisited(i *Value) bool {
+func (a *AnalyzeContext) TheValueShouldBeVisited(i *Value) (bool, *Value) {
 	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
 	if !ok {
-		return false
+		return false, i
 	}
-	if _, ok := valueVisited.visited[i.GetId()]; !ok {
-		valueVisited.visited[i.GetId()] = struct{}{}
-		return true
+	if val, ok := valueVisited.visited[i.GetId()]; !ok {
+		valueVisited.visited[i.GetId()] = i
+		return true, i
+	} else {
+		return false, val
 	}
-	return false
 }
 
 func (a *AnalyzeContext) TheMemberShouldBeVisited(i *Value) bool {
@@ -144,7 +145,7 @@ func (a *AnalyzeContext) TheMemberShouldBeVisited(i *Value) bool {
 		return false
 	}
 	if _, ok := valueVisited.visitedObject[i.GetId()]; !ok {
-		valueVisited.visitedObject[i.GetId()] = struct{}{}
+		valueVisited.visitedObject[i.GetId()] = i
 		return true
 	}
 	return false
