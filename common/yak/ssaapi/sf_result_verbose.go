@@ -140,7 +140,12 @@ func (r *SyntaxFlowResult) Dump(showCode bool) string {
 
 				}
 				line("ID: %v", val.GetId())
-				line("Filename: %v", val.GetRange().GetEditor().GetFormatedUrl())
+				if rg := val.GetRange(); rg != nil {
+					if editor := rg.GetEditor(); editor != nil {
+						line("Filename: %v", editor.GetFormatedUrl())
+					}
+				}
+				// line("Filename: %v", val.GetRange().GetEditor().GetFormatedUrl())
 				if strings.Contains(rule.Title, "SCA:") {
 					line("Reason: SCA: 根据依赖版本检查漏洞")
 				} else {
@@ -148,7 +153,9 @@ func (r *SyntaxFlowResult) Dump(showCode bool) string {
 						line("Fixed Point(不动点)：%v", val.GetSSAValue().String())
 					}
 					if showCode {
-						line("Source Code: \n%v", val.GetRange().GetTextContext(3))
+						if val.GetRange() != nil {
+							line("Source Code: \n%v", val.GetRange().GetTextContext(3))
+						}
 					}
 				}
 				decrease()
