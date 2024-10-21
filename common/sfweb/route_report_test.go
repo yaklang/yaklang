@@ -1,0 +1,109 @@
+package sfweb_test
+
+import (
+	"encoding/json"
+	"net/http"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/sfweb"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+)
+
+func TestReportFalsePositive(t *testing.T) {
+	t.Run("missing parameter", func(t *testing.T) {
+		t.Run("missing content", func(t *testing.T) {
+			var rsp sfweb.ErrorResponse
+			body, err := json.Marshal(&sfweb.ReportFalsePositiveRequest{
+				Lang:     "yak",
+				RiskHash: "123",
+			})
+			require.NoError(t, err)
+
+			rawRsp, err := DoResponse(http.MethodPost, "/report/false_positive", &rsp, poc.WithReplaceHttpPacketBody(body, false))
+			require.NoError(t, err)
+			require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
+			require.Equal(t, sfweb.NewReportMissingParameterError("content").Error(), rsp.Message)
+		})
+
+		t.Run("missing lang", func(t *testing.T) {
+			var rsp sfweb.ErrorResponse
+			body, err := json.Marshal(&sfweb.ReportFalsePositiveRequest{
+				Content:  "content",
+				RiskHash: "123",
+			})
+			require.NoError(t, err)
+
+			rawRsp, err := DoResponse(http.MethodPost, "/report/false_positive", &rsp, poc.WithReplaceHttpPacketBody(body, false))
+			require.NoError(t, err)
+			require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
+			require.Equal(t, sfweb.NewReportMissingParameterError("lang").Error(), rsp.Message)
+		})
+
+		t.Run("missing risk_hash", func(t *testing.T) {
+			var rsp sfweb.ErrorResponse
+			body, err := json.Marshal(&sfweb.ReportFalsePositiveRequest{
+				Content: "content",
+				Lang:    "yak",
+			})
+			require.NoError(t, err)
+
+			rawRsp, err := DoResponse(http.MethodPost, "/report/false_positive", &rsp, poc.WithReplaceHttpPacketBody(body, false))
+			require.NoError(t, err)
+			require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
+			require.Equal(t, sfweb.NewReportMissingParameterError("risk_hash").Error(), rsp.Message)
+		})
+	})
+
+	t.Run("normal", func(t *testing.T) {
+		var risks []*sfweb.SyntaxFlowScanRisk
+		progress := 0.0
+
+		wc, err := lowhttp.NewWebsocketClient(
+			GetScanRequest(),
+			lowhttp.WithWebsocketFromServerHandlerEx(func(wc *lowhttp.WebsocketClient, b []byte, f []*lowhttp.Frame) {
+				var rsp sfweb.SyntaxFlowScanResponse
+				err := json.Unmarshal(b, &rsp)
+				require.NoError(t, err)
+				if len(rsp.Risk) > 0 {
+					risks = append(risks, rsp.Risk...)
+				}
+				if rsp.Progress > 0 {
+					progress = rsp.Progress
+				}
+			}),
+		)
+		require.NoError(t, err)
+
+		err = writeJSON(wc, &sfweb.SyntaxFlowScanRequest{
+			Content:        scanFileContent,
+			Lang:           `java`,
+			ControlMessage: `start`,
+		})
+		require.NoError(t, err)
+
+		wc.Start()
+		wc.Wait()
+
+		require.GreaterOrEqual(t, len(risks), 1)
+		require.Equal(t, 1.0, progress)
+
+		var rsp sfweb.ReportResponse
+		firstRisk := risks[0]
+		riskHash := firstRisk.RiskHash
+
+		body, err := json.Marshal(&sfweb.ReportFalsePositiveRequest{
+			Content:  scanFileContent,
+			Lang:     `java`,
+			RiskHash: riskHash,
+		})
+		require.NoError(t, err)
+
+		rawRsp, err := DoResponse(http.MethodPost, "/report/false_positive", &rsp, poc.WithReplaceHttpPacketBody(body, false))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode(), string(rawRsp.GetBody()))
+		require.NotEmpty(t, rsp.Link)
+		t.Log(rsp.Link)
+	})
+}
