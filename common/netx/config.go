@@ -92,7 +92,7 @@ type ReliableDNSConfig struct {
 	OnFinished func()
 
 	// blacklist
-	DisabledDomain *utils.HostsFilter
+	DisabledDomain *utils.GlobFilter
 }
 
 type DNSOption func(*ReliableDNSConfig)
@@ -155,7 +155,7 @@ func NewBackupInitilizedReliableDNSConfig() *ReliableDNSConfig {
 		mutex:              new(sync.Mutex),
 		SpecificDoH:        DefaultCustomDoHServers,
 		SpecificDNSServers: DefaultCustomDNSServers,
-		DisabledDomain:     utils.NewHostsFilter(),
+		DisabledDomain:     utils.NewGlobFilter('.'),
 	}
 	return config
 }
@@ -270,7 +270,7 @@ func WithDNSDisabledDomain(domain ...string) DNSOption {
 			return
 		}
 		if config.DisabledDomain == nil {
-			config.DisabledDomain = utils.NewHostsFilter()
+			config.DisabledDomain = utils.NewGlobFilter('.')
 		}
 		config.DisabledDomain.Add(domain...)
 	}
