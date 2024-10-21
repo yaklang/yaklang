@@ -117,10 +117,15 @@ func PcapIfaceNameToNetInterface(ifaceName string) (*net.Interface, error) {
 			// windows 下的 pcap dev name 与 net.Interface.Name 不一致
 			if runtime.GOOS == "windows" {
 				var ifaceIP string
-				if len(dev.Addresses) < 1 {
-					ifaceIP = net.IPv4(127, 0, 0, 1).String()
+				if len(dev.Addresses) == 0 {
+					if dev.Name == WIN_DEV_LOOP {
+						ifaceIP = net.IPv4(127, 0, 0, 1).String()
+					}
 				} else {
 					ifaceIP = dev.Addresses[0].IP.String()
+				}
+				if ifaceIP == "" {
+					return nil, utils.Errorf("no iface ip found: %s", ifaceName)
 				}
 				iface, err := netutil.FindInterfaceByIP(ifaceIP)
 				if err != nil {
