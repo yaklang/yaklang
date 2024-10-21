@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/gobwas/glob"
 	"math/big"
 	"math/rand"
 	"net"
@@ -639,6 +640,57 @@ func FixForParseIP(host string) string {
 		}
 	}
 	return host
+}
+
+type GlobFilter struct {
+	origin []string
+
+	actions   []func(string) bool
+	mutex     *sync.Mutex
+	separator rune
+}
+
+func NewGlobFilter(separator rune, exclude ...string) *GlobFilter {
+	f := &GlobFilter{
+		origin:    exclude,
+		mutex:     new(sync.Mutex),
+		separator: separator,
+	}
+	f.Add(exclude...)
+	return f
+}
+
+func (f *GlobFilter) createAction(rule string) {
+	compile, err := glob.Compile(rule, f.separator)
+	if err != nil {
+		f.actions = append(f.actions, func(s string) bool {
+			return s == rule
+		})
+	} else {
+		f.actions = append(f.actions, compile.Match)
+	}
+}
+
+func (f *GlobFilter) Add(block ...string) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	for _, b := range block {
+		for _, sub := range ParseStringToHosts(b) {
+			sub = strings.TrimSpace(sub)
+			f.createAction(sub)
+		}
+	}
+}
+
+func (f *GlobFilter) Contains(target string) bool {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	for _, action := range f.actions {
+		if action(target) {
+			return true
+		}
+	}
+	return false
 }
 
 type HostsFilter struct {
