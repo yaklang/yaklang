@@ -13,10 +13,18 @@ func (v *Value) GetBottomUses(opt ...OperationOption) Values {
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = v
 	ret := v.getBottomUses(actx, opt...)
-	lo.UniqBy(ret, func(item *Value) int64 {
-		return item.GetId()
-	})
-	return ret
+	mapx := make(map[int64]*Value)
+	for _, value := range ret {
+		if v, exit := mapx[value.GetId()]; exit {
+			//todo: 是否有其他数据
+			v.EffectOn = append(v.EffectOn, value.EffectOn...)
+			v.DependOn = append(v.DependOn, value.DependOn...)
+			v.Predecessors = append(v.Predecessors, value.Predecessors...)
+			continue
+		}
+		mapx[value.GetId()] = value
+	}
+	return lo.Values(mapx)
 }
 
 func (v Values) GetBottomUses(opts ...OperationOption) Values {

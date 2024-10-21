@@ -15,10 +15,18 @@ func (i *Value) GetTopDefs(opt ...OperationOption) Values {
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = i
 	ret := i.getTopDefs(actx, opt...)
-	ret = lo.UniqBy(ret, func(item *Value) int64 {
-		return item.GetId()
-	})
-	return ret
+	mapx := make(map[int64]*Value)
+	for _, value := range ret {
+		if v, exit := mapx[value.GetId()]; exit {
+			//todo: other data
+			v.EffectOn = append(v.EffectOn, value.EffectOn...)
+			v.DependOn = append(v.DependOn, value.DependOn...)
+			v.Predecessors = append(v.Predecessors, value.Predecessors...)
+			continue
+		}
+		mapx[value.GetId()] = value
+	}
+	return lo.Values(mapx)
 }
 
 func (v Values) GetTopDefs(opts ...OperationOption) Values {
@@ -36,6 +44,7 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	}
 
 	for _, def := range i.node.GetValues() {
+
 		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
