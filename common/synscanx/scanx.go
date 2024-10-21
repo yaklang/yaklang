@@ -325,8 +325,8 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 		s.OpenPortHandlers = func(host net.IP, port int) {
 			openPortLock.Lock()
 			defer openPortLock.Unlock()
-
-			if s.loopbackMap[host.String()] != "" {
+			originalHost := host.String()
+			if s.loopbackMap[originalHost] != "" {
 				host = net.ParseIP(s.loopbackMap[host.String()])
 			}
 
@@ -337,11 +337,11 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 
 			resultFilter.Insert(addr)
 			if s.FromPing {
-				if !(s._hosts.Contains(host.String()) && s.ports.Contains(port)) {
+				if !((s._hosts.Contains(host.String()) || s._hosts.Contains(originalHost)) && s.ports.Contains(port)) {
 					return
 				}
 			} else {
-				if !(s.hosts.Contains(host.String()) && s.ports.Contains(port)) {
+				if !((s.hosts.Contains(host.String()) || s.hosts.Contains(originalHost)) && s.ports.Contains(port)) {
 					return
 				}
 
