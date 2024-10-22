@@ -570,7 +570,7 @@ func (y *builder) VisitMethodDeclaration(
 	}
 
 	key := i.Identifier().GetText()
-	funcName := fmt.Sprintf("%s", key)
+	funcName := fmt.Sprintf("%s_%s", class.Name, key)
 	methodName := key
 
 	if isStatic {

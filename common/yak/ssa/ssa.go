@@ -216,8 +216,6 @@ type Program struct {
 	Funcs map[string]*Function
 	// class blue print
 	ClassBluePrint map[string]*Blueprint
-	ExprotValue    map[string]Value
-	ExprotType     map[string]Type
 
 	ExportValue map[string]Value
 	ExportType  map[string]Type

@@ -316,8 +316,8 @@ public class B{
 `, func(prog *ssaapi.Program) error {
 		prog.Show()
 		result1 := prog.SyntaxFlow(`a* as $a;`).GetValues("a")
-		assert.Equal(t, "Function-a()", result1[0].String())
-		assert.Equal(t, "Function-a()", result1[1].String())
+		assert.Equal(t, "Function-A_a()", result1[0].String())
+		assert.Equal(t, "Function-A_a()", result1[1].String())
 		result2 := prog.SyntaxFlow(`b* as $b;`).GetValues("b")
 		assert.Equal(t, "Undefined-A.b", result2[0].String())
 		assert.Equal(t, "Undefined-A.b(Undefined-A)", result2[1].String())
@@ -347,8 +347,8 @@ public class B{
 `, func(prog *ssaapi.Program) error {
 		prog.Show()
 		result1 := prog.SyntaxFlow(`a* as $a;`).GetValues("a")
-		assert.Equal(t, "Function-a()", result1[0].String())
-		assert.Equal(t, "Function-a()", result1[1].String())
+		assert.Equal(t, "Function-A_a()", result1[0].String())
+		assert.Equal(t, "Function-A_a()", result1[1].String())
 		result2 := prog.SyntaxFlow(`b* as $b;`).GetValues("b")
 		assert.Equal(t, "Undefined-object.b", result2[0].String())
 		assert.Equal(t, "Undefined-object.b(Undefined-A-constructor(Undefined-A))", result2[1].String())
