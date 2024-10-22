@@ -56,7 +56,7 @@ HtmlComment    : '<!' '--' .*? '-->'  -> channel(HIDDEN);
 HtmlDtd        : '<!' .*? '>';
 HtmlOpen       : '<'       -> pushMode(INSIDE);
 Shebang        : '#'       { this.IsNewLineOrStart(-2) }? '!' ~[\r\n]*;
-NumberSign     : '#' ~'<'* -> more;
+NumberSign     : '#' ~'<'* ;
 Error          : .         -> channel(ErrorLexem);
 
 // TODO: parse xml attributes.
