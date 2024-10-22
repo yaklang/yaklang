@@ -185,9 +185,9 @@ func TestBuildInRule_Verify_DEBUG(t *testing.T) {
 	}
 
 	yakit.InitialDatabase()
-	ruleName := "java-reflection-for-class-unsafe.sf"
+	ruleName := "php-exec-function.sf"
 
-	rule, err := sfdb.GetRule(ruleName)
+	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {
 		t.Fatal(err)
 	}
