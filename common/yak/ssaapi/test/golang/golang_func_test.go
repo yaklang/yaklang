@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-func Test_Cross_Function(t *testing.T) {
+func Test_CrossFunction(t *testing.T) {
 	t.Run("multiple parameter", func(t *testing.T) {
 		code := `package main
 
@@ -183,4 +183,58 @@ func Test_Closure(t *testing.T) {
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
 	})
+}
+
+func Test_Method_lazybuild(t *testing.T) {
+
+	t.Run("normal", func(t *testing.T) {
+		code := `package main
+
+		type T struct {
+		    a int
+			b int 
+		}
+
+		func main(){
+			t := T{1,2}
+			c := t.add()
+		}
+
+		func (t *T) add() int{
+		    return t.a + t.b + 3
+		}
+		`
+		ssatest.CheckSyntaxFlow(t, code,
+			`c #-> as $target`,
+			map[string][]string{
+				"target": {"1", "2", "3"},
+			},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+}
+
+func Test_Function_lazybuild(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		code := `package main
+
+		func main(){
+			a := 1
+			b := 2
+			c := add(a,b)
+		}
+
+		func add(a,b int) int{
+			return a+b+3
+		}
+		`
+		ssatest.CheckSyntaxFlow(t, code,
+			`c #-> as $target`,
+			map[string][]string{
+				"target": {"1", "2", "3"},
+			},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+
 }

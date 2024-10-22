@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 
@@ -38,6 +39,10 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return extension == ".go" || extension == ".mod"
 }
 
+func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.GetProgram().GetApplication().Build("", editor, builder)
+}
+
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {
@@ -51,6 +56,11 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 	dirname, filename := fileSystem.PathSplit(path)
 	_ = dirname
 	_ = filename
+	file, err := fileSystem.ReadFile(path)
+	if err != nil {
+		log.Errorf("read file %s error: %v", path, err)
+		return nil
+	}
 
 	// go.mod
 	if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "go.mod" {
@@ -73,7 +83,8 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 			prog.ExtraFile["go.mod"] = path[:len(path)-1]
 		}
 	}
-
+	prog.Build(path, memedit.NewMemEditor(string(file)), functionBuilder)
+	prog.GetIncludeFiles()
 	return nil
 }
 
@@ -98,8 +109,6 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
 		cmap:            []map[string]struct{}{},
-		structTypes:     map[string]*ssa.ObjectType{},
-		aliasTypes:      map[string]*ssa.AliasType{},
 		result:          map[string][]string{},
 		tpHandler:       map[string]func(){},
 		labels:          map[string]*ssa.LabelBuilder{},
@@ -120,8 +129,6 @@ func (*SSABuilder) FilterFile(path string) bool {
 type astbuilder struct {
 	*ssa.FunctionBuilder
 	cmap           []map[string]struct{}
-	structTypes    map[string]*ssa.ObjectType
-	aliasTypes     map[string]*ssa.AliasType
 	result         map[string][]string
 	tpHandler      map[string]func()
 	labels         map[string]*ssa.LabelBuilder
@@ -192,12 +199,6 @@ func (b *astbuilder) CheckGlobalVariablePhi(l *ssa.Variable, r ssa.Value) bool {
 
 func (b *astbuilder) GetGlobalVariableL(name string) (*ssa.Variable, bool) {
 	var variable *ssa.Variable
-	/*for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
-		if i.String() == name {
-			variable = m.GetLastVariable()
-			return variable, true
-		}
-	}*/
 	return variable, false
 }
 
@@ -230,10 +231,7 @@ func (b *astbuilder) GetResultDefault() []string {
 
 func (b *astbuilder) GetImportPackage(name string) *ssa.Program {
 	prog := b.GetProgram()
-	lib, skip := prog.GetLibrary(name)
-	if skip {
-		return nil
-	}
+	lib, _ := prog.GetLibrary(name)
 	return lib
 }
 
@@ -246,38 +244,60 @@ func (b *astbuilder) GetLabelByName(name string) *ssa.LabelBuilder {
 
 // ====================== Object type
 func (b *astbuilder) AddStruct(name string, t *ssa.ObjectType) {
-	b.structTypes[name] = t
+	b.GetProgram().SetExportType(name, t)
 }
 
 func (b *astbuilder) GetStructByStr(name string) ssa.Type {
-	if b.structTypes[name] == nil {
-		return nil
+	if t, ok := b.GetProgram().GetExportType(name); ok {
+		if obj, ok := t.(*ssa.ObjectType); ok {
+			return obj
+		} else {
+			b.NewError(ssa.Warn, TAG, "type is not struct")
+		}
 	}
-	return b.structTypes[name]
+	return nil
 }
 
 func (b *astbuilder) GetStructAll() map[string]*ssa.ObjectType {
-	return b.structTypes
+	var objs map[string]*ssa.ObjectType = make(map[string]*ssa.ObjectType)
+	for s, o := range b.GetProgram().ExportType {
+		if o, ok := o.(*ssa.ObjectType); ok {
+			objs[s] = o
+		}
+	}
+
+	return objs
 }
 
 // ====================== Alias type
 func (b *astbuilder) AddAlias(name string, t *ssa.AliasType) {
-	b.aliasTypes[name] = t
+	b.GetProgram().SetExportType(name, t)
 }
 
 func (b *astbuilder) DelAliasByStr(name string) {
-	delete(b.aliasTypes, name)
+	delete(b.GetProgram().ExportType, name)
 }
 
 func (b *astbuilder) GetAliasByStr(name string) ssa.Type {
-	if b.aliasTypes[name] == nil {
-		return nil
+	if t, ok := b.GetProgram().GetExportType(name); ok {
+		if obj, ok := t.(*ssa.AliasType); ok {
+			return obj
+		} else {
+			b.NewError(ssa.Warn, TAG, "type is not struct")
+		}
 	}
-	return b.aliasTypes[name].GetType()
+	return nil
 }
 
 func (b *astbuilder) GetAliasAll() map[string]*ssa.AliasType {
-	return b.aliasTypes
+	var objs map[string]*ssa.AliasType = make(map[string]*ssa.AliasType)
+	for s, o := range b.GetProgram().ExportType {
+		if o, ok := o.(*ssa.AliasType); ok {
+			objs[s] = o
+		}
+	}
+
+	return objs
 }
 
 // ====================== Special
