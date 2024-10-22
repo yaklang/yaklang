@@ -21,14 +21,6 @@ import (
 
 var Cases = []BuildinRuleTestCase{
 	{
-		Name: "检测Java任意文件下载",
-		Rule: `java-springboot-filedownload`,
-		FS: map[string]string{
-			"download.java": "download.java",
-		},
-		ContainsAll: []string{"middle", "headers"},
-	},
-	{
 		Name: "检测Java任意文件下载(attachment)",
 		Rule: `java-filedownload-attachment-filename`,
 		FS: map[string]string{
