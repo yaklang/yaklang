@@ -112,13 +112,19 @@ func toValidLang(lang string) (string, bool) {
 	return lang, true
 }
 
+func GetAllSupportedLanguages() []consts.Language {
+	return lo.FilterMap(consts.GetAllSupportedLanguages(), func(item consts.Language, index int) (consts.Language, bool) {
+		return item, item != consts.JS
+	})
+}
+
 func (s *SyntaxFlowWebServer) registerTemplateRoute() {
 	router := s.router
 	subRouter := router.Name("template").Subrouter()
 
 	// 获取支持的语言
 	subRouter.HandleFunc("/template_lang", func(w http.ResponseWriter, r *http.Request) {
-		writeJson(w, TemplateLangResponse{Language: consts.GetAllSupportedLanguages()})
+		writeJson(w, TemplateLangResponse{Language: GetAllSupportedLanguages()})
 	}).Name("template lang").Methods(http.MethodGet)
 
 	// 获取语言内的模板列表

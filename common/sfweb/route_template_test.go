@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/sfweb"
 )
 
@@ -16,7 +15,7 @@ func TestTemplateLang(t *testing.T) {
 	rawRsp, err := DoResponse("GET", "/template_lang", &data)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
-	require.ElementsMatch(t, consts.GetAllSupportedLanguages(), data.Language)
+	require.ElementsMatch(t, sfweb.GetAllSupportedLanguages(), data.Language)
 }
 
 func TestTemplateList(t *testing.T) {
