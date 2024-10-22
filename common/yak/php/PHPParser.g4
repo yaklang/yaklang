@@ -72,6 +72,7 @@ htmlElement
     | HtmlScriptOpen
     | HtmlScriptClose
     | XmlStart XmlText* XmlClose
+    | NumberSign
     ;
 
 // Script
