@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -220,8 +219,6 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		// response: variable values
 		values := result.GetValues(variable)
 		for index, v := range values {
-			_ = v
-			_ = index
 			codeRange, source := coverCodeRange(programName, v.GetRange())
 			res := createNewRes(url, 0, []extra{
 				{"index", index},
@@ -367,7 +364,7 @@ type NodeInfo struct {
 	CodeRange  *CodeRange `json:"code_range"`
 }
 
-func coverNodeInfos(graph *ssaapi.ValueGraph, programName string, nodeID int) []*NodeInfo {
+func coverNodeInfos(graph *ssaapi.ValueGraph, programName string) []*NodeInfo {
 	res := make([]*NodeInfo, 0, len(graph.Node2Value))
 	for id, node := range graph.Node2Value {
 		codeRange, source := coverCodeRange(programName, node.GetRange())
@@ -382,64 +379,18 @@ func coverNodeInfos(graph *ssaapi.ValueGraph, programName string, nodeID int) []
 	return res
 }
 
-// deep first search for nodeID and its children to [][]id, id is string,
-// if node.Prev have more than one, add a new line
-type DeepFirst struct {
-	res     [][]string
-	current *orderedmap.OrderedMap // map[string]nil
-	graph   *ssaapi.ValueGraph
-}
-
-func (d *DeepFirst) deepFirst(nodeID int) {
-	if _, ok := d.current.Get(dot.NodeName(nodeID)); ok {
-		return
-	}
-	d.current.Set(dot.NodeName(nodeID), nil)
-	// d.current = append(d.current, dot.NodeName(nodeID))
-	node := d.graph.GetNodeByID(nodeID)
-	prevs := node.Prevs()
-	if len(prevs) == 0 {
-		d.res = append(d.res, d.current.Keys())
-		return
-	}
-	if len(prevs) == 1 {
-		prev := prevs[0]
-		d.deepFirst(prev)
-		return
-	}
-
-	// origin
-	current := d.current
-	for _, prev := range prevs {
-		// new line
-		d.current = orderedmap.New()
-		d.current = current.Copy()
-		d.deepFirst(prev)
-	}
-}
-
-func DeepFirstGraph(graph *ssaapi.ValueGraph, nodeID int) [][]string {
-	df := &DeepFirst{
-		res:     make([][]string, 0),
-		current: orderedmap.New(),
-		graph:   graph,
-	}
-	df.deepFirst(nodeID)
-	return df.res
-}
-
 func Value2Response(programName string, value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
-	valueGraph := ssaapi.NewValueGraph(value)
+	vg := ssaapi.NewValueGraph(value)
+	nodeID := vg.Value2Node[value.GetId()]
+	nodeInfos := coverNodeInfos(vg, programName)
+	graphLines := vg.DeepFirstGraph(nodeID)
+
 	var buf bytes.Buffer
-	valueGraph.GenerateDOT(&buf)
-
-	nodeID := valueGraph.Value2Node[value.GetId()]
-	nodeInfos := coverNodeInfos(valueGraph, programName, nodeID)
-	graphLines := DeepFirstGraph(valueGraph, nodeID)
-
+	vg.GenerateDOT(&buf)
+	dotString := buf.String()
 	res := createNewRes(url, 0, []extra{
 		{"node_id", dot.NodeName(nodeID)},
-		{"graph", buf.String()},
+		{"graph", dotString},
 		{"graph_info", nodeInfos},
 		{"message", msg},
 		{"graph_line", graphLines},
