@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"context"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -44,8 +45,8 @@ func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error
 	var items []*ResultVariable
 	db = db.Model(&AuditNode{}).
 		Where("result_id = ? and is_entry_node = ?", resultID, true).
-		Select("result_variable, result_alert_msg, count(ir_code_id) as num").
-		Group("result_variable").
+		Select("result_variable, result_alert_msg, count(ir_code_id) as num, MIN(created_at) as created_at").
+		Group("result_variable, result_alert_msg").
 		Order("created_at asc")
 	row, err := db.Rows()
 	if err != nil {
@@ -54,7 +55,8 @@ func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error
 
 	for row.Next() {
 		var item ResultVariable
-		if err := row.Scan(&item.Name, &item.Alert, &item.ValueNum); err != nil {
+		var tmp time.Time
+		if err := row.Scan(&item.Name, &item.Alert, &item.ValueNum, &tmp); err != nil {
 			log.Errorf("scan failed: %s", err)
 			continue
 		}

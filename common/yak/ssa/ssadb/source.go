@@ -23,7 +23,7 @@ type IrSource struct {
 	FileName   string `json:"file_name"`
 
 	// file content
-	QuotedCode string `json:"quoted_code"`
+	QuotedCode string `json:"quoted_code" gorm:"type:text"`
 	IsBigFile  bool   `json:"is_big_file"` // if set this flag, the source code is too big, QuotedCode contain this file path
 }
 

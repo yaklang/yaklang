@@ -12,8 +12,8 @@ import (
 type IrType struct {
 	gorm.Model
 	Kind             int    `json:"kind"`
-	String           string `json:"string"`
-	ExtraInformation string `json:"extra_information"`
+	String           string `json:"string" gorm:"type:text"`
+	ExtraInformation string `json:"extra_information" gorm:"type:text"`
 	Hash             string `json:"hash" gorm:"unique_index"`
 }
 

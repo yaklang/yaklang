@@ -36,7 +36,7 @@ type IrCode struct {
 	Name             string `json:"name"`
 	VerboseName      string `json:"verbose_name"`
 	ShortVerboseName string `json:"short_verbose_name"`
-	String           string `json:"string"`
+	String           string `json:"string" gorm:"type:text"`
 
 	// any IrCode in one block inner one  function
 	CurrentBlock    int64 `json:"current_block"`
@@ -96,7 +96,7 @@ type IrCode struct {
 	Pointer Int64Slice `json:"pointer" gorm:"type:text"`
 
 	// not important information
-	ExtraInformation string `json:"extra_information"`
+	ExtraInformation string `json:"extra_information" gorm:"type:text"`
 }
 
 func emptyIrCode() *IrCode {
