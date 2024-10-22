@@ -7,9 +7,18 @@ type lazyBuilder struct {
 	isBuild bool
 }
 
-func (n *lazyBuilder) SetLazyBuilder(Builder func()) {
+func (n *lazyBuilder) SetLazyBuilder(Builder func(), asyns ...bool) {
+	asyn := true
+	if len(asyns) > 0 {
+		asyn = asyns[0]
+	}
 	once := sync.Once{}
-	n._build = func() { once.Do(Builder) }
+	if asyn {
+		n._build = func() { once.Do(Builder) }
+	} else {
+		n._build = Builder
+	}
+
 	n.isBuild = false
 }
 
