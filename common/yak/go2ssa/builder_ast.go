@@ -84,6 +84,12 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 		}
 
+		for _, decl := range ast.AllDeclaration() {
+			if decl, ok := decl.(*gol.DeclarationContext); ok {
+				b.buildDeclaration(decl, true)
+			}
+		}
+
 		for _, meth := range ast.AllMethodDecl() {
 			if meth, ok := meth.(*gol.MethodDeclContext); ok {
 				b.buildMethodDeclFront(meth)
@@ -93,12 +99,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		for _, fun := range ast.AllFunctionDecl() {
 			if fun, ok := fun.(*gol.FunctionDeclContext); ok {
 				b.buildFunctionDeclFront(fun)
-			}
-		}
-
-		for _, decl := range ast.AllDeclaration() {
-			if decl, ok := decl.(*gol.DeclarationContext); ok {
-				b.buildDeclaration(decl, true)
 			}
 		}
 
@@ -582,10 +582,15 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.AssignVariable(variable, newFunc)
 	}
 
+	PreHandlerBlock := b.CurrentBlock
 	newFunc.SetLazyBuilder(func() {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
+		CurrentBlock := b.CurrentBlock
+		b.CurrentBlock = PreHandlerBlock
+
 		defer func() {
 			recoverRange()
+			b.CurrentBlock = CurrentBlock
 			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
 				tph()
 				delete(b.tpHandler, newFunc.GetName())
@@ -656,15 +661,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		b.AssignVariable(variable, newFunc)
 	}
 
-	newFunc.SetLazyBuilder(func() {
-		recoverRange := b.SetRange(fun.BaseParserRuleContext)
-		defer func() {
-			recoverRange()
-			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
-				tph()
-				delete(b.tpHandler, newFunc.GetName())
-			}
-		}()
+	{
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
@@ -676,6 +673,25 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 				}
 			}
 		}
+		b.FunctionBuilder = b.PopFunction()
+	}
+
+	PreHandlerBlock := b.CurrentBlock
+	newFunc.SetLazyBuilder(func() {
+		recoverRange := b.SetRange(fun.BaseParserRuleContext)
+		CurrentBlock := b.CurrentBlock
+		b.CurrentBlock = PreHandlerBlock
+
+		defer func() {
+			recoverRange()
+			b.CurrentBlock = CurrentBlock
+			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
+				tph()
+				delete(b.tpHandler, newFunc.GetName())
+			}
+		}()
+		b.FunctionBuilder = b.PushFunction(newFunc)
+		b.SupportClosure = false
 
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
