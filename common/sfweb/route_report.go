@@ -17,11 +17,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-var issueTemplate *template.Template
+var (
+	falsePositiveIssueTemplate *template.Template
+	falseNegativeIssueTemplate *template.Template
+)
 
 func init() {
 	var err error
-	issueTemplate, err = template.New("issueBody").Funcs(template.FuncMap{
+	falsePositiveIssueTemplate, err = template.New("issueBody").Funcs(template.FuncMap{
 		"CodeBlock": CodeBlock,
 		"Details":   Details,
 		"Escape":    html.EscapeString,
@@ -50,6 +53,21 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	falseNegativeIssueTemplate, err = template.New("issueBody").Funcs(template.FuncMap{
+		"CodeBlock": CodeBlock,
+		"Details":   Details,
+		"Escape":    html.EscapeString,
+	}).Parse(`### 预期存在的规则名称
+<p>{{.RuleName | Escape }}</p>
+
+## 文件内容
+{{CodeBlock .Lang .Content}}
+
+## 额外描述
+`)
+	if err != nil {
+		panic(err)
+	}
 }
 
 type ReportFalsePositiveTemplateData struct {
@@ -59,6 +77,12 @@ type ReportFalsePositiveTemplateData struct {
 	Lang    string
 }
 
+type ReportFalseNegativeTemplateData struct {
+	RuleName string
+	Content  string
+	Lang     string
+}
+
 type ReportFalsePositiveRequest struct {
 	// 扫描文件内容
 	Content string `json:"content,omitempty"`
@@ -66,6 +90,15 @@ type ReportFalsePositiveRequest struct {
 	Lang string `json:"lang,omitempty"`
 	// 风险hash
 	RiskHash string `json:"risk_hash,omitempty"`
+}
+
+type ReportFalseNegativeRequest struct {
+	// 扫描文件内容
+	Content string `json:"content,omitempty"`
+	// 语言
+	Lang string `json:"lang,omitempty"`
+	// 规则名
+	RuleName string `json:"rule_name,omitempty"`
 }
 
 type ReportMissingParameterError struct {
@@ -134,7 +167,7 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 		title := fmt.Sprintf("规则 %s 存在误报", rule.Title)
 
 		var issueBodyBuilder strings.Builder
-		err = issueTemplate.Execute(&issueBodyBuilder, ReportFalsePositiveTemplateData{
+		err = falsePositiveIssueTemplate.Execute(&issueBodyBuilder, ReportFalsePositiveTemplateData{
 			Content: req.Content,
 			Lang:    req.Lang,
 			Rule:    rule,
@@ -147,4 +180,42 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 		issueBody := url.QueryEscape(strings.TrimSpace(issueBodyBuilder.String()))
 		writeJson(w, &ReportResponse{Link: fmt.Sprintf("https://github.com/yaklang/ssa.to/issues/new?labels=bug&title=%s&body=%s", url.QueryEscape(title), issueBody)})
 	}).Name("false positive report").Methods(http.MethodPost)
+
+	subRouter.HandleFunc("/false_negative", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeErrorJson(w, utils.Wrap(err, "read body error"))
+			return
+		}
+		var req ReportFalseNegativeRequest
+		if err = json.Unmarshal(body, &req); err != nil {
+			writeErrorJson(w, utils.Wrap(err, "unmarshal request error"))
+			return
+		}
+		if req.Content == "" {
+			writeErrorJson(w, NewReportMissingParameterError("content"))
+			return
+		} else if req.Lang == "" {
+			writeErrorJson(w, NewReportMissingParameterError("lang"))
+			return
+		} else if req.RuleName == "" {
+			writeErrorJson(w, NewReportMissingParameterError("rule_name"))
+			return
+		}
+
+		title := fmt.Sprintf("规则 %s 存在漏报", req.RuleName)
+
+		var issueBodyBuilder strings.Builder
+		err = falseNegativeIssueTemplate.Execute(&issueBodyBuilder, ReportFalseNegativeTemplateData{
+			RuleName: req.RuleName,
+			Content:  req.Content,
+			Lang:     req.Lang,
+		})
+		if err != nil {
+			writeErrorJson(w, utils.Wrap(err, "execute template error"))
+			return
+		}
+		issueBody := url.QueryEscape(strings.TrimSpace(issueBodyBuilder.String()))
+		writeJson(w, &ReportResponse{Link: fmt.Sprintf("https://github.com/yaklang/ssa.to/issues/new?labels=bug&title=%s&body=%s", url.QueryEscape(title), issueBody)})
+	}).Name("false negative report").Methods(http.MethodPost)
 }

@@ -13,50 +13,41 @@ import (
 
 func TestReportFalsePositive(t *testing.T) {
 	t.Run("missing parameter", func(t *testing.T) {
-		t.Run("missing content", func(t *testing.T) {
+		checkMissingParameter := func(t *testing.T, req *sfweb.ReportFalsePositiveRequest, missing string) {
+			t.Helper()
+
 			var rsp sfweb.ErrorResponse
-			body, err := json.Marshal(&sfweb.ReportFalsePositiveRequest{
-				Lang:     "yak",
-				RiskHash: "123",
-			})
+			body, err := json.Marshal(req)
 			require.NoError(t, err)
 
 			rawRsp, err := DoResponse(http.MethodPost, "/report/false_positive", &rsp, poc.WithReplaceHttpPacketBody(body, false))
 			require.NoError(t, err)
 			require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
-			require.Equal(t, sfweb.NewReportMissingParameterError("content").Error(), rsp.Message)
+			require.Equal(t, sfweb.NewReportMissingParameterError(missing).Error(), rsp.Message)
+		}
+		t.Run("missing content", func(t *testing.T) {
+			checkMissingParameter(t, &sfweb.ReportFalsePositiveRequest{
+				Lang:     "yak",
+				RiskHash: "123",
+			}, "content")
 		})
 
 		t.Run("missing lang", func(t *testing.T) {
-			var rsp sfweb.ErrorResponse
-			body, err := json.Marshal(&sfweb.ReportFalsePositiveRequest{
+			checkMissingParameter(t, &sfweb.ReportFalsePositiveRequest{
 				Content:  "content",
 				RiskHash: "123",
-			})
-			require.NoError(t, err)
-
-			rawRsp, err := DoResponse(http.MethodPost, "/report/false_positive", &rsp, poc.WithReplaceHttpPacketBody(body, false))
-			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
-			require.Equal(t, sfweb.NewReportMissingParameterError("lang").Error(), rsp.Message)
+			}, "content")
 		})
 
 		t.Run("missing risk_hash", func(t *testing.T) {
-			var rsp sfweb.ErrorResponse
-			body, err := json.Marshal(&sfweb.ReportFalsePositiveRequest{
+			checkMissingParameter(t, &sfweb.ReportFalsePositiveRequest{
 				Content: "content",
 				Lang:    "yak",
-			})
-			require.NoError(t, err)
-
-			rawRsp, err := DoResponse(http.MethodPost, "/report/false_positive", &rsp, poc.WithReplaceHttpPacketBody(body, false))
-			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
-			require.Equal(t, sfweb.NewReportMissingParameterError("risk_hash").Error(), rsp.Message)
+			}, "risk_hash")
 		})
 	})
 
-	t.Run("normal", func(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
 		var risks []*sfweb.SyntaxFlowScanRisk
 		progress := 0.0
 
@@ -101,6 +92,58 @@ func TestReportFalsePositive(t *testing.T) {
 		require.NoError(t, err)
 
 		rawRsp, err := DoResponse(http.MethodPost, "/report/false_positive", &rsp, poc.WithReplaceHttpPacketBody(body, false))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode(), string(rawRsp.GetBody()))
+		require.NotEmpty(t, rsp.Link)
+		t.Log(rsp.Link)
+	})
+}
+
+func TestReportFalseNegative(t *testing.T) {
+	t.Run("missing parameter", func(t *testing.T) {
+		checkMissingParameter := func(t *testing.T, req *sfweb.ReportFalseNegativeRequest, missing string) {
+			t.Helper()
+
+			var rsp sfweb.ErrorResponse
+			body, err := json.Marshal(req)
+			require.NoError(t, err)
+
+			rawRsp, err := DoResponse(http.MethodPost, "/report/false_negative", &rsp, poc.WithReplaceHttpPacketBody(body, false))
+			require.NoError(t, err)
+			require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
+			require.Equal(t, sfweb.NewReportMissingParameterError(missing).Error(), rsp.Message)
+		}
+		t.Run("missing content", func(t *testing.T) {
+			checkMissingParameter(t, &sfweb.ReportFalseNegativeRequest{
+				Lang:     "yak",
+				RuleName: "rule",
+			}, "content")
+		})
+
+		t.Run("missing lang", func(t *testing.T) {
+			checkMissingParameter(t, &sfweb.ReportFalseNegativeRequest{
+				Content:  "content",
+				RuleName: "rule",
+			}, "lang")
+		})
+
+		t.Run("missing rule_name", func(t *testing.T) {
+			checkMissingParameter(t, &sfweb.ReportFalseNegativeRequest{
+				Content: "content",
+				Lang:    "yak",
+			}, "rule_name")
+		})
+	})
+	t.Run("ok", func(t *testing.T) {
+		var rsp sfweb.ReportResponse
+		body, err := json.Marshal(&sfweb.ReportFalseNegativeRequest{
+			Content:  scanFileContent,
+			Lang:     `java`,
+			RuleName: "rule",
+		})
+		require.NoError(t, err)
+
+		rawRsp, err := DoResponse(http.MethodPost, "/report/false_negative", &rsp, poc.WithReplaceHttpPacketBody(body, false))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode(), string(rawRsp.GetBody()))
 		require.NotEmpty(t, rsp.Link)
