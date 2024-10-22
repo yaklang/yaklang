@@ -40,14 +40,12 @@ type ResultVariable struct {
 }
 
 func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error) {
-	// db = db.Debug()
 	// get andit node by result_id, unique by result_variable, and get number of result_variable
 	var items []*ResultVariable
 	db = db.Model(&AuditNode{}).
 		Where("result_id = ? and is_entry_node = ?", resultID, true).
 		Select("result_variable, result_alert_msg, count(ir_code_id) as num").
-		Group("result_variable").
-		Order("created_at asc")
+		Group("result_variable, result_alert_msg")
 	row, err := db.Rows()
 	if err != nil {
 		return nil, err
@@ -55,6 +53,7 @@ func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error
 
 	for row.Next() {
 		var item ResultVariable
+		// var tmp time.Time
 		if err := row.Scan(&item.Name, &item.Alert, &item.ValueNum); err != nil {
 			log.Errorf("scan failed: %s", err)
 			continue

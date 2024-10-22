@@ -29,6 +29,10 @@ type IrIndex struct {
 	ValueID int64 `json:"value_id" gorm:"index"`
 }
 
+func (i *IrIndex) TableName() string {
+	return "ir_indices"
+}
+
 func CreateIndex() *IrIndex {
 	ret := &IrIndex{}
 	GetDB().Model(&IrIndex{}).Create(ret)
@@ -43,14 +47,25 @@ func SaveIrIndex(idx *IrIndex) {
 	db.Save(idx)
 }
 
-func GetScope(programName, scopeName string) ([]IrIndex, error) {
+type IrVariable struct {
+	VariableName string
+	ValueID      int64
+	VersionID    int64
+}
+
+func GetScope(programName, scopeName string) ([]IrVariable, error) {
 	db := GetDB()
-	var ret []IrIndex
-	if err := db.Where("scope_name = ?", scopeName).
-		Where("program_name = ?", programName).
-		Group("variable_name").
-		Order("version_id desc").
-		First(&ret).Error; err != nil {
+
+	var ret []IrVariable
+	// get the max version of each variable
+	retDB := db.Table("ir_indices").
+		Select("variable_name, value_id, version_id").
+		Where("scope_name = ? AND program_name = ? AND deleted_at IS NULL", scopeName, programName).
+		Where(`version_id = (
+			SELECT max(version_id) FROM ir_indices AS sub
+			WHERE sub.variable_name = ir_indices.variable_name AND sub.scope_name = ir_indices.scope_name AND sub.program_name = ir_indices.program_name
+		)`).Scan(&ret)
+	if err := retDB.Error; err != nil {
 		return nil, err
 	}
 	return ret, nil
