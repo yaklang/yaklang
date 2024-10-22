@@ -126,15 +126,17 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	targetCh := scanner.SubmitTarget(targets, ports)
-
+	targetCh, err := scanner.SubmitTarget(targets, ports)
+	if err != nil {
+		return nil, err
+	}
 	resultCh, err := scanner.Scan(targetCh)
 	if err != nil {
 		log.Errorf("scan failed: %s", err)
 		return nil, err
 	}
-
 	return resultCh, nil
+
 }
 
 var SynxPortScanExports = map[string]interface{}{
