@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -161,10 +160,5 @@ func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
 }
 
 func (r *SyntaxFlowResult) newValue(valueID int64) *Value {
-	node, err := ssa.NewLazyInstruction(valueID)
-	if err != nil {
-		log.Errorf("GetValues new lazy instruction: %v", err)
-		return nil
-	}
-	return r.program.NewValue(node)
+	return r.program.NewValueFromDB(valueID)
 }

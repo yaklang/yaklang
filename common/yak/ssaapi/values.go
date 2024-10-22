@@ -1,12 +1,14 @@
 package ssaapi
 
 import (
+	"bytes"
 	"fmt"
-
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -30,11 +32,17 @@ type Value struct {
 	// for syntaxflow vm
 	Predecessors []*PredecessorValue
 	DescInfo     map[string]string
+	// value from database
+	auditNode *ssadb.AuditNode
 }
 
 type PredecessorValue struct {
 	Node *Value
 	Info *sfvm.AnalysisContext
+}
+
+func (v *Value) IsFromDataBase() bool {
+	return v.auditNode != nil
 }
 
 func (v *Value) getEffectOnPath(m map[int64]struct{}) Values {
@@ -157,6 +165,24 @@ func (p *Program) NewValue(n ssa.Value) *Value {
 	}
 }
 
+func (p *Program) NewValueFromDB(id int64) *Value {
+	if id == -1 {
+		return nil
+	}
+	node, err := ssa.NewLazyInstruction(id)
+	if err != nil {
+		log.Errorf("GetValues new lazy instruction: %v", err)
+		return nil
+	}
+	val := p.NewValue(node)
+	auditNode := ssadb.GetAuditNodeById(id)
+	if !utils.IsNil(auditNode) {
+		val.auditNode = auditNode
+		return val
+	}
+	return nil
+}
+
 func (v *Value) GetProgramName() string {
 	if v.IsNil() {
 		return ""
@@ -252,7 +278,9 @@ func (v *Value) GetVerboseName() string {
 	if v.IsNil() {
 		return ""
 	}
-
+	if v.auditNode != nil {
+		return v.auditNode.VerboseName
+	}
 	var name string
 	if name = v.node.GetName(); name != "" {
 		if v.IsPhi() {
@@ -297,7 +325,15 @@ func (v *Value) GetRange() memedit.RangeIf {
 	if v.IsNil() {
 		return nil
 	}
-	return v.node.GetRange()
+	if !v.IsFromDataBase() {
+		return v.node.GetRange()
+	}
+	ir := ssadb.GetIrCodeById(ssadb.GetDB(), v.GetId())
+	_, start, end, err := ir.GetStartAndEndPositions()
+	if err != nil {
+		return nil
+	}
+	return memedit.NewRange(start, end)
 }
 
 func (v *Value) HasOperands() bool {
@@ -319,6 +355,10 @@ func (v *Value) GetOperands() Values {
 
 func (v *Value) NewValue(value ssa.Value) *Value {
 	return v.ParentProgram.NewValue(value)
+}
+
+func (v *Value) NewValueFromDB(id int64) *Value {
+	return v.ParentProgram.NewValueFromDB(id)
 }
 
 func (v *Value) GetOperand(index int) *Value {
@@ -820,6 +860,73 @@ func (v *Value) GetCallee() *Value {
 	return nil
 }
 
+func (v *Value) GetPredecessors() []*PredecessorValue {
+	if !v.IsFromDataBase() {
+		return v.Predecessors
+	}
+	preds := ssadb.GetPredecessorEdgeByFromID(v.GetId())
+	var results []*PredecessorValue
+	for _, pred := range preds {
+		p := v.NewValueFromDB(pred.ToNode)
+		result := &PredecessorValue{
+			Node: p,
+			Info: &sfvm.AnalysisContext{
+				Step:  int(pred.AnalysisStep),
+				Label: pred.AnalysisLabel,
+			},
+		}
+		results = append(results, result)
+	}
+	return results
+}
+
+func (v *Value) GetDependOn() Values {
+	if !v.IsFromDataBase() {
+		return v.DependOn
+	}
+	ids := ssadb.GetDependEdgeOnByFromNodeId(v.GetId())
+	var dependOn Values
+	for _, id := range ids {
+		d := v.NewValueFromDB(id)
+		if d != nil {
+			dependOn = append(dependOn, d)
+		}
+	}
+	return dependOn
+}
+
+func (v *Value) GetEffectOn() Values {
+	if !v.IsFromDataBase() {
+		return v.EffectOn
+	}
+	ids := ssadb.GetEffectOnEdgeByFromNodeId(v.GetId())
+	var effectOn Values
+	for _, id := range ids {
+		e := v.NewValueFromDB(id)
+		if e != nil {
+			effectOn = append(effectOn, e)
+		}
+	}
+	return effectOn
+}
+
+func (v *Value) DotGraph() string {
+	vg := NewValueGraph(v)
+	var buf bytes.Buffer
+	vg.GenerateDOT(&buf)
+	return buf.String()
+}
+
+func (v *Value) ShowDot() *Value {
+	dotGraph := v.DotGraph()
+	fmt.Println(dotGraph)
+	return v
+}
+
+func (v *Value) AnalyzeDepth() int {
+	return v.GetDepth()
+}
+
 type Values []*Value
 
 func (value Values) Ref(name string) Values {
@@ -938,4 +1045,11 @@ func (v Values) GetOperands() Values {
 		ret = append(ret, v.GetOperands()...)
 	})
 	return ret
+}
+
+func (v Values) DotGraph() string {
+	vg := NewValueGraph(v...)
+	var buf bytes.Buffer
+	vg.GenerateDOT(&buf)
+	return buf.String()
 }
