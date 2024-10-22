@@ -597,17 +597,17 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 		CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 			result, err := programs.SyntaxFlowWithError(rule.Content, sfvm.WithEnableDebug())
 			if err != nil {
-				return err
+				return utils.Errorf("syntax flow content failed: %v", err)
 			}
 			if err := check(result); err != nil {
-				return err
+				return utils.Errorf("check content failed: %v", err)
 			}
-			result2, err := programs.SyntaxFlowRuleName(rule.RuleName, sfvm.WithEnableDebug())
+			result2, err := programs.SyntaxFlowRule(rule, sfvm.WithEnableDebug())
 			if err != nil {
-				return err
+				return utils.Errorf("syntax flow rule failed: %v", err)
 			}
 			if err := check(result2); err != nil {
-				return err
+				return utils.Errorf("check rule failed: %v", err)
 			}
 			return nil
 		})

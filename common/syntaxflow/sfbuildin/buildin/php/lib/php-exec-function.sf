@@ -5,11 +5,12 @@ desc(
     lib: 'php-os-exec',
 )
 
-/eval|exec|assert|system|shell_exec|pcntl_exec|popen|ob_start/ as $output
+/^(eval|exec|assert|system|shell_exec|pcntl_exec|popen|ob_start)$/ as $output
 
 alert $output
 desc(
     lang: php,
+    alert_min:8,
     'file://unsafe.php': <<<UNSAFE
 <?php
     eval($_POST[1]);
@@ -21,5 +22,9 @@ desc(
     popen($_POST[1]);
     ob_start($_POST[1]);
     ob_end($_POST[1]);
-UNSAFE
+UNSAFE,
+    "safefile://save.php": <<<SAFE
+<?php 
+    evala($_POST[1]);
+SAFE 
 )
