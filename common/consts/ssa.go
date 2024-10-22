@@ -7,6 +7,9 @@ import (
 
 	"github.com/pkg/errors"
 
+	_ "github.com/jinzhu/gorm/dialects/mysql"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
+
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
@@ -62,6 +65,10 @@ func GetSSADataBasePathDefault() string {
 	return filepath.Join(GetDefaultYakitBaseDir(), filename)
 }
 
+func SetSSADB(db *gorm.DB) {
+	ssaDatabase = db
+}
+
 func SetSSADataBasePath(path string) {
 	if path == "" {
 		return
@@ -79,10 +86,24 @@ func GetSSADataBasePath() string {
 
 func initSSADatabase() {
 	initSSADatabaseOnce.Do(func() {
-		var err error
-		ssaDatabase, err = createAndConfigDatabase(GetSSADataBasePath(), SQLiteExtend)
-		if err != nil {
-			log.Errorf("create ssa database err: %v", err)
+		if ssaDatabase == nil {
+			var err error
+			// if os.Getenv("SSA_DATABASE_PATH") != "" && os.Getenv("SSA_DATABASE_DRIVER") != "" {
+			// ssaDatabase, err = createAndConfigDatabase(os.Getenv("SSA_DATABASE_PATH"), os.Getenv("SSA_DATABASE_DRIVER"))
+
+			// connectStr := "host=127.0.0.1 user=postgres password=password dbname=postgres port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+			// ssaDatabase, err = gorm.Open("postgres", connectStr)
+
+			connectStr := "root:password@tcp(127.0.0.1:3306)/mysql?charset=utf8mb4&parseTime=True&loc=Local"
+			ssaDatabase, err = gorm.Open("mysql", connectStr)
+
+			// ssaDatabase, err = createAndConfigDatabase()
+			// } else {
+			// 	ssaDatabase, err = createAndConfigDatabase(GetSSADataBasePath(), SQLiteExtend)
+			// }
+			if err != nil {
+				log.Errorf("create ssa database err: %v", err)
+			}
 		}
 		log.Infof("init ssa database: %s", GetSSADataBasePath())
 		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SSA_DATABASE)
