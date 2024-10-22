@@ -175,7 +175,7 @@ func (r *IrCode) GetExtraInfo() map[string]any {
 	return results
 }
 
-func (r *IrCode) GetStartAndEndPositions(db *gorm.DB) (*memedit.MemEditor, memedit.PositionIf, memedit.PositionIf, error) {
+func (r *IrCode) GetStartAndEndPositions() (*memedit.MemEditor, memedit.PositionIf, memedit.PositionIf, error) {
 	editor, err := GetIrSourceFromHash(r.SourceCodeHash)
 	if err != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
@@ -184,8 +184,8 @@ func (r *IrCode) GetStartAndEndPositions(db *gorm.DB) (*memedit.MemEditor, memed
 	return editor, start, end, nil
 }
 
-func (r *IrCode) GetSourceCode(db *gorm.DB) string {
-	editor, start, end, err := r.GetStartAndEndPositions(db)
+func (r *IrCode) GetSourceCode() string {
+	editor, start, end, err := r.GetStartAndEndPositions()
 	if err != nil {
 		log.Warnf("GetSourceCode failed: %v", err)
 		return ""
@@ -193,8 +193,8 @@ func (r *IrCode) GetSourceCode(db *gorm.DB) string {
 	return editor.GetWordTextFromRange(editor.GetRangeByPosition(start, end))
 }
 
-func (r *IrCode) GetSourceCodeContext(db *gorm.DB, n int) string {
-	editor, start, end, err := r.GetStartAndEndPositions(db)
+func (r *IrCode) GetSourceCodeContext(n int) string {
+	editor, start, end, err := r.GetStartAndEndPositions()
 	if err != nil {
 		log.Warnf("GetSourceCodeContext failed: %v", err)
 		return ""

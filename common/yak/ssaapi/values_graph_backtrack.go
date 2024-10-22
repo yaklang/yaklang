@@ -240,10 +240,3 @@ func (v Values) DotGraphs() []string {
 	}
 	return ret
 }
-
-func (v Values) DotGraph() string {
-	vg := NewValueGraph(v...)
-	var buf bytes.Buffer
-	vg.GenerateDOT(&buf)
-	return buf.String()
-}
