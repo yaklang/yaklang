@@ -4,6 +4,7 @@ desc(
 )
 
 __dependency__.*shiro*core.version as $ver;
+__dependency__.*shiro*spring.version as $ver;
 $ver in (,1.10.1] as $vuln_shiro_core;
 alert $vuln_shiro_core for {
     message: 'SCA: shiro-core versions between 1.10.0 and 1.10.1 have an authentication bypass vulnerability',
