@@ -6,7 +6,7 @@ import (
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-func TestTemplate_Type(t *testing.T) {
+func Test_Template(t *testing.T) {
 	t.Run("template type", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		type Queue[T int] struct {
@@ -23,7 +23,7 @@ func TestTemplate_Type(t *testing.T) {
 	})
 }
 
-func TestTemplate_Function(t *testing.T) {
+func Test_Template_Function(t *testing.T) {
 	t.Run("template function", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -41,5 +41,25 @@ func TestTemplate_Function(t *testing.T) {
 			println(c)
 		}
 		`, []string{"Function-Pop(1)", "Function-Pop(\"1\")", "Function-Pop(true)"}, t)
+	})
+}
+
+func Test_AliasType(t *testing.T) {
+	t.Run("alias type", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+	type a int
+	type b string
+	type c bool
+
+	func main() {
+		var a1 a
+		var b1 b
+		var c1 c
+		println(a1) // 默认值 0
+		println(b1) // 默认值 ""
+		println(c1) // 默认值 false
+	}
+		`, []string{"0", `""`, "false"}, t)
 	})
 }

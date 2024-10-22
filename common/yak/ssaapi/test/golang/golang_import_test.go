@@ -86,7 +86,7 @@ func TestImport_function(t *testing.T) {
 	)
 }
 
-func TestImport_struct_function(t *testing.T) {
+func TestImport_method(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
@@ -265,7 +265,7 @@ func TestImport_syntaxflow_muti(t *testing.T) {
 	)
 }
 
-func TestImport_order(t *testing.T) {
+func TestImport_unorder(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang

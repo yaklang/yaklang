@@ -220,18 +220,8 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				_ = a
 			}
 
-			if exData := b.GetImportPackage(rv.GetName()); exData != nil {
-				if value := exData.GetExportValue(test); value != nil {
-					if fun, ok := value.(*ssa.Function); ok {
-						return b.ReadMemberCallValue(b.ReadValue(rv.GetName()), fun), nil
-					} else {
-						return b.ReadMemberCallValue(rv, value), nil
-					}
-				}
-
-				// TODO 目前没法识别golang库中的函数
-				b.NewError(ssa.Warn, TAG, "function not found, but create")
-				rightv = b.ReadOrCreateMemberCallVariable(b.ReadValue(rv.GetName()), b.EmitConstInst(test))
+			if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), test); ok {
+				rightv = value
 			} else {
 				rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(test))
 			}

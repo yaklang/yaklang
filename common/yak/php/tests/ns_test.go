@@ -165,7 +165,6 @@ namespace {
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 
-	// CheckSyntaxFlowWithFS里面不会执行PreHandlerProject
 	t.Run("more namespace", func(t *testing.T) {
 		t.SkipNow()
 		fs := filesys.NewVirtualFs()
