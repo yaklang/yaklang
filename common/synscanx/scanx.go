@@ -22,6 +22,8 @@ import (
 
 type Scannerx struct {
 	ctx    context.Context
+	cancel context.CancelFunc
+
 	config *SynxConfig
 
 	// 取样IP
@@ -73,8 +75,10 @@ func getRoute(sampleIP string) (*net.Interface, net.IP, net.IP, error) {
 
 func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scannerx, error) {
 	limitInterval := time.Duration(config.rateLimitDelayMs * float64(time.Millisecond))
+	rootCtx, cancel := context.WithCancel(context.Background())
 	s := &Scannerx{
-		ctx:           ctx,
+		ctx:           rootCtx,
+		cancel:        cancel,
 		config:        config,
 		startTime:     time.Now(),
 		ports:         utils.NewPortsFilter(),
@@ -168,13 +172,12 @@ func generateHostPort(nonExcludedHosts []string, nonExcludedPorts []int) <-chan 
 	return out
 }
 
-func (s *Scannerx) SubmitTarget(targets, ports string) <-chan *SynxTarget {
+func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, error) {
 	nonExcludedHosts := s.GetNonExcludedHosts(targets)
 	nonExcludedPorts := s.GetNonExcludedPorts(ports)
 	if len(nonExcludedHosts) == 0 || len(nonExcludedPorts) == 0 {
-		log.Error("targets or ports is empty")
-		s.ctx.Done()
-		return nil
+		s.cancel()
+		return nil, errors.New("targets or ports is empty")
 	}
 	s.OnSubmitTask(func(h string, p int) {
 		s.config.callSubmitTaskCallback(utils.HostPort(h, p))
@@ -216,7 +219,7 @@ func (s *Scannerx) SubmitTarget(targets, ports string) <-chan *SynxTarget {
 			}
 		}
 	}()
-	return tgCh
+	return tgCh, nil
 }
 
 func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *SynxTarget {
@@ -423,6 +426,7 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 	for {
 		select {
 		case <-s.ctx.Done():
+			log.Errorf("111111111111111111 %v", s.ctx.Err())
 			return
 		case target, ok := <-targetCh:
 			if !ok {
