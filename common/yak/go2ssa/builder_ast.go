@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/log"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -15,96 +14,9 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	var funclist []*ssa.Function
-	var methlist []*ssa.Function
 	var pkgNameCurrent string
 
-	if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
-		pkgPath := b.buildPackage(packag)
-		if b.GetProgram().ExtraFile["go.mod"] != "" {
-			pkgNameCurrent = b.GetProgram().ExtraFile["go.mod"] + "/" + pkgPath[0]
-		} else {
-			pkgNameCurrent = pkgPath[0]
-		}
-		prog := b.GetProgram()
-		application := prog.Application
-		global := application.GlobalScope
-
-		initHandler := func(name string) {
-			variable := b.CreateMemberCallVariable(global, b.EmitConstInst(name))
-			emptyContainer := b.EmitEmptyContainer()
-			b.AssignVariable(variable, emptyContainer)
-		}
-		initHandler(pkgNameCurrent)
-
-		b.pkgNameCurrent = pkgNameCurrent
-
-		lib, skip := prog.GetLibrary(pkgPath[0])
-		if skip {
-			return
-		}
-		if lib == nil {
-			lib = prog.NewLibrary(pkgPath[0], pkgPath)
-		}
-		lib.PushEditor(prog.GetCurrentEditor())
-		lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInst(pkgNameCurrent))
-
-		init := lib.GetAndCreateFunction(pkgNameCurrent, "@init")
-		init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
-		builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "@init")
-
-		if builder != nil {
-			builder.SetBuildSupport(b.FunctionBuilder)
-			builder.SetEditor(prog.GetApplication().GetCurrentEditor())
-			currentBuilder := b.FunctionBuilder
-			b.FunctionBuilder = builder
-			defer func() {
-				for _, e := range builder.GetProgram().GetErrors() {
-					currentBuilder.GetProgram().AddError(e)
-				}
-				b.FunctionBuilder = currentBuilder
-			}()
-		}
-	}
-
-	for _, impo := range ast.AllImportDecl() {
-		namel, _ := b.buildImportDecl(impo.(*gol.ImportDeclContext))
-		for i := range namel {
-			if lib, _ := b.GetProgram().GetLibrary(namel[i]); lib == nil {
-				if _, err := b.BuildDirectoryPackage([]string{namel[i]}, true); err == nil {
-				} else {
-					log.Infof("Dependencies Missed: Import package not found(%v)", err)
-				}
-			}
-		}
-	}
-
-	for _, decl := range ast.AllDeclaration() {
-		if decl, ok := decl.(*gol.DeclarationContext); ok {
-			b.buildDeclaration(decl, true)
-		}
-	}
-
-	for _, meth := range ast.AllMethodDecl() {
-		if meth, ok := meth.(*gol.MethodDeclContext); ok {
-			methlist = append(methlist, b.buildMethodDeclFront(meth))
-		}
-	}
-
-	for _, fun := range ast.AllFunctionDecl() {
-		if fun, ok := fun.(*gol.FunctionDeclContext); ok {
-			funclist = append(funclist, b.buildFunctionDeclFront(fun))
-		}
-	}
-
-	for _, f := range methlist {
-		f.Build()
-	}
-	for _, f := range funclist {
-		f.Build()
-	}
-
-	var bpHandler = func() {
+	var exportHandler = func() {
 		lib := b.GetProgram()
 		for structName, structType := range b.GetStructAll() {
 			lib.SetExportType(structName, structType)
@@ -121,8 +33,118 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			lib.SetExportValue(globalName, globalValue)
 		}
 	}
+	_ = exportHandler
 
-	bpHandler()
+	if b.PreHandler() {
+		if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
+			pkgPath := b.buildPackage(packag)
+			if b.GetProgram().ExtraFile["go.mod"] != "" {
+				pkgNameCurrent = b.GetProgram().ExtraFile["go.mod"] + "/" + pkgPath[0]
+			} else {
+				pkgNameCurrent = pkgPath[0]
+			}
+			prog := b.GetProgram()
+			application := prog.Application
+			global := application.GlobalScope
+
+			initHandler := func(name string) {
+				variable := b.CreateMemberCallVariable(global, b.EmitConstInst(name))
+				emptyContainer := b.EmitEmptyContainer()
+				b.AssignVariable(variable, emptyContainer)
+			}
+			initHandler(pkgNameCurrent)
+
+			b.pkgNameCurrent = pkgNameCurrent
+
+			lib, skip := prog.GetLibrary(pkgPath[0])
+			if skip {
+				return
+			}
+			if lib == nil {
+				lib = prog.NewLibrary(pkgPath[0], pkgPath)
+			}
+			lib.PushEditor(prog.GetCurrentEditor())
+			lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInst(pkgNameCurrent))
+
+			init := lib.GetAndCreateFunction(pkgNameCurrent, "@init")
+			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
+			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "@init")
+
+			if builder != nil {
+				builder.SetBuildSupport(b.FunctionBuilder)
+				builder.SetEditor(prog.GetApplication().GetCurrentEditor())
+				currentBuilder := b.FunctionBuilder
+				b.FunctionBuilder = builder
+				defer func() {
+					for _, e := range builder.GetProgram().GetErrors() {
+						currentBuilder.GetProgram().AddError(e)
+					}
+					b.FunctionBuilder = currentBuilder
+				}()
+			}
+		}
+
+		for _, meth := range ast.AllMethodDecl() {
+			if meth, ok := meth.(*gol.MethodDeclContext); ok {
+				b.buildMethodDeclFront(meth)
+			}
+		}
+
+		for _, fun := range ast.AllFunctionDecl() {
+			if fun, ok := fun.(*gol.FunctionDeclContext); ok {
+				b.buildFunctionDeclFront(fun)
+			}
+		}
+
+		for _, decl := range ast.AllDeclaration() {
+			if decl, ok := decl.(*gol.DeclarationContext); ok {
+				b.buildDeclaration(decl, true)
+			}
+		}
+
+		exportHandler()
+	} else {
+		if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
+			pkgPath := b.buildPackage(packag)
+			prog := b.GetProgram()
+			lib, _ := prog.GetLibrary(pkgPath[0])
+
+			if lib == nil {
+				b.NewError(ssa.Error, TAG, "no library found for package %s", pkgPath[0])
+			}
+
+			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "@init")
+
+			if builder != nil {
+				builder.SetBuildSupport(b.FunctionBuilder)
+				builder.SetEditor(prog.GetApplication().GetCurrentEditor())
+				currentBuilder := b.FunctionBuilder
+				b.FunctionBuilder = builder
+				defer func() {
+					for _, e := range builder.GetProgram().GetErrors() {
+						currentBuilder.GetProgram().AddError(e)
+					}
+					b.FunctionBuilder = currentBuilder
+				}()
+			}
+		}
+
+		for _, impo := range ast.AllImportDecl() {
+			namel, pathl := b.buildImportDecl(impo.(*gol.ImportDeclContext))
+			_ = namel
+			_ = pathl
+
+			for _, name := range namel {
+				if lib := b.GetImportPackage(name); lib != nil {
+					b.GetProgram().ImportAll(lib)
+				}
+			}
+		}
+
+		for _, f := range b.GetProgram().Funcs {
+			f.Build()
+		}
+	}
 }
 
 func (b *astbuilder) buildPackage(p *gol.PackageClauseContext) []string {
@@ -522,7 +544,7 @@ func (b *astbuilder) buildTypeParameterDecl(typ *gol.TypeParameterDeclContext) [
 	return alias
 }
 
-func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.Function {
+func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	var params []ssa.Type
 	var result ssa.Type
 
@@ -593,10 +615,9 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		b.FunctionBuilder = b.PopFunction()
 
 	})
-	return newFunc
 }
 
-func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Function {
+func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	var params []ssa.Type
 	var result ssa.Type
 
@@ -673,7 +694,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 		b.FunctionBuilder = b.PopFunction()
 
 	})
-	return newFunc
 }
 
 func (b *astbuilder) buildReceiver(stmt *gol.ReceiverContext) []ssa.Type {

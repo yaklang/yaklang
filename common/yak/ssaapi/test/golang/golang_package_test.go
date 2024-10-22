@@ -41,7 +41,7 @@ func Test_Package(t *testing.T) {
 	)
 }
 
-func Test_PackageEX(t *testing.T) {
+func Test_Package_lazybuild(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
@@ -69,7 +69,7 @@ func Test_PackageEX(t *testing.T) {
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"Undefined-add", "1", "2"},
+		"a": {"3", "1", "2"},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
