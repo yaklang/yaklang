@@ -91,19 +91,13 @@ Accept: */*
 			defer wsClient.WriteClose()
 		}
 	}
-	var flows []*schema.HTTPFlow
-	db := consts.GetGormProjectDatabase()
-	err = utils.AttemptWithDelayFast(func() error {
-		_, flows, err = yakit.QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
-			Keyword: token2,
-		})
-		return err
-	})
-
+	rsp, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+		Keyword: token2,
+	}, 1)
 	require.NoError(t, err)
-	require.Len(t, flows, 1, "len(flows) != 1")
-	require.True(t, flows[0].IsWebsocket, "flow is not websocket")
-	hash := flows[0].WebsocketHash
+	flow := rsp.Data[0]
+	require.True(t, flow.IsWebsocket, "flow is not websocket")
+	hash := flow.WebsocketHash
 
 	var wsFlows []*schema.WebsocketFlow
 	err = utils.AttemptWithDelayFast(func() error {
