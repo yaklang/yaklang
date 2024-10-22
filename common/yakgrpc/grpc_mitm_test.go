@@ -117,7 +117,10 @@ token: `+token+`
 	time.Sleep(100 * time.Millisecond)
 	checkSave(1)
 	stream.Send(&ypb.MITMRequest{
-		ExcludeHostname:  []string{addr},
+		FilterData: &ypb.MITMFilterData{ExcludeHostnames: []*ypb.FilterDataItem{{
+			MatcherType: "word",
+			Group:       []string{addr},
+		}}},
 		UpdateFilter:     true,
 		Recover:          true,
 		Forward:          true,

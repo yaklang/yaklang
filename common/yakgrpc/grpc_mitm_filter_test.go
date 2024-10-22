@@ -601,7 +601,9 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 		stream.Recv()
 		stream.Send(&ypb.MITMRequest{
 			UpdateFilter: true,
-			ExcludeUri:   []string{"abc"},
+			FilterData: &ypb.MITMFilterData{
+				ExcludeUri: []*ypb.FilterDataItem{{MatcherType: "word", Group: []string{"abc"}}},
+			},
 		})
 		stream.Recv()
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
