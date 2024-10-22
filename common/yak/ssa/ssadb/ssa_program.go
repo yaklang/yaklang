@@ -4,9 +4,10 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-var Programs = make(map[string]*schema.SSAProgram)
+var Programs = omap.NewEmptyOrderedMap[string, *schema.SSAProgram]()
 
 func CheckAndSwitchDB(name string) {
 	// switch to database
@@ -20,7 +21,7 @@ func CheckAndSwitchDB(name string) {
 }
 
 func GetSSAProgram(name string) *schema.SSAProgram {
-	if prog, ok := Programs[name]; ok {
+	if prog, ok := Programs.Get(name); ok {
 		return prog
 	}
 
@@ -33,7 +34,7 @@ func GetSSAProgram(name string) *schema.SSAProgram {
 	if len(programs) == 0 {
 		return nil
 	}
-	Programs[name] = programs[0]
+	Programs.Set(name, programs[0])
 	return programs[0]
 }
 
@@ -47,7 +48,7 @@ func SaveSSAProgram(name, desc, language string) error {
 		Language:    language,
 	}
 
-	Programs[name] = prog
+	Programs.Set(name, prog)
 
 	return db.Model(&schema.SSAProgram{}).Save(prog).Error
 }
@@ -58,7 +59,7 @@ func DeleteSSAProgram(name string) error {
 		log.Errorf("delete ssa program [%v] error: %s", name, err)
 		return err
 	}
-	delete(Programs, name)
+	Programs.Delete(name)
 	return nil
 }
 
@@ -73,7 +74,7 @@ func AllSSAPrograms() []*schema.SSAProgram {
 		if p == nil {
 			continue
 		}
-		Programs[p.Name] = p
+		Programs.Set(p.Name, p)
 	}
 
 	return programs
