@@ -10,3 +10,77 @@ alert $vuln_shiro_core for {
     cve: 'CVE-2023-22602',
     level: 'high',
 }
+
+desc(
+lang: java,
+'file://pom.xml': <<<CODE
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>ymd-mzf</artifactId>
+        <groupId>com.ymd.mzf</groupId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>ymd-mzf-system</artifactId>
+    <packaging>jar</packaging>
+    <name>ymd-mzf-system</name>
+    <description>Demo project for Spring Boot</description>
+
+    <!-- 依赖声明 -->
+    <dependencies>
+        <!-- 基础依赖 -->
+        <dependency>
+            <groupId>com.ymd.mzf</groupId>
+            <artifactId>ymd-mzf-common</artifactId>
+        </dependency>
+        <!-- Shiro 核心依赖 -->
+        <dependency>
+            <groupId>org.apache.shiro</groupId>
+            <artifactId>shiro-spring</artifactId>
+            <version>1.4.0</version>
+        </dependency>
+        <!-- Shiro-redis插件 -->
+        <dependency>
+            <groupId>org.crazycake</groupId>
+            <artifactId>shiro-redis</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+        <!-- thymeleaf模板引擎和shiro框架的整合 -->
+        <dependency>
+            <groupId>com.github.theborakompanioni</groupId>
+            <artifactId>thymeleaf-extras-shiro</artifactId>
+            <version>2.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.github.whvcse</groupId>
+            <artifactId>easy-captcha</artifactId>
+            <version>1.6.2</version>
+        </dependency>
+        <!--thymeleaf 模板依赖-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <!--thymeleaf 布局依赖-->
+        <dependency>
+            <groupId>nz.net.ultraq.thymeleaf</groupId>
+            <artifactId>thymeleaf-layout-dialect</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+</project>
+CODE
+)
