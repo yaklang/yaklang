@@ -619,7 +619,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 
-	})
+	}, false)
 }
 
 func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
@@ -709,7 +709,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 
-	})
+	}, false)
 }
 
 func (b *astbuilder) buildReceiver(stmt *gol.ReceiverContext) []ssa.Type {
