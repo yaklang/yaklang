@@ -204,6 +204,7 @@ func GetMethod(t Type, id string) *Function {
 	var f *Function
 	if fun, ok := t.GetMethod()[id]; ok {
 		f = fun
+		f.Build()
 	}
 
 	if f == nil && ExternMethodBuilder != nil {

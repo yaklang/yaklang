@@ -510,7 +510,7 @@ world`+"`"+`)
 			do(b)
 		}
 		`, []string{
-			"ParameterMember-parameter[0].Add(Parameter-i)", "ParameterMember-parameter[0].Sub(Parameter-i)",
+			"ParameterMember-parameter[0].Add()", "ParameterMember-parameter[0].Sub()",
 		}, t)
 	})
 }
