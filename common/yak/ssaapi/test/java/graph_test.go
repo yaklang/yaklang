@@ -23,43 +23,50 @@ $entry.*Builder().parse(* #-> as $source);
 
 check $source then "XXE Attack" else "XXE Safe";
 `
+	check := func(t *testing.T, result *ssaapi.SyntaxFlowResult) {
+		source := result.GetValues("source")
+		//source.ShowDot()
+		if !utils.MatchAllOfSubString(
+			source.DotGraph(),
+			"fontcolor", "color",
+			"step[",
+			"penwidth=\"3.0\"",
+			": call",
+			"search-exact:parse", // "search parse",
+			"all-actual-args",
+			"ByteArrayInputStream",
+			"getBytes",
+			"parse",
+			"UTF-8",
+			"xmlStr",
+		) {
+			fmt.Println(source.DotGraph())
+			t.Fatal("failed to match all of the substring, bad dot graph")
+		}
+
+		entry := result.GetValues("entry")
+		require.NotNil(t, entry)
+		entryDot := entry.DotGraph()
+		if !utils.MatchAllOfSubString(
+			entryDot,
+			"newInstance",
+			"DocumentBuilderFactory",
+			"newInstance(DocumentBuilderFactory)",
+			"search-exact:newInstance",
+		) {
+			fmt.Println(entryDot)
+			t.Fatal("failed to match all of the substring, bad dot graph")
+		}
+
+	}
 
 	t.Run("draw dot graph in memory", func(t *testing.T) {
 		ssatest.Check(t, XXE_Code, func(prog *ssaapi.Program) error {
 			assert.Equal(t, prog.GetLanguage(), "java")
 			results, err := prog.SyntaxFlowWithError(sfRule)
 			require.NoError(t, err)
-			entry := results.GetValues("entry")
-			if !utils.MatchAllOfSubString(
-				entry.DotGraph(),
-				"newInstance",
-				"DocumentBuilderFactory",
-				"newInstance(DocumentBuilderFactory)",
-				"search-exact:newInstance",
-			) {
-				fmt.Println(entry.DotGraph())
-				t.Fatal("failed to match all of the substring, bad dot graph")
-			}
+			check(t, results)
 
-			source := results.GetValues("source")
-			//source.ShowDot()
-			if !utils.MatchAllOfSubString(
-				source.DotGraph(),
-				"fontcolor", "color",
-				"step[",
-				"penwidth=\"3.0\"",
-				": call",
-				"search-exact:parse", // "search parse",
-				"all-actual-args",
-				"ByteArrayInputStream",
-				"getBytes",
-				"parse",
-				"UTF-8",
-				"xmlStr",
-			) {
-				fmt.Println(source.DotGraph())
-				t.Fatal("failed to match all of the substring, bad dot graph")
-			}
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
@@ -83,40 +90,6 @@ check $source then "XXE Attack" else "XXE Safe";
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		source := result.GetValues("source")
-		require.NotNil(t, source)
-		sourceDot := source.DotGraph()
-		//source.ShowDot()
-		entry := result.GetValues("entry")
-		require.NotNil(t, entry)
-		entryDot := entry.DotGraph()
-		if !utils.MatchAllOfSubString(
-			sourceDot,
-			"newInstance",
-			"DocumentBuilderFactory",
-			"newInstance(DocumentBuilderFactory)",
-			"search-exact:newInstance",
-		) {
-			fmt.Println(entryDot)
-			t.Fatal("failed to match all of the substring, bad dot graph")
-		}
-
-		if !utils.MatchAllOfSubString(
-			sourceDot,
-			"fontcolor", "color",
-			"step[",
-			"penwidth=\"3.0\"",
-			": call",
-			"search-exact:parse", // "search parse",
-			"all-actual-args",
-			"ByteArrayInputStream",
-			"getBytes",
-			"parse",
-			"UTF-8",
-			"xmlStr",
-		) {
-			fmt.Println(sourceDot)
-			t.Fatal("failed to match all of the substring, bad dot graph")
-		}
+		check(t, result)
 	})
 }

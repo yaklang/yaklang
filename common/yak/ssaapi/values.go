@@ -285,7 +285,7 @@ func (v *Value) GetVerboseName() string {
 	if v.IsNil() {
 		return ""
 	}
-	if v.auditNode != nil {
+	if v.IsFromDataBase() {
 		return v.auditNode.VerboseName
 	}
 	var name string
@@ -332,15 +332,7 @@ func (v *Value) GetRange() memedit.RangeIf {
 	if v.IsNil() {
 		return nil
 	}
-	if !v.IsFromDataBase() {
-		return v.node.GetRange()
-	}
-	ir := ssadb.GetIrCodeById(ssadb.GetDB(), v.GetId())
-	_, start, end, err := ir.GetStartAndEndPositions()
-	if err != nil {
-		return nil
-	}
-	return memedit.NewRange(start, end)
+	return v.node.GetRange()
 }
 
 func (v *Value) HasOperands() bool {
