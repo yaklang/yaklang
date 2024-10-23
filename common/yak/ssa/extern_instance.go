@@ -81,10 +81,9 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 	// write to extern Lib
 	name := getExternLibMemberCall(extern, key)
 	// read from scope, if assign to this library-value, return this value
-	if ret := b.PeekValueInThisFunction(name); ret != nil {
-		return ret
+	if ret := ReadVariableFromScope(b.CurrentBlock.ScopeTable, name); !utils.IsNil(ret) {
+		return ret.Value
 	}
-
 	// try build field
 	if ret := extern.BuildField(key.String()); ret != nil {
 		// set program offsetMap for extern value
