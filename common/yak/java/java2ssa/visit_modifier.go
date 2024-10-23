@@ -118,8 +118,8 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			recoverRange := y.SetCurrent(v)
 			defer recoverRange()
 
-			annotation := y.ReadMemberCallVariable(v, y.EmitConstInst("annotation"))
-			thisAnnotation := y.ReadMemberCallVariable(annotation, y.EmitConstInst(annotationName))
+			annotation := y.ReadMemberCallValue(v, y.EmitConstInst("annotation"))
+			thisAnnotation := y.ReadMemberCallValue(annotation, y.EmitConstInst(annotationName))
 			for name, v := range data {
 				variable := y.CreateMemberCallVariable(thisAnnotation, y.EmitConstInst(name))
 				y.AssignVariable(variable, v)
