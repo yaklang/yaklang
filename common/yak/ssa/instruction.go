@@ -5,6 +5,20 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
+	i := &Make{
+		anValue: NewValue(),
+		low:     low,
+		high:    high,
+		step:    step,
+		parentI: parentI,
+		Len:     Len,
+		Cap:     Cap,
+	}
+	i.SetType(typ)
+	return i
+}
+
 func NewJump(to *BasicBlock) *Jump {
 	j := &Jump{
 		anInstruction: NewInstruction(),
