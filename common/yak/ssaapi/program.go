@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"sort"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -21,9 +22,22 @@ type Program struct {
 	enableDatabase bool
 	// come from database will affect search operation
 	comeFromDatabase bool
+	//value cache
+	valueCache *utils.CacheWithKey[int64, *Value]
 }
 
 type Programs []*Program
+
+func (p *Program) GetValueFromCache(id int64) *Value {
+	if value, ok := p.valueCache.Get(id); ok {
+		return value
+	}
+	return nil
+}
+
+func (p *Program) SetValueCache(id int64, value *Value) {
+	p.valueCache.Set(id, value)
+}
 
 func (p *Program) IsFromDatabase() bool {
 	return p.comeFromDatabase
@@ -57,6 +71,7 @@ func NewProgram(prog *ssa.Program, config *config) *Program {
 		Program:        prog,
 		config:         config,
 		enableDatabase: config.ProgramName != "",
+		valueCache:     utils.NewTTLCacheWithKey[int64, *Value](8 * time.Second),
 	}
 
 	// if config.DatabaseProgramName == "" {
