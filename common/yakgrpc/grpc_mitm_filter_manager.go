@@ -238,6 +238,9 @@ func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilter {
 
 func (m *MITMFilter) IsEmpty() bool {
 	data := m.Data
+	if data == nil {
+		return true
+	}
 	return len(data.ExcludeMIME) <= 0 && len(data.ExcludeMethods) <= 0 &&
 		len(data.ExcludeSuffix) <= 0 && len(data.ExcludeHostnames) <= 0 &&
 		len(data.IncludeHostnames) <= 0 && len(data.IncludeSuffix) <= 0 &&

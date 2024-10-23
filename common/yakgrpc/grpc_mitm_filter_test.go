@@ -584,7 +584,9 @@ afterRequest = func(ishttps, oreq/*原始请求*/ ,req/*hiajck修改之后的请
 		stream.Recv()
 		stream.Send(&ypb.MITMRequest{
 			UpdateFilter: true,
-			ExcludeUri:   []string{"abc"},
+			FilterData: &ypb.MITMFilterData{
+				ExcludeUri: []*ypb.FilterDataItem{{MatcherType: "word", Group: []string{"abc"}}},
+			},
 		})
 		stream.Recv()
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()

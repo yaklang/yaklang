@@ -1165,7 +1165,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 过滤
-		if !filterManager.IsPassed(method, hostname, urlStr, extName, isHttps) {
+		if !filterManager.IsPassed(method, hostname, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return req
 		}
