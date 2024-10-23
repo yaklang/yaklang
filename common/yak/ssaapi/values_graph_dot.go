@@ -18,8 +18,7 @@ type ValueGraph struct {
 	// use this map contain node-id to marshaled ssaapi.value
 	// in same node-id, that mean this ssaapi.value is same ssa.value
 	// ! this field just use in graph build
-	marshaledValue      map[int]map[*Value]struct{} // node-id ->  ssaapi.value
-	marshaledAuditValue map[int]map[uint]struct{}   // node-id-> ssadb.auditNode.ID
+	marshaledValue map[int]map[*Value]struct{} // node-id ->  ssaapi.value
 	// graph node id to value, this value just use bare ssa.value
 	Node2Value map[int]*Value
 }
@@ -29,11 +28,10 @@ func NewValueGraph(v ...*Value) *ValueGraph {
 	graph.MakeDirected()
 	graph.GraphAttribute("rankdir", "BT")
 	g := &ValueGraph{
-		Graph:               graph,
-		Value2Node:          make(map[int64]int),
-		marshaledValue:      make(map[int]map[*Value]struct{}),
-		marshaledAuditValue: make(map[int]map[uint]struct{}),
-		Node2Value:          make(map[int]*Value),
+		Graph:          graph,
+		Value2Node:     make(map[int64]int),
+		marshaledValue: make(map[int]map[*Value]struct{}),
+		Node2Value:     make(map[int]*Value),
 	}
 	for _, value := range v {
 		// log.Infof("start graph %v", value.GetVerboseName())
@@ -65,12 +63,7 @@ func (g *ValueGraph) CreateNode(value *Value) int {
 }
 
 func (g *ValueGraph) _marshal(selfID int, value *Value) {
-	if !value.IsFromDataBase() {
-		g.marshaledValue[selfID][value] = struct{}{}
-	} else {
-		g.marshaledAuditValue[selfID][value.auditNode.ID] = struct{}{}
-	}
-
+	g.marshaledValue[selfID][value] = struct{}{}
 	if len(value.GetDependOn()) == 0 && len(value.GetEffectOn()) == 0 && len(value.GetPredecessors()) == 0 {
 		return
 	}
@@ -114,28 +107,19 @@ func (g *ValueGraph) _marshal(selfID int, value *Value) {
 }
 
 func (g *ValueGraph) theValueShouldMarshal(value *Value, id int) bool {
-	if !value.IsFromDataBase() {
-		if marshaledValue, ok := g.marshaledValue[id]; ok {
-			// if this node-id not contain this ssaapi.value, marshal
-			if _, ok := marshaledValue[value]; !ok {
-				return true
-			}
+	if marshaledValue, ok := g.marshaledValue[id]; ok {
+		if value.IsFromDataBase() {
 			return false
-		} else {
-			// if this node-id not exist, make and marshal
-			g.marshaledValue[id] = make(map[*Value]struct{})
+		}
+		// if this node-id not contain this ssaapi.value, marshal
+		if _, ok := marshaledValue[value]; !ok {
 			return true
 		}
+		return false
 	} else {
-		if marshaledValue, ok := g.marshaledAuditValue[id]; ok {
-			if _, ok := marshaledValue[value.auditNode.ID]; !ok {
-				return true
-			}
-			return false
-		} else {
-			g.marshaledAuditValue[id] = make(map[uint]struct{})
-			return true
-		}
+		// if this node-id not exist, make and marshal
+		g.marshaledValue[id] = make(map[*Value]struct{})
+		return true
 	}
 }
 

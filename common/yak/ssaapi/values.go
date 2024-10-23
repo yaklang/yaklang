@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"time"
 )
 
 type Value struct {
@@ -163,13 +162,15 @@ func (p *Program) NewValue(n ssa.Value) *Value {
 		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
 		node:          n,
 		ParentProgram: p,
-		valueCache:    utils.NewTTLCacheWithKey[int64, *Value](time.Duration(0)),
 	}
 }
 
 func (p *Program) NewValueFromDB(id int64) *Value {
 	if id == -1 {
 		return nil
+	}
+	if v := p.GetValueFromCache(id); v != nil {
+		return v
 	}
 	node, err := ssa.NewLazyInstruction(id)
 	if err != nil {
@@ -180,11 +181,11 @@ func (p *Program) NewValueFromDB(id int64) *Value {
 		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
 		node:          node,
 		ParentProgram: p,
-		valueCache:    utils.NewTTLCacheWithKey[int64, *Value](time.Second * 8),
 	}
 	auditNode := ssadb.GetAuditNodeById(id)
 	if !utils.IsNil(auditNode) {
 		val.auditNode = auditNode
+		p.SetValueCache(id, val)
 		return val
 	}
 	return nil
@@ -357,12 +358,7 @@ func (v *Value) NewValue(value ssa.Value) *Value {
 }
 
 func (v *Value) NewValueFromDB(id int64) *Value {
-	if val, ok := v.valueCache.Get(id); ok {
-		return val
-	}
 	value := v.ParentProgram.NewValueFromDB(id)
-	value.valueCache.Set(id, value)
-	value.valueCache = v.valueCache
 	return value
 }
 
