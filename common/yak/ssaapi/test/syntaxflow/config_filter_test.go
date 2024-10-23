@@ -177,3 +177,86 @@ UNTIL,
 			})
 	})
 }
+
+func TestSF_NativeCall_DataFlow_DFS(t *testing.T) {
+	code := `
+getCmd = (param1) => {
+	return filter(param1) + "-al"
+}
+
+filter = (param2) => {
+	return param2 - "-t" 
+}
+
+cmd = "ls"
+if c1{
+	cmd += "-l"
+}else{
+	cmd = getCmd()
+}
+exec(cmd)
+`
+
+	t.Run("exclude all paths", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+exec(* as $end);
+$end #-> as $start;
+
+$start<dataflow(
+exclude:<<<EXCLUDE
+	*?{have:'getCmd'}?{opcode:call}
+EXCLUDE,
+end:'end',
+)>as $result;
+			`,
+			map[string][]string{
+				"start":  {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
+				"result": {"\"-l\"", "\"ls\"", "Undefined-c1"},
+				"end":    {"phi(cmd)[\"ls-l\",Function-getCmd() binding[Function-filter]]"},
+			})
+	})
+
+	t.Run("exclude some of paths", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+exec(* as $end);
+$end #-> as $start;
+
+$start<dataflow(
+exclude:<<<EXCLUDE
+	filter?{opcode:function}
+EXCLUDE,
+end:'end',
+)>as $result;
+			`,
+			map[string][]string{
+				"start": {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
+				// because function-filter just exclude the path:
+				// 1. cmd -> getCmd() -> binding-> function-filter ->param2
+				// 2. cmd -> getCmd() -> function-getCmd ->filter(param1) -> function-filter->param2
+				// but the path could not be excluded:
+				// cmd -> getCmd()-> function-getCmd-> param1
+				// therefore, the result "param2" is still reserved.
+				"result": {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
+				"end":    {"phi(cmd)[\"ls-l\",Function-getCmd() binding[Function-filter]]"},
+			})
+	})
+
+	t.Run("include some of paths", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+exec(* #->as $start);
+getCmd?{opcode:function} as $end;
+
+$start<dataflow(
+include:<<<INCLUDE
+	*?{have:'-t'}
+INCLUDE,
+end:'end',
+)>as $result;
+			`,
+			map[string][]string{
+				"start":  {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
+				"result": {"\"-t\""},
+				"end":    {"Function-getCmd"},
+			})
+	})
+}

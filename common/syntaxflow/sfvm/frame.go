@@ -199,7 +199,9 @@ func (s *SFFrame) GetSymbol(sfi *SFI) (ValueOperator, bool) {
 	}
 	return nil, false
 }
-
+func (s *SFFrame) GetSymbolByName(name string) (ValueOperator, bool) {
+	return s.result.SymbolTable.Get(name)
+}
 func (s *SFFrame) ToLeft() bool {
 	return s.toLeft
 }
