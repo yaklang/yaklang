@@ -12,6 +12,11 @@ func FilterSyntaxFlowResult(rawDB *gorm.DB, filter *ypb.SyntaxFlowResultFilter) 
 		return db
 	}
 
+	/*
+		syntaxflow-result create and update,
+		when program_name is empty, it means the result just create , not update.
+	*/
+	db = db.Where("program_name != ?", "")
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "task_id", filter.GetTaskIDs())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "id", filter.GetResultIDs())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", filter.GetRuleNames())
