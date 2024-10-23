@@ -9,7 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-var SfWebLogger = log.GetLogger("sfweb")
+var (
+	SfWebLogger      = log.GetLogger("sfweb")
+	CHAT_GLM_API_KEY = "CHATGLM_API_KEY"
+)
 
 type ErrorResponse struct {
 	Message string `json:"message"`

@@ -67,16 +67,12 @@ func WithStreamHandler(h func(io.Reader)) AIConfigOption {
 
 func WithDebugStream(h ...bool) AIConfigOption {
 	return func(c *AIConfig) {
-		if len(h) <= 0 {
+		if len(h) <= 0 || h[0] {
 			c.StreamHandler = func(r io.Reader) {
 				io.Copy(os.Stdout, r)
 			}
-			return
-		}
-		if h[0] {
-			c.StreamHandler = func(r io.Reader) {
-				io.Copy(os.Stdout, r)
-			}
+		} else {
+			c.StreamHandler = nil
 		}
 	}
 }

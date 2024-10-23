@@ -74,6 +74,7 @@ func (s *SyntaxFlowWebServer) init() {
 	s.registerTemplateRoute()
 	s.registerYakURLRoute()
 	s.registerScanRoute()
+	s.registerAIAnalysisRoute()
 	s.registerReportRoute()
 }
 
