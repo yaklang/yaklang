@@ -88,6 +88,15 @@ func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest)
 
 	params := req.GetPagination()
 
+	if params == nil {
+		params = &ypb.Paging{
+			Page:    1,
+			Limit:   30,
+			OrderBy: "updated_at",
+			Order:   "desc",
+		}
+	}
+
 	db = bizhelper.QueryOrder(db, params.OrderBy, params.Order)
 
 	var ret []*schema.ExtractedData
