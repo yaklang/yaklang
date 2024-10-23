@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/yaklang/yaklang/common/sfweb"
 	"github.com/yaklang/yaklang/common/utils"
@@ -19,7 +20,7 @@ var (
 func init() {
 	var err error
 	port := utils.GetRandomAvailableTCPPort()
-	serverUrl, err = sfweb.NewSyntaxFlowWebServer(context.Background(), false, "127.0.0.1", port, true)
+	serverUrl, err = sfweb.NewSyntaxFlowWebServer(context.Background(), sfweb.WithHost("127.0.0.1"), sfweb.WithPort(port), sfweb.WithHttps(false), sfweb.WithDebug(true), sfweb.WithChatGLMAPIKey(os.Getenv("CHATGLM_API_KEY")))
 	if err != nil {
 		panic(err)
 	}
