@@ -53,7 +53,7 @@ var mysqlAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "mysql",
 	DefaultPorts:     "3306",
 	DefaultUsernames: []string{"mysql", "root", "guest", "op", "ops"},
-	DefaultPasswords: CommonPasswords,
+	DefaultPasswords: append(CommonPasswords, ""),
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 3306)
 		res := i.Result()
