@@ -131,7 +131,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 		switch typ.GetTypeKind() {
 		case ssa.SliceTypeKind, ssa.BytesTypeKind:
 			if len(kvs) == 0 {
-				return b.CreateInterfaceWithMap(nil, nil)
+				return b.CreateObjectWithMap(nil, nil)
 			}
 			if kvs[0].value != nil {
 				return kvs[0].value
@@ -147,7 +147,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				})
 		case ssa.MapTypeKind:
 			if len(kvs) == 0 {
-				return b.CreateInterfaceWithMap(nil, nil)
+				return b.CreateObjectWithMap(nil, nil)
 			}
 			if kvs[0].value != nil {
 				return kvs[0].value
@@ -162,7 +162,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				})
 		case ssa.StructTypeKind:
 			if len(kvs) == 0 {
-				return b.CreateInterfaceWithMap(nil, nil)
+				return b.CreateObjectWithMap(nil, nil)
 			}
 			if kvs[0].value != nil {
 				return kvs[0].value

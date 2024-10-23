@@ -761,7 +761,7 @@ func (b *astbuilder) buildOptionalChainExpression(stmt *JS.OptionalChainExpressi
 	if left {
 		return nil, b.CreateMemberCallVariable(expr, index)
 	} else {
-		return b.ReadMemberCallVariable(expr, index), nil
+		return b.ReadMemberCallValue(expr, index), nil
 	}
 }
 
@@ -998,7 +998,7 @@ func (b *astbuilder) buildMemberIndexExpression(stmt *JS.MemberIndexExpressionCo
 	if s := stmt.SingleExpression(1); s != nil {
 		value, _ = b.buildSingleExpression(s, false)
 	}
-	return b.ReadMemberCallVariable(expr, value), nil
+	return b.ReadMemberCallValue(expr, value), nil
 }
 
 func (b *astbuilder) buildChainExpression(stmt *JS.ChainExpressionContext, IsValue bool) (ssa.Value, *ssa.Variable) {
@@ -1023,7 +1023,7 @@ func (b *astbuilder) buildChainExpression(stmt *JS.ChainExpressionContext, IsVal
 		variable := b.CreateMemberCallVariable(expr, index)
 		return nil, variable
 	}
-	return b.ReadMemberCallVariable(expr, index), nil
+	return b.ReadMemberCallValue(expr, index), nil
 }
 
 func (b *astbuilder) buildArrayLiteral(stmt *JS.ArrayLiteralContext) ssa.Value {
@@ -1045,7 +1045,7 @@ func (b *astbuilder) buildArrayLiteral(stmt *JS.ArrayLiteralContext) ssa.Value {
 		}
 	}
 
-	return b.CreateInterfaceWithSlice(value)
+	return b.CreateObjectWithSlice(value)
 }
 
 func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value {
@@ -1164,10 +1164,10 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 	}
 
 	if len(keys) == 0 {
-		return b.CreateInterfaceWithSlice(value)
+		return b.CreateObjectWithSlice(value)
 	}
 
-	return b.CreateInterfaceWithMap(keys, value)
+	return b.CreateObjectWithMap(keys, value)
 }
 
 func (b *astbuilder) buildPropertyName(stmt *JS.PropertyNameContext) ssa.Value {
