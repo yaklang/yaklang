@@ -197,9 +197,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		c.CurrentMethod = method
 		funcCtx := c.FuncCtx
 		funcCtx.FunctionName = name
-		if name != "isAssignableToAnyOf" {
-			continue
-		}
+		//if name != "isAssignableToAnyOf" {
+		//	continue
+		//}
 		println(name)
 		funcCtx.FunctionType = c.MethodType
 		for _, attribute := range method.Attributes {
