@@ -243,7 +243,7 @@ func CheckSyntaxFlowLanguage(languageRaw string) (consts.Language, error) {
 		return consts.PHP, nil
 	case "js", "es", "javascript", "ecmascript", "nodejs", "node", "node.js":
 		return consts.JS, nil
-	case "go":
+	case "golang":
 		return consts.GO, nil
 	}
 	return "", utils.Errorf("invalid language: %v is not supported yet", languageRaw)
