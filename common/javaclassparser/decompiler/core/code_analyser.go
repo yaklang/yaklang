@@ -306,7 +306,19 @@ func (d *Decompiler) ParseStatement() error {
 		switch opcode.Instr.OpCode {
 		case OP_ALOAD, OP_ILOAD, OP_LLOAD, OP_DLOAD, OP_FLOAD, OP_ALOAD_0, OP_ILOAD_0, OP_LLOAD_0, OP_DLOAD_0, OP_FLOAD_0, OP_ALOAD_1, OP_ILOAD_1, OP_LLOAD_1, OP_DLOAD_1, OP_FLOAD_1, OP_ALOAD_2, OP_ILOAD_2, OP_LLOAD_2, OP_DLOAD_2, OP_FLOAD_2, OP_ALOAD_3, OP_ILOAD_3, OP_LLOAD_3, OP_DLOAD_3, OP_FLOAD_3:
 			//varTable = append(varTable, runtimeStackSimulation.Pop())
-			slot := GetRetrieveIdx(opcode)
+			var slot int = -1
+			switch opcode.Instr.OpCode {
+			case OP_ALOAD_0, OP_ILOAD_0, OP_LLOAD_0, OP_DLOAD_0, OP_FLOAD_0:
+				slot = 0
+			case OP_ALOAD_1, OP_ILOAD_1, OP_LLOAD_1, OP_DLOAD_1, OP_FLOAD_1:
+				slot = 1
+			case OP_ALOAD_2, OP_ILOAD_2, OP_LLOAD_2, OP_DLOAD_2, OP_FLOAD_2:
+				slot = 2
+			case OP_ALOAD_3, OP_ILOAD_3, OP_LLOAD_3, OP_DLOAD_3, OP_FLOAD_3:
+				slot = 3
+			default:
+				slot = GetRetrieveIdx(opcode)
+			}
 			runtimeStackSimulation.Push(d.GetVar(slot))
 			////return mkRetrieve(variableFactory);
 		case OP_ACONST_NULL:
