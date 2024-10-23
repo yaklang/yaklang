@@ -77,6 +77,42 @@ func (prog *Program) TryGetSimilarityKey(name, key string) string {
 	return ret
 }
 
+func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) Value {
+	// write to extern Lib
+	name := getExternLibMemberCall(extern, key)
+	// read from scope, if assign to this library-value, return this value
+	if ret := b.PeekValueInThisFunction(name); ret != nil {
+		return ret
+	}
+
+	// try build field
+	if ret := extern.BuildField(key.String()); ret != nil {
+		// set program offsetMap for extern value
+		b.GetProgram().SetOffsetValue(ret, b.CurrentRange)
+
+		// create variable for extern value
+		variable := ret.GetVariable(name)
+		if variable == nil {
+			ret.AddVariable(b.CreateMemberCallVariable(extern, key))
+		} else {
+			variable.AddRange(b.CurrentRange, true)
+		}
+
+		// set member call
+		setMemberCallRelationship(extern, key, ret)
+		return ret
+	}
+
+	// handler
+	// want := b.TryGetSimilarityKey(pa.GetName(), ci.String())
+	want := b.TryGetSimilarityKey(extern.GetName(), key.String())
+	b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), key.String(), want))
+	un := b.EmitUndefined(name)
+	un.SetExtern(true)
+	setMemberCallRelationship(extern, key, un)
+	return un
+}
+
 func (prog *Program) TryBuildExternValue(b *FunctionBuilder, id string) Value {
 	getExternValue := func(id string) Value {
 		if v, ok := prog.cacheExternInstance[id]; ok {

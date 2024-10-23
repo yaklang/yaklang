@@ -679,7 +679,7 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 				length = it.Len
 				if len(leftVariables) == length {
 					for i := range leftVariables {
-						value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+						value := b.ReadMemberCallValue(c, b.EmitConstInst(i))
 						b.AssignVariable(leftVariables[i], value)
 					}
 					return
@@ -689,7 +689,7 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 				for i := range leftVariables {
 					b.AssignVariable(
 						leftVariables[i],
-						b.ReadMemberCallVariable(c, b.EmitConstInst(i)),
+						b.ReadMemberCallValue(c, b.EmitConstInst(i)),
 					)
 				}
 				return
@@ -719,7 +719,7 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 					continue
 				}
 				// this call type is tuple type, can read member
-				value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+				value := b.ReadMemberCallValue(c, b.EmitConstInst(i))
 				b.AssignVariable(leftVariables[i], value)
 			}
 			return
@@ -773,13 +773,13 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 			}
 
 			for i, variable := range leftVariables {
-				idxVar := b.ReadMemberCallVariable(inter, b.EmitConstInst(i))
+				idxVar := b.ReadMemberCallValue(inter, b.EmitConstInst(i))
 				b.AssignVariable(variable, idxVar)
 			}
 		case leftLen == 1:
 			// (1) = (n)
 			// (1) = interface(n)
-			_interface := b.CreateInterfaceWithSlice(rightValue)
+			_interface := b.CreateObjectWithSlice(rightValue)
 			// lvalues[0].Assign(_interface)
 			b.AssignVariable(leftVariables[0], _interface)
 		default:
@@ -1027,14 +1027,14 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		exprx := b.buildExpression(expr)
 		if id := s.Identifier(); id != nil {
 			idText := id.GetText()
-			return b.ReadMemberCallVariable(exprx, b.EmitConstInst(idText))
+			return b.ReadMemberCallValue(exprx, b.EmitConstInst(idText))
 		} else if id := s.IdentifierWithDollar(); id != nil {
 			key := b.ReadValue(id.GetText()[1:])
 			if key == nil {
 				b.NewError(ssa.Error, TAG, ExpressionNotVariable(id.GetText()))
 				return nil
 			}
-			return b.ReadMemberCallVariable(exprx, key)
+			return b.ReadMemberCallValue(exprx, key)
 		}
 	}
 
@@ -1047,7 +1047,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		expr := b.buildExpression(expression)
 		keys := b.buildSliceCall(s)
 		if len(keys) == 1 {
-			return b.ReadMemberCallVariable(expr, keys[0])
+			return b.ReadMemberCallValue(expr, keys[0])
 		} else if len(keys) == 2 {
 			return b.EmitMakeSlice(expr, keys[0], keys[1], nil)
 		} else if len(keys) == 3 {
