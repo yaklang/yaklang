@@ -1,0 +1,143 @@
+desc(
+    title: 'FastJson Security Checking',
+    title_zh: 'FastJson 安全检查',
+    type: vuln,
+)
+
+__dependency__.*alibaba*fastjson.version as $ver;
+$ver in (,1.2.83) as $vulnerable;
+check $vulnerable;
+
+FastJsonHttpMessageConverter()?{<getCall><getCaller><name>?{have: '.add'}} as $config;
+alert $config for {
+    message_zh: "FastJson 配置类中使用了 FastJsonHttpMessageConverter",
+    message: "FastJson configuration class uses FastJsonHttpMessageConverter"
+};
+
+// 检查 FastJson 的 parseObject 方法
+JSON?{<typeName>?{have: 'alibaba'}}.parse*(,* as $dataSource) as $parseObjectCall;
+alert $parseObjectCall for {
+    message_zh: "FastJson 使用了不安全的 parseObject/parse 方法",
+    message: "FastJson uses the unsafe parseObject/parse method"
+};
+<include('java-spring-param')> as $entry;
+<include('java-servlet-param')> as $entry;
+$entry -{
+    until: <<<CODE
+* & $dataSource <var(reachable)> as $__next__
+CODE
+}->;
+alert $reachable for {
+    message_zh: "FastJson 使用了不安全的 parseObject/parse 方法(Springboot / Servlet参数可达)",
+    message: "FastJson uses the unsafe parseObject/parse method (parameter reachable)"
+};
+
+desc(
+lang: java,
+alert_min: 3,
+"file://pom.xml": <<<POM
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>unsafe-fastjson-demo</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.5.5</version>
+    </parent>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- FastJSON 依赖 - 使用不安全的旧版本 -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.24</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+POM,
+'file://config.java': <<<CONFIG
+import com.alibaba.fastjson.support.config.FastJsonConfig;
+import com.alibaba.fastjson.support.spring.FastJsonHttpMessageConverter;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.util.List;
+
+@Configuration
+public class FastJsonConfig implements WebMvcConfigurer {
+
+    @Override
+    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
+        FastJsonHttpMessageConverter fastConverter = new FastJsonHttpMessageConverter();
+        FastJsonConfig fastJsonConfig = new FastJsonConfig();
+        fastJsonConfig.setDateFormat("yyyy-MM-dd HH:mm:ss");
+        fastConverter.setFastJsonConfig(fastJsonConfig);
+        converters.add(0, fastConverter);
+    }
+}
+CONFIG,
+'file://controller.java': <<<CONTROLLER
+package com.example.fastjsondemo.controller;
+
+import com.alibaba.fastjson.JSON;
+import com.example.fastjsondemo.model.User;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api")
+public class UserController {
+
+    @PostMapping("/user")
+    public User createUser(@RequestBody String jsonString) {
+        // 使用 FastJSON 将 JSON 字符串解析为 User 对象
+        User user = JSON.parseObject(jsonString, User.class);
+        System.out.println("Received user: " + user);
+        return user;
+    }
+
+    @GetMapping("/user")
+    public String getUser() {
+        // 创建一个 User 对象并将其转换为 JSON 字符串
+        User user = new User("John", 30);
+        String jsonString = JSON.toJSONString(user);
+        System.out.println("Generated JSON: " + jsonString);
+        return jsonString;
+    }
+}
+CONTROLLER
+)
