@@ -1919,7 +1919,7 @@ func TestGRPCMUSTTPASS_MITM_GM_Prefer(t *testing.T) {
 		})
 	}, func(stream ypb.Yak_MITMClient) {
 		defer cancel()
-		rsp, _, err := poc.DoGET((GMTLSTarget), poc.WithProxy(proxy))
+		rsp, _, err := poc.DoGET((GMTLSTarget), poc.WithProxy(proxy), poc.WithSave(false))
 		require.NoError(t, err)
 		require.Equal(t, rsp.GetStatusCode(), 200)
 
@@ -1928,4 +1928,72 @@ func TestGRPCMUSTTPASS_MITM_GM_Prefer(t *testing.T) {
 		require.Equal(t, rsp.GetStatusCode(), 200)
 	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
 	})
+}
+
+func TestGRPCMUSTPASS_RuleExtractedData(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+
+	token := utils.RandStringBytes(10)
+
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+			"Content-Length:0\r\n\r\n"))
+	})
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host:        mitmHost,
+			Port:        uint32(mitmPort),
+			EnableGMTLS: true,
+			PreferGMTLS: true,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			SetContentReplacers: true,
+			Replacers: []*ypb.MITMContentReplacer{
+				{
+					Rule:             token,
+					NoReplace:        true,
+					Result:           ``,
+					Color:            "",
+					EnableForRequest: true,
+					EnableForHeader:  true,
+					EnableForBody:    true,
+					Index:            0,
+					ExtraTag:         []string{"example"},
+					Disabled:         false,
+					VerboseName:      "",
+				},
+			},
+		})
+		time.Sleep(3 * time.Second)
+		defer cancel()
+		requestBytes := []byte(fmt.Sprintf(`GET /%s HTTP/1.1
+Host: %s:%d
+`, token, host, port))
+		req, err := lowhttp.ParseBytesToHttpRequest(requestBytes)
+		require.NoError(t, err)
+		rsp, _, err := poc.HTTP(req, poc.WithProxy(proxy), poc.WithSave(false))
+		require.NoError(t, err)
+		require.Equal(t, lowhttp.GetStatusCodeFromResponse(rsp), 200)
+		flows, err := QueryHTTPFlows(ctx, client, &ypb.QueryHTTPFlowRequest{
+			Keyword: token,
+		}, 1)
+		require.NoError(t, err)
+		require.Len(t, flows.GetData(), 1)
+
+		flow := flows.Data[0]
+
+		data, err := client.QueryMITMRuleExtractedData(ctx, &ypb.QueryMITMRuleExtractedDataRequest{
+			HTTPFlowHiddenIndex: flow.HiddenIndex,
+		})
+		require.NoError(t, err)
+		require.Len(t, data.GetData(), 1)
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+
+	})
+
 }
