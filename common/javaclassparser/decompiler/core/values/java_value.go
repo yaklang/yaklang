@@ -7,19 +7,26 @@ import (
 )
 
 type JavaRef struct {
-	Id       int
-	StackVar JavaValue
-	IsThis   bool
-	JavaType types.JavaType
+	Id          int
+	StackVar    JavaValue
+	CustomValue *CustomValue
+	IsThis      bool
+	JavaType    types.JavaType
 }
 
 func (j *JavaRef) Type() types.JavaType {
+	if j == nil {
+		println()
+	}
 	return j.JavaType
 }
 
 func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
 	if j.IsThis {
 		return "this"
+	}
+	if j.CustomValue != nil {
+		return j.CustomValue.String(funcCtx)
 	}
 	if j.StackVar != nil {
 		return j.StackVar.String(funcCtx)
@@ -52,7 +59,7 @@ func NewJavaArray(class *types.JavaClass, length JavaValue) *JavaArray {
 	return &JavaArray{
 		Class:    class,
 		Length:   length,
-		JavaType: types.NewJavaArrayType(class, length),
+		JavaType: types.NewJavaArrayType(class),
 	}
 }
 
@@ -66,6 +73,14 @@ func (j *JavaLiteral) Type() types.JavaType {
 }
 
 func (j *JavaLiteral) String(funcCtx *class_context.ClassContext) string {
+	if j.JavaType.String(funcCtx) == types.NewJavaPrimer(types.JavaBoolean).String(funcCtx) {
+		if v, ok := j.Data.(int); ok {
+			if v == 0 {
+				return "false"
+			}
+			return "true"
+		}
+	}
 	if j.JavaType.String(funcCtx) == "java.lang.String" || j.JavaType.String(funcCtx) == "String" {
 		return fmt.Sprintf(`"%s"`, j.Data)
 	} else {
@@ -80,11 +95,24 @@ func NewJavaLiteral(data any, typ types.JavaType) *JavaLiteral {
 	}
 }
 
+type JavaClassValue struct {
+	types.JavaType
+}
+
+func (j *JavaClassValue) Type() types.JavaType {
+	return j.JavaType
+}
+func NewJavaClassValue(typ types.JavaType) *JavaClassValue {
+	return &JavaClassValue{
+		JavaType: typ,
+	}
+}
+
 type JavaClassMember struct {
 	Name        string
 	Member      string
 	Description string
-	JavaType    *types.JavaFuncType
+	JavaType    types.JavaType
 }
 
 func (j *JavaClassMember) Type() types.JavaType {
@@ -99,17 +127,17 @@ func (j *JavaClassMember) String(funcCtx *class_context.ClassContext) string {
 	name := funcCtx.ShortTypeName(j.Name)
 	return fmt.Sprintf("%s.%s", name, j.Member)
 }
-func NewJavaClassMember(typeName, member, desc string) *JavaClassMember {
+func NewJavaClassMember(typeName, member string, typ types.JavaType) *JavaClassMember {
 	return &JavaClassMember{
-		Name:        typeName,
-		Member:      member,
-		Description: desc,
+		Name:     typeName,
+		Member:   member,
+		JavaType: typ,
 	}
 }
 
 type RefMember struct {
 	Member   string
-	Id       int
+	Object   JavaValue
 	JavaType types.JavaType
 }
 
@@ -117,10 +145,10 @@ func (j *RefMember) Type() types.JavaType {
 	return j.JavaType
 }
 
-func NewRefMember(id int, member string, typ types.JavaType) *RefMember {
+func NewRefMember(object JavaValue, member string, typ types.JavaType) *RefMember {
 	return &RefMember{
 		Member:   member,
-		Id:       id,
+		Object:   object,
 		JavaType: typ,
 	}
 }
@@ -131,7 +159,7 @@ type JavaArrayMember struct {
 }
 
 func (j *JavaArrayMember) Type() types.JavaType {
-	return j.Object.Type().(*types.JavaArrayType).JavaType
+	return j.Object.Type().ElementType()
 }
 func (j *JavaArrayMember) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("%s[%v]", j.Object.String(funcCtx), j.Index.String(funcCtx))
@@ -145,8 +173,24 @@ func NewJavaArrayMember(object JavaValue, index JavaValue) *JavaArrayMember {
 }
 
 func (j *RefMember) String(funcCtx *class_context.ClassContext) string {
-	if j.Id == 0 {
-		return j.Member
-	}
-	return fmt.Sprintf("var%d.%s", j.Id, j.Member)
+	//if j.Id == 0 {
+	//	return j.Member
+	//}
+	return fmt.Sprintf("%s.%s", j.Object.String(funcCtx), j.Member)
 }
+
+type javaNull struct {
+}
+
+func (j javaNull) Type() types.JavaType {
+	return types.NewJavaPrimer(types.JavaVoid)
+}
+
+func (j javaNull) String(funcCtx *class_context.ClassContext) string {
+	return "null"
+}
+
+func (j javaNull) IsJavaType() {
+}
+
+var JavaNull = javaNull{}

@@ -10,13 +10,14 @@ import (
 )
 
 type StatementManager struct {
-	currentNodeId int
-	RootNode      *core.Node
-	PreNode       *core.Node
-	idToNode      map[int]*core.Node
-	CirclePoint   []*core.Node
+	currentNodeId    int
+	RootNode         *core.Node
+	PreNode          *core.Node
+	idToNode         map[int]*core.Node
+	CircleEntryPoint []*core.Node
 	//MergePoint      []*core.Node
 	IfNodes           []*core.Node
+	RepeatNodeMap     map[*core.Node]*core.Node
 	FinalActions      []func() error
 	LoopOccupiedNodes *utils.Set[*core.Node]
 
@@ -37,6 +38,7 @@ func NewRootStatementManager(node *core.Node) *StatementManager {
 		RootNode:          node,
 		idToNode:          map[int]*core.Node{},
 		LoopOccupiedNodes: utils.NewSet[*core.Node](),
+		RepeatNodeMap:     map[*core.Node]*core.Node{},
 	}
 	manager.generateIdToNodeMap()
 	return manager
@@ -188,6 +190,8 @@ func (s *StatementManager) generateIdToNodeMap() {
 type NodeExtInfo struct {
 	PreNodeRoute    *NodeRoute
 	AllPreNodeRoute []*NodeRoute
+	AllCircleRoute  []*NodeRoute
+	CircleRoute     *utils.Set[*core.Node]
 }
 type Block struct {
 	StartNode *core.Node
@@ -249,10 +253,23 @@ func (s *StatementManager) ScanCoreInfo() error {
 			current := stack.Pop()
 			getNodeInfo(current).AllPreNodeRoute = append(getNodeInfo(current).AllPreNodeRoute, subNodeRoute)
 			if m, ok := getNodeInfo(node).PreNodeRoute.Has(current); ok {
-				current.IsCircle = true
+				getNodeInfo(node).AllCircleRoute = append(getNodeInfo(node).AllCircleRoute, subNodeRoute)
+				route, _ := getNodeInfo(node).PreNodeRoute.HasPre(current)
+				if v := getNodeInfo(current).CircleRoute; v != nil {
+					getNodeInfo(current).CircleRoute = v.Or(route)
+				} else {
+					getNodeInfo(current).CircleRoute = route
+					core.WalkGraph[*core.Node](current, func(node *core.Node) ([]*core.Node, error) {
+						route.Add(node)
+						if len(node.Next) > 1 {
+							return nil, nil
+						}
+						return node.Next, nil
+					})
+				}
 				circleNodes = append(circleNodes, current)
 				_ = m
-				//continue
+				continue
 			}
 			skip := len(getNodeInfo(current).AllPreNodeRoute) > 1
 			getNodeInfo(node).PreNodeRoute.Add(current)
@@ -307,35 +324,29 @@ func (s *StatementManager) ScanCoreInfo() error {
 	//for _, node := range circleNodes {
 	//	node := node
 	//	node.InCircle = func(n *core.Node) bool {
-	//		return CheckIsPreNode(getNodeInfo, node.OutPointMergeNode, n) && !CheckIsPreNode(getNodeInfo, node, n)
+	//		return CheckIsPreNode(getNodeInfo, node.LoopEndNode, n) && !CheckIsPreNode(getNodeInfo, node, n)
 	//	}
 	//}
+	loopEndNodeMap := map[*core.Node]*core.Node{}
 	for _, circleNodeEntry := range circleNodes {
 		outPointMap := map[*core.Node]*core.Node{}
-		circleNodeEntry.CircleNodesSet = utils.NewSet[*core.Node]()
-		inCircleSource := []*core.Node{}
-		for _, node := range circleNodeEntry.Source {
-			for _, n := range circleNodeEntry.Next {
-				if CheckIsPreNode(getNodeInfo, node, n) {
-					inCircleSource = append(inCircleSource, node)
-					break
-				}
-			}
-		}
-
+		circleNodeEntry.CircleNodesSet = getNodeInfo(circleNodeEntry).CircleRoute
 		core.WalkGraph(circleNodeEntry, func(node *core.Node) ([]*core.Node, error) {
 			next := funk.Filter(node.Next, func(n *core.Node) bool {
-				var isInCircle bool
-				for _, node := range inCircleSource {
-					for _, route := range getNodeInfo(node).AllPreNodeRoute {
-						if _, ok := route.Has(n); ok {
-							isInCircle = true
-						}
-					}
-					if isInCircle {
-						break
-					}
+				isInCircle := circleNodeEntry.CircleNodesSet.Has(n)
+				//if ok := getNodeInfo(circleNodeEntry).CircleRoute.ChildrenHas(n); ok {
+				//	isInCircle = true
+				//	//break
+				//}
+				if n == circleNodeEntry {
+					isInCircle = true
 				}
+				//for _, route := range getNodeInfo(circleNodeEntry).AllCircleRoute {
+				//	if ok := route.ChildrenHas(n); ok {
+				//		isInCircle = true
+				//		break
+				//	}
+				//}
 				if !isInCircle {
 					outPointMap[node] = n
 					//outPoint = append(outPoint, n)
@@ -387,6 +398,9 @@ func (s *StatementManager) ScanCoreInfo() error {
 			return errors.New("invalid circle")
 		}
 		for c, _ := range outPointMap {
+			if _, ok := c.Statement.(*statements.ConditionStatement); !ok {
+				return errors.New("invalid circle")
+			}
 			circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, c)
 		}
 		//var outPointMergeNode *core.Node
@@ -403,12 +417,40 @@ func (s *StatementManager) ScanCoreInfo() error {
 		//if outPointMergeNode == nil {
 		//	return utils.Errorf("found circle break node from code graph failed, circle start node id: %d", circleNodeEntry.Id)
 		//}
-		circleNodeEntry.OutPointMergeNode = mergeNode
+		loopEndNodeMap[mergeNode] = mergeNode
+		circleNodeEntry.GetLoopEndNode = func() *core.Node {
+			return loopEndNodeMap[mergeNode]
+		}
+		circleNodeEntry.SetLoopEndNode = func(node1, node2 *core.Node) {
+			loopEndNodeMap[node1] = node2
+		}
+		breakNodeSet := utils.NewSet[*core.Node]()
+		var walkParent func(node *core.Node) bool
+		for _, mergeSource := range mergeNode.Source {
+			walkParent = func(node *core.Node) bool {
+				if node == nil {
+					return false
+				}
+				if _, ok := outPointMap[node]; ok {
+					return true
+				}
+				for _, route := range getNodeInfo(node).AllPreNodeRoute {
+					if _, ok := outPointMap[route.ConditionNode]; ok {
+						return true
+					} else {
+						return walkParent(route.ConditionNode)
+					}
+				}
+				return false
+			}
+			if walkParent(mergeSource) {
+				breakNodeSet.Add(mergeSource)
+			}
+		}
+		circleNodeEntry.BreakNode = breakNodeSet.List()
 	}
-	s.CirclePoint = circleNodes
-	s.IfNodes = funk.Filter(ifNodes, func(item *core.Node) bool {
-		return item.IsIf && item.IsCircle == false
-	}).([]*core.Node)
+	s.CircleEntryPoint = circleNodes
+	s.IfNodes = ifNodes
 	//for _, node := range s.IfNodes {
 	//	if node.MergeNode == nil {
 	//		return utils.Errorf("if node merge node is nil, node id: %d", node.Id)

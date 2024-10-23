@@ -14,12 +14,62 @@ const (
 )
 
 type JavaType interface {
+	javaType
+	ResetType(t JavaType)
+	IsArray() bool
+	ElementType() JavaType
+	ArrayDim() int
+	FunctionType() *JavaFuncType
+	RawType() javaType
+}
+
+type JavaTypeWrap struct {
+	javaType
+}
+
+func (j *JavaTypeWrap) ArrayDim() int {
+	v, ok := j.javaType.(*JavaArrayType)
+	if ok {
+		return v.Dim
+	}
+	return 0
+}
+func (j *JavaTypeWrap) RawType() javaType {
+	return j.javaType
+}
+func (j *JavaTypeWrap) FunctionType() *JavaFuncType {
+	v, ok := j.javaType.(*JavaFuncType)
+	if ok {
+		return v
+	}
+	return nil
+}
+func (j *JavaTypeWrap) IsArray() bool {
+	_, ok := j.javaType.(*JavaArrayType)
+	return ok
+}
+func (j *JavaTypeWrap) ElementType() JavaType {
+	v, ok := j.javaType.(*JavaArrayType)
+	if ok {
+		return v.JavaType
+	}
+	return nil
+}
+func (j *JavaTypeWrap) ResetType(t JavaType) {
+	j.javaType = t.RawType()
+}
+func newJavaTypeWrap(t javaType) *JavaTypeWrap {
+	return &JavaTypeWrap{
+		javaType: t,
+	}
+}
+
+type javaType interface {
 	String(funcCtx *class_context.ClassContext) string
 	IsJavaType()
 }
 
-var _ JavaType = &JavaClass{}
-var _ JavaType = &JavaPrimer{}
-var _ JavaType = &JavaArrayType{}
-var _ JavaType = &javaNull{}
-var _ JavaType = &JavaFuncType{}
+var _ javaType = &JavaClass{}
+var _ javaType = &JavaPrimer{}
+var _ javaType = &JavaArrayType{}
+var _ javaType = &JavaFuncType{}

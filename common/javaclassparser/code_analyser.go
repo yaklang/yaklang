@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 )
 
@@ -42,7 +43,11 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	convertMemberInfo := func(classMemberInfo *ConstantMemberrefInfo) values.JavaValue {
 		className := getClassName(classMemberInfo.ClassIndex)
 		name, desc := getNameAndType(pool, classMemberInfo.NameAndTypeIndex)
-		return values.NewJavaClassMember(className, name, desc)
+		typ, err := types.ParseMethodDescriptor(desc)
+		if err != nil {
+			log.Errorf("parse descriptor failed:%s", desc)
+		}
+		return values.NewJavaClassMember(className, name, typ)
 	}
 	switch ret := constant.(type) {
 	case *ConstantMemberrefInfo:
@@ -59,7 +64,11 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
-		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value)
+		typ, err := types.ParseDescriptor(descInfo.Value)
+		if err != nil {
+			log.Errorf("parse descriptor failed:%s", descInfo.Value)
+		}
+		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, typ)
 		return classIns
 	case *ConstantMethodrefInfo:
 		classInfo := indexFromPool(int(ret.ClassIndex)).(*ConstantClassInfo)
@@ -70,26 +79,34 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
-		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value)
+		typ, err := types.ParseMethodDescriptor(descInfo.Value)
+		if err != nil {
+			log.Errorf("parse descriptor failed:%s", descInfo.Value)
+		}
+		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, typ)
 		return classIns
 	case *ConstantClassInfo:
 		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
-		return types.NewJavaClass(typeName)
+		return values.NewJavaClassValue(types.NewJavaClass(typeName))
 	default:
 		panic("failed")
 	}
 }
-func GetLiteralFromCP(pool []ConstantInfo, index int) *values.JavaLiteral {
+func GetLiteralFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	constant := pool[index-1]
 	switch ret := constant.(type) {
 	case *ConstantStringInfo:
-		return values.NewJavaLiteral(pool[ret.StringIndex-1].(*ConstantUtf8Info).Value, types.JavaString)
+		return values.NewJavaLiteral(pool[ret.StringIndex-1].(*ConstantUtf8Info).Value, types.NewJavaPrimer(types.JavaString))
 	case *ConstantLongInfo:
-		return values.NewJavaLiteral(ret.Value, types.JavaLong)
+		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaLong))
 	case *ConstantIntegerInfo:
-		return values.NewJavaLiteral(ret.Value, types.JavaInteger)
+		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaInteger))
+	case *ConstantDoubleInfo:
+		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaDouble))
+	case *ConstantClassInfo:
+		return GetValueFromCP(pool, index)
 	default:
 		panic("failed")
 	}
@@ -105,9 +122,10 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute) ([]state
 	parser := core.NewDecompiler(codeAttr.Code, func(id int) values.JavaValue {
 		return GetValueFromCP(dumper.ConstantPool, id)
 	})
+	parser.FunctionContext = dumper.FuncCtx
 	parser.FunctionType = dumper.MethodType
 	//parser.FunctionContext.FunctionName
-	parser.ConstantPoolLiteralGetter = func(id int) *values.JavaLiteral {
+	parser.ConstantPoolLiteralGetter = func(id int) values.JavaValue {
 		return GetLiteralFromCP(dumper.ConstantPool, id)
 	}
 	parser.ConstantPoolInvokeDynamicInfo = func(index int) (string, string) {

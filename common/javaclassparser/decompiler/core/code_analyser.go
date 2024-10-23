@@ -25,7 +25,7 @@ type Decompiler struct {
 	OpCodeRoot                    *OpCode
 	RootNode                      *Node
 	constantPoolGetter            func(id int) values.JavaValue
-	ConstantPoolLiteralGetter     func(constantPoolGetterid int) *values.JavaLiteral
+	ConstantPoolLiteralGetter     func(constantPoolGetterid int) values.JavaValue
 	ConstantPoolInvokeDynamicInfo func(id int) (string, string)
 	offsetToOpcodeIndex           map[uint16]int
 	opcodeIndexToOffset           map[int]uint16
@@ -49,13 +49,11 @@ func (d *Decompiler) GetValueFromPool(index int) values.JavaValue {
 	return d.constantPoolGetter(index)
 }
 func (d *Decompiler) GetMethodFromPool(index int) *values.JavaClassMember {
-	val := d.constantPoolGetter(index).(*values.JavaClassMember)
-	typ, err := types.ParseMethodDescriptor(val.Description)
-	if err != nil {
-		log.Errorf("Error parsing descriptor: %s, error: %v", val.Description, err)
+	member := d.constantPoolGetter(index).(*values.JavaClassMember)
+	if member.Name == "addToAnnotationLists" {
+		println()
 	}
-	val.JavaType = typ
-	return val
+	return d.constantPoolGetter(index).(*values.JavaClassMember)
 }
 func (d *Decompiler) ParseOpcode() error {
 	defer func() {
@@ -121,8 +119,9 @@ func (d *Decompiler) ScanJmp() error {
 			visitNodeRecord.Add(opcode)
 			pre = opcode
 			switch opcode.Instr.OpCode {
-			case OP_RETURN:
+			case OP_RETURN, OP_IRETURN, OP_ARETURN, OP_LRETURN, OP_DRETURN, OP_FRETURN, OP_ATHROW:
 				opcode.Target = []*OpCode{endOp}
+				pre = nil
 			case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
 				gotoRaw := Convert2bytesToInt(opcode.Data)
 				gotoOp := d.offsetToOpcodeIndex[d.opcodeIndexToOffset[i]+gotoRaw]
@@ -218,6 +217,9 @@ func (d *Decompiler) AssignVar(slot int, typ values.JavaValue) (*values.JavaRef,
 	return ref, false
 }
 func (d *Decompiler) GetVar(slot int) *values.JavaRef {
+	if d.varTable[slot] == nil {
+		panic(fmt.Sprintf("slot %d is nil", slot))
+	}
 	return d.varTable[slot]
 }
 func (d *Decompiler) ParseStatement() error {
@@ -255,8 +257,8 @@ func (d *Decompiler) ParseStatement() error {
 	stackVarIndex := 0
 	mapCodeToStackVarIndex := map[*OpCode]int{}
 	assignStackVar := func(value values.JavaValue) {
-		//appendNode(NewStackAssignStatement(stackVarIndex, value))
 		ref := values.NewJavaRef(stackVarIndex, value.Type())
+		appendNode(statements.NewStackAssignStatement(stackVarIndex, ref))
 		ref.StackVar = value
 		runtimeStackSimulation.Push(ref)
 		stackVarIndex++
@@ -266,16 +268,28 @@ func (d *Decompiler) ParseStatement() error {
 		defer func() { lambdaIndex++ }()
 		return lambdaIndex
 	}
-	d.FunctionType.ParamTypes = append([]types.JavaType{types.NewJavaClass(d.FunctionContext.ClassName)}, d.FunctionType.ParamTypes...)
-	for i, paramType := range d.FunctionType.ParamTypes {
+	if !d.FunctionContext.IsStatic {
+		d.FunctionType.ParamTypes = append([]types.JavaType{types.NewJavaClass(d.FunctionContext.ClassName)}, d.FunctionType.ParamTypes...)
+	}
+
+	i := 0
+	for _, paramType := range d.FunctionType.ParamTypes {
 		assignStackVar(values.NewJavaRef(stackVarIndex, paramType))
 		d.AssignVar(i, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 			return ""
 		}, func() types.JavaType {
 			return paramType
 		}))
+		typStr := paramType.String(d.FunctionContext)
+		if typStr == types.NewJavaPrimer(types.JavaLong).String(d.FunctionContext) || typStr == types.NewJavaPrimer(types.JavaDouble).String(d.FunctionContext) {
+			i += 2
+		} else {
+			i++
+		}
 	}
-	d.GetVar(0).IsThis = true
+	if !d.FunctionContext.IsStatic {
+		d.GetVar(0).IsThis = true
+	}
 	//d.AssignVar(0, values.NewJavaRef(0,""))
 	checkAndConvertRef := func(value values.JavaValue) {
 		if _, ok := runtimeStackSimulation.Peek().(*values.JavaRef); !ok {
@@ -296,39 +310,39 @@ func (d *Decompiler) ParseStatement() error {
 			runtimeStackSimulation.Push(d.GetVar(slot))
 			////return mkRetrieve(variableFactory);
 		case OP_ACONST_NULL:
-			assignStackVar(values.NewJavaLiteral("null", types.JavaNull))
+			assignStackVar(values.NewJavaLiteral("null", types.NewJavaPrimer(types.JavaVoid)))
 		case OP_ICONST_M1:
-			assignStackVar(values.NewJavaLiteral(-1, types.JavaInteger))
+			assignStackVar(values.NewJavaLiteral(-1, types.NewJavaPrimer(types.JavaInteger)))
 		case OP_ICONST_0:
-			assignStackVar(values.NewJavaLiteral(0, types.JavaInteger))
+			assignStackVar(values.NewJavaLiteral(0, types.NewJavaPrimer(types.JavaInteger)))
 		case OP_ICONST_1:
-			assignStackVar(values.NewJavaLiteral(1, types.JavaInteger))
+			assignStackVar(values.NewJavaLiteral(1, types.NewJavaPrimer(types.JavaInteger)))
 		case OP_ICONST_2:
-			assignStackVar(values.NewJavaLiteral(2, types.JavaInteger))
+			assignStackVar(values.NewJavaLiteral(2, types.NewJavaPrimer(types.JavaInteger)))
 		case OP_ICONST_3:
-			assignStackVar(values.NewJavaLiteral(3, types.JavaInteger))
+			assignStackVar(values.NewJavaLiteral(3, types.NewJavaPrimer(types.JavaInteger)))
 		case OP_ICONST_4:
-			assignStackVar(values.NewJavaLiteral(4, types.JavaInteger))
+			assignStackVar(values.NewJavaLiteral(4, types.NewJavaPrimer(types.JavaInteger)))
 		case OP_ICONST_5:
-			assignStackVar(values.NewJavaLiteral(5, types.JavaInteger))
+			assignStackVar(values.NewJavaLiteral(5, types.NewJavaPrimer(types.JavaInteger)))
 		case OP_LCONST_0:
-			assignStackVar(values.NewJavaLiteral(int64(0), types.JavaLong))
+			assignStackVar(values.NewJavaLiteral(int64(0), types.NewJavaPrimer(types.JavaLong)))
 		case OP_LCONST_1:
-			assignStackVar(values.NewJavaLiteral(int64(1), types.JavaLong))
+			assignStackVar(values.NewJavaLiteral(int64(1), types.NewJavaPrimer(types.JavaLong)))
 		case OP_FCONST_0:
-			assignStackVar(values.NewJavaLiteral(float32(0), types.JavaFloat))
+			assignStackVar(values.NewJavaLiteral(float32(0), types.NewJavaPrimer(types.JavaFloat)))
 		case OP_FCONST_1:
-			assignStackVar(values.NewJavaLiteral(float32(1), types.JavaFloat))
+			assignStackVar(values.NewJavaLiteral(float32(1), types.NewJavaPrimer(types.JavaFloat)))
 		case OP_FCONST_2:
-			assignStackVar(values.NewJavaLiteral(float32(2), types.JavaFloat))
+			assignStackVar(values.NewJavaLiteral(float32(2), types.NewJavaPrimer(types.JavaFloat)))
 		case OP_DCONST_0:
-			assignStackVar(values.NewJavaLiteral(float64(0), types.JavaDouble))
+			assignStackVar(values.NewJavaLiteral(float64(0), types.NewJavaPrimer(types.JavaDouble)))
 		case OP_DCONST_1:
-			assignStackVar(values.NewJavaLiteral(float64(1), types.JavaDouble))
+			assignStackVar(values.NewJavaLiteral(float64(1), types.NewJavaPrimer(types.JavaDouble)))
 		case OP_BIPUSH:
-			assignStackVar(values.NewJavaLiteral(opcode.Data[0], types.JavaInteger))
+			assignStackVar(values.NewJavaLiteral(opcode.Data[0], types.NewJavaPrimer(types.JavaInteger)))
 		case OP_SIPUSH:
-			assignStackVar(values.NewJavaLiteral(Convert2bytesToInt(opcode.Data), types.JavaInteger))
+			assignStackVar(values.NewJavaLiteral(Convert2bytesToInt(opcode.Data), types.NewJavaPrimer(types.JavaInteger)))
 		case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE, OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0, OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1, OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2, OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3:
 			slot := GetStoreIdx(opcode)
 			value := runtimeStackSimulation.Pop().(values.JavaValue)
@@ -336,41 +350,45 @@ func (d *Decompiler) ParseStatement() error {
 			appendNode(statements.NewAssignStatement(ref, value, isFirst))
 		case OP_NEW:
 			n := Convert2bytesToInt(opcode.Data)
-			javaClass := d.constantPoolGetter(int(n)).(*types.JavaClass)
+			javaClass := d.constantPoolGetter(int(n)).(*values.JavaClassValue)
 			//runtimeStackSimulation.Push(javaClass)
-			runtimeStackSimulation.Push(values.NewNewExpression(javaClass))
+			runtimeStackSimulation.Push(values.NewNewExpression(javaClass.Type()))
 			//appendNode()
 		case OP_NEWARRAY:
 			length := runtimeStackSimulation.Pop().(values.JavaValue)
 			primerTypeName := types.GetPrimerArrayType(int(opcode.Data[0]))
-			runtimeStackSimulation.Push(values.NewNewArrayExpression(types.NewJavaArrayType(primerTypeName, length)))
+			runtimeStackSimulation.Push(values.NewNewArrayExpression(types.NewJavaArrayType(primerTypeName), length))
 		case OP_ANEWARRAY:
 			value := getConstantPoolValue(opcode)
 			length := runtimeStackSimulation.Pop().(values.JavaValue)
-			arrayType := types.NewJavaArrayType(value.(*types.JavaClass), length)
-			exp := values.NewNewArrayExpression(arrayType)
+			arrayType := types.NewJavaArrayType(value.(*values.JavaClassValue).Type())
+			exp := values.NewNewArrayExpression(arrayType, length)
 			runtimeStackSimulation.Push(exp)
 		case OP_MULTIANEWARRAY:
-			desc := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data[:2]))).(*types.JavaClass).Name
+			desc := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data[:2]))).(*values.JavaClassValue).Type().RawType().(*types.JavaClass).Name
 			dimensions := int(opcode.Data[2])
-			var lens []values.JavaValue
-			for _, d := range runtimeStackSimulation.PopN(dimensions) {
-				lens = append(lens, d.(values.JavaValue))
-			}
-			lens = funk.Reverse(lens).([]values.JavaValue)
 			typ, err := types.ParseDescriptor(desc)
 			if err != nil {
 				log.Errorf("parse type `%s` error: %s", desc, err)
 			}
-			typ.(*types.JavaArrayType).Length = utils.InterfaceToSliceInterface(lens)
-			exp := values.NewNewArrayExpression(typ)
+			var lens []values.JavaValue
+			for _, d := range runtimeStackSimulation.PopN(dimensions) {
+				lens = append(lens, d.(values.JavaValue))
+				typ = types.NewJavaArrayType(typ)
+			}
+			lens = funk.Reverse(lens).([]values.JavaValue)
+			exp := values.NewNewArrayExpression(typ, lens...)
 			runtimeStackSimulation.Push(exp)
 		case OP_ARRAYLENGTH:
-			ref := runtimeStackSimulation.Pop().(*values.JavaRef)
-			runtimeStackSimulation.Push(values.NewRefMember(ref.Id, "length", types.JavaInteger))
+			ref := runtimeStackSimulation.Pop().(values.JavaValue)
+			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				return fmt.Sprintf("%s.length", ref.String(funcCtx))
+			}, func() types.JavaType {
+				return types.NewJavaPrimer(types.JavaInteger)
+			}))
 		case OP_AALOAD, OP_IALOAD, OP_BALOAD, OP_CALOAD, OP_FALOAD, OP_LALOAD, OP_DALOAD, OP_SALOAD:
 			index := runtimeStackSimulation.Pop().(values.JavaValue)
-			ref := runtimeStackSimulation.Pop().(*values.JavaRef)
+			ref := runtimeStackSimulation.Pop().(values.JavaValue)
 			runtimeStackSimulation.Push(values.NewJavaArrayMember(ref, index))
 		case OP_AASTORE, OP_IASTORE, OP_BASTORE, OP_CASTORE, OP_FASTORE, OP_LASTORE, OP_DASTORE, OP_SASTORE:
 			value := runtimeStackSimulation.Pop().(values.JavaValue)
@@ -418,49 +436,49 @@ func (d *Decompiler) ParseStatement() error {
 			switch opcode.Instr.OpCode {
 			case OP_I2B:
 				fname = TypeCaseByte
-				typ = types.JavaByte
+				typ = types.NewJavaPrimer(types.JavaByte)
 			case OP_I2C:
 				fname = TypeCaseChar
-				typ = types.JavaChar
+				typ = types.NewJavaPrimer(types.JavaChar)
 			case OP_I2D:
 				fname = TypeCaseDouble
-				typ = types.JavaDouble
+				typ = types.NewJavaPrimer(types.JavaDouble)
 			case OP_I2F:
 				fname = TypeCaseFloat
-				typ = types.JavaFloat
+				typ = types.NewJavaPrimer(types.JavaFloat)
 			case OP_I2L:
 				fname = TypeCaseLong
-				typ = types.JavaLong
+				typ = types.NewJavaPrimer(types.JavaLong)
 			case OP_I2S:
 				fname = TypeCaseShort
-				typ = types.JavaShort
+				typ = types.NewJavaPrimer(types.JavaShort)
 			case OP_L2D:
 				fname = TypeCaseDouble
-				typ = types.JavaDouble
+				typ = types.NewJavaPrimer(types.JavaDouble)
 			case OP_L2F:
 				fname = TypeCaseFloat
-				typ = types.JavaFloat
+				typ = types.NewJavaPrimer(types.JavaFloat)
 			case OP_L2I:
 				fname = TypeCaseInt
-				typ = types.JavaInteger
+				typ = types.NewJavaPrimer(types.JavaInteger)
 			case OP_F2D:
 				fname = TypeCaseDouble
-				typ = types.JavaDouble
+				typ = types.NewJavaPrimer(types.JavaDouble)
 			case OP_F2I:
 				fname = TypeCaseInt
-				typ = types.JavaInteger
+				typ = types.NewJavaPrimer(types.JavaInteger)
 			case OP_F2L:
 				fname = TypeCaseLong
-				typ = types.JavaLong
+				typ = types.NewJavaPrimer(types.JavaLong)
 			case OP_D2F:
 				fname = TypeCaseFloat
-				typ = types.JavaFloat
+				typ = types.NewJavaPrimer(types.JavaFloat)
 			case OP_D2I:
 				fname = TypeCaseInt
-				typ = types.JavaInteger
+				typ = types.NewJavaPrimer(types.JavaInteger)
 			case OP_D2L:
 				fname = TypeCaseLong
-				typ = types.JavaLong
+				typ = types.NewJavaPrimer(types.JavaLong)
 			}
 			arg := runtimeStackSimulation.Pop().(values.JavaValue)
 			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
@@ -469,34 +487,39 @@ func (d *Decompiler) ParseStatement() error {
 				return typ
 			}))
 		case OP_INSTANCEOF:
-			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*types.JavaClass)
+			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*values.JavaClassValue).Type()
 			value := runtimeStackSimulation.Pop().(values.JavaValue)
 			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return fmt.Sprintf("%s instanceof %s", value.String(funcCtx), classInfo.String(funcCtx))
 			}, func() types.JavaType {
-				return types.JavaBoolean
+				return types.NewJavaPrimer(types.JavaBoolean)
 			}))
 		case OP_CHECKCAST:
-			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*types.JavaClass)
+			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*values.JavaClassValue).Type()
 			arg := runtimeStackSimulation.Pop().(values.JavaValue)
-			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+			value := values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return fmt.Sprintf("(%s)(%s)", classInfo.String(funcCtx), arg.String(funcCtx))
 			}, func() types.JavaType {
 				return classInfo
-			}))
+			})
+			ref := d.NewVar(value)
+			appendNode(statements.NewAssignStatement(ref, value, true))
+			runtimeStackSimulation.Push(ref)
 		case OP_INVOKESTATIC:
 			classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
 			methodName := classInfo.Member
-			funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType) // 不push到栈中
+			funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
 			//funcCallValue.JavaType = classInfo.JavaType
-			funcCallValue.Object = types.NewJavaClass(classInfo.Name)
+			funcCallValue.Object = values.NewJavaClassValue(types.NewJavaClass(classInfo.Name))
 			funcCallValue.IsStatic = true
 			for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 				funcCallValue.Arguments = append(funcCallValue.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
 			}
 			funcCallValue.Arguments = funk.Reverse(funcCallValue.Arguments).([]values.JavaValue)
-			if funcCallValue.FuncType.ReturnType.String(funcCtx) != types.JavaVoid.String(funcCtx) {
+			if funcCallValue.FuncType.ReturnType.String(funcCtx) != types.NewJavaPrimer(types.JavaVoid).String(funcCtx) {
 				runtimeStackSimulation.Push(funcCallValue)
+			} else {
+				appendNode(statements.NewExpressionStatement(funcCallValue))
 			}
 		case OP_INVOKEDYNAMIC:
 			_, desc := d.ConstantPoolInvokeDynamicInfo(int(Convert2bytesToInt(opcode.Data)))
@@ -505,18 +528,18 @@ func (d *Decompiler) ParseStatement() error {
 				panic(err)
 				return
 			}
-			runtimeStackSimulation.Push(values.NewLambdaFuncRef(getLambdaIndex(), typ.ReturnType))
+			runtimeStackSimulation.Push(values.NewLambdaFuncRef(getLambdaIndex(), typ.FunctionType().ReturnType))
 		case OP_INVOKESPECIAL:
 			classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
 			methodName := classInfo.Member
-			funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType) // 不push到栈中
+			funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
 			for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 				funcCallValue.Arguments = append(funcCallValue.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
 			}
 			funcCallValue.Arguments = funk.Reverse(funcCallValue.Arguments).([]values.JavaValue)
 
 			funcCallValue.Object = runtimeStackSimulation.Pop().(values.JavaValue)
-			if funcCallValue.FuncType.ReturnType.String(funcCtx) != types.JavaVoid.String(funcCtx) {
+			if funcCallValue.FuncType.ReturnType.String(funcCtx) != types.NewJavaPrimer(types.JavaVoid).String(funcCtx) {
 				runtimeStackSimulation.Push(funcCallValue)
 			} else {
 				var skip bool
@@ -549,13 +572,13 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_INVOKEINTERFACE:
 			classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
 			methodName := classInfo.Member
-			funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType) // 不push到栈中
+			funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
 			for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 				funcCallValue.Arguments = append(funcCallValue.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
 			}
 			funcCallValue.Arguments = funk.Reverse(funcCallValue.Arguments).([]values.JavaValue)
 			funcCallValue.Object = runtimeStackSimulation.Pop().(values.JavaValue)
-			if funcCallValue.FuncType.ReturnType.String(funcCtx) != types.JavaVoid.String(funcCtx) {
+			if funcCallValue.FuncType.ReturnType.String(funcCtx) != types.NewJavaPrimer(types.JavaVoid).String(funcCtx) {
 				runtimeStackSimulation.Push(funcCallValue)
 			} else {
 				appendNode(statements.NewExpressionStatement(funcCallValue))
@@ -563,13 +586,13 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_INVOKEVIRTUAL:
 			classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
 			methodName := classInfo.Member
-			funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType) // 不push到栈中
+			funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
 			for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 				funcCallValue.Arguments = append(funcCallValue.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
 			}
 			funcCallValue.Arguments = funk.Reverse(funcCallValue.Arguments).([]values.JavaValue)
 			funcCallValue.Object = runtimeStackSimulation.Pop().(values.JavaValue)
-			if funcCallValue.FuncType.ReturnType.String(funcCtx) != types.JavaVoid.String(funcCtx) {
+			if funcCallValue.FuncType.ReturnType.String(funcCtx) != types.NewJavaPrimer(types.JavaVoid).String(funcCtx) {
 				runtimeStackSimulation.Push(funcCallValue)
 			} else {
 				appendNode(statements.NewExpressionStatement(funcCallValue))
@@ -586,13 +609,13 @@ func (d *Decompiler) ParseStatement() error {
 			//	st.ToStatement = getter(opcode.Id)
 			//})
 		case OP_IFNONNULL:
-			st := statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), types.JavaNull), EQ)
+			st := statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), values.JavaNull), EQ)
 			appendNode(st)
 			//addStatementHandle(func(getter func(id int) (toStatement int)) {
 			//	st.ToStatement = getter(opcode.Id)
 			//})
 		case OP_IFNULL:
-			st := statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), types.JavaNull), NEQ)
+			st := statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), values.JavaNull), NEQ)
 			appendNode(st)
 			//addStatementHandle(func(getter func(id int) (toStatement int)) {
 			//	st.ToStatement = getter(opcode.Id)
@@ -644,15 +667,21 @@ func (d *Decompiler) ParseStatement() error {
 			}))
 		case OP_IRETURN:
 			v := runtimeStackSimulation.Pop().(values.JavaValue)
+			v.Type().ResetType(funcCtx.FunctionType.(*types.JavaFuncType).ReturnType)
 			appendNode(statements.NewReturnStatement(v))
 		case OP_ARETURN, OP_LRETURN, OP_DRETURN, OP_FRETURN:
 			v := runtimeStackSimulation.Pop().(values.JavaValue)
+			v.Type().ResetType(funcCtx.FunctionType.(*types.JavaFuncType).ReturnType)
 			appendNode(statements.NewReturnStatement(v))
 		case OP_GETFIELD:
 			index := Convert2bytesToInt(opcode.Data)
 			member := d.constantPoolGetter(int(index)).(*values.JavaClassMember)
 			v := runtimeStackSimulation.Pop().(values.JavaValue)
-			runtimeStackSimulation.Push(values.NewRefMember(v.(*values.JavaRef).Id, member.Member, member.JavaType))
+			//if v1, ok := v.(*values.JavaRef); !ok {
+			//	print(v1)
+			//	println(v.String(d.FunctionContext))
+			//}
+			runtimeStackSimulation.Push(values.NewRefMember(v, member.Member, member.JavaType))
 		case OP_GETSTATIC:
 			index := Convert2bytesToInt(opcode.Data)
 			runtimeStackSimulation.Push(d.constantPoolGetter(int(index)))
@@ -765,7 +794,7 @@ func (d *Decompiler) ParseStatement() error {
 			index := opcode.Data[0]
 			inc := opcode.Data[1]
 			ref := d.GetVar(int(index))
-			appendNode(values.NewBinaryExpression(ref, values.NewJavaLiteral(inc, types.JavaInteger), INC))
+			appendNode(values.NewBinaryExpression(ref, values.NewJavaLiteral(inc, types.NewJavaPrimer(types.JavaInteger)), INC))
 		case OP_DNEG, OP_FNEG, OP_LNEG, OP_INEG:
 			v := runtimeStackSimulation.Pop().(values.JavaValue)
 			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
@@ -774,7 +803,11 @@ func (d *Decompiler) ParseStatement() error {
 				return v.Type()
 			}))
 		case OP_END:
-			return
+			endNode := statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+				return "end"
+			})
+			endNode.Name = "end"
+			appendNode(endNode)
 		default:
 			panic("not support")
 		}
@@ -850,6 +883,9 @@ func (d *Decompiler) ParseStatement() error {
 	}
 	for _, node := range nodes {
 		node := node
+		if node.Id == 21 {
+			print()
+		}
 		opcode := idToOpcode[node.Id]
 		for _, code := range opcode.Target {
 			id := getStatementNextIdByOpcodeId(code.Id)
