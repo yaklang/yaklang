@@ -21,23 +21,24 @@ func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
 	local, err := NewLocalClient()
 	require.NoError(t, err)
 
+	syntaxFlowCode := `println(* as $para)`
+
 	progName := uuid.NewString()
 	prog, err := ssaapi.Parse(`println("araa")`,
 		ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.Yak),
 	)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	require.NoError(t, err)
-
 	taskID1 := uuid.NewString()
-	res := prog.SyntaxFlow(`println(* as $para)`)
+	res := prog.SyntaxFlow(syntaxFlowCode)
 	resultID1, err := res.Save(taskID1)
 	require.NoError(t, err)
 
 	taskID2 := uuid.NewString()
-	res = prog.SyntaxFlow(`println(* as $para)`)
+	res = prog.SyntaxFlow(syntaxFlowCode)
 	resultID2, err := res.Save(taskID2)
 	require.NoError(t, err)
-	res = prog.SyntaxFlow(`println(* as $para)`)
+	res = prog.SyntaxFlow(syntaxFlowCode)
 	resultID3, err := res.Save(taskID2)
 	require.NoError(t, err)
 
@@ -69,6 +70,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
 		require.Equal(t, 2, len(rsp.GetResults()))
 		require.Equal(t, resultID2, uint(rsp.GetResults()[0].GetResultID()))
 		require.Equal(t, resultID3, uint(rsp.GetResults()[1].GetResultID()))
+		// check content
+		require.Equal(t, syntaxFlowCode, rsp.GetResults()[0].GetRuleContent())
+		require.Equal(t, syntaxFlowCode, rsp.GetResults()[1].GetRuleContent())
 	})
 
 	t.Run("test query result by program", func(t *testing.T) {
