@@ -77,18 +77,14 @@ func ImportDatabase(reader io.Reader) error {
 	return nil
 }
 
-func CreateOrUpdateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
+func MigrateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
 	db := consts.GetGormProfileDatabase()
-	var rules []*schema.SyntaxFlowRule
 
 	if hash == "" {
 		hash = i.CalcHash()
 	}
-	var sameHashRule schema.SyntaxFlowRule
-	if db.Where("hash = ?", hash).First(&sameHashRule); sameHashRule.ID > 0 {
-		return nil
-	}
 
+	var rules []schema.SyntaxFlowRule
 	if err := db.Where("rule_name = ?", i.RuleName).Find(&rules).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return db.Create(i).Error
@@ -103,15 +99,30 @@ func CreateOrUpdateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
 			// if same name, but different content, update
 			return db.Model(&rule).Updates(i).Error
 		}
-	} else {
+		return nil
+	} else if len(rules) > 1 {
 		// multiple rule in same name, delete all and create new
 		if err := db.Where("rule_name = ?", i.RuleName).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error; err != nil {
 			return err
 		}
+	} else {
 		return db.Create(i).Error
 	}
-
 	return nil
+}
+
+func CreateOrUpdateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
+	db := consts.GetGormProfileDatabase()
+
+	if hash == "" {
+		hash = i.CalcHash()
+	}
+	var rule schema.SyntaxFlowRule
+	if db.Where("hash = ?", hash).First(&rule); rule.ID > 0 {
+		return db.Model(&rule).Updates(i).Error
+	} else {
+		return db.Create(i).Error
+	}
 }
 
 func DeleteRuleByRuleName(name string) error {
@@ -151,6 +162,10 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	rule.Language = string(language)
 	rule.Tag = strings.Join(tags, "|")
 	rule.IsBuildInRule = buildin
+	err = MigrateSyntaxFlow(rule.CalcHash(), rule)
+	if err != nil {
+		return nil, utils.Wrap(err, "migrate syntax flow rule error")
+	}
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
 		return nil, utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
@@ -276,8 +291,10 @@ func SaveSyntaxFlowRule(ruleName, language, content string, tags ...string) erro
 	return nil
 }
 
-var valid func(rule *schema.SyntaxFlowRule) error
-var registerOnce = new(sync.Once)
+var (
+	valid        func(rule *schema.SyntaxFlowRule) error
+	registerOnce = new(sync.Once)
+)
 
 func RegisterValid(f func(rule *schema.SyntaxFlowRule) error) {
 	registerOnce.Do(func() {
@@ -319,7 +336,7 @@ func GetAllRules() ([]*schema.SyntaxFlowRule, error) {
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*schema.SyntaxFlowRule
 			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
@@ -356,7 +373,7 @@ func GetRules(ruleNameGlob string) ([]*schema.SyntaxFlowRule, error) {
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*schema.SyntaxFlowRule
 			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
@@ -391,7 +408,7 @@ func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxF
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*schema.SyntaxFlowRule
 			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
@@ -424,7 +441,7 @@ func YieldSyntaxFlowRulesWithoutLib(ctx context.Context) chan *schema.SyntaxFlow
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*schema.SyntaxFlowRule
 			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
