@@ -510,7 +510,7 @@ world`+"`"+`)
 			do(b)
 		}
 		`, []string{
-			"Undefined-i.Add(valid)(Parameter-i)", "Undefined-i.Sub(valid)(Parameter-i)",
+			"ParameterMember-parameter[0].Add(Parameter-i)", "ParameterMember-parameter[0].Sub(Parameter-i)",
 		}, t)
 	})
 }

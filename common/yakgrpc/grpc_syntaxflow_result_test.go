@@ -18,7 +18,6 @@ import (
 )
 
 func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
-
 	local, err := NewLocalClient()
 	require.NoError(t, err)
 

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
@@ -27,19 +28,32 @@ println($PHP_EOL);`
 		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
 }
-
-func TestMemberAdd(t *testing.T) {
+func TestCallNumber(t *testing.T) {
 	code := `<?php
-
-class test{
-    public $a=0;
+$a = new B();
+$a->a();
+$a->a();
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		result := prog.SyntaxFlow(".a() as $call")
+		assert.True(t, len(result.GetValues("call")) == 2)
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
 
-$a = new test;
-$a->a++;
-println($a->a);
+func TestMemberAddSideEffect(t *testing.T) {
+	code := `<?php
+	class test{
+	public $a = 0;
+	public function __construct($a){
+		$this->a = $a;
+	}
+}
+	$a = new test(1);
+	$a->a++;
+	println($a->a);
 `
-	ssatest.CheckPrintlnValue(code, []string{"add(Undefined-$a.a(valid), 1)"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"add(side-effect(Parameter-$a, #18.a), 1)"}, t)
 }
 
 func TestExperssion_PHP_Scope(t *testing.T) {
