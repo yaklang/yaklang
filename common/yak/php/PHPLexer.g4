@@ -44,8 +44,6 @@ options {
 // Insert here @header for C++ lexer.
 
 SeaWhitespace  : [ \t\r\n]+ -> channel(HIDDEN);
-HtmlCOMMENT: '/*' .*? '*/' -> skip;
-NESTED_COMMENT: '/*' (HtmlCOMMENT | ~[*])* '*/' -> skip;
 HtmlText       : ~[<#]+;
 XmlStart       : '<?xml'              -> pushMode(XML);
 PHPStartEcho   : PhpStartEchoFragment -> type(Echo), pushMode(PHP);
