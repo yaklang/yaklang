@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	_ "github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
+
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/crep"
