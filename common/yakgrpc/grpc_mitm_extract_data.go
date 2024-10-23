@@ -12,12 +12,10 @@ import (
 
 func (s *Server) QueryMITMRuleExtractedData(ctx context.Context, req *ypb.QueryMITMRuleExtractedDataRequest) (*ypb.QueryMITMRuleExtractedDataResponse, error) {
 	db := s.GetProjectDatabase()
-	if req.GetHTTPFlowHash() != "" {
-		db = db.Where("source_type == 'httpflow' and trace_id = ?", req.GetHTTPFlowHash())
-	}
-
-	if req.GetHTTPFlowHash() == "" {
-		return nil, utils.Error("httpflow hash must be set")
+	if req.GetHTTPFlowHiddenIndex() != "" {
+		db = db.Where("source_type == 'httpflow' and trace_id = ?", req.GetHTTPFlowHiddenIndex())
+	} else {
+		return nil, utils.Error("httpflow hiddenindex must be set")
 	}
 	p, data, err := yakit.QueryExtractedData(db, req)
 	if err != nil {

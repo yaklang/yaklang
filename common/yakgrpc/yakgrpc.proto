@@ -1657,6 +1657,7 @@ message QueryMITMRuleExtractedDataResponse {
 message QueryMITMRuleExtractedDataRequest {
   Paging Pagination = 1;
   string HTTPFlowHash = 2;
+  string HTTPFlowHiddenIndex = 3;
 }
 
 message ExportProjectRequest {
