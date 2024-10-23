@@ -59,6 +59,10 @@ func main() {
 			Name:  "host,t",
 			Value: `127.0.0.1`,
 		},
+		cli.StringFlag{
+			Name:  "key",
+			Usage: "chatglm api key",
+		},
 		cli.BoolFlag{
 			Name: "debug",
 		},
@@ -70,7 +74,15 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 		debug := c.Bool("debug")
-		servers, err := sfweb.NewSyntaxFlowWebServer(runCtx, !c.Bool("nohttps"), c.String("host"), c.Int("port"), debug)
+		port := c.Int("port")
+		opts := []sfweb.ServerOpt{
+			sfweb.WithHost(c.String("host")),
+			sfweb.WithPort(port),
+			sfweb.WithDebug(debug),
+			sfweb.WithHttps(!c.Bool("nohttps")),
+			sfweb.WithChatGLMAPIKey(c.String("key")),
+		}
+		servers, err := sfweb.NewSyntaxFlowWebServer(runCtx, opts...)
 		if debug {
 			sfweb.SfWebLogger.SetLevel("debug")
 		}
@@ -87,7 +99,7 @@ func main() {
 				if !utils.IsIPv4(ip) {
 					continue
 				}
-				log.Infof("checking on: %v:%v", ip, c.Int("port"))
+				log.Infof("checking on: %v:%v", ip, port)
 			}
 		}
 		log.Infof("SyntaxFlow Web Server running in: %s", servers)
