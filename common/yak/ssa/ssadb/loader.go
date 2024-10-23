@@ -6,6 +6,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/glob"
 )
 
 func YieldIrCodesProgramName(rawDB *gorm.DB, ctx context.Context, program string) chan *IrCode {
@@ -135,7 +136,7 @@ func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 	case NameMatch:
 		db = db.Where("variable_name = ? OR class_name = ?", value, value)
 	case KeyMatch:
-		db = db.Where("field_name = ?", value, value)
+		db = db.Where("field_name = ?", value)
 	case BothMatch:
 		db = db.Where("variable_name = ? OR class_name = ? OR field_name = ?", value, value, value)
 	}
@@ -144,21 +145,10 @@ func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 }
 
 func GlobSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
-	db := DB.Model(&IrIndex{})
-	if mod&ConstType != 0 {
-		_db := DB.Model(&IrCode{}).Where("opcode=5 and string GLOB ?", value)
-		return _yieldIrCodes(_db, context.Background())
-	}
-	switch mod {
-	case NameMatch:
-		db = db.Where("variable_name GLOB ?", value)
-	case KeyMatch:
-		db = db.Where("field_name GLOB ?", value, value)
-	case BothMatch:
-		db = db.Where("variable_name GLOB ? OR class_name GLOB ? OR field_name GLOB ?", value, value, value)
-	}
-	return yieldIrIndex(db, context.Background())
+	regStr := glob.Glob2Regex(value)
+	return RegexpSearchVariable(DB, mod, regStr)
 }
+
 func RegexpSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 	db := DB.Model(&IrIndex{})
 	if mod&ConstType != 0 {
