@@ -68,33 +68,42 @@ func ypbToSyntaxFlowScanRisk(risk *ypb.Risk, result *ypb.SyntaxFlowResult) *Synt
 }
 
 func WriteWebsocketJSON(c *websocket.Conn, data any) error {
+	if err := c.WriteJSON(data); err != nil {
+		return err
+	}
 	if SfWebLogger.Level == log.DebugLevel {
 		bytes, _ := json.Marshal(data)
 		SfWebLogger.Debugf("->client: %s", bytes)
 	}
-	if err := c.WriteJSON(data); err != nil {
+	return nil
+}
+
+func ReadWebsocketJSON(c *websocket.Conn, data any) error {
+	_, msg, err := c.ReadMessage()
+	if err != nil {
 		return err
+	}
+	if err := json.Unmarshal(msg, data); err != nil {
+		return err
+	}
+	if SfWebLogger.Level == log.DebugLevel {
+		bytes, _ := json.Marshal(data)
+		SfWebLogger.Debugf("<-client: %s", bytes)
 	}
 	return nil
 }
 
 func (s *SyntaxFlowWebServer) registerScanRoute() {
 	s.router.HandleFunc("/scan", func(w http.ResponseWriter, r *http.Request) {
-		// upgrade to websocket
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			writeErrorJson(w, err)
 			return
 		}
 		defer conn.Close()
-		// 读取客户端的消息
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			SfWebLogger.Errorf("read websocket message failed: %v", err)
-			return
-		}
+
 		var req SyntaxFlowScanRequest
-		if err := json.Unmarshal(msg, &req); err != nil {
+		if err = ReadWebsocketJSON(conn, &req); err != nil {
 			WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
 				Error: fmt.Sprintf("invalid request: %v", err),
 			})

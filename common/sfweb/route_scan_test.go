@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
-func GetScanRequest() []byte {
+func GetScanHTTPRequest() []byte {
 	return []byte(fmt.Sprintf(`GET /scan HTTP/1.1
 Host: %s
 Sec-WebSocket-Version: 13
@@ -51,7 +51,7 @@ func TestScan(t *testing.T) {
 	var risks []*sfweb.SyntaxFlowScanRisk
 
 	wc, err := lowhttp.NewWebsocketClient(
-		GetScanRequest(),
+		GetScanHTTPRequest(),
 		lowhttp.WithWebsocketFromServerHandlerEx(func(wc *lowhttp.WebsocketClient, b []byte, f []*lowhttp.Frame) {
 			var rsp sfweb.SyntaxFlowScanResponse
 			err := json.Unmarshal(b, &rsp)
@@ -66,6 +66,12 @@ func TestScan(t *testing.T) {
 			}
 			if len(rsp.Risk) > 0 {
 				risks = append(risks, rsp.Risk...)
+				// for _, risk := range rsp.Risk {
+				// 	result, err := ssaapi.LoadResultByID(uint(risk.ResultID))
+				// 	if err == nil {
+				// 		t.Logf("!!!! %s", result.DumpValuesJson(risk.VarName))
+				// 	}
+				// }
 			}
 		}),
 	)
