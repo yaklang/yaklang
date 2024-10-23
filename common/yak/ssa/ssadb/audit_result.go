@@ -21,6 +21,7 @@ type AuditResult struct {
 	RulePurpose  string `json:"purpose"`
 	RuleSeverity string `json:"rule_severity"`
 	RuleDesc     string `json:"rule_desc"`
+	RuleContent  string `json:"rule_content" gorm:"type:text"`
 
 	AlertDesc schema.MapEx[string, *schema.SyntaxFlowDescInfo] `gorm:"type:text"`
 
@@ -108,6 +109,7 @@ func (r *AuditResult) ToGRPCModel() *ypb.SyntaxFlowResult {
 		ProgramName: r.ProgramName,
 		Language:    r.Language,
 		RiskCount:   r.RiskCount,
+		RuleContent: r.RuleContent,
 	}
 	return res
 
