@@ -57,6 +57,7 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	// use in ssautil, handle inner member
 	ForEachCapturedVariable(VariableHandler[T])
 	SetCapturedVariable(string, VersionedIF[T])
+	SetCapturedSideEffect(string, VersionedIF[T])
 
 	// use in phi
 	CoverBy(ScopedVersionedTableIF[T])
@@ -126,6 +127,7 @@ type ScopedVersionedTable[T versionedValue] struct {
 	linkVariable    map[T]VersionedIF[T]
 	linkCaptured    map[string]VersionedIF[T]
 	linkIncomingPhi map[string]VersionedIF[T]
+	linkSideEffect  map[string]VersionedIF[T]
 
 	//// record the lexical variable
 	//values   *omap.OrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]] // from variable get value, assigned variable
@@ -181,6 +183,7 @@ func NewScope[T versionedValue](
 		// linkValues:      newLinkNodeMap[T](callback),
 		linkVariable:    make(map[T]VersionedIF[T]),
 		linkCaptured:    make(map[string]VersionedIF[T]),
+		linkSideEffect:  make(map[string]VersionedIF[T]),
 		linkIncomingPhi: make(map[string]VersionedIF[T]),
 	}
 	s.linkValues = newLinkNodeMap[T](func(i VersionedIF[T]) {
@@ -226,6 +229,9 @@ func NewRootVersionedTable[T versionedValue](
 
 func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 	sub := NewScope[T](v.ProgramName, v.offsetFetcher, v.newVersioned, v)
+	for _, variable := range v.linkSideEffect {
+		sub.linkValues.Append(variable.GetName(), variable)
+	}
 	return sub
 }
 
@@ -363,6 +369,10 @@ func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(handler VariableHandl
 
 func (scope *ScopedVersionedTable[T]) SetCapturedVariable(name string, ver VersionedIF[T]) {
 	scope.linkCaptured[name] = ver
+}
+
+func (scope *ScopedVersionedTable[T]) SetCapturedSideEffect(name string, ver VersionedIF[T]) {
+	scope.linkSideEffect[name] = ver
 }
 
 // CreateSymbolicVariable create a non-lexical and no named variable
