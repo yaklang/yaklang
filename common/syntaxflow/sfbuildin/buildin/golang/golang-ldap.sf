@@ -1,0 +1,61 @@
+desc(
+    title: "golang LDAP Injection",
+    type: audit,
+    severity: high,
+)
+
+l.Search(* #-> as $search)
+fmt.Sprintf(* #-> as $param)
+$param #{
+	until: `* & $search`,
+}-> as $high;
+
+alert $high for {
+    title: 'LDAP Injection detected',
+    title_zh: '检测到LDAP注入',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"fmt"
+	"log"
+
+	ldap "gopkg.in/ldap.v2"
+)
+
+func authenticate(username, password string) bool {
+	l, err := ldap.Dial("tcp", "localhost:389")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer l.Close()
+
+	// LDAP 查询构造
+	searchRequest := ldap.NewSearchRequest(
+		"ou=users,dc=example,dc=com",
+		ldap.ScopeWholeSubtree,
+		ldap.NeverDerefAliases,
+		0, 0, false,
+		fmt.Sprintf("(uid=%s)", username), // 潜在的注入点
+		[]string{"dn"},
+		nil,
+	)
+
+	// 执行查询
+	_, err = l.Search(searchRequest)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 这里省略了密码验证的具体实现
+	return true
+}
+UNSAFE
+)
