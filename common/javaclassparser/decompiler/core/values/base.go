@@ -21,5 +21,6 @@ var (
 	_ JavaValue = &FunctionCallExpression{}
 	_ JavaValue = &RefMember{}
 	_ JavaValue = &JavaCompare{}
-	_ JavaValue = types.JavaNull
+	_ JavaValue = &JavaClassValue{}
+	//_ JavaValue = types.JavaNull
 )

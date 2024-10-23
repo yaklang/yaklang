@@ -27,6 +27,9 @@ type ClassObjectDumper struct {
 }
 
 func (c *ClassObjectDumper) GetConstructorMethodName() string {
+	if c.PackageName == "" {
+		return c.ClassName
+	}
 	after, ok := strings.CutPrefix(c.ClassName, c.PackageName+".")
 	if ok {
 		return after
@@ -61,11 +64,6 @@ func (c *ClassObjectDumper) UnTab() {
 }
 func (c *ClassObjectDumper) DumpClass() (string, error) {
 	result := classTemplate
-	funcCtx := &class_context.ClassContext{
-		ClassName:   c.ClassName,
-		PackageName: c.PackageName,
-	}
-	c.FuncCtx = funcCtx
 	accessFlagsVerbose := c.obj.AccessFlagsVerbose
 	//if len(accessFlagsVerbose) < 1 {
 	//	return "", utils.Error("accessFlagsVerbose is empty")
@@ -77,7 +75,11 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	c.PackageName = packageName
 	className := splits[len(splits)-1]
 	c.ClassName = strings.Replace(name, "/", ".", -1)
-
+	funcCtx := &class_context.ClassContext{
+		ClassName:   c.ClassName,
+		PackageName: c.PackageName,
+	}
+	c.FuncCtx = funcCtx
 	buildInLib := []string{
 		c.PackageName + ".*",
 		"java.lang.*",
@@ -165,6 +167,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 	defer c.UnTab()
 	result := []string{}
 	for _, method := range c.obj.Methods {
+		c.FuncCtx.IsStatic = method.AccessFlags&StaticFlag == StaticFlag
 		accessFlagsVerbose := getAccessFlagsVerbose(method.AccessFlags)
 		//if len(accessFlagsVerbose) < 1 {
 		//	return nil, utils.Error("method accessFlagsVerbose is empty")
@@ -183,20 +186,22 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 			return nil, err
 		}
 		paramsNewStrList := []string{}
-		for i, paramsType := range methodType.ParamTypes {
+		for i, paramsType := range methodType.FunctionType().ParamTypes {
 			paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s var%d", paramsType.String(c.FuncCtx), i+1))
 		}
-		c.MethodType = methodType
-		returnTypeStr := methodType.ReturnType.String(c.FuncCtx)
+		c.MethodType = methodType.FunctionType()
+		returnTypeStr := methodType.FunctionType().ReturnType.String(c.FuncCtx)
 		paramsNewStr := strings.Join(paramsNewStrList, ", ")
 		code := ""
 		c.Tab()
 		c.CurrentMethod = method
 		funcCtx := c.FuncCtx
 		funcCtx.FunctionName = name
-		if name != "isLastElementInArray" {
+		if name != "isAssignableToAnyOf" {
 			continue
 		}
+		println(name)
+		funcCtx.FunctionType = c.MethodType
 		for _, attribute := range method.Attributes {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
 				statementList, err := ParseBytesCode(c, codeAttr)
@@ -206,11 +211,15 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 				sourceCode := "\n"
 				var statementToString func(statement statements.Statement) string
 				var statementListToString func(statements []statements.Statement) string
-				statementListToString = func(statements []statements.Statement) string {
+				statementListToString = func(statementList []statements.Statement) string {
 					c.Tab()
 					defer c.UnTab()
 					var res []string
-					for _, statement := range statements {
+					for _, statement := range statementList {
+						_, ok := statement.(*statements.StackAssignStatement)
+						if ok {
+							continue
+						}
 						res = append(res, statementToString(statement))
 					}
 					return strings.Join(res, "\n")

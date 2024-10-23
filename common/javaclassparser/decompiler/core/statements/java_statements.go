@@ -18,6 +18,7 @@ func (r *ConditionStatement) String(funcCtx *class_context.ClassContext) string 
 }
 
 func NewConditionStatement(cmp values.JavaValue, op string) *ConditionStatement {
+	cmp.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
 	if v, ok := cmp.(*values.JavaCompare); ok {
 		return &ConditionStatement{
 			Condition: values.NewBinaryExpression(v.JavaValue1, v.JavaValue2, op),
@@ -67,13 +68,13 @@ func NewDeclareStatement(id int, typ types.JavaType) *DeclareStatement {
 
 type StackAssignStatement struct {
 	Id        int
-	JavaValue values.JavaValue
+	JavaValue *values.JavaRef
 }
 
 func (a *StackAssignStatement) String(funcCtx *class_context.ClassContext) string {
 	return a.JavaValue.String(funcCtx)
 }
-func NewStackAssignStatement(id int, value values.JavaValue) *StackAssignStatement {
+func NewStackAssignStatement(id int, value *values.JavaRef) *StackAssignStatement {
 	return &StackAssignStatement{
 		Id:        id,
 		JavaValue: value,
@@ -140,6 +141,10 @@ func NewArrayMemberAssignStatement(m *values.JavaArrayMember, value values.JavaV
 }
 
 func NewAssignStatement(leftVal, value values.JavaValue, isFirst bool) *AssignStatement {
+	if value == nil || leftVal == nil || value.Type() == nil || leftVal.Type() == nil {
+		panic("type is nil")
+	}
+	value.Type().ResetType(leftVal.Type())
 	return &AssignStatement{
 		LeftValue: leftVal,
 		JavaValue: value,

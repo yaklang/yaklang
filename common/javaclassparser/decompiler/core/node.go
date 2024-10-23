@@ -16,9 +16,12 @@ type Node struct {
 	IsCircle            bool
 	IsMerge             bool
 	IsIf                bool
-	OutPointMergeNode   *Node
+	GetLoopEndNode      func() *Node
+	SetLoopEndNode      func(*Node, *Node)
 	ConditionNode       []*Node
+	BreakNode           []*Node
 	CircleNodesSet      *utils.Set[*Node]
+	IsInCircle          bool
 	//CircleRoute         *SubNodeMap
 	//PreNodeRoute          *SubNodeMap
 	//AllPreNodeRoute       []*SubNodeMap
@@ -46,9 +49,6 @@ func (n *Node) ReplaceNext(node1, node2 *Node) {
 	}
 }
 func (n *Node) RemoveNext(node *Node) {
-	if n.Id == 22 {
-		print()
-	}
 	for i, next := range n.Next {
 		if next == node {
 			n.Next = append(n.Next[:i], n.Next[i+1:]...)

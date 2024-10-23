@@ -27,7 +27,7 @@ func TestParseJar(t *testing.T) {
 		if jarFs.Ext(path) != ".class" {
 			return nil
 		}
-		if path != "org/junit/rules/TemporaryFolder.class" {
+		if path != "org/junit/experimental/theories/internal/AllMembersSupplier.class" {
 			return nil
 		}
 		data, err := jarFs.ReadFile(path)
