@@ -579,9 +579,6 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 
 	defer func() {
 		stringForSettingColor(colorName, tagNames, flow)
-		for _, extractedData := range extracted {
-			extractedData.TraceId = flow.CalcHash()
-		}
 	}()
 
 	for _, rule := range m._mirrorRules {
@@ -633,7 +630,7 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 			}
 
 			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
-				"",
+				flow.HiddenIndex,
 				rule.VerboseName,
 				match,
 				ret,

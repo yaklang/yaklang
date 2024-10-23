@@ -99,7 +99,7 @@ func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest)
 	return paging, ret, nil
 }
 
-func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, matchResult *MatchResult, data string, regexpStr ...string) *schema.ExtractedData {
+func ExtractedDataFromHTTPFlow(hiddenIndex string, ruleName string, matchResult *MatchResult, data string, regexpStr ...string) *schema.ExtractedData {
 	var r string
 	if len(regexpStr) > 0 {
 		r = strings.Join(regexpStr, ", ")
@@ -107,7 +107,7 @@ func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, matchResult *Ma
 
 	extractData := &schema.ExtractedData{
 		SourceType:     "httpflow",
-		TraceId:        flowHash,
+		TraceId:        hiddenIndex,
 		Regexp:         r,
 		RuleVerbose:    ruleName,
 		Data:           data,
@@ -153,9 +153,9 @@ func BatchExtractedData(db *gorm.DB, ctx context.Context) chan *schema.Extracted
 	return outC
 }
 
-func DeleteExtractedDataByTraceIds(db *gorm.DB, httpFlowHash []string) error {
+func DeleteExtractedDataByTraceIds(db *gorm.DB, hiddenIndex []string) error {
 	db = db.Model(&schema.ExtractedData{}).Where("source_type == 'httpflow' ")
-	db = bizhelper.ExactQueryStringArrayOr(db, "trace_id", httpFlowHash)
+	db = bizhelper.ExactQueryStringArrayOr(db, "trace_id", hiddenIndex)
 	db = db.Unscoped().Delete(&schema.ExtractedData{})
 	if db.Error != nil {
 		return db.Error
@@ -163,8 +163,8 @@ func DeleteExtractedDataByTraceIds(db *gorm.DB, httpFlowHash []string) error {
 	return nil
 }
 
-func DeleteExtractedDataByTraceId(db *gorm.DB, flowHash string) error {
-	if internalDb := db.Model(&schema.ExtractedData{}).Where("trace_id = ?", flowHash).Unscoped().Delete(&schema.ExtractedData{}); internalDb.Error != nil {
+func DeleteExtractedDataByTraceId(db *gorm.DB, hiddenIndex string) error {
+	if internalDb := db.Model(&schema.ExtractedData{}).Where("trace_id = ?", hiddenIndex).Unscoped().Delete(&schema.ExtractedData{}); internalDb.Error != nil {
 		return db.Error
 	}
 	return nil
