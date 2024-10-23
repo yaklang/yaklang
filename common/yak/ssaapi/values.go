@@ -3,15 +3,15 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"time"
 )
 
 type Value struct {
@@ -33,7 +33,8 @@ type Value struct {
 	Predecessors []*PredecessorValue
 	DescInfo     map[string]string
 	// value from database
-	auditNode *ssadb.AuditNode
+	auditNode  *ssadb.AuditNode
+	valueCache *utils.CacheWithKey[int64, *Value]
 }
 
 type PredecessorValue struct {
@@ -162,6 +163,7 @@ func (p *Program) NewValue(n ssa.Value) *Value {
 		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
 		node:          n,
 		ParentProgram: p,
+		valueCache:    utils.NewTTLCacheWithKey[int64, *Value](time.Duration(0)),
 	}
 }
 
@@ -174,7 +176,12 @@ func (p *Program) NewValueFromDB(id int64) *Value {
 		log.Errorf("GetValues new lazy instruction: %v", err)
 		return nil
 	}
-	val := p.NewValue(node)
+	val := &Value{
+		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
+		node:          node,
+		ParentProgram: p,
+		valueCache:    utils.NewTTLCacheWithKey[int64, *Value](time.Second * 8),
+	}
 	auditNode := ssadb.GetAuditNodeById(id)
 	if !utils.IsNil(auditNode) {
 		val.auditNode = auditNode
@@ -358,7 +365,13 @@ func (v *Value) NewValue(value ssa.Value) *Value {
 }
 
 func (v *Value) NewValueFromDB(id int64) *Value {
-	return v.ParentProgram.NewValueFromDB(id)
+	if val, ok := v.valueCache.Get(id); ok {
+		return val
+	}
+	value := v.ParentProgram.NewValueFromDB(id)
+	value.valueCache.Set(id, value)
+	value.valueCache = v.valueCache
+	return value
 }
 
 func (v *Value) GetOperand(index int) *Value {
