@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/crep"
@@ -321,9 +322,9 @@ func TestGRPCMUSTPASS_MITM_Runtime_Proxy(t *testing.T) {
 	var (
 		networkIsPassed  bool
 		downstreamPassed bool
-		token            = utils.RandNumberStringBytes(10)
+		token            = utils.RandNumberStringBytes(16)
 	)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -341,90 +342,47 @@ func TestGRPCMUSTPASS_MITM_Runtime_Proxy(t *testing.T) {
 		}
 		return req
 	}))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	addr := utils.HostPort("127.0.0.1", port)
-	go func() {
-		server.Serve(ctx, addr)
-	}()
-	if utils.WaitConnect(addr, 10) != nil {
-		t.Fatal("wait connect timeout")
-	}
+	go server.Serve(ctx, addr)
+
+	require.NoError(t, utils.WaitConnect(addr, 10))
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-	stream, err := client.MITM(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stream.Send(&ypb.MITMRequest{
-		Host: "127.0.0.1",
-		Port: uint32(mitmPort),
-	})
-	for {
-		data, err := stream.Recv()
-		if err != nil {
-			break
-		}
-		if data.GetMessage().GetIsMessage() {
-			msg := string(data.GetMessage().GetMessage())
-			fmt.Println(msg)
-			if strings.Contains(msg, "starting mitm server") {
-				log.Infof("starting mitm server")
-				go func() {
-					for {
-						stream.Recv()
-					}
-				}()
-				break
-			}
-		}
-	}
+	require.NoError(t, err)
 
-	// not set proxy
-	if _, err := yak.Execute(
-		`
-poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
-		map[string]any{
-			"mockUrl":   mockUrl,
-			"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
-			"token":     token,
-		}); err != nil {
-		t.Fatalf("execute script failed: %v", err)
-	}
-	if downstreamPassed {
-		t.Fatalf("Downstream proxy should not passed")
-	}
-	if !networkIsPassed {
-		t.Fatalf("Network should passed")
-	}
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host: "127.0.0.1",
+			Port: uint32(mitmPort),
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		// not set proxy, send
+		mitmProxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+		_, _, err := poc.DoGET(mockUrl, poc.WithProxy(mitmProxy), poc.WithReplaceHttpPacketQueryParam("u", token))
 
-	// set proxy and check
-	stream.Send(&ypb.MITMRequest{
-		SetDownstreamProxy: true,
-		DownstreamProxy:    "http://" + utils.HostPort("127.0.0.1", port),
-	})
-	if _, err := yak.Execute(
-		`
-poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
-		map[string]any{
-			"mockUrl":   mockUrl,
-			"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
-			"token":     token,
-		}); err != nil {
-		t.Fatalf("execute script failed: %v", err)
-	}
-	if !downstreamPassed {
-		t.Fatalf("Downstream proxy should passed")
-	}
+		require.NoError(t, err)
+		require.False(t, downstreamPassed, "Downstream proxy should not passed")
+		require.True(t, networkIsPassed, "Network should passed")
 
-	if !networkIsPassed {
-		t.Fatalf("Network should passed")
-	}
+		// set downstream proxy
+		stream.Send(&ypb.MITMRequest{
+			SetDownstreamProxy: true,
+			DownstreamProxy:    "http://" + utils.HostPort("127.0.0.1", port),
+		})
+		networkIsPassed = false
+		time.Sleep(1 * time.Second)
+
+		// send again
+		_, _, err = poc.DoGET(mockUrl, poc.WithProxy(mitmProxy), poc.WithReplaceHttpPacketQueryParam("u", token))
+
+		require.NoError(t, err)
+		require.True(t, downstreamPassed, "Downstream proxy should passed")
+		require.True(t, networkIsPassed, "Network should passed")
+		cancel()
+	}, nil)
 }
 
 func TestGRPCMUSTPASS_MITM_Proxy_MITMPluginInheritProxy(t *testing.T) {

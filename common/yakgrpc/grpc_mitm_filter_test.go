@@ -3,11 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"golang.org/x/net/websocket"
 
@@ -49,7 +50,9 @@ func RunMITMTestServerEx(
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	onInit(stream)
+	if onInit != nil {
+		onInit(stream)
+	}
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
