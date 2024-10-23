@@ -24,7 +24,7 @@ func MYSQLAuth(target, username, password string, needAuth bool) (ok, finished b
 		})
 	})
 
-	dsn := fmt.Sprintf("tcp(%v)/mysql?allowFallbackToPlaintext=true&allowCleartextPasswords=true", target)
+	dsn := fmt.Sprintf("tcp(%v)/mysql", target)
 	if needAuth {
 		dsn = fmt.Sprintf("%v:%v@%v", url.PathEscape(username), url.PathEscape(password), dsn)
 	}
