@@ -8,15 +8,15 @@ import (
 )
 
 type NewExpression struct {
-	IsArray bool
 	types.JavaType
+	Length          []JavaValue
 	ArgumentsGetter func() string
 }
 
-func NewNewArrayExpression(typ types.JavaType) *NewExpression {
+func NewNewArrayExpression(typ types.JavaType, length ...JavaValue) *NewExpression {
 	return &NewExpression{
 		JavaType: typ,
-		IsArray:  true,
+		Length:   length,
 	}
 }
 func NewNewExpression(typ types.JavaType) *NewExpression {
@@ -29,10 +29,9 @@ func (n *NewExpression) Type() types.JavaType {
 }
 
 func (n *NewExpression) String(funcCtx *class_context.ClassContext) string {
-	if n.IsArray {
-		typ := n.JavaType.(*types.JavaArrayType)
-		s := fmt.Sprintf("new %s", typ.JavaType.String(funcCtx))
-		for _, l := range typ.Length {
+	if n.IsArray() {
+		s := fmt.Sprintf("new %s", n.ElementType().String(funcCtx))
+		for _, l := range n.Length {
 			s += fmt.Sprintf("[%v]", l.(JavaValue).String(funcCtx))
 		}
 		return s
@@ -106,6 +105,11 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 	//}
 	if f.FunctionName == "<init>" {
 		return fmt.Sprintf("%s(%s)", f.Object.String(funcCtx), strings.Join(paramStrs, ","))
+	}
+	if v, ok := f.Object.(*JavaClassValue); ok {
+		if v.Type().RawType().(*types.JavaClass).Name == funcCtx.ClassName {
+			return fmt.Sprintf("%s(%s)", f.FunctionName, strings.Join(paramStrs, ","))
+		}
 	}
 	return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
 }

@@ -11,7 +11,7 @@ type JavaCompare struct {
 }
 
 func (j *JavaCompare) Type() types.JavaType {
-	return types.JavaBoolean
+	return types.NewJavaPrimer(types.JavaBoolean)
 }
 
 func (j *JavaCompare) String(funcCtx *class_context.ClassContext) string {

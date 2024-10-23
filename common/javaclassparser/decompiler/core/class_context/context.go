@@ -9,9 +9,11 @@ import (
 type ClassContext struct {
 	ClassName        string
 	FunctionName     string
+	FunctionType     any
 	PackageName      string
 	BuildInLibsMap   map[string][]string
 	Arguments        []string
+	IsStatic         bool
 	GetTypeShortName func(rawName string) string
 }
 

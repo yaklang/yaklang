@@ -6,23 +6,23 @@ type JavaPrimer struct {
 	Name string
 }
 
-func newJavaPrimer(name string) *JavaPrimer {
-	return &JavaPrimer{
+func NewJavaPrimer(name string) JavaType {
+	return newJavaTypeWrap(&JavaPrimer{
 		Name: name,
-	}
+	})
 }
 
 var (
-	JavaChar    = newJavaPrimer("char")
-	JavaInteger = newJavaPrimer("int")
-	JavaLong    = newJavaPrimer("long")
-	JavaDouble  = newJavaPrimer("double")
-	JavaFloat   = newJavaPrimer("float")
-	JavaBoolean = newJavaPrimer("boolean")
-	JavaByte    = newJavaPrimer("byte")
-	JavaShort   = newJavaPrimer("short")
-	JavaString  = newJavaPrimer("String")
-	JavaVoid    = newJavaPrimer("void")
+	JavaChar    = "char"
+	JavaInteger = "int"
+	JavaLong    = "long"
+	JavaDouble  = "double"
+	JavaFloat   = "float"
+	JavaBoolean = "boolean"
+	JavaByte    = "byte"
+	JavaShort   = "short"
+	JavaString  = "String"
+	JavaVoid    = "void"
 )
 
 func (j *JavaPrimer) String(funcCtx *class_context.ClassContext) string {

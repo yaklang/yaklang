@@ -9,6 +9,7 @@ type NodeRoute struct {
 	ConditionNode *core.Node
 	Parent        []*NodeRoute
 	NodeMap       *utils.Set[*core.Node]
+	Children      []*NodeRoute
 }
 
 func (s *NodeRoute) AddParent(nodeMap *NodeRoute) {
@@ -46,6 +47,47 @@ func (s *NodeRoute) GetFirstSameParentCondition(m *NodeRoute) *core.Node {
 	}
 	return nil
 }
+func (s *NodeRoute) HasPre(node *core.Node) (*utils.Set[*core.Node], bool) {
+	stack := utils.NewStack[[]*NodeRoute]()
+	stack.Push([]*NodeRoute{nil, s})
+	allRoutes := []*NodeRoute{}
+	for stack.Len() > 0 {
+		l := stack.Pop()
+		current := l[1]
+		if current.NodeMap.Has(node) {
+			continue
+		}
+		allRoutes = append(allRoutes, current)
+		for _, n := range current.Parent {
+			stack.Push([]*NodeRoute{current, n})
+		}
+	}
+	res := utils.NewSet[*core.Node]()
+	for _, route := range allRoutes {
+		res = res.Or(route.NodeMap)
+	}
+	return res, false
+}
+func (s *NodeRoute) ChildrenHas(node *core.Node) bool {
+	stack := utils.NewStack[*NodeRoute]()
+	stack.Push(s)
+	for stack.Len() > 0 {
+		current := stack.Pop()
+		if current == nil {
+			continue
+		}
+		if current.NodeMap == nil {
+			continue
+		}
+		if current.NodeMap.Has(node) {
+			return true
+		}
+		for _, n := range current.Children {
+			stack.Push(n)
+		}
+	}
+	return false
+}
 func (s *NodeRoute) Has(node *core.Node) (*NodeRoute, bool) {
 	stack := utils.NewStack[*NodeRoute]()
 	stack.Push(s)
@@ -68,6 +110,7 @@ func NewRootNodeRoute() *NodeRoute {
 func (s *NodeRoute) NewChild(conditionNode *core.Node) *NodeRoute {
 	m := NewRootNodeRoute()
 	m.Parent = []*NodeRoute{s}
+	s.Children = append(s.Children, m)
 	m.ConditionNode = conditionNode
 	return m
 }

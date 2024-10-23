@@ -8,21 +8,21 @@ import (
 func GetPrimerArrayType(id int) JavaType {
 	switch id {
 	case 4:
-		return JavaBoolean
+		return NewJavaPrimer(JavaBoolean)
 	case 5:
-		return JavaChar
+		return NewJavaPrimer(JavaChar)
 	case 6:
-		return JavaFloat
+		return NewJavaPrimer(JavaFloat)
 	case 7:
-		return JavaDouble
+		return NewJavaPrimer(JavaDouble)
 	case 8:
-		return JavaByte
+		return NewJavaPrimer(JavaByte)
 	case 9:
-		return JavaShort
+		return NewJavaPrimer(JavaShort)
 	case 10:
-		return JavaInteger
+		return NewJavaPrimer(JavaInteger)
 	case 11:
-		return JavaLong
+		return NewJavaPrimer(JavaLong)
 	default:
 		panic(fmt.Sprintf("unknow primer array type: %d", id))
 	}
@@ -33,7 +33,7 @@ func ParseDescriptor(descriptor string) (JavaType, error) {
 }
 
 // parseMethodDescriptor 解析 Java 方法描述符
-func ParseMethodDescriptor(descriptor string) (*JavaFuncType, error) {
+func ParseMethodDescriptor(descriptor string) (JavaType, error) {
 	if descriptor == "" {
 		return nil, fmt.Errorf("descriptor is empty")
 	}
@@ -63,7 +63,7 @@ func ParseMethodDescriptor(descriptor string) (*JavaFuncType, error) {
 		return nil, err
 	}
 
-	return NewJavaFuncType(descriptor, paramTypes, returnType), nil
+	return newJavaTypeWrap(NewJavaFuncType(descriptor, paramTypes, returnType)), nil
 }
 
 // parseTypes 解析多个类型描述符
@@ -111,23 +111,23 @@ func ParseJavaDescription(descriptor string) (JavaType, string, error) {
 
 	switch descriptor[0] {
 	case 'B':
-		return JavaByte, descriptor[1:], nil
+		return NewJavaPrimer(JavaByte), descriptor[1:], nil
 	case 'C':
-		return JavaChar, descriptor[1:], nil
+		return NewJavaPrimer(JavaChar), descriptor[1:], nil
 	case 'D':
-		return JavaDouble, descriptor[1:], nil
+		return NewJavaPrimer(JavaDouble), descriptor[1:], nil
 	case 'F':
-		return JavaFloat, descriptor[1:], nil
+		return NewJavaPrimer(JavaFloat), descriptor[1:], nil
 	case 'I':
-		return JavaInteger, descriptor[1:], nil
+		return NewJavaPrimer(JavaInteger), descriptor[1:], nil
 	case 'J':
-		return JavaLong, descriptor[1:], nil
+		return NewJavaPrimer(JavaLong), descriptor[1:], nil
 	case 'S':
-		return JavaShort, descriptor[1:], nil
+		return NewJavaPrimer(JavaShort), descriptor[1:], nil
 	case 'Z':
-		return JavaBoolean, descriptor[1:], nil
+		return NewJavaPrimer(JavaBoolean), descriptor[1:], nil
 	case 'V':
-		return JavaVoid, descriptor[1:], nil
+		return NewJavaPrimer(JavaVoid), descriptor[1:], nil
 	case 'L':
 		// 类类型，以 L 开头，以 ; 结尾
 		endIndex := strings.Index(descriptor, ";")
@@ -142,13 +142,7 @@ func ParseJavaDescription(descriptor string) (JavaType, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		switch ret := elemType.(type) {
-		case *JavaArrayType:
-			ret.Length = append(ret.Length)
-			return ret, rest, nil
-		default:
-			return NewJavaArrayType(elemType), rest, nil
-		}
+		return NewJavaArrayType(elemType), rest, nil
 	default:
 		return nil, "", fmt.Errorf("unknown type descriptor: %c", descriptor[0])
 	}
