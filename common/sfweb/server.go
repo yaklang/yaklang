@@ -19,12 +19,55 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type SyntaxFlowWebServer struct {
-	db     *gorm.DB
-	router *mux.Router
-	debug  bool
+type ServerConfig struct {
+	Host          string
+	ChatGLMAPIKey string
+	Port          int
+	Debug         bool
+	Https         bool
+}
 
+func NewServerConfig() *ServerConfig {
+	return &ServerConfig{}
+}
+
+type ServerOpt func(*ServerConfig)
+
+func WithHost(host string) ServerOpt {
+	return func(c *ServerConfig) {
+		c.Host = host
+	}
+}
+
+func WithChatGLMAPIKey(apiKey string) ServerOpt {
+	return func(c *ServerConfig) {
+		c.ChatGLMAPIKey = apiKey
+	}
+}
+
+func WithPort(port int) ServerOpt {
+	return func(c *ServerConfig) {
+		c.Port = port
+	}
+}
+
+func WithDebug(debug bool) ServerOpt {
+	return func(c *ServerConfig) {
+		c.Debug = debug
+	}
+}
+
+func WithHttps(https bool) ServerOpt {
+	return func(c *ServerConfig) {
+		c.Https = https
+	}
+}
+
+type SyntaxFlowWebServer struct {
 	grpcClient ypb.YakClient
+	db         *gorm.DB
+	router     *mux.Router
+	config     *ServerConfig
 }
 
 func (s *SyntaxFlowWebServer) init() {
@@ -34,7 +77,12 @@ func (s *SyntaxFlowWebServer) init() {
 	s.registerReportRoute()
 }
 
-func NewSyntaxFlowWebServer(ctx context.Context, https bool, host string, port int, debug bool) (string, error) {
+func NewSyntaxFlowWebServer(ctx context.Context, opts ...ServerOpt) (string, error) {
+	config := NewServerConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	router := mux.NewRouter()
 	router.Use(func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -47,7 +95,7 @@ func NewSyntaxFlowWebServer(ctx context.Context, https bool, host string, port i
 			}
 			SfWebLogger.Infof("Request:\n%s", requestRaw)
 			var debugWriter *LogHTTPResponseWriter
-			if debug {
+			if config.Debug {
 				debugWriter = NewLogHTTPResponseWriter(writer)
 				writer = debugWriter
 			}
@@ -56,13 +104,13 @@ func NewSyntaxFlowWebServer(ctx context.Context, https bool, host string, port i
 			writer.Header().Set("Access-Control-Allow-Credentials", "true")
 
 			handler.ServeHTTP(writer, request)
-			if debug {
+			if config.Debug {
 				SfWebLogger.Debugf("Response:\n%s", debugWriter.Raw())
 			}
 		})
 	})
 
-	server := &SyntaxFlowWebServer{router: router, debug: debug}
+	server := &SyntaxFlowWebServer{router: router, config: config}
 	client, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		return "", err
@@ -72,11 +120,12 @@ func NewSyntaxFlowWebServer(ctx context.Context, https bool, host string, port i
 	// route
 	server.init()
 
-	if port <= 0 {
-		port = utils.GetRandomAvailableTCPPort()
+	if config.Port <= 0 {
+		config.Port = utils.GetRandomAvailableTCPPort()
 	}
+	addr := utils.HostPort(config.Host, config.Port)
 
-	lis, err := net.Listen("tcp", utils.HostPort(host, port))
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return "", err
 	}
@@ -91,7 +140,7 @@ func NewSyntaxFlowWebServer(ctx context.Context, https bool, host string, port i
 	go func() {
 		crep.InitMITMCert()
 		ca, key, _ := crep.GetDefaultCaAndKey()
-		if ca == nil || !https {
+		if ca == nil || !config.Https {
 			dealTls <- false
 			SfWebLogger.Info("start to load no tls config")
 			err := http.Serve(lis, router)
@@ -120,7 +169,7 @@ func NewSyntaxFlowWebServer(ctx context.Context, https bool, host string, port i
 		proto = "https"
 	}
 	time.Sleep(time.Second)
-	addr := fmt.Sprintf("%s://%v", proto, utils.HostPort(host, port))
-	SfWebLogger.Infof("start syntaxflow web server on: %v", addr)
-	return addr, nil
+	url := fmt.Sprintf("%s://%s", proto, addr)
+	SfWebLogger.Infof("start syntaxflow web server on: %v", url)
+	return url, nil
 }
