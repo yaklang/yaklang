@@ -1788,6 +1788,7 @@ func TestGRPCMUSTTPASS_MITM_HijackTags(t *testing.T) {
 			Page:  1,
 			Limit: 1,
 		},
+		SourceType: "mitm",
 	}, 1)
 	require.NoError(t, err)
 	flow := flows.Data[0]
@@ -1800,6 +1801,7 @@ func TestGRPCMUSTTPASS_MITM_HijackTags(t *testing.T) {
 			Page:  1,
 			Limit: 1,
 		},
+		SourceType: "mitm",
 	}, 1)
 	require.NoError(t, err)
 	flow = flows.Data[0]
