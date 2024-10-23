@@ -80,3 +80,67 @@ func main() {
 	}, ssaapi.WithLanguage(ssaapi.GO))
 
 }
+
+func Test_Captured_SideEffect(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		code := `package main
+
+	import "fmt"
+
+	func test() {
+		a := 1
+		f := func() {
+			a = 0
+		}
+		{
+			a := 2
+			f()
+			b := a // 2 不会被side-effect影响
+		}
+
+		c := a // 0 会被side-effect影响
+	}
+		`
+		ssatest.CheckSyntaxFlow(t, code, `
+			b #-> as $b
+			c #-> as $c
+		`, map[string][]string{
+			"b": {"2"},
+			"c": {"0", "1"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	t.Run("nesting", func(t *testing.T) {
+		code := `package main
+
+	import "fmt"
+
+	func test() {
+		a := 1
+		f := func() {
+			a = 0
+		}
+		{
+			a := 2
+			{
+				a := 3
+				f()
+				b := a // 3 不会被side-effect影响
+			}
+			f()
+			c := a // 2 不会被side-effect影响
+		}
+		d := a // 0 会被side-effect影响
+	}
+		`
+		ssatest.CheckSyntaxFlow(t, code, `
+			b #-> as $b
+			c #-> as $c
+			d #-> as $d
+		`, map[string][]string{
+			"b": {"3"},
+			"c": {"2"},
+			"d": {"0", "1"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+}

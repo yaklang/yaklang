@@ -304,13 +304,19 @@ func (c *Call) handleCalleeFunction() {
 				variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
 			}
 
-			// TODO: handle side effect in loop scope,
-			// will replace value in scope and create new phi
-			sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify)
-			if sideEffect != nil {
-				builder.AssignVariable(variable, sideEffect)
-				sideEffect.SetVerboseName(se.VerboseName)
-				c.SideEffectValue[se.VerboseName] = sideEffect
+			if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
+				if se.Variable.GetScope() == currentScope {
+					// TODO: handle side effect in loop scope,
+					// will replace value in scope and create new phi
+					builder.AssignVariable(variable, sideEffect)
+					sideEffect.SetVerboseName(se.VerboseName)
+					c.SideEffectValue[se.Name] = sideEffect
+				} else {
+					value := currentScope.CreateVariable(se.VerboseName, false)
+					currentScope.AssignVariable(value, sideEffect)
+					sideEffect.SetVerboseName(se.VerboseName)
+					currentScope.SetCapturedSideEffect(se.Name, value)
+				}
 			}
 		}
 		recoverBuilder()
