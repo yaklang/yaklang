@@ -52,7 +52,7 @@ func TestReportFalsePositive(t *testing.T) {
 		progress := 0.0
 
 		wc, err := lowhttp.NewWebsocketClient(
-			GetScanRequest(),
+			GetScanHTTPRequest(),
 			lowhttp.WithWebsocketFromServerHandlerEx(func(wc *lowhttp.WebsocketClient, b []byte, f []*lowhttp.Frame) {
 				var rsp sfweb.SyntaxFlowScanResponse
 				err := json.Unmarshal(b, &rsp)
