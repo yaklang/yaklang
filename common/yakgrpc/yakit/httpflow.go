@@ -476,17 +476,19 @@ func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) (finErr error) {
 	}()
 
 	if i.ID > 0 {
-		if db = db.Where("id = ?", i.ID).UpdateColumn("tags", i.Tags); db.Error != nil {
+		i.Hash = i.CalcHash()
+		if db = db.Where("id = ?", i.ID).UpdateColumns(schema.HTTPFlow{Hash: i.Hash, Tags: tags}); db.Error != nil {
 			log.Errorf("update tags(by id) failed: %s", db.Error)
 			return db.Error
 		}
 	} else if i.HiddenIndex != "" {
-		if db = db.Where("hidden_index = ?", i.HiddenIndex).UpdateColumn("tags", i.Tags); db.Error != nil {
+		i.Hash = i.CalcHash()
+		if db = db.Where("hidden_index = ?", i.HiddenIndex).UpdateColumn(schema.HTTPFlow{Hash: i.Hash, Tags: tags}); db.Error != nil {
 			log.Errorf("update tags(by hidden_index) failed: %s", db.Error)
 			return db.Error
 		}
 	} else if i.Hash != "" {
-		if db = db.Where("hash = ?", i.HiddenIndex).UpdateColumn("tags", i.Tags); db.Error != nil {
+		if db = db.Where("hash = ?", i.Hash).UpdateColumn("tags", i.Tags); db.Error != nil {
 			log.Errorf("update tags(by hash) failed: %s", db.Error)
 			return db.Error
 		}
