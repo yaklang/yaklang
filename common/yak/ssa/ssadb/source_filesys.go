@@ -134,6 +134,13 @@ func (fs *irSourceFS) Stat(path string) (fs.FileInfo, error) {
 }
 
 func (fs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
+	if path == "/" {
+		for _, program := range AllSSAPrograms() {
+			fs.virtual.Delete(fmt.Sprintf("/%s", program.Name))
+			fs.virtual.AddDir(fmt.Sprintf("/%s", program.Name))
+		}
+	}
+
 	if entry, err := fs.virtual.ReadDir(path); err == nil && entry != nil {
 		return entry, nil
 	}
