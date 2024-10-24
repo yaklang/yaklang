@@ -141,15 +141,11 @@ func UrlToHTTPRequest(text string) ([]byte, error) {
 		r.RequestURI += "?" + u.RawQuery
 	}
 
-	if u.Fragment != "" {
-		if u.RawFragment != "" {
-			r.RequestURI += "#" + u.RawFragment
-		} else {
-			r.RequestURI += "#" + url.PathEscape(u.Fragment)
-		}
-	}
-
-	if strings.HasSuffix(text, "#") && u.Fragment == "" {
+	if u.RawFragment != "" {
+		r.RequestURI += "#" + u.RawFragment
+	} else if u.Fragment != "" {
+		r.RequestURI += "#" + url.PathEscape(u.Fragment)
+	} else if strings.HasSuffix(text, "#") {
 		r.RequestURI += "#"
 	}
 

@@ -103,7 +103,7 @@ func ParseStringToUrl(s string) *url.URL {
 	// handle #
 	s, fragment, fragmentOk := strings.Cut(s, "#")
 	if fragmentOk {
-		u.Fragment = fragment
+		u.RawFragment = fragment
 	}
 
 	haveSchemeSplit := false
