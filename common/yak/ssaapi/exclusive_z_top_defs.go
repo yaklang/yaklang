@@ -299,8 +299,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
+			if !actx.needCrossProcess(i, traced) {
+				return Values{}
+			}
 			ret := traced.getTopDefs(actx, opt...)
-
 			if !actx.needCrossProcess(i, traced) {
 				ret = append(ret, i)
 			}
@@ -318,9 +320,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
-				call2fun = lo.UniqBy(call2fun, func(item *Value) int64 {
-					return item.GetId()
-				})
 				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call)
 					vals = append(vals, val...)
@@ -369,18 +368,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
-			ret := traced.getTopDefs(actx, opt...)
-			// From formal parameters to actual parameters,
-			// if it is not the cross-process analysis,
-			// then append the formal-parameters value to results
-			// to provide more analysis information.
 			if !actx.needCrossProcess(i, traced) {
-				if i.IsFreeValue() && inst.GetDefault() != nil {
-					ret = append(ret, i.NewValue(inst.GetDefault()))
-				} else {
-					ret = append(ret, i)
-				}
+				return Values{}
 			}
+			ret := traced.getTopDefs(actx, opt...)
 			if len(ret) > 0 {
 				return ret
 			} else {
@@ -403,12 +394,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
-				// In database mode, the call2fun returns multiple duplicate values
-				// which will affect the mechanism to prevent recursion,
-				// which require deduplication.
-				call2fun = lo.UniqBy(call2fun, func(item *Value) int64 {
-					return item.GetId()
-				})
 				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call)
 					vals = append(vals, val...)
