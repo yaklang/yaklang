@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -117,11 +118,11 @@ func UrlToHTTPRequest(text string) ([]byte, error) {
 	if !(strings.HasPrefix(text, "http://") || strings.HasPrefix(text, "https://")) {
 		text = "http://" + text
 	}
-	u, err := url.Parse(text)
-	if err != nil {
-		return nil, err
+	u := utils.ParseStringToUrl(text)
+	if u == nil {
+		return nil, errors.New("parse url error")
 	}
-	r, err = http.NewRequest("GET", text, http.NoBody)
+	r, err := http.NewRequest("GET", text, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
