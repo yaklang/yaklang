@@ -136,7 +136,10 @@ func (v *Value) GetCallActualParams(i int) (sfvm.ValueOperator, error) {
 }
 
 func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
-	return v.GetCalledBy(), nil
+	// return v.GetCalledBy(), nil
+	ret := v.GetCalledBy()
+	ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
+	return ret, nil
 }
 
 func (v *Value) GetFields() (sfvm.ValueOperator, error) {
