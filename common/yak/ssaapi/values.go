@@ -3,8 +3,8 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -32,13 +32,19 @@ type Value struct {
 	Predecessors []*PredecessorValue
 	DescInfo     map[string]string
 	// value from database
-	auditNode  *ssadb.AuditNode
-	valueCache *utils.CacheWithKey[int64, *Value]
+	auditNode *ssadb.AuditNode
 }
 
 type PredecessorValue struct {
 	Node *Value
 	Info *sfvm.AnalysisContext
+}
+
+func (v *Value) GetAuditNodeId() uint {
+	if v.auditNode == nil {
+		return 0
+	}
+	return v.auditNode.ID
 }
 
 func (v *Value) IsFromDataBase() bool {
@@ -154,43 +160,6 @@ func ValueCompare(v1raw, v2raw *Value) bool {
 	return res
 }
 
-func (p *Program) NewValue(n ssa.Value) *Value {
-	if utils.IsNil(n) {
-		return nil
-	}
-	return &Value{
-		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
-		node:          n,
-		ParentProgram: p,
-	}
-}
-
-func (p *Program) NewValueFromDB(id int64) *Value {
-	if id == -1 {
-		return nil
-	}
-	if v := p.GetValueFromCache(id); v != nil {
-		return v
-	}
-	node, err := ssa.NewLazyInstruction(id)
-	if err != nil {
-		log.Errorf("GetValues new lazy instruction: %v", err)
-		return nil
-	}
-	val := &Value{
-		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
-		node:          node,
-		ParentProgram: p,
-	}
-	auditNode := ssadb.GetAuditNodeById(id)
-	if !utils.IsNil(auditNode) {
-		val.auditNode = auditNode
-		p.SetValueCache(id, val)
-		return val
-	}
-	return nil
-}
-
 func (v *Value) GetProgramName() string {
 	if v.IsNil() {
 		return ""
@@ -286,9 +255,6 @@ func (v *Value) GetVerboseName() string {
 	if v.IsNil() {
 		return ""
 	}
-	if v.IsFromDataBase() {
-		return v.auditNode.VerboseName
-	}
 	var name string
 	if name = v.node.GetName(); name != "" {
 		if v.IsPhi() {
@@ -351,15 +317,6 @@ func (v *Value) GetOperands() Values {
 		v.operands = lo.Map(v.node.GetValues(), func(ssaVal ssa.Value, _ int) *Value { return v.NewValue(ssaVal) })
 	}
 	return v.operands
-}
-
-func (v *Value) NewValue(value ssa.Value) *Value {
-	return v.ParentProgram.NewValue(value)
-}
-
-func (v *Value) NewValueFromDB(id int64) *Value {
-	value := v.ParentProgram.NewValueFromDB(id)
-	return value
 }
 
 func (v *Value) GetOperand(index int) *Value {
@@ -862,53 +819,60 @@ func (v *Value) GetCallee() *Value {
 }
 
 func (v *Value) GetPredecessors() []*PredecessorValue {
-	if !v.IsFromDataBase() {
-		return v.Predecessors
-	}
-	preds := ssadb.GetPredecessorEdgeByFromID(v.GetId())
-	var results []*PredecessorValue
-	for _, pred := range preds {
-		p := v.NewValueFromDB(pred.ToNode)
-		result := &PredecessorValue{
-			Node: p,
-			Info: &sfvm.AnalysisContext{
-				Step:  int(pred.AnalysisStep),
-				Label: pred.AnalysisLabel,
-			},
+	if len(v.Predecessors) == 0 {
+		if auditNode := v.auditNode; auditNode != nil {
+			edges := ssadb.GetPredecessorEdgeByFromID(auditNode.ID)
+			var preds []*PredecessorValue
+			for _, edges := range edges {
+				p := v.NewValueFromAuditNode(uint(edges.ToNode))
+				if p != nil {
+					preds = append(preds, &PredecessorValue{
+						Node: p,
+						Info: &sfvm.AnalysisContext{
+							Step:  int(edges.AnalysisStep),
+							Label: edges.AnalysisLabel,
+						},
+					})
+				}
+			}
+			v.Predecessors = preds
 		}
-		results = append(results, result)
 	}
-	return results
+	return v.Predecessors
 }
 
 func (v *Value) GetDependOn() Values {
-	if !v.IsFromDataBase() {
-		return v.DependOn
-	}
-	ids := ssadb.GetDependEdgeOnByFromNodeId(v.GetId())
-	var dependOn Values
-	for _, id := range ids {
-		d := v.NewValueFromDB(id)
-		if d != nil {
-			dependOn = append(dependOn, d)
+	if len(v.DependOn) == 0 {
+		if auditNode := v.auditNode; auditNode != nil {
+			nodeIds := ssadb.GetDependEdgeOnByFromNodeId(auditNode.ID)
+			var dependOn Values
+			for _, id := range nodeIds {
+				d := v.NewValueFromAuditNode(id)
+				if d != nil {
+					dependOn = append(dependOn, d)
+				}
+			}
+			v.DependOn = dependOn
 		}
 	}
-	return dependOn
+	return v.DependOn
 }
 
 func (v *Value) GetEffectOn() Values {
-	if !v.IsFromDataBase() {
-		return v.EffectOn
-	}
-	ids := ssadb.GetEffectOnEdgeByFromNodeId(v.GetId())
-	var effectOn Values
-	for _, id := range ids {
-		e := v.NewValueFromDB(id)
-		if e != nil {
-			effectOn = append(effectOn, e)
+	if len(v.EffectOn) == 0 {
+		if auditNode := v.auditNode; auditNode != nil {
+			nodeIds := ssadb.GetEffectOnEdgeByFromNodeId(auditNode.ID)
+			var effectOn Values
+			for _, id := range nodeIds {
+				e := v.NewValueFromAuditNode(id)
+				if e != nil {
+					effectOn = append(effectOn, e)
+				}
+			}
+			v.EffectOn = effectOn
 		}
 	}
-	return effectOn
+	return v.EffectOn
 }
 
 func (v *Value) DotGraph() string {
@@ -1050,7 +1014,5 @@ func (v Values) GetOperands() Values {
 
 func (v Values) DotGraph() string {
 	vg := NewValueGraph(v...)
-	var buf bytes.Buffer
-	vg.GenerateDOT(&buf)
-	return buf.String()
+	return vg.Dot()
 }
