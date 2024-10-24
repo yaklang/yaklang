@@ -194,7 +194,13 @@ Get SyntaxFlowAction
 			* ResourceType: information + result_id
 			this value information, contain message && graph && node-info
 */
-func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.RequestYakURLResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = utils.Errorf("recover: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 
 	query, err := a.GetResult(params)
 	if err != nil {

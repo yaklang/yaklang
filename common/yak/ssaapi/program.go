@@ -184,7 +184,11 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 		log.Errorf("NewValueFromDB: audit node not found: %d", nodeID)
 		return nil
 	}
-	val := p.GetValueByIdMust(auditNode.IRCodeID)
+	val, err := p.GetValueById(auditNode.IRCodeID)
+	if err != nil {
+		log.Errorf("NewValueFromDB: get value by id failed: %v", err)
+		return nil
+	}
 	val.auditNode = auditNode
 
 	// save cache
