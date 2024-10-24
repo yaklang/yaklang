@@ -630,7 +630,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			err = utils.Errorf("search glob failed: not found: %v", i.UnaryStr)
 		}
 		s.debugSubLog("result next: %v", next.String())
-		_ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
+		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
@@ -659,7 +659,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			err = utils.Errorf("search regexp failed: not found: %v", i.UnaryStr)
 		}
 		s.debugSubLog("result next: %v", next.String())
-		_ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
+		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
@@ -698,7 +698,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		callLen := ValuesLen(results)
 		s.debugSubLog("<< push len: %v", callLen)
-		_ = results.AppendPredecessor(value, s.WithPredecessorContext("call"))
+		// _ = results.AppendPredecessor(value, s.WithPredecessorContext("call"))
 		s.stack.Push(results)
 
 	case OpGetCallArgs:
