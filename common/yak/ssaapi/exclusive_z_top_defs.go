@@ -36,7 +36,6 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	}
 
 	for _, def := range i.node.GetValues() {
-
 		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
@@ -62,6 +61,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	if actx == nil {
 		actx = NewAnalyzeContext(opt...)
 	}
+	i.actx = actx
 
 	actx.depth--
 	defer func() {
@@ -85,8 +85,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return i.getTopDefs(actx, opt...)
 	}
-	if !actx.TheValueShouldBeVisited(i) {
-		return Values{i}
+	if visited, value := actx.TheValueShouldBeVisited(i); !visited {
+		return []*Value{value}
 	}
 	{
 		obj, key, member := actx.GetCurrentObject()

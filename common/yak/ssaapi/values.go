@@ -30,6 +30,7 @@ type Value struct {
 	// for syntaxflow vm
 	Predecessors []*PredecessorValue
 	DescInfo     map[string]string
+	actx         *AnalyzeContext
 }
 
 type PredecessorValue struct {
@@ -103,6 +104,24 @@ func (v *Value) getDependOnPath(m map[int64]struct{}) Values {
 		vals = append(vals, i.getDependOnPath(m)...)
 	}
 	return vals
+}
+
+func (v *Value) GetEffectOnAllPath() []Values {
+	return v.getDataFlowAllPath(nil, Values{v}, func(i *Value) Values {
+		return i.EffectOn
+	})
+}
+func (v *Value) GetDependOnAllPath() []Values {
+	return v.getDataFlowAllPath(nil, Values{v}, func(i *Value) Values {
+		return i.DependOn
+	})
+}
+func (v *Value) getDataFlowAllPath(pathStack *utils.Stack[Values], path Values, get func(i *Value) Values) []Values {
+	if pathStack == nil {
+		pathStack = utils.NewStack[Values]()
+	}
+	values := get(v)
+	return values.getDataFlowAllPath(pathStack, path, get)
 }
 
 func (v *Value) GetDependOnPath() Values {
@@ -318,6 +337,17 @@ func (v *Value) GetOperands() Values {
 }
 
 func (v *Value) NewValue(value ssa.Value) *Value {
+	if v.actx != nil {
+		if visited, b := v.actx.crossProcessVisitedTable.getCurrentVisited(); !b {
+			return v.ParentProgram.NewValue(value)
+		} else {
+			if v2, ok := visited.visited[value.GetId()]; ok {
+				return v2
+			} else {
+				return v.ParentProgram.NewValue(value)
+			}
+		}
+	}
 	return v.ParentProgram.NewValue(value)
 }
 
@@ -836,6 +866,45 @@ func (value Values) Ref(name string) Values {
 	return ret
 }
 
+func (v Values) GetEffectOnAllPath() []Values {
+	var paths []Values
+	for _, value := range v {
+		paths = append(paths, value.GetEffectOnAllPath()...)
+	}
+	return paths
+}
+func (v Values) GetDependOnAllPath() []Values {
+	var paths []Values
+	for _, value := range v {
+		paths = append(paths, value.GetDependOnAllPath()...)
+	}
+	return paths
+}
+func (v Values) getDataFlowAllPath(pathStack *utils.Stack[Values], path Values, get func(i *Value) Values) []Values {
+	if pathStack == nil {
+		pathStack = utils.NewStack[Values]()
+	}
+	var paths []Values
+	if v == nil || v.Len() == 0 {
+		paths = append(paths, path)
+		return paths
+	}
+	switch v.Len() {
+	case 1:
+		path = append(path, v...)
+		return v[0].getDataFlowAllPath(pathStack, path, get)
+	default:
+		pathStack.Push(path)
+		for _, value := range v {
+			path = append(path, value)
+			allPath := value.getDataFlowAllPath(pathStack, path, get)
+			path = pathStack.Peek()
+			paths = append(paths, allPath...)
+		}
+		path = pathStack.Pop()
+	}
+	return paths
+}
 func (v Values) StringEx(flag int) string {
 	if len(v) <= 0 {
 		return "Values: 0"

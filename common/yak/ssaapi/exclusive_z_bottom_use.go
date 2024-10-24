@@ -95,8 +95,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 		return v.getBottomUses(actx, opt...)
 	}
-	if !actx.TheValueShouldBeVisited(v) {
-		return Values{v}
+	visited, value := actx.TheValueShouldBeVisited(v)
+	if !visited {
+		return []*Value{value}
 	}
 
 	switch ins := v.node.(type) {

@@ -10,8 +10,8 @@ import (
 type valueVisited struct {
 	from          *Value
 	to            *Value
-	visited       map[int64]struct{}
-	visitedObject map[int64]struct{}
+	visited       map[int64]*Value
+	visitedObject map[int64]*Value
 }
 
 type crossProcessVisitedTable struct {
@@ -39,8 +39,8 @@ func newValueVisited(from *Value, to *Value) *valueVisited {
 	return &valueVisited{
 		from:          from,
 		to:            to,
-		visited:       make(map[int64]struct{}),
-		visitedObject: make(map[int64]struct{}),
+		visited:       make(map[int64]*Value),
+		visitedObject: make(map[int64]*Value),
 	}
 }
 
@@ -48,8 +48,8 @@ func newDefaultValueVisited() *valueVisited {
 	return &valueVisited{
 		from:          nil,
 		to:            nil,
-		visited:       make(map[int64]struct{}),
-		visitedObject: make(map[int64]struct{}),
+		visited:       make(map[int64]*Value),
+		visitedObject: make(map[int64]*Value),
 	}
 }
 
