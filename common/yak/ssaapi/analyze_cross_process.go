@@ -120,12 +120,12 @@ func (c *crossProcess) memberShould(v *Value) bool {
 // If from-value and to-value do not have a function, then use -1 for calculation
 func calcCrossProcessHash(from *Value, to *Value) string {
 	var fromId, toId int64
-	if from == nil {
+	if from == nil || from.node == nil {
 		fromId = -1
 	} else {
 		fromId = from.GetFunction().GetId()
 	}
-	if to == nil {
+	if to == nil || to.node == nil {
 		toId = -1
 	} else {
 		toId = to.GetFunction().GetId()
