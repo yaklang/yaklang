@@ -469,6 +469,26 @@ func TestProgram_NewProgram(t *testing.T) {
 		}
 		return progs
 	}
+	{
+		progName := uuid.NewString()
+		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
+		require.NoError(t, err)
+	}
+	{
+		progName := uuid.NewString()
+		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
+		require.NoError(t, err)
+	}
+	{
+		progName := uuid.NewString()
+		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
+		require.NoError(t, err)
+	}
+	{
+		progName := uuid.NewString()
+		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
+		require.NoError(t, err)
+	}
 
 	t.Run("test", func(t *testing.T) {
 		progs := get()
@@ -483,9 +503,7 @@ func TestProgram_NewProgram(t *testing.T) {
 
 		newProgs := get()
 		log.Info("new prog: ", newProgs)
-		progNum := len(progs)
 		assert.Equal(t, len(progs)+1, len(newProgs))
-		assert.Equal(t, fmt.Sprintf("/%s", progName), newProgs[progNum])
-
+		assert.Equal(t, fmt.Sprintf("/%s", progName), newProgs[0])
 	})
 }
