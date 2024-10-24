@@ -266,7 +266,8 @@ type MiddleStatement struct {
 }
 
 func (a *MiddleStatement) String(funcCtx *class_context.ClassContext) string {
-	panic("middle statement should not be printed")
+	return "switch"
+	//panic("middle statement should not be printed")
 }
 
 func NewMiddleStatement(flag string, d any) *MiddleStatement {
