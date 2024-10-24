@@ -207,7 +207,8 @@ func TestUrlToHTTPRequest(t *testing.T) {
 				t.FailNow()
 				return
 			}
-			assert.Equalf(t, tt.want, got, "UrlToHTTPRequest(%v)", tt.args.text)
+
+			assert.Equalf(t, string(tt.want), string(got), "UrlToHTTPRequest(%v)", tt.args.text)
 		})
 	}
 }
