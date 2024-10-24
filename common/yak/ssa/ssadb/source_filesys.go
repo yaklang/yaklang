@@ -19,11 +19,15 @@ type irSourceFS struct {
 }
 
 func NewIrSourceFs() *irSourceFS {
+	ret := &irSourceFS{}
+	ret.resetVfs()
+	return ret
+}
+
+func (sfs *irSourceFS) resetVfs() {
 	virtual := filesys.NewVirtualFs()
 	virtual.AddDir("/")
-	return &irSourceFS{
-		virtual: virtual,
-	}
+	sfs.virtual = virtual
 }
 
 var _ filesys_interface.FileSystem = (*irSourceFS)(nil)
@@ -134,6 +138,13 @@ func (fs *irSourceFS) Stat(path string) (fs.FileInfo, error) {
 }
 
 func (fs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
+	if path == "/" {
+		fs.resetVfs()
+		for _, program := range AllSSAPrograms() {
+			fs.virtual.AddDir(fmt.Sprintf("/%s", program.Name))
+		}
+	}
+
 	if entry, err := fs.virtual.ReadDir(path); err == nil && entry != nil {
 		return entry, nil
 	}

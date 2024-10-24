@@ -69,8 +69,11 @@ func (c *config) parseProject() (Programs, error) {
 		ssadb.SaveFolder(prog.Name, []string{"/"})
 	}
 
-	totalSize := 0
+	totalSize := 1
 	prog.ProcessInfof = func(s string, v ...any) {
+		if prog.PreHandler() {
+			return
+		}
 		msg := fmt.Sprintf(s, v...)
 		if ret := prog.GetIncludeFiles(); len(ret) > 0 {
 			for idx, fileName := range ret {
@@ -163,15 +166,15 @@ func (c *config) parseProject() (Programs, error) {
 	}
 	prog.ProcessInfof("program %s finishing", prog.Name)
 	prog.Finish()
-	prog.ProcessInfof("program %s finish", prog.Name)
 	var progs = []*Program{NewProgram(prog, c)}
-	//for _, program := range prog.ChildApplication {
-	//	progs = append(progs, NewProgram(program, c))
-	//}
 	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
-
 	}
+	// todo:  rewrite me  in next time
+	if len(prog.FileList) == totalSize-1 {
+		totalSize = len(prog.FileList)
+	}
+	prog.ProcessInfof("program %s finish", prog.Name)
 	return progs, nil
 }
 
