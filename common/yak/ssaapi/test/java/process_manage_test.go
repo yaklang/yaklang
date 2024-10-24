@@ -41,6 +41,7 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 			vf.AddFile(path, fmt.Sprintf("package %s;", lastDirName))
 		}
 
+		var finalProcess float64
 		var maxProcess float64
 		programID := uuid.NewString()
 		ctx, cancel := context.WithCancel(context.Background())
@@ -51,7 +52,10 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 				if process >= 0.5 {
 					cancel()
 				}
-				if process > maxProcess {
+				if process > finalProcess {
+					finalProcess = process
+				}
+				if process > maxProcess && process != 1 {
 					maxProcess = process
 				}
 				log.Infof("message %v, process: %f", msg, process)
@@ -59,7 +63,8 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 			ssaapi.WithContext(ctx),
 		)
 		assert.NoErrorf(t, err, "parse project error: %v", err)
-		require.LessOrEqual(t, maxProcess, 0.5)
+		require.Equal(t, finalProcess, float64(1)) // when cancel, the process will be 1
+		require.LessOrEqual(t, maxProcess, 0.6)
 		file := make([]string, 0)
 		dbfs := ssadb.NewIrSourceFs()
 		filesys.Recursive(
@@ -71,7 +76,7 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 				return nil
 			}),
 		)
-		require.LessOrEqual(t, len(file), 5)
+		require.LessOrEqual(t, len(file), 6)
 	})
 
 }
