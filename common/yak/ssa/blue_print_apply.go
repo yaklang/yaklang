@@ -120,7 +120,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 		// classBluePrint only create by `class` keyword.
 		// in this case, member can be set nil, just declare the type.
 		if utils.IsNil(value) {
-			value := builder.ReadMemberCallVariable(obj, key)
+			value := builder.ReadMemberCallValue(obj, key)
 			value.SetType(typ)
 		} else {
 			builder.AssignVariable(

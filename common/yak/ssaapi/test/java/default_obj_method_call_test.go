@@ -1,6 +1,7 @@
 package java
 
 import (
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 
@@ -125,7 +126,7 @@ class B {
 		//}
 
 		res1 := prog.SyntaxFlow(`result #-> as $result;`).GetValues("result")
-		param1 := prog.SyntaxFlow(` obj.objMethod(* as $param1);`).GetValues("param1")
+		param1 := prog.SyntaxFlow(`obj.objMethod(* as $param1);`).GetValues("param1")
 		if res1.Show().Len() == 0 {
 			t.Fatal("result have no value")
 		}
@@ -267,6 +268,25 @@ class A {
 
 }
 
+func TestFunctionCallSf(t *testing.T) {
+	code := `public class A{
+public void a(){}
+}
+public class B{
+	public static void main(){
+		A a = new A();
+		a.a();
+		a.a();
+	}
+}
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		result, err := prog.SyntaxFlowWithError(`a.a() as $call`)
+		require.NoError(t, err)
+		require.True(t, result.GetValues("call").Len() == 2)
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
 func TestDefaultObjForPeekValue(t *testing.T) {
 	ssatest.Check(t, `
 public class A{

@@ -4,6 +4,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 )
 
 func (r *Return) calcType() Type {
@@ -136,8 +137,9 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 		if _, ok := tmp[typs]; !ok {
 			tmp[typs] = struct{}{}
 		}
+		var opcode = []Opcode{SSAOpcodeParameter, SSAOpcodeFreeValue, SSAOpcodeParameterMember, SSAOpcodeSideEffect}
 		for _, result := range r.Results {
-			if result.GetOpcode() != SSAOpcodeParameter || result.GetOpcode() != SSAOpcodeFreeValue || result.GetOpcode() != SSAOpcodeParameterMember || result.GetOpcode() != SSAOpcodeSideEffect {
+			if !slices.Contains(opcode, result.GetOpcode()) {
 				if result.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 					for key, value := range result.GetAllMember() {
 						variable := value.GetLastVariable()

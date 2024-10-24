@@ -53,3 +53,30 @@ public class Main {
 		"param": {"Function-IFunc.DoGet", "2"},
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+
+func TestTypename(t *testing.T) {
+	code := `
+package com.example.springboot.controller;
+import com.thoughtworks.xstream.XStream;
+class test{
+	public XStream xstreamInstance = null;
+    public void createPerson() {
+        xstreamInstance.alias("person", Person.class);
+    }
+	public void XX(){
+	}
+}
+}
+`
+	t.Run("test typename field", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `.alias<getObject><typeName> as $output`,
+			map[string][]string{"output": {`"com.thoughtworks.xstream.XStream"`, `"XStream"`}},
+			ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+	t.Run("test typename member method", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `.alias<typeName> as $output`,
+			map[string][]string{"output": {`"com.thoughtworks.xstream.XStream"`, `"XStream"`}},
+			ssaapi.WithLanguage(ssaapi.JAVA))
+	},
+	)
+}

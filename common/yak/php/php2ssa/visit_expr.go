@@ -74,7 +74,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 	case *phpparser.MemerCallExpressionContext:
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitMemberCallKey(ret.MemberCallKey())
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
 	case *phpparser.FullyQualifiedNamespaceExpressionContext:
@@ -85,14 +85,14 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		if key == nil {
 			return obj
 		}
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.IndexLegacyCallExpressionContext: // $a{1}
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
 		if key == nil {
 			return obj
 		}
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.FunctionCallExpressionContext:
 		tmp := y.isFunction
 		y.isFunction = true
@@ -1192,15 +1192,15 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	case *phpparser.IndexVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.IndexLegacyCallVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.MemberVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitMemberCallKey(i.MemberCallKey())
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallValue(obj, key)
 	default:
 		return y.EmitUndefined(raw.GetText())
 	}

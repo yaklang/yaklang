@@ -112,7 +112,6 @@ func TestJava_Extend_Class(t *testing.T) {
 			"0",
 		}, t)
 	})
-
 	t.Run("free-value", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 	public 	class Q {
@@ -133,6 +132,23 @@ func TestJava_Extend_Class(t *testing.T) {
 		`, []string{
 			"Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]", "Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[1]",
 		}, t)
+	})
+	t.Run("test function call", func(t *testing.T) {
+		code := `
+class A{
+	public static void b(){
+		return "1";
+	}
+}
+public class main{
+	public static void main(String[] args){
+		A.a();
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `A.a() as $call`, map[string][]string{
+			"call": {"Undefined-A.a(Undefined-A)"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
 	t.Run("just use method", func(t *testing.T) {

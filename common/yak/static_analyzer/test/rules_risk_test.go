@@ -53,6 +53,16 @@ func TestSSARuleMustPassRiskOption(t *testing.T) {
 			rules.ErrorRiskCheck(),
 		})
 	})
+	t.Run("risk with desc and solution", func(t *testing.T) {
+		code := `
+		risk.NewRisk(
+			"abc", 
+			risk.solution("abc"),
+			risk.description("abc")
+		)
+			`
+		check(t, code, []string{})
+	})
 	t.Run("risk with all", func(t *testing.T) {
 		check(t, `
 		risk.NewRisk(
