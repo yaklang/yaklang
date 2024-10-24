@@ -199,19 +199,26 @@ func (b FunctionBuilder) HandlerEllipsis() {
 	b.hasEllipsis = true
 }
 
-// add current function defer function
-func (b *FunctionBuilder) EmitDefer(i Instruction) {
+func (b *FunctionBuilder) EmitDefer(instruction Instruction) {
 	deferBlock := b.GetDeferBlock()
 	endBlock := b.CurrentBlock
 	defer func() {
 		b.CurrentBlock = endBlock
 	}()
 	b.CurrentBlock = deferBlock
-	if len(deferBlock.Insts) == 0 {
-		deferBlock.Insts = append(deferBlock.Insts, i)
-	} else {
-		deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, Instruction(i), 0)
-	}
+	b.emitEx(instruction, func(instruction Instruction) {
+		if c, flag := ToCall(instruction); flag {
+			c.handlerGeneric()
+			c.handlerObjectMethod()
+			c.handlerReturnType()
+			c.handleCalleeFunction()
+		}
+		if len(deferBlock.Insts) == 0 {
+			deferBlock.Insts = append(deferBlock.Insts, instruction)
+		} else {
+			deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, instruction, 0)
+		}
+	})
 }
 
 func (b *FunctionBuilder) SetMarkedFunction(name string) (ret func()) {
