@@ -237,6 +237,9 @@ func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 
 func (v *ScopedVersionedTable[T]) CreateShadowScope() ScopedVersionedTableIF[T] {
 	sub := NewScope[T](v.ProgramName, v.offsetFetcher, v.newVersioned, v)
+	for _, variable := range v.linkSideEffect {
+		sub.linkValues.Append(variable.GetName(), variable)
+	}
 	v.ForEachCapturedVariable(func(s string, vi VersionedIF[T]) {
 		sub.SetCapturedVariable(s, vi)
 	})

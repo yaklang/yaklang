@@ -311,6 +311,10 @@ func (c *Call) handleCalleeFunction() {
 					builder.AssignVariable(variable, sideEffect)
 					sideEffect.SetVerboseName(se.VerboseName)
 					c.SideEffectValue[se.Name] = sideEffect
+				} else if !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
+					builder.AssignVariable(variable, sideEffect)
+					sideEffect.SetVerboseName(se.VerboseName)
+					c.SideEffectValue[se.Name] = sideEffect
 				} else {
 					value := currentScope.CreateVariable(se.VerboseName, false)
 					currentScope.AssignVariable(value, sideEffect)
