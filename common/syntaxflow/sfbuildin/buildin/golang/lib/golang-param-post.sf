@@ -1,0 +1,55 @@
+desc(
+    title: "check golang param post",
+    type: audit,
+    level: info,
+    lib: 'golang-param-post',
+)
+
+.FormValue --> as $post
+
+alert $post
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://param.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	// 确保请求方法是 POST
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 解析表单数据
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	// 获取表单参数
+	name := r.FormValue("name")
+	age := r.FormValue("age")
+
+	// 返回响应
+	fmt.Fprintf(w, "Hello, %s! You are %s years old.", name, age)
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+
+	fmt.Println("Starting server on :8080...")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		fmt.Println("Server failed:", err)
+	}
+}
+
+PARAM
+)

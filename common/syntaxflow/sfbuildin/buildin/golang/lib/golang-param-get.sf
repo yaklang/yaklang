@@ -1,0 +1,56 @@
+desc(
+    title: "check golang param get",
+    type: audit,
+    level: info,
+    lib: 'golang-param-get',
+)
+
+.Get --> as $get
+
+alert $get
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://param.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+// 处理请求的函数
+func handler(w http.ResponseWriter, r *http.Request) {
+	// 获取查询参数
+	queryParams := r.URL.Query()
+
+	// 通过参数名获取参数值
+	name := queryParams.Get("name")
+	age := queryParams.Get("age")
+
+	// 处理未提供的参数
+	if name == "" {
+		name = "Guest"
+	}
+	if age == "" {
+		age = "unknown"
+	}
+
+	// 返回响应
+	fmt.Fprintf(w, "Hello, %s! You are %s years old.", name, age)
+}
+
+func main() {
+	// 注册处理函数
+	http.HandleFunc("/", handler)
+
+	// 启动服务器，监听8080端口
+	fmt.Println("Starting server on :8080...")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		fmt.Println("Server failed:", err)
+	}
+}
+
+PARAM
+)

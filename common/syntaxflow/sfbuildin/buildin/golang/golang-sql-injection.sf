@@ -1,0 +1,67 @@
+desc(
+    title: "golang SQL Injection",
+    type: audit,
+    severity: high,
+)
+
+
+db.QueryRow( * #-> as $query)
+fmt.Sprintf(* #-> as $param)
+
+$query #{
+    until: `* & $param`,
+}-> as $root;
+
+$root?{ .FormValue(*) } as $high;
+
+alert $high for {
+    title: 'SQL Injection detected',
+    title_zh: '检测到SQL注入',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"net/http"
+
+	_ "github.com/go-sql-driver/mysql"
+)
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	// 不安全的 SQL 查询
+	query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
+
+	db, err := sql.Open("mysql", "user:password@/dbname")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	var userID int
+	err = db.QueryRow(query).Scan(&userID)
+	if err != nil {
+		http.Error(w, "Invalid login", http.StatusUnauthorized)
+		return
+	}
+
+	fmt.Fprintf(w, "User ID: %d", userID)
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+UNSAFE
+)
