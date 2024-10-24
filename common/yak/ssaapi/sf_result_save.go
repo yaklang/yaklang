@@ -60,6 +60,7 @@ func (r *SyntaxFlowResult) Save(TaskIDs ...string) (uint, error) {
 	result.RuleSeverity = string(schema.ValidSeverityType(rule.Severity))
 	result.RuleDesc = rule.Description
 	result.AlertDesc = rule.AlertDesc
+	result.RuleContent = rule.Content
 	// program
 	result.ProgramName = r.program.GetProgramName()
 	// value

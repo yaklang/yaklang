@@ -5575,4 +5575,6 @@ message SyntaxFlowResult {
 
   // runtime info 
   uint64 RiskCount = 11; 
+
+  string RuleContent = 12;
 }
