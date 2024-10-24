@@ -115,3 +115,73 @@ HOOK
 	require.Equal(t, len(memPath), len(dbPath))
 
 }
+
+func TestGraph2(t *testing.T) {
+	code := `
+public interface RemoteLogService
+{
+	@PostMapping("/operlog")
+    public R<Boolean> saveLog(@RequestBody SysOperLog sysOperLog, @RequestHeader(SecurityConstants.FROM_SOURCE) String source) throws Exception;
+
+	@Override
+    public T deserialize1() throws SerializationException
+    {
+        return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
+    }
+	@Override
+    public T deserialize2() throws SerializationException
+    {
+        return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
+    }
+	@Override
+    public T deserialize3() throws SerializationException
+    {
+        return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
+    }
+	@Override
+    public T deserialize4() throws SerializationException
+    {
+        return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
+    }
+}
+	`
+
+	ProgName := uuid.NewString()
+	prog, err := ssaapi.Parse(code,
+		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithProgramName(ProgName),
+	)
+	require.NoError(t, err)
+
+	res, err := prog.SyntaxFlowWithError(`
+	// <include('java-spring-param')> as $entry;
+	JSON.parse*() as $entry;
+	`)
+	require.NoError(t, err)
+	entrys := res.GetValues("entry")
+	require.Greater(t, len(entrys), 0)
+	entry := entrys[0]
+	graph := ssaapi.NewValueGraph(entry)
+	path := graph.DeepFirstGraph(entry.GetId())
+	log.Infof("path: %v", path)
+	memDot := entry.DotGraph()
+	log.Infof("dot: \n%v", memDot)
+	require.Equal(t, len(path), 1)
+
+	resultID, err := res.Save()
+	require.NoError(t, err)
+
+	result, err := ssaapi.CreateResultByID(resultID)
+	require.NoError(t, err)
+	entrysDB := result.GetValues("entry")
+	require.Greater(t, len(entrysDB), 0)
+	entryDB := entrysDB[0]
+	graphDB := ssaapi.NewValueGraph(entryDB)
+	pathDB := graphDB.DeepFirstGraph(entry.GetId())
+	require.Equal(t, len(pathDB), 1)
+
+	log.Infof("path from db: %v", pathDB)
+	dbDot := entryDB.DotGraph()
+	log.Infof("dot from db: \n%v", dbDot)
+
+}
