@@ -71,6 +71,9 @@ func (c *config) parseProject() (Programs, error) {
 
 	totalSize := 1
 	prog.ProcessInfof = func(s string, v ...any) {
+		if prog.PreHandler() {
+			return
+		}
 		msg := fmt.Sprintf(s, v...)
 		if ret := prog.GetIncludeFiles(); len(ret) > 0 {
 			for idx, fileName := range ret {
@@ -167,7 +170,10 @@ func (c *config) parseProject() (Programs, error) {
 	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
 	}
-	totalSize = len(prog.FileList)
+	// todo:  rewrite me  in next time
+	if len(prog.FileList) == totalSize-1 {
+		totalSize = len(prog.FileList)
+	}
 	prog.ProcessInfof("program %s finish", prog.Name)
 	return progs, nil
 }
