@@ -1,0 +1,49 @@
+desc(
+    title: "check file write function",
+    type: audit,
+    level: info,
+    lib: 'golang-file-write'
+)
+
+/WriteAll|WriteFile/ as $output
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://filewrite.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+)
+
+func main() {
+	// 要写入的文件名
+	fileName := "example.txt"
+
+	// 写入数据到文件
+	data := []byte("Hello, Go Programming!\nThis is a simple file I/O example.")
+	err := ioutil.WriteFile(fileName, data, 0644) // 0644 是文件权限
+	if err != nil {
+		log.Fatalf("Error writing to file: %s", err)
+	}
+	fmt.Println("Data written to file successfully.")
+
+	// 读取文件内容
+	content, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		log.Fatalf("Error reading from file: %s", err)
+	}
+
+	// 打印文件内容
+	fmt.Println("File content:")
+	fmt.Println(string(content))
+}
+
+PARAM
+)
