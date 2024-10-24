@@ -30,6 +30,13 @@ func (s *Server) IsPrivilegedForNetRaw(ctx context.Context, req *ypb.Empty) (*yp
 			AdviceVerbose: "使用管理员权限打开 Yakit 或者 yak.exe",
 		}, nil
 	}
+	if runtime.GOOS == "darwin" {
+		return &ypb.IsPrivilegedForNetRawResponse{
+			IsPrivileged:  pcapfix.IsPrivilegedForNetRaw(),
+			Advice:        "执行命令",
+			AdviceVerbose: "sudo chgrp access_bpf /dev/bpf* && chmod g+rw /dev/bpf*",
+		}, nil
+	}
 	return &ypb.IsPrivilegedForNetRawResponse{
 		IsPrivileged:  pcapfix.IsPrivilegedForNetRaw(),
 		Advice:        "use pcapfix.Fix or Yakit FixPcapPermission to fix this;",
