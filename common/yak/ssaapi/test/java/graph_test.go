@@ -29,16 +29,13 @@ check $source then "XXE Attack" else "XXE Safe";
 		if !utils.MatchAllOfSubString(
 			source.DotGraph(),
 			"fontcolor", "color",
-			"step[",
 			"penwidth=\"3.0\"",
-			": call",
-			"search-exact:parse", // "search parse",
+			"call",
 			"all-actual-args",
-			"ByteArrayInputStream",
-			"getBytes",
-			"parse",
-			"UTF-8",
-			"xmlStr",
+			"search-exact:newInstance",
+			"search-exact:parse",
+			"search-glob:*Builder",
+			"newInstance(DocumentBuilderFactory)",
 		) {
 			fmt.Println(source.DotGraph())
 			t.Fatal("failed to match all of the substring, bad dot graph")
