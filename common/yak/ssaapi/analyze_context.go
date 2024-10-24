@@ -16,37 +16,93 @@ type objectItem struct {
 type AnalyzeContext struct {
 	// Self
 	Self                        *Value
-	crossProcessVisitedTable    *crossProcessVisitedTable
 	_objectStack                *utils.Stack[objectItem]
 	config                      *OperationConfig
 	depth                       int
 	haveBeenReachedDepthLimited bool
+	// cross process
+	crossProcess *crossProcess
+	_valueStack  utils.Stack[*Value]
+	_causeValue  *Value
 }
 
-func (a *AnalyzeContext) check(opt ...OperationOption) bool {
+func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
+	actx := &AnalyzeContext{
+		crossProcess: newCrossProcessTable(),
+		_objectStack: utils.NewStack[objectItem](),
+		config:       NewOperations(opt...),
+		depth:        -1,
+	}
+	return actx
+}
+
+func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
+	// cross process
+	a._valueStack.Push(v)
+	recoverCrossProcess := a.pushCrossProcess()
+	recoverStack = func() {
+		recoverCrossProcess()
+		a._valueStack.Pop()
+	}
+	// depth limited check
+	needExit = true
 	if a.haveBeenReachedDepthLimited {
 		log.Warnf("reached depth limit,stop it")
-		return true
+		return
 	}
-
-	a.EnterRecursive()
+	a.enterRecursive()
 	// 1w recursive call check
 	if !utils.InGithubActions() {
-		if a.GetRecursiveCounter() > 10000 {
+		if a.getRecursiveCounter() > 10000 {
 			log.Warnf("recursive call is over 10000, stop it")
-			return true
+			return
 		}
 	}
-
 	if a.depth > 0 && a.config.MaxDepth > 0 && a.depth > a.config.MaxDepth {
 		a.haveBeenReachedDepthLimited = true
-		return true
+		return
 	}
 	if a.depth < 0 && a.config.MinDepth < 0 && a.depth < a.config.MinDepth {
 		a.haveBeenReachedDepthLimited = true
-		return true
+		return
 	}
-	return false
+	needExit = false
+	return
+}
+
+func (a *AnalyzeContext) pushCrossProcess() func() {
+	defer func() {
+		a._causeValue = nil
+	}()
+
+	if a._valueStack.Len() > 1 {
+		currentValue := a._valueStack.Peek()
+		lastValue := a._valueStack.PeekN(1)
+		if a.needCrossProcess(lastValue, currentValue) {
+			// When the cross process is about to take place, it is necessary to
+			// remove the causeValue in current process stack info from the visited table.
+			// Because causeValue is the information of the next layer's process stack info.
+			if a._causeValue != nil {
+				a.crossProcess.deleteCurrentCauseValue(a._causeValue)
+			}
+			return a.crossProcess.pushCrossProcess(lastValue, currentValue, a._causeValue)
+		}
+	}
+	return func() {}
+}
+
+// needCrossProcess If the SSA-ID of the function from-value and to-value is different,
+// it is considered to cross the function boundary,
+// which means it is trying to cross process.
+func (a *AnalyzeContext) needCrossProcess(from *Value, to *Value) bool {
+	if from == nil || to == nil {
+		return false
+	}
+	return from.GetFunction().GetId() != to.GetFunction().GetId()
+}
+
+func (a *AnalyzeContext) setCauseValue(v *Value) {
+	a._causeValue = v
 }
 
 func (a *AnalyzeContext) hook(i *Value) error {
@@ -66,109 +122,48 @@ func (a *AnalyzeContext) hook(i *Value) error {
 	return nil
 }
 
-func (a *AnalyzeContext) GetRecursiveCounter() int64 {
-	return atomic.LoadInt64(&a.crossProcessVisitedTable._recursiveCounter)
+func (a *AnalyzeContext) getRecursiveCounter() int64 {
+	return atomic.LoadInt64(&a.crossProcess._recursiveCounter)
 }
 
-func (a *AnalyzeContext) EnterRecursive() {
-	atomic.AddInt64(&a.crossProcessVisitedTable._recursiveCounter, 1)
+func (a *AnalyzeContext) enterRecursive() {
+	atomic.AddInt64(&a.crossProcess._recursiveCounter, 1)
 }
 
-func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
-	actx := &AnalyzeContext{
-		crossProcessVisitedTable: newCrossProcessVisitedTable(),
-		_objectStack:             utils.NewStack[objectItem](),
-		config:                   NewOperations(opt...),
-		depth:                    -1,
+func (a *AnalyzeContext) haveTheCrossProcess(next *Value) bool {
+	if a._valueStack.Len() == 0 {
+		return false
 	}
-	return actx
+	lastValue := a._valueStack.Peek()
+	hash := calcCrossProcessHash(lastValue, next)
+	return a.crossProcess.crossProcessMap.Have(hash)
 }
 
-func (a *AnalyzeContext) CrossProcess(from *Value, to *Value) bool {
-	return a.crossProcessVisitedTable.crossProcess(from, to)
-}
-
-func (a *AnalyzeContext) RecoverCrossProcess() {
-	a.crossProcessVisitedTable.recoverCrossProcess()
-}
-
-// ReverseProcess 逆向跨过程，如果正栈为空，将停止逆向过程
-func (a *AnalyzeContext) ReverseProcess() (string, bool) {
-	return a.crossProcessVisitedTable.reverseProcess(nil, nil)
-}
-
-// ReverseProcessWithDirection 逆向跨过程，如果正栈为空，继续往非正栈中继续逆向过程
-func (a *AnalyzeContext) ReverseProcessWithDirection(from *Value, to *Value) (string, bool) {
-	return a.crossProcessVisitedTable.reverseProcess(from, to)
-}
-
-func (a *AnalyzeContext) RecoverReverseProcess(hash string) {
-	a.crossProcessVisitedTable.recoverReverseProcess(hash)
-}
-
-func (a *AnalyzeContext) GetCallFromLastCrossProcess() *Value {
-	table := a.crossProcessVisitedTable.getValueVisitedTable()
-	if table.Len() <= 0 {
+func (a *AnalyzeContext) getLastCauseValue() *Value {
+	cp := a.crossProcess
+	if cp.crossProcessStack.Len() <= 0 {
 		return nil
 	}
-	if a.crossProcessVisitedTable.positiveHashStack.Len() == 0 {
+	info, ok := cp.getCurrentProcessInfo()
+	if !ok {
 		return nil
 	}
-	hash := a.crossProcessVisitedTable.positiveHashStack.Peek()
-	visited, ok := table.Get(hash)
-	if ok {
-		if visited.to.IsCall() {
-			return visited.to
-		} else if visited.from.IsCall() {
-			return visited.from
-		}
-	}
-	return nil
+	return info.causeValue
 }
 
-func (a *AnalyzeContext) TheValueShouldBeVisited(i *Value) bool {
-	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
-	if !ok {
-		return false
-	}
-	if _, ok := valueVisited.visited[i.GetId()]; !ok {
-		valueVisited.visited[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
+func (a *AnalyzeContext) theValueShouldBeVisited(i *Value) bool {
+	return a.crossProcess.valueShould(i)
 }
 
-func (a *AnalyzeContext) TheMemberShouldBeVisited(i *Value) bool {
-	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
-	if !ok {
-		return false
-	}
-	if _, ok := valueVisited.visitedObject[i.GetId()]; !ok {
-		valueVisited.visitedObject[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
-}
-
-func (a *AnalyzeContext) TheCrossProcessVisited(from *Value, to *Value) bool {
-	visited := a.crossProcessVisitedTable.valueVisitedTable
-	if visited == nil {
-		return false
-	}
-	hash := calcCrossProcessHash(from, to)
-	_, ok := visited.Get(hash)
-	if ok {
-		return true
-	}
-	return false
-
+func (a *AnalyzeContext) theMemberShouldBeVisited(i *Value) bool {
+	return a.crossProcess.memberShould(i)
 }
 
 // ========================================== OBJECT STACK ==========================================
 
-func (g *AnalyzeContext) PushObject(obj, key, member *Value) error {
-	if !g.TheMemberShouldBeVisited(member) {
-		return utils.Errorf("This member(%d) visited, skip", member.GetId())
+func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
+	if !g.theMemberShouldBeVisited(member) {
+		return utils.Errorf("This member(%d) valueVisited, skip", member.GetId())
 	}
 	if !obj.IsObject() {
 		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.node)
