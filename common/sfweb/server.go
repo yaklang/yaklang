@@ -101,8 +101,15 @@ func NewSyntaxFlowWebServer(ctx context.Context, opts ...ServerOpt) (string, err
 				writer = debugWriter
 			}
 			writer.Header().Set("Access-Control-Allow-Origin", "*")
-			writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+			writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 			writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			writer.Header().Set("Access-Control-Max-Age", "86400")
+			if request.Method == http.MethodOptions {
+				writer.Header().Set("Access-Control-Allow-Headers", request.Header.Get("Access-Control-Request-Headers"))
+				writer.Header().Set("Allow", "POST, GET, OPTIONS")
+				writer.WriteHeader(http.StatusOK)
+				return
+			}
 
 			handler.ServeHTTP(writer, request)
 			if config.Debug {
