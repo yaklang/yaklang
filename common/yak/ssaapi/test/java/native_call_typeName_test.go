@@ -196,9 +196,9 @@ func TestMemberCallTypeName(t *testing.T) {
 		obj = prog.SyntaxFlowChain(`res1<fullTypeName>?{have: 'com.org.MemberCallTypeName.A.A'} as $obj`)
 		assert.Equal(t, 1, obj.Len())
 
-		obj = prog.SyntaxFlowChain(`res2<typeName>?{have:'number'} as $obj`)
+		obj = prog.SyntaxFlowChain(`res2<typeName>?{have:'int'} as $obj`)
 		assert.Equal(t, 1, obj.Len())
-		obj = prog.SyntaxFlowChain(`res2<fullTypeName>?{have:'number'} as $obj`)
+		obj = prog.SyntaxFlowChain(`res2<fullTypeName>?{have:'int'} as $obj`)
 		assert.Equal(t, 1, obj.Len())
 
 		obj = prog.SyntaxFlowChain(`res3<typeName>?{have:'Dog'} as $obj`)
@@ -253,9 +253,9 @@ func TestParamTypeName(t *testing.T) {
 		prog := progs[0]
 		prog.Show()
 
-		obj := prog.SyntaxFlowChain(`param1<typeName>?{have: 'number'} as $obj`)
+		obj := prog.SyntaxFlowChain(`param1<typeName>?{have: 'int'} as $obj`)
 		assert.Equal(t, 1, obj.Len())
-		obj = prog.SyntaxFlowChain(`param1<fullTypeName>?{have: 'number'} as $obj`)
+		obj = prog.SyntaxFlowChain(`param1<fullTypeName>?{have: 'int'} as $obj`)
 		assert.Equal(t, 1, obj.Len())
 
 		obj = prog.SyntaxFlowChain(`param2<typeName>?{have:'A'} as $obj`)
@@ -297,9 +297,9 @@ func TestTypeNamePriority(t *testing.T) {
 		assert.Equal(t, 2, obj.Len())
 		obj = prog.SyntaxFlowChain(`res1<fullTypeName>?{have: 'com.org.Priority.A'} as $obj`)
 		assert.Equal(t, 1, obj.Len())
-		obj = prog.SyntaxFlowChain(`res2<typeName>?{have:'number'} as $obj`)
+		obj = prog.SyntaxFlowChain(`res2<typeName>?{have:'int'} as $obj`)
 		assert.Equal(t, 1, obj.Len())
-		obj = prog.SyntaxFlowChain(`res2<fullTypeName>?{have:'number'} as $obj`)
+		obj = prog.SyntaxFlowChain(`res2<fullTypeName>?{have:'int'} as $obj`)
 		assert.Equal(t, 1, obj.Len())
 
 		return nil
@@ -451,7 +451,7 @@ public class FastJSONDemoController {
 			obj = prog.SyntaxFlowChain("FastJSONDemoController.annotation.RequestMapping<fullTypeName>?{have:'org.springframework.web.bind.annotation.RequestMapping'} as $obj")
 			assert.Equal(t, 1, obj.Len())
 
-			obj = prog.SyntaxFlowChain("*Param.__ref__<fullTypeName>?{have:number} as $obj")
+			obj = prog.SyntaxFlowChain("*Param.__ref__<fullTypeName>?{have:int} as $obj")
 			assert.Equal(t, 1, obj.Len())
 
 			return nil
