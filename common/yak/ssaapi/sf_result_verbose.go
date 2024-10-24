@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
+
+func (r *SyntaxFlowResult) GetAlertValue(name string) Values {
+	if r == nil {
+		return nil
+	}
+	return r.GetValues(name)
+}
 
 func (r *SyntaxFlowResult) GetAlertValues() *omap.OrderedMap[string, Values] {
 	if r == nil {
@@ -24,6 +32,94 @@ func (r *SyntaxFlowResult) GetAlertValues() *omap.OrderedMap[string, Values] {
 		}
 	}
 	return ret
+}
+
+func (r *SyntaxFlowResult) DumpValuesJson(name string) string {
+	vs := r.GetValues(name)
+	if vs == nil {
+		return ""
+	}
+	resultMap := make(map[string]any)
+	valuesMap := make(map[int64]any)
+
+	rule := r.rule
+	resultMap["variable_name"] = name
+	resultMap["rule_name"] = rule.RuleName
+	resultMap["rule_content"] = rule.Content
+	resultMap["title"] = rule.Title
+	resultMap["values"] = valuesMap
+	if rule.TitleZh != "" {
+		resultMap["title_zh"] = rule.TitleZh
+	}
+	isSCA := strings.Contains(rule.Title, "SCA:")
+	if isSCA {
+		resultMap["reason"] = "SCA: 根据依赖版本检查漏洞"
+	}
+	if extra, ok := r.GetAlertInfo(name); extra != nil && ok {
+		general := utils.InterfaceToGeneralMap(extra.ExtraInfo)
+		haveMsg := false
+		if extra.Msg != "" {
+			resultMap["message"] = extra.Msg
+			haveMsg = true
+		}
+		msg := utils.MapGetStringByManyFields(general, "msg", "message", "content")
+		if msg != "" && !haveMsg {
+			resultMap["message"] = msg
+			haveMsg = true
+		}
+		cve := utils.MapGetStringByManyFields(general, "cve", "Cve", "CVE")
+		if cve != "" {
+			resultMap["cve"] = cve
+		}
+		cwe := utils.MapGetStringByManyFields(general, "cwe", "Cwe", "CWE")
+		if cwe != "" {
+			resultMap["cwe"] = cwe
+		}
+
+		if extra.Severity != "" {
+			resultMap["level"] = extra.Severity
+		}
+	}
+
+	idMap := make(map[int64]struct{})
+	vs.Recursive(func(operator sfvm.ValueOperator) error {
+		val, ok := operator.(*Value)
+		if !ok {
+			return nil
+		}
+
+		_, existed := idMap[val.GetId()]
+		if existed {
+			return nil
+		} else {
+			idMap[val.GetId()] = struct{}{}
+		}
+
+		valueMap := make(map[string]any)
+		valueMap["value"] = val.String()
+		valueMap["id"] = val.GetId()
+
+		if !isSCA {
+			if !strings.Contains(val.GetSSAValue().String(), "\n") {
+				valueMap["fixed_point"] = val.GetSSAValue().String()
+			}
+			if val.GetRange() != nil {
+				valueMap["source_code"] = val.GetRange().GetTextContext(3)
+			}
+		}
+
+		valuesMap[val.GetId()] = valueMap
+		return nil
+	})
+
+	buffer := new(bytes.Buffer)
+	encoder := json.NewEncoder(buffer)
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(resultMap)
+	if err != nil {
+		return ""
+	}
+	return buffer.String()
 }
 
 func (r *SyntaxFlowResult) Dump(showCode bool) string {
@@ -59,7 +155,7 @@ func (r *SyntaxFlowResult) Dump(showCode bool) string {
 		for i := 0; i < len(lines); i++ {
 			newBuf := bytes.NewBufferString("")
 			if indent > 0 {
-				var prefix = "*─" // "├─"
+				prefix := "*─" // "├─"
 				if i == 0 {
 					prefix = "├─"
 				} else if i == len(lines)-1 {

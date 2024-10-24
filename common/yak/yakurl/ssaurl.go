@@ -75,7 +75,7 @@ func (a *SyntaxFlowAction) getResult(programName, code string, resultID uint) (*
 		}
 
 		// get db result by ResultID
-		result, err := ssaapi.CreateResultByID(resultID)
+		result, err := ssaapi.LoadResultByID(resultID)
 		if err != nil {
 			return nil, 0, utils.Errorf("get result by id %d failed: %v", resultID, err)
 		}
@@ -196,7 +196,6 @@ Get SyntaxFlowAction
 			this value information, contain message && graph && node-info
 */
 func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-
 	query, err := a.GetResult(params)
 	if err != nil {
 		return nil, err
