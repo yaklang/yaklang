@@ -148,7 +148,7 @@ func (r *SyntaxFlowResult) GetResultID() uint {
 }
 
 func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
-	auditNodeIDs, err := ssadb.GetResultValueByVariable(ssadb.GetDB(), r.GetResultID(), name)
+	auditNodeIDs, err := ssadb.GetResultNodeByVariable(ssadb.GetDB(), r.GetResultID(), name)
 	if err != nil {
 		return nil
 	}

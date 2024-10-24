@@ -64,7 +64,19 @@ func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error
 	return items, nil
 }
 
-func GetResultValueByVariable(db *gorm.DB, resultID uint, resultVariable string) ([]uint, error) {
+func GetResultValueByVariable(db *gorm.DB, resultID uint, resultVariable string) ([]int64, error) {
+	// db = db.Debug()
+	// get andit node by result_id, unique by result_variable, and get number of result_variable
+	var items []int64
+	if err := db.Model(&AuditNode{}).
+		Where("result_id = ? and result_variable = ? and is_entry_node = ?", resultID, resultVariable, true).
+		Pluck("ir_code_id", &items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func GetResultNodeByVariable(db *gorm.DB, resultID uint, resultVariable string) ([]uint, error) {
 	// db = db.Debug()
 	// get andit node by result_id, unique by result_variable, and get number of result_variable
 	var items []uint
