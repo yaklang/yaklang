@@ -132,6 +132,9 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 	subRouter := s.router.Name("report").PathPrefix("/report").Subrouter()
 
 	subRouter.HandleFunc("/false_positive", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			return
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			writeErrorJson(w, utils.Wrap(err, "read body error"))
@@ -179,9 +182,12 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 		}
 		issueBody := url.QueryEscape(strings.TrimSpace(issueBodyBuilder.String()))
 		writeJson(w, &ReportResponse{Link: fmt.Sprintf("https://github.com/yaklang/ssa.to/issues/new?labels=bug&title=%s&body=%s", url.QueryEscape(title), issueBody)})
-	}).Name("false positive report").Methods(http.MethodPost)
+	}).Name("false positive report").Methods(http.MethodPost, http.MethodOptions)
 
 	subRouter.HandleFunc("/false_negative", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			return
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			writeErrorJson(w, utils.Wrap(err, "read body error"))
@@ -217,5 +223,5 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 		}
 		issueBody := url.QueryEscape(strings.TrimSpace(issueBodyBuilder.String()))
 		writeJson(w, &ReportResponse{Link: fmt.Sprintf("https://github.com/yaklang/ssa.to/issues/new?labels=bug&title=%s&body=%s", url.QueryEscape(title), issueBody)})
-	}).Name("false negative report").Methods(http.MethodPost)
+	}).Name("false negative report").Methods(http.MethodPost, http.MethodOptions)
 }
