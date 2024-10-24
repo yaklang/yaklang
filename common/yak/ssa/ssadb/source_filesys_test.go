@@ -449,7 +449,6 @@ func TestProgram_NewProgram(t *testing.T) {
 	local, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err)
 	get := func() []string {
-
 		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
 			Method: "GET",
 			Url: &ypb.YakURL{
@@ -484,9 +483,9 @@ func TestProgram_NewProgram(t *testing.T) {
 
 		newProgs := get()
 		log.Info("new prog: ", newProgs)
-
+		progNum := len(progs)
 		assert.Equal(t, len(progs)+1, len(newProgs))
-		assert.Equal(t, fmt.Sprintf("/%s", progName), newProgs[0])
+		assert.Equal(t, fmt.Sprintf("/%s", progName), newProgs[progNum])
 
 	})
 }
