@@ -473,21 +473,29 @@ func TestProgram_NewProgram(t *testing.T) {
 		progName := uuid.NewString()
 		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
 		require.NoError(t, err)
+		defer ssadb.DeleteSSAProgram(progName)
+		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	}
 	{
 		progName := uuid.NewString()
 		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
 		require.NoError(t, err)
+		defer ssadb.DeleteSSAProgram(progName)
+		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	}
 	{
 		progName := uuid.NewString()
 		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
 		require.NoError(t, err)
+		defer ssadb.DeleteSSAProgram(progName)
+		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	}
 	{
 		progName := uuid.NewString()
 		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
 		require.NoError(t, err)
+		defer ssadb.DeleteSSAProgram(progName)
+		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	}
 
 	t.Run("test", func(t *testing.T) {
