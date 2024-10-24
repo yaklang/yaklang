@@ -3,6 +3,7 @@ package javaclassparser
 import (
 	"bytes"
 	"compress/gzip"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io/ioutil"
@@ -11,17 +12,14 @@ import (
 
 var ValueTypeError = utils.Error("error value type")
 
-//	func FindFromPool(v string, pool ConstantPool) int {
-//		for i := 1; i < len(pool); i++ {
-//			s, ok := pool[i].(*ConstantUtf8Info)
-//			if ok {
-//				if s.Value == v {
-//					return i
-//				}
-//			}
-//		}
-//		return -1
-//	}
+func IsJavaSupperRef(value values.JavaValue) bool {
+	ref, ok := value.(*values.JavaRef)
+	if ok {
+		return ref.Id == 0
+	}
+	return false
+}
+
 func deleteStringKeysFromMap(data map[string]interface{}, keys ...string) {
 	for _, key := range keys {
 		delete(data, key)
