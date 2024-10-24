@@ -219,7 +219,7 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 			),
 		)
 	case *LazyInstruction:
-		return liner.DisasmValue(v.Self())
+		return lineDisasm(v.Self(), liner)
 	default:
 		return ""
 	}

@@ -1,7 +1,10 @@
 package ssaapi
 
 import (
+	"bytes"
 	"fmt"
+
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 
 	"github.com/yaklang/yaklang/common/utils/dot"
@@ -41,7 +44,14 @@ func NewValueGraph(v ...*Value) *ValueGraph {
 	return g
 }
 
+func (g *ValueGraph) Dot() string {
+	var buf bytes.Buffer
+	g.GenerateDOT(&buf)
+	return buf.String()
+}
+
 func (g *ValueGraph) CreateNode(value *Value) int {
+	log.Infof("create node %d: %v, %p", value.GetId(), value.GetVerboseName(), value)
 	// get node id, if existed, no need to create
 	id, ok := g.Value2Node[value.GetId()]
 	if !ok {
@@ -54,7 +64,7 @@ func (g *ValueGraph) CreateNode(value *Value) int {
 	// marshal
 	// add node2Value, just use bare ssa.value
 	if _, ok := g.Node2Value[id]; !ok {
-		g.Node2Value[id] = value.NewValue(value.node)
+		g.Node2Value[id] = value
 	}
 	if g.theValueShouldMarshal(value, id) {
 		g._marshal(id, value)
@@ -108,9 +118,6 @@ func (g *ValueGraph) _marshal(selfID int, value *Value) {
 
 func (g *ValueGraph) theValueShouldMarshal(value *Value, id int) bool {
 	if marshaledValue, ok := g.marshaledValue[id]; ok {
-		if value.IsFromDataBase() {
-			return false
-		}
 		// if this node-id not contain this ssaapi.value, marshal
 		if _, ok := marshaledValue[value]; !ok {
 			return true
@@ -164,7 +171,11 @@ func (d *DeepFirst) deepFirst(nodeID int) {
 	}
 }
 
-func (g *ValueGraph) DeepFirstGraph(nodeID int) [][]string {
+func (g *ValueGraph) DeepFirstGraph(valueID int64) [][]string {
+	nodeID, ok := g.Value2Node[valueID]
+	if !ok {
+		return nil
+	}
 	df := &DeepFirst{
 		res:     make([][]string, 0),
 		current: orderedmap.New(),
