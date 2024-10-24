@@ -444,3 +444,49 @@ func TestProgram_ListAndDelete(t *testing.T) {
 	})
 
 }
+
+func TestProgram_NewProgram(t *testing.T) {
+	local, err := yakgrpc.NewLocalClient()
+	require.NoError(t, err)
+	get := func() []string {
+
+		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema: "ssadb",
+				Path:   "/",
+				Query: []*ypb.KVPair{
+					{
+						Key:   "op",
+						Value: "list",
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		progs := make([]string, 0, len(res.Resources))
+		for _, info := range res.Resources {
+			progs = append(progs, info.Path)
+		}
+		return progs
+	}
+
+	t.Run("test", func(t *testing.T) {
+		progs := get()
+		log.Infof("progs: %v", progs)
+
+		progName := uuid.NewString()
+		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
+		require.NoError(t, err)
+		log.Infof("progName: %v", progName)
+		defer ssadb.DeleteSSAProgram(progName)
+		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+
+		newProgs := get()
+		log.Info("new prog: ", newProgs)
+
+		assert.Equal(t, len(progs)+1, len(newProgs))
+		assert.Equal(t, fmt.Sprintf("/%s", progName), newProgs[0])
+
+	})
+}
