@@ -27,9 +27,9 @@ func TestParseJar(t *testing.T) {
 		if jarFs.Ext(path) != ".class" {
 			return nil
 		}
-		//if path != "org/junit/experimental/theories/internal/AllMembersSupplier.class" {
-		//	return nil
-		//}
+		if path != "org/mockito/asm/tree/analysis/Analyzer.class" {
+			return nil
+		}
 		data, err := jarFs.ReadFile(path)
 		if err != nil {
 			return err
@@ -80,8 +80,8 @@ func TestDemoClass(t *testing.T) {
 	}
 	assert.Equal(t, string(expectSource), source)
 }
-func TestAddSupperInterface(t *testing.T) {
-	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/ForTraditionTest.class")
+func TestClassFile(t *testing.T) {
+	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/DupX1.class")
 	cf, err := Parse(classesContent)
 	if err != nil {
 		t.Fatal(err)

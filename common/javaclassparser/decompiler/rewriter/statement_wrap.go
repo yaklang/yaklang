@@ -20,9 +20,10 @@ type StatementManager struct {
 	RepeatNodeMap     map[*core.Node]*core.Node
 	FinalActions      []func() error
 	LoopOccupiedNodes *utils.Set[*core.Node]
-
-	nodeSet *utils.Set[*core.Node]
-	edgeSet *utils.Set[[2]*core.Node]
+	SwitchNode        []*core.Node
+	nodeSet           *utils.Set[*core.Node]
+	edgeSet           *utils.Set[[2]*core.Node]
+	DominatorMap      map[*core.Node][]*core.Node
 }
 
 func NewStatementManager(node *core.Node, parent *StatementManager) *StatementManager {
@@ -226,6 +227,7 @@ func NewBlock(startNode *core.Node) *Block {
 //		return nil
 //	}
 func (s *StatementManager) ScanCoreInfo() error {
+	s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	//err := s.scanIf()
 	//if err != nil {
 	//	return err
@@ -286,6 +288,15 @@ func (s *StatementManager) ScanCoreInfo() error {
 					walkIfStatement(n, subNodeRoute.NewChild(current))
 				}
 				continue
+			} else if v, ok := current.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleSwitch {
+				s.SwitchNode = append(s.SwitchNode, current)
+				for _, n := range current.Next {
+					newRoute := subNodeRoute.NewChild(current)
+					newRoute.ConditionNode = nil
+					newRoute.SwitchNode = current
+					walkIfStatement(n, newRoute)
+				}
+				continue
 			} else {
 				for _, n := range current.Next {
 					stack.Push(n)
@@ -302,7 +313,31 @@ func (s *StatementManager) ScanCoreInfo() error {
 	//	//}).([]*core.Node)
 	//	node.MergeNode = node.FalseNode()
 	//}
-
+	switchSet := utils.NewSet[*core.Node]()
+	switchSet.AddList(s.SwitchNode)
+	s.SwitchNode = switchSet.List()
+	for _, node := range s.SwitchNode {
+		caseItemMap := node.Statement.(*statements.MiddleStatement).Data.([]any)[0].(map[int]*core.Node)
+		itemMap := map[*core.Node]struct{}{}
+		for _, item := range caseItemMap {
+			itemMap[item] = struct{}{}
+		}
+		for _, n := range s.DominatorMap[node] {
+			if _, ok := itemMap[n]; !ok {
+				node.SwitchMergeNode = n
+				break
+			}
+		}
+	}
+	//for switchNode, nodes := range switchMergeNodeCandidates {
+	//	caseMap := switchNode.Statement.(*statements.MiddleStatement).Data.([]any)[0].(map[int]*core.Node)
+	//	allOk := false
+	//	for _, node := range nodes {
+	//		for _, route := range getNodeInfo(node).AllPreNodeRoute {
+	//
+	//		}
+	//	}
+	//}
 	for _, current := range mergeNodesSet.List() {
 		for _, nodeMap := range getNodeInfo(current).AllPreNodeRoute {
 			if nodeMap.ConditionNode == nil {
@@ -463,7 +498,7 @@ func (s *StatementManager) Rewrite() error {
 	if err != nil {
 		return err
 	}
-	rewriters := []rewriterFunc{LoopRewriter, IfRewriter}
+	rewriters := []rewriterFunc{SwitchRewriter, LoopRewriter, IfRewriter}
 	for _, rewriter := range rewriters {
 		rewriter(s)
 	}

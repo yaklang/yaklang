@@ -274,7 +274,7 @@ func (d *Decompiler) ParseStatement() error {
 
 	i := 0
 	for _, paramType := range d.FunctionType.ParamTypes {
-		assignStackVar(values.NewJavaRef(stackVarIndex, paramType))
+		//assignStackVar(values.NewJavaRef(stackVarIndex, paramType))
 		d.AssignVar(i, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 			return ""
 		}, func() types.JavaType {
@@ -305,6 +305,9 @@ func (d *Decompiler) ParseStatement() error {
 		stackVarIndex = mapCodeToStackVarIndex[opcode]
 		switch opcode.Instr.OpCode {
 		case OP_ALOAD, OP_ILOAD, OP_LLOAD, OP_DLOAD, OP_FLOAD, OP_ALOAD_0, OP_ILOAD_0, OP_LLOAD_0, OP_DLOAD_0, OP_FLOAD_0, OP_ALOAD_1, OP_ILOAD_1, OP_LLOAD_1, OP_DLOAD_1, OP_FLOAD_1, OP_ALOAD_2, OP_ILOAD_2, OP_LLOAD_2, OP_DLOAD_2, OP_FLOAD_2, OP_ALOAD_3, OP_ILOAD_3, OP_LLOAD_3, OP_DLOAD_3, OP_FLOAD_3:
+			if opcode.Id == 293 {
+				print(nodes)
+			}
 			//varTable = append(varTable, runtimeStackSimulation.Pop())
 			var slot int = -1
 			switch opcode.Instr.OpCode {
@@ -318,6 +321,10 @@ func (d *Decompiler) ParseStatement() error {
 				slot = 3
 			default:
 				slot = GetRetrieveIdx(opcode)
+			}
+
+			if slot == -1 {
+				print()
 			}
 			runtimeStackSimulation.Push(d.GetVar(slot))
 			////return mkRetrieve(variableFactory);
@@ -356,6 +363,9 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_SIPUSH:
 			assignStackVar(values.NewJavaLiteral(Convert2bytesToInt(opcode.Data), types.NewJavaPrimer(types.JavaInteger)))
 		case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE, OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0, OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1, OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2, OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3:
+			if opcode.Id == 294 {
+				print(nodes)
+			}
 			slot := GetStoreIdx(opcode)
 			value := runtimeStackSimulation.Pop().(values.JavaValue)
 			ref, isFirst := d.AssignVar(slot, value)
@@ -697,10 +707,16 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_GETSTATIC:
 			index := Convert2bytesToInt(opcode.Data)
 			runtimeStackSimulation.Push(d.constantPoolGetter(int(index)))
-		case OP_PUTSTATIC, OP_PUTFIELD:
+		case OP_PUTSTATIC:
 			index := Convert2bytesToInt(opcode.Data)
 			staticVal := d.constantPoolGetter(int(index))
 			appendNode(statements.NewAssignStatement(staticVal, runtimeStackSimulation.Pop().(values.JavaValue), false))
+		case OP_PUTFIELD:
+			index := Convert2bytesToInt(opcode.Data)
+			staticVal := d.constantPoolGetter(int(index))
+			value := runtimeStackSimulation.Pop().(values.JavaValue)
+			field := values.NewRefMember(runtimeStackSimulation.Pop().(values.JavaValue), staticVal.(*values.JavaClassMember).Member, staticVal.(*values.JavaClassMember).JavaType)
+			appendNode(statements.NewAssignStatement(field, value, false))
 		case OP_SWAP:
 			v1 := runtimeStackSimulation.Pop()
 			v2 := runtimeStackSimulation.Pop()
@@ -860,6 +876,9 @@ func (d *Decompiler) ParseStatement() error {
 				d.varTable = newMap
 			}
 		}
+		if node.Id == 291 {
+			print()
+		}
 		parseOpcode(node)
 		opcodeToVarTable[node] = []any{d.varTable, d.currentVarId}
 		return node.Target, nil
@@ -867,6 +886,7 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
+	//println(DumpOpcodesToDotExp(d.opCodes[0]))
 	//println(DumpOpcodesToDotExp(d.opCodes[0]))
 	// generate to statement
 	sort.Slice(nodes, func(i, j int) bool {
@@ -895,9 +915,17 @@ func (d *Decompiler) ParseStatement() error {
 	}
 	for _, node := range nodes {
 		node := node
-		if node.Id == 21 {
-			print()
+		if v, ok := node.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleSwitch {
+			data := v.Data.([]any)
+			m := data[0].(map[int]int)
+			newM := map[int]*Node{}
+			for k, v := range m {
+				newM[k] = idToNode[getStatementNextIdByOpcodeId(v)]
+			}
+			data[0] = newM
+			v.Data = data
 		}
+
 		opcode := idToOpcode[node.Id]
 		for _, code := range opcode.Target {
 			id := getStatementNextIdByOpcodeId(code.Id)
@@ -958,32 +986,7 @@ func (d *Decompiler) StandardStatement() error {
 			for _, n := range node.Source {
 				node.Next[0].Source = append(node.Next[0].Source, n)
 			}
-
-			//if len(n.Next) == 0 {
-			//	println()
-			//}
-			//gotoNext := n.Next[0]
-			//if node.Id == 22 || gotoNext.Id == 22 || n.Id == 22 {
-			//	println()
-			//}
-			//node.ReplaceNext(n, gotoNext)
-			//gotoNext.RemoveSource(n)
-			//gotoNext.AddSource(node)
 		}
-		//for _, n := range node.Next {
-		//	if _, ok := n.Statement.(*statements.GOTOStatement); ok {
-		//		if len(n.Next) == 0 {
-		//			println()
-		//		}
-		//		gotoNext := n.Next[0]
-		//		if node.Id == 22 || gotoNext.Id == 22 || n.Id == 22 {
-		//			println()
-		//		}
-		//		node.ReplaceNext(n, gotoNext)
-		//		gotoNext.RemoveSource(n)
-		//		gotoNext.AddSource(node)
-		//	}
-		//}
 		if _, ok := node.Statement.(*statements.ConditionStatement); ok {
 			var trueIndex, falseIndex int
 			if node.Next[0] == node.JmpNode {
