@@ -20,6 +20,7 @@ type Node struct {
 	SetLoopEndNode      func(*Node, *Node)
 	ConditionNode       []*Node
 	BreakNode           []*Node
+	SwitchMergeNode     *Node
 	CircleNodesSet      *utils.Set[*Node]
 	IsInCircle          bool
 	//CircleRoute         *SubNodeMap
@@ -36,7 +37,9 @@ func (n *Node) RemoveSource(node *Node) {
 	node.RemoveNext(n)
 }
 func (n *Node) RemoveAllNext() {
-	for _, node := range n.Next {
+	next := make([]*Node, len(n.Next))
+	copy(next, n.Next)
+	for _, node := range next {
 		n.RemoveNext(node)
 	}
 }
