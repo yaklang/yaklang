@@ -234,6 +234,7 @@ func TestRuleRisk(t *testing.T) {
 		"msg": "target is not const",
 		"level": "warning",
 		"type": "security",
+		"risk": "sqli",
 	}
 	alert $target2 for {
 		"msg": "target is const",
@@ -271,6 +272,7 @@ func TestRuleRisk(t *testing.T) {
 	require.Equal(t, resultDB.RiskCount, uint64(len(risks)))
 	risk := risks[0]
 	require.Contains(t, risk.Details, "target is not const")
+	require.Equal(t, "sqli", risk.RiskType)
 	require.Equal(t, "warning", risk.Severity)
 	require.Equal(t, "check print variable", risk.Title)
 
