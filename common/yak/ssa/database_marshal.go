@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"strconv"
 
@@ -315,6 +316,8 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		if id <= 0 {
 			log.Infof("unmarshalExtraInformation: invalid id: %v if u want to check why? enable DEBUG=1", id)
 			utils.Debug(func() {
+				spew.Dump(inst)
+				spew.Dump(ir)
 				utils.PrintCurrentGoroutineRuntimeStack()
 			})
 			return nil
@@ -328,13 +331,11 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	}
 	unmarshalValues := func(p any) []Value {
 		vs := make([]Value, 0)
-		switch ret := p.(type) {
-		case []any:
-			for _, id := range ret {
-				vs = append(vs, newLazyInstruction(id))
+		for _, id := range utils.InterfaceToSliceInterface(p) {
+			lazyIns := newLazyInstruction(id)
+			if lazyIns != nil {
+				vs = append(vs, lazyIns)
 			}
-
-		default:
 		}
 		return vs
 	}
