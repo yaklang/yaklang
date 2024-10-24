@@ -1,6 +1,9 @@
 package php2ssa
 
-import phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+import (
+	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+)
 
 func (y *builder) VisitGlobalStatement(raw phpparser.IGlobalStatementContext) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
@@ -22,7 +25,10 @@ func (y *builder) VisitGlobalStatement(raw phpparser.IGlobalStatementContext) in
 		defaultValue := y.VisitChain(globalVarContext)
 		left := y.VisitChainLeft(globalVarContext)
 		value := y.BuildFreeValue(left.GetName())
-		value.SetDefault(defaultValue)
+		p, ok := ssa.ToParameter(defaultValue)
+		if ok && p.GetDefault() != nil {
+			value.SetDefault(p.GetDefault())
+		}
 		value.SetType(defaultValue.GetType())
 	}
 	return nil
