@@ -144,6 +144,9 @@ func (f *VirtualFS) AddFile(name, content string) {
 }
 
 func (f *VirtualFS) addFileByVirtualFile(vf *VirtualFile) {
+	if _, ok := f.files.Get(vf.name); ok {
+		return
+	}
 	f.files.Set(vf.name, vf)
 	f.dirEntry = append(f.dirEntry, vf.info)
 }
