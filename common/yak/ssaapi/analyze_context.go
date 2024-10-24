@@ -95,7 +95,7 @@ func (a *AnalyzeContext) pushCrossProcess() func() {
 // it is considered to cross the function boundary,
 // which means it is trying to cross process.
 func (a *AnalyzeContext) needCrossProcess(from *Value, to *Value) bool {
-	if from == nil || to == nil {
+	if from == nil || from.node == nil || to == nil || to.node == nil {
 		return false
 	}
 	return from.GetFunction().GetId() != to.GetFunction().GetId()
