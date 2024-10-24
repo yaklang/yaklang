@@ -368,7 +368,11 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	default:
 		t = ssa.CreateAnyType()
 	}
-	t.AddFullTypeName(t.String())
+	if text := i.GetText(); text != "" {
+		t.AddFullTypeName(text)
+	} else {
+		t.AddFullTypeName(t.String())
+	}
 	return t
 }
 
