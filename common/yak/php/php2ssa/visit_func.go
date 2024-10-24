@@ -212,7 +212,10 @@ func (y *builder) VisitLambdaFunctionUseVar(raw phpparser.ILambdaFunctionUseVarC
 	}()
 	if value := y.ReadValue(i.VarName().GetText()); value != nil {
 		freeValue := y.BuildFreeValue(i.VarName().GetText())
-		freeValue.SetDefault(value)
+		p, ok := ssa.ToParameter(value)
+		if ok && p.GetDefault() != nil {
+			freeValue.SetDefault(p.GetDefault())
+		}
 		freeValue.SetType(value.GetType())
 	}
 	return nil
