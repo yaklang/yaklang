@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
@@ -149,16 +148,14 @@ func (r *SyntaxFlowResult) GetResultID() uint {
 }
 
 func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
-	resValueID, err := ssadb.GetResultValueByVariable(ssadb.GetDB(), r.GetResultID(), name)
+	auditNodeIDs, err := ssadb.GetResultValueByVariable(ssadb.GetDB(), r.GetResultID(), name)
 	if err != nil {
 		return nil
 	}
-	vs := lo.Map(resValueID, func(id int64, _ int) *Value {
-		return r.newValue(id)
-	})
-	return vs
-}
 
-func (r *SyntaxFlowResult) newValue(valueID int64) *Value {
-	return r.program.NewValueFromDB(valueID)
+	vs := make(Values, 0, len(auditNodeIDs))
+	for _, nodeID := range auditNodeIDs {
+		vs = append(vs, r.program.NewValueFromAuditNode(nodeID))
+	}
+	return vs
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
@@ -42,6 +43,7 @@ func SendURL(local ypb.YakClient, program, path string, body string) ([]*ypb.Yak
 
 func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode string, checkHandler func([]*ypb.YakURLResource)) {
 	var resultID string
+	var memoryQuery, cacheQuery, databaseQuery time.Duration
 	{
 		// send memory query
 		url := &ypb.RequestYakURLParams{
@@ -54,8 +56,10 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 			Body: []byte(sfCode),
 		}
 
+		start := time.Now()
 		res, err := local.RequestYakURL(context.Background(), url)
 		require.NoError(t, err)
+		memoryQuery = time.Since(start)
 		t.Log("checkHandler in memory query ")
 		spew.Dump(res)
 
@@ -86,8 +90,10 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 				},
 			},
 		}
+		start := time.Now()
 		res, err := local.RequestYakURL(context.Background(), url)
 		require.NoError(t, err)
+		cacheQuery = time.Since(start)
 		t.Log("checkHandler in database query ")
 		spew.Dump(res)
 
@@ -123,8 +129,10 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 				},
 			},
 		}
+		start := time.Now()
 		res, err := local.RequestYakURL(context.Background(), url)
 		require.NoError(t, err)
+		databaseQuery = time.Since(start)
 		t.Log("checkHandler in database query ")
 		spew.Dump(res)
 
@@ -137,6 +145,13 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 
 		checkHandler(res.Resources[:len(res.Resources)-1])
 	}
+
+	t.Log("memory query: ", memoryQuery)
+	t.Log("cache query: ", cacheQuery)
+	t.Log("database query: ", databaseQuery)
+
+	// assert.True(t, databaseQuery < memoryQuery*10)
+	// assert.True(t, (databaseQuery-memoryQuery)/memoryQuery < 1)
 }
 
 func checkVariable(t *testing.T, res []*ypb.YakURLResource, want []string) {
@@ -353,5 +368,4 @@ func TestSFURl(t *testing.T) {
 			require.True(t, found)
 		})
 	})
-
 }

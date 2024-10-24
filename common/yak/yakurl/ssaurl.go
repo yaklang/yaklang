@@ -383,7 +383,7 @@ func Value2Response(programName string, value *ssaapi.Value, msg string, url *yp
 	vg := ssaapi.NewValueGraph(value)
 	nodeID := vg.Value2Node[value.GetId()]
 	nodeInfos := coverNodeInfos(vg, programName)
-	graphLines := vg.DeepFirstGraph(nodeID)
+	graphLines := vg.DeepFirstGraph(value.GetId())
 
 	var buf bytes.Buffer
 	vg.GenerateDOT(&buf)

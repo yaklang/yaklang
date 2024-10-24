@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -23,21 +24,10 @@ type Program struct {
 	// come from database will affect search operation
 	comeFromDatabase bool
 	//value cache
-	valueCache *utils.CacheWithKey[int64, *Value]
+	nodeId2ValueCache *utils.CacheWithKey[uint, *Value]
 }
 
 type Programs []*Program
-
-func (p *Program) GetValueFromCache(id int64) *Value {
-	if value, ok := p.valueCache.Get(id); ok {
-		return value
-	}
-	return nil
-}
-
-func (p *Program) SetValueCache(id int64, value *Value) {
-	p.valueCache.Set(id, value)
-}
 
 func (p *Program) IsFromDatabase() bool {
 	return p.comeFromDatabase
@@ -68,10 +58,10 @@ func (p *Program) GetType(name string) *Type {
 
 func NewProgram(prog *ssa.Program, config *config) *Program {
 	p := &Program{
-		Program:        prog,
-		config:         config,
-		enableDatabase: config.ProgramName != "",
-		valueCache:     utils.NewTTLCacheWithKey[int64, *Value](8 * time.Second),
+		Program:           prog,
+		config:            config,
+		enableDatabase:    config.ProgramName != "",
+		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
 	}
 
 	// if config.DatabaseProgramName == "" {
@@ -100,26 +90,6 @@ func (p *Program) IsNil() bool {
 
 func (p *Program) GetErrors() ssa.SSAErrors {
 	return p.Program.GetErrors()
-}
-
-func (p *Program) GetValueById(id int64) (*Value, error) {
-	val, ok := p.Program.GetInstructionById(id).(ssa.Value)
-	if val == nil {
-		return nil, utils.Errorf("instruction not found: %d", id)
-	}
-	if !ok {
-		return nil, utils.Errorf("[%T] not an instruction node", val)
-	}
-
-	return p.NewValue(val), nil
-}
-
-func (p *Program) GetValueByIdMust(id int64) *Value {
-	v, err := p.GetValueById(id)
-	if err != nil {
-		log.Errorf("GetValueByIdMust: %v", err)
-	}
-	return v
 }
 
 func (p *Program) GetInstructionById(id int64) ssa.Instruction {
@@ -155,4 +125,70 @@ func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
 			return v.GetVariable() != nil
 		},
 	)
+}
+
+// normal from ssa value
+func (v *Value) NewValue(value ssa.Value) *Value {
+	return v.ParentProgram.NewValue(value)
+}
+func (p *Program) NewValue(n ssa.Value) *Value {
+	if utils.IsNil(n) {
+		return nil
+	}
+	return &Value{
+		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
+		node:          n,
+		ParentProgram: p,
+	}
+}
+
+// from ssa id  (IrCode)
+func (p *Program) GetValueById(id int64) (*Value, error) {
+	val, ok := p.Program.GetInstructionById(id).(ssa.Value)
+	if val == nil {
+		return nil, utils.Errorf("instruction not found: %d", id)
+	}
+	if !ok {
+		return nil, utils.Errorf("[%T] not an instruction node", val)
+	}
+	ret := p.NewValue(val)
+	return ret, nil
+}
+
+func (p *Program) GetValueByIdMust(id int64) *Value {
+	v, err := p.GetValueById(id)
+	if err != nil {
+		log.Errorf("GetValueByIdMust: %v", err)
+	}
+	return v
+}
+
+// from audit node id
+func (v *Value) NewValueFromAuditNode(nodeID uint) *Value {
+	value := v.ParentProgram.NewValueFromAuditNode(nodeID)
+	return value
+}
+
+func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
+	if nodeID == 0 {
+		return nil
+	}
+
+	// check cache
+	if val, ok := p.nodeId2ValueCache.Get(nodeID); ok {
+		return val
+	}
+
+	auditNode, err := ssadb.GetAuditNodeById(nodeID)
+	if err != nil {
+		log.Errorf("NewValueFromDB: audit node not found: %d", nodeID)
+		return nil
+	}
+	val := p.GetValueByIdMust(auditNode.IRCodeID)
+	val.auditNode = auditNode
+
+	// save cache
+	p.nodeId2ValueCache.Set(nodeID, val)
+
+	return val
 }
