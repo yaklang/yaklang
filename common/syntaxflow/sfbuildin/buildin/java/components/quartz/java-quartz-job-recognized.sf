@@ -6,7 +6,10 @@ desc(
 )
 
 .execute as $execute;
-$execute?{.inherit}<>;
+$execute?{<getObject>.inherits?{have: 'Job'}} as $jobClass;
+check $jobClass;
+$jobClass(*<show>);
+alert $jobClass;
 
 desc(
 lang: java,
