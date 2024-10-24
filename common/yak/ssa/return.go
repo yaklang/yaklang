@@ -173,8 +173,9 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
-	if f.DeferBlock != nil {
-		f.Blocks = append(f.Blocks, f.DeferBlock)
+
+	if block, ok := ToBasicBlock(f.DeferBlock); ok {
+		addToBlocks(block)
 	}
 
 	if f.Type == nil {

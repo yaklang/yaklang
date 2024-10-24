@@ -15,18 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) handlerClassConstructor(class *ssa.Blueprint, args []ssa.Value, ellipsis bool) *ssa.Call {
-	// constructorFunc
-	constructorFunc := class.GetMagicMethod(ssa.Constructor)
-	call := y.NewCall(constructorFunc, args)
-	y.EmitCall(call)
-	// destructorFunc
-	destructorFunc := class.GetMagicMethod(ssa.Destructor)
-	destructorCall := y.NewCall(destructorFunc, []ssa.Value{call})
-	y.EmitDefer(destructorCall)
-	return call
-}
-
 func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
