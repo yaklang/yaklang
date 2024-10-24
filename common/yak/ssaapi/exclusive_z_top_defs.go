@@ -36,7 +36,6 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	}
 
 	for _, def := range i.node.GetValues() {
-
 		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
@@ -68,14 +67,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		actx.depth++
 	}()
 
-	reachDepthLimit := actx.check(opt...)
-	if reachDepthLimit {
-		return Values{i}
-	}
-	err := actx.hook(i)
-	if err != nil {
-		return Values{i}
-	}
 	if inst, ok := ssa.ToLazyInstruction(i.node); ok {
 		var ok bool
 		i.node, ok = inst.Self().(ssa.Value)
@@ -85,8 +76,19 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return i.getTopDefs(actx, opt...)
 	}
-	if !actx.TheValueShouldBeVisited(i) {
+
+	reachDepthLimit, recoverStack := actx.check(i)
+	defer recoverStack()
+	if reachDepthLimit {
 		return Values{i}
+	}
+	err := actx.hook(i)
+	if err != nil {
+		return Values{i}
+	}
+
+	if !actx.theValueShouldBeVisited(i) {
+		return Values{}
 	}
 	{
 		obj, key, member := actx.GetCurrentObject()
@@ -108,16 +110,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if value.IsMember() {
 			obj := i.NewValue(value.GetObject())
 			key := i.NewValue(value.GetKey())
-			if err := actx.PushObject(obj, key, i); err != nil {
+			if err := actx.pushObject(obj, key, i); err != nil {
 				log.Errorf("%v", err)
 				return i.visitedDefs(actx, opt...)
 			}
 			obj.AppendDependOn(apiValue)
-			crossSuccess := actx.CrossProcess(i, obj)
 			ret := obj.getTopDefs(actx, opt...)
-			if crossSuccess {
-				actx.RecoverCrossProcess()
-			}
 			if !ValueCompare(i, actx.Self) {
 				ret = append(ret, i)
 			}
@@ -128,7 +126,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 	switch inst := i.node.(type) {
 	case *ssa.Undefined:
-		// ret[n]
 		return getMemberCall(i, inst, actx)
 	case *ssa.ConstInst:
 		return i.visitedDefs(actx, opt...)
@@ -148,10 +145,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 		fun, isFunc := ssa.ToFunction(calleeInst)
-		// callee := i.NewValue(fun)
 		if !isFunc && calleeInst.GetReference() != nil {
 			fun, isFunc = ssa.ToFunction(calleeInst.GetReference())
-			// callee = i.NewValue(fun)
 		}
 
 		switch {
@@ -159,10 +154,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			callee := i.NewValue(fun)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 			callee.AppendEffectOn(i)
-			crossSuccess := actx.CrossProcess(i, callee)
-			if crossSuccess {
-				defer actx.RecoverCrossProcess()
-			}
+			// The call will result in crossing the function boundary
+			actx.setCauseValue(i)
 			// inherit return index
 			val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
 			if ok {
@@ -307,30 +300,29 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
 			ret := traced.getTopDefs(actx, opt...)
+
+			if !actx.needCrossProcess(i, traced) {
+				ret = append(ret, i)
+			}
 			if len(ret) > 0 {
 				return ret
 			} else {
 				return Values{traced}
 			}
 		}
-		called := actx.GetCallFromLastCrossProcess()
+		called := actx.getLastCauseValue()
 		if called != nil {
-			hash, reverseSuccess := actx.ReverseProcessWithDirection(i, called)
 			calledByValue := getCalledByValue(called)
-			if reverseSuccess {
-				actx.RecoverReverseProcess(hash)
-			}
 			vals = append(vals, calledByValue...)
 		}
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
-				fun.GetCalledBy().ForEach(func(call *Value) {
-					hash, reverseSuccess := actx.ReverseProcessWithDirection(i, call)
-					if !reverseSuccess {
-						return
-					}
+				call2fun := fun.GetCalledBy()
+				call2fun = lo.UniqBy(call2fun, func(item *Value) int64 {
+					return item.GetId()
+				})
+				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call)
-					actx.RecoverReverseProcess(hash)
 					vals = append(vals, val...)
 				})
 			}
@@ -340,7 +332,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.Parameter:
-		// 查找被调用函数的TopDef
 		getCalledByValue := func(called *Value) Values {
 			if called == nil {
 				return nil
@@ -379,41 +370,47 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
 			ret := traced.getTopDefs(actx, opt...)
-
+			// From formal parameters to actual parameters,
+			// if it is not the cross-process analysis,
+			// then append the formal-parameters value to results
+			// to provide more analysis information.
+			if !actx.needCrossProcess(i, traced) {
+				if i.IsFreeValue() && inst.GetDefault() != nil {
+					ret = append(ret, i.NewValue(inst.GetDefault()))
+				} else {
+					ret = append(ret, i)
+				}
+			}
 			if len(ret) > 0 {
 				return ret
 			} else {
 				return Values{traced}
 			}
 		}
-
 		var vals Values
-		called := actx.GetCallFromLastCrossProcess()
+		// Retrieve the case value. And it is required that the value must be a Call.
+		called := actx.getLastCauseValue()
 		if called != nil {
 			if !called.IsCall() {
 				log.Infof("parent function is not called by any other function, skip (%T)", called)
 				return Values{i}
 			}
-			hash, reverseSuccess := actx.ReverseProcess()
 			calledByValue := getCalledByValue(called)
-			if reverseSuccess {
-				actx.RecoverReverseProcess(hash)
-			}
 			vals = append(vals, calledByValue...)
 		}
 
 		// if not found in call stack, then find in called-by
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
-			fun := i.GetFunction()
-			if fun != nil {
+			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
+				// In database mode, the call2fun returns multiple duplicate values
+				// which will affect the mechanism to prevent recursion,
+				// which require deduplication.
+				call2fun = lo.UniqBy(call2fun, func(item *Value) int64 {
+					return item.GetId()
+				})
 				call2fun.ForEach(func(call *Value) {
-					hash, reverseSuccess := actx.ReverseProcessWithDirection(i, call)
-					if !reverseSuccess {
-						return
-					}
 					val := getCalledByValue(call)
-					actx.RecoverReverseProcess(hash)
 					vals = append(vals, val...)
 				})
 			}
@@ -432,10 +429,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if callIns != nil {
 			call := i.NewValue(callIns).AppendEffectOn(i)
 			v := i.NewValue(inst.Value).AppendEffectOn(i)
-			crossSuccess := actx.CrossProcess(call, v)
-			if crossSuccess {
-				defer actx.RecoverCrossProcess()
-			}
+			actx.setCauseValue(call)
 			return v.getTopDefs(actx, opt...)
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
@@ -445,7 +439,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		values = append(values, i)
 		for key, member := range inst.GetAllMember() {
 			value := i.NewValue(member)
-			if err := actx.PushObject(i, i.NewValue(key), value); err != nil {
+			if err := actx.pushObject(i, i.NewValue(key), value); err != nil {
 				log.Errorf("push object failed: %v", err)
 				continue
 			}
