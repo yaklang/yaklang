@@ -43,8 +43,8 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) 
 		if alertInfo.CVE != "" {
 			opts = append(opts, yakit.WithRiskParam_CVE(alertInfo.CVE))
 		}
-		if alertInfo.Purpose != "" {
-			opts = append(opts, yakit.WithRiskParam_RiskType(string(rule.RiskType)))
+		if alertInfo.RiskType != "" {
+			opts = append(opts, yakit.WithRiskParam_RiskType(string(alertInfo.RiskType)))
 		}
 		if alertInfo.Title != "" {
 			opts = append(opts, yakit.WithRiskParam_Title(alertInfo.Title))
