@@ -129,6 +129,11 @@ func (s *Set[T]) Diff(other *Set[T]) *Set[T] {
 			diff.Add(item)
 		}
 	}
+	for item := range other.m {
+		if !s.Has(item) {
+			diff.Add(item)
+		}
+	}
 	return diff
 }
 

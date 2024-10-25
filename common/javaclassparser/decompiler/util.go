@@ -1,5 +1,0 @@
-package decompiler
-
-func CheckIf() {
-
-}
