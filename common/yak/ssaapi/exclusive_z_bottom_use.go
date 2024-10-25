@@ -44,7 +44,7 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 	}
 	if v.IsMember() && !undefineMember {
 		obj := v.GetObject()
-		if err := actx.PushObject(obj, v.GetKey(), v); err != nil {
+		if err := actx.pushObject(obj, v.GetKey(), v); err != nil {
 			log.Errorf("%v", err)
 			return v.visitedDefs(actx, opt...)
 		}
@@ -69,24 +69,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		actx.depth--
 	}()
 
-	reachDepthLimit := actx.check(opt...)
-	if reachDepthLimit {
-		return Values{v}
-	}
-	v.SetDepth(actx.depth)
-
-	err := actx.hook(v)
-	if err != nil {
-		return Values{v}
-	}
-
-	// if lazy-instruction will entry this function twice
-	// will be blocked by this condition
-	// ValueCompare should check the Value is lazy
-	// if ValueCompare(v, actx.Self) {
-	// 	return v.visitUserFallback(actx, opt...)
-	// }
-
 	if ins, ok := ssa.ToLazyInstruction(v.node); ok {
 		v.node, ok = ins.Self().(ssa.Value)
 		if !ok {
@@ -95,7 +77,21 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 		return v.getBottomUses(actx, opt...)
 	}
-	if !actx.TheValueShouldBeVisited(v) {
+
+	reachDepthLimit, recoverStack := actx.check(v)
+	defer recoverStack()
+
+	log.Infof("getBottomUses: %v", v.String())
+	if reachDepthLimit {
+		return Values{v}
+	}
+	v.SetDepth(actx.depth)
+	err := actx.hook(v)
+	if err != nil {
+		return Values{v}
+	}
+
+	if !actx.theValueShouldBeVisited(v) {
 		return Values{v}
 	}
 
@@ -107,7 +103,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			// log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
 			return v.visitUserFallback(actx, opt...)
 		}
-
 		// enter function via call
 		f, ok := ssa.ToFunction(ins.Method)
 		if !ok {
@@ -115,21 +110,18 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			return v.visitUserFallback(actx, opt...)
 		}
 		funcValue := v.NewValue(f).AppendDependOn(v)
-		if actx.TheCrossProcessVisited(v, funcValue) {
-			return v.visitUserFallback(actx, opt...)
-		}
 		if ValueCompare(funcValue, actx.Self) {
 			return v.visitUserFallback(actx, opt...)
 		}
-		crossSuccess := actx.CrossProcess(v, funcValue)
-		if !crossSuccess {
+		if actx.haveTheCrossProcess(funcValue) {
+			log.Infof("Have Have")
 			return v.visitUserFallback(actx, opt...)
 		} else {
-			defer actx.RecoverCrossProcess()
+			actx.setCauseValue(v)
 		}
-		// try to find formal param index from call
-		// v is calling instruction
-		// funcValue is the function
+		//try to find formal param index from call
+		//v is calling instruction
+		//funcValue is the function
 		getCalledFormalParams := func(f *ssa.Function) Values {
 			existed := map[int64]struct{}{}
 			v.DependOn.ForEach(func(value *Value) {
@@ -194,9 +186,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if f := ins.GetFunc(); f != nil {
 				v.NewValue(f).GetCalledBy().ForEach(func(value *Value) {
 					dep := value.AppendDependOn(v)
-					crossSuccess := actx.CrossProcess(v, dep)
-					if crossSuccess {
-						defer actx.RecoverCrossProcess()
+					if !actx.haveTheCrossProcess(dep) {
+						actx.setCauseValue(dep)
 					}
 					results = append(results, dep.getBottomUses(actx, opt...)...)
 				})
@@ -222,11 +213,18 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			}
 		}
 
-		currentCallValue := actx.GetCallFromLastCrossProcess()
+		currentCallValue := actx.getLastCauseValue()
+		if currentCallValue != nil {
+			log.Infof("cause value%s", currentCallValue.String())
+		}
 		if currentCallValue == nil {
 			return fallback()
 		}
 		call, ok := ssa.ToCall(currentCallValue.node)
+		if !ok {
+			log.Warnf("BUG: (call's fun is not clean!) call stack's value is not call: %v", currentCallValue.String())
+			return fallback()
+		}
 		fun, ok := ssa.ToFunction(call.Method)
 		if !ok {
 			log.Warnf("BUG: (call's fun is not clean!) unknown function: %v", v.String())
@@ -257,7 +255,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				continue
 			}
 			returnReceiver := v.NewValue(indexedReturn)
-			actx.PushObject(currentCallValue, returnReceiver.GetKey(), returnReceiver)
+			actx.pushObject(currentCallValue, returnReceiver.GetKey(), returnReceiver)
 			if newVals := returnReceiver.AppendDependOn(returnReceiver).AppendDependOn(v).getBottomUses(actx); len(newVals) > 0 {
 				vals = append(vals, newVals...)
 			}
