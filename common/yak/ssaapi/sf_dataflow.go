@@ -85,7 +85,7 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 		return false, nil, utils.Errorf("exclude and include can't be used at the same time")
 	}
 	var end sf.ValueOperator
-	endName := params.GetString("end")
+	endName := params.GetString("end", "dest", "destination")
 	if endName != "" {
 		var ok bool
 		end, ok = frame.GetSymbolByName(endName)
