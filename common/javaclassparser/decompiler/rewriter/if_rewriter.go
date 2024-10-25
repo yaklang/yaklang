@@ -9,9 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 )
 
-type rewriterFunc func(statementManager *StatementManager) error
 
-func IfRewriter(manager *StatementManager) error {
+func _IfRewriter(manager *StatementManager) error {
 	for _, ifNode := range manager.IfNodes {
 		if ifNode.IsCircle {
 			continue

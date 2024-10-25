@@ -27,6 +27,7 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	//core.GenerateDominatorTree(decompiler.RootNode)
 	statementManager := rewriter.NewRootStatementManager(decompiler.RootNode)
 	statementManager.SetId(decompiler.CurrentId)
+
 	err = statementManager.Rewrite()
 	if err != nil {
 		return nil, err
