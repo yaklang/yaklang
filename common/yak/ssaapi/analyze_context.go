@@ -16,7 +16,6 @@ type objectItem struct {
 type AnalyzeContext struct {
 	// Self
 	Self                        *Value
-	_objectStack                *utils.Stack[objectItem]
 	config                      *OperationConfig
 	depth                       int
 	haveBeenReachedDepthLimited bool
@@ -24,6 +23,8 @@ type AnalyzeContext struct {
 	crossProcess *crossProcess
 	_valueStack  utils.Stack[*Value]
 	_causeValue  *Value
+	//object
+	_objectStack *utils.Stack[objectItem]
 }
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
@@ -85,7 +86,8 @@ func (a *AnalyzeContext) pushCrossProcess() func() {
 			if a._causeValue != nil {
 				a.crossProcess.deleteCurrentCauseValue(a._causeValue)
 			}
-			return a.crossProcess.pushCrossProcess(lastValue, currentValue, a._causeValue)
+			hash := a.calcCrossProcessHash(lastValue, currentValue)
+			return a.crossProcess.pushCrossProcess(hash, a._causeValue)
 		}
 	}
 	return func() {}
@@ -135,7 +137,7 @@ func (a *AnalyzeContext) haveTheCrossProcess(next *Value) bool {
 		return false
 	}
 	lastValue := a._valueStack.Peek()
-	hash := calcCrossProcessHash(lastValue, next)
+	hash := a.calcCrossProcessHash(lastValue, next)
 	return a.crossProcess.crossProcessMap.Have(hash)
 }
 
@@ -157,6 +159,41 @@ func (a *AnalyzeContext) theValueShouldBeVisited(i *Value) bool {
 
 func (a *AnalyzeContext) theMemberShouldBeVisited(i *Value) bool {
 	return a.crossProcess.memberShould(i)
+}
+
+func (a *AnalyzeContext) calcCrossProcessHash(from *Value, to *Value) string {
+	var (
+		fromFuncId, toFuncId int64
+		fromId, toId         int64
+		objectHash           string
+	)
+
+	getObjectHash := func(v *Value) string {
+		if v == nil || v.node == nil || !v.IsCall() {
+			return ""
+		}
+		obj, key, member := a.getCurrentObject()
+		return utils.CalcSha1(obj.GetId(), key.GetId(), member.GetId())
+	}
+
+	if from == nil || from.node == nil {
+		fromFuncId = -1
+		fromId = -1
+	} else {
+		fromId = from.GetId()
+		fromFuncId = from.GetFunction().GetId()
+		objectHash = getObjectHash(from)
+	}
+
+	if to == nil || to.node == nil {
+		toFuncId = -1
+		toId = -1
+	} else {
+		toFuncId = to.GetFunction().GetId()
+		toFuncId = to.GetId()
+	}
+	hash := utils.CalcSha1(fromFuncId, toFuncId, fromId, toId, objectHash)
+	return hash
 }
 
 // ========================================== OBJECT STACK ==========================================
@@ -184,7 +221,7 @@ func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
 	return nil
 }
 
-func (g *AnalyzeContext) PopObject() (*Value, *Value, *Value) {
+func (g *AnalyzeContext) popObject() (*Value, *Value, *Value) {
 	if g._objectStack.Len() <= 0 {
 		return nil, nil, nil
 	}
@@ -192,7 +229,7 @@ func (g *AnalyzeContext) PopObject() (*Value, *Value, *Value) {
 	return item.object, item.key, item.member
 }
 
-func (g *AnalyzeContext) GetCurrentObject() (*Value, *Value, *Value) {
+func (g *AnalyzeContext) getCurrentObject() (*Value, *Value, *Value) {
 	if g._objectStack.Len() <= 0 {
 		return nil, nil, nil
 	}

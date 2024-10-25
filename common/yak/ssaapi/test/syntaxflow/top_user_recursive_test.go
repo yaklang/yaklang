@@ -154,7 +154,7 @@ func TestCrossProcessAndReverseProcess(t *testing.T) {
 		f2(tmp)
 		`, `
 		a1?{opcode: param} #-> * as $target`, map[string][]string{
-			"target": {"11"},
+			"target": {"11", "Parameter-a2"},
 		})
 	})
 }
