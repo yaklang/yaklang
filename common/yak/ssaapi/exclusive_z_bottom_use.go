@@ -81,7 +81,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	reachDepthLimit, recoverStack := actx.check(v)
 	defer recoverStack()
 
-	log.Infof("getBottomUses: %v", v.String())
 	if reachDepthLimit {
 		return Values{v}
 	}
@@ -114,7 +113,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			return v.visitUserFallback(actx, opt...)
 		}
 		if actx.haveTheCrossProcess(funcValue) {
-			log.Infof("Have Have")
 			return v.visitUserFallback(actx, opt...)
 		} else {
 			actx.setCauseValue(v)
@@ -214,9 +212,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 
 		currentCallValue := actx.getLastCauseValue()
-		if currentCallValue != nil {
-			log.Infof("cause value%s", currentCallValue.String())
-		}
 		if currentCallValue == nil {
 			return fallback()
 		}
