@@ -49,7 +49,7 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 			return v.visitedDefs(actx, opt...)
 		}
 		vals = append(vals, obj.getBottomUses(actx, opt...)...)
-		actx.PopObject()
+		actx.popObject()
 	}
 	if len(vals) <= 0 {
 		return Values{v}
@@ -254,7 +254,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if newVals := returnReceiver.AppendDependOn(returnReceiver).AppendDependOn(v).getBottomUses(actx); len(newVals) > 0 {
 				vals = append(vals, newVals...)
 			}
-			actx.PopObject()
+			actx.popObject()
 		}
 		if len(vals) > 0 {
 			return vals
