@@ -45,29 +45,17 @@ func newProcessInfo(causeValue *Value) *processStackInfo {
 	}
 }
 
-func (c *crossProcess) pushCrossProcess(from *Value, to *Value, causeValue *Value) func() {
-	hash := calcCrossProcessHash(from, to)
-	info := newProcessInfo(causeValue)
-	return c.pushCrossProcessWithInfo(hash, info)
-}
-
-func (c *crossProcess) pushCrossProcessWithInfo(hash string, info *processStackInfo) func() {
+func (c *crossProcess) pushCrossProcess(hash string, causeValue *Value) func() {
 	if hash == "" {
 		return func() {}
 	}
-	//the cross process is already exist,
-	if c.crossProcessMap.Have(hash) {
-		c.crossProcessStack.Push(hash)
-		return func() {
-			hash = c.crossProcessStack.Pop()
-		}
-	}
-	//the cross process is not exist
+	info := newProcessInfo(causeValue)
 	c.crossProcessStack.Push(hash)
-	c.crossProcessMap.Set(hash, info)
+	if !c.crossProcessMap.Have(hash) {
+		c.crossProcessMap.Set(hash, info)
+	}
 	return func() {
 		hash = c.crossProcessStack.Pop()
-		c.crossProcessMap.Delete(hash)
 	}
 }
 
@@ -114,22 +102,4 @@ func (c *crossProcess) memberShould(v *Value) bool {
 		return true
 	}
 	return false
-}
-
-// calcCrossProcessHash Calculate cross process hash using the ssa-id of functions from-value and to-value.
-// If from-value and to-value do not have a function, then use -1 for calculation
-func calcCrossProcessHash(from *Value, to *Value) string {
-	var fromId, toId int64
-	if from == nil || from.node == nil {
-		fromId = -1
-	} else {
-		fromId = from.GetFunction().GetId()
-	}
-	if to == nil || to.node == nil {
-		toId = -1
-	} else {
-		toId = to.GetFunction().GetId()
-	}
-	hash := utils.CalcSha1(fromId, toId)
-	return hash
 }

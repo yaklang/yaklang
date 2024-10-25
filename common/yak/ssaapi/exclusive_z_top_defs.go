@@ -91,13 +91,13 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		return Values{}
 	}
 	{
-		obj, key, member := actx.GetCurrentObject()
+		obj, key, member := actx.getCurrentObject()
 		_ = obj
 		_ = key
 		_ = member
 		if obj != nil && i.IsObject() && i != obj {
 			if m := i.GetMember(key); m != nil && !ValueCompare(m, member) {
-				actx.PopObject()
+				actx.popObject()
 				return m.getTopDefs(actx, opt...)
 			}
 		}
@@ -429,7 +429,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				continue
 			}
 			values = append(values, value.getTopDefs(actx, opt...)...)
-			actx.PopObject()
+			actx.popObject()
 		}
 		return values
 	}
