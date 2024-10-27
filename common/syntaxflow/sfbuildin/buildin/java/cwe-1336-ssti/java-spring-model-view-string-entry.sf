@@ -1,0 +1,49 @@
+desc(
+    title_zh: "识别到 Java Spring Framework 中处理 ModelAndView 时直接传入 String 类型参数",
+    title: "Recognize Java Spring Framework code handling ModelAndView with String type parameter",
+    type: vuln,
+    level: high,
+)
+
+<include('java-spring-param')>?{<typeName>?{have: "String"}} as $param;
+$param<getFunc><getReturns> as $returns;
+$returns?{<typeName>?{have: "ModelAndView"}} as $result;
+$result.addObject(,,* as $sourceEntry);
+$sourceEntry<show> #{
+    until: `* & $param as $source`,
+}->;
+$source<dataflow(exclude=<<<CODE
+*?{opcode: call}
+CODE)> as $filteredSource
+<delete(param)>
+alert $filteredSource for {
+    message_zh: "识别到 Java Spring Framework 中处理 ModelAndView 时直接传入 String 类型参数",
+    message: "Identified Java Spring Framework code handling ModelAndView with String type parameter",
+};
+
+desc(
+lang: java,
+'file://a.java': <<<CODE
+package com.ibeetl.admin.console.web;
+
+@Controller
+public class OrgConsoleController {
+    @GetMapping(MODEL + "/edit.do")
+    @Function("org.edit")
+    public ModelAndView edit(String id) {
+    	ModelAndView view = new ModelAndView("/admin/org/edit.html");
+        CoreOrg org = orgConsoleService.queryById(id);
+        view.addObject("org", org);
+        return view;
+    }
+    
+    @GetMapping(MODEL + "/edit.do")
+    @Function("org.edit")
+    public ModelAndView edit2(String id) {
+    	ModelAndView view = new ModelAndView("/admin/org/edit2.html");
+        view.addObject("org", id);
+        return view;
+    }
+}
+CODE
+)
