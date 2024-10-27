@@ -27,9 +27,9 @@ func TestParseJar(t *testing.T) {
 		if jarFs.Ext(path) != ".class" {
 			return nil
 		}
-		//if path != "org/mockito/asm/AnnotationWriter.class" {
-		//	return nil
-		//}
+		if path != "org/apache/commons/lang/time/DurationFormatUtils.class" {
+			return nil
+		}
 		data, err := jarFs.ReadFile(path)
 		if err != nil {
 			return err

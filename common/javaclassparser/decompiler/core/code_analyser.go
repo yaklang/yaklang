@@ -74,6 +74,7 @@ func (d *Decompiler) ParseOpcode() error {
 	indexToOffset := map[int]uint16{}
 	reader := NewJavaByteCodeReader(d.bytecodes)
 	id := 0
+	isWide := false
 	for {
 		b, err := reader.ReadByte()
 		if err != nil {
@@ -84,7 +85,15 @@ func (d *Decompiler) ParseOpcode() error {
 		if !ok {
 			return fmt.Errorf("unknow op: %x", b)
 		}
+		if instr.OpCode == OP_WIDE {
+			isWide = true
+			continue
+		}
 		opcode := &OpCode{Instr: instr, Id: id, CurrentOffset: uint16(current)}
+		if isWide {
+			opcode.IsWide = true
+			isWide = false
+		}
 		var factory = DefaultFactory
 		if v, ok := OpFactories[instr.HandleName]; ok {
 			factory = v
@@ -308,10 +317,6 @@ func (d *Decompiler) ParseStatement() error {
 		stackVarIndex = mapCodeToStackVarIndex[opcode]
 		switch opcode.Instr.OpCode {
 		case OP_ALOAD, OP_ILOAD, OP_LLOAD, OP_DLOAD, OP_FLOAD, OP_ALOAD_0, OP_ILOAD_0, OP_LLOAD_0, OP_DLOAD_0, OP_FLOAD_0, OP_ALOAD_1, OP_ILOAD_1, OP_LLOAD_1, OP_DLOAD_1, OP_FLOAD_1, OP_ALOAD_2, OP_ILOAD_2, OP_LLOAD_2, OP_DLOAD_2, OP_FLOAD_2, OP_ALOAD_3, OP_ILOAD_3, OP_LLOAD_3, OP_DLOAD_3, OP_FLOAD_3:
-			if opcode.Id == 293 {
-				print(nodes)
-			}
-			//varTable = append(varTable, runtimeStackSimulation.Pop())
 			var slot int = -1
 			switch opcode.Instr.OpCode {
 			case OP_ALOAD_0, OP_ILOAD_0, OP_LLOAD_0, OP_DLOAD_0, OP_FLOAD_0:
@@ -366,9 +371,6 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_SIPUSH:
 			assignStackVar(values.NewJavaLiteral(Convert2bytesToInt(opcode.Data), types.NewJavaPrimer(types.JavaInteger)))
 		case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE, OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0, OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1, OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2, OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3:
-			if opcode.Id == 294 {
-				print(nodes)
-			}
 			slot := GetStoreIdx(opcode)
 			value := runtimeStackSimulation.Pop().(values.JavaValue)
 			ref, isFirst := d.AssignVar(slot, value)
@@ -739,10 +741,10 @@ func (d *Decompiler) ParseStatement() error {
 			runtimeStackSimulation.Push(v2)
 			runtimeStackSimulation.Push(v1)
 		case OP_DUP_X2:
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v1 := runtimeStackSimulation.Pop()
 			v2 := runtimeStackSimulation.Pop()
 			v3 := runtimeStackSimulation.Pop()
-			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			runtimeStackSimulation.Push(v1)
 			runtimeStackSimulation.Push(v3)
 			runtimeStackSimulation.Push(v2)
@@ -830,8 +832,14 @@ func (d *Decompiler) ParseStatement() error {
 			//	}
 			//})
 		case OP_IINC:
-			index := opcode.Data[0]
-			inc := opcode.Data[1]
+			var index, inc int
+			if opcode.IsWide {
+				index = int(Convert2bytesToInt(opcode.Data))
+				inc = int(Convert2bytesToInt(opcode.Data[2:]))
+			} else {
+				index = int(opcode.Data[0])
+				inc = int(opcode.Data[1])
+			}
 			ref := d.GetVar(int(index))
 			appendNode(values.NewBinaryExpression(ref, values.NewJavaLiteral(inc, types.NewJavaPrimer(types.JavaInteger)), INC))
 		case OP_DNEG, OP_FNEG, OP_LNEG, OP_INEG:
