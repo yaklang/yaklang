@@ -105,6 +105,8 @@ func GetLiteralFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaInteger))
 	case *ConstantDoubleInfo:
 		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaDouble))
+	case *ConstantFloatInfo:
+		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaFloat))
 	case *ConstantClassInfo:
 		return GetValueFromCP(pool, index)
 	default:

@@ -53,50 +53,71 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) error {
 	var hasBreak bool
 	for _, v := range keyMap {
 		startNode := caseMap[v]
-		caseItem := statements.NewCaseItem(v, nil)
-		caseItem.IsDefault = v == -1
-		if caseItem.IsDefault {
-			caseItem.IntValue = math.MaxInt
-		}
-		var terminalIsEndNode bool
-		elements, err := manager.ToStatementsFromNode(startNode, func(node *core.Node) bool {
+		err := core.WalkGraph[*core.Node](startNode, func(node *core.Node) ([]*core.Node, error) {
+			if hasBreak {
+				return nil, nil
+			}
 			if _, ok := caseStartNodesMap[node]; ok && node != startNode {
-				return false
+				return nil, nil
 			}
-			if !caseItem.IsDefault && switchNode.SwitchMergeNode == node {
+			if v != -1 && switchNode.SwitchMergeNode == node {
 				hasBreak = true
-				terminalIsEndNode = true
-				return false
+				return nil, nil
 			}
-			if caseItem.IsDefault && hasBreak && node == switchNode.SwitchMergeNode {
-				terminalIsEndNode = true
-				return false
-			}
-			return true
+			return node.Next, nil
 		})
 		if err != nil {
 			return err
 		}
-		sts := core.NodesToStatements(elements)
-
-		if terminalIsEndNode && hasBreak && !caseItem.IsDefault {
-			sts = append(sts, statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-				return "break"
-			}))
-		}
-		if caseItem.IsDefault && len(sts) == 2 {
-			print()
-		}
-		caseItem.Body = sts
-		caseItems = append(caseItems, caseItem)
 	}
-	switchStatement.Cases = caseItems
-	sort.Slice(caseItems, func(i, j int) bool {
-		return caseItems[i].IntValue < caseItems[j].IntValue
-	})
 	if hasBreak {
 		node.AddNext(node.SwitchMergeNode)
 	}
+	manager.AddFinalAction(func() error {
+		for _, v := range keyMap {
+			startNode := caseMap[v]
+			caseItem := statements.NewCaseItem(v, nil)
+			caseItem.IsDefault = v == -1
+			if caseItem.IsDefault {
+				caseItem.IntValue = math.MaxInt
+			}
+			var terminalIsEndNode bool
+			elements, err := manager.ToStatementsFromNode(startNode, func(node *core.Node) bool {
+				if _, ok := caseStartNodesMap[node]; ok && node != startNode {
+					return false
+				}
+				if !caseItem.IsDefault && switchNode.SwitchMergeNode == node {
+					terminalIsEndNode = true
+					return false
+				}
+				if caseItem.IsDefault && hasBreak && node == switchNode.SwitchMergeNode {
+					terminalIsEndNode = true
+					return false
+				}
+				return true
+			})
+			if err != nil {
+				return err
+			}
+			sts := core.NodesToStatements(elements)
+
+			if terminalIsEndNode && hasBreak && !caseItem.IsDefault {
+				sts = append(sts, statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+					return "break"
+				}))
+			}
+			if caseItem.IsDefault && len(sts) == 2 {
+				print()
+			}
+			caseItem.Body = sts
+			caseItems = append(caseItems, caseItem)
+		}
+		switchStatement.Cases = caseItems
+		sort.Slice(caseItems, func(i, j int) bool {
+			return caseItems[i].IntValue < caseItems[j].IntValue
+		})
+		return nil
+	})
 	return nil
 	//for i, key := range caseMapKeys {
 	//	i := i

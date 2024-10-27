@@ -12,7 +12,11 @@ func DefaultFactory(reader *JavaByteCodeReader, opcode *OpCode) error {
 	if opcode.Instr.Length == 0 {
 		return nil
 	}
-	opcode.Data = make([]byte, opcode.Instr.Length)
+	length := opcode.Instr.Length
+	if opcode.IsWide {
+		length *= 2
+	}
+	opcode.Data = make([]byte, length)
 	_, err := reader.Read(opcode.Data)
 	return err
 }
