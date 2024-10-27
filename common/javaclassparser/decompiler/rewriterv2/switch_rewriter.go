@@ -47,12 +47,8 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) error {
 		caseStartNodesMap[startNode] = struct{}{}
 	}
 
-	keyMap := maps.Keys(caseMap)
-	sort.Ints(keyMap)
-	keyMap = append(keyMap[1:], -1)
 	var hasBreak bool
-	for _, v := range keyMap {
-		startNode := caseMap[v]
+	for v, startNode := range caseMap {
 		caseItem := statements.NewCaseItem(v, nil)
 		caseItem.IsDefault = v == -1
 		if caseItem.IsDefault {
@@ -83,9 +79,6 @@ func rewriteSwitch(node *core.Node, manager *StatementManager) error {
 			sts = append(sts, statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 				return "break"
 			}))
-		}
-		if caseItem.IsDefault && len(sts) == 2 {
-			print()
 		}
 		caseItem.Body = sts
 		caseItems = append(caseItems, caseItem)

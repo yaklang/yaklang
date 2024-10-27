@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/rewriter"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
+	utils2 "github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
 )
@@ -75,25 +76,24 @@ func TestLoopDoWhile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statementManager.DumpDominatorTree()
-	//compareNodeList := func(nodes1, nodes2 []*core.Node) bool {
-	//	set1 := utils2.NewSet[*core.Node]()
-	//	set1.AddList(nodes1)
-	//	set2 := utils2.NewSet[*core.Node]()
-	//	set2.AddList(nodes2)
-	//	if set1.Diff(set2).Len() == 0 {
-	//		return true
-	//	} else {
-	//		return false
-	//	}
-	//}
+	compareNodeList := func(nodes1, nodes2 []*core.Node) bool {
+		set1 := utils2.NewSet[*core.Node]()
+		set1.AddList(nodes1)
+		set2 := utils2.NewSet[*core.Node]()
+		set2.AddList(nodes2)
+		if set1.Diff(set2).Len() == 0 {
+			return true
+		} else {
+			return false
+		}
+	}
 	println(utils.DumpNodesToDotExp(start))
 	assert.Equal(t, 6, len(statementManager.IfNodes), "if nodes")
 	assert.Equal(t, 1, len(statementManager.CircleEntryPoint), "circle entry point")
 	assert.Equal(t, loopStart, statementManager.CircleEntryPoint[0], "circle entry point address")
-	//assert.Equal(t, loopEnd, loopStart.GetLoopEndNode(), "loop end node")
-	//assert.Equal(t, 6, loopStart.CircleNodesSet.Len(), "node in circle set size")
-	//assert.Equal(t, true, compareNodeList(loopStart.ConditionNode, []*core.Node{if2, if4, loopCondition}), "node in circle set size")
+	assert.Equal(t, loopEnd, loopStart.GetLoopEndNode(), "loop end node")
+	assert.Equal(t, 6, loopStart.CircleNodesSet.Len(), "node in circle set size")
+	assert.Equal(t, true, compareNodeList(loopStart.ConditionNode, []*core.Node{if2, if4, loopCondition}), "node in circle set size")
 
 	err = statementManager.Rewrite()
 	if err != nil {
@@ -121,7 +121,7 @@ func TestLoopDoWhile(t *testing.T) {
 	}
 	assert.Equal(t, `start
 if (if other){
-
+if other body
 }else{
 do{
 loop startif (while condition){
@@ -287,9 +287,11 @@ func TestBreakInLoop(t *testing.T) {
 	println(strings.Join(statementsStrs, "\n"))
 	assert.Equal(t, `start
 while(loop1 start) {
-while(loop2 start) {
-loop2 bodycontinue
-}continue
+loop1 bodyif (if1){
+break
+}else{
+continue
+}
 }
 loop1 end`, strings.Join(statementsStrs, "\n"))
 }

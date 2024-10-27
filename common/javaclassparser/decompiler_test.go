@@ -13,7 +13,7 @@ import (
 )
 
 func TestParseJar(t *testing.T) {
-	jarFs, err := NewJarFSFromLocal("/Users/z3/Code/idea/yak-yso/yak-yso/lib/ysoserial-for-woodpecker-0.5.2.jar")
+	jarFs, err := NewJarFSFromLocal("/home/z3/Downloads/ysoserial-for-woodpecker-0.5.2.jar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,9 +27,9 @@ func TestParseJar(t *testing.T) {
 		if jarFs.Ext(path) != ".class" {
 			return nil
 		}
-		if path != "org/mockito/asm/tree/analysis/Analyzer.class" {
-			return nil
-		}
+		//if path != "org/mockito/asm/AnnotationWriter.class" {
+		//	return nil
+		//}
 		data, err := jarFs.ReadFile(path)
 		if err != nil {
 			return err
