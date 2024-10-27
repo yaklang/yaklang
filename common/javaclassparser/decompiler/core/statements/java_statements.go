@@ -18,6 +18,9 @@ func (r *ConditionStatement) String(funcCtx *class_context.ClassContext) string 
 }
 
 func NewConditionStatement(cmp values.JavaValue, op string) *ConditionStatement {
+	if cmp.Type() == nil {
+		print()
+	}
 	cmp.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
 	if v, ok := cmp.(*values.JavaCompare); ok {
 		return &ConditionStatement{

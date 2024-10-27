@@ -35,26 +35,3 @@ func DumpNodesToDotExp(code *core.Node) string {
 	sb.WriteString("}\n")
 	return sb.String()
 }
-
-func DumpOpcodesToDotExp(code *core.OpCode) string {
-	var visitor func(node *core.OpCode, visited map[*core.OpCode]bool, sb *strings.Builder)
-	visitor = func(node *core.OpCode, visited map[*core.OpCode]bool, sb *strings.Builder) {
-		if node == nil {
-			return
-		}
-		if visited[node] {
-			return
-		}
-		visited[node] = true
-		for _, nextNode := range node.Target {
-			sb.WriteString(fmt.Sprintf("  \"%d%s\" -> \"%d%s\";\n", node.Id, node.Instr.Name, nextNode.Id, nextNode.Instr.Name))
-			visitor(nextNode, visited, sb)
-		}
-	}
-	var sb strings.Builder
-	sb.WriteString("digraph G {\n")
-	visited := make(map[*core.OpCode]bool)
-	visitor(code, visited, &sb)
-	sb.WriteString("}\n")
-	return sb.String()
-}

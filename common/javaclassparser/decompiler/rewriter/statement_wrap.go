@@ -2,13 +2,11 @@ package rewriter
 
 import (
 	"errors"
-	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
+	"golang.org/x/exp/maps"
 )
 
 type StatementManager struct {
@@ -25,8 +23,7 @@ type StatementManager struct {
 	SwitchNode        []*core.Node
 	nodeSet           *utils.Set[*core.Node]
 	edgeSet           *utils.Set[[2]*core.Node]
-	DominatorTree     map[*core.Node][]*core.Node
-	DominatorSet      map[*core.Node]*utils.Set[*core.Node]
+	DominatorMap      map[*core.Node][]*core.Node
 }
 
 func NewStatementManager(node *core.Node, parent *StatementManager) *StatementManager {
@@ -230,363 +227,275 @@ func NewBlock(startNode *core.Node) *Block {
 //		return nil
 //	}
 func (s *StatementManager) ScanCoreInfo() error {
-	s.DominatorTree = GenerateDominatorTree(s.RootNode)
+	s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	//err := s.scanIf()
 	//if err != nil {
 	//	return err
 	//}
-	//nodeExtInfo := map[*core.Node]*NodeExtInfo{}
-	//getNodeInfo := func(node *core.Node) *NodeExtInfo {
-	//	if info, ok := nodeExtInfo[node]; ok {
-	//		return info
-	//	}
-	//	info := &NodeExtInfo{}
-	//	nodeExtInfo[node] = info
-	//	return info
+	nodeExtInfo := map[*core.Node]*NodeExtInfo{}
+	getNodeInfo := func(node *core.Node) *NodeExtInfo {
+		if info, ok := nodeExtInfo[node]; ok {
+			return info
+		}
+		info := &NodeExtInfo{}
+		nodeExtInfo[node] = info
+		return info
+	}
+	stack := utils.NewStack[*core.Node]()
+	//visited := NewRootNodeRoute()
+	circleNodes := []*core.Node{}
+	ifNodes := []*core.Node{}
+	mergeNodesSet := utils.NewSet[*core.Node]()
+
+	var walkIfStatement func(node *core.Node, subNodeRoute *NodeRoute)
+	walkIfStatement = func(node *core.Node, subNodeRoute *NodeRoute) {
+		getNodeInfo(node).PreNodeRoute = subNodeRoute
+		stack.Push(node)
+		for stack.Len() > 0 {
+			current := stack.Pop()
+			getNodeInfo(current).AllPreNodeRoute = append(getNodeInfo(current).AllPreNodeRoute, subNodeRoute)
+			if m, ok := getNodeInfo(node).PreNodeRoute.Has(current); ok {
+				getNodeInfo(node).AllCircleRoute = append(getNodeInfo(node).AllCircleRoute, subNodeRoute)
+				route, _ := getNodeInfo(node).PreNodeRoute.HasPre(current)
+				if v := getNodeInfo(current).CircleRoute; v != nil {
+					getNodeInfo(current).CircleRoute = v.Or(route)
+				} else {
+					getNodeInfo(current).CircleRoute = route
+					core.WalkGraph[*core.Node](current, func(node *core.Node) ([]*core.Node, error) {
+						route.Add(node)
+						if len(node.Next) > 1 {
+							return nil, nil
+						}
+						return node.Next, nil
+					})
+				}
+				circleNodes = append(circleNodes, current)
+				_ = m
+				continue
+			}
+			skip := len(getNodeInfo(current).AllPreNodeRoute) > 1
+			getNodeInfo(node).PreNodeRoute.Add(current)
+			if skip {
+				mergeNodesSet.Add(current)
+				current.IsMerge = true
+				continue
+			}
+
+			if _, ok := current.Statement.(*statements.ConditionStatement); ok {
+				current.IsIf = true
+				ifNodes = append(ifNodes, current)
+				for _, n := range current.Next {
+					walkIfStatement(n, subNodeRoute.NewChild(current))
+				}
+				continue
+			} else if v, ok := current.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleSwitch {
+				s.SwitchNode = append(s.SwitchNode, current)
+				for _, n := range current.Next {
+					newRoute := subNodeRoute.NewChild(current)
+					newRoute.ConditionNode = nil
+					newRoute.SwitchNode = current
+					walkIfStatement(n, newRoute)
+				}
+				continue
+			} else {
+				for _, n := range current.Next {
+					stack.Push(n)
+				}
+			}
+		}
+	}
+	subNodeRoute := NewRootNodeRoute()
+	walkIfStatement(s.RootNode, subNodeRoute)
+	circleNodes = utils.NewSet[*core.Node](circleNodes).List()
+	//for _, node := range circleNodes {
+	//	//mergeNode := funk.Filter(node.Next, func(item *core.Node) bool {
+	//	//	return !node.CircleNodesSet.Has(item)
+	//	//}).([]*core.Node)
+	//	node.MergeNode = node.FalseNode()
 	//}
-	//stack := utils.NewStack[*core.Node]()
-	////visited := NewRootNodeRoute()
-	//circleNodes := []*core.Node{}
-	//ifNodes := []*core.Node{}
-	//mergeNodesSet := utils.NewSet[*core.Node]()
+	switchSet := utils.NewSet[*core.Node]()
+	switchSet.AddList(s.SwitchNode)
+	s.SwitchNode = switchSet.List()
+	for _, node := range s.SwitchNode {
+		caseItemMap := node.Statement.(*statements.MiddleStatement).Data.([]any)[0].(map[int]*core.Node)
+		itemMap := map[*core.Node]struct{}{}
+		for _, item := range caseItemMap {
+			itemMap[item] = struct{}{}
+		}
+		for _, n := range s.DominatorMap[node] {
+			if _, ok := itemMap[n]; !ok {
+				node.SwitchMergeNode = n
+				break
+			}
+		}
+	}
+	//for switchNode, nodes := range switchMergeNodeCandidates {
+	//	caseMap := switchNode.Statement.(*statements.MiddleStatement).Data.([]any)[0].(map[int]*core.Node)
+	//	allOk := false
+	//	for _, node := range nodes {
+	//		for _, route := range getNodeInfo(node).AllPreNodeRoute {
 	//
-	//var walkIfStatement func(node *core.Node, subNodeRoute *NodeRoute)
-	//walkIfStatement = func(node *core.Node, subNodeRoute *NodeRoute) {
-	//	getNodeInfo(node).PreNodeRoute = subNodeRoute
-	//	stack.Push(node)
-	//	for stack.Len() > 0 {
-	//		current := stack.Pop()
-	//		getNodeInfo(current).AllPreNodeRoute = append(getNodeInfo(current).AllPreNodeRoute, subNodeRoute)
-	//		if m, ok := getNodeInfo(node).PreNodeRoute.Has(current); ok {
-	//			getNodeInfo(node).AllCircleRoute = append(getNodeInfo(node).AllCircleRoute, subNodeRoute)
-	//			route, _ := getNodeInfo(node).PreNodeRoute.HasPre(current)
-	//			if v := getNodeInfo(current).CircleRoute; v != nil {
-	//				getNodeInfo(current).CircleRoute = v.Or(route)
-	//			} else {
-	//				getNodeInfo(current).CircleRoute = route
-	//				core.WalkGraph[*core.Node](current, func(node *core.Node) ([]*core.Node, error) {
-	//					route.Add(node)
-	//					if len(node.Next) > 1 {
-	//						return nil, nil
-	//					}
-	//					return node.Next, nil
-	//				})
-	//			}
-	//			circleNodes = append(circleNodes, current)
-	//			_ = m
-	//			continue
-	//		}
-	//		skip := len(getNodeInfo(current).AllPreNodeRoute) > 1
-	//		getNodeInfo(node).PreNodeRoute.Add(current)
-	//		if skip {
-	//			mergeNodesSet.Add(current)
-	//			current.IsMerge = true
-	//			continue
-	//		}
-	//
-	//		if _, ok := current.Statement.(*statements.ConditionStatement); ok {
-	//			current.IsIf = true
-	//			ifNodes = append(ifNodes, current)
-	//			for _, n := range current.Next {
-	//				walkIfStatement(n, subNodeRoute.NewChild(current))
-	//			}
-	//			continue
-	//		} else if v, ok := current.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleSwitch {
-	//			s.SwitchNode = append(s.SwitchNode, current)
-	//			for _, n := range current.Next {
-	//				newRoute := subNodeRoute.NewChild(current)
-	//				newRoute.ConditionNode = nil
-	//				newRoute.SwitchNode = current
-	//				walkIfStatement(n, newRoute)
-	//			}
-	//			continue
-	//		} else {
-	//			for _, n := range current.Next {
-	//				stack.Push(n)
-	//			}
 	//		}
 	//	}
 	//}
-	//subNodeRoute := NewRootNodeRoute()
-	//walkIfStatement(s.RootNode, subNodeRoute)
-	//circleNodes = utils.NewSet[*core.Node](circleNodes).List()
-	////for _, node := range circleNodes {
-	////	//mergeNode := funk.Filter(node.Next, func(item *core.Node) bool {
-	////	//	return !node.CircleNodesSet.Has(item)
-	////	//}).([]*core.Node)
-	////	node.MergeNode = node.FalseNode()
-	////}
-	//switchSet := utils.NewSet[*core.Node]()
-	//switchSet.AddList(s.SwitchNode)
-	//s.SwitchNode = switchSet.List()
-	//for _, node := range s.SwitchNode {
-	//	caseItemMap := node.Statement.(*statements.MiddleStatement).Data.([]any)[0].(map[int]*core.Node)
-	//	itemMap := map[*core.Node]struct{}{}
-	//	for _, item := range caseItemMap {
-	//		itemMap[item] = struct{}{}
-	//	}
-	//	for _, n := range s.DominatorTree[node] {
-	//		if _, ok := itemMap[n]; !ok {
-	//			node.SwitchMergeNode = n
-	//			break
-	//		}
-	//	}
-	//}
-	////for switchNode, nodes := range switchMergeNodeCandidates {
-	////	caseMap := switchNode.Statement.(*statements.MiddleStatement).Data.([]any)[0].(map[int]*core.Node)
-	////	allOk := false
-	////	for _, node := range nodes {
-	////		for _, route := range getNodeInfo(node).AllPreNodeRoute {
-	////
-	////		}
-	////	}
-	////}
-	//for _, current := range mergeNodesSet.List() {
-	//	for _, nodeMap := range getNodeInfo(current).AllPreNodeRoute {
-	//		if nodeMap.ConditionNode == nil {
-	//			continue
-	//		}
-	//		if nodeMap.ConditionNode.MergeNode != nil {
-	//			continue
-	//		}
-	//		checkNode := []*core.Node{nodeMap.ConditionNode.TrueNode(), nodeMap.ConditionNode.FalseNode()}
-	//		isPreNode := true
-	//		for _, node := range checkNode {
-	//			isPreNode = CheckIsPreNode(getNodeInfo, current, node) && isPreNode
-	//		}
-	//		if isPreNode {
-	//			nodeMap.ConditionNode.MergeNode = current
-	//		}
+	for _, current := range mergeNodesSet.List() {
+		for _, nodeMap := range getNodeInfo(current).AllPreNodeRoute {
+			if nodeMap.ConditionNode == nil {
+				continue
+			}
+			if nodeMap.ConditionNode.MergeNode != nil {
+				continue
+			}
+			checkNode := []*core.Node{nodeMap.ConditionNode.TrueNode(), nodeMap.ConditionNode.FalseNode()}
+			isPreNode := true
+			for _, node := range checkNode {
+				isPreNode = CheckIsPreNode(getNodeInfo, current, node) && isPreNode
+			}
+			if isPreNode {
+				nodeMap.ConditionNode.MergeNode = current
+			}
+		}
+	}
+	//for _, node := range circleNodes {
+	//	node := node
+	//	node.InCircle = func(n *core.Node) bool {
+	//		return CheckIsPreNode(getNodeInfo, node.LoopEndNode, n) && !CheckIsPreNode(getNodeInfo, node, n)
 	//	}
 	//}
-	////for _, node := range circleNodes {
-	////	node := node
-	////	node.InCircle = func(n *core.Node) bool {
-	////		return CheckIsPreNode(getNodeInfo, node.LoopEndNode, n) && !CheckIsPreNode(getNodeInfo, node, n)
-	////	}
-	////}
-	//loopEndNodeMap := map[*core.Node]*core.Node{}
-	//for _, circleNodeEntry := range circleNodes {
-	//	outPointMap := map[*core.Node]*core.Node{}
-	//	circleNodeEntry.CircleNodesSet = getNodeInfo(circleNodeEntry).CircleRoute
-	//	core.WalkGraph(circleNodeEntry, func(node *core.Node) ([]*core.Node, error) {
-	//		next := funk.Filter(node.Next, func(n *core.Node) bool {
-	//			isInCircle := circleNodeEntry.CircleNodesSet.Has(n)
-	//			//if ok := getNodeInfo(circleNodeEntry).CircleRoute.ChildrenHas(n); ok {
-	//			//	isInCircle = true
-	//			//	//break
-	//			//}
-	//			if n == circleNodeEntry {
-	//				isInCircle = true
-	//			}
-	//			//for _, route := range getNodeInfo(circleNodeEntry).AllCircleRoute {
-	//			//	if ok := route.ChildrenHas(n); ok {
-	//			//		isInCircle = true
-	//			//		break
-	//			//	}
-	//			//}
-	//			if !isInCircle {
-	//				outPointMap[node] = n
-	//				//outPoint = append(outPoint, n)
-	//			}
-	//			return isInCircle
-	//		}).([]*core.Node)
-	//		circleNodeEntry.CircleNodesSet.Add(node)
-	//		return next, nil
-	//	})
-	//	if len(outPointMap) == 0 {
-	//		return errors.New("invalid circle")
-	//	}
-	//	//mergeNode := outPointMap[circleNodeEntry]
-	//	var mergeNode *core.Node
-	//	if len(outPointMap) == 1 {
-	//		mergeNode = maps.Values(outPointMap)[0]
-	//	} else {
-	//		edgeSet := utils.NewSet[*core.Node]()
-	//		values := maps.Values(outPointMap)
-	//		core.WalkGraph[*core.Node](values[0], func(node *core.Node) ([]*core.Node, error) {
-	//			edgeSet.Add(node)
-	//			return node.Next, nil
-	//		})
-	//		core.WalkGraph[*core.Node](values[1], func(node *core.Node) ([]*core.Node, error) {
-	//			if edgeSet.Has(node) {
-	//				mergeNode = node
-	//				return nil, nil
-	//			}
-	//			return node.Next, nil
-	//		})
-	//	}
-	//
-	//	//for _, node1 := range outPointMap {
-	//	//	ok := true
-	//	//	for c, node2 := range outPointMap {
-	//	//		if node1 == node2 {
-	//	//			continue
-	//	//		}
-	//	//		if !CheckIsPreNode(getNodeInfo, node1, c) {
-	//	//			ok = false
-	//	//			break
-	//	//		}
-	//	//	}
-	//	//	if ok {
-	//	//		mergeNode = node1
-	//	//	}
-	//	//}
-	//	if mergeNode == nil {
-	//		return errors.New("invalid circle")
-	//	}
-	//	for c, _ := range outPointMap {
-	//		if _, ok := c.Statement.(*statements.ConditionStatement); !ok {
-	//			return errors.New("invalid circle")
-	//		}
-	//		circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, c)
-	//	}
-	//	//var outPointMergeNode *core.Node
-	//	//for conditionNode, node := range outPointMap {
-	//	//	if outPointMergeNode != nil {
-	//	//		if outPointMergeNode != node {
-	//	//			return errors.New("invalid break")
-	//	//		}
-	//	//	} else {
-	//	//		outPointMergeNode = node
-	//	//	}
-	//	//	circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, conditionNode)
-	//	//}
-	//	//if outPointMergeNode == nil {
-	//	//	return utils.Errorf("found circle break node from code graph failed, circle start node id: %d", circleNodeEntry.Id)
-	//	//}
-	//	loopEndNodeMap[mergeNode] = mergeNode
-	//	circleNodeEntry.GetLoopEndNode = func() *core.Node {
-	//		return loopEndNodeMap[mergeNode]
-	//	}
-	//	circleNodeEntry.SetLoopEndNode = func(node1, node2 *core.Node) {
-	//		loopEndNodeMap[node1] = node2
-	//	}
-	//	if circleNodeEntry.Id == 188 {
-	//		print()
-	//	}
-	//	breakNodeSet := utils.NewSet[*core.Node]()
-	//	var walkParent func(node *core.Node) bool
-	//	for _, mergeSource := range mergeNode.Source {
-	//		walkParent = func(node *core.Node) bool {
-	//			if node == nil {
-	//				return false
-	//			}
-	//			if _, ok := outPointMap[node]; ok {
-	//				return true
-	//			}
-	//			for _, route := range getNodeInfo(node).AllPreNodeRoute {
-	//				if _, ok := outPointMap[route.ConditionNode]; ok {
-	//					return true
-	//				} else {
-	//					return walkParent(route.ConditionNode)
-	//				}
-	//			}
-	//			return false
-	//		}
-	//		if walkParent(mergeSource) {
-	//			breakNodeSet.Add(mergeSource)
-	//		}
-	//	}
-	//	circleNodeEntry.BreakNode = breakNodeSet.List()
-	//}
-	//s.CircleEntryPoint = circleNodes
-	//s.IfNodes = ifNodes
+	loopEndNodeMap := map[*core.Node]*core.Node{}
+	for _, circleNodeEntry := range circleNodes {
+		outPointMap := map[*core.Node]*core.Node{}
+		circleNodeEntry.CircleNodesSet = getNodeInfo(circleNodeEntry).CircleRoute
+		core.WalkGraph(circleNodeEntry, func(node *core.Node) ([]*core.Node, error) {
+			next := funk.Filter(node.Next, func(n *core.Node) bool {
+				isInCircle := circleNodeEntry.CircleNodesSet.Has(n)
+				//if ok := getNodeInfo(circleNodeEntry).CircleRoute.ChildrenHas(n); ok {
+				//	isInCircle = true
+				//	//break
+				//}
+				if n == circleNodeEntry {
+					isInCircle = true
+				}
+				//for _, route := range getNodeInfo(circleNodeEntry).AllCircleRoute {
+				//	if ok := route.ChildrenHas(n); ok {
+				//		isInCircle = true
+				//		break
+				//	}
+				//}
+				if !isInCircle {
+					outPointMap[node] = n
+					//outPoint = append(outPoint, n)
+				}
+				return isInCircle
+			}).([]*core.Node)
+			circleNodeEntry.CircleNodesSet.Add(node)
+			return next, nil
+		})
+		if len(outPointMap) == 0 {
+			return errors.New("invalid circle")
+		}
+		//mergeNode := outPointMap[circleNodeEntry]
+		var mergeNode *core.Node
+		if len(outPointMap) == 1 {
+			mergeNode = maps.Values(outPointMap)[0]
+		} else {
+			edgeSet := utils.NewSet[*core.Node]()
+			values := maps.Values(outPointMap)
+			core.WalkGraph[*core.Node](values[0], func(node *core.Node) ([]*core.Node, error) {
+				edgeSet.Add(node)
+				return node.Next, nil
+			})
+			core.WalkGraph[*core.Node](values[1], func(node *core.Node) ([]*core.Node, error) {
+				if edgeSet.Has(node) {
+					mergeNode = node
+					return nil, nil
+				}
+				return node.Next, nil
+			})
+		}
+
+		//for _, node1 := range outPointMap {
+		//	ok := true
+		//	for c, node2 := range outPointMap {
+		//		if node1 == node2 {
+		//			continue
+		//		}
+		//		if !CheckIsPreNode(getNodeInfo, node1, c) {
+		//			ok = false
+		//			break
+		//		}
+		//	}
+		//	if ok {
+		//		mergeNode = node1
+		//	}
+		//}
+		if mergeNode == nil {
+			return errors.New("invalid circle")
+		}
+		for c, _ := range outPointMap {
+			if _, ok := c.Statement.(*statements.ConditionStatement); !ok {
+				if v, ok := c.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleSwitch {
+					continue
+				} else {
+					return errors.New("invalid circle")
+				}
+			}
+			circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, c)
+		}
+		//var outPointMergeNode *core.Node
+		//for conditionNode, node := range outPointMap {
+		//	if outPointMergeNode != nil {
+		//		if outPointMergeNode != node {
+		//			return errors.New("invalid break")
+		//		}
+		//	} else {
+		//		outPointMergeNode = node
+		//	}
+		//	circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, conditionNode)
+		//}
+		//if outPointMergeNode == nil {
+		//	return utils.Errorf("found circle break node from code graph failed, circle start node id: %d", circleNodeEntry.Id)
+		//}
+		loopEndNodeMap[mergeNode] = mergeNode
+		circleNodeEntry.GetLoopEndNode = func() *core.Node {
+			return loopEndNodeMap[mergeNode]
+		}
+		circleNodeEntry.SetLoopEndNode = func(node1, node2 *core.Node) {
+			loopEndNodeMap[node1] = node2
+		}
+		breakNodeSet := utils.NewSet[*core.Node]()
+		var walkParent func(node *core.Node) bool
+		for _, mergeSource := range mergeNode.Source {
+			walkParent = func(node *core.Node) bool {
+				if node == nil {
+					return false
+				}
+				if _, ok := outPointMap[node]; ok {
+					return true
+				}
+				for _, route := range getNodeInfo(node).AllPreNodeRoute {
+					if _, ok := outPointMap[route.ConditionNode]; ok {
+						return true
+					} else {
+						return walkParent(route.ConditionNode)
+					}
+				}
+				return false
+			}
+			if walkParent(mergeSource) {
+				breakNodeSet.Add(mergeSource)
+			}
+		}
+		circleNodeEntry.BreakNode = breakNodeSet.List()
+	}
+	s.CircleEntryPoint = circleNodes
+	s.IfNodes = ifNodes
 	//for _, node := range s.IfNodes {
 	//	if node.MergeNode == nil {
 	//		return utils.Errorf("if node merge node is nil, node id: %d", node.Id)
 	//	}
 	//}
-
-	circleNodesSet := utils.NewSet[*core.Node]()
-	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
-		checkNode := node
-		if node.Id == 6 {
-			print()
-		}
-		for _, n := range node.Next {
-
-			for _, v := range s.DominatorTree[n] {
-				ok := false
-				core.WalkGraph[*core.Node](v, func(node *core.Node) ([]*core.Node, error) {
-					if node == checkNode {
-						ok = true
-					}
-					if ok {
-						return nil, nil
-					}
-					return s.DominatorTree[node], nil
-				})
-				if ok {
-					circleNodesSet.Add(n)
-					inCircleNodeSet := utils.NewSet[*core.Node]()
-					core.WalkGraph[*core.Node](n, func(node *core.Node) ([]*core.Node, error) {
-						inCircleNodeSet.Add(node)
-						return s.DominatorTree[node], nil
-					})
-
-					//visited := utils.NewSet[*core.Node]()
-					//inCircleNodeSet := utils.NewSet[*core.Node]()
-					//var walkNodes func(node *core.Node, route []*core.Node)
-					//walkNodes = func(node *core.Node, route []*core.Node) {
-					//	if visited.Has(node) {
-					//		return
-					//	}
-					//	visited.Add(node)
-					//	route = append(route, node)
-					//	if node == checkNode {
-					//		inCircleNodeSet.AddList(route)
-					//		return
-					//	}
-					//	for _, n := range node.Next {
-					//		walkNodes(n, route)
-					//	}
-					//}
-					//walkNodes(n, []*core.Node{n})
-					if n.CircleNodesSet == nil {
-						n.CircleNodesSet = inCircleNodeSet
-					} else {
-						n.CircleNodesSet = n.CircleNodesSet.Or(inCircleNodeSet)
-					}
-				}
-			}
-		}
-		return node.Next, nil
-	})
-	s.CircleEntryPoint = circleNodesSet.List()
-	for _, node := range s.CircleEntryPoint {
-		node := node
-		node.GetLoopEndNode = func() *core.Node {
-			return s.DominatorTree[node][0]
-		}
-		node.ConditionNode = funk.Filter(node.CircleNodesSet.List(), func(item *core.Node) bool {
-			_, ok := item.Statement.(*statements.ConditionStatement)
-			if ok && !(node.CircleNodesSet.Has(item.Next[0]) && node.CircleNodesSet.Has(item.Next[1])) {
-				return true
-			}
-			return false
-		}).([]*core.Node)
-	}
-	s.IfNodes = nil
-	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
-		if _, ok := node.Statement.(*statements.ConditionStatement); ok && !circleNodesSet.Has(node) {
-			s.IfNodes = append(s.IfNodes, node)
-			//if len(s.DominatorTree[node])
-		}
-		return s.DominatorTree[node], nil
-	})
 	return nil
-}
-func (s *StatementManager) DumpDominatorTree() {
-	var sb strings.Builder
-	sb.WriteString("digraph G {\n")
-	for node, dom := range s.DominatorTree {
-		for _, n := range dom {
-			sb.WriteString(fmt.Sprintf("\"%d%s\" -> \"%d%s\"\n", n.Id, n.Statement.String(&class_context.ClassContext{}), node.Id, node.Statement.String(&class_context.ClassContext{})))
-		}
-	}
-	sb.WriteString("}\n")
-	println(sb.String())
 }
 func (s *StatementManager) Rewrite() error {
 	err := s.ScanCoreInfo()

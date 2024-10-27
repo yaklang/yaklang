@@ -66,13 +66,20 @@ func (j *JavaClass) Type() JavaType {
 }
 
 func (j *JavaClass) String(funcCtx *class_context.ClassContext) string {
-	if funcCtx.ClassName == j.Name{
+	if funcCtx.ClassName == j.Name {
 
 	}
 	name := funcCtx.ShortTypeName(j.Name)
 	return fmt.Sprintf("%s", name)
 }
 func NewJavaClass(typeName string) JavaType {
+	if strings.HasPrefix(typeName, "[") {
+		t, err := ParseDescriptor(typeName)
+		if err != nil {
+			panic("parse type failed")
+		}
+		return t
+	}
 	return newJavaTypeWrap(&JavaClass{
 		Name: typeName,
 	})

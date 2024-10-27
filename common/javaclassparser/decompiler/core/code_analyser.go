@@ -48,6 +48,14 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 func (d *Decompiler) GetValueFromPool(index int) values.JavaValue {
 	return d.constantPoolGetter(index)
 }
+func (d *Decompiler) GetTypeFromPool(index int) types.JavaType {
+	val := d.constantPoolGetter(index).(*values.JavaClassValue)
+	typ, err := types.ParseDescriptor(val.Type().(*types.JavaClass).Name)
+	if err != nil {
+		panic("parse type failed")
+	}
+	return typ
+}
 func (d *Decompiler) GetMethodFromPool(index int) *values.JavaClassMember {
 	member := d.constantPoolGetter(index).(*values.JavaClassMember)
 	if member.Name == "addToAnnotationLists" {
@@ -280,12 +288,7 @@ func (d *Decompiler) ParseStatement() error {
 		}, func() types.JavaType {
 			return paramType
 		}))
-		typStr := paramType.String(d.FunctionContext)
-		if typStr == types.NewJavaPrimer(types.JavaLong).String(d.FunctionContext) || typStr == types.NewJavaPrimer(types.JavaDouble).String(d.FunctionContext) {
-			i += 2
-		} else {
-			i++
-		}
+		i += GetTypeSize(paramType)
 	}
 	if !d.FunctionContext.IsStatic {
 		d.GetVar(0).IsThis = true
@@ -409,6 +412,9 @@ func (d *Decompiler) ParseStatement() error {
 				return types.NewJavaPrimer(types.JavaInteger)
 			}))
 		case OP_AALOAD, OP_IALOAD, OP_BALOAD, OP_CALOAD, OP_FALOAD, OP_LALOAD, OP_DALOAD, OP_SALOAD:
+			if opcode.Id == 178 {
+				print()
+			}
 			index := runtimeStackSimulation.Pop().(values.JavaValue)
 			ref := runtimeStackSimulation.Pop().(values.JavaValue)
 			runtimeStackSimulation.Push(values.NewJavaArrayMember(ref, index))
@@ -803,8 +809,13 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_POP:
 			appendNode(statements.NewExpressionStatement(runtimeStackSimulation.Pop().(values.JavaValue)))
 		case OP_POP2:
-			appendNode(statements.NewExpressionStatement(runtimeStackSimulation.Pop().(values.JavaValue)))
-			appendNode(statements.NewExpressionStatement(runtimeStackSimulation.Pop().(values.JavaValue)))
+			val := runtimeStackSimulation.Peek().(values.JavaValue)
+			if GetTypeSize(val.Type()) == 1 {
+				appendNode(statements.NewExpressionStatement(runtimeStackSimulation.Pop().(values.JavaValue)))
+				appendNode(statements.NewExpressionStatement(runtimeStackSimulation.Pop().(values.JavaValue)))
+			} else {
+				appendNode(statements.NewExpressionStatement(runtimeStackSimulation.Pop().(values.JavaValue)))
+			}
 		case OP_TABLESWITCH, OP_LOOKUPSWITCH:
 			switchMap := map[int]int{}
 			for k, v := range opcode.SwitchJmpCase {
@@ -859,6 +870,7 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
+	println(DumpOpcodesToDotExp(d.opCodes[0]))
 	err = WalkGraph[*OpCode](d.opCodes[0], func(node *OpCode) ([]*OpCode, error) {
 		var validSource *OpCode
 		if len(node.Source) != 0 {
@@ -868,12 +880,14 @@ func (d *Decompiler) ParseStatement() error {
 					break
 				}
 			}
-			d.varTable = opcodeToVarTable[validSource][0].(map[int]*values.JavaRef)
-			d.currentVarId = opcodeToVarTable[validSource][1].(int)
-			if len(validSource.Target) > 1 {
-				newMap := map[int]*values.JavaRef{}
-				maps.Copy(newMap, d.varTable)
-				d.varTable = newMap
+			if validSource != nil {
+				d.varTable = opcodeToVarTable[validSource][0].(map[int]*values.JavaRef)
+				d.currentVarId = opcodeToVarTable[validSource][1].(int)
+				if len(validSource.Target) > 1 {
+					newMap := map[int]*values.JavaRef{}
+					maps.Copy(newMap, d.varTable)
+					d.varTable = newMap
+				}
 			}
 		}
 		if node.Id == 291 {
@@ -1013,4 +1027,26 @@ func (d *Decompiler) ParseSourceCode() error {
 		return err
 	}
 	return nil
+}
+func DumpOpcodesToDotExp(code *OpCode) string {
+	var visitor func(node *OpCode, visited map[*OpCode]bool, sb *strings.Builder)
+	visitor = func(node *OpCode, visited map[*OpCode]bool, sb *strings.Builder) {
+		if node == nil {
+			return
+		}
+		if visited[node] {
+			return
+		}
+		visited[node] = true
+		for _, nextNode := range node.Target {
+			sb.WriteString(fmt.Sprintf("  \"%d%s\" -> \"%d%s\";\n", node.Id, node.Instr.Name, nextNode.Id, nextNode.Instr.Name))
+			visitor(nextNode, visited, sb)
+		}
+	}
+	var sb strings.Builder
+	sb.WriteString("digraph G {\n")
+	visited := make(map[*OpCode]bool)
+	visitor(code, visited, &sb)
+	sb.WriteString("}\n")
+	return sb.String()
 }
