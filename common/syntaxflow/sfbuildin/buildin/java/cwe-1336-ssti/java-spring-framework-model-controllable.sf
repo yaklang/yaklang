@@ -1,0 +1,59 @@
+desc(
+    title_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
+    title: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
+    type: vuln,
+    level: high,
+    harm_zh: "这种漏洞可能导致服务器端模板注入(SSTI)攻击。攻击者可以通过控制ModelAndView构造函数的参数来注入恶意模板，从而执行任意代码、访问敏感数据或进行其他未授权操作。",
+    harm: "This vulnerability may lead to Server-Side Template Injection (SSTI) attacks. Attackers can inject malicious templates by controlling the parameters of the ModelAndView constructor, potentially executing arbitrary code, accessing sensitive data, or performing other unauthorized operations.",
+    fix_zh: "建议使用安全的模板引擎，并避免直接将用户输入作为模板路径或内容的一部分。",
+    fix: "Use a secure template engine and avoid directly using user input as part of the template path or content."
+)
+
+<include('java-spring-param')>?{<typeName>?{have: "String"}} as $param;
+$param<getFunc><getReturns> as $returns;
+$returns?{<typeName>?{have: "ModelAndView"}} as $result;
+$returns #{
+    until: `* & $param as $source`,
+}->;
+$source<dataflow(exclude=<<<CODE
+*<show>?{opcode: call && <getCaller><name>?{!have: "ModelAndView"}}
+CODE)> as $filteredSource
+<delete(param)>
+alert $filteredSource for {
+    message_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
+    message: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
+};
+
+desc(
+lang: java,
+'file://a.java': <<<CODE
+package com.ibeetl.admin.console.web;
+
+@Controller
+public class OrgConsoleController {
+    @GetMapping(MODEL + "/edit.do")
+    @Function("org.edit")
+    public ModelAndView edit(String id) {
+    	ModelAndView view = new ModelAndView("/admin/org" + id + "/edit.html");
+        CoreOrg org = orgConsoleService.queryById(id);
+        view.addObject("org", org);
+        return view;
+    }
+}
+CODE,
+'safefile://b.java': <<<CODE
+package com.ibeetl.admin.console.web;
+
+@Controller
+public class OrgConsoleController {
+    @GetMapping(MODEL + "/edit.do")
+    @Function("org.edit")
+    public ModelAndView edit(String id) {
+    	ModelAndView view = new ModelAndView("/admin/org" + "/edit.html");
+        CoreOrg org = orgConsoleService.queryById(id);
+        view.addObject("org", org);
+        return view;
+    }
+}
+CODE
+)
