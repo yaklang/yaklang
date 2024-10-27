@@ -6,11 +6,21 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 )
 
+func GetTypeSize(typ types.JavaType) int {
+	funCtx := &class_context.ClassContext{}
+	typStr := typ.String(funCtx)
+	if typStr == types.NewJavaPrimer(types.JavaLong).String(funCtx) || typStr == types.NewJavaPrimer(types.JavaDouble).String(funCtx) {
+		return 2
+	} else {
+		return 1
+	}
+}
 func GetRetrieveIdx(code *OpCode) int {
 	switch code.Instr.OpCode {
 	case OP_ALOAD, OP_ILOAD, OP_LLOAD, OP_DLOAD, OP_FLOAD, OP_IINC:

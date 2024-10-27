@@ -9,19 +9,18 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 )
 
-type LoopStatement struct {
-	Condition values.JavaValue
-	BodyStart *core.Node
-}
-
-func LoopRewriter(manager *StatementManager) error {
+func _LoopRewriter(manager *StatementManager) error {
 	for _, node := range manager.CircleEntryPoint {
+		if node.Id == 23 {
+			print()
+		}
 		originNodeNext := make([]*core.Node, len(node.Next))
 		copy(originNodeNext, node.Next)
 		LoopEndNode := node.GetLoopEndNode()
 		loopconditionStat, ok := node.Statement.(*statements.ConditionStatement)
 		var entryConditionNode *core.Node
 		var loopCondition values.JavaValue
+		node.IsCircle = true
 		isWhile := false
 		circleSetHas := func(n *core.Node) bool {
 			if v, ok := manager.RepeatNodeMap[n]; ok {
@@ -30,12 +29,21 @@ func LoopRewriter(manager *StatementManager) error {
 			return node.CircleNodesSet.Has(n)
 		}
 		if ok {
+			if node.Id == 90 {
+				print()
+			}
 			for i, n := range node.Next {
 				if !circleSetHas(n) && n == LoopEndNode {
+					isWhile = true
+				}
+				if len(n.Next) == 1 && n.Next[0] == LoopEndNode {
+					if v, ok := LoopEndNode.Statement.(*statements.CustomStatement); ok && v.Name == "end" {
+						isWhile = true
+					}
+				}
+				if isWhile {
 					entryConditionNode = node.Next[1-i]
 					loopCondition = loopconditionStat.Condition
-					node.IsCircle = true
-					isWhile = true
 					break
 				}
 			}
@@ -87,6 +95,9 @@ func LoopRewriter(manager *StatementManager) error {
 			}
 			sourceNode.ReplaceNext(node, continueNode)
 			continueNode.AddSource(sourceNode)
+			if sourceNode.Id == 116 {
+				print()
+			}
 			node.RemoveSource(sourceNode)
 		}
 		node.SetLoopEndNode(node, manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
@@ -128,41 +139,30 @@ func LoopRewriter(manager *StatementManager) error {
 		//		//sourceNode.AddNext(continueNode)
 		//	}
 		//}
-		breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-			return "break"
-		}))
-		for _, n := range node.ConditionNode {
-			core.WalkGraph(n, func(node *core.Node) ([]*core.Node, error) {
-				for i, n2 := range node.Next {
-					if n2 == LoopEndNode {
-						node.Next[i] = breakNode
-						LoopEndNode.RemoveSource(n2)
-					}
+		for _, n := range node.BreakNode {
+			if isWhile && n == node {
+				continue
+			}
+			breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+				return "break"
+			}))
+			if n.Id == 188 {
+				print()
+			}
+			var endNode *core.Node
+			for _, n2 := range n.Next {
+				if !node.CircleNodesSet.Has(n2) {
+					endNode = n2
+					break
 				}
-				return node.Next, nil
-			})
+			}
+			n.ReplaceNext(endNode, breakNode)
+			breakNode.AddSource(n)
+			if n.Id == 116 {
+				print()
+			}
+			LoopEndNode.RemoveSource(n)
 		}
-		//for _, n := range node.BreakNode {
-		//	if isWhile && n == node {
-		//		continue
-		//	}
-		//	breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-		//		return "break"
-		//	}))
-		//	if n.Id == 18 {
-		//		print()
-		//	}
-		//	var endNode *core.Node
-		//	for _, n2 := range n.Next {
-		//		if !node.CircleNodesSet.Has(n2) {
-		//			endNode = n2
-		//			break
-		//		}
-		//	}
-		//	n.ReplaceNext(endNode, breakNode)
-		//	breakNode.AddSource(n)
-		//	LoopEndNode.RemoveSource(n)
-		//}
 		//outMergeNodeSource := copyNodes(node.LoopEndNode.Source)
 		//outMergeNodeSource = funk.Filter(outMergeNodeSource, func(item *core.Node) bool {
 		//	if entryConditionNode != nil && item == entryConditionNode {
