@@ -22,6 +22,9 @@ func GetTypeSize(typ types.JavaType) int {
 	}
 }
 func GetRetrieveIdx(code *OpCode) int {
+	if code.IsWide {
+		return int(Convert2bytesToInt(code.Data))
+	}
 	switch code.Instr.OpCode {
 	case OP_ALOAD, OP_ILOAD, OP_LLOAD, OP_DLOAD, OP_FLOAD, OP_IINC:
 		res := int(code.Data[0])
@@ -44,6 +47,9 @@ func GetRetrieveIdx(code *OpCode) int {
 	}
 }
 func GetStoreIdx(code *OpCode) int {
+	if code.IsWide {
+		return int(Convert2bytesToInt(code.Data))
+	}
 	switch code.Instr.OpCode {
 	case OP_ASTORE, OP_ISTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE, OP_IINC:
 		res := int(code.Data[0])
