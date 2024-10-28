@@ -101,6 +101,7 @@ func (c *Blueprint) GetNormalMethod(key string) Value {
 
 // static method
 func (c *Blueprint) RegisterStaticMethod(name string, val *Function) {
+	c.storeInContainer(name, val, BluePrintStaticMember)
 	c.StaticMethod[name] = val
 }
 

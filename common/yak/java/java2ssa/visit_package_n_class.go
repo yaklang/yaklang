@@ -573,14 +573,12 @@ func (y *builder) VisitMethodDeclaration(
 		return func() {}
 	}
 
-	key := i.Identifier().GetText()
-	funcName := fmt.Sprintf("%s_%s", class.Name, key)
-	methodName := key
+	methodName := i.Identifier().GetText()
+	funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
 
+	newFunction := y.NewFunc(funcName)
+	newFunction.SetMethodName(methodName)
 	if isStatic {
-		newFunction := y.NewFunc(funcName)
-		newFunction.SetMethodName(methodName)
-
 		build := func() {
 			recoverRange := y.SetRange(raw)
 			defer recoverRange()
@@ -599,12 +597,10 @@ func (y *builder) VisitMethodDeclaration(
 			for _, def := range defCallback {
 				def(newFunction)
 			}
-			class.RegisterStaticMethod(key, newFunction)
-			//y.AddToPackage(funcName)
+			class.RegisterStaticMethod(methodName, newFunction)
 		}
-		class.RegisterConstMember(key, newFunction)
+		class.RegisterConstMember(methodName, newFunction)
 
-		//y.AssignClassConst(class.Name, key, newFunction)
 		if i.THROWS() != nil {
 			if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
 				y.VisitQualifiedNameList(qualifiedNameList)
@@ -612,8 +608,6 @@ func (y *builder) VisitMethodDeclaration(
 		}
 		return build
 	}
-	newFunction := y.NewFunc(funcName)
-	newFunction.SetMethodName(methodName)
 
 	build := func() {
 		recoverRange := y.SetRange(raw)
@@ -640,14 +634,8 @@ func (y *builder) VisitMethodDeclaration(
 		if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
 			y.VisitQualifiedNameList(qualifiedNameList)
 		}
-
 	}
-	var prefix = ""
-	if isStatic {
-		prefix = "static "
-	}
-	log.Infof("start to build %vmethod: %v to %v", prefix, funcName, class.Name)
-	class.RegisterNormalMethod(key, newFunction)
+	class.RegisterNormalMethod(methodName, newFunction)
 	return build
 }
 

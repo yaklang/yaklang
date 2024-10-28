@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
@@ -141,11 +142,11 @@ func TestOOP_static_method(t *testing.T) {
 		println($instance::aStaticMethod())
 		?>
 		`, []string{
-			"Function-Foo_aStaticMethod()",
-			"Function-Foo_aStaticMethod()",
-			"Function-Foo_aStaticMethod()",
-			"Function-Foo_aStaticMethod()",
-			"Function-Foo_aStaticMethod()",
+			"Function-Foo.aStaticMethod()",
+			"Function-Foo.aStaticMethod()",
+			"Function-Foo.aStaticMethod()",
+			"Function-Foo.aStaticMethod()",
+			"Function-Foo.aStaticMethod()",
 		}, t)
 	})
 
@@ -188,13 +189,26 @@ class B {
 }
 ?>
 		`, []string{
-			"Function-A_aStaticMethod()",
-			"Function-A_aStaticMethod()",
-			"Function-A_aStaticMethod()",
-			"Function-A_aStaticMethod()",
-			"Function-A_aStaticMethod()",
+			"Function-A.aStaticMethod()",
+			"Function-A.aStaticMethod()",
+			"Function-A.aStaticMethod()",
+			"Function-A.aStaticMethod()",
+			"Function-A.aStaticMethod()",
 		}, t)
 
+	})
+
+	t.Run("get static method by variable name", func(t *testing.T) {
+		code := `
+<?php
+class MyClass {
+    public static function myStaticMethod() {
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `*myStaticMethod as $fun`, map[string][]string{
+			"fun": {"Function-MyClass.myStaticMethod", "Undefined-MyClass.myStaticMethod(valid)"},
+		}, ssaapi.WithLanguage(consts.PHP))
 	})
 }
 
