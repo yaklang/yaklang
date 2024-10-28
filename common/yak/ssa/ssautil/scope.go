@@ -368,6 +368,9 @@ func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(handler VariableHandl
 	for name, ver := range ps.linkCaptured {
 		handler(name, ver)
 	}
+	for name, ver := range ps.linkSideEffect {
+		handler(name, ver)
+	}
 }
 
 func (scope *ScopedVersionedTable[T]) SetCapturedVariable(name string, ver VersionedIF[T]) {
