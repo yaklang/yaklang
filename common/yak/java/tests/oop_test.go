@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
@@ -523,5 +524,21 @@ public class Main{
     }
 }`
 		ssatest.CheckPrintlnValue(code, []string{"ParameterMember-parameter[1].a(Parameter-t)"}, t)
+	})
+}
+
+func TestJava_Method(t *testing.T) {
+	t.Run("get static method by variable name", func(t *testing.T) {
+		code := `
+public class ImageUtils{
+    public  InputStream getFile(String imagePath){
+    }
+    public static byte[] readFile(String url){
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `*readFile as $fun`, map[string][]string{
+			"fun": {"Function-ImageUtils.readFile", "Undefined-ImageUtils.readFile(valid)"},
+		}, ssaapi.WithLanguage(consts.JAVA))
 	})
 }

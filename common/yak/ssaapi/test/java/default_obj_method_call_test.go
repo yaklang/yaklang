@@ -327,21 +327,20 @@ public class A{
 
 public class B{
 	public static void main(){
-		int a1=A.a(); //不应该有this
-		int b1=A.b(); // 应该有this
-		int a2=A.a(); // 前面已经出现过，直接拿并返回
-		int b2=A.b(); // 前面已经出现过，直接拿并返回
+		int c1=A.a(); //不应该有this
+		int d1=A.b(); // 应该有this
+		int c2=A.a(); // 前面已经出现过，直接拿并返回
+		int d2=A.b(); // 前面已经出现过，直接拿并返回
 	}
 }
 `, func(prog *ssaapi.Program) error {
 		prog.Show()
-		result1 := prog.SyntaxFlow(`a* as $a;`).GetValues("a")
-		assert.Equal(t, "Function-A_a()", result1[0].String())
-		assert.Equal(t, "Function-A_a()", result1[1].String())
-		result2 := prog.SyntaxFlow(`b* as $b;`).GetValues("b")
-		assert.Equal(t, "Undefined-A.b", result2[0].String())
+		result1 := prog.SyntaxFlow(`c* as $c;`).GetValues("c").Show(false)
+		assert.Equal(t, "Function-A.a()", result1[0].String())
+		assert.Equal(t, "Function-A.a()", result1[1].String())
+		result2 := prog.SyntaxFlow(`d* as $d;`).GetValues("d")
+		assert.Equal(t, "Undefined-A.b(Undefined-A)", result2[0].String())
 		assert.Equal(t, "Undefined-A.b(Undefined-A)", result2[1].String())
-		assert.Equal(t, "Undefined-A.b(Undefined-A)", result2[2].String())
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 
@@ -358,21 +357,20 @@ public class A{
 public class B{
 	public static void main(){
 		A object =new A();
-		int a1=object.a(); // 会直接拿到a并返回
-		int b1=object.b(); // typ应该为nil,所以有this
-		int a2=object.a(); // 前面已经出现过，直接拿并返回
-		int b2=object.b(); // 前面已经出现过，直接拿并返回
+		int c1=object.a(); // 会直接拿到a并返回
+		int d1=object.b(); // typ应该为nil,所以有this
+		int c2=object.a(); // 前面已经出现过，直接拿并返回
+		int d2=object.b(); // 前面已经出现过，直接拿并返回
 	}
 }
 `, func(prog *ssaapi.Program) error {
 		prog.Show()
-		result1 := prog.SyntaxFlow(`a* as $a;`).GetValues("a")
-		assert.Equal(t, "Function-A_a()", result1[0].String())
-		assert.Equal(t, "Function-A_a()", result1[1].String())
-		result2 := prog.SyntaxFlow(`b* as $b;`).GetValues("b")
-		assert.Equal(t, "Undefined-object.b", result2[0].String())
+		result1 := prog.SyntaxFlow(`c* as $c;`).GetValues("c")
+		assert.Equal(t, "Function-A.a()", result1[0].String())
+		assert.Equal(t, "Function-A.a()", result1[1].String())
+		result2 := prog.SyntaxFlow(`d* as $d;`).GetValues("d")
+		assert.Equal(t, "Undefined-object.b(Undefined-A-constructor(Undefined-A))", result2[0].String())
 		assert.Equal(t, "Undefined-object.b(Undefined-A-constructor(Undefined-A))", result2[1].String())
-		assert.Equal(t, "Undefined-object.b(Undefined-A-constructor(Undefined-A))", result2[2].String())
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
