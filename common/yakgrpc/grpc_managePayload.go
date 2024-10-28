@@ -155,14 +155,14 @@ func (s *Server) QueryPayloadFromFile(ctx context.Context, req *ypb.QueryPayload
 		if size > FiveMB && handlerSize > OneKB {
 			// If file is larger than 5MB, read only the first 50KB
 			return &ypb.QueryPayloadFromFileResponse{
-				Data:      buf.Bytes(),
+				Data:      bytes.TrimRight(buf.Bytes(), "\n"),
 				IsBigFile: true,
 			}, nil
 		}
 	}
 
 	return &ypb.QueryPayloadFromFileResponse{
-		Data:      buf.Bytes(),
+		Data:      bytes.TrimRight(buf.Bytes(), "\n"),
 		IsBigFile: false,
 	}, nil
 }
@@ -263,7 +263,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			Message:             msg,
 		})
 	}
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(time.Second)
 	go func() {
 		defer func() {
 			size = total
@@ -290,13 +290,10 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		total += state.Size()
 
 		defer feedback(-1, "文件 "+f+" 写入数据库成功")
-		feedback(-1, "正在读取文件: "+f)
+		feedback(-1, "正在处理文件: "+f)
 		err = utils.GormTransaction(s.GetProfileDatabase(), func(tx *gorm.DB) error {
-			return yakit.ReadPayloadFileLineWithCallBack(f, func(data string, hitCount int64) error {
-				size += int64(len(data))
-				if total < size {
-					total = size + 1
-				}
+			return yakit.ReadPayloadFileLineWithCallBack(ctx, f, func(data string, rawLen int64, hitCount int64) error {
+				size += rawLen
 				err := yakit.CreateOrUpdatePayload(tx, data, group, folder, hitCount, false)
 				return err
 			})
@@ -324,11 +321,8 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		// 旧接口
 		total = int64(len(content))
 		feedback(-1, "正在读取数据")
-		if err := yakit.ReadQuotedLinesWithCallBack(content, func(data string) error {
-			size += int64(len(data))
-			if total < size {
-				total = size + 1
-			}
+		if err := yakit.ReadQuotedLinesWithCallBack(content, func(data string, rawLen int64) error {
+			size += rawLen
 			return yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), data, group, folder, 0, false)
 		}); err != nil {
 			log.Errorf("save payload group by content error: %s", err.Error())
@@ -364,46 +358,62 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	var handledSize, filtered, duplicate, total int64
+	var (
+		handledSize, filtered, duplicate, total int64
+		startTime                               = time.Now()
+	)
 	feedback := func(progress float64, msg string) {
 		if progress == -1 {
 			progress = float64(handledSize) / float64(total)
 		}
 		stream.Send(&ypb.SavePayloadProgress{
-			Progress: progress,
-			Message:  msg,
+			Progress:            progress,
+			CostDurationVerbose: time.Since(startTime).Round(time.Second).String(),
+			Message:             msg,
 		})
 	}
-
-	data := make([]struct {
-		data     string
-		hitCount int64
-	}, 0)
+	// dst
 	dataFilter := filter.NewBigFilter()
-	defer dataFilter.Close()
 
-	saveDataByFilter := func(s string, hitCount int64) error {
-		handledSize += int64(len(s))
-		if total < handledSize {
-			total = handledSize + 1
+	payloadFolder := consts.GetDefaultYakitPayloadsDir()
+	dstFileName := filepath.Join(payloadFolder, fmt.Sprintf("%s_%s.txt", folder, group))
+	dstFD, err := os.OpenFile(dstFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		dstFD.Close()
+		dataFilter.Close()
+		if stream.Context().Err() == context.Canceled {
+			os.Remove(dstFileName)
 		}
+	}()
+
+	saveDataByFilter := func(s string, rawLen, hitCount int64) error {
+		handledSize += rawLen
+		newLine := true
+		if handledSize >= total {
+			newLine = false
+		}
+
 		if !dataFilter.Exist(s) {
 			filtered++
 			dataFilter.Insert(s)
-			data = append(data,
-				struct {
-					data     string
-					hitCount int64
-				}{
-					s, hitCount,
-				})
+			if _, err := dstFD.WriteString(s); err != nil {
+				return err
+			}
+			if newLine {
+				if _, err := dstFD.WriteString("\n"); err != nil {
+					return err
+				}
+			}
 		} else {
 			duplicate++
 		}
 		return nil
 	}
-	saveDataByFilterNoHitCount := func(s string) error {
-		return saveDataByFilter(s, 0)
+	saveDataByFilterNoHitCount := func(line string, rawLen int64) error {
+		return saveDataByFilter(line, rawLen, 0)
 	}
 
 	handleFile := func(f string) error {
@@ -416,9 +426,22 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 		}
 		total += state.Size()
 
-		feedback(-1, "正在读取文件: "+f)
-		return yakit.ReadPayloadFileLineWithCallBack(f, saveDataByFilter)
+		feedback(-1, "正在处理文件: "+f)
+		return yakit.ReadPayloadFileLineWithCallBack(ctx, f, saveDataByFilter)
 	}
+
+	ticker := time.NewTicker(time.Second)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				time.Sleep(time.Second)
+				feedback(-1, "")
+			}
+		}
+	}()
 
 	if isFile {
 		feedback(0, "开始解析文件")
@@ -436,53 +459,7 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	feedback(1, fmt.Sprintf("检测到有%d项重复数据", duplicate))
 	feedback(1, fmt.Sprintf("已去除重复数据, 剩余%d项数据", filtered))
 
-	feedback(1, "step2")
-	start := time.Now()
-	feedback = func(progress float64, msg string) {
-		if progress == 0 {
-			progress = float64(handledSize) / float64(total)
-		}
-		d := time.Since(start)
-		stream.Send(&ypb.SavePayloadProgress{
-			Progress:            progress,
-			CostDurationVerbose: d.Round(time.Second).String(),
-			Message:             msg,
-		})
-	}
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				time.Sleep(time.Second)
-				feedback(-1, "")
-			}
-		}
-	}()
-	handledSize = 0
-	total = int64(len(data))
-	// save to file
-	ProjectFolder := consts.GetDefaultYakitPayloadsDir()
-	fileName := filepath.Join(ProjectFolder, fmt.Sprintf("%s_%s.txt", folder, group))
-	fd, err := os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
-	if err != nil {
-		return err
-	}
-	feedback(0, "正在写入文件")
-	for i, d := range data {
-		handledSize = int64(i)
-		if i == int(total)-1 {
-			fd.WriteString(d.data)
-		} else {
-			fd.WriteString(d.data + "\r\n")
-		}
-	}
-	if err := fd.Close(); err != nil {
-		return err
-	}
-	feedback(0.99, "写入文件完成")
-	yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), fileName, group, folder, 0, true)
+	yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), dstFileName, group, folder, 0, true)
 	yakit.SetGroupInEnd(s.GetProfileDatabase(), group)
 	if total == 0 {
 		return utils.Error("empty data no payload created")
@@ -670,8 +647,8 @@ func (s *Server) UpdatePayloadToFile(ctx context.Context, req *ypb.UpdatePayload
 	}
 	defer file.Close()
 
-	err = yakit.ReadQuotedLinesWithCallBack(content, func(s string) error {
-		if _, err := file.WriteLineString(s); err != nil {
+	err = yakit.ReadQuotedLinesWithCallBack(content, func(line string, rawLen int64) error {
+		if _, err := file.WriteLineString(line); err != nil {
 			return utils.Wrap(err, "write payload to file error")
 		}
 		return nil
