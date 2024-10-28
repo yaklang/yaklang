@@ -26,16 +26,6 @@ jobs:
           fi
       - name: Check Version
         run: echo ${{ env.YAK_VERSION }}
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Switch to version branch
-        run: |
-          git fetch origin ${{ github.event.inputs.publish_version }} 
-          git checkout ${{ github.event.inputs.publish_version }}
-          if [ $? -ne 0 ]; then
-            echo "Branch checkout failed."
-            exit 1
-          fi
 
       - name: Download Last Published Version
         run: wget -q -O previous_version.txt https://aliyun-oss.yaklang.com/yak/latest/version.txt
@@ -52,6 +42,7 @@ jobs:
             ["linux_amd64"]="yak_linux_amd64"
             ["linux_arm64"]="yak_linux_arm64"
             ["windows_amd64"]="yak_windows_amd64.exe"
+            ["windows_legacy_amd64"]="yak_windows_legacy_amd64.exe"
           )
           
           # Base URL for downloads
@@ -90,20 +81,12 @@ jobs:
       - name: Upload Yak Binary Version
         run: |
           bucket="yaklang"
-          for arch in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64.exe; do
-            if [[ $arch == "windows_amd64.exe" ]]; then
-              file_path='yak_windows_amd64.exe:/yak/latest/yak_windows_amd64.exe'
-            else
-              file_path="yak_${arch}:/yak/latest/yak_${arch}"
-            fi
+          for arch in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64.exe windows_legacy_amd64.exe; do
+            file_path="yak_${arch}:/yak/latest/yak_${arch}"
+            file_hash_path="yak_${arch}.sha256.txt:/yak/latest/yak_${arch}.sha256.txt"
+            
             echo "Start to upload $file_path"
             ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f $file_path
-          
-            if [[ $arch == "windows_amd64.exe" ]]; then
-              file_hash_path='yak_windows_amd64.exe.sha256.txt:/yak/latest/yak_windows_amd64.exe.sha256.txt'
-            else
-              file_hash_path="yak_${arch}.sha256.txt:/yak/latest/yak_${arch}.sha256.txt"
-            fi
           
             # Check if SHA256 file exists before uploading
             if [[ -f "${file_hash_path%%:*}" ]]; then
