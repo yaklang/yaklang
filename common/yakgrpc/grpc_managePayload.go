@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -278,7 +279,6 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		}
 	}()
 
-	feedback(0, "start")
 	handleFile := func(f string) error {
 		state, err := os.Stat(f)
 		fileSize := state.Size()
@@ -294,7 +294,11 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		err = utils.GormTransaction(s.GetProfileDatabase(), func(tx *gorm.DB) error {
 			return yakit.ReadPayloadFileLineWithCallBack(ctx, f, func(data string, rawLen int64, hitCount int64) error {
 				size += rawLen
-				err := yakit.CreateOrUpdatePayload(tx, data, group, folder, hitCount, false)
+
+				err := yakit.CreatePayload(tx, data, group, folder, hitCount, false)
+				if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: payloads.hash") {
+					err = nil // ignore duplicate error
+				}
 				return err
 			})
 		})
@@ -323,7 +327,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		feedback(-1, "正在读取数据")
 		if err := yakit.ReadQuotedLinesWithCallBack(content, func(data string, rawLen int64) error {
 			size += rawLen
-			return yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), data, group, folder, 0, false)
+			return yakit.CreatePayload(s.GetProfileDatabase(), data, group, folder, 0, false)
 		}); err != nil {
 			log.Errorf("save payload group by content error: %s", err.Error())
 		}
@@ -381,7 +385,9 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	if err != nil {
 		return err
 	}
+	dstWriter := bufio.NewWriterSize(dstFD, oneMB)
 	defer func() {
+		dstWriter.Flush()
 		dstFD.Close()
 		dataFilter.Close()
 		if stream.Context().Err() == context.Canceled {
@@ -399,11 +405,11 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 		if !dataFilter.Exist(s) {
 			filtered++
 			dataFilter.Insert(s)
-			if _, err := dstFD.WriteString(s); err != nil {
+			if _, err := dstWriter.WriteString(s); err != nil {
 				return err
 			}
 			if newLine {
-				if _, err := dstFD.WriteString("\n"); err != nil {
+				if _, err := dstWriter.WriteString("\n"); err != nil {
 					return err
 				}
 			}
