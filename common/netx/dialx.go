@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"net"
 	"sync/atomic"
 	"time"
@@ -195,10 +196,11 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		sni = config.SNI
 	}
 
+	minVer, maxVer := consts.GetGlobalTLSVersion()
 	var tlsConfig any = &tls.Config{
 		ServerName:         sni,
-		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-		MaxVersion:         tls.VersionTLS13,
+		MinVersion:         minVer, // nolint[:staticcheck]
+		MaxVersion:         maxVer,
 		InsecureSkipVerify: true,
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
 	}
@@ -234,8 +236,8 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 					WorkMode: gmtls.ModeGMSSLOnly,
 				},
 				ServerName:         sni,
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
+				MinVersion:         minVer, // nolint[:staticcheck]
+				MaxVersion:         maxVer,
 				InsecureSkipVerify: true,
 				Renegotiation:      gmtls.RenegotiateFreelyAsClient,
 			}
@@ -252,8 +254,8 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		case TLS_Strategy_GMDial_Without_GMSupport:
 			gmtlsConfig := &gmtls.Config{
 				ServerName:         sni,
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
+				MinVersion:         minVer, // nolint[:staticcheck]
+				MaxVersion:         maxVer,
 				InsecureSkipVerify: true,
 				Renegotiation:      gmtls.RenegotiateFreelyAsClient,
 			}

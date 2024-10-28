@@ -890,8 +890,6 @@ func (p *Proxy) handshakeWithTarget(req *http.Request) (net.Conn, error) {
 	vanillaTLS := func() {
 		rawConn, err = netx.DialTLSTimeout(time.Second*10, req.URL.Host, &tls.Config{
 			InsecureSkipVerify: true,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
 			NextProtos:         []string{"h2", "http/1.1"},
 			ServerName:         utils.ExtractHost(req.URL.Host),
 		}, proxyUrl)

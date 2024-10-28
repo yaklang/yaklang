@@ -2,6 +2,7 @@ package netx
 
 import (
 	"crypto/tls"
+	"github.com/yaklang/yaklang/common/consts"
 	"net"
 	"sync"
 	"time"
@@ -198,14 +199,27 @@ func DialX_WithTLSNextProto(nextProtos ...string) DialXOption {
 
 func DialX_WithTLSConfig(tlsConfig any) DialXOption {
 	return func(c *dialXConfig) {
+		minVer, maxVer := consts.GetGlobalTLSVersion()
 		c.EnableTLS = true
 		switch ret := tlsConfig.(type) {
 		case *tls.Config:
 			c.ShouldOverrideTLSConfig = true
+			if ret.MinVersion == 0 {
+				ret.MinVersion = minVer
+			}
+			if ret.MaxVersion == 0 {
+				ret.MaxVersion = maxVer
+			}
 			c.TLSConfig = ret
 		case *gmtls.Config:
 			c.ShouldOverrideGMTLSConfig = true
 			c.GMTLSConfig = ret
+			if ret.MinVersion == 0 {
+				ret.MinVersion = minVer
+			}
+			if ret.MaxVersion == 0 {
+				ret.MaxVersion = maxVer
+			}
 		case *gmtls.GMSupport:
 			c.ShouldOverrideGMTLSConfig = true
 			c.GMTLSConfig = &gmtls.Config{

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"io/ioutil"
 	"net"
@@ -182,10 +183,11 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 		}
 	} else {
 		log.Infof("tcp+tls connect to %s", target)
+		minVer, maxVer := consts.GetGlobalTLSVersion()
 		remoteConn, err = tls.DialWithDialer(dialer, "tcp", target, &tls.Config{
 			InsecureSkipVerify: true,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
+			MinVersion:         minVer,
+			MaxVersion:         maxVer,
 			ServerName:         originHost,
 		})
 		if err != nil {

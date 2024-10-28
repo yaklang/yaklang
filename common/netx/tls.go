@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"github.com/yaklang/yaklang/common/consts"
 	"net"
 	"time"
 
@@ -36,11 +37,12 @@ func UpgradeToTLSConnection(conn net.Conn, sni string, i any, spec *utls.ClientH
 
 func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout time.Duration, spec *utls.ClientHelloSpec, tlsNextProto ...string) (net.Conn, error) {
 	var handshakeConn HandshakeConn
+	minVer, maxVer := consts.GetGlobalTLSVersion()
 	if i == nil {
 		i = &tls.Config{
 			ServerName:         sni,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
+			MinVersion:         minVer,
+			MaxVersion:         maxVer,
 			InsecureSkipVerify: true,
 			Renegotiation:      tls.RenegotiateFreelyAsClient,
 		}
@@ -61,11 +63,12 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 		gmtlsConfig = ret
 		config = gmtlsConfig
 	case *gmtls.GMSupport:
+
 		gmtlsConfig = &gmtls.Config{
 			GMSupport:          ret,
 			ServerName:         sni,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
+			MinVersion:         minVer, // nolint[:staticcheck]
+			MaxVersion:         maxVer,
 			InsecureSkipVerify: true,
 		}
 		config = gmtlsConfig
@@ -83,8 +86,8 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 		if isCustomClientHello {
 			utlsConfig = &utls.Config{
 				ServerName:         sni,
-				MinVersion:         utls.VersionSSL30,
-				MaxVersion:         utls.VersionTLS13,
+				MinVersion:         minVer,
+				MaxVersion:         maxVer,
 				InsecureSkipVerify: true,
 				Renegotiation:      utls.RenegotiateFreelyAsClient,
 				NextProtos:         tlsConfig.NextProtos,

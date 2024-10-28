@@ -499,16 +499,12 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				NextProtos:         nextProto,
 				ServerName:         host,
 				InsecureSkipVerify: !option.VerifyCertificate,
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
 			}))
 		} else {
 			dialopts = append(dialopts, netx.DialX_WithTLSConfig(&tls.Config{
 				NextProtos:         nextProto,
 				ServerName:         host,
 				InsecureSkipVerify: !option.VerifyCertificate,
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
 			}))
 		}
 		dialopts = append(dialopts, netx.DialX_WithGMTLSSupport(gmTLS), netx.DialX_WithTLS(https), netx.DialX_WithGMTLSOnly(onlyGMTLS), netx.DialX_WithGMTLSPrefer(preferGMTLS))
