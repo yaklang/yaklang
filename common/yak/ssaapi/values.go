@@ -566,6 +566,7 @@ func (v *Value) IsExternLib() bool       { return v.getOpcode() == ssa.SSAOpcode
 func (v *Value) IsFunction() bool        { return v.getOpcode() == ssa.SSAOpcodeFunction }
 func (v *Value) IsBasicBlock() bool      { return v.getOpcode() == ssa.SSAOpcodeBasicBlock }
 func (v *Value) IsParameter() bool       { return v.getOpcode() == ssa.SSAOpcodeParameter }
+func (v *Value) IsSideEffect() bool      { return v.getOpcode() == ssa.SSAOpcodeSideEffect }
 func (v *Value) IsParameterMember() bool { return v.getOpcode() == ssa.SSAOpcodeParameterMember }
 func (v *Value) IsPhi() bool             { return v.getOpcode() == ssa.SSAOpcodePhi }
 func (v *Value) IsConstInst() bool       { return v.getOpcode() == ssa.SSAOpcodeConstInst }

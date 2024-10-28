@@ -18,6 +18,7 @@ type versionedValue interface {
 type SSAValue interface {
 	IsUndefined() bool
 	IsParameter() bool
+	IsSideEffect() bool
 	SelfDelete()
 	GetId() int64
 }
