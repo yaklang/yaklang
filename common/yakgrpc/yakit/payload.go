@@ -73,6 +73,15 @@ func updateOrDeletePayload(db *gorm.DB, p *schema.Payload) error {
 		})
 }
 
+func CreatePayload(db *gorm.DB, content, group, folder string, hitCount int64, isFile bool) error {
+	payload := NewPayload(group, content)
+	payload.Folder = &folder
+	payload.HitCount = &hitCount
+	payload.IsFile = &isFile
+	payload.Hash = payload.CalcHash()
+	return db.Create(&payload).Error
+}
+
 func CreateOrUpdatePayload(db *gorm.DB, content, group, folder string, hitCount int64, isFile bool) error {
 	payload := NewPayload(group, content)
 	payload.Folder = &folder
