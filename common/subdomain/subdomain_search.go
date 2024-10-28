@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -41,11 +42,12 @@ func virustotalVisit(ctx context.Context, url string) (result []string, err erro
 			Next string `json:"next"`
 		} `json:"links"`
 	}
+	minVer, maxVer := consts.GetGlobalTLSVersion()
 	client := http.Client{
 		Transport: &http.Transport{TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
+			MinVersion:         minVer, // nolint[:staticcheck]
+			MaxVersion:         maxVer,
 		}},
 		Timeout: timeoutFromContext(ctx, 15*time.Second),
 	}

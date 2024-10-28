@@ -523,8 +523,6 @@ func GetX509MutualAuthClientTlsConfig(clientCrt, clientPriv []byte, caCrts ...[]
 
 	config := tls.Config{
 		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-		MaxVersion:         tls.VersionTLS13,
 		Certificates:       []tls.Certificate{pair},
 		ClientCAs:          pool,
 	}
