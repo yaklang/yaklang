@@ -10,6 +10,9 @@ func ForEachCapturedVariable[T versionedValue](
 		if ver.CanCaptureInScope(base) || scope.GetForceCapture() {
 			handler(name, ver)
 		}
+		if ver.GetValue().IsSideEffect() {
+			handler(name, ver)
+		}
 	})
 }
 

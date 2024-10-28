@@ -88,6 +88,7 @@ type Node interface {
 	GetValues() Values
 	IsUndefined() bool
 	IsParameter() bool
+	IsSideEffect() bool
 }
 
 type Typed interface {
@@ -602,6 +603,10 @@ func (p *Parameter) IsParameter() bool {
 	return true
 }
 
+func (p *Parameter) IsSideEffect() bool {
+	return false
+}
+
 var (
 	_ Node  = (*Parameter)(nil)
 	_ Value = (*Parameter)(nil)
@@ -725,6 +730,18 @@ type SideEffect struct {
 	anValue
 	CallSite Value // call instruction
 	Value    Value // modify to this value
+}
+
+func (p *SideEffect) IsUndefined() bool {
+	return false
+}
+
+func (p *SideEffect) IsParameter() bool {
+	return false
+}
+
+func (p *SideEffect) IsSideEffect() bool {
+	return true
 }
 
 var (

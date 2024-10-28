@@ -10,6 +10,7 @@ type value interface {
 	String() string
 	IsUndefined() bool
 	IsParameter() bool
+	IsSideEffect() bool
 	SelfDelete()
 	GetId() int64
 }
@@ -46,9 +47,10 @@ func (p *phi) String() string {
 	return fmt.Sprintf("phi%s", p.edge)
 }
 
-func (p *phi) IsUndefined() bool { return false }
-func (p *phi) IsParameter() bool { return false }
-func (p *phi) SelfDelete()       {}
+func (p *phi) IsUndefined() bool  { return false }
+func (p *phi) IsParameter() bool  { return false }
+func (p *phi) IsSideEffect() bool { return false }
+func (p *phi) SelfDelete()        {}
 
 type constsIns struct {
 	value any
@@ -69,9 +71,10 @@ func (c *constsIns) Replace(old, new value) {}
 func (c *constsIns) String() string {
 	return fmt.Sprintf("const(%v)", c.value)
 }
-func (p *constsIns) IsUndefined() bool { return false }
-func (p *constsIns) IsParameter() bool { return false }
-func (p *constsIns) SelfDelete()       {}
+func (p *constsIns) IsUndefined() bool  { return false }
+func (p *constsIns) IsParameter() bool  { return false }
+func (p *constsIns) IsSideEffect() bool { return false }
+func (p *constsIns) SelfDelete()        {}
 
 type binary struct {
 	X, Y value
@@ -101,9 +104,10 @@ func (b *binary) String() string {
 	return fmt.Sprintf("binary(%v, %v)", b.X, b.Y)
 }
 
-func (p *binary) IsUndefined() bool { return false }
-func (p *binary) IsParameter() bool { return false }
-func (p *binary) SelfDelete()       {}
+func (p *binary) IsUndefined() bool  { return false }
+func (p *binary) IsParameter() bool  { return false }
+func (p *binary) IsSideEffect() bool { return false }
+func (p *binary) SelfDelete()        {}
 
 // ======== builder
 
