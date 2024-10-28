@@ -2,7 +2,9 @@ package yakit
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"os"
 	"strconv"
 	"strings"
 
@@ -101,46 +103,60 @@ func CheckExistGroup(db *gorm.DB, group string) (bool, error) {
 
 // save payload from file
 func SavePayloadByFilename(db *gorm.DB, group string, fileName string) error {
-	return ReadPayloadFileLineWithCallBack(fileName, func(s string, hitCount int64) error {
+	return ReadPayloadFileLineWithCallBack(context.Background(), fileName, func(s string, rawLen int64, hitCount int64) error {
 		return CreateOrUpdatePayload(db, s, group, "", hitCount, true)
 	})
 }
 
-func ReadPayloadFileLineWithCallBack(fileName string, handler func(string, int64) error) error {
-	ch, err := utils.FileLineReader(fileName)
+func ReadPayloadFileLineWithCallBack(ctx context.Context, fileName string, handler func(line string, rawLen int64, hitCount int64) error) error {
+	fd, err := os.Open(fileName)
 	if err != nil {
 		return err
 	}
+	defer fd.Close()
+	reader := bufio.NewReader(fd)
 
 	firstLine := true
 	isCSV := strings.HasSuffix(fileName, ".csv")
-	for lineRaw := range ch {
-		line := string(lineRaw)
-		var hitCount int64 = 0
-		if isCSV {
-			if firstLine {
-				firstLine = false
-			} else {
-				lines := utils.PrettifyListFromStringSplited(line, ",")
-				if len(lines) == 0 {
-					continue
-				}
-				p := strconv.Quote(strings.TrimRightFunc(lines[0], TrimWhitespaceExceptSpace))
-				if len(lines) > 1 {
-					// hit count
-					i, err := strconv.ParseInt(lines[1], 10, 64)
-					if err == nil {
-						hitCount = i
+BREAKOUT:
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			lineRaw, err := reader.ReadBytes('\n')
+			if err != nil && len(lineRaw) == 0 {
+				break BREAKOUT
+			}
+			lineRawLen := int64(len(lineRaw))
+			lineRaw = bytes.TrimSpace(lineRaw)
+			line := string(lineRaw)
+			var hitCount int64 = 0
+			if isCSV {
+				if firstLine {
+					firstLine = false
+				} else {
+					lines := utils.PrettifyListFromStringSplited(line, ",")
+					if len(lines) == 0 {
+						continue
+					}
+					p := strconv.Quote(strings.TrimRightFunc(lines[0], TrimWhitespaceExceptSpace))
+					if len(lines) > 1 {
+						// hit count
+						i, err := strconv.ParseInt(lines[1], 10, 64)
+						if err == nil {
+							hitCount = i
+						}
+					}
+					if err := handler(p, lineRawLen, hitCount); err != nil {
+						return err
 					}
 				}
-				if err := handler(p, hitCount); err != nil {
+			} else {
+				line = strconv.Quote(strings.TrimRightFunc(line, TrimWhitespaceExceptSpace))
+				if err := handler(line, lineRawLen, hitCount); err != nil {
 					return err
 				}
-			}
-		} else {
-			line = strconv.Quote(strings.TrimRightFunc(line, TrimWhitespaceExceptSpace))
-			if err := handler(line, hitCount); err != nil {
-				return err
 			}
 		}
 	}
@@ -161,20 +177,22 @@ func SavePayloadGroup(db *gorm.DB, group string, lists []string) error {
 
 // save payload from raw-data
 func SavePayloadGroupByRaw(db *gorm.DB, group string, data string) error {
-	return ReadQuotedLinesWithCallBack(data, func(s string) error {
+	return ReadQuotedLinesWithCallBack(data, func(s string, rawLen int64) error {
 		return CreateOrUpdatePayload(db, s, group, "", 0, false)
 	})
 }
 
-func ReadQuotedLinesWithCallBack(data string, handler func(string) error) error {
+func ReadQuotedLinesWithCallBack(data string, handler func(line string, rawLen int64) error) error {
 	r := bufio.NewReader(strings.NewReader(data))
 	for {
-		lineRaw, err := utils.BufioReadLine(r)
-		if err != nil {
+		lineRaw, err := r.ReadBytes('\n')
+		if err != nil && len(lineRaw) == 0 {
 			break
 		}
+		lineRawLen := int64(len(lineRaw))
+		lineRaw = bytes.TrimSpace(lineRaw)
 		line := strconv.Quote(strings.TrimRightFunc(string(lineRaw), TrimWhitespaceExceptSpace))
-		if err := handler(line); err != nil {
+		if err := handler(line, lineRawLen); err != nil {
 			return err
 		}
 	}

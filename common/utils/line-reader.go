@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/pkg/errors"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 func RemoveBOM(raw []byte) []byte {
@@ -44,8 +45,8 @@ func FileLineReaderWithContext(file string, ctx context.Context) (chan []byte, e
 				return
 			default:
 			}
-			lineRaw, err := BufioReadLine(reader)
-			if err != nil {
+			lineRaw, err := reader.ReadBytes('\n')
+			if err != nil && len(lineRaw) == 0 {
 				break
 			}
 			raw := bytes.TrimSpace(lineRaw)

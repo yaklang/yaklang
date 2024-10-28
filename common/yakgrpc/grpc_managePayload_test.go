@@ -484,7 +484,7 @@ func TestPayload(t *testing.T) {
 	t.Run("File_CRUD", func(t *testing.T) {
 		group := uuid.NewString()
 		bigGroup := uuid.NewString()
-		want := "asd\nqwe\nzxc\n"
+		want := "asd\nqwe\nzxc"
 
 		// save file
 		save2file(local, t, group, "", want)
