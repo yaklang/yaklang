@@ -86,8 +86,6 @@ func verify(serConfig, cliConfig *tls.Config, domain string) error {
 	if cliConfig == nil {
 		cliConfig = &tls.Config{
 			ServerName: domain,
-			MinVersion: tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion: tls.VersionTLS13,
 		}
 	}
 	conn, err := netx.DialX(fmt.Sprintf("127.0.0.1:%d", port),

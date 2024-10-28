@@ -393,6 +393,9 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 	// 插件扫描黑白名单
 	SetGlobalPluginScanLists(c.IncludePluginScanURIs, c.ExcludePluginScanURIs)
 
+	consts.SetGlobalTLSMaxVersion(uint16(c.GetMaxTlsVersion()))
+	consts.SetGlobalTLSMinVersion(uint16(c.GetMinTlsVersion()))
+
 	for _, certs := range c.GetClientCertificates() {
 		if len(certs.GetPkcs12Bytes()) > 0 {
 			err := netx.LoadP12Bytes(certs.Pkcs12Bytes, string(certs.GetPkcs12Password()))

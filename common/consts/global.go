@@ -1,6 +1,7 @@
 package consts
 
 import (
+	"crypto/tls"
 	"go.uber.org/atomic"
 	"os"
 	"path/filepath"
@@ -46,12 +47,38 @@ var (
 	GLOBAL_DB_SAVE_SYNC = utils.NewBool(false)
 
 	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT = atomic.NewFloat64(60)
+
+	// tls global config
+	GLOBAL_TLS_MIN_VERSION uint16 = tls.VersionSSL30
+	GLOBAL_TLS_MAX_VERSION uint16 = tls.VersionTLS13
 )
 
 const (
 	YAK_PROJECT_DATA_DB_NAME_RECOVERED   = "default-yakit.db"
 	YAK_PROFILE_PLUGIN_DB_NAME_RECOVERED = "yakit-profile-plugin.db"
 )
+
+var (
+	Global_Tsl_Mutex = sync.Mutex{}
+)
+
+func GetGlobalTLSVersion() (uint16, uint16) {
+	Global_Tsl_Mutex.Lock()
+	defer Global_Tsl_Mutex.Unlock()
+	return GLOBAL_TLS_MIN_VERSION, GLOBAL_TLS_MAX_VERSION
+}
+
+func SetGlobalTLSMinVersion(min uint16) {
+	Global_Tsl_Mutex.Lock()
+	defer Global_Tsl_Mutex.Unlock()
+	GLOBAL_TLS_MIN_VERSION = min
+}
+
+func SetGlobalTLSMaxVersion(max uint16) {
+	Global_Tsl_Mutex.Lock()
+	defer Global_Tsl_Mutex.Unlock()
+	GLOBAL_TLS_MAX_VERSION = max
+}
 
 func GetGlobalCallerCallPluginTimeout() float64 {
 	return GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()

@@ -112,8 +112,6 @@ func (s *SMTPMailSender) GetAuthClient(ctx context.Context) (net.Conn, *smtp.Cli
 	)
 	if s.config.ConnectSSL {
 		conn, err = netx.DialTLSTimeout(10*time.Second, addr, &tls.Config{InsecureSkipVerify: true,
-			MinVersion: tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion: tls.VersionTLS13,
 			ServerName: s.config.Server})
 		if err != nil {
 			return nil, nil, errors.Errorf("tls dial failed:  %s", err)
