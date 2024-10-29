@@ -39,15 +39,23 @@ func (w *WhileStatement) String(funcCtx *class_context.ClassContext) string {
 type TryCatchStatement struct {
 	Exception *values.JavaRef
 	TryBody   []Statement
-	CatchBody []Statement
+	CatchBodies [][]Statement
 }
 
-func NewTryCatchStatement(body1, body2 []Statement) *TryCatchStatement {
+func NewTryCatchStatement(body1 []Statement, body2 [][]Statement) *TryCatchStatement {
 	return &TryCatchStatement{
 		TryBody:   body1,
-		CatchBody: body2,
+		CatchBodies: body2,
 	}
 }
 func (w *TryCatchStatement) String(funcCtx *class_context.ClassContext) string {
-	return fmt.Sprintf("try{\n%s\n}catch{\n%s\n}", StatementsString(w.TryBody, funcCtx), StatementsString(w.CatchBody, funcCtx))
+	bodies := []string{}
+	for _, body := range w.CatchBodies {
+		bodies = append(bodies, StatementsString(body, funcCtx))
+	}
+	s :=  fmt.Sprintf("try{\n%s\n}", StatementsString(w.TryBody, funcCtx))
+	for _, body := range bodies {
+		s += fmt.Sprintf("catch{\n%s\n}", body)
+	}
+	return s
 }

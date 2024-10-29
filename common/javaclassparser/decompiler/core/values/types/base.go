@@ -21,12 +21,18 @@ type JavaType interface {
 	ArrayDim() int
 	FunctionType() *JavaFuncType
 	RawType() javaType
+	Copy() JavaType
 }
 
 type JavaTypeWrap struct {
 	javaType
 }
 
+func (j *JavaTypeWrap) Copy() JavaType {
+	return &JavaTypeWrap{
+		javaType: j.javaType,
+	}
+}
 func (j *JavaTypeWrap) ArrayDim() int {
 	v, ok := j.javaType.(*JavaArrayType)
 	if ok {
@@ -63,7 +69,12 @@ func (j *JavaTypeWrap) ElementType() JavaType {
 	return nil
 }
 func (j *JavaTypeWrap) ResetType(t JavaType) {
-	j.javaType = t.RawType()
+	if t.String(&class_context.ClassContext{}) == JavaBoolean {
+		j.javaType = t.RawType()
+	}
+	if j.String(&class_context.ClassContext{}) == JavaVoid {
+		j.javaType = t.RawType()
+	}
 }
 func newJavaTypeWrap(t javaType) *JavaTypeWrap {
 	return &JavaTypeWrap{

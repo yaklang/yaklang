@@ -517,26 +517,22 @@ func (s *StatementManager) ScanCoreInfo() error {
 	return nil
 }
 func (s *StatementManager) Rewrite() error {
-	println("scan core info")
 	err := s.ScanCoreInfo()
 	if err != nil {
 		return err
 	}
 	rewriters := []rewriterFunc{SwitchRewriter, LoopRewriter, IfRewriter, TryRewriter}
 	for _, rewriter := range rewriters {
-		println("run rewriter")
 		err := rewriter(s)
 		if err != nil {
 			return err
 		}
 	}
-	println("run action")
 	for _, action := range s.FinalActions {
 		err := action()
 		if err != nil {
 			return err
 		}
 	}
-	println("run action end")
 	return nil
 }
