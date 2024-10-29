@@ -1,6 +1,7 @@
 package consts
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -53,6 +54,19 @@ var (
 
 func init() {
 	resetSSADB()
+
+	// use env to config ssa database
+	dialect := os.Getenv("YAK_SSA_DATABASE_DIALECT") // dialect
+	url := os.Getenv("YAK_SSA_DATABASE_URL")         // url
+	if dialect != "" && url != "" {
+		db, err := gorm.Open(dialect, url)
+		if err != nil {
+			log.Errorf("create ssa database err: %v", err)
+		} else {
+			ssaDatabase = db
+			log.Infof("init ssa database:[%s]%s", dialect, url)
+		}
+	}
 }
 
 func resetSSADB() {
@@ -90,14 +104,15 @@ func GetSSADataBasePath() string {
 
 func initSSADatabase() {
 	initSSADatabaseOnce.Do(func() {
+		// use default sqlite database
 		if ssaDatabase == nil {
-			var err error
-			ssaDatabase, err = createAndConfigDatabase(GetSSADataBasePath(), SQLiteExtend)
-			if err != nil {
+			if db, err := createAndConfigDatabase(GetSSADataBasePath(), SQLiteExtend); err != nil {
 				log.Errorf("create ssa database err: %v", err)
+			} else {
+				ssaDatabase = db
+				log.Infof("init ssa database: %s", GetSSADataBasePath())
 			}
 		}
-		log.Infof("init ssa database: %s", GetSSADataBasePath())
 		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SSA_DATABASE)
 	})
 }
