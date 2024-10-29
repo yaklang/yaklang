@@ -2,9 +2,10 @@ package openai
 
 import (
 	"errors"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"io"
 )
 
 type GetawayClient struct {
@@ -19,7 +20,6 @@ func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, err
 
 func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
 	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions, g.config.StreamHandler)
-
 }
 
 func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
@@ -27,7 +27,7 @@ func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]a
 }
 
 func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.BuildHTTPOptions)
+	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.BuildHTTPOptions)
 }
 
 func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
@@ -57,6 +57,7 @@ func (g *GetawayClient) CheckValid() error {
 	}
 	return nil
 }
+
 func (g *GetawayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	opts := []poc.PocConfigOption{
 		poc.WithReplaceAllHttpPacketHeaders(map[string]string{

@@ -2,11 +2,12 @@ package tongyi
 
 import (
 	"errors"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"io"
 )
 
 type GetawayClient struct {
@@ -24,7 +25,7 @@ func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.F
 }
 
 func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.BuildHTTPOptions)
+	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.BuildHTTPOptions)
 }
 
 func (g *GetawayClient) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {

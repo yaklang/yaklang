@@ -89,7 +89,11 @@ func (s *SyntaxFlowWebServer) registerAIAnalysisRoute() {
 			return
 		}
 
-		client := ai.ChatGLM(aispec.WithModel("glm-4-flash"), aispec.WithAPIKey(s.config.ChatGLMAPIKey))
+		client := ai.ChatGLM(aispec.WithModel("glm-4-flash"), aispec.WithAPIKey(s.config.ChatGLMAPIKey), aispec.WithHTTPErrorHandler(func(err error) {
+			WriteWebsocketJSON(conn, &SyntaxFlowAIAnalysisResponse{
+				Error: fmt.Sprintf("send http packet for chat error: %v", err),
+			})
+		}))
 
 		var promptBuilder strings.Builder
 		err = chatTemplate.Execute(&promptBuilder, map[string]string{

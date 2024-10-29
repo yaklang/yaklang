@@ -3,6 +3,10 @@ package aispec
 import (
 	"bufio"
 	"encoding/json"
+	"io"
+	"net/http/httputil"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,9 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"net/http/httputil"
-	"strings"
 )
 
 func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.PocConfigOption) {
@@ -69,7 +70,7 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 	return pr, opts
 }
 
-func ChatWithStream(url string, model string, msg string, opt func() ([]poc.PocConfigOption, error)) (io.Reader, error) {
+func ChatWithStream(url string, model string, msg string, httpErrHandler func(err error), opt func() ([]poc.PocConfigOption, error)) (io.Reader, error) {
 	opts, err := opt()
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to get options")
@@ -89,7 +90,11 @@ func ChatWithStream(url string, model string, msg string, opt func() ([]poc.PocC
 	go func() {
 		rsp, _, err := poc.DoPOST(url, opts...)
 		if err != nil {
-			log.Errorf("failed to post stream request: %v", err)
+			if httpErrHandler == nil {
+				log.Errorf("failed to post stream request: %v", err)
+			} else {
+				httpErrHandler(err)
+			}
 			return
 		}
 		_ = rsp
