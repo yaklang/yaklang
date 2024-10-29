@@ -282,6 +282,7 @@ func (c *Call) handleCalleeFunction() {
 
 		for _, se := range funcTyp.SideEffects {
 			var variable *Variable
+			var sescope ScopeIF
 			// is object
 			if se.MemberCallKind == NoMemberCall {
 				if funCallee := se.Modify.GetFunc(); funCallee != nil {
@@ -305,16 +306,22 @@ func (c *Call) handleCalleeFunction() {
 			}
 
 			if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
-				if se.Variable.GetScope() == currentScope {
+				if se.Variable != nil {
+					sescope = se.Variable.GetScope()
+				} else {
+					sescope = variable.GetScope()
+				}
+
+				if sescope == currentScope {
 					// TODO: handle side effect in loop scope,
 					// will replace value in scope and create new phi
 					builder.AssignVariable(variable, sideEffect)
 					sideEffect.SetVerboseName(se.VerboseName)
-					c.SideEffectValue[se.Name] = sideEffect
-				} else if !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
+					c.SideEffectValue[se.VerboseName] = sideEffect
+				} else if !currentScope.IsSameOrSubScope(sescope) {
 					builder.AssignVariable(variable, sideEffect)
 					sideEffect.SetVerboseName(se.VerboseName)
-					c.SideEffectValue[se.Name] = sideEffect
+					c.SideEffectValue[se.VerboseName] = sideEffect
 				} else {
 					value := currentScope.CreateVariable(se.VerboseName, false)
 					currentScope.AssignVariable(value, sideEffect)
