@@ -7,6 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	_ "github.com/jinzhu/gorm/dialects/mysql"
+
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
@@ -66,6 +68,11 @@ func GetSSADataBasePathDefault() string {
 	return filepath.Join(GetDefaultYakitBaseDir(), filename)
 }
 
+func SetSSADB(db *gorm.DB) {
+	ssaDatabase = db
+	initSSADatabaseOnce = new(sync.Once)
+}
+
 func SetSSADataBasePath(path string) {
 	if path == "" {
 		return
@@ -83,10 +90,12 @@ func GetSSADataBasePath() string {
 
 func initSSADatabase() {
 	initSSADatabaseOnce.Do(func() {
-		var err error
-		ssaDatabase, err = createAndConfigDatabase(GetSSADataBasePath(), SQLiteExtend)
-		if err != nil {
-			log.Errorf("create ssa database err: %v", err)
+		if ssaDatabase == nil {
+			var err error
+			ssaDatabase, err = createAndConfigDatabase(GetSSADataBasePath(), SQLiteExtend)
+			if err != nil {
+				log.Errorf("create ssa database err: %v", err)
+			}
 		}
 		log.Infof("init ssa database: %s", GetSSADataBasePath())
 		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SSA_DATABASE)
