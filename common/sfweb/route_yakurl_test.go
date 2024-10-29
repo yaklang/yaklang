@@ -26,7 +26,15 @@ func checkSSAURL(t *testing.T, programName, path, sfCode string, checkHandler fu
 		req := &sfweb.YakURLRequest{
 			Method: http.MethodGet,
 			URL: &sfweb.YakURL{
-				FromRaw: fmt.Sprintf("syntaxflow://%s%s?save_result=true", programName, path),
+				Schema:   "syntaxflow",
+				Location: programName,
+				Path:     path,
+				Query: []*sfweb.Query{
+					{
+						Key:   "save_result",
+						Value: "true",
+					},
+				},
 			},
 			Body: sfCode,
 		}
@@ -41,8 +49,8 @@ func checkSSAURL(t *testing.T, programName, path, sfCode string, checkHandler fu
 		t.Log("checkHandler in memory query")
 		resultIDRes := rsp.Resources[len(rsp.Resources)-1]
 		resultID = resultIDRes.ResourceName
-		require.Equal(t, resultIDRes.ResourceType, "message")
-		require.Equal(t, resultIDRes.VerboseType, "result_id")
+		require.Equal(t, "result_id", resultIDRes.ResourceType)
+		require.Equal(t, "result_id", resultIDRes.VerboseType)
 
 		checkHandler(rsp.Resources[:len(rsp.Resources)-1])
 	}
@@ -52,7 +60,15 @@ func checkSSAURL(t *testing.T, programName, path, sfCode string, checkHandler fu
 		req := &sfweb.YakURLRequest{
 			Method: http.MethodGet,
 			URL: &sfweb.YakURL{
-				FromRaw: fmt.Sprintf("syntaxflow://%s%s?result_id=%s", programName, path, resultID),
+				Schema:   "syntaxflow",
+				Location: programName,
+				Path:     path,
+				Query: []*sfweb.Query{
+					{
+						Key:   "result_id",
+						Value: resultID,
+					},
+				},
 			},
 			Body: sfCode,
 		}
@@ -64,7 +80,7 @@ func checkSSAURL(t *testing.T, programName, path, sfCode string, checkHandler fu
 		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
 
 		resultIDRes := rsp.Resources[len(rsp.Resources)-1]
-		require.Equal(t, resultIDRes.ResourceType, "message")
+		require.Equal(t, resultIDRes.ResourceType, "result_id")
 		require.Equal(t, resultIDRes.VerboseType, "result_id")
 		// got result
 		gotResultID := resultIDRes.ResourceName
@@ -83,6 +99,7 @@ func checkVariable(t *testing.T, res []*sfweb.YakURLResource, want []string) {
 }
 
 func TestYakURL(t *testing.T) {
+	debug()
 	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.apackage")
 	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.bpackage.sub")
 
@@ -128,7 +145,7 @@ func TestYakURL(t *testing.T) {
 		var rsp sfweb.ErrorResponse
 		rawRsp, err := DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody([]byte(`{`), false))
 		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
+		require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
 		require.Contains(t, rsp.Message, "unmarshal request error")
 	})
 
@@ -146,17 +163,17 @@ func TestYakURL(t *testing.T) {
 		require.NoError(t, err)
 		rawRsp, err := DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody(body, false))
 		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
+		require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
 		require.Equal(t, sfweb.NewInvalidSchemeError(scheme).Error(), rsp.Message)
 
 		// Schema
 		req.URL.FromRaw = ""
-		req.URL.Schema = "syntaxflow"
+		req.URL.Schema = scheme
 		body, err = json.Marshal(req)
 		require.NoError(t, err)
 		rawRsp, err = DoResponse(http.MethodPost, "/yakurl", &rsp, poc.WithReplaceHttpPacketBody(body, false))
 		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
+		require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
 		require.Equal(t, sfweb.NewInvalidSchemeError(scheme).Error(), rsp.Message)
 	})
 
