@@ -4,15 +4,15 @@ desc(
     severity: high,
 )
 
-
-db.QueryRow( * #-> as $query)
+*.QueryRow( * #-> as $query)
 fmt.Sprintf(* #-> as $param)
 
 $query #{
-    until: `* & $param`,
-}-> as $root;
+	until: `* & $param`,
+}-> as $sink;
 
-$root?{ .FormValue(*) } as $high;
+$sink?{ .FormValue(*) } as $root;
+$root?{have: 'Parameter'} as $high
 
 alert $high for {
     title: 'SQL Injection detected',

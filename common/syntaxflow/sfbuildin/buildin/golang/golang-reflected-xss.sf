@@ -4,8 +4,9 @@ desc(
     severity: high,
 )
 
-w.Write(* #-> as $param)
-$param?{ r.URL.Query() } as $high;
+*.Write(* #-> as $param)
+$param?{ *.URL.Query() } as $sink
+$sink?{have: 'Parameter'} as $high
 
 
 alert $high for {

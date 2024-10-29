@@ -1,0 +1,39 @@
+desc(
+    title: "check execution input variable",
+    type: audit,
+    level: info,
+    lib: 'golang-os-exec'
+)
+
+.Command as $output
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://exec.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"os/exec"
+)
+
+func main() {
+	// 创建一个命令
+	cmd := exec.Command("ls", "-l") // 在 Unix/Linux 系统中，使用 "dir" 对于 Windows 系统
+
+	// 执行命令并获取输出
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	// 打印输出
+	fmt.Println(string(output))
+}
+
+PARAM
+)
