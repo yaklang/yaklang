@@ -24,7 +24,7 @@ var (
 
 func init() {
 	var err error
-	falsePositiveIssueTemplate, err = template.New("issueBody").Funcs(template.FuncMap{
+	falsePositiveIssueTemplate, err = template.New("false_positive_body").Funcs(template.FuncMap{
 		"CodeBlock": CodeBlock,
 		"Details":   Details,
 		"Escape":    html.EscapeString,
@@ -53,7 +53,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	falseNegativeIssueTemplate, err = template.New("issueBody").Funcs(template.FuncMap{
+	falseNegativeIssueTemplate, err = template.New("false_negative_body").Funcs(template.FuncMap{
 		"CodeBlock": CodeBlock,
 		"Details":   Details,
 		"Escape":    html.EscapeString,
@@ -155,6 +155,11 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 			writeErrorJson(w, NewReportMissingParameterError("risk_hash"))
 			return
 		}
+		lang, err := consts.ValidateLanguage(req.Lang)
+		if err != nil {
+			writeErrorJson(w, NewInvalidLangError(req.Lang))
+			return
+		}
 
 		risk, err := yakit.GetRiskByHash(consts.GetGormProjectDatabase(), req.RiskHash)
 		if err != nil {
@@ -172,7 +177,7 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 		var issueBodyBuilder strings.Builder
 		err = falsePositiveIssueTemplate.Execute(&issueBodyBuilder, ReportFalsePositiveTemplateData{
 			Content: req.Content,
-			Lang:    req.Lang,
+			Lang:    string(lang),
 			Rule:    rule,
 			Risk:    risk,
 		})
@@ -209,13 +214,19 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 			return
 		}
 
+		lang, err := consts.ValidateLanguage(req.Lang)
+		if err != nil {
+			writeErrorJson(w, NewInvalidLangError(req.Lang))
+			return
+		}
+
 		title := fmt.Sprintf("规则 %s 存在漏报", req.RuleName)
 
 		var issueBodyBuilder strings.Builder
 		err = falseNegativeIssueTemplate.Execute(&issueBodyBuilder, ReportFalseNegativeTemplateData{
 			RuleName: req.RuleName,
 			Content:  req.Content,
-			Lang:     req.Lang,
+			Lang:     string(lang),
 		})
 		if err != nil {
 			writeErrorJson(w, utils.Wrap(err, "execute template error"))
