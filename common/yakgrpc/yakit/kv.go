@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"strconv"
 	"sync"
@@ -339,6 +340,8 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		AuthInfos:         make([]*ypb.AuthInfo, 0),
 		DbSaveSync:        false,
 		CallPluginTimeout: 60,
+		MaxTlsVersion:     tls.VersionTLS13,
+		MinTlsVersion:     tls.VersionSSL30,
 	}
 	config := netx.NewBackupInitilizedReliableDNSConfig()
 	defaultConfig.CustomDoHServers = config.SpecificDoH
