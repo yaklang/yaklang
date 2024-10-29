@@ -79,6 +79,7 @@ func (u *YakURL) toYpb() *ypb.YakURL {
 	})
 	return &ypb.YakURL{
 		FromRaw:  u.FromRaw,
+		Schema:   u.Schema,
 		Location: u.Location,
 		Pass:     u.Pass,
 		User:     u.User,
