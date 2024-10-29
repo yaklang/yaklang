@@ -47,6 +47,8 @@ func writeJSON(wc *lowhttp.WebsocketClient, data any) error {
 }
 
 func TestScan(t *testing.T) {
+	t.Parallel()
+
 	progress := 0.0
 	var risks []*sfweb.SyntaxFlowScanRisk
 
@@ -66,12 +68,6 @@ func TestScan(t *testing.T) {
 			}
 			if len(rsp.Risk) > 0 {
 				risks = append(risks, rsp.Risk...)
-				// for _, risk := range rsp.Risk {
-				// 	result, err := ssaapi.LoadResultByID(uint(risk.ResultID))
-				// 	if err == nil {
-				// 		t.Logf("!!!! %s", result.DumpValuesJson(risk.VarName))
-				// 	}
-				// }
 			}
 		}),
 	)
