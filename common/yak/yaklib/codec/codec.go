@@ -142,6 +142,9 @@ func EncodeToHex(i interface{}) string {
 }
 
 func DecodeHex(i string) ([]byte, error) {
+	if strings.HasPrefix(i, "0x") {
+		i = i[2:]
+	}
 	return hex.DecodeString(i)
 }
 
