@@ -2,9 +2,10 @@ package moonshot
 
 import (
 	"errors"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"io"
 )
 
 type GatewayClient struct {
@@ -14,7 +15,7 @@ type GatewayClient struct {
 }
 
 func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.BuildHTTPOptions)
+	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.BuildHTTPOptions)
 }
 
 func (g *GatewayClient) Chat(s string, function ...aispec.Function) (string, error) {
@@ -23,7 +24,6 @@ func (g *GatewayClient) Chat(s string, function ...aispec.Function) (string, err
 
 func (g *GatewayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
 	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions, g.config.StreamHandler)
-
 }
 
 func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
@@ -50,12 +50,14 @@ func (g *GatewayClient) LoadOption(opt ...aispec.AIConfigOption) {
 		g.targetUrl = "https://api.moonshot.cn/v1/chat/completions"
 	}
 }
+
 func (g *GatewayClient) CheckValid() error {
 	if g.config.APIKey == "" {
 		return errors.New("APIKey is required")
 	}
 	return nil
 }
+
 func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	opts := []poc.PocConfigOption{
 		poc.WithReplaceAllHttpPacketHeaders(map[string]string{

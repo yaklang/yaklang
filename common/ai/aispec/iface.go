@@ -1,8 +1,9 @@
 package aispec
 
 import (
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
+
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
 type Chatter interface {
