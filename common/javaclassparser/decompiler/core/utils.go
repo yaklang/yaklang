@@ -241,6 +241,7 @@ func NodesToStatements(nodes []*Node) []statements.Statement {
 	}
 	return result
 }
+
 func CutNode(src, target *Node) func() {
 	for i, item := range src.Next {
 		if item == target {

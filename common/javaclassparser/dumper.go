@@ -197,9 +197,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		c.CurrentMethod = method
 		funcCtx := c.FuncCtx
 		funcCtx.FunctionName = name
-		if name != "formatPeriod" {
-			continue
-		}
+		//if name != "decodeText" {
+		//	continue
+		//}
 		println(name)
 		funcCtx.FunctionType = c.MethodType
 		for _, attribute := range method.Attributes {
@@ -208,6 +208,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 				if err != nil {
 					return nil, err
 				}
+				println("parse end")
 				sourceCode := "\n"
 				var statementToString func(statement statements.Statement) string
 				var statementListToString func(statements []statements.Statement) string
@@ -216,6 +217,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					defer c.UnTab()
 					var res []string
 					for _, statement := range statementList {
+						if _, ok := statement.(*statements.MiddleStatement); ok {
+							continue
+						}
 						_, ok := statement.(*statements.StackAssignStatement)
 						if ok {
 							continue
@@ -226,6 +230,10 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 				}
 				statementToString = func(statement statements.Statement) (statementStr string) {
 					switch ret := statement.(type) {
+					case *statements.TryCatchStatement:
+						statementStr = fmt.Sprintf(c.GetTabString()+"try{\n"+
+							"%s\n"+
+							c.GetTabString()+"} catch (%s %s){\n"+"%s\n"+c.GetTabString()+"}", statementListToString(ret.TryBody), ret.Exception.Type().String(funcCtx), ret.Exception.String(funcCtx), statementListToString(ret.CatchBody))
 					case *statements.WhileStatement:
 						statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
 							"%s\n"+
@@ -298,6 +306,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		methodSource += strings.Repeat("\t", c.TabNumber()) + "}"
 		result = append(result, methodSource)
 	}
+	println("dump methods end")
 	return result, nil
 }
 func (c *ClassObjectDumper) parseImportCLass(name string) string {

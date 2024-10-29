@@ -130,6 +130,15 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute) ([]state
 	parser.ConstantPoolLiteralGetter = func(id int) values.JavaValue {
 		return GetLiteralFromCP(dumper.ConstantPool, id)
 	}
+	for _, entry := range codeAttr.ExceptionTable {
+		parser.ExceptionTable = append(parser.ExceptionTable, &core.ExceptionTableEntry{
+			StartPc:   entry.StartPc,
+			EndPc:     entry.EndPc,
+			HandlerPc: entry.HandlerPc,
+			CatchType: entry.CatchType,
+		})
+	}
+
 	parser.ConstantPoolInvokeDynamicInfo = func(index int) (string, string) {
 		indexFromPool := func(i int) ConstantInfo {
 			return pool[i-1]

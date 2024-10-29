@@ -7,13 +7,18 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"maps"
 	"sort"
 	"strings"
 )
 
+type ExceptionTableEntry struct {
+	StartPc   uint16
+	EndPc     uint16
+	HandlerPc uint16
+	CatchType uint16
+}
 type Decompiler struct {
 	FunctionType                  *types.JavaFuncType
 	FunctionContext               *class_context.ClassContext
@@ -29,6 +34,7 @@ type Decompiler struct {
 	ConstantPoolInvokeDynamicInfo func(id int) (string, string)
 	offsetToOpcodeIndex           map[uint16]int
 	opcodeIndexToOffset           map[int]uint16
+	ExceptionTable                []*ExceptionTableEntry
 	CurrentId                     int
 }
 
@@ -70,10 +76,11 @@ func (d *Decompiler) ParseOpcode() error {
 		}
 	}()
 	opcodes := []*OpCode{}
+	opcodes = append(opcodes, &OpCode{Instr: &Instruction{OpCode: OP_START}})
 	offsetToIndex := map[uint16]int{}
 	indexToOffset := map[int]uint16{}
 	reader := NewJavaByteCodeReader(d.bytecodes)
-	id := 0
+	id := 1
 	isWide := false
 	for {
 		b, err := reader.ReadByte()
@@ -109,9 +116,9 @@ func (d *Decompiler) ParseOpcode() error {
 	}
 	d.offsetToOpcodeIndex = offsetToIndex
 	d.opcodeIndexToOffset = indexToOffset
-	d.opCodes = opcodes
 	d.CurrentId = id
-	return d.ScanJmp()
+	d.opCodes = opcodes
+	return nil
 }
 
 func (d *Decompiler) ScanJmp() error {
@@ -127,9 +134,26 @@ func (d *Decompiler) ScanJmp() error {
 				break
 			}
 			opcode := opcodes[i]
+			if opcode.Instr.OpCode == OP_START {
+				i++
+				pre = opcode
+				continue
+			}
 			if pre != nil {
 				SetOpcode(pre, opcode)
 			}
+			for _, entry := range d.ExceptionTable {
+				if opcode.CurrentOffset == entry.StartPc {
+					gotoOp := d.offsetToOpcodeIndex[entry.HandlerPc]
+					d.opCodes[gotoOp].IsCatch = true
+					d.opCodes[gotoOp].ExceptionTypeIndex = entry.CatchType
+					walkNode(gotoOp)
+					if pre != nil {
+						SetOpcode(pre, d.opCodes[gotoOp])
+					}
+				}
+			}
+
 			if visitNodeRecord.Has(opcode) {
 				break
 			}
@@ -242,6 +266,10 @@ func (d *Decompiler) GetVar(slot int) *values.JavaRef {
 func (d *Decompiler) ParseStatement() error {
 	funcCtx := d.FunctionContext
 	err := d.ParseOpcode()
+	if err != nil {
+		return err
+	}
+	err = d.ScanJmp()
 	if err != nil {
 		return err
 	}
@@ -392,14 +420,14 @@ func (d *Decompiler) ParseStatement() error {
 			exp := values.NewNewArrayExpression(arrayType, length)
 			runtimeStackSimulation.Push(exp)
 		case OP_MULTIANEWARRAY:
-			desc := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data[:2]))).(*values.JavaClassValue).Type().RawType().(*types.JavaClass).Name
-			dimensions := int(opcode.Data[2])
-			typ, err := types.ParseDescriptor(desc)
-			if err != nil {
-				log.Errorf("parse type `%s` error: %s", desc, err)
-			}
+			typ := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data[:2]))).(*values.JavaClassValue).Type()
+			//dimensions := int(opcode.Data[2])
+			//typ, err := types.ParseDescriptor(desc)
+			//if err != nil {
+			//	log.Errorf("parse type `%s` error: %s", desc, err)
+			//}
 			var lens []values.JavaValue
-			for _, d := range runtimeStackSimulation.PopN(dimensions) {
+			for _, d := range runtimeStackSimulation.PopN(typ.ArrayDim()) {
 				lens = append(lens, d.(values.JavaValue))
 				typ = types.NewJavaArrayType(typ)
 			}
@@ -681,8 +709,10 @@ func (d *Decompiler) ParseStatement() error {
 			//	st.ToStatement = getter(opcode.Id)
 			//})
 		case OP_JSR, OP_JSR_W:
+			return
 			panic("not support")
 		case OP_RET:
+			return
 			panic("not support")
 		case OP_GOTO, OP_GOTO_W:
 			st := statements.NewGOTOStatement()
@@ -743,48 +773,124 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_DUP_X2:
 			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 			v1 := runtimeStackSimulation.Pop()
-			v2 := runtimeStackSimulation.Pop()
-			v3 := runtimeStackSimulation.Pop()
+			runtimeStackSimulationPopN := func(n int) []any {
+				datas := []any{}
+				current := 0
+				for {
+					if current >= n {
+						break
+					}
+					checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+					v := runtimeStackSimulation.Pop()
+					current += GetTypeSize(v.(values.JavaValue).Type())
+					datas = append(datas, v)
+				}
+				return datas
+			}
+			datas := runtimeStackSimulationPopN(2)
 			runtimeStackSimulation.Push(v1)
-			runtimeStackSimulation.Push(v3)
-			runtimeStackSimulation.Push(v2)
+			for i := len(datas) - 1; i >= 0; i-- {
+				runtimeStackSimulation.Push(datas[i])
+			}
 			runtimeStackSimulation.Push(v1)
 		case OP_DUP2:
-			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
-			v1 := runtimeStackSimulation.Pop()
-			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
-			v2 := runtimeStackSimulation.Pop()
-			runtimeStackSimulation.Push(v2)
-			runtimeStackSimulation.Push(v1)
-			runtimeStackSimulation.Push(v2)
-			runtimeStackSimulation.Push(v1)
+			runtimeStackSimulationPopN := func(n int) []any {
+				datas := []any{}
+				current := 0
+				for {
+					if current >= n {
+						break
+					}
+					checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+					v := runtimeStackSimulation.Pop()
+					current += GetTypeSize(v.(values.JavaValue).Type())
+					datas = append(datas, v)
+				}
+				return datas
+			}
+			runtimeStackSimulationPushReverse := func(datas []any) {
+				for i := len(datas) - 1; i >= 0; i-- {
+					runtimeStackSimulation.Push(datas[i])
+				}
+			}
+			datas := runtimeStackSimulationPopN(2)
+			runtimeStackSimulationPushReverse(datas)
+			runtimeStackSimulationPushReverse(datas)
 		case OP_DUP2_X1:
-			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+			runtimeStackSimulationPopN := func(n int) []any {
+				datas := []any{}
+				current := 0
+				for {
+					if current >= n {
+						break
+					}
+					checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+					v := runtimeStackSimulation.Pop()
+					current += GetTypeSize(v.(values.JavaValue).Type())
+					datas = append(datas, v)
+				}
+				return datas
+			}
+			runtimeStackSimulationPushReverse := func(datas []any) {
+				for i := len(datas) - 1; i >= 0; i-- {
+					runtimeStackSimulation.Push(datas[i])
+				}
+			}
+			datas := runtimeStackSimulationPopN(2)
 			v1 := runtimeStackSimulation.Pop()
-			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
-			v2 := runtimeStackSimulation.Pop()
-			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
-			v3 := runtimeStackSimulation.Pop()
-			runtimeStackSimulation.Push(v2)
+			runtimeStackSimulationPushReverse(datas)
 			runtimeStackSimulation.Push(v1)
-			runtimeStackSimulation.Push(v3)
-			runtimeStackSimulation.Push(v2)
-			runtimeStackSimulation.Push(v1)
+			runtimeStackSimulationPushReverse(datas)
+			//checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+			//v1 := runtimeStackSimulation.Pop()
+			//checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+			//v2 := runtimeStackSimulation.Pop()
+			//checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+			//v3 := runtimeStackSimulation.Pop()
+			//runtimeStackSimulation.Push(v2)
+			//runtimeStackSimulation.Push(v1)
+			//runtimeStackSimulation.Push(v3)
+			//runtimeStackSimulation.Push(v2)
+			//runtimeStackSimulation.Push(v1)
 		case OP_DUP2_X2:
-			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
-			v1 := runtimeStackSimulation.Pop()
-			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
-			v2 := runtimeStackSimulation.Pop()
-			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
-			v3 := runtimeStackSimulation.Pop()
-			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
-			v4 := runtimeStackSimulation.Pop()
-			runtimeStackSimulation.Push(v2)
-			runtimeStackSimulation.Push(v1)
-			runtimeStackSimulation.Push(v4)
-			runtimeStackSimulation.Push(v3)
-			runtimeStackSimulation.Push(v2)
-			runtimeStackSimulation.Push(v1)
+			runtimeStackSimulationPopN := func(n int) []any {
+				datas := []any{}
+				current := 0
+				for {
+					if current >= n {
+						break
+					}
+					checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+					v := runtimeStackSimulation.Pop()
+					current += GetTypeSize(v.(values.JavaValue).Type())
+					datas = append(datas, v)
+				}
+				return datas
+			}
+			runtimeStackSimulationPushReverse := func(datas []any) {
+				for i := len(datas) - 1; i >= 0; i-- {
+					runtimeStackSimulation.Push(datas[i])
+				}
+			}
+			datas1 := runtimeStackSimulationPopN(2)
+			datas2 := runtimeStackSimulationPopN(2)
+			runtimeStackSimulationPushReverse(datas1)
+			runtimeStackSimulationPushReverse(datas2)
+			runtimeStackSimulationPushReverse(datas1)
+			//checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+			//v1 := runtimeStackSimulation.Pop()
+			//checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+			//v2 := runtimeStackSimulation.Pop()
+			//checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+			//v3 := runtimeStackSimulation.Pop()
+			//checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+			//v4 := runtimeStackSimulation.Pop()
+			//runtimeStackSimulation.Push(v2)
+			//runtimeStackSimulation.Push(v1)
+			//runtimeStackSimulation.Push(v4)
+			//runtimeStackSimulation.Push(v3)
+			//runtimeStackSimulation.Push(v2)
+			//runtimeStackSimulation.Push(v1)
 		case OP_LDC:
 			runtimeStackSimulation.Push(d.ConstantPoolLiteralGetter(int(opcode.Data[0])))
 		case OP_LDC_W:
@@ -850,10 +956,10 @@ func (d *Decompiler) ParseStatement() error {
 				return v.Type()
 			}))
 		case OP_END:
-			endNode := statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-				return "end"
-			})
-			endNode.Name = "end"
+			endNode := statements.NewMiddleStatement("end", nil)
+			appendNode(endNode)
+		case OP_START:
+			endNode := statements.NewMiddleStatement("start", nil)
 			appendNode(endNode)
 		default:
 			panic("not support")
@@ -900,6 +1006,14 @@ func (d *Decompiler) ParseStatement() error {
 		}
 		if node.Id == 291 {
 			print()
+		}
+		if node.IsCatch {
+			typ := d.GetValueFromPool(int(node.ExceptionTypeIndex))
+			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				return "Exception"
+			}, func() types.JavaType {
+				return typ.Type()
+			}))
 		}
 		parseOpcode(node)
 		opcodeToVarTable[node] = []any{d.varTable, d.currentVarId}
@@ -972,6 +1086,35 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
+	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
+		if len(node.Next) > 1 {
+			if _, ok := node.Statement.(*statements.ConditionStatement); ok {
+				return node.Next, nil
+			}
+			if v, ok := node.Statement.(*statements.MiddleStatement); ok {
+				if v.Flag == statements.MiddleSwitch || v.Flag == "tryStart" {
+					return node.Next, nil
+				}
+			}
+			tryStartNode := node.Next[0]
+			catchStartNode := node.Next[1]
+			tryNode := NewNode(statements.NewMiddleStatement("tryStart", nil))
+			node.RemoveAllNext()
+			node.AddNext(tryNode)
+			tryNode.AddNext(tryStartNode)
+			tryNode.AddNext(catchStartNode)
+			source := funk.Filter(tryStartNode.Source, func(item *Node) bool {
+				return item != tryNode
+			}).([]*Node)
+			for _, n := range source {
+				tryStartNode.RemoveSource(n)
+			}
+			for _, n := range source {
+				tryNode.AddSource(n)
+			}
+		}
+		return node.Next, nil
+	})
 	err = d.ReGenerateNodeId()
 	if err != nil {
 		return err

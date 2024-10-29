@@ -116,6 +116,9 @@ type JavaClassMember struct {
 }
 
 func (j *JavaClassMember) Type() types.JavaType {
+	if j.Name == "org.apache.commons.codec.digest.UnixCrypt" {
+		print()
+	}
 	return j.JavaType
 }
 

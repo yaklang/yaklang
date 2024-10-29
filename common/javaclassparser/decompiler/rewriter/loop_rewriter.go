@@ -16,59 +16,43 @@ type LoopStatement struct {
 
 func LoopRewriter(manager *StatementManager) error {
 	for _, node := range manager.CircleEntryPoint {
+		if node.Id == 33 || node.Id == 379 {
+			print()
+		}
 		originNodeNext := make([]*core.Node, len(node.Next))
 		copy(originNodeNext, node.Next)
 		LoopEndNode := node.GetLoopEndNode()
-		loopconditionStat, ok := node.Statement.(*statements.ConditionStatement)
+		isWhile := false
 		var entryConditionNode *core.Node
 		var loopCondition values.JavaValue
-		isWhile := false
 		circleSetHas := func(n *core.Node) bool {
 			if v, ok := manager.RepeatNodeMap[n]; ok {
 				n = v
 			}
 			return node.CircleNodesSet.Has(n)
 		}
-		if ok {
-			for i, n := range node.Next {
-				if !circleSetHas(n) && n == LoopEndNode {
-					entryConditionNode = node.Next[1-i]
-					loopCondition = loopconditionStat.Condition
-					node.IsCircle = true
-					isWhile = true
-					break
+		if LoopEndNode == nil {
+
+		} else {
+			loopconditionStat, ok := node.Statement.(*statements.ConditionStatement)
+
+			if ok {
+				for i, n := range node.Next {
+					if !circleSetHas(n) && n == LoopEndNode {
+						entryConditionNode = node.Next[1-i]
+						loopCondition = loopconditionStat.Condition
+						node.IsCircle = true
+						isWhile = true
+						break
+					}
 				}
 			}
 		}
+
 		if !isWhile {
 			entryConditionNode = node
 			loopCondition = values.NewJavaLiteral(true, types.NewJavaPrimer(types.JavaBoolean))
 		}
-		//outNode := []*core.Node{}
-		//for _, conditionNode := range node.ConditionNode {
-		//	for _, n := range conditionNode.Next {
-		//		if n == node.LoopEndNode {
-		//			outNode = append(outNode, conditionNode)
-		//		}
-		//	}
-		//	falseNode := conditionNode.FalseNode()
-		//	trueNode := conditionNode.TrueNode()
-		//	if conditionNode == node && falseNode == node.LoopEndNode ||
-		//		trueNode == node && falseNode == node.LoopEndNode ||
-		//		falseNode == node && trueNode == node.LoopEndNode {
-		//		loopConditionNode = append(loopConditionNode, conditionNode)
-		//		if falseNode == node && trueNode == node.LoopEndNode {
-		//			statement := conditionNode.Statement.(*statements.ConditionStatement)
-		//			statement.Op = core.GetReverseOp(statement.Op)
-		//			if exp, ok := statement.Condition.(*values.JavaExpression); ok {
-		//				exp.Op = statement.Op
-		//			}
-		//		}
-		//	} else {
-		//		outNode = append(outNode, conditionNode)
-		//		loopConditionNode = append(loopConditionNode, conditionNode)
-		//	}
-		//}
 		copyNodes := func(nodes []*core.Node) []*core.Node {
 			result := make([]*core.Node, len(nodes))
 			copy(result, nodes)
@@ -89,45 +73,17 @@ func LoopRewriter(manager *StatementManager) error {
 			continueNode.AddSource(sourceNode)
 			node.RemoveSource(sourceNode)
 		}
-		node.SetLoopEndNode(node, manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-			return "break"
-		})))
+		if LoopEndNode != nil {
+			node.SetLoopEndNode(node, manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+				return "break"
+			})))
+		}
+
 		for _, n := range node.Source {
 			if circleSetHas(n) {
 				return errors.New("cut jmp loop header edge failed")
 			}
 		}
-		//if entryConditionNode != nil {
-		//	conditionNodeSource := copyNodes(entryConditionNode.Source)
-		//	for _, sourceNode := range conditionNodeSource {
-		//		if !circleSetHas(sourceNode) {
-		//			continue
-		//		}
-		//		continueNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-		//			return "continue"
-		//		}))
-		//		sourceNode.ReplaceNext(entryConditionNode, continueNode)
-		//	}
-		//}
-
-		//for _, conditionNode := range node.ConditionNode {
-		//	if !circleSetHas(conditionNode.Next[0]) && !circleSetHas(conditionNode.Next[1]) {
-		//		continue
-		//	}
-		//	conditionNodeSource := copyNodes(conditionNode.Source)
-		//	for _, sourceNode := range conditionNodeSource {
-		//		if !circleSetHas(sourceNode) {
-		//			continue
-		//		}
-		//		continueNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-		//			return "continue"
-		//		}))
-		//		sourceNode.ReplaceNext(conditionNode, continueNode)
-		//
-		//		//continueNode.AddNext(loopBodyEnd)
-		//		//sourceNode.AddNext(continueNode)
-		//	}
-		//}
 		breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 			return "break"
 		}))
@@ -136,7 +92,9 @@ func LoopRewriter(manager *StatementManager) error {
 				for i, n2 := range node.Next {
 					if n2 == LoopEndNode {
 						node.Next[i] = breakNode
-						LoopEndNode.RemoveSource(n2)
+						if LoopEndNode != nil {
+							LoopEndNode.RemoveSource(n2)
+						}
 					}
 				}
 				return node.Next, nil
@@ -227,8 +185,10 @@ func LoopRewriter(manager *StatementManager) error {
 			node.RemoveAllSource()
 			node.RemoveAllNext()
 			manager.RepeatNodeMap[loopNode] = node
-			loopNode.AddNext(LoopEndNode)
-			entryConditionNode.RemoveNext(LoopEndNode)
+			if LoopEndNode != nil {
+				loopNode.AddNext(LoopEndNode)
+				entryConditionNode.RemoveNext(LoopEndNode)
+			}
 		} else {
 			doWhileStatement := statements.NewDoWhileStatement(values.NewJavaLiteral(true, types.NewJavaPrimer(types.JavaBoolean)), nil)
 			setBody = func(body []statements.Statement) {
@@ -236,48 +196,18 @@ func LoopRewriter(manager *StatementManager) error {
 			}
 			loopNode = manager.NewNode(doWhileStatement)
 			for _, n := range node.Source {
+				//if n.Id == 379 {
+				//	print()
+				//}
+				//println(circleSetHas(n))
 				loopNode.AddSource(n)
 			}
+			manager.RepeatNodeMap[loopNode] = node
 			node.RemoveAllSource()
-			loopNode.AddNext(LoopEndNode)
+			if LoopEndNode != nil {
+				loopNode.AddNext(LoopEndNode)
+			}
 		}
-
-		//node.Statement = whileStatement
-		//loopStatement = whileStatement
-		//if _, ok := node.Statement.(*statements.ConditionStatement); ok {
-		//
-		//} else {
-		//	isDoWhile = true
-		//	doWhileStatement := statements.NewDoWhileStatement(loopCondition, nil)
-		//	setBody = func(body []statements.Statement) {
-		//		doWhileStatement.Body = body
-		//	}
-		//	loopStatement = doWhileStatement
-		//}
-		//firstSt := node.Statement
-		//node.Statement = loopStatement
-		//node.RemoveAllNext()
-		//node.AddNext(node.LoopEndNode)
-
-		//manager.LoopOccupiedNodes.Add(node)
-		//if occupiedEnd {
-		//	manager.LoopOccupiedNodes.Add(node.LoopEndNode)
-		//}
-		//var firstNode *core.Node
-		//for _, n := range originNodeNext {
-		//	if circleSetHas(n) {
-		//		firstNode = n
-		//		break
-		//	}
-		//}
-		//if firstNode == nil {
-		//	return errors.New("first node not found")
-		//}
-		//node.RemoveNext(firstNode)
-		//whileNode.Next = []*core.Node{node.LoopEndNode}
-		//if !isWhile {
-		//	node.LoopEndNode.RemoveNext()
-		//}
 		manager.AddFinalAction(func() error {
 			println(isWhile)
 			body, err := manager.ToStatementsFromNode(entryConditionNode, nil)
