@@ -49,11 +49,6 @@ func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
 			return
 		}
 
-		if parentValue, ok := f.getParentFunctionVariable(para.GetName()); ok {
-			pv := parentValue.GetVariable(para.GetName())
-			f.AddSideEffect(pv, v)
-		}
-
 		sideEffect := &FunctionSideEffect{
 			Name:                 variable.GetName(),
 			VerboseName:          getMemberVerboseName(variable.object, variable.key),
