@@ -279,7 +279,6 @@ func _LoopRewriter(manager *StatementManager) error {
 		//	node.LoopEndNode.RemoveNext()
 		//}
 		manager.AddFinalAction(func() error {
-			println(isWhile)
 			body, err := manager.ToStatementsFromNode(entryConditionNode, nil)
 			if err != nil {
 				return err
