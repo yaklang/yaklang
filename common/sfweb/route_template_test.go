@@ -31,7 +31,7 @@ func TestTemplateList(t *testing.T) {
 	var errData sfweb.ErrorResponse
 	rawRsp, err = DoResponse("GET", "/template/"+id, &errData)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
+	require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
 	require.Equal(t, sfweb.NewInvalidLangError(id).Error(), errData.Message)
 }
 
@@ -57,13 +57,13 @@ func TestTemplateContent(t *testing.T) {
 	var errData sfweb.ErrorResponse
 	rawRsp, err = DoResponse("GET", fmt.Sprintf("/template/%s/example", lang), &errData)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
+	require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
 	require.Equal(t, sfweb.NewInvalidLangError(lang).Error(), errData.Message)
 
 	// negative invalid id
 	template := uuid.NewString()
 	rawRsp, err = DoResponse("GET", fmt.Sprintf("/template/yak/%s", template), &errData)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, rawRsp.GetStatusCode())
+	require.Equal(t, http.StatusInternalServerError, rawRsp.GetStatusCode())
 	require.Equal(t, sfweb.NewInvalidTemplateError(fmt.Sprintf("yak/%s", template)).Error(), errData.Message)
 }
