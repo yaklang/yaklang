@@ -418,15 +418,15 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return v
 		}
 
-		if exData := b.GetImportPackage(text); exData != nil {
+		if importp := b.GetImportPackage(text); importp != nil {
 			var names []string
 			var values []ssa.Value
 
-			for n, g := range exData.ExportValue {
+			for n, g := range importp.ExportValue {
 				names = append(names, n)
 				values = append(values, g)
 			}
-			obj := b.InterfaceAddFieldBuild(len(exData.ExportValue),
+			obj := b.InterfaceAddFieldBuild(len(importp.ExportValue),
 				func(i int) ssa.Value {
 					return b.EmitConstInst(names[i])
 				},
@@ -437,8 +437,7 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return obj
 		}
 
-		funcs := b.GetProgram().Funcs
-		v = funcs[text]
+		v = b.GetFunc(text, "")
 		if v.(*ssa.Function) == nil {
 			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
 			return b.ReadValue(text)
