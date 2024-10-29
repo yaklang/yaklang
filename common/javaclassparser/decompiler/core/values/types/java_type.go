@@ -28,12 +28,12 @@ func NewJavaFuncType(desc string, params []JavaType, returnType JavaType) *JavaF
 }
 
 type JavaArrayType struct {
-	JavaType JavaType
-	Dim      int
+	JavaType  JavaType
+	Dimension int
 }
 
 func (j *JavaArrayType) String(funcCtx *class_context.ClassContext) string {
-	return fmt.Sprintf("%s%s", j.JavaType.String(funcCtx), strings.Repeat("[]", j.Dim))
+	return fmt.Sprintf("%s%s", j.JavaType.String(funcCtx), strings.Repeat("[]", j.Dimension))
 }
 
 func (j *JavaArrayType) IsJavaType() {
@@ -43,13 +43,13 @@ func (j *JavaArrayType) IsJavaType() {
 func NewJavaArrayType(typ JavaType) JavaType {
 	if typ.IsArray() {
 		return newJavaTypeWrap(&JavaArrayType{
-			JavaType: typ.ElementType(),
-			Dim:      typ.ArrayDim() + 1,
+			JavaType:  typ.ElementType(),
+			Dimension: typ.ArrayDim() + 1,
 		})
 	}
 	return newJavaTypeWrap(&JavaArrayType{
-		JavaType: typ,
-		Dim:      1,
+		JavaType:  typ,
+		Dimension: 1,
 	})
 }
 

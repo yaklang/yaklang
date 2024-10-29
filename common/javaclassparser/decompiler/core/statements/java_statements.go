@@ -145,6 +145,7 @@ func NewArrayMemberAssignStatement(m *values.JavaArrayMember, value values.JavaV
 
 func NewAssignStatement(leftVal, value values.JavaValue, isFirst bool) *AssignStatement {
 	if value == nil || leftVal == nil || value.Type() == nil || leftVal.Type() == nil {
+		value.Type()
 		panic("type is nil")
 	}
 	value.Type().ResetType(leftVal.Type())
@@ -269,7 +270,7 @@ type MiddleStatement struct {
 }
 
 func (a *MiddleStatement) String(funcCtx *class_context.ClassContext) string {
-	return "switch"
+	return a.Flag
 	//panic("middle statement should not be printed")
 }
 

@@ -7,6 +7,8 @@ type OpCode struct {
 	Data          []byte
 	Jmp           int
 	IsWide        bool
+	IsCatch       bool
+	ExceptionTypeIndex uint16
 	SwitchJmpCase map[int]uint32
 	Source        []*OpCode
 	Target        []*OpCode

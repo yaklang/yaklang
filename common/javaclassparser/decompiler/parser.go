@@ -36,12 +36,8 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	sts, err := statementManager.ToStatements(func(node *core.Node) bool {
 		return true
 	})
+	println("to statement end")
 	sts = funk.Filter(sts, func(item *core.Node) bool {
-		if v, ok := item.Statement.(*statements.CustomStatement); ok {
-			if v.Name == "end" {
-				return false
-			}
-		}
 		_, ok := item.Statement.(*statements.StackAssignStatement)
 		return !ok
 	}).([]*core.Node)

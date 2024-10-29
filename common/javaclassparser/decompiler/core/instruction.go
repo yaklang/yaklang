@@ -211,6 +211,8 @@ const (
 	OP_ATHROW          = 0xbf
 	OP_IALOAD          = 0x2e
 	OP_END             = 0xff
+	OP_TRY_CATCH       = 0xfe
+	OP_START           = 0xfd
 )
 
 type Instruction struct {

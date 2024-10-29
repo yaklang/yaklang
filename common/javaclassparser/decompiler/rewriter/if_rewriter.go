@@ -41,6 +41,15 @@ func IfRewriter(manager *StatementManager) error {
 			ifNode.AddNext(ifNode.MergeNode)
 		}
 		manager.AddFinalAction(func() error {
+			if v, ok := ifStatement.Condition.(*values.FunctionCallExpression); ok {
+				if len(v.Arguments) == 4 {
+					if v, ok := v.Arguments[1].(*values.JavaLiteral); ok {
+						if v.Data == "extensions" {
+							print()
+						}
+					}
+				}
+			}
 			trueBody, err := manager.ToStatementsFromNode(trueNode, func(node *core.Node) bool {
 				if node == ifNode.MergeNode {
 					return false
