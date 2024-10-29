@@ -2,10 +2,11 @@ package chatglm
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
 type GLMClient struct {
@@ -15,7 +16,7 @@ type GLMClient struct {
 }
 
 func (g *GLMClient) ChatStream(msg string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.targetUrl, g.config.Model, msg, g.BuildHTTPOptions)
+	return aispec.ChatWithStream(g.targetUrl, g.config.Model, msg, g.config.HTTPErrorHandler, g.BuildHTTPOptions)
 }
 
 func (g *GLMClient) LoadOption(opt ...aispec.AIConfigOption) {
@@ -41,12 +42,14 @@ func (g *GLMClient) LoadOption(opt ...aispec.AIConfigOption) {
 		g.targetUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 	}
 }
+
 func (g *GLMClient) CheckValid() error {
 	if g.config.APIKey == "" {
 		return errors.New("APIKey is required")
 	}
 	return nil
 }
+
 func (g *GLMClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	k, err := generateToken(g.config.APIKey)
 	if err != nil {

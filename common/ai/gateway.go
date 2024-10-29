@@ -54,7 +54,7 @@ func (g *Gateway) ExtractData(msg string, desc string, fields map[string]any) (m
 }
 
 func (g *Gateway) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.TargetUrl, g.Config.Model, s, g.AIClient.BuildHTTPOptions)
+	return aispec.ChatWithStream(g.TargetUrl, g.Config.Model, s, g.Config.HTTPErrorHandler, g.AIClient.BuildHTTPOptions)
 }
 
 func NewGateway() *Gateway {

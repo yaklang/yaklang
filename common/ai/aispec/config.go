@@ -26,6 +26,8 @@ type AIConfig struct {
 	Type          string
 
 	FunctionCallRetryTimes int
+
+	HTTPErrorHandler func(error)
 }
 
 func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
@@ -122,5 +124,11 @@ func WithNoHttps(b bool) AIConfigOption {
 func WithFunctionCallRetryTimes(times int) AIConfigOption {
 	return func(c *AIConfig) {
 		c.FunctionCallRetryTimes = times
+	}
+}
+
+func WithHTTPErrorHandler(h func(error)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.HTTPErrorHandler = h
 	}
 }
