@@ -17,16 +17,29 @@ var chatTemplate *template.Template
 
 func init() {
 	var err error
-	chatTemplate, err = template.New("issueBody").Parse(`"""
+	chatTemplate, err = template.New("chat_template").Parse(`"""
 {{.Content}}
 """
-	
+
 你是一名漏洞与代码分析专家，擅长分析{{.Lang}}语言。我需要你：
-1.解析扫描结果JSON文件，识别并提取与风险相关的信息
+1.解析上述扫描结果JSON文件，识别并提取与风险相关的信息
 2. 判断这个规则扫描的风险是否存在，你需要严格回答关于此规则的内容，不要擅自对其进行风险判断
 - 如果风险存在，则根据结果解释该风险，并提出修复方案
-- 如果风险不存在，则解释该风险为何不存在	
-`)
+- 如果风险不存在，则解释该风险为何不存在
+
+请以下述模板以中文进行回答：
+# 规则信息
+- 规则名称： <规则名称>
+- 规则描述： <规则描述>
+- 代码片段： <代码片段>
+
+# 风险分析
+- 风险是否存在： <只能填是或否，若否>
+<若风险不存在，则后续不需要再回答>
+- 风险： <根据代码片段与规则描述对风险进行解释与分析>
+
+# 风险修复建议
+<风险修复建议>`)
 	if err != nil {
 		panic(err)
 	}
@@ -107,6 +120,7 @@ func (s *SyntaxFlowWebServer) registerAIAnalysisRoute() {
 			SfWebLogger.Errorf("execute template error: %v", err)
 			return
 		}
+		SfWebLogger.Debugf("chat prompt: %s", promptBuilder.String())
 
 		reader, err := client.ChatStream(promptBuilder.String())
 		if err != nil {
