@@ -153,4 +153,7 @@ var CodecExports = map[string]interface{}{
 	"Sm2EncryptAsn1":               codec.SM2EncryptASN1,
 	"Sm2DecryptAsn1WithPassword":   codec.SM2DecryptASN1WithPassword,
 	"Sm2DecryptAsn1":               codec.SM2DecryptASN1,
+
+	"SignSHA256WithRSA":       tlsutils.PemSignSha256WithRSA,
+	"SignVerifySHA256WithRSA": tlsutils.PemVerifySignSha256WithRSA,
 }
