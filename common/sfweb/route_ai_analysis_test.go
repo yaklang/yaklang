@@ -22,6 +22,8 @@ Upgrade: websocket
 }
 
 func TestAIAnalysis(t *testing.T) {
+	t.Parallel()
+
 	key := os.Getenv(sfweb.CHAT_GLM_API_KEY)
 	if key == "" {
 		t.Skip("missing CHAT_GLM_API_KEY from env")

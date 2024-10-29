@@ -99,7 +99,6 @@ func checkVariable(t *testing.T, res []*sfweb.YakURLResource, want []string) {
 }
 
 func TestYakURL(t *testing.T) {
-	debug()
 	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.apackage")
 	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.bpackage.sub")
 

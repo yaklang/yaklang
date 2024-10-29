@@ -26,6 +26,8 @@ func TestReportFalsePositive(t *testing.T) {
 			require.Equal(t, sfweb.NewReportMissingParameterError(missing).Error(), rsp.Message)
 		}
 		t.Run("missing content", func(t *testing.T) {
+			t.Parallel()
+
 			checkMissingParameter(t, &sfweb.ReportFalsePositiveRequest{
 				Lang:     "yak",
 				RiskHash: "123",
@@ -33,13 +35,17 @@ func TestReportFalsePositive(t *testing.T) {
 		})
 
 		t.Run("missing lang", func(t *testing.T) {
+			t.Parallel()
+
 			checkMissingParameter(t, &sfweb.ReportFalsePositiveRequest{
 				Content:  "content",
 				RiskHash: "123",
-			}, "content")
+			}, "lang")
 		})
 
 		t.Run("missing risk_hash", func(t *testing.T) {
+			t.Parallel()
+
 			checkMissingParameter(t, &sfweb.ReportFalsePositiveRequest{
 				Content: "content",
 				Lang:    "yak",
@@ -48,6 +54,8 @@ func TestReportFalsePositive(t *testing.T) {
 	})
 
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		var risks []*sfweb.SyntaxFlowScanRisk
 		progress := 0.0
 
@@ -114,6 +122,8 @@ func TestReportFalseNegative(t *testing.T) {
 			require.Equal(t, sfweb.NewReportMissingParameterError(missing).Error(), rsp.Message)
 		}
 		t.Run("missing content", func(t *testing.T) {
+			t.Parallel()
+
 			checkMissingParameter(t, &sfweb.ReportFalseNegativeRequest{
 				Lang:     "yak",
 				RuleName: "rule",
@@ -121,6 +131,8 @@ func TestReportFalseNegative(t *testing.T) {
 		})
 
 		t.Run("missing lang", func(t *testing.T) {
+			t.Parallel()
+
 			checkMissingParameter(t, &sfweb.ReportFalseNegativeRequest{
 				Content:  "content",
 				RuleName: "rule",
@@ -128,6 +140,8 @@ func TestReportFalseNegative(t *testing.T) {
 		})
 
 		t.Run("missing rule_name", func(t *testing.T) {
+			t.Parallel()
+
 			checkMissingParameter(t, &sfweb.ReportFalseNegativeRequest{
 				Content: "content",
 				Lang:    "yak",
@@ -135,6 +149,8 @@ func TestReportFalseNegative(t *testing.T) {
 		})
 	})
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		var rsp sfweb.ReportResponse
 		body, err := json.Marshal(&sfweb.ReportFalseNegativeRequest{
 			Content:  scanFileContent,
