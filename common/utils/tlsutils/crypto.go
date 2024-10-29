@@ -296,6 +296,7 @@ func PemSignSha256WithRSA(pemBytes []byte, data interface{}) ([]byte, error) {
 // -----END PUBLIC KEY-----`)
 // err := tls.PemVerifySignSha256WithRSA(pemBytes, "hello", signBytes)
 // die(err)
+// ```
 func PemVerifySignSha256WithRSA(pemBytes []byte, originData any, sign []byte) error {
 	dataBytes := utils.InterfaceToBytes(originData)
 	block, _ := pem.Decode(pemBytes)
