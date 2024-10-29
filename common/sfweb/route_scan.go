@@ -41,14 +41,15 @@ type SyntaxFlowScanResponse struct {
 }
 
 type SyntaxFlowScanRisk struct {
-	RuleName  string `json:"rule_name"`
-	Severity  string `json:"severity"`
-	Title     string `json:"title"`
-	Type      string `json:"type"`
-	VarName   string `json:"var_name"`
-	RiskHash  string `json:"risk_hash"`
-	ResultID  uint64 `json:"result_id"`
-	Timestamp int64  `json:"timestamp"`
+	RuleName    string `json:"rule_name"`
+	Severity    string `json:"severity"`
+	Title       string `json:"title"`
+	Type        string `json:"type"`
+	VarName     string `json:"var_name"`
+	ProgramName string `json:"program_name"`
+	RiskHash    string `json:"risk_hash"`
+	ResultID    uint64 `json:"result_id"`
+	Timestamp   int64  `json:"timestamp"`
 }
 
 func ypbToSyntaxFlowScanRisk(risk *ypb.Risk, result *ypb.SyntaxFlowResult) *SyntaxFlowScanRisk {
@@ -56,14 +57,15 @@ func ypbToSyntaxFlowScanRisk(risk *ypb.Risk, result *ypb.SyntaxFlowResult) *Synt
 		return nil
 	}
 	return &SyntaxFlowScanRisk{
-		ResultID:  result.ResultID,
-		RuleName:  result.RuleName,
-		Severity:  risk.Severity,
-		Timestamp: time.Now().Unix(),
-		Title:     risk.Title,
-		Type:      risk.RiskType,
-		VarName:   risk.SyntaxFlowVariable,
-		RiskHash:  risk.Hash,
+		ResultID:    result.ResultID,
+		RuleName:    result.RuleName,
+		Severity:    risk.Severity,
+		Timestamp:   risk.CreatedAt,
+		Title:       risk.Title,
+		Type:        risk.RiskType,
+		VarName:     risk.SyntaxFlowVariable,
+		ProgramName: risk.ProgramName,
+		RiskHash:    risk.Hash,
 	}
 }
 
