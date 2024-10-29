@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -83,6 +84,10 @@ var SSACompilerCommands = []*cli.Command{
 				Name:  "database,db",
 				Usage: "database path",
 			},
+			cli.StringFlag{
+				Name:  "database-dialect,db-dialect",
+				Usage: "database dialect for gorm, support: mysql, sqlite3(default)",
+			},
 			cli.BoolFlag{
 				Name:  "database-debug,dbdebug",
 				Usage: "enable database debug mode",
@@ -127,6 +132,7 @@ var SSACompilerCommands = []*cli.Command{
 			rawFile := c.String("target")
 			target := utils.GetFirstExistedPath(rawFile)
 			databaseFileRaw := c.String("database")
+			databaseDialect := c.String("database-dialect")
 			noOverride := c.Bool("no-override")
 			syntaxFlow := c.String("syntaxflow")
 			dbDebug := c.Bool("database-debug")
@@ -154,22 +160,34 @@ var SSACompilerCommands = []*cli.Command{
 				}
 			}
 
+			opt := make([]ssaapi.Option, 0, 3)
 			// set database
-			if databaseFileRaw != "" {
+			if databaseDialect != "" {
+				// if set dialect, open gorm and set db
+				if databaseFileRaw == "" {
+					return utils.Errorf("database path is required when using database dialect")
+				}
+				db, err := gorm.Open(databaseDialect, databaseFileRaw)
+				if err != nil {
+					return utils.Errorf("open database failed: %v", err)
+				}
+				consts.SetSSADB(db)
+			}
+			// if not set dialect, use existed db
+			if databaseDialect == "" && databaseFileRaw != "" {
 				// set database path
 				if target == "" &&
 					utils.GetFirstExistedFile(databaseFileRaw) == "" {
 					// no compile ,database not existed
 					return utils.Errorf("database file not found: %v", databaseFileRaw)
 				}
+				opt = append(opt, ssaapi.WithDatabasePath(databaseFileRaw))
 			}
 
 			// compile
 			if target == "" {
 				return utils.Errorf("target file not found: %v", rawFile)
 			}
-			opt := make([]ssaapi.Option, 0, 3)
-			opt = append(opt, ssaapi.WithDatabasePath(databaseFileRaw))
 			log.Infof("start to compile file: %v ", target)
 			opt = append(opt, ssaapi.WithRawLanguage(input_language))
 			opt = append(opt, ssaapi.WithReCompile(reCompile))
@@ -203,7 +221,7 @@ var SSACompilerCommands = []*cli.Command{
 			log.Infof("finished compiling..., results: %v", len(proj))
 			if syntaxFlow != "" {
 				log.Warn("Deprecated: syntax flow query language will be removed in ssa sub-command, please use `ssa-query(in short: sf/syntaxFlow)` instead")
-				return SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
+				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
 			}
 			return nil
 		},
@@ -462,6 +480,10 @@ var SSACompilerCommands = []*cli.Command{
 				Name:  "database,db",
 				Usage: "database path",
 			},
+			cli.StringFlag{
+				Name:  "database-dialect,db-dialect",
+				Usage: "database dialect for gorm, support: mysql, sqlite3(default)",
+			},
 			cli.BoolFlag{
 				Name:  "database-debug,dbdebug",
 				Usage: "enable database debug mode",
@@ -486,11 +508,32 @@ var SSACompilerCommands = []*cli.Command{
 			}
 			programName := c.String("program")
 			databaseFileRaw := c.String("database")
+			databaseDialect := c.String("database-dialect")
 			dbDebug := c.Bool("database-debug")
 			sfDebug := c.Bool("syntaxflow-debug")
 			syntaxFlow := c.String("syntaxflow")
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
+
+			// set database
+			if databaseDialect != "" {
+				// if set dialect, open gorm and set db
+				if databaseFileRaw == "" {
+					return utils.Errorf("database path is required when using database dialect")
+				}
+				db, err := gorm.Open(databaseDialect, databaseFileRaw)
+				if err != nil {
+					return utils.Errorf("open database failed: %v", err)
+				}
+				consts.SetSSADB(db)
+			} else if databaseFileRaw != "" {
+				// set database path
+				if utils.GetFirstExistedFile(databaseFileRaw) == "" {
+					// no compile ,database not existed
+					return utils.Errorf("database file not found: %v use default database", databaseFileRaw)
+				}
+				consts.SetSSADataBasePath(databaseFileRaw)
+			}
 
 			sarifFile := c.String("sarif")
 			if sarifFile != "" {
@@ -536,13 +579,13 @@ var SSACompilerCommands = []*cli.Command{
 			}()
 
 			if syntaxFlow != "" {
-				return SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
+				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
 			}
 
 			var dirChecking []string
 
 			handleBySyntaxFlowContent := func(syntaxFlow string) error {
-				err := SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
+				err := SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
 				if err != nil {
 					return err
 				}
@@ -646,7 +689,7 @@ var SSACompilerCommands = []*cli.Command{
 }
 
 func SyntaxFlowQuery(
-	programName, databaseFileRaw string,
+	programName string,
 	syntaxFlow string,
 	dbDebug, sfDebug, showDot, withCode bool,
 	callbacks ...func(*ssaapi.SyntaxFlowResult),
@@ -656,15 +699,6 @@ func SyntaxFlowQuery(
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-
-	// set database
-	if databaseFileRaw != "" {
-		// set database path
-		if utils.GetFirstExistedFile(databaseFileRaw) == "" {
-			// no compile ,database not existed
-			return utils.Errorf("database file not found: %v use default database", databaseFileRaw)
-		}
-	}
 
 	if programName == "" {
 		return utils.Error("program name is required when using syntax flow query language")
