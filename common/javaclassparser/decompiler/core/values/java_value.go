@@ -15,9 +15,6 @@ type JavaRef struct {
 }
 
 func (j *JavaRef) Type() types.JavaType {
-	if j == nil {
-		println()
-	}
 	return j.JavaType
 }
 
@@ -149,6 +146,17 @@ func (j *RefMember) Type() types.JavaType {
 }
 
 func NewRefMember(object JavaValue, member string, typ types.JavaType) *RefMember {
+	//if object.Type().RawType().(*types.JavaClass){
+	//	if object.Type().String(&class_context.ClassContext{}) == "java.lang.Object" {
+	//		rawObject := object
+	//		newType := types.NewJavaArrayType(object.Type())
+	//		object = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+	//			return fmt.Sprintf("(%s)(%s)", newType.String(funcCtx), rawObject.String(funcCtx))
+	//		}, func() types.JavaType {
+	//			return newType
+	//		})
+	//	}
+	//}
 	return &RefMember{
 		Member:   member,
 		Object:   object,
@@ -169,6 +177,17 @@ func (j *JavaArrayMember) String(funcCtx *class_context.ClassContext) string {
 }
 
 func NewJavaArrayMember(object JavaValue, index JavaValue) *JavaArrayMember {
+	if !object.Type().IsArray() {
+		if object.Type().String(&class_context.ClassContext{}) == "java.lang.Object" {
+			rawObject := object
+			newType := types.NewJavaArrayType(object.Type())
+			object = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				return fmt.Sprintf("(%s)(%s)", newType.String(funcCtx), rawObject.String(funcCtx))
+			}, func() types.JavaType {
+				return newType
+			})
+		}
+	}
 	return &JavaArrayMember{
 		Object: object,
 		Index:  index,

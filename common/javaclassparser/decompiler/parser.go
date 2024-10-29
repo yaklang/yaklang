@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/rewriter"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 )
 
 func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, err error) {
@@ -18,7 +17,7 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	if err != nil {
 		return nil, err
 	}
-	println(utils.DumpNodesToDotExp(decompiler.RootNode))
+	//println(utils.DumpNodesToDotExp(decompiler.RootNode))
 	err = rewriter.CheckNodesIsValid(decompiler.RootNode)
 	if err != nil {
 		return nil, err
@@ -36,7 +35,7 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	sts, err := statementManager.ToStatements(func(node *core.Node) bool {
 		return true
 	})
-	println("to statement end")
+	//println("to statement end")
 	sts = funk.Filter(sts, func(item *core.Node) bool {
 		_, ok := item.Statement.(*statements.StackAssignStatement)
 		return !ok

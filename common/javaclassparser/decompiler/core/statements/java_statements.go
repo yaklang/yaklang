@@ -24,7 +24,7 @@ func NewConditionStatement(cmp values.JavaValue, op string) *ConditionStatement 
 	cmp.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
 	if v, ok := cmp.(*values.JavaCompare); ok {
 		return &ConditionStatement{
-			Condition: values.NewBinaryExpression(v.JavaValue1, v.JavaValue2, op),
+			Condition: values.NewBinaryExpression(v.JavaValue1, v.JavaValue2, op, types.NewJavaPrimer(types.JavaBoolean)),
 			Op:        op,
 		}
 	} else {
@@ -148,6 +148,7 @@ func NewAssignStatement(leftVal, value values.JavaValue, isFirst bool) *AssignSt
 		value.Type()
 		panic("type is nil")
 	}
+
 	value.Type().ResetType(leftVal.Type())
 	return &AssignStatement{
 		LeftValue: leftVal,

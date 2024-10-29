@@ -46,10 +46,11 @@ func (n *NewExpression) String(funcCtx *class_context.ClassContext) string {
 type JavaExpression struct {
 	Values []JavaValue
 	Op     string
+	Typ    types.JavaType
 }
 
 func (j *JavaExpression) Type() types.JavaType {
-	return j.Values[0].Type()
+	return j.Typ
 }
 
 func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
@@ -69,10 +70,11 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 	}
 }
 
-func NewBinaryExpression(value1, value2 JavaValue, op string) *JavaExpression {
+func NewBinaryExpression(value1, value2 JavaValue, op string, typ types.JavaType) *JavaExpression {
 	return &JavaExpression{
 		Values: []JavaValue{value1, value2},
 		Op:     op,
+		Typ:    typ.Copy(),
 	}
 }
 

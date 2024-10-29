@@ -27,7 +27,7 @@ func TestParseJar(t *testing.T) {
 		if jarFs.Ext(path) != ".class" {
 			return nil
 		}
-		if path != "org/apache/myfaces/renderkit/ErrorPageWriter$ErrorPageBean.class" {
+		if path != "org/apache/xalan/xsltc/dom/SAXImpl.class" {
 			return nil
 		}
 		data, err := jarFs.ReadFile(path)
@@ -35,7 +35,8 @@ func TestParseJar(t *testing.T) {
 			return err
 		}
 		fmt.Printf("file: %s\n", path)
-		println(string(data))
+		//println(string(data))
+		_ = data
 		return nil
 	})
 	if err != nil {

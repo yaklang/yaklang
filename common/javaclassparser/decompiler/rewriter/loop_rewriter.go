@@ -209,7 +209,6 @@ func LoopRewriter(manager *StatementManager) error {
 			}
 		}
 		manager.AddFinalAction(func() error {
-			println(isWhile)
 			body, err := manager.ToStatementsFromNode(entryConditionNode, nil)
 			if err != nil {
 				return err

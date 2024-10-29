@@ -2,7 +2,6 @@ package rewriter
 
 import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,7 +9,6 @@ import (
 
 func TryRewriter(manager *StatementManager) error {
 	for _, node := range manager.TryNodes {
-		println(node.Next[1].Statement.String(&class_context.ClassContext{}))
 		leftSet := utils.NewSet[*core.Node]()
 		core.WalkGraph[*core.Node](node.Next[0], func(node *core.Node) ([]*core.Node, error) {
 			leftSet.Add(node)
@@ -51,17 +49,19 @@ func TryRewriter(manager *StatementManager) error {
 				return err
 			}
 			tryCatchSt.TryBody = core.NodesToStatements(tryBody)
-			catchBody, err := manager.ToStatementsFromNode(next[1], func(node *core.Node) bool {
-				if mergeNode != nil && node == mergeNode {
-					return false
+			for _, c := range next {
+				catchBody, err := manager.ToStatementsFromNode(c, func(node *core.Node) bool {
+					if mergeNode != nil && node == mergeNode {
+						return false
+					}
+					return true
+				})
+				if err != nil {
+					return err
 				}
-				return true
-			})
-			if err != nil {
-				return err
+				tryCatchSt.Exception = catchBody[0].Statement.(*statements.AssignStatement).LeftValue.(*values.JavaRef)
+				tryCatchSt.CatchBodies = append(tryCatchSt.CatchBodies, core.NodesToStatements(catchBody)[1:])
 			}
-			tryCatchSt.Exception = catchBody[0].Statement.(*statements.AssignStatement).LeftValue.(*values.JavaRef)
-			tryCatchSt.CatchBody = core.NodesToStatements(catchBody)[1:]
 			return nil
 		})
 	}

@@ -63,10 +63,6 @@ func (d *Decompiler) GetTypeFromPool(index int) types.JavaType {
 	return typ
 }
 func (d *Decompiler) GetMethodFromPool(index int) *values.JavaClassMember {
-	member := d.constantPoolGetter(index).(*values.JavaClassMember)
-	if member.Name == "addToAnnotationLists" {
-		println()
-	}
 	return d.constantPoolGetter(index).(*values.JavaClassMember)
 }
 func (d *Decompiler) ParseOpcode() error {
@@ -127,6 +123,12 @@ func (d *Decompiler) ScanJmp() error {
 	endOp := &OpCode{Instr: InstrInfos[OP_END], Id: d.CurrentId}
 	var walkNode func(start int)
 	walkNode = func(start int) {
+		deferWalkId := []int{}
+		defer func() {
+			for _, id := range deferWalkId {
+				walkNode(id)
+			}
+		}()
 		var pre *OpCode
 		i := start
 		for {
@@ -144,13 +146,17 @@ func (d *Decompiler) ScanJmp() error {
 			}
 			for _, entry := range d.ExceptionTable {
 				if opcode.CurrentOffset == entry.StartPc {
+					if entry.StartPc == entry.HandlerPc {
+						continue
+					}
 					gotoOp := d.offsetToOpcodeIndex[entry.HandlerPc]
 					d.opCodes[gotoOp].IsCatch = true
 					d.opCodes[gotoOp].ExceptionTypeIndex = entry.CatchType
+					deferWalkId = append(deferWalkId, gotoOp)
 					walkNode(gotoOp)
-					if pre != nil {
-						SetOpcode(pre, d.opCodes[gotoOp])
-					}
+					//if pre != nil {
+					//	SetOpcode(pre, d.opCodes[gotoOp])
+					//}
 				}
 			}
 
@@ -249,17 +255,26 @@ func (d *Decompiler) NewVar(val values.JavaValue) *values.JavaRef {
 	return newRef
 }
 func (d *Decompiler) AssignVar(slot int, typ values.JavaValue) (*values.JavaRef, bool) {
+	if slot == 7 {
+		print()
+	}
 	ref, ok := d.varTable[slot]
 	if !ok || ref.String(d.FunctionContext) != typ.String(d.FunctionContext) {
 		newRef := d.NewVar(typ)
 		d.varTable[slot] = newRef
 		return newRef, true
 	}
+	if ref.Id == 2 {
+		print()
+	}
 	return ref, false
 }
 func (d *Decompiler) GetVar(slot int) *values.JavaRef {
 	if d.varTable[slot] == nil {
 		panic(fmt.Sprintf("slot %d is nil", slot))
+	}
+	if d.varTable[slot].Id == 2 {
+		print()
 	}
 	return d.varTable[slot]
 }
@@ -340,11 +355,17 @@ func (d *Decompiler) ParseStatement() error {
 		}
 	}
 	parseOpcode := func(opcode *OpCode) {
+		if opcode.Id == 307 {
+			print()
+		}
 		//opcodeIndex := opcode.Id
 		statementsIndex = opcode.Id
 		stackVarIndex = mapCodeToStackVarIndex[opcode]
 		switch opcode.Instr.OpCode {
 		case OP_ALOAD, OP_ILOAD, OP_LLOAD, OP_DLOAD, OP_FLOAD, OP_ALOAD_0, OP_ILOAD_0, OP_LLOAD_0, OP_DLOAD_0, OP_FLOAD_0, OP_ALOAD_1, OP_ILOAD_1, OP_LLOAD_1, OP_DLOAD_1, OP_FLOAD_1, OP_ALOAD_2, OP_ILOAD_2, OP_LLOAD_2, OP_DLOAD_2, OP_FLOAD_2, OP_ALOAD_3, OP_ILOAD_3, OP_LLOAD_3, OP_DLOAD_3, OP_FLOAD_3:
+			if opcode.Id == 46 {
+				print()
+			}
 			var slot int = -1
 			switch opcode.Instr.OpCode {
 			case OP_ALOAD_0, OP_ILOAD_0, OP_LLOAD_0, OP_DLOAD_0, OP_FLOAD_0:
@@ -365,7 +386,7 @@ func (d *Decompiler) ParseStatement() error {
 			runtimeStackSimulation.Push(d.GetVar(slot))
 			////return mkRetrieve(variableFactory);
 		case OP_ACONST_NULL:
-			assignStackVar(values.NewJavaLiteral("null", types.NewJavaPrimer(types.JavaVoid)))
+			assignStackVar(values.NewJavaLiteral("null", types.NewJavaClass("java.lang.Object")))
 		case OP_ICONST_M1:
 			assignStackVar(values.NewJavaLiteral(-1, types.NewJavaPrimer(types.JavaInteger)))
 		case OP_ICONST_0:
@@ -456,7 +477,7 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_LCMP, OP_DCMPG, OP_DCMPL, OP_FCMPG, OP_FCMPL:
 			var1 := runtimeStackSimulation.Pop().(values.JavaValue)
 			var2 := runtimeStackSimulation.Pop().(values.JavaValue)
-			runtimeStackSimulation.Push(values.NewBinaryExpression(var1, var2, "compare"))
+			runtimeStackSimulation.Push(values.NewBinaryExpression(var1, var2, "compare", types.NewJavaPrimer(types.JavaBoolean)))
 		case OP_LSUB, OP_ISUB, OP_DSUB, OP_FSUB, OP_LADD, OP_IADD, OP_FADD, OP_DADD, OP_IREM, OP_FREM, OP_LREM, OP_DREM, OP_IDIV, OP_FDIV, OP_DDIV, OP_LDIV, OP_IMUL, OP_DMUL, OP_FMUL, OP_LMUL, OP_LAND, OP_LOR, OP_LXOR, OP_ISHR, OP_ISHL, OP_LSHL, OP_LSHR, OP_IUSHR, OP_LUSHR, OP_IOR, OP_IAND, OP_IXOR:
 			var op string
 			switch opcode.Instr.OpCode {
@@ -487,7 +508,7 @@ func (d *Decompiler) ParseStatement() error {
 			}
 			var2 := runtimeStackSimulation.Pop().(values.JavaValue)
 			var1 := runtimeStackSimulation.Pop().(values.JavaValue)
-			runtimeStackSimulation.Push(values.NewBinaryExpression(var1, var2, op))
+			runtimeStackSimulation.Push(values.NewBinaryExpression(var1, var2, op, var1.Type()))
 		case OP_I2B, OP_I2C, OP_I2D, OP_I2F, OP_I2L, OP_I2S, OP_L2D, OP_L2F, OP_L2I, OP_F2D, OP_F2I, OP_F2L, OP_D2F, OP_D2I, OP_D2L:
 			var fname string
 			var typ types.JavaType
@@ -694,6 +715,7 @@ func (d *Decompiler) ParseStatement() error {
 			case OP_IFGE:
 				op = ">="
 			}
+			op = GetReverseOp(op)
 			//newIfScope(opcodeIndex, int(jmpTo))
 			v := runtimeStackSimulation.Pop()
 			if v == nil {
@@ -703,7 +725,7 @@ func (d *Decompiler) ParseStatement() error {
 			if !ok {
 				panic("not support")
 			}
-			st := statements.NewConditionStatement(cmp, op)
+			st := statements.NewConditionStatement(values.NewJavaCompare(cmp, values.NewJavaLiteral(0, types.NewJavaPrimer(types.JavaInteger))), op)
 			appendNode(st)
 			//addStatementHandle(func(getter func(id int) (toStatement int)) {
 			//	st.ToStatement = getter(opcode.Id)
@@ -947,7 +969,7 @@ func (d *Decompiler) ParseStatement() error {
 				inc = int(opcode.Data[1])
 			}
 			ref := d.GetVar(int(index))
-			appendNode(values.NewBinaryExpression(ref, values.NewJavaLiteral(inc, types.NewJavaPrimer(types.JavaInteger)), INC))
+			appendNode(values.NewBinaryExpression(ref, values.NewJavaLiteral(inc, types.NewJavaPrimer(types.JavaInteger)), INC, ref.Type()))
 		case OP_DNEG, OP_FNEG, OP_LNEG, OP_INEG:
 			v := runtimeStackSimulation.Pop().(values.JavaValue)
 			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
@@ -984,7 +1006,6 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
-	println(DumpOpcodesToDotExp(d.opCodes[0]))
 	err = WalkGraph[*OpCode](d.opCodes[0], func(node *OpCode) ([]*OpCode, error) {
 		var validSource *OpCode
 		if len(node.Source) != 0 {
