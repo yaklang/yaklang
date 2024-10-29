@@ -7,3 +7,4 @@ assert codec.EncodeToHex(string(x`{{gb18030(你好)}}`[0])) == codec.EncodeToHex
 dump(x`你好`[0], "\xe4\xbd\xa0\xe5\xa5\xbd")
 assert x`你好`[0] == codec.DecodeHex("e4bda0e5a5bd")~      // utf8
 assert x`{{gb18030toUTF8({{hexd(c4e3bac3)}})}}`[0] == "你好"
+assert x`{{hexd(0x616263)}}`[0] == `abc`
