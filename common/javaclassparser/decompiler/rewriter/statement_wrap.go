@@ -21,6 +21,7 @@ type StatementManager struct {
 	FinalActions      []func() error
 	LoopOccupiedNodes *utils.Set[*core.Node]
 	SwitchNode        []*core.Node
+	TryNodes          []*core.Node
 	nodeSet           *utils.Set[*core.Node]
 	edgeSet           *utils.Set[[2]*core.Node]
 	DominatorMap      map[*core.Node][]*core.Node
@@ -246,6 +247,7 @@ func (s *StatementManager) ScanCoreInfo() error {
 	circleNodes := []*core.Node{}
 	ifNodes := []*core.Node{}
 	mergeNodesSet := utils.NewSet[*core.Node]()
+	tryNodesSet := utils.NewSet[*core.Node]()
 
 	var walkIfStatement func(node *core.Node, subNodeRoute *NodeRoute)
 	walkIfStatement = func(node *core.Node, subNodeRoute *NodeRoute) {
@@ -297,6 +299,14 @@ func (s *StatementManager) ScanCoreInfo() error {
 					walkIfStatement(n, newRoute)
 				}
 				continue
+			} else if v, ok := current.Statement.(*statements.MiddleStatement); ok && v.Flag == "tryStart" {
+				tryNodesSet.Add(current)
+				for _, n := range current.Next {
+					newRoute := subNodeRoute.NewChild(current)
+					newRoute.ConditionNode = nil
+					newRoute.TryNode = current
+					walkIfStatement(n, newRoute)
+				}
 			} else {
 				for _, n := range current.Next {
 					stack.Push(n)
@@ -338,6 +348,7 @@ func (s *StatementManager) ScanCoreInfo() error {
 	//		}
 	//	}
 	//}
+	s.TryNodes = tryNodesSet.List()
 	for _, current := range mergeNodesSet.List() {
 		for _, nodeMap := range getNodeInfo(current).AllPreNodeRoute {
 			if nodeMap.ConditionNode == nil {
@@ -391,12 +402,22 @@ func (s *StatementManager) ScanCoreInfo() error {
 			circleNodeEntry.CircleNodesSet.Add(node)
 			return next, nil
 		})
-		if len(outPointMap) == 0 {
-			return errors.New("invalid circle")
+		//if len(outPointMap) == 0 {
+		//	return errors.New("invalid circle")
+		//}
+		tryNodes := funk.Filter(maps.Keys(outPointMap), func(node *core.Node) bool {
+			if v, ok := node.Statement.(*statements.MiddleStatement); ok && v.Flag == "tryStart" {
+				return true
+			}
+			return false
+		}).([]*core.Node)
+		for _, node := range tryNodes {
+			delete(outPointMap, node)
 		}
 		//mergeNode := outPointMap[circleNodeEntry]
 		var mergeNode *core.Node
-		if len(outPointMap) == 1 {
+		if len(outPointMap) == 0 {
+		} else if len(outPointMap) == 1 {
 			mergeNode = maps.Values(outPointMap)[0]
 		} else {
 			edgeSet := utils.NewSet[*core.Node]()
@@ -429,88 +450,93 @@ func (s *StatementManager) ScanCoreInfo() error {
 		//		mergeNode = node1
 		//	}
 		//}
-		if mergeNode == nil {
-			return errors.New("invalid circle")
-		}
+		//if mergeNode == nil {
+		//	return errors.New("invalid circle")
+		//}
 		for c, _ := range outPointMap {
-			if _, ok := c.Statement.(*statements.ConditionStatement); !ok {
-				if v, ok := c.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleSwitch {
-					continue
-				} else {
-					return errors.New("invalid circle")
-				}
-			}
-			circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, c)
-		}
-		//var outPointMergeNode *core.Node
-		//for conditionNode, node := range outPointMap {
-		//	if outPointMergeNode != nil {
-		//		if outPointMergeNode != node {
-		//			return errors.New("invalid break")
-		//		}
-		//	} else {
-		//		outPointMergeNode = node
-		//	}
-		//	circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, conditionNode)
-		//}
-		//if outPointMergeNode == nil {
-		//	return utils.Errorf("found circle break node from code graph failed, circle start node id: %d", circleNodeEntry.Id)
-		//}
-		loopEndNodeMap[mergeNode] = mergeNode
-		circleNodeEntry.GetLoopEndNode = func() *core.Node {
-			return loopEndNodeMap[mergeNode]
-		}
-		circleNodeEntry.SetLoopEndNode = func(node1, node2 *core.Node) {
-			loopEndNodeMap[node1] = node2
-		}
-		breakNodeSet := utils.NewSet[*core.Node]()
-		var walkParent func(node *core.Node) bool
-		for _, mergeSource := range mergeNode.Source {
-			walkParent = func(node *core.Node) bool {
-				if node == nil {
-					return false
-				}
-				if _, ok := outPointMap[node]; ok {
+			check := func(node *core.Node) bool {
+				if _, ok := c.Statement.(*statements.ConditionStatement); ok {
 					return true
 				}
-				for _, route := range getNodeInfo(node).AllPreNodeRoute {
-					if _, ok := outPointMap[route.ConditionNode]; ok {
-						return true
-					} else {
-						return walkParent(route.ConditionNode)
-					}
-				}
+				//if v, ok := c.Statement.(*statements.MiddleStatement); ok && v.Flag == "tryStart" {
+				//	return true
+				//}
 				return false
 			}
-			if walkParent(mergeSource) {
-				breakNodeSet.Add(mergeSource)
+
+			//if !check(c) {
+			//	return errors.New("invalid circle")
+			//}
+			if check(c) {
+				circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, c)
 			}
+
 		}
-		circleNodeEntry.BreakNode = breakNodeSet.List()
+		circleNodeEntry.GetLoopEndNode = func() *core.Node {
+			return nil
+		}
+		circleNodeEntry.SetLoopEndNode = func(node *core.Node, node2 *core.Node) {
+
+		}
+		if mergeNode != nil {
+			loopEndNodeMap[mergeNode] = mergeNode
+			circleNodeEntry.GetLoopEndNode = func() *core.Node {
+				return loopEndNodeMap[mergeNode]
+			}
+			circleNodeEntry.SetLoopEndNode = func(node1, node2 *core.Node) {
+				loopEndNodeMap[node1] = node2
+			}
+			breakNodeSet := utils.NewSet[*core.Node]()
+			var walkParent func(node *core.Node) bool
+			for _, mergeSource := range mergeNode.Source {
+				walkParent = func(node *core.Node) bool {
+					if node == nil {
+						return false
+					}
+					if _, ok := outPointMap[node]; ok {
+						return true
+					}
+					for _, route := range getNodeInfo(node).AllPreNodeRoute {
+						if _, ok := outPointMap[route.ConditionNode]; ok {
+							return true
+						} else {
+							return walkParent(route.ConditionNode)
+						}
+					}
+					return false
+				}
+				if walkParent(mergeSource) {
+					breakNodeSet.Add(mergeSource)
+				}
+			}
+			circleNodeEntry.BreakNode = breakNodeSet.List()
+		}
 	}
 	s.CircleEntryPoint = circleNodes
 	s.IfNodes = ifNodes
-	//for _, node := range s.IfNodes {
-	//	if node.MergeNode == nil {
-	//		return utils.Errorf("if node merge node is nil, node id: %d", node.Id)
-	//	}
-	//}
 	return nil
 }
 func (s *StatementManager) Rewrite() error {
+	println("scan core info")
 	err := s.ScanCoreInfo()
 	if err != nil {
 		return err
 	}
-	rewriters := []rewriterFunc{SwitchRewriter, LoopRewriter, IfRewriter}
+	rewriters := []rewriterFunc{SwitchRewriter, LoopRewriter, IfRewriter, TryRewriter}
 	for _, rewriter := range rewriters {
-		rewriter(s)
+		println("run rewriter")
+		err := rewriter(s)
+		if err != nil {
+			return err
+		}
 	}
+	println("run action")
 	for _, action := range s.FinalActions {
 		err := action()
 		if err != nil {
 			return err
 		}
 	}
+	println("run action end")
 	return nil
 }

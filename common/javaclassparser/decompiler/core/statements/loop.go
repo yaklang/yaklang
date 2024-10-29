@@ -35,3 +35,19 @@ func NewWhileStatement(condition values.JavaValue, body []Statement) *WhileState
 func (w *WhileStatement) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("while(%s) {\n%s\n}", w.ConditionValue.String(funcCtx), StatementsString(w.Body, funcCtx))
 }
+
+type TryCatchStatement struct {
+	Exception *values.JavaRef
+	TryBody   []Statement
+	CatchBody []Statement
+}
+
+func NewTryCatchStatement(body1, body2 []Statement) *TryCatchStatement {
+	return &TryCatchStatement{
+		TryBody:   body1,
+		CatchBody: body2,
+	}
+}
+func (w *TryCatchStatement) String(funcCtx *class_context.ClassContext) string {
+	return fmt.Sprintf("try{\n%s\n}catch{\n%s\n}", StatementsString(w.TryBody, funcCtx), StatementsString(w.CatchBody, funcCtx))
+}

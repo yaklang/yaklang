@@ -13,7 +13,7 @@ import (
 )
 
 func TestParseJar(t *testing.T) {
-	jarFs, err := NewJarFSFromLocal("/home/z3/Downloads/ysoserial-for-woodpecker-0.5.2.jar")
+	jarFs, err := NewJarFSFromLocal("/Users/z3/Code/idea/yak-yso/yak-yso/lib/ysoserial-for-woodpecker-0.5.2.jar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestParseJar(t *testing.T) {
 		if jarFs.Ext(path) != ".class" {
 			return nil
 		}
-		if path != "org/apache/commons/lang/time/DurationFormatUtils.class" {
+		if path != "org/apache/myfaces/renderkit/ErrorPageWriter$ErrorPageBean.class" {
 			return nil
 		}
 		data, err := jarFs.ReadFile(path)
@@ -81,7 +81,7 @@ func TestDemoClass(t *testing.T) {
 	assert.Equal(t, string(expectSource), source)
 }
 func TestClassFile(t *testing.T) {
-	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/DupX1.class")
+	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/TryCatch.class")
 	cf, err := Parse(classesContent)
 	if err != nil {
 		t.Fatal(err)

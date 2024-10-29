@@ -29,7 +29,9 @@ type Node struct {
 }
 
 func (n *Node) RemoveAllSource() {
-	for _, node := range n.Source {
+	source := make([]*Node, len(n.Source))
+	copy(source, n.Source)
+	for _, node := range source {
 		node.RemoveNext(n)
 	}
 }
@@ -69,6 +71,9 @@ func (n *Node) AddSource(node *Node) {
 	node.AddNext(n)
 }
 func (n *Node) AddNext(node *Node) {
+	//if n.Id == 371 && node.Id == 379 {
+	//	print()
+	//}
 	var found bool
 	for _, next := range n.Next {
 		if next == node {

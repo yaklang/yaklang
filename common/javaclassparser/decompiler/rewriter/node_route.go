@@ -8,6 +8,7 @@ import (
 type NodeRoute struct {
 	ConditionNode *core.Node
 	SwitchNode    *core.Node
+	TryNode    *core.Node
 	Parent        []*NodeRoute
 	NodeMap       *utils.Set[*core.Node]
 	Children      []*NodeRoute

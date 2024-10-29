@@ -30,7 +30,7 @@ type JavaTypeWrap struct {
 func (j *JavaTypeWrap) ArrayDim() int {
 	v, ok := j.javaType.(*JavaArrayType)
 	if ok {
-		return v.Dim
+		return v.Dimension
 	}
 	return 0
 }
@@ -51,7 +51,14 @@ func (j *JavaTypeWrap) IsArray() bool {
 func (j *JavaTypeWrap) ElementType() JavaType {
 	v, ok := j.javaType.(*JavaArrayType)
 	if ok {
-		return v.JavaType
+		if v.Dimension == 1 {
+			return v.JavaType
+		} else {
+			return newJavaTypeWrap(&JavaArrayType{
+				JavaType:  v.JavaType,
+				Dimension: v.Dimension - 1,
+			})
+		}
 	}
 	return nil
 }
