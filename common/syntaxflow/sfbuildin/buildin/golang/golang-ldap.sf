@@ -4,11 +4,10 @@ desc(
     severity: high,
 )
 
-l.Search(* #-> as $search)
-fmt.Sprintf(* #-> as $param)
-$param #{
-	until: `* & $search`,
-}-> as $high;
+*.Search( * #-> as $request)
+$request <getCall><getCaller> as $sink
+$sink?{have: 'Sprintf'}( * #-> as $param)
+$param?{have: 'Parameter'} as $high
 
 alert $high for {
     title: 'LDAP Injection detected',
@@ -31,11 +30,17 @@ import (
 )
 
 func authenticate(username, password string) bool {
-	l, err := ldap.Dial("tcp", "localhost:389")
+	l, err := ldap.Dial("tcp", "ldap.example.com:389")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to connect to LDAP server: %s", err)
 	}
 	defer l.Close()
+
+	// 绑定到 LDAP 服务器
+	err = l.Bind("cn=admin,dc=example,dc=com", password)
+	if err != nil {
+		log.Fatalf("Failed to bind: %s", err)
+	}
 
 	// LDAP 查询构造
 	searchRequest := ldap.NewSearchRequest(

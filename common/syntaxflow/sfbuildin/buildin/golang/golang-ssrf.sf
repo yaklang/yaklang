@@ -5,7 +5,8 @@ desc(
 )
 
 http.Get(* #-> as $param)
-$param?{ r.URL.Query().Get() } as $high;
+$param?{ *.URL.Query().Get() } as $sink;
+$sink?{have: 'Parameter'} as $high
 
 alert $high for {
     title: 'SSRF detected',
