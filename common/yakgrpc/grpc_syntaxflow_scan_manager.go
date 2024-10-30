@@ -2,10 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
@@ -27,10 +29,12 @@ const (
 )
 
 type SyntaxFlowScanManager struct {
+	// task info
 	taskID string
 	status SyntaxFlowScanStatus
 	ctx    context.Context
 
+	// stream
 	stream ypb.Yak_SyntaxFlowScanServer
 	client *yaklib.YakitClient
 
@@ -41,9 +45,14 @@ type SyntaxFlowScanManager struct {
 	// program
 	programs []string
 
-	// process
-	currentQuery int64
-	totalQuery   int64
+	// query execute
+	failedQuery  int64 // query failed
+	skipQuery    int64 // language not match, skip this rule
+	successQuery int64
+	// risk
+	riskCount int64
+	// query process
+	totalQuery int64
 }
 
 func CreateSyntaxFlowScanManager(ctx context.Context, stream ypb.Yak_SyntaxFlowScanServer, req *ypb.SyntaxFlowScanRequest) (*SyntaxFlowScanManager, error) {
@@ -99,28 +108,52 @@ func (m *SyntaxFlowScanManager) Query(programName string) error {
 		return err
 	}
 	for rule := range sfdb.YieldSyntaxFlowRulesWithoutLib(m.rules, m.ctx) {
+		m.currentRuleName = rule.RuleName
+
+		if res, err := prog.SyntaxFlowRule(rule); err == nil {
+			if _, err := res.Save(m.taskID); err == nil {
+				m.successQuery++
+				m.notifyResult(res)
+			} else {
+				m.failedQuery++
+				m.client.YakitError("program %s exec rule %s result save failed: %s", programName, rule.RuleName, err)
+			}
+		} else {
+			m.failedQuery++
 			m.client.YakitError("program %s exc rule %s failed: %s", programName, rule.RuleName, err)
-			// continue
 		}
-		if _, err := res.Save(m.taskID); err != nil {
-			m.client.YakitError("program %s exec rule %s result save failed: %s", programName, rule.RuleName, err)
-			// continue
-		}
-		m.notifyResult(res)
+		m.notifyProgress()
 	}
 	return nil
 }
 
 func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
-	m.currentQuery++
-	if m.currentQuery == m.totalQuery {
-		m.status = Done
+	if riskLen := len(res.GetGRPCModelRisk()); riskLen != 0 {
+		m.riskCount += int64(riskLen)
 	}
-	m.client.YakitSetProgress(float64(m.currentQuery) / float64(m.totalQuery))
+	// m.riskQuery
 	m.stream.Send(&ypb.SyntaxFlowScanResponse{
 		TaskID: m.taskID,
 		Status: string(m.status),
 		Result: res.GetGRPCModelResult(),
 		Risks:  res.GetGRPCModelRisk(),
 	})
+}
+
+func (m *SyntaxFlowScanManager) notifyProgress() {
+	finishQuery := m.successQuery + m.failedQuery + m.skipQuery
+	if finishQuery == m.totalQuery {
+		m.status = Done
+		m.client.StatusCard("当前执行规则", "已执行完毕", "规则执行进度")
+	}
+	m.client.YakitSetProgress(float64(finishQuery) / float64(m.totalQuery))
+
+	// process
+	m.client.StatusCard("已执行规则", fmt.Sprintf("%d/%d", finishQuery, m.totalQuery), "规则执行进度")
+	m.client.StatusCard("已跳过规则", m.skipQuery, "规则执行进度")
+	// runtime status
+	m.client.StatusCard("执行成功个数", m.successQuery, "规则执行状态")
+	m.client.StatusCard("执行失败个数", m.failedQuery, "规则执行状态")
+	// risk status
+	m.client.StatusCard("检出漏洞/风险个数", m.riskCount, "漏洞/风险状态")
 }
