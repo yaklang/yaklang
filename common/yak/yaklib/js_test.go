@@ -139,3 +139,26 @@ func TestRunWithVariable(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, wantStr, value.String())
 }
+
+func TestGetFunction(t *testing.T) {
+	vm, _, err := _run(`function sum(a, b) {return a+b;}`)
+	require.NoError(t, err)
+	sum, ok := _getFunction(vm, "sum")
+	require.True(t, ok)
+	v, err := sum(1, 2)
+	require.NoError(t, err)
+	require.Equal(t, int64(3), v.ToInteger())
+}
+
+func TestGetObjectFunction(t *testing.T) {
+	vm, _, err := _run(`a = {
+d: 3,
+add(a) {return this.d+a},
+}`)
+	require.NoError(t, err)
+	add, ok := _getObjectFunction(vm, "a", "add")
+	require.True(t, ok)
+	v, err := add(1)
+	require.NoError(t, err)
+	require.Equal(t, int64(4), v.ToInteger())
+}
