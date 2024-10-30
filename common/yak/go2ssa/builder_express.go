@@ -418,7 +418,7 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return v
 		}
 
-		if importp, path := b.GetImportPackage(text); path != nil {
+		if importp, path := b.GetImportPackage(text); len(path) != 0 {
 			var obj ssa.Value
 
 			if importp != nil { // user defined package
