@@ -6,10 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -27,6 +30,7 @@ import (
 const (
 	OneKB   = 1 * 1024
 	EightKB = 8 * 1024
+	FiftyKB = 50 * 1024
 	OneMB   = 1 * 1024 * 1024 // 1 MB in bytes
 	FiveMB  = 5 * 1024 * 1024 // 5 MB in bytes
 )
@@ -38,7 +42,7 @@ type getAllPayloadResult struct {
 	IsFile   *bool
 }
 
-func grpc2Paging(pag *ypb.Paging) *yakit.Paging {
+func NewPagingFromGRPCModel(pag *ypb.Paging) *yakit.Paging {
 	ret := yakit.NewPaging()
 	if pag != nil {
 		ret.Order = pag.GetOrder()
@@ -49,67 +53,18 @@ func grpc2Paging(pag *ypb.Paging) *yakit.Paging {
 	return ret
 }
 
-func Payload2Grpc(payload *schema.Payload) *ypb.Payload {
-	content := getPayloadContent(payload)
-	p := &ypb.Payload{
-		Id:           int64(payload.ID),
-		Group:        payload.Group,
-		ContentBytes: []byte(content),
-		Content:      utils.EscapeInvalidUTF8Byte([]byte(content)),
-		// Folder:       *r.Folder,
-		// HitCount:     *r.HitCount,
-		// IsFile:       *r.IsFile,
-	}
-	if payload.Folder != nil {
-		p.Folder = *payload.Folder
-	}
-	if payload.HitCount != nil {
-		p.HitCount = *payload.HitCount
-	}
-	if payload.IsFile != nil {
-		p.IsFile = *payload.IsFile
-	}
-	return p
-}
-
-func grpc2Payload(p *ypb.Payload) *schema.Payload {
-	content := strconv.Quote(p.Content)
-	payload := &schema.Payload{
-		Group:    p.Group,
-		Content:  &content,
-		Folder:   &p.Folder,
-		HitCount: &p.HitCount,
-		IsFile:   &p.IsFile,
-	}
-	payload.Hash = payload.CalcHash()
-	return payload
-}
-
-func getPayloadContent(p *schema.Payload) string {
-	if p.Content == nil {
-		return ""
-	}
-	content := *p.Content
-	unquoted, err := strconv.Unquote(content)
-	if err == nil {
-		content = unquoted
-	}
-	content = strings.TrimSpace(content)
-	return content
-}
-
 func (s *Server) QueryPayload(ctx context.Context, req *ypb.QueryPayloadRequest) (*ypb.QueryPayloadResponse, error) {
 	if req == nil {
 		return nil, utils.Errorf("empty parameter")
 	}
-	p, d, err := yakit.QueryPayload(s.GetProfileDatabase(), req.GetFolder(), req.GetGroup(), req.GetKeyword(), grpc2Paging(req.GetPagination()))
+	p, data, err := yakit.QueryPayload(s.GetProfileDatabase(), req.GetFolder(), req.GetGroup(), req.GetKeyword(), NewPagingFromGRPCModel(req.GetPagination()))
 	if err != nil {
 		return nil, utils.Wrap(err, "query payload error")
 	}
 
 	var items []*ypb.Payload
-	for _, r := range d {
-		items = append(items, Payload2Grpc(r))
+	for _, p := range data {
+		items = append(items, p.ToGRPCModel())
 	}
 
 	return &ypb.QueryPayloadResponse{
@@ -147,13 +102,13 @@ func (s *Server) QueryPayloadFromFile(ctx context.Context, req *ypb.QueryPayload
 	buf := bytes.NewBuffer(make([]byte, 0, size))
 	for line := range lineCh {
 		lineStr := string(line)
-		handlerSize += int64(len(line))
 		if unquoted, err := strconv.Unquote(lineStr); err == nil {
 			lineStr = unquoted
 		}
 		lineStr += "\n"
+		handlerSize += int64(len(lineStr) + 1)
 		buf.WriteString(lineStr)
-		if size > FiveMB && handlerSize > OneKB {
+		if size > FiveMB && handlerSize > FiftyKB {
 			// If file is larger than 5MB, read only the first 50KB
 			return &ypb.QueryPayloadFromFileResponse{
 				Data:      bytes.TrimRight(buf.Bytes(), "\n"),
@@ -332,6 +287,118 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			log.Errorf("save payload group by content error: %s", err.Error())
 		}
 	}
+	return nil
+}
+
+func (s Server) SaveLargePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb.Yak_SaveLargePayloadToFileStreamServer) error {
+	content := req.GetContent()
+	group := req.GetGroup()
+	folder := req.GetFolder()
+	isFile, isNew := req.GetIsFile(), req.GetIsNew()
+	filename := req.GetFileName()
+	if !isFile && content == "" {
+		return utils.Error("content is empty")
+	}
+	if isFile && len(filename) == 0 {
+		return utils.Error("file name is empty")
+	}
+	if group == "" {
+		return utils.Error("group is empty")
+	}
+
+	if isNew {
+		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
+			return utils.Wrapf(err, "check group[%s]", group)
+		} else if ok {
+			return utils.Errorf("group[%s] exist", group)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+
+	startTime := time.Now()
+	payloadFolder := consts.GetDefaultYakitPayloadsDir()
+	dstFileName := filepath.Join(payloadFolder, fmt.Sprintf("%s_%s.txt", folder, group))
+	dstFD, err := os.OpenFile(dstFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
+	if err != nil {
+		return err
+	}
+	dstWriter := bufio.NewWriterSize(dstFD, oneMB)
+	ch := make(chan string, 128)
+	once := utils.NewAtomicBool()
+	defer func() {
+		dstWriter.Flush()
+		dstFD.Close()
+		if stream.Context().Err() == context.Canceled {
+			os.Remove(dstFileName)
+		}
+	}()
+
+	var handledSize, total int64
+	feedback := func(progress float64, msg string) {
+		if progress == -1 {
+			progress = float64(handledSize) / float64(total)
+		}
+		stream.Send(&ypb.SavePayloadProgress{
+			Progress:            progress,
+			CostDurationVerbose: time.Since(startTime).Round(time.Second).String(),
+			Message:             msg,
+		})
+	}
+	feedback(-1, "")
+
+	ticker := time.NewTicker(time.Second)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				time.Sleep(time.Second)
+				feedback(-1, "")
+			}
+		}
+	}()
+
+	var productWG sync.WaitGroup
+	productWG.Add(len(filename))
+	for _, f := range filename {
+		f := f
+		go func(f string) {
+			defer func() {
+				productWG.Done()
+			}()
+			yakit.ReadLargeFileLineWithCallBack(ctx, f,
+				func(fi fs.FileInfo) {
+					atomic.AddInt64(&total, fi.Size())
+				},
+				func(line string) error {
+					atomic.AddInt64(&handledSize, int64(len(line)+1)) // +1 for '\n'
+					line = strconv.Quote(line)
+					ch <- line
+					return nil
+				})
+		}(f)
+	}
+
+	// wait for all file read done
+	go func() {
+		productWG.Wait()
+		close(ch)
+	}()
+
+	for s := range ch {
+		if once.SetToIf(false, true) {
+			dstWriter.WriteString(s)
+		} else {
+			dstWriter.WriteString("\n" + s)
+		}
+	}
+	yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), dstFileName, group, folder, 0, true)
+	yakit.SetGroupInEnd(s.GetProfileDatabase(), group)
+	feedback(1, "导入完成")
+
 	return nil
 }
 
@@ -515,7 +582,7 @@ func (s *Server) RenamePayloadGroup(ctx context.Context, req *ypb.RenameRequest)
 
 func (s *Server) UpdatePayload(ctx context.Context, req *ypb.UpdatePayloadRequest) (*ypb.Empty, error) {
 	id := req.GetId()
-	data := req.GetData()
+	p := req.GetData()
 	group, oldGroup := req.GetGroup(), req.GetOldGroup()
 
 	db := s.GetProfileDatabase()
@@ -532,11 +599,11 @@ func (s *Server) UpdatePayload(ctx context.Context, req *ypb.UpdatePayloadReques
 	if id == 0 {
 		return nil, utils.Error("id is empty")
 	}
-	if data == nil {
+	if p == nil {
 		return nil, utils.Error("data is empty")
 	}
 	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
-		return yakit.UpdatePayload(tx, int(id), grpc2Payload(data))
+		return yakit.UpdatePayload(tx, int(id), schema.NewPayloadFromGRPCModel(p))
 	})
 	return &ypb.Empty{}, err
 }
@@ -710,7 +777,7 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 			defer file.Close()
 			for _, payload := range payloads {
 				// write to target file payload group
-				content := getPayloadContent(payload)
+				content := payload.GetContent()
 				if content == "" {
 					continue
 				}
@@ -861,7 +928,7 @@ func (s *Server) GetAllPayload(ctx context.Context, req *ypb.GetAllPayloadReques
 
 	for p := range gen {
 		payloads = append(payloads, &ypb.Payload{
-			Content: getPayloadContent(p),
+			Content: p.GetContent(),
 		})
 	}
 
@@ -944,7 +1011,7 @@ func (s *Server) ExportAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_
 	}
 
 	for p := range gen {
-		content := getPayloadContent(p)
+		content := p.GetContent()
 		if content == "" {
 			continue
 		}

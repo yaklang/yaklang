@@ -12,6 +12,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -186,6 +188,37 @@ func save2file(local ypb.YakClient, t *testing.T, group, folder, data string, er
 		Content: "",
 		FileName: []string{
 			fileName,
+		},
+	})
+
+	for {
+		ret, err = client.Recv()
+		if err != nil {
+			break
+		}
+		t.Log(ret)
+	}
+	if len(errorHandler) > 0 {
+		errorHandler[0](t, err)
+	} else if err != nil && !errors.Is(err, io.EOF) {
+		t.Fatal(err)
+	}
+}
+
+func save2LargeFile(local ypb.YakClient, t *testing.T, ctx context.Context, group, folder, filename string, errorHandler ...func(*testing.T, error)) {
+	t.Helper()
+	var (
+		err    error
+		client ypb.Yak_SavePayloadToFileStreamClient
+		ret    *ypb.SavePayloadProgress
+	)
+	client, err = local.SaveLargePayloadToFileStream(ctx, &ypb.SavePayloadRequest{
+		IsFile:  true,
+		Group:   group,
+		Folder:  "",
+		Content: "",
+		FileName: []string{
+			filename,
 		},
 	})
 
@@ -413,6 +446,38 @@ func comparePayload(got, want string, t *testing.T) {
 			t.Fatalf("compare error : want(%s) vs got(%s)", wantL[i], gotL[i])
 		}
 	}
+}
+
+func generateLargePayloadFile(lines int) (filename string, clean func(), err error) {
+	fd, err := os.CreateTemp("", "large_payload_file")
+	if err != nil {
+		return "", nil, err
+	}
+
+	for i := 0; i < lines; i++ {
+		fd.WriteString(utils.RandAlphaNumStringBytes(16) + "\n")
+	}
+
+	return fd.Name(), func() {
+		fd.Close()
+		os.Remove(fd.Name())
+	}, nil
+}
+
+func TestLargePayload(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+	filename, clean, err := generateLargePayloadFile(1e6)
+	defer clean()
+	require.NoError(t, err)
+	group := uuid.NewString()
+	ctx := utils.TimeoutContextSeconds(20)
+	save2LargeFile(local, t, ctx, group, "", filename)
+
+	rsp := queryFromFile(local, t, group, "")
+	require.True(t, rsp.IsBigFile)
+	// t.Logf("big file size: %d", len(rsp.Data))
+	// t.Logf("big file content:\n%s", rsp.Data[:])
 }
 
 func TestPayload(t *testing.T) {
