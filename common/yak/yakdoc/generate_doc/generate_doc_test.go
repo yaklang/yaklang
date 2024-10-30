@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
@@ -52,6 +53,7 @@ func CheckDocumentHelper(t *testing.T, helper *yakdoc.DocumentHelper) {
 	}
 
 	checkStructMethods := func(structName string, method ...string) {
+		t.Helper()
 		lib, ok := helper.StructMethods[structName]
 		if !ok {
 			t.Fatalf("%s check failed: struct not exist", structName)
@@ -69,6 +71,18 @@ func CheckDocumentHelper(t *testing.T, helper *yakdoc.DocumentHelper) {
 				checkFuncDecl(decl)
 			}
 		}
+	}
+	checkStructMethodParams := func(structName string, method string, callback func(*yakdoc.FuncDecl)) {
+		t.Helper()
+		lib, ok := helper.StructMethods[structName]
+		if !ok {
+			t.Fatalf("%s check failed: struct not exist", structName)
+		}
+		decl, ok := lib.Functions[method]
+		if !ok {
+			t.Fatalf("%s.%s check failed: function not exist", structName, method)
+		}
+		callback(decl)
 	}
 
 	checkNormalFunction("", "eval")
@@ -88,6 +102,10 @@ func CheckDocumentHelper(t *testing.T, helper *yakdoc.DocumentHelper) {
 	checkStructMethods("github.com/yaklang/yaklang/common/yak/yaklib.WaitGroupProxy", "Wait")
 	// alias builtin struct
 	checkStructMethods("net.IP", "Equal")
+	// check auto-generated file struct method params
+	checkStructMethodParams("time.Time", "Unix", func(decl *yakdoc.FuncDecl) {
+		require.Len(t, decl.Params, 0)
+	})
 }
 
 func TestGenerateDoc(t *testing.T) {
