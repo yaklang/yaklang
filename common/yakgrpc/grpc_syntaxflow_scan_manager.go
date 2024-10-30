@@ -46,7 +46,11 @@ type SyntaxFlowScanManager struct {
 	totalQuery   int64
 }
 
-func CreateSyntaxFlowScanManager(ctx context.Context, stream ypb.Yak_SyntaxFlowScanServer) *SyntaxFlowScanManager {
+func CreateSyntaxFlowScanManager(ctx context.Context, stream ypb.Yak_SyntaxFlowScanServer, req *ypb.SyntaxFlowScanRequest) (*SyntaxFlowScanManager, error) {
+	if len(req.GetProgramName()) == 0 {
+		return nil, utils.Errorf("program name is empty")
+	}
+
 	taskID := uuid.NewString()
 	m := &SyntaxFlowScanManager{
 		status: Executing,
@@ -54,6 +58,19 @@ func CreateSyntaxFlowScanManager(ctx context.Context, stream ypb.Yak_SyntaxFlowS
 		ctx:    ctx,
 		stream: stream,
 	}
+	m.programs = req.GetProgramName()
+
+	// get rules
+	m.rules = yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), req.GetFilter())
+
+	rulesCount := 0
+	if err := m.rules.Model(&schema.SyntaxFlowRule{}).Count(&rulesCount).Error; err != nil {
+		return nil, utils.Errorf("count rules failed: %s", err)
+	}
+	m.rulesCount = rulesCount
+
+	m.totalQuery = int64(m.rulesCount) * int64(len(m.programs))
+
 	yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
 		result.RuntimeID = taskID
 		return stream.Send(&ypb.SyntaxFlowScanResponse{
@@ -63,27 +80,10 @@ func CreateSyntaxFlowScanManager(ctx context.Context, stream ypb.Yak_SyntaxFlowS
 		})
 	}, taskID)
 	m.client = yakitClient
-	return m
+	return m, nil
 }
 
-func (m *SyntaxFlowScanManager) Start(req *ypb.SyntaxFlowScanRequest) error {
-	if len(req.GetProgramName()) == 0 {
-		return utils.Errorf("program name is empty")
-	}
-	m.programs = req.GetProgramName()
-
-	// get rules
-	m.rules = yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), req.GetFilter())
-	// rules := sfdb.YieldSyntaxFlowRules(db, m.ctx)
-
-	rulesCount := 0
-	if err := m.rules.Model(&schema.SyntaxFlowRule{}).Count(&rulesCount).Error; err != nil {
-		return utils.Errorf("count rules failed: %s", err)
-	}
-	m.rulesCount = rulesCount
-
-	m.totalQuery = int64(m.rulesCount) * int64(len(m.programs))
-
+func (m *SyntaxFlowScanManager) Start() error {
 	var errs error
 	for _, progName := range m.programs {
 		if err := m.Query(progName); err != nil {
@@ -98,9 +98,7 @@ func (m *SyntaxFlowScanManager) Query(programName string) error {
 	if err != nil {
 		return err
 	}
-	for rule := range sfdb.YieldSyntaxFlowRules(m.rules, m.ctx) {
-		res, err := prog.SyntaxFlowRule(rule)
-		if err != nil {
+	for rule := range sfdb.YieldSyntaxFlowRulesWithoutLib(m.rules, m.ctx) {
 			m.client.YakitError("program %s exc rule %s failed: %s", programName, rule.RuleName, err)
 			// continue
 		}
