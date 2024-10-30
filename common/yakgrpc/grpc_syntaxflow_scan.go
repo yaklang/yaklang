@@ -18,9 +18,12 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 
 	switch strings.ToLower(firstRequest.GetControlMode()) {
 	case "start":
-		manager := CreateSyntaxFlowScanManager(streamCtx, stream)
-		if err := manager.Start(firstRequest); err != nil {
+		if manager, err := CreateSyntaxFlowScanManager(streamCtx, stream, firstRequest); err != nil {
 			return err
+		} else {
+			if err := manager.Start(); err != nil {
+				return err
+			}
 		}
 	}
 
