@@ -63,7 +63,7 @@ func TestSimpleExtraFile(t *testing.T) {
 			map[string][]string{
 				"url": {`"jdbc:mysql://localhost:3306/your_database"`},
 			}, false,
-			// ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 
@@ -77,7 +77,7 @@ func TestSimpleExtraFile(t *testing.T) {
 				"url":  {`"selectUserByUsername"`},
 				"url2": {`"selectUserByUsername"`},
 			}, false,
-			// ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 }
