@@ -7,7 +7,6 @@ import (
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -35,7 +34,7 @@ func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) err
 		lmap:            make(map[string]struct{}),
 		cmap:            make(map[string]struct{}),
 	}
-	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
+	// log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
 	return nil
 }

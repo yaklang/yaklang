@@ -79,7 +79,7 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("parse AST FrontEnd success: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
+	// log.Infof("parse AST FrontEnd success: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	b.WithExternValue(phpBuildIn)
 	startParse := func(functionBuilder *ssa.FunctionBuilder) {
 		functionBuilder.SupportClassStaticModifier = true
