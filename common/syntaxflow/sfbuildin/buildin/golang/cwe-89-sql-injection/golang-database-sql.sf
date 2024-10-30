@@ -1,18 +1,12 @@
 desc(
-    title: "golang SQL Injection",
+    title: "golang SQL Injection(database/sql)",
     type: audit,
     severity: high,
 )
 
-*.QueryRow( * #-> as $query)
-fmt.Sprintf(* #-> as $param)
-
-$query #{
-	until: `* & $param`,
-}-> as $sink;
-
-$sink?{ .FormValue(*) } as $root;
-$root?{have: 'Parameter'} as $high
+sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
+*.QueryRow(* #-> as $sink)
+$sink?{have: 'Parameter'} as $high
 
 alert $high for {
     title: 'SQL Injection detected',

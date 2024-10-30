@@ -1,0 +1,67 @@
+desc(
+    title: "golang SQL Injection(pop)",
+    type: audit,
+    severity: high,
+)
+
+pop?{<fullTypeName>?{have: 'github.com/gobuffalo/pop'}} as $entry;
+.RawQuery(* #-> as $param)
+$param?{have: 'Parameter'} as $high
+
+alert $high for {
+    title: 'SQL Injection detected',
+    title_zh: '检测到SQL注入',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"net/http"
+
+	"github.com/gobuffalo/pop"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	// 连接到数据库
+	db, err := pop.Connect("development")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 不安全的查询
+	var users []User
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	if err := db.RawQuery(query).Scan(&users); err != nil {
+		log.Fatal(err)
+	}
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+UNSAFE
+)
