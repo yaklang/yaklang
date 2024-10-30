@@ -92,7 +92,7 @@ func (s *Server) QueryPayloadFromFile(ctx context.Context, req *ypb.QueryPayload
 		}
 	}
 
-	lineCh, err := utils.FileLineReader(filename)
+	lineCh, err := utils.FileLineReaderWithContext(filename, ctx)
 	if err != nil {
 		return nil, utils.Errorf("failed to read file: %s", err)
 	}
@@ -139,7 +139,7 @@ func (s *Server) DeletePayloadByGroup(ctx context.Context, req *ypb.DeletePayloa
 	if group == "" {
 		return nil, utils.Errorf("group name is empty")
 	}
-	// if file, delete  file
+	// if file, delete file
 	payload, err := yakit.GetPayloadFirst(s.GetProfileDatabase(), group)
 	if err != nil {
 		return nil, utils.Wrap(err, "delete payload by group error")
