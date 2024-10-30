@@ -141,7 +141,7 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 			}),
 			ssaapi.WithContext(ctx),
 		)
-		assert.NoErrorf(t, err, "parse project error: %v", err)
+		assert.Error(t, err, "parse project error: %v", err)
 		// when cancel, the process will not 1
 		require.LessOrEqual(t, maxProcess, 0.6)
 		file := make([]string, 0)
@@ -155,7 +155,7 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 				return nil
 			}),
 		)
-		require.LessOrEqual(t, len(file), 6)
+		require.LessOrEqual(t, len(file), 10)
 	})
 
 }

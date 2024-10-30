@@ -49,7 +49,27 @@ var AllLanguageBuilders = []ssa.Builder{
 	go2ssa.Builder,
 }
 
+func (c *config) isStop() bool {
+	if c == nil || c.ctx == nil {
+		return false
+	}
+	select {
+	case <-c.ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
 func (c *config) parseProject() (Programs, error) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			// err = utils.Errorf("parse [%s] error %v  ", path, r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
 	if c.reCompile {
 		ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
 		if c.SaveToProfile {
@@ -69,31 +89,24 @@ func (c *config) parseProject() (Programs, error) {
 		ssadb.SaveFolder(prog.Name, []string{"/"})
 	}
 
-	totalSize := 1
+	totalProcess := 0
+	handledProcess := 0
 	prog.ProcessInfof = func(s string, v ...any) {
-		if prog.PreHandler() {
-			return
-		}
 		msg := fmt.Sprintf(s, v...)
-		if ret := prog.GetIncludeFiles(); len(ret) > 0 {
-			for idx, fileName := range ret {
-				ssa.HitCompileFile(fileName)
-				log.Infof("parsed file[%v]: %v", idx, fileName)
-			}
-		}
-		handled := len(prog.FileList)
+		// handled := len(prog.FileList)
 		if c.process != nil {
-			c.process(msg, float64(handled)/float64(totalSize))
+			c.process(msg, float64(handledProcess)/float64(totalProcess))
 		} else {
 			log.Info(msg)
 		}
 	}
-	_ = totalSize
+	preHandlerSize := 0
+	parseSize := 0
 
-	prog.SetPreHandler(true)
-	prog.ProcessInfof("parse project in fs: %v, path: %v", c.fs, programPath)
+	// get total size
 	filesys.Recursive(programPath,
 		filesys.WithFileSystem(c.fs),
+		filesys.WithContext(c.ctx),
 		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
 			_, name := c.fs.PathSplit(s)
 			if name == "test" || name == ".git" {
@@ -105,23 +118,68 @@ func (c *config) parseProject() (Programs, error) {
 			if fi.Size() == 0 {
 				return nil
 			}
-			// check
-			if err := c.checkLanguagePreHandler(path); err == nil {
-				if language := c.LanguageBuilder; language != nil {
-					c.LanguageBuilder.InitHandler(builder)
-					language.PreHandlerProject(c.fs, builder, path)
-				}
+			if c.checkLanguage(path) == nil {
+				parseSize++
 			}
-			if err := c.checkLanguage(path); err == nil {
-				log.Infof("parse file: %v", path)
-				totalSize++
+			if c.checkLanguagePreHandler(path) == nil {
+				preHandlerSize++
+			}
+			// log.Infof("nomatch when calc total: %s", path)
+			return nil
+		}),
+	)
+	if c.isStop() {
+		return nil, utils.Errorf("parse project stop")
+	}
+	if (parseSize + preHandlerSize) == 0 {
+		return nil, utils.Errorf("no file can compile with language[%s]", c.language)
+	}
+	totalProcess = parseSize + preHandlerSize + 1
+
+	// pre handler
+	prog.SetPreHandler(true)
+	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", c.fs, programPath)
+	filesys.Recursive(programPath,
+		filesys.WithFileSystem(c.fs),
+		filesys.WithContext(c.ctx),
+		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
+			_, name := c.fs.PathSplit(s)
+			if name == "test" || name == ".git" {
+				return filesys.SkipDir
+			}
+			return nil
+		}),
+		filesys.WithFileStat(func(path string, fi fs.FileInfo) (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					err = utils.Errorf("parse [%s] error %v  ", path, r)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			if fi.Size() == 0 {
+				return nil
+			}
+			// check
+			if err := c.checkLanguagePreHandler(path); err != nil {
+				return nil
+			}
+			handledProcess++
+			if language := c.LanguageBuilder; language != nil {
+				c.LanguageBuilder.InitHandler(builder)
+				language.PreHandlerProject(c.fs, builder, path)
 			}
 			return nil
 		}),
 	)
+	if c.isStop() {
+		return nil, utils.Errorf("parse project stop")
+	}
+	prog.ProcessInfof("pre-handler parse project finish")
+	handledProcess = preHandlerSize // finish pre-handler 50%
 
-	prog.SetPreHandler(false)
 	// parse project
+	prog.ProcessInfof("parse project start")
+	prog.SetPreHandler(false)
 	err = ssareducer.ReducerCompile(
 		programPath, // base
 		ssareducer.WithFileSystem(c.fs),
@@ -147,13 +205,13 @@ func (c *config) parseProject() (Programs, error) {
 				log.Warnf("parse file %s error: %v", path, err)
 				return nil, nil
 			}
+			handledProcess++
 
 			// build
 			if err := prog.Build(path, memedit.NewMemEditor(raw), builder); err != nil {
 				log.Debugf("parse %#v failed: %v", path, err)
 				return nil, utils.Wrapf(err, "parse file %s error", path)
 			}
-			// ret = append(ret, prog)
 			exclude := prog.GetIncludeFiles()
 			if len(exclude) > 0 {
 				log.Infof("program include files: %v will not be as the entry from project", len(exclude))
@@ -164,17 +222,18 @@ func (c *config) parseProject() (Programs, error) {
 	if err != nil {
 		return nil, utils.Wrap(err, "parse project error")
 	}
-	prog.ProcessInfof("program %s finishing", prog.Name)
+	if c.isStop() {
+		return nil, utils.Errorf("parse project stop")
+	}
+	handledProcess = preHandlerSize + parseSize
+	prog.ProcessInfof("program %s finishing", prog.Name) // %99
 	prog.Finish()
 	var progs = []*Program{NewProgram(prog, c)}
 	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
 	}
-	// todo:  rewrite me  in next time
-	if len(prog.FileList) == totalSize-1 {
-		totalSize = len(prog.FileList)
-	}
-	prog.ProcessInfof("program %s finish", prog.Name)
+	handledProcess = preHandlerSize + parseSize + 1
+	prog.ProcessInfof("program %s finish", prog.Name) // %100
 	return progs, nil
 }
 

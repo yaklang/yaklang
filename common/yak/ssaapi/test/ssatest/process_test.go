@@ -19,6 +19,7 @@ func checkProcess(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.O
 	}
 
 	matchFinish := 0
+	prevProcess := 0.0
 	msgs := make([]message, 0)
 	programID := uuid.NewString()
 	opt = append(opt,
@@ -29,6 +30,13 @@ func checkProcess(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.O
 			if process == 1 {
 				matchFinish++
 			}
+			if process > 1 {
+				t.Fatal("process greater than 1")
+			}
+			if process < prevProcess {
+				t.Fatal("process reduce")
+			}
+			prevProcess = process
 			msgs = append(msgs, message{msg, process})
 		}),
 	)
@@ -146,6 +154,28 @@ func TestParseProject_PHP_withEmptyFile(t *testing.T) {
 		require_once("c.php");
 		`)
 		vf.AddFile("example/src/main/php/c.php", ``)
+
+		checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+
+	t.Run("normal file ", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("example/src/main/php/a.php", `
+		<?php
+		echo 1;
+		`)
+		vf.AddFile("example/src/main/php/b.php", `
+		<?php
+		echo 1;
+		`)
+		vf.AddFile("example/src/main/php/c.iphp", `
+		echo 1; 
+		`)
+		vf.AddFile(".aaa", `a aa`)
+		vf.AddFile("example/src/main/php/b.php", `
+		<?php
+		echo 1;
+		`)
 
 		checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.PHP))
 	})
