@@ -36,8 +36,10 @@ func FileLineReaderWithContext(file string, ctx context.Context) (chan []byte, e
 	reader := bufio.NewReader(f)
 	outC := make(chan []byte)
 	go func() {
-		defer f.Close()
-		defer close(outC)
+		defer func() {
+			f.Close()
+			close(outC)
+		}()
 		bomHandled := NewBool(false)
 		for {
 			select {
@@ -54,7 +56,11 @@ func FileLineReaderWithContext(file string, ctx context.Context) (chan []byte, e
 				raw = RemoveBOM(raw)
 				bomHandled.Set()
 			}
-			outC <- raw
+			select {
+			case outC <- raw:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
