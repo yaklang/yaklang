@@ -5471,6 +5471,8 @@ message SyntaxFlowRuleFilter {
   repeated string Purpose = 5;
   repeated string Tag = 6;
   string Keyword = 7;
+  // 是否包含作为库的规则  这些规则只提供相关数据并被其他规则引用 默认不包含
+  bool includeLibraryRule = 8; // default false 
 }
 
 message CreateSyntaxFlowRuleRequest{

@@ -435,33 +435,6 @@ func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxF
 }
 
 func YieldSyntaxFlowRulesWithoutLib(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
-	outC := make(chan *schema.SyntaxFlowRule)
 	db = db.Where("allow_included = ?", false)
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.SyntaxFlowRule
-			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return YieldSyntaxFlowRules(db, ctx)
 }

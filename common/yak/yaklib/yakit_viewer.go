@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"fmt"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -91,7 +92,12 @@ type YakitStatusCard struct {
 }
 
 func yakitStatusCard(id string, data interface{}, tags ...string) {
-	yakitClientInstance.Output(&YakitStatusCard{
+	yakitClientInstance.StatusCard(id, data, tags...)
+}
+
+func (c *YakitClient) StatusCard(id string, data interface{}, tags ...string) {
+	// yakitStatusCard(id, data, tags...)
+	c.Output(&YakitStatusCard{
 		Id: id, Data: fmt.Sprint(data), Tags: tags,
 	})
 }
