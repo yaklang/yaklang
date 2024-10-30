@@ -22,7 +22,7 @@ var (
 
 	LangToTemplateMap     = make(map[string][]string)
 	TemplateToFilenameMap = make(map[string]string)
-	TemplateContentCache  = utils.NewTTLCache[[]byte](5 * time.Minute)
+	TemplateContentCache  = utils.NewTTLCache[string](5 * time.Minute)
 )
 
 func init() {
@@ -97,7 +97,7 @@ type TemplateListResponse struct {
 }
 
 type TemplateContentResponse struct {
-	Content []byte `json:"content"`
+	Content string `json:"content"`
 }
 
 func toValidLang(lang string) (string, bool) {
@@ -152,8 +152,8 @@ func (s *SyntaxFlowWebServer) registerTemplateRoute() {
 		}
 		fullID := fmt.Sprintf("%s/%s", lang, id)
 		// cache
-		if content, ok := TemplateContentCache.Get(fullID); ok {
-			writeJson(w, TemplateContentResponse{Content: content})
+		if contentStr, ok := TemplateContentCache.Get(fullID); ok {
+			writeJson(w, TemplateContentResponse{Content: contentStr})
 			return
 		}
 
@@ -167,7 +167,7 @@ func (s *SyntaxFlowWebServer) registerTemplateRoute() {
 			writeErrorJson(w, utils.JoinErrors(err, NewReadFileError()))
 			return
 		}
-		TemplateContentCache.Set(fullID, content)
-		writeJson(w, TemplateContentResponse{Content: content})
+		TemplateContentCache.Set(fullID, string(content))
+		writeJson(w, TemplateContentResponse{Content: string(content)})
 	}).Name("template list").Methods(http.MethodGet)
 }
