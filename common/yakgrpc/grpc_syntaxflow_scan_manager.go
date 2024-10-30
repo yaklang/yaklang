@@ -34,6 +34,9 @@ type SyntaxFlowScanManager struct {
 	status SyntaxFlowScanStatus
 	ctx    context.Context
 
+	// config
+	ignoreLanguage bool
+
 	// stream
 	stream ypb.Yak_SyntaxFlowScanServer
 	client *yaklib.YakitClient
@@ -68,6 +71,7 @@ func CreateSyntaxFlowScanManager(ctx context.Context, stream ypb.Yak_SyntaxFlowS
 		stream: stream,
 	}
 	m.programs = req.GetProgramName()
+	m.ignoreLanguage = req.GetIgnoreLanguage()
 
 	// get rules
 	m.rules = yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), req.GetFilter())
@@ -107,8 +111,16 @@ func (m *SyntaxFlowScanManager) Query(programName string) error {
 	if err != nil {
 		return err
 	}
-	for rule := range sfdb.YieldSyntaxFlowRulesWithoutLib(m.rules, m.ctx) {
-		m.currentRuleName = rule.RuleName
+	for rule := range sfdb.YieldSyntaxFlowRules(m.rules, m.ctx) {
+		log.Infof("executing rule %s", rule.RuleName)
+		m.client.StatusCard("当前执行规则", rule.RuleName, "规则执行进度")
+		if !m.ignoreLanguage {
+			if rule.Language != prog.GetLanguage() {
+				m.skipQuery++
+				// m.client.YakitInfo("program %s(lang:%s) exec rule %s(lang:%s) failed: language not match", programName, prog.GetLanguage(), rule.RuleName, rule.Language)
+				continue
+			}
+		}
 
 		if res, err := prog.SyntaxFlowRule(rule); err == nil {
 			if _, err := res.Save(m.taskID); err == nil {
