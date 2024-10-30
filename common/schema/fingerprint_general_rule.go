@@ -2,9 +2,10 @@ package schema
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 type CPE struct {
@@ -68,7 +69,7 @@ func (g *GeneralRule) String() string {
 	return strings.Join(items, " ")
 }
 
-func FromFingerprintGRPCModel(gr *ypb.FingerprintRule) *GeneralRule {
+func NewFingerprintFromGRPCModel(gr *ypb.FingerprintRule) *GeneralRule {
 	if gr == nil {
 		return nil
 	}

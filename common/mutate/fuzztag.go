@@ -15,13 +15,11 @@ import (
 	cryptoRand "crypto/rand"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/dateparse"
 	"github.com/yaklang/yaklang/common/utils/regen"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -629,37 +627,8 @@ func init() {
 				}
 			}
 
-			yieldPayloads := func(db *gorm.DB, ctx context.Context) chan *schema.Payload {
-				outC := make(chan *schema.Payload)
-				go func() {
-					defer close(outC)
-					page := 1
-					for {
-						var items []*schema.Payload
-						if _, b := bizhelper.NewPagination(&bizhelper.Param{
-							DB:    db,
-							Page:  page,
-							Limit: 1000,
-						}, &items); b.Error != nil {
-							log.Errorf("paging failed: %s", b.Error)
-							return
-						}
-						page++
-						for _, d := range items {
-							select {
-							case <-ctx.Done():
-								return
-							case outC <- d:
-							}
-						}
-						if len(items) < 1000 {
-							return
-						}
-					}
-				}()
-				return outC
-			}
-			ch := yieldPayloads(db.Table("payloads").Select("content, is_file").Order("hit_count desc"), ctx)
+			
+			ch := schema.YieldPayloads(db.Table("payloads").Select("content, is_file").Order("hit_count desc"), ctx)
 
 			f := filter.NewBigFilter()
 			defer f.Close()
@@ -668,12 +637,7 @@ func init() {
 					continue
 				}
 
-				payloadRaw, isFile := *payload.Content, *payload.IsFile
-
-				unquoted, err := strconv.Unquote(payloadRaw)
-				if err == nil {
-					payloadRaw = unquoted
-				}
+				payloadRaw, isFile := payload.GetContent(), payload.GetIsFile()
 
 				if isFile {
 					ch, err := utils.FileLineReaderWithContext(payloadRaw, ctx)
