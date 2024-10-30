@@ -1,0 +1,78 @@
+desc(
+    title: "Find Executing Request",
+    type: audit,
+    level: low,
+    lib: "golang-http-net",
+)
+
+http?{<fullTypeName>?{have: 'net/http'}} as $entry;
+$entry.Get(*?{<fullTypeName>?{!have: 'net/http'}} as $output);
+$entry.Post(*?{<fullTypeName>?{!have: 'net/http'}} as $output);
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 2,
+    'file://http_net.go': <<<PARAM
+	package main
+
+	import (
+		"bytes"
+		"encoding/json"
+		"fmt"
+		"io/ioutil"
+		"log"
+		"net/http"
+	)
+	
+	func get() {
+		// 发送 GET 请求
+		response, err := http.Get("https://jsonplaceholder.typicode.com/posts/1")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer response.Body.Close() // 确保在函数结束时关闭响应体
+	
+		// 读取响应体
+		body, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+	
+		// 打印响应状态和响应体
+		fmt.Println("Response Status:", response.Status)
+		fmt.Println("Response Body:", string(body))
+	}
+	
+	func post() {
+		// 创建要发送的数据
+		postData := map[string]string{
+			"title":  "foo",
+			"body":   "bar",
+			"userId": "1",
+		}
+		jsonData, err := json.Marshal(postData) // 将数据编码为 JSON
+		if err != nil {
+			log.Fatal(err)
+		}
+	
+		// 发送 POST 请求
+		response, err := http.Post("https://jsonplaceholder.typicode.com/posts", "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer response.Body.Close() // 确保在函数结束时关闭响应体
+	
+		// 读取响应体
+		body, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+	
+		// 打印响应状态和响应体
+		fmt.Println("Response Status:", response.Status)
+		fmt.Println("Response Body:", string(body))
+	}
+PARAM
+)
