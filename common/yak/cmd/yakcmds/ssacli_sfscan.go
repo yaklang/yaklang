@@ -3,7 +3,9 @@ package yakcmds
 import (
 	"context"
 	"fmt"
+
 	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -38,7 +40,7 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 
 		var results []*ssaapi.SyntaxFlowResult
 
-		for rule := range sfdb.YieldSyntaxFlowRulesWithoutLib(context.Background()) {
+		for rule := range sfdb.YieldSyntaxFlowRulesWithoutLib(consts.GetGormProfileDatabase(), context.Background()) {
 			rule := rule
 			ScanWithSFRule(prog, rule, func(result *ssaapi.SyntaxFlowResult) {
 				if ret := result.GetAlertValues(); ret.Len() > 0 {
