@@ -14,11 +14,14 @@ import (
 	"github.com/dop251/goja_nodejs/buffer"
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javascript"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/embed"
 )
+
+type jsFunction func(v ...any) (goja.Value, error)
 
 var (
 	defaultJSRuntime = goja.New()
@@ -58,6 +61,10 @@ var JSExports = map[string]interface{}{
 	"ToValue":        defaultJSRuntime.ToValue,
 	"NaNValue":       goja.NaN(),
 	"TrueValue":      defaultJSRuntime.ToValue(true),
+
+	// function
+	"GetObjectFunction": _getObjectFunction,
+	"GetFunction":       _getFunction,
 }
 
 func init() {
@@ -70,14 +77,14 @@ func GetStatementType(st interface{}) string {
 }
 
 type jsLibrary struct {
+	program *goja.Program
 	name    string
 	version string
-	program *goja.Program
 }
 
 type JsRunConfig struct {
-	libs      []*jsLibrary
 	variables map[string]any
+	libs      []*jsLibrary
 }
 
 func newJsRunConfig() *JsRunConfig {
@@ -125,7 +132,7 @@ func _libCryptoJSV3() jsRunOpts {
 	if opt, ok = jsRunOptsCache.Get("libCryptoJSV3"); !ok {
 		src, _ := embed.Asset("data/js-libs/cryptojs/3.3.0/cryptojs.min.js.gz")
 		prog, _ := goja.Compile("CryptoJS-3.3.0", string(src), false)
-		opt = jsRunWithLibs(&jsLibrary{"CryptoJS", "3.3.0", prog})
+		opt = jsRunWithLibs(&jsLibrary{prog, "CryptoJS", "3.3.0"})
 		jsRunOptsCache.Set("libCryptoJSV3", opt)
 	}
 	return opt
@@ -146,7 +153,7 @@ func _libCryptoJSV4() jsRunOpts {
 	if opt, ok = jsRunOptsCache.Get("libCryptoJSV4"); !ok {
 		src, _ := embed.Asset("data/js-libs/cryptojs/4.2.0/cryptojs.min.js.gz")
 		prog, _ := goja.Compile("CryptoJS-4.2.0", string(src), false)
-		opt = jsRunWithLibs(&jsLibrary{"CryptoJS", "4.2.0", prog})
+		opt = jsRunWithLibs(&jsLibrary{prog, "CryptoJS", "4.2.0"})
 		jsRunOptsCache.Set("libCryptoJSV4", opt)
 	}
 	return opt
@@ -167,7 +174,7 @@ func _libJSRSASign() jsRunOpts {
 	if opt, ok = jsRunOptsCache.Get("libJSRSASign"); !ok {
 		src, _ := embed.Asset("data/js-libs/jsrsasign/10.8.6/jsrsasign-all-min.js.gz")
 		prog, _ := goja.Compile("jsrsasign-10.8.6", string(src), false)
-		opt = jsRunWithLibs(&jsLibrary{"jsrsasign", "10.8.6", prog})
+		opt = jsRunWithLibs(&jsLibrary{prog, "jsrsasign", "10.8.6"})
 		jsRunOptsCache.Set("libJSRSASign", opt)
 	}
 	return opt
@@ -187,7 +194,7 @@ func _libJsEncrypt() jsRunOpts {
 	if opt, ok = jsRunOptsCache.Get("libJsEncrypt"); !ok {
 		src, _ := embed.Asset("data/js-libs/jsencrypt/3.3.2/jsencrypt.min.js.gz")
 		prog, _ := goja.Compile("jsencrypt-3.3.2", string(src), false)
-		opt = jsRunWithLibs(&jsLibrary{"jsencrypt", "3.3.2", prog})
+		opt = jsRunWithLibs(&jsLibrary{prog, "jsencrypt", "3.3.2"})
 		jsRunOptsCache.Set("libJsEncrypt", opt)
 	}
 	return opt
@@ -268,7 +275,7 @@ func _run(src any, opts ...jsRunOpts) (*goja.Runtime, goja.Value, error) {
 }
 
 // CallFunctionFromCode 从传入的代码中调用指定的JS函数并返回调用结果
-// 它的第一个参数为包含JS代码的字符串
+// 第一个参数为包含JS代码的字符串
 // 第二个参数为要调用的JS函数名
 // 后续参数为零个到多个函数参数
 // Example:
@@ -297,6 +304,63 @@ func _jsCallFuncFromCode(src any, funcName string, params ...interface{}) (goja.
 		}
 		return f(goja.Undefined(), vmParams...)
 	}
+}
+
+// GetObjectFunction 将传入的Value转换为可以调用的对象(Object)函数
+// 第一个参数为JS引擎
+// 第二个参数为Object名字
+// 第三个参数为方法名字
+// Example:
+// ```
+// vm, _ = js.Run(`a = {
+// d: 3,
+// add(a) {return this.d+a},
+// }`)~
+// add, ok = js.GetObjectFunction(vm, "a", "add")
+// if ok {
+// println(add(1).ToInteger()) // 4
+// }
+// ```
+func _getObjectFunction(vm *goja.Runtime, thisName, funcName string) (jsFunction, bool) {
+	this := vm.Get(thisName)
+	obj := this.ToObject(vm)
+	if obj == nil {
+		return nil, false
+	}
+	value := obj.Get(funcName)
+	if utils.IsNil(value) {
+		return nil, false
+	}
+
+	return _toObjectFunction(vm, this, value)
+}
+
+// GetFunction 将传入的Value转换为可以调用的对象(Object)函数
+// 第一个参数为JS引擎
+// 第二个参数为函数名字
+// Example:
+// ```
+// vm, _ = js.Run(`function sum(a, b) {return a+b;}`)~
+// sum, ok = js.GetFunction(vm,"sum")
+// if ok {
+// println(sum(2,3).ToInteger()) // 5
+// }
+// ```
+func _getFunction(vm *goja.Runtime, funcName string) (jsFunction, bool) {
+	return _toObjectFunction(vm, goja.Undefined(), vm.Get(funcName))
+}
+
+func _toObjectFunction(vm *goja.Runtime, this, value goja.Value) (jsFunction, bool) {
+	callable, ok := goja.AssertFunction(value)
+	if !ok {
+		return nil, false
+	}
+	return func(v ...any) (goja.Value, error) {
+		values := lo.Map(v, func(i any, _ int) goja.Value {
+			return vm.ToValue(i)
+		})
+		return callable(this, values...)
+	}, true
 }
 
 func autoImportLib(code string) (opts []jsRunOpts) {
