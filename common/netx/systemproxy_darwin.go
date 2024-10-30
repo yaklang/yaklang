@@ -57,7 +57,8 @@ func GetSystemProxy() (SystemProxySetting, error) {
 			DefaultServer: "",
 		}, nil
 	}
-	return SystemProxySetting{}, utils.Errorf("scutil result empty...")
+	log.Warn("cannot found proxy settings from `scutil --proxy`")
+	return SystemProxySetting{}, nil
 }
 
 /*
