@@ -649,30 +649,38 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 	}, nil
 }
 
-func ForceFuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDecl, error) {
+func ForceFuncToFuncDecl(f interface{}, libName string, overideName string, isMethod bool) (*FuncDecl, error) {
 	funcRefValue := reflect.ValueOf(f)
 	funcRefType := funcRefValue.Type()
 	if funcRefValue.Kind() != reflect.Func {
 		return nil, fmt.Errorf("not a function")
 	}
-	params, results := make([]*Field, funcRefType.NumIn()), make([]*Field, funcRefType.NumOut())
+	lenOfParams := funcRefType.NumIn()
+	if isMethod {
+		lenOfParams--
+	}
+	params, results := make([]*Field, 0, lenOfParams), make([]*Field, 0, funcRefType.NumOut())
 
-	for i := 0; i < funcRefType.NumIn(); i++ {
+	var i int
+	if isMethod {
+		i = 1
+	}
+	for ; i < funcRefType.NumIn(); i++ {
 		inType := funcRefType.In(i)
-		params[i] = &Field{
+		params = append(params, &Field{
 			Name:    "",
 			Type:    ShrinkTypeVerboseName(inType.String()),
 			RefType: inType,
-		}
+		})
 	}
 
 	for i := 0; i < funcRefType.NumOut(); i++ {
 		outType := funcRefType.Out(i)
-		results[i] = &Field{
+		results = append(results, &Field{
 			Name:    "",
 			Type:    ShrinkTypeVerboseName(outType.String()),
 			RefType: outType,
-		}
+		})
 	}
 
 	declaration, completion := GetDeclAndCompletion(overideName, params, results, funcRefType)
