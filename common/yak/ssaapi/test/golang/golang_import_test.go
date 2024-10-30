@@ -339,8 +339,8 @@ func TestImport_fulltypename(t *testing.T) {
 
 	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		have := prog.SyntaxFlowChain(`A?{<fullTypeName>?{have: 'github.com'}} as $have;`).Show()
-		nothave := prog.SyntaxFlowChain(`A?{<fullTypeName>?{have: 'github.com1'}} as $nothave;`).Show()
+		have := prog.SyntaxFlowChain(`A?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/A'}} as $have;`).Show()
+		nothave := prog.SyntaxFlowChain(`A?{<fullTypeName>?{have: 'github1.com/yaklang/yaklang/A'}} as $nothave;`).Show()
 		assert.GreaterOrEqual(t, have.Len(), 1)
 		assert.GreaterOrEqual(t, nothave.Len(), 0)
 		return nil
@@ -366,8 +366,8 @@ func TestImport_fulltypename_lib(t *testing.T) {
 
 	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		have := prog.SyntaxFlowChain(`assert?{<fullTypeName>?{have: 'github.com'}} as $have;`).Show()
-		nothave := prog.SyntaxFlowChain(`assert?{<fullTypeName>?{have: 'github.com1'}} as $nothave;`).Show()
+		have := prog.SyntaxFlowChain(`assert?{<fullTypeName>?{have: 'github.com/stretchr/testify/assert'}} as $have;`).Show()
+		nothave := prog.SyntaxFlowChain(`assert?{<fullTypeName>?{have: 'github1.com/stretchr/testify/assert'}} as $nothave;`).Show()
 		assert.GreaterOrEqual(t, have.Len(), 1)
 		assert.GreaterOrEqual(t, nothave.Len(), 0)
 		return nil
