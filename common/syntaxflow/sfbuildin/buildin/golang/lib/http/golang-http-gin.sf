@@ -1,0 +1,105 @@
+desc(
+    title: "Find Executing Request",
+    type: audit,
+    level: low,
+    lib: "golang-http-gin",
+)
+
+gin?{<fullTypeName>?{have: 'github.com/gin-gonic/gin'}} as $entry;
+$entry.Default() as $default;
+$default.GET(* as $output,);
+$default.POST(* as $output,);
+$default.PUT(* as $output,);
+$default.DELETE(* as $output,);
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 5,
+    'file://http_gin.go': <<<PARAM
+package main
+
+import (
+    "github.com/gin-gonic/gin"
+    "net/http"
+)
+
+type User struct {
+    ID   string
+    Name string
+    Age  int 
+}
+
+var users = []User{
+    {ID: "1", Name: "Alice", Age: 25},
+    {ID: "2", Name: "Bob", Age: 30},
+}
+
+func main() {
+    router := gin.Default()
+
+    // 获取所有用户
+    router.GET("/users", func(c *gin.Context) {
+        c.JSON(http.StatusOK, users)
+    })
+
+    // 创建用户
+    router.POST("/users", func(c *gin.Context) {
+        var newUser User
+        if err := c.ShouldBindJSON(&newUser); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+            return
+        }
+        users = append(users, newUser)
+        c.JSON(http.StatusCreated, newUser)
+    })
+
+    // 获取特定用户
+    router.GET("/users/:id", func(c *gin.Context) {
+        id := c.Param("id")
+        for _, user := range users {
+            if user.ID == id {
+                c.JSON(http.StatusOK, user)
+                return
+            }
+        }
+        c.JSON(http.StatusNotFound, gin.H{"message": "user not found"})
+    })
+
+    // 更新用户
+    router.PUT("/users/:id", func(c *gin.Context) {
+        id := c.Param("id")
+        var updatedUser User
+        if err := c.ShouldBindJSON(&updatedUser); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+            return
+        }
+        for i, user := range users {
+            if user.ID == id {
+                users[i] = updatedUser
+                c.JSON(http.StatusOK, updatedUser)
+                return
+            }
+        }
+        c.JSON(http.StatusNotFound, gin.H{"message": "user not found"})
+    })
+
+    // 删除用户
+    router.DELETE("/users/:id", func(c *gin.Context) {
+        id := c.Param("id")
+        for i, user := range users {
+            if user.ID == id {
+                users = append(users[:i], users[i+1:]...)
+                c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
+                return
+            }
+        }
+        c.JSON(http.StatusNotFound, gin.H{"message": "user not found"})
+    })
+
+    // 启动服务器
+    router.Run(":8080")
+}
+PARAM
+)

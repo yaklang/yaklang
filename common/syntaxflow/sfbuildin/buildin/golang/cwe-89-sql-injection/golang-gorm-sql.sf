@@ -1,0 +1,67 @@
+desc(
+    title: "golang SQL Injection(GORM)",
+    type: audit,
+    severity: high,
+)
+
+gorm?{<fullTypeName>?{have: 'gorm.io/gorm'}} as $entry;
+.Raw(* #-> as $param)
+$param?{have: 'Parameter'} as $high
+
+alert $high for {
+    title: 'SQL Injection detected',
+    title_zh: '检测到SQL注入',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"net/http"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	// 连接到数据库
+	dsn := username + ":" + password + "@tcp(localhost:3306)/dbname"
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 不安全的查询
+	var users []User
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	db.Raw(query).Scan(&users)
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+UNSAFE
+)
