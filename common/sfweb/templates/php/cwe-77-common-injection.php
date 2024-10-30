@@ -5,7 +5,6 @@
     //demo2
         $a = $_GET['a'] ?: "aaaa";
         include(xxx($a));
-    // demo3
     $INCLUDE_ALLOW_LIST = [
         "home.php",
         "dashboard.php",
