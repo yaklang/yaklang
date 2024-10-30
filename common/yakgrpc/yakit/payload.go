@@ -462,36 +462,5 @@ func QueryPayload(db *gorm.DB, folder, group, keyword string, paging *Paging) (*
 }
 
 func YieldPayloads(db *gorm.DB, ctx context.Context) chan *schema.Payload {
-	outC := make(chan *schema.Payload)
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.Payload
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return schema.YieldPayloads(db, ctx)
 }
