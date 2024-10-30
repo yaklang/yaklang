@@ -3,6 +3,8 @@ package ssaapi
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -309,4 +311,65 @@ func TestImport_unorder(t *testing.T) {
 		"a": {"\"hello world\"", "1", "2"},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
+}
+
+func TestImport_fulltypename(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+	vf.AddFile("src/main/go/A/test.go", `
+	package A
+
+	func add(a,b int) int {
+	    return a + b
+	}
+	`)
+	vf.AddFile("src/main/go/B/test.go", `
+	package B
+
+	import "github.com/yaklang/yaklang/A"
+
+	func test() {
+	    println(A.add(1,2))
+	}
+	`)
+
+	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+		prog := programs[0]
+		have := prog.SyntaxFlowChain(`A?{<fullTypeName>?{have: 'github.com'}} as $have;`).Show()
+		nothave := prog.SyntaxFlowChain(`A?{<fullTypeName>?{have: 'github.com1'}} as $nothave;`).Show()
+		assert.GreaterOrEqual(t, have.Len(), 1)
+		assert.GreaterOrEqual(t, nothave.Len(), 0)
+		return nil
+	}, ssaapi.WithLanguage(consts.GO))
+}
+
+func TestImport_fulltypename_lib(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+	vf.AddFile("src/main/go/A/test.go", `
+	package A
+
+	import "github.com/stretchr/testify/assert"
+
+	func main() int {
+	    assert.GreaterOrEqual(t, have.Len(), 1)
+	}
+	`)
+
+	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+		prog := programs[0]
+		have := prog.SyntaxFlowChain(`assert?{<fullTypeName>?{have: 'github.com'}} as $have;`).Show()
+		nothave := prog.SyntaxFlowChain(`assert?{<fullTypeName>?{have: 'github.com1'}} as $nothave;`).Show()
+		assert.GreaterOrEqual(t, have.Len(), 1)
+		assert.GreaterOrEqual(t, nothave.Len(), 0)
+		return nil
+	}, ssaapi.WithLanguage(consts.GO))
 }

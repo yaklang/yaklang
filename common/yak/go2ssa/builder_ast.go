@@ -102,6 +102,18 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 		}
 
+		for _, impo := range ast.AllImportDecl() {
+			names, paths := b.buildImportDecl(impo.(*gol.ImportDeclContext))
+
+			for i, name := range names {
+				pathl := strings.Split(paths[i], "/")
+				b.SetImportPackage(name, pathl[len(pathl)-1], paths)
+				if lib, _ := b.GetImportPackage(name); lib != nil {
+					b.GetProgram().ImportAll(lib)
+				}
+			}
+		}
+
 		exportHandler()
 	} else {
 		if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
@@ -126,18 +138,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					}
 					b.FunctionBuilder = currentBuilder
 				}()
-			}
-		}
-
-		for _, impo := range ast.AllImportDecl() {
-			namel, pathl := b.buildImportDecl(impo.(*gol.ImportDeclContext))
-			_ = namel
-			_ = pathl
-
-			for _, name := range namel {
-				if lib := b.GetImportPackage(name); lib != nil {
-					b.GetProgram().ImportAll(lib)
-				}
 			}
 		}
 
@@ -187,17 +187,17 @@ func (b *astbuilder) buildImportSpec(importSpec *gol.ImportSpecContext) (string,
 	var name string
 	var path string
 
+	if p := importSpec.ImportPath(); p != nil {
+		path = b.buildImportPath(p.(*gol.ImportPathContext))
+		namel := strings.Split(path, "/")
+		name = namel[len(namel)-1]
+	}
+
 	if id := importSpec.IDENTIFIER(); id != nil {
 		name = id.GetText()
 	}
 	if dot := importSpec.DOT(); dot != nil {
 		name = "."
-	}
-
-	if p := importSpec.ImportPath(); p != nil {
-		path = b.buildImportPath(p.(*gol.ImportPathContext))
-		namel := strings.Split(path, "/")
-		name = namel[len(namel)-1]
 	}
 	return name, path
 }
@@ -1810,7 +1810,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 
 	if qul := tname.QualifiedIdent(); qul != nil {
 		if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
-			lib := b.GetImportPackage(qul.IDENTIFIER(0).GetText())
+			lib, _ := b.GetImportPackage(qul.IDENTIFIER(0).GetText())
 			if lib == nil { // 没有找到包，可能是golang库,也可能是package名称和导入名称不同
 				b.NewError(ssa.Warn, TAG, PackageNotFind(qul.IDENTIFIER(0).GetText()))
 				ssatyp = ssa.CreateAnyType()
