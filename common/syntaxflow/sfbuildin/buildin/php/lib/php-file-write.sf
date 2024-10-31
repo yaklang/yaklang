@@ -6,7 +6,7 @@ desc(
 )
 
 
-/^fwrite|file_put_contents/ as $output
+/^(fwrite|file_put_contents)$/ as $output
 alert $output
 
 desc(
