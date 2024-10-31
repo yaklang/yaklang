@@ -28,9 +28,10 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 				y.fullTypeNameMap[pkgNames[len(pkgNames)-1]] = pkgNames
 			}
 		}
-
 		_, _, _ = pkgNames, static, all
-
+		if y.PreHandler() {
+			continue
+		}
 		var prog *ssa.Program
 		var className string
 		// found package

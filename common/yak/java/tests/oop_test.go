@@ -432,7 +432,43 @@ public class Main{
 			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
-
+	t.Run("test no package with constructor and direct use member", func(t *testing.T) {
+		code := `package com.example.A;
+public class A{
+	public int num1=0;
+	public A(int num1){
+		this.num1 = num1;
+	}
+}
+class Main{
+	public static void main(String[] args) {
+		A a = new A();
+		println(a.num1);
+	}
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-num1, #15.num1)"}, t)
+	})
+	t.Run("test no package with constructor and no direct use member", func(t *testing.T) {
+		code := `package com.example.A;
+public class A{
+	public int num1=0;
+	public A(int num1){
+		this.num1 = num1;
+	}
+	public int getNum(){
+		return this.num1;
+	}
+}
+class Main{
+	public static void main(String[] args) {
+		A a = new A();
+		println(a.getNum());
+	}
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-a.getNum(valid)(Function-com.example.A_A_A(Undefined-A)) member[side-effect(Parameter-num1, #19.num1)]"}, t)
+	})
 	t.Run("test package with constructor", func(t *testing.T) {
 		code := `
 	package com.example.A;
@@ -462,7 +498,7 @@ public class Main{
 		`
 		ssatest.CheckPrintlnValue(code, []string{
 			// TODO: this error
-			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, #16.num1)]", "Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, #16.num2)]",
+			"Undefined-a.getNum1(valid)(Function-com.example.A_A_A(Undefined-A,1,2)) member[side-effect(Parameter-num1, #15.num1)]", "Undefined-a.getNum2(valid)(Function-com.example.A_A_A(Undefined-A,1,2)) member[side-effect(Parameter-num2, #15.num2)]",
 			// "Undefined-a.getNum1(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]",
 			// "Undefined-a.getNum2(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)
@@ -485,7 +521,7 @@ class Test{
         println(main.a);
     }
 }`
-	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-a, #13.a)"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-a, #12.a)"}, t)
 	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 		"param": {"2"},
 	}, ssaapi.WithLanguage(ssaapi.JAVA))

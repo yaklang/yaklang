@@ -603,7 +603,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}
 
 	editor := b.GetEditor() // 为了区分不同函数所属的文件
-	newFunc.SetLazyBuilder(func() {
+	newFunc.AddLazyBuilder(func() {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		b.SetEditor(editor)
 		defer func() {
@@ -731,13 +731,15 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		b.FunctionBuilder = b.PopFunction()
 	}
 
-	editor := b.GetEditor() // 为了区分不同函数所属的文件
+	PreHandlerBlock := b.CurrentBlock
 	newFunc.SetLazyBuilder(func() {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
+		CurrentBlock := b.CurrentBlock
+		b.CurrentBlock = PreHandlerBlock
 
-		b.SetEditor(editor)
 		defer func() {
 			recoverRange()
+			b.CurrentBlock = CurrentBlock
 			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
 				tph()
 				delete(b.tpHandler, newFunc.GetName())

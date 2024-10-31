@@ -210,24 +210,6 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 			if !ok {
 				continue
 			}
-
-			// String url = app.GetProperties("jdbc.url");
-			// String url = "jdbc... from file";
-			//
-			// JDBCConnectionBuilder = JDBC....getConnection(url);
-			//
-			// app.GetProper*(*?{opcode: const} as $literalConfig)
-			// ${/(\.xml)|(.proper.*?)/}.regexp(result: $literalConfig<buildExpr>)
-			// $result?{!(any: "127.0.0.1",localhost,*.internel)} as $dangerous
-			// check $dangerout
-			//
-			// class{
-			//   @Properties("aliyunoss.ak")
-			//   String accessKey = null;
-			// }
-			//
-			//
-
 			var insCallbacks, defCallbacks []func(ssa.Value)
 			for _, modRaw := range raw.AllInterfaceMethodModifier() {
 				ins, ok := modRaw.(*javaparser.InterfaceMethodModifierContext)
@@ -271,8 +253,6 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 			for _, def := range defCallbacks {
 				def(val)
 			}
-			// TODO: GenericInterfaceMethodDeclaration
-			// handler(memberName, val)
 		} else if ret := recv.InterfaceDeclaration(); ret != nil {
 			y.VisitInterfaceDeclaration(ret.(*javaparser.InterfaceDeclarationContext))
 		} else if ret := recv.AnnotationTypeDeclaration(); ret != nil {
