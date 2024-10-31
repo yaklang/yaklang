@@ -1181,6 +1181,14 @@ func (d *Decompiler) ParseStatement() error {
 	//	})
 	//}
 	d.RootNode = nodes[0]
+	for _, node := range nodes {
+		if v, ok := node.Statement.(*statements.GOTOStatement); ok {
+			if v.ToStatement == 0 {
+				print()
+			}
+		}
+	}
+
 	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
 		if node.IsDel {
 			sources := slices.Clone(node.Source)

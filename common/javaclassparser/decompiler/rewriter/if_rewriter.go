@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
+	"slices"
 )
 
 type rewriterFunc func(statementManager *StatementManager) error
@@ -52,6 +53,9 @@ func IfRewriter(manager *StatementManager) error {
 		manager.AddFinalAction(func() error {
 			getBody := func(bodyStartNode *core.Node) ([]statements.Statement, error) {
 				sts := []statements.Statement{}
+				if !slices.Contains(manager.DominatorMap[ifNode], bodyStartNode) {
+					return sts, nil
+				}
 				err := core.WalkGraph[*core.Node](bodyStartNode, func(node *core.Node) ([]*core.Node, error) {
 					if mergeNode != nil && node == mergeNode {
 						return nil, nil
@@ -60,13 +64,13 @@ func IfRewriter(manager *StatementManager) error {
 						return nil, fmt.Errorf("invalid if node %d", node.Id)
 					}
 					sts = append(sts, node.Statement)
-					//var next []*core.Node
-					//for _, n := range node.Next {
-					//	if n.LoopBreak || slices.Contains(manager.DominatorMap[node], n) {
-					//		next = append(next, n)
-					//	}
-					//}
-					return node.Next, nil
+					var next []*core.Node
+					for _, n := range node.Next {
+						if slices.Contains(manager.DominatorMap[node], n) {
+							next = append(next, n)
+						}
+					}
+					return next, nil
 				})
 				if err != nil {
 					return nil, err

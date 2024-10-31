@@ -29,9 +29,10 @@ func LabelRewriter(manager *StatementManager) error {
 				to.Statement = statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 					return "continue " + loopNode.Label
 				})
-			} else {
-				return errors.New("loop end node conflict")
 			}
+			//} else {
+			//	return errors.New("loop end node conflict")
+			//}
 		} else {
 			if node.LoopEndNode == nil {
 				to.Statement = statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
