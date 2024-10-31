@@ -14,7 +14,7 @@ desc(
     alert_min: 8,
     'file:///filter.php': <<<CODE
 <?php
-    filter_input();
+    filter();
     htmlspecialchars();
     mysql_real_escape_string();
     addslashes();

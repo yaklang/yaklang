@@ -11,12 +11,10 @@ import (
 // value
 func setMemberCallRelationship(obj, key, member Value) {
 	obj.AddMember(key, member)
-	member.SetObject(obj)
-	member.SetKey(key)
-
-	obj.AddMember(key, member)
-	member.SetObject(obj)
-	member.SetKey(key)
+	if !member.IsMember() {
+		member.SetObject(obj)
+		member.SetKey(key)
+	}
 
 	handlerMemberCall := func(obj Value) {
 		for _, v := range obj.(*Phi).Edge {
