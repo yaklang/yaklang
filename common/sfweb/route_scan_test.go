@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/sfweb"
@@ -72,7 +73,7 @@ func TestScan(t *testing.T) {
 		}),
 	)
 	require.NoError(t, err)
-
+	now := time.Now()
 	err = writeJSON(wc, &sfweb.SyntaxFlowScanRequest{
 		Content:        scanFileContent,
 		Lang:           `java`,
@@ -82,6 +83,7 @@ func TestScan(t *testing.T) {
 
 	wc.Start()
 	wc.Wait()
-	require.GreaterOrEqual(t, len(risks), 1)
 	require.Equal(t, 1.0, progress)
+	require.GreaterOrEqual(t, len(risks), 1)
+	require.GreaterOrEqual(t, risks[0].Timestamp, now.Unix(), "timestamp should be >= time that scan started")
 }
