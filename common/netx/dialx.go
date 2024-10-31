@@ -288,10 +288,10 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 }
 
 // dialPlainUdpConn get abstract udp conn, with global netx config (disallow address, etc)
-func dialPlainUdpConn(target string, config *dialXConfig) (*net.UDPConn, error) {
+func dialPlainUdpConn(target string, config *dialXConfig) (udpConn *net.UDPConn, remoteAddr *net.UDPAddr, err error) {
 	host, port, err := utils.ParseStringToHostPort(target)
 	if err != nil {
-		return nil, utils.Errorf("invalid target %#v, cannot find host:port", target)
+		return nil, nil, utils.Errorf("invalid target %#v, cannot find host:port", target)
 	}
 
 	host = utils.FixForParseIP(host)
@@ -300,24 +300,32 @@ func dialPlainUdpConn(target string, config *dialXConfig) (*net.UDPConn, error) 
 		// not valid ip
 		host = LookupFirst(host, config.DNSOpts...)
 		if ipIns = net.ParseIP(host); ipIns == nil {
-			return nil, utils.Errorf("cannot resolve %v", target)
+			return nil, nil, utils.Errorf("cannot resolve %v", target)
 		}
 	}
 
 	// handle ip address
 	if config.DisallowAddress != nil {
 		if config.DisallowAddress.Contains(host) {
-			return nil, utils.Errorf("disallow address %v by config(check your yakit system/network config)", host)
+			return nil, nil, utils.Errorf("disallow address %v by config(check your yakit system/network config)", host)
 		}
 	}
 
-	return net.DialUDP("udp", config.LocalAddr, &net.UDPAddr{
+	remoteAddr = &net.UDPAddr{
 		IP:   ipIns,
 		Port: port,
-	})
+	}
+
+	if config.JustListen {
+		udpConn, err = net.ListenUDP("udp", config.LocalAddr)
+		return
+	}
+
+	udpConn, err = net.DialUDP("udp", config.LocalAddr, remoteAddr)
+	return
 }
 
-func DialUdpX(target string, opt ...DialXOption) (*net.UDPConn, error) {
+func DialUdpX(target string, opt ...DialXOption) (*net.UDPConn, *net.UDPAddr, error) {
 	config := &dialXConfig{
 		DisallowAddress: utils.NewHostsFilter(),
 	}
