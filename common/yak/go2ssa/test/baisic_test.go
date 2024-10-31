@@ -601,3 +601,60 @@ func TestType_nesting(t *testing.T) {
 		`, []string{"1", "\"a\"", "0", "\"b\""}, t)
 	})
 }
+
+func TestMethod_normol(t *testing.T) {
+	t.Run("method", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+	import "fmt"
+
+	type User struct {
+		Id   int
+		Name string
+	}
+
+	func (u * User) SetId(id int) {
+		u.Id = id
+	}
+
+	func (u * User) SetName(name string) {
+		u.Name = name
+	}
+
+	func main() {
+		u := &User{}
+		u.SetId(1)
+		u.SetName("yaklang")
+		println(u.Id)
+		println(u.Name)
+	}
+
+		`, []string{"side-effect(Parameter-id, u.Id)", "side-effect(Parameter-name, u.Name)"}, t)
+	})
+}
+
+func TestMethod_repeat(t *testing.T) {
+	t.Run("method repeat", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		
+		type test struct{
+			a int
+		}
+
+		func (t* test)add() int {
+			return t.a
+		}
+
+		func add(t* test) int {
+			return t.a
+		}
+
+		func main(){
+			a := test{a: 1}
+			println(add(a))
+			println(a.add())
+		}
+
+		`, []string{"Function-add(make(struct {number})) member[1]", "Undefined-a.add(valid)(make(struct {number})) member[1]"}, t)
+	})
+}

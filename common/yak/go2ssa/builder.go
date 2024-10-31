@@ -264,8 +264,6 @@ func (b *astbuilder) GetStructByStr(name string) ssa.Type {
 	if t, ok := b.GetProgram().GetExportType(name); ok {
 		if obj, ok := t.(*ssa.ObjectType); ok {
 			return obj
-		} else {
-			b.NewError(ssa.Warn, TAG, "type is not struct")
 		}
 	}
 	return nil
@@ -295,8 +293,6 @@ func (b *astbuilder) GetAliasByStr(name string) ssa.Type {
 	if t, ok := b.GetProgram().GetExportType(name); ok {
 		if obj, ok := t.(*ssa.AliasType); ok {
 			return obj
-		} else {
-			b.NewError(ssa.Warn, TAG, "type is not struct")
 		}
 	}
 	return nil
