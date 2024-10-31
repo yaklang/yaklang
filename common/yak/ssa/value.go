@@ -144,6 +144,10 @@ func (b *FunctionBuilder) writeUndefine(variable string, names ...string) *Undef
 
 // AssignVariable  assign value to variable
 func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
+	if variable == nil {
+		log.Errorf("assign variable is nil")
+		return
+	}
 	// log.Infof("AssignVariable: %v, %v typ %s", variable.GetName(), value.GetName(), value.GetType())
 	name := variable.GetName()
 	_ = name
