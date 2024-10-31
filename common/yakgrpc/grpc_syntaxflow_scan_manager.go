@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
@@ -99,44 +98,45 @@ func CreateSyntaxFlowScanManager(ctx context.Context, stream ypb.Yak_SyntaxFlowS
 func (m *SyntaxFlowScanManager) Start() error {
 	var errs error
 	for _, progName := range m.programs {
-		if err := m.Query(progName); err != nil {
+		prog, err := ssaapi.FromDatabase(progName)
+		if err != nil {
 			errs = utils.JoinErrors(errs, err)
+			m.skipQuery += int64(m.rulesCount) // skip all rules for this program
+			continue
+		}
+		for rule := range sfdb.YieldSyntaxFlowRules(m.rules, m.ctx) {
+			m.Query(rule, prog)
 		}
 	}
 	return errs
 }
 
-func (m *SyntaxFlowScanManager) Query(programName string) error {
-	prog, err := ssaapi.FromDatabase(programName)
-	if err != nil {
-		return err
-	}
-	for rule := range sfdb.YieldSyntaxFlowRules(m.rules, m.ctx) {
-		log.Infof("executing rule %s", rule.RuleName)
-		m.client.StatusCard("当前执行规则", rule.RuleName, "规则执行进度")
-		if !m.ignoreLanguage {
-			if rule.Language != prog.GetLanguage() {
-				m.skipQuery++
-				// m.client.YakitInfo("program %s(lang:%s) exec rule %s(lang:%s) failed: language not match", programName, prog.GetLanguage(), rule.RuleName, rule.Language)
-				continue
-			}
-		}
+func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 
-		if res, err := prog.SyntaxFlowRule(rule); err == nil {
-			if _, err := res.Save(m.taskID); err == nil {
-				m.successQuery++
-				m.notifyResult(res)
-			} else {
-				m.failedQuery++
-				m.client.YakitError("program %s exec rule %s result save failed: %s", programName, rule.RuleName, err)
-			}
+	defer m.notifyProgress(rule.RuleName)
+
+	// log.Infof("executing rule %s", rule.RuleName)
+	if !m.ignoreLanguage {
+		if rule.Language != prog.GetLanguage() {
+			m.skipQuery++
+			// m.client.YakitInfo("program %s(lang:%s) exec rule %s(lang:%s) failed: language not match", programName, prog.GetLanguage(), rule.RuleName, rule.Language)
+			return
+		}
+	}
+
+	// if language match or ignore language
+	if res, err := prog.SyntaxFlowRule(rule); err == nil {
+		if _, err := res.Save(m.taskID); err == nil {
+			m.successQuery++
+			m.notifyResult(res)
 		} else {
 			m.failedQuery++
-			m.client.YakitError("program %s exc rule %s failed: %s", programName, rule.RuleName, err)
+			m.client.YakitError("program %s exec rule %s result save failed: %s", prog.GetProgramName(), rule.RuleName, err)
 		}
-		m.notifyProgress()
+	} else {
+		m.failedQuery++
+		m.client.YakitError("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
 	}
-	return nil
 }
 
 func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
@@ -152,7 +152,8 @@ func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	})
 }
 
-func (m *SyntaxFlowScanManager) notifyProgress() {
+func (m *SyntaxFlowScanManager) notifyProgress(ruleName string) {
+	m.client.StatusCard("当前执行规则", ruleName, "规则执行进度")
 	finishQuery := m.successQuery + m.failedQuery + m.skipQuery
 	if finishQuery == m.totalQuery {
 		m.status = Done
