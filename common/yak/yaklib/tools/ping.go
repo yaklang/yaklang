@@ -124,9 +124,11 @@ func _pingScan(target string, opts ...PingConfigOpt) chan *pingutil.PingResult {
 	config._cancel = cancel
 	opts = append(opts, _pingConfigOpt_cancel(config._cancel))
 
-	resultChan := make(chan *pingutil.PingResult, 100)
+	resultChan := make(chan *pingutil.PingResult)
 	go func() {
-		defer close(resultChan)
+		defer func() {
+			close(resultChan)
+		}()
 
 		swg := utils.NewSizedWaitGroup(config.concurrent)
 		for _, hostRaw := range utils.ParseStringToHosts(target) {
@@ -145,10 +147,13 @@ func _pingScan(target string, opts ...PingConfigOpt) chan *pingutil.PingResult {
 					return
 				}
 				if config.skipped || config.IsFiltered(targetHost) {
-					resultChan <- &pingutil.PingResult{
+					select {
+					case <-ctx.Done():
+					case resultChan <- &pingutil.PingResult{
 						IP:     hostOrigin,
 						Ok:     true,
 						Reason: "skipped",
+					}:
 					}
 					return
 				}
@@ -162,7 +167,10 @@ func _pingScan(target string, opts ...PingConfigOpt) chan *pingutil.PingResult {
 						result.IP = hostOrigin
 					}
 					if ctx.Err() == nil {
-						resultChan <- result
+						select {
+						case <-ctx.Done():
+						case resultChan <- result:
+						}
 					}
 				}
 			}()
