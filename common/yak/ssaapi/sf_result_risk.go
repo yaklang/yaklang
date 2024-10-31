@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -62,7 +64,9 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) 
 		}
 	}
 
-	risk := yakit.CreateRisk("", opts...)
+	fileUrl := fmt.Sprintf("syntaxflow://%s/%s?result_id=%d", result.ProgramName, variable, result.ID)
+	risk := yakit.CreateRisk("", opts...) // this url not use in argument, because it is not a real url
+	risk.Url = fileUrl
 	risk.ResultID = result.ID
 	risk.Variable = variable
 	risk.ProgramName = result.ProgramName
