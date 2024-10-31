@@ -167,6 +167,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	var (
 		https                = option.Https
 		forceHttp2           = option.Http2
+		forceHttp3           = option.Http3
 		gmTLS                = option.GmTLS
 		onlyGMTLS            = option.GmTLSOnly
 		preferGMTLS          = option.GmTLSPrefer
@@ -292,30 +293,20 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		proxy = ordinaryProxy
 	}
 
-	if gmTLS {
-		https = true
-	}
-
-	/*
-	   extract url
-	*/
 	var forceOverrideURL string
-	var urlBuf bytes.Buffer
-	if https {
-		urlBuf.WriteString("https://")
-	} else {
-		urlBuf.WriteString("http://")
-	}
 	var requestURI string
 	var hostInPacket string
 	var haveTE bool
 	var haveCL bool
 	var clInt int
 	enableHttp2 := false
+	enableHttp3 := false
 	_, originBody := SplitHTTPHeadersAndBodyFromPacketEx(requestPacket, func(method string, uri string, proto string) error {
 		requestURI = uri
 		if strings.HasPrefix(proto, "HTTP/2") || forceHttp2 {
 			enableHttp2 = true
+		} else if strings.HasPrefix(proto, "HTTP/3") || forceHttp3 {
+			enableHttp3 = true
 		}
 		if utils.IsHttpOrHttpsUrl(requestURI) {
 			forceOverrideURL = requestURI
@@ -336,6 +327,19 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			clInt = codec.Atoi(value)
 		}
 	})
+
+	if gmTLS || enableHttp3 {
+		https = true
+	}
+	/*
+	   extract url
+	*/
+	var urlBuf bytes.Buffer
+	if https {
+		urlBuf.WriteString("https://")
+	} else {
+		urlBuf.WriteString("http://")
+	}
 
 	connPool = DefaultLowHttpConnPool
 	if hostInPacket == "" && host == "" {
@@ -566,15 +570,26 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		clientHelloSpec: clientHelloSpec,
 	}
 	haveNativeHTTPRequestInstance := reqIns != nil
-RECONNECT:
 	if haveNativeHTTPRequestInstance {
 		httpctx.SetRequestHTTPS(reqIns, https)
 	}
-	if withConnPool || enableHttp2 {
+RECONNECT:
+	if enableHttp3 {
+		http3Conn, err := getHTTP3Conn(ctx, originAddr, dialopts...)
+		if err != nil {
+			return nil, err
+		}
+		_, responsePacket, err := doHttp3Request(ctx, http3Conn, requestPacket)
+
+		httpctx.SetBareResponseBytes(reqIns, responsePacket)
+		response.RawPacket = responsePacket
+		return response, nil
+	} else if withConnPool || enableHttp2 {
 		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
 	} else {
 		conn, err = netx.DialX(originAddr, dialopts...)
 	}
+
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
 	response.Https = https
 
@@ -626,29 +641,12 @@ RECONNECT:
 	}
 	response.PortIsOpen = true
 
-	if enableHttp2 && conn.(*persistConn).cacheKey.scheme != H2 {
-		enableHttp2 = false
-		method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
-		requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
-	}
-
 	if enableHttp2 {
-		//ddl, cancel := context.WithTimeout(context.Background(), timeout)
-		//defer cancel()
-		//if option.BeforeDoRequest != nil {
-		//	requestPacket = option.BeforeDoRequest(requestPacket)
-		//}
-		//
-		//scheme := "https"
-		//if !https {
-		//	scheme = "http"
-		//}
-		//rsp, err := HTTPRequestToHTTP2(scheme, utils.HostPort(host, port), conn, requestPacket, noFixContentLength)
-		//if err != nil {
-		//	return response, utils.Errorf("yak.http2 error: %s", err)
-		//}
-		//response.RawPacket = rsp
-		//return response, err
+		if conn.(*persistConn).cacheKey.scheme != H2 { // http2 downgrade to http1.1
+			enableHttp2 = false
+			method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
+			requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
+		}
 		h2Conn := conn.(*persistConn).alt
 		if h2Conn == nil {
 			return nil, utils.Error("conn h2 Processor is nil")
@@ -690,10 +688,6 @@ RECONNECT:
 		if option.BeforeDoRequest != nil {
 			requestPacket = option.BeforeDoRequest(requestPacket)
 		}
-
-		//if haveNativeHTTPRequestInstance {
-		//	httpctx.SetBareRequestBytes(reqIns, requestPacket)
-		//}
 
 		if oldVersionProxyChecking {
 			requestPacket, err = BuildLegacyProxyRequest(requestPacket)
