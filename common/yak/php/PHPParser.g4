@@ -575,6 +575,7 @@ flexiVariable
     : variable                                    #CustomVariable
     | flexiVariable '[' indexMemberCallKey? ']'    #IndexVariable
     | flexiVariable OpenCurlyBracket indexMemberCallKey? CloseCurlyBracket    # IndexLegacyCallVariable
+    | flexiVariable ObjectOperator memberCallKey arguments  #MemberFunction
     | flexiVariable ObjectOperator memberCallKey            #MemberVariable
     ;
 

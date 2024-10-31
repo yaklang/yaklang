@@ -523,6 +523,10 @@ func (v *BasePHPParserVisitor) VisitStaticClassAccessExpression(ctx *StaticClass
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitMemberFunction(ctx *MemberFunctionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitIndexLegacyCallVariable(ctx *IndexLegacyCallVariableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
