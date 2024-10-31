@@ -14,6 +14,7 @@ import (
 )
 
 func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
+	risk := &schema.Risk{}
 	db = db.Model(&schema.Risk{})
 
 	var token string
@@ -23,6 +24,7 @@ func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 		if ret.FromYakScript == "" {
 			ret.FromYakScript = consts.GetCurrentYakitPluginID()
 		}
+		risk = ret
 	case schema.Risk:
 		token = ret.ReverseToken
 		if ret.FromYakScript == "" {
@@ -40,7 +42,7 @@ func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 	}
 
 	if token != "" {
-		if db := db.Model(&schema.Risk{}).Where(
+		if db := db.Where(
 			"reverse_token LIKE ?", "%"+token+"%",
 		).Update(map[string]interface{}{
 			"waiting_verified": false,
@@ -49,7 +51,7 @@ func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 		}
 	}
 
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.Risk{}); db.Error != nil {
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(risk); db.Error != nil {
 		return utils.Errorf("create/update Risk failed: %s", db.Error)
 	}
 
