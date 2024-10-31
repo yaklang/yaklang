@@ -175,13 +175,13 @@ func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 }
 
 func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
-	if global := b.GetProgram().GlobalScope; global != nil {
-		for i, m := range global.GetAllMember() {
-			name := i.String()
-			value := b.EmitPhi(name, []Value{m, b.PeekValue(name)})
-			global.SetStringMember(name, value)
-		}
-	}
+	// if global := b.GetProgram().GlobalScope; global != nil {
+	// 	for i, m := range global.GetAllMember() {
+	// 		name := i.String()
+	// 		value := b.EmitPhi(name, []Value{m, b.PeekValue(name)})
+	// 		global.SetStringMember(name, value)
+	// 	}
+	// }
 
 	return b.parentBuilder
 }
