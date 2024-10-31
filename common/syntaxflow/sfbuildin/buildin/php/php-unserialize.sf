@@ -6,20 +6,20 @@ desc(
 
 <include('php-param')> as $params
 <include('php-filter-function')> as $filter
-unserialize(* as $param)
-$param#{until: `* & $params`}-> as $root
-$root?{!<dataflow(<<<CODE
-*?{opcode: call && <self> & $filter} as $__next__
-CODE)>} as $result
-alert $result for {
+unserialize(* as $sink)
+$sink #{
+    include: `<self> & $params`,
+    exclude: `<self>?{opcode: call}`
+}-> as $high
+alert $high for {
     title: 'php deserialization is not filtered',
     type: 'vuln',
     level: 'high'
 }
-
-$root?{<dataflow(<<<CODE
-*?{opcode: call && !<self> & $filter} as $__next__
-CODE)>} as $mid
+$sink #{
+    include: `<self> & $params`,
+    include: `<self>?{opcode: call && !<self><getCaller> & $filter}`
+}-> as $mid
 
 alert $mid for {
     title: 'php deserialization has function calls, but no filter function is checked out',
@@ -27,10 +27,10 @@ alert $mid for {
     type: 'mid',
     level: 'mid'
 }
-
-$root?{<dataflow(<<<CODE
-*?{opcode: call && <self> & $filter} as $__next__
-CODE)>} as $low
+$sink #{
+    include: `<self> & $params`,
+    include: `<self>?{opcode: call && <self><getCaller> & $filter}`
+}-> as $low
 
 alert $low for {
     title: 'php deserialization has function calls that check out filter functions',
@@ -40,12 +40,27 @@ alert $low for {
 }
 desc(
     lang: php,
-    'file:///unsafe.php': <<<UNSAFE
+    alert_min: 3,
+    alert_low: 1,
+    alert_mid: 1,
+    alert_high: 1,
+    'file://mid.php': <<<UNSAFE
 <?php
-function __unserialize($a){
+function unserializex($a){
     unserialize("$a");
 }
 $a = $_GET["1"];
-__unserialize($a);
-UNSAFE
+$a = trim($a);
+unserializex($a);
+UNSAFE,
+    'file://high.php':<<<CODE
+<?php
+    $a = $_GET[1];
+    unserialize($a);
+CODE,
+    'file://low.php':<<<CODE
+<?php
+    $a = $_GET[1];
+    unserialize(filter($a));
+CODE
 )

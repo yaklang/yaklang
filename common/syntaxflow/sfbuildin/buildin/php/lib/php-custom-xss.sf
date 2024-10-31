@@ -1,0 +1,29 @@
+desc(
+    title: 'php Methods for xss may exist',
+    type: audit,
+    lib: 'php-xss-method'
+)
+
+/^(echo|print|print_r|exit|die|sprint|var_dump|var_export)$/ as $output
+
+alert $output
+
+desc(
+    lang: php,
+    alert_min: 8,
+    'file://xss.php':<<<CODE
+<?php
+    echo(1);
+    print(1);
+    print_r(1);
+    exit(1);
+    die(1);
+    sprint(1);
+    var_dump(1);
+    var_export(1);
+CODE,
+    'safefile://safe.php':<<<CODE
+<?php
+    echox(1);
+CODE
+)
