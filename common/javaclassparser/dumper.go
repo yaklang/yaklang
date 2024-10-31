@@ -197,9 +197,10 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		c.CurrentMethod = method
 		funcCtx := c.FuncCtx
 		funcCtx.FunctionName = name
-		if name != "getMapping2" {
+		if name != "Directive" {
 			continue
 		}
+		println(name)
 		funcCtx.FunctionType = c.MethodType
 		for _, attribute := range method.Attributes {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
@@ -208,6 +209,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					return nil, err
 				}
 				sourceCode := "\n"
+				statementSet := utils.NewSet[statements.Statement]()
 				var statementToString func(statement statements.Statement) string
 				var statementListToString func(statements []statements.Statement) string
 				statementListToString = func(statementList []statements.Statement) string {
@@ -227,6 +229,10 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					return strings.Join(res, "\n")
 				}
 				statementToString = func(statement statements.Statement) (statementStr string) {
+					if statementSet.Has(statement) {
+						panic("statement already exists")
+					}
+					statementSet.Add(statement)
 					switch ret := statement.(type) {
 					case *statements.TryCatchStatement:
 						statementStr = fmt.Sprintf(c.GetTabString()+"try{\n"+
@@ -245,6 +251,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 						statementStr = fmt.Sprintf(c.GetTabString()+"do{\n"+
 							"%s\n"+
 							c.GetTabString()+"} while (%s);", statementListToString(ret.Body), ret.ConditionValue.String(funcCtx))
+						if ret.Label != "" {
+							statementStr = fmt.Sprintf("%s%s:\n%s", c.GetTabString(), ret.Label, statementStr)
+						}
 					case *statements.SwitchStatement:
 						getBody := func(caseItems []*statements.CaseItem) string {
 							var res []string
