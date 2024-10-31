@@ -260,3 +260,12 @@ func CutNode(src, target *Node) func() {
 		target.Source = append(target.Source, src)
 	}
 }
+
+func GraphToList(code *OpCode) []*OpCode {
+	res := []*OpCode{}
+	WalkGraph[*OpCode](code, func(code *OpCode) ([]*OpCode, error) {
+		res = append(res, code)
+		return code.Target, nil
+	})
+	return res
+}

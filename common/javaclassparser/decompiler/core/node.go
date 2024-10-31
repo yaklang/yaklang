@@ -12,6 +12,7 @@ type Node struct {
 	Source              []*Node
 	HideNext            *Node
 	Next                []*Node
+	IsDel               bool
 	TrueNode, FalseNode func() *Node
 	JmpNode             *Node
 	MergeNode           *Node
