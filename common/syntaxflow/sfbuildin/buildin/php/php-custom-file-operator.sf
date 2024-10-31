@@ -14,25 +14,61 @@ $read + $write + $unlink as $source
 
 $source(* as $param)
 
-$param#{until: `* & $params`}-> as $root
+$param#{
+    include: `<self> & $params`,
+    exclude: `<self>?{opcode: call}`
+}-> as $high
 
-$root?{!<dataflow(<<<CODE
-*?{opcode: call} as $__next__;
-CODE)>} as $result
-
-alert $result for {
-    title: 'Direct file manipulation',
+alert $high for{
+    title: 'Direct file manipulation,not call method',
     type: 'vuln',
     level: 'high'
 }
 
+$param #{
+    include: `<self>& $params`,
+    include: `*?{opcode: call && !<self><getCaller> & $filter}`
+}-> as $middle
+
+alert $middle for{
+    title_zh: '存在文件操作，文件操作经过函数，但未检出过滤',
+    title: 'File operations exist, file operations pass through functions, but no filter is checked out',
+    type: 'mid',
+    level: 'mid'
+}
+
+$param #{
+    include: `<self> & $params`,
+    include: `*?{opcode: call && <self><getCaller> & $filter}`
+}-> as $low
+
+alert $low for{
+    title_zh: '存在文件操作，文件操作经过函数，检出过滤',
+    title: 'File operations exist, file operations pass through functions,  filter is checked out',
+    type: 'low',
+    level: 'low'
+}
 desc(
     lang: php,
-    alert_min: 1,
-    'file://unsafe.php': <<<UNSAFE
+    alert_min: 3,
+    alert_low: 1,
+    alert_mid: 1,
+    alert_high: 1,
+    'file://high.php': <<<UNSAFE
 <?php
-fopen($_GET[0],'r');
-file_get_contents($_GET[1]);
-file_put_contents('aa.php',$_GET[2]);
-UNSAFE
+    $a = $_GET[1];
+    unlink($a);
+UNSAFE,
+    'file://mid.php':<<<CODE
+<?php
+    $a = $_GET[1];
+    $a = trim($a);
+    file_get_contents($a);
+CODE,
+    'file://low.php': <<<CODE
+<?php
+    $a = $_GET[1];
+    $a = filter($a);
+    file_put_contents("1.php",$a);
+CODE
 )

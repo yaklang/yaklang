@@ -4,6 +4,7 @@ desc(
     level: info,
     lib: 'php-tp-all-extern-variable-param-source'
 )
+
 input() as $param
 $param as $output
 check $output

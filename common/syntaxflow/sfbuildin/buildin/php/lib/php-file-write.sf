@@ -5,11 +5,8 @@ desc(
     lib: 'php-file-write'
 )
 
-fwrite as $sink1
-file_put_contents as $sink2
 
-$sink1 + $sink2 as $output
-
+/^fwrite|file_put_contents/ as $output
 alert $output
 
 desc(

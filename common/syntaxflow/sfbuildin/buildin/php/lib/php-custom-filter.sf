@@ -5,7 +5,7 @@ desc(
     lib: 'php-filter-function'
 )
 
-/htmlspecialchars|strip_tags|mysql_real_escape_string|addslashes|filter|is_numeric|str_replace|ereg|strpos/ as $output
+/^(htmlspecialchars|strip_tags|mysql_real_escape_string|addslashes|filter|is_numeric|str_replace|ereg|strpos)$/ as $output
 
 alert $output
 

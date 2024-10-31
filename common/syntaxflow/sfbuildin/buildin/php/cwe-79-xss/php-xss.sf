@@ -1,0 +1,66 @@
+desc(
+    title: "Check PHP XSS: Directly User OUTPUT",
+)
+
+<include('php-param')> as $extraValue;
+<include('php-xss-method')> as $method;
+<include('php-filter-function')> as $function;
+
+$method(* as $param);
+
+$param#{
+    include:`<self> & $extraValue`,
+    exclude: `<self>?{opcode: call}`
+}-> as $high
+
+alert $high for{
+    title_zh: '存在xss漏洞，参数直接从外部传入',
+    title: 'xss vulnerability exists, parameters are passed in directly from outside',
+    type: 'vuln',
+    level: 'high'
+}
+
+$param#{
+    include: `<self> & $extraValue`,
+    include: `<self>?{opcode: call && !<self><getCaller> & $function}`
+}-> as $middle
+
+alert $middle for{
+    title_zh: '存在xss漏洞，参数经过函数，但未检出过滤',
+    title: 'xss vulnerability exists, parameters pass through the function, but no filter is detected',
+    type: 'mid',
+    level: 'mid'
+}
+
+$param#{
+    include: `<self> & $extraValue`,
+    include: `<self>?{opcode: call && <self><getCaller> & $function}`
+}-> as $low
+
+alert $low for {
+    title: 'xss vulnerability exists. Parameters are checked out and filtered by functions',
+    title_zh: '存在xss漏洞，参数经过函数，检出过滤',
+    type: 'low',
+    level: 'low'
+};
+
+desc(
+    language: php,
+    alert_min: 3,
+    alert_low: 1,
+    alert_mid: 1,
+    alert_high:1,
+    'file://high.php': <<<CODE
+<?php
+echo "您的输入是：" . $_POST['data'];
+?>
+CODE,
+    'file://mid.php':  <<<CODE
+<?php
+   echo "您的输入是：" . trim($_POST['data']);
+CODE,
+    'file://low.php':<<<CODE
+<?php
+   echo "您的输入是：" . filter($_POST['data']);
+CODE
+)
