@@ -29,6 +29,7 @@ type LowhttpExecConfig struct {
 	Https                            bool
 	ResponseCallback                 func(response *LowhttpResponse)
 	Http2                            bool
+	Http3                            bool
 	GmTLS                            bool
 	GmTLSOnly                        bool
 	GmTLSPrefer                      bool
@@ -434,6 +435,12 @@ func WithResponseCallback(h func(i *LowhttpResponse)) LowhttpOpt {
 func WithHttp2(Http2 bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Http2 = Http2
+	}
+}
+
+func WithHttp3(http3 bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.Http3 = http3
 	}
 }
 
