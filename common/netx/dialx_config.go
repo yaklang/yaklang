@@ -52,6 +52,8 @@ type dialXConfig struct {
 	ClientHelloSpec *utls.ClientHelloSpec
 
 	LocalAddr *net.UDPAddr
+
+	JustListen bool // just listen udp , not connect .
 }
 
 type DialXOption func(c *dialXConfig)
@@ -239,6 +241,12 @@ func DialX_WithClientHelloSpec(spec *utls.ClientHelloSpec) DialXOption {
 func DialX_WithLocalAddr(addr *net.UDPAddr) DialXOption {
 	return func(c *dialXConfig) {
 		c.LocalAddr = addr
+	}
+}
+
+func DialX_WithUdpJustListen(b bool) DialXOption {
+	return func(c *dialXConfig) {
+		c.JustListen = b
 	}
 }
 

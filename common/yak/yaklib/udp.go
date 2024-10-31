@@ -71,7 +71,7 @@ func connectUdp(target string, portRaw any, opts ...udpClientOption) (*udpConnec
 	if config.localAddr != nil {
 		netx.DialX_WithLocalAddr(config.localAddr)
 	}
-	uc, err := netx.DialUdpX(target, netxOpt...)
+	uc, _, err := netx.DialUdpX(target, netxOpt...)
 	if err != nil {
 		return nil, err
 	}
