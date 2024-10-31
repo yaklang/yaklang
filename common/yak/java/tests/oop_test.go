@@ -118,12 +118,12 @@ func TestJava_Extend_Class(t *testing.T) {
 	t.Run("free-value", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 	public 	class Q {
-		int a = 0;
+		int a = 0; 
 		public void getA() {
 			return this.a;
 		}
 	}
-	class A extends Q{}	
+	class A extends Q{}
 	public class Main{
 	public static void main(String[] args) {
 		A a = new A(); 
