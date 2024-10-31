@@ -28,6 +28,10 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 
 // create member call variable
 func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable {
+	if object == nil || key == nil {
+		log.Errorf("CreateMemberCallVariable: object or key is nil")
+		return nil
+	}
 	// check
 	if object.GetId() == -1 || key.GetId() == -1 {
 		log.Infof("CreateMemberCallVariable: %v, %v", object.GetName(), key)
