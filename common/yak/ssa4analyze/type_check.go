@@ -185,24 +185,39 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			log.Errorf("TypeCheckCall: %s, %s", c.Method.GetVerboseName(),
 				"gotParaLen == funcTyp.ParameterLen but no enough argument")
 		}
-		checkParamType := func(i int) {
-			if !ssa.TypeCompare(gotPara[i], funcTyp.Parameter[i]) {
+		checkParamType := func(i int, got, want ssa.Type) {
+			if !ssa.TypeCompare(got, want) {
 				// any just skip
 				index := i + 1
 				if isMethod {
 					index = i
 				}
 				c.NewError(ssa.Error, TypeCheckTAG,
-					ArgumentTypeError(index, gotPara[i].String(), funcTyp.Parameter[i].String(), funName),
+					ArgumentTypeError(index, got.String(), want.String(), funName),
 				)
 			}
 		}
 
+		lenOfFuncParams := len(funcTyp.Parameter)
+		var got, want ssa.Type
 		for i := 0; i < gotParaLen; i++ {
-			if i == wantParaLen-1 && funcTyp.IsVariadic {
-				break // ignore
+			got = gotPara[i]
+			if i >= wantParaLen-1 && funcTyp.IsVariadic {
+				obj, ok := ssa.ToObjectType(funcTyp.Parameter[lenOfFuncParams-1])
+				if !ok {
+					// ignore
+					log.Errorf("TypeCheckCall: [%s] last Parameter not a object type", funName)
+					break
+				} else if obj.Kind != ssa.SliceTypeKind {
+					// ignore
+					log.Errorf("TypeCheckCall: [%s] last Parameter not a slice type", funName)
+					break
+				}
+				want = obj.FieldType
+			} else {
+				want = funcTyp.Parameter[i]
 			}
-			checkParamType(i)
+			checkParamType(i, got, want)
 		}
 	}()
 	if len(c.GetAllVariables()) == 0 && len(c.GetUsers()) == 0 {
