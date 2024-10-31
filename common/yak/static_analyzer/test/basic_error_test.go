@@ -28,7 +28,9 @@ func TestFunctionCallTypeCheck(t *testing.T) {
 	t.Run("variadic function call, error type in variadic parament", func(t *testing.T) {
 		check(t, `
 		ssa.Parse("a", 1)
-		`, []string{})
+		`, []string{
+			ssa4analyze.ArgumentTypeError(2, "number", "ssaapi.Option", "ssa.Parse"),
+		})
 	})
 
 	t.Run("variadic function call, error type both", func(t *testing.T) {
@@ -36,6 +38,7 @@ func TestFunctionCallTypeCheck(t *testing.T) {
 		ssa.Parse(1, 1) 
 		`, []string{
 			ssa4analyze.ArgumentTypeError(1, "number", "string", "ssa.Parse"),
+			ssa4analyze.ArgumentTypeError(2, "number", "ssaapi.Option", "ssa.Parse"),
 		})
 	})
 }
