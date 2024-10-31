@@ -27,7 +27,10 @@ func TestParseJar(t *testing.T) {
 		if jarFs.Ext(path) != ".class" {
 			return nil
 		}
-		if path != "org/apache/xalan/xsltc/dom/SAXImpl.class" {
+		//if path == "org/apache/velocity/runtime/parser/Parser.class" {
+		//	return nil
+		//}
+		if path != "org/apache/velocity/runtime/parser/Parser.class" {
 			return nil
 		}
 		data, err := jarFs.ReadFile(path)
@@ -82,7 +85,7 @@ func TestDemoClass(t *testing.T) {
 	assert.Equal(t, string(expectSource), source)
 }
 func TestClassFile(t *testing.T) {
-	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/TryCatch.class")
+	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/BreakLabel.class")
 	cf, err := Parse(classesContent)
 	if err != nil {
 		t.Fatal(err)

@@ -13,6 +13,90 @@ type rewriterFunc func(statementManager *StatementManager) error
 
 func IfRewriter(manager *StatementManager) error {
 	for _, ifNode := range manager.IfNodes {
+		ifNode := ifNode
+		if ifNode.IsCircle {
+			continue
+		}
+		trueNode := ifNode.TrueNode()
+		falseNode := ifNode.FalseNode()
+		ifNode.RemoveAllNext()
+		mergeNode := ifNode.MergeNode
+		if mergeNode != nil {
+			ifNode.AddNext(mergeNode)
+		}
+		ifStatement := statements.NewIfStatement(nil, nil, nil)
+		originNodeStatement := ifNode.Statement
+		ifNode.Statement = ifStatement
+		//var mergeNode *core.Node
+		//var ok1, ok2 bool
+		//core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
+		//	if node == ifNode.MergeNode {
+		//		ok1 = true
+		//		return nil, nil
+		//	}
+		//	return node.Next, nil
+		//})
+		//core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
+		//	if node == ifNode.MergeNode {
+		//		ok2 = true
+		//		return nil, nil
+		//	}
+		//	return node.Next, nil
+		//})
+		//if ok1 && ok2 {
+		//	mergeNode = ifNode.MergeNode
+		//}
+		//if slices.Contains(manager.DominatorMap[ifNode], ifNode.MergeNode) {
+		//	ifNode.AddNext(ifNode.MergeNode)
+		//}
+		manager.AddFinalAction(func() error {
+			getBody := func(bodyStartNode *core.Node) ([]statements.Statement, error) {
+				sts := []statements.Statement{}
+				err := core.WalkGraph[*core.Node](bodyStartNode, func(node *core.Node) ([]*core.Node, error) {
+					if mergeNode != nil && node == mergeNode {
+						return nil, nil
+					}
+					if len(node.Next) > 1 {
+						return nil, fmt.Errorf("invalid if node %d", node.Id)
+					}
+					sts = append(sts, node.Statement)
+					//var next []*core.Node
+					//for _, n := range node.Next {
+					//	if n.LoopBreak || slices.Contains(manager.DominatorMap[node], n) {
+					//		next = append(next, n)
+					//	}
+					//}
+					return node.Next, nil
+				})
+				if err != nil {
+					return nil, err
+				}
+				return sts, nil
+			}
+			condition := originNodeStatement.(*statements.ConditionStatement).Condition
+			ifStatement.Condition = condition
+			if trueNode != nil {
+				ifBody, err := getBody(trueNode)
+				if err != nil {
+					return err
+				}
+				ifStatement.IfBody = ifBody
+			}
+			if falseNode != nil {
+				elseBody, err := getBody(falseNode)
+				if err != nil {
+					return err
+				}
+
+				ifStatement.ElseBody = elseBody
+			}
+			return nil
+		})
+	}
+	return nil
+}
+func _IfRewriter(manager *StatementManager) error {
+	for _, ifNode := range manager.IfNodes {
 		if ifNode.IsCircle {
 			continue
 		}

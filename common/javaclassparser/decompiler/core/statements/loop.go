@@ -7,6 +7,7 @@ import (
 )
 
 type DoWhileStatement struct {
+	Label          string
 	ConditionValue values.JavaValue
 	Body           []Statement
 }
@@ -18,7 +19,11 @@ func NewDoWhileStatement(condition values.JavaValue, body []Statement) *DoWhileS
 	}
 }
 func (w *DoWhileStatement) String(funcCtx *class_context.ClassContext) string {
-	return fmt.Sprintf("do{\n%s\n}while(%s)", StatementsString(w.Body, funcCtx), w.ConditionValue.String(funcCtx))
+	s := fmt.Sprintf("do{\n%s\n}while(%s)", StatementsString(w.Body, funcCtx), w.ConditionValue.String(funcCtx))
+	if w.Label != "" {
+		return fmt.Sprintf("%s: %s", w.Label, s)
+	}
+	return s
 }
 
 type WhileStatement struct {
@@ -37,14 +42,14 @@ func (w *WhileStatement) String(funcCtx *class_context.ClassContext) string {
 }
 
 type TryCatchStatement struct {
-	Exception *values.JavaRef
-	TryBody   []Statement
+	Exception   *values.JavaRef
+	TryBody     []Statement
 	CatchBodies [][]Statement
 }
 
 func NewTryCatchStatement(body1 []Statement, body2 [][]Statement) *TryCatchStatement {
 	return &TryCatchStatement{
-		TryBody:   body1,
+		TryBody:     body1,
 		CatchBodies: body2,
 	}
 }
@@ -53,7 +58,7 @@ func (w *TryCatchStatement) String(funcCtx *class_context.ClassContext) string {
 	for _, body := range w.CatchBodies {
 		bodies = append(bodies, StatementsString(body, funcCtx))
 	}
-	s :=  fmt.Sprintf("try{\n%s\n}", StatementsString(w.TryBody, funcCtx))
+	s := fmt.Sprintf("try{\n%s\n}", StatementsString(w.TryBody, funcCtx))
 	for _, body := range bodies {
 		s += fmt.Sprintf("catch{\n%s\n}", body)
 	}

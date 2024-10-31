@@ -2,11 +2,14 @@ package rewriter
 
 import (
 	"errors"
+	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
+	"golang.org/x/exp/slices"
 )
 
 type LoopStatement struct {
@@ -14,11 +17,165 @@ type LoopStatement struct {
 	BodyStart *core.Node
 }
 
-func LoopRewriter(manager *StatementManager) error {
+func LoopRewriter1(manager *StatementManager) error {
 	for _, node := range manager.CircleEntryPoint {
-		if node.Id == 33 || node.Id == 379 {
-			print()
+		doWhileSt := statements.NewDoWhileStatement(values.NewJavaLiteral(true, types.NewJavaPrimer(types.JavaBoolean)), nil)
+		doWhileNode := manager.NewNode(doWhileSt)
+
+		circleNodeSource := slices.Clone(node.Source)
+		node.RemoveAllSource()
+
+		//node.LoopNode = doWhileNode
+		//doWhileNode.AddNext(circleNode)
+		for _, n := range circleNodeSource {
+			doWhileNode.AddSource(n)
 		}
+		doWhileNode.AddNext(node)
+		if node.LoopEndNode != nil {
+			doWhileNode.AddNext(node.LoopEndNode)
+		}
+		manager.WhileNode = append(manager.WhileNode, doWhileNode)
+	}
+	return nil
+}
+func LoopRewriter(manager *StatementManager, node *core.Node) error {
+	circleNode := node
+	loopStart := circleNode.Next[0]
+	var loopEnd *core.Node
+	if len(circleNode.Next) == 2 {
+		loopEnd = circleNode.Next[1]
+	}
+	core.WalkGraph[*core.Node](loopStart, func(node *core.Node) ([]*core.Node, error) {
+		nextList := []*core.Node{}
+		allNext := slices.Clone(node.Next)
+		for _, next := range allNext {
+			if next == circleNode {
+				continueNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+					return "continue"
+				}))
+				node.RemoveNext(next)
+				node.AddNext(continueNode)
+				continue
+			}
+			if loopEnd != nil && next == loopEnd {
+				breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+					return "break"
+				}))
+				node.RemoveNext(next)
+				node.AddNext(breakNode)
+				continue
+			}
+			if !slices.Contains(manager.DominatorMap[node], next) {
+				breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+					return "break"
+				}))
+				breakNode.HideNext = next
+				manager.UncertainBreakNodes = append(manager.UncertainBreakNodes, [2]*core.Node{circleNode, breakNode})
+				node.RemoveNext(next)
+				node.AddNext(breakNode)
+				continue
+			}
+			nextList = append(nextList, next)
+		}
+		return nextList, nil
+	})
+	circleNode.RemoveNext(loopStart)
+	manager.AddFinalAction(func() error {
+		//for _, n := range allNext {
+		//	circleNode.AddNext(n)
+		//}
+		body, err := manager.ToStatementsFromNode(loopStart, nil)
+		if err != nil {
+			return err
+		}
+		doWhile := circleNode.Statement.(*statements.DoWhileStatement)
+		doWhile.Body = append(doWhile.Body, core.NodesToStatements(body)...)
+		return nil
+	})
+	return nil
+}
+func _1LoopRewriter(manager *StatementManager) error {
+	for _, node := range manager.WhileNode {
+		circleNode := node
+		core.WalkGraph[*core.Node](circleNode, func(node *core.Node) ([]*core.Node, error) {
+			var next []*core.Node
+			originNext := slices.Clone(node.Next)
+			for _, n := range originNext {
+				if slices.Contains(manager.DominatorMap[node], n) {
+					next = append(next, n)
+				} else {
+					if circleNode.CircleNodesSet.Has(n) {
+						if n == circleNode {
+							continueNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+								return "continue"
+							}))
+							node.RemoveNext(n)
+							node.AddNext(continueNode)
+							continueNode.LoopBreak = true
+							continueNode.HideNext = n
+						} else {
+							return nil, fmt.Errorf("invalid circle node %d", n.Id)
+						}
+					} else {
+						breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+							return "break"
+						}))
+						if utils.IsDominate(manager.DominatorMap, circleNode, n) {
+							//if circleNode.LoopEndNode == nil {
+							//	circleNode.LoopEndNode = n
+							//} else {
+							//	if circleNode.LoopEndNode != n {
+							//		return nil, errors.New("loop end node conflict")
+							//	}
+							//}
+						} else {
+							//if circleNode.UncertainBreakNodes == nil {
+							//	circleNode.UncertainBreakNodes = make(map[*core.Node]*core.Node)
+							//}
+							//circleNode.UncertainBreakNodes[node] = breakNode
+							manager.UncertainBreakNodes = append(manager.UncertainBreakNodes, [2]*core.Node{circleNode, breakNode})
+						}
+						node.RemoveNext(n)
+						node.AddNext(breakNode)
+						breakNode.LoopBreak = true
+						breakNode.HideNext = n
+					}
+				}
+			}
+			return next, nil
+		})
+		node.IsDoWhile = true
+		//node.RemoveAllNext()
+		doWhileSt := statements.NewDoWhileStatement(values.NewJavaLiteral(true, types.NewJavaPrimer(types.JavaBoolean)), nil)
+		doWhileNode := manager.NewNode(doWhileSt)
+		circleNodeSource := slices.Clone(node.Source)
+		node.RemoveAllSource()
+		//doWhileNode.AddNext(circleNode)
+		for _, n := range circleNodeSource {
+			doWhileNode.AddSource(n)
+		}
+		if circleNode.LoopEndNode != nil {
+			doWhileNode.AddNext(circleNode.LoopEndNode)
+		}
+		//allNext := slices.Clone(node.Next)
+		//node.RemoveAllNext()
+		manager.AddFinalAction(func() error {
+			//for _, n := range allNext {
+			//	circleNode.AddNext(n)
+			//}
+			body, err := manager.ToStatementsFromNode(circleNode, nil)
+			if err != nil {
+				return err
+			}
+			doWhileSt.Body = append(doWhileSt.Body, core.NodesToStatements(body)...)
+			circleNode.Statement = doWhileSt
+			return nil
+		})
+	}
+	return nil
+}
+func _LoopRewriter(manager *StatementManager) error {
+	for _, node := range manager.CircleEntryPoint {
 		originNodeNext := make([]*core.Node, len(node.Next))
 		copy(originNodeNext, node.Next)
 		LoopEndNode := node.GetLoopEndNode()
@@ -35,7 +192,6 @@ func LoopRewriter(manager *StatementManager) error {
 
 		} else {
 			loopconditionStat, ok := node.Statement.(*statements.ConditionStatement)
-
 			if ok {
 				for i, n := range node.Next {
 					if !circleSetHas(n) && n == LoopEndNode {
