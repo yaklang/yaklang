@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 	"maps"
 	"sort"
 	"strings"
@@ -292,6 +293,46 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
+	dominatorMap := GenerateDominatorTree(d.OpCodeRoot, func(code *OpCode) []*OpCode {
+		return code.Target
+	}, func(code *OpCode) []*OpCode {
+		return code.Source
+	})
+	codes := GraphToList(d.OpCodeRoot)
+	codes = funk.Filter(codes, func(code *OpCode) bool {
+		switch code.Instr.OpCode {
+		case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
+			return true
+		default:
+			return false
+		}
+	}).([]*OpCode)
+	for _, ifNode := range codes {
+		if len(dominatorMap[ifNode]) == 3 {
+			mergeNode := funk.Filter(dominatorMap[ifNode], func(code *OpCode) bool {
+				return code != ifNode.Target[0] && code != ifNode.Target[1]
+			}).([]*OpCode)[0]
+			if len(mergeNode.Instr.StackPopped) > 0 {
+				ifNode.TrueNode = ifNode.Target[1]
+				ifNode.FalseNode = ifNode.Target[0]
+				ifNode.Target = []*OpCode{mergeNode}
+				ifNode.IsTernaryNode = true
+				ifNode.MergeNode = mergeNode
+				WalkGraph(ifNode.TrueNode, func(code *OpCode) ([]*OpCode, error) {
+					if len(code.Target) > 0 && code.Target[0] == mergeNode {
+						code.Target = nil
+					}
+					return code.Target, nil
+				})
+				WalkGraph(ifNode.FalseNode, func(code *OpCode) ([]*OpCode, error) {
+					if len(code.Target) > 0 && code.Target[0] == mergeNode {
+						code.Target = nil
+					}
+					return code.Target, nil
+				})
+			}
+		}
+	}
 
 	// convert opcode to statement
 	var nodes []*Node
@@ -308,7 +349,7 @@ func (d *Decompiler) ParseStatement() error {
 	//addStatementHandle := func(handle func(getter func(id int) (toStatement int))) {
 	//	statementHandle = append(statementHandle, handle)
 	//}
-
+	opcodeIdToNode := map[int]func(f func(value values.JavaValue) values.JavaValue){}
 	getConstantPoolValue := func(opcode *OpCode) values.JavaValue {
 		return d.getPoolValue(int(Convert2bytesToInt(opcode.Data)))
 	}
@@ -354,13 +395,35 @@ func (d *Decompiler) ParseStatement() error {
 			appendNode(statements.NewAssignStatement(ref, val, true))
 		}
 	}
-	parseOpcode := func(opcode *OpCode) {
-		if opcode.Id == 307 {
-			print()
-		}
+	var runCode func(startNode *OpCode) error
+	var parseOpcode func(opcode *OpCode)
+	parseOpcode = func(opcode *OpCode) {
 		//opcodeIndex := opcode.Id
 		statementsIndex = opcode.Id
 		stackVarIndex = mapCodeToStackVarIndex[opcode]
+		if opcode.IsTernaryNode {
+			opcode.IsTernaryNode = false
+			parseOpcode(opcode)
+			currentStack := runtimeStackSimulation
+			node := utils.GetLastElement(nodes)
+			node.IsDel = true
+			conditionSt := node.Statement.(*statements.ConditionStatement)
+			//nodes = nodes[:len(nodes)-1]
+			condition := conditionSt.Condition
+			err := runCode(opcode.TrueNode)
+			if err != nil {
+				panic(err)
+			}
+			data1 := runtimeStackSimulation.Peek()
+			err = runCode(opcode.FalseNode)
+			if err != nil {
+				panic(err)
+			}
+			data2 := runtimeStackSimulation.Peek()
+			currentStack.Push(values.NewTernaryExpression(condition, data1.(values.JavaValue), data2.(values.JavaValue)))
+			runtimeStackSimulation = currentStack
+			return
+		}
 		switch opcode.Instr.OpCode {
 		case OP_ALOAD, OP_ILOAD, OP_LLOAD, OP_DLOAD, OP_FLOAD, OP_ALOAD_0, OP_ILOAD_0, OP_LLOAD_0, OP_DLOAD_0, OP_FLOAD_0, OP_ALOAD_1, OP_ILOAD_1, OP_LLOAD_1, OP_DLOAD_1, OP_FLOAD_1, OP_ALOAD_2, OP_ILOAD_2, OP_LLOAD_2, OP_DLOAD_2, OP_FLOAD_2, OP_ALOAD_3, OP_ILOAD_3, OP_LLOAD_3, OP_DLOAD_3, OP_FLOAD_3:
 			if opcode.Id == 46 {
@@ -423,7 +486,11 @@ func (d *Decompiler) ParseStatement() error {
 			slot := GetStoreIdx(opcode)
 			value := runtimeStackSimulation.Pop().(values.JavaValue)
 			ref, isFirst := d.AssignVar(slot, value)
-			appendNode(statements.NewAssignStatement(ref, value, isFirst))
+			assignSt := statements.NewAssignStatement(ref, value, isFirst)
+			appendNode(assignSt)
+			opcodeIdToNode[opcode.Id] = func(f func(value values.JavaValue) values.JavaValue) {
+				assignSt.JavaValue = f(assignSt.JavaValue)
+			}
 		case OP_NEW:
 			n := Convert2bytesToInt(opcode.Data)
 			javaClass := d.constantPoolGetter(int(n)).(*values.JavaClassValue)
@@ -473,7 +540,11 @@ func (d *Decompiler) ParseStatement() error {
 			value := runtimeStackSimulation.Pop().(values.JavaValue)
 			index := runtimeStackSimulation.Pop().(values.JavaValue)
 			ref := runtimeStackSimulation.Pop().(values.JavaValue)
-			appendNode(statements.NewArrayMemberAssignStatement(values.NewJavaArrayMember(ref, index), value))
+			assignSt := statements.NewArrayMemberAssignStatement(values.NewJavaArrayMember(ref, index), value)
+			appendNode(assignSt)
+			opcodeIdToNode[opcode.Id] = func(f func(value values.JavaValue) values.JavaValue) {
+				assignSt.JavaValue = f(assignSt.JavaValue)
+			}
 		case OP_LCMP, OP_DCMPG, OP_DCMPL, OP_FCMPG, OP_FCMPL:
 			var1 := runtimeStackSimulation.Pop().(values.JavaValue)
 			var2 := runtimeStackSimulation.Pop().(values.JavaValue)
@@ -776,7 +847,11 @@ func (d *Decompiler) ParseStatement() error {
 			staticVal := d.constantPoolGetter(int(index))
 			value := runtimeStackSimulation.Pop().(values.JavaValue)
 			field := values.NewRefMember(runtimeStackSimulation.Pop().(values.JavaValue), staticVal.(*values.JavaClassMember).Member, staticVal.(*values.JavaClassMember).JavaType)
-			appendNode(statements.NewAssignStatement(field, value, false))
+			assignSt := statements.NewAssignStatement(field, value, false)
+			appendNode(assignSt)
+			opcodeIdToNode[opcode.Id] = func(f func(val values.JavaValue) values.JavaValue) {
+				assignSt.JavaValue = f(assignSt.JavaValue)
+			}
 		case OP_SWAP:
 			v1 := runtimeStackSimulation.Pop()
 			v2 := runtimeStackSimulation.Pop()
@@ -1006,40 +1081,43 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
-	err = WalkGraph[*OpCode](d.opCodes[0], func(node *OpCode) ([]*OpCode, error) {
-		var validSource *OpCode
-		if len(node.Source) != 0 {
-			for _, s := range node.Source {
-				if _, ok := opcodeToVarTable[s]; ok {
-					validSource = s
-					break
+	runCode = func(startNode *OpCode) error {
+		return WalkGraph[*OpCode](startNode, func(node *OpCode) ([]*OpCode, error) {
+			var validSource *OpCode
+			if len(node.Source) != 0 {
+				for _, s := range node.Source {
+					if _, ok := opcodeToVarTable[s]; ok {
+						validSource = s
+						break
+					}
+				}
+				if validSource != nil {
+					d.varTable = opcodeToVarTable[validSource][0].(map[int]*values.JavaRef)
+					d.currentVarId = opcodeToVarTable[validSource][1].(int)
+					if len(validSource.Target) > 1 {
+						newMap := map[int]*values.JavaRef{}
+						maps.Copy(newMap, d.varTable)
+						d.varTable = newMap
+					}
 				}
 			}
-			if validSource != nil {
-				d.varTable = opcodeToVarTable[validSource][0].(map[int]*values.JavaRef)
-				d.currentVarId = opcodeToVarTable[validSource][1].(int)
-				if len(validSource.Target) > 1 {
-					newMap := map[int]*values.JavaRef{}
-					maps.Copy(newMap, d.varTable)
-					d.varTable = newMap
-				}
+			if node.Id == 291 {
+				print()
 			}
-		}
-		if node.Id == 291 {
-			print()
-		}
-		if node.IsCatch {
-			typ := d.GetValueFromPool(int(node.ExceptionTypeIndex))
-			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-				return "Exception"
-			}, func() types.JavaType {
-				return typ.Type()
-			}))
-		}
-		parseOpcode(node)
-		opcodeToVarTable[node] = []any{d.varTable, d.currentVarId}
-		return node.Target, nil
-	})
+			if node.IsCatch {
+				typ := d.GetValueFromPool(int(node.ExceptionTypeIndex))
+				runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+					return "Exception"
+				}, func() types.JavaType {
+					return typ.Type()
+				}))
+			}
+			parseOpcode(node)
+			opcodeToVarTable[node] = []any{d.varTable, d.currentVarId}
+			return node.Target, nil
+		})
+	}
+	err = runCode(d.opCodes[0])
 	if err != nil {
 		return err
 	}
@@ -1103,11 +1181,38 @@ func (d *Decompiler) ParseStatement() error {
 	//	})
 	//}
 	d.RootNode = nodes[0]
+	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
+		if node.IsDel {
+			sources := slices.Clone(node.Source)
+			next := slices.Clone(node.Next)
+			node.RemoveAllSource()
+			node.RemoveAllNext()
+			for _, source := range sources {
+				for _, n := range next {
+					n.AddSource(source)
+				}
+			}
+			return next, nil
+		}
+		return node.Next, nil
+	})
 	err = d.StandardStatement()
 	if err != nil {
 		return err
 	}
 	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
+		if node.IsDel {
+			sources := slices.Clone(node.Source)
+			next := slices.Clone(node.Next)
+			node.RemoveAllSource()
+			node.RemoveAllNext()
+			for _, source := range sources {
+				for _, n := range next {
+					n.AddSource(source)
+				}
+			}
+			return next, nil
+		}
 		if len(node.Next) > 1 {
 			if _, ok := node.Statement.(*statements.ConditionStatement); ok {
 				return node.Next, nil
