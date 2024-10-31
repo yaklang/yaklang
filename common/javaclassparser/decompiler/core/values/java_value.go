@@ -216,3 +216,24 @@ func (j javaNull) IsJavaType() {
 }
 
 var JavaNull = javaNull{}
+
+type TernaryExpression struct {
+	Condition  JavaValue
+	TrueValue  JavaValue
+	FalseValue JavaValue
+}
+
+func (j TernaryExpression) Type() types.JavaType {
+	return j.TrueValue.Type()
+}
+func (j TernaryExpression) String(funcCtx *class_context.ClassContext) string {
+	return fmt.Sprintf("(%s) ? (%s) : (%s)", j.Condition.String(funcCtx), j.TrueValue.String(funcCtx), j.FalseValue.String(funcCtx))
+}
+
+func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {
+	return &TernaryExpression{
+		Condition:  condition,
+		TrueValue:  v1,
+		FalseValue: v2,
+	}
+}

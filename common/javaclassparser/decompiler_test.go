@@ -13,7 +13,7 @@ import (
 )
 
 func TestParseJar(t *testing.T) {
-	jarFs, err := NewJarFSFromLocal("/Users/z3/Code/idea/yak-yso/yak-yso/lib/ysoserial-for-woodpecker-0.5.2.jar")
+	jarFs, err := NewJarFSFromLocal("/home/z3/Downloads/ysoserial-for-woodpecker-0.5.2.jar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestDemoClass(t *testing.T) {
 	assert.Equal(t, string(expectSource), source)
 }
 func TestClassFile(t *testing.T) {
-	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/BreakLabel.class")
+	classesContent, _ := os.ReadFile("/home/z3/code/java/TernaryExpressionTest.class")
 	cf, err := Parse(classesContent)
 	if err != nil {
 		t.Fatal(err)
