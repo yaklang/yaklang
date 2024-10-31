@@ -7,46 +7,50 @@ desc(
 <include('php-filter-function')> as $filter;
 
 mysql_query(* as $query);
+
 $query #{
-    until: `* & $params`,
-}-> as $root;
-$root?{!<dataflow(<<<CODE
-*?{opcode: call} as $__next__;
-CODE)>} as $result;
-alert $result for {
+    include: `<self> & $params`,
+    exclude: `<self>?{opcode: call}`
+}-> as $high;
+
+alert $high for {
     title: "Direct mysql injection",
     title_zh: "直接的mysql注入不经过任何过滤",
     type: 'vuln',
     level: 'high',
 };
 
-$root?{<dataflow(<<<CODE
-*?{opcode: call && <self> & $filter} as $__next__;
+$query #{
+    include: `<self> & $params`,
+    include: `<self>?{opcode: call && !<self><getCaller> & $filter}`
+}-> as $middle
 
-CODE)>} as $filter_result;
-
-alert $filter_result for {
-    title: 'Filtered sql injection, filter function detected',
-    title_zh: '经过过滤的sql注入，检测到过滤函数',
-    type: 'low',
-    level: 'low'
-};
-
-$root?{<dataflow(<<<CODE
-*?{opcode: call && !<self> & $filter} as $__next__;
-CODE)>} as $seem_filter;
-
-alert $seem_filter for {
+alert $middle for {
     title: 'Filtered sql injection, but no filter function detected',
     title_zh: '经过过滤的sql注入，但未检测到过滤函数',
     type: 'mid',
     level: 'mid'
 };
 
+
+$query #{
+    include: `<self> & $params`,
+    include: `<self>?{opcode: call && <self><getCaller> & $filter}`
+}-> as $low
+
+alert $low for {
+    title: 'Filtered sql injection, filter function detected',
+    title_zh: '经过过滤的sql注入，检测到过滤函数',
+    type: 'low',
+    level: 'low'
+};
+
+
 desc(
+    alert_min: 3,
     alert_high: 1,
     lang: php,
-    'file:///mysql.php': <<<UNSAFE
+    'file:///high.php': <<<UNSAFE
 <?php
     $llink=$_GET['r'];
     $query = "SELECT * FROM nav WHERE link='$llink'";
@@ -57,7 +61,8 @@ UNSAFE
 
 desc(
     lang: php,
-    'file:///mysql_filter.php': <<<CODE
+    alert_low: 1,
+    'file:///low.php': <<<CODE
 <?php
     $llink=addslashes($_GET['1']);
     $query = "SELECT * FROM nav WHERE link='$llink'";
@@ -69,7 +74,7 @@ CODE
 desc(
     alert_mid: '1',
     lang: php,
-    'file:///mysql_inject.php': <<<UNSAFE
+    'file:///middle.php': <<<UNSAFE
 <?php
     $llink=trim($_GET['1']);
     $query = "SELECT * FROM nav WHERE link='$llink'";

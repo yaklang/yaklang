@@ -4,10 +4,8 @@ desc(
     lib: 'php-file-unlink'
 )
 
-unlink as $unlink
-rmdir as $rmdir
 
-$rmdir + $unlink as $output
+/^(unlink|rmdir)$/ as $output
 
 alert $output
 
@@ -30,5 +28,9 @@ desc(
     } else {
         echo '目录不存在';
     }
-PARAM
+PARAM,
+    'safefile://safe.php':<<<CODE
+<?php
+    unlinkx();
+CODE
 )

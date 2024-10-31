@@ -5,10 +5,7 @@ desc(
     lib: 'php-file-read'
 )
 
-fopen as $sink1
-file_get_contents as $sink2
-
-$sink1 + $sink2 as $output
+/^(fopen|file_get_contents)$/ as $output
 
 alert $output
 
