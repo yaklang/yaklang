@@ -622,17 +622,53 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}, false)
 }
 
+func (b *astbuilder) getReceiver(stmt *gol.ReceiverContext) []string {
+	if parameters := stmt.Parameters(); parameters != nil {
+		return b.getReceiverParameter(parameters.(*gol.ParametersContext))
+	}
+	return []string{}
+}
+
+func (b *astbuilder) getReceiverParameter(parms *gol.ParametersContext) []string {
+	var types []string
+
+	if f := parms.AllParameterDecl(); f != nil {
+		for _, i := range f {
+			types = append(types, b.getReceiverDecl(i.(*gol.ParameterDeclContext)))
+		}
+	}
+
+	return types
+}
+
+func (b *astbuilder) getReceiverDecl(para *gol.ParameterDeclContext) string {
+	if typ := para.Type_(); typ != nil {
+		if lit := typ.(*gol.Type_Context).TypeLit(); lit != nil {
+		}
+		if typ.GetText()[0] == '*' {
+			return typ.GetText()[1:]
+		}
+		return typ.GetText()
+	}
+	return ""
+}
+
 func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	var params []ssa.Type
 	var result ssa.Type
 
 	funcName := ""
+	methodName := ""
 	if Name := fun.IDENTIFIER(); Name != nil {
-		funcName = Name.GetText()
+		methodName = Name.GetText()
+		if recove := fun.Receiver(); recove != nil {
+			ssatypName := b.getReceiver(recove.(*gol.ReceiverContext))
+			funcName = fmt.Sprintf("%s_%s", ssatypName[0], methodName)
+		}
 	}
 
 	newFunc := b.NewFunc(funcName)
-	newFunc.SetMethodName(funcName)
+	newFunc.SetMethodName(methodName)
 
 	hitDefinedFunction := false
 	MarkedFunctionType := b.GetMarkedFunction()
@@ -669,7 +705,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 			ssatyp := b.buildReceiver(recove.(*gol.ReceiverContext))
 			for _, t := range ssatyp {
 				if it, ok := ssa.ToObjectType(t); ok {
-					it.AddMethod(funcName, newFunc)
+					it.AddMethod(methodName, newFunc)
 				}
 			}
 		}
