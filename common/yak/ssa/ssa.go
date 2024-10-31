@@ -217,6 +217,8 @@ type Program struct {
 	// class blue print
 	ClassBluePrint map[string]*Blueprint
 
+	Blueprint2prog map[*Blueprint]*Program
+
 	ExportValue map[string]Value
 	ExportType  map[string]Type
 

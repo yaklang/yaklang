@@ -583,7 +583,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}
 
 	PreHandlerBlock := b.CurrentBlock
-	newFunc.SetLazyBuilder(func() {
+	newFunc.AddLazyBuilder(func() {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		CurrentBlock := b.CurrentBlock
 		b.CurrentBlock = PreHandlerBlock
@@ -677,7 +677,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	}
 
 	PreHandlerBlock := b.CurrentBlock
-	newFunc.SetLazyBuilder(func() {
+	newFunc.AddLazyBuilder(func() {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		CurrentBlock := b.CurrentBlock
 		b.CurrentBlock = PreHandlerBlock

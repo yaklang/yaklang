@@ -37,6 +37,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ExternInstance:          make(map[string]any),
 		ExternLib:               make(map[string]map[string]any),
 		importDeclares:          omap.NewOrderedMap(make(map[string]*importDeclareItem)),
+		Blueprint2prog:          make(map[*Blueprint]*Program),
 	}
 	if kind == Application {
 		prog.Application = prog

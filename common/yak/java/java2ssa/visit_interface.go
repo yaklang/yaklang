@@ -1,6 +1,7 @@
 package java2ssa
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -158,24 +159,28 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 				recoverRange := y.SetRange(member)
 				defer recoverRange()
 			}
-
-			fakeFunc := y.NewFunc(member.Identifier().GetText())
-			fakeFunc.SetMethodName(member.Identifier().GetText())
-			y.FunctionBuilder = y.PushFunction(fakeFunc)
-			thisPara := y.NewParam("this", raw)
-			thisPara.SetType(this)
-			y.VisitFormalParameters(member.FormalParameters())
-			y.VisitMethodBody(member.MethodBody())
-			if len(fakeFunc.Return) <= 0 {
-				retVal := y.EmitUndefined("")
-				if t := y.VisitTypeTypeOrVoid(member.TypeTypeOrVoid()); t != nil {
-					retVal.SetType(t)
+			methodName := member.Identifier().GetText()
+			funcName := fmt.Sprintf("%s_%s", this.Name, methodName)
+			fakeFunc := y.NewFunc(funcName)
+			fakeFunc.SetMethodName(methodName)
+			this.RegisterNormalMethod(member.Identifier().GetText(), fakeFunc)
+			fakeFunc.AddLazyBuilder(func() {
+				y.FunctionBuilder = y.PushFunction(fakeFunc)
+				thisPara := y.NewParam("this", raw)
+				thisPara.SetType(this)
+				y.VisitFormalParameters(member.FormalParameters())
+				y.VisitMethodBody(member.MethodBody())
+				if len(fakeFunc.Return) <= 0 {
+					retVal := y.EmitUndefined("")
+					if t := y.VisitTypeTypeOrVoid(member.TypeTypeOrVoid()); t != nil {
+						retVal.SetType(t)
+					}
+					fakeRet := y.EmitReturn([]ssa.Value{retVal})
+					fakeFunc.Return = append(fakeFunc.Return, fakeRet)
 				}
-				fakeRet := y.EmitReturn([]ssa.Value{retVal})
-				fakeFunc.Return = append(fakeFunc.Return, fakeRet)
-			}
-			y.Finish()
-			y.FunctionBuilder = y.PopFunction()
+				y.Finish()
+				y.FunctionBuilder = y.PopFunction()
+			})
 
 			for _, anno := range member.AllAnnotation() {
 				ins, def := y.VisitAnnotation(anno)
@@ -186,22 +191,26 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 					defCallbacks = append(defCallbacks, def)
 				}
 			}
-
-			memberName := member.Identifier().GetText()
-			val := fakeFunc
-			for _, ins := range insCallbacks {
-				ins(val)
-			}
-			for _, def := range defCallbacks {
-				def(val)
-			}
-			for _, cb := range cbs {
-				cb(val)
-			}
-			for _, def := range defs {
-				def(val)
-			}
-			this.AddMethod(memberName, val)
+			this.AddLazyBuilder(func() {
+				for _, ins := range insCallbacks {
+					ins(fakeFunc)
+				}
+				for _, def := range defCallbacks {
+					def(fakeFunc)
+				}
+				for _, cb := range cbs {
+					cb(fakeFunc)
+				}
+				for _, def := range defs {
+					def(fakeFunc)
+				}
+				for _, function := range this.NormalMethod {
+					function.Build()
+				}
+				for _, function := range this.StaticMethod {
+					function.Build()
+				}
+			})
 			// handler(memberName, val)
 		} else if ret := recv.GenericInterfaceMethodDeclaration(); ret != nil {
 			recoverRange := y.SetRange(ret)

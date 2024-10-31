@@ -47,6 +47,8 @@ func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...C
 	if err := blueprint.InitializeWithContainer(klassContainer); err != nil {
 		log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
 	}
+	app := b.GetProgram().GetApplication()
+	app.Blueprint2prog[blueprint] = b.GetProgram()
 	return blueprint
 }
 func (b *FunctionBuilder) CreateBluePrint(name string, tokenizer ...CanStartStopToken) *Blueprint {

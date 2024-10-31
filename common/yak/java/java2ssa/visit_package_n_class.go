@@ -136,32 +136,44 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 			y.AssignVariable(variable, y.EmitConstInst(strings.Join(classlessParents, ",")))
 		})
 	}
-
-	//if i.PERMITS() != nil {
-	//	idx := 1
-	//	if !haveImplements {
-	//		idx = 0
-	//	}
-	//	log.Infof("class: %v java17 permits: %v", className, i.TypeList(idx).GetText())
-	//}
-
-	for _, parentClass := range mergedTemplate {
-		if parent := y.GetBluePrint(parentClass); parent != nil {
-			class.AddParentClass(parent)
-		} else {
-			parentBP := y.CreateBluePrint(parentClass)
-			y.AddFullTypeNameForAllImport(parentClass, parentBP)
-			class.AddParentClass(parentBP)
-		}
-	}
-	y.VisitClassBody(i.ClassBody(), class)
 	container := class.GetClassContainer()
-	defer func() {
-		for _, callback := range classContainerCallback {
-			callback(container)
+	y.VisitClassBody(i.ClassBody(), class)
+	for _, callback := range classContainerCallback {
+		callback(container)
+	}
+	/*
+		该lazyBuilder顺序按照cls解析顺序
+	*/
+	class.AddLazyBuilder(func() {
+		_, f := y.switchProg(class)
+		defer f()
+		for _, parentClass := range mergedTemplate {
+			if bluePrint := y.GetBluePrint(parentClass); bluePrint != nil {
+				class.AddParentClass(bluePrint)
+			} else {
+				parentX := y.CreateBluePrint(parentClass)
+				y.AddFullTypeNameForAllImport(parentClass, parentX)
+				class.AddParentClass(parentX)
+			}
 		}
-	}()
+		for _, function := range class.NormalMethod {
+			function.Build()
+		}
+		for _, function := range class.StaticMethod {
+			function.Build()
+		}
+	})
 	return container
+}
+func (y *builder) switchProg(blueprint *ssa.Blueprint) (*ssa.Program, func()) {
+	app := y.GetProgram().GetApplication()
+	program := app.Blueprint2prog[blueprint]
+	functionBuilder := program.GetAndCreateFunctionBuilder("", "init")
+	currentBuilder := y.FunctionBuilder
+	y.FunctionBuilder = functionBuilder
+	return program, func() {
+		y.FunctionBuilder = currentBuilder
+	}
 }
 
 func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Blueprint) interface{} {
@@ -178,12 +190,8 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Bl
 	y.PushBluePrint(class)
 	defer y.PopBluePrint()
 
-	builders := make([]func(), len(i.AllClassBodyDeclaration()))
-	for i, ret := range i.AllClassBodyDeclaration() {
-		builders[i] = y.VisitClassBodyDeclaration(ret, class)
-	}
-	for _, build := range builders {
-		build()
+	for _, ret := range i.AllClassBodyDeclaration() {
+		y.VisitClassBodyDeclaration(ret, class)
 	}
 	return nil
 }
@@ -210,51 +218,50 @@ func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext)
 
 }
 
-func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.Blueprint) func() {
+func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
-		return func() {}
+		return
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.MemberDeclarationContext)
 	if i == nil {
-		return func() {}
+		return
 	}
 	annotationFunc, defCallbacks, isStatic := y.VisitModifiers(modifiers)
 	_ = annotationFunc
 	_ = defCallbacks
+	if i.ConstructorDeclaration() != nil {
+		y.VisitConstructorDeclaration(i.ConstructorDeclaration(), class)
+	} else if i.FieldDeclaration() != nil {
+		class.AddLazyBuilder(func() {
+			_, f := y.switchProg(class)
+			defer f()
+			setMember := class.RegisterNormalMember
+			if isStatic {
+				setMember = class.RegisterStaticMember
+			}
+			field := i.FieldDeclaration().(*javaparser.FieldDeclarationContext)
 
-	if ret := i.RecordDeclaration(); ret != nil {
+			var fieldType ssa.Type
+			if field.TypeType() != nil {
+				fieldType = y.VisitTypeType(field.TypeType())
+			}
+			_ = fieldType
+
+			variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
+			for _, variableDeclarator := range variableDeclarators {
+				v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
+				name, value := y.VisitVariableDeclarator(v, nil)
+				value.SetType(fieldType)
+				setMember(name, value)
+			}
+		})
+	} else if ret := i.RecordDeclaration(); ret != nil {
 		log.Infof("todo: java17: %v", ret.GetText())
 	} else if ret := i.MethodDeclaration(); ret != nil {
-		return y.VisitMethodDeclaration(ret, class, isStatic, annotationFunc, defCallbacks)
+		y.VisitMethodDeclaration(ret, class, isStatic, annotationFunc, defCallbacks)
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
-	} else if ret := i.FieldDeclaration(); ret != nil {
-		// 声明成员变量
-		setMember := class.RegisterNormalMember
-		if isStatic {
-			setMember = class.RegisterStaticMember
-		}
-		field := ret.(*javaparser.FieldDeclarationContext)
-
-		var fieldType ssa.Type
-		if field.TypeType() != nil {
-			fieldType = y.VisitTypeType(field.TypeType())
-		}
-		_ = fieldType
-
-		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
-		for _, variableDeclarator := range variableDeclarators {
-			v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
-			name, value := y.VisitVariableDeclarator(v, nil)
-			value.SetType(fieldType)
-			setMember(name, value)
-		}
-
-	} else if ret := i.ConstructorDeclaration(); ret != nil {
-		//声明构造函数
-		y.VisitConstructorDeclaration(ret, class)
-
 	} else if ret := i.GenericConstructorDeclaration(); ret != nil {
 
 	} else if ret := i.InterfaceDeclaration(); ret != nil {
@@ -271,7 +278,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		log.Errorf("no member declaration found: %v", i.GetText())
 	}
 
-	return func() {}
+	return
 }
 func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
@@ -495,36 +502,33 @@ func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarations
 		return
 	}
 
-	builders := make([]func(), len(i.AllClassBodyDeclaration()))
-	for i, ret := range i.AllClassBodyDeclaration() {
-		builders[i] = y.VisitClassBodyDeclaration(ret, class)
-	}
-	for _, build := range builders {
-		build()
+	for _, ret := range i.AllClassBodyDeclaration() {
+		y.VisitClassBodyDeclaration(ret, class)
 	}
 }
 
 func (y *builder) VisitClassBodyDeclaration(
 	raw javaparser.IClassBodyDeclarationContext,
 	class *ssa.Blueprint,
-) func() {
+) {
 	if y == nil || raw == nil || y.IsStop() {
-		return func() {}
+		return
 	}
 
 	i, _ := raw.(*javaparser.ClassBodyDeclarationContext)
 	if i == nil {
-		return func() {}
+		return
 	}
 
 	if ret := i.Block(); ret != nil {
+		//todo：可能也得加入到lazyBuilder中
 		y.VisitBlock(i.Block())
 	} else if ret := i.MemberDeclaration(); ret != nil {
 		if class != nil {
-			return y.VisitMemberDeclaration(ret, i.Modifiers(), class)
+			y.VisitMemberDeclaration(ret, i.Modifiers(), class)
 		}
 	}
-	return func() {}
+	return
 }
 
 func (y *builder) VisitAnnotationTypeDeclaration(raw javaparser.IAnnotationTypeDeclarationContext) interface{} {
@@ -562,93 +566,53 @@ func (y *builder) VisitMethodDeclaration(
 	class *ssa.Blueprint, isStatic bool,
 	annotationFunc []func(ssa.Value),
 	defCallback []func(ssa.Value),
-) func() {
+) {
 	if y == nil || raw == nil || y.IsStop() {
-		return func() {}
+		return
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.MethodDeclarationContext)
 	if i == nil {
-		return func() {}
+		return
 	}
 
 	key := i.Identifier().GetText()
 	funcName := fmt.Sprintf("%s_%s", class.Name, key)
 	methodName := key
-
+	newFunc := y.NewFunc(funcName)
+	newFunc.SetMethodName(methodName)
 	if isStatic {
-		newFunction := y.NewFunc(funcName)
-		newFunction.SetMethodName(methodName)
-
-		build := func() {
-			recoverRange := y.SetRange(raw)
-			defer recoverRange()
-			y.FunctionBuilder = y.PushFunction(newFunction)
-			y.MarkedThisClassBlueprint = class
-			y.VisitFormalParameters(i.FormalParameters())
-			y.VisitMethodBody(i.MethodBody())
-			y.SetCurrentReturnType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
-			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
-			y.Finish()
-			y.FunctionBuilder = y.PopFunction()
-			if len(annotationFunc) > 0 || len(defCallback) > 0 {
-				log.Infof("start to build annotation ref to def: %v", funcName)
-			}
-			newFunction.Type.AddAnnotationFunc(annotationFunc...)
-			for _, def := range defCallback {
-				def(newFunction)
-			}
-			class.RegisterStaticMethod(key, newFunction)
-			//y.AddToPackage(funcName)
-		}
-		class.RegisterConstMember(key, newFunction)
-
-		//y.AssignClassConst(class.Name, key, newFunction)
-		if i.THROWS() != nil {
-			if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
-				y.VisitQualifiedNameList(qualifiedNameList)
-			}
-		}
-		return build
+		class.RegisterStaticMethod(key, newFunc)
+	} else {
+		class.RegisterNormalMethod(key, newFunc)
 	}
-	newFunction := y.NewFunc(funcName)
-	newFunction.SetMethodName(methodName)
-
-	build := func() {
-		recoverRange := y.SetRange(raw)
-		defer recoverRange()
-		y.FunctionBuilder = y.PushFunction(newFunction)
+	class.AddLazyBuilder(func() {
+		_, f := y.switchProg(class)
+		defer f()
+		y.FunctionBuilder = y.PushFunction(newFunc)
+		if isStatic {
+			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
+		}
+		if !isStatic {
+			this := y.NewParam("this", raw)
+			this.SetType(class)
+		}
 		y.MarkedThisClassBlueprint = class
-		this := y.NewParam("this", raw)
-		this.SetType(class)
-		y.SetCurrentReturnType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 		y.VisitFormalParameters(i.FormalParameters())
 		y.VisitMethodBody(i.MethodBody())
+		y.SetCurrentReturnType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 		y.Finish()
 		y.FunctionBuilder = y.PopFunction()
 		if len(annotationFunc) > 0 || len(defCallback) > 0 {
 			log.Infof("start to build annotation ref to def: %v", funcName)
 		}
-		newFunction.Type.AddAnnotationFunc(annotationFunc...)
+		newFunc.Type.AddAnnotationFunc(annotationFunc...)
 		for _, def := range defCallback {
-			def(newFunction)
+			def(newFunc)
 		}
-	}
-
-	if i.THROWS() != nil {
-		if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
-			y.VisitQualifiedNameList(qualifiedNameList)
-		}
-
-	}
-	var prefix = ""
-	if isStatic {
-		prefix = "static "
-	}
-	log.Infof("start to build %vmethod: %v to %v", prefix, funcName, class.Name)
-	class.RegisterNormalMethod(key, newFunction)
-	return build
+	})
+	return
 }
 
 func (y *builder) VisitMethodBody(raw javaparser.IMethodBodyContext) {
@@ -866,10 +830,12 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	pkgName := y.GetProgram()
 	// pkgName := strings.Join(pkgPath, "_")
 	funcName := fmt.Sprintf("%s_%s_%s", pkgName.Name, class.Name, key)
-
-	createFunction := func() *ssa.Function {
-		newFunction := y.NewFunc(funcName)
-		y.FunctionBuilder = y.PushFunction(newFunction)
+	newFunc := y.NewFunc(funcName)
+	class.Constructor = newFunc
+	class.AddLazyBuilder(func() {
+		_, f := y.switchProg(class)
+		defer f()
+		y.FunctionBuilder = y.PushFunction(newFunc)
 		{
 			y.NewParam("$this")
 			container := y.EmitEmptyContainer()
@@ -882,13 +848,8 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 			y.Finish()
 		}
 		y.FunctionBuilder = y.PopFunction()
-		return newFunction
-	}
-
-	if i.THROWS() != nil {
-		y.VisitQualifiedNameList(i.QualifiedNameList())
-	}
-	newFunction := createFunction()
-	class.Constructor = newFunction
-
+		if i.THROWS() != nil {
+			y.VisitQualifiedNameList(i.QualifiedNameList())
+		}
+	})
 }

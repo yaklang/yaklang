@@ -198,7 +198,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			}
 		}
 		ClassBlock := y.CurrentBlock
-		class.SetLazyBuilder(func() {
+		class.AddLazyBuilder(func() {
 			// handle variable name
 			CurrentBlock := y.CurrentBlock
 			y.CurrentBlock = ClassBlock
@@ -234,7 +234,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
 		newFunction := y.NewFunc(funcName)
 		newFunction.SetMethodName(methodName)
-		newFunction.SetLazyBuilder(func() {
+		newFunction.AddLazyBuilder(func() {
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
 				var param ssa.Value

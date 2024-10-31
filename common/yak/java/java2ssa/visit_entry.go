@@ -19,23 +19,22 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 	if i == nil {
 		return nil
 	}
-
 	if ret := i.PackageDeclaration(); ret != nil {
 		pkgPath := y.VisitPackageDeclaration(ret)
 		pkgName := strings.Join(pkgPath, ".")
 		prog := y.GetProgram()
-		lib, skip := prog.GetLibrary(pkgName)
-		if skip {
-			// log.Infof("package %v skip, file %v", pkgName, prog.GetCurrentEditor().GetFilename())
-			return nil
-		}
+		lib, _ := prog.GetLibrary(pkgName)
+		//if skip {
+		// log.Infof("package %v skip, file %v", pkgName, prog.GetCurrentEditor().GetFilename())
+		//return nil
+		//}
 		// log.Infof("package %v parse, file %v", pkgName, prog.GetCurrentEditor().GetFilename())
 		if lib == nil {
 			lib = prog.NewLibrary(pkgName, pkgPath)
 		}
 		lib.PushEditor(prog.GetApplication().GetCurrentEditor())
 
-		builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
+		builder := lib.GetAndCreateFunctionBuilder("", "init")
 		if builder != nil {
 			builder.SetEditor(prog.GetApplication().GetCurrentEditor())
 			builder.SetBuildSupport(y.FunctionBuilder)
@@ -46,14 +45,28 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 			}()
 		}
 	}
+
+	/*
+		pre handler 情况下只记录import fullType记录
+	*/
 	y.VisitAllImport(i)
-	for _, inst := range i.AllTypeDeclaration() {
-		y.VisitTypeDeclaration(inst)
+	if y.PreHandler() {
+		for _, declarationContext := range i.AllTypeDeclaration() {
+			y.VisitTypeDeclaration(declarationContext)
+		}
+	}
+	if !y.PreHandler() {
+		for _, blueprint := range y.GetProgram().ClassBluePrint {
+			blueprint.Build()
+		}
+		for _, function := range y.GetProgram().Funcs {
+			function.Build()
+		}
 	}
 
-	if ret := i.ModuleDeclaration(); ret != nil {
-		y.VisitModuleDeclaration(ret)
-	}
+	//if ret := i.ModuleDeclaration(); ret != nil {
+	//	y.VisitModuleDeclaration(ret)
+	//}
 
 	return nil
 }
