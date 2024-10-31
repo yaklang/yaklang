@@ -27,8 +27,9 @@ func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interfac
 		for _, f := range y.GetProgram().Funcs {
 			f.Build()
 		}
-		for _, c := range y.GetProgram().ClassBluePrint {
-			c.Build()
+		mapx := y.GetProgram().ClassBluePrint.GetMap()
+		for _, blueprint := range mapx {
+			blueprint.Build()
 		}
 	}
 	return nil

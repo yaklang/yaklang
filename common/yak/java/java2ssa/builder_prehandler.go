@@ -25,10 +25,13 @@ func (s *SSABuilder) Create() ssa.Builder {
 
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
-	fileList := []string{".java", ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc", ".php", ".go"}
+	fileList := []string{".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc", ".php", ".go"}
 	return !slices.Contains(fileList, extension)
 }
 
+func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.GetProgram().GetApplication().Build("", editor, builder)
+}
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.FunctionBuilder, path string) error {
 	prog := fb.GetProgram()
 	if prog == nil {
@@ -64,9 +67,14 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
 		fb.GenerateDependence(pkgs, filename)
 	}
-
 	switch strings.ToLower(fileSystem.Ext(path)) {
-	case ".java", ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
+	case ".java":
+		file, err := fileSystem.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		prog.Build(path, memedit.NewMemEditor(string(file)), fb)
+	case ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
 		return nil
 	default:
 		fs, err := fileSystem.Open(path)

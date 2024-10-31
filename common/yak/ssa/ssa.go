@@ -223,7 +223,7 @@ type Program struct {
 	// function list
 	Funcs map[string]*Function
 	// class blue print
-	ClassBluePrint map[string]*Blueprint
+	ClassBluePrint *omap.OrderedMap[string, *Blueprint]
 
 	ExportValue map[string]Value
 	ExportType  map[string]Type

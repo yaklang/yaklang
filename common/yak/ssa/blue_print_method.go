@@ -19,10 +19,15 @@ func (c *Blueprint) IsMagicMethodName(name BlueprintMagicMethodKind) bool {
 	return slices.Contains(c._container.GetProgram().magicMethodName, string(name))
 }
 
-func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value) {
+func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val *Function) {
 	if !c.IsMagicMethodName(name) {
 		log.Warnf("register magic method fail: not magic method")
 		//return
+	}
+	if method, exit := c.MagicMethod[name]; exit {
+		Point(val, method)
+	} else {
+		c.MagicMethod[name] = val
 	}
 	switch name {
 	case Constructor:
@@ -96,11 +101,11 @@ func (c *Blueprint) RegisterNormalMethod(name string, val *Function, store ...bo
 	if f, ok := ToFunction(val); ok {
 		f.SetMethod(true, c)
 	}
-	// if overwrite parent-class/interface, then new function  point to the older
-	if method := c.GetNormalMethod(name); !utils.IsNil(method) {
-		Point(val, method)
+	if method := c.NormalMethod[name]; !utils.IsNil(method) {
+		Point(method, val)
+	} else {
+		c.NormalMethod[name] = val
 	}
-	c.NormalMethod[name] = val
 }
 
 func (c *Blueprint) GetNormalMethod(key string) Value {
@@ -118,8 +123,12 @@ func (c *Blueprint) GetNormalMethod(key string) Value {
 
 // static method
 func (c *Blueprint) RegisterStaticMethod(name string, val *Function) {
-	c.storeInContainer(name, val, BluePrintStaticMember)
-	c.StaticMethod[name] = val
+	if method := c.StaticMethod[name]; !utils.IsNil(method) {
+		Point(method, val)
+	} else {
+		c.storeInContainer(name, val, BluePrintStaticMember)
+		c.StaticMethod[name] = val
+	}
 }
 
 func (c *Blueprint) GetStaticMethod(key string) Value {
