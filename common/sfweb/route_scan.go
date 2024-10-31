@@ -203,7 +203,7 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 							SfWebLogger.Errorf("write error message failed: %v", err)
 							break
 						}
-					} else {
+					} else if level != "feature-status-card-data" {
 						err = WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
 							Message: fmt.Sprintf("[%s] %s", level, data),
 						})
