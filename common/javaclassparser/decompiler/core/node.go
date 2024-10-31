@@ -7,8 +7,10 @@ import (
 
 type Node struct {
 	Id                  int
+	LoopBreak           bool
 	Statement           statements.Statement
 	Source              []*Node
+	HideNext            *Node
 	Next                []*Node
 	TrueNode, FalseNode func() *Node
 	JmpNode             *Node
@@ -16,13 +18,17 @@ type Node struct {
 	IsCircle            bool
 	IsMerge             bool
 	IsIf                bool
+	IsDoWhile           bool
+	BodyNodeStart       *Node
 	GetLoopEndNode      func() *Node
 	SetLoopEndNode      func(*Node, *Node)
 	ConditionNode       []*Node
-	BreakNode           []*Node
 	SwitchMergeNode     *Node
 	CircleNodesSet      *utils.Set[*Node]
 	IsInCircle          bool
+	OutNodeMap          map[*Node]*Node
+	LoopEndNode         *Node
+	UncertainBreakNodes map[*Node]*Node
 	//CircleRoute         *SubNodeMap
 	//PreNodeRoute          *SubNodeMap
 	//AllPreNodeRoute       []*SubNodeMap

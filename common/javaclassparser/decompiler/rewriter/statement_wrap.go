@@ -2,19 +2,26 @@ package rewriter
 
 import (
 	"errors"
+	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+	"strings"
 )
 
 type StatementManager struct {
-	currentNodeId    int
-	RootNode         *core.Node
-	PreNode          *core.Node
-	idToNode         map[int]*core.Node
-	CircleEntryPoint []*core.Node
+	currentNodeId       int
+	RootNode            *core.Node
+	PreNode             *core.Node
+	idToNode            map[int]*core.Node
+	CircleEntryPoint    []*core.Node
+	WhileNode           []*core.Node
+	UncertainBreakNodes [][2]*core.Node
 	//MergePoint      []*core.Node
 	IfNodes           []*core.Node
 	RepeatNodeMap     map[*core.Node]*core.Node
@@ -25,6 +32,7 @@ type StatementManager struct {
 	nodeSet           *utils.Set[*core.Node]
 	edgeSet           *utils.Set[[2]*core.Node]
 	DominatorMap      map[*core.Node][]*core.Node
+	LabelId           int
 }
 
 func NewStatementManager(node *core.Node, parent *StatementManager) *StatementManager {
@@ -68,6 +76,10 @@ func NewRootStatementManager(node *core.Node) *StatementManager {
 //		}
 //		return
 //	}
+func (s *StatementManager) NewLoopLabel() string {
+	s.LabelId++
+	return fmt.Sprintf("LOOP_%d", s.LabelId)
+}
 func (s *StatementManager) SetId(id int) {
 	s.currentNodeId = id
 }
@@ -373,26 +385,16 @@ func (s *StatementManager) ScanCoreInfo() error {
 	//		return CheckIsPreNode(getNodeInfo, node.LoopEndNode, n) && !CheckIsPreNode(getNodeInfo, node, n)
 	//	}
 	//}
-	loopEndNodeMap := map[*core.Node]*core.Node{}
+	circleNodeEntryToOutPoint := map[*core.Node]map[*core.Node]*core.Node{}
 	for _, circleNodeEntry := range circleNodes {
 		outPointMap := map[*core.Node]*core.Node{}
 		circleNodeEntry.CircleNodesSet = getNodeInfo(circleNodeEntry).CircleRoute
 		core.WalkGraph(circleNodeEntry, func(node *core.Node) ([]*core.Node, error) {
 			next := funk.Filter(node.Next, func(n *core.Node) bool {
 				isInCircle := circleNodeEntry.CircleNodesSet.Has(n)
-				//if ok := getNodeInfo(circleNodeEntry).CircleRoute.ChildrenHas(n); ok {
-				//	isInCircle = true
-				//	//break
-				//}
 				if n == circleNodeEntry {
 					isInCircle = true
 				}
-				//for _, route := range getNodeInfo(circleNodeEntry).AllCircleRoute {
-				//	if ok := route.ChildrenHas(n); ok {
-				//		isInCircle = true
-				//		break
-				//	}
-				//}
 				if !isInCircle {
 					outPointMap[node] = n
 					//outPoint = append(outPoint, n)
@@ -414,7 +416,11 @@ func (s *StatementManager) ScanCoreInfo() error {
 		for _, node := range tryNodes {
 			delete(outPointMap, node)
 		}
-		//mergeNode := outPointMap[circleNodeEntry]
+		circleNodeEntry.OutNodeMap = outPointMap
+		circleNodeEntryToOutPoint[circleNodeEntry] = outPointMap
+	}
+	circleNodeEntryToOutPoint = nil
+	for circleNodeEntry, outPointMap := range circleNodeEntryToOutPoint {
 		var mergeNode *core.Node
 		if len(outPointMap) == 0 {
 		} else if len(outPointMap) == 1 {
@@ -422,6 +428,9 @@ func (s *StatementManager) ScanCoreInfo() error {
 		} else {
 			edgeSet := utils.NewSet[*core.Node]()
 			values := maps.Values(outPointMap)
+			values = funk.Filter(values, func(item *core.Node) bool {
+				return item.Id > circleNodeEntry.Id
+			}).([]*core.Node)
 			core.WalkGraph[*core.Node](values[0], func(node *core.Node) ([]*core.Node, error) {
 				edgeSet.Add(node)
 				return node.Next, nil
@@ -434,43 +443,16 @@ func (s *StatementManager) ScanCoreInfo() error {
 				return node.Next, nil
 			})
 		}
-
-		//for _, node1 := range outPointMap {
-		//	ok := true
-		//	for c, node2 := range outPointMap {
-		//		if node1 == node2 {
-		//			continue
-		//		}
-		//		if !CheckIsPreNode(getNodeInfo, node1, c) {
-		//			ok = false
-		//			break
-		//		}
-		//	}
-		//	if ok {
-		//		mergeNode = node1
-		//	}
-		//}
-		//if mergeNode == nil {
-		//	return errors.New("invalid circle")
-		//}
 		for c, _ := range outPointMap {
 			check := func(node *core.Node) bool {
 				if _, ok := c.Statement.(*statements.ConditionStatement); ok {
 					return true
 				}
-				//if v, ok := c.Statement.(*statements.MiddleStatement); ok && v.Flag == "tryStart" {
-				//	return true
-				//}
 				return false
 			}
-
-			//if !check(c) {
-			//	return errors.New("invalid circle")
-			//}
 			if check(c) {
 				circleNodeEntry.ConditionNode = append(circleNodeEntry.ConditionNode, c)
 			}
-
 		}
 		circleNodeEntry.GetLoopEndNode = func() *core.Node {
 			return nil
@@ -478,6 +460,7 @@ func (s *StatementManager) ScanCoreInfo() error {
 		circleNodeEntry.SetLoopEndNode = func(node *core.Node, node2 *core.Node) {
 
 		}
+		loopEndNodeMap := map[*core.Node]*core.Node{}
 		if mergeNode != nil {
 			loopEndNodeMap[mergeNode] = mergeNode
 			circleNodeEntry.GetLoopEndNode = func() *core.Node {
@@ -486,34 +469,34 @@ func (s *StatementManager) ScanCoreInfo() error {
 			circleNodeEntry.SetLoopEndNode = func(node1, node2 *core.Node) {
 				loopEndNodeMap[node1] = node2
 			}
-			breakNodeSet := utils.NewSet[*core.Node]()
-			var walkParent func(node *core.Node) bool
-			for _, mergeSource := range mergeNode.Source {
-				walkParent = func(node *core.Node) bool {
-					if node == nil {
-						return false
-					}
-					if _, ok := outPointMap[node]; ok {
-						return true
-					}
-					for _, route := range getNodeInfo(node).AllPreNodeRoute {
-						if _, ok := outPointMap[route.ConditionNode]; ok {
-							return true
-						} else {
-							return walkParent(route.ConditionNode)
-						}
-					}
-					return false
-				}
-				if walkParent(mergeSource) {
-					breakNodeSet.Add(mergeSource)
-				}
-			}
-			circleNodeEntry.BreakNode = breakNodeSet.List()
 		}
 	}
+	//mergeNodeToCircleNode := map[*core.Node][]*core.Node{}
+	//for circleNodeEntry, _ := range circleNodeEntryToOutPoint {
+	//	if circleNodeEntry.MergeNode != nil {
+	//		mergeNodeToCircleNode[circleNodeEntry.MergeNode] = append(mergeNodeToCircleNode[circleNodeEntry.MergeNode], circleNodeEntry)
+	//	}
+	//}
+	//for mergeNode, circleNodes := range mergeNodeToCircleNode {
+	//	if len(circleNodes) == 1 {
+	//		continue
+	//	}
+	//	sort.Slice(circleNodes, func(i, j int) bool {
+	//		return circleNodes[i].Id < circleNodes[j].Id
+	//	})
+	//	for _, node := range circleNodes {
+	//
+	//	}
+	//}
 	s.CircleEntryPoint = circleNodes
 	s.IfNodes = ifNodes
+	for _, node := range circleNodes {
+		for _, c := range s.DominatorMap[node] {
+			if !node.CircleNodesSet.Has(c) {
+				node.LoopEndNode = c
+			}
+		}
+	}
 	return nil
 }
 func (s *StatementManager) Rewrite() error {
@@ -521,13 +504,119 @@ func (s *StatementManager) Rewrite() error {
 	if err != nil {
 		return err
 	}
-	rewriters := []rewriterFunc{SwitchRewriter, LoopRewriter, IfRewriter, TryRewriter}
+	err = LoopRewriter1(s)
+	if err != nil {
+		return err
+	}
+	println(utils2.DumpNodesToDotExp(s.RootNode))
+	s.DominatorMap = GenerateDominatorTree(s.RootNode)
+	for _, ifNode := range s.IfNodes {
+		ifNode.MergeNode = nil
+		trueNode := ifNode.TrueNode()
+		falseNode := ifNode.FalseNode()
+		doms := s.DominatorMap[ifNode]
+		switch len(doms) {
+		case 1:
+			ok1 := false
+			err := core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
+				if node == ifNode {
+					return nil, nil
+				}
+				if node == doms[0] {
+					ok1 = true
+					return nil, nil
+				}
+				return node.Next, nil
+			})
+			if err != nil {
+				return err
+			}
+			ok2 := false
+			err = core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
+				if node == ifNode {
+					return nil, nil
+				}
+				if node == doms[0] {
+					ok2 = true
+					return nil, nil
+				}
+				return node.Next, nil
+			})
+			if err != nil {
+				return err
+			}
+			if ok1 && ok2 {
+				ifNode.MergeNode = doms[0]
+			}
+		case 2:
+			for _, dom := range doms {
+				ok1 := false
+				err := core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
+					if node == ifNode {
+						return nil, nil
+					}
+					if node == dom {
+						ok1 = true
+						return nil, nil
+					}
+					return node.Next, nil
+				})
+				if err != nil {
+					return err
+				}
+				ok2 := false
+				err = core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
+					if node == ifNode {
+						return nil, nil
+					}
+					if node == dom {
+						ok2 = true
+						return nil, nil
+					}
+					return node.Next, nil
+				})
+				if err != nil {
+					return err
+				}
+				if ok1 && ok2 {
+					ifNode.MergeNode = dom
+					break
+				}
+			}
+		case 3:
+			ifNode.MergeNode = utils2.NodeFilter(doms, func(node *core.Node) bool {
+				return node != trueNode && node != falseNode
+			})[0]
+		}
+	}
+	//s.DumpDominatorTree()
+	err = SwitchRewriter(s)
+	if err != nil {
+		return err
+	}
+	whileNodes := []*core.Node{}
+	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
+		if slices.Contains(s.WhileNode,node){
+			whileNodes = append(whileNodes,node)
+		}
+		return s.DominatorMap[node],nil
+	})
+	for i := len(whileNodes)-1; i >=0; i-- {
+		err = LoopRewriter(s,whileNodes[i])
+		if err != nil {
+			return err
+		}
+	}
+
+	println(utils2.DumpNodesToDotExp(s.RootNode))
+	rewriters := []rewriterFunc{IfRewriter, TryRewriter, LabelRewriter}
 	for _, rewriter := range rewriters {
 		err := rewriter(s)
 		if err != nil {
 			return err
 		}
 	}
+	//s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	for _, action := range s.FinalActions {
 		err := action()
 		if err != nil {
@@ -535,4 +624,21 @@ func (s *StatementManager) Rewrite() error {
 		}
 	}
 	return nil
+}
+func (s *StatementManager) DumpDominatorTree() {
+	var sb strings.Builder
+	sb.WriteString("digraph G {\n")
+	toString := func(node *core.Node) string {
+		//return strconv.Quote(node.Statement.String(&ClassContext{}))
+		s := strings.Replace(node.Statement.String(&class_context.ClassContext{}), "\"", "", -1)
+		s = strings.Replace(s, "\n", " ", -1)
+		return s
+	}
+	for node, dom := range s.DominatorMap {
+		for _, n := range dom {
+			sb.WriteString(fmt.Sprintf("\"%d%s\" -> \"%d%s\"\n", n.Id, toString(n), node.Id, toString(node)))
+		}
+	}
+	sb.WriteString("}\n")
+	println(sb.String())
 }
