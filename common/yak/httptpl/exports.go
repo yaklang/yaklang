@@ -538,6 +538,7 @@ var Exports = map[string]interface{}{
 	"tcpResultCallback": _tcpCallback,
 	"https":             lowhttp.WithHttps,
 	"http2":             lowhttp.WithHttp2,
+	"http3":             lowhttp.WithHttp3,
 	"fromPlugin":        lowhttp.WithFromPlugin,
 	"context":           WithContext,
 }
