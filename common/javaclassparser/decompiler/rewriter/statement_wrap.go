@@ -590,25 +590,25 @@ func (s *StatementManager) Rewrite() error {
 		}
 	}
 	//s.DumpDominatorTree()
-	err = SwitchRewriter(s)
-	if err != nil {
-		return err
-	}
 	whileNodes := []*core.Node{}
 	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
-		if slices.Contains(s.WhileNode,node){
-			whileNodes = append(whileNodes,node)
+		if slices.Contains(s.WhileNode, node) {
+			whileNodes = append(whileNodes, node)
 		}
-		return s.DominatorMap[node],nil
+		return s.DominatorMap[node], nil
 	})
-	for i := len(whileNodes)-1; i >=0; i-- {
-		err = LoopRewriter(s,whileNodes[i])
+	for i := len(whileNodes) - 1; i >= 0; i-- {
+		err = LoopRewriter(s, whileNodes[i])
 		if err != nil {
 			return err
 		}
 	}
-
-	println(utils2.DumpNodesToDotExp(s.RootNode))
+	s.DominatorMap = GenerateDominatorTree(s.RootNode)
+	err = SwitchRewriter(s)
+	if err != nil {
+		return err
+	}
+	//println(utils2.DumpNodesToDotExp(s.RootNode))
 	rewriters := []rewriterFunc{IfRewriter, TryRewriter, LabelRewriter}
 	for _, rewriter := range rewriters {
 		err := rewriter(s)

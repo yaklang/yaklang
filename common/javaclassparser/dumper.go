@@ -229,9 +229,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					return strings.Join(res, "\n")
 				}
 				statementToString = func(statement statements.Statement) (statementStr string) {
-					if statementSet.Has(statement) {
-						panic("statement already exists")
-					}
+					//if statementSet.Has(statement) {
+					//	panic("statement already exists")
+					//}
 					statementSet.Add(statement)
 					switch ret := statement.(type) {
 					case *statements.TryCatchStatement:
