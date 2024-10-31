@@ -5,13 +5,13 @@ desc(
     lib: 'php-file-read'
 )
 
-/^(fopen|file_get_contents)$/ as $output
+/^(file_get_contents|file|readfile|fgetss|fgets|fread)$/ as $output
 
 alert $output
 
 desc(
     lang: php,
-    alert_min: '2',
+    alert_min: '1',
     'file://fileRead.php': <<<PARAM
 <?php
 $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
@@ -20,14 +20,8 @@ $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
  		return false;
  	}
  	$tpl = BLUE_ROOT.'templates/default/'.$tpl_name;
- 	if(!$handle = @fopen($tpl, 'wb')){
-		showmsg("打开目标模版文件 $tpl 失败");
- 	}
- 	if(fwrite($handle, $tpl_content) === false){
- 		showmsg('写入目标 $tpl 失败');
- 	}
+    $handle = @fopen($tpl,"rb");
+    $content = @fread($handle,1024);
  	fclose($handle);
- 	showmsg('编辑模板成功', 'tpl_manage.php');
- 	file_get_contents("");
 PARAM
 )
