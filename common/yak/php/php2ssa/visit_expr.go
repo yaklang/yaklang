@@ -1201,6 +1201,13 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitMemberCallKey(i.MemberCallKey())
 		return y.ReadMemberCallValue(obj, key)
+	case *phpparser.MemberFunctionContext:
+		obj := y.VisitRightValue(i.FlexiVariable())
+		key := y.VisitMemberCallKey(i.MemberCallKey())
+		method := y.ReadMemberCallMethod(obj, key)
+		arguments, _ := y.VisitArguments(i.Arguments())
+		call := y.NewCall(method, arguments)
+		return y.EmitCall(call)
 	default:
 		return y.EmitUndefined(raw.GetText())
 	}

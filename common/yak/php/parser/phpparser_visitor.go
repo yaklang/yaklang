@@ -394,6 +394,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#StaticClassAccessExpression.
 	VisitStaticClassAccessExpression(ctx *StaticClassAccessExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#MemberFunction.
+	VisitMemberFunction(ctx *MemberFunctionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#IndexLegacyCallVariable.
 	VisitIndexLegacyCallVariable(ctx *IndexLegacyCallVariableContext) interface{}
 
