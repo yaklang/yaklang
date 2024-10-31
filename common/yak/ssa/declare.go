@@ -31,7 +31,7 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string) *Blueprint {
 	}
 
 	getInCurrent := func() (Type, bool) {
-		if c, ok := p.ClassBluePrint[name]; ok {
+		if c, ok := p.ClassBluePrint.Get(name); ok {
 			if !p.PreHandler() {
 				c.Build()
 			}

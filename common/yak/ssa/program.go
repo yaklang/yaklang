@@ -27,7 +27,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
 		Funcs:                   make(map[string]*Function),
-		ClassBluePrint:          make(map[string]*Blueprint),
+		ClassBluePrint:          omap.NewEmptyOrderedMap[string, *Blueprint](),
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		FileList:                make(map[string]string),

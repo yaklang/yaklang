@@ -154,9 +154,10 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		for _, fun := range namespaceProg.Funcs {
 			fun.Build()
 		}
-		for _, cls := range namespaceProg.ClassBluePrint {
-			cls.Build()
-		}
+		namespaceProg.ClassBluePrint.ForEach(func(i string, v *ssa.Blueprint) bool {
+			v.Build()
+			return true
+		})
 	case !hasName && !y.PreHandler():
 		prog.PkgName = namespaceName
 		// build this un-name namespace
@@ -239,7 +240,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					}
 					for _, t := range namespace.ExportType {
 						if bluePrint, ok := t.(*ssa.Blueprint); ok {
-							prog.ClassBluePrint[fmt.Sprintf("%s\\%s", currentName, bluePrint.Name)] = bluePrint
+							prog.ClassBluePrint.Set(fmt.Sprintf("%s\\%s", currentName, bluePrint.Name), bluePrint)
 						}
 					}
 

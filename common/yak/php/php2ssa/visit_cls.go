@@ -190,23 +190,23 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				class.RegisterNormalMember(name, value)
 			}
 		}
-		//ClassBlock := y.CurrentBlock
-		//class.SetLazyBuilder(func() {
-		//handle variable name
-		//CurrentBlock := y.CurrentBlock
-		//y.CurrentBlock = ClassBlock
-		//defer func() {
-		//	y.CurrentBlock = CurrentBlock
-		//}()
+		ClassBlock := y.CurrentBlock
+		class.AddLazyBuilder(func() {
+			// handle variable name
+			CurrentBlock := y.CurrentBlock
+			y.CurrentBlock = ClassBlock
+			defer func() {
+				y.CurrentBlock = CurrentBlock
+			}()
 
-		for _, va := range ret.AllVariableInitializer() {
-			name, value := y.VisitVariableInitializer(va)
-			if strings.HasPrefix(name, "$") {
-				name = name[1:]
+			for _, va := range ret.AllVariableInitializer() {
+				name, value := y.VisitVariableInitializer(va)
+				if strings.HasPrefix(name, "$") {
+					name = name[1:]
+				}
+				setMember(name, value)
 			}
-			setMember(name, value)
-		}
-		//})
+		})
 
 		return
 	case *phpparser.FunctionContext:
@@ -226,7 +226,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
 		newFunction := y.NewFunc(funcName)
 		newFunction.SetMethodName(methodName)
-		newFunction.SetLazyBuilder(func() {
+		newFunction.AddLazyBuilder(func() {
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
 				var param ssa.Value
