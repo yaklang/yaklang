@@ -9,7 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 )
+
+var literalReflectType_OrderedMap = reflect.TypeOf((*orderedmap.OrderedMap)(nil))
 
 type jsonConfig struct {
 	prefix string
@@ -93,7 +96,7 @@ func _jsonDumps(raw interface{}, opts ...JsonOpt) string {
 	return string(bytes)
 }
 
-// loads 将一个 JSON 字符串转换为对象，返回转换后的对象
+// loads 将一个 JSON 字符串转换为对象，返回转换后的对象，通常是一个omap
 // Example:
 // ```
 // v = json.loads(`{"a": "b", "c": "d"}`)
@@ -101,7 +104,7 @@ func _jsonDumps(raw interface{}, opts ...JsonOpt) string {
 func _jsonLoad(raw interface{}, opts ...JsonOpt) interface{} {
 	// opts 中暂时没有load的选项，所以这里暂时不处理
 	var i interface{}
-	defaultValue := make(map[string]interface{})
+	defaultValue := orderedmap.New()
 
 	str := utils.InterfaceToString(raw)
 	str = strings.TrimSpace(str)
@@ -142,7 +145,8 @@ type yakJson struct {
 
 // 判断是不是 map/object {}
 func (y *yakJson) IsObject() bool {
-	return y.jsonObject != nil && reflect.TypeOf(y.jsonObject).Kind() == reflect.Map
+	refTyp := reflect.TypeOf(y.jsonObject)
+	return y.jsonObject != nil && (refTyp.Kind() == reflect.Map || refTyp == literalReflectType_OrderedMap)
 }
 
 func (y *yakJson) IsMap() bool {
