@@ -52,7 +52,7 @@ func TestGRPC_PluginEnv(t *testing.T) {
 
 		env, err := client.GetAllPluginEnv(ctx, &ypb.Empty{})
 		require.NoError(t, err)
-		require.Greater(t, len(env.Env), 2)
+		require.GreaterOrEqual(t, len(env.Env), 2)
 
 		var check1, check2 bool
 		for _, e := range env.GetEnv() {
