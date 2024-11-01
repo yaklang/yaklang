@@ -42,11 +42,11 @@ func TestGRPC_PluginEnv(t *testing.T) {
 		tokenValue := utils.RandStringBytes(10)
 		db := consts.GetGormProfileDatabase()
 
-		err = yakit.SetPluginEnv(db, tokenKey1, tokenValue)
+		err = yakit.CreatePluginEnv(db, tokenKey1, tokenValue)
 		require.NoError(t, err)
 		defer yakit.DeletePluginEnvByKey(db, tokenKey1)
 
-		err = yakit.SetPluginEnv(db, tokenKey2, tokenValue)
+		err = yakit.CreatePluginEnv(db, tokenKey2, tokenValue)
 		require.NoError(t, err)
 		defer yakit.DeletePluginEnvByKey(db, tokenKey2)
 
@@ -70,7 +70,7 @@ func TestGRPC_PluginEnv(t *testing.T) {
 	t.Run("test delete env", func(t *testing.T) {
 		tokenKey := utils.RandStringBytes(10)
 		tokenValue := utils.RandStringBytes(10)
-		err := yakit.SetPluginEnv(consts.GetGormProfileDatabase(), tokenKey, tokenValue)
+		err := yakit.CreatePluginEnv(consts.GetGormProfileDatabase(), tokenKey, tokenValue)
 		require.NoError(t, err)
 
 		_, err = client.DeletePluginEnv(ctx, &ypb.DeletePluginEnvRequest{Key: tokenKey})

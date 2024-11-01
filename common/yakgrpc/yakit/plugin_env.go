@@ -5,8 +5,8 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-func SetPluginEnv(db *gorm.DB, key string, value string) error {
-	if db := db.Save(&schema.PluginEnv{Key: key, Value: value}); db.Error != nil {
+func CreatePluginEnv(db *gorm.DB, key string, value string) error {
+	if db := db.Create(&schema.PluginEnv{Key: key, Value: value}); db.Error != nil {
 		return db.Error
 	}
 	return nil
