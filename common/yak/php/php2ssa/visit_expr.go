@@ -56,7 +56,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 	defer recoverRange()
 
 	if raw.GetText() == "" {
-		return y.EmitConstInst("")
+		return y.EmitUndefined("")
 	}
 
 	switch ret := raw.(type) {
@@ -68,7 +68,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		if !ok {
 			return target
 		}
-		return y.EmitCall(y.NewCall(val, nil))
+		return y.EmitCall(y.NewCall(val, []ssa.Value{}))
 	case *phpparser.VariableExpressionContext:
 		return y.VisitRightValue(ret.FlexiVariable())
 	case *phpparser.MemerCallExpressionContext:
@@ -828,7 +828,7 @@ func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) ([][2]
 	for _, a := range i.AllArrayItem() {
 
 		k, v := y.VisitArrayItem(a)
-		if k == nil {
+		if utils.IsNil(k) {
 			k = y.EmitConstInst(countIndex)
 			countIndex++
 		}
@@ -976,7 +976,7 @@ type arrayKeyValuePair struct {
 
 func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
-		return nil
+		return y.EmitUndefined(raw.GetText())
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
