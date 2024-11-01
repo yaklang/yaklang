@@ -353,6 +353,10 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 		}, strings.Split(params.GetKeyword(), ","), false)
 	}
 
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
+		"script_name", "help",
+	}, strings.Split(params.GetFieldKeywords(), ","), false)
+
 	// 判断是否是历史脚本 暂时没用
 	/*if !params.GetIsHistory() {
 		db = db.Where("is_history = ?", false)
