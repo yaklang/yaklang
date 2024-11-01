@@ -231,7 +231,7 @@ func (b *astbuilder) GetResultDefault() []string {
 	return b.result[b.Function.GetName()]
 }
 
-func (b *astbuilder) SetImportPackage(useName, trueName string, path []string) {
+func (b *astbuilder) SetImportPackage(useName, trueName string, path string) {
 	p := &Package{
 		Name: trueName,
 		Path: path,
@@ -239,10 +239,10 @@ func (b *astbuilder) SetImportPackage(useName, trueName string, path []string) {
 	b.importMap[useName] = p
 }
 
-func (b *astbuilder) GetImportPackage(name string) (*ssa.Program, []string) {
+func (b *astbuilder) GetImportPackage(name string) (*ssa.Program, string) {
 	prog := b.GetProgram()
 	if b.importMap[name] == nil {
-		return nil, []string{}
+		return nil, ""
 	}
 	lib, _ := prog.GetLibrary(b.importMap[name].Name)
 	return lib, b.importMap[name].Path
@@ -328,5 +328,5 @@ func (b *astbuilder) CheckSpecialValueByStr(name string) (interface{}, bool) {
 
 type Package struct {
 	Name string
-	Path []string
+	Path string
 }
