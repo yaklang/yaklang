@@ -317,49 +317,6 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			if err := s.IterEnd(); err != nil {
 				return err
 			}
-		case OpFileFilterJsonPath:
-			s.debugSubLog(">> pop file name: %v", i.UnaryStr)
-			name := i.UnaryStr
-			if name == "" {
-				return utils.Errorf("file filter failed: file name is empty")
-			}
-			paramList := i.Values
-			paramMap := i.FileFilterMethodItem
-			res, err := input.FileFilter(name, "jsonpath", paramMap, paramList)
-			if err != nil {
-				return utils.Errorf("file filter failed: %v", err)
-			}
-			s.stack.Push(res)
-		case OpFileFilterXpath:
-			s.debugSubLog(">> pop file name: %v", i.UnaryStr)
-			name := i.UnaryStr
-			if name == "" {
-				return utils.Errorf("file filter failed: file name is empty")
-			}
-			paramList := i.Values
-			paramMap := i.FileFilterMethodItem
-			res, err := input.FileFilter(name, "xpath", paramMap, paramList)
-			if err != nil {
-				return utils.Errorf("file filter failed: %v", err)
-			}
-			s.stack.Push(res)
-			_ = paramList
-			_ = paramMap
-		case OpFileFilterReg:
-			s.debugSubLog(">> pop file name: %v", i.UnaryStr)
-			name := i.UnaryStr
-			if name == "" {
-				return utils.Errorf("file filter failed: file name is empty")
-			}
-			paramList := i.Values
-			paramMap := i.FileFilterMethodItem
-			res, err := input.FileFilter(name, "regexp", paramMap, paramList)
-			if err != nil {
-				return utils.Errorf("file filter failed: %v", err)
-			}
-			s.stack.Push(res)
-			// _ = paramList
-			// _ = paramMap
 		default:
 			if err := s.execStatement(i); err != nil {
 				if errors.Is(err, CriticalError) {
@@ -1244,7 +1201,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push: %v", ret)
 		s.stack.Push(ret)
 	case OpFileFilterJsonPath:
-		// TODO: 调用FileFilter接口并实现具体功能
+		s.debugSubLog(">> pop")
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "native call failed: stack top is empty")
+		}
 		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
 		name := i.UnaryStr
 		if name == "" {
@@ -1252,10 +1213,17 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		paramList := i.Values
 		paramMap := i.FileFilterMethodItem
-		_ = paramList
-		_ = paramMap
+		res, err := value.FileFilter(name, "jsonpath", paramMap, paramList)
+		if err != nil {
+			return utils.Errorf("file filter failed: %v", err)
+		}
+		s.stack.Push(res)
 	case OpFileFilterXpath:
-		// TODO: 调用FileFilter接口并实现具体功能
+		s.debugSubLog(">> pop")
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "native call failed: stack top is empty")
+		}
 		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
 		name := i.UnaryStr
 		if name == "" {
@@ -1263,10 +1231,19 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		paramList := i.Values
 		paramMap := i.FileFilterMethodItem
+		res, err := value.FileFilter(name, "xpath", paramMap, paramList)
+		if err != nil {
+			return utils.Errorf("file filter failed: %v", err)
+		}
+		s.stack.Push(res)
 		_ = paramList
 		_ = paramMap
 	case OpFileFilterReg:
-		// TODO: 调用FileFilter接口并实现具体功能
+		s.debugSubLog(">> pop")
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "native call failed: stack top is empty")
+		}
 		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
 		name := i.UnaryStr
 		if name == "" {
@@ -1274,8 +1251,13 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		paramList := i.Values
 		paramMap := i.FileFilterMethodItem
-		_ = paramList
-		_ = paramMap
+		res, err := value.FileFilter(name, "regexp", paramMap, paramList)
+		if err != nil {
+			return utils.Errorf("file filter failed: %v", err)
+		}
+		s.stack.Push(res)
+		// _ = paramList
+		// _ = paramMap
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		return utils.Wrap(CriticalError, msg)

@@ -200,6 +200,23 @@ func (value Values) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.
 	return nil
 }
 
-func (value Values) FileFilter(string, string, map[string]string, []string) (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ssa.Values is not supported file filter")
+// func (value Values) FileFilter(string, string, map[string]string, []string) (sfvm.ValueOperator, error) {
+func (vs Values) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
+	var res []sfvm.ValueOperator
+	var errs error
+	for _, value := range vs {
+		filtered, err := value.FileFilter(path, match, rule, rule2)
+		if err != nil {
+			errs = utils.JoinErrors(errs, err)
+			// return nil, err
+			continue
+		}
+		if filtered != nil {
+			res = append(res, filtered)
+		}
+	}
+	if errs != nil {
+		return nil, errs
+	}
+	return sfvm.NewValues(res), nil
 }

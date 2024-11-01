@@ -203,6 +203,6 @@ func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.Anal
 	})
 }
 
-func (v *Value) FileFilter(string, string, map[string]string, []string) (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ssa.Value is not supported file filter")
+func (v *Value) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
+	return v.ParentProgram.FileFilter(path, match, rule, rule2)
 }
