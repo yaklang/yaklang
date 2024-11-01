@@ -1,0 +1,83 @@
+desc(
+    title: "check file write function",
+    type: audit,
+    level: info,
+    lib: 'golang-database-sql'
+)
+
+sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
+$entry.Open() --> as $open;
+$open <getMembers> as $db;
+$db.Query(* #-> as $output);
+$db.QueryRow(* #-> as $output);
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://database.go': <<<PARAM
+package main
+
+import (
+    "database/sql"
+    "fmt"
+    "log"
+
+    _ "github.com/mattn/go-sqlite3" // SQLite 驱动
+)
+
+func main() {
+    // 连接到 SQLite 数据库（如果文件不存在，将创建文件）
+    db, err := sql.Open("sqlite3", "example.db")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    // 创建表
+    createTableSQL := `CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        age INTEGER
+    );`
+    if _, err := db.Exec(createTableSQL); err != nil {
+        log.Fatal(err)
+    }
+
+    // 插入数据
+    insertSQL := `INSERT INTO users (name, age) VALUES (?, ?)`
+    if _, err := db.Exec(insertSQL, "Alice", 30); err != nil {
+        log.Fatal(err)
+    }
+    if _, err := db.Exec(insertSQL, "Bob", 25); err != nil {
+        log.Fatal(err)
+    }
+
+    // 查询数据
+    rows, err := db.Query("SELECT id, name, age FROM users")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer rows.Close()
+
+    // 处理查询结果
+    fmt.Println("Users:")
+    for rows.Next() {
+        var id int
+        var name string
+        var age int
+        if err := rows.Scan(&id, &name, &age); err != nil {
+            log.Fatal(err)
+        }
+        fmt.Printf("ID: %d, Name: %s, Age: %d\n", id, name, age)
+    }
+
+    // 检查查询过程中是否出现错误
+    if err := rows.Err(); err != nil {
+        log.Fatal(err)
+    }
+}
+
+PARAM
+)

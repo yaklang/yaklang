@@ -4,9 +4,8 @@ desc(
     severity: high,
 )
 
-gorm?{<fullTypeName>?{have: 'gorm.io/gorm'}} as $entry;
-.Raw(* #-> as $param)
-$param?{have: 'Parameter'} as $high
+<include('golang-database-gorm')> as $sink;
+$sink?{have: 'Parameter'} as $high;
 
 alert $high for {
     title: 'SQL Injection detected',

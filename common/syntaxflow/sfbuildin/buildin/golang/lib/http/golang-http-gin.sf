@@ -7,16 +7,14 @@ desc(
 
 gin?{<fullTypeName>?{have: 'github.com/gin-gonic/gin'}} as $entry;
 $entry.Default() as $default;
-$default.GET(* as $output,);
-$default.POST(* as $output,);
-$default.PUT(* as $output,);
-$default.DELETE(* as $output,);
+$default.*(,* as $handle);
+$handle(* as $output)
 
 alert $output
 
 desc(
     lang: golang,
-    alert_min: 5,
+    alert_min: 1,
     'file://http_gin.go': <<<PARAM
 package main
 

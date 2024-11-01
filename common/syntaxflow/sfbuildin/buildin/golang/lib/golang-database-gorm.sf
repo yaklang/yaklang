@@ -1,0 +1,76 @@
+desc(
+    title: "check file write function",
+    type: audit,
+    level: info,
+    lib: 'golang-database-gorm'
+)
+
+gorm?{<fullTypeName>?{have: 'gorm.io/gorm'}} as $entry;
+$entry.Open() --> as $open;
+$open <getMembers> as $db;
+$db.Create(* #-> as $output);
+$db.Find(* #-> as $output);
+$db.Model(* #-> as $output);
+$db.Raw(* #-> as $output);
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://database.go': <<<PARAM
+package main
+
+import (
+    "gorm.io/driver/sqlite"
+    "gorm.io/gorm"
+    "log"
+)
+
+// User 定义用户模型
+type User struct {
+    ID   uint    // 主键
+    Name string  // 用户名
+    Age  int     // 年龄
+}
+
+func main() {
+    // 连接到 SQLite 数据库
+    db, err := gorm.Open(sqlite.Open("example.db"), &gorm.Config{})
+    if err != nil {
+        log.Fatal("failed to connect database:", err)
+    }
+
+    // 自动迁移，创建表
+    err = db.AutoMigrate(&User{})
+    if err != nil {
+        log.Fatal("failed to migrate:", err)
+    }
+
+    // 插入用户数据
+    user1 := User{Name: "Alice", Age: 30}
+    user2 := User{Name: "Bob", Age: 25}
+
+    db.Create(&user1)
+    db.Create(&user2)
+
+    // 查询所有用户
+    var users []User
+    db.Find(&users)
+
+    // 打印用户信息
+    log.Println("Users:")
+    for _, user := range users {
+        log.Printf("ID: %d, Name: %s, Age: %d\n", user.ID, user.Name, user.Age)
+    }
+
+    // 更新用户信息
+    db.Model(&user1).Update("Age", 31)
+
+    // 删除用户
+    db.Delete(&user2)
+}
+
+
+PARAM
+)
