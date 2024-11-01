@@ -159,6 +159,9 @@ func _pingScan(target string, opts ...PingConfigOpt) chan *pingutil.PingResult {
 				}
 
 				result := _ping(targetHost, opts...)
+				if ctx.Err() != nil {
+					return
+				}
 				if config._onResult != nil {
 					config._onResult(result)
 				}
