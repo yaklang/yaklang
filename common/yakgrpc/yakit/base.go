@@ -38,12 +38,17 @@ func RegisterPostInitDatabaseFunction(f func() error) {
 }
 
 func CallPostInitDatabase() error {
-	for _, f := range __initializingDatabase {
-		err := f()
-		if err != nil {
-			return err
+	__mutexForInit.Lock()
+	defer __mutexForInit.Unlock()
+	go func() {
+		for _, f := range __initializingDatabase {
+			err := f()
+			if err != nil {
+				log.Warnf("CallPostInitDatabase failed: %s", err)
+				return
+			}
 		}
-	}
+	}()
 	return nil
 }
 
