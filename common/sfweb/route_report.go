@@ -118,7 +118,7 @@ type ReportResponse struct {
 }
 
 func CodeBlock(lang string, content string) string {
-	return fmt.Sprintf("<details>\n<summary>click</summary>\n\n~~~%s\n%s\n~~~\n\n</details>", lang, html.EscapeString(content))
+	return fmt.Sprintf("<details>\n<summary>click</summary>\n\n~~~%s\n%s\n~~~\n\n</details>", lang, content)
 }
 
 func Details(summary, details string) string {
