@@ -288,3 +288,79 @@ func TestTempYakScriptQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.Lenf(t, res.Data, 0, "ignore is ineffective, len(res)[%d] != 1", len(res.Data))
 }
+
+func TestQueryYakScript(t *testing.T) {
+	type TestCase struct {
+		script *schema.YakScript
+	}
+	createScript := func(scripts ...*TestCase) {
+		for _, script := range scripts {
+			err := yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, script.script)
+			require.NoError(t, err)
+		}
+	}
+
+	testcases := []*TestCase{
+		{
+			script: &schema.YakScript{
+				ScriptName: "fileKeywords-test-script-1",
+				Type:       "yak",
+				Content:    "yakit.AutoInitYakit()\n\n# Input your code!\n\n// 测试",
+			},
+		},
+		{script: &schema.YakScript{
+			ScriptName: "fileKeywords-script-2",
+			Type:       "yak",
+			Content:    "yakit.AutoInitYakit()\n\n# Input your code!\n\n// fileKeywords-测试-2",
+		},
+		},
+		{script: &schema.YakScript{
+			ScriptName: "fileKeywords-test-3",
+			Type:       "yak",
+			Content:    "yakit.AutoInitYakit()\n\n# Input your code!\n\n// -fileKeywords-script-3",
+		},
+		}}
+
+	createScript(testcases...)
+	defer func() {
+		lo.ForEach(testcases, func(item *TestCase, index int) {
+			require.NoError(t, yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), item.script.ScriptName))
+		})
+	}()
+
+	tests := []struct {
+		filedKeywords string
+		count         int
+	}{
+		{
+			filedKeywords: "fileKeywords-test",
+			count:         2,
+		},
+		{
+			filedKeywords: "fileKeywords-script",
+			count:         1,
+		},
+		{
+			filedKeywords: "",
+			count:         3,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.filedKeywords, func(t *testing.T) {
+			var count int
+			db := consts.GetGormProfileDatabase().Model(&schema.YakScript{})
+			db = yakit.FilterYakScript(db, &ypb.QueryYakScriptRequest{
+				FieldKeywords: tc.filedKeywords,
+			})
+			db.Count(&count)
+			if tc.filedKeywords == "" {
+				if count < tc.count {
+					t.Errorf("yakScript  not found for filedKeywords=%s", tc.filedKeywords)
+				}
+			} else if tc.count != count {
+				t.Errorf("yakScript  not found for filedKeywords=%s", tc.filedKeywords)
+			}
+		})
+
+	}
+}
