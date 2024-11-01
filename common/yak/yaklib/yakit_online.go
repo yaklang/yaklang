@@ -166,6 +166,7 @@ type SaveYakScriptOnlineRequest struct {
 	IsPrivate            bool                 `json:"is_private"`
 	RiskInfo             []*OnlineRiskDetail  `json:"riskInfo"`
 	IsCorePlugin         bool                 `json:"isCorePlugin"`
+	PluginSupplement     string               `json:"pluginSupplement"`
 }
 
 type OnlinePluginItem struct {
@@ -730,6 +731,7 @@ func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptT
 		req.IsPrivate,
 		plugin.RiskDetail,
 		plugin.IsCorePlugin,
+		req.PluginSupplement,
 	)
 	if err != nil {
 		log.Errorf("save yakScript to online failed: %s", err.Error())
@@ -740,7 +742,7 @@ func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptT
 }
 
 func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
-	token string, scriptName string, pluginType, content, params, help, tags string, enablePluginSelector bool, pluginSelectorTypes string, isGeneralModule, isPrivate bool, riskDetail string, isCorePlugin bool) error {
+	token string, scriptName string, pluginType, content, params, help, tags string, enablePluginSelector bool, pluginSelectorTypes string, isGeneralModule, isPrivate bool, riskDetail string, isCorePlugin bool, pluginSupplement string) error {
 	urlIns, err := url.Parse(s.genUrl("/api/plugins"))
 	if err != nil {
 		return utils.Errorf("parse url-instance failed: %s", err)
@@ -778,6 +780,7 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 		IsPrivate:            isPrivate,
 		RiskInfo:             riskDetailJson,
 		IsCorePlugin:         isCorePlugin,
+		PluginSupplement:     pluginSupplement,
 	})
 
 	if err != nil {
