@@ -2,6 +2,7 @@ package sfweb
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -204,23 +205,28 @@ func NewSyntaxFlowWebServer(ctx context.Context, opts ...ServerOpt) (string, err
 
 		dealTls <- true
 		SfWebLogger.Info("start to load tls config")
-		var server *http.Server
-		if serverCfg.ServerCrtPath != "" && serverCfg.ServerKeyPath != "" {
-			server = &http.Server{Handler: router}
-			err = server.ServeTLS(lis, serverCfg.ServerCrtPath, serverCfg.ServerKeyPath)
-		} else {
+		var (
+			server           *http.Server
+			config           *tls.Config
+			crtPath, keyPath = serverCfg.ServerCrtPath, serverCfg.ServerKeyPath
+		)
+		if serverCfg.ServerCrtPath == "" || serverCfg.ServerKeyPath == "" {
+			crtPath, keyPath = "", ""
 			ca, key, _ := crep.GetDefaultCaAndKey()
 			crt, serverKey, _ := tlsutils.SignServerCrtNKeyWithParams(ca, key, "127.0.0.1", time.Now().Add(time.Hour*24*180), false)
-			config, err := tlsutils.GetX509ServerTlsConfig(ca, crt, serverKey)
+			config, err = tlsutils.GetX509ServerTlsConfig(ca, crt, serverKey)
 			if err != nil {
 				SfWebLogger.Error(err)
 				return
 			}
-			server = &http.Server{Handler: router}
-			server.TLSConfig = config
-			err = server.ServeTLS(lis, "", "")
+		} else {
+			config = &tls.Config{}
 		}
-
+		server = &http.Server{Handler: router}
+		config.MinVersion = tls.VersionSSL30
+		config.MaxVersion = tls.VersionTLS13
+		server.TLSConfig = config
+		err = server.ServeTLS(lis, crtPath, keyPath)
 		if err != nil {
 			SfWebLogger.Error(err)
 			return
