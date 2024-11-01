@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sfweb"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 var (
@@ -81,6 +82,8 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
+		yakit.InitialDatabase()
+
 		debug := c.Bool("debug")
 		port := c.Int("port")
 		opts := []sfweb.ServerOpt{
