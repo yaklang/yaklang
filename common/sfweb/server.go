@@ -25,6 +25,8 @@ type ServerConfig struct {
 	Port          int
 	Debug         bool
 	Https         bool
+	ServerCrtPath string
+	ServerKeyPath string
 }
 
 func NewServerConfig() *ServerConfig {
@@ -63,6 +65,18 @@ func WithHttps(https bool) ServerOpt {
 	}
 }
 
+func WithServerCrtPath(p string) ServerOpt {
+	return func(c *ServerConfig) {
+		c.ServerCrtPath = p
+	}
+}
+
+func WithServerKeyPath(p string) ServerOpt {
+	return func(c *ServerConfig) {
+		c.ServerKeyPath = p
+	}
+}
+
 type SyntaxFlowWebServer struct {
 	grpcClient ypb.YakClient
 	db         *gorm.DB
@@ -79,9 +93,9 @@ func (s *SyntaxFlowWebServer) init() {
 }
 
 func NewSyntaxFlowWebServer(ctx context.Context, opts ...ServerOpt) (string, error) {
-	config := NewServerConfig()
+	serverCfg := NewServerConfig()
 	for _, opt := range opts {
-		opt(config)
+		opt(serverCfg)
 	}
 
 	router := mux.NewRouter()
@@ -96,7 +110,7 @@ func NewSyntaxFlowWebServer(ctx context.Context, opts ...ServerOpt) (string, err
 			}
 			SfWebLogger.Infof("Request:\n%s", requestRaw)
 			var debugWriter *LogHTTPResponseWriter
-			if config.Debug {
+			if serverCfg.Debug {
 				debugWriter = NewLogHTTPResponseWriter(writer)
 				writer = debugWriter
 			}
@@ -112,13 +126,13 @@ func NewSyntaxFlowWebServer(ctx context.Context, opts ...ServerOpt) (string, err
 			}
 
 			handler.ServeHTTP(writer, request)
-			if config.Debug {
+			if serverCfg.Debug {
 				SfWebLogger.Debugf("Response:\n%s", debugWriter.Raw())
 			}
 		})
 	})
 
-	server := &SyntaxFlowWebServer{router: router, config: config}
+	server := &SyntaxFlowWebServer{router: router, config: serverCfg}
 	client, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		return "", err
@@ -128,10 +142,10 @@ func NewSyntaxFlowWebServer(ctx context.Context, opts ...ServerOpt) (string, err
 	// route
 	server.init()
 
-	if config.Port <= 0 {
-		config.Port = utils.GetRandomAvailableTCPPort()
+	if serverCfg.Port <= 0 {
+		serverCfg.Port = utils.GetRandomAvailableTCPPort()
 	}
-	addr := utils.HostPort(config.Host, config.Port)
+	addr := utils.HostPort(serverCfg.Host, serverCfg.Port)
 
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -147,29 +161,38 @@ func NewSyntaxFlowWebServer(ctx context.Context, opts ...ServerOpt) (string, err
 
 	go func() {
 		crep.InitMITMCert()
-		ca, key, _ := crep.GetDefaultCaAndKey()
-		if ca == nil || !config.Https {
+		if !serverCfg.Https {
 			dealTls <- false
 			SfWebLogger.Info("start to load no tls config")
 			err := http.Serve(lis, router)
 			if err != nil {
 				SfWebLogger.Error(err)
 			}
+			return
+		}
+
+		dealTls <- true
+		SfWebLogger.Info("start to load tls config")
+		var server *http.Server
+		if serverCfg.ServerCrtPath != "" && serverCfg.ServerKeyPath != "" {
+			server = &http.Server{Handler: router}
+			err = server.ServeTLS(lis, serverCfg.ServerCrtPath, serverCfg.ServerKeyPath)
 		} else {
-			dealTls <- true
-			SfWebLogger.Info("start to load tls config")
+			ca, key, _ := crep.GetDefaultCaAndKey()
 			crt, serverKey, _ := tlsutils.SignServerCrtNKeyWithParams(ca, key, "127.0.0.1", time.Now().Add(time.Hour*24*180), false)
 			config, err := tlsutils.GetX509ServerTlsConfig(ca, crt, serverKey)
 			if err != nil {
 				SfWebLogger.Error(err)
 				return
 			}
-			server := &http.Server{Handler: router}
+			server = &http.Server{Handler: router}
 			server.TLSConfig = config
 			err = server.ServeTLS(lis, "", "")
-			if err != nil {
-				SfWebLogger.Error(err)
-			}
+		}
+
+		if err != nil {
+			SfWebLogger.Error(err)
+			return
 		}
 	}()
 	proto := "http"

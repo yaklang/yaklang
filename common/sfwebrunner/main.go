@@ -66,6 +66,14 @@ func main() {
 		cli.BoolFlag{
 			Name: "debug",
 		},
+		cli.StringFlag{
+			Name:  "crtPath",
+			Usage: "server.crt path",
+		},
+		cli.StringFlag{
+			Name:  "keyPath",
+			Usage: "server.key path",
+		},
 	}
 
 	app.Before = func(context *cli.Context) error {
@@ -81,6 +89,8 @@ func main() {
 			sfweb.WithDebug(debug),
 			sfweb.WithHttps(!c.Bool("nohttps")),
 			sfweb.WithChatGLMAPIKey(c.String("key")),
+			sfweb.WithServerCrtPath(c.String("crtPath")),
+			sfweb.WithServerKeyPath(c.String("keyPath")),
 		}
 		servers, err := sfweb.NewSyntaxFlowWebServer(runCtx, opts...)
 		if debug {
