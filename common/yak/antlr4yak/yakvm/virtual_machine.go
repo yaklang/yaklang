@@ -329,6 +329,11 @@ func (v *VirtualMachine) InlineExecYakCode(ctx context.Context, codes []*Code, f
 var vmstackLock = new(sync.Mutex)
 
 func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags ...ExecFlag) error {
+	// 先检查 context 是否已取消
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	flag := GetFlag(flags...)
 
 	var frame *Frame
