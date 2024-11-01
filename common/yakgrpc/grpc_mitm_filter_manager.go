@@ -31,45 +31,62 @@ type MITMFilterManager struct { // legacy
 
 func LegacyFilter2FilterMatcherData(m *MITMFilterManager) *ypb.MITMFilterData {
 	var result = &ypb.MITMFilterData{}
-	result.IncludeHostnames = []*ypb.FilterDataItem{{
-		MatcherType: httptpl.MATCHER_TYPE_GLOB,
-		Group:       m.IncludeHostnames,
-	}}
 
-	result.ExcludeHostnames = []*ypb.FilterDataItem{{
-		MatcherType: httptpl.MATCHER_TYPE_GLOB,
-		Group:       m.ExcludeHostnames,
-	}}
+	if len(m.IncludeHostnames) > 0 {
+		result.IncludeHostnames = []*ypb.FilterDataItem{{
+			MatcherType: httptpl.MATCHER_TYPE_GLOB,
+			Group:       m.IncludeHostnames,
+		}}
+	}
 
-	result.IncludeSuffix = []*ypb.FilterDataItem{{
-		MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
-		Group:       m.IncludeSuffix,
-	}}
+	if len(m.ExcludeHostnames) > 0 {
+		result.ExcludeHostnames = []*ypb.FilterDataItem{{
+			MatcherType: httptpl.MATCHER_TYPE_GLOB,
+			Group:       m.ExcludeHostnames,
+		}}
+	}
 
-	result.ExcludeSuffix = []*ypb.FilterDataItem{{
-		MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
-		Group:       m.ExcludeSuffix,
-	}}
+	if len(m.IncludeSuffix) > 0 {
+		result.IncludeSuffix = []*ypb.FilterDataItem{{
+			MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
+			Group:       m.IncludeSuffix,
+		}}
+	}
 
-	result.IncludeUri = []*ypb.FilterDataItem{{
-		MatcherType: httptpl.MATCHER_TYPE_GLOB,
-		Group:       m.IncludeUri,
-	}}
+	if len(m.ExcludeSuffix) > 0 {
+		result.ExcludeSuffix = []*ypb.FilterDataItem{{
+			MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
+			Group:       m.ExcludeSuffix,
+		}}
+	}
 
-	result.ExcludeUri = []*ypb.FilterDataItem{{
-		MatcherType: httptpl.MATCHER_TYPE_GLOB,
-		Group:       m.ExcludeUri,
-	}}
+	if len(m.IncludeUri) > 0 {
+		result.IncludeUri = []*ypb.FilterDataItem{{
+			MatcherType: httptpl.MATCHER_TYPE_GLOB,
+			Group:       m.IncludeUri,
+		}}
+	}
 
-	result.ExcludeMethods = []*ypb.FilterDataItem{{
-		MatcherType: httptpl.MATCHER_TYPE_GLOB,
-		Group:       m.ExcludeMethods,
-	}}
+	if len(m.ExcludeUri) > 0 {
+		result.ExcludeUri = []*ypb.FilterDataItem{{
+			MatcherType: httptpl.MATCHER_TYPE_GLOB,
+			Group:       m.ExcludeUri,
+		}}
+	}
 
-	result.ExcludeMIME = []*ypb.FilterDataItem{{
-		MatcherType: httptpl.MATCHER_TYPE_MIME,
-		Group:       m.ExcludeMIME,
-	}}
+	if len(m.ExcludeMethods) > 0 {
+		result.ExcludeMethods = []*ypb.FilterDataItem{{
+			MatcherType: httptpl.MATCHER_TYPE_GLOB,
+			Group:       m.ExcludeMethods,
+		}}
+	}
+
+	if len(m.ExcludeMIME) > 0 {
+		result.ExcludeMIME = []*ypb.FilterDataItem{{
+			MatcherType: httptpl.MATCHER_TYPE_MIME,
+			Group:       m.ExcludeMIME,
+		}}
+	}
 	return result
 }
 
@@ -207,8 +224,8 @@ func getInitFilterManager(db *gorm.DB) (*MITMFilter, error) {
 		serializedFilter = yakit.GetKey(db, MITMFilterKeyRecords)
 	}
 
-	var filter MITMFilter
-	err := json.Unmarshal([]byte(serializedFilter), &filter)
+	var filterData ypb.MITMFilterData
+	err := json.Unmarshal([]byte(serializedFilter), &filterData)
 	if err != nil {
 		// legacy
 		var manager MITMFilterManager
@@ -218,7 +235,7 @@ func getInitFilterManager(db *gorm.DB) (*MITMFilter, error) {
 		}
 		return NewMITMFilter(LegacyFilter2FilterMatcherData(&manager)), nil
 	}
-	return &filter, nil
+	return NewMITMFilter(&filterData), nil
 }
 
 func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilter {
