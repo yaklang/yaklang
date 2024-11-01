@@ -4,8 +4,8 @@ desc(
     severity: high,
 )
 
-http.Get(* #-> as $param)
-$param?{ *.URL.Query().Get() } as $sink;
+<include('golang-http-sink')> as $output;
+$output.URL.Query().Get() #-> as $sink;
 $sink?{have: 'Parameter'} as $high
 
 alert $high for {

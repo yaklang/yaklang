@@ -1,18 +1,20 @@
 desc(
-    title: "check file read function",
+    title: "check file write function",
     type: audit,
     level: info,
-    lib: 'golang-file-read'
+    lib: 'golang-file-write'
 )
 
-/ReadAll|ReadFile/ as $output
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
+$entry.WriteAll(,* #-> as $output) 
+$entry.WriteFile(,* #-> as $output) 
 
 alert $output
 
 desc(
     lang: golang,
     alert_min: 1,
-    'file://fileread.go': <<<PARAM
+    'file://filewrite.go': <<<PARAM
 package main
 
 import (

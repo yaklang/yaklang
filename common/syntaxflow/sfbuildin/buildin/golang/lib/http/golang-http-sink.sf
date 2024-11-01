@@ -1,24 +1,19 @@
 desc(
-    title: "golang Reflected XSS",
+    title: "Find Executing Request",
     type: audit,
-    severity: high,
+    level: low,
+    lib: "golang-http-sink",
 )
 
-<include('golang-http-sink')> as $output;
-$output.Write(* #-> as $sink)
-$sink?{have: 'Parameter'} as $high
+<include('golang-http-gin')> as $output;
+<include('golang-http-net')> as $output;
 
-alert $high for {
-    title: 'Reflected XSS detected',
-    title_zh: '检测到反射XSS',
-    type: 'vuln',
-    level: 'high',
-}
+alert $output
 
 desc(
     lang: golang,
-    alert_high: 1,
-    'file://main.go': <<<UNSAFE
+    alert_min: 2,
+    'file://http_net.go': <<<PARAM
 package main
 
 import (
@@ -31,7 +26,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
 
 	// 直接将用户输入插入到 HTML 中
-	tmpl := `<h1>Hello, ` + name + `!</h1>`
+	tmpl := "<h1>Hello," + name + "!</h1>"
 	w.Write([]byte(tmpl))
 }
 
@@ -39,5 +34,6 @@ func main() {
 	http.HandleFunc("/", handler)
 	http.ListenAndServe(":8080", nil)
 }
-UNSAFE
+
+PARAM
 )

@@ -5,13 +5,14 @@ desc(
     lib: 'golang-os-exec'
 )
 
-.Command as $output
+exec?{<fullTypeName>?{have: 'os/exec'}} as $entry
+$entry.Command(* as $output) 
 
 alert $output
 
 desc(
     lang: golang,
-    alert_min: 1,
+    alert_min: 2,
     'file://exec.go': <<<PARAM
 package main
 
