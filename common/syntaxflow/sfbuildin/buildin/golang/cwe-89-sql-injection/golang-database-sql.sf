@@ -4,8 +4,7 @@ desc(
     severity: high,
 )
 
-sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
-*.QueryRow(* #-> as $sink)
+<include('golang-database-sql')> as $sink;
 $sink?{have: 'Parameter'} as $high
 
 alert $high for {

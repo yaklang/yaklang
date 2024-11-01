@@ -1,0 +1,91 @@
+desc(
+    title: "check file read function",
+    type: audit,
+    level: info,
+    lib: 'golang-file-read-bufio'
+)
+
+bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
+$entry.NewReader -> as $reader;
+$reader.ReadString() --> as $output;
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://fileread.go': <<<PARAM
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "os"
+)
+
+func main() {
+    // 写入文件
+    writeToFile("example.txt", []string{"Hello, World!", "Welcome to Go programming.", "This is a buffered I/O example."})
+
+    // 读取文件
+    readFromFile("example.txt")
+}
+
+// writeToFile 使用 bufio 写入文本到文件
+func writeToFile(filename string, lines []string) {
+    // 创建或打开文件
+    file, err := os.Create(filename)
+    if err != nil {
+        fmt.Println("Error creating file:", err)
+        return
+    }
+    defer file.Close() // 确保在函数结束时关闭文件
+
+    // 创建一个带缓冲的写入器
+    writer := bufio.NewWriter(file)
+
+    // 写入每一行
+    for _, line := range lines {
+        _, err := writer.WriteString(line + "\n")
+        if err != nil {
+            fmt.Println("Error writing to file:", err)
+            return
+        }
+    }
+
+    // 确保所有缓冲的数据都写入文件
+    if err := writer.Flush(); err != nil {
+        fmt.Println("Error flushing to file:", err)
+    }
+
+    fmt.Println("Data written to", filename)
+}
+
+// readFromFile 使用 bufio 逐行读取文件
+func readFromFile(filename string) {
+    // 打开文件
+    file, err := os.Open(filename)
+    if err != nil {
+        fmt.Println("Error opening file:", err)
+        return
+    }
+    defer file.Close() // 确保在函数结束时关闭文件
+
+    // 创建一个带缓冲的读取器
+    reader := bufio.NewReader(file)
+
+    // 逐行读取文件
+    for {
+        line, err := reader.ReadString('\n')
+        if err != nil {
+            break // EOF 或其他错误
+        }
+        fmt.Print(line) // 打印读取的行
+    }
+
+    if err != nil && err.Error() != "EOF" {
+        fmt.Println("Error reading file:", err)
+    }
+}
+PARAM
+)

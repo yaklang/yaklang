@@ -5,7 +5,8 @@ desc(
 )
 
 ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $entry;
-.User.Query().Where(* #-> as $param)
+$entry.Open() <getMembers> as $client
+$client.User.Query().Where(* #-> as $param)
 $param?{have: 'Parameter'} as $high
 
 alert $high for {
