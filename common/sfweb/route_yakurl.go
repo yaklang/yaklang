@@ -200,6 +200,9 @@ const (
 
 func (s *SyntaxFlowWebServer) registerYakURLRoute() {
 	s.router.HandleFunc("/yakurl", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			return
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			writeErrorJson(w, utils.Wrap(err, "read body error"))
@@ -230,5 +233,5 @@ func (s *SyntaxFlowWebServer) registerYakURLRoute() {
 		}
 		rsp := ypbToYakURLResponse(grpcRsp)
 		writeJson(w, rsp)
-	}).Name("yakurl").Methods(http.MethodPost)
+	}).Name("yakurl").Methods(http.MethodPost, http.MethodOptions)
 }
