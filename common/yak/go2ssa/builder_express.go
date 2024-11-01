@@ -446,7 +446,7 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			}
 
 			obj.SetName(text)
-			obj.GetType().SetFullTypeNames(path)
+			obj.GetType().SetFullTypeNames([]string{path})
 			b.AssignVariable(b.CreateLocalVariable(text), obj)
 			return obj
 		}
