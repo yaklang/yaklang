@@ -103,6 +103,7 @@ func TestReportFalsePositive(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode(), string(rawRsp.GetBody()))
 		require.NotEmpty(t, rsp.Link)
+		require.NotEmpty(t, rsp.Body)
 		t.Log(rsp.Link)
 	})
 }
@@ -163,6 +164,7 @@ func TestReportFalseNegative(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, rawRsp.GetStatusCode(), string(rawRsp.GetBody()))
 		require.NotEmpty(t, rsp.Link)
+		require.NotEmpty(t, rsp.Body)
 		t.Log(rsp.Link)
 	})
 }

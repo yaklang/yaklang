@@ -32,9 +32,6 @@ func init() {
 ### 规则名称
 {{Details .Rule.Title .Rule.TitleZh }}
 
-### 规则内容
-{{CodeBlock "syntaxflow" .Rule.Content}}
-
 ## 误报风险
 ### 风险标题
 {{Details .Risk.Title .Risk.TitleVerbose }}
@@ -115,6 +112,7 @@ func NewReportMissingParameterError(param string) *ReportMissingParameterError {
 
 type ReportResponse struct {
 	Link string `json:"link"`
+	Body string `json:"body,omitempty"`
 }
 
 func CodeBlock(lang string, content string) string {
@@ -185,8 +183,11 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 			writeErrorJson(w, utils.Wrap(err, "execute template error"))
 			return
 		}
-		issueBody := url.QueryEscape(strings.TrimSpace(issueBodyBuilder.String()))
-		writeJson(w, &ReportResponse{Link: fmt.Sprintf("https://github.com/yaklang/ssa.to/issues/new?labels=bug&title=%s&body=%s", url.QueryEscape(title), issueBody)})
+		issueBody := strings.TrimSpace(issueBodyBuilder.String())
+		writeJson(w, &ReportResponse{
+			Link: fmt.Sprintf("https://github.com/yaklang/ssa.to/issues/new?labels=bug&title=%s", url.QueryEscape(title)),
+			Body: issueBody,
+		})
 	}).Name("false positive report").Methods(http.MethodPost, http.MethodOptions)
 
 	subRouter.HandleFunc("/false_negative", func(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +233,10 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 			writeErrorJson(w, utils.Wrap(err, "execute template error"))
 			return
 		}
-		issueBody := url.QueryEscape(strings.TrimSpace(issueBodyBuilder.String()))
-		writeJson(w, &ReportResponse{Link: fmt.Sprintf("https://github.com/yaklang/ssa.to/issues/new?labels=bug&title=%s&body=%s", url.QueryEscape(title), issueBody)})
+		issueBody := strings.TrimSpace(issueBodyBuilder.String())
+		writeJson(w, &ReportResponse{
+			Link: fmt.Sprintf("https://github.com/yaklang/ssa.to/issues/new?labels=bug&title=%s", url.QueryEscape(title)),
+			Body: issueBody,
+		})
 	}).Name("false negative report").Methods(http.MethodPost, http.MethodOptions)
 }
