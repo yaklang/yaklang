@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"strings"
 	"testing"
@@ -197,6 +199,32 @@ func TestCliParamOpt(t *testing.T) {
 		app.SetArgs([]string{})
 		app.String("s", app.SetRequired(true), app.SetDefault("123"))
 		test.False(app.paramInvalid.IsSet())
+	})
+
+	t.Run("opt-env-with-default", func(t *testing.T) {
+		test := assert.New(t)
+		key := utils.RandStringBytes(10)
+		if db := consts.GetGormProfileDatabase().Save(&schema.PluginEnv{Key: key, Value: "abc"}); db.Error != nil {
+			t.Fatal(db.Error)
+		}
+		defer consts.GetGormProfileDatabase().Where("key = ?", key).Unscoped().Delete(&schema.PluginEnv{})
+		app := NewCliApp()
+		app.SetArgs([]string{})
+		s := app.String("s", app.SetPluginEnv(key), app.SetDefault("123"))
+		test.Equal("abc", s)
+	})
+
+	t.Run("opt-env-with-default2", func(t *testing.T) { // test empty
+		test := assert.New(t)
+		key := utils.RandStringBytes(10)
+		if db := consts.GetGormProfileDatabase().Save(&schema.PluginEnv{Key: key, Value: ""}); db.Error != nil {
+			t.Fatal(db.Error)
+		}
+		defer consts.GetGormProfileDatabase().Where("key = ?", key).Unscoped().Delete(&schema.PluginEnv{})
+		app := NewCliApp()
+		app.SetArgs([]string{"--s", "abc"})
+		s := app.String("s", app.SetPluginEnv(key), app.SetDefault("123"))
+		test.Equal("", s)
 	})
 }
 
