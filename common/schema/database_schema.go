@@ -59,6 +59,7 @@ var ProfileTables = []interface{}{
 	//syntaxFlow rule
 	&SyntaxFlowRule{},
 	&SyntaxFlowRuleGroup{},
+	&PluginEnv{},
 }
 
 var databaseSchemas = map[uint8][]any{

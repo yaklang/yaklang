@@ -730,6 +730,10 @@ service Yak {
   rpc QuerySSAPrograms(QuerySSAProgramRequest)returns(QuerySSAProgramResponse);
   rpc UpdateSSAProgram(UpdateSSAProgramRequest)returns(DbOperateMessage);
   rpc DeleteSSAPrograms(DeleteSSAProgramRequest)returns(DbOperateMessage);
+
+  rpc GetAllPluginEnv(Empty) returns (AllPluginEnv);
+  rpc SetPluginEnv(PluginEnvRequest) returns (Empty);
+  rpc DeletePluginEnv(DeletePluginEnvRequest) returns (Empty);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -5737,4 +5741,18 @@ message SyntaxFlowResult {
   uint64 RiskCount = 11;
 
   string RuleContent = 12;
+}
+
+message AllPluginEnv {
+  repeated KVPair Env = 1;
+}
+
+message PluginEnvRequest {
+  string key = 1;
+  string value = 2;
+}
+
+message DeletePluginEnvRequest {
+  string key = 1;
+  bool all = 2;
 }
