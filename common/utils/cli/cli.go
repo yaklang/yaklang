@@ -3,6 +3,8 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"io/ioutil"
 	"os"
@@ -59,6 +61,7 @@ func NewCliApp() *CliApp {
 }
 
 type cliExtraParams struct {
+	envValue     *string
 	optName      string
 	optShortName string
 	params       []string
@@ -354,6 +357,9 @@ func (c *CliApp) Args() []string {
 
 func (c *CliApp) _cliFromString(name string, opts ...SetCliExtraParam) (string, *cliExtraParams) {
 	param := c._getExtraParams(name, opts...)
+	if param.envValue != nil {
+		return *param.envValue, param
+	}
 	index := param.foundArgsIndex()
 	if index < 0 {
 		return utils.InterfaceToString(param.GetDefaultValue("")), param
@@ -802,6 +808,21 @@ func (c *CliApp) SetJsonSchema(schema string) SetCliExtraParam {
 	return func(c *cliExtraParams) {}
 }
 
+// setPluginEnv 是一个选项函数，设置参数从插件环境中取值
+// Example:
+// ```
+// cli.String("key", cli.setPluginEnv("api-key"))
+// ```
+func (c *CliApp) SetPluginEnv(key string) SetCliExtraParam {
+	return func(cep *cliExtraParams) {
+		var env schema.PluginEnv
+		if db := consts.GetGormProfileDatabase().Select("value").Where("key = ?", key).First(&env); db.Error != nil {
+			log.Errorf("GetPluginEnvByKey error: %s", db.Error)
+		}
+		cep.envValue = &env.Value
+	}
+}
+
 func (c *CliApp) UI(opts ...UIParams) {
 }
 
@@ -887,6 +908,7 @@ var CliExports = map[string]interface{}{
 	"setShortName": DefaultCliApp.SetShortName,
 	"setDefault":   DefaultCliApp.SetDefault,
 	"setRequired":  DefaultCliApp.SetRequired,
+	"setPluginEnv": DefaultCliApp.SetPluginEnv,
 	// 设置中文名
 	"setVerboseName": DefaultCliApp.SetVerboseName,
 	// 设置参数组名
