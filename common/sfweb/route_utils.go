@@ -35,11 +35,31 @@ func writeJson(w http.ResponseWriter, data any) {
 	w.Write(body)
 }
 
+type StatusCodeResponseWriter struct {
+	http.ResponseWriter
+	http.Hijacker
+	StatusCode int
+}
+
+func NewStatusCodeResponseWriter(w http.ResponseWriter) *StatusCodeResponseWriter {
+	nw := &StatusCodeResponseWriter{ResponseWriter: w, StatusCode: http.StatusOK}
+	if hijacker, ok := w.(http.Hijacker); ok {
+		nw.Hijacker = hijacker
+	}
+	return nw
+}
+
+func (w *StatusCodeResponseWriter) WriteHeader(statusCode int) {
+	w.StatusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
 type LogHTTPResponseWriter struct {
 	http.ResponseWriter
 	http.Hijacker
 	wroteHeader bool
 	raw         *bytes.Buffer
+	StatusCode  int
 }
 
 func NewLogHTTPResponseWriter(w http.ResponseWriter) *LogHTTPResponseWriter {
@@ -64,6 +84,7 @@ func (w *LogHTTPResponseWriter) Raw() []byte {
 
 func (w *LogHTTPResponseWriter) WriteHeader(statusCode int) {
 	if !w.wroteHeader {
+		w.StatusCode = statusCode
 		w.wroteHeader = true
 		statusLine := fmt.Sprintf("HTTP/1.1 %d %s\r\n", statusCode, http.StatusText(statusCode))
 		w.raw.WriteString(statusLine)

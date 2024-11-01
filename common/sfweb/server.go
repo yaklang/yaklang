@@ -108,12 +108,17 @@ func NewSyntaxFlowWebServer(ctx context.Context, opts ...ServerOpt) (string, err
 					requestRaw = []byte(header)
 				}
 			}
-			SfWebLogger.Infof("Request:\n%s", requestRaw)
+			var statusCodeWriter *StatusCodeResponseWriter
 			var debugWriter *LogHTTPResponseWriter
 			if serverCfg.Debug {
+				SfWebLogger.Infof("Request:\n%s", requestRaw)
 				debugWriter = NewLogHTTPResponseWriter(writer)
 				writer = debugWriter
+			} else {
+				statusCodeWriter = NewStatusCodeResponseWriter(writer)
+				writer = statusCodeWriter
 			}
+
 			writer.Header().Set("Access-Control-Allow-Origin", "*")
 			writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 			writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -128,6 +133,32 @@ func NewSyntaxFlowWebServer(ctx context.Context, opts ...ServerOpt) (string, err
 			handler.ServeHTTP(writer, request)
 			if serverCfg.Debug {
 				SfWebLogger.Debugf("Response:\n%s", debugWriter.Raw())
+			} else {
+				u := request.URL
+				var (
+					path       string
+					query      string
+					statusCode int = statusCodeWriter.StatusCode
+				)
+				if u != nil {
+					if u.RawPath != "" {
+						path = u.RawPath
+					} else {
+						path = u.Path
+					}
+					if u.RawQuery != "" {
+						query = "?" + u.RawQuery
+					} else {
+						query = u.RawQuery
+					}
+				} else {
+					path = "/!unknown_path"
+				}
+				if statusCode == 200 {
+					SfWebLogger.Infof("[%d] %s%s", statusCode, path, query)
+				} else {
+					SfWebLogger.Errorf("[%d] %s%s", statusCode, path, query)
+				}
 			}
 		})
 	})
