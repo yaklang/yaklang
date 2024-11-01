@@ -32,20 +32,19 @@ func LoopRewriter1(manager *StatementManager) error {
 		}
 		doWhileNode.AddNext(node)
 		if node.LoopEndNode != nil {
+			doWhileNode.LoopEndNode = node.LoopEndNode
 			doWhileNode.AddNext(node.LoopEndNode)
 		}
 		manager.WhileNode = append(manager.WhileNode, doWhileNode)
 	}
 	return nil
 }
-func LoopRewriter(manager *StatementManager, node *core.Node) error {
-	circleNode := node
-	loopStart := circleNode.Next[0]
-	var loopEnd *core.Node
-	if len(circleNode.Next) == 2 {
-		loopEnd = circleNode.Next[1]
+func LoopRewriter2(manager *StatementManager, circleNode *core.Node) error {
+	loopEnd := circleNode.LoopEndNode
+	if loopEnd != nil {
+		circleNode.RemoveNext(loopEnd)
 	}
-	core.WalkGraph[*core.Node](loopStart, func(node *core.Node) ([]*core.Node, error) {
+	err := core.WalkGraph[*core.Node](circleNode, func(node *core.Node) ([]*core.Node, error) {
 		nextList := []*core.Node{}
 		allNext := slices.Clone(node.Next)
 		for _, next := range allNext {
@@ -71,6 +70,45 @@ func LoopRewriter(manager *StatementManager, node *core.Node) error {
 				}))
 				breakNode.HideNext = next
 				manager.UncertainBreakNodes = append(manager.UncertainBreakNodes, [2]*core.Node{circleNode, breakNode})
+
+				matched := utils.NodeFilter(manager.WhileNode, func(node *core.Node) bool {
+					return node == next
+				})
+				if len(matched) > 0 {
+					if utils.IsDominate(manager.DominatorMap, matched[0], circleNode) {
+						loopNode := matched[0].Statement.(*statements.DoWhileStatement)
+						if loopNode.Label == "" {
+							label := manager.NewLoopLabel()
+							loopNode.Label = label
+						}
+						breakNode.Statement = statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+							return "continue " + loopNode.Label
+						})
+					}
+					//} else {
+					//	return nil, errors.New("loop end node conflict")
+					//}
+				} else {
+					//var ok bool
+					for _, n := range manager.WhileNode {
+						if n.LoopEndNode == next && utils.IsDominate(manager.DominatorMap, n, circleNode) {
+							loopNode := n.Statement.(*statements.DoWhileStatement)
+							if loopNode.Label == "" {
+								label := manager.NewLoopLabel()
+								loopNode.Label = label
+							}
+							breakNode.Statement = statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+								return "break " + loopNode.Label
+							})
+							//ok = true
+							break
+						}
+					}
+					//if !ok {
+					//	return nil, errors.New("loop end node conflict")
+					//}
+				}
+
 				node.RemoveNext(next)
 				node.AddNext(breakNode)
 				continue
@@ -79,19 +117,50 @@ func LoopRewriter(manager *StatementManager, node *core.Node) error {
 		}
 		return nextList, nil
 	})
-	circleNode.RemoveNext(loopStart)
-	manager.AddFinalAction(func() error {
-		//for _, n := range allNext {
-		//	circleNode.AddNext(n)
-		//}
-		body, err := manager.ToStatementsFromNode(loopStart, nil)
-		if err != nil {
-			return err
+	if err != nil {
+		return err
+	}
+	if loopEnd != nil {
+		circleNode.AddNext(loopEnd)
+	}
+	return nil
+}
+func LoopRewriter(manager *StatementManager, node *core.Node) error {
+	circleNode := node
+	loopStart := circleNode.Next[0]
+
+	if circleNode.LoopEndNode != nil {
+		circleNode.AddNext(circleNode.LoopEndNode)
+	}
+	body := []statements.Statement{}
+	err := core.WalkGraph[*core.Node](loopStart, func(node *core.Node) ([]*core.Node, error) {
+		manager.AddVisitedNode(node)
+		body = append(body, node.Statement)
+		var next []*core.Node
+		for _, n := range node.Next {
+			if slices.Contains(manager.DominatorMap[node], n) {
+				next = append(next, n)
+			}
 		}
-		doWhile := circleNode.Statement.(*statements.DoWhileStatement)
-		doWhile.Body = append(doWhile.Body, core.NodesToStatements(body)...)
-		return nil
+		return next, nil
 	})
+	if err != nil {
+		return err
+	}
+	doWhileSt := statements.NewDoWhileStatement(values.NewJavaLiteral(true, types.NewJavaPrimer(types.JavaBoolean)), nil)
+	doWhileSt.Label = circleNode.Statement.(*statements.DoWhileStatement).Label
+	doWhileSt.Body = append(doWhileSt.Body, body...)
+	//allSource := slices.Clone(node.Source)
+	//node.RemoveAllSource()
+	//for _, n := range allSource {
+	//	n.AddNext(manager.NewNode(doWhileSt))
+	//}
+	loopNode := manager.NewNode(doWhileSt)
+	if circleNode.LoopEndNode != nil {
+		loopNode.AddNext(circleNode.LoopEndNode)
+	}
+	circleNode.Replace(loopNode)
+	//node.Statement = doWhileSt
 	return nil
 }
 func _1LoopRewriter(manager *StatementManager) error {
