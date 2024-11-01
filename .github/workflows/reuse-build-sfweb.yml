@@ -84,7 +84,7 @@ jobs:
             export CC=aarch64-linux-gnu-gcc
           fi
 
-          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -o $OUTPUT_NAME -v common/sfwebrunner/main.go && ls
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)'" -o $OUTPUT_NAME -v common/sfwebrunner/main.go && ls
 
           echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
 
