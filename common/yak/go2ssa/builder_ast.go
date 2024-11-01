@@ -1867,8 +1867,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			if lib == nil && path != "" { // 没有找到包，可能是golang库,也可能是package名称和导入名称不同
 				b.NewError(ssa.Warn, TAG, PackageNotFind(libName))
 				path = path + "/" + typName
-				ssatyp = ssa.NewStructType()
-				ssatyp.(*ssa.ObjectType).Name = typName
+				ssatyp = ssa.CreateAnyType()
 				ssatyp.SetFullTypeNames([]string{path})
 
 				//variable := b.CreateLocalVariable(typName)
