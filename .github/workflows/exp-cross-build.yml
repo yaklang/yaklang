@@ -1,4 +1,4 @@
-name: Cross-Build
+name: Cross-Build-Yak
 
 on:
   workflow_dispatch:
