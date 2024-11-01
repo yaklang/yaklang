@@ -43,6 +43,7 @@ func OperationFactoryLookupSwitch(reader *JavaByteCodeReader, opcode *OpCode) er
 	defaultTargetPos := Convert4bytesToInt(defaultValue)
 	pairN := Convert4bytesToInt(pairsValue)
 	opcode.SwitchJmpCase = make(map[int]uint32)
+	opcode.SwitchJmpCase1 = make(map[int]int)
 	for i := 0; i < int(pairN); i++ {
 		val := make([]byte, 4)
 		_, err = reader.Read(val)
@@ -92,6 +93,7 @@ func OperationFactoryTableSwitch(reader *JavaByteCodeReader, opcode *OpCode) err
 	targetN := Convert4bytesToInt(highValue) - startVal + 1
 	defaultTargetPos := Convert4bytesToInt(defaultValue)
 	opcode.SwitchJmpCase = make(map[int]uint32)
+	opcode.SwitchJmpCase1 = make(map[int]int)
 	for i := 0; i < int(targetN); i++ {
 		target := make([]byte, 4)
 		_, err = reader.Read(target)

@@ -13,7 +13,7 @@ import (
 )
 
 func TestParseJar(t *testing.T) {
-	jarFs, err := NewJarFSFromLocal("/home/z3/Downloads/ysoserial-for-woodpecker-0.5.2.jar")
+	jarFs, err := NewJarFSFromLocal("/Users/z3/Downloads/ysoserial-for-woodpecker-0.5.2.jar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestParseJar(t *testing.T) {
 		//if path == "org/apache/velocity/runtime/parser/Parser.class" {
 		//	return nil
 		//}
-		if path != "org/apache/velocity/runtime/parser/Parser.class" {
+		if path != "org/mockito/asm/tree/analysis/BasicVerifier.class" {
 			return nil
 		}
 		data, err := jarFs.ReadFile(path)

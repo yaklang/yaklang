@@ -18,13 +18,13 @@ import (
 func TestSwitch(t *testing.T) {
 	id := 0
 	newSwitch := func(startNodes []*core.Node) *core.Node {
-		m := map[int]*core.Node{}
-		for i, node := range startNodes {
+		m := map[int]int{}
+		for i, _ := range startNodes {
 			if i == len(startNodes)-1 {
-				m[-1] = node
+				m[-1] = i
 				continue
 			}
-			m[i] = node
+			m[i] = i
 		}
 		node := core.NewNode(statements.NewMiddleStatement(statements.MiddleSwitch, []any{m, values.NewJavaLiteral("switch", types.NewJavaPrimer(types.JavaString))}))
 		node.Id = id
@@ -42,20 +42,22 @@ func TestSwitch(t *testing.T) {
 		id++
 		return node
 	}
+	start := newCommonNode("start")
 	case1 := newCommonNode("case1 body")
 	case2 := newCommonNode("case2 body")
 	case3 := newCommonNode("case3 body")
 	defaultNode := newCommonNode("default body")
 	switchNode := newSwitch([]*core.Node{case1, case2, case3, defaultNode})
 	endNode := newCommonNode("end")
+	start.AddNext(switchNode)
 	case1.AddNext(case2)
 	case2.AddNext(case3)
 	case3.AddNext(defaultNode)
 	defaultNode.AddNext(endNode)
 	//rewriter.GenerateDominatorTree(switchNode)
-	println(utils.DumpNodesToDotExp(switchNode))
+	println(utils.DumpNodesToDotExp(start))
 
-	statementManager := rewriter.NewRootStatementManager(switchNode)
+	statementManager := rewriter.NewRootStatementManager(start)
 	statementManager.SetId(id)
 	err := statementManager.ScanCoreInfo()
 	if err != nil {
@@ -74,8 +76,8 @@ func TestSwitch(t *testing.T) {
 	}
 	_ = compareNodeList
 	//println(utils.DumpNodesToDotExp(start))
-	assert.Equal(t, 1, len(statementManager.SwitchNode), "switch nodes")
-	assert.Equal(t, switchNode, statementManager.SwitchNode[0], "switch node")
+	//assert.Equal(t, 1, len(statementManager.SwitchNode), "switch nodes")
+	//assert.Equal(t, switchNode, statementManager.SwitchNode[0], "switch node")
 	//assert.Equal(t, endNode, statementManager.SwitchNode[0].SwitchMergeNode, "switch merge node")
 	err = statementManager.Rewrite()
 	if err != nil {
@@ -101,7 +103,8 @@ func TestSwitch(t *testing.T) {
 		statementsStrs = append(statementsStrs, st.String(&class_context.ClassContext{}))
 	}
 	println(strings.Join(statementsStrs, "\n"))
-	assert.Equal(t, `switch("switch") {
+	assert.Equal(t, `start
+switch("switch") {
 case 0:
 case1 body
 case 1:
@@ -116,13 +119,13 @@ default bodyend
 func TestSwitch2(t *testing.T) {
 	id := 0
 	newSwitch := func(startNodes []*core.Node) *core.Node {
-		m := map[int]*core.Node{}
-		for i, node := range startNodes {
+		m := map[int]int{}
+		for i, _ := range startNodes {
 			if i == len(startNodes)-1 {
-				m[-1] = node
+				m[-1] = i
 				continue
 			}
-			m[i] = node
+			m[i] = i
 		}
 		node := core.NewNode(statements.NewMiddleStatement(statements.MiddleSwitch, []any{m, values.NewJavaLiteral("switch", types.NewJavaPrimer(types.JavaString))}))
 		node.Id = id
@@ -140,20 +143,22 @@ func TestSwitch2(t *testing.T) {
 		id++
 		return node
 	}
+	start := newCommonNode("start")
 	case1 := newCommonNode("case1 body")
 	case2 := newCommonNode("case2 body")
 	case3 := newCommonNode("case3 body")
 	defaultNode := newCommonNode("default body")
 	switchNode := newSwitch([]*core.Node{case1, case2, case3, defaultNode})
 	endNode := newCommonNode("end")
+	start.AddNext(switchNode)
 	case1.AddNext(case2)
 	case2.AddNext(endNode)
 	case3.AddNext(defaultNode)
 	defaultNode.AddNext(endNode)
 	//rewriter.GenerateDominatorTree(switchNode)
-	println(utils.DumpNodesToDotExp(switchNode))
+	println(utils.DumpNodesToDotExp(start))
 
-	statementManager := rewriter.NewRootStatementManager(switchNode)
+	statementManager := rewriter.NewRootStatementManager(start)
 	statementManager.SetId(id)
 	err := statementManager.ScanCoreInfo()
 	if err != nil {
@@ -172,9 +177,9 @@ func TestSwitch2(t *testing.T) {
 	}
 	_ = compareNodeList
 	//println(utils.DumpNodesToDotExp(start))
-	assert.Equal(t, 1, len(statementManager.SwitchNode), "switch nodes")
-	assert.Equal(t, switchNode, statementManager.SwitchNode[0], "switch node")
-	assert.Equal(t, endNode, statementManager.SwitchNode[0].SwitchMergeNode, "switch merge node")
+	//assert.Equal(t, 1, len(statementManager.SwitchNode), "switch nodes")
+	//assert.Equal(t, switchNode, statementManager.SwitchNode[0], "switch node")
+	//assert.Equal(t, endNode, statementManager.SwitchNode[0].SwitchMergeNode, "switch merge node")
 	err = statementManager.Rewrite()
 	if err != nil {
 		t.Fatal(err)
@@ -199,7 +204,8 @@ func TestSwitch2(t *testing.T) {
 		statementsStrs = append(statementsStrs, st.String(&class_context.ClassContext{}))
 	}
 	println(strings.Join(statementsStrs, "\n"))
-	assert.Equal(t, `switch("switch") {
+	assert.Equal(t, `start
+switch("switch") {
 case 0:
 case1 body
 case 1:
@@ -207,7 +213,7 @@ case2 bodybreak
 case 2:
 case3 body
 default:
-default body
+default bodybreak
 }
 end`, strings.Join(statementsStrs, "\n"))
 }

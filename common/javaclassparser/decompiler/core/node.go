@@ -77,10 +77,20 @@ func (n *Node) RemoveNext(node *Node) {
 func (n *Node) AddSource(node *Node) {
 	node.AddNext(n)
 }
+func (n *Node) Replace(node *Node) {
+	for _, source := range n.Source {
+		source.ReplaceNext(n, node)
+		node.AddSource(source)
+	}
+	n.RemoveAllSource()
+}
 func (n *Node) AddNext(node *Node) {
-	//if n.Id == 371 && node.Id == 379 {
-	//	print()
-	//}
+	if n == nil || node == nil {
+		println()
+	}
+	if n.Id == 45 {
+		print()
+	}
 	var found bool
 	for _, next := range n.Next {
 		if next == node {

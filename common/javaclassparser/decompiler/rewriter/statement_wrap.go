@@ -33,6 +33,8 @@ type StatementManager struct {
 	edgeSet           *utils.Set[[2]*core.Node]
 	DominatorMap      map[*core.Node][]*core.Node
 	LabelId           int
+	visitedNodeSet    *utils.Set[*core.Node]
+	LoopStart         []*core.Node
 }
 
 func NewStatementManager(node *core.Node, parent *StatementManager) *StatementManager {
@@ -49,6 +51,7 @@ func NewRootStatementManager(node *core.Node) *StatementManager {
 		idToNode:          map[int]*core.Node{},
 		LoopOccupiedNodes: utils.NewSet[*core.Node](),
 		RepeatNodeMap:     map[*core.Node]*core.Node{},
+		visitedNodeSet:    utils.NewSet[*core.Node](),
 	}
 	manager.generateIdToNodeMap()
 	return manager
@@ -76,6 +79,15 @@ func NewRootStatementManager(node *core.Node) *StatementManager {
 //		}
 //		return
 //	}
+func (s *StatementManager) AddVisitedNode(node *core.Node) {
+	if node.Id == 45 {
+		print()
+	}
+	if s.visitedNodeSet.Has(node) {
+		panic("visited")
+	}
+	s.visitedNodeSet.Add(node)
+}
 func (s *StatementManager) NewLoopLabel() string {
 	s.LabelId++
 	return fmt.Sprintf("LOOP_%d", s.LabelId)
@@ -146,6 +158,7 @@ func (s *StatementManager) ToStatementsFromNode(node *core.Node, stopCheck func(
 		if visited.Has(current) {
 			return nil, ErrHasCircle
 		}
+		s.AddVisitedNode(current)
 		if stopCheck != nil && !stopCheck(current) {
 			break
 		}
@@ -338,19 +351,19 @@ func (s *StatementManager) ScanCoreInfo() error {
 	switchSet := utils.NewSet[*core.Node]()
 	switchSet.AddList(s.SwitchNode)
 	s.SwitchNode = switchSet.List()
-	for _, node := range s.SwitchNode {
-		caseItemMap := node.Statement.(*statements.MiddleStatement).Data.([]any)[0].(map[int]*core.Node)
-		itemMap := map[*core.Node]struct{}{}
-		for _, item := range caseItemMap {
-			itemMap[item] = struct{}{}
-		}
-		for _, n := range s.DominatorMap[node] {
-			if _, ok := itemMap[n]; !ok {
-				node.SwitchMergeNode = n
-				break
-			}
-		}
-	}
+	//for _, node := range s.SwitchNode {
+	//	caseItemMap := node.Statement.(*statements.MiddleStatement).Data.([]any)[0].(map[int]*core.Node)
+	//	itemMap := map[*core.Node]struct{}{}
+	//	for _, item := range caseItemMap {
+	//		itemMap[item] = struct{}{}
+	//	}
+	//	for _, n := range s.DominatorMap[node] {
+	//		if _, ok := itemMap[n]; !ok {
+	//			node.SwitchMergeNode = n
+	//			break
+	//		}
+	//	}
+	//}
 	//for switchNode, nodes := range switchMergeNodeCandidates {
 	//	caseMap := switchNode.Statement.(*statements.MiddleStatement).Data.([]any)[0].(map[int]*core.Node)
 	//	allOk := false
@@ -508,8 +521,37 @@ func (s *StatementManager) Rewrite() error {
 	if err != nil {
 		return err
 	}
-	println(utils2.DumpNodesToDotExp(s.RootNode))
 	s.DominatorMap = GenerateDominatorTree(s.RootNode)
+	println(utils2.DumpNodesToDotExp(s.RootNode))
+	nodeToRewriter := map[*core.Node]rewriterFunc{}
+	for _, node := range s.WhileNode {
+		nodeToRewriter[node] = LoopRewriter
+
+		err := LoopRewriter2(s, node)
+		if err != nil {
+			return err
+		}
+		s.DominatorMap = GenerateDominatorTree(s.RootNode)
+	}
+	for _, node := range s.SwitchNode {
+		nodeToRewriter[node] = SwitchRewriter
+		err := SwitchRewriter1(s, node)
+		if err != nil {
+			return err
+		}
+		s.DominatorMap = GenerateDominatorTree(s.RootNode)
+	}
+	for _, node := range s.IfNodes {
+		nodeToRewriter[node] = IfRewriter
+	}
+	order := []*core.Node{}
+	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
+		if _, ok := nodeToRewriter[node]; ok {
+			order = append(order, node)
+		}
+		return s.DominatorMap[node], nil
+	})
+	println(utils2.DumpNodesToDotExp(s.RootNode))
 	for _, ifNode := range s.IfNodes {
 		ifNode.MergeNode = nil
 		trueNode := ifNode.TrueNode()
@@ -589,6 +631,28 @@ func (s *StatementManager) Rewrite() error {
 			})[0]
 		}
 	}
+
+	for i := len(order) - 1; i >= 0; i-- {
+		s.DominatorMap = GenerateDominatorTree(s.RootNode)
+		node := order[i]
+		err := nodeToRewriter[node](s, node)
+		if err != nil {
+			return err
+		}
+		println(utils2.DumpNodesToDotExp(s.RootNode))
+	}
+	//err = LabelRewriter(s)
+	//if err != nil {
+	//	return err
+	//}
+	return nil
+	err = LoopRewriter1(s)
+	if err != nil {
+		return err
+	}
+	println(utils2.DumpNodesToDotExp(s.RootNode))
+	s.DominatorMap = GenerateDominatorTree(s.RootNode)
+
 	//s.DumpDominatorTree()
 	whileNodes := []*core.Node{}
 	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
@@ -604,18 +668,25 @@ func (s *StatementManager) Rewrite() error {
 		}
 	}
 	s.DominatorMap = GenerateDominatorTree(s.RootNode)
-	err = SwitchRewriter(s)
-	if err != nil {
-		return err
-	}
-	//println(utils2.DumpNodesToDotExp(s.RootNode))
-	rewriters := []rewriterFunc{IfRewriter, TryRewriter, LabelRewriter}
-	for _, rewriter := range rewriters {
-		err := rewriter(s)
-		if err != nil {
-			return err
+	for _, startNode := range s.LoopStart {
+		for k, v := range GenerateDominatorTree(startNode) {
+			s.DominatorMap[k] = v
 		}
 	}
+
+	//err = SwitchRewriter(s)
+	//if err != nil {
+	//	return err
+	//}
+	//s.DumpDominatorTree()
+	////println(utils2.DumpNodesToDotExp(s.RootNode))
+	//rewriters := []rewriterFunc{IfRewriter, TryRewriter, LabelRewriter}
+	//for _, rewriter := range rewriters {
+	//	err := rewriter(s)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 	//s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	for _, action := range s.FinalActions {
 		err := action()

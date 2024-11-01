@@ -188,12 +188,9 @@ func (d *Decompiler) ScanJmp() error {
 				walkNode(gotoOp)
 				return
 			case OP_LOOKUPSWITCH, OP_TABLESWITCH:
-				targets := []uint32{}
-				for _, u := range opcode.SwitchJmpCase {
-					targets = append(targets, u)
-				}
-				for _, target := range targets {
+				for v, target := range opcode.SwitchJmpCase {
 					gotoOp := d.offsetToOpcodeIndex[uint16(target)]
+					opcode.SwitchJmpCase1[v] = len(opcode.Target)
 					SetOpcode(opcode, d.opCodes[gotoOp])
 					walkNode(gotoOp)
 				}
@@ -1022,11 +1019,11 @@ func (d *Decompiler) ParseStatement() error {
 				appendNode(statements.NewExpressionStatement(runtimeStackSimulation.Pop().(values.JavaValue)))
 			}
 		case OP_TABLESWITCH, OP_LOOKUPSWITCH:
-			switchMap := map[int]int{}
-			for k, v := range opcode.SwitchJmpCase {
-				switchMap[k] = d.offsetToOpcodeIndex[uint16(v)]
-			}
-			switchStatement := statements.NewMiddleStatement(statements.MiddleSwitch, []any{switchMap, runtimeStackSimulation.Pop().(values.JavaValue)})
+			//switchMap := map[int]int{}
+			//for k, v := range opcode.SwitchJmpCase {
+			//	switchMap[k] = d.offsetToOpcodeIndex[uint16(v)]
+			//}
+			switchStatement := statements.NewMiddleStatement(statements.MiddleSwitch, []any{opcode.SwitchJmpCase1, runtimeStackSimulation.Pop().(values.JavaValue)})
 			appendNode(switchStatement)
 
 			//addStatementHandle(func(getter func(id int) (toStatement int)) {
@@ -1150,16 +1147,16 @@ func (d *Decompiler) ParseStatement() error {
 	}
 	for _, node := range nodes {
 		node := node
-		if v, ok := node.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleSwitch {
-			data := v.Data.([]any)
-			m := data[0].(map[int]int)
-			newM := map[int]*Node{}
-			for k, v := range m {
-				newM[k] = idToNode[getStatementNextIdByOpcodeId(v)]
-			}
-			data[0] = newM
-			v.Data = data
-		}
+		//if v, ok := node.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleSwitch {
+		//	data := v.Data.([]any)
+		//	m := data[0].(map[int]int)
+		//	newM := map[int]*Node{}
+		//	for k, v := range m {
+		//		newM[k] = idToNode[getStatementNextIdByOpcodeId(v)]
+		//	}
+		//	data[0] = newM
+		//	v.Data = data
+		//}
 
 		opcode := idToOpcode[node.Id]
 		for _, code := range opcode.Target {
@@ -1270,6 +1267,9 @@ func (d *Decompiler) ReGenerateNodeId() error {
 }
 func (d *Decompiler) StandardStatement() error {
 	return WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
+		if node.Id == 23 {
+			print()
+		}
 		if _, ok := node.Statement.(*statements.GOTOStatement); ok {
 			for _, source := range node.Source {
 				source.ReplaceNext(node, node.Next[0])
