@@ -1,4 +1,4 @@
-name: Cross-Build
+name: Reuse-Build-SyntaxFlow-Web-Server
 
 on:
   workflow_dispatch:
@@ -25,10 +25,6 @@ on:
         description: "System to build"
         required: true
         type: string
-      ee:
-        type: boolean
-        description: whether to build ee version
-        default: false 
 
 jobs:
   build_and_upload_asset:
@@ -51,10 +47,6 @@ jobs:
           Get-Content "${{ github.workspace }}\.github\patch_go122\48042aa09c2f878c4faa576948b07fe625c4707a.diff" | patch --verbose -R -p 1
           cd ${{ github.workspace }}
 
-      - name: Get Repo tags
-        run: |
-          go run common/yak/cmd/yak.go repos-tag -o tags.txt
-          echo "YAK_TAG=$(cat tags.txt)" >> ${{ contains(inputs.os, 'windows') && '$env:GITHUB_ENV' || '$GITHUB_ENV' }} 
 
       - name: Download CrossBuild GCC(Linux x64 / MacOS x64)
         if: inputs.os == 'linux-amd64' || inputs.os == 'macos-amd64'
@@ -70,23 +62,13 @@ jobs:
           brew install aarch64-unknown-linux-gnu
           aarch64-linux-gnu-gcc -v
 
-      - name: Generate Document
-        run: go run -gcflags=all=-l common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
-
-      - name: Codec Methods Document
-        run: go run -gcflags=all=-l common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.gzip
-
-      - name: Initialize License Machine
-        if: inputs.ee
-        run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
-
       - name: Build for Windows
         if: contains(inputs.os, 'windows')
         run: |
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
-          $outputName = if ("${{ inputs.os }}" -eq "windows7") { "yak_windows_legacy_amd64.exe" } else { "yak_windows_amd64.exe" }
-          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $outputName -v common/yak/cmd/yak.go
+          $outputName = if ("${{ inputs.os }}" -eq "windows7") { "sfweb_windows_legacy_amd64.exe" } else { "sfweb_windows_amd64.exe" }
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -o $outputName -v common/sfwebrunner/main.go
           echo "OUTPUT_NAME=$outputName" >> $env:GITHUB_ENV
 
       - name: Build for Non-Windows
@@ -94,7 +76,7 @@ jobs:
         run: |
           export GOOS=$(echo ${{ inputs.os }} | cut -d'-' -f1)
           export GOARCH=$(echo ${{ inputs.os }} | cut -d'-' -f2)
-          export OUTPUT_NAME="yak_${GOOS}_${GOARCH}"
+          export OUTPUT_NAME="sfweb_${GOOS}_${GOARCH}"
           export CGO_ENABLED=1
           if [ "${{ inputs.os }}" = "linux-amd64" ]; then
             export CC=x86_64-linux-gnu-gcc
@@ -102,7 +84,7 @@ jobs:
             export CC=aarch64-linux-gnu-gcc
           fi
 
-          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $OUTPUT_NAME -v common/yak/cmd/yak.go && ls
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -o $OUTPUT_NAME -v common/sfwebrunner/main.go && ls
 
           echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
 
