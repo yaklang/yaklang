@@ -107,7 +107,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 			for i, name := range names {
 				pathl := strings.Split(paths[i], "/")
-				b.SetImportPackage(name, pathl[len(pathl)-1], paths)
+				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i])
 				if lib, _ := b.GetImportPackage(name); lib != nil {
 					b.GetProgram().ImportAll(lib)
 				}
@@ -213,6 +213,18 @@ func (b *astbuilder) buildImportPath(importPath *gol.ImportPathContext) string {
 	}
 
 	return ""
+}
+
+func (b *astbuilder) handleImportPackage() (values []ssa.Value) {
+	for n, _ := range b.importMap {
+		value := b.ReadValue(n)
+		values = append(values, value)
+		if ft, ok := b.importMap[n]; ok {
+			value.GetType().AddFullTypeName(ft.Path)
+		}
+	}
+
+	return
 }
 
 func (b *astbuilder) buildDeclaration(decl *gol.DeclarationContext, isglobal bool) {
@@ -613,6 +625,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
 		}
 
+		b.handleImportPackage()
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
 		}
@@ -703,6 +716,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
 		}
 
+		b.handleImportPackage()
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
 		}
@@ -812,6 +826,7 @@ func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Ty
 			for _, p := range pList {
 				typeTypes = append(typeTypes, typeType)
 				p.SetType(typeType)
+				p.GetProgram().Cache.AddVariable(typeType.String(), p)
 			}
 		}
 		return typeTypes
@@ -875,7 +890,7 @@ func (b *astbuilder) buildResult(rety *gol.ResultContext) ssa.Type {
 
 	if paras := rety.Parameters(); paras != nil {
 		key, field := b.buildResultParameters(paras.(*gol.ParametersContext))
-		obj := ssa.NewObjectType()
+		obj := ssa.NewStructType()
 		obj.SetTypeKind(ssa.TupleTypeKind)
 		for i := range field {
 			obj.AddField(key[i], field[i])
@@ -1810,17 +1825,25 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 
 	if qul := tname.QualifiedIdent(); qul != nil {
 		if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
-			lib, _ := b.GetImportPackage(qul.IDENTIFIER(0).GetText())
-			if lib == nil { // 没有找到包，可能是golang库,也可能是package名称和导入名称不同
-				b.NewError(ssa.Warn, TAG, PackageNotFind(qul.IDENTIFIER(0).GetText()))
-				ssatyp = ssa.CreateAnyType()
+			libName := qul.IDENTIFIER(0).GetText()
+			typName := qul.IDENTIFIER(1).GetText()
+			lib, path := b.GetImportPackage(libName)
+			if lib == nil && path != "" { // 没有找到包，可能是golang库,也可能是package名称和导入名称不同
+				b.NewError(ssa.Warn, TAG, PackageNotFind(libName))
+				path = path + "/" + typName
+				ssatyp = ssa.NewStructType()
+				ssatyp.(*ssa.ObjectType).Name = typName
+				ssatyp.SetFullTypeNames([]string{path})
+
+				//variable := b.CreateLocalVariable(typName)
+				//b.AssignVariable(variable, b.EmitTypeValue(ssatyp))
 			} else {
-				obj, ok := lib.GetExportType(qul.IDENTIFIER(1).GetText())
+				obj, ok := lib.GetExportType(typName)
 
 				if ok {
 					ssatyp = obj
 				} else { // 没有找到类型，可能来自于golang库
-					b.NewError(ssa.Warn, TAG, StructNotFind(qul.IDENTIFIER(1).GetText()))
+					b.NewError(ssa.Warn, TAG, StructNotFind(typName))
 					ssatyp = ssa.CreateAnyType()
 				}
 			}
