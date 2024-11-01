@@ -57,8 +57,27 @@ func _scanxFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...sy
 		opt(config)
 	}
 
-	return doFromPingUtils(pingutilsToChan(res), ports, config)
+	return doFromPingUtils(_pingutilsToChan(res), ports, config)
 
+}
+
+func _pingutilsToChan(res chan *pingutil.PingResult) chan string {
+	c := make(chan string)
+	go func() {
+		defer close(c)
+		hasValidResult := false
+		for result := range res {
+			if result.Ok {
+				hasValidResult = true
+				c <- result.IP
+			}
+		}
+		// 如果没有任何有效结果
+		if !hasValidResult {
+			c <- ""
+		}
+	}()
+	return c
 }
 
 func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
@@ -66,43 +85,38 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 		config.Ctx = context.Background()
 	}
 	ctx := config.Ctx
-	// 提取第一个ip
-	waitSimpleReady := make(chan struct{})
-	var sample string
-	inputCh := make(chan string)
-	go func() {
-		defer close(inputCh)
-		for {
-			select {
-			case v, ok := <-res:
-				if !ok {
-					return
-				}
-				if sample == "" {
-					sample = v
-					waitSimpleReady <- struct{}{}
-				}
 
-				inputCh <- v
-
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	// 等待拿到第一个ip
-	<-waitSimpleReady
+	// 先获取第一个有效的目标
+	firstTarget, ok := <-res
+	if !ok || firstTarget == "" {
+		return nil, utils.Errorf("no valid ping results found")
+	}
 
 	// 创建Scanner
-	scanner, err := synscanx.NewScannerx(ctx, sample, config)
+	scanner, err := synscanx.NewScannerx(ctx, firstTarget, config)
 	if err != nil {
 		return nil, err
 	}
 	scanner.FromPing = true
+
+	inputCh := make(chan string)
+	go func() {
+		defer close(inputCh)
+		// 先发送第一个目标
+		inputCh <- firstTarget
+		// 转发剩余的有效目标
+		for target := range res {
+			if target != "" {
+				inputCh <- target
+			}
+		}
+	}()
+
 	targetCh := scanner.SubmitTargetFromPing(inputCh, ports)
 	resultCh, err := scanner.Scan(targetCh)
 	if err != nil {
 		log.Errorf("scan failed: %s", err)
+		return nil, err
 	}
 	return resultCh, nil
 

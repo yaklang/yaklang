@@ -144,6 +144,37 @@ func Test___scanxFromPingUtils(t *testing.T) {
 	t.Log("synPacketCounter:", synPacketCounter)
 }
 
+func Test___scanxFromPingUtils_NoAliveHosts(t *testing.T) {
+	list := utils.ParseStringToHosts("192.168.3.3/24")
+	c := make(chan *pingutil.PingResult)
+	go func() {
+		defer close(c)
+		for _, ip := range list {
+			c <- &pingutil.PingResult{
+				IP: ip,
+				Ok: false, // 设置所有主机都不存活
+			}
+		}
+	}()
+
+	// 执行扫描
+	_, err := _scanxFromPingUtils(
+		c,
+		"80,443",
+		synscanx.WithWaiting(1),
+	)
+
+	// 验证错误信息
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+
+	expectedErr := "no valid ping results found"
+	if err.Error() != expectedErr {
+		t.Fatalf("expected error message %q but got %q", expectedErr, err.Error())
+	}
+}
+
 func Test___filter(t *testing.T) {
 
 	wg := sync.WaitGroup{}
