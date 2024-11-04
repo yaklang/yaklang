@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/network"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -125,60 +126,67 @@ func _pingScan(target string, opts ...PingConfigOpt) chan *pingutil.PingResult {
 	opts = append(opts, _pingConfigOpt_cancel(config._cancel))
 
 	resultChan := make(chan *pingutil.PingResult)
+	taskChan := make(chan string)
+
 	go func() {
-		defer func() {
-			close(resultChan)
-		}()
+		defer close(resultChan)
 
-		swg := utils.NewSizedWaitGroup(config.concurrent)
-		for _, hostRaw := range utils.ParseStringToHosts(target) {
-			hostOrigin := hostRaw
-			host := utils.ExtractHost(hostRaw)
-			err := swg.AddWithContext(ctx)
-			if err != nil {
-				log.Error("cancel pingscan from context")
-				return
-			}
-			targetHost := host
+		var wg sync.WaitGroup
+		for i := 0; i < config.concurrent; i++ {
+			wg.Add(1)
 			go func() {
-				defer swg.Done()
-				if ctx.Err() != nil {
-					log.Error("cancel pingscan from context")
-					return
-				}
-				if config.skipped || config.IsFiltered(targetHost) {
-					select {
-					case <-ctx.Done():
-					case resultChan <- &pingutil.PingResult{
-						IP:     hostOrigin,
-						Ok:     true,
-						Reason: "skipped",
-					}:
-					}
-					return
-				}
+				defer wg.Done()
+				for hostRaw := range taskChan {
+					host := utils.ExtractHost(hostRaw)
+					targetHost := host
 
-				result := _ping(targetHost, opts...)
-				if ctx.Err() != nil {
-					return
-				}
-				if config._onResult != nil {
-					config._onResult(result)
-				}
-				if result != nil {
-					if result.IP != hostOrigin {
-						result.IP = hostOrigin
-					}
-					if ctx.Err() == nil {
+					if config.skipped || config.IsFiltered(targetHost) {
 						select {
 						case <-ctx.Done():
+							return
+						case resultChan <- &pingutil.PingResult{
+							IP:     hostRaw,
+							Ok:     true,
+							Reason: "skipped",
+						}:
+						}
+						continue
+					}
+
+					result := _ping(targetHost, opts...)
+					if ctx.Err() != nil {
+						return
+					}
+					if config._onResult != nil {
+						config._onResult(result)
+					}
+					if result != nil {
+						if result.IP != hostRaw {
+							result.IP = hostRaw
+						}
+						select {
+						case <-ctx.Done():
+							return
 						case resultChan <- result:
 						}
+
 					}
 				}
 			}()
 		}
-		swg.Wait()
+
+		for _, hostRaw := range utils.ParseStringToHosts(target) {
+			select {
+			case <-ctx.Done():
+				log.Infof("ping scan canceled")
+				goto EXIT
+			case taskChan <- hostRaw:
+			}
+		}
+
+	EXIT:
+		close(taskChan)
+		wg.Wait()
 	}()
 
 	return resultChan
