@@ -1,12 +1,12 @@
 desc(
-  title: 'checking [freemaker.Template.Process directly] audit prompt',
+  title: 'checking [freeMarker.Template.Process directly] audit prompt',
   type: audit,
   level: warning,
 )
 getTemplate(,*?{!opcode: const} as $sink).process(,* as $params,);
 check $params;
 $params.put(,,* as $sink);
-check $sink then "Found Freemaker Process Using" else "No Freemaker Process Simple";
+check $sink then "Found Freemarker Process Using" else "No Freemarker Process Simple";
 alert $sink;
 
 desc(
