@@ -39,7 +39,6 @@ func SwitchRewriter1(manager *StatementManager, node *core.Node) error {
 	var mergeNode *core.Node
 	if len(endNodes) == 1 {
 		mergeNode = endNodes[0]
-		node.AddNext(endNodes[0])
 		allSources := slices.Clone(mergeNode.Source)
 		mergeNode.RemoveAllSource()
 		for _, source := range allSources {
@@ -48,6 +47,7 @@ func SwitchRewriter1(manager *StatementManager, node *core.Node) error {
 			}))
 			source.AddNext(breakNode)
 		}
+		node.AddNext(mergeNode)
 	}
 	node.MergeNode = mergeNode
 	return nil
@@ -84,7 +84,7 @@ func SwitchRewriter(manager *StatementManager, node *core.Node) error {
 	}
 
 	keyMap := maps.Keys(caseMap)
-
+	node.RemoveAllNext()
 	switchNode := manager.NewNode(switchStatement)
 	node.Replace(switchNode)
 	if node.MergeNode != nil {

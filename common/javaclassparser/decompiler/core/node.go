@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/utils"
+	"slices"
 )
 
 type Node struct {
@@ -12,6 +13,7 @@ type Node struct {
 	Source              []*Node
 	HideNext            *Node
 	Next                []*Node
+	IsJmp               bool
 	IsDel               bool
 	TrueNode, FalseNode func() *Node
 	JmpNode             *Node
@@ -61,6 +63,9 @@ func (n *Node) ReplaceNext(node1, node2 *Node) {
 	}
 }
 func (n *Node) RemoveNext(node *Node) {
+	if node.Id == 258 {
+		println()
+	}
 	for i, next := range n.Next {
 		if next == node {
 			n.Next = append(n.Next[:i], n.Next[i+1:]...)
@@ -78,9 +83,13 @@ func (n *Node) AddSource(node *Node) {
 	node.AddNext(n)
 }
 func (n *Node) Replace(node *Node) {
+	next := slices.Clone(n.Next)
 	for _, source := range n.Source {
 		source.ReplaceNext(n, node)
 		node.AddSource(source)
+	}
+	for _, n2 := range next {
+		node.AddNext(n2)
 	}
 	n.RemoveAllSource()
 }

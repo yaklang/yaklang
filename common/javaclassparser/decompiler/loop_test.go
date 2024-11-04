@@ -235,9 +235,10 @@ if (loop2 start){
 loop2 body
 continue
 }else{
-continue LOOP_1
+break
 }
 }while(true)
+continue LOOP_1
 }else{
 break
 }

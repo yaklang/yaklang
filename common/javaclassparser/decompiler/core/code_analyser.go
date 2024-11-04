@@ -190,8 +190,12 @@ func (d *Decompiler) ScanJmp() error {
 			case OP_LOOKUPSWITCH, OP_TABLESWITCH:
 				for v, target := range opcode.SwitchJmpCase {
 					gotoOp := d.offsetToOpcodeIndex[uint16(target)]
-					opcode.SwitchJmpCase1[v] = len(opcode.Target)
+					if slices.Contains(opcode.Target, d.opCodes[gotoOp]) {
+						opcode.SwitchJmpCase1[v] = len(opcode.Target) - 1
+						continue
+					}
 					SetOpcode(opcode, d.opCodes[gotoOp])
+					opcode.SwitchJmpCase1[v] = len(opcode.Target) - 1
 					walkNode(gotoOp)
 				}
 				return
@@ -1296,9 +1300,15 @@ func (d *Decompiler) StandardStatement() error {
 				falseIndex = 0
 			}
 			node.TrueNode = func() *Node {
+				if trueIndex >= len(node.Next) {
+					return nil
+				}
 				return node.Next[trueIndex]
 			}
 			node.FalseNode = func() *Node {
+				if falseIndex >= len(node.Next) {
+					return nil
+				}
 				return node.Next[falseIndex]
 			}
 		}

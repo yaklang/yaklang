@@ -3,12 +3,17 @@ package rewriter
 import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 )
 
-func GenerateDominatorTree(node *core.Node) map[*core.Node][]*core.Node {
+func GenerateDominatorTree(rootNode *core.Node) map[*core.Node][]*core.Node {
 	nodes := []*core.Node{}
-	err := core.WalkGraph[*core.Node](node, func(node *core.Node) ([]*core.Node, error) {
+	sourceMap := make(map[*core.Node][]*core.Node)
+	err := core.WalkGraph[*core.Node](rootNode, func(node *core.Node) ([]*core.Node, error) {
 		nodes = append(nodes, node)
+		for _, n := range node.Next {
+			sourceMap[n] = append(sourceMap[n], node)
+		}
 		return node.Next, nil
 	})
 	if err != nil {
@@ -19,8 +24,8 @@ func GenerateDominatorTree(node *core.Node) map[*core.Node][]*core.Node {
 		nodeToId[n] = i
 	}
 	dMap := map[*core.Node]*utils.Set[*core.Node]{}
-	dMap[node] = utils.NewSet[*core.Node]()
-	dMap[node].Add(node)
+	dMap[rootNode] = utils.NewSet[*core.Node]()
+	dMap[rootNode].Add(rootNode)
 	//startNode := node
 	for i := 1; i < len(nodes); i++ {
 		dMap[nodes[i]] = utils.NewSet[*core.Node]()
@@ -37,9 +42,9 @@ func GenerateDominatorTree(node *core.Node) map[*core.Node][]*core.Node {
 			if netSet == nil {
 				println()
 			}
-			for _, p := range nodes[i].Source {
+			for _, p := range sourceMap[nodes[i]] {
 				if dMap[p] == nil {
-					continue
+					println(slices.Contains(nodes, p))
 				}
 				netSet = netSet.And(dMap[p])
 			}
