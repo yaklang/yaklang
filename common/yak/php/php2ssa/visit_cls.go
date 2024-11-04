@@ -39,20 +39,6 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
 		return y.EmitUndefined(raw.GetText())
 	}
-	if class == nil {
-		log.Warnf("class %v instantiation failed, checking the dependency package is loaded already?", name)
-		variable := y.CreateVariable(name)
-		obj.SetType(ssa.GetAnyType())
-		defaultClassFullback := y.EmitUndefined(name)
-		y.AssignVariable(variable, defaultClassFullback)
-		args := []ssa.Value{obj}
-		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
-		args = append(args, tmp...)
-		call := y.NewCall(defaultClassFullback, args)
-		call.IsEllipsis = hasEllipsis
-		// new一个类的时候，如果这个类不存在，为了方便跟踪数据流也给它一个默认构造函数
-		return y.EmitCall(call)
-	}
 	obj.SetType(class)
 	ellipsis := false
 	args := []ssa.Value{obj}
@@ -266,9 +252,9 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		switch methodName {
 		case "__construct":
 			newFunction.SetType(ssa.NewFunctionType(fmt.Sprintf("%s-__construct", class.Name), []ssa.Type{class}, class, true))
-			class.Constructor = newFunction
+			class.RegisterMagicMethod(ssa.Constructor, newFunction)
 		case "__destruct":
-			class.Destructor = newFunction
+			class.RegisterMagicMethod(ssa.Destructor, newFunction)
 		default:
 			if isStatic {
 				member := y.GetStaticMember(class, newFunction.GetName())

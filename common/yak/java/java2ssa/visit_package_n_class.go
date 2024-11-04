@@ -854,7 +854,6 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	pkgName := y.GetProgram()
 	// pkgName := strings.Join(pkgPath, "_")
 	funcName := fmt.Sprintf("%s_%s_%s", pkgName.Name, class.Name, key)
-
 	createFunction := func() *ssa.Function {
 		newFunction := y.NewFunc(funcName)
 		y.FunctionBuilder = y.PushFunction(newFunction)
@@ -877,6 +876,5 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		y.VisitQualifiedNameList(i.QualifiedNameList())
 	}
 	newFunction := createFunction()
-	class.Constructor = newFunction
-
+	class.RegisterMagicMethod(ssa.Constructor, newFunction)
 }
