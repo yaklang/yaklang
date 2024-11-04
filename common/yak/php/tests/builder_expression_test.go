@@ -546,6 +546,13 @@ eval($validate);
 			},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	t.Run("instanceof expression", func(t *testing.T) {
+		code := `<?php
+
+$c = $a instanceof $b;
+println($c);`
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-instanceof(Undefined-$a,Undefined-$b)"}, t)
+	})
 }
 func TestCondition(t *testing.T) {
 	code := `<?php
