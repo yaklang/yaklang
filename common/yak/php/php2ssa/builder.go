@@ -398,5 +398,6 @@ var phpBuildIn = map[string]any{
 	"intval": func(vars interface{}) any {
 		return any("")
 	},
-	"empty": func(vars any) any { return any("") },
+	"empty":      func(vars any) any { return any("") },
+	"instanceOf": func(val1, val2 any) {},
 }

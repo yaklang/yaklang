@@ -551,7 +551,7 @@ eval($validate);
 
 $c = $a instanceof $b;
 println($c);`
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-instanceof(Undefined-$a,Undefined-$b)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"Function-instanceOf(Undefined-$a,Undefined-$b)"}, t)
 	})
 }
 func TestCondition(t *testing.T) {
