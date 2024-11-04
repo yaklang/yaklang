@@ -200,7 +200,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		//if name != "isDebugging" {
 		//	continue
 		//}
-		println(name)
+		// println(name)
 		funcCtx.FunctionType = c.MethodType
 		for _, attribute := range method.Attributes {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
