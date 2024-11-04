@@ -5,5 +5,5 @@ desc(
     level: warning,
 )
 
-Runtime.getRuntime().exec(*?{!have: 'getRuntime(', ')'} as $output);
+Runtime.getRuntime().exec(,* as $output);
 alert $output;
