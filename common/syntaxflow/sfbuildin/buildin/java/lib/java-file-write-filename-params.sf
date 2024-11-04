@@ -6,19 +6,19 @@ desc(
 )
 
 // new File("aaaa.txt")
-File?{<typeName>?{have: 'java.io.File'}}(*?{!have: File} as $javaIOFileParam);
+File?{<typeName>?{have: 'java.io.File'}}(,* as $javaIOFileParam);
 
 // PrintWriter writer = new PrintWriter("example.txt", "UTF-8");
-PrintWriter(*?{!have: PrintWriter} as $printWriterFilenames);
+PrintWriter(,* as $printWriterFilenames);
 
 // FileOutputStream outputStream = new FileOutputStream("example.txt");
-FileOutputStream(*?{!have: FileOutputStream} as $javaIOFileStreamName);
+FileOutputStream(,*  as $javaIOFileStreamName);
 
 // java.io.FileWriter
-FileWriter(*?{!have: FileWriter} as $javaIOFileName);
+FileWriter(, * as $javaIOFileName);
 
 // java.nio.file.Files
-Files?{<typeName>?{have: 'java.nio'}}.write(*?{!have: Files } as $nioParam)
+Files?{<typeName>?{have: 'java.nio'}}.write(*, as $nioParam)
 
 
 $javaIOFileParam as $output;
