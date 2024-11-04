@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java jackson-core Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*jackson*core.version as $ver;

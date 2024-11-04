@@ -2,6 +2,7 @@ desc(
     title: "Check The Use Of Broken Or Risky Hash Algorithm",
     type: vuln,
     level: low,
+    risk : "risky_crypt",
 )
 
 MessageDigest.getInstance(* as $algorithm);

@@ -2,6 +2,7 @@ desc(
     title: "Find Java Native Deserialization Vulnerability via ObjectInputStream",
     type: vuln,
     lang: java,
+    risk: 'unserialize',
 )
 
 .readObject?{<getObject>?{<typeName>?{have: ObjectInputStream}}<var(input)> } as $readObject;

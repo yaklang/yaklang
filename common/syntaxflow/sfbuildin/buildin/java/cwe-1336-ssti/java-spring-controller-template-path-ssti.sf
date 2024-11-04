@@ -2,6 +2,7 @@ desc(
     title: "Spring Controller Template Path SSTI",
     type: vuln,
     level: high,
+    risk:ssti,
 )
 
 <include('java-spring-param')>?{<typeName>?{have: String}} as $params;

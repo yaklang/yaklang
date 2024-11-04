@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java sqlite-jdbc Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*sqlite*jdbc.version as $ver;

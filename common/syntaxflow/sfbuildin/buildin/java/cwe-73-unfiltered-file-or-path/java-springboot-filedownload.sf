@@ -2,6 +2,7 @@ desc(
     title: "checking [File or Content download via Springboot Params]",
     type: vuln,
     level: warning,
+    risk:"path-traversal",
 )
 
 <include('java-spring-param')> as $params;

@@ -2,6 +2,7 @@ desc(
     title: "Check The Use Of Broken Or Risky Encryption Algorithm",
     type: vuln,
     level: low,
+    risk : "risky_crypt",
 )
 
 SecretKeySpec(* as $algorithm);

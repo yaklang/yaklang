@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java mysql-connector-java Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*mysql*connector*java.version as $ver;

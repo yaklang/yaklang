@@ -1,6 +1,7 @@
 desc(
     title: "Java Spring Framework Multipart File Saving",
     title_zh: "识别到 Spring Framework 中处理文件上传的代码",
+    risk:"rce",
 )
 
 <include('java-spring-param')>?{<typeName>?{have: "MultipartFile"}} as $entry;
