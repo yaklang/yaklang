@@ -137,6 +137,10 @@ func (m *MITMFilter) updateMatcher() {
 
 func (m *MITMFilter) Recover() {
 	m.Update(defaultMITMFilterData)
+	err := m.SaveToDb()
+	if err != nil {
+		log.Errorf("recover mitm filter failed: %s", err)
+	}
 }
 
 func (m *MITMFilter) Update(data *ypb.MITMFilterData) {
@@ -204,7 +208,7 @@ var defaultMITMFilterData = &ypb.MITMFilterData{
 		Group:       defaultExcludeSuffix,
 	}},
 	ExcludeHostnames: []*ypb.FilterDataItem{{
-		MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
+		MatcherType: httptpl.MATCHER_TYPE_GLOB,
 		Group:       defaultExcludeHostnames,
 	}},
 	ExcludeMIME: []*ypb.FilterDataItem{{
@@ -265,18 +269,24 @@ func (m *MITMFilter) IsEmpty() bool {
 }
 
 func (m *MITMFilter) Save() {
+	if m.IsEmpty() { // if filter is empty ,recover to default
+		m.Update(defaultMITMFilterData)
+	}
+	if err := m.SaveToDb(); err != nil {
+		log.Errorf("save mitm filter failed: %s", err)
+	}
+	return
+}
+
+func (m *MITMFilter) SaveToDb() error {
 	db := m.db
 	if db == nil {
-		return
+		return utils.Error("mitm filter not set db")
 	}
 
-	if m.IsEmpty() {
-		m.Recover()
-	}
 	result, err := json.Marshal(m.Data)
 	if err != nil {
-		log.Errorf("marshal mitm filter failed: %s", err)
-		return
+		return err
 	}
 	// project first
 	if db.HasTable(&schema.ProjectGeneralStorage{}) {
@@ -284,9 +294,7 @@ func (m *MITMFilter) Save() {
 	} else {
 		err = yakit.SetKey(db, MITMFilterKeyRecords, string(result))
 	}
-	if err != nil {
-		log.Errorf("set filter db key failed: %s", err)
-	}
+	return err
 }
 
 func _FilterCheck(include *httptpl.YakMatcher, exclude *httptpl.YakMatcher, raw string) bool {
