@@ -1,0 +1,83 @@
+desc(
+    title: "Check Java Direct URL Redirect Vulnerability",
+    title_zh: "检测Java直接URL重定向漏洞",
+    type:vuln,
+    risk_type:"url-redirect",
+)
+<include('java-spring-param')> as $param1;
+<include('java-servlet-param')> as $param2;
+$param1 + $param2 as $source;
+
+Controller.__ref__<getMembers>?{.annotation.*Mapping && !.annotation.ResponseBody} as $entryMethods;
+$entryMethods<getReturns>?{<typeName>?{have: String}}?{have:'redirect:'} as $sink;
+
+HttpServletResponse?{<typeName>?{have:'javax.servlet.http'}}.sendRedirect(,* as $sink);
+RedirectView?{<typeName>?{have:'org.springframework.web.servlet.view'}}(,* as $sink);
+check $sink;
+
+$sink #{
+    include:`<self> & $source`,
+    exclude:`<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`
+}->as $result;
+
+alert $result for {
+    message: "Find direct URL redirect vulnerability for java",
+    type: vuln,
+    level: high,
+};
+
+desc(
+    alert_min:3,
+    lang: java,
+    'file://urlDirect1.java': <<<EOF
+package com.example.urlredirection;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.view.RedirectView;
+
+@Controller
+public class SecureRedirectController {
+
+    @GetMapping("/Redirect1")
+    public RedirectView RedirectTo(@RequestParam String target) {
+        return new RedirectView(target);
+    }
+
+   @GetMapping("/redirectUsingString")
+   public String redirectToExternalUrlUsingString(@RequestParam String target) {
+       return "redirect:http://" + target;
+   }
+}
+EOF,
+    'file://urlDirect2.java': <<<EOF
+    import java.io.IOException;
+    import javax.servlet.ServletException;
+    import javax.servlet.annotation.WebServlet;
+    import javax.servlet.http.HttpServlet;
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+
+    @WebServlet("/SecureRedirectServlet")
+    public class SecureRedirectServlet extends HttpServlet {
+        private static final long serialVersionUID = 1L;
+
+        protected void doGet(HttpServletRequest request, HttpServletResponse response)
+                throws ServletException, IOException {
+
+            String target = request.getParameter("target");
+
+            if (isTrustedURL(target)) {
+                response.sendRedirect(target);
+            } else {
+                response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid redirect target.");
+            }
+        }
+
+        private boolean isTrustedURL(String url) {
+            return url != null && (url.startsWith("http://example.com/") || url.startsWith("https://example.com/"));
+        }
+    }
+EOF
+)

@@ -1,0 +1,121 @@
+desc(
+    title: "Check LDAP Injection Vulnerability For Java",
+    title_zh: "检测Java LDAP注入漏洞",
+    type:vuln,
+    risk_type:"ldap-injection",
+)
+
+<include('java-spring-param')> as $source;
+<include('java-servlet-param')> as $source;
+
+InitialDirContext()?{<typeName>?{have:'javax.naming'}}.search(*?{<typeName>?{have:'String'||'string'}} as $sink);
+check $sink;
+
+$sink #{
+    include:`<self> & $source`,
+    exclude:`<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`
+}->as $high;
+
+alert $high for {
+    message: "Find LDAP direct injection vulnerability",
+    level: high,
+};
+
+desc(
+    alert_min: 1,
+    alert_high: 1,
+    language: java,
+    'file://LDAPInjection.java': <<<EOF
+package com.example;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.naming.Context;
+import javax.naming.NamingException;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.InitialDirContext;
+import javax.naming.directory.SearchControls;
+import javax.naming.directory.SearchResult;
+import java.io.IOException;
+import java.util.Hashtable;
+
+@WebServlet("/ldapSearch")
+public class LdapSearchServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String username = request.getParameter("username");
+        response.setContentType("text/html");
+        Hashtable<String, String> env = new Hashtable<>();
+        env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
+        env.put(Context.PROVIDER_URL, "ldap://ldap.example.com:389");
+        env.put(Context.SECURITY_AUTHENTICATION, "simple");
+        env.put(Context.SECURITY_PRINCIPAL, "cn=admin,dc=example,dc=com");
+
+        try {
+            DirContext ctx = new InitialDirContext(env);
+            SearchControls searchCtls = new SearchControls();
+            searchCtls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+            String searchFilter = "(&(objectClass=user)(sAMAccountName=" + username + "))";
+            NamingEnumeration<SearchResult> answer = ctx.search("dc=example,dc=com", searchFilter, searchCtls);
+            while (answer.hasMoreElements()) {
+                SearchResult sr = (SearchResult) answer.next();
+                response.getWriter().println("Found user: " + sr.getNameInNamespace());
+            }
+            ctx.close();
+        } catch (NamingException e) {
+            throw new ServletException("LDAP search failed", e);
+        }
+    }
+}
+EOF
+)
+
+desc(
+    language: java,
+    'safefile://LDAPInjection.java': <<<SAFE
+package com.example;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.naming.Context;
+import javax.naming.NamingException;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.InitialDirContext;
+import javax.naming.directory.SearchControls;
+import javax.naming.directory.SearchResult;
+import java.io.IOException;
+import java.util.Hashtable;
+
+@WebServlet("/ldapSearch")
+public class LdapSearchServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String username = request.getParameter("username");
+        response.setContentType("text/html");
+        Hashtable<String, String> env = new Hashtable<>();
+        env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
+        env.put(Context.PROVIDER_URL, "ldap://ldap.example.com:389");
+        env.put(Context.SECURITY_AUTHENTICATION, "simple");
+        env.put(Context.SECURITY_PRINCIPAL, "cn=admin,dc=example,dc=com");
+
+        try {
+            DirContext ctx = new InitialDirContext(env);
+            SearchControls searchCtls = new SearchControls();
+            searchCtls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+           String searchFilter = "(&(objectClass=user)(sAMAccountName={0}))";
+           Object[] searchArguments = new Object[]{username};
+            NamingEnumeration<SearchResult> answer = ctx.search("dc=example,dc=com", searchFilter, searchArguments, searchCtls);
+            while (answer.hasMoreElements()) {
+                SearchResult sr = (SearchResult) answer.next();
+                response.getWriter().println("Found user: " + sr.getNameInNamespace());
+            }
+            ctx.close();
+        } catch (NamingException e) {
+            throw new ServletException("LDAP search failed", e);
+        }
+    }
+}
+SAFE
+)

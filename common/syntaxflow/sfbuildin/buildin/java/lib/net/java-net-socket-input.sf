@@ -1,0 +1,95 @@
+desc(
+    title : "Find TCP Data Reception Point",
+    title_zh : "查找TCP数据接收点",
+    type : audit,
+)
+
+// java.net.Socket
+// java.net.ServerSocket
+.getInputStream?{<typeName>?{have: 'java.net.Socket' || 'java.new.ServerSocket'}} as $output;
+//java.nio.channels.SocketChannel
+.read?{<typeName>?{have: 'java.nio.channels.SocketChannel'}} as $output;
+
+alert $output;
+
+desc(
+    lang: java,
+    alert_min: 2,
+    'file://NioServer.java': <<<EOF
+    import java.io.IOException;
+    import java.net.InetSocketAddress;
+    import java.nio.ByteBuffer;
+    import java.nio.channels.SelectionKey;
+    import java.nio.channels.Selector;
+    import java.nio.channels.ServerSocketChannel;
+    import java.nio.channels.SocketChannel;
+    import java.util.Iterator;
+    import java.util.Set;
+
+    public class NioTcpServer {
+        public static void main(String[] args) throws IOException {
+            Selector selector = Selector.open();
+            ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+            serverSocketChannel.bind(new InetSocketAddress(8080));
+            serverSocketChannel.configureBlocking(false);
+            serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+            while (true) {
+                if (selector.select() == 0) {
+                    continue;
+                }
+
+                Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
+
+                while (keyIterator.hasNext()) {
+                    SelectionKey key = keyIterator.next();
+
+                    if (key.isAcceptable()) {
+                        SocketChannel clientChannel = serverSocketChannel.accept();
+                        clientChannel.configureBlocking(false);
+                        clientChannel.register(selector, SelectionKey.OP_READ);
+                    } else if (key.isReadable()) {
+                        SocketChannel clientChannel = (SocketChannel) key.channel();
+                        ByteBuffer buffer = ByteBuffer.allocate(1024);
+                        int bytesRead = clientChannel.read(buffer);
+
+                        if (bytesRead == -1) {
+                            clientChannel.close();
+                        } else {
+                            buffer.flip();
+                            while (buffer.hasRemaining()) {
+                                System.out.print((char) buffer.get());
+                            }
+                            buffer.clear();
+                        }
+                    }
+                    keyIterator.remove();
+                }
+            }
+        }
+    }
+EOF,
+    'file://SocketServer.java': <<<EOF
+    import java.io.BufferedReader;
+    import java.io.IOException;
+    import java.io.InputStreamReader;
+    import java.net.ServerSocket;
+    import java.net.Socket;
+
+    public class TcpServer {
+        public static void main(String[] args) throws IOException {
+            ServerSocket serverSocket = new ServerSocket(8080);
+            Socket socket = serverSocket.accept();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+            reader.close();
+            socket.close();
+            serverSocket.close();
+        }
+    }
+EOF
+)
