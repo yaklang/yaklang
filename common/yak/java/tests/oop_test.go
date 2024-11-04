@@ -65,7 +65,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]", "Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[1]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -90,7 +91,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]", "Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -131,7 +133,8 @@ func TestJava_Extend_Class(t *testing.T) {
 	}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]", "Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[1]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
 	t.Run("test function call", func(t *testing.T) {
@@ -174,7 +177,8 @@ public class main{
 			}
 		}
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]", "Undefined-a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -197,7 +201,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
+			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -425,7 +429,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
+			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -458,7 +462,8 @@ public class Main{
 		`
 		ssatest.CheckPrintlnValue(code, []string{
 			// TODO: this error
-			"Undefined-a.getNum1(valid)(Function-com.example.A_A_A(Undefined-A,1,2)) member[side-effect(Parameter-num1, #15.num1)]", "Undefined-a.getNum2(valid)(Function-com.example.A_A_A(Undefined-A,1,2)) member[side-effect(Parameter-num2, #15.num2)]",
+			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, #15.num1)]",
+			"Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, #15.num2)]",
 			// "Undefined-a.getNum1(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]",
 			// "Undefined-a.getNum2(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)
@@ -512,7 +517,7 @@ public class Main{
     }
 }`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-File-constructor(Undefined-File)",
+			"Undefined-File(Undefined-File)",
 		}, t)
 	})
 	t.Run("test undefind function call", func(t *testing.T) {

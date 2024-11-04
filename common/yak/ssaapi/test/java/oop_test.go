@@ -80,3 +80,31 @@ class test{
 	},
 	)
 }
+func TestConstructor(t *testing.T) {
+	t.Run("have constructor", func(t *testing.T) {
+		code := `package main;
+class test{
+	public test(){
+	}
+	public void A(){
+		test t = new test();
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `test() as $output`, map[string][]string{
+			"output": {"Function-test(Undefined-test)"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+	t.Run("no constructor", func(t *testing.T) {
+		code := `package main;
+class test{
+	public void A(){
+		test t = new test();
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `test() as $output`, map[string][]string{
+			"output": {"Undefined-test(Undefined-test)"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+}

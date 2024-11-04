@@ -19,12 +19,21 @@ func (c *Blueprint) IsMagicMethodName(name BlueprintMagicMethodKind) bool {
 	return slices.Contains(c._container.GetProgram().magicMethodName, string(name))
 }
 
-func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val *Function) {
+func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value) {
 	if !c.IsMagicMethodName(name) {
 		log.Warnf("register magic method fail: not magic method")
-		return
+		//return
 	}
-	c.MagicMethod[name] = val
+	switch name {
+	case Constructor:
+		c.Constructor = val
+		c.storeInContainer(c.Name, val, BluePrintMagicMethod)
+		val.SetVerboseName(c.Name)
+		return
+	case Destructor:
+		c.Destructor = val
+	}
+	c.storeInContainer(val.GetName(), val, BluePrintMagicMethod)
 }
 func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 	var _method Value
@@ -60,11 +69,13 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 			constructor := c.GeneralUndefined(_name)
 			_method = constructor
 			_method.SetType(NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true))
+			c.RegisterMagicMethod(Constructor, _method)
 		case Destructor:
 			_name := fmt.Sprintf("%s-destructor", c.Name)
 			destructor := c.GeneralUndefined(_name)
 			_method = destructor
 			_method.SetType(NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true))
+			c.RegisterMagicMethod(Destructor, _method)
 		default:
 			return nil
 		}
