@@ -9,14 +9,14 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-func TestNativeCall_FreeMakerXSS(t *testing.T) {
+func TestNativeCall_FreeMarkerXSS(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 
-	vf.AddFile("com/example/demo/controller/freemakerdemo/FreeMakerDemo.java", `package com.example.demo.controller.freemakerdemo;
+	vf.AddFile("com/example/demo/controller/FreeMarkerdemo/FreeMarkerDemo.java", `package com.example.demo.controller.FreeMarkerdemo;
     
 @Controller
 @RequestMapping("/freemarker")
-public class FreeMakerDemo {
+public class FreeMarkerDemo {
     
 
     @GetMapping("/welcome")
@@ -31,7 +31,7 @@ public class FreeMakerDemo {
 
 }`)
 	vf.AddFile("src/main/resources/application.properties", `spring.application.name=demo
-# freemaker
+# FreeMarker
 spring.freemarker.template-loader-path=classpath:/templates/
 spring.freemarker.suffix=.ftl
 `)
@@ -54,15 +54,15 @@ spring.freemarker.suffix=.ftl
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
 
-func TestNativeCall_FreeMakerXSS_WithNoSuffixConfig(t *testing.T) {
+func TestNativeCall_FreeMarkerXSS_WithNoSuffixConfig(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 
-	vf.AddFile("com/example/demo/controller/freemakerdemo/FreeMakerDemo.java", `package com.example.demo.controller.freemakerdemo;
+	vf.AddFile("com/example/demo/controller/FreeMarkerdemo/FreeMarkerDemo.java", `package com.example.demo.controller.FreeMarkerdemo;
     
 
 @Controller
 @RequestMapping("/freemarker")
-public class FreeMakerDemo {
+public class FreeMarkerDemo {
     @Autowired
     private Configuration freemarkerConfig;
 
@@ -96,15 +96,15 @@ public class FreeMakerDemo {
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
 
-func TestNativeCall_FreeMakerXSS_WithDirfferentSuffix(t *testing.T) {
+func TestNativeCall_FreeMarkerXSS_WithDirfferentSuffix(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 
-	vf.AddFile("com/example/demo/controller/freemakerdemo/FreeMakerDemo.java", `package com.example.demo.controller.freemakerdemo;
+	vf.AddFile("com/example/demo/controller/FreeMarkerdemo/FreeMarkerDemo.java", `package com.example.demo.controller.FreeMarkerdemo;
     
 
 @Controller
 @RequestMapping("/freemarker")
-public class FreeMakerDemo {
+public class FreeMarkerDemo {
     @Autowired
     private Configuration freemarkerConfig;
 
@@ -120,7 +120,7 @@ public class FreeMakerDemo {
 
 }`)
 	vf.AddFile("src/main/resources/application.properties", `spring.application.name=demo
-# freemaker
+# FreeMarker
 spring.freemarker.template-loader-path=classpath:/templates/
 spring.freemarker.suffix=.html
 `)
