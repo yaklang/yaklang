@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java c3p0 Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*c3p0.version as $ver;

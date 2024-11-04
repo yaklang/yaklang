@@ -3,6 +3,7 @@ desc(
     title_zh: '找到 MyBatis/iBatis XML Mapper 不安全(${...})参数到 Springframework 可达路径',
     type: vuln,
     level: middle,
+    risk:sqli,
 )
 
 <include('java-spring-param')> as $top;

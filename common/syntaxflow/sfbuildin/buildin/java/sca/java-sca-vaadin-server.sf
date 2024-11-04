@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java vaadin-server Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*vaadin*server.version as $ver;

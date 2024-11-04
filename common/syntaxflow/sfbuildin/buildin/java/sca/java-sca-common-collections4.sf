@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java commons-collections4 Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*commons*collections4.version as $ver;

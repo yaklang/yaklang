@@ -2,6 +2,7 @@ desc(
     title: "Servlet Command Injection",
     type: vuln,
     level: high,
+    risk:rce,
 )
 
 <include('java-servlet-param')> as $source;
@@ -10,7 +11,7 @@ check $source;
 <include('runtime-exec-sink')> as $sink;
 <include('command-exec-sink')> as $sink;
 
-$source?{<show>-{
+$source?{<self>-{
    until: `* & $sink`,
 }->} as $params;
 check $params;

@@ -1,6 +1,7 @@
 desc(
     title: "Check for suspected SQL statement concatenation and execution in database queries",
     title_zh: "检查疑似 SQL 语句拼接并执行到数据库查询的代码"
+    risk:sqli,
 )
 
 g"SELECT*" as $sqlConst;

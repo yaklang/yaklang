@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java shiro-core Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*shiro*core.version as $ver;

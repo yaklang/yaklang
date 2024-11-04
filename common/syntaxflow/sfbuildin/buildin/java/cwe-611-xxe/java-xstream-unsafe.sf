@@ -3,6 +3,7 @@ desc(
     title_zh: "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
     type: vuln,
     level: warning,
+    risk:xxe,
 )
 
 fromXML as $fromXML;

@@ -2,6 +2,7 @@ desc(
     title: "Checking [Filename Attachment when Filedownloading]",
     type: vuln,
     level: low,
+    risk:"path-traversal",
 )
 
 File().get*() -{

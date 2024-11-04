@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java rome Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*rome.version as $ver;

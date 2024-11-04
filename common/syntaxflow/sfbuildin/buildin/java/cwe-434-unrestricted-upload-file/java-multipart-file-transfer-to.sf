@@ -2,6 +2,7 @@ desc(
     title: "Find Springframework MultipartFile.transferTo use",
     type: audit,
     level: info,
+    risk:"rce",
 )
 
 

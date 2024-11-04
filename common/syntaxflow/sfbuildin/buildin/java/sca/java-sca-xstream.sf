@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java xstream Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*xstream.version as $ver;

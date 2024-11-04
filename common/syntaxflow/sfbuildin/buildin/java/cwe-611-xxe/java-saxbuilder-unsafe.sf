@@ -3,6 +3,7 @@ desc(
     title_zh: "SAXBuilder 未明确设置安全策略（.setFeature(...)）",
     type: vuln,
     level: warning,
+    risk:xxe,
 )
 
 .build?{<getObject>}<getObject> as $builder
