@@ -833,6 +833,18 @@ $a = new a(2);
 println($a->a);`
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"2"}}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	t.Run("test oop constructor", func(t *testing.T) {
+		code := `<?php
+class A{
+	public function __construct($a){
+		$this->b = $a;
+	}
+}
+$a = new A(2);
+println($a->b);
+`
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #17.b)"}, t)
+	})
 	t.Run("test oop return", func(t *testing.T) {
 		code := `<?php
 class A{
