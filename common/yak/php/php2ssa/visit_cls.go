@@ -197,14 +197,14 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				class.RegisterNormalMember(name, value)
 			}
 		}
-		ClassBlock := y.CurrentBlock
+		//ClassBlock := y.CurrentBlock
 		class.SetLazyBuilder(func() {
 			// handle variable name
-			CurrentBlock := y.CurrentBlock
-			y.CurrentBlock = ClassBlock
-			defer func() {
-				y.CurrentBlock = CurrentBlock
-			}()
+			//CurrentBlock := y.CurrentBlock
+			//y.CurrentBlock = ClassBlock
+			//defer func() {
+			//	y.CurrentBlock = CurrentBlock
+			//}()
 
 			for _, va := range ret.AllVariableInitializer() {
 				name, value := y.VisitVariableInitializer(va)

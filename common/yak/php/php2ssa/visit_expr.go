@@ -249,10 +249,11 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		return y.EmitBinOp(o, op1, op2)
 	case *phpparser.InstanceOfExpressionContext:
 		// instanceof
-		log.Error("InstanceOfExpressionContext unfinished")
-		log.Error("InstanceOfExpressionContext unfinished")
-		log.Error("InstanceOfExpressionContext unfinished")
-		y.EmitUndefined("")
+		undefined := y.EmitUndefined(ret.InstanceOf().GetText())
+		expression := y.VisitExpression(ret.Expression(0))
+		visitExpression := y.VisitExpression(ret.Expression(1))
+		call := y.NewCall(undefined, []ssa.Value{expression, visitExpression})
+		return call
 	case *phpparser.ComparisonExpressionContext:
 		switch ret.GetOp().GetText() {
 		case "<<":
@@ -848,24 +849,21 @@ func (y *builder) VisitArrayItem(raw phpparser.IArrayItemContext) (ssa.Value, ss
 	if i == nil {
 		return nil, nil
 	}
-
-	if i.Chain() != nil {
-		// (expression '=>')? '&' chain
-		var v ssa.Value
+	switch {
+	case i.Chain() != nil:
 		if i.Expression(0) != nil {
-			v = y.VisitExpression(i.Expression(0))
-		}
-		return v, y.VisitChain(i.Chain())
-	} else {
-		// expression ('=>' expression)?
-		k := y.VisitExpression(i.Expression(0))
-		var v ssa.Value
-		if ret := i.Expression(1); ret != nil {
-			v = y.VisitExpression(ret)
+			expr := y.VisitExpression(i.Expression(0))
+			chain := y.VisitChain(i.Chain())
+			return expr, chain
 		} else {
-			return nil, k
+			return y.EmitConstInstNil(), y.VisitChain(i.Chain())
 		}
-		return k, v
+	default:
+		if len(i.AllExpression()) == 2 {
+			return y.VisitExpression(i.Expression(0)), y.VisitExpression(i.Expression(1))
+		} else {
+			return y.EmitConstInstNil(), y.VisitExpression(i.Expression(0))
+		}
 	}
 }
 
@@ -984,7 +982,7 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 	case *phpparser.ConstantStringitializerContext:
 		var initVal ssa.Value
 		for _, c := range ret.AllConstantString() {
-			if initVal == nil {
+			if utils.IsNil(initVal) {
 				initVal = y.VisitConstantString(c)
 				continue
 			}
@@ -1318,11 +1316,11 @@ func (y *builder) VisitDefineExpr(raw phpparser.IDefineExprContext) ssa.Value {
 	}
 	var flag bool
 	if i.Defined() != nil {
-		if value := y.PeekValue(i.ConstantString().GetText()); value == nil || value.IsUndefined() {
-			flag = false
-		} else {
-			flag = true
-		}
+		undefined := y.EmitUndefined(i.Defined().GetText())
+		visitConstantString := y.VisitConstantString(i.ConstantString())
+		call := y.NewCall(undefined, []ssa.Value{visitConstantString})
+		emitCall := y.EmitCall(call)
+		return emitCall
 	}
 	if i.Define() != nil {
 		value := y.VisitExpression(i.Expression())
