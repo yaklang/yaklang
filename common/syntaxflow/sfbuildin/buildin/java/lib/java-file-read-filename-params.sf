@@ -6,22 +6,22 @@ desc(
 )
 
 // FileReader reader = new FileReader("example.txt");
-FileReader(*?{!have: FileReader} as $fileReader);
+FileReader(,* as $fileReader);
 
 // BufferedReader reader = new BufferedReader(new FileReader("example.txt"));
-BufferedReader(*?{!have: BufferedReader} as $bufferedReader);
+BufferedReader(,* as $bufferedReader);
 
 // FileInputStream inputStream = new FileInputStream("example.txt");
-FileInputStream(*?{!have: FileInputStream} as $fileInputStream);
+FileInputStream(,* as $fileInputStream);
 
 // java.nio.file.Files.readAllBytes,java.nio.file.Files.readString etc...
-Files?{<typeName>?{have: 'java.nio'}}.read*(* as $nioFileRead);
+Files?{<typeName>?{have: 'java.nio'}}.read*(,* as $nioFileRead);
 
 // java.nio.file.Files.newBufferedReader
-Files?{<typeName>?{have: 'java.nio'}}.newBufferedReader(* as $nioBufferedReader);
+Files?{<typeName>?{have: 'java.nio'}}.newBufferedReader(,* as $nioBufferedReader);
 
 // java.nio.file.Files.newInputStream
-Files?{<typeName>?{have: 'java.nio'}}.newInputStream(* as $nioInputStream);
+Files?{<typeName>?{have: 'java.nio'}}.newInputStream(,* as $nioInputStream);
 
 
 $fileReader as $output;
