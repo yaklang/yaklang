@@ -615,3 +615,24 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	require.False(t, shouldFilter)
 	require.True(t, notFilter)
 }
+
+func TestGRPCMUSTPASS_MITM_Filter_Set_Get(t *testing.T) {
+	ctx := utils.TimeoutContextSeconds(5)
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	data := &ypb.MITMFilterData{
+		IncludeUri: []*ypb.FilterDataItem{{MatcherType: "word", Group: []string{"abc"}}},
+	}
+
+	_, err = client.SetMITMFilter(ctx, &ypb.SetMITMFilterRequest{
+		FilterData: data,
+	})
+	require.NoError(t, err)
+
+	defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
+	filter, err := client.GetMITMFilter(ctx, &ypb.Empty{})
+	require.NoError(t, err)
+	require.Equal(t, "word", filter.FilterData.IncludeUri[0].MatcherType)
+	require.Equal(t, []string{"abc"}, filter.FilterData.IncludeUri[0].Group)
+}
