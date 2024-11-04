@@ -265,8 +265,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[1]",
+			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -355,8 +355,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[1]",
+			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -378,8 +378,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-A-constructor(Undefined-A)) member[side-effect(Parameter-$par, $this.a)]",
+			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -397,7 +397,7 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
+			"Undefined-$a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -415,7 +415,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Function-A___construct(Undefined-A,1)) member[side-effect(Parameter-$num, #22.num)]",
+			"Undefined-$a.getNum(valid)(Function-A(Undefined-A,1)) member[side-effect(Parameter-$num, #24.num)]",
 		}, t)
 	})
 }
@@ -451,7 +451,7 @@ $c = new class("2"){
     }
 };
 println($c->a);`
-	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #18.a)"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #20.a)"}, t)
 }
 
 //func TestOOP_custom_member(t *testing.T) {
@@ -473,7 +473,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A();
 		println($a);`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-A-constructor(Undefined-A)",
+			"Undefined-A(Undefined-A)",
 		}, t)
 	})
 
@@ -489,7 +489,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A(); 
 		println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-A-constructor(Undefined-A)) member[0]",
+			"Undefined-$a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
 }
@@ -574,7 +574,7 @@ class childB extends b{
 $a = new childB(1);
 println($a->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #19.a)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #21.a)"}, t)
 	})
 
 	t.Run("no impl __construct and get parent custom member", func(t *testing.T) {
@@ -737,7 +737,7 @@ class b
 	$c = new class("2") extends a {
 	};
 	println($c->a);`
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #19.a)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #20.a)"}, t)
 	})
 	t.Run("class const", func(t *testing.T) {
 		code := `<?php
@@ -843,7 +843,7 @@ class A{
 $a = new A(2);
 println($a->b);
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #17.b)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #19.b)"}, t)
 	})
 	t.Run("test oop return", func(t *testing.T) {
 		code := `<?php
@@ -859,7 +859,7 @@ function test(){
 $b = test();
 println($b->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(2, #20.a)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(2, #22.a)"}, t)
 	})
 	//todo: visit if condition
 	//
