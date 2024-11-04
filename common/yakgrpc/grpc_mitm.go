@@ -1478,15 +1478,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		shouldBeHijacked := !isFiltered
-		// 劫持过滤
-		if isFiltered {
-			return
-		}
+
 		pluginCtx := httpctx.GetPluginContext(req)
 		go func() {
 			mitmPluginCaller.MirrorHTTPFlowWithCtx(pluginCtx, isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
 		}()
-
+		// 劫持过滤
+		if isFiltered {
+			return
+		}
 		saveBarePacketHandler := func(id uint) {
 			// 存储KV，将flow ID作为key，bare request和bare response作为value
 			if httpctx.GetRequestIsModified(req) {
