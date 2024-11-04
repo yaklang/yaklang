@@ -75,7 +75,10 @@ func getRoute(sampleIP string) (*net.Interface, net.IP, net.IP, error) {
 
 func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scannerx, error) {
 	limitInterval := time.Duration(config.rateLimitDelayMs * float64(time.Millisecond))
-	rootCtx, cancel := context.WithCancel(context.Background())
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	rootCtx, cancel := context.WithCancel(ctx)
 	s := &Scannerx{
 		ctx:           rootCtx,
 		cancel:        cancel,
@@ -278,7 +281,12 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 					if proto == "udp" {
 						target.Mode = UDP
 					}
-					tgCh <- target
+					select {
+					case <-s.ctx.Done():
+						log.Infof("SubmitTargetFromPing canceled")
+						return
+					case tgCh <- target:
+					}
 				}
 			}
 		}
@@ -385,8 +393,7 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 			select {
 			case <-s.ctx.Done():
 				return
-			default:
-				resultCh <- result
+			case resultCh <- result:
 			}
 		}
 	}
@@ -426,7 +433,7 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 	for {
 		select {
 		case <-s.ctx.Done():
-			log.Errorf("111111111111111111 %v", s.ctx.Err())
+			log.Error("send packet canceled")
 			return
 		case target, ok := <-targetCh:
 			if !ok {
