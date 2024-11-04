@@ -874,3 +874,17 @@ println($b->a);
 	//CODE)>} as $low;`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
 	//	})
 }
+
+func TestOopFunc(t *testing.T) {
+	code := `<?php
+class A{
+	public function A_method(){
+	}
+}
+function main(){
+	$a = new A();
+	println($a->A_method());
+}
+`
+	ssatest.CheckPrintlnValue(code, []string{"Undefined-$a.A_method(valid)(Undefined-A-constructor(Undefined-A))"}, t)
+}
