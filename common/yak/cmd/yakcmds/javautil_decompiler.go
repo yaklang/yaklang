@@ -33,17 +33,18 @@ var JavaDecompilerCommand = &cli.Command{
 			return err
 		}
 
+		if utils.GetFirstExistedFile(jarPath) == "" {
+			return utils.Errorf("jar file not existed: %v", jarPath)
+		}
+
 		compiledBase := c.String("output")
 		if compiledBase == "" {
 			var notJar bool
-			compiledBase, notJar = strings.CutSuffix(jarPath, ".jar")
+			var jarName string
+			_, jarName = filepath.Split(jarPath)
+			compiledBase, notJar = strings.CutSuffix(jarName, ".jar")
 			if !notJar {
-				l := filepath.SplitList(jarPath)
-				if len(l) > 0 {
-					compiledBase = l[len(l)-1]
-				} else {
-					return utils.Error("output directory not specified, and failed to get from jar path")
-				}
+				compiledBase = jarName
 			}
 		}
 		compiledBase, err = filepath.Abs(compiledBase)
