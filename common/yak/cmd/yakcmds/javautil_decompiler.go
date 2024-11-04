@@ -130,7 +130,8 @@ func jarAction(multiMode bool, jarPath string, c *cli.Context) error {
 		failedDir = ""
 	}
 	if failedDir == "" {
-		failedDir = strings.TrimRight(compiledBase, "/") + "-compiling-failed-files"
+		dirName, _ := filepath.Split(compiledBase)
+		failedDir = filepath.Join(dirName, "compiling-failed-files")
 	}
 	err = os.MkdirAll(failedDir, 0755)
 	if err != nil {
