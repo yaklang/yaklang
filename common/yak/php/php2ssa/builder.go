@@ -2,6 +2,8 @@ package php2ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"os"
 	"path/filepath"
 
@@ -22,28 +24,30 @@ type SSABuild struct {
 
 func (*SSABuild) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
-	return extension == ".php"
+	return extension == ".php" || extension == ".lock"
 }
 func (s *SSABuild) Create() ssa.Builder {
 	return &SSABuild{}
 }
 func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 	s.InitHandlerOnce.Do(func() {
-		fb.SetEmptyRange()
-		container := fb.EmitEmptyContainer()
-		fb.AssignVariable(fb.CreateVariable("global-container"), container)
-		initHandler := func(name ...string) {
-			for _, _name := range name {
-				variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
-				emptyContainer := fb.EmitEmptyContainer()
-				fb.AssignVariable(variable, emptyContainer)
+		s.InitHandlerFunc = append(s.InitHandlerFunc, func() {
+			fb.SetEmptyRange()
+			container := fb.EmitEmptyContainer()
+			fb.AssignVariable(fb.CreateVariable("global-container"), container)
+			initHandler := func(name ...string) {
+				for _, _name := range name {
+					variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
+					emptyContainer := fb.EmitEmptyContainer()
+					fb.AssignVariable(variable, emptyContainer)
+				}
 			}
-		}
-		initHandler("_SERVER")
-		fb.GetProgram().GlobalScope = container
+			initHandler("_SERVER")
+			fb.GetProgram().GlobalScope = container
+		})
 	})
 }
-func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
 	prog := builder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -52,19 +56,38 @@ func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 	if prog.ExtraFile == nil {
 		prog.ExtraFile = make(map[string]string)
 	}
-	if !b.FilterFile(path) {
+	if !s.FilterPreHandlerFile(path) {
 		return nil
 	}
 	dirname, filename := fileSystem.PathSplit(path)
 	_ = dirname
 	_ = filename
-	file, err := fileSystem.ReadFile(path)
-	if err != nil {
-		log.Errorf("read file %s error: %v", path, err)
-		return nil
+	if filepath.Ext(filename) == ".lock" && filename == "composer.lock" {
+		raw, err := fileSystem.ReadFile(path)
+		if err != nil {
+			log.Warnf("read pom.xml error: %v", err)
+			return nil
+		}
+		editor := memedit.NewMemEditor(string(raw))
+		editor.SetUrl(path)
+		builder.SetEditor(editor)
+		vfs := filesys.NewVirtualFs()
+		vfs.AddFile(filename, string(raw))
+		pkgs, err := sca.ScanFilesystem(vfs)
+		if err != nil {
+			log.Warnf("scan pom.xml error: %v", err)
+			return nil
+		}
+		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
+		builder.GenerateDependence(pkgs, filename)
+	} else {
+		file, err := fileSystem.ReadFile(path)
+		if err != nil {
+			log.Errorf("read file %s error: %v", path, err)
+			return nil
+		}
+		prog.Build(path, memedit.NewMemEditor(string(file)), builder)
 	}
-	prog.Build(path, memedit.NewMemEditor(string(file)), builder)
-	prog.GetIncludeFiles()
 	return nil
 }
 
@@ -119,7 +142,8 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 
 // FilterFile 这里可能还会有问题 比如配置文件
 func (*SSABuild) FilterFile(path string) bool {
-	return filepath.Ext(path) == ".php"
+	ext := filepath.Ext(path)
+	return ext == ".php"
 }
 
 func (*SSABuild) GetLanguage() consts.Language {

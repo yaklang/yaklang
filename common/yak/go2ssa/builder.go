@@ -30,8 +30,10 @@ func (s *SSABuilder) Create() ssa.Builder {
 
 func (s *SSABuilder) InitHandler(fb *ssa.FunctionBuilder) {
 	s.InitHandlerOnce.Do(func() {
-		container := fb.EmitEmptyContainer()
-		fb.GetProgram().GlobalScope = container
+		s.InitHandlerFunc = append(s.InitHandlerFunc, func() {
+			container := fb.EmitEmptyContainer()
+			fb.GetProgram().GlobalScope = container
+		})
 	})
 }
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
