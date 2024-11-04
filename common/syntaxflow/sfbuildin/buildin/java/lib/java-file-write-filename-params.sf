@@ -1,6 +1,6 @@
 desc(
-    title: "Find Java File I/O Sinks",
-    title_zh: "查找 Java 文件 I/O 接收点",
+    title: "Find Java File Write Sinks",
+    title_zh: "查找 Java 文件写入接收点",
     type: audit,
     lib: "write-filename-sink"
 )
