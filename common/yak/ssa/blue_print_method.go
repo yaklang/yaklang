@@ -69,6 +69,11 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 			return nil
 		}
 	}
+	if !utils.IsNil(_method) {
+		if function, b := ToFunction(_method); b {
+			function.Build()
+		}
+	}
 	return _method
 }
 
@@ -92,6 +97,7 @@ func (c *Blueprint) GetNormalMethod(key string) Value {
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if function, ok := bluePrint.NormalMethod[key]; ok {
 			f = function
+			function.Build()
 			return true
 		}
 		return false
@@ -110,6 +116,7 @@ func (c *Blueprint) GetStaticMethod(key string) Value {
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if function, ok := bluePrint.StaticMethod[key]; ok {
 			f = function
+			function.Build()
 			return true
 		}
 		return false
