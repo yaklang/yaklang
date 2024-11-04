@@ -24,4 +24,5 @@ var JavaUtils = []*cli.Command{
 			}
 		},
 	},
+	JavaDecompilerCommand,
 }
