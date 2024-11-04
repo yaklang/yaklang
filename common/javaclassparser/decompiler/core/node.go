@@ -63,9 +63,6 @@ func (n *Node) ReplaceNext(node1, node2 *Node) {
 	}
 }
 func (n *Node) RemoveNext(node *Node) {
-	if node.Id == 258 {
-		println()
-	}
 	for i, next := range n.Next {
 		if next == node {
 			n.Next = append(n.Next[:i], n.Next[i+1:]...)
@@ -94,12 +91,6 @@ func (n *Node) Replace(node *Node) {
 	n.RemoveAllSource()
 }
 func (n *Node) AddNext(node *Node) {
-	if n == nil || node == nil {
-		println()
-	}
-	if n.Id == 45 {
-		print()
-	}
 	var found bool
 	for _, next := range n.Next {
 		if next == node {

@@ -235,10 +235,10 @@ if (loop2 start){
 loop2 body
 continue
 }else{
-break
+continue LOOP_1
 }
 }while(true)
-continue LOOP_1
+continue
 }else{
 break
 }

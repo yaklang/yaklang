@@ -95,16 +95,6 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 	for _, arg := range f.Arguments {
 		paramStrs = append(paramStrs, arg.String(funcCtx))
 	}
-	//if f.IsStatic {
-	//	return fmt.Sprintf("%s.%s(%s)", f.JavaType.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
-	//}
-	//var objName string
-	//if !reflect.ValueOf(f.Object).IsNil() {
-	//	objName = f.Object.String(funcCtx)
-	//}
-	//if objName == "" {
-	//	return fmt.Sprintf("%s(%s)", f.FunctionName, strings.Join(paramStrs, ","))
-	//}
 	if f.FunctionName == "<init>" {
 		return fmt.Sprintf("%s(%s)", f.Object.String(funcCtx), strings.Join(paramStrs, ","))
 	}

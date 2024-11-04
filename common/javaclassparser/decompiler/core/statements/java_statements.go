@@ -18,9 +18,6 @@ func (r *ConditionStatement) String(funcCtx *class_context.ClassContext) string 
 }
 
 func NewConditionStatement(cmp values.JavaValue, op string) *ConditionStatement {
-	if cmp.Type() == nil {
-		print()
-	}
 	cmp.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
 	if v, ok := cmp.(*values.JavaCompare); ok {
 		return &ConditionStatement{
@@ -272,7 +269,6 @@ type MiddleStatement struct {
 
 func (a *MiddleStatement) String(funcCtx *class_context.ClassContext) string {
 	return a.Flag
-	//panic("middle statement should not be printed")
 }
 
 func NewMiddleStatement(flag string, d any) *MiddleStatement {
