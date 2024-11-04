@@ -225,6 +225,9 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 		// response: variable values
 		values := result.GetValues(variable)
 		for index, v := range values {
+			if v == nil {
+				continue
+			}
 			codeRange, source := coverCodeRange(programName, v.GetRange())
 			res := createNewRes(url, 0, []extra{
 				{"index", index},
