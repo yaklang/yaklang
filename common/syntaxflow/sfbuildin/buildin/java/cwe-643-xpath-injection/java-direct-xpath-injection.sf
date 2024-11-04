@@ -1,0 +1,111 @@
+desc(
+    title: "Check XPath Injection Vulnerability For Java",
+    title_zh: "检测Java XPath注入漏洞",
+    type:vuln,
+    risk_type:"xpath-injection",
+)
+
+<include('java-spring-param')> as $source;
+<include('java-servlet-param')> as $source;
+
+.evaluate?{<typeName>?{have:'javax.xml.xpath.XPath'}}(* as $sink);
+check $sink;
+
+$sink #{
+    include:`<self> & $source`,
+    exclude:`<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`
+}->as $high;
+
+alert $high for {
+    message: "Find LDAP direct injection vulnerability",
+    level: high,
+};
+
+desc(
+    alert_min: 2,
+    language: java,
+    'file://XPathInjection.java': <<<EOF
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathFactory;
+
+@RestController
+public class XPathInjectionExample {
+
+    @GetMapping("/searchBooks")
+    public String searchBooks(@RequestParam String bookAuthor) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document document = builder.parse(getClass().getResourceAsStream("/books.xml"));
+
+        XPathFactory xPathfactory = XPathFactory.newInstance();
+        XPath xpath = xPathfactory.newXPath();
+
+        String expression = "/books/book[author='" + bookAuthor + "']";//source
+        XPathExpression compiledExpression = xpath.compile(expression); //sink
+
+        NodeList nodeList = (NodeList) compiledExpression.evaluate(document, XPathConstants.NODESET);
+
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < nodeList.getLength(); i++) {
+            result.append(nodeList.item(i).getTextContent()).append("\n");
+        }
+        return result.toString();
+    }
+
+
+}
+EOF,
+    'file://XPathInjection2.java': <<<EOF
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
+import javax.xml.xpath.XPath;
+import org.w3c.dom.Document;
+import org.springframework.beans.factory.annotation.Autowired;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.InputStream;
+import org.springframework.core.io.ClassPathResource;
+
+@RestController
+public class VulnerableXPathController {
+
+    private final XPath xpath = XPathFactory.newInstance().newXPath();
+
+    @Autowired
+    private DocumentBuilderFactory documentBuilderFactory;
+
+    @GetMapping("/searchByUsername")
+    public ResponseEntity<String> searchByUsername(@RequestParam String username) {
+        try {
+            InputStream inputStream = new ClassPathResource("users.xml").getInputStream();
+            DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+            Document document = documentBuilder.parse(inputStream);
+
+            String expression = "//user[username='" + username + "']";//source
+
+            String result = (String) xpath.evaluate(expression, document, XPathConstants.STRING);//sink
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("Error processing request");
+        }
+    }
+}
+EOF
+)

@@ -1,0 +1,76 @@
+desc(
+    title: "Check The Use Of Broken Or Risky Hash Algorithm",
+    type: vuln,
+    level: low,
+)
+
+MessageDigest.getInstance(* as $algorithm);
+$algorithm?{have:'SHA-0' || 'SHA-1'|| 'MD5' || 'MD4'} as $sink;
+alert $sink for{
+    message:"Find the use of broken or risky encryption algorithm",
+    type: vuln,
+    level:low,
+}
+
+desc(
+    lang:java,
+    alert_min:4,
+    'file://unsafe.java': <<<EOF
+     import java.security.MessageDigest;
+     import java.security.NoSuchAlgorithmException;
+     import java.util.Formatter;
+
+     public class UnsafeHashExample {
+          public static String md4(String input) throws NoSuchAlgorithmException {
+                             MessageDigest md = MessageDigest.getInstance("MD4");
+                             byte[] messageDigest = md.digest(input.getBytes());
+
+                             Formatter formatter = new Formatter();
+                             for (byte b : messageDigest) {
+                                 formatter.format("%02x", b);
+                             }
+                             String result = formatter.toString();
+                             formatter.close();
+                             return result;
+                         }
+        public static String md5(String input) throws NoSuchAlgorithmException {
+                     MessageDigest md = MessageDigest.getInstance("MD5");
+                     byte[] messageDigest = md.digest(input.getBytes());
+
+                     Formatter formatter = new Formatter();
+                     for (byte b : messageDigest) {
+                         formatter.format("%02x", b);
+                     }
+                     String result = formatter.toString();
+                     formatter.close();
+                     return result;
+                 }
+          public static String sha0(String input) throws NoSuchAlgorithmException {
+                  MessageDigest md = MessageDigest.getInstance("SHA-0");
+                  byte[] messageDigest = md.digest(input.getBytes());
+
+                  Formatter formatter = new Formatter();
+                  for (byte b : messageDigest) {
+                      formatter.format("%02x", b);
+                  }
+                  String result = formatter.toString();
+                  formatter.close();
+                  return result;
+              }
+
+         public static String sha1(String input) throws NoSuchAlgorithmException {
+             MessageDigest md = MessageDigest.getInstance("SHA-1");
+             byte[] messageDigest = md.digest(input.getBytes());
+
+             Formatter formatter = new Formatter();
+             for (byte b : messageDigest) {
+                 formatter.format("%02x", b);
+             }
+             String result = formatter.toString();
+             formatter.close();
+             return result;
+         }
+
+     }
+EOF
+)
