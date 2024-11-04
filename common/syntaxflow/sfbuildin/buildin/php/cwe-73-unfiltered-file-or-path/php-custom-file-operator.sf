@@ -1,7 +1,7 @@
 desc(
     title: 'file operator',
     type: vul,
-    level: low
+    level: low,
    risk:"path-traversal",
 )
 
