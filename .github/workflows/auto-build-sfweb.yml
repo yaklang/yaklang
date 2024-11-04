@@ -1,0 +1,16 @@
+name: Auto-Build-SyntaxFlow-Web-Server
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+    paths:
+      - "common/sfweb/**"
+      - ".github/workflows/auto-build-sfweb.yml"
+
+jobs:
+  build:
+    uses: ./.github/workflows/reuse-build-sfweb.yml
+    with:
+      os: linux-amd64
+    secrets: inherit

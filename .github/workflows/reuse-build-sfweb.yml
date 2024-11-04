@@ -14,11 +14,6 @@ on:
           - macos-arm64
           - linux-amd64
           - linux-arm64
-      ee:
-        type: boolean
-        description: whether to build ee version
-        default: false
-  
   workflow_call:
     inputs:
       os:
