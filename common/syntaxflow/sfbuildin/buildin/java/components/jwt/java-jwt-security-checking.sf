@@ -1,0 +1,121 @@
+desc(
+    title: 'JWT Security Checking For Java',
+    title_zh: 'Java JWT 安全检查',
+    type: vuln,
+)
+
+Jwts?{<typeName>?{have: 'io.jsonwebtoken'}} as $jwt;
+check $jwt;
+$jwt.parser().setSigningKey().parse() as $riskParse;
+
+alert $riskParse for {
+    message: "JWT uses the unsafe parse method",
+    message_zh: "JWT 使用了不安全的 parse 方法",
+    type: vuln,
+    level: mid,
+    risk : "auth-bypass",
+}
+
+.signWith?{<typeName>?{have:'io.jsonwebtoken'}}(,,* as $key)
+$key?{opcode:const} as $simpleKey;
+$key?{opcode: call && <getCaller>?{<getObject><name>?{have:base64 || BASE64  || Base64}}(,*?{opcode: const}<var(base64EncodedKey)>) } as $sink;
+$simpleKey + $base64EncodedKey as $hardcodedKey;
+alert $hardcodedKey for {
+    message: "JWT uses the hardcoded key",
+    message_zh: "JWT 使用了硬编码的密钥",
+    type: vuln,
+    level: high,
+    risk : "auth-bypass",
+}
+
+alert $sink for {
+    message: "JWT uses the unsafe key",
+    message_zh: "JWT 使用了不安全的密钥",
+    type: vuln,
+    level: mid,
+    risk : "auth-bypass",
+}
+
+desc(
+    alert_min: 3,
+    lang:java,
+    "file://JWTSecurity.java": <<<EOF
+package org.owasp.aaa;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.impl.TextCodec;
+
+
+public class JWTVotesEndpoint extends AssignmentEndpoint {
+    private static final String JWT_PASSWORD = "bm5n3SkxCX4kKRy4";
+    public static final String[] SECRETS = {
+            "victory", "business", "available", "shipping", "washington"
+    };
+    public static final String JWT_SECRET =
+            TextCodec.BASE64.encode(SECRETS[new Random().nextInt(SECRETS.length)]);
+    @GetMapping("/JWT/votings")
+    @ResponseBody
+    public MappingJacksonValue getVotes(
+            @CookieValue(value = "access_token", required = false) String accessToken) {
+        MappingJacksonValue value =
+                new MappingJacksonValue(
+                        votes.values().stream()
+                                .sorted(comparingLong(Vote::getAverage).reversed())
+                                .collect(toList()));
+        if (StringUtils.isEmpty(accessToken)) {
+            value.setSerializationView(Views.GuestView.class);
+        } else {
+            try {
+                Jwt jwt = Jwts.parser().setSigningKey(JWT_PASSWORD).parse(accessToken);
+                Claims claims = (Claims) jwt.getBody();
+                String user = (String) claims.get("user");
+                if ("Guest".equals(user) || !validUsers.contains(user)) {
+                    value.setSerializationView(Views.GuestView.class);
+                } else {
+                    value.setSerializationView(Views.UserView.class);
+                }
+            } catch (JwtException e) {
+                value.setSerializationView(Views.GuestView.class);
+            }
+        }
+        return value;
+    }
+
+    private Map<String, Object> createNewTokens(String user) {
+        Map<String, Object> claims = Map.of("admin", "false", "user", user);
+        String token =
+                Jwts.builder()
+                        .setIssuedAt(new Date(System.currentTimeMillis() + TimeUnit.DAYS.toDays(10)))
+                        .setClaims(claims)
+                        .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, JWT_PASSWORD)
+                        .compact();
+        Map<String, Object> tokenJson = new HashMap<>();
+        String refreshToken = RandomStringUtils.randomAlphabetic(20);
+        validRefreshTokens.add(refreshToken);
+        tokenJson.put("access_token", token);
+        tokenJson.put("refresh_token", refreshToken);
+        return tokenJson;
+    }
+
+    @RequestMapping(path = "/JWT/secret/gettoken", produces = MediaType.TEXT_HTML_VALUE)
+    @ResponseBody
+    public String getSecretToken() {
+        return Jwts.builder()
+                .setIssuer("WebGoat Token Builder")
+                .setAudience("webgoat.org")
+                .setIssuedAt(Calendar.getInstance().getTime())
+                .setExpiration(Date.from(Instant.now().plusSeconds(60)))
+                .setSubject("tom@webgoat.org")
+                .claim("username", "Tom")
+                .claim("Email", "tom@webgoat.org")
+                .claim("Role", new String[] {"Manager", "Project Administrator"})
+                .signWith(SignatureAlgorithm.HS256, JWT_SECRET)
+                .compact();
+    }
+}
+EOF
+)
+
+

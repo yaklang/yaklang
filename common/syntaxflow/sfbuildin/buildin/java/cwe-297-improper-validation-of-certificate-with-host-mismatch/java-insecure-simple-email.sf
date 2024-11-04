@@ -1,0 +1,51 @@
+desc(
+    title: "Check If Java SimpleEmail Verifies The Certificate",
+    title_zh: "检测Java SimpleEmail在建立SSL连接时是否验证服务器的SSL证书",
+    level: info,
+    lang: java,
+)
+
+SimpleEmail()?{<typeName>?{have:'org.apache.commons.mail'}} as $simpleEmail;
+check $simpleEmail;
+$simpleEmail?{!(.setSSLCheckServerIdentity)} as $sink;
+alert $sink for {
+    message_zh: "SimpleEmail 未验证务器的SSL证书",
+    message: "SimpleEmail has not verified the server’s security certificate.",
+    level:info,
+    risk_type:"auth-bypass",
+};
+
+desc(
+lang: java,
+alert_min: 1,
+alert_low: 1,
+'file://SimpleEmail.java': <<<UNSAFE
+package org.example;
+
+import org.apache.commons.mail.DefaultAuthenticator;
+import org.apache.commons.mail.Email;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.SimpleEmail;
+
+public class MailSender {
+    public static void main(String[] args) {
+        Email email = new SimpleEmail();
+        email.setHostName("smtp.example.com");
+        email.setSmtpPort(587);
+        email.setAuthenticator(new DefaultAuthenticator("your-email@example.com", "your-password"));
+        email.setTLS(true);
+        try {
+            email.setFrom("your-email@example.com");
+            email.addTo("recipient-email@example.com");
+            email.setSubject("邮件主题");
+            email.setMsg("这是邮件的正文内容。");
+
+            email.send();
+            System.out.println("邮件发送成功！");
+        } catch (EmailException e) {
+            e.printStackTrace();
+        }
+    }
+}
+UNSAFE
+)

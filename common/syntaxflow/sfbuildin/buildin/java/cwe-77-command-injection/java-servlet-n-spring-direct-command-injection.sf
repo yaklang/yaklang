@@ -1,0 +1,126 @@
+desc(
+    title: "Servlet & Springframework Paremeter Directly Passed into Command Injection Sink",
+    title: 'Servlet & Springframewor 基础参数直接命令注入',
+    type: vuln,
+    risk:rce,
+)
+
+<include('java-servlet-param')> as $source;
+<include('java-spring-param')> as $source;
+check $source;
+<include('runtime-exec-sink')> as $sink;
+<include('command-exec-sink')> as $sink;
+check $sink;
+
+$sink #{
+    include:`<self> & $source`,
+    exclude:`<self>?{opcode:call}?{!<self> & $source}`
+}->as $result;
+
+alert $result for{
+    message: "Find direct command injection vulnerability for java",
+    level: high,
+};
+
+desc(
+language: java,
+alert_min:1,
+'file://directly.java': <<<EOF
+package com.example;
+
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import java.io.*;
+
+public class CommandInjectionServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String otherInput = request.getParameter("ccc");
+        String userInput = request.getParameter("command");
+        String command = "cmd.exe /c " + userInput; // 直接使用用户输入
+        Process process = Runtime.getRuntime().exec(userInput);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String line;
+        PrintWriter out = response.getWriter();
+
+        while ((line = reader.readLine()) != null) {
+            out.println(line);
+        }
+    }
+}
+EOF
+)
+
+desc(
+language: java,
+'safefile://a.java': <<<EOF
+package com.example;
+
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import java.io.*;
+
+public class CommandInjectionServlet2 extends HttpServlet {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String otherInput = request.getParameter("ccc");
+        String userInput = request.getParameter("cmd");
+        String command = "cmd.exe /c";
+
+        Process process = Runtime.getRuntime().exec(command);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String line;
+        PrintWriter out = response.getWriter();
+
+        while ((line = reader.readLine()) != null) {
+            out.println(line);
+        }
+    }
+}
+EOF
+)
+
+desc(
+language: java,
+alert_min:1,
+'file://directly.java':<<<EOF
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+
+@SpringBootApplication
+@RestController
+public class CommandExecutionApplication {
+    @GetMapping("/execute/{command}")
+    public String executeCommand(@PathVariable String command) {
+        StringBuilder output = new StringBuilder();
+        try {
+            Process process = Runtime.getRuntime().exec(command);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append(System.lineSeparator());
+            }
+
+            int exitCode = process.waitFor();
+            if (exitCode == 0) {
+                return "Command executed successfully. Output: " + output.toString();
+            } else {
+                return "Command failed with exit code: " + exitCode;
+            }
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "Error executing command: " + e.getMessage();
+        }
+
+    }
+}
+EOF
+)

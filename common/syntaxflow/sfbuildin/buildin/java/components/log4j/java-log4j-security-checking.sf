@@ -1,0 +1,113 @@
+desc(
+    title: 'Log4j Security Checking',
+    title_zh: 'Log4j 安全检查',
+    type: vuln,
+)
+
+__dependency__./org.apache.logging.log4j/?{<self>.name?{have:'og4j-core'} }.version as $ver;
+$ver in (,2.17.0] as $vulnerable;
+check $vulnerable;
+
+<include('java-spring-param')> as $source;
+<include('java-servlet-param')> as $source;
+
+.error as $sinkFunc;
+.warn as $sinkFunc;
+.info as $sinkFunc;
+.debug as $sinkFunc;
+.trace as $sinkFunc;
+.fatal as $sinkFunc;
+
+$sinkFunc?{<typeName>?{have:'org.apache.logging.log4j'}}(* as $sink) ;
+
+check $sink;
+
+$sink #{
+    include:`<self> & $source`,
+    exclude:`<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
+}->as $high;
+
+alert $high for {
+    message: "Find Log4j direct jndi injection vulnerability",
+    level: high,
+    risk: "rce",
+};
+
+desc(
+    alert_min: 1,
+    lang:java,
+    'file://Log4jInjection.java': <<<EOF
+    package org.joychou.controller;
+
+    import cn.hutool.http.server.HttpServerRequest;
+    import org.apache.logging.log4j.LogManager;
+    import org.apache.logging.log4j.Logger;
+    import org.springframework.web.bind.annotation.RequestMapping;
+    import org.springframework.web.bind.annotation.RestController;
+
+    @RestController
+    public class Log4j {
+        private static final Logger logger = LogManager.getLogger("Log4j");
+
+        @RequestMapping(value = "/log4j")
+        public String log4j(HttpServerRequest request) {
+            logger.error(request.getParam("token"));
+            return "log4j";
+        }
+     }
+EOF,
+    'file://pom.xml': <<<EOF
+   <?xml version="1.0" encoding="UTF-8"?>
+   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+       <modelVersion>4.0.0</modelVersion>
+       <parent>
+           <groupId>org.springframework.boot</groupId>
+           <artifactId>spring-boot-starter-parent</artifactId>
+           <version>3.3.5</version>
+           <relativePath/> <!-- lookup parent from repository -->
+       </parent>
+       <groupId>org.example</groupId>
+       <artifactId>demo5</artifactId>
+       <version>0.0.1-SNAPSHOT</version>
+       <name>demo5</name>
+       <description>demo5</description>
+       <url/>
+       <licenses>
+           <license/>
+       </licenses>
+       <developers>
+           <developer/>
+       </developers>
+       <scm>
+           <connection/>
+           <developerConnection/>
+           <tag/>
+           <url/>
+       </scm>
+       <properties>
+           <java.version>17</java.version>
+       </properties>
+       <dependencies>
+           <dependency>
+               <groupId>org.apache.logging.log4j</groupId>
+               <artifactId>log4j-core</artifactId>
+               <version>2.9.1</version>
+           </dependency>
+           <dependency>
+               <groupId>org.apache.logging.log4j</groupId>
+               <artifactId>log4j-api</artifactId>
+               <version>2.9.1</version>
+           </dependency>
+       </dependencies>
+       <build>
+           <plugins>
+               <plugin>
+                   <groupId>org.springframework.boot</groupId>
+                   <artifactId>spring-boot-maven-plugin</artifactId>
+               </plugin>
+           </plugins>
+       </build>
+   </project>
+EOF,
+)
