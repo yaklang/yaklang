@@ -115,6 +115,9 @@ func (z *ZipFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, erro
 }
 
 func (z *ZipFS) Stat(name string) (fs.FileInfo, error) {
+	if name == "." {
+		name = ""
+	}
 	name = z.Clean(name)
 	f, err := z.forest.Get(name)
 	if err != nil {
@@ -123,7 +126,14 @@ func (z *ZipFS) Stat(name string) (fs.FileInfo, error) {
 	if f == nil {
 		return nil, os.ErrNotExist
 	}
+
 	if f.Value == nil {
+		if len(f.Children) > 0 {
+			return &VirtualFileInfo{
+				name: name,
+				mod:  fs.ModeDir,
+			}, nil
+		}
 		return nil, os.ErrNotExist
 	}
 	v, ok := f.Value.(*zip.File)
