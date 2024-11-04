@@ -1,7 +1,6 @@
 package java2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path/filepath"
 	"strings"
@@ -56,13 +55,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 			return nil
 		}
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
-		s.InitHandlerOnce.Do(func() {
-			fb.SetEmptyRange()
-			variable := fb.CreateVariable("__dependency__")
-			container := fb.EmitEmptyContainer()
-			fb.AssignVariable(variable, container)
-		})
-		handlerDependency(pkgs, fb, filename)
+		fb.GenerateDependence(pkgs, filename)
 	}
 
 	switch strings.ToLower(fileSystem.Ext(path)) {
@@ -100,59 +93,4 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 
 	}
 	return nil
-}
-
-func handlerDependency(pkgs []*dxtypes.Package, fb *ssa.FunctionBuilder, filename string) {
-	container := fb.ReadValue("__dependency__")
-	if container == nil {
-		return
-	}
-
-	setDependencyRange := func(name string) {
-		id := strings.Split(name, ":")
-		if len(id) != 2 {
-			return
-		}
-		group, artifact := id[0], id[1]
-		rs1 := fb.GetRangeByText(artifact)
-		if len(rs1) == 1 {
-			fb.SetRangeByRangeIf(rs1[0])
-			return
-		}
-		rs2 := fb.GetRangeByText(group)
-		if len(rs2) == 1 {
-			fb.SetRangeByRangeIf(rs2[0])
-			return
-		}
-		fb.SetEmptyRange()
-	}
-	/*
-		__dependency__.name?{}
-	*/
-	fb.SetEmptyRange()
-	for _, pkg := range pkgs {
-		sub := fb.EmitEmptyContainer()
-		// check item
-		// 1. name
-		// 2. version
-		// 3. filename
-		// 4. group
-		// 5. artifact
-		for k, v := range map[string]string{
-			"name":     pkg.Name,
-			"version":  pkg.Version,
-			"filename": filename,
-		} {
-			if k == "name" {
-				setDependencyRange(v)
-			}
-			fb.AssignVariable(
-				fb.CreateMemberCallVariable(sub, fb.EmitConstInst(k)),
-				fb.EmitConstInst(v),
-			)
-		}
-
-		pkgItem := fb.CreateMemberCallVariable(container, fb.EmitConstInst(pkg.Name))
-		fb.AssignVariable(pkgItem, sub)
-	}
 }
