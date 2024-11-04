@@ -155,7 +155,9 @@ func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
 
 	vs := make(Values, 0, len(auditNodeIDs))
 	for _, nodeID := range auditNodeIDs {
-		vs = append(vs, r.program.NewValueFromAuditNode(nodeID))
+		if v := r.program.NewValueFromAuditNode(nodeID); v != nil {
+			vs = append(vs, v)
+		}
 	}
 	return vs
 }
