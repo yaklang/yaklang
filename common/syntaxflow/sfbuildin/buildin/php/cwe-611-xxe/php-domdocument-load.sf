@@ -2,6 +2,7 @@ desc(
     title: "Checking new DOMDocument().load with LIBXML_NOENT (XXE)",
     type: vuln,
     level: high,
+    risk: "xxe"
 )
 
 LIBXML_NOENT<getCall><getCaller>?{<getObject><name>?{have: DOMDocument} && <name>?{have: load} } as $vuln;

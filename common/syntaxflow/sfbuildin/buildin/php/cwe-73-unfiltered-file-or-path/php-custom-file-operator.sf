@@ -2,6 +2,7 @@ desc(
     title: 'file operator',
     type: vul,
     level: low
+   risk:"path-traversal",
 )
 
 <include('php-file-read')> as $read
