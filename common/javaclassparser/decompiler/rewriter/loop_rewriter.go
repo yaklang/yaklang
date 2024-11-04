@@ -16,7 +16,7 @@ type LoopStatement struct {
 	BodyStart *core.Node
 }
 
-func LoopRewriter1(manager *StatementManager) error {
+func RebuildLoopNode(manager *RewriteManager) error {
 	for _, node := range manager.CircleEntryPoint {
 		doWhileSt := statements.NewDoWhileStatement(values.NewJavaLiteral(true, types.NewJavaPrimer(types.JavaBoolean)), nil)
 		doWhileNode := manager.NewNode(doWhileSt)
@@ -34,18 +34,16 @@ func LoopRewriter1(manager *StatementManager) error {
 	}
 	return nil
 }
-func LoopRewriter2(manager *StatementManager, circleNode *core.Node) error {
-	//loopEnd := circleNode.LoopEndNode
-	loopEnd := FoundEndNode(circleNode, circleNode.Next[0])
-	if loopEnd != nil {
-		circleNode.AddNext(loopEnd)
-	}
-
-	//if loopEnd == nil {
-	//	loopEnd = CalcMergeNode1(circleNode)
-	//}
+func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
+	loopEnd := searchCircleEndNode(circleNode, circleNode.Next[0])
 	checkNode := func(node *core.Node) ([]*core.Node, error) {
 		if node.IsJmp {
+			return nil, nil
+		}
+		if _, ok := node.Statement.(*statements.IfStatement); ok {
+			return nil, nil
+		}
+		if !utils.IsDominate(manager.DominatorMap, circleNode, node) {
 			return nil, nil
 		}
 		nextList := []*core.Node{}
@@ -62,14 +60,13 @@ func LoopRewriter2(manager *StatementManager, circleNode *core.Node) error {
 				continue
 			}
 
-			if !utils.IsDominate(manager.DominatorMap, node, next) {
+			if !utils.IsDominate(manager.DominatorMap, node, next) && node != circleNode && false {
 				if node != circleNode {
 					breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 						return "break"
 					}))
 					breakNode.HideNext = next
 					breakNode.IsJmp = true
-					manager.UncertainBreakNodes = append(manager.UncertainBreakNodes, [2]*core.Node{circleNode, breakNode})
 					node.RemoveNext(next)
 					node.AddNext(breakNode)
 					breakNode.AddNext(circleNode)
@@ -81,7 +78,6 @@ func LoopRewriter2(manager *StatementManager, circleNode *core.Node) error {
 				}))
 				breakNode.HideNext = next
 				breakNode.IsJmp = true
-				manager.UncertainBreakNodes = append(manager.UncertainBreakNodes, [2]*core.Node{circleNode, breakNode})
 
 				matched := utils.NodeFilter(manager.WhileNode, func(node *core.Node) bool {
 					return node == next
@@ -137,7 +133,62 @@ func LoopRewriter2(manager *StatementManager, circleNode *core.Node) error {
 				breakNode.IsJmp = true
 				continue
 			}
-
+			if node != circleNode {
+				matched := utils.NodeFilter(manager.WhileNode, func(node *core.Node) bool {
+					return node == next
+				})
+				if len(matched) > 0 {
+					if utils.IsDominate(manager.DominatorMap, matched[0], circleNode) {
+						loopNode := matched[0].Statement.(*statements.DoWhileStatement)
+						if loopNode.Label == "" {
+							label := manager.NewLoopLabel()
+							loopNode.Label = label
+						}
+						breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+							return "break"
+						}))
+						breakNode.Statement = statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+							return "continue " + loopNode.Label
+						})
+						breakNode.IsJmp = true
+						node.RemoveNext(next)
+						node.AddNext(breakNode)
+						breakNode.AddNext(matched[0])
+					}
+					//} else {
+					//	return nil, errors.New("loop end node conflict")
+					//}
+				} else {
+					//var ok bool
+					for _, n := range manager.WhileNode {
+						if len(n.Next) < 2 {
+							continue
+						}
+						endNode := searchCircleEndNode(n, n.Next[0])
+						if endNode == next && utils.IsDominate(manager.DominatorMap, n, circleNode) {
+							loopNode := n.Statement.(*statements.DoWhileStatement)
+							if loopNode.Label == "" {
+								label := manager.NewLoopLabel()
+								loopNode.Label = label
+							}
+							breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+								return "break"
+							}))
+							breakNode.Statement = statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+								return "break " + loopNode.Label
+							})
+							breakNode.IsJmp = true
+							node.RemoveNext(next)
+							node.AddNext(breakNode)
+							breakNode.AddNext(endNode)
+							break
+						}
+					}
+					//if !ok {
+					//	return nil, errors.New("loop end node conflict")
+					//}
+				}
+			}
 			nextList = append(nextList, next)
 		}
 		return nextList, nil
@@ -154,27 +205,23 @@ func LoopRewriter2(manager *StatementManager, circleNode *core.Node) error {
 	}
 	return nil
 }
-func LoopRewriter(manager *StatementManager, node *core.Node) error {
-	if len(node.Next) == 3 {
-		print()
-	}
+func LoopRewriter(manager *RewriteManager, node *core.Node) error {
 	circleNode := node
-	//loopEndNode := FoundEndNode(manager.DominatorMap, node)
-	//if loopEndNode != nil {
-	//	circleNode.AddNext(loopEndNode)
-	//}
 	loopStart := circleNode.Next[0]
 	circleNode.RemoveNext(loopStart)
 
 	body := []statements.Statement{}
 	endNodes := []*core.Node{}
-	circleSet := getCircleSet(circleNode, loopStart)
+	circleSet := getCircleElementSet(circleNode, loopStart)
 	err := core.WalkGraph[*core.Node](loopStart, func(node *core.Node) ([]*core.Node, error) {
 		if !circleSet.Has(node) {
 			endNodes = append(endNodes, node)
 			return nil, nil
 		}
-		manager.AddVisitedNode(node)
+		err := manager.CheckVisitedNode(node)
+		if err != nil {
+			return nil, err
+		}
 		body = append(body, node.Statement)
 		var next []*core.Node
 		for _, n := range node.Next {
@@ -204,37 +251,31 @@ func LoopRewriter(manager *StatementManager, node *core.Node) error {
 	for _, c := range NodeDeduplication(endNodes) {
 		loopNode.AddNext(c)
 	}
-	//if len(loopNode.Next) > 1 {
-	//	print()
-	//}
-	//node.Statement = doWhileSt
 	return nil
 }
-func getCircleSet(circleNode *core.Node, loopStart *core.Node) *utils2.Set[*core.Node] {
+func getCircleElementSet(circleNode *core.Node, loopStart *core.Node) *utils2.Set[*core.Node] {
 	finalSet := utils2.NewSet[*core.Node]()
-	var walkNodes func(start *core.Node, route []*core.Node) bool
-	walkNodes = func(start *core.Node, route []*core.Node) bool {
+	var walkNodes func(start *core.Node, route []*core.Node)
+	walkNodes = func(start *core.Node, route []*core.Node) {
 		if slices.Contains(route, start) {
-			return false
+			return
 		}
 		if start == circleNode {
 			finalSet.AddList(route)
-			return true
+			return
 		}
 		route = append(route, start)
 		for _, n := range start.Next {
-			if walkNodes(n, route) {
-				return true
-			}
+			walkNodes(n, route)
 		}
-		return false
+		return
 	}
 	walkNodes(loopStart, []*core.Node{})
+	finalSet.Add(circleNode)
 	return finalSet
 }
-func FoundEndNode(circleNode *core.Node, loopStart *core.Node) *core.Node {
-	elementSet := getCircleSet(circleNode, loopStart)
-	elementSet.Add(circleNode)
+func searchCircleEndNode(circleNode *core.Node, loopStart *core.Node) *core.Node {
+	elementSet := getCircleElementSet(circleNode, loopStart)
 	outNodes := []*core.Node{}
 	elementSet.ForEach(func(node *core.Node) {
 		for _, n := range node.Next {
@@ -243,6 +284,7 @@ func FoundEndNode(circleNode *core.Node, loopStart *core.Node) *core.Node {
 			}
 		}
 	})
+	outNodes = NodeDeduplication(outNodes)
 	if len(outNodes) == 0 {
 		return nil
 	}

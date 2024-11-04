@@ -2,17 +2,6 @@ package types
 
 import "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 
-const (
-	Integer    = "integer"
-	Long       = "long"
-	Double     = "double"
-	Float      = "float"
-	NullObject = "null"
-	Class      = "class"
-	//MethodHandle,  // Only used for invokedynamic arguments
-	MethodType = "method"
-)
-
 type JavaType interface {
 	javaType
 	ResetType(t JavaType)
