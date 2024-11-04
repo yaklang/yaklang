@@ -254,22 +254,19 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 
 	tooLarge := httpctx.GetResponseTooLarge(req)
 
-	// response hijacker
-	if m.responseHijackHandler != nil {
-		responseBytes = httpctx.GetBareResponseBytes(req)
-		if len(responseBytes) <= 0 {
-			var err error
-			responseBytes, err = utils.DumpHTTPResponse(rsp, !tooLarge)
-			if err != nil {
-				log.Errorf("mitm-hijack marshal response to bytes failed: %s", err)
-				return nil
-			}
-			httpctx.SetBareResponseBytes(req, responseBytes)
-		}
-
-		if httpctx.IsFiltered(req) {
+	responseBytes = httpctx.GetBareResponseBytes(req)
+	if len(responseBytes) <= 0 {
+		var err error
+		responseBytes, err = utils.DumpHTTPResponse(rsp, !tooLarge)
+		if err != nil {
+			log.Errorf("mitm-hijack marshal response to bytes failed: %s", err)
 			return nil
 		}
+		httpctx.SetBareResponseBytes(req, responseBytes)
+	}
+
+	// response hijacker
+	if m.responseHijackHandler != nil && !httpctx.IsFiltered(req) { // if flow is filtered, do not hijack response
 		isHttps := httpctx.GetRequestHTTPS(rsp.Request)
 		result := m.responseHijackHandler(isHttps, req, rsp, responseBytes, httpctx.GetRemoteAddr(req))
 		if result == nil {
@@ -290,7 +287,7 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		}
 	}
 
-	if m.httpFlowMirror != nil && !httpctx.IsFiltered(req) {
+	if m.httpFlowMirror != nil { // fix for mirrorFilteredHTTPFlow
 		if len(responseBytes) <= 0 {
 			var err error
 			responseBytes, err = utils.HttpDumpWithBody(rsp, !tooLarge)
