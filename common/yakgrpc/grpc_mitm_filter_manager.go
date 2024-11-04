@@ -272,7 +272,6 @@ func (m *MITMFilter) Save() {
 
 	if m.IsEmpty() {
 		m.Recover()
-		return
 	}
 	result, err := json.Marshal(m.Data)
 	if err != nil {
