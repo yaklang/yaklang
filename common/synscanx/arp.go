@@ -119,7 +119,11 @@ func (s *Scannerx) arp(target string) {
 		log.Errorf("assemble arp packet failed: %v", err)
 		return
 	}
-	s.PacketChan <- packet
+	select {
+	case <-s.ctx.Done():
+		return
+	case s.PacketChan <- packet:
+	}
 	//err = s.Handle.WritePacketData(packet)
 	//if err != nil {
 	//	log.Errorf("write to device arp failed: %v", s.handleError(err))
