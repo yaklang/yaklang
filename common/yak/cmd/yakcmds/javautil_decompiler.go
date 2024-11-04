@@ -64,7 +64,7 @@ var JavaDecompilerCommand = &cli.Command{
 		jars = lo.Filter(jars, func(jar string, _ int) bool {
 			jar = strings.TrimSpace(jar)
 			if utils.GetFirstExistedFile(jar) != "" {
-				log.Info("find jar: %v", jar)
+				log.Infof("find jar: %v", jar)
 				return true
 			}
 			log.Warnf("jar file not existed: %v", jar)
