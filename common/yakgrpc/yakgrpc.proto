@@ -4778,6 +4778,7 @@ message HTTPFlow {
   repeated string Payloads = 47;
   int64 DurationMs = 48;
   string HiddenIndex = 49;
+  string FromPlugin = 50;
 }
 
 message FuzzableParam {
