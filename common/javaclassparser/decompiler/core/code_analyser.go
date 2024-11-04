@@ -149,6 +149,9 @@ func (d *Decompiler) ScanJmp() error {
 					d.opCodes[gotoOp].ExceptionTypeIndex = entry.CatchType
 					deferWalkId = append(deferWalkId, gotoOp)
 					walkNode(gotoOp)
+					if pre != nil {
+						SetOpcode(pre, d.opCodes[gotoOp])
+					}
 				}
 			}
 
@@ -247,10 +250,11 @@ func (d *Decompiler) NewVar(val values.JavaValue) *values.JavaRef {
 	d.idToValue[d.currentVarId] = val
 	return newRef
 }
-func (d *Decompiler) AssignVar(slot int, typ values.JavaValue) (*values.JavaRef, bool) {
+func (d *Decompiler) AssignVar(slot int, val values.JavaValue) (*values.JavaRef, bool) {
+	typ := val.Type()
 	ref, ok := d.varTable[slot]
-	if !ok || ref.String(d.FunctionContext) != typ.String(d.FunctionContext) {
-		newRef := d.NewVar(typ)
+	if !ok || ref.Type().String(d.FunctionContext) != typ.String(d.FunctionContext) {
+		newRef := d.NewVar(val)
 		d.varTable[slot] = newRef
 		return newRef, true
 	}
@@ -1115,13 +1119,13 @@ func (d *Decompiler) ParseStatement() error {
 				return node.Next, nil
 			}
 			if v, ok := node.Statement.(*statements.MiddleStatement); ok {
-				if v.Flag == statements.MiddleSwitch || v.Flag == "tryStart" {
+				if v.Flag == statements.MiddleSwitch || v.Flag == statements.MiddleTryStart {
 					return node.Next, nil
 				}
 			}
 			tryStartNode := node.Next[0]
 			catchStartNode := node.Next[1]
-			tryNode := NewNode(statements.NewMiddleStatement("tryStart", nil))
+			tryNode := NewNode(statements.NewMiddleStatement(statements.MiddleTryStart, nil))
 			node.RemoveAllNext()
 			node.AddNext(tryNode)
 			tryNode.AddNext(tryStartNode)

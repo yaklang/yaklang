@@ -198,7 +198,7 @@ func (s *RewriteManager) ScanCoreInfo() error {
 					walkIfStatement(n, newRoute)
 				}
 				continue
-			} else if v, ok := current.Statement.(*statements.MiddleStatement); ok && v.Flag == "tryStart" {
+			} else if v, ok := current.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleTryStart {
 				tryNodesSet.Add(current)
 				for _, n := range current.Next {
 					newRoute := subNodeRoute.NewChild(current)
@@ -295,7 +295,7 @@ func (s *RewriteManager) ScanCoreInfo() error {
 		//	return errors.New("invalid circle")
 		//}
 		tryNodes := funk.Filter(maps.Keys(outPointMap), func(node *core.Node) bool {
-			if v, ok := node.Statement.(*statements.MiddleStatement); ok && v.Flag == "tryStart" {
+			if v, ok := node.Statement.(*statements.MiddleStatement); ok && v.Flag == statements.MiddleTryStart {
 				return true
 			}
 			return false
@@ -402,6 +402,9 @@ func (s *RewriteManager) Rewrite() error {
 	}
 	for _, node := range s.IfNodes {
 		nodeToRewriter[node] = IfRewriter
+	}
+	for _, node := range s.TryNodes {
+		nodeToRewriter[node] = TryRewriter
 	}
 	//for _, node := range s.TopologicalSortReverse(s.WhileNode) {
 	//	println(utils2.DumpNodesToDotExp(s.RootNode))

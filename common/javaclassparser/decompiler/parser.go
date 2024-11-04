@@ -5,14 +5,16 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/rewriter"
+	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, err error) {
-	//defer func() {
-	//	if e := recover(); e != nil {
-	//		err = utils.Error(e)
-	//	}
-	//}()
+	defer func() {
+		if e := recover(); e != nil {
+			err = utils.Error(e)
+		}
+	}()
 	err = decompiler.ParseSourceCode()
 	if err != nil {
 		return nil, err
@@ -25,7 +27,7 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	//core.GenerateDominatorTree(decompiler.RootNode)
 	statementManager := rewriter.NewRootStatementManager(decompiler.RootNode)
 	statementManager.SetId(decompiler.CurrentId)
-
+	utils2.DumpNodesToDotExp(decompiler.RootNode)
 	err = statementManager.Rewrite()
 	if err != nil {
 		return nil, err
