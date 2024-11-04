@@ -260,6 +260,7 @@ func NewSwitchStatement(value values.JavaValue, cases []*CaseItem) *SwitchStatem
 
 const (
 	MiddleSwitch = "switch"
+	MiddleTryStart = "tryStart"
 )
 
 type MiddleStatement struct {

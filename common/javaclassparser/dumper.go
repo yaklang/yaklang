@@ -237,11 +237,11 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					case *statements.TryCatchStatement:
 						statementStr = fmt.Sprintf(c.GetTabString()+"try{\n"+
 							"%s\n"+
-							c.GetTabString()+"}", statementListToString(ret.TryBody), ret.Exception.Type().String(funcCtx))
-						for _, body := range ret.CatchBodies {
+							c.GetTabString()+"}", statementListToString(ret.TryBody))
+						for i, body := range ret.CatchBodies {
 							statementStr += fmt.Sprintf("catch(%s %s){\n"+
 								"%s\n"+
-								c.GetTabString()+"}", ret.Exception.Type().String(funcCtx), ret.Exception.String(funcCtx), statementListToString(body))
+								c.GetTabString()+"}", ret.Exception[i].Type().String(funcCtx), ret.Exception[i].String(funcCtx), statementListToString(body))
 						}
 					case *statements.WhileStatement:
 						statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+

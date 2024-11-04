@@ -42,7 +42,7 @@ func (w *WhileStatement) String(funcCtx *class_context.ClassContext) string {
 }
 
 type TryCatchStatement struct {
-	Exception   *values.JavaRef
+	Exception   []*values.JavaRef
 	TryBody     []Statement
 	CatchBodies [][]Statement
 }

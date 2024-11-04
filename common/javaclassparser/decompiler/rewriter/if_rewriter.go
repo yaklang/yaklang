@@ -32,10 +32,6 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 	ifStatementNode := manager.NewNode(ifStatement)
 	ifNode.Replace(ifStatementNode)
 
-	//if mergeNode != nil {
-	//	mergeNode.RemoveAllSource()
-	//	ifStatementNode.AddNext(mergeNode)
-	//}
 	endNodes := []*core.Node{}
 	getBody := func(bodyStartNode *core.Node) ([]statements.Statement, error) {
 
