@@ -22,5 +22,4 @@ var (
 	_ JavaValue = &RefMember{}
 	_ JavaValue = &JavaCompare{}
 	_ JavaValue = &JavaClassValue{}
-	//_ JavaValue = types.JavaNull
 )

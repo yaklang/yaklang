@@ -4,11 +4,15 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func GenerateDominatorTree(node *OpCode, getNext func(*OpCode) []*OpCode, getSource func(*OpCode) []*OpCode) map[*OpCode][]*OpCode {
+func GenerateDominatorTree(node *OpCode) map[*OpCode][]*OpCode {
 	nodes := []*OpCode{}
+	sourceMap := map[*OpCode][]*OpCode{}
 	err := WalkGraph[*OpCode](node, func(node *OpCode) ([]*OpCode, error) {
 		nodes = append(nodes, node)
-		return getNext(node), nil
+		for _, p := range node.Source {
+			sourceMap[p] = append(sourceMap[p], node)
+		}
+		return node.Target, nil
 	})
 	if err != nil {
 		return nil
@@ -30,10 +34,7 @@ func GenerateDominatorTree(node *OpCode, getNext func(*OpCode) []*OpCode, getSou
 		flag = false
 		for i := 0; i < len(nodes); i++ {
 			netSet := dMap[nodes[i]]
-			if netSet == nil {
-				println()
-			}
-			for _, p := range getSource(nodes[i]) {
+			for _, p := range sourceMap[nodes[i]] {
 				if dMap[p] == nil {
 					continue
 				}
@@ -46,13 +47,8 @@ func GenerateDominatorTree(node *OpCode, getNext func(*OpCode) []*OpCode, getSou
 			}
 		}
 	}
-
-	//var sb strings.Builder
-	//sb.WriteString("digraph G {\n")
 	dominatorMap := map[*OpCode][]*OpCode{}
 	for node, dom := range dMap {
-		//dominatorMap[idToNode[dom]] = append(dominatorMap[idToNode[dom]], node)
-		//n1 := idToNode[dom]
 		var idom *OpCode
 		for _, n := range dom.List() {
 			if n == node {
@@ -70,9 +66,6 @@ func GenerateDominatorTree(node *OpCode, getNext func(*OpCode) []*OpCode, getSou
 			continue
 		}
 		dominatorMap[idom] = append(dominatorMap[idom], node)
-		//sb.WriteString(fmt.Sprintf("  \"%s\" -> \"%s\";\n", idom.Statement.String(&class_context.ClassContext{}), node.Statement.String(&class_context.ClassContext{})))
 	}
-	//sb.WriteString("}\n")
-	//println(sb.String())
 	return dominatorMap
 }

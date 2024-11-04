@@ -57,15 +57,3 @@ func SplitPackageClassName(s string) (string, string) {
 	log.Errorf("split package name and class name failed: %v", s)
 	return "", ""
 }
-
-//func GetShortName(ctx *ClassContext, name string) string {
-//	libs := append(ctx.BuildInLibs, ctx.ClassName)
-//	for _, lib := range libs {
-//		pkg, className := SplitPackageClassName(lib)
-//		fpkg, fclassName := SplitPackageClassName(name)
-//		if fpkg == pkg && (className == "*" || fclassName == className) {
-//			return fclassName
-//		}
-//	}
-//	return name
-//}

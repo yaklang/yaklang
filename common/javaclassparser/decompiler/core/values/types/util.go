@@ -24,7 +24,7 @@ func GetPrimerArrayType(id int) JavaType {
 	case 11:
 		return NewJavaPrimer(JavaLong)
 	default:
-		panic(fmt.Sprintf("unknow primer array type: %d", id))
+		return nil
 	}
 }
 func ParseDescriptor(descriptor string) (JavaType, error) {
@@ -32,7 +32,7 @@ func ParseDescriptor(descriptor string) (JavaType, error) {
 	return returnType, err
 }
 
-// parseMethodDescriptor 解析 Java 方法描述符
+// ParseMethodDescriptor 解析 Java 方法描述符
 func ParseMethodDescriptor(descriptor string) (JavaType, error) {
 	if descriptor == "" {
 		return nil, fmt.Errorf("descriptor is empty")
@@ -79,29 +79,6 @@ func parseTypes(descriptor string) ([]JavaType, error) {
 	}
 	return types, nil
 }
-func parseFuncType(desc string) (*JavaFuncType, string, error) {
-	if desc == "" {
-		return nil, "", fmt.Errorf("descriptor is empty")
-	}
-	if desc[0] != '(' {
-		return nil, "", fmt.Errorf("invalid descriptor format")
-	}
-	endIndex := strings.Index(desc, ")")
-	if endIndex == -1 {
-		return nil, "", fmt.Errorf("invalid descriptor format")
-	}
-	paramDesc := desc[1:endIndex]
-	returnDesc := desc[endIndex+1:]
-	params, err := parseTypes(paramDesc)
-	if err != nil {
-		return nil, "", err
-	}
-	returnType, _, err := ParseJavaDescription(returnDesc)
-	if err != nil {
-		return nil, "", err
-	}
-	return NewJavaFuncType(desc, params, returnType), "", nil
-}
 
 // ParseJavaDescription 解析单个类型描述符
 func ParseJavaDescription(descriptor string) (JavaType, string, error) {
@@ -129,7 +106,6 @@ func ParseJavaDescription(descriptor string) (JavaType, string, error) {
 	case 'V':
 		return NewJavaPrimer(JavaVoid), descriptor[1:], nil
 	case 'L':
-		// 类类型，以 L 开头，以 ; 结尾
 		endIndex := strings.Index(descriptor, ";")
 		if endIndex == -1 {
 			return nil, "", fmt.Errorf("invalid class descriptor format")
@@ -137,7 +113,6 @@ func ParseJavaDescription(descriptor string) (JavaType, string, error) {
 		name := strings.Replace(descriptor[1:endIndex], "/", ".", -1)
 		return NewJavaClass(name), descriptor[endIndex+1:], nil
 	case '[':
-		// 数组类型，以 [ 开头，后跟元素类型
 		elemType, rest, err := ParseJavaDescription(descriptor[1:])
 		if err != nil {
 			return nil, "", err

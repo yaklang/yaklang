@@ -8,10 +8,9 @@ import (
 	"slices"
 )
 
-// type rewriterFunc func(statementManager *StatementManager) error
-type rewriterFunc func(statementManager *StatementManager, node *core.Node) error
+type rewriterFunc func(statementManager *RewriteManager, node *core.Node) error
 
-func IfRewriter(manager *StatementManager, ifNode *core.Node) error {
+func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 	mergeNode := CalcMergeNode1(ifNode)
 
 	err := CalcEnd(manager.DominatorMap, ifNode)
@@ -20,17 +19,11 @@ func IfRewriter(manager *StatementManager, ifNode *core.Node) error {
 	}
 	trueNode := ifNode.TrueNode()
 	falseNode := ifNode.FalseNode()
-	//ifNode.RemoveAllNext()
+	ifNode.RemoveAllNext()
 	domNodes := utils2.NodeFilter(ifNode.Next, func(node *core.Node) bool {
-		if node.Id == 258 {
-			print()
-		}
 		return slices.Contains(manager.DominatorMap[ifNode], node)
 	})
 	for _, node := range domNodes {
-		if node.Id == 258 {
-			print()
-		}
 		ifNode.RemoveNext(node)
 	}
 	ifStatement := statements.NewIfStatement(nil, nil, nil)
@@ -51,7 +44,10 @@ func IfRewriter(manager *StatementManager, ifNode *core.Node) error {
 			return sts, nil
 		}
 		err := core.WalkGraph[*core.Node](bodyStartNode, func(node *core.Node) ([]*core.Node, error) {
-			manager.AddVisitedNode(node)
+			err := manager.CheckVisitedNode(node)
+			if err != nil {
+				return nil, err
+			}
 			sts = append(sts, node.Statement)
 			var next []*core.Node
 			for _, n := range node.Next {
@@ -85,11 +81,10 @@ func IfRewriter(manager *StatementManager, ifNode *core.Node) error {
 
 		ifStatement.ElseBody = elseBody
 	}
-	endSet := utils.NewSet[*core.Node]()
-	endSet.AddList(endNodes)
-	for _, node := range endSet.List() {
+	for _, node := range NodeDeduplication(endNodes) {
 		ifStatementNode.AddNext(node)
 	}
+
 	return nil
 }
 

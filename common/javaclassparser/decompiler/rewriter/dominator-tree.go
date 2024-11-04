@@ -3,7 +3,6 @@ package rewriter
 import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/slices"
 )
 
 func GenerateDominatorTree(rootNode *core.Node) map[*core.Node][]*core.Node {
@@ -35,17 +34,8 @@ func GenerateDominatorTree(rootNode *core.Node) map[*core.Node][]*core.Node {
 	for flag {
 		flag = false
 		for i := 0; i < len(nodes); i++ {
-			if nodes[i].Id == 2 {
-				print()
-			}
 			netSet := dMap[nodes[i]]
-			if netSet == nil {
-				println()
-			}
 			for _, p := range sourceMap[nodes[i]] {
-				if dMap[p] == nil {
-					println(slices.Contains(nodes, p))
-				}
 				netSet = netSet.And(dMap[p])
 			}
 			netSet.Add(nodes[i])

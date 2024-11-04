@@ -14,107 +14,55 @@ import (
 	"strings"
 )
 
-type StatementManager struct {
-	currentNodeId       int
-	RootNode            *core.Node
-	PreNode             *core.Node
-	idToNode            map[int]*core.Node
-	CircleEntryPoint    []*core.Node
-	WhileNode           []*core.Node
-	UncertainBreakNodes [][2]*core.Node
-	//MergePoint      []*core.Node
-	IfNodes           []*core.Node
-	RepeatNodeMap     map[*core.Node]*core.Node
-	FinalActions      []func() error
-	LoopOccupiedNodes *utils.Set[*core.Node]
-	SwitchNode        []*core.Node
-	TryNodes          []*core.Node
-	nodeSet           *utils.Set[*core.Node]
-	edgeSet           *utils.Set[[2]*core.Node]
-	DominatorMap      map[*core.Node][]*core.Node
-	LabelId           int
-	visitedNodeSet    *utils.Set[*core.Node]
-	LoopStart         []*core.Node
+type RewriteManager struct {
+	currentNodeId    int
+	RootNode         *core.Node
+	PreNode          *core.Node
+	CircleEntryPoint []*core.Node
+	WhileNode        []*core.Node
+	IfNodes          []*core.Node
+	SwitchNode       []*core.Node
+	TryNodes         []*core.Node
+	DominatorMap     map[*core.Node][]*core.Node
+	LabelId          int
+	visitedNodeSet   *utils.Set[*core.Node]
 }
 
-func NewStatementManager(node *core.Node, parent *StatementManager) *StatementManager {
-	manager := NewRootStatementManager(node)
-	return manager
-}
-
-func NewRootStatementManager(node *core.Node) *StatementManager {
+func NewRootStatementManager(node *core.Node) *RewriteManager {
 	if node == nil {
 		return nil
 	}
-	manager := &StatementManager{
-		RootNode:          node,
-		idToNode:          map[int]*core.Node{},
-		LoopOccupiedNodes: utils.NewSet[*core.Node](),
-		RepeatNodeMap:     map[*core.Node]*core.Node{},
-		visitedNodeSet:    utils.NewSet[*core.Node](),
+	manager := &RewriteManager{
+		RootNode:       node,
+		visitedNodeSet: utils.NewSet[*core.Node](),
 	}
-	manager.generateIdToNodeMap()
 	return manager
 }
 
-//	func (s *StatementManager) GenerateIfChildSet() {
-//		stack := utils.NewStack[*core.Node]()
-//		visited := utils.NewSet[any]()
-//		stack.Push(s.RootNode)
-//		for stack.Len() > 0 {
-//			current := stack.Pop()
-//			if visited.Has(current) {
-//				continue
-//			}
-//			visited.Add(current)
-//			if _, ok := current.Statement.(*core.ConditionStatement); ok {
-//				s.RewriterContext.ifChildSet[current.Id] = utils.NewSet[*core.Node]()
-//				stack.Push(current.Next[1])
-//				stack.Push(current.Next[0])
-//			} else {
-//				for _, n := range current.Next {
-//					stack.Push(n)
-//				}
-//			}
-//		}
-//		return
-//	}
-func (s *StatementManager) AddVisitedNode(node *core.Node) {
-	if node.Id == 3 {
-		print()
-	}
+func (s *RewriteManager) CheckVisitedNode(node *core.Node) error {
 	if s.visitedNodeSet.Has(node) {
-		panic("visited")
+		return fmt.Errorf("current node %d has been visited", node.Id)
 	}
 	s.visitedNodeSet.Add(node)
+	return nil
 }
-func (s *StatementManager) NewLoopLabel() string {
+func (s *RewriteManager) NewLoopLabel() string {
 	s.LabelId++
 	return fmt.Sprintf("LOOP_%d", s.LabelId)
 }
-func (s *StatementManager) SetId(id int) {
+func (s *RewriteManager) SetId(id int) {
 	s.currentNodeId = id
 }
-func (s *StatementManager) NewNode(st statements.Statement) *core.Node {
+func (s *RewriteManager) NewNode(st statements.Statement) *core.Node {
 	node := core.NewNode(st)
 	node.Id = s.GetNewNodeId()
 	return node
 }
-func (s *StatementManager) GetNewNodeId() int {
+func (s *RewriteManager) GetNewNodeId() int {
 	s.currentNodeId++
 	return s.currentNodeId
 }
-func (s *StatementManager) SetRootNode(node *core.Node) {
-	s.RootNode = node
-	s.generateIdToNodeMap()
-}
-func (s *StatementManager) AddFinalAction(f func() error) {
-	s.FinalActions = append(s.FinalActions, f)
-}
-func (s *StatementManager) GetNodeById(id int) *core.Node {
-	return s.idToNode[id]
-}
-func (s *StatementManager) ScanStatementSimple(handle func(node *core.Node) error) error {
+func (s *RewriteManager) ScanStatementSimple(handle func(node *core.Node) error) error {
 	return s.ScanStatement(func(node *core.Node) (error, bool) {
 		err := handle(node)
 		if err != nil {
@@ -123,7 +71,7 @@ func (s *StatementManager) ScanStatementSimple(handle func(node *core.Node) erro
 		return nil, true
 	})
 }
-func (s *StatementManager) ScanStatement(handle func(node *core.Node) (error, bool)) error {
+func (s *RewriteManager) ScanStatement(handle func(node *core.Node) (error, bool)) error {
 	err := core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
 		err, ok := handle(node)
 		if err != nil {
@@ -137,15 +85,7 @@ func (s *StatementManager) ScanStatement(handle func(node *core.Node) (error, bo
 	return err
 }
 
-//func (s *StatementManager) AppendStatement(statement Statement) *core.Node {
-//	defer s.generateIdToNodeMap()
-//	node := NewNode(statement)
-//	s.Nodes = append(s.Nodes, node)
-//	s.idToNodeIndex[node.Id] = len(s.Nodes) - 1
-//	return node
-//}
-
-func (s *StatementManager) ToStatementsFromNode(node *core.Node, stopCheck func(node *core.Node) bool) ([]*core.Node, error) {
+func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(node *core.Node) bool) ([]*core.Node, error) {
 	var ErrMultipleNext = errors.New("multiple next")
 	var ErrHasCircle = errors.New("has circle")
 	result := []*core.Node{}
@@ -158,7 +98,10 @@ func (s *StatementManager) ToStatementsFromNode(node *core.Node, stopCheck func(
 		if visited.Has(current) {
 			return nil, ErrHasCircle
 		}
-		s.AddVisitedNode(current)
+		err := s.CheckVisitedNode(current)
+		if err != nil {
+			return nil, err
+		}
 		if stopCheck != nil && !stopCheck(current) {
 			break
 		}
@@ -169,9 +112,6 @@ func (s *StatementManager) ToStatementsFromNode(node *core.Node, stopCheck func(
 		if len(current.Next) == 0 {
 			break
 		}
-		if current == s.PreNode {
-			break
-		}
 		if len(current.Next) > 1 {
 			return nil, ErrMultipleNext
 		}
@@ -179,39 +119,8 @@ func (s *StatementManager) ToStatementsFromNode(node *core.Node, stopCheck func(
 	}
 	return result, nil
 }
-func (s *StatementManager) ToStatements(stopCheck func(node *core.Node) bool) ([]*core.Node, error) {
+func (s *RewriteManager) ToStatements(stopCheck func(node *core.Node) bool) ([]*core.Node, error) {
 	return s.ToStatementsFromNode(s.RootNode, stopCheck)
-}
-func (s *StatementManager) InsertStatementAfterId(id int, statement statements.Statement) {
-	defer s.generateIdToNodeMap()
-	preNode := s.GetNodeById(id)
-	node := core.NewNode(statement)
-	node.Source = append(node.Source, preNode)
-	node.Next = preNode.Next
-	preNode.Next = []*core.Node{node}
-}
-func (s *StatementManager) DeleteStatementById(id int) {
-	defer s.generateIdToNodeMap()
-	deletedNode := s.GetNodeById(id)
-	for _, node := range deletedNode.Source {
-		node.Next = funk.Filter(node.Next, func(item *core.Node) bool {
-			return item != deletedNode
-		}).([]*core.Node)
-		node.Next = append(node.Next, deletedNode.Next...)
-	}
-	for _, node := range deletedNode.Next {
-		node.Source = funk.Filter(node.Source, func(item *core.Node) bool {
-			return item != deletedNode
-		}).([]*core.Node)
-		node.Source = append(node.Source, deletedNode.Source...)
-	}
-}
-
-func (s *StatementManager) generateIdToNodeMap() {
-	s.ScanStatementSimple(func(node *core.Node) error {
-		s.idToNode[node.Id] = node
-		return nil
-	})
 }
 
 type NodeExtInfo struct {
@@ -220,44 +129,9 @@ type NodeExtInfo struct {
 	AllCircleRoute  []*NodeRoute
 	CircleRoute     *utils.Set[*core.Node]
 }
-type Block struct {
-	StartNode *core.Node
-	EndNode   *core.Node
-	Source    []*Block
-}
 
-func NewBlock(startNode *core.Node) *Block {
-	return &Block{
-		StartNode: startNode,
-	}
-}
-
-//	func (s *StatementManager) scanIf() error {
-//		edgeSet := utils.NewSet[[2]*core.Node]()
-//		stack := utils.NewStack[[2]*core.Node]()
-//		stack.Push([2]*core.Node{nil, s.RootNode})
-//		for {
-//			if stack.Len() == 0 {
-//				break
-//			}
-//			edge := stack.Pop()
-//			if edgeSet.Has(edge) {
-//				continue
-//			}
-//			edgeSet.Add(edge)
-//			_, to := edge[0], edge[1]
-//			for _, n := range to.Next {
-//				stack.Push([2]*core.Node{to, n})
-//			}
-//		}
-//		return nil
-//	}
-func (s *StatementManager) ScanCoreInfo() error {
+func (s *RewriteManager) ScanCoreInfo() error {
 	s.DominatorMap = GenerateDominatorTree(s.RootNode)
-	//err := s.scanIf()
-	//if err != nil {
-	//	return err
-	//}
 	nodeExtInfo := map[*core.Node]*NodeExtInfo{}
 	getNodeInfo := func(node *core.Node) *NodeExtInfo {
 		if info, ok := nodeExtInfo[node]; ok {
@@ -434,15 +308,12 @@ func (s *StatementManager) ScanCoreInfo() error {
 	}
 	for circleNodeEntry, outPointMap := range circleNodeEntryToOutPoint {
 		var mergeNode *core.Node
-		if len(outPointMap) == 0 {
-		} else if len(outPointMap) == 1 {
-			mergeNode = maps.Values(outPointMap)[0]
+		edgeSet := utils.NewSet[*core.Node]()
+		values := maps.Values(outPointMap)
+		if len(values) == 0 {
+		} else if len(values) == 1 {
+			mergeNode = values[0]
 		} else {
-			edgeSet := utils.NewSet[*core.Node]()
-			values := maps.Values(outPointMap)
-			values = funk.Filter(values, func(item *core.Node) bool {
-				return item.Id > circleNodeEntry.Id
-			}).([]*core.Node)
 			core.WalkGraph[*core.Node](values[0], func(node *core.Node) ([]*core.Node, error) {
 				edgeSet.Add(node)
 				return node.Next, nil
@@ -511,12 +382,12 @@ func (s *StatementManager) ScanCoreInfo() error {
 	//}
 	return nil
 }
-func (s *StatementManager) Rewrite() error {
+func (s *RewriteManager) Rewrite() error {
 	err := s.ScanCoreInfo()
 	if err != nil {
 		return err
 	}
-	err = LoopRewriter1(s)
+	err = RebuildLoopNode(s)
 	if err != nil {
 		return err
 	}
@@ -532,82 +403,41 @@ func (s *StatementManager) Rewrite() error {
 	for _, node := range s.IfNodes {
 		nodeToRewriter[node] = IfRewriter
 	}
-	for _, node := range s.SortNodesByDom(s.WhileNode) {
-		err := LoopRewriter2(s, node)
-		if err != nil {
-			return err
-		}
-		s.DominatorMap = GenerateDominatorTree(s.RootNode)
-		println(utils2.DumpNodesToDotExp(s.RootNode))
-	}
-	for _, node := range s.SortNodesByDom(s.SwitchNode) {
+	//for _, node := range s.TopologicalSortReverse(s.WhileNode) {
+	//	println(utils2.DumpNodesToDotExp(s.RootNode))
+	//	err := LoopJmpRewriter(s, node)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	s.DominatorMap = GenerateDominatorTree(s.RootNode)
+	//
+	//}
+	//println(utils2.DumpNodesToDotExp(s.RootNode))
+	for _, node := range s.TopologicalSortReverse(s.SwitchNode) {
 		err := SwitchRewriter1(s, node)
 		if err != nil {
 			return err
 		}
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	}
-	order := s.SortNodesByDom(maps.Keys(nodeToRewriter))
-	//for i := len(order) - 1; i >= 0; i-- {
+	order := s.TopologicalSortReverse(maps.Keys(nodeToRewriter))
 	for i := 0; i < len(order); i++ {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 		node := order[i]
-		fmt.Printf("rebuild node %d\n", node.Id)
+		if slices.Contains(s.IfNodes, node) {
+			for j := i; j < len(order); j++ {
+				n := order[j]
+				if slices.Contains(s.WhileNode, n) && utils2.IsDominate(s.DominatorMap, n, node) {
+					err := LoopJmpRewriter(s, n)
+					if err != nil {
+						return err
+					}
+					s.DominatorMap = GenerateDominatorTree(s.RootNode)
+					break
+				}
+			}
+		}
 		err := nodeToRewriter[node](s, node)
-		if err != nil {
-			return err
-		}
-		println(utils2.DumpNodesToDotExp(s.RootNode))
-	}
-	//err = LabelRewriter(s)
-	//if err != nil {
-	//	return err
-	//}
-	return nil
-	err = LoopRewriter1(s)
-	if err != nil {
-		return err
-	}
-	println(utils2.DumpNodesToDotExp(s.RootNode))
-	s.DominatorMap = GenerateDominatorTree(s.RootNode)
-
-	//s.DumpDominatorTree()
-	whileNodes := []*core.Node{}
-	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
-		if slices.Contains(s.WhileNode, node) {
-			whileNodes = append(whileNodes, node)
-		}
-		return s.DominatorMap[node], nil
-	})
-	for i := len(whileNodes) - 1; i >= 0; i-- {
-		err = LoopRewriter(s, whileNodes[i])
-		if err != nil {
-			return err
-		}
-	}
-	s.DominatorMap = GenerateDominatorTree(s.RootNode)
-	for _, startNode := range s.LoopStart {
-		for k, v := range GenerateDominatorTree(startNode) {
-			s.DominatorMap[k] = v
-		}
-	}
-
-	//err = SwitchRewriter(s)
-	//if err != nil {
-	//	return err
-	//}
-	//s.DumpDominatorTree()
-	////println(utils2.DumpNodesToDotExp(s.RootNode))
-	//rewriters := []rewriterFunc{IfRewriter, TryRewriter, LabelRewriter}
-	//for _, rewriter := range rewriters {
-	//	err := rewriter(s)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
-	//s.DominatorMap = GenerateDominatorTree(s.RootNode)
-	for _, action := range s.FinalActions {
-		err := action()
 		if err != nil {
 			return err
 		}
@@ -615,7 +445,7 @@ func (s *StatementManager) Rewrite() error {
 	return nil
 }
 
-func (s *StatementManager) SortNodesByDom(nodes []*core.Node) []*core.Node {
+func (s *RewriteManager) TopologicalSortReverse(nodes []*core.Node) []*core.Node {
 	order := []*core.Node{}
 	nodesMap := map[*core.Node]struct{}{}
 	for _, node := range nodes {
@@ -630,11 +460,10 @@ func (s *StatementManager) SortNodesByDom(nodes []*core.Node) []*core.Node {
 	slices.Reverse(order)
 	return order
 }
-func (s *StatementManager) DumpDominatorTree() {
+func (s *RewriteManager) DumpDominatorTree() {
 	var sb strings.Builder
 	sb.WriteString("digraph G {\n")
 	toString := func(node *core.Node) string {
-		//return strconv.Quote(node.Statement.String(&ClassContext{}))
 		s := strings.Replace(node.Statement.String(&class_context.ClassContext{}), "\"", "", -1)
 		s = strings.Replace(s, "\n", " ", -1)
 		return s
