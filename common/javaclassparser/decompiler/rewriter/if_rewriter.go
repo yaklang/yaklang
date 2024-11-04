@@ -1,12 +1,10 @@
 package rewriter
 
 import (
-	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
+	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
+	"github.com/yaklang/yaklang/common/utils"
 	"slices"
 )
 
@@ -14,36 +12,53 @@ import (
 type rewriterFunc func(statementManager *StatementManager, node *core.Node) error
 
 func IfRewriter(manager *StatementManager, ifNode *core.Node) error {
+	mergeNode := CalcMergeNode1(ifNode)
+
+	err := CalcEnd(manager.DominatorMap, ifNode)
+	if err != nil {
+		return err
+	}
 	trueNode := ifNode.TrueNode()
 	falseNode := ifNode.FalseNode()
-	ifNode.RemoveAllNext()
-	mergeNode := ifNode.MergeNode
+	//ifNode.RemoveAllNext()
+	domNodes := utils2.NodeFilter(ifNode.Next, func(node *core.Node) bool {
+		if node.Id == 258 {
+			print()
+		}
+		return slices.Contains(manager.DominatorMap[ifNode], node)
+	})
+	for _, node := range domNodes {
+		if node.Id == 258 {
+			print()
+		}
+		ifNode.RemoveNext(node)
+	}
 	ifStatement := statements.NewIfStatement(nil, nil, nil)
 	originNodeStatement := ifNode.Statement
 
 	ifStatementNode := manager.NewNode(ifStatement)
 	ifNode.Replace(ifStatementNode)
 
-	if mergeNode != nil {
-		mergeNode.RemoveAllSource()
-		ifStatementNode.AddNext(mergeNode)
-	}
-
+	//if mergeNode != nil {
+	//	mergeNode.RemoveAllSource()
+	//	ifStatementNode.AddNext(mergeNode)
+	//}
+	endNodes := []*core.Node{}
 	getBody := func(bodyStartNode *core.Node) ([]statements.Statement, error) {
+
 		sts := []statements.Statement{}
-		if !slices.Contains(manager.DominatorMap[ifNode], bodyStartNode) {
+		if !slices.Contains(manager.DominatorMap[ifNode], bodyStartNode) || mergeNode == bodyStartNode {
 			return sts, nil
 		}
 		err := core.WalkGraph[*core.Node](bodyStartNode, func(node *core.Node) ([]*core.Node, error) {
-			if mergeNode != nil && node == mergeNode {
-				return nil, nil
-			}
 			manager.AddVisitedNode(node)
 			sts = append(sts, node.Statement)
 			var next []*core.Node
 			for _, n := range node.Next {
 				if slices.Contains(manager.DominatorMap[node], n) {
 					next = append(next, n)
+				} else {
+					endNodes = append(endNodes, n)
 				}
 			}
 			return next, nil
@@ -70,91 +85,118 @@ func IfRewriter(manager *StatementManager, ifNode *core.Node) error {
 
 		ifStatement.ElseBody = elseBody
 	}
+	endSet := utils.NewSet[*core.Node]()
+	endSet.AddList(endNodes)
+	for _, node := range endSet.List() {
+		ifStatementNode.AddNext(node)
+	}
 	return nil
 }
-func _IfRewriter(manager *StatementManager) error {
-	for _, ifNode := range manager.IfNodes {
-		if ifNode.IsCircle {
-			continue
+
+func CalcMergeNode1(ifNode *core.Node) *core.Node {
+	trueNode := ifNode.TrueNode()
+	falseNode := ifNode.FalseNode()
+	trueNodeSet := utils.NewSet[*core.Node]()
+	core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
+		next := []*core.Node{}
+		for _, n := range node.Next {
+			if n != ifNode {
+				next = append(next, n)
+			}
 		}
-		ifNode := ifNode
-		ifStatement := statements.NewIfStatement(ifNode.Statement.(*statements.ConditionStatement).Condition, nil, nil)
-		ifNode.Statement = ifStatement
-		trueNode := ifNode.TrueNode()
-		falseNode := ifNode.FalseNode()
-		ifNode.RemoveAllNext()
-		var ok1, ok2 bool
-		core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
-			if node == ifNode.MergeNode {
+		trueNodeSet.Add(node)
+		return next, nil
+	})
+	var mergeNode *core.Node
+	core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
+		if mergeNode != nil {
+			return nil, nil
+		}
+		if trueNodeSet.Has(falseNode) {
+			mergeNode = node
+			return nil, nil
+		}
+		return node.Next, nil
+	})
+	return mergeNode
+}
+func CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
+	ifNode.MergeNode = nil
+	trueNode := ifNode.TrueNode()
+	falseNode := ifNode.FalseNode()
+	doms := domTree[ifNode]
+	switch len(doms) {
+	case 1:
+		ok1 := false
+		err := core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
+			if node == ifNode {
+				return nil, nil
+			}
+			if node == doms[0] {
 				ok1 = true
 				return nil, nil
 			}
 			return node.Next, nil
 		})
-		core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
-			if node == ifNode.MergeNode {
+		if err != nil {
+			return err
+		}
+		ok2 := false
+		err = core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
+			if node == ifNode {
+				return nil, nil
+			}
+			if node == doms[0] {
 				ok2 = true
 				return nil, nil
 			}
 			return node.Next, nil
 		})
-		if ok1 && ok2 {
-			ifNode.AddNext(ifNode.MergeNode)
+		if err != nil {
+			return err
 		}
-		manager.AddFinalAction(func() error {
-			if v, ok := ifStatement.Condition.(*values.FunctionCallExpression); ok {
-				if len(v.Arguments) == 4 {
-					if v, ok := v.Arguments[1].(*values.JavaLiteral); ok {
-						if v.Data == "extensions" {
-							print()
-						}
-					}
+		if ok1 && ok2 {
+			ifNode.MergeNode = doms[0]
+		}
+	case 2:
+		for _, dom := range doms {
+			ok1 := false
+			err := core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
+				if node == ifNode {
+					return nil, nil
 				}
-			}
-			trueBody, err := manager.ToStatementsFromNode(trueNode, func(node *core.Node) bool {
-				if node == ifNode.MergeNode {
-					return false
+				if node == dom {
+					ok1 = true
+					return nil, nil
 				}
-				return true
+				return node.Next, nil
 			})
 			if err != nil {
 				return err
 			}
-			falseBody, err := manager.ToStatementsFromNode(falseNode, func(node *core.Node) bool {
-				if node == ifNode.MergeNode {
-					return false
+			ok2 := false
+			err = core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
+				if node == ifNode {
+					return nil, nil
 				}
-				return true
+				if node == dom {
+					ok2 = true
+					return nil, nil
+				}
+				return node.Next, nil
 			})
 			if err != nil {
 				return err
 			}
-			ifStatement.IfBody = core.NodesToStatements(trueBody)
-			ifStatement.ElseBody = core.NodesToStatements(falseBody)
-			if len(ifStatement.IfBody) == 1 && len(ifStatement.ElseBody) == 1 {
-				v1, ok1 := ifStatement.IfBody[0].(*statements.StackAssignStatement)
-				v2, ok2 := ifStatement.ElseBody[0].(*statements.StackAssignStatement)
-				if ok1 && ok2 {
-					v2.JavaValue.JavaType.ResetType(v1.JavaValue.Type())
-					v1.JavaValue.CustomValue = values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-						return fmt.Sprintf("%s ? %s : %s", ifStatement.Condition.String(funcCtx), v1.JavaValue.StackVar.String(funcCtx), v2.JavaValue.StackVar.String(funcCtx))
-					}, func() types.JavaType {
-						return v1.JavaValue.Type()
-					})
-					v2.JavaValue.CustomValue = v1.JavaValue.CustomValue
-					allSource := make([]*core.Node, len(ifNode.Source))
-					copy(allSource, ifNode.Source)
-					for _, source := range allSource {
-						source.RemoveNext(ifNode)
-						for _, next := range ifNode.Next {
-							source.AddNext(next)
-						}
-					}
-				}
+			if ok1 && ok2 {
+				ifNode.MergeNode = dom
+				break
 			}
-			return nil
-		})
-		//ifNode.AddNext(ifNode.MergeNode)
+		}
+	case 3:
+		ifNode.MergeNode = utils2.NodeFilter(doms, func(node *core.Node) bool {
+			return node != trueNode && node != falseNode
+		})[0]
 	}
 	return nil
 }

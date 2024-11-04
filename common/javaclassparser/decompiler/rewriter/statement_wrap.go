@@ -80,7 +80,7 @@ func NewRootStatementManager(node *core.Node) *StatementManager {
 //		return
 //	}
 func (s *StatementManager) AddVisitedNode(node *core.Node) {
-	if node.Id == 45 {
+	if node.Id == 3 {
 		print()
 	}
 	if s.visitedNodeSet.Has(node) {
@@ -432,7 +432,6 @@ func (s *StatementManager) ScanCoreInfo() error {
 		circleNodeEntry.OutNodeMap = outPointMap
 		circleNodeEntryToOutPoint[circleNodeEntry] = outPointMap
 	}
-	circleNodeEntryToOutPoint = nil
 	for circleNodeEntry, outPointMap := range circleNodeEntryToOutPoint {
 		var mergeNode *core.Node
 		if len(outPointMap) == 0 {
@@ -503,13 +502,13 @@ func (s *StatementManager) ScanCoreInfo() error {
 	//}
 	s.CircleEntryPoint = circleNodes
 	s.IfNodes = ifNodes
-	for _, node := range circleNodes {
-		for _, c := range s.DominatorMap[node] {
-			if !node.CircleNodesSet.Has(c) {
-				node.LoopEndNode = c
-			}
-		}
-	}
+	//for _, node := range circleNodes {
+	//	for _, c := range s.DominatorMap[node] {
+	//		if !node.CircleNodesSet.Has(c) {
+	//			node.LoopEndNode = c
+	//		}
+	//	}
+	//}
 	return nil
 }
 func (s *StatementManager) Rewrite() error {
@@ -522,119 +521,38 @@ func (s *StatementManager) Rewrite() error {
 		return err
 	}
 	s.DominatorMap = GenerateDominatorTree(s.RootNode)
-	println(utils2.DumpNodesToDotExp(s.RootNode))
 	nodeToRewriter := map[*core.Node]rewriterFunc{}
 	for _, node := range s.WhileNode {
 		nodeToRewriter[node] = LoopRewriter
+	}
 
+	for _, node := range s.SwitchNode {
+		nodeToRewriter[node] = SwitchRewriter
+	}
+	for _, node := range s.IfNodes {
+		nodeToRewriter[node] = IfRewriter
+	}
+	for _, node := range s.SortNodesByDom(s.WhileNode) {
 		err := LoopRewriter2(s, node)
 		if err != nil {
 			return err
 		}
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
+		println(utils2.DumpNodesToDotExp(s.RootNode))
 	}
-	for _, node := range s.SwitchNode {
-		nodeToRewriter[node] = SwitchRewriter
+	for _, node := range s.SortNodesByDom(s.SwitchNode) {
 		err := SwitchRewriter1(s, node)
 		if err != nil {
 			return err
 		}
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	}
-	for _, node := range s.IfNodes {
-		nodeToRewriter[node] = IfRewriter
-	}
-	order := []*core.Node{}
-	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
-		if _, ok := nodeToRewriter[node]; ok {
-			order = append(order, node)
-		}
-		return s.DominatorMap[node], nil
-	})
-	println(utils2.DumpNodesToDotExp(s.RootNode))
-	for _, ifNode := range s.IfNodes {
-		ifNode.MergeNode = nil
-		trueNode := ifNode.TrueNode()
-		falseNode := ifNode.FalseNode()
-		doms := s.DominatorMap[ifNode]
-		switch len(doms) {
-		case 1:
-			ok1 := false
-			err := core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
-				if node == ifNode {
-					return nil, nil
-				}
-				if node == doms[0] {
-					ok1 = true
-					return nil, nil
-				}
-				return node.Next, nil
-			})
-			if err != nil {
-				return err
-			}
-			ok2 := false
-			err = core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
-				if node == ifNode {
-					return nil, nil
-				}
-				if node == doms[0] {
-					ok2 = true
-					return nil, nil
-				}
-				return node.Next, nil
-			})
-			if err != nil {
-				return err
-			}
-			if ok1 && ok2 {
-				ifNode.MergeNode = doms[0]
-			}
-		case 2:
-			for _, dom := range doms {
-				ok1 := false
-				err := core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
-					if node == ifNode {
-						return nil, nil
-					}
-					if node == dom {
-						ok1 = true
-						return nil, nil
-					}
-					return node.Next, nil
-				})
-				if err != nil {
-					return err
-				}
-				ok2 := false
-				err = core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
-					if node == ifNode {
-						return nil, nil
-					}
-					if node == dom {
-						ok2 = true
-						return nil, nil
-					}
-					return node.Next, nil
-				})
-				if err != nil {
-					return err
-				}
-				if ok1 && ok2 {
-					ifNode.MergeNode = dom
-					break
-				}
-			}
-		case 3:
-			ifNode.MergeNode = utils2.NodeFilter(doms, func(node *core.Node) bool {
-				return node != trueNode && node != falseNode
-			})[0]
-		}
-	}
-
-	for i := len(order) - 1; i >= 0; i-- {
+	order := s.SortNodesByDom(maps.Keys(nodeToRewriter))
+	//for i := len(order) - 1; i >= 0; i-- {
+	for i := 0; i < len(order); i++ {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 		node := order[i]
+		fmt.Printf("rebuild node %d\n", node.Id)
 		err := nodeToRewriter[node](s, node)
 		if err != nil {
 			return err
@@ -695,6 +613,22 @@ func (s *StatementManager) Rewrite() error {
 		}
 	}
 	return nil
+}
+
+func (s *StatementManager) SortNodesByDom(nodes []*core.Node) []*core.Node {
+	order := []*core.Node{}
+	nodesMap := map[*core.Node]struct{}{}
+	for _, node := range nodes {
+		nodesMap[node] = struct{}{}
+	}
+	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
+		if _, ok := nodesMap[node]; ok {
+			order = append(order, node)
+		}
+		return s.DominatorMap[node], nil
+	})
+	slices.Reverse(order)
+	return order
 }
 func (s *StatementManager) DumpDominatorTree() {
 	var sb strings.Builder
