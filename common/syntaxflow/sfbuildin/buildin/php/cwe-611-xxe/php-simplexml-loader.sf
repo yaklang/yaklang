@@ -2,6 +2,7 @@ desc(
     title: "CWE-611 simplexml_load_string checking for XXE (LIBXML_NOENT)",
     level: high,
     type: audit,
+    risk: "xxe"
 )
 
 LIBXML_NOENT <getCall> <getCaller> <name> ?{have: simplexml_load_string} as $vuln;

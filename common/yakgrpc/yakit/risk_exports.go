@@ -36,6 +36,8 @@ type (
 
 var (
 	riskTypeVerboses = []*riskType{
+		{Types: []string{"variable_coverage"}, Verbose: "变量覆盖"},
+		{Types: []string{"include", "file-include"}, Verbose: "文件包含"},
 		{Types: []string{"sca"}, Verbose: "使用不安全的依赖"},
 		{Types: []string{"risky-crypt"}, Verbose: "不安全的加密算法"},
 		{Types: []string{"xpath", "xpath-inj", "xpath-injection"}, Verbose: "XPath注入"},

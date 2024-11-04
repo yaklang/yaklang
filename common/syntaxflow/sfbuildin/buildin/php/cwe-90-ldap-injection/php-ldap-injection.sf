@@ -2,6 +2,7 @@ desc(
     title: "LDAP Injection PHP checking",
     type: vuln,
     severity: mid,
+    risk:'ldap-injection'
 )
 
 ldap_search(*<slice(start=1)> as $query);
