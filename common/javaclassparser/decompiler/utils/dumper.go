@@ -33,5 +33,6 @@ func DumpNodesToDotExp(code *core.Node) string {
 	visited := make(map[*core.Node]bool)
 	visitor(code, visited, &sb)
 	sb.WriteString("}\n")
+	println(sb.String())
 	return sb.String()
 }

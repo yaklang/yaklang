@@ -32,6 +32,18 @@ func (g *graphBuilder) NewNode(name string) *core.Node {
 	g.id++
 	return node
 }
+func (g *graphBuilder) NewTry(name string) *core.Node {
+	node := core.NewNode(statements.NewConditionStatement(values.NewJavaLiteral(name, types.NewJavaPrimer(types.JavaString)), ""))
+	node.Id = g.id
+	g.id++
+	node.TrueNode = func() *core.Node {
+		return node.Next[0]
+	}
+	node.FalseNode = func() *core.Node {
+		return node.Next[1]
+	}
+	return node
+}
 func (g *graphBuilder) NewIf(name string) *core.Node {
 	node := core.NewNode(statements.NewConditionStatement(values.NewJavaLiteral(name, types.NewJavaPrimer(types.JavaString)), ""))
 	node.Id = g.id
