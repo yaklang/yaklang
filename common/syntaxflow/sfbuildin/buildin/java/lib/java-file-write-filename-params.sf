@@ -18,7 +18,7 @@ FileOutputStream(,*  as $javaIOFileStreamName);
 FileWriter(, * as $javaIOFileName);
 
 // java.nio.file.Files
-Files?{<typeName>?{have: 'java.nio'}}.write(*, as $nioParam)
+Files?{<typeName>?{have: 'java.nio'}}.write(,* as $nioParam)
 
 
 $javaIOFileParam as $output;
