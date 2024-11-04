@@ -1,7 +1,6 @@
 package javaclassparser
 
 import (
-	"fmt"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memfile"
 	"io/fs"
@@ -29,7 +28,7 @@ func NewJarFS(zipFs *filesys.ZipFS) *FS {
 	}
 }
 func (z *FS) ReadFile(name string) ([]byte, error) {
-	fmt.Printf("start parse file: %s\n", name)
+	// fmt.Printf("start parse file: %s\n", name)
 	data, err := z.ZipFS.ReadFile(name)
 	if err != nil {
 		return nil, err

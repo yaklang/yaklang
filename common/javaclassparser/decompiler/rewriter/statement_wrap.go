@@ -477,5 +477,5 @@ func (s *RewriteManager) DumpDominatorTree() {
 		}
 	}
 	sb.WriteString("}\n")
-	println(sb.String())
+	// println(sb.String())
 }
