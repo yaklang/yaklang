@@ -64,6 +64,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		return flow, nil
 	}
 	flow := &ypb.HTTPFlow{
+		FromPlugin:                 f.FromPlugin,
 		HiddenIndex:                f.HiddenIndex,
 		Id:                         uint64(f.ID),
 		IsHTTPS:                    f.IsHTTPS,
