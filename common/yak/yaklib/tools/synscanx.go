@@ -103,11 +103,17 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 	go func() {
 		defer close(inputCh)
 		// 先发送第一个目标
-		inputCh <- firstTarget
+		select {
+		case <-ctx.Done():
+			return
+		case inputCh <- firstTarget:
+		}
 		// 转发剩余的有效目标
 		for target := range res {
-			if target != "" {
-				inputCh <- target
+			select {
+			case <-ctx.Done():
+				return
+			case inputCh <- target:
 			}
 		}
 	}()
