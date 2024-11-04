@@ -2,12 +2,14 @@ package lowhttp
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/davecgh/go-spew/spew"
 	utls "github.com/refraction-networking/utls"
@@ -122,10 +124,12 @@ type LowhttpResponse struct {
 
 	// custom tags
 	Tags []string
+
+	postParts []*multipart.Part
 }
 
 func (f *LowhttpResponse) RemoveColor() {
-	var newTags = make([]string, 0, len(f.Tags))
+	newTags := make([]string, 0, len(f.Tags))
 	for _, i := range f.Tags {
 		if strings.HasPrefix(i, schema.COLORPREFIX) {
 			continue
@@ -138,48 +142,48 @@ func yakitColor(i string) string {
 	return schema.COLORPREFIX + i
 }
 
-func (f *LowhttpResponse) AddTag(i string) {
-	f.Tags = append(f.Tags, i)
+func (r *LowhttpResponse) AddTag(i string) {
+	r.Tags = append(r.Tags, i)
 }
 
-func (f *LowhttpResponse) Red() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("RED"))
+func (r *LowhttpResponse) Red() {
+	r.RemoveColor()
+	r.AddTag(yakitColor("RED"))
 }
 
-func (f *LowhttpResponse) Green() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("GREEN"))
+func (r *LowhttpResponse) Green() {
+	r.RemoveColor()
+	r.AddTag(yakitColor("GREEN"))
 }
 
-func (f *LowhttpResponse) Blue() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("BLUE"))
+func (r *LowhttpResponse) Blue() {
+	r.RemoveColor()
+	r.AddTag(yakitColor("BLUE"))
 }
 
-func (f *LowhttpResponse) Yellow() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("YELLOW"))
+func (r *LowhttpResponse) Yellow() {
+	r.RemoveColor()
+	r.AddTag(yakitColor("YELLOW"))
 }
 
-func (f *LowhttpResponse) Orange() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("ORANGE"))
+func (r *LowhttpResponse) Orange() {
+	r.RemoveColor()
+	r.AddTag(yakitColor("ORANGE"))
 }
 
-func (f *LowhttpResponse) Purple() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("PURPLE"))
+func (r *LowhttpResponse) Purple() {
+	r.RemoveColor()
+	r.AddTag(yakitColor("PURPLE"))
 }
 
-func (f *LowhttpResponse) Cyan() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("CYAN"))
+func (r *LowhttpResponse) Cyan() {
+	r.RemoveColor()
+	r.AddTag(yakitColor("CYAN"))
 }
 
-func (f *LowhttpResponse) Grey() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("GREY"))
+func (r *LowhttpResponse) Grey() {
+	r.RemoveColor()
+	r.AddTag(yakitColor("GREY"))
 }
 
 func (f *LowhttpResponse) ColorSharp(rgbHex string) {
@@ -187,23 +191,58 @@ func (f *LowhttpResponse) ColorSharp(rgbHex string) {
 	f.AddTag(yakitColor(rgbHex))
 }
 
-func (l *LowhttpResponse) GetBody() []byte {
-	_, body := SplitHTTPPacketFast(l.RawPacket)
+func (r *LowhttpResponse) GetHeader(key string) string {
+	return GetHTTPPacketHeader(r.RawPacket, key)
+}
+
+func (r *LowhttpResponse) GetHeaders() map[string]string {
+	return GetHTTPPacketHeaders(r.RawPacket)
+}
+
+func (r *LowhttpResponse) GetHeadersFull() map[string][]string {
+	return GetHTTPPacketHeadersFull(r.RawPacket)
+}
+
+func (r *LowhttpResponse) GetContentType() string {
+	return GetHTTPPacketContentType(r.RawPacket)
+}
+
+func (r *LowhttpResponse) GetCookie(key string) string {
+	return GetHTTPPacketCookie(r.RawPacket, key)
+}
+
+func (r *LowhttpResponse) GetBody() []byte {
+	_, body := SplitHTTPPacketFast(r.RawPacket)
 	return body
 }
 
-func (l *LowhttpResponse) GetStatusCode() int {
-	return GetStatusCodeFromResponse(l.RawPacket)
+func (r *LowhttpResponse) GetHost() string {
+	return GetHTTPPacketHeader(r.RawPacket, "Host")
 }
 
-func (l *LowhttpResponse) GetDurationFloat() float64 {
-	if l == nil {
+func (r *LowhttpResponse) URL() string {
+	if r.RawRequest == nil {
+		return ""
+	}
+	scheme := "http"
+	if r.Https {
+		scheme = "https"
+	}
+	return GetUrlFromHTTPRequest(scheme, r.RawRequest)
+}
+
+func (r *LowhttpResponse) GetStatusCode() int {
+	return GetStatusCodeFromResponse(r.RawPacket)
+}
+
+func (r *LowhttpResponse) GetDurationFloat() float64 {
+	if r == nil {
 		return 0
 	}
-	if l.TraceInfo == nil {
+	if r.TraceInfo == nil {
 		return 0
 	}
-	return float64(l.TraceInfo.GetServerDurationMS()) / float64(1000)
+	return float64(r.TraceInfo.GetServerDurationMS()) / float64(1000)
 }
 
 type LowhttpTraceInfo struct {
