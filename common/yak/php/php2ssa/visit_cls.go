@@ -86,6 +86,10 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, bluePrint)
 	}
+	bluePrint.SetLazyBuilder(func() {
+		bluePrint.BuildConstructorAndDestructor()
+	})
+	//todo: 可能会有问题
 	bluePrint.Build()
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(bluePrint)
@@ -155,6 +159,9 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			for _, statement := range i.AllClassStatement() {
 				y.VisitClassStatement(statement, class)
 			}
+			class.SetLazyBuilder(func() {
+				class.BuildConstructorAndDestructor()
+			})
 		}
 	} else {
 		// as interface
@@ -198,23 +205,22 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			}
 		}
 		//ClassBlock := y.CurrentBlock
-		class.SetLazyBuilder(func() {
-			// handle variable name
-			//CurrentBlock := y.CurrentBlock
-			//y.CurrentBlock = ClassBlock
-			//defer func() {
-			//	y.CurrentBlock = CurrentBlock
-			//}()
+		//class.SetLazyBuilder(func() {
+		//handle variable name
+		//CurrentBlock := y.CurrentBlock
+		//y.CurrentBlock = ClassBlock
+		//defer func() {
+		//	y.CurrentBlock = CurrentBlock
+		//}()
 
-			for _, va := range ret.AllVariableInitializer() {
-				name, value := y.VisitVariableInitializer(va)
-				if strings.HasPrefix(name, "$") {
-					name = name[1:]
-				}
-				setMember(name, value)
+		for _, va := range ret.AllVariableInitializer() {
+			name, value := y.VisitVariableInitializer(va)
+			if strings.HasPrefix(name, "$") {
+				name = name[1:]
 			}
-			class.BuildConstructorAndDestructor()
-		})
+			setMember(name, value)
+		}
+		//})
 
 		return
 	case *phpparser.FunctionContext:

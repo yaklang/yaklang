@@ -249,10 +249,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		return y.EmitBinOp(o, op1, op2)
 	case *phpparser.InstanceOfExpressionContext:
 		// instanceof
-		undefined := y.EmitUndefined(ret.InstanceOf().GetText())
+		instace := y.ReadValue("instanceOf")
 		expression := y.VisitExpression(ret.Expression(0))
 		visitExpression := y.VisitExpression(ret.Expression(1))
-		call := y.NewCall(undefined, []ssa.Value{expression, visitExpression})
+		call := y.NewCall(instace, []ssa.Value{expression, visitExpression})
 		return call
 	case *phpparser.ComparisonExpressionContext:
 		switch ret.GetOp().GetText() {
@@ -506,11 +506,9 @@ func (y *builder) VisitChainLeft(raw phpparser.IChainContext) *ssa.Variable {
 	if i.FlexiVariable() != nil {
 		return y.VisitLeftVariable(i.FlexiVariable())
 	}
-	if i.StaticClassExprVariableMember() != nil {
-		// member := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-		// return member
-	}
-	return nil
+	member, s := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+	staticMember := y.GetStaticMember(member, s)
+	return staticMember
 }
 
 func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
