@@ -496,12 +496,18 @@ Sec-WebSocket-Key: w4v7O6xFTi36lq3RNcgctw==
 }
 
 func TestGRPCMUSTPASS_MITM_Filter_Plugin(t *testing.T) {
-	var PluginTriggered bool
-	testToken := utils.RandStringBytes(10)
+	var shouldFilter bool
+	var notFilter bool
+
+	shouldFilterToken := utils.RandStringBytes(10)
+	notFilterToken := utils.RandStringBytes(10)
 	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		token := lowhttp.GetHTTPRequestQueryParam(req, "token")
-		if token == testToken {
-			PluginTriggered = true
+		if token == shouldFilterToken {
+			shouldFilter = true
+		}
+		if token == notFilterToken {
+			notFilter = true
 		}
 		return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 	})
@@ -509,8 +515,12 @@ func TestGRPCMUSTPASS_MITM_Filter_Plugin(t *testing.T) {
 Host: 127.0.0.1:%d`, mockPort))
 
 	code := fmt.Sprintf(`
-mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
 poc.HTTP(req,poc.replaceQueryParam("token", "%s"))
+}
+
+hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+  poc.HTTP(flow.Request,poc.replaceQueryParam("token", "%s")) 
 }
 
 hijackHTTPRequest = func(isHttps, url, req, forward /*func(modifiedRequest []byte)*/, drop /*func()*/) {
@@ -524,7 +534,11 @@ beforeRequest = func(ishttps, oreq/*原始请求*/, req/*hijack修改后的请�
 afterRequest = func(ishttps, oreq/*原始请求*/ ,req/*hiajck修改之后的请求*/ ,orsp/*原始响应*/ ,rsp/*hijack修改后的响应*/){
 	poc.HTTP(req,poc.replaceQueryParam("token", "%s"))	
 }
-`, testToken, testToken, testToken, testToken)
+
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+   poc.HTTP(req,poc.replaceQueryParam("token", "%s"))	 
+}
+`, shouldFilterToken, shouldFilterToken, shouldFilterToken, shouldFilterToken, shouldFilterToken, notFilterToken)
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -554,5 +568,6 @@ afterRequest = func(ishttps, oreq/*原始请求*/ ,req/*hiajck修改之后的请
 		time.Sleep(3 * time.Second)
 		cancel()
 	})
-	require.False(t, PluginTriggered)
+	require.False(t, shouldFilter)
+	require.True(t, notFilter)
 }
