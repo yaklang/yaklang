@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java commons-beanutils Existed Vulnerabilities',
     type: vuln,
+    risk:sca
 )
 
 __dependency__.*commons*beanutils.version as $ver;

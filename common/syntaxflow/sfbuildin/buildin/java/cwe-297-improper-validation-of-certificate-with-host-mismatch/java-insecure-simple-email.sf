@@ -3,6 +3,7 @@ desc(
     title_zh: "检测Java SimpleEmail在建立SSL连接时是否验证服务器的SSL证书",
     level: info,
     lang: java,
+    risk:"auth-bypass",
 )
 
 SimpleEmail()?{<typeName>?{have:'org.apache.commons.mail'}} as $simpleEmail;
@@ -12,7 +13,6 @@ alert $sink for {
     message_zh: "SimpleEmail 未验证务器的SSL证书",
     message: "SimpleEmail has not verified the server’s security certificate.",
     level:info,
-    risk_type:"auth-bypass",
 };
 
 desc(

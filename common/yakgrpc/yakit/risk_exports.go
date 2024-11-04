@@ -36,6 +36,8 @@ type (
 
 var (
 	riskTypeVerboses = []*riskType{
+		{Types: []string{"sca"}, Verbose: "使用不安全的依赖"},
+		{Types: []string{"risky-crypt"}, Verbose: "不安全的加密算法"},
 		{Types: []string{"xpath", "xpath-inj", "xpath-injection"}, Verbose: "XPath注入"},
 		{Types: []string{"url-redirect"}, Verbose: "URL重定向"},
 		{Types: []string{"ldap", "ldap-inj", "ldap-injection"}, Verbose: "LDAP注入"},

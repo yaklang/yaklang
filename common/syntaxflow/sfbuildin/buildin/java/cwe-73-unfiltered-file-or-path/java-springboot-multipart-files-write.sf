@@ -2,6 +2,7 @@ desc(
   title: 'checking [Directly relative Files.write from MultipartFile]',
   type: audit,
   level: warning,
+  risk:"path-traversal",
 )
 
 <include('java-spring-param')>?{<typeName>?{have: MultipartFile}} as $upload;

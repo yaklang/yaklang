@@ -3,6 +3,7 @@ desc(
     title_zh: "Java Hibernate create*Query SQL 拼接",
     type: audit,
     level: high,
+    risk:sqli,
 )
 
 .create*Query(,* as $query,);

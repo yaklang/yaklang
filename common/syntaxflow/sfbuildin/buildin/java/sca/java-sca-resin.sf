@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java resin Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*resin.version as $ver;

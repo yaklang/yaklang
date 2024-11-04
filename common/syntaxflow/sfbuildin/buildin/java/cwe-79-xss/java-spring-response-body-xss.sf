@@ -1,6 +1,7 @@
 desc(
     title: "Find SpringBoot RestController Basic XSS",
     type: vuln,
+    risk:xss,
 )
 
 <include('java-spring-param')>?{<typeName>?{have: String}} as $params;

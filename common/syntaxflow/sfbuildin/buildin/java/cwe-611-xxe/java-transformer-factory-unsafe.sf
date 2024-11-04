@@ -3,6 +3,7 @@ desc(
     title_zh: "在上下文中查找 'javax.xml.transform.Transformer' 不安全使用",
     type: vuln,
     level: warning,
+    risk:xxe,
 )
 
 TransformerFactory.newInstance() as $newInstance;

@@ -3,6 +3,7 @@ desc(
     title_zh: "通过 getClass() 和 getMethod() 发现 Java 反射调用的潜在威胁",
     type: audit,
     severity: mid,
+    risk: rce,
 )
 
 

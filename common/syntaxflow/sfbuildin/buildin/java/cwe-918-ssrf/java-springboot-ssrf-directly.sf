@@ -2,6 +2,7 @@ desc(
     title: "Find Java SpringBoot SSRF Vuln Directly",
     type: vuln,
     level: mid,
+    risk:ssrf,
 )
 
 <include('java-spring-param')> as $source;

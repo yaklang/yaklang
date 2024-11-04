@@ -2,6 +2,7 @@ desc(
     title: "Find 'SAXTransformerFactory' unsafe use (XXE)",
     type: vuln,
     level: warning,
+    risk:xxe,
 )
 
 SAXTransformerFactory.newInstance() as $ins;

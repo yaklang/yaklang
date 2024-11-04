@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java Fastjson Existed Vulnerabilities',
     type: vuln,
+    risk:sca,
 )
 
 __dependency__.*alibaba*fastjson.version as $ver;

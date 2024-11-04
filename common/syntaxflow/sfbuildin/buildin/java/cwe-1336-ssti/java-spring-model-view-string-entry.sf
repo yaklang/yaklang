@@ -3,6 +3,7 @@ desc(
     title: "Recognize Java Spring Framework code handling ModelAndView with String type parameter",
     type: audit,
     level: mid,
+    risk:ssti,
 )
 
 <include('java-spring-param')>?{<typeName>?{have: "String"}} as $param;
