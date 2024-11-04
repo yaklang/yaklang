@@ -3,6 +3,7 @@ desc(
     title_zh: "用户输入被过滤的命令注入代码（需额外检查过滤是否充分）",
     type: audit,
     level: mid,
+    risk:'rce'
 )
 <include('php-os-exec')>(* as $sink);
 <include('php-param')> as $params;

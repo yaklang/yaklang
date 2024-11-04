@@ -1,6 +1,7 @@
 desc(
     title: "check include vul",
     type: audit,
+    risk:'file-include'
 )
 <include('php-param')> as $params;
 <include('php-filter-function')> as $filter;

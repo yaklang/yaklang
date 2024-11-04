@@ -2,6 +2,7 @@ desc(
     title: "mysql inject",
     type: audit,
     level: low,
+    risk: "sqli",
 )
 <include('php-param')> as $params;
 <include('php-filter-function')> as $filter;

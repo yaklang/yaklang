@@ -2,6 +2,7 @@ desc(
     title: 'check php function unserialize',
     type: audit,
     level: low,
+    risk:'unserialize'
 )
 
 <include('php-param')> as $params

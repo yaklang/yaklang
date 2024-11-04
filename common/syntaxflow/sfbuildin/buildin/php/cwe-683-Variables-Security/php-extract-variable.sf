@@ -2,6 +2,7 @@ desc(
     title: "check php Variable coverage",
     type: audit,
     level: low,
+    risk:'variable_coverage'
 )
 
 <include('php-param')> as $input1;
