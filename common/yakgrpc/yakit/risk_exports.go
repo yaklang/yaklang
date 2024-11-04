@@ -36,6 +36,9 @@ type (
 
 var (
 	riskTypeVerboses = []*riskType{
+		{Types: []string{"xpath", "xpath-inj", "xpath-injection"}, Verbose: "XPath注入"},
+		{Types: []string{"url-redirect"}, Verbose: "URL重定向"},
+		{Types: []string{"ldap", "ldap-inj", "ldap-injection"}, Verbose: "LDAP注入"},
 		{Types: []string{"sqli", "sqlinj", "sql-inj", "sqlinjection", "sql-injection"}, Verbose: "SQL注入"},
 		{Types: []string{"xss"}, Verbose: "XSS"},
 		{Types: []string{"rce", "rce-command"}, Verbose: "命令执行/注入"},
