@@ -10,6 +10,7 @@ import (
 
 type PreHandlerAnalyzer interface {
 	InitHandler(builder *FunctionBuilder)
+	DoInitHandlerFunc(builder *FunctionBuilder)
 	FilterPreHandlerFile(string) bool
 	PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error
 	PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder)
@@ -29,6 +30,8 @@ var _ PreHandlerAnalyzer = &DummyPreHandler{}
 
 type DummyPreHandler struct {
 	InitHandlerOnce sync.Once
+	DoHandlerOnce   sync.Once
+	InitHandlerFunc []func()
 }
 
 func (d *DummyPreHandler) PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder) {
@@ -41,4 +44,18 @@ func (d *DummyPreHandler) FilterPreHandlerFile(string) bool {
 func (d *DummyPreHandler) PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error {
 	return nil
 }
-func (d *DummyPreHandler) InitHandler(builder *FunctionBuilder) {}
+func (d *DummyPreHandler) InitHandler(b *FunctionBuilder) {
+}
+func (d *DummyPreHandler) DoInitHandlerFunc(b *FunctionBuilder) {
+	d.DoHandlerOnce.Do(func() {
+		d.InitHandlerFunc = append(d.InitHandlerFunc, func() {
+			b.SetEmptyRange()
+			variable := b.CreateVariable("__dependency__")
+			container := b.EmitEmptyContainer()
+			b.AssignVariable(variable, container)
+		})
+		for _, f := range d.InitHandlerFunc {
+			f()
+		}
+	})
+}

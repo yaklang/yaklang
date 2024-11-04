@@ -462,8 +462,7 @@ public class Main{
 		`
 		ssatest.CheckPrintlnValue(code, []string{
 			// TODO: this error
-			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, #15.num1)]",
-			"Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, #15.num2)]",
+			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, #15.num1)]", "Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, #15.num2)]",
 			// "Undefined-a.getNum1(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]",
 			// "Undefined-a.getNum2(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)

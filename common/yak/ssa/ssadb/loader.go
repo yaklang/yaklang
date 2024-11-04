@@ -43,7 +43,7 @@ func yieldIrCodes(DB *gorm.DB, ctx context.Context) chan *IrCode {
 
 func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan *IrCode {
 	db := DB.Model(&IrIndex{})
-	db = db.Debug()
+	//db = db.Debug()
 	outC := make(chan *IrCode)
 	go func() {
 		defer close(outC)

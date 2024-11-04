@@ -53,7 +53,7 @@ func TestMemberAddSideEffect(t *testing.T) {
 	$a->a++;
 	println($a->a);
 `
-	ssatest.CheckPrintlnValue(code, []string{"add(side-effect(Parameter-$a, #20.a), 1)"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"add(side-effect(Parameter-$a, #16.a), 1)"}, t)
 }
 
 func TestExperssion_PHP_Scope(t *testing.T) {

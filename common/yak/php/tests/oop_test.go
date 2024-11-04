@@ -416,7 +416,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Function-A(Undefined-A,1)) member[side-effect(Parameter-$num, #24.num)]",
+			"Undefined-$a.getNum(valid)(Function-A(Undefined-A,1)) member[side-effect(Parameter-$num, #20.num)]",
 		}, t)
 	})
 }
@@ -452,7 +452,7 @@ $c = new class("2"){
     }
 };
 println($c->a);`
-	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #20.a)"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #16.a)"}, t)
 }
 
 //func TestOOP_custom_member(t *testing.T) {
@@ -575,7 +575,7 @@ class childB extends b{
 $a = new childB(1);
 println($a->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #21.a)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #17.a)"}, t)
 	})
 
 	t.Run("no impl __construct and get parent custom member", func(t *testing.T) {
@@ -738,7 +738,7 @@ class b
 	$c = new class("2") extends a {
 	};
 	println($c->a);`
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #20.a)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #16.a)"}, t)
 	})
 	t.Run("class const", func(t *testing.T) {
 		code := `<?php
@@ -844,7 +844,7 @@ class A{
 $a = new A(2);
 println($a->b);
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #17.b)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #13.b)"}, t)
 	})
 	t.Run("test oop return", func(t *testing.T) {
 		code := `<?php
@@ -860,7 +860,7 @@ function test(){
 $b = test();
 println($b->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(2, #22.a)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(2, #18.a)"}, t)
 	})
 	//todo: visit if condition
 	//

@@ -3,6 +3,7 @@ package ssa
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"reflect"
 	"strings"
 
@@ -263,4 +264,60 @@ func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) V
 }
 func (b *FunctionBuilder) GetStaticMember(classname *Blueprint, field string) *Variable {
 	return b.CreateVariable(fmt.Sprintf("%s_%s", classname.Name, strings.TrimPrefix(field, "$")))
+}
+
+func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename string) {
+	container := b.ReadValue("__dependency__")
+	if utils.IsNil(container) {
+		log.Warnf("not found __dependency")
+		return
+	}
+
+	setDependencyRange := func(name string) {
+		id := strings.Split(name, ":")
+		if len(id) != 2 {
+			return
+		}
+		group, artifact := id[0], id[1]
+		rs1 := b.GetRangeByText(artifact)
+		if len(rs1) == 1 {
+			b.SetRangeByRangeIf(rs1[0])
+			return
+		}
+		rs2 := b.GetRangeByText(group)
+		if len(rs2) == 1 {
+			b.SetRangeByRangeIf(rs2[0])
+			return
+		}
+		b.SetEmptyRange()
+	}
+	/*
+		__dependency__.name?{}
+	*/
+	b.SetEmptyRange()
+	for _, pkg := range pkgs {
+		sub := b.EmitEmptyContainer()
+		// check item
+		// 1. name
+		// 2. version
+		// 3. filename
+		// 4. group
+		// 5. artifact
+		for k, v := range map[string]string{
+			"name":     pkg.Name,
+			"version":  pkg.Version,
+			"filename": filename,
+		} {
+			if k == "name" {
+				setDependencyRange(v)
+			}
+			b.AssignVariable(
+				b.CreateMemberCallVariable(sub, b.EmitUndefined(k)),
+				b.EmitConstInst(v),
+			)
+		}
+
+		pkgItem := b.CreateMemberCallVariable(container, b.EmitUndefined(pkg.Name))
+		b.AssignVariable(pkgItem, sub)
+	}
 }

@@ -160,7 +160,7 @@ include `+strconv.Quote(filename)+`
 
 c("d")
 `, ssaapi.WithProgramName(progName))
-	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+	//defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)
 	}
