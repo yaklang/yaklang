@@ -97,29 +97,17 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
 
-	getClass := func(name string) *ssa.Blueprint {
-		if parent := y.GetBluePrint(name); parent != nil {
-			return parent
-		} else {
-			parentBP := y.CreateBluePrint(name)
-			y.AddFullTypeNameForAllImport(name, parentBP)
-			return parentBP
-		}
-	}
-
 	var classContainerCallback []func(ssa.Value)
 	var classlessParents []string
 	if i.EXTENDS() != nil {
 		if extend := i.TypeType(); extend != nil {
-			parentName := extend.GetText()
-			class.AddParentClass(getClass(parentName))
+			class.AddParentBlueprint(y.GetBlueprintOrCreate(extend))
 		}
 	}
 
 	if i.IMPLEMENTS() != nil {
 		for _, val := range i.AllTypeList() {
-			name := val.GetText()
-			class.AddParentClass(getClass(name))
+			class.AddParentBlueprint(y.GetBlueprintOrCreate(val))
 		}
 	}
 
@@ -377,9 +365,9 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 
 	for _, parentClass := range mergedTemplate {
 		if parent := y.GetBluePrint(parentClass); parent != nil {
-			class.AddParentClass(parent)
+			class.AddParentBlueprint(parent)
 		} else {
-			class.AddParentClass(y.CreateBluePrint(parentClass))
+			class.AddParentBlueprint(y.CreateBluePrint(parentClass))
 		}
 	}
 

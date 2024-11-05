@@ -135,12 +135,15 @@ functionDeclaration
     ;
 
 classDeclaration
-    : attributes? Private? modifier? Partial? (
-        classEntryType identifier /*typeParameterListInBrackets?*/ (Extends qualifiedStaticTypeRef)? (
-            Implements interfaceList
-        )?
-        | Interface identifier /*typeParameterListInBrackets?*/ (Extends interfaceList)?
-    ) OpenCurlyBracket classStatement* CloseCurlyBracket
+    : attributes? Private? modifier? Partial? 
+    (
+        classEntryType identifier /*typeParameterListInBrackets?*/ 
+            (Extends qualifiedStaticTypeRef)? 
+            (Implements interfaceList)?
+        | Interface identifier /*typeParameterListInBrackets?*/ 
+            (Extends interfaceList)?
+    ) 
+    OpenCurlyBracket classStatement* CloseCurlyBracket
     ;
 
 classEntryType

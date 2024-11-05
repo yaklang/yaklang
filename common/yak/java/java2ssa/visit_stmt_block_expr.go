@@ -1,6 +1,7 @@
 package java2ssa
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -1777,10 +1778,13 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 	}
 	if i.ClassBody() != nil {
 		// 匿名类
-		className := uuid.NewString()
+		className := fmt.Sprintf("anonymous_class_%s_%d",
+			y.CurrentRange.GetEditor().GetFilename(),
+			y.CurrentRange.GetStartOffset(),
+		)
 		class := y.CreateBluePrint(className)
 		if oldClassName != "" {
-			class.AddParentClass(y.GetBluePrint(oldClassName))
+			class.AddParentBlueprint(y.GetBluePrint(oldClassName))
 		}
 		y.VisitClassBody(i.ClassBody(), class)
 	}

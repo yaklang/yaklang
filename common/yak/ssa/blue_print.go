@@ -56,10 +56,12 @@ const (
 var (
 	children_variable = "children"
 	parent_variable   = "parents"
+	// is this needed??
 	// BlueprintRelationNormal     = blueprintRelation{"children", "parents"} // all relation should set this
 	// BlueprintRelationExtends    = blueprintRelation{"sub", "supper"}       // class extends
 	// BlueprintRelationImplements = blueprintRelation{"impl", "interface"}   // interface implements
 	// BlueprintRelationEmbed      = blueprintRelation{"embed", "embedded"}   // golang struct embed
+	// BlueprintRelationPermits permits // java
 )
 
 // Blueprint is a class blueprint, it is used to create a new class
@@ -111,8 +113,8 @@ func NewClassBluePrint(name string) *Blueprint {
 }
 
 // ======================= class blue print
-// AddParentClass is used to add a parent class to the class,
-func (c *Blueprint) AddParentClass(parent *Blueprint) {
+// AddParentBlueprint is used to add a parent class to the class,
+func (c *Blueprint) AddParentBlueprint(parent *Blueprint) {
 	if parent == nil {
 		return
 	}

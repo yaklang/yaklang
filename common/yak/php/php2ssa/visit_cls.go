@@ -80,7 +80,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	bluePrint := y.CreateBluePrint(cname)
 	if i.QualifiedStaticTypeRef() != nil {
 		if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
-			bluePrint.AddParentClass(ref)
+			bluePrint.AddParentBlueprint(ref)
 		}
 	}
 	for _, statement := range i.AllClassStatement() {
@@ -144,20 +144,14 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			fallthrough
 		case "class":
 			className = y.VisitIdentifier(i.Identifier())
-
-			parentClassName := ""
 			if i.Extends() != nil {
-				parentClassName = i.QualifiedStaticTypeRef().GetText()
+				parentClassName := i.QualifiedStaticTypeRef().GetText()
+				mergedTemplate = append(mergedTemplate, parentClassName)
 			}
-
-			class := y.CreateBluePrint(className)
-			y.GetProgram().SetExportType(className, class)
-			if parentClass := y.GetBluePrint(parentClassName); parentClass != nil {
-				//感觉在ssa-classBlue中做更好，暂时修复
-				class.AddParentClass(parentClass)
-			}
-			for _, statement := range i.AllClassStatement() {
-				y.VisitClassStatement(statement, class)
+			if i.Implements() != nil {
+				for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
+					mergedTemplate = append(mergedTemplate, impl.GetText())
+				}
 			}
 			class.SetLazyBuilder(func() {
 				class.BuildConstructorAndDestructor()
@@ -171,6 +165,16 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 				mergedTemplate = append(mergedTemplate, impl.GetText())
 			}
 		}
+	}
+	class := y.CreateBluePrint(className)
+	for _, name := range mergedTemplate {
+		if parentClass := y.GetBluePrint(name); parentClass != nil {
+			class.AddParentBlueprint(parentClass)
+		}
+	}
+	y.GetProgram().SetExportType(className, class)
+	for _, statement := range i.AllClassStatement() {
+		y.VisitClassStatement(statement, class)
 	}
 
 	return nil

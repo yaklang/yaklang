@@ -1,9 +1,6 @@
 package java2ssa
 
 import (
-	"strings"
-
-	"github.com/yaklang/yaklang/common/utils"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -18,46 +15,42 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 	if i == nil {
 		return y.EmitEmptyContainer()
 	}
-
 	ifaceName := i.Identifier().GetText()
-	interfaceClass := y.CreateBluePrint(ifaceName)
-	y.GetProgram().SetExportType(ifaceName, interfaceClass)
-	var callbacks []func(ssa.Value)
-	var inherits []string
-	if i.EXTENDS() != nil {
-		extends := utils.PrettifyListFromStringSplited(i.TypeList(0).GetText(), ",")
-		if len(extends) > 0 {
-			inherits = append(inherits, extends...)
-			callbacks = append(callbacks, func(value ssa.Value) {
-				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("extends"))
-				y.AssignVariable(variable, y.EmitConstInst(strings.Join(extends, ",")))
-			})
+	interfaceBlueprint := y.CreateBluePrint(ifaceName)
+	y.GetProgram().SetExportType(ifaceName, interfaceBlueprint)
+	// : '@'? INTERFACE identifier typeParameters? (EXTENDS typeList)? (PERMITS typeList)? interfaceBody
+	hasExtends := i.EXTENDS() != nil
+	hasPermits := i.PERMITS() != nil
+	if hasExtends {
+		if typeList, ok := i.TypeList(0).(*javaparser.TypeListContext); ok {
+			for _, val := range typeList.AllTypeType() {
+				interfaceBlueprint.AddParentBlueprint(y.GetBlueprintOrCreate(val))
+			}
+		}
+
+	}
+	if hasPermits {
+		var index int
+		/*
+			if extends is true, index = 1 else index = 0
+			(Extends typeList)? (PERMITS typeList)?
+		*/
+		if hasExtends {
+			index = 1
+		} else {
+			index = 0
+		}
+
+		if typeList, ok := i.TypeList(index).(*javaparser.TypeListContext); ok {
+			for _, val := range typeList.AllTypeType() {
+				interfaceBlueprint.AddParentBlueprint(y.GetBlueprintOrCreate(val))
+			}
 		}
 	}
-	if i.PERMITS() != nil {
-		permits := utils.PrettifyListFromStringSplited(i.TypeList(1).GetText(), ",")
-		if len(permits) > 0 {
-			inherits = append(inherits, permits...)
-			callbacks = append(callbacks, func(value ssa.Value) {
-				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("permits"))
-				y.AssignVariable(variable, y.EmitConstInst(strings.Join(permits, ",")))
-			})
-		}
-	}
 
-	if len(inherits) > 0 {
-		callbacks = append(callbacks, func(value ssa.Value) {
-			variable := y.CreateMemberCallVariable(value, y.EmitConstInst("inherits"))
-			y.AssignVariable(variable, y.EmitConstInst(strings.Join(inherits, ",")))
-		})
-	}
+	y.VisitInterfaceBody(i.InterfaceBody().(*javaparser.InterfaceBodyContext), interfaceBlueprint)
 
-	y.VisitInterfaceBody(i.InterfaceBody().(*javaparser.InterfaceBodyContext), interfaceClass)
-
-	container := interfaceClass.GetClassContainer()
-	for _, cb := range callbacks {
-		cb(container)
-	}
+	container := interfaceBlueprint.GetClassContainer()
 	return container
 }
 

@@ -14,6 +14,14 @@ func (pkg *Program) GetBluePrint(name string) *Blueprint {
 	return pkg.GetClassBlueprintEx(name, "")
 }
 
+func (y *FunctionBuilder) GetBlueprintOrCreate(token CanStartStopToken) *Blueprint {
+	name := token.GetText()
+	bp := y.GetBluePrint(name)
+	if bp == nil {
+		bp = y.CreateBluePrint(name, token)
+	}
+	return bp
+}
 func (b *FunctionBuilder) GetBluePrint(name string) *Blueprint {
 	p := b.prog
 	return p.GetBluePrint(name)
@@ -34,6 +42,10 @@ func (b *FunctionBuilder) SetClassBluePrint(name string, class *Blueprint) {
 // saving the static variables and util methods.
 
 func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...CanStartStopToken) *Blueprint {
+	if len(tokenizer) > 0 {
+		recoverRange := b.SetRange(tokenizer[0])
+		defer recoverRange()
+	}
 	prog := b.prog
 	blueprint := NewClassBluePrint(name)
 	if prog.ClassBluePrint == nil {
@@ -43,7 +55,7 @@ func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...C
 		return b.EmitUndefined(s)
 	}
 	prog.ClassBluePrint[name] = blueprint
-	blueprintVar := b.CreateVariable(fmt.Sprintf("%s", name), tokenizer...)
+	blueprintVar := b.CreateVariable(fmt.Sprintf(`%s`, name), tokenizer...)
 	blueprintContainer := b.EmitEmptyContainer()
 	blueprintContainer.SetName(fmt.Sprintf("%s-declare", name))
 	b.AssignVariable(blueprintVar, blueprintContainer)
