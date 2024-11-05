@@ -21,6 +21,9 @@ type Node struct {
 	IsCircle            bool
 	IsMerge             bool
 	IsIf                bool
+	IsTryCatch          bool
+	TryNodeId           int
+	CatchNodeId         []int
 	IsDoWhile           bool
 	BodyNodeStart       *Node
 	GetLoopEndNode      func() *Node

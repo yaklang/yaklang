@@ -6,9 +6,25 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io/fs"
+	"os"
 	"testing"
 )
 
+func TestParseClass(t *testing.T) {
+	data, err := os.ReadFile("/Users/z3/Downloads/compiling-failed-files/decompiler-err-DruidDataSource-2oO3ya5yGV9b4rAPdYJAChKTmxd.class")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cf, err := Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := cf.Dump()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(source)
+}
 func TestParseJar(t *testing.T) {
 	jarFs, err := NewJarFSFromLocal("/Users/z3/Downloads/ysoserial-for-woodpecker-0.5.2.jar")
 	if err != nil {
