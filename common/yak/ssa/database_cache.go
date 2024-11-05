@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -46,6 +47,9 @@ type Cache struct {
 	MemberCache     map[string][]Instruction
 	Class2InstIndex map[string][]Instruction
 	constCache      []Instruction
+	saveInstruct    chan instructionIrCode
+	waitGroup       *sync.WaitGroup
+	once            *sync.Once
 }
 
 func (c *Cache) SetFetchId(_func func() int64) {
@@ -66,13 +70,25 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 		VariableCache:    make(map[string][]Instruction),
 		MemberCache:      make(map[string][]Instruction),
 		Class2InstIndex:  make(map[string][]Instruction),
-		constCache:       make([]Instruction, 0)}
+		constCache:       make([]Instruction, 0),
+		saveInstruct:     make(chan instructionIrCode, 1024),
+		waitGroup:        &sync.WaitGroup{},
+		once:             &sync.Once{},
+	}
 
 	if databaseEnable {
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
-		cache.InstructionCache.SetCheckExpirationCallback(func(key int64, inst instructionIrCode) bool {
-			return cache.saveInstruction(inst)
+		cache.InstructionCache.SetCheckExpirationCallback(func(key int64, value instructionIrCode) bool {
+			cache.saveInstruct <- value
+			return true
 		})
+		cache.waitGroup.Add(1)
+		go func() {
+			for code := range cache.saveInstruct {
+				cache.saveInstruction(code)
+			}
+			cache.waitGroup.Done()
+		}()
 	} else {
 		id := atomic.NewInt64(0)
 		cache.fetchId = func() int64 {
@@ -223,21 +239,23 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 }
 
 func (c *Cache) SaveToDatabase() {
-	if !c.HaveDatabaseBackend() {
-		return
-	}
+	c.once.Do(func() {
+		if !c.HaveDatabaseBackend() {
+			return
+		}
 
-	start := time.Now()
-	defer func() {
-		syncAtomic.AddUint64(&_SSACacheToDatabaseCost, uint64(time.Now().Sub(start).Nanoseconds()))
-	}()
-
-	insturctionCache := c.InstructionCache.GetAll()
-	c.InstructionCache.Close()
-
-	for _, instIR := range insturctionCache {
-		c.saveInstruction(instIR)
-	}
+		start := time.Now()
+		defer func() {
+			syncAtomic.AddUint64(&_SSACacheToDatabaseCost, uint64(time.Now().Sub(start).Nanoseconds()))
+		}()
+		all := c.InstructionCache.GetAll()
+		c.InstructionCache.Close()
+		for _, code := range all {
+			c.saveInstruct <- code
+		}
+		close(c.saveInstruct)
+		c.waitGroup.Wait()
+	})
 }
 
 func (c *Cache) IsExistedSourceCodeHash(programName string, hashString string) bool {
