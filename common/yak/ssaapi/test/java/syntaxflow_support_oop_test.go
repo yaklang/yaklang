@@ -31,9 +31,17 @@ func Test_Blueprint_name2declare(t *testing.T) {
 			A as $classA
 			C as $classC // interface 
 			`, map[string][]string{
-				"classA": {"A-declare"},
-				"classC": {"C-declare"},
+				"classA": {"A_declare"},
+				"classC": {"C_declare"},
 			}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("search declare class", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+		A_declare as $classA
+		`, map[string][]string{
+			"classA": {"A_declare"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
 	t.Run("search class relationship", func(t *testing.T) {
@@ -46,12 +54,12 @@ func Test_Blueprint_name2declare(t *testing.T) {
 		D.parents as $classD // C
 		E.parents as $classE // A C
 		`, map[string][]string{
-			"classA":  {"B-declare", "E-declare"},
-			"classC":  {"D-declare", "E-declare", "CC-declare"},
-			"classB":  {"A-declare"},
-			"classD":  {"C-declare"},
-			"classCC": {"C-declare"},
-			"classE":  {"A-declare", "C-declare"},
+			"classA":  {"B_declare", "E_declare"},
+			"classC":  {"D_declare", "E_declare", "CC_declare"},
+			"classB":  {"A_declare"},
+			"classD":  {"C_declare"},
+			"classCC": {"C_declare"},
+			"classE":  {"A_declare", "C_declare"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
@@ -134,12 +142,12 @@ func Test_Blueprint_no_declare(t *testing.T) {
 		C.parents as $class5 // CC
 		D.parents as $class6 // AA BB
 		`, map[string][]string{
-			"class1": {"A-declare", "D-declare"},
-			"class2": {"B-declare", "D-declare"},
-			"class3": {"AA-declare"},
-			"class4": {"BB-declare"},
-			"class5": {"CC-declare"},
-			"class6": {"AA-declare", "BB-declare"},
+			"class1": {"A_declare", "D_declare"},
+			"class2": {"B_declare", "D_declare"},
+			"class3": {"AA_declare"},
+			"class4": {"BB_declare"},
+			"class5": {"CC_declare"},
+			"class6": {"AA_declare", "BB_declare"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }

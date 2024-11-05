@@ -27,8 +27,8 @@ func Test_OOP_className(t *testing.T) {
 			A as $classA
 			C as $classC // interface 
 			`, map[string][]string{
-				"classA": {"A-declare"},
-				"classC": {"C-declare"},
+				"classA": {"A_declare"},
+				"classC": {"C_declare"},
 			}, ssaapi.WithLanguage(ssaapi.PHP),
 		)
 	})
@@ -43,12 +43,12 @@ func Test_OOP_className(t *testing.T) {
 		D.parents as $classD // C
 		E.parents as $classE // A C
 		`, map[string][]string{
-			"classA":  {"B-declare", "E-declare"},
-			"classC":  {"D-declare", "E-declare", "CC-declare"},
-			"classB":  {"A-declare"},
-			"classD":  {"C-declare"},
-			"classCC": {"C-declare"},
-			"classE":  {"A-declare", "C-declare"},
+			"classA":  {"B_declare", "E_declare"},
+			"classC":  {"D_declare", "E_declare", "CC_declare"},
+			"classB":  {"A_declare"},
+			"classD":  {"C_declare"},
+			"classCC": {"C_declare"},
+			"classE":  {"A_declare", "C_declare"},
 		}, ssaapi.WithLanguage(ssaapi.PHP),
 		)
 	})

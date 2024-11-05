@@ -35,12 +35,11 @@ func (b *FunctionBuilder) SetClassBluePrint(name string, class *Blueprint) {
 	p.ClassBluePrint[name] = class
 }
 
-// CreateClassBluePrint will create object template (maybe class)
+// CreateBluePrintWithPkgName will create object template (maybe class)
 // in dynamic and classless language, we can create object without class
 // but because of the 'this/super', we will still keep the concept 'Class'
 // for ref the method/function, the blueprint is a container too,
 // saving the static variables and util methods.
-
 func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...CanStartStopToken) *Blueprint {
 	if len(tokenizer) > 0 {
 		recoverRange := b.SetRange(tokenizer[0])
@@ -55,12 +54,18 @@ func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...C
 		return b.EmitUndefined(s)
 	}
 	prog.ClassBluePrint[name] = blueprint
-	blueprintVar := b.CreateVariable(fmt.Sprintf(`%s`, name), tokenizer...)
 	blueprintContainer := b.EmitEmptyContainer()
-	blueprintContainer.SetName(fmt.Sprintf("%s-declare", name))
+	variableName := fmt.Sprintf("%s_declare", name)
+	blueprintContainer.SetName(variableName)
+
+	// search this blueprint-declare can use ${blueprint-name} or ${blueprint-name}_declare
+	blueprintVar := b.CreateVariable(name, tokenizer...)
 	b.AssignVariable(blueprintVar, blueprintContainer)
+	blueprintVar = b.CreateVariable(variableName, tokenizer...)
+	b.AssignVariable(blueprintVar, blueprintContainer)
+
 	if err := blueprint.InitializeWithContainer(blueprintContainer); err != nil {
-		log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
+		log.Errorf("CreateBluePrintWithPkgName.InitializeWithContainer error: %s", err)
 	}
 	return blueprint
 }
