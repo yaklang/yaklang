@@ -346,7 +346,7 @@ func (f fileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestY
 	if !exists {
 		return nil, utils.Errorf("file [%s] exists check error: %s", u.GetPath(), err)
 	}
-	if trash, ok := fs.(fi.TrashFS); ok && query.Get("trash") == "true" {
+	if trash, ok := fs.(fi.TrashFileSystem); ok && query.Get("trash") == "true" {
 		err = trash.Throw(absPath)
 		if err != nil {
 			return nil, err

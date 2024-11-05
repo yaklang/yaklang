@@ -335,7 +335,7 @@ func CopyFileEx(
 			if _, err := io.Copy(dstW, srcFh); err != nil {
 				return err
 			}
-			if syncW, ok := dstFh.(fi.SyncFile); ok {
+			if syncW, ok := dstFh.(fi.SyncFileSystem); ok {
 				return syncW.Sync()
 			}
 		} else {
