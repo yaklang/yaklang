@@ -77,6 +77,9 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 
 		ifStatement.ElseBody = elseBody
 	}
+	endNodes = utils2.NodeFilter(endNodes, func(node *core.Node) bool {
+		return !IsEndNode(node)
+	})
 	for _, node := range NodeDeduplication(endNodes) {
 		ifStatementNode.AddNext(node)
 	}
