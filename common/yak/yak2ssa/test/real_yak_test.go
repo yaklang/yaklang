@@ -117,8 +117,8 @@ Rawfuzz = func(p, fuzzPayload) {
 func Test_Real_FunctionReturn(t *testing.T) {
 	t.Run("function return", func(t *testing.T) {
 		ssatest.CheckNoError(t, `
-		f = param =>{
-			if param == 1 {
+		f = p =>{
+			if p == 1 {
 				return nil
 			}
 			return 1

@@ -1,4 +1,7 @@
-Files.write(, * #-> as $params) as $sink;
-$params?{.getBytes()} as $source;
+.getBytes() as $ source;
+Files.write(,* as $sink)
+$sink #{
+	until: '<self> & $source;',
+}-> as $result;
 
-check $source then "Local Files Writer" else "No Files Written";
+check $result then "Local Files Writer" else "No Files Written";
