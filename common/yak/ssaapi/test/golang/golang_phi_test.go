@@ -131,16 +131,13 @@ func Test_Phi_WithReturn(t *testing.T) {
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.GO))
 
-	ssatest.CheckWithName("phi-with-return-without-param", t, code, func(prog *ssaapi.Program) error {
+	ssatest.CheckWithName("phi-with-return-with-param", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
-		nophis := prog.SyntaxFlow("c as $c").GetValues("c")
-		nophi := nophis[0]
-
-		_, ok := ssa.ToPhi(nophi.GetSSAValue())
-		if ok {
-			t.Fatal("It shouldn't be phi here")
+		ret := prog.SyntaxFlow("c as $c").GetValues("c")[0]
+		_, ok := ssa.ToPhi(ret.GetSSAValue())
+		if !ok {
+			t.Fatal("It shouldn be phi here")
 		}
-
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.GO))
 
