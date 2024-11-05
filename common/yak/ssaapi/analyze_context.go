@@ -157,8 +157,8 @@ func (a *AnalyzeContext) theValueShouldBeVisited(i *Value) bool {
 	return a.crossProcess.valueShould(i)
 }
 
-func (a *AnalyzeContext) theMemberShouldBeVisited(i *Value) bool {
-	return a.crossProcess.memberShould(i)
+func (a *AnalyzeContext) theObjectShouldBeVisited(object, key, member *Value) bool {
+	return a.crossProcess.objectShould(object, key, member)
 }
 
 func (a *AnalyzeContext) calcCrossProcessHash(from *Value, to *Value) string {
@@ -199,11 +199,11 @@ func (a *AnalyzeContext) calcCrossProcessHash(from *Value, to *Value) string {
 // ========================================== OBJECT STACK ==========================================
 
 func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
-	if !g.theMemberShouldBeVisited(member) {
-		return utils.Errorf("This member(%d) valueVisited, skip", member.GetId())
-	}
 	if !obj.IsObject() {
 		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.node)
+	}
+	if !g.theObjectShouldBeVisited(obj, key, member) {
+		return utils.Errorf("This make object(%d) key(%d) member(%d) valueVisited, skip", obj.GetId(), key.GetId(), member.GetId())
 	}
 	if g._objectStack.HaveLastStackValue() {
 		last := g._objectStack.LastStackValue()

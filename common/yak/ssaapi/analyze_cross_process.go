@@ -13,7 +13,7 @@ const emptyStackHash = "__EmptyStack__"
 // 以及导致此次跨过程的causeValue
 type processStackInfo struct {
 	valueVisited  map[int64]struct{}
-	objectVisited map[int64]struct{}
+	objectVisited map[string]struct{}
 	causeValue    *Value
 }
 
@@ -40,7 +40,7 @@ func newCrossProcessTable() *crossProcess {
 func newProcessInfo(causeValue *Value) *processStackInfo {
 	return &processStackInfo{
 		valueVisited:  make(map[int64]struct{}),
-		objectVisited: make(map[int64]struct{}),
+		objectVisited: make(map[string]struct{}),
 		causeValue:    causeValue,
 	}
 }
@@ -92,13 +92,17 @@ func (c *crossProcess) valueShould(v *Value) bool {
 	return false
 }
 
-func (c *crossProcess) memberShould(v *Value) bool {
+func (c *crossProcess) objectShould(object, key, member *Value) bool {
 	info, ok := c.getCurrentProcessInfo()
 	if !ok {
 		return false
 	}
-	if _, ok := info.objectVisited[v.GetId()]; !ok {
-		info.objectVisited[v.GetId()] = struct{}{}
+	if utils.IsNil(object) || utils.IsNil(member) || utils.IsNil(key) {
+		return false
+	}
+	hash := utils.CalcSha1(object.GetId(), member.GetId(), key.GetId())
+	if _, ok := info.objectVisited[hash]; !ok {
+		info.objectVisited[hash] = struct{}{}
 		return true
 	}
 	return false
