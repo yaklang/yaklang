@@ -326,7 +326,7 @@ func TestFuntion_normol(t *testing.T) {
 }
 
 func TestClosu_normol(t *testing.T) {
-	t.Run("baisic", func(t *testing.T) {
+	t.Run("basic", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
 		func main(){
@@ -344,7 +344,7 @@ func TestClosu_normol(t *testing.T) {
 }
 
 func TestType_normol(t *testing.T) {
-	t.Run("baisic unassign", func(t *testing.T) {
+	t.Run("basic unassign", func(t *testing.T) {
 
 		test.CheckPrintlnValue(`package main
 
@@ -363,7 +363,7 @@ func TestType_normol(t *testing.T) {
 		`, []string{"0", "\"\"", "false", "0"}, t)
 	})
 
-	t.Run("baisic", func(t *testing.T) {
+	t.Run("basic", func(t *testing.T) {
 
 		test.CheckPrintlnValue(`package main
 

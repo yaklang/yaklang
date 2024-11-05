@@ -1872,7 +1872,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 
 				//variable := b.CreateLocalVariable(typName)
 				//b.AssignVariable(variable, b.EmitTypeValue(ssatyp))
-			} else {
+			} else if lib != nil {
 				obj, ok := lib.GetExportType(typName)
 
 				if ok {
@@ -1881,6 +1881,9 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 					b.NewError(ssa.Warn, TAG, StructNotFind(typName))
 					ssatyp = ssa.CreateAnyType()
 				}
+			} else {
+				b.NewError(ssa.Warn, TAG, StructNotFind(typName))
+				ssatyp = ssa.CreateAnyType()
 			}
 		}
 	} else {
