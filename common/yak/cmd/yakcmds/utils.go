@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/coreplugin"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/twofa"
 	"io"
 	"io/fs"
@@ -39,6 +41,37 @@ import (
 )
 
 var UtilsCommands = []*cli.Command{
+	{
+		Name:  "embed-fs-hash",
+		Usage: `Generate Current Embed File System(yak/syntaxflow) Hash`,
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name: "type",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			switch ret := strings.ToLower(c.String("type")); ret {
+			case "coreplugin", "yak", "yaklang":
+				result, err := coreplugin.CorePluginHash()
+				if err != nil {
+					return err
+				}
+				fmt.Println(result)
+			case "sf", "syntaxflow", "sast":
+				result, err := sfbuildin.SyntaxFlowRuleHash()
+				if err != nil {
+					return err
+				}
+				fmt.Println(result)
+			default:
+				if ret == "" {
+					return utils.Error("empty type")
+				}
+				return utils.Error("invalid type: " + c.String("type"))
+			}
+			return nil
+		},
+	},
 	{
 		Name: "http-server",
 		Flags: []cli.Flag{
