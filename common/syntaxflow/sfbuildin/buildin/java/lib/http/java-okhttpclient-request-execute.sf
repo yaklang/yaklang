@@ -2,6 +2,7 @@ desc(
     title: "Find OkHttpClient Uses and Executing Request",
     type: audit,
     level: low,
+    lib: "java-okhttpclient-request-execute",
 )
 
 Request?{<fullTypeName>?{have: 'okhttp3.'}}.Builder()...url(,* as $output);

@@ -1,6 +1,6 @@
 desc(
     title: "Find Runtime.getRuntime().exec Point",
-    lib: 'runtime-exec-sink',
+    lib: 'java-runtime-exec-sink',
     type: audit,
     level: warning,
 )

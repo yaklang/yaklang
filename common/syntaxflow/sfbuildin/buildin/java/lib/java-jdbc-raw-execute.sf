@@ -3,7 +3,7 @@ desc(
     title_zh: "JDBC getConnection.createStatement.executeQuery SQL 执行语句",
     type: audit,
     level: 'low',
-    lib: 'jdbc-raw-execute-sink',
+    lib: 'java-jdbc-raw-execute-sink',
 )
 
 DriverManager.getConnection().createStatement() as $stmt;

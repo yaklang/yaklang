@@ -2,7 +2,7 @@ desc(
     title: "Find Java File Read Sinks",
     title_zh: "查找 Java 文件读取接收点",
     type: audit,
-    lib: "read-filename-sink"
+    lib: "java-read-filename-sink"
 )
 
 // FileReader reader = new FileReader("example.txt");
