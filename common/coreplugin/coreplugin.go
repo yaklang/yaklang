@@ -92,8 +92,19 @@ func ClearBlackListPlugin(blackList []string) {
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
+
 		ClearBlackListPlugin(BlackListCorePlugin)
+
+		const key = "cd336beba498c97738c275f6771efca3"
+		if yakit.Get(key) == consts.ExistedCorePluginEmbedFSHash {
+			return nil
+		}
 		log.Debug("start to load core plugin")
+		defer func() {
+			hash, _ := CorePluginHash()
+			yakit.Set(key, hash)
+		}()
+
 		registerBuildInPlugin(
 			"mitm",
 			"HTTP请求走私",

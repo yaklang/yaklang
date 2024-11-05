@@ -6,9 +6,11 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/twofa"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"io"
 	"io/fs"
 	"io/ioutil"
@@ -16,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -48,26 +51,103 @@ var UtilsCommands = []*cli.Command{
 			cli.StringFlag{
 				Name: "type",
 			},
+			cli.BoolFlag{
+				Name: "override",
+			},
+			cli.BoolFlag{
+				Name: "all",
+			},
 		},
 		Action: func(c *cli.Context) error {
-			switch ret := strings.ToLower(c.String("type")); ret {
-			case "coreplugin", "yak", "yaklang":
-				result, err := coreplugin.CorePluginHash()
-				if err != nil {
-					return err
+			templs := []string{
+				"common/consts/hash.go",
+				"consts/hash.go",
+			}
+			template := utils.GetFirstExistedFile(templs...)
+			if c.Bool("override") && template == "" {
+				return utils.Errorf("template not found, in %v", templs)
+			}
+
+			rets := []string{strings.ToLower(c.String("type"))}
+			if c.Bool("all") {
+				rets = []string{"yak", "syntaxflow"}
+			}
+			for _, ret := range rets {
+				switch ret {
+				case "coreplugin", "yak", "yaklang":
+					result, err := coreplugin.CorePluginHash()
+					if err != nil {
+						return err
+					}
+					fmt.Println(result)
+					if c.Bool("override") {
+						if consts.ExistedCorePluginEmbedFSHash == result {
+							continue
+						}
+						if matched, _ := regexp_utils.NewYakRegexpUtils("[0-9a-fA-F]+").MatchString(result); !matched {
+							return utils.Errorf("invalid hash: %v", result)
+						}
+						templ, err := os.ReadFile(template)
+						if err != nil {
+							return err
+						}
+
+						re := regexp.MustCompile(`(const ExistedCorePluginEmbedFSHash string = ")([a-zA-Z0-9]+)(")`)
+						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
+						err = os.RemoveAll(template + ".bak")
+						if err != nil {
+							return err
+						}
+						err = os.Rename(template, template+".bak")
+						if err != nil {
+							return err
+						}
+						err = os.WriteFile(template, []byte(newContent), 0o644)
+						if err != nil {
+							return err
+						}
+						continue
+					}
+				case "sf", "syntaxflow", "sast":
+					result, err := sfbuildin.SyntaxFlowRuleHash()
+					if err != nil {
+						return err
+					}
+					fmt.Println(result)
+					if c.Bool("override") {
+						if consts.ExistedSyntaxFlowEmbedFSHash == result {
+							continue
+						}
+						if matched, _ := regexp_utils.NewYakRegexpUtils("[0-9a-fA-F]+").MatchString(result); !matched {
+							return utils.Errorf("invalid hash: %v", result)
+						}
+						templ, err := os.ReadFile(template)
+						if err != nil {
+							return err
+						}
+
+						re := regexp.MustCompile(`(const ExistedSyntaxFlowEmbedFSHash string = ")([a-zA-Z0-9]+)(")`)
+						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
+						err = os.RemoveAll(template + ".bak")
+						if err != nil {
+							return err
+						}
+						err = os.Rename(template, template+".bak")
+						if err != nil {
+							return err
+						}
+						err = os.WriteFile(template, []byte(newContent), 0o644)
+						if err != nil {
+							return err
+						}
+					}
+				default:
+					if ret == "" {
+						return utils.Error("empty type")
+					}
+					return utils.Error("invalid type: " + c.String("type"))
 				}
-				fmt.Println(result)
-			case "sf", "syntaxflow", "sast":
-				result, err := sfbuildin.SyntaxFlowRuleHash()
-				if err != nil {
-					return err
-				}
-				fmt.Println(result)
-			default:
-				if ret == "" {
-					return utils.Error("empty type")
-				}
-				return utils.Error("invalid type: " + c.String("type"))
+				continue
 			}
 			return nil
 		},
