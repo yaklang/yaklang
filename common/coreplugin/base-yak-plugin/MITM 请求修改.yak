@@ -70,7 +70,7 @@ hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
             rawShouldHandle = pattern.MatchString(req)~
             // or
             if rawShouldHandle {
-                break 
+                break
             }
         }
     }
