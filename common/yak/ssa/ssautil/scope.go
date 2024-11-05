@@ -553,12 +553,12 @@ func (s *ScopedVersionedTable[T]) GetAllVariableNames() map[string]struct{} {
 		if s == "" || s == "_" {
 			return
 		}
-		if vi.GetValue().IsParameter() { // 参数不能生成phi
-			return
-		}
-		if s[0] == '#' { // 成员变量不能生成phi
-			return
-		}
+		//if vi.GetValue().IsParameter() { // 参数不能生成phi
+		//	return
+		//}
+		//if s[0] == '#' { // 成员变量不能生成phi
+		//	return
+		//}
 		names[s] = struct{}{}
 	})
 

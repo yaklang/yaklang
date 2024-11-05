@@ -1,6 +1,8 @@
 package tests
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestJavaBasic_Variable_InIf(t *testing.T) {
 	t.Run("test simple if", func(t *testing.T) {
@@ -159,6 +161,34 @@ func TestJavaBasic_Variable_InIf(t *testing.T) {
 			"2",
 			"phi(a)[2,1]",
 		}, t)
+	})
+	t.Run("test param should be phi after return", func(t *testing.T) {
+		CheckAllJavaPrintlnValue(`
+		package main;
+class A {
+	public void PathTravel(String filePath){
+		if (!Utils.Validate(filePath)) {
+			logger.error("Invalid file path: " + filePath);
+			return;
+		}
+		println(filePath);		
+	}
+}
+		`, []string{"phi(filePath)[Undefined-filePath,Parameter-filePath]"}, t)
+	})
+
+	t.Run("test param should not be phi after normal if statement", func(t *testing.T) {
+		CheckAllJavaPrintlnValue(`
+		package main;
+class A {
+	public void PathTravel(String filePath){
+		if (!Utils.Validate(filePath)) {
+			logger.error("Invalid file path: " + filePath);
+		}
+		println(filePath);		
+	}
+}
+		`, []string{"Parameter-filePath"}, t)
 	})
 }
 
