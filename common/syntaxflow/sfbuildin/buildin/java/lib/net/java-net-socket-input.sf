@@ -1,6 +1,7 @@
 desc(
     title : "Find TCP Data Reception Point",
     title_zh : "查找TCP数据接收点",
+    lib : "java-tcp-socket-read",
     type : audit,
 )
 

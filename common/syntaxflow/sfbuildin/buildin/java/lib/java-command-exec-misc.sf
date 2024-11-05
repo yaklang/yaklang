@@ -1,6 +1,6 @@
 desc(
     title: "Find Thirdparty CommandLine Executing Sink",
-    lib: 'command-exec-sink',
+    lib: 'java-command-exec-sink',
     type: audit,
 )
 
