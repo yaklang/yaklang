@@ -1,6 +1,7 @@
 package yakcmds
 
 import (
+	"errors"
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -43,23 +44,30 @@ var JavaDecompilerCommand = &cli.Command{
 		if c.Bool("quiet") {
 			log.SetLevel(log.WarnLevel)
 		}
-		jarPath := c.String("jar")
-		dirMode := c.String("jar-directory")
-
-		var jars []string
-		err := filesys.Recursive(dirMode, filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-			if strings.HasSuffix(s, ".jar") {
-				jars = append(jars, s)
-			}
-			return nil
-		}))
-		if err != nil {
-			return err
+		if c.IsSet("jar") && c.IsSet("jar-directory") {
+			return errors.New("only one of --jar and --jar-directory can be set")
 		}
-
-		jarPaths := strings.Split(jarPath, ",")
-		for _, jar := range jarPaths {
-			jars = append(jars, jar)
+		if !c.IsSet("jar") && !c.IsSet("jar-directory") {
+			return errors.New("one of --jar and --jar-directory must be set")
+		}
+		var jars []string
+		if c.IsSet("jar") {
+			jarPath := c.String("jar")
+			jarPaths := strings.Split(jarPath, ",")
+			for _, jar := range jarPaths {
+				jars = append(jars, jar)
+			}
+		} else {
+			dirMode := c.String("jar-directory")
+			err := filesys.Recursive(dirMode, filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				if strings.HasSuffix(s, ".jar") {
+					jars = append(jars, s)
+				}
+				return nil
+			}))
+			if err != nil {
+				return err
+			}
 		}
 		jars = lo.Filter(jars, func(jar string, _ int) bool {
 			jar = strings.TrimSpace(jar)
