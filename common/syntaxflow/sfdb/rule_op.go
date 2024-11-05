@@ -143,7 +143,7 @@ func DeleteRuleByTitle(name string) error {
 	return db.Where("title = ? or title_zh = ?", name, name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
-func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+func ImportRuleWithoutValid(ruleName string, content string, buildin bool, versionHash string, tags ...string) (*schema.SyntaxFlowRule, error) {
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
 	language, err := CheckSyntaxFlowLanguage(languageRaw)
 	if err != nil {
@@ -160,6 +160,7 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	rule.Type = ruleType
 	rule.RuleName = ruleName
 	rule.Language = string(language)
+	rule.RuleVersionHash = versionHash
 	rule.Tag = strings.Join(tags, "|")
 	rule.IsBuildInRule = buildin
 	err = MigrateSyntaxFlow(rule.CalcHash(), rule)
@@ -437,4 +438,11 @@ func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxF
 func YieldSyntaxFlowRulesWithoutLib(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
 	db = db.Where("allow_included = ?", false)
 	return YieldSyntaxFlowRules(db, ctx)
+}
+
+func HaveFileSystemHash(hash string) bool {
+	db := consts.GetGormProfileDatabase()
+	var count int64
+	db.Model(&schema.SyntaxFlowRule{}).Where("rule_version_hash = ?", hash).Count(&count)
+	return count > 0
 }

@@ -158,7 +158,8 @@ type SyntaxFlowRule struct {
 	IncludedName  string
 	OpCodes       string
 
-	Hash string `json:"hash" gorm:"unique_index"`
+	Hash            string `json:"hash" gorm:"unique_index"`
+	RuleVersionHash string `json:"rule_version_hash" gorm:"index"`
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {

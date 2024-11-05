@@ -20,6 +20,10 @@ var ruleFS embed.FS
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 		fsInstance := filesys.NewEmbedFS(ruleFS)
+		ruleVersionHash := utils.CalcSha256(ruleFS)
+		if sfdb.HaveFileSystemHash(ruleVersionHash) {
+			return nil
+		}
 		err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 			dirName, name := fsInstance.PathSplit(s)
 			if !strings.HasSuffix(name, ".sf") {
@@ -57,7 +61,7 @@ func init() {
 			}
 			content := string(raw)
 			// import builtin rule
-			rule,err := sfdb.ImportRuleWithoutValid(name, content, true, tags...)
+			rule, err := sfdb.ImportRuleWithoutValid(name, content, true, ruleVersionHash, tags...)
 			if err != nil {
 				log.Warnf("import rule %s error: %s", name, err)
 				return err
@@ -71,5 +75,4 @@ func init() {
 		}))
 		return utils.Wrapf(err, "init builtin rules error")
 	})
-
 }
