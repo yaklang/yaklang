@@ -1024,14 +1024,26 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng meme
 }
 
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
+	// check syntaxflow
+	if resp, match := SyntaxFlowServer(req); match {
+		return resp, nil
+	}
+
+	scriptType := req.GetYakScriptType()
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
+	switch scriptType {
+	case "yak", "mitm", "port-scan", "codec":
+		// do nothing
+	default:
+		// unsupported script type
+		return ret, utils.Errorf("unsupported script type: %s", scriptType)
+	}
 
 	result, err := LanguageServerAnalyzeProgram(req)
 	if err != nil {
 		return ret, err
 	}
 	prog, word, containPoint, ssaRange, v := result.Program, result.Word, result.ContainPoint, result.Range, result.Value
-	scriptType := req.GetYakScriptType()
 
 	if v == nil {
 		return ret, nil
