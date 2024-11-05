@@ -11,7 +11,7 @@ import (
 )
 
 func TestParseClass(t *testing.T) {
-	data, err := os.ReadFile("/Users/z3/Downloads/compiling-failed-files/decompiler-err-DruidDataSource-2oO3ya5yGV9b4rAPdYJAChKTmxd.class")
+	data, err := os.ReadFile("/Users/z3/Downloads/compiling-failed-files/decompiler-err-WallVisitorUtils-2oO3x6B5pD43b1a2Jzf1mRLSW2n.class")
 	if err != nil {
 		t.Fatal(err)
 	}
