@@ -1167,3 +1167,38 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature_Generic(t *testing.T) {
 		)
 	})
 }
+
+func Test_SyntaxflowCompletion(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	t.Run("native-call", func(t *testing.T) {
+		id := uuid.NewString()
+		resp := GetSuggestion(local, "completion", "syntaxflow", t, `
+<
+		`, &ypb.Range{
+			Code:        "<",
+			StartLine:   2,
+			StartColumn: 2,
+			EndLine:     2,
+			EndColumn:   3,
+		}, id)
+		require.True(t, len(resp.SuggestionMessage) > 0)
+	})
+
+	t.Run("library", func(t *testing.T) {
+		id := uuid.NewString()
+		resp := GetSuggestion(local, "completion", "syntaxflow", t, `
+<include()>
+`, &ypb.Range{
+			Code:        "<include(",
+			StartLine:   2,
+			StartColumn: 10,
+			EndLine:     2,
+			EndColumn:   10,
+		}, id)
+
+		require.True(t, len(resp.SuggestionMessage) > 0)
+
+	})
+}
