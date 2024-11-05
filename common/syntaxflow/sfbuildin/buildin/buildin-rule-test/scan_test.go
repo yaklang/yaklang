@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 	"testing"
 
@@ -261,7 +262,7 @@ desc(
 $a #-> * as $param
 
 alert $param for {"level": "high"}
-`, true)
+`, true, uuid.NewString())
 	require.NoError(t, err)
 	rule, err := sfdb.GetRule("test.sf")
 	require.NoError(t, err)

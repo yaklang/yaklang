@@ -2,6 +2,7 @@ package syntaxflow_test
 
 import (
 	_ "embed"
+	"github.com/google/uuid"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -14,11 +15,11 @@ var sflib string
 
 func TestSFLib(t *testing.T) {
 	const ruleName = "fetch-abc-calling"
-	_,err := sfdb.ImportRuleWithoutValid(ruleName, `
+	_, err := sfdb.ImportRuleWithoutValid(ruleName, `
 desc(lib: "abc");
 abc() as $output;
 alert $output
-`, false)
+`, false, uuid.NewString())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +50,7 @@ func TestFS_RuleUPdate(t *testing.T) {
 	a as $a
 	alert $a
 	`
-	sfdb.ImportRuleWithoutValid(name, content, true)
+	sfdb.ImportRuleWithoutValid(name, content, true, uuid.NewString())
 	defer sfdb.DeleteRuleByRuleName(name)
 
 	ssatest.CheckSyntaxFlow(t, `
@@ -68,7 +69,7 @@ func TestFS_RuleUPdate(t *testing.T) {
 	b as $a
 	alert $a
 	`
-	sfdb.ImportRuleWithoutValid(name, content, true)
+	sfdb.ImportRuleWithoutValid(name, content, true, uuid.NewString())
 
 	ssatest.CheckSyntaxFlow(t, `
 	a = 1 

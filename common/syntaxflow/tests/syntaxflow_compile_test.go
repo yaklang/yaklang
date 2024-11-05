@@ -71,8 +71,7 @@ func TestCompileFromDb(t *testing.T) {
 	syntaxflowRule := `
 a*?{.b} as $a
 	`
-
-	_, err := sfdb.ImportRuleWithoutValid(rulename, syntaxflowRule, false)
+	_, err := sfdb.ImportRuleWithoutValid(rulename, syntaxflowRule, false, uuid.NewString())
 	require.NoError(t, err)
 	defer sfdb.DeleteRuleByRuleName(rulename)
 
