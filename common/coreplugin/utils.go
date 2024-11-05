@@ -3,6 +3,7 @@ package coreplugin
 import (
 	"embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"path"
 	"strings"
 	"sync"
@@ -42,4 +43,8 @@ func GetAllCorePluginName() []string {
 		}
 	}
 	return corePluginNames
+}
+
+func CorePluginHash() (string, error) {
+	return filesys.CreateEmbedFSHash(basePlugin)
 }
