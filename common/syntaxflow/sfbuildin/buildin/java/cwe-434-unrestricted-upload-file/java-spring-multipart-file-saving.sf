@@ -15,6 +15,8 @@ alert $result for {
 
 desc(
     lang: java,
+    alert_min:1,
+    alert_mid:1,
     'file://a.java': <<<CODE
 package com.ibeetl.admin.core.web;
 
@@ -57,9 +59,6 @@ public class FileSystemContorller {
 	@PostMapping(MODEL + "/uploadAttachment.json")
     @ResponseBody
     public JsonResult uploadFile(@RequestParam("file") MultipartFile file,String batchFileUUID,String bizType,String bizId) throws IOException {
-        if(file.isEmpty()) {
-            return JsonResult.fail();
-        }
         CoreUser user = platformService.getCurrentUser();
         CoreOrg  org = platformService.getCurrentOrg();
         FileItem fileItem = fileService.createFileItem(file.getOriginalFilename(), bizType, bizId, user.getId(), org.getId(), batchFileUUID,null);
