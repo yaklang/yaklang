@@ -57,7 +57,7 @@ func init() {
 			}
 			content := string(raw)
 			// import builtin rule
-			rule,err := sfdb.ImportRuleWithoutValid(name, content, true, tags...)
+			rule, err := sfdb.ImportRuleWithoutValid(name, content, true, tags...)
 			if err != nil {
 				log.Warnf("import rule %s error: %s", name, err)
 				return err
@@ -72,4 +72,8 @@ func init() {
 		return utils.Wrapf(err, "init builtin rules error")
 	})
 
+}
+
+func SyntaxFlowRuleHash() (string, error) {
+	return filesys.CreateEmbedFSHash(ruleFS)
 }

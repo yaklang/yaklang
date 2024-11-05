@@ -3,11 +3,14 @@ package filesys
 import (
 	"bytes"
 	"embed"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -65,6 +68,27 @@ func (f *embedFs) Base(p string) string                        { return path.Bas
 
 func NewEmbedFS(fs embed.FS) fi.FileSystem {
 	return &embedFs{fs}
+}
+
+func CreateEmbedFSHash(f embed.FS) (string, error) {
+	var hashes []string
+	err := Recursive(".", WithFileSystem(NewEmbedFS(f)), WithFileStat(func(s string, info fs.FileInfo) error {
+		result, err := f.ReadFile(s)
+		if err != nil {
+			return err
+		}
+		hash := codec.Sha256(result)
+		hashes = append(hashes, hash)
+		return nil
+	}))
+	if err != nil {
+		return "", err
+	}
+	if len(hashes) <= 0 {
+		return "", utils.Error("no file found")
+	}
+	sort.Strings(hashes)
+	return codec.Sha256([]byte(strings.Join(hashes, "|"))), nil
 }
 
 // local FileSystem
