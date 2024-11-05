@@ -8,8 +8,8 @@ desc(
 <include('java-servlet-param')> as $source;
 <include('java-spring-param')> as $source;
 check $source;
-<include('runtime-exec-sink')> as $sink;
-<include('command-exec-sink')> as $sink;
+<include('java-runtime-exec-sink')> as $sink;
+<include('java-command-exec-sink')> as $sink;
 check $sink;
 
 $sink #{

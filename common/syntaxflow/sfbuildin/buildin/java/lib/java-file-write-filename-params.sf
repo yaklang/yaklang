@@ -2,7 +2,7 @@ desc(
     title: "Find Java File Write Sinks",
     title_zh: "查找 Java 文件写入接收点",
     type: audit,
-    lib: "write-filename-sink"
+    lib: "java-write-filename-sink"
 )
 
 // new File("aaaa.txt")

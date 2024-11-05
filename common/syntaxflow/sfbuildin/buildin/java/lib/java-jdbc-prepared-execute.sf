@@ -3,7 +3,7 @@ desc(
     title_zh: "JDBC getConnection.prepareStatement.executeQuery SQL 执行语句",
     type: audit,
     level: low,
-    lib: 'jdbc-prepared-execute-sink'
+    lib: 'java-jdbc-prepared-execute-sink'
 )
 
 DriverManager.getConnection() as $conn;
