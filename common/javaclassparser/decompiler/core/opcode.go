@@ -8,6 +8,9 @@ type OpCode struct {
 	Jmp                            int
 	IsWide                         bool
 	IsCatch                        bool
+	IsTryCatchParent               bool
+	TryNode                        *OpCode
+	CatchNode                      []*OpCode
 	ExceptionTypeIndex             uint16
 	SwitchJmpCase                  map[int]uint32
 	SwitchJmpCase1                 map[int]int

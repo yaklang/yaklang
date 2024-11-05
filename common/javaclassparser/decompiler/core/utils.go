@@ -269,3 +269,13 @@ func GraphToList(code *OpCode) []*OpCode {
 	})
 	return res
 }
+
+func NodeFilter(nodes []*Node, f func(*Node) bool) []*Node {
+	var res []*Node
+	for _, node := range nodes {
+		if f(node) {
+			res = append(res, node)
+		}
+	}
+	return res
+}

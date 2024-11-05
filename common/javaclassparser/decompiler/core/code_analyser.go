@@ -151,6 +151,9 @@ func (d *Decompiler) ScanJmp() error {
 					walkNode(gotoOp)
 					if pre != nil {
 						SetOpcode(pre, d.opCodes[gotoOp])
+						pre.IsTryCatchParent = true
+						pre.TryNode = opcode
+						pre.CatchNode = append(pre.CatchNode, d.opCodes[gotoOp])
 					}
 				}
 			}
@@ -317,10 +320,19 @@ func (d *Decompiler) ParseStatement() error {
 	// convert opcode to statement
 	var nodes []*Node
 	statementsIndex := 0
+	var tryCatchOpcode *OpCode
 	appendNode := func(statement statements.Statement) *Node {
 		node := NewNode(statement)
 		node.Id = statementsIndex
 		nodes = append(nodes, node)
+		if tryCatchOpcode != nil {
+			node.IsTryCatch = true
+			node.TryNodeId = tryCatchOpcode.TryNode.Id
+			for _, code := range tryCatchOpcode.CatchNode {
+				node.CatchNodeId = append(node.CatchNodeId, code.Id)
+			}
+			tryCatchOpcode = nil
+		}
 		return node
 	}
 
@@ -373,6 +385,9 @@ func (d *Decompiler) ParseStatement() error {
 	var runCode func(startNode *OpCode) error
 	var parseOpcode func(opcode *OpCode) error
 	parseOpcode = func(opcode *OpCode) error {
+		if opcode.IsTryCatchParent {
+			tryCatchOpcode = opcode
+		}
 		//opcodeIndex := opcode.Id
 		statementsIndex = opcode.Id
 		stackVarIndex = mapCodeToStackVarIndex[opcode]
@@ -1101,7 +1116,7 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
-	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
+	err = WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
 		if node.IsDel {
 			sources := slices.Clone(node.Source)
 			next := slices.Clone(node.Next)
@@ -1114,22 +1129,32 @@ func (d *Decompiler) ParseStatement() error {
 			}
 			return next, nil
 		}
-		if len(node.Next) > 1 {
-			if _, ok := node.Statement.(*statements.ConditionStatement); ok {
-				return node.Next, nil
+		if node.IsTryCatch {
+			tryNodeId := getStatementNextIdByOpcodeId(node.TryNodeId)
+			catchNodeIds := funk.Map(node.CatchNodeId, func(id int) int {
+				return getStatementNextIdByOpcodeId(id)
+			}).([]int)
+			tryNodes := NodeFilter(node.Next, func(n *Node) bool {
+				return n.Id == tryNodeId
+			})
+			catchNodes := NodeFilter(node.Next, func(n *Node) bool {
+				return slices.Contains(catchNodeIds, n.Id)
+			})
+			if len(tryNodes) == 0 {
+				return nil, errors.New("not found try body")
 			}
-			if v, ok := node.Statement.(*statements.MiddleStatement); ok {
-				if v.Flag == statements.MiddleSwitch || v.Flag == statements.MiddleTryStart {
-					return node.Next, nil
-				}
+			if len(catchNodes) == 0 {
+				return nil, errors.New("not found catch body")
 			}
-			tryStartNode := node.Next[0]
-			catchStartNode := node.Next[1]
+			tryStartNode := tryNodes[0]
 			tryNode := NewNode(statements.NewMiddleStatement(statements.MiddleTryStart, nil))
-			node.RemoveAllNext()
+			node.RemoveNext(tryNode)
 			node.AddNext(tryNode)
 			tryNode.AddNext(tryStartNode)
-			tryNode.AddNext(catchStartNode)
+			for _, catchNode := range catchNodes {
+				tryNode.AddNext(catchNode)
+				node.RemoveNext(catchNode)
+			}
 			source := funk.Filter(tryStartNode.Source, func(item *Node) bool {
 				return item != tryNode
 			}).([]*Node)
@@ -1142,6 +1167,9 @@ func (d *Decompiler) ParseStatement() error {
 		}
 		return node.Next, nil
 	})
+	if err != nil {
+		return err
+	}
 	err = d.ReGenerateNodeId()
 	if err != nil {
 		return err
