@@ -506,7 +506,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0152", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"}, `    /**
+		{"aTaintCase0152", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime", "Undefined-cmd", "nil"}, `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
@@ -527,7 +527,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0153", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"}, `    /**
+		{"aTaintCase0153", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime", "Undefined-cmd", "nil"}, `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
@@ -739,14 +739,14 @@ func Test_Simple_Exec_Case(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		allCode := fmt.Sprintf(`
+		t.Run(tt.name, func(t *testing.T) {
+			allCode := fmt.Sprintf(`
             package com.sast.astbenchmark.cases;
             @RestController()
             public class AstTaintCase{
                 private SSRFShowManager ssrfShowManager = new SSRFShowManageImpl();
                 %v
             }`, tt.code)
-		t.Run(tt.name, func(t *testing.T) {
 			testExecTopDef(t, &TestCase{
 				Code: allCode,
 				Expect: map[string][]string{
