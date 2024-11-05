@@ -1,0 +1,70 @@
+outputFile := cli.String("output", cli.setVerboseName("输出文件名"), cli.setDefault("/tmp/syntaxflow-meta.json"))
+concurrent := cli.Int("concurrent", cli.setDefault(10), )
+cli.check()
+
+existed = {}
+for element in json.loads(file.ReadFile(outputFile)~) {
+    existed[element.sha256] = element
+}
+
+handleResult = result => {
+    m := json.loads(json.dumps(result))
+    delete(m, "DeletedAt")
+    delete(m, "UpdatedAt")
+    delete(m, "CreatedAt")
+    delete(m, "ID")
+    delete(m, "OpCodes")
+    hash = codec.Sha256(m.Content)
+    if existed.Has(hash) {
+        log.Info("RULE： %v existed", result.RuleName)
+        return existed[hash]
+    }
+    for in 10 {
+        try {
+            obj = ai.FunctionCall(
+                string(json.dumps(m)), 
+                {"detail": "(类型：字符串)把规则总结成30字左右的表达，快速表达其含义，适合放在列表中", "detail_en": "(类型：字符串；语言：英语)把规则总结成30字左右的表达，快速表达其含义，适合放在列表中", "score": "(类型：浮点数)把规则用类似CVSS的评判规则，给出一个0-10.0的评分"}, 
+                ai.funcCallRetryTimes(3), 
+                ai.debugStream(true), 
+            )~
+            obj["rule"] = m.RuleName
+            obj["sha256"] = hash
+            obj["is_lib"] = m.IncludedName != "" ? true : false
+            if obj["detail"] == "" || obj["detail_en"] == "" {
+                continue
+            }
+            
+            println(string(json.dumps(obj)))
+            return obj
+        } catch e {
+            log.Warn("ai decorator failed: %v", e)
+            return
+        }
+    }
+    
+}
+
+swg = sync.NewSizedWaitGroup(concurrent)
+resultMutex = sync.NewMutex()
+results = []
+for result in syntaxflow.QuerySyntaxFlowRules("-") {
+    result := result
+    swg.Add()
+    go func {
+        defer swg.Done()
+
+        obj = handleResult(result)
+        resultMutex.Lock()
+        results.Push(obj)
+        resultMutex.Unlock()
+    }
+}
+
+swg.Wait()
+if results.Len() <= 10 {
+    die("failed to fetch ai-meta info")
+    return
+}
+
+file.SaveJson(outputFile, results)
+file.Cat(outputFile)

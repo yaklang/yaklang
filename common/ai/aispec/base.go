@@ -137,12 +137,22 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 			i+1, keys[i], fields[keys[i]]))
 	}
 
-	var text = `我在完成数据精炼和提取任务，数据源是
--------------------------------------------------------
+	var text = `
+# 背景
+
+你是一个专业人员，并且在完成数据精炼和提取任务，尽量省略推理过程，直接提取或总结数据，输出尽量保持 JSON 格式，不要提供脚本
+
+# 数据源是
+
 ` + strconv.Quote(msg) + "\n" +
-		"-------------------------------------------------------\n\n" +
-		"如要提取一系列字段，请提取内容，输出成JSON格式，对JSON对象需求的字段列表为: \n" + buf.String()
-	msg = text + "\n\n注意：尽量不要输出和JSON的东西 尽量少提出意见"
+		"\n" +
+		`
+# 数据源格式要求如下：
+
+如要提取一系列字段，请提取内容，输出成JSON格式，对JSON对象需求的字段列表为: 
+
+` + buf.String()
+	msg = text + "\n\n# 注意：尽量不要输出非JSON的东西 尽量少提出意见"
 
 	if streamHandler != nil {
 		fmt.Println(text)
