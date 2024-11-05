@@ -74,7 +74,6 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	if i == nil {
 		return y.EmitEmptyContainer()
 	}
-	var mergedTemplate []string
 	// 声明的类为外部类情况
 	var class *ssa.Blueprint
 	if outClass == nil {
@@ -98,35 +97,30 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
 
+	getClass := func(name string) *ssa.Blueprint {
+		if parent := y.GetBluePrint(name); parent != nil {
+			return parent
+		} else {
+			parentBP := y.CreateBluePrint(name)
+			y.AddFullTypeNameForAllImport(name, parentBP)
+			return parentBP
+		}
+	}
+
 	var classContainerCallback []func(ssa.Value)
 	var classlessParents []string
 	if i.EXTENDS() != nil {
 		if extend := i.TypeType(); extend != nil {
 			parentName := extend.GetText()
-			classContainerCallback = append(classContainerCallback, func(value ssa.Value) {
-				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("extends"))
-				y.AssignVariable(variable, y.EmitConstInst(parentName))
-				classlessParents = append(classlessParents, parentName)
-			})
-			mergedTemplate = append(mergedTemplate, parentName)
+			class.AddParentClass(getClass(parentName))
 		}
 	}
 
-	//haveImplements := false
 	if i.IMPLEMENTS() != nil {
-		//haveImplements = true
-		var implName []string
 		for _, val := range i.AllTypeList() {
-			implName = append(implName, val.GetText())
-			classlessParents = append(classlessParents, val.GetText())
+			name := val.GetText()
+			class.AddParentClass(getClass(name))
 		}
-		if len(implName) > 0 {
-			classContainerCallback = append(classContainerCallback, func(value ssa.Value) {
-				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("implements"))
-				y.AssignVariable(variable, y.EmitConstInst(strings.Join(implName, ",")))
-			})
-		}
-		mergedTemplate = append(mergedTemplate, i.TypeList(0).GetText())
 	}
 
 	classlessParents = utils.StringArrayFilterEmpty(classlessParents)
@@ -137,23 +131,6 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		})
 	}
 
-	//if i.PERMITS() != nil {
-	//	idx := 1
-	//	if !haveImplements {
-	//		idx = 0
-	//	}
-	//	log.Infof("class: %v java17 permits: %v", className, i.TypeList(idx).GetText())
-	//}
-
-	for _, parentClass := range mergedTemplate {
-		if parent := y.GetBluePrint(parentClass); parent != nil {
-			class.AddParentClass(parent)
-		} else {
-			parentBP := y.CreateBluePrint(parentClass)
-			y.AddFullTypeNameForAllImport(parentClass, parentBP)
-			class.AddParentClass(parentBP)
-		}
-	}
 	y.VisitClassBody(i.ClassBody(), class)
 	container := class.GetClassContainer()
 	defer func() {

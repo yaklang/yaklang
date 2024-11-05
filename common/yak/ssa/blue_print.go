@@ -1,15 +1,16 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-type BluePrintFieldKind int
+type bluePrintFieldKind int
 
 const (
 	// method: static normal magic
-	BluePrintStaticMethod BluePrintFieldKind = iota
+	BluePrintStaticMethod bluePrintFieldKind = iota
 	BluePrintNormalMethod
 	BluePrintMagicMethod
 
@@ -17,6 +18,9 @@ const (
 	BluePrintNormalMember
 	BluePrintConstMember
 	BluePrintStaticMember
+
+	// relation kind
+	BlueprintRelationShip
 )
 
 type ClassModifier int
@@ -32,9 +36,36 @@ const (
 	Readonly
 )
 
+type blueprintKind int
+
+const (
+	BlueprintNone blueprintKind = iota
+	BlueprintClass
+	BlueprintInterface
+	BlueprintEnum
+	BlueprintStruct
+)
+
+// type blueprintRelation struct {
+// 	// use by parent
+// 	children_variable string
+// 	// use by children
+// 	parent_variable string
+// }
+
+var (
+	children_variable = "children"
+	parent_variable   = "parents"
+	// BlueprintRelationNormal     = blueprintRelation{"children", "parents"} // all relation should set this
+	// BlueprintRelationExtends    = blueprintRelation{"sub", "supper"}       // class extends
+	// BlueprintRelationImplements = blueprintRelation{"impl", "interface"}   // interface implements
+	// BlueprintRelationEmbed      = blueprintRelation{"embed", "embedded"}   // golang struct embed
+)
+
 // Blueprint is a class blueprint, it is used to create a new class
 type Blueprint struct {
 	Name string
+	kind blueprintKind
 
 	NormalMethod map[string]*Function
 	StaticMethod map[string]*Function
@@ -86,6 +117,12 @@ func (c *Blueprint) AddParentClass(parent *Blueprint) {
 		return
 	}
 	c.ParentClass = append(c.ParentClass, parent)
+
+	// handler blueprint relation
+	c.storeInContainer(parent_variable, parent.GetClassContainer(), BlueprintRelationShip)
+	parent.storeInContainer(children_variable, c.GetClassContainer(), BlueprintRelationShip)
+
+	// handler member and method
 	for name, f := range parent.NormalMethod {
 		c.RegisterNormalMethod(name, f, false)
 	}
@@ -132,15 +169,13 @@ func (c *Blueprint) getFieldWithParent(get func(bluePrint *Blueprint) bool) bool
 }
 
 // storeInContainer store static in global container
-func (c *Blueprint) storeInContainer(name string, val Value, _type BluePrintFieldKind) {
+func (c *Blueprint) storeInContainer(name string, val Value, _type bluePrintFieldKind) {
 	if utils.IsNil(c._container) || utils.IsNil(c._container.GetFunc()) {
 		return
 	}
-	createVariable := func(builder *FunctionBuilder, variable *Variable) {
-		builder.AssignVariable(variable, val)
-	}
 	builder := c._container.GetFunc().builder
-	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(name)))
+	variable := builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(name))
+	builder.AssignVariable(variable, val)
 }
 func (b *Blueprint) InitializeWithContainer(con *Make) error {
 	if b._container != nil {

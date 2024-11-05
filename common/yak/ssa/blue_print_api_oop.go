@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -41,10 +43,11 @@ func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...C
 		return b.EmitUndefined(s)
 	}
 	prog.ClassBluePrint[name] = blueprint
-	klassvar := b.CreateVariable(name, tokenizer...)
-	klassContainer := b.EmitEmptyContainer()
-	b.AssignVariable(klassvar, klassContainer)
-	if err := blueprint.InitializeWithContainer(klassContainer); err != nil {
+	blueprintVar := b.CreateVariable(fmt.Sprintf("%s", name), tokenizer...)
+	blueprintContainer := b.EmitEmptyContainer()
+	blueprintContainer.SetName(fmt.Sprintf("%s-declare", name))
+	b.AssignVariable(blueprintVar, blueprintContainer)
+	if err := blueprint.InitializeWithContainer(blueprintContainer); err != nil {
 		log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
 	}
 	return blueprint
