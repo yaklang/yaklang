@@ -3,64 +3,65 @@ package utils
 import (
 	"sync"
 	"time"
-
-	"github.com/yaklang/yaklang/common/log"
 )
 
-// CacheFunc do cache and retry
-// It's used for unstable func.
-func CacheFunc[T any](t time.Duration, f func() (T, error)) func() (T, error) {
-	var (
-		mutex    sync.Mutex
-		timer    = time.NewTimer(t)
-		cache    T
-		err      error
-		updating bool // 是否正在更新缓存
-	)
+type cacheEntry[T any] struct {
+    value     T
+    err       error
+    timestamp time.Time
+}
 
-	updateCache := func() {
-		mutex.Lock()
-		if updating {
-			mutex.Unlock()
-			return
-		}
-		updating = true
-		mutex.Unlock()
+func CacheFunc[T any](duration time.Duration, f func() (T, error)) func() (T, error) {
+    var mu sync.RWMutex
+    var entry cacheEntry[T]
 
-		const maxAttempts = 3
-		var lastErr error
-		for i := 0; i < maxAttempts; i++ {
-			newCache, newErr := f()
-			if newErr == nil {
-				mutex.Lock()
-				cache, err = newCache, nil
-				updating = false
-				mutex.Unlock()
-				break
-			} else {
-				log.Errorf("cache update attempt %d failed: %s", i+1, newErr)
-				lastErr = newErr
-			}
-		}
+    // 初始化缓存
+    value, err := tryGetValue(f)
+    entry = cacheEntry[T]{
+        value:     value,
+        err:       err,
+        timestamp: time.Now(),
+    }
 
-		mutex.Lock()
-		if lastErr != nil {
-			err = lastErr
-		}
-		updating = false
-		mutex.Unlock()
+    return func() (T, error) {
+		// 1. 尝试读取缓存
+        mu.RLock()
+        if time.Since(entry.timestamp) < duration {
+            defer mu.RUnlock()
+            return entry.value, entry.err
+        }
+        mu.RUnlock()
 
-		timer.Reset(t) // Reset timer after update attempt
-	}
+        // 2. 缓存过期，需要更新缓存
+        mu.Lock()
+        defer mu.Unlock()
 
-	timer = time.AfterFunc(t, updateCache)
+        // 双重检查，避免并发更新
+        if time.Since(entry.timestamp) < duration {
+            return entry.value, entry.err
+        }
+		// 3. 更新缓存
+        value, err := tryGetValue(f)
+        entry = cacheEntry[T]{
+            value:     value,
+            err:       err,
+            timestamp: time.Now(),
+        }
+        return entry.value, entry.err
+    }
+}
 
-	// 首次填充缓存
-	updateCache()
-
-	return func() (T, error) {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return cache, err
-	}
+// 尝试获取值，最多重试3次
+func tryGetValue[T any](f func() (T, error)) (T, error) {
+    var lastErr error
+    for i := 0; i < 3; i++ {
+        if value, err := f(); err == nil {
+            return value, nil
+        } else {
+            lastErr = err
+            time.Sleep(time.Millisecond * 100) // 重试间隔
+        }
+    }
+    var zero T
+    return zero, Errorf("all retry attempts failed: %v", lastErr)
 }

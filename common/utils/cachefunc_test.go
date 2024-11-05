@@ -32,7 +32,7 @@ func TestCacheFunc(t *testing.T) {
 				return 0, errors.New("failure")
 			},
 			expectedValue: 0,
-			expectedError: errors.New("failure"),
+			expectedError: Errorf("all retry attempts failed: %v", errors.New("failure")),
 		},
 	}
 
@@ -45,7 +45,8 @@ func TestCacheFunc(t *testing.T) {
 				t.Errorf("CacheFunc() = %v, want %v", value, tt.expectedValue)
 			}
 
-			if (err != nil && tt.expectedError == nil) || (err == nil && tt.expectedError != nil) || (err != nil && tt.expectedError != nil && err.Error() != tt.expectedError.Error()) {
+			if (err != nil && tt.expectedError == nil) || (err == nil && tt.expectedError != nil) ||
+				(err != nil && tt.expectedError != nil && err.Error() != tt.expectedError.Error()) {
 				t.Errorf("CacheFunc() error = %v, wantErr %v", err, tt.expectedError)
 			}
 		})
@@ -90,7 +91,7 @@ func TestCacheFuncConcurrentWithErrors(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			value, err := cachedFunc()
-			if value != 0 || err == nil || err.Error() != "failure" {
+			if value != 0 || err == nil || err.Error() != Errorf("all retry attempts failed: %v", errors.New("failure")).Error() {
 				t.Errorf("CacheFunc() = %v, %v, want %v, %v", value, err, 0, "failure")
 			}
 		}()
