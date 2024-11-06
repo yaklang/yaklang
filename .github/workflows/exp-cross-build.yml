@@ -205,7 +205,7 @@ jobs:
           
           # 如果行数超过3行，输出111
           if [ "$line_count" -gt 3 ]; then
-            ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type openai --apikey ${{ secrets.OPENAI_APIKEY }} --filename ./raw_commit_message.txt --ai-model gpt-4-0613
+            ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type chatglm --apikey ${{ secrets.CHATGLM_APIKEY }} --filename ./raw_commit_message.txt --ai-model glm-4
             ls | grep release
           fi
           
@@ -286,7 +286,7 @@ jobs:
           fi
           
           echo "Checking downloaded file..."
-          ls -l syntaxflow_meta_info.yak
+          ls -l  | grep syntaxflow
           
           echo "Generating meta info with yak script..."
           ./yak_linux_amd64 scripts/syntaxflow_meta_info.yak \
