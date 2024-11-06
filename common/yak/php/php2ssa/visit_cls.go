@@ -135,7 +135,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	}
 
 	var className string
-	var mergedTemplate []string
+	var mergedTemplate []ssa.CanStartStopToken
 	if i.ClassEntryType() != nil {
 		switch strings.ToLower(i.ClassEntryType().GetText()) {
 		case "trait":
@@ -145,33 +145,32 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		case "class":
 			className = y.VisitIdentifier(i.Identifier())
 			if i.Extends() != nil {
-				parentClassName := i.QualifiedStaticTypeRef().GetText()
-				mergedTemplate = append(mergedTemplate, parentClassName)
+				mergedTemplate = append(mergedTemplate, i.QualifiedStaticTypeRef())
 			}
 			if i.Implements() != nil {
 				for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
-					mergedTemplate = append(mergedTemplate, impl.GetText())
+					mergedTemplate = append(mergedTemplate, impl)
 				}
 			}
-			class.SetLazyBuilder(func() {
-				class.BuildConstructorAndDestructor()
-			})
 		}
 	} else {
 		// as interface
 		className = y.VisitIdentifier(i.Identifier())
 		if i.Extends() != nil {
 			for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
-				mergedTemplate = append(mergedTemplate, impl.GetText())
+				mergedTemplate = append(mergedTemplate, impl)
 			}
 		}
 	}
 	class := y.CreateBluePrint(className)
-	for _, name := range mergedTemplate {
-		if parentClass := y.GetBluePrint(name); parentClass != nil {
+	for _, token := range mergedTemplate {
+		if parentClass := y.GetBlueprintOrCreate(token); parentClass != nil {
 			class.AddParentBlueprint(parentClass)
 		}
 	}
+	class.SetLazyBuilder(func() {
+		class.BuildConstructorAndDestructor()
+	})
 	y.GetProgram().SetExportType(className, class)
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, class)

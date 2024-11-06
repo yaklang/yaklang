@@ -85,8 +85,8 @@ func Test_Blueprint_anonyous_name2declare(t *testing.T) {
 			require.NoError(t, err)
 			res.Show()
 
-			require.True(t, res.GetValues("classA").Len() > 0)
-			require.True(t, res.GetValues("classC").Len() > 0)
+			require.True(t, res.GetValues("classA").Len() == 1)
+			require.True(t, res.GetValues("classC").Len() == 1)
 
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
