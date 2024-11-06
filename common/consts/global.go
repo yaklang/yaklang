@@ -43,6 +43,9 @@ var (
 	// default  http flow save config
 	GLOBAL_HTTP_FLOW_SAVE = utils.NewBool(true)
 
+	//control response max content-length
+	GLOBAL_MAXSIZE_CONTENT_LENGTH = atomic.NewUint64(1024 * 1024 * 10)
+
 	OnceYakitHome = new(sync.Once)
 
 	GLOBAL_DB_SAVE_SYNC = utils.NewBool(false)
@@ -87,6 +90,13 @@ func GetGlobalCallerCallPluginTimeout() float64 {
 
 func SetGlobalCallerCallPluginTimeout(i float64) {
 	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Store(i)
+}
+func SetGlobalMaxContentLength(i uint64) {
+	if i > uint64(1024*1024*10) {
+		GLOBAL_MAXSIZE_CONTENT_LENGTH.Store(1024 * 1024 * 10)
+		return
+	}
+	GLOBAL_MAXSIZE_CONTENT_LENGTH.Store(i)
 }
 
 func GetCurrentYakitPluginID() string {

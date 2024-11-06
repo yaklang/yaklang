@@ -272,7 +272,7 @@ type MITMServer struct {
 
 func (m *MITMServer) GetMaxContentLength() int {
 	if m == nil || m.maxContentLength <= 0 {
-		return 10 * 1000 * 1000 // 10MB roughly
+		return 10 * 1024 * 1024 // 10MB roughly
 	}
 	return m.maxContentLength
 }
@@ -394,9 +394,9 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 		DNSServers:               make([]string, 0),
 		dnsCache:                 new(sync.Map),
 		HostMapping:              make(map[string]string),
-		hijackedMaxContentLength: 10 * 1000 * 1000,
+		hijackedMaxContentLength: 10 * 1024 * 1024,
 		http2:                    false,
-		maxContentLength:         10 * 1000 * 1000,
+		maxContentLength:         10 * 1024 * 1024,
 	}
 	for _, op := range options {
 		err := op(server)

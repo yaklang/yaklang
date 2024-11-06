@@ -1203,6 +1203,7 @@ message GlobalNetworkConfig {
 
   uint64 MinTlsVersion = 21;
   uint64 MaxTlsVersion = 22;
+  uint64 MaxContentLength = 23;
 }
 
 message AuthInfo {
@@ -1813,7 +1814,7 @@ message RegisterFacadesHTTPResponse {
 message GetHTTPPacketBodyRequest {
   string Packet = 1;
   bytes PacketRaw = 2;
-  bool ForceRenderFuzztag =3;
+  bool ForceRenderFuzztag = 3;
 }
 
 message DownloadBodyByHTTPFlowIDRequest {
@@ -1854,8 +1855,8 @@ message SaveFuzzerConfigRequest {
 }
 
 message QueryFuzzerConfigRequest {
-    Paging Pagination = 1;
-    repeated string PageId =2;
+  Paging Pagination = 1;
+  repeated string PageId = 2;
 }
 
 message QueryFuzzerConfigResponse {
@@ -1870,7 +1871,7 @@ message FuzzerConfig {
 
 message DeleteFuzzerConfigRequest {
   repeated string PageId = 1;
-  bool DeleteAll =2;
+  bool DeleteAll = 2;
 }
 
 message ExtractDataRequest {
@@ -2046,7 +2047,7 @@ message YaklangLanguageSuggestionRequest {
   // {
   // from database : support getReference 
   // if set this progranName will use this from database 
-  string ProgramName = 6; 
+  string ProgramName = 6;
   string FileName = 7;
   // } 
 }
@@ -3004,7 +3005,7 @@ message Risk {
 
   uint64 ResultID = 30;
   string SyntaxFlowVariable = 31;
-  string ProgramName  = 32;
+  string ProgramName = 32;
 }
 
 message QueryRisksRequest {
@@ -4002,7 +4003,7 @@ message SaveYakScriptToOnlineRequest {
   string Token = 2;
   bool IsPrivate = 3;
   bool All = 4;
-  string PluginSupplement= 5;
+  string PluginSupplement = 5;
 }
 
 message SaveYakScriptToOnlineResponse {
@@ -4793,9 +4794,9 @@ message FuzzableParam {
 }
 
 message GetHTTPFlowBodyByIdResponse {
-   bytes Data = 1;
-   string Filename = 2; // 第一个响应里才有，应该保存的文件名
-   bool EOF = 3; // 是否是最后一个包
+  bytes Data = 1;
+  string Filename = 2; // 第一个响应里才有，应该保存的文件名
+  bool EOF = 3; // 是否是最后一个包
 }
 
 message QueryHTTPFlowResponse {
@@ -5463,14 +5464,14 @@ message QuerySyntaxFlowRuleRequest{
 }
 
 message SyntaxFlowRule{
-  string RuleName =1;
+  string RuleName = 1;
   string Content = 2;
 
   string Language = 3;
   string Type = 4;
   string Severity = 5;
   string Purpose = 6;
-  bool IsBuildInRule =7;
+  bool IsBuildInRule = 7;
 
   string Title = 8;
   string TitleZh = 9;
@@ -5496,7 +5497,7 @@ message  SyntaxFlowRuleInput{
 message SyntaxFlowRuleFilter {
   repeated string RuleNames = 1;
   repeated string Language = 2;
-  repeated string GroupNames =3;
+  repeated string GroupNames = 3;
   repeated string Severity = 4;
   repeated string Purpose = 5;
   repeated string Tag = 6;
@@ -5506,16 +5507,16 @@ message SyntaxFlowRuleFilter {
 }
 
 message CreateSyntaxFlowRuleRequest{
-  SyntaxFlowRuleInput SyntaxFlowInput =1;
+  SyntaxFlowRuleInput SyntaxFlowInput = 1;
 }
 
 message UpdateSyntaxFlowRuleRequest{
-  SyntaxFlowRuleInput SyntaxFlowInput =1;
+  SyntaxFlowRuleInput SyntaxFlowInput = 1;
 }
 
 message QuerySyntaxFlowRuleResponse{
   Paging Pagination = 1;
-  DbOperateMessage DbMessage= 2;
+  DbOperateMessage DbMessage = 2;
   repeated SyntaxFlowRule Rule = 3;
   uint64 Total = 4;
 }
@@ -5535,7 +5536,7 @@ message SyntaxFlowGroup{
 }
 
 message QuerySyntaxFlowRuleGroupRequest{
-    SyntaxFlowRuleGroupFilter Filter = 1;
+  SyntaxFlowRuleGroupFilter Filter = 1;
 }
 
 message QuerySyntaxFlowRuleGroupResponse{
@@ -5567,8 +5568,8 @@ message SyntaxFlowScanResponse{
 
 
 message SyntaxFlowResultFilter {
-  repeated string TaskIDs = 1; 
-  repeated string ResultIDs = 2; 
+  repeated string TaskIDs = 1;
+  repeated string ResultIDs = 2;
   repeated string RuleNames = 3;
   repeated string ProgramNames = 4;
 
@@ -5577,7 +5578,7 @@ message SyntaxFlowResultFilter {
 
   bool OnlyRisk = 6;
 
-  int64 AfterID = 7; 
+  int64 AfterID = 7;
   int64 BeforeID = 8;
 
   repeated string Severity = 9;  //  "info", "low", "middle", "critical", "high"
@@ -5590,15 +5591,15 @@ message QuerySyntaxFlowResultRequest{
 
 message QuerySyntaxFlowResultResponse{
   Paging Pagination = 1;
-  DbOperateMessage DbMessage= 2;
+  DbOperateMessage DbMessage = 2;
   repeated SyntaxFlowResult Results = 3;
-  uint64 Total = 4; 
+  uint64 Total = 4;
 }
 
 
 message SyntaxFlowResult {
   // result ID for yakurl(syntaxflow://)
-  uint64 ResultID  = 1; 
+  uint64 ResultID = 1;
   string TaskID = 2;
 
   // rule info 
@@ -5611,10 +5612,10 @@ message SyntaxFlowResult {
 
   // target info 
   string ProgramName = 9;
-  string Language = 10; 
+  string Language = 10;
 
   // runtime info 
-  uint64 RiskCount = 11; 
+  uint64 RiskCount = 11;
 
   string RuleContent = 12;
 }
