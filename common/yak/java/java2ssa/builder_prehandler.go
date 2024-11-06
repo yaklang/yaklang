@@ -1,10 +1,11 @@
 package java2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca"
@@ -66,7 +67,9 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 	}
 
 	switch strings.ToLower(fileSystem.Ext(path)) {
-	case ".java", ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
+	case ".java":
+
+	case ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
 		return nil
 	default:
 		fs, err := fileSystem.Open(path)
