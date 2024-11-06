@@ -1624,7 +1624,7 @@ func fixHTTPResponse(r []byte) []byte {
 // poc.CurlToHTTPRequest("curl -X POST -d 'a=b&c=d' http://example.com")
 // ```
 func curlToHTTPRequest(command string) (req []byte) {
-	raw, err := lowhttp.CurlToHTTPRequest(command)
+	raw, err := lowhttp.CurlToRawHTTPRequest(command)
 	if err != nil {
 		log.Errorf(`CurlToHTTPRequest failed: %s`, err)
 	}

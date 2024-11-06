@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"net/url"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/url"
-	"strings"
 )
 
 type HttpParamPositionType string
@@ -233,10 +234,17 @@ func (q *QueryParams) SetPosition(p HttpParamPositionType) *QueryParams {
 }
 
 func (q *QueryParams) Add(key, val string) {
+	if q == nil {
+		return
+	}
 	q.Items = append(q.Items, &QueryParamItem{Key: key, Value: val, NoAutoEncode: q.NoAutoEncode})
 }
 
 func (q *QueryParams) Set(key, val string) {
+	if q == nil {
+		return
+	}
+
 	for i := 0; i < len(q.Items); i++ {
 		if q.Items[i].Key == key && q.Items[i].Position == q.Position {
 			q.Items[i].Value = val
@@ -256,6 +264,10 @@ func (q *QueryParams) Set(key, val string) {
 }
 
 func (q *QueryParams) Have(key string) bool {
+	if q == nil {
+		return false
+	}
+
 	for _, item := range q.Items {
 		if item.Key == key {
 			return true
@@ -265,6 +277,9 @@ func (q *QueryParams) Have(key string) bool {
 }
 
 func (q *QueryParams) Remove(key string) {
+	if q == nil {
+		return
+	}
 	q.Items = lo.Filter(q.Items, func(item *QueryParamItem, _ int) bool {
 		if item.Key == key {
 			return false
@@ -274,10 +289,16 @@ func (q *QueryParams) Remove(key string) {
 }
 
 func (q *QueryParams) Del(key string) {
+	if q == nil {
+		return
+	}
 	q.Remove(key)
 }
 
 func (q *QueryParams) Get(key string) string {
+	if q == nil {
+		return ""
+	}
 	for _, item := range q.Items {
 		if item.Key == key {
 			return item.Value
@@ -287,10 +308,17 @@ func (q *QueryParams) Get(key string) string {
 }
 
 func (q *QueryParams) AppendRaw(raw string) {
+	if q == nil {
+		return
+	}
+
 	q.Items = append(q.Items, &QueryParamItem{Raw: raw, NoAutoEncode: q.NoAutoEncode})
 }
 
 func (q *QueryParams) GetLast(key string) string {
+	if q == nil {
+		return ""
+	}
 	for i := len(q.Items) - 1; i >= 0; i-- {
 		if q.Items[i].Key == key {
 			return q.Items[i].Value
@@ -300,6 +328,9 @@ func (q *QueryParams) GetLast(key string) string {
 }
 
 func (q *QueryParams) GetAll(key string) []string {
+	if q == nil {
+		return nil
+	}
 	values := make([]string, 0, len(q.Items))
 	for _, item := range q.Items {
 		if item.Key == key {
@@ -310,6 +341,10 @@ func (q *QueryParams) GetAll(key string) []string {
 }
 
 func (q *QueryParams) Encode() string {
+	if q == nil {
+		return ""
+	}
+
 	var buf bytes.Buffer
 	for _, item := range q.Items {
 		if buf.Len() > 0 {
@@ -325,6 +360,9 @@ func (q *QueryParams) Encode() string {
 }
 
 func (q *QueryParams) EncodeByPos(pos HttpParamPositionType) string {
+	if q == nil {
+		return ""
+	}
 	var buf bytes.Buffer
 	for _, item := range q.Items {
 		if item.Position == pos {
@@ -342,9 +380,15 @@ func (q *QueryParams) EncodeByPos(pos HttpParamPositionType) string {
 }
 
 func (q *QueryParams) Clear() {
+	if q == nil {
+		return
+	}
 	q.Items = make([]*QueryParamItem, 0)
 }
 
 func (q *QueryParams) IsEmpty() bool {
+	if q == nil {
+		return true
+	}
 	return len(q.Items) == 0
 }

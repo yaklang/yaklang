@@ -1313,3 +1313,80 @@ func IsPlainText(raw []byte) bool {
 
 	return true
 }
+
+// UnquoteANSIC 解码ANSI-C风格的引号字符串
+func UnquoteANSIC(s string) (string, error) {
+	// 检查是否以单引号开始和结束
+	if len(s) < 2 || s[0] != '\'' || s[len(s)-1] != '\'' {
+		return "", fmt.Errorf("string must begin and end with single quotes")
+	}
+
+	// 去掉首尾的引号
+	s = s[1 : len(s)-1]
+
+	var result strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\\' {
+			result.WriteByte(s[i])
+			continue
+		}
+
+		// 处理转义序列
+		if i+1 >= len(s) {
+			return "", fmt.Errorf("invalid escape sequence at end of string")
+		}
+
+		i++
+		switch s[i] {
+		case 'a':
+			result.WriteByte('\a')
+		case 'b':
+			result.WriteByte('\b')
+		case 'f':
+			result.WriteByte('\f')
+		case 'n':
+			result.WriteByte('\n')
+		case 'r':
+			result.WriteByte('\r')
+		case 't':
+			result.WriteByte('\t')
+		case 'v':
+			result.WriteByte('\v')
+		case '\\':
+			result.WriteByte('\\')
+		case '\'':
+			result.WriteByte('\'')
+		case '"':
+			result.WriteByte('"')
+		case 'x':
+			// 处理十六进制转义序列 \xHH
+			if i+2 >= len(s) {
+				return "", fmt.Errorf("invalid hex escape sequence")
+			}
+			hex := s[i+1 : i+3]
+			n, err := strconv.ParseUint(hex, 16, 8)
+			if err != nil {
+				return "", fmt.Errorf("invalid hex escape sequence: %s", hex)
+			}
+			result.WriteByte(byte(n))
+			i += 2
+		case '0', '1', '2', '3', '4', '5', '6', '7':
+			// 处理八进制转义序列 \ooo
+			end := i + 1
+			for end < len(s) && end-i < 3 && s[end] >= '0' && s[end] <= '7' {
+				end++
+			}
+			oct := s[i:end]
+			n, err := strconv.ParseUint(oct, 8, 8)
+			if err != nil {
+				return "", fmt.Errorf("invalid octal escape sequence: %s", oct)
+			}
+			result.WriteByte(byte(n))
+			i = end - 1
+		default:
+			return "", fmt.Errorf("invalid escape sequence: \\%c", s[i])
+		}
+	}
+
+	return result.String(), nil
+}
