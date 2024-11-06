@@ -44,12 +44,14 @@ var Exports = map[string]interface{}{
 }
 
 var SimpleExports = map[string]interface{}{
-	"createBrowser": simple.CreateHeadlessBrowser,
+	"CreateBrowser": simple.CreateHeadlessBrowser,
 
 	"wsAddress":      simple.WithWsAddress,
+	"exePath":        simple.WithExePath,
 	"proxy":          simple.WithProxy,
 	"noSandBox":      simple.WithNoSandBox,
 	"headless":       simple.WithHeadless,
+	"hijack":         simple.WithHijack,
 	"requestModify":  simple.WithRequestModification,
 	"responseModify": simple.WithResponseModification,
 

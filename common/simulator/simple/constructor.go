@@ -1,19 +1,21 @@
 package simple
 
 import (
-	"crypto/tls"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/yaklang/yaklang/common/crawlerx"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"net/http"
-	"net/url"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"strings"
+	"time"
 )
 
 type VBrowser struct {
 	browser *rod.Browser
 
+	exePath       string
 	wsAddress     string
 	proxyAddress  string
 	proxyUsername string
@@ -21,6 +23,12 @@ type VBrowser struct {
 
 	noSandBox bool
 	headless  bool
+	hijack    bool
+
+	runtimeID  string
+	fromPlugin string
+	saveToDB   bool
+	sourceType string
 
 	responseModification []*ResponseModification
 	requestModification  []*RequestModification
@@ -30,6 +38,7 @@ func CreateHeadlessBrowser(opts ...BrowserConfigOpt) *VBrowser {
 	config := &BrowserConfig{
 		noSandBox: true,
 		headless:  true,
+		hijack:    false,
 
 		responseModification: make([]*ResponseModification, 0),
 		requestModification:  make([]*RequestModification, 0),
@@ -39,12 +48,18 @@ func CreateHeadlessBrowser(opts ...BrowserConfigOpt) *VBrowser {
 	}
 	browser := &VBrowser{
 		browser:              rod.New(),
+		exePath:              config.exePath,
 		wsAddress:            config.wsAddress,
 		proxyAddress:         config.proxyAddress,
 		proxyUsername:        config.proxyUsername,
 		proxyPassword:        config.proxyPassword,
 		noSandBox:            config.noSandBox,
 		headless:             config.headless,
+		hijack:               config.hijack,
+		runtimeID:            config.runtimeID,
+		fromPlugin:           config.fromPlugin,
+		saveToDB:             config.saveToDB,
+		sourceType:           config.sourceType,
 		requestModification:  config.requestModification,
 		responseModification: config.responseModification,
 	}
@@ -65,6 +80,9 @@ func (browser *VBrowser) BrowserInit() error {
 		browser.browser.Client(launch.MustClient())
 	} else {
 		launch := launcher.New()
+		if browser.exePath != "" {
+			launch = launch.Bin(browser.exePath)
+		}
 		if browser.proxyAddress != "" {
 			launch.Proxy(browser.proxyAddress)
 		}
@@ -82,68 +100,76 @@ func (browser *VBrowser) BrowserInit() error {
 	if browser.proxyUsername != "" {
 		go browser.browser.MustHandleAuth(browser.proxyUsername, browser.proxyPassword)()
 	}
-	browser.browser.IgnoreCertErrors(true)
-	browser.createHijack()
+	_ = browser.browser.IgnoreCertErrors(true)
+	if browser.hijack {
+		browser.createHijack()
+	}
 	return nil
 }
 
-func (browser *VBrowser) Navigate(urlStr string) *VPage {
+func (browser *VBrowser) Navigate(urlStr string, waitFor string) *VPage {
 	page, err := browser.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
 	if err != nil {
 		log.Errorf("create page error: %s", err)
 		return nil
 	}
 	p := &VPage{page: page}
-	p.Navigate(urlStr)
+	err = p.Navigate(urlStr, waitFor)
+	if err != nil {
+		log.Errorf("navigate error: %s", err)
+		return nil
+	}
 	return p
 }
 
-func (browser *VBrowser) createHijack() error {
-	hijackRouter := browser.browser.HijackRequests()
-	hijackRouter.MustAdd("*", func(hijack *rod.Hijack) {
-		for _, modify := range browser.requestModification {
-			reg := modify.GetReg()
-			if reg.MatchString(hijack.Request.URL().String()) {
-				err := modify.Modify(hijack.Request)
-				if err != nil {
-					log.Error(err)
-				}
-			}
-		}
-		client := http.Client{
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-		}
-		transport := http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		if browser.proxyAddress != "" {
-			proxyUrl, err := url.Parse(browser.proxyAddress)
-			if err != nil {
-				return
-			}
-			transport.Proxy = http.ProxyURL(proxyUrl)
-		}
-		client.Transport = &transport
+func (browser *VBrowser) Close() error {
+	return browser.browser.Close()
+}
 
-		err := hijack.LoadResponse(&client, true)
-		if err != nil {
-			log.Errorf("hijack load response error: %s", err)
+func (browser *VBrowser) createHijack() error {
+	opts := []lowhttp.LowhttpOpt{
+		lowhttp.WithTimeout(30 * time.Second),
+		lowhttp.WithSaveHTTPFlow(browser.saveToDB),
+		lowhttp.WithSource(browser.sourceType),
+	}
+	if browser.proxyAddress != "" {
+		opts = append(opts, lowhttp.WithProxy(browser.proxyAddress))
+	}
+	if browser.runtimeID != "" {
+		opts = append(opts, lowhttp.WithRuntimeId(browser.runtimeID))
+	}
+	if browser.fromPlugin != "" {
+		opts = append(opts, lowhttp.WithFromPlugin(browser.fromPlugin))
+	}
+	router := crawlerx.NewBrowserHijackRequests(browser.browser)
+	err := router.Add("*", "", func(hijack *crawlerx.CrawlerHijack) {
+		contentType := hijack.Request.Header("Content-Type")
+		if strings.Contains(contentType, "multipart/form-data") {
+			hijack.ContinueRequest(&proto.FetchContinueRequest{})
 			return
 		}
-		for _, modify := range browser.responseModification {
-			reg := modify.GetReg()
-			if reg.MatchString(hijack.Request.URL().String()) {
-				err := modify.Modify(hijack.Response)
-				if err != nil {
-					log.Error(err)
-				}
-			}
+		tempOpts := make([]lowhttp.LowhttpOpt, 0)
+		tempOpts = append(tempOpts, opts...)
+		url := hijack.Request.URL().String()
+		if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "wss://") {
+			tempOpts = append(tempOpts, lowhttp.WithHttps(true))
 		}
+		err := hijack.LoadResponse(tempOpts, true)
+		if err != nil {
+			if !strings.Contains(err.Error(), "context canceled") {
+				log.Errorf("load response error: %s", err)
+			}
+			hijack.Response.SetHeader()
+			hijack.Response.SetBody("")
+			return
+		}
+		return
 	})
+	if err != nil {
+		return utils.Errorf(`create hijack error: %v`, err.Error())
+	}
 	go func() {
-		hijackRouter.Run()
+		router.Run()
 	}()
 	return nil
 }
