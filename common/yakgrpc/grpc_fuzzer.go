@@ -651,9 +651,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		requestCount = 1
 	}
 
-	maxBodySize := 5 * 1024 * 1024
-	if req.GetMaxBodySize() > 1024 {
-		maxBodySize = int(req.GetMaxBodySize())
+	//maxBodySize := 5 * 1024 * 1024
+	maxBodySize := consts.GLOBAL_MAXSIZE_CONTENT_LENGTH.Load()
+	if req.GetMaxBodySize() > 1024 && req.GetMaxBodySize() < 10*1024*1024 {
+		maxBodySize = uint64(req.MaxBodySize)
 	}
 
 	fuzzerRequestSwg := utils.NewSizedWaitGroup(int(concurrent))
@@ -690,7 +691,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)),
 			mutate.WithPoolOpt_Source("webfuzzer"),
 			mutate.WithPoolOpt_RetryTimes(int(req.GetMaxRetryTimes())),
-			mutate.WithPoolOpt_MaxContentLength(maxBodySize),
+			mutate.WithPoolOpt_MaxContentLength(int(maxBodySize)),
 			mutate.WithPoolOpt_RetryInStatusCode(inStatusCode),
 			mutate.WithPoolOpt_RetryNotInStatusCode(notInStatusCode),
 			mutate.WithPoolOpt_RetryWaitTime(req.GetRetryWaitSeconds()),

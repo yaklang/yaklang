@@ -155,7 +155,7 @@ func (p *Proxy) SetMaxContentLength(i int) {
 
 func (p *Proxy) GetMaxContentLength() int {
 	if p == nil || p.maxContentLength <= 0 {
-		return 10 * 1000 * 1000
+		return 10 * 1024 * 1024
 	}
 	return p.maxContentLength
 }
