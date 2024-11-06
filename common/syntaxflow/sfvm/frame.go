@@ -237,6 +237,14 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		if s.idx >= len(s.Codes) {
 			break
 		}
+		// if s.config.ctx
+		if s.config.ctx != nil {
+			select {
+			case <-s.config.ctx.Done():
+				return utils.Errorf("context done")
+			default:
+			}
+		}
 
 		i := s.Codes[s.idx]
 

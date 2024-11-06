@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -108,12 +109,13 @@ func (m *SyntaxFlowScanManager) Start() error {
 			m.Query(rule, prog)
 		}
 	}
+	m.notifyProgress("")
 	return errs
 }
 
 func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 
-	defer m.notifyProgress(rule.RuleName)
+	m.notifyProgress(rule.RuleName)
 
 	// log.Infof("executing rule %s", rule.RuleName)
 	if !m.ignoreLanguage {
@@ -125,7 +127,7 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 	}
 
 	// if language match or ignore language
-	if res, err := prog.SyntaxFlowRule(rule); err == nil {
+	if res, err := prog.SyntaxFlowRule(rule, sfvm.WithContext(m.ctx)); err == nil {
 		if _, err := res.Save(m.taskID); err == nil {
 			m.successQuery++
 			m.notifyResult(res)
