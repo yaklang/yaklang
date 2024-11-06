@@ -1594,8 +1594,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	for _, cert := range firstReq.GetCertificates() {
 		opts = append(opts, crep.MITM_MutualTLSClient(cert.CrtPem, cert.KeyPem, cert.GetCaCertificates()...))
 	}
-	mServer, err = crep.NewMITMServer(
-		crep.MITM_EnableMITMCACertPage(!disableCACertPage),
+	opts = append(opts, crep.MITM_EnableMITMCACertPage(!disableCACertPage),
 		crep.MITM_RandomJA3(randomJA3),
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),
 		crep.MITM_SetHijackedMaxContentLength(packetLimit),
@@ -1613,9 +1612,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		crep.MITM_SetGMOnly(onlyGMTLS),
 		crep.MITM_SetDNSServers(dnsServers...),
 		crep.MITM_SetHostMapping(hostMapping),
-		crep.MITM_SetHTTPForceClose(forceDisableKeepAlive),
-		crep.MITM_SetMaxContentLength(firstReq.GetMaxContentLength()),
-	)
+		crep.MITM_SetHTTPForceClose(forceDisableKeepAlive))
+
+	//如果 mitm 启动时进行设置，优先使用mitm中的设置
+	if firstReq.GetMaxContentLength() != 0 && firstReq.GetMaxContentLength() <= 10*1024*1024 {
+		opts = append(opts, crep.MITM_SetMaxContentLength(firstReq.GetMaxContentLength()))
+	} else {
+		opts = append(opts, crep.MITM_SetMaxContentLength(int64(consts.GLOBAL_MAXSIZE_CONTENT_LENGTH.Load())))
+	}
+	mServer, err = crep.NewMITMServer(opts...)
 	if err != nil {
 		log.Error(err)
 		return err
