@@ -1003,7 +1003,7 @@ func (flow *CodecExecFlow) MakePacket(mode string) error {
 	var err error
 	switch mode {
 	case "cURL":
-		res, err = lowhttp.CurlToHTTPRequest(string(flow.Text))
+		res, err = lowhttp.CurlToRawHTTPRequest(string(flow.Text))
 	case "URL":
 		res, err = lowhttp.UrlToHTTPRequest(strings.TrimSpace(string(flow.Text)))
 	default:

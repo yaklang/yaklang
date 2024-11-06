@@ -345,7 +345,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		result = cmd.String()
 		raw = []byte(result)
 	case "packet-from-curl":
-		raw, err = lowhttp.CurlToHTTPRequest(text)
+		raw, err = lowhttp.CurlToRawHTTPRequest(text)
 		if err != nil {
 			return nil, utils.Errorf("codec[%v] failed: %s", "packet-from-curl", err)
 		}
@@ -1080,7 +1080,7 @@ func (s *Server) SaveCodecFlow(ctx context.Context, req *ypb.CustomizeCodecFlow)
 	if err != nil {
 		return nil, err
 	}
-	var cf = &schema.CodecFlow{
+	cf := &schema.CodecFlow{
 		FlowName:   req.GetFlowName(),
 		WorkFlow:   flowByte,
 		WorkFlowUI: req.GetWorkFlowUI(),

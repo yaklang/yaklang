@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -167,4 +168,203 @@ func TestMUSTPASS_HostPort(t *testing.T) {
 func TestMUSSPASS_StringGlobArrayContains(t *testing.T) {
 	assert.Equal(t, true, StringGlobArrayContains([]string{"/api/push?pass=*"}, "localhost/api/push?pass=123"))
 	assert.Equal(t, true, StringGlobArrayContains([]string{"/api/push?pass=*&abc=123"}, "localhost/api/push?pass=123&abc=123"))
+}
+
+func TestUnquoteANSIC(t *testing.T) {
+	// 定义测试表
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+		wantErr  bool
+		errMsg   string
+	}{
+		// 基本字符串测试
+		{
+			name:     "empty string",
+			input:    "''",
+			expected: "",
+		},
+		{
+			name:     "simple string without escapes",
+			input:    "'hello'",
+			expected: "hello",
+		},
+
+		// 简单转义序列测试
+		{
+			name:     "basic escape sequences",
+			input:    "'\\a\\b\\f\\n\\r\\t\\v'",
+			expected: "\a\b\f\n\r\t\v",
+		},
+		{
+			name:     "quote escapes",
+			input:    `'\\\'\\\"'`,
+			expected: `\'\"`,
+		},
+		{
+			name:     "backslash escape",
+			input:    "'\\\\'",
+			expected: "\\",
+		},
+
+		// 十六进制转义测试
+		{
+			name:     "hex escape - lowercase",
+			input:    "'\\x41\\x42\\x43'",
+			expected: "ABC",
+		},
+		{
+			name:     "hex escape - uppercase",
+			input:    "'\\x61\\x62\\x63'",
+			expected: "abc",
+		},
+		{
+			name:     "hex escape - mix with normal chars",
+			input:    "'Hello\\x20World'",
+			expected: "Hello World",
+		},
+
+		// 八进制转义测试
+		{
+			name:     "octal escape - single digit",
+			input:    "'\\7'",
+			expected: "\x07",
+		},
+		{
+			name:     "octal escape - two digits",
+			input:    "'\\12'",
+			expected: "\x0A",
+		},
+		{
+			name:     "octal escape - three digits",
+			input:    "'\\101\\102\\103'",
+			expected: "ABC",
+		},
+		{
+			name:     "octal escape - mix with normal chars",
+			input:    "'Hello\\040World'",
+			expected: "Hello World",
+		},
+
+		// 组合测试
+		{
+			name:     "mixed escapes",
+			input:    "'\\x41\\n\\102\\t\\103'",
+			expected: "A\nB\tC",
+		},
+		{
+			name:     "complex string",
+			input:    "'Hello\\040\\x57\\157rld\\041'",
+			expected: "Hello World!",
+		},
+
+		// 错误情况测试
+		{
+			name:    "error - no starting quote",
+			input:   "hello'",
+			wantErr: true,
+			errMsg:  "string must begin and end with single quotes",
+		},
+		{
+			name:    "error - no ending quote",
+			input:   "'hello",
+			wantErr: true,
+			errMsg:  "string must begin and end with single quotes",
+		},
+		{
+			name:    "error - invalid escape sequence",
+			input:   "'\\z'",
+			wantErr: true,
+			errMsg:  "invalid escape sequence: \\z",
+		},
+		{
+			name:    "error - incomplete hex escape",
+			input:   "'\\x4'",
+			wantErr: true,
+			errMsg:  "invalid hex escape sequence",
+		},
+		{
+			name:    "error - invalid hex escape",
+			input:   "'\\xZZ'",
+			wantErr: true,
+			errMsg:  "invalid hex escape sequence: ZZ",
+		},
+		{
+			name:    "error - escape at end of string",
+			input:   "'\\",
+			wantErr: true,
+			errMsg:  "string must begin and end with single quotes",
+		},
+		{
+			name:    "error - invalid octal value",
+			input:   "'\\400'",
+			wantErr: true,
+			errMsg:  "invalid octal escape sequence: 400",
+		},
+
+		// 边界测试
+		{
+			name:     "boundary - all ASCII printable characters",
+			input:    "'\\x20\\x21\\x22\\x23\\x24\\x25\\x26\\x27\\x28\\x29\\x2A\\x2B\\x2C\\x2D\\x2E\\x2F'",
+			expected: " !\"#$%&'()*+,-./",
+		},
+		{
+			name:     "boundary - max octal value",
+			input:    "'\\377'",
+			expected: "\xFF",
+		},
+		{
+			name:     "boundary - consecutive escapes",
+			input:    "'\\x00\\x01\\x02'",
+			expected: "\x00\x01\x02",
+		},
+	}
+
+	// 运行测试用例
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := UnquoteANSIC(tt.input)
+
+			// 检查错误情况
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("UnquoteANSIC() expected error, got none")
+					return
+				}
+				if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("UnquoteANSIC() error = %v, want error containing %v", err, tt.errMsg)
+				}
+				return
+			}
+
+			// 检查正常情况
+			if err != nil {
+				t.Errorf("UnquoteANSIC() unexpected error = %v", err)
+				return
+			}
+
+			if got != tt.expected {
+				t.Errorf("UnquoteANSIC() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+// 基准测试
+func BenchmarkUnquoteANSIC(b *testing.B) {
+	testCases := []string{
+		"'simple string'",
+		"'string\\x20with\\x20hex'",
+		"'string\\040with\\040octal'",
+		"'mixed\\x20\\n\\t\\r\\040string'",
+	}
+
+	for _, tc := range testCases {
+		b.Run(tc, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, _ = UnquoteANSIC(tc)
+			}
+		})
+	}
 }
