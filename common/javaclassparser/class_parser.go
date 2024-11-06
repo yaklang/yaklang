@@ -11,7 +11,7 @@ func NewClassParser(data []byte) *ClassParser {
 
 	return &ClassParser{
 		reader:   NewClassReader(data),
-		classObj: &ClassObject{},
+		classObj: NewClassObject(),
 	}
 }
 
