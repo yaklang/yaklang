@@ -1,6 +1,6 @@
 raw = cli.String("filename", cli.setHelp("Raw Message Info"), cli.setRequired(true), cli.setDefault("/tmp/msg.txt"))
 apiKey = cli.String("apikey", cli.setHelp("openai-key"), cli.setRequired(true))
-aiType = cli.String("ai-type", cli.setHelp("ai-type-key"), cli.setRequired(true))
+aiType = cli.String("ai-type", cli.setHelp("ai-type-key"), cli.setRequired(true), cli.setDefault("chatglm"))
 model = cli.String("ai-model", cli.setRequired(true), cli.setHelp("Show AI Model"), cli.setDefault("gpt-4-0613"))
 
 cli.check()
