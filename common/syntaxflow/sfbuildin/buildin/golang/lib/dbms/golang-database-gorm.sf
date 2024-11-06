@@ -6,12 +6,8 @@ desc(
 )
 
 gorm?{<fullTypeName>?{have: 'gorm.io/gorm'}} as $entry;
-$entry.Open() --> as $open;
-$open <getMembers> as $db;
-$db.Create(* #-> as $output);
-$db.Find(* #-> as $output);
-$db.Model(* #-> as $output);
-$db.Raw(* #-> as $output);
+$entry.Open <getCall> as $open;
+$open <getMembers> as $output;
 
 alert $output
 

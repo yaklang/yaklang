@@ -5,7 +5,8 @@ desc(
 )
 
 <include('golang-database-sql')> as $sink;
-$sink?{have: 'Parameter'} as $high
+$sink.QueryRow( * #-> as $param);
+$param?{have: 'Parameter'} as $high;
 
 alert $high for {
     title: 'SQL Injection detected',
@@ -56,5 +57,6 @@ func main() {
 	http.HandleFunc("/login", login)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
+
 UNSAFE
 )

@@ -1,0 +1,14 @@
+desc(
+    title: "check file write function",
+    type: audit,
+    level: info,
+    lib: 'golang-database-sqlx'
+)
+
+<include('golang-database-gorm')> as $output;
+<include('golang-database-pop')> as $output;
+<include('golang-database-reform')> as $output;
+<include('golang-database-sql')> as $output;
+<include('golang-database-sqlx')> as $output;
+
+alert $output;

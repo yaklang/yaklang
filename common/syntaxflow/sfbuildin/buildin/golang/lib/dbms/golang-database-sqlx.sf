@@ -1,0 +1,85 @@
+desc(
+    title: "check file write function",
+    type: audit,
+    level: info,
+    lib: 'golang-database-sqlx'
+)
+
+sqlx?{<fullTypeName>?{have: 'github.com/jmoiron/sqlx'}} as $entry;
+$entry.Connect <getCall> as $open;
+$open <getMembers> as $output;
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://database.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "log"
+
+    "github.com/jmoiron/sqlx"
+    _ "modernc.org/sqlite"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func main() {
+    // 连接到 SQLite 数据库
+    db, err := sqlx.Open("sqlite", "example.db")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    // 创建用户表
+    schema := `CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        age INTEGER
+    );`
+    db.MustExec(schema)
+
+    // 插入用户数据
+    user := User{Name: "Alice", Age: 30}
+    _, err = db.NamedExec(`INSERT INTO users (name, age) VALUES (:name, :age)`, &user)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 查询用户数据
+    var users []User
+    err = db.Select(&users, "SELECT * FROM users")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 打印用户信息
+    fmt.Println("Users:")
+    for _, u := range users {
+        fmt.Printf("ID: %d, Name: %s, Age: %d\n", u.ID, u.Name, u.Age)
+    }
+
+    // 更新用户信息
+    user.Age = 31
+    _, err = db.NamedExec(`UPDATE users SET age = :age WHERE name = :name`, user)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 删除用户
+    _, err = db.Exec(`DELETE FROM users WHERE name = ?`, user.Name)
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+
+PARAM
+)
