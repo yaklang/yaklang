@@ -60,7 +60,12 @@ func (d *Decompiler) GetValueFromPool(index int) values.JavaValue {
 func (d *Decompiler) GetMethodFromPool(index int) *values.JavaClassMember {
 	return d.constantPoolGetter(index).(*values.JavaClassMember)
 }
-func (d *Decompiler) ParseOpcode() error {
+func (d *Decompiler) ParseOpcode() (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = errors.New(fmt.Sprintf("%v", e))
+		}
+	}()
 	defer func() {
 		if len(d.opCodes) > 0 {
 			d.OpCodeRoot = d.opCodes[0]

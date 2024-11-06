@@ -9,22 +9,29 @@ import (
 
 type ClassObject struct {
 	//魔数 class的魔术 -> 0xCAFEBABE
-	Type               string
-	Magic              uint32
-	MinorVersion       uint16
-	MajorVersion       uint16
-	ConstantPool       []ConstantInfo
-	AccessFlags        uint16
-	AccessFlagsVerbose []string
-	ThisClass          uint16
-	ThisClassVerbose   string
-	SuperClass         uint16
-	SuperClassVerbose  string
-	Interfaces         []uint16
-	InterfacesVerbose  []string
-	Fields             []*MemberInfo
-	Methods            []*MemberInfo
-	Attributes         []AttributeInfo
+	Type                string
+	Magic               uint32
+	MinorVersion        uint16
+	MajorVersion        uint16
+	ConstantPool        []ConstantInfo
+	ConstantPoolManager *ConstantPool
+	AccessFlags         uint16
+	AccessFlagsVerbose  []string
+	ThisClass           uint16
+	ThisClassVerbose    string
+	SuperClass          uint16
+	SuperClassVerbose   string
+	Interfaces          []uint16
+	InterfacesVerbose   []string
+	Fields              []*MemberInfo
+	Methods             []*MemberInfo
+	Attributes          []AttributeInfo
+}
+
+func NewClassObject() *ClassObject {
+	ins := &ClassObject{}
+	ins.ConstantPoolManager = NewConstantPoolWithConstant(&ins.ConstantPool)
+	return ins
 }
 
 //type CLassObjectJson struct {

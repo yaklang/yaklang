@@ -355,7 +355,7 @@ func mapToClassObject(objData map[string]interface{}) (_ *ClassObject, err error
 			return
 		}
 	}()
-	classObj := &ClassObject{ConstantPool: []ConstantInfo{}, Methods: []*MemberInfo{}, Fields: []*MemberInfo{}, Attributes: []AttributeInfo{}}
+	classObj := NewClassObject()
 	ConstantPool := []ConstantInfo{}
 	memberInfo := []*MemberInfo{}
 	Attributes := []AttributeInfo{}

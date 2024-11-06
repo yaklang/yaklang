@@ -14,7 +14,6 @@ type ClassContext struct {
 	BuildInLibsMap   map[string][]string
 	Arguments        []string
 	IsStatic         bool
-	GetTypeShortName func(rawName string) string
 }
 
 func (f *ClassContext) GetAllImported() []string {
