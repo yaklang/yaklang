@@ -223,7 +223,15 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), test); ok {
 				rightv = value
 			} else {
-				rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(test))
+				if phi, ok := ssa.ToPhi(rv); ok {
+					var vs []ssa.Value
+					for _, e := range phi.Edge {
+						vs = append(vs, b.ReadMemberCallValue(e, b.EmitConstInst(test)))
+					}
+					rightv = vs[0]
+				} else {
+					rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(test))
+				}
 			}
 		}
 
