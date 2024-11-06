@@ -1,6 +1,10 @@
 package sfvm
 
-import "github.com/yaklang/yaklang/common/utils/omap"
+import (
+	"context"
+
+	"github.com/yaklang/yaklang/common/utils/omap"
+)
 
 func NewConfig(opts ...Option) *Config {
 	c := &Config{}
@@ -18,6 +22,7 @@ type Config struct {
 	FailFast                  bool
 	initialContextVars        *omap.OrderedMap[string, ValueOperator]
 	onResultCapturedCallbacks []ResultCapturedCallback
+	ctx                       context.Context
 }
 
 type Option func(*Config)
@@ -35,6 +40,12 @@ func WithFailFast(b ...bool) Option {
 			return
 		}
 		config.FailFast = b[0]
+	}
+}
+
+func WithContext(ctx context.Context) Option {
+	return func(config *Config) {
+		config.ctx = ctx
 	}
 }
 
