@@ -1,10 +1,29 @@
 outputFile := cli.String("output", cli.setVerboseName("输出文件名"), cli.setDefault("/tmp/syntaxflow-meta.json"))
 concurrent := cli.Int("concurrent", cli.setDefault(10), )
+version := cli.String("version", cli.setDefault("dev"))
+enableCustomAI := cli.Bool("custom-ai")
+aiType := cli.String("ai-type", cli.setDefault("chatglm"))
+aiModel := cli.String("ai-model", cli.setDefault("glm-4-long"))
+aiAPIKEY = cli.String("apikey", cli.setDefault(""))
 cli.check()
 
 existed = {}
-for element in json.loads(file.ReadFile(outputFile)~) {
-    existed[element.sha256] = element
+try {
+    for element in json.loads(file.ReadFile(outputFile)~).rules {
+        try { existed[element.sha256] = element } catch e { log.info("load rule %v failed" % sdump(element)) }
+    }
+} catch e {
+    die("load existed " + outputFile + f" failed: ${e}")
+}
+
+var opts = [
+    ai.funcCallRetryTimes(3),
+    ai.debugStream(true),
+]
+if enableCustomAI {
+    opts.Push(ai.model(aiModel))
+    opts.Push(ai.type(aiType))
+    opts.Push(ai.apiKey(aiAPIKEY))
 }
 
 handleResult = result => {
@@ -24,8 +43,7 @@ handleResult = result => {
             obj = ai.FunctionCall(
                 string(json.dumps(m)), 
                 {"detail": "(类型：字符串)把规则总结成30字左右的表达，快速表达其含义，适合放在列表中", "detail_en": "(类型：字符串；语言：英语)把规则总结成30字左右的表达，快速表达其含义，适合放在列表中", "score": "(类型：浮点数)把规则用类似CVSS的评判规则，给出一个0-10.0的评分"}, 
-                ai.funcCallRetryTimes(3), 
-                ai.debugStream(true), 
+                opts...
             )~
             obj["rule"] = m.RuleName
             obj["sha256"] = hash
@@ -66,5 +84,6 @@ if results.Len() <= 10 {
     return
 }
 
-file.SaveJson(outputFile, results)
+os.Remove(outputFile)
+file.SaveJson(outputFile, {"rules": results, "version": version})
 file.Cat(outputFile)
