@@ -155,7 +155,7 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 	msg = text + "\n\n# 注意：尽量不要输出非JSON的东西 尽量少提出意见"
 
 	if streamHandler != nil {
-		fmt.Println(text)
+		// fmt.Println(text)
 	}
 	result, err := ChatBase(url, model, msg, nil, opt, streamHandler)
 	if err != nil {
