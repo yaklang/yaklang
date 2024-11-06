@@ -198,25 +198,22 @@ func yieldAuditNode(DB *gorm.DB, ctx context.Context) chan *AuditNode {
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		paginator := bizhelper.NewFastPaginator(db, 100)
 		for {
 			var items []*AuditNode
-			if _, b := bizhelper.Paging(db, page, 100, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
+			if err, ok := paginator.Next(&items); !ok {
+				break
+			} else if err != nil {
+				log.Errorf("paging failed: %s", err)
+				continue
 			}
 
-			page++
 			for _, d := range items {
 				select {
 				case <-ctx.Done():
 					return
 				case outC <- d:
 				}
-			}
-
-			if len(items) < 100 {
-				return
 			}
 		}
 	}()

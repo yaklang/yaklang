@@ -123,8 +123,7 @@ func GetIrByVariable(db *gorm.DB, program, name string) []*IrCode {
 	ret := make([]*IrCode, 0)
 	res := db.Model(&IrIndex{}).Where("(variable_name = ? OR class_name = ?) AND program_name = ?", name, name, program)
 	for v := range yieldIrIndex(res, context.Background()) {
-		r := GetIrCodeById(db, v)
-		ret = append(ret, r)
+		ret = append(ret, v)
 	}
 	return ret
 }
