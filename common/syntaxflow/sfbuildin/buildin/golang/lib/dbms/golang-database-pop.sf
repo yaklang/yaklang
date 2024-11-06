@@ -1,0 +1,68 @@
+desc(
+    title: "check file write function",
+    type: audit,
+    level: info,
+    lib: 'golang-database-pop'
+)
+
+pop?{<fullTypeName>?{have: 'github.com/gobuffalo/pop'}} as $entry;
+$entry.Connect <getCall> as $open;
+$open <getMembers> as $output;
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://database.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "github.com/gobuffalo/pop"
+    "log"
+    "os"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func main() {
+    // 连接到 SQLite 数据库
+    db, err := pop.Connect("development")
+    if err != nil {
+        log.Fatal("Could not connect to the database:", err)
+    }
+
+    // 执行迁移
+    err = db.Migrate("create_users_table")
+    if err != nil {
+        log.Fatal("Could not migrate the database:", err)
+    }
+
+    // 插入用户数据
+    user := &User{Name: "Alice", Age: 30}
+    err = db.Create(user)
+    if err != nil {
+        log.Fatal("Could not create user:", err)
+    }
+
+    // 查询用户数据
+    var users []User
+    err = db.All(&users)
+    if err != nil {
+        log.Fatal("Could not retrieve users:", err)
+    }
+
+    // 打印用户信息
+    fmt.Println("Users:")
+    for _, u := range users {
+        fmt.Printf("ID: %d, Name: %s, Age: %d\n", u.ID, u.Name, u.Age)
+    }
+}
+
+PARAM
+)

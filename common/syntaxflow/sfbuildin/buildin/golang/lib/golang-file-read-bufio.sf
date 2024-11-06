@@ -6,8 +6,8 @@ desc(
 )
 
 bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
-$entry.NewReader -> as $reader;
-$reader.ReadString() --> as $output;
+$entry.NewReader <getCall> as $reader;
+$reader.ReadString <getCall> <getMembers> as $output;
 
 alert $output
 

@@ -6,8 +6,8 @@ desc(
 )
 
 ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
-$entry.ReadAll() --> as $output
-$entry.ReadFile() --> as $output
+$entry.ReadAll <getCall> <getMembers> as $output
+$entry.ReadFile <getCall> <getMembers> as $output
 
 alert $output
 

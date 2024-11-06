@@ -4,8 +4,8 @@ desc(
     severity: high,
 )
 
-reform?{<fullTypeName>?{have: 'github.com/hedonist/reform'}} as $entry;
-.Select(* #-> as $param)
+<include('golang-database-reform')> as $sink;
+$sink.Select(,* #-> as $param)
 $param?{have: 'Parameter'} as $high
 
 alert $high for {
@@ -69,5 +69,6 @@ func main() {
 	http.HandleFunc("/login", login)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
+
 UNSAFE
 )

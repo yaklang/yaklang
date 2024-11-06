@@ -4,9 +4,12 @@ desc(
     severity: high,
 )
 
-*.Search( * #-> as $request)
-$request <getCall><getCaller> as $sink
-$sink?{have: 'Sprintf'}( * #-> as $param)
+ldap?{<fullTypeName>?{have: 'gopkg.in/ldap.v2'}} as $entry;
+ldap?{<fullTypeName>?{have: 'github.com/nmcclain/ldap'}} as $entry;
+ldap?{<fullTypeName>?{have: 'github.com/go-ldap/ldap'}} as $entry;
+$entry.Dial <getCall> as $open;
+$open <getMembers> as $sink;
+$sink.Search( * #-> as $param)
 $param?{have: 'Parameter'} as $high
 
 alert $high for {
@@ -62,5 +65,6 @@ func authenticate(username, password string) bool {
 	// 这里省略了密码验证的具体实现
 	return true
 }
+
 UNSAFE
 )

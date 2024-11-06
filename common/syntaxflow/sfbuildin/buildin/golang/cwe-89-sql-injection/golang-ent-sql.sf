@@ -5,9 +5,9 @@ desc(
 )
 
 ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $entry;
-$entry.Open() <getMembers> as $client
-$client.User.Query().Where(* #-> as $param)
-$param?{have: 'Parameter'} as $high
+$entry.Open() <getMembers> as $client;
+$client.User.Query().Where(* #-> as $param);
+$param?{have: 'Parameter'} as $high;
 
 alert $high for {
     title: 'SQL Injection detected',
@@ -68,5 +68,6 @@ func main() {
 	http.HandleFunc("/login", login)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
+
 UNSAFE
 )

@@ -1,0 +1,91 @@
+desc(
+    title: "check file write function",
+    type: audit,
+    level: info,
+    lib: 'golang-database-reform'
+)
+
+reform?{<fullTypeName>?{have: 'github.com/hedonist/reform'}} as $entry;
+$entry.NewDB <getCall> as $output;
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://database.go': <<<PARAM
+package main
+
+import (
+    "database/sql"
+    "fmt"
+    "log"
+
+    "github.com/hedonist/reform"
+    _ "modernc.org/sqlite"
+)
+
+// User 定义用户模型
+type User struct {
+    ID   uint    // 主键
+    Name string  // 用户名
+    Age  int     // 年龄
+}
+
+func main() {
+    // 连接到 SQLite 数据库
+    db, err := sql.Open("sqlite", "example.db")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    // 创建 Reform 连接
+    reformDB := reform.NewDB(db, reform.NewDialect("sqlite"))
+
+    // 自动迁移：创建表
+    err = reformDB.Exec(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        age INTEGER
+    );`)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 插入用户数据
+    user := &User{Name: "Alice", Age: 30}
+    err = reformDB.Insert(user)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 查询用户数据
+    var users []User
+    err = reformDB.Select(&users, "SELECT * FROM users")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 打印用户信息
+    fmt.Println("Users:")
+    for _, u := range users {
+        fmt.Printf("ID: %d, Name: %s, Age: %d\n", u.ID, u.Name, u.Age)
+    }
+
+    // 更新用户信息
+    user.Age = 31
+    err = reformDB.Update(user)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 删除用户
+    err = reformDB.Delete(user)
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+
+PARAM
+)
