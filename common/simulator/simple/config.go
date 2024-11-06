@@ -24,18 +24,45 @@ type BrowserConfig struct {
 
 type BrowserConfigOpt func(*BrowserConfig)
 
+// simulator.simple.wsAddress 是一个请求选项 用于输入浏览器的websocket地址
+//
+// Example:
+// ```
+//
+//	proxy = simulator.simple.proxy("http://127.0.0.1:7890")
+//	browser = simulator.simple.createBrowser(proxy)
+//
+// ```
 func WithWsAddress(wsAddress string) BrowserConfigOpt {
 	return func(config *BrowserConfig) {
 		config.wsAddress = wsAddress
 	}
 }
 
+// simulator.simple.exePath 是一个请求选项 用于输入浏览器的websocket地址
+//
+// Example:
+// ```
+//
+//	exePath = simulator.simple.exePath("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+//	browser = simulator.simple.createBrowser(exePath)
+//
+// ```
 func WithExePath(exePath string) BrowserConfigOpt {
 	return func(config *BrowserConfig) {
 		config.exePath = exePath
 	}
 }
 
+// simulator.simple.proxy 是一个请求选项 用于输入代理服务器地址
+//
+// Example:
+// ```
+//
+//	proxy = simulator.simple.proxy("http://127.0.0.1:7890")
+//	browser = simulator.simple.createBrowser(proxy)
+//
+// ```
 func WithProxy(proxyAddress string, proxyUserInfo ...string) BrowserConfigOpt {
 	return func(config *BrowserConfig) {
 		config.proxyAddress = proxyAddress
@@ -46,18 +73,45 @@ func WithProxy(proxyAddress string, proxyUserInfo ...string) BrowserConfigOpt {
 	}
 }
 
+// simulator.simple.noSandBox 是一个请求选项 用于开启/关闭sandbox
+//
+// Example:
+// ```
+//
+//	sandBox = simulator.simple.noSandBox(true)
+//	browser = simulator.simple.createBrowser(sandBox)
+//
+// ```
 func WithNoSandBox(noSandBox bool) BrowserConfigOpt {
 	return func(config *BrowserConfig) {
 		config.noSandBox = noSandBox
 	}
 }
 
+// simulator.simple.headless 是一个请求选项 用于开启关闭headless模式
+//
+// Example:
+// ```
+//
+//	headless = simulator.simple.headless(true)
+//	browser = simulator.simple.createBrowser(headless)
+//
+// ```
 func WithHeadless(headless bool) BrowserConfigOpt {
 	return func(config *BrowserConfig) {
 		config.headless = headless
 	}
 }
 
+// simulator.simple.hijack 是一个请求选项 用于开启流量劫持模式
+//
+// Example:
+// ```
+//
+//	hijack = simulator.simple.hijack(true)
+//	browser = simulator.simple.createBrowser(hijack)
+//
+// ```
 func WithHijack(hijack bool) BrowserConfigOpt {
 	return func(config *BrowserConfig) {
 		config.hijack = hijack
@@ -104,6 +158,15 @@ func WithRequestModification(modifyUrl string, modifyTarget ModifyTarget, modify
 	}
 }
 
+// simulator.simple.timeout 是一个请求选项 用于设置页面最大加载时间 单位秒
+//
+// Example:
+// ```
+//
+//	timeout = simulator.simple.timeout(30)
+//	browser = simulator.simple.createBrowser(timeout)
+//
+// ```
 func WithTimeout(timeout int) BrowserConfigOpt {
 	return func(config *BrowserConfig) {
 		config.timeout = timeout

@@ -36,6 +36,20 @@ type VBrowser struct {
 	requestModification  []*RequestModification
 }
 
+// simulator.simple.createBrowser / simulator.simpleCreateBrowser 浏览器手动操作模式 进行目标页面操作
+//
+//	 第一个参数为目标url，后面可以添加零个或多个请求选项，用于对此次请求进行配置
+//	 返回值为浏览器 可以创建页面
+//
+//		 Example:
+//		 ```
+//		replaceStr = []string{"0","1"}
+//		replaceModify = simulator.simple.responseModify("uapws/login.ajax", simulator.simple.bodyReplaceTarget, replaceStr)
+//		headless = simulator.simple.headless(false)
+//		browser = simulator.simple.createBrowser(headless, replaceModify)
+//		page = browser.Navigate("https://www.group-ib.com/blog/cron/", infoWaitFor)
+//
+// ```
 func CreateHeadlessBrowser(opts ...BrowserConfigOpt) *VBrowser {
 	config := &BrowserConfig{
 		noSandBox: true,
@@ -112,6 +126,19 @@ func (browser *VBrowser) BrowserInit() error {
 	return nil
 }
 
+// Navigate 开启浏览器的一个页面 并跳转到对应url
+// 其中第二个参数为 页面存在对应元素selector时即认为完成加载
+//
+//	 Example:
+//	 ```
+//	replaceStr = []string{"0","1"}
+//	infoWaitFor = "body > div.theme-container > div > div > div.c-16.c-md-9 > div.header--blog-post > div > div"
+//	replaceModify = simulator.simple.responseModify("uapws/login.ajax", simulator.simple.bodyReplaceTarget, replaceStr)
+//	headless = simulator.simple.headless(false)
+//	browser = simulator.simple.createBrowser(headless, replaceModify)
+//	page = browser.Navigate("https://www.group-ib.com/blog/cron/", infoWaitFor)
+//
+// ```
 func (browser *VBrowser) Navigate(urlStr string, waitFor string) *VPage {
 	page, err := browser.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
 	if err != nil {
