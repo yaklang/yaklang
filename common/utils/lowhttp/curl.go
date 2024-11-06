@@ -16,6 +16,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+// CurlToHTTPRequest
+// deprecated, use CurlToRawHTTPRequest instead
 func CurlToHTTPRequest(i string) ([]byte, error) {
 	items, err := shlex.Split(i)
 	if err != nil {
@@ -94,7 +96,7 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 			if index+1 < maxItem {
 				val := items[index+1]
 				if (strings.HasSuffix(val, `"`) && strings.HasPrefix(val, `"`)) || (strings.HasSuffix(val, `'`) && strings.HasPrefix(val, `'`)) {
-					var valUnquoted, err = strconv.Unquote(val)
+					valUnquoted, err := strconv.Unquote(val)
 					if err != nil {
 						val = val[1 : len(val)-1]
 					} else {
@@ -179,13 +181,13 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 	}
 
 	// fetch form data
-	var formData = make(url.Values)
+	formData := make(url.Values)
 	for index, item := range items {
 		if item == "-F" || item == "--form" {
 			if index+1 < maxItem {
 				val := items[index+1]
 				if (strings.HasSuffix(val, `"`) && strings.HasPrefix(val, `"`)) || (strings.HasSuffix(val, `'`) && strings.HasPrefix(val, `'`)) {
-					var valUnquoted, err = strconv.Unquote(val)
+					valUnquoted, err := strconv.Unquote(val)
 					if err != nil {
 						val = val[1 : len(val)-1]
 					} else {
