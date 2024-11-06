@@ -13,37 +13,22 @@ func YieldIrCodesProgramName(rawDB *gorm.DB, ctx context.Context, program string
 	db := rawDB.Model(&IrCode{}).Where("program_name = ?", program)
 	return yieldIrCodes(db, ctx)
 }
-func _yieldIrCodes(db *gorm.DB, ctx context.Context) chan int64 {
-	res := make(chan int64)
-	go func() {
-		defer close(res)
-		codes := yieldIrCodes(db, ctx)
-		for code := range codes {
-			select {
-			case <-ctx.Done():
-				return
-			case res <- int64(code.ID):
-			}
-		}
-	}()
-	return res
-}
-
 func yieldIrCodes(DB *gorm.DB, ctx context.Context) chan *IrCode {
 	db := DB.Model(&IrCode{})
 	outC := make(chan *IrCode)
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		paginator := bizhelper.NewFastPaginator(db, 100)
+		// var page = 1
 		for {
 			var items []*IrCode
-			if _, b := bizhelper.Paging(db, page, 100, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
+			if err, ok := paginator.Next(&items); !ok {
+				break
+			} else if err != nil {
+				log.Errorf("paging failed: %s", err)
+				continue
 			}
-
-			page++
 			for _, d := range items {
 				select {
 				case <-ctx.Done():
@@ -51,32 +36,31 @@ func yieldIrCodes(DB *gorm.DB, ctx context.Context) chan *IrCode {
 				case outC <- d:
 				}
 			}
-
-			if len(items) < 100 {
-				return
-			}
 		}
 	}()
 	return outC
 }
 
-func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan int64 {
+func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan *IrCode {
 	db := DB.Model(&IrIndex{})
-	outC := make(chan int64)
+	db = db.Debug()
+	outC := make(chan *IrCode)
 	go func() {
 		defer close(outC)
 
 		filter := make(map[int64]struct{})
 
-		var page = 1
+		paginator := bizhelper.NewFastPaginator(db, 100)
+
 		for {
 			var items []*IrIndex
-			if _, b := bizhelper.Paging(db, page, 100, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
+			if err, ok := paginator.Next(&items); !ok {
+				break
+			} else if err != nil {
+				log.Errorf("paging failed: %s", err)
+				continue
 			}
 
-			page++
 			for _, d := range items {
 				id := d.ValueID
 				if _, ok := filter[id]; ok {
@@ -84,15 +68,14 @@ func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan int64 {
 				}
 				filter[id] = struct{}{}
 
+				// get ir code
+				code := GetIrCodeById(GetDB(), id)
+
 				select {
 				case <-ctx.Done():
 					return
-				case outC <- id:
+				case outC <- code:
 				}
-			}
-
-			if len(items) < 100 {
-				return
 			}
 		}
 	}()
@@ -113,7 +96,7 @@ const (
 	RegexpCompare
 )
 
-func SearchVariable(db *gorm.DB, compareMode, matchMod int, value string) chan int64 {
+func SearchVariable(db *gorm.DB, compareMode, matchMod int, value string) chan *IrCode {
 	switch compareMode {
 	case ExactCompare:
 		return ExactSearchVariable(db, matchMod, value)
@@ -125,12 +108,12 @@ func SearchVariable(db *gorm.DB, compareMode, matchMod int, value string) chan i
 	return nil
 }
 
-func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
+func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan *IrCode {
 	db := DB.Model(&IrIndex{})
 	if mod&ConstType != 0 {
 		//指定opcode为const
 		_db := DB.Model(&IrCode{}).Where("opcode=5 and string=?", value)
-		return _yieldIrCodes(_db, context.Background())
+		return yieldIrCodes(_db, context.Background())
 	}
 	switch mod {
 	case NameMatch:
@@ -144,16 +127,16 @@ func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 	return yieldIrIndex(db, context.Background())
 }
 
-func GlobSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
+func GlobSearchVariable(DB *gorm.DB, mod int, value string) chan *IrCode {
 	regStr := glob.Glob2Regex(value)
 	return RegexpSearchVariable(DB, mod, regStr)
 }
 
-func RegexpSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
+func RegexpSearchVariable(DB *gorm.DB, mod int, value string) chan *IrCode {
 	db := DB.Model(&IrIndex{})
 	if mod&ConstType != 0 {
 		_db := DB.Model(&IrCode{}).Where("opcode=5 and string REGEXP ?", value)
-		return _yieldIrCodes(_db, context.Background())
+		return yieldIrCodes(_db, context.Background())
 	}
 	switch mod {
 	case NameMatch:

@@ -143,7 +143,13 @@ func (c *Cache) GetInstruction(id int64) Instruction {
 	if !ok && c.HaveDatabaseBackend() {
 		// if no in cache, get from database
 		// if found in database, create a new lazy instruction
-		return c.newLazyInstruction(id)
+		// return c.newLazyInstructionWithoutCache(id)
+		v, err := newLazyInstruction(id, nil, c)
+		if err != nil {
+			log.Errorf("newLazyInstruction failed: %v", err)
+			return nil
+		}
+		return v
 		// all instruction from database will be lazy instruction
 	}
 	return ret.inst

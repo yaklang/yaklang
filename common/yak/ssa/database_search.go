@@ -4,6 +4,7 @@ import (
 	"regexp"
 
 	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -30,8 +31,13 @@ func matchInstructionsEx(
 	if prog.EnableDatabase {
 		var insts []Instruction
 		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), compareMode, matchMode, name)
-		for id := range ch {
-			inst := prog.Cache.newLazyInstruction(id)
+		for ir := range ch {
+			inst, err := NewLazyInstructionFromIrCode(ir)
+			if err != nil {
+				log.Errorf("NewLazyInstructionFromIrCode failed: %v", err)
+				continue
+			}
+			// inst := prog.Cache.newLazyInstructionWithoutCache(int64(id.ID))
 			insts = append(insts, inst)
 		}
 		return insts
@@ -54,8 +60,12 @@ func matchInstructionsEx(
 			ssadb.GetDB().Where("program_name = ?", prog.Name),
 			compareMode, matchMode, name,
 		)
-		for id := range ch {
-			inst := prog.Cache.newLazyInstruction(id)
+		for ir := range ch {
+			inst, err := NewLazyInstructionFromIrCode(ir)
+			if err != nil {
+				log.Errorf("NewLazyInstructionFromIrCode failed: %v", err)
+				continue
+			}
 			insts = append(insts, inst)
 		}
 		addRes(insts...)

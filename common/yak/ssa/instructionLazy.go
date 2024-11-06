@@ -54,20 +54,15 @@ func NewInstructionFromLazy[T Instruction](id int64, Cover func(Instruction) (T,
 // NewLazyInstruction : create a new lazy instruction, only create in cache
 func NewLazyInstruction(id int64) (Value, error) {
 	ir := ssadb.GetIrCodeById(ssadb.GetDB(), id)
-	if ir == nil {
-		return nil, utils.Error("ircode [" + fmt.Sprint(id) + "]not found")
-	}
-	cache := GetCacheFromPool(ir.ProgramName)
-	return newLazyInstruction(id, ir, cache)
+	return NewLazyInstructionFromIrCode(ir)
 }
 
-func (c *Cache) newLazyInstruction(id int64) Value {
-	v, err := newLazyInstruction(id, nil, c)
-	if err != nil {
-		log.Errorf("newLazyInstruction failed: %v", err)
-		return nil
+func NewLazyInstructionFromIrCode(ir *ssadb.IrCode) (Value, error) {
+	if ir == nil {
+		return nil, utils.Error("ircode is nil")
 	}
-	return v
+	cache := GetCacheFromPool(ir.ProgramName)
+	return newLazyInstruction(int64(ir.ID), ir, cache)
 }
 
 func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) (Value, error) {
