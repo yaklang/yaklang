@@ -1,13 +1,14 @@
 desc(
-    title: "check file write function",
+    title: "check file database function",
     type: audit,
     level: info,
     lib: 'golang-database-sqlx'
 )
 
 sqlx?{<fullTypeName>?{have: 'github.com/jmoiron/sqlx'}} as $entry;
-$entry.Connect <getCall> as $open;
-$open <getMembers> as $output;
+$entry.Connect <getCall> as $db;
+$entry.Open <getCall> as $db;
+$db <getMembers> as $output;
 
 alert $output
 
