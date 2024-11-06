@@ -16,6 +16,8 @@ type BrowserConfig struct {
 	sourceType string
 	saveToDB   bool
 
+	timeout int
+
 	responseModification []*ResponseModification
 	requestModification  []*RequestModification
 }
@@ -99,5 +101,11 @@ func WithRequestModification(modifyUrl string, modifyTarget ModifyTarget, modify
 		config.requestModification = append(config.requestModification, &RequestModification{
 			baseModify{modifyUrl: modifyUrl, modifyTarget: modifyTarget, modifyResult: modifyResult},
 		})
+	}
+}
+
+func WithTimeout(timeout int) BrowserConfigOpt {
+	return func(config *BrowserConfig) {
+		config.timeout = timeout
 	}
 }

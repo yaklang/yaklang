@@ -52,6 +52,7 @@ var SimpleExports = map[string]interface{}{
 	"noSandBox":      simple.WithNoSandBox,
 	"headless":       simple.WithHeadless,
 	"hijack":         simple.WithHijack,
+	"timeout":        simple.WithTimeout,
 	"requestModify":  simple.WithRequestModification,
 	"responseModify": simple.WithResponseModification,
 
