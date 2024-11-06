@@ -523,8 +523,15 @@ func checkResult(frame *sfvm.SFFrame, rule *schema.SyntaxFlowRule, result *ssaap
 
 	ret := frame.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin")
 	if ret > 0 {
-		if alertCount < frame.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin") {
+		if alertCount < ret {
 			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is less than alert_min config: %v actual got: %v", ret, alertCount))
+			return
+		}
+	}
+	maxNum := frame.GetExtraInfoInt("alert_max", "vuln_max", "alertMax", "vulnMax")
+	if maxNum > 0 {
+		if alertCount > maxNum {
+			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is more than alert_max config: %v actual got: %v", maxNum, alertCount))
 			return
 		}
 	}
@@ -546,6 +553,13 @@ func checkResult(frame *sfvm.SFFrame, rule *schema.SyntaxFlowRule, result *ssaap
 	if low > 0 {
 		if alert_info < low {
 			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is less than alert_low config: %v, actual got: %v", low, alert_info))
+			return
+		}
+	}
+	exact := frame.GetExtraInfoInt("alert_exact", "alertExact", "vulnExact", "alert_num", "vulnNum")
+	if exact > 0 {
+		if alert_info != exact {
+			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is not equal alert_exact config: %v, actual got: %v", exact, alert_info))
 			return
 		}
 	}
