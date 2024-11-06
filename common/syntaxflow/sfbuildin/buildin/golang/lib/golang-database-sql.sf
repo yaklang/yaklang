@@ -1,13 +1,13 @@
 desc(
-    title: "check file write function",
+    title: "check file database function",
     type: audit,
     level: info,
     lib: 'golang-database-sql'
 )
 
 sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
-$entry.Open <getCall> as $open;
-$open <getMembers> as $output;
+$entry.Open <getCall> as $db;
+$db <getMembers> as $output;
 
 alert $output
 
