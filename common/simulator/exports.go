@@ -43,8 +43,10 @@ var Exports = map[string]interface{}{
 	"simple": SimpleExports,
 }
 
+// simulator.simple 浏览器手动操作模式
 var SimpleExports = map[string]interface{}{
 	"CreateBrowser": simple.CreateHeadlessBrowser,
+	"createBrowser": simple.CreateHeadlessBrowser,
 
 	"wsAddress":      simple.WithWsAddress,
 	"exePath":        simple.WithExePath,

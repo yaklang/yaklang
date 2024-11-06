@@ -7,6 +7,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// HttpBruteForce 进行目标url的页面进行http爆破 第一个参数为目标url，后面可以添加零个或多个请求选项，用于对此次请求进行配置 返回值包括channel和错误，从channel中获取爆破结果
+//
+// Example:
+// ```
+//
+//	ch, err = simulator.HttpBruteForce("http://127.0.0.1:8080/", simulator.username("admin"), simulator.password("admin", "luckyadmin123"))
+//
+//	for item := range ch {
+//	    yakit.Info(`[bruteforce] %s:%s login %v with info: %s`, item.Username(), item.Password(), item.Status(), item.Info())
+//	}
+//
+// ```
 func HttpBruteForce(targetUrl string, opts ...BruteConfigOpt) (chan Result, error) {
 	ch := make(chan Result)
 	opts = append(opts, WithResultChannel(ch))
