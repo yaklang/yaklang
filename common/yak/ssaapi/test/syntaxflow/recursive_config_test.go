@@ -18,8 +18,42 @@ func TestSF_Config_Until(t *testing.T) {
 		`,
 			"b* #{until:`* ?{opcode:call}`}-> * as $result",
 			map[string][]string{
-				"result": {"Undefined-b3", "Undefined-f(11,1)"},
+				"result": {"Undefined-f(11,1)"},
 			})
+	})
+
+	t.Run("util in dataflow path", func(t *testing.T) {
+		/*
+			a
+				-- f
+					-- 1  // const
+					-- 1  // actual-parameter
+				-- f2
+					-- 2  // const
+					-- b //  actual-parameter  // only this path
+		*/
+		code := `
+	f = (i) => {
+		return i + 1
+	}
+
+	f2 = (i) => {
+		return i + 2 
+	}
+	b = 11 
+	a = f(1) + f2(b)
+	`
+
+		t.Run("test until contain include", func(t *testing.T) {
+			ssatest.CheckSyntaxFlow(t, code, `
+		b as $b
+		a #{
+			until: "* & $b"
+		}-> as $output
+		`, map[string][]string{
+				"output": {"11"},
+			})
+		})
 	})
 
 }
@@ -96,6 +130,13 @@ func TestSF_Config_Include(t *testing.T) {
 }
 
 func TestSF_config_WithNameVariableInner(t *testing.T) {
+	/*
+		utils/include/exclude can use variable, but `__next__` is magic name,
+		variable len:
+			0:  just use `_` variable
+			1:  use this  variable
+			>1: use `__next__` variable
+	*/
 	check := func(t *testing.T, code string) {
 		ssatest.CheckSyntaxFlow(t, `
 		b0 = f1(1)
@@ -103,7 +144,7 @@ func TestSF_config_WithNameVariableInner(t *testing.T) {
 		b1 = f2 + 22
 		`,
 			code, map[string][]string{
-				"result": {"Undefined-f2", "22", "Undefined-f1(1)"},
+				"result": {"Undefined-f1(1)"},
 			})
 	}
 	t.Run("check no name", func(t *testing.T) {

@@ -45,6 +45,7 @@ func WithSyntaxFlowConfig(
 			}
 		case sf.RecursiveConfig_Until:
 			configItems = append(configItems, item)
+			addHandler(sf.RecursiveConfig_Include, item.Value)
 		case sf.RecursiveConfig_Hook:
 			configItems = append(configItems, item)
 
