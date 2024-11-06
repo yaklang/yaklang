@@ -574,7 +574,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 	if err != nil {
 		return err
 	}
-
+	log.Infof("unsafe filesystem start")
 	CheckWithFS(vfs, t, func(p ssaapi.Programs) error {
 		result, err := p.SyntaxFlowWithError(rule.Content)
 		if err != nil {
@@ -608,6 +608,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 
 	l, vfs, _ = frame.ExtractNegativeFilesystemAndLanguage()
 	if vfs != nil && l != "" {
+		log.Infof("safe filesystem start")
 		CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 			result, err := programs.SyntaxFlowWithError(rule.Content, sfvm.WithEnableDebug())
 			if err != nil {

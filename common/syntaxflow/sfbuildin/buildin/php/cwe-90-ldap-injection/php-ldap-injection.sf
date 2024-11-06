@@ -74,5 +74,13 @@ $password = $_POST['password'];
 $escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
 $dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
 $is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
+CODE, 
+
+
+'safefile:///save.php':<<<CODE
+// no php-param
+$escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
+$dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
+$is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
 CODE
 )
