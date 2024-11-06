@@ -279,7 +279,7 @@ jobs:
           echo "YAK_TAG version: ${{ env.YAK_TAG }}"
           
           echo "Downloading latest syntaxflow rule info..."
-          wget -O syntaxflow_meta_info.yak https://aliyun-oss.yaklang.com/yak/latest/syntaxflow-meta.json
+          wget -O syntaxflow-meta.json https://aliyun-oss.yaklang.com/yak/latest/syntaxflow-meta.json
           if [ $? -ne 0 ]; then
             echo "::error::Failed to download syntaxflow meta info"
             exit 1
