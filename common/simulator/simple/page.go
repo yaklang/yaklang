@@ -10,12 +10,13 @@ import (
 )
 
 type VPage struct {
-	page *rod.Page
+	page    *rod.Page
+	timeout int
 }
 
 func (page *VPage) Navigate(urlStr string, waitFor string) error {
 	var err error
-	page.page = page.page.Timeout(30 * time.Second)
+	page.page = page.page.Timeout(time.Duration(page.timeout) * time.Second)
 	err = page.page.Navigate(urlStr)
 	if err != nil {
 		log.Error(err)

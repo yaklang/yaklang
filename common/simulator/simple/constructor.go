@@ -30,6 +30,8 @@ type VBrowser struct {
 	saveToDB   bool
 	sourceType string
 
+	timeout int
+
 	responseModification []*ResponseModification
 	requestModification  []*RequestModification
 }
@@ -39,6 +41,8 @@ func CreateHeadlessBrowser(opts ...BrowserConfigOpt) *VBrowser {
 		noSandBox: true,
 		headless:  true,
 		hijack:    false,
+
+		timeout: 30,
 
 		responseModification: make([]*ResponseModification, 0),
 		requestModification:  make([]*RequestModification, 0),
@@ -56,6 +60,7 @@ func CreateHeadlessBrowser(opts ...BrowserConfigOpt) *VBrowser {
 		noSandBox:            config.noSandBox,
 		headless:             config.headless,
 		hijack:               config.hijack,
+		timeout:              config.timeout,
 		runtimeID:            config.runtimeID,
 		fromPlugin:           config.fromPlugin,
 		saveToDB:             config.saveToDB,
@@ -113,7 +118,7 @@ func (browser *VBrowser) Navigate(urlStr string, waitFor string) *VPage {
 		log.Errorf("create page error: %s", err)
 		return nil
 	}
-	p := &VPage{page: page}
+	p := &VPage{page: page, timeout: browser.timeout}
 	err = p.Navigate(urlStr, waitFor)
 	if err != nil {
 		log.Errorf("navigate error: %s", err)
