@@ -6,7 +6,7 @@ desc(
 )
 
 bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
-$entry.NewWriter -> as $writer;
+$entry.NewWriter <getCall> as $writer;
 $writer.WriteString(* #-> as $output); 
 
 alert $output

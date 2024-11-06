@@ -4,9 +4,9 @@ desc(
     severity: high,
 )
 
-sqlx?{<fullTypeName>?{have: 'github.com/jmoiron/sqlx'}} as $entry;
-.Select(* #-> as $param)
-$param?{have: 'Parameter'} as $high
+<include('golang-database-sqlx')> as $sink;
+$sink.Select(, * #-> as $param);
+$param?{have: 'Parameter'} as $high;
 
 alert $high for {
     title: 'SQL Injection detected',

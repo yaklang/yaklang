@@ -5,7 +5,8 @@ desc(
 )
 
 <include('golang-database-gorm')> as $sink;
-$sink?{have: 'Parameter'} as $high;
+$sink.Raw(* #-> as $param);
+$param?{have: 'Parameter'} as $high;
 
 alert $high for {
     title: 'SQL Injection detected',
