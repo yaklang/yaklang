@@ -7,8 +7,8 @@ desc(
 ldap?{<fullTypeName>?{have: 'gopkg.in/ldap.v2'}} as $entry;
 ldap?{<fullTypeName>?{have: 'github.com/nmcclain/ldap'}} as $entry;
 ldap?{<fullTypeName>?{have: 'github.com/go-ldap/ldap'}} as $entry;
-$entry.Dial <getCall> as $open;
-$open <getMembers> as $sink;
+$entry.Dial <getCall> as $db;
+$db <getMembers> as $sink;
 $sink.Search( * #-> as $param)
 $param?{have: 'Parameter'} as $high
 
