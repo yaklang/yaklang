@@ -36,7 +36,7 @@
 
 ### func
 
-`simulator.simple.createBrowser(opts ...BrowserConfigOpt) *Browser` 根据参数创建浏览器，并完成初始化
+`simulator.simple.CreateBrowser(opts ...BrowserConfigOpt) *Browser` 根据参数创建浏览器，并完成初始化
 
 其中 浏览器的参数设置如下：
 
@@ -76,7 +76,7 @@
 
 ### type Browser func
 
-`func (b *Browser) Navigate(urlStr string) *Page` 创建一个页面并访问指定的url，返回该页面
+`func (b *Browser) Navigate(urlStr string, waitFor string) *Page` 创建一个页面并访问指定的url，返回该页面，若waitFor参数不为空，则会等待waitFor的selector对应元素加载完成
 
 ### type Page func
 
