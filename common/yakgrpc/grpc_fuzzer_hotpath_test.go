@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -445,5 +446,49 @@ afterRequest = func(rsp){
 		}, 1)
 		require.NoError(t, err)
 		require.Contains(t, string(out.Data[0].Response), token2, "afterRequest hotpatch failed")
+	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror_Duplicated_ExtractorResults(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("abc"))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{p(a)}}",
+		HotPatchCode: `mirrorHTTPFlow = (req, rsp, params) => {
+	return params
+}
+`,
+		ForceFuzz: true,
+		Params: []*ypb.FuzzerParamItem{
+			{
+				Key:   "a",
+				Value: "{{int(1-10)}}",
+				Type:  "fuzztag",
+			},
+		},
+	})
+	require.NoError(t, err)
+	count := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		count++
+		require.Len(t, rsp.ExtractedResults, 1)
+		require.Equal(t, "a", rsp.ExtractedResults[0].Key)
+		valueStr := rsp.ExtractedResults[0].Value
+		value, err := strconv.Atoi(valueStr)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, value, 1)
+		require.LessOrEqual(t, value, 10)
+	}
+	if count != 10 {
+		t.Fatalf("expect 10, got %v", count)
 	}
 }
