@@ -1,7 +1,7 @@
-.getBytes() as $ source;
+*Mapping.__ref__?{opcode: function} as $entryFunc;
+$entryFunc(*?{opcode: param && !have: this} as $source);
 Files.write(,* as $sink)
 $sink #{
-	until: '<self> & $source;',
+        until: '<self> & $source;',
 }-> as $result;
-
 check $result then "Local Files Writer" else "No Files Written";
