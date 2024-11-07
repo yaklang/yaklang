@@ -12,5 +12,6 @@ type SSAProgram struct {
 
 	DBPath string `json:"db_path"`
 	// program language when set
-	Language string `json:"language" gorm:"type:varchar(255)"`
+	Language      string `json:"language" gorm:"type:varchar(255)"`
+	EngineVersion string `json:"engine_version" gorm:"type:varchar(255)"`
 }

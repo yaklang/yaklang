@@ -42,10 +42,11 @@ func SaveSSAProgram(name, desc, language string) error {
 	db := consts.GetGormProfileDatabase()
 
 	prog := &schema.SSAProgram{
-		Name:        name,
-		Description: desc,
-		DBPath:      consts.GetSSADataBasePath(),
-		Language:    language,
+		Name:          name,
+		Description:   desc,
+		DBPath:        consts.GetSSADataBasePath(),
+		Language:      language,
+		EngineVersion: consts.GetYakVersion(),
 	}
 
 	Programs.Set(name, prog)
