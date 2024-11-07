@@ -11,15 +11,13 @@ import (
 type rewriterFunc func(statementManager *RewriteManager, node *core.Node) error
 
 func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
-	mergeNode := CalcMergeNode1(ifNode)
-
 	err := CalcEnd(manager.DominatorMap, ifNode)
 	if err != nil {
 		return err
 	}
 	trueNode := ifNode.TrueNode()
 	falseNode := ifNode.FalseNode()
-	ifNode.RemoveAllNext()
+	//ifNode.RemoveAllNext()
 	domNodes := utils2.NodeFilter(ifNode.Next, func(node *core.Node) bool {
 		return slices.Contains(manager.DominatorMap[ifNode], node)
 	})
@@ -31,12 +29,42 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 
 	ifStatementNode := manager.NewNode(ifStatement)
 	ifNode.Replace(ifStatementNode)
-
+	checkIsEndNode := func(node1, node2 *core.Node) bool {
+		if node1 == nil || node2 == nil {
+			return false
+		}
+		endNodes := []*core.Node{}
+		core.WalkGraph[*core.Node](node1, func(node *core.Node) ([]*core.Node, error) {
+			var next []*core.Node
+			for _, n := range node.Next {
+				if slices.Contains(manager.DominatorMap[node], n) {
+					next = append(next, n)
+				}
+			}
+			if len(next) == 0 {
+				endNodes = append(endNodes, node)
+			}
+			return next, nil
+		})
+		for _, node := range NodeDeduplication(endNodes) {
+			for _, n := range node.Next {
+				if n != node2 {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	if checkIsEndNode(trueNode, falseNode) {
+		falseNode = nil
+	}
+	if checkIsEndNode(falseNode, trueNode) {
+		trueNode = nil
+	}
 	endNodes := []*core.Node{}
-	getBody := func(bodyStartNode *core.Node) ([]statements.Statement, error) {
-
-		sts := []statements.Statement{}
-		if !slices.Contains(manager.DominatorMap[ifNode], bodyStartNode) || mergeNode == bodyStartNode {
+	getBody := func(bodyStartNode *core.Node) ([](*core.Node), error) {
+		sts := []*core.Node{}
+		if !slices.Contains(manager.DominatorMap[ifNode], bodyStartNode) {
 			return sts, nil
 		}
 		err := core.WalkGraph[*core.Node](bodyStartNode, func(node *core.Node) ([]*core.Node, error) {
@@ -44,7 +72,7 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 			if err != nil {
 				return nil, err
 			}
-			sts = append(sts, node.Statement)
+			sts = append(sts, node)
 			var next []*core.Node
 			for _, n := range node.Next {
 				if slices.Contains(manager.DominatorMap[node], n) {
@@ -62,22 +90,27 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 	}
 	condition := originNodeStatement.(*statements.ConditionStatement).Condition
 	ifStatement.Condition = condition
+	ifBodyNodes := []*core.Node{}
 	if trueNode != nil {
 		ifBody, err := getBody(trueNode)
 		if err != nil {
 			return err
 		}
-		ifStatement.IfBody = ifBody
+		ifStatement.IfBody = core.NodesToStatements(ifBody)
+		ifBodyNodes = append(ifBodyNodes, ifBody...)
 	}
 	if falseNode != nil {
 		elseBody, err := getBody(falseNode)
 		if err != nil {
 			return err
 		}
-
-		ifStatement.ElseBody = elseBody
+		ifStatement.ElseBody = core.NodesToStatements(elseBody)
+		ifBodyNodes = append(ifBodyNodes, elseBody...)
 	}
 	endNodes = utils2.NodeFilter(endNodes, func(node *core.Node) bool {
+		if slices.Contains(ifBodyNodes, node) {
+			return false
+		}
 		return !IsEndNode(node)
 	})
 	for _, node := range NodeDeduplication(endNodes) {
