@@ -64,8 +64,17 @@ func (this *ClassObject) Json() (string, error) {
 	return string(s), err
 }
 
-func (this *ClassObject) Dump() (string, error) {
-	return NewClassObjectDumper(this).DumpClass()
+func (this *ClassObject) Dump() (_ string, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = utils.ErrorStack(e)
+		}
+	}()
+	result, err := NewClassObjectDumper(this).DumpClass()
+	if err != nil {
+		return "", err
+	}
+	return result, nil
 }
 
 func (this *ClassObject) Bcel() (string, error) {

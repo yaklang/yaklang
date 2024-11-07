@@ -25,7 +25,7 @@ var JavaDecompilerCommand = &cli.Command{
 			Usage: "--jar <jar file> to decompile",
 		},
 		cli.StringFlag{
-			Name:  "jar-directory,jardir",
+			Name:  "jar-directory,jardir,dir",
 			Usage: "--jar-directory <jar directory> to decompile",
 		},
 		cli.StringFlag{
@@ -51,6 +51,7 @@ var JavaDecompilerCommand = &cli.Command{
 			return errors.New("one of --jar and --jar-directory must be set")
 		}
 		var jars []string
+		var handledClass []string
 		if c.IsSet("jar") {
 			jarPath := c.String("jar")
 			jarPaths := strings.Split(jarPath, ",")
@@ -62,6 +63,24 @@ var JavaDecompilerCommand = &cli.Command{
 			err := filesys.Recursive(dirMode, filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 				if strings.HasSuffix(s, ".jar") {
 					jars = append(jars, s)
+					return nil
+				}
+				if strings.HasSuffix(s, ".class") {
+					target := strings.TrimSuffix(s, ".class") + ".java"
+					if res, _ := utils.PathExists(target); res {
+						log.Infof("%v is decompiled, skip", s)
+						handledClass = append(handledClass, target)
+						return nil
+					}
+					log.Infof("start to decompile %v", s)
+					raw, err := os.ReadFile(s)
+					if err != nil {
+						return err
+					}
+					err = classDecompiler(raw, target)
+					if err != nil {
+						return err
+					}
 				}
 				return nil
 			}))
@@ -89,10 +108,26 @@ var JavaDecompilerCommand = &cli.Command{
 		} else if len(jars) == 1 {
 			return jarAction(false, jars[0], c)
 		} else {
+			if len(handledClass) > 0 {
+				log.Infof("compile %v java class files", len(handledClass))
+				return nil
+			}
 			return utils.Errorf("no jar file found")
 		}
 		return nil
 	},
+}
+
+func classDecompiler(raw []byte, targetFile string) error {
+	obj, err := javaclassparser.Parse(raw)
+	if err != nil {
+		return err
+	}
+	decompilerStr, err := obj.Dump()
+	if err != nil {
+		return utils.Wrap(err, "javaclassparser.Parse(raw).Dump() failed")
+	}
+	return os.WriteFile(targetFile, []byte(decompilerStr), 0755)
 }
 
 func jarAction(multiMode bool, jarPath string, c *cli.Context) error {

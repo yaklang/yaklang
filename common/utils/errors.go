@@ -3,6 +3,8 @@ package utils
 import (
 	"fmt"
 	"io"
+	"runtime"
+	"strings"
 
 	"github.com/samber/lo"
 )
@@ -158,4 +160,40 @@ func (err *YakError) Format(s fmt.State, verb rune) {
 	case 'q':
 		fmt.Fprintf(s, "%q", err.Error())
 	}
+}
+
+// ErrorStack 捕获 panic 并返回 error
+func ErrorStack(origin any) (err error) {
+	// 收集调用栈信息，跳过前3个栈帧
+	var pcs [32]uintptr
+	n := runtime.Callers(3, pcs[:])
+
+	// 获取对应的调用栈帧信息
+	frames := runtime.CallersFrames(pcs[:n])
+
+	// 构建错误信息
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "panic: %v\n", origin)
+	fmt.Fprintf(&sb, "stack trace:\n")
+
+	// 遍历并记录函数调用栈
+	for {
+		frame, more := frames.Next()
+		fmt.Fprintf(&sb, "    %s\n        %s:%d\n",
+			frame.Function, frame.File, frame.Line)
+		if !more {
+			break
+		}
+	}
+
+	// 返回包含堆栈信息的错误
+	var originErr error
+	switch origin.(type) {
+	case error:
+		originErr = origin.(error)
+	default:
+		originErr = Error(origin)
+	}
+	err = Wrapf(originErr, "%s", sb.String())
+	return
 }
