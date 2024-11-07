@@ -2,11 +2,12 @@ package consts
 
 import (
 	"crypto/tls"
-	"go.uber.org/atomic"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
+
+	"go.uber.org/atomic"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -135,6 +136,10 @@ func GetDefaultPublicReverseServer() string {
 
 func GetYakVersion() string {
 	return YAK_VERSION
+}
+
+func IsDevMode() bool {
+	return YAK_VERSION == "dev"
 }
 
 func SetYakVersion(v string) {
