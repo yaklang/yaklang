@@ -8,6 +8,7 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -159,13 +160,14 @@ func (f *fuzzerSequenceFlow) GetFuzzerRequest() *ypb.FuzzerRequest {
 func (f *fuzzerSequenceFlow) FromFuzzerResponse(response *ypb.FuzzerResponse) *fuzzerSequenceFlow {
 	f.hijack = func(request *ypb.FuzzerRequest) *ypb.FuzzerRequest {
 		if request.InheritVariables {
-			for _, k := range response.GetExtractedResults() {
-				request.Params = append(request.Params, &ypb.FuzzerParamItem{
-					Key:   k.Key,
-					Value: k.Value,
+			oldParams := lo.Map(response.GetExtractedResults(), func(item *ypb.KVPair, index int) *ypb.FuzzerParamItem {
+				return &ypb.FuzzerParamItem{
+					Key:   item.GetKey(),
+					Value: item.GetValue(),
 					Type:  "raw",
-				})
-			}
+				}
+			})
+			request.Params = append(oldParams, request.Params...)
 		}
 
 		if request.InheritCookies {
