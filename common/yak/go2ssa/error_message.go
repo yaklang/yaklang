@@ -119,6 +119,10 @@ func StructNotFind(n string) string {
 	return fmt.Sprintf("struct %s not find, it may belong to the golang library", n)
 }
 
+func ImportNotFind(n string) string {
+	return fmt.Sprintf("%s not import", n)
+}
+
 func MissInitExpr(name string) string {
 	return fmt.Sprintf("miss init expression for %s", name)
 }

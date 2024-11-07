@@ -1871,24 +1871,20 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			if lib == nil && path != "" { // 没有找到包，可能是golang库,也可能是package名称和导入名称不同
 				b.NewError(ssa.Warn, TAG, PackageNotFind(libName))
 				path = path + "/" + typName
-				ssatyp = ssa.CreateAnyType()
-				ssatyp.SetFullTypeNames([]string{path})
-
-				//variable := b.CreateLocalVariable(typName)
-				//b.AssignVariable(variable, b.EmitTypeValue(ssatyp))
 			} else if lib != nil {
 				obj, ok := lib.GetExportType(typName)
 
 				if ok {
-					ssatyp = obj
+					return obj
 				} else { // 没有找到类型，可能来自于golang库
 					b.NewError(ssa.Warn, TAG, StructNotFind(typName))
-					ssatyp = ssa.CreateAnyType()
 				}
 			} else {
-				b.NewError(ssa.Warn, TAG, StructNotFind(typName))
-				ssatyp = ssa.CreateAnyType()
+				b.NewError(ssa.Warn, TAG, ImportNotFind(typName))
 			}
+			ssatyp = b.CreateBluePrint(libName)
+			ssatyp.AddMethod(typName, b.NewFunc(typName))
+			ssatyp.SetFullTypeNames([]string{path})
 		}
 	} else {
 		name := tname.IDENTIFIER().GetText()
