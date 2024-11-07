@@ -197,10 +197,10 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		c.CurrentMethod = method
 		funcCtx := c.FuncCtx
 		funcCtx.FunctionName = name
-		//if name != "generateTenantValue" {
-		//	continue
-		//}
-		//println(name)
+		if name != "nextTokenNotOrNull" {
+			continue
+		}
+		println(name)
 		funcCtx.FunctionType = c.MethodType
 		for _, attribute := range method.Attributes {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
