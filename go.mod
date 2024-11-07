@@ -52,7 +52,6 @@ require (
 	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-dap v0.10.0
 	github.com/google/gopacket v1.1.19
-	github.com/google/shlex v0.0.0-20181106134648-c34317bd91bf
 	github.com/google/uuid v1.5.0
 	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/websocket v1.4.2

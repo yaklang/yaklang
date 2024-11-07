@@ -3,11 +3,12 @@ package vulinbox
 import (
 	"context"
 	"fmt"
-	"github.com/google/shlex"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"os/exec"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/shlex"
 )
 
 func (s *VulinServer) registerPingCMDI() {
@@ -25,7 +26,7 @@ func (s *VulinServer) registerPingCMDI() {
 					writer.Write([]byte(`no ip set`))
 					return
 				}
-				var raw = fmt.Sprintf("ping %v", ip)
+				raw := fmt.Sprintf("ping %v", ip)
 				list, err := shlex.Split(raw)
 				if err != nil {
 					writer.Write([]byte(`shlex parse failed: ` + err.Error()))
@@ -58,7 +59,7 @@ func (s *VulinServer) registerPingCMDI() {
 					writer.Write([]byte(`no ip set`))
 					return
 				}
-				var raw = fmt.Sprintf("ping %v", ip)
+				raw := fmt.Sprintf("ping %v", ip)
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
 				outputs, err1 := exec.CommandContext(ctx, `bash`, "-c", raw).CombinedOutput()

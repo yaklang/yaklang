@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/shlex"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/multipart"
+	"github.com/yaklang/yaklang/common/utils/shlex"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
