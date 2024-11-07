@@ -95,15 +95,17 @@ func init() {
 
 		ClearBlackListPlugin(BlackListCorePlugin)
 
-		const key = "cd336beba498c97738c275f6771efca3"
-		if yakit.Get(key) == consts.ExistedCorePluginEmbedFSHash {
-			return nil
+		if consts.IsDevMode() {
+			const key = "cd336beba498c97738c275f6771efca3"
+			if yakit.Get(key) == consts.ExistedCorePluginEmbedFSHash {
+				return nil
+			}
+			log.Debug("start to load core plugin")
+			defer func() {
+				hash, _ := CorePluginHash()
+				yakit.Set(key, hash)
+			}()
 		}
-		log.Debug("start to load core plugin")
-		defer func() {
-			hash, _ := CorePluginHash()
-			yakit.Set(key, hash)
-		}()
 
 		registerBuildInPlugin(
 			"mitm",
