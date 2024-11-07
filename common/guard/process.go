@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/shlex"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/shlex"
 )
 
 type PsAuxProcessEventType string

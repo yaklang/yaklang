@@ -3,7 +3,7 @@ package dap
 import (
 	"errors"
 
-	"github.com/google/shlex"
+	"github.com/yaklang/yaklang/common/utils/shlex"
 )
 
 const (
@@ -27,12 +27,11 @@ h, help                          : show help info
 	// msgDisable    = `disable breakpoint in line <line> or disable all breakpoints`
 )
 
-var (
-	errNoCmd = errors.New("command not available")
-	// errWatchNoExpr      = errors.New("watch/unwatch command need expression")
-	// errObsNoExpr        = errors.New("obs/unobs command need expression")
-	// errBreakPointNoLine = errors.New("breakpoint command need line number")
-)
+var errNoCmd = errors.New("command not available")
+
+// errWatchNoExpr      = errors.New("watch/unwatch command need expression")
+// errObsNoExpr        = errors.New("obs/unobs command need expression")
+// errBreakPointNoLine = errors.New("breakpoint command need line number")
 
 type cmdfunc func(args []string) (string, error)
 

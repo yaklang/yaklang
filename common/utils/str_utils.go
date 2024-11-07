@@ -1314,15 +1314,15 @@ func IsPlainText(raw []byte) bool {
 	return true
 }
 
-// UnquoteANSIC 解码ANSI-C风格的引号字符串
-func UnquoteANSIC(s string) (string, error) {
+func UnquoteANSICWithQuote(s string, quote rune) (string, error) {
 	// 检查是否以单引号开始和结束
-	if len(s) < 2 || s[0] != '\'' || s[len(s)-1] != '\'' {
-		return "", fmt.Errorf("string must begin and end with single quotes")
+	if quote != 0 {
+		if len(s) < 2 || s[0] != byte(quote) || s[len(s)-1] != byte(quote) {
+			return "", fmt.Errorf("string must begin and end with %c", quote)
+		}
+		// 去掉首尾的引号
+		s = s[1 : len(s)-1]
 	}
-
-	// 去掉首尾的引号
-	s = s[1 : len(s)-1]
 
 	var result strings.Builder
 	for i := 0; i < len(s); i++ {
@@ -1389,4 +1389,9 @@ func UnquoteANSIC(s string) (string, error) {
 	}
 
 	return result.String(), nil
+}
+
+// UnquoteANSIC 解码ANSI-C风格的引号字符串
+func UnquoteANSIC(s string) (string, error) {
+	return UnquoteANSICWithQuote(s, '\'')
 }

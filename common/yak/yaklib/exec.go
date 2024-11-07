@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 
-	"github.com/google/shlex"
+	"github.com/yaklang/yaklang/common/utils/shlex"
 )
 
 // CommandContext 创建一个受上下文控制的命令结构体，其第一个参数是上下文，第二个参数是要执行的命令
