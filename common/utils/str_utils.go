@@ -1358,6 +1358,10 @@ func UnquoteANSICWithQuote(s string, quote rune) (string, error) {
 			result.WriteByte('\'')
 		case '"':
 			result.WriteByte('"')
+		case '?':
+			result.WriteByte('?')
+		case 'e', 'E':
+			result.WriteByte('\033')
 		case 'x':
 			// 处理十六进制转义序列 \xHH
 			if i+2 >= len(s) {
@@ -1383,11 +1387,42 @@ func UnquoteANSICWithQuote(s string, quote rune) (string, error) {
 			}
 			result.WriteByte(byte(n))
 			i = end - 1
+		case 'u':
+			// 处理Unicode转义序列 \uHHHH
+			if i+4 >= len(s) {
+				return "", fmt.Errorf("invalid unicode escape sequence")
+			}
+			hex := s[i+1 : i+5]
+			n, err := strconv.ParseUint(hex, 16, 16)
+			if err != nil {
+				return "", fmt.Errorf("invalid unicode escape sequence: %s", hex)
+			}
+			v := rune(n)
+			if !utf8.ValidRune(v) {
+				return "", fmt.Errorf("invalid unicode escape sequence: %s", hex)
+			}
+			result.WriteRune(v)
+			i = i + 4
+		case 'U':
+			// 处理Unicode转义序列 \UHHHHHHHH
+			if i+8 >= len(s) {
+				return "", fmt.Errorf("invalid long unicode escape sequence")
+			}
+			hex := s[i+1 : i+9]
+			n, err := strconv.ParseUint(hex, 16, 32)
+			if err != nil {
+				return "", fmt.Errorf("invalid long unicode escape sequence: %s", hex)
+			}
+			v := rune(n)
+			if !utf8.ValidRune(v) {
+				return "", fmt.Errorf("invalid long unicode escape sequence: %s", hex)
+			}
+			result.WriteRune(v)
+			i = i + 8
 		default:
 			return "", fmt.Errorf("invalid escape sequence: \\%c", s[i])
 		}
 	}
-
 	return result.String(), nil
 }
 
