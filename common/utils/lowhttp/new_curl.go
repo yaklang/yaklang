@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/corpix/uarand"
-	"github.com/google/shlex"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/multipart"
+	"github.com/yaklang/yaklang/common/utils/shlex"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -72,19 +72,6 @@ func toCurlURL(u string) (*maybeURL, bool) {
 	return nil, false
 }
 
-func handleBashCommand(args []string) []string {
-	for i := 0; i < len(args); i++ {
-		// ANSI-C
-		if strings.HasPrefix(args[i], "$") {
-			args[i] = args[i][1:]
-			newArg, err := utils.UnquoteANSIC(fmt.Sprintf("'%s'", args[i]))
-			if err == nil {
-				args[i] = newArg
-			}
-		}
-	}
-	return args
-}
 
 func safeIndex(args []string, i int) (string, bool) {
 	if i >= len(args) {
@@ -107,7 +94,6 @@ func (c *Curl) ParseFromRaw(raw string) error {
 		s = strings.TrimSpace(s)
 		return s, s != ""
 	})
-	args = handleBashCommand(args)
 
 	return c.ParseOptions(args)
 }

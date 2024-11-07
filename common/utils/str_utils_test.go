@@ -246,7 +246,11 @@ func TestUnquoteANSIC(t *testing.T) {
 			input:    "'Hello\\040World'",
 			expected: "Hello World",
 		},
-
+		{
+			name:     "ansi-c escape",
+			input:    "'\\a\\b\\f\\n\\r\\t\\v\\'\\\"\\\\\\x41\\x42\\x43\\101\\102\\103'",
+			expected: "\a\b\f\n\r\t\v'\"\\ABCABC",
+		},
 		// 组合测试
 		{
 			name:     "mixed escapes",
@@ -264,13 +268,13 @@ func TestUnquoteANSIC(t *testing.T) {
 			name:    "error - no starting quote",
 			input:   "hello'",
 			wantErr: true,
-			errMsg:  "string must begin and end with single quotes",
+			errMsg:  "string must begin and end with '",
 		},
 		{
 			name:    "error - no ending quote",
 			input:   "'hello",
 			wantErr: true,
-			errMsg:  "string must begin and end with single quotes",
+			errMsg:  "string must begin and end with '",
 		},
 		{
 			name:    "error - invalid escape sequence",
@@ -294,7 +298,7 @@ func TestUnquoteANSIC(t *testing.T) {
 			name:    "error - escape at end of string",
 			input:   "'\\",
 			wantErr: true,
-			errMsg:  "string must begin and end with single quotes",
+			errMsg:  "string must begin and end with '",
 		},
 		{
 			name:    "error - invalid octal value",

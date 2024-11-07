@@ -13,11 +13,11 @@ import (
 	"strings"
 
 	"github.com/aymanbagabas/go-pty"
-	"github.com/google/shlex"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/shlex"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"golang.org/x/term"
 )
