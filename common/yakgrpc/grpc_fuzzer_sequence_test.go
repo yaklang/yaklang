@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -109,7 +111,6 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_InheritKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	token := utils.RandStringBytes(32)
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("GREAT"))
 		return
@@ -119,10 +120,10 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_InheritKey(t *testing.T) {
 		utils.TimeoutContextSeconds(10),
 		&ypb.FuzzerRequests{Requests: []*ypb.FuzzerRequest{
 			{
-				Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
-Host: www.example.com
+				Request: fmt.Sprintf(`GET / HTTP/1.1
+Host: %s
 
-{{p(a)}}`), "Host", utils.HostPort(host, port))),
+{{p(a)}}`, utils.HostPort(host, port)),
 				IsHTTPS:                  false,
 				PerRequestTimeoutSeconds: 5,
 				RedirectTimes:            3,
@@ -130,28 +131,52 @@ Host: www.example.com
 				Params: []*ypb.FuzzerParamItem{
 					{
 						Key:   "a",
-						Value: "{{int(1-10)}}",
+						Value: "{{int(1-2)}}",
 						Type:  "fuzztag",
 					},
 				},
 			},
 			{
-				Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /verify HTTP/1.1
-Host: www.example.com
-Authorization: Bearer {{params(test)}}
+				Request: fmt.Sprintf(`GET /verify HTTP/1.1
+Host: %s
 
-`+token+`_`+"{{p(a)}}"), "Host", utils.HostPort(host, port))),
+{{p(b)}}`, utils.HostPort(host, port)),
 				IsHTTPS:                  false,
 				PerRequestTimeoutSeconds: 5,
 				RedirectTimes:            3,
 				InheritVariables:         true,
 				ForceFuzz:                true,
+				Params: []*ypb.FuzzerParamItem{
+					{
+						Key:   "b",
+						Value: "{{p(a)}}",
+						Type:  "fuzztag",
+					},
+				},
+			},
+			{
+				Request: fmt.Sprintf(`GET /verify2 HTTP/1.1
+Host: %s
+
+{{p(c)}}`, utils.HostPort(host, port)),
+				IsHTTPS:                  false,
+				PerRequestTimeoutSeconds: 5,
+				RedirectTimes:            3,
+				InheritVariables:         true,
+				ForceFuzz:                true,
+				Params: []*ypb.FuzzerParamItem{
+					{
+						Key:   "c",
+						Value: "{{a+b}}",
+						Type:  "nuclei-dsl",
+					},
+				},
 			},
 		}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	firstRequestParams := make([]string, 0)
+	secondRequestParams := make([]string, 0)
 
 	count := 0
 	for {
@@ -163,15 +188,29 @@ Authorization: Bearer {{params(test)}}
 			break
 		}
 		count++
-		if strings.Contains(string(resp.Response.RequestRaw), token+`_-9`) {
-			// fmt.Println(string(resp.Response.RequestRaw))
-			t.Fatalf("fuzztag variables passed failed. request:\n%s", string(resp.Response.RequestRaw))
+		body := lowhttp.GetHTTPPacketBody(resp.Response.RequestRaw)
+		req, err := lowhttp.ParseBytesToHttpRequest(resp.Response.RequestRaw)
+		require.NoError(t, err)
+		require.NotNil(t, req.URL)
+		if req.URL.Path == "/" {
+			firstRequestParams = append(firstRequestParams, string(body))
+		} else if req.URL.Path == "/verify" {
+			secondRequestParams = append(secondRequestParams, string(body))
+
+			verifyParams := lo.Map(firstRequestParams, func(item string, index int) string {
+				return item
+			})
+			require.Contains(t, verifyParams, string(body))
+		} else if req.URL.Path == "/verify2" {
+			params, err := cartesian.Product([][]string{firstRequestParams, secondRequestParams})
+			require.NoError(t, err)
+			verifyParams := lo.Map(params, func(item []string, index int) string {
+				return item[0] + item[1]
+			})
+			require.Contains(t, verifyParams, string(body))
 		}
 	}
-	t.Logf("FETCH COUNT: %v", count)
-	if count != 20 {
-		t.Fatal("not 20 request")
-	}
+	require.Equal(t, 3+3, count, "count failed")
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_FuzzerWithTag(t *testing.T) {

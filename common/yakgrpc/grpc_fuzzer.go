@@ -1504,6 +1504,9 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 	l := make([][]string, len(params))
 	idToParam := make(map[int]*ypb.FuzzerParamItem)
 	hasNucleiTag := false
+	paramsMap := lo.SliceToMap(params, func(item *ypb.FuzzerParamItem) (string, string) {
+		return item.GetKey(), item.GetValue()
+	})
 
 	for index, p := range params {
 		_, value := p.GetKey(), p.GetValue()
@@ -1512,6 +1515,7 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 
 		if typ == "fuzztag" {
 			opts := mutate.FuzzFileOptions()
+			opts = append(opts, mutate.Fuzz_WithParams(paramsMap))
 			//if syncTagIndex {
 			//	opts = append(opts, mutate.Fuzz_SyncTag(true))
 			//}
