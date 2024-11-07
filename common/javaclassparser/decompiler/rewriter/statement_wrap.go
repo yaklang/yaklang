@@ -393,29 +393,24 @@ func (s *RewriteManager) Rewrite() error {
 	}
 	s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	nodeToRewriter := map[*core.Node]rewriterFunc{}
+	keyNodes := []*core.Node{}
 	for _, node := range s.WhileNode {
 		nodeToRewriter[node] = LoopRewriter
+		keyNodes = append(keyNodes, node)
 	}
 
 	for _, node := range s.SwitchNode {
 		nodeToRewriter[node] = SwitchRewriter
+		keyNodes = append(keyNodes, node)
 	}
 	for _, node := range s.IfNodes {
 		nodeToRewriter[node] = IfRewriter
+		keyNodes = append(keyNodes, node)
 	}
 	for _, node := range s.TryNodes {
 		nodeToRewriter[node] = TryRewriter
+		keyNodes = append(keyNodes, node)
 	}
-	//for _, node := range s.TopologicalSortReverse(s.WhileNode) {
-	//	println(utils2.DumpNodesToDotExp(s.RootNode))
-	//	err := LoopJmpRewriter(s, node)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	s.DominatorMap = GenerateDominatorTree(s.RootNode)
-	//
-	//}
-	//println(utils2.DumpNodesToDotExp(s.RootNode))
 	for _, node := range s.TopologicalSortReverse(s.SwitchNode) {
 		err := SwitchRewriter1(s, node)
 		if err != nil {
@@ -423,7 +418,7 @@ func (s *RewriteManager) Rewrite() error {
 		}
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	}
-	order := s.TopologicalSortReverse(maps.Keys(nodeToRewriter))
+	order := s.TopologicalSortReverse(keyNodes)
 	loopJmpRewriterRecoed := map[*core.Node]struct{}{}
 	for i := 0; i < len(order); i++ {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
@@ -460,6 +455,7 @@ func (s *RewriteManager) TopologicalSortReverse(nodes []*core.Node) []*core.Node
 		nodesMap[node] = struct{}{}
 	}
 	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
+		print(node.Id)
 		if _, ok := nodesMap[node]; ok {
 			order = append(order, node)
 		}

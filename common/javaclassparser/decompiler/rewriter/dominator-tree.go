@@ -3,6 +3,7 @@ package rewriter
 import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/utils"
+	"sort"
 )
 
 func GenerateDominatorTree(rootNode *core.Node) map[*core.Node][]*core.Node {
@@ -73,6 +74,11 @@ func GenerateDominatorTree(rootNode *core.Node) map[*core.Node][]*core.Node {
 	}
 	//sb.WriteString("}\n")
 	//println(sb.String())
+	for _, nodeList := range dominatorMap {
+		sort.Slice(nodeList, func(i, j int) bool {
+			return nodeToId[nodeList[i]] < nodeToId[nodeList[j]]
+		})
+	}
 	return dominatorMap
 
 }

@@ -197,7 +197,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		c.CurrentMethod = method
 		funcCtx := c.FuncCtx
 		funcCtx.FunctionName = name
-		if name != "nextTokenNotOrNull" {
+		if name != "nextToken" {
 			continue
 		}
 		println(name)
