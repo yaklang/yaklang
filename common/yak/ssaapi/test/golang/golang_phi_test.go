@@ -159,3 +159,27 @@ func Test_Phi_WithReturn(t *testing.T) {
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.GO))
 }
+
+func Test_MemberCall_WithPhi(t *testing.T) {
+	code := `package main
+
+	func main() {
+		a := function1()
+		if a == nil {
+			a = function2()
+		}
+		
+		a.test()
+	}
+`
+	t.Run("member-call-with-phi", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+		function1 <getCall> as $entry
+		$entry.test as $output
+
+`, map[string][]string{
+			"entry":  {"Undefined-function1()"},
+			"output": {"Undefined-a.test(valid)"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+}
