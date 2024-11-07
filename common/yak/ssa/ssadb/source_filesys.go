@@ -1,157 +1,89 @@
 package ssadb
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type irSourceFS struct {
-	virtual *filesys.VirtualFS
+	virtual map[string]*filesys.VirtualFS // echo program -> virtual fs
 }
+
+var _ filesys_interface.ReadOnlyFileSystem = (*irSourceFS)(nil)
+var _ filesys_interface.FileSystem = (*irSourceFS)(nil)
 
 func NewIrSourceFs() *irSourceFS {
 	ret := &irSourceFS{}
-	ret.resetVfs()
+	ret.virtual = make(map[string]*filesys.VirtualFS)
 	return ret
 }
 
-func (sfs *irSourceFS) resetVfs() {
-	virtual := filesys.NewVirtualFs()
-	virtual.AddDir("/")
-	sfs.virtual = virtual
-}
-
-var _ filesys_interface.FileSystem = (*irSourceFS)(nil)
-
-func (fs *irSourceFS) addFile(source *IrSource) {
-	path := fs.Join(source.FolderPath, source.FileName)
-	if source.QuotedCode == "" {
-		// fs.virtual.add dir
-		fs.virtual.AddDir(path)
-	} else {
-		code, _ := strconv.Unquote(source.QuotedCode)
-		if code == "" {
-			code = source.QuotedCode
-		}
-
-		// fs.virtual.add file
-		fs.virtual.AddFile(path, code)
-	}
-}
-func (fs *irSourceFS) loadStat(fullpath string) error {
-	if fullpath == "/" {
-		for _, program := range AllSSAPrograms() {
-			fs.virtual.AddDir(fmt.Sprintf("/%s", program.Name))
-		}
-		return nil
-	}
-	return fs.loadFile(fullpath)
-}
-
-func (fs *irSourceFS) loadFile(fullPath string) error {
-	programName, _ := fs.getProgram(fullPath)
-	CheckAndSwitchDB(programName)
-
-	path, name := fs.PathSplit(fullPath)
-	if name == "" {
-		fs.loadFolder(path)
-	} else {
-		// just file
-		source, err := GetIrSourceByPathAndName(path, name)
-		if err != nil {
-			return err
-		}
-		fs.addFile(source)
-	}
-	return nil
-}
-
-func (fs *irSourceFS) loadFolder(path string) error {
-	if path == "/" {
-		for _, program := range AllSSAPrograms() {
-			fs.virtual.AddDir(fmt.Sprintf("/%s", program.Name))
-		}
-		return nil
-	}
-	programName, _ := fs.getProgram(path)
-	CheckAndSwitchDB(programName)
-
-	// just folder
-	sources, err := GetIrSourceByPath(path)
-	if err != nil {
-		return err
-	}
-	for _, source := range sources {
-		fs.addFile(source)
-	}
-	return nil
-}
-
 func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
-	if data, err := fs.virtual.ReadFile(path); err == nil {
-		return data, nil
+	if path == "/" {
+		return nil, utils.Errorf("path [%v] is a program root path, not file.", path)
 	}
-	if err := fs.loadFile(path); err != nil {
+
+	vf, err := fs.checkPath(path)
+	if err != nil {
 		return nil, err
 	}
-
-	return fs.virtual.ReadFile(path)
+	return vf.ReadFile(path)
 }
 
 func (fs *irSourceFS) Open(path string) (fs.File, error) {
-	if file, err := fs.virtual.Open(path); err == nil {
-		return file, nil
+	if path == "/" {
+		return nil, utils.Errorf("path [%v] is a program root path, not file.", path)
 	}
-	if err := fs.loadFile(path); err != nil {
+	vf, err := fs.checkPath(path)
+	if err != nil {
 		return nil, err
 	}
-	return fs.virtual.Open(path)
+	return vf.Open(path)
 }
 
 func (fs *irSourceFS) OpenFile(path string, flag int, perm os.FileMode) (fs.File, error) {
-	if file, err := fs.virtual.OpenFile(path, flag, perm); err == nil {
-		return file, nil
+	if path == "/" {
+		return nil, utils.Errorf("path [%v] is a program root path, not file.", path)
 	}
-	if err := fs.loadFile(path); err != nil {
+	vf, err := fs.checkPath(path)
+	if err != nil {
 		return nil, err
 	}
-	return fs.virtual.OpenFile(path, flag, perm)
+	return vf.OpenFile(path, flag, perm)
 }
 
 func (fs *irSourceFS) Stat(path string) (fs.FileInfo, error) {
-	if info, err := fs.virtual.Stat(path); err == nil {
-		return info, nil
+	if path == "/" {
+		return filesys.NewVirtualFileInfo("/", 0, true), nil
 	}
-	if err := fs.loadStat(path); err != nil {
+	// handler path
+	vf, err := fs.checkPath(path, false)
+	if err != nil {
 		return nil, err
 	}
-	return fs.virtual.Stat(path)
+	return vf.Stat(path)
 }
 
-func (fs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
+func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	if path == "/" {
-		fs.resetVfs()
-		for _, program := range AllSSAPrograms() {
-			fs.virtual.AddDir(fmt.Sprintf("/%s", program.Name))
+		ret := make([]fs.DirEntry, 0)
+		for _, porgram := range AllSSAPrograms() {
+			ret = append(ret, filesys.NewVirtualFileInfo(porgram.Name, 0, true))
 		}
+		return ret, nil
 	}
-
-	if entry, err := fs.virtual.ReadDir(path); err == nil && entry != nil {
-		return entry, nil
-	}
-	if err := fs.loadFolder(path); err != nil {
+	vf, err := isfs.checkPath(path, true)
+	if err != nil {
 		return nil, err
 	}
-	return fs.virtual.ReadDir(path)
+	return vf.ReadDir(path)
 }
 
 func (fs *irSourceFS) PathSplit(p string) (string, string) {
@@ -166,19 +98,12 @@ func pathSplit(p string) (string, string) {
 	return dir, name
 }
 
-func (fs *irSourceFS) getProgram(path string) (string, bool) {
-	dir := strings.Split(path, string(fs.GetSeparators()))
-	return dir[1], len(dir) == 2
-}
-
 func (f *irSourceFS) ExtraInfo(path string) map[string]any {
 	m := make(map[string]any)
-	// if root path ? get program Name
-	programName, programRoot := f.getProgram(path)
-	if !programRoot {
+	programName, isProgram := f.getProgram(path)
+	if !isProgram {
 		return m
 	}
-
 	if prog := GetSSAProgram(programName); prog != nil {
 		m["programName"] = programName
 		m["CreateAt"] = prog.CreatedAt.Unix()
@@ -190,21 +115,18 @@ func (f *irSourceFS) ExtraInfo(path string) map[string]any {
 }
 
 func (f *irSourceFS) Delete(path string) error {
-	f.virtual.Delete(path)
-	// if root path ? get program Name
-	programName, programRoot := f.getProgram(path)
-	if !programRoot {
+	if path == "/" {
+		return utils.Errorf("path [%v] is a program root path, can't delete", path)
+	}
+	programName, isProgram := f.getProgram(path)
+	if !isProgram {
 		return utils.Errorf("path [%v] is not a program root path, can't delete", path)
 	}
-	prog := GetSSAProgram(programName)
-	if prog == nil {
+	// switch db path
+	if prog := CheckAndSwitchDB(programName); prog == nil {
 		return utils.Errorf("program [%v] not exist", programName)
 	}
-	// switch db path
-	origin := consts.GetSSADataBasePath()
-	if origin != prog.DBPath {
-		consts.SetSSADataBasePath(prog.DBPath)
-	}
+	delete(f.virtual, programName)
 	// delete program
 	DeleteProgram(GetDB(), programName)
 	DeleteSSAProgram(programName)
@@ -213,6 +135,11 @@ func (f *irSourceFS) Delete(path string) error {
 
 func (fs *irSourceFS) Ext(string) string {
 	return ""
+}
+
+func (fs *irSourceFS) getProgram(path string) (string, bool) {
+	dir := strings.Split(path, string(fs.GetSeparators()))
+	return dir[1], len(dir) == 2
 }
 
 func (f *irSourceFS) GetSeparators() rune         { return '/' }
@@ -230,3 +157,82 @@ func (f *irSourceFS) Rel(string, string) (string, error)          { return "", u
 func (f *irSourceFS) WriteFile(string, []byte, os.FileMode) error { return utils.Error("implement me") }
 func (f *irSourceFS) MkdirAll(string, os.FileMode) error          { return utils.Error("implement me") }
 func (f *irSourceFS) Base(p string) string                        { return path.Base(p) }
+
+func (fs *irSourceFS) checkPath(path string, isDirs ...bool) (*filesys.VirtualFS, error) {
+	progName, isProgram := fs.getProgram(path)
+	vf, ok := fs.virtual[progName]
+	if !ok {
+		vf = filesys.NewVirtualFs()
+		fs.virtual[progName] = vf
+	}
+	// is directory parameter
+	isDir := false
+	if len(isDirs) > 0 {
+		isDir = isDirs[0]
+	}
+	// if "/programName" this is a program root path, is directory
+	if isProgram {
+		isDir = true
+	}
+	loadIrSourceFS(path, progName, isDir, fs, vf)
+	return vf, nil
+}
+
+func loadIrSourceFS(path, progName string, isDir bool, fs *irSourceFS, vf *filesys.VirtualFS) {
+	add2FS := func(source *IrSource) {
+		path := fs.Join(source.FolderPath, source.FileName)
+		if source.QuotedCode == "" {
+			// fs.virtual.add dir
+			vf.AddDir(path)
+		} else {
+			code, _ := strconv.Unquote(source.QuotedCode)
+			if code == "" {
+				code = source.QuotedCode
+			}
+
+			// fs.virtual.add file
+			vf.AddFile(path, code)
+		}
+	}
+
+	addDir := func(path string) {
+		sources, err := GetIrSourceByPath(path)
+		if err != nil {
+			return
+		}
+		for _, source := range sources {
+			add2FS(source)
+		}
+	}
+
+	// if _, err := vf.Stat(path); err == nil {
+	// 	return
+	// }
+
+	CheckAndSwitchDB(progName)
+	if isDir {
+		addDir(path)
+		return
+	}
+
+	// other
+	path, name := fs.PathSplit(path)
+	// if is program, this is root path
+	if name == "" {
+		// directory
+		sources, err := GetIrSourceByPath(path)
+		if err != nil {
+			return
+		}
+		for _, source := range sources {
+			add2FS(source)
+		}
+	} else {
+		// file
+		source, err := GetIrSourceByPathAndName(path, name)
+		if err != nil {
+			return
+		}
+		add2FS(source)
+	}
+}

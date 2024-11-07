@@ -9,15 +9,16 @@ import (
 
 var Programs = omap.NewEmptyOrderedMap[string, *schema.SSAProgram]()
 
-func CheckAndSwitchDB(name string) {
+func CheckAndSwitchDB(name string) *schema.SSAProgram {
 	// switch to database
 	prog := GetSSAProgram(name)
 	if prog == nil {
-		return
+		return nil
 	}
 	if prog.DBPath != consts.GetSSADataBasePath() {
 		consts.SetSSADataBasePath(prog.DBPath)
 	}
+	return prog
 }
 
 func GetSSAProgram(name string) *schema.SSAProgram {
