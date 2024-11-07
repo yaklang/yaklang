@@ -26,6 +26,8 @@ const (
 	ConstantMethodType           = "ConstantMethodType"
 	ConstantMethodHandle         = "ConstantMethodHandle"
 	ConstantInvokeDynamic        = "ConstantInvokeDynamic"
+	ConstantModule               = "ConstantModule"
+	ConstantPackage              = "ConstantPackage"
 	CodeAttributeType            = "CodeAttribute"
 	ConstantValueAttributeType   = "ConstantValueAttribute"
 	DeprecatedAttributeType      = "DeprecatedAttribute"
@@ -105,6 +107,12 @@ func _MarshalJavaClass(cp *ClassObject, charLength int) []byte {
 			writer.Write1Byte(CONSTANT_InvokeDynamic)
 			writer.Write2Byte(cp.ConstantPool[i].(*ConstantInvokeDynamicInfo).BootstrapMethodAttrIndex)
 			writer.Write2Byte(cp.ConstantPool[i].(*ConstantInvokeDynamicInfo).NameAndTypeIndex)
+		case *ConstantModuleInfo:
+			writer.Write1Byte(CONSTANT_Module)
+			writer.Write2Byte(cp.ConstantPool[i].(*ConstantModuleInfo).NameIndex)
+		case *ConstantPackageInfo:
+			writer.Write1Byte(CONSTANT_Package)
+			writer.Write2Byte(cp.ConstantPool[i].(*ConstantPackageInfo).NameIndex)
 		case nil:
 			continue
 		default:
@@ -332,6 +340,12 @@ func AddVerboseAndType(classObj *ClassObject, obj interface{}) {
 		ret.Type = ConstantInvokeDynamic
 		ret.BootstrapMethodAttrIndexVerbose, _ = classObj.getUtf8(ret.BootstrapMethodAttrIndex)
 		ret.NameAndTypeIndexVerbose, _ = classObj.getUtf8(ret.NameAndTypeIndex)
+	case *ConstantModuleInfo:
+		ret.Type = ConstantModule
+		ret.NameIndexVerbose, _ = classObj.getUtf8(ret.NameIndex)
+	case *ConstantPackageInfo:
+		ret.Type = ConstantPackage
+		ret.NameIndexVerbose, _ = classObj.getUtf8(ret.NameIndex)
 	}
 }
 func _UnmarshalToClassObject(jsonData string) (*ClassObject, error) {

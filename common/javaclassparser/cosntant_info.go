@@ -1,6 +1,9 @@
 package javaclassparser
 
+import "github.com/davecgh/go-spew/spew"
+
 /*
+* See: https://docs.oracle.com/javase/specs/jvms/se9/html/jvms-4.html#jvms-4.4.11
 *
 常量数据结构如下
 
@@ -24,6 +27,8 @@ const (
 	CONSTANT_MethodHandle       = 15
 	CONSTANT_MethodType         = 16
 	CONSTANT_InvokeDynamic      = 18
+	CONSTANT_Module             = 19
+	CONSTANT_Package            = 20
 )
 
 /*
@@ -85,7 +90,16 @@ func newConstantInfo(tag uint8) ConstantInfo {
 		return &ConstantMethodHandleInfo{}
 	case CONSTANT_InvokeDynamic:
 		return &ConstantInvokeDynamicInfo{}
+	case CONSTANT_Module:
+		return &ConstantModuleInfo{}
+	case CONSTANT_Package:
+		return &ConstantPackageInfo{}
 	default:
-		panic("java.lang.ClassFormatError: constant pool tag!")
+		panic("java.lang.ClassFormatError: constant pool tag! met " + spew.Sdump(tag))
 	}
 }
+
+/*
+[WARN] 2024-11-07 20:14:33 [fs:135] walk file /Users/v1ll4n/Projects/java/compiling-failed-files/decompiler-err-module-info-2oO3wkCNSKbDbjtgKu1Nx6HOlsy.class failed: parse class error: java.lang.ClassFormatError: constant pool tag! met (uint8) 19
+
+*/
