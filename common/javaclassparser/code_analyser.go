@@ -90,6 +90,18 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
 		return values.NewJavaClassValue(types.NewJavaClass(typeName))
+	case *ConstantModuleInfo:
+		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
+		typeName := nameInfo.Value
+		typeName = strings.Replace(typeName, "/", ".", -1)
+		log.Warn("TODO: the java module should be a new java type")
+		return values.NewJavaClassValue(types.NewJavaClass(typeName))
+	case *ConstantPackageInfo:
+		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
+		typeName := nameInfo.Value
+		typeName = strings.Replace(typeName, "/", ".", -1)
+		log.Warn("TODO: the java module should be a new java type")
+		return values.NewJavaClassValue(types.NewJavaClass(typeName))
 	default:
 		panic("failed")
 	}
@@ -108,6 +120,10 @@ func GetLiteralFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	case *ConstantFloatInfo:
 		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaFloat))
 	case *ConstantClassInfo:
+		return GetValueFromCP(pool, index)
+	case *ConstantModuleInfo:
+		return GetValueFromCP(pool, index)
+	case *ConstantPackageInfo:
 		return GetValueFromCP(pool, index)
 	default:
 		panic("failed")

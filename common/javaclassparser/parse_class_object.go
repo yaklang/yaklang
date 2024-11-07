@@ -214,6 +214,10 @@ func (this *ClassObject) getUtf8(index uint16) (string, error) {
 		return this.getUtf8(ret.StringIndex)
 	case *ConstantClassInfo:
 		return this.getUtf8(ret.NameIndex)
+	case *ConstantModuleInfo:
+		return this.getUtf8(ret.NameIndex)
+	case *ConstantPackageInfo:
+		return this.getUtf8(ret.NameIndex)
 	case *ConstantFieldrefInfo:
 		return this.getUtf8(ret.ClassIndex)
 	case *ConstantMethodrefInfo:

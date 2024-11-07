@@ -346,6 +346,8 @@ func (c *ClassObjectDumper) dumpConstantPool() ([]string, error) {
 		case *ConstantMethodTypeInfo:
 		case *ConstantMethodHandleInfo:
 		case *ConstantInvokeDynamicInfo:
+		case *ConstantModuleInfo:
+		case *ConstantPackageInfo:
 		}
 	}
 	return result, nil
