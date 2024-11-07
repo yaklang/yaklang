@@ -271,9 +271,6 @@ type MITMServer struct {
 }
 
 func (m *MITMServer) GetMaxContentLength() int {
-	if m == nil || m.maxContentLength <= 0 {
-		return 10 * 1024 * 1024 // 10MB roughly
-	}
 	return m.maxContentLength
 }
 
@@ -330,7 +327,9 @@ func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string,
 	if m.randomJA3 {
 		config = append(config, lowhttp.WithRandomJA3FingerPrint(true))
 	}
-
+	if m.GetMaxContentLength() != 0 && m.GetMaxContentLength() < 10*1024*1024 {
+		m.proxy.SetMaxContentLength(m.GetMaxContentLength())
+	}
 	m.proxy.SetLowhttpConfig(config)
 	m.proxy.SetGMTLS(m.gmtls)
 	m.proxy.SetGMPrefer(m.gmPrefer)
@@ -338,7 +337,6 @@ func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string,
 	m.proxy.SetHTTPForceClose(m.forceDisableKeepAlive)
 
 	m.proxy.SetMITM(m.mitmConfig)
-	m.proxy.SetMaxContentLength(m.GetMaxContentLength())
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
