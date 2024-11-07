@@ -1,9 +1,10 @@
 package tests
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
@@ -843,7 +844,7 @@ class A{
 $a = new A(2);
 println($a->b);
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #19.b)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #17.b)"}, t)
 	})
 	t.Run("test oop return", func(t *testing.T) {
 		code := `<?php
@@ -898,5 +899,5 @@ function main(){
 	println($a->A_method());
 }
 `
-	ssatest.CheckPrintlnValue(code, []string{"Undefined-$a.A_method(valid)(Undefined-A-constructor(Undefined-A))"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"Undefined-$a.A_method(valid)(Undefined-A(Undefined-A))"}, t)
 }
