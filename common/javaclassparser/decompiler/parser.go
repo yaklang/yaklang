@@ -11,7 +11,7 @@ import (
 func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			err = utils.Error(e)
+			err = utils.ErrorStack(e)
 		}
 	}()
 	err = decompiler.ParseSourceCode()
