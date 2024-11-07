@@ -96,7 +96,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	attrs := ""
 	fields, err := c.DumpFields()
 	if err != nil {
-		return "", err
+		return "", utils.Wrap(err, "DumpFields failed")
 	}
 	if len(fields) > 0 {
 		attrs += "\n\t// Fields\n"
@@ -107,7 +107,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 
 	methods, err := c.DumpMethods()
 	if err != nil {
-		return "", err
+		return "", utils.Wrap(err, "DumpMethods failed")
 	}
 	if len(methods) > 0 {
 		attrs += "\n"
@@ -175,15 +175,15 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		accessFlags := strings.Join(accessFlagsVerbose, " ")
 		name, err := c.obj.getUtf8(method.NameIndex)
 		if err != nil {
-			return nil, err
+			return nil, utils.Wrapf(err, "getUtf8(%v) failed", method.NameIndex)
 		}
 		descriptor, err := c.obj.getUtf8(method.DescriptorIndex)
 		if err != nil {
-			return nil, err
+			return nil, utils.Wrapf(err, "getUtf8(%v) failed", method.DescriptorIndex)
 		}
 		methodType, err := types.ParseMethodDescriptor(descriptor)
 		if err != nil {
-			return nil, err
+			return nil, utils.Wrapf(err, "ParseMethodDescriptor(%v) failed", descriptor)
 		}
 		paramsNewStrList := []string{}
 		for i, paramsType := range methodType.FunctionType().ParamTypes {
@@ -206,7 +206,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
 				statementList, err := ParseBytesCode(c, codeAttr)
 				if err != nil {
-					return nil, err
+					return nil, utils.Wrap(err, "ParseBytesCode failed")
 				}
 				sourceCode := "\n"
 				statementSet := utils.NewSet[statements.Statement]()
