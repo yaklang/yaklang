@@ -1617,8 +1617,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	//如果 mitm 启动时进行设置，优先使用mitm中的设置
 	if firstReq.GetMaxContentLength() != 0 && firstReq.GetMaxContentLength() <= 10*1024*1024 {
 		opts = append(opts, crep.MITM_SetMaxContentLength(firstReq.GetMaxContentLength()))
-	} else {
-		opts = append(opts, crep.MITM_SetMaxContentLength(int64(consts.GLOBAL_MAXSIZE_CONTENT_LENGTH.Load())))
 	}
 	mServer, err = crep.NewMITMServer(opts...)
 	if err != nil {
