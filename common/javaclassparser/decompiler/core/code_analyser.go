@@ -300,7 +300,7 @@ func (d *Decompiler) ParseStatement() error {
 			mergeNode := funk.Filter(dominatorMap[ifNode], func(code *OpCode) bool {
 				return code != ifNode.Target[0] && code != ifNode.Target[1]
 			}).([]*OpCode)[0]
-			if len(mergeNode.Instr.StackPopped) > 0 {
+			if IsPopInstr(mergeNode.Instr.OpCode) {
 				ifNode.TrueNode = ifNode.Target[1]
 				ifNode.FalseNode = ifNode.Target[0]
 				ifNode.Target = []*OpCode{mergeNode}
@@ -1003,6 +1003,7 @@ func (d *Decompiler) ParseStatement() error {
 		}
 		return nil
 	}
+
 	opcodeToVarTable := map[*OpCode][]any{}
 	opcodeToVarTable[d.opCodes[0]] = []any{d.varTable, d.currentVarId}
 	err = WalkGraph[*OpCode](d.opCodes[0], func(code *OpCode) ([]*OpCode, error) {

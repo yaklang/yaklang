@@ -11,6 +11,9 @@ import (
 type rewriterFunc func(statementManager *RewriteManager, node *core.Node) error
 
 func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
+	if ifNode.Id == 78 {
+		println()
+	}
 	err := CalcEnd(manager.DominatorMap, ifNode)
 	if err != nil {
 		return err
@@ -29,6 +32,9 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 
 	ifStatementNode := manager.NewNode(ifStatement)
 	ifNode.Replace(ifStatementNode)
+	if ifStatementNode.Id == 792 {
+		println()
+	}
 	checkIsEndNode := func(node1, node2 *core.Node) bool {
 		if node1 == nil || node2 == nil {
 			return false
@@ -46,14 +52,20 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 			}
 			return next, nil
 		})
-		for _, node := range NodeDeduplication(endNodes) {
+		endNodes = NodeDeduplication(endNodes)
+		hasNext := false
+		for _, node := range endNodes {
 			for _, n := range node.Next {
+				hasNext = true
 				if n != node2 {
 					return false
 				}
 			}
 		}
-		return true
+		if hasNext {
+			return true
+		}
+		return false
 	}
 	if checkIsEndNode(trueNode, falseNode) {
 		falseNode = nil

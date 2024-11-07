@@ -216,6 +216,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 	return nil
 }
 func LoopRewriter(manager *RewriteManager, node *core.Node) error {
+	utils.DumpNodesToDotExp(manager.RootNode)
 	circleNode := node
 	loopStart := circleNode.Next[0]
 	circleNode.RemoveNext(loopStart)
@@ -258,7 +259,7 @@ func LoopRewriter(manager *RewriteManager, node *core.Node) error {
 	//}
 	loopNode := manager.NewNode(doWhileSt)
 	circleNode.Replace(loopNode)
-	if len(NodeDeduplication(endNodes)) > 1 {
+	if len(NodeDeduplication(endNodes)) > 0 {
 		print()
 	}
 	for _, c := range NodeDeduplication(endNodes) {
