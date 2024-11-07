@@ -315,7 +315,7 @@ func TestCurlToRawHTTPRequestOldTest(t *testing.T) {
 -H 'authority: audio-consideration-rc2ldz.cn.goofy.app' \
 -A '-A setting' \
 --data-raw $'{"query":"query QueryRiskList($req: QueryRiskListReqInput\u0021) {\\n  QueryRiskList(req: $req) {\\n    Data\\n    TotalCount\\n  }\\n}\\n","variables":{"req":{"Filters":[{"FieldName":"basic_info.source","DataType":"String","Operator":"IN","Value":"[\\"BLACKBOX\\"]"},{"FieldName":"basic_info.created_at","DataType":"Int","Operator":"GE","Value":"1689004800"},{"FieldName":"basic_info.created_at","DataType":"Int","Operator":"LE","Value":"1689091199"},{"FieldName":"basic_info.status","DataType":"String","Operator":"IN","Value":"[\\"PENDING\\"]"},{"FieldName":"basic_info.business_tree_id","DataType":"Int","Operator":"EQ","Value":"6"},{"FieldName":"basic_info.risk_vuln_type","DataType":"String","Operator":"EQ","Value":"\\"auth_bypass\\""}],"Category":"ALL","CurrentPage":"1","PerPageItems":"20","OrderField":"basic_info.created_at","OrderType":"DESC"}}}' \
---compressed`, []string{`POST`, `HTTP/1.`, "-A setting", "H setting"}, nil)
+--compressed`, []string{`POST`, `HTTP/1.`, "-A setting", "H setting", "QueryRiskListReqInput\u0021)"}, nil)
 	})
 }
 
