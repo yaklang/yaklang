@@ -2,10 +2,11 @@ package sfbuildin
 
 import (
 	"embed"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"io/fs"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
@@ -22,13 +23,15 @@ func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 
 		const key = "e18179b8cbbea727589cd210c8204306"
-		if yakit.Get(key) == consts.ExistedSyntaxFlowEmbedFSHash {
-			return nil
+		if !consts.IsDevMode() {
+			if yakit.Get(key) == consts.ExistedSyntaxFlowEmbedFSHash {
+				return nil
+			}
+			defer func() {
+				hash, _ := SyntaxFlowRuleHash()
+				yakit.Set(key, hash)
+			}()
 		}
-		defer func() {
-			hash, _ := SyntaxFlowRuleHash()
-			yakit.Set(key, hash)
-		}()
 
 		fsInstance := filesys.NewEmbedFS(ruleFS)
 		err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
