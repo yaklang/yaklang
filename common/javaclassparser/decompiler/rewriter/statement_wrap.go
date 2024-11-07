@@ -424,6 +424,7 @@ func (s *RewriteManager) Rewrite() error {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	}
 	order := s.TopologicalSortReverse(maps.Keys(nodeToRewriter))
+	loopJmpRewriterRecoed := map[*core.Node]struct{}{}
 	for i := 0; i < len(order); i++ {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 		node := order[i]
@@ -431,10 +432,14 @@ func (s *RewriteManager) Rewrite() error {
 			for j := i; j < len(order); j++ {
 				n := order[j]
 				if slices.Contains(s.WhileNode, n) && utils2.IsDominate(s.DominatorMap, n, node) {
+					if _, ok := loopJmpRewriterRecoed[n]; ok {
+						break
+					}
 					err := LoopJmpRewriter(s, n)
 					if err != nil {
 						return err
 					}
+					loopJmpRewriterRecoed[n] = struct{}{}
 					s.DominatorMap = GenerateDominatorTree(s.RootNode)
 					break
 				}

@@ -36,6 +36,13 @@ func RebuildLoopNode(manager *RewriteManager) error {
 }
 func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 	loopEnd := searchCircleEndNode(circleNode, circleNode.Next[0])
+	preWhileNodes := utils.NodeFilter(manager.WhileNode, func(node *core.Node) bool {
+		return utils.IsDominate(manager.DominatorMap, node, circleNode)
+	})
+	preWhileNodeEnds := map[*core.Node]*core.Node{}
+	for _, n := range preWhileNodes {
+		preWhileNodeEnds[n] = searchCircleEndNode(n, n.Next[0])
+	}
 	checkNode := func(node *core.Node) ([]*core.Node, error) {
 		if node.IsJmp {
 			return nil, nil
@@ -60,7 +67,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 				continue
 			}
 
-			if !utils.IsDominate(manager.DominatorMap, node, next) && node != circleNode && false {
+			if false && !utils.IsDominate(manager.DominatorMap, node, next) && node != circleNode {
 				if node != circleNode {
 					breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 						return "break"
@@ -164,8 +171,8 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 						if len(n.Next) < 2 {
 							continue
 						}
-						endNode := searchCircleEndNode(n, n.Next[0])
-						if endNode == next && utils.IsDominate(manager.DominatorMap, n, circleNode) {
+						endNode := preWhileNodeEnds[n]
+						if endNode == next {
 							loopNode := n.Statement.(*statements.DoWhileStatement)
 							if loopNode.Label == "" {
 								label := manager.NewLoopLabel()
@@ -193,7 +200,10 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 		}
 		return nextList, nil
 	}
+	times := 0
 	err := core.WalkGraph[*core.Node](circleNode.Next[0], func(node *core.Node) ([]*core.Node, error) {
+		times++
+		//return node.Next, nil
 		return checkNode(node)
 	})
 	if err != nil {
@@ -248,6 +258,9 @@ func LoopRewriter(manager *RewriteManager, node *core.Node) error {
 	//}
 	loopNode := manager.NewNode(doWhileSt)
 	circleNode.Replace(loopNode)
+	if len(NodeDeduplication(endNodes)) > 1 {
+		print()
+	}
 	for _, c := range NodeDeduplication(endNodes) {
 		loopNode.AddNext(c)
 	}
