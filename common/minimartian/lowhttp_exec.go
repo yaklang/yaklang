@@ -1,6 +1,7 @@
 package minimartian
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"net/http"
 
@@ -62,7 +63,10 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 	}
 
 	isGmTLS := p.gmTLS && isHttps
-
+	MaxContentLength := int(consts.GetGlobalMaxContentLength())
+	if p.GetMaxContentLength() != 0 {
+		MaxContentLength = p.maxContentLength
+	}
 	opts := append(
 		p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
@@ -74,6 +78,7 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		lowhttp.WithConnPool(true),
 		lowhttp.WithSaveHTTPFlow(false),
 		lowhttp.WithNativeHTTPRequestInstance(req),
+		lowhttp.WithMaxContentLength(MaxContentLength),
 	)
 
 	//if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
@@ -126,14 +131,14 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		}
 
 		if key == "content-length" {
-			if contentLength := codec.Atoi(value); contentLength < p.GetMaxContentLength() {
+			if contentLength := codec.Atoi(value); contentLength < int(MaxContentLength) {
 				return
 			}
 		}
 
 		// set if chunked or content-length is too large
 		httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
-			writerCloser := utils.NewTriggerWriter(uint64(p.GetMaxContentLength()), func(buffer io.ReadCloser) {
+			writerCloser := utils.NewTriggerWriter(uint64(MaxContentLength), func(buffer io.ReadCloser) {
 				httpctx.SetResponseTooLarge(req, true)
 				httpctx.SetMITMSkipFrontendFeedback(req, true)
 				bwr.Write(headerBytes)

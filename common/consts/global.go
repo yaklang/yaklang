@@ -91,6 +91,10 @@ func GetGlobalCallerCallPluginTimeout() float64 {
 func SetGlobalCallerCallPluginTimeout(i float64) {
 	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Store(i)
 }
+
+func GetGlobalMaxContentLength() uint64 {
+	return GLOBAL_MAXSIZE_CONTENT_LENGTH.Load()
+}
 func SetGlobalMaxContentLength(i uint64) {
 	if i > uint64(1024*1024*10) {
 		GLOBAL_MAXSIZE_CONTENT_LENGTH.Store(1024 * 1024 * 10)

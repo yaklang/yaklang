@@ -652,7 +652,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	}
 
 	//maxBodySize := 5 * 1024 * 1024
-	maxBodySize := consts.GLOBAL_MAXSIZE_CONTENT_LENGTH.Load()
+	maxBodySize := consts.GetGlobalMaxContentLength()
 	if req.GetMaxBodySize() > 1024 && req.GetMaxBodySize() < 10*1024*1024 {
 		maxBodySize = uint64(req.MaxBodySize)
 	}
