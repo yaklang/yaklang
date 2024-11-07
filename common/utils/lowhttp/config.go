@@ -295,7 +295,7 @@ func NewLowhttpOption() *LowhttpExecConfig {
 		Proxy:                nil,
 		RedirectHandler:      nil,
 		SaveHTTPFlow:         consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
-		MaxContentLength:     10 * 1000 * 1000, // 10MB roughly
+		MaxContentLength:     10 * 1024 * 1024, // 10MB roughly
 	}
 }
 
