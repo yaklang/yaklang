@@ -2,11 +2,12 @@ package httptpl
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
@@ -19,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	utils2 "github.com/yaklang/yaklang/common/yak/httptpl/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type requestRaw struct {
@@ -380,7 +382,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			if y.ReverseConnectionNeed { // check token even if send error
 				if v, ok := y.Variables.GetRaw()["reverse_dnslog_token"]; ok {
 					if config.OOBRequireCheckingTrigger == nil {
-						InjectInteractshVar(v.Data, config.RuntimeId, runtimeVars)
+						InjectInteractshVar(codec.AnyToString(v.Data), config.RuntimeId, runtimeVars)
 					}
 				}
 			}

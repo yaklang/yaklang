@@ -162,9 +162,10 @@ func (f *fuzzerSequenceFlow) FromFuzzerResponse(response *ypb.FuzzerResponse) *f
 		if request.InheritVariables {
 			oldParams := lo.Map(response.GetExtractedResults(), func(item *ypb.KVPair, index int) *ypb.FuzzerParamItem {
 				return &ypb.FuzzerParamItem{
-					Key:   item.GetKey(),
-					Value: item.GetValue(),
-					Type:  "raw",
+					Key:          item.GetKey(),
+					Value:        item.GetValue(),
+					MarshalValue: item.GetMarshalValue(),
+					Type:         "raw",
 				}
 			})
 			request.Params = append(oldParams, request.Params...)

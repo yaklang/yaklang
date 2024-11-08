@@ -145,7 +145,7 @@ var nucleiDSLFunctions = map[string]interface{}{
 		}
 		return string(raw)
 	},
-	"deflate": func(arg any) any {
+	"deflate": func(arg any) string {
 		buffer := &bytes.Buffer{}
 		writer, err := flate.NewWriter(buffer, -1)
 		if err != nil {
@@ -161,7 +161,7 @@ var nucleiDSLFunctions = map[string]interface{}{
 
 		return buffer.String()
 	},
-	"infalte": func(arg any) any {
+	"infalte": func(arg any) string {
 		reader := flate.NewReader(strings.NewReader(toString(arg)))
 		data, err := io.ReadAll(reader)
 		if err != nil {
@@ -691,7 +691,7 @@ var nucleiDSLFunctions = map[string]interface{}{
 		return data
 	},
 
-	"generate_jwt": func(args ...interface{}) interface{} {
+	"generate_jwt": func(args ...interface{}) string {
 		var optionalAlgorithm jwt.SigningMethod
 		var optionalKey []byte = []byte{}
 		var optionalMaxAgeUnix int64
@@ -700,7 +700,7 @@ var nucleiDSLFunctions = map[string]interface{}{
 
 		if argSize < 1 || argSize > 4 {
 			log.Errorf("invalid number of arguments: %d", argSize)
-			return nil
+			return ""
 		}
 		jsonString := toString(args[0])
 
@@ -709,7 +709,7 @@ var nucleiDSLFunctions = map[string]interface{}{
 		err := json.Unmarshal([]byte(jsonString), &claims)
 		if err != nil {
 			log.Error(err)
-			return nil
+			return ""
 		}
 
 		if argSize > 1 {
@@ -720,7 +720,7 @@ var nucleiDSLFunctions = map[string]interface{}{
 			}
 			if optionalAlgorithm == nil {
 				log.Errorf("invalid algorithm: %s", alg)
-				return nil
+				return ""
 			}
 		}
 
@@ -732,7 +732,7 @@ var nucleiDSLFunctions = map[string]interface{}{
 			optionalMaxAgeUnix, err = strconv.ParseInt(toString(args[3]), 10, 64)
 			if err != nil {
 				log.Error(err)
-				return nil
+				return ""
 			}
 			claims["exp"] = optionalMaxAgeUnix
 		}
@@ -743,7 +743,7 @@ var nucleiDSLFunctions = map[string]interface{}{
 		tokenString, err = token.SignedString(optionalKey)
 		if err != nil {
 			log.Error(err)
-			return nil
+			return ""
 		}
 		return tokenString
 	},
@@ -830,7 +830,8 @@ func NewNucleiDSLYakSandbox() *NucleiDSL {
 				return "", true
 			}
 			return nil, false
-		}}
+		},
+	}
 	return dsl
 }
 
@@ -912,6 +913,7 @@ func (d *NucleiDSL) createSandboxEngine(items ...map[string]interface{}) (*antlr
 	}
 	return box, merged, nil
 }
+
 func (d *NucleiDSL) ExecuteWithOnGetVar(expr string, getter func(name string) (any, bool), items ...map[string]interface{}) (interface{}, error) {
 	box, merged, err := d.createSandboxEngine(items...)
 	if err != nil {
