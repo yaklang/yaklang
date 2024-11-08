@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
@@ -175,4 +176,28 @@ func TestCreateOrUpdateHTTPFlow(t *testing.T) {
 	newFlow, err := GetHTTPFlowByIDOrHash(consts.GetGormProjectDatabase().Debug(), int64(flow.ID), "")
 	require.NoError(t, err)
 	require.Equal(t, token1, newFlow.SourceType, "create or update http flow error")
+}
+
+func TestQueryHttpFlowFromPlugin(t *testing.T) {
+	hash := uuid.NewString()
+	httpflow := &schema.HTTPFlow{
+		FromPlugin: "abcabc",
+	}
+	err := CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase().Debug(), hash, httpflow)
+	require.NoError(t, err)
+	defer func() {
+		DeleteHTTPFlowByID(consts.GetGormProjectDatabase().Debug(), int64(httpflow.ID))
+	}()
+	paging, httpflows, err := QueryHTTPFlow(consts.GetGormProjectDatabase().Debug(), &ypb.QueryHTTPFlowRequest{
+		FromPlugin: "abc",
+	})
+	require.NoError(t, err)
+	require.True(t, paging.TotalRecord != 0)
+	var flag bool
+	for _, httpflow := range httpflows {
+		if httpflow.FromPlugin == "abcabc" {
+			flag = true
+		}
+	}
+	require.True(t, flag)
 }

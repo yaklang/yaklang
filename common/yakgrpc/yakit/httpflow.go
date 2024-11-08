@@ -707,6 +707,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	}
 	// 搜索 URL
 	db = bizhelper.FuzzQueryLike(db, "url", params.GetSearchURL())
+	db = bizhelper.FuzzQueryLike(db, "from_plugin", params.GetFromPlugin())
 	// status code 这里可以支持范围搜索
 	db = bizhelper.QueryBySpecificPorts(db, "status_code", params.GetStatusCode())
 	if params.GetHaveBody() {
@@ -714,7 +715,6 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	}
 	db = bizhelper.ExactQueryString(db, "runtime_id", params.GetRuntimeId())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "runtime_id", params.GetRuntimeIDs())
-	db = bizhelper.ExactQueryString(db, "from_plugin", params.GetFromPlugin())
 
 	// 搜索是否有对应的参数
 	if params.GetHaveCommonParams() {
