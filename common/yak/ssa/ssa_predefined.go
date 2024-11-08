@@ -232,6 +232,7 @@ type anValue struct {
 	pointer   Values // the pointer is point to this value
 	reference Value  // the value is pointed by this value
 
+	occultation []Value
 }
 
 func NewValue() anValue {
@@ -441,4 +442,23 @@ func (i *anValue) AddPointer(v Value) {
 
 func (i *anValue) GetPointer() Values {
 	return i.pointer
+}
+
+func (i *anValue) AddOccultation(p *Phi) {
+	i.occultation = append(i.occultation, p)
+}
+
+func (i *anValue) GetOccultation() []Value {
+	var ret []Value
+	var handler func(i *anValue)
+
+	handler = func(i *anValue) {
+		for _, v := range i.occultation {
+			ret = append(ret, v)
+			handler(&v.(*Phi).anValue)
+		}
+	}
+	handler(i)
+
+	return ret
 }
