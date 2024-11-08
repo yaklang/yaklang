@@ -151,3 +151,30 @@ func (w *PipeWriter) CloseWithError(err error) error {
 	w.cond.Broadcast()
 	return nil
 }
+
+type PerHandlerWriter struct {
+	writer       io.Writer
+	buf          []byte
+	preHandlerOk bool
+	handler      func([]byte) ([]byte, bool)
+}
+
+func (w *PerHandlerWriter) Write(p []byte) (n int, err error) {
+	if w.preHandlerOk {
+		return w.writer.Write(p)
+	}
+	w.buf = append(w.buf, p...)
+	if remainData, ok := w.handler(w.buf); !ok {
+		return len(p), nil
+	} else {
+		w.preHandlerOk = true
+		return w.writer.Write(remainData)
+	}
+}
+
+func NewPerHandlerWriter(w io.Writer, handler func([]byte) ([]byte, bool)) *PerHandlerWriter {
+	return &PerHandlerWriter{
+		writer:  w,
+		handler: handler,
+	}
+}
