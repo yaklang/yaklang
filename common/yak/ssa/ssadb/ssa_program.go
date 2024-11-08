@@ -39,7 +39,7 @@ func GetSSAProgram(name string) *schema.SSAProgram {
 	return programs[0]
 }
 
-func SaveSSAProgram(name, desc, language string) error {
+func SaveSSAProgram(name, desc, language, info string) error {
 	db := consts.GetGormProfileDatabase()
 
 	prog := &schema.SSAProgram{
@@ -48,6 +48,7 @@ func SaveSSAProgram(name, desc, language string) error {
 		DBPath:        consts.GetSSADataBasePath(),
 		Language:      language,
 		EngineVersion: consts.GetYakVersion(),
+		ConfigInput:   info,
 	}
 
 	Programs.Set(name, prog)

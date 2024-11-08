@@ -14,4 +14,7 @@ type SSAProgram struct {
 	// program language when set
 	Language      string `json:"language" gorm:"type:varchar(255)"`
 	EngineVersion string `json:"engine_version" gorm:"type:varchar(255)"`
+
+	// compile argument
+	ConfigInput string `json:"config_input" gorm:"type:text"`
 }
