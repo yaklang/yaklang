@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -392,47 +393,70 @@ func init() {
 				panic(fmt.Sprintf("cannot support op1[%v] + op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 			} else if op1.IsString() && op2.IsInt64() {
 				str := op1.Value.(string)
-				char, ok := op2.IsInt64EX()
+				v2, ok := op2.IsInt64EX()
 				if !ok {
-					panic(fmt.Sprintf("cannot support convert %v to char", op2.Value))
+					panic(fmt.Sprintf("cannot support convert %v to string", op2.Value))
 				}
-				ret := str + string(rune(char))
+				var ret string
+				if op2.TypeVerbose == "char" {
+					ret = str + string(rune(v2))
+				} else {
+					ret = str + strconv.Itoa(int(v2))
+				}
 				return &yakvm.Value{
 					TypeVerbose: "string",
 					Value:       ret,
 				}
 			} else if op1.IsInt64() && op2.IsString() {
-				str := op2.Value.(string)
-				char, ok := op1.Value.(rune)
+				v2 := op2.Value.(string)
+				v, ok := op1.IsInt64EX()
 				if !ok {
-					panic("cannot support string + int64")
+					panic(fmt.Sprintf("cannot support convert %v to int", op1.Value))
 				}
-				ret := string(char) + str
-				return &yakvm.Value{
-					TypeVerbose: "string",
-					Value:       ret,
+				if op1.TypeVerbose == "char" {
+					return &yakvm.Value{
+						TypeVerbose: "string",
+						Value:       string(rune(v)) + v2,
+					}
+				} else {
+					return &yakvm.Value{
+						TypeVerbose: "string",
+						Value:       strconv.Itoa(int(v)) + v2,
+					}
 				}
 			} else if op1.IsBytes() && op2.IsInt64() {
 				b := op1.Value.([]byte)
-				char, ok := op2.IsInt64EX()
+				v2, ok := op2.IsInt64EX()
 				if !ok {
 					panic(fmt.Sprintf("cannot support convert %v to char", op2.Value))
 				}
-				ret := append(b, byte(char))
+				var ret []byte
+				if op2.TypeVerbose == "char" {
+					ret = append(b, byte(v2))
+				} else {
+					v2Str := strconv.Itoa(int(v2))
+					ret = append(b, []byte(v2Str)...)
+				}
 				return &yakvm.Value{
 					TypeVerbose: "bytes",
 					Value:       ret,
 				}
 			} else if op1.IsInt64() && op2.IsBytes() {
 				b := op2.Value.([]byte)
-				char, ok := op1.Value.(rune)
+				v, ok := op1.IsInt64EX()
 				if !ok {
-					panic("cannot support string + int64")
+					panic(fmt.Sprintf("cannot support convert %v to int", op1.Value))
 				}
-				ret := append([]byte{byte(char)}, b...)
-				return &yakvm.Value{
-					TypeVerbose: "bytes",
-					Value:       ret,
+				if op1.TypeVerbose == "char" {
+					return &yakvm.Value{
+						TypeVerbose: "bytes",
+						Value:       append([]byte{byte(v)}, b...),
+					}
+				} else {
+					return &yakvm.Value{
+						TypeVerbose: "bytes",
+						Value:       append([]byte(strconv.Itoa(int(v))), b...),
+					}
 				}
 			}
 
