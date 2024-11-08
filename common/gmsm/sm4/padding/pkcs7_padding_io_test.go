@@ -9,7 +9,7 @@ import (
 // 测试P7填充Reader
 func TestPaddingFileReader_Read(t *testing.T) {
 	srcIn := bytes.NewBuffer(bytes.Repeat([]byte{'A'}, 16))
-	p := NewPKCS7PaddingReader(srcIn, 16)
+	p := NewPKCSPaddingReader(srcIn, 16)
 
 	tests := []struct {
 		name    string
@@ -45,7 +45,7 @@ func TestPKCS7PaddingWriter_Write(t *testing.T) {
 	paddedSrc := append(src, bytes.Repeat([]byte{0x08}, 8)...)
 	reader := bytes.NewReader(paddedSrc)
 	out := bytes.NewBuffer(make([]byte, 0, 64))
-	writer := NewPKCS7PaddingWriter(out, 8)
+	writer := NewPKCSPaddingWriter(out, 8)
 
 	for {
 		buf := make([]byte, 3)
