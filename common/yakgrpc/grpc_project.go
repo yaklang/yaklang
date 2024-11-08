@@ -1,12 +1,16 @@
 package yakgrpc
 
 import (
+	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/gmsm/sm4"
+	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -324,43 +328,29 @@ func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_Exp
 			}
 		}
 	}()
-	var buf bytes.Buffer
-	buf.Write(ret)
-	io.Copy(&buf, fp)
 
-	var results []byte = buf.Bytes()
+	projectReader := io.MultiReader(bytes.NewBuffer(ret), bufio.NewReader(fp))
+	fileWriter := gzip.NewWriter(outFp)
 	if req.GetPassword() != "" {
+		outFp.Write(encryptProjectMagic)
 		feedProgress("开始加密数据库... SM4-GCM", 0)
-		encData, err := codec.SM4GCMEnc(codec.PKCS7Padding([]byte(req.GetPassword())), results, nil)
+		key := codec.PKCS7Padding([]byte(req.GetPassword()))
+		iv := key[:sm4.BlockSize]
+		_, err = sm4.Sm4GCMEncryptStream(key, iv, nil, projectReader, fileWriter, padding.NewPKCSPaddingReader)
 		if err != nil {
 			feedProgress("加密数据库失败:"+err.Error(), 0.97)
 			cancel()
 			return err
 		}
-		results = encData
 	}
+	fileWriter.Flush()
+	fileWriter.Close()
 
-	feedProgress("开始压缩数据库", 0)
-	results, err = utils.GzipCompress(results)
-	if err != nil {
-		feedProgress("导出项目失败：GZIP 压缩失败: "+err.Error(), 0.97)
-		cancel()
-		return err
-	}
-
-	if req.GetPassword() != "" {
-		feedProgress("开始写入加密数据，请妥善保管密码", 0.94)
-	}
-
-	if req.GetPassword() != "" {
-		outFp.Write(encryptProjectMagic)
-	}
-	outFp.Write(results)
 	cancel()
 	for !finished {
 		time.Sleep(300 * time.Millisecond)
 	}
-	feedProgress("导出成功，导出项目大小："+utils.ByteSize(uint64(len(results))), 1.0)
+	feedProgress("导出成功", 1.0)
 	return nil
 }
 
@@ -387,6 +377,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 		return utils.Errorf("cannot find local project path: %s", path)
 	}
 
+	// build reader -------
 	feedProgress("打开项目本地文件:"+req.GetProjectFilePath(), 0.2)
 	fp, err := os.Open(req.GetProjectFilePath())
 	if err != nil {
@@ -394,62 +385,106 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 		return err
 	}
 	defer fp.Close()
-
+	projectReader := bufio.NewReader(fp)
 	feedProgress("正在读取项目文件", 0.3)
-	raw, err := ioutil.ReadAll(fp)
-	if err != nil {
+	if magicNumber, err := projectReader.Peek(len(encryptProjectMagic)); err != nil {
 		feedProgress("读取项目文件失败："+err.Error(), 0.9)
 		return err
-	}
-
-	if bytes.HasPrefix(raw, encryptProjectMagic) {
+	} else if bytes.Equal(magicNumber, encryptProjectMagic) {
 		if req.GetPassword() != "" {
-			raw = raw[len(encryptProjectMagic):]
+			_, err = projectReader.Discard(len(encryptProjectMagic))
+			if err != nil {
+				feedProgress("去除加密幻数失败", 0.99)
+				return err
+			}
 		} else {
 			feedProgress("需要密码解密项目数据", 0.99)
 			return utils.Error("需要密码解密")
 		}
 	}
 
-	rawBytes := raw
+	header, err := projectReader.Peek(3)
+	if err != nil {
+		return utils.Wrapf(err, "peek header failed")
+	}
+
+	var DataReader io.Reader
+	DataReader = projectReader
+	if utils.IsGzip(header) {
+		DataReader, err = gzip.NewReader(projectReader)
+		if err != nil {
+			return utils.Wrapf(err, "gzip.NewReader fail")
+		}
+	}
+
+	// build writer -----
 	projectName := utils.TrimFileNameExt(filepath.Base(req.GetProjectFilePath()))
 	description := ""
-	if utils.IsGzipBytes(raw) {
-		feedProgress("正在解压数据库", 0.4)
-		rawBytes, err = utils.GzipDeCompress(raw)
+	paramsBytes := make([]byte, 0)
+	tempFp, err := os.OpenFile(filepath.Join(consts.GetDefaultYakitProjectsDir(), uuid.NewString()), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		feedProgress("创建临时文件失败："+err.Error(), 0.99)
+		return err
+	}
+	tempFileWriter := bufio.NewWriter(tempFp)
+	tryGetProtoData := func(rawBytes []byte) ([]byte, int, bool) {
+		data, n := protowire.ConsumeBytes(rawBytes)
+		if data != nil && n > 0 {
+			return data, n, true
+		}
+		return nil, 0, false
+	}
+	tempFpWriter := utils.NewPerHandlerWriter(tempFileWriter, func(i []byte) ([]byte, bool) {
+		var n = 0
+		var data []byte
+		var ok bool
+		if data, n, ok = tryGetProtoData(i); !ok {
+			return nil, false
+		}
+		i = i[n:]
+		projectName = string(data)
+		if data, n, ok = tryGetProtoData(i); !ok {
+			return nil, false
+		}
+		i = i[n:]
+		description = string(data)
+		if data, n, ok = tryGetProtoData(i); !ok {
+			return nil, false
+		}
+		paramsBytes = data
+		return i[n:], true
+
+	})
+	feedProgress("正在解压数据库", 0.4)
+	if req.GetPassword() != "" {
+		feedProgress("解压完成，正在解密数据库", 0.43)
+		key := codec.PKCS7Padding([]byte(req.GetPassword()))
+		iv := key[:sm4.BlockSize]
+		_, err = sm4.Sm4GCMDecryptStream(key, iv, nil, DataReader, tempFpWriter, padding.NewPKCSPaddingWriter)
 		if err != nil {
+			feedProgress("写入(解密)数据库失败:"+err.Error(), 0.97)
 			return err
 		}
-		feedProgress("解压完成，正在解密数据库", 0.43)
-		if req.GetPassword() != "" {
-			decData, err := codec.SM4GCMDec(codec.PKCS7Padding([]byte(req.GetPassword())), rawBytes, nil)
-			if err != nil {
-				feedProgress("解密失败！", 0.99)
-				return utils.Error("解密失败！")
-			}
-			rawBytes = decData
+	} else {
+		_, err = io.Copy(tempFpWriter, DataReader)
+		if err != nil {
+			feedProgress("写入数据库失败:"+err.Error(), 0.97)
+			return err
 		}
-
-		feedProgress("读取项目基本信息", 0.45)
-		projectName, n := protowire.ConsumeString(rawBytes)
-		rawBytes = rawBytes[n:]
-		description, n := protowire.ConsumeString(rawBytes)
-		rawBytes = rawBytes[n:]
-		paramsBytes, n := protowire.ConsumeBytes(rawBytes)
-		rawBytes = rawBytes[n:]
-
-		params := make(map[string]interface{})
-		json.Unmarshal(paramsBytes, &params)
-		if params != nil && len(params) > 0 {
-			// handle params
-		}
-
-		feedProgress(fmt.Sprintf(
-			"读取项目基本信息，原始项目名「%v」，描述信息：%v",
-			projectName, description,
-		), 0.5)
-
 	}
+	tempFileWriter.Flush()
+	tempFp.Close()
+
+	params := make(map[string]interface{})
+	json.Unmarshal(paramsBytes, &params)
+	if params != nil && len(params) > 0 {
+		// handle params
+	}
+
+	feedProgress(fmt.Sprintf(
+		"读取项目基本信息，原始项目名「%v」，描述信息：%v",
+		projectName, description,
+	), 0.5)
 
 	if req.GetLocalProjectName() != "" {
 		projectName = req.GetLocalProjectName()
@@ -462,7 +497,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 	_, err = s.IsProjectNameValid(stream.Context(), &ypb.IsProjectNameValidRequest{ProjectName: projectName, Type: yakit.TypeProject})
 	if err != nil {
 		projectName = projectName + fmt.Sprintf("_%v", utils.RandStringBytes(6))
-		_, err := s.IsProjectNameValid(stream.Context(), &ypb.IsProjectNameValidRequest{ProjectName: projectName})
+		_, err := s.IsProjectNameValid(stream.Context(), &ypb.IsProjectNameValidRequest{ProjectName: projectName, Type: yakit.TypeProject})
 		if err != nil {
 			feedProgress("创建新的项目失败："+projectName+"："+err.Error(), 0.9)
 			return utils.Errorf("cannot valid project name: %s", err)
@@ -471,11 +506,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 	feedProgress("创建新的项目："+projectName, 0.6)
 	databaseName := fmt.Sprintf("yakit-%v-%v.sqlite3.db", projectNameToFileName(projectName), time.Now().Unix())
 	fileName := filepath.Join(consts.GetDefaultYakitProjectsDir(), databaseName)
-	err = os.WriteFile(
-		fileName,
-		rawBytes,
-		0o666,
-	)
+	err = os.Rename(tempFp.Name(), fileName)
 	if err != nil {
 		feedProgress("创建新数据库失败："+err.Error(), 0.9)
 		return err
