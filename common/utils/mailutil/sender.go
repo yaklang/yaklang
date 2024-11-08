@@ -2,9 +2,9 @@ package mailutil
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/netx"
 	"gopkg.in/gomail.v2"
 	"net"
@@ -111,7 +111,7 @@ func (s *SMTPMailSender) GetAuthClient(ctx context.Context) (net.Conn, *smtp.Cli
 		addr = fmt.Sprintf("%s:%v", s.config.Server, s.config.Port)
 	)
 	if s.config.ConnectSSL {
-		conn, err = netx.DialTLSTimeout(10*time.Second, addr, &tls.Config{InsecureSkipVerify: true,
+		conn, err = netx.DialTLSTimeout(10*time.Second, addr, &gmtls.Config{InsecureSkipVerify: true,
 			ServerName: s.config.Server})
 		if err != nil {
 			return nil, nil, errors.Errorf("tls dial failed:  %s", err)

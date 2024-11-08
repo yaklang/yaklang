@@ -1,8 +1,8 @@
 package yaklib
 
 import (
-	"crypto/tls"
 	"fmt"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -110,7 +110,7 @@ func (t *tcpConnection) RecvStringTimeout(seconds float64) (string, error) {
 }
 
 type _tcpDialer struct {
-	tlsConfig *tls.Config
+	tlsConfig *gmtls.Config
 	proxy     string
 	timeout   time.Duration
 	localAddr *net.TCPAddr

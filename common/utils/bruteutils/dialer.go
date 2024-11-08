@@ -2,7 +2,7 @@ package bruteutils
 
 import (
 	"context"
-	"crypto/tls"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"net"
 	"time"
 
@@ -33,7 +33,7 @@ func (d *NetXDialer) DialContext(ctx context.Context, network, address string) (
 		err  error
 	)
 	// tls first
-	conn, err = netx.DialTLSTimeout(defaultTimeout, address, &tls.Config{InsecureSkipVerify: true})
+	conn, err = netx.DialTLSTimeout(defaultTimeout, address, &gmtls.Config{InsecureSkipVerify: true})
 	if err == nil {
 		return conn, nil
 	}
