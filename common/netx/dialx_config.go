@@ -23,18 +23,18 @@ type dialXConfig struct {
 	KeepAlive                time.Duration
 
 	// EnableTLS is true, force to use TLS, auto upgrade
-	EnableTLS                 bool
-	ShouldOverrideTLSConfig   bool
-	TLSConfig                 *tls.Config
-	ShouldOverrideGMTLSConfig bool
-	GMTLSConfig               *gmtls.Config
-	GMTLSSupport              bool
-	GMTLSPrefer               bool
-	GMTLSOnly                 bool
-	TLSTimeout                time.Duration
-	ShouldOverrideSNI         bool
-	SNI                       string
-	TLSNextProto              []string
+	EnableTLS               bool
+	ShouldOverrideTLSConfig bool
+	TLSConfig               *gmtls.Config
+	//ShouldOverrideGMTLSConfig bool
+	//GMTLSConfig               *gmtls.Config
+	GMTLSSupport      bool
+	GMTLSPrefer       bool
+	GMTLSOnly         bool
+	TLSTimeout        time.Duration
+	ShouldOverrideSNI bool
+	SNI               string
+	TLSNextProto      []string
 
 	// Retry
 	EnableTimeoutRetry  bool
@@ -159,8 +159,8 @@ func DialX_WithTLS(b bool) DialXOption {
 func DialX_WithGMTLSConfig(config *gmtls.Config) DialXOption {
 	return func(c *dialXConfig) {
 		c.EnableTLS = true
-		c.ShouldOverrideGMTLSConfig = true
-		c.GMTLSConfig = config
+		c.ShouldOverrideTLSConfig = true
+		c.TLSConfig = config
 	}
 }
 
@@ -205,6 +205,17 @@ func DialX_WithTLSConfig(tlsConfig any) DialXOption {
 		c.EnableTLS = true
 		switch ret := tlsConfig.(type) {
 		case *tls.Config:
+			if gmtlsConfig, err := gmtls.SimpleTlsConfigToGmTlsConfig(ret); err == nil {
+				c.ShouldOverrideTLSConfig = true
+				if gmtlsConfig.MinVersion == 0 {
+					gmtlsConfig.MinVersion = minVer
+				}
+				if gmtlsConfig.MaxVersion == 0 {
+					gmtlsConfig.MaxVersion = maxVer
+				}
+				c.TLSConfig = gmtlsConfig
+			}
+		case *gmtls.Config:
 			c.ShouldOverrideTLSConfig = true
 			if ret.MinVersion == 0 {
 				ret.MinVersion = minVer
@@ -213,18 +224,9 @@ func DialX_WithTLSConfig(tlsConfig any) DialXOption {
 				ret.MaxVersion = maxVer
 			}
 			c.TLSConfig = ret
-		case *gmtls.Config:
-			c.ShouldOverrideGMTLSConfig = true
-			c.GMTLSConfig = ret
-			if ret.MinVersion == 0 {
-				ret.MinVersion = minVer
-			}
-			if ret.MaxVersion == 0 {
-				ret.MaxVersion = maxVer
-			}
 		case *gmtls.GMSupport:
-			c.ShouldOverrideGMTLSConfig = true
-			c.GMTLSConfig = &gmtls.Config{
+			c.ShouldOverrideTLSConfig = true
+			c.TLSConfig = &gmtls.Config{
 				GMSupport: ret,
 			}
 		}

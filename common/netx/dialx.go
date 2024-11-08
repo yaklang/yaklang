@@ -2,7 +2,6 @@ package netx
 
 import (
 	"bytes"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
@@ -183,11 +182,11 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	strategies := []TLSStrategy{TLS_Strategy_Ordinary}
 	if config.GMTLSSupport {
 		if config.GMTLSOnly {
-			strategies = []TLSStrategy{TLS_Strategy_GMDail, TLS_Strategy_GMDial_Without_GMSupport}
+			strategies = []TLSStrategy{TLS_Strategy_GMDail, TLS_Strategy_Ordinary}
 		} else if config.GMTLSPrefer {
-			strategies = []TLSStrategy{TLS_Strategy_GMDail, TLS_Strategy_Ordinary, TLS_Strategy_GMDial_Without_GMSupport}
+			strategies = []TLSStrategy{TLS_Strategy_GMDail, TLS_Strategy_Ordinary}
 		} else {
-			strategies = []TLSStrategy{TLS_Strategy_Ordinary, TLS_Strategy_GMDail, TLS_Strategy_GMDial_Without_GMSupport}
+			strategies = []TLSStrategy{TLS_Strategy_Ordinary, TLS_Strategy_GMDail}
 		}
 	}
 
@@ -197,12 +196,12 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	}
 
 	minVer, maxVer := consts.GetGlobalTLSVersion()
-	var tlsConfig any = &tls.Config{
+	var tlsConfig = &gmtls.Config{
 		ServerName:         sni,
 		MinVersion:         minVer, // nolint[:staticcheck]
 		MaxVersion:         maxVer,
 		InsecureSkipVerify: true,
-		Renegotiation:      tls.RenegotiateFreelyAsClient,
+		Renegotiation:      gmtls.RenegotiateFreelyAsClient,
 	}
 	if config.ShouldOverrideTLSConfig {
 		tlsConfig = config.TLSConfig
@@ -224,50 +223,42 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 
 		switch strategy {
 		case TLS_Strategy_Ordinary:
-			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
-			if err != nil {
-				errs = append(errs, err)
-				continue
-			}
-			return tlsConn, nil
+			tlsConfig.GMSupport = nil
 		case TLS_Strategy_GMDail:
-			gmtlsConfig := &gmtls.Config{
-				GMSupport: &gmtls.GMSupport{
-					WorkMode: gmtls.ModeGMSSLOnly,
-				},
-				ServerName:         sni,
-				MinVersion:         minVer, // nolint[:staticcheck]
-				MaxVersion:         maxVer,
-				InsecureSkipVerify: true,
-				Renegotiation:      gmtls.RenegotiateFreelyAsClient,
+			tlsConfig.GMSupport = &gmtls.GMSupport{
+				WorkMode: gmtls.ModeGMSSLOnly,
 			}
-			if config.ShouldOverrideGMTLSConfig {
-				gmtlsConfig = config.GMTLSConfig
-			}
-
-			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, gmtlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
-			if err != nil {
-				errs = append(errs, err)
-				continue
-			}
-			return tlsConn, nil
-		case TLS_Strategy_GMDial_Without_GMSupport:
-			gmtlsConfig := &gmtls.Config{
-				ServerName:         sni,
-				MinVersion:         minVer, // nolint[:staticcheck]
-				MaxVersion:         maxVer,
-				InsecureSkipVerify: true,
-				Renegotiation:      gmtls.RenegotiateFreelyAsClient,
-			}
-			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, gmtlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
-			if err != nil {
-				errs = append(errs, err)
-				continue
-			}
-			return tlsConn, nil
+			//gmtlsConfig := &gmtls.Config{
+			//	GMSupport: &gmtls.GMSupport{
+			//		WorkMode: gmtls.ModeGMSSLOnly,
+			//	},
+			//	ServerName:         sni,
+			//	MinVersion:         minVer, // nolint[:staticcheck]
+			//	MaxVersion:         maxVer,
+			//	InsecureSkipVerify: true,
+			//	Renegotiation:      gmtls.RenegotiateFreelyAsClient,
+			//}
+			//if config.ShouldOverrideGMTLSConfig {
+			//	gmtlsConfig = config.GMTLSConfig
+			//}
+		//case TLS_Strategy_GMDial_Without_GMSupport:
+		//	gmtlsConfig := &gmtls.Config{
+		//		ServerName:         sni,
+		//		MinVersion:         minVer, // nolint[:staticcheck]
+		//		MaxVersion:         maxVer,
+		//		InsecureSkipVerify: true,
+		//		Renegotiation:      gmtls.RenegotiateFreelyAsClient,
+		//	}
+		//
 		default:
 			return nil, utils.Errorf("unknown tls strategy %v", strategy)
 		}
+		tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		return tlsConn, nil
 	}
 	if len(errs) > 0 {
 		var suffix bytes.Buffer
