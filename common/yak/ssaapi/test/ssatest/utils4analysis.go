@@ -43,7 +43,7 @@ const (
 func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
 	// only in memory
 	{
-		prog, err := ssaapi.ParseProject(fs, opt...)
+		prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
 		assert.Nil(t, err)
 
 		log.Infof("only in memory ")
@@ -59,7 +59,7 @@ func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(ssaapi.Progra
 	// parse with database
 	{
 		opt = append(opt, ssaapi.WithProgramName(programID))
-		prog, err := ssaapi.ParseProject(fs, opt...)
+		prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
 		}()
@@ -197,7 +197,7 @@ func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p Pars
 	// only in memory
 	{
 		start := time.Now()
-		prog, err := ssaapi.ParseProject(fs, opt...)
+		prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
 		assert.Nil(t, err)
 
 		log.Infof("only in memory ")
@@ -214,7 +214,7 @@ func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p Pars
 	{
 		start := time.Now()
 		opt = append(opt, ssaapi.WithProgramName(programID))
-		prog, err := ssaapi.ParseProject(fs, opt...)
+		prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
 		}()
@@ -246,7 +246,7 @@ func CheckFSWithProgram(
 	//ssadb.DeleteProgram(ssadb.GetDB(), programName)
 
 	opt = append(opt, ssaapi.WithProgramName(programName))
-	_, err := ssaapi.ParseProject(codeFS, opt...)
+	_, err := ssaapi.ParseProjectWithFS(codeFS, opt...)
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}

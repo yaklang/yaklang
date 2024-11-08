@@ -129,7 +129,7 @@ func TestYakURL(t *testing.T) {
 		}
 		`)
 	progID := uuid.NewString()
-	prog, err := ssaapi.ParseProject(vf,
+	prog, err := ssaapi.ParseProjectWithFS(vf,
 		ssaapi.WithLanguage(consts.JAVA),
 		ssaapi.WithProgramPath("example"),
 		ssaapi.WithProgramName(progID),

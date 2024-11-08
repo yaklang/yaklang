@@ -156,7 +156,7 @@ func TestLib_ServletParam(t *testing.T) {
 func Test_Include_HitCache(t *testing.T) {
 	programName := uuid.NewString()
 	vfs := createTestVFS()
-	prog, err := ssaapi.ParseProject(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.JAVA))
+	prog, err := ssaapi.ParseProjectWithFS(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.JAVA))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	require.NoError(t, err)
 	require.NotNil(t, prog)

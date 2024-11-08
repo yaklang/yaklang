@@ -89,7 +89,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 		}
 		`)
 	progID := uuid.NewString()
-	prog, err := ssaapi.ParseProject(vf,
+	prog, err := ssaapi.ParseProjectWithFS(vf,
 		ssaapi.WithLanguage(consts.JAVA),
 		ssaapi.WithProgramPath("example"),
 		ssaapi.WithProgramName(progID),
@@ -179,7 +179,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel(t *testing.T) {
 		}
 		`)
 	progID := uuid.NewString()
-	prog, err := ssaapi.ParseProject(vf,
+	prog, err := ssaapi.ParseProjectWithFS(vf,
 		ssaapi.WithLanguage(consts.JAVA),
 		ssaapi.WithProgramPath("example"),
 		ssaapi.WithProgramName(progID),
@@ -267,7 +267,7 @@ func TestGRPCMUSTPASS_Syntaxflow_Scan_Cancel_Multiple(t *testing.T) {
 		}
 		`)
 	progID := uuid.NewString()
-	prog, err := ssaapi.ParseProject(vf,
+	prog, err := ssaapi.ParseProjectWithFS(vf,
 		ssaapi.WithLanguage(consts.JAVA),
 		ssaapi.WithProgramPath("example"),
 		ssaapi.WithProgramName(progID),

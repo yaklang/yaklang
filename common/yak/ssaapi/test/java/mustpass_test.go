@@ -37,7 +37,7 @@ func TestMustPass_JAVA_Debug_Compile(t *testing.T) {
 		return
 	}
 
-	_, err := ssaapi.ParseProject(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
+	_, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestMustPass_Debug(t *testing.T) {
 		return
 	}
 
-	_, err := ssaapi.ParseProject(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
+	_, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}

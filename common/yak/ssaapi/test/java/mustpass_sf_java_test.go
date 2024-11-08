@@ -23,7 +23,7 @@ var sf_rules embed.FS
 
 func Test_Debug(t *testing.T) {
 	programID := uuid.NewString()
-	progs, err := ssaapi.ParseProject(
+	progs, err := ssaapi.ParseProjectWithFS(
 		filesys.NewEmbedFS(sample_code),
 		ssaapi.WithLanguage(ssaapi.JAVA),
 		// ssaapi.WithDatabaseProgramName(programID),
@@ -39,7 +39,7 @@ func Test_Debug(t *testing.T) {
 
 func TestCheckRuleInSource(t *testing.T) {
 	// source
-	prog, err := ssaapi.ParseProject(
+	prog, err := ssaapi.ParseProjectWithFS(
 		filesys.NewEmbedFS(sample_code),
 		ssaapi.WithLanguage(ssaapi.JAVA),
 	)
@@ -51,7 +51,7 @@ func TestCheckRuleInSource(t *testing.T) {
 
 func TestCheckRuleWithDatabase(t *testing.T) {
 	programID := uuid.NewString()
-	prog, err := ssaapi.ParseProject(
+	prog, err := ssaapi.ParseProjectWithFS(
 		filesys.NewEmbedFS(sample_code),
 		ssaapi.WithLanguage(ssaapi.JAVA),
 		ssaapi.WithProgramName(programID),
@@ -69,7 +69,7 @@ func TestCheckRuleOnlyDatabase(t *testing.T) {
 	programID := uuid.NewString()
 	// compile with database
 	{
-		_, err := ssaapi.ParseProject(
+		_, err := ssaapi.ParseProjectWithFS(
 			filesys.NewEmbedFS(sample_code),
 			ssaapi.WithLanguage(ssaapi.JAVA),
 			ssaapi.WithProgramName(programID),
