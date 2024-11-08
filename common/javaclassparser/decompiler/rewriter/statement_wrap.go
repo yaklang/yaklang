@@ -40,7 +40,7 @@ func NewRootStatementManager(node *core.Node) *RewriteManager {
 }
 
 func (s *RewriteManager) CheckVisitedNode(node *core.Node) error {
-	if node.Id == 79 {
+	if node.Id == 25 {
 		println()
 	}
 	if s.visitedNodeSet.Has(node) {
@@ -461,7 +461,6 @@ func (s *RewriteManager) TopologicalSortReverse(nodes []*core.Node) []*core.Node
 		nodesMap[node] = struct{}{}
 	}
 	core.WalkGraph[*core.Node](s.RootNode, func(node *core.Node) ([]*core.Node, error) {
-		print(node.Id)
 		if _, ok := nodesMap[node]; ok {
 			order = append(order, node)
 		}
