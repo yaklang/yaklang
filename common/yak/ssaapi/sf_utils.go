@@ -71,8 +71,18 @@ func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.
 					add(value.NewValue(v))
 				}
 			}
+		} else if ovs := value.node.GetOccultation(); ovs != nil {
+			for _, ov := range ovs {
+				allMember := ov.GetAllMember()
+				for k, v := range allMember {
+					if check(value.NewValue(k)) {
+						add(value.NewValue(v))
+					}
+				}
+			}
 		}
 	}
+
 	return newValue
 }
 func WithSyntaxFlowResult(expected string, handler func(*Value) error) sfvm.Option {
