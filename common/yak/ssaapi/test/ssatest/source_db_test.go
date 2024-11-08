@@ -19,7 +19,7 @@ func checkSource(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.Op
 	opt = append(opt,
 		ssaapi.WithProgramName(progName),
 	)
-	prog, err := ssaapi.ParseProject(vf, opt...)
+	prog, err := ssaapi.ParseProjectWithFS(vf, opt...)
 	require.NoError(t, err)
 	require.NotNil(t, prog)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)

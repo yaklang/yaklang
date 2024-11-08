@@ -51,7 +51,7 @@ func TestReadFileWith_SSADB(t *testing.T) {
 	programName := uuid.NewString()
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("a/b/c.yak", code)
-	_, err := ssaapi.ParseProject(vf,
+	_, err := ssaapi.ParseProjectWithFS(vf,
 		ssaapi.WithLanguage(ssaapi.Yak),
 		ssaapi.WithProgramName(programName),
 	)

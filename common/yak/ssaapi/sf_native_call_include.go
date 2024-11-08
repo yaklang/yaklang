@@ -17,7 +17,7 @@ func ValidSyntaxFlowRule(s *schema.SyntaxFlowRule) error {
 	if err != nil {
 		return err
 	}
-	prog, err := ParseProject(fs)
+	prog, err := ParseProjectWithFS(fs)
 	if err != nil {
 		return err
 	}

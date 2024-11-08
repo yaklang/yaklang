@@ -14,7 +14,7 @@ import (
 var springbootLoader embed.FS
 
 func TestExtraFileAnalyzer(t *testing.T) {
-	prog, err := ssaapi.ParseProject(
+	prog, err := ssaapi.ParseProjectWithFS(
 		filesys.NewEmbedFS(springbootLoader),
 		ssaapi.WithLanguage(ssaapi.JAVA),
 	)

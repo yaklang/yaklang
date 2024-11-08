@@ -17,7 +17,7 @@ func TestParseProject(t *testing.T) {
 	vfs.AddFile("c/c.yak", `include "b/b.yak"; dump(b + 1)`)
 
 	t.Run("parse project with entry", func(t *testing.T) {
-		progs, err := ssaapi.ParseProject(
+		progs, err := ssaapi.ParseProjectWithFS(
 			vfs,
 			ssaapi.WithFileSystemEntry("a/a.yak"),
 			// ssaapi.WithDatabaseProgramName("test"),
