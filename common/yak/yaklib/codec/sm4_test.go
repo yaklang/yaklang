@@ -1,7 +1,12 @@
 package codec
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/gmsm/sm4"
+	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 	"github.com/yaklang/yaklang/common/log"
 	"testing"
 )
@@ -141,5 +146,72 @@ func TestPadding(t *testing.T) {
 		if i3 == nil {
 			panic(1)
 		}
+	}
+}
+
+func TestSM4GCMStream(t *testing.T) {
+	key := []byte("1234567890abcdef")
+	data := []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10}
+	IV := make([]byte, sm4.BlockSize)
+	testA := [][]byte{ // the length of the A can be random
+		[]byte{},
+		[]byte{0x01, 0x23, 0x45, 0x67, 0x89},
+		[]byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10},
+	}
+	for _, A := range testA {
+		plain := bytes.NewReader(data)
+		var gcmCipher bytes.Buffer
+		T, err := sm4.GCMEncryptStream(key, IV, A, padding.NewPKCSPaddingReader(plain, 16), &gcmCipher)
+		require.NoError(t, err)
+		fmt.Printf("gcmMsg = %x\n", gcmCipher.Bytes())
+
+		var gcmPlain bytes.Buffer
+		T_, err := sm4.GCMDecryptStream(key, IV, A, &gcmCipher, padding.NewPKCSPaddingWriter(&gcmPlain, 16))
+		require.NoError(t, err)
+		fmt.Printf("gcmDec = %x\n", gcmPlain.Bytes())
+		require.Equal(t, T, T_, "authentication not successed")
+		require.Equal(t, data, gcmPlain.Bytes(), "decrypt fail")
+
+		//Failed Test : if we input the different A , that will be a falied result.
+		A = []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd}
+		plain = bytes.NewReader(data)
+		gcmCipher = bytes.Buffer{}
+		T, err = sm4.GCMEncryptStream(key, IV, A, padding.NewPKCSPaddingReader(plain, 16), &gcmCipher)
+		require.NoError(t, err)
+		require.NotEqual(t, T, T_, "authentication tag should not equal")
+	}
+
+}
+
+func TestSM4GCMStreamZero(t *testing.T) {
+	key := []byte("1234567890abcdef")
+	data := []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10, 0x1}
+	IV := make([]byte, sm4.BlockSize)
+	testA := [][]byte{ // the length of the A can be random
+		[]byte{},
+		[]byte{0x01, 0x23, 0x45, 0x67, 0x89},
+		[]byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10},
+	}
+	for _, A := range testA {
+		plain := bytes.NewReader(data)
+		var gcmCipher bytes.Buffer
+		T, err := sm4.GCMEncryptStream(key, IV, A, padding.NewZeroPaddingReader(plain, 16), &gcmCipher)
+		require.NoError(t, err)
+		fmt.Printf("gcmMsg = %x\n", gcmCipher.Bytes())
+
+		var gcmPlain bytes.Buffer
+		T_, err := sm4.GCMDecryptStream(key, IV, A, &gcmCipher, padding.NewZeroPaddingWriter(&gcmPlain, 16))
+		require.NoError(t, err)
+		fmt.Printf("gcmDec = %x\n", gcmPlain.Bytes())
+		require.Equal(t, T, T_, "authentication not successed")
+		require.Equal(t, data, gcmPlain.Bytes(), "decrypt fail")
+
+		//Failed Test : if we input the different A , that will be a falied result.
+		A = []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd}
+		plain = bytes.NewReader(data)
+		gcmCipher = bytes.Buffer{}
+		T, err = sm4.GCMEncryptStream(key, IV, A, padding.NewZeroPaddingReader(plain, 16), &gcmCipher)
+		require.NoError(t, err)
+		require.NotEqual(t, T, T_, "authentication tag should not equal")
 	}
 }
