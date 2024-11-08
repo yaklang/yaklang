@@ -138,8 +138,14 @@ type Value interface {
 	Maskable
 	AssignAble
 	PointerIF
+	Occultation
 	AddUser(User)
 	RemoveUser(User)
+}
+
+type Occultation interface {
+	AddOccultation(*Phi)
+	GetOccultation() []Value
 }
 
 type PointerIF interface {

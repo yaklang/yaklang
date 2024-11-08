@@ -468,5 +468,8 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 	f.emitEx(p, func(i Instruction) {
 		f.CurrentBlock.Phis = append(f.CurrentBlock.Phis, p)
 	})
+	for _, v := range vs {
+		v.AddOccultation(p)
+	}
 	return p
 }
