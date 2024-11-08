@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -19,7 +20,7 @@ import (
 func TestMUSTPASS_MITM_CONFIG(t *testing.T) {
 	database := consts.GetGormProjectDatabase().Debug()
 	yakit.DeleteHTTPFlow(database, &ypb.DeleteHTTPFlowRequest{DeleteAll: true})
-	consts.SetGlobalMaxContentLength(1024 * 1024 * 1)
+	consts.SetGlobalMaxContentLength(1024)
 	defer consts.SetGlobalMaxContentLength(1024 * 1024 * 10)
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -28,7 +29,7 @@ func TestMUSTPASS_MITM_CONFIG(t *testing.T) {
 	stream, err := client.MITM(ctx)
 	require.NoError(t, err)
 	mitmPort := utils.GetRandomAvailableTCPPort()
-	data := bytes.Repeat([]byte("a"), 1024*1024*3)
+	data := bytes.Repeat([]byte("a"), 1024*2)
 	address, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %v\r\n\r\n%s", len(data), data))
 	})
@@ -56,8 +57,12 @@ func TestMUSTPASS_MITM_CONFIG(t *testing.T) {
 	var flag bool
 	pading, httpflows, err := yakit.QueryHTTPFlow(database, &ypb.QueryHTTPFlowRequest{
 		SearchURL: addressx,
+		Full:      true,
 	})
 	for _, httpflow := range httpflows {
+		marshal, err := json.Marshal(httpflow)
+		require.NoError(t, err)
+		fmt.Println("flowData: :", string(marshal))
 		if httpflow.IsTooLargeResponse {
 			flag = true
 		}
