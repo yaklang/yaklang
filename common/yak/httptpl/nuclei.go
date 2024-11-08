@@ -522,7 +522,7 @@ func generateYakVariables(node *yaml.Node) *YakVariables {
 		return vars
 	}
 	mappingNodeForEach(subNode, func(key string, valueNode *yaml.Node) error {
-		vars.AutoSet(key, valueNode.Value)
+		vars.SetAsNucleiTags(key, valueNode.Value)
 		return nil
 	})
 	return vars
