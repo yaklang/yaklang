@@ -3,8 +3,8 @@ package yaklib
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
 	"fmt"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
@@ -14,7 +14,7 @@ import (
 type tcpServerConfig struct {
 	ctx       context.Context
 	callback  func(conn *tcpConnection)
-	tlsConfig *tls.Config
+	tlsConfig *gmtls.Config
 }
 
 type TcpServerConfigOpt func(c *tcpServerConfig)
@@ -55,7 +55,7 @@ func tcpServe(host interface{}, port int, opts ...TcpServerConfigOpt) error {
 	if config.tlsConfig == nil {
 		lis, err = net.Listen("tcp", addr)
 	} else {
-		lis, err = tls.Listen("tcp", addr, config.tlsConfig)
+		lis, err = gmtls.Listen("tcp", addr, config.tlsConfig)
 	}
 	if err != nil {
 		return utils.Errorf("listen %v failed: %s", addr, err)

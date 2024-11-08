@@ -2,7 +2,7 @@ package yaklib
 
 import (
 	"context"
-	"crypto/tls"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"net"
 	"net/http"
 
@@ -26,14 +26,14 @@ var (
 )
 
 type _httpServerConfig struct {
-	tlsConfig *tls.Config
+	tlsConfig *gmtls.Config
 	ctx       context.Context
 	callback  http.HandlerFunc
 }
 
 type HttpServerConfigOpt func(c *_httpServerConfig)
 
-func BuildTlsConfig(crt, key interface{}, cas ...interface{}) *tls.Config {
+func BuildTlsConfig(crt, key interface{}, cas ...interface{}) *gmtls.Config {
 	crtRaw := utils.StringAsFileParams(crt)
 	keyRaw := utils.StringAsFileParams(key)
 	var caCrts [][]byte
@@ -43,7 +43,7 @@ func BuildTlsConfig(crt, key interface{}, cas ...interface{}) *tls.Config {
 	tlsConfig, err := tlsutils.GetX509MutualAuthClientTlsConfig(crtRaw, keyRaw, caCrts...)
 	if err != nil {
 		log.Errorf("build tls.Config failed")
-		return &tls.Config{InsecureSkipVerify: true}
+		return &gmtls.Config{InsecureSkipVerify: true}
 	}
 	tlsConfig.InsecureSkipVerify = true
 	return tlsConfig
@@ -106,7 +106,7 @@ func _listen(host string, port int, opts ...HttpServerConfigOpt) (lis net.Listen
 	}
 
 	if config.tlsConfig != nil {
-		lis, err = tls.Listen("tcp", utils.HostPort(host, port), config.tlsConfig)
+		lis, err = gmtls.Listen("tcp", utils.HostPort(host, port), config.tlsConfig)
 	} else {
 		lis, err = net.Listen("tcp", utils.HostPort(host, port))
 	}
