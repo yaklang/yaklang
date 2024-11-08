@@ -95,7 +95,7 @@ func init() {
 
 		ClearBlackListPlugin(BlackListCorePlugin)
 
-		if consts.IsDevMode() {
+		if !consts.IsDevMode() {
 			const key = "cd336beba498c97738c275f6771efca3"
 			if yakit.Get(key) == consts.ExistedCorePluginEmbedFSHash {
 				return nil
