@@ -26,9 +26,11 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"io/ioutil"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/gmsm/sm2"
@@ -315,15 +317,48 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 	return nil, errors.New("tls: failed to parse private key")
 }
 
-func TlsConfigToGmTlsConfig(config *tls.Config) (*Config, error) {
-	jsonData, err := json.Marshal(config)
+func SimpleTlsConfigToGmTlsConfig(config *tls.Config) (*Config, error) {
+	rootCAsData, err := json.Marshal(config.RootCAs)
 	if err != nil {
 		return nil, err
 	}
-	var gmConfig Config
-	err = json.Unmarshal(jsonData, &gmConfig)
+	clientCAsData, err := json.Marshal(config.ClientCAs)
 	if err != nil {
 		return nil, err
 	}
-	return &gmConfig, nil
+	var rootCAs, clientCAs *X.CertPool
+	err = json.Unmarshal(rootCAsData, rootCAs)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(clientCAsData, clientCAs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Config{
+		Rand:                     config.Rand,
+		Time:                     config.Time,
+		RootCAs:                  rootCAs,
+		NextProtos:               config.NextProtos,
+		ServerName:               config.ServerName,
+		ClientAuth:               ClientAuthType(config.ClientAuth),
+		ClientCAs:                clientCAs,
+		InsecureSkipVerify:       config.InsecureSkipVerify,
+		CipherSuites:             config.CipherSuites,
+		PreferServerCipherSuites: config.PreferServerCipherSuites,
+		SessionTicketsDisabled:   config.SessionTicketsDisabled,
+		SessionTicketKey:         config.SessionTicketKey,
+		MinVersion:               config.MinVersion,
+		MaxVersion:               config.MaxVersion,
+		CurvePreferences: lo.Map(config.CurvePreferences, func(item tls.CurveID, _ int) CurveID {
+			return CurveID(item)
+		}),
+		DynamicRecordSizingDisabled: config.DynamicRecordSizingDisabled,
+		Renegotiation:               RenegotiationSupport(config.Renegotiation),
+		KeyLogWriter:                config.KeyLogWriter,
+		serverInitOnce:              sync.Once{},
+		mutex:                       sync.RWMutex{},
+		sessionTicketKeys:           nil,
+	}, nil
 }

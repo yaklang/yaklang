@@ -55,13 +55,6 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 	overrideNextProtos := len(tlsNextProto) > 0
 	// i is a *tls.Config or *gmtls.Config
 	switch ret := i.(type) {
-	case *tls.Config:
-		if gmConfig, err := gmtls.TlsConfigToGmTlsConfig(ret); err == nil {
-			gmtlsConfig = gmConfig
-			config = gmtlsConfig
-		} else {
-			return nil, err
-		}
 	case *gmtls.Config:
 		gmtlsConfig = ret
 		config = gmtlsConfig
