@@ -170,10 +170,7 @@ func SetObfuscation() GenClassOptionFun {
 // gadgetObj,err = yso.GetCommonsBeanutils1JavaObject(yso.useBytesEvilClass(bytesCode))
 // ```
 func SetBytesEvilClass(data []byte) GenClassOptionFun {
-	return func(config *ClassGenConfig) {
-		config.ClassType = ClassTemplateImplClassLoader
-		config.SetParam(ClassParamBase64Class, codec.EncodeBase64(data))
-	}
+	return SetClassBytes(data)
 }
 
 // SetClassBase64Bytes
@@ -202,8 +199,8 @@ func SetClassBase64Bytes(base64 string) GenClassOptionFun {
 // ```
 func SetClassBytes(data []byte) GenClassOptionFun {
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassTemplateImplClassLoader
-		config.SetParam(ClassParamBase64Class, codec.EncodeBase64(data))
+		config.ClassType = ClassRaw
+		config.CustomTemplate = data
 	}
 }
 
