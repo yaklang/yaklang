@@ -62,7 +62,10 @@ func (c *Blueprint) Apply(obj Value) Type {
 	}
 	builder := fun.builder
 	_ = builder
-
+	if builder == nil {
+		log.Errorf("BUG: ClassBluePrint.Apply: fun.builder is nil, fun: %v", fun)
+		return nil
+	}
 	prog := builder.GetProgram()
 
 	for _, parent := range c.ParentClass {

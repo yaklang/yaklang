@@ -94,9 +94,11 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 				builder.CurrentBlock = recoverBlock
 			}()
 		}
-
 		phi := builder.EmitPhi(name, t)
 		if phi == nil {
+			return nil
+		}
+		if len(t) == 0 {
 			return nil
 		}
 		phi.GetProgram().SetVirtualRegister(phi)
