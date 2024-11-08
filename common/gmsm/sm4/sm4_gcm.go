@@ -17,8 +17,11 @@ writed by Zhiwei Yan, 2020 Oct
 
 package sm4
 
+import "C"
 import (
 	"errors"
+	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
+	"io"
 	"strconv"
 )
 
@@ -42,6 +45,14 @@ func Sm4GCM(key []byte, IV, in, A []byte, mode bool) ([]byte, []byte, error) {
 		P, _T := GCMDecrypt(key, IV, in, A)
 		return P, _T, nil
 	}
+}
+
+func Sm4GCMEncryptStream(K, IV, A []byte, PlainText io.Reader, CipherText io.Writer, wrapper padding.PaddingReaderWrapper) (T []byte, err error) {
+	return GCMEncryptStream(K, IV, A, wrapper(PlainText, BlockSize), CipherText)
+}
+
+func Sm4GCMDecryptStream(K, IV, A []byte, PlainText io.Reader, CipherText io.Writer, wrapper padding.PaddingWriterWrapper) (T []byte, err error) {
+	return GCMDecryptStream(K, IV, A, PlainText, wrapper(CipherText, BlockSize))
 }
 
 // GetH 对“0”分组的加密得到 GHASH泛杂凑函数的子密钥
@@ -172,7 +183,7 @@ func GHASH(H []byte, A []byte, C []byte) (X []byte) {
 
 	//i=m+n+1
 	var lenAB []byte
-	calculateLenToBytes := func(len int) []byte {
+	calculateLenToBytes := func(len int) []byte { //binary.BigEndian.PutUint64
 		data := make([]byte, 8)
 		data[0] = byte((len >> 56) & 0xff)
 		data[1] = byte((len >> 48) & 0xff)
@@ -245,6 +256,97 @@ func MSB(len int, S []byte) (out []byte) {
 	return S[:len/8]
 }
 
+func Incr(currentCounter []byte) []byte {
+	nextCounter := make([]byte, len(currentCounter))
+	copy(nextCounter[:], currentCounter[:])
+	Len := len(currentCounter)
+	var rc byte = 0x00
+	for i := Len - 1; i >= 0; i-- {
+		if i == Len-1 {
+			if nextCounter[i] < 0xff {
+				nextCounter[i] = nextCounter[i] + 0x01
+				rc = 0x00
+			} else {
+				nextCounter[i] = 0x00
+				rc = 0x01
+			}
+		} else {
+			if nextCounter[i]+rc < 0xff {
+				nextCounter[i] = nextCounter[i] + rc
+				rc = 0x00
+			} else {
+				nextCounter[i] = 0x00
+				rc = 0x01
+			}
+		}
+	}
+	return nextCounter
+}
+
+func GCMEncryptStream(K, IV, A []byte, PlainText padding.PaddingReader, CipherText io.Writer) (T []byte, err error) {
+	c, err := NewCipher(K)
+	if err != nil {
+		return nil, err
+	}
+	// A for GHash
+	H := GetH(K)
+	X := make([]byte, BlockSize) // X0 = [00,00 ...] len blockSize
+	if len(A) > 0 {
+		paddingA := append(A, make([]byte, (BlockSize-len(A)%BlockSize))...)
+		for i := 0; i < len(paddingA)-BlockSize; i += BlockSize {
+			copy(X, multiplication(addition(X, paddingA[i:i+BlockSize]), H)) // GHash
+		}
+	}
+
+	// Encrypt main
+	CLen := 0
+	blockEnc := make([]byte, BlockSize)
+	counter := GetY0(H, IV)
+	for {
+		blockBuffer, err := PlainText.ReadBlock()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		CLen += BlockSize
+		counter = Incr(counter) // counter incr
+		c.Encrypt(blockEnc, counter)
+		copy(blockEnc, addition(blockBuffer, blockEnc))
+		copy(X, multiplication(addition(X, blockEnc), H)) // GHash
+		_, err = CipherText.Write(blockEnc)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// len A C for GHash
+	var lenAC []byte
+	calculateLenToBytes := func(len int) []byte { //binary.BigEndian.PutUint64
+		data := make([]byte, 8)
+		data[0] = byte((len >> 56) & 0xff)
+		data[1] = byte((len >> 48) & 0xff)
+		data[2] = byte((len >> 40) & 0xff)
+		data[3] = byte((len >> 32) & 0xff)
+		data[4] = byte((len >> 24) & 0xff)
+		data[5] = byte((len >> 16) & 0xff)
+		data[6] = byte((len >> 8) & 0xff)
+		data[7] = byte((len >> 0) & 0xff)
+		return data
+	}
+	lenAC = append(lenAC, calculateLenToBytes(len(A))...)
+	lenAC = append(lenAC, calculateLenToBytes(CLen)...)
+	copy(X, multiplication(addition(X, lenAC), H))
+
+	// generate T
+	EKey := make([]byte, BlockSize)
+	c.Encrypt(EKey, GetY0(H, IV))
+	T = MSB(128, addition(EKey, X))
+
+	return T, nil
+}
+
 // GCMEncrypt 可鉴别加密函数 (GCM-AE(k))
 // K: 对称密钥
 // IV: IV向量
@@ -303,6 +405,77 @@ func GCMEncrypt(K, IV, P, A []byte) (C, T []byte) {
 	t := 128
 	T = MSB(t, addition(Enc, GHASH(H, A, C)))
 	return C, T
+}
+
+func GCMDecryptStream(K, IV, A []byte, CipherText io.Reader, PlainText padding.PaddingWriter) (T []byte, err error) {
+	c, err := NewCipher(K)
+	if err != nil {
+		return nil, err
+	}
+	// A for GHash
+	H := GetH(K)
+	X := make([]byte, BlockSize) // X0 = [00,00 ...] len blockSize
+	if len(A) > 0 {
+		paddingA := append(A, make([]byte, (BlockSize-len(A)%BlockSize))...)
+		for i := 0; i < len(paddingA)-BlockSize; i += BlockSize {
+			copy(X, multiplication(addition(X, paddingA[i:i+BlockSize]), H)) // GHash
+		}
+	}
+
+	// Encrypt main
+	CLen := 0
+	blockBuffer := make([]byte, BlockSize)
+	blockDec := make([]byte, BlockSize)
+	counter := GetY0(H, IV)
+	for {
+		n, err := io.ReadFull(CipherText, blockBuffer) // reader data should divide blockSize, so unexpected EOF is not allowed
+		if err != nil {
+			if errors.Is(err, io.EOF) || (errors.Is(err, io.ErrUnexpectedEOF) && n == 0) {
+				n, err = io.ReadFull(CipherText, blockBuffer)
+				break
+			}
+			return nil, err
+		}
+		CLen += n
+		counter = Incr(counter) // counter incr
+		c.Encrypt(blockDec, counter)
+		copy(blockDec, addition(blockBuffer, blockDec))
+		copy(X, multiplication(addition(X, blockBuffer), H)) // GHash
+		_, err = PlainText.Write(blockDec)
+		if err != nil {
+			return nil, err
+		}
+		blockBuffer = make([]byte, BlockSize)
+	}
+	err = PlainText.Final()
+	if err != nil {
+		return nil, err
+	}
+
+	// len A C for GHash
+	var lenAC []byte
+	calculateLenToBytes := func(len int) []byte { //binary.BigEndian.PutUint64
+		data := make([]byte, 8)
+		data[0] = byte((len >> 56) & 0xff)
+		data[1] = byte((len >> 48) & 0xff)
+		data[2] = byte((len >> 40) & 0xff)
+		data[3] = byte((len >> 32) & 0xff)
+		data[4] = byte((len >> 24) & 0xff)
+		data[5] = byte((len >> 16) & 0xff)
+		data[6] = byte((len >> 8) & 0xff)
+		data[7] = byte((len >> 0) & 0xff)
+		return data
+	}
+	lenAC = append(lenAC, calculateLenToBytes(len(A))...)
+	lenAC = append(lenAC, calculateLenToBytes(CLen)...)
+	copy(X, multiplication(addition(X, lenAC), H))
+
+	// generate T
+	EKey := make([]byte, BlockSize)
+	c.Encrypt(EKey, GetY0(H, IV))
+	T = MSB(128, addition(EKey, X))
+
+	return T, nil
 }
 
 func GCMDecrypt(K, IV, C, A []byte) (P, _T []byte) {

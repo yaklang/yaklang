@@ -12,7 +12,7 @@ import (
 func P7BlockDecrypt(decrypter cipher.BlockMode, in io.Reader, out io.Writer) error {
 	bufIn := make([]byte, 1024)
 	bufOut := make([]byte, 1024)
-	p7Out := NewPKCS7PaddingWriter(out, decrypter.BlockSize())
+	p7Out := NewPKCSPaddingWriter(out, decrypter.BlockSize())
 	for {
 		n, err := in.Read(bufIn)
 		if err != nil && err != io.EOF {
@@ -37,7 +37,7 @@ func P7BlockDecrypt(decrypter cipher.BlockMode, in io.Reader, out io.Writer) err
 func P7BlockEnc(encrypter cipher.BlockMode, in io.Reader, out io.Writer) error {
 	bufIn := make([]byte, 1024)
 	bufOut := make([]byte, 1024)
-	p7In := NewPKCS7PaddingReader(in, encrypter.BlockSize())
+	p7In := NewPKCSPaddingReader(in, encrypter.BlockSize())
 	for {
 		n, err := p7In.Read(bufIn)
 		if err != nil && err != io.EOF {
