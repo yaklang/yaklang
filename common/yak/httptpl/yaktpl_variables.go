@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type TemplateVarTypePrefix string
@@ -29,21 +30,25 @@ const (
 
 type Var struct {
 	Type TemplateVarType // 需要在保证nuclei中可以正确解析的情况下，携带类型信息，所以对于除nuclei-dsl类型的变量，在值前增加@raw、@fuzztag标记类型
-	Data string
+	Data any
 }
 
-func NewVar(v string) *Var {
+func NewVar(v any) *Var {
 	val := &Var{Data: v, Type: NucleiDslType}
-	if strings.HasPrefix(v, string(FuzztagPrefix)) { // 指定为fuzztag类型
-		val.Data = v[len(string(FuzztagPrefix)):]
-		val.Type = FuzztagType
-	} else if strings.HasPrefix(v, string(RawPrefix)) { // 指定为raw类型
-		val.Data = v[len(string(RawPrefix)):]
-		val.Type = RawType
-	} else if strings.Contains(v, "{{") { // 自动类型解析
-		val.Type = NucleiDslType
-	} else {
-		val.Type = RawType
+	switch i := v.(type) {
+	case string:
+		if strings.HasPrefix(i, string(FuzztagPrefix)) { // 指定为fuzztag类型
+			val.Data = i[len(string(FuzztagPrefix)):]
+			val.Type = FuzztagType
+		} else if strings.HasPrefix(i, string(RawPrefix)) { // 指定为raw类型
+			val.Data = i[len(string(RawPrefix)):]
+			val.Type = RawType
+		} else if strings.Contains(i, "{{") { // 自动类型解析
+			val.Type = NucleiDslType
+		} else {
+			val.Type = RawType
+		}
+	default:
 	}
 	return val
 }
@@ -51,11 +56,11 @@ func NewVar(v string) *Var {
 func (v *Var) GetValue() string {
 	switch v.Type {
 	case FuzztagType:
-		return string(FuzztagPrefix) + v.Data
+		return string(FuzztagPrefix) + codec.AnyToString(v.Data)
 	case RawType:
-		return string(RawPrefix) + v.Data
+		return string(RawPrefix) + codec.AnyToString(v.Data)
 	default:
-		return v.Data
+		return codec.AnyToString(v.Data)
 	}
 }
 
@@ -69,14 +74,14 @@ type YakVariables struct {
 	outputMutex  *sync.Mutex
 }
 
-func (v *YakVariables) Set(key string, value string) {
+func (v *YakVariables) Set(key string, value any) {
 	if v == nil {
 		return
 	}
 	v.SetWithType(key, value, string(RawType))
 }
 
-func (v *YakVariables) SetWithType(key string, value string, typeName string) error {
+func (v *YakVariables) SetWithType(key string, value any, typeName string) error {
 	if v == nil {
 		return nil
 	}
@@ -97,7 +102,7 @@ func (v *YakVariables) SetWithType(key string, value string, typeName string) er
 	return nil
 }
 
-func (v *YakVariables) SetAsNucleiTags(key string, value string) {
+func (v *YakVariables) SetAsNucleiTags(key string, value any) {
 	if v == nil {
 		return
 	}
@@ -109,7 +114,7 @@ func (v *YakVariables) SetAsNucleiTags(key string, value string) {
 	})
 }
 
-func (v *YakVariables) AutoSet(key string, value string) {
+func (v *YakVariables) AutoSet(key string, value any) {
 	if v == nil {
 		return
 	}
@@ -118,7 +123,7 @@ func (v *YakVariables) AutoSet(key string, value string) {
 	v.set(key, NewVar(value))
 }
 
-func (v *YakVariables) SetNucleiDSL(key string, value string) {
+func (v *YakVariables) SetNucleiDSL(key string, value any) {
 	if v == nil {
 		return
 	}
@@ -195,7 +200,7 @@ func (v *YakVariables) ToMap() map[string]any {
 				return results[0], nil
 			}
 		case NucleiDslType:
-			ret, err := execNucleiDSL(s.Data, func(s string) (any, error) {
+			ret, err := execNucleiDSL(codec.AnyToString(s.Data), func(s string) (any, error) {
 				if variable, ok := res[s]; ok {
 					return variable, nil
 				} else {
@@ -204,7 +209,7 @@ func (v *YakVariables) ToMap() map[string]any {
 			})
 			// fallback to string
 			if ret == nil || err != nil {
-				rets, err := FuzzNucleiTag(s.Data, res, lo.MapEntries(res, func(key string, value any) (string, []string) {
+				rets, err := FuzzNucleiTag(codec.AnyToString(s.Data), res, lo.MapEntries(res, func(key string, value any) (string, []string) {
 					return key, []string{toString(value)}
 				}), "")
 				if err != nil {
