@@ -158,7 +158,7 @@ func (c *config) SaveProfile() {
 	if c.toProfile {
 		ssadb.SaveSSAProgram(
 			c.ProgramName, c.ProgramDescription,
-			string(c.language),
+			string(c.language), c.info,
 		)
 	}
 }
