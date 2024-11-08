@@ -58,7 +58,7 @@ type config struct {
 	// other build options
 	DatabaseProgramCacheHitter func(any)
 	EnableCache                bool
-	SaveToProfile              bool
+	toProfile                  bool
 	// for hash
 	externInfo string
 	// process ctx
@@ -67,8 +67,8 @@ type config struct {
 	err error
 }
 
-func defaultConfig() *config {
-	return &config{
+func defaultConfig(opts ...Option) (*config, error) {
+	c := &config{
 		language:                   "",
 		SelectedLanguageBuilder:    nil,
 		originEditor:               memedit.NewMemEditor(""),
@@ -78,9 +78,17 @@ func defaultConfig() *config {
 		externLib:                  make(map[string]map[string]any),
 		externValue:                make(map[string]any),
 		defineFunc:                 make(map[string]any),
-		SaveToProfile:              false,
+		toProfile:                  false,
 		DatabaseProgramCacheHitter: func(any) {},
 	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+	if c.err != nil {
+		return nil, c.err
+	}
+	return c, nil
 }
 
 func (c *config) CalcHash() string {
@@ -110,6 +118,21 @@ func WithStrictMode(b bool) Option {
 func WithError(err error) Option {
 	return func(c *config) {
 		c.err = err
+	}
+}
+
+func WithLocalFs(path string) Option {
+	return func(c *config) {
+		c.fs = filesys.NewRelLocalFs(path)
+	}
+}
+func WithFileSystem(fs fi.FileSystem) Option {
+	return func(c *config) {
+		if fs == nil {
+			c.err = utils.Errorf("need set filesystem")
+		} else {
+			c.fs = fs
+		}
 	}
 }
 
@@ -260,9 +283,9 @@ func WithDatabaseProgramCacheHitter(h func(i any)) Option {
 func WithSaveToProfile(b ...bool) Option {
 	return func(c *config) {
 		if len(b) > 0 {
-			c.SaveToProfile = b[0]
+			c.toProfile = b[0]
 		} else {
-			c.SaveToProfile = true
+			c.toProfile = true
 		}
 	}
 }
@@ -284,23 +307,23 @@ func WithContext(ctx context.Context) Option {
 }
 
 func ParseProjectFromPath(path string, opts ...Option) (Programs, error) {
-	return ParseProject(filesys.NewRelLocalFs(path), opts...)
+	if path != "" {
+		opts = append(opts, WithLocalFs(path))
+	}
+	return ParseProject(opts...)
 }
 
-func ParseProject(fs fi.FileSystem, opts ...Option) (Programs, error) {
-	config := defaultConfig()
-	for _, opt := range opts {
-		opt(config)
+func ParseProjectWithFS(fs fi.FileSystem, opts ...Option) (Programs, error) {
+	opts = append(opts, WithFileSystem(fs))
+	return ParseProject(opts...)
+}
+
+func ParseProject(opts ...Option) (Programs, error) {
+	config, err := defaultConfig(opts...)
+	if err != nil {
+		return nil, err
 	}
-	if config.err != nil {
-		return nil, config.err
-	}
-	config.fs = fs
-	if config.fs == nil {
-		return nil, utils.Errorf("need set filesystem")
-	}
-	ret, err := config.parseProject()
-	return ret, err
+	return config.parseProject()
 }
 
 var ttlSSAParseCache = createCache(10 * time.Second)
@@ -322,12 +345,9 @@ func Parse(code string, opts ...Option) (*Program, error) {
 
 // ParseFromReader parse simple file to ssa.Program
 func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
-	config := defaultConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-	if config.err != nil {
-		return nil, config.err
+	config, err := defaultConfig(opts...)
+	if err != nil {
+		return nil, err
 	}
 	if input != nil {
 		raw, err := io.ReadAll(input)
@@ -365,19 +385,18 @@ func (p *Program) Feed(code io.Reader) error {
 }
 
 // FromDatabase get program from database by program name
-func FromDatabase(programName string, opts ...Option) (*Program, error) {
-	config := defaultConfig()
-	for _, opt := range opts {
-		opt(config)
+func FromDatabase(programName string) (*Program, error) {
+	config, err := defaultConfig(WithProgramName(programName))
+	if err != nil {
+		return nil, err
 	}
-	config.ProgramName = programName
-
 	return config.fromDatabase()
 }
 
 var Exports = map[string]any{
 	"Parse":              Parse,
 	"ParseLocalProject":  ParseProjectFromPath,
+	"ParseProject":       ParseProject,
 	"NewFromProgramName": FromDatabase,
 
 	"withLanguage":      WithRawLanguage,

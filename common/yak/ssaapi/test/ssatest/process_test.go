@@ -40,7 +40,7 @@ func checkProcess(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.O
 			msgs = append(msgs, message{msg, process})
 		}),
 	)
-	prog, err := ssaapi.ParseProject(vf, opt...)
+	prog, err := ssaapi.ParseProjectWithFS(vf, opt...)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programID)
 	assert.NoError(t, err)
 	assert.NotNil(t, prog)

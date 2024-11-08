@@ -203,7 +203,7 @@ func TestSourceFilesys(t *testing.T) {
 		`)
 
 	programID := uuid.NewString()
-	_, err := ssaapi.ParseProject(vf,
+	_, err := ssaapi.ParseProjectWithFS(vf,
 		ssaapi.WithLanguage(ssaapi.JAVA),
 		ssaapi.WithProgramName(programID),
 		ssaapi.WithSaveToProfile(),
@@ -314,7 +314,7 @@ func TestProgram_ListAndDelete(t *testing.T) {
 
 	var err error
 	programID1 := uuid.NewString()
-	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID1), ssaapi.WithSaveToProfile())
+	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID1), ssaapi.WithSaveToProfile())
 	defer func() {
 		ssadb.CheckAndSwitchDB(programID1)
 		ssadb.DeleteProgram(ssadb.GetDB(), programID1)
@@ -323,7 +323,7 @@ func TestProgram_ListAndDelete(t *testing.T) {
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
 	programID2 := uuid.NewString()
-	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID2), ssaapi.WithSaveToProfile())
+	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID2), ssaapi.WithSaveToProfile())
 	defer func() {
 		ssadb.CheckAndSwitchDB(programID2)
 		ssadb.DeleteProgram(ssadb.GetDB(), programID2)
@@ -333,7 +333,7 @@ func TestProgram_ListAndDelete(t *testing.T) {
 
 	consts.SetSSADataBasePath(dbPath)
 	programID3 := uuid.NewString()
-	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID3), ssaapi.WithSaveToProfile())
+	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID3), ssaapi.WithSaveToProfile())
 	defer func() {
 		ssadb.CheckAndSwitchDB(programID3)
 		ssadb.DeleteProgram(ssadb.GetDB(), programID3)

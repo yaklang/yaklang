@@ -24,7 +24,7 @@ func Test_CompileError(t *testing.T) {
 	check := func(t *testing.T, fs filesys_interface.FileSystem) {
 		progName := uuid.NewString()
 		finalProcess := 0.0
-		prog, err := ssaapi.ParseProject(fs,
+		prog, err := ssaapi.ParseProjectWithFS(fs,
 			ssaapi.WithStrictMode(true),
 			ssaapi.WithProgramName(progName),
 			ssaapi.WithProcess(func(msg string, process float64) {
@@ -74,7 +74,7 @@ func Test_CompileError(t *testing.T) {
 		vf.AddFile("b.yak", "print('Hello, ")
 		vf.AddFile("c.yak", "print('Hello,')")
 		finalProcess := 0.0
-		prog, err := ssaapi.ParseProject(vf, ssaapi.WithProcess(func(msg string, process float64) {
+		prog, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithProcess(func(msg string, process float64) {
 			if process > finalProcess {
 				finalProcess = process
 			}
@@ -90,7 +90,7 @@ func Test_CompileError(t *testing.T) {
 		vf.AddFile("b.yak", "print('Hello, )")
 		vf.AddFile("c.yak", "print('Hello,')")
 		finalProcess := 0.0
-		prog, err := ssaapi.ParseProject(vf, ssaapi.WithProcess(func(msg string, process float64) {
+		prog, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithProcess(func(msg string, process float64) {
 			if process > finalProcess {
 				finalProcess = process
 			}
@@ -127,7 +127,7 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 		var maxProcess float64
 		programID := uuid.NewString()
 		ctx, cancel := context.WithCancel(context.Background())
-		_, err := ssaapi.ParseProject(vf,
+		_, err := ssaapi.ParseProjectWithFS(vf,
 			ssaapi.WithLanguage(ssaapi.JAVA),
 			ssaapi.WithProgramName(programID),
 			ssaapi.WithProcess(func(msg string, process float64) {

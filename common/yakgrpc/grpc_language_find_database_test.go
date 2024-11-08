@@ -19,7 +19,7 @@ import (
 func initProgram(t *testing.T, fs filesys_interface.FileSystem, opts ...ssaapi.Option) (string, func()) {
 	programID := uuid.NewString()
 	opts = append(opts, ssaapi.WithProgramName(programID))
-	_, err := ssaapi.ParseProject(fs, opts...)
+	_, err := ssaapi.ParseProjectWithFS(fs, opts...)
 	assert.NoErrorf(t, err, "ParseProject failed: %v", err)
 	return programID, func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)

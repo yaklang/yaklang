@@ -2,6 +2,9 @@ package yakgrpc
 
 import (
 	"context"
+	"io"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -11,8 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
@@ -83,7 +84,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		}
 		`)
 		progID := uuid.NewString()
-		prog, err := ssaapi.ParseProject(vf,
+		prog, err := ssaapi.ParseProjectWithFS(vf,
 			ssaapi.WithLanguage(consts.JAVA),
 			ssaapi.WithProgramPath("example"),
 			ssaapi.WithProgramName(progID),
@@ -173,7 +174,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		`)
 
 		progID1 := uuid.NewString()
-		prog1, err := ssaapi.ParseProject(vf1,
+		prog1, err := ssaapi.ParseProjectWithFS(vf1,
 			ssaapi.WithLanguage(consts.JAVA),
 			ssaapi.WithProgramPath("example"),
 			ssaapi.WithProgramName(progID1),
@@ -186,7 +187,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		require.NotNil(t, prog1)
 
 		progID2 := uuid.NewString()
-		prog2, err := ssaapi.ParseProject(vf1,
+		prog2, err := ssaapi.ParseProjectWithFS(vf1,
 			ssaapi.WithLanguage(consts.JAVA),
 			ssaapi.WithProgramPath("example"),
 			ssaapi.WithProgramName(progID2),
@@ -315,7 +316,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		}
 		`)
 		progID := uuid.NewString()
-		prog, err := ssaapi.ParseProject(vf,
+		prog, err := ssaapi.ParseProjectWithFS(vf,
 			ssaapi.WithLanguage(consts.JAVA),
 			ssaapi.WithProgramPath("example"),
 			ssaapi.WithProgramName(progID),

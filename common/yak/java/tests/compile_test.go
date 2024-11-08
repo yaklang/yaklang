@@ -342,7 +342,7 @@ func TestCompileProgram_MultipleFileInLibrary(t *testing.T) {
 
 	check := func(programID string, want []string) {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)
-		prog, err := ssaapi.ParseProject(
+		prog, err := ssaapi.ParseProjectWithFS(
 			vf,
 			ssaapi.WithLanguage(ssaapi.JAVA),
 			ssaapi.WithProgramName(programID),

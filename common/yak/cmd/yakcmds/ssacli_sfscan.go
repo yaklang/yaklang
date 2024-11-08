@@ -37,8 +37,7 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 			return utils.Error("program name is required")
 		}
 
-		var opt []ssaapi.Option
-		prog, err := ssaapi.FromDatabase(program, opt...)
+		prog, err := ssaapi.FromDatabase(program)
 		if err != nil {
 			return err
 		}
