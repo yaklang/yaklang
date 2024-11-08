@@ -1370,8 +1370,6 @@ func MIMEGlobRuleCheck(target string, rule string) bool {
 	return false // 仅 rule 有 / 则直接返回 false
 }
 
-// UnquoteANSIC 解码ANSI-C风格的引号字符串
-func UnquoteANSIC(s string) (string, error) {
 func UnquoteANSICWithQuote(s string, quote rune) (string, error) {
 	// 检查是否以单引号开始和结束
 	if quote != 0 {
