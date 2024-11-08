@@ -39,31 +39,33 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 	var handshakeConn HandshakeConn
 	minVer, maxVer := consts.GetGlobalTLSVersion()
 	if i == nil {
-		i = &tls.Config{
+		i = &gmtls.Config{ // use gmtls for
 			ServerName:         sni,
 			MinVersion:         minVer,
 			MaxVersion:         maxVer,
 			InsecureSkipVerify: true,
-			Renegotiation:      tls.RenegotiateFreelyAsClient,
+			Renegotiation:      gmtls.RenegotiateFreelyAsClient,
 		}
 	}
 	var (
 		config      any
 		gmtlsConfig *gmtls.Config
-		tlsConfig   *tls.Config
 		utlsConfig  *utls.Config
 	)
 	overrideNextProtos := len(tlsNextProto) > 0
 	// i is a *tls.Config or *gmtls.Config
 	switch ret := i.(type) {
 	case *tls.Config:
-		tlsConfig = ret
-		config = tlsConfig
+		if gmConfig, err := gmtls.TlsConfigToGmTlsConfig(ret); err == nil {
+			gmtlsConfig = gmConfig
+			config = gmtlsConfig
+		} else {
+			return nil, err
+		}
 	case *gmtls.Config:
 		gmtlsConfig = ret
 		config = gmtlsConfig
 	case *gmtls.GMSupport:
-
 		gmtlsConfig = &gmtls.Config{
 			GMSupport:          ret,
 			ServerName:         sni,
@@ -77,68 +79,55 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 	}
 	isCustomClientHello := spec != nil
 
-	if tlsConfig != nil {
-		if overrideNextProtos {
-			tlsConfig.NextProtos = tlsNextProto
-		}
-		tlsConfig.Renegotiation = tls.RenegotiateFreelyAsClient
+	if overrideNextProtos {
+		gmtlsConfig.NextProtos = tlsNextProto
+	}
+	gmtlsConfig.Renegotiation = gmtls.RenegotiateFreelyAsClient
 
-		if isCustomClientHello {
-			utlsConfig = &utls.Config{
-				ServerName:         sni,
-				MinVersion:         minVer,
-				MaxVersion:         maxVer,
-				InsecureSkipVerify: true,
-				Renegotiation:      utls.RenegotiateFreelyAsClient,
-				NextProtos:         tlsConfig.NextProtos,
-			}
-			config = utlsConfig
+	if isCustomClientHello {
+		utlsConfig = &utls.Config{
+			ServerName:         sni,
+			MinVersion:         minVer,
+			MaxVersion:         maxVer,
+			InsecureSkipVerify: true,
+			Renegotiation:      utls.RenegotiateFreelyAsClient,
+			NextProtos:         gmtlsConfig.NextProtos,
 		}
-
+		config = utlsConfig
 		err := LoadCertificatesConfig(config)
 		if err != nil {
 			log.Warnf("LoadCertificatesConfig(tlsConfig) error: %s", err)
 		}
-
-		if isCustomClientHello {
-			spec := *spec
-
-			uConn := utls.UClient(conn, utlsConfig, utls.HelloCustom)
-			// if tlsNextProtos not contains h2, but spec contains, remove it
-			if !lo.Contains(tlsNextProto, "h2") {
-				for i, ext := range spec.Extensions {
-					if _, ok := ext.(*utls.ALPNExtension); !ok {
-						continue
-					}
-					old := spec.Extensions[i].(*utls.ALPNExtension).AlpnProtocols
-					if !lo.Contains(old, "h2") {
-						break
-					}
-
-					// force set ALPN
-					spec.Extensions[i] = &utls.ALPNExtension{
-						AlpnProtocols: tlsNextProto,
-					}
+		spec := *spec
+		uConn := utls.UClient(conn, utlsConfig, utls.HelloCustom)
+		// if tlsNextProtos not contains h2, but spec contains, remove it
+		if !lo.Contains(tlsNextProto, "h2") {
+			for i, ext := range spec.Extensions {
+				if _, ok := ext.(*utls.ALPNExtension); !ok {
+					continue
+				}
+				old := spec.Extensions[i].(*utls.ALPNExtension).AlpnProtocols
+				if !lo.Contains(old, "h2") {
 					break
 				}
-			}
 
-			err = uConn.ApplyPreset(&spec)
-			if err != nil {
-				return nil, utils.Wrap(err, "uConn.ApplyPreset error")
+				// force set ALPN
+				spec.Extensions[i] = &utls.ALPNExtension{
+					AlpnProtocols: tlsNextProto,
+				}
+				break
 			}
+		}
 
-			handshakeConn = uConn
-		} else {
-			handshakeConn = tls.Client(conn, tlsConfig)
+		err = uConn.ApplyPreset(&spec)
+		if err != nil {
+			return nil, utils.Wrap(err, "uConn.ApplyPreset error")
 		}
-	} else if gmtlsConfig != nil {
-		if overrideNextProtos {
-			gmtlsConfig.NextProtos = tlsNextProto
-		}
-		gmtlsConfig.Renegotiation = gmtls.RenegotiateFreelyAsClient
+		handshakeConn = uConn
+	} else {
 		handshakeConn = gmtls.Client(conn, gmtlsConfig)
 	}
+
 	if handshakeConn == nil {
 		return nil, utils.Errorf("invalid tlsConfig type %T", i)
 	}
