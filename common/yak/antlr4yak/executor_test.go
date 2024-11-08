@@ -801,6 +801,9 @@ func _viewLexerTokens(i string) {
 func _marshallerTestWithCtx(i string, ctx context.Context, debug bool) {
 	m := yakvm.NewCodesMarshaller()
 	cl := compiler(i)
+	if err := cl.GetErrors(); len(err) > 0 {
+		panic(err)
+	}
 	oldSymbolTable, oldCodes := cl.GetRootSymbolTable(), cl.GetOpcodes()
 	_ = oldSymbolTable
 	_ = oldCodes
@@ -3349,12 +3352,6 @@ func TestNewExecutor_MemberCall(t *testing.T) {
 //v = 1
 //v+=2
 //assert v == 2, "PlusEq运算失败"
-v = "你好"
-assert v[0] == '你', "解析char类型或索引字符串中的char失败"
-v = "你" + '好'
-assert v == "你好","string加char失败"
-v = '你'+"好"
-assert v == "你好","char加string失败"
 
 // v = getGoStruct()
 // assert v.GetName() == "派大星", "获取go结构体成员（通过FunctionCall方式）失败"
@@ -3731,7 +3728,7 @@ assert ab == ""
 ab = 'c'
 assert 'c' == 99
 dump(ab)
-ab = 'cc'
+ab = "9999"
 assert ab == "" + 99 + 99
 dump(ab, "" + 99 + 99)
 `
@@ -4058,6 +4055,36 @@ assert typeof(a) == map[string]%s
 		_marshallerTest(`
 assert typeof([testIns]) == typeof(wantInsSlice)
 `)
+	})
+}
+
+func TestAutoTypeConvert(t *testing.T) {
+	t.Run("plus", func(t *testing.T) {
+		code := `
+assert typeof(1 + 1.1) == typeof(2.1), "int + float == float failed"
+assert typeof(1.1 + 1) == typeof(2.1), "float + int == float failed"
+try {
+	"a" + b"b"
+} catch e {
+	assert e != nil, "string + bytes shoule be failed"
+} 
+
+try {
+	b"a" + "b"
+} catch e {
+	assert e != nil, "bytes + string shoule be failed"
+} 
+v = "你好"
+assert v[0] == '你', "string[0] == char failed"
+assert "你" + '好' == "你好","string + char == string failed"
+assert '你'+"好" == "你好","char + string == string failed"
+assert "1" + 1 == "11", "string + int == string failed"
+assert 1 + "1" == "11", "int + string == string failed"
+assert b"1" + 1 == b"11", "bytes + int == bytes failed"
+assert 1 + b"1" == b"11", "int + bytes == bytes failed"
+`
+
+		_marshallerTest(code)
 	})
 }
 
