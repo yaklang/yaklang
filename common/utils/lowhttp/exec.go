@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -505,7 +504,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				InsecureSkipVerify: !option.VerifyCertificate,
 			}))
 		} else {
-			dialopts = append(dialopts, netx.DialX_WithTLSConfig(&tls.Config{
+			dialopts = append(dialopts, netx.DialX_WithTLSConfig(&gmtls.Config{
 				NextProtos:         nextProto,
 				ServerName:         host,
 				InsecureSkipVerify: !option.VerifyCertificate,

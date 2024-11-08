@@ -1,7 +1,7 @@
 package consts
 
 import (
-	"crypto/tls"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -53,8 +53,8 @@ var (
 	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT = atomic.NewFloat64(60)
 
 	// tls global config
-	GLOBAL_TLS_MIN_VERSION uint16 = tls.VersionSSL30
-	GLOBAL_TLS_MAX_VERSION uint16 = tls.VersionTLS13
+	GLOBAL_TLS_MIN_VERSION uint16 = gmtls.VersionSSL30
+	GLOBAL_TLS_MAX_VERSION uint16 = gmtls.VersionTLS13
 )
 
 const (

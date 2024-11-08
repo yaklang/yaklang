@@ -888,7 +888,7 @@ func (p *Proxy) handshakeWithTarget(req *http.Request) (net.Conn, error) {
 		proxyUrl = p.proxyURL.String()
 	}
 	vanillaTLS := func() {
-		rawConn, err = netx.DialTLSTimeout(time.Second*10, req.URL.Host, &tls.Config{
+		rawConn, err = netx.DialTLSTimeout(time.Second*10, req.URL.Host, &gmtls.Config{
 			InsecureSkipVerify: true,
 			NextProtos:         []string{"h2", "http/1.1"},
 			ServerName:         utils.ExtractHost(req.URL.Host),

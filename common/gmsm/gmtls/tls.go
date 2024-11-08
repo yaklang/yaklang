@@ -20,7 +20,9 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -311,4 +313,17 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 		return key, nil
 	}
 	return nil, errors.New("tls: failed to parse private key")
+}
+
+func TlsConfigToGmTlsConfig(config *tls.Config) (*Config, error) {
+	jsonData, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+	var gmConfig Config
+	err = json.Unmarshal(jsonData, &gmConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &gmConfig, nil
 }

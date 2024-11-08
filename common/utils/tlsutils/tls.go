@@ -478,8 +478,8 @@ func GetX509ServerTlsConfigWithAuth(caPemRaw, serverCrt, keyPriv []byte, auth bo
 	return &config, nil
 }
 
-func ParseCertAndPriKeyAndPool(clientCrt, clientPriv []byte, caCrts ...[]byte) (tls.Certificate, *x509.CertPool, error) {
-	pool := x509.NewCertPool()
+func ParseCertAndPriKeyAndPool(clientCrt, clientPriv []byte, caCrts ...[]byte) (tls.Certificate, *x509gm.CertPool, error) {
+	pool := x509gm.NewCertPool()
 	for _, crt := range caCrts {
 		if !pool.AppendCertsFromPEM(crt) {
 			log.Errorf("append ca pem error")
@@ -508,22 +508,22 @@ func ParseCertAndPriKeyAndPoolForGM(clientCrt, clientPriv []byte, caCrts ...[]by
 	return pair, pool, nil
 }
 
-func GetX509MutualAuthClientTlsConfig(clientCrt, clientPriv []byte, caCrts ...[]byte) (*tls.Config, error) {
-	pool := x509.NewCertPool()
+func GetX509MutualAuthClientTlsConfig(clientCrt, clientPriv []byte, caCrts ...[]byte) (*gmtls.Config, error) {
+	pool := x509gm.NewCertPool()
 	for _, crt := range caCrts {
 		if !pool.AppendCertsFromPEM(crt) {
 			log.Errorf("append ca pem error")
 		}
 	}
 
-	pair, err := tls.X509KeyPair(clientCrt, clientPriv)
+	pair, err := gmtls.X509KeyPair(clientCrt, clientPriv)
 	if err != nil {
 		return nil, errors.Errorf("cannot build client crt/key pair: %s", err)
 	}
 
-	config := tls.Config{
+	config := gmtls.Config{
 		InsecureSkipVerify: true,
-		Certificates:       []tls.Certificate{pair},
+		Certificates:       []gmtls.Certificate{pair},
 		ClientCAs:          pool,
 	}
 
