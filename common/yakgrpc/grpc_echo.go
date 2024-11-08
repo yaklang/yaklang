@@ -89,15 +89,17 @@ func verify(serConfig, cliConfig *tls.Config, domain string) error {
 		}
 	}
 	conn, err := netx.DialX(fmt.Sprintf("127.0.0.1:%d", port),
-		netx.DialX_WithTLS(true),
-		netx.DialX_WithTLSConfig(cliConfig),
 		netx.DialX_WithTimeout(3*time.Second),
 	)
-
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	tlsConn := tls.Client(conn, cliConfig)
+	err = tlsConn.Handshake()
+	if err != nil {
+		return err
+	}
+	defer tlsConn.Close()
 
 	return nil
 }
