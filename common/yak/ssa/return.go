@@ -139,6 +139,9 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 		}
 		var opcode = []Opcode{SSAOpcodeParameter, SSAOpcodeFreeValue, SSAOpcodeParameterMember, SSAOpcodeSideEffect}
 		for _, result := range r.Results {
+			if utils.IsNil(result) {
+				continue
+			}
 			if !slices.Contains(opcode, result.GetOpcode()) {
 				if result.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 					for key, value := range result.GetAllMember() {

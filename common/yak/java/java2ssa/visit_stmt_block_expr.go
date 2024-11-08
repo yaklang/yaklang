@@ -147,10 +147,12 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			//todo : 显式泛型调用
 			key = y.EmitConstInst(explicit.GetText())
 		}
-		if res == nil {
+		if utils.IsNil(res) {
 			res = y.ReadMemberCallValue(obj, key)
+			if utils.IsNil(res) {
+				return nil
+			}
 		}
-
 		resTyp := res.GetType()
 		if resTyp != nil && len(resTyp.GetFullTypeNames()) != 0 {
 			return res
@@ -309,6 +311,9 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		}
 
 		v := y.VisitExpression(ret.Expression())
+		if utils.IsNil(v) {
+			return nil
+		}
 		if castType != nil {
 			v.SetType(castType)
 		}
@@ -1020,6 +1025,9 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		// 处理 return 语句
 		if ret.Expression() != nil {
 			value := y.VisitExpression(ret.Expression())
+			if utils.IsNil(value) {
+				return nil
+			}
 			if funcTyp := y.GetCurrentReturnType(); funcTyp != nil {
 				value.SetType(funcTyp)
 			}
