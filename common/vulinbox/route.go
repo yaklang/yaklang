@@ -65,7 +65,6 @@ func (s *VulinServer) init() {
 	}
 
 	router := s.router
-
 	// FE AND FEEDBACK
 	fe := http.FileServer(http.FS(staticFS))
 	router.NotFoundHandler = http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
