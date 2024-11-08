@@ -719,3 +719,17 @@ func (lz *LazyInstruction) SetReference(v Value) {
 	}
 	lz.Value.SetReference(v)
 }
+
+func (lz *LazyInstruction) AddOccultation(p *Phi) {
+
+}
+
+func (lz *LazyInstruction) GetOccultation() []Value {
+	var ret []Value
+
+	for _, u := range lz.GetUsers() {
+		ret = append(ret, u.(*LazyInstruction))
+	}
+
+	return ret
+}
