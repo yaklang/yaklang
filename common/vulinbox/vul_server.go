@@ -107,6 +107,7 @@ func NewVulinServerEx(ctx context.Context, noHttps, safeMode bool, host string, 
 			}
 			server := &http.Server{Handler: router}
 			server.TLSConfig = config
+			server.MaxHeaderBytes = 1024 * 8
 			err = server.ServeTLS(lis, "", "")
 			//err := http.ServeTLS(lis, router, "server.crt", "server.key")
 			if err != nil {
