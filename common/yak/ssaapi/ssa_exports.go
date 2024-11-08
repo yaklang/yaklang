@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"path/filepath"
 	"strings"
@@ -40,6 +41,8 @@ type config struct {
 	// input, code or project path
 	originEditor *memedit.MemEditor
 	// project
+	info string
+	// file system
 	fs          fi.FileSystem
 	entryFile   []string
 	programPath string
@@ -124,6 +127,10 @@ func WithError(err error) Option {
 func WithLocalFs(path string) Option {
 	return func(c *config) {
 		c.fs = filesys.NewRelLocalFs(path)
+		c.info = config_info{
+			Kind:      "local",
+			LocalFile: path,
+		}.String()
 	}
 }
 func WithFileSystem(fs fi.FileSystem) Option {
@@ -132,6 +139,26 @@ func WithFileSystem(fs fi.FileSystem) Option {
 			c.err = utils.Errorf("need set filesystem")
 		} else {
 			c.fs = fs
+		}
+	}
+}
+
+func WithConfigInfo(input map[string]any) Option {
+	return func(c *config) {
+		if input == nil {
+			return
+		}
+		// json marshal info
+		raw, err := json.Marshal(input)
+		if err != nil {
+			c.err = err
+			return
+		}
+		info := string(raw)
+
+		c.info = info
+		if err := c.initializeFromInfo(); err != nil {
+			c.err = err
 		}
 	}
 }
@@ -400,6 +427,7 @@ var Exports = map[string]any{
 	"NewFromProgramName": FromDatabase,
 
 	"withLanguage":      WithRawLanguage,
+	"withConfigInfo":    WithConfigInfo,
 	"withExternLib":     WithExternLib,
 	"withExternValue":   WithExternValue,
 	"withProgramName":   WithProgramName,
