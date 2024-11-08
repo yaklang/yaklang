@@ -460,7 +460,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 							for k, v := range vars {
 								params[k] = v
-								extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v)}) // 提取器 参数
+								extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v), MarshalValue: marshalValue(v)}) // 提取器 参数
 							}
 						}
 					}
@@ -476,7 +476,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 						if getMirrorHTTPFlowParams != nil {
 							for k, v := range getMirrorHTTPFlowParams(respModel.RequestRaw, respModel.ResponseRaw, existedParams) { // 热加载的参数
-								extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v))})
+								extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v)), MarshalValue: "string"})
 							}
 						}
 
@@ -772,7 +772,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 			if result != nil && result.ExtraInfo != nil {
 				for k, v := range result.ExtraInfo {
-					extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v))})
+					extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v)), MarshalValue: "string"})
 				}
 			}
 
@@ -818,7 +818,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					}
 					for k, v := range vars {
 						params[k] = v
-						extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v)})
+						extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v), MarshalValue: marshalValue(v)})
 					}
 				}
 			}
@@ -826,6 +826,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			for k, v := range mergedParams {
 				extractorResults = append(extractorResults, &ypb.KVPair{
 					Key: k, Value: utils.EscapeInvalidUTF8Byte(codec.AnyToBytes(v)),
+					MarshalValue: marshalValue(v),
 				},
 				)
 			}
@@ -1483,7 +1484,8 @@ func (s *Server) RenderVariables(ctx context.Context, req *ypb.RenderVariablesRe
 func (s *Server) RenderVariablesWithTypedKV(ctx context.Context, kvs []*ypb.FuzzerParamItem) map[string]any {
 	vars := httptpl.NewVars()
 	for _, kv := range kvs {
-		key, value := kv.GetKey(), kv.GetValue()
+		key, _ := kv.GetKey(), kv.GetValue()
+		value := unmarshalValue(kv.GetMarshalValue())
 		if kv.GetType() == "nuclei-dsl" {
 			vars.SetAsNucleiTags(key, value)
 		} else {
@@ -1501,15 +1503,25 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 		return resultsChan
 	}
 
-	l := make([][]string, len(params))
+	l := make([][]any, len(params))
 	idToParam := make(map[int]*ypb.FuzzerParamItem)
 	hasNucleiTag := false
-	paramsMap := lo.SliceToMap(params, func(item *ypb.FuzzerParamItem) (string, string) {
-		return item.GetKey(), item.GetValue()
+	paramsMap := lo.SliceToMap(params, func(item *ypb.FuzzerParamItem) (string, any) {
+		if item.GetMarshalValue() == "" {
+			return item.GetKey(), item.GetValue()
+		}
+		return item.GetKey(), unmarshalValue(item.GetMarshalValue())
 	})
 
 	for index, p := range params {
-		_, value := p.GetKey(), p.GetValue()
+		_, valueStr := p.GetKey(), p.GetValue()
+		var value any
+		if p.GetMarshalValue() == "" {
+			value = valueStr
+		} else {
+			value = unmarshalValue(p.GetMarshalValue())
+		}
+
 		typ := strings.TrimSpace(strings.ToLower(p.GetType()))
 		idToParam[index] = p
 
@@ -1519,27 +1531,30 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 			//if syncTagIndex {
 			//	opts = append(opts, mutate.Fuzz_SyncTag(true))
 			//}
-			rets, _ := mutate.FuzzTagExec(value, opts...)
+			rets, _ := mutate.FuzzTagExec(valueStr, opts...)
 			if len(rets) > 0 {
-				l[index] = rets
+				anyRets := lo.Map(rets, func(item string, _ int) any {
+					return item
+				})
+				l[index] = anyRets
 				continue
 			}
 		} else if typ == "nuclei-dsl" {
 			hasNucleiTag = true
 		}
 
-		l[index] = []string{value}
+		l[index] = []any{value}
 	}
 
 	var count int64 = 0
-	handlePayload := func(payloads []string) error {
+	handlePayload := func(payloads []any) error {
 		params := make([]*ypb.FuzzerParamItem, 0)
 		resultMap := make(map[string]any)
 		if hasNucleiTag {
 			for index, v := range payloads {
 				p := idToParam[index]
 				key := p.GetKey()
-				params = append(params, &ypb.FuzzerParamItem{Key: key, Value: v, Type: p.GetType()})
+				params = append(params, &ypb.FuzzerParamItem{Key: key, Value: codec.AnyToString(v), Type: p.GetType(), MarshalValue: marshalValue(v)})
 			}
 			resultMap = s.RenderVariablesWithTypedKV(ctx, params)
 		} else {
@@ -1570,7 +1585,7 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 		if syncTagIndex {
 			for i := 0; ; i++ {
 				ok := false
-				payload := []string{}
+				payload := []any{}
 				for _, group := range l {
 					if i >= len(group) {
 						payload = append(payload, "")

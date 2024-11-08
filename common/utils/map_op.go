@@ -134,9 +134,11 @@ func MapGetRawOr(m map[string]interface{}, key string, value interface{}) interf
 func MapGetString(m map[string]interface{}, key string) string {
 	return MapGetStringOr(m, key, "")
 }
+
 func MapGetStringSlice(m map[string]interface{}, key string) []string {
 	return InterfaceToStringSlice(MapGetRaw(m, key))
 }
+
 func MapGetStringByManyFields(m map[string]interface{}, key ...string) string {
 	if len(key) <= 0 {
 		return ""
@@ -372,7 +374,7 @@ func InterfaceToGeneralMap(params interface{}) (finalResult map[string]interface
 		}
 	}()
 
-	var p = map[string]interface{}{}
+	p := map[string]interface{}{}
 	setField := func(r reflect.Type, v reflect.Value, i int) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -417,7 +419,7 @@ func InterfaceToGeneralMap(params interface{}) (finalResult map[string]interface
 }
 
 func ToMapParams(params any) (map[string]any, error) {
-	var p = map[string]any{}
+	p := map[string]any{}
 	raw, err := json.Marshal(params)
 	if err != nil {
 		return nil, Errorf("marshal params failed: %s", err)

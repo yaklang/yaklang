@@ -106,7 +106,7 @@ func Fuzz_WithResultHandler(handler func(string, []string) bool) FuzzConfigOpt {
 }
 
 func Fuzz_WithParams(i interface{}) FuzzConfigOpt {
-	m := utils2.InterfaceToGeneralMap(i)
+	m := utils2.InterfaceToMapInterface(i)
 	return Fuzz_WithExtraFuzzTagHandler("params", func(s string) []string {
 		if m == nil {
 			return []string{""}
