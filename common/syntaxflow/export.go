@@ -12,44 +12,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
-type execRuleConfig struct {
-	taskID string
-	debug  bool
-}
-type ExecRuleOption func(*execRuleConfig)
-
-func WithExecTaskID(taskID string) ExecRuleOption {
-	return func(c *execRuleConfig) {
-		c.taskID = taskID
-	}
-}
-
-func WithExecDebug(debug ...bool) ExecRuleOption {
-	return func(c *execRuleConfig) {
-		c.debug = true
-		if len(debug) > 0 {
-			c.debug = debug[0]
-		}
-	}
-}
-
-func ExecRule(r *schema.SyntaxFlowRule, prog *ssaapi.Program, opts ...ExecRuleOption) (*ssaapi.SyntaxFlowResult, error) {
-	config := &execRuleConfig{}
-	for _, opt := range opts {
-		opt(config)
-	}
-	res, err := prog.SyntaxFlowRule(r, sfvm.WithEnableDebug(config.debug))
+func ExecRule(r *schema.SyntaxFlowRule, prog *ssaapi.Program, opts ...sfvm.Option) (*ssaapi.SyntaxFlowResult, error) {
+	res, err := prog.SyntaxFlowRule(r, opts...)
 	if err != nil {
 		return nil, err
 	}
-
-	if config.taskID != "" {
-		if resID, err := res.Save(config.taskID); err != nil {
-			_ = resID
-			return res, err
-		}
-	}
-
 	return res, nil
 }
 
@@ -66,8 +33,9 @@ func QuerySyntaxFlowRules(name string, opts ...QueryRulesOption) chan *schema.Sy
 
 var Exports = map[string]any{
 	"ExecRule":       ExecRule,
-	"withExecTaskID": WithExecTaskID,
-	"withExecDebug":  WithExecDebug,
+	"withExecTaskID": sfvm.WithExecTaskID,
+	"withExecDebug":  sfvm.WithEnableDebug,
+	"withProcess":    sfvm.WithProcessCallback,
 
 	"QuerySyntaxFlowRules": QuerySyntaxFlowRules,
 }

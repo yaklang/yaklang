@@ -15,6 +15,7 @@ func NewConfig(opts ...Option) *Config {
 }
 
 type ResultCapturedCallback func(name string, results ValueOperator) error
+type processCallback func(float64, string)
 
 type Config struct {
 	debug                     bool
@@ -23,6 +24,9 @@ type Config struct {
 	initialContextVars        *omap.OrderedMap[string, ValueOperator]
 	onResultCapturedCallbacks []ResultCapturedCallback
 	ctx                       context.Context
+	processCallback           processCallback
+
+	taskID string
 }
 
 type Option func(*Config)
@@ -30,6 +34,19 @@ type Option func(*Config)
 func WithInitialContextVars(o *omap.OrderedMap[string, ValueOperator]) Option {
 	return func(config *Config) {
 		config.initialContextVars = o
+	}
+}
+
+func WithProcessCallback(p processCallback) Option {
+	return func(config *Config) {
+		config.processCallback = p
+	}
+}
+
+// WithExecTaskID set taskID for exec this result will be save with this taskID
+func WithExecTaskID(taskID string) Option {
+	return func(config *Config) {
+		config.taskID = taskID
 	}
 }
 

@@ -43,7 +43,8 @@ type SFFrame struct {
 	// install meta info and result info
 	result *SFFrameResult
 
-	idx int // current opcode index
+	idx            int     // current opcode index
+	currentProcess float64 // current process
 
 	stack          *utils.Stack[ValueOperator] // for filter
 	conditionStack *utils.Stack[[]bool]        // for condition
@@ -218,6 +219,24 @@ func (s *SFFrame) WithPredecessorContext(label string) AnalysisContextOption {
 	}
 }
 
+func (s *SFFrame) process() {
+	if s.config.processCallback != nil {
+		// update only when the process is greater than the last process
+		// for loop, we don't want to process reduce.
+		if p := float64(s.idx) / float64(len(s.Codes)); p > s.currentProcess {
+			s.currentProcess = p
+		}
+		var msg string
+		if s.idx == len(s.Codes) {
+			msg = "exec: end"
+		} else {
+			i := s.Codes[s.idx]
+			msg = fmt.Sprintf("exec: %s", i.String())
+		}
+		s.config.processCallback(s.currentProcess, fmt.Sprintf("exec: %s", msg))
+	}
+}
+
 func (s *SFFrame) exec(input ValueOperator) (ret error) {
 	s.predCounter = 0
 	defer func() {
@@ -234,6 +253,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		}
 	}()
 	for {
+		s.process()
 		if s.idx >= len(s.Codes) {
 			break
 		}
@@ -249,6 +269,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		i := s.Codes[s.idx]
 
 		s.debugLog(i.String())
+
 		switch i.OpCode {
 		case OpFilterExprEnter:
 			s.filterExprStack.Push(&errorSkipContext{
