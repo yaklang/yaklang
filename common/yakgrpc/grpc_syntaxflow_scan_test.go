@@ -3,7 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -17,7 +19,7 @@ import (
 )
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
-	local, err := NewLocalClient()
+	client, err := NewLocalClient()
 	require.NoError(t, err)
 
 	vf := filesys.NewVirtualFs()
@@ -58,73 +60,167 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, prog)
 
-	stream, err := local.SyntaxFlowScan(context.Background())
-	require.NoError(t, err)
-
-	stream.Send(&ypb.SyntaxFlowScanRequest{
-		ControlMode: "start",
-		Filter:      &ypb.SyntaxFlowRuleFilter{},
-		ProgramName: []string{
-			progID,
-		},
-	})
-
-	resp, err := stream.Recv()
-	require.NoError(t, err)
-	log.Infof("resp: %v", resp)
-	taskID := resp.TaskID
-
-	go func() {
-		notify, err := local.DuplexConnection(context.Background())
+	startScan := func() (string, ypb.Yak_SyntaxFlowScanClient) {
+		stream, err := client.SyntaxFlowScan(context.Background())
 		require.NoError(t, err)
-		for {
-			res, err := notify.Recv()
-			require.NoError(t, err)
-			if res.MessageType == "syntaxflow_result" {
-				var tmp map[string]string
-				err = json.Unmarshal(res.GetData(), &tmp)
-				require.NoError(t, err)
-				require.Equal(t, tmp["task_id"], taskID)
 
-				res, err := local.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
-					Filter: &ypb.SyntaxFlowResultFilter{
-						TaskIDs: []string{taskID},
-					},
-				})
-				require.NoError(t, err)
-				require.Greater(t, len(res.Results), 0)
-			}
-		}
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			Filter:      &ypb.SyntaxFlowRuleFilter{},
+			ProgramName: []string{
+				progID,
+			},
+		})
 
-	}()
-
-	hasProcess := false
-	finishProcess := 0.0
-	for {
 		resp, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
 		require.NoError(t, err)
-		log.Infof("resp %v", resp)
-		if resp.ExecResult != nil && resp.ExecResult.IsMessage {
-			rawMsg := resp.ExecResult.GetMessage()
-			var msg msg
-			json.Unmarshal(rawMsg, &msg)
-			if msg.Type == "progress" {
-				log.Infof("msg: %v", msg)
-				if 0 < msg.Content.Process && msg.Content.Process < 1 {
-					hasProcess = true
-				}
-				finishProcess = msg.Content.Process
+		log.Infof("resp: %v", resp)
+		taskID := resp.TaskID
+		return taskID, stream
+	}
+
+	pauseTask := func(stream ypb.Yak_SyntaxFlowScanClient) {
+		err := stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "pause",
+		})
+		require.NoError(t, err)
+	}
+
+	resumeTask := func(taskId string) ypb.Yak_SyntaxFlowScanClient {
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode:  "resume",
+			ResumeTaskId: taskId,
+		})
+		return stream
+	}
+
+	deleteTask := func(taskId string) {
+		err := ssadb.DeleteResultByTaskID(taskId)
+		require.NoError(t, err)
+		err = yakit.DeleteSyntaxFlowScanTask(consts.GetGormProjectDatabase(), taskId)
+		require.NoError(t, err)
+	}
+
+	checkRecvMsg := func(stream ypb.Yak_SyntaxFlowScanClient, handlerStatus func(status string), handlerProcess func(process float64)) {
+		for {
+			resp, err := stream.Recv()
+			if err == io.EOF {
+				break
 			}
+			require.NoError(t, err)
+			log.Infof("resp %v", resp)
+			if resp.ExecResult != nil && resp.ExecResult.IsMessage {
+				rawMsg := resp.ExecResult.GetMessage()
+				var msg msg
+				json.Unmarshal(rawMsg, &msg)
+				if msg.Type == "progress" {
+					log.Infof("msg: %v", msg)
+					handlerProcess(msg.Content.Process)
+				}
+			}
+			handlerStatus(resp.Status)
 		}
 	}
-	require.True(t, hasProcess)
-	require.Equal(t, 1.0, finishProcess)
 
-	log.Infof("wait for task %v", taskID)
+	t.Run("start a syntax flow scan", func(t *testing.T) {
+		taskID, stream := startScan()
+		require.NoError(t, err)
 
+		var wg sync.WaitGroup
+		c := make(chan struct{})
+		go func() {
+			wg.Add(1)
+			notify, err := client.DuplexConnection(context.Background())
+			require.NoError(t, err)
+			for {
+				res, err := notify.Recv()
+				require.NoError(t, err)
+				if res.MessageType == "syntaxflow_result" {
+					var tmp map[string]string
+					err = json.Unmarshal(res.GetData(), &tmp)
+					require.NoError(t, err)
+					require.Equal(t, tmp["task_id"], taskID)
+
+					res, err := client.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
+						Filter: &ypb.SyntaxFlowResultFilter{
+							TaskIDs: []string{taskID},
+						},
+					})
+					require.NoError(t, err)
+					require.Greater(t, len(res.Results), 0)
+				}
+				select {
+				case <-c:
+					wg.Done()
+					return
+				}
+			}
+		}()
+
+		hasProcess := false
+		finishProcess := 0.0
+
+		handlerStatus := func(status string) {
+			if status == "done" {
+				c <- struct{}{}
+			}
+		}
+
+		handlerProcess := func(process float64) {
+			if 0 < process && process < 1 {
+				hasProcess = true
+			}
+			finishProcess = process
+		}
+
+		checkRecvMsg(stream, handlerStatus, handlerProcess)
+		require.True(t, hasProcess)
+		require.Equal(t, 1.0, finishProcess)
+
+		log.Infof("wait for task %v", taskID)
+		wg.Wait()
+		deleteTask(taskID)
+	})
+
+	t.Run("test pause and resume syntax flow scan", func(t *testing.T) {
+		taskID, stream := startScan()
+		defer deleteTask(taskID)
+
+		finishProcess := 0.0
+		var finishStatus string
+
+		handlerStatus := func(status string) {
+			finishStatus = status
+		}
+		handlerProcess := func(process float64) {
+			if 0.5 < process && process < 0.7 {
+				pauseTask(stream)
+			}
+			finishProcess = process
+		}
+		checkRecvMsg(stream, handlerStatus, handlerProcess)
+		require.LessOrEqual(t, finishProcess, 0.7)
+		require.GreaterOrEqual(t, finishProcess, 0.5)
+		require.Equal(t, "paused", finishStatus)
+		// resume
+		newStream := resumeTask(taskID)
+		haveExecute := false
+		handlerAfterResumeStatus := func(status string) {
+			if status == "executing" {
+				haveExecute = true
+			}
+			finishStatus = status
+		}
+		handlerAfterResumeProcess := func(process float64) {
+			finishProcess = process
+		}
+		checkRecvMsg(newStream, handlerAfterResumeStatus, handlerAfterResumeProcess)
+		require.True(t, haveExecute)
+		require.Equal(t, "done", finishStatus)
+		require.Equal(t, 1.0, finishProcess)
+	})
 }
 
 type msg struct {
