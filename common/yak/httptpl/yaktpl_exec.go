@@ -40,6 +40,8 @@ type RequestBulk struct {
 
 func (y *YakTemplate) GenerateRequestSequences(u string, renderPayload bool) []*RequestBulk {
 	vars := utils.InterfaceToMapInterface(utils2.ExtractorVarsFromUrl(u))
+	utils.MergeToMap(vars, y.Variables.ToMap())
+
 	result := []*RequestBulk{}
 	for _, sequenceCfg := range y.HTTPRequestSequences {
 		var payloads map[string][]string
