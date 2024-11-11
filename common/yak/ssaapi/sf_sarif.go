@@ -216,10 +216,11 @@ func convertSyntaxFlowFrameToSarifRun(root *SarifContext, frameResult *sfvm.SFFr
 		frameResult.AlertSymbolTable = make(map[string]sfvm.ValueOperator)
 	}
 
-	ruleId := codec.Sha256(frameResult.Rule)
+	SFRule := frameResult.GetRule()
+	ruleId := codec.Sha256(SFRule.Content)
 
 	rule := sarif.NewRule(ruleId).WithName(frameResult.Name()).WithDescription(frameResult.GetDescription())
-	rule.WithFullDescription(sarif.NewMultiformatMessageString(frameResult.Rule))
+	rule.WithFullDescription(sarif.NewMultiformatMessageString(SFRule.Content))
 
 	if len(frameResult.AlertSymbolTable) == 0 {
 		for _, name := range frameResult.CheckParams {
@@ -283,7 +284,7 @@ func convertSyntaxFlowFrameToSarifRun(root *SarifContext, frameResult *sfvm.SFFr
 		results = append(results, sarif.NewRuleResult(
 			ruleId,
 		).WithMessage(
-			sarif.NewTextMessage(frameResult.Rule),
+			sarif.NewTextMessage(SFRule.Content),
 		).WithCodeFlows(
 			sctx.codeFlows,
 		).WithLocations(
