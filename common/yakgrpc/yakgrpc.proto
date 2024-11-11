@@ -5551,7 +5551,9 @@ message SyntaxFlowScanRequest{
 
   // 启动扫描任务
   SyntaxFlowRuleFilter Filter = 2; // 用于指定扫描的规则
-  repeated string ProgramName = 3; // 用于指定扫描的程序 
+  repeated string ProgramName = 3; // 用于指定扫描的程序
+  // 恢复扫描任务
+  string ResumeTaskId = 5;         // 恢复任务ID
 
   // 其他参数 
   bool IgnoreLanguage = 4; // 是否忽略语言 默认为false 将会只运行和当前项目语言一致的规则，最后运行的规则可能会比当前选中的规则少一些。
