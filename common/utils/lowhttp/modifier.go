@@ -1799,6 +1799,16 @@ func GetAllHTTPRequestPostParams(packet []byte) (params map[string]string) {
 	return
 }
 
+// GetAllHTTPPacketPostParamsFull 是一个辅助函数，用于获取请求报文中的所有POST请求参数，其返回值为map[string][]string，其中键为参数名，值为参数值切片
+// Example:
+// ```
+// poc.GetAllHTTPPacketPostParams(`POST /post HTTP/1.1
+// Content-Type: application/json
+// COntent-Length: 7
+// Host: pie.dev
+//
+// a=b&a=c`) // 获取所有POST请求参数，这里会返回{"a":["b", "c"]}
+// ```
 func GetFullHTTPRequestPostParams(packet []byte) (params map[string][]string) {
 	body := GetHTTPPacketBody(packet)
 	vals := ParseQueryParams(string(body))
@@ -1831,6 +1841,15 @@ func GetAllHTTPRequestQueryParams(packet []byte) (params map[string]string) {
 	})
 }
 
+// GetAllHTTPPacketQueryParamsFull 是一个辅助函数，用于获取请求报文中的所有GET请求参数，其返回值为map[string][]string，其中键为参数名，值为参数值切片
+// Example:
+// ```
+// poc.GetAllHTTPPacketQueryParamsFull(`GET /get?a=b&a=c HTTP/1.1
+// Content-Type: application/json
+// Host: pie.dev
+//
+// `) // 返回所有GET请求参数，这里会返回{"a":["b", "c"]}
+// ```
 func GetFullHTTPRequestQueryParams(packet []byte) (params map[string][]string) {
 	_, uriPath, _ := GetHTTPPacketFirstLine(packet)
 	_, rawQuery, ok := strings.Cut(uriPath, "?")
