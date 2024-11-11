@@ -3,10 +3,11 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"sync"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -129,12 +130,18 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 		require.NoError(t, err)
 
 		var wg sync.WaitGroup
-		c := make(chan struct{})
+		var c = make(chan struct{})
+		wg.Add(1)
 		go func() {
-			wg.Add(1)
+			defer wg.Done()
 			notify, err := client.DuplexConnection(context.Background())
 			require.NoError(t, err)
 			for {
+				select {
+				case <-c:
+					return
+				default:
+				}
 				res, err := notify.Recv()
 				require.NoError(t, err)
 				if res.MessageType == "syntaxflow_result" {
@@ -142,30 +149,23 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 					err = json.Unmarshal(res.GetData(), &tmp)
 					require.NoError(t, err)
 					require.Equal(t, tmp["task_id"], taskID)
-
 					res, err := client.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
 						Filter: &ypb.SyntaxFlowResultFilter{
 							TaskIDs: []string{taskID},
+							Keyword: "java",
 						},
 					})
 					require.NoError(t, err)
 					require.Greater(t, len(res.Results), 0)
-				}
-				select {
-				case <-c:
-					wg.Done()
-					return
 				}
 			}
 		}()
 
 		hasProcess := false
 		finishProcess := 0.0
-
+		var finishStatus string
 		handlerStatus := func(status string) {
-			if status == "done" {
-				c <- struct{}{}
-			}
+			finishStatus = status
 		}
 
 		handlerProcess := func(process float64) {
@@ -178,10 +178,10 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 		checkRecvMsg(stream, handlerStatus, handlerProcess)
 		require.True(t, hasProcess)
 		require.Equal(t, 1.0, finishProcess)
-
-		log.Infof("wait for task %v", taskID)
+		require.Equal(t, "done", finishStatus)
+		close(c)
 		wg.Wait()
-		deleteTask(taskID)
+		log.Infof("wait for task %v", taskID)
 	})
 
 	t.Run("test pause and resume syntax flow scan", func(t *testing.T) {
