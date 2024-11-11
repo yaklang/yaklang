@@ -130,7 +130,7 @@ func CreateHybridTask(id string, ctx context.Context) (*HybridScanTaskManager, e
 
 func GetHybridTask(id string) (*HybridScanTaskManager, error) {
 	raw, ok := hybrisScanManager.Load(id)
-	if ok {
+	if !ok {
 		return nil, utils.Errorf("task id %s not exists", id)
 	}
 	if ins, ok := raw.(*HybridScanTaskManager); ok {
@@ -142,7 +142,6 @@ func GetHybridTask(id string) (*HybridScanTaskManager, error) {
 
 func RemoveHybridTask(id string) {
 	r, err := GetHybridTask(id)
-	hybrisScanManager.Delete(id)
 	if err != nil {
 		return
 	}
