@@ -1,10 +1,11 @@
 package javaclassparser
 
 import (
-	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/utils/memfile"
 	"io/fs"
 	"os"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/memfile"
 )
 
 type FS struct {
@@ -47,7 +48,7 @@ func (f *FS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) 
 	return f.Open(name)
 }
 func (z *FS) Open(name string) (fs.File, error) {
-	raw, err := z.ReadFile(name)
+	raw, err := z.ZipFS.ReadFile(name)
 	if err != nil {
 		return nil, err
 	}
