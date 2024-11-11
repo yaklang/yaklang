@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/maps"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"math"
 	"slices"
 	"sort"
@@ -16,15 +16,16 @@ import (
 func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	middleStatement := node.Statement.(*statements.MiddleStatement)
 	switchData := middleStatement.Data.([]any)
-	caseToIndexMap := switchData[0].(map[int]int)
-	caseMap := map[int]*core.Node{}
-	for k, v := range caseToIndexMap {
-		caseMap[k] = node.Next[v]
-	}
-	keyMap := maps.Keys(caseMap)
+	caseToIndexMap := switchData[0].(*omap.OrderedMap[int, int])
+	caseMap := omap.NewEmptyOrderedMap[int, *core.Node]()
+	caseToIndexMap.ForEach(func(k int, v int) bool {
+		caseMap.Set(k, node.Next[v])
+		return true
+	})
+	keyMap := caseMap.Keys()
 	sort.Ints(keyMap)
 	keyMap = append(keyMap[1:], -1)
-	startNodes := maps.Values(caseMap)
+	startNodes := caseMap.Values()
 	endNodes := utils.NodeFilter(manager.DominatorMap[node], func(node *core.Node) bool {
 		if v, ok := node.Statement.(*statements.MiddleStatement); ok && (v.Flag == "end" || v.Flag == "start") {
 			return false
@@ -56,18 +57,19 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 	//switchNode := node
 	middleStatement := node.Statement.(*statements.MiddleStatement)
 	switchData := middleStatement.Data.([]any)
-	caseToIndexMap := switchData[0].(map[int]int)
-	caseMap := map[int]*core.Node{}
-	for k, v := range caseToIndexMap {
-		caseMap[k] = node.Next[v]
-	}
+	caseToIndexMap := switchData[0].(*omap.OrderedMap[int, int])
+	caseMap := omap.NewEmptyOrderedMap[int, *core.Node]()
+	caseToIndexMap.ForEach(func(k int, v int) bool {
+		caseMap.Set(k, node.Next[v])
+		return true
+	})
 	data := switchData[1].(values.JavaValue)
 	//defaultCase := caseMap[-1]
 	//delete(caseMap, -1)
 	//_ = defaultCase
-	caseMapKeys := maps.Keys(caseMap)
-	caseMap[math.MaxInt] = caseMap[-1]
-	delete(caseMap, -1)
+	caseMapKeys := caseMap.Keys()
+	caseMap.Set(math.MaxInt, caseMap.GetMust(-1))
+	caseMap.Delete(-1)
 	sort.Ints(caseMapKeys)
 	caseItems := []*statements.CaseItem{}
 	// case start node source must content switch node
@@ -79,11 +81,11 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 	//}
 	switchStatement := statements.NewSwitchStatement(data, caseItems)
 	caseStartNodesMap := map[*core.Node]struct{}{}
-	for _, startNode := range caseMap {
-		caseStartNodesMap[startNode] = struct{}{}
-	}
-
-	keyMap := maps.Keys(caseMap)
+	caseMap.ForEach(func(i int, v *core.Node) bool {
+		caseStartNodesMap[v] = struct{}{}
+		return true
+	})
+	keyMap := caseMap.Keys()
 	node.RemoveAllNext()
 	switchNode := manager.NewNode(switchStatement)
 	node.Replace(switchNode)
@@ -91,23 +93,28 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 		node.RemoveNext(node.MergeNode)
 		switchNode.AddNext(node.MergeNode)
 	}
-	nodeToVals := map[*core.Node][]int{}
-	for k, v := range caseMap {
-		nodeToVals[v] = append(nodeToVals[v], k)
-	}
-	for k, v := range nodeToVals {
+	nodeToVals := omap.NewEmptyOrderedMap[*core.Node, []int]()
+	caseMap.ForEach(func(i int, v *core.Node) bool {
+		idList := nodeToVals.GetMust(v)
+		nodeToVals.Set(v, append(idList, i))
+		return true
+	})
+	newNodeToVals := omap.NewEmptyOrderedMap[*core.Node, []int]()
+	nodeToVals.ForEach(func(k *core.Node, v []int) bool {
 		sort.Ints(v)
-		nodeToVals[k] = v
+		newNodeToVals.Set(k, v)
 		for i, val := range v {
 			if i == len(v)-1 {
 				break
 			}
-			caseMap[val] = nil
+			caseMap.Set(val, nil)
 		}
-	}
+		return true
+	})
+	nodeToVals = newNodeToVals
 	sort.Ints(keyMap)
 	for _, v := range keyMap {
-		startNode := caseMap[v]
+		startNode := caseMap.GetMust(v)
 		caseItem := statements.NewCaseItem(v, nil)
 		if startNode == nil {
 			caseItems = append(caseItems, caseItem)

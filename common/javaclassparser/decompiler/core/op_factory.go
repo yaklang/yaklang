@@ -1,5 +1,9 @@
 package core
 
+import (
+	"github.com/yaklang/yaklang/common/utils/omap"
+)
+
 type OpFactory func(reader *JavaByteCodeReader, opcode *OpCode) error
 
 var OpFactories = map[string]OpFactory{
@@ -42,8 +46,8 @@ func OperationFactoryLookupSwitch(reader *JavaByteCodeReader, opcode *OpCode) er
 	}
 	defaultTargetPos := Convert4bytesToInt(defaultValue)
 	pairN := Convert4bytesToInt(pairsValue)
-	opcode.SwitchJmpCase = make(map[int]uint32)
-	opcode.SwitchJmpCase1 = make(map[int]int)
+	opcode.SwitchJmpCase = omap.NewEmptyOrderedMap[int, int32]()
+	opcode.SwitchJmpCase1 = omap.NewEmptyOrderedMap[int, int]()
 	for i := 0; i < int(pairN); i++ {
 		val := make([]byte, 4)
 		_, err = reader.Read(val)
@@ -59,9 +63,9 @@ func OperationFactoryLookupSwitch(reader *JavaByteCodeReader, opcode *OpCode) er
 		if targetPos == defaultTargetPos {
 			continue
 		}
-		opcode.SwitchJmpCase[int(Convert4bytesToInt(val))] = targetPos + uint32(opcode.CurrentOffset)
+		opcode.SwitchJmpCase.Set(int(Convert4bytesToInt(val)), int32(targetPos+uint32(opcode.CurrentOffset)))
 	}
-	opcode.SwitchJmpCase[-1] = defaultTargetPos + uint32(opcode.CurrentOffset)
+	opcode.SwitchJmpCase.Set(-1, int32(defaultTargetPos+uint32(opcode.CurrentOffset)))
 	return nil
 }
 func OperationFactoryTableSwitch(reader *JavaByteCodeReader, opcode *OpCode) error {
@@ -92,8 +96,8 @@ func OperationFactoryTableSwitch(reader *JavaByteCodeReader, opcode *OpCode) err
 	startVal := Convert4bytesToInt(lowValue)
 	targetN := Convert4bytesToInt(highValue) - startVal + 1
 	defaultTargetPos := Convert4bytesToInt(defaultValue)
-	opcode.SwitchJmpCase = make(map[int]uint32)
-	opcode.SwitchJmpCase1 = make(map[int]int)
+	opcode.SwitchJmpCase = omap.NewEmptyOrderedMap[int, int32]()
+	opcode.SwitchJmpCase1 = omap.NewEmptyOrderedMap[int, int]()
 	for i := 0; i < int(targetN); i++ {
 		target := make([]byte, 4)
 		_, err = reader.Read(target)
@@ -104,8 +108,8 @@ func OperationFactoryTableSwitch(reader *JavaByteCodeReader, opcode *OpCode) err
 		if targetPos == defaultTargetPos {
 			continue
 		}
-		opcode.SwitchJmpCase[int(startVal)+i] = uint32(opcode.CurrentOffset) + targetPos
+		opcode.SwitchJmpCase.Set(int(startVal)+i, int32(uint32(opcode.CurrentOffset)+targetPos))
 	}
-	opcode.SwitchJmpCase[-1] = defaultTargetPos + uint32(opcode.CurrentOffset)
+	opcode.SwitchJmpCase.Set(-1, int32(defaultTargetPos+uint32(opcode.CurrentOffset)))
 	return nil
 }
