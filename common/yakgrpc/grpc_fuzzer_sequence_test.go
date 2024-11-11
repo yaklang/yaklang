@@ -744,3 +744,80 @@ abc`), "Host", utils.HostPort(host, port))),
 		t.Fatal("checkFuzzerIndex2 failed")
 	}
 }
+
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_Extractor_OnlyOneResult(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := utils.RandStringBytes(32)
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(fmt.Sprintf(`{"a":"%s"}`, token)))
+		return
+	})
+
+	client, err := c.HTTPFuzzerSequence(
+		utils.TimeoutContextSeconds(10000000),
+		&ypb.FuzzerRequests{Requests: []*ypb.FuzzerRequest{
+			{
+				Request: fmt.Sprintf(`GET / HTTP/1.1
+Host: %s
+`, utils.HostPort(host, port)),
+				IsHTTPS:                  false,
+				PerRequestTimeoutSeconds: 5,
+				RedirectTimes:            3,
+				ForceFuzz:                true,
+				Extractors: []*ypb.HTTPResponseExtractor{
+					{
+						Name:   "test",
+						Type:   "json",
+						Scope:  "body",
+						Groups: []string{".a"},
+					},
+				},
+			},
+			{
+				Request: fmt.Sprintf(`GET /verify HTTP/1.1
+Host: %s
+
+{{p(b)}}`, utils.HostPort(host, port)),
+				IsHTTPS:                  false,
+				PerRequestTimeoutSeconds: 5,
+				RedirectTimes:            3,
+				InheritVariables:         true,
+				ForceFuzz:                true,
+				Params: []*ypb.FuzzerParamItem{
+					{
+						Key:   "b",
+						Value: `{{replace(test,"","")}}`,
+						Type:  "nuclei-dsl",
+					},
+				},
+			},
+		}},
+	)
+	require.NoError(t, err)
+
+	count := 0
+	for {
+		resp, err := client.Recv()
+		if err != nil {
+			break
+		}
+		if resp == nil {
+			break
+		}
+		count++
+		body := lowhttp.GetHTTPPacketBody(resp.Response.RequestRaw)
+		req, err := lowhttp.ParseBytesToHttpRequest(resp.Response.RequestRaw)
+		require.NoError(t, err)
+		require.NotNil(t, req.URL)
+		if req.URL.Path == "/verify" {
+			require.Equal(t, token, string(body))
+			require.NotContains(t, string(body), "[")
+			require.NotContains(t, string(body), "]")
+		}
+	}
+	require.Equal(t, 1+1, count, "count failed")
+}
