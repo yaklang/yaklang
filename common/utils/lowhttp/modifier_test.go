@@ -1300,6 +1300,39 @@ Host: www.baidu.com
 	}
 }
 
+func TestGetFullHTTPRequestQueryParam(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		expected map[string][]string
+	}{
+		{
+			origin: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+
+			expected: map[string][]string{
+				"a": {"1"},
+				"b": {"2"},
+			},
+		},
+		{
+			origin: `GET /?a=1&a=2 HTTP/1.1
+Host: www.baidu.com
+`,
+
+			expected: map[string][]string{
+				"a": {"1", "2"},
+			},
+		},
+	}
+	for _, testcase := range testcases {
+		actual := GetFullHTTPRequestQueryParams([]byte(testcase.origin))
+		if !reflect.DeepEqual(actual, testcase.expected) {
+			t.Fatalf("GetAllHTTPRequestPostParam failed: %v", actual)
+		}
+	}
+}
+
 func TestGetAllHTTPRequestPostParam(t *testing.T) {
 	testcases := []struct {
 		origin   string
@@ -1330,6 +1363,41 @@ a=1&b=2&a=3`,
 	}
 	for _, testcase := range testcases {
 		actual := GetAllHTTPRequestPostParams([]byte(testcase.origin))
+		if !reflect.DeepEqual(actual, testcase.expected) {
+			t.Fatalf("GetAllHTTPRequestPostParam failed: %v", actual)
+		}
+	}
+}
+
+func TestGetFullHTTPRequestPostParam(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		expected map[string][]string
+	}{
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1&b=2`,
+
+			expected: map[string][]string{
+				"a": {"1"},
+				"b": {"2"},
+			},
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1&a=2`,
+
+			expected: map[string][]string{
+				"a": {"1", "2"},
+			},
+		},
+	}
+	for _, testcase := range testcases {
+		actual := GetFullHTTPRequestPostParams([]byte(testcase.origin))
 		if !reflect.DeepEqual(actual, testcase.expected) {
 			t.Fatalf("GetAllHTTPRequestPostParam failed: %v", actual)
 		}
