@@ -194,16 +194,18 @@ func (d *Decompiler) ScanJmp() error {
 				walkNode(gotoOp)
 				return
 			case OP_LOOKUPSWITCH, OP_TABLESWITCH:
-				for v, target := range opcode.SwitchJmpCase {
+				opcode.SwitchJmpCase.ForEach(func(v int, target int32) bool {
 					gotoOp := d.offsetToOpcodeIndex[uint16(target)]
 					if slices.Contains(opcode.Target, d.opCodes[gotoOp]) {
-						opcode.SwitchJmpCase1[v] = len(opcode.Target) - 1
-						continue
+						opcode.SwitchJmpCase1.Set(v, len(opcode.Target)-1)
+						return true
 					}
 					LinkOpcode(opcode, d.opCodes[gotoOp])
-					opcode.SwitchJmpCase1[v] = len(opcode.Target) - 1
+					opcode.SwitchJmpCase1.Set(v, len(opcode.Target)-1)
 					walkNode(gotoOp)
-				}
+					return true
+				})
+
 				return
 			}
 			i++
