@@ -8,17 +8,24 @@ import (
 )
 
 func TestDecompiler(t *testing.T) {
-	testCase := []string{
-		"SwitchTest",
+	testCase := []struct {
+		name string
+	}{
+		{
+			name: "TernaryExpressionTest",
+		},
+		{
+			name: "SwitchTest",
+		},
 	}
-	for _, s := range testCase {
-		t.Run(s, func(t *testing.T) {
+	for _, testItem := range testCase {
+		t.Run(testItem.name, func(t *testing.T) {
 			t.Parallel()
-			classRaw, err := classes.FS.ReadFile(s + ".class")
+			classRaw, err := classes.FS.ReadFile(testItem.name + ".class")
 			if err != nil {
 				t.Fatal(err)
 			}
-			sourceCode, err := classes.FS.ReadFile(s + ".java")
+			sourceCode, err := classes.FS.ReadFile(testItem.name + ".java")
 			if err != nil {
 				t.Fatal(err)
 			}
