@@ -656,6 +656,9 @@ const (
 	UndefinedMemberInValid
 	// UndefinedMemberValid member call, has this key, but not this value, this shouldn't mark error
 	UndefinedMemberValid
+
+	// Return
+	UndefinedValueReturn
 )
 
 type Undefined struct {
