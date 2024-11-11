@@ -50,7 +50,7 @@ type VBrowser struct {
 //		page = browser.Navigate("https://www.group-ib.com/blog/cron/", infoWaitFor)
 //
 // ```
-func CreateHeadlessBrowser(opts ...BrowserConfigOpt) *VBrowser {
+func CreateHeadlessBrowser(opts ...BrowserConfigOpt) (*VBrowser, error) {
 	config := &BrowserConfig{
 		noSandBox: true,
 		headless:  true,
@@ -82,8 +82,8 @@ func CreateHeadlessBrowser(opts ...BrowserConfigOpt) *VBrowser {
 		requestModification:  config.requestModification,
 		responseModification: config.responseModification,
 	}
-	browser.BrowserInit()
-	return browser
+	err := browser.BrowserInit()
+	return browser, err
 }
 
 func (browser *VBrowser) BrowserInit() error {
@@ -121,7 +121,7 @@ func (browser *VBrowser) BrowserInit() error {
 	}
 	_ = browser.browser.IgnoreCertErrors(true)
 	if browser.hijack {
-		browser.createHijack()
+		return browser.createHijack()
 	}
 	return nil
 }
@@ -139,19 +139,19 @@ func (browser *VBrowser) BrowserInit() error {
 //	page = browser.Navigate("https://www.group-ib.com/blog/cron/", infoWaitFor)
 //
 // ```
-func (browser *VBrowser) Navigate(urlStr string, waitFor string) *VPage {
+func (browser *VBrowser) Navigate(urlStr string, waitFor string) (*VPage, error) {
 	page, err := browser.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
 	if err != nil {
 		log.Errorf("create page error: %s", err)
-		return nil
+		return nil, err
 	}
 	p := &VPage{page: page, timeout: browser.timeout}
 	err = p.Navigate(urlStr, waitFor)
 	if err != nil {
 		log.Errorf("navigate error: %s", err)
-		return nil
+		return nil, err
 	}
-	return p
+	return p, nil
 }
 
 func (browser *VBrowser) Close() error {
