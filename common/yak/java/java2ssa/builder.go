@@ -16,14 +16,10 @@ import (
 // ========================================== For SSAAPI ==========================================
 
 type SSABuilder struct {
-	ssa.DummyPreHandler
+	*ssa.PreHandlerInit
 }
 
-var Builder = &SSABuilder{}
-
-func (s *SSABuilder) Create() ssa.Builder {
-	return &SSABuilder{}
-}
+var Builder ssa.Builder = &SSABuilder{}
 
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	b.SupportClass = true

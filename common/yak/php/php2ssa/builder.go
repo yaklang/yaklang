@@ -2,10 +2,11 @@ package php2ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/sca"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"os"
 	"path/filepath"
+
+	"github.com/yaklang/yaklang/common/sca"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
@@ -19,34 +20,36 @@ import (
 )
 
 type SSABuild struct {
-	ssa.DummyPreHandler
+	*ssa.PreHandlerInit
 }
+
+var Builder ssa.Builder = &SSABuild{}
 
 func (*SSABuild) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".php" || extension == ".lock"
 }
 func (s *SSABuild) Create() ssa.Builder {
-	return &SSABuild{}
+	return &SSABuild{
+		PreHandlerInit: ssa.NewPreHandlerInit(initHandler),
+	}
 }
-func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
-	s.InitHandlerOnce.Do(func() {
-		s.InitHandlerFunc = append(s.InitHandlerFunc, func() {
-			fb.SetEmptyRange()
-			container := fb.EmitEmptyContainer()
-			fb.AssignVariable(fb.CreateVariable("global-container"), container)
-			initHandler := func(name ...string) {
-				for _, _name := range name {
-					variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
-					emptyContainer := fb.EmitEmptyContainer()
-					fb.AssignVariable(variable, emptyContainer)
-				}
-			}
-			initHandler("_SERVER")
-			fb.GetProgram().GlobalScope = container
-		})
-	})
+
+func initHandler(fb *ssa.FunctionBuilder) {
+	fb.SetEmptyRange()
+	container := fb.EmitEmptyContainer()
+	fb.AssignVariable(fb.CreateVariable("global-container"), container)
+	initHandler := func(name ...string) {
+		for _, _name := range name {
+			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
+			emptyContainer := fb.EmitEmptyContainer()
+			fb.AssignVariable(variable, emptyContainer)
+		}
+	}
+	initHandler("_SERVER")
+	fb.GetProgram().GlobalScope = container
 }
+
 func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
 	prog := builder.GetProgram()
 	if prog == nil {
@@ -90,8 +93,6 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 	}
 	return nil
 }
-
-var Builder = &SSABuild{}
 
 func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
 	builder.GetProgram().GetApplication().Build("", editor, builder)

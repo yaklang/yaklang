@@ -165,7 +165,7 @@ func (c *config) parseProject() (Programs, error) {
 			}
 			handledProcess++
 			if language := c.LanguageBuilder; language != nil {
-				c.LanguageBuilder.InitHandler(builder)
+				language.InitHandler(builder)
 				language.PreHandlerProject(c.fs, builder, path)
 			}
 			return nil
