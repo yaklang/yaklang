@@ -19,23 +19,22 @@ import (
 )
 
 type SSABuilder struct {
-	ssa.DummyPreHandler
+	*ssa.PreHandlerInit
 }
 
 var Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
-	return &SSABuilder{}
+	return &SSABuilder{
+		PreHandlerInit: ssa.NewPreHandlerInit(initHandler),
+	}
 }
 
-func (s *SSABuilder) InitHandler(fb *ssa.FunctionBuilder) {
-	s.InitHandlerOnce.Do(func() {
-		s.InitHandlerFunc = append(s.InitHandlerFunc, func() {
-			container := fb.EmitEmptyContainer()
-			fb.GetProgram().GlobalScope = container
-		})
-	})
+func initHandler(fb *ssa.FunctionBuilder) {
+	container := fb.EmitEmptyContainer()
+	fb.GetProgram().GlobalScope = container
 }
+
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".go" || extension == ".mod"
