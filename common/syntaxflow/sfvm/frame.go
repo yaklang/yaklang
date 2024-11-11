@@ -173,7 +173,7 @@ func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() (consts.Language, files
 
 func (s *SFFrame) Flush() {
 	if s.result == nil {
-		s.result = NewSFResult(s.Text) // TODO: This code affects the reentrancy of the function
+		s.result = NewSFResult(s.rule, s.config) // TODO: This code affects the reentrancy of the function
 	}
 	s.stack = utils.NewStack[ValueOperator]()
 	s.statementStack = utils.NewStack[*errorSkipContext]()

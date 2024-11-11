@@ -18,8 +18,8 @@ import (
 
 type SFFrameResult struct {
 	// base info
-	Rule string
-	rule *schema.SyntaxFlowRule
+	config *Config
+	rule   *schema.SyntaxFlowRule
 	// additional info
 	Description *omap.OrderedMap[string, string]
 	CheckParams []string
@@ -30,10 +30,10 @@ type SFFrameResult struct {
 	AlertSymbolTable map[string]ValueOperator
 }
 
-func NewSFResult(rule string) *SFFrameResult {
+func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
 	return &SFFrameResult{
-		rule:             &schema.SyntaxFlowRule{},
-		Rule:             rule,
+		config:           config,
+		rule:             rule,
 		Description:      omap.NewEmptyOrderedMap[string, string](),
 		CheckParams:      make([]string, 0),
 		SymbolTable:      omap.NewEmptyOrderedMap[string, ValueOperator](),
