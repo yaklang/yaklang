@@ -444,18 +444,24 @@ func (i *anValue) GetPointer() Values {
 	return i.pointer
 }
 
-func (i *anValue) AddOccultation(p *Phi) {
+func (i *anValue) AddOccultation(p Value) {
 	i.occultation = append(i.occultation, p)
 }
 
 func (i *anValue) GetOccultation() []Value {
+	return i.occultation
+}
+
+func (i *anValue) HandleOccultation() []Value {
 	var ret []Value
 	var handler func(i *anValue)
 
 	handler = func(i *anValue) {
 		for _, v := range i.occultation {
 			ret = append(ret, v)
-			handler(&v.(*Phi).anValue)
+			if p, ok := ToPhi(v); ok {
+				handler(&p.anValue)
+			}
 		}
 	}
 	handler(i)
