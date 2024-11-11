@@ -35,12 +35,12 @@ func (page *VPage) Navigate(urlStr string, waitFor string) error {
 	return nil
 }
 
-func (page *VPage) Element(selector string) (*rod.Element, error) {
+func (page *VPage) Element(selector string) (*VElement, error) {
 	element, err := page.page.Element(selector)
 	if err != nil {
 		return nil, utils.Errorf("element find error: %s", err)
 	}
-	return element, nil
+	return &VElement{element: element}, nil
 }
 
 func (page *VPage) Elements(selector string) (rod.Elements, error) {
@@ -56,12 +56,12 @@ func (page *VPage) Click(selector string) error {
 	if err != nil {
 		return utils.Errorf("click element find error: %s", err)
 	}
-	err = element.Click(proto.InputMouseButtonLeft, 1)
+	err = element.element.Click(proto.InputMouseButtonLeft, 1)
 	if err != nil {
 		return utils.Errorf("element click error: %s", err)
 	}
-	page.page.WaitLoad()
-	return nil
+	err = page.page.WaitLoad()
+	return err
 }
 
 func (page *VPage) Input(selector, inputStr string) error {
@@ -69,7 +69,7 @@ func (page *VPage) Input(selector, inputStr string) error {
 	if err != nil {
 		return utils.Errorf("input element find error: %s", err)
 	}
-	err = element.Input(inputStr)
+	err = element.element.Input(inputStr)
 	if err != nil {
 		return utils.Errorf("element input error: %s", err)
 	}
