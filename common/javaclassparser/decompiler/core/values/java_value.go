@@ -220,10 +220,10 @@ type TernaryExpression struct {
 	FalseValue JavaValue
 }
 
-func (j TernaryExpression) Type() types.JavaType {
+func (j *TernaryExpression) Type() types.JavaType {
 	return j.TrueValue.Type()
 }
-func (j TernaryExpression) String(funcCtx *class_context.ClassContext) string {
+func (j *TernaryExpression) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("(%s) ? (%s) : (%s)", j.Condition.String(funcCtx), j.TrueValue.String(funcCtx), j.FalseValue.String(funcCtx))
 }
 
@@ -232,5 +232,26 @@ func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {
 		Condition:  condition,
 		TrueValue:  v1,
 		FalseValue: v2,
+	}
+}
+
+type SlotValue struct {
+	Value   JavaValue
+	TmpType types.JavaType
+}
+
+func (s *SlotValue) Type() types.JavaType {
+	if s.Value == nil {
+		return s.TmpType
+	}
+	return s.Value.Type()
+}
+func (s *SlotValue) String(funcCtx *class_context.ClassContext) string {
+	return s.Value.String(funcCtx)
+}
+
+func NewSlotValue(val JavaValue) *SlotValue {
+	return &SlotValue{
+		Value: val,
 	}
 }
