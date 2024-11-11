@@ -1,12 +1,10 @@
 package yakgrpc
 
 import (
+	"context"
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 )
@@ -18,29 +16,25 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 	}
 
 	streamCtx := stream.Context()
-	recoverSyntaxFlowScanStatus := func() error {
+	getTaskManager := func() (*SyntaxFlowScanManager, error) {
 		taskId := firstRequest.GetResumeTaskId()
 		if taskId == "" {
-			return utils.Error("get syntaxflow scan manager failed: task id is empty")
+			return nil, utils.Error("get syntaxflow scan manager failed: task id is empty")
 		}
-
-		task, err := yakit.GetSyntaxFlowScanTaskById(consts.GetGormProjectDatabase(), taskId)
+		taskManager, err := GetSyntaxFlowTask(taskId)
 		if err != nil {
-			return err
+			taskManager, err = CreateSyntaxFlowTask(taskId, streamCtx)
+			if err != nil {
+				return nil, err
+			}
 		}
-		result, err := ssadb.GetResultByTaskID(taskId)
-		if err != nil {
-			return utils.Errorf("get syntaxflow scan manager failed: %s", err)
+		if streamCtx != nil {
+			taskManager.ctx = streamCtx
+			ctx, cancel := context.WithCancel(streamCtx)
+			taskManager.ctx = ctx
+			taskManager.cancel = cancel
 		}
-		risks := result.ToGRPCModelRisk()
-
-		stream.Send(&ypb.SyntaxFlowScanResponse{
-			TaskID: task.TaskId,
-			Status: task.Status,
-			Result: result.ToGRPCModel(),
-			Risks:  risks,
-		})
-		return nil
+		return taskManager, nil
 	}
 
 	var taskId string
@@ -62,17 +56,15 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 			close(errC)
 		}()
 	case "status":
-		return recoverSyntaxFlowScanStatus()
-	case "resume":
-		if err := recoverSyntaxFlowScanStatus(); err != nil {
+		taskManager, err = getTaskManager()
+		if err != nil {
 			return err
 		}
-		taskId = firstRequest.GetResumeTaskId()
-		if taskId == "" {
-			return utils.Error("resume task id is empty")
-		}
-		taskManager, err = CreateSyntaxFlowTask(taskId, streamCtx)
-		if err != nil {
+		taskId = taskManager.TaskId()
+		err = s.syntaxFlowStatusTask(taskManager, stream)
+		return err
+	case "resume":
+		if taskManager, err = getTaskManager(); err != nil {
 			return err
 		}
 		taskManager.Resume()
