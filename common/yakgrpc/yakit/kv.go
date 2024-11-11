@@ -321,7 +321,20 @@ func GetNetworkConfig() *ypb.GlobalNetworkConfig {
 		log.Errorf("unmarshal global network config failed: %s", err)
 		return nil
 	}
+	InitNetworkConfig(config)
 	return config
+}
+
+func InitNetworkConfig(config *ypb.GlobalNetworkConfig) { // init some network config, for add new config which not allow be zero value.
+	if config.MaxTlsVersion == 0 {
+		config.MaxTlsVersion = tls.VersionTLS13
+	}
+	if config.MinTlsVersion == 0 {
+		config.MinTlsVersion = tls.VersionSSL30
+	}
+	if config.CallPluginTimeout == 0 {
+		config.CallPluginTimeout = 60 // default 60s
+	}
 }
 
 // LoadGlobalNetworkConfig load config from yakit config in db
