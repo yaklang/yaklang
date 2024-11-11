@@ -457,15 +457,19 @@ func InterfaceToStringSlice(i interface{}) (result []string) {
 	if i == nil {
 		return []string{}
 	}
-
-	va := reflect.ValueOf(i)
-	switch reflect.TypeOf(i).Kind() {
-	case reflect.Slice, reflect.Array:
-		for i := 0; i < va.Len(); i++ {
-			result = append(result, InterfaceToString(va.Index(i).Interface()))
-		}
+	switch ret := i.(type) {
+	case []string:
+		return ret
 	default:
-		result = append(result, InterfaceToString(i))
+		va := reflect.ValueOf(i)
+		switch reflect.TypeOf(i).Kind() {
+		case reflect.Slice, reflect.Array:
+			for i := 0; i < va.Len(); i++ {
+				result = append(result, InterfaceToString(va.Index(i).Interface()))
+			}
+		default:
+			result = append(result, InterfaceToString(i))
+		}
 	}
 	return result
 }

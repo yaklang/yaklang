@@ -54,7 +54,17 @@ type YakExtractor struct {
 // group1 for key
 // group2 for value
 
-func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[string]interface{}, error) {
+func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[string]any, error) {
+	tag := y.Name
+	if tag == "" {
+		tag = "data"
+	}
+	results := []string{}
+	addResult := func(result any) {
+		results = append(results, utils.InterfaceToString(result))
+	}
+	resultsMap := make(map[string]any)
+
 	var material string
 	switch strings.TrimSpace(strings.ToLower(y.Scope)) {
 	case "body":
@@ -66,10 +76,7 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 	default:
 		material = string(rsp)
 	}
-	results := []string{}
-	addResult := func(result interface{}) {
-		results = append(results, utils.InterfaceToString(result))
-	}
+
 	t := strings.TrimSpace(strings.ToLower(y.Type))
 	switch t {
 	case "regex":
@@ -224,11 +231,14 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 	default:
 		return nil, utils.Errorf("unknown extractor type: %s", t)
 	}
-	tag := y.Name
-	if tag == "" {
-		tag = "data"
+
+	if len(results) == 1 {
+		resultsMap[tag] = results[0]
+	} else {
+		resultsMap[tag] = results
 	}
-	return map[string]interface{}{tag: results}, nil
+
+	return resultsMap, nil
 }
 
 var (
