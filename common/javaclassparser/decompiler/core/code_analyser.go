@@ -814,12 +814,41 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		return err
 	}
 	opcodeToSim := map[*OpCode]*StackSimulationImpl{}
-	isIfMergeNode := func(code *OpCode) bool {
-		return false
-	}
-	getIfMergeNodeCondition := func(code *OpCode) values.JavaValue {
-		return nil
-	}
+	//dominatorMap := GenerateDominatorTree(d.OpCodeRoot)
+	//codes := GraphToList(d.OpCodeRoot)
+	//codes = lo.Filter(codes, func(code *OpCode, index int) bool {
+	//	switch code.Instr.OpCode {
+	//	case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
+	//		return true
+	//	default:
+	//		return false
+	//	}
+	//})
+	mergeToIfNode := map[*OpCode][]*OpCode{}
+	//for _, ifNode := range codes {
+	//	if len(dominatorMap[ifNode]) == 3 {
+	//		mergeNode := funk.Filter(dominatorMap[ifNode], func(code *OpCode) bool {
+	//			return code != ifNode.Target[0] && code != ifNode.Target[1]
+	//		}).([]*OpCode)[0]
+	//		mergeToIfNode[mergeNode] = append(mergeToIfNode[mergeNode], ifNode)
+	//	}
+	//}
+	//
+	//isIfMergeNode := func(code *OpCode) bool {
+	//	_, ok := mergeToIfNode[code]
+	//	return ok
+	//}
+	//getIfMergeNodeCondition := func(code *OpCode) values.JavaValue {
+	//	ifs := mergeToIfNode[code]
+	//	if len(ifs) > 0 {
+	//		ifNode := ifs[0]
+	//		ifs = ifs[1:]
+	//		return ifNode.stackConsumed[0]
+	//	}
+	//	return nil
+	//}
+	ternaryExpMergeNode := []*OpCode{}
+	ternaryExpMergeNodeSlot := map[*OpCode]*values.SlotValue{}
 	if !d.FunctionContext.IsStatic {
 		d.FunctionType.ParamTypes = append([]types.JavaType{types.NewJavaClass(d.FunctionContext.ClassName)}, d.FunctionType.ParamTypes...)
 	}
@@ -855,46 +884,67 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			source := lo.Filter(code.Source, func(item *OpCode, index int) bool {
 				return opcodeToSim[item] != nil
 			})
-			if isIfMergeNode(code) {
-				sims := []*StackSimulationImpl{}
-				for _, source := range source {
-					sim := opcodeToSim[source]
-					if sim == nil {
-						return nil, fmt.Errorf("not found simuation stack for opcode %d", source.Id)
-					}
-					sims = append(sims, sim)
+			sims := []*StackSimulationImpl{}
+			for _, source := range source {
+				sim := opcodeToSim[source]
+				if sim == nil {
+					return nil, fmt.Errorf("not found simuation stack for opcode %d", source.Id)
 				}
-				size := -1
-				for _, sim := range sims {
-					if sim.Size() > 1 {
-						return nil, fmt.Errorf("invalid stack size %d for opcode %d", sim.Size(), code.Id)
-					}
-					if size == -1 {
-						size = sim.Size()
-					} else {
-						if size != sim.Size() {
-							return nil, fmt.Errorf("invalid stack size %d for opcode %d", sim.Size(), code.Id)
-						}
-					}
+				sims = append(sims, sim)
+			}
+			if len(sims) == 0 {
+				return nil, errors.New("invalid if merge node")
+			}
+			size := -1
+			for _, sim := range sims {
+				if sim.Size() > 1 {
+					return nil, fmt.Errorf("invalid stack size %d for opcode %d", sim.Size(), code.Id)
 				}
-				if size == 0 {
-					runtimeStackSimulation = sims[0]
+				if size == -1 {
+					size = sim.Size()
 				} else {
-					runtimeStackSimulation = NewStackSimulation(startStackEntry)
-					runtimeStackSimulation.Push(values.NewTernaryExpression(getIfMergeNodeCondition(code), sims[0].Peek(), sims[1].Peek()))
-				}
-			} else {
-				for _, source := range source {
-					stackEntry := opcodeToSim[source]
-					if stackEntry == nil {
-						return nil, fmt.Errorf("not found simuation stack for opcode %d", source.Id)
-					}
-					sim := NewStackSimulation(startStackEntry)
-					if sim.Size() != 0 {
+					if size != sim.Size() {
 						return nil, fmt.Errorf("invalid stack size %d for opcode %d", sim.Size(), code.Id)
 					}
 				}
-				runtimeStackSimulation = opcodeToSim[source[0]]
+			}
+			isIfMergeNode := size != 0
+			if isIfMergeNode {
+				runtimeStackSimulation = NewStackSimulation(startStackEntry)
+				slotVal := values.NewSlotValue(nil)
+				slotVal.TmpType = sims[0].Peek().Type()
+				runtimeStackSimulation.Push(slotVal)
+				ternaryExpMergeNodeSlot[code] = slotVal
+				ternaryExpMergeNode = append(ternaryExpMergeNode, code)
+				ifNodes := []*OpCode{}
+				for _, opCode := range code.Source {
+					WalkGraph[*OpCode](opCode, func(code *OpCode) ([]*OpCode, error) {
+						switch code.Instr.OpCode {
+						case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
+							if !slices.Contains(ifNodes, code) {
+								ifNodes = append(ifNodes, code)
+							}
+							return nil, nil
+						default:
+						}
+						return code.Source, nil
+					})
+				}
+				ternaryExpMergeNode = append(ternaryExpMergeNode, code)
+				mergeToIfNode[code] = append(mergeToIfNode[code], ifNodes...)
+			} else {
+				runtimeStackSimulation = sims[0]
+				//for _, source := range source {
+				//	stackEntry := opcodeToSim[source]
+				//	if stackEntry == nil {
+				//		return nil, fmt.Errorf("not found simuation stack for opcode %d", source.Id)
+				//	}
+				//	sim := NewStackSimulation(startStackEntry)
+				//	if sim.Size() != 0 {
+				//		return nil, fmt.Errorf("invalid stack size %d for opcode %d", sim.Size(), code.Id)
+				//	}
+				//}
+				//runtimeStackSimulation = opcodeToSim[source[0]]
 			}
 		}
 		opcodeToSim[code] = runtimeStackSimulation
@@ -915,16 +965,14 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				return typ.Type()
 			}))
 		}
+		if code.Id == 13 {
+			println()
+		}
 		err := d.calcOpcodeStackInfo(sim, code)
 		if err != nil {
 			return nil, err
 		}
-		lo.Filter(code.Target, func(item *OpCode, index int) bool {
-			if item.Id == 104 {
-				println()
-			}
-			return false
-		})
+		code.StackEntry = runtimeStackSimulation.stackEntry
 		return code.Target, nil
 	})
 	if err != nil {
@@ -932,6 +980,89 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 	}
 	d.opCodes = GraphToList(d.OpCodeRoot)
 	d.opcodeToSimulateStack = opcodeToSim
+	ternaryExpMergeNode = utils.NewSet(ternaryExpMergeNode).List()
+	for _, code := range ternaryExpMergeNode {
+		mergeNode := code
+		ifNodes := mergeToIfNode[code]
+		var preVal values.JavaValue
+		for i := 0; i < len(ifNodes); i++ {
+			ifCode := ifNodes[i]
+			source := []*OpCode{}
+			WalkGraph[*OpCode](ifCode, func(code *OpCode) ([]*OpCode, error) {
+				if slices.Contains(code.Target, mergeNode) {
+					source = append(source, code)
+					return nil, nil
+				}
+				return code.Target, nil
+			})
+			if len(source) != 2 {
+				return errors.New("found invalid ternary expression")
+			}
+			var condition values.JavaValue
+			switch ifCode.Instr.OpCode {
+			case OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE:
+				op := GetNotOp(ifCode)
+				rv := ifCode.stackConsumed[0]
+				lv := ifCode.stackConsumed[1]
+				condition = values.NewBinaryExpression(lv, rv, op, types.NewJavaPrimer(types.JavaBoolean))
+			case OP_IFNONNULL:
+				condition = values.NewBinaryExpression(ifCode.stackConsumed[0], values.JavaNull, EQ, types.NewJavaPrimer(types.JavaBoolean))
+			case OP_IFNULL:
+				condition = values.NewBinaryExpression(ifCode.stackConsumed[0], values.JavaNull, NEQ, types.NewJavaPrimer(types.JavaBoolean))
+			case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE:
+				op := ""
+				switch ifCode.Instr.OpCode {
+				case OP_IFEQ:
+					op = "=="
+				case OP_IFNE:
+					op = "!="
+				case OP_IFLE:
+					op = "<="
+				case OP_IFLT:
+					op = "<"
+				case OP_IFGT:
+					op = ">"
+				case OP_IFGE:
+					op = ">="
+				}
+				op = GetReverseOp(op)
+				condition = values.NewBinaryExpression(ifCode.stackConsumed[0], values.NewJavaLiteral(0, types.NewJavaPrimer(types.JavaInteger)), op, types.NewJavaPrimer(types.JavaBoolean))
+			default:
+				return errors.New("invalid if opcode")
+			}
+			val := values.NewTernaryExpression(condition, source[0].StackEntry.value, source[1].StackEntry.value)
+			preVal = val
+			newOpcode := &OpCode{Info: val}
+			for _, opCode := range source {
+				opCode.Target = lo.Filter(opCode.Target, func(item *OpCode, index int) bool {
+					return item != code
+				})
+				opCode.Target = append(opCode.Target, newOpcode)
+				newOpcode.Source = append(newOpcode.Source, opCode)
+			}
+			code.Source = lo.Filter(code.Source, func(item *OpCode, index int) bool {
+				return item != source[0] && item != source[1]
+			})
+			code.Source = append(code.Source, newOpcode)
+			newOpcode.Target = append(newOpcode.Target, code)
+			sim := NewStackSimulation(startStackEntry)
+			sim.Push(val)
+			newOpcode.StackEntry = sim.stackEntry
+		}
+
+		lastIfNode := utils.GetLastElement(ifNodes)
+		sources := slices.Clone(lastIfNode.Source)
+		lastIfNode.Source = nil
+		code.Source = nil
+		ternaryExpMergeNodeSlot[code].Value = preVal
+		for _, source := range sources {
+			source.Target = lo.Filter(source.Target, func(item *OpCode, index int) bool {
+				return item != lastIfNode
+			})
+			source.Target = append(source.Target, code)
+			code.Source = append(code.Source, source)
+		}
+	}
 	return nil
 }
 func (d *Decompiler) _ParseStatement() error {
@@ -1884,7 +2015,7 @@ func (d *Decompiler) ParseStatement() error {
 
 	opcodeIdToNode := map[int]func(f func(value values.JavaValue) values.JavaValue){}
 	mapCodeToStackVarIndex := map[*OpCode]int{}
-
+	//DumpOpcodesToDotExp(d.OpCodeRoot)
 	var runCode func(startNode *OpCode) error
 	var parseOpcode func(opcode *OpCode) error
 	parseOpcode = func(opcode *OpCode) error {
@@ -2292,5 +2423,6 @@ func DumpOpcodesToDotExp(code *OpCode) string {
 	visited := make(map[*OpCode]bool)
 	visitor(code, visited, &sb)
 	sb.WriteString("}\n")
+	println(sb.String())
 	return sb.String()
 }

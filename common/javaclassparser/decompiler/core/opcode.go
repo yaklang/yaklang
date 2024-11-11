@@ -18,6 +18,8 @@ type OpCode struct {
 	IsTryCatchParent               bool
 	TryNode                        *OpCode
 	CatchNode                      []*OpCode
+	//StackSimulation                *StackSimulationImpl
+	StackEntry                     *StackItem
 	ExceptionTypeIndex             uint16
 	SwitchJmpCase                  *omap.OrderedMap[int, int32]
 	SwitchJmpCase1                 *omap.OrderedMap[int, int]
@@ -28,4 +30,6 @@ type OpCode struct {
 	TrueNode, FalseNode, MergeNode *OpCode
 	StackInfo                      *utils.Stack[*values.JavaValue]
 	IsTernaryNode                  bool
+	IfNode                         *OpCode
+	Info                           any
 }

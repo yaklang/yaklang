@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/rewriter"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"strings"
 	"testing"
 )
@@ -18,13 +19,13 @@ import (
 func TestSwitch(t *testing.T) {
 	id := 0
 	newSwitch := func(startNodes []*core.Node) *core.Node {
-		m := map[int]int{}
+		m := omap.NewEmptyOrderedMap[int, int]()
 		for i, _ := range startNodes {
 			if i == len(startNodes)-1 {
-				m[-1] = i
+				m.Set(-1, i)
 				continue
 			}
-			m[i] = i
+			m.Set(i, i)
 		}
 		node := core.NewNode(statements.NewMiddleStatement(statements.MiddleSwitch, []any{m, values.NewJavaLiteral("switch", types.NewJavaPrimer(types.JavaString))}))
 		node.Id = id
@@ -119,13 +120,13 @@ default bodyend
 func TestSwitch2(t *testing.T) {
 	id := 0
 	newSwitch := func(startNodes []*core.Node) *core.Node {
-		m := map[int]int{}
+		m := omap.NewEmptyOrderedMap[int, int]()
 		for i, _ := range startNodes {
 			if i == len(startNodes)-1 {
-				m[-1] = i
+				m.Set(-1, i)
 				continue
 			}
-			m[i] = i
+			m.Set(i, i)
 		}
 		node := core.NewNode(statements.NewMiddleStatement(statements.MiddleSwitch, []any{m, values.NewJavaLiteral("switch", types.NewJavaPrimer(types.JavaString))}))
 		node.Id = id
