@@ -2,11 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-
-	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -15,17 +15,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-)
-
-type SyntaxFlowScanStatus string
-
-// "executing" | "done" | "paused" | "error"
-
-const (
-	Executing SyntaxFlowScanStatus = "executing"
-	Paused                         = "paused"
-	Done                           = "done"
-	Error                          = "error"
+	"strings"
+	"sync"
+	"sync/atomic"
 )
 
 type SyntaxFlowScanManager struct {
@@ -62,54 +54,121 @@ type SyntaxFlowScanManager struct {
 	totalQuery int64
 }
 
-func CreateSyntaxFlowScanManager(ctx context.Context, stream ypb.Yak_SyntaxFlowScanServer, req *ypb.SyntaxFlowScanRequest) (*SyntaxFlowScanManager, error) {
-	if len(req.GetProgramName()) == 0 {
-		return nil, utils.Errorf("program name is empty")
-	}
+var syntaxFlowScanManager = new(sync.Map)
 
-	taskID := uuid.NewString()
+func CreateSyntaxFlowTask(taskId string, ctx context.Context) (*SyntaxFlowScanManager, error) {
+	_, ok := syntaxFlowScanManager.Load(taskId)
+	if ok {
+		return nil, utils.Errorf("task id %s already exists", taskId)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var rootctx, cancel = context.WithCancel(ctx)
 	m := &SyntaxFlowScanManager{
-		status: Executing,
-		taskID: taskID,
-		ctx:    ctx,
-		stream: stream,
+		taskID:       taskId,
+		ctx:          rootctx,
+		status:       yakit.SYNTAXFLOWSCAN_EXECUTING,
+		resumeSignal: sync.NewCond(&sync.Mutex{}),
+		isPaused:     utils.NewAtomicBool(),
+		cancel:       cancel,
 	}
-	m.programs = req.GetProgramName()
-	m.ignoreLanguage = req.GetIgnoreLanguage()
-
-	// get rules
-	m.rules = yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), req.GetFilter())
-
-	rulesCount := 0
-	if err := m.rules.Model(&schema.SyntaxFlowRule{}).Count(&rulesCount).Error; err != nil {
-		return nil, utils.Errorf("count rules failed: %s", err)
-	}
-	m.rulesCount = rulesCount
-
-	m.totalQuery = int64(m.rulesCount) * int64(len(m.programs))
-
-	yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
-		result.RuntimeID = taskID
-		return stream.Send(&ypb.SyntaxFlowScanResponse{
-			TaskID:     taskID,
-			Status:     string(m.status),
-			ExecResult: result,
-		})
-	}, taskID)
-	m.client = yakitClient
+	syntaxFlowScanManager.Store(taskId, m)
 	return m, nil
 }
 
-func (m *SyntaxFlowScanManager) Start() error {
+func RemoveSyntaxFlowTask(id string) {
+	r, err := GetSyntaxFlowTask(id)
+	syntaxFlowScanManager.Delete(id)
+	if err != nil {
+		return
+	}
+	r.Stop()
+	syntaxFlowScanManager.Delete(id)
+}
+
+func GetSyntaxFlowTask(id string) (*SyntaxFlowScanManager, error) {
+	raw, ok := syntaxFlowScanManager.Load(id)
+	if !ok {
+		return nil, utils.Errorf("task id %s not exists", id)
+	}
+	if ins, ok := raw.(*SyntaxFlowScanManager); ok {
+		return ins, nil
+	} else {
+		return nil, utils.Errorf("task id %s not exists(typeof %T err)", id, raw)
+	}
+}
+
+func (m *SyntaxFlowScanManager) Start(startIndex ...int64) error {
+	defer func() {
+		if err := recover(); err != nil {
+			m.taskRecorder.Reason = fmt.Sprintf("%v", err)
+			m.status = yakit.SYNTAXFLOWSCAN_ERROR
+			m.notifyStatus()
+			m.SaveTask()
+			return
+		}
+		if m.status == yakit.SYNTAXFLOWSCAN_PAUSED {
+			m.notifyStatus()
+			m.SaveTask()
+			return
+		}
+		m.status = yakit.SYNTAXFLOWSCAN_DONE
+		m.notifyStatus()
+		m.SaveTask()
+	}()
+
+	// wait for pause signal
+	go func() {
+		for {
+			rsp, err := m.stream.Recv()
+			if err != nil {
+				m.taskRecorder.Reason = err.Error()
+				return
+			}
+			if rsp.GetControlMode() == "pause" {
+				m.status = yakit.SYNTAXFLOWSCAN_PAUSED
+				m.Pause()
+				m.Stop()
+			}
+		}
+	}()
+
+	var start int64
+	if len(startIndex) == 0 {
+		start = 0
+	} else {
+		start = startIndex[0]
+	}
+	if start > m.totalQuery || start < 0 {
+		return utils.Errorf("SyntaxFlow scan start with a wrong task index")
+	}
 	var errs error
+	var taskIndex int64 // when taskIndex == totalQuery, the task start to run.
 	for _, progName := range m.programs {
+		if m.IsPause() || m.IsStop() {
+			break
+		}
+		nextIndex := taskIndex + m.rulesCount
+		if nextIndex <= start {
+			taskIndex = nextIndex
+		}
 		prog, err := ssaapi.FromDatabase(progName)
 		if err != nil {
 			errs = utils.JoinErrors(errs, err)
-			m.skipQuery += int64(m.rulesCount) // skip all rules for this program
+			atomic.AddInt64(&m.skipQuery, m.rulesCount) // skip all rules for this program // skip all rules for this program
+			taskIndex += m.rulesCount
+			m.SaveTask()
 			continue
 		}
 		for rule := range sfdb.YieldSyntaxFlowRules(m.rules, m.ctx) {
+			taskIndex++
+			if taskIndex <= start {
+				continue
+			}
+			if m.IsPause() || m.IsStop() {
+				break
+			}
 			m.Query(rule, prog)
 		}
 	}
@@ -143,13 +202,12 @@ func (m *SyntaxFlowScanManager) SaveTask() {
 }
 
 func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
-
 	m.notifyProgress(rule.RuleName)
 	defer m.SaveTask()
 	// log.Infof("executing rule %s", rule.RuleName)
 	if !m.ignoreLanguage {
 		if rule.Language != prog.GetLanguage() {
-			m.skipQuery++
+			atomic.AddInt64(&m.skipQuery, 1)
 			// m.client.YakitInfo("program %s(lang:%s) exec rule %s(lang:%s) failed: language not match", programName, prog.GetLanguage(), rule.RuleName, rule.Language)
 			return
 		}
@@ -158,14 +216,14 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 	// if language match or ignore language
 	if res, err := prog.SyntaxFlowRule(rule, sfvm.WithContext(m.ctx)); err == nil {
 		if _, err := res.Save(m.taskID); err == nil {
-			m.successQuery++
+			atomic.AddInt64(&m.successQuery, 1)
 			m.notifyResult(res)
 		} else {
-			m.failedQuery++
+			atomic.AddInt64(&m.failedQuery, 1)
 			m.client.YakitError("program %s exec rule %s result save failed: %s", prog.GetProgramName(), rule.RuleName, err)
 		}
 	} else {
-		m.failedQuery++
+		atomic.AddInt64(&m.failedQuery, 1)
 		m.client.YakitError("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
 	}
 }

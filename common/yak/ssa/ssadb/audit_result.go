@@ -2,6 +2,8 @@ package ssadb
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -43,6 +45,18 @@ func GetResultByID(resultID uint) (*AuditResult, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+func GetResultByTaskID(taskId string) (*AuditResult, error) {
+	var result AuditResult
+	if err := GetDB().Where("task_id = ?", taskId).First(&result).Error; err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func DeleteResultByTaskID(taskId string) error {
+	return GetDB().Where("task_id = ?", taskId).Unscoped().Delete(&AuditResult{}).Error
 }
 
 func DeleteResultByID(resultID uint) error {
@@ -109,7 +123,19 @@ func (r *AuditResult) ToGRPCModel() *ypb.SyntaxFlowResult {
 		RuleContent: r.RuleContent,
 	}
 	return res
+}
 
+func (r *AuditResult) ToGRPCModelRisk() []*ypb.Risk {
+	var risks []*ypb.Risk
+	for _, hash := range r.RiskHashs {
+		risk, err := yakit.GetRiskByHash(consts.GetGormProjectDatabase(), hash)
+		if err != nil {
+			log.Errorf("get risk by hash failed: %s", err)
+			continue
+		}
+		risks = append(risks, risk.ToGRPCModel())
+	}
+	return risks
 }
 
 func (r *AuditResult) AfterUpdate(tx *gorm.DB) (err error) {
