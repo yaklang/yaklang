@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
@@ -86,7 +87,7 @@ var _ ssautil.SpinHandle[Value] = SpinHandle
 
 // build phi
 func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Value) func(name string, t []Value) Value {
-	return func(name string, t []Value) Value {
+	return func(name string, vs []Value) Value {
 		if block != nil {
 			recoverBlock := builder.CurrentBlock
 			builder.CurrentBlock = block
@@ -94,7 +95,32 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 				builder.CurrentBlock = recoverBlock
 			}()
 		}
-		phi := builder.EmitPhi(name, t)
+
+		var t Type
+		typeMerge := make(map[Type]struct{})
+		for _, v := range vs {
+			if v.GetType().GetTypeKind() == AnyTypeKind {
+				continue
+			}
+			if _, ok := typeMerge[v.GetType()]; ok {
+				continue
+			}
+			typeMerge[v.GetType()] = struct{}{}
+		}
+		switch len(typeMerge) {
+		case 0:
+			t = GetAnyType()
+		case 1:
+			for typ := range typeMerge {
+				t = typ
+			}
+		default:
+			// import the or type
+			t = NewOrType(lo.Keys(typeMerge)...)
+		}
+
+		phi := builder.EmitPhi(name, vs)
+		phi.SetType(t)
 		if phi == nil {
 			return nil
 		}
@@ -103,7 +129,7 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		}
 		phi.GetProgram().SetVirtualRegister(phi)
 		phi.GetProgram().SetInstructionWithName(name, phi)
-		phi.SetVerboseName(t[0].GetVerboseName())
+		phi.SetVerboseName(vs[0].GetVerboseName())
 		phi.CFGEntryBasicBlock = cfgEntryBlock
 		return phi
 	}

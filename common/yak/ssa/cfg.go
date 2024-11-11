@@ -815,15 +815,16 @@ func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Valu
 		if value == nil {
 			continue
 		}
-		if und, ok := value.(*Undefined); ok {
-			if und.Kind == UndefinedValueInValid {
-				continue
-			}
-		}
+
+		// if und, ok := value.(*Undefined); ok {
+		// if und.Kind == UndefinedValueInValid {
+		// 	continue
+		// }
+		// }
 
 		leftv := b.CreateVariable(name)
 		und := b.EmitUndefined(name)
-		und.Kind = UndefinedValueValid
+		und.Kind = UndefinedValueReturn
 		b.AssignVariable(leftv, und)
 	}
 

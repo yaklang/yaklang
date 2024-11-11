@@ -385,3 +385,31 @@ b = a.A
 		}))
 	})
 }
+
+func Test_Return_phi(t *testing.T) {
+	t.Run("return phi type", func(t *testing.T) {
+		code := `
+		encodePayload,err = codec.AESCBCEncrypt("", "", "")
+		if err {
+			// panic("codec AES CBC Encrypt error")
+            return 
+		}	
+        print(encodePayload)
+		`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			res, err := prog.SyntaxFlowWithError(`
+			print( * as $para)
+			$para<typeName()> as $typeName 
+			`)
+			require.NoError(t, err)
+			typeName := res.GetValues("typeName")
+			// typeName
+			require.True(t, len(typeName) == 1)
+			require.Equal(t, typeName[0].String(), "byte[]")
+
+			return nil
+		})
+
+	})
+}
