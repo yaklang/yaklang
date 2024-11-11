@@ -68,6 +68,8 @@ type IrCode struct {
 	// Use-Def Chains Relation
 	Defs  Int64Slice `json:"defs" gorm:"type:text"`
 	Users Int64Slice `json:"users" gorm:"type:text"`
+	// Phi Chains Relation
+	Phics Int64Slice `json:"phis" gorm:"type:text"`
 	// this is user is call and method is this IR self
 	CalledBy Int64Slice `json:"is_called_by" gorm:"type:text"`
 
