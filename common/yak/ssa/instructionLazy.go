@@ -720,15 +720,24 @@ func (lz *LazyInstruction) SetReference(v Value) {
 	lz.Value.SetReference(v)
 }
 
-func (lz *LazyInstruction) AddOccultation(p *Phi) {
+func (lz *LazyInstruction) AddOccultation(p Value) {
 
 }
 
-func (lz *LazyInstruction) GetOccultation() []Value {
+func (lz *LazyInstruction) HandleOccultation() []Value {
 	var ret []Value
+	var handler func(i *anValue)
 
-	for _, u := range lz.GetUsers() {
-		ret = append(ret, u.(*LazyInstruction))
+	handler = func(i *anValue) {
+		for _, v := range i.occultation {
+			ret = append(ret, v)
+			if p, ok := ToPhi(v); ok {
+				handler(&p.anValue)
+			}
+		}
+	}
+	if u, ok := ToUndefined(lz.Value); ok {
+		handler(&u.anValue)
 	}
 
 	return ret

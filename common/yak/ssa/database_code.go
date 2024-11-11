@@ -166,6 +166,10 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		}
 	}
 
+	for _, oc := range value.GetOccultation() {
+		ir.Phics = append(ir.Phics, oc.GetId())
+	}
+
 	// Object
 	ir.IsObject = value.IsObject()
 	if ir.IsObject {
@@ -227,6 +231,11 @@ func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	//  user
 	for _, user := range ir.Users {
 		value.AddUser(getUser(user))
+	}
+
+	//  phic
+	for _, oc := range ir.Phics {
+		value.AddOccultation(getValue(oc))
 	}
 
 	// object

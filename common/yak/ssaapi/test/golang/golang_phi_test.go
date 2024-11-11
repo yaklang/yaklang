@@ -159,6 +159,7 @@ func Test_Phi_WithReturn(t *testing.T) {
 
 func Test_MemberCall_WithPhi(t *testing.T) {
 	code := `package main
+	
 	func main() {
 		a := function1()
 		if b {
@@ -170,7 +171,7 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 `
 	t.Run("member-call-with-phi", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
-		function1 <getCall> as $entry
+		function1() as $entry
 		$entry.test as $output
 `, map[string][]string{
 			"entry":  {"Undefined-function1()"},
@@ -195,16 +196,36 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 `
 	t.Run("member-call-with-phi-ex", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
-		a as $entry
+		function1() as $entry
 		$entry.test as $output
 `, map[string][]string{
-			"entry": {"Undefined-function1()",
-				"Undefined-function2()",
-				"Undefined-function3()",
-				"phi(a)[Undefined-function2(),Undefined-function3()]",
-				"phi(a)[phi(a)[Undefined-function2(),Undefined-function3()],Undefined-function1()]",
-			},
-			"output": {"Undefined-a.test(valid)", "Undefined-a.test(valid)"},
+			"entry":  {"Undefined-function1()"},
+			"output": {"Undefined-a.test(valid)"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+}
+
+func Test_ImportPackage_WithPhi(t *testing.T) {
+	code := `package main
+
+	import "github.com/your/template"
+
+	func main() {
+		t, err := template.New().Parse()
+		if err != nil {
+			t, err = template.New().Parse()
+		}
+		t.Execute(w, messages)
+	}`
+
+	t.Run("import-package-with-phi", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+		template?{<fullTypeName>?{have: 'github.com/your/template'}} as $entry;
+		$entry.New() as $new;
+		$new.Parse() <getMembers> as $parse;
+		$parse.Execute(* #-> as $sink);
+		`, map[string][]string{
+			"sink": {"Undefined-w", "Undefined-messages"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }
