@@ -10,7 +10,6 @@ import (
 
 type PreHandlerAnalyzer interface {
 	InitHandler(builder *FunctionBuilder)
-	DoInitHandlerFunc(builder *FunctionBuilder)
 	FilterPreHandlerFile(string) bool
 	PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error
 	PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder)
@@ -26,36 +25,43 @@ type Builder interface {
 	PreHandlerAnalyzer
 }
 
-var _ PreHandlerAnalyzer = &DummyPreHandler{}
+type initHanlderFunc func(*FunctionBuilder)
 
-type DummyPreHandler struct {
+type PreHandlerInit struct {
 	InitHandlerOnce sync.Once
-	DoHandlerOnce   sync.Once
-	InitHandlerFunc []func()
+	initHandlerFunc []initHanlderFunc
 }
 
-func (d *DummyPreHandler) PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder) {
+func NewPreHandlerInit(fs ...initHanlderFunc) *PreHandlerInit {
+	return &PreHandlerInit{
+		InitHandlerOnce: sync.Once{},
+		initHandlerFunc: fs,
+	}
 }
 
-func (d *DummyPreHandler) FilterPreHandlerFile(string) bool {
+func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
+	d.InitHandlerOnce.Do(func() {
+		// build the global dependency scope
+		b.SetEmptyRange()
+		variable := b.CreateVariable("__dependency__")
+		container := b.EmitEmptyContainer()
+		b.AssignVariable(variable, container)
+
+		// run the init handler functions
+		for _, f := range d.initHandlerFunc {
+			// xx
+			f(b)
+		}
+	})
+}
+
+func (d *PreHandlerInit) PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder) {
+}
+
+func (d *PreHandlerInit) FilterPreHandlerFile(string) bool {
 	return false
 }
 
-func (d *DummyPreHandler) PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error {
+func (d *PreHandlerInit) PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error {
 	return nil
-}
-func (d *DummyPreHandler) InitHandler(b *FunctionBuilder) {
-}
-func (d *DummyPreHandler) DoInitHandlerFunc(b *FunctionBuilder) {
-	d.DoHandlerOnce.Do(func() {
-		d.InitHandlerFunc = append(d.InitHandlerFunc, func() {
-			b.SetEmptyRange()
-			variable := b.CreateVariable("__dependency__")
-			container := b.EmitEmptyContainer()
-			b.AssignVariable(variable, container)
-		})
-		for _, f := range d.InitHandlerFunc {
-			f()
-		}
-	})
 }

@@ -1,9 +1,10 @@
 package java2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca"
@@ -15,6 +16,12 @@ import (
 )
 
 var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
+
+func (s *SSABuilder) Create() ssa.Builder {
+	return &SSABuilder{
+		PreHandlerInit: ssa.NewPreHandlerInit(),
+	}
+}
 
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)

@@ -13,13 +13,15 @@ import (
 )
 
 type SSABuilder struct {
-	ssa.DummyPreHandler
+	*ssa.PreHandlerInit
 }
 
 var Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
-	return &SSABuilder{}
+	return &SSABuilder{
+		PreHandlerInit: ssa.NewPreHandlerInit(),
+	}
 }
 
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
