@@ -88,6 +88,48 @@ func TestMixCaller_call_Plugin_Timeout(t *testing.T) {
 	}
 }
 
+func TestMixCaller_call_Plugin_Timeout2(t *testing.T) {
+	code := `
+handle = result => {
+	yakit.Info("开始执行")
+	go fn {
+		for {
+			sleep(1)
+			yakit.Info("执行中...")
+		}
+	}
+	sleep(9)
+	yakit.Info("执行结束了")
+
+	return "ok"
+}
+`
+	consts.GetGormProjectDatabase()
+	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("port-scan", code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearFunc()
+
+	caller, err := NewMixPluginCaller()
+	if err != nil {
+		t.Fatal(err)
+	}
+	caller.SetCallPluginTimeout(5)
+	caller.SetDividedContext(true)
+	err = caller.LoadPlugin(tempName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	caller.HandleServiceScanResult(nil)
+	caller.Wait()
+	executionDuration := time.Since(now)
+	if executionDuration > 6*time.Second {
+		t.Fatalf("context timeout setting might be incorrect: expected execution time <= 7s, got %v", executionDuration)
+	}
+}
+
 func TestMixCaller_load_Plugin_Timeout_effect_call(t *testing.T) {
 	code := `
 	mirrorHTTPFlow = func(isHttps, url, req , rsp , body ) {

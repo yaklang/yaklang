@@ -243,11 +243,23 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 					}
 				}()
 
-				subCtx, _ := context.WithTimeout(pluginContext.Ctx, y.callTimeout)
-				subCtx = context.WithValue(subCtx, "pluginName", scriptName)
-				_, err = nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
-				if err != nil && !errors.Is(err, context.Canceled) {
-					log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
+				subCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.callTimeout)
+				defer cancel()
+
+				done := make(chan error, 1)
+				go func() {
+					_, err = nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
+					done <- err
+				}()
+
+				select {
+				case err := <-done:
+					if err != nil && !errors.Is(err, context.Canceled) {
+						log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
+					}
+				case <-subCtx.Done():
+					log.Errorf("call YakFunction timeout after %v seconds", y.callTimeout)
+					return
 				}
 			},
 		}
