@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -840,4 +841,25 @@ func TestCallPluginTimeout(t *testing.T) {
 	}
 
 	require.True(t, checkOk, "call plugin timeout failed")
+}
+
+func TestInitNetworkConfig(t *testing.T) {
+	emptyConfig := &ypb.GlobalNetworkConfig{}
+	yakit.InitNetworkConfig(emptyConfig)
+	defaultConfig := yakit.GetDefaultNetworkConfig()
+
+	var notNeedCheckValue = []string{"ClientCertificates", "CustomDNSServers", "CustomDoHServers", "AuthInfos", "AiApiPriority"}
+
+	defaultReflect := reflect.ValueOf(*defaultConfig)
+	emptyReflect := reflect.ValueOf(*emptyConfig)
+	for i := 0; i < defaultReflect.Type().NumField(); i++ {
+		//get field name
+		if defaultReflect.Type().Field(i).IsExported() {
+			fieldName := defaultReflect.Type().Field(i).Name
+			if !utils.StringArrayContains(notNeedCheckValue, fieldName) {
+				require.Equal(t, defaultReflect.Field(i).Interface(), emptyReflect.Field(i).Interface(), fmt.Sprintf("init network config failed: fieldName[%s]", fieldName))
+			}
+		}
+
+	}
 }
