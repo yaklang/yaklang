@@ -48,6 +48,13 @@ func (s *SFFrameResult) GetRule() *schema.SyntaxFlowRule {
 	return s.rule
 }
 
+func (s *SFFrameResult) TaskID() string {
+	if s == nil || s.config == nil {
+		return ""
+	}
+	return s.config.taskID
+}
+
 func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
 	result.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
 		if get, b := s.SymbolTable.Get(i); b {
@@ -226,7 +233,7 @@ func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *s
 }
 
 func (s *SFFrameResult) Copy() *SFFrameResult {
-	ret := NewSFResult(s.Rule)
+	ret := NewSFResult(s.rule, s.config)
 	ret.Description = s.Description.Copy()
 	ret.CheckParams = append([]string{}, s.CheckParams...)
 	ret.Errors = append([]string{}, s.Errors...)

@@ -45,8 +45,12 @@ func CreateResultFromQuery(res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret := createEmptyResult()
 	ret.memResult = res
 	ret.rule = res.GetRule()
+	if taskID := res.TaskID(); taskID != "" {
+		ret.Save(taskID)
+	}
 	return ret
 }
+
 func (r *SyntaxFlowResult) String(opts ...sfvm.ShowOption) string {
 	if r == nil || r.memResult == nil {
 		return ""
