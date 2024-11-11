@@ -8,13 +8,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -55,14 +56,24 @@ func nc_sort(origin ...interface{}) (ret []interface{}) {
 func toString(i interface{}) string {
 	return utils.InterfaceToString(i)
 }
+
 func toBytes(i interface{}) []byte {
 	return utils.InterfaceToBytes(i)
 }
+
 func ExtractResultToString(i interface{}) string {
-	return strings.Join(lo.Map(utils.InterfaceToStringSlice(i), func(item string, index int) string {
-		return utils.EscapeInvalidUTF8Byte([]byte(item))
-	}), ",")
+	switch v := i.(type) {
+	case string:
+		return utils.EscapeInvalidUTF8Byte([]byte(v))
+	case []byte:
+		return utils.EscapeInvalidUTF8Byte(v)
+	default:
+		return strings.Join(lo.Map(utils.InterfaceToStringSlice(i), func(item string, index int) string {
+			return utils.EscapeInvalidUTF8Byte([]byte(item))
+		}), ",")
+	}
 }
+
 func parseTimeOrNow(arguments []interface{}) (time.Time, error) {
 	var currentTime time.Time
 	if len(arguments) == 2 {
@@ -111,12 +122,14 @@ func WhatsMyIP() (string, error) {
 
 	return strings.Trim(string(ip), "\n\r\t "), nil
 }
+
 func GetPublicIP() string {
 	PublicIPGetOnce.Do(func() {
 		publicIP, _ = WhatsMyIP()
 	})
 	return publicIP
 }
+
 func _index(arg any, index int64) interface{} {
 	// If the first argument is a slice, we index into it
 	switch v := arg.(type) {
@@ -138,6 +151,7 @@ func _index(arg any, index int64) interface{} {
 		return string(str[index])
 	}
 }
+
 func gadgetEncodingHelper(returnData []byte, encoding string) string {
 	switch encoding {
 	case "raw":
