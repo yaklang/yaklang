@@ -30,10 +30,13 @@ const (
 
 type SyntaxFlowScanManager struct {
 	// task info
-	taskID string
-	status SyntaxFlowScanStatus
-	ctx    context.Context
-
+	taskID       string
+	status       string
+	ctx          context.Context
+	resumeSignal *sync.Cond
+	isPaused     *utils.AtomicBool
+	cancel       context.CancelFunc
+	taskRecorder *schema.SyntaxFlowScanTask
 	// config
 	ignoreLanguage bool
 
@@ -43,7 +46,8 @@ type SyntaxFlowScanManager struct {
 
 	// rules
 	rules      *gorm.DB
-	rulesCount int
+	ruleFilter *ypb.SyntaxFlowRuleFilter
+	rulesCount int64
 
 	// program
 	programs []string
@@ -113,10 +117,35 @@ func (m *SyntaxFlowScanManager) Start() error {
 	return errs
 }
 
+// SaveTask save task info which is from manager to database
+func (m *SyntaxFlowScanManager) SaveTask() {
+	if m.taskRecorder == nil {
+		m.taskRecorder = &schema.SyntaxFlowScanTask{}
+	}
+	m.taskRecorder.Programs = strings.Join(m.programs, ",")
+	m.taskRecorder.TaskId = m.taskID
+	m.taskRecorder.Status = m.status
+	m.taskRecorder.SuccessQuery = m.successQuery
+	m.taskRecorder.FailedQuery = m.failedQuery
+	m.taskRecorder.SkipQuery = m.skipQuery
+	m.taskRecorder.RiskCount = m.riskCount
+	m.taskRecorder.TotalQuery = m.totalQuery
+	marshal, err := json.Marshal(m.ruleFilter)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	m.taskRecorder.RuleFilter = marshal
+	err = yakit.SaveSyntaxFlowScanTask(consts.GetGormProjectDatabase(), m.taskRecorder)
+	if err != nil {
+		log.Error(err)
+	}
+}
+
 func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 
 	m.notifyProgress(rule.RuleName)
-
+	defer m.SaveTask()
 	// log.Infof("executing rule %s", rule.RuleName)
 	if !m.ignoreLanguage {
 		if rule.Language != prog.GetLanguage() {
@@ -141,6 +170,10 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 	}
 }
 
+func (m *SyntaxFlowScanManager) Resume() {
+	m.isPaused.UnSet()
+}
+
 func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	if riskLen := len(res.GetGRPCModelRisk()); riskLen != 0 {
 		m.riskCount += int64(riskLen)
@@ -148,7 +181,7 @@ func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	// m.riskQuery
 	m.stream.Send(&ypb.SyntaxFlowScanResponse{
 		TaskID: m.taskID,
-		Status: string(m.status),
+		Status: m.status,
 		Result: res.GetGRPCModelResult(),
 		Risks:  res.GetGRPCModelRisk(),
 	})
@@ -158,7 +191,7 @@ func (m *SyntaxFlowScanManager) notifyProgress(ruleName string) {
 	m.client.StatusCard("当前执行规则", ruleName, "规则执行进度")
 	finishQuery := m.successQuery + m.failedQuery + m.skipQuery
 	if finishQuery == m.totalQuery {
-		m.status = Done
+		m.status = yakit.SYNTAXFLOWSCAN_DONE
 		m.client.StatusCard("当前执行规则", "已执行完毕", "规则执行进度")
 	}
 	m.client.YakitSetProgress(float64(finishQuery) / float64(m.totalQuery))
@@ -171,4 +204,63 @@ func (m *SyntaxFlowScanManager) notifyProgress(ruleName string) {
 	m.client.StatusCard("执行失败个数", m.failedQuery, "规则执行状态")
 	// risk status
 	m.client.StatusCard("检出漏洞/风险个数", m.riskCount, "漏洞/风险状态")
+}
+
+func (m *SyntaxFlowScanManager) notifyStatus() {
+	m.stream.Send(&ypb.SyntaxFlowScanResponse{
+		TaskID: m.taskID,
+		Status: m.status,
+	})
+}
+
+func (m *SyntaxFlowScanManager) Stop() {
+	m.cancel()
+}
+
+func (m *SyntaxFlowScanManager) TaskId() string {
+	return m.taskID
+}
+
+func (m *SyntaxFlowScanManager) Pause() {
+	m.isPaused.Set()
+}
+
+func (m *SyntaxFlowScanManager) IsPause() bool {
+	return m.isPaused.IsSet()
+}
+
+func (m *SyntaxFlowScanManager) IsStop() bool {
+	select {
+	case <-m.ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+func (m *SyntaxFlowScanManager) ResumeManagerFromTask() error {
+	task, err := yakit.GetSyntaxFlowScanTaskById(consts.GetGormProjectDatabase(), m.TaskId())
+	if err != nil {
+		return utils.Wrapf(err, "Resume SyntaxFlow task by is failed")
+	}
+	m.taskRecorder = task
+	m.status = task.Status
+	m.status = task.Status
+	m.programs = strings.Split(task.Programs, ",")
+	m.successQuery = task.SuccessQuery
+	m.failedQuery = task.FailedQuery
+	m.skipQuery = task.SkipQuery
+	m.riskCount = task.RiskCount
+	m.totalQuery = task.TotalQuery
+	m.ruleFilter = &ypb.SyntaxFlowRuleFilter{}
+	err = json.Unmarshal(task.RuleFilter, m.ruleFilter)
+	if err != nil {
+		return utils.Wrapf(err, "Unmarshal SyntaxFlow RuleFilter: %v", task.RuleFilter)
+	}
+	m.rules = yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), m.ruleFilter)
+	return nil
+}
+
+func (m *SyntaxFlowScanManager) CurrentTaskIndex() int64 {
+	return m.skipQuery + m.failedQuery + m.successQuery
 }
