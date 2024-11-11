@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type OpCode struct {
@@ -18,8 +19,8 @@ type OpCode struct {
 	TryNode                        *OpCode
 	CatchNode                      []*OpCode
 	ExceptionTypeIndex             uint16
-	SwitchJmpCase                  map[int]uint32
-	SwitchJmpCase1                 map[int]int
+	SwitchJmpCase                  *omap.OrderedMap[int, int32]
+	SwitchJmpCase1                 *omap.OrderedMap[int, int]
 	stackProduced                  []values.JavaValue
 	stackConsumed                  []values.JavaValue
 	Source                         []*OpCode
