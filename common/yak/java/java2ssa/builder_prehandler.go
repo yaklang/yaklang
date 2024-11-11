@@ -68,7 +68,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		fb.GenerateDependence(pkgs, filename)
 	}
 	switch strings.ToLower(fileSystem.Ext(path)) {
-	case ".java":
+	case ".java", ".class":
 		file, err := fileSystem.ReadFile(path)
 		if err != nil {
 			return err
