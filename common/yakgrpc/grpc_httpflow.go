@@ -99,15 +99,28 @@ func (s *Server) GetHTTPFlowById(_ context.Context, r *ypb.GetHTTPFlowByIdReques
 
 func (s *Server) GetHTTPFlowBodyById(r *ypb.GetHTTPFlowBodyByIdRequest, stream ypb.Yak_GetHTTPFlowBodyByIdServer) error {
 	bufSize := int(r.GetBufSize())
+	var (
+		flow *schema.HTTPFlow
+		err  error
+	)
 	if bufSize == 0 {
 		bufSize = oneMB
 	} else if bufSize < 0 {
 		return utils.Error("GetHTTPFlowBodyById: bufSize must be positive")
 	}
-
-	flow, err := yakit.GetHTTPFlow(s.GetProjectDatabase(), r.GetId())
-	if err != nil {
-		return err
+	if r.Id != 0 {
+		flow, err = yakit.GetHTTPFlow(s.GetProjectDatabase(), r.GetId())
+		if err != nil {
+			return err
+		}
+	} else {
+		flow, err = yakit.GetHttpFlowByRuntimeId(s.GetProjectDatabase(), r.GetRuntimeId())
+		if err != nil {
+			return err
+		}
+	}
+	if flow == nil {
+		return utils.Errorf("not found this httpflow")
 	}
 	var (
 		packet, rawPacket string

@@ -4612,6 +4612,7 @@ message GetHTTPFlowBodyByIdRequest {
   int64 Id = 1;
   bool IsRequest = 2;
   int64 BufSize = 3;
+  string RuntimeId = 4;
 }
 
 message QueryHTTPFlowRequest {
@@ -5001,7 +5002,7 @@ message MITMFilterData {
   repeated FilterDataItem ExcludeUri = 6;
 
   repeated FilterDataItem ExcludeMethods = 7;
-  repeated FilterDataItem ExcludeMIME  = 8;
+  repeated FilterDataItem ExcludeMIME = 8;
 }
 
 message Certificate {
