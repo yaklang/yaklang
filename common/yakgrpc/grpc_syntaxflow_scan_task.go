@@ -93,3 +93,24 @@ func (s *Server) syntaxFlowResumeTask(m *SyntaxFlowScanManager, stream ypb.Yak_S
 	}
 	return nil
 }
+
+func (s *Server) syntaxFlowStatusTask(m *SyntaxFlowScanManager, stream ypb.Yak_SyntaxFlowScanServer) error {
+	err := m.ResumeManagerFromTask()
+	if err != nil {
+		return err
+	}
+	m.stream = stream
+	if m.client == nil {
+		yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
+			result.RuntimeID = m.TaskId()
+			return m.stream.Send(&ypb.SyntaxFlowScanResponse{
+				TaskID:     m.TaskId(),
+				Status:     m.status,
+				ExecResult: result,
+			})
+		}, m.TaskId())
+		m.client = yakitClient
+	}
+	m.notifyStatus()
+	return nil
+}

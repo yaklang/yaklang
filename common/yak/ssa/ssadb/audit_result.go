@@ -47,14 +47,6 @@ func GetResultByID(resultID uint) (*AuditResult, error) {
 	return &result, nil
 }
 
-func GetResultByTaskID(taskId string) (*AuditResult, error) {
-	var result AuditResult
-	if err := GetDB().Where("task_id = ?", taskId).First(&result).Error; err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
 func DeleteResultByTaskID(taskId string) error {
 	return GetDB().Where("task_id = ?", taskId).Unscoped().Delete(&AuditResult{}).Error
 }

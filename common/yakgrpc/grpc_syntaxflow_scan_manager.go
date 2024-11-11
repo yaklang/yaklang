@@ -246,6 +246,10 @@ func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 
 func (m *SyntaxFlowScanManager) notifyProgress(ruleName string) {
 	m.client.StatusCard("当前执行规则", ruleName, "规则执行进度")
+	m.notifyStatus()
+}
+
+func (m *SyntaxFlowScanManager) notifyStatus() {
 	finishQuery := m.successQuery + m.failedQuery + m.skipQuery
 	if finishQuery == m.totalQuery {
 		m.status = yakit.SYNTAXFLOWSCAN_DONE
@@ -261,9 +265,6 @@ func (m *SyntaxFlowScanManager) notifyProgress(ruleName string) {
 	m.client.StatusCard("执行失败个数", m.failedQuery, "规则执行状态")
 	// risk status
 	m.client.StatusCard("检出漏洞/风险个数", m.riskCount, "漏洞/风险状态")
-}
-
-func (m *SyntaxFlowScanManager) notifyStatus() {
 	m.stream.Send(&ypb.SyntaxFlowScanResponse{
 		TaskID: m.taskID,
 		Status: m.status,
