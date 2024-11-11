@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -50,22 +49,19 @@ func init() {
 }
 
 func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalNetworkConfigRequest) (*ypb.GlobalNetworkConfig, error) {
-	data := yakit.Get(consts.GLOBAL_NETWORK_CONFIG)
-	if data == "" {
-		defaultConfig := yakit.GetDefaultNetworkConfig()
-		raw, err := json.Marshal(defaultConfig)
+	var config *ypb.GlobalNetworkConfig
+	defer func() {
+		raw, err := json.Marshal(config)
 		if err != nil {
-			return nil, err
+			log.Errorf("marshal config error: %v", err)
 		}
 		yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(raw))
-		return defaultConfig, nil
+	}()
+	config = yakit.GetNetworkConfig()
+	if config == nil {
+		config = yakit.GetDefaultNetworkConfig()
+		return config, nil
 	}
-	var config ypb.GlobalNetworkConfig
-	err := json.Unmarshal([]byte(data), &config)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, appConfig := range config.AppConfigs {
 		consts.ConvertCompatibleConfig(appConfig)
 	}
@@ -82,7 +78,7 @@ func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalN
 			config.AiApiPriority = append(config.AiApiPriority, s)
 		}
 	}
-	return &config, nil
+	return config, nil
 }
 
 func (s *Server) SetGlobalNetworkConfig(ctx context.Context, req *ypb.GlobalNetworkConfig) (*ypb.Empty, error) {
