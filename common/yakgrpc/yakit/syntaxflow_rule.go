@@ -98,3 +98,11 @@ func DeleteSyntaxFlowRule(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest) 
 	db = db.Unscoped().Delete(&schema.SyntaxFlowRule{})
 	return db.RowsAffected, db.Error
 }
+
+func QuerySyntaxFlowRuleCount(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter) (int64, error) {
+	db = db.Model(&schema.SyntaxFlowRule{})
+	db = FilterSyntaxFlowRule(db, filter)
+	var count int64
+	db.Count(&count)
+	return count, db.Error
+}

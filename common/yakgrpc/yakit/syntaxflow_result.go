@@ -42,3 +42,10 @@ func FilterSyntaxFlowResult(rawDB *gorm.DB, filter *ypb.SyntaxFlowResultFilter) 
 
 	return db
 }
+
+func GetSyntaxFlowResultByTaskId(db *gorm.DB, taskId string) *gorm.DB {
+	filter := &ypb.SyntaxFlowResultFilter{
+		TaskIDs: []string{taskId},
+	}
+	return FilterSyntaxFlowResult(db, filter)
+}
