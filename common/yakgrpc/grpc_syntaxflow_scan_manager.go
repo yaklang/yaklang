@@ -79,7 +79,6 @@ func CreateSyntaxFlowTask(taskId string, ctx context.Context) (*SyntaxFlowScanMa
 
 func RemoveSyntaxFlowTask(id string) {
 	r, err := GetSyntaxFlowTask(id)
-	syntaxFlowScanManager.Delete(id)
 	if err != nil {
 		return
 	}
