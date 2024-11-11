@@ -590,6 +590,13 @@ func GetHTTPFlowByIDOrHash(db *gorm.DB, id int64, hash string) (*schema.HTTPFlow
 
 	return &req, nil
 }
+func GetHttpFlowByRuntimeId(db *gorm.DB, rid string) (*schema.HTTPFlow, error) {
+	var req schema.HTTPFlow
+	if dbx := db.Model(&schema.HTTPFlow{}).Where("runtime_id=?", rid).First(&req); dbx.Error != nil {
+		return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
+	}
+	return &req, nil
+}
 
 func GetHTTPFlowByHash(db *gorm.DB, hash string) (*schema.HTTPFlow, error) {
 	var req schema.HTTPFlow

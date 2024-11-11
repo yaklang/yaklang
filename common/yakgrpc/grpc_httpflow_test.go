@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"os"
@@ -776,4 +777,24 @@ Content-Length: 19
 		require.NoError(t, err)
 		require.Equal(t, []byte("A"), packetBody.GetRaw())
 	})
+}
+
+func TestGetHttpFlowByIdOrRuntimeId(t *testing.T) {
+	projectDb := consts.GetGormProjectDatabase()
+	runtimeId := uuid.NewString()
+	yakit.SaveHTTPFlow(projectDb, &schema.HTTPFlow{
+		RuntimeId: runtimeId,
+	})
+	httpflow, err := yakit.GetHttpFlowByRuntimeId(projectDb, runtimeId)
+	require.NoError(t, err)
+	require.True(t, httpflow.RuntimeId == runtimeId)
+	defer func() {
+		yakit.DeleteHTTPFlow(projectDb, &ypb.DeleteHTTPFlowRequest{Id: []int64{int64(httpflow.ID)}})
+	}()
+	client, err2 := NewLocalClient(true)
+	require.NoError(t, err2)
+	_, err2 = client.GetHTTPFlowBodyById(context.Background(), &ypb.GetHTTPFlowBodyByIdRequest{
+		RuntimeId: runtimeId,
+	})
+	require.NoError(t, err2)
 }
