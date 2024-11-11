@@ -342,6 +342,7 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		CallPluginTimeout: 60,
 		MaxTlsVersion:     tls.VersionTLS13,
 		MinTlsVersion:     tls.VersionSSL30,
+		MaxContentLength:  1024 * 1024 * 10,
 	}
 	config := netx.NewBackupInitilizedReliableDNSConfig()
 	defaultConfig.CustomDoHServers = config.SpecificDoH
