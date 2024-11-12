@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -69,6 +70,13 @@ func (s *SFFrame) GetRule() *schema.SyntaxFlowRule {
 
 func (s *SFFrame) WithContext(result *SFFrameResult) {
 	s.context = result
+}
+
+func (s *SFFrame) GetContext() context.Context {
+	if s == nil || s.config == nil {
+		return context.Background()
+	}
+	return s.config.GetContext()
 }
 
 func (s *SFFrame) GetExtraInfo(key string, backup ...string) string {
@@ -257,13 +265,10 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		if s.idx >= len(s.Codes) {
 			break
 		}
-		// if s.config.ctx
-		if s.config.ctx != nil {
-			select {
-			case <-s.config.ctx.Done():
-				return utils.Errorf("context done")
-			default:
-			}
+		select {
+		case <-s.GetContext().Done():
+			return utils.Errorf("context done")
+		default:
 		}
 
 		i := s.Codes[s.idx]
@@ -451,7 +456,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if !s.config.StrictMatch {
 			mod |= KeyMatch
 		}
-		result, next, err := value.ExactMatch(mod, i.UnaryStr)
+		result, next, err := value.ExactMatch(s.GetContext(), mod, i.UnaryStr)
 		if err != nil {
 			err = utils.Wrapf(err, "search exact failed")
 		}
@@ -475,7 +480,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		var next []ValueOperator
 		err := recursiveDeepChain(value, func(operator ValueOperator) bool {
-			ok, results, _ := operator.ExactMatch(BothMatch, i.UnaryStr)
+			ok, results, _ := operator.ExactMatch(s.GetContext(), BothMatch, i.UnaryStr)
 			if ok {
 				have := false
 				log.Infof("recursive search exact: %v from: %v", results.String(), operator.String())
@@ -520,7 +525,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		var next []ValueOperator
 		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
-			ok, results, _ := operator.GlobMatch(mod|NameMatch, i.UnaryStr)
+			ok, results, _ := operator.GlobMatch(s.GetContext(), mod|NameMatch, i.UnaryStr)
 			if ok {
 				have := false
 				_ = results.Recursive(func(operator ValueOperator) error {
@@ -567,7 +572,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			//if strings.Contains(operator.String(), "aaa") {
 			//	spew.Dump(1)
 			//}
-			ok, results, _ := operator.RegexpMatch(mod|NameMatch, i.UnaryStr)
+			ok, results, _ := operator.RegexpMatch(s.GetContext(), mod|NameMatch, i.UnaryStr)
 			if ok {
 				have := false
 				_ = results.Recursive(func(operator ValueOperator) error {
@@ -610,7 +615,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if !s.config.StrictMatch {
 			mod |= KeyMatch
 		}
-		result, next, err := value.GlobMatch(mod, i.UnaryStr)
+		result, next, err := value.GlobMatch(s.GetContext(), mod, i.UnaryStr)
 		if err != nil {
 			err = utils.Wrapf(err, "search glob failed")
 		}
@@ -639,7 +644,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if !s.config.StrictMatch {
 			mod |= KeyMatch
 		}
-		result, next, err := value.RegexpMatch(mod, regexpIns.String())
+		result, next, err := value.RegexpMatch(s.GetContext(), mod, regexpIns.String())
 		if err != nil {
 			err = utils.Wrap(err, "search regexp failed")
 		}
