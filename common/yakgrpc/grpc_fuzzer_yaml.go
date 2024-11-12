@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -226,28 +227,32 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	// Matcher转换
 	var HttpResponseMatchers2YakMatchers func(matchers []*ypb.HTTPResponseMatcher) []*httptpl.YakMatcher
 	HttpResponseMatchers2YakMatchers = func(matchers []*ypb.HTTPResponseMatcher) []*httptpl.YakMatcher {
-		return funk.Map(matchers, func(matcher *ypb.HTTPResponseMatcher) *httptpl.YakMatcher {
-			scope := ""
-			switch matcher.Scope {
-			case "status_code":
-				scope = "status"
-			case "all_headers":
-				scope = "header"
-			default:
-				scope = matcher.Scope
+		newMatchers := make([]*httptpl.YakMatcher, 0, len(matchers))
+		for _, matcher := range matchers {
+			for _, subMatcher := range matcher.SubMatchers {
+				scope := ""
+				switch subMatcher.Scope {
+				case "status_code":
+					scope = "status"
+				case "all_headers":
+					scope = "header"
+				default:
+					scope = subMatcher.Scope
+				}
+				newMatchers = append(newMatchers, &httptpl.YakMatcher{
+					SubMatchers:         HttpResponseMatchers2YakMatchers(subMatcher.SubMatchers),
+					SubMatcherCondition: subMatcher.SubMatcherCondition,
+					MatcherType:         subMatcher.MatcherType,
+					Scope:               scope,
+					Condition:           subMatcher.Condition,
+					Group:               subMatcher.Group,
+					GroupEncoding:       subMatcher.GroupEncoding,
+					Negative:            subMatcher.Negative,
+					ExprType:            subMatcher.ExprType,
+				})
 			}
-			return &httptpl.YakMatcher{
-				SubMatchers:         HttpResponseMatchers2YakMatchers(matcher.SubMatchers),
-				SubMatcherCondition: matcher.SubMatcherCondition,
-				MatcherType:         matcher.MatcherType,
-				Scope:               scope,
-				Condition:           matcher.Condition,
-				Group:               matcher.Group,
-				GroupEncoding:       matcher.GroupEncoding,
-				Negative:            matcher.Negative,
-				ExprType:            matcher.ExprType,
-			}
-		}).([]*httptpl.YakMatcher)
+		}
+		return newMatchers
 	}
 	// 生成请求桶
 	// requestBulks := []*httptpl.YakRequestBulkConfig{}
@@ -296,9 +301,9 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 				Timeout: time.Duration(request.PerRequestTimeoutSeconds) * time.Second,
 			})
 		}
-		var topMatcher = &ypb.HTTPResponseMatcher{SubMatchers: []*ypb.HTTPResponseMatcher{}}
+		topMatcher := &ypb.HTTPResponseMatcher{SubMatchers: []*ypb.HTTPResponseMatcher{}}
 		if len(request.GetMatchers()) > 0 {
-			topMatcher = request.GetMatchers()[0]
+			topMatcher.SubMatchers = request.GetMatchers()
 		}
 
 		matchers := HttpResponseMatchers2YakMatchers(topMatcher.SubMatchers)

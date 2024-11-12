@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -1206,4 +1207,55 @@ Host: www.example.com
   a: '{{rand_char(5)}}'`) {
 		t.Fatal("export yaml failed")
 	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzerTaskToYaml_MultiMatchers(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	token, statusCode := utils.RandStringBytes(16), "200"
+	ctx := context.Background()
+	rsp, err := client.ExportHTTPFuzzerTaskToYaml(ctx, &ypb.ExportHTTPFuzzerTaskToYamlRequest{
+		Requests: &ypb.FuzzerRequests{
+			Requests: []*ypb.FuzzerRequest{
+				{
+					RequestRaw: []byte(`GET / HTTP/1.1
+Host: www.example.com
+`),
+					IsHTTPS:                  false,
+					PerRequestTimeoutSeconds: 5,
+					RedirectTimes:            3,
+					Matchers: []*ypb.HTTPResponseMatcher{
+						{
+							SubMatchers: []*ypb.HTTPResponseMatcher{
+								{
+									Scope:       "body",
+									MatcherType: "word",
+									Group:       []string{token},
+								},
+							},
+						},
+						{
+							SubMatchers: []*ypb.HTTPResponseMatcher{
+								{
+									Scope:       "status",
+									MatcherType: "status_code",
+									Group:       []string{statusCode},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		TemplateType: "path",
+	})
+	require.NoError(t, err)
+	fmt.Println(rsp.YamlContent)
+	require.Contains(t, rsp.YamlContent, `  - type: word
+    part: body
+    words:
+    - `+token)
+	require.Contains(t, rsp.YamlContent, `  - type: status
+    status:
+    - `+statusCode)
 }
