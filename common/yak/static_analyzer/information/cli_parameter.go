@@ -44,11 +44,12 @@ func newCliParameter(name, typ, methodTyp string) *CliParameter {
 	}
 }
 
-func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo) {
+func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo, []string) {
 	// prog.Show()
 	params := make([]*CliParameter, 0)
 	uiInfos := make([]*UIInfo, 0)
 	groups := make(map[string][]*CliParameter)
+	envKeys := make([]string, 0)
 
 	getConstString := func(v *ssaapi.Value) string {
 		if str, ok := v.GetConstValue().(string); ok {
@@ -109,7 +110,7 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo) {
 		}
 	}
 
-	handleOption := func(cli *CliParameter, opt *ssaapi.Value) {
+	handleOption := func(cli *CliParameter, opt *ssaapi.Value) (skip bool) {
 		// opt.ShowUseDefChain()
 		if !opt.IsCall() {
 			// skip no function call
@@ -154,7 +155,17 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo) {
 				break
 			}
 			cli.JsonSchema = arg1
+		case "cli.setPluginEnv":
+			key := ""
+			if opt.GetOperand(1).IsConstInst() {
+				key = opt.GetOperand(1).GetConst().VarString()
+			} else {
+				key = opt.GetOperand(1).String()
+			}
+			envKeys = append(envKeys, key)
+			skip = true
 		}
+		return
 	}
 	parseUiFunc := func(v *ssaapi.Value) {
 		v.GetUsers().Filter(
@@ -197,12 +208,15 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo) {
 			if name == "" {
 				return
 			}
-
 			cli := newCliParameter(name, typ, methodTyp)
 			opLen := len(v.GetOperands())
 			// handler option
+			shouldSkip := false
 			for i := 2; i < opLen; i++ {
-				handleOption(cli, v.GetOperand(i))
+				shouldSkip = handleOption(cli, v.GetOperand(i))
+			}
+			if shouldSkip {
+				return
 			}
 			params = append(params, cli)
 		})
@@ -239,7 +253,7 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo) {
 		}
 	}
 
-	return params, uiInfos
+	return params, uiInfos, envKeys
 }
 
 type pair struct {

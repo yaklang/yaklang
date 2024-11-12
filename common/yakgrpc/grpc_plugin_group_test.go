@@ -185,7 +185,7 @@ func TestQueryGroupCount(t *testing.T) {
 	if err != nil {
 		t.Fatal("ssa parse error")
 	}
-	parameters, _ := information.ParseCliParameter(prog)
+	parameters, _, _ := information.ParseCliParameter(prog)
 	params := cliParam2grpc(parameters)
 	err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), scriptName1, GRPCYakScriptToYakitScript(&ypb.YakScript{
 		Content:    content,

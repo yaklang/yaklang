@@ -253,23 +253,22 @@ func OverWriteCorePluginToLocal() {
 
 func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerateParam bool) {
 	var err error
-	generateParam := func(code, pluginType string) (string, error) {
+	generateParam := func(code, pluginType string) (string, string, error) {
 		if enableGenerateParam {
 			oldLevel := log.GetLevel()
 			log.SetLevel(log.ErrorLevel)
 			defer log.SetLevel(oldLevel)
-
 			prog, err := static_analyzer.SSAParse(code, pluginType)
 			if err != nil {
-				return "", err
+				return "", "", err
 			}
-			params, err := yakgrpc.GenerateParameterFromProgram(prog)
+			params, envKey, err := yakgrpc.GenerateParameterFromProgram(prog)
 			if err != nil {
-				return "", utils.Wrapf(err, "generate param for %s failed", name)
+				return "", "", utils.Wrapf(err, "generate param for %s failed", name)
 			}
-			return params, nil
+			return params, envKey, nil
 		}
-		return "", nil
+		return "", "", nil
 	}
 	pluginHash := func(code string, headImg string, tags string) string {
 		return utils.CalcSha1(string(code), headImg, tags)
@@ -289,7 +288,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		// 添加核心插件字段
 		scriptData.IsCorePlugin = true
 		// 生成参数
-		scriptData.Params, err = generateParam(code, scriptData.Type)
+		scriptData.Params, scriptData.PluginEnvKey, err = generateParam(code, scriptData.Type)
 		if err != nil {
 			log.Error(err)
 		}
@@ -305,7 +304,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		return
 	} else {
 		// 生成参数
-		scriptData.Params, err = generateParam(string(codeBytes), scriptData.Type)
+		scriptData.Params, scriptData.PluginEnvKey, err = generateParam(string(codeBytes), scriptData.Type)
 		if err != nil {
 			log.Error(err)
 		}
