@@ -3,10 +3,9 @@ package ssadb
 import (
 	"context"
 	"encoding/json"
-
 	"github.com/davecgh/go-spew/spew"
-
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -135,12 +134,13 @@ func (r *IrCode) IsEmptySourceCodeHash() bool {
 	if r.SourceCodeHash == "" {
 		return true
 	}
-	for _, hash := range []func(...any) string{
-		utils.CalcMd5,
-		utils.CalcSha1,
-		utils.CalcSha256,
+	for _, hash := range []func(any) string{
+		codec.Md5,
+		codec.Sha1,
+		codec.Sha256,
 	} {
-		if r.SourceCodeHash == hash("") {
+		hashx := hash("")
+		if r.SourceCodeHash == hashx {
 			return true
 		}
 	}
