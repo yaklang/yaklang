@@ -69,6 +69,9 @@ func (r *SyntaxFlowResult) GetAllVariable() *orderedmap.OrderedMap {
 func (r *SyntaxFlowResult) GetAllValuesChain() Values {
 	var results Values
 	m := r.GetAllVariable()
+	if m == nil {
+		return nil
+	}
 	m.ForEach(func(name string, value any) {
 		vs := r.GetValues(name)
 		results = append(results, vs...)

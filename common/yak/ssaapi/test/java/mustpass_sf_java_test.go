@@ -10,8 +10,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/google/uuid"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -95,8 +93,6 @@ func TestCheckRuleOnlyDatabase(t *testing.T) {
 }
 
 func Check(t *testing.T, progs []*ssaapi.Program, include ...string) {
-	vs := sfvm.NewValues(lo.Map(progs, func(v *ssaapi.Program, _ int) sfvm.ValueOperator { return v }))
-	vm := sfvm.NewSyntaxFlowVirtualMachine(sfvm.WithEnableDebug(true), sfvm.WithFailFast())
 	entry, err := sf_rules.ReadDir("mustpass")
 	if err != nil {
 		t.Fatalf("no embed syntax files found: %v", err)
@@ -106,21 +102,22 @@ func Check(t *testing.T, progs []*ssaapi.Program, include ...string) {
 			continue
 		}
 		rulePath := path.Join("mustpass", f.Name())
-		raw, err := sf_rules.ReadFile(rulePath)
+		rule, err := sf_rules.ReadFile(rulePath)
 		if err != nil {
 			t.Fatalf("cannot found syntax fs: %v", rulePath)
 		}
 		if len(include) != 0 && !slices.Contains(include, f.Name()) {
 			continue
 		}
-		frame, err := vm.Compile(string(raw))
-		if err != nil {
-			t.Fatalf("syntaxFlow compile error: %s", rulePath)
-		}
 		t.Log("compile success: ", rulePath)
 
 		t.Run(f.Name(), func(t *testing.T) {
-			res, err := frame.Feed(vs)
+			res, err := ssaapi.QuerySyntaxflow(
+				ssaapi.QueryWithPrograms(progs),
+				ssaapi.QueryWithRuleContent(string(rule)),
+				ssaapi.QueryWithEnableDebug(),
+				ssaapi.QueryWithFailFast(),
+			)
 			if err != nil {
 				t.Fatalf("feed error: %v", err)
 			}

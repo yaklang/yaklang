@@ -295,7 +295,7 @@ func CheckSyntaxFlowWithFS(t *testing.T, fs fi.FileSystem, sf string, wants map[
 		for _, program := range p {
 			program.Show()
 		}
-		results, err := p.SyntaxFlowWithError(sf, sfvm.WithEnableDebug())
+		results, err := p.SyntaxFlowWithError(sf, ssaapi.QueryWithEnableDebug())
 		assert.Nil(t, err)
 		assert.NotNil(t, results)
 		CompareResult(t, contain, results, wants)
@@ -311,14 +311,14 @@ func CheckSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants
 	checkSyntaxFlowEx(t, code, sf, contain, wants, opt, nil)
 }
 
-func CheckSyntaxFlowWithSFOption(t *testing.T, code string, sf string, wants map[string][]string, opt ...sfvm.Option) {
+func CheckSyntaxFlowWithSFOption(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.QueryOption) {
 	checkSyntaxFlowEx(t, code, sf, false, wants, nil, opt)
 }
 
-func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaapi.Option, sfOpt []sfvm.Option) {
+func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaapi.Option, sfOpt []ssaapi.QueryOption) {
 	Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
-		sfOpt = append(sfOpt, sfvm.WithEnableDebug(true))
+		sfOpt = append(sfOpt, ssaapi.QueryWithEnableDebug(true))
 		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
 		assert.Nil(t, err)
 		assert.NotNil(t, results)
@@ -610,14 +610,14 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 	if vfs != nil && l != "" {
 		log.Infof("safe filesystem start")
 		CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-			result, err := programs.SyntaxFlowWithError(rule.Content, sfvm.WithEnableDebug())
+			result, err := programs.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithEnableDebug())
 			if err != nil {
 				return utils.Errorf("syntax flow content failed: %v", err)
 			}
 			if err := check(result); err != nil {
 				return utils.Errorf("check content failed: %v", err)
 			}
-			result2, err := programs.SyntaxFlowRule(rule, sfvm.WithEnableDebug())
+			result2, err := programs.SyntaxFlowRule(rule, ssaapi.QueryWithEnableDebug())
 			if err != nil {
 				return utils.Errorf("syntax flow rule failed: %v", err)
 			}
@@ -643,7 +643,7 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 
 	var errs error
 	CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-		result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug(false))
+		result, err := programs.SyntaxFlowWithError(i, ssaapi.QueryWithEnableDebug(false))
 		if err != nil {
 			errs = utils.JoinErrors(errs, err)
 			return err
@@ -660,7 +660,7 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 	l, vfs, _ = frame.ExtractNegativeFilesystemAndLanguage()
 	if vfs != nil && l != "" {
 		CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-			result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug(false))
+			result, err := programs.SyntaxFlowWithError(i, ssaapi.QueryWithEnableDebug(false))
 			if err != nil {
 				if errors.Is(err, sfvm.CriticalError) {
 					errs = utils.JoinErrors(errs, err)

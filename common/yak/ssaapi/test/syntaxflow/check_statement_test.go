@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -22,7 +21,7 @@ func TestCheckStatement(t *testing.T) {
 				data, err := prog.SyntaxFlowWithError(`
 				f( * as $i )
 				check $i then fine else fail
-				`, sfvm.WithEnableDebug())
+				`, ssaapi.QueryWithEnableDebug())
 				assert.Nil(t, err)
 				log.Infof("data: %v", data)
 				return nil
@@ -41,7 +40,7 @@ func TestCheckStatement(t *testing.T) {
 				bbbb( * as $i )
 				check $i then fine else fail
 				f( * as $b)
-				`, sfvm.WithEnableDebug())
+				`, ssaapi.QueryWithEnableDebug())
 				assert.NotNil(t, data.GetErrors())
 				log.Infof("err: %v", err)
 				log.Infof("data: %v", data)
@@ -64,7 +63,7 @@ func TestCheckStatement(t *testing.T) {
 				check $i then fine else fail
 				f(* as $b)
 				`,
-					sfvm.WithEnableDebug(), sfvm.WithFailFast())
+					ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithFailFast())
 				assert.NotNil(t, err)
 				log.Infof("err: %v", err)
 				log.Infof("data: %v", data)

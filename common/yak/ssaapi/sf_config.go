@@ -4,7 +4,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 type RecursiveConfig struct {
@@ -104,24 +103,23 @@ func (r *RecursiveConfig) compileAndRun(value sf.ValueOperator) map[sf.Recursive
 		if !item.SyntaxFlowRule {
 			continue
 		}
-		// TODO: save frame in config
-		frame, err := r.vm.Compile(item.Value)
+		res, err := QuerySyntaxflow(
+			QueryWithVM(r.vm),
+			QueryWithInitVar(r.contextResult.SymbolTable),
+			QueryWithValue(value),
+			QueryWithRuleContent(item.Value),
+		)
+		sfres := res.GetSFResult()
 		if err != nil {
-			log.Errorf("syntaxflow rule compile fail: %v", utils.Errorf("SyntaxFlow compile %#v failed: %v", item.Value, err))
+			log.Errorf("syntaxflow rule exec fail: %v", err)
 			continue
 		}
-		frame.WithContext(r.contextResult)
-		res, err := frame.Feed(value)
-		if err != nil {
-			log.Errorf("frame exec opcode fail: %s", err)
-			continue
-		}
-		s := CreateResultFromQuery(res)
+		s := CreateResultFromQuery(sfres)
 		if isMatch(s) {
 			ret[sf.RecursiveConfigKey(item.Key)] = struct{}{}
 		}
-		clearSymbolTable(res)
-		r.contextResult.MergeByResult(res)
+		clearSymbolTable(sfres)
+		r.contextResult.MergeByResult(sfres)
 	}
 	return ret
 }

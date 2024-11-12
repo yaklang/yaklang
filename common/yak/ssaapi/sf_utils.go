@@ -86,32 +86,6 @@ func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.
 
 	return newValue
 }
-func WithSyntaxFlowResult(expected string, handler func(*Value) error) sfvm.Option {
-	return sfvm.WithResultCaptured(func(name string, results sfvm.ValueOperator) error {
-		if name != expected {
-			return nil
-		}
-		return results.Recursive(func(operator sfvm.ValueOperator) error {
-			result, ok := operator.(*Value)
-			if !ok {
-				return nil
-			}
-			err := handler(result)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-	})
-}
-
-func WithSyntaxFlowStrictMatch(stricts ...bool) sfvm.Option {
-	strict := true
-	if len(stricts) > 0 {
-		strict = stricts[0]
-	}
-	return sfvm.WithStrictMatch(strict)
-}
 
 func SyntaxFlowVariableToValues(v sfvm.ValueOperator) Values {
 	var vals Values

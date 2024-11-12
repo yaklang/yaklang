@@ -1,13 +1,13 @@
 package java
 
 import (
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -224,7 +224,7 @@ class A {
 }
 `, func(prog *ssaapi.Program) error {
 		prog.Show()
-		callA := prog.SyntaxFlow(`p.CallA(* as $param,)`, sfvm.WithEnableDebug(true)).GetValues("param")
+		callA := prog.SyntaxFlow(`p.CallA(* as $param,)`, ssaapi.QueryWithEnableDebug(true)).GetValues("param")
 		callA.Show()
 		assert.Contains(t, callA.String(), "add(Parameter-p, 2)")
 		callB := prog.SyntaxFlow(`p.CallB(* as $param,)`).GetValues("param")

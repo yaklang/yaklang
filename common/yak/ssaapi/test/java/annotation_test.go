@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -16,7 +15,7 @@ var AnnotationBasic string
 
 func TestAnnotation_Negative(t *testing.T) {
 	ssatest.Check(t, AnnotationBasic, func(prog *ssaapi.Program) error {
-		if result := prog.SyntaxFlowChain("xmlStr --> as $ret", sf.WithEnableDebug(true)).Show(); result.Len() <= 0 {
+		if result := prog.SyntaxFlowChain("xmlStr --> as $ret", ssaapi.QueryWithEnableDebug(true)).Show(); result.Len() <= 0 {
 			t.Fatal("xmlStr --> $ret not found")
 		}
 		return nil
@@ -25,7 +24,7 @@ func TestAnnotation_Negative(t *testing.T) {
 
 func TestAnnotation_Positive_Basic1(t *testing.T) {
 	ssatest.CheckWithName("annotation-basic-1", t, AnnotationBasic, func(prog *ssaapi.Program) error {
-		if prog.SyntaxFlowChain("Request*.__ref__ --> as $ret", sf.WithEnableDebug(true)).Show().Len() <= 0 {
+		if prog.SyntaxFlowChain("Request*.__ref__ --> as $ret", ssaapi.QueryWithEnableDebug(true)).Show().Len() <= 0 {
 			t.Fatal("Request*.__ref__ --> $ret not found")
 		}
 		return nil
@@ -37,7 +36,7 @@ var FormalParamAnnotationBasic string
 
 func TestAnnotation_Postive_FormalParam(t *testing.T) {
 	ssatest.CheckWithName("annotation-basic-2", t, FormalParamAnnotationBasic, func(prog *ssaapi.Program) error {
-		if prog.SyntaxFlowChain("*Param.__ref__ --> as $ret", sf.WithEnableDebug(true)).Show().Len() <= 0 {
+		if prog.SyntaxFlowChain("*Param.__ref__ --> as $ret", ssaapi.QueryWithEnableDebug(true)).Show().Len() <= 0 {
 			t.Fatal("*Param.__ref__ --> $ret not found")
 		}
 		return nil
@@ -46,7 +45,7 @@ func TestAnnotation_Postive_FormalParam(t *testing.T) {
 
 func TestAnnotation_Postive_FormalParam_2(t *testing.T) {
 	ssatest.CheckWithName("annotation-basic-3", t, AnnotationBasic, func(prog *ssaapi.Program) error {
-		if prog.SyntaxFlowChain("*Param.__ref__ --> as $ret", sf.WithEnableDebug(true)).Show().Len() <= 0 {
+		if prog.SyntaxFlowChain("*Param.__ref__ --> as $ret", ssaapi.QueryWithEnableDebug(true)).Show().Len() <= 0 {
 			t.Fatal("*Param.__ref__ --> $ret not found")
 		}
 		return nil
@@ -65,28 +64,28 @@ public class DemoABCEntryClass {
 }
 `, func(prog *ssaapi.Program) error {
 		t.Log("checking xmlStr?{opcode: param}.annotation.*Param.value as $ref")
-		assert.Greater(t, prog.SyntaxFlowChain("xmlStr?{opcode: param}.annotation.*Param.value as $ref", sf.WithEnableDebug(false)).Show().Len(), 0)
+		assert.Greater(t, prog.SyntaxFlowChain("xmlStr?{opcode: param}.annotation.*Param.value as $ref", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 0)
 
 		t.Log("checking .annotation.*Param.value as $ref")
-		assert.Greater(t, prog.SyntaxFlowChain(".annotation.*Param.value as $ref", sf.WithEnableDebug(false)).Show().Len(), 0)
+		assert.Greater(t, prog.SyntaxFlowChain(".annotation.*Param.value as $ref", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 0)
 
 		t.Log("checking *Param.value as $ref")
-		assert.Greater(t, prog.SyntaxFlowChain("*Param.value as $ref", sf.WithEnableDebug(false)).Show().Len(), 0)
+		assert.Greater(t, prog.SyntaxFlowChain("*Param.value as $ref", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 0)
 
 		t.Log("checking *Param.__ref__?{const} as $ref")
-		assert.Equal(t, prog.SyntaxFlowChain("*Param.__ref__?{opcode: const} as $ref", sf.WithEnableDebug(false)).Show().Len(), 0)
+		assert.Equal(t, prog.SyntaxFlowChain("*Param.__ref__?{opcode: const} as $ref", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 0)
 
 		t.Log("checking *Param.__ref__?{opcode: param} as $ref")
-		assert.Equal(t, prog.SyntaxFlowChain("*Param.__ref__?{opcode: param} as $ref", sf.WithEnableDebug(false)).Show().Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain("*Param.__ref__?{opcode: param} as $ref", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 
 		t.Log("checking *Param.__ref__?{opcode: param && .annotation} as $ref")
-		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{opcode: param && .annotation} as $ref )", sf.WithEnableDebug(false)).Show().Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{opcode: param && .annotation} as $ref )", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 
 		t.Log("checking *Param.__ref__?{opcode: param && !have: this} as $ref")
-		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{opcode: param && !have: this} as $ref )", sf.WithEnableDebug(false)).Show().Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{opcode: param && !have: this} as $ref )", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 
 		t.Log("checking *Param.__ref__?{have: this} as $ref")
-		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{have: this} as $ref )", sf.WithEnableDebug(false)).Show().Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{have: this} as $ref )", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
@@ -174,15 +173,15 @@ public class DemoABCEntryClass {
 }
 `, func(prog *ssaapi.Program) error {
 		prog.Show()
-		assert.Equal(t, prog.SyntaxFlowChain("Controller.__ref__ as $ref ", sf.WithEnableDebug(false)).Show(false).Len(), 1)
-		assert.Equal(t, prog.SyntaxFlowChain("ResponseBody.__ref__ as $ref ", sf.WithEnableDebug(false)).Show(false).Len(), 1)
-		assert.Equal(t, prog.SyntaxFlowChain(".annotation.Controller.value?{have:'aa'} as $ref ", sf.WithEnableDebug(false)).Show(false).Len(), 1)
-		assert.Equal(t, prog.SyntaxFlowChain(".annotation.ResponseBody.value?{have:'bb'} as $ref ", sf.WithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain("Controller.__ref__ as $ref ", ssaapi.QueryWithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain("ResponseBody.__ref__ as $ref ", ssaapi.QueryWithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(".annotation.Controller.value?{have:'aa'} as $ref ", ssaapi.QueryWithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(".annotation.ResponseBody.value?{have:'bb'} as $ref ", ssaapi.QueryWithEnableDebug(false)).Show(false).Len(), 1)
 
-		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__ as $ref", sf.WithEnableDebug(false)).Show(false).Len(), 1)
-		assert.Equal(t, prog.SyntaxFlowChain("ResponseStatus.__ref__ as $ref", sf.WithEnableDebug(false)).Show(false).Len(), 1)
-		assert.Equal(t, prog.SyntaxFlowChain(".annotation.*Mapping.value?{have:'/'} as $ref", sf.WithEnableDebug(false)).Show(false).Len(), 1)
-		assert.Equal(t, prog.SyntaxFlowChain(".annotation.ResponseStatus.value?{have:'200'} as $ref ", sf.WithEnableDebug(false)).Show().Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__ as $ref", ssaapi.QueryWithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain("ResponseStatus.__ref__ as $ref", ssaapi.QueryWithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(".annotation.*Mapping.value?{have:'/'} as $ref", ssaapi.QueryWithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(".annotation.ResponseStatus.value?{have:'200'} as $ref ", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }

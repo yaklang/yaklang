@@ -1,125 +1,307 @@
 package ssaapi
 
 import (
+	"context"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func (p *Program) SyntaxFlow(i string, opts ...sfvm.Option) *SyntaxFlowResult {
-	res, err := p.SyntaxFlowWithError(i, opts...)
+type queryConfig struct {
+	// input
+	program *Program
+	value   sfvm.ValueOperator // use this
+	//  rule
+	ruleContent string
+	ruleName    string
+	rule        *schema.SyntaxFlowRule // use this
+
+	// runtime
+	vm *sfvm.SyntaxFlowVirtualMachine
+
+	// runtime config
+	opts []sfvm.Option // config
+	// config       *sfvm.Config
+	// parentResult *sfvm.SFFrameResult
+
+	// save
+	save   bool
+	taskID string
+
+	// control
+	ctx context.Context
+
+	// process
+	processCallback func(float64, string)
+}
+
+func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
+	// get vm
+	vm := config.vm
+	if vm == nil {
+		vm = sfvm.NewSyntaxFlowVirtualMachine()
+	}
+
+	// use rule compiled
+	if config.rule != nil {
+		frame, err := vm.Load(config.rule)
+		if err != nil {
+			return nil, utils.Errorf("SyntaxflowQuery: load rule %s error: %v", config.rule.RuleName, err)
+		}
+		return frame, nil
+	}
+
+	// use rule content
+	if config.ruleContent != "" {
+		// compile rule
+		frame, err := vm.Compile(config.ruleContent)
+		if err != nil {
+			return nil, utils.Errorf("SyntaxflowQuery: compile rule error: %v", err)
+		}
+		return frame, nil
+	}
+
+	// use rule name
+	if config.ruleName != "" {
+		rule, err := sfdb.GetRule(config.ruleName)
+		if err != nil {
+			return nil, utils.Errorf("SyntaxflowQuery: load rule %s from db error: %v", config.ruleName, err)
+		}
+		frame, err := vm.Load(rule)
+		if err != nil {
+			return nil, utils.Errorf("SyntaxflowQuery: load rule %s to sfvm error: %v", config.ruleName, err)
+		}
+		return frame, nil
+	}
+
+	// no rule
+	return nil, utils.Errorf("SyntaxflowQuery: rule is nil")
+}
+func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
+	config := &queryConfig{}
+	for _, o := range opt {
+		o(config)
+	}
+	// handler input  value
+	value := config.value
+	if utils.IsNil(value) {
+		return nil, utils.Errorf("SyntaxflowQuery: value is nil")
+	}
+
+	// get runtime frame
+	frame, err := config.GetFrame()
 	if err != nil {
-		log.Warnf("exec syntaxflow: %#v failed: %v", i, err)
+		return nil, err
+	}
+
+	// runtime
+	res, err := frame.Feed(value, config.opts...)
+	if err != nil {
+		return nil, utils.Errorf("SyntaxflowQuery: feed failed: %v", err)
+	}
+	ret := CreateResultFromQuery(res)
+
+	if config.program != nil {
+		ret.program = config.program
+		//TODO:  now we not save result without program
+		// save ret
+		if config.save {
+			resultID, err := ret.Save(config.taskID)
+			_ = resultID
+			if err != nil {
+				return ret, utils.Errorf("SyntaxflowQuery: save failed: %v", err)
+			}
+		}
+	}
+
+	return ret, nil
+}
+
+type QueryOption func(*queryConfig)
+
+func QueryWithProgram(program *Program) QueryOption {
+	return func(c *queryConfig) {
+		c.program = program
+		c.value = program
+	}
+}
+
+func QueryWithPrograms(programs Programs) QueryOption {
+	return func(c *queryConfig) {
+		c.value = sfvm.NewValues(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator { return p }))
+	}
+}
+
+func QueryWithValue(value sfvm.ValueOperator) QueryOption {
+	return func(c *queryConfig) {
+		c.value = value
+	}
+}
+
+func QueryWithRule(rule *schema.SyntaxFlowRule) QueryOption {
+	return func(c *queryConfig) {
+		c.rule = rule
+	}
+}
+
+func QueryWithRuleContent(rule string) QueryOption {
+	return func(c *queryConfig) {
+		c.ruleContent = rule
+	}
+}
+
+func QueryWithVM(vm *sfvm.SyntaxFlowVirtualMachine) QueryOption {
+	return func(c *queryConfig) {
+		c.vm = vm
+	}
+}
+
+func QueryWithSave() QueryOption {
+	return func(c *queryConfig) {
+		c.save = true
+	}
+}
+
+func QueryWithTaskID(taskID string) QueryOption {
+	return func(c *queryConfig) {
+		c.taskID = taskID
+	}
+}
+
+func QueryWithRuleName(names string) QueryOption {
+	return func(c *queryConfig) {
+		c.ruleName = names
+	}
+}
+
+func QueryWithSFConfig(config *sfvm.Config) QueryOption {
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithConfig(config))
+	}
+}
+func QueryWithInitVar(result *omap.OrderedMap[string, sfvm.ValueOperator]) QueryOption {
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithInitialContextVars(result))
+	}
+}
+
+func QueryWithContext(ctx context.Context) QueryOption {
+	return func(c *queryConfig) {
+		c.ctx = ctx
+		c.opts = append(c.opts, sfvm.WithContext(ctx))
+	}
+}
+
+func QueryWithProcessCallback(cb func(float64, string)) QueryOption {
+	return func(c *queryConfig) {
+		c.processCallback = cb
+	}
+}
+
+func QueryWithInitialContextVars(o *omap.OrderedMap[string, sfvm.ValueOperator]) QueryOption {
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithInitialContextVars(o))
+	}
+}
+
+func QueryWithFailFast(b ...bool) QueryOption {
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithFailFast(b...))
+	}
+}
+
+func QueryWithEnableDebug(b ...bool) QueryOption {
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithEnableDebug(b...))
+	}
+}
+
+func QueryWithStrictMatch(b ...bool) QueryOption {
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithStrictMatch(b...))
+	}
+}
+
+func QueryWithResultCaptured(capture sfvm.ResultCapturedCallback) QueryOption {
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithResultCaptured(capture))
+	}
+}
+func QueryWithSyntaxFlowResult(expected string, handler func(*Value) error) QueryOption {
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithResultCaptured(func(name string, results sfvm.ValueOperator) error {
+			if name != expected {
+				return nil
+			}
+			return results.Recursive(func(operator sfvm.ValueOperator) error {
+				result, ok := operator.(*Value)
+				if !ok {
+					return nil
+				}
+				err := handler(result)
+				if err != nil {
+					return err
+				}
+				return nil
+			})
+		}))
+	}
+}
+
+func (p *Program) SyntaxFlowChain(i string, opts ...QueryOption) Values {
+	res := p.SyntaxFlow(i, opts...)
+	return res.GetAllValuesChain()
+
+}
+func (p *Program) SyntaxFlow(rule string, opts ...QueryOption) *SyntaxFlowResult {
+	res, err := p.SyntaxFlowWithError(rule, opts...)
+	if err != nil {
+		log.Errorf("SyntaxFlow: %v", err)
+		return nil
 	}
 	return res
 }
-
-func (p *Program) SyntaxFlowChain(i string, opts ...sfvm.Option) Values {
-	var results Values
-	res, err := p.SyntaxFlowWithError(i, opts...)
-	if err != nil {
-		log.Warnf("syntax_flow_chain_failed: %s", err)
-	}
-	if res == nil {
-		return results
-	}
-	return res.GetAllValuesChain()
+func (p *Program) SyntaxFlowWithError(rule string, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	opts = append(opts, QueryWithProgram(p), QueryWithRuleContent(rule))
+	return QuerySyntaxflow(opts...)
 }
 
-func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	return SyntaxFlowWithError(p, i, opts...)
-}
-
-func (ps Programs) SyntaxFlowWithError(i string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	return SyntaxFlowWithError(
-		sfvm.NewValues(lo.Map(ps, func(p *Program, _ int) sfvm.ValueOperator { return p })),
-		i, opts...,
-	)
-}
-
-func SyntaxFlowWithError(p sfvm.ValueOperator, sfCode string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	if utils.IsNil(p) {
-		return nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
-	}
-	vm := sfvm.NewSyntaxFlowVirtualMachine(opts...)
-	frame, err := vm.Compile(sfCode)
-	if err != nil {
-		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", sfCode, err)
-	}
-	res, err := frame.Feed(p)
-	ret := CreateResultFromQuery(res)
-	if prog, ok := p.(*Program); ok {
-		ret.program = prog
-	}
-	return ret, err
+func (ps Programs) SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	opts = append(opts, QueryWithPrograms(ps), QueryWithRuleContent(i))
+	return QuerySyntaxflow(opts...)
 }
 
 func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config) (*SyntaxFlowResult, error) {
-	if utils.IsNil(p) {
-		return nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
+	opts := []QueryOption{
+		QueryWithValue(p),
+		QueryWithRuleContent(sfCode),
+		QueryWithSFConfig(sfConfig),
+		QueryWithInitVar(sfResult.SymbolTable),
 	}
-	vm := sfvm.NewSyntaxFlowVirtualMachine()
-	vm.SetConfig(sfConfig)
-	frame, err := vm.Compile(sfCode)
-	if err != nil {
-		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", sfCode, err)
-	}
-	//暂时未启用，后续如果config需要使用外部变量可以启用 context
-	frame.WithContext(sfResult)
-	res, err := frame.Feed(p)
-	ret := CreateResultFromQuery(res)
-	if prog, ok := p.(*Program); ok {
-		ret.program = prog
-	}
-	return ret, err
+	return QuerySyntaxflow(opts...)
 }
 
-func (p *Program) SyntaxFlowRuleName(ruleName string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	rule, err := sfdb.GetRule(ruleName)
-	if err != nil {
-		return nil, err
-	}
-	return SyntaxFlowRule(p, rule, opts...)
+func (p *Program) SyntaxFlowRuleName(ruleName string, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	opts = append(opts, QueryWithProgram(p), QueryWithRuleName(ruleName))
+	return QuerySyntaxflow(opts...)
 }
 
-func (ps Programs) SyntaxFlowRuleName(ruleName string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	rule, err := sfdb.GetRule(ruleName)
-	if err != nil {
-		return nil, err
-	}
-	return SyntaxFlowRule(
-		sfvm.NewValues(lo.Map(ps, func(p *Program, _ int) sfvm.ValueOperator { return p })),
-		rule, opts...,
-	)
+func (ps Programs) SyntaxFlowRuleName(ruleName string, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	opts = append(opts, QueryWithPrograms(ps), QueryWithRuleName(ruleName))
+	return QuerySyntaxflow(opts...)
 }
 
-func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	return SyntaxFlowRule(p, rule, opts...)
+func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	opts = append(opts, QueryWithProgram(p), QueryWithRule(rule))
+	return QuerySyntaxflow(opts...)
 }
 
-func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	return SyntaxFlowRule(
-		sfvm.NewValues(lo.Map(ps, func(p *Program, _ int) sfvm.ValueOperator { return p })),
-		rule, opts...,
-	)
-}
-
-func SyntaxFlowRule(p sfvm.ValueOperator, rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	if utils.IsNil(p) {
-		return nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
-	}
-	vm := sfvm.NewSyntaxFlowVirtualMachine(opts...)
-	frame, err := vm.Load(rule)
-	if err != nil {
-		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", rule.OpCodes, err)
-	}
-	feed, err := frame.Feed(p)
-	ret := CreateResultFromQuery(feed)
-	if prog, ok := p.(*Program); ok {
-		ret.program = prog
-	}
-	return ret, err
+func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	opts = append(opts, QueryWithPrograms(ps), QueryWithRule(rule))
+	return QuerySyntaxflow(opts...)
 }
