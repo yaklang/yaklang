@@ -270,6 +270,7 @@ if err != nil {
 
 manager.SetConcurrent(20)
 manager.SetDividedContext(true)
+manager.SetCallPluginTimeout(30)
 
 loadPluginFailed = 0
 loadPluginFinished = 0

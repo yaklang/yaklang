@@ -248,6 +248,7 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 
 				done := make(chan error, 1)
 				go func() {
+					defer close(done)
 					_, err = nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
 					done <- err
 				}()
@@ -258,7 +259,7 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 						log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
 					}
 				case <-subCtx.Done():
-					log.Errorf("call YakFunction timeout after %v seconds", y.callTimeout)
+					log.Errorf("call %s YakFunction timeout after %v seconds",scriptName, y.callTimeout)
 					return
 				}
 			},
