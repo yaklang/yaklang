@@ -11,6 +11,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
+type JavaSwitchLabel string
+
+const (
+	CASE    JavaSwitchLabel = "case"
+	DEFAULT                 = "default"
+)
+
 func (y *builder) VisitBlock(raw javaparser.IBlockContext, syntaxBlocks ...bool) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
@@ -975,49 +982,8 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		}
 
 		return nil
-	case *javaparser.SwitchStatementContext:
-		// 处理 switch 语句
-		SwitchBuilder := y.BuildSwitch()
-		SwitchBuilder.AutoBreak = false
-		// 设置switch的参数
-		var cond ssa.Value
-		parExpr := ret.ParExpression().(*javaparser.ParExpressionContext)
-		if expr := parExpr.Expression(); expr != nil {
-			SwitchBuilder.BuildCondition(func() ssa.Value {
-				cond = y.VisitExpression(expr)
-				return cond
-			})
-		} else {
-			// expression is nil
-			recoverRange := y.SetRangeFromTerminalNode(ret.SWITCH())
-			y.NewError(ssa.Warn, "javaast", "switch expression is nil")
-			recoverRange()
-		}
-		// 设置case数目
-		allcase := ret.AllCASE()
-		SwitchBuilder.BuildCaseSize(len(allcase))
-		// 设置case参数
-		SwitchBuilder.SetCase(func(i int) []ssa.Value {
-			if exprList := ret.ExpressionList(i); exprList != nil {
-				return y.VisitExpressionList(exprList)
-			}
-			return nil
-		})
-		// 设置case执行体
-		SwitchBuilder.BuildBody(func(i int) {
-			if stmtList := ret.StatementList(i); stmtList != nil {
-				y.VisitStatementList(stmtList)
-			}
-		})
-		//设置defalut
-		if ret.DEFAULT() != nil {
-			if stmtlist := ret.StatementList(len(allcase)); stmtlist != nil {
-				SwitchBuilder.BuildDefault(func() {
-					y.VisitStatementList(stmtlist)
-				})
-			}
-		}
-		SwitchBuilder.Finish()
+	case *javaparser.PureSwitchStatementContext:
+		y.VisitSwitchStatement(ret.SwitchStatement())
 	case *javaparser.SynchronizedStatementContext:
 		// 处理 synchronized 语句
 		return nil
@@ -1991,4 +1957,107 @@ func (y *builder) VisitResource(raw javaparser.IResourceContext) ssa.Value {
 	}
 	y.AssignVariable(variable, value)
 	return value
+}
+
+func (y *builder) VisitSwitchStatement(raw javaparser.ISwitchStatementContext) {
+	if y == nil || raw == nil || y.IsStop() {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*javaparser.SwitchStatementContext)
+	if i == nil {
+		return
+	}
+
+	SwitchBuilder := y.BuildSwitch()
+	SwitchBuilder.AutoBreak = false
+	var cond ssa.Value
+	parExpr := i.ParExpression().(*javaparser.ParExpressionContext)
+	if expr := parExpr.Expression(); expr != nil {
+		SwitchBuilder.BuildCondition(func() ssa.Value {
+			cond = y.VisitExpression(expr)
+			return cond
+		})
+	} else {
+		recoverRange := y.SetRangeFromTerminalNode(i.SWITCH())
+		y.NewError(ssa.Warn, "javaast", "switch expression is nil")
+		recoverRange()
+	}
+
+	var defaultStatement func()
+	caseLen := 0
+	caseValueMap := make(map[int]ssa.Values)
+	caseStatementMap := make(map[int]func())
+
+	for _, s := range i.AllSwitchBlockStatementGroup() {
+		labelType, labelValues, visitStatement := y.VisitSwitchBlockStatementGroup(s)
+		if labelType == CASE {
+			caseValueMap[caseLen] = labelValues
+			caseStatementMap[caseLen] = visitStatement
+			caseLen++
+		}
+		if labelType == DEFAULT {
+			defaultStatement = visitStatement
+		}
+	}
+	SwitchBuilder.BuildCaseSize(caseLen)
+	SwitchBuilder.SetCase(func(i int) []ssa.Value {
+		if v, ok := caseValueMap[i]; ok {
+			return v
+		}
+		return nil
+	})
+	SwitchBuilder.BuildBody(func(i int) {
+		if f, ok := caseStatementMap[i]; ok {
+			f()
+		}
+	})
+	if defaultStatement != nil {
+		SwitchBuilder.BuildDefault(defaultStatement)
+	}
+	SwitchBuilder.Finish()
+}
+
+func (y *builder) VisitSwitchBlockStatementGroup(raw javaparser.ISwitchBlockStatementGroupContext) (labelType JavaSwitchLabel, labelValues ssa.Values, visitStatement func()) {
+	if y == nil || raw == nil || y.IsStop() {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.SwitchBlockStatementGroupContext)
+	if i == nil {
+		return
+	}
+	if ret := i.SwitchLabel(); ret != nil {
+		labelType, labelValues = y.VisitSwitchLabel(ret)
+	}
+	visitStatement = func() {
+		if ret := i.StatementList(); ret != nil {
+			y.VisitStatementList(ret)
+		}
+	}
+	return
+}
+
+func (y *builder) VisitSwitchLabel(raw javaparser.ISwitchLabelContext) (JavaSwitchLabel, ssa.Values) {
+	if y == nil || raw == nil || y.IsStop() {
+		return "", nil
+	}
+
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*javaparser.SwitchLabelContext)
+	if i == nil {
+		return "", nil
+	}
+	if i.CASE() != nil {
+		return CASE, y.VisitExpressionList(i.ExpressionList())
+	}
+	if i.DEFAULT() != nil {
+		return DEFAULT, y.VisitExpressionList(i.ExpressionList())
+	}
+	return "", nil
 }

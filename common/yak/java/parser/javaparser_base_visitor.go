@@ -407,7 +407,7 @@ func (v *BaseJavaParserVisitor) VisitTryWithResourcesStatement(ctx *TryWithResou
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitSwitchStatement(ctx *SwitchStatementContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitPureSwitchStatement(ctx *PureSwitchStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -452,6 +452,18 @@ func (v *BaseJavaParserVisitor) VisitIdentifierLabelStatement(ctx *IdentifierLab
 }
 
 func (v *BaseJavaParserVisitor) VisitStatementList(ctx *StatementListContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitSwitchStatement(ctx *SwitchStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitSwitchBlockStatementGroup(ctx *SwitchBlockStatementGroupContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitSwitchLabel(ctx *SwitchLabelContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
