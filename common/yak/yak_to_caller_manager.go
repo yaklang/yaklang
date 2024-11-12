@@ -232,24 +232,23 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 		nIns := ins
 		fTable[funcName] = &YakFunctionCaller{
 			Handler: func(callback func(*yakvm.Frame), args ...interface{}) {
-				defer func() {
-					if err := recover(); err != nil {
-						y.Err = utils.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
-						log.Error(y.Err)
-						fmt.Println()
-						if os.Getenv("YAK_IN_TERMINAL_MODE") == "" {
-							utils.PrintCurrentGoroutineRuntimeStack()
-						}
-					}
-				}()
-
 				subCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.callTimeout)
 				defer cancel()
 
 				done := make(chan error, 1)
 				go func() {
-					defer close(done)
-					_, err = nIns.SafeCallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
+					defer func() {
+						if err := recover(); err != nil {
+							y.Err = utils.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
+							log.Error(y.Err)
+							fmt.Println()
+							if os.Getenv("YAK_IN_TERMINAL_MODE") == "" {
+								utils.PrintCurrentGoroutineRuntimeStack()
+							}
+						}
+						close(done)
+					}()
+					_, err = nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
 					done <- err
 				}()
 
