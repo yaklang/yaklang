@@ -68,7 +68,7 @@ func CreateSyntaxFlowTask(taskId string, ctx context.Context) (*SyntaxFlowScanMa
 	m := &SyntaxFlowScanManager{
 		taskID:       taskId,
 		ctx:          rootctx,
-		status:       yakit.SYNTAXFLOWSCAN_EXECUTING,
+		status:       schema.SYNTAXFLOWSCAN_EXECUTING,
 		resumeSignal: sync.NewCond(&sync.Mutex{}),
 		isPaused:     utils.NewAtomicBool(),
 		cancel:       cancel,
@@ -102,17 +102,17 @@ func (m *SyntaxFlowScanManager) Start(startIndex ...int64) error {
 	defer func() {
 		if err := recover(); err != nil {
 			m.taskRecorder.Reason = fmt.Sprintf("%v", err)
-			m.status = yakit.SYNTAXFLOWSCAN_ERROR
+			m.status = schema.SYNTAXFLOWSCAN_ERROR
 			m.notifyStatus()
 			m.SaveTask()
 			return
 		}
-		if m.status == yakit.SYNTAXFLOWSCAN_PAUSED {
+		if m.status == schema.SYNTAXFLOWSCAN_PAUSED {
 			m.notifyStatus()
 			m.SaveTask()
 			return
 		}
-		m.status = yakit.SYNTAXFLOWSCAN_DONE
+		m.status = schema.SYNTAXFLOWSCAN_DONE
 		m.notifyStatus()
 		m.SaveTask()
 	}()
@@ -126,7 +126,7 @@ func (m *SyntaxFlowScanManager) Start(startIndex ...int64) error {
 				return
 			}
 			if rsp.GetControlMode() == "pause" {
-				m.status = yakit.SYNTAXFLOWSCAN_PAUSED
+				m.status = schema.SYNTAXFLOWSCAN_PAUSED
 				m.Pause()
 				m.Stop()
 			}
@@ -173,31 +173,6 @@ func (m *SyntaxFlowScanManager) Start(startIndex ...int64) error {
 	}
 	m.notifyProgress("")
 	return errs
-}
-
-// SaveTask save task info which is from manager to database
-func (m *SyntaxFlowScanManager) SaveTask() {
-	if m.taskRecorder == nil {
-		m.taskRecorder = &schema.SyntaxFlowScanTask{}
-	}
-	m.taskRecorder.Programs = strings.Join(m.programs, ",")
-	m.taskRecorder.TaskId = m.taskID
-	m.taskRecorder.Status = m.status
-	m.taskRecorder.SuccessQuery = m.successQuery
-	m.taskRecorder.FailedQuery = m.failedQuery
-	m.taskRecorder.SkipQuery = m.skipQuery
-	m.taskRecorder.RiskCount = m.riskCount
-	m.taskRecorder.TotalQuery = m.totalQuery
-	marshal, err := json.Marshal(m.ruleFilter)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	m.taskRecorder.RuleFilter = marshal
-	err = yakit.SaveSyntaxFlowScanTask(consts.GetGormProjectDatabase(), m.taskRecorder)
-	if err != nil {
-		log.Error(err)
-	}
 }
 
 func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
@@ -252,7 +227,7 @@ func (m *SyntaxFlowScanManager) notifyProgress(ruleName string) {
 func (m *SyntaxFlowScanManager) notifyStatus() {
 	finishQuery := m.successQuery + m.failedQuery + m.skipQuery
 	if finishQuery == m.totalQuery {
-		m.status = yakit.SYNTAXFLOWSCAN_DONE
+		m.status = schema.SYNTAXFLOWSCAN_DONE
 		m.client.StatusCard("当前执行规则", "已执行完毕", "规则执行进度")
 	}
 	m.client.YakitSetProgress(float64(finishQuery) / float64(m.totalQuery))
@@ -296,15 +271,40 @@ func (m *SyntaxFlowScanManager) IsStop() bool {
 	}
 }
 
+// SaveTask save task info which is from manager to database
+func (m *SyntaxFlowScanManager) SaveTask() {
+	if m.taskRecorder == nil {
+		m.taskRecorder = &schema.SyntaxFlowScanTask{}
+	}
+	m.taskRecorder.Programs = strings.Join(m.programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
+	m.taskRecorder.TaskId = m.taskID
+	m.taskRecorder.Status = m.status
+	m.taskRecorder.SuccessQuery = m.successQuery
+	m.taskRecorder.FailedQuery = m.failedQuery
+	m.taskRecorder.SkipQuery = m.skipQuery
+	m.taskRecorder.RiskCount = m.riskCount
+	m.taskRecorder.TotalQuery = m.totalQuery
+	marshal, err := json.Marshal(m.ruleFilter)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	m.taskRecorder.RuleFilter = marshal
+	err = schema.SaveSyntaxFlowScanTask(consts.GetGormProjectDatabase(), m.taskRecorder)
+	if err != nil {
+		log.Error(err)
+	}
+}
+
 func (m *SyntaxFlowScanManager) ResumeManagerFromTask() error {
-	task, err := yakit.GetSyntaxFlowScanTaskById(consts.GetGormProjectDatabase(), m.TaskId())
+	task, err := schema.GetSyntaxFlowScanTaskById(consts.GetGormProjectDatabase(), m.TaskId())
 	if err != nil {
 		return utils.Wrapf(err, "Resume SyntaxFlow task by is failed")
 	}
 	m.taskRecorder = task
 	m.status = task.Status
 	m.status = task.Status
-	m.programs = strings.Split(task.Programs, ",")
+	m.programs = strings.Split(task.Programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 	m.successQuery = task.SuccessQuery
 	m.failedQuery = task.FailedQuery
 	m.skipQuery = task.SkipQuery

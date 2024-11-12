@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
@@ -54,7 +54,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Task(t *testing.T) {
 	deleteTask := func(taskId string) {
 		err := ssadb.DeleteResultByTaskID(taskId)
 		require.NoError(t, err)
-		err = yakit.DeleteSyntaxFlowScanTask(consts.GetGormProjectDatabase(), taskId)
+		err = schema.DeleteSyntaxFlowScanTask(consts.GetGormProjectDatabase(), taskId)
 		require.NoError(t, err)
 	}
 

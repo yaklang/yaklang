@@ -5,7 +5,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/schema"
 	"testing"
 )
 
@@ -27,7 +27,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Manager(t *testing.T) {
 		task, err := CreateSyntaxFlowTask(taskId, context.Background())
 		require.NoError(t, err)
 		{
-			task.status = yakit.SYNTAXFLOWSCAN_DONE
+			task.status = schema.SYNTAXFLOWSCAN_DONE
 			task.totalQuery = 60
 			task.skipQuery = 11
 			task.failedQuery = 22
@@ -50,7 +50,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Manager(t *testing.T) {
 			require.Equal(t, task.riskCount, newTask.riskCount)
 			require.Equal(t, task.programs, newTask.programs)
 		}
-		err = yakit.DeleteSyntaxFlowScanTask(consts.GetGormProjectDatabase(), taskId)
+		err = schema.DeleteSyntaxFlowScanTask(consts.GetGormProjectDatabase(), taskId)
 		require.NoError(t, err)
 	})
 }
