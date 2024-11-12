@@ -166,6 +166,9 @@ handle = result => {
 
 	caller.HandleServiceScanResult(nil)
 	caller.Wait()
+
+	require.Error(t, caller.LastErr())
+	require.Contains(t, caller.callers.Err.Error(), "aaaaa")
 }
 
 func TestMixCaller_load_Plugin_Timeout_effect_call(t *testing.T) {
