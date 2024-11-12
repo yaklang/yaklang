@@ -2,6 +2,8 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -46,7 +48,7 @@ func DeleteSsaProgram(db *gorm.DB, request *ypb.DeleteSsaProgramRequest) error {
 	}
 	return result.Error
 }
-func QuerySsaProgram(db *gorm.DB, request *ypb.QuerySsaProgramRequest) (*bizhelper.Paginator, []*schema.SSAProgram, error) {
+func QuerySsaProgram(db *gorm.DB, request *ypb.QuerySsaProgramRequest) (*bizhelper.Paginator, []*ypb.SsaProgram, error) {
 	defer func() {
 		if msg := recover(); msg != nil {
 			log.Errorf("query ssa program fail: %s", msg)
@@ -66,7 +68,20 @@ func QuerySsaProgram(db *gorm.DB, request *ypb.QuerySsaProgramRequest) (*bizhelp
 	if dbx.Error != nil {
 		return nil, nil, utils.Errorf("select ssa program fail: %s", dbx.Error)
 	}
-	return paging, programs, nil
+	var programsName []string
+	lo.ForEach(programs, func(item *schema.SSAProgram, index int) {
+		programsName = append(programsName, item.Name)
+	})
+	tmpPrograms := lo.SliceToMap[*schema.SSAProgram, string, *ypb.SsaProgram](programs, func(item *schema.SSAProgram) (string, *ypb.SsaProgram) {
+		return item.Name, item.ToGrpcProgram()
+	})
+	resultsRiskInfo := GetSyntaxFlowResultRiskInfo(consts.GetGormDefaultSSADataBase().Debug(), programsName, int(request.Filter.GetRiskNum()), request.GetFilter().GetRiskType())
+	for _, resultinfo := range resultsRiskInfo {
+		if program, ok := tmpPrograms[resultinfo.ProgramName]; ok {
+			program.RiskNumber += int64(resultinfo.RiskCount)
+		}
+	}
+	return paging, lo.Values(tmpPrograms), nil
 }
 func BuildQuerySsaProgram(db *gorm.DB, request *ypb.QuerySsaProgramRequest) *gorm.DB {
 	if request.Paging == nil {

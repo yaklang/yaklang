@@ -26,7 +26,7 @@ func TestSsaProgramsQuery(t *testing.T) {
 	defer func() {
 		yakit.DeleteSsaProgramWithName(db, name)
 	}()
-	queryCheck := func(programs []*ypb.SsaProgram) {
+	queryCheck := func(t *testing.T, programs []*ypb.SsaProgram) {
 		var flag bool
 		for _, program := range programs {
 			if program.GetName() == name {
@@ -42,7 +42,7 @@ func TestSsaProgramsQuery(t *testing.T) {
 			IsAll: true,
 		})
 		require.NoError(t, err)
-		queryCheck(programs.Programs)
+		queryCheck(t, programs.Programs)
 	})
 	t.Run("query with filter name", func(t *testing.T) {
 		client, err := NewLocalClient(true)
@@ -53,7 +53,7 @@ func TestSsaProgramsQuery(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		queryCheck(programs.Programs)
+		queryCheck(t, programs.Programs)
 	})
 	t.Run("query with filter description", func(t *testing.T) {
 		client, err := NewLocalClient(true)
@@ -62,7 +62,7 @@ func TestSsaProgramsQuery(t *testing.T) {
 			Keyword: "crip",
 		}})
 		require.NoError(t, err)
-		queryCheck(programs.Programs)
+		queryCheck(t, programs.Programs)
 	})
 	t.Run("query with Language", func(t *testing.T) {
 		client, err := NewLocalClient(true)
@@ -76,7 +76,7 @@ func TestSsaProgramsQuery(t *testing.T) {
 		}})
 		require.NoError(t, err2)
 		require.True(t, programs2.Total == 0)
-		queryCheck(programs.Programs)
+		queryCheck(t, programs.Programs)
 	})
 }
 
