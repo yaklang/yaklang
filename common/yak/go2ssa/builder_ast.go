@@ -216,16 +216,18 @@ func (b *astbuilder) buildImportPath(importPath *gol.ImportPathContext) string {
 }
 
 func (b *astbuilder) handleImportPackage() (values []ssa.Value) {
-	for n, ft := range b.importMap {
-		value := b.ReadValue(n)
-		values = append(values, value)
-		typ := value.GetType()
+	for id, ft := range b.importMap {
+		ex := ssa.NewExternLib(id, b.FunctionBuilder, nil)
+		ex.SetExtern(true)
+
+		values = append(values, ex)
+		typ := ex.GetType()
 
 		if b, ok := ssa.ToBasicType(typ); ok {
 			typ = ssa.NewBasicType(b.Kind, b.GetName())
 			typ.SetFullTypeNames([]string{ft.Path})
 		}
-		value.SetType(typ)
+		ex.SetType(typ)
 	}
 
 	return
