@@ -18,7 +18,7 @@ func TestGRPC_PluginEnv(t *testing.T) {
 	t.Run("test set env", func(t *testing.T) {
 		tokenKey := utils.RandStringBytes(10)
 		tokenValue1 := utils.RandStringBytes(10)
-		_, err := client.SetPluginEnv(ctx, &ypb.PluginEnvRequest{Value: tokenValue1, Key: tokenKey})
+		_, err := client.SetPluginEnv(ctx, &ypb.PluginEnvData{Env: []*ypb.KVPair{{Key: tokenKey, Value: tokenValue1}}})
 		require.NoError(t, err)
 		defer yakit.DeletePluginEnvByKey(consts.GetGormProfileDatabase(), tokenKey)
 
@@ -27,7 +27,7 @@ func TestGRPC_PluginEnv(t *testing.T) {
 		require.Equal(t, tokenValue1, actualValue)
 
 		tokenValue2 := utils.RandStringBytes(10)
-		_, err = client.SetPluginEnv(ctx, &ypb.PluginEnvRequest{Value: tokenValue2, Key: tokenKey})
+		_, err = client.SetPluginEnv(ctx, &ypb.PluginEnvData{Env: []*ypb.KVPair{{Key: tokenKey, Value: tokenValue2}}})
 		require.NoError(t, err)
 
 		actualValue, err = yakit.GetPluginEnvByKey(consts.GetGormProfileDatabase(), tokenKey)
@@ -65,6 +65,17 @@ func TestGRPC_PluginEnv(t *testing.T) {
 		}
 		require.True(t, check1 && check2)
 
+	})
+
+	t.Run("test create env", func(t *testing.T) {
+		tokenKey := utils.RandStringBytes(10)
+		tokenValue := utils.RandStringBytes(10)
+		err := yakit.CreatePluginEnv(consts.GetGormProfileDatabase(), tokenKey, tokenValue)
+		require.NoError(t, err)
+		defer yakit.DeletePluginEnvByKey(consts.GetGormProfileDatabase(), tokenKey)
+
+		_, err = client.CreatePluginEnv(ctx, &ypb.PluginEnvData{Env: []*ypb.KVPair{{Key: tokenKey, Value: tokenValue}}})
+		require.Error(t, err)
 	})
 
 	t.Run("test delete env", func(t *testing.T) {

@@ -731,8 +731,10 @@ service Yak {
   rpc UpdateSSAProgram(UpdateSSAProgramRequest)returns(DbOperateMessage);
   rpc DeleteSSAPrograms(DeleteSSAProgramRequest)returns(DbOperateMessage);
 
-  rpc GetAllPluginEnv(Empty) returns (AllPluginEnv);
-  rpc SetPluginEnv(PluginEnvRequest) returns (Empty);
+  rpc GetAllPluginEnv(Empty) returns (PluginEnvData);
+  rpc QueryPluginEnv(QueryPluginEnvRequest) returns (PluginEnvData);
+  rpc CreatePluginEnv(PluginEnvData) returns (Empty); // create
+  rpc SetPluginEnv(PluginEnvData) returns (Empty); // create or update
   rpc DeletePluginEnv(DeletePluginEnvRequest) returns (Empty);
 }
 message GetSpaceEngineAccountStatusRequest {
@@ -2097,6 +2099,7 @@ message YaklangInspectInformationResponse {
   repeated YakRiskInfo RiskInfo = 3;
   repeated YakUIInfo UIInfo = 4;
   repeated string Tags = 5;
+  repeated string PluginEnvKey = 6;
 }
 
 message YakUIInfo {
@@ -3977,6 +3980,7 @@ message YakScript {
   repeated Collaborator CollaboratorInfo = 35;
   repeated YakRiskInfo RiskInfo = 36;
   bool IsUpdate = 37;
+  repeated string PluginEnvKey =38;
 }
 
 message Collaborator {
@@ -4007,6 +4011,7 @@ message SaveNewYakScriptRequest {
   string RiskAnnotation = 19;
   int64 Id = 20;
   repeated YakRiskInfo RiskInfo = 21;
+  repeated string PluginEnvKey = 22;
 }
 
 message SaveYakScriptToOnlineRequest {
@@ -5743,13 +5748,12 @@ message SyntaxFlowResult {
   string RuleContent = 12;
 }
 
-message AllPluginEnv {
-  repeated KVPair Env = 1;
+message QueryPluginEnvRequest {
+  repeated string Key = 1;
 }
 
-message PluginEnvRequest {
-  string key = 1;
-  string value = 2;
+message PluginEnvData {
+  repeated KVPair Env = 1;
 }
 
 message DeletePluginEnvRequest {
