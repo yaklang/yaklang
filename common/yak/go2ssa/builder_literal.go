@@ -613,7 +613,7 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			}
 			if p, ok := parent.(*ssa.ObjectType); ok {
 				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), p)
-				structTyp.AnonymousField = append(structTyp.AnonymousField, p)
+				structTyp.AnonymousField[typ.TypeName().GetText()] = p
 			} else if a, ok := parent.(*ssa.AliasType); ok {
 				structTyp.AddField(b.EmitConstInst(a.Name), a.GetType())
 			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
@@ -767,9 +767,9 @@ func coverType(ityp, iwantTyp ssa.Type) {
 			typ.AddMethod(s, f)
 		})
 	}
-	for _, a := range wantTyp.AnonymousField {
+	for n, a := range wantTyp.AnonymousField {
 		// TODO: 匿名结构体应该是一个指针，修改时应该要连带父类一起修改
-		typ.AnonymousField = append(typ.AnonymousField, a)
+		typ.AnonymousField[n] = a
 	}
 }
 
