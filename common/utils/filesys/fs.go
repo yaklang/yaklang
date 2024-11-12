@@ -9,6 +9,27 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func SimpleRecursive(opts ...Option) error {
+	c := NewConfig()
+	for _, opt := range opts {
+		opt(c)
+	}
+	start := ""
+	for _, entryPath := range []string{
+		".", "", "/",
+	} {
+		entries, _ := c.fileSystem.ReadDir(entryPath)
+		if len(entries) > 0 {
+			start = entryPath
+			break
+		}
+	}
+	if start == "" {
+		return utils.Error("no entry found")
+	}
+	return recursive(start, *c, opts...)
+}
+
 // Recursive recursively walk through the file system
 // raw: the root path
 // opts: options
