@@ -256,7 +256,16 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 		return obj
 	}
 
-	return typeHandler(typ, kvs)
+	rvalue := typeHandler(typ, kvs)
+	if typ.GetTypeKind() == ssa.StructTypeKind {
+		bp := b.CreateBluePrint("")
+		for n, f := range typ.GetMethod() {
+			bp.AddMethod(n, f)
+		}
+		rvalue.SetType(typ)
+	}
+
+	return rvalue
 }
 
 func (b *astbuilder) buildLiteralValue(exp *gol.LiteralValueContext, iscreate bool) (ret []keyValue) {

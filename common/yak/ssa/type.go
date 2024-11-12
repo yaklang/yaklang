@@ -911,20 +911,15 @@ func (i *ObjectType) GetKeybyName(key string) Value {
 
 func NewObjectType() *ObjectType {
 	return &ObjectType{
-		baseType:       &baseType{},
-		Name:           "",
-		pkgPath:        "",
-		Kind:           NumberTypeKind,
-		Len:            0,
-		Keys:           []Value{},
-		keymap:         map[string]int{},
-		keyTypes:       []Type{},
-		FieldTypes:     []Type{},
-		AnonymousField: map[string]*ObjectType{},
-		Combination:    false,
-		KeyTyp:         nil,
-		FieldType:      nil,
+		baseType:   NewBaseType(),
+		Kind:       ObjectTypeKind,
+		Keys:       make([]Value, 0),
+		keymap:     make(map[string]int),
+		keyTypes:   make([]Type, 0),
+		FieldTypes: make([]Type, 0),
+
 		fullTypeName:   []string{},
+		AnonymousField: map[string]*ObjectType{},
 	}
 }
 
