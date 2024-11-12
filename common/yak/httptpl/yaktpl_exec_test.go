@@ -1887,6 +1887,61 @@ http:
 	require.Truef(t, ok, "not matched, Response:\n%s", string(rspRaw))
 }
 
+func TestHTTPTpl_Variable_With_Fuzztag_Params(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(request.Header["A"][0]))
+	})
+	addr := fmt.Sprintf("http://%s:%d", host, port)
+	token := utils.RandStringBytes(5)
+	tmpl := fmt.Sprintf(`
+id: WebFuzzer-Template-gsKlwUxp
+
+info:
+  name: WebFuzzer Template gsKlwUxp
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 1
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: c0abc6a540717b4dec61cd347b30ccaa
+
+variables:
+  a: '@raw%[1]s'
+  payload1: '@fuzztag{{p(a)}}'
+http:
+- raw:
+  - |-
+    @timeout: 30s
+    GET / HTTP/1.1
+    Host: {{Hostname}}
+    A: {{payload1}}
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "%[1]s"
+
+  max-redirects: 3
+  matchers-condition: and
+`, token)
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	require.NoError(t, err)
+	var ok bool
+	var rspRaw []byte
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		ok = result
+		rspRaw = rsp[0].RawPacket
+	}))
+	_, err = ytpl.ExecWithUrl(addr, config)
+	require.Truef(t, ok, "not matched, Response:\n%s", string(rspRaw))
+}
+
 func TestHTTPTpl_Path_Support_Variable(t *testing.T) {
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(request.URL.Path))
