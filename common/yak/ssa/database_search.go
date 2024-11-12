@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"context"
 	"regexp"
 
 	"github.com/gobwas/glob"
@@ -8,21 +9,22 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func MatchInstructionByExact(prog *Program, mod int, e string) []Instruction {
-	return matchInstructionsEx(prog, ssadb.ExactCompare, mod, e)
+func MatchInstructionByExact(ctx context.Context, prog *Program, mod int, e string) []Instruction {
+	return matchInstructionsEx(ctx, prog, ssadb.ExactCompare, mod, e)
 }
 
 // GetByVariableGlob means get variable name(glob).
-func MatchInstructionByGlob(prog *Program, mod int, g string) []Instruction {
-	return matchInstructionsEx(prog, ssadb.GlobCompare, mod, g)
+func MatchInstructionByGlob(ctx context.Context, prog *Program, mod int, g string) []Instruction {
+	return matchInstructionsEx(ctx, prog, ssadb.GlobCompare, mod, g)
 }
 
 // GetByVariableRegexp will filter Instruction via variable regexp name
-func MatchInstructionByRegexp(prog *Program, mod int, r string) []Instruction {
-	return matchInstructionsEx(prog, ssadb.RegexpCompare, mod, r)
+func MatchInstructionByRegexp(ctx context.Context, prog *Program, mod int, r string) []Instruction {
+	return matchInstructionsEx(ctx, prog, ssadb.RegexpCompare, mod, r)
 }
 
 func matchInstructionsEx(
+	ctx context.Context,
 	prog *Program,
 	compareMode, matchMode int,
 	name string,
@@ -30,7 +32,7 @@ func matchInstructionsEx(
 	// all application in database, just use sql
 	if prog.EnableDatabase {
 		var insts []Instruction
-		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), compareMode, matchMode, name)
+		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), ctx, compareMode, matchMode, name)
 		for ir := range ch {
 			inst, err := NewLazyInstructionFromIrCode(ir)
 			if err != nil {
@@ -58,6 +60,7 @@ func matchInstructionsEx(
 		var insts []Instruction
 		ch := ssadb.SearchVariable(
 			ssadb.GetDB().Where("program_name = ?", prog.Name),
+			ctx,
 			compareMode, matchMode, name,
 		)
 		for ir := range ch {

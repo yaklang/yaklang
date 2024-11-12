@@ -1,6 +1,7 @@
 package syntaxflow
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,9 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-func Test_Process(t *testing.T) {
-
-	code := `
+const code = `
 @RestController(value = "/xxe")
 public class XXEController {
 
@@ -48,6 +47,8 @@ public class XXEFixExample {
     }
 }
 	`
+
+func Test_Process(t *testing.T) {
 
 	check := func(prog *ssaapi.Program, rule string) {
 		process := 0.0
@@ -96,4 +97,31 @@ public class XXEFixExample {
 		)
 	})
 
+}
+
+func Test_Context(t *testing.T) {
+	t.Run("test context", func(t *testing.T) {
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			ctx, cancel := context.WithCancel(context.Background())
+			process := 0.0
+			_, err := prog.SyntaxFlowWithError(`
+			DocumentBuilderFactory.newInstance().*Builder().parse(* as $param)
+			`,
+				sfvm.WithContext(ctx),
+				sfvm.WithProcessCallback(func(f float64, s string) {
+					log.Infof("process %f : %s", process, s)
+					if process < f {
+						process = f
+					}
+					if process >= 0.5 {
+						cancel()
+					}
+				}),
+			)
+			require.Error(t, err)
+			require.Equal(t, err.Error(), "context done")
+			require.True(t, process < 1.0)
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
 }

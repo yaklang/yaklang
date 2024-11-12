@@ -7,7 +7,9 @@ import (
 )
 
 func NewConfig(opts ...Option) *Config {
-	c := &Config{}
+	c := &Config{
+		ctx: context.Background(),
+	}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -27,6 +29,10 @@ type Config struct {
 	processCallback           processCallback
 
 	taskID string
+}
+
+func (c *Config) GetContext() context.Context {
+	return c.ctx
 }
 
 type Option func(*Config)
