@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -102,19 +101,10 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 	taskID, stream := startScan()
 	require.NoError(t, err)
 
-	var wg sync.WaitGroup
-	var c = make(chan struct{})
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		notify, err := client.DuplexConnection(context.Background())
 		require.NoError(t, err)
 		for {
-			select {
-			case <-c:
-				return
-			default:
-			}
 			res, err := notify.Recv()
 			require.NoError(t, err)
 			if res.MessageType == "syntaxflow_result" {
@@ -152,10 +142,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 	require.True(t, hasProcess)
 	require.Equal(t, 1.0, finishProcess)
 	require.Equal(t, "done", finishStatus)
-	close(c)
-	wg.Wait()
 	log.Infof("wait for task %v", taskID)
-
 }
 
 type msg struct {
