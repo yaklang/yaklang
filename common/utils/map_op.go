@@ -445,6 +445,14 @@ func ParseStringToGeneralMap(i any) map[string]any {
 	return InterfaceToGeneralMap(target)
 }
 
+func MergeToMap[K comparable, V any](m map[K]V, ms ...map[K]V) {
+	for _, i := range ms {
+		for k, v := range i {
+			m[k] = v
+		}
+	}
+}
+
 func MergeStringMap(ms ...map[string]string) map[string]string {
 	res := map[string]string{}
 	for _, m := range ms {
