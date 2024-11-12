@@ -203,6 +203,68 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 			"output": {"Undefined-a.test(valid)"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
+
+	code = `package main
+
+	func main() {
+		a := function1()
+		if b {
+			a = function2()
+			a.test(2)
+		}
+		a.test(1)
+	}
+`
+	t.Run("member-call-and-param-with-phi", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+		function1() as $f1
+		function2() as $f2
+
+		$f1.test(* #-> as $output1) 
+		$f2.test(* #-> as $output2) 
+`, map[string][]string{
+			"output1": {"1"},
+			"output2": {"1", "2"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	code = `package main
+
+	func main() {
+		a := function1() // 1 5
+		if b {
+			a.test(1)
+			a = function2() // 2 4 5
+			if c {
+				a.test(2)
+				if d {
+					a = function3() // nil
+				}
+				a = function4() // 3 4 5
+				a.test(3)
+			}
+			a.test(4)
+		}
+		a.test(5)
+	}
+`
+	t.Run("member-call-with-phi-complex", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+		function1() as $f1
+		function2() as $f2
+		function3() as $f3
+		function4() as $f4
+
+		$f1.test(* #-> as $output1) 
+		$f2.test(* #-> as $output2) 
+		$f3.test(* #-> as $output3) 
+		$f4.test(* #-> as $output4) 
+`, map[string][]string{
+			"output1": {"1", "5"},
+			"output2": {"2", "4", "5"},
+			"output4": {"3", "4", "5"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
 }
 
 func Test_ImportPackage_WithPhi(t *testing.T) {
