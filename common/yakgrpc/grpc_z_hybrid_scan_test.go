@@ -327,14 +327,15 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 
 func TestGRPCMUSTPASS_HybridScan_HttpflowID(t *testing.T) {
 	token := utils.RandSecret(10)
+	okToken := utils.RandStringBytes(10)
 	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", fmt.Sprintf(`
 mirrorHTTPFlow = func(isHttps , url , req , rsp , body) { 
 	dump(req)
 	if str.Contains(string(req),"%s"){
-    yakit.Output("ok")
+    yakit.Output("%s")
 	}
 }
-`, token))
+`, token, okToken))
 	require.NoError(t, err)
 	defer clearFunc()
 
@@ -394,7 +395,7 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 			break
 		}
 		if rsp.ExecResult != nil && rsp.ExecResult.IsMessage {
-			if bytes.Contains(rsp.ExecResult.Message, []byte("ok")) {
+			if bytes.Contains(rsp.ExecResult.Message, []byte(okToken)) {
 				checkCount++
 			}
 		}
