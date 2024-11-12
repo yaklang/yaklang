@@ -146,7 +146,7 @@ type Value interface {
 type Occultation interface {
 	AddOccultation(Value)
 	GetOccultation() []Value
-	HandleOccultation() []Value
+	FlatOccultation() []Value
 }
 
 type PointerIF interface {

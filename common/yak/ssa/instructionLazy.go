@@ -724,7 +724,7 @@ func (lz *LazyInstruction) AddOccultation(p Value) {
 
 }
 
-func (lz *LazyInstruction) HandleOccultation() []Value {
+func (lz *LazyInstruction) FlatOccultation() []Value {
 	var ret []Value
 	var handler func(i *anValue)
 
