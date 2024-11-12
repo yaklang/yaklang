@@ -193,9 +193,9 @@ func (v *YakVariables) ToMap() map[string]any {
 	getVar := func(s *Var) (any, error) {
 		switch s.Type {
 		case FuzztagType:
-			results := mutate.MutateQuick(s.Data)
-			if len(results) == 0 {
-				return s.Data, nil
+			results, err := mutate.FuzzTagExec(s.Data, mutate.Fuzz_WithParams(res))
+			if err != nil {
+				return s.Data, err
 			} else {
 				return results[0], nil
 			}
