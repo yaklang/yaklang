@@ -48,13 +48,6 @@ func (s *SFFrameResult) GetRule() *schema.SyntaxFlowRule {
 	return s.rule
 }
 
-func (s *SFFrameResult) TaskID() string {
-	if s == nil || s.config == nil {
-		return ""
-	}
-	return s.config.taskID
-}
-
 func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
 	result.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
 		if get, b := s.SymbolTable.Get(i); b {

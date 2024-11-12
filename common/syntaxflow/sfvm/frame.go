@@ -61,15 +61,10 @@ type SFFrame struct {
 	debug  bool
 
 	predCounter int
-	context     *SFFrameResult
 }
 
 func (s *SFFrame) GetRule() *schema.SyntaxFlowRule {
 	return s.rule
-}
-
-func (s *SFFrame) WithContext(result *SFFrameResult) {
-	s.context = result
 }
 
 func (s *SFFrame) GetContext() context.Context {
@@ -202,8 +197,8 @@ func (s *SFFrame) GetSymbol(sfi *SFI) (ValueOperator, bool) {
 	switch sfi.OpCode {
 	// variable +/-/&& can read from context
 	case OpMergeRef, OpRemoveRef, OpIntersectionRef:
-		if s.context != nil {
-			return s.context.SymbolTable.Get(sfi.UnaryStr)
+		if initVars := s.config.initialContextVars; initVars != nil {
+			return initVars.Get(sfi.UnaryStr)
 		}
 	}
 	return nil, false
@@ -227,24 +222,6 @@ func (s *SFFrame) WithPredecessorContext(label string) AnalysisContextOption {
 	}
 }
 
-func (s *SFFrame) process() {
-	if s.config.processCallback != nil {
-		// update only when the process is greater than the last process
-		// for loop, we don't want to process reduce.
-		if p := float64(s.idx) / float64(len(s.Codes)); p > s.currentProcess {
-			s.currentProcess = p
-		}
-		var msg string
-		if s.idx == len(s.Codes) {
-			msg = "exec: end"
-		} else {
-			i := s.Codes[s.idx]
-			msg = fmt.Sprintf("exec: %s", i.String())
-		}
-		s.config.processCallback(s.currentProcess, fmt.Sprintf("exec: %s", msg))
-	}
-}
-
 func (s *SFFrame) exec(input ValueOperator) (ret error) {
 	s.predCounter = 0
 	defer func() {
@@ -261,7 +238,6 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		}
 	}()
 	for {
-		s.process()
 		if s.idx >= len(s.Codes) {
 			break
 		}

@@ -115,7 +115,7 @@ func TestGetMemberAndVariable(t *testing.T) {
 			map[string][]string{
 				"target": {"4"},
 			},
-			ssaapi.WithSyntaxFlowStrictMatch(),
+			ssaapi.QueryWithStrictMatch(),
 		)
 	})
 
@@ -133,7 +133,7 @@ func TestGetMemberAndVariable(t *testing.T) {
 			map[string][]string{
 				"target": {"1", "Undefined-obj.a1(valid)"},
 			},
-			ssaapi.WithSyntaxFlowStrictMatch(),
+			ssaapi.QueryWithStrictMatch(),
 		)
 	})
 

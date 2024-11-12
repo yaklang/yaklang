@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -28,7 +27,7 @@ func TestXXE(t *testing.T) {
 
 func TestXXE_WithConditionExpr_Basic(t *testing.T) {
 	ssatest.Check(t, XXE_Code, func(prog *ssaapi.Program) error {
-		if prog.SyntaxFlowChain(`.newInstance()?{.setFeature}`, sfvm.WithEnableDebug(true)).Show().Len() <= 0 {
+		if prog.SyntaxFlowChain(`.newInstance()?{.setFeature}`, ssaapi.QueryWithEnableDebug(true)).Show().Len() <= 0 {
 			t.Fatal("setFeature(*) not found")
 		}
 		return nil
@@ -45,7 +44,7 @@ $entry.*Builder().parse() as $result;
 
 check $result then "dangerous xml doc builder" else "safe xml doc builder";
 
-`, sfvm.WithEnableDebug(true)).Show(); ret.Len() <= 0 {
+`, ssaapi.QueryWithEnableDebug(true)).Show(); ret.Len() <= 0 {
 			t.Fatal("setFeature(*) not found")
 		} else {
 			ret.Get(0).ShowWithSourceCode()
@@ -66,7 +65,7 @@ check $result then "dangerous xml doc builder" else "safe xml doc builder";
 $result + $entry as $output;
 alert $output;
 
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 		if err != nil {
 			t.Fatal(err)
 		}

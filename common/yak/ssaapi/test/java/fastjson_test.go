@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -19,7 +18,7 @@ func TestFastjson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := prog.SyntaxFlowWithError("deserializers.put(,,* as $deserializer) as $call", sfvm.WithEnableDebug(false))
+	res, err := prog.SyntaxFlowWithError("deserializers.put(,,* as $deserializer) as $call", ssaapi.QueryWithEnableDebug(false))
 	if err != nil {
 		t.Fatal(err)
 	}

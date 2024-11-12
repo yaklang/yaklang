@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -53,7 +52,7 @@ func Test_Process(t *testing.T) {
 	check := func(prog *ssaapi.Program, rule string) {
 		process := 0.0
 		res, err := prog.SyntaxFlowWithError(rule,
-			sfvm.WithProcessCallback(func(f float64, s string) {
+			ssaapi.QueryWithProcessCallback(func(f float64, s string) {
 				log.Infof("process callback %f %s", f, s)
 				// check is reduce
 				if process > f {
@@ -107,8 +106,8 @@ func Test_Context(t *testing.T) {
 			_, err := prog.SyntaxFlowWithError(`
 			DocumentBuilderFactory.newInstance().*Builder().parse(* as $param)
 			`,
-				sfvm.WithContext(ctx),
-				sfvm.WithProcessCallback(func(f float64, s string) {
+				ssaapi.QueryWithContext(ctx),
+				ssaapi.QueryWithProcessCallback(func(f float64, s string) {
 					log.Infof("process %f : %s", process, s)
 					if process < f {
 						process = f

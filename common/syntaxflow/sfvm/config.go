@@ -17,7 +17,6 @@ func NewConfig(opts ...Option) *Config {
 }
 
 type ResultCapturedCallback func(name string, results ValueOperator) error
-type processCallback func(float64, string)
 
 type Config struct {
 	debug                     bool
@@ -26,9 +25,7 @@ type Config struct {
 	initialContextVars        *omap.OrderedMap[string, ValueOperator]
 	onResultCapturedCallbacks []ResultCapturedCallback
 	ctx                       context.Context
-	processCallback           processCallback
-
-	taskID string
+	processCallback           func(idx int, msg string)
 }
 
 func (c *Config) GetContext() context.Context {
@@ -43,16 +40,9 @@ func WithInitialContextVars(o *omap.OrderedMap[string, ValueOperator]) Option {
 	}
 }
 
-func WithProcessCallback(p processCallback) Option {
+func WithProcessCallback(p func(int, string)) Option {
 	return func(config *Config) {
 		config.processCallback = p
-	}
-}
-
-// WithExecTaskID set taskID for exec this result will be save with this taskID
-func WithExecTaskID(taskID string) Option {
-	return func(config *Config) {
-		config.taskID = taskID
 	}
 }
 
@@ -82,14 +72,41 @@ func WithEnableDebug(b ...bool) Option {
 	}
 }
 
-func WithStrictMatch(b bool) Option {
+func WithStrictMatch(b ...bool) Option {
 	return func(config *Config) {
-		config.StrictMatch = b
+		if len(b) > 0 {
+			config.StrictMatch = b[0]
+		} else {
+			config.StrictMatch = true
+		}
 	}
 }
 
 func WithResultCaptured(c ResultCapturedCallback) Option {
 	return func(config *Config) {
 		config.onResultCapturedCallbacks = append(config.onResultCapturedCallbacks, c)
+	}
+}
+
+func WithConfig(other *Config) Option {
+	return func(self *Config) {
+		self.StrictMatch = other.StrictMatch
+		self.FailFast = other.FailFast
+		self.initialContextVars = other.initialContextVars
+		self.onResultCapturedCallbacks = other.onResultCapturedCallbacks
+		self.ctx = other.ctx
+		self.processCallback = other.processCallback
+	}
+}
+
+func (c *Config) Copy() *Config {
+	return &Config{
+		debug:                     c.debug,
+		StrictMatch:               c.StrictMatch,
+		FailFast:                  c.FailFast,
+		initialContextVars:        c.initialContextVars,
+		onResultCapturedCallbacks: c.onResultCapturedCallbacks,
+		ctx:                       c.ctx,
+		processCallback:           c.processCallback,
 	}
 }

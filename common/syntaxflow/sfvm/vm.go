@@ -165,7 +165,10 @@ func (s *SyntaxFlowVirtualMachine) SetConfig(config *Config) {
 	s.config = config
 }
 
-func (frame *SFFrame) Feed(i ValueOperator) (*SFFrameResult, error) {
+func (frame *SFFrame) Feed(i ValueOperator, opt ...Option) (*SFFrameResult, error) {
+	for _, o := range opt {
+		o(frame.config)
+	}
 	err := frame.exec(i)
 	frame.result.rule = frame.rule
 	return frame.result, err

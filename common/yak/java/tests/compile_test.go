@@ -9,7 +9,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -265,7 +264,7 @@ func TestCompileProgram_ReUseLibrary(t *testing.T) {
 	prog, err := ssaapi.FromDatabase(programID2)
 	assert.NoError(t, err)
 
-	res := prog.SyntaxFlow(`a as $a`, sfvm.WithEnableDebug())
+	res := prog.SyntaxFlow(`a as $a`, ssaapi.QueryWithEnableDebug())
 	assert.Equal(t,
 		[]string{"1"},
 		lo.Map(
@@ -362,7 +361,7 @@ func TestCompileProgram_MultipleFileInLibrary(t *testing.T) {
 			prog, err := ssaapi.FromDatabase(programID)
 			assert.NoError(t, err)
 			_ = prog
-			res, err := prog.SyntaxFlowWithError(`a as $a`, sfvm.WithEnableDebug())
+			res, err := prog.SyntaxFlowWithError(`a as $a`, ssaapi.QueryWithEnableDebug())
 			assert.NoError(t, err)
 			assert.Equal(t,
 				want,
