@@ -36,6 +36,7 @@ var SystemExports = map[string]interface{}{
 	"Getgid":               Getgid,
 	"Getegid":              Getegid,
 	"Environ":              Environ,
+	"GetHomeDir":           GetHomeDir,
 	"Hostname":             Hostname,
 	"Unsetenv":             Unsetenv,
 	"LookupEnv":            LookupEnv,
@@ -263,6 +264,42 @@ func Getegid() int {
 // ```
 func Environ() []string {
 	return os.Environ()
+}
+
+// GetHomeDir 获取当前用户的家目录
+// Example:
+// ```
+// os.GetHomeDir() // "/Users/yaklang"
+// ```
+func GetHomeDir() string {
+	// key: HOME, USERPROFILE, HOMEDRIVE + HOMEPATH
+	// macOS: HOME, USERPROFILE
+	// Windows: USERPROFILE, HOMEDRIVE + HOMEPATH
+	// Linux: HOME
+	home := os.Getenv("HOME")
+	if home != "" {
+		return home
+	}
+
+	// Windows 环境
+	userProfile := os.Getenv("USERPROFILE")
+	if userProfile != "" {
+		return userProfile
+	}
+
+	// Windows 环境的另一种情况
+	homeDrive := os.Getenv("HOMEDRIVE")
+	homePath := os.Getenv("HOMEPATH")
+	if homeDrive != "" && homePath != "" {
+		return homeDrive + homePath
+	}
+
+	// 如果都获取不到,返回当前目录
+	pwd, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+	return pwd
 }
 
 // Hostname 获取主机名

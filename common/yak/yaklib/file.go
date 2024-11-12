@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
@@ -587,6 +588,17 @@ func _tailf(i string, line func(i string)) {
 // file.Abs("./test.txt") // /tmp/test.txt
 // ```
 func _fileAbs(i string) string {
+	if runtime.GOOS != "windows" && strings.HasPrefix(i, "~") {
+		if len(i) == 1 {
+			return GetHomeDir()
+		}
+		if i[1] == '/' {
+			after := i[2:]
+			hdir := GetHomeDir()
+			return filepath.Join(hdir, after)
+		}
+	}
+
 	raw, err := filepath.Abs(i)
 	if err != nil {
 		log.Errorf("fetch abs path failed for[%v]: %s", i, raw)
