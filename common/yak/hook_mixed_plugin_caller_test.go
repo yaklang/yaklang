@@ -130,6 +130,44 @@ handle = result => {
 	}
 }
 
+func TestMixCaller_call_Plugin_TimeoutPanic(t *testing.T) {
+	code := `
+handle = result => {
+	yakit.Info("开始执行")
+	go fn {
+		for {
+			sleep(1)
+			yakit.Info("执行中...")
+		}
+	}
+	panic("aaaaa")
+	yakit.Info("执行结束了")
+
+	return "ok"
+}
+`
+	consts.GetGormProjectDatabase()
+	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("port-scan", code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearFunc()
+
+	caller, err := NewMixPluginCaller()
+	if err != nil {
+		t.Fatal(err)
+	}
+	caller.SetCallPluginTimeout(5)
+	caller.SetDividedContext(true)
+	err = caller.LoadPlugin(tempName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	caller.HandleServiceScanResult(nil)
+	caller.Wait()
+}
+
 func TestMixCaller_load_Plugin_Timeout_effect_call(t *testing.T) {
 	code := `
 	mirrorHTTPFlow = func(isHttps, url, req , rsp , body ) {

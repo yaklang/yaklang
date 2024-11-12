@@ -148,6 +148,19 @@ func (n *Engine) CallYakFunctionNative(ctx context.Context, function *yakvm.Func
 	return n.vm.ExecYakFunction(ctx, function, yakvm.YakVMValuesToFunctionMap(function, paramsValue, n.vm.GetConfig().GetFunctionNumberCheck()), yakvm.None)
 }
 
+func (n *Engine) SafeCallYakFunctionNativeWithFrameCallback(ctx context.Context, frameCallback func(*yakvm.Frame), function *yakvm.Function, params ...interface{}) (result interface{}, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			if v, ok := e.(error); ok {
+				err = v
+			} else {
+				err = utils.Error(e)
+			}
+		}
+	}()
+	return n.CallYakFunctionNativeWithFrameCallback(ctx, frameCallback, function, params...)
+}
+
 func (n *Engine) CallYakFunctionNativeWithFrameCallback(ctx context.Context, frameCallback func(*yakvm.Frame), function *yakvm.Function, params ...interface{}) (interface{}, error) {
 	if function == nil {
 		return nil, utils.Error("no function")
