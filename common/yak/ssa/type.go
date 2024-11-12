@@ -852,7 +852,7 @@ type ObjectType struct {
 	keyTypes   []Type
 	FieldTypes []Type
 
-	AnonymousField []*ObjectType
+	AnonymousField map[string]*ObjectType
 
 	Combination bool // function multiple return will combined to struct
 	// VariadicPara bool // function last variadic parameter will become slice
@@ -902,14 +902,29 @@ func (i *ObjectType) SetPkgPath(pkg string) {
 	i.pkgPath = pkg
 }
 
+func (i *ObjectType) GetKeybyName(key string) Value {
+	if index, ok := i.keymap[key]; ok {
+		return i.Keys[index]
+	}
+	return nil
+}
+
 func NewObjectType() *ObjectType {
 	return &ObjectType{
-		baseType:   NewBaseType(),
-		Kind:       ObjectTypeKind,
-		Keys:       make([]Value, 0),
-		keymap:     make(map[string]int),
-		keyTypes:   make([]Type, 0),
-		FieldTypes: make([]Type, 0),
+		baseType:       &baseType{},
+		Name:           "",
+		pkgPath:        "",
+		Kind:           NumberTypeKind,
+		Len:            0,
+		Keys:           []Value{},
+		keymap:         map[string]int{},
+		keyTypes:       []Type{},
+		FieldTypes:     []Type{},
+		AnonymousField: map[string]*ObjectType{},
+		Combination:    false,
+		KeyTyp:         nil,
+		FieldType:      nil,
+		fullTypeName:   []string{},
 	}
 }
 
