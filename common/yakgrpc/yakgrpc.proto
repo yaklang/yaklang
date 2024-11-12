@@ -5522,6 +5522,9 @@ message SsaProgram{
   string Dbpath = 5;
   string Language = 6;
   string EngineVersion = 7;
+
+  bool Recompile = 8;
+  int64 RiskNumber = 9; //风险数
 }
 message SsaProgramFilter{
   string ProgramName = 1;
@@ -5530,15 +5533,16 @@ message SsaProgramFilter{
   int64 BeforeUpdateAt = 4;
   int64 AfterUpdateAt = 5;
   string Keyword = 6;
-  string RiskNum = 7;
-  string RiskType = 8;
+
+  int64 RiskNum = 7;
+  repeated string RiskType = 8;
 }
 message QuerySsaProgramRequest{
   Paging Paging = 1;
   int64 Id = 2;
   SsaProgramFilter Filter = 3;
-  int64 Offset = 4;
-  bool IsAll = 5;
+  int64 Offset = 5;
+  bool IsAll = 6;
 }
 message DeleteSsaProgramRequest{
   SsaProgramFilter filter = 1;

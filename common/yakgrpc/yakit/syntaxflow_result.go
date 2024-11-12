@@ -2,7 +2,9 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -41,6 +43,20 @@ func FilterSyntaxFlowResult(rawDB *gorm.DB, filter *ypb.SyntaxFlowResultFilter) 
 	}
 
 	return db
+}
+func GetSyntaxFlowResultRiskInfo(db *gorm.DB, programs []string, number int, severity []string) []*ssadb.AuditResult {
+	var result []*ssadb.AuditResult
+	db = db.Where("program_name != ?", "")
+	if number != 0 {
+		db.Where("risk_count>?", number)
+	}
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", programs)
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_severity", severity)
+	resultx := db.Find(&result)
+	if resultx.Error != nil {
+		log.Errorf("get syntax flow result risk info fail: %s", resultx.Error)
+	}
+	return result
 }
 
 func GetSyntaxFlowResultByTaskId(db *gorm.DB, taskId string) *gorm.DB {

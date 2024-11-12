@@ -9,20 +9,19 @@ import (
 )
 
 func (s *Server) QuerySsaPrograms(ctx context.Context, req *ypb.QuerySsaProgramRequest) (*ypb.QuerySsaProgramResponse, error) {
-	var ypbPrograms []*ypb.SsaProgram
 	pagine, programs, err := yakit.QuerySsaProgram(consts.GetGormProfileDatabase(), req)
 	if err != nil {
 		return nil, err
 	}
 	for _, program := range programs {
-		ypbPrograms = append(ypbPrograms, program.ToGrpcProgram())
+		program.Recompile = program.GetEngineVersion() != consts.GetYakVersion()
 	}
 	return &ypb.QuerySsaProgramResponse{
 		Paging: &ypb.Paging{
 			Page:  int64(pagine.Page),
 			Limit: int64(pagine.Limit),
 		},
-		Programs: ypbPrograms,
+		Programs: programs,
 		Total:    int64(pagine.TotalRecord),
 	}, nil
 }
