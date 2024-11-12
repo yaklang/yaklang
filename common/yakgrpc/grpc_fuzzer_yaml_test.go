@@ -2,8 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/exp/maps"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -1190,35 +1193,59 @@ func TestGRPCMUSTPASS_HTTPFuzzerTaskToYaml(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx := context.Background()
+	expect := map[string]string{
+		"params":       "rand_char",
+		"doubleUrl":    "%25%33%31%25%33%32%25%33%33",
+		"simpleTag":    "%75%72%6c%28%31%32%33%29",
+		"backSlashTag": "%7b%7b%61%61%61",
+	}
+	actual := map[string]string{}
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		body, err := io.ReadAll(r.Body)
+		if err == nil {
+			r.Body.Close()
+			json.Unmarshal(body, &actual)
+		}
+	})
 	for i := 0; i < 100; i++ {
 		rsp, err := client.ExportHTTPFuzzerTaskToYaml(ctx, &ypb.ExportHTTPFuzzerTaskToYamlRequest{
 			Requests: &ypb.FuzzerRequests{
 				Requests: []*ypb.FuzzerRequest{
 					{
-						RequestRaw: []byte(`GET / HTTP/1.1
+						RequestRaw: []byte(`POST / HTTP/1.1
 Host: www.example.com
 
-{{p(a)}}`),
+{
+	"params":"{{p(a)}}",
+	"doubleUrl":"{{url({{url(123)}})}}",
+	"simpleTag":"{{url(url(123))}}",
+	"backSlashTag":"{{url(\{{aaa)}}"
+}`),
 						IsHTTPS:                  false,
 						PerRequestTimeoutSeconds: 5,
 						RedirectTimes:            3,
 						Params: []*ypb.FuzzerParamItem{
 							{
 								Key:   "a",
-								Value: "{{rand_char(5)}}",
-								Type:  "nuclei-dsl",
+								Value: "rand_char",
+								Type:  "raw",
 							},
 						},
 					},
 				},
 			},
-			TemplateType: "path",
+			TemplateType: "raw",
 		})
 		require.NoError(t, err)
-		aIndex := strings.Index(rsp.YamlContent, "a: '{{rand_char(5)}}'")
-		payloadIndex := strings.Index(rsp.YamlContent, "payload1: '@fuzztag{{p(a)}}'")
-		require.Greater(t, aIndex, -1, "variable a not found")
-		require.Greater(t, payloadIndex, -1, "variable payload1 not found")
-		require.Greater(t, payloadIndex, aIndex, "variable payload1 should be after variable a")
+		templateIns, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(rsp.YamlContent)
+		require.NoError(t, err)
+		_, err = templateIns.ExecWithUrl("http://"+utils.HostPort(host, port), httptpl.NewConfig())
+		require.NoError(t, err)
+		expectVals := utils.NewSet(maps.Values(expect))
+		actualVals := utils.NewSet(maps.Values(actual))
+		if expectVals.Diff(actualVals).Len() != 0 {
+			t.Fatal("expect: ", expect, "actual: ", actual)
+		}
 	}
 }
