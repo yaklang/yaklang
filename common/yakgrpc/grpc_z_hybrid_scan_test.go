@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/schema"
@@ -327,14 +328,15 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 
 func TestGRPCMUSTPASS_HybridScan_HttpflowID(t *testing.T) {
 	token := utils.RandSecret(10)
+	checkString := ksuid.New().String()
 	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", fmt.Sprintf(`
 mirrorHTTPFlow = func(isHttps , url , req , rsp , body) { 
 	dump(req)
 	if str.Contains(string(req),"%s"){
-    yakit.Output("okOKokOK")
+    yakit.Output("%s")
 	}
 }
-`, token))
+`, token, checkString))
 	require.NoError(t, err)
 	defer clearFunc()
 
@@ -394,7 +396,7 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 			break
 		}
 		if rsp.ExecResult != nil && rsp.ExecResult.IsMessage {
-			if bytes.Contains(rsp.ExecResult.Message, []byte("okOKokOK")) {
+			if bytes.Contains(rsp.ExecResult.Message, []byte(checkString)) {
 				checkCount++
 			}
 		}
