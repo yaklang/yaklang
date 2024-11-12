@@ -590,6 +590,7 @@ func GetHTTPFlowByIDOrHash(db *gorm.DB, id int64, hash string) (*schema.HTTPFlow
 
 	return &req, nil
 }
+
 func GetHttpFlowByRuntimeId(db *gorm.DB, rid string) (*schema.HTTPFlow, error) {
 	var req schema.HTTPFlow
 	if dbx := db.Model(&schema.HTTPFlow{}).Where("runtime_id=?", rid).First(&req); dbx.Error != nil {
@@ -715,8 +716,20 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	// 搜索 URL
 	db = bizhelper.FuzzQueryLike(db, "url", params.GetSearchURL())
 	db = bizhelper.FuzzQueryLike(db, "from_plugin", params.GetFromPlugin())
-	// status code 这里可以支持范围搜索
-	db = bizhelper.QueryBySpecificPorts(db, "status_code", params.GetStatusCode())
+	// status code 这里可以支持范围搜索,支持1-200,300这样的写法
+	statusCodeRaw := params.GetStatusCode()
+	if strings.HasPrefix(statusCodeRaw, "-") || strings.HasSuffix(statusCodeRaw, "-") {
+		// 排除-200,200-这样的写法
+		db = db.Where("true = false")
+	} else {
+		statusCode := utils.ParseStringToPorts(statusCodeRaw)
+		if len(statusCode) > 0 {
+			db = bizhelper.ExactQueryIntArrayOr(db, "status_code", statusCode)
+		} else if len(statusCodeRaw) > 0 {
+			// 如果状态码不合理，应该返回空
+			db = db.Where("true = false")
+		}
+	}
 	if params.GetHaveBody() {
 		db = db.Where("body_length > 0")
 	}
