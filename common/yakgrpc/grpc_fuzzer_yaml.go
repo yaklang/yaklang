@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -262,10 +264,26 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 				log.Errorf("set vars error: %v", err)
 			}
 		}
+
 		etcHosts := map[string]string{}
 		for _, pair := range request.EtcHosts {
 			etcHosts[pair.Key] = pair.Value
 		}
+
+		isRenderFuzzTag := request.ForceFuzz || request.GetFuzzTagMode() != "close"
+		varToFuzztagMap := make(map[string]string)
+		var fuzztagToNucleiTag func(s string) string
+
+		if isRenderFuzzTag {
+			index := 0
+			fuzztagToNucleiTag = func(s string) string {
+				newString, newVarToFuzztagMap := ExtractAndReplaceFuzzTagFromStrings(s, index)
+				index += len(newVarToFuzztagMap)
+				utils.MergeToMap(varToFuzztagMap, newVarToFuzztagMap)
+				return newString
+			}
+		}
+
 		switch templateType {
 		case "path":
 			url, err := lowhttp.ExtractURLFromHTTPRequestRaw(request.RequestRaw, false)
@@ -274,29 +292,51 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			}
 			// rootPath := utils.ParseStringUrlToWebsiteRootPath(url.Path)
 			// path := strings.Replace(url.Path, rootPath, "{{RootUrl}}", 1)
-			bulk.Paths = append(bulk.Paths, url.Path)
-			bulk.Body = string(lowhttp.GetHTTPPacketBody(request.RequestRaw))
-			bulk.Headers = lowhttp.GetHTTPPacketHeaders(request.RequestRaw)
+			path := url.Path
+			body, headers := string(lowhttp.GetHTTPPacketBody(request.RequestRaw)), lowhttp.GetHTTPPacketHeaders(request.RequestRaw)
+			method, _, _ := lowhttp.GetHTTPPacketFirstLine(request.RequestRaw)
+
+			if isRenderFuzzTag {
+				bulk.Method = fuzztagToNucleiTag(bulk.Method)
+				path = fuzztagToNucleiTag(path)
+				for k, v := range headers {
+					headers[k] = fuzztagToNucleiTag(v)
+				}
+				bulk.Body = fuzztagToNucleiTag(body)
+			}
+			path = "{{RootURL}}" + path
+
+			bulk.Paths = append(bulk.Paths, path)
+			bulk.Body = body
+			bulk.Headers = headers
 			if _, ok := bulk.Headers["Host"]; ok {
 				delete(bulk.Headers, "Host")
 			}
-			req, err := lowhttp.ParseBytesToHttpRequest(request.RequestRaw)
-			if err != nil {
-				log.Error(err)
-				bulk.Method = "GET"
-			} else {
-				bulk.Method = req.Method
-			}
+			bulk.Method = method
+
 		case "raw":
 			fallthrough
 		default:
 			// generalizedRequests := lowhttp.ReplaceHTTPPacketHeader(request.RequestRaw, "Host", "{{Hostname}}")
+			requestRaw := string(request.RequestRaw)
+			if isRenderFuzzTag {
+				requestRaw = fuzztagToNucleiTag(requestRaw)
+			}
+			requestRaw = string(lowhttp.ReplaceHTTPPacketHeader([]byte(requestRaw), "Host", "{{Hostname}}"))
 			bulk.HTTPRequests = append(bulk.HTTPRequests, &httptpl.YakHTTPRequestPacket{
-				Request: string(request.RequestRaw),
+				Request: requestRaw,
 				Timeout: time.Duration(request.PerRequestTimeoutSeconds) * time.Second,
 			})
+
 		}
-		var topMatcher = &ypb.HTTPResponseMatcher{SubMatchers: []*ypb.HTTPResponseMatcher{}}
+		// 如果将fuzztag重新修改为nuclei-tag，写入variables
+		if isRenderFuzzTag {
+			for k, v := range varToFuzztagMap {
+				vars.SetWithType(k, v, "fuzztag")
+			}
+		}
+
+		topMatcher := &ypb.HTTPResponseMatcher{SubMatchers: []*ypb.HTTPResponseMatcher{}}
 		if len(request.GetMatchers()) > 0 {
 			topMatcher = request.GetMatchers()[0]
 		}
@@ -361,6 +401,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		bulk.InheritVariables = request.InheritVariables
 		bulk.StopAtFirstMatch = request.StopAtFirstMatch
 		bulk.AfterRequested = request.AfterRequested
+		bulk.RenderFuzzTag = isRenderFuzzTag
 		//payloadsMap := map[string]any{}
 		//for k, v := range vars.GetRaw() {
 		//	data := strings.Split(v.Data, "\n")
@@ -383,14 +424,6 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	template.Severity = "low"
 	template.Description = "write your description here"
 	template.Reference = []string{"https://github.com/", "https://cve.mitre.org/"}
-	for _, sequence := range template.HTTPRequestSequences {
-		for _, request := range sequence.HTTPRequests {
-			request.Request = string(lowhttp.ReplaceHTTPPacketHeader([]byte(request.Request), "Host", "{{Hostname}}"))
-		}
-		for i, path := range sequence.Paths {
-			sequence.Paths[i] = "{{RootURL}}" + path
-		}
-	}
 	template.Sign = template.SignMainParams()
 	if vars.Len() > 0 {
 		template.Variables = vars
@@ -409,6 +442,19 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		YamlContent: yamlContent,
 		Status:      res,
 	}, nil
+}
+
+var fuzztagPattern = regexp.MustCompile(`\{\{.*?\}\}`)
+
+func ExtractAndReplaceFuzzTagFromStrings(s string, index int) (replaced string, varToFuzztagMap map[string]string) {
+	varToFuzztagMap = make(map[string]string)
+	replaced = fuzztagPattern.ReplaceAllStringFunc(s, func(s string) string {
+		index++
+		newKey := fmt.Sprintf("payload%d", index)
+		varToFuzztagMap[newKey] = s
+		return fmt.Sprintf("{{%s}}", newKey)
+	})
+	return
 }
 
 func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
@@ -501,13 +547,12 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		})
 		// 请求配置
 		isPaths := len(sequence.Paths) > 0
-		var payloadsMap *YamlMapBuilder
+		payloadsMap := sequenceItem.NewSubMapBuilder("payloads")
 		if isPaths {
 			// addSignElements(sequence.Method, sequence.Paths, sequence.Headers, sequence.Body)
 			maxRequest += len(sequence.Paths)
 			sequenceItem.Set("method", sequence.Method)
 			sequenceItem.Set("path", sequence.Paths)
-			payloadsMap = sequenceItem.NewSubMapBuilder("payloads")
 			sequenceItem.Set("headers", sequence.Headers)
 			sequenceItem.Set("body", sequence.Body)
 			sequenceItem.AddEmptyLine()
@@ -531,7 +576,6 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			}
 			sequenceItem.Set("raw", reqArray)
 			sequenceItem.AddEmptyLine()
-			payloadsMap = sequenceItem.NewSubMapBuilder("payloads")
 		}
 		// 写入payloads
 		if sequence.Payloads != nil && len(sequence.Payloads.GetRawPayloads()) > 0 {

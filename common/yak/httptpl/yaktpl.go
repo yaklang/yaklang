@@ -41,7 +41,7 @@ type RequestConfig struct {
 	IsHTTPS              bool
 }
 type YakTemplate struct {
-	//RequestConfig
+	// RequestConfig
 	Id            string   `json:"id"`
 	Name          string   `json:"name"`
 	NameZh        string   `json:"nameZh,omitempty"`
@@ -158,6 +158,7 @@ func (y *YakTemplate) SignMainParams() string {
 	signDataStr := fmt.Sprintf("%#v", signData)
 	return codec.Md5(signDataStr)
 }
+
 func (y *YakTemplate) CheckTemplateRisks() error {
 	var errs error = nil
 	addErrorMsg := func(msg string) {
@@ -180,18 +181,18 @@ func (y *YakTemplate) CheckTemplateRisks() error {
 	//}
 	if y.Sign != "" {
 		if y.Sign != y.SignMainParams() {
-			//addErrorMsg("signature error, may be the script is invalid")
+			// addErrorMsg("signature error, may be the script is invalid")
 			addErrorMsg("签名错误，当前可能脚本是无效的")
 		}
 	} else {
-		//addErrorMsg("lack of signature information, unable to verify script validity")
+		// addErrorMsg("lack of signature information, unable to verify script validity")
 		addErrorMsg("缺少签名信息，无法验证脚本有效性")
 	}
 	return errs
 }
 
 type YakRequestBulkConfig struct {
-	//RequestConfig
+	// RequestConfig
 
 	Matcher   *YakMatcher
 	Extractor []*YakExtractor
@@ -207,6 +208,7 @@ type YakRequestBulkConfig struct {
 
 	// req-condition - 为 true 的时候，要等所有的请求发送完在执行 Matcher
 	AfterRequested bool
+	RenderFuzzTag  bool
 	Method         string
 	Paths          []string
 	Headers        map[string]string
@@ -222,7 +224,7 @@ type YakRequestBulkConfig struct {
 
 func (c *YakRequestBulkConfig) GenerateRaw() []*RequestBulk {
 	var maxLen int
-	var dicts = map[string][]string{}
+	dicts := map[string][]string{}
 	if c.Payloads != nil {
 		for k, p := range c.Payloads.raw {
 			if maxLen < len(p.Data) {
@@ -233,7 +235,7 @@ func (c *YakRequestBulkConfig) GenerateRaw() []*RequestBulk {
 	}
 
 	if maxLen <= 0 {
-		var requestSeq = &RequestBulk{RequestConfig: c, Requests: nil}
+		requestSeq := &RequestBulk{RequestConfig: c, Requests: nil}
 		for _, req := range c.HTTPRequests {
 			for _, raw := range req.GenerateRaw() {
 				raw.Origin = c
@@ -243,11 +245,11 @@ func (c *YakRequestBulkConfig) GenerateRaw() []*RequestBulk {
 		return []*RequestBulk{requestSeq}
 	}
 
-	var requests = make([]*RequestBulk, 0)
+	requests := make([]*RequestBulk, 0)
 	switch c.AttackMode {
 	case "sync", "pitchfork":
 		for i := 0; i < maxLen; i++ {
-			var vars = map[string]interface{}{}
+			vars := map[string]interface{}{}
 			for k, v := range dicts {
 				if i >= len(v) {
 					vars[k] = ""
@@ -271,8 +273,8 @@ func (c *YakRequestBulkConfig) GenerateRaw() []*RequestBulk {
 			}
 		}
 	default:
-		var indexToVar = map[int]string{}
-		var data = make([][]string, len(dicts))
+		indexToVar := map[int]string{}
+		data := make([][]string, len(dicts))
 		var index int
 		for k, v := range dicts {
 			indexToVar[index] = k
@@ -285,7 +287,7 @@ func (c *YakRequestBulkConfig) GenerateRaw() []*RequestBulk {
 			return requests
 		}
 		for {
-			var vars = map[string]interface{}{}
+			vars := map[string]interface{}{}
 			for index, data := range mix.Value() {
 				vars[indexToVar[index]] = data
 			}
@@ -325,7 +327,7 @@ type YakHTTPRequestPacket struct {
 }
 
 func (s *YakHTTPRequestPacket) GenerateRaw() []*requestRaw {
-	var requests = make([]*requestRaw, 0)
+	requests := make([]*requestRaw, 0)
 	var isHttps bool
 	var err error
 	_ = s.Request
@@ -356,7 +358,7 @@ func createVarsFromHTTPRequest(isHttps bool, s []byte) (map[string]interface{}, 
 	if err != nil {
 		return nil, err
 	}
-	var host, port, _ = utils.ParseStringToHostPort(extractedUrl.String())
+	host, port, _ := utils.ParseStringToHostPort(extractedUrl.String())
 	baseUrl := extractedUrl.String()
 	var rootUrl string
 	if isHttps {
