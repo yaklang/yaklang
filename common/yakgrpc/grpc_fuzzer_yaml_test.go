@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -589,7 +590,11 @@ func TestGRPCMUSTPASS_HTTPFuzzer_WebFuzzerSequenceConvertYaml(t *testing.T) {
 		expect  string
 	}{
 		{ // 一个请求节点包含两个请求，预期解析为两个请求节点
-			content: `http:
+			content: `
+variables:
+  username: admin
+  password: admin
+http:
   - raw:
       - |
         POST /wp-login.php HTTP/1.1
@@ -616,14 +621,18 @@ func TestGRPCMUSTPASS_HTTPFuzzer_WebFuzzerSequenceConvertYaml(t *testing.T) {
           - 'contains(body_2, "\"data\":{")'
         condition: and
 `,
-			expect: `http:
+			expect: `
+variables:
+  username: admin
+  password: admin
+http:
   - raw:
       - |
         POST /wp-login.php HTTP/1.1
         Host: {{Hostname}}
         Content-Type: application/x-www-form-urlencoded
 
-        log={{username}}&pwd={{password}}&wp-submit=Log+In
+        log=admin&pwd=admin&wp-submit=Log+In
 
       - |
         @timeout: 10s
@@ -727,7 +736,11 @@ func TestGRPCMUSTPASS_HTTPFuzzer_WebFuzzerSequenceConvertYaml(t *testing.T) {
         condition: and`,
 		},
 		{ // 包含payload等其它配置，验证生成配置完整且有序
-			content: `http:
+			content: `
+variables:
+  username: admin
+  password: admin
+http:
   - raw:
       - |
         GET /fuel/login/ HTTP/1.1
@@ -760,7 +773,11 @@ func TestGRPCMUSTPASS_HTTPFuzzer_WebFuzzerSequenceConvertYaml(t *testing.T) {
           - 'status_code_3 == 200'
           - 'contains(body_1, "FUEL CMS")'
         condition: and`,
-			expect: `http:
+			expect: `
+variables:
+  username: admin
+  password: admin
+http:
   - raw:
       - |
         GET /fuel/login/ HTTP/1.1
@@ -772,7 +789,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_WebFuzzerSequenceConvertYaml(t *testing.T) {
         Referer: http://www.example.com
         Content-Length: 65
 
-        user_name={{username}}&password={{password}}&Login=Login&forward=
+        user_name=admin&password=admin&Login=Login&forward=
       - |
         @timeout: 10s
         GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
@@ -1198,12 +1215,8 @@ Host: www.example.com
 		},
 		TemplateType: "path",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	fmt.Println(rsp.YamlContent)
-	if !strings.Contains(rsp.YamlContent, `variables:
-  a: '{{rand_char(5)}}'`) {
-		t.Fatal("export yaml failed")
-	}
+	require.Contains(t, rsp.YamlContent, `a: '{{rand_char(5)}}'`)
+	require.Contains(t, rsp.YamlContent, `payload1: '@fuzztag{{p(a)}}'`)
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -20,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestMockTest_SmokingTest(t *testing.T) {
@@ -1834,6 +1836,87 @@ http:
 	if !ok {
 		t.FailNow()
 	}
+}
+
+func TestHTTPTpl_VariableType(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(request.Header["A"][0]))
+		writer.Write([]byte(request.Header["B"][0]))
+		body, _ := io.ReadAll(request.Body)
+		writer.Write([]byte(body))
+	})
+	addr := fmt.Sprintf("http://%s:%d", host, port)
+	token, token2, token3 := utils.RandStringBytes(5), utils.RandStringBytes(5), utils.RandStringBytes(5)
+	tmpl := fmt.Sprintf(`
+variables:
+    fuzztag: "@fuzztag{{regen(%[1]s)}}"
+    nuclei: "{{md5('%[2]s')}}"
+    raw: "@raw%[3]s"
+http:
+- method: POST
+  path:
+  - '{{RootURL}}'
+  headers:
+    a: "{{fuzztag}}"
+    b: "{{nuclei}}"
+  body: '{{raw}}'
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "%[1]s"
+    - type: word
+      part: body
+      words:
+        - "%[4]s"
+    - type: word
+      part: body
+      words:
+        - "%[3]s"
+  matchers-condition: and
+`, token, token2, token3, codec.Md5(token2))
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	require.NoError(t, err)
+	var ok bool
+	var rspRaw []byte
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		ok = result
+		rspRaw = rsp[0].RawPacket
+	}))
+	_, err = ytpl.ExecWithUrl(addr, config)
+	require.Truef(t, ok, "not matched, Response:\n%s", string(rspRaw))
+}
+
+func TestHTTPTpl_Path_Support_Variable(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(request.URL.Path))
+	})
+	addr := fmt.Sprintf("http://%s:%d", host, port)
+	token := utils.RandStringBytes(5)
+	tmpl := fmt.Sprintf(`
+variables:
+    raw: "@raw%[1]s"
+http:
+- method: POST
+  path:
+  - '{{RootURL}}/{{raw}}'
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "%[1]s"
+  matchers-condition: and
+`, token)
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	require.NoError(t, err)
+	var ok bool
+	var rspRaw []byte
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		ok = result
+		rspRaw = rsp[0].RawPacket
+	}))
+	_, err = ytpl.ExecWithUrl(addr, config)
+	require.Truef(t, ok, "not matched, Response:\n%s", string(rspRaw))
 }
 
 func TestMockTest_interactsh(t *testing.T) {
