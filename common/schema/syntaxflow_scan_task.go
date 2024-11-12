@@ -2,6 +2,8 @@ package schema
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 )
 
 const (
@@ -31,6 +33,25 @@ type SyntaxFlowScanTask struct {
 	RiskCount int64
 	// query process
 	TotalQuery int64
+}
+
+func (s *SyntaxFlowScanTask) ToGRPCModel() *ypb.SyntaxFlowScanTask {
+	res := &ypb.SyntaxFlowScanTask{
+		Id:           uint64(s.ID),
+		CreatedAt:    s.CreatedAt.Unix(),
+		UpdatedAt:    s.CreatedAt.Unix(),
+		TaskId:       s.TaskId,
+		Programs:     strings.Split(s.Programs, SYNTAXFLOWSCAN_PROGRAM_SPLIT),
+		RuleCount:    s.RulesCount,
+		Status:       s.Status,
+		Reason:       s.Reason,
+		FailedQuery:  s.FailedQuery,
+		SkipQuery:    s.SkipQuery,
+		SuccessQuery: s.SuccessQuery,
+		RiskCount:    s.RiskCount,
+		TotalQuery:   s.TotalQuery,
+	}
+	return res
 }
 
 func SaveSyntaxFlowScanTask(db *gorm.DB, task *SyntaxFlowScanTask) error {

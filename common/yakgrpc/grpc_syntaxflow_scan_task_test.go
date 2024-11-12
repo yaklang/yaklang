@@ -11,10 +11,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
 	"testing"
 )
 
-func TestGRPCMUSTPASS_SyntaxFlow_Task(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -256,5 +257,109 @@ func TestGRPCMUSTPASS_SyntaxFlow_Task(t *testing.T) {
 		require.True(t, haveExecute)
 		require.Equal(t, "done", finishStatus)
 		require.Equal(t, 1.0, finishProcess)
+	})
+}
+
+func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	startScan := func(progIds []string) (string, ypb.Yak_SyntaxFlowScanClient) {
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			Filter:      &ypb.SyntaxFlowRuleFilter{},
+			ProgramName: progIds,
+		})
+
+		resp, err := stream.Recv()
+		require.NoError(t, err)
+		log.Infof("resp: %v", resp)
+		taskID := resp.TaskID
+		return taskID, stream
+	}
+
+	deleteTasks := func(taskIds []string) {
+		_, err := client.DeleteSyntaxFlowScanTask(context.Background(), &ypb.DeleteSyntaxFlowScanTaskRequest{
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				TaskIds: taskIds,
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	queryTasks := func(taskIds []string) []*ypb.SyntaxFlowScanTask {
+		rsp, err := client.QuerySyntaxFlowScanTask(context.Background(), &ypb.QuerySyntaxFlowScanTaskRequest{
+			Pagination: &ypb.Paging{},
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				TaskIds: taskIds,
+			},
+		})
+		require.NoError(t, err)
+		return rsp.GetData()
+	}
+	t.Run("test query and delete after starting a scan task", func(t *testing.T) {
+		// save prog
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
+		package com.example.apackage; 
+		import com.example.bpackage.sub.B;
+		class A {
+			public static void main(String[] args) {
+				B b = new B();
+				target1(b.get());
+				b.show(1);
+			}
+		}
+		`)
+		progID := uuid.NewString()
+		prog, err := ssaapi.ParseProject(vf,
+			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithProgramPath("example"),
+			ssaapi.WithProgramName(progID),
+		)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progID)
+		}()
+		require.NoError(t, err)
+		require.NotNil(t, prog)
+		//start
+		taskID, stream := startScan([]string{progID})
+		defer deleteTasks([]string{taskID})
+		for {
+			_, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+		}
+		data := queryTasks([]string{taskID})
+		require.Equal(t, 1, len(data))
+		require.Equal(t, "done", data[0].Status)
+	})
+
+	t.Run("test query and delete mutli tasks", func(t *testing.T) {
+		taskIds := make([]string, 0)
+		tasksMap := make(map[string]*SyntaxFlowScanManager)
+		for i := 0; i < 10; i++ {
+			taskId := uuid.NewString()
+			taskIds = append(taskIds, taskId)
+			task, err := CreateSyntaxFlowTask(taskId, context.Background())
+			if i%3 == 1 {
+				task.status = schema.SYNTAXFLOWSCAN_PAUSED // flag
+			}
+			require.NoError(t, err)
+			task.SaveTask()
+			tasksMap[taskId] = task
+		}
+
+		gotTasks := queryTasks(taskIds)
+		require.Equal(t, 10, len(gotTasks))
+		for _, gotTask := range gotTasks {
+			if tasksMap[gotTask.TaskId].status != gotTask.Status {
+				t.Errorf("task status not match")
+			}
+		}
 	})
 }
