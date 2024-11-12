@@ -71,13 +71,14 @@ func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.
 					add(value.NewValue(v))
 				}
 			}
-		} else if ovs := value.node.HandleOccultation(); ovs != nil {
-			for _, ov := range ovs {
-				allMember := ov.GetAllMember()
-				for k, v := range allMember {
-					if check(value.NewValue(k)) {
-						add(value.NewValue(v))
-					}
+
+		}
+
+		for _, ov := range value.node.FlatOccultation() {
+			allMember := ov.GetAllMember()
+			for k, v := range allMember {
+				if check(value.NewValue(k)) {
+					add(value.NewValue(v))
 				}
 			}
 		}

@@ -452,7 +452,7 @@ func (i *anValue) GetOccultation() []Value {
 	return i.occultation
 }
 
-func (i *anValue) HandleOccultation() []Value {
+func (i *anValue) FlatOccultation() []Value {
 	var ret []Value
 	var handler func(i *anValue)
 
