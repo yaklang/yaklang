@@ -2,11 +2,12 @@ package yakit
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
-	"testing"
 
 	"github.com/go-rod/rod/lib/utils"
 	"github.com/stretchr/testify/assert"
@@ -200,4 +201,80 @@ func TestQueryHttpFlowFromPlugin(t *testing.T) {
 		}
 	}
 	require.True(t, flag)
+}
+
+func TestHTTPFlow_StatusCode(t *testing.T) {
+	token := utils.RandString(10)
+	var ids []int64
+	defer func() {
+		if len(ids) > 0 {
+			DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+				Id: ids,
+			})
+		}
+	}()
+	for i := 200; i < 205; i++ {
+		httpsFlow := &schema.HTTPFlow{
+			Url:        fmt.Sprintf("https://exxample.com:443?a=%s", token),
+			StatusCode: int64(i),
+		}
+		err := InsertHTTPFlow(consts.GetGormProjectDatabase(), httpsFlow)
+		require.NoError(t, err)
+		ids = append(ids, int64(httpsFlow.ID))
+	}
+
+	t.Run("number", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:    token,
+				StatusCode: "200",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 1)
+	})
+
+	t.Run("number range", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:    token,
+				StatusCode: "200-204",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 5)
+	})
+
+	t.Run("number range and number", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:    token,
+				StatusCode: "200-203,204",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 5)
+	})
+
+	t.Run("prefix with -", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:    token,
+				StatusCode: "-200",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 0)
+	})
+
+	t.Run("suffix with -", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:    token,
+				StatusCode: "200-",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 0)
+	})
 }
