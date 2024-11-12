@@ -512,9 +512,9 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	infoMap.Set("tags", strings.Join(y.Tags, ","))
 	yakitInfo := infoMap.NewSubMapBuilder("yakit-info")
 
-	for k, v := range y.Variables.GetRaw() {
+	y.Variables.Foreach(func(k string, v *httptpl.Var) {
 		varMap.Set(k, v.GetValue())
-	}
+	})
 	// 生成req sequences
 	maxRequest := 0
 	//signElements := make([]string, 0)
