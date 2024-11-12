@@ -331,7 +331,7 @@ func TestGRPCMUSTPASS_HybridScan_HttpflowID(t *testing.T) {
 mirrorHTTPFlow = func(isHttps , url , req , rsp , body) { 
 	dump(req)
 	if str.Contains(string(req),"%s"){
-    yakit.Output("ok")
+    yakit.Output("okOKokOK")
 	}
 }
 `, token))
@@ -394,7 +394,7 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 			break
 		}
 		if rsp.ExecResult != nil && rsp.ExecResult.IsMessage {
-			if bytes.Contains(rsp.ExecResult.Message, []byte("ok")) {
+			if bytes.Contains(rsp.ExecResult.Message, []byte("okOKokOK")) {
 				checkCount++
 			}
 		}
