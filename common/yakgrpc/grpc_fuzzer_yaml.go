@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/fuzztagx"
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"regexp"
 	"strconv"
 	"strings"
@@ -448,12 +450,21 @@ var fuzztagPattern = regexp.MustCompile(`\{\{.*?\}\}`)
 
 func ExtractAndReplaceFuzzTagFromStrings(s string, index int) (replaced string, varToFuzztagMap map[string]string) {
 	varToFuzztagMap = make(map[string]string)
-	replaced = fuzztagPattern.ReplaceAllStringFunc(s, func(s string) string {
-		index++
-		newKey := fmt.Sprintf("payload%d", index)
-		varToFuzztagMap[newKey] = s
-		return fmt.Sprintf("{{%s}}", newKey)
-	})
+	nodes, err := fuzztagx.ParseFuzztag(s, false)
+	if err != nil {
+		return s, varToFuzztagMap
+	}
+	replaced = ""
+	for _, node := range nodes {
+		switch node.(type) {
+		case parser.StringNode:
+			replaced += node.String()
+		default:
+			index++
+			replaced += fmt.Sprintf("{{payload%d}}", index)
+			varToFuzztagMap[fmt.Sprintf("payload%d", index)] = node.String()
+		}
+	}
 	return
 }
 
