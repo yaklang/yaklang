@@ -307,8 +307,8 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#TryWithResourcesStatement.
 	VisitTryWithResourcesStatement(ctx *TryWithResourcesStatementContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#SwitchStatement.
-	VisitSwitchStatement(ctx *SwitchStatementContext) interface{}
+	// Visit a parse tree produced by JavaParser#PureSwitchStatement.
+	VisitPureSwitchStatement(ctx *PureSwitchStatementContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#SynchronizedStatement.
 	VisitSynchronizedStatement(ctx *SynchronizedStatementContext) interface{}
@@ -342,6 +342,15 @@ type JavaParserVisitor interface {
 
 	// Visit a parse tree produced by JavaParser#statementList.
 	VisitStatementList(ctx *StatementListContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#switchStatement.
+	VisitSwitchStatement(ctx *SwitchStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#switchBlockStatementGroup.
+	VisitSwitchBlockStatementGroup(ctx *SwitchBlockStatementGroupContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#switchLabel.
+	VisitSwitchLabel(ctx *SwitchLabelContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#ifstmt.
 	VisitIfstmt(ctx *IfstmtContext) interface{}

@@ -543,7 +543,7 @@ statement
     | DO block WHILE parExpressionList ';'                                      # DoWhileStatement
     | TRY block (catchClause+ finallyBlock? | finallyBlock)                     # TryStatement
     | TRY resourceSpecification block catchClause* finallyBlock?                # TryWithResourcesStatement
-    | SWITCH parExpression '{' (CASE expressionList ':' statementList?)* ( DEFAULT ':' statementList?)?'}'*  # SwitchStatement
+    | switchStatement                                                           # PureSwitchStatement
     | SYNCHRONIZED parExpression block                                          # SynchronizedStatement
     | RETURN expression? ';'                                                    # ReturnStatement
     | THROW expression ';'                                                      # ThrowStatement
@@ -556,7 +556,20 @@ statement
     | identifierLabel = identifier ':' statement                                # IdentifierLabelStatement
     ;
 
-statementList: (statement  )+;
+statementList: statement+;
+
+switchStatement
+    : 'switch' parExpression '{' switchBlockStatementGroup* '}'
+    ;
+
+switchBlockStatementGroup
+    : switchLabel statementList?
+    ;
+
+switchLabel
+    : 'case' expressionList ':'
+    | 'default' ':'
+    ;
 
 ifstmt
     :IF parExpression blockOrState? elseIfBlock* elseBlock?

@@ -247,7 +247,44 @@ func TestJavaBasic_Variable_Switch(t *testing.T) {
 			"22", "33", "44", "44",
 		}, t)
 	})
-
+	t.Run("test default statement before case 1", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		var a = 1;
+		switch (a) {
+		default:
+			a = 44;
+			println(a); 
+		case 2: 
+			a = 22;
+			println(a);
+		case 3, 4:
+			a = 33;
+			println(a);
+		}
+		println(a); 
+		`, []string{
+			"22", "33", "44", "44",
+		}, t)
+	})
+	t.Run("test default statement before case 2", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		var a = 1;
+		switch (a) {
+		case 2: 
+			a = 22;
+			println(a);
+		default:
+			a = 44;
+			println(a); 
+		case 3, 4:
+			a = 33;
+			println(a);
+		}
+		println(a); 
+		`, []string{
+			"22", "33", "44", "44",
+		}, t)
+	})
 }
 
 func TestJavaBasic_Variable_SwitchArrow(t *testing.T) {
