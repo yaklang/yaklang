@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -745,6 +746,45 @@ func TestGRPCMUSTPASS_GetHTTPFlowBodyById(t *testing.T) {
 			}
 		}
 		require.Equal(t, 2, count, "should only have 2 messages")
+	})
+	t.Run("get risk body", func(t *testing.T) {
+		target := uuid.NewString()
+		content := uuid.NewString()
+		risk := &schema.Risk{
+			Url: target,
+			QuotedRequest: strconv.Quote(fmt.Sprintf(`POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+%s`, content)),
+		}
+		err2 := yakit.SaveRisk(risk)
+		require.NoError(t, err2)
+		defer func() {
+			yakit.DeleteRiskByTarget(consts.GetGormProjectDatabase(), target)
+		}()
+		c, err2 := NewLocalClient(true)
+		require.NoError(t, err2)
+		stream, err2 := c.GetHTTPFlowBodyById(context.Background(), &ypb.GetHTTPFlowBodyByIdRequest{
+			Id:        int64(risk.ID),
+			IsRequest: true,
+			IsRisk:    true,
+		})
+		require.NoError(t, err2)
+		count := 0
+		for {
+			recv, err2 := stream.Recv()
+			if err2 != nil {
+				break
+			}
+			count++
+			if count == 2 {
+				data := recv.GetData()
+				fmt.Println(content)
+				fmt.Println(string(data))
+				require.True(t, string(data) == content)
+			}
+		}
 	})
 }
 

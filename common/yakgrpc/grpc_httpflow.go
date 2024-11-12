@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/mutate"
 	"io"
 	"os"
@@ -13,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 
@@ -100,50 +100,66 @@ func (s *Server) GetHTTPFlowById(_ context.Context, r *ypb.GetHTTPFlowByIdReques
 func (s *Server) GetHTTPFlowBodyById(r *ypb.GetHTTPFlowBodyByIdRequest, stream ypb.Yak_GetHTTPFlowBodyByIdServer) error {
 	bufSize := int(r.GetBufSize())
 	var (
-		flow *schema.HTTPFlow
-		err  error
+		flow              *schema.HTTPFlow
+		risk              *schema.Risk
+		err               error
+		packet, rawPacket string
+		filename          = "body.txt"
+		reader            io.Reader
+		isRequest         = r.GetIsRequest()
 	)
 	if bufSize == 0 {
 		bufSize = oneMB
 	} else if bufSize < 0 {
 		return utils.Error("GetHTTPFlowBodyById: bufSize must be positive")
 	}
-	if r.Id != 0 {
+	if r.IsRisk {
+		risk, err = yakit.GetRisk(s.GetProjectDatabase(), r.GetId())
+	} else if r.Id != 0 {
 		flow, err = yakit.GetHTTPFlow(s.GetProjectDatabase(), r.GetId())
-		if err != nil {
-			return err
-		}
-	} else {
+	} else if r.RuntimeId != "" {
 		flow, err = yakit.GetHttpFlowByRuntimeId(s.GetProjectDatabase(), r.GetRuntimeId())
-		if err != nil {
-			return err
-		}
 	}
-	if flow == nil {
-		return utils.Errorf("not found this httpflow")
+	if err != nil || (flow == nil && risk == nil) {
+		return utils.Errorf("get body fail: intput invalid")
 	}
-	var (
-		packet, rawPacket string
-		filename          = "body.txt"
-		reader            io.Reader
-		isRequest         = r.GetIsRequest()
-	)
-
 	if isRequest {
-		packet = flow.Request
-	} else {
-		if flow.TooLargeResponseBodyFile != "" {
-			fh, err := os.Open(flow.TooLargeResponseBodyFile)
-			if err != nil {
-				return utils.Wrap(err, "GetHTTPFlowBodyById: open file error")
-			}
-			defer fh.Close()
-			reader = fh
+		if r.IsRisk {
+			packet = risk.QuotedRequest
 		} else {
-			packet = flow.Response
+			packet = flow.Request
+		}
+	} else {
+		if r.IsRisk {
+			packet = risk.QuotedResponse
+		} else {
+			if flow.TooLargeResponseBodyFile != "" {
+				fh, err := os.Open(flow.TooLargeResponseBodyFile)
+				if err != nil {
+					return utils.Wrap(err, "GetHTTPFlowBodyById: open file error")
+				}
+				defer fh.Close()
+				reader = fh
+			} else {
+				packet = flow.Response
+			}
+
+			//get filename
+			u := utils.ParseStringToUrl(flow.Url)
+			base := path.Base(u.Path)
+			if !strings.Contains(base, ".") {
+				if len(rawPacket) > 0 {
+					// try to detect mime type
+					mime := mimetype.Detect([]byte(rawPacket))
+					if mime != nil {
+						filename = "body" + mime.Extension()
+					}
+				}
+			} else {
+				filename = base
+			}
 		}
 	}
-
 	// unquote packet
 	if reader == nil {
 		rawPacket, err = strconv.Unquote(packet)
@@ -156,21 +172,6 @@ func (s *Server) GetHTTPFlowBodyById(r *ypb.GetHTTPFlowBodyByIdRequest, stream y
 	}
 
 	// get save filename
-	if !isRequest {
-		u := utils.ParseStringToUrl(flow.Url)
-		base := path.Base(u.Path)
-		if !strings.Contains(base, ".") {
-			if len(rawPacket) > 0 {
-				// try to detect mime type
-				mime := mimetype.Detect([]byte(rawPacket))
-				if mime != nil {
-					filename = "body" + mime.Extension()
-				}
-			}
-		} else {
-			filename = base
-		}
-	}
 
 	if err := stream.Send(&ypb.GetHTTPFlowBodyByIdResponse{Filename: filename}); err != nil {
 		return utils.Wrap(err, "GetHTTPFlowBodyById: send body to stream error")
