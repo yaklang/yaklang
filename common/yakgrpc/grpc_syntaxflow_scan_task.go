@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -15,7 +16,7 @@ func (s *Server) syntaxFlowScanNewTask(m *SyntaxFlowScanManager, req *ypb.Syntax
 		return utils.Errorf("program name is empty")
 	}
 	taskId := m.TaskId()
-	m.status = yakit.SYNTAXFLOWSCAN_EXECUTING
+	m.status = schema.SYNTAXFLOWSCAN_EXECUTING
 	m.stream = stream
 	m.programs = req.GetProgramName()
 	m.ignoreLanguage = req.GetIgnoreLanguage()
@@ -51,7 +52,7 @@ func (s *Server) syntaxFlowResumeTask(m *SyntaxFlowScanManager, stream ypb.Yak_S
 	if err != nil {
 		return err
 	}
-	m.status = yakit.SYNTAXFLOWSCAN_EXECUTING
+	m.status = schema.SYNTAXFLOWSCAN_EXECUTING
 	m.stream = stream
 	if m.client == nil {
 		yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
@@ -69,21 +70,21 @@ func (s *Server) syntaxFlowResumeTask(m *SyntaxFlowScanManager, stream ypb.Yak_S
 	defer func() {
 		if err := recover(); err != nil {
 			m.taskRecorder.Reason = fmt.Sprintf("PANIC from resume:%v", err)
-			m.status = yakit.SYNTAXFLOWSCAN_ERROR
+			m.status = schema.SYNTAXFLOWSCAN_ERROR
 			m.SaveTask()
 			return
 		}
-		if m.status == yakit.SYNTAXFLOWSCAN_PAUSED {
+		if m.status == schema.SYNTAXFLOWSCAN_PAUSED {
 			m.SaveTask()
 			return
 		}
-		m.status = yakit.SYNTAXFLOWSCAN_DONE
+		m.status = schema.SYNTAXFLOWSCAN_DONE
 		m.SaveTask()
 	}()
 
 	taskIndex := m.CurrentTaskIndex()
 	if taskIndex > m.totalQuery {
-		m.status = yakit.SYNTAXFLOWSCAN_DONE
+		m.status = schema.SYNTAXFLOWSCAN_DONE
 		m.SaveTask()
 		return nil
 	}
