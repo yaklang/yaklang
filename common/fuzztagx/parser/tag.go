@@ -104,8 +104,14 @@ func (*BaseTag) IsNode() {
 }
 func (b *BaseTag) String() string {
 	s := ""
+	escaper := NewDefaultEscaper(`\`, "{{", "}}")
 	for _, data := range b.Data {
-		s += data.String()
+		switch data.(type) {
+		case StringNode:
+			s += escaper.Escape(data.String())
+		default:
+			s += data.String()
+		}
 	}
 	return fmt.Sprintf("{{%s}}", s)
 }
