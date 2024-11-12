@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"strconv"
 	"strings"
 
@@ -128,12 +129,12 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
-	parameters, uiInfos := information.ParseCliParameter(prog)
+	parameters, uiInfos, pluginEnvKey := information.ParseCliParameter(prog)
 	ret.CliParameter = cliParam2grpc(parameters)
 	ret.UIInfo = uiInfo2grpc(uiInfos)
 	ret.RiskInfo = riskInfo2grpc(information.ParseRiskInfo(prog), consts.GetGormCVEDatabase())
 	ret.Tags = information.ParseTags(prog)
-
+	ret.PluginEnvKey = pluginEnvKey
 	return ret, nil
 }
 
@@ -330,7 +331,7 @@ func getNeedReturn(script *schema.YakScript) ([]*ypb.YakScriptParam, error) {
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
-	parameters, _ := information.ParseCliParameter(prog)
+	parameters, _, _ := information.ParseCliParameter(prog)
 	codeParameter := lo.SliceToMap(
 		cliParam2grpc(parameters),
 		func(ysp *ypb.YakScriptParam) (string, *ypb.YakScriptParam) {
@@ -387,13 +388,28 @@ func (s *Server) YaklangGetCliCodeFromDatabase(ctx context.Context, req *ypb.Yak
 	}, nil
 }
 
-func GenerateParameterFromProgram(prog *ssaapi.Program) (string, error) {
-	parameters, _ := information.ParseCliParameter(prog)
+func GenerateParameterFromProgram(prog *ssaapi.Program) (string, string, error) {
+	parameters, _, pluginEnvKey := information.ParseCliParameter(prog) //
 	cli := cliParam2grpc(parameters)
-	data, err := json.Marshal(cli)
-	if err != nil {
-		return "", err
+
+	getMarshalData := func(data interface{}) (string, error) {
+		if funk.IsEmpty(data) {
+			return "", nil
+		}
+		dataRaw, err := json.Marshal(data)
+		if err != nil {
+			return "", err
+		}
+		return strconv.Quote(string(dataRaw)), err
 	}
-	str := strconv.Quote(string(data))
-	return str, nil
+
+	parameterRaw, err := getMarshalData(cli)
+	if err != nil {
+		return "", "", err
+	}
+	pluginEnvKeyRaw, err := getMarshalData(pluginEnvKey)
+	if err != nil {
+		return "", "", err
+	}
+	return parameterRaw, pluginEnvKeyRaw, nil
 }
