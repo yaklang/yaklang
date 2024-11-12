@@ -1188,35 +1188,37 @@ http:
 
 func TestGRPCMUSTPASS_HTTPFuzzerTaskToYaml(t *testing.T) {
 	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ctx := context.Background()
-	rsp, err := client.ExportHTTPFuzzerTaskToYaml(ctx, &ypb.ExportHTTPFuzzerTaskToYamlRequest{
-		Requests: &ypb.FuzzerRequests{
-			Requests: []*ypb.FuzzerRequest{
-				{
-					RequestRaw: []byte(`GET / HTTP/1.1
+	for i := 0; i < 100; i++ {
+		rsp, err := client.ExportHTTPFuzzerTaskToYaml(ctx, &ypb.ExportHTTPFuzzerTaskToYamlRequest{
+			Requests: &ypb.FuzzerRequests{
+				Requests: []*ypb.FuzzerRequest{
+					{
+						RequestRaw: []byte(`GET / HTTP/1.1
 Host: www.example.com
 
 {{p(a)}}`),
-					IsHTTPS:                  false,
-					PerRequestTimeoutSeconds: 5,
-					RedirectTimes:            3,
-					Params: []*ypb.FuzzerParamItem{
-						{
-							Key:   "a",
-							Value: "{{rand_char(5)}}",
-							Type:  "nuclei-dsl",
+						IsHTTPS:                  false,
+						PerRequestTimeoutSeconds: 5,
+						RedirectTimes:            3,
+						Params: []*ypb.FuzzerParamItem{
+							{
+								Key:   "a",
+								Value: "{{rand_char(5)}}",
+								Type:  "nuclei-dsl",
+							},
 						},
 					},
 				},
 			},
-		},
-		TemplateType: "path",
-	})
-	require.NoError(t, err)
-	fmt.Println(rsp.YamlContent)
-	require.Contains(t, rsp.YamlContent, `a: '{{rand_char(5)}}'`)
-	require.Contains(t, rsp.YamlContent, `payload1: '@fuzztag{{p(a)}}'`)
+			TemplateType: "path",
+		})
+		require.NoError(t, err)
+		aIndex := strings.Index(rsp.YamlContent, "a: '{{rand_char(5)}}'")
+		payloadIndex := strings.Index(rsp.YamlContent, "payload1: '@fuzztag{{p(a)}}'")
+		require.Greater(t, aIndex, -1, "variable a not found")
+		require.Greater(t, payloadIndex, -1, "variable payload1 not found")
+		require.Greater(t, payloadIndex, aIndex, "variable payload1 should be after variable a")
+	}
 }

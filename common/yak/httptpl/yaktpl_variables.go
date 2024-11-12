@@ -153,23 +153,34 @@ func (v *YakVariables) Keys() []string {
 	return v.raw.Keys()
 }
 
-func (v *YakVariables) GetRaw() map[string]*Var {
+func (v *YakVariables) Foreach(f func(key string, value *Var)) {
 	if v == nil {
-		return make(map[string]*Var)
+		return
 	}
-	retMap := make(map[string]*Var)
-	if v == nil {
-		return retMap
-	}
-	for key, iValue := range v.raw.ToStringMap() {
+	v.raw.ForEach(func(key string, iValue any) {
 		value, ok := iValue.(*Var)
 		if !ok {
 			log.Errorf("BUG: nuclei variables not *Vars, but %T", iValue)
-			continue
+			return
 		}
-		retMap[key] = value
+		f(key, value)
+	})
+}
+
+func (v *YakVariables) Get(key string) (*Var, bool) {
+	if v == nil {
+		return nil, false
 	}
-	return retMap
+	iValue, exists := v.raw.Get(key)
+	if !exists {
+		return nil, false
+	}
+	value, ok := iValue.(*Var)
+	if !ok {
+		log.Errorf("BUG: nuclei variables not *Vars, but %T", iValue)
+		return nil, false
+	}
+	return value, true
 }
 
 func (v *YakVariables) Len() int {

@@ -97,9 +97,12 @@ http:
 	assert.Equal(t, 2, len(tmp.HTTPRequestSequences[0].HTTPRequests), "parse HTTPRequests error")
 	assert.Equal(t, 1, len(tmp.HTTPRequestSequences[1].Paths), "parse HTTPRequests error")
 	assert.Equal(t, "GET", tmp.HTTPRequestSequences[1].Method, "parse HTTPRequests error")
-	rawVarMap := tmp.Variables.GetRaw()
-	assert.Equal(t, "{{replace(BaseURL,\"/\",\"_\")}}", rawVarMap["filename"].Data, "parse variables error")
-	assert.Equal(t, "screenshots", rawVarMap["dir"].Data, "parse variables error")
+	filenameVar, ok := tmp.Variables.Get("filename")
+	assert.True(t, ok, "parse variables[filename] error")
+	assert.Equal(t, "{{replace(BaseURL,\"/\",\"_\")}}", filenameVar.Data, "parse variables[filename] error")
+	dirVar, ok := tmp.Variables.Get("dir")
+	assert.True(t, ok, "parse variables[dir] error")
+	assert.Equal(t, "screenshots", dirVar.Data, "parse variables[dir] error")
 	// matchers
 	matchers := tmp.HTTPRequestSequences[1].Matcher
 	assert.NotNil(t, matchers)
