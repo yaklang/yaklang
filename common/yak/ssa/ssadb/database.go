@@ -4,7 +4,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 var SSAProjectTables = []any{
@@ -27,13 +26,7 @@ var SSAProjectTables = []any{
 
 func init() {
 	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_SSA_DATABASE, SSAProjectTables...)
-	yakit.RegisterPostInitDatabaseFunction(func() error {
-		db := consts.GetGormProfileDatabase()
-		db = db.Where("deleted_at != NULL").Unscoped().Delete(&schema.SSAProgram{})
-		return db.Error
-	})
 }
-
 func GetDB() *gorm.DB {
 	return consts.GetGormDefaultSSADataBase()
 }

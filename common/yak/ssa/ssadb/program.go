@@ -59,7 +59,6 @@ func GetLibrary(name, version string) (*IrProgram, error) {
 }
 
 func GetProgram(name, kind string) (*IrProgram, error) {
-
 	var p IrProgram
 	db := GetDB().Model(&IrProgram{})
 	if name == "" {
