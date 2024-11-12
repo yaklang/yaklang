@@ -181,6 +181,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 	var leftv *ssa.Variable = nil
 	var rightv ssa.Value = nil
+	var handleObjectType func(ssa.Value, *ssa.ObjectType)
 
 	if IslValue {
 		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
@@ -193,7 +194,25 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 		if ret := exp.DOT(); ret != nil {
 			id := exp.IDENTIFIER()
 			test := id.GetText()
-			leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(test))
+
+			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
+				if key := typ.GetKeybyName(test); key != nil {
+					leftv = b.CreateMemberCallVariable(rv, key)
+				} else {
+					for n, a := range typ.AnonymousField {
+						rv = b.ReadMemberCallValue(rv, b.EmitConstInst(n))
+						handleObjectType(rv, a)
+					}
+				}
+			}
+
+			if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
+				handleObjectType(rv, typ)
+			}
+
+			if leftv == nil {
+				leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(test))
+			}
 		}
 	} else {
 		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
@@ -220,9 +239,25 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				_ = a
 			}
 
+			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
+				if key := typ.GetKeybyName(test); key != nil {
+					rightv = b.ReadMemberCallValue(rv, key)
+				} else {
+					for n, a := range typ.AnonymousField {
+						rv = b.ReadMemberCallValue(rv, b.EmitConstInst(n))
+						handleObjectType(rv, a)
+					}
+				}
+			}
+
 			if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), test); ok {
 				rightv = value
 			} else {
+				if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
+					handleObjectType(rv, typ)
+				}
+			}
+			if rightv == nil {
 				rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(test))
 			}
 		}
