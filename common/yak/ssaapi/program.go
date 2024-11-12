@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"sort"
 	"time"
 
@@ -98,7 +99,9 @@ func (p *Program) GetInstructionById(id int64) ssa.Instruction {
 
 func (p *Program) Ref(name string) Values {
 	return lo.FilterMap(
-		ssa.MatchInstructionByExact(p.Program, ssadb.NameMatch, name),
+		ssa.MatchInstructionByExact(
+			context.Background(), p.Program, ssadb.NameMatch, name,
+		),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true

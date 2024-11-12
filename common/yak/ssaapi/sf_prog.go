@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"regexp"
 	"strings"
 
@@ -54,9 +55,9 @@ func (p *Program) Recursive(f func(operator sfvm.ValueOperator) error) error {
 	return f(p)
 }
 
-func (p *Program) ExactMatch(mod int, s string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) ExactMatch(ctx context.Context, mod int, s string) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		ssa.MatchInstructionByExact(p.Program, mod, s),
+		ssa.MatchInstructionByExact(ctx, p.Program, mod, s),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true
@@ -68,9 +69,9 @@ func (p *Program) ExactMatch(mod int, s string) (bool, sfvm.ValueOperator, error
 	return len(values) > 0, values, nil
 }
 
-func (p *Program) GlobMatch(mod int, g string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		ssa.MatchInstructionByGlob(p.Program, mod, g),
+		ssa.MatchInstructionByGlob(ctx, p.Program, mod, g),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true
@@ -81,9 +82,9 @@ func (p *Program) GlobMatch(mod int, g string) (bool, sfvm.ValueOperator, error)
 	return len(values) > 0, values, nil
 }
 
-func (p *Program) RegexpMatch(mod int, re string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		ssa.MatchInstructionByRegexp(p.Program, mod, re),
+		ssa.MatchInstructionByRegexp(ctx, p.Program, mod, re),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true

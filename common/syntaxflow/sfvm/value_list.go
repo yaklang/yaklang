@@ -1,6 +1,7 @@
 package sfvm
 
 import (
+	"context"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -226,10 +227,10 @@ func (v *ValueList) IsList() bool {
 	return true
 }
 
-func (v *ValueList) ExactMatch(mod int, s string) (bool, ValueOperator, error) {
+func (v *ValueList) ExactMatch(ctx context.Context, mod int, s string) (bool, ValueOperator, error) {
 	var res []ValueOperator
 	for _, value := range v.values {
-		match, next, err := value.ExactMatch(mod, s)
+		match, next, err := value.ExactMatch(ctx, mod, s)
 		if err != nil {
 			return false, nil, err
 		}
@@ -242,10 +243,10 @@ func (v *ValueList) ExactMatch(mod int, s string) (bool, ValueOperator, error) {
 	return len(res) > 0, NewValues(res), nil
 }
 
-func (v *ValueList) GlobMatch(mod int, s string) (bool, ValueOperator, error) {
+func (v *ValueList) GlobMatch(ctx context.Context, mod int, s string) (bool, ValueOperator, error) {
 	var res []ValueOperator
 	for _, value := range v.values {
-		match, next, err := value.GlobMatch(mod, s)
+		match, next, err := value.GlobMatch(ctx, mod, s)
 		if err != nil {
 			return false, nil, err
 		}
@@ -258,10 +259,10 @@ func (v *ValueList) GlobMatch(mod int, s string) (bool, ValueOperator, error) {
 	return len(res) > 0, NewValues(res), nil
 }
 
-func (v *ValueList) RegexpMatch(mod int, regexp string) (bool, ValueOperator, error) {
+func (v *ValueList) RegexpMatch(ctx context.Context, mod int, regexp string) (bool, ValueOperator, error) {
 	var res []ValueOperator
 	for _, value := range v.values {
-		match, next, err := value.RegexpMatch(mod, regexp)
+		match, next, err := value.RegexpMatch(ctx, mod, regexp)
 		if err != nil {
 			return false, nil, err
 		}

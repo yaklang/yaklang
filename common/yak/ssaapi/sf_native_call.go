@@ -2,12 +2,13 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/gobwas/glob"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -225,15 +226,15 @@ func init() {
 		constHandler := func(operator sfvm.ValueOperator) {
 			switch mode {
 			case "e":
-				if match, valueOperator, err := operator.ExactMatch(ssadb.ConstType, rule); match && err == nil {
+				if match, valueOperator, err := operator.ExactMatch(frame.GetContext(), ssadb.ConstType, rule); match && err == nil {
 					results = append(results, valueOperator)
 				}
 			case "g":
-				if match, valueOperator, err := operator.GlobMatch(ssadb.ConstType, rule); match && err == nil {
+				if match, valueOperator, err := operator.GlobMatch(frame.GetContext(), ssadb.ConstType, rule); match && err == nil {
 					results = append(results, valueOperator)
 				}
 			case "r":
-				if match, valueOperator, err := operator.RegexpMatch(ssadb.ConstType, rule); match && err == nil {
+				if match, valueOperator, err := operator.RegexpMatch(frame.GetContext(), ssadb.ConstType, rule); match && err == nil {
 					results = append(results, valueOperator)
 				}
 			}
@@ -735,7 +736,7 @@ func init() {
 							if val.ParentProgram == nil {
 								return utils.Error("ParentProgram is nil")
 							}
-							ok, next, _ := val.ParentProgram.ExactMatch(sfvm.BothMatch, funcName)
+							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), sfvm.BothMatch, funcName)
 							if ok {
 								vals = append(vals, next)
 							}
@@ -751,7 +752,7 @@ func init() {
 							if val.ParentProgram == nil {
 								return utils.Error("ParentProgram is nil")
 							}
-							ok, next, _ := val.ParentProgram.ExactMatch(sfvm.BothMatch, funcName)
+							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), sfvm.BothMatch, funcName)
 							if ok {
 								next.AppendPredecessor(val, frame.WithPredecessorContext("searchCall: "+funcName))
 								vals = append(vals, next)
@@ -774,7 +775,7 @@ func init() {
 						if prog == nil {
 							return utils.Error("ParentProgram is nil")
 						}
-						haveNext, next, _ := prog.ExactMatch(sfvm.BothMatch, methodName)
+						haveNext, next, _ := prog.ExactMatch(frame.GetContext(), sfvm.BothMatch, methodName)
 						if haveNext && next != nil {
 							next.Recursive(func(operator sfvm.ValueOperator) error {
 								callee, ok := operator.(*Value)
@@ -791,7 +792,7 @@ func init() {
 						if str, err := strconv.Unquote(funcName); err == nil {
 							funcName = str
 						}
-						ok, next, _ := val.ParentProgram.ExactMatch(sfvm.BothMatch, funcName)
+						ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), sfvm.BothMatch, funcName)
 						if ok {
 							next.AppendPredecessor(val, frame.WithPredecessorContext("searchCall: "+funcName))
 							vals = append(vals, next)

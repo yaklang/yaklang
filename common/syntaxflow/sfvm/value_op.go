@@ -1,6 +1,7 @@
 package sfvm
 
 import (
+	"context"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -113,11 +114,11 @@ type ValueOperator interface {
 	Recursive(func(ValueOperator) error) error
 
 	// ExactMatch return ops, for OpPushSearchExact
-	ExactMatch(int, string) (bool, ValueOperator, error)
+	ExactMatch(context.Context, int, string) (bool, ValueOperator, error)
 	// GlobMatch return opts, for OpPushSearchGlob
-	GlobMatch(int, string) (bool, ValueOperator, error)
+	GlobMatch(context.Context, int, string) (bool, ValueOperator, error)
 	// RegexpMatch for OpPushSearchRegexp
-	RegexpMatch(int, string) (bool, ValueOperator, error)
+	RegexpMatch(context.Context, int, string) (bool, ValueOperator, error)
 
 	// GetCallActualParams for OpGetCallArgs
 	GetCalled() (ValueOperator, error)
