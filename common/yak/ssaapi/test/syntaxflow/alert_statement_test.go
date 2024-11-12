@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -22,7 +21,7 @@ func TestAlertStatement(t *testing.T) {
 				f( * as $i )
 				alert $i
 
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -46,7 +45,7 @@ func TestAlertStatement(t *testing.T) {
 				f( * as $i )
 				alert $i for {msg: "this is an alert message"}
 
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 			if err != nil {
 				t.Fatal(err)
 			}

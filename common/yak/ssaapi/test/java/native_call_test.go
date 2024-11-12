@@ -1,10 +1,11 @@
 package java
 
 import (
-	"github.com/stretchr/testify/assert"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -67,7 +68,7 @@ func TestNativeCall_GetObject(t *testing.T) {
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
 .b<getObject>.c as $sink;
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 			sink := results.GetValues("sink").Show()
 			if sink.Len() != 1 {
 				t.Fatal("sink.Len() != 1")
@@ -86,7 +87,7 @@ func TestNativeCall_GetReturns(t *testing.T) {
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
 HHHHH <getReturns> as $sink; 
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 			sink := results.GetValues("sink").Show()
 			if sink.Len() != 1 {
 				t.Fatal("sink.Len() != 1")
@@ -105,7 +106,7 @@ func TestNativeCall_GetFormalParams(t *testing.T) {
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
 HHHHH <getFormalParams> as $sink; 
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 			sink := results.GetValues("sink").Show()
 			if sink.Len() != 2 {
 				t.Fatal("sink.Len() != 2")
@@ -125,7 +126,7 @@ func TestNativeCall_SearchCall(t *testing.T) {
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
 flexible <getCall> <searchFunc> as $sink; 
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 			sink := results.GetValues("sink")
 			if sink.Len() <= 1 {
 				t.Fatal("sink.Len() <= 1")
@@ -141,7 +142,7 @@ func TestNativeCall_GetCall(t *testing.T) {
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
 aArgs <getCall> as $sink; 
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 			sink := results.GetValues("sink")
 			if sink.Len() != 1 {
 				t.Fatal("sink.Len() != 1")
@@ -157,7 +158,7 @@ func TestNativeCall_GetCall_Then_GetFunc(t *testing.T) {
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
 yourMethod()<getCaller> as $sink; 
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 			sink := results.GetValues("sink")
 			sink.Show()
 			if sink.Len() < 2 {
@@ -179,7 +180,7 @@ func TestNativeCall_GetCaller(t *testing.T) {
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
 aArgs <getCall> <getCaller> as $sink; 
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 			sink := results.GetValues("sink").Show()
 			if sink.Len() != 1 {
 				t.Fatal("sink.Len() != 1")
@@ -207,7 +208,7 @@ yourMethod = () => {
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
 aArgs <getFunc> as $sink; 
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 			sink := results.GetValues("sink").Show()
 			if sink.Len() != 1 {
 				t.Fatal("sink.Len() != 1")
@@ -228,7 +229,7 @@ func TestNativeCall_SearchFormalParams(t *testing.T) {
 	ssatest.Check(t, NativeCallTest,
 		func(prog *ssaapi.Program) error {
 			prog.Show()
-			results := prog.SyntaxFlow("DocumentBuilderFactory...parse(* #-> as $source) as $sink", sfvm.WithEnableDebug(true))
+			results := prog.SyntaxFlow("DocumentBuilderFactory...parse(* #-> as $source) as $sink", ssaapi.QueryWithEnableDebug(true))
 			results.Show()
 			ssatest.CompareResult(t, true, results, map[string][]string{
 				"source": {`"Hello Native Method"`, `"aaaaaaa"`},

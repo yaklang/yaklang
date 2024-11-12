@@ -41,10 +41,10 @@ dump(a(2))
 	var ssaValueCount = 0
 	var check2 = false
 	var check4 = false
-	prog.SyntaxFlowChain(`dump(* #-> * as $abc)`, sfvm.WithEnableDebug(true), sfvm.WithResultCaptured(func(name string, op sfvm.ValueOperator) error {
+	prog.SyntaxFlowChain(`dump(* #-> * as $abc)`, ssaapi.QueryWithEnableDebug(true), ssaapi.QueryWithResultCaptured(func(name string, op sfvm.ValueOperator) error {
 		count++
 		return nil
-	}), ssaapi.WithSyntaxFlowResult("abc", func(value *ssaapi.Value) error {
+	}), ssaapi.QueryWithSyntaxFlowResult("abc", func(value *ssaapi.Value) error {
 		ssaValueCount++
 		spew.Dump(value.String())
 		switch value.String() {

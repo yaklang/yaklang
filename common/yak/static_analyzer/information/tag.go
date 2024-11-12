@@ -1,7 +1,6 @@
 package information
 
 import (
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -59,7 +58,7 @@ http./^(Raw|Get|Post|Request|Do)$/() as $target
 httpool.Pool() as $target
 poc./^(Get|Post|Head|Delete|Options|Do|Websocket|HTTP|HTTPEx)$/() as $target
 fuzz./^(HTTPRequest|MustHTTPRequest)$/() as $target
-`, sfvm.WithEnableDebug(true))
+`, ssaapi.QueryWithEnableDebug(true))
 	if err == nil {
 		return res.GetValues("target").Len()
 	}

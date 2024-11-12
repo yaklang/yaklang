@@ -5,9 +5,8 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
-
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 )
 
 func (y *SyntaxFlowVisitor) EmitEnterStatement() *SFI {

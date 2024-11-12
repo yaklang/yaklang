@@ -7,12 +7,11 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
-func ExecRule(r *schema.SyntaxFlowRule, prog *ssaapi.Program, opts ...sfvm.Option) (*ssaapi.SyntaxFlowResult, error) {
+func ExecRule(r *schema.SyntaxFlowRule, prog *ssaapi.Program, opts ...ssaapi.QueryOption) (*ssaapi.SyntaxFlowResult, error) {
 	res, err := prog.SyntaxFlowRule(r, opts...)
 	if err != nil {
 		return nil, err
@@ -33,9 +32,11 @@ func QuerySyntaxFlowRules(name string, opts ...QueryRulesOption) chan *schema.Sy
 
 var Exports = map[string]any{
 	"ExecRule":       ExecRule,
-	"withExecTaskID": sfvm.WithExecTaskID,
-	"withExecDebug":  sfvm.WithEnableDebug,
-	"withProcess":    sfvm.WithProcessCallback,
+	"withExecTaskID": ssaapi.QueryWithTaskID,
+	"withExecDebug":  ssaapi.QueryWithEnableDebug,
+	"withProcess":    ssaapi.QueryWithProcessCallback,
+	"withContext":    ssaapi.QueryWithContext,
+	"withSave":       ssaapi.QueryWithSave,
 
 	"QuerySyntaxFlowRules": QuerySyntaxFlowRules,
 }

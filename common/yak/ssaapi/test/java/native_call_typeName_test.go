@@ -2,10 +2,11 @@ package java
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
@@ -368,7 +369,7 @@ func TestFullTypeNameWithParentClass1(t *testing.T) {
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
 		prog.Show()
-		flow := prog.SyntaxFlow(`a<fullTypeName><show>`, sfvm.WithEnableDebug())
+		flow := prog.SyntaxFlow(`a<fullTypeName><show>`, ssaapi.QueryWithEnableDebug())
 		flow.Show()
 		obj := prog.SyntaxFlowChain("a<typeName> as $obj")
 		assert.Equal(t, 6, obj.Len())

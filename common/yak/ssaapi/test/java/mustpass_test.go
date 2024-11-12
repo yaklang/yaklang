@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -79,7 +77,7 @@ func TestMustPass_Debug(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		result, err := prog.SyntaxFlowWithError(string(raw), sfvm.WithEnableDebug(true))
+		result, err := prog.SyntaxFlowWithError(string(raw), ssaapi.QueryWithEnableDebug(true))
 		if err != nil {
 			t.Fatal(err)
 		}

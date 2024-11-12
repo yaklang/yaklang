@@ -2,13 +2,13 @@ package php
 
 import (
 	_ "embed"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"strings"
-	"testing"
 )
 
 //go:embed phpcode/vul/exec.php
@@ -35,7 +35,7 @@ include('files/'.$action.'.php'); //载入相应文件
 	})
 	t.Run("test-exec", func(t *testing.T) {
 		ssatest.Check(t, ExecCode, func(prog *ssaapi.Program) error {
-			results, err := prog.SyntaxFlowWithError(`exec(* #-> * as $param)`, sfvm.WithEnableDebug(true))
+			results, err := prog.SyntaxFlowWithError(`exec(* #-> * as $param)`, ssaapi.QueryWithEnableDebug(true))
 			require.NoError(t, err)
 			var flag bool
 			values := results.GetValues("param")

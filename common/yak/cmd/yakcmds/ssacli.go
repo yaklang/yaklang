@@ -711,9 +711,9 @@ func SyntaxFlowQuery(
 	if dbDebug {
 		prog.DBDebug()
 	}
-	opt := make([]sfvm.Option, 0)
+	opt := make([]ssaapi.QueryOption, 0)
 	if sfDebug {
-		opt = append(opt, sfvm.WithEnableDebug())
+		opt = append(opt, ssaapi.QueryWithEnableDebug())
 	}
 	var execError error
 	result, err := prog.SyntaxFlowWithError(syntaxFlow, opt...)
