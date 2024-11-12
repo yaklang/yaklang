@@ -13,14 +13,7 @@ func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*
 		params = &ypb.QuerySyntaxFlowRuleRequest{}
 	}
 	db = db.Model(&schema.SyntaxFlowRule{})
-	if params.Pagination == nil {
-		params.Pagination = &ypb.Paging{
-			Page:    1,
-			Limit:   30,
-			OrderBy: "updated_at",
-			Order:   "desc",
-		}
-	}
+
 	p := params.Pagination
 	db = bizhelper.OrderByPaging(db, p)
 	db = FilterSyntaxFlowRule(db, params.GetFilter())

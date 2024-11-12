@@ -89,7 +89,7 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 		return nil
 	case <-streamCtx.Done():
 		taskManager.Stop()
-		RemoveHybridTask(taskId)
+		RemoveSyntaxFlowTask(taskId)
 		return utils.Error("client canceled")
 	}
 }
