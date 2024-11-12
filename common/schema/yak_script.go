@@ -78,6 +78,8 @@ type YakScript struct {
 	RiskAnnotation string `json:"risk_annotation"`
 	// 协作者
 	CollaboratorInfo string `json:"collaborator_info"`
+
+	PluginEnvKey string `json:"plugin_env_key"`
 }
 
 func (s *YakScript) BeforeSave() error {

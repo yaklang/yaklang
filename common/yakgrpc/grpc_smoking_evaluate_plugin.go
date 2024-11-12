@@ -201,7 +201,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		if err != nil {
 			pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error)
 		}
-		parameters, _ := information.ParseCliParameter(prog)
+		parameters, _, _ := information.ParseCliParameter(prog)
 		if len(parameters) > 0 {
 			hasParameter = true
 		}
