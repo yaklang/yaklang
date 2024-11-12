@@ -7,8 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -230,7 +228,16 @@ func (s *Server) QueryYakScript(ctx context.Context, req *ypb.QueryYakScriptRequ
 }
 
 func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
-	raw, _ := json.Marshal(script.Params)
+	getMarshalRaw := func(i interface{}) string {
+		if funk.IsEmpty(i) {
+			return ""
+		}
+		raw, _ := json.Marshal(i)
+		return strconv.Quote(string(raw))
+	}
+	paramsRaw := getMarshalRaw(script.Params)
+	pluginEnvRaw := getMarshalRaw(script.PluginEnvKey)
+	riskRaw := getMarshalRaw(script.RiskInfo)
 	if script.IsGeneralModule && script.GeneralModuleKey == "" {
 		script.GeneralModuleKey = script.ScriptName
 		script.GeneralModuleVerbose = script.ScriptName
@@ -240,7 +247,9 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 		Type:                 script.Type,
 		Content:              script.Content,
 		Level:                script.Level,
-		Params:               strconv.Quote(string(raw)),
+		Params:               strconv.Quote(string(paramsRaw)),
+		PluginEnvKey:         strconv.Quote(string(pluginEnvRaw)),
+		RiskDetail:           strconv.Quote(string(riskRaw)),
 		Help:                 script.Help,
 		Author:               script.Author,
 		Tags:                 script.Tags,
@@ -260,14 +269,6 @@ func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb
 		if err != nil {
 			return nil, utils.Errorf("save plugin failed! content is invalid(潜在语法错误): %s", err)
 		}
-		if script.Type == "mitm" {
-			prog, err := static_analyzer.SSAParse(script.Content, script.Type)
-			if err != nil {
-				return nil, utils.Error("ssa parse error")
-			}
-			parameters, _ := information.ParseCliParameter(prog)
-			script.Params = cliParam2grpc(parameters)
-		}
 	}
 
 	err := yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, GRPCYakScriptToYakitScript(script))
@@ -279,15 +280,6 @@ func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb
 		"enable_plugin_selector": script.EnablePluginSelector,
 		"plugin_selector_types":  script.PluginSelectorTypes,
 	})
-
-	//if !script.IsGeneralModule {
-	//	err = yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(),script.ScriptName, map[string]interface{}{
-	//		"is_general_module": script.IsGeneralModule,
-	//	})
-	//	if err != nil {
-	//		log.Errorf("update is_general_module failed: %s", err)
-	//	}
-	//}
 
 	res, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), script.ScriptName)
 	if err != nil {
@@ -926,85 +918,59 @@ func (s *Server) YakScriptRiskTypeList(context.Context, *ypb.Empty) (*ypb.YakScr
 	return ret, nil
 }
 
-func GRPCYakScriptToYakScript(script *ypb.SaveNewYakScriptRequest) map[string]interface{} {
-	if script.IsGeneralModule && script.GeneralModuleKey == "" {
-		script.GeneralModuleKey = script.ScriptName
-		script.GeneralModuleVerbose = script.ScriptName
+func LegacyGRPCSaveNewYakScriptRequestGetYakScript(request *ypb.SaveNewYakScriptRequest) *ypb.YakScript {
+	if request.IsGeneralModule && request.GeneralModuleKey == "" {
+		request.GeneralModuleKey = request.ScriptName
+		request.GeneralModuleVerbose = request.ScriptName
 	}
-	Data := map[string]interface{}{
-		"script_name":            script.ScriptName,
-		"type":                   script.Type,
-		"content":                script.Content,
-		"level":                  script.Level,
-		"help":                   script.Help,
-		"tags":                   script.Tags,
-		"is_history":             script.IsHistory,
-		"is_general_module":      script.IsGeneralModule,
-		"general_module_key":     script.GeneralModuleKey,
-		"general_module_verbose": script.GeneralModuleVerbose,
-		"enable_plugin_selector": script.EnablePluginSelector,
-		"plugin_selector_types":  script.PluginSelectorTypes,
+	script := &ypb.YakScript{
+		ScriptName:           request.ScriptName,
+		Type:                 request.Type,
+		Content:              request.Content,
+		Level:                request.Level,
+		Help:                 request.Help,
+		Tags:                 request.Tags,
+		IsHistory:            request.IsHistory,
+		IsGeneralModule:      request.IsGeneralModule,
+		GeneralModuleKey:     request.GeneralModuleKey,
+		GeneralModuleVerbose: request.GeneralModuleVerbose,
+		EnablePluginSelector: request.EnablePluginSelector,
+		PluginSelectorTypes:  request.PluginSelectorTypes,
+		RiskDetail:           request.RiskDetail,
+		RiskInfo:             request.RiskInfo,
+		PluginEnvKey:         request.PluginEnvKey,
 	}
-	if len(script.Params) > 0 {
-		raw, _ := json.Marshal(script.Params)
-		Data["params"] = strconv.Quote(string(raw))
-	} else {
-		Data["params"] = ""
-	}
-	raw, err := json.Marshal(script.RiskInfo)
-	if err == nil {
-		Data["risk_detail"] = strconv.Quote(string(raw))
-	} else {
-		Data["risk_detail"] = ""
-	}
-	return Data
+	return script
 }
 
-func (s *Server) SaveNewYakScript(ctx context.Context, script *ypb.SaveNewYakScriptRequest) (*ypb.YakScript, error) {
+func (s *Server) SaveNewYakScript(ctx context.Context, request *ypb.SaveNewYakScriptRequest) (*ypb.YakScript, error) {
+	script := LegacyGRPCSaveNewYakScriptRequestGetYakScript(request)
 	if script.Type == "nuclei" {
 		script.Params = buildinNucleiYakScriptParam
 	}
-
 	switch script.Type {
 	case "yak", "mitm", "port-scan":
 		_, err := antlr4yak.New().FormattedAndSyntaxChecking(script.GetContent())
 		if err != nil {
 			return nil, utils.Errorf("save plugin failed! content is invalid(潜在语法错误): %s", err)
 		}
-		if script.Type == "mitm" {
-			prog, err := static_analyzer.SSAParse(script.Content, script.Type)
-			if err != nil {
-				return nil, utils.Error("ssa parse error")
-			}
-			parameters, _ := information.ParseCliParameter(prog)
-			script.Params = cliParam2grpc(parameters)
-		}
 	}
 	script.ScriptName = strings.TrimSpace(script.ScriptName)
-
-	yakScript, _ := yakit.GetYakScriptByWhere(s.GetProfileDatabase(), script.ScriptName, script.Id)
-	var isUpdate bool
-
-	if (script.Id > 0 && yakScript != nil) || (script.Id <= 0 && yakScript != nil) {
-		return nil, utils.Errorf("save plugin failed! 插件名重复")
-	}
-	yakScript, _ = yakit.GetYakScript(s.GetProfileDatabase(), script.Id)
-	if yakScript != nil {
-		isUpdate = true
-		err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.Id, GRPCYakScriptToYakScript(script))
-		if err != nil {
+	isUpdate := script.Id > 0
+	err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.Id, GRPCYakScriptToYakitScript(script))
+	if err != nil {
+		if isUpdate {
+			if strings.Contains(err.Error(), "UNIQUE constraint failed: yak_scripts.script_name") {
+				return nil, utils.Errorf("save plugin failed! 插件名重复")
+			}
 			return nil, utils.Errorf("update yakScript failed: %s", err.Error())
-		}
-	} else {
-		err := yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, GRPCYakScriptToYakScript(script))
-		if err != nil {
+		} else {
 			return nil, utils.Errorf("create yakScript failed: %s", err.Error())
 		}
 	}
-
 	res, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), script.ScriptName)
 	if err != nil {
-		return nil, utils.Errorf("query saved yak script failed: %s", err)
+		return nil, utils.Errorf("query saved yak request failed: %s", err)
 	}
 	data := res.ToGRPCModel()
 	data.IsUpdate = isUpdate

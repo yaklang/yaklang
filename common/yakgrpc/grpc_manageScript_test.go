@@ -72,7 +72,7 @@ func TestServer_Cli_YakSript(t *testing.T) {
 		_ = client
 		createHandler := func(scripts ...*TestCase) {
 			for _, script := range scripts {
-				err = yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, script.script)
+				err = yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase().Debug(), 0, script.script)
 				require.NoError(t, err)
 			}
 		}
