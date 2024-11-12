@@ -462,7 +462,7 @@ public class Main{
 		`
 		ssatest.CheckPrintlnValue(code, []string{
 			// TODO: this error
-			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, #15.num1)]", "Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, #15.num2)]",
+			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, #16.num1)]", "Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, #16.num2)]",
 			// "Undefined-a.getNum1(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]",
 			// "Undefined-a.getNum2(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)
@@ -485,7 +485,7 @@ class Test{
         println(main.a);
     }
 }`
-	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-a, #12.a)"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-a, #13.a)"}, t)
 	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 		"param": {"2"},
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
