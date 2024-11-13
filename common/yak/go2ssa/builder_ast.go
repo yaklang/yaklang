@@ -107,7 +107,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 			for i, name := range names {
 				pathl := strings.Split(paths[i], "/")
-				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i])
+				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], impo.(*gol.ImportDeclContext).ImportSpec(i))
 				if lib, _ := b.GetImportPackage(name); lib != nil {
 					b.GetProgram().ImportAll(lib)
 				}
@@ -215,22 +215,29 @@ func (b *astbuilder) buildImportPath(importPath *gol.ImportPathContext) string {
 	return ""
 }
 
-func (b *astbuilder) handleImportPackage() (values []ssa.Value) {
-	for id, ft := range b.importMap {
+func (b *astbuilder) handleImportPackage() {
+	for id, info := range b.importMap {
 		ex := ssa.NewExternLib(id, b.FunctionBuilder, nil)
 		ex.SetExtern(true)
 
-		values = append(values, ex)
-		typ := ex.GetType()
+		// 手动设置range
+		ex.SetRange(b.GetCurrentRange(info.Pos))
 
+		if importp, _ := b.GetImportPackage(id); importp != nil {
+			for n, g := range importp.ExportValue {
+				ex.Member = append(ex.Member, g)
+				ex.MemberMap[n] = g
+			}
+		}
+
+		typ := ex.GetType()
 		if b, ok := ssa.ToBasicType(typ); ok {
 			typ = ssa.NewBasicType(b.Kind, b.GetName())
-			typ.SetFullTypeNames([]string{ft.Path})
+			typ.SetFullTypeNames([]string{info.Path})
 		}
 		ex.SetType(typ)
+		b.AssignVariable(b.CreateVariable(id, info.Pos), ex)
 	}
-
-	return
 }
 
 func (b *astbuilder) buildDeclaration(decl *gol.DeclarationContext, isglobal bool) {
