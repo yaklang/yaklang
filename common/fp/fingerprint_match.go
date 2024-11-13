@@ -27,7 +27,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	}
 
 	// 是否需要适配 ConfigOption
-	config := NewConfig()
+	config := NewDefaultConfig()
 	if len(options) > 0 {
 		err := copier.Copy(config, f.Config)
 		if err != nil {

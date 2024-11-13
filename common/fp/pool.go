@@ -37,7 +37,7 @@ func NewExecutingPool(
 	config *Config,
 ) (*Pool, error) {
 	if config == nil {
-		config = NewConfig()
+		config = NewDefaultConfig()
 	}
 
 	pCtx, cancel := context.WithCancel(ctx)

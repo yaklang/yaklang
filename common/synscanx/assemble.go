@@ -226,7 +226,7 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) ([]byte, error) {
 	opts = append(opts, pcapx.WithUDP_SrcPort(srcPort))
 	opts = append(opts, pcapx.WithUDP_DstPort(port))
 	var payload []byte
-	nmapRuleConfig := fp.NewConfig(
+	nmapRuleConfig := fp.NewDefaultConfig(
 		fp.WithActiveMode(true),
 		fp.WithTransportProtos(fp.UDP),
 		fp.WithProbesMax(3),

@@ -26,7 +26,7 @@ func NewConfig(options ...ConfigOption) *Config {
 	c2 := utils.NewTTLCache[*fp.MatchResult](1 * time.Hour)
 
 	config := &Config{
-		FingerprintMatcherConfig:       fp.NewConfig(),
+		FingerprintMatcherConfig:       fp.NewDefaultConfig(),
 		FingerprintMatchQueueBuffer:    100000,
 		OpenPortTTLCache:               c1,
 		FingerprintMatchResultTTLCache: c2,
@@ -64,7 +64,7 @@ func WithFingerprintMatcherConfig(c *fp.Config) ConfigOption {
 
 func WithFingerprintMatcherConfigOptions(options ...fp.ConfigOption) ConfigOption {
 	return func(config *Config) {
-		config.FingerprintMatcherConfig = fp.NewConfig(options...)
+		config.FingerprintMatcherConfig = fp.NewDefaultConfig(options...)
 	}
 }
 

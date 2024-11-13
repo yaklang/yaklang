@@ -343,7 +343,7 @@ func DebugMockUDP(rsp []byte) (string, int) {
 }
 
 func DebugMockUDPProtocol(name string) (string, int) {
-	cfg := fp.NewConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"udp"}...)...))
+	cfg := fp.NewDefaultConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"udp"}...)...))
 	blocks := fp.GetRuleBlockByServiceName(name, cfg)
 	var generate string
 	var err error

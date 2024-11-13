@@ -59,6 +59,12 @@ var (
 	UNKNOWN PortState = "unknown"
 )
 
+type ScanTarget struct {
+	Host  string
+	Port  int
+	Proto TransportProto
+}
+
 type MatchResult struct {
 	Target      string           `json:"target"`
 	Port        int              `json:"port"`
@@ -417,7 +423,7 @@ func GetMatchResultCache(addr string) *MatchResult {
 func NewFingerprintMatcher(rules map[*NmapProbe][]*NmapMatch, config *Config) (*Matcher, error) {
 	if config == nil {
 		log.Debugf("build fingerprint match without config, use default")
-		config = NewConfig()
+		config = NewDefaultConfig()
 	}
 
 	matcher := &Matcher{
