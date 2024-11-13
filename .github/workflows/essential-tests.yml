@@ -88,6 +88,8 @@ jobs:
               go test ./common/utils/yakgit/yakdiff/...
               # YAK suspect tools
               go test ./common/utils/suspect
+              # Jar Checking
+              go test ./common/javaclassparser/jarwar/...
 
           - name: Test NetX
             run: |
