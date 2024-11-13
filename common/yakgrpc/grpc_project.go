@@ -367,7 +367,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 		stream.Send(&ypb.ProjectIOProgress{
 			TargetPath: req.GetProjectFilePath(),
 			Percent:    progress,
-			Verbose:    verbose,
+			Verbose:    utils.EscapeInvalidUTF8Byte([]byte(verbose)), // avoid invalid utf8 byte for grpc
 		})
 	}
 
@@ -387,6 +387,9 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 	defer fp.Close()
 	projectReader := bufio.NewReader(fp)
 	feedProgress("正在读取项目文件", 0.3)
+
+	var isEncryptProject bool
+
 	if magicNumber, err := projectReader.Peek(len(encryptProjectMagic)); err != nil {
 		feedProgress("读取项目文件失败："+err.Error(), 0.9)
 		return err
@@ -397,6 +400,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 				feedProgress("去除加密幻数失败", 0.99)
 				return err
 			}
+			isEncryptProject = true
 		} else {
 			feedProgress("需要密码解密项目数据", 0.99)
 			return utils.Error("需要密码解密")
@@ -426,47 +430,52 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 		feedProgress("创建临时文件失败："+err.Error(), 0.99)
 		return err
 	}
-	tempFileWriter := bufio.NewWriter(tempFp)
-	tryGetProtoData := func(rawBytes []byte) ([]byte, int, bool) {
-		data, n := protowire.ConsumeBytes(rawBytes)
-		if data != nil && n > 0 {
-			return data, n, true
-		}
-		return nil, 0, false
-	}
-	tempFpWriter := utils.NewPerHandlerWriter(tempFileWriter, func(i []byte) ([]byte, bool) {
-		var n = 0
-		var data []byte
-		var ok bool
-		if data, n, ok = tryGetProtoData(i); !ok {
-			return nil, false
-		}
-		i = i[n:]
-		projectName = string(data)
-		if data, n, ok = tryGetProtoData(i); !ok {
-			return nil, false
-		}
-		i = i[n:]
-		description = string(data)
-		if data, n, ok = tryGetProtoData(i); !ok {
-			return nil, false
-		}
-		paramsBytes = data
-		return i[n:], true
 
-	})
+	tempFileWriter := bufio.NewWriter(tempFp) // use bufio to improve performance, need separate var to flush before close
+	var importProjectWriter io.Writer
+	importProjectWriter = tempFileWriter
+	if isEncryptProject {
+		tryGetProtoData := func(rawBytes []byte) ([]byte, int, bool) {
+			data, n := protowire.ConsumeBytes(rawBytes)
+			if data != nil && n > 0 {
+				return data, n, true
+			}
+			return nil, 0, false
+		}
+		importProjectWriter = utils.NewPerHandlerWriter(importProjectWriter, func(i []byte) ([]byte, bool) {
+			var n = 0
+			var data []byte
+			var ok bool
+			if data, n, ok = tryGetProtoData(i); !ok {
+				return nil, false
+			}
+			i = i[n:]
+			projectName = string(data)
+			if data, n, ok = tryGetProtoData(i); !ok {
+				return nil, false
+			}
+			i = i[n:]
+			description = string(data)
+			if data, n, ok = tryGetProtoData(i); !ok {
+				return nil, false
+			}
+			paramsBytes = data
+			return i[n:], true
+		})
+	}
+
 	feedProgress("正在解压数据库", 0.4)
 	if req.GetPassword() != "" {
 		feedProgress("解压完成，正在解密数据库", 0.43)
 		key := codec.PKCS7Padding([]byte(req.GetPassword()))
 		iv := key[:sm4.BlockSize]
-		_, err = sm4.Sm4GCMDecryptStream(key, iv, nil, DataReader, tempFpWriter, padding.NewPKCSPaddingWriter)
+		_, err = sm4.Sm4GCMDecryptStream(key, iv, nil, DataReader, importProjectWriter, padding.NewPKCSPaddingWriter)
 		if err != nil {
 			feedProgress("写入(解密)数据库失败:"+err.Error(), 0.97)
 			return err
 		}
 	} else {
-		_, err = io.Copy(tempFpWriter, DataReader)
+		_, err = io.Copy(importProjectWriter, DataReader)
 		if err != nil {
 			feedProgress("写入数据库失败:"+err.Error(), 0.97)
 			return err
