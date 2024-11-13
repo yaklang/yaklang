@@ -16,14 +16,14 @@ func GRPCGeneralRuleToSchemaGeneralRule(gr *ypb.FingerprintRule) *schema.General
 		return nil
 	}
 	cpe := &schema.CPE{}
-	if gr.Cpe != nil {
-		cpe.Part = gr.Cpe.Part
-		cpe.Vendor = gr.Cpe.Vendor
-		cpe.Product = gr.Cpe.Product
-		cpe.Version = gr.Cpe.Version
-		cpe.Update = gr.Cpe.Update
-		cpe.Edition = gr.Cpe.Edition
-		cpe.Language = gr.Cpe.Language
+	if gr.CPE != nil {
+		cpe.Part = gr.CPE.Part
+		cpe.Vendor = gr.CPE.Vendor
+		cpe.Product = gr.CPE.Product
+		cpe.Version = gr.CPE.Version
+		cpe.Update = gr.CPE.Update
+		cpe.Edition = gr.CPE.Edition
+		cpe.Language = gr.CPE.Language
 	}
 	rule := &schema.GeneralRule{
 		CPE:             cpe,
