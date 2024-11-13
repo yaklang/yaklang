@@ -2,9 +2,11 @@ package yaklib
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 // parseInt 尝试将传入的字符串转换为对应进制的整数，默认为十进制，如果失败则返回0
@@ -84,4 +86,17 @@ func _input(s ...string) string {
 		panic(err)
 	}
 	return input
+}
+
+func IsYakFunction(i interface{}) bool {
+	return IsNewYakFunction(i)
+}
+
+func IsNewYakFunction(i interface{}) bool {
+	_, ok := i.(*yakvm.Function)
+	if ok {
+		return true
+	}
+
+	return reflect.TypeOf(i).Kind() == reflect.Func
 }
