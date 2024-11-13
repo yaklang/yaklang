@@ -235,9 +235,6 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 		raw, _ := json.Marshal(i)
 		return strconv.Quote(string(raw))
 	}
-	paramsRaw := getMarshalRaw(script.Params)
-	pluginEnvRaw := getMarshalRaw(script.PluginEnvKey)
-	riskRaw := getMarshalRaw(script.RiskInfo)
 	if script.IsGeneralModule && script.GeneralModuleKey == "" {
 		script.GeneralModuleKey = script.ScriptName
 		script.GeneralModuleVerbose = script.ScriptName
@@ -247,9 +244,9 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 		Type:                 script.Type,
 		Content:              script.Content,
 		Level:                script.Level,
-		Params:               strconv.Quote(string(paramsRaw)),
-		PluginEnvKey:         strconv.Quote(string(pluginEnvRaw)),
-		RiskDetail:           strconv.Quote(string(riskRaw)),
+		Params:               getMarshalRaw(script.Params),
+		PluginEnvKey:         getMarshalRaw(script.PluginEnvKey),
+		RiskDetail:           getMarshalRaw(script.RiskInfo),
 		Help:                 script.Help,
 		Author:               script.Author,
 		Tags:                 script.Tags,
@@ -939,6 +936,7 @@ func LegacyGRPCSaveNewYakScriptRequestGetYakScript(request *ypb.SaveNewYakScript
 		RiskDetail:           request.RiskDetail,
 		RiskInfo:             request.RiskInfo,
 		PluginEnvKey:         request.PluginEnvKey,
+		Params:               request.Params,
 	}
 	return script
 }
