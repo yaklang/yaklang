@@ -552,6 +552,25 @@ func TestJavaBasic_Variable_Try(t *testing.T) {
 			"Undefined-e",
 		}, t)
 	})
+
+	t.Run("test try-catch with throw expression", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a = 1;
+		try {
+			if (a == 0){
+				throw new Exception("a is zero");
+			}
+			println(a);
+		} catch (Exception e) {
+			println(a);
+		} 
+		println(a);
+		`, []string{
+			"phi(a)[Undefined-a,1]",
+			"phi(a)[phi(a)[Undefined-a,1],1]",
+			"phi(a)[phi(a)[Undefined-a,1],phi(a)[phi(a)[Undefined-a,1],1]]",
+		}, t)
+	})
 }
 
 func TestJavaBasic_variable_Try_Multiple_cache(t *testing.T) {

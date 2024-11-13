@@ -992,6 +992,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		if ret.Expression() != nil {
 			value := y.VisitExpression(ret.Expression())
 			if utils.IsNil(value) {
+				y.EmitReturn(nil)
 				return nil
 			}
 			if funcTyp := y.GetCurrentReturnType(); funcTyp != nil {
@@ -1004,6 +1005,17 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		return nil
 	case *javaparser.ThrowStatementContext:
 		// 处理 throw 语句
+		if ret.Expression() != nil {
+			value := y.VisitExpression(ret.Expression())
+			if utils.IsNil(value) {
+				y.EmitReturn(nil)
+				return nil
+			}
+			value.SetType(ssa.GetErrorType())
+			y.EmitReturn([]ssa.Value{value})
+		} else {
+			y.EmitReturn(nil)
+		}
 		return nil
 	case *javaparser.BreakStatementContext:
 		// 处理 break 语句
