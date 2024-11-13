@@ -1,0 +1,35 @@
+yakit.AutoInitYakit()
+
+
+ProgramName := cli.String("programName", 
+    cli.setRequired(true),
+    cli.setVerboseName("项目名"),
+)
+
+ruleContext := cli.Text("ruleContext", 
+    cli.setRequired(true),
+)
+
+cli.check()
+
+
+prog, err := ssa.NewFromProgramName(ProgramName)
+if err !=nil{
+    yakit.Error("load program %s from db err: %s",ProgramName, err)
+    return 
+}
+
+res, err := prog.SyntaxFlowWithError(ruleContext, 
+    syntaxflow.withContext(context.Background()), 
+    syntaxflow.withProcess((f, s)=>{
+        yakit.SetProgress(f)
+        yakit.Info("%s",s)
+    }), 
+    syntaxflow.withSave(), 
+)
+
+if err != nil {
+    yakit.Error("exec syntaxflow rule:%s", err)
+    return 
+}
+yakit.Output(res.GetResultID()) 
