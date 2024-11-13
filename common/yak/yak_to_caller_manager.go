@@ -623,6 +623,9 @@ func FeedbackFactory(db *gorm.DB, caller func(result *ypb.ExecResult) error, sav
 
 		err = caller(result)
 		if err != nil {
+			if strings.Contains(err.Error(), "feedback handler not set") {
+				return
+			}
 			log.Warn(err)
 			return
 		}
