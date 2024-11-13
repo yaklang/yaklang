@@ -48,7 +48,8 @@ func TestNew(t *testing.T) {
 
 	// 验证反编译的 java 文件
 	javaFiles := lo.Filter(files, func(f string, _ int) bool {
-		println(f)
+		raw, _ := os.ReadFile(f)
+		fmt.Println(string(raw))
 		return strings.HasSuffix(f, ".java")
 	})
 	assert.NotEmpty(t, javaFiles)

@@ -85,7 +85,6 @@ func (j *JarWar) DumpToLocalFileSystem(dir string) error {
 	err := filesys.Recursive(".", filesys.WithFileSystem(j.fs), filesys.WithStat(func(isDir bool, s string, info fs.FileInfo) error {
 		target := filepath.Join(dir, s)
 		if isDir {
-			log.Infof("create dir: %v", target)
 			err := os.MkdirAll(target, 0755)
 			if err != nil {
 				log.Warnf("os.MkdirAll failed: %v", err)
@@ -96,20 +95,27 @@ func (j *JarWar) DumpToLocalFileSystem(dir string) error {
 
 		if filepath.Ext(s) == ".class" {
 			// 尝试反编译.class文件
+			originalRaw, err := j.fs.ZipFS.ReadFile(s)
+			if err != nil {
+				log.Warnf("ReadFile failed: %v", err)
+				return utils.Wrap(err, "ReadFile failed during decompilation")
+			}
+			originalSize := len(originalRaw)
+
 			decompiled, err := j.fs.ReadFile(s)
 			if err != nil {
 				log.Warnf("Decompile failed, keep original(%v): %v", s, err)
-				raw, err := j.fs.ZipFS.ReadFile(s)
-				if err != nil {
-					log.Warnf("ReadFile failed: %v", err)
-					return utils.Wrap(err, "ReadFile failed during decompilation")
-				}
 				// 保存反编译失败的文件(带锁去重)
 				j.failedFilesLock.Lock()
 				j.failedDecompiledFiles[s] = struct{}{}
 				j.failedFilesLock.Unlock()
-				return os.WriteFile(target, raw, 0755)
+				return os.WriteFile(target, originalRaw, 0755)
 			}
+
+			lines := strings.Count(string(decompiled), "\n") + 1
+			log.Infof("Decompiled [%v] - Original size: %d bytes, Decompiled size: %d bytes, Lines of code: %d",
+				s, originalSize, len(decompiled), lines)
+
 			// 将.class文件改为.java后缀
 			javaTarget := strings.TrimSuffix(target, ".class") + ".java"
 			return os.WriteFile(javaTarget, decompiled, 0755)
