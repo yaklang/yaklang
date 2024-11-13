@@ -102,7 +102,7 @@ func (h *DocumentHelper) InjectInterfaceDocumentManually(interfacePath, sourceCo
 		sourceCodePath, _ = filepath.Abs(filepath.Join(GetProjectPath(), sourceCodePath))
 	}
 
-	bundle, err := GetCacheAstBundle(sourceCodePath)
+	bundle, err := GetCacheAstBundle(sourceCodePath, "")
 	if err != nil {
 		return err
 	}
