@@ -537,10 +537,11 @@ var GlobalExport = map[string]interface{}{
 	"sleep": sleep,
 	"wait":  _wait,
 
-	"desc":    _desc,
-	"descStr": _descToString,
-	"chr":     chr,
-	"ord":     ord,
-	"type":    typeof,
-	"typeof":  typeof,
+	"desc":     _desc,
+	"descStr":  _descToString,
+	"chr":      chr,
+	"ord":      ord,
+	"type":     typeof,
+	"typeof":   typeof,
+	"callable": IsYakFunction,
 }

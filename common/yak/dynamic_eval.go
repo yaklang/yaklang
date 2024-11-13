@@ -4,15 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklang/spec"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
 var GlobalEvalExports = map[string]interface{}{
@@ -24,7 +26,7 @@ var EvalExports = map[string]interface{}{
 	"Eval":            QuickEvalWithoutContext,
 	"LoadVarFromFile": LoadingVariableFrom,
 	"Import":          ImportVarFromFile,
-	"IsYakFunc":       yaklang.IsYakFunction,
+	"IsYakFunc":       yaklib.IsYakFunction,
 	"params":          setYakEvalParams,
 	"recursive":       setYakBatchImportRecursiveParams,
 }
@@ -68,8 +70,9 @@ type yakVariable struct {
 }
 
 func (y *yakVariable) Callable() bool {
-	return yaklang.IsYakFunction(y.Value)
+	return yaklib.IsYakFunction(y.Value)
 }
+
 func ImportVarFromYakFile(path string, exportsName string) (interface{}, error) {
 	engine := yaklang.New()
 	if err := engine.RunFile(context.Background(), path); err != nil {
@@ -81,6 +84,7 @@ func ImportVarFromYakFile(path string, exportsName string) (interface{}, error) 
 	}
 	return v, nil
 }
+
 func ImportVarFromScript(engine *antlr4yak.Engine, script string, exportsName string) (interface{}, error) {
 	if engine == nil {
 		return nil, utils.Error("empty engine")
@@ -95,6 +99,7 @@ func ImportVarFromScript(engine *antlr4yak.Engine, script string, exportsName st
 	}
 	return v, nil
 }
+
 func ImportVarFromFile(file string, exportsName string) (interface{}, error) {
 	var absFile string
 	yakFile := utils.GetFirstExistedFile(file, fmt.Sprintf("%v.yak", file))
@@ -196,7 +201,7 @@ func LoadingVariableFrom(path string, exportsName string, opts ...yakEvalConfigO
 			return nil, utils.Errorf("not a existed file: %v", fileName)
 		}
 
-		var absFileName = fileName
+		absFileName := fileName
 		if !filepath.IsAbs(absFileName) {
 			absFileName, err = filepath.Abs(absFileName)
 			if err != nil {
@@ -211,7 +216,7 @@ func LoadingVariableFrom(path string, exportsName string, opts ...yakEvalConfigO
 
 		config.params["YAK_FILENAME"] = absFileName
 
-		var mergedParams = make(map[string]interface{})
+		mergedParams := make(map[string]interface{})
 		raw, _ := json.Marshal(config.params)
 		if raw == nil {
 			mergedParams["YAK_FILENAME"] = absFileName
@@ -223,7 +228,7 @@ func LoadingVariableFrom(path string, exportsName string, opts ...yakEvalConfigO
 		if err != nil {
 			return nil, utils.Errorf("execute file %s code failed: %s", fileName, err.Error())
 		}
-		var modName = fmt.Sprint(engine.Var("YAK_MOD"))
+		modName := fmt.Sprint(engine.Var("YAK_MOD"))
 		if modName == spec.Undefined {
 			modName = ""
 		}
