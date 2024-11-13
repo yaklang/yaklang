@@ -282,3 +282,30 @@ func IsPopInstr(opcode int) bool {
 		return false
 	}
 }
+func CalcMergeOpcode(ifOpcode *OpCode) *OpCode {
+	trueNode := ifOpcode.Target[0]
+	falseNode := ifOpcode.Target[1]
+	trueNodeSet := utils.NewSet[*OpCode]()
+	WalkGraph[*OpCode](trueNode, func(node *OpCode) ([]*OpCode, error) {
+		next := []*OpCode{}
+		for _, n := range node.Target {
+			if n != ifOpcode {
+				next = append(next, n)
+			}
+		}
+		trueNodeSet.Add(node)
+		return next, nil
+	})
+	var mergeNode *OpCode
+	WalkGraph[*OpCode](falseNode, func(node *OpCode) ([]*OpCode, error) {
+		if mergeNode != nil {
+			return nil, nil
+		}
+		if trueNodeSet.Has(node) {
+			mergeNode = node
+			return nil, nil
+		}
+		return node.Target, nil
+	})
+	return mergeNode
+}

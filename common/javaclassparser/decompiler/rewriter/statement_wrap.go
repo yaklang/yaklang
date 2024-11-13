@@ -40,9 +40,6 @@ func NewRootStatementManager(node *core.Node) *RewriteManager {
 }
 
 func (s *RewriteManager) CheckVisitedNode(node *core.Node) error {
-	if node.Id == 25 {
-		println()
-	}
 	if s.visitedNodeSet.Has(node) {
 		return fmt.Errorf("current node %d has been visited", node.Id)
 	}
@@ -407,9 +404,6 @@ func (s *RewriteManager) Rewrite() error {
 		keyNodes = append(keyNodes, node)
 	}
 	for _, node := range s.IfNodes {
-		if node.Id == 78 {
-			println()
-		}
 		nodeToRewriter[node] = IfRewriter
 		keyNodes = append(keyNodes, node)
 	}
