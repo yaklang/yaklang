@@ -107,6 +107,7 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 	want := b.TryGetSimilarityKey(extern.GetName(), key.String())
 	b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), key.String(), want))
 	un := b.EmitUndefined(name)
+	un.Kind = UndefinedMemberInValid
 	un.SetExtern(true)
 	setMemberCallRelationship(extern, key, un)
 	return un
