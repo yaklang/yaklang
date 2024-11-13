@@ -47,10 +47,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install libpcap-dev=1.9.1-3
         if: runner.os == 'Linux'
-
-      - name: Generate Document
-        run: go run -gcflags=all=-l common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
-
       - name: Initialize License Machine
         run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
 
