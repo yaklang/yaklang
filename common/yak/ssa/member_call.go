@@ -48,6 +48,7 @@ func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bo
 	}
 	return nil
 }
+
 func (b *FunctionBuilder) InterfaceAddFieldBuild(size int, keys func(int) Value, value func(int) Value) *Make {
 	// lValueLen := NewConst(size)
 	var lValueLen Value = nil
@@ -74,6 +75,7 @@ func (b *FunctionBuilder) InterfaceAddFieldBuild(size int, keys func(int) Value,
 	// ityp.Len = len(vs)
 	return itf
 }
+
 func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, method bool) Value {
 	if !b.SupportClass {
 		return nil
@@ -98,7 +100,7 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 	// create undefined memberCall value if the value can not be peeked
 	name := res.name
 	memberHandler := func(typ Type, member Value) {
-		//todo: phi type is anytype,unknown other value
+		// todo: phi type is anytype,unknown other value
 		if typ == nil || typ.GetTypeKind() == AnyTypeKind {
 			if wantFunction {
 				t := NewFunctionTypeDefine(name, nil, nil, false)
@@ -113,7 +115,7 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 				}
 			}
 			if typ == nil {
-				typ = CreateStringType()
+				typ = CreateAnyType()
 			}
 		}
 		if typ != nil {
@@ -139,8 +141,8 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 			fun.SetObject(object)
 			un := writeUndefind()
 			memberHandler(res.typ, un)
-			//un := writeUndefind()
-			//memberHandler(res.typ, un)
+			// un := writeUndefind()
+			// memberHandler(res.typ, un)
 			return un
 		}
 	}
