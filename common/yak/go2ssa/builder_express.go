@@ -453,39 +453,6 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return v
 		}
 
-		if importp, path := b.GetImportPackage(text); len(path) != 0 {
-			var obj ssa.Value
-
-			if importp != nil { // user defined package
-				var names []string
-				var values []ssa.Value
-				for n, g := range importp.ExportValue {
-					names = append(names, n)
-					values = append(values, g)
-				}
-				obj = b.InterfaceAddFieldBuild(len(importp.ExportValue),
-					func(i int) ssa.Value {
-						return b.EmitConstInst(names[i])
-					},
-					func(i int) ssa.Value {
-						return values[i]
-					})
-			} else { // lib package
-				obj = b.InterfaceAddFieldBuild(0,
-					func(i int) ssa.Value {
-						return nil
-					},
-					func(i int) ssa.Value {
-						return nil
-					})
-			}
-
-			obj.SetName(text)
-			obj.GetType().SetFullTypeNames([]string{path})
-			b.AssignVariable(b.CreateLocalVariable(text), obj)
-			return obj
-		}
-
 		v = b.GetFunc(text, "")
 		if v.(*ssa.Function) == nil {
 			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))

@@ -52,3 +52,70 @@ func Test_Range(t *testing.T) {
 	}, ssaapi.WithLanguage(ssaapi.GO))
 
 }
+
+func Test_Import_Range(t *testing.T) {
+	code := `package test
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+
+	"entgo.io/ent"
+	_ "github.com/go-sql-driver/mysql"
+)
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	// 连接到数据库
+	client, err := ent.Open("mysql", "user:password@tcp(localhost:3306)/dbname")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	// 不安全的查询
+	input := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	ctx := context.Background()
+
+	users, err := client.User.Query().Where(user.Name(input)).All(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+`
+	ssatest.CheckWithName("import-range", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		ent := prog.SyntaxFlow("ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $target;").GetValues("target")
+		fmt := prog.SyntaxFlow("fmt?{<fullTypeName>?{have: 'fmt'}} as $target;").GetValues("target")
+		ent.Show()
+		fmt.Show()
+		a := ent[0].GetSSAValue()
+		b := fmt[0].GetSSAValue()
+		if ca, ok := ssa.ToExternLib(a); ok {
+			ra := ca.GetRange()
+			assert.Equal(t, 9, ra.GetStart().GetLine())
+			assert.Equal(t, 2, ra.GetStart().GetColumn())
+			assert.Equal(t, 9, ra.GetEnd().GetLine())
+			assert.Equal(t, 16, ra.GetEnd().GetColumn())
+		}
+		if cb, ok := ssa.ToExternLib(b); ok {
+			rb := cb.GetRange()
+			assert.Equal(t, 5, rb.GetStart().GetLine())
+			assert.Equal(t, 2, rb.GetStart().GetColumn())
+			assert.Equal(t, 5, rb.GetEnd().GetLine())
+			assert.Equal(t, 7, rb.GetEnd().GetColumn())
+		}
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
+}

@@ -110,7 +110,7 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
 		cmap:            []map[string]struct{}{},
-		importMap:       map[string]*Package{},
+		importMap:       map[string]*PackageInfo{},
 		result:          map[string][]string{},
 		tpHandler:       map[string]func(){},
 		labels:          map[string]*ssa.LabelBuilder{},
@@ -131,7 +131,7 @@ func (*SSABuilder) FilterFile(path string) bool {
 type astbuilder struct {
 	*ssa.FunctionBuilder
 	cmap           []map[string]struct{}
-	importMap      map[string]*Package
+	importMap      map[string]*PackageInfo
 	result         map[string][]string
 	tpHandler      map[string]func()
 	labels         map[string]*ssa.LabelBuilder
@@ -232,10 +232,11 @@ func (b *astbuilder) GetResultDefault() []string {
 	return b.result[b.Function.GetName()]
 }
 
-func (b *astbuilder) SetImportPackage(useName, trueName string, path string) {
-	p := &Package{
+func (b *astbuilder) SetImportPackage(useName, trueName string, path string, pos ssa.CanStartStopToken) {
+	p := &PackageInfo{
 		Name: trueName,
 		Path: path,
+		Pos:  pos,
 	}
 	b.importMap[useName] = p
 }
@@ -327,7 +328,8 @@ func (b *astbuilder) CheckSpecialValueByStr(name string) (interface{}, bool) {
 	return key, true
 }
 
-type Package struct {
+type PackageInfo struct {
 	Name string
 	Path string
+	Pos  ssa.CanStartStopToken
 }
