@@ -246,29 +246,35 @@ func ReadUntilStableEx(reader io.Reader, noTimeout bool, conn net.Conn, timeout 
 		}
 	}
 }
-
 func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
+	var mu sync.Mutex
 	ch := make([]byte, 1)
-	var n int
-	var err error
-	l := 0
 	buffer := bytes.NewBuffer(nil)
 	readTimeout := 1000 * time.Millisecond
 	readAsyncTimeout := 250 * time.Millisecond
 	readGapTimeout := 350 * time.Millisecond
+
 	defer conn.SetDeadline(time.Now().Add(3 * time.Minute))
-	ddlCtx, originCancel := context.WithTimeout(context.Background(), timeout)
-	cancel := func() {
-		originCancel()
-	}
+
+	ddlCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		for {
-			conn.SetDeadline(time.Now().Add(readAsyncTimeout))
-			n, err = conn.Read(ch)
+			if err := conn.SetDeadline(time.Now().Add(readAsyncTimeout)); err != nil {
+				return
+			}
+
+			n, err := conn.Read(ch)
 			if n > 0 {
+				mu.Lock()
 				buffer.Write(ch)
-				if buffer.Len() == maxSize {
-					// cancel()
+				currentLen := buffer.Len()
+				mu.Unlock()
+
+				if currentLen >= maxSize {
 					return
 				}
 			}
@@ -276,37 +282,42 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				return
 			}
+
 			if err != nil {
 				msg := err.Error()
-				switch true {
-				case MatchAllOfGlob(msg, "*i/o timeout"):
-				default:
+				if !MatchAllOfGlob(msg, "*i/o timeout") {
 					time.Sleep(time.Second)
 					log.Debugf("conn[%s] met error: %v", conn.RemoteAddr().String(), err)
 				}
 			}
 
-			// bufio.Scanner/Buffer scanner.Split(bufio.ScanByte)
-
 			select {
 			case <-ddlCtx.Done():
-				cancel()
 				return
 			default:
-				continue
 			}
 		}
 	}()
-	// wait := make(chan int)
+
+	var lastLen int
 	for {
 		time.Sleep(readTimeout)
-		if buffer.Len() == 0 || buffer.Len() == l {
+
+		mu.Lock()
+		currentLen := buffer.Len()
+		mu.Unlock()
+
+		if currentLen == 0 || currentLen == lastLen {
 			break
 		}
-		l = buffer.Len()
+		lastLen = currentLen
 	}
-	cancel()
+
+	<-done
 	time.Sleep(readGapTimeout)
+
+	mu.Lock()
+	defer mu.Unlock()
 	return buffer.Bytes()
 }
 
