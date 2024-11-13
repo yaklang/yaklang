@@ -1,8 +1,9 @@
 package yakit
 
 import (
+	"time"
+
 	"github.com/jinzhu/gorm"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -10,122 +11,122 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"time"
 )
 
-func CreateSsaProgram(db *gorm.DB, program *schema.SSAProgram) error {
-	result := db.Model(&schema.SSAProgram{}).Create(program)
-	return result.Error
-}
-func UpdateSsaProgram(db *gorm.DB, program *schema.SSAProgram) error {
-	result := db.Model(&schema.SSAProgram{}).UpdateColumn("description", program.Description)
-	return result.Error
-}
-func DeleteSsaProgramWithName(db *gorm.DB, name string) error {
-	ssadb.DeleteProgram(ssadb.GetDB(), name)
-	result := db.Model(&schema.SSAProgram{}).Where("name=?", name).Unscoped().Delete(&schema.SSAProgram{})
-	return result.Error
-}
-func DeleteSsaProgram(db *gorm.DB, request *ypb.DeleteSsaProgramRequest) error {
-	var programs []*schema.SSAProgram
+func FilterSsaProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
 	db = db.Model(&schema.SSAProgram{})
-	if !request.IsAll {
-		ids := request.GetId()
-		raw := make([]interface{}, len(ids))
-		for index, id := range ids {
-			raw[index] = id
-		}
-		db = bizhelper.ExactQueryArrayOr(db.Model(&schema.SSAProgram{}), "id", raw)
-		db = FilterSsaProgram(db, request.Filter)
+	if filter == nil {
+		return db
 	}
-	queryResult := db.Select("name").Table("ssa_programs").Find(&programs)
+
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "name", filter.GetProgramNames())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguages())
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetIds())
+
+	if word := filter.GetKeyword(); word != "" {
+		db = bizhelper.FuzzSearchEx(db, []string{"name", "description"}, word, false)
+	}
+	if filter.GetAfterID() > 0 {
+		db = db.Where("id > ?", filter.GetAfterID())
+	}
+	if filter.GetBeforeID() > 0 {
+		db = db.Where("id < ?", filter.GetBeforeID())
+	}
+
+	if filter.GetBeforeUpdatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", 0, filter.GetBeforeUpdatedAt())
+	}
+	if filter.GetAfterUpdatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", filter.GetAfterUpdatedAt(), time.Now().Add(10*time.Minute).Unix())
+	}
+	return db
+}
+
+func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
+	db := DB.Model(&schema.SSAProgram{})
+	db = FilterSsaProgram(db, filter)
+	// get all program
+	var programs []*schema.SSAProgram
+	queryResult := db.Model(&schema.SSAProgram{}).Select("name").Find(&programs)
 	if queryResult.Error != nil {
 		log.Errorf("query ssa program fail: %s", queryResult.Error)
 	}
+	// delete schema program
 	result := db.Unscoped().Delete(&schema.SSAProgram{})
+	// delete ssadb program
 	for _, prog := range programs {
 		ssadb.DeleteProgram(ssadb.GetDB(), prog.Name)
 	}
-	return result.Error
+	return len(programs), result.Error
 }
-func QuerySsaProgram(db *gorm.DB, request *ypb.QuerySsaProgramRequest) (*bizhelper.Paginator, []*ypb.SsaProgram, error) {
-	defer func() {
-		if msg := recover(); msg != nil {
-			log.Errorf("query ssa program fail: %s", msg)
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
-	db = BuildQuerySsaProgram(db.Model(&schema.SSAProgram{}), request)
+
+func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator, []*ypb.SSAProgram, error) {
 	var programs []*schema.SSAProgram
-	if request.Offset != 0 {
-		if request.Paging.Order == "desc" {
-			db = db.Where("id < ?", request.Offset)
-		} else {
-			db = db.Where("id > ?", request.Offset)
-		}
-	}
-	paging, dbx := bizhelper.Paging(db, int(request.Paging.Page), int(request.Paging.Limit), &programs)
-	if dbx.Error != nil {
-		return nil, nil, utils.Errorf("select ssa program fail: %s", dbx.Error)
-	}
-	var programsName []string
-	lo.ForEach(programs, func(item *schema.SSAProgram, index int) {
-		programsName = append(programsName, item.Name)
-	})
-	tmpPrograms := lo.SliceToMap[*schema.SSAProgram, string, *ypb.SsaProgram](programs, func(item *schema.SSAProgram) (string, *ypb.SsaProgram) {
-		return item.Name, item.ToGrpcProgram()
-	})
-	resultsRiskInfo := GetSyntaxFlowResultRiskInfo(consts.GetGormDefaultSSADataBase().Debug(), programsName, int(request.Filter.GetRiskNum()), request.GetFilter().GetRiskType())
-	for _, resultinfo := range resultsRiskInfo {
-		if program, ok := tmpPrograms[resultinfo.ProgramName]; ok {
-			program.RiskNumber += int64(resultinfo.RiskCount)
-		}
-	}
-	return paging, lo.Values(tmpPrograms), nil
-}
-func BuildQuerySsaProgram(db *gorm.DB, request *ypb.QuerySsaProgramRequest) *gorm.DB {
-	if request.Paging == nil {
-		request.Paging = &ypb.Paging{
+	p := request.Paging
+	if p == nil {
+		p = &ypb.Paging{
 			Page:    1,
 			Limit:   30,
 			OrderBy: "updated_at",
 			Order:   "desc",
 		}
 	}
-	p := request.Paging
-	if p.OrderBy == "" {
-		p.OrderBy = "id"
+	paging, dbx := bizhelper.Paging(db, int(p.Page), int(p.Limit), &programs)
+	if dbx.Error != nil {
+		return nil, nil, utils.Errorf("select ssa program fail: %s", dbx.Error)
 	}
-	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
-	if request.GetIsAll() {
-		return db
+	progGRPCs := make([]*ypb.SSAProgram, 0, len(programs))
+	for _, prog := range programs {
+		progGRPCs = append(progGRPCs, Prog2GRPC(prog))
 	}
-	if request.Id != 0 {
-		db = db.Where("id=?", request.Id)
-	}
-	db = FilterSsaProgram(db, request.Filter)
-	return db
+	return paging, progGRPCs, nil
 }
-func FilterSsaProgram(db *gorm.DB, params *ypb.SsaProgramFilter) *gorm.DB {
-	db = db.Model(&schema.SSAProgram{})
-	if params == nil {
-		params = &ypb.SsaProgramFilter{}
+
+func Prog2GRPC(prog *schema.SSAProgram) *ypb.SSAProgram {
+	ret := &ypb.SSAProgram{
+		// basic info
+		CreateAt:      prog.CreatedAt.Unix(),
+		UpdateAt:      prog.UpdatedAt.Unix(),
+		Name:          prog.Name,
+		Description:   prog.Description,
+		Language:      prog.Language,
+		EngineVersion: prog.EngineVersion,
 	}
-	if params.GetBeforeUpdateAt() > 0 {
-		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", 0, params.GetBeforeUpdateAt())
+	// recompile
+	NeedReCompile := func() bool {
+		return prog.EngineVersion != consts.GetYakVersion()
 	}
-	if params.GetAfterUpdateAt() > 0 {
-		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", params.GetAfterUpdateAt(), time.Now().Add(10*time.Minute).Unix())
+	ret.Recompile = NeedReCompile()
+	// risk info
+	{
+		var result struct {
+			High     int64
+			Low      int64
+			Critical int64
+			Warning  int64
+		}
+		projectDB := consts.GetGormProjectDatabase()
+		if err := projectDB.Model(&schema.Risk{}).Where("program_name=?", prog.Name).Select(`
+		sum(case when severity='critical' then 1 else 0 end) as critical,
+		sum(case when severity='high' then 1 else 0 end) as high,
+		sum(case when severity='warning' then 1 else 0 end) as warning,
+		sum(case when severity='low' then 1 else 0 end) as low
+		`).Scan(&result).Error; err != nil {
+			log.Errorf("query risk fail: %s", err) // ignore
+		}
+		ret.CriticalRiskNumber = result.Critical
+		ret.HighRiskNumber = result.High
+		ret.WarnRiskNumber = result.Warning
+		ret.LowRiskNumber = result.Low
 	}
-	if params.GetLanguage() != "" {
-		db = db.Where("language=?", params.GetLanguage())
+
+	return ret
+}
+
+func UpdateSsaProgram(DB *gorm.DB, input *ypb.SSAProgramInput) error {
+	if input == nil {
+		return utils.Errorf("input is nil ")
 	}
-	if params.GetEngineVersion() != "" {
-		db = db.Where("engine_version=?", params.GetEngineVersion())
-	}
-	db = bizhelper.FuzzSearchEx(db, []string{"description"}, params.GetKeyword(), false)
-	if params.GetProgramName() != "" {
-		db = db.Where("name=?", params.GetProgramName())
-	}
-	return db
+	db := DB.Model(&schema.SSAProgram{})
+	return db.Where("name = ?", input.GetName()).Update("description", input.Description).Error
 }
