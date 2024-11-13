@@ -230,12 +230,7 @@ func (b *astbuilder) handleImportPackage() {
 			}
 		}
 
-		typ := ex.GetType()
-		if b, ok := ssa.ToBasicType(typ); ok {
-			typ = ssa.NewBasicType(b.Kind, b.GetName())
-			typ.SetFullTypeNames([]string{info.Path})
-		}
-		ex.SetType(typ)
+		ex.SetType(HandleFullTypeNames(ex.GetType(), info.Path))
 		b.AssignVariable(b.CreateVariable(id, info.Pos), ex)
 	}
 }
@@ -624,6 +619,8 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
+		b.handleImportPackage()
+
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
 		}
@@ -638,7 +635,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
 		}
 
-		b.handleImportPackage()
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
 		}
@@ -744,6 +740,8 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		CurrentBlock := b.CurrentBlock
 		b.CurrentBlock = PreHandlerBlock
 
+		b.handleImportPackage()
+
 		defer func() {
 			recoverRange()
 			b.CurrentBlock = CurrentBlock
@@ -765,7 +763,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
 		}
 
-		b.handleImportPackage()
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
 		}
@@ -1870,34 +1867,47 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 	recoverRange := b.SetRange(tname.BaseParserRuleContext)
 	defer recoverRange()
-	var ssatyp ssa.Type
 
-	if qul := tname.QualifiedIdent(); qul != nil {
-		if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
-			libName := qul.IDENTIFIER(0).GetText()
-			typName := qul.IDENTIFIER(1).GetText()
-			lib, path := b.GetImportPackage(libName)
-			if lib == nil && path != "" { // 没有找到包，可能是golang库,也可能是package名称和导入名称不同
-				b.NewError(ssa.Warn, TAG, PackageNotFind(libName))
-				path = path + "/" + typName
-			} else if lib != nil {
-				obj, ok := lib.GetExportType(typName)
-
-				if ok {
-					return obj
-				} else { // 没有找到类型，可能来自于golang库
-					b.NewError(ssa.Warn, TAG, StructNotFind(typName))
-				}
-			} else {
-				b.NewError(ssa.Warn, TAG, ImportNotFind(typName))
+	if iqul := tname.QualifiedIdent(); iqul != nil {
+		qul := iqul.(*gol.QualifiedIdentContext)
+		libName := qul.IDENTIFIER(0).GetText()
+		typName := qul.IDENTIFIER(1).GetText()
+		lib, path := b.GetImportPackage(libName)
+		if lib == nil && path != "" { // 没有找到包，可能是golang库，也可能是package名称和导入名称不同
+			path = path + "/" + typName
+			b.NewError(ssa.Warn, TAG, PackageNotFind(libName))
+		} else if lib != nil && path != "" {
+			path = path + "/" + typName
+			libtype, ok := lib.GetExportType(typName)
+			if ok {
+				return HandleFullTypeNames(libtype, path)
+			} else { // 找到包但没有找到类型，可能是包中引用了golang库
+				b.NewError(ssa.Warn, TAG, StructNotFind(typName))
 			}
-			ssatyp = b.CreateBluePrint(libName)
-			ssatyp.AddMethod(typName, b.NewFunc(typName))
-			ssatyp.SetFullTypeNames([]string{path})
+		} else {
+			b.NewError(ssa.Error, TAG, ImportNotFind(typName))
 		}
+
+		bp := b.CreateBluePrint(typName)
+
+		newFunction := b.NewFunc(typName)
+		newFunction.SetMethodName(typName)
+
+		newFunction.SetType(ssa.NewFunctionType(fmt.Sprintf("%s-__construct", typName), []ssa.Type{}, nil, true))
+		bp.RegisterMagicMethod(ssa.Constructor, newFunction)
+		bp.SetFullTypeNames([]string{path})
+
+		if v := b.PeekValue(libName); v != nil {
+			lv := b.CreateLocalVariable(typName)
+			rv := b.ReadMemberCallValue(v, bp.Constructor)
+			rv.SetType(HandleFullTypeNames(rv.GetType(), path))
+			b.AssignVariable(lv, rv)
+		}
+
+		return bp
 	} else {
 		name := tname.IDENTIFIER().GetText()
-		ssatyp = ssa.GetTypeByStr(name)
+		ssatyp := ssa.GetTypeByStr(name)
 		if ssatyp == nil {
 			ssatyp = b.GetAliasByStr(name)
 		}
@@ -1911,9 +1921,9 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			b.NewError(ssa.Error, TAG, fmt.Sprintf("Type %v is not defined", name))
 			ssatyp = ssa.CreateAnyType()
 		}
-	}
 
-	return ssatyp
+		return ssatyp
+	}
 }
 
 func (b *astbuilder) buildTypeElement(stmt *gol.TypeElementContext) ssa.Type {
@@ -1976,4 +1986,12 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 	}
 
 	interfacetyp.AddMethod(funcName, newFunc)
+}
+
+func HandleFullTypeNames(t ssa.Type, path string) ssa.Type {
+	if b, ok := ssa.ToBasicType(t); ok {
+		t = ssa.NewBasicType(b.Kind, b.GetName())
+		t.SetFullTypeNames([]string{path})
+	}
+	return t
 }
