@@ -87,9 +87,6 @@ func (s *StackSimulationImpl) Pop() values.JavaValue {
 	if s.stackEntry == startStackEntry {
 		panic("Stack is empty")
 	}
-	if s.stackEntry == nil {
-		println()
-	}
 	val := s.stackEntry.value
 	s.stackEntry = s.stackEntry.GetParent()
 	return val

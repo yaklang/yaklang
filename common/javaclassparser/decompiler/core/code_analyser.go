@@ -32,7 +32,7 @@ type Decompiler struct {
 	currentVarId                  int
 	bytecodes                     []byte
 	opCodes                       []*OpCode
-	OpCodeRoot                    *OpCode
+	RootOpCode                    *OpCode
 	RootNode                      *Node
 	constantPoolGetter            func(id int) values.JavaValue
 	ConstantPoolLiteralGetter     func(constantPoolGetterid int) values.JavaValue
@@ -72,7 +72,7 @@ func (d *Decompiler) ParseOpcode() (err error) {
 	}()
 	defer func() {
 		if len(d.opCodes) > 0 {
-			d.OpCodeRoot = d.opCodes[0]
+			d.RootOpCode = d.opCodes[0]
 		}
 	}()
 	opcodes := []*OpCode{}
@@ -814,8 +814,8 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		return err
 	}
 	opcodeToSim := map[*OpCode]*StackSimulationImpl{}
-	//dominatorMap := GenerateDominatorTree(d.OpCodeRoot)
-	//codes := GraphToList(d.OpCodeRoot)
+	//dominatorMap := GenerateDominatorTree(d.RootOpCode)
+	//codes := GraphToList(d.RootOpCode)
 	//codes = lo.Filter(codes, func(code *OpCode, index int) bool {
 	//	switch code.Instr.OpCode {
 	//	case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
@@ -866,7 +866,30 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 	if !d.FunctionContext.IsStatic {
 		d.GetVar(0).IsThis = true
 	}
-	err = WalkGraph[*OpCode](d.OpCodeRoot, func(code *OpCode) ([]*OpCode, error) {
+	//isIfNode := func(code *OpCode) bool {
+	//	switch code.Instr.OpCode {
+	//	case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
+	//		return true
+	//	default:
+	//		return false
+	//	}
+	//}
+	//opcodes := GraphToList(d.RootOpCode)
+	//ifOpcodes := lo.Filter(opcodes, func(code *OpCode, index int) bool {
+	//	return isIfNode(code)
+	//})
+
+	//ifNodeToMergeNode := map[*OpCode]*OpCode{}
+	//mergeNodeToIfNode := map[*OpCode][]*OpCode{}
+	//DumpOpcodesToDotExp(d.RootOpCode)
+	//for _, opcode := range ifOpcodes {
+	//	mergeNode := CalcMergeOpcode(opcode)
+	//	if mergeNode != nil {
+	//		ifNodeToMergeNode[opcode] = mergeNode
+	//		mergeNodeToIfNode[mergeNode] = append(mergeNodeToIfNode[mergeNode], opcode)
+	//	}
+	//}
+	err = WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
 		var runtimeStackSimulation *StackSimulationImpl
 		if len(code.Source) == 0 {
 			if code.Instr.OpCode == OP_START {
@@ -875,76 +898,137 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				return nil, fmt.Errorf("opcode %d has no source", code.Id)
 			}
 		} else if len(code.Source) == 1 {
-			sim := opcodeToSim[code.Source[0]]
-			if sim == nil {
+			entry := code.Source[0].StackEntry
+			if entry == nil {
 				return nil, fmt.Errorf("not found simuation stack for opcode %d", code.Source[0].Id)
 			}
-			runtimeStackSimulation = sim
-		} else {
-			source := lo.Filter(code.Source, func(item *OpCode, index int) bool {
-				return opcodeToSim[item] != nil
+			runtimeStackSimulation = NewStackSimulation(entry)
+		} else if len(code.Source) > 0 {
+			//ifNodes := mergeNodeToIfNode[code]
+			//for _, opCode := range code.Source {
+			//	WalkGraph[*OpCode](opCode, func(code *OpCode) ([]*OpCode, error) {
+			//		switch code.Instr.OpCode {
+			//		case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
+			//			if !slices.Contains(ifNodes, code) {
+			//				ifNodes = append(ifNodes, code)
+			//			}
+			//			return nil, nil
+			//		default:
+			//		}
+			//		return code.Source, nil
+			//	})
+			//}
+			//ifNodes = lo.Filter(ifNodes, func(item *OpCode, index int) bool {
+			//	return item.StackEntry != nil
+			//})
+			sources := lo.Filter(code.Source, func(item *OpCode, index int) bool {
+				return item.StackEntry != nil
 			})
-			sims := []*StackSimulationImpl{}
-			for _, source := range source {
-				sim := opcodeToSim[source]
-				if sim == nil {
+			stackEntries := []*StackItem{}
+			for _, source := range sources {
+				entry := source.StackEntry
+				if entry == nil {
 					return nil, fmt.Errorf("not found simuation stack for opcode %d", source.Id)
 				}
-				sims = append(sims, sim)
+				stackEntries = append(stackEntries, entry)
 			}
-			if len(sims) == 0 {
+			//sourceIfCodes := []*OpCode{}
+			//for _, opCode := range code.Source {
+			//	WalkGraph[*OpCode](opCode, func(code *OpCode) ([]*OpCode, error) {
+			//		switch code.Instr.OpCode {
+			//		case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
+			//			if !slices.Contains(sourceIfCodes, code) {
+			//				sourceIfCodes = append(sourceIfCodes, code)
+			//			}
+			//			return nil, nil
+			//		default:
+			//		}
+			//		return code.Source, nil
+			//	})
+			//}
+			//sourceIfCodes = lo.Filter(sourceIfCodes, func(item *OpCode, index int) bool {
+			//	return slices.Contains(ifNodes, item)
+			//})
+			//ifStackEntries := []*StackItem{}
+			//for _, ifNode := range sourceIfCodes {
+			//	entry := ifNode.StackEntry
+			//	if entry == nil {
+			//		return nil, fmt.Errorf("not found simuation stack for opcode %d", ifNode.Id)
+			//	}
+			//	ifStackEntries = append(stackEntries, entry)
+			//}
+
+			if len(stackEntries) == 0 {
 				return nil, errors.New("invalid if merge node")
 			}
 			size := -1
-			for _, sim := range sims {
-				if sim.Size() > 1 {
-					return nil, fmt.Errorf("invalid stack size %d for opcode %d", sim.Size(), code.Id)
-				}
+			for _, stackEntry := range stackEntries {
+				stackSize := NewStackSimulation(stackEntry).Size()
+				//if stackSize > 1 {
+				//	return nil, fmt.Errorf("invalid stack size %d for opcode %d", stackSize, code.Id)
+				//}
 				if size == -1 {
-					size = sim.Size()
+					size = stackSize
 				} else {
-					if size != sim.Size() {
-						return nil, fmt.Errorf("invalid stack size %d for opcode %d", sim.Size(), code.Id)
+					if size != stackSize {
+						return nil, fmt.Errorf("invalid stack size %d for opcode %d", stackSize, code.Id)
 					}
 				}
 			}
-			isIfMergeNode := size != 0
+			ifNodes := []*OpCode{}
+			for _, opCode := range code.Source {
+				WalkGraph[*OpCode](opCode, func(code *OpCode) ([]*OpCode, error) {
+					switch code.Instr.OpCode {
+					case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
+						if !slices.Contains(ifNodes, code) {
+							ifNodes = append(ifNodes, code)
+						}
+						return nil, nil
+					default:
+					}
+					return code.Source, nil
+				})
+			}
+			var isIfMergeNode bool
+			if len(ifNodes) > 0 {
+				ifSize := -1
+				for _, ifNode := range ifNodes {
+					if ifNode.StackEntry == nil {
+						continue
+					}
+					stackSize := NewStackSimulation(ifNode.StackEntry).Size()
+					if ifSize == -1 {
+						ifSize = stackSize
+					} else {
+						if ifSize != stackSize {
+							return nil, fmt.Errorf("invalid stack size %d for opcode %d", stackSize, code.Id)
+						}
+					}
+				}
+				if ifSize != -1 {
+					isIfMergeNode = ifSize < size
+				}
+			}
 			if isIfMergeNode {
-				runtimeStackSimulation = NewStackSimulation(startStackEntry)
+				preSim := NewStackSimulation(stackEntries[0])
+				preSim.Pop()
+				runtimeStackSimulation = NewStackSimulation(preSim.stackEntry)
 				slotVal := values.NewSlotValue(nil)
-				slotVal.TmpType = sims[0].Peek().Type()
+				slotVal.TmpType = stackEntries[0].value.Type()
 				runtimeStackSimulation.Push(slotVal)
 				ternaryExpMergeNodeSlot[code] = slotVal
-				ternaryExpMergeNode = append(ternaryExpMergeNode, code)
-				ifNodes := []*OpCode{}
-				for _, opCode := range code.Source {
-					WalkGraph[*OpCode](opCode, func(code *OpCode) ([]*OpCode, error) {
-						switch code.Instr.OpCode {
-						case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
-							if !slices.Contains(ifNodes, code) {
-								ifNodes = append(ifNodes, code)
-							}
-							return nil, nil
-						default:
-						}
-						return code.Source, nil
-					})
-				}
+
 				ternaryExpMergeNode = append(ternaryExpMergeNode, code)
 				mergeToIfNode[code] = append(mergeToIfNode[code], ifNodes...)
 			} else {
-				runtimeStackSimulation = sims[0]
-				//for _, source := range source {
-				//	stackEntry := opcodeToSim[source]
-				//	if stackEntry == nil {
-				//		return nil, fmt.Errorf("not found simuation stack for opcode %d", source.Id)
-				//	}
-				//	sim := NewStackSimulation(startStackEntry)
-				//	if sim.Size() != 0 {
-				//		return nil, fmt.Errorf("invalid stack size %d for opcode %d", sim.Size(), code.Id)
-				//	}
-				//}
-				//runtimeStackSimulation = opcodeToSim[source[0]]
+				runtimeStackSimulation = NewStackSimulation(stackEntries[0])
+			}
+		} else {
+			for _, opCode := range code.Source {
+				if opCode.StackEntry != nil {
+					runtimeStackSimulation = NewStackSimulation(opCode.StackEntry)
+					break
+				}
 			}
 		}
 		opcodeToSim[code] = runtimeStackSimulation
@@ -965,9 +1049,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				return typ.Type()
 			}))
 		}
-		if code.Id == 13 {
-			println()
-		}
 		err := d.calcOpcodeStackInfo(sim, code)
 		if err != nil {
 			return nil, err
@@ -978,13 +1059,20 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 	if err != nil {
 		return err
 	}
-	d.opCodes = GraphToList(d.OpCodeRoot)
+	d.opCodes = GraphToList(d.RootOpCode)
 	d.opcodeToSimulateStack = opcodeToSim
 	ternaryExpMergeNode = utils.NewSet(ternaryExpMergeNode).List()
+	sort.Slice(ternaryExpMergeNode, func(i, j int) bool {
+		return ternaryExpMergeNode[i].Id > ternaryExpMergeNode[j].Id
+	})
+	customId := 0
 	for _, code := range ternaryExpMergeNode {
 		mergeNode := code
 		ifNodes := mergeToIfNode[code]
-		var preVal values.JavaValue
+		sort.Slice(ifNodes, func(i, j int) bool {
+			return ifNodes[i].Id > ifNodes[j].Id
+		})
+		//var preVal values.JavaValue
 		for i := 0; i < len(ifNodes); i++ {
 			ifCode := ifNodes[i]
 			source := []*OpCode{}
@@ -1031,37 +1119,62 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				return errors.New("invalid if opcode")
 			}
 			val := values.NewTernaryExpression(condition, source[0].StackEntry.value, source[1].StackEntry.value)
-			preVal = val
-			newOpcode := &OpCode{Info: val}
-			for _, opCode := range source {
-				opCode.Target = lo.Filter(opCode.Target, func(item *OpCode, index int) bool {
-					return item != code
-				})
-				opCode.Target = append(opCode.Target, newOpcode)
-				newOpcode.Source = append(newOpcode.Source, opCode)
+			//preVal = val
+			newOpcode := &OpCode{
+				Info: val,
+				Instr: &Instruction{
+					OpCode: OP_NOP,
+					Name:   "custom",
+				},
+				Id: customId,
 			}
-			code.Source = lo.Filter(code.Source, func(item *OpCode, index int) bool {
-				return item != source[0] && item != source[1]
-			})
-			code.Source = append(code.Source, newOpcode)
+			customId++
+			newOpcode.stackConsumed = ifCode.stackConsumed
+			newOpcode.stackProduced = []values.JavaValue{val}
 			newOpcode.Target = append(newOpcode.Target, code)
+			code.Source = append(code.Source, newOpcode)
 			sim := NewStackSimulation(startStackEntry)
 			sim.Push(val)
 			newOpcode.StackEntry = sim.stackEntry
+			sources := slices.Clone(ifCode.Source)
+			for _, source := range sources {
+				source.Target = lo.Filter(source.Target, func(item *OpCode, index int) bool {
+					return item != ifCode
+				})
+				source.Target = append(source.Target, newOpcode)
+				newOpcode.Source = append(newOpcode.Source, source)
+			}
+			ternaryExpMergeNodeSlot[code].Value = val
+			//
+			//for _, opCode := range source {
+			//	opCode.Target = lo.Filter(opCode.Target, func(item *OpCode, index int) bool {
+			//		return item != code
+			//	})
+			//	opCode.Target = append(opCode.Target, newOpcode)
+			//	newOpcode.Source = append(newOpcode.Source, opCode)
+			//}
+			//code.Source = lo.Filter(code.Source, func(item *OpCode, index int) bool {
+			//	return item != source[0] && item != source[1]
+			//})
+			//code.Source = append(code.Source, newOpcode)
+			//newOpcode.Target = append(newOpcode.Target, code)
+			//sim := NewStackSimulation(startStackEntry)
+			//sim.Push(val)
+			//newOpcode.StackEntry = sim.stackEntry
 		}
 
-		lastIfNode := utils.GetLastElement(ifNodes)
-		sources := slices.Clone(lastIfNode.Source)
-		lastIfNode.Source = nil
-		code.Source = nil
-		ternaryExpMergeNodeSlot[code].Value = preVal
-		for _, source := range sources {
-			source.Target = lo.Filter(source.Target, func(item *OpCode, index int) bool {
-				return item != lastIfNode
-			})
-			source.Target = append(source.Target, code)
-			code.Source = append(code.Source, source)
-		}
+		//lastIfNode := utils.GetLastElement(ifNodes)
+		//sources := slices.Clone(lastIfNode.Source)
+		//lastIfNode.Source = nil
+		//code.Source = nil
+		//ternaryExpMergeNodeSlot[code].Value = preVal
+		//for _, source := range sources {
+		//	source.Target = lo.Filter(source.Target, func(item *OpCode, index int) bool {
+		//		return item != lastIfNode
+		//	})
+		//	source.Target = append(source.Target, code)
+		//	code.Source = append(code.Source, source)
+		//}
 	}
 	return nil
 }
@@ -1079,8 +1192,8 @@ func (d *Decompiler) _ParseStatement() error {
 	if err != nil {
 		return err
 	}
-	dominatorMap := GenerateDominatorTree(d.OpCodeRoot)
-	codes := GraphToList(d.OpCodeRoot)
+	dominatorMap := GenerateDominatorTree(d.RootOpCode)
+	codes := GraphToList(d.RootOpCode)
 	codes = funk.Filter(codes, func(code *OpCode) bool {
 		switch code.Instr.OpCode {
 		case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
@@ -2015,7 +2128,7 @@ func (d *Decompiler) ParseStatement() error {
 
 	opcodeIdToNode := map[int]func(f func(value values.JavaValue) values.JavaValue){}
 	mapCodeToStackVarIndex := map[*OpCode]int{}
-	//DumpOpcodesToDotExp(d.OpCodeRoot)
+	//DumpOpcodesToDotExp(d.RootOpCode)
 	var runCode func(startNode *OpCode) error
 	var parseOpcode func(opcode *OpCode) error
 	parseOpcode = func(opcode *OpCode) error {
@@ -2037,16 +2150,34 @@ func (d *Decompiler) ParseStatement() error {
 			val := d.idToValue[leftRef.Id]
 			appendNode(statements.NewAssignStatement(leftRef, val, true))
 		case OP_INVOKESTATIC:
-			if len(opcode.stackProduced) > 0 {
-				appendNode(statements.NewExpressionStatement(opcode.stackProduced[0]))
-			}
-		case OP_INVOKEDYNAMIC:
-		case OP_INVOKESPECIAL:
-			if len(opcode.stackProduced) > 0 {
-				var skip bool
+			if len(opcode.stackProduced) == 0 {
 				classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
 				methodName := classInfo.Member
 				funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+				//funcCallValue.JavaType = classInfo.JavaType
+				funcCallValue.Object = values.NewJavaClassValue(types.NewJavaClass(classInfo.Name))
+				funcCallValue.IsStatic = true
+				n := 0
+				for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
+					funcCallValue.Arguments = append(funcCallValue.Arguments, opcode.stackConsumed[n])
+					n++
+				}
+				funcCallValue.Arguments = funk.Reverse(funcCallValue.Arguments).([]values.JavaValue)
+				appendNode(statements.NewExpressionStatement(funcCallValue))
+			}
+		case OP_INVOKESPECIAL:
+			if len(opcode.stackProduced) == 0 {
+				classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
+				methodName := classInfo.Member
+				funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+				n := 0
+				for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
+					funcCallValue.Arguments = append(funcCallValue.Arguments, opcode.stackConsumed[n])
+					n++
+				}
+				funcCallValue.Arguments = funk.Reverse(funcCallValue.Arguments).([]values.JavaValue)
+				funcCallValue.Object = opcode.stackConsumed[n]
+				var skip bool
 				func() {
 					if methodName != "<init>" {
 						return
@@ -2070,16 +2201,36 @@ func (d *Decompiler) ParseStatement() error {
 					}
 				}()
 				if !skip {
-					appendNode(statements.NewExpressionStatement(opcode.stackProduced[0]))
+					appendNode(statements.NewExpressionStatement(funcCallValue))
 				}
 			}
 		case OP_INVOKEINTERFACE:
-			if len(opcode.stackProduced) > 0 {
-				appendNode(statements.NewExpressionStatement(opcode.stackProduced[0]))
+			if len(opcode.stackProduced) == 0 {
+				classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
+				methodName := classInfo.Member
+				funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+				n := 0
+				for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
+					funcCallValue.Arguments = append(funcCallValue.Arguments, opcode.stackConsumed[n])
+					n++
+				}
+				funcCallValue.Arguments = funk.Reverse(funcCallValue.Arguments).([]values.JavaValue)
+				funcCallValue.Object = opcode.stackConsumed[n]
+				appendNode(statements.NewExpressionStatement(funcCallValue))
 			}
 		case OP_INVOKEVIRTUAL:
-			if len(opcode.stackProduced) > 0 {
-				appendNode(statements.NewExpressionStatement(opcode.stackProduced[0]))
+			if len(opcode.stackProduced) == 0 {
+				classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
+				methodName := classInfo.Member
+				funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+				n := 0
+				for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
+					funcCallValue.Arguments = append(funcCallValue.Arguments, opcode.stackConsumed[n])
+					n++
+				}
+				funcCallValue.Arguments = funk.Reverse(funcCallValue.Arguments).([]values.JavaValue)
+				funcCallValue.Object = opcode.stackConsumed[n]
+				appendNode(statements.NewExpressionStatement(funcCallValue))
 			}
 		case OP_RETURN:
 			appendNode(statements.NewReturnStatement(nil))
