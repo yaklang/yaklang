@@ -335,6 +335,9 @@ func InitNetworkConfig(config *ypb.GlobalNetworkConfig) { // init some network c
 	if config.CallPluginTimeout == 0 {
 		config.CallPluginTimeout = 60 // default 60s
 	}
+	if config.MaxContentLength == 0 {
+		config.MaxContentLength = 1024 * 1024 * 10 // default 10M
+	}
 }
 
 // LoadGlobalNetworkConfig load config from yakit config in db
