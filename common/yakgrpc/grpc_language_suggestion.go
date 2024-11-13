@@ -1013,12 +1013,24 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng meme
 		ret = append(ret, completionComplexStructMethodAndInstances(v)...)
 	}
 	if len(ret) == 0 && containPoint && v.IsUndefined() {
+		obj := v.GetObject()
+		if obj.IsNil() {
+			return ret
+		}
+
+		undefined, ok := ssa.ToUndefined(ssaapi.GetBareNode(v))
+		if !ok {
+			return ret
+		}
+
+		// should check if key is member
+		if undefined.Kind != ssa.UndefinedMemberValid && undefined.Kind != ssa.UndefinedMemberInValid {
+			return ret
+		}
+
 		// undefined means halfway through the analysis
 		// so try to get the value before and complete again
-		v = v.GetObject()
-		if !v.IsNil() {
-			return OnCompletion(prog, word, containPoint, rng, scriptType, v)
-		}
+		return OnCompletion(prog, word, containPoint, rng, scriptType, obj)
 	}
 	return ret
 }
