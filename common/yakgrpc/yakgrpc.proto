@@ -5586,7 +5586,7 @@ message SyntaxFlowScanTask {
     int64 UpdatedAt = 3;
 
     string TaskId = 4;
-    repeated string programs = 5;
+    repeated string Programs = 5;
     int64 RuleCount = 6;
     string Status = 7; // executing / paused / done / error
     string Reason = 8;
