@@ -407,9 +407,9 @@ const (
 	Yak_QuerySyntaxFlowRuleGroup_FullMethodName                   = "/ypb.Yak/QuerySyntaxFlowRuleGroup"
 	Yak_SyntaxFlowScan_FullMethodName                             = "/ypb.Yak/SyntaxFlowScan"
 	Yak_QuerySyntaxFlowResult_FullMethodName                      = "/ypb.Yak/QuerySyntaxFlowResult"
-	Yak_QuerySsaPrograms_FullMethodName                           = "/ypb.Yak/QuerySsaPrograms"
-	Yak_UpdateSsaProgram_FullMethodName                           = "/ypb.Yak/UpdateSsaProgram"
-	Yak_DeleteSsaPrograms_FullMethodName                          = "/ypb.Yak/DeleteSsaPrograms"
+	Yak_QuerySSAPrograms_FullMethodName                           = "/ypb.Yak/QuerySSAPrograms"
+	Yak_UpdateSSAProgram_FullMethodName                           = "/ypb.Yak/UpdateSSAProgram"
+	Yak_DeleteSSAPrograms_FullMethodName                          = "/ypb.Yak/DeleteSSAPrograms"
 )
 
 // YakClient is the client API for Yak service.
@@ -920,9 +920,9 @@ type YakClient interface {
 	// query result
 	QuerySyntaxFlowResult(ctx context.Context, in *QuerySyntaxFlowResultRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowResultResponse, error)
 	// query ssa program
-	QuerySsaPrograms(ctx context.Context, in *QuerySsaProgramRequest, opts ...grpc.CallOption) (*QuerySsaProgramResponse, error)
-	UpdateSsaProgram(ctx context.Context, in *SsaProgram, opts ...grpc.CallOption) (*Empty, error)
-	DeleteSsaPrograms(ctx context.Context, in *DeleteSsaProgramRequest, opts ...grpc.CallOption) (*Empty, error)
+	QuerySSAPrograms(ctx context.Context, in *QuerySSAProgramRequest, opts ...grpc.CallOption) (*QuerySSAProgramResponse, error)
+	UpdateSSAProgram(ctx context.Context, in *UpdateSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	DeleteSSAPrograms(ctx context.Context, in *DeleteSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 }
 
 type yakClient struct {
@@ -6001,27 +6001,27 @@ func (c *yakClient) QuerySyntaxFlowResult(ctx context.Context, in *QuerySyntaxFl
 	return out, nil
 }
 
-func (c *yakClient) QuerySsaPrograms(ctx context.Context, in *QuerySsaProgramRequest, opts ...grpc.CallOption) (*QuerySsaProgramResponse, error) {
-	out := new(QuerySsaProgramResponse)
-	err := c.cc.Invoke(ctx, Yak_QuerySsaPrograms_FullMethodName, in, out, opts...)
+func (c *yakClient) QuerySSAPrograms(ctx context.Context, in *QuerySSAProgramRequest, opts ...grpc.CallOption) (*QuerySSAProgramResponse, error) {
+	out := new(QuerySSAProgramResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySSAPrograms_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *yakClient) UpdateSsaProgram(ctx context.Context, in *SsaProgram, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
-	err := c.cc.Invoke(ctx, Yak_UpdateSsaProgram_FullMethodName, in, out, opts...)
+func (c *yakClient) UpdateSSAProgram(ctx context.Context, in *UpdateSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_UpdateSSAProgram_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *yakClient) DeleteSsaPrograms(ctx context.Context, in *DeleteSsaProgramRequest, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
-	err := c.cc.Invoke(ctx, Yak_DeleteSsaPrograms_FullMethodName, in, out, opts...)
+func (c *yakClient) DeleteSSAPrograms(ctx context.Context, in *DeleteSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteSSAPrograms_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6536,9 +6536,9 @@ type YakServer interface {
 	// query result
 	QuerySyntaxFlowResult(context.Context, *QuerySyntaxFlowResultRequest) (*QuerySyntaxFlowResultResponse, error)
 	// query ssa program
-	QuerySsaPrograms(context.Context, *QuerySsaProgramRequest) (*QuerySsaProgramResponse, error)
-	UpdateSsaProgram(context.Context, *SsaProgram) (*Empty, error)
-	DeleteSsaPrograms(context.Context, *DeleteSsaProgramRequest) (*Empty, error)
+	QuerySSAPrograms(context.Context, *QuerySSAProgramRequest) (*QuerySSAProgramResponse, error)
+	UpdateSSAProgram(context.Context, *UpdateSSAProgramRequest) (*DbOperateMessage, error)
+	DeleteSSAPrograms(context.Context, *DeleteSSAProgramRequest) (*DbOperateMessage, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -7710,14 +7710,14 @@ func (UnimplementedYakServer) SyntaxFlowScan(Yak_SyntaxFlowScanServer) error {
 func (UnimplementedYakServer) QuerySyntaxFlowResult(context.Context, *QuerySyntaxFlowResultRequest) (*QuerySyntaxFlowResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QuerySyntaxFlowResult not implemented")
 }
-func (UnimplementedYakServer) QuerySsaPrograms(context.Context, *QuerySsaProgramRequest) (*QuerySsaProgramResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QuerySsaPrograms not implemented")
+func (UnimplementedYakServer) QuerySSAPrograms(context.Context, *QuerySSAProgramRequest) (*QuerySSAProgramResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySSAPrograms not implemented")
 }
-func (UnimplementedYakServer) UpdateSsaProgram(context.Context, *SsaProgram) (*Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateSsaProgram not implemented")
+func (UnimplementedYakServer) UpdateSSAProgram(context.Context, *UpdateSSAProgramRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSSAProgram not implemented")
 }
-func (UnimplementedYakServer) DeleteSsaPrograms(context.Context, *DeleteSsaProgramRequest) (*Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteSsaPrograms not implemented")
+func (UnimplementedYakServer) DeleteSSAPrograms(context.Context, *DeleteSSAProgramRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSSAPrograms not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -14978,56 +14978,56 @@ func _Yak_QuerySyntaxFlowResult_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Yak_QuerySsaPrograms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QuerySsaProgramRequest)
+func _Yak_QuerySSAPrograms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySSAProgramRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(YakServer).QuerySsaPrograms(ctx, in)
+		return srv.(YakServer).QuerySSAPrograms(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Yak_QuerySsaPrograms_FullMethodName,
+		FullMethod: Yak_QuerySSAPrograms_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).QuerySsaPrograms(ctx, req.(*QuerySsaProgramRequest))
+		return srv.(YakServer).QuerySSAPrograms(ctx, req.(*QuerySSAProgramRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Yak_UpdateSsaProgram_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SsaProgram)
+func _Yak_UpdateSSAProgram_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSSAProgramRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(YakServer).UpdateSsaProgram(ctx, in)
+		return srv.(YakServer).UpdateSSAProgram(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Yak_UpdateSsaProgram_FullMethodName,
+		FullMethod: Yak_UpdateSSAProgram_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).UpdateSsaProgram(ctx, req.(*SsaProgram))
+		return srv.(YakServer).UpdateSSAProgram(ctx, req.(*UpdateSSAProgramRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Yak_DeleteSsaPrograms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteSsaProgramRequest)
+func _Yak_DeleteSSAPrograms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSSAProgramRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(YakServer).DeleteSsaPrograms(ctx, in)
+		return srv.(YakServer).DeleteSSAPrograms(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Yak_DeleteSsaPrograms_FullMethodName,
+		FullMethod: Yak_DeleteSSAPrograms_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).DeleteSsaPrograms(ctx, req.(*DeleteSsaProgramRequest))
+		return srv.(YakServer).DeleteSSAPrograms(ctx, req.(*DeleteSSAProgramRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -16316,16 +16316,16 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_QuerySyntaxFlowResult_Handler,
 		},
 		{
-			MethodName: "QuerySsaPrograms",
-			Handler:    _Yak_QuerySsaPrograms_Handler,
+			MethodName: "QuerySSAPrograms",
+			Handler:    _Yak_QuerySSAPrograms_Handler,
 		},
 		{
-			MethodName: "UpdateSsaProgram",
-			Handler:    _Yak_UpdateSsaProgram_Handler,
+			MethodName: "UpdateSSAProgram",
+			Handler:    _Yak_UpdateSSAProgram_Handler,
 		},
 		{
-			MethodName: "DeleteSsaPrograms",
-			Handler:    _Yak_DeleteSsaPrograms_Handler,
+			MethodName: "DeleteSSAPrograms",
+			Handler:    _Yak_DeleteSSAPrograms_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -727,9 +727,9 @@ service Yak {
   // query result 
   rpc QuerySyntaxFlowResult (QuerySyntaxFlowResultRequest) returns (QuerySyntaxFlowResultResponse);
   //query ssa program
-  rpc QuerySsaPrograms(QuerySsaProgramRequest)returns(QuerySsaProgramResponse);
-  rpc UpdateSsaProgram(SsaProgram)returns(Empty);
-  rpc DeleteSsaPrograms(DeleteSsaProgramRequest)returns(Empty);
+  rpc QuerySSAPrograms(QuerySSAProgramRequest)returns(QuerySSAProgramResponse);
+  rpc UpdateSSAProgram(UpdateSSAProgramRequest)returns(DbOperateMessage);
+  rpc DeleteSSAPrograms(DeleteSSAProgramRequest)returns(DbOperateMessage);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -5515,44 +5515,62 @@ message SyntaxFlowRuleFilter {
   bool includeLibraryRule = 8; // default false 
 }
 
-message SsaProgram{
-  string CreateTime = 2;
+message SSAProgram{
+  // basic info
+  int64 CreateAt = 1;
+  int64  UpdateAt = 2;
   string Name = 3;
   string Description = 4;
   string Dbpath = 5;
   string Language = 6;
   string EngineVersion = 7;
 
+  // need re-compile 
   bool Recompile = 8;
-  int64 RiskNumber = 9; //风险数
-}
-message SsaProgramFilter{
-  string ProgramName = 1;
-  string Language = 2;
-  string EngineVersion = 3;
-  int64 BeforeUpdateAt = 4;
-  int64 AfterUpdateAt = 5;
-  string Keyword = 6;
-
-  int64 RiskNum = 7;
-  repeated string RiskType = 8;
-}
-message QuerySsaProgramRequest{
-  Paging Paging = 1;
-  int64 Id = 2;
-  SsaProgramFilter Filter = 3;
-  int64 Offset = 5;
-  bool IsAll = 6;
-}
-message DeleteSsaProgramRequest{
-  SsaProgramFilter filter = 1;
-  repeated int64 Id = 2;
-  bool IsAll = 3;
+  // risk number 
+  int64 HighRiskNumber = 9; 
+  int64 CriticalRiskNumber = 10; 
+  int64 WarnRiskNumber = 11; 
+  int64 LowRiskNumber = 12;
 }
 
-message QuerySsaProgramResponse{
+message SSAProgramInput {
+  string Name = 1; // index 
+  string Description = 2; 
+}
+
+message SSAProgramFilter{
+  repeated string ProgramNames =  1; 
+  repeated string Languages =  2; 
+  repeated int64 Ids =  3; 
+
+  // update range
+  int64 BeforeUpdatedAt = 5;
+  int64 AfterUpdatedAt = 6;
+  // fuzz search 
+  string Keyword =  7 ;
+  // id range
+  int64 AfterID =  8;
+  int64 BeforeID = 9;
+}
+
+
+message QuerySSAProgramRequest{
   Paging Paging = 1;
-  repeated SsaProgram programs = 2;
+  SSAProgramFilter Filter = 3;
+}
+
+message UpdateSSAProgramRequest{
+  SSAProgramInput ProgramInput = 1;
+}
+
+message DeleteSSAProgramRequest{
+  SSAProgramFilter Filter = 1;
+}
+
+message QuerySSAProgramResponse{
+  Paging Paging = 1;
+  repeated SSAProgram programs = 2;
   int64 Total = 3;
 }
 
