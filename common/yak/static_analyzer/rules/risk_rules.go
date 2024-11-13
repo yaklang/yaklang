@@ -1,9 +1,10 @@
 package rules
 
 import (
+	"strconv"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"strconv"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
