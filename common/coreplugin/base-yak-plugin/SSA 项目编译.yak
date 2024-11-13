@@ -48,17 +48,17 @@ description := cli.Text("description",
 
 
 // {{ database 
-dbPaths := cli.FileNames("dbPath", 
-    cli.setVerboseName("数据库路径"),
-    cli.setCliGroup("database"),
-)
+//dbPaths := cli.FileNames("dbPath",
+//    cli.setVerboseName("数据库路径"),
+//    cli.setCliGroup("database"),
+//)
 // }}
 
 cli.check()
-dbPath  = ""
-if len(dbPaths) > 0 {
-    dbPath = dbPaths[0]
-}
+//dbPath  = ""
+//if len(dbPaths) > 0 {
+//    dbPath = dbPaths[0]
+//}
 
 var language
 if len(languages) == 1 {
@@ -76,7 +76,7 @@ opts = [
     ssa.withReCompile(reCompile), 
     ssa.withStrictMode(strictMode),
     ssa.withDescription(description),
-    ssa.withDatabasePath(dbPath),
+    //ssa.withDatabasePath(dbPath),
     ssa.withSaveToProfile(true),
     ssa.withContext(context.Background()),
 ] 
