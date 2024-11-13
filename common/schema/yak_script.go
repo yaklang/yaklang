@@ -129,7 +129,7 @@ func (s *YakScript) GetParams() []*ypb.YakScriptParam {
 	var paras []*ypb.YakScriptParam
 	params, err := strconv.Unquote(s.Params)
 	if err != nil {
-		log.Errorf("unquote params string error: %s", err)
+		log.Debugf("%v: unquote params string error: %s(%v)", s.ScriptName, err, s.Params)
 		return nil
 	}
 	err = json.Unmarshal([]byte(params), &paras)
