@@ -51,9 +51,14 @@ func Test_Process(t *testing.T) {
 
 	check := func(prog *ssaapi.Program, rule string) {
 		process := 0.0
+		hasProcess := false
 		res, err := prog.SyntaxFlowWithError(rule,
 			ssaapi.QueryWithProcessCallback(func(f float64, s string) {
 				log.Infof("process callback %f %s", f, s)
+				// check has process
+				if f > 0 && f < 1 {
+					hasProcess = true
+				}
 				// check is reduce
 				if process > f {
 					t.Fatal("process is reduce")
@@ -72,6 +77,7 @@ func Test_Process(t *testing.T) {
 		)
 
 		require.Equal(t, process, 1.0)
+		require.True(t, hasProcess)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	}
@@ -118,7 +124,7 @@ func Test_Context(t *testing.T) {
 				}),
 			)
 			require.Error(t, err)
-			require.Equal(t, err.Error(), "context done")
+			require.Contains(t, err.Error(), "context done")
 			require.True(t, process < 1.0)
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.JAVA))

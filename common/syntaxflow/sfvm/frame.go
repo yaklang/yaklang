@@ -238,6 +238,15 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		}
 	}()
 	for {
+		if s.config.processCallback != nil {
+			var msg string
+			if s.idx < len(s.Codes) {
+				msg = s.Codes[s.idx].String()
+			} else {
+				msg = "exec rule finished"
+			}
+			s.config.processCallback(s.idx, msg)
+		}
 		if s.idx >= len(s.Codes) {
 			break
 		}

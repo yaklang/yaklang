@@ -82,23 +82,39 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 	// no rule
 	return nil, utils.Errorf("SyntaxflowQuery: rule is nil")
 }
+
 func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	config := &queryConfig{}
 	for _, o := range opt {
 		o(config)
 	}
+	process := func(f float64, msg string) {
+		if config.processCallback != nil {
+			config.processCallback(f, msg)
+		}
+	}
+	process(0, "start query syntaxflow")
 	// handler input  value
 	value := config.value
 	if utils.IsNil(value) {
 		return nil, utils.Errorf("SyntaxflowQuery: value is nil")
 	}
 
+	process(0, "load or compile syntaxflow rule ")
 	// get runtime frame
 	frame, err := config.GetFrame()
 	if err != nil {
 		return nil, err
 	}
 
+	total := len(frame.Codes) + 1
+	handler := 0
+	config.opts = append(config.opts, sfvm.WithProcessCallback(func(i int, s string) {
+		if handler < i {
+			handler = i
+		}
+		process(float64(handler)/float64(total), s)
+	}))
 	// runtime
 	res, err := frame.Feed(value, config.opts...)
 	if err != nil {
@@ -106,11 +122,13 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	}
 	ret := CreateResultFromQuery(res)
 
+	defer process(1, "end query syntaxflow")
 	if config.program != nil {
 		ret.program = config.program
 		//TODO:  now we not save result without program
 		// save ret
 		if config.save {
+			process(float64(total-1)/float64(total), "save result")
 			resultID, err := ret.Save(config.taskID)
 			_ = resultID
 			if err != nil {
