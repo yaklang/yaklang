@@ -74,14 +74,14 @@ func NewFingerprintFromGRPCModel(gr *ypb.FingerprintRule) *GeneralRule {
 		return nil
 	}
 	cpe := &CPE{}
-	if gr.Cpe != nil {
-		cpe.Part = gr.Cpe.Part
-		cpe.Vendor = gr.Cpe.Vendor
-		cpe.Product = gr.Cpe.Product
-		cpe.Version = gr.Cpe.Version
-		cpe.Update = gr.Cpe.Update
-		cpe.Edition = gr.Cpe.Edition
-		cpe.Language = gr.Cpe.Language
+	if gr.CPE != nil {
+		cpe.Part = gr.CPE.Part
+		cpe.Vendor = gr.CPE.Vendor
+		cpe.Product = gr.CPE.Product
+		cpe.Version = gr.CPE.Version
+		cpe.Update = gr.CPE.Update
+		cpe.Edition = gr.CPE.Edition
+		cpe.Language = gr.CPE.Language
 	}
 	rule := &GeneralRule{
 		CPE:             cpe,
@@ -111,7 +111,7 @@ func (gr *GeneralRule) ToGRPCModel() *ypb.FingerprintRule {
 	}
 
 	return &ypb.FingerprintRule{
-		Cpe:             cpe,
+		CPE:             cpe,
 		RuleName:        gr.RuleName,
 		WebPath:         gr.WebPath,
 		ExtInfo:         gr.ExtInfo,
