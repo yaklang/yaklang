@@ -408,24 +408,58 @@ rsp.`,
 		)
 	})
 
-	t.Run("halfway", func(t *testing.T) {
+	t.Run("halfway-string", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallbacks(t,
+			`a = "";a.has`,
+			&ypb.Range{
+				Code:        "a.has",
+				StartLine:   1,
+				StartColumn: 8,
+				EndLine:     1,
+				EndColumn:   13,
+			},
+			labelsContainsCallback(t, []string{"HasPrefix"}),
+			labelsNotContainsCallback(t, []string{"has", "poc"}),
+		)
+	})
+
+	t.Run("halfway-map", func(t *testing.T) {
 		t.Parallel()
 
 		checkCompletionWithCallbacks(t,
 			`a = {"a":1};a.del`,
 			&ypb.Range{
-				Code:        "a.Del",
+				Code:        "a.del",
 				StartLine:   1,
 				StartColumn: 13,
 				EndLine:     1,
 				EndColumn:   18,
 			},
 			labelsContainsCallback(t, []string{"Delete"}),
-			labelsNotContainsCallback(t, []string{"del"}),
+			labelsNotContainsCallback(t, []string{"del", "poc"}),
 		)
 	})
 
-	t.Run("halfway2", func(t *testing.T) {
+	t.Run("halfway-slice", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallbacks(t,
+			`a = [];a.app`,
+			&ypb.Range{
+				Code:        "a.app",
+				StartLine:   1,
+				StartColumn: 8,
+				EndLine:     1,
+				EndColumn:   13,
+			},
+			labelsContainsCallback(t, []string{"Append"}),
+			labelsNotContainsCallback(t, []string{"app", "poc"}),
+		)
+	})
+
+	t.Run("halfway-lib", func(t *testing.T) {
 		t.Parallel()
 
 		checkCompletionWithCallbacks(t,
@@ -438,6 +472,23 @@ rsp.`,
 				EndColumn:   21,
 			},
 			labelsContainsCallback(t, []string{"https", "HTTPRequest", "FuzzCalcExpr"}),
+		)
+	})
+	t.Run("halfway-struct", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallbacks(t,
+			`rsp, req = poc.HTTPEx("")~
+rsp.Ba`,
+			&ypb.Range{
+				Code:        "rsp.Ba",
+				StartLine:   2,
+				StartColumn: 1,
+				EndLine:     2,
+				EndColumn:   7,
+			},
+			labelsContainsCallback(t, []string{"Https", "BareResponse", "Proxy", "RawPacket"}),
+			labelsNotContainsCallback(t, []string{"Len", "Push", "Pop"}), // should not be string method
 		)
 	})
 
@@ -1199,6 +1250,5 @@ func Test_SyntaxflowCompletion(t *testing.T) {
 		}, id)
 
 		require.True(t, len(resp.SuggestionMessage) > 0)
-
 	})
 }
