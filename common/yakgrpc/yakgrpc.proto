@@ -5758,5 +5758,5 @@ message PluginEnvData {
 
 message DeletePluginEnvRequest {
   string key = 1;
-  bool all = 2;
+  bool All = 2;
 }
