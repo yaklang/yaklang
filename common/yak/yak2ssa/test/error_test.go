@@ -1108,7 +1108,9 @@ func TestExternInstance(t *testing.T) {
 			`,
 			Want: []string{
 				ssa.ExternFieldError("Lib", "lib", "GetInt", "getInt"),
+				ssa4analyze.InvalidField("any", "GetInt"),
 				ssa.ExternFieldError("Lib", "lib", "GetaInt", "getAInt"),
+				ssa4analyze.InvalidField("any", "GetaInt"),
 				ssa.ContAssignExtern("lib.getInt"),
 				// ssa.ContAssignExtern("lib.GetInt"),
 				ssa.ContAssignExtern("lib"),
