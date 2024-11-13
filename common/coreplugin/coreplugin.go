@@ -231,7 +231,13 @@ func init() {
 		registerBuildInPlugin(
 			"yak", "SSA 项目编译",
 			withPluginHelp("将选择的项目编译到 SSA 数据库内，用于后续的代码查询和分析。"),
-			withPluginAuthors("Lingze"),
+			withPluginAuthors("令则"),
+			withPluginEnableGenerateParam(true),
+		)
+		registerBuildInPlugin(
+			"yak", "SyntaxFlow 规则执行",
+			withPluginHelp("执行 SyntaxFlow 规则"),
+			withPluginAuthors("令则"),
 			withPluginEnableGenerateParam(true),
 		)
 		return nil
