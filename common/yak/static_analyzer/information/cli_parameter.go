@@ -213,7 +213,9 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo, []stri
 			// handler option
 			shouldSkip := false
 			for i := 2; i < opLen; i++ {
-				shouldSkip = handleOption(cli, v.GetOperand(i))
+				if handleOption(cli, v.GetOperand(i)) {
+					shouldSkip = true
+				}
 			}
 			if shouldSkip {
 				return
