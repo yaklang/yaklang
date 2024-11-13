@@ -1,5 +1,7 @@
 package yserx
 
+import "github.com/yaklang/yaklang/common/javaclassparser/jarwar"
+
 var Exports = map[string]interface{}{
 	"ToJson":                   ToJson,
 	"FromJson":                 FromJson,
@@ -33,4 +35,6 @@ var Exports = map[string]interface{}{
 	"NewJavaObject":           NewJavaObject,
 	"NewJavaReference":        NewJavaReference,
 	"MarshalJavaObjects":      MarshalJavaObjects,
+
+	"Decompile": jarwar.AutoDecompile,
 }
