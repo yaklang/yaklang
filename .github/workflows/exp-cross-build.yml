@@ -125,10 +125,10 @@ jobs:
           aarch64-linux-gnu-gcc -v
 
       - name: Generate Document
-        run: go run -gcflags=all=-l common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
+        run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
 
       - name: Codec Methods Document
-        run: go run common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.gzip
+        run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.gzip
 
       - name: Sync Embed FS Hash to Code
         run: go run common/yak/cmd/yak.go embed-fs-hash --override --all
