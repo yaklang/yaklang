@@ -600,7 +600,7 @@ c = a();
 		if err != nil && errors.Is(err, sfvm.CriticalError) && strings.Contains(err.Error(), "forbid") {
 			return nil
 		}
-		return utils.Error("forbid native call is not finished")
+		return utils.Errorf("forbid native call is not finished: %v", err)
 	})
 }
 

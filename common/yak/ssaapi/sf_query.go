@@ -118,7 +118,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	// runtime
 	res, err := frame.Feed(value, config.opts...)
 	if err != nil {
-		return nil, utils.Errorf("SyntaxflowQuery: feed failed: %v", err)
+		return nil, utils.Wrap(err, "SyntaxflowQuery: feed failed")
 	}
 	ret := CreateResultFromQuery(res)
 
@@ -132,7 +132,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 			resultID, err := ret.Save(config.taskID)
 			_ = resultID
 			if err != nil {
-				return ret, utils.Errorf("SyntaxflowQuery: save failed: %v", err)
+				return ret, utils.Wrap(err, "SyntaxflowQuery: save failed")
 			}
 		}
 	}
