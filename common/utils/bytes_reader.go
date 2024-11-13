@@ -246,9 +246,9 @@ func ReadUntilStableEx(reader io.Reader, noTimeout bool, conn net.Conn, timeout 
 		}
 	}
 }
+
 func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 	var mu sync.Mutex
-	ch := make([]byte, 1)
 	buffer := bytes.NewBuffer(nil)
 	readTimeout := 1000 * time.Millisecond
 	readAsyncTimeout := 250 * time.Millisecond
@@ -259,11 +259,13 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 	ddlCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	done := make(chan struct{})
+	done := make(chan bool)
 	go func() {
 		defer close(done)
+		ch := make([]byte, 1)
 		for {
 			if err := conn.SetDeadline(time.Now().Add(readAsyncTimeout)); err != nil {
+				log.Debugf("SetDeadline failed: %v", err)
 				return
 			}
 
@@ -275,24 +277,22 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 				mu.Unlock()
 
 				if currentLen >= maxSize {
+					done <- true
 					return
 				}
 			}
 
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
-				return
-			}
-
 			if err != nil {
-				msg := err.Error()
-				if !MatchAllOfGlob(msg, "*i/o timeout") {
-					time.Sleep(time.Second)
-					log.Debugf("conn[%s] met error: %v", conn.RemoteAddr().String(), err)
+				if err == io.EOF || err == io.ErrUnexpectedEOF {
+					done <- true
+					return
 				}
+				log.Debugf("conn[%s] met error: %v", conn.RemoteAddr().String(), err)
 			}
 
 			select {
 			case <-ddlCtx.Done():
+				done <- false
 				return
 			default:
 			}
@@ -300,8 +300,12 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 	}()
 
 	var lastLen int
+	timer := time.NewTimer(readTimeout)
+	defer timer.Stop()
+
 	for {
-		time.Sleep(readTimeout)
+		<-timer.C
+		timer.Reset(readTimeout)
 
 		mu.Lock()
 		currentLen := buffer.Len()
@@ -313,8 +317,9 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 		lastLen = currentLen
 	}
 
-	<-done
-	time.Sleep(readGapTimeout)
+	if success := <-done; success {
+		time.Sleep(readGapTimeout)
+	}
 
 	mu.Lock()
 	defer mu.Unlock()
