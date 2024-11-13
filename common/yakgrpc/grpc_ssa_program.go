@@ -34,7 +34,13 @@ func (s *Server) UpdateSSAProgram(ctx context.Context, req *ypb.UpdateSSAProgram
 }
 
 func (s *Server) DeleteSSAPrograms(ctx context.Context, req *ypb.DeleteSSAProgramRequest) (*ypb.DbOperateMessage, error) {
-	count, err := yakit.DeleteSSAProgram(consts.GetGormProfileDatabase(), req.GetFilter())
+	var count int
+	var err error
+	if req.DeleteAll {
+		count, err = yakit.DeleteSSAProgram(s.GetProfileDatabase(), nil)
+	} else if req.GetFilter() != nil {
+		count, err = yakit.DeleteSSAProgram(consts.GetGormProfileDatabase(), req.GetFilter())
+	}
 	if err != nil {
 		return nil, err
 	}

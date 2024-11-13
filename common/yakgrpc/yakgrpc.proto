@@ -5565,7 +5565,8 @@ message UpdateSSAProgramRequest{
 }
 
 message DeleteSSAProgramRequest{
-  SSAProgramFilter Filter = 1;
+  bool DeleteAll = 1;
+  SSAProgramFilter Filter = 2;
 }
 
 message QuerySSAProgramResponse{
