@@ -37,7 +37,6 @@ func writeToFile(filename string, lines []string) {
     file, err := os.Create(filename)
     if err != nil {
         fmt.Println("Error creating file:", err)
-        return
     }
     defer file.Close() // 确保在函数结束时关闭文件
 
@@ -49,7 +48,6 @@ func writeToFile(filename string, lines []string) {
         _, err := writer.WriteString(line + "\n")
         if err != nil {
             fmt.Println("Error writing to file:", err)
-            return
         }
     }
 
@@ -67,7 +65,6 @@ func readFromFile(filename string) {
     file, err := os.Open(filename)
     if err != nil {
         fmt.Println("Error opening file:", err)
-        return
     }
     defer file.Close() // 确保在函数结束时关闭文件
 
