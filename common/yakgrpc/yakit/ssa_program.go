@@ -42,6 +42,7 @@ func FilterSsaProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
 	return db
 }
 
+// when filter == nil delete all program
 func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
 	db := DB.Model(&schema.SSAProgram{})
 	db = FilterSsaProgram(db, filter)
