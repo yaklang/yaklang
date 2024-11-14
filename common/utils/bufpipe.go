@@ -168,7 +168,11 @@ func (w *PerHandlerWriter) Write(p []byte) (n int, err error) {
 		return len(p), nil
 	} else {
 		w.preHandlerOk = true
-		return w.writer.Write(remainData)
+		_, err = w.writer.Write(remainData)
+		if err == nil {
+			return len(p), err
+		}
+		return 0, err
 	}
 }
 
