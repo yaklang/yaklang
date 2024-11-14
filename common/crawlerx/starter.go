@@ -234,7 +234,7 @@ func (starter *BrowserStarter) doLauncher(l *launcher.Launcher) *launcher.Launch
 	if starter.browserConfig.proxyAddress != nil {
 		l = l.Proxy(starter.browserConfig.proxyAddress.String())
 	}
-	l = l.NoSandbox(true).Set(flags.Headless, "new")
+	l = l.NoSandbox(true).Set(flags.Headless, "new").Set("disable-features", "HttpsUpgrades")
 	if (starter.baseConfig.leakless == "default" && strings.Contains(runtime.GOOS, "windows")) ||
 		starter.baseConfig.leakless == "false" {
 		l = l.Leakless(false)
