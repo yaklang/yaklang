@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -55,6 +56,15 @@ var (
 	yakKeywordSuggestions      = make([]*ypb.SuggestionDescription, 0)
 	yakTypeSuggestions         = make([]*ypb.SuggestionDescription, 0)
 	progCacheMap               = utils.NewTTLCache[*ssaapi.Program](0)
+
+	CompletionKindField     = "Field"
+	CompletionKindKeyword   = "Keyword"
+	ComplectionKindConstant = "Constant"
+	CompletionKindVariable  = "Variable"
+	CompletionKindFunction  = "Function"
+	CompletionKindMethod    = "Method"
+	CompletionKindClass     = "Class"
+	CompletionKindModule    = "Module"
 )
 
 func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
@@ -66,7 +76,7 @@ func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
 				Label:       keyword,
 				InsertText:  keyword,
 				Description: "Language Keyword",
-				Kind:        "Keyword",
+				Kind:        CompletionKindKeyword,
 			})
 		}
 	}
@@ -83,7 +93,7 @@ func getLanguageBasicTypeSuggestions() []*ypb.SuggestionDescription {
 				Label:       typ,
 				InsertText:  typ,
 				Description: "Basic Type",
-				Kind:        "Class",
+				Kind:        CompletionKindClass,
 			})
 		}
 	}
@@ -100,7 +110,7 @@ func getStringBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 				Label:       methodName,
 				Description: method.Description,
 				InsertText:  snippets,
-				Kind:        "Method",
+				Kind:        CompletionKindMethod,
 			}
 			stringBuiltinMethodSuggestionMap[methodName] = sug
 			stringBuiltinMethodSuggestions = append(stringBuiltinMethodSuggestions, sug)
@@ -119,7 +129,7 @@ func getBytesBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 				Label:       methodName,
 				Description: method.Description,
 				InsertText:  snippets,
-				Kind:        "Method",
+				Kind:        CompletionKindMethod,
 			}
 			bytesBuiltinMethodSuggestionMap[methodName] = sug
 			bytesBuiltinMethodSuggestions = append(bytesBuiltinMethodSuggestions, sug)
@@ -138,7 +148,7 @@ func getMapBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 				Label:       methodName,
 				Description: method.Description,
 				InsertText:  snippets,
-				Kind:        "Method",
+				Kind:        CompletionKindMethod,
 			}
 			mapBuiltinMethodSuggestionMap[methodName] = sug
 			mapBuiltinMethodSuggestions = append(mapBuiltinMethodSuggestions, sug)
@@ -158,7 +168,7 @@ func getSliceBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 				DefinitionVerbose: verbose,
 				Description:       method.Description,
 				InsertText:        snippets,
-				Kind:              "Method",
+				Kind:              CompletionKindMethod,
 			}
 			sliceBuiltinMethodSuggestionMap[methodName] = sug
 			sliceBuiltinMethodSuggestions = append(sliceBuiltinMethodSuggestions, sug)
@@ -177,7 +187,7 @@ func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 				Label:       libName,
 				InsertText:  libName,
 				Description: "Standard Library",
-				Kind:        "Module",
+				Kind:        CompletionKindModule,
 			})
 		}
 	}
@@ -763,9 +773,9 @@ func completionUserDefinedVariable(prog *ssaapi.Program, rng memedit.RangeIf, fi
 		}
 
 		insertText := varName
-		vKind := "Variable"
+		vKind := CompletionKindVariable
 		if !v.IsNil() && v.IsFunction() {
-			vKind = "Function"
+			vKind = CompletionKindFunction
 			funcTyp, _ := ssa.ToFunctionType(bareValue.GetType())
 			insertText = getSSAFunctionVscodeSnippets(varName, funcTyp)
 		}
@@ -793,7 +803,7 @@ func completionExternValues(prog *ssaapi.Program, filterMap map[string]struct{})
 				Label:       name,
 				Description: funcDecl.Document,
 				InsertText:  funcDecl.VSCodeSnippets,
-				Kind:        "Function",
+				Kind:        CompletionKindFunction,
 			})
 		} else {
 			bareValue := prog.Program.BuildValueFromAny(nil, name, value)
@@ -801,10 +811,10 @@ func completionExternValues(prog *ssaapi.Program, filterMap map[string]struct{})
 
 			insertText := name
 			desc := ""
-			vKind := "Variable"
+			vKind := CompletionKindVariable
 
 			if !v.IsNil() && v.IsFunction() {
-				vKind = "Function"
+				vKind = CompletionKindFunction
 				funcTyp, _ := ssa.ToFunctionType(bareValue.GetType())
 				insertText = getSSAFunctionVscodeSnippets(name, funcTyp)
 			} else {
@@ -838,7 +848,7 @@ func completionYakStandardLibraryChildren(v *ssaapi.Value, word string) (ret []*
 				Label:       decl.MethodName,
 				Description: decl.Document,
 				InsertText:  decl.VSCodeSnippets,
-				Kind:        "Function",
+				Kind:        CompletionKindVariable,
 			})
 		}
 	}
@@ -848,7 +858,7 @@ func completionYakStandardLibraryChildren(v *ssaapi.Value, word string) (ret []*
 				Label:       instance.InstanceName,
 				Description: "",
 				InsertText:  instance.InstanceName,
-				Kind:        "Constant",
+				Kind:        ComplectionKindConstant,
 			})
 		}
 	}
@@ -893,7 +903,7 @@ func completionYakTypeBuiltinMethod(rng memedit.RangeIf, v *ssaapi.Value, realTy
 				continue
 			}
 
-			kind := "Field"
+			vKind := CompletionKindField
 			insertText := ""
 			label := key.String()
 			if kind := key.GetTypeKind(); kind == ssa.StringTypeKind || kind == ssa.BytesTypeKind {
@@ -902,14 +912,14 @@ func completionYakTypeBuiltinMethod(rng memedit.RangeIf, v *ssaapi.Value, realTy
 			insertText = label
 
 			if typ := ssaapi.GetBareType(member.GetType()); typ.GetTypeKind() == ssa.FunctionTypeKind {
-				kind = "Method"
+				vKind = CompletionKindMethod
 				insertText = getFuncCompletionBySSAType(label, typ)
 			}
 			ret = append(ret, &ypb.SuggestionDescription{
 				Label:       label,
 				Description: "",
 				InsertText:  insertText,
-				Kind:        kind,
+				Kind:        vKind,
 			})
 		}
 	case ssa.StringTypeKind:
@@ -954,7 +964,7 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 				Label:       keyStr,
 				Description: "",
 				InsertText:  keyStr,
-				Kind:        "Field",
+				Kind:        CompletionKindField,
 			})
 		}
 
@@ -963,7 +973,7 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 				Label:       methodName,
 				Description: funcDecl.Document,
 				InsertText:  funcDecl.VSCodeSnippets,
-				Kind:        "Method",
+				Kind:        CompletionKindMethod,
 			})
 		}
 		return
@@ -977,7 +987,7 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 				Label:       keyStr,
 				Description: fieldType.String(),
 				InsertText:  keyStr,
-				Kind:        "Field",
+				Kind:        CompletionKindField,
 			})
 		}
 		for methodName, method := range objType.GetMethod() {
@@ -987,12 +997,86 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 				Label:       methodName,
 				Description: "",
 				InsertText:  insertText,
-				Kind:        "Method",
+				Kind:        CompletionKindMethod,
 			})
 		}
 	}
 
 	return
+}
+
+func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ssaapi.Value) []*ypb.SuggestionDescription {
+	// fix completion, for function params that are function type, we should complete function name instead of function signature
+	// e.g. callable(app) -> callable(append), not callable(append(a, vals...))
+	users := v.GetUsers()
+	if len(users) == 0 {
+		return suggestions
+	}
+	sort.SliceStable(users, func(i, j int) bool {
+		return users[i].GetRange().GetEndOffset() < users[j].GetRange().GetEndOffset()
+	})
+	lastUser := users[len(users)-1]
+	if !lastUser.IsCall() {
+		return suggestions
+	}
+	call, ok := ssa.ToCall(ssaapi.GetBareNode(lastUser))
+	if !ok {
+		return suggestions
+	}
+	funcTyp, ok := ssa.ToFunctionType(call.Method.GetType())
+	if !ok {
+		return suggestions
+	}
+	// find index of call.Args
+	index := -1
+	for i, arg := range call.Args {
+		if arg == ssaapi.GetBareNode(v) {
+			index = i
+		}
+	}
+	if index == -1 {
+		return suggestions
+	}
+	if len(funcTyp.Parameter) <= index {
+		return suggestions
+	}
+	paramTyp := funcTyp.Parameter[index]
+	if paramTyp.GetTypeKind() != ssa.FunctionTypeKind {
+		return suggestions
+	}
+	if ssa.TypeCompare(paramTyp, ssaapi.GetBareType(v.GetType())) {
+		for _, r := range suggestions {
+			if r.Kind != CompletionKindFunction && r.Kind != CompletionKindMethod {
+				continue
+			}
+			if index := strings.Index(r.InsertText, "("); index != -1 {
+				r.InsertText = r.InsertText[:index]
+			}
+		}
+	}
+	return suggestions
+}
+
+func fixCompletionBeforeParen(suggestions []*ypb.SuggestionDescription, prog *ssaapi.Program, rng memedit.RangeIf, v *ssaapi.Value) []*ypb.SuggestionDescription {
+	// fix completion, for text before paren, we should complete function name instead of function signature
+	// e.g. callable(app()) -> callable(append()), not callable(append(a, vals...)())
+	editor, ok := prog.Program.GetEditor("")
+	if !ok {
+		return suggestions
+	}
+	text := editor.GetTextFromOffset(rng.GetEndOffset(), rng.GetEndOffset()+1)
+	if text != "(" {
+		return suggestions
+	}
+	for _, r := range suggestions {
+		if r.Kind != CompletionKindFunction && r.Kind != CompletionKindMethod {
+			continue
+		}
+		if index := strings.Index(r.InsertText, "("); index != -1 {
+			r.InsertText = r.InsertText[:index]
+		}
+	}
+	return suggestions
 }
 
 func OnCompletion(
@@ -1003,6 +1087,8 @@ func OnCompletion(
 		if r := recover(); r != nil {
 			log.Errorf("Language completion error: %v", r)
 		}
+		ret = fixCompletionFunctionParams(ret, v)
+		ret = fixCompletionBeforeParen(ret, prog, rng, v)
 	}()
 	if !containPoint {
 		ret = append(ret, completionYakStandardLibrary()...)
