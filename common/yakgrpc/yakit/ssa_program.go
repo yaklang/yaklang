@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func FilterSsaProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
+func FilterSSAProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
 	db = db.Model(&schema.SSAProgram{})
 	if filter == nil {
 		return db
@@ -45,7 +45,7 @@ func FilterSsaProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
 // when filter == nil delete all program
 func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
 	db := DB.Model(&schema.SSAProgram{})
-	db = FilterSsaProgram(db, filter)
+	db = FilterSSAProgram(db, filter)
 	// get all program
 	var programs []*schema.SSAProgram
 	queryResult := db.Model(&schema.SSAProgram{}).Select("name").Find(&programs)
@@ -72,6 +72,7 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 			Order:   "desc",
 		}
 	}
+	db = FilterSSAProgram(db, request.GetFilter())
 	paging, dbx := bizhelper.Paging(db, int(p.Page), int(p.Limit), &programs)
 	if dbx.Error != nil {
 		return nil, nil, utils.Errorf("select ssa program fail: %s", dbx.Error)

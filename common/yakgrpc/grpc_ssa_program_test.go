@@ -72,6 +72,11 @@ func TestSsaProgramsQuery(t *testing.T) {
 			Languages: []string{string(ssaapi.Yak)},
 		}))
 	})
+	t.Run("query risk by filter", func(t *testing.T) {
+		require.Nil(t, queryByFilter(t, &ypb.SSAProgramFilter{
+			Languages: []string{string(ssaapi.JAVA)},
+		}))
+	})
 
 	t.Run("query risk", func(t *testing.T) {
 		res, err := prog.SyntaxFlowWithError(`
