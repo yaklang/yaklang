@@ -29,6 +29,7 @@ type LanguageServerAnalyzerResult struct {
 	Editor       *memedit.MemEditor
 	Word         string
 	ContainPoint bool
+	PointSuffix  bool
 }
 
 func (r *LanguageServerAnalyzerResult) Clone() *LanguageServerAnalyzerResult {
@@ -39,6 +40,7 @@ func (r *LanguageServerAnalyzerResult) Clone() *LanguageServerAnalyzerResult {
 		Editor:       r.Editor,
 		Word:         r.Word,
 		ContainPoint: r.ContainPoint,
+		PointSuffix:  r.PointSuffix,
 	}
 }
 
@@ -103,7 +105,7 @@ func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) 
 	ssaRange := GrpcRangeToSSARange(code, rng)
 	editor := ssaRange.GetEditor()
 	rangeWordText := ssaRange.GetWordText()
-	word, containPoint := trimSourceCode(rangeWordText)
+	word, containPoint, pointSuffix := trimSourceCode(rangeWordText)
 
 	getProgram := func() (*ssaapi.Program, error) {
 		prog, err := static_analyzer.SSAParse(code, scriptType)
@@ -153,6 +155,7 @@ func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) 
 		if fallback, ok := fallbackAnalyzeCache.Get(id); ok {
 			cloned := fallback.Clone()
 			cloned.ContainPoint = containPoint
+			cloned.PointSuffix = pointSuffix
 			cloned.Range = ssaRange
 			cloned.Word = word
 			cloned.Value = nil
@@ -178,6 +181,7 @@ func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) 
 		Range:        ssaRange,
 		Value:        v,
 		Editor:       editor,
+		PointSuffix:  pointSuffix,
 	}
 	fallbackAnalyzeCache.Set(id, result)
 	return result, err

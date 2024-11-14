@@ -684,12 +684,13 @@ func getFuncCompletionBySSAType(funcName string, typ ssa.Type) string {
 	)
 }
 
-func trimSourceCode(sourceCode string) (string, bool) {
-	containPoint := strings.Contains(sourceCode, ".")
-	if strings.HasSuffix(sourceCode, ".") {
+func trimSourceCode(sourceCode string) (code string, containPoint bool, pointSuffix bool) {
+	containPoint = strings.Contains(sourceCode, ".")
+	pointSuffix = strings.HasSuffix(sourceCode, ".")
+	if pointSuffix {
 		sourceCode = sourceCode[:len(sourceCode)-1]
 	}
-	return strings.TrimSpace(sourceCode), containPoint
+	return strings.TrimSpace(sourceCode), containPoint, pointSuffix
 }
 
 func OnHover(prog *ssaapi.Program, word string, containPoint bool, rng memedit.RangeIf, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
@@ -994,7 +995,10 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 	return
 }
 
-func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng memedit.RangeIf, scriptType string, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
+func OnCompletion(
+	prog *ssaapi.Program, word string, containPoint bool, pointSuffix bool,
+	rng memedit.RangeIf, scriptType string, v *ssaapi.Value,
+) (ret []*ypb.SuggestionDescription) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("Language completion error: %v", r)
@@ -1012,7 +1016,11 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng meme
 		ret = append(ret, completionYakTypeBuiltinMethod(rng, v)...)
 		ret = append(ret, completionComplexStructMethodAndInstances(v)...)
 	}
-	if len(ret) == 0 && containPoint && v.IsUndefined() {
+	if len(ret) == 0 && containPoint && !pointSuffix && v.IsUndefined() {
+		/*
+			when member completion item is empty  use object completion , for `a.bb` completion all a member
+			but when pointSuffix=true: `a.b.`, b is the object, not `a`,
+		*/
 		obj := v.GetObject()
 		if obj.IsNil() {
 			return ret
@@ -1030,7 +1038,7 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng meme
 
 		// undefined means halfway through the analysis
 		// so try to get the value before and complete again
-		return OnCompletion(prog, word, containPoint, rng, scriptType, obj)
+		return OnCompletion(prog, word, containPoint, pointSuffix, rng, scriptType, obj)
 	}
 	return ret
 }
@@ -1064,7 +1072,7 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	// todo: 处理YakScriptType，不同语言的补全、提示可能有不同
 	switch req.InspectType {
 	case COMPLETION:
-		ret.SuggestionMessage = OnCompletion(prog, word, containPoint, ssaRange, scriptType, v)
+		ret.SuggestionMessage = OnCompletion(prog, word, containPoint, result.PointSuffix, ssaRange, scriptType, v)
 	case HOVER:
 		ret.SuggestionMessage = OnHover(prog, word, containPoint, ssaRange, v)
 	case SIGNATURE:
