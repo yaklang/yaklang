@@ -280,7 +280,9 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	funcCtx := d.FunctionContext
 	lambdaIndex := 0
 	getLambdaIndex := func() int {
-		lambdaIndex++
+		defer func() {
+			lambdaIndex++
+		}()
 		return lambdaIndex
 	}
 	checkAndConvertRef := func(value values.JavaValue) {

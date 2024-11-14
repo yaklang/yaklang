@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const classTemplate = "%s class %s {%s}"
+const classTemplate = "%s class %s%s {%s}"
 const attrTemplate = `%s %s %s {%s}`
 
 type ClassObjectDumper struct {
@@ -83,10 +83,35 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	buildInLib := []string{
 		c.PackageName + ".*",
 		"java.lang.*",
-		"java.io.*",
+		//"java.io.*",
 	}
 	for _, s := range buildInLib {
 		funcCtx.Import(s)
+	}
+	superStr := ""
+	supperClassName := c.obj.GetSupperClassName()
+	supperClassName = strings.Replace(supperClassName, "/", ".", -1)
+	if supperClassName != "java.lang.Object" {
+		funcCtx.Import(supperClassName)
+		supperClassName = funcCtx.ShortTypeName(supperClassName)
+		if supperClassName != "" {
+			superStr += fmt.Sprintf(" extends %s", supperClassName)
+		}
+	}
+	for _, u := range c.obj.Interfaces {
+		info, err := c.obj.getConstantInfo(u)
+		if err != nil {
+			continue
+		}
+		classInfo := info.(*ConstantClassInfo)
+		name, err := c.obj.getUtf8(classInfo.NameIndex)
+		if err != nil {
+			continue
+		}
+		name = funcCtx.ShortTypeName(strings.Replace(name, "/", ".", -1))
+		if name != "" {
+			superStr += fmt.Sprintf(" implements %s", name)
+		}
 	}
 
 	packageSource := fmt.Sprintf("package %s;\n\n", packageName)
@@ -115,7 +140,8 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			attrs += fmt.Sprintf("\t%s\n", method)
 		}
 	}
-	result = fmt.Sprintf(result, accessFlags, className, attrs)
+
+	result = fmt.Sprintf(result, accessFlags, className, superStr, attrs)
 	importsStr := ""
 	for _, s := range funcCtx.GetAllImported() {
 		if utils.StringSliceContain(buildInLib, s) {
