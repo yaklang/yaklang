@@ -382,3 +382,65 @@ func TestBlock_Value_For(t *testing.T) {
 		`, []string{"phi(a)[1,add(a, 1)]", "3"}, t)
 	})
 }
+
+func TestBlock_Return_Phi(t *testing.T) {
+	t.Run("phi-with-return", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main() {
+			a := 1
+			if true {
+				return
+			}
+			println(a) // phi
+		}
+		`, []string{"phi(a)[Undefined-a,1]"}, t)
+	})
+
+	t.Run("phi-with-return-nested-if", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main() {
+			a := 1
+			if true {
+				if false {
+				    return
+				}
+			}
+			println(a) // phi
+		}
+		`, []string{"phi(a)[phi(a)[Undefined-a,1],1]"}, t)
+	})
+
+	t.Run("phi-with-return-if-else", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main() {
+			a := 1
+			if true {
+				return
+			}else if false {
+				return
+			}
+			println(a) // phi
+		}
+		`, []string{"phi(a)[Undefined-a,Undefined-a,1]"}, t)
+	})
+
+	t.Run("phi-with-return-nested-if-else", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main() {
+			a := 1
+			if true {
+				if false {
+				    return
+				}else if false {
+				    return
+				}
+			}
+			println(a) // phi
+		}
+		`, []string{"phi(a)[phi(a)[Undefined-a,Undefined-a,1],1]"}, t)
+	})
+}

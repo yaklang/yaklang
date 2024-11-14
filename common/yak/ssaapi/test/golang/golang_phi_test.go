@@ -157,6 +157,164 @@ func Test_Phi_WithReturn(t *testing.T) {
 	}, ssaapi.WithLanguage(ssaapi.GO))
 }
 
+func Test_Phi_WithReturn_Extend(t *testing.T) {
+	code := `package main
+
+	func main(p int) {
+		a := 1
+		var u int
+		if a == 1 {
+			return
+		} else if a == 2 {
+			return
+		} else if a == 3 {
+			return
+		}
+		b := a
+		c := p
+		d := u
+	}
+`
+	ssatest.CheckWithName("phi-with-return-else-if", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		phis := prog.SyntaxFlow("b as $b").GetValues("b")
+		phi := phis[0]
+
+		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds := targetIns.GetControlFlowConditions()
+		assert.Equal(t, 2, len(conds))
+
+		phis = prog.SyntaxFlow("c as $c").GetValues("c")
+		phi = phis[0]
+
+		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds = targetIns.GetControlFlowConditions()
+		assert.Equal(t, 2, len(conds))
+
+		phis = prog.SyntaxFlow("d as $d").GetValues("d")
+		phi = phis[0]
+
+		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds = targetIns.GetControlFlowConditions()
+		assert.Equal(t, 2, len(conds))
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
+
+	code = `package main
+
+	func main(p int) {
+		a := 1
+		var u int
+		if a == 1 {
+			if a == 2 {
+				if a == 3 {
+					return
+				}
+			}
+		} 
+		b := a
+		c := p
+		d := u
+	}
+`
+	ssatest.CheckWithName("phi-with-return-nested-if", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		phis := prog.SyntaxFlow("b as $b").GetValues("b")
+		phi := phis[0]
+
+		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds := targetIns.GetControlFlowConditions()
+		assert.Equal(t, 1, len(conds))
+
+		phis = prog.SyntaxFlow("c as $c").GetValues("c")
+		phi = phis[0]
+
+		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds = targetIns.GetControlFlowConditions()
+		assert.Equal(t, 1, len(conds))
+
+		phis = prog.SyntaxFlow("d as $d").GetValues("d")
+		phi = phis[0]
+
+		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds = targetIns.GetControlFlowConditions()
+		assert.Equal(t, 1, len(conds))
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
+
+	code = `package main
+
+	func main(p int) {
+		a := 1
+		var u int
+		if a == 1 {
+			if a == 2 {
+				return
+			} else {
+				return
+			}
+		} 
+		b := a
+		c := p
+		d := u
+	}
+`
+	ssatest.CheckWithName("phi-with-return-nested-if-else", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		phis := prog.SyntaxFlow("b as $b").GetValues("b")
+		phi := phis[0]
+
+		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds := targetIns.GetControlFlowConditions()
+		assert.Equal(t, 1, len(conds))
+
+		phis = prog.SyntaxFlow("c as $c").GetValues("c")
+		phi = phis[0]
+
+		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds = targetIns.GetControlFlowConditions()
+		assert.Equal(t, 1, len(conds))
+
+		phis = prog.SyntaxFlow("d as $d").GetValues("d")
+		phi = phis[0]
+
+		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds = targetIns.GetControlFlowConditions()
+		assert.Equal(t, 1, len(conds))
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
+}
+
 func Test_MemberCall_WithPhi(t *testing.T) {
 	code := `package main
 	
