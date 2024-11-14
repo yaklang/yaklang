@@ -230,9 +230,10 @@ func newFinishedHash(version uint16, cipherSuite *cipherSuite) finishedHash {
 		prf = prfAndHashForGM()
 		return finishedHash{sm3.New(), sm3.New(), nil, nil, buffer, version, prf}
 	} else {
-		prf, hash := prfAndHashForVersion(version, cipherSuite)
-		if hash != 0 {
-			return finishedHash{hash.New(), hash.New(), nil, nil, buffer, version, prf}
+		var cryptoHash crypto.Hash
+		prf, cryptoHash = prfAndHashForVersion(version, cipherSuite)
+		if cryptoHash != 0 {
+			return finishedHash{cryptoHash.New(), cryptoHash.New(), nil, nil, buffer, version, prf}
 		}
 	}
 
