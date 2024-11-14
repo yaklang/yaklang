@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -109,10 +110,10 @@ func (y *YakCompiler) GetRangeVerbose() string {
 	var prefix string
 	if y.currentStartPosition != nil && y.currentEndPosition != nil {
 		prefix = fmt.Sprintf(`[%v:%v -> %v:%v]`,
-			y.currentStartPosition.LineNumber,
-			y.currentStartPosition.ColumnNumber,
-			y.currentEndPosition.LineNumber,
-			y.currentEndPosition.ColumnNumber,
+			y.currentStartPosition.GetLine(),
+			y.currentStartPosition.GetColumn(),
+			y.currentEndPosition.GetLine(),
+			y.currentEndPosition.GetColumn(),
 		)
 	}
 	return prefix
@@ -128,25 +129,19 @@ func (y *YakCompiler) SetRange(b canStartStopToken) func() {
 	}
 }
 
-func (y *YakCompiler) _setCurrentStartPosition(t antlr.Token) *Position {
+func (y *YakCompiler) _setCurrentStartPosition(t antlr.Token) memedit.PositionIf {
 	origin := y.currentStartPosition
-	y.currentStartPosition = &Position{
-		LineNumber:   t.GetLine(),
-		ColumnNumber: t.GetColumn(),
-	}
+	y.currentStartPosition = memedit.NewPosition(t.GetLine(), t.GetColumn())
 	return origin
 }
 
-func (y *YakCompiler) _setCurrentEndPosition(t antlr.Token) *Position {
+func (y *YakCompiler) _setCurrentEndPosition(t antlr.Token) memedit.PositionIf {
 	origin := y.currentEndPosition
 	line, column := GetEndPosition(t)
-	y.currentEndPosition = &Position{
-		LineNumber:   line,
-		ColumnNumber: column,
+	if column > 0 {
+		column--
 	}
-	if y.currentEndPosition.ColumnNumber > 0 {
-		y.currentEndPosition.ColumnNumber--
-	}
+	y.currentEndPosition = memedit.NewPosition(line, column)
 	return origin
 }
 

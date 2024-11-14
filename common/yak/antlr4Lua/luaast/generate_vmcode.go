@@ -19,10 +19,10 @@ const (
 func (l *LuaTranslator) _pushOpcodeWithCurrentCodeContext(codes ...*yakvm.Code) {
 	for _, c := range codes {
 		if l.currentStartPosition != nil && l.currentEndPosition != nil {
-			c.StartLineNumber = l.currentStartPosition.LineNumber
-			c.StartColumnNumber = l.currentStartPosition.ColumnNumber
-			c.EndLineNumber = l.currentEndPosition.LineNumber
-			c.EndColumnNumber = l.currentEndPosition.ColumnNumber
+			c.StartLineNumber = l.currentStartPosition.GetLine()
+			c.StartColumnNumber = l.currentStartPosition.GetColumn()
+			c.EndLineNumber = l.currentEndPosition.GetLine()
+			c.EndColumnNumber = l.currentEndPosition.GetColumn()
 		}
 	}
 	l.codes = append(l.codes, codes...)

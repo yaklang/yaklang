@@ -2,10 +2,13 @@ package luaast
 
 import (
 	"fmt"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4Lua/infrastructure"
 	lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
@@ -27,16 +30,16 @@ type LuaTranslator struct {
 	currentLabeltbl *infrastructure.LabelTable
 	programCounter  int
 
-	currentStartPosition, currentEndPosition *Position
+	currentStartPosition, currentEndPosition memedit.PositionIf
 
 	AntlrTokenStream antlr.TokenStream
 	lexer            *lua.LuaLexer
 	parser           *lua.LuaParser
 
 	// 编译过程语法错误的地方
-	lexerErrors    LuaMergeError
-	parserErrors   LuaMergeError
-	compilerErrors LuaMergeError
+	lexerErrors    antlr4util.SourceCodeErrors
+	parserErrors   antlr4util.SourceCodeErrors
+	compilerErrors antlr4util.SourceCodeErrors
 
 	// 为了精简，栈只存 for 开始位置
 	forDepthStack    *vmstack.Stack
@@ -58,30 +61,25 @@ func NewLuaTranslator() *LuaTranslator {
 	}
 	return compiler
 }
+
 func NewLuaTranslatorWithTable(rootSymbol *yakvm.SymbolTable, rootLabel *infrastructure.LabelTable) *LuaTranslator {
 	return NewLuaTranslatorWithTableWithCode("", rootSymbol, rootLabel)
 }
 
 func NewLuaTranslatorWithTableWithCode(code string, rootSymbol *yakvm.SymbolTable, rootLabel *infrastructure.LabelTable) *LuaTranslator {
 	compiler := &LuaTranslator{
-		sourceCode:       code,
-		language:         "en",
-		rootSymtbl:       rootSymbol,
-		currentSymtbl:    rootSymbol,
-		rootLabeltbl:     rootLabel,
-		currentLabeltbl:  rootLabel,
-		constTbl:         make(map[string]int),
-		forDepthStack:    vmstack.New(),
-		repeatDepthStack: vmstack.New(),
-		whileDepthStack:  vmstack.New(),
-		currentStartPosition: &Position{
-			LineNumber:   0,
-			ColumnNumber: 0,
-		},
-		currentEndPosition: &Position{
-			LineNumber:   0,
-			ColumnNumber: 0,
-		},
+		sourceCode:           code,
+		language:             "en",
+		rootSymtbl:           rootSymbol,
+		currentSymtbl:        rootSymbol,
+		rootLabeltbl:         rootLabel,
+		currentLabeltbl:      rootLabel,
+		constTbl:             make(map[string]int),
+		forDepthStack:        vmstack.New(),
+		repeatDepthStack:     vmstack.New(),
+		whileDepthStack:      vmstack.New(),
+		currentStartPosition: memedit.NewPosition(0, 0),
+		currentEndPosition:   memedit.NewPosition(0, 0),
 	}
 	return compiler
 }
@@ -102,13 +100,13 @@ func (l *LuaTranslator) Translate(code string) bool {
 	if l.lexer == nil || l.parser == nil {
 		lexer := lua.NewLuaLexer(antlr.NewInputStream(code))
 		lexer.RemoveErrorListeners()
-		//lexer.AddErrorListener(l.lexerErrorListener)
+		// lexer.AddErrorListener(l.lexerErrorListener)
 		tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 		parser := lua.NewLuaParser(tokenStream)
 		l.AntlrTokenStream = tokenStream
 		parser.RemoveErrorListeners()
-		//parser.AddErrorListener(l.parserErrorListener)
-		//parser.SetErrorHandler(NewErrorStrategy())
+		// parser.AddErrorListener(l.parserErrorListener)
+		// parser.SetErrorHandler(NewErrorStrategy())
 		l.Init(lexer, parser)
 	}
 	raw := l.parser.Chunk()
@@ -119,7 +117,6 @@ func (l *LuaTranslator) Translate(code string) bool {
 	//	return false
 	//}
 	return true
-
 }
 
 func (l *LuaTranslator) Init(lexer *lua.LuaLexer, parser *lua.LuaParser) {
@@ -143,7 +140,6 @@ func (l *LuaTranslator) VisitChunk(raw lua.IChunkContext) interface{} {
 
 	l.VisitBlock(i.Block())
 	return nil
-
 }
 
 func (l *LuaTranslator) VisitBlock(raw lua.IBlockContext) interface{} {
@@ -166,18 +162,19 @@ func (l *LuaTranslator) VisitBlock(raw lua.IBlockContext) interface{} {
 	return nil
 }
 
-func (l *LuaTranslator) GetErrors() LuaMergeError {
-	return *NewYakMergeError(l.GetLexerErrors(), l.GetParserErrors(), l.GetCompileErrors())
+func (l *LuaTranslator) GetErrors() antlr4util.SourceCodeErrors {
+	return *antlr4util.NewSourceCodeErrors(l.GetLexerErrors(), l.GetParserErrors(), l.GetCompileErrors())
 }
 
-func (l *LuaTranslator) GetLexerErrors() LuaMergeError {
+func (l *LuaTranslator) GetLexerErrors() antlr4util.SourceCodeErrors {
 	return l.lexerErrors
 }
-func (l *LuaTranslator) GetParserErrors() LuaMergeError {
+
+func (l *LuaTranslator) GetParserErrors() antlr4util.SourceCodeErrors {
 	return l.parserErrors
 }
 
-func (l *LuaTranslator) GetCompileErrors() LuaMergeError {
+func (l *LuaTranslator) GetCompileErrors() antlr4util.SourceCodeErrors {
 	return l.compilerErrors
 }
 
@@ -187,15 +184,11 @@ func (l *LuaTranslator) panicCompilerError(e constError, items ...interface{}) {
 	panic(err)
 }
 
-func (l *LuaTranslator) newError(msg string, items ...interface{}) *LuaError {
+func (l *LuaTranslator) newError(msg string, items ...interface{}) *antlr4util.SourceCodeError {
 	if len(items) > 0 {
 		msg = fmt.Sprintf(msg, items...)
 	}
-	return &LuaError{
-		StartPos: *l.currentStartPosition,
-		EndPos:   *l.currentEndPosition,
-		Message:  msg,
-	}
+	return antlr4util.NewSourceCodeError(msg, l.currentStartPosition, l.currentEndPosition)
 }
 
 type whileContext struct {
