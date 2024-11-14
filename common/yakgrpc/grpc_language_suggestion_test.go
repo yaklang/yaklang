@@ -572,6 +572,46 @@ println(PLUGIN_RUNTIME_ID)
 			},
 		)
 	})
+
+	t.Run("fix-function-params", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallbacks(t,
+			`dyn.IsYakFunc(app)`,
+			&ypb.Range{
+				Code:        "app",
+				StartLine:   1,
+				StartColumn: 15,
+				EndLine:     1,
+				EndColumn:   18,
+			},
+			func(suggestions []*ypb.SuggestionDescription) {
+				item := getExactSuggestion(t, suggestions, "append")
+				require.Equal(t, "Function", item.Kind)
+				require.Equal(t, "append", item.InsertText)
+			},
+		)
+	})
+
+	t.Run("fix-before-paren", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallbacks(t,
+			`dyn.IsYakFunc(app())`,
+			&ypb.Range{
+				Code:        "app",
+				StartLine:   1,
+				StartColumn: 15,
+				EndLine:     1,
+				EndColumn:   18,
+			},
+			func(suggestions []*ypb.SuggestionDescription) {
+				item := getExactSuggestion(t, suggestions, "append")
+				require.Equal(t, "Function", item.Kind)
+				require.Equal(t, "append", item.InsertText)
+			},
+		)
+	})
 }
 
 var local ypb.YakClient = nil
@@ -862,7 +902,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Generic(t *testing.T) {
 				EndLine:     1,
 				EndColumn:   8,
 			},
-			"```go\nFind(i []T|map[U]T, fc (T) -> boolean) T\n```",
+			_markdownWrapper(`Find(i []T|map[U]T, fc (T) -> boolean) T`),
 		)
 	})
 }
@@ -1144,6 +1184,23 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_ForPhi(t *testing.T) {
 	)
 }
 
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_FixFunctionParams(t *testing.T) {
+	t.Parallel()
+
+	check := CheckHover(t)
+	code := `dyn.IsYakFunc(x.Find)`
+
+	ssaParseRange := &ypb.Range{
+		Code:        "x.Find",
+		StartLine:   1,
+		StartColumn: 15,
+		EndLine:     1,
+		EndColumn:   21,
+	}
+	// 标准库函数
+	check(t, code, "yak", ssaParseRange, _markdownWrapper(`Find(i []T|map[U]T, fc (T) -> boolean) T`))
+}
+
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature(t *testing.T) {
 	check := CheckSignature(t)
 	code := `a = func(b, c...) {}
@@ -1239,6 +1296,27 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature_Generic(t *testing.T) {
 				StartLine:   1,
 				StartColumn: 1,
 				EndLine:     1,
+				EndColumn:   8,
+			},
+			"Find(i []T|map[U]T, fc (T) -> boolean) T",
+			"",
+		)
+	})
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature_Generic_After_FunctionParams(t *testing.T) {
+	t.Run("x.Find", func(t *testing.T) {
+		t.Parallel()
+
+		check := CheckSignature(t)
+		check(t, `dyn.IsYakFunc(x.Find)
+x.Find()`,
+			"yak",
+			&ypb.Range{
+				Code:        "x.Find",
+				StartLine:   2,
+				StartColumn: 1,
+				EndLine:     2,
 				EndColumn:   8,
 			},
 			"Find(i []T|map[U]T, fc (T) -> boolean) T",
