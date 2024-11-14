@@ -132,15 +132,26 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			className = y.VisitIdentifier(i.Identifier())
 
 			parentClassName := ""
-			if i.Extends() != nil {
-				parentClassName = i.QualifiedStaticTypeRef().GetText()
-			}
 
 			class := y.CreateBluePrint(className)
 			y.GetProgram().SetExportType(className, class)
-			if parentClass := y.GetBluePrint(parentClassName); parentClass != nil {
-				//感觉在ssa-classBlue中做更好，暂时修复
-				class.AddParentClass(parentClass)
+			if i.Extends() != nil {
+				parentClassName = i.QualifiedStaticTypeRef().GetText()
+				fb := y.FunctionBuilder
+				class.AddLazyBuilder(func() {
+					currentbuilder := y.FunctionBuilder
+					y.FunctionBuilder = fb
+					defer func() {
+						y.FunctionBuilder = currentbuilder
+					}()
+					if parentClass := y.GetBluePrint(parentClassName); parentClass != nil {
+						//感觉在ssa-classBlue中做更好，暂时修复
+						class.AddParentClass(parentClass)
+						for _, s := range parentClass.GetFullTypeNames() {
+							class.AddFullTypeName(s)
+						}
+					}
+				})
 			}
 			for _, statement := range i.AllClassStatement() {
 				y.VisitClassStatement(statement, class)
@@ -170,18 +181,17 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 	defer recoverRange()
 	switch ret := raw.(type) {
 	case *phpparser.PropertyModifiersVariableContext:
-		// variable
 		modifiers := y.VisitPropertyModifiers(ret.PropertyModifiers())
-		// handle type hint
-		typ := y.VisitTypeHint(ret.TypeHint())
-
-		setMember := func(name string, value ssa.Value) {
+		for _, va := range ret.AllVariableInitializer() {
+			name, value := y.VisitVariableInitializer(va)
+			if strings.HasPrefix(name, "$") {
+				name = name[1:]
+			}
 			_, isStatic := modifiers[ssa.Static]
 			if utils.IsNil(value) {
 				value = y.EmitUndefined(name)
 			}
-			value.SetType(typ)
-
+			//todo: 在Member中没办法写New
 			if isStatic {
 				class.RegisterStaticMember(name, value)
 				variable := y.GetStaticMember(class, name)
@@ -189,25 +199,18 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			} else {
 				class.RegisterNormalMember(name, value)
 			}
+			currentBuilder := y.FunctionBuilder
+			class.AddLazyBuilder(func() {
+				lazyCurrentBuilder := y.FunctionBuilder
+				defer func() {
+					y.FunctionBuilder = lazyCurrentBuilder
+				}()
+				y.FunctionBuilder = currentBuilder
+				typ := y.VisitTypeHint(ret.TypeHint())
+				value.SetType(typ)
+			})
+
 		}
-		ClassBlock := y.CurrentBlock
-		class.AddLazyBuilder(func() {
-			// handle variable name
-			CurrentBlock := y.CurrentBlock
-			y.CurrentBlock = ClassBlock
-			defer func() {
-				y.CurrentBlock = CurrentBlock
-			}()
-
-			for _, va := range ret.AllVariableInitializer() {
-				name, value := y.VisitVariableInitializer(va)
-				if strings.HasPrefix(name, "$") {
-					name = name[1:]
-				}
-				setMember(name, value)
-			}
-		})
-
 		return
 	case *phpparser.FunctionContext:
 		// function

@@ -1,9 +1,9 @@
 package php2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
@@ -171,6 +171,6 @@ func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticType
 			}
 		}
 	}
-	log.Warnf("classBlue print not found")
-	return y.CreateBluePrint(uuid.NewString())
+	log.Warnf("classBlue print not found: %s", raw.GetText())
+	return y.CreateBluePrint(yakunquote.TryUnquote(raw.GetText()))
 }

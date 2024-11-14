@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -47,6 +48,16 @@ func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...C
 	b.AssignVariable(klassvar, klassContainer)
 	if err := blueprint.InitializeWithContainer(klassContainer); err != nil {
 		log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
+	}
+
+	if prog.VirtualImport {
+		//generate default fullTypeName
+		packagename := b.GetProgram().PkgName
+		if packagename == "" {
+			packagename = "main"
+		}
+		defaultFullTypename := fmt.Sprintf("%s.%s", packagename, name)
+		blueprint.AddFullTypeName(defaultFullTypename)
 	}
 	return blueprint
 }
