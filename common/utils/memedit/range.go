@@ -34,8 +34,16 @@ type PositionIf interface {
 	String() string
 }
 
-var _ RangeIf = (*codeRange)(nil)
-var _ PositionIf = (*position)(nil)
+type EditablePositionIf interface {
+	SetLine(int)
+	SetColumn(int)
+}
+
+var (
+	_ RangeIf            = (*codeRange)(nil)
+	_ PositionIf         = (*position)(nil)
+	_ EditablePositionIf = (*position)(nil)
+)
 
 type position struct {
 	line   int
@@ -58,6 +66,14 @@ func (p *position) String() string {
 	return fmt.Sprintf("%d:%d", p.line, p.column)
 }
 
+func (p *position) SetLine(line int) {
+	p.line = line
+}
+
+func (p *position) SetColumn(column int) {
+	p.column = column
+}
+
 type codeRange struct {
 	start       PositionIf
 	startOffset int
@@ -77,6 +93,7 @@ func NewRange(p1, p2 PositionIf) *codeRange {
 	}
 	return &codeRange{start: p2, end: p1}
 }
+
 func (r *codeRange) SetEditor(editor *MemEditor) {
 	r.editor = editor
 	r.startOffset = editor.GetOffsetByPosition(r.start)
@@ -90,6 +107,7 @@ func (r *codeRange) GetEditor() *MemEditor {
 func (r *codeRange) GetStart() PositionIf {
 	return r.start
 }
+
 func (r *codeRange) GetStartOffset() int {
 	return r.startOffset
 }
@@ -97,6 +115,7 @@ func (r *codeRange) GetStartOffset() int {
 func (r *codeRange) GetEnd() PositionIf {
 	return r.end
 }
+
 func (r *codeRange) GetEndOffset() int {
 	return r.endOffset
 }

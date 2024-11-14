@@ -7,6 +7,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
@@ -23,13 +25,13 @@ type YakCompiler struct {
 	yak.BaseYaklangParserVisitor
 
 	language            CompilerLanguage
-	lexerErrorListener  *ErrorListener
-	parserErrorListener *ErrorListener
+	lexerErrorListener  antlr.ErrorListener
+	parserErrorListener antlr.ErrorListener
 	errorStrategy       *ErrorStrategy
 	// 语法错误的问题处理
 
 	// 新增语句绑定起止位置
-	currentStartPosition, currentEndPosition *Position
+	currentStartPosition, currentEndPosition memedit.PositionIf
 
 	// 格式化
 	formatted         *bytes.Buffer
@@ -47,9 +49,9 @@ type YakCompiler struct {
 	switchDepthStack *vmstack.Stack
 	tryDepthStack    *vmstack.Stack
 	// 编译过程语法错误的地方
-	lexerErrors    YakMergeError
-	parserErrors   YakMergeError
-	compilerErrors YakMergeError
+	lexerErrors    antlr4util.SourceCodeErrors
+	parserErrors   antlr4util.SourceCodeErrors
+	compilerErrors antlr4util.SourceCodeErrors
 	// is omap
 	isOMap bool
 
@@ -133,12 +135,20 @@ func NewYakCompilerWithSymbolTable(rootSymbol *yakvm.SymbolTable, options ...Com
 	for _, o := range options {
 		o(compiler)
 	}
-	compiler.lexerErrorListener = NewErrorListener(func(msg string, start, end Position) {
-		compiler.lexerErrors.Push(NewErrorWithPostion(msg, start, end))
-	})
-	compiler.parserErrorListener = NewErrorListener(func(msg string, start, end Position) {
-		compiler.parserErrors.Push(NewErrorWithPostion(msg, start, end))
-	})
+	compiler.lexerErrorListener = antlr4util.NewErrorListener(
+		antlr4util.SimpleSyntaxErrorHandler(
+			func(msg string, start, end memedit.PositionIf) {
+				compiler.lexerErrors.Push(antlr4util.NewSourceCodeError(msg, start, end))
+			},
+		),
+	)
+	compiler.parserErrorListener = antlr4util.NewErrorListener(
+		antlr4util.SimpleSyntaxErrorHandler(
+			func(msg string, start, end memedit.PositionIf) {
+				compiler.parserErrors.Push(antlr4util.NewSourceCodeError(msg, start, end))
+			},
+		),
+	)
 	return compiler
 }
 
@@ -155,11 +165,11 @@ func NewYakCompiler(options ...CompilerOptionsFun) *YakCompiler {
 	return NewYakCompilerWithSymbolTable(root, options...)
 }
 
-func (y *YakCompiler) GetLexerErrorListener() *ErrorListener {
+func (y *YakCompiler) GetLexerErrorListener() antlr.ErrorListener {
 	return y.lexerErrorListener
 }
 
-func (y *YakCompiler) GetParserErrorListener() *ErrorListener {
+func (y *YakCompiler) GetParserErrorListener() antlr.ErrorListener {
 	return y.parserErrorListener
 }
 
@@ -169,17 +179,17 @@ func (y *YakCompiler) panicCompilerError(e constError, items ...interface{}) {
 	panic(err)
 }
 
-func (y *YakCompiler) pushError(yakError *YakError) {
+func (y *YakCompiler) pushError(yakError *antlr4util.SourceCodeError) {
 	y.compilerErrors.Push(yakError)
 }
 
-func (y *YakCompiler) newError(msg string, items ...interface{}) *YakError {
+func (y *YakCompiler) newError(msg string, items ...interface{}) *antlr4util.SourceCodeError {
 	if len(items) > 0 {
 		msg = fmt.Sprintf(msg, items...)
 	}
-	return &YakError{
-		StartPos: *y.currentStartPosition,
-		EndPos:   *y.currentEndPosition,
+	return &antlr4util.SourceCodeError{
+		StartPos: y.currentStartPosition,
+		EndPos:   y.currentEndPosition,
 		Message:  msg,
 	}
 }
@@ -216,20 +226,20 @@ func (y *YakCompiler) Compiler(code string) bool {
 	y.sourceCodePointer = &code
 	y.codes = []*yakvm.Code{}
 	raw := y.parser.Program()
-	parseErrors := NewYakMergeError(y.GetLexerErrors(), y.GetParserErrors())
+	parseErrors := antlr4util.NewSourceCodeErrors(y.GetLexerErrors(), y.GetParserErrors())
 	if len(*parseErrors) > 0 {
 		return false
 	}
 	y.VisitProgram(raw.(*yak.ProgramContext))
 
 	// 检查全局定义的变量，允许在非全局作用域内调用全局定义域内定义的变量
-	errorMap := make(map[any]*YakError)
+	errorMap := make(map[any]*antlr4util.SourceCodeError)
 	for _, compilerError := range y.compilerErrors {
 		errorMap[reflect.ValueOf(compilerError).Pointer()] = compilerError
 	}
 	for _, variable := range y.indeterminateUndefinedVar {
 		name := variable[0].(string)
-		err := variable[1].(*YakError)
+		err := variable[1].(*antlr4util.SourceCodeError)
 		if _, ok := y.rootSymtbl.GetSymbolByVariableName(name); ok {
 			errorMap[reflect.ValueOf(err).Pointer()] = nil
 		}
@@ -249,16 +259,10 @@ func (y *YakCompiler) Compiler(code string) bool {
 		} else {
 			startColumn = 0
 		}
-		yErr := &YakError{
-			StartPos: Position{
-				LineNumber:   lastToken.GetLine(),
-				ColumnNumber: startColumn,
-			},
-			EndPos: Position{
-				LineNumber:   lastToken.GetLine(),
-				ColumnNumber: startColumn + 6,
-			},
-			Message: y.GetConstError(syntaxUnrecoverableError),
+		yErr := &antlr4util.SourceCodeError{
+			StartPos: memedit.NewPosition(lastToken.GetLine(), startColumn),
+			EndPos:   memedit.NewPosition(lastToken.GetLine(), startColumn+6),
+			Message:  y.GetConstError(syntaxUnrecoverableError),
 		}
 		y.pushError(yErr)
 	}
@@ -343,8 +347,8 @@ func (y *YakCompiler) GetRootSymbolTable() *yakvm.SymbolTable {
 	return y.rootSymtbl
 }
 
-func (y *YakCompiler) GetErrors() YakMergeError {
-	return *NewYakMergeError(y.GetLexerErrors(), y.GetParserErrors(), y.GetCompileErrors())
+func (y *YakCompiler) GetErrors() antlr4util.SourceCodeErrors {
+	return *antlr4util.NewSourceCodeErrors(y.GetLexerErrors(), y.GetParserErrors(), y.GetCompileErrors())
 }
 
 func (y *YakCompiler) GetNormalErrors() (bool, error) {
@@ -352,15 +356,15 @@ func (y *YakCompiler) GetNormalErrors() (bool, error) {
 	return len(err) > 0, err
 }
 
-func (y *YakCompiler) GetLexerErrors() YakMergeError {
+func (y *YakCompiler) GetLexerErrors() antlr4util.SourceCodeErrors {
 	return y.lexerErrors
 }
 
-func (y *YakCompiler) GetParserErrors() YakMergeError {
+func (y *YakCompiler) GetParserErrors() antlr4util.SourceCodeErrors {
 	return y.parserErrors
 }
 
-func (y *YakCompiler) GetCompileErrors() YakMergeError {
+func (y *YakCompiler) GetCompileErrors() antlr4util.SourceCodeErrors {
 	return y.compilerErrors
 }
 

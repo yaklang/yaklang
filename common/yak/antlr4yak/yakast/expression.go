@@ -1,6 +1,7 @@
 package yakast
 
 import (
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
@@ -100,8 +101,12 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 			if y.strict {
 				id := s.GetText()
 				if _, ok := y.extVarsMap[id]; !ok {
-					y.currentStartPosition.ColumnNumber += 1
-					y.currentEndPosition.ColumnNumber += 2
+					if p, ok := y.currentStartPosition.(memedit.EditablePositionIf); ok {
+						p.SetColumn(y.currentStartPosition.GetColumn() + 1)
+					}
+					if p, ok := y.currentEndPosition.(memedit.EditablePositionIf); ok {
+						p.SetColumn(y.currentEndPosition.GetColumn() + 2)
+					}
 					err := y.newError(y.GetConstError(notFoundVariable), id)
 					y.compilerErrors.Push(err)
 					if y.currentSymtbl != y.rootSymtbl {

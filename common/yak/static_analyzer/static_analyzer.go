@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
@@ -34,15 +34,15 @@ func StaticAnalyzeYaklang(code, codeTyp string, kind StaticAnalyzeKind) []*resul
 	_, err := newEngine.Compile(code)
 	if err != nil {
 		switch ret := err.(type) {
-		case yakast.YakMergeError:
+		case antlr4util.SourceCodeErrors:
 			for _, e := range ret {
 				results = append(results, &result.StaticAnalyzeResult{
 					Message:         fmt.Sprintf("基础语法错误（Syntax Error）：%v", e.Message),
 					Severity:        result.Error,
-					StartLineNumber: int64(e.StartPos.LineNumber),
-					StartColumn:     int64(e.StartPos.ColumnNumber),
-					EndLineNumber:   int64(e.EndPos.LineNumber),
-					EndColumn:       int64(e.EndPos.ColumnNumber + 1),
+					StartLineNumber: int64(e.StartPos.GetLine()),
+					StartColumn:     int64(e.StartPos.GetColumn()),
+					EndLineNumber:   int64(e.EndPos.GetLine()),
+					EndColumn:       int64(e.EndPos.GetColumn() + 1),
 					From:            "compiler",
 				})
 			}
