@@ -224,6 +224,9 @@ jobs:
           - name: Test cmd 
             run: |
               go test --timeout 30s ./common/yak/cmd/...
+          - name: Test Java Decompiler
+            run: |
+              go test --timeout 30s ./common/javaclassparser/tests/...
 
     steps:
       - name: Cache YakLang Project
