@@ -59,3 +59,106 @@ $output -> as $sink
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
+
+func TestFulLTypename(t *testing.T) {
+	t.Run("test no package,blueprint packageName", func(t *testing.T) {
+		code := `<?php
+class A{}
+$a = new A();
+`
+		ssatest.CheckSyntaxFlow(t, code, `A() as $start;  $start<fullTypeName><show> as $end`, map[string][]string{
+			"end": []string{`"main.A"`},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test package blueprint packageName", func(t *testing.T) {
+		code := `<?php
+namespace B\A\C{
+class A{}
+}
+namespace{
+	use B\A\C\A;
+	$a = new A();
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `
+A() as $start;
+$start<fullTypeName><show> as $end;
+`, map[string][]string{
+			"end": {`"B.A.C.A"`},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test package blueprint member", func(t *testing.T) {
+		code := `<?php
+
+class B{
+
+}
+class A{
+    public B $a;
+}
+$a = new A();
+println($a->a);
+`
+		ssatest.CheckSyntaxFlow(t, code, `println(* as $start);$start<fullTypeName><show>  as $end`, map[string][]string{
+			"end": {`"main.B"`},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test package bluePrint member not import", func(t *testing.T) {
+		code := `<?php
+
+namespace A\B\C{
+    use B\C\D\B;
+    class A{
+        public B $a;
+    }
+}
+namespace {
+	use \A\B\C\A;
+    $a = new A();
+    println($a->a);
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
+			"end": {`"A.B.C.B"`},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+
+	//todo: fix fullTypename member
+	t.Run("test no import", func(t *testing.T) {
+		code := `<?php
+namespace A\B\C{
+    class A{
+        public B $a;
+    }    
+}
+namespace {
+    $a = new A();
+    println($a->a);
+}`
+		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
+			"end": {`"string"`},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("parent class", func(t *testing.T) {
+		code := `<?php
+
+namespace B\C\D{
+    class A{}
+}
+namespace A\B\C{
+    use B\C\D\A;
+    class BB extends A{}
+}
+namespace{
+    use A\B\C\BB;
+    $a = new BB;
+    println($a);
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end;`,
+			map[string][]string{
+				"end": {`"A.B.C.BB"`, `"B.C.D.A"`},
+			},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+}

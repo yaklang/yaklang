@@ -95,6 +95,7 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 }
 
 func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.GetProgram().VirtualImport = true
 	builder.GetProgram().GetApplication().Build("", editor, builder)
 }
 

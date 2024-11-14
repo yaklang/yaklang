@@ -111,16 +111,39 @@ func (p *Program) ImportTypeFromLib(lib *Program, names ...string) error {
 	if err != nil {
 		return err
 	}
-
 	for _, name := range names {
 		t, ok := lib.GetExportType(name)
 		if !ok {
-			err = utils.JoinErrors(err, utils.Errorf("library %s not contain value %s", lib.Name, name))
-			continue
+			if p.VirtualImport {
+				p.virtualImport(lib, name, false)
+			} else {
+				err = utils.Errorf("library %s not contain value %s,by virtual import", lib.Name, name)
+			}
 		}
 		pkg.typ[name] = t
 	}
 	return err
+}
+
+// VirtualImportTypeFromLib by generate virtual lib to import
+func (p *Program) GenerateVirtualLib(packagePath string) (*Program, error) {
+	lib := p.NewLibrary(packagePath, []string{})
+	lib.PkgName = packagePath
+	lib.GetAndCreateFunctionBuilder(packagePath, "@virtual")
+	_, err := p.checkImportRelationship(lib)
+	return lib, err
+}
+
+// VirtualImportType 虚拟导入，针对于未找到的情况
+func (p *Program) virtualImport(lib *Program, name string, isValue bool) {
+	builder := p.GetAndCreateFunctionBuilder(lib.PkgName, "@virtual")
+	if !isValue {
+		bluePrint := builder.CreateBluePrint(name)
+		lib.ExportType[name] = bluePrint
+	} else {
+		val := builder.EmitUndefined(name)
+		lib.ExportValue[name] = val
+	}
 }
 
 func (p *Program) ImportValueFromLib(lib *Program, names ...string) error {
@@ -132,7 +155,11 @@ func (p *Program) ImportValueFromLib(lib *Program, names ...string) error {
 		// get value
 		v, ok := lib.ExportValue[name]
 		if !ok {
-			err = utils.JoinErrors(err, utils.Errorf("library %s not contain value %s", lib.Name, name))
+			if p.VirtualImport {
+				p.virtualImport(lib, name, true)
+			} else {
+				err = utils.Errorf("library %s not contain value %s,by virtual import", lib.Name, name)
+			}
 		}
 		pkg.val[name] = v
 	}
