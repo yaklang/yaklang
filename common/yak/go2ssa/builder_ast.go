@@ -740,8 +740,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		CurrentBlock := b.CurrentBlock
 		b.CurrentBlock = PreHandlerBlock
 
-		b.handleImportPackage()
-
 		defer func() {
 			recoverRange()
 			b.CurrentBlock = CurrentBlock
@@ -752,6 +750,8 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
+
+		b.handleImportPackage()
 
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
