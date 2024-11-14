@@ -124,10 +124,11 @@ func Prog2GRPC(prog *schema.SSAProgram) *ypb.SSAProgram {
 	return ret
 }
 
-func UpdateSsaProgram(DB *gorm.DB, input *ypb.SSAProgramInput) error {
+func UpdateSSAProgram(DB *gorm.DB, input *ypb.SSAProgramInput) (int64, error) {
 	if input == nil {
-		return utils.Errorf("input is nil ")
+		return 0, utils.Errorf("input is nil ")
 	}
 	db := DB.Model(&schema.SSAProgram{})
-	return db.Where("name = ?", input.GetName()).Update("description", input.Description).Error
+	db = db.Where("name = ?", input.GetName()).Update("description", input.Description)
+	return db.RowsAffected, db.Error
 }
