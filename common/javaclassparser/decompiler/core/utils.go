@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"sort"
 	"strings"
 )
 
@@ -296,16 +297,39 @@ func CalcMergeOpcode(ifOpcode *OpCode) *OpCode {
 		trueNodeSet.Add(node)
 		return next, nil
 	})
-	var mergeNode *OpCode
+	var mergeNodes []*OpCode
 	WalkGraph[*OpCode](falseNode, func(node *OpCode) ([]*OpCode, error) {
-		if mergeNode != nil {
-			return nil, nil
-		}
 		if trueNodeSet.Has(node) {
-			mergeNode = node
+			mergeNodes = append(mergeNodes, node)
 			return nil, nil
 		}
 		return node.Target, nil
 	})
-	return mergeNode
+	if len(mergeNodes) == 0 {
+		return nil
+	}
+	if len(mergeNodes) == 1 {
+		return mergeNodes[0]
+	}
+	isPreNode := func(node1, node2 *OpCode) bool {
+		if node1.Id > node2.Id {
+			return false
+		}
+		isPre := false
+		WalkGraph[*OpCode](node1, func(node *OpCode) ([]*OpCode, error) {
+			if isPre {
+				return nil, nil
+			}
+			if node == node2 {
+				isPre = true
+				return nil, nil
+			}
+			return node.Target, nil
+		})
+		return isPre
+	}
+	sort.Slice(mergeNodes, func(i, j int) bool {
+		return isPreNode(mergeNodes[i], mergeNodes[j])
+	})
+	return utils.GetLastElement(mergeNodes)
 }
