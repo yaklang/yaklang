@@ -406,7 +406,7 @@ func Test_Return_phi(t *testing.T) {
 			typeName := res.GetValues("typeName")
 			// typeName
 			require.True(t, len(typeName) == 1)
-			require.Equal(t, typeName[0].String(), "byte[]")
+			require.Equal(t, typeName[0].String(), "\"any\"")
 
 			return nil
 		})

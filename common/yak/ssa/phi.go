@@ -124,7 +124,7 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		if phi == nil {
 			return nil
 		}
-		if len(t) == 0 {
+		if len(vs) == 0 {
 			return nil
 		}
 		phi.GetProgram().SetVirtualRegister(phi)

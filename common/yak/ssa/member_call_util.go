@@ -35,7 +35,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 	if phi, ok := obj.(*Phi); ok {
 		for _, v := range phi.Edge {
 			if und, ok := ToUndefined(v); ok { // 遇到库类
-				if und.Kind == UndefinedValueValid {
+				if und.Kind == UndefinedValueValid || und.Kind == UndefinedValueReturn {
 					handlerMemberCall(obj)
 				}
 			}

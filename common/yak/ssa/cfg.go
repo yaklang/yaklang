@@ -336,6 +336,7 @@ func (i *IfBuilder) Build() *IfBuilder {
 				SSABuilder.CurrentBlock.SetScope(bodyScope)
 				item.Body()
 				if SSABuilder.IsReturn {
+					SSABuilder.IsReturn = false
 					return SSABuilder.HandlerReturnPhi(bodyScope)
 				} else if SSABuilder.CurrentBlock.finish && !SSABuilder.IsReturn {
 					return nil
@@ -816,11 +817,15 @@ func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Valu
 			continue
 		}
 
-		// if und, ok := value.(*Undefined); ok {
-		// if und.Kind == UndefinedValueInValid {
-		// 	continue
-		// }
-		// }
+		if und, ok := ToUndefined(value); ok {
+			if und.Kind == UndefinedValueInValid {
+				continue
+			}
+		}
+
+		if _, ok := ToFunction(value); ok {
+			continue
+		}
 
 		leftv := b.CreateVariable(name)
 		und := b.EmitUndefined(name)
