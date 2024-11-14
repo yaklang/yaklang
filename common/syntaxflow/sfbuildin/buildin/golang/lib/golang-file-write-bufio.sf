@@ -37,6 +37,7 @@ func writeToFile(filename string, lines []string) {
     file, err := os.Create(filename)
     if err != nil {
         fmt.Println("Error creating file:", err)
+        return
     }
     defer file.Close() // 确保在函数结束时关闭文件
 
@@ -48,12 +49,14 @@ func writeToFile(filename string, lines []string) {
         _, err := writer.WriteString(line + "\n")
         if err != nil {
             fmt.Println("Error writing to file:", err)
+            return
         }
     }
 
     // 确保所有缓冲的数据都写入文件
     if err := writer.Flush(); err != nil {
         fmt.Println("Error flushing to file:", err)
+        return
     }
 
     fmt.Println("Data written to", filename)
@@ -65,6 +68,7 @@ func readFromFile(filename string) {
     file, err := os.Open(filename)
     if err != nil {
         fmt.Println("Error opening file:", err)
+        return
     }
     defer file.Close() // 确保在函数结束时关闭文件
 
@@ -82,8 +86,8 @@ func readFromFile(filename string) {
 
     if err != nil && err.Error() != "EOF" {
         fmt.Println("Error reading file:", err)
+        return
     }
 }
-
 PARAM
 )
