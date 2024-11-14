@@ -442,6 +442,34 @@ rsp.`,
 		)
 	})
 
+	t.Run("no completion with slice", func(t *testing.T) {
+		t.Parallel()
+		code := `a = []int{1};member=a[4];member.`
+		r := &ypb.Range{
+			Code:        `member.`,
+			StartLine:   1,
+			StartColumn: 26,
+			EndLine:     1,
+			EndColumn:   33,
+		}
+		res := getCompletion(t, code, r, "yak", "")
+		labelsNotContainsCallback(t, []string{"Append"})(res.SuggestionMessage)
+	})
+
+	t.Run("no completion in member  with map", func(t *testing.T) {
+		t.Parallel()
+		code := `a = map[string]int{};member=a.b;member.`
+		r := &ypb.Range{
+			Code:        `member.`,
+			StartLine:   1,
+			StartColumn: 33,
+			EndLine:     1,
+			EndColumn:   40,
+		}
+		res := getCompletion(t, code, r, "yak", "")
+		labelsNotContainsCallback(t, []string{"Append"})(res.SuggestionMessage)
+	})
+
 	t.Run("halfway-slice", func(t *testing.T) {
 		t.Parallel()
 
