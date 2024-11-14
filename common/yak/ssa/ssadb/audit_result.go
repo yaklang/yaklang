@@ -2,9 +2,6 @@ package ssadb
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -115,19 +112,6 @@ func (r *AuditResult) ToGRPCModel() *ypb.SyntaxFlowResult {
 		RuleContent: r.RuleContent,
 	}
 	return res
-}
-
-func (r *AuditResult) ToGRPCModelRisk() []*ypb.Risk {
-	var risks []*ypb.Risk
-	for _, hash := range r.RiskHashs {
-		risk, err := yakit.GetRiskByHash(consts.GetGormProjectDatabase(), hash)
-		if err != nil {
-			log.Errorf("get risk by hash failed: %s", err)
-			continue
-		}
-		risks = append(risks, risk.ToGRPCModel())
-	}
-	return risks
 }
 
 func (r *AuditResult) AfterUpdate(tx *gorm.DB) (err error) {
