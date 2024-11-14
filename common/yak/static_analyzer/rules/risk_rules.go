@@ -11,10 +11,16 @@ import (
 )
 
 var RiskTypeFuncs = []string{"risk.type", "risk.typeVerbose"}
+var RiskNewFuncs = []string{"risk.NewRisk", "risk.NewDNSLogDomain", "risk.NewHTTPLog", "risk.NewLocalReverseHTTPSUrl",
+	"risk.NewLocalReverseHTTPUrl", "risk.NewLocalReverseRMIUrl", "risk.NewPublicReverseHTTPSUrl", "risk.NewPublicReverseHTTPUrl",
+	"risk.NewPublicReverseRMIUrl", "risk.NewRandomPortTrigger", "NewUnverifiedRisk"}
 
 func init() {
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeYak, RuleRisk)
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeYak, RuleRiskTypeVerbose)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, RuleRiskLocation)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeCodec, RuleRiskLocation)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypePortScan, RuleRiskLocation)
 }
 
 // 检查 risk 是否符合规范
@@ -105,6 +111,25 @@ func RuleRiskTypeVerbose(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 	}
 
 	return ret
+}
+
+// 检测new risk的位置是否规范
+func RuleRiskLocation(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults("risk check")
+	for _, funcName := range RiskNewFuncs {
+		prog.Ref(funcName).GetUsers().Filter(func(v *ssaapi.Value) bool {
+			return v.IsCall() && v.IsReachable() != -1
+		}).ForEach(func(v *ssaapi.Value) {
+			if v.InMainFunction() {
+				ret.NewError(ErrorInvalidRiskNewLocation(), v)
+			}
+		})
+	}
+	return ret
+}
+
+func ErrorInvalidRiskNewLocation() string {
+	return "Attempt to instantiate ‘new risk’ within ‘main’. This may lead to a persistent risk. To resolve, please define and declare ‘risk’ within a custom function."
 }
 
 func WarnInvalidRiskTypeVerbose() string {

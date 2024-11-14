@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/rules"
@@ -121,4 +122,49 @@ func TestSSARuleMustPassRiskCreate(t *testing.T) {
 			`, []string{})
 	})
 
+}
+
+func TestSSARuleMustPassNewRiskPosition(t *testing.T) {
+	t.Run("test invalid risk save location (mitm) ", func(t *testing.T) {
+		check(t, `
+		 server,token = risk.NewDNSLogDomain()~
+		 handle = func(result) {
+				log.Info("result: ", result)
+		}
+			`, []string{rules.ErrorInvalidRiskNewLocation()}, string(plugin_type.PluginTypeMitm))
+	})
+
+	t.Run("test invalid risk save location (port-scan)", func(t *testing.T) {
+		check(t, `
+		 	risk.NewRisk("http://example.com", risk.title("SQL注入漏洞"), risk.type("sqli"), risk.severity("high"), risk.description(""), risk.solution(""))
+			handleCheck = func(target,port){
+				 addr = str.HostPort(target, port)
+			}
+			handle = func(result) {
+				log.Info("result: ", result)
+			}
+			`, []string{rules.ErrorInvalidRiskNewLocation()}, string(plugin_type.PluginTypePortScan))
+	})
+
+	t.Run("test invalid risk save location (codec)", func(t *testing.T) {
+		check(t, `
+		 server,token = risk.NewHTTPLog()~
+		 handle = func(result) {
+				log.Info("result: ", result)
+			}
+			`, []string{rules.ErrorInvalidRiskNewLocation()}, string(plugin_type.PluginTypeCodec))
+	})
+
+	t.Run("test correct risk save location ", func(t *testing.T) {
+		check(t, `
+		handleCheck = func(target,port){
+			addr = str.HostPort(target, port)
+			isTls = str.IsTLSServer(addr)
+			server,token = risk.NewDNSLogDomain()~
+		}
+		handle = func(result) {
+				log.Info("result: ", result)
+			}
+			`, []string{}, string(plugin_type.PluginTypePortScan))
+	})
 }
