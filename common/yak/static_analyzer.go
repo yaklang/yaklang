@@ -37,10 +37,10 @@ func WithStaticAnalyzePluginType(typ string) StaticAnalyzeOption {
 	}
 }
 
-func StaticAnalyzeYaklang(code string, opts ...StaticAnalyzeOption) []*result.StaticAnalyzeResult {
+func StaticAnalyze(code string, opts ...StaticAnalyzeOption) []*result.StaticAnalyzeResult {
 	config := NewStaticAnalyzeConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
-	return static_analyzer.StaticAnalyzeYaklang(code, config.pluginType, config.kind)
+	return static_analyzer.StaticAnalyze(code, config.pluginType, config.kind)
 }

@@ -23,7 +23,7 @@ func check(t *testing.T, code string, want []string, typ ...string) *ssaapi.Prog
 	prog, err := ssaapi.Parse(code, static_analyzer.GetPluginSSAOpt(pluginType)...)
 	test.Nil(err)
 	prog.Show()
-	gotErr := yak.StaticAnalyzeYaklang(code, yak.WithStaticAnalyzePluginType(pluginType))
+	gotErr := yak.StaticAnalyze(code, yak.WithStaticAnalyzePluginType(pluginType))
 	got := lo.Map(gotErr, func(res *result.StaticAnalyzeResult, _ int) string {
 		return res.Message
 	})
@@ -49,7 +49,7 @@ func checkScore(t *testing.T, code string, want []string, score int, typ ...stri
 	prog, err := ssaapi.Parse(code, static_analyzer.GetPluginSSAOpt(pluginType)...)
 	test.Nil(err)
 	prog.Show()
-	results := yak.StaticAnalyzeYaklang(code, yak.WithStaticAnalyzePluginType(pluginType), yak.WithStaticAnalyzeKindScore())
+	results := yak.StaticAnalyze(code, yak.WithStaticAnalyzePluginType(pluginType), yak.WithStaticAnalyzeKindScore())
 	got := lo.Map(results, func(res *result.StaticAnalyzeResult, _ int) string {
 		return res.Message
 	})
