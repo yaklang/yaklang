@@ -126,7 +126,58 @@ func TestServer_Project_ExportAndImportProject(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("import project (unencrypt type) just DB", func(t *testing.T) {
+	t.Run("import project (unencrypt type)", func(t *testing.T) {
+		exportStream, err := client.ExportProject(ctx, &ypb.ExportProjectRequest{
+			ProjectName: token,
+			Id:          newProjectResp.Id,
+		})
+		require.NoError(t, err)
+
+		exportPath := ""
+		for {
+			rsp, err := exportStream.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					t.Fatal(err)
+				}
+				break
+			}
+			if rsp.TargetPath != "" {
+				exportPath = rsp.TargetPath
+			}
+			spew.Dump(rsp)
+		}
+
+		newProjectName := utils.RandStringBytes(10)
+		importStream, err := client.ImportProject(ctx, &ypb.ImportProjectRequest{
+			ProjectFilePath:  exportPath,
+			LocalProjectName: newProjectName,
+		})
+		require.NoError(t, err)
+
+		for {
+			rsp, err := importStream.Recv()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				t.Fatal(err)
+			}
+			spew.Dump(rsp)
+		}
+
+		newProject, err := yakit.GetProjectByName(consts.GetGormProfileDatabase(), newProjectName)
+		require.NoError(t, err)
+		require.Equal(t, newProject.ProjectName, newProjectName)
+		defer func() {
+			yakit.DeleteProjectByProjectName(consts.GetGormProfileDatabase(), newProjectName)
+		}()
+
+		_, err = gorm.Open(consts.SQLite, newProject.DatabasePath) // check db whether it is damaged
+		require.NoError(t, err)
+	})
+
+	t.Run("import project DB file", func(t *testing.T) {
 		projectInfo, err := yakit.GetProjectByID(consts.GetGormProfileDatabase(), newProjectResp.Id)
 		require.NoError(t, err)
 
