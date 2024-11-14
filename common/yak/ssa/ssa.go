@@ -193,7 +193,7 @@ type Program struct {
 	ProgramKind     ProgramKind // is library or application
 	Language        string
 	magicMethodName []string
-
+	VirtualImport   bool
 	// from pom.xml file
 	SCAPackages []*dxtypes.Package
 
