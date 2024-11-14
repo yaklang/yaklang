@@ -9,10 +9,10 @@ import (
 func (s *YakCompiler) _pushOpcodeWithCurrentCodeContext(codes ...*yakvm.Code) {
 	for _, c := range codes {
 		if s.currentStartPosition != nil && s.currentEndPosition != nil {
-			c.StartLineNumber = s.currentStartPosition.LineNumber
-			c.StartColumnNumber = s.currentStartPosition.ColumnNumber
-			c.EndLineNumber = s.currentEndPosition.LineNumber
-			c.EndColumnNumber = s.currentEndPosition.ColumnNumber
+			c.StartLineNumber = s.currentStartPosition.GetLine()
+			c.StartColumnNumber = s.currentStartPosition.GetColumn()
+			c.EndLineNumber = s.currentEndPosition.GetLine()
+			c.EndColumnNumber = s.currentEndPosition.GetColumn()
 			c.SourceCodePointer = s.sourceCodePointer
 			c.SourceCodeFilePath = s.sourceCodeFilePathPointer
 		}
