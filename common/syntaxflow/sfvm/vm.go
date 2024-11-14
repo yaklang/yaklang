@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 )
@@ -15,7 +16,8 @@ import (
 type SyntaxFlowVirtualMachine struct {
 	config *Config
 
-	vars *omap.OrderedMap[string, ValueOperator]
+	vars          *omap.OrderedMap[string, ValueOperator]
+	compileErrors antlr4util.SourceCodeErrors
 
 	debug      bool
 	frameMutex *sync.Mutex
@@ -55,6 +57,7 @@ func (s *SyntaxFlowVirtualMachine) Show() {
 		f.Show()
 	}
 }
+
 func (f *SFFrame) Show() {
 	fmt.Println("--------------------------")
 	for idx, c := range f.Codes {
@@ -86,7 +89,13 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 			frame = nil
 		}
 	}()
-	errLis := antlr4util.NewErrorListener()
+	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end memedit.PositionIf) {
+		s.compileErrors = append(s.compileErrors, antlr4util.NewSourceCodeError(msg, start, end))
+	})
+	errLis := antlr4util.NewErrorListener(func(self *antlr4util.ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
+		antlr4util.StringSyntaxErrorHandler(self, recognizer, offendingSymbol, line, column, msg, e)
+		errHandler(self, recognizer, offendingSymbol, line, column, msg, e)
+	})
 
 	lexer := sf.NewSyntaxFlowLexer(antlr.NewInputStream(text))
 	lexer.RemoveErrorListeners()
@@ -120,6 +129,14 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	s.frames = append(s.frames, frame)
 
 	return frame, nil
+}
+
+func (s *SyntaxFlowVirtualMachine) GetErrors() antlr4util.SourceCodeErrors {
+	return s.GetCompileErrors()
+}
+
+func (s *SyntaxFlowVirtualMachine) GetCompileErrors() antlr4util.SourceCodeErrors {
+	return s.compileErrors
 }
 
 func (s *SyntaxFlowVirtualMachine) Snapshot() *omap.OrderedMap[string, ValueOperator] {

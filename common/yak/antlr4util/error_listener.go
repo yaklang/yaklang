@@ -84,7 +84,7 @@ func NewErrorListener(handlers ...handlerFunc) *ErrorListener {
 	var handler handlerFunc
 	if len(handlers) == 0 {
 		// default handler
-		handler = StringSyntaxErrorHandler()
+		handler = StringSyntaxErrorHandler
 	} else {
 		handler = handlers[0]
 	}
@@ -108,48 +108,46 @@ func SimpleSyntaxErrorHandler(simpleHandler func(msg string, start, end memedit.
 	}
 }
 
-func StringSyntaxErrorHandler() handlerFunc {
-	return func(el *ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
-		token, ok := offendingSymbol.(*antlr.CommonToken)
-		var ctxText string
-		var ctxTextHash string
-		var start, end int
-		if ok {
-			stream := token.GetInputStream()
-			start, end = token.GetStart(), token.GetStop()
-			// get all code
-			meditor := memedit.NewMemEditor(stream.GetText(0, stream.Size()))
-			ctxText, _ = meditor.GetContextAroundRange(
-				meditor.GetPositionByOffset(start),
-				meditor.GetPositionByOffset(end),
-				3,
-				func(i int) string {
-					return fmt.Sprintf("%5s| ", fmt.Sprint(i))
-				},
-			)
-			if ctxText != "" {
-				ctxTextHash = codec.Sha256(ctxText)
-			}
-			if el.textFilter == nil {
-				el.textFilter = make(map[string]struct{})
-			}
-		}
-
-		buf := bytes.NewBufferString("")
+func StringSyntaxErrorHandler(el *ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
+	token, ok := offendingSymbol.(*antlr.CommonToken)
+	var ctxText string
+	var ctxTextHash string
+	var start, end int
+	if ok {
+		stream := token.GetInputStream()
+		start, end = token.GetStart(), token.GetStop()
+		// get all code
+		meditor := memedit.NewMemEditor(stream.GetText(0, stream.Size()))
+		ctxText, _ = meditor.GetContextAroundRange(
+			meditor.GetPositionByOffset(start),
+			meditor.GetPositionByOffset(end),
+			3,
+			func(i int) string {
+				return fmt.Sprintf("%5s| ", fmt.Sprint(i))
+			},
+		)
 		if ctxText != "" {
-			if el.textFilter != nil {
-				_, existed := el.textFilter[ctxTextHash]
-				if !existed {
-					buf.WriteString("----" + utils.ShrinkString(ctxTextHash, 16) + "----\n")
-					buf.WriteString(ctxText)
-					buf.WriteByte('\n')
-					buf.WriteString("-----------------------------\n")
-					el.textFilter[ctxTextHash] = struct{}{}
-				}
+			ctxTextHash = codec.Sha256(ctxText)
+		}
+		if el.textFilter == nil {
+			el.textFilter = make(map[string]struct{})
+		}
+	}
+
+	buf := bytes.NewBufferString("")
+	if ctxText != "" {
+		if el.textFilter != nil {
+			_, existed := el.textFilter[ctxTextHash]
+			if !existed {
+				buf.WriteString("----" + utils.ShrinkString(ctxTextHash, 16) + "----\n")
+				buf.WriteString(ctxText)
+				buf.WriteByte('\n')
+				buf.WriteString("-----------------------------\n")
+				el.textFilter[ctxTextHash] = struct{}{}
 			}
 		}
-		buf.WriteString(fmt.Sprintf("line:%v:%v symbol: %v, reason: %v", line, column, offendingSymbol, msg))
-
-		el.err = append(el.err, buf.String())
 	}
+	buf.WriteString(fmt.Sprintf("line:%v:%v symbol: %v, reason: %v", line, column, offendingSymbol, msg))
+
+	el.err = append(el.err, buf.String())
 }
