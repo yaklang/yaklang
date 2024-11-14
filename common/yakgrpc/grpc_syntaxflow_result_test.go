@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"testing"
 	"time"
 
@@ -94,7 +95,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
 
 }
 
-func TestGRPCMUSTPASS_Syntaxflow_Notify(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 	yakit.InitialDatabase()
 
 	local, err := NewLocalClient(true)
@@ -131,6 +132,11 @@ func TestGRPCMUSTPASS_Syntaxflow_Notify(t *testing.T) {
 		res, err = stream.Recv()
 		log.Info(res)
 		log.Info(err)
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		require.NotNil(t, res)
 		if res.MessageType == "syntaxflow_result" {
 			var tmp map[string]string
 			err = json.Unmarshal(res.GetData(), &tmp)
