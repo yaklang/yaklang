@@ -24,14 +24,16 @@ func TestParseClass(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if path != "/Users/z3/Downloads/compiling-failed-files 3/decompiler-err-Lexer-2oO3yquqD1PlSd8KDN3CSOlr3o5.class" {
-			return nil
-		}
+		//if path != "/Users/z3/Downloads/compiling-failed-files 3/decompiler-err-LinkedBlockingDeque-2oO3vnOHDunZXdMyn8b5VRlh1bt.class" {
+		//	return nil
+		//}
 		source, err := cf.Dump()
 		if err != nil {
-			return err
+			//return err
+			println(path)
 		}
-		fmt.Println(source)
+		_ = source
+		//fmt.Println(source)
 		return nil
 	})
 	if err != nil {

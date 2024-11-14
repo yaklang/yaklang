@@ -277,9 +277,6 @@ func (d *Decompiler) GetVar(slot int) *values.JavaRef {
 	return d.varTable[slot]
 }
 func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation, opcode *OpCode) error {
-	if opcode.Id == 20 {
-		print()
-	}
 	funcCtx := d.FunctionContext
 	lambdaIndex := 0
 	getLambdaIndex := func() int {
@@ -897,7 +894,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			mergeNodeToIfNode[mergeNode] = append(mergeNodeToIfNode[mergeNode], opcode)
 		}
 	}
-	DumpOpcodesToDotExp(d.RootOpCode)
 	err = WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
 		var runtimeStackSimulation *StackSimulationImpl
 		if len(code.Source) == 0 {
@@ -1090,7 +1086,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		})
 		//var preVal values.JavaValue
 		for i := 0; i < len(ifNodes); i++ {
-			DumpOpcodesToDotExp(d.RootOpCode)
 			ifCode := ifNodes[i]
 			source := []*OpCode{}
 			WalkGraph[*OpCode](ifCode, func(code *OpCode) ([]*OpCode, error) {
