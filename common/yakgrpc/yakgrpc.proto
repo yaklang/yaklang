@@ -2118,7 +2118,7 @@ message YaklangGetCliCodeFromDatabaseRequest {
 
 message StaticAnalyzeErrorRequest {
   bytes Code = 1;
-  string PluginType = 2;
+  string PluginType = 2; // "yak" "mitm" "port-scan" "codec" "syntaxflow"
 }
 
 message YaklangCompileAndFormatRequest {

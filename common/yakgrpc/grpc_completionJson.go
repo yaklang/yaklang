@@ -130,7 +130,7 @@ func (s *Server) GetYakitCompletionRaw(ctx context.Context, _ *ypb.Empty) (*ypb.
 }
 
 func (s *Server) StaticAnalyzeError(ctx context.Context, r *ypb.StaticAnalyzeErrorRequest) (*ypb.StaticAnalyzeErrorResponse, error) {
-	tmpRes := yak.StaticAnalyzeYaklang(string(r.GetCode()), yak.WithStaticAnalyzePluginType(r.GetPluginType()))
+	tmpRes := yak.StaticAnalyze(string(r.GetCode()), yak.WithStaticAnalyzePluginType(r.GetPluginType()))
 	es := lo.Map(tmpRes, func(i *result.StaticAnalyzeResult, _ int) *ypb.StaticAnalyzeErrorResult {
 		return &ypb.StaticAnalyzeErrorResult{
 			Message:         []byte(i.Message),

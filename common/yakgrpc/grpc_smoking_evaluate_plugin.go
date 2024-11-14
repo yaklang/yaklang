@@ -100,7 +100,7 @@ func NewPluginTestingEchoServer(ctx context.Context) *PluginTestingEchoServer {
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	var echoServer = &PluginTestingEchoServer{
+	echoServer := &PluginTestingEchoServer{
 		RequestsHistory:     make([]byte, 0),
 		RequestHistoryMutex: new(sync.Mutex),
 		JunkData:            BuildPluginTestingJunkData(),
@@ -156,9 +156,9 @@ func BuildPluginTestingJunkData() []byte {
 	junkData = append(junkData, []byte(strings.Join(mutate.MutateQuick("{{rangechar(20,7e)}}"), ""))...)  // visible characters
 	passwd, _ := embed.Asset("data/plugin-testing-data/top_100_passwd.txt.gz")                            //  top passwd and hash
 	junkData = append(junkData, passwd...)
-	commonWord, _ := embed.Asset("data/plugin-testing-data/common_word.txt.gz") //website common word
+	commonWord, _ := embed.Asset("data/plugin-testing-data/common_word.txt.gz") // website common word
 	junkData = append(junkData, commonWord...)
-	commonWebSite, _ := embed.Asset("data/plugin-testing-data/common_website.txt.gz") //common website page baidu/bilibili/taobao
+	commonWebSite, _ := embed.Asset("data/plugin-testing-data/common_website.txt.gz") // common website page baidu/bilibili/taobao
 	junkData = append(junkData, commonWebSite...)
 	return junkData
 }
@@ -211,7 +211,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	if slices.Contains([]string{
 		"mitm", "port-scan", "codec", "yak",
 	}, pluginType) {
-		staticResults := yak.StaticAnalyzeYaklang(pluginCode,
+		staticResults := yak.StaticAnalyze(pluginCode,
 			yak.WithStaticAnalyzePluginType(pluginType),
 			yak.WithStaticAnalyzeKindScore(),
 		)
@@ -266,9 +266,9 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				if err != nil {
 					return err
 				}
-				//spew.Dump(m)
-				//spew.Dump(m["request"])
-				//spew.Dump(m["response"])
+				// spew.Dump(m)
+				// spew.Dump(m["request"])
+				// spew.Dump(m["response"])
 				log.Info("debugScript recv: ", string(result.Message))
 			}
 			return nil

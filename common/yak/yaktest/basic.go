@@ -23,7 +23,7 @@ func exec(raw string) error {
 }
 
 func analyze(raw string) []*result.StaticAnalyzeResult {
-	return yak.StaticAnalyzeYaklang(raw)
+	return yak.StaticAnalyze(raw)
 }
 
 func Run(verbose string, t *testing.T, cases ...YakTestCase) {
