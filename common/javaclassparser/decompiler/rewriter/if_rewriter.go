@@ -11,7 +11,6 @@ import (
 type rewriterFunc func(statementManager *RewriteManager, node *core.Node) error
 
 func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
-	utils2.DumpNodesToDotExp(manager.RootNode)
 	err := CalcEnd(manager.DominatorMap, ifNode)
 	if err != nil {
 		return err
