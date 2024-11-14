@@ -23,61 +23,67 @@ const (
 	Score
 )
 
-// plugin type : "yak" "mitm" "port-scan" "codec"
+// plugin type : "yak" "mitm" "port-scan" "codec" "syntaxflow"
 
-func StaticAnalyzeYaklang(code, codeTyp string, kind StaticAnalyzeKind) []*result.StaticAnalyzeResult {
+func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.StaticAnalyzeResult {
 	var results []*result.StaticAnalyzeResult
 
 	// compiler
-	newEngine := yaklang.New()
-	newEngine.SetStrictMode(false)
-	_, err := newEngine.Compile(code)
-	if err != nil {
-		switch ret := err.(type) {
-		case antlr4util.SourceCodeErrors:
-			for _, e := range ret {
-				results = append(results, &result.StaticAnalyzeResult{
-					Message:         fmt.Sprintf("基础语法错误（Syntax Error）：%v", e.Message),
-					Severity:        result.Error,
-					StartLineNumber: int64(e.StartPos.GetLine()),
-					StartColumn:     int64(e.StartPos.GetColumn()),
-					EndLineNumber:   int64(e.EndPos.GetLine()),
-					EndColumn:       int64(e.EndPos.GetColumn() + 1),
-					From:            "compiler",
-				})
+	switch codeTyp {
+	case "yak", "mitm", "port-scan", "codec":
+		newEngine := yaklang.New()
+		newEngine.SetStrictMode(false)
+		_, err := newEngine.Compile(code)
+		if err != nil {
+			switch ret := err.(type) {
+			case antlr4util.SourceCodeErrors:
+				for _, e := range ret {
+					results = append(results, &result.StaticAnalyzeResult{
+						Message:         fmt.Sprintf("基础语法错误（Syntax Error）：%v", e.Message),
+						Severity:        result.Error,
+						StartLineNumber: int64(e.StartPos.GetLine()),
+						StartColumn:     int64(e.StartPos.GetColumn()),
+						EndLineNumber:   int64(e.EndPos.GetLine()),
+						EndColumn:       int64(e.EndPos.GetColumn() + 1),
+						From:            "compiler",
+					})
+				}
+			default:
+				log.Error("静态分析失败：Yaklang 返回错误不标准")
 			}
-		default:
-			log.Error("静态分析失败：Yaklang 返回错误不标准")
 		}
-	}
 
-	prog, err := SSAParse(code, codeTyp)
-	if err != nil {
-		log.Error("SSA 解析失败：", err)
+		prog, err := SSAParse(code, codeTyp)
+		if err != nil {
+			log.Error("SSA 解析失败：", err)
+			return results
+		}
+		results = append(results, checkRules(codeTyp, prog, kind).Get()...)
+		errs := prog.GetErrors()
+		for _, err := range errs {
+			severity := result.Hint
+			switch err.Kind {
+			case ssa.Warn:
+				severity = result.Warn
+			case ssa.Error:
+				severity = result.Error
+			}
+			results = append(results, &result.StaticAnalyzeResult{
+				Message:         err.Message,
+				Severity:        severity,
+				StartLineNumber: int64(err.Pos.GetStart().GetLine()),
+				StartColumn:     int64(err.Pos.GetStart().GetColumn()),
+				EndLineNumber:   int64(err.Pos.GetEnd().GetLine()),
+				EndColumn:       int64(err.Pos.GetEnd().GetColumn()),
+				From:            "SSA:" + string(err.Tag),
+			})
+		}
 		return results
+	case "syntaxflow":
+	default:
+		log.Error("静态分析失败：未知的代码类型")
 	}
-	results = append(results, checkRules(codeTyp, prog, kind).Get()...)
-
-	errs := prog.GetErrors()
-	for _, err := range errs {
-		severity := result.Hint
-		switch err.Kind {
-		case ssa.Warn:
-			severity = result.Warn
-		case ssa.Error:
-			severity = result.Error
-		}
-		results = append(results, &result.StaticAnalyzeResult{
-			Message:         err.Message,
-			Severity:        severity,
-			StartLineNumber: int64(err.Pos.GetStart().GetLine()),
-			StartColumn:     int64(err.Pos.GetStart().GetColumn()),
-			EndLineNumber:   int64(err.Pos.GetEnd().GetLine()),
-			EndColumn:       int64(err.Pos.GetEnd().GetColumn()),
-			From:            "SSA:" + string(err.Tag),
-		})
-	}
-	return results
+	return nil
 }
 
 func GetPluginSSAOpt(plugin string) []ssaapi.Option {

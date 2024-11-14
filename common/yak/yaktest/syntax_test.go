@@ -411,8 +411,7 @@ fuzz.HTTPRequest("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n")[0].CAAAA()
 }
 
 func TestMisc_Syntax_NilCall(t *testing.T) {
-
-	//os.Setenv("YAKLANGDEBUG", "123")
+	// os.Setenv("YAKLANGDEBUG", "123")
 	cases := []YakTestCase{
 		{
 			Name: "测试空指针引用1",
@@ -440,8 +439,7 @@ servicescan.proto(["tcp"]...)
 }
 
 func TestMisc_Syntax_NilCall111(t *testing.T) {
-
-	//os.Setenv("YAKLANGDEBUG", "123")
+	// os.Setenv("YAKLANGDEBUG", "123")
 	cases := []YakTestCase{
 		{
 			Name: "测试空指针引用1",
@@ -466,7 +464,7 @@ abc1 = abc("123", "")
 }
 
 func TestMisc_FuncAsParamCall(t *testing.T) {
-	//os.Setenv("YAKLANGDEBUG", "123")
+	// os.Setenv("YAKLANGDEBUG", "123")
 	cases := []YakTestCase{
 		{
 			Name: "函数参数调用失败",
@@ -488,7 +486,7 @@ hook.NewMixPluginCaller()[0].LoadPlugin(i)
 }
 
 func TestMisc_FuncAsParamCall_RetError(t *testing.T) {
-	//os.Setenv("YAKLANGDEBUG", "123")
+	// os.Setenv("YAKLANGDEBUG", "123")
 	cases := []YakTestCase{
 		{
 			Name: "函数返回值失败",
@@ -515,7 +513,7 @@ a = str.MatchAllOfGlob(av, "abc*")
 dump(a)
 */
 func TestMisc_FuncAsParamCall_RetError1111(t *testing.T) {
-	//os.Setenv("YAKLANGDEBUG", "123")
+	// os.Setenv("YAKLANGDEBUG", "123")
 	cases := []YakTestCase{
 		{
 			Name: "函数返回值失败",
@@ -532,7 +530,7 @@ dump(a)
 }
 
 func TestMisc_FuncAsParamCall_RetError1(t *testing.T) {
-	//os.Setenv("YAKLANGDEBUG", "123")
+	// os.Setenv("YAKLANGDEBUG", "123")
 	cases := []YakTestCase{
 		{
 			Name: "函数返回值失败",
@@ -558,7 +556,7 @@ a,bc,c = abc()
 }
 
 func TestMisc_FuncAsParamCall_PhpMyAdmin(t *testing.T) {
-	//os.Setenv("YAKLANGDEBUG", "123")
+	// os.Setenv("YAKLANGDEBUG", "123")
 	cases := []YakTestCase{
 		{
 			Name: "函数返回值失败",
@@ -577,7 +575,7 @@ println(result.String())
 }
 
 func TestMisc_TypeConvert(t *testing.T) {
-	//os.Setenv("YAKLANGDEBUG", "123")
+	// os.Setenv("YAKLANGDEBUG", "123")
 	cases := []YakTestCase{
 		{
 			Name: "函数返回值失败",
@@ -662,7 +660,7 @@ freq.Show()
 
 // 测试函数写错的情况
 func TestMisc_ParseError(t *testing.T) {
-	var src = `
+	src := `
 1
 req, err := http.NewRequest("GET", "https://baidu.com", a
 )
@@ -672,7 +670,7 @@ freq, err := fuzz.HTTPRequest(req)
 die(err)
 
 freq.Show()`
-	result := yak.StaticAnalyzeYaklang(src)
+	result := yak.StaticAnalyze(src)
 	if len(result) <= 0 {
 		panic("parse params failed")
 	}
@@ -685,7 +683,7 @@ freq.Show()`
 
 // 测试普通错误
 func TestMisc_ParseError1(t *testing.T) {
-	var src = `
+	src := `
 1,
 req, err := http.NewRequest("GET", "https://baidu.com", a
 )
@@ -695,7 +693,7 @@ freq, err := fuzz.HTTPRequest(req)
 die(err)
 
 freq.Show()`
-	result := yak.StaticAnalyzeYaklang(src)
+	result := yak.StaticAnalyze(src)
 	if len(result) <= 0 {
 		panic("parse params failed")
 	}
@@ -708,11 +706,11 @@ freq.Show()`
 
 // 测试声明问题
 func TestMisc_ParseError2(t *testing.T) {
-	var src = `
+	src := `
 a = {"123": 1, 
 "1111111":}
 `
-	result := yak.StaticAnalyzeYaklang(src)
+	result := yak.StaticAnalyze(src)
 	if len(result) <= 0 {
 		panic("parse params failed")
 	}
@@ -725,13 +723,13 @@ a = {"123": 1,
 
 // 测试声明问题
 func TestMisc_ParseError3(t *testing.T) {
-	var src = `
+	src := `
 a = {"123": 1, 
 "1111111": 1
 
 }
 `
-	result := yak.StaticAnalyzeYaklang(src)
+	result := yak.StaticAnalyze(src)
 	if len(result) <= 0 {
 		panic("parse params failed")
 	}
@@ -744,13 +742,13 @@ a = {"123": 1,
 
 // 测试声明问题：Chinese Comma
 func TestMisc_ParseError3_ChineseComma(t *testing.T) {
-	var src = `
+	src := `
 a = {"123": 1, 
 "1111111": 1，
 
 }
 `
-	result := yak.StaticAnalyzeYaklang(src)
+	result := yak.StaticAnalyze(src)
 	if len(result) <= 0 {
 		panic("无法检测到错误！")
 	}
@@ -763,7 +761,7 @@ a = {"123": 1,
 
 // 测试声明问题：Chinese Comma
 func TestMisc_ParseError3_Chinese(t *testing.T) {
-	var src = `
+	src := `
 a = {"123": 1, 
 
 
@@ -772,7 +770,7 @@ a = {"123": 1,
 
 }
 `
-	result := yak.StaticAnalyzeYaklang(src)
+	result := yak.StaticAnalyze(src)
 	if len(result) <= 0 {
 		panic("无法检测到错误！")
 	}
@@ -785,7 +783,7 @@ a = {"123": 1,
 
 // 测试声明变量混合中文语法错误：Chinese Comma
 func TestMisc_ParseError3_ChineseWithUndefined(t *testing.T) {
-	var src = `
+	src := `
 
 println(abc)
 
@@ -797,7 +795,7 @@ a = {"123": 1,
 
 }
 `
-	result := yak.StaticAnalyzeYaklang(src)
+	result := yak.StaticAnalyze(src)
 	if len(result) <= 0 {
 		panic("无法检测到错误！")
 	}

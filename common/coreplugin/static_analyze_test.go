@@ -17,7 +17,7 @@ func staticCheck(code, pluginType string, t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to parse code: ", err)
 	}
-	if res := yak.StaticAnalyzeYaklang(string(code), yak.WithStaticAnalyzePluginType(pluginType)); len(lo.Filter(res, func(item *result.StaticAnalyzeResult, index int) bool {
+	if res := yak.StaticAnalyze(string(code), yak.WithStaticAnalyzePluginType(pluginType)); len(lo.Filter(res, func(item *result.StaticAnalyzeResult, index int) bool {
 		return item.Severity == result.Error
 	})) != 0 {
 		t.Fatalf("plugin : static analyzer failed: \n%s", res)
