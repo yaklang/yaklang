@@ -338,7 +338,14 @@ func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_Exp
 		iv := key[:sm4.BlockSize]
 		_, err = sm4.Sm4GCMEncryptStream(key, iv, nil, projectReader, fileWriter, padding.NewPKCSPaddingReader)
 		if err != nil {
-			feedProgress("加密数据库失败:"+err.Error(), 0.97)
+			feedProgress("加密数据库失败/压缩写入项目文件失败:"+err.Error(), 0.97)
+			cancel()
+			return err
+		}
+	} else {
+		_, err = io.Copy(fileWriter, projectReader)
+		if err != nil {
+			feedProgress("压缩写入项目文件失败:"+err.Error(), 0.97)
 			cancel()
 			return err
 		}
@@ -388,8 +395,6 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 	projectReader := bufio.NewReader(fp)
 	feedProgress("正在读取项目文件", 0.3)
 
-	var isEncryptProject bool
-
 	if magicNumber, err := projectReader.Peek(len(encryptProjectMagic)); err != nil {
 		feedProgress("读取项目文件失败："+err.Error(), 0.9)
 		return err
@@ -400,7 +405,6 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 				feedProgress("去除加密幻数失败", 0.99)
 				return err
 			}
-			isEncryptProject = true
 		} else {
 			feedProgress("需要密码解密项目数据", 0.99)
 			return utils.Error("需要密码解密")
@@ -413,8 +417,10 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 	}
 
 	var DataReader io.Reader
+	var isProjectFile bool
 	DataReader = projectReader
-	if utils.IsGzip(header) {
+	if utils.IsGzip(header) { // if gzip , file is project file
+		isProjectFile = true
 		DataReader, err = gzip.NewReader(projectReader)
 		if err != nil {
 			return utils.Wrapf(err, "gzip.NewReader fail")
@@ -434,7 +440,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 	tempFileWriter := bufio.NewWriter(tempFp) // use bufio to improve performance, need separate var to flush before close
 	var importProjectWriter io.Writer
 	importProjectWriter = tempFileWriter
-	if isEncryptProject {
+	if isProjectFile { // Project file should read Proto data
 		tryGetProtoData := func(rawBytes []byte) ([]byte, int, bool) {
 			data, n := protowire.ConsumeBytes(rawBytes)
 			if data != nil && n > 0 {
