@@ -34,6 +34,10 @@ func typeEqualEx(t1, t2 Type, depth int) bool {
 	case FunctionTypeKind:
 		t1f, _ := ToFunctionType(t1)
 		t2f, _ := ToFunctionType(t2)
+		if t1f.IsAnyFunctionType() {
+			return t2f.IsAnyFunctionType()
+		}
+
 		if t1f.ParameterLen != t2f.ParameterLen {
 			return false
 		}
@@ -122,6 +126,9 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 			break
 		}
 		t1f, _ := ToFunctionType(t1)
+		if t1f.IsAnyFunctionType() {
+			return true
+		}
 		if t1f.ParameterLen != t2f.ParameterLen {
 			return false
 		}
@@ -1109,8 +1116,9 @@ type FunctionType struct {
 	ObjectType      Type
 	IsModifySelf    bool // if this is method function
 
-	AnnotationFunc []func(Value)
-	fullTypeName   []string
+	AnnotationFunc    []func(Value)
+	fullTypeName      []string
+	isAnyFunctionType bool
 }
 
 var _ Type = (*FunctionType)(nil)
@@ -1119,6 +1127,7 @@ func (f *FunctionType) SetIsMethod(isMethod bool, obj Type) {
 	f.IsMethod = isMethod
 	f.ObjectType = obj
 }
+
 func (f *FunctionType) AddFullTypeName(name string) {
 	if f == nil {
 		return
@@ -1158,6 +1167,13 @@ func CalculateType(ts []Type) Type {
 		// i.SetLen(NewConst(len(ts)))
 		i.Len = len(ts)
 		return i
+	}
+}
+
+func NewAnyFunctionType() *FunctionType {
+	return &FunctionType{
+		baseType:          NewBaseType(),
+		isAnyFunctionType: true,
 	}
 }
 
@@ -1209,6 +1225,10 @@ func (s *FunctionType) RawString() string {
 	for i := 0; i < s.ParameterLen; i++ {
 		paras = append(paras, s.Parameter[i].String())
 	}
+	returnTypeStr := ""
+	if s.ReturnType != nil {
+		returnTypeStr = s.ReturnType.String()
+	}
 
 	return fmt.Sprintf(
 		"(%s%s) -> %s",
@@ -1217,8 +1237,12 @@ func (s *FunctionType) RawString() string {
 			", ",
 		),
 		variadic,
-		s.ReturnType,
+		returnTypeStr,
 	)
+}
+
+func (s *FunctionType) IsAnyFunctionType() bool {
+	return s.isAnyFunctionType
 }
 
 func (s *FunctionType) GetParamString() string {
@@ -1337,6 +1361,10 @@ func GetGenericTypeFromType(t Type) []Type {
 		typs = append(typs, GetGenericTypeFromType(obj.FieldType)...)
 	case FunctionTypeKind:
 		obj := t.(*FunctionType)
+		if obj.IsAnyFunctionType() {
+			typs = append(typs, obj)
+			break
+		}
 		for _, typ := range obj.Parameter {
 			typs = append(typs, GetGenericTypeFromType(typ)...)
 		}

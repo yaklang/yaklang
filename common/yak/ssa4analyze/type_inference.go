@@ -166,11 +166,12 @@ func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
 			return
 		}
 		if argFuncType, ok := ssa.ToFunctionType(argTyp); ok {
-			arg.SetType(paramTyp)
 			paramFuncType, _ := ssa.ToFunctionType(paramTyp)
-			if paramFuncType == nil {
+			// should not override to any function type
+			if paramFuncType == nil || paramFuncType.IsAnyFunctionType() {
 				return
 			}
+			arg.SetType(paramTyp)
 
 			argFunc, ok := ssa.ToFunction(arg)
 			if !ok {
