@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -27,6 +28,19 @@ const (
 
 func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.StaticAnalyzeResult {
 	var results []*result.StaticAnalyzeResult
+	addSourceCodeError := func(errs antlr4util.SourceCodeErrors) {
+		for _, e := range errs {
+			results = append(results, &result.StaticAnalyzeResult{
+				Message:         fmt.Sprintf("基础语法错误（Syntax Error）：%v", e.Message),
+				Severity:        result.Error,
+				StartLineNumber: int64(e.StartPos.GetLine()),
+				StartColumn:     int64(e.StartPos.GetColumn()),
+				EndLineNumber:   int64(e.EndPos.GetLine()),
+				EndColumn:       int64(e.EndPos.GetColumn() + 1),
+				From:            "compiler",
+			})
+		}
+	}
 
 	// compiler
 	switch codeTyp {
@@ -37,17 +51,7 @@ func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.Stati
 		if err != nil {
 			switch ret := err.(type) {
 			case antlr4util.SourceCodeErrors:
-				for _, e := range ret {
-					results = append(results, &result.StaticAnalyzeResult{
-						Message:         fmt.Sprintf("基础语法错误（Syntax Error）：%v", e.Message),
-						Severity:        result.Error,
-						StartLineNumber: int64(e.StartPos.GetLine()),
-						StartColumn:     int64(e.StartPos.GetColumn()),
-						EndLineNumber:   int64(e.EndPos.GetLine()),
-						EndColumn:       int64(e.EndPos.GetColumn() + 1),
-						From:            "compiler",
-					})
-				}
+				addSourceCodeError(ret)
 			default:
 				log.Error("静态分析失败：Yaklang 返回错误不标准")
 			}
@@ -78,12 +82,17 @@ func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.Stati
 				From:            "SSA:" + string(err.Tag),
 			})
 		}
-		return results
 	case "syntaxflow":
+		vm := sfvm.NewSyntaxFlowVirtualMachine()
+		vm.Compile(code)
+		errs := vm.GetErrors()
+		if errs != nil {
+			addSourceCodeError(errs)
+		}
 	default:
 		log.Error("静态分析失败：未知的代码类型")
 	}
-	return nil
+	return results
 }
 
 func GetPluginSSAOpt(plugin string) []ssaapi.Option {
