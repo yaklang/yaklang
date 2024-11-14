@@ -24,11 +24,11 @@ func (s *Server) QuerySSAPrograms(ctx context.Context, req *ypb.QuerySSAProgramR
 }
 
 func (s *Server) UpdateSSAProgram(ctx context.Context, req *ypb.UpdateSSAProgramRequest) (*ypb.DbOperateMessage, error) {
-	err := yakit.UpdateSsaProgram(consts.GetGormProfileDatabase(), req.GetProgramInput())
+	count, err := yakit.UpdateSSAProgram(consts.GetGormProfileDatabase(), req.GetProgramInput())
 	return &ypb.DbOperateMessage{
 		TableName:    "ssa_programs",
 		Operation:    "update",
-		EffectRows:   1,
+		EffectRows:   count,
 		ExtraMessage: "",
 	}, err
 }
