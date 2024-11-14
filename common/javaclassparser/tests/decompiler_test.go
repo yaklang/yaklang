@@ -12,6 +12,9 @@ func TestDecompiler(t *testing.T) {
 		name string
 	}{
 		{
+			"TryCatch",
+		},
+		{
 			name: "LogicalOperation",
 		},
 		{

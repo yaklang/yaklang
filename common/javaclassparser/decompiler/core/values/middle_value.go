@@ -29,6 +29,7 @@ type LambdaFuncRef struct {
 	Id           int
 	JavaType     types.JavaType
 	LambdaRender func(funcCtx *class_context.ClassContext) string
+	Arguments    []JavaValue
 }
 
 func (j *LambdaFuncRef) Type() types.JavaType {
@@ -39,12 +40,17 @@ func (j *LambdaFuncRef) String(funcCtx *class_context.ClassContext) string {
 	if j.LambdaRender != nil {
 		return j.LambdaRender(funcCtx)
 	}
-	return fmt.Sprintf("getLambda(%d)", j.Id)
+	args := ""
+	for _, arg := range j.Arguments {
+		args += arg.String(funcCtx) + ","
+	}
+	return fmt.Sprintf("getLambda(%d)(%s)", j.Id, args)
 }
 
-func NewLambdaFuncRef(id int, typ types.JavaType) *LambdaFuncRef {
+func NewLambdaFuncRef(id int, Arguments []JavaValue, typ types.JavaType) *LambdaFuncRef {
 	return &LambdaFuncRef{
-		Id:       id,
-		JavaType: typ,
+		Id:        id,
+		JavaType:  typ,
+		Arguments: Arguments,
 	}
 }

@@ -7,23 +7,37 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
 func TestParseClass(t *testing.T) {
-	data, err := os.ReadFile("/Users/z3/Downloads/compiling-failed-files 2/decompiler-err-Lexer-2oO3yquqD1PlSd8KDN3CSOlr3o5.class")
+	err := filepath.Walk("/Users/z3/Downloads/compiling-failed-files 3", func(path string, info fs.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cf, err := Parse(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if path != "/Users/z3/Downloads/compiling-failed-files 3/decompiler-err-Lexer-2oO3yquqD1PlSd8KDN3CSOlr3o5.class" {
+			return nil
+		}
+		source, err := cf.Dump()
+		if err != nil {
+			return err
+		}
+		fmt.Println(source)
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	cf, err := Parse(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	source, err := cf.Dump()
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Println(source)
+
 }
 func TestParseJar(t *testing.T) {
 	jarFs, err := NewJarFSFromLocal("/Users/z3/Downloads/ysoserial-for-woodpecker-0.5.2.jar")
