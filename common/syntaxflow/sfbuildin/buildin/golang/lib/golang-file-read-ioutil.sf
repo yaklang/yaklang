@@ -33,6 +33,7 @@ func main() {
 	err := ioutil.WriteFile(fileName, data, 0644) // 0644 是文件权限
 	if err != nil {
 		log.Fatalf("Error writing to file: %s", err)
+		return
 	}
 	fmt.Println("Data written to file successfully.")
 
@@ -40,6 +41,7 @@ func main() {
 	content, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Fatalf("Error reading from file: %s", err)
+		return
 	}
 
 	// 打印文件内容
