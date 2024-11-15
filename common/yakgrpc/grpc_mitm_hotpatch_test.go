@@ -156,7 +156,7 @@ assert rsp.RawPacket.Contains("yes")
 }
 
 func TestGRPCMUSTPASS_MITM_HotPatch_BeforeRequest_AfterRequest(t *testing.T) {
-	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(100000000))
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(100))
 	defer cancel()
 
 	originReqToken := utils.RandStringBytes(16)
