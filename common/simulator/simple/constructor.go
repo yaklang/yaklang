@@ -24,6 +24,7 @@ type VBrowser struct {
 	noSandBox bool
 	headless  bool
 	hijack    bool
+	leakless  bool
 
 	runtimeID  string
 	fromPlugin string
@@ -55,6 +56,7 @@ func CreateHeadlessBrowser(opts ...BrowserConfigOpt) (*VBrowser, error) {
 		noSandBox: true,
 		headless:  true,
 		hijack:    false,
+		leakless:  false,
 
 		timeout: 30,
 
@@ -74,6 +76,7 @@ func CreateHeadlessBrowser(opts ...BrowserConfigOpt) (*VBrowser, error) {
 		noSandBox:            config.noSandBox,
 		headless:             config.headless,
 		hijack:               config.hijack,
+		leakless:             config.leakless,
 		timeout:              config.timeout,
 		runtimeID:            config.runtimeID,
 		fromPlugin:           config.fromPlugin,
@@ -95,7 +98,7 @@ func (browser *VBrowser) BrowserInit() error {
 		if browser.proxyAddress != "" {
 			launch.Proxy(browser.proxyAddress)
 		}
-		launch.NoSandbox(browser.noSandBox).Headless(browser.headless)
+		launch.NoSandbox(browser.noSandBox).Headless(browser.headless).Leakless(browser.leakless)
 		browser.browser.Client(launch.MustClient())
 	} else {
 		launch := launcher.New()
@@ -105,7 +108,7 @@ func (browser *VBrowser) BrowserInit() error {
 		if browser.proxyAddress != "" {
 			launch.Proxy(browser.proxyAddress)
 		}
-		launch.NoSandbox(browser.noSandBox).Headless(browser.headless)
+		launch.NoSandbox(browser.noSandBox).Headless(browser.headless).Leakless(browser.leakless)
 		controlUrl, err := launch.Launch()
 		if err != nil {
 			return utils.Errorf("new launcher launch error: %s", err)

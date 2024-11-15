@@ -55,6 +55,7 @@ var SimpleExports = map[string]interface{}{
 	"headless":       simple.WithHeadless,
 	"hijack":         simple.WithHijack,
 	"timeout":        simple.WithTimeout,
+	"leakless":       simple.WithLeakless,
 	"requestModify":  simple.WithRequestModification,
 	"responseModify": simple.WithResponseModification,
 
