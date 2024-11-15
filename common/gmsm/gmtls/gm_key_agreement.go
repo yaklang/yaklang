@@ -38,7 +38,7 @@ import (
 //	return md5SHA1Hash(slices), nil
 //}
 //
-//func curveForCurveID(id CurveID) (elliptic.Curve, bool) {
+//func ellipticCurveForCurveID(id CurveID) (elliptic.Curve, bool) {
 //	switch id {
 //	case CurveP256:
 //		return elliptic.P256(), true
@@ -99,7 +99,7 @@ func (ka *ecdheKeyAgreementGM) generateServerKeyExchange(config *Config, signCer
 	//		ka.privateKey = scalar[:]
 	//		ecdhePublic = public[:]
 	//	} else {
-	//		curve, ok := curveForCurveID(ka.curveid)
+	//		curve, ok := ellipticCurveForCurveID(ka.curveid)
 	//		if !ok {
 	//			return nil, errors.New("tls: preferredCurves includes unsupported curve")
 	//		}
@@ -126,7 +126,7 @@ func (ka *ecdheKeyAgreementGM) generateServerKeyExchange(config *Config, signCer
 	//		return nil, errors.New("tls: certificate private key does not implement crypto.Signer")
 	//	}
 	//
-	//	signatureAlgorithm, sigType, hashFunc, err := pickSignatureAlgorithm(priv.Public(), clientHello.supportedSignatureAlgorithms, supportedSignatureAlgorithms, ka.version)
+	//	signatureAlgorithm, sigType, hashFunc, err := pickSignatureAlgorithm(priv.Public(), clientHello.defaultSupportedSignatureAlgorithms, defaultSupportedSignatureAlgorithms, ka.version)
 	//	if err != nil {
 	//		return nil, err
 	//	}
@@ -186,7 +186,7 @@ func (ka *ecdheKeyAgreementGM) processClientKeyExchange(config *Config, cert *Ce
 	//		return sharedKey[:], nil
 	//	}
 	//
-	//	curve, ok := curveForCurveID(ka.curveid)
+	//	curve, ok := ellipticCurveForCurveID(ka.curveid)
 	//	if !ok {
 	//		panic("internal error")
 	//	}
@@ -266,7 +266,7 @@ func (ka *ecdheKeyAgreementGM) generateClientKeyExchange(config *Config, clientH
 		serialized = ourPublic[:]
 		preMasterSecret = sharedKey[:]
 	} else {
-		curve, ok := curveForCurveID(ka.curveid)
+		curve, ok := ellipticCurveForCurveID(ka.curveid)
 		if !ok {
 			panic("internal error")
 		}

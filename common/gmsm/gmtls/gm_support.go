@@ -133,7 +133,7 @@ var gmCipherSuites = []*cipherSuite{
 // aeadSM4GCM SM4 GCM向前加解密函数
 // key: 对称密钥
 // nonce: 隐式随机数 (implicit nonce 4 Byte)
-func aeadSM4GCM(key []byte, nonce []byte) cipher.AEAD {
+func aeadSM4GCM(key []byte, nonce []byte) aead {
 	if len(nonce) != noncePrefixLength {
 		panic("tls: internal error: wrong implicit nonce length")
 	}

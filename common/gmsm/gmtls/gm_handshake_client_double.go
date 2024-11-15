@@ -31,7 +31,8 @@ type clientHandshakeStateGM struct {
 	allowServerCertsUsingWeakEncryption bool
 }
 
-func makeClientHelloGM(config *Config) (*clientHelloMsg, error) {
+func (c *Conn) makeClientHelloGM() (*clientHelloMsg, error) {
+	config := c.config
 	if len(config.ServerName) == 0 && !config.InsecureSkipVerify {
 		return nil, errors.New("tls: either ServerName or InsecureSkipVerify must be specified in the tls.Config")
 	}
@@ -383,7 +384,7 @@ func (hs *clientHandshakeStateGM) doFullHandshake() error {
 	}
 
 	hs.masterSecret = masterFromPreMasterSecret(c.vers, hs.suite, preMasterSecret, hs.hello.random, hs.serverHello.random)
-	if err := c.config.writeKeyLog(hs.hello.random, hs.masterSecret); err != nil {
+	if err := c.config.writeKeyLog(keyLogLabelTLS12, hs.hello.random, hs.masterSecret); err != nil {
 		c.sendAlert(alertInternalError)
 		return errors.New("tls: failed to write to key log: " + err.Error())
 	}

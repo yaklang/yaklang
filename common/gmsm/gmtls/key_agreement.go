@@ -138,20 +138,6 @@ func hashForServerKeyExchange(sigType uint8, hashFunc crypto.Hash, version uint1
 	return md5SHA1Hash(slices), nil
 }
 
-func curveForCurveID(id CurveID) (elliptic.Curve, bool) {
-	switch id {
-	case CurveP256:
-		return elliptic.P256(), true
-	case CurveP384:
-		return elliptic.P384(), true
-	case CurveP521:
-		return elliptic.P521(), true
-	default:
-		return nil, false
-	}
-
-}
-
 // ecdheKeyAgreement implements a TLS key agreement where the server
 // generates an ephemeral EC public/private key pair and signs it. The
 // pre-master secret is then calculated using ECDH. The signature may
@@ -200,7 +186,7 @@ NextCandidate:
 		ka.privateKey = scalar[:]
 		ecdhePublic = public[:]
 	} else {
-		curve, ok := curveForCurveID(ka.curveid)
+		curve, ok := ellipticCurveForCurveID(ka.curveid)
 		if !ok {
 			return nil, errors.New("tls: preferredCurves includes unsupported curve")
 		}
@@ -227,7 +213,7 @@ NextCandidate:
 		return nil, errors.New("tls: certificate private key does not implement crypto.Signer")
 	}
 
-	signatureAlgorithm, sigType, hashFunc, err := pickSignatureAlgorithm(priv.Public(), clientHello.supportedSignatureAlgorithms, supportedSignatureAlgorithms, ka.version)
+	signatureAlgorithm, sigType, hashFunc, err := pickSignatureAlgorithm(priv.Public(), clientHello.supportedSignatureAlgorithms, supportedSignatureAlgorithms(), ka.version)
 	if err != nil {
 		return nil, err
 	}
@@ -269,6 +255,20 @@ NextCandidate:
 	return skx, nil
 }
 
+//func ellipticCurveForCurveID(id CurveID) (elliptic.Curve, bool) {
+//	switch id {
+//	case CurveP256:
+//		return elliptic.P256(), true
+//	case CurveP384:
+//		return elliptic.P384(), true
+//	case CurveP521:
+//		return elliptic.P521(), true
+//	default:
+//		return nil, false
+//	}
+//
+//}
+
 func (ka *ecdheKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
 	if len(ckx.ciphertext) == 0 || int(ckx.ciphertext[0]) != len(ckx.ciphertext)-1 {
 		return nil, errClientKeyExchange
@@ -286,7 +286,7 @@ func (ka *ecdheKeyAgreement) processClientKeyExchange(config *Config, cert *Cert
 		return sharedKey[:], nil
 	}
 
-	curve, ok := curveForCurveID(ka.curveid)
+	curve, ok := ellipticCurveForCurveID(ka.curveid)
 	if !ok {
 		panic("internal error")
 	}
@@ -329,7 +329,7 @@ func (ka *ecdheKeyAgreement) processServerKeyExchange(config *Config, clientHell
 		}
 		ka.publicKey = publicKey
 	} else {
-		curve, ok := curveForCurveID(ka.curveid)
+		curve, ok := ellipticCurveForCurveID(ka.curveid)
 		if !ok {
 			return errors.New("tls: server selected unsupported curve")
 		}
@@ -389,7 +389,7 @@ func (ka *ecdheKeyAgreement) generateClientKeyExchange(config *Config, clientHel
 		serialized = ourPublic[:]
 		preMasterSecret = sharedKey[:]
 	} else {
-		curve, ok := curveForCurveID(ka.curveid)
+		curve, ok := ellipticCurveForCurveID(ka.curveid)
 		if !ok {
 			panic("internal error")
 		}

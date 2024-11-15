@@ -25,7 +25,7 @@ func (m *certificateRequestMsgGM) equal(i interface{}) bool {
 		eqByteSlices(m.certificateAuthorities, m1.certificateAuthorities)
 }
 
-func (m *certificateRequestMsgGM) marshal() (x []byte) {
+func (m *certificateRequestMsgGM) marshal() []byte {
 	if m.raw != nil {
 		return m.raw
 	}
@@ -38,7 +38,7 @@ func (m *certificateRequestMsgGM) marshal() (x []byte) {
 	}
 	length += casLength
 
-	x = make([]byte, 4+length)
+	x := make([]byte, 4+length)
 	x[0] = typeCertificateRequest
 	x[1] = uint8(length >> 16)
 	x[2] = uint8(length >> 8)
@@ -61,7 +61,7 @@ func (m *certificateRequestMsgGM) marshal() (x []byte) {
 	}
 
 	m.raw = x
-	return
+	return m.raw
 }
 
 func (m *certificateRequestMsgGM) unmarshal(data []byte) bool {

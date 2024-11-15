@@ -15,7 +15,9 @@ limitations under the License.
 package gmtls
 
 import (
+	"bytes"
 	"container/list"
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/sha512"
@@ -62,19 +64,23 @@ const (
 
 // TLS handshake message types.
 const (
-	typeHelloRequest       uint8 = 0
-	typeClientHello        uint8 = 1
-	typeServerHello        uint8 = 2
-	typeNewSessionTicket   uint8 = 4
-	typeCertificate        uint8 = 11
-	typeServerKeyExchange  uint8 = 12
-	typeCertificateRequest uint8 = 13
-	typeServerHelloDone    uint8 = 14
-	typeCertificateVerify  uint8 = 15
-	typeClientKeyExchange  uint8 = 16
-	typeFinished           uint8 = 20
-	typeCertificateStatus  uint8 = 22
-	typeNextProtocol       uint8 = 67 // Not IANA assigned
+	typeHelloRequest        uint8 = 0
+	typeClientHello         uint8 = 1
+	typeServerHello         uint8 = 2
+	typeNewSessionTicket    uint8 = 4
+	typeEndOfEarlyData      uint8 = 5
+	typeEncryptedExtensions uint8 = 8
+	typeCertificate         uint8 = 11
+	typeServerKeyExchange   uint8 = 12
+	typeCertificateRequest  uint8 = 13
+	typeServerHelloDone     uint8 = 14
+	typeCertificateVerify   uint8 = 15
+	typeClientKeyExchange   uint8 = 16
+	typeFinished            uint8 = 20
+	typeCertificateStatus   uint8 = 22
+	typeKeyUpdate           uint8 = 24
+	typeNextProtocol        uint8 = 67  // Not IANA assigned
+	typeMessageHash         uint8 = 254 // synthetic message
 )
 
 // TLS compression types.
@@ -84,16 +90,24 @@ const (
 
 // TLS extension numbers
 const (
-	extensionServerName          uint16 = 0
-	extensionStatusRequest       uint16 = 5
-	extensionSupportedCurves     uint16 = 10
-	extensionSupportedPoints     uint16 = 11
-	extensionSignatureAlgorithms uint16 = 13
-	extensionALPN                uint16 = 16
-	extensionSCT                 uint16 = 18 // https://tools.ietf.org/html/rfc6962#section-6
-	extensionSessionTicket       uint16 = 35
-	extensionNextProtoNeg        uint16 = 13172 // not IANA assigned
-	extensionRenegotiationInfo   uint16 = 0xff01
+	extensionServerName              uint16 = 0
+	extensionStatusRequest           uint16 = 5
+	extensionSupportedCurves         uint16 = 10
+	extensionSupportedPoints         uint16 = 11
+	extensionSignatureAlgorithms     uint16 = 13
+	extensionALPN                    uint16 = 16
+	extensionSCT                     uint16 = 18 // https://tools.ietf.org/html/rfc6962#section-6
+	extensionSessionTicket           uint16 = 35
+	extensionPreSharedKey            uint16 = 41
+	extensionEarlyData               uint16 = 42
+	extensionSupportedVersions       uint16 = 43
+	extensionCookie                  uint16 = 44
+	extensionPSKModes                uint16 = 45
+	extensionCertificateAuthorities  uint16 = 47
+	extensionSignatureAlgorithmsCert uint16 = 50
+	extensionKeyShare                uint16 = 51
+	extensionNextProtoNeg            uint16 = 13172 // not IANA assigned
+	extensionRenegotiationInfo       uint16 = 0xff01
 )
 
 // TLS signaling cipher suite values
@@ -102,7 +116,10 @@ const (
 )
 
 // CurveID is the type of a TLS identifier for an elliptic curve. See
-// https://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-8
+// https://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-8.
+//
+// In TLS 1.3, this type is called NamedGroup, but at this time this library
+// only supports Elliptic Curve based groups. See RFC 8446, Section 4.2.7.
 type CurveID uint16
 
 const (
@@ -111,6 +128,25 @@ const (
 	CurveP521 CurveID = 25
 	X25519    CurveID = 29
 )
+
+// TLS 1.3 Key Share. See RFC 8446, Section 4.2.8.
+type keyShare struct {
+	group CurveID
+	data  []byte
+}
+
+// TLS 1.3 PSK Key Exchange Modes. See RFC 8446, Section 4.2.9.
+const (
+	pskModePlain uint8 = 0
+	pskModeDHE   uint8 = 1
+)
+
+// TLS 1.3 PSK Identity. Can be a Session Ticket, or a reference to a saved
+// session. See RFC 8446, Section 4.2.11.
+type pskIdentity struct {
+	label               []byte
+	obfuscatedTicketAge uint32
+}
 
 // TLS Elliptic Curve Point Formats
 // https://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-9
@@ -145,22 +181,49 @@ const (
 	signatureECDSA
 	signatureRSAPSS
 	signatureSM2
+	signatureEd25519
 )
 
-// supportedSignatureAlgorithms contains the signature and hash algorithms that
+// directSigning is a standard Hash value that signals that no pre-hashing
+// should be performed, and that the input should be signed directly. It is the
+// hash function associated with the Ed25519 signature scheme.
+var directSigning crypto.Hash = 0
+
+// defaultSupportedSignatureAlgorithms contains the signature and hash algorithms that
 // the code advertises as supported in a TLS 1.2 ClientHello and in a TLS 1.2
 // CertificateRequest. The two fields are merged to match with TLS 1.3.
 // Note that in TLS 1.2, the ECDSA algorithms are not constrained to P-256, etc.
-var supportedSignatureAlgorithms = []SignatureScheme{
-	PKCS1WithSHA256,
+var defaultSupportedSignatureAlgorithms = []SignatureScheme{
+	PSSWithSHA256,
 	ECDSAWithP256AndSHA256,
+	Ed25519,
+	PSSWithSHA384,
+	PSSWithSHA512,
+	PKCS1WithSHA256,
 	PKCS1WithSHA384,
-	ECDSAWithP384AndSHA384,
 	PKCS1WithSHA512,
+	ECDSAWithP384AndSHA384,
 	ECDSAWithP521AndSHA512,
 	PKCS1WithSHA1,
 	ECDSAWithSHA1,
 }
+
+// helloRetryRequestRandom is set as the Random value of a ServerHello
+// to signal that the message is actually a HelloRetryRequest.
+var helloRetryRequestRandom = []byte{ // See RFC 8446, Section 4.1.3.
+	0xCF, 0x21, 0xAD, 0x74, 0xE5, 0x9A, 0x61, 0x11,
+	0xBE, 0x1D, 0x8C, 0x02, 0x1E, 0x65, 0xB8, 0x91,
+	0xC2, 0xA2, 0x11, 0x16, 0x7A, 0xBB, 0x8C, 0x5E,
+	0x07, 0x9E, 0x09, 0xE2, 0xC8, 0xA8, 0x33, 0x9C,
+}
+
+const (
+	// downgradeCanaryTLS12 or downgradeCanaryTLS11 is embedded in the server
+	// random as a downgrade protection if the server would be capable of
+	// negotiating a higher version. See RFC 8446, Section 4.1.3.
+	downgradeCanaryTLS12 = "DOWNGRD\x01"
+	downgradeCanaryTLS11 = "DOWNGRD\x00"
+)
 
 // ConnectionState records basic TLS details about the connection.
 type ConnectionState struct {
@@ -217,6 +280,14 @@ type ClientSessionState struct {
 	masterSecret       []byte                // MasterSecret generated by client on a full handshake
 	serverCertificates []*x509.Certificate   // Certificate chain presented by the server
 	verifiedChains     [][]*x509.Certificate // Certificate chains we built for verification
+	receivedAt         time.Time             // When the session ticket was received from the server
+	ocspResponse       []byte                // Stapled OCSP response presented by the server
+	scts               [][]byte              // SCTs presented by the server
+
+	// TLS 1.3 fields.
+	nonce  []byte    // Ticket nonce sent by the server, to derive PSK
+	useBy  time.Time // Expiration of the ticket lifetime as set by the server
+	ageAdd uint32    // Random obfuscation factor for sending the ticket age
 }
 
 // ClientSessionCache is a cache of ClientSessionState objects that can be used
@@ -250,6 +321,9 @@ const (
 	ECDSAWithP256AndSHA256 SignatureScheme = 0x0403
 	ECDSAWithP384AndSHA384 SignatureScheme = 0x0503
 	ECDSAWithP521AndSHA512 SignatureScheme = 0x0603
+
+	// EdDSA algorithms.
+	Ed25519 SignatureScheme = 0x0807
 
 	// Legacy signature and hash algorithms for TLS 1.2.
 	ECDSAWithSHA1 SignatureScheme = 0x0203
@@ -321,6 +395,12 @@ type CertificateRequestInfo struct {
 	// SignatureSchemes lists the signature schemes that the server is
 	// willing to verify.
 	SignatureSchemes []SignatureScheme
+
+	// Version is the TLS version that was negotiated for this connection.
+	Version uint16
+
+	// ctx is the context of the handshake that is in progress.
+	ctx context.Context
 }
 
 // RenegotiationSupport enumerates the different levels of support for TLS
@@ -445,6 +525,16 @@ type Config struct {
 	// RequestClientCert or RequireAnyClientCert, then this callback will
 	// be considered but the verifiedChains argument will always be nil.
 	VerifyPeerCertificate func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
+
+	// VerifyConnection, if not nil, is called after normal certificate
+	// verification and after VerifyPeerCertificate by either a TLS client
+	// or server. If it returns a non-nil error, the handshake is aborted
+	// and that error results.
+	//
+	// If normal verification fails then the handshake will abort before
+	// considering this callback. This callback will run for all connections
+	// regardless of InsecureSkipVerify or ClientAuth settings.
+	VerifyConnection func(ConnectionState) error
 
 	// RootCAs defines the set of root certificate authorities
 	// that clients use when verifying server certificates.
@@ -573,6 +663,10 @@ func ticketKeyFromBytes(b [32]byte) (key ticketKey) {
 	return key
 }
 
+// maxSessionTicketLifetime is the maximum allowed lifetime of a TLS 1.3 session
+// ticket, and the lifetime we set for tickets we send.
+const maxSessionTicketLifetime = 7 * 24 * time.Hour
+
 // Clone returns a shallow clone of c. It is safe to clone a Config that is
 // being used concurrently by a TLS client or server.
 func (c *Config) Clone() *Config {
@@ -699,7 +793,7 @@ func (c *Config) time() time.Time {
 func (c *Config) cipherSuites() []uint16 {
 	s := c.CipherSuites
 	if s == nil {
-		s = defaultCipherSuites()
+		s = getDefaultCipherSuites()
 	}
 	return s
 }
@@ -727,19 +821,27 @@ func (c *Config) curvePreferences() []CurveID {
 	return c.CurvePreferences
 }
 
+func (c *Config) supportsCurve(curve CurveID) bool {
+	for _, cc := range c.curvePreferences() {
+		if cc == curve {
+			return true
+		}
+	}
+	return false
+}
+
 // mutualVersion returns the protocol version to use given the advertised
 // version of the peer.
-func (c *Config) mutualVersion(vers uint16) (uint16, bool) {
-	minVersion := c.minVersion()
-	maxVersion := c.maxVersion()
-
-	if vers < minVersion {
-		return 0, false
+func (c *Config) mutualVersion(isClient bool, peerVersions []uint16) (uint16, bool) {
+	supportedVersions := c.supportedVersions(isClient)
+	for _, peerVersion := range peerVersions {
+		for _, v := range supportedVersions {
+			if v == peerVersion {
+				return v, true
+			}
+		}
 	}
-	if vers > maxVersion {
-		vers = maxVersion
-	}
-	return vers, true
+	return 0, false
 }
 
 // getCertificate 返回密钥交换使用的证书及密钥
@@ -823,14 +925,22 @@ func (c *Config) BuildNameToCertificate() {
 	}
 }
 
+const (
+	keyLogLabelTLS12           = "CLIENT_RANDOM"
+	keyLogLabelClientHandshake = "CLIENT_HANDSHAKE_TRAFFIC_SECRET"
+	keyLogLabelServerHandshake = "SERVER_HANDSHAKE_TRAFFIC_SECRET"
+	keyLogLabelClientTraffic   = "CLIENT_TRAFFIC_SECRET_0"
+	keyLogLabelServerTraffic   = "SERVER_TRAFFIC_SECRET_0"
+)
+
 // writeKeyLog logs client random and master secret if logging was enabled by
 // setting c.KeyLogWriter.
-func (c *Config) writeKeyLog(clientRandom, masterSecret []byte) error {
+func (c *Config) writeKeyLog(label string, clientRandom, secret []byte) error {
 	if c.KeyLogWriter == nil {
 		return nil
 	}
 
-	logLine := []byte(fmt.Sprintf("CLIENT_RANDOM %x %x\n", clientRandom, masterSecret))
+	logLine := fmt.Appendf(nil, "%s %x %x\n", label, clientRandom, secret)
 
 	writerMutex.Lock()
 	_, err := c.KeyLogWriter.Write(logLine)
@@ -852,6 +962,9 @@ type Certificate struct {
 	// (performing client authentication), this must be a crypto.Signer
 	// with an RSA or ECDSA PublicKey.
 	PrivateKey crypto.PrivateKey
+	// SupportedSignatureAlgorithms is an optional list restricting what
+	// signature algorithms the PrivateKey can be used for.
+	SupportedSignatureAlgorithms []SignatureScheme
 	// OCSPStaple contains an optional OCSP response which will be served
 	// to clients that request it.
 	OCSPStaple []byte
@@ -959,7 +1072,7 @@ var (
 	varDefaultCipherSuites []uint16
 )
 
-func defaultCipherSuites() []uint16 {
+func getDefaultCipherSuites() []uint16 {
 	once.Do(initDefaultCipherSuites)
 	return varDefaultCipherSuites
 }
@@ -1019,4 +1132,101 @@ func signatureFromSignatureScheme(signatureAlgorithm SignatureScheme) uint8 {
 	default:
 		return 0
 	}
+}
+
+// CertificateVerificationError is returned when certificate verification fails during the handshake.
+type CertificateVerificationError struct {
+	// UnverifiedCertificates and its contents should not be modified.
+	UnverifiedCertificates []*x509.Certificate
+	Err                    error
+}
+
+func (e *CertificateVerificationError) Error() string {
+	return fmt.Sprintf("tls: failed to verify certificate: %s", e.Err)
+}
+
+func (e *CertificateVerificationError) Unwrap() error {
+	return e.Err
+}
+
+var defaultSupportedVersions = []uint16{
+	VersionTLS13,
+	VersionTLS12,
+	VersionTLS11,
+	VersionTLS10,
+}
+
+func (c *Config) supportedVersions(isClient bool) []uint16 {
+	versions := make([]uint16, 0, len(defaultSupportedVersions))
+	for _, v := range defaultSupportedVersions {
+		if needFIPS() && (v < fipsMinVersion(c) || v > fipsMaxVersion(c)) {
+			continue
+		}
+		if (c == nil || c.MinVersion == 0) &&
+			isClient && v < VersionTLS12 {
+			continue
+		}
+		if c != nil && c.MinVersion != 0 && v < c.MinVersion {
+			continue
+		}
+		if c != nil && c.MaxVersion != 0 && v > c.MaxVersion {
+			continue
+		}
+		versions = append(versions, v)
+	}
+	return versions
+}
+
+func (c *Config) maxSupportedVersion(isClient bool) uint16 {
+	supportedVersions := c.supportedVersions(isClient)
+	if len(supportedVersions) == 0 {
+		return 0
+	}
+	return supportedVersions[0]
+}
+
+// supportedVersionsFromMax returns a list of supported versions derived from a
+// legacy maximum version value. Note that only versions supported by this
+// library are returned. Any newer peer will use supportedVersions anyway.
+func supportedVersionsFromMax(maxVersion uint16) []uint16 {
+	versions := make([]uint16, 0, len(defaultSupportedVersions))
+	for _, v := range defaultSupportedVersions {
+		if v > maxVersion {
+			continue
+		}
+		versions = append(versions, v)
+	}
+	return versions
+}
+
+// SupportsCertificate returns nil if the provided certificate is supported by
+// the server that sent the CertificateRequest. Otherwise, it returns an error
+// describing the reason for the incompatibility.
+func (cri *CertificateRequestInfo) SupportsCertificate(c *Certificate) error {
+	if _, err := selectSignatureScheme(cri.Version, c, cri.SignatureSchemes); err != nil {
+		return err
+	}
+
+	if len(cri.AcceptableCAs) == 0 {
+		return nil
+	}
+
+	for j, cert := range c.Certificate {
+		x509Cert := c.Leaf
+		// Parse the certificate if this isn't the leaf node, or if
+		// chain.Leaf was nil.
+		if j != 0 || x509Cert == nil {
+			var err error
+			if x509Cert, err = x509.ParseCertificate(cert); err != nil {
+				return fmt.Errorf("failed to parse certificate #%d in the chain: %w", j, err)
+			}
+		}
+
+		for _, ca := range cri.AcceptableCAs {
+			if bytes.Equal(x509Cert.RawIssuer, ca) {
+				return nil
+			}
+		}
+	}
+	return errors.New("chain is not signed by an acceptable CA")
 }
