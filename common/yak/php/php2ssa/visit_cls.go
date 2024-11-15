@@ -191,7 +191,6 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			if utils.IsNil(value) {
 				value = y.EmitUndefined(name)
 			}
-			//todo: 在Member中没办法写New
 			if isStatic {
 				class.RegisterStaticMember(name, value)
 				variable := y.GetStaticMember(class, name)

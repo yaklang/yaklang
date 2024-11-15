@@ -185,6 +185,13 @@ const (
 	Library                 = "library"
 )
 
+type FunctionName string
+
+const (
+	MainFunctionName    FunctionName = "@main"
+	VirtualFunctionName FunctionName = "@virtual"
+)
+
 // both instruction and value
 type Program struct {
 	// package list

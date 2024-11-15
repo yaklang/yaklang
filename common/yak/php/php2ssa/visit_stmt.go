@@ -186,17 +186,30 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 	if list == nil {
 		return nil
 	}
-	getNamespace := func(virtualImport bool, name ...string) *ssa.Program {
+	checkNamespace := func(name ...string) *ssa.Program {
 		namespaceName := strings.Join(name, ".")
-		namespace, ok := prog.GetLibrary(namespaceName, virtualImport)
-		if namespace == nil || !ok {
+		namespace, exit := prog.GetLibrary(namespaceName)
+		if namespace == nil || exit {
 			return nil
 		}
 		return namespace
 	}
+	getOrCreateNamespace := func(name ...string) *ssa.Program {
+		program := checkNamespace(name...)
+		if !utils.IsNil(program) {
+			return program
+		}
+		namespaceName := strings.Join(name, ".")
+		library, err := prog.GetOrCreateLibrary(namespaceName)
+		if err != nil {
+			return nil
+		} else {
+			return library
+		}
+	}
 	for _, listContext := range list.AllNamespaceNameList() {
 		path, aliasMap := y.VisitNamespaceNameList(listContext)
-		namespace := getNamespace(true, path...)
+		namespace := getOrCreateNamespace(path...)
 		if namespace == nil {
 			log.Warnf("namespace %s not found", path)
 		}
@@ -221,7 +234,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					}
 				}
 
-				if namespace := getNamespace(false, append(path, realName)...); namespace != nil {
+				if namespace := checkNamespace(append(path, realName)...); namespace != nil {
 					if err := prog.ImportAll(namespace); err != nil {
 						log.Errorf("get namespace all fail: %s", err)
 						return nil
