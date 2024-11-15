@@ -3,6 +3,7 @@ package chaosmaker
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"strings"
 	"testing"
@@ -341,4 +342,38 @@ func TestExportChaosRulesToFile(t *testing.T) {
 func TestImportChaosRulesToFile(t *testing.T) {
 	consts.GetGormProjectDatabase()
 	rule.ImportRulesFromFile(consts.GetGormProfileDatabase(), "/tmp/chaosmaker.json.txt")
+}
+
+func TestGenerateHttpTrafficBug(t *testing.T) {
+	for _, testcase := range []struct {
+		name    string
+		ruleStr string
+	}{
+		{
+			name:    "httpBug",
+			ruleStr: "alert http any any -> any 7001 (msg:\"Exploit CVE-2021-2109 on Oracle Weblogic Server\"; flow:to_server,established; content:\"/console/consolejndi.portal\"; startswith; http_uri; content:\"com.bea.console.handles.JndiBindingHandle\"; content:\"AdminServer\"; distance:2; reference:cve,CVE-2021-2109; classtype:web-application-attack; sid:20212109; rev:1;)",
+		},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			ruleStr := testcase.ruleStr
+			rules, err := surirule.Parse(ruleStr)
+			if err != nil {
+				panic(err)
+			}
+			var fRule []*rule.Storage
+			for _, r := range rules {
+				fRule = append(fRule, rule.NewRuleFromSuricata(r))
+			}
+			mk := NewChaosMaker()
+			mk.FeedRule(fRule...)
+			ok := false
+			for traffic := range mk.Generate() {
+				ok = match.New(rules[0]).Match(traffic)
+				if ok {
+					break
+				}
+			}
+			assert.Equal(t, true, ok)
+		})
+	}
 }

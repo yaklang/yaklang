@@ -28,8 +28,12 @@ func newHTTPGen(r *rule.Rule) (Generator, error) {
 	}
 
 	g := &HTTPGen{
-		rules: r.ContentRuleConfig.ContentRules,
-		gen:   make(map[modifier.Modifier]ModifierGenerator),
+		rules:   r.ContentRuleConfig.ContentRules,
+		gen:     make(map[modifier.Modifier]ModifierGenerator),
+		srcPort: r.SourcePort,
+		dstPort: r.DestinationPort,
+		srcAddr: r.SourceAddress,
+		dstAddr: r.DestinationAddress,
 	}
 
 	// parse rules
