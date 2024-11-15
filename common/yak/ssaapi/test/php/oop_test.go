@@ -119,7 +119,22 @@ namespace {
 }
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
-			"end": {`"A.B.C.B"`},
+			"end": {`"B.C.D.B"`},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test package blueprint", func(t *testing.T) {
+		code := `<?php
+namespace {
+	use B\C\D;
+	class A{
+		public D $a;
+	}
+}
+$a = new A();
+println($a->a);
+`
+		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
+			"end": {`"B.C.D"`, `"any"`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 
@@ -136,7 +151,7 @@ namespace {
     println($a->a);
 }`
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
-			"end": {`"string"`},
+			"end": {`"any"`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("parent class", func(t *testing.T) {

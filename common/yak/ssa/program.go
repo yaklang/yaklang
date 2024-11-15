@@ -96,7 +96,19 @@ func (prog *Program) NewLibrary(name string, path []string) *Program {
 	return prog.createSubProgram(name, Library, path...)
 }
 
-func (prog *Program) GetLibrary(name string, virtualImport ...bool) (*Program, bool) {
+func (prog *Program) GetOrCreateLibrary(name string) (*Program, error) {
+	library, flag := prog.GetLibrary(name)
+	if flag {
+		return library, nil
+	}
+	lib, err := prog.GenerateVirtualLib(name)
+	if err != nil {
+		log.Warnf("generate virtual lib fail: %s", err)
+		return nil, err
+	}
+	return lib, nil
+}
+func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	if prog == nil || utils.IsNil(prog) || prog.Application == nil || utils.IsNil(prog.Application) {
 		return nil, false
 	}
@@ -121,14 +133,6 @@ func (prog *Program) GetLibrary(name string, virtualImport ...bool) (*Program, b
 	if p, ok := prog.UpStream[name]; ok {
 		app.AddUpStream(p)
 		return p, hasFile(p)
-	}
-	if len(virtualImport) > 0 && virtualImport[0] {
-		lib, err := prog.GenerateVirtualLib(name)
-		if err != nil {
-			log.Warnf("generate virtual lib fail: %s", err)
-			return nil, false
-		}
-		return lib, true
 	}
 	if !app.EnableDatabase {
 		return nil, false
