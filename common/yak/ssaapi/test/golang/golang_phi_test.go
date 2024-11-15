@@ -1,11 +1,14 @@
 package ssaapi
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"gotest.tools/v3/assert"
 )
 
@@ -448,4 +451,43 @@ func Test_ImportPackage_WithPhi(t *testing.T) {
 			"sink": {"Undefined-w", "Undefined-messages"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
+}
+
+func Test_PhiType(t *testing.T) {
+	code := `package main
+
+	func main() {
+		encodePayload,err = codec.AESCBCEncrypt("", "", "")
+		if err {
+			// panic("codec AES CBC Encrypt error")
+            return 
+		}	
+        print(encodePayload)
+	}`
+
+	symbol := yaklang.New().GetFntable()
+	opts := make([]ssaapi.Option, 0)
+	tmp := reflect.TypeOf(make(map[string]interface{}))
+	for name, item := range symbol {
+		itype := reflect.TypeOf(item)
+		if itype == tmp {
+			opts = append(opts, ssaapi.WithExternLib(name, item.(map[string]interface{})))
+		}
+	}
+	opts = append(opts, ssaapi.WithLanguage(ssaapi.GO))
+
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		res, err := prog.SyntaxFlowWithError(`
+		print( * as $para)
+		$para<typeName()> as $typeName 
+		`)
+		require.NoError(t, err)
+		typeName := res.GetValues("typeName")
+		// typeName
+		require.True(t, len(typeName) == 1)
+		require.Equal(t, typeName[0].String(), "\"bytes\"")
+
+		return nil
+	}, opts...)
 }

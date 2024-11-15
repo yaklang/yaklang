@@ -1,6 +1,7 @@
 package test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 func TestYakBuildInMethod(t *testing.T) {
@@ -396,6 +398,17 @@ func Test_Return_phi(t *testing.T) {
 		}	
         print(encodePayload)
 		`
+
+		symbol := yaklang.New().GetFntable()
+		opts := make([]ssaapi.Option, 0)
+		tmp := reflect.TypeOf(make(map[string]interface{}))
+		for name, item := range symbol {
+			itype := reflect.TypeOf(item)
+			if itype == tmp {
+				opts = append(opts, ssaapi.WithExternLib(name, item.(map[string]interface{})))
+			}
+		}
+
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			prog.Show()
 			res, err := prog.SyntaxFlowWithError(`
@@ -406,10 +419,10 @@ func Test_Return_phi(t *testing.T) {
 			typeName := res.GetValues("typeName")
 			// typeName
 			require.True(t, len(typeName) == 1)
-			require.Equal(t, typeName[0].String(), "\"any\"")
+			require.Equal(t, typeName[0].String(), "\"bytes\"")
 
 			return nil
-		})
+		}, opts...)
 
 	})
 }
