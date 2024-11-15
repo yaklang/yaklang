@@ -224,7 +224,7 @@ func TestGenerateSelfSignedCertKey(t *testing.T) {
 		//	t.Fail()
 		//}
 
-		config, err := GetX509MutualAuthClientTlsConfig(clientCert, clientKey)
+		config, err := GetX509MutualAuthGoClientTlsConfig(clientCert, clientKey)
 		if err != nil {
 			log.Errorf("build client tls config error: %s", err)
 			t.Fail()

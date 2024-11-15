@@ -529,3 +529,25 @@ func GetX509MutualAuthClientTlsConfig(clientCrt, clientPriv []byte, caCrts ...[]
 
 	return &config, nil
 }
+
+func GetX509MutualAuthGoClientTlsConfig(clientCrt, clientPriv []byte, caCrts ...[]byte) (*tls.Config, error) {
+	pool := x509.NewCertPool()
+	for _, crt := range caCrts {
+		if !pool.AppendCertsFromPEM(crt) {
+			log.Errorf("append ca pem error")
+		}
+	}
+
+	pair, err := tls.X509KeyPair(clientCrt, clientPriv)
+	if err != nil {
+		return nil, errors.Errorf("cannot build client crt/key pair: %s", err)
+	}
+
+	config := tls.Config{
+		InsecureSkipVerify: true,
+		Certificates:       []tls.Certificate{pair},
+		ClientCAs:          pool,
+	}
+
+	return &config, nil
+}
