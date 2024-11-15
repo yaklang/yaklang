@@ -258,15 +258,13 @@ func (b *astbuilder) GetLabelByName(name string) *ssa.LabelBuilder {
 }
 
 // ====================== Object type
-func (b *astbuilder) AddStruct(name string, t *ssa.ObjectType) {
+func (b *astbuilder) AddStruct(name string, t ssa.Type) {
 	b.GetProgram().SetExportType(name, t)
 }
 
 func (b *astbuilder) GetStructByStr(name string) ssa.Type {
 	if t, ok := b.GetProgram().GetExportType(name); ok {
-		if obj, ok := t.(*ssa.ObjectType); ok {
-			return obj
-		}
+		return t
 	}
 	return nil
 }

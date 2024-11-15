@@ -2,6 +2,9 @@ package ssa
 
 import (
 	"fmt"
+
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -61,8 +64,22 @@ func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...C
 	}
 	return blueprint
 }
+
 func (b *FunctionBuilder) CreateBluePrint(name string, tokenizer ...CanStartStopToken) *Blueprint {
 	return b.CreateBluePrintWithPkgName(name, tokenizer...)
+}
+
+func (b *FunctionBuilder) GetAndCreateBluePrint(name string) *Blueprint {
+	if bp := b.GetBluePrint(name); bp != nil {
+		return bp
+	}
+
+	bp := b.CreateBluePrint(name)
+	newFunction := b.NewFunc(name)
+	newFunction.SetMethodName(name)
+	newFunction.SetType(NewFunctionType(fmt.Sprintf("%s-__construct", name), []Type{}, nil, true))
+	bp.RegisterMagicMethod(Constructor, newFunction)
+	return bp
 }
 
 // ReadSelfMember  用于读取当前类成员，包括静态成员和普通成员和方法。
