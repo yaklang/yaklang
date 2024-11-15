@@ -9,8 +9,8 @@ on:
         options:
           - windows
           - windows7
-          - macos-amd64 
-          - macos-arm64
+          - darwin-amd64 
+          - darwin-arm64
           - linux-amd64
           - linux-arm64
       ee:
