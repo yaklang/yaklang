@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
 	"github.com/yaklang/yaklang/common/suricata/rule"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"testing"
 )
 
@@ -220,4 +221,52 @@ func TestTCP(t *testing.T) {
 	r := rs[0]
 	matched := New(r).Match(bytes)
 	t.Log(matched)
+}
+
+func TestDistance(t *testing.T) {
+	for _, testcase := range []struct {
+		name    string
+		ruleStr string
+		traffic string
+		expect  bool
+	}{
+		// check content:com.bea.console.handles.JndiBindingHandle; content:AdminServer; distance:0;
+		// traffic content com.bea.console.handles.JndiBindingHandleAdminServer
+		{
+			name:    "distance0",
+			ruleStr: "alert http any any -> any 7001 (msg:\"Exploit CVE-2021-2109 on Oracle Weblogic Server\"; flow:to_server,established; content:\"/console/consolejndi.portal\"; startswith; http_uri; content:\"com.bea.console.handles.JndiBindingHandle\"; content:\"AdminServer\"; distance:0; reference:cve,CVE-2021-2109; classtype:web-application-attack; sid:20212109; rev:1;)",
+			traffic: "MGbQJoEb+E2Jka9SCABHAADSAAAAAEAGhcus4HVvmt0jcgIEBbQDBAcA51AbWfLIF6yUK2LFcBgGj8IKAAACBAW0AwMHAFRSQUNFIC9jb25zb2xlL2NvbnNvbGVqbmRpLnBvcnRhbF06JEdUIEhUVFAvMS4xDQpIb3N0OiBMUjcuNXQ4Lnk4cQ0KQ29udGVudC1MZW5ndGg6IDY0DQoNCj0/P3FGc0VnbGNvbS5iZWEuY29uc29sZS5oYW5kbGVzLkpuZGlCaW5kaW5nSGFuZGxlQWRtaW5TZXJ2ZXIsJjU=",
+			expect:  true,
+		},
+		// check content:com.bea.console.handles.JndiBindingHandle; content:AdminServer; distance:0;
+		// traffic content com.bea.console.handles.JndiBindingHandle..AdminServer
+		{
+			name:    "distance0",
+			ruleStr: "alert http any any -> any 7001 (msg:\"Exploit CVE-2021-2109 on Oracle Weblogic Server\"; flow:to_server,established; content:\"/console/consolejndi.portal\"; startswith; http_uri; content:\"com.bea.console.handles.JndiBindingHandle\"; content:\"AdminServer\"; distance:0; reference:cve,CVE-2021-2109; classtype:web-application-attack; sid:20212109; rev:1;)",
+			traffic: "MGbQJoEb+E2Jka9SCABHAAGTAAAAAEAGVD4/Vgjp16XxhgIEBbQDBAcA77IbWbGR1tYs2JlNcBgEHKwoAAACBAW0AwMHAFBBVENIIC9jb25zb2xlL2NvbnNvbGVqbmRpLnBvcnRhbEs/LmcrIEhUVFAvMS4xDQpIb3N0OiAxMzAuY0hBLlhXYQ0KQ29udGVudC1MZW5ndGg6IDI1Ng0KDQp8KmYgVVxeNSVvX3M2RmpjJiIyIH0sNDhgYF40ZnspQ2xBPGtpYEUqQDxNej5abWhbbDgnL1hQUHg/THQlc0okKT1yIy5ERSdoMTVAYG9mS0tULjsqIiIlcTVGQWNhezJUW3otMWVIdkMzXz5KeyslMDhQYjUqVHxuXnkjIFZ4Tn1LJkM8JUlvWT9CfiYoVW5fdyJsPCwlQklEKUluJmV6JnRsbVZlYzRHP2xYXzZ6YEJHbk42V14+TUMqMVteY29tLmJlYS5jb25zb2xlLmhhbmRsZXMuSm5kaUJpbmRpbmdIYW5kbGVQLEFkbWluU2VydmVyeS9pNGQ5WmM+V3Rb",
+			expect:  true,
+		},
+		// check content:com.bea.console.handles.JndiBindingHandle; content:AdminServer; distance:3;
+		// traffic content com.bea.console.handles.JndiBindingHandle..AdminServer
+		{
+			name:    "distance3",
+			ruleStr: "alert http any any -> any 7001 (msg:\"Exploit CVE-2021-2109 on Oracle Weblogic Server\"; flow:to_server,established; content:\"/console/consolejndi.portal\"; startswith; http_uri; content:\"com.bea.console.handles.JndiBindingHandle\"; content:\"AdminServer\"; distance:3; reference:cve,CVE-2021-2109; classtype:web-application-attack; sid:20212109; rev:1;)",
+			traffic: "MGbQJoEb+E2Jka9SCABHAAGTAAAAAEAGVD4/Vgjp16XxhgIEBbQDBAcA77IbWbGR1tYs2JlNcBgEHKwoAAACBAW0AwMHAFBBVENIIC9jb25zb2xlL2NvbnNvbGVqbmRpLnBvcnRhbEs/LmcrIEhUVFAvMS4xDQpIb3N0OiAxMzAuY0hBLlhXYQ0KQ29udGVudC1MZW5ndGg6IDI1Ng0KDQp8KmYgVVxeNSVvX3M2RmpjJiIyIH0sNDhgYF40ZnspQ2xBPGtpYEUqQDxNej5abWhbbDgnL1hQUHg/THQlc0okKT1yIy5ERSdoMTVAYG9mS0tULjsqIiIlcTVGQWNhezJUW3otMWVIdkMzXz5KeyslMDhQYjUqVHxuXnkjIFZ4Tn1LJkM8JUlvWT9CfiYoVW5fdyJsPCwlQklEKUluJmV6JnRsbVZlYzRHP2xYXzZ6YEJHbk42V14+TUMqMVteY29tLmJlYS5jb25zb2xlLmhhbmRsZXMuSm5kaUJpbmRpbmdIYW5kbGVQLEFkbWluU2VydmVyeS9pNGQ5WmM+V3Rb",
+			expect:  false,
+		},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			traffic, err := codec.DecodeBase64(testcase.traffic)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ruleIns, err := rule.Parse(testcase.ruleStr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := New(ruleIns[0])
+			matched := r.Match(traffic)
+			assert.Equal(t, testcase.expect, matched, "match failed")
+		})
+	}
 }
