@@ -2,6 +2,12 @@ package yakcmds
 
 import (
 	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -9,10 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 var JavaDecompilerCommand = &cli.Command{
@@ -202,6 +204,25 @@ func jarAction(multiMode bool, jarPath string, c *cli.Context) error {
 			return os.WriteFile(target, raw, 0755)
 		}
 
+		finished := utils.NewBool(false)
+		go func() {
+			time.Sleep(5 * time.Second)
+			if finished.IsSet() {
+				return
+			}
+			originFileRaw, _ := jarfs.ZipFS.ReadFile(s)
+			log.Warnf("Jarpath: %v", jarPath)
+			log.Warnf("Decompiler for %v is too slow, maybe it's a big(%v) class or bug here", s, utils.ByteSize(uint64(len(originFileRaw))))
+			// saving to failed dir (block-slow)
+			fileName := filepath.Base(s)
+			fileName = strings.TrimSuffix(fileName, ".class")
+			fileName = "decompiler-block-" + fileName + "-" + ksuid.New().String() + ".class"
+			mirrorFailedFile := filepath.Join(failedDir, fileName)
+			log.Warnf("write failed file: %v", mirrorFailedFile)
+			if err := os.WriteFile(mirrorFailedFile, originFileRaw, 0755); err != nil {
+				log.Errorf("os.WriteFile failed: %v", err)
+			}
+		}()
 		raw, err := jarfs.ReadFile(s)
 		if err != nil {
 			log.Warnf("jarfs.ReadFile (Decompiler) failed: %v", err)
