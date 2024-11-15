@@ -555,6 +555,10 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 						if ret.ConnectionState().NegotiatedProtocol == "h2" {
 							serverUseH2 = true
 						}
+					case *gmtls.Conn:
+						if ret.ConnectionState().NegotiatedProtocol == "h2" {
+							serverUseH2 = true
+						}
 					}
 					netConn.Close()
 				}
