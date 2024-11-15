@@ -28,6 +28,7 @@ func GetX509GMServerTlsConfigWithAuth(ca, server, serverKey []byte, auth bool) (
 	}
 
 	config := gmtls.Config{
+		GMSupport:    &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch},
 		Certificates: []gmtls.Certificate{serverPair},
 		ClientCAs:    p,
 	}

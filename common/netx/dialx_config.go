@@ -160,7 +160,7 @@ func DialX_WithGMTLSConfig(config *gmtls.Config) DialXOption {
 	return func(c *dialXConfig) {
 		c.EnableTLS = true
 		c.ShouldOverrideTLSConfig = true
-		c.TLSConfig = config
+		c.TLSConfig = initTlsConfigVersion(config)
 	}
 }
 
@@ -201,34 +201,20 @@ func DialX_WithTLSNextProto(nextProtos ...string) DialXOption {
 
 func DialX_WithTLSConfig(tlsConfig any) DialXOption {
 	return func(c *dialXConfig) {
-		minVer, maxVer := consts.GetGlobalTLSVersion()
 		c.EnableTLS = true
 		switch ret := tlsConfig.(type) {
 		case *tls.Config:
 			if gmtlsConfig, err := gmtls.SimpleTlsConfigToGmTlsConfig(ret); err == nil {
-				c.ShouldOverrideTLSConfig = true
-				if gmtlsConfig.MinVersion == 0 {
-					gmtlsConfig.MinVersion = minVer
-				}
-				if gmtlsConfig.MaxVersion == 0 {
-					gmtlsConfig.MaxVersion = maxVer
-				}
-				c.TLSConfig = gmtlsConfig
+				c.TLSConfig = initTlsConfigVersion(gmtlsConfig)
 			}
 		case *gmtls.Config:
 			c.ShouldOverrideTLSConfig = true
-			if ret.MinVersion == 0 {
-				ret.MinVersion = minVer
-			}
-			if ret.MaxVersion == 0 {
-				ret.MaxVersion = maxVer
-			}
-			c.TLSConfig = ret
+			c.TLSConfig = initTlsConfigVersion(ret)
 		case *gmtls.GMSupport:
 			c.ShouldOverrideTLSConfig = true
-			c.TLSConfig = &gmtls.Config{
+			c.TLSConfig = initTlsConfigVersion(&gmtls.Config{
 				GMSupport: ret,
-			}
+			})
 		}
 	}
 }
@@ -273,3 +259,14 @@ const (
 	TLS_Strategy_GMDial_Without_GMSupport TLSStrategy = "gmtls-ns"
 	TLS_Strategy_Ordinary                 TLSStrategy = "tls"
 )
+
+func initTlsConfigVersion(config *gmtls.Config) *gmtls.Config {
+	minVer, maxVer := consts.GetGlobalTLSVersion()
+	if config.MinVersion == 0 {
+		config.MinVersion = minVer
+	}
+	if config.MaxVersion == 0 {
+		config.MaxVersion = maxVer
+	}
+	return config
+}

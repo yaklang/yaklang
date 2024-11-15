@@ -1952,9 +1952,9 @@ type certificateRequestMsgTLS13 struct {
 	certificateAuthorities           [][]byte
 }
 
-func (m *certificateRequestMsgTLS13) marshal() ([]byte, error) {
+func (m *certificateRequestMsgTLS13) marshal() []byte {
 	if m.raw != nil {
-		return m.raw, nil
+		return m.raw
 	}
 
 	var b cryptobyte.Builder
@@ -2015,7 +2015,10 @@ func (m *certificateRequestMsgTLS13) marshal() ([]byte, error) {
 
 	var err error
 	m.raw, err = b.Bytes()
-	return m.raw, err
+	if err != nil {
+		log.Errorf("certificate request tls13 message marshal failed: %v", err)
+	}
+	return m.raw
 }
 
 func (m *certificateRequestMsgTLS13) unmarshal(data []byte) bool {

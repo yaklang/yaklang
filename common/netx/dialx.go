@@ -213,6 +213,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 
 	errs := make([]error, 0, len(strategies))
 	for _, strategy := range strategies {
+		tempTlsConfig := tlsConfig.Clone()
 		if config.Debug {
 			log.Infof("dial %v with tls strategy: %v", target, strategy)
 		}
@@ -223,38 +224,15 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 
 		switch strategy {
 		case TLS_Strategy_Ordinary:
-			tlsConfig.GMSupport = nil
-			tlsConfig.MaxVersion = gmtls.VersionTLS12
+			tempTlsConfig.GMSupport = nil
 		case TLS_Strategy_GMDail:
-			tlsConfig.GMSupport = &gmtls.GMSupport{
+			tempTlsConfig.GMSupport = &gmtls.GMSupport{
 				WorkMode: gmtls.ModeGMSSLOnly,
 			}
-			//gmtlsConfig := &gmtls.Config{
-			//	GMSupport: &gmtls.GMSupport{
-			//		WorkMode: gmtls.ModeGMSSLOnly,
-			//	},
-			//	ServerName:         sni,
-			//	MinVersion:         minVer, // nolint[:staticcheck]
-			//	MaxVersion:         maxVer,
-			//	InsecureSkipVerify: true,
-			//	Renegotiation:      gmtls.RenegotiateFreelyAsClient,
-			//}
-			//if config.ShouldOverrideGMTLSConfig {
-			//	gmtlsConfig = config.GMTLSConfig
-			//}
-		//case TLS_Strategy_GMDial_Without_GMSupport:
-		//	gmtlsConfig := &gmtls.Config{
-		//		ServerName:         sni,
-		//		MinVersion:         minVer, // nolint[:staticcheck]
-		//		MaxVersion:         maxVer,
-		//		InsecureSkipVerify: true,
-		//		Renegotiation:      gmtls.RenegotiateFreelyAsClient,
-		//	}
-		//
 		default:
 			return nil, utils.Errorf("unknown tls strategy %v", strategy)
 		}
-		tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
+		tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tempTlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
 		if err != nil {
 			errs = append(errs, err)
 			continue
