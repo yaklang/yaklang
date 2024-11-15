@@ -24,7 +24,7 @@ func query(t *testing.T, filter *ypb.SSAProgramFilter, local ypb.YakClient, name
 	return nil
 }
 
-func TestSsaProgramsQuery(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlow_SSAPrograms_Query(t *testing.T) {
 	name := uuid.NewString()
 	desc := `
 	this is simple yaklang code example 
@@ -96,7 +96,7 @@ func TestSsaProgramsQuery(t *testing.T) {
 	})
 }
 
-func TestDeleteProgramWithKeyword(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlow_Program_Delete_WithKeyword(t *testing.T) {
 	name := uuid.NewString()
 	desc := `
 	this is simple yaklang code example 
@@ -135,7 +135,7 @@ func TestDeleteProgramWithKeyword(t *testing.T) {
 	require.False(t, have(name))
 }
 
-func TestUpdateProgram(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlow_Program_Update(t *testing.T) {
 
 	name := uuid.NewString()
 	desc := `
