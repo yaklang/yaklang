@@ -209,7 +209,7 @@ world`+"`"+`)
 			do(b)
 		}
 		`, []string{
-			"ParameterMember-parameter[0].Add()", "ParameterMember-parameter[0].Sub()",
+			"ParameterMember-parameter[0].Add(Parameter-i)", "ParameterMember-parameter[0].Sub(Parameter-i)",
 		}, t)
 	})
 }
@@ -415,6 +415,39 @@ func TestType_struct(t *testing.T) {
 
 
 	`, []string{"3", "2", "3", "3", "4", "3", "5", "4", "5"}, t)
+	})
+}
+
+func TestType_interface(t *testing.T) {
+	t.Skip()
+	t.Run("interface type", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+	type IA interface {
+		Get(key string) int
+	}
+
+	type B1 struct {
+		mp map[string]int
+	}
+
+	type B2 struct {
+		arr int
+	}
+
+	func (b *B1) Get(key string) int {
+		return b.mp[key]
+	}
+
+	func (b *B2) Get(key string) int {
+		return b.arr
+	}
+
+	var (
+		_ IA = (*B1)(nil)
+		_ IA = (*B2)(nil)
+	)
+		`, []string{""}, t)
 	})
 }
 

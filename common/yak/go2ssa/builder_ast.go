@@ -243,7 +243,7 @@ func (b *astbuilder) buildDeclaration(decl *gol.DeclarationContext, isglobal boo
 		b.buildConstDecl(constDecl.(*gol.ConstDeclContext))
 	}
 	if varDecl := decl.VarDecl(); varDecl != nil {
-		b.buildVarDecl(varDecl.(*gol.VarDeclContext), isglobal)
+		b.buildVarDecl(varDecl.(*gol.VarDeclContext), false)
 	}
 	if typeDecl := decl.TypeDecl(); typeDecl != nil {
 		b.buildTypeDecl(typeDecl.(*gol.TypeDeclContext))
@@ -513,10 +513,10 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 	ssatyp := b.buildType(typedef.Type_().(*gol.Type_Context))
 
 	switch ssatyp.GetTypeKind() {
-	case ssa.StructTypeKind:
-		if it, ok := ssa.ToObjectType(ssatyp); ok {
-			b.AddStruct(name, it)
-		}
+	case ssa.StructTypeKind, ssa.InterfaceTypeKind:
+		b.AddStruct(name, ssatyp)
+		bp := b.GetAndCreateBluePrint(name)
+		_ = bp
 	default:
 		aliast := ssa.NewAliasType(name, ssatyp.PkgPathString(), ssatyp)
 		b.AddAlias(name, aliast)
@@ -1885,13 +1885,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			b.NewError(ssa.Error, TAG, ImportNotFind(typName))
 		}
 
-		bp := b.CreateBluePrint(typName)
-
-		newFunction := b.NewFunc(typName)
-		newFunction.SetMethodName(typName)
-
-		newFunction.SetType(ssa.NewFunctionType(fmt.Sprintf("%s-__construct", typName), []ssa.Type{}, nil, true))
-		bp.RegisterMagicMethod(ssa.Constructor, newFunction)
+		bp := b.GetAndCreateBluePrint(typName)
 		bp.SetFullTypeNames([]string{path})
 
 		if v := b.PeekValue(libName); v != nil {
