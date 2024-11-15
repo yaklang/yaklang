@@ -20,6 +20,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/process"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
@@ -643,6 +644,15 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	}
 	defer req.Body.Close()
 
+	// set process name
+	if p.findProcessName {
+		_, name, err := process.FindProcessNameByConn(conn)
+		if err != nil {
+			log.Errorf("mitm: conn[%s->%s] failed to get process name: %v", conn.LocalAddr(), conn.RemoteAddr(), err)
+		} else {
+			httpctx.SetProcessName(req, name)
+		}
+	}
 	httpctx.SetMITMFrontendReadWriter(req, brw)
 	httpctx.SetPluginContext(req, consts.NewPluginContext())
 
