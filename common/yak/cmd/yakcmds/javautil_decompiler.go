@@ -224,6 +224,7 @@ func jarAction(multiMode bool, jarPath string, c *cli.Context) error {
 			}
 		}()
 		raw, err := jarfs.ReadFile(s)
+		finished.Set()
 		if err != nil {
 			log.Warnf("jarfs.ReadFile (Decompiler) failed: %v", err)
 			raw, err := jarfs.ZipFS.ReadFile(s)
