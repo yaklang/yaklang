@@ -19,6 +19,7 @@ type CliParameter struct {
 	Group          string
 	MultipleSelect bool
 	SelectOption   *orderedmap.OrderedMap
+	JsonSchema     string
 }
 
 type UIInfo struct {
@@ -148,6 +149,11 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo) {
 			} else {
 				cli.SelectOption.Set(arg1, arg2)
 			}
+		case "cli.setJsonSchema":
+			if cli.Type != "json" {
+				break
+			}
+			cli.JsonSchema = arg1
 		}
 	}
 	parseUiFunc := func(v *ssaapi.Value) {
@@ -237,7 +243,9 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo) {
 }
 
 type pair struct {
-	typ       string
+	// for frontend component select
+	typ string // yakit/app/renderer/src/main/src/pages/plugins/operator/localPluginExecuteDetailHeard/LocalPluginExecuteDetailHeard.tsx
+	// for code generation  in yaklang/common/yakgrpc/grpc_yaklang_inspect_information.go
 	methodTyp string
 }
 
@@ -266,6 +274,7 @@ var (
 		"cli.Hosts":         {"text", "hosts"},
 		"cli.FileOrContent": {"upload-file-content", "file_content"},
 		"cli.LineDict":      {"upload-file-content", "line_dict"},
+		"cli.Json":          {"json", "json"},
 	}
 	methodType2Method = map[string]string{
 		"string":       "cli.String",
