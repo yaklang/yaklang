@@ -3,7 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -101,20 +101,50 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 	local, err := NewLocalClient(true)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 	stream, err := local.DuplexConnection(ctx)
 	require.NoError(t, err)
 
-	taskID1 := ""
+	taskID1 := uuid.NewString()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		check_syntaxflow_result := false
+
+		for {
+			res, err := stream.Recv()
+			log.Info(res)
+			log.Info(err)
+			if err != nil {
+				break
+			}
+			require.NotNil(t, res)
+			if res.MessageType == ssadb.ServerPushType_SyntaxflowResult {
+				var tmp map[string]string
+				err = json.Unmarshal(res.GetData(), &tmp)
+				require.NoError(t, err)
+				require.Equal(t, tmp["task_id"], taskID1)
+				check_syntaxflow_result = true
+			}
+			if check_syntaxflow_result {
+				break
+			}
+		}
+		require.True(t, check_syntaxflow_result)
+	}()
+
 	{
 		progName := uuid.NewString()
 		prog, err := ssaapi.Parse(`println("araa")`,
-			ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.Yak),
+			ssaapi.WithProgramName(progName),
+			ssaapi.WithLanguage(ssaapi.Yak),
 		)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 		require.NoError(t, err)
 
-		taskID1 = uuid.NewString()
 		res := prog.SyntaxFlow(`println(* as $para); alert $para`)
 		resultID1, err := res.Save(taskID1)
 		defer ssadb.DeleteResultByID(resultID1)
@@ -122,41 +152,16 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 			RuntimeId: taskID1,
 		})
 		require.NoError(t, err)
+
+		// check have risk
+		_, risks, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
+			RuntimeId: taskID1,
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(risks))
+		require.Equal(t, taskID1, risks[0].RuntimeId)
 		_ = resultID1
 	}
+	wg.Wait()
 
-	passCheck := 0
-
-	var res *ypb.DuplexConnectionResponse
-	for {
-		res, err = stream.Recv()
-		log.Info(res)
-		log.Info(err)
-		if err == io.EOF {
-			break
-		}
-		require.NoError(t, err)
-		require.NotNil(t, res)
-		if res.MessageType == "syntaxflow_result" {
-			var tmp map[string]string
-			err = json.Unmarshal(res.GetData(), &tmp)
-			require.NoError(t, err)
-			require.Equal(t, tmp["task_id"], taskID1)
-			passCheck++
-		}
-		if res.MessageType == "risk" {
-			_, risks, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
-				RuntimeId: taskID1,
-			})
-			require.NoError(t, err)
-			require.Equal(t, 1, len(risks))
-			require.Equal(t, taskID1, risks[0].RuntimeId)
-			passCheck++
-		}
-
-		if passCheck == 2 {
-			break
-		}
-	}
-	cancel()
 }

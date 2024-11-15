@@ -2,11 +2,16 @@ package ssadb
 
 import (
 	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
+
+const (
+	ServerPushType_SyntaxflowResult = "syntaxflow_result"
 )
 
 type AuditResult struct {
@@ -115,7 +120,7 @@ func (r *AuditResult) ToGRPCModel() *ypb.SyntaxFlowResult {
 }
 
 func (r *AuditResult) AfterUpdate(tx *gorm.DB) (err error) {
-	schema.GetBroadCast_Data().Call("syntaxflow_result", map[string]string{
+	schema.GetBroadCast_Data().Call(ServerPushType_SyntaxflowResult, map[string]string{
 		"task_id": r.TaskID,
 		"action":  "update",
 	})
@@ -123,7 +128,7 @@ func (r *AuditResult) AfterUpdate(tx *gorm.DB) (err error) {
 }
 
 func (r *AuditResult) AfterDelete(tx *gorm.DB) (err error) {
-	schema.GetBroadCast_Data().Call("syntaxflow_result", map[string]string{
+	schema.GetBroadCast_Data().Call(ServerPushType_SyntaxflowResult, map[string]string{
 		"task_id": r.TaskID,
 		"action":  "delete",
 	})
