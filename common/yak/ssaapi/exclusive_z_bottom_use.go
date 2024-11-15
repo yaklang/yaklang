@@ -158,7 +158,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			var formalParams Values
 			if params.Len() > 0 {
 				for _, formalParam := range params.Values() {
-					formalParams = append(formalParams, v.NewValue(formalParam).AppendDependOn(funcValue))
+					formalParams = append(formalParams, funcValue.NewValue(formalParam).AppendDependOn(funcValue))
 				}
 				return formalParams
 			}
@@ -180,7 +180,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		// enter return
 		var vals Values
 		for _, retStmt := range f.Return {
-			retVals := v.NewValue(retStmt).getBottomUses(actx, opt...).AppendDependOn(funcValue)
+			retVals := funcValue.NewValue(retStmt).getBottomUses(actx, opt...).AppendDependOn(funcValue)
 			vals = append(vals, retVals...)
 		}
 		return vals
@@ -190,7 +190,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			// var results Values
 			results := make(Values, 0)
 			if f := ins.GetFunc(); f != nil {
-				v.NewValue(f).GetCalledBy().ForEach(func(value *Value) {
+				v.NewValue(f).AppendDependOn(v).GetCalledBy().ForEach(func(value *Value) {
 					dep := value.AppendDependOn(v)
 					if !actx.haveTheCrossProcess(dep) {
 						actx.setCauseValue(dep)
@@ -237,8 +237,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 
 		var vals Values
 		if !call.IsObject() || len(indexes) <= 0 {
-			v.NewValue(call).GetUsers().ForEach(func(user *Value) {
-				if ret := user.AppendDependOn(currentCallValue).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
+			currentCallValue.GetUsers().ForEach(func(user *Value) {
+				if ret := user.AppendDependOn(currentCallValue).getBottomUses(actx); len(ret) > 0 {
 					vals = append(vals, ret...)
 				}
 			})
@@ -259,7 +259,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			}
 			returnReceiver := v.NewValue(indexedReturn)
 			actx.pushObject(currentCallValue, returnReceiver.GetKey(), returnReceiver)
-			if newVals := returnReceiver.AppendDependOn(returnReceiver).AppendDependOn(v).getBottomUses(actx); len(newVals) > 0 {
+			if newVals := returnReceiver.AppendDependOn(returnReceiver).getBottomUses(actx); len(newVals) > 0 {
 				vals = append(vals, newVals...)
 			}
 			actx.popObject()
