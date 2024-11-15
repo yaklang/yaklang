@@ -739,6 +739,7 @@ func TestGRPCMUSTPASS_HTTP_DebugPlugin_Global_SaveHTTPFlow(t *testing.T) {
 	require.NoError(t, err)
 	config.SkipSaveHTTPFlow = true
 	client.SetGlobalNetworkConfig(context.Background(), config)
+	defer client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 
 	target := "http://" + utils.HostPort(host, port)
 	testTemplate := `id: WebFuzzer-Template-gPdWZhvP
