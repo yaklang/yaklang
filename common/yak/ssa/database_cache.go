@@ -245,23 +245,18 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 }
 
 func (c *Cache) SaveToDatabase() {
+	if !c.HaveDatabaseBackend() {
+		return
+	}
 	c.once.Do(func() {
-		if !c.HaveDatabaseBackend() {
-			return
-		}
-
-		start := time.Now()
-		defer func() {
-			syncAtomic.AddUint64(&_SSACacheToDatabaseCost, uint64(time.Now().Sub(start).Nanoseconds()))
-		}()
 		all := c.InstructionCache.GetAll()
 		c.InstructionCache.Close()
 		for _, code := range all {
 			c.saveInstruct <- code
 		}
 		close(c.saveInstruct)
-		c.waitGroup.Wait()
 	})
+	c.waitGroup.Wait()
 }
 
 func (c *Cache) IsExistedSourceCodeHash(programName string, hashString string) bool {
