@@ -817,13 +817,17 @@ func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Valu
 			continue
 		}
 
-		if und, ok := ToUndefined(value); ok {
+		if und, ok := ToUndefined(value); ok { // 忽略外部库的function
 			if und.Kind == UndefinedValueInValid {
 				continue
 			}
 		}
 
-		if _, ok := ToFunction(value); ok {
+		if _, ok := ToFunction(value); ok { // 忽略function
+			continue
+		}
+
+		if _, ok := ToExternLib(value); ok { // 忽略import value
 			continue
 		}
 
