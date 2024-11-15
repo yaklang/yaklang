@@ -554,6 +554,7 @@ func (s *ScopedVersionedTable[T]) GetAllVariableNames() map[string]struct{} {
 			return
 		}
 
+		// TODO: 多值返回时生成的member导致phi值重复，这里暂时先跳过
 		if s[0] == '#' {
 			return
 		}
