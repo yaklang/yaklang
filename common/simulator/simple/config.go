@@ -10,6 +10,7 @@ type BrowserConfig struct {
 	noSandBox bool
 	headless  bool
 	hijack    bool
+	leakless  bool
 
 	runtimeID  string
 	fromPlugin string
@@ -170,5 +171,21 @@ func WithRequestModification(modifyUrl string, modifyTarget ModifyTarget, modify
 func WithTimeout(timeout int) BrowserConfigOpt {
 	return func(config *BrowserConfig) {
 		config.timeout = timeout
+	}
+}
+
+// simulator.simple.leakless 是一个请求选项 用于设置在程序运行结束时强行杀死浏览器
+// 注意在windows上可能会报毒，windows建议关闭
+//
+// Example:
+// ```
+//
+//	leakless = simulator.simple.leakless(true)
+//	browser = simulator.simple.createBrowser(leakless)
+//
+// ```
+func WithLeakless(leakless bool) BrowserConfigOpt {
+	return func(config *BrowserConfig) {
+		config.leakless = leakless
 	}
 }
