@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"testing"
 	"time"
 
@@ -101,7 +100,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 	local, err := NewLocalClient(true)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
 	stream, err := local.DuplexConnection(ctx)
 	require.NoError(t, err)
 
@@ -125,24 +124,24 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 		_ = resultID1
 	}
 
-	passCheck := 0
+	check_syntaxflow_result := false
+	check_risk := false
 
 	var res *ypb.DuplexConnectionResponse
 	for {
 		res, err = stream.Recv()
 		log.Info(res)
 		log.Info(err)
-		if err == io.EOF {
+		if err != nil {
 			break
 		}
-		require.NoError(t, err)
 		require.NotNil(t, res)
 		if res.MessageType == "syntaxflow_result" {
 			var tmp map[string]string
 			err = json.Unmarshal(res.GetData(), &tmp)
 			require.NoError(t, err)
 			require.Equal(t, tmp["task_id"], taskID1)
-			passCheck++
+			check_syntaxflow_result = true
 		}
 		if res.MessageType == "risk" {
 			_, risks, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
@@ -151,12 +150,12 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, len(risks))
 			require.Equal(t, taskID1, risks[0].RuntimeId)
-			passCheck++
+			check_risk = true
 		}
-
-		if passCheck == 2 {
+		if check_syntaxflow_result && check_risk {
 			break
 		}
 	}
-	cancel()
+	require.True(t, check_syntaxflow_result)
+	require.True(t, check_risk)
 }
