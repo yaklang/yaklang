@@ -37,7 +37,7 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 		// need a
 		// return ssa.NewUnionType(types)
 	}
-	return ssa.GetAnyType()
+	return ssa.CreateAnyType()
 }
 
 func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.Blueprint, string) {

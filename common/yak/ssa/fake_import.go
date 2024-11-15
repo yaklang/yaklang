@@ -1,10 +1,11 @@
 package ssa
 
 func (p *Program) GenerateVirtualLib(packagePath string) (*Program, error) {
-	lib := p.NewLibrary(packagePath, []string{})
+	app := p.GetApplication()
+	lib := app.NewLibrary(packagePath, []string{})
 	lib.PkgName = packagePath
 	lib.GetAndCreateFunctionBuilder(packagePath, string(VirtualFunctionName))
-	_, err := p.checkImportRelationship(lib)
+	_, err := app.checkImportRelationship(lib)
 	return lib, err
 }
 

@@ -181,7 +181,6 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 		opmode = ""
 	}
 	prog := y.GetProgram()
-
 	list, _ := i.UseDeclarationContentList().(*phpparser.UseDeclarationContentListContext)
 	if list == nil {
 		return nil
@@ -189,7 +188,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 	checkNamespace := func(name ...string) *ssa.Program {
 		namespaceName := strings.Join(name, ".")
 		namespace, exit := prog.GetLibrary(namespaceName)
-		if namespace == nil || exit {
+		if namespace == nil || !exit {
 			return nil
 		}
 		return namespace
