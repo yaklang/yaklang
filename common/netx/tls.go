@@ -118,6 +118,10 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 		}
 		handshakeConn = uConn
 	} else {
+		err := LoadCertificatesConfig(gmtlsConfig)
+		if err != nil {
+			log.Warnf("LoadCertificatesConfig(tlsConfig) error: %s", err)
+		}
 		handshakeConn = gmtls.Client(conn, gmtlsConfig)
 	}
 
@@ -138,7 +142,7 @@ var (
 	// presetClientCertificates is a list of certificates that will be used to
 	// authenticate to the server if required.
 	// load p12/pfx file to presetClientCertificates
-	presetClientCertificates  []tls.Certificate
+	presetClientCertificates  []gmtls.Certificate
 	presetUClientCertificates []utls.Certificate
 	clientRootCA              = x509.NewCertPool()
 )
@@ -149,7 +153,7 @@ func LoadP12Bytes(p12bytes []byte, password string) error {
 		return err
 	}
 	{
-		client, err := tls.X509KeyPair(cCert, cKey)
+		client, err := gmtls.X509KeyPair(cCert, cKey)
 		if err != nil {
 			return err
 		}
@@ -213,13 +217,13 @@ func LoadCertificatesConfig(i any) error {
 			}
 		}
 		return nil
-	case *tls.Config:
+	case *gmtls.Config:
 		if len(ret.Certificates) > 0 {
-			certs := make([]tls.Certificate, len(ret.Certificates), len(ret.Certificates)+len(presetClientCertificates))
+			certs := make([]gmtls.Certificate, len(ret.Certificates), len(ret.Certificates)+len(presetClientCertificates))
 			copy(certs, ret.Certificates)
 			certs = append(certs, presetClientCertificates...)
 			ret.Certificates = certs
-			ret.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			ret.GetClientCertificate = func(info *gmtls.CertificateRequestInfo) (*gmtls.Certificate, error) {
 				for _, cert := range certs {
 					err := info.SupportsCertificate(&cert)
 					if err != nil {
@@ -234,7 +238,7 @@ func LoadCertificatesConfig(i any) error {
 			if len(presetClientCertificates) == 0 {
 				return nil
 			}
-			ret.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			ret.GetClientCertificate = func(info *gmtls.CertificateRequestInfo) (*gmtls.Certificate, error) {
 				// 服务端请求客户端证书时，如果客户端没有配置证书，是否能完成握手取决于服务器的配置
 				//if len(presetClientCertificates) == 0 {
 				//	log.Warn("server request client certificate, but no client certificate configured")
@@ -254,7 +258,7 @@ func LoadCertificatesConfig(i any) error {
 			}
 		}
 		return nil
-	case *gmtls.Config:
+	case *tls.Config:
 		return nil
 	default:
 		log.Warnf("invalid tlsConfig type %T", i)
