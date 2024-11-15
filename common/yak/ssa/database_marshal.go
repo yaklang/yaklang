@@ -2,9 +2,10 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"strconv"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -562,6 +563,8 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		if hasEllipsis, ok := params["has_ellipsis"].(bool); ok {
 			ret.hasEllipsis = hasEllipsis
 		}
+	case *ExternLib:
+
 	default:
 		log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())
 	}
