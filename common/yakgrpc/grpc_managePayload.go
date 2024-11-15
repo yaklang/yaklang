@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
@@ -206,6 +207,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
+	var sqlErr sqlite3.Error
 	size, total := int64(0), int64(0)
 	start := time.Now()
 	feedback := func(progress float64, msg string) {
@@ -251,7 +253,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 				size += rawLen
 
 				err := yakit.CreatePayload(tx, data, group, folder, hitCount, false)
-				if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: payloads.hash") {
+				if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint {
 					err = nil // ignore duplicate error
 				}
 				return err
@@ -282,9 +284,13 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		feedback(-1, "正在读取数据")
 		if err := yakit.ReadQuotedLinesWithCallBack(content, func(data string, rawLen int64) error {
 			size += rawLen
-			return yakit.CreatePayload(s.GetProfileDatabase(), data, group, folder, 0, false)
+			err := yakit.CreatePayload(s.GetProfileDatabase(), data, group, folder, 0, false)
+			if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint {
+				err = nil // ignore duplicate error
+			}
+			return err
 		}); err != nil {
-			log.Errorf("save payload group by content error: %s", err.Error())
+			return utils.Wrapf(err, "save payload group by content error")
 		}
 	}
 	return nil
