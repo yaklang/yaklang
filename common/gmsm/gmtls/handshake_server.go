@@ -147,7 +147,7 @@ func (hs *serverHandshakeState) readClientHello() (isResume bool, err error) {
 		}
 	}
 
-	c.vers, ok = c.config.mutualVersion(hs.clientHello.vers)
+	c.vers, ok = c.config.mutualVersion(false, hs.clientHello.getClientVersions())
 	if !ok {
 		c.sendAlert(alertProtocolVersion)
 		return false, fmt.Errorf("tls: client offered an unsupported, maximum protocol version of %x", hs.clientHello.vers)
@@ -431,7 +431,7 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 		}
 		if c.vers >= VersionTLS12 {
 			certReq.hasSignatureAndHash = true
-			certReq.supportedSignatureAlgorithms = supportedSignatureAlgorithms
+			certReq.supportedSignatureAlgorithms = supportedSignatureAlgorithms()
 		}
 
 		// An empty list of certificateAuthorities signals to
@@ -509,7 +509,7 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 		return err
 	}
 	hs.masterSecret = masterFromPreMasterSecret(c.vers, hs.suite, preMasterSecret, hs.clientHello.random, hs.hello.random)
-	if err := c.config.writeKeyLog(hs.clientHello.random, hs.masterSecret); err != nil {
+	if err := c.config.writeKeyLog(keyLogLabelTLS12, hs.clientHello.random, hs.masterSecret); err != nil {
 		c.sendAlert(alertInternalError)
 		return err
 	}
@@ -532,7 +532,8 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 		}
 
 		// Determine the signature type.
-		_, sigType, hashFunc, err := pickSignatureAlgorithm(pub, []SignatureScheme{certVerify.signatureAlgorithm}, supportedSignatureAlgorithms, c.vers)
+		_, sigType, hashFunc, err := pickSignatureAlgorithm(pub, []SignatureScheme{certVerify.signatureAlgorithm}, supportedSignatureAlgorithms(), c.vers)
+
 		if err != nil {
 			c.sendAlert(alertIllegalParameter)
 			return err
@@ -802,4 +803,33 @@ func (hs *serverHandshakeState) clientHelloInfo() *ClientHelloInfo {
 	}
 
 	return hs.cachedClientHelloInfo
+}
+
+// supportsECDHE returns whether ECDHE key exchanges can be used with this
+// pre-TLS 1.3 client.
+func supportsECDHE(c *Config, supportedCurves []CurveID, supportedPoints []uint8) bool {
+	supportsCurve := false
+	for _, curve := range supportedCurves {
+		if c.supportsCurve(curve) {
+			supportsCurve = true
+			break
+		}
+	}
+
+	supportsPointFormat := false
+	for _, pointFormat := range supportedPoints {
+		if pointFormat == pointFormatUncompressed {
+			supportsPointFormat = true
+			break
+		}
+	}
+	// Per RFC 8422, Section 5.1.2, if the Supported Point Formats extension is
+	// missing, uncompressed points are supported. If supportedPoints is empty,
+	// the extension must be missing, as an empty extension body is rejected by
+	// the parser. See https://go.dev/issue/49126.
+	if len(supportedPoints) == 0 {
+		supportsPointFormat = true
+	}
+
+	return supportsCurve && supportsPointFormat
 }
