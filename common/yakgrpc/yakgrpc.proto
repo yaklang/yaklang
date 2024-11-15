@@ -5571,7 +5571,7 @@ message DeleteSSAProgramRequest{
 
 message QuerySSAProgramResponse{
   Paging Paging = 1;
-  repeated SSAProgram programs = 2;
+  repeated SSAProgram Programs = 2;
   int64 Total = 3;
 }
 
