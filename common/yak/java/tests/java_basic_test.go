@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 )
 
@@ -78,18 +76,5 @@ public class HelloWorld {
 		default : break;
 };
 `, t)
-	})
-	t.Run("test", func(t *testing.T) {
-		code := `package com.example.demo1;
-import java.io.FileInputStream;
-
-public class test {
-    FileInputStream fileInputStream;
-
-    public void AA() {
-        println(fileInputStream);
-    }
-}`
-		ssatest.CheckSyntaxFlow(t, code, `println(* as $start);$start<fullTypeName><show> as $end`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }

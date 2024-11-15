@@ -67,7 +67,7 @@ class A{}
 $a = new A();
 `
 		ssatest.CheckSyntaxFlow(t, code, `A() as $start;  $start<fullTypeName><show> as $end`, map[string][]string{
-			"end": []string{`"main.A"`},
+			"end": {`"main.A"`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("test package blueprint packageName", func(t *testing.T) {
