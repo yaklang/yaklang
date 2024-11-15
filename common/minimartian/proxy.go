@@ -57,19 +57,20 @@ func isCloseable(err error) bool {
 
 // Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
 type Proxy struct {
-	dial      func(context.Context, string, string) (net.Conn, error)
-	timeout   time.Duration
-	mitm      *mitm.Config
-	proxyURL  *url.URL
-	conns     sync.WaitGroup
-	connsMu   sync.Mutex // protects conns.Add/Wait from concurrent access
-	closing   chan bool
-	http2     bool
-	gmTLS     bool
-	gmPrefer  bool
-	gmTLSOnly bool
-	reqmod    RequestModifier
-	resmod    ResponseModifier
+	dial            func(context.Context, string, string) (net.Conn, error)
+	timeout         time.Duration
+	mitm            *mitm.Config
+	proxyURL        *url.URL
+	conns           sync.WaitGroup
+	connsMu         sync.Mutex // protects conns.Add/Wait from concurrent access
+	closing         chan bool
+	http2           bool
+	gmTLS           bool
+	gmPrefer        bool
+	gmTLSOnly       bool
+	findProcessName bool
+	reqmod          RequestModifier
+	resmod          ResponseModifier
 
 	// context cache
 	ctxCacheLock     *sync.Mutex
@@ -207,6 +208,10 @@ func (p *Proxy) SetHTTPForceClose(enable bool) {
 // SetLowhttpConfig sets the lowhttp config
 func (p *Proxy) SetLowhttpConfig(config []lowhttp.LowhttpOpt) {
 	p.lowhttpConfig = config
+}
+
+func (p *Proxy) SetFindProcessName(b bool) {
+	p.findProcessName = b
 }
 
 // Close sets the proxy to the closing state so it stops receiving new connections,
