@@ -53,7 +53,7 @@ func TestP12Auth(t *testing.T) {
 		}
 	}()
 	time.Sleep(time.Second)
-	clientConfig, err := GetX509MutualAuthClientTlsConfig(cCert, cKey, ca)
+	clientConfig, err := GetX509MutualAuthGoClientTlsConfig(cCert, cKey, ca)
 	if err != nil {
 		t.Fatal()
 	}
@@ -76,7 +76,7 @@ func TestP12Auth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientConfig, err = GetX509MutualAuthClientTlsConfig(cCert, cKey, ca)
+	clientConfig, err = GetX509MutualAuthGoClientTlsConfig(cCert, cKey, ca)
 	if err != nil {
 		t.Fatal()
 	}
