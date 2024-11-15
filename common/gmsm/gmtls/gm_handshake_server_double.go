@@ -137,7 +137,7 @@ func (hs *serverHandshakeStateGM) readClientHello() (isResume bool, err error) {
 		}
 	}
 
-	c.vers, ok = c.config.mutualVersion(hs.clientHello.vers)
+	c.vers, ok = c.config.mutualVersion(false, hs.clientHello.getClientVersions())
 	if !ok {
 		c.sendAlert(alertProtocolVersion)
 		return false, fmt.Errorf("tls: client offered an unsupported, maximum protocol version of %x", hs.clientHello.vers)
@@ -387,7 +387,7 @@ func (hs *serverHandshakeStateGM) doFullHandshake() error {
 		}
 		//if c.vers >= VersionTLS12 {
 		//	certReq.hasSignatureAndHash = true
-		//	certReq.supportedSignatureAlgorithms = supportedSignatureAlgorithms
+		//	certReq.defaultSupportedSignatureAlgorithms = defaultSupportedSignatureAlgorithms
 		//}
 
 		// An empty list of certificateAuthorities signals to
@@ -466,7 +466,7 @@ func (hs *serverHandshakeStateGM) doFullHandshake() error {
 		return err
 	}
 	hs.masterSecret = masterFromPreMasterSecret(c.vers, hs.suite, preMasterSecret, hs.clientHello.random, hs.hello.random)
-	if err := c.config.writeKeyLog(hs.clientHello.random, hs.masterSecret); err != nil {
+	if err := c.config.writeKeyLog(keyLogLabelTLS12, hs.clientHello.random, hs.masterSecret); err != nil {
 		c.sendAlert(alertInternalError)
 		return err
 	}
@@ -489,7 +489,7 @@ func (hs *serverHandshakeStateGM) doFullHandshake() error {
 		}
 
 		// Determine the signature type.
-		_, sigType, hashFunc, err := pickSignatureAlgorithm(pub, []SignatureScheme{certVerify.signatureAlgorithm}, supportedSignatureAlgorithms, c.vers)
+		_, sigType, hashFunc, err := pickSignatureAlgorithm(pub, []SignatureScheme{certVerify.signatureAlgorithm}, supportedSignatureAlgorithms(), c.vers)
 		if err != nil {
 			c.sendAlert(alertIllegalParameter)
 			return err
@@ -723,11 +723,11 @@ func (hs *serverHandshakeStateGM) clientHelloInfo() *ClientHelloInfo {
 	// GM握手实现只需要支持 GMSSL版本就可以
 	supportedVersions := []uint16{VersionGMSSL}
 
-	//var supportedVersions []uint16
+	//var defaultSupportedVersions []uint16
 	//if hs.clientHello.vers > VersionTLS12 {
-	//	supportedVersions = suppVersArray[:]
+	//	defaultSupportedVersions = suppVersArray[:]
 	//} else if hs.clientHello.vers >= VersionSSL30 {
-	//	supportedVersions = suppVersArray[VersionTLS12-hs.clientHello.vers:]
+	//	defaultSupportedVersions = suppVersArray[VersionTLS12-hs.clientHello.vers:]
 	//}else{
 	//
 	//}

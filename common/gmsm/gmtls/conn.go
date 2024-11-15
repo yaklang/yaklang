@@ -59,6 +59,11 @@ type Conn struct {
 	peerCertificates []*x509.Certificate
 	// verifiedChains contains the certificate chains that we built, as
 	// opposed to the ones presented by the server.
+
+	// activeCertHandles contains the cache handles to certificates in
+	// peerCertificates that are used to track active references.
+	activeCertHandles []*activeCert
+
 	verifiedChains [][]*x509.Certificate
 	// serverName contains the server name indicated by the client, if any.
 	serverName string
@@ -68,6 +73,9 @@ type Conn struct {
 	secureRenegotiation bool
 	// ekm is a closure for exporting keying material.
 	ekm func(label string, context []byte, length int) ([]byte, error)
+	// resumptionSecret is the resumption_master_secret for handling
+	// NewSessionTicket messages. nil if config.SessionTicketsDisabled.
+	resumptionSecret []byte
 
 	// clientFinishedIsFirst is true if the client sent the first Finished
 	// message during the most recent handshake. This is recorded because
@@ -114,6 +122,8 @@ type Conn struct {
 	activeCall int32
 
 	tmp [16]byte
+
+	isHandshakeComplete atomic.Bool
 }
 
 // Access to net.Conn methods.
@@ -168,6 +178,8 @@ type halfConn struct {
 
 	// used to save allocating a new buffer for each MAC.
 	inDigestBuf, outDigestBuf []byte
+
+	trafficSecret []byte // current TLS 1.3 traffic secret
 }
 
 func (hc *halfConn) setErrorLocked(err error) error {
@@ -197,6 +209,15 @@ func (hc *halfConn) changeCipherSpec() error {
 		hc.seq[i] = 0
 	}
 	return nil
+}
+
+func (hc *halfConn) setTrafficSecret(suite *cipherSuiteTLS13, secret []byte) {
+	hc.trafficSecret = secret
+	key, iv := suite.trafficKey(secret)
+	hc.cipher = suite.aead(key, iv)
+	for i := range hc.seq {
+		hc.seq[i] = 0
+	}
 }
 
 // incSeq increments the sequence number.
@@ -947,6 +968,21 @@ func (c *Conn) writeRecordLocked(typ recordType, data []byte) (int, error) {
 	return n, nil
 }
 
+// writeHandshakeRecord writes a handshake message to the connection and updates
+// the record layer state. If transcript is non-nil the marshalled message is
+// written to it.
+func (c *Conn) writeHandshakeRecord(msg handshakeMessage, transcript transcriptHash) (int, error) {
+	c.out.Lock()
+	defer c.out.Unlock()
+
+	data := msg.marshal()
+	if transcript != nil {
+		transcript.Write(data)
+	}
+
+	return c.writeRecordLocked(recordTypeHandshake, data)
+}
+
 // writeRecord writes a TLS record with the given type and payload to the
 // connection and updates the record layer state.
 func (c *Conn) writeRecord(typ recordType, data []byte) (int, error) {
@@ -959,6 +995,12 @@ func (c *Conn) writeRecord(typ recordType, data []byte) (int, error) {
 // readHandshake reads the next handshake message from
 // the record layer.
 func (c *Conn) readHandshake() (interface{}, error) {
+	return c.readHandshakeEx(nil)
+}
+
+// readHandshake reads the next handshake message from
+// the record layer.
+func (c *Conn) readHandshakeEx(transcript transcriptHash) (interface{}, error) {
 	for c.hand.Len() < 4 {
 		if err := c.in.err; err != nil {
 			return nil, err
@@ -1031,6 +1073,11 @@ func (c *Conn) readHandshake() (interface{}, error) {
 	if !m.unmarshal(data) {
 		return nil, c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
 	}
+
+	if transcript != nil {
+		transcript.Write(data)
+	}
+
 	return m, nil
 }
 
@@ -1131,7 +1178,7 @@ func (c *Conn) handleRenegotiation() error {
 	defer c.handshakeMutex.Unlock()
 
 	atomic.StoreUint32(&c.handshakeStatus, 0)
-	if c.handshakeErr = c.clientHandshake(); c.handshakeErr == nil {
+	if c.handshakeErr = c.clientHandshake(nil); c.handshakeErr == nil {
 		c.handshakes++
 	}
 	return c.handshakeErr
@@ -1282,12 +1329,12 @@ func (c *Conn) HandshakeContext(ctx context.Context) error {
 }
 
 func (c *Conn) handshakeContext(ctx context.Context) (ret error) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Warnf("handshake context panic: %v", err)
-			ret = fmt.Errorf("handshake context panic: %v", err)
-		}
-	}()
+	//defer func() {
+	//	if err := recover(); err != nil {
+	//		log.Warnf("handshake context panic: %v", err)
+	//		ret = fmt.Errorf("handshake context panic: %v", err)
+	//	}
+	//}()
 
 	// Fast sync/atomic-based exit if there is no handshake in flight and the
 	// last one succeeded without an error. Avoids the expensive context setup
@@ -1343,7 +1390,7 @@ func (c *Conn) handshakeContext(ctx context.Context) (ret error) {
 	defer c.in.Unlock()
 
 	if c.isClient {
-		c.handshakeErr = c.clientHandshake()
+		c.handshakeErr = c.clientHandshake(handshakeCtx)
 	} else {
 		if c.config.GMSupport == nil {
 			// TLS Only
@@ -1418,6 +1465,34 @@ func (c *Conn) ConnectionState() ConnectionState {
 		}
 	}
 
+	return state
+}
+
+func (c *Conn) connectionStateLocked() ConnectionState {
+	var state ConnectionState
+	state.HandshakeComplete = c.isHandshakeComplete.Load()
+	state.Version = c.vers
+	state.NegotiatedProtocol = c.clientProtocol
+	state.DidResume = c.didResume
+	state.NegotiatedProtocolIsMutual = true
+	state.ServerName = c.serverName
+	state.CipherSuite = c.cipherSuite
+	state.PeerCertificates = c.peerCertificates
+	state.VerifiedChains = c.verifiedChains
+	state.SignedCertificateTimestamps = c.scts
+	state.OCSPResponse = c.ocspResponse
+	if !c.didResume && c.vers != VersionTLS13 {
+		if c.clientFinishedIsFirst {
+			state.TLSUnique = c.clientFinished[:]
+		} else {
+			state.TLSUnique = c.serverFinished[:]
+		}
+	}
+	if c.config.Renegotiation != RenegotiateNever {
+		state.ekm = noExportedKeyingMaterial
+	} else {
+		state.ekm = c.ekm
+	}
 	return state
 }
 

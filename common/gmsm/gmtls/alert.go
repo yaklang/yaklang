@@ -26,30 +26,39 @@ const (
 )
 
 const (
-	alertCloseNotify            alert = 0
-	alertUnexpectedMessage      alert = 10
-	alertBadRecordMAC           alert = 20
-	alertDecryptionFailed       alert = 21
-	alertRecordOverflow         alert = 22
-	alertDecompressionFailure   alert = 30
-	alertHandshakeFailure       alert = 40
-	alertBadCertificate         alert = 42
-	alertUnsupportedCertificate alert = 43
-	alertCertificateRevoked     alert = 44
-	alertCertificateExpired     alert = 45
-	alertCertificateUnknown     alert = 46
-	alertIllegalParameter       alert = 47
-	alertUnknownCA              alert = 48
-	alertAccessDenied           alert = 49
-	alertDecodeError            alert = 50
-	alertDecryptError           alert = 51
-	alertProtocolVersion        alert = 70
-	alertInsufficientSecurity   alert = 71
-	alertInternalError          alert = 80
-	alertInappropriateFallback  alert = 86
-	alertUserCanceled           alert = 90
-	alertNoRenegotiation        alert = 100
-	alertNoApplicationProtocol  alert = 120
+	alertCloseNotify                  alert = 0
+	alertUnexpectedMessage            alert = 10
+	alertBadRecordMAC                 alert = 20
+	alertDecryptionFailed             alert = 21
+	alertRecordOverflow               alert = 22
+	alertDecompressionFailure         alert = 30
+	alertHandshakeFailure             alert = 40
+	alertBadCertificate               alert = 42
+	alertUnsupportedCertificate       alert = 43
+	alertCertificateRevoked           alert = 44
+	alertCertificateExpired           alert = 45
+	alertCertificateUnknown           alert = 46
+	alertIllegalParameter             alert = 47
+	alertUnknownCA                    alert = 48
+	alertAccessDenied                 alert = 49
+	alertDecodeError                  alert = 50
+	alertDecryptError                 alert = 51
+	alertProtocolVersion              alert = 70
+	alertInsufficientSecurity         alert = 71
+	alertInternalError                alert = 80
+	alertInappropriateFallback        alert = 86
+	alertUserCanceled                 alert = 90
+	alertNoRenegotiation              alert = 100
+	alertMissingExtension             alert = 109
+	alertUnsupportedExtension         alert = 110
+	alertCertificateUnobtainable      alert = 111
+	alertUnrecognizedName             alert = 112
+	alertBadCertificateStatusResponse alert = 113
+	alertBadCertificateHashValue      alert = 114
+	alertUnknownPSKIdentity           alert = 115
+	alertCertificateRequired          alert = 116
+	alertNoApplicationProtocol        alert = 120
+
 	//GMT0024
 	alertUnspporttedSite2Site alert = 200
 	alertNoArea               alert = 201
