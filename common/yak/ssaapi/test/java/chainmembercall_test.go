@@ -19,15 +19,23 @@ public class CommandInjectionServlet2 extends HttpServlet {
     }
 }
 `, func(prog *ssaapi.Program) error {
-		result, err := prog.SyntaxFlowWithError("\n" +
-			"getPara*() as $source;" +
-			"exec(* #{" +
-			"	until: `* ?{<self> & $source} as $vuln`,\n" +
-			"}->);" +
-			"$vuln<dataflow(<<<CODE\n" +
-			"*?{opcode: call}<getCaller>?{<name>?{have: concat}}(,* as $info) as $concat" +
-			"\nCODE)>\n" +
-			"check $concat; check $info; $info<show>")
+		rule := `
+getPara*() as $source;
+exec(* #{
+until: <<<UNTIL
+* ?{<self> & $source} as $vuln
+UNTIL
+}->);
+$vuln<dataflow(<<<CODE
+*?{opcode:call}<getCaller>?{<name>?{have:'concat'}}(,* as $a) as $concatA ;
+CODE)>
+$concatA<getCall><getCaller>(,* as $b) as $concatB;
+$concatB<getCall><getCaller>(,* as $c);
+$a + $b + $c as $info;
+$concatA + $concatB as $concat;
+check $concat; check $info; $info<show>
+`
+		result, err := prog.SyntaxFlowWithError(rule)
 		if err != nil {
 			t.Fatal(err)
 		}

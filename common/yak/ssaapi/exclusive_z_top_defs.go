@@ -44,7 +44,6 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	}
 
 	for _, def := range i.node.GetValues() {
-
 		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
@@ -160,9 +159,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		switch {
 		case isFunc && !fun.IsExtern():
-			callee := i.NewValue(fun)
+			callee := i.NewValue(fun).AppendEffectOn(i)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
-			callee.AppendEffectOn(i)
 			// The call will result in crossing the function boundary
 			actx.setCauseValue(i)
 			// inherit return index
@@ -170,19 +168,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if ok {
 				callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, val)
 			}
-			return callee.getTopDefs(actx, opt...).AppendEffectOn(callee)
+			return callee.getTopDefs(actx, opt...)
 		default:
-			callee := i.NewValue(calleeInst)
-			i.AppendDependOn(callee)
+			callee := i.NewValue(calleeInst).AppendEffectOn(i)
 			nodes := Values{callee}
 			for _, val := range inst.Args {
-				arg := i.NewValue(val)
-				i.AppendDependOn(arg)
+				arg := i.NewValue(val).AppendEffectOn(i)
 				nodes = append(nodes, arg)
 			}
 			for _, value := range inst.Binding {
-				arg := i.NewValue(value)
-				i.AppendDependOn(arg)
+				arg := i.NewValue(value).AppendEffectOn(i)
 				nodes = append(nodes, arg)
 			}
 			var results Values
@@ -190,7 +185,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				if subNode == nil {
 					continue
 				}
-				vals := subNode.getTopDefs(actx, opt...).AppendEffectOn(subNode)
+				vals := subNode.getTopDefs(actx, opt...)
 				results = append(results, vals...)
 			}
 			return results
@@ -276,7 +271,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		for _, child := range inst.GetPointer() {
 			handlerReturn(i.NewValue(child))
 		}
-		return vals.AppendEffectOn(i)
+		return vals
 	case *ssa.ParameterMember:
 		var vals Values
 		getParameter := func() Values {
@@ -307,7 +302,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return getParameter()
 			}
 			actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
-			traced := i.NewValue(actualParam).AppendEffectOn(called)
+			traced := i.NewValue(actualParam).AppendEffectOn(i)
 			if !actx.needCrossProcess(i, traced) {
 				return Values{}
 			}
@@ -338,7 +333,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if len(vals) == 0 {
 			return getParameter()
 		}
-		return vals.AppendEffectOn(i)
+		return vals
 	case *ssa.Parameter:
 		getCalledByValue := func(called *Value) Values {
 			if called == nil {
@@ -376,7 +371,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				}
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
-			traced := i.NewValue(actualParam).AppendEffectOn(called)
+			traced := i.NewValue(actualParam).AppendEffectOn(i)
 			if !actx.needCrossProcess(i, traced) {
 				return Values{}
 			}
@@ -412,12 +407,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		if len(vals) == 0 {
 			if i.IsFreeValue() && inst.GetDefault() != nil {
-				vals = append(vals, i.NewValue(inst.GetDefault()))
+				vals = append(vals, i.NewValue(inst.GetDefault()).AppendEffectOn(i))
 			} else {
 				vals = append(vals, i)
 			}
 		}
-		return vals.AppendEffectOn(i)
+		return vals
 	case *ssa.SideEffect:
 		callIns := inst.CallSite
 		if callIns != nil {

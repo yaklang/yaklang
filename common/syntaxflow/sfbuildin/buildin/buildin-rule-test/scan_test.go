@@ -185,7 +185,7 @@ func TestBuildInRule_Verify_DEBUG(t *testing.T) {
 	}
 
 	yakit.InitialDatabase()
-	ruleName := "php-exec-function.sf"
+	ruleName := "java-path-travel-directly.sf"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {

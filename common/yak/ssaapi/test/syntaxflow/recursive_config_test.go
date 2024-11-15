@@ -270,14 +270,8 @@ end:'end',
 )>as $result;
 			`,
 			map[string][]string{
-				"start": {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
-				// because function-filter just exclude the path:
-				// 1. cmd -> getCmd() -> binding-> function-filter ->param2
-				// 2. cmd -> getCmd() -> function-getCmd ->filter(param1) -> function-filter->param2
-				// but the path could not be excluded:
-				// cmd -> getCmd()-> function-getCmd-> param1
-				// therefore, the result "param2" is still reserved.
-				"result": {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
+				"start":  {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
+				"result": {"\"-al\"", "\"-l\"", "\"ls\"", "Parameter-param1", "Undefined-c1"},
 				"end":    {"phi(cmd)[\"ls-l\",Function-getCmd() binding[Function-filter]]"},
 			})
 	})
@@ -296,7 +290,7 @@ end:'end',
 			`,
 			map[string][]string{
 				"start":  {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
-				"result": {"\"-t\""},
+				"result": {"\"-t\"", "Parameter-param2"},
 				"end":    {"Function-getCmd"},
 			})
 	})
