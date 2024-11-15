@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -683,6 +684,20 @@ func (c *CliApp) LineDict(name string, opts ...SetCliExtraParam) []string {
 	return utils.ParseStringToLines(string(raw))
 }
 
+// JsonSchema 获取对应名称的命令行参数
+func (c *CliApp) Json(name string, opts ...SetCliExtraParam) map[string]any {
+	s, p := c._cliFromString(name, opts...)
+	p._type = "json"
+	var result map[string]any
+	err := json.Unmarshal([]byte(s), &result)
+	if err != nil {
+		c.paramInvalid.Set()
+		c.errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Invalid JSON: %s", p.optName, err.Error())
+		return nil
+	}
+	return result
+}
+
 // YakitPlugin 获取名称为 yakit-plugin-file 的命令行参数
 // 根据其传入的值读取其对应文件内容并根据"|"切割并返回 []string 类型，表示各个插件名
 // Example:
@@ -783,6 +798,10 @@ func (c *CliApp) SetSelectOption(name, value string) SetCliExtraParam {
 	return func(cep *cliExtraParams) {}
 }
 
+func (c *CliApp) SetJsonSchema(schema string) SetCliExtraParam {
+	return func(c *cliExtraParams) {}
+}
+
 func (c *CliApp) UI(opts ...UIParams) {
 }
 
@@ -861,6 +880,7 @@ var CliExports = map[string]interface{}{
 	"FolderName":    DefaultCliApp.FolderName,
 	"FileOrContent": DefaultCliApp.FileOrContent,
 	"LineDict":      DefaultCliApp.LineDict,
+	"Json":          DefaultCliApp.Json,
 
 	// 设置param属性
 	"setHelp":      DefaultCliApp.SetHelp,
@@ -875,6 +895,7 @@ var CliExports = map[string]interface{}{
 	"setMultipleSelect": DefaultCliApp.SetMultipleSelect,
 	// 设置下拉框选项 (只支持`cli.StringSlice`)
 	"setSelectOption": DefaultCliApp.SetSelectOption,
+	"setJsonSchema":   DefaultCliApp.SetJsonSchema,
 
 	// UI Info
 	"UI":           DefaultCliApp.UI,
