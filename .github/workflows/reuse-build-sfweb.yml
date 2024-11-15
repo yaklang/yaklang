@@ -10,8 +10,8 @@ on:
         options:
           - windows
           - windows7
-          - macos-amd64 
-          - macos-arm64
+          - darwin-amd64 
+          - darwin-arm64
           - linux-amd64
           - linux-arm64
   workflow_call:
@@ -44,7 +44,7 @@ jobs:
 
 
       - name: Download CrossBuild GCC(Linux x64 / MacOS x64)
-        if: inputs.os == 'linux-amd64' || inputs.os == 'macos-amd64'
+        if: inputs.os == 'linux-amd64' || inputs.os == 'darwin-amd64'
         run: |
           brew tap messense/macos-cross-toolchains
           brew install x86_64-unknown-linux-gnu
