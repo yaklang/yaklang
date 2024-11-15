@@ -1,10 +1,13 @@
 package rule
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math/rand"
+	"slices"
+	"sort"
 	"strings"
 )
 
@@ -141,7 +144,26 @@ func (p *PortRule) GetAvailablePort() uint32 {
 		}
 		count++
 	}
-
+	if p.Negative {
+		allPorts := []uint32{}
+		lo.ForEach(p.Rules, func(item *PortRule, index int) {
+			lo.ForEach(item.Ports, func(item int, index int) {
+				allPorts = append(allPorts, uint32(item))
+			})
+		})
+		sort.Slice(allPorts, func(i, j int) bool {
+			return allPorts[i] < allPorts[j]
+		})
+		if len(allPorts) > 0 {
+			for i := 0; i < 10000; i++ {
+				n := rand.Intn(65535-1000) + 1000
+				if !slices.Contains(allPorts, uint32(n)) {
+					return uint32(n)
+				}
+			}
+			return 0
+		}
+	}
 	return p.Rules[rand.Intn(len(p.Rules))].GetAvailablePort()
 }
 

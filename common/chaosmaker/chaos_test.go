@@ -3,6 +3,7 @@ package chaosmaker
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/google/gopacket/layers"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"strings"
@@ -344,6 +345,37 @@ func TestImportChaosRulesToFile(t *testing.T) {
 	rule.ImportRulesFromFile(consts.GetGormProfileDatabase(), "/tmp/chaosmaker.json.txt")
 }
 
+func TestGenerateBangPortTrafficBug(t *testing.T) {
+	for _, testcase := range []struct {
+		name    string
+		ruleStr string
+	}{
+		{
+			name:    "bangPortBug",
+			ruleStr: "alert http any any -> any !7001 (msg:\"Exploit CVE-2021-2109 on Oracle Weblogic Server\"; flow:to_server,established; content:\"/console/consolejndi.portal\"; startswith; http_uri; content:\"com.bea.console.handles.JndiBindingHandle\"; content:\"AdminServer\"; distance:2; reference:cve,CVE-2021-2109; classtype:web-application-attack; sid:20212109; rev:1;)",
+		},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			ruleStr := testcase.ruleStr
+			rules, err := surirule.Parse(ruleStr)
+			if err != nil {
+				panic(err)
+			}
+			var fRule []*rule.Storage
+			for _, r := range rules {
+				fRule = append(fRule, rule.NewRuleFromSuricata(r))
+			}
+			mk := NewChaosMaker()
+			mk.FeedRule(fRule...)
+			for traffic := range mk.Generate() {
+				packet := gopacket.NewPacket(traffic, layers.LayerTypeEthernet, gopacket.Default)
+				if packet.TransportLayer().TransportFlow().Dst().String() == "7001" {
+					t.Fatal("port 7001 should not be in the traffic")
+				}
+			}
+		})
+	}
+}
 func TestGenerateHttpTrafficBug(t *testing.T) {
 	for _, testcase := range []struct {
 		name    string
@@ -352,6 +384,10 @@ func TestGenerateHttpTrafficBug(t *testing.T) {
 		{
 			name:    "httpBug",
 			ruleStr: "alert http any any -> any 7001 (msg:\"Exploit CVE-2021-2109 on Oracle Weblogic Server\"; flow:to_server,established; content:\"/console/consolejndi.portal\"; startswith; http_uri; content:\"com.bea.console.handles.JndiBindingHandle\"; content:\"AdminServer\"; distance:2; reference:cve,CVE-2021-2109; classtype:web-application-attack; sid:20212109; rev:1;)",
+		},
+		{
+			name:    "bangPortBug",
+			ruleStr: "alert http any any -> any !7001 (msg:\"Exploit CVE-2021-2109 on Oracle Weblogic Server\"; flow:to_server,established; content:\"/console/consolejndi.portal\"; startswith; http_uri; content:\"com.bea.console.handles.JndiBindingHandle\"; content:\"AdminServer\"; distance:2; reference:cve,CVE-2021-2109; classtype:web-application-attack; sid:20212109; rev:1;)",
 		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
