@@ -123,7 +123,10 @@ type Conn struct {
 
 	tmp [16]byte
 
-	isHandshakeComplete atomic.Bool
+	// retryCount counts the number of consecutive non-advancing records
+	// received by Conn.readRecord. That is, records that neither advance the
+	// handshake, nor deliver application data. Protected by in.Mutex.
+	retryCount int
 }
 
 // Access to net.Conn methods.
@@ -172,6 +175,8 @@ type halfConn struct {
 	seq            [8]byte  // 64-bit sequence number
 	bfree          *block   // list of free blocks
 	additionalData [13]byte // to avoid allocs; interface method args escape
+
+	scratchBuf [13]byte // to avoid allocs; interface method args escape
 
 	nextCipher interface{} // next encryption state
 	nextMac    macFunction // next MAC algorithm
@@ -233,6 +238,30 @@ func (hc *halfConn) incSeq() {
 	// Instead, must renegotiate before it does.
 	// Not likely enough to bother.
 	panic("TLS: sequence number wraparound")
+}
+
+// explicitNonceLen returns the number of bytes of explicit nonce or IV included
+// in each record. Explicit nonces are present only in CBC modes after TLS 1.0
+// and in certain AEAD modes in TLS 1.2.
+func (hc *halfConn) explicitNonceLen() int {
+	if hc.cipher == nil {
+		return 0
+	}
+
+	switch c := hc.cipher.(type) {
+	case cipher.Stream:
+		return 0
+	case aead:
+		return c.explicitNonceLen()
+	case cbcMode:
+		// TLS 1.1 introduced a per-record explicit IV to fix the BEAST attack.
+		if hc.version >= VersionTLS11 {
+			return c.BlockSize()
+		}
+		return 0
+	default:
+		panic("unknown cipher type")
+	}
 }
 
 // extractPadding returns, in constant time, the length of the padding to remove
@@ -303,103 +332,142 @@ type cbcMode interface {
 // decrypt checks and strips the mac and decrypts the data in b. Returns a
 // success boolean, the number of bytes to skip from the start of the record in
 // order to get the application payload, and an optional alert value.
-func (hc *halfConn) decrypt(b *block) (ok bool, prefixLen int, alertValue alert) {
-	// pull out payload
-	payload := b.data[recordHeaderLen:]
+func (hc *halfConn) decrypt(record []byte) ([]byte, recordType, error) {
+	var plaintext []byte
+	typ := recordType(record[0])
+	payload := record[recordHeaderLen:]
 
-	macSize := 0
-	if hc.mac != nil {
-		macSize = hc.mac.Size()
+	// In TLS 1.3, change_cipher_spec messages are to be ignored without being
+	// decrypted. See RFC 8446, Appendix D.4.
+	if hc.version == VersionTLS13 && typ == recordTypeChangeCipherSpec {
+		return payload, typ, nil
 	}
 
 	paddingGood := byte(255)
 	paddingLen := 0
-	explicitIVLen := 0
 
-	// decrypt
+	explicitNonceLen := hc.explicitNonceLen()
+
 	if hc.cipher != nil {
 		switch c := hc.cipher.(type) {
 		case cipher.Stream:
 			c.XORKeyStream(payload, payload)
 		case aead:
-			explicitIVLen = c.explicitNonceLen()
-			if len(payload) < explicitIVLen {
-				return false, 0, alertBadRecordMAC
+			if len(payload) < explicitNonceLen {
+				return nil, 0, alertBadRecordMAC
 			}
-			nonce := payload[:explicitIVLen]
-			payload = payload[explicitIVLen:]
-
+			nonce := payload[:explicitNonceLen]
 			if len(nonce) == 0 {
 				nonce = hc.seq[:]
 			}
+			payload = payload[explicitNonceLen:]
 
-			copy(hc.additionalData[:], hc.seq[:])
-			copy(hc.additionalData[8:], b.data[:3])
-			n := len(payload) - c.Overhead()
-			hc.additionalData[11] = byte(n >> 8)
-			hc.additionalData[12] = byte(n)
-			var err error
-			payload, err = c.Open(payload[:0], nonce, payload, hc.additionalData[:])
-			if err != nil {
-				return false, 0, alertBadRecordMAC
+			var additionalData []byte
+			if hc.version == VersionTLS13 {
+				additionalData = record[:recordHeaderLen]
+			} else {
+				additionalData = append(hc.scratchBuf[:0], hc.seq[:]...)
+				additionalData = append(additionalData, record[:3]...)
+				n := len(payload) - c.Overhead()
+				additionalData = append(additionalData, byte(n>>8), byte(n))
 			}
-			b.resize(recordHeaderLen + explicitIVLen + len(payload))
+
+			var err error
+			plaintext, err = c.Open(payload[:0], nonce, payload, additionalData)
+			if err != nil {
+				return nil, 0, alertBadRecordMAC
+			}
 		case cbcMode:
 			blockSize := c.BlockSize()
-			if hc.version >= VersionTLS11 || hc.version == VersionGMSSL {
-				explicitIVLen = blockSize
+			minPayload := explicitNonceLen + roundUp(hc.mac.Size()+1, blockSize)
+			if len(payload)%blockSize != 0 || len(payload) < minPayload {
+				return nil, 0, alertBadRecordMAC
 			}
 
-			if len(payload)%blockSize != 0 || len(payload) < roundUp(explicitIVLen+macSize+1, blockSize) {
-				return false, 0, alertBadRecordMAC
-			}
-
-			if explicitIVLen > 0 {
-				c.SetIV(payload[:explicitIVLen])
-				payload = payload[explicitIVLen:]
+			if explicitNonceLen > 0 {
+				c.SetIV(payload[:explicitNonceLen])
+				payload = payload[explicitNonceLen:]
 			}
 			c.CryptBlocks(payload, payload)
-			if hc.version == VersionSSL30 {
-				paddingLen, paddingGood = extractPaddingSSL30(payload)
-			} else {
-				paddingLen, paddingGood = extractPadding(payload)
 
-				// To protect against CBC padding oracles like Lucky13, the data
-				// past paddingLen (which is secret) is passed to the MAC
-				// function as extra data, to be fed into the HMAC after
-				// computing the digest. This makes the MAC constant time as
-				// long as the digest computation is constant time and does not
-				// affect the subsequent write.
-			}
+			// In a limited attempt to protect against CBC padding oracles like
+			// Lucky13, the data past paddingLen (which is secret) is passed to
+			// the MAC function as extra data, to be fed into the HMAC after
+			// computing the digest. This makes the MAC roughly constant time as
+			// long as the digest computation is constant time and does not
+			// affect the subsequent write, modulo cache effects.
+			paddingLen, paddingGood = extractPadding(payload)
 		default:
 			panic("unknown cipher type")
 		}
+
+		if hc.version == VersionTLS13 {
+			if typ != recordTypeApplicationData {
+				return nil, 0, alertUnexpectedMessage
+			}
+			if len(plaintext) > maxPlaintext+1 {
+				return nil, 0, alertRecordOverflow
+			}
+			// Remove padding and find the ContentType scanning from the end.
+			for i := len(plaintext) - 1; i >= 0; i-- {
+				if plaintext[i] != 0 {
+					typ = recordType(plaintext[i])
+					plaintext = plaintext[:i]
+					break
+				}
+				if i == 0 {
+					return nil, 0, alertUnexpectedMessage
+				}
+			}
+		}
+	} else {
+		plaintext = payload
 	}
 
-	// check, strip mac
 	if hc.mac != nil {
+		macSize := hc.mac.Size()
 		if len(payload) < macSize {
-			return false, 0, alertBadRecordMAC
+			return nil, 0, alertBadRecordMAC
 		}
 
-		// strip mac off payload, b.data
 		n := len(payload) - macSize - paddingLen
 		n = subtle.ConstantTimeSelect(int(uint32(n)>>31), 0, n) // if n < 0 { n = 0 }
-		b.data[3] = byte(n >> 8)
-		b.data[4] = byte(n)
+		record[3] = byte(n >> 8)
+		record[4] = byte(n)
 		remoteMAC := payload[n : n+macSize]
-		localMAC := hc.mac.MAC(hc.inDigestBuf, hc.seq[0:], b.data[:recordHeaderLen], payload[:n], payload[n+macSize:])
+		localMAC := hc.mac.MAC(hc.scratchBuf[:0], hc.seq[:], record[:recordHeaderLen], payload[:n], payload[n+macSize:])
 
-		if subtle.ConstantTimeCompare(localMAC, remoteMAC) != 1 || paddingGood != 255 {
-			return false, 0, alertBadRecordMAC
+		// This is equivalent to checking the MACs and paddingGood
+		// separately, but in constant-time to prevent distinguishing
+		// padding failures from MAC failures. Depending on what value
+		// of paddingLen was returned on bad padding, distinguishing
+		// bad MAC from bad padding can lead to an attack.
+		//
+		// See also the logic at the end of extractPadding.
+		macAndPaddingGood := subtle.ConstantTimeCompare(localMAC, remoteMAC) & int(paddingGood)
+		if macAndPaddingGood != 1 {
+			return nil, 0, alertBadRecordMAC
 		}
-		hc.inDigestBuf = localMAC
 
-		b.resize(recordHeaderLen + explicitIVLen + n)
+		plaintext = payload[:n]
 	}
-	hc.incSeq()
 
-	return true, recordHeaderLen + explicitIVLen, 0
+	hc.incSeq()
+	return plaintext, typ, nil
+}
+
+// sliceForAppend extends the input slice by n bytes. head is the full extended
+// slice, while tail is the appended part. If the original slice has sufficient
+// capacity no allocation is performed.
+func sliceForAppend(in []byte, n int) (head, tail []byte) {
+	if total := len(in) + n; cap(in) >= total {
+		head = in[:total]
+	} else {
+		head = make([]byte, total)
+		copy(head, in)
+	}
+	tail = head[len(in):]
+	return
 }
 
 // padToBlockSize calculates the needed padding block, if any, for a payload.
@@ -419,63 +487,91 @@ func padToBlockSize(payload []byte, blockSize int) (prefix, finalBlock []byte) {
 	return
 }
 
-// encrypt encrypts and macs the data in b.
-func (hc *halfConn) encrypt(b *block, explicitIVLen int) (bool, alert) {
-	// mac
-	if hc.mac != nil {
-		mac := hc.mac.MAC(hc.outDigestBuf, hc.seq[0:], b.data[:recordHeaderLen], b.data[recordHeaderLen+explicitIVLen:], nil)
-
-		n := len(b.data)
-		b.resize(n + len(mac))
-		copy(b.data[n:], mac)
-		hc.outDigestBuf = mac
+// encrypt encrypts payload, adding the appropriate nonce and/or MAC, and
+// appends it to record, which must already contain the record header.
+func (hc *halfConn) encrypt(record, payload []byte, rand io.Reader) ([]byte, error) {
+	if hc.cipher == nil {
+		return append(record, payload...), nil
 	}
 
-	payload := b.data[recordHeaderLen:]
-
-	// encrypt
-	if hc.cipher != nil {
-		switch c := hc.cipher.(type) {
-		case cipher.Stream:
-			c.XORKeyStream(payload, payload)
-		case aead:
-			payloadLen := len(b.data) - recordHeaderLen - explicitIVLen
-			b.resize(len(b.data) + c.Overhead())
-			nonce := b.data[recordHeaderLen : recordHeaderLen+explicitIVLen]
-			if len(nonce) == 0 {
-				nonce = hc.seq[:]
+	var explicitNonce []byte
+	if explicitNonceLen := hc.explicitNonceLen(); explicitNonceLen > 0 {
+		record, explicitNonce = sliceForAppend(record, explicitNonceLen)
+		if _, isCBC := hc.cipher.(cbcMode); !isCBC && explicitNonceLen < 16 {
+			// The AES-GCM construction in TLS has an explicit nonce so that the
+			// nonce can be random. However, the nonce is only 8 bytes which is
+			// too small for a secure, random nonce. Therefore we use the
+			// sequence number as the nonce. The 3DES-CBC construction also has
+			// an 8 bytes nonce but its nonces must be unpredictable (see RFC
+			// 5246, Appendix F.3), forcing us to use randomness. That's not
+			// 3DES' biggest problem anyway because the birthday bound on block
+			// collision is reached first due to its similarly small block size
+			// (see the Sweet32 attack).
+			copy(explicitNonce, hc.seq[:])
+		} else {
+			if _, err := io.ReadFull(rand, explicitNonce); err != nil {
+				return nil, err
 			}
-			payload := b.data[recordHeaderLen+explicitIVLen:]
-			payload = payload[:payloadLen]
-
-			copy(hc.additionalData[:], hc.seq[:])
-			copy(hc.additionalData[8:], b.data[:3])
-			hc.additionalData[11] = byte(payloadLen >> 8)
-			hc.additionalData[12] = byte(payloadLen)
-
-			c.Seal(payload[:0], nonce, payload, hc.additionalData[:])
-		case cbcMode:
-			blockSize := c.BlockSize()
-			if explicitIVLen > 0 {
-				c.SetIV(payload[:explicitIVLen])
-				payload = payload[explicitIVLen:]
-			}
-			prefix, finalBlock := padToBlockSize(payload, blockSize)
-			b.resize(recordHeaderLen + explicitIVLen + len(prefix) + len(finalBlock))
-			c.CryptBlocks(b.data[recordHeaderLen+explicitIVLen:], prefix)
-			c.CryptBlocks(b.data[recordHeaderLen+explicitIVLen+len(prefix):], finalBlock)
-		default:
-			panic("unknown cipher type")
 		}
 	}
 
-	// update length to include MAC and any block padding needed.
-	n := len(b.data) - recordHeaderLen
-	b.data[3] = byte(n >> 8)
-	b.data[4] = byte(n)
+	var dst []byte
+	switch c := hc.cipher.(type) {
+	case cipher.Stream:
+		mac := hc.mac.MAC(hc.scratchBuf[:0], hc.seq[:], record[:recordHeaderLen], payload, nil)
+		record, dst = sliceForAppend(record, len(payload)+len(mac))
+		c.XORKeyStream(dst[:len(payload)], payload)
+		c.XORKeyStream(dst[len(payload):], mac)
+	case aead:
+		nonce := explicitNonce
+		if len(nonce) == 0 {
+			nonce = hc.seq[:]
+		}
+
+		if hc.version == VersionTLS13 {
+			record = append(record, payload...)
+
+			// Encrypt the actual ContentType and replace the plaintext one.
+			record = append(record, record[0])
+			record[0] = byte(recordTypeApplicationData)
+
+			n := len(payload) + 1 + c.Overhead()
+			record[3] = byte(n >> 8)
+			record[4] = byte(n)
+
+			record = c.Seal(record[:recordHeaderLen],
+				nonce, record[recordHeaderLen:], record[:recordHeaderLen])
+		} else {
+			additionalData := append(hc.scratchBuf[:0], hc.seq[:]...)
+			additionalData = append(additionalData, record[:recordHeaderLen]...)
+			record = c.Seal(record, nonce, payload, additionalData)
+		}
+	case cbcMode:
+		mac := hc.mac.MAC(hc.scratchBuf[:0], hc.seq[:], record[:recordHeaderLen], payload, nil)
+		blockSize := c.BlockSize()
+		plaintextLen := len(payload) + len(mac)
+		paddingLen := blockSize - plaintextLen%blockSize
+		record, dst = sliceForAppend(record, plaintextLen+paddingLen)
+		copy(dst, payload)
+		copy(dst[len(payload):], mac)
+		for i := plaintextLen; i < len(dst); i++ {
+			dst[i] = byte(paddingLen - 1)
+		}
+		if len(explicitNonce) > 0 {
+			c.SetIV(explicitNonce)
+		}
+		c.CryptBlocks(dst, dst)
+	default:
+		panic("unknown cipher type")
+	}
+
+	// Update length to include nonce, MAC and any block padding needed.
+	n := len(record) - recordHeaderLen
+	record[3] = byte(n >> 8)
+	record[4] = byte(n)
 	hc.incSeq()
 
-	return true, 0
+	return record, nil
 }
 
 // A block is a simple data buffer.
@@ -593,6 +689,15 @@ func (c *Conn) newRecordHeaderError(msg string) (err RecordHeaderError) {
 	return err
 }
 
+func (c *Conn) retryReadRecord(wantType recordType) error {
+	c.retryCount++
+	if c.retryCount > maxUselessRecords {
+		c.sendAlert(alertUnexpectedMessage)
+		return c.in.setErrorLocked(errors.New("tls: too many ignored records"))
+	}
+	return c.readRecord(wantType)
+}
+
 // readRecord reads the next TLS record from the connection
 // and updates the record layer state.
 func (c *Conn) readRecord(want recordType) error {
@@ -647,7 +752,7 @@ Again:
 
 	vers := uint16(b.data[1])<<8 | uint16(b.data[2])
 	n := int(b.data[3])<<8 | int(b.data[4])
-	if c.haveVers && vers != c.vers {
+	if c.haveVers && c.vers != VersionTLS13 && vers != c.vers {
 		c.sendAlert(alertProtocolVersion)
 		msg := fmt.Sprintf("received record with version %x when expecting version %x", vers, c.vers)
 		return c.in.setErrorLocked(c.newRecordHeaderError(msg))
@@ -679,22 +784,22 @@ Again:
 
 	// Process message.
 	b, c.rawInput = c.in.splitBlock(b, recordHeaderLen+n)
-	ok, off, alertValue := c.in.decrypt(b)
-	if !ok {
-		c.in.freeBlock(b)
-		return c.in.setErrorLocked(c.sendAlert(alertValue))
+	data, typ, err := c.in.decrypt(b.data)
+	if err != nil {
+		return c.in.setErrorLocked(c.sendAlert(err.(alert)))
 	}
-	b.off = off
-	data := b.data[b.off:]
 	if len(data) > maxPlaintext {
-		err := c.sendAlert(alertRecordOverflow)
-		c.in.freeBlock(b)
-		return c.in.setErrorLocked(err)
+		return c.in.setErrorLocked(c.sendAlert(alertRecordOverflow))
 	}
 
-	if typ != recordTypeAlert && len(data) > 0 {
-		// this is a valid non-alert message: reset the count of alerts
-		c.warnCount = 0
+	// Application Data messages are always protected.
+	if c.in.cipher == nil && typ == recordTypeApplicationData {
+		return c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
+	}
+
+	// Handshake messages MUST NOT be interleaved with other record types in TLS 1.3.
+	if c.vers == VersionTLS13 && typ != recordTypeHandshake && c.hand.Len() > 0 {
+		return c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
 	}
 
 	switch typ {
@@ -729,8 +834,8 @@ Again:
 		}
 
 	case recordTypeChangeCipherSpec:
-		if typ != want || len(data) != 1 || data[0] != 1 {
-			c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
+		if len(data) != 1 || data[0] != 1 {
+			c.in.setErrorLocked(c.sendAlert(alertDecodeError))
 			break
 		}
 		// Handshake messages are not allowed to fragment across the CCS
@@ -738,6 +843,11 @@ Again:
 			c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
 			break
 		}
+
+		if c.vers == VersionTLS13 {
+			return c.retryReadRecord(want)
+		}
+
 		err := c.in.changeCipherSpec()
 		if err != nil {
 			c.in.setErrorLocked(c.sendAlert(err.(alert)))
@@ -821,7 +931,7 @@ const (
 //
 // In the interests of simplicity and determinism, this code does not attempt
 // to reset the record size once the connection is idle, however.
-func (c *Conn) maxPayloadSizeForWrite(typ recordType, explicitIVLen int) int {
+func (c *Conn) maxPayloadSizeForWrite(typ recordType) int {
 	if c.config.DynamicRecordSizingDisabled || typ != recordTypeApplicationData {
 		return maxPlaintext
 	}
@@ -836,7 +946,7 @@ func (c *Conn) maxPayloadSizeForWrite(typ recordType, explicitIVLen int) int {
 		macSize = c.out.mac.Size()
 	}
 
-	payloadBytes := tcpMSSEstimate - recordHeaderLen - explicitIVLen
+	payloadBytes := tcpMSSEstimate - recordHeaderLen - c.out.explicitNonceLen()
 	if c.out.cipher != nil {
 		switch ciph := c.out.cipher.(type) {
 		case cipher.Stream:
@@ -893,73 +1003,74 @@ func (c *Conn) flush() (int, error) {
 	return n, err
 }
 
+// writeChangeCipherRecord writes a ChangeCipherSpec message to the connection and
+// updates the record layer state.
+func (c *Conn) writeChangeCipherRecord() error {
+	c.out.Lock()
+	defer c.out.Unlock()
+	_, err := c.writeRecordLocked(recordTypeChangeCipherSpec, []byte{1})
+	return err
+}
+
+// outBufPool pools the record-sized scratch buffers used by writeRecordLocked.
+var outBufPool = sync.Pool{
+	New: func() any {
+		return new([]byte)
+	},
+}
+
 // writeRecordLocked writes a TLS record with the given type and payload to the
 // connection and updates the record layer state.
 func (c *Conn) writeRecordLocked(typ recordType, data []byte) (int, error) {
-	b := c.out.newBlock()
-	defer c.out.freeBlock(b)
+	outBufPtr := outBufPool.Get().(*[]byte)
+	outBuf := *outBufPtr
+	defer func() {
+		// You might be tempted to simplify this by just passing &outBuf to Put,
+		// but that would make the local copy of the outBuf slice header escape
+		// to the heap, causing an allocation. Instead, we keep around the
+		// pointer to the slice header returned by Get, which is already on the
+		// heap, and overwrite and return that.
+		*outBufPtr = outBuf
+		outBufPool.Put(outBufPtr)
+	}()
 
 	var n int
 	for len(data) > 0 {
-		explicitIVLen := 0
-		explicitIVIsSeq := false
-
-		var cbc cbcMode
-		if c.out.version >= VersionTLS11 || c.out.version == VersionGMSSL {
-			var ok bool
-			if cbc, ok = c.out.cipher.(cbcMode); ok {
-				explicitIVLen = cbc.BlockSize()
-			}
-		}
-		if explicitIVLen == 0 {
-			if c, ok := c.out.cipher.(aead); ok {
-				explicitIVLen = c.explicitNonceLen()
-
-				// The AES-GCM construction in TLS has an
-				// explicit nonce so that the nonce can be
-				// random. However, the nonce is only 8 bytes
-				// which is too small for a secure, random
-				// nonce. Therefore we use the sequence number
-				// as the nonce.
-				explicitIVIsSeq = explicitIVLen > 0
-			}
-		}
 		m := len(data)
-		if maxPayload := c.maxPayloadSizeForWrite(typ, explicitIVLen); m > maxPayload {
+		if maxPayload := c.maxPayloadSizeForWrite(typ); m > maxPayload {
 			m = maxPayload
 		}
-		b.resize(recordHeaderLen + explicitIVLen + m)
-		b.data[0] = byte(typ)
+
+		_, outBuf = sliceForAppend(outBuf[:0], recordHeaderLen)
+		outBuf[0] = byte(typ)
 		vers := c.vers
 		if vers == 0 {
 			// Some TLS servers fail if the record version is
 			// greater than TLS 1.0 for the initial ClientHello.
 			vers = VersionTLS10
+		} else if vers == VersionTLS13 {
+			// TLS 1.3 froze the record layer version to 1.2.
+			// See RFC 8446, Section 5.1.
+			vers = VersionTLS12
 		}
-		b.data[1] = byte(vers >> 8)
-		b.data[2] = byte(vers)
-		b.data[3] = byte(m >> 8)
-		b.data[4] = byte(m)
-		if explicitIVLen > 0 {
-			explicitIV := b.data[recordHeaderLen : recordHeaderLen+explicitIVLen]
-			if explicitIVIsSeq {
-				copy(explicitIV, c.out.seq[:])
-			} else {
-				if _, err := io.ReadFull(c.config.rand(), explicitIV); err != nil {
-					return n, err
-				}
-			}
+		outBuf[1] = byte(vers >> 8)
+		outBuf[2] = byte(vers)
+		outBuf[3] = byte(m >> 8)
+		outBuf[4] = byte(m)
+
+		var err error
+		outBuf, err = c.out.encrypt(outBuf, data[:m], c.config.rand())
+		if err != nil {
+			return n, err
 		}
-		copy(b.data[recordHeaderLen+explicitIVLen:], data)
-		c.out.encrypt(b, explicitIVLen)
-		if _, err := c.write(b.data); err != nil {
+		if _, err := c.write(outBuf); err != nil {
 			return n, err
 		}
 		n += m
 		data = data[m:]
 	}
 
-	if typ == recordTypeChangeCipherSpec {
+	if typ == recordTypeChangeCipherSpec && c.vers != VersionTLS13 {
 		if err := c.out.changeCipherSpec(); err != nil {
 			return n, c.sendAlertLocked(err.(alert))
 		}
@@ -1034,9 +1145,17 @@ func (c *Conn) readHandshakeEx(transcript transcriptHash) (interface{}, error) {
 	case typeServerHello:
 		m = new(serverHelloMsg)
 	case typeNewSessionTicket:
-		m = new(newSessionTicketMsg)
+		if c.vers == VersionTLS13 {
+			m = new(newSessionTicketMsgTLS13)
+		} else {
+			m = new(newSessionTicketMsg)
+		}
 	case typeCertificate:
-		m = new(certificateMsg)
+		if c.vers == VersionTLS13 {
+			m = new(certificateMsgTLS13)
+		} else {
+			m = new(certificateMsg)
+		}
 	case typeCertificateRequest:
 		if c.config.GMSupport != nil {
 			m = &certificateRequestMsgGM{}
@@ -1061,6 +1180,12 @@ func (c *Conn) readHandshakeEx(transcript transcriptHash) (interface{}, error) {
 		m = new(nextProtoMsg)
 	case typeFinished:
 		m = new(finishedMsg)
+	case typeEncryptedExtensions:
+		m = new(encryptedExtensionsMsg)
+	case typeEndOfEarlyData:
+		m = new(endOfEarlyDataMsg)
+	case typeKeyUpdate:
+		m = new(keyUpdateMsg)
 	default:
 		return nil, c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
 	}
@@ -1211,7 +1336,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 			if c.hand.Len() > 0 {
 				// We received handshake bytes, indicating the
 				// start of a renegotiation.
-				if err := c.handleRenegotiation(); err != nil {
+				if err := c.handlePostHandshakeMessage(); err != nil {
 					return 0, err
 				}
 			}
@@ -1470,7 +1595,7 @@ func (c *Conn) ConnectionState() ConnectionState {
 
 func (c *Conn) connectionStateLocked() ConnectionState {
 	var state ConnectionState
-	state.HandshakeComplete = c.isHandshakeComplete.Load()
+	state.HandshakeComplete = c.handshakeComplete()
 	state.Version = c.vers
 	state.NegotiatedProtocol = c.clientProtocol
 	state.DidResume = c.didResume
@@ -1525,4 +1650,106 @@ func (c *Conn) VerifyHostname(host string) error {
 
 func (c *Conn) handshakeComplete() bool {
 	return atomic.LoadUint32(&c.handshakeStatus) == 1
+}
+
+func (c *Conn) handleNewSessionTicket(msg *newSessionTicketMsgTLS13) error {
+	if !c.isClient {
+		c.sendAlert(alertUnexpectedMessage)
+		return errors.New("tls: received new session ticket from a client")
+	}
+
+	if c.config.SessionTicketsDisabled || c.config.ClientSessionCache == nil {
+		return nil
+	}
+
+	// See RFC 8446, Section 4.6.1.
+	if msg.lifetime == 0 {
+		return nil
+	}
+	lifetime := time.Duration(msg.lifetime) * time.Second
+	if lifetime > maxSessionTicketLifetime {
+		c.sendAlert(alertIllegalParameter)
+		return errors.New("tls: received a session ticket with invalid lifetime")
+	}
+
+	cipherSuite := cipherSuiteTLS13ByID(c.cipherSuite)
+	if cipherSuite == nil || c.resumptionSecret == nil {
+		return c.sendAlert(alertInternalError)
+	}
+
+	// Save the resumption_master_secret and nonce instead of deriving the PSK
+	// to do the least amount of work on NewSessionTicket messages before we
+	// know if the ticket will be used. Forward secrecy of resumed connections
+	// is guaranteed by the requirement for pskModeDHE.
+	session := &ClientSessionState{
+		sessionTicket:      msg.label,
+		vers:               c.vers,
+		cipherSuite:        c.cipherSuite,
+		masterSecret:       c.resumptionSecret,
+		serverCertificates: c.peerCertificates,
+		verifiedChains:     c.verifiedChains,
+		receivedAt:         c.config.time(),
+		nonce:              msg.nonce,
+		useBy:              c.config.time().Add(lifetime),
+		ageAdd:             msg.ageAdd,
+		ocspResponse:       c.ocspResponse,
+		scts:               c.scts,
+	}
+
+	cacheKey := clientSessionCacheKey(c.conn.RemoteAddr(), c.config)
+	c.config.ClientSessionCache.Put(cacheKey, session)
+
+	return nil
+}
+
+func (c *Conn) handleKeyUpdate(keyUpdate *keyUpdateMsg) error {
+	cipherSuite := cipherSuiteTLS13ByID(c.cipherSuite)
+	if cipherSuite == nil {
+		return c.in.setErrorLocked(c.sendAlert(alertInternalError))
+	}
+
+	newSecret := cipherSuite.nextTrafficSecret(c.in.trafficSecret)
+	c.in.setTrafficSecret(cipherSuite, newSecret)
+
+	if keyUpdate.updateRequested {
+		c.out.Lock()
+		defer c.out.Unlock()
+
+		msg := &keyUpdateMsg{}
+		msgBytes := msg.marshal()
+		_, err := c.writeRecordLocked(recordTypeHandshake, msgBytes)
+		if err != nil {
+			// Surface the error at the next write.
+			c.out.setErrorLocked(err)
+			return nil
+		}
+
+		newSecret := cipherSuite.nextTrafficSecret(c.out.trafficSecret)
+		c.out.setTrafficSecret(cipherSuite, newSecret)
+	}
+
+	return nil
+}
+
+// handlePostHandshakeMessage processes a handshake message arrived after the
+// handshake is complete. Up to TLS 1.2, it indicates the start of a renegotiation.
+func (c *Conn) handlePostHandshakeMessage() error {
+	if c.vers != VersionTLS13 {
+		return c.handleRenegotiation()
+	}
+
+	msg, err := c.readHandshake()
+	if err != nil {
+		return err
+	}
+
+	switch msg := msg.(type) {
+	case *newSessionTicketMsgTLS13:
+		return c.handleNewSessionTicket(msg)
+	case *keyUpdateMsg:
+		return c.handleKeyUpdate(msg)
+	default:
+		c.sendAlert(alertUnexpectedMessage)
+		return fmt.Errorf("tls: received unexpected handshake message of type %T", msg)
+	}
 }

@@ -13,6 +13,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"hash"
+	"sync/atomic"
 	"time"
 )
 
@@ -109,7 +110,7 @@ func (hs *clientHandshakeStateTLS13) handshake() error {
 		return err
 	}
 
-	c.isHandshakeComplete.Store(true)
+	atomic.StoreUint32(&c.handshakeStatus, 1)
 
 	return nil
 }
@@ -182,10 +183,7 @@ func (hs *clientHandshakeStateTLS13) sendDummyChangeCipherSpec() error {
 	}
 	hs.sentDummyCCS = true
 
-	hs.c.out.Lock()
-	_, err := hs.c.writeRecordLocked(recordTypeChangeCipherSpec, []byte{1})
-	hs.c.out.Unlock()
-	return err
+	return hs.c.writeChangeCipherRecord()
 }
 
 // processHelloRetryRequest handles the HRR in hs.serverHello, modifies and
@@ -659,56 +657,6 @@ func (hs *clientHandshakeStateTLS13) sendClientFinished() error {
 		c.resumptionSecret = hs.suite.deriveSecret(hs.masterSecret,
 			resumptionLabel, hs.transcript)
 	}
-
-	return nil
-}
-
-func (c *Conn) handleNewSessionTicket(msg *newSessionTicketMsgTLS13) error {
-	if !c.isClient {
-		c.sendAlert(alertUnexpectedMessage)
-		return errors.New("tls: received new session ticket from a client")
-	}
-
-	if c.config.SessionTicketsDisabled || c.config.ClientSessionCache == nil {
-		return nil
-	}
-
-	// See RFC 8446, Section 4.6.1.
-	if msg.lifetime == 0 {
-		return nil
-	}
-	lifetime := time.Duration(msg.lifetime) * time.Second
-	if lifetime > maxSessionTicketLifetime {
-		c.sendAlert(alertIllegalParameter)
-		return errors.New("tls: received a session ticket with invalid lifetime")
-	}
-
-	cipherSuite := cipherSuiteTLS13ByID(c.cipherSuite)
-	if cipherSuite == nil || c.resumptionSecret == nil {
-		return c.sendAlert(alertInternalError)
-	}
-
-	// Save the resumption_master_secret and nonce instead of deriving the PSK
-	// to do the least amount of work on NewSessionTicket messages before we
-	// know if the ticket will be used. Forward secrecy of resumed connections
-	// is guaranteed by the requirement for pskModeDHE.
-	session := &ClientSessionState{
-		sessionTicket:      msg.label,
-		vers:               c.vers,
-		cipherSuite:        c.cipherSuite,
-		masterSecret:       c.resumptionSecret,
-		serverCertificates: c.peerCertificates,
-		verifiedChains:     c.verifiedChains,
-		receivedAt:         c.config.time(),
-		nonce:              msg.nonce,
-		useBy:              c.config.time().Add(lifetime),
-		ageAdd:             msg.ageAdd,
-		ocspResponse:       c.ocspResponse,
-		scts:               c.scts,
-	}
-
-	cacheKey := clientSessionCacheKey(c.conn.RemoteAddr(), c.config)
-	c.config.ClientSessionCache.Put(cacheKey, session)
 
 	return nil
 }
