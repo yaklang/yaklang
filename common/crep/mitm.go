@@ -228,6 +228,7 @@ type MITMServer struct {
 	gmPrefer              bool
 	gmOnly                bool
 	forceDisableKeepAlive bool
+	findProcessName       bool
 
 	clientCerts []*ClientCertificationPair
 
@@ -335,6 +336,7 @@ func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string,
 	m.proxy.SetGMPrefer(m.gmPrefer)
 	m.proxy.SetGMOnly(m.gmOnly)
 	m.proxy.SetHTTPForceClose(m.forceDisableKeepAlive)
+	m.proxy.SetFindProcessName(m.findProcessName)
 
 	m.proxy.SetMITM(m.mitmConfig)
 

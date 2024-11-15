@@ -45,8 +45,9 @@ type HTTPFlow struct {
 	// 用来计算 websocket hash, 每次连接都不一样，一般来说，内部对象 req 指针足够了
 	WebsocketHash string
 
-	RuntimeId  string
-	FromPlugin string
+	RuntimeId   string
+	FromPlugin  string
+	ProcessName string
 
 	// friendly for gorm build instance, not for store
 	// 这两个字段不参与数据库存储，但是在序列化的时候，会被覆盖

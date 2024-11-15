@@ -6,16 +6,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/consts"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -1476,6 +1478,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		startCreateFlow = time.Now()
+		// 额外，获取进程名
+		if name := httpctx.GetProcessName(req); name != "" {
+			flow.ProcessName = filepath.Base(name)
+		}
 
 		flow.Hash = flow.CalcHash()
 		if isViewed {
@@ -1502,12 +1508,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		hijackedFlowMutex := new(sync.Mutex)
 		isDroppedSaveFlow := utils.NewBool(false)
 
-		pluginFinishCh := make(chan struct{})
+		pluginCh := make(chan struct{})
 		mitmPluginCaller.HijackSaveHTTPFlowEx(
 			pluginCtx,
 			flow,
 			func() {
-				close(pluginFinishCh)
+				close(pluginCh)
 			},
 			func(replaced *schema.HTTPFlow) {
 				if replaced == nil {
@@ -1527,14 +1533,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// storage
 		flow.Hash = flow.CalcHash()
 		startCreateFlow = time.Now()
-		colorOK := make(chan struct{})
-
+		colorCh := make(chan struct{})
 		var extracted []*schema.ExtractedData
+
 		// replacer hook color
 		if replacer != nil {
 			go func() {
 				extracted = replacer.hookColor(plainRequest, plainResponse, req, flow)
-				close(colorOK)
+				close(colorCh)
 				for _, e := range extracted {
 					err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
 					if err != nil {
@@ -1543,20 +1549,20 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 			}()
 		} else {
-			close(colorOK)
+			close(colorCh)
 		}
 
 		var needUpdate bool
 		timeoutCtx, timeCancel := context.WithTimeout(ctx, 300*time.Millisecond)
 		defer timeCancel()
 		select {
-		case <-colorOK:
+		case <-colorCh:
 		case <-timeoutCtx.Done(): // wait for max 300ms
 			needUpdate = true
 		}
 
 		select {
-		case <-pluginFinishCh:
+		case <-pluginCh:
 		case <-timeoutCtx.Done(): // wait for max 300ms
 			needUpdate = true
 		}
@@ -1575,8 +1581,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				log.Errorf("create / save httpflow from mirror error: %s", err)
 			} else if needUpdate {
 				go func() {
-					<-colorOK
-					<-pluginFinishCh
+					<-colorCh
+					<-pluginCh
 					if tags != flow.Tags {
 						err := yakit.UpdateHTTPFlowTagsEx(flow)
 						if err != nil {
@@ -1610,11 +1616,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		crep.MITM_SetGM(enableGMTLS),
 		crep.MITM_SetGMPrefer(preferGMTLS),
 		crep.MITM_SetGMOnly(onlyGMTLS),
+		crep.MITM_SetFindProcessName(true),
 		crep.MITM_SetDNSServers(dnsServers...),
 		crep.MITM_SetHostMapping(hostMapping),
 		crep.MITM_SetHTTPForceClose(forceDisableKeepAlive))
 
-	//如果 mitm 启动时进行设置，优先使用mitm中的设置
+	// 如果 mitm 启动时进行设置，优先使用mitm中的设置
 	if firstReq.GetMaxContentLength() != 0 && firstReq.GetMaxContentLength() <= 10*1024*1024 {
 		opts = append(opts, crep.MITM_SetMaxContentLength(firstReq.GetMaxContentLength()))
 	}

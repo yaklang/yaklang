@@ -270,6 +270,7 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseHijackedBytes        = "responseHijackedBytes"
 	REQUEST_CONTEXT_KEY_RequestIsStrippedGzip        = "requestIsStrippedGzip"
 	RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest = "shouldBeHijackedFromRequest"
+	REQUEST_CONTEXT_KEY_ProcessName                  = "ProcessName"
 	REQUEST_CONTEXT_KEY_ConnectedTo                  = "connectedTo"
 	REQUEST_CONTEXT_KEY_ConnectedToPort              = "connectedToPort"
 	REQUEST_CONTEXT_KEY_ConnectedToHost              = "connectedToHost"
@@ -687,4 +688,12 @@ func GetPluginContext(r *http.Request) context.Context {
 		return c
 	}
 	return nil
+}
+
+func SetProcessName(r *http.Request, name string) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ProcessName, name)
+}
+
+func GetProcessName(r *http.Request) string {
+	return GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_ProcessName)
 }
