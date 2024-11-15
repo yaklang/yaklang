@@ -81,6 +81,7 @@ func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 			Group:        param.Group,
 			ExtraSetting: string(extra),
 			MethodType:   param.MethodType,
+			JsonSchema:   param.JsonSchema,
 		})
 	}
 
@@ -268,6 +269,14 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 			cliFunction = "LineDict"
 			if para.DefaultValue != "" {
 				cliDefault = fmt.Sprintf("cli.setDefault(%#v)", para.DefaultValue)
+			}
+		case "json":
+			cliFunction = "Json"
+			if para.DefaultValue != "" {
+				cliDefault = fmt.Sprintf("cli.setDefault(%#v)", para.DefaultValue)
+			}
+			if para.JsonSchema != "" {
+				Option = append(Option, fmt.Sprintf(`cli.setJsonSchema(%#v)`, para.JsonSchema))
 			}
 		default:
 			// cliFunction = "Undefine-" + para.TypeVerbose

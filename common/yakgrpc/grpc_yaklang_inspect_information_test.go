@@ -210,6 +210,73 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 			t,
 		)
 	})
+
+	t.Run("cli json schema", func(t *testing.T) {
+		json := `
+{
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "local",
+        "compression",
+        "git",
+        "svn",
+        "jar"
+      ],
+      "default": "local"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "local"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "local_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "local_path"
+        ]
+      }
+    },
+    {
+    // add other kind in this 
+    }
+    {
+      "required": [
+        "kind"
+      ]
+    }
+  ],
+}
+		`
+		check(fmt.Sprintf(`
+	cli.Json("a", cli.setJsonSchema(<<<JSON
+%s
+JSON))
+		`, json),
+
+			[]*ypb.YakScriptParam{
+				{
+					Field:        "a",
+					TypeVerbose:  "json",
+					MethodType:   "json",
+					FieldVerbose: "a",
+					JsonSchema:   json,
+				},
+			},
+			t,
+		)
+	})
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli_UI(t *testing.T) {
@@ -377,6 +444,72 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliCode(t *testing.T) {
 				},
 			},
 		)
+	})
+
+	t.Run("cli json schema", func(t *testing.T) {
+		json := `
+{
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "local",
+        "compression",
+        "git",
+        "svn",
+        "jar"
+      ],
+      "default": "local"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "local"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "local_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "local_path"
+        ]
+      }
+    },
+    {
+    // add other kind in this 
+    }
+    {
+      "required": [
+        "kind"
+      ]
+    }
+  ],
+
+}
+		`
+
+		check(t, []*ypb.YakScriptParam{
+			{
+				Field:        "a",
+				DefaultValue: "",
+				TypeVerbose:  "json",
+				FieldVerbose: "aa",
+				Help:         "",
+				Required:     false,
+				Group:        "",
+				ExtraSetting: "",
+				MethodType:   "json",
+				JsonSchema:   json,
+			},
+		})
 	})
 }
 

@@ -209,6 +209,7 @@ func RuleCliDefault(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 	checkCliDefault("cli.HTTPPacket", []*ssaapi.Type{ssaapi.String}, nil)
 	checkCliDefault("cli.YakCode", []*ssaapi.Type{ssaapi.String}, nil)
 	checkCliDefault("cli.Text", []*ssaapi.Type{ssaapi.String}, nil)
+	checkCliDefault("cli.Json", []*ssaapi.Type{ssaapi.String}, nil)
 	return ret
 }
 
@@ -240,6 +241,7 @@ func RuleCliParamName(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 		"cli.Have",
 		"cli.YakCode",
 		"cli.Text",
+		"cli.Json",
 	}
 
 	paramLineMap := make(map[string]int)
@@ -298,6 +300,7 @@ func RuleCliCheck(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 		"cli.YakCode",
 		"cli.Text",
 		"cli.UI",
+		"cli.Json",
 	}
 
 	var (
