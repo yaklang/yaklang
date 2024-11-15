@@ -499,9 +499,8 @@ func (hs *clientHandshakeStateGM) processServerHello() (bool, error) {
 func (hs *clientHandshakeStateGM) readFinished(out []byte) error {
 	c := hs.c
 
-	c.readRecord(recordTypeChangeCipherSpec)
-	if c.in.err != nil {
-		return c.in.err
+	if err := c.readChangeCipherSpec(); err != nil {
+		return err
 	}
 
 	msg, err := c.readHandshake()

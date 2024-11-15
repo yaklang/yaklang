@@ -224,6 +224,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		switch strategy {
 		case TLS_Strategy_Ordinary:
 			tlsConfig.GMSupport = nil
+			tlsConfig.MaxVersion = gmtls.VersionTLS12
 		case TLS_Strategy_GMDail:
 			tlsConfig.GMSupport = &gmtls.GMSupport{
 				WorkMode: gmtls.ModeGMSSLOnly,

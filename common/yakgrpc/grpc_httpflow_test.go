@@ -538,15 +538,15 @@ Host: %s
 		}
 	}
 
-	responses, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+	responses, err := QueryHTTPFlows(utils.TimeoutContextSeconds(5), client, &ypb.QueryHTTPFlowRequest{
 		Pagination: &ypb.Paging{
 			Page:  1,
 			Limit: 100,
 		},
 		RuntimeId:   runtimeID,
 		WithPayload: true,
-	})
-	require.Len(t, responses.Data, 2, "should have 2 httpflows")
+	}, 2)
+	require.NoError(t, err)
 	require.ElementsMatch(t,
 		lo.Map(responses.Data, func(f *ypb.HTTPFlow, _ int) []string {
 			return f.Payloads
