@@ -79,6 +79,7 @@ require (
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-sqlite3 v1.14.15
 	github.com/mdlayher/arp v0.0.0-20191213142603-f72070a231fc
+	github.com/mdlayher/netlink v1.1.1
 	github.com/mfonda/simhash v0.0.0-20151007195837-79f94a1100d6
 	github.com/miekg/dns v1.1.50
 	github.com/mitchellh/go-vnc v0.0.0-20150629162542-723ed9867aed
