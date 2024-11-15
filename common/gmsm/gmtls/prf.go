@@ -261,7 +261,7 @@ func (h *finishedHash) Write(msg []byte) (n int, err error) {
 	h.client.Write(msg)
 	h.server.Write(msg)
 
-	if h.version < VersionTLS12 {
+	if h.version < VersionTLS12 && h.version != VersionGMSSL {
 		h.clientMD5.Write(msg)
 		h.serverMD5.Write(msg)
 	}

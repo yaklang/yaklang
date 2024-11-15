@@ -1092,6 +1092,9 @@ func (c *Conn) readHandshakeEx(transcript transcriptHash) (interface{}, error) {
 	case typeCertificateRequest:
 		if c.config.GMSupport != nil {
 			m = &certificateRequestMsgGM{}
+		} else if c.vers == VersionTLS13 {
+			m = &certificateRequestMsgTLS13{}
+
 		} else {
 			m = &certificateRequestMsg{
 				hasSignatureAndHash: c.vers >= VersionTLS12,

@@ -1090,6 +1090,11 @@ func initDefaultCipherSuites() {
 		TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 		TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 		TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+		// add gm tls cipher suites
+		GMTLS_ECC_SM4_CBC_SM3,
+		GMTLS_ECC_SM4_GCM_SM3,
+		GMTLS_ECDHE_SM4_CBC_SM3,
+		GMTLS_ECDHE_SM4_GCM_SM3,
 	}
 
 	varDefaultCipherSuites = make([]uint16, 0, len(cipherSuites))
@@ -1157,6 +1162,7 @@ var defaultSupportedVersions = []uint16{
 	VersionTLS12,
 	VersionTLS11,
 	VersionTLS10,
+	VersionGMSSL,
 }
 
 func (c *Config) supportedVersions(isClient bool) []uint16 {

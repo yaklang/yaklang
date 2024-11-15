@@ -115,6 +115,11 @@ var cipherSuites = []*cipherSuite{
 	{TLS_RSA_WITH_RC4_128_SHA, 16, 20, 0, rsaKA, suiteDefaultOff, cipherRC4, macSHA1, nil},
 	{TLS_ECDHE_RSA_WITH_RC4_128_SHA, 16, 20, 0, ecdheRSAKA, suiteECDHE | suiteDefaultOff, cipherRC4, macSHA1, nil},
 	{TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, 16, 20, 0, ecdheECDSAKA, suiteECDHE | suiteECDSA | suiteDefaultOff, cipherRC4, macSHA1, nil},
+	//{GMTLS_ECC_SM4_CBC_SM3, 16, 32, 16, eccGMKA, suiteECDSA, cipherSM4, macSM3, nil},
+	//{GMTLS_ECC_SM4_GCM_SM3, 16, 0, 4, eccGMKA, suiteECDSA, nil, nil, aeadSM4GCM},
+
+	{GMTLS_ECDHE_SM4_CBC_SM3, 16, 32, 16, ecdheGMKA, suiteECDHE | suiteECDSA, cipherSM4, macSM3, nil},
+	{GMTLS_ECDHE_SM4_GCM_SM3, 16, 0, 4, ecdheGMKA, suiteECDHE | suiteECDSA, nil, nil, aeadSM4GCM},
 }
 
 // selectCipherSuite returns the first TLS 1.0–1.2 cipher suite from ids which

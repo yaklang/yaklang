@@ -309,7 +309,7 @@ func processClientHello(c *Conn, hs *serverHandshakeState) (bool, error) {
 	var ok bool
 	var err error
 
-	c.vers, ok = c.config.mutualVersion(false, hs.clientHello.getClientVersions())
+	c.vers, ok = c.config.mutualVersion(false, []uint16{hs.clientHello.vers})
 	if !ok {
 		_ = c.sendAlert(alertProtocolVersion)
 		return false, fmt.Errorf("tls: client offered an unsupported, maximum protocol version of %x", hs.clientHello.vers)

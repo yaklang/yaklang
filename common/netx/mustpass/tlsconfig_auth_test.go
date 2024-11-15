@@ -2,6 +2,7 @@ package mustpass
 
 import (
 	"crypto/tls"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -177,8 +178,8 @@ func TestTLSConfigAuth2(t *testing.T) {
 	})
 
 	err = tlsConn.Handshake()
-	if !strings.Contains(err.Error(), "tls: bad certificate") && !strings.Contains(err.Error(), "tls: certificate required") {
-		t.Fatal("cannot connect without cert")
+	if !strings.Contains(err.Error(), "tls: bad certificate") && !strings.Contains(err.Error(), "tls: certificate required") && !strings.Contains(err.Error(), "tls: alert(116)") {
+		t.Fatalf("cannot connect without cert:%v", err)
 	}
 
 	tokenSecret := utils.RandStringBytes(10)
@@ -198,7 +199,8 @@ func TestTLSConfigAuth2(t *testing.T) {
 		t.Fatal(err)
 	}
 	var buf = make([]byte, 40)
-	conn.Read(buf)
+	_, err = conn.Read(buf)
+	require.NoError(t, err)
 	if string(buf) != token {
 		t.Fatal("token not match")
 	}
