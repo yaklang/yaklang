@@ -178,3 +178,45 @@ CODE
 		})
 	})
 }
+
+func Test_Bottom_Use_UD_Relationship(t *testing.T) {
+	t.Run("test bottom ud chain: return --> function", func(t *testing.T) {
+		code := `
+		f = () =>{
+			a = 11
+			return a
+		}
+		f2 = (i) => {
+			println(i)
+		}
+		t = f()
+		f2(t) 
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			rule := `
+a as $source;
+
+
+$source -{
+hook:<<<CODE
+<self>?{opcode:return} as $start;
+<self>?{opcode:call}?{have:'f2'} as $end;
+CODE
+}-> as $result;
+			`
+			vals, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			//result := vals.GetValues("result")
+			//result.ShowDot()
+			start := vals.GetValues("start")
+			require.Contains(t, start.String(), "return(11)")
+			require.NotNil(t, start)
+			end := vals.GetValues("end")
+			end.Show()
+			require.NotNil(t, end)
+			require.Contains(t, end.String(), "Function-f2(Function-f())")
+			checkDirectlyConnect(t, start, end[0]) // f2(t)和return不应该直接连接
+			return nil
+		})
+	})
+}
