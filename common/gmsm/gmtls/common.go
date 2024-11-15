@@ -49,7 +49,9 @@ const (
 	maxWarnAlertCount = 5            // maximum number of consecutive warning alerts
 
 	minVersion = VersionGMSSL
-	maxVersion = VersionTLS12
+	maxVersion = VersionTLS13
+
+	maxUselessRecords = 16
 )
 
 // TLS record types.
