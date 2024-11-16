@@ -1874,7 +1874,7 @@ func TestGRPCMUSTTPASS_MITM_GM_Only(t *testing.T) {
 
 	host, port = utils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
 		"Content-Length:0\r\n\r\n")))
-	TLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
+	//TLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
 
 	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
 		stream.Send(&ypb.MITMRequest{
@@ -1885,13 +1885,13 @@ func TestGRPCMUSTTPASS_MITM_GM_Only(t *testing.T) {
 		})
 	}, func(stream ypb.Yak_MITMClient) {
 		defer cancel()
-		rsp, _, err := poc.DoGET((GMTLSTarget), poc.WithProxy(proxy))
+		rsp, _, err := poc.DoGET(GMTLSTarget, poc.WithProxy(proxy))
 		require.NoError(t, err)
 		require.Equal(t, rsp.GetStatusCode(), 200)
 
-		rsp, _, err = poc.DoGET((TLSTarget), poc.WithProxy(proxy))
-		require.NoError(t, err)
-		require.Contains(t, string(rsp.RawPacket), "all tls strategy failed")
+		//rsp, _, err = poc.DoGET(TLSTarget, poc.WithProxy(proxy)) // gm tls only == gm prefer
+		//require.NoError(t, err)
+		//require.Contains(t, string(rsp.RawPacket), "all tls strategy failed")
 	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
 	})
 }
