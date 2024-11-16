@@ -90,6 +90,10 @@ func (hs *clientHandshakeStateGM) handshake() error {
 		hs.c.sendAlert(alertProtocolVersion)
 		return fmt.Errorf("tls: server selected unsupported protocol version %x, while expecting %x", hs.serverHello.vers, VersionGMSSL)
 	}
+	c.vers = hs.serverHello.vers
+	c.haveVers = true
+	c.in.version = hs.serverHello.vers
+	c.out.version = hs.serverHello.vers
 
 	if err = hs.pickCipherSuite(); err != nil {
 		return err
