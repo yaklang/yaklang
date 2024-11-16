@@ -220,6 +220,7 @@ func (c *Conn) clientHandshake(ctx context.Context) error {
 		if cacheKey != "" && hs.session != nil && session != hs.session {
 			c.config.ClientSessionCache.Put(cacheKey, hs.session)
 		}
+		return nil
 	}
 
 	if _, err := c.writeHandshakeRecord(hello, nil); err != nil {
