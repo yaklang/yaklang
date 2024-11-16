@@ -160,7 +160,7 @@ func _tcpLocalAddr(i interface{}) dialerOpt {
 }
 
 func _tcpClientTls(crt, key interface{}, caCerts ...interface{}) dialerOpt {
-	tlcConfig := BuildTlsConfig(crt, key, caCerts...)
+	tlcConfig := BuildGmTlsConfig(crt, key, caCerts...)
 	return func(d *_tcpDialer) {
 		d.tlsConfig = tlcConfig
 	}
