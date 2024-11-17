@@ -27,6 +27,8 @@ type _pingConfig struct {
 	excludeHostsFilter *hostsparser.HostsParser
 	_cancel            func()
 	_onResult          func(result *pingutil.PingResult)
+
+	forceTcpPing bool
 }
 
 func NewDefaultPingConfig() *_pingConfig {
@@ -201,14 +203,18 @@ func _ping(target string, opts ...PingConfigOpt) *pingutil.PingResult {
 	for _, r := range opts {
 		r(config)
 	}
+	options := []pingutil.PingConfigOpt{
+		pingutil.WithPingContext(config.Ctx),
+		pingutil.WithDefaultTcpPort(config.tcpPingPort),
+		pingutil.WithTimeout(config.timeout),
+		pingutil.WithProxies(config.proxies...),
+	}
+	if config.forceTcpPing {
+		options = append(options, pingutil.WithForceTcpPing())
+	}
 
 	if utils.IsIPv4(target) || utils.IsIPv6(target) {
-		return pingutil.PingAuto(target,
-			pingutil.WithPingContext(config.Ctx),
-			pingutil.WithDefaultTcpPort(config.tcpPingPort),
-			pingutil.WithTimeout(config.timeout),
-			pingutil.WithProxies(config.proxies...),
-		)
+		return pingutil.PingAuto(target, options...)
 	} else if strings.HasPrefix(
 		target, "https://") || strings.HasPrefix(
 		target, "http://") {
@@ -225,12 +231,7 @@ func _ping(target string, opts ...PingConfigOpt) *pingutil.PingResult {
 	} else {
 		result := netx.LookupFirst(target, netx.WithTimeout(config.dnsTimeout), netx.WithDNSServers(config.dnsServers...))
 		if result != "" && (utils.IsIPv4(result) || utils.IsIPv6(result)) {
-			return pingutil.PingAuto(result,
-				pingutil.WithPingContext(config.Ctx),
-				pingutil.WithDefaultTcpPort(config.tcpPingPort),
-				pingutil.WithTimeout(config.timeout),
-				pingutil.WithProxies(config.proxies...),
-			)
+			return pingutil.PingAuto(result, options...)
 		}
 		return &pingutil.PingResult{
 			IP:     target,
@@ -253,6 +254,12 @@ func _pingConfigOpt_excludeHosts(host string) PingConfigOpt {
 			return
 		}
 		config.excludeHostsFilter = hostsparser.NewHostsParser(context.Background(), host)
+	}
+}
+
+func _pingConfigOpt_forceTcpPing(i bool) PingConfigOpt {
+	return func(config *_pingConfig) {
+		config.forceTcpPing = i
 	}
 }
 
@@ -283,4 +290,5 @@ var PingExports = map[string]interface{}{
 	"concurrent":   _pingConfigOpt_concurrent,
 	"tcpPingPorts": _pingConfigOpt_tcpPingPorts,
 	"proxy":        _pingConfigOpt_proxy,
+	"forceTcpPing": _pingConfigOpt_forceTcpPing,
 }

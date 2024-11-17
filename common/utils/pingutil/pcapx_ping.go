@@ -2,6 +2,11 @@ package pingutil
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/pcapfix"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,9 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"net"
-	"sync"
-	"time"
 )
 
 var icmpPayload = []byte("f\xc8\x14A\x00\n\xebs\b\t\n\v\f\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !\"#$%&'()*+,-./01234567")
@@ -60,7 +62,20 @@ func PingAuto2(target string, config *PingConfig) *PingResult {
 	}
 }
 
+var canCaptureOnce sync.Once
+var canCaptureResult bool
+
+func canCapture() bool {
+	canCaptureOnce.Do(func() {
+		canCaptureResult = pcapfix.IsPrivilegedForNetRaw()
+	})
+	return canCaptureResult
+}
+
 func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
+	if !canCapture() {
+		return nil, utils.Errorf("no permission to capture packets")
+	}
 	if config.Ctx == nil {
 		config.Ctx = context.Background()
 	}

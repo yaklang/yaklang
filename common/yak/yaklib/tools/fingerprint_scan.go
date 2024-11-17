@@ -2,12 +2,11 @@ package tools
 
 import (
 	"context"
-	"fmt"
 	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"reflect"
-	"strings"
+	"sync"
 
-	filter2 "github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
@@ -35,7 +34,7 @@ import (
 // ```
 func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
 	config := fp.NewConfig(opts...)
-	return _scanFingerprint(config.Ctx, config, 50, target, port)
+	return _scanFingerprint(config.Ctx, config, target, port)
 }
 
 // ScanOne servicescan 单体扫描，同步扫描一个目标，主机+端口
@@ -63,92 +62,96 @@ func scanOneFingerprint(target string, port int, opts ...fp.ConfigOption) (*fp.M
 	return matcher.Match(target, port)
 }
 
-func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, host, port string) (chan *fp.MatchResult, error) {
+func _scanFingerprint(ctx context.Context, config *fp.Config, host, port string) (chan *fp.MatchResult, error) {
 	matcher, err := fp.NewDefaultFingerprintMatcher(config)
 	if err != nil {
 		return nil, err
 	}
+	concurrent := matcher.Config.PoolSize
 
 	log.Infof("start to scan [%s] 's port: %s", host, port)
 
-	if matcher.Config.PoolSize > 0 {
-		concurrent = matcher.Config.PoolSize
+	portsInt := utils.ParseStringToPorts(port)
+	hosts := utils.ParseStringToHosts(host)
+
+	taskChan := make(chan *fp.ScanTarget, concurrent)
+	resultChan := make(chan *fp.MatchResult, concurrent)
+
+	var wg sync.WaitGroup
+	for i := 0; i < concurrent; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for target := range taskChan {
+				result, err := matcher.MatchWithContext(ctx, target.Host, target.Port)
+				if err != nil {
+					log.Errorf("failed to scan [%s://%s]: %v", target.Proto, utils.HostPort(target.Host, target.Port), err)
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case resultChan <- result:
+				}
+			}
+		}()
 	}
-
-	filter := filter2.NewFilter()
-
-	outC := make(chan *fp.MatchResult)
+	filterable := filter.NewFilter()
 	go func() {
-		swg := utils.NewSizedWaitGroup(concurrent)
-		portsInt := utils.ParseStringToPorts(port)
-		for _, p := range portsInt {
-			for _, hRaw := range utils.ParseStringToHosts(host) {
-				h := utils.ExtractHost(hRaw)
-				if h != hRaw {
-					buildinHost, buildinPort, _ := utils.ParseStringToHostPort(hRaw)
-					if buildinPort > 0 {
-						swg.Add()
-						go func() {
-							defer swg.Done()
-							proto, portWithoutProto := utils.ParsePortToProtoPort(buildinPort) // 这里将协议和端口分开，便于后面打印日志
-							addr := utils.HostPort(buildinHost, buildinPort)
-							if filter.Exist(addr) {
-								return
-							}
-							filter.Insert(addr)
-							log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(buildinHost, portWithoutProto))
-							result, err := matcher.MatchWithContext(ctx, buildinHost, buildinPort)
-							if err != nil {
-								if len(portsInt) <= 0 {
-									if strings.Contains(fmt.Sprint(err), "excludeHosts/Ports") {
-										return
-									}
-								} else {
-									if strings.Contains(fmt.Sprint(err), "filtered by servicescan") {
-										return
-									}
-								}
-								log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(buildinHost, portWithoutProto), err)
-								return
-							}
+		defer close(taskChan)
+		defer filterable.Close()
 
-							outC <- result
-						}()
+		for _, port := range portsInt {
+			proto, portWithoutproto := utils.ParsePortToProtoPort(port)
+			var tasks []*fp.ScanTarget
+			for _, raw := range hosts {
+				host := utils.ExtractHost(raw)
+				// 自带了端口的情况 比如 1.1.1.1:8080 ,然后端口是 80
+				if host != raw {
+					buildinHost, buildinPort, _ := utils.ParseStringToHostPort(raw)
+					if buildinPort > 0 {
+						// 对自带的端口进行判断
+						buildInProto, pwp := utils.ParsePortToProtoPort(buildinPort)
+						addr := utils.HostPort(buildinHost, pwp)
+						if filterable.Exist(addr) {
+							continue
+						}
+						filterable.Insert(addr)
+						tasks = append(tasks, &fp.ScanTarget{
+							Host:  buildinHost,
+							Port:  pwp,
+							Proto: fp.TransportProto(buildInProto),
+						})
 					}
 				}
 
-				swg.Add()
-				rawPort := p
-				rawHost := h
-				proto, portWithoutProto := utils.ParsePortToProtoPort(p) // 这里将协议和端口分开，便于后面打印日志
-				go func() {
-					defer swg.Done()
-
-					addr := utils.HostPort(rawHost, rawPort)
-					if filter.Exist(addr) {
-						return
-					}
-					filter.Insert(addr)
-
-					//log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
-					result, err := matcher.MatchWithContext(ctx, rawHost, rawPort)
-					if err != nil {
-						log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
-						return
-					}
-
-					outC <- result
-				}()
+				addr := utils.HostPort(host, portWithoutproto)
+				if filterable.Exist(addr) {
+					continue
+				}
+				filterable.Insert(addr)
+				tasks = append(tasks, &fp.ScanTarget{
+					Host:  host,
+					Port:  portWithoutproto,
+					Proto: fp.TransportProto(proto),
+				})
 			}
+			for _, task := range tasks {
+				select {
+				case <-ctx.Done():
+					return
+				case taskChan <- task:
+				}
+			}
+
 		}
-		go func() {
-			swg.Wait()
-			filter.Close()
-			close(outC)
-		}()
 	}()
 
-	return outC, nil
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+	return resultChan, nil
 }
 
 // ScanFromPing 从 ping.Scan 的结果中进行指纹识别
