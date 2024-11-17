@@ -72,7 +72,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, bluePrint)
 	}
-	bluePrint.SetLazyBuilder(func() {
+	bluePrint.AddLazyBuilder(func() {
 		bluePrint.BuildConstructorAndDestructor()
 	})
 	//todo: 可能会有问题
@@ -145,7 +145,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			for _, statement := range i.AllClassStatement() {
 				y.VisitClassStatement(statement, class)
 			}
-			class.SetLazyBuilder(func() {
+			class.AddLazyBuilder(func() {
 				class.BuildConstructorAndDestructor()
 			})
 		}

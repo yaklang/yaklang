@@ -206,10 +206,10 @@ class IA {
 	`)
 
 	vf.AddFile("a/src/main/java/com/a/example/User.java", `
-package com.a.example;
+package com.a.example1;
 import com.a.example.impl.IAImpl;
 import com.a.example.impl.IAImpl2;
-
+import com.a.example.IA;
 class User {
     private IA ia;
 
