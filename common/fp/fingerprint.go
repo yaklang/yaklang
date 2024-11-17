@@ -45,6 +45,12 @@ var (
 	UNKNOWN PortState = "unknown"
 )
 
+type ScanTarget struct {
+	Host  string
+	Port  int
+	Proto TransportProto
+}
+
 type MatchResult struct {
 	Target      string           `json:"target"`
 	Port        int              `json:"port"`
