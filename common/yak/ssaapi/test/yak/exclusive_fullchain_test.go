@@ -181,10 +181,10 @@ f = b(2,3,4)`
 		dot.ShowDotGraphToAsciiArt(value.DotGraph())
 		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			ret := value.GetConstValue()
-			if ret == 2 && len(value.EffectOn) == 3 {
+			if ret == 2 && len(value.EffectOn) == 1 {
 				check2 = true
 			}
-			if ret == 3 && len(value.EffectOn) == 3 {
+			if ret == 3 && len(value.EffectOn) == 1 {
 				check3 = true
 			}
 		})
