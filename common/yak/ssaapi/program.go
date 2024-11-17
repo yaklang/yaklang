@@ -127,6 +127,14 @@ func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
 	)
 }
 
+func (v *Value) NewTopDefValue(value ssa.Value) *Value {
+	return v.NewValue(value).AppendEffectOn(v)
+}
+
+func (v *Value) NewBottomUseValue(value ssa.Value) *Value {
+	return v.NewValue(value).AppendDependOn(v)
+}
+
 // normal from ssa value
 func (v *Value) NewValue(value ssa.Value) *Value {
 	return v.ParentProgram.NewValue(value)

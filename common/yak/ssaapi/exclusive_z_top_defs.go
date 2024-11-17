@@ -44,7 +44,7 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	}
 
 	for _, def := range i.node.GetValues() {
-		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx, opt...); len(ret) > 0 {
+		if ret := i.NewTopDefValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
 	}
@@ -54,7 +54,7 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	}
 	if maskable, ok := i.node.(ssa.Maskable); ok {
 		for _, def := range maskable.GetMask() {
-			if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx, opt...); len(ret) > 0 {
+			if ret := i.NewTopDefValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
 				vals = append(vals, ret...)
 			}
 		}
@@ -141,8 +141,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		conds := inst.GetControlFlowConditions()
 		result := getMemberCall(i, inst, actx)
 		for _, cond := range conds {
-			v := i.NewValue(cond)
-			ret := v.AppendEffectOn(i).getTopDefs(actx, opt...)
+			ret := i.NewTopDefValue(cond).getTopDefs(actx, opt...)
 			result = append(result, ret...)
 		}
 		return result
@@ -159,7 +158,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		switch {
 		case isFunc && !fun.IsExtern():
-			callee := i.NewValue(fun).AppendEffectOn(i)
+			callee := i.NewTopDefValue(fun)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 			// The call will result in crossing the function boundary
 			actx.setCauseValue(i)
@@ -170,14 +169,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			return callee.getTopDefs(actx, opt...)
 		default:
-			callee := i.NewValue(calleeInst).AppendEffectOn(i)
+			callee := i.NewTopDefValue(calleeInst)
 			nodes := Values{callee}
 			for _, val := range inst.Args {
-				arg := i.NewValue(val).AppendEffectOn(i)
+				arg := i.NewTopDefValue(val)
 				nodes = append(nodes, arg)
 			}
 			for _, value := range inst.Binding {
-				arg := i.NewValue(value).AppendEffectOn(i)
+				arg := i.NewTopDefValue(value)
 				nodes = append(nodes, arg)
 			}
 			var results Values
@@ -208,7 +207,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 					}
 					for idx, traceVal := range retIns.Results {
 						if idx == targetIdx {
-							traceRets = append(traceRets, i.NewValue(traceVal).AppendEffectOn(i))
+							traceRets = append(traceRets, i.NewTopDefValue(traceVal))
 						}
 					}
 				}
@@ -227,7 +226,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 					for _, traceVal := range retIns.Results {
 						val, ok := traceVal.GetStringMember(retIndexRawStr)
 						if ok {
-							traceRets = append(traceRets, i.NewValue(val).AppendEffectOn(i))
+							traceRets = append(traceRets, i.NewTopDefValue(val))
 							// trace mask ?
 							if len(inst.Blocks) > 0 {
 								name, ok := ssa.CombineMemberCallVariableName(traceVal, ssa.NewConst(retIndexRawStr))
@@ -256,7 +255,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			for _, r := range fun.Return {
 				for _, subVal := range r.GetValues() {
-					if ret := value.NewValue(subVal).AppendEffectOn(value).getTopDefs(actx, opt...); len(ret) > 0 {
+					if ret := value.NewTopDefValue(subVal).getTopDefs(actx, opt...); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
 				}
@@ -302,7 +301,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return getParameter()
 			}
 			actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
-			traced := i.NewValue(actualParam).AppendEffectOn(i)
+			traced := i.NewTopDefValue(actualParam)
 			if !actx.needCrossProcess(i, traced) {
 				return Values{}
 			}
@@ -324,6 +323,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
+				call2fun.AppendEffectOn(fun)
 				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call)
 					vals = append(vals, val...)
@@ -371,7 +371,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				}
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
-			traced := i.NewValue(actualParam).AppendEffectOn(i)
+			traced := i.NewTopDefValue(actualParam)
 			if !actx.needCrossProcess(i, traced) {
 				return Values{}
 			}
@@ -398,6 +398,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
+				call2fun.AppendEffectOn(fun)
 				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call)
 					vals = append(vals, val...)
@@ -407,7 +408,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		if len(vals) == 0 {
 			if i.IsFreeValue() && inst.GetDefault() != nil {
-				vals = append(vals, i.NewValue(inst.GetDefault()).AppendEffectOn(i))
+				vals = append(vals, i.NewTopDefValue(inst.GetDefault()))
 			} else {
 				vals = append(vals, i)
 			}
@@ -416,8 +417,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	case *ssa.SideEffect:
 		callIns := inst.CallSite
 		if callIns != nil {
-			call := i.NewValue(callIns).AppendEffectOn(i)
-			v := i.NewValue(inst.Value).AppendEffectOn(i)
+			call := i.NewTopDefValue(callIns)
+			v := i.NewTopDefValue(inst.Value)
 			actx.setCauseValue(call)
 			return v.getTopDefs(actx, opt...)
 		} else {
