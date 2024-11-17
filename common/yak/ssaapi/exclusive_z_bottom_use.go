@@ -116,7 +116,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			//log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
 			return v.visitUserFallback(actx, opt...)
 		}
-		funcValue := v.NewValue(f).AppendDependOn(v)
+		funcValue := v.NewBottomUseValue(f)
 		if ValueCompare(funcValue, actx.Self) {
 			return v.visitUserFallback(actx, opt...)
 		}
@@ -158,7 +158,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			var formalParams Values
 			if params.Len() > 0 {
 				for _, formalParam := range params.Values() {
-					formalParams = append(formalParams, funcValue.NewValue(formalParam).AppendDependOn(funcValue))
+					formalParams = append(formalParams, funcValue.NewBottomUseValue(formalParam))
 				}
 				return formalParams
 			}
@@ -180,7 +180,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		// enter return
 		var vals Values
 		for _, retStmt := range f.Return {
-			retVals := funcValue.NewValue(retStmt).getBottomUses(actx, opt...).AppendDependOn(funcValue)
+			retVals := funcValue.NewBottomUseValue(retStmt).getBottomUses(actx, opt...)
 			vals = append(vals, retVals...)
 		}
 		return vals
@@ -190,7 +190,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			// var results Values
 			results := make(Values, 0)
 			if f := ins.GetFunc(); f != nil {
-				v.NewValue(f).AppendDependOn(v).GetCalledBy().ForEach(func(value *Value) {
+				v.NewBottomUseValue(f).GetCalledBy().ForEach(func(value *Value) {
 					dep := value.AppendDependOn(v)
 					if !actx.haveTheCrossProcess(dep) {
 						actx.setCauseValue(dep)
@@ -202,7 +202,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				return results
 			}
 			for _, result := range ins.Results {
-				results = append(results, v.NewValue(result).AppendDependOn(v))
+				results = append(results, v.NewBottomUseValue(result))
 			}
 			return results
 		}
@@ -246,7 +246,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if len(vals) > 0 {
 				return vals
 			}
-			return v.NewValue(call).AppendDependOn(v).getBottomUses(actx, opt...)
+			return v.NewBottomUseValue(call).getBottomUses(actx, opt...)
 		}
 
 		// handle indexed return to call return
@@ -257,9 +257,10 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if !ok {
 				continue
 			}
-			returnReceiver := v.NewValue(indexedReturn)
+
+			returnReceiver := v.NewBottomUseValue(indexedReturn)
 			actx.pushObject(currentCallValue, returnReceiver.GetKey(), returnReceiver)
-			if newVals := returnReceiver.AppendDependOn(returnReceiver).getBottomUses(actx); len(newVals) > 0 {
+			if newVals := returnReceiver.getBottomUses(actx); len(newVals) > 0 {
 				vals = append(vals, newVals...)
 			}
 			actx.popObject()
@@ -267,9 +268,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		if len(vals) > 0 {
 			return vals
 		}
-		return v.NewValue(call).AppendDependOn(v).getBottomUses(actx, opt...)
+		return v.NewBottomUseValue(call).getBottomUses(actx, opt...)
 		// }
-		return fallback()
 	case *ssa.Function:
 
 	}
