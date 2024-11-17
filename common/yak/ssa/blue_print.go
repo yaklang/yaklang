@@ -38,7 +38,7 @@ type Blueprint struct {
 
 	NormalMethod map[string]*Function
 	StaticMethod map[string]*Function
-	MagicMethod  map[BlueprintMagicMethodKind]*Function
+	MagicMethod  map[BlueprintMagicMethodKind]Value
 
 	NormalMember map[string]Value
 	StaticMember map[string]Value
@@ -72,7 +72,7 @@ func NewClassBluePrint(name string) *Blueprint {
 
 		NormalMethod: make(map[string]*Function),
 		StaticMethod: make(map[string]*Function),
-		MagicMethod:  make(map[BlueprintMagicMethodKind]*Function),
+		MagicMethod:  make(map[BlueprintMagicMethodKind]Value),
 
 		fullTypeName: make([]string, 0),
 	}
