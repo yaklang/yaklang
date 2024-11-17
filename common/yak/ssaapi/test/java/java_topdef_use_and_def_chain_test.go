@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestJava_TopDef_Value_RelationShip(t *testing.T) {
+func TestJava_TopDef_UD_Relationship_Param(t *testing.T) {
 	code := `package com.ruoyi.web.controller.common;
 import java.io.*;
 
@@ -84,76 +84,39 @@ EXCLUDE,
 	})
 }
 
-func Test_asdpoik(t *testing.T) {
-	code := `import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+func TestJava_TopDef_UD_Relationship_Function(t *testing.T) {
+	t.Run("test ud relationship:function -> pointer", func(t *testing.T) {
+		code := `package com.example.demo1;
+class IFunc {
+    public int DoGet(String url);
+}
 
-public class SecureServlet extends HttpServlet {
-
-    private static final String BASE_DIR = "/usr/local/apache-tomcat/webapps/ROOT/safe_directory/";
-
+class ImplB implements IFunc {
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String requestedFile = request.getParameter("file");
+    public int DoGet(String url) {
+        return 2;
+    }
+}
 
-        String path= Util.Check(requestedFile);
+public class Main {
+    private IFunc Ifunc;
+	private ImplB implb;
 
-        File file = new File(BASE_DIR + path);
-        if (!file.getCanonicalPath().startsWith(new File(BASE_DIR).getCanonicalPath())) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
-            return;
-        }
-        if (!file.exists()) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "File not found");
-            return;
-        }
-        response.setContentType("text/plain");
-        try (OutputStream out = response.getOutputStream();
-             FileInputStream in = new FileInputStream(file)) {
-            byte[] buffer = new byte[4096];
-            int length;
-            while ((length = in.read(buffer)) > 0) {
-                out.write(buffer, 0, length);
-            }
-        }
+    public void main(String[] args) {
+        func0(Ifunc.DoGet("123"));
     }
 }`
 
-	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		sfRule := `
-		<include('java-spring-param')> as $source;
-<include('java-servlet-param')> as $source;
-<include('java-write-filename-sink')> as  $sink;
-<include('java-read-filename-sink')> as  $sink;
-
-
-$sink #{
-    include:<<<INCLUDE
-<self> & $source;
-INCLUDE,
-    exclude:<<<EXCLUDE
-<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink};
-EXCLUDE
-}->as $high;
-
-alert $high for {
-    message: "Find direct path travel vulnerability for java",
-    type: vuln,
-    level: high,
-};
-		`
-
-		vals, err := prog.SyntaxFlowWithError(sfRule)
-		require.NoError(t, err)
-		res := vals.GetValues("high")
-
-		res.ShowDot()
-		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+		sfRule := `func0(* #-> * as $param)`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			vals, err := prog.SyntaxFlowWithError(sfRule)
+			require.NoError(t, err)
+			res := vals.GetValues("param")
+			require.NotNil(t, res)
+			path := res.DotGraph()
+			require.Contains(t, path, "IFunc_DoGet")
+			require.Contains(t, path, "ImplB_DoGet")
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
 }
