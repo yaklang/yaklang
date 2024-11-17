@@ -268,7 +268,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		// handler child-class function
 		for _, child := range inst.GetPointer() {
-			handlerReturn(i.NewValue(child))
+			handlerReturn(i.NewTopDefValue(child))
 		}
 		return vals
 	case *ssa.ParameterMember:
