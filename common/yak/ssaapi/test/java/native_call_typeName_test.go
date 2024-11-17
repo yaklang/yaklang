@@ -642,3 +642,14 @@ class Main{
 		}, ssaapi.WithLanguage(consts.JAVA),
 	)
 }
+func TestReturnType(t *testing.T) {
+	code := `
+class Main{
+	public Long test(){
+		return call();
+	}
+}`
+	ssatest.CheckSyntaxFlow(t, code, `test<getReturns><typeName> as $b`, map[string][]string{
+		"b": {`"Long"`},
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}

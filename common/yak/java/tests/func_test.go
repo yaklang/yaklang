@@ -30,7 +30,7 @@ func TestJava_Func_Params(t *testing.T) {
         println(a);
     }
 }
-`, []string{"Function-Main_A(0)", "Parameter-a"}, t)
+`, []string{"Parameter-a", "Function-Main.A(0)"}, t)
 	})
 
 	t.Run("test  function params 2", func(t *testing.T) {
