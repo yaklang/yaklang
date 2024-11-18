@@ -83,7 +83,11 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, host, port string)
 		go func() {
 			defer wg.Done()
 			for target := range taskChan {
-				result, err := matcher.MatchWithContext(ctx, target.Host, target.Port)
+				var opts []fp.ConfigOption
+				if target.Proto == fp.UDP {
+					opts  = append(opts,  fp.WithTransportProtos(fp.UDP))
+				}
+				result, err := matcher.MatchWithContext(ctx, target.Host, target.Port, opts...)
 				if err != nil {
 					log.Errorf("failed to scan [%s://%s]: %v", target.Proto, utils.HostPort(target.Host, target.Port), err)
 					continue
