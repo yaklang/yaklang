@@ -129,7 +129,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 			if builder != nil {
 				builder.SetBuildSupport(b.FunctionBuilder)
-				builder.SetEditor(prog.GetApplication().GetCurrentEditor())
+				//builder.SetEditor(prog.GetApplication().GetCurrentEditor())
 				currentBuilder := b.FunctionBuilder
 				b.FunctionBuilder = builder
 				defer func() {
@@ -602,15 +602,12 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.AssignVariable(variable, newFunc)
 	}
 
-	PreHandlerBlock := b.CurrentBlock
+	editor := b.GetEditor() // 为了区分不同函数所属的文件
 	newFunc.SetLazyBuilder(func() {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
-		CurrentBlock := b.CurrentBlock
-		b.CurrentBlock = PreHandlerBlock
-
+		b.SetEditor(editor)
 		defer func() {
 			recoverRange()
-			b.CurrentBlock = CurrentBlock
 			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
 				tph()
 				delete(b.tpHandler, newFunc.GetName())
