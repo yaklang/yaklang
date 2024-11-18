@@ -1,0 +1,14 @@
+# https://taskfile.dev
+
+version: '3'
+
+includes:
+  yak: 
+    taskfile: ./yak_Taskfile.yml
+    dir: ./
+  antlr: 
+    taskfile: ./common/yak/antlr_Taskfile.yml
+    dir: ./common/yak
+  generate: 
+    taskfile: ./common/generate_Taskfile.yml
+    dir: ./common
