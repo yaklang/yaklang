@@ -348,8 +348,6 @@ func TestImport_fulltypename(t *testing.T) {
 }
 
 func TestImport_fulltypename_lib(t *testing.T) {
-	// TODO: add lib
-	t.Skip()
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang

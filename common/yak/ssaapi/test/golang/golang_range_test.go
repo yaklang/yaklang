@@ -9,7 +9,7 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-func Test_Range(t *testing.T) {
+func TestRange_normol(t *testing.T) {
 	code := `package main
 		
 	func test() bool{
@@ -28,9 +28,7 @@ func Test_Range(t *testing.T) {
 	}
 `
 	ssatest.CheckWithName("range", t, code, func(prog *ssaapi.Program) error {
-		prog.Show()
 		target := prog.SyntaxFlow("println( * #-> as $target )").GetValues("target")
-		target.Show()
 		a := target[0].GetSSAValue()
 		b := target[1].GetSSAValue()
 		if ca, ok := ssa.ToConst(a); ok {
@@ -53,7 +51,7 @@ func Test_Range(t *testing.T) {
 
 }
 
-func Test_Import_Range(t *testing.T) {
+func TestRange_import(t *testing.T) {
 	code := `package test
 
 import (
@@ -94,11 +92,8 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 `
 	ssatest.CheckWithName("import-range", t, code, func(prog *ssaapi.Program) error {
-		prog.Show()
 		ent := prog.SyntaxFlow("ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $target;").GetValues("target")
 		fmt := prog.SyntaxFlow("fmt?{<fullTypeName>?{have: 'fmt'}} as $target;").GetValues("target")
-		ent.Show()
-		fmt.Show()
 		a := ent[0].GetSSAValue()
 		b := fmt[0].GetSSAValue()
 		if ca, ok := ssa.ToExternLib(a); ok {
