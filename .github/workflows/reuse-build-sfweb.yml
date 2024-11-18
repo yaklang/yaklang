@@ -63,7 +63,7 @@ jobs:
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
           $outputName = if ("${{ inputs.os }}" -eq "windows7") { "sfweb_windows_legacy_amd64.exe" } else { "sfweb_windows_amd64.exe" }
-          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -o $outputName -v common/sfwebrunner/main.go
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)'" -o $outputName -v common/sfwebrunner/main.go
           echo "OUTPUT_NAME=$outputName" >> $env:GITHUB_ENV
 
       - name: Build for Non-Windows
