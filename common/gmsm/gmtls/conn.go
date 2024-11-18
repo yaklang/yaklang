@@ -254,7 +254,7 @@ func (hc *halfConn) explicitNonceLen() int {
 		return c.explicitNonceLen()
 	case cbcMode:
 		// TLS 1.1 introduced a per-record explicit IV to fix the BEAST attack.
-		if hc.version >= VersionTLS11 {
+		if hc.version >= VersionTLS11 || hc.version == VersionGMSSL {
 			return c.BlockSize()
 		}
 		return 0
