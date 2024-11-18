@@ -2,7 +2,6 @@ package pingutil
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/pcapfix"
 	"net"
 	"sync"
 	"time"
@@ -62,20 +61,7 @@ func PingAuto2(target string, config *PingConfig) *PingResult {
 	}
 }
 
-var canCaptureOnce sync.Once
-var canCaptureResult bool
-
-func canCapture() bool {
-	canCaptureOnce.Do(func() {
-		canCaptureResult = pcapfix.IsPrivilegedForNetRaw()
-	})
-	return canCaptureResult
-}
-
 func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
-	if !canCapture() {
-		return nil, utils.Errorf("no permission to capture packets")
-	}
 	if config.Ctx == nil {
 		config.Ctx = context.Background()
 	}
