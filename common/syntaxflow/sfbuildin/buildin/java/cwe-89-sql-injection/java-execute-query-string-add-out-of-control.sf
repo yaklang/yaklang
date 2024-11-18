@@ -54,6 +54,7 @@ desc(
 language: java,
 alert_min: 8,
 'file://a.java': <<<FILE
+package src.main.a;
 class Login {
   String hashPassword(char[] p) {
     return callHash(p);
@@ -79,6 +80,7 @@ class Login {
 }
 FILE,
 'file://a1.java': <<<FILE
+package src.main.b;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -110,6 +112,7 @@ class Login {
 }
 FILE,
 'file://a3.java': <<<FILE
+package src.main.c;
 class Login {
   String hashPassword(char[] p) {
     return callHash(p);
@@ -133,6 +136,7 @@ class Login {
 }
 FILE,
 'file://a4.java': <<<FILE
+package src.main.d;
 class Login {
   String hashPassword(char[] p) {
     return callHash(p);

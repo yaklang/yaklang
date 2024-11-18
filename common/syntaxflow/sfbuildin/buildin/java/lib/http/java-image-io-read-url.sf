@@ -13,7 +13,7 @@ desc(
 lang: java,
 alert_min: 2,
 'file://risk1.java': <<<TEXT
-
+package src.main.a;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -30,7 +30,7 @@ public class ImageDownloadExample {
 }
 TEXT,
 'file://risk.java': <<<TEXT
-
+package src.main.b;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;

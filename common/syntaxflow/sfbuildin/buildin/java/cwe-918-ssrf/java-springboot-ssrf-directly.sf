@@ -24,6 +24,7 @@ desc(
 lang: java,
 alert_min: 2,
 'file://risk1.java': <<<TEXT
+package src.main.a;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,6 +46,7 @@ public class SsrfVulnerableController {
 }
 TEXT,
 'file://risk2.java': <<<TEXT
+package src.main.b;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;

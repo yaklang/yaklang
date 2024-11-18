@@ -24,6 +24,7 @@ desc(
 lang: java,
 alert_min: 2,
 'file://risk2.java': <<<TEXT
+package src.main.a;
 import org.apache.http.client.fluent.Request;
 import org.apache.http.client.fluent.Response;
 
@@ -44,6 +45,7 @@ public class FluentGetExample {
 }
 TEXT,
 'file://risk1.java': <<<TEXT
+package src.main.b;
 import org.apache.http.client.fluent.Request;
 import org.apache.http.client.fluent.Response;
 
