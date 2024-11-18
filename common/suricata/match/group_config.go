@@ -1,7 +1,7 @@
 package match
 
 import (
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 )
 

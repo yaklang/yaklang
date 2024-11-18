@@ -2,8 +2,8 @@ package pcaputil
 
 import (
 	"context"
-	"github.com/google/gopacket"
 	"github.com/google/uuid"
+	"github.com/gopacket/gopacket"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,7 +25,7 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper)
 		select {
 		case <-ctx.Done():
 			return nil
-		case packet := <-packetSource.Packets():
+		case packet := <-packetSource.PacketsCtx(innerCtx):
 			if packet == nil {
 				return nil
 			}

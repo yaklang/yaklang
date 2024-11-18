@@ -8,7 +8,7 @@
 // +build darwin dragonfly freebsd netbsd openbsd
 
 // This is a BSD import for the routing structure initially found in
-// https://github.com/google/gopacket/blob/master/routing/routing.go
+// https://github.com/gopacket/gopacket/blob/master/routing/routing.go
 // RIB parsing follows the BSD route format described in
 // https://github.com/freebsd/freebsd/blob/master/sys/net/route.h
 package netroute
@@ -19,7 +19,7 @@ import (
 	"sort"
 	"syscall"
 
-	"github.com/google/gopacket/routing"
+	"github.com/gopacket/gopacket/routing"
 	"golang.org/x/net/route"
 )
 

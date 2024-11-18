@@ -2,7 +2,7 @@ package arpx
 
 import (
 	"context"
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 	"net"
 	"runtime"
 	"strings"
@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/arptable"
 
-	"github.com/google/gopacket/layers"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/mdlayher/arp"
 	"github.com/pkg/errors"
 

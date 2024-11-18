@@ -14,7 +14,7 @@ import (
 	"net"
 	"unsafe"
 
-	"github.com/google/gopacket/routing"
+	"github.com/gopacket/gopacket/routing"
 	"golang.org/x/sys/windows"
 )
 

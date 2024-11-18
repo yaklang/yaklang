@@ -3,7 +3,7 @@ package finscan
 import (
 	"context"
 	"fmt"
-	"github.com/google/gopacket/layers"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"net"

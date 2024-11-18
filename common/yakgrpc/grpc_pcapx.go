@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 	"github.com/samber/lo"
 	"github.com/yaklang/pcap"
 	bin_parser2 "github.com/yaklang/yaklang/common/bin-parser"

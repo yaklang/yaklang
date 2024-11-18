@@ -5,7 +5,7 @@ Go Netroute
 [![](https://img.shields.io/badge/project-libp2p-yellow.svg?style=flat-square)](http://github.com/libp2p/libp2p)
 [![Build Status](https://travis-ci.com/libp2p/go-netroute.svg?branch=master)](https://travis-ci.com/libp2p/go-netroute)
 
-A cross-platform implementation of the [`gopacket/routing.Router`](https://godoc.org/github.com/google/gopacket/routing#Router) interface.
+A cross-platform implementation of the [`gopacket/routing.Router`](https://godoc.org/github.com/gopacket/gopacket/routing#Router) interface.
 
 This library is derived from `gopacket` for linux, `x/net/route` for mac, and `iphlpapi.dll` for windows.
 
@@ -44,7 +44,7 @@ func main() {
 
 ## Documentation
 
-See the [gopacket](https://github.com/google/gopacket/blob/master/routing/) interface for thoughts on design,
+See the [gopacket](https://github.com/gopacket/gopacket/blob/master/routing/) interface for thoughts on design,
 and [godoc](https://godoc.org/github.com/libp2p/go-netroute) for API documentation.
 
 ## Contribute

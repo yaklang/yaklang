@@ -2,7 +2,7 @@ package match
 
 import (
 	"fmt"
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
