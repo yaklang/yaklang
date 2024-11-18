@@ -35,29 +35,41 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 		var prog *ssa.Program
 		var className string
 		// found package
-		for i := len(pkgNames) - 1; i > 0; i-- {
-			className = strings.Join(pkgNames[i:], ".")
-			if lib, _ := y.GetProgram().GetLibrary(strings.Join(pkgNames[:i], ".")); lib != nil {
-				prog = lib
-				break
+		if static {
+			pkg := pkgNames[:len(pkgNames)-2]
+			className = pkgNames[len(pkgNames)-2]
+			valName := pkgNames[len(pkgNames)-1]
+			if library, _ := y.GetProgram().GetLibrary(strings.Join(pkg, ".")); library != nil {
+				prog = library
+				if all {
+					_ = y.GetProgram().ImportTypeStaticAll(prog, className)
+				} else {
+					_ = y.GetProgram().ImportTypeStaticMemberFromLib(prog, className, valName)
+				}
 			}
-			if p, err := y.BuildDirectoryPackage(pkgNames[:i], true); err == nil {
-				prog = p
-				break
-			} else {
-				log.Infof("Dependencies Missed: Import package not found(%v)", err)
+		} else {
+			for i := len(pkgNames) - 1; i > 0; i-- {
+				className = strings.Join(pkgNames[i:], ".")
+				if lib, _ := y.GetProgram().GetLibrary(strings.Join(pkgNames[:i], ".")); lib != nil {
+					prog = lib
+					break
+				}
+				if p, err := y.BuildDirectoryPackage(pkgNames[:i], true); err == nil {
+					prog = p
+					break
+				} else {
+					log.Infof("Dependencies Missed: Import package not found(%v)", err)
+				}
 			}
 		}
 		if prog == nil {
 			log.Warnf("Dependencies Missed: Import package %v but not found", pkgNames)
 			continue
 		}
-
 		// get class
 		if all {
 			_ = y.GetProgram().ImportAll(prog)
 		} else {
-			//if class := prog.GetClassBluePrint(className); class != nil
 			_ = y.GetProgram().ImportTypeFromLib(prog, className)
 		}
 	}
