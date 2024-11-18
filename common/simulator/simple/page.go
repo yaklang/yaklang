@@ -43,12 +43,16 @@ func (page *VPage) Element(selector string) (*VElement, error) {
 	return &VElement{element: element}, nil
 }
 
-func (page *VPage) Elements(selector string) (rod.Elements, error) {
+func (page *VPage) Elements(selector string) (VElements, error) {
+	var result VElements
 	elements, err := page.page.Elements(selector)
 	if err != nil {
-		return nil, utils.Errorf("elements find error: %s", err)
+		return result, utils.Errorf("elements find error: %s", err)
 	}
-	return elements, nil
+	for _, element := range elements {
+		result = append(result, &VElement{element: element})
+	}
+	return result, nil
 }
 
 func (page *VPage) Click(selector string) error {
