@@ -921,6 +921,7 @@ func LegacyGRPCSaveNewYakScriptRequestGetYakScript(request *ypb.SaveNewYakScript
 		request.GeneralModuleVerbose = request.ScriptName
 	}
 	script := &ypb.YakScript{
+		Id:                   request.Id,
 		ScriptName:           request.ScriptName,
 		Type:                 request.Type,
 		Content:              request.Content,

@@ -165,6 +165,19 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		}
 	}
 
+	var pluginEnvKey []string
+	if s.PluginEnvKey != "" && s.PluginEnvKey != `""` && s.PluginEnvKey != "{}" { //"{}"
+		r, err := strconv.Unquote(s.PluginEnvKey)
+		if err != nil {
+			r = s.PluginEnvKey
+		}
+		err = json.Unmarshal([]byte(r), &pluginEnvKey)
+		if err != nil { // errors may occur due to version iterations has break change, so we just ignore it (this field has been deprecated actually)
+			// log.Errorf("unmarshal RiskDetail failed: %s", err)
+			// spew.Dump([]byte(r))
+		}
+	}
+
 	var collaboratorInfo []*ypb.Collaborator
 	if s.CollaboratorInfo != "" && s.CollaboratorInfo != `""` {
 		c, _ := strconv.Unquote(s.CollaboratorInfo)
@@ -209,6 +222,7 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		RiskAnnotation:       s.RiskAnnotation,
 		RiskInfo:             riskDetail,
 		IsCorePlugin:         s.IsCorePlugin,
+		PluginEnvKey:         pluginEnvKey,
 	}
 	/*if s.Type == "mitm" {
 		script.Params = mitmPluginDefaultPlugins
