@@ -8,8 +8,10 @@ import (
 	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/pcapfix"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -24,7 +26,19 @@ type PingResult struct {
 	Reason string
 }
 
-var promptICMPNotAvailableOnce = new(sync.Once)
+var canCaptureOnce sync.Once
+var icmpPingIsNotAvailable = utils.NewBool(false)
+
+func init() {
+	canCaptureOnce.Do(func() {
+		if runtime.GOOS == "windows" {
+			return
+		}
+		if pcapfix.IsPrivilegedForNetRaw() {
+			icmpPingIsNotAvailable.Set()
+		}
+	})
+}
 
 func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 	config := NewPingConfig()
@@ -111,8 +125,6 @@ func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 func PingAuto(ip string, opts ...PingConfigOpt) *PingResult {
 	return PingAutoConfig(ip, opts...)
 }
-
-var icmpPingIsNotAvailable = utils.NewBool(false)
 
 func PingNativeBase(ip string, cxt context.Context, timeout time.Duration) *PingResult {
 	if icmpPingIsNotAvailable.IsSet() {
