@@ -12,20 +12,19 @@ desc(
 <include('java-image-io-read-url')> as $output;
 <include('java-net-url-connect')> as $output;
 <include('java-spring-rest-template-use')> as $output;
-// <include('java-net-url-connect')> as $output;
 alert $output;
 
 desc(
 lang: java,
 alert_min: 2,
 'file://risk1.java': <<<TEXT
-
+package src.main.a;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.URL;
 
-public class ImageDownloadExample {
+public class ImageDownloadExample1 {
     public static void main(String[] args) {
         try {
             BufferedImage image = ImageIO.read(new URL("http://example.com/image.jpg"));
@@ -36,7 +35,7 @@ public class ImageDownloadExample {
 }
 TEXT,
 'file://risk.java': <<<TEXT
-
+package src.main.b;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;

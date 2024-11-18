@@ -517,8 +517,11 @@ func (y *builder) VisitClassBodyDeclaration(
 	}
 
 	if ret := i.Block(); ret != nil {
+		currentFb := y.FunctionBuilder
 		class.AddLazyBuilder(func() {
+			f := y.switchProg(currentFb)
 			y.VisitBlock(i.Block())
+			f()
 		})
 	} else if ret := i.MemberDeclaration(); ret != nil {
 		if class != nil {

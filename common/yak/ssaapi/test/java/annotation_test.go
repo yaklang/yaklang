@@ -144,7 +144,7 @@ public interface HomeDao3 {
 		prog.Show()
 		var results ssaapi.Values
 
-		results = prog.SyntaxFlowChain(`.annotation.*?{.value<regexp('aabbccddeeff')>}.__ref__.*ab(*?{any: limit,offset} as $params)`, sf.WithEnableDebug()).Show()
+		results = prog.SyntaxFlowChain(`.annotation.*?{.value<regexp('aabbccddeeff')>}.__ref__.*ab(*?{any: limit,offset} as $params)`).Show()
 		assert.GreaterOrEqual(t, results.Len(), 2)
 
 		results = prog.SyntaxFlowChain(`.annotation.ClassAnnotationTest.__ref__.*bar(*?{any: limit,offset} as $params)`).Show()
