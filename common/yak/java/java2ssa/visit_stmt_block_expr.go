@@ -1876,7 +1876,9 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 	if value, ok := y.ReadConst(name); ok {
 		return value
 	}
-
+	if importValue, b := y.GetProgram().ReadImportValue(name); b {
+		return importValue
+	}
 	return y.ReadValue(name)
 }
 

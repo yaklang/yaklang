@@ -129,6 +129,59 @@ func (p *Program) ImportValueFromLib(lib *Program, names ...string) error {
 	}
 	return err
 }
+func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
+	pkg, err := p.checkImportRelationship(lib)
+	if err != nil {
+		return err
+	}
+	t, ok := lib.ExportType[classname]
+	if !ok {
+		return utils.Errorf("library %s not contain type: %s", lib.Name, classname)
+	}
+	blueprint, b := ToClassBluePrintType(t)
+	if !b {
+		return utils.Errorf("no support to blueprint")
+	}
+	for s, value := range blueprint.StaticMember {
+		pkg.val[s] = value
+	}
+	for s, function := range blueprint.StaticMethod {
+		pkg.val[s] = function
+	}
+	return nil
+}
+func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, names ...string) error {
+	pkg, err := p.checkImportRelationship(lib)
+	if err != nil {
+		return err
+	}
+	build := func(blueprint *Blueprint, name string) {
+		for s, value := range blueprint.StaticMember {
+			if name == s {
+				pkg.val[s] = value
+			}
+		}
+		for s, function := range blueprint.StaticMethod {
+			if name == s {
+				pkg.val[s] = function
+			}
+		}
+	}
+	if v, ok := lib.ExportType[clsName]; !ok {
+		err = utils.JoinErrors(err, utils.Errorf("library %s not contain type %s", lib.Name, clsName))
+		return err
+	} else {
+		blueprint, b := ToClassBluePrintType(v)
+		if !b {
+			errx := utils.Errorf("no support other type")
+			return errx
+		}
+		for _, name := range names {
+			build(blueprint, name)
+		}
+	}
+	return nil
+}
 
 func (p *Program) ImportAll(lib *Program) error {
 	pkg, err := p.checkImportRelationship(lib)
