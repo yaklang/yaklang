@@ -828,6 +828,9 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	if params.BeforeBodyLength > 0 {
 		db = db.Where("body_length <= ?", params.BeforeBodyLength)
 	}
+	if len(params.ProcessName) > 0 {
+		db = bizhelper.ExactQueryStringArrayOr(db, "process_name", params.ProcessName)
+	}
 
 	return db
 }
@@ -887,6 +890,7 @@ content_type, status_code, source_type,
 get_params_total, post_params_total, cookie_params_total,
 ip_address, remote_addr, ip_integer,
 tags, is_websocket, websocket_hash, runtime_id, from_plugin,
+process_name,
 
 -- request is larger than 200K, return empty string
 LENGTH(request) > 204800 as is_request_oversize,
