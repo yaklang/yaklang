@@ -2,6 +2,8 @@ package tools
 
 import (
 	"context"
+
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -185,46 +187,14 @@ func (y *yakBruter) Start(targets ...string) (chan *bruteutils.BruteItemResult, 
 				}
 			}()
 			select {
+			case <-y.Ctx.Done():
+				return
 			case ch <- b:
 				if !b.Ok {
 					return
 				}
-				// 更新hit_count，+1
-				db := consts.GetGormProfileDatabase()
-				payloads, err := yakit.QueryPayloadWithoutPaging(db, "", "", b.Username)
-				if err != nil {
-					log.Errorf("brute failed: %v", err)
-					return
-				}
-				if len(payloads) > 0 {
-					var zero int64 = 0
-					for _, payload := range payloads {
-						if payload.HitCount == nil {
-							payload.HitCount = &zero
-						}
-						zero += 1
-						payload.HitCount = &zero
-						yakit.UpdatePayload(db, int(payload.ID), payload)
-					}
-				}
-
-				payloads, err = yakit.QueryPayloadWithoutPaging(db, "", "", b.Password)
-				if err != nil {
-					log.Errorf("brute failed: %v", err)
-					return
-				}
-				if len(payloads) > 0 {
-					var hitCount int64 = 0
-					for _, payload := range payloads {
-						if payload.HitCount == nil {
-							payload.HitCount = &hitCount
-						} else {
-							hitCount = *payload.HitCount
-						}
-						hitCount += 1
-						payload.HitCount = &hitCount
-						yakit.UpdatePayload(db, int(payload.ID), payload)
-					}
+				if err := updateHitCount(b); err != nil {
+					log.Errorf("update hit count failed: %v", err)
 				}
 			}
 		})
@@ -235,6 +205,46 @@ func (y *yakBruter) Start(targets ...string) (chan *bruteutils.BruteItemResult, 
 	}()
 
 	return ch, nil
+}
+
+func updateHitCount(b *bruteutils.BruteItemResult) error {
+	db := consts.GetGormProfileDatabase()
+
+	// 更新用户名命中次数
+	if err := updatePayloadHitCount(db, b.Username); err != nil {
+		return err
+	}
+
+	// 更新密码命中次数
+	if err := updatePayloadHitCount(db, b.Password); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func updatePayloadHitCount(db *gorm.DB, payload string) error {
+	payloads, err := yakit.QueryPayloadWithoutPaging(db, "", "", payload)
+	if err != nil {
+		return err
+	}
+
+	if len(payloads) > 0 {
+		var hitCount int64 = 0
+		for _, p := range payloads {
+			if p.HitCount == nil {
+				p.HitCount = &hitCount
+			} else {
+				hitCount = *p.HitCount
+			}
+			hitCount++
+			p.HitCount = &hitCount
+			if err := yakit.UpdatePayload(db, int(p.ID), p); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func _yakitBruterNew(typeStr string, opts ...BruteOpt) (*yakBruter, error) {
