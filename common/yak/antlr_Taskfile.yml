@@ -1,0 +1,93 @@
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  yaklang:
+    dir: antlr4yak
+    ignore_errors: true
+    silent: true
+    cmds:
+      - | 
+        rm ./parser/*.tokens
+        rm ./parser/*.interp
+        antlr4 -Dlanguage=Go YaklangLexer.g4 YaklangParser.g4 -o parser -no-listener -visitor  
+    generates:
+      - parser
+  java:
+    dir: java
+    ignore_errors: true
+    silent: true
+    cmds:
+      - |
+        rm ./parser/*.tokens
+        rm ./parser/*.interp
+        antlr -Dlanguage=Go -package javaparser ./JavaLexer.g4 ./JavaParser.g4 -o parser -no-listener -visitor
+    generates:
+      - parser
+  java_jsp:
+    dir: java/jsp
+    ignore_errors: true
+    silent: true
+    cmds:
+      - |
+        rm ./parser/*.tokens
+        rm ./parser/*.interp
+        antlr -Dlanguage=Go -package jspparser ./JSPLexer.g4 ./JSPParser.g4 -o parser -no-listener -visitor
+    generates:
+      - parser
+  java_spel:
+    dir: java/spel
+    ignore_errors: true
+    silent: true
+    cmds:
+      - |
+        rm ./parser/*.tokens
+        rm ./parser/*.interp
+        antlr -Dlanguage=Go -package spelparser ./SpelLexer.g4 ./SpelParser.g4 -o parser -no-listener -visitor
+    generates:
+      - parser
+  java_freemarker:
+    dir: java/freemarker
+    ignore_errors: true
+    silent: true
+    cmds:
+      - |
+        rm ./parser/*.tokens
+        rm ./parser/*.interp
+        antlr -Dlanguage=Go -package freemarkerparser ./FreemarkerLexer.g4 ./FreemarkerParser.g4 -o parser -no-listener -visitor
+    generates:
+      - parser
+  php:
+    dir: php
+    ignore_errors: true
+    silent: true
+    cmds:
+      - |
+        rm ./parser/*.tokens
+        rm ./parser/*.interp
+        antlr -Dlanguage=Go -package phpparser ./PHPLexer.g4 ./PHPParser.g4 -o parser -no-listener -visitor
+    generates:
+      - parser
+  go:
+    dir: antlr4go
+    ignore_errors: true
+    silent: true
+    cmds:
+      - |
+        rm ./parser/*.tokens
+        rm ./parser/*.interp
+        antlr -Dlanguage=Go -package goparser ./GoLexer.g4 ./GoParser.g4 -o parser -no-listener -visitor
+    generates:
+      - parser
+  syntaxflow:
+    dir: syntaxflow
+    ignore_errors: true
+    silent: true
+    cmds:
+      - |
+        rm ./parser/*.tokens
+        rm ./parser/*.interp
+        antlr -Dlanguage=Go ./SyntaxFlowLexer.g4 ./SyntaxFlowParser.g4 -o sf -package sf -no-listener -visitor
+    generates:
+      - parser
