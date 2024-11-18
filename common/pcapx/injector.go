@@ -2,8 +2,8 @@ package pcapx
 
 import (
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"

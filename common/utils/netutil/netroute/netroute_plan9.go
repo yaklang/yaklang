@@ -1,5 +1,5 @@
 // Generate a local routing table structure following the code at
-// https://github.com/google/gopacket/blob/master/routing/routing.go
+// https://github.com/gopacket/gopacket/blob/master/routing/routing.go
 //
 // Plan 9 networking is described here: http://9p.io/magic/man2html/3/ip
 
@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/gopacket/routing"
+	"github.com/gopacket/gopacket/routing"
 )
 
 const netdir = "/net"

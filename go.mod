@@ -51,7 +51,7 @@ require (
 	github.com/golang/snappy v0.0.4
 	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-dap v0.10.0
-	github.com/google/gopacket v1.1.19
+	github.com/gopacket/gopacket v1.3.1
 	github.com/google/uuid v1.5.0
 	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/websocket v1.4.2
@@ -110,7 +110,7 @@ require (
 	github.com/vjeantet/grok v1.0.0
 	github.com/xdg-go/pbkdf2 v1.0.0
 	github.com/xdg-go/scram v1.1.2
-	github.com/yaklang/pcap v1.0.4
+	github.com/yaklang/pcap v1.0.5
 	github.com/ysmood/gson v0.7.3
 	github.com/ysmood/leakless v0.8.0
 	go.mongodb.org/mongo-driver v1.12.1

@@ -8,7 +8,7 @@ package netroute
 import (
 	"net"
 
-	"github.com/google/gopacket/routing"
+	"github.com/gopacket/gopacket/routing"
 )
 
 func New() (routing.Router, error) {

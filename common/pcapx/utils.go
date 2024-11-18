@@ -1,7 +1,7 @@
 package pcapx
 
 import (
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 	"github.com/pkg/errors"
 )
 
