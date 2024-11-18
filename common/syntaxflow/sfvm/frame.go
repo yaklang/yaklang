@@ -1331,7 +1331,7 @@ func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 }
 
 func (s *SFFrame) debugLog(i string, item ...any) {
-	if !s.debug {
+	if !s.config.debug {
 		return
 	}
 
