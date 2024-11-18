@@ -822,9 +822,26 @@ targetBatch = ""
 count := 0
 wgScan := sync.NewSizedWaitGroup(2)
 updateStatus("端口扫描中")
-for fileReader.Next(){
+handleBatch := func(batch) {
+    wgScan.Add(1)
+    go func(targets) {
+        defer wgScan.Done()
+        handleTCP(targets)
+    }(batch)
+
+    if synscanEnable {
+        wgScan.Add(1)
+        go func(targets) {
+            defer wgScan.Done()
+            handleSYN(targets)
+        }(batch)
+    }
+}
+
+for fileReader.Next() {
     var currentTarget = fileReader.Text()
-    yakit.StatusCard("当前文件指针", fileReader.GetLastRecordPtr(),"no display")
+    yakit.StatusCard("当前文件指针", fileReader.GetLastRecordPtr(), "no display")
+
     if count > 0 {
         targetBatch += "," + currentTarget
     } else {
@@ -834,19 +851,7 @@ for fileReader.Next(){
     addScanHostCount()
 
     if count == concurrent {
-        wgScan.Add(1)
-        go func() {
-            defer wgScan.Done()
-            handleTCP(targetBatch)
-        }()
-
-        if synscanEnable {
-            wgScan.Add(1)
-            go func() {
-                defer wgScan.Done()
-                handleSYN(targetBatch)
-            }()
-        }
+        handleBatch(targetBatch)
         targetBatch = ""
         count = 0
     }
@@ -854,19 +859,9 @@ for fileReader.Next(){
 
 if count > 0 {
     addScanHostCount()
-    wgScan.Add(1)
-    go func {
-        defer wgScan.Done()
-        handleTCP(targetBatch)
-    }
-    if synscanEnable {
-        wgScan.Add(1)
-        go func() {
-            defer wgScan.Done()
-            handleSYN(targetBatch)
-        }()
-    }
+    handleBatch(targetBatch)
 }
+
 if skippedHostAliveScan {
     finalScanHostCount = ScanHostCount - 1
 }else {
