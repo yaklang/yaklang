@@ -1,0 +1,32 @@
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  yak_doc:
+    silent: true
+    dir: common/yak/yakdoc
+    cmds:
+      - go run -gcflags=all="-N -l" ./generate_doc/generate_doc.go ./doc/doc.gob.gzip
+    generates:
+      - ./doc/doc.gob.gzip
+  codec_doc:
+    silent: true
+    dir: common/yak/yaklib/codec/codegrpc/doc
+    cmds:
+      - go run -gcflags=all="-N -l" codec_doc.go ../codec.gob.gzip
+    generates:
+      - ../codec.gob.gzip
+  proto:
+    silent: true
+    dir: yakgrpc
+    cmds:
+      - protoc --go-grpc_out=./ypb --go_out=./ypb --proto_path=./ yakgrpc.proto
+    generates:
+      - ./ypb/yakgrpc.pb.go
+      - ./ypb/yakgrpc_grpc.pb.go
+  embed_fs:
+    silent: true
+    dir: common/yak/cmd
+    cmds:
+      - go run yak.go embed-fs-hash --override --all
