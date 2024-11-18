@@ -16,6 +16,7 @@ alert $result for "Return String is not used";
 desc(
 lang: java,
 'safefile://b1.java': <<<REPLACE
+package src.main.a;
 public class Replace {
   public static void main(String[] args) {
     String original = "insecure";
@@ -24,6 +25,7 @@ public class Replace {
 }
 REPLACE,
 'safefile://b2.java': <<<REPLACE
+package src.main.b;
 public class Replace {
   public static void main(String[] args) {
     String original = "insecure";
@@ -34,6 +36,7 @@ REPLACE,
 
 alert_min: 6,
 'file://a1.java': <<<REPLACE
+package src.main.c;
 public class Replace {
   public static void main(String[] args) {
     String original = "insecure";
@@ -43,6 +46,7 @@ public class Replace {
 }
 REPLACE,
 'file://a2.java': <<<REPLACE
+package src.main.d;
 public class Replace {
   public static void main(String[] args) {
     String original = "insecure";
@@ -52,6 +56,7 @@ public class Replace {
 }
 REPLACE,
 'file://a3.java': <<<REPLACE
+package src.main.e;
 public class Replace {
   public static void main(String[] args) {
     String original = "insecure";
@@ -61,6 +66,7 @@ public class Replace {
 }
 REPLACE,
 'file://a4.java': <<<REPLACE
+package src.main.f;
 public class Replace {
   public static void main(String[] args) {
     String original = "insecure";

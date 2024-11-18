@@ -30,6 +30,7 @@ language: java,
 alert_min: 3,
 
 'file://a3.java': <<<TEXT
+package src.main.a;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -68,6 +69,7 @@ public class HttpClientExample {
 TEXT,
 
 'file://a2.java': <<<TEXT
+package src.main.b;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
