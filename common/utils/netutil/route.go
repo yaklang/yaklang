@@ -3,7 +3,7 @@ package netutil
 import (
 	"context"
 	"github.com/dlclark/regexp2"
-	"github.com/google/gopacket/routing"
+	"github.com/gopacket/gopacket/routing"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"

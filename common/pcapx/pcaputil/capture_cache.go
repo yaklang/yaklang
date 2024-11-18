@@ -2,7 +2,7 @@ package pcaputil
 
 import (
 	"context"
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"sync"
 )

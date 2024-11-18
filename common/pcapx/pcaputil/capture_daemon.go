@@ -3,7 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"context"
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -149,7 +149,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 				packetSource.Lazy = true
 				packetSource.NoCopy = true
 				packetSource.DecodeStreamsAsDatagrams = true
-				source := packetSource.Packets()
+				source := packetSource.PacketsCtx(conf.Context)
 				onceFirstPacket := new(sync.Once)
 
 				go func() {

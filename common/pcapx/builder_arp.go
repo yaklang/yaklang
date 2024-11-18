@@ -2,7 +2,7 @@ package pcapx
 
 import (
 	"errors"
-	"github.com/google/gopacket/layers"
+	"github.com/gopacket/gopacket/layers"
 	"net"
 )
 

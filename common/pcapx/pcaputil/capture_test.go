@@ -2,7 +2,7 @@ package pcaputil
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 	"github.com/yaklang/yaklang/common/utils"
 	"testing"
 	"time"

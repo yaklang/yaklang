@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"github.com/asaskevich/govalidator"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/google/gopacket/layers"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"

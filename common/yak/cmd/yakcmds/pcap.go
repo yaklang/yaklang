@@ -2,7 +2,7 @@ package yakcmds
 
 import (
 	"fmt"
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 	"github.com/urfave/cli"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/consts"

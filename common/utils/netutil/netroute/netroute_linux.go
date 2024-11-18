@@ -8,7 +8,7 @@
 // +build linux
 
 // Generate a local routing table structure following the code at
-// https://github.com/google/gopacket/blob/master/routing/routing.go
+// https://github.com/gopacket/gopacket/blob/master/routing/routing.go
 
 package netroute
 
@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/google/gopacket/routing"
+	"github.com/gopacket/gopacket/routing"
 )
 
 // Pulled from http://man7.org/linux/man-pages/man7/rtnetlink.7.html
