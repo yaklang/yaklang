@@ -4,11 +4,13 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"gotest.tools/v3/assert"
 )
 
-func Test_Package(t *testing.T) {
+func TestPackage_normol(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
@@ -41,7 +43,7 @@ func Test_Package(t *testing.T) {
 	)
 }
 
-func Test_Package_lazybuild(t *testing.T) {
+func TestPackage_lazybuild(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
@@ -74,7 +76,7 @@ func Test_Package_lazybuild(t *testing.T) {
 	)
 }
 
-func Test_Package_mutifile_init(t *testing.T) {
+func TestPackage_muti_file_init(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
@@ -114,7 +116,7 @@ func Test_Package_mutifile_init(t *testing.T) {
 	)
 }
 
-func Test_Package_mutifile_meminit(t *testing.T) {
+func Test_Package_muti_file_meminit(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
@@ -156,4 +158,106 @@ func Test_Package_mutifile_meminit(t *testing.T) {
 		"a": {"\"hello world\""},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
+}
+
+func TestFileName_muti_package(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+	vf.AddFile("src/main/go/A/test.go", `
+	package A
+
+	import "fmt"
+
+	func test(){
+		fmt.Println("A")
+	}
+
+	`)
+	vf.AddFile("src/main/go/B/test.go", `
+	package B
+
+	import "fmt"
+
+	func test(){
+		fmt.Println("B")
+	}
+	`)
+
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		for _, prog := range progs {
+			sf := `
+				fmt?{<fullTypeName>?{have: 'fmt'}} as $entry;
+				$entry.Println( * as $target);
+			`
+			result := prog.SyntaxFlow(sf)
+			target := result.GetValues("target")
+			a := target[0].GetSSAValue()
+			b := target[1].GetSSAValue()
+			if ca, ok := ssa.ToConst(a); ok {
+				ea := ca.GetRange().GetEditor()
+				assert.Equal(t, ea.GetFilename(), "src/main/go/A/test.go")
+			}
+			if cb, ok := ssa.ToConst(b); ok {
+				eb := cb.GetRange().GetEditor()
+				assert.Equal(t, eb.GetFilename(), "src/main/go/B/test.go")
+			}
+		}
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
+}
+
+func TestFileName_muti_file(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+	vf.AddFile("src/main/go/A/test1.go", `
+	package A
+
+	import "fmt"
+
+	func test1(){
+		fmt.Println("A")
+	}
+
+	`)
+	vf.AddFile("src/main/go/A/test2.go", `
+	package A
+
+	import "fmt"
+
+	func test2(){
+		fmt.Println("B")
+	}
+	`)
+
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		for _, prog := range progs {
+			sf := `
+				fmt?{<fullTypeName>?{have: 'fmt'}} as $entry;
+				$entry.Println( * as $target);
+			`
+			result := prog.SyntaxFlow(sf)
+			target := result.GetValues("target")
+			a := target[0].GetSSAValue()
+			b := target[1].GetSSAValue()
+			if ca, ok := ssa.ToConst(a); ok {
+				ea := ca.GetRange().GetEditor()
+				assert.Equal(t, ea.GetFilename(), "src/main/go/A/test1.go")
+			}
+			if cb, ok := ssa.ToConst(b); ok {
+				eb := cb.GetRange().GetEditor()
+				assert.Equal(t, eb.GetFilename(), "src/main/go/A/test2.go")
+			}
+		}
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
 }

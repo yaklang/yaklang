@@ -369,3 +369,119 @@ func TestSFURl(t *testing.T) {
 		})
 	})
 }
+
+func TestSFURl_golang(t *testing.T) {
+	local, err := yakgrpc.NewLocalClient()
+	if err != nil {
+		t.Error(err)
+	}
+	_ = local
+
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+	vf.AddFile("src/main/go/A/test1.go", `
+	package A
+
+	import "fmt"
+
+	func test1(){
+		fmt.Println("A")
+	}
+
+	`)
+	vf.AddFile("src/main/go/A/test2.go", `
+	package A
+
+	import "fmt"
+
+	func test2(){
+		// padding
+		fmt.Println("B")
+	}
+	`)
+	progID := uuid.NewString()
+	prog, err := ssaapi.ParseProject(vf,
+		ssaapi.WithLanguage(consts.GO),
+		ssaapi.WithProgramPath("src"),
+		ssaapi.WithProgramName(progID),
+	)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progID)
+	}()
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+
+	t.Run("check syntaxflow variable", func(t *testing.T) {
+		t.Skip()
+		CheckSSAURL(t, local, progID, "/",
+			`	
+			fmt?{<fullTypeName>?{have: 'fmt'}} as $entry;
+			$entry.Println( * as $target);
+			`,
+			func(res []*ypb.YakURLResource) {
+				checkVariable(t, res, []string{"entry", "target", "_"})
+			},
+		)
+	})
+
+	t.Run("check syntaxflow information package with different filename", func(t *testing.T) {
+		query := `
+			fmt.Println as $a
+		`
+
+		graphInfoMap := map[int]string{}
+		CheckSSAURL(t, local, progID, "/a/0", query, func(res []*ypb.YakURLResource) {
+			require.NoError(t, err)
+			spew.Dump(res)
+			check := func(path string) {
+				log.Infof("check path: %s", path)
+				_, err := ssadb.NewIrSourceFs().Stat(path)
+				require.NoError(t, err)
+			}
+
+			for _, extra := range res[0].Extra {
+				if extra.Key == "graph_info" {
+					log.Infof("graph info: %v", extra.Value)
+					var graphInfo []*yakurl.NodeInfo
+					if err := json.Unmarshal([]byte(extra.Value), &graphInfo); err != nil {
+						t.Error(err)
+					}
+					for _, info := range graphInfo {
+						check(info.CodeRange.URL)
+						graphInfoMap[0] = info.CodeRange.URL
+					}
+				}
+			}
+		})
+
+		CheckSSAURL(t, local, progID, "/a/1", query, func(res []*ypb.YakURLResource) {
+			require.NoError(t, err)
+			spew.Dump(res)
+			check := func(path string) {
+				log.Infof("check path: %s", path)
+				_, err := ssadb.NewIrSourceFs().Stat(path)
+				require.NoError(t, err)
+			}
+
+			for _, extra := range res[0].Extra {
+				if extra.Key == "graph_info" {
+					log.Infof("graph info: %v", extra.Value)
+					var graphInfo []*yakurl.NodeInfo
+					if err := json.Unmarshal([]byte(extra.Value), &graphInfo); err != nil {
+						t.Error(err)
+					}
+					for _, info := range graphInfo {
+						check(info.CodeRange.URL)
+						graphInfoMap[1] = info.CodeRange.URL
+					}
+				}
+			}
+		})
+
+		require.NotEqual(t, graphInfoMap[0], graphInfoMap[1], "The two strings should not be equal")
+	})
+}
