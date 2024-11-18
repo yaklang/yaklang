@@ -85,11 +85,11 @@ func CreateHeadlessBrowser(opts ...BrowserConfigOpt) (*VBrowser, error) {
 		requestModification:  config.requestModification,
 		responseModification: config.responseModification,
 	}
-	err := browser.BrowserInit()
+	err := browser.browserInit()
 	return browser, err
 }
 
-func (browser *VBrowser) BrowserInit() error {
+func (browser *VBrowser) browserInit() error {
 	if browser.wsAddress != "" {
 		launch, err := launcher.NewManaged(browser.wsAddress)
 		if err != nil {
@@ -98,7 +98,8 @@ func (browser *VBrowser) BrowserInit() error {
 		if browser.proxyAddress != "" {
 			launch.Proxy(browser.proxyAddress)
 		}
-		launch.NoSandbox(browser.noSandBox).Headless(browser.headless).Leakless(browser.leakless)
+		launch = launch.Set("disable-features", "HttpsUpgrades")
+		launch = launch.NoSandbox(browser.noSandBox).Headless(browser.headless).Leakless(browser.leakless)
 		browser.browser.Client(launch.MustClient())
 	} else {
 		launch := launcher.New()
@@ -108,7 +109,8 @@ func (browser *VBrowser) BrowserInit() error {
 		if browser.proxyAddress != "" {
 			launch.Proxy(browser.proxyAddress)
 		}
-		launch.NoSandbox(browser.noSandBox).Headless(browser.headless).Leakless(browser.leakless)
+		launch = launch.Set("disable-features", "HttpsUpgrades")
+		launch = launch.NoSandbox(browser.noSandBox).Headless(browser.headless).Leakless(browser.leakless)
 		controlUrl, err := launch.Launch()
 		if err != nil {
 			return utils.Errorf("new launcher launch error: %s", err)
