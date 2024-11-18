@@ -142,3 +142,67 @@ class B{
 			ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
+
+func TestImportStatic(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("a.java", `
+package com.example.demo2;
+
+public class A {
+    public static int a = 1;
+
+    public static void Method(int b) {
+		println(b);
+    }
+}
+`)
+	fs.AddFile("b.java", `
+package com.example.demo1;
+
+import static com.example.demo2.A.*;
+
+class A {
+	public static void main(){
+		Method(1);
+		println(a);
+	}
+}`)
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`,
+		map[string][]string{
+			"param": {"1", "1"},
+		},
+		true,
+		ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestImportStaticAll(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("a.java", `
+package com.example.demo2;
+
+public class A {
+    public static int a = 1;
+
+    public static void Method(int a) {
+		println(a);
+    }
+}
+`)
+	fs.AddFile("b.java", `
+package com.example.demo1;
+
+import static com.example.demo2.A.a;
+
+class A {
+	public static void main(){
+		println(a);
+		Method(1);
+	}
+}`)
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`,
+		map[string][]string{
+			"param": {"1", "Parameter-a"},
+		},
+		true,
+		ssaapi.WithLanguage(ssaapi.JAVA))
+}
