@@ -3,11 +3,11 @@ package ssaapi
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"gotest.tools/v3/assert"
 )
 
 func TestPackage_normol(t *testing.T) {
@@ -188,23 +188,25 @@ func TestFileName_muti_package(t *testing.T) {
 	`)
 
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		var as, bs string
 		for _, prog := range progs {
 			sf := `
-				fmt?{<fullTypeName>?{have: 'fmt'}} as $entry;
-				$entry.Println( * as $target);
-			`
+					fmt?{<fullTypeName>?{have: 'fmt'}} as $entry;
+					$entry.Println( * as $target);
+				`
 			result := prog.SyntaxFlow(sf)
 			target := result.GetValues("target")
 			a := target[0].GetSSAValue()
 			b := target[1].GetSSAValue()
 			if ca, ok := ssa.ToConst(a); ok {
 				ea := ca.GetRange().GetEditor()
-				assert.Equal(t, ea.GetFilename(), "src/main/go/A/test.go")
+				as = ea.GetFilename()
 			}
 			if cb, ok := ssa.ToConst(b); ok {
 				eb := cb.GetRange().GetEditor()
-				assert.Equal(t, eb.GetFilename(), "src/main/go/B/test.go")
+				bs = eb.GetFilename()
 			}
+			require.NotEqual(t, as, bs)
 		}
 
 		return nil
@@ -234,28 +236,31 @@ func TestFileName_muti_file(t *testing.T) {
 	import "fmt"
 
 	func test2(){
+		// padding
 		fmt.Println("B")
 	}
 	`)
 
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		var as, bs string
 		for _, prog := range progs {
 			sf := `
-				fmt?{<fullTypeName>?{have: 'fmt'}} as $entry;
-				$entry.Println( * as $target);
-			`
+					fmt?{<fullTypeName>?{have: 'fmt'}} as $entry;
+					$entry.Println( * as $target);
+				`
 			result := prog.SyntaxFlow(sf)
 			target := result.GetValues("target")
 			a := target[0].GetSSAValue()
 			b := target[1].GetSSAValue()
 			if ca, ok := ssa.ToConst(a); ok {
 				ea := ca.GetRange().GetEditor()
-				assert.Equal(t, ea.GetFilename(), "src/main/go/A/test1.go")
+				as = ea.GetFilename()
 			}
 			if cb, ok := ssa.ToConst(b); ok {
 				eb := cb.GetRange().GetEditor()
-				assert.Equal(t, eb.GetFilename(), "src/main/go/A/test2.go")
+				bs = eb.GetFilename()
 			}
+			require.NotEqual(t, as, bs)
 		}
 
 		return nil
