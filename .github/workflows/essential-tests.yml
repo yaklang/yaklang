@@ -103,18 +103,24 @@ jobs:
               go test -timeout 30s ./common/mutate
               go test -timeout 30s ./common/fuzzx
 
-          - name: Test SSA / SSARule / StaticAnalyze / Multilingual Frontend
+          - name: Test SSA / SSAAPI
             run: |
               # SSA
+              go test -timeout 20s ./common/yak/ssa/...
+              # SSAAPI
               go test -timeout 4m ./common/yak/ssaapi/... 
+
+          - name: Test StaticAnalyze / BuildIn SyntaxFlow Rule 
+            run: |
               # SSA plugin rule/option
               go test -timeout 20s ./common/yak/static_analyzer/test/...
               # StaticAnalyze
               go test -timeout 20s -run TestAnalyzeMustPASS* ./common/coreplugin
               # BuildIn SyntaxFlow Rule
               go test -timeout 1m ./common/syntaxflow/sfbuildin/...
-              # SSA UTIL
-              go test -timeout 20s ./common/yak/ssa/...
+
+          - name: Test SSA Frontend (yak/java/php/js/go)
+            run: |
               # yak ssa
               go test -timeout 20s ./common/yak/yak2ssa/test/...
               # Test Java Syntax
@@ -125,6 +131,7 @@ jobs:
               go test -timeout 60s ./common/yak/JS2ssa/...
               # Test go syntax
               go test -timeout 30s ./common/yak/go2ssa/...
+
           - name: Test SyntaxFlow Web Server
               go test -timeout 20s ./common/sfweb/...
 
