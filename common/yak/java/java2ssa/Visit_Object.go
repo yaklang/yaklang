@@ -15,12 +15,12 @@ func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext)
 	i, _ := raw.(*javaparser.ArrayInitializerContext)
 	if i == nil {
 		return nil
-}
+	}
 
 	allVariableInitializer := i.AllVariableInitializer()
 	if len(allVariableInitializer) == 0 {
 		return y.EmitMakeBuildWithType(
-			ssa.NewSliceType(ssa.BasicTypes[ssa.AnyTypeKind]),
+			ssa.NewSliceType(ssa.CreateAnyType()),
 			y.EmitConstInst(0), y.EmitConstInst(0),
 		)
 	}
