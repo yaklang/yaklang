@@ -96,11 +96,12 @@ import (
 
 
 func main() {
-	db, err := sql.Open("mysql","root:root@tcp(127.0.0.1:3306)/test")
+	db := function1()
 
 	router := gin.Default()
 	router.GET("/inject", func(ctx *gin.Context) {
-		rows, err := db.Query("11111111111") // db为side-effect，syntaxflow中应该能识别并查找到
+		db = function2()
+		db.Query("11111111111") // db为side-effect，syntaxflow中应该能识别并查找到
 	})
 	router.Run(Addr)
 }
@@ -108,13 +109,10 @@ func main() {
 
 	t.Run("side-effect bind syntaxflow", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
-			sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
-			$entry.Open <getCall> as $db;
-			$db <getMembers> as $output;
+			function1() as $output;
 			$output.Query as $query;
 	`, map[string][]string{
-			"output": {"Undefined-db(valid)", "Undefined-err(valid)"},
-			"query":  {""},
+			"query": {""},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }

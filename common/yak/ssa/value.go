@@ -96,6 +96,7 @@ func (b *FunctionBuilder) readValueEx(
 			para := b.BuildFreeValue(name)
 			para.SetDefault(parentValue)
 			para.SetType(parentValue.GetType())
+			parentValue.AddOccultation(para)
 			return para
 		}
 	}
