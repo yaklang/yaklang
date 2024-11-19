@@ -141,7 +141,7 @@ func (browser *VBrowser) browserInit() error {
 //	replaceModify = simulator.simple.responseModify("uapws/login.ajax", simulator.simple.bodyReplaceTarget, replaceStr)
 //	headless = simulator.simple.headless(false)
 //	browser = simulator.simple.createBrowser(headless, replaceModify)
-//	page = browser.Navigate("https://www.group-ib.com/blog/cron/", infoWaitFor)
+//	page = browser.Navigate("https://example.com/", infoWaitFor)
 //
 // ```
 func (browser *VBrowser) Navigate(urlStr string, waitFor string) (*VPage, error) {
