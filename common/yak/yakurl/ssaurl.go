@@ -331,29 +331,33 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 }
 
 type CodeRange struct {
-	URL         string `json:"url"`
-	StartLine   int64  `json:"start_line"`
-	StartColumn int64  `json:"start_column"`
-	EndLine     int64  `json:"end_line"`
-	EndColumn   int64  `json:"end_column"`
+	URL            string `json:"url"`
+	StartLine      int64  `json:"start_line"`
+	StartColumn    int64  `json:"start_column"`
+	EndLine        int64  `json:"end_line"`
+	EndColumn      int64  `json:"end_column"`
+	SourceCodeLine int64  `json:"source_code_line"`
 }
+
+const CodeContextLine = 3
 
 func coverCodeRange(programName string, r memedit.RangeIf) (*CodeRange, string) {
 	// url := ""
 	source := ""
 	ret := &CodeRange{
-		URL:         "",
-		StartLine:   0,
-		StartColumn: 0,
-		EndLine:     0,
-		EndColumn:   0,
+		URL:            "",
+		StartLine:      0,
+		StartColumn:    0,
+		EndLine:        0,
+		EndColumn:      0,
+		SourceCodeLine: 0,
 	}
 	if r == nil {
 		return ret, source
 	}
 	if editor := r.GetEditor(); editor != nil {
 		ret.URL = fmt.Sprintf("/%s/%s", programName, editor.GetFilename())
-		source = editor.GetTextContextWithPrompt(r, 1)
+		source = editor.GetTextFromRangeContext(r, CodeContextLine)
 	}
 	if start := r.GetStart(); start != nil {
 		ret.StartLine = int64(start.GetLine())
@@ -363,14 +367,18 @@ func coverCodeRange(programName string, r memedit.RangeIf) (*CodeRange, string) 
 		ret.EndLine = int64(end.GetLine())
 		ret.EndColumn = int64(end.GetColumn())
 	}
+	if start := ret.StartLine - CodeContextLine - 1; start > 0 {
+		ret.SourceCodeLine = start
+	}
 	return ret, source
 }
 
 type NodeInfo struct {
-	NodeID     string     `json:"node_id"`
-	IRCode     string     `json:"ir_code"`
-	SourceCode string     `json:"source_code"`
-	CodeRange  *CodeRange `json:"code_range"`
+	NodeID          string     `json:"node_id"`
+	IRCode          string     `json:"ir_code"`
+	SourceCode      string     `json:"source_code"`
+	SourceCodeStart int        `json:"source_code_start"`
+	CodeRange       *CodeRange `json:"code_range"`
 }
 
 func coverNodeInfos(graph *ssaapi.ValueGraph, programName string) []*NodeInfo {
