@@ -2,8 +2,12 @@ package mutate
 
 import (
 	"fmt"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	url2 "net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -126,4 +130,39 @@ Host: www.example.com
 		_ = i
 	}
 
+}
+
+func TestBatchTargetHost(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK`))
+	addr := fmt.Sprintf("%s:%d", host, port)
+	testcases := []struct {
+		url    string
+		expect string
+	}{
+		{"127.0.0.1", "http://127.0.0.1"},
+		{"https://127.0.0.1:443", "https://127.0.0.1"},
+		{"http://127.0.0.1", "http://127.0.0.1"},
+		{"http://127.0.0.1:80", "http://127.0.0.1"},
+		{"http://127.0.0.1:90", "http://127.0.0.1:90"},
+	}
+	targetList := lo.Map(testcases, func(item struct {
+		url    string
+		expect string
+	}, index int) string {
+		return item.url
+	})
+	packet, _ := lowhttp.UrlToHTTPRequest(`http://www.example.com`)
+	resCh, err := _httpPool(packet, WithPoolOpt_BatchTarget(strings.Join(targetList, "\n")), WithPoolOpt_Proxy("http://"+addr), WithPoolOpt_Timeout(0.1), WithPoolOpt_Concurrent(1))
+	assert.NoError(t, err)
+	i := 0
+	for res := range resCh {
+		host := lowhttp.GetHTTPPacketHeader(res.RequestRaw, "host")
+		urlIns, err := url2.Parse(testcases[i].expect)
+		assert.NoError(t, err)
+		assert.Equal(t, urlIns.Host, host)
+		i++
+		if i == len(testcases) {
+			break
+		}
+	}
 }

@@ -178,6 +178,39 @@ func simpleDumpHTTPRequest(r *http.Request) []byte {
 	return buf.Bytes()
 }
 
+// FixHttpURL fill the scheme and simplify the host
+// Example: FixHttpURL("example.com") => "http://example.com" FixHttpURL("https://example.com:443/abc") => "https://example.com/abc"
+func FixHttpURL(u string) (string, error) {
+	// fix url scheme by port if not set scheme
+	u = FixURLScheme(u)
+	urlPath := utils.ExtractRawPath(u)
+	host, port, _ := utils.ParseStringToHostPort(u)
+	if host == "" {
+		return "", errors.New("empty host")
+	}
+	isHttps := false
+	if strings.HasPrefix(u, "https://") {
+		isHttps = true
+	}
+	// fix port by scheme
+	if port == 0 {
+		if isHttps {
+			port = 443
+		} else {
+			port = 80
+		}
+	}
+	if isHttps {
+		if port == 443 {
+			return fmt.Sprintf("https://%s%s", host, urlPath), nil
+		}
+		return fmt.Sprintf("https://%s:%d%s", host, port, urlPath), nil
+	}
+	if port == 80 {
+		return fmt.Sprintf("http://%s%s", host, urlPath), nil
+	}
+	return fmt.Sprintf("http://%s:%d%s", host, port, urlPath), nil
+}
 func FixURLScheme(u string) string {
 	if strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://") {
 		return u
