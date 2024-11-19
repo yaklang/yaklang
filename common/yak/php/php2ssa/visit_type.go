@@ -12,14 +12,14 @@ import (
 
 func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TypeHintContext)
 	if i == nil {
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	}
 	if r := i.QualifiedStaticTypeRef(); r != nil {
 		//这里类型就行修复
@@ -138,13 +138,13 @@ func (y *builder) VisitCastOperation(raw phpparser.ICastOperationContext) ssa.Ty
 	case i.UnicodeCast() != nil:
 		return ssa.GetStringType()
 	case i.Array() != nil:
-		return ssa.NewMapType(ssa.GetAnyType(), ssa.GetAnyType())
+		return ssa.NewMapType(ssa.CreateAnyType(), ssa.CreateAnyType())
 	case i.ObjectType() != nil:
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	case i.Unset() != nil:
 		return ssa.GetNullType()
 	default:
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	}
 	return nil
 }

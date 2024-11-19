@@ -62,7 +62,7 @@ func (y *builder) AddFullTypeNameRaw(typName string, typ ssa.Type) ssa.Type {
 	}
 
 	if typ == nil {
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	}
 	typ.AddFullTypeName(typName)
 	return typ
@@ -75,7 +75,7 @@ func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type 
 	}
 
 	if typ == nil {
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	}
 
 	typStr := typName
@@ -103,7 +103,7 @@ func (y *builder) MergeFullTypeNameForType(allTypName []string, typ ssa.Type) ss
 	}
 
 	if typ == nil {
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	}
 	for _, typStr := range allTypName {
 		if !utils.ContainsAll[string](typ.GetFullTypeNames(), typStr) {
@@ -154,7 +154,7 @@ func (y *builder) AddFullTypeNameFromAnnotationMap(typName string, typ ssa.Type)
 	}
 
 	if typ == nil {
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	}
 
 	for _, p := range y.allImportPkgSlice {
