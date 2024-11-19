@@ -157,8 +157,10 @@ func WithConfigInfo(input map[string]any) Option {
 		info := string(raw)
 
 		c.info = info
-		if err := c.initializeFromInfo(); err != nil {
+		if fs, err := initializeFromInfo(info); err != nil {
 			c.err = err
+		} else {
+			c.fs = fs
 		}
 	}
 }

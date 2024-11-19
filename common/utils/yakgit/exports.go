@@ -5,7 +5,7 @@ var Exports = map[string]any{
 
 	// githack
 	"GitHack":       GitHack,
-	"Clone":         clone,
+	"Clone":         Clone,
 	"Pull":          pull,
 	"Fetch":         fetch,
 	"Checkout":      checkout,

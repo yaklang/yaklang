@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	gitClient "github.com/go-git/go-git/v5/plumbing/transport/client"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/yaklang/yaklang/common/log"
@@ -34,7 +35,7 @@ func SetProxy(proxies ...string) {
 // ```
 // git.Clone("https://github.com/yaklang/yaklang", "C:/Users/xxx/Desktop/yaklang", git.recursive(true), git.verify(false))
 // ```
-func clone(u string, localPath string, opt ...Option) error {
+func Clone(u string, localPath string, opt ...Option) error {
 	c := &config{}
 	for _, o := range opt {
 		if err := o(c); err != nil {
@@ -47,11 +48,13 @@ func clone(u string, localPath string, opt ...Option) error {
 
 	respos, err := git.PlainCloneContext(c.Context, localPath, false, &git.CloneOptions{
 		URL:               u,
-		Auth:              c.ToAuth(),
+		Auth:              c.Auth,
 		Depth:             c.Depth,
 		RecurseSubmodules: c.ToRecursiveSubmodule(),
 		InsecureSkipTLS:   !c.VerifyTLS,
 		Progress:          os.Stdout,
+		ProxyOptions:      c.Proxy,
+		ReferenceName:     plumbing.ReferenceName(c.Branch),
 	})
 	if err != nil {
 		return utils.Wrapf(err, "git clone: %v to %v failed", u, localPath)
