@@ -3,12 +3,13 @@ package yakgit
 import (
 	"context"
 
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
 type config struct {
@@ -16,13 +17,15 @@ type config struct {
 	Cancel  context.CancelFunc
 
 	VerifyTLS          bool
-	Username           string
-	Password           string
+	Auth               transport.AuthMethod
 	Depth              int
 	RecursiveSubmodule bool
 
 	// remote operation
 	Remote string
+	Branch string
+
+	Proxy transport.ProxyOptions
 
 	// Force
 	Force        bool
@@ -65,17 +68,6 @@ func (c *config) ToRecursiveSubmodule() git.SubmoduleRescursivity {
 		recursiveSubmodule = git.NoRecurseSubmodules
 	}
 	return recursiveSubmodule
-}
-
-func (c *config) ToAuth() gitHttp.AuthMethod {
-	var auth gitHttp.AuthMethod
-	if c.Username != "" && c.Password != "" {
-		auth = &gitHttp.BasicAuth{
-			Username: c.Username,
-			Password: c.Password,
-		}
-	}
-	return auth
 }
 
 type Option func(*config) error
@@ -246,6 +238,13 @@ func WithRemote(remote string) Option {
 	}
 }
 
+func WithBranch(branch string) Option {
+	return func(c *config) error {
+		c.Branch = branch
+		return nil
+	}
+}
+
 // recursive 是一个选项函数，用于指定其他 Git 操作（例如Clone）时的是否递归克隆子模块，默认为false
 // Example:
 // ```
@@ -277,9 +276,24 @@ func WithContext(ctx context.Context) Option {
 // ```
 func WithUsernamePassword(username, password string) Option {
 	return func(c *config) error {
-		c.Username = username
-		c.Password = password
+		if username != "" && password != "" {
+			c.Auth = &gitHttp.BasicAuth{
+				Username: username,
+				Password: password,
+			}
+		}
 		return nil
+	}
+}
+
+func WithPrivateKey(userName, keyPath, password string) Option {
+	return func(c *config) error {
+		if auth, err := ssh.NewPublicKeysFromFile(userName, keyPath, password); err == nil {
+			c.Auth = auth
+			return nil
+		} else {
+			return err
+		}
 	}
 }
 
@@ -315,6 +329,17 @@ func WithUseLocalGitBinary(b bool) Option {
 func WithHTTPOptions(opts ...poc.PocConfigOption) Option {
 	return func(c *config) error {
 		c.HTTPOptions = opts
+		return nil
+	}
+}
+
+func WithProxy(proxyUrl, proxyName, proxyPasswd string) Option {
+	return func(c *config) error {
+		c.Proxy = transport.ProxyOptions{
+			URL:      proxyUrl,
+			Username: proxyName,
+			Password: proxyPasswd,
+		}
 		return nil
 	}
 }

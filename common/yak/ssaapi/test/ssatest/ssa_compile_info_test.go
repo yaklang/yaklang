@@ -82,10 +82,10 @@ func TestJar(t *testing.T) {
 
 func Test_Multiple_input(t *testing.T) {
 
-	check := func(info string) {
+	check := func(info map[string]any, language string) {
 		progName := uuid.NewString()
 		res, err := ssaapi.ParseProject(
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithRawLanguage(language),
 			ssaapi.WithConfigInfo(info),
 			ssaapi.WithProgramName(progName),
 			ssaapi.WithSaveToProfile(),
@@ -126,13 +126,10 @@ func Test_Multiple_input(t *testing.T) {
 		err = os.WriteFile(zipPath, zipData, 0644)
 		require.NoError(t, err)
 
-		info := `
-		{
-			"kind": "compression",
-			"local_file": "` + zipPath + `"
-		}
-		`
-		check(info)
+		check(map[string]any{
+			"kind":       "compression",
+			"local_file": zipPath,
+		}, "java")
 	})
 
 	t.Run("test jar input", func(t *testing.T) {
@@ -144,12 +141,10 @@ func Test_Multiple_input(t *testing.T) {
 		err = os.WriteFile(jarPath, jar, 0644)
 		require.NoError(t, err)
 
-		info := `
-		{
-			"kind": "jar",
-			"local_file": "` + jarPath + `"
-		}
-		`
-		check(info)
+		check(map[string]any{
+			"kind":       "jar",
+			"local_file": jarPath,
+		}, "java")
 	})
+
 }

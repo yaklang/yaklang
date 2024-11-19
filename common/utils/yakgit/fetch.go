@@ -34,7 +34,7 @@ func fetch(localPath string, opts ...Option) error {
 	err = repos.FetchContext(c.Context, &git.FetchOptions{
 		RemoteName:      c.Remote,
 		Depth:           c.Depth,
-		Auth:            c.ToAuth(),
+		Auth:            c.Auth,
 		Progress:        os.Stdout,
 		Tags:            tag,
 		Force:           c.Force,
