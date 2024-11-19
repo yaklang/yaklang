@@ -752,7 +752,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	}
 
 	if len(params.GetColor()) > 0 {
-		db = bizhelper.FuzzSearchWithStringArrayOrAf(db, []string{"tags"}, params.GetColor(), false)
+		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, params.GetColor(), false)
 	}
 
 	// 搜索 Content-Type

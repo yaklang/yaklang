@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"fmt"
+	"github.com/segmentio/ksuid"
 	"testing"
 
 	"github.com/google/uuid"
@@ -277,4 +278,21 @@ func TestHTTPFlow_StatusCode(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, flows, 0)
 	})
+}
+
+func TestColorFilter(t *testing.T) {
+	token := ksuid.New().String()
+	colorToken := ksuid.New().String()
+	jsFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s.js", token),
+		Path: fmt.Sprintf("https://example.com/%s.js", token),
+		Tags: fmt.Sprintf("SQL注入测试点|%s|SQL注入测试点", colorToken),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase(), jsFlow)
+	db := FilterHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+		Color: []string{colorToken},
+	})
+	res := []*schema.HTTPFlow{}
+	db.Find(&res)
+	assert.Len(t, res, 1)
 }
