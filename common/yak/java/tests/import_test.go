@@ -93,8 +93,9 @@ class A{
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `off #-> * as $param`, map[string][]string{"param": {"1"}}, false, ssaapi.WithLanguage(ssaapi.JAVA))
 }
 func TestImportClass(t *testing.T) {
-	fs := filesys.NewVirtualFs()
-	fs.AddFile("com/example/demo1/A.java", `
+	t.Run("import class", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("com/example/demo1/A.java", `
 package com.example.demo1;
 class A {
     public static int a = 1;
@@ -103,7 +104,7 @@ class A {
 	}
 }
 `)
-	fs.AddFile("com/example/demo2/test.java", `
+		fs.AddFile("com/example/demo2/test.java", `
 package com.example.demo2;
 import com.example.demo1.A;
 class test {
@@ -112,5 +113,32 @@ class test {
     }
 }
 `)
-	ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{"param": {"1"}}, false, ssaapi.WithLanguage(ssaapi.JAVA))
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{"param": {"1"}}, false, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+	t.Run("import class2", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("a.java", `
+package com.example.demo1;
+import com.example.demo.B;
+class A{
+	public B b;
+	public void main(){
+		println(this.b.a);
+	}
+}
+
+`)
+		fs.AddFile("b.java", `
+package com.example.demo;
+class B{
+	public static int a = 1;
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* as $sink)`,
+			map[string][]string{
+				"sink": {"1"},
+			},
+			true,
+			ssaapi.WithLanguage(ssaapi.JAVA))
+	})
 }
