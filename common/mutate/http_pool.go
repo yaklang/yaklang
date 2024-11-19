@@ -925,7 +925,12 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						} else if strings.HasPrefix(strings.ToLower(newTarget), "http://") {
 							isHTTPS = false
 						}
-						host, port, _ := utils.ParseStringToHostPort(newTarget)
+						newTargetUrl, err := lowhttp.FixHttpURL(newTarget)
+						if err != nil {
+							log.Errorf("fix url failed: %s", err)
+							continue
+						}
+						host, port, _ := utils.ParseStringToHostPort(newTargetUrl)
 						if (isHTTPS && port != 443) || (!isHTTPS && port != 80) {
 							// hide port
 							overrideHost = utils.HostPort(host, port)
