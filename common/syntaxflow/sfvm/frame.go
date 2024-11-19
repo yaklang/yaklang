@@ -58,7 +58,6 @@ type SFFrame struct {
 	Text   string
 	Codes  []*SFI
 	toLeft bool
-	debug  bool
 
 	predCounter int
 }
@@ -272,7 +271,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			if s.stack.Len() != checkLen {
 				err := utils.Errorf("filter expr stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
 				log.Errorf("%v", err)
-				if s.debug {
+				if s.config.debug {
 					return err
 				}
 				s.stack.PopN(s.stack.Len() - checkLen)
@@ -293,7 +292,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			if s.stack.Len() != checkLen {
 				err := utils.Errorf("filter statement stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
 				log.Errorf("%v", err)
-				if s.debug {
+				if s.config.debug {
 					return err
 				}
 				s.stack.PopN(s.stack.Len() - checkLen)

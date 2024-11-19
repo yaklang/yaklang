@@ -114,7 +114,6 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	result.VisitFlow(flow)
 	result.rule.OpCodes = result.codes.ToString()
 	frame = result.CreateFrame(s.vars)
-	frame.debug = s.config.debug
 	frame.config = s.config
 	if len(result.verifyFilesystem) > 0 {
 		frame.VerifyFs = result.verifyFilesystem
