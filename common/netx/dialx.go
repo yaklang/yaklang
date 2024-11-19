@@ -191,9 +191,6 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	}
 
 	sni := utils.ExtractHost(target)
-	if config.ShouldOverrideSNI {
-		sni = config.SNI
-	}
 
 	minVer, maxVer := consts.GetGlobalTLSVersion()
 	var tlsConfig = &gmtls.Config{
@@ -206,6 +203,10 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	if config.ShouldOverrideTLSConfig {
 		tlsConfig = config.TLSConfig
 	}
+	if config.ShouldOverrideSNI {
+		tlsConfig.ServerName = config.SNI
+	}
+
 	tlsTimeout := 10 * time.Second
 	if config.TLSTimeout > 0 {
 		tlsTimeout = config.TLSTimeout

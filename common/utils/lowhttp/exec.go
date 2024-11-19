@@ -523,8 +523,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				log.Debugf("generate random JA3 fingerprint failed: %v", err)
 			}
 		}
-		if sni != "" {
-			dialopts = append(dialopts, netx.DialX_WithSNI(sni))
+		if sni != nil {
+			dialopts = append(dialopts, netx.DialX_WithSNI(*sni))
 		}
 	}
 

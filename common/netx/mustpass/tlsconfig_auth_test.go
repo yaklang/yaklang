@@ -2,6 +2,7 @@ package mustpass
 
 import (
 	"crypto/tls"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -204,4 +205,12 @@ func TestTLSConfigAuth2(t *testing.T) {
 	if string(buf) != token {
 		t.Fatal("token not match")
 	}
+}
+
+func TestDialxGm(t *testing.T) {
+	t.Skip("skip")
+	addr := "180.163.248.139:443"
+	conn, err := netx.DialX(addr, netx.DialX_WithTLS(true), netx.DialX_WithGMTLSSupport(true), netx.DialX_WithGMTLSOnly(true), netx.DialX_WithSNI("sm2test.ovssl.cn"), netx.DialX_WithTLSTimeout(100*time.Second), netx.DialX_Debug(true))
+	require.NoError(t, err)
+	spew.Dump(conn)
 }
