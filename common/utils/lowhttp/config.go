@@ -80,7 +80,7 @@ type LowhttpExecConfig struct {
 	BodyStreamReaderHandler func(responseHeader []byte, closer io.ReadCloser)
 
 	// SNI
-	SNI string
+	SNI *string
 
 	// payloads (web fuzzer)
 	Payloads []string
@@ -623,7 +623,7 @@ func WithConnPool(b bool) LowhttpOpt {
 
 func WithSNI(sni string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.SNI = sni
+		o.SNI = &sni
 	}
 }
 
