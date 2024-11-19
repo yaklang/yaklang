@@ -209,7 +209,6 @@ class IA {
 package com.a.example;
 import com.a.example.impl.IAImpl;
 import com.a.example.impl.IAImpl2;
-import com.a.example.IA;
 class User {
     private IA ia;
 	private IAImpl iai; 
@@ -285,4 +284,23 @@ class User {
 		}, true, ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
+}
+func TestPackageDecl(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("a.java", `package main;
+class A{
+	public B b;
+	public void a(){
+		println(b.a);
+	}
+}`)
+	fs.AddFile("b.java", `package main;
+class B{
+	public static int a = 1;
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`,
+		map[string][]string{},
+		false,
+		ssaapi.WithLanguage(ssaapi.JAVA))
 }
