@@ -22,11 +22,11 @@ import (
 
 
 func main() {
-	db, err := sql.Open("mysql","root:root@tcp(127.0.0.1:3306)/test")
+	db, _ := sql.Open("mysql","root:root@tcp(127.0.0.1:3306)/test")
 
 	router := gin.Default()
 	router.GET("/inject", func(ctx *gin.Context) {
-		rows, err := db.Query("11111111111") // db为freevalue，syntaxflow中应该能识别并查找到
+		db.Query("11111111111") // db为freevalue，syntaxflow中应该能识别并查找到
 	})
 	router.Run(Addr)
 }
@@ -39,8 +39,43 @@ func main() {
 			$db <getMembers> as $output;
 			$output.Query as $query;
 	`, map[string][]string{
-			"output": {"Undefined-db(valid)", "Undefined-err(valid)"},
-			"query":  {""},
+			"query": {"ParameterMember-freeValue-db.Query"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	code = `package example
+
+import (
+	"flag"
+	"log"
+
+	"database/sql"
+
+	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
+)
+
+
+func main() {
+	db, _ := sql.Open("mysql","root:root@tcp(127.0.0.1:3306)/test")
+
+	router := gin.Default()
+	router.GET("/inject", func(ctx *gin.Context) {
+		db2 := db
+		db2.Query("11111111111") // db为freevalue，syntaxflow中应该能识别并查找到
+	})
+	router.Run(Addr)
+}
+`
+
+	t.Run("freevalue bind syntaxflow indirect", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+			sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
+			$entry.Open <getCall> as $db;
+			$db <getMembers> as $output;
+			$output.Query as $query;
+	`, map[string][]string{
+			"query": {"ParameterMember-freeValue-db.Query"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }
