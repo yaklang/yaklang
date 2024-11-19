@@ -21,8 +21,17 @@ func UpdatePluginEnv(db *gorm.DB, key string, value string) error {
 }
 
 func CreateOrUpdatePluginEnv(db *gorm.DB, key string, value string) error {
-	if db := db.Where("key = ?", key).Assign(schema.PluginEnv{Key: key, Value: value}).FirstOrCreate(&schema.PluginEnv{}); db.Error != nil {
-		return db.Error
+	if findDb := db.Where("key = ?", key).Find(&schema.PluginEnv{}); findDb.Error != nil {
+		if !findDb.RecordNotFound() {
+			return findDb.Error
+		}
+		if db := db.Create(&schema.PluginEnv{Key: key, Value: value}); db.Error != nil {
+			return db.Error
+		}
+	} else {
+		if db := db.Model(&schema.PluginEnv{}).Where("key = ?", key).Update("value", value); db.Error != nil {
+			return db.Error
+		}
 	}
 	return nil
 }

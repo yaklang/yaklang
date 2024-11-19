@@ -34,6 +34,13 @@ func TestGRPC_PluginEnv(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, tokenValue2, actualValue)
 
+		_, err = client.SetPluginEnv(ctx, &ypb.PluginEnvData{Env: []*ypb.KVPair{{Key: tokenKey, Value: ""}}}) // test empty value
+		require.NoError(t, err)
+
+		actualValue, err = yakit.GetPluginEnvByKey(consts.GetGormProfileDatabase(), tokenKey)
+		require.NoError(t, err)
+		require.Equal(t, "", actualValue)
+
 	})
 
 	t.Run("test get all env", func(t *testing.T) {
