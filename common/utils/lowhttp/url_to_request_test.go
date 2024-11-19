@@ -213,7 +213,7 @@ func TestUrlToHTTPRequest(t *testing.T) {
 	}
 }
 
-func TestFixURL(t *testing.T) {
+func TestFixURLScheme(t *testing.T) {
 	t.Run("no scheme 80 port", func(t *testing.T) {
 		require.Equal(t, "http://example.com", FixURLScheme("example.com:80"))
 	})
@@ -229,4 +229,69 @@ func TestFixURL(t *testing.T) {
 	t.Run("normal https", func(t *testing.T) {
 		require.Equal(t, "http://example.com:8443", FixURLScheme("http://example.com:8443"))
 	})
+}
+func TestFixHttpURL(t *testing.T) {
+	for _, testcase := range []struct {
+		url    string
+		expect string
+		name   string
+	}{
+		// fix schema
+		{
+			name:   "fix scheme by port 1",
+			url:    "example.com:80",
+			expect: "http://example.com",
+		},
+		{
+			name:   "fix scheme by port 2",
+			url:    "example.com:443",
+			expect: "https://example.com",
+		},
+		{
+			name:   "fix scheme by default1",
+			url:    "example.com",
+			expect: "http://example.com",
+		},
+		{
+			name:   "fix scheme by default2",
+			url:    "example.com:801",
+			expect: "http://example.com:801",
+		},
+		// simplify the host
+		{
+			name:   "simplify the host 1",
+			url:    "http://example.com:80",
+			expect: "http://example.com",
+		},
+		{
+			name:   "simplify the host 2",
+			url:    "https://example.com:443",
+			expect: "https://example.com",
+		},
+		// simplify the host negative test
+		{
+			name:   "simplify the host negative test 1",
+			url:    "http://example.com:443",
+			expect: "http://example.com:443",
+		},
+		{
+			name:   "simplify the host negative test 2",
+			url:    "https://example.com:80",
+			expect: "https://example.com:80",
+		},
+		// check path
+		{
+			name:   "check path",
+			url:    "https://example.com:80/abc",
+			expect: "https://example.com:80/abc",
+		},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			u, err := FixHttpURL(testcase.url)
+			if err != nil {
+				t.Fatal(err)
+			}
+			require.Equal(t, testcase.expect, u)
+		})
+	}
 }
