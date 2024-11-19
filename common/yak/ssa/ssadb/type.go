@@ -35,10 +35,9 @@ func SaveType(kind int, str string, extra string) int {
 	irType.Hash = irType.CalcHash()
 
 	err := utils.GormTransaction(GetDB(), func(tx *gorm.DB) error {
-		rawDB := tx.Model(&IrType{})
-		if queryDB := rawDB.Where("hash = ? ", irType.Hash).First(&irType); queryDB.Error != nil {
+		if queryDB := tx.Model(&IrType{}).Where("hash = ? ", irType.Hash).First(&irType); queryDB.Error != nil {
 			if queryDB.RecordNotFound() {
-				if saveDB := rawDB.Save(&irType); saveDB.Error != nil {
+				if saveDB := tx.Model(&IrType{}).Save(&irType); saveDB.Error != nil {
 					return saveDB.Error
 				}
 			} else {
