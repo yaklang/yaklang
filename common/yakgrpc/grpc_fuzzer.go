@@ -706,6 +706,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_RandomSession(true),
 		}
 
+		if req.GetOverwriteSNI() {
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_SNI(req.GetSNI()))
+		}
+
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
 		forceFuzz := req.GetForceFuzz()  // true/false
 		if fuzzMode == "" {              // 以forceFuzz为准

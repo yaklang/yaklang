@@ -32,7 +32,7 @@ type dialXConfig struct {
 	GMTLSPrefer       bool
 	GMTLSOnly         bool
 	TLSTimeout        time.Duration
-	ShouldOverrideSNI bool
+	ShouldOverrideSNI bool // High priority (will overwrite TlsConfig)
 	SNI               string
 	TLSNextProto      []string
 

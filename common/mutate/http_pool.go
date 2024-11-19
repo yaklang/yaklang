@@ -97,6 +97,8 @@ type httpPoolConfig struct {
 	RandomSession bool // for cookie jar
 
 	FromPlugin string
+
+	SNI *string
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -469,6 +471,12 @@ func _httpPool_fromPlugin(plugin string) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_sni(sni string) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.SNI = &sni
+	}
+}
+
 func _httpPool_extraMutateCondition(codes ...*RegexpMutateCondition) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.ExtraRegexpMutateCondition = codes
@@ -773,6 +781,11 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithGmTLS(config.IsGmTLS),
 							lowhttp.WithConnPool(config.WithConnPool),
 						}
+
+						if config.SNI != nil {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithSNI(*config.SNI))
+						}
+
 						if config.RandomSession {
 							tmpSession := uuid.NewString()
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithSession(tmpSession))
@@ -1041,6 +1054,7 @@ var (
 	WithPoolOpt_noFixContentLength         = _httpPool_noFixContentLength
 	WithPoolOpt_Proxy                      = _httpPool_proxies
 	WithPoolOpt_FromPlugin                 = _httpPool_fromPlugin
+	WithPoolOpt_SNI                        = _httpPool_sni
 	WithPoolOpt_Timeout                    = _httpPool_PerRequestTimeout
 	WithPoolOpt_Concurrent                 = _httpPool_SetSize
 	WithPoolOpt_SizedWaitGroup             = _httpPool_SetSizedWaitGroup
