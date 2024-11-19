@@ -6,8 +6,8 @@ import (
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-func Test_Cross_SideEffect(t *testing.T) {
-	t.Run("SideEffect bind", func(t *testing.T) {
+func Test_Closu_SideEffect(t *testing.T) {
+	t.Run("side-effect bind", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		
 		func main(){
