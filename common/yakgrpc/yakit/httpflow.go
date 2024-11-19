@@ -11,6 +11,7 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -1167,4 +1168,16 @@ func HTTPFlowToOnline(db *gorm.DB, hash []string) error {
 		return utils.Errorf("HTTPFlowToOnline failed %s", db.Error)
 	}
 	return nil
+}
+
+func QueryHTTPFlowsProcessNames(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) ([]string, error) {
+	var processNames []string
+	db = db.Model(&schema.HTTPFlow{})
+	db = FilterHTTPFlow(db, params)
+	if db := db.Pluck("DISTINCT(`process_name`)", &processNames); db.Error != nil {
+		return nil, db.Error
+	}
+	return lo.Filter(processNames, func(item string, _ int) bool {
+		return item != ""
+	}), nil
 }

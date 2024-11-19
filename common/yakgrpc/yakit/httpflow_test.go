@@ -280,6 +280,92 @@ func TestHTTPFlow_StatusCode(t *testing.T) {
 	})
 }
 
+func TestQueryHTTPFlowsProcessNames(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		processNames := make([]string, 0, 5)
+		ids := make([]int64, 0, 5)
+		defer func() {
+			if len(ids) > 0 {
+				DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+					Id: ids,
+				})
+			}
+		}()
+		for i := 0; i < 5; i++ {
+			processName := utils.RandString(16)
+			processNames = append(processNames, processName)
+			flow := &schema.HTTPFlow{
+				Url:         uuid.NewString(),
+				ProcessName: processName,
+			}
+			err := InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
+			require.NoError(t, err)
+			require.NotEmpty(t, flow.ID)
+			ids = append(ids, int64(flow.ID))
+		}
+
+		db := consts.GetGormProjectDatabase()
+		got, err := QueryHTTPFlowsProcessNames(db, &ypb.QueryHTTPFlowRequest{
+			ProcessName: processNames,
+		})
+		require.NoError(t, err)
+		require.ElementsMatch(t, processNames, got)
+	})
+
+	t.Run("distinct", func(t *testing.T) {
+		processNames := make([]string, 0, 5)
+		ids := make([]int64, 0, 5)
+		defer func() {
+			if len(ids) > 0 {
+				DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+					Id: ids,
+				})
+			}
+		}()
+		processName := utils.RandString(16)
+		for i := 0; i < 5; i++ {
+			processNames = append(processNames, processName)
+			flow := &schema.HTTPFlow{
+				Url:         uuid.NewString(),
+				ProcessName: processName,
+			}
+			err := InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
+			require.NoError(t, err)
+			require.NotEmpty(t, flow.ID)
+			ids = append(ids, int64(flow.ID))
+		}
+
+		db := consts.GetGormProjectDatabase()
+		got, err := QueryHTTPFlowsProcessNames(db, &ypb.QueryHTTPFlowRequest{
+			ProcessName: append(processNames, processNames...),
+		})
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		require.Equal(t, processName, got[0])
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		runtimeID := uuid.NewString()
+		flow := &schema.HTTPFlow{
+			Url:         uuid.NewString(),
+			RuntimeId:   runtimeID,
+			ProcessName: "",
+		}
+		err := InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
+		require.NoError(t, err)
+		require.NotEmpty(t, flow.ID)
+		defer DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+			Id: []int64{int64(flow.ID)},
+		})
+		db := consts.GetGormProjectDatabase()
+		got, err := QueryHTTPFlowsProcessNames(db, &ypb.QueryHTTPFlowRequest{
+			RuntimeId: runtimeID,
+		})
+		require.NoError(t, err)
+		require.Len(t, got, 0)
+	})
+}
+
 func TestColorFilter(t *testing.T) {
 	token := ksuid.New().String()
 	colorToken := ksuid.New().String()
