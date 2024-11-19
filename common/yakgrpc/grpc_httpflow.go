@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/mimetype"
-	"github.com/yaklang/yaklang/common/mutate"
 	"io"
 	"os"
 	"path"
@@ -13,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/mutate"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
@@ -144,7 +145,7 @@ func (s *Server) GetHTTPFlowBodyById(r *ypb.GetHTTPFlowBodyByIdRequest, stream y
 				packet = flow.Response
 			}
 
-			//get filename
+			// get filename
 			u := utils.ParseStringToUrl(flow.Url)
 			base := path.Base(u.Path)
 			if !strings.Contains(base, ".") {
@@ -776,4 +777,15 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 	}
 
 	return &ypb.Empty{}, nil
+}
+
+func (s *Server) QueryHTTPFlowsProcessNames(ctx context.Context, req *ypb.QueryHTTPFlowRequest) (*ypb.QueryHTTPFlowsProcessNamesResponse, error) {
+	db := s.GetProjectDatabase()
+	processNames, err := yakit.QueryHTTPFlowsProcessNames(db, req)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.QueryHTTPFlowsProcessNamesResponse{
+		ProcessNames: processNames,
+	}, nil
 }

@@ -212,6 +212,7 @@ service Yak {
   rpc GetHTTPFlowBare(HTTPFlowBareRequest) returns (HTTPFlowBareResponse);
   rpc ExportHTTPFlows(ExportHTTPFlowsRequest) returns(QueryHTTPFlowResponse);
   rpc HTTPFlowsToOnline(HTTPFlowsToOnlineRequest) returns (Empty);
+  rpc QueryHTTPFlowsProcessNames(QueryHTTPFlowRequest) returns (QueryHTTPFlowsProcessNamesResponse);
 
   // 从一个 FuzzerRequest 中提取 Url
   rpc ExtractUrl(FuzzerRequest) returns (ExtractedUrl);
@@ -4708,6 +4709,10 @@ message ExportHTTPFlowsRequest {
   QueryHTTPFlowRequest ExportWhere = 1;
   repeated int64 Ids = 2;
   repeated string FieldName = 3;
+}
+
+message QueryHTTPFlowsProcessNamesResponse {
+    repeated string ProcessNames = 1;
 }
 
 message DeleteHTTPFlowRequest {
