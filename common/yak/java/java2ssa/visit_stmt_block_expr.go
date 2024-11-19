@@ -1727,7 +1727,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 	}
 	log.Errorf("array  init failed.")
 	obj = y.EmitMakeWithoutType(nil, nil)
-	obj.SetType(ssa.GetAnyType())
+	obj.SetType(ssa.CreateAnyType())
 	return obj, nil
 
 }
@@ -1779,7 +1779,7 @@ func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext,
 	allExpr := i.AllExpression()
 	var slice ssa.Value
 	if allExpr == nil {
-		slice = y.EmitMakeBuildWithType(ssa.NewSliceType(ssa.BasicTypes[ssa.AnyTypeKind]),
+		slice = y.EmitMakeBuildWithType(ssa.NewSliceType(ssa.CreateAnyType()),
 			y.EmitConstInst(0), y.EmitConstInst(0))
 	}
 	slice = y.InterfaceAddFieldBuild(len(allExpr),
@@ -1810,7 +1810,7 @@ func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) (typ ssa.
 	if ret := i.PrimitiveType(); ret != nil {
 		typ = y.VisitPrimitiveType(ret)
 	} else {
-		typ = ssa.GetAnyType()
+		typ = ssa.CreateAnyType()
 	}
 	for _, name := range i.AllIdentifier() {
 		text := name.GetText()
