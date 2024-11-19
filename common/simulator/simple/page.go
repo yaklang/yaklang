@@ -3,7 +3,6 @@ package simple
 import (
 	"encoding/base64"
 	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"time"
@@ -31,18 +30,29 @@ func (page *VPage) Navigate(urlStr string, waitFor string) error {
 		log.Error(err)
 		return err
 	}
-	page.page = page.page.CancelTimeout()
+	//page.page = page.page.CancelTimeout()
 	return nil
 }
 
+// Element 返回页面中匹配css selector的一个元素
+// Example:
+// page, _ = browser.Navigate("https://example.com", "")
+// element, _ = page.Element("#pageName") // 匹配id为pageName的元素
 func (page *VPage) Element(selector string) (*VElement, error) {
-	element, err := page.page.Element(selector)
+	elements, err := page.page.Elements(selector)
 	if err != nil {
 		return nil, utils.Errorf("element find error: %s", err)
 	}
-	return &VElement{element: element}, nil
+	if len(elements) == 0 {
+		return nil, utils.Errorf("element not found")
+	}
+	return &VElement{element: elements.First()}, nil
 }
 
+// Elements 返回页面中匹配css selector的所有元素
+// Example:
+// page, _ = browser.Navigate("https://example.com", "")
+// elements, _ = page.Element("p") // 匹配所有p标签元素
 func (page *VPage) Elements(selector string) (VElements, error) {
 	var result VElements
 	elements, err := page.page.Elements(selector)
@@ -55,31 +65,38 @@ func (page *VPage) Elements(selector string) (VElements, error) {
 	return result, nil
 }
 
+// Click 点击页面中css selector匹配到的元素
+// 同 element.Click()
 func (page *VPage) Click(selector string) error {
 	element, err := page.Element(selector)
 	if err != nil {
 		return utils.Errorf("click element find error: %s", err)
 	}
-	err = element.element.Click(proto.InputMouseButtonLeft, 1)
+	err = element.Click()
 	if err != nil {
-		return utils.Errorf("element click error: %s", err)
+		return utils.Errorf("click element error: %s", err)
 	}
-	err = page.page.WaitLoad()
-	return err
+	return page.page.WaitLoad()
 }
 
+// Input 在页面中css selector匹配到的元素中输入内容
+// 同 element.Input(string)
 func (page *VPage) Input(selector, inputStr string) error {
 	element, err := page.Element(selector)
 	if err != nil {
 		return utils.Errorf("input element find error: %s", err)
 	}
-	err = element.element.Input(inputStr)
+	err = element.Input(inputStr)
 	if err != nil {
-		return utils.Errorf("element input error: %s", err)
+		return utils.Errorf("input element error: %s", err)
 	}
-	return nil
+	return page.page.WaitLoad()
 }
 
+// HTML 返回整个页面的html内容
+// Example:
+// page, _ = browser.Navigate("https://example.com", "")
+// html, _ = page.HTML()
 func (page *VPage) HTML() (string, error) {
 	html, err := page.page.HTML()
 	if err != nil {
