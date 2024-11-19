@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/samber/lo"
 	"sort"
 	"strings"
 
@@ -208,6 +209,29 @@ func (prog *Program) Finish() {
 		prog.Cache.SaveToDatabase()
 		updateToDatabase(prog)
 	}
+}
+func (p *Program) LazyBuild() {
+	buildLazyFunction := func(program *Program) {
+		for k := 0; k < program.ClassBluePrint.Len(); k++ {
+			if blueprint, exits := program.ClassBluePrint.GetByIndex(k); exits {
+				blueprint.Build()
+			}
+		}
+		for _, function := range program.Funcs {
+			function.Build()
+		}
+		for k := 0; k < program.ClassBluePrint.Len(); k++ {
+			if blueprint, exits := program.ClassBluePrint.GetByIndex(k); exits {
+				blueprint.BuildConstructorAndDestructor()
+			}
+		}
+	}
+	buildMoreProg := func(prog ...*Program) {
+		for _, program := range prog {
+			buildLazyFunction(program)
+		}
+	}
+	buildMoreProg(append(append(lo.Values(p.UpStream), lo.Values(p.DownStream)...), p)...)
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {

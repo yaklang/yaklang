@@ -140,8 +140,9 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		该lazyBuilder顺序按照cls解析顺序
 	*/
 	current := y.FunctionBuilder
+	currentEditor := y.FunctionBuilder.GetEditor()
 	class.AddLazyBuilder(func() {
-		f := y.switchProg(current)
+		f := y.SwitchProg(current, currentEditor)
 		defer f()
 		for _, parentClass := range mergedTemplate {
 			if bluePrint := y.GetBluePrint(parentClass); bluePrint != nil {
@@ -159,13 +160,6 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		callback(container)
 	}
 	return container
-}
-func (y *builder) switchProg(fb *ssa.FunctionBuilder) func() {
-	currentBuilder := y.FunctionBuilder
-	y.FunctionBuilder = fb
-	return func() {
-		y.FunctionBuilder = currentBuilder
-	}
 }
 
 func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Blueprint) interface{} {
@@ -227,6 +221,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		y.VisitConstructorDeclaration(i.ConstructorDeclaration(), class)
 	} else if i.FieldDeclaration() != nil {
 		currentBuilder := y.FunctionBuilder
+		currentEditor := y.FunctionBuilder.GetEditor()
 		setMember := class.RegisterNormalMember
 		if isStatic {
 			setMember = class.RegisterStaticMember
@@ -237,7 +232,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 			setMember(name.GetText(), ssa.NewUndefined("name"))
 		}
 		class.AddLazyBuilder(func() {
-			f := y.switchProg(currentBuilder)
+			f := y.SwitchProg(currentBuilder, currentEditor)
 			defer f()
 			var fieldType ssa.Type
 			if field.TypeType() != nil {
@@ -518,8 +513,9 @@ func (y *builder) VisitClassBodyDeclaration(
 
 	if ret := i.Block(); ret != nil {
 		currentFb := y.FunctionBuilder
+		currentEditor := y.FunctionBuilder.GetEditor()
 		class.AddLazyBuilder(func() {
-			f := y.switchProg(currentFb)
+			f := y.SwitchProg(currentFb, currentEditor)
 			y.VisitBlock(i.Block())
 			f()
 		})
@@ -588,8 +584,9 @@ func (y *builder) VisitMethodDeclaration(
 		class.RegisterNormalMethod(key, newFunc)
 	}
 	currentBuilder := y.FunctionBuilder
+	currentEditor := y.FunctionBuilder.GetEditor()
 	newFunc.AddLazyBuilder(func() {
-		f := y.switchProg(currentBuilder)
+		f := y.SwitchProg(currentBuilder, currentEditor)
 		defer f()
 		y.FunctionBuilder = y.PushFunction(newFunc)
 		if isStatic {
@@ -836,9 +833,10 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	newFunc := y.NewFunc(funcName)
 	class.Constructor = newFunc
 	currentBuilder := y.FunctionBuilder
+	currentEditor := y.FunctionBuilder.GetEditor()
 	class.RegisterMagicMethod(ssa.Constructor, newFunc)
 	class.AddLazyBuilder(func() {
-		f := y.switchProg(currentBuilder)
+		f := y.SwitchProg(currentBuilder, currentEditor)
 		defer f()
 		y.FunctionBuilder = y.PushFunction(newFunc)
 		{

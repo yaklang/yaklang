@@ -1453,16 +1453,6 @@ class SMTP
             self::DEBUG_CONNECTION
         );
     }
-
-    /**
-     * Extract and return the ID of the last SMTP transaction based on
-     * a list of patterns provided in SMTP::$smtp_transaction_id_patterns.
-     * Relies on the host providing the ID in response to a DATA command.
-     * If no reply has been received yet, it will return null.
-     * If no pattern was matched, it will return false.
-     *
-     * @return bool|string|null
-     */
     protected function recordLastTransactionID()
     {
         $reply = $this->getLastReply();
@@ -1482,16 +1472,6 @@ class SMTP
 
         return $this->last_smtp_transaction_id;
     }
-
-    /**
-     * Get the queue/transaction ID of the last SMTP transaction
-     * If no reply has been received yet, it will return null.
-     * If no pattern was matched, it will return false.
-     *
-     * @return bool|string|null
-     *
-     * @see recordLastTransactionID()
-     */
     public function getLastTransactionID()
     {
         return $this->last_smtp_transaction_id;

@@ -1,6 +1,8 @@
 package java2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -55,24 +57,6 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 			y.VisitTypeDeclaration(declarationContext)
 		}
 	}
-	if !y.PreHandler() {
-		/*
-			有顺序，应该先解掉所有的cls，再去解function
-		*/
-		for k := 0; k < y.GetProgram().ClassBluePrint.Len(); k++ {
-			if blueprint, exit := y.GetProgram().ClassBluePrint.GetByIndex(k); exit {
-				blueprint.Build()
-			}
-		}
-		for _, function := range y.GetProgram().Funcs {
-			function.Build()
-		}
-		for k := 0; k < y.GetProgram().ClassBluePrint.Len(); k++ {
-			if blueprint, exit := y.GetProgram().ClassBluePrint.GetByIndex(k); exit {
-				blueprint.BuildConstructorAndDestructor()
-			}
-		}
-	}
 
 	return nil
 }
@@ -117,6 +101,16 @@ func (y *builder) VisitPackageDeclaration(raw javaparser.IPackageDeclarationCont
 	selfPkgPath := append(packagePath, "*")
 	y.selfPkgPath = selfPkgPath
 	return packagePath
+}
+func (b *builder) SwitchProg(functionBuilder *ssa.FunctionBuilder, editor *memedit.MemEditor) func() {
+	currentfb := b.FunctionBuilder
+	currenteditor := b.FunctionBuilder.GetEditor()
+	b.FunctionBuilder = functionBuilder
+	b.FunctionBuilder.SetEditor(editor)
+	return func() {
+		b.FunctionBuilder = currentfb
+		b.FunctionBuilder.SetEditor(currenteditor)
+	}
 }
 
 func (y *builder) VisitPackageName(raw javaparser.IPackageNameContext) []string {
