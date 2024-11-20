@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"database/sql"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -47,7 +48,7 @@ type HTTPFlow struct {
 
 	RuntimeId   string
 	FromPlugin  string
-	ProcessName string
+	ProcessName sql.NullString
 
 	// friendly for gorm build instance, not for store
 	// 这两个字段不参与数据库存储，但是在序列化的时候，会被覆盖
