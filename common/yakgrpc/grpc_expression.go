@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Server) EvaluateMultiExpression(ctx context.Context, req *ypb.EvaluateMultiExpressionRequest) (*ypb.EvaluateMultiExpressionResponse, error) {
-	defaultSandbox := yak.NewSandbox()
+	defaultSandbox := yak.NewSandbox(yak.WithYaklang_Libs(req.GetImportYaklangLibs()))
 	var deps map[string]any
 	if len(req.GetVariables()) > 0 {
 		deps = make(map[string]any)
@@ -45,7 +45,7 @@ func (s *Server) EvaluateMultiExpression(ctx context.Context, req *ypb.EvaluateM
 }
 
 func (s *Server) EvaluateExpression(ctx context.Context, req *ypb.EvaluateExpressionRequest) (*ypb.EvaluateExpressionResponse, error) {
-	defaultSandbox := yak.NewSandbox()
+	defaultSandbox := yak.NewSandbox(yak.WithYaklang_Libs(req.GetImportYaklangLibs()))
 	var deps map[string]any
 	if len(req.GetVariables()) > 0 {
 		deps = make(map[string]any)
