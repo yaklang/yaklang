@@ -11,9 +11,65 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
+// XMLEncoder 扩展标准的 xml.Encoder
+type XMLEncoder struct {
+	*xml.Encoder
+	escapeHTML bool
+}
+
+// EncoderOption 定义编码器选项的函数类型
+type EncoderOption func(*XMLEncoder)
+
+// NewXMLEncoder 创建新的 XMLEncoder
+func NewXMLEncoder(w io.Writer, options ...EncoderOption) *XMLEncoder {
+	e := &XMLEncoder{
+		Encoder:    xml.NewEncoder(w),
+		escapeHTML: true, // 默认转义 HTML
+	}
+
+	// 应用选项
+	for _, opt := range options {
+		opt(e)
+	}
+
+	return e
+}
+
+// WithHTMLEscape 设置是否转义 HTML 的选项，默认为 True，即转义 HTML
+// Example:
+// ```
+// m = {"a": "qwe&zxc"}
+// e := xml.dumps(m, xml.escape(false))
+// ```
+func WithHTMLEscape(escape bool) EncoderOption {
+	return func(e *XMLEncoder) {
+		e.escapeHTML = escape
+	}
+}
+
+// 用于存储原始 HTML 内容
+type RawString string
+
+func (h RawString) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	// 直接将 HTML 内容作为原始标记写入
+	tokens := []xml.Token{
+		start,
+		xml.CharData(h),
+		start.End(),
+	}
+
+	for _, t := range tokens {
+		err := e.EncodeToken(t)
+		if err != nil {
+			return err
+		}
+	}
+	return e.Flush()
+}
+
 type StringMap map[string]interface{}
 
-func (m StringMap) marshalXML(e *xml.Encoder, start xml.StartElement, first bool) error {
+func (m StringMap) marshalXML(e *XMLEncoder, start xml.StartElement, first bool) error {
 	var err error
 	if !first {
 		err = e.EncodeToken(start)
@@ -25,7 +81,11 @@ func (m StringMap) marshalXML(e *xml.Encoder, start xml.StartElement, first bool
 		childStart := xml.StartElement{Name: xml.Name{Local: key}}
 		switch v := val.(type) {
 		case string:
-			err = e.EncodeElement(v, childStart)
+			if !e.escapeHTML {
+				err = e.EncodeElement(RawString(v), childStart)
+			} else {
+				err = e.EncodeElement(v, childStart)
+			}
 		case StringMap:
 			err = v.marshalXML(e, childStart, false)
 		case map[string]interface{}:
@@ -44,7 +104,10 @@ func (m StringMap) marshalXML(e *xml.Encoder, start xml.StartElement, first bool
 }
 
 func (m StringMap) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	return m.marshalXML(e, start, true)
+	return m.marshalXML(&XMLEncoder{
+		Encoder:    e,
+		escapeHTML: true, // 使用默认设置
+	}, start, true)
 }
 
 func (m *StringMap) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
@@ -103,26 +166,23 @@ func XmlEscape(s []byte) string {
 	return w.String()
 }
 
-func XmlDumps(v interface{}) []byte {
+func XmlDumps(v interface{}, opts ...EncoderOption) []byte {
 	var b bytes.Buffer
 
 	v = StringMap(InterfaceToGeneralMap(v))
-	enc := xml.NewEncoder(&b)
+	enc := NewXMLEncoder(&b, opts...)
 	enc.Indent("", "  ")
 	err := enc.Encode(v)
 	if err != nil {
-		panic(err)
+		log.Errorf("xml encode error: %v", err)
 	}
 	return b.Bytes()
 }
 
 func XmlLoads(v interface{}) map[string]any {
-	var buf bytes.Buffer
 	i := make(StringMap)
-	buf.Write([]byte("<root>"))
-	buf.Write(InterfaceToBytes(v))
-	buf.Write([]byte("</root>"))
-	decoder := xml.NewDecoder(&buf)
+	buf := bytes.NewBufferString(fmt.Sprintf("<root>%s</root>", InterfaceToString(v)))
+	decoder := xml.NewDecoder(buf)
 	decoder.CharsetReader = func(label string, input io.Reader) (io.Reader, error) {
 		e, _ := charset.Lookup(label)
 		if e != nil {
