@@ -1,7 +1,9 @@
 package simple
 
 import (
+	"context"
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/crawlerx"
@@ -39,18 +41,21 @@ type VBrowser struct {
 
 // simulator.simple.createBrowser / simulator.simpleCreateBrowser 浏览器手动操作模式 进行目标页面操作
 //
-//	 第一个参数为目标url，后面可以添加零个或多个请求选项，用于对此次请求进行配置
+//	 可以添加零个或多个请求选项，用于对此次请求进行配置
+//
 //	 返回值为浏览器 可以创建页面
 //
-//		 Example:
-//		 ```
-//		replaceStr = []string{"0","1"}
-//		replaceModify = simulator.simple.responseModify("uapws/login.ajax", simulator.simple.bodyReplaceTarget, replaceStr)
-//		headless = simulator.simple.headless(false)
-//		browser = simulator.simple.createBrowser(headless, replaceModify)
-//		page = browser.Navigate("https://www.group-ib.com/blog/cron/", infoWaitFor)
+//	Example:
+//	```
+//	proxy = simulator.simple.proxy("http://127.0.0.1:7890") // 代理地址修改
+//	exePath = simulator.simple.exePath("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome") // 浏览器路径修改
+//	timeout = simulator.simple.timeout(20)
+//	browser, err = simulator.simple.CreateBrowser(exePath, timeout, proxy)
+//	if err != nil {
+//		return
+//	}
 //
-// ```
+//	```
 func CreateHeadlessBrowser(opts ...BrowserConfigOpt) (*VBrowser, error) {
 	config := &BrowserConfig{
 		noSandBox: true,
@@ -91,6 +96,7 @@ func CreateHeadlessBrowser(opts ...BrowserConfigOpt) (*VBrowser, error) {
 
 func (browser *VBrowser) browserInit() error {
 	if browser.wsAddress != "" {
+		ctx := context.Background()
 		launch, err := launcher.NewManaged(browser.wsAddress)
 		if err != nil {
 			return utils.Errorf("new managed launcher %s error: %s", browser.wsAddress, err)
@@ -98,9 +104,14 @@ func (browser *VBrowser) browserInit() error {
 		if browser.proxyAddress != "" {
 			launch.Proxy(browser.proxyAddress)
 		}
-		launch = launch.Set("disable-features", "HttpsUpgrades")
+		launch = launch.Context(ctx).Set("disable-features", "HttpsUpgrades")
 		launch = launch.NoSandbox(browser.noSandBox).Headless(browser.headless).Leakless(browser.leakless)
-		browser.browser.Client(launch.MustClient())
+		serviceURL, header := launch.ClientHeader()
+		client, err := cdp.StartWithURL(ctx, serviceURL, header)
+		if err != nil {
+			return utils.Errorf("start cdp client %s error: %s", serviceURL, err)
+		}
+		browser.browser = browser.browser.Client(client)
 	} else {
 		launch := launcher.New()
 		if browser.exePath != "" {
@@ -115,7 +126,7 @@ func (browser *VBrowser) browserInit() error {
 		if err != nil {
 			return utils.Errorf("new launcher launch error: %s", err)
 		}
-		browser.browser.ControlURL(controlUrl)
+		browser.browser = browser.browser.ControlURL(controlUrl)
 	}
 	err := browser.browser.Connect()
 	if err != nil {
@@ -132,33 +143,39 @@ func (browser *VBrowser) browserInit() error {
 }
 
 // Navigate 开启浏览器的一个页面 并跳转到对应url
+//
 // 其中第二个参数为 页面存在对应元素selector时即认为完成加载
 //
 //	 Example:
 //	 ```
-//	replaceStr = []string{"0","1"}
-//	infoWaitFor = "body > div.theme-container > div > div > div.c-16.c-md-9 > div.header--blog-post > div > div"
-//	replaceModify = simulator.simple.responseModify("uapws/login.ajax", simulator.simple.bodyReplaceTarget, replaceStr)
-//	headless = simulator.simple.headless(false)
-//	browser = simulator.simple.createBrowser(headless, replaceModify)
-//	page = browser.Navigate("https://example.com/", infoWaitFor)
+//	proxy = simulator.simple.proxy("http://127.0.0.1:7890") // 代理地址修改
+//	exePath = simulator.simple.exePath("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome") // 浏览器路径修改
+//	timeout = simulator.simple.timeout(20)
+//	browser, _ = simulator.simple.CreateBrowser(exePath, timeout, proxy)
+//	selector = "#code"
+//	// Navigate方法第二个参数不为空时 表示页面处于加载状态直到页面中出现css selector匹配到的元素后完成加载
+//	page, err = browser.Navigate("https://example.com", selector)
+//	// Navigate方法第二个参数为空时 页面正常通过document.readyState参数获取页面加载状态 完成加载等待
+//	page, err = browser.Navigate("https://example.com", "")
+//	if err != nil {
+//		return
+//	}
 //
-// ```
+//	```
 func (browser *VBrowser) Navigate(urlStr string, waitFor string) (*VPage, error) {
 	page, err := browser.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
 	if err != nil {
-		log.Errorf("create page error: %s", err)
-		return nil, err
+		return nil, utils.Errorf("create page error: %v", err)
 	}
 	p := &VPage{page: page, timeout: browser.timeout}
 	err = p.Navigate(urlStr, waitFor)
 	if err != nil {
-		log.Errorf("navigate error: %s", err)
-		return nil, err
+		return nil, utils.Errorf("navigate %v error: %v", urlStr, err)
 	}
 	return p, nil
 }
 
+// Close 关闭浏览器
 func (browser *VBrowser) Close() error {
 	return browser.browser.Close()
 }
