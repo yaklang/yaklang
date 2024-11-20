@@ -125,6 +125,7 @@ var DatabaseExports = map[string]interface{}{
 	"QueryDomainsByDomainKeyword": queryDomainAssetByDomainKeyword,
 	"QueryDomainsByTitle":         queryDomainAssetByHTMLTitle,
 	"QueryPayloadGroups":          getPayloadGroups,
+	"GetAllPayloadGroupsName":     getAllPayloadGroupsName,
 	"DeletePayloadByGroup":        deletePayloadByGroup,
 	"YieldPayload":                YieldPayload,
 	"GetProjectKey": func(k any) string {

@@ -73,15 +73,16 @@ func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 		}
 
 		ret = append(ret, &ypb.YakScriptParam{
-			Field:        param.Name,
-			DefaultValue: string(defaultValue),
-			TypeVerbose:  param.Type,
-			FieldVerbose: param.NameVerbose,
-			Help:         param.Help,
-			Required:     param.Required,
-			Group:        param.Group,
-			ExtraSetting: string(extra),
-			MethodType:   param.MethodType,
+			Field:                    param.Name,
+			DefaultValue:             string(defaultValue),
+			TypeVerbose:              param.Type,
+			FieldVerbose:             param.NameVerbose,
+			Help:                     param.Help,
+			Required:                 param.Required,
+			Group:                    param.Group,
+			SuggestionDataExpression: param.SuggestionValueExpression,
+			ExtraSetting:             string(extra),
+			MethodType:               param.MethodType,
 			JsonSchema:   param.JsonSchema,
 		})
 	}

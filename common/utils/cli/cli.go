@@ -772,6 +772,16 @@ func (c *CliApp) SetCliGroup(group string) SetCliExtraParam {
 	return func(cep *cliExtraParams) {}
 }
 
+// setYakitPayload 是一个选项函数，设置参数建议值为Yakit payload的字典名列表
+// Example:
+// ```
+// cli.String("dictName", cli.setYakitPayload(true))
+// ```
+func (c *CliApp) SetYakitPayload(b bool) SetCliExtraParam {
+	return func(c *cliExtraParams) {
+	}
+}
+
 // setShortName 是一个选项函数，设置参数的短名称
 // Example:
 // ```
@@ -913,6 +923,8 @@ var CliExports = map[string]interface{}{
 	"setVerboseName": DefaultCliApp.SetVerboseName,
 	// 设置参数组名
 	"setCliGroup": DefaultCliApp.SetCliGroup,
+	// 设置Yakit payload
+	"setYakitPayload": DefaultCliApp.SetYakitPayload,
 	// 设置是否多选 (只支持`cli.StringSlice`)
 	"setMultipleSelect": DefaultCliApp.SetMultipleSelect,
 	// 设置下拉框选项 (只支持`cli.StringSlice`)
