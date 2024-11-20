@@ -268,7 +268,8 @@ type Program struct {
 	ExternInstance          map[string]any
 	ExternLib               map[string]map[string]any
 
-	PkgName string
+	PkgName           string
+	fixImportCallback []func()
 }
 
 // implement Value
