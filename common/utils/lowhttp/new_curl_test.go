@@ -49,6 +49,13 @@ func TestCurlToRawHTTPRequestURL(t *testing.T) {
 	t.Run("ipv6", func(t *testing.T) {
 		testCurlToRawHTTPRequest(t, `curl [::1] -d "https://www.baidu.com"`, []string{`Host: [::1]`, "\r\nhttps://www.baidu.com"}, nil)
 	})
+
+	t.Run("ws", func(t *testing.T) {
+		testCurlToRawHTTPRequest(t, `curl ws://example.com/a/b/c`, []string{`Host: example.com`, `GET /a/b/c HTTP/1.1`}, nil)
+	})
+	t.Run("wss", func(t *testing.T) {
+		testCurlToRawHTTPRequest(t, `curl wss://example.com/a/b/c`, []string{`Host: example.com`, `GET /a/b/c HTTP/1.1`}, nil)
+	})
 }
 
 func TestCurlToRawHTTPRequestProtocol(t *testing.T) {
