@@ -228,8 +228,12 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		}
 		field := i.FieldDeclaration().(*javaparser.FieldDeclarationContext)
 		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
+		name2Map := make(map[string]*ssa.Value)
 		for _, name := range variableDeclarators {
-			setMember(name.GetText(), ssa.NewUndefined("name"))
+			namex := y.OnlyVisitVariableDeclaratorName(name)
+			undefined := ssa.Value(ssa.NewUndefined(namex))
+			name2Map[namex] = &undefined
+			setMember(namex, undefined)
 		}
 		class.AddLazyBuilder(func() {
 			f := y.SwitchProg(currentBuilder, currentEditor)
@@ -245,6 +249,9 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 				v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
 				name, value := y.VisitVariableDeclarator(v, nil)
 				value.SetType(fieldType)
+				if val, ok := name2Map[name]; ok {
+					*val = value
+				}
 				setMember(name, value)
 			}
 		})
@@ -610,9 +617,6 @@ func (y *builder) VisitMethodDeclaration(
 			def(newFunc)
 		}
 	})
-	class.AddLazyBuilder(func() {
-		newFunc.Build()
-	})
 	return
 }
 
@@ -835,7 +839,7 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	currentBuilder := y.FunctionBuilder
 	currentEditor := y.FunctionBuilder.GetEditor()
 	class.RegisterMagicMethod(ssa.Constructor, newFunc)
-	class.AddLazyBuilder(func() {
+	newFunc.AddLazyBuilder(func() {
 		f := y.SwitchProg(currentBuilder, currentEditor)
 		defer f()
 		y.FunctionBuilder = y.PushFunction(newFunc)

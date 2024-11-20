@@ -19,7 +19,7 @@ func (c *Blueprint) IsMagicMethodName(name BlueprintMagicMethodKind) bool {
 	return slices.Contains(c._container.GetProgram().magicMethodName, string(name))
 }
 
-func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val *Function) {
+func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value) {
 	if !c.IsMagicMethodName(name) {
 		log.Warnf("register magic method fail: not magic method")
 		//return

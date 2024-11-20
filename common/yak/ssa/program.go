@@ -81,6 +81,7 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 	prog.Application.AddUpStream(subProg)
 	subProg.Application = prog.Application
 	subProg.Cache = prog.Cache
+	subProg.fixImportCallback = make([]func(), 0)
 	return subProg
 }
 
@@ -218,31 +219,47 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 }
 
 func (prog *Program) Finish() {
+	prog.LazyBuild()
 	if prog.ProgramKind == Application && prog.EnableDatabase {
 		prog.Cache.SaveToDatabase()
 		updateToDatabase(prog)
 	}
 }
 func (p *Program) LazyBuild() {
-	buildLazyFunction := func(program *Program) {
+	syntaxFunc := func(syntaxInstance func(program *Program), prog ...*Program) {
+		for _, program := range prog {
+			syntaxInstance(program)
+		}
+	}
+	syntaxClassInstace := func(program *Program) {
 		for k := 0; k < program.ClassBluePrint.Len(); k++ {
 			if blueprint, exits := program.ClassBluePrint.GetByIndex(k); exits {
 				blueprint.Build()
 			}
 		}
+	}
+	syntaxFuncInstance := func(program *Program) {
 		for _, function := range program.Funcs {
 			function.Build()
 		}
+	}
+	syntaxClassOtherInstance := func(program *Program) {
 		for k := 0; k < program.ClassBluePrint.Len(); k++ {
 			if blueprint, exits := program.ClassBluePrint.GetByIndex(k); exits {
 				blueprint.BuildConstructorAndDestructor()
 			}
 		}
 	}
-	buildMoreProg := func(prog ...*Program) {
-		for _, program := range prog {
-			buildLazyFunction(program)
+	fixImport := func(program *Program) {
+		for _, f := range program.fixImportCallback {
+			f()
 		}
+	}
+	buildMoreProg := func(prog ...*Program) {
+		syntaxFunc(syntaxClassInstace, prog...)
+		syntaxFunc(fixImport, prog...)
+		syntaxFunc(syntaxFuncInstance, prog...)
+		syntaxFunc(syntaxClassOtherInstance, prog...)
 	}
 	buildMoreProg(append(append(lo.Values(p.UpStream), lo.Values(p.DownStream)...), p)...)
 }

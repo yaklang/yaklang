@@ -143,7 +143,7 @@ class B{
 	})
 }
 
-func TestImportStatic(t *testing.T) {
+func TestImportStaticAll(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("a.java", `
 package com.example.demo2;
@@ -175,7 +175,7 @@ class A {
 		ssaapi.WithLanguage(ssaapi.JAVA))
 }
 
-func TestImportStaticAll(t *testing.T) {
+func TestImportStaticMember(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("a.java", `
 package com.example.demo2;

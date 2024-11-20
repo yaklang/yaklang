@@ -1083,6 +1083,25 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 	return nil
 }
 
+func (y *builder) OnlyVisitVariableDeclaratorName(raw javaparser.IVariableDeclaratorContext) string {
+	name := uuid.NewString()[:4]
+	if y == nil || raw == nil || y.IsStop() {
+		return name
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.VariableDeclaratorContext)
+	if i == nil {
+		return name
+	}
+
+	id, ok := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext)
+	if !ok {
+		return name
+	}
+	name = id.Identifier().GetText()
+	return name
+}
 func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, typ ssa.Type) (name string, value ssa.Value) {
 	if y == nil || raw == nil || y.IsStop() {
 		return

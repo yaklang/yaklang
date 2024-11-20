@@ -142,6 +142,15 @@ func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
 	if !b {
 		return utils.Errorf("no support to blueprint")
 	}
+	p.fixImportCallback = append(p.fixImportCallback, func() {
+		//fix
+		for s, value := range blueprint.StaticMember {
+			pkg.val[s] = value
+		}
+		for s, function := range blueprint.StaticMethod {
+			pkg.val[s] = function
+		}
+	})
 	for s, value := range blueprint.StaticMember {
 		pkg.val[s] = value
 	}
@@ -156,6 +165,18 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 		return err
 	}
 	build := func(blueprint *Blueprint, name string) {
+		p.fixImportCallback = append(p.fixImportCallback, func() {
+			for s, value := range blueprint.StaticMember {
+				if name == s {
+					pkg.val[s] = value
+				}
+			}
+			for s, function := range blueprint.StaticMethod {
+				if name == s {
+					pkg.val[s] = function
+				}
+			}
+		})
 		for s, value := range blueprint.StaticMember {
 			if name == s {
 				pkg.val[s] = value
