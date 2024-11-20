@@ -103,7 +103,9 @@ func init() {
 			}
 			return []string{res.GetResult()}
 		},
-		Description: "调用codec模块保存的codec flow，例如 {{codecflow(flowname|test)}}，其中flowname是保存的codecflow名，input是需要编码的输入",
+		Description:         "调用codec模块保存的codec flow，例如 {{codecflow(flowname|test)}}，其中flowname是保存的codecflow名，input是需要编码的输入",
+		TagNameVerbose:      "调用codec模块保存的codec flow",
+		ArgumentDescription: "{{string(name:codecflow名)}}{{string(abc:输入)}}",
 	})
 }
 

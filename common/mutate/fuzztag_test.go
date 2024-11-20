@@ -386,3 +386,10 @@ func TestTagResultLimit(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, res, 10)
 }
+
+func TestName(t *testing.T) {
+	tags := GetAllFuzztags()
+	for _, tag := range tags {
+		println(tag.TagName)
+	}
+}
