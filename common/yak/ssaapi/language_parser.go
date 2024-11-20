@@ -227,7 +227,6 @@ func (c *config) parseProject() (Programs, error) {
 	}
 	handledProcess = preHandlerSize + parseSize
 	prog.ProcessInfof("program %s finishing", prog.Name) // %99
-	prog.LazyBuild()
 	prog.Finish()
 	var progs = []*Program{NewProgram(prog, c)}
 	if c.SaveToProfile {
@@ -246,7 +245,6 @@ func (c *config) parseFile() (ret *Program, err error) {
 	if err != nil {
 		return nil, err
 	}
-	prog.LazyBuild()
 	prog.Finish()
 	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
