@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -17,6 +18,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+var urlPrefixPattern = regexp.MustCompile(`^(https?|wss?)://`)
+
 type Curl struct {
 	Headers        http.Header
 	URLInstance    *url.URL
@@ -26,6 +29,7 @@ type Curl struct {
 	Protocol       string
 	uploadFile     string
 	body           []byte
+	IsTLS          bool
 	putDataInQuery bool
 	parsed         bool
 }
@@ -51,7 +55,7 @@ func NewMaybeURL(u string, credibility uint8) *maybeURL {
 }
 
 func toCurlURL(u string) (*maybeURL, bool) {
-	if strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
+	if urlPrefixPattern.MatchString(u) {
 		return NewMaybeURL(u, 4), true
 	} else if utils.IsIPv4(u) || utils.IsIPv6(u) || utils.IsValidDomain(u) {
 		u = "http://" + u
@@ -71,7 +75,6 @@ func toCurlURL(u string) (*maybeURL, bool) {
 	}
 	return nil, false
 }
-
 
 func safeIndex(args []string, i int) (string, bool) {
 	if i >= len(args) {
@@ -277,6 +280,7 @@ func (c *Curl) ParseOptions(args []string) error {
 	if err != nil {
 		return err
 	}
+	c.IsTLS = uIns.Scheme == "https" || uIns.Scheme == "wss"
 	if c.uploadFile != "" && (uIns.Path == "/" || uIns.Path == "") {
 		uIns.Path = "/" + c.uploadFile
 	}
