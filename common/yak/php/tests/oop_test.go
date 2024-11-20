@@ -595,7 +595,7 @@ class childB extends b{
 $b = new childB(1);
 println($b->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"0"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, #29.a)"}, t)
 	})
 	t.Run("class custom member", func(t *testing.T) {
 		code := `<?php

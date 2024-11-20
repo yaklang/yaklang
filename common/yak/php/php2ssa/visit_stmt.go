@@ -142,17 +142,8 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		program.PkgName = namespaceName
 		declareStatement()
 	case hasName && !y.PreHandler():
-		// finish Function
 		normalStatement()
-		namespaceProg, f := switchToNamespace()
-		defer f()
-		for _, fun := range namespaceProg.Funcs {
-			fun.Build()
-		}
-		namespaceProg.ClassBluePrint.ForEach(func(i string, v *ssa.Blueprint) bool {
-			v.Build()
-			return true
-		})
+
 	case !hasName && !y.PreHandler():
 		prog.PkgName = namespaceName
 		// build this un-name namespace
