@@ -5548,29 +5548,29 @@ message SSAProgram{
   string Language = 6;
   string EngineVersion = 7;
 
-  // need re-compile 
+  // need re-compile
   bool Recompile = 8;
-  // risk number 
-  int64 HighRiskNumber = 9; 
-  int64 CriticalRiskNumber = 10; 
-  int64 WarnRiskNumber = 11; 
+  // risk number
+  int64 HighRiskNumber = 9;
+  int64 CriticalRiskNumber = 10;
+  int64 WarnRiskNumber = 11;
   int64 LowRiskNumber = 12;
 }
 
 message SSAProgramInput {
-  string Name = 1; // index 
-  string Description = 2; 
+  string Name = 1; // index
+  string Description = 2;
 }
 
 message SSAProgramFilter{
-  repeated string ProgramNames =  1; 
-  repeated string Languages =  2; 
-  repeated int64 Ids =  3; 
+  repeated string ProgramNames =  1;
+  repeated string Languages =  2;
+  repeated int64 Ids =  3;
 
   // update range
   int64 BeforeUpdatedAt = 5;
   int64 AfterUpdatedAt = 6;
-  // fuzz search 
+  // fuzz search
   string Keyword =  7 ;
   // id range
   int64 AfterID =  8;
@@ -5769,4 +5769,30 @@ message PluginEnvData {
 message DeletePluginEnvRequest {
   string Key = 1;
   bool All = 2;
+}
+//
+//    rpc GetAllFuzztagInfo (GetAllFuzztagInfoRequest) returns (GetAllFuzztagInfoResponse);
+//    rpc GenerateFuzztag (GenerateFuzztagRequest) returns (GenerateFuzztagResponse);
+message GetAllFuzztagInfoRequest{
+  string Key = 1;
+}
+
+message GetAllFuzztagInfoResponse{
+  repeated FuzztagInfo Data = 2;
+}
+message FuzztagInfo{
+  string Name = 1;
+  string Description = 2;
+  string VerboseName = 3;
+}
+
+message GenerateFuzztagRequest{
+  string Name = 1;
+  string Type = 2;
+  Range Range = 3;
+}
+
+message GenerateFuzztagResponse{
+  GeneralResponse Status = 1;
+  string Result = 2;
 }

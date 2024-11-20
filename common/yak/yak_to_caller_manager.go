@@ -122,6 +122,9 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 			}
 			return logAndWrapError("invalid function params")
 		},
+		Description:         "执行热加载代码",
+		TagNameVerbose:      "执行热加载代码",
+		ArgumentDescription: "{{string_split(handle:函数名)}}{{list(string(param:参数))}}",
 	})
 	// return mutate.Fuzz_WithExtraFuzzErrorTagHandler("yak", func(s string) (result []*parser.FuzzResult, err error) {
 	// 	handle, params, _ := strings.Cut(s, "|")
