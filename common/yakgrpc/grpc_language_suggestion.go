@@ -57,14 +57,14 @@ var (
 	yakTypeSuggestions         = make([]*ypb.SuggestionDescription, 0)
 	progCacheMap               = utils.NewTTLCache[*ssaapi.Program](0)
 
-	CompletionKindField     = "Field"
-	CompletionKindKeyword   = "Keyword"
-	ComplectionKindConstant = "Constant"
-	CompletionKindVariable  = "Variable"
-	CompletionKindFunction  = "Function"
-	CompletionKindMethod    = "Method"
-	CompletionKindClass     = "Class"
-	CompletionKindModule    = "Module"
+	CompletionKindField    = "Field"
+	CompletionKindKeyword  = "Keyword"
+	CompletionKindConstant = "Constant"
+	CompletionKindVariable = "Variable"
+	CompletionKindFunction = "Function"
+	CompletionKindMethod   = "Method"
+	CompletionKindClass    = "Class"
+	CompletionKindModule   = "Module"
 )
 
 func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
@@ -848,7 +848,7 @@ func completionYakStandardLibraryChildren(v *ssaapi.Value, word string) (ret []*
 				Label:       decl.MethodName,
 				Description: decl.Document,
 				InsertText:  decl.VSCodeSnippets,
-				Kind:        CompletionKindVariable,
+				Kind:        CompletionKindFunction,
 			})
 		}
 	}
@@ -858,7 +858,7 @@ func completionYakStandardLibraryChildren(v *ssaapi.Value, word string) (ret []*
 				Label:       instance.InstanceName,
 				Description: "",
 				InsertText:  instance.InstanceName,
-				Kind:        ComplectionKindConstant,
+				Kind:        CompletionKindConstant,
 			})
 		}
 	}
