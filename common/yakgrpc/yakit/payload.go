@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"github.com/samber/lo"
 	"os"
 	"strconv"
 	"strings"
@@ -463,4 +464,15 @@ func QueryPayload(db *gorm.DB, folder, group, keyword string, paging *Paging) (*
 
 func YieldPayloads(db *gorm.DB, ctx context.Context) chan *schema.Payload {
 	return schema.YieldPayloads(db, ctx)
+}
+
+func GetAllPayloadGroupName(db *gorm.DB) ([]string, error) {
+	var groups []string
+	if db := db.Model(&schema.Payload{}).Pluck("DISTINCT(`group`)", &groups); db.Error != nil {
+		return nil, db.Error
+	}
+	groups = lo.Filter(groups, func(s string, _ int) bool {
+		return !strings.HasSuffix(s, "///empty")
+	})
+	return groups, nil
 }

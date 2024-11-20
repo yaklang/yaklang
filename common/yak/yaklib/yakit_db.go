@@ -398,6 +398,19 @@ func getPayloadGroups(group string) []string {
 	return yakit.PayloadGroups(consts.GetGormProfileDatabase(), group)
 }
 
+func getAllPayloadGroupsName() []string {
+	if consts.GetGormProfileDatabase() == nil {
+		log.Error("no database connections")
+		return nil
+	}
+
+	if allGroupName, err := yakit.GetAllPayloadGroupName(consts.GetGormProfileDatabase()); err != nil {
+		return nil
+	} else {
+		return allGroupName
+	}
+}
+
 // YieldPayload means
 func YieldPayload(raw any, extra ...any) chan string {
 	db := consts.GetGormProfileDatabase().Model(&schema.Payload{})
