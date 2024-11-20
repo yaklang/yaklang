@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1480,7 +1481,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		startCreateFlow = time.Now()
 		// 额外，获取进程名
 		if name := httpctx.GetProcessName(req); name != "" {
-			flow.ProcessName = filepath.Base(name)
+			flow.ProcessName = sql.NullString{
+				String: filepath.Base(name),
+				Valid:  true,
+			}
 		}
 
 		flow.Hash = flow.CalcHash()

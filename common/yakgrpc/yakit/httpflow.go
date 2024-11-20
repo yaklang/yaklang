@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"runtime/debug"
@@ -1171,13 +1172,15 @@ func HTTPFlowToOnline(db *gorm.DB, hash []string) error {
 }
 
 func QueryHTTPFlowsProcessNames(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) ([]string, error) {
-	var processNames []string
+	var processNames []sql.NullString
 	db = db.Model(&schema.HTTPFlow{})
 	db = FilterHTTPFlow(db, params)
+	db = db.Where("process_name != '' and process_name IS NOT NULL")
 	if db := db.Pluck("DISTINCT(`process_name`)", &processNames); db.Error != nil {
 		return nil, db.Error
 	}
-	return lo.Filter(processNames, func(item string, _ int) bool {
-		return item != ""
+	return lo.FilterMap(processNames, func(item sql.NullString, _ int) (string, bool) {
+		s := item.String
+		return s, s != "" && item.Valid
 	}), nil
 }
