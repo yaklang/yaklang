@@ -3938,6 +3938,8 @@ message YakScriptParam {
 
   string MethodType = 9;
   string JsonSchema = 10;
+
+  string SuggestionDataExpression = 11;
 }
 
 message YakScript {

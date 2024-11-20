@@ -9,16 +9,17 @@ import (
 )
 
 type CliParameter struct {
-	Name           string
-	NameVerbose    string
-	Required       bool
-	Type           string
-	MethodType     string
-	Default        any
-	Help           string
-	Group          string
-	MultipleSelect bool
-	SelectOption   *orderedmap.OrderedMap
+	Name                      string
+	NameVerbose               string
+	Required                  bool
+	Type                      string
+	MethodType                string
+	Default                   any
+	Help                      string
+	Group                     string
+	SuggestionValueExpression string
+	MultipleSelect            bool
+	SelectOption              *orderedmap.OrderedMap
 	JsonSchema     string
 }
 
@@ -31,16 +32,17 @@ type UIInfo struct {
 
 func newCliParameter(name, typ, methodTyp string) *CliParameter {
 	return &CliParameter{
-		Name:           name,
-		NameVerbose:    name,
-		Required:       false,
-		Type:           typ,
-		MethodType:     methodTyp,
-		Default:        nil,
-		Help:           "",
-		Group:          "",
-		MultipleSelect: false,
-		SelectOption:   orderedmap.New(),
+		Name:                      name,
+		NameVerbose:               name,
+		Required:                  false,
+		Type:                      typ,
+		MethodType:                methodTyp,
+		Default:                   nil,
+		Help:                      "",
+		Group:                     "",
+		MultipleSelect:            false,
+		SuggestionValueExpression: "",
+		SelectOption:              orderedmap.New(),
 	}
 }
 
@@ -155,6 +157,10 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo, []stri
 				break
 			}
 			cli.JsonSchema = arg1
+		case "cli.setYakitPayload":
+			if getConstBool(opt.GetOperand(1)) {
+				cli.SuggestionValueExpression = "db.GetAllPayloadGroupsName()"
+			}
 		case "cli.setPluginEnv":
 			key := ""
 			if opt.GetOperand(1).IsConstInst() {
