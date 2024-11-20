@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"golang.org/x/net/html/charset"
 )
 
 type StringMap map[string]interface{}
@@ -118,6 +122,17 @@ func XmlLoads(v interface{}) map[string]any {
 	buf.Write([]byte("<root>"))
 	buf.Write(InterfaceToBytes(v))
 	buf.Write([]byte("</root>"))
-	xml.Unmarshal(buf.Bytes(), &i)
+	decoder := xml.NewDecoder(&buf)
+	decoder.CharsetReader = func(label string, input io.Reader) (io.Reader, error) {
+		e, _ := charset.Lookup(label)
+		if e != nil {
+			return e.NewDecoder().Reader(input), nil
+		}
+		return input, nil // default to utf-8
+	}
+	err := decoder.Decode(&i)
+	if err != nil {
+		log.Errorf("xml decode error: %v", err)
+	}
 	return map[string]any(i)
 }
