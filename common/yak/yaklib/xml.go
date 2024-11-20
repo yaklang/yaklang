@@ -8,4 +8,5 @@ var XMLExports = map[string]interface{}{
 	"Escape": utils.XmlEscape,
 	"dumps":  utils.XmlDumps,
 	"loads":  utils.XmlLoads,
+	"escape": utils.WithHTMLEscape,
 }
