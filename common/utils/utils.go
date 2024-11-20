@@ -422,6 +422,7 @@ type trieNode struct {
 	flag       int // 对节点的标记，可以用来标记结束节点
 }
 
+// IndexAllSubstrings 只遍历一次查找所有子串位置 返回值是一个二维数组，每个元素是一个[2]int类型匹配结果，其中第一个元素是规则index，第二个元素是索引位置
 func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 	// 构建trie树
 	root := &trieNode{

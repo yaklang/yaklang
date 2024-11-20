@@ -85,7 +85,7 @@ func fuzzuserWithCallback(i string, level int, callback func(string) bool) {
 
 	var res []string
 	splited := utils.PrettifyListFromStringSplitEx(i, ",", "|")
-	if len(splited) <= 2 {
+	if len(splited) <= 1 {
 		callback(i)
 		return
 	}
