@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ func TestEvaluateExpression(t *testing.T) {
 	require.NoError(t, err)
 	ctx := context.Background()
 
-	check := func(t *testing.T, expression string, expectedResult string, expectedBoolResult bool, vars ...map[string]string) {
+	check := func(t *testing.T, expression string, importYaklangLibs bool, expectedResult string, expectedBoolResult bool, vars ...map[string]string) {
 		t.Helper()
 		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
@@ -30,17 +31,21 @@ func TestEvaluateExpression(t *testing.T) {
 		}
 
 		resp, err := local.EvaluateExpression(ctx, &ypb.EvaluateExpressionRequest{
-			Expression: expression,
-			Variables:  variables,
+			Expression:        expression,
+			ImportYaklangLibs: importYaklangLibs,
+			Variables:         variables,
 		})
+
+		spew.Dump(resp)
 
 		require.NoError(t, err)
 		require.Equal(t, expectedResult, resp.Result)
 		require.Equal(t, expectedBoolResult, resp.BoolResult)
 
 		multiResp, err := local.EvaluateMultiExpression(ctx, &ypb.EvaluateMultiExpressionRequest{
-			Expressions: []string{expression},
-			Variables:   variables,
+			Expressions:       []string{expression},
+			ImportYaklangLibs: importYaklangLibs,
+			Variables:         variables,
 		})
 
 		require.NoError(t, err)
@@ -50,25 +55,30 @@ func TestEvaluateExpression(t *testing.T) {
 	}
 
 	t.Run("bool", func(t *testing.T) {
-		check(t, "false || true", "true", true)
+		check(t, "false || true", false, "true", true)
 	})
 
 	t.Run("string", func(t *testing.T) {
-		check(t, `"a"+"b"`, `"ab"`, true)
+		check(t, `"a"+"b"`, false, `"ab"`, true)
 	})
 
 	t.Run("vars equal", func(t *testing.T) {
-		check(t, "a == 1", "true", true, map[string]string{
+		check(t, "a == 1", false, "true", true, map[string]string{
 			"a": "1",
 		})
 	})
 
 	t.Run("vars with complex logic", func(t *testing.T) {
-		check(t, "a && (b || (c || d))", "true", true, map[string]string{
+		check(t, "a && (b || (c || d))", false, "true", true, map[string]string{
 			"a": "true",
 			"b": "false",
 			"c": "false",
 			"d": "true",
 		})
 	})
+
+	t.Run("use yaklang libs", func(t *testing.T) {
+		check(t, "max(1,2)", true, "2", true)
+	})
+
 }
