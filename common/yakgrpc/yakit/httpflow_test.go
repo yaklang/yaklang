@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/segmentio/ksuid"
 	"testing"
@@ -295,8 +296,11 @@ func TestQueryHTTPFlowsProcessNames(t *testing.T) {
 			processName := utils.RandString(16)
 			processNames = append(processNames, processName)
 			flow := &schema.HTTPFlow{
-				Url:         uuid.NewString(),
-				ProcessName: processName,
+				Url: uuid.NewString(),
+				ProcessName: sql.NullString{
+					String: processName,
+					Valid:  true,
+				},
 			}
 			err := InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
 			require.NoError(t, err)
@@ -326,8 +330,11 @@ func TestQueryHTTPFlowsProcessNames(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			processNames = append(processNames, processName)
 			flow := &schema.HTTPFlow{
-				Url:         uuid.NewString(),
-				ProcessName: processName,
+				Url: uuid.NewString(),
+				ProcessName: sql.NullString{
+					String: processName,
+					Valid:  true,
+				},
 			}
 			err := InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
 			require.NoError(t, err)
@@ -344,19 +351,36 @@ func TestQueryHTTPFlowsProcessNames(t *testing.T) {
 		require.Equal(t, processName, got[0])
 	})
 
-	t.Run("Empty", func(t *testing.T) {
+	t.Run("Empty and Null", func(t *testing.T) {
 		runtimeID := uuid.NewString()
+		ids := make([]int64, 0, 2)
+		defer DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+			Id: ids,
+		})
 		flow := &schema.HTTPFlow{
-			Url:         uuid.NewString(),
-			RuntimeId:   runtimeID,
-			ProcessName: "",
+			Url:       uuid.NewString(),
+			RuntimeId: runtimeID,
+			ProcessName: sql.NullString{
+				String: "",
+				Valid:  true,
+			},
 		}
 		err := InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
 		require.NoError(t, err)
 		require.NotEmpty(t, flow.ID)
-		defer DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
-			Id: []int64{int64(flow.ID)},
-		})
+		ids = append(ids, int64(flow.ID))
+		flow2 := &schema.HTTPFlow{
+			Url:       uuid.NewString(),
+			RuntimeId: runtimeID,
+			ProcessName: sql.NullString{
+				Valid: false,
+			},
+		}
+		err = InsertHTTPFlow(consts.GetGormProjectDatabase(), flow2)
+		require.NoError(t, err)
+		require.NotEmpty(t, flow2.ID)
+		ids = append(ids, int64(flow2.ID))
+
 		db := consts.GetGormProjectDatabase()
 		got, err := QueryHTTPFlowsProcessNames(db, &ypb.QueryHTTPFlowRequest{
 			RuntimeId: runtimeID,

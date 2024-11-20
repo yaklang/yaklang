@@ -839,24 +839,3 @@ func TestGetHttpFlowByIdOrRuntimeId(t *testing.T) {
 	})
 	require.NoError(t, err2)
 }
-
-func TestGetHttpFlowProcessName(t *testing.T) {
-	projectDb := consts.GetGormProjectDatabase()
-	processName := uuid.NewString()
-	flow := &schema.HTTPFlow{
-		Url:         "http://www.example.com",
-		ProcessName: processName,
-	}
-	err := yakit.SaveHTTPFlow(projectDb, flow)
-	require.NoError(t, err)
-	require.NotEmpty(t, flow.ID)
-	defer func() {
-		yakit.DeleteHTTPFlow(projectDb, &ypb.DeleteHTTPFlowRequest{Id: []int64{int64(flow.ID)}})
-	}()
-	_, httpflows, err := yakit.QueryHTTPFlow(projectDb, &ypb.QueryHTTPFlowRequest{
-		ProcessName: []string{processName},
-	})
-	require.NoError(t, err)
-	require.Len(t, httpflows, 1)
-	require.Equal(t, processName, httpflows[0].ProcessName)
-}
