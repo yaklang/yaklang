@@ -28,7 +28,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
 		Funcs:                   make(map[string]*Function),
-		ClassBluePrint:          omap.NewEmptyOrderedMap[string, *Blueprint](),
+		Blueprint:               make(map[string]*Blueprint),
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		FileList:                make(map[string]string),
@@ -231,11 +231,9 @@ func (p *Program) LazyBuild() {
 			syntaxInstance(program)
 		}
 	}
-	syntaxClassInstace := func(program *Program) {
-		for k := 0; k < program.ClassBluePrint.Len(); k++ {
-			if blueprint, exits := program.ClassBluePrint.GetByIndex(k); exits {
-				blueprint.Build()
-			}
+	syntaxClassInstance := func(program *Program) {
+		for _, blueprint := range program.Blueprint {
+			blueprint.Build()
 		}
 	}
 	syntaxFuncInstance := func(program *Program) {
@@ -244,10 +242,8 @@ func (p *Program) LazyBuild() {
 		}
 	}
 	syntaxClassOtherInstance := func(program *Program) {
-		for k := 0; k < program.ClassBluePrint.Len(); k++ {
-			if blueprint, exits := program.ClassBluePrint.GetByIndex(k); exits {
-				blueprint.BuildConstructorAndDestructor()
-			}
+		for _, blueprint := range program.Blueprint {
+			blueprint.BuildConstructorAndDestructor()
 		}
 	}
 	fixImport := func(program *Program) {
@@ -256,7 +252,7 @@ func (p *Program) LazyBuild() {
 		}
 	}
 	buildMoreProg := func(prog ...*Program) {
-		syntaxFunc(syntaxClassInstace, prog...)
+		syntaxFunc(syntaxClassInstance, prog...)
 		syntaxFunc(fixImport, prog...)
 		syntaxFunc(syntaxFuncInstance, prog...)
 		syntaxFunc(syntaxClassOtherInstance, prog...)

@@ -2,6 +2,7 @@ package java2ssa
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -228,12 +229,10 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		}
 		field := i.FieldDeclaration().(*javaparser.FieldDeclarationContext)
 		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
-		name2Map := make(map[string]*ssa.Value)
 		for _, name := range variableDeclarators {
 			namex := y.OnlyVisitVariableDeclaratorName(name)
 			undefined := ssa.Value(ssa.NewUndefined(namex))
-			name2Map[namex] = &undefined
-			setMember(namex, undefined)
+			setMember(namex, undefined, false)
 		}
 		class.AddLazyBuilder(func() {
 			f := y.SwitchProg(currentBuilder, currentEditor)
@@ -249,9 +248,6 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 				v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
 				name, value := y.VisitVariableDeclarator(v, nil)
 				value.SetType(fieldType)
-				if val, ok := name2Map[name]; ok {
-					*val = value
-				}
 				setMember(name, value)
 			}
 		})
@@ -581,7 +577,7 @@ func (y *builder) VisitMethodDeclaration(
 	}
 
 	key := i.Identifier().GetText()
-	funcName := fmt.Sprintf("%s_%s", class.Name, key)
+	funcName := fmt.Sprintf("%s_%s_%s", class.Name, key, uuid.NewString()[:4])
 	methodName := key
 	newFunc := y.NewFunc(funcName)
 	newFunc.SetMethodName(methodName)
@@ -833,7 +829,7 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 
 	key := i.Identifier().GetText()
 	pkgName := y.GetProgram()
-	funcName := fmt.Sprintf("%s_%s_%s", pkgName.Name, class.Name, key)
+	funcName := fmt.Sprintf("%s_%s_%s_%s", pkgName.Name, class.Name, key, uuid.NewString()[:4])
 	newFunc := y.NewFunc(funcName)
 	class.Constructor = newFunc
 	currentBuilder := y.FunctionBuilder
