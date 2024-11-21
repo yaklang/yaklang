@@ -577,7 +577,7 @@ func main() {
 			$db <getMembers> as $output;
 			$output.Query as $query;
 	`, map[string][]string{
-			"query": {""},
+			"query": {"Undefined-db.Query(valid)"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }
