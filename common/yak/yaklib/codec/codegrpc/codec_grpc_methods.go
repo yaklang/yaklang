@@ -13,6 +13,7 @@ import (
 	_ "embed"
 	"encoding/gob"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 	"hash"
 	"regexp"
 	"strconv"
@@ -989,6 +990,14 @@ func (flow *CodecExecFlow) JsonFormat(mode string) error {
 		return err
 	}
 	flow.Text = res
+	return nil
+}
+
+// Tag = "数据美化"
+// CodecName = "XML美化"
+// Desc = """可扩展标记语言（英语：Extensible Markup Language，简称：XML）是一种标记语言和用于存储、传输和重构松散数据的文件格式。它定义了一系列编码文档的规则以使其在人类可读的同时机器可读。"""
+func (flow *CodecExecFlow) XMLFormat() error {
+	flow.Text = []byte(xml_tools.XmlPrettify(flow.Text))
 	return nil
 }
 
