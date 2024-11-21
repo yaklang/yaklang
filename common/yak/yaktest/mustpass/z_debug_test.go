@@ -17,7 +17,7 @@ func TestMustPassDebug(t *testing.T) {
 
 	yakit.RegisterLowHTTPSaveCallback()
 
-	debugName := "syntaxflow.yak"
+	debugName := "git_test.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
