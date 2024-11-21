@@ -689,6 +689,14 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		"tags", "url", "path", "request",
 		"response", "remote_addr",
 	}, params.GetKeyword(), false)
+	if len(params.GetExcludeKeywords()) > 0 {
+		for _, keyword := range params.GetExcludeKeywords() {
+			db = bizhelper.FuzzSearchNotEx(db, []string{
+				"tags", "url", "path", "request",
+				"response", "remote_addr",
+			}, keyword, false)
+		}
+	}
 	if params.GetAfterId() > 0 {
 		db = db.Where("id > ?", params.GetAfterId())
 	}
