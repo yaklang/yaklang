@@ -158,11 +158,11 @@ func (c *Blueprint) BuildConstructorAndDestructor() {
 		p.BuildConstructorAndDestructor()
 	}
 
-	if c.Constructor != nil {
-		c.Constructor.GetFunc()
-		if function, b := ToFunction(c.Constructor); b {
+	for _, value := range c.MagicMethod {
+		if function, b := ToFunction(value); b {
 			function.Build()
 		}
+
 	}
 	for _, m := range c.NormalMethod {
 		m.Build()

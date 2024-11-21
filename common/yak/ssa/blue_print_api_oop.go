@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func (pkg *Program) GetBluePrint(name string) *Blueprint {
@@ -21,10 +20,11 @@ func (b *FunctionBuilder) GetBluePrint(name string) *Blueprint {
 
 func (b *FunctionBuilder) SetClassBluePrint(name string, class *Blueprint) {
 	p := b.prog
-	if _, flag := p.ClassBluePrint.Get(name); flag {
+	_, exit := p.Blueprint["name"]
+	if exit {
 		log.Errorf("SetClassBluePrint: this class redeclare")
 	}
-	p.ClassBluePrint.Set(name, class)
+	p.Blueprint[name] = class
 }
 
 // CreateClassBluePrint will create object template (maybe class)
@@ -36,13 +36,13 @@ func (b *FunctionBuilder) SetClassBluePrint(name string, class *Blueprint) {
 func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...CanStartStopToken) *Blueprint {
 	prog := b.prog
 	blueprint := NewClassBluePrint(name)
-	if prog.ClassBluePrint == nil {
-		prog.ClassBluePrint = omap.NewEmptyOrderedMap[string, *Blueprint]()
+	if prog.Blueprint == nil {
+		prog.Blueprint = make(map[string]*Blueprint)
 	}
 	blueprint.GeneralUndefined = func(s string) *Undefined {
 		return b.EmitUndefined(s)
 	}
-	prog.ClassBluePrint.Set(name, blueprint)
+	b.SetClassBluePrint(name, blueprint)
 	klassvar := b.CreateVariable(name, tokenizer...)
 	klassContainer := b.EmitEmptyContainer()
 	b.AssignVariable(klassvar, klassContainer)
