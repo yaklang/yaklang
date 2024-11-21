@@ -130,3 +130,7 @@ func MissInitExpr(name string) string {
 func NotFunction(name string) string {
 	return fmt.Sprintf("value %s is not a function", name)
 }
+
+func NotCreateBluePrint(name string) string {
+	return fmt.Sprintf("[BUG]struct %v is not create blueprint", name)
+}

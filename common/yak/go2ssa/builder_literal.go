@@ -614,12 +614,6 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			if a := typ.TypeArgs(); a != nil {
 				b.tpHandler[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
 			}
-			if parent == nil {
-				name := typ.TypeName().(*gol.TypeNameContext).GetText()
-				b.NewError(ssa.Warn, TAG, StructNotFind(name))
-				parent = ssa.NewStructType()
-				parent.(*ssa.ObjectType).Name = name
-			}
 			if p, ok := parent.(*ssa.ObjectType); ok {
 				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), p)
 				structTyp.AnonymousField[typ.TypeName().GetText()] = p
