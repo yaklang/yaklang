@@ -3,8 +3,10 @@ package yakit
 import (
 	"database/sql"
 	"fmt"
-	"github.com/segmentio/ksuid"
 	"testing"
+	"time"
+
+	"github.com/segmentio/ksuid"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -405,4 +407,37 @@ func TestColorFilter(t *testing.T) {
 	res := []*schema.HTTPFlow{}
 	db.Find(&res)
 	assert.Len(t, res, 1)
+}
+
+func TestExcludeKeywords(t *testing.T) {
+	sameToken, token := uuid.NewString(), uuid.NewString()
+	ids := make([]int64, 0, 2)
+	defer DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+		Id: ids,
+	})
+	flow := &schema.HTTPFlow{
+		Path: token,
+		Url:  sameToken,
+	}
+	err := InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
+	require.NoError(t, err)
+	require.Greater(t, flow.ID, uint(0))
+	ids = append(ids, int64(flow.ID))
+	flow2 := &schema.HTTPFlow{
+		Url: sameToken,
+	}
+	err = InsertHTTPFlow(consts.GetGormProjectDatabase(), flow2)
+	require.NoError(t, err)
+	require.Greater(t, flow.ID, uint(0))
+	ids = append(ids, int64(flow.ID))
+
+	db := consts.GetGormProjectDatabase().Debug()
+	start := time.Now()
+	_, httpflows, err := QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+		Keyword:         sameToken,
+		ExcludeKeywords: []string{token},
+	})
+	t.Logf("query with exclude keywords cost: %v", time.Since(start))
+	require.NoError(t, err)
+	require.Len(t, httpflows, 1)
 }

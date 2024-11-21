@@ -4699,7 +4699,9 @@ message QueryHTTPFlowRequest {
 
   repeated string IncludeHash = 41;
   repeated string HiddenIndex = 42;
+  
   repeated string ProcessName = 43;
+  repeated string ExcludeKeywords = 44;
 }
 
 message HTTPFlowsToOnlineRequest {
