@@ -31,11 +31,11 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string) *Blueprint {
 	}
 
 	getInCurrent := func() (Type, bool) {
-		if c, ok := p.ClassBluePrint.Get(name); ok {
+		if blueprint, exit := p.Blueprint[name]; exit {
 			if !p.PreHandler() {
-				c.Build()
+				blueprint.Build()
 			}
-			return c, true
+			return blueprint, true
 		}
 		return nil, false
 	}
