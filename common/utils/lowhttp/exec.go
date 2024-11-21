@@ -554,7 +554,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			netx.WithDNSServers(dnsServers...),
 			netx.WithTemporaryHosts(dnsHosts),
 		),
-		netx.DialX_WithSNI(host),
 	)
 
 	if option.OverrideEnableSystemProxyFromEnv {
