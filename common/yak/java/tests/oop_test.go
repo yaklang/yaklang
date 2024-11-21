@@ -2,8 +2,10 @@ package tests
 
 import (
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -447,7 +449,7 @@ class Main{
 	}
 }
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-num1, #21.num1)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-num1, this.num1)"}, t)
 	})
 	t.Run("test no package with constructor and no direct use member", func(t *testing.T) {
 		code := `package com.example.A;
@@ -467,7 +469,7 @@ class Main{
 	}
 }
 `
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-a.getNum(valid)(Function-A(Undefined-A)) member[side-effect(Parameter-num1, #32.num1)]"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-a.getNum(valid)(Function-A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]"}, t)
 	})
 	t.Run("test package with constructor", func(t *testing.T) {
 		code := `
@@ -497,7 +499,7 @@ class Main{
 	}
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, #38.num1)]", "Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, #38.num2)]",
+			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, this.num1)]", "Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)
 	})
 }
@@ -518,7 +520,7 @@ class Test{
         println(main.a);
     }
 }`
-	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-a, #21.a)"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-a, this.a)"}, t)
 	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 		"param": {"2"},
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
@@ -577,5 +579,28 @@ public class ImageUtils{
 		ssatest.CheckSyntaxFlow(t, code, `*readFile as $fun`, map[string][]string{
 			"fun": {"Function-ImageUtils.readFile", "Undefined-ImageUtils.readFile(valid)"},
 		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+	t.Run("new java blueprint by fullName", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("a.java", `
+package com.example.demo1;
+class A{
+	public void method(int a){
+		println(a);
+	}
+}
+`)
+		fs.AddFile("b.java", `
+package com.example.demo2;
+import com.example.demo1.A;
+class B{
+	public static void main(string[] args){
+		com.example.demo1.A a = new com.example.demo1.A();
+		
+	}
+}`)
+		ssatest.CheckProfileWithFS(fs, t, func(p ssatest.ParseStage, prog ssaapi.Programs, start time.Time) error {
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
