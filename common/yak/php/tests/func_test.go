@@ -462,7 +462,9 @@ function a(){
 function b($a){
     exec($a);
 }`
-		test.CheckSyntaxFlow(t, code, `exec(* #-> * as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+		test.CheckSyntaxFlow(t, code, `exec(* #-> * as $param)`, map[string][]string{
+			"param": {`"whoami"`},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("test A use self", func(t *testing.T) {
 		code := `<?php

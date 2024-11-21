@@ -2,6 +2,7 @@ package java
 
 import (
 	_ "embed"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ func TestFastjson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := prog.SyntaxFlowWithError("deserializers.put(,,* as $deserializer) as $call", ssaapi.QueryWithEnableDebug(false))
+	res, err := prog.SyntaxFlowWithError("deserializers.put(,,* as $deserializer) as $call", ssaapi.QueryWithEnableDebug(true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,6 +30,7 @@ func TestFastjson(t *testing.T) {
 	for _, value := range deserializerList {
 		name := value.GetObject().GetName()
 		if name == "" {
+			fmt.Println(fmt.Sprintf("value:[%s] get obj name is null", value.GetName()))
 			continue
 		}
 		deserializerSet.Add(name)
