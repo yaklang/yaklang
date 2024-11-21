@@ -5333,6 +5333,7 @@ message TraceRouteResponse{
 message EvaluateExpressionRequest {
   string Expression = 1;
   repeated KVPair Variables = 2;
+  bool ImportYaklangLibs = 3;
 }
 
 message EvaluateExpressionResponse {
@@ -5343,6 +5344,7 @@ message EvaluateExpressionResponse {
 message EvaluateMultiExpressionRequest {
   repeated string Expressions = 1;
   repeated KVPair Variables = 2;
+  bool ImportYaklangLibs = 3;
 }
 
 message EvaluateMultiExpressionResponse {
