@@ -89,6 +89,21 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				b.buildDeclaration(decl, true)
 			}
 		}
+		for n, s := range b.GetStructAll() {
+			bp := b.GetBluePrint(n)
+			if bp == nil {
+				b.NewError(ssa.Error, TAG, NotCreateBluePrint(n))
+				continue
+			}
+			for pn, _ := range s.AnonymousField {
+				pbp := b.GetBluePrint(pn)
+				if pbp != nil {
+					b.NewError(ssa.Warn, TAG, StructNotFind(n))
+					pbp = b.CreateBluePrint(pn)
+				}
+				bp.ParentClass = append(bp.ParentClass, pbp)
+			}
+		}
 
 		for _, meth := range ast.AllMethodDecl() {
 			if meth, ok := meth.(*gol.MethodDeclContext); ok {
@@ -243,7 +258,7 @@ func (b *astbuilder) buildDeclaration(decl *gol.DeclarationContext, isglobal boo
 		b.buildConstDecl(constDecl.(*gol.ConstDeclContext))
 	}
 	if varDecl := decl.VarDecl(); varDecl != nil {
-		b.buildVarDecl(varDecl.(*gol.VarDeclContext), false)
+		b.buildVarDecl(varDecl.(*gol.VarDeclContext), isglobal)
 	}
 	if typeDecl := decl.TypeDecl(); typeDecl != nil {
 		b.buildTypeDecl(typeDecl.(*gol.TypeDeclContext))
@@ -1909,8 +1924,8 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			ssatyp = b.GetSpecialTypeByStr(name)
 		}
 		if ssatyp == nil {
-			b.NewError(ssa.Error, TAG, fmt.Sprintf("Type %v is not defined", name))
-			ssatyp = ssa.CreateAnyType()
+			b.NewError(ssa.Warn, TAG, StructNotFind(name))
+			ssatyp = ssa.NewStructType()
 		}
 
 		return ssatyp
