@@ -2,11 +2,11 @@ package yaklib
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestXMLloadsAndDumps(t *testing.T) {
@@ -22,9 +22,9 @@ func TestXMLloadsAndDumps(t *testing.T) {
 	</b>
 </a>
 `
-	v := utils.XmlLoads(s)
+	v := xml_tools.XmlLoads(s)
 	spew.Dump(v)
-	fmt.Println(string(utils.XmlDumps(v)))
+	fmt.Println(string(xml_tools.XmlDumps(v)))
 
 	require.Equal(t, v, map[string]any{
 		"a": map[string]any{
@@ -39,9 +39,9 @@ func TestXMLloadsAndDumps(t *testing.T) {
 func TestXMLloadsEncoding(t *testing.T) {
 	t.Run("utf-8", func(t *testing.T) {
 		s := `<?xml version="1.0" encoding="utf-8"?><note><to>George</to><from>John</from><heading>Reminder</heading><body>Don't forget the meeting!</body></note>`
-		v := utils.XmlLoads(s)
+		v := xml_tools.XmlLoads(s)
 		spew.Dump(v)
-		fmt.Println(string(utils.XmlDumps(v)))
+		fmt.Println(string(xml_tools.XmlDumps(v)))
 
 		require.Equal(t, v, map[string]any{
 			"note": map[string]any{
@@ -54,12 +54,32 @@ func TestXMLloadsEncoding(t *testing.T) {
 	})
 	t.Run("ISO-8859-1", func(t *testing.T) {
 		s := fmt.Sprintf(`<?xml version="1.0" encoding="ISO-8859-1"?><note>%s</note>`, string([]byte{0xc4, 0xd6, 0xdc, 0xe4, 0xf6, 0xfc, 0xdf}))
-		v := utils.XmlLoads(s)
+		v := xml_tools.XmlLoads(s)
 		spew.Dump(v)
-		fmt.Println(string(utils.XmlDumps(v)))
+		fmt.Println(string(xml_tools.XmlDumps(v)))
 
 		require.Equal(t, v, map[string]any{
 			"note": "ÄÖÜäöüß",
 		})
+	})
+}
+
+func TestXMLDumpEscape(t *testing.T) {
+	t.Run("true", func(t *testing.T) {
+		s := `<a><b>'</b></a>`
+		v := xml_tools.XmlLoads(s)
+		spew.Dump(v)
+		res := xml_tools.XmlDumps(v)
+		spew.Dump(res)
+		require.Contains(t, string(res), `&#39;`)
+	})
+
+	t.Run("ISO-8859-1", func(t *testing.T) {
+		s := `<a><b>'</b></a>`
+		v := xml_tools.XmlLoads(s)
+		spew.Dump(v)
+		res := xml_tools.XmlDumps(v, xml_tools.WithHTMLEscape(false))
+		fmt.Println(string(res))
+		require.NotContains(t, string(res), `&#39;`)
 	})
 }
