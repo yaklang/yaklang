@@ -3,6 +3,7 @@ package yakcmds
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
@@ -25,6 +26,10 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 			Name:  "code,show-code",
 			Usage: "show code",
 		},
+		cli.StringFlag{
+			Name:  "rule-keyword,rk,kw",
+			Usage: `set rule keyword for file`,
+		},
 	},
 	Action: func(c *cli.Context) error {
 		program := c.String("program")
@@ -40,7 +45,14 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 
 		var results []*ssaapi.SyntaxFlowResult
 
+		filterKw := c.String("rule-keyword")
+
 		for rule := range sfdb.YieldSyntaxFlowRulesWithoutLib(consts.GetGormProfileDatabase(), context.Background()) {
+			if filterKw != "" {
+				if !strings.Contains(strings.ToLower(rule.RuleName), strings.ToLower(filterKw)) {
+					continue
+				}
+			}
 			rule := rule
 			ScanWithSFRule(prog, rule, func(result *ssaapi.SyntaxFlowResult) {
 				if ret := result.GetAlertValues(); ret.Len() > 0 {
