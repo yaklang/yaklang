@@ -7,6 +7,8 @@ package pkcs12
 import (
 	"bytes"
 	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
 	"math/big"
 )
 
@@ -17,6 +19,18 @@ var (
 // sha1Sum returns the SHA-1 hash of in.
 func sha1Sum(in []byte) []byte {
 	sum := sha1.Sum(in)
+	return sum[:]
+}
+
+// sha256Sum returns the SHA-256 hash of in.
+func sha256Sum(in []byte) []byte {
+	sum := sha256.Sum256(in)
+	return sum[:]
+}
+
+// sha512Sum returns the SHA-512 hash of in.
+func sha512Sum(in []byte) []byte {
+	sum := sha512.Sum512(in)
 	return sum[:]
 }
 
@@ -102,7 +116,7 @@ func pbkdf(hash func([]byte) []byte, u, v int, salt, password []byte, r int, ID 
 	c := (size + u - 1) / u
 
 	//    6.  For i=1, 2, ..., c, do the following:
-	A := make([]byte, c*20)
+	A := make([]byte, c*u)
 	var IjBuf []byte
 	for i := 0; i < c; i++ {
 		//        A.  Set A2=H^r(D||I). (i.e., the r-th hash of D||1,
@@ -111,7 +125,7 @@ func pbkdf(hash func([]byte) []byte, u, v int, salt, password []byte, r int, ID 
 		for j := 1; j < r; j++ {
 			Ai = hash(Ai)
 		}
-		copy(A[i*20:], Ai[:])
+		copy(A[i*u:], Ai[:])
 
 		if i < c-1 { // skip on last iteration
 			// B.  Concatenate copies of Ai to create a string B of length v
