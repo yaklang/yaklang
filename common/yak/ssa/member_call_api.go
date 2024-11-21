@@ -1,6 +1,9 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/log"
+import (
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 // read member call variable, want method
 func (b *FunctionBuilder) ReadMemberCallMethod(object, key Value) Value {
@@ -28,7 +31,7 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 
 // create member call variable
 func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable {
-	if object == nil || key == nil {
+	if utils.IsNil(object) || utils.IsNil(key) {
 		log.Errorf("CreateMemberCallVariable: object or key is nil")
 		return nil
 	}
