@@ -527,6 +527,11 @@ type YakClient interface {
 	QuerySSAPrograms(ctx context.Context, in *QuerySSAProgramRequest, opts ...grpc.CallOption) (*QuerySSAProgramResponse, error)
 	UpdateSSAProgram(ctx context.Context, in *UpdateSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteSSAPrograms(ctx context.Context, in *DeleteSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error)
+	QueryPluginEnv(ctx context.Context, in *QueryPluginEnvRequest, opts ...grpc.CallOption) (*PluginEnvData, error)
+	CreatePluginEnv(ctx context.Context, in *PluginEnvData, opts ...grpc.CallOption) (*Empty, error)
+	SetPluginEnv(ctx context.Context, in *PluginEnvData, opts ...grpc.CallOption) (*Empty, error)
+	DeletePluginEnv(ctx context.Context, in *DeletePluginEnvRequest, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type yakClient struct {
@@ -5650,6 +5655,51 @@ func (c *yakClient) DeleteSSAPrograms(ctx context.Context, in *DeleteSSAProgramR
 	return out, nil
 }
 
+func (c *yakClient) GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error) {
+	out := new(PluginEnvData)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/GetAllPluginEnv", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryPluginEnv(ctx context.Context, in *QueryPluginEnvRequest, opts ...grpc.CallOption) (*PluginEnvData, error) {
+	out := new(PluginEnvData)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryPluginEnv", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) CreatePluginEnv(ctx context.Context, in *PluginEnvData, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/CreatePluginEnv", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SetPluginEnv(ctx context.Context, in *PluginEnvData, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/SetPluginEnv", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeletePluginEnv(ctx context.Context, in *DeletePluginEnvRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/DeletePluginEnv", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -6163,6 +6213,11 @@ type YakServer interface {
 	QuerySSAPrograms(context.Context, *QuerySSAProgramRequest) (*QuerySSAProgramResponse, error)
 	UpdateSSAProgram(context.Context, *UpdateSSAProgramRequest) (*DbOperateMessage, error)
 	DeleteSSAPrograms(context.Context, *DeleteSSAProgramRequest) (*DbOperateMessage, error)
+	GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error)
+	QueryPluginEnv(context.Context, *QueryPluginEnvRequest) (*PluginEnvData, error)
+	CreatePluginEnv(context.Context, *PluginEnvData) (*Empty, error)
+	SetPluginEnv(context.Context, *PluginEnvData) (*Empty, error)
+	DeletePluginEnv(context.Context, *DeletePluginEnvRequest) (*Empty, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -7348,6 +7403,21 @@ func (UnimplementedYakServer) UpdateSSAProgram(context.Context, *UpdateSSAProgra
 }
 func (UnimplementedYakServer) DeleteSSAPrograms(context.Context, *DeleteSSAProgramRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSSAPrograms not implemented")
+}
+func (UnimplementedYakServer) GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllPluginEnv not implemented")
+}
+func (UnimplementedYakServer) QueryPluginEnv(context.Context, *QueryPluginEnvRequest) (*PluginEnvData, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryPluginEnv not implemented")
+}
+func (UnimplementedYakServer) CreatePluginEnv(context.Context, *PluginEnvData) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreatePluginEnv not implemented")
+}
+func (UnimplementedYakServer) SetPluginEnv(context.Context, *PluginEnvData) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetPluginEnv not implemented")
+}
+func (UnimplementedYakServer) DeletePluginEnv(context.Context, *DeletePluginEnvRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeletePluginEnv not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -14698,6 +14768,96 @@ func _Yak_DeleteSSAPrograms_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetAllPluginEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAllPluginEnv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/GetAllPluginEnv",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAllPluginEnv(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryPluginEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryPluginEnvRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryPluginEnv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QueryPluginEnv",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryPluginEnv(ctx, req.(*QueryPluginEnvRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_CreatePluginEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PluginEnvData)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreatePluginEnv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/CreatePluginEnv",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreatePluginEnv(ctx, req.(*PluginEnvData))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SetPluginEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PluginEnvData)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SetPluginEnv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/SetPluginEnv",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SetPluginEnv(ctx, req.(*PluginEnvData))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeletePluginEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeletePluginEnvRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeletePluginEnv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/DeletePluginEnv",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeletePluginEnv(ctx, req.(*DeletePluginEnvRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -16000,6 +16160,26 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteSSAPrograms",
 			Handler:    _Yak_DeleteSSAPrograms_Handler,
+		},
+		{
+			MethodName: "GetAllPluginEnv",
+			Handler:    _Yak_GetAllPluginEnv_Handler,
+		},
+		{
+			MethodName: "QueryPluginEnv",
+			Handler:    _Yak_QueryPluginEnv_Handler,
+		},
+		{
+			MethodName: "CreatePluginEnv",
+			Handler:    _Yak_CreatePluginEnv_Handler,
+		},
+		{
+			MethodName: "SetPluginEnv",
+			Handler:    _Yak_SetPluginEnv_Handler,
+		},
+		{
+			MethodName: "DeletePluginEnv",
+			Handler:    _Yak_DeletePluginEnv_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

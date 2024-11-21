@@ -171,11 +171,7 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		if err != nil {
 			r = s.PluginEnvKey
 		}
-		err = json.Unmarshal([]byte(r), &pluginEnvKey)
-		if err != nil { // errors may occur due to version iterations has break change, so we just ignore it (this field has been deprecated actually)
-			// log.Errorf("unmarshal RiskDetail failed: %s", err)
-			// spew.Dump([]byte(r))
-		}
+		_ = json.Unmarshal([]byte(r), &pluginEnvKey)
 	}
 
 	var collaboratorInfo []*ypb.Collaborator
