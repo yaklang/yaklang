@@ -13,7 +13,8 @@ type FunctionSideEffect struct {
 	Modify      Value
 	// only call-side Scope > this Scope-level, this side-effect can be create
 	// Scope *Scope
-	Variable *Variable
+	Variable     *Variable
+	BindVariable *Variable
 
 	forceCreate bool
 
@@ -30,11 +31,20 @@ func (f *Function) AddForceSideEffect(name string, v Value) {
 		},
 	})
 }
-func (f *Function) AddSideEffect(name *Variable, v Value) {
+func (f *Function) AddSideEffect(variable *Variable, v Value) {
+	var bind *Variable
+	if p := f.builder.parentBuilder; p != nil {
+		if value := p.PeekValue(variable.GetName()); value != nil {
+			bind = value.GetVariable(variable.GetName())
+		}
+	}
+
 	f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
-		Name:     name.GetName(),
-		Modify:   v,
-		Variable: name,
+		Name:         variable.GetName(),
+		VerboseName:  variable.GetName(),
+		Modify:       v,
+		Variable:     variable,
+		BindVariable: bind,
 		parameterMemberInner: &parameterMemberInner{
 			MemberCallKind: NoMemberCall,
 		},
@@ -42,6 +52,19 @@ func (f *Function) AddSideEffect(name *Variable, v Value) {
 }
 
 func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
+	var bind *Variable
+	if p := f.builder.parentBuilder; p != nil {
+		if value := p.PeekValue(variable.GetName()); value != nil {
+			bind = value.GetVariable(variable.GetName())
+		} else {
+			if obj := variable.object; obj == nil {
+
+			} else if value := p.PeekValue(obj.GetName()); value != nil {
+				bind = value.GetVariable(obj.GetName())
+			}
+		}
+	}
+
 	if variable.IsMemberCall() {
 		// if name is member call, it's modify parameter field
 		para, ok := ToParameter(variable.object)
@@ -54,6 +77,7 @@ func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
 			VerboseName:          getMemberVerboseName(variable.object, variable.key),
 			Modify:               v,
 			Variable:             variable,
+			BindVariable:         bind,
 			forceCreate:          false,
 			parameterMemberInner: newParameterMember(para, variable.key),
 		}

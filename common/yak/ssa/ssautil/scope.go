@@ -329,10 +329,18 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 }
 
 func (scope *ScopedVersionedTable[T]) GetHeadVariable(name string) VersionedIF[T] {
+	var ret VersionedIF[T]
+
 	if result := scope.getHeadVersionInCurrentLexicalScope(name); result != nil {
-		return result
+		ret = result
+	} else {
+		if scope.GetParent() != nil {
+			ret = scope.GetParent().GetHeadVariable(name)
+		} else {
+			ret = nil
+		}
 	}
-	return nil
+	return ret
 }
 
 func (v *ScopedVersionedTable[T]) ReadValue(name string) (t T) {

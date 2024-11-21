@@ -201,7 +201,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			c #-> as $c
 	`, map[string][]string{
 			"b": {"20"},
-			"c": {"1"},
+			"c": {"1", "10"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 
@@ -232,7 +232,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			b #-> as $b
 			c #-> as $c
 	`, map[string][]string{
-			"b": {"2"},
+			"b": {"2", "20"},
 			"c": {"10"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
@@ -264,7 +264,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			b #-> as $b
 			c  #->as $c
 	`, map[string][]string{
-			"b": {"2"},
+			"b": {"2", "20"},
 			"c": {"10"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
@@ -517,23 +517,26 @@ func Test_Captured_SideEffect(t *testing.T) {
 		}
 
 		{
-			t := 10
+			t := 3
 			f2 := func(){
 				f()
-				b := t // 2 不会被side-effect影响
+				b := t // 3 不会被side-effect影响
 			}
 
 			f2()
-			c := t // 2 会被side-effect影响
+			c := t // 3 会被side-effect影响
 		}
+		d := t // 2 会被side-effect影响
 	}
 		`
 		ssatest.CheckSyntaxFlow(t, code, `
 			b #-> as $b
 			c #-> as $c
+			d #-> as $d
 		`, map[string][]string{
-			"b": {"2"},
-			"c": {"2"},
+			"b": {"3"},
+			"c": {"3"},
+			"d": {"2"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }
