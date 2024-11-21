@@ -66,8 +66,6 @@ type config struct {
 	externInfo string
 	// process ctx
 	ctx context.Context
-	// error
-	err error
 }
 
 func defaultConfig(opts ...Option) (*config, error) {
@@ -86,10 +84,9 @@ func defaultConfig(opts ...Option) (*config, error) {
 	}
 
 	for _, opt := range opts {
-		opt(c)
-	}
-	if c.err != nil {
-		return nil, c.err
+		if err := opt(c); err != nil {
+			return nil, err
+		}
 	}
 	return c, nil
 }
@@ -98,88 +95,89 @@ func (c *config) CalcHash() string {
 	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.language, c.ignoreSyntaxErr, c.externInfo)
 }
 
-type Option func(*config)
+type Option func(*config) error
 
 func WithProcess(process ProcessFunc) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.process = process
+		return nil
 	}
 }
 
 func WithReCompile(b bool) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.reCompile = b
+		return nil
 	}
 }
 
 func WithStrictMode(b bool) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.strictMode = b
-	}
-}
-
-func WithError(err error) Option {
-	return func(c *config) {
-		c.err = err
+		return nil
 	}
 }
 
 func WithLocalFs(path string) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.fs = filesys.NewRelLocalFs(path)
 		c.info = config_info{
 			Kind:      "local",
 			LocalFile: path,
 		}.String()
+		return nil
 	}
 }
+
 func WithFileSystem(fs fi.FileSystem) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		if fs == nil {
-			c.err = utils.Errorf("need set filesystem")
-		} else {
-			c.fs = fs
+			return utils.Errorf("need set filesystem")
 		}
+		c.fs = fs
+		return nil
 	}
 }
 
 func WithConfigInfo(input map[string]any) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		if input == nil {
-			return
+			return nil
 		}
 		// json marshal info
 		raw, err := json.Marshal(input)
 		if err != nil {
-			c.err = err
-			return
+			return err
 		}
 		info := string(raw)
 
 		c.info = info
-		if fs, err := initializeFromInfo(info); err != nil {
-			c.err = err
-		} else {
-			c.fs = fs
+		fs, err := initializeFromInfo(info)
+		if err != nil {
+			return err
 		}
+		c.fs = fs
+		return nil
 	}
 }
 
 func WithRawLanguage(input_language string) Option {
 	if input_language == "" {
-		return func(*config) {}
+		return func(*config) error { return nil }
 	}
 	if language, err := consts.ValidateLanguage(input_language); err == nil {
 		return WithLanguage(language)
 	} else {
-		return WithError(err)
+		return func(c *config) error {
+			return err
+		}
 	}
 }
 
 func WithLanguage(language consts.Language) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		if language == "" {
-			return
+			return nil
 		}
 		c.language = language
 		if parser, ok := LanguageBuilders[language]; ok {
@@ -188,150 +186,164 @@ func WithLanguage(language consts.Language) Option {
 			log.Errorf("SSA not support language %s", language)
 			c.SelectedLanguageBuilder = nil
 		}
+		return nil
 	}
 }
 
 func WithFileSystemEntry(files ...string) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.entryFile = append(c.entryFile, files...)
+		return nil
 	}
 }
 
 func WithProgramPath(path string) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.programPath = path
+		return nil
 	}
 }
 
 func WithIncludePath(path ...string) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.includePath = append(c.includePath, path...)
+		return nil
 	}
 }
 
 func WithExternLib(name string, table map[string]any) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.externLib[name] = table
+		return nil
 	}
 }
 
 func WithExternValue(table map[string]any) Option {
-	return func(c *config) {
-		// c.externValue = table
+	return func(c *config) error {
 		for name, value := range table {
-			// this value set again
-			// if _, ok := c.externValue[name]; !ok {
-			// 	// skip
-			// }
 			c.externValue[name] = value
 		}
+		return nil
 	}
 }
 
 func WithExternMethod(b ssa.MethodBuilder) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.externMethod = b
+		return nil
 	}
 }
 
 func WithExternBuildValueHandler(id string, callback func(b *ssa.FunctionBuilder, id string, v any) ssa.Value) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		if c.externBuildValueHandler == nil {
 			c.externBuildValueHandler = make(map[string]func(b *ssa.FunctionBuilder, id string, v any) ssa.Value)
 		}
 		c.externBuildValueHandler[id] = callback
+		return nil
 	}
 }
 
 func WithIgnoreSyntaxError(b ...bool) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		if len(b) > 0 {
 			c.ignoreSyntaxErr = b[0]
 		} else {
 			c.ignoreSyntaxErr = true
 		}
+		return nil
 	}
 }
 
 func WithExternInfo(info string) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.externInfo = info
+		return nil
 	}
 }
 
 func WithDefineFunc(table map[string]any) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		for name, t := range table {
 			c.defineFunc[name] = t
 		}
+		return nil
 	}
 }
 
 func WithFeedCode(b ...bool) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		if len(b) > 0 {
 			c.feedCode = b[0]
 		} else {
 			c.feedCode = true
 		}
+		return nil
 	}
 }
 
 func WithProgramDescription(desc string) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.ProgramDescription = desc
+		return nil
 	}
 }
 
 func WithDatabasePath(path string) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		if utils.GetFirstExistedFile(path) == "" {
-			return
+			return nil
 		}
 		if absPath, err := filepath.Abs(path); err != nil {
 			log.Errorf("get abs path error: %v", err)
 		} else {
 			c.databasePath = absPath
 		}
+		return nil
 	}
 }
 
 // save to database, please set the program name
 func WithProgramName(name string) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.ProgramName = name
+		return nil
 	}
 }
 
 func WithDatabaseProgramCacheHitter(h func(i any)) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.DatabaseProgramCacheHitter = h
+		return nil
 	}
 }
 
 func WithSaveToProfile(b ...bool) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		if len(b) > 0 {
 			c.toProfile = b[0]
 		} else {
 			c.toProfile = true
 		}
+		return nil
 	}
 }
 
 func WithEnableCache(b ...bool) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		if len(b) > 0 {
 			c.EnableCache = b[0]
 		} else {
 			c.EnableCache = true
 		}
+		return nil
 	}
 }
 
 func WithContext(ctx context.Context) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.ctx = ctx
+		return nil
 	}
 }
 
@@ -441,7 +453,6 @@ var Exports = map[string]any{
 	"withStrictMode":    WithStrictMode,
 	"withSaveToProfile": WithSaveToProfile,
 	"withContext":       WithContext,
-	// "": with,
 	// language:
 	"Javascript": JS,
 	"Yak":        Yak,
