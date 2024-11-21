@@ -130,3 +130,13 @@ func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
 	}
 	return nil
 }
+
+// 查找当前scope中的第一个Variable
+func GetHeadVariableFromScope(scope ScopeIF, name string) *Variable {
+	if ret := scope.GetHeadVariable(name); ret != nil {
+		if variable, ok := ret.(*Variable); ok {
+			return variable
+		}
+	}
+	return nil
+}

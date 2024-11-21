@@ -214,7 +214,16 @@ func (f *Function) Finish() {
 		}
 	}
 	funType.SetFreeValue(result)
-	se := append(funType.SideEffects, f.SideEffects...)
-	funType.SetSideEffect(se)
+	var ses []*FunctionSideEffect
+	for _, se := range f.SideEffects {
+		scope := se.Modify.GetBlock().ScopeTable
+		if ret := GetHeadVariableFromScope(scope, se.Name); ret != nil {
+			if ret.GetLocal() {
+				continue
+			}
+		}
+		ses = append(ses, se)
+	}
+	funType.SetSideEffect(ses)
 	f.SetType(funType)
 }

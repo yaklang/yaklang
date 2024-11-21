@@ -282,19 +282,31 @@ func (c *Call) handleCalleeFunction() {
 
 		for _, se := range funcTyp.SideEffects {
 			var variable *Variable
-			var sescope ScopeIF
+			var bindScope, modifyScope ScopeIF
+			if se.Variable != nil {
+				bindScope = se.Variable.GetScope()
+			} else {
+				bindScope = currentScope
+			}
+			modifyScope = se.Modify.GetBlock().ScopeTable
+			_ = modifyScope
+
 			// is object
 			if se.MemberCallKind == NoMemberCall {
-				if funCallee := se.Modify.GetFunc(); funCallee != nil {
-					if se.Variable != nil && !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
-						function.SideEffects = append(function.SideEffects, se)
+				// // if find same name value in current scope, skip
+				// if currentScope.ReadValue(se.Name) != nil {
+				// 	continue
+				// }
+				// is normal side-effect
+
+				if ret := currentScope.GetHeadVariable(se.Name); ret != nil {
+					if ret.GetLocal() {
+						if modifyScope.IsSameOrSubScope(bindScope) {
+							continue
+						}
 					}
 				}
-				// side-effect only create in scope that lower or same than modify's scope
-				if !se.forceCreate && !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
-					continue
-				}
-				// is normal side-effect
+
 				variable = builder.CreateVariable(se.Name)
 			} else {
 				// is object
@@ -306,27 +318,54 @@ func (c *Call) handleCalleeFunction() {
 			}
 
 			if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
-				if se.Variable != nil {
-					sescope = se.Variable.GetScope()
-				} else {
-					sescope = variable.GetScope()
-				}
-
-				if sescope == currentScope {
+				AddSideEffect := func() {
 					// TODO: handle side effect in loop scope,
 					// will replace value in scope and create new phi
 					builder.AssignVariable(variable, sideEffect)
 					sideEffect.SetVerboseName(se.VerboseName)
 					c.SideEffectValue[se.VerboseName] = sideEffect
-				} else if !currentScope.IsSameOrSubScope(sescope) {
-					builder.AssignVariable(variable, sideEffect)
+				}
+
+				SetCapturedSideEffect := func() {
+					err := variable.Assign(sideEffect)
+					if err != nil {
+						log.Warnf("BUG: variable.Assign error: %v", err)
+						return
+					}
 					sideEffect.SetVerboseName(se.VerboseName)
-					c.SideEffectValue[se.VerboseName] = sideEffect
+					currentScope.SetCapturedSideEffect(se.VerboseName, variable)
+
+					if funCallee := se.Modify.GetFunc(); funCallee != nil {
+						if ret := currentScope.GetHeadVariable(se.Name); ret == nil {
+							return
+						} else if ret.GetLocal() {
+							return
+						}
+						function.SideEffects = append(function.SideEffects, se)
+					}
+				}
+
+				CheckSideEffect := func(find *Variable) {
+					if find.GetLocal() {
+						if find.GetScope() == bindScope {
+							AddSideEffect()
+						} else {
+							SetCapturedSideEffect()
+						}
+					} else {
+						AddSideEffect()
+					}
+				}
+
+				if ret := GetHeadVariableFromScope(currentScope, se.Name); ret != nil {
+					CheckSideEffect(ret)
 				} else {
-					value := currentScope.CreateVariable(se.VerboseName, false)
-					currentScope.AssignVariable(value, sideEffect)
-					sideEffect.SetVerboseName(se.VerboseName)
-					currentScope.SetCapturedSideEffect(se.Name, value)
+					obj := se.parameterMemberInner // 处理object
+					if ret := GetHeadVariableFromScope(currentScope, obj.ObjectName); ret != nil {
+						CheckSideEffect(ret)
+					} else {
+						AddSideEffect()
+					}
 				}
 			}
 		}

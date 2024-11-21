@@ -131,6 +131,32 @@ func CheckWithName(
 	}
 }
 
+func CheckWithNameOnlyInMemory(
+	name string,
+	t *testing.T, code string,
+	handler func(prog *ssaapi.Program) error,
+	opt ...ssaapi.Option,
+) {
+	// only in memory
+	{
+		prog, err := ssaapi.Parse(code, opt...)
+		assert.Nil(t, err)
+
+		log.Infof("only in memory ")
+		err = handler(prog)
+		assert.Nil(t, err)
+	}
+
+	programID := uuid.NewString()
+	if name != "" {
+		programID = name
+		ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	}
+	fmt.Println("------------------------------DEBUG PROGRAME ID------------------------------")
+	log.Info("Program ID: ", programID)
+	fmt.Println("-----------------------------------------------------------------------------")
+}
+
 func Check(
 	t *testing.T, code string,
 	handler func(prog *ssaapi.Program) error,
