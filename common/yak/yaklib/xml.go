@@ -1,12 +1,13 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 )
 
 var XMLExports = map[string]interface{}{
-	"Escape": utils.XmlEscape,
-	"dumps":  utils.XmlDumps,
-	"loads":  utils.XmlLoads,
-	"escape": utils.WithHTMLEscape,
+	"Escape":   xml_tools.XmlEscape,
+	"dumps":    xml_tools.XmlDumps,
+	"loads":    xml_tools.XmlLoads,
+	"Prettify": xml_tools.XmlPrettify,
+	"escape":   xml_tools.WithHTMLEscape,
 }

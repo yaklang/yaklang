@@ -3,9 +3,10 @@ package orderedmap
 import (
 	"bytes"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakxml"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/samber/lo"
@@ -46,10 +47,15 @@ func New(maps ...any) *OrderedMap {
 		if om, ok := maps[0].(*OrderedMap); ok {
 			return om
 		}
-
 		m = utils.InterfaceToMapInterface(maps[0])
 	} else {
 		m = make(map[string]any)
+	}
+
+	for k, v := range m {
+		if reflect.TypeOf(v).Kind() == reflect.Map {
+			m[k] = New(v)
+		}
 	}
 
 	o := &OrderedMap{
@@ -131,7 +137,18 @@ func (o *OrderedMap) Keys() []string {
 }
 
 func (o *OrderedMap) ToStringMap() map[string]any {
-	return o.values
+	stringMap := make(map[string]any, len(o.values))
+	for _, k := range o.keys {
+		switch ret := o.values[k].(type) {
+		case *OrderedMap:
+			stringMap[k] = ret.ToStringMap()
+		case OrderedMap:
+			stringMap[k] = ret.ToStringMap()
+		default:
+			stringMap[k] = ret
+		}
+	}
+	return stringMap
 }
 
 func (o *OrderedMap) ToAnyMap() map[any]any {
@@ -154,7 +171,7 @@ func (o *OrderedMap) Range(fn func(key string, value any)) {
 	o.ForEach(fn)
 }
 
-func (o *OrderedMap) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+func (o *OrderedMap) UnmarshalXML(d *yakxml.Decoder, start yakxml.StartElement) error {
 	*o = *New()
 
 	var stack []*OrderedMap
@@ -167,7 +184,7 @@ func (o *OrderedMap) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error 
 		}
 
 		switch se := token.(type) {
-		case xml.StartElement:
+		case yakxml.StartElement:
 			name := se.Name.Local
 			oldName = name
 			node := New()
@@ -175,9 +192,9 @@ func (o *OrderedMap) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error 
 			top := stack[len(stack)-1]
 			top.Set(name, node)
 			stack = append(stack, node)
-		case xml.EndElement:
+		case yakxml.EndElement:
 			stack = stack[:len(stack)-1]
-		case xml.CharData:
+		case yakxml.CharData:
 			val := strings.TrimSpace(string(se))
 			if len(stack) >= 2 {
 				top2 := stack[len(stack)-2]
@@ -206,14 +223,14 @@ func (o *OrderedMap) UnmarshalJSON(b []byte) error {
 	return jsonDecodeOrderedMap(dec, o)
 }
 
-func xmlDecodeOrderedMap(dec *xml.Decoder, o *OrderedMap) error {
+func xmlDecodeOrderedMap(dec *yakxml.Decoder, o *OrderedMap) error {
 	hasKey := make(map[string]struct{}, len(o.values))
 	for {
 		token, err := dec.Token()
 		if err != nil {
 			return err
 		}
-		if _, ok := token.(xml.EndElement); ok {
+		if _, ok := token.(yakxml.EndElement); ok {
 			return nil
 		}
 		key := token.(string)
@@ -235,7 +252,7 @@ func xmlDecodeOrderedMap(dec *xml.Decoder, o *OrderedMap) error {
 		if err != nil {
 			return err
 		}
-		if _, ok := token.(xml.StartElement); ok {
+		if _, ok := token.(yakxml.StartElement); ok {
 			if values, ok := o.values[key].(map[string]any); ok {
 				newMap := OrderedMap{
 					keys:       make([]string, 0, len(values)),
@@ -386,19 +403,42 @@ func jsonDecodeSlice(dec *json.Decoder, s []any, escapeHTML bool) error {
 	}
 }
 
-func (o OrderedMap) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	if len(o.keys) == 0 {
-		return nil
-	}
-	if err := e.EncodeToken(start); err != nil {
-		return err
-	}
-	for _, k := range o.keys {
-		if err := e.EncodeElement(o.values[k], xml.StartElement{Name: xml.Name{Local: k}}); err != nil {
+func (o OrderedMap) marshalXML(e *yakxml.Encoder, start yakxml.StartElement, first bool) error {
+	var err error
+	if !first {
+		err = e.EncodeToken(start)
+		if err != nil {
 			return err
 		}
 	}
-	return e.EncodeToken(start.End())
+
+	for _, k := range o.keys {
+		v := o.values[k]
+		childStart := yakxml.StartElement{Name: yakxml.Name{Local: k}}
+
+		switch ret := v.(type) {
+		case OrderedMap:
+			if err := ret.marshalXML(e, childStart, false); err != nil {
+				return err
+			}
+		case *OrderedMap:
+			if err := ret.marshalXML(e, childStart, false); err != nil {
+				return err
+			}
+		default:
+			if err := e.EncodeElement(v, childStart); err != nil {
+				return err
+			}
+		}
+	}
+	if !first {
+		return e.EncodeToken(start.End())
+	}
+	return nil
+}
+
+func (m OrderedMap) MarshalXML(e *yakxml.Encoder, start yakxml.StartElement) error {
+	return m.marshalXML(e, start, true)
 }
 
 func (o OrderedMap) MarshalJSON() ([]byte, error) {
