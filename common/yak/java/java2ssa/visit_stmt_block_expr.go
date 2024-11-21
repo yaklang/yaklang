@@ -1861,6 +1861,9 @@ func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext)
 func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 	defer func() {
 		//set full type name
+		if utils.IsNil(value) {
+			return
+		}
 		t := value.GetType()
 		if t != nil {
 			if len(t.GetFullTypeNames()) == 0 {
@@ -1870,13 +1873,14 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 		}
 	}()
 
-	if value := y.PeekValue(name); value != nil {
+	if value = y.PeekValue(name); value != nil {
 		// found
 		return value
 	}
 	//if in this class, return
 	if class := y.MarkedThisClassBlueprint; class != nil {
 		if method := class.GetStaticMethod(name); !utils.IsNil(method) {
+			value = method
 			return method
 		}
 		if class.GetNormalMember(name) != nil {
@@ -1892,13 +1896,16 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 			return value
 		}
 	}
-	if value, ok := y.ReadConst(name); ok {
+	var ok bool
+	if value, ok = y.ReadConst(name); ok {
 		return value
 	}
 	if importValue, b := y.GetProgram().ReadImportValue(name); b {
+		value = importValue
 		return importValue
 	}
-	return y.ReadValue(name)
+	value = y.ReadValue(name)
+	return
 }
 
 func (y *builder) VisitResourceSpecification(raw javaparser.IResourceSpecificationContext) []ssa.Value {
