@@ -3,8 +3,6 @@ package ssa
 import (
 	"fmt"
 
-	"fmt"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
