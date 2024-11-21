@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"reflect"
 	"sort"
 	"strconv"
@@ -215,7 +216,9 @@ func InterfaceToMapInterfaceE(i interface{}) (map[string]interface{}, error) {
 	}
 	switch ret := i.(type) {
 	case map[string]interface{}:
-		return ret, nil
+		result := make(map[string]interface{})
+		maps.Copy(result, ret)
+		return result, nil
 	case map[string]string:
 		for k, v := range ret {
 			result[k] = v

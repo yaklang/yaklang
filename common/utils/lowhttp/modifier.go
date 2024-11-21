@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 	"io"
 	"mime"
 	"net/http"
@@ -1372,7 +1373,7 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string][]str
 
 	// try xml
 	if len(params) == 0 {
-		tempMap = utils.XmlLoads(body)
+		tempMap = xml_tools.XmlLoads(body)
 		if len(tempMap) > 0 {
 			params = handleUnmarshalResults(tempMap)
 		}
