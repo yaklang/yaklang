@@ -241,6 +241,9 @@ func (c *Call) handleCalleeFunction() {
 		builder := function.builder
 		recoverBuilder := builder.SetCurrent(c)
 		currentScope := c.GetBlock().ScopeTable
+		defer func() {
+			recoverBuilder()
+		}()
 
 		for true {
 			if len(c.ArgMember) == len(funcTyp.ParameterMember) {
@@ -283,8 +286,9 @@ func (c *Call) handleCalleeFunction() {
 		for _, se := range funcTyp.SideEffects {
 			var variable *Variable
 			var bindScope, modifyScope ScopeIF
-			if se.Variable != nil {
-				bindScope = se.Variable.GetScope()
+			if se.BindVariable != nil {
+				// BindVariable大多数时候和Variable相同，除非遇到object
+				bindScope = se.BindVariable.GetScope()
 			} else {
 				bindScope = currentScope
 			}
@@ -293,12 +297,7 @@ func (c *Call) handleCalleeFunction() {
 
 			// is object
 			if se.MemberCallKind == NoMemberCall {
-				// // if find same name value in current scope, skip
-				// if currentScope.ReadValue(se.Name) != nil {
-				// 	continue
-				// }
-				// is normal side-effect
-
+				// TODO: 不应该查找head，应该遍历当前scope
 				if ret := currentScope.GetHeadVariable(se.Name); ret != nil {
 					if ret.GetLocal() {
 						if modifyScope.IsSameOrSubScope(bindScope) {
@@ -335,14 +334,7 @@ func (c *Call) handleCalleeFunction() {
 					sideEffect.SetVerboseName(se.VerboseName)
 					currentScope.SetCapturedSideEffect(se.VerboseName, variable)
 
-					if funCallee := se.Modify.GetFunc(); funCallee != nil {
-						if ret := currentScope.GetHeadVariable(se.Name); ret == nil {
-							return
-						} else if ret.GetLocal() {
-							return
-						}
-						function.SideEffects = append(function.SideEffects, se)
-					}
+					function.SideEffects = append(function.SideEffects, se)
 				}
 
 				CheckSideEffect := func(find *Variable) {
@@ -359,9 +351,19 @@ func (c *Call) handleCalleeFunction() {
 
 				if ret := GetHeadVariableFromScope(currentScope, se.Name); ret != nil {
 					CheckSideEffect(ret)
-				} else {
-					obj := se.parameterMemberInner // 处理object
+					continue
+				} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
 					if ret := GetHeadVariableFromScope(currentScope, obj.ObjectName); ret != nil {
+						CheckSideEffect(ret)
+						continue
+					}
+				}
+
+				functionScope := function.GetBlock().ScopeTable
+				if ret := GetHeadVariableFromScope(functionScope, se.Name); ret != nil {
+					CheckSideEffect(ret)
+				} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
+					if ret := GetHeadVariableFromScope(functionScope, obj.ObjectName); ret != nil {
 						CheckSideEffect(ret)
 					} else {
 						AddSideEffect()
@@ -369,7 +371,6 @@ func (c *Call) handleCalleeFunction() {
 				}
 			}
 		}
-		recoverBuilder()
 	}
 
 	// only handler in method call
