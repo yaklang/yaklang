@@ -3,8 +3,30 @@ package test
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
+
+func TestBlock_Normol(t *testing.T) {
+	t.Run("cross block", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`package main
+
+	import "fmt"
+
+	func test() {
+		a := 1
+		{
+			a := 2
+			a = 4
+			println(a)
+		}
+		println(a) 
+	}
+		`, []string{
+			"4", "1",
+		}, t)
+	})
+}
 
 func TestBlock_Value_If(t *testing.T) {
 	t.Run("if stmt;exp", func(t *testing.T) {

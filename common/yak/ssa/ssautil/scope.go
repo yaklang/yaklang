@@ -29,6 +29,8 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	// read value by name
 	ReadValue(name string) T
 
+	GetHeadVariable(name string) VersionedIF[T]
+
 	// create variable, if isLocal is true, the variable is local
 	CreateVariable(name string, isLocal bool) VersionedIF[T]
 
@@ -291,6 +293,10 @@ func (v *ScopedVersionedTable[T]) getLatestVersionInCurrentLexicalScope(name str
 	return v.linkValues.Get(name)
 }
 
+func (v *ScopedVersionedTable[T]) getHeadVersionInCurrentLexicalScope(name string) VersionedIF[T] {
+	return v.linkValues.Head(name)
+}
+
 func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 	// var parent = v
 	// for parent != nil {
@@ -320,6 +326,13 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 	}
 
 	return ret
+}
+
+func (scope *ScopedVersionedTable[T]) GetHeadVariable(name string) VersionedIF[T] {
+	if result := scope.getHeadVersionInCurrentLexicalScope(name); result != nil {
+		return result
+	}
+	return nil
 }
 
 func (v *ScopedVersionedTable[T]) ReadValue(name string) (t T) {
@@ -353,6 +366,11 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 
 	// capture variable
 	if !variable.GetLocal() && !scope.IsRoot() {
+		if ret := scope.GetHeadVariable(variable.GetName()); ret == nil {
+			return
+		} else if ret.GetLocal() {
+			return
+		}
 		scope.tryRegisterCapturedVariable(variable.GetName(), variable)
 	}
 }
