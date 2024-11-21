@@ -1007,6 +1007,28 @@ func FuzzSearchWithStringArrayOrEx(db *gorm.DB, fields []string, targets []strin
 	return db.Where(strings.Join(conds, " OR "), items...)
 }
 
+func FuzzSearchNotEx(db *gorm.DB, fields []string, target string, ilike bool) *gorm.DB {
+	if target == "" || len(fields) <= 0 {
+		return db
+	}
+
+	target = fmt.Sprintf("%%%s%%", target)
+
+	var conds []string
+	var items []interface{}
+
+	for _, field := range fields {
+		if ilike {
+			conds = append(conds, fmt.Sprintf("( %v NOT ILIKE ?)", field))
+		} else {
+			conds = append(conds, fmt.Sprintf("( %v NOT LIKE ?)", field))
+		}
+		items = append(items, target)
+	}
+
+	return db.Where(strings.Join(conds, " AND "), items...)
+}
+
 func QueryIntegerInArrayInt64(db *gorm.DB, field string, targets []int64) *gorm.DB {
 	if len(targets) > 0 {
 		return db.Where(
