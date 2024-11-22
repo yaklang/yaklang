@@ -113,20 +113,18 @@ jobs:
       - name: Download CrossBuild GCC(Linux x64)
         if: matrix.os == 'linux-amd64'
         run: |
-          brew unlink pkg-config@0.29.2
+          brew list pkg-config &>/dev/null && brew unlink pkg-config
           brew tap messense/macos-cross-toolchains
           brew install x86_64-unknown-linux-gnu
           x86_64-linux-gnu-gcc -v
-        continue-on-error: true
 
       - name: Download CrossBuild GCC(Linux arm64)
         if: matrix.os == 'linux-arm64'
         run: |
-          brew unlink pkg-config@0.29.2
+          brew list pkg-config &>/dev/null && brew unlink pkg-config
           brew tap messense/macos-cross-toolchains
           brew install aarch64-unknown-linux-gnu
           aarch64-linux-gnu-gcc -v
-        continue-on-error: true
 
       - name: Generate Document
         run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
