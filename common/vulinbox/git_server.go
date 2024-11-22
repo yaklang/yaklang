@@ -21,6 +21,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
 
+/*
+* use zipfile and routPrefix should be same
+* zipRaw should be zip `.git` folder
+* zipfileName should be the name of the zip file
+ */
 func GeneratorGitHTTPHandler(routePrefix, zipfileName string, zipRaw []byte) (string, func(http.ResponseWriter, *http.Request)) {
 
 	var rootDir string
