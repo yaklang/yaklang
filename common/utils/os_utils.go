@@ -414,10 +414,31 @@ func GetDefaultOnlyGMTLSConfig(i float64) *gmtls.Config {
 
 func DebugMockHTTPServerWithContext(ctx context.Context, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, handle func([]byte) []byte) (string, int) {
 	addr := GetRandomLocalAddr()
-	return DebugMockHTTPServerWithContextWithAddress(ctx, addr, https, h2, gmtlsFlag, onlyGmtls, keepAlive, handle)
+	return DebugMockHTTPServerWithContextWithAddress(ctx, addr, https, h2, gmtlsFlag, onlyGmtls, keepAlive, false, handle)
 }
 
-func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, handle func([]byte) []byte) (string, int) {
+func TLSConfigSetCheckServerName(tlsConfig *tls.Config, host string) *tls.Config {
+	if tlsConfig == nil {
+		return nil
+	}
+
+	cert := tlsConfig.Certificates
+	tlsConfig.Certificates = []tls.Certificate{}
+	tlsConfig.GetCertificate = func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		if len(cert) <= 0 {
+			return nil, errors.New("no certificate provided")
+		}
+		if clientHello.ServerName == "" {
+			return nil, errors.New("SNI not provided, failed to build certificate")
+		} else if clientHello.ServerName != host {
+			return nil, errors.New("SNI not match")
+		}
+		return &cert[0], nil
+	}
+	return tlsConfig
+}
+
+func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, checkServerName bool, handle func([]byte) []byte) (string, int) {
 	time.Sleep(300 * time.Millisecond)
 	host, port, _ := ParseStringToHostPort(addr)
 	go func() {
@@ -430,9 +451,15 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 			if tlsConfig == nil {
 				panic(1)
 			}
+			if checkServerName {
+				TLSConfigSetCheckServerName(tlsConfig, host)
+			}
 			lis, err = tls.Listen("tcp", addr, tlsConfig)
 		} else if h2 {
 			origin := GetDefaultTLSConfig(5)
+			if checkServerName {
+				TLSConfigSetCheckServerName(origin, host)
+			}
 			copied := *origin
 			copied.NextProtos = []string{"h2"}
 			lis, err = tls.Listen("tcp", addr, &copied)
