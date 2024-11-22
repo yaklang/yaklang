@@ -49,6 +49,8 @@ type FuzzTagDescription struct {
 	Alias                 []string
 	Description           string
 	ArgumentDescription   string
+	Examples              []string
+	ArgumentTypes         []*FuzztagArgumentType
 }
 
 func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzTagDescription) {
@@ -146,6 +148,23 @@ func GetExistedFuzzTagMap() map[string]*parser.TagMethod {
 }
 
 func AddFuzzTagToGlobal(f *FuzzTagDescription) {
+	if f.ArgumentDescription != "" {
+		ex, err := GenerateExampleTags(f)
+		if err != nil {
+			log.Errorf("generate example tags error: %v", err)
+		} else {
+			f.Examples = ex
+		}
+		typs, err := ParseFuzztagArgumentTypes(f.ArgumentDescription)
+		if err != nil {
+			log.Errorf("parse fuzztag argument types error: %v", err)
+		} else {
+			f.ArgumentTypes = typs
+		}
+	} else {
+		f.Examples = []string{fmt.Sprintf("{{%s()}}", f.TagName)}
+	}
+
 	existedFuzztag = append(existedFuzztag, f)
 	AddFuzzTagDescriptionToMap(tagMethodMap, f)
 }

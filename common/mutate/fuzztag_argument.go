@@ -203,7 +203,7 @@ func DumpFuzztagArgumentTypes(typ []*FuzztagArgumentType) string {
 	return strings.Join(res, ",")
 }
 
-func GenerateTestTags(tag *FuzzTagDescription) ([]string, error) {
+func GenerateExampleTags(tag *FuzzTagDescription) ([]string, error) {
 	args := tag.ArgumentDescription
 	if args == "" {
 		return []string{fmt.Sprintf("{{%s}}", tag.TagName)}, nil

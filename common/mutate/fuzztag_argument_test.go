@@ -16,7 +16,7 @@ func TestParseBuildinTagArgumentTypes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		testTags, err := GenerateTestTags(tag)
+		testTags, err := GenerateExampleTags(tag)
 		if err != nil {
 			t.Fatal(err)
 		}

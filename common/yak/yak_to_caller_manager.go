@@ -124,7 +124,7 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 		},
 		Description:         "执行热加载代码",
 		TagNameVerbose:      "执行热加载代码",
-		ArgumentDescription: "{{string_split(handle:函数名)}}{{list(string(param:参数))}}",
+		ArgumentDescription: "{{string_split(handle:函数名)}}{{optional(string(params:参数))}}",
 	})
 	// return mutate.Fuzz_WithExtraFuzzErrorTagHandler("yak", func(s string) (result []*parser.FuzzResult, err error) {
 	// 	handle, params, _ := strings.Cut(s, "|")
@@ -456,8 +456,8 @@ func (y *YakToCallerManager) SetForYakit(
 	ctx context.Context,
 	code string,
 	paramMap map[string]any, callerIf interface {
-		Send(result *ypb.ExecResult) error
-	},
+	Send(result *ypb.ExecResult) error
+},
 	hooks ...string,
 ) error {
 	caller := func(result *ypb.ExecResult) error {
@@ -1353,8 +1353,8 @@ func (y *YakToCallerManager) AddForYakit(
 	ctx context.Context, script *schema.YakScript,
 	paramMap map[string]any,
 	code string, callerIf interface {
-		Send(result *ypb.ExecResult) error
-	},
+	Send(result *ypb.ExecResult) error
+},
 	hooks ...string,
 ) error {
 	caller := func(result *ypb.ExecResult) error {
