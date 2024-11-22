@@ -151,6 +151,7 @@ type OnlinePlugin struct {
 	RiskInfo             []*OnlineRiskDetail       `json:"riskInfo"`
 	IsCorePlugin         bool                      `json:"isCorePlugin"`
 	CollaboratorInfo     []*OnlineCollaboratorInfo `json:"collaborator"`
+	PluginEnvKey         []string                  `json:"pluginEnvKey"`
 }
 
 type SaveYakScriptOnlineRequest struct {
@@ -167,6 +168,7 @@ type SaveYakScriptOnlineRequest struct {
 	RiskInfo             []*OnlineRiskDetail  `json:"riskInfo"`
 	IsCorePlugin         bool                 `json:"isCorePlugin"`
 	PluginSupplement     string               `json:"pluginSupplement"`
+	PluginEnvKey         []string             `json:"pluginEnvKey"`
 }
 
 type OnlinePluginItem struct {
@@ -449,6 +451,13 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 				log.Errorf("[%v] Save YakScriptGroup [%v] err %s", i.ScriptName, group, err.Error())
 			}
 		}
+		getMarshalRaw := func(i interface{}) string {
+			if funk.IsEmpty(i) {
+				return ""
+			}
+			raw, _ := json.Marshal(i)
+			return strconv.Quote(string(raw))
+		}
 
 		y := &schema.YakScript{
 			ScriptName:           scriptName,
@@ -473,6 +482,7 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 			OnlineOfficial:       i.Official,
 			//OnlineGroup:          strings.Join(onlineGroup, ","),
 			IsCorePlugin: i.IsCorePlugin,
+			PluginEnvKey: getMarshalRaw(i.PluginEnvKey),
 		}
 		var riskDetail []*ypb.YakRiskInfo
 		for _, riskDetailInstance := range i.RiskInfo {
@@ -548,7 +558,7 @@ func (s *OnlineClient) DownloadOnlinePluginsBatch(
 
 func (s *OnlineClient) DownloadOnlinePluginByPluginName(
 	ctx context.Context, token string, scriptName []string) *OnlineDownloadStream {
-	return s.DownloadNewOnlinePlugins(ctx, token, nil, "", nil, nil, "", 0, "", nil, "other", nil, nil, scriptName)
+	return s.DownloadNewOnlinePlugins(ctx, token, nil, "", nil, nil, "", 0, "", nil, "", nil, nil, scriptName)
 }
 
 func (s *OnlineClient) DownloadOnlinePluginByUUID(token, uuid string) (*OnlinePlugin, error) {
@@ -732,6 +742,7 @@ func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptT
 		plugin.RiskDetail,
 		plugin.IsCorePlugin,
 		req.PluginSupplement,
+		plugin.PluginEnvKey,
 	)
 	if err != nil {
 		log.Errorf("save yakScript to online failed: %s", err.Error())
@@ -742,14 +753,17 @@ func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptT
 }
 
 func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
-	token string, scriptName string, pluginType, content, params, help, tags string, enablePluginSelector bool, pluginSelectorTypes string, isGeneralModule, isPrivate bool, riskDetail string, isCorePlugin bool, pluginSupplement string) error {
+	token string, scriptName string, pluginType, content, params, help, tags string, enablePluginSelector bool, pluginSelectorTypes string, isGeneralModule, isPrivate bool, riskDetail string, isCorePlugin bool, pluginSupplement, pluginEnvKey string) error {
 	urlIns, err := url.Parse(s.genUrl("/api/plugins"))
 	if err != nil {
 		return utils.Errorf("parse url-instance failed: %s", err)
 	}
-	var riskDetailJson []*OnlineRiskDetail
-	var paramsJson []*OnlinePluginParam
-	var yakScriptParams []*ypb.YakScriptParam
+	var (
+		riskDetailJson   []*OnlineRiskDetail
+		paramsJson       []*OnlinePluginParam
+		yakScriptParams  []*ypb.YakScriptParam
+		pluginEnvKeyJson []string
+	)
 	_ = json.Unmarshal([]byte(riskDetail), &riskDetailJson)
 	r, _ := strconv.Unquote(params)
 	_ = json.Unmarshal([]byte(r), &yakScriptParams)
@@ -767,6 +781,7 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 		})
 	}
 	tagsJson := strings.Split(tags, ",")
+	_ = json.Unmarshal([]byte(pluginEnvKey), &pluginEnvKeyJson)
 	raw, err := json.Marshal(SaveYakScriptOnlineRequest{
 		ScriptName:           scriptName,
 		Type:                 pluginType,
@@ -781,6 +796,7 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 		RiskInfo:             riskDetailJson,
 		IsCorePlugin:         isCorePlugin,
 		PluginSupplement:     pluginSupplement,
+		PluginEnvKey:         pluginEnvKeyJson,
 	})
 
 	if err != nil {
