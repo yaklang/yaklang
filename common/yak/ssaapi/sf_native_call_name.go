@@ -47,7 +47,7 @@ var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 			if !existed {
 				filter[name] = struct{}{}
 				results := val.NewValue(ssa.NewConst(name))
-				results.AppendPredecessor(v, frame.WithPredecessorContext("getFuncName"))
+				results.AppendPredecessor(val, frame.WithPredecessorContext("getFuncName"))
 				vals = append(vals, results)
 			}
 		}
