@@ -2,15 +2,17 @@ package codec
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/log"
+	"fmt"
 	"html"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"golang.org/x/exp/maps"
 
 	"github.com/asaskevich/govalidator"
 )
@@ -22,12 +24,14 @@ type AutoDecodeResult struct {
 	Result      string
 }
 
-var jsonUnicodeRegexp = regexp.MustCompile(`(?i)\\u[\dabcdef]{4}`)
-var base64Regexp = regexp.MustCompile(`(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4})`)
-var urlRegexp = regexp.MustCompile(`%[\da-fA-F]{2}`)
-var htmlEntityRegexp = regexp.MustCompile(`^((&[a-zA-Z]+;)|(&#[a-fA-F0-9]+;))+$`)
-var hexRegexp = regexp.MustCompile(`^\b([0-9A-Fa-f]{2}\s?)+[0-9A-Fa-f]{2}\b$`)
-var base32Regexp = regexp.MustCompile(`^([A-Z2-7]{8})*([A-Z2-7]{8}|[A-Z2-7]{2}([A-Z2-7]{6})*|[A-Z2-7]{4}([A-Z2-7]{4})*|[A-Z2-7]{5}([A-Z2-7]{3})*|[A-Z2-7]{7})(=){0,6}$`)
+var (
+	unicodeRegexp    = regexp.MustCompile(`(\\u[\da-fA-F]{4})|(\\U[\da-fA-F]{8})`)
+	base64Regexp     = regexp.MustCompile(`(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4})`)
+	urlRegexp        = regexp.MustCompile(`%[\da-fA-F]{2}`)
+	htmlEntityRegexp = regexp.MustCompile(`(&[a-zA-Z]+;)|(&#[a-fA-F0-9]{2};)`)
+	hexRegexp        = regexp.MustCompile(`^(0x)?([0-9A-Fa-f]{2}\s?)+[0-9A-Fa-f]{2}$`)
+	base32Regexp     = regexp.MustCompile(`^([A-Z2-7]{8})*([A-Z2-7]{8}|[A-Z2-7]{2}([A-Z2-7]{6})*|[A-Z2-7]{4}([A-Z2-7]{4})*|[A-Z2-7]{5}([A-Z2-7]{3})*|[A-Z2-7]{7})(=){0,6}$`)
+)
 
 var encodeMap = map[string]func(string) string{
 	"UrlDecode": func(s string) string {
@@ -78,217 +82,185 @@ func EncodeByType(t string, i interface{}) string {
 	}
 	return ""
 }
+
 func AutoDecode(i interface{}) []*AutoDecodeResult {
 	rawBytes := interfaceToBytes(i)
 	rawStr := string(rawBytes)
+	origin := rawStr
 
-	var results []*AutoDecodeResult
-	var origin = rawStr
+	var (
+		results     []*AutoDecodeResult
+		sameMap     = make(map[string]struct{})
+		base32Bytes []byte
+		base64Bytes []byte
+		jwtBuf      bytes.Buffer
+		mimeResult  *MIMEResult
+	)
+	addResult := func(result *AutoDecodeResult) {
+		results = append(results, result)
+		maps.Clear(sameMap)
+	}
+	checkNewIsSameToOrigin := func(new string, typ string) bool {
+		if new == origin {
+			sameMap[typ] = struct{}{}
+		}
+		return new == origin
+	}
+	isSame := func(new string) bool {
+		_, ok := sameMap[new]
+		return ok
+	}
+	tryDecode := func(rawStr string, typ, typVerbose string, matchFunc func(string) bool, decodeFunc func(string) (string, error)) bool {
+		if !isSame(typ) && matchFunc(rawStr) {
+			decoded, err := decodeFunc(rawStr)
+			if err != nil {
+				return false
+			}
+			if decoded != "" && !checkNewIsSameToOrigin(decoded, typ) {
+				if !utf8.ValidString(decoded) {
+					decoded = EscapeInvalidUTF8Byte([]byte(decoded))
+				}
+				addResult(&AutoDecodeResult{
+					Type:        typ,
+					TypeVerbose: typVerbose,
+					Origin:      origin,
+					Result:      decoded,
+				})
+				origin = decoded
+				return true
+			}
+			return false
+		}
+		return false
+	}
+	htmlDecode := func(rawStr string) (string, error) {
+		return html.UnescapeString(rawStr), nil
+	}
+	hexDecode := func(rawStr string) (string, error) {
+		if strings.HasPrefix(rawStr, "0x") {
+			rawStr = rawStr[2:]
+		}
+		rawStr = hexRegexp.ReplaceAllStringFunc(rawStr, func(s string) string {
+			result, err := DecodeHex(strings.ReplaceAll(s, " ", ""))
+			if err != nil {
+				return s
+			}
+			return string(result)
+		})
+		return rawStr, nil
+	}
+	unicodeDecode := func(rawStr string) (string, error) {
+		return yakunquote.UnquoteInner(rawStr, 0)
+	}
+	base32Detect := func(rawStr string) bool {
+		matched := base32Regexp.MatchString(rawStr)
+		if !matched {
+			return false
+		}
+		decoded, err := DecodeBase32(rawStr)
+		if err != nil {
+			return false
+		}
+		if !utf8.Valid(decoded) {
+			return false
+		}
+		base32Bytes = decoded
+		return true
+	}
+	base64Detect := func(rawStr string) bool {
+		matched := govalidator.IsBase64(rawStr)
+		if !matched {
+			return false
+		}
+		decoded, err := DecodeBase64(rawStr)
+		if err != nil {
+			return false
+		}
+		if !utf8.Valid(decoded) {
+			return false
+		}
+		base64Bytes = decoded
+		return true
+	}
+	base64Decode := func(rawStr string) (string, error) {
+		return string(base64Bytes), nil
+	}
+	base32Decode := func(rawStr string) (string, error) {
+		return string(base32Bytes), nil
+	}
+	charsetDetect := func(rawStr string) bool {
+		var err error
+		mimeResult, err = MatchMIMEType(rawStr)
+		return err == nil
+	}
+	charsetDecode := func(rawStr string) (string, error) {
+		newBytes, changed := mimeResult.TryUTF8Convertor(rawBytes)
+		if changed {
+			return string(newBytes), nil
+		}
+		return "", fmt.Errorf("no changed")
+	}
+	jwtDetect := func(rawStr string) bool {
+		if strings.Count(rawStr, ".") <= 1 {
+			return false
+		}
+		blocks := strings.Split(rawStr, ".")
+		failed := false
+		for index, i := range blocks {
+			base64Decoded, _ := DecodeBase64(i)
+			if len(base64Decoded) <= 0 {
+				break
+			}
+			if govalidator.IsPrintableASCII(string(base64Decoded)) {
+				jwtBuf.WriteString(EscapeInvalidUTF8Byte(base64Decoded))
+			} else {
+				jwtBuf.WriteString(i)
+			}
+			if index != len(blocks)-1 {
+				jwtBuf.WriteByte('.')
+			}
+		}
+		return !failed
+	}
+	jwtDecode := func(rawStr string) (string, error) {
+		return jwtBuf.String(), nil
+	}
+
 	for i := 0; i < 100; i++ {
-		// urlencode
-		if r := urlRegexp.MatchString(rawStr); r {
-			rawStr, _ = url.QueryUnescape(rawStr)
-			if rawStr != "" {
-				results = append(results, &AutoDecodeResult{
-					Type:        "UrlDecode",
-					TypeVerbose: "URL解码",
-					Origin:      origin,
-					Result:      rawStr,
-				})
-				origin = rawStr
-				continue
-			}
+		// url
+		if tryDecode(origin, "UrlDecode", "URL编码", urlRegexp.MatchString, url.QueryUnescape) {
+			continue
 		}
-
-		// html entity encode
-		if r := htmlEntityRegexp.MatchString(rawStr); r {
-			rawStr = html.UnescapeString(rawStr)
-			if rawStr != "" {
-				results = append(results, &AutoDecodeResult{
-					Type:        "Html Entity Decode",
-					TypeVerbose: "Html Entity 解码",
-					Origin:      origin,
-					Result:      rawStr,
-				})
-				origin = rawStr
-				continue
-			}
+		// html entity
+		if tryDecode(origin, "HTML Entity Decode", "HTML实体编码", htmlEntityRegexp.MatchString, htmlDecode) {
+			continue
 		}
-
 		// hex
-		if hexRegexp.MatchString(rawStr) {
-			rawStr = hexRegexp.ReplaceAllStringFunc(rawStr, func(s string) string {
-				result, err := DecodeHex(strings.ReplaceAll(s, " ", ""))
-				if err != nil {
-					return s
-				}
-				for _, ch := range []rune(string(result)) {
-					if !strconv.IsPrint(ch) {
-						return s
-					}
-				}
-				return EscapeInvalidUTF8Byte(result)
-			})
-			if rawStr != "" && rawStr != origin {
-				results = append(results, &AutoDecodeResult{
-					Type:        "Hex Decode",
-					TypeVerbose: "Hex 解码",
-					Origin:      origin,
-					Result:      rawStr,
-				})
-				origin = rawStr
-				continue
-			}
+		if tryDecode(origin, "Hex Decode", "Hex 解码", hexRegexp.MatchString, hexDecode) {
+			continue
 		}
-
-		// json-unicode
-		if r := jsonUnicodeRegexp.MatchString(rawStr); r {
-			rawStr = jsonUnicodeRegexp.ReplaceAllStringFunc(rawStr, func(s string) string {
-				number, err := DecodeHex(strings.TrimLeft(s, "\\u"))
-				if err != nil {
-					return s
-				}
-				return string(rune(binary.BigEndian.Uint16(number)))
-			})
-			if rawStr != "" {
-				results = append(results, &AutoDecodeResult{
-					Type:        "Json Unicode Decode",
-					TypeVerbose: "Json Unicode 解码",
-					Origin:      origin,
-					Result:      rawStr,
-				})
-				origin = rawStr
-				continue
-			}
+		// unicode
+		if tryDecode(origin, "Unicode Decode", "Unicode 解码", unicodeRegexp.MatchString, unicodeDecode) {
+			continue
 		}
-
-		// base64
-		if govalidator.IsBase64(rawStr) {
-			rawStr = base64Regexp.ReplaceAllStringFunc(rawStr, func(s string) string {
-				result, err := DecodeBase64(s)
-				if err != nil {
-					return s
-				}
-				for _, ch := range []rune(string(result)) {
-					if !strconv.IsPrint(ch) {
-						return s
-					}
-				}
-				return EscapeInvalidUTF8Byte(result)
-			})
-			if rawStr != "" && rawStr != origin {
-				results = append(results, &AutoDecodeResult{
-					Type:        "Base64 Decode",
-					TypeVerbose: "Base64 解码",
-					Origin:      origin,
-					Result:      rawStr,
-				})
-				origin = rawStr
-				continue
-			}
-		}
-
 		// base32
-		if base32Regexp.MatchString(rawStr) {
-			rawStr = base32Regexp.ReplaceAllStringFunc(rawStr, func(s string) string {
-				result, err := DecodeBase32(s)
-				if err != nil {
-					return s
-				}
-				for _, ch := range []rune(string(result)) {
-					if !strconv.IsPrint(ch) {
-						return s
-					}
-				}
-				return EscapeInvalidUTF8Byte(result)
-			})
-			if rawStr != "" && rawStr != origin {
-				results = append(results, &AutoDecodeResult{
-					Type:        "Base32 Decode",
-					TypeVerbose: "Base32 解码",
-					Origin:      origin,
-					Result:      rawStr,
-				})
-				origin = rawStr
-				continue
-			}
+		if tryDecode(origin, "Base32 Decode", "Base32 解码", base32Detect, base32Decode) {
+			continue
 		}
-
-		// base64 with urlencode
-		decodedByBas64, err := DecodeBase64Url(rawStr)
-		if len(decodedByBas64) > 0 && err == nil {
-			if utf8.Valid(decodedByBas64) {
-				results = append(results, &AutoDecodeResult{
-					Type:        "Base64Url Decode",
-					TypeVerbose: "Base64 解码",
-					Origin:      origin,
-					Result:      string(decodedByBas64),
-				})
-				origin = rawStr
-				rawStr = string(decodedByBas64)
-				continue
-			}
-
-			decoded, err := GB18030ToUtf8(decodedByBas64)
-			if err == nil && len(decoded) > 0 {
-				results = append(results, &AutoDecodeResult{
-					Type:        "Base64Utf8 Decode",
-					TypeVerbose: "Base64 解码（UTF8-Invalid）",
-					Origin:      origin,
-					Result:      EscapeInvalidUTF8Byte(decodedByBas64),
-				})
-				origin = rawStr
-				results = append(results, &AutoDecodeResult{
-					Type:        "GB(K/18030) Decode",
-					TypeVerbose: "GB(K/18030) 解码",
-					Origin:      origin,
-					Result:      EscapeInvalidUTF8Byte(decoded),
-				})
-				origin = rawStr
-				rawStr = string(decoded)
-				continue
-			}
+		// base64
+		if tryDecode(origin, "Base64 Decode", "Base64 解码", base64Detect, base64Decode) {
+			continue
 		}
-
 		// jwt
-		if strings.Count(rawStr, ".") > 1 {
-			var blocks = strings.Split(rawStr, ".")
-			var buf bytes.Buffer
-			var failed = false
-			for index, i := range blocks {
-				base64Decoded, _ := DecodeBase64(i)
-				if len(base64Decoded) <= 0 {
-					failed = true
-					break
-				}
-				if govalidator.IsPrintableASCII(string(base64Decoded)) {
-					buf.WriteString(EscapeInvalidUTF8Byte(base64Decoded))
-				} else {
-					buf.WriteString(i)
-				}
-				if index != len(blocks)-1 {
-					buf.WriteByte('.')
-				}
-			}
-			if failed {
-				continue
-			}
-			rawStr = buf.String()
-			if rawStr != "" && rawStr != origin {
-				results = append(results, &AutoDecodeResult{
-					Type:        "jwt",
-					TypeVerbose: "JWT",
-					Origin:      origin,
-					Result:      rawStr,
-				})
-				origin = rawStr
-				continue
-			}
-		}
-
-		if rawStr == origin {
+		if tryDecode(origin, "jwt", "JWT 解码", jwtDetect, jwtDecode) {
+			// if jwt decode success, break anymore
 			break
 		}
+		// charset
+		if tryDecode(origin, "Charset Decode", "字符集解码", charsetDetect, charsetDecode) {
+			continue
+		}
+		break
 	}
 
 	if len(results) <= 0 {
