@@ -202,6 +202,9 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	}
 	if config.ShouldOverrideTLSConfig {
 		tlsConfig = config.TLSConfig
+		if tlsConfig.ServerName == "" { // sni is empty , default sni require not empty
+			tlsConfig.ServerName = sni
+		}
 	}
 	if config.ShouldOverrideSNI {
 		tlsConfig.ServerName = config.SNI
