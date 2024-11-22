@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 
 	"github.com/samber/lo"
@@ -120,20 +121,27 @@ func (v *Value) GetAllCallActualParams() (sfvm.ValueOperator, error) {
 }
 
 func (v *Value) GetCallActualParams(i int) (sfvm.ValueOperator, error) {
-	vs := make(Values, 0)
+	rets := make(Values, 0)
+	add := func(value ssa.Value) {
+		ret := v.NewValue(value)
+		ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label(
+			fmt.Sprintf("actual-args[%d]", i),
+		))
+		rets = append(rets, ret)
+	}
 	v.GetCalledBy().ForEach(func(c *Value) {
 		if c, ok := ssa.ToCall(c.node); ok {
 			if len(c.Args) > i {
-				vs = append(vs, v.NewValue(c.Args[i]))
+				add(c.Args[i])
 			}
 		}
 	})
 	if f, ok := ssa.ToFunction(v.node); ok {
 		if len(f.Params) > i {
-			vs = append(vs, v.NewValue(f.Params[i]))
+			add(f.Params[i])
 		}
 	}
-	return vs, nil
+	return rets, nil
 }
 
 func (v *Value) GetCalled() (sfvm.ValueOperator, error) {

@@ -515,7 +515,7 @@ func init() {
 					}
 					for _, param := range rets.Params {
 						newVal := val.NewValue(param)
-						newVal.AppendPredecessor(v, frame.WithPredecessorContext("getFormalParams"))
+						newVal.AppendPredecessor(val, frame.WithPredecessorContext("getFormalParams"))
 						vals = append(vals, newVal)
 					}
 				}
@@ -549,9 +549,9 @@ func init() {
 						continue
 					}
 					for _, retIns := range retVal.Results {
-						val := val.NewValue(retIns)
-						val.AppendPredecessor(v, frame.WithPredecessorContext("getReturns"))
-						vals = append(vals, val)
+						new := val.NewValue(retIns)
+						new.AppendPredecessor(val, frame.WithPredecessorContext("getReturns"))
+						vals = append(vals, new)
 					}
 				}
 				return nil
@@ -577,7 +577,7 @@ func init() {
 				if val.IsCall() {
 					call := val.GetCallee()
 					if call != nil {
-						call.AppendPredecessor(v, frame.WithPredecessorContext("getCaller"))
+						call.AppendPredecessor(val, frame.WithPredecessorContext("getCaller"))
 						vals = append(vals, call)
 					}
 				}
@@ -629,12 +629,12 @@ func init() {
 					return nil
 				}
 				for _, elements := range obj.GetMembers() {
-					for _, val := range elements {
-						if val == nil {
+					for _, newVal := range elements {
+						if newVal == nil {
 							continue
 						}
-						val.AppendPredecessor(v, frame.WithPredecessorContext("getSiblings"))
-						vals = append(vals, val)
+						newVal.AppendPredecessor(val, frame.WithPredecessorContext("getSiblings"))
+						vals = append(vals, newVal)
 					}
 				}
 				return nil
@@ -650,25 +650,25 @@ func init() {
 	registerNativeCall(
 		NativeCall_GetMembers,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-			var vals []sfvm.ValueOperator
+			var rets []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
 					return nil
 				}
-				for _, i := range val.GetMembers() {
-					for _, val := range i {
-						if val == nil {
+				for _, members := range val.GetMembers() {
+					for _, member := range members {
+						if member == nil {
 							continue
 						}
-						val.AppendPredecessor(v, frame.WithPredecessorContext("getMembers"))
-						vals = append(vals, val)
+						member.AppendPredecessor(val, frame.WithPredecessorContext("getMembers"))
+						rets = append(rets, member)
 					}
 				}
 				return nil
 			})
-			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
+			if len(rets) > 0 {
+				return true, sfvm.NewValues(rets), nil
 			}
 			return false, nil, utils.Error("no value(members) found")
 		}),
@@ -677,22 +677,22 @@ func init() {
 	registerNativeCall(
 		NativeCall_GetObject,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-			var vals []sfvm.ValueOperator
+			var ret []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
 					return nil
 				}
-				val = val.GetObject()
-				if val != nil {
-					val.AppendPredecessor(v, frame.WithPredecessorContext("getObject"))
-					vals = append(vals, val)
+				obj := val.GetObject()
+				if obj != nil {
+					obj.AppendPredecessor(val, frame.WithPredecessorContext("getObject"))
+					ret = append(ret, obj)
 					return nil
 				}
 				return nil
 			})
-			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
+			if len(ret) > 0 {
+				return true, sfvm.NewValues(ret), nil
 			}
 			return false, nil, utils.Error("no value(parent object) found")
 		}),
@@ -709,7 +709,7 @@ func init() {
 				}
 				for _, u := range val.GetUsers() {
 					if u.getOpcode() == ssa.SSAOpcodeCall {
-						u.AppendPredecessor(v, frame.WithPredecessorContext("getCall"))
+						u.AppendPredecessor(val, frame.WithPredecessorContext("getCall"))
 						vals = append(vals, u)
 					}
 				}
