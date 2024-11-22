@@ -3,6 +3,8 @@ package yakcmds
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"io/fs"
 	"strings"
 
 	"github.com/urfave/cli"
@@ -30,6 +32,10 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 			Name:  "rule-keyword,rk,kw",
 			Usage: `set rule keyword for file`,
 		},
+		cli.StringFlag{
+			Name:  "rule-dir,rdir",
+			Usage: `set rule dir for file`,
+		},
 	},
 	Action: func(c *cli.Context) error {
 		program := c.String("program")
@@ -45,22 +51,58 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 
 		var results []*ssaapi.SyntaxFlowResult
 
-		filterKw := c.String("rule-keyword")
-
-		for rule := range sfdb.YieldSyntaxFlowRulesWithoutLib(consts.GetGormProfileDatabase(), context.Background()) {
-			if filterKw != "" {
-				if !strings.Contains(strings.ToLower(rule.RuleName), strings.ToLower(filterKw)) {
-					continue
+		if c.String("rule-dir") != "" {
+			lfs := filesys.NewRelLocalFs(c.String("rule-dir"))
+			var rules []*schema.SyntaxFlowRule
+			err := filesys.SimpleRecursive(filesys.WithFileSystem(lfs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				if lfs.Ext(s) != ".sf" {
+					return nil
 				}
+				log.Infof("scan rule file: %s", s)
+				raw, err := lfs.ReadFile(s)
+				if err != nil {
+					log.Warnf("read file: %s failed: %s", s, err)
+					return nil
+				}
+				rule, err := sfdb.OnlyCreateSyntaxFlow(s, string(raw), false)
+				if err != nil {
+					return err
+				}
+				if rule.IncludedName != "" {
+					log.Infof("skip rule: %s included: %s", rule.RuleName, rule.IncludedName)
+					return nil
+				}
+				rules = append(rules, rule)
+				return nil
+			}))
+			if err != nil {
+				return err
 			}
-			rule := rule
-			ScanWithSFRule(prog, rule, func(result *ssaapi.SyntaxFlowResult) {
-				if ret := result.GetAlertValues(); ret.Len() > 0 {
-					results = append(results, result)
-				}
-			})
-		}
 
+			for _, _rule := range rules {
+				rule := _rule
+				ScanWithSFRule(prog, rule, func(result *ssaapi.SyntaxFlowResult) {
+					if ret := result.GetAlertValues(); ret.Len() > 0 {
+						results = append(results, result)
+					}
+				})
+			}
+		} else {
+			filterKw := c.String("rule-keyword")
+			for rule := range sfdb.YieldSyntaxFlowRulesWithoutLib(consts.GetGormProfileDatabase(), context.Background()) {
+				if filterKw != "" {
+					if !strings.Contains(strings.ToLower(rule.RuleName), strings.ToLower(filterKw)) {
+						continue
+					}
+				}
+				rule := rule
+				ScanWithSFRule(prog, rule, func(result *ssaapi.SyntaxFlowResult) {
+					if ret := result.GetAlertValues(); ret.Len() > 0 {
+						results = append(results, result)
+					}
+				})
+			}
+		}
 		for _, result := range results {
 			fmt.Println("-----------------------------------------")
 			fmt.Println(result.Dump(c.Bool("code")))
