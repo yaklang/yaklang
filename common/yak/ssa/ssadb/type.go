@@ -34,17 +34,21 @@ func SaveType(kind int, str string, extra string) int {
 	}
 	irType.Hash = irType.CalcHash()
 
-	err := utils.GormTransaction(GetDB(), func(tx *gorm.DB) error {
-		if queryDB := tx.Model(&IrType{}).Where("hash = ? ", irType.Hash).First(&irType); queryDB.Error != nil {
-			if queryDB.RecordNotFound() {
-				if saveDB := tx.Model(&IrType{}).Save(&irType); saveDB.Error != nil {
-					return saveDB.Error
+	err := utils.AttemptWithDelayFast(func() error {
+		return utils.GormTransaction(GetDB(), func(tx *gorm.DB) error {
+			if queryDB := tx.Model(&IrType{}).Where("hash = ? ", irType.Hash).First(&irType); queryDB.Error != nil {
+				if queryDB.RecordNotFound() {
+					if saveDB := tx.Model(&IrType{}).Save(&irType); saveDB.Error != nil {
+						log.Errorf("save error :%s", saveDB.Error)
+						return saveDB.Error
+					}
+				} else {
+					log.Errorf("query error :%s", queryDB.Error)
+					return queryDB.Error
 				}
-			} else {
-				return queryDB.Error
 			}
-		}
-		return nil
+			return nil
+		})
 	})
 	if err != nil {
 		log.Errorf("SaveType error: %v", err)
