@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/yakxml"
 	"io"
 	"reflect"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/yakxml"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -53,6 +54,9 @@ func New(maps ...any) *OrderedMap {
 	}
 
 	for k, v := range m {
+		if utils.IsNil(v) {
+			continue
+		}
 		if reflect.TypeOf(v).Kind() == reflect.Map {
 			m[k] = New(v)
 		}
