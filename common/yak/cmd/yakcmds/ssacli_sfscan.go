@@ -3,17 +3,16 @@ package yakcmds
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/filesys"
-	"io/fs"
-	"strings"
-
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"io/fs"
+	"path/filepath"
 )
 
 var SSACompilerSyntaxFlowCommand = &cli.Command{
@@ -51,10 +50,48 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 
 		var results []*ssaapi.SyntaxFlowResult
 
+		filterKw := c.String("rule-keyword")
+
+		isHitByFiltered := func(i string) bool {
+			if filterKw != "" {
+				kws := utils.PrettifyListFromStringSplited(filterKw, ",")
+				if utils.MatchAnyOfSubString(i, kws...) {
+					return true
+				}
+			} else {
+				return true
+			}
+			return false
+		}
+
 		if c.String("rule-dir") != "" {
-			lfs := filesys.NewRelLocalFs(c.String("rule-dir"))
+			dir := c.String("rule-dir")
+			originDir := dir
+			var filterKwExtra string
+			if utils.GetFirstExistedPath(dir) == "" {
+				// no existed path
+				dir, filterKwExtra = filepath.Split(dir)
+				if utils.GetFirstExistedPath(dir) == "" {
+					return utils.Errorf("rule dir [%v or %v] not existed", dir, originDir)
+				}
+			} else if utils.GetFirstExistedFile(dir) != "" {
+				// is a single file
+				dir, filterKwExtra = filepath.Split(dir)
+			}
+
+			if filterKwExtra != "" {
+				filterKw += "," + filterKwExtra
+			}
+
+			log.Infof("start to create rel local fs: %s", dir)
+			lfs := filesys.NewRelLocalFs(dir)
 			var rules []*schema.SyntaxFlowRule
 			err := filesys.SimpleRecursive(filesys.WithFileSystem(lfs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				if !isHitByFiltered(s) {
+					return nil
+				}
+
+				log.Infof("checking file: %s", s)
 				if lfs.Ext(s) != ".sf" {
 					return nil
 				}
@@ -87,13 +124,17 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 					}
 				})
 			}
+
+			defer func() {
+				for _, r := range rules {
+					log.Infof("handled local fs rule: %s", r.RuleName)
+				}
+			}()
 		} else {
-			filterKw := c.String("rule-keyword")
 			for rule := range sfdb.YieldSyntaxFlowRulesWithoutLib(consts.GetGormProfileDatabase(), context.Background()) {
-				if filterKw != "" {
-					if !strings.Contains(strings.ToLower(rule.RuleName), strings.ToLower(filterKw)) {
-						continue
-					}
+				if !isHitByFiltered(rule.RuleName) {
+					log.Infof("skip rule: %v", rule.RuleName)
+					continue
 				}
 				rule := rule
 				ScanWithSFRule(prog, rule, func(result *ssaapi.SyntaxFlowResult) {
