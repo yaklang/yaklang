@@ -143,7 +143,7 @@ func DeleteRuleByTitle(name string) error {
 	return db.Where("title = ? or title_zh = ?", name, name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
-func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+func OnlyCreateSyntaxFlow(ruleName string, content string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
 	language, err := CheckSyntaxFlowLanguage(languageRaw)
 	if err != nil {
@@ -165,6 +165,14 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	err = MigrateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
 		return nil, utils.Wrap(err, "migrate syntax flow rule error")
+	}
+	return rule, nil
+}
+
+func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+	rule, err := OnlyCreateSyntaxFlow(ruleName, content, buildin, tags...)
+	if err != nil {
+		return nil, err
 	}
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
