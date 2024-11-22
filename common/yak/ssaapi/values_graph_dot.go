@@ -163,7 +163,12 @@ func (d *DeepFirst) deepFirst(nodeID int) {
 
 	// origin
 	current := d.current
+	tmp := make(map[int]struct{})
 	for _, prev := range prevs {
+		if _, ok := tmp[prev]; ok {
+			continue
+		}
+		tmp[prev] = struct{}{}
 		// new line
 		d.current = orderedmap.New()
 		d.current = current.Copy()
