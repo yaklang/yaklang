@@ -693,7 +693,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
 
-		_ = results.AppendPredecessor(value, s.WithPredecessorContext("actual-args["+fmt.Sprint(i.UnaryInt)+"]"))
+		// _ = results.AppendPredecessor(value, s.WithPredecessorContext("actual-args["+fmt.Sprint(i.UnaryInt)+"]"))
 		s.stack.Push(results)
 
 	case OpGetAllCallArgs:
