@@ -3,13 +3,17 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestGRPCMUSTPASS_FuzzerConfig(t *testing.T) {
@@ -126,4 +130,93 @@ func TestGRPCMUSTPASS_MaxSize(t *testing.T) {
 			break
 		}
 	})
+}
+
+func TestGRPCMUSTPASS_SNI(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+
+	dataToken := utils.RandStringBytes(10)
+	addr := utils.GetRandomLocalAddr()
+	address, port := utils.DebugMockHTTPServerWithContextWithAddress(utils.TimeoutContext(30*time.Second), addr, true, false, false, false, false, true, func(bytes []byte) []byte {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length:10 \r\n\r\n%s", dataToken))
+	})
+	target := utils.HostPort(address, port)
+
+	t.Run("sni overwriter empty", func(t *testing.T) {
+		fuzzer, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+			RequestRaw:    []byte("GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n"),
+			SNI:           "",
+			OverwriteSNI:  true,
+			IsHTTPS:       true,
+			NoSystemProxy: true,
+		})
+		require.NoError(t, err)
+		handShankErrorCheck := false
+		for {
+			recv, err := fuzzer.Recv()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				t.Fatal(err)
+			}
+			if strings.Contains(recv.Reason, "all tls strategy failed") {
+				handShankErrorCheck = true
+			}
+		}
+		require.True(t, handShankErrorCheck)
+	})
+
+	t.Run("sni overwriter ", func(t *testing.T) {
+		token := utils.RandStringBytes(10)
+		fuzzer, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+			RequestRaw:    []byte("GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n"),
+			SNI:           token,
+			OverwriteSNI:  true,
+			IsHTTPS:       true,
+			NoSystemProxy: true,
+		})
+		require.NoError(t, err)
+		handShankErrorCheck := false
+		for {
+			recv, err := fuzzer.Recv()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				t.Fatal(err)
+			}
+			if strings.Contains(recv.Reason, "all tls strategy failed") || strings.Contains(recv.Reason, token) {
+				handShankErrorCheck = true
+			}
+		}
+		require.True(t, handShankErrorCheck)
+	})
+
+	t.Run("sni auto ", func(t *testing.T) {
+		token := utils.RandStringBytes(10)
+		fuzzer, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+			RequestRaw:    []byte("GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n"),
+			SNI:           token,
+			IsHTTPS:       true,
+			NoSystemProxy: true,
+		})
+		require.NoError(t, err)
+		handShankOK := false
+		for {
+			recv, err := fuzzer.Recv()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				t.Fatal(err)
+			}
+			if bytes.Contains(recv.ResponseRaw, []byte(dataToken)) {
+				handShankOK = true
+			}
+		}
+		require.True(t, handShankOK)
+	})
+
 }
