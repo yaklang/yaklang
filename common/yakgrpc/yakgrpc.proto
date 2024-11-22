@@ -737,6 +737,9 @@ service Yak {
   rpc CreatePluginEnv(PluginEnvData) returns (Empty); // create
   rpc SetPluginEnv(PluginEnvData) returns (Empty); // create or update
   rpc DeletePluginEnv(DeletePluginEnvRequest) returns (Empty);
+
+  rpc GetAllFuzztagInfo (GetAllFuzztagInfoRequest) returns (GetAllFuzztagInfoResponse);
+  rpc GenerateFuzztag (GenerateFuzztagRequest) returns (GenerateFuzztagResponse);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -5770,9 +5773,7 @@ message DeletePluginEnvRequest {
   string Key = 1;
   bool All = 2;
 }
-//
-//    rpc GetAllFuzztagInfo (GetAllFuzztagInfoRequest) returns (GetAllFuzztagInfoResponse);
-//    rpc GenerateFuzztag (GenerateFuzztagRequest) returns (GenerateFuzztagResponse);
+
 message GetAllFuzztagInfoRequest{
   string Key = 1;
 }
@@ -5780,10 +5781,21 @@ message GetAllFuzztagInfoRequest{
 message GetAllFuzztagInfoResponse{
   repeated FuzztagInfo Data = 2;
 }
+
+message FuzztagArgumentType{
+  string Name = 1;
+  string DefaultValue = 2;
+  string Description = 3;
+  bool IsOptional = 4;
+  bool IsList = 5;
+  repeated string Separators = 6;
+}
 message FuzztagInfo{
   string Name = 1;
   string Description = 2;
   string VerboseName = 3;
+  repeated string Examples = 4;
+  repeated FuzztagArgumentType ArgumentTypes = 5;
 }
 
 message GenerateFuzztagRequest{
