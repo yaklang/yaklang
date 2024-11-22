@@ -1082,9 +1082,9 @@ func hostnameInSNI(name string) string {
 	if i := strings.LastIndex(host, "%"); i > 0 {
 		host = host[:i]
 	}
-	if net.ParseIP(host) != nil {
-		return ""
-	}
+	//if net.ParseIP(host) != nil { // compatible ip sni
+	//	return ""
+	//}
 	for len(name) > 0 && name[len(name)-1] == '.' {
 		name = name[:len(name)-1]
 	}
