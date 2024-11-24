@@ -5,7 +5,15 @@ parser grammar JSPParser;
 options { tokenVocab=JSPLexer; }
 
 jspDocument
-    : (jspDirective | scriptlet | WHITESPACES)* xml? (jspDirective | scriptlet | WHITESPACES)* dtd? (jspDirective | scriptlet | WHITESPACES)* jspElements*
+    : jspStart* xml
+    | jspStart* dtd
+    | jspStart* jspElements*
+    ;
+
+jspStart
+    :jspDirective
+    |scriptlet
+    |WHITESPACES
     ;
 
 jspElements
@@ -13,13 +21,21 @@ jspElements
     ;
 
 jspElement
-    : TAG_BEGIN name=htmlTagName atts+=htmlAttribute* TAG_END htmlContent* CLOSE_TAG_BEGIN htmlTagName TAG_END
-    | TAG_BEGIN name=htmlTagName atts+=htmlAttribute* TAG_SLASH_END
-    | TAG_BEGIN name=htmlTagName atts+=htmlAttribute* TAG_END;
+    : TAG_BEGIN htmlTag htmlAttribute* TAG_END htmlContents CLOSE_TAG_BEGIN htmlTagName TAG_END # JspElementWithTagAndContent
+    | TAG_BEGIN htmlTag htmlAttribute* TAG_SLASH_END                                            # JspElementWithSelfClosingTag
+    | TAG_BEGIN htmlTag htmlAttribute* TAG_END                                                  # JspElementWithOpenTagOnly
+    ;
 
+htmlTag
+    : htmlTagName (JSP_JSTL_COLON htmlTagName)?
+    ;
 
 jspDirective
     : DIRECTIVE_BEGIN name=htmlTagName atts+=htmlAttribute*? TAG_WHITESPACE* DIRECTIVE_END
+    ;
+
+htmlContents
+    : htmlContent*
     ;
 
 htmlContent
@@ -37,10 +53,9 @@ jspExpression
     ;
 
 htmlAttribute
-    :
-      jspElement
-    | name=htmlAttributeName EQUALS value=htmlAttributeValue
-    | name=htmlAttributeName
+    //: jspElement
+    : htmlAttributeName EQUALS htmlAttributeValue
+    | htmlAttributeName
     | scriptlet
     ;
 

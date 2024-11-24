@@ -238,6 +238,9 @@ JSPEXPR_CONTENT_CLOSE
 // tag declarations
 //
 mode TAG;
+JSP_JSTL_COLON
+    : ':'
+    ;
 
 TAG_SLASH_END
     : EMPTY_ELEMENT_CLOSE -> popMode
@@ -316,7 +319,7 @@ TAG_NameChar
 
 fragment
 TAG_NameStartChar
-    :   [:a-zA-Z]
+    :   [a-zA-Z]
     |   '\u2070'..'\u218F'
     |   '\u2C00'..'\u2FEF'
     |   '\u3001'..'\uD7FF'
