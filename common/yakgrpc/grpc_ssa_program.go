@@ -14,12 +14,12 @@ func (s *Server) QuerySSAPrograms(ctx context.Context, req *ypb.QuerySSAProgramR
 		return nil, err
 	}
 	return &ypb.QuerySSAProgramResponse{
-		Paging: &ypb.Paging{
+		Pagination: &ypb.Paging{
 			Page:  int64(pagine.Page),
 			Limit: int64(pagine.Limit),
 		},
-		Programs: programs,
-		Total:    int64(pagine.TotalRecord),
+		Data:  programs,
+		Total: int64(pagine.TotalRecord),
 	}, nil
 }
 

@@ -63,7 +63,7 @@ func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
 
 func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator, []*ypb.SSAProgram, error) {
 	var programs []*schema.SSAProgram
-	p := request.Paging
+	p := request.Pagination
 	if p == nil {
 		p = &ypb.Paging{
 			Page:    1,
@@ -72,6 +72,7 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 			Order:   "desc",
 		}
 	}
+	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 	db = FilterSSAProgram(db, request.GetFilter())
 	paging, dbx := bizhelper.Paging(db, int(p.Page), int(p.Limit), &programs)
 	if dbx.Error != nil {
@@ -86,6 +87,7 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 
 func Prog2GRPC(prog *schema.SSAProgram) *ypb.SSAProgram {
 	ret := &ypb.SSAProgram{
+		Id: uint32(prog.ID),
 		// basic info
 		CreateAt:      prog.CreatedAt.Unix(),
 		UpdateAt:      prog.UpdatedAt.Unix(),
@@ -93,6 +95,7 @@ func Prog2GRPC(prog *schema.SSAProgram) *ypb.SSAProgram {
 		Description:   prog.Description,
 		Language:      prog.Language,
 		EngineVersion: prog.EngineVersion,
+		Dbpath:        prog.DBPath,
 	}
 	// recompile
 	NeedReCompile := func() bool {

@@ -5571,6 +5571,7 @@ message SSAProgram{
   int64 CriticalRiskNumber = 10;
   int64 WarnRiskNumber = 11;
   int64 LowRiskNumber = 12;
+  uint32 Id = 13;
 }
 
 message SSAProgramInput {
@@ -5595,7 +5596,8 @@ message SSAProgramFilter{
 
 
 message QuerySSAProgramRequest{
-  Paging Paging = 1;
+  Paging Paging = 1; // abort 
+  Paging Pagination = 2; 
   SSAProgramFilter Filter = 3;
 }
 
@@ -5609,8 +5611,10 @@ message DeleteSSAProgramRequest{
 }
 
 message QuerySSAProgramResponse{
-  Paging Paging = 1;
-  repeated SSAProgram Programs = 2;
+  Paging Paging = 1; // abort 
+  Paging Pagination = 5;
+  repeated SSAProgram Programs = 2; // abort
+  repeated SSAProgram Data = 4;
   int64 Total = 3;
 }
 
