@@ -51,6 +51,49 @@ func TestRange_normol(t *testing.T) {
 
 }
 
+func TestRange_function(t *testing.T) {
+	code := `package main
+		
+func test() bool{
+	return true
+}
+
+func test2() bool{
+	return false
+}
+
+func main(){
+	a := test()
+	b := test2()
+	println(a)
+	println(b)
+}
+`
+	ssatest.CheckWithName("funtion-range", t, code, func(prog *ssaapi.Program) error {
+		target := prog.SyntaxFlow("test as $target1").GetValues("target1")
+		target2 := prog.SyntaxFlow("test2 as $target2").GetValues("target2")
+		a := target[0].GetSSAValue()
+		b := target2[0].GetSSAValue()
+		if ca, ok := ssa.ToFunction(a); ok {
+			ra := ca.GetRange()
+			assert.Equal(t, 3, ra.GetStart().GetLine())
+			assert.Equal(t, 1, ra.GetStart().GetColumn())
+			assert.Equal(t, 5, ra.GetEnd().GetLine())
+			assert.Equal(t, 2, ra.GetEnd().GetColumn())
+		}
+		if cb, ok := ssa.ToFunction(b); ok {
+			rb := cb.GetRange()
+			assert.Equal(t, 7, rb.GetStart().GetLine())
+			assert.Equal(t, 1, rb.GetStart().GetColumn())
+			assert.Equal(t, 9, rb.GetEnd().GetLine())
+			assert.Equal(t, 2, rb.GetEnd().GetColumn())
+		}
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
+
+}
+
 func TestRange_import(t *testing.T) {
 	code := `package test
 

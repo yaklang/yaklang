@@ -221,7 +221,7 @@ func (b *astbuilder) handleImportPackage() {
 		ex.SetExtern(true)
 
 		// 手动设置range
-		ex.SetRange(b.GetCurrentRange(info.Pos))
+		ex.SetRange(b.GetRangeByToken(info.Pos))
 
 		if importp, _ := b.GetImportPackage(id); importp != nil {
 			for n, g := range importp.ExportValue {
@@ -565,6 +565,9 @@ func (b *astbuilder) buildTypeParameterDecl(typ *gol.TypeParameterDeclContext) [
 }
 
 func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
+	recoverRange := b.SetRange(fun.BaseParserRuleContext)
+	defer recoverRange()
+
 	var params []ssa.Type
 	var result ssa.Type
 
@@ -595,19 +598,14 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}
 
 	if funcName != "" {
-		recoverRange := b.SetRange(fun.BaseParserRuleContext)
-		defer recoverRange()
-
 		variable := b.CreateLocalVariable(funcName)
 		b.AssignVariable(variable, newFunc)
 	}
 
 	editor := b.GetEditor() // 为了区分不同函数所属的文件
 	newFunc.AddLazyBuilder(func() {
-		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		b.SetEditor(editor)
 		defer func() {
-			recoverRange()
 			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
 				tph()
 				delete(b.tpHandler, newFunc.GetName())
@@ -673,6 +671,9 @@ func (b *astbuilder) getReceiverDecl(para *gol.ParameterDeclContext) string {
 }
 
 func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
+	recoverRange := b.SetRange(fun.BaseParserRuleContext)
+	defer recoverRange()
+
 	var params []ssa.Type
 	var result ssa.Type
 
@@ -709,9 +710,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	}
 
 	if funcName != "" {
-		recoverRange := b.SetRange(fun.BaseParserRuleContext)
-		defer recoverRange()
-
 		variable := b.CreateLocalVariable(funcName)
 		b.AssignVariable(variable, newFunc)
 	}
@@ -733,12 +731,10 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 
 	PreHandlerBlock := b.CurrentBlock
 	newFunc.AddLazyBuilder(func() {
-		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		CurrentBlock := b.CurrentBlock
 		b.CurrentBlock = PreHandlerBlock
 
 		defer func() {
-			recoverRange()
 			b.CurrentBlock = CurrentBlock
 			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
 				tph()
