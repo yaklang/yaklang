@@ -214,14 +214,17 @@ func (f *Function) Finish() {
 		}
 	}
 	funType.SetFreeValue(result)
-	var ses []*FunctionSideEffect
+	ses := funType.SideEffects
 	for _, se := range f.SideEffects {
-		scope := se.Modify.GetBlock().ScopeTable
-		if ret := GetHeadVariableFromScope(scope, se.Name); ret != nil {
-			if ret.GetLocal() {
-				continue
+		if se.Modify.GetBlock() != nil {
+			scope := se.Modify.GetBlock().ScopeTable
+			if ret := GetHeadVariableFromScope(scope, se.Name); ret != nil {
+				if ret.GetLocal() {
+					continue
+				}
 			}
 		}
+
 		ses = append(ses, se)
 	}
 	funType.SetSideEffect(ses)
