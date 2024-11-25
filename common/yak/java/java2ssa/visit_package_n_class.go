@@ -84,11 +84,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		class = y.CreateBluePrint(className)
 		y.GetProgram().SetExportType(className, class)
 	} else {
-		var builder strings.Builder
-		builder.WriteString(outClass.Name)
-		builder.WriteString(".")
-		builder.WriteString(i.Identifier().GetText())
-		className := builder.String()
+		className := fmt.Sprintf("%s.%s", outClass.Name, i.Identifier().GetText())
 		class = y.CreateBluePrint(className)
 	}
 	// set full type name for class's self

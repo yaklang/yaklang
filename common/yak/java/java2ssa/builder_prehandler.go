@@ -1,6 +1,9 @@
 package java2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
+	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
+	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"path/filepath"
 	"strings"
 
@@ -32,6 +35,7 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
 	builder.GetProgram().GetApplication().Build("", editor, builder)
 }
+
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.FunctionBuilder, path string) error {
 	prog := fb.GetProgram()
 	if prog == nil {
@@ -42,11 +46,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		prog.ExtraFile = make(map[string]string)
 	}
 
-	// handlerFile := func(path string) {
 	dirname, filename := fileSystem.PathSplit(path)
-	_ = dirname
-	_ = filename
-
 	// pom.xml
 	if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "pom.xml" {
 		raw, err := fileSystem.ReadFile(path)
@@ -67,15 +67,55 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
 		fb.GenerateDependence(pkgs, filename)
 	}
+
+	saveExtraFile := func(path string, raw []byte) {
+		if prog.GetProgramName() == "" {
+			prog.ExtraFile[path] = string(raw)
+		} else {
+			folders := []string{prog.GetProgramName()}
+			folders = append(folders,
+				strings.Split(dirname, string(fileSystem.GetSeparators()))...,
+			)
+			prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
+		}
+	}
 	switch strings.ToLower(fileSystem.Ext(path)) {
 	case ".java", ".class":
-		file, err := fileSystem.ReadFile(path)
+		raw, err := fileSystem.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		prog.Build(path, memedit.NewMemEditor(string(file)), fb)
+		prog.Build(path, memedit.NewMemEditor(string(raw)), fb)
 	case ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
 		return nil
+	case ".jsp":
+		raw, err := fileSystem.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		saveExtraFile(path, raw)
+		var info tl.TemplateGeneratedInfo
+		info, err = tj.ConvertTemplateToJava(tj.JSP, string(raw), path)
+		if err != nil {
+			return utils.Errorf("convert jsp to java error: %v", err)
+		}
+		saveExtraFile(path, raw)
+		javaPath := path[:len(path)-4] + "_jsp.java"
+		prog.SetTemplate(javaPath, info)
+		err = prog.Build(javaPath, memedit.NewMemEditor(info.GetContent()), fb)
+		if err != nil {
+			return err
+		}
+	case ".properties":
+		raw, err := fileSystem.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		saveExtraFile(path, raw)
+		err = prog.ParseProjectConfig(string(raw), ssa.PROJECT_CONFIG_PROPERTIES)
+		if err != nil {
+			return err
+		}
 	default:
 		fs, err := fileSystem.Open(path)
 		if err != nil {
@@ -95,17 +135,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 			log.Warnf("read file %s error: %v", path, err)
 			return nil
 		}
-
-		if prog.GetProgramName() == "" {
-			prog.ExtraFile[path] = string(raw)
-		} else {
-			folders := []string{prog.GetProgramName()}
-			folders = append(folders,
-				strings.Split(dirname, string(fileSystem.GetSeparators()))...,
-			)
-			prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
-		}
-
+		saveExtraFile(path, raw)
 	}
 	return nil
 }

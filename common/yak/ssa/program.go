@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"github.com/samber/lo"
+	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"sort"
 	"strings"
 
@@ -13,6 +15,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+)
+
+type ProjectConfigType int
+
+const (
+	PROJECT_CONFIG_YAML ProjectConfigType = iota
+	PROJECT_CONFIG_JSON
+	PROJECT_CONFIG_PROPERTIES
 )
 
 func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
@@ -38,6 +48,8 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ExternInstance:          make(map[string]any),
 		ExternLib:               make(map[string]map[string]any),
 		importDeclares:          omap.NewOrderedMap(make(map[string]*importDeclareItem)),
+		ProjectConfig:           make(map[string]string),
+		Template:                make(map[string]tl.TemplateGeneratedInfo),
 	}
 	if kind == Application {
 		prog.Application = prog
@@ -342,4 +354,66 @@ func (p *Program) GetApplication() *Program {
 		return nil
 	}
 	return p.Application
+}
+
+func (p *Program) ParseProjectConfig(content string, typ ProjectConfigType) error {
+	switch typ {
+	case PROJECT_CONFIG_PROPERTIES:
+		err := p.parsePropertiesProjectConfig(content)
+		if err != nil {
+			return err
+		}
+	}
+	return utils.Errorf("not support project config type: %d", typ)
+}
+
+func (p *Program) parsePropertiesProjectConfig(content string) error {
+	if p == nil {
+		return utils.Errorf("program is nil")
+	}
+	lines := strings.Split(content, "\n")
+	var errs error
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "!") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			errs = utils.JoinErrors(errs, utils.Errorf("bad properties line: %s", line))
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		p.ProjectConfig[key] = value
+	}
+	return nil
+}
+
+func (p *Program) GetProjectConfig(key string) string {
+	if p == nil {
+		return ""
+	}
+	return p.ProjectConfig[key]
+}
+
+func (p *Program) SetProjectConfig(key string, value string) {
+	if p == nil {
+		return
+	}
+	p.ProjectConfig[key] = value
+}
+
+func (p *Program) GetTemplate(path string) tl.TemplateGeneratedInfo {
+	if p == nil {
+		return nil
+	}
+	return p.Template[path]
+}
+
+func (p *Program) SetTemplate(path string, info tl.TemplateGeneratedInfo) {
+	if p == nil {
+		return
+	}
+	p.Template[path] = info
 }
