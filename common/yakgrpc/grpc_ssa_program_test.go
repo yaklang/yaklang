@@ -16,7 +16,7 @@ func query(t *testing.T, filter *ypb.SSAProgramFilter, local ypb.YakClient, name
 		Filter: filter,
 	})
 	require.NoError(t, err)
-	for _, prog := range res.Programs {
+	for _, prog := range res.Data {
 		if prog.Name == name {
 			return prog
 		}
