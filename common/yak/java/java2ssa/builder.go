@@ -2,8 +2,6 @@ package java2ssa
 
 import (
 	"fmt"
-	"path/filepath"
-
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,6 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
+	"path/filepath"
 )
 
 // ========================================== For SSAAPI ==========================================
@@ -124,6 +124,13 @@ func (b *builder) AssignClassConst(className, key string, value ssa.Value) {
 func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
 	name := fmt.Sprintf("%s_%s", className, key)
 	return b.ReadConst(name)
+}
+
+// ========================================== For Template Language ==========================================
+
+type TemplateBuilder struct {
+	content string
+	typ     tl.TemplateTyp
 }
 
 func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
