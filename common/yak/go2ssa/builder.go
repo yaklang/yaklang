@@ -243,20 +243,22 @@ func (b *astbuilder) SetImportPackage(useName, trueName string, path string, pos
 
 func (b *astbuilder) GetImportPackage(name string) (*ssa.Program, string) {
 	prog := b.GetProgram()
-	if b.importMap[name] == nil {
-		return nil, ""
+	path := ""
+	if b.importMap[name] != nil {
+		path = b.importMap[name].Path
 	}
 	lib, _ := prog.GetOrCreateLibrary(b.importMap[name].Name)
-	return lib, b.importMap[name].Path
+	return lib, path
 }
 
 func (b *astbuilder) GetImportPackageUser(name string) (*ssa.Program, string) {
 	prog := b.GetProgram()
-	if b.importMap[name] == nil {
-		return nil, ""
+	path := ""
+	if b.importMap[name] != nil {
+		path = b.importMap[name].Path
 	}
 	lib, _ := prog.GetLibrary(b.importMap[name].Name)
-	return lib, b.importMap[name].Path
+	return lib, path
 }
 
 func (b *astbuilder) GetLabelByName(name string) *ssa.LabelBuilder {
