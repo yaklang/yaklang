@@ -43,6 +43,7 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) matchHandler 
 				return nil
 			}
 			c.Value["prevMatch"] = []data.Matched{indexes[0]}
+			c.SetPrevMatched(mdf, indexes)
 			return nil
 		}
 
