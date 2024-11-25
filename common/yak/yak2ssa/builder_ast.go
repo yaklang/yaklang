@@ -972,6 +972,8 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		return nil
 	}
 
+	// fmt.Printf("exp = %v\n", stmt.GetText())
+
 	// typeLiteral expression
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		if stmt.LParen() != nil && stmt.RParen() != nil {
