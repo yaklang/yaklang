@@ -393,6 +393,10 @@ func TestGenerateHttpTrafficBug(t *testing.T) {
 			name:    "env var bug",
 			ruleStr: "alert http any any -> $HTTP_SERVERS any (msg:\"ET WEB_SPECIFIC_APPS OGNL Expression Injection (CVE-2017-9791)\"; flow:established,to_server; http.method; content:\"POST\"; nocase; http.request_body; content:\"multipart\"; content:\"form-data\"; distance:1; within:11; content:\"ognl.OgnlContext\"; distance:1; fast_pattern; content:\"DEFAULT_MEMBER_ACCESS\"; distance:1; within:23; content:\"java.lang.ProcessBuilder\"; distance:1; content:\".start\"; distance:1; reference:url,securityonline.info/tutorial-cve-2017-9791-apache-struts2-s2-048-remote-code-execution-vulnerability/; reference:cve,2017-9791; classtype:attempted-user; sid:2024468; rev:3; metadata:affected_product Apache_Struts2, attack_target Web_Server, created_at 2017_07_14, deployment Datacenter, former_category WEB_SPECIFIC_APPS, performance_impact Low, signature_severity Major, updated_at 2020_08_10;)\n",
 		},
+		{
+			name:    "pcre bug",
+			ruleStr: "alert http any any -> any any (msg:\"Exploit CVE-2020-27131 on Cisco Security Manager\"; flow:to_server,established; content:\"POST\"; http_method; content:\"/CSCOnm/servlet/com.cisco.nm.cmf.servlet.\"; startswith; http_uri; pcre:\"/^(AuthTokenServlet|ClientServicesServlet|SecretServiceServlet)/UR\"; content:\"|ac ed 00 05|\"; startswith; http_client_body; content:\"java.rmi.server.RemoteObject\"; distance:0; http_client_body; reference:cve,CVE-2020-27131; classtype:web-application-attack; sid:2020271313; rev:1;)",
+		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
 			ruleStr := testcase.ruleStr
