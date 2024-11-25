@@ -135,6 +135,25 @@ func Test_SideEffect(t *testing.T) {
 			"4", "3", "3", "side-effect(2, a)",
 		}, t)
 	})
+
+	t.Run("side-effect cross global", func(t *testing.T) {
+		// TODO: handle global and side-effect
+		t.Skip()
+		ssatest.CheckPrintlnValue(`package main
+
+	var a = 1
+
+	func main() {
+		c := func() {
+			a = 2
+		}
+		c()
+		println(a)
+	}
+		`, []string{
+			"side-effect(2, a)",
+		}, t)
+	})
 }
 
 func Test_SideEffect_Bind(t *testing.T) {
