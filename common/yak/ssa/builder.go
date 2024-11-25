@@ -3,9 +3,10 @@ package ssa
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"reflect"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -163,13 +164,6 @@ func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 	}
 	if build.CurrentRange == nil {
 		build.CurrentRange = newFunc.R
-	}
-
-	if global := build.GetProgram().GlobalScope; global != nil {
-		for i, m := range global.GetAllMember() {
-			variable := build.CreateLocalVariable(i.String())
-			build.AssignVariable(variable, m)
-		}
 	}
 
 	return build
