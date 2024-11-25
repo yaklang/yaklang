@@ -338,35 +338,45 @@ func (c *Call) handleCalleeFunction() {
 				}
 
 				CheckSideEffect := func(find *Variable) {
-					if find.GetLocal() {
-						if find.GetScope() == bindScope {
-							AddSideEffect()
-						} else {
-							SetCapturedSideEffect()
-						}
-					} else {
+					if find.GetScope() == bindScope {
 						AddSideEffect()
+					} else {
+						SetCapturedSideEffect()
 					}
 				}
 
+				if _, ok := se.Modify.(*Parameter); ok {
+					AddSideEffect()
+					continue
+				}
+
+				obj := se.parameterMemberInner
 				if ret := GetHeadVariableFromScope(currentScope, se.Name); ret != nil {
 					CheckSideEffect(ret)
 					continue
-				} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
-					if ret := GetHeadVariableFromScope(currentScope, obj.ObjectName); ret != nil {
-						CheckSideEffect(ret)
-						continue
-					}
+				} else if ret := GetHeadVariableFromScope(currentScope, obj.ObjectName); ret != nil {
+					CheckSideEffect(ret)
+					continue
+				} else if obj.ObjectName == "this" {
+					AddSideEffect()
+					continue
 				}
 
-				functionScope := function.GetBlock().ScopeTable
-				if ret := GetHeadVariableFromScope(functionScope, se.Name); ret != nil {
-					CheckSideEffect(ret)
-				} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
-					if ret := GetHeadVariableFromScope(functionScope, obj.ObjectName); ret != nil {
+				if obj.MemberCallKind == ParameterMemberCall || obj.MemberCallKind == CallMemberCall {
+					AddSideEffect()
+					continue
+				}
+
+				if block := function.GetBlock(); block != nil {
+					functionScope := block.ScopeTable
+					if ret := GetHeadVariableFromScope(functionScope, se.Name); ret != nil {
 						CheckSideEffect(ret)
-					} else {
-						AddSideEffect()
+					} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
+						if ret := GetHeadVariableFromScope(functionScope, obj.ObjectName); ret != nil {
+							CheckSideEffect(ret)
+						} else {
+							AddSideEffect()
+						}
 					}
 				}
 			}

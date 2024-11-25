@@ -136,3 +136,29 @@ func Test_SideEffect(t *testing.T) {
 		}, t)
 	})
 }
+
+func Test_SideEffect_Bind(t *testing.T) {
+	t.Run("side-effect method", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`package main
+
+	import "fmt"
+
+	func (t *T)setA(a int) {
+	    t.a = a
+	}
+
+	type T struct {
+	    a int
+	}
+
+	func test() {
+		t := T{1}
+		t.setA(2)
+
+		println(t.a)// 2 会被side-effect影响
+	}
+		`, []string{
+			"side-effect(Parameter-a, t.a)",
+		}, t)
+	})
+}

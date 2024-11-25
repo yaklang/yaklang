@@ -76,6 +76,8 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
+	// fmt.Printf("exp = %v\n", raw.GetText())
+
 	var opcode ssa.BinaryOpcode
 	var unaryOpcode ssa.UnaryOpcode
 	var variable *ssa.Variable

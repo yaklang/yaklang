@@ -87,7 +87,7 @@ var _ ssautil.SpinHandle[Value] = SpinHandle
 
 // build phi
 func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Value) func(name string, t []Value) Value {
-	return func(name string, vs []Value) Value {
+	return func(name string, vst []Value) Value {
 		if block != nil {
 			recoverBlock := builder.CurrentBlock
 			builder.CurrentBlock = block
@@ -97,7 +97,15 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		}
 
 		var t Type
+		var vs []Value
 		typeMerge := make(map[Type]struct{})
+
+		for _, v := range vst {
+			if v != nil {
+				vs = append(vs, v)
+			}
+		}
+
 		for _, v := range vs {
 			if v.GetType().GetTypeKind() == AnyTypeKind {
 				continue
