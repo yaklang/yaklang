@@ -67,15 +67,22 @@ func (b *FunctionBuilder) CreateBluePrint(name string, tokenizer ...CanStartStop
 	return b.CreateBluePrintWithPkgName(name, tokenizer...)
 }
 
-func (b *FunctionBuilder) GetAndCreateBluePrint(name string) *Blueprint {
+func (b *FunctionBuilder) CreateBluePrintAndSetConstruct(typName string, libName ...string) *Blueprint {
+	var name string
+	if len(libName) > 0 {
+		name = fmt.Sprintf("%s_%s", libName[0], typName)
+	} else {
+		name = typName
+	}
+
 	if bp := b.GetBluePrint(name); bp != nil {
 		return bp
 	}
 
 	bp := b.CreateBluePrint(name)
-	newFunction := b.NewFunc(name)
-	newFunction.SetMethodName(name)
-	newFunction.SetType(NewFunctionType(fmt.Sprintf("%s-__construct", name), []Type{}, nil, true))
+	newFunction := b.NewFunc(typName)
+	newFunction.SetMethodName(typName)
+	newFunction.SetType(NewFunctionType(fmt.Sprintf("%s-__construct", typName), []Type{}, nil, true))
 	bp.RegisterMagicMethod(Constructor, newFunction)
 	return bp
 }

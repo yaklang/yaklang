@@ -246,6 +246,15 @@ func (b *astbuilder) GetImportPackage(name string) (*ssa.Program, string) {
 	if b.importMap[name] == nil {
 		return nil, ""
 	}
+	lib, _ := prog.GetOrCreateLibrary(b.importMap[name].Name)
+	return lib, b.importMap[name].Path
+}
+
+func (b *astbuilder) GetImportPackageUser(name string) (*ssa.Program, string) {
+	prog := b.GetProgram()
+	if b.importMap[name] == nil {
+		return nil, ""
+	}
 	lib, _ := prog.GetLibrary(b.importMap[name].Name)
 	return lib, b.importMap[name].Path
 }
