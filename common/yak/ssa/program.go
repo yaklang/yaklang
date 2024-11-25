@@ -1,9 +1,10 @@
 package ssa
 
 import (
-	"github.com/samber/lo"
 	"sort"
 	"strings"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -98,8 +99,8 @@ func (prog *Program) NewLibrary(name string, path []string) *Program {
 }
 
 func (prog *Program) GetOrCreateLibrary(name string) (*Program, error) {
-	library, flag := prog.GetLibrary(name)
-	if flag {
+	library, _ := prog.GetLibrary(name)
+	if library != nil {
 		return library, nil
 	}
 	lib, err := prog.GenerateVirtualLib(name)

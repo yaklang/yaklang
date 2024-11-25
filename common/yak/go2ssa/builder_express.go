@@ -250,13 +250,12 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				}
 			}
 
-			if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), test); ok {
+			if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
+				handleObjectType(rv, typ)
+			} else if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), test); ok {
 				rightv = value
-			} else {
-				if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
-					handleObjectType(rv, typ)
-				}
 			}
+
 			if rightv == nil {
 				rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(test))
 			}
