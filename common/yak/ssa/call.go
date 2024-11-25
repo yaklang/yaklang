@@ -300,7 +300,7 @@ func (c *Call) handleCalleeFunction() {
 				// TODO: 不应该查找head，应该遍历当前scope
 				if ret := currentScope.GetHeadVariable(se.Name); ret != nil {
 					if ret.GetLocal() {
-						if modifyScope.IsSameOrSubScope(bindScope) {
+						if modifyScope.IsSameOrSubScope(ret.GetScope()) {
 							continue
 						}
 					}
