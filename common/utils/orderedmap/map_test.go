@@ -25,3 +25,20 @@ func TestOrderedMapXML(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("%s", b)
 }
+
+func TestOrderMapCopy(t *testing.T) {
+	m := New()
+	m.Set("a", 1)
+	m.Set("b", 2)
+	m.Set("c", 3)
+	m.Set("d", 4)
+	m.Set("e", 5)
+	m.Set("f", 6)
+	m.Set("g", 7)
+	m.Set("h", 8)
+	m.Set("i", 9)
+	m.Set("j", 10)
+
+	m2 := m.Copy()
+	require.Equal(t, m.Keys(), m2.Keys())
+}
