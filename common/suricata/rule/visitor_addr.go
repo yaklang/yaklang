@@ -117,7 +117,8 @@ func (a *AddressRule) Generate() string {
 		raw, existed := a.envtable[a.Env]
 		if !existed {
 			log.Warnf("suricata env %s not found, fallback to any", a.Env)
-			return utils.GetRandomLocalAddr()
+			//return utils.GetRandomLocalAddr()
+			return "127.0.0.1"
 		}
 		return raw
 	}
