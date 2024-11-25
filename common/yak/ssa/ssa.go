@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 )
 
 type ErrorLogger interface {
@@ -278,6 +279,12 @@ type Program struct {
 
 	PkgName           string
 	fixImportCallback []func()
+
+	// Project Config
+	ProjectConfig map[string]string
+
+	// Template Language
+	Template map[string]tl.TemplateGeneratedInfo
 }
 
 // implement Value
