@@ -65,6 +65,57 @@ func (s *VulinServer) registerCryptoJS() {
 		password := utils.MapGetString(params, "password")
 		return isLogined(username, password)
 	}
+	var isLoginedFromRawViaDatabase = func(i any) (bool, string) {
+		var params = make(map[string]any)
+		switch i.(type) {
+		case string:
+			params = utils.ParseStringToGeneralMap(i)
+		case []byte:
+			params = utils.ParseStringToGeneralMap(i)
+		default:
+			params = utils.InterfaceToGeneralMap(i)
+		}
+		username := utils.MapGetString(params, "username")
+		password := utils.MapGetString(params, "password")
+		log.Info("username: ", username, " password: ", password)
+		users, err := s.database.GetUserByUsernameUnsafe(username)
+		if err != nil {
+			return false, utils.Wrapf(err, "get user by username failed: %v", username).Error()
+		}
+		for _, user := range users {
+			tUser := utils.InterfaceToString(*user["username"].(*any))
+			tPass := utils.InterfaceToString(*user["password"].(*any))
+			log.Infof("user: %v pass: %v expect: %v", tUser, tPass, password)
+			if tPass == password {
+				return true, "success! your password is correct! inject success!"
+			}
+		}
+		return false, "failed! your password is incorrect! inject failed!"
+	}
+
+	var isLoginedFromRawViaDatabase2 = func(i any) (bool, string) {
+		var params = make(map[string]any)
+		switch i.(type) {
+		case string:
+			params = utils.ParseStringToGeneralMap(i)
+		case []byte:
+			params = utils.ParseStringToGeneralMap(i)
+		default:
+			params = utils.InterfaceToGeneralMap(i)
+		}
+		username := utils.MapGetString(params, "username")
+		password := utils.MapGetString(params, "password")
+		log.Info("username: ", username, " password: ", password)
+		users, err := s.database.UnsafeSqlQuery(`select * from vulin_users where username = '` + username + "' and password = '" + password + "';")
+		if err != nil {
+			return false, utils.Wrapf(err, "get user by username failed: %v", username).Error()
+		}
+		if len(users) > 0 {
+			return true, "success! your password is correct! inject success!"
+		}
+		return false, "failed! your password is incorrect! inject failed!"
+	}
+
 	var renderLoginSuccess = func(writer http.ResponseWriter, loginUsername, loginPassword string, fallback []byte, success ...[]byte) {
 		if loginUsername != username || loginPassword != password {
 			writer.WriteHeader(403)
@@ -347,6 +398,38 @@ setTimeout(function(){
 			},
 		},
 		{
+			Path:  "/js/lib/aes/ecb/sqli",
+			Title: "CryptoJS.AES(ECB) 被前端加密的 SQL 注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, cryptoJSlibTemplateHtml, map[string]any{
+					"url":      `/crypto/js/lib/aes/ecb/handler/sqli`,
+					"initcode": "// ignore:  var iv = CryptoJS.lib.WordArray.random(128/8);",
+					`extrakv`:  "// iv: iv.toString(),",
+					"title":    "AES(ECB PKCS7) 加密",
+					"key":      `CryptoJS.enc.Utf8.parse("1234123412341234")`,
+					"info":     "CryptoJS.AES(ECB).encrypt/decrypt，默认 PKCS7Padding，密钥长度不足16字节，以 NULL 补充，超过16字节，截断。本页面中表单有注入，一般扫描器均可扫出，Try it？",
+					"encrypt":  `CryptoJS.AES.encrypt(word, key, {mode: CryptoJS.mode.ECB}).toString();`,
+					"decrypt":  `CryptoJS.AES.decrypt(word, key, {mode: CryptoJS.mode.ECB}).toString();`,
+				})
+			},
+		},
+		{
+			Path:  "/js/lib/aes/ecb/sqli/bypass",
+			Title: "CryptoJS.AES(ECB) 被前端加密的 SQL 注入(Bypass认证)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, cryptoJSlibTemplateHtml, map[string]any{
+					"url":      `/crypto/js/lib/aes/ecb/handler/sqli/bypass`,
+					"initcode": "// ignore:  var iv = CryptoJS.lib.WordArray.random(128/8);",
+					`extrakv`:  "// iv: iv.toString(),",
+					"title":    "AES(ECB PKCS7) 加密",
+					"key":      `CryptoJS.enc.Utf8.parse("1234123412341234")`,
+					"info":     "CryptoJS.AES(ECB).encrypt/decrypt，默认 PKCS7Padding，密钥长度不足16字节，以 NULL 补充，超过16字节，截断。本页面中表单有注入，使用 SQL 注入的万能密码试试看？",
+					"encrypt":  `CryptoJS.AES.encrypt(word, key, {mode: CryptoJS.mode.ECB}).toString();`,
+					"decrypt":  `CryptoJS.AES.decrypt(word, key, {mode: CryptoJS.mode.ECB}).toString();`,
+				})
+			},
+		},
+		{
 			Path: "/js/lib/aes/ecb/handler",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				raw, err := utils.HttpDumpWithBody(request, true)
@@ -380,6 +463,82 @@ setTimeout(function(){
 					blocks = append(blocks, block("用户名密码验证失败", "origin data: "+string(dataBase64D)))
 				}
 
+				DefaultRender(BlockContent(blocks...), writer, request)
+			},
+		},
+		{
+			Path: "/js/lib/aes/ecb/handler/sqli",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				raw, err := utils.HttpDumpWithBody(request, true)
+				if err != nil {
+					Failed(writer, request, "dump request failed: %v", err)
+					return
+				}
+				params := utils.ParseStringToGeneralMap(lowhttp.GetHTTPPacketBody(raw))
+				keyEncoded := utils.MapGetString(params, "key")
+				keyPlain, err := codec.DecodeHex(keyEncoded)
+				if err != nil {
+					Failed(writer, request, "key decode hex failed: %v", err)
+					return
+				}
+				dataBase64D := utils.MapGetString(params, "data")
+				dataRaw, err := codec.DecodeBase64(dataBase64D)
+				if err != nil {
+					Failed(writer, request, "decode base64 failed: %v", err)
+					return
+				}
+				dec, err := codec.AESECBDecrypt([]byte(keyPlain), dataRaw, nil)
+				if err != nil {
+					Failed(writer, request, "decrypt failed: %v", err)
+					return
+				}
+				var blocks []string
+				blocks = append(blocks, block("解密前端内容成功", string(dec)))
+				flag, ret := isLoginedFromRawViaDatabase(dec)
+				if flag {
+					blocks = append(blocks, block("用户名密码验证成功", "恭喜您，登录成功！"))
+				} else {
+					blocks = append(blocks, block("用户名密码验证失败", "origin data: "+string(dataBase64D)+" | "))
+				}
+				blocks = append(blocks, block("数据库执行额外信息", ret))
+				DefaultRender(BlockContent(blocks...), writer, request)
+			},
+		},
+		{
+			Path: "/js/lib/aes/ecb/handler/sqli/bypass",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				raw, err := utils.HttpDumpWithBody(request, true)
+				if err != nil {
+					Failed(writer, request, "dump request failed: %v", err)
+					return
+				}
+				params := utils.ParseStringToGeneralMap(lowhttp.GetHTTPPacketBody(raw))
+				keyEncoded := utils.MapGetString(params, "key")
+				keyPlain, err := codec.DecodeHex(keyEncoded)
+				if err != nil {
+					Failed(writer, request, "key decode hex failed: %v", err)
+					return
+				}
+				dataBase64D := utils.MapGetString(params, "data")
+				dataRaw, err := codec.DecodeBase64(dataBase64D)
+				if err != nil {
+					Failed(writer, request, "decode base64 failed: %v", err)
+					return
+				}
+				dec, err := codec.AESECBDecrypt([]byte(keyPlain), dataRaw, nil)
+				if err != nil {
+					Failed(writer, request, "decrypt failed: %v", err)
+					return
+				}
+				var blocks []string
+				blocks = append(blocks, block("解密前端内容成功", string(dec)))
+				flag, ret := isLoginedFromRawViaDatabase2(dec)
+				if flag {
+					blocks = append(blocks, block("用户名密码验证成功", "恭喜您，登录成功！"))
+				} else {
+					blocks = append(blocks, block("用户名密码验证失败", "origin data: "+string(dataBase64D)+" | "))
+				}
+				blocks = append(blocks, block("数据库执行额外信息", ret))
 				DefaultRender(BlockContent(blocks...), writer, request)
 			},
 		},
