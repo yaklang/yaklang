@@ -14,6 +14,12 @@ var presetEnv = map[string]string{
 	"HOME_NET": utils.GetLocalIPAddress(),
 }
 
+func init() {
+	for _, varName := range []string{"HTTP_SERVERS", "SMTP_SERVERS", "SQL_SERVERS", "DNS_SERVERS", "TELNET_SERVERS"} {
+		presetEnv[varName] = presetEnv["HOME_NET"]
+	}
+}
+
 func Parse(data string, envs ...string) ([]*Rule, error) {
 	var buf strings.Builder
 	var dataBuf = bufio.NewReader(strings.NewReader(data))
