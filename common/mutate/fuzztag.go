@@ -5,10 +5,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"io/fs"
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -2007,24 +2008,22 @@ func FileTag() []*FuzzTagDescription {
 			HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 				empty := true
 				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
-					fileRaw, err := os.ReadDir(lineFile)
-					if err != nil {
-						log.Errorf("fuzz.filedir read dir failed: %s", err)
-						continue
-					}
-					for _, info := range fileRaw {
-						if info.IsDir() {
-							continue
-						}
-						fileContent, err := os.ReadFile(filepath.Join(lineFile, info.Name()))
+					err := filesys.Recursive(lineFile, filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+						fileContent, err := os.ReadFile(s)
 						if err != nil {
-							continue
+							log.Errorf("fuzz.filedir read file failed: %s", err)
+							return nil
 						}
 						if err := tryYield(ctx, yield, string(fileContent)); err != nil {
 							return err
 						} else {
 							empty = false
 						}
+						return nil
+					}))
+					if err != nil {
+						log.Errorf("fuzz.filedir read dir failed: %s", err)
+						continue
 					}
 				}
 				if empty {

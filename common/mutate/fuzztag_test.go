@@ -1,6 +1,10 @@
 package mutate
 
 import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -387,9 +391,28 @@ func TestTagResultLimit(t *testing.T) {
 	require.Len(t, res, 10)
 }
 
-func TestName(t *testing.T) {
-	tags := GetAllFuzztags()
-	for _, tag := range tags {
-		println(tag.TagName)
+func TestFileDir(t *testing.T) {
+	tmpDir := filepath.Join(os.TempDir(), "test")
+	isExist, err := utils.PathExists(tmpDir)
+	assert.NoError(t, err)
+	if isExist {
+		os.RemoveAll(tmpDir)
 	}
+	err = os.Mkdir(filepath.Join(os.TempDir(), "test"), os.ModePerm)
+	assert.NoError(t, err)
+	expect := []string{}
+	for i := 0; i < 5; i++ {
+		f, err := os.CreateTemp(tmpDir, fmt.Sprintf("test-file%d-*.txt", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		fileContent := fmt.Sprintf("test-file%d", i)
+		expect = append(expect, fileContent)
+		f.Write([]byte(fileContent))
+		f.Close()
+	}
+
+	res, err := FuzzTagExec("{{file:dir("+tmpDir+")}}", Fuzz_WithEnableFileTag())
+	assert.NoError(t, err)
+	assert.Equal(t, expect, res)
 }
