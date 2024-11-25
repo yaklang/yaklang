@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/orderedmap"
 
 	"github.com/yaklang/yaklang/common/utils/dot"
 )
@@ -130,62 +129,10 @@ func (g *ValueGraph) theValueShouldMarshal(value *Value, id int) bool {
 	}
 }
 
-func CreateDotGraph(vals Values) (string, error) {
-	totalGraph := vals.DotGraph()
-	return totalGraph, nil
-}
-
-// deep first search for nodeID and its children to [][]id, id is string,
-// if node.Prev have more than one, add a new line
-type DeepFirst struct {
-	res     [][]string
-	current *orderedmap.OrderedMap // map[string]nil
-	graph   *ValueGraph
-}
-
-func (d *DeepFirst) deepFirst(nodeID int) {
-	if _, ok := d.current.Get(dot.NodeName(nodeID)); ok {
-		return
-	}
-	d.current.Set(dot.NodeName(nodeID), nil)
-	// d.current = append(d.current, dot.NodeName(nodeID))
-	node := d.graph.GetNodeByID(nodeID)
-	prevs := node.Prevs()
-	if len(prevs) == 0 {
-		d.res = append(d.res, d.current.Keys())
-		return
-	}
-	if len(prevs) == 1 {
-		prev := prevs[0]
-		d.deepFirst(prev)
-		return
-	}
-
-	// origin
-	current := d.current
-	tmp := make(map[int]struct{})
-	for _, prev := range prevs {
-		if _, ok := tmp[prev]; ok {
-			continue
-		}
-		tmp[prev] = struct{}{}
-		// new line
-		d.current = orderedmap.New()
-		d.current = current.Copy()
-		d.deepFirst(prev)
-	}
-}
-
 func (g *ValueGraph) DeepFirstGraph(valueID int64) [][]string {
 	nodeID, ok := g.Value2Node[valueID]
 	if !ok {
 		return nil
 	}
-	df := &DeepFirst{
-		res:     make([][]string, 0),
-		current: orderedmap.New(),
-		graph:   g,
-	}
-	df.deepFirst(nodeID)
-	return df.res
+	return dot.GraphPathPrev(g.Graph, nodeID)
 }
