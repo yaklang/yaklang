@@ -70,7 +70,21 @@ func New(maps ...any) *OrderedMap {
 }
 
 func (o *OrderedMap) Copy() *OrderedMap {
-	ret := New(o.values)
+	m := utils.InterfaceToMapInterface(o.values)
+	for k, v := range m {
+		if utils.IsNil(v) {
+			continue
+		}
+		if reflect.TypeOf(v).Kind() == reflect.Map {
+			m[k] = New(v)
+		}
+	}
+
+	ret := &OrderedMap{
+		keys:   o.keys,
+		values: m,
+	}
+
 	return ret
 }
 
