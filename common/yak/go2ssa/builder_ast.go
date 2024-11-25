@@ -238,7 +238,7 @@ func (b *astbuilder) handleImportPackage() {
 		// 手动设置range
 		ex.SetRange(b.GetRangeByToken(info.Pos))
 
-		if importp, _ := b.GetImportPackage(id); importp != nil {
+		if importp, _ := b.GetImportPackageUser(id); importp != nil {
 			for n, g := range importp.ExportValue {
 				ex.Member = append(ex.Member, g)
 				ex.MemberMap[n] = g
@@ -530,7 +530,7 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 	switch ssatyp.GetTypeKind() {
 	case ssa.StructTypeKind, ssa.InterfaceTypeKind:
 		b.AddStruct(name, ssatyp)
-		bp := b.GetAndCreateBluePrint(name)
+		bp := b.CreateBluePrintAndSetConstruct(name)
 		_ = bp
 	default:
 		aliast := ssa.NewAliasType(name, ssatyp.PkgPathString(), ssatyp)
@@ -1881,32 +1881,34 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 		libName := qul.IDENTIFIER(0).GetText()
 		typName := qul.IDENTIFIER(1).GetText()
 		lib, path := b.GetImportPackage(libName)
-		if lib == nil && path != "" { // 没有找到包，可能是golang库，也可能是package名称和导入名称不同
-			path = path + "/" + typName
-			b.NewError(ssa.Warn, TAG, PackageNotFind(libName))
-		} else if lib != nil && path != "" {
-			path = path + "/" + typName
+		path = path + "/" + typName
+
+		if lib != nil && path != "" {
 			libtype, ok := lib.GetExportType(typName)
 			if ok {
-				return HandleFullTypeNames(libtype, path)
+				return libtype
 			} else { // 找到包但没有找到类型，可能是包中引用了golang库
-				b.NewError(ssa.Warn, TAG, StructNotFind(typName))
+				if err := b.GetProgram().ImportTypeFromLib(lib, typName); err != nil {
+					b.NewError(ssa.Warn, TAG, "get namespace type fail: %s", err)
+				}
 			}
 		} else {
 			b.NewError(ssa.Error, TAG, ImportNotFind(typName))
 		}
 
-		bp := b.GetAndCreateBluePrint(typName)
-		bp.SetFullTypeNames([]string{path})
-
-		if v := b.PeekValue(libName); v != nil {
-			lv := b.CreateLocalVariable(typName)
-			rv := b.ReadMemberCallValue(v, bp.Constructor)
-			rv.SetType(HandleFullTypeNames(rv.GetType(), path))
-			b.AssignVariable(lv, rv)
+		typ, _ := lib.GetExportType(typName)
+		if bp, ok := typ.(*ssa.Blueprint); ok {
+			if v := b.PeekValue(libName); v != nil {
+				lv := b.CreateLocalVariable(typName)
+				rv := b.ReadMemberCallValue(v, bp.Constructor)
+				rv.SetType(HandleFullTypeNames(rv.GetType(), path))
+				b.AssignVariable(lv, rv)
+			}
 		}
-
-		return bp
+		if typ == nil {
+			typ = ssa.CreateAnyType()
+		}
+		return typ
 	} else {
 		name := tname.IDENTIFIER().GetText()
 		ssatyp := ssa.GetTypeByStr(name)
