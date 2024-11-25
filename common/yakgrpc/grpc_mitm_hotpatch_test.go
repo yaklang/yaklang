@@ -54,8 +54,11 @@ func TestGRPCMUSTPASS_MITM_HotPatch_Drop(t *testing.T) {
 			}
 			// load hot-patch mitm plugin
 			stream.Send(&ypb.MITMRequest{
-				SetYakScript:     true,
-				YakScriptContent: `hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) { drop() }`,
+				SetYakScript: true,
+				YakScriptContent: `hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) { drop() }
+afterRequest = func(ishttps, oreq ,req ,orsp ,rsp){
+}
+`,
 			})
 		} else if data.GetCurrentHook && len(data.GetHooks()) > 0 {
 			// send packet
