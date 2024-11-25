@@ -324,4 +324,27 @@ namespace{
 }`
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
 	})
+	t.Run("test namespace lib", func(t *testing.T) {
+		code := `<?php
+
+namespace A\B\C{
+    class test{
+        
+    }
+}
+namespace B\C\D{
+    class B{
+        
+    }
+}
+namespace B\C\D\E{
+	use A\B\C\test;
+    $t = new test();
+    println($t->a);
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `println(*<fullTypeName> as $param)`, map[string][]string{
+			"param": {"\"A.B.C.test\""},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }

@@ -23,6 +23,7 @@ var Builder ssa.Builder = &SSABuilder{}
 
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	b.SupportClass = true
+	b.GetProgram().VirtualImport = true
 	ast, err := Frontend(src, force)
 	if err != nil {
 		return err

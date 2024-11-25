@@ -185,6 +185,7 @@ func (prog *Program) SetCacheExternInstance(name string, v Value) {
 
 // create or get main function builder
 func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string) *FunctionBuilder {
+	prog.SetPackageName(pkgName)
 	fun := prog.GetAndCreateFunction(pkgName, funcName)
 	builder := fun.builder
 	if builder == nil {
@@ -192,6 +193,9 @@ func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string
 	}
 
 	return builder
+}
+func (prog *Program) SetPackageName(name string) {
+	prog.PkgName = name
 }
 
 func (prog *Program) EachFunction(handler func(*Function)) {

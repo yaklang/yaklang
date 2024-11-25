@@ -147,37 +147,6 @@ func (y *builder) GetPkgSCAVersion(pkgName string) string {
 	return ""
 }
 
-func (y *builder) AddFullTypeNameFromAnnotationMap(typName string, typ ssa.Type) ssa.Type {
-	if b, ok := ssa.ToBasicType(typ); ok {
-		typ = ssa.NewBasicType(b.Kind, b.GetName())
-		typ.SetFullTypeNames(b.GetFullTypeNames())
-	}
-
-	if typ == nil {
-		return ssa.CreateAnyType()
-	}
-
-	for _, p := range y.allImportPkgSlice {
-		str := strings.Join(p[:len(p)-1], ".")
-		switch str {
-		case "org.springframework.web.bind.annotation":
-			ok := SpringFrameworkAnnotationMap[typName]
-			if ok {
-				return y.AddFullTypeNameRaw(fmt.Sprintf("%s.%s", str, typName), typ)
-			}
-		case "javax.servlet.annotation":
-			ok := ServletAnnotationMap[typName]
-			if ok {
-				return y.AddFullTypeNameRaw(fmt.Sprintf("%s.%s", str, typName), typ)
-			}
-		default:
-			return y.AddFullTypeNameForAllImport(typName, typ)
-		}
-	}
-
-	return y.AddFullTypeNameForAllImport(typName, typ)
-}
-
 func (y *builder) HaveCastType(typ ssa.Type) bool {
 	if typ == nil {
 		return false
