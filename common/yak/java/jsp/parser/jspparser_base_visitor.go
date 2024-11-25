@@ -11,15 +11,35 @@ func (v *BaseJSPParserVisitor) VisitJspDocument(ctx *JspDocumentContext) interfa
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJSPParserVisitor) VisitJspStart(ctx *JspStartContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJSPParserVisitor) VisitJspElements(ctx *JspElementsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJSPParserVisitor) VisitJspElement(ctx *JspElementContext) interface{} {
+func (v *BaseJSPParserVisitor) VisitJspElementWithTagAndContent(ctx *JspElementWithTagAndContentContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitJspElementWithSelfClosingTag(ctx *JspElementWithSelfClosingTagContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitJspElementWithOpenTagOnly(ctx *JspElementWithOpenTagOnlyContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitHtmlTag(ctx *HtmlTagContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseJSPParserVisitor) VisitJspDirective(ctx *JspDirectiveContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitHtmlContents(ctx *HtmlContentsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

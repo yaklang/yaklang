@@ -10,14 +10,29 @@ type JSPParserVisitor interface {
 	// Visit a parse tree produced by JSPParser#jspDocument.
 	VisitJspDocument(ctx *JspDocumentContext) interface{}
 
+	// Visit a parse tree produced by JSPParser#jspStart.
+	VisitJspStart(ctx *JspStartContext) interface{}
+
 	// Visit a parse tree produced by JSPParser#jspElements.
 	VisitJspElements(ctx *JspElementsContext) interface{}
 
-	// Visit a parse tree produced by JSPParser#jspElement.
-	VisitJspElement(ctx *JspElementContext) interface{}
+	// Visit a parse tree produced by JSPParser#JspElementWithTagAndContent.
+	VisitJspElementWithTagAndContent(ctx *JspElementWithTagAndContentContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#JspElementWithSelfClosingTag.
+	VisitJspElementWithSelfClosingTag(ctx *JspElementWithSelfClosingTagContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#JspElementWithOpenTagOnly.
+	VisitJspElementWithOpenTagOnly(ctx *JspElementWithOpenTagOnlyContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#htmlTag.
+	VisitHtmlTag(ctx *HtmlTagContext) interface{}
 
 	// Visit a parse tree produced by JSPParser#jspDirective.
 	VisitJspDirective(ctx *JspDirectiveContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#htmlContents.
+	VisitHtmlContents(ctx *HtmlContentsContext) interface{}
 
 	// Visit a parse tree produced by JSPParser#htmlContent.
 	VisitHtmlContent(ctx *HtmlContentContext) interface{}
