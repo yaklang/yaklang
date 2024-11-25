@@ -30,6 +30,7 @@ type Matcher struct {
 
 type Generator struct {
 	*PCRE
+	reSyntax  *syntax.Regexp
 	generator regen.Generator
 }
 
@@ -68,6 +69,7 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 				pcre.relative = true
 			case 'U':
 				// skip
+				pcre.modifier = modifier.HTTPUri
 			case 'I':
 				if normailized {
 					pcre.modifier = modifier.HTTPUri
@@ -143,13 +145,33 @@ func (p *PCRE) StartsWith() bool {
 }
 
 func (p *PCRE) Generator() (*Generator, error) {
+	re, err := syntax.Parse(p.expr, syntax.Perl)
+	if err != nil {
+		return nil, err
+	}
 	generator, err := regen.NewGeneratorOne(p.expr, &regen.GeneratorArgs{
 		Flags: syntax.Perl,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid pcre pattern")
 	}
+	var beginText bool
+	var walkPositionControlOp func(regexpIns *syntax.Regexp)
+	walkPositionControlOp = func(regexpIns *syntax.Regexp) {
+		if regexpIns.Op == syntax.OpConcat {
+			if len(regexpIns.Sub) > 0 {
+				walkPositionControlOp(regexpIns.Sub[0])
+				return
+			}
+		}
+		if regexpIns.Op == syntax.OpBeginText {
+			beginText = true
+		}
+	}
+	walkPositionControlOp(re)
+	p.startsWith = beginText
 	return &Generator{
+		reSyntax:  re,
 		PCRE:      p,
 		generator: generator,
 	}, nil

@@ -70,15 +70,22 @@ func (m *RegexpModifier) Modify(payload *bytemap.ByteMap) error {
 	begin := 0
 	end := math.MaxInt
 
-	if m.Generator.StartsWith() {
-		begin = 0
-		end = len(content)
-	} else if m.Generator.Relative() {
-		lastpos, lastlen := payload.Last()
-		begin = lastpos + lastlen
-		end = begin + len(content)
+	if m.Generator.Relative() {
+		if m.Generator.StartsWith() {
+			lastpos, lastlen := payload.Last()
+			begin = lastpos + lastlen
+			end = begin + len(content)
+		} else {
+			lastpos, lastlen := payload.Last()
+			begin = lastpos + lastlen
+			end = begin + len(content)
+		}
+	} else {
+		if m.Generator.StartsWith() {
+			begin = 0
+			end = len(content)
+		}
 	}
-
 	allfree := payload.FindFreeRange(len(content), begin, end)
 	if len(allfree) == 0 {
 		return ErrOverFlow
