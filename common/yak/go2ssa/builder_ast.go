@@ -1026,11 +1026,22 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, syntaxBlocks ...bool) {
 		return
 	}
 
+	handleGlobal := func() {
+		if global := b.GetProgram().GlobalScope; global != nil {
+			for i, m := range global.GetAllMember() {
+				variable := b.CreateLocalVariable(i.String())
+				b.AssignVariable(variable, m)
+			}
+		}
+	}
+
 	if syntaxBlock {
 		b.BuildSyntaxBlock(func() {
+			handleGlobal()
 			b.buildStatementList(s)
 		})
 	} else {
+		handleGlobal()
 		b.buildStatementList(s)
 	}
 }
