@@ -54,8 +54,6 @@ func TestFunction_Value(t *testing.T) {
 }
 
 func TestFunction_GlobalValue(t *testing.T) {
-	// TODO: global value
-	t.Skip()
 	t.Run("global value", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -143,10 +141,10 @@ func TestFunction_GlobalValue(t *testing.T) {
 		}
 
 		func main2(){
-		    println(count) // phi(count)[1,phi(count)[3,4]]
+		    println(count) // 1
 		}
 		`, []string{
-			"phi(count)[3,4]", "phi(count)[1,phi(count)[3,4]]",
+			"phi(count)[3,4]", "1",
 		}, t)
 	})
 
@@ -166,10 +164,10 @@ func TestFunction_GlobalValue(t *testing.T) {
 		}
 
 		func main2(){
-		    println(count) // phi(count)[1,5]
+		    println(count) // 1
 		}
 		`, []string{
-			"5", "phi(count)[1,5]",
+			"5", "1",
 		}, t)
 	})
 
@@ -184,7 +182,7 @@ func TestFunction_GlobalValue(t *testing.T) {
 		}
 	
 		func main(){
-			println(count) // phi(count)[1,2]
+			println(count) // 1
 			if true {
 			    count = 3
 			}else{
@@ -193,7 +191,7 @@ func TestFunction_GlobalValue(t *testing.T) {
 			println(count) // phi(count)[3,4]
 		}
 		`, []string{
-			"2", "phi(count)[1,2]", "phi(count)[3,4]",
+			"2", "1", "phi(count)[3,4]",
 		}, t)
 	})
 
@@ -211,16 +209,15 @@ func TestFunction_GlobalValue(t *testing.T) {
 			if true {
 			    count = 3
 			}
-			println(count) // phi(count)[3,phi(count)[1,2]]
+			println(count) // phi(count)[3,1]
 		}
 
 		func main(){
-			println(count) // phi(count)[phi(count)[1,2],phi(count)[3,phi(count)[1,2]]]
+			println(count) // 1
 		}	
 
 		`, []string{
-			"2", "phi(count)[3,phi(count)[1,2]]",
-			"phi(count)[phi(count)[1,2],phi(count)[3,phi(count)[1,2]]]",
+			"2", "phi(count)[3,1]", "1",
 		}, t)
 	})
 
@@ -241,12 +238,11 @@ func TestFunction_GlobalValue(t *testing.T) {
 		}
 
 		func main(){
-			println(count) // phi(count)[phi(count)[1,2],phi(count)[3,sub(count, 1)]]
+			println(count) // 1
 		}	
 
 		`, []string{
-			"2", "phi(count)[3,sub(count, 1)]",
-			"phi(count)[phi(count)[1,2],phi(count)[3,sub(count, 1)]]",
+			"2", "phi(count)[3,sub(count, 1)]", "1",
 		}, t)
 	})
 }
