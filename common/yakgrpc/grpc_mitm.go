@@ -752,7 +752,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 			if afterRequest != nil {
-				hijackRsp = afterRequest(isHttps, httpctx.GetBareRequestBytes(req), httpctx.GetRequestBytes(req), httpctx.GetBareResponseBytes(req), httpctx.GetResponseBytes(req))
+				hijackRsp = afterRequest(isHttps, httpctx.GetBareRequestBytes(req), httpctx.GetRequestBytes(req), httpctx.GetBareResponseBytes(req), hijackRsp)
 				httpctx.SetResponseModified(req, "yaklang.hook(ex) afterRequest")
 				httpctx.SetHijackedResponseBytes(req, hijackRsp)
 			}

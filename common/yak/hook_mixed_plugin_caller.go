@@ -506,6 +506,7 @@ func (m *MixPluginCaller) CallHijackRequestWithCtx(
 	if callers.ShouldCallByName(HOOK_HijackHTTPRequest) {
 		callers.Call(
 			HOOK_HijackHTTPRequest,
+			WithCallConfigForceSync(true),
 			WithCallConfigRuntimeCtx(runtimeCtx),
 			WithCallConfigItemFuncs(
 				func() any { return isHttps },
@@ -537,6 +538,7 @@ func (m *MixPluginCaller) CallHijackResponseWithCtx(
 	if callers.ShouldCallByName(HOOK_HijackHTTPResponse) {
 		callers.Call(
 			HOOK_HijackHTTPResponse,
+			WithCallConfigForceSync(true),
 			WithCallConfigRuntimeCtx(runtimeCtx),
 			WithCallConfigItemFuncs(
 				func() any { return isHttps },
@@ -566,6 +568,7 @@ func (m *MixPluginCaller) CallHijackResponseExWithCtx(
 	callers := m.callers
 	if callers.ShouldCallByName(HOOK_HijackHTTPResponseEx) {
 		callers.Call(HOOK_HijackHTTPResponseEx,
+			WithCallConfigForceSync(true),
 			WithCallConfigRuntimeCtx(runtimeCtx),
 			WithCallConfigItemFuncs(
 				func() any { return isHttps },
