@@ -17,9 +17,9 @@ import (
 
 func TestNativeCallTypeName(t *testing.T) {
 	ssatest.Check(t, XXE_Code, func(prog *ssaapi.Program) error {
-		typeName := prog.SyntaxFlowChain(`documentBuilder<typeName> as $id;`)[0]
+		typeName := prog.SyntaxFlowChain(`documentBuilder<typeName> as $id;`, ssaapi.QueryWithEnableDebug())[0]
 		assert.Contains(t, typeName.String(), "DocumentBuilder")
-		typeName = prog.SyntaxFlowChain(`documentBuilder<fullTypeName> as $id;`)[0]
+		typeName = prog.SyntaxFlowChain(`documentBuilder<fullTypeName> as $id;`, ssaapi.QueryWithEnableDebug())[0]
 		assert.Contains(t, typeName.Show().String(), "javax.xml.parsers.DocumentBuilder")
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
@@ -80,18 +80,18 @@ public class FastJSONDemoController {
 
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
-		obj := prog.SyntaxFlowChain(`JSON<fullTypeName>?{have: 'alibaba.fastjson'} as $obj`).Show(false)
+		obj := prog.SyntaxFlowChain(`JSON<fullTypeName>?{have: 'alibaba.fastjson'} as $obj`, ssaapi.QueryWithEnableDebug()).Show(true)
 		assert.NotNil(t, obj)
 
-		obj = prog.SyntaxFlowChain(`parse*?{<getObject><fullTypeName>?{have: 'alibaba.fastjson'} } as $obj`).Show(false)
+		obj = prog.SyntaxFlowChain(`parse*?{<getObject><fullTypeName>?{have: 'alibaba.fastjson'} } as $obj`, ssaapi.QueryWithEnableDebug()).Show(true)
 		assert.NotNil(t, obj)
 
-		obj = prog.SyntaxFlowChain(`ok()?{<getCaller><getObject><fullTypeName>?{have: 'org.springframework.'} } as $obj`).Show(true)
+		obj = prog.SyntaxFlowChain(`ok()?{<getCaller><getObject><fullTypeName>?{have: 'org.springframework.'} } as $obj`, ssaapi.QueryWithEnableDebug()).Show(true)
 		assert.NotNil(t, obj)
 
-		typeName := prog.SyntaxFlowChain(`anyJSON<typeName>?{have:'JSON'} as $id;`).Show()
+		typeName := prog.SyntaxFlowChain(`anyJSON<typeName>?{have:'JSON'} as $id;`, ssaapi.QueryWithEnableDebug()).Show()
 		assert.Contains(t, typeName.String(), "JSON")
-		typeName = prog.SyntaxFlowChain(`anyJSON<fullTypeName>?{have:'JSON'} as $id`)
+		typeName = prog.SyntaxFlowChain(`anyJSON<fullTypeName>?{have:'JSON'} as $id`, ssaapi.QueryWithEnableDebug())
 		assert.Contains(t, typeName.String(), "com.alibaba.fastjson.JSON:1.2.24")
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
@@ -112,7 +112,7 @@ func TestLocalVariableDeclareTypeName(t *testing.T) {
 				public static void main(String[] args){
 					A res1 = "aaa";  
 					A res2 = 1;  				
-					var res3 = A;  
+					var res3 = A;
 					var res4 ="a";     
 					A res5 = Dog(); 
 					A test1 ,test2 = Dog();
@@ -331,14 +331,14 @@ func TestTypeNameForImportStar(t *testing.T) {
 		prog.Show()
 
 		typeName := prog.SyntaxFlowChain(`res1<typeName> as $id;`)
-		assert.Equal(t, 3, typeName.Show(false).Len())
+		assert.Equal(t, 3, typeName.Show(true).Len())
 		typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)
-		assert.Equal(t, 2, typeName.Show(false).Len())
+		assert.Equal(t, 2, typeName.Show(true).Len())
 
 		typeName = prog.SyntaxFlowChain(`res2<typeName> as $id;`)
-		assert.Equal(t, 3, typeName.Show(false).Len())
+		assert.Equal(t, 3, typeName.Show(true).Len())
 		typeName = prog.SyntaxFlowChain(`res2<fullTypeName> as $id;`)
-		assert.Equal(t, 2, typeName.Show(false).Len())
+		assert.Equal(t, 2, typeName.Show(true).Len())
 
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
@@ -462,7 +462,7 @@ public class FastJSONDemoController {
 	t.Run("test no spring framework anntation type name ", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("Test.java", `
-	package com.Annotation2.example;
+package com.Annotation2.example;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 

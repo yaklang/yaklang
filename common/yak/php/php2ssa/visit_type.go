@@ -105,13 +105,13 @@ func (y *builder) VisitPrimitiveType(raw phpparser.IPrimitiveTypeContext) ssa.Ty
 	} else if i.StringType() != nil {
 		return ssa.GetTypeByStr("string")
 	} else if i.Resource() != nil {
-		return ssa.GetTypeByStr("any")
+		return ssa.CreateAnyType()
 	} else if i.ObjectType() != nil {
-		return ssa.GetTypeByStr("any")
+		return ssa.CreateAnyType()
 	} else if i.Array() != nil {
-		return ssa.NewMapType(ssa.GetTypeByStr("any"), ssa.GetTypeByStr("any"))
+		return ssa.NewMapType(ssa.CreateAnyType(), ssa.CreateAnyType())
 	}
-	return ssa.GetTypeByStr("any")
+	return ssa.CreateAnyType()
 }
 
 func (y *builder) VisitCastOperation(raw phpparser.ICastOperationContext) ssa.Type {

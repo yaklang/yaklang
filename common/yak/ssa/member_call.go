@@ -106,16 +106,15 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 				t := NewFunctionTypeDefine(name, nil, nil, false)
 				t.SetIsMethod(true, object.GetType())
 				typ = t
-
-				objType := object.GetType()
-				if objType != nil {
-					if fts := objType.GetFullTypeNames(); len(fts) != 0 {
-						typ.SetFullTypeNames(fts)
-					}
-				}
 			}
 			if typ == nil {
 				typ = CreateAnyType()
+			}
+			objType := object.GetType()
+			if objType != nil {
+				if fts := objType.GetFullTypeNames(); len(fts) != 0 {
+					typ.SetFullTypeNames(fts)
+				}
 			}
 		}
 		if typ != nil {
@@ -133,6 +132,7 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		} else {
 			un.Kind = UndefinedMemberInValid
 		}
+
 		return un
 	}
 	// normal method

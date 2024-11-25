@@ -144,12 +144,12 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		declareStatement()
 	case hasName && !y.PreHandler():
 		// this statenment should effect on outter
+		namespace, f := switchToNamespace()
+		f()
+		currentProg := y.GetProgram()
+		y.SetProgram(namespace)
 		normalStatement()
-		_, f := switchToNamespace()
-		defer f()
-		// this statement should effect namespace inner
-		// normalStatement()
-
+		y.SetProgram(currentProg)
 	case !hasName && !y.PreHandler():
 		prog.PkgName = namespaceName
 		// build this un-name namespace

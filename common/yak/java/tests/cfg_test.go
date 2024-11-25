@@ -640,5 +640,4 @@ func TestJavaBasic_Variable_While(t *testing.T) {
 			"phi(i)[0,add(i, 1)]",
 		}, t)
 	})
-
 }
