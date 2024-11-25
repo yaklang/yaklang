@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -2003,10 +2005,9 @@ func FileTag() []*FuzzTagDescription {
 		{
 			TagName: "file:dir",
 			HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
-				s = strings.Trim(s, " ()")
 				empty := true
 				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
-					fileRaw, err := ioutil.ReadDir(lineFile)
+					fileRaw, err := os.ReadDir(lineFile)
 					if err != nil {
 						log.Errorf("fuzz.filedir read dir failed: %s", err)
 						continue
@@ -2015,7 +2016,7 @@ func FileTag() []*FuzzTagDescription {
 						if info.IsDir() {
 							continue
 						}
-						fileContent, err := ioutil.ReadFile(info.Name())
+						fileContent, err := os.ReadFile(filepath.Join(lineFile, info.Name()))
 						if err != nil {
 							continue
 						}
