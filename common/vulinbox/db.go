@@ -129,6 +129,28 @@ func newDBM() (*dbm, error) {
 		Role:     "user",
 		Remake:   "我是用户",
 	})
+	db.Save(&VulinUser{
+		Username: "user1111",
+		Password: "123456",
+		Age:      25,
+		Role:     "user",
+		Remake:   "我是用户",
+	})
+	db.Save(&VulinUser{
+		Username: "user_2",
+		Password: "666666",
+		Age:      25,
+		Role:     "user",
+		Remake:   "我是用户",
+	})
+	db.Save(&VulinUser{
+		Username: "user_8",
+		Password: "88888888",
+		Age:      25,
+		Role:     "user",
+		Remake:   "我是用户",
+	})
+	// 生成随机用户
 	for _, u := range generateRandomUsers(20) {
 		db.Save(&u)
 	}
@@ -201,7 +223,9 @@ func (s *dbm) GetUserById(i int) (*VulinUser, error) {
 }
 
 func (s *dbm) GetUserByUsernameUnsafe(i string) ([]map[string]interface{}, error) {
-	res, err := s.UnsafeSqlQuery(`select * from vulin_users where username = '` + i + "';")
+	sqli := `select * from vulin_users where username = '` + i + "';"
+	log.Info("Do GetUserByUsernameUnsafe: " + sqli)
+	res, err := s.UnsafeSqlQuery(sqli)
 	if err != nil || len(res) == 0 {
 		return nil, err
 	}
