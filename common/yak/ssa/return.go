@@ -218,7 +218,7 @@ func (f *Function) Finish() {
 	for _, se := range f.SideEffects {
 		if se.Modify.GetBlock() != nil {
 			scope := se.Modify.GetBlock().ScopeTable
-			if ret := GetHeadVariableFromScope(scope, se.Name); ret != nil {
+			if ret := GetLocalVariableFromScope(scope, se.Name); ret != nil {
 				if ret.GetLocal() {
 					continue
 				}

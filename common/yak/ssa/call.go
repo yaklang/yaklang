@@ -297,12 +297,9 @@ func (c *Call) handleCalleeFunction() {
 
 			// is object
 			if se.MemberCallKind == NoMemberCall {
-				// TODO: 不应该查找head，应该遍历当前scope
-				if ret := currentScope.GetHeadVariable(se.Name); ret != nil {
-					if ret.GetLocal() {
-						if modifyScope.IsSameOrSubScope(ret.GetScope()) {
-							continue
-						}
+				if ret := GetLocalVariableFromScope(currentScope, se.Name); ret != nil {
+					if modifyScope.IsSameOrSubScope(ret.GetScope()) {
+						continue
 					}
 				}
 
@@ -338,7 +335,7 @@ func (c *Call) handleCalleeFunction() {
 				}
 
 				CheckSideEffect := func(find *Variable) {
-					if find.GetScope() == bindScope {
+					if bindScope.IsSameOrSubScope(find.GetScope()) {
 						AddSideEffect()
 					} else {
 						SetCapturedSideEffect()
@@ -351,10 +348,10 @@ func (c *Call) handleCalleeFunction() {
 				}
 
 				obj := se.parameterMemberInner
-				if ret := GetHeadVariableFromScope(currentScope, se.Name); ret != nil {
+				if ret := GetVariableFromScope(currentScope, se.Name); ret != nil {
 					CheckSideEffect(ret)
 					continue
-				} else if ret := GetHeadVariableFromScope(currentScope, obj.ObjectName); ret != nil {
+				} else if ret := GetVariableFromScope(currentScope, obj.ObjectName); ret != nil {
 					CheckSideEffect(ret)
 					continue
 				} else if obj.ObjectName == "this" {
@@ -369,10 +366,10 @@ func (c *Call) handleCalleeFunction() {
 
 				if block := function.GetBlock(); block != nil {
 					functionScope := block.ScopeTable
-					if ret := GetHeadVariableFromScope(functionScope, se.Name); ret != nil {
+					if ret := GetLocalVariableFromScope(functionScope, se.Name); ret != nil {
 						CheckSideEffect(ret)
 					} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
-						if ret := GetHeadVariableFromScope(functionScope, obj.ObjectName); ret != nil {
+						if ret := GetLocalVariableFromScope(functionScope, obj.ObjectName); ret != nil {
 							CheckSideEffect(ret)
 						} else {
 							AddSideEffect()

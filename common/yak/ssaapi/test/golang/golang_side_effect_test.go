@@ -262,10 +262,40 @@ func Test_SideEffect_Bind(t *testing.T) {
 	t.Run("side-effect nesting bind", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 			b #-> as $b
-			c  #->as $c
+			c #-> as $c
 	`, map[string][]string{
 			"b": {"2", "20"},
 			"c": {"10"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	code = `package main
+
+func main() {
+	a := 1
+	{
+		a = 2
+		a := 3
+		f1 := func() {
+			a = 4
+		}
+		f1()
+		b := a
+		{
+			a = 5
+		}
+		f1()
+		c := a
+	}
+}`
+
+	t.Run("side-effect muti nesting bind", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+			b #-> as $b
+			c #-> as $c
+	`, map[string][]string{
+			"b": {"4"},
+			"c": {"4"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }
