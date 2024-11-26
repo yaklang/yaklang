@@ -7,6 +7,10 @@ type BaseJSPParserVisitor struct {
 	*antlr.BaseParseTreeVisitor
 }
 
+func (v *BaseJSPParserVisitor) VisitJspDocuments(ctx *JspDocumentsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJSPParserVisitor) VisitJspDocument(ctx *JspDocumentContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -19,15 +23,11 @@ func (v *BaseJSPParserVisitor) VisitJspElements(ctx *JspElementsContext) interfa
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJSPParserVisitor) VisitJspElementWithTagAndContent(ctx *JspElementWithTagAndContentContext) interface{} {
+func (v *BaseJSPParserVisitor) VisitJspElement(ctx *JspElementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJSPParserVisitor) VisitJspElementWithSelfClosingTag(ctx *JspElementWithSelfClosingTagContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJSPParserVisitor) VisitJspElementWithOpenTagOnly(ctx *JspElementWithOpenTagOnlyContext) interface{} {
+func (v *BaseJSPParserVisitor) VisitHtmlBegin(ctx *HtmlBeginContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
