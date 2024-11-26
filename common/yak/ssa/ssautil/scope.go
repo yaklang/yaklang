@@ -29,7 +29,7 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	// read value by name
 	ReadValue(name string) T
 
-	GetHeadVariable(name string) VersionedIF[T]
+	GetVariables(name string) []VersionedIF[T]
 
 	// create variable, if isLocal is true, the variable is local
 	CreateVariable(name string, isLocal bool) VersionedIF[T]
@@ -294,7 +294,11 @@ func (v *ScopedVersionedTable[T]) getLatestVersionInCurrentLexicalScope(name str
 }
 
 func (v *ScopedVersionedTable[T]) getHeadVersionInCurrentLexicalScope(name string) VersionedIF[T] {
-	return v.linkValues.Head(name)
+	return v.linkValues.GetHead(name)
+}
+
+func (v *ScopedVersionedTable[T]) getAllVersionInCurrentLexicalScope(name string) []VersionedIF[T] {
+	return v.linkValues.GetAll(name)
 }
 
 func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
@@ -328,16 +332,14 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 	return ret
 }
 
-func (scope *ScopedVersionedTable[T]) GetHeadVariable(name string) VersionedIF[T] {
-	var ret VersionedIF[T]
+func (scope *ScopedVersionedTable[T]) GetVariables(name string) []VersionedIF[T] {
+	var ret []VersionedIF[T]
 
-	if result := scope.getHeadVersionInCurrentLexicalScope(name); result != nil {
-		ret = result
-	} else {
+	if result := scope.getAllVersionInCurrentLexicalScope(name); result != nil {
+		ret = append(result, ret...)
+
 		if scope.GetParent() != nil {
-			ret = scope.GetParent().GetHeadVariable(name)
-		} else {
-			ret = nil
+			ret = append(ret, scope.GetParent().GetVariables(name)...)
 		}
 	}
 	return ret
@@ -374,10 +376,10 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 
 	// capture variable
 	if !variable.GetLocal() && !scope.IsRoot() {
-		if ret := scope.GetHeadVariable(variable.GetName()); ret == nil {
-			return
-		} else if ret.GetLocal() {
-			return
+		for _, variable := range scope.GetVariables(variable.GetName()) {
+			if variable.GetLocal() {
+				return
+			}
 		}
 		scope.tryRegisterCapturedVariable(variable.GetName(), variable)
 	}

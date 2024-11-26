@@ -45,6 +45,14 @@ func (n *LinkNode[T]) First() VersionedIF[T] {
 	return n.header.value
 }
 
+func (n *LinkNode[T]) All() []VersionedIF[T] {
+	var ret []VersionedIF[T]
+	for current := n.header; current != nil; current = current.next {
+		ret = append([]VersionedIF[T]{current.value}, ret...)
+	}
+	return ret
+}
+
 type linkNodeMap[T versionedValue] struct {
 	val      map[string]*LinkNode[T]
 	callBack linkNodeCallback[T]
@@ -69,7 +77,14 @@ func (m linkNodeMap[T]) Get(key string) VersionedIF[T] {
 	return nil
 }
 
-func (m linkNodeMap[T]) Head(key string) VersionedIF[T] {
+func (m linkNodeMap[T]) GetAll(key string) []VersionedIF[T] {
+	if v, ok := m.val[key]; ok {
+		return v.All()
+	}
+	return nil
+}
+
+func (m linkNodeMap[T]) GetHead(key string) VersionedIF[T] {
 	if v, ok := m.val[key]; ok {
 		return v.First()
 	}
