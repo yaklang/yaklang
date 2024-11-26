@@ -1,9 +1,11 @@
 package test
 
 import (
+	"embed"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
+	"io/fs"
 	"testing"
 )
 
@@ -15,7 +17,11 @@ func TestJSP2Java_Content(t *testing.T) {
 	}{
 		{"test  JspElementWithOpenTagOnly pure text  ", "<html>", []string{"out = request.getOut(); ", `out.write("<html>")`}},
 		{"test JspElementWithClosingTagOnly pure text  ", "<html/>", []string{`out.write("<html/>");`}},
-		{"test JspElementWithTagAndContent pure text  ", "<title>hello</title>", []string{`out.write("<title>hello</title>");`}},
+		{"test JspElementWithTagAndContent pure text  ", "<title>hello</title>", []string{`out.write("<title>");`, `out.write("hello");`, `out.write("</title>");`}},
+		{"test jsp java script", "<%\n    int sum = 5 + 10;\n    out.println(\"Sum is: \" + sum);\n%>", []string{"int sum = 5 + 10;", "out.println(\"Sum is: \" + sum);"}},
+		{"test jsp expression script", `<%= request.getParameter("userInput") %>`, []string{`out.print( request.getParameter("userInput") )`}},
+		{"test jsp declaration script", `<%! int count = 0; %>`, []string{`int count = 0;`}},
+		{"test jsp directive script import", `<%@ page import="java.util.*, com.example.model.User" %>`, []string{`import  com.example.model.User;`, `import java.util.*;`}},
 		{"test jstl-core out tag", "<c:out value='${name}'/>", []string{`name = request.getAttribute("name");`, `out.print(escapeHtml(name));`}},
 		{"test jstl-core out tag without escaping", "<c:out value='${name}' escapeXml=\"false\"/>", []string{`name = request.getAttribute("name");`, `out.print(name);`}},
 	}

@@ -10,6 +10,9 @@ const (
 	OpPureText Opcode = iota
 	OpOutput
 	OpEscapeOutput
+	OpPureOutPut
+	OpPureCode
+	OpImport
 )
 
 type Instruction struct {

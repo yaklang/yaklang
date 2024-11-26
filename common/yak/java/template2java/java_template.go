@@ -19,6 +19,21 @@ type JavaTemplate struct {
 	builder strings.Builder
 }
 
+func (t *JavaTemplate) WriteImport(path string) {
+	backUp := t.builder.String()
+	t.builder.Reset()
+	t.builder.WriteString("import " + path + ";\r\n")
+	t.builder.WriteString(backUp)
+}
+
+func (t *JavaTemplate) WritePureOut(expression string) {
+	t.builder.WriteString("\tout.print(" + expression + ");\r\n")
+}
+
+func (t *JavaTemplate) WritePureCode(code string) {
+	t.builder.WriteString("\t" + code + "\r\n")
+}
+
 func (t *JavaTemplate) String() string {
 	return t.builder.String()
 }

@@ -15,6 +15,9 @@ type TemplateRender interface {
 	WritePureText(text string)         // Just writing text, usually used to write HTML content in templates
 	WriteOutput(variable string)       // Write output, usually used to write variables in templates
 	WriteEscapeOutput(variable string) // Write variables to the template output, but they will be HTML escaped
+	WritePureCode(code string)         // Write pure code, usually used to write Java code in templates
+	WritePureOut(expression string)    // Write pure out, usually used to write Java out in templates
+	WriteImport(path string)           // Write import dependency statement
 	String() string
 	Finish()
 }
