@@ -19,6 +19,22 @@ type JavaTemplate struct {
 	builder strings.Builder
 }
 
+func (t *JavaTemplate) WriteIfStmt(condition string) {
+	t.builder.WriteString("\tif(" + condition + ") {\r\n")
+}
+
+func (t *JavaTemplate) WriteBlock(block string) {
+	t.builder.WriteString("\t{\n" + block + "\t}\r\n")
+}
+
+func (t *JavaTemplate) WriteElseIfStmt(condition string) {
+	t.builder.WriteString("\telse if(" + condition + ") {\r\n")
+}
+
+func (t *JavaTemplate) WriteElseStmt() {
+	t.builder.WriteString("\telse \r\n")
+}
+
 func (t *JavaTemplate) WriteImport(path string) {
 	backUp := t.builder.String()
 	t.builder.Reset()

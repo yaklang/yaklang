@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/java/template2java"
@@ -46,6 +47,7 @@ func TestCreateJavaTemplate(t *testing.T) {
 			jt.WriteOutput("var1")
 			jt.WriteEscapeOutput("var2")
 			jt.Finish()
+			fmt.Println(jt.String())
 			checkJavaFront(t, jt.String())
 			for _, want := range tt.wants {
 				require.Contains(t, jt.String(), want)

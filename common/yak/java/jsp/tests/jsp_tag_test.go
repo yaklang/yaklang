@@ -23,5 +23,4 @@ func TestJSPAST(t *testing.T) {
 			visitor.VisitJspDocuments(ast.JspDocuments())
 		})
 	}
-
 }

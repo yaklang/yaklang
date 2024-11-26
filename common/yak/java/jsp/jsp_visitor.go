@@ -148,10 +148,11 @@ func (y *JSPVisitor) VisitJspElement(raw jspparser.IJspElementContext) {
 	}
 
 	if i.CLOSE_TAG_BEGIN() != nil {
-		// open and close tag
-		y.ParseSingleTag(i.HtmlBegin().GetText() + i.TAG_CLOSE(0).GetText())
-		y.VisitHtmlContent(i.HtmlContent())
-		y.ParseSingleTag(i.CLOSE_TAG_BEGIN().GetText() + i.HtmlTag().GetText() + i.TAG_CLOSE(1).GetText())
+		openTag := i.HtmlBegin().GetText() + i.TAG_CLOSE(0).GetText()
+		closedTag := i.CLOSE_TAG_BEGIN().GetText() + i.HtmlTag().GetText() + i.TAG_CLOSE(1).GetText()
+		y.ParseDoubleTag(openTag, closedTag, func() {
+			y.VisitHtmlContents(i.HtmlContents())
+		})
 	} else {
 		// only open tag
 		y.ParseSingleTag(i.GetText())
@@ -178,6 +179,24 @@ func (y *JSPVisitor) VisitHtmlBegin(raw jspparser.IHtmlBeginContext) {
 		attrs[key] = value
 	}
 	y.PushTagInfo(tag, attrs)
+}
+
+func (y *JSPVisitor) VisitHtmlContents(raw jspparser.IHtmlContentsContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i := raw.(*jspparser.HtmlContentsContext)
+	if i == nil {
+		return
+	}
+	for _, content := range i.AllHtmlContent() {
+		y.VisitHtmlContent(content)
+	}
+	for _, data := range i.AllHtmlChardata() {
+		y.VisitHtmlCharData(data)
+	}
 }
 
 func (y *JSPVisitor) VisitHtmlTag(raw jspparser.IHtmlTagContext) (tagType TagType) {
@@ -246,18 +265,16 @@ func (y *JSPVisitor) VisitHtmlContent(raw jspparser.IHtmlContentContext) {
 	}
 	if i.JspExpression() != nil {
 
-	} else if i.JspElement() != nil {
-
+	} else if i.JspElements() != nil {
+		y.VisitJspElements(i.JspElements())
 	} else if i.XhtmlCDATA() != nil {
 
 	} else if i.HtmlComment() != nil {
 
 	} else if i.Scriptlet() != nil {
-
+		y.VisitScriptlet(i.Scriptlet())
 	} else if i.JspDirective() != nil {
-
-	} else if i.HtmlChardata() != nil {
-		y.ParseSingleTag(i.HtmlChardata().GetText())
+		y.VisitJspDirective(i.JspDirective())
 	}
 }
 
@@ -316,4 +333,27 @@ func (y *JSPVisitor) VisitJspDirective(raw jspparser.IJspDirectiveContext) {
 	y.PushTagInfo(tag, attrs)
 	defer y.PopTagInfo()
 	y.ParseSingleTag(i.GetText())
+}
+
+func (y *JSPVisitor) VisitHtmlCharData(raw jspparser.IHtmlChardataContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i := raw.(*jspparser.HtmlChardataContext)
+	if i == nil {
+		return
+	}
+	for _, data := range i.AllHTML_TEXT() {
+		texts := data.GetText()
+		for _, text := range strings.Split(texts, "\n") {
+			text = strings.TrimSpace(text)
+			y.EmitPureText(text)
+		}
+	}
+	if el := i.EL_EXPR(); el != nil {
+		expr := y.fixElExpr(el.GetText())
+		y.EmitPureOutput(expr)
+	}
 }

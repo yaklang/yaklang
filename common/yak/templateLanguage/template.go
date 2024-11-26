@@ -18,6 +18,7 @@ type TemplateRender interface {
 	WritePureCode(code string)         // Write pure code, usually used to write Java code in templates
 	WritePureOut(expression string)    // Write pure out, usually used to write Java out in templates
 	WriteImport(path string)           // Write import dependency statement
+
 	String() string
 	Finish()
 }

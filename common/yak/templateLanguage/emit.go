@@ -35,3 +35,31 @@ func (y *Visitor) EmitImport(path string) {
 	inst.Text = path
 	y.Instructions = append(y.Instructions, inst)
 }
+
+type IfBuilder struct {
+	items     []*conditionItem
+	elseBlock string
+}
+
+type conditionItem struct {
+	condition string
+	block     string
+}
+
+func (ib *IfBuilder) SetIfCondition(condition, block string) {
+	ib.items = append(ib.items, &conditionItem{condition, block})
+}
+
+func (ib *IfBuilder) SetElse(block string) {
+	ib.elseBlock = block
+}
+
+func (y *Visitor) NewIfBuilder() *IfBuilder {
+	return &IfBuilder{}
+}
+
+func (y *Visitor) EmitIfStatement(builder *IfBuilder) {
+	inst := newInstruction(OpIfStmt, y.CurrentRange)
+	inst.ifBuilder = builder
+	y.Instructions = append(y.Instructions, inst)
+}
