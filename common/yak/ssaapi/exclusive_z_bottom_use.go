@@ -13,18 +13,7 @@ func (v *Value) GetBottomUses(opt ...OperationOption) Values {
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = v
 	ret := v.getBottomUses(actx, opt...)
-	mapx := make(map[int64]*Value)
-	for _, value := range ret {
-		if v, exit := mapx[value.GetId()]; exit {
-			//todo: 是否有其他数据
-			v.EffectOn = append(v.EffectOn, value.EffectOn...)
-			v.DependOn = append(v.DependOn, value.DependOn...)
-			v.Predecessors = append(v.Predecessors, value.Predecessors...)
-			continue
-		}
-		mapx[value.GetId()] = value
-	}
-	return lo.Values(mapx)
+	return MergeValues(ret)
 }
 
 func (v Values) GetBottomUses(opts ...OperationOption) Values {
@@ -32,7 +21,7 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 	for _, sub := range v {
 		ret = append(ret, sub.GetBottomUses(opts...)...)
 	}
-	return ret
+	return MergeValues(ret)
 }
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {

@@ -11,31 +11,16 @@ import (
 
 var _ ValueOperator = &ValueList{}
 
-func MergeValues(values ...ValueOperator) ValueOperator {
-	return NewValues(values)
-}
-
 func NewValues(values []ValueOperator) ValueOperator {
-	v := &ValueList{values: values}
-	tmp := make(map[int64]struct{})
-	vs := make([]ValueOperator, 0, len(values))
-	v.Recursive(func(operator ValueOperator) error {
-		if canGetID, ok := operator.(interface{ GetId() int64 }); ok {
-			//value filter by id
-			id := canGetID.GetId()
-			if id == -1 {
-				vs = append(vs, operator)
-			} else if _, ok := tmp[id]; !ok {
-				tmp[canGetID.GetId()] = struct{}{}
-				vs = append(vs, operator)
-			}
-		} else {
-			vs = append(vs, operator)
-		}
+	if len(values) == 0 {
 		return nil
-	})
-	// flat
-	return &ValueList{values: vs}
+	}
+
+	ret, err := values[0].Merge(values[0:]...)
+	if err != nil {
+		return nil
+	}
+	return ret
 }
 
 func NewEmptyValues() ValueOperator {
@@ -53,7 +38,18 @@ func (v *ValueList) AppendPredecessor(value ValueOperator, opts ...AnalysisConte
 }
 
 func (v *ValueList) Merge(values ...ValueOperator) (ValueOperator, error) {
-	return MergeValues(append(v.values, values...)...), nil
+	var res []ValueOperator
+	v.Recursive(func(operator ValueOperator) error {
+		res = append(res, operator)
+		return nil
+	})
+	for _, value := range values {
+		value.Recursive(func(vo ValueOperator) error {
+			res = append(res, vo)
+			return nil
+		})
+	}
+	return NewValues(res), nil
 }
 
 func (v *ValueList) Remove(values ...ValueOperator) (ValueOperator, error) {

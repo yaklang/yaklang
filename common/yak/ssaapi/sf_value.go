@@ -72,10 +72,9 @@ func (v *Value) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.Va
 }
 
 func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	var vals []sfvm.ValueOperator
-	vals = append(vals, v)
-	vals = append(vals, sf...)
-	return sfvm.NewValues(vals), nil
+	sf = append(sf, v)
+	vals := MergeValues(SyntaxFlowVariableToValues(sf...))
+	return vals, nil
 }
 
 func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
