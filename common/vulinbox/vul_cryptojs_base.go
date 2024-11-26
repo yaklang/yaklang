@@ -1059,6 +1059,9 @@ setTimeout(function(){
 			},
 		},
 	}
+
+	cryptoRoutes = append(cryptoRoutes, s.getEncryptSQLinj()...)
+
 	for _, v := range cryptoRoutes {
 		addRouteWithVulInfo(cryptoGroup, v)
 	}

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users</title>
+    <link rel="stylesheet" href="/static/js/bootstrap_5.3/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/highlightjs/default.min.css">
+    <script>
+        function handle404(event) {
+            console.error(event.target.src + " not found")
+        }
+    </script>
+    <script src="/static/js/cryptojs_4.0.0/crypto-js.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/jsrsasign/jsrsasign-all-min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/marked.min.js"></script>
+    <script src="/static/js/highlightjs/highlight.min.js"></script>
+    <style>
+        .container {
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .search-box {
+            margin-bottom: 20px;
+        }
+        .search-box input {
+            padding: 8px;
+            width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f5f5f5;
+        }
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .logout-btn {
+            padding: 8px 16px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .logout-btn:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-container">
+            <h1>用户列表</h1>
+            <button class="logout-btn" onclick="logout()">登出</button>
+        </div>
+        
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="搜索用户...">
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>用户名</th>
+                    <th>年龄</th>
+                </tr>
+            </thead>
+            <tbody id="userTableBody">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // 加密请求数据函数
+        function encryptRequest(data) {
+            const generateRandomHex = (length) => {
+                const bytes = new Uint8Array(length);
+                crypto.getRandomValues(bytes);
+                return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+            };
+
+            const key = generateRandomHex(16);
+            const iv = generateRandomHex(16);
+
+            const message = CryptoJS.AES.encrypt(
+                JSON.stringify(data),
+                CryptoJS.enc.Hex.parse(key),
+                {
+                    iv: CryptoJS.enc.Hex.parse(iv),
+                    mode: CryptoJS.mode.CBC,
+                    padding: CryptoJS.pad.Pkcs7
+                }
+            ).toString();
+
+            return {
+                key: key,
+                iv: iv,
+                message: message
+            };
+        }
+
+        // 解密响应数据函数
+        function decryptResponse(data) {
+            const decrypted = CryptoJS.AES.decrypt(
+                data.message,
+                CryptoJS.enc.Hex.parse(data.key),
+                {
+                    iv: CryptoJS.enc.Hex.parse(data.iv),
+                    mode: CryptoJS.mode.CBC,
+                    padding: CryptoJS.pad.Pkcs7
+                }
+            );
+            
+            return JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
+        }
+        // 登出函数
+        function logout() {
+            // 请求登出接口
+            fetch('./logout')
+                .then(() => {
+                    // 清除本地cookie
+                    document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                    // 跳转到登录页
+                    window.location.href = "./login";
+                });
+        }
+
+        // 加载用户数据
+        function loadUsers(searchTerm = '') {
+            const requestData = {
+                search: searchTerm
+            };
+
+            const encryptedData = encryptRequest(requestData);
+
+            // 创建并显示提示气泡
+            const showToast = (message, isError = false) => {
+                const toast = document.createElement('div');
+                toast.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 25px;
+                    background: ${isError ? '#ff4444' : '#44b544'};
+                    color: white;
+                    border-radius: 4px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    z-index: 1000;
+                    transition: opacity 0.3s;
+                `;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+
+                // 3秒后淡出消失
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            };
+
+            fetch('./query/users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(encryptedData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                const decryptedData = decryptResponse(data);
+                if (decryptedData.error) {
+                    throw new Error(decryptedData.error);
+                }
+                
+                const tableBody = document.getElementById('userTableBody');
+                tableBody.innerHTML = '';
+                
+                decryptedData.users.forEach(user => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${user.id}</td>
+                        <td>${user.username}</td>
+                        <td>${user.age}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+                showToast('数据加载成功');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('加载用户数据失败: ' + error.message, true);
+            });
+        }
+
+        // 页面加载时获取用户数据
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUsers();
+        });
+
+        // 搜索框防抖
+        let debounceTimer;
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                loadUsers(e.target.value);
+            }, 300);
+        });
+    </script>
+</body>
+</html>
