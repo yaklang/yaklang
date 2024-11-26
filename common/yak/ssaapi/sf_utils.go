@@ -87,30 +87,32 @@ func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.
 	return newValue
 }
 
-func SyntaxFlowVariableToValues(v sfvm.ValueOperator) Values {
-	var vals Values
-	err := v.Recursive(func(operator sfvm.ValueOperator) error {
-		switch ret := operator.(type) {
-		case *Value:
-			vals = append(vals, ret)
-		case Values:
-			vals = append(vals, ret...)
-		case *sfvm.ValueList:
-			values, err := SFValueListToValues(ret)
-			if err != nil {
-				log.Warnf("cannot handle type: %T error: %v", operator, err)
-			} else {
-				vals = append(vals, values...)
+func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
+	var rets Values
+	for _, v := range vs {
+		err := v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				rets = append(rets, ret)
+			case Values:
+				rets = append(rets, ret...)
+			case *sfvm.ValueList:
+				values, err := SFValueListToValues(ret)
+				if err != nil {
+					log.Warnf("cannot handle type: %T error: %v", operator, err)
+				} else {
+					rets = append(rets, values...)
+				}
+			default:
+				log.Warnf("cannot handle type: %T", operator)
 			}
-		default:
-			log.Warnf("cannot handle type: %T", operator)
+			return nil
+		})
+		if err != nil {
+			log.Warnf("SyntaxFlowToValues: %v", err)
 		}
-		return nil
-	})
-	if err != nil {
-		log.Warnf("SyntaxFlowToValues: %v", err)
 	}
-	return vals
+	return rets
 }
 
 func SFValueListToValues(list *sfvm.ValueList) (Values, error) {

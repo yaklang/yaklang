@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -17,16 +19,20 @@ func (v Values) FullUseDefChain(h func(*Value)) {
 	}
 }
 
-func (i Values) AppendEffectOn(v *Value) Values {
-	for _, node := range i {
-		node.AppendEffectOn(v)
+func (i Values) AppendEffectOn(vs ...*Value) Values {
+	for _, v := range vs {
+		for _, node := range i {
+			node.AppendEffectOn(v)
+		}
 	}
 	return i
 }
 
-func (i Values) AppendDependOn(v *Value) Values {
-	for _, node := range i {
-		node.AppendDependOn(v)
+func (i Values) AppendDependOn(vs ...*Value) Values {
+	for _, v := range vs {
+		for _, node := range i {
+			node.AppendDependOn(v)
+		}
 	}
 	return i
 }
@@ -60,58 +66,55 @@ func (v *Value) GetDepth() int {
 	return 0
 }
 
-func (v *Value) AppendDependOn(i *Value) *Value {
-	if v.GetId() == i.GetId() {
-		return v
-	}
-
-	var existed bool
-	for _, node := range v.DependOn {
-		if node.GetId() == i.GetId() {
-			existed = true
-			break
+func (i *Value) AppendDependOn(vs ...*Value) *Value {
+	for _, v := range vs {
+		if i.GetId() == v.GetId() {
+			return i
 		}
+		i.DependOn = utils.AppendSliceItemWhenNotExists(i.DependOn, v)
+		v.EffectOn = utils.AppendSliceItemWhenNotExists(v.EffectOn, i)
 	}
-	if !existed {
-		v.DependOn = append(v.DependOn, i)
-	}
-	existed = false
-	for _, node := range i.EffectOn {
-		if node.GetId() == v.GetId() {
-			existed = true
-			break
-		}
-	}
-	if !existed {
-		i.EffectOn = append(i.EffectOn, v)
-	}
-	return v
+	return i
 }
 
-func (v *Value) AppendEffectOn(i *Value) *Value {
-	if v.GetId() == i.GetId() {
-		return v
+func (i *Value) AppendEffectOn(vs ...*Value) *Value {
+	for _, v := range vs {
+		if i.GetId() == v.GetId() {
+			return i
+		}
+		i.EffectOn = utils.AppendSliceItemWhenNotExists(i.EffectOn, v)
+		v.DependOn = utils.AppendSliceItemWhenNotExists(v.DependOn, i)
 	}
+	return i
+}
 
-	var existed bool
-	for _, node := range v.EffectOn {
-		if node.GetId() == i.GetId() {
-			existed = true
-			break
+func MergeValues(vs ...Values) Values {
+	mapx := make(map[int64]*Value)
+	checkAndMerge := func(v *Value) {
+		if exist, has := mapx[v.GetId()]; has {
+			// merge v to existValue
+			for _, effect := range v.EffectOn {
+				exist.AppendEffectOn(effect)
+				effect.DependOn = utils.RemoveSliceItem(effect.DependOn, v)
+			}
+
+			for _, depend := range v.DependOn {
+				exist.AppendDependOn(depend)
+				depend.EffectOn = utils.RemoveSliceItem(depend.EffectOn, v)
+			}
+
+			for _, pred := range v.Predecessors {
+				exist.Predecessors = utils.AppendSliceItemWhenNotExists(exist.Predecessors, pred)
+			}
+		} else {
+			// set v is exist
+			mapx[v.GetId()] = v
 		}
 	}
-	if !existed {
-		v.EffectOn = append(v.EffectOn, i)
-	}
-	existed = false
-	for _, node := range i.DependOn {
-		if node.GetId() == v.GetId() {
-			existed = true
-			break
+	for _, vs := range vs {
+		for _, v := range vs {
+			checkAndMerge(v)
 		}
 	}
-	if !existed {
-		i.DependOn = append(i.DependOn, v)
-	}
-	return v
+	return lo.Values(mapx)
 }

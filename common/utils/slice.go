@@ -25,3 +25,10 @@ func ReplaceSliceItem[T comparable](s []T, t T, to T) []T {
 	}
 	return s
 }
+
+func AppendSliceItemWhenNotExists[T comparable](s []T, t T) []T {
+	if slices.Contains(s, t) {
+		return s
+	}
+	return append(s, t)
+}
