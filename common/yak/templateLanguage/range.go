@@ -13,6 +13,9 @@ type CanStartStopToken interface {
 }
 
 func (y *Visitor) SetRange(token CanStartStopToken) func() {
+	if y.Editor == nil {
+		return func() {}
+	}
 	r := GetRange(y.Editor, token)
 	if r == nil {
 		return func() {}

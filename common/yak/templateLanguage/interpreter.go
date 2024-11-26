@@ -1,7 +1,6 @@
 package templateLanguage
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
@@ -13,8 +12,8 @@ type Interpreter struct {
 	idx           int
 	templateTyp   TemplateTyp
 	generatedCode string
-	// for fix java range
-	rangeMap  map[int]memedit.RangeIf // java code line -> template range
+	// for fix  range
+	rangeMap  map[int]memedit.RangeIf // generated code line -> template range
 	startLine int
 }
 
@@ -70,15 +69,14 @@ func (i *Interpreter) SetStartLine() {
 	i.startLine = i.GetCurrentLine()
 }
 
-func (i *Interpreter) GenerateCode() {
+func (i *Interpreter) GenerateCode() (err error) {
 	if i == nil || i.GetTemplate() == nil {
-		log.Errorf("interpreter or template is nil")
-		return
+		return utils.Errorf("interpreter or template is nil")
 	}
 	defer func() {
-		if err := recover(); err != nil {
-			ret := utils.Errorf("generate code panic: %v", err)
-			log.Infof("%+v", ret)
+		if rec := recover(); err != nil {
+			err = utils.Errorf("failed to generate code, got: %v", rec)
+			return
 		}
 	}()
 	for {
@@ -95,10 +93,19 @@ func (i *Interpreter) GenerateCode() {
 			i.template.WriteOutput(ins.Text)
 		case OpEscapeOutput:
 			i.template.WriteEscapeOutput(ins.Text)
+		case OpPureOutPut:
+			i.template.WritePureOut(ins.Text)
+		case OpPureCode:
+			i.template.WritePureCode(ins.Text)
+		case OpImport:
+			i.template.WriteImport(ins.Text)
+		default:
+			return utils.Errorf("unknown opcode: %v", ins.Opcode)
 		}
 		i.SetRangeMap()
 		i.idx++
 	}
 	i.template.Finish()
 	i.generatedCode = i.template.String()
+	return nil
 }

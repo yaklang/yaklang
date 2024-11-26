@@ -80,7 +80,10 @@ func ConvertTemplateToJava(typ JavaTemplateType, content, filePath string) (tl.T
 	}
 	interpreter := tl.NewInterpreter(visitor.GetInstructions())
 	interpreter.SetTemplate(t)
-	interpreter.GenerateCode()
+	err = interpreter.GenerateCode()
+	if err != nil {
+		return nil, err
+	}
 	info := &GeneratedJavaInfo{
 		pkgName:       t.pkgName,
 		className:     t.className,

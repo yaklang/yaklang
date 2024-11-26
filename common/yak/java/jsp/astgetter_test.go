@@ -90,7 +90,7 @@ func TestGetAST(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jspEq := result.JspDocument()
+	jspEq := result.JspDocuments()
 	if jspEq == nil {
 		t.Fatal("jspEq is nil")
 	}
