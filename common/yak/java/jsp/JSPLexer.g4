@@ -11,6 +11,7 @@ JSP_COMMENT_END
 JSP_COMMENT_START_TAG
     :'<!--'
     ;
+HTML_TEXT: ~'<'+;
 
 JSP_COMMENT_END_TAG
     : '-->'
@@ -217,11 +218,15 @@ DTD_TAG_CLOSE
 mode JSP_BLOB;
 
 BLOB_CLOSE
-   : CLOSE_TAG -> popMode
+   : JSP_END -> popMode
    ;
 
 BLOB_CONTENT
-    : .
+    : BLOB_CONTENT_FRAGMENT+
+    ;
+
+fragment BLOB_CONTENT_FRAGMENT
+    : ~('<' | '%' | '>' )
     ;
 
 mode IN_JSP_EXPRESSION;
@@ -233,6 +238,8 @@ JSPEXPR_CONTENT
 JSPEXPR_CONTENT_CLOSE
     : ('}' | '%>') -> popMode
     ;
+
+
 
 //
 // tag declarations
@@ -254,7 +261,7 @@ SUB_END_TAG_OPEN:
 
 
 TAG_CLOSE
-    : CLOSE_TAG -> type(TAG_END),popMode
+    : CLOSE_TAG -> popMode
     ;
 
 TAG_SLASH
@@ -461,10 +468,8 @@ fragment DECCHARS
     ;
 
 EL_EXPR
-    : '${' ~[<}]* '}'
+    : '${' ~[}]* '}'
     ;
-
-
 
 fragment ESCAPED_SINGLE_QUOTE
     : '\\\''

@@ -36,3 +36,23 @@ func TestJSP2Java_Content(t *testing.T) {
 		})
 	}
 }
+
+//go:embed jspcode/*
+var jspDir embed.FS
+
+func TestRealJsp(t *testing.T) {
+	dirEntries, err := fs.ReadDir(jspDir, "jspcode")
+	require.NoError(t, err)
+	for _, entry := range dirEntries {
+		if !entry.IsDir() {
+			path := "jspcode/" + entry.Name()
+			content, err := fs.ReadFile(jspDir, path)
+			require.NoError(t, err)
+			codeInfo, err := tj.ConvertTemplateToJava(tj.JSP, string(content), path)
+			require.NoError(t, err)
+			require.NotNil(t, codeInfo)
+			fmt.Println(codeInfo.GetContent())
+			checkJavaFront(t, codeInfo.GetContent())
+		}
+	}
+}
