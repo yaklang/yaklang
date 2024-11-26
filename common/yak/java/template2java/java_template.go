@@ -19,25 +19,13 @@ type JavaTemplate struct {
 	builder strings.Builder
 }
 
-func (t *JavaTemplate) WriteIfStmt(condition string) {
-	t.builder.WriteString("\tif(" + condition + ") {\r\n")
-}
-
-func (t *JavaTemplate) WriteBlock(block string) {
-	t.builder.WriteString("\t{\n" + block + "\t}\r\n")
-}
-
-func (t *JavaTemplate) WriteElseIfStmt(condition string) {
-	t.builder.WriteString("\telse if(" + condition + ") {\r\n")
-}
-
-func (t *JavaTemplate) WriteElseStmt() {
-	t.builder.WriteString("\telse \r\n")
-}
-
 func (t *JavaTemplate) WriteImport(path string) {
-	backUp := t.builder.String()
+	origin := t.builder.String()
+	lines := strings.Split(origin, "\r\n")
+	pkgDel := lines[0]
+	backUp := strings.Join(lines[1:], "\r\n")
 	t.builder.Reset()
+	t.builder.WriteString(pkgDel + "\r\n")
 	t.builder.WriteString("import " + path + ";\r\n")
 	t.builder.WriteString(backUp)
 }
@@ -55,6 +43,7 @@ func (t *JavaTemplate) String() string {
 }
 
 func (t *JavaTemplate) WritePureText(text string) {
+	text = strings.ReplaceAll(text, "\"", "\\\"")
 	t.builder.WriteString("\tout.write(\"" + text + "\");\r\n")
 }
 
@@ -68,7 +57,6 @@ func (t *JavaTemplate) WriteOutput(variable string) {
 }
 
 func (t *JavaTemplate) WriteEscapeOutput(variable string) {
-	t.WriteGetAttribute(variable)
 	t.builder.WriteString("\tout.print(escapeHtml(" + variable + "));\r\n")
 }
 
