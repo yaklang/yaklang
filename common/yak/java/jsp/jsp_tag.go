@@ -1,6 +1,7 @@
 package jsp
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"strings"
 )
@@ -86,7 +87,7 @@ func (y *JSPVisitor) ParseSingleTag(text string) {
 			log.Errorf("JSTL out tag must have value attribute")
 			return
 		}
-		variable := y.extractELExpression(elExpr)
+		variable := y.fixElExpr(elExpr)
 
 		// check escapeXml attribute
 		var noEscape bool
@@ -98,11 +99,49 @@ func (y *JSPVisitor) ParseSingleTag(text string) {
 		} else {
 			y.EmitEscapeOutput(variable)
 		}
+	case JSP_TAG_CORE_SET:
+		variable, ok := tagInfo.attrs["var"]
+		if !ok {
+			log.Errorf("JSTL set tag must have var attribute")
+			return
+		}
+		elExpr, ok := tagInfo.attrs["value"]
+		value := y.fixElExpr(elExpr)
+		y.EmitPureCode("request.setAttribute(\"" + variable + "\", " + value + ");")
 	default:
 		log.Errorf("Unknown JSTL tag type: %v", tagInfo.typ)
 	}
 }
 
-func (y *JSPVisitor) extractELExpression(expr string) string {
-	return strings.Trim(expr, "${}")
+func (y *JSPVisitor) ParseDoubleTag(openTag string, closedTag string, visitContent func()) {
+	tagInfo := y.PeekTagInfo()
+	if tagInfo == nil {
+		return
+	}
+	switch tagInfo.typ {
+	case JSP_TAG_PURE_HTML:
+		y.EmitPureText(openTag)
+		visitContent()
+		y.EmitPureText(closedTag)
+	case JSP_TAG_CORE_IF:
+		condition, ok := tagInfo.attrs["test"]
+		if !ok {
+			log.Errorf("JSTL if tag must have test attribute")
+			return
+		}
+		condition = y.fixElExpr(condition)
+		y.EmitPureCode("if (" + condition + ") {")
+		visitContent()
+		y.EmitPureCode("}")
+	default:
+		log.Errorf("Unknown JSTL tag type: %v", tagInfo.typ)
+	}
+}
+
+func (y *JSPVisitor) fixElExpr(expr string) string {
+	expr = strings.TrimSpace(expr)
+	if strings.HasPrefix(expr, "${") && strings.HasSuffix(expr, "}") {
+		expr = fmt.Sprintf("elExpr.parse(%s)", expr)
+	}
+	return expr
 }

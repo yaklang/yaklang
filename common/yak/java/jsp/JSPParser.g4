@@ -23,7 +23,7 @@ jspElements
     ;
 
 jspElement
-    :htmlBegin  (TAG_CLOSE (htmlContent CLOSE_TAG_BEGIN htmlTag TAG_CLOSE)? | TAG_SLASH_END)
+    :htmlBegin  (TAG_CLOSE (htmlContents CLOSE_TAG_BEGIN htmlTag TAG_CLOSE)? | TAG_SLASH_END)
     ;
 
 htmlBegin
@@ -43,9 +43,8 @@ htmlContents
     ;
 
 htmlContent
-    : htmlChardata
-    | jspExpression
-    | jspElement
+    : jspExpression
+    | jspElements
     | xhtmlCDATA
     | htmlComment
     | scriptlet
@@ -89,13 +88,14 @@ htmlChardata
     : JSP_STATIC_CONTENT_CHARS_MIXED
     | JSP_STATIC_CONTENT_CHARS
     | WHITESPACES
-    | HTML_TEXT
+    | HTML_TEXT? EL_EXPR? HTML_TEXT?
     ;
 
 htmlMisc
     : htmlComment
     | jspExpression
     | scriptlet
+    | WHITESPACES
     ;
 
 htmlComment

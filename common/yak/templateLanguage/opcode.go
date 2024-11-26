@@ -13,6 +13,7 @@ const (
 	OpPureOutPut
 	OpPureCode
 	OpImport
+	OpIfStmt
 )
 
 type Instruction struct {
@@ -20,6 +21,8 @@ type Instruction struct {
 	Attributes map[string]string
 	Text       string
 	Range      memedit.RangeIf
+
+	ifBuilder *IfBuilder
 }
 
 func newInstruction(opcode Opcode, insRange ...memedit.RangeIf) *Instruction {

@@ -53,7 +53,6 @@
     <!-- 5. 循环和条件判断 -->
     <div class="section">
         <h2>5. 循环和条件判断示例</h2>
-        <% List<User> users = (List<User>)request.getAttribute("users"); %>
         <% if(users != null && !users.isEmpty()) { %>
             <table border="1">
                 <tr>

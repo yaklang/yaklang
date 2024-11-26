@@ -11,7 +11,12 @@ JSP_COMMENT_END
 JSP_COMMENT_START_TAG
     :'<!--'
     ;
-HTML_TEXT: ~'<'+;
+
+WHITESPACES
+    :  (' ' | '\t' | '\r'? '\n')+
+    ;
+
+HTML_TEXT: ~('<'|'$')+;
 
 JSP_COMMENT_END_TAG
     : '-->'
@@ -77,9 +82,8 @@ EXPRESSION_OPEN
     : ('${'|'#{') ->pushMode(IN_JSP_EXPRESSION)
     ;
 
-WHITESPACES
-    :  (' '|'\t'|'\r'? '\n')+
-    ;
+
+
 
 DOUBLE_QUOTE
     : '"'
