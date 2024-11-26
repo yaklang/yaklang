@@ -1,13 +1,15 @@
-
-
 parser grammar JSPParser;
 
 options { tokenVocab=JSPLexer; }
 
+jspDocuments
+    : jspDocument+
+    ;
+
 jspDocument
     : jspStart* xml
     | jspStart* dtd
-    | jspStart* jspElements*
+    | jspStart* jspElements+
     ;
 
 jspStart
@@ -21,9 +23,11 @@ jspElements
     ;
 
 jspElement
-    : TAG_BEGIN htmlTag htmlAttribute* TAG_END htmlContents CLOSE_TAG_BEGIN htmlTagName TAG_END # JspElementWithTagAndContent
-    | TAG_BEGIN htmlTag htmlAttribute* TAG_SLASH_END                                            # JspElementWithSelfClosingTag
-    | TAG_BEGIN htmlTag htmlAttribute* TAG_END                                                  # JspElementWithOpenTagOnly
+    :htmlBegin  (TAG_CLOSE (htmlContent CLOSE_TAG_BEGIN htmlTag TAG_CLOSE)? | TAG_SLASH_END)
+    ;
+
+htmlBegin
+    :TAG_BEGIN htmlTag htmlAttribute*
     ;
 
 htmlTag
@@ -31,11 +35,11 @@ htmlTag
     ;
 
 jspDirective
-    : DIRECTIVE_BEGIN name=htmlTagName atts+=htmlAttribute*? TAG_WHITESPACE* DIRECTIVE_END
+    : DIRECTIVE_BEGIN htmlTagName htmlAttribute*? TAG_WHITESPACE* DIRECTIVE_END
     ;
 
 htmlContents
-    : htmlContent*
+    : htmlChardata?  (htmlContent htmlChardata?)*
     ;
 
 htmlContent
@@ -49,7 +53,7 @@ htmlContent
     ;
 
 jspExpression
-    : EL_EXPR
+    :  EL_EXPR
     ;
 
 htmlAttribute
@@ -85,11 +89,11 @@ htmlChardata
     : JSP_STATIC_CONTENT_CHARS_MIXED
     | JSP_STATIC_CONTENT_CHARS
     | WHITESPACES
+    | HTML_TEXT
     ;
 
 htmlMisc
     : htmlComment
-    | htmlChardata
     | jspExpression
     | scriptlet
     ;
@@ -128,4 +132,7 @@ xml: XML_DECLARATION name=htmlTagName atts+=htmlAttribute*? TAG_END
     ;
 
 scriptlet
-    : SCRIPTLET_OPEN BLOB_CONTENT JSP_END    ;
+    : SCRIPTLET_OPEN BLOB_CONTENT BLOB_CLOSE
+    | ECHO_EXPRESSION_OPEN  BLOB_CONTENT BLOB_CLOSE
+    | DECLARATION_BEGIN BLOB_CONTENT BLOB_CLOSE
+    ;

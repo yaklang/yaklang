@@ -7,6 +7,9 @@ import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
 type JSPParserVisitor interface {
 	antlr.ParseTreeVisitor
 
+	// Visit a parse tree produced by JSPParser#jspDocuments.
+	VisitJspDocuments(ctx *JspDocumentsContext) interface{}
+
 	// Visit a parse tree produced by JSPParser#jspDocument.
 	VisitJspDocument(ctx *JspDocumentContext) interface{}
 
@@ -16,14 +19,11 @@ type JSPParserVisitor interface {
 	// Visit a parse tree produced by JSPParser#jspElements.
 	VisitJspElements(ctx *JspElementsContext) interface{}
 
-	// Visit a parse tree produced by JSPParser#JspElementWithTagAndContent.
-	VisitJspElementWithTagAndContent(ctx *JspElementWithTagAndContentContext) interface{}
+	// Visit a parse tree produced by JSPParser#jspElement.
+	VisitJspElement(ctx *JspElementContext) interface{}
 
-	// Visit a parse tree produced by JSPParser#JspElementWithSelfClosingTag.
-	VisitJspElementWithSelfClosingTag(ctx *JspElementWithSelfClosingTagContext) interface{}
-
-	// Visit a parse tree produced by JSPParser#JspElementWithOpenTagOnly.
-	VisitJspElementWithOpenTagOnly(ctx *JspElementWithOpenTagOnlyContext) interface{}
+	// Visit a parse tree produced by JSPParser#htmlBegin.
+	VisitHtmlBegin(ctx *HtmlBeginContext) interface{}
 
 	// Visit a parse tree produced by JSPParser#htmlTag.
 	VisitHtmlTag(ctx *HtmlTagContext) interface{}
