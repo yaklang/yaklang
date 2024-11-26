@@ -26,7 +26,7 @@ func TestGraph(t *testing.T) {
 				// for test 1: A->B
 				target1(b.get());
 				// for test 2: B->A
-				b.show(1);
+				b.show(b.get());
 			}
 		}
 		`)
@@ -81,7 +81,7 @@ HOOK
 		start := time.Now()
 		valueMem := res.GetValues("para_top_def")
 		require.NotNil(t, valueMem)
-		require.Greater(t, len(valueMem), 0)
+		require.Equal(t, len(valueMem), 1)
 		value := valueMem[0]
 		graph := ssaapi.NewValueGraph(value)
 		dotStr := graph.Dot()
@@ -99,7 +99,7 @@ HOOK
 	{
 		start := time.Now()
 		valueDB := result.GetValues("para_top_def")
-		require.Greater(t, len(valueDB), 0)
+		require.Equal(t, len(valueDB), 1)
 		value := valueDB[0]
 		graphDB := ssaapi.NewValueGraph(value)
 		dotStrDB := graphDB.Dot()
@@ -110,8 +110,10 @@ HOOK
 		dbPath = graphDB.DeepFirstGraph(value.GetId())
 		// dbTime = since
 	}
+	log.Infof("memory path: %v", memPath)
+	log.Infof("db path: %v", dbPath)
 
-	// require.True(t, memTime*20 > dbTime)
+	require.Equal(t, len(memPath), 2)
 	require.Equal(t, len(memPath), len(dbPath))
 }
 

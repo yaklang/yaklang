@@ -164,13 +164,10 @@ func (value Values) ListIndex(i int) (sfvm.ValueOperator, error) {
 	return value[i], nil
 }
 
-func (value Values) Merge(values ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	var results []sfvm.ValueOperator
-	if value != nil {
-		results = append(results, value)
-	}
-	results = append(results, values...)
-	return sfvm.NewValues(results), nil
+func (vs Values) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+	sf = append(sf, vs)
+	vals := MergeValues(SyntaxFlowVariableToValues(sf...))
+	return ValuesToSFValueList(vals), nil
 }
 
 func (value Values) Remove(values ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
