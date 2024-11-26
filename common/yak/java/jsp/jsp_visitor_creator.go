@@ -18,6 +18,6 @@ func (b *VisitorCreator) Create(editor *memedit.MemEditor) (tl.TemplateVisitor, 
 	if err != nil {
 		return nil, utils.Errorf("failed to get jsp.AST, got: %T", err)
 	}
-	visitor.VisitJspDocument(ast.JspDocument())
+	visitor.VisitJspDocuments(ast.JspDocuments())
 	return visitor, nil
 }

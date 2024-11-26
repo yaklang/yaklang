@@ -8,7 +8,9 @@ import (
 type TagType int
 
 const (
-	JSP_TAG_PURE_HTML TagType = iota
+	JSP_TAG_PURE_HTML TagType = 1 + iota
+	// jsp directive tag
+	JSP_DIRECTIVE_PAGE
 
 	// core tags
 	JSP_TAG_CORE_OUT
@@ -52,10 +54,34 @@ func (y *JSPVisitor) GetCoreJSTLTag(name string) TagType {
 	return -1
 }
 
-func (y *JSPVisitor) ParseTag(tag TagType, attrs map[string]string) {
-	switch tag {
+func (y *JSPVisitor) GetDirectiveTag(name string) TagType {
+	switch name {
+	case "page":
+		return JSP_DIRECTIVE_PAGE
+	}
+	return -1
+}
+
+// ParseSingleTag parse only open or close tag
+func (y *JSPVisitor) ParseSingleTag(text string) {
+	tagInfo := y.PeekTagInfo()
+	if tagInfo == nil {
+		return
+	}
+	switch tagInfo.typ {
+	case JSP_TAG_PURE_HTML:
+		y.EmitPureText(text)
+	case JSP_DIRECTIVE_PAGE:
+		value, ok := tagInfo.attrs["import"]
+		if ok {
+			paths := strings.Split(value, ",")
+			for _, path := range paths {
+				y.EmitImport(path)
+			}
+		}
+		return
 	case JSP_TAG_CORE_OUT:
-		elExpr, ok := attrs["value"]
+		elExpr, ok := tagInfo.attrs["value"]
 		if !ok {
 			log.Errorf("JSTL out tag must have value attribute")
 			return
@@ -64,16 +90,16 @@ func (y *JSPVisitor) ParseTag(tag TagType, attrs map[string]string) {
 
 		// check escapeXml attribute
 		var noEscape bool
-		if v, ok := attrs["escapeXml"]; ok {
+		if v, ok := tagInfo.attrs["escapeXml"]; ok {
 			noEscape = v == "false"
 		}
 		if noEscape {
-			y.EmitOutput(variable, y.CurrentRange)
+			y.EmitOutput(variable)
 		} else {
-			y.EmitEscapeOutput(variable, y.CurrentRange)
+			y.EmitEscapeOutput(variable)
 		}
 	default:
-		log.Errorf("Unknown JSTL tag type: %v", tag)
+		log.Errorf("Unknown JSTL tag type: %v", tagInfo.typ)
 	}
 }
 

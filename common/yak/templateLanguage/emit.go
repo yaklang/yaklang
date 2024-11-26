@@ -1,21 +1,37 @@
 package templateLanguage
 
-import "github.com/yaklang/yaklang/common/utils/memedit"
-
-func (t *Visitor) EmitPureText(text string, currentRange ...memedit.RangeIf) {
-	inst := newInstruction(OpPureText, currentRange...)
+func (y *Visitor) EmitPureText(text string) {
+	inst := newInstruction(OpPureText, y.CurrentRange)
 	inst.Text = text
-	t.Instructions = append(t.Instructions, inst)
+	y.Instructions = append(y.Instructions, inst)
 }
 
-func (t *Visitor) EmitOutput(variable string, currentRange ...memedit.RangeIf) {
-	inst := newInstruction(OpOutput, currentRange...)
+func (y *Visitor) EmitOutput(variable string) {
+	inst := newInstruction(OpOutput, y.CurrentRange)
 	inst.Text = variable
-	t.Instructions = append(t.Instructions, inst)
+	y.Instructions = append(y.Instructions, inst)
 }
 
-func (t *Visitor) EmitEscapeOutput(variable string, currentRange ...memedit.RangeIf) {
-	inst := newInstruction(OpEscapeOutput, currentRange...)
+func (y *Visitor) EmitEscapeOutput(variable string) {
+	inst := newInstruction(OpEscapeOutput, y.CurrentRange)
 	inst.Text = variable
-	t.Instructions = append(t.Instructions, inst)
+	y.Instructions = append(y.Instructions, inst)
+}
+
+func (y *Visitor) EmitPureOutput(expression string) {
+	inst := newInstruction(OpPureOutPut, y.CurrentRange)
+	inst.Text = expression
+	y.Instructions = append(y.Instructions, inst)
+}
+
+func (y *Visitor) EmitPureCode(code string) {
+	inst := newInstruction(OpPureCode, y.CurrentRange)
+	inst.Text = code
+	y.Instructions = append(y.Instructions, inst)
+}
+
+func (y *Visitor) EmitImport(path string) {
+	inst := newInstruction(OpImport, y.CurrentRange)
+	inst.Text = path
+	y.Instructions = append(y.Instructions, inst)
 }

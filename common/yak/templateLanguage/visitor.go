@@ -20,6 +20,6 @@ func NewVisitor() *Visitor {
 	return &Visitor{}
 }
 
-func (v *Visitor) GetInstructions() Instructions {
-	return v.Instructions
+func (y *Visitor) GetInstructions() Instructions {
+	return y.Instructions
 }
