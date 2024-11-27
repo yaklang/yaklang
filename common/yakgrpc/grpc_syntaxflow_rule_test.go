@@ -9,20 +9,20 @@ import (
 	"testing"
 )
 
+func createSfRule(client ypb.YakClient, ruleName string) error {
+	rule := &ypb.CreateSyntaxFlowRuleRequest{
+		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+			RuleName: ruleName,
+			Language: "java",
+		},
+	}
+	_, err := client.CreateSyntaxFlowRule(context.Background(), rule)
+	return err
+}
+
 func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
-
-	createRule := func(ruleName string) {
-		rule := &ypb.CreateSyntaxFlowRuleRequest{
-			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
-				RuleName: ruleName,
-				Language: "java",
-			},
-		}
-		_, err := client.CreateSyntaxFlowRule(context.Background(), rule)
-		require.NoError(t, err)
-	}
 
 	queryRulesCount := func() int {
 		req := &ypb.QuerySyntaxFlowRuleRequest{
@@ -56,13 +56,44 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		}
 	}
 
+	queryRulesId := func(ruleName []string) []int64 {
+		req := &ypb.QuerySyntaxFlowRuleRequest{
+			Pagination: &ypb.Paging{Limit: -1},
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: ruleName,
+			},
+		}
+		rsp, err := client.QuerySyntaxFlowRule(context.Background(), req)
+		require.NoError(t, err)
+		var ids []int64
+		for _, rule := range rsp.GetRule() {
+			require.NotEqual(t, rule.GetId(), int64(0))
+			ids = append(ids, rule.GetId())
+		}
+		return ids
+	}
+
+	queryRulesById := func(fromId, utilId int64) []*ypb.SyntaxFlowRule {
+		req := &ypb.QuerySyntaxFlowRuleRequest{
+			Pagination: &ypb.Paging{Limit: -1},
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				FromId:  fromId,
+				UntilId: utilId,
+			},
+		}
+		rsp, err := client.QuerySyntaxFlowRule(context.Background(), req)
+		require.NoError(t, err)
+		return rsp.GetRule()
+	}
+
 	t.Run("test create and delete syntax flow rule", func(t *testing.T) {
 		var ruleNames []string
 
 		beforeCreateCount := queryRulesCount()
 		for i := 0; i < 100; i++ {
 			ruleName := fmt.Sprintf("test_%s.sf", uuid.NewString())
-			createRule(ruleName)
+			err := createSfRule(client, ruleName)
+			require.NoError(t, err)
 			ruleNames = append(ruleNames, ruleName)
 		}
 		afterCreateCount := queryRulesCount()
@@ -79,7 +110,8 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		beforeCreateCount := queryRulesCount()
 		for i := 0; i < 100; i++ {
 			ruleName := fmt.Sprintf("test_%s.sf", uuid.NewString())
-			createRule(ruleName)
+			err := createSfRule(client, ruleName)
+			require.NoError(t, err)
 			ruleNames = append(ruleNames, ruleName)
 		}
 		afterCreateCount := queryRulesCount()
@@ -124,4 +156,32 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		deleteRuleByNames([]string{ruleName})
 	})
 
+	t.Run("test query infinite list", func(t *testing.T) {
+		var ruleNames []string
+		for i := 0; i < 100; i++ {
+			ruleName := fmt.Sprintf("test_%s.sf", uuid.NewString())
+			err = createSfRule(client, ruleName)
+			require.NoError(t, err)
+			ruleNames = append(ruleNames, ruleName)
+		}
+		ids := queryRulesId(ruleNames)
+		require.Equal(t, len(ids), 100)
+		rules := queryRulesById(ids[20], ids[60])
+		require.Equal(t, len(rules), 40)
+		deleteRuleByNames(ruleNames)
+	})
+}
+
+func TestGRPCMUSTPASS_SyntaxFlow_Get_Support_Language(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	t.Run("get support language", func(t *testing.T) {
+		rsp, err := client.QuerySyntaxFlowSupportLanguage(context.Background(), &ypb.Empty{})
+		require.NoError(t, err)
+		require.Contains(t, rsp.GetLanguages(), "Yak")
+		require.Contains(t, rsp.GetLanguages(), "Java")
+		require.Contains(t, rsp.GetLanguages(), "PHP")
+		require.Contains(t, rsp.GetLanguages(), "Golang")
+	})
 }
