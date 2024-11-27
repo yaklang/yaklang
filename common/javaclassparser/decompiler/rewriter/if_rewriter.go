@@ -18,6 +18,10 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 	trueNode := ifNode.TrueNode()
 	falseNode := ifNode.FalseNode()
 	//ifNode.RemoveAllNext()
+	if trueNode == falseNode {
+		trueNode = nil
+		trueNode = nil
+	}
 	domNodes := utils2.NodeFilter(ifNode.Next, func(node *core.Node) bool {
 		return slices.Contains(manager.DominatorMap[ifNode], node)
 	})

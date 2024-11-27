@@ -873,7 +873,7 @@ func (p *JavaSerializationParser) readStringUTF(r io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	raw, err = utils.ParseJavaOverLongString(raw)
+	raw, err = utils.SimplifyUtf8(raw)
 	if err != nil {
 		return "", err
 	}
