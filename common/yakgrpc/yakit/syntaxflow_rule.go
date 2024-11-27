@@ -25,6 +25,17 @@ func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*
 	return paging, ret, nil
 }
 
+func QuerySyntaxFlowRuleNames(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter) ([]string, error) {
+	if filter == nil {
+		return nil, utils.Error("query syntax flow rule names failed: filter is nil")
+	}
+	db = db.Model(&schema.SyntaxFlowRule{})
+	db = FilterSyntaxFlowRule(db, filter)
+	var names []string
+	db.Pluck("rule_name", &names)
+	return names, db.Error
+}
+
 func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.DB {
 	if params == nil {
 		return db
@@ -48,7 +59,12 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 			"rule_name", "title", "title_zh", "description", "content", "tag",
 		}, []string{params.GetKeyword()}, false)
 	}
-
+	if params.GetFromId() > 0 {
+		db = db.Where("id > ?", params.GetFromId())
+	}
+	if params.GetUntilId() > 0 {
+		db = db.Where("id <= ?", params.GetUntilId())
+	}
 	return db
 }
 
