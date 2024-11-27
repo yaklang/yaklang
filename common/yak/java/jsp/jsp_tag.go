@@ -137,6 +137,36 @@ func (y *JSPVisitor) ParseDoubleTag(openTag string, closedTag string, visitConte
 		y.EmitPureCode("if (" + condition + ") {")
 		visitContent()
 		y.EmitPureCode("}")
+	case JSP_TAG_CORE_CHOOSE:
+		y.EmitPureCode("switch (true) {")
+		visitContent()
+		y.EmitPureCode("}")
+	case JSP_TAG_CORE_WHEN:
+		condition, ok := tagInfo.attrs["test"]
+		if !ok {
+			log.Errorf("JSTL when tag must have test attribute")
+			return
+		}
+		condition = y.fixElExpr(condition)
+		y.EmitPureCode("case " + condition + ":")
+		visitContent()
+	case JSP_TAG_CORE_OTHERWISE:
+		y.EmitPureCode("default:")
+		visitContent()
+	case JSP_TAG_CORE_FOREACH:
+		variable, ok := tagInfo.attrs["var"]
+		if !ok {
+			log.Errorf("JSTL foreach tag must have var attribute")
+			return
+		}
+		items, ok := tagInfo.attrs["items"]
+		if !ok {
+			log.Errorf("JSTL foreach tag must have items attribute")
+			return
+		}
+		y.EmitPureCode("for (Object " + variable + " : " + items + ") {")
+		visitContent()
+		y.EmitPureCode("}")
 	default:
 		log.Errorf("Unknown JSTL tag type: %v", tagInfo.typ)
 	}

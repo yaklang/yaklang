@@ -36,6 +36,29 @@ func TestJSP2Java_Content(t *testing.T) {
 			[]string{`if (elExpr.parse("${sessionScope.userType == 'admin'}")) {`, `out.write("<p>");`, `out.print(elExpr.parse("${sessionScope.userType}"));`, `out.write("Welcome, Admin! Your user type is:");`},
 		},
 		//core choose tag
+		{"test jstl-core choose tag ", `<c:choose>
+    <c:when test="${valueToSwitch eq 'case1'}">
+        <!-- 当valueToSwitch等于'case1'时的代码 -->
+        Value is case1
+    </c:when>
+    <c:when test="${valueToSwitch eq 'case2'}">
+        <!-- 当valueToSwitch等于'case2'时的代码 -->
+        Value is case2
+    </c:when>
+    <c:when test="${valueToSwitch eq 'case3'}">
+        <!-- 当valueToSwitch等于'case3'时的代码 -->
+        Value is case3
+    </c:when>
+    <c:otherwise>
+        <!-- 当valueToSwitch不匹配任何case时的代码 -->
+        Value does not match any case
+    </c:otherwise>
+</c:choose>`, []string{"switch (true) {", "case elExpr.parse(\"${valueToSwitch eq 'case1'}\"):", "out.write(\"Value is case1\");", "default:"},
+		},
+		{"test jstl-core foreach tag ", ` 
+		<c:forEach var="item" items="${items}">
+        <li>${item}</li>
+   	 	</c:forEach>`, []string{"a"}},
 	}
 	check := func(jspCode string, wants []string) {
 		codeInfo, err := tj.ConvertTemplateToJava(tj.JSP, jspCode, "test.jsp")
@@ -45,7 +68,7 @@ func TestJSP2Java_Content(t *testing.T) {
 		fmt.Print(codeInfo.GetContent())
 		checkJavaFront(t, codeInfo.GetContent())
 		for _, want := range wants {
-			require.Contains(t, codeInfo.GetContent(), want)
+			require.Contains(t, codeInfo.GetContent(), want, "want: %s", want)
 		}
 	}
 	for _, tt := range tests {
