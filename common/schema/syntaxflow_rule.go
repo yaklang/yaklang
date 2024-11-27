@@ -182,6 +182,7 @@ func (s *SyntaxFlowRule) GetAlertInfo(msg string) (*SyntaxFlowDescInfo, bool) {
 
 func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
 	sfRule := &ypb.SyntaxFlowRule{
+		Id:            int64(s.ID),
 		IsBuildInRule: s.IsBuildInRule,
 		Language:      s.Language,
 		RuleName:      s.RuleName,
