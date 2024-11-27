@@ -10,3 +10,4 @@ rsp = http.Do(req)~
 assert rsp.StatusCode == 200
 rsp = http.Post(f"https://127.0.0.1:${port}", http.body("aaa=bbb"))~
 assert rsp.StatusCode == 200
+

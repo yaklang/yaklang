@@ -2,6 +2,7 @@ package poc
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"reflect"
@@ -475,6 +476,37 @@ func WithRuntimeId(r string) PocConfigOption {
 func WithFromPlugin(b string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.FromPlugin = b
+	}
+}
+
+// json 是一个请求选项参数，用于指定请求的 body 为 json 格式，需要传入一个任意类型的参数，会自动转换为 json 格式
+// Example:
+// ```
+// poc.Post("https://www.example.com", poc.json({"a": "b"})) // 向 www.example.com 发起请求，请求的 body 为 {"a": "b"} 并自动设置 Content-Type 为 application/json
+// ```
+func WithJSON(i any) PocConfigOption {
+	raw, err := json.Marshal(i)
+	if err != nil {
+		log.Errorf("poc WithJson Failed: %v", err)
+		return func(c *PocConfig) {
+
+		}
+	}
+	return func(c *PocConfig) {
+		WithReplaceHttpPacketHeader("Content-Type", "application/json")(c)
+		WithReplaceHttpPacketBody(raw, false)(c)
+	}
+}
+
+// body 是一个请求选项参数，用于指定请求的 body，需要传入一个任意类型的参数，会自动转换为 json 格式
+// Example:
+// ```
+// poc.Post("https://www.example.com", poc.body("a=b")) // 向 www.example.com 发起请求，请求的 body 为 a=b
+// ```
+func WithBody(i any) PocConfigOption {
+	return func(c *PocConfig) {
+		raw := utils.InterfaceToBytes(i)
+		WithReplaceHttpPacketBody(raw, false)(c)
 	}
 }
 
@@ -1719,6 +1751,7 @@ var PoCExports = map[string]interface{}{
 	"username":             WithUsername,
 	"password":             WithPassword,
 	"randomJA3":            WithRandomJA3,
+	"json":                 WithJSON,
 
 	"replaceFirstLine":                   WithReplaceHttpPacketFirstLine,
 	"replaceMethod":                      WithReplaceHttpPacketMethod,
