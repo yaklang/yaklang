@@ -1,6 +1,7 @@
 package rewriter
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
@@ -63,6 +64,9 @@ func TryRewriter(manager *RewriteManager, node *core.Node) error {
 
 	tryCatchSt.TryBody = append(tryCatchSt.TryBody, tryBody...)
 	tryCatchSt.CatchBodies = append(tryCatchSt.CatchBodies, catchBodies...)
+	endNodes = lo.Filter(endNodes, func(item *core.Node, index int) bool {
+		return !IsEndNode(item)
+	})
 	for _, c := range NodeDeduplication(endNodes) {
 		tryNode.AddNext(c)
 	}

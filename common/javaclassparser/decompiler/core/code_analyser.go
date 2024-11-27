@@ -1349,6 +1349,12 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_IFNULL:
 			st := statements.NewConditionStatement(values.NewJavaCompare(opcode.stackConsumed[0], values.JavaNull), NEQ)
 			appendNode(st)
+		case OP_AASTORE, OP_IASTORE, OP_BASTORE, OP_CASTORE, OP_FASTORE, OP_LASTORE, OP_DASTORE, OP_SASTORE:
+			value := opcode.stackConsumed[0]
+			index := opcode.stackConsumed[1]
+			ref := opcode.stackConsumed[2]
+			st := statements.NewArrayMemberAssignStatement(values.NewJavaArrayMember(ref, index), value)
+			appendNode(st)
 		case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE:
 			op := ""
 			switch opcode.Instr.OpCode {
