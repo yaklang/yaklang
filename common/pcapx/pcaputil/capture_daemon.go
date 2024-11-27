@@ -149,7 +149,8 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 				packetSource.Lazy = true
 				packetSource.NoCopy = true
 				packetSource.DecodeStreamsAsDatagrams = true
-				source := packetSource.PacketsCtx(conf.Context)
+				//source := packetSource.PacketsCtx(conf.Context)
+				source := packetSource.Packets()
 				onceFirstPacket := new(sync.Once)
 
 				go func() {

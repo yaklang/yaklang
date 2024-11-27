@@ -25,7 +25,8 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper)
 		select {
 		case <-ctx.Done():
 			return nil
-		case packet := <-packetSource.PacketsCtx(innerCtx):
+		//case packet := <-packetSource.PacketsCtx(innerCtx):
+		case packet := <-packetSource.Packets():
 			if packet == nil {
 				return nil
 			}
