@@ -245,7 +245,7 @@ func (b *astbuilder) handleImportPackage() {
 			}
 		}
 
-		ex.SetType(HandleFullTypeNames(ex.GetType(), info.Path))
+		ex.SetType(HandleFullTypeNames(ex.GetType(), []string{info.Path}))
 		b.AssignVariable(b.CreateVariable(id, info.Pos), ex)
 	}
 }
@@ -1905,7 +1905,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			if v := b.PeekValue(libName); v != nil {
 				lv := b.CreateLocalVariable(typName)
 				rv := b.ReadMemberCallValue(v, bp.Constructor)
-				rv.SetType(HandleFullTypeNames(rv.GetType(), path))
+				rv.SetType(HandleFullTypeNames(rv.GetType(), []string{path}))
 				b.AssignVariable(lv, rv)
 			}
 		}
@@ -1996,10 +1996,10 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 	interfacetyp.AddMethod(funcName, newFunc)
 }
 
-func HandleFullTypeNames(t ssa.Type, path string) ssa.Type {
+func HandleFullTypeNames(t ssa.Type, path []string) ssa.Type {
 	if b, ok := ssa.ToBasicType(t); ok {
 		t = ssa.NewBasicType(b.Kind, b.GetName())
-		t.SetFullTypeNames([]string{path})
+		t.SetFullTypeNames(path)
 	}
 	return t
 }

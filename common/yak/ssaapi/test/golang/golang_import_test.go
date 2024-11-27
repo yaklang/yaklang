@@ -214,21 +214,28 @@ func TestImport_globals(t *testing.T) {
 }
 
 func TestImport_syntaxflow(t *testing.T) {
-	t.Run("temp", func(t *testing.T) {
+	t.Run("import syntaxflow", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowContain(t, `package main
 
 		import (
-			"fmt"
+			"github.com/yaklang/test"
 		)
 
 		func main() {
-			fmt.Println("Hello, World!")
+			test.Println("Hello, World!") // function
+			a := test.A
 		}
 
 	`,
-			`fmt.Println(* #-> as $a)`,
+			`
+			test?{<fullTypeName>?{have: 'github.com/yaklang/test'}} as $entry;
+			$entry.Println?{<fullTypeName>?{have: 'github.com/yaklang/test'}} as $function // function
+			$entry.A?{<fullTypeName>?{have: 'github.com/yaklang/test'}} as $value // value
+			`,
 			map[string][]string{
-				"a": {"\"Hello, World!\""},
+				"entry":    {"ExternLib-test"},
+				"function": {"Undefined-test.Println"},
+				"value":    {"Undefined-a"},
 			},
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
@@ -265,6 +272,37 @@ func TestImport_syntaxflow_muti(t *testing.T) {
 		"a": {"1"},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
+}
+
+func TestFakeImport_syntaxflow(t *testing.T) {
+	t.Run("fake import syntaxflow", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, `package main
+
+	import (
+		"fmt"
+		"io/ioutil"
+		"net/http"
+	)
+
+	func handleGet(w http.ResponseWriter, r *http.Request) {
+		name := r.URL.Query().Get("name")
+		response := fmt.Sprintf("Hello, %s!", name)
+		
+		w.Write([]byte(response))
+	}
+
+	`,
+			`
+			http?{<fullTypeName>?{have: 'net/http'}} as $entry;
+			$entry.Request as $target;
+			
+			`,
+			map[string][]string{
+				"target": {"Undefined-Request"},
+			},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
 }
 
 func TestImport_unorder(t *testing.T) {
