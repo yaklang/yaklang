@@ -100,6 +100,7 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.Language = string(language)
 	rule.RuleName = ruleInput.RuleName
 	rule.Tag = strings.Join(ruleInput.Tags, "|")
+	rule.Title = ruleInput.RuleName
 	return rule, nil
 }
 
