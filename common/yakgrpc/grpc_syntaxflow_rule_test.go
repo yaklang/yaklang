@@ -171,17 +171,3 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		deleteRuleByNames(ruleNames)
 	})
 }
-
-func TestGRPCMUSTPASS_SyntaxFlow_Get_Support_Language(t *testing.T) {
-	client, err := NewLocalClient()
-	require.NoError(t, err)
-
-	t.Run("get support language", func(t *testing.T) {
-		rsp, err := client.QuerySyntaxFlowSupportLanguage(context.Background(), &ypb.Empty{})
-		require.NoError(t, err)
-		require.Contains(t, rsp.GetLanguages(), "Yak")
-		require.Contains(t, rsp.GetLanguages(), "Java")
-		require.Contains(t, rsp.GetLanguages(), "PHP")
-		require.Contains(t, rsp.GetLanguages(), "Golang")
-	})
-}
