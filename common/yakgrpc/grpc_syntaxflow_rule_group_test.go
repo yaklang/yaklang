@@ -20,6 +20,15 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		err := yakit.AddSyntaxFlowRulesGroup(consts.GetGormProfileDatabase(), saveData)
 		require.NoError(t, err)
 	}
+
+	createGroup := func(group string) {
+		req := &ypb.CreateSyntaxFlowRuleGroupRequest{
+			GroupName: group,
+		}
+		_, err := client.CreateSyntaxFlowRuleGroup(context.Background(), req)
+		require.NoError(t, err)
+	}
+
 	queryRuleGroupCount := func(groupName string) int {
 		req := &ypb.QuerySyntaxFlowRuleGroupRequest{
 			Filter: &ypb.SyntaxFlowRuleGroupFilter{
@@ -37,13 +46,15 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 			return 0
 		}
 	}
-	deleteRuleGroup := func(ruleName string, groupName string) {
-		data := &schema.SyntaxFlowRuleGroup{
-			RuleName:  ruleName,
-			GroupName: groupName,
+	deleteRuleGroup := func(groupName string) int64 {
+		req := &ypb.DeleteSyntaxFlowRuleGroupRequest{
+			Filter: &ypb.SyntaxFlowRuleGroupFilter{
+				GroupNames: []string{groupName},
+			},
 		}
-		err := yakit.DeleteSyntaxFlowRuleGroup(consts.GetGormProfileDatabase(), data)
+		m, err := client.DeleteSyntaxFlowRuleGroup(context.Background(), req)
 		require.NoError(t, err)
+		return m.EffectRows
 	}
 
 	t.Run("test add and delete syntax flow rule group", func(t *testing.T) {
@@ -56,11 +67,22 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		}
 		afterSaveCount := queryRuleGroupCount(groupName)
 		require.Equal(t, 10, afterSaveCount)
-		for _, ruleName := range ruleNames {
-			deleteRuleGroup(ruleName, groupName)
-		}
+		count := deleteRuleGroup(groupName)
+		require.Equal(t, count, int64(10))
 		afterDeleteCount := queryRuleGroupCount(groupName)
 		require.Equal(t, afterDeleteCount, 0)
-	},
-	)
+	})
+
+	t.Run("create and delete syntax flow rule group", func(t *testing.T) {
+		var groups []string
+		for i := 0; i < 10; i++ {
+			groupName := fmt.Sprintf("group_%d_%s", i, uuid.NewString())
+			createGroup(groupName)
+			groups = append(groups, groupName)
+		}
+		for _, group := range groups {
+			count := deleteRuleGroup(group)
+			require.Equal(t, count, int64(1))
+		}
+	})
 }
