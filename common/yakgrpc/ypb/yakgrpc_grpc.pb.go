@@ -407,6 +407,7 @@ const (
 	Yak_DeleteSyntaxFlowRule_FullMethodName                       = "/ypb.Yak/DeleteSyntaxFlowRule"
 	Yak_QuerySyntaxFlowRuleGroup_FullMethodName                   = "/ypb.Yak/QuerySyntaxFlowRuleGroup"
 	Yak_DeleteSyntaxFlowRuleGroup_FullMethodName                  = "/ypb.Yak/DeleteSyntaxFlowRuleGroup"
+	Yak_CreateSyntaxFlowRuleGroup_FullMethodName                  = "/ypb.Yak/CreateSyntaxFlowRuleGroup"
 	Yak_UpdateSyntaxFlowRuleAndGroup_FullMethodName               = "/ypb.Yak/UpdateSyntaxFlowRuleAndGroup"
 	Yak_SyntaxFlowScan_FullMethodName                             = "/ypb.Yak/SyntaxFlowScan"
 	Yak_QuerySyntaxFlowScanTask_FullMethodName                    = "/ypb.Yak/QuerySyntaxFlowScanTask"
@@ -930,6 +931,7 @@ type YakClient interface {
 	// SyntaxFlow Group
 	QuerySyntaxFlowRuleGroup(ctx context.Context, in *QuerySyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowRuleGroupResponse, error)
 	DeleteSyntaxFlowRuleGroup(ctx context.Context, in *DeleteSyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	CreateSyntaxFlowRuleGroup(ctx context.Context, in *CreateSyntaxFlowGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateSyntaxFlowRuleAndGroup(ctx context.Context, in *UpdateSyntaxFlowRuleAndGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	// syntaxflow scan
 	SyntaxFlowScan(ctx context.Context, opts ...grpc.CallOption) (Yak_SyntaxFlowScanClient, error)
@@ -6004,6 +6006,15 @@ func (c *yakClient) DeleteSyntaxFlowRuleGroup(ctx context.Context, in *DeleteSyn
 	return out, nil
 }
 
+func (c *yakClient) CreateSyntaxFlowRuleGroup(ctx context.Context, in *CreateSyntaxFlowGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_CreateSyntaxFlowRuleGroup_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) UpdateSyntaxFlowRuleAndGroup(ctx context.Context, in *UpdateSyntaxFlowRuleAndGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
 	out := new(DbOperateMessage)
 	err := c.cc.Invoke(ctx, Yak_UpdateSyntaxFlowRuleAndGroup_FullMethodName, in, out, opts...)
@@ -6667,6 +6678,7 @@ type YakServer interface {
 	// SyntaxFlow Group
 	QuerySyntaxFlowRuleGroup(context.Context, *QuerySyntaxFlowRuleGroupRequest) (*QuerySyntaxFlowRuleGroupResponse, error)
 	DeleteSyntaxFlowRuleGroup(context.Context, *DeleteSyntaxFlowRuleGroupRequest) (*DbOperateMessage, error)
+	CreateSyntaxFlowRuleGroup(context.Context, *CreateSyntaxFlowGroupRequest) (*DbOperateMessage, error)
 	UpdateSyntaxFlowRuleAndGroup(context.Context, *UpdateSyntaxFlowRuleAndGroupRequest) (*DbOperateMessage, error)
 	// syntaxflow scan
 	SyntaxFlowScan(Yak_SyntaxFlowScanServer) error
@@ -7855,6 +7867,9 @@ func (UnimplementedYakServer) QuerySyntaxFlowRuleGroup(context.Context, *QuerySy
 }
 func (UnimplementedYakServer) DeleteSyntaxFlowRuleGroup(context.Context, *DeleteSyntaxFlowRuleGroupRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSyntaxFlowRuleGroup not implemented")
+}
+func (UnimplementedYakServer) CreateSyntaxFlowRuleGroup(context.Context, *CreateSyntaxFlowGroupRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateSyntaxFlowRuleGroup not implemented")
 }
 func (UnimplementedYakServer) UpdateSyntaxFlowRuleAndGroup(context.Context, *UpdateSyntaxFlowRuleAndGroupRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSyntaxFlowRuleAndGroup not implemented")
@@ -15152,6 +15167,24 @@ func _Yak_DeleteSyntaxFlowRuleGroup_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CreateSyntaxFlowRuleGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSyntaxFlowGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateSyntaxFlowRuleGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateSyntaxFlowRuleGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateSyntaxFlowRuleGroup(ctx, req.(*CreateSyntaxFlowGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_UpdateSyntaxFlowRuleAndGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateSyntaxFlowRuleAndGroupRequest)
 	if err := dec(in); err != nil {
@@ -16716,6 +16749,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteSyntaxFlowRuleGroup",
 			Handler:    _Yak_DeleteSyntaxFlowRuleGroup_Handler,
+		},
+		{
+			MethodName: "CreateSyntaxFlowRuleGroup",
+			Handler:    _Yak_CreateSyntaxFlowRuleGroup_Handler,
 		},
 		{
 			MethodName: "UpdateSyntaxFlowRuleAndGroup",
