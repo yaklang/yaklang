@@ -15,6 +15,15 @@ func fakeImportValue(lib *Program, name string) Value {
 	if value, ok := lib.ExportValue[name]; !ok && lib.VirtualImport {
 		val := builder.EmitUndefined(name)
 		lib.ExportValue[name] = val
+		if b, ok := ToBasicType(val.GetType()); ok {
+			packagename := lib.PkgName
+			if packagename == "" {
+				packagename = "main"
+			}
+			t := NewBasicType(b.Kind, b.GetName())
+			t.AddFullTypeName(packagename)
+			val.SetType(t)
+		}
 		return val
 	} else {
 		return value
@@ -25,11 +34,7 @@ func fakeImportType(lib *Program, name string) Type {
 	if t, ok := lib.ExportType[name]; !ok && lib.VirtualImport {
 		bluePrint := builder.CreateBluePrint(name)
 		lib.ExportType[name] = bluePrint
-
-		// newFunction := builder.NewFunc(name)
-		// newFunction.SetMethodName(name)
-		// newFunction.SetType(NewFunctionType(fmt.Sprintf("%s-__construct", name), []Type{}, nil, true))
-		// bluePrint.RegisterMagicMethod(Constructor, newFunction)
+		builder.ClassConstructor(bluePrint, []Value{})
 		return bluePrint
 	} else {
 		return t
