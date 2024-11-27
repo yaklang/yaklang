@@ -14,9 +14,233 @@ languages = cli.StringSlice("language",
     cli.setSelectOption("Golang", "go"), 
     cli.setRequired(true)
 )
-path = cli.FolderName("ProgramPath", 
-    cli.setVerboseName("项目路径"),
-    cli.setRequired(true),
+
+info = cli.Json("info", 
+    cli.setVerboseName("项目信息"),
+    cli.setJsonSchema(<<<JSON
+{
+  "type": "object",
+  "properties": {
+    "kind": {
+      "title": "项目类型",
+      "type": "string",
+      "enum": [
+        "local",
+        "compression",
+        "jar",
+        "git"
+      ],
+      "default": "local"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "local"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "local_file": {
+            "title": "项目路径",
+            "yakit_type":"upload-folder-path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "local_file"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "compression"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "local_file": {
+            "title": "压缩包路径",
+            "yakit_type":"upload-path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "local_file"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "jar"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "local_file": {
+            "title": "Jar包路径",
+            "yakit_type":"upload-path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "local_file"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "git"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "url": {
+            "title": "远程项目URL",
+            "type": "string"
+          },
+          "branch": {
+            "title": "项目分支",
+            "type": "string"
+          },
+          "auth": {
+            "properties": {
+              "auth": {
+                "title": "认证方式",
+                "type": "string",
+                "enum": [
+                  "none",
+                  "password",
+                  "ssh_key"
+                ],
+                "default": "none"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "auth": {
+                      "const": "password"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "user_name": {
+                      "title": "认证用户名",
+                      "type": "string"
+                    },
+                    "password": {
+                      "title": "认证密码",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "user_name",
+                    "password"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "auth": {
+                      "const": "ssh_key"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "key_path": {
+                      "title": "认证私钥地址",
+                      "yakit_type":"upload-path",
+                      "type": "string"
+                    },
+                    "user_name": {
+                      "title": "认证用户名",
+                      "type": "string"
+                    },
+                    "password": {
+                      "title": "认证密码",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "key_path",
+                    "user_name"
+                  ]
+                }
+              }
+            ]
+          },
+          "proxy": {
+            "properties": {
+              "proxy": {
+                "title": "是否启用代理",
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "proxy": {
+                      "const": true
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "url": {
+                      "title": "代理URL",
+                      "type": "string"
+                    },
+                    "user": {
+                      "title": "代理认证用户名",
+                      "type": "string"
+                    },
+                    "password": {
+                      "title": "代理认证用密码",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ]
+                }
+
+              }
+            ]
+          }
+        },
+         "required": [
+        "url"
+      ]
+      }
+    },
+    {
+      "required": [
+        "kind"
+      ]
+    }
+  ]
+}
+JSON),
+    cli.setRequired(true)
 ) 
 
 // }}
@@ -78,16 +302,17 @@ opts = [
     //ssa.withDatabasePath(dbPath),
     ssa.withSaveToProfile(true),
     ssa.withContext(context.Background()),
+    ssa.withConfigInfo(info), 
 ] 
 if len(entry) != 0{
     opts = append(opts, ssa.withEntryFile(entry...))
 }
 
 
-progs, err := ssa.ParseLocalProject(path, opts...)
+progs, err := ssa.ParseProject(opts...)
 if err != nil {
     yakit.Text("编译错误信息:\n" + err.Error())
-    yakit.Error("路径： %s", path)
     yakit.Error("语言： %s", language)
     yakit.Error("项目名：%s", programName)
+    yakit.Error("编译信息： %s", info)
 }
