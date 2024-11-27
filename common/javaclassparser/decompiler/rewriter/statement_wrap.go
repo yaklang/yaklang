@@ -3,6 +3,7 @@ package rewriter
 import (
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
@@ -109,13 +110,16 @@ func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(no
 		if _, ok := current.Statement.(*statements.MiddleStatement); !ok {
 			result = append(result, current)
 		}
-		if len(current.Next) == 0 {
+		next := lo.Filter(current.Next, func(item *core.Node, index int) bool {
+			return !IsEndNode(item)
+		})
+		if len(next) == 0 {
 			break
 		}
-		if len(current.Next) > 1 {
+		if len(next) > 1 {
 			return nil, ErrMultipleNext
 		}
-		current = current.Next[0]
+		current = next[0]
 	}
 	return result, nil
 }

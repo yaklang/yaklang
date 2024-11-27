@@ -1221,26 +1221,41 @@ func ReplaceLastSubString(s, sub, new string) string {
 	return strings.Replace(s, sub, new, strings.LastIndex(s, sub))
 }
 
-func ParseJavaOverLongString(raw []byte) ([]byte, error) {
+// SimplifyUtf8 simplify utf8 bytes to utf8 bytes
+func SimplifyUtf8(raw []byte) ([]byte, error) {
+	res, err := utf8ToUnicode(raw)
+	if err != nil {
+		return nil, err
+	}
+	return unicodeToUtf8(res), nil
+}
+func utf8ToUnicode(raw []byte) ([]uint32, error) {
 	reader := bytes.NewReader(raw)
-	var res []byte
+	var res []uint32
+	addBinaryBits := func(res *uint32, b byte, l byte) {
+		mask := uint32(1<<l - 1)
+		*res = *res<<l | uint32(b)&mask
+	}
 	for i := 0; i < len(raw); {
 		b, err := reader.ReadByte()
 		if err != nil {
 			return nil, err
 		}
-		byteFlag := b >> 4
-		if byteFlag <= 7 {
-			res = append(res, b)
+		switch {
+		case b>>7 == 0b0:
+			res = append(res, uint32(b))
 			i += 1
-		} else if byteFlag <= 13 {
+		case b>>5 == 0b110:
 			b1, err := reader.ReadByte()
 			if err != nil {
 				return nil, err
 			}
-			res = append(res, ((b&0x1F)<<6)|(b1&0x3F))
+			var ch uint32
+			addBinaryBits(&ch, b, 5)
+			addBinaryBits(&ch, b1, 6)
+			res = append(res, ch)
 			i += 2
-		} else if byteFlag <= 14 {
+		case b>>4 == 0b1110:
 			b1, err := reader.ReadByte()
 			if err != nil {
 				return nil, err
@@ -1249,42 +1264,111 @@ func ParseJavaOverLongString(raw []byte) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			res = append(res, ((b1&0x3F)<<6)|(b2&0x3F))
+			var ch uint32
+			addBinaryBits(&ch, b, 4)
+			addBinaryBits(&ch, b1, 6)
+			addBinaryBits(&ch, b2, 6)
+			res = append(res, ch)
 			i += 3
-		} else {
+		case b>>3 == 0b11110:
+			b1, err := reader.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			b2, err := reader.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			b3, err := reader.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			var ch uint32
+			addBinaryBits(&ch, b, 4)
+			addBinaryBits(&ch, b1, 6)
+			addBinaryBits(&ch, b2, 6)
+			addBinaryBits(&ch, b3, 6)
+			res = append(res, ch)
+			i += 4
+		default:
 			return nil, errors.New("utf data format is invalid")
 		}
 	}
 	return res, nil
 }
 
-// ToJavaOverLongString convert string
-func ToJavaOverLongString(str []byte, l int) []byte {
-	// 3 byte format: 1110xxxx 10xxxxxx 10xxxxxx
-	// 2 byte format: 110xxxxx 10xxxxxx
-	// 1 byte format: 0xxxxxxx
+func unicodeToUtf8(str []uint32) []byte {
+	var res []byte
+	for _, ch := range str {
+		if ch < 0x80 {
+			res = append(res, byte(ch))
+		} else if ch < 0x800 {
+			res = append(res, byte(0xc0|ch>>6), byte(0x80|ch&0x3f))
+		} else if ch < 0x10000 {
+			res = append(res, byte(0xe0|ch>>12), byte(0x80|ch>>6&0x3f), byte(0x80|ch&0x3f))
+		} else {
+			res = append(res, byte(0xf0|ch>>18), byte(0x80|ch>>12&0x3f), byte(0x80|ch>>6&0x3f), byte(0x80|ch&0x3f))
+		}
+	}
+	return res
+}
 
-	switch l {
-	case 1:
+// Utf8EncodeBySpecificLength force encode unicode bytes to utf8 bytes by specific encode length
+func Utf8EncodeBySpecificLength(str []byte, l int) []byte {
+	unicodeList, err := utf8ToUnicode(str)
+	if err != nil {
+		log.Errorf("utf8ToUnicode failed: %s", err)
 		return str
-	case 2:
-		buf := bytes.Buffer{}
-		for _, ch := range str {
+	}
+	if l == 0 {
+		return str
+	}
+	getChByteLength := func(ch uint32) int {
+		if ch < 0x80 {
+			return 1
+		} else if ch < 0x800 {
+			return 2
+		} else if ch < 0x10000 {
+			return 3
+		} else {
+			return 4
+		}
+	}
+	encodeBySpecificLength := func(ch uint32, l int) []byte {
+		switch l {
+		case 1:
+			return []byte{byte(ch)}
+		case 2:
+			buf := bytes.Buffer{}
 			buf.WriteByte(0xc0 | byte(ch>>6))
 			buf.WriteByte(0x80 | byte(ch&0x3f))
-		}
-		return buf.Bytes()
-	case 3:
-		buf := bytes.Buffer{}
-		for _, ch := range str {
+			return buf.Bytes()
+		case 3:
+			buf := bytes.Buffer{}
 			buf.WriteByte(0xe0 | byte(ch>>12))
 			buf.WriteByte(0x80 | byte((ch>>6)&0x3f))
 			buf.WriteByte(0x80 | byte(ch&0x3f))
+			return buf.Bytes()
+		case 4:
+			buf := bytes.Buffer{}
+			buf.WriteByte(0xf0 | byte(ch>>18))
+			buf.WriteByte(0x80 | byte((ch>>12)&0x3f))
+			buf.WriteByte(0x80 | byte((ch>>6)&0x3f))
+			buf.WriteByte(0x80 | byte(ch&0x3f))
+			return buf.Bytes()
+		default:
+			return str
 		}
-		return buf.Bytes()
-	default:
-		return str
 	}
+	var res []byte
+	for _, u := range unicodeList {
+		var maxL = getChByteLength(u)
+		for maxL < l {
+			maxL = l
+		}
+		res = append(res, encodeBySpecificLength(u, maxL)...)
+	}
+	return res
 }
 
 func IsPlainText(raw []byte) bool {

@@ -20,7 +20,7 @@ func (s *JavaString) Marshal(cfg *MarshalContext) []byte {
 		return raw
 	}
 	raw := []byte{TC_STRING}
-	byts := utils.ToJavaOverLongString(s.Raw, cfg.StringCharLength)
+	byts := utils.Utf8EncodeBySpecificLength(s.Raw, cfg.StringCharLength)
 	raw = append(raw, IntTo2Bytes(len(byts))...)
 	raw = append(raw, byts...)
 	return raw

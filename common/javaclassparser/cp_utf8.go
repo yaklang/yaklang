@@ -22,7 +22,7 @@ type ConstantUtf8Info struct {
 func (self *ConstantUtf8Info) readInfo(cp *ClassParser) {
 	length := uint32(cp.reader.readUint16())
 	bytes := cp.reader.readBytes(length)
-	bytes, err := utils.ParseJavaOverLongString(bytes)
+	bytes, err := utils.SimplifyUtf8(bytes)
 	if err != nil {
 		log.Errorf("parse utf8 data error: %v", err)
 	}

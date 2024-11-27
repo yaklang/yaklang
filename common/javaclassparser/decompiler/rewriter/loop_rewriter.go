@@ -1,6 +1,7 @@
 package rewriter
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
@@ -258,6 +259,9 @@ func LoopRewriter(manager *RewriteManager, node *core.Node) error {
 	//}
 	loopNode := manager.NewNode(doWhileSt)
 	circleNode.Replace(loopNode)
+	endNodes = lo.Filter(endNodes, func(item *core.Node, index int) bool {
+		return !IsEndNode(item)
+	})
 	for _, c := range NodeDeduplication(endNodes) {
 		loopNode.AddNext(c)
 	}

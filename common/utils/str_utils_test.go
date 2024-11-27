@@ -10,6 +10,31 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+func TestUtf8Converter(t *testing.T) {
+
+	chChar := []byte{229, 147, 136}
+	overLongChChar := Utf8EncodeBySpecificLength(chChar, 4)
+	assert.Len(t, overLongChChar, 4)
+	newRes, err := SimplifyUtf8(overLongChChar)
+	assert.NoError(t, err)
+	assert.Len(t, newRes, 3)
+	assert.Equal(t, string(newRes), "哈")
+
+	overLongChChar = Utf8EncodeBySpecificLength(chChar, 2)
+	assert.Len(t, overLongChChar, 3)
+	newRes, err = SimplifyUtf8(overLongChChar)
+	assert.NoError(t, err)
+	assert.Len(t, newRes, 3)
+	assert.Equal(t, string(newRes), "哈")
+
+	singleChars := []byte("abc")
+	overLongChChar = Utf8EncodeBySpecificLength(singleChars, 4)
+	assert.Len(t, overLongChChar, 12)
+	newRes, err = SimplifyUtf8(overLongChChar)
+	assert.NoError(t, err)
+	assert.Len(t, newRes, 3)
+	assert.Equal(t, string(newRes), "abc")
+}
 func TestRemoveUnprintableChars(t *testing.T) {
 	cases := map[string]string{
 		"\x00W\xffO\x00R\x00K": `\x00W\xffO\x00R\x00K`,
