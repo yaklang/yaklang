@@ -258,6 +258,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 			if rightv == nil {
 				rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(test))
+				rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
 			}
 		}
 
