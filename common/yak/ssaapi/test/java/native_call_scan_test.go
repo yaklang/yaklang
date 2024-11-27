@@ -1,6 +1,7 @@
 package java
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -98,20 +99,20 @@ func TestScanPreviousIfStmtWithConfig(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb2<scanPrevious(exclude=`*?{opcode: const}`)> as $result;",
 			map[string][]string{
 				"result": {"Undefined-bb1", "Undefined-bb2", "Undefined-c"},
-			}, ssaapi.WithLanguage("java"))
+			}, ssaapi.WithLanguage(consts.JAVA))
 	})
 	t.Run("test include", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb2<scanPrevious{include:`* ?{opcode:const}`}> as $result;",
 			map[string][]string{
 				"result": {"1", "2", "3"},
-			}, ssaapi.WithLanguage("java"))
+			}, ssaapi.WithLanguage(consts.JAVA))
 	})
 
 	t.Run("test until", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb2<scanPrevious(until=`*?{opcode: const}`)> as $result;",
 			map[string][]string{
 				"result": {"Undefined-bb2"},
-			}, ssaapi.WithLanguage("java"))
+			}, ssaapi.WithLanguage(consts.JAVA))
 
 	})
 
@@ -120,7 +121,7 @@ func TestScanPreviousIfStmtWithConfig(t *testing.T) {
 			map[string][]string{
 				"result": {"1", "2", "3", "Undefined-bb1", "Undefined-bb2", "Undefined-c"},
 				"num":    {"1", "2", "3"},
-			}, ssaapi.WithLanguage("java"))
+			}, ssaapi.WithLanguage(consts.JAVA))
 
 	})
 }
@@ -141,20 +142,20 @@ func TestScanNextLoopWithConfig(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb1<scanNext(exclude=`*?{opcode: const}`)> as $result;",
 			map[string][]string{
 				"result": {"Undefined-a", "Undefined-bb1", "Undefined-bb2", "add(Undefined-a, phi(i)[0,add(i, 1)])", "add(phi(i)[0,add(i, 1)], 1)", "lt(phi(i)[0,add(i, 1)], 10)"},
-			}, ssaapi.WithLanguage("java"))
+			}, ssaapi.WithLanguage(consts.JAVA))
 	})
 	t.Run("test include", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb1<scanNext{include:`* ?{opcode:const}`}> as $result;",
 			map[string][]string{
 				"result": {"0", "0", "1", "10"},
-			}, ssaapi.WithLanguage("java"))
+			}, ssaapi.WithLanguage(consts.JAVA))
 	})
 
 	t.Run("test until", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb1<scanNext(until=`*?{opcode: const}`)> as $result;",
 			map[string][]string{
 				"result": {"Undefined-bb1"},
-			}, ssaapi.WithLanguage("java"))
+			}, ssaapi.WithLanguage(consts.JAVA))
 	})
 
 	t.Run("test hook", func(t *testing.T) {
@@ -162,7 +163,7 @@ func TestScanNextLoopWithConfig(t *testing.T) {
 			map[string][]string{
 				"result": {"0", "0", "1", "10", "Undefined-a", "Undefined-bb1", "Undefined-bb2", "add(Undefined-a, phi(i)[0,add(i, 1)])", "add(phi(i)[0,add(i, 1)], 1)", "lt(phi(i)[0,add(i, 1)], 10)"},
 				"num":    {"0", "0", "1", "10"},
-			}, ssaapi.WithLanguage("java"))
+			}, ssaapi.WithLanguage(consts.JAVA))
 
 	})
 }

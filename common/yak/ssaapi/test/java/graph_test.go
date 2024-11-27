@@ -59,7 +59,7 @@ check $source then "XXE Attack" else "XXE Safe";
 
 	t.Run("draw dot graph in memory", func(t *testing.T) {
 		ssatest.Check(t, XXE_Code, func(prog *ssaapi.Program) error {
-			assert.Equal(t, prog.GetLanguage(), "java")
+			assert.Equal(t, prog.GetLanguage(), "Java")
 			results, err := prog.SyntaxFlowWithError(sfRule)
 			require.NoError(t, err)
 			check(t, results)
