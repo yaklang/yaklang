@@ -2,8 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/consts"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -102,15 +100,4 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.Tag = strings.Join(ruleInput.Tags, "|")
 	rule.Title = ruleInput.RuleName
 	return rule, nil
-}
-
-func (s *Server) QuerySyntaxFlowSupportLanguage(ctx context.Context, req *ypb.Empty) (*ypb.QuerySyntaxFlowSupportLanguageResponse, error) {
-	rsp := &ypb.QuerySyntaxFlowSupportLanguageResponse{
-		Languages: []string{},
-	}
-	lo.FilterMap(consts.GetAllSupportedLanguages(), func(item consts.Language, index int) (consts.Language, bool) {
-		rsp.Languages = append(rsp.Languages, string(item))
-		return item, true
-	})
-	return rsp, nil
 }
