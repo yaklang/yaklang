@@ -14,11 +14,17 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 	require.NoError(t, err)
 
 	createGroups := func(groupNames []string) {
-		group := &ypb.UpdateSyntaxFlowRuleAndGroupRequest{
-			AddGroups: groupNames,
+
+		for _, group := range groupNames {
+			req := &ypb.CreateSyntaxFlowGroupRequest{
+				GroupName: group,
+			}
+			_, err = client.CreateSyntaxFlowRuleGroup(context.Background(), req)
+			if err != nil {
+				return
+			}
+			require.NoError(t, err)
 		}
-		_, err := client.UpdateSyntaxFlowRuleAndGroup(context.Background(), group)
-		require.NoError(t, err)
 	}
 	_ = createGroups
 

@@ -722,12 +722,13 @@ service Yak {
   // SyntaxFlow Group
   rpc QuerySyntaxFlowRuleGroup(QuerySyntaxFlowRuleGroupRequest)returns (QuerySyntaxFlowRuleGroupResponse);
   rpc DeleteSyntaxFlowRuleGroup(DeleteSyntaxFlowRuleGroupRequest) returns (DbOperateMessage);
+  rpc CreateSyntaxFlowRuleGroup(CreateSyntaxFlowGroupRequest) returns (DbOperateMessage);
   rpc UpdateSyntaxFlowRuleAndGroup(UpdateSyntaxFlowRuleAndGroupRequest) returns (DbOperateMessage);
   // syntaxflow scan
   rpc SyntaxFlowScan(stream SyntaxFlowScanRequest) returns (stream SyntaxFlowScanResponse);
   rpc QuerySyntaxFlowScanTask(QuerySyntaxFlowScanTaskRequest) returns (QuerySyntaxFlowScanTaskResponse);
   rpc DeleteSyntaxFlowScanTask(DeleteSyntaxFlowScanTaskRequest) returns (DbOperateMessage);
-  // query result 
+  // query result
   rpc QuerySyntaxFlowResult (QuerySyntaxFlowResultRequest) returns (QuerySyntaxFlowResultResponse);
   //query ssa program
   rpc QuerySSAPrograms(QuerySSAProgramRequest)returns(QuerySSAProgramResponse);
@@ -5646,6 +5647,10 @@ message QuerySyntaxFlowRuleGroupRequest{
 
 message QuerySyntaxFlowRuleGroupResponse{
   repeated SyntaxFlowGroup Group = 1;
+}
+
+message CreateSyntaxFlowGroupRequest{
+  string GroupName = 1;
 }
 
 message UpdateSyntaxFlowRuleAndGroupRequest{
