@@ -52,7 +52,6 @@ func (t *JavaTemplate) WriteGetAttribute(variable string) {
 }
 
 func (t *JavaTemplate) WriteOutput(variable string) {
-	t.WriteGetAttribute(variable)
 	t.builder.WriteString("\tout.print(" + variable + ");\r\n")
 }
 

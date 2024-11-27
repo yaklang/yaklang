@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+const (
+	JSP_EL_PARSE_METHOD = "elExpr.parse"
+)
+
 type TagType int
 
 const (
@@ -141,7 +145,7 @@ func (y *JSPVisitor) ParseDoubleTag(openTag string, closedTag string, visitConte
 func (y *JSPVisitor) fixElExpr(expr string) string {
 	expr = strings.TrimSpace(expr)
 	if strings.HasPrefix(expr, "${") && strings.HasSuffix(expr, "}") {
-		expr = fmt.Sprintf("elExpr.parse(%s)", expr)
+		expr = fmt.Sprintf("%s(\"%s\")", JSP_EL_PARSE_METHOD, expr)
 	}
 	return expr
 }
