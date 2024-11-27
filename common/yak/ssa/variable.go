@@ -145,6 +145,7 @@ func GetLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 	return nil
 }
 
+// 查找当前scope中的第一个Variable
 func GetVariableFromScope(scope ScopeIF, name string) *Variable {
 	if variables := scope.GetVariables(name); variables != nil {
 		for _, variable := range variables {
@@ -154,4 +155,17 @@ func GetVariableFromScope(scope ScopeIF, name string) *Variable {
 		}
 	}
 	return nil
+}
+
+// 查找当前scope中的所有Variable
+func GetVariablesFromScope(scope ScopeIF, name string) []*Variable {
+	var rets []*Variable
+	if variables := scope.GetVariables(name); variables != nil {
+		for _, variable := range variables {
+			if ret, ok := variable.(*Variable); ok {
+				rets = append(rets, ret)
+			}
+		}
+	}
+	return rets
 }
