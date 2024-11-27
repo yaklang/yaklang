@@ -245,12 +245,34 @@ func (y *JSPVisitor) VisitAttribute(raw jspparser.IHtmlAttributeContext) (key st
 	if i.HtmlAttributeName() != nil {
 		key = i.HtmlAttributeName().GetText()
 		if i.HtmlAttributeValue() != nil {
-			value = i.HtmlAttributeValue().GetText()
+			value = y.VisitHtmlAttributeValue(i.HtmlAttributeValue())
 		}
 	}
 	key = yakunquote.TryUnquote(key)
 	value = yakunquote.TryUnquote(value)
 	return
+}
+
+func (y *JSPVisitor) VisitHtmlAttributeValue(raw jspparser.IHtmlAttributeValueContext) string {
+	if y == nil || raw == nil {
+		return ""
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i := raw.(*jspparser.HtmlAttributeValueContext)
+	if i == nil {
+		return ""
+	}
+	if i.HtmlAttributeValueExpr() != nil {
+		elExpr := i.HtmlAttributeValueExpr().GetText()
+		elExpr = y.fixElExpr(elExpr)
+		return elExpr
+	} else if i.JspElement() != nil {
+		y.VisitJspElement(i.JspElement())
+	} else if i.HtmlAttributeValueConstant() != nil {
+		return i.HtmlAttributeValueConstant().GetText()
+	}
+	return ""
 }
 
 func (y *JSPVisitor) VisitHtmlContent(raw jspparser.IHtmlContentContext) {
