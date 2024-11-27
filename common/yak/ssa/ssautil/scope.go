@@ -337,10 +337,18 @@ func (scope *ScopedVersionedTable[T]) GetVariables(name string) []VersionedIF[T]
 
 	if result := scope.getAllVersionInCurrentLexicalScope(name); result != nil {
 		ret = append(result, ret...)
+	}
+	if scope.GetParent() != nil {
+		ret = append(ret, scope.GetParent().GetVariables(name)...)
+	}
+	return ret
+}
 
-		if scope.GetParent() != nil {
-			ret = append(ret, scope.GetParent().GetVariables(name)...)
-		}
+func (scope *ScopedVersionedTable[T]) GetCurrentVariables(name string) []VersionedIF[T] {
+	var ret []VersionedIF[T]
+
+	if result := scope.getAllVersionInCurrentLexicalScope(name); result != nil {
+		ret = append(result, ret...)
 	}
 	return ret
 }
@@ -376,7 +384,7 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 
 	// capture variable
 	if !variable.GetLocal() && !scope.IsRoot() {
-		for _, variable := range scope.GetVariables(variable.GetName()) {
+		for _, variable := range scope.GetCurrentVariables(variable.GetName()) {
 			if variable.GetLocal() {
 				return
 			}

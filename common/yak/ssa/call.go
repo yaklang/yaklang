@@ -342,16 +342,25 @@ func (c *Call) handleCalleeFunction() {
 					}
 				}
 
+				GetScope := func(scope ScopeIF, name string) *Variable {
+					if ret := GetLocalVariableFromScope(scope, name); ret != nil {
+						return ret
+					} else if ret := GetVariableFromScope(scope, name); ret != nil {
+						return ret
+					}
+					return nil
+				}
+
 				if _, ok := se.Modify.(*Parameter); ok {
 					AddSideEffect()
 					continue
 				}
 
 				obj := se.parameterMemberInner
-				if ret := GetVariableFromScope(currentScope, se.Name); ret != nil {
+				if ret := GetScope(currentScope, se.Name); ret != nil {
 					CheckSideEffect(ret)
 					continue
-				} else if ret := GetVariableFromScope(currentScope, obj.ObjectName); ret != nil {
+				} else if ret := GetScope(currentScope, obj.ObjectName); ret != nil {
 					CheckSideEffect(ret)
 					continue
 				} else if obj.ObjectName == "this" {
@@ -364,15 +373,19 @@ func (c *Call) handleCalleeFunction() {
 					continue
 				}
 
+				// 处理跨闭包的side-effect
 				if block := function.GetBlock(); block != nil {
 					functionScope := block.ScopeTable
-					if ret := GetLocalVariableFromScope(functionScope, se.Name); ret != nil {
+					if ret := GetScope(functionScope, se.Name); ret != nil {
 						CheckSideEffect(ret)
+						continue
 					} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
-						if ret := GetLocalVariableFromScope(functionScope, obj.ObjectName); ret != nil {
+						if ret := GetScope(functionScope, obj.ObjectName); ret != nil {
 							CheckSideEffect(ret)
+							continue
 						} else {
 							AddSideEffect()
+							continue
 						}
 					}
 				}
