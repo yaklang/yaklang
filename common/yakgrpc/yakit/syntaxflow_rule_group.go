@@ -2,7 +2,6 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -25,6 +24,7 @@ func FilterSyntaxFlowGroup(db *gorm.DB, filter *ypb.SyntaxFlowRuleGroupFilter) *
 	if filter == nil {
 		return db
 	}
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "group_name", filter.GetGroupNames())
 	if filter.GetKeyWord() != "" {
 		db = bizhelper.FuzzQueryStringArrayOrLike(db,
 			"group_name", []string{filter.GetKeyWord()})
@@ -61,18 +61,33 @@ func UpdateSyntaxFlowRulesGroup(db *gorm.DB, i *schema.SyntaxFlowRuleGroup) erro
 	return nil
 }
 
-func DeleteSyntaxFlowRuleGroup(db *gorm.DB, i *schema.SyntaxFlowRuleGroup) error {
+func DeleteSyntaxFlowRuleGroup(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleGroupRequest) (int64, error) {
 	db = db.Model(&schema.SyntaxFlowRuleGroup{})
-	hash := i.CalcHash()
-	if err := db.Where("hash = ?", hash).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.Errorf("delete syntax flow rule group failed: the rule group not found")
-		} else {
-			return utils.Errorf("delete syntax flow rule group failed: %s", err)
+	if params == nil {
+		return 0, utils.Error("delete syntax flow rule group failed: delete syntaxflow rule request is nil")
+	}
+	if params.GetDeleteAll() {
+		if err := db.Delete(&schema.SyntaxFlowRuleGroup{}).Error; err != nil {
+			return 0, utils.Errorf("delete all SyntaxFlowGroup failed: %s", err)
 		}
+		return 0, nil
 	}
-	if db := db.Where("hash = ?", hash).Unscoped().Delete(&schema.SyntaxFlowRuleGroup{}); db.Error != nil {
-		return utils.Errorf("delete SyntaxFlowGroup failed: %s", db.Error)
+	if params.GetFilter() == nil {
+		return 0, utils.Error("delete syntax flow rule group failed: delete filter is nil")
 	}
-	return nil
+	db = FilterSyntaxFlowGroup(db, params.GetFilter())
+	db = db.Unscoped().Delete(&schema.SyntaxFlowRuleGroup{})
+	return db.RowsAffected, db.Error
+}
+
+func CreateSyntaxFlowRuleGroup(db *gorm.DB, params *ypb.CreateSyntaxFlowRuleGroupRequest) (int64, error) {
+	db = db.Model(&schema.SyntaxFlowRuleGroup{})
+	if params == nil {
+		return 0, utils.Error("create syntax flow rule group failed: create syntaxflow rule request is nil")
+	}
+	if params.GetGroupName() == "" {
+		return 0, utils.Error("create syntax flow rule group failed: group name is empty")
+	}
+	db = db.Create(&schema.SyntaxFlowRuleGroup{GroupName: params.GetGroupName()})
+	return db.RowsAffected, db.Error
 }
