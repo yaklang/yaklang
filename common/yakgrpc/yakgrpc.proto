@@ -720,7 +720,8 @@ service Yak {
   rpc UpdateSyntaxFlowRule(UpdateSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc DeleteSyntaxFlowRule(DeleteSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc QuerySyntaxFlowRuleGroup(QuerySyntaxFlowRuleGroupRequest)returns (QuerySyntaxFlowRuleGroupResponse);
-
+  rpc DeleteSyntaxFlowRuleGroup(DeleteSyntaxFlowRuleGroupRequest) returns (DbOperateMessage);
+  rpc CreateSyntaxFlowRuleGroup(CreateSyntaxFlowRuleGroupRequest) returns (DbOperateMessage);
   // syntaxflow scan 
   rpc SyntaxFlowScan(stream SyntaxFlowScanRequest) returns (stream SyntaxFlowScanResponse);
   rpc QuerySyntaxFlowScanTask(QuerySyntaxFlowScanTaskRequest) returns (QuerySyntaxFlowScanTaskResponse);
@@ -5623,6 +5624,7 @@ message DeleteSyntaxFlowRuleRequest{
 }
 
 message SyntaxFlowRuleGroupFilter {
+  repeated string GroupNames = 2;
   // for fuzzing search
   string KeyWord = 1;
 }
@@ -5638,6 +5640,15 @@ message QuerySyntaxFlowRuleGroupRequest{
 
 message QuerySyntaxFlowRuleGroupResponse{
   repeated SyntaxFlowGroup Group = 1;
+}
+
+message CreateSyntaxFlowRuleGroupRequest{
+  string GroupName = 1;
+}
+
+message DeleteSyntaxFlowRuleGroupRequest{
+  SyntaxFlowRuleGroupFilter Filter = 1;
+  bool  DeleteAll = 2;
 }
 
 message SyntaxFlowScanRequest{
