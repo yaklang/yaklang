@@ -32,13 +32,13 @@ func FilterSyntaxFlowGroup(db *gorm.DB, filter *ypb.SyntaxFlowRuleGroupFilter) *
 	return db
 }
 
-func AddSyntaxFlowRulesGroup(db *gorm.DB, i *schema.SyntaxFlowRuleGroup) error {
+func CreateSyntaxFlowRuleGroup(db *gorm.DB, group string) error {
 	db = db.Model(&schema.SyntaxFlowRuleGroup{})
-	if i.RuleName == "" {
-		return utils.Error("add syntax flow rule group failed:rule name is empty")
-	}
-	if i.GroupName == "" {
+	if group == "" {
 		return utils.Errorf("add syntax flow rule group failed:group name is empty")
+	}
+	i := &schema.SyntaxFlowRuleGroup{
+		GroupName: group,
 	}
 	if db := db.Create(i); db.Error != nil {
 		return utils.Errorf("create SyntaxFlowGroup failed: %s", db.Error)
@@ -46,19 +46,56 @@ func AddSyntaxFlowRulesGroup(db *gorm.DB, i *schema.SyntaxFlowRuleGroup) error {
 	return nil
 }
 
-func UpdateSyntaxFlowRulesGroup(db *gorm.DB, i *schema.SyntaxFlowRuleGroup) error {
+func AddSyntaxFlowRuleGroup(db *gorm.DB, rules []string, group string) (int64, error) {
+	if len(rules) == 0 {
+		return 0, utils.Errorf("add syntax flow rule group failed:rule name is empty")
+	}
+	if group == "" {
+		return 0, utils.Errorf("add syntax flow rule group failed:group name is empty")
+	}
+
 	db = db.Model(&schema.SyntaxFlowRuleGroup{})
-	if i.RuleName == "" {
-		return utils.Error("add syntax flow rule group failed:rule name is empty")
+	var count int64
+	var errs error
+	for _, rule := range rules {
+		i := &schema.SyntaxFlowRuleGroup{
+			RuleName:  rule,
+			GroupName: group,
+		}
+		if db := db.Create(i); db.Error != nil {
+			errs = utils.JoinErrors(errs, db.Error)
+			continue
+		} else {
+			count++
+		}
 	}
-	if i.GroupName == "" {
-		return utils.Errorf("add syntax flow rule group failed:group name is empty")
+	return count, errs
+}
+
+func RemoveSyntaxFlowRuleGroup(db *gorm.DB, rules []string, group string) (int64, error) {
+	if len(rules) == 0 {
+		return 0, utils.Errorf("add syntax flow rule group failed:rule name is empty")
 	}
-	hash := i.CalcHash()
-	if err := db.Where("hash = ?", hash).Update(i).Error; err != nil {
-		return utils.Errorf("update SyntaxFlowGroup failed: %s", err)
+	if group == "" {
+		return 0, utils.Errorf("add syntax flow rule group failed:group name is empty")
 	}
-	return nil
+
+	db = db.Model(&schema.SyntaxFlowRuleGroup{})
+	var count int64
+	var errs error
+	for _, rule := range rules {
+		i := &schema.SyntaxFlowRuleGroup{
+			RuleName:  rule,
+			GroupName: group,
+		}
+		if db := db.Where("rule_name = ? AND group_name = ?", rule, group).Unscoped().Delete(i); db.Error != nil {
+			errs = utils.JoinErrors(errs, db.Error)
+			continue
+		} else {
+			count++
+		}
+	}
+	return count, errs
 }
 
 func DeleteSyntaxFlowRuleGroup(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleGroupRequest) (int64, error) {
@@ -66,28 +103,10 @@ func DeleteSyntaxFlowRuleGroup(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleGrou
 	if params == nil {
 		return 0, utils.Error("delete syntax flow rule group failed: delete syntaxflow rule request is nil")
 	}
-	if params.GetDeleteAll() {
-		if err := db.Delete(&schema.SyntaxFlowRuleGroup{}).Error; err != nil {
-			return 0, utils.Errorf("delete all SyntaxFlowGroup failed: %s", err)
-		}
-		return 0, nil
-	}
 	if params.GetFilter() == nil {
 		return 0, utils.Error("delete syntax flow rule group failed: delete filter is nil")
 	}
 	db = FilterSyntaxFlowGroup(db, params.GetFilter())
 	db = db.Unscoped().Delete(&schema.SyntaxFlowRuleGroup{})
-	return db.RowsAffected, db.Error
-}
-
-func CreateSyntaxFlowRuleGroup(db *gorm.DB, params *ypb.CreateSyntaxFlowRuleGroupRequest) (int64, error) {
-	db = db.Model(&schema.SyntaxFlowRuleGroup{})
-	if params == nil {
-		return 0, utils.Error("create syntax flow rule group failed: create syntaxflow rule request is nil")
-	}
-	if params.GetGroupName() == "" {
-		return 0, utils.Error("create syntax flow rule group failed: group name is empty")
-	}
-	db = db.Create(&schema.SyntaxFlowRuleGroup{GroupName: params.GetGroupName()})
 	return db.RowsAffected, db.Error
 }

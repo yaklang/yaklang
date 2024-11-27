@@ -719,10 +719,12 @@ service Yak {
   rpc CreateSyntaxFlowRule(CreateSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc UpdateSyntaxFlowRule(UpdateSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc DeleteSyntaxFlowRule(DeleteSyntaxFlowRuleRequest) returns (DbOperateMessage);
+  rpc QuerySyntaxFlowSupportLanguage(Empty) returns (QuerySyntaxFlowSupportLanguageResponse);
+  // SyntaxFlow Group
   rpc QuerySyntaxFlowRuleGroup(QuerySyntaxFlowRuleGroupRequest)returns (QuerySyntaxFlowRuleGroupResponse);
   rpc DeleteSyntaxFlowRuleGroup(DeleteSyntaxFlowRuleGroupRequest) returns (DbOperateMessage);
-  rpc CreateSyntaxFlowRuleGroup(CreateSyntaxFlowRuleGroupRequest) returns (DbOperateMessage);
-  // syntaxflow scan 
+  rpc UpdateSyntaxFlowRuleAndGroup(UpdateSyntaxFlowRuleAndGroupRequest) returns (DbOperateMessage);
+  // syntaxflow scan
   rpc SyntaxFlowScan(stream SyntaxFlowScanRequest) returns (stream SyntaxFlowScanResponse);
   rpc QuerySyntaxFlowScanTask(QuerySyntaxFlowScanTaskRequest) returns (QuerySyntaxFlowScanTaskResponse);
   rpc DeleteSyntaxFlowScanTask(DeleteSyntaxFlowScanTaskRequest) returns (DbOperateMessage);
@@ -5502,6 +5504,8 @@ message QuerySyntaxFlowRuleRequest{
 }
 
 message SyntaxFlowRule{
+  int64 Id = 18;
+
   string RuleName = 1;
   string Content = 2;
 
@@ -5541,7 +5545,10 @@ message SyntaxFlowRuleFilter {
   repeated string Tag = 6;
   string Keyword = 7;
   // 是否包含作为库的规则  这些规则只提供相关数据并被其他规则引用 默认不包含
-  bool includeLibraryRule = 8; // default false 
+  bool includeLibraryRule = 8; // default false
+  // for infinite list
+  int64 FromId = 9;
+  int64  UntilId = 10;
 }
 
 message SSAProgram{
@@ -5623,6 +5630,10 @@ message DeleteSyntaxFlowRuleRequest{
   SyntaxFlowRuleFilter Filter = 1;
 }
 
+message QuerySyntaxFlowSupportLanguageResponse{
+  repeated string Languages = 1;
+}
+
 message SyntaxFlowRuleGroupFilter {
   repeated string GroupNames = 2;
   // for fuzzing search
@@ -5642,13 +5653,15 @@ message QuerySyntaxFlowRuleGroupResponse{
   repeated SyntaxFlowGroup Group = 1;
 }
 
-message CreateSyntaxFlowRuleGroupRequest{
-  string GroupName = 1;
+message UpdateSyntaxFlowRuleAndGroupRequest{
+   SyntaxFlowRuleFilter Filter = 1;
+   repeated string AddGroups= 2;
+   repeated string RemoveGroups = 3;
+   bool All = 4;
 }
 
 message DeleteSyntaxFlowRuleGroupRequest{
   SyntaxFlowRuleGroupFilter Filter = 1;
-  bool  DeleteAll = 2;
 }
 
 message SyntaxFlowScanRequest{
