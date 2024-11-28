@@ -1,7 +1,9 @@
 package javaclassparser
 
 import (
+	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
@@ -129,7 +131,19 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			attrs += fmt.Sprintf("\t%s\n", field)
 		}
 	}
-
+	annoStrs := []string{}
+	for _, info := range lo.Filter(c.obj.Attributes, func(item AttributeInfo, index int) bool {
+		_, ok := item.(*RuntimeVisibleAnnotationsAttribute)
+		return ok
+	}) {
+		for _, annotation := range info.(*RuntimeVisibleAnnotationsAttribute).Annotations {
+			res, err := c.DumpAnnotation(annotation)
+			if err != nil {
+				return "", utils.Wrap(err, "DumpAnnotation failed")
+			}
+			annoStrs = append(annoStrs, res)
+		}
+	}
 	methods, err := c.DumpMethods()
 	if err != nil {
 		return "", utils.Wrap(err, "DumpMethods failed")
@@ -142,6 +156,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 
 	result = fmt.Sprintf(result, accessFlags, className, superStr, attrs)
+	result = fmt.Sprintf("%s\n%s", strings.Join(annoStrs, "\n"), result)
 	importsStr := ""
 	for _, s := range funcCtx.GetAllImported() {
 		if utils.StringSliceContain(buildInLib, s) {
@@ -188,6 +203,100 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 	}
 	return result, nil
 }
+
+func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, error) {
+	result := ""
+
+	annoName := anno.TypeName
+	typ, err := types.ParseDescriptor(annoName)
+	if err != nil {
+		return "", fmt.Errorf("parse annotation error, %w", err)
+	}
+	classIns, ok := typ.RawType().(*types.JavaClass)
+	if !ok {
+		return "", errors.New("invalid annotation type")
+	}
+	annoName = c.FuncCtx.ShortTypeName(classIns.Name)
+	var parseElement func(element *ElementValuePairAttribute) (string, error)
+	parseElement = func(element *ElementValuePairAttribute) (string, error) {
+		valStr := ""
+		switch element.Tag {
+		case 'B', 'C', 'D', 'F', 'I', 'J', 'S', 'Z':
+			constant := element.Value.(ConstantInfo)
+			switch ret := constant.(type) {
+			case *ConstantStringInfo:
+				s, err := c.obj.getUtf8(ret.StringIndex)
+				if err != nil {
+					return "", err
+				}
+				valStr = fmt.Sprintf("\"%s\"", s)
+			case *ConstantLongInfo:
+				valStr = fmt.Sprintf("%dL", ret.Value)
+			case *ConstantIntegerInfo:
+				valStr = fmt.Sprintf("%d", ret.Value)
+			case *ConstantDoubleInfo:
+				valStr = fmt.Sprintf("%f", ret.Value)
+			case *ConstantFloatInfo:
+				valStr = fmt.Sprintf("%f", ret.Value)
+			default:
+				return "", errors.New("parse annotation error, unknown constant type")
+			}
+		case 's':
+			valStr = fmt.Sprintf("\"%s\"", element.Value.(string))
+		case 'e':
+			//val := &EnumConstValue{
+			//	TypeName:  getUtf8(reader.readUint16()),
+			//	ConstName: getUtf8(reader.readUint16()),
+			//}
+			//ele.Value = val
+			enum := element.Value.(*EnumConstValue)
+			valStr = fmt.Sprintf("%s.%s", enum.TypeName, enum.ConstName)
+		case 'c':
+			//ele.Value = getUtf8(reader.readUint16())
+			valStr = element.Value.(string)
+		case '@':
+			//ele.Value = ParseAnnotation(cp)
+			annotation := element.Value.(*AnnotationAttribute)
+			res, err := c.DumpAnnotation(annotation)
+			if err != nil {
+				return "", err
+			}
+			valStr = res
+		case '[':
+			//length := reader.readUint16()
+			//l := []any{}
+			//for k := 0; k < int(length); k++ {
+			//	val := ParseAnnotationElementValue(cp)
+			//	l = append(l, val)
+			//}
+			//ele.Value = l
+			l := element.Value.([]*ElementValuePairAttribute)
+			eleList := []string{}
+			for _, e := range l {
+				res, err := parseElement(e)
+				if err != nil {
+					return "", err
+				}
+				eleList = append(eleList, res)
+			}
+			valStr = fmt.Sprintf("{%s}", strings.Join(eleList, ", "))
+		default:
+			return "", fmt.Errorf("parse annotation error, unknown tag: %c", element.Tag)
+		}
+		return valStr, nil
+	}
+	elementStrList := []string{}
+	for _, element := range anno.ElementValuePairs {
+		str, err := parseElement(element)
+		if err != nil {
+			return "", err
+		}
+		elementStrList = append(elementStrList, fmt.Sprintf("%s=%s", element.Name, str))
+	}
+	result = fmt.Sprintf("@%s(%s)", annoName, strings.Join(elementStrList, ", "))
+	return result, nil
+}
+
 func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 	c.Tab()
 	defer c.UnTab()
@@ -227,8 +336,18 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		//	continue
 		//}
 		//println(name)
+		annoStrs := []string{}
 		funcCtx.FunctionType = c.MethodType
 		for _, attribute := range method.Attributes {
+			if anno, ok := attribute.(*RuntimeVisibleAnnotationsAttribute); ok {
+				for _, annotation := range anno.Annotations {
+					res, err := c.DumpAnnotation(annotation)
+					if err != nil {
+						return nil, err
+					}
+					annoStrs = append(annoStrs, res)
+				}
+			}
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
 				statementList, err := ParseBytesCode(c, codeAttr)
 				if err != nil {
@@ -342,7 +461,14 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 			methodSource = fmt.Sprintf(`%s %s %s {%s`, accessFlags, returnTypeStr, name, code)
 		}
 		methodSource += strings.Repeat("\t", c.TabNumber()) + "}"
-		result = append(result, methodSource)
+		if len(annoStrs) == 0 {
+			result = append(result, methodSource)
+		} else {
+			c.Tab()
+			annoStr := strings.Join(annoStrs, c.GetTabString()+"\n")
+			c.UnTab()
+			result = append(result, annoStr+"\n"+c.GetTabString()+methodSource)
+		}
 	}
 	return result, nil
 }
