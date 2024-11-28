@@ -166,6 +166,7 @@ type ExceptionTableEntry struct {
 	CatchType uint16
 }
 type ElementValuePairAttribute struct {
+	Tag   uint8
 	Name  string
 	Value any
 }
