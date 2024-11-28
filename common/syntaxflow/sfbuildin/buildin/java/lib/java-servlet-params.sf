@@ -16,3 +16,16 @@ $directParam + $indirectParam + $getInputStream as $output;
 
 
 alert $output;
+desc (
+  lang: java,
+  alert_num:1,
+  'file://demo.java':<<<EOF
+import javax.servlet.http.HttpServletRequest;
+
+class Demo{
+   public void trace_route(HttpServletRequest request, HttpServletResponse response) throws IOException {
+         String ip = request.getParameter("ip");
+   }
+}
+EOF
+)
