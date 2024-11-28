@@ -2,8 +2,9 @@ package java2ssa
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -589,6 +590,7 @@ func (y *builder) VisitMethodDeclaration(
 	currentBuilder := y.FunctionBuilder
 	currentEditor := y.FunctionBuilder.GetEditor()
 	newFunc.AddLazyBuilder(func() {
+		log.Infof("lazybuild: %s %s ", funcName, key)
 		f := y.SwitchProg(currentBuilder, currentEditor)
 		defer f()
 		y.FunctionBuilder = y.PushFunction(newFunc)

@@ -68,6 +68,7 @@ func (c *config) parseProject() (Programs, error) {
 			return nil
 		}),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
+			log.Infof("calc total: %s", path)
 			if fi.Size() == 0 {
 				return nil
 			}

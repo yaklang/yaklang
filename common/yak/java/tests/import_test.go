@@ -90,7 +90,11 @@ class A{
 }
 }
 `)
-	ssatest.CheckSyntaxFlowWithFS(t, vf, `off #-> * as $param`, map[string][]string{"param": {"1"}}, false, ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckSyntaxFlowWithFS(t, vf,
+		`off #-> * as $param`,
+		map[string][]string{
+			"param": {"1"},
+		}, false, ssaapi.WithLanguage(ssaapi.JAVA))
 }
 func TestImportClass(t *testing.T) {
 	t.Run("import class", func(t *testing.T) {
