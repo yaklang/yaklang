@@ -216,7 +216,6 @@ func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 		Value:    value,
 	}
 	s.SetName(variable)
-	s.SetType(value.GetType())
 	return s
 }
 
