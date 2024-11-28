@@ -64,7 +64,8 @@ func (p *Program) VisitAst(ast ASTIF) {
 			p.Application.ProcessInfof("program %s build Instruction", p.Name)
 			p.LazyBuild() // build instruction
 			p.Application.ProcessInfof("program %s save Instruction(%d) to database", p.Name, p.Cache.CountInstruction())
-			p.Cache.SaveToDatabase() // save instruction
+			// will cause instruction not save bug
+			// p.Cache.SaveToDatabase() // save instruction
 		}
 	}
 }

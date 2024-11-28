@@ -105,22 +105,48 @@ func TestMustPass_Debug(t *testing.T) {
 }
 
 func TestAnnontation(t *testing.T) {
-	prog, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
-	if err != nil {
-		t.Fatalf("compile failed: %v", err)
-	}
-	rule := `
+
+	check := func(t *testing.T, prog *ssaapi.Program) {
+		rule := `
 *Mapping.__ref__?{opcode: function} as $entryFunc;
 $entryFunc(*?{opcode: param && !have: this} as $source);
 `
-	result, err := prog.SyntaxFlowWithError(rule)
-	if err != nil {
-		t.Fatal(err)
+		result, err := prog.SyntaxFlowWithError(rule)
+		if err != nil {
+			t.Fatal(err)
+		}
+		result.Show()
+		valueName := lo.Map(result.GetValues("entryFunc"), func(value *ssaapi.Value, _ int) string {
+			return value.String()
+		})
+		require.Greater(t, len(valueName), 10)
+		require.Greater(t, len(result.GetValues("source")), 10)
 	}
-	result.Show()
-	valueName := lo.Map(result.GetValues("entryFunc"), func(value *ssaapi.Value, _ int) string {
-		return value.String()
+
+	t.Run("memory ", func(t *testing.T) {
+		prog, err := ssaapi.ParseProjectWithFS(
+			filesys.NewEmbedFS(sourceCodeSample),
+			ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+		if err != nil {
+			t.Fatalf("compile failed: %v", err)
+		}
+		check(t, prog[0])
 	})
-	require.Greater(t, len(valueName), 10)
-	require.Greater(t, len(result.GetValues("source")), 10)
+
+	t.Run("db", func(t *testing.T) {
+		ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
+		_, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
+		if err != nil {
+			t.Fatalf("compile failed: %v", err)
+		}
+		defer ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
+
+		prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
+		if err != nil {
+			t.Fatalf("compile failed: %v", err)
+		}
+		check(t, prog)
+	})
+
 }

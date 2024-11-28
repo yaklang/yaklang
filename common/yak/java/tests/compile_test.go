@@ -56,7 +56,7 @@ public class A {
 	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JAVA))
 	assert.NoError(t, err)
 	prog.Show()
-	assert.Equal(t, 1, len(prog.Program.UpStream))
+	assert.Equal(t, 1, prog.Program.UpStream.Len())
 	assert.Equal(t, 0, len(prog.Program.DownStream))
 	if slices.Contains(ssadb.AllPrograms(ssadb.GetDB()), pkgName) {
 		t.Fatalf("package %s should not be in the database", pkgName)
@@ -89,7 +89,7 @@ public class A {
 	}()
 
 	prog.Show()
-	assert.Equal(t, 1, len(prog.Program.UpStream))
+	assert.Equal(t, 1, prog.Program.UpStream.Len())
 	assert.Equal(t, 0, len(prog.Program.DownStream))
 	{
 		// check in ir-code table

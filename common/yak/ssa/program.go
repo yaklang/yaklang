@@ -20,7 +20,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		Name:                    ProgramName,
 		ProgramKind:             kind,
 		LibraryFile:             make(map[string][]string),
-		UpStream:                make(map[string]*Program),
+		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
 		Cache:                   NewDBCache(ProgramName, enableDatabase),
@@ -86,7 +86,7 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 }
 
 func (prog *Program) GetSubProgram(name string, path ...string) *Program {
-	child, ok := prog.UpStream[name]
+	child, ok := prog.UpStream.Get(name)
 	if !ok {
 		child = prog.createSubProgram(name, Library, path...)
 	}
@@ -127,11 +127,11 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	}
 
 	// contain in memory
-	if p, ok := app.UpStream[name]; ok {
+	if p, ok := app.UpStream.Get(name); ok {
 		return p, hasFile(p)
 	}
 
-	if p, ok := prog.UpStream[name]; ok {
+	if p, ok := prog.UpStream.Get(name); ok {
 		app.AddUpStream(p)
 		return p, hasFile(p)
 	}
@@ -158,7 +158,7 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 }
 
 func (prog *Program) AddUpStream(sub *Program) {
-	prog.UpStream[sub.Name] = sub
+	prog.UpStream.Set(sub.Name, sub)
 	sub.DownStream[prog.Name] = prog
 }
 
@@ -215,12 +215,13 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 	// for _, f := range prog.Funcs {
 	// 	handFunc(f)
 	// }
-	for _, up := range prog.UpStream {
-		up.Funcs.ForEach(func(i string, v *Function) bool {
+	prog.UpStream.ForEach(func(i string, v *Program) bool {
+		v.Funcs.ForEach(func(i string, v *Function) bool {
 			handFunc(v)
 			return true
 		})
-	}
+		return true
+	})
 }
 
 func (prog *Program) Finish() {
@@ -238,9 +239,10 @@ func (prog *Program) Finish() {
 	// log.Errorf("BUG!! program %s has not finish ast", prog.Name)
 	prog.LazyBuild() // finish
 	// }
-	for _, up := range prog.UpStream {
-		up.Finish()
-	}
+	prog.UpStream.ForEach(func(i string, v *Program) bool {
+		v.Finish()
+		return true
+	})
 	// save instruction
 	prog.Cache.SaveToDatabase()
 
