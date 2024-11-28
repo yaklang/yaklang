@@ -143,9 +143,12 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		program.PkgName = namespaceName
 		declareStatement()
 	case hasName && !y.PreHandler():
+		// this statenment should effect on outter
+		normalStatement()
 		_, f := switchToNamespace()
 		defer f()
-		normalStatement()
+		// this statement should effect namespace inner
+		// normalStatement()
 
 	case !hasName && !y.PreHandler():
 		prog.PkgName = namespaceName
@@ -236,12 +239,14 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					//todo:
 					for _, value := range namespace.ExportValue {
 						if function, b := ssa.ToFunction(value); b {
-							prog.Funcs[fmt.Sprintf("%s\\%s", currentName, function.GetName())] = function
+							name := fmt.Sprintf("%s\\%s", currentName, function.GetName())
+							prog.Funcs.Set(name, function)
 						}
 					}
 					for _, t := range namespace.ExportType {
 						if bluePrint, ok := t.(*ssa.Blueprint); ok {
-							prog.Blueprint[fmt.Sprintf("%s\\%s", currentName, bluePrint.Name)] = bluePrint
+							name := fmt.Sprintf("%s\\%s", currentName, bluePrint.Name)
+							prog.Blueprint.Set(name, bluePrint)
 						}
 					}
 

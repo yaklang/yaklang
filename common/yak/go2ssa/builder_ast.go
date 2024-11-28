@@ -24,11 +24,12 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		for aliasName, aliasType := range b.GetAliasAll() {
 			lib.SetExportType(aliasName, aliasType)
 		}
-		for funcName, funcValue := range b.GetProgram().Funcs {
+		b.GetProgram().Funcs.ForEach(func(funcName string, funcValue *ssa.Function) bool {
 			if !funcValue.IsMethod() && funcValue.GetName() != "@init" {
 				lib.SetExportValue(funcName, funcValue)
 			}
-		}
+			return true
+		})
 		for globalName, globalValue := range b.GetGlobalVariables() {
 			lib.SetExportValue(globalName, globalValue)
 		}

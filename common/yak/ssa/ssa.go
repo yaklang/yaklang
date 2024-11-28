@@ -237,8 +237,8 @@ type Program struct {
 	//consts
 	Consts map[string]Value
 	// function list
-	Funcs       map[string]*Function
-	Blueprint   map[string]*Blueprint
+	Funcs       *omap.OrderedMap[string, *Function]
+	Blueprint   *omap.OrderedMap[string, *Blueprint]
 	ExportValue map[string]Value
 	ExportType  map[string]Type
 

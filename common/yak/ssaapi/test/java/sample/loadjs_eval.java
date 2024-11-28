@@ -1,4 +1,5 @@
-package org.vuln.javasec.controller.basevul.rce;
+// package org.vuln.javasec.controller.basevul.rce;
+package org.vuln.javasec.controller.basevul.file;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;

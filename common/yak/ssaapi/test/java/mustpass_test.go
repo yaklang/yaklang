@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -55,14 +57,14 @@ func TestMustPass_Debug(t *testing.T) {
 		return
 	}
 
-	_, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
+	prog, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
-	defer ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
+	// defer ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
 
-	keyword := "xxe.sf"
-	prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
+	keyword := "local-file-write.sf"
+	// prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,11 +79,12 @@ func TestMustPass_Debug(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		result, err := prog.SyntaxFlowWithError(string(raw), ssaapi.QueryWithEnableDebug(true))
+		result, err := prog.SyntaxFlowWithError(string(raw))
 		if err != nil {
 			t.Fatal(err)
 		}
-
+		result.Show()
+		result.Dump(false)
 		if len(result.GetErrors()) > 0 {
 			t.Fatal("errors: ", strings.Join(result.GetErrors(), "\n"))
 		}
@@ -99,4 +102,25 @@ func TestMustPass_Debug(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestAnnontation(t *testing.T) {
+	prog, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
+	if err != nil {
+		t.Fatalf("compile failed: %v", err)
+	}
+	rule := `
+*Mapping.__ref__?{opcode: function} as $entryFunc;
+$entryFunc(*?{opcode: param && !have: this} as $source);
+`
+	result, err := prog.SyntaxFlowWithError(rule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result.Show()
+	valueName := lo.Map(result.GetValues("entryFunc"), func(value *ssaapi.Value, _ int) string {
+		return value.String()
+	})
+	require.Greater(t, len(valueName), 10)
+	require.Greater(t, len(result.GetValues("source")), 10)
 }
