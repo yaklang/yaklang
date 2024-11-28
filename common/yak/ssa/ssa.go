@@ -212,7 +212,8 @@ type Program struct {
 	Application *Program // current Application
 	// program relationship
 	DownStream map[string]*Program
-	UpStream   map[string]*Program
+	// UpStream   map[string]*Program
+	UpStream *omap.OrderedMap[string, *Program]
 
 	EnableDatabase bool             // for compile, whether use database
 	irProgram      *ssadb.IrProgram // from database program
