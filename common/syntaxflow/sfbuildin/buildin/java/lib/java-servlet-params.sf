@@ -4,6 +4,7 @@ desc(
   lib: 'java-servlet-param'
 )
 
+HttpServletRequest?{opcode:param}?{<typeName>?{have:'javax.servlet.http.HttpServletRequest'}} as $req
 /(do(Get|Post|Delete|Filter|[A-Z]\w+))|(service)/(*?{!have: this && opcode: param } as $req);
 $req.getParameter() as $directParam;
 $req -{
