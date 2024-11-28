@@ -186,10 +186,10 @@ func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
 		"yakit": GetExtYakitLibByClient(client),
 		"risk": map[string]any{
 			"NewRisk":                   YakitNewRiskBuilder(client),
-			"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(client.runtimeID),
-			"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(client.runtimeID),
-			"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(client.runtimeID),
-			"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(client.runtimeID),
+			"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(yakit.YakitPluginInfo{}),
+			"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(yakit.YakitPluginInfo{}),
+			"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(yakit.YakitPluginInfo{}),
+			"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(yakit.YakitPluginInfo{}),
 		},
 	})
 
