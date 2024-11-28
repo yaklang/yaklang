@@ -115,7 +115,9 @@ func (f *FunctionBuilder) SetCurrent(i Instruction, noChangeRanges ...bool) func
 
 	f.CurrentBlock = i.GetBlock()
 	f.Function = i.GetFunc()
-	f.parentScope = builder.parentScope
+	if builder != nil { // check nil skip replace scope
+		f.parentScope = builder.parentScope
+	}
 	if !noChangeRange {
 		f.CurrentRange = i.GetRange()
 	}

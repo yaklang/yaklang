@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
@@ -88,6 +89,7 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 	}
 	if !utils.IsNil(_method) {
 		if function, b := ToFunction(_method); b {
+			_ = function
 			function.Build()
 		}
 	}

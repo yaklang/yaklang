@@ -120,6 +120,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		if library == nil || !ok {
 			library = prog.NewLibrary(namespaceName, []string{prog.Loader.GetBasePath()})
 		}
+		library.VisitAst(raw)
 		//if custom syntax, only syntax it
 		library.PushEditor(prog.GetCurrentEditor())
 		functionBuilder := library.GetAndCreateFunctionBuilder(namespaceName, "init")
@@ -142,6 +143,8 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		program.PkgName = namespaceName
 		declareStatement()
 	case hasName && !y.PreHandler():
+		_, f := switchToNamespace()
+		defer f()
 		normalStatement()
 
 	case !hasName && !y.PreHandler():

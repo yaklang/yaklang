@@ -1,9 +1,10 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func Test_Class_Member(t *testing.T) {

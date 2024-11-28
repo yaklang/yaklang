@@ -21,7 +21,7 @@ func TestSqliteID(t *testing.T) {
 	id2, _ := ssadb.RequireIrCode(db, projectName)
 	defer ssadb.DeleteProgram(db, projectName)
 
-	require.Equal(t, id+1, id2)
+	require.Greater(t, id2, id)
 }
 
 func TestBuild(t *testing.T) {

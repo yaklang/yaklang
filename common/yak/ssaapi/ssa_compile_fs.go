@@ -54,6 +54,8 @@ func (c *config) parseProject() (Programs, error) {
 	preHandlerSize := 0
 	parseSize := 0
 
+	prog.ProcessInfof("parse project in fs: %v, path: %v", c.fs, c.info)
+	prog.ProcessInfof("calculate total size of project")
 	// get total size
 	filesys.Recursive(programPath,
 		filesys.WithFileSystem(c.fs),
@@ -85,11 +87,12 @@ func (c *config) parseProject() (Programs, error) {
 	if (parseSize + preHandlerSize) == 0 {
 		return nil, utils.Errorf("no file can compile with language[%s]", c.language)
 	}
+	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerSize, parseSize)
 	totalProcess = parseSize + preHandlerSize + 1
 
 	// pre handler
 	prog.SetPreHandler(true)
-	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", c.fs, programPath)
+	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", c.fs, c.info)
 	filesys.Recursive(programPath,
 		filesys.WithFileSystem(c.fs),
 		filesys.WithContext(c.ctx),
@@ -177,7 +180,7 @@ func (c *config) parseProject() (Programs, error) {
 		return nil, utils.Errorf("parse project stop")
 	}
 	handledProcess = preHandlerSize + parseSize
-	prog.ProcessInfof("program %s finishing", prog.Name) // %99
+	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, prog.Cache.CountInstruction()) // %99
 	prog.Finish()
 	var progs = []*Program{NewProgram(prog, c)}
 	c.SaveProfile()
