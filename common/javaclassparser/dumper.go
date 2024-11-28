@@ -156,7 +156,9 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 
 	result = fmt.Sprintf(result, accessFlags, className, superStr, attrs)
-	result = fmt.Sprintf("%s\n%s", strings.Join(annoStrs, "\n"), result)
+	if len(annoStrs) > 0 {
+		result = fmt.Sprintf("%s\n%s", strings.Join(annoStrs, "\n"), result)
+	}
 	importsStr := ""
 	for _, s := range funcCtx.GetAllImported() {
 		if utils.StringSliceContain(buildInLib, s) {
