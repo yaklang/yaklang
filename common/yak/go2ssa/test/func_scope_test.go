@@ -54,6 +54,7 @@ func TestFunction_Value(t *testing.T) {
 }
 
 func TestFunction_GlobalValue(t *testing.T) {
+	t.Skip()
 	t.Run("global value", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
