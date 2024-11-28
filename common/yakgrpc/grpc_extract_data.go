@@ -5,10 +5,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"regexp"
 	"strings"
-	"sync"
+	"time"
 )
 
 func (s *Server) ExtractData(server ypb.Yak_ExtractDataServer) error {
@@ -31,44 +32,21 @@ func (s *Server) ExtractData(server ypb.Yak_ExtractDataServer) error {
 	}
 }
 
-var _cacheForExtractingRequest = new(sync.Map)
+var _cacheForExtractingRequest = utils.NewTTLCache[*httptpl.YakExtractor](10 * time.Second)
 
 func execExtractRequest(req *ypb.ExtractDataRequest) (string, error) {
 	data := req.GetData()
 	if data == nil {
 		return "", utils.Error("extract data is empty...")
 	}
-	dataString := string(data)
-
-	var err error
+	var reRule string
+	var reGroupName []string
 	switch strings.ToLower(req.GetMode()) {
 	case "regexp":
 		if req.GetMatchRegexp() == "" {
 			return "", utils.Error("empty mach regexp")
 		}
-		reRule := req.GetMatchRegexp()
-		reRuleSha1 := utils.CalcSha1(reRule)
-		var ins *regexp.Regexp
-		insRaw, ok := _cacheForExtractingRequest.Load(reRuleSha1)
-		if !ok {
-			ins, err = regexp.Compile(reRule)
-			if err != nil {
-				return "", utils.Errorf("compile regexp-between re failed: %s", err)
-			}
-			_cacheForExtractingRequest.Store(reRuleSha1, ins)
-		} else {
-			ins = insRaw.(*regexp.Regexp)
-		}
-		results := ins.FindSubmatch(data)
-		if results != nil {
-			if len(results) > 1 {
-				return string(bytes.Join(results[1:], []byte(" "))), nil
-			}
-			//start, end := results[0][0], results[0][1]
-			return string(results[0]), nil
-		} else {
-			return "", nil
-		}
+		reRule = req.GetMatchRegexp()
 	case "regexp-between":
 		if req.GetPrefixRegexp() == "" && req.GetSuffixRegexp() == "" {
 			return "", utils.Error("regexp-between mode cannot use empty prefix/suffix at same time")
@@ -81,31 +59,34 @@ func execExtractRequest(req *ypb.ExtractDataRequest) (string, error) {
 		if suffixRe == "" {
 			suffixRe = "$"
 		}
-		reRule := fmt.Sprintf("(?sU)(%v)(?P<extracted>.+)(%v)", prefixRe, suffixRe)
-		reRuleSha1 := utils.CalcSha1(reRule)
-		var ins *regexp.Regexp
-		insRaw, ok := _cacheForExtractingRequest.Load(reRuleSha1)
-		if !ok {
-			ins, err = regexp.Compile(reRule)
-			if err != nil {
-				return "", utils.Errorf("compile regexp-between re failed: %s", err)
-			}
-			_cacheForExtractingRequest.Store(reRuleSha1, ins)
-		} else {
-			ins = insRaw.(*regexp.Regexp)
-		}
-		subs := ins.FindAllStringSubmatch(dataString, 1)
-		if len(subs) == 0 {
-			return "", nil
-		}
-		firstSubmatches := subs[0]
-		if firstSubmatches != nil {
-			return firstSubmatches[ins.SubexpIndex("extracted")], nil
-		} else {
-			return "", nil
-		}
+		reRule = fmt.Sprintf("(?sU)(%v)(?P<extracted>.+)(%v)", prefixRe, suffixRe)
+		reGroupName = []string{"extracted"}
 	default:
 		return "", utils.Errorf("no mode: %v", req.GetMode())
+	}
+	reRuleSha1 := utils.CalcSha1(fmt.Sprintf("%v-%v", reRule, reGroupName))
+	var extractor *httptpl.YakExtractor
+	if extractor, _ = _cacheForExtractingRequest.Get(reRuleSha1); extractor == nil {
+		extractor = &httptpl.YakExtractor{
+			Id:                   0,
+			Name:                 "",
+			Type:                 "regex",
+			Scope:                "all",
+			Groups:               []string{reRule},
+			RegexpMatchGroup:     nil,
+			RegexpMatchGroupName: reGroupName,
+			XPathAttribute:       "",
+		}
+		_cacheForExtractingRequest.Set(reRuleSha1, extractor)
+	}
+	resMap, err := extractor.Execute(data)
+	if extractData, ok := resMap["data"]; err != nil || !ok {
+		return "", utils.Errorf("extract error: %s", err)
+	} else {
+		if ret, ok := extractData.([]string); ok {
+			return strings.Join(ret, ","), nil
+		}
+		return utils.InterfaceToString(extractData), nil
 	}
 }
 
