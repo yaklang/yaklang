@@ -242,7 +242,7 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 					opt(lowhttpConfig)
 				}
 				renderVars := utils2.ExtractorVarsFromUrl(u)
-				err := tcpReq.Execute(config, p, renderVars, lowhttpConfig, func(response []*NucleiTcpResponse, matched bool, extractorResults map[string]any) {
+				err := tcpReq.Execute(config, p, renderVars, lowhttpConfig, y, func(response []*NucleiTcpResponse, matched bool, extractorResults map[string]any) {
 					atomic.AddInt64(&count, 1)
 					config.ExecuteTCPResultCallback(y, tcpReq, response, matched, extractorResults)
 					if config.Debug || config.DebugResponse {
@@ -384,7 +384,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			if y.ReverseConnectionNeed { // check token even if send error
 				if v, ok := y.Variables.Get("reverse_dnslog_token"); ok {
 					if config.OOBRequireCheckingTrigger == nil {
-						InjectInteractshVar(codec.AnyToString(v.Data), config.RuntimeId, runtimeVars)
+						y.InjectInteractshVar(codec.AnyToString(v.Data), config.RuntimeId, runtimeVars)
 					}
 				}
 			}
@@ -441,8 +441,11 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	return responses, matchResults, extracted, count
 }
 
-func InjectInteractshVar(token string, runtimeID string, vars map[string]any) {
-	DnsLogEvents, err := yakit.CheckDNSLogByToken(token, runtimeID)
+func (y *YakTemplate) InjectInteractshVar(token string, runtimeID string, vars map[string]any) {
+	DnsLogEvents, err := yakit.CheckDNSLogByToken(token, yakit.YakitPluginInfo{
+		PluginName: y.ScriptName,
+		RuntimeId:  runtimeID,
+	})
 	if err != nil {
 		log.Error("CheckDNSLogByToken failed: ", err)
 	}

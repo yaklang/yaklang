@@ -27,7 +27,8 @@ type NucleiTcpResponse struct {
 func (y *YakNetworkBulkConfig) handleConn(
 	config *Config,
 	conn net.Conn, lowhttpConfig *lowhttp.LowhttpExecConfig,
-	vars map[string]any, callback func(rsp []*NucleiTcpResponse, matched bool, extractorResults map[string]any),
+	vars map[string]any, template *YakTemplate,
+	callback func(rsp []*NucleiTcpResponse, matched bool, extractorResults map[string]any),
 ) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -89,7 +90,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 			if y.ReverseConnectionNeed {
 				if token, ok := vars["reverse_dnslog_token"].(string); ok {
 					if config.OOBRequireCheckingTrigger == nil {
-						InjectInteractshVar(token, config.RuntimeId, vars)
+						template.InjectInteractshVar(token, config.RuntimeId, vars)
 					}
 				}
 			}
@@ -154,7 +155,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 
 func (y *YakNetworkBulkConfig) Execute(
 	config *Config,
-	vars map[string]interface{}, params map[string]string, lowhttpConfig *lowhttp.LowhttpExecConfig,
+	vars map[string]interface{}, params map[string]string, lowhttpConfig *lowhttp.LowhttpExecConfig, template *YakTemplate,
 	callback func(rsp []*NucleiTcpResponse, matched bool, extractorResults map[string]any),
 ) error {
 	if len(y.Hosts) == 0 {
@@ -196,7 +197,7 @@ func (y *YakNetworkBulkConfig) Execute(
 			log.Errorf("get conn[%v] failed: %s", target, err)
 			continue
 		}
-		err = y.handleConn(config, conn, lowhttpConfig, vars, callback)
+		err = y.handleConn(config, conn, lowhttpConfig, vars, template, callback)
 		if conn != nil {
 			conn.Close()
 		}

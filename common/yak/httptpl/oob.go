@@ -30,8 +30,11 @@ func RequireOOBAddr(timeout ...float64) (string, string, error) {
 	return "", "", utils.Errorf("get dnslog domain failed")
 }
 
-func CheckingDNSLogOOB(token string, runtimeID string, timeout ...float64) (string, []byte) {
-	DnsLogEvents, err := yakit.CheckDNSLogByToken(token, runtimeID, timeout...)
+func CheckingDNSLogOOB(token string, runtimeID string, templateName string, timeout ...float64) (string, []byte) {
+	DnsLogEvents, err := yakit.CheckDNSLogByToken(token, yakit.YakitPluginInfo{
+		PluginName: templateName,
+		RuntimeId:  runtimeID,
+	}, timeout...)
 	if err != nil {
 		log.Error("CheckDNSLogByToken failed: ", err)
 	}
