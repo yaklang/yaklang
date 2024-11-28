@@ -1752,6 +1752,7 @@ var PoCExports = map[string]interface{}{
 	"password":             WithPassword,
 	"randomJA3":            WithRandomJA3,
 	"json":                 WithJSON,
+	"body":                 WithBody,
 
 	"replaceFirstLine":                   WithReplaceHttpPacketFirstLine,
 	"replaceMethod":                      WithReplaceHttpPacketMethod,
