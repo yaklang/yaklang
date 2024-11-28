@@ -1,10 +1,12 @@
 package ssa
 
 import (
+	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
+	"runtime"
 )
 
 func NewPhi(block *BasicBlock, variable string) *Phi {
@@ -88,6 +90,17 @@ var _ ssautil.SpinHandle[Value] = SpinHandle
 // build phi
 func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Value) func(name string, t []Value) Value {
 	return func(name string, vst []Value) Value {
+		defer func() {
+			if msg := recover(); msg != nil {
+				var buffer = make([]byte, 4096)
+				stack := runtime.Stack(buffer, false)
+				fmt.Println("报错原因：" + string(buffer[:stack]))
+				fmt.Println("name: " + name)
+				for _, value := range vst {
+					fmt.Println("verbose: " + value.GetShortVerboseName())
+				}
+			}
+		}()
 		if block != nil {
 			recoverBlock := builder.CurrentBlock
 			builder.CurrentBlock = block
@@ -111,11 +124,6 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		if len(vs) == 0 {
 			return nil
 		}
-
-		//todo: fix this why vs is nil
-		if len(vs) == 1 {
-			return vs[0]
-		}
 		for _, v := range vs {
 			if v.GetType().GetTypeKind() == AnyTypeKind {
 				continue
@@ -129,14 +137,13 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		case 0:
 			t = CreateAnyType()
 		case 1:
-			for typ := range typeMerge {
-				t = typ
+			for t2, _ := range typeMerge {
+				t = t2
 			}
 		default:
 			// import the or type
 			t = NewOrType(lo.Keys(typeMerge)...)
 		}
-
 		phi := builder.EmitPhi(name, vs)
 		phi.SetType(t)
 		if phi == nil {
