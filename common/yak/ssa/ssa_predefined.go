@@ -349,7 +349,7 @@ func (n *anValue) RemoveUser(u User) {
 func (n *anValue) GetType() Type {
 	if n == nil {
 		log.Errorf("BUG in *anValue.GetType(), the *anValue is nil!")
-		return GetAnyType()
+		return CreateAnyType()
 	}
 	return n.typ
 }

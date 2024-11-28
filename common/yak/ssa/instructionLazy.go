@@ -593,6 +593,7 @@ func (lz *LazyInstruction) GetStringMember(n string) (Value, bool) {
 func (lz *LazyInstruction) GetType() Type {
 	lz.check()
 	if lz.Value == nil {
+		log.Errorf("[BUG]: lazyInstruction value is nil,get type fail: %d", lz.id)
 		return nil
 	}
 	return lz.Value.GetType()

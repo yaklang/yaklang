@@ -20,7 +20,7 @@ func (c *Const) GetRawValue() any {
 func (c *Const) GetType() Type {
 	t := c.typ
 	if t == nil {
-		t = BasicTypes[AnyTypeKind]
+		t = CreateAnyType()
 	}
 	return t
 }

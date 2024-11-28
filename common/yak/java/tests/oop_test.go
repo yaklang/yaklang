@@ -604,3 +604,149 @@ class B{
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
+func TestImport1(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("a.java", `package com.simp.sso.service.imp;
+
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
+/* loaded from: iam.app.5.0.enc.jar:com/simp/sso/service/imp/Encryption.class */
+public class Encryption {
+    public static final int ENC_ALG_DES3_CODE_NULL = 0;
+    public static final String ENC_ALG_DES3 = "3des";
+    public static final int ENC_ALG_DES3_CODE = 100;
+    public static final String ENC_ALG_DES3_EX = "3des_ex";
+    public static final int ENC_ALG_DES3_EX_CODE = 200;
+    public static final String DES3 = "TripleDES";
+    public static final String DES3_TAIL = "/ECB/PKCS5Padding";
+    private static final String str1 = "acftyuij";
+    private static final String str2 = "7653!$#@";
+    private static final String str3 = "R$GV*&(<";
+    private byte[] kbs = null;
+    private int encryptAlg = 0;
+    private Cipher cipherEnc = null;
+    private Cipher cipherDec = null;
+
+    public Encryption(int encAlg, String keyStr) {
+        ini(encAlg, keyStr);
+    }
+
+    public Encryption(String encAlg, String keyStr) {
+        ini(encAlg, keyStr);
+    }
+
+    public boolean ini(int encryptAlg, String keyStr) {
+        if (encryptAlg == 0) {
+            return false;
+        }
+        this.kbs = "acftyuij7653!$#@R$GV*&(<".getBytes();
+        this.encryptAlg = encryptAlg;
+        saltKey(keyStr);
+        return true;
+    }
+
+    public boolean ini(String encAlg, String keyStr) {
+        int alg;
+        if ("3des".equalsIgnoreCase(encAlg)) {
+            alg = 100;
+        } else if ("3des_ex".equalsIgnoreCase(encAlg)) {
+            alg = 200;
+        } else {
+            alg = 0;
+        }
+        return ini(alg, keyStr);
+    }
+
+    private void saltKey(String keyStr) {
+        byte[] bs = keyStr.getBytes();
+        byte a = bs[0];
+        byte b = bs[bs.length - 1];
+        byte c = bs[bs.length / 2];
+        this.kbs[0] = a;
+        this.kbs[this.kbs.length / 2] = b;
+        this.kbs[this.kbs.length - 1] = c;
+    }
+
+    private byte[] saltBySid(String sid) {
+        byte[] bs = sid.getBytes();
+        byte a = bs[bs.length - 3];
+        byte b = bs[bs.length - 2];
+        byte c = bs[bs.length - 1];
+        byte[] rv = new byte[this.kbs.length];
+        System.arraycopy(this.kbs, 0, rv, 0, rv.length);
+        rv[0] = (byte) (rv[0] ^ a);
+        int length = this.kbs.length / 2;
+        rv[length] = (byte) (rv[length] ^ b);
+        int length2 = this.kbs.length - 1;
+        rv[length2] = (byte) (rv[length2] ^ c);
+        return rv;
+    }
+
+    public Cipher getCipherEnc(String sid) {
+        if (this.encryptAlg == 0) {
+            return null;
+        }
+        if (100 == this.encryptAlg) {
+            if (this.cipherEnc == null) {
+                this.cipherEnc = createCipher(1, this.kbs);
+            }
+            return this.cipherEnc;
+        } else if (200 == this.encryptAlg) {
+            byte[] ks = saltBySid(sid);
+            return createCipher(1, ks);
+        } else {
+            return null;
+        }
+    }
+
+    public int getEncryptAlg() {
+        return this.encryptAlg;
+    }
+
+    public Cipher getCipherDec(int decAlg, String sid) {
+        if (decAlg == 0) {
+            return null;
+        }
+        if (100 == decAlg) {
+            if (this.cipherDec == null) {
+                this.cipherDec = createCipher(2, this.kbs);
+            }
+            return this.cipherDec;
+        } else if (200 == decAlg) {
+            byte[] ks = saltBySid(sid);
+            return createCipher(2, ks);
+        } else {
+            return null;
+        }
+    }
+
+    private Cipher createCipher(int mode, byte[] ks) {
+        try {
+            SecretKey key = new SecretKeySpec(ks, DES3);
+            Cipher rv = Cipher.getInstance("TripleDES/ECB/PKCS5Padding");
+            rv.init(mode, key);
+            return rv;
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+            return null;
+        } catch (NoSuchAlgorithmException e2) {
+            e2.printStackTrace();
+            return null;
+        } catch (NoSuchPaddingException e3) {
+            e3.printStackTrace();
+            return null;
+        }
+    }
+}`)
+	ssatest.CheckProfileWithFS(fs, t, func(p ssatest.ParseStage, prog ssaapi.Programs, start time.Time) error {
+		for _, program := range prog {
+			program.Show()
+		}
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}

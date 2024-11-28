@@ -142,9 +142,12 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 			if utils.IsNil(result) {
 				continue
 			}
-			if !utils.IsNil(result) && !slices.Contains(opcode, result.GetOpcode()) {
-				typ := result.GetType()
-				if !utils.IsNil(typ) && typ.GetTypeKind() == ClassBluePrintTypeKind {
+			if !slices.Contains(opcode, result.GetOpcode()) {
+				if utils.IsNil(result.GetType()) {
+					log.Errorf("[BUG]: result type is null,check it: %v  name: %s", result.GetOpcode(), result.GetVerboseName())
+					continue
+				}
+				if result.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 					for key, value := range result.GetAllMember() {
 						variable := value.GetLastVariable()
 						functionType.SideEffects = append(functionType.SideEffects, &FunctionSideEffect{

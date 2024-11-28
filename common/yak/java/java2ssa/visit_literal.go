@@ -38,7 +38,7 @@ func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 			s, err = strconv.Unquote(fmt.Sprintf("\"%s\"", lit[1:len(lit)-1]))
 			if err != nil {
 				log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("unquote error %s", err))
-				return nil
+				return y.EmitConstInst(s)
 			}
 		}
 		runeChar := []rune(s)[0]
@@ -56,14 +56,14 @@ func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 		val, err := strconv.Unquote(text)
 		if err != nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("unquote error %s", err))
-			return nil
+			return y.EmitConstInst(val)
 		}
 		res = y.EmitConstInst(val)
 	} else if ret := i.BOOL_LITERAL(); ret != nil {
 		boolLit, err := strconv.ParseBool(ret.GetText())
 		if err != nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("parse bool error %s", err))
-			return nil
+			return y.EmitConstInst(boolLit)
 		}
 		res = y.EmitConstInst(boolLit)
 	} else if ret = i.NULL_LITERAL(); ret != nil {
