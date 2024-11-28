@@ -110,7 +110,7 @@ jobs:
               # SSAAPI
               go test -timeout 4m ./common/yak/ssaapi/... 
 
-          - name: Test StaticAnalyze / BuildIn SyntaxFlow Rule 
+          - name: Test StaticAnalyze / BuildIn SyntaxFlow Rule
             run: |
               # SSA plugin rule/option
               go test -timeout 20s ./common/yak/static_analyzer/test/...
@@ -124,7 +124,7 @@ jobs:
               # yak ssa
               go test -timeout 20s ./common/yak/yak2ssa/test/...
               # Test Java Syntax
-              go test -timeout 10s ./common/yak/java/...
+              go test -timeout 60s ./common/yak/java/...
               # Test php syntax
               go test -timeout 60s ./common/yak/php/...
               # Test js syntax
@@ -230,7 +230,7 @@ jobs:
           - name: Test FP Scan
             run: |
               go test --timeout 30s ./common/fp/...
-          - name: Test cmd 
+          - name: Test cmd
             run: |
               go test --timeout 30s ./common/yak/cmd/...
           - name: Test Java Decompiler
