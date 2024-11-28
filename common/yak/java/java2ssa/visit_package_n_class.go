@@ -215,9 +215,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	if i == nil {
 		return
 	}
-	annotationFunc, defCallbacks, isStatic := y.VisitModifiers(modifiers)
-	_ = annotationFunc
-	_ = defCallbacks
+	_, _, isStatic := y.VisitModifiers(modifiers)
 	if i.ConstructorDeclaration() != nil {
 		y.VisitConstructorDeclaration(i.ConstructorDeclaration(), class)
 	} else if i.FieldDeclaration() != nil {
@@ -257,7 +255,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	} else if ret := i.RecordDeclaration(); ret != nil {
 		log.Infof("todo: java17: %v", ret.GetText())
 	} else if ret := i.MethodDeclaration(); ret != nil {
-		y.VisitMethodDeclaration(ret, class, isStatic, annotationFunc, defCallbacks)
+		y.VisitMethodDeclaration(ret, class, isStatic, modifiers)
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.GenericConstructorDeclaration(); ret != nil {
 
@@ -565,8 +563,7 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 func (y *builder) VisitMethodDeclaration(
 	raw javaparser.IMethodDeclarationContext,
 	class *ssa.Blueprint, isStatic bool,
-	annotationFunc []func(ssa.Value),
-	defCallback []func(ssa.Value),
+	modify javaparser.IModifiersContext,
 ) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
@@ -583,6 +580,7 @@ func (y *builder) VisitMethodDeclaration(
 	methodName := key
 	newFunc := y.NewFunc(funcName)
 	newFunc.SetMethodName(methodName)
+	annotationFunc, defCallback, _ := y.VisitModifiers(modify)
 	if isStatic {
 		class.RegisterStaticMethod(key, newFunc)
 	} else {
@@ -606,11 +604,11 @@ func (y *builder) VisitMethodDeclaration(
 		y.VisitFormalParameters(i.FormalParameters())
 		y.VisitMethodBody(i.MethodBody())
 		y.Finish()
+		newFunc.Type.AddAnnotationFunc(annotationFunc...)
 		y.FunctionBuilder = y.PopFunction()
 		if len(annotationFunc) > 0 || len(defCallback) > 0 {
 			log.Infof("start to build annotation ref to def: %v", funcName)
 		}
-		newFunc.Type.AddAnnotationFunc(annotationFunc...)
 		for _, def := range defCallback {
 			def(newFunc)
 		}
