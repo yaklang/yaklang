@@ -217,7 +217,7 @@ func TestFunction_GlobalValue(t *testing.T) {
 		}	
 
 		`, []string{
-			"2", "phi(count)[3,1]", "1",
+			"1", "2", "phi(count)[3,1]",
 		}, t)
 	})
 
