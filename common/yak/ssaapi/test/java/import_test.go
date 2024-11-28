@@ -1,10 +1,11 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestImport(t *testing.T) {

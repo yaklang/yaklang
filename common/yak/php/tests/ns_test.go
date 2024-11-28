@@ -206,7 +206,7 @@ namespace {
 			false,
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
-	t.Run("namepsace references each other", func(t *testing.T) {
+	t.Run("namespace references each other", func(t *testing.T) {
 		code := `<?php
 
 namespace a {
@@ -242,7 +242,7 @@ namespace {
 }`
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
 	})
-	t.Run("namepsace references each other1", func(t *testing.T) {
+	t.Run("namespace references each other1", func(t *testing.T) {
 		code := `<?php
 
 namespace a {

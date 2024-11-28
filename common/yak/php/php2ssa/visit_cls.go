@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
@@ -62,7 +60,8 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	if i == nil {
 		return nil
 	}
-	cname := uuid.NewString()
+	// cname := uuid.NewString()
+	cname := fmt.Sprintf("anonymous_%s_%s", y.CurrentFile, y.CurrentRange.GetStart())
 	bluePrint := y.CreateBluePrint(cname)
 	if i.QualifiedStaticTypeRef() != nil {
 		if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
@@ -72,11 +71,8 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, bluePrint)
 	}
-	bluePrint.AddLazyBuilder(func() {
-		bluePrint.BuildConstructorAndDestructor()
-	})
 	//todo: 可能会有问题
-	bluePrint.Build()
+	// bluePrint.Build()
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(bluePrint)
 	args := []ssa.Value{obj}
@@ -156,9 +152,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			for _, statement := range i.AllClassStatement() {
 				y.VisitClassStatement(statement, class)
 			}
-			class.AddLazyBuilder(func() {
-				class.BuildConstructorAndDestructor()
-			})
 		}
 	} else {
 		// as interface

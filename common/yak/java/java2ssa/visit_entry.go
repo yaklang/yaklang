@@ -1,9 +1,10 @@
 package java2ssa
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
@@ -57,6 +58,7 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 			y.VisitTypeDeclaration(declarationContext)
 		}
 	}
+	y.GetProgram().VisitAst(i)
 
 	return nil
 }

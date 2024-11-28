@@ -1,8 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type BluePrintFieldKind int
@@ -151,23 +152,4 @@ func (b *Blueprint) InitializeWithContainer(con *Make) error {
 }
 func (b *Blueprint) GetClassContainer() Value {
 	return b._container
-}
-
-func (c *Blueprint) BuildConstructorAndDestructor() {
-	for _, p := range c.ParentClass {
-		p.BuildConstructorAndDestructor()
-	}
-
-	for _, value := range c.MagicMethod {
-		if function, b := ToFunction(value); b {
-			function.Build()
-		}
-
-	}
-	for _, m := range c.NormalMethod {
-		m.Build()
-	}
-	for _, function := range c.StaticMethod {
-		function.Build()
-	}
 }

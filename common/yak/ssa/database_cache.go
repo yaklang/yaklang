@@ -49,7 +49,7 @@ type Cache struct {
 	constCache      []Instruction
 	saveInstruct    chan instructionIrCode
 	waitGroup       *sync.WaitGroup
-	once            *sync.Once
+	close           *atomic.Bool
 }
 
 func (c *Cache) SetFetchId(_func func() int64) {
@@ -73,13 +73,22 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 		constCache:       make([]Instruction, 0),
 		saveInstruct:     make(chan instructionIrCode, 1024),
 		waitGroup:        &sync.WaitGroup{},
-		once:             &sync.Once{},
+		close:            atomic.NewBool(false),
 	}
 
 	if databaseEnable {
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
 		cache.InstructionCache.SetCheckExpirationCallback(func(key int64, value instructionIrCode) bool {
-			cache.saveInstruct <- value
+			if !cache.close.Load() && cache.saveInstruct != nil {
+				cache.saveInstruct <- value
+			} else {
+				/* todo: when we close this cache,
+				some instruction expiration,
+				this will be save in closer? or handle in here?
+				*/
+				log.Infof("cache close, save instruction: %v", value.inst.GetId())
+				cache.saveInstruction(value)
+			}
 			return true
 		})
 		cache.waitGroup.Add(1)
@@ -213,6 +222,7 @@ func (c *Cache) AddClassInstance(name string, inst Instruction) {
 // =============================================== Database =======================================================
 // only LazyInstruction and false marshal will not be saved to database
 func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
+	// log.Infof("save instruction : %v", instIr.inst.GetId())
 	start := time.Now()
 	if !c.HaveDatabaseBackend() {
 		log.Errorf("BUG: saveInstruction called when DB is nil")
@@ -248,15 +258,24 @@ func (c *Cache) SaveToDatabase() {
 	if !c.HaveDatabaseBackend() {
 		return
 	}
-	c.once.Do(func() {
-		all := c.InstructionCache.GetAll()
-		c.InstructionCache.Close()
-		for _, code := range all {
-			c.saveInstruct <- code
-		}
+	all := c.InstructionCache.GetAll()
+	c.InstructionCache.DeleteAll()
+	for _, code := range all {
+		c.saveInstruct <- code
+	}
+}
+
+func (c *Cache) Wait() {
+	if !c.close.Load() {
 		close(c.saveInstruct)
-	})
+		c.saveInstruct = nil
+		c.close.Store(false)
+	}
 	c.waitGroup.Wait()
+}
+
+func (c *Cache) CountInstruction() int {
+	return c.InstructionCache.Count()
 }
 
 func (c *Cache) IsExistedSourceCodeHash(programName string, hashString string) bool {
