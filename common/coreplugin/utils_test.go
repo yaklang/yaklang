@@ -82,13 +82,14 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 			log.Infof("mock domain: %v, token: %v", mockDomain, mockToken)
 			return mockDomain, mockToken, nil
 		}).Build()
-		Mock(yakit.CheckDNSLogByToken).When(func(token string, runtimeId string, timeout ...float64) bool {
+		Mock(yakit.CheckDNSLogByToken).When(func(token string, yakitInfo yakit.YakitPluginInfo, timeout ...float64) bool {
 			_, ok := mockTokenToResultMap[token]
 			return ok
-		}).To(func(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+		}).To(func(token string, yakitInfo yakit.YakitPluginInfo, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 			events, ok := mockTokenToResultMap[token]
 			if !ok {
 				return nil, nil
+
 			} else {
 				return []*tpb.DNSLogEvent{events}, nil
 			}
