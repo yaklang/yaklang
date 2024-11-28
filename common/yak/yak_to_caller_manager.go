@@ -456,8 +456,8 @@ func (y *YakToCallerManager) SetForYakit(
 	ctx context.Context,
 	code string,
 	paramMap map[string]any, callerIf interface {
-	Send(result *ypb.ExecResult) error
-},
+		Send(result *ypb.ExecResult) error
+	},
 	hooks ...string,
 ) error {
 	caller := func(result *ypb.ExecResult) error {
@@ -965,6 +965,22 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		return i
 	})
 
+	nIns.GetVM().RegisterMapMemberCallHandler("risk", "CheckDNSLogByToken", func(i interface{}) interface{} {
+		return yakit.YakitNewCheckDNSLogByToken(pluginContext.YakitPluginInfo)
+	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("risk", "CheckHTTPLogByToken", func(i interface{}) interface{} {
+		return yakit.YakitNewCheckHTTPLogByToken(pluginContext.YakitPluginInfo)
+	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("risk", "CheckRandomTriggerByToken", func(i interface{}) interface{} {
+		return yakit.YakitNewCheckRandomTriggerByToken(pluginContext.YakitPluginInfo)
+	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("risk", "CheckICMPTriggerByLength", func(i interface{}) interface{} {
+		return yakit.YakitNewCheckICMPTriggerByLength(pluginContext.YakitPluginInfo)
+	})
+
 	nIns.GetVM().RegisterMapMemberCallHandler("crawler", "Start", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(string, ...crawler.ConfigOpt) (chan *crawler.Req, error))
 		if ok {
@@ -1353,8 +1369,8 @@ func (y *YakToCallerManager) AddForYakit(
 	ctx context.Context, script *schema.YakScript,
 	paramMap map[string]any,
 	code string, callerIf interface {
-	Send(result *ypb.ExecResult) error
-},
+		Send(result *ypb.ExecResult) error
+	},
 	hooks ...string,
 ) error {
 	caller := func(result *ypb.ExecResult) error {

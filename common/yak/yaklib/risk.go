@@ -3,7 +3,6 @@ package yaklib
 import (
 	"context"
 	"fmt"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -183,10 +182,10 @@ var (
 		"NewRandomPortTrigger":      yakit.NewRandomPortTrigger,
 		"NewDNSLogDomain":           yakit.NewDNSLogDomain,
 		"NewHTTPLog":                yakit.NewHTTPLog,
-		"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(""),
-		"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(""),
-		"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(""),
-		"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(""),
+		"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(yakit.YakitPluginInfo{}),
+		"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(yakit.YakitPluginInfo{}),
+		"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(yakit.YakitPluginInfo{}),
+		"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(yakit.YakitPluginInfo{}),
 		"CheckServerReachable":      yakit.CheckServerReachable,
 		"ExtractTokenFromUrl":       yakit.ExtractTokenFromUrl,
 		"payload":                   yakit.WithRiskParam_Payload,
