@@ -1,0 +1,32 @@
+desc(
+    title: "check file write function",
+    type: audit,
+    level: info,
+    lib: 'golang-file-path'
+)
+
+filepath?{<fullTypeName>?{have: 'path/filepath'}} as $output
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://filepath.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"path/filepath"
+)
+
+func main() {
+	matched, err := filepath.Match("*.txt", "myfile.txt")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	fmt.Println("Matched:", matched) // 输出: Matched: true
+}
+PARAM
+)

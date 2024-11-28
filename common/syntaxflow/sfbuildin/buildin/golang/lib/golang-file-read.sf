@@ -1,0 +1,11 @@
+desc(
+    title: "check file read function",
+    type: audit,
+    level: info,
+    lib: 'golang-file-read'
+)
+
+<include('golang-file-read-bufio')> as $output;
+<include('golang-file-read-ioutil')> as $output;
+
+alert $output

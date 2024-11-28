@@ -1,0 +1,11 @@
+desc(
+    title: "check file write function",
+    type: audit,
+    level: info,
+    lib: 'golang-file-write'
+)
+
+<include('golang-file-write-bufio')> as $output;
+<include('golang-file-write-ioutil')> as $output;
+
+alert $output

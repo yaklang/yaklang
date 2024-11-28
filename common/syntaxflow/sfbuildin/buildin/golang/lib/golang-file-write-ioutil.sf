@@ -2,7 +2,7 @@ desc(
     title: "check file write function",
     type: audit,
     level: info,
-    lib: 'golang-file-write'
+    lib: 'golang-file-write-ioutil',
 )
 
 ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
