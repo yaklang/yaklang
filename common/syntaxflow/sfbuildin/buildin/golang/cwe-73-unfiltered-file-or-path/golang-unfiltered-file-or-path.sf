@@ -13,7 +13,7 @@ $sink?{<self>-{
 
 alert $high for {
     title: 'Reflected XSS detected',
-    title_zh: '检测到反射XSS',
+    title_zh: '检测到未过滤路径',
     type: 'vuln',
     level: 'high',
 }
