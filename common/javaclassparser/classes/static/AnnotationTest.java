@@ -1,11 +1,20 @@
+//
+// Source code recreated from a .class file by IntelliJ IDEA
+// (powered by FernFlower decompiler)
+//
+
 package org.benf.cfr.reader;
 
-import java.lang.annotation.*;
-
-@Deprecated
+@MyAnnotation("test")
 public class AnnotationTest {
-    @Deprecated
-    void main(){
+    @MyAnnotation("field")
+    String field;
+
+    public AnnotationTest() {
+    }
+
+    @MyAnnotation("test1")
+    void main(@MyAnnotation("test1") int p) {
         System.out.println("123");
     }
 }

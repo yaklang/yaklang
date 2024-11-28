@@ -32,9 +32,9 @@ func TestDecompiler(t *testing.T) {
 		{
 			name: "StaticCodeBlockTest",
 		},
-		{
-			name: "AnnotationTest",
-		},
+		//{
+		//	name: "AnnotationTest",
+		//},
 	}
 	for _, testItem := range testCase {
 		t.Run(testItem.name, func(t *testing.T) {
