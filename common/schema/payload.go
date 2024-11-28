@@ -1,14 +1,11 @@
 package schema
 
 import (
-	"context"
 	"strconv"
 	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -114,39 +111,4 @@ func NewPayloadFromGRPCModel(p *ypb.Payload) *Payload {
 	}
 	payload.Hash = payload.CalcHash()
 	return payload
-}
-
-func YieldPayloads(db *gorm.DB, ctx context.Context) chan *Payload {
-	outC := make(chan *Payload)
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*Payload
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
 }

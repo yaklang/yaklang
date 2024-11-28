@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/samber/lo"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -463,7 +464,7 @@ func QueryPayload(db *gorm.DB, folder, group, keyword string, paging *Paging) (*
 }
 
 func YieldPayloads(db *gorm.DB, ctx context.Context) chan *schema.Payload {
-	return schema.YieldPayloads(db, ctx)
+	return bizhelper.YieldModel[*schema.Payload](ctx, db)
 }
 
 func GetAllPayloadGroupName(db *gorm.DB) ([]string, error) {

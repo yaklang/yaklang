@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io/fs"
 	"io/ioutil"
 	"math/rand"
@@ -14,6 +13,9 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata"
+
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	cryptoRand "crypto/rand"
 
@@ -700,7 +702,7 @@ func init() {
 				}
 			}
 
-			ch := schema.YieldPayloads(db.Table("payloads").Select("content, is_file").Order("hit_count desc"), ctx)
+			ch := bizhelper.YieldModel[*schema.Payload](ctx, db.Table("payloads").Select("content, is_file").Order("hit_count desc"))
 
 			f := filter.NewBigFilter()
 			defer f.Close()
