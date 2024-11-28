@@ -232,7 +232,9 @@ func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, dura
 					}
 					var checkingInteractsh func(string, string, ...float64) (string, []byte)
 					if config == nil || config.OOBRequireCheckingTrigger == nil {
-						checkingInteractsh = CheckingDNSLogOOB // if not set, use default func try get
+						checkingInteractsh = func(token string, runtimeID string, timeout ...float64) (string, []byte) { // if not set, use default func try get
+							return CheckingDNSLogOOB(token, runtimeID, name, timeout...)
+						}
 					} else {
 						checkingInteractsh = config.OOBRequireCheckingTrigger
 					}
@@ -258,7 +260,9 @@ func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, dura
 					}
 					var checkingInteractsh func(string, string, ...float64) (string, []byte)
 					if config == nil || config.OOBRequireCheckingTrigger == nil {
-						checkingInteractsh = CheckingDNSLogOOB // if not set, use default func try get
+						checkingInteractsh = func(token string, runtimeID string, timeout ...float64) (string, []byte) { // if not set, use default func try get
+							return CheckingDNSLogOOB(token, runtimeID, name, timeout...)
+						}
 					} else {
 						checkingInteractsh = config.OOBRequireCheckingTrigger
 					}
