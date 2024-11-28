@@ -17,7 +17,8 @@ func (c *config) parseProject() (Programs, error) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			// err = utils.Errorf("parse [%s] error %v  ", path, r)
+			//err = utils.Errorf("parse [%s] error %v  ", path, r)
+			log.Errorf("parse project error: %s", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()

@@ -247,6 +247,9 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 			for _, variableDeclarator := range variableDeclarators {
 				v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
 				name, value := y.VisitVariableDeclarator(v, nil)
+				if utils.IsNil(value) {
+					continue
+				}
 				value.SetType(fieldType)
 				setMember(name, value)
 			}
