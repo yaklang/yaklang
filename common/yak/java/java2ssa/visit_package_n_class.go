@@ -318,6 +318,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	// if len(i.AllIdentifier()) == 1 {
 	// 	// only one type
 	var typ ssa.Type
+	typ = ssa.CreateAnyType()
 	className := i.TypeIdentifier().GetText()
 	//wrapper class
 	switch className {
@@ -484,8 +485,6 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 	setMember := class.RegisterStaticMember
 
 	name := i.Identifier().GetText()
-	variable := y.CreateVariable(name)
-	_ = variable
 	setMember(name, y.EmitValueOnlyDeclare(name))
 	return
 }
@@ -746,7 +745,6 @@ func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorId
 	if text == "" {
 		return ""
 	}
-	y.CreateVariable(text)
 	return text
 }
 

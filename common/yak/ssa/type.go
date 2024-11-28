@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 	"strings"
 	"sync"
@@ -209,6 +210,10 @@ var ExternMethodBuilder MethodBuilder
 
 func GetMethod(t Type, id string) *Function {
 	var f *Function
+	if utils.IsNil(t) {
+		log.Error("[BUG]: type is nil")
+		return f
+	}
 	if fun, ok := t.GetMethod()[id]; ok {
 		f = fun
 		f.Build()

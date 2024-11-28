@@ -30,7 +30,7 @@ func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext)
 			return y.VisitVariableInitializer(allVariableInitializer[i])
 		})
 	if utils.IsNil(obj) {
-		return nil
+		return y.EmitUndefined(raw.GetText())
 	}
 	obj.GetType().(*ssa.ObjectType).Kind = ssa.SliceTypeKind
 	return obj

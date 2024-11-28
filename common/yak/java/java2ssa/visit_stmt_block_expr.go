@@ -121,20 +121,20 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		// 处理切片调用表达式
 		expr := y.VisitExpression(ret.Expression(0))
 		key := y.VisitExpression(ret.Expression(1))
-		if expr == nil {
+		if utils.IsNil(expr) {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), "slice call expression left side is empty")
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		if utils.IsNil(key) {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignRightSideEmpty())
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		return y.ReadMemberCallValue(expr, key)
 	case *javaparser.MemberCallExpressionContext:
 		// 处理成员调用表达式，如通过点操作符访问成员
 		obj := y.VisitExpression(ret.Expression())
-		if obj == nil {
-			return nil
+		if utils.IsNil(obj) {
+			return y.EmitUndefined(raw.GetText())
 		}
 		var key ssa.Value
 		var res ssa.Value
@@ -159,7 +159,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		if utils.IsNil(res) {
 			res = y.ReadMemberCallValue(obj, key)
 			if utils.IsNil(res) {
-				return nil
+				return y.EmitUndefined(raw.GetText())
 			}
 		}
 		resTyp := res.GetType()
@@ -178,15 +178,15 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		if s := ret.MethodCall(); s != nil {
 			return y.VisitMethodCall(s, nil)
 		}
-		return nil
+		return y.EmitUndefined(raw.GetText())
 	case *javaparser.MethodReferenceExpressionContext:
 		// 处理方法引用表达式
 		// todo: 方法引用表达式
-		return nil
+		return y.EmitUndefined(raw.GetText())
 	case *javaparser.ConstructorReferenceExpressionContext:
 		// 处理构造器引用表达式
 		// todo: 构造器引用表达式
-		return nil
+		return y.EmitUndefined(raw.GetText())
 	case *javaparser.Java17SwitchExpressionContext:
 		// 处理 Java 17 的 switch 表达式
 		value := y.VisitSwitchExpression(ret.SwitchExpression(), true)
@@ -228,7 +228,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		}
 		if variable == nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 
 		if postfix := ret.GetPostfix().GetText(); postfix == "++" {
@@ -281,7 +281,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 
 		if variable == nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 
 		value = y.ReadValueByVariable(variable)
@@ -299,7 +299,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		}
 		if variable == nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 
 		value = y.ReadValueByVariable(variable)
@@ -321,7 +321,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 
 		v := y.VisitExpression(ret.Expression())
 		if utils.IsNil(v) {
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		if castType != nil {
 			v.SetType(castType)
@@ -347,7 +347,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			opcode = ssa.OpMod
 		default:
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		return y.EmitBinOp(opcode, op1, op2)
 	case *javaparser.AdditiveExpressionContext:
@@ -361,7 +361,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			opcode = ssa.OpSub
 		default:
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		return y.EmitBinOp(opcode, op1, op2)
 	case *javaparser.ShiftExpressionContext:
@@ -382,7 +382,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 
 		if ltNum != 0 && rtNum != 0 {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		if ltNum == 2 {
 			opcode = ssa.OpShl
@@ -393,7 +393,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			opcode = ssa.OpShr
 		} else {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		return y.EmitBinOp(opcode, op1, op2)
 	case *javaparser.RelationalExpressionContext:
@@ -411,7 +411,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			opcode = ssa.OpGtEq
 		default:
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		return y.EmitBinOp(opcode, op1, op2)
 
@@ -429,7 +429,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			opcode = ssa.OpNotEq
 		default:
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		return y.EmitBinOp(opcode, op1, op2)
 	case *javaparser.BitwiseAndExpressionContext:
@@ -440,7 +440,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			opcode = ssa.OpAnd
 		} else {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		return y.EmitBinOp(opcode, op1, op2)
 	case *javaparser.BitwiseXORExpressionContext:
@@ -451,7 +451,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			opcode = ssa.OpXor
 		} else {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		return y.EmitBinOp(opcode, op1, op2)
 	case *javaparser.BitwiseORExpressionContext:
@@ -462,7 +462,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			opcode = ssa.OpOr
 		} else {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		return y.EmitBinOp(opcode, op1, op2)
 	case *javaparser.LogicANDExpressionContext:
@@ -531,7 +531,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 
 		if variable == nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		v := y.VisitExpression(ret.Expression(1))
 		switch ret.GetBop().GetText() {
@@ -559,7 +559,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			opcode = ssa.OpXor
 		default:
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		value := y.EmitBinOp(opcode, y.ReadValueByVariable(variable), v)
 		y.AssignVariable(variable, value)
@@ -570,7 +570,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		variable = y.CreateVariable(ret.Identifier().GetText())
 		if variable == nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		v := y.VisitExpression(ret.Expression())
 		switch ret.GetBop().GetText() {
@@ -598,7 +598,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			opcode = ssa.OpXor
 		default:
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		value := y.EmitBinOp(opcode, y.ReadValueByVariable(variable), v)
 		y.AssignVariable(variable, value)
@@ -668,11 +668,10 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		log.Errorf("unsupported expression type: %T", ret)
 		panic("unsupported expression type")
 	}
-
-	return y.EmitUndefined("_")
+	return y.EmitConstInstNil()
 }
 
-func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.Value) *ssa.Call {
+func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.Value) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -684,7 +683,7 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 		return nil
 	}
 
-	if object == nil {
+	if utils.IsNil(object) {
 		var v ssa.Value
 		if ret := i.Identifier(); ret != nil {
 			v = y.VisitIdentifier(ret.GetText())
@@ -720,7 +719,8 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 		}
 	}
 
-	return nil
+	return y.EmitUndefined(raw.GetText())
+
 }
 
 func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
@@ -771,7 +771,7 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 		return y.EmitTypeValue(typ)
 	}
 
-	return nil
+	return y.EmitUndefined(raw.GetText())
 }
 
 func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext) ssa.Value {
@@ -788,7 +788,7 @@ func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext) ssa
 	if i.Identifier() != nil {
 		return y.EmitConstInst(i.Identifier().GetText())
 	}
-	return nil
+	return y.EmitUndefined(raw.GetText())
 }
 
 func (y *builder) VisitBlockOrState(raw javaparser.IBlockOrStateContext) {
@@ -831,7 +831,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 				return y.VisitExpression(expr)
 			}
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.UnexpectedAssertStmt())
-			return nil
+			return y.EmitUndefined(raw.GetText())
 		}
 		exprs := ret.AllExpression()
 		lenExprs := len(exprs)
@@ -842,8 +842,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		if lenExprs > 1 {
 			msgV = getExpr(1)
 		}
-		y.EmitAssert(cond, msgV, exprs[0].GetText())
-		return nil
+		return y.EmitAssert(cond, msgV, exprs[0].GetText())
 	case *javaparser.IfStatementContext:
 		// 处理 if 语句
 		y.VisitIfStmt(ret.Ifstmt())
@@ -1123,6 +1122,11 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 	name = id.Identifier().GetText()
 	recoverRange2 := y.SetRange(id)
 	variable := y.CreateVariable(name)
+	defer func() {
+		if utils.IsNil(value) {
+			y.AssignVariable(variable, y.EmitUndefined(name))
+		}
+	}()
 	recoverRange2()
 
 	if i.VariableInitializer() != nil {
@@ -1148,6 +1152,7 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		return name, value
 	} else {
 		value := y.EmitValueOnlyDeclare(name)
+		y.AssignVariable(variable, value)
 		return name, value
 	}
 
@@ -1720,7 +1725,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 			log.Warnf("class %v instantiation failed. maybe the origin (package) is not loaded? (dependency missed) ", className)
 			variable := y.CreateVariable(className)
 			defaultClassFullback := fixChainCreator()
-			if defaultClassFullback == nil {
+			if utils.IsNil(defaultClassFullback) {
 				log.Errorf("fixChainCreator failed.")
 				return obj, nil
 			}

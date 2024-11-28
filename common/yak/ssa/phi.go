@@ -103,9 +103,19 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		for _, v := range vst {
 			if v != nil {
 				vs = append(vs, v)
+			} else {
+				log.Errorf("[BUG]: generate phi value is nil,check it. name: %s,currentFile: %s", name, builder.CurrentFile)
+				continue
 			}
 		}
+		if len(vs) == 0 {
+			return nil
+		}
 
+		//todo: fix this why vs is nil
+		if len(vs) == 1 {
+			return vs[0]
+		}
 		for _, v := range vs {
 			if v.GetType().GetTypeKind() == AnyTypeKind {
 				continue
@@ -117,7 +127,7 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		}
 		switch len(typeMerge) {
 		case 0:
-			t = GetAnyType()
+			t = CreateAnyType()
 		case 1:
 			for typ := range typeMerge {
 				t = typ
@@ -130,9 +140,6 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		phi := builder.EmitPhi(name, vs)
 		phi.SetType(t)
 		if phi == nil {
-			return nil
-		}
-		if len(vs) == 0 {
 			return nil
 		}
 		phi.GetProgram().SetVirtualRegister(phi)
