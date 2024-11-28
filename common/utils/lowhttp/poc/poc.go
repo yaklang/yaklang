@@ -498,15 +498,77 @@ func WithJSON(i any) PocConfigOption {
 	}
 }
 
-// body 是一个请求选项参数，用于指定请求的 body，需要传入一个任意类型的参数，会自动转换为 json 格式
+// body 是一个请求选项参数，用于指定请求的 body，需要传入一个任意类型的参数，如果不是 string 或者 bytes 会抛出日志并忽略。
 // Example:
 // ```
 // poc.Post("https://www.example.com", poc.body("a=b")) // 向 www.example.com 发起请求，请求的 body 为 a=b
 // ```
 func WithBody(i any) PocConfigOption {
 	return func(c *PocConfig) {
-		raw := utils.InterfaceToBytes(i)
-		WithReplaceHttpPacketBody(raw, false)(c)
+		switch i.(type) {
+		case string, []byte:
+			WithReplaceHttpPacketBody(utils.InterfaceToBytes(i), false)(c)
+		default:
+			log.Warnf("poc WithBody Failed: %#v", i)
+		}
+	}
+}
+
+// query 是一个请求选项参数，用于指定请求的 query 参数，需要传入一个任意类型的参数，会自动转换为 query 参数
+// 如果输入的是 map 类型，则会自动转换为 query 参数，例如：{"a": "b"} 转换为 a=b
+// 如果输入的是其他，会把字符串结果直接作为 query 设置
+// Example:
+// ```
+// poc.Get("https://www.example.com", poc.query({"a": "b"})) // 向 www.example.com 发起请求，请求的 query 为 a=b, url 为 https://www.example.com?a=b
+// poc.Get("https://www.example.com", poc.query("a=b")) // 向 www.example.com 发起请求，请求的 query 为 a=b, url 为 https://www.example.com?a=b
+// poc.Get("https://www.example.com", poc.query("abc")) // 向 www.example.com 发起请求，请求的 query 为 a=b, url 为 https://www.example.com?abc
+// ```
+func WithQuery(i any) PocConfigOption {
+	return func(c *PocConfig) {
+		if utils.IsMap(i) {
+			for k, raw := range utils.InterfaceToMap(i) {
+				if len(raw) > 0 {
+					for _, v := range raw {
+						WithAppendQueryParam(k, utils.InterfaceToString(v))(c)
+					}
+				} else {
+					WithAppendQueryParam(k, "")(c)
+				}
+			}
+		} else {
+			WithReplaceHttpPacketQueryParamRaw(utils.InterfaceToString(i))(c)
+		}
+	}
+}
+
+// postData 是一个请求选项参数，用于指定请求的 body 为 post 数据，需要传入一个任意类型的参数，会自动转换为 post 数据
+// 输入是原始字符串，不会修改 Content-Type
+// Example:
+// ```
+// poc.Post("https://www.example.com", poc.postData("a=b")) // 向 www.example.com 发起请求，请求的 body 为 a=b
+// ```
+func WithPostData(i string) PocConfigOption {
+	return func(c *PocConfig) {
+		WithReplaceHttpPacketBody([]byte(i), false)(c)
+	}
+}
+
+// postParams 是一个请求选项参数，用于指定请求的 body 为 post 数据，需要传入一个任意类型的参数，会自动转换为 post 数据
+// 输入是 map 类型，会自动转换为 post 数据，同时会自动设置 Content-Type 为 application/x-www-form-urlencoded
+// Example:
+// ```
+// poc.Post("https://www.example.com", poc.postParams({"a": "b"})) // 向 www.example.com 发起请求，请求的 body 为 a=b 并自动设置 Content-Type 为 application/x-www-form-urlencoded
+// ```
+func WithPostParams(i any) PocConfigOption {
+	return func(c *PocConfig) {
+		if utils.IsMap(i) {
+			WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded")(c)
+			for k, v := range utils.InterfaceToMap(i) {
+				WithReplaceHttpPacketPostParam(k, utils.InterfaceToString(v))(c)
+			}
+		} else {
+			WithPostData(utils.InterfaceToString(i))(c)
+		}
 	}
 }
 
@@ -1753,6 +1815,9 @@ var PoCExports = map[string]interface{}{
 	"randomJA3":            WithRandomJA3,
 	"json":                 WithJSON,
 	"body":                 WithBody,
+	"query":                WithQuery,
+	"postData":             WithPostData,
+	"postParams":           WithPostParams,
 
 	"replaceFirstLine":                   WithReplaceHttpPacketFirstLine,
 	"replaceMethod":                      WithReplaceHttpPacketMethod,

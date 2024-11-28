@@ -22,6 +22,11 @@ func IsMap(input any) bool {
 	switch input.(type) {
 	case map[string]any:
 		return true
+	default:
+		reflectValue := reflect.ValueOf(input)
+		if reflectValue.Kind() == reflect.Map {
+			return true
+		}
 	}
 	return false
 }
