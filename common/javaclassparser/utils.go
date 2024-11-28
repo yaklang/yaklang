@@ -3,6 +3,7 @@ package javaclassparser
 import (
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -209,4 +210,72 @@ func getAccessFlagsVerbose(u uint16) []string {
 	}
 	return result
 
+}
+func ParseAnnotationElementValue(cp *ClassParser) *ElementValuePairAttribute {
+	getUtf8 := func(index uint16) string {
+		s, err := cp.classObj.getUtf8(index)
+		if err != nil {
+			panic(fmt.Errorf("get utf8 error: %s", err))
+		}
+		return s
+	}
+	reader := cp.reader
+	ele := &ElementValuePairAttribute{
+		Name: getUtf8(reader.readUint16()),
+	}
+	tag := reader.readUint8()
+	switch tag {
+	case 'B', 'C', 'D', 'F', 'I', 'J', 'S', 'Z':
+		index := reader.readUint16()
+		var err error
+		ele.Value, err = cp.classObj.getConstantInfo(index)
+		if err != nil {
+			panic(fmt.Errorf("get constant info error: %s", err))
+		}
+	case 's':
+		ele.Value = getUtf8(reader.readUint16())
+	case 'e':
+		val := &EnumConstValue{
+			TypeName:  getUtf8(reader.readUint16()),
+			ConstName: getUtf8(reader.readUint16()),
+		}
+		ele.Value = val
+	case 'c':
+		ele.Value = getUtf8(reader.readUint16())
+	case '@':
+		ele.Value = ParseAnnotation(cp)
+	case '[':
+		length := reader.readUint16()
+		l := []any{}
+		for k := 0; k < int(length); k++ {
+			val := ParseAnnotationElementValue(cp)
+			l = append(l, val)
+		}
+		ele.Value = l
+	default:
+		panic(fmt.Errorf("parse annotation error, unknown tag: %c", tag))
+	}
+	return ele
+}
+func ParseAnnotation(cp *ClassParser) *AnnotationAttribute {
+	getUtf8 := func(index uint16) string {
+		s, err := cp.classObj.getUtf8(index)
+		if err != nil {
+			panic(fmt.Errorf("get utf8 error: %s", err))
+		}
+		return s
+	}
+	reader := cp.reader
+
+	typeIndex := reader.readUint16()
+	elementLen := reader.readUint16()
+	typeName := getUtf8(typeIndex)
+	anno := &AnnotationAttribute{
+		TypeName:          typeName,
+		ElementValuePairs: make([]*ElementValuePairAttribute, elementLen),
+	}
+	for j := range anno.ElementValuePairs {
+		anno.ElementValuePairs[j] = ParseAnnotationElementValue(cp)
+	}
+	return anno
 }
