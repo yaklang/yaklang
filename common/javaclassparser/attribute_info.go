@@ -165,6 +165,33 @@ type ExceptionTableEntry struct {
 	HandlerPc uint16
 	CatchType uint16
 }
+type ElementValuePairAttribute struct {
+	Name  string
+	Value any
+}
+type AnnotationAttribute struct {
+	TypeName          string
+	ElementValuePairs []*ElementValuePairAttribute
+}
+
+type RuntimeVisibleAnnotationsAttribute struct {
+	Type        string
+	AttrLen     uint32
+	Annotations []*AnnotationAttribute
+}
+type EnumConstValue struct {
+	TypeName  string
+	ConstName string
+}
+
+func (r *RuntimeVisibleAnnotationsAttribute) readInfo(cp *ClassParser) {
+	annotationsCount := cp.reader.readUint16()
+	r.Annotations = make([]*AnnotationAttribute, annotationsCount)
+	for i := range r.Annotations {
+		anno := ParseAnnotation(cp)
+		r.Annotations[i] = anno
+	}
+}
 
 func (self *CodeAttribute) readInfo(cp *ClassParser) {
 	self.MaxStack = cp.reader.readUint16()
@@ -207,6 +234,8 @@ func newAttributeInfo(attrName string, attrLen uint32) AttributeInfo {
 		return &SourceFileAttribute{AttrLen: attrLen}
 	case "Synthetic":
 		return &SyntheticAttribute{AttrLen: attrLen}
+	case "RuntimeVisibleAnnotations":
+		return &RuntimeVisibleAnnotationsAttribute{AttrLen: attrLen}
 	default:
 		return &UnparsedAttribute{Name: attrName, Length: attrLen, Info: nil}
 
