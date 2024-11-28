@@ -45,10 +45,11 @@ type YakExtractor struct {
 	// body
 	// header
 	// all
-	Scope            string // header body all
-	Groups           []string
-	RegexpMatchGroup []int
-	XPathAttribute   string
+	Scope                string // header body all
+	Groups               []string
+	RegexpMatchGroup     []int
+	RegexpMatchGroupName []string
+	XPathAttribute       string
 }
 
 // group1 for key
@@ -86,6 +87,10 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 				if err != nil {
 					log.Errorf("compile[%v] failed: %v", group, err)
 					continue
+				}
+
+				for _, groupName := range y.RegexpMatchGroupName {
+					y.RegexpMatchGroup = append(y.RegexpMatchGroup, r.SubexpIndex(groupName))
 				}
 				// default match group 0
 				if len(y.RegexpMatchGroup) == 0 {
