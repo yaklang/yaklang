@@ -825,7 +825,13 @@ func init() {
 		ArgumentDescription: "",
 	})
 
-	AddFuzzTagToGlobal(&FuzzTagDescription{TagName: "bmp", Handler: func(s string) []string { return []string{"\x42\x4d"} }, Description: "生成一个 bmp 文件头，例如 {{bmp}}"})
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName:             "bmp",
+		Handler:             func(s string) []string { return []string{"\x42\x4d"} },
+		Description:         "生成一个 bmp 文件头，例如 {{bmp}}",
+		TagNameVerbose:      "生成bmp文件头",
+		ArgumentDescription: "",
+	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName:             "gif",

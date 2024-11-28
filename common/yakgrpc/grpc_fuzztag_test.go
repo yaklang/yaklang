@@ -115,6 +115,16 @@ func TestGenerateFuzztag(t *testing.T) {
 			},
 			expect: "{{base64()}}{{int(1-5)}}",
 		},
+		{
+			textRange: &ypb.Range{
+				Code:        "哈哈{{int(1-5)}}",
+				StartLine:   1,
+				StartColumn: 2,
+				EndLine:     1,
+				EndColumn:   2,
+			},
+			expect: "哈{{base64()}}哈{{int(1-5)}}",
+		},
 	} {
 		t.Run(fmt.Sprintf("test%d", i), func(t *testing.T) {
 			typ := testCase.typ
