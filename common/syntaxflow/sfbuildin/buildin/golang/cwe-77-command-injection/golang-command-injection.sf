@@ -9,7 +9,7 @@ $sink?{have: 'Parameter'} as $high
 
 alert $high for {
     title: 'Reflected XSS detected',
-    title_zh: '检测到反射XSS',
+    title_zh: '检测到命令注入',
     type: 'vuln',
     level: 'high',
 }
