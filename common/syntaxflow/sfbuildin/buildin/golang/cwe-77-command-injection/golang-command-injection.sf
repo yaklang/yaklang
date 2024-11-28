@@ -1,0 +1,46 @@
+desc(
+    title: "golang Command Injection",
+    type: audit,
+    severity: high,
+)
+
+<include('golang-os-exec')> as $sink;
+$sink?{have: 'Parameter'} as $high
+
+alert $high for {
+    title: 'Reflected XSS detected',
+    title_zh: '检测到反射XSS',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+    "fmt"
+    "os/exec"
+)
+
+func executeCommand(userInput string) {
+    // 不安全的做法：直接将用户输入拼接到命令中
+    cmd := exec.Command("echo", userInput)
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    fmt.Println(string(output))
+}
+
+func main() {
+    var userInput string
+    fmt.Print("Enter your command: ")
+    fmt.Scanln(&userInput) // 接收用户输入
+    executeCommand(userInput)
+}
+UNSAFE
+)

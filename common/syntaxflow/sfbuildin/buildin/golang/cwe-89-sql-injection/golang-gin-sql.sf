@@ -9,7 +9,7 @@ desc(
 $db.Query( * #-> as $param)
 
 $param?{<self>-{
-   until: `+"`* & $sink`"+`,
+   until: `* & $sink`,
 }->} as $high;
 
 alert $high for {
