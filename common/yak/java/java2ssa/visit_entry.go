@@ -103,6 +103,7 @@ func (y *builder) VisitPackageDeclaration(raw javaparser.IPackageDeclarationCont
 	return packagePath
 }
 func (b *builder) SwitchProg(functionBuilder *ssa.FunctionBuilder, editor *memedit.MemEditor) func() {
+	//log.Infof("lazyBuilder current File: %s", currentFile)
 	currentfb := b.FunctionBuilder
 	currenteditor := b.FunctionBuilder.GetEditor()
 	b.FunctionBuilder = functionBuilder

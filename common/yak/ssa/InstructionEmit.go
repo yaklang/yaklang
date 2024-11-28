@@ -191,7 +191,7 @@ func (f *FunctionBuilder) emitAroundInstruction(i, other Instruction, insert fun
 }
 
 func (f *FunctionBuilder) emit(i Instruction) {
-	if f.CurrentBlock.finish || utils.IsNil(i) {
+	if utils.IsNil(i) {
 		log.Errorf("this block [%s] is finish, instruction[%s] can't insert!", f.CurrentBlock, i)
 	}
 	f.emitEx(i, f.EmitOnly)
