@@ -1,0 +1,105 @@
+desc(
+    title: "golang Unfiltered File-or-Path",
+    type: audit,
+    severity: high,
+)
+
+<include('golang-file-read')> as $read;
+$read --> as $sink;
+strings.HasPrefix() as $check;
+$sink?{<self>-{
+    until: `* & $check`,
+}->} as $high;
+
+alert $high for {
+    title: 'Reflected XSS detected',
+    title_zh: '检测到反射XSS',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 0,
+    'safe://main.go': <<<SAFE
+package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "net/http"
+    "path/filepath"
+    "strings"
+)
+
+const allowedBasePath = "/allowed/path/"
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    userInput := r.URL.Query().Get("file")
+
+    // 清洗路径并转换为绝对路径
+    requestedPath := filepath.Join(allowedBasePath, userInput)
+    cleanedPath := filepath.Clean(requestedPath)
+
+    // 验证路径是否在允许的基础路径下
+    if !strings.HasPrefix(cleanedPath, allowedBasePath) {
+        http.Error(w, "Invalid file path", http.StatusBadRequest)
+        return
+    }
+
+    // 读取文件
+    content, err := ioutil.ReadFile(cleanedPath)
+    if err != nil {
+        http.Error(w, "File not found", http.StatusNotFound)
+        return
+    }
+
+    // 返回文件内容
+    w.Write(content)
+}
+
+func main() {
+    http.HandleFunc("/", handler)
+    fmt.Println("Server is running on :8080")
+    http.ListenAndServe(":8080", nil)
+}
+SAFE,
+    'unsafe://main.go': <<<UNSAFE
+package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "net/http"
+    "path/filepath"
+    "strings"
+)
+
+const allowedBasePath = "/allowed/path/"
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    userInput := r.URL.Query().Get("file")
+
+    // 清洗路径并转换为绝对路径
+    requestedPath := filepath.Join(allowedBasePath, userInput)
+    cleanedPath := filepath.Clean(requestedPath)
+
+    // 读取文件
+    content, err := ioutil.ReadFile(cleanedPath)
+    if err != nil {
+        http.Error(w, "File not found", http.StatusNotFound)
+        return
+    }
+
+    // 返回文件内容
+    w.Write(content)
+}
+
+func main() {
+    http.HandleFunc("/", handler)
+    fmt.Println("Server is running on :8080")
+    http.ListenAndServe(":8080", nil)
+}
+UNSAFE
+)
+
