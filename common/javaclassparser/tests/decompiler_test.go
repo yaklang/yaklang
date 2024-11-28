@@ -29,6 +29,12 @@ func TestDecompiler(t *testing.T) {
 		{
 			name: "SwitchTest",
 		},
+		{
+			name: "StaticCodeBlockTest",
+		},
+		{
+			name: "AnnotationTest",
+		},
 	}
 	for _, testItem := range testCase {
 		t.Run(testItem.name, func(t *testing.T) {
