@@ -8,6 +8,7 @@ yakmisc-*
 *.sock
 *.exe
 *.exe~
+yak
 build/
 releases/*
 releases/

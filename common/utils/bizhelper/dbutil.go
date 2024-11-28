@@ -888,7 +888,7 @@ func QueryCount(db *gorm.DB, m interface{}, items *GormWhereBlock) int {
 		db = db.Where(items.Cond, items.Items...)
 	}
 	if db := db.Count(&count); db.Error != nil {
-		log.Error("query count failed: %s", db.Error)
+		log.Errorf("query count failed: %s", db.Error)
 		return 0
 	}
 	return count
