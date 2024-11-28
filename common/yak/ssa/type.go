@@ -209,6 +209,9 @@ var ExternMethodBuilder MethodBuilder
 
 func GetMethod(t Type, id string) *Function {
 	var f *Function
+	if t == nil {
+		return nil
+	}
 	if fun, ok := t.GetMethod()[id]; ok {
 		f = fun
 		f.Build()

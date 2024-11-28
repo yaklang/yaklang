@@ -374,7 +374,11 @@ func (n *anValue) SetType(typ Type) {
 
 	switch t := typ.(type) {
 	case *Blueprint:
-		n.typ = t.Apply(getThis())
+		typ = t.Apply(getThis())
+		if typ == nil {
+			return
+		}
+		n.typ = typ
 	case *FunctionType:
 		n.typ = typ
 		this := getThis()
