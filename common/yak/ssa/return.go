@@ -142,8 +142,9 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 			if utils.IsNil(result) {
 				continue
 			}
-			if !slices.Contains(opcode, result.GetOpcode()) {
-				if result.GetType().GetTypeKind() == ClassBluePrintTypeKind {
+			if !utils.IsNil(result) && !slices.Contains(opcode, result.GetOpcode()) {
+				typ := result.GetType()
+				if !utils.IsNil(typ) && typ.GetTypeKind() == ClassBluePrintTypeKind {
 					for key, value := range result.GetAllMember() {
 						variable := value.GetLastVariable()
 						functionType.SideEffects = append(functionType.SideEffects, &FunctionSideEffect{
