@@ -1,23 +1,29 @@
 port = os.GetRandomAvailableTCPPort()
 check = false
-ctx = context.WithTimeoutSeconds(4)
-ctx, cancel = context.WithCancel(ctx)
+check2 = false
+rs = randstr(100)
 go func {
     httpserver.Serve(
         "0.0.0.0",
         port,
         httpserver.handler((rsp, req) => {
             raw = http.dump(req)~
+            reqBytes = http.dump(req)~
+            println(string(reqBytes))
             if raw.Contains("application/json") && raw.Contains(`"a":`) && raw.Contains(`"b"`) {
                 check = true
-                cancel()
             }
-
+            if raw.Contains(rs) {
+                check2 = true
+            }
+            rsp.Write(`{"key": "value"}`)
         }),
     )~
 }
 
-os.WaitConnect(f"127.0.0.1:${port}", 3)
+os.WaitConnect(f"127.0.0.1:${port}", 3)~
 rsp, req = poc.Post(f"http://127.0.0.1:${port}", poc.json({"a": "b"}))~
 assert check
-println(string(rsp.RawRequest))
+assert rsp.Json().key == "value"
+poc.Post(f"http://127.0.0.1:${port}", poc.body(rs))~
+assert check2

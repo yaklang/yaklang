@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -229,6 +230,36 @@ func (r *LowhttpResponse) URL() string {
 		scheme = "https"
 	}
 	return GetUrlFromHTTPRequest(scheme, r.RawRequest)
+}
+
+func (r *LowhttpResponse) Json() any {
+	if utils.IContains(r.GetHeader("Content-Type"), "json") {
+		var i any
+		err := json.Unmarshal(r.GetBody(), &i)
+		if err != nil || utils.IsNil(i) {
+			log.Warnf("json unmarshal failed: %s", err)
+			return make(map[string]any)
+		}
+		return i
+	}
+
+	// check body
+	if utils.IsNil(r.GetBody()) {
+		return make(map[string]any)
+	}
+
+	// check is json
+	if _, ok := utils.IsJSON(string(r.GetBody())); ok {
+		var i any
+		err := json.Unmarshal(r.GetBody(), &i)
+		if err != nil || utils.IsNil(i) {
+			log.Warnf("json unmarshal failed: %s", err)
+			return make(map[string]any)
+		}
+		return i
+	}
+
+	return make(map[string]any)
 }
 
 func (r *LowhttpResponse) GetStatusCode() int {
