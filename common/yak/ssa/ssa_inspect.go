@@ -39,9 +39,11 @@ func (p *Program) show(flag FunctionAsmFlag) {
 
 func (p *Program) Show() *Program {
 	p.show(DisAsmDefault)
-	for _, up := range p.UpStream {
-		up.show(DisAsmDefault)
-	}
+	p.UpStream.ForEach(func(i string, v *Program) bool {
+		v.show(DisAsmDefault)
+		return true
+	})
+
 	return p
 }
 

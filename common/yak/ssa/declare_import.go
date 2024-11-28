@@ -81,13 +81,13 @@ func (p *Program) ReadImportValueWithPkg(pkgName, name string) (Value, bool) {
 /// ===================================== import
 
 func (p *Program) checkImportRelationship(lib *Program) (*importDeclareItem, error) {
-	currentLib, ok := p.UpStream[lib.Name]
+	currentLib, ok := p.UpStream.Get(lib.Name)
 	if ok {
 		if currentLib != lib {
 			return nil, utils.Errorf("program library not contain this program")
 		}
 	} else {
-		p.UpStream[lib.Name] = lib
+		p.UpStream.Set(lib.Name, lib)
 	}
 	importDecl := p.importDeclares
 	if importDecl == nil {
