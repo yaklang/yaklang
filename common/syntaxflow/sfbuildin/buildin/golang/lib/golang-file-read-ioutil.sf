@@ -9,6 +9,9 @@ ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
 $entry.ReadAll <getCall> <getMembers> as $output
 $entry.ReadFile <getCall> <getMembers> as $output
 
+$entry.ReadAll(* #-> as $output) 
+$entry.ReadFile(* #-> as $output)
+
 alert $output
 
 desc(
