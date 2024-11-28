@@ -647,6 +647,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
 		}
 
+		b.SetGlobal = false
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
 		}
@@ -773,6 +774,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
 		}
 
+		b.SetGlobal = false
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
 		}
@@ -1029,7 +1031,8 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, syntaxBlocks ...bool) {
 	}
 
 	handleGlobal := func() {
-		if global := b.GetProgram().GlobalScope; global != nil {
+		if global := b.GetProgram().GlobalScope; global != nil && !b.SetGlobal {
+			b.SetGlobal = true
 			for i, m := range global.GetAllMember() {
 				variable := b.CreateLocalVariable(i.String())
 				b.AssignVariable(variable, m)
