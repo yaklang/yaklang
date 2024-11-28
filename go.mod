@@ -51,8 +51,8 @@ require (
 	github.com/golang/snappy v0.0.4
 	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-dap v0.10.0
-	github.com/gopacket/gopacket v1.3.1
 	github.com/google/uuid v1.5.0
+	github.com/gopacket/gopacket v1.3.1
 	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/websocket v1.4.2
 	github.com/gosnmp/gosnmp v1.35.0
@@ -120,7 +120,7 @@ require (
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
 	golang.org/x/mod v0.17.0
 	golang.org/x/net v0.28.0
-	golang.org/x/sys v0.23.0
+	golang.org/x/sys v0.24.0
 	golang.org/x/term v0.23.0
 	golang.org/x/text v0.17.0
 	golang.org/x/time v0.5.0
