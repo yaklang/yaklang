@@ -1,8 +1,8 @@
 package tests
 
 import (
-	"embed"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,13 +67,10 @@ func TestDecompiler(t *testing.T) {
 
 }
 
-//go:embed testfile
-var javazip embed.FS
-
 func TestDisCompilerJar(t *testing.T) {
 	// javaclassparser.NewJarFSFromLocal()
 	dir := os.TempDir()
-	jar, err := javazip.ReadFile("testfile/test.jar")
+	jar, err := classes.FS.ReadFile("test.jar")
 	require.NoError(t, err)
 
 	jarPath := dir + "/test.jar"
@@ -89,6 +86,9 @@ func TestDisCompilerJar(t *testing.T) {
 			".",
 			filesys.WithFileSystem(jarFs),
 			filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
+				if !strings.HasSuffix(pathname, ".class") {
+					return nil
+				}
 				if isDir {
 					return nil
 				}
