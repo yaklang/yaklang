@@ -561,6 +561,13 @@ func checkResult(frame *sfvm.SFFrame, rule *schema.SyntaxFlowRule, result *ssaap
 			return
 		}
 	}
+	num := frame.GetExtraInfoInt("alert_exact", "alertExact", "vulnExact", "alert_num", "vulnNum")
+	if num > 0 {
+		if alertCount != num {
+			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is not equal alert_exact config: %v, actual got: %v", num, alert_info))
+			return
+		}
+	}
 	high := frame.GetExtraInfoInt("alert_high", "alertHigh", "vulnHigh")
 	if high > 0 {
 		if alert_high < high {
@@ -582,13 +589,7 @@ func checkResult(frame *sfvm.SFFrame, rule *schema.SyntaxFlowRule, result *ssaap
 			return
 		}
 	}
-	exact := frame.GetExtraInfoInt("alert_exact", "alertExact", "vulnExact", "alert_num", "vulnNum")
-	if exact > 0 {
-		if alert_info != exact {
-			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is not equal alert_exact config: %v, actual got: %v", exact, alert_info))
-			return
-		}
-	}
+
 	return
 }
 func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T) error {
