@@ -27,8 +27,8 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		astMap:                  make(map[string]struct{}),
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
-		Funcs:                   make(map[string]*Function),
-		Blueprint:               make(map[string]*Blueprint),
+		Funcs:                   omap.NewEmptyOrderedMap[string, *Function](),
+		Blueprint:               omap.NewEmptyOrderedMap[string, *Blueprint](),
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		FileList:                make(map[string]string),
@@ -208,13 +208,18 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 		}
 	}
 
-	for _, f := range prog.Funcs {
-		handFunc(f)
-	}
+	prog.Funcs.ForEach(func(i string, v *Function) bool {
+		handFunc(v)
+		return true
+	})
+	// for _, f := range prog.Funcs {
+	// 	handFunc(f)
+	// }
 	for _, up := range prog.UpStream {
-		for _, f := range up.Funcs {
-			handFunc(f)
-		}
+		up.Funcs.ForEach(func(i string, v *Function) bool {
+			handFunc(v)
+			return true
+		})
 	}
 }
 
@@ -226,13 +231,13 @@ func (prog *Program) Finish() {
 	prog.finished = true
 
 	// check instruction build
-	if len(prog.astMap) != 0 {
-		/* in end this program not delete all astMap item,
-		this mean some file build in preHandler but not build in Build
-		*/
-		log.Errorf("BUG!! program %s has not finish ast", prog.Name)
-		prog.LazyBuild() // finish
-	}
+	// if len(prog.astMap) != 0 {
+	/* in end this program not delete all astMap item,
+	this mean some file build in preHandler but not build in Build
+	*/
+	// log.Errorf("BUG!! program %s has not finish ast", prog.Name)
+	prog.LazyBuild() // finish
+	// }
 	for _, up := range prog.UpStream {
 		up.Finish()
 	}

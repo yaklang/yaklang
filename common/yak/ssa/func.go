@@ -11,7 +11,7 @@ func (p *Program) NewFunction(name string) *Function {
 }
 
 func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function {
-	index := len(p.Funcs)
+	index := p.Funcs.Len()
 	if index == 0 && name == "" {
 		name = "main"
 	}
@@ -43,7 +43,8 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		// Pos: parent.CurrentPos,
 		f.SetRange(parent.builder.CurrentRange)
 	} else {
-		p.Funcs[name] = f
+		// p.Funcs[name] = f
+		p.Funcs.Set(name, f)
 	}
 	p.SetVirtualRegister(f)
 	// function 's Range is essential!

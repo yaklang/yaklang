@@ -1,10 +1,11 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestInterface(t *testing.T) {
@@ -43,7 +44,10 @@ public class test {
 }`
 		ssatest.CheckSyntaxFlow(t, code, `target --> as $param`,
 			map[string][]string{
-				"param": {"Undefined-this.a.getA(valid)(ParameterMember-parameter[0].a)", "Undefined-this.b.getA(valid)(ParameterMember-parameter[0].b)"},
+				"param": {
+					"Undefined-this.a.getA(valid)(ParameterMember-parameter[0].a)",
+					"Undefined-this.b.getA(valid)(ParameterMember-parameter[0].b)",
+				},
 			},
 			ssaapi.WithLanguage(ssaapi.JAVA))
 	})

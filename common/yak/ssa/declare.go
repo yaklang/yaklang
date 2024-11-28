@@ -31,7 +31,7 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string) *Blueprint {
 	}
 
 	getInCurrent := func() (Type, bool) {
-		if blueprint, exit := p.Blueprint[name]; exit {
+		if blueprint, exit := p.Blueprint.Get(name); exit {
 			if !p.PreHandler() {
 				blueprint.Build()
 			}
@@ -60,7 +60,7 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string) *Blueprint {
 
 func (prog *Program) GetFunctionEx(name, pkg string) *Function {
 	getFunc := func() (Value, bool) {
-		if fun, ok := prog.Funcs[name]; ok {
+		if fun, ok := prog.Funcs.Get(name); ok {
 			if !prog.PreHandler() {
 				fun.Build()
 			}

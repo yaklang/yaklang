@@ -31,9 +31,10 @@ func (p *Program) show(flag FunctionAsmFlag) {
 	}
 
 	fmt.Println("==============================\npackage:", p.Name, p.ProgramKind)
-	for _, i := range p.Funcs {
-		showFunc(i)
-	}
+	p.Funcs.ForEach(func(i string, v *Function) bool {
+		showFunc(v)
+		return true
+	})
 }
 
 func (p *Program) Show() *Program {

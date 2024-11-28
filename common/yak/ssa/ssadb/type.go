@@ -37,15 +37,15 @@ func SaveType(kind int, str string, extra string) int {
 	err := utils.AttemptWithDelayFast(func() error {
 		return utils.GormTransaction(GetDB(), func(tx *gorm.DB) error {
 			if queryDB := tx.Model(&IrType{}).Where("hash = ? ", irType.Hash).First(&irType); queryDB.Error != nil {
-				if queryDB.RecordNotFound() {
-					if saveDB := tx.Model(&IrType{}).Save(&irType); saveDB.Error != nil {
-						log.Errorf("save error :%s", saveDB.Error)
-						return saveDB.Error
-					}
-				} else {
+				if !queryDB.RecordNotFound() {
 					log.Errorf("query error :%s", queryDB.Error)
 					return queryDB.Error
 				}
+			}
+
+			if saveDB := tx.Model(&IrType{}).Save(&irType); saveDB.Error != nil {
+				log.Errorf("save error :%s", saveDB.Error)
+				return saveDB.Error
 			}
 			return nil
 		})
