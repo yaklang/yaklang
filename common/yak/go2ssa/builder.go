@@ -138,6 +138,7 @@ type astbuilder struct {
 	specialValues  map[string]interface{}
 	specialTypes   map[string]ssa.Type
 	pkgNameCurrent string
+	SetGlobal      bool
 }
 
 func Frontend(src string, must bool) (*gol.SourceFileContext, error) {

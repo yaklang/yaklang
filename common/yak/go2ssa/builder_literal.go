@@ -72,6 +72,7 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 
 		handleFunctionType(b.Function)
 
+		b.SetGlobal = false
 		if block, ok := exp.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block, true)
 		}
