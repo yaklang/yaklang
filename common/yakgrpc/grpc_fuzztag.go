@@ -58,8 +58,9 @@ func (s *Server) GenerateFuzztag(ctx context.Context, req *ypb.GenerateFuzztagRe
 	name := req.GetName()
 	typ := req.GetType()
 	selectedRange := req.GetRange()
-	source := selectedRange.GetCode()
-	editor := memedit.NewMemEditor(source)
+	sourceStr := selectedRange.GetCode()
+	source := []rune(sourceStr)
+	editor := memedit.NewMemEditor(sourceStr)
 	startOffset := editor.GetOffsetByPositionRaw(int(selectedRange.StartLine), int(selectedRange.StartColumn))
 	endOffset := editor.GetOffsetByPositionRaw(int(selectedRange.EndLine), int(selectedRange.EndColumn))
 	var result string
@@ -68,8 +69,8 @@ func (s *Server) GenerateFuzztag(ctx context.Context, req *ypb.GenerateFuzztagRe
 		if startOffset < 0 || startOffset > len(source) || endOffset < 0 || endOffset > len(source) {
 			return nil, errors.New("invalid range")
 		}
-		prefix := source[:startOffset]
-		suffix := source[endOffset:]
+		prefix := string(source[:startOffset])
+		suffix := string(source[endOffset:])
 		newTag := fmt.Sprintf("{{%s()}}", name)
 		newData := fmt.Sprintf("%s%s%s", prefix, newTag, suffix)
 		result = newData
@@ -77,9 +78,9 @@ func (s *Server) GenerateFuzztag(ctx context.Context, req *ypb.GenerateFuzztagRe
 		if startOffset < 0 || startOffset > len(source) || endOffset < 0 || endOffset > len(source) {
 			return nil, errors.New("invalid range")
 		}
-		prefix := source[:startOffset]
-		suffix := source[endOffset:]
-		innerData := source[startOffset:endOffset]
+		prefix := string(source[:startOffset])
+		suffix := string(source[endOffset:])
+		innerData := string(source[startOffset:endOffset])
 		newTag := fmt.Sprintf("{{%s(%s)}}", name, innerData)
 		newData := fmt.Sprintf("%s%s%s", prefix, newTag, suffix)
 		result = newData
