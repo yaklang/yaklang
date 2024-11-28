@@ -64,7 +64,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 	_ = builder
 	if builder == nil {
 		log.Errorf("BUG: ClassBluePrint.Apply: fun.builder is nil, fun: %v", fun)
-		return nil
+		return CreateAnyType()
 	}
 	prog := builder.GetProgram()
 

@@ -67,7 +67,7 @@ func (f *Function) GetType() Type {
 	if f.Type != nil {
 		return f.Type
 	} else {
-		return GetAnyType()
+		return CreateAnyType()
 	}
 }
 

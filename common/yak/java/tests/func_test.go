@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 )
 
@@ -125,5 +127,15 @@ public class Main {
 			"Function-Main.A",
 		}, t)
 	})
-
+}
+func TestCode(t *testing.T) {
+	code := `package main;
+class B{}
+class C{
+	B b;
+}`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
