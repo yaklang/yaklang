@@ -1,11 +1,12 @@
 package tests
 
 import (
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"testing"
-	"time"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )

@@ -225,6 +225,15 @@ type Program struct {
 
 	Cache *Cache
 
+	/*
+		when build : ref: common/yak/ssa/lazy_builder.go
+			*preHandler: set map hash -> false
+			*build : 	 delete map hash
+			when len(astMap) == 0  this program finish
+	*/
+	astMap   map[string]struct{} // ast hash list
+	finished bool
+
 	//consts
 	Consts map[string]Value
 	// function list

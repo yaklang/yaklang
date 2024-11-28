@@ -23,9 +23,6 @@ func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interfac
 	for _, el := range elements {
 		y.VisitHtmlDocumentElement(el)
 	}
-	if !y.PreHandler() {
-		y.GetProgram().LazyBuild()
-	}
 	return nil
 }
 

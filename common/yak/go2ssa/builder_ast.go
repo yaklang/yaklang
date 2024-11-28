@@ -63,6 +63,9 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			if lib == nil {
 				lib = prog.NewLibrary(pkgPath[0], pkgPath)
 			}
+			defer func() {
+				lib.VisitAst(ast)
+			}()
 			lib.PushEditor(prog.GetCurrentEditor())
 			lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInst(pkgNameCurrent))
 
@@ -139,7 +142,9 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			if lib == nil {
 				b.NewError(ssa.Error, TAG, "no library found for package %s", pkgPath[0])
 			}
-
+			defer func() {
+				lib.VisitAst(ast)
+			}()
 			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "@init")
 
 			if builder != nil {
@@ -154,10 +159,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					b.FunctionBuilder = currentBuilder
 				}()
 			}
-		}
-
-		for _, f := range b.GetProgram().Funcs {
-			f.Build()
 		}
 	}
 }

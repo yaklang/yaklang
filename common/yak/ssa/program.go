@@ -4,8 +4,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/samber/lo"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils"
@@ -26,6 +24,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
 		Cache:                   NewDBCache(ProgramName, enableDatabase),
+		astMap:                  make(map[string]struct{}),
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
 		Funcs:                   make(map[string]*Function),
@@ -220,45 +219,34 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 }
 
 func (prog *Program) Finish() {
-	prog.LazyBuild()
-	if prog.ProgramKind == Application && prog.EnableDatabase {
-		prog.Cache.SaveToDatabase()
-		updateToDatabase(prog)
+	// only run once and not wait
+	if prog.finished {
+		return
 	}
-}
-func (p *Program) LazyBuild() {
-	syntaxFunc := func(syntaxInstance func(program *Program), prog ...*Program) {
-		for _, program := range prog {
-			syntaxInstance(program)
+	prog.finished = true
+
+	// check instruction build
+	if len(prog.astMap) != 0 {
+		/* in end this program not delete all astMap item,
+		this mean some file build in preHandler but not build in Build
+		*/
+		log.Errorf("BUG!! program %s has not finish ast", prog.Name)
+		prog.LazyBuild() // finish
+	}
+	for _, up := range prog.UpStream {
+		up.Finish()
+	}
+	// save instruction
+	prog.Cache.SaveToDatabase()
+
+	// only application need save and wait
+	if prog.ProgramKind == Application {
+		if prog.EnableDatabase { // save program
+			updateToDatabase(prog)
 		}
+		// wait cache save instruction
+		prog.Cache.Wait()
 	}
-	syntaxClassInstance := func(program *Program) {
-		for _, blueprint := range program.Blueprint {
-			blueprint.Build()
-		}
-	}
-	syntaxFuncInstance := func(program *Program) {
-		for _, function := range program.Funcs {
-			function.Build()
-		}
-	}
-	syntaxClassOtherInstance := func(program *Program) {
-		for _, blueprint := range program.Blueprint {
-			blueprint.BuildConstructorAndDestructor()
-		}
-	}
-	fixImport := func(program *Program) {
-		for _, f := range program.fixImportCallback {
-			f()
-		}
-	}
-	buildMoreProg := func(prog ...*Program) {
-		syntaxFunc(syntaxClassInstance, prog...)
-		syntaxFunc(fixImport, prog...)
-		syntaxFunc(syntaxFuncInstance, prog...)
-		syntaxFunc(syntaxClassOtherInstance, prog...)
-	}
-	buildMoreProg(append(append(lo.Values(p.UpStream), lo.Values(p.DownStream)...), p)...)
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {

@@ -4,6 +4,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestJava_Func_Params(t *testing.T) {
@@ -18,12 +20,13 @@ func TestJava_Func_Params(t *testing.T) {
     }
 }
 `, []string{
-			"Parameter-a", "Function-Main.A(0)",
+			"Parameter-a",
+			"Function-Main.A(0)",
 		}, t)
 	})
 
 	t.Run("test  function params, callee function behind caller function", func(t *testing.T) {
-		CheckAllJavaPrintlnValue(`public class Main {
+		test.CheckPrintlnValue(`public class Main {
     public static void main(String[] args) {
         println(A(0));
     }
@@ -32,7 +35,10 @@ func TestJava_Func_Params(t *testing.T) {
         println(a);
     }
 }
-`, []string{"Parameter-a", "Function-Main.A(0)"}, t)
+`, []string{
+			"Parameter-a",
+			"Function-Main.A(0)",
+		}, t)
 	})
 
 	t.Run("test  function params 2", func(t *testing.T) {
