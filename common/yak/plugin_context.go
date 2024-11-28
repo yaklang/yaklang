@@ -5,12 +5,11 @@ import (
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type YakitPluginContext struct {
-	PluginName  string
-	PluginUUID  string
-	RuntimeId   string
+	yakit.YakitPluginInfo
 	Proxy       string
 	Ctx         context.Context
 	CliApp      *cli.CliApp
@@ -63,7 +62,7 @@ func (y *YakitPluginContext) WithCliApp(cliApp *cli.CliApp) *YakitPluginContext 
 }
 
 func CreateYakitPluginContext(runtimeId string) *YakitPluginContext {
-	return &YakitPluginContext{
-		RuntimeId: runtimeId,
-	}
+	y := &YakitPluginContext{}
+	y.RuntimeId = runtimeId
+	return y
 }
