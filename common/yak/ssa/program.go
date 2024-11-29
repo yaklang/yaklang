@@ -243,16 +243,14 @@ func (prog *Program) Finish() {
 		v.Finish()
 		return true
 	})
-	// save instruction
-	prog.Cache.SaveToDatabase()
 
 	// only application need save and wait
 	if prog.ProgramKind == Application {
 		if prog.EnableDatabase { // save program
 			updateToDatabase(prog)
 		}
-		// wait cache save instruction
-		prog.Cache.Wait()
+		// save instruction
+		prog.Cache.SaveToDatabase()
 	}
 }
 

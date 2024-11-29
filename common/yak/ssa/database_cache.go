@@ -49,7 +49,7 @@ type Cache struct {
 	constCache      []Instruction
 	saveInstruct    chan instructionIrCode
 	waitGroup       *sync.WaitGroup
-	close           *atomic.Bool
+	once            *sync.Once
 }
 
 func (c *Cache) SetFetchId(_func func() int64) {
@@ -73,22 +73,13 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 		constCache:       make([]Instruction, 0),
 		saveInstruct:     make(chan instructionIrCode, 1024),
 		waitGroup:        &sync.WaitGroup{},
-		close:            atomic.NewBool(false),
+		once:             &sync.Once{},
 	}
 
 	if databaseEnable {
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
 		cache.InstructionCache.SetCheckExpirationCallback(func(key int64, value instructionIrCode) bool {
-			if !cache.close.Load() && cache.saveInstruct != nil {
-				cache.saveInstruct <- value
-			} else {
-				/* todo: when we close this cache,
-				some instruction expiration,
-				this will be save in closer? or handle in here?
-				*/
-				log.Infof("cache close, save instruction: %v", value.inst.GetId())
-				cache.saveInstruction(value)
-			}
+			cache.saveInstruct <- value
 			return true
 		})
 		cache.waitGroup.Add(1)
@@ -253,24 +244,18 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 
 	return true
 }
-
 func (c *Cache) SaveToDatabase() {
 	if !c.HaveDatabaseBackend() {
 		return
 	}
-	all := c.InstructionCache.GetAll()
-	c.InstructionCache.DeleteAll()
-	for _, code := range all {
-		c.saveInstruct <- code
-	}
-}
-
-func (c *Cache) Wait() {
-	if !c.close.Load() {
+	c.once.Do(func() {
+		all := c.InstructionCache.GetAll()
+		c.InstructionCache.Close()
+		for _, code := range all {
+			c.saveInstruct <- code
+		}
 		close(c.saveInstruct)
-		c.saveInstruct = nil
-		c.close.Store(false)
-	}
+	})
 	c.waitGroup.Wait()
 }
 
