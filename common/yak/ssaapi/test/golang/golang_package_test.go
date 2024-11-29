@@ -195,6 +195,7 @@ func TestFileName_muti_package(t *testing.T) {
 					$entry.Println( * as $target);
 				`
 			result := prog.SyntaxFlow(sf)
+			result.Show()
 			target := result.GetValues("target")
 			a := target[0].GetSSAValue()
 			b := target[1].GetSSAValue()

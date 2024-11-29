@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -32,24 +33,25 @@ func SaveType(kind int, str string, extra string) int {
 		String:           str,
 		ExtraInformation: extra,
 	}
-	irType.Hash = irType.CalcHash()
+	// TODO: ignore reuse ir-type
+	irType.Hash = irType.CalcHash() + uuid.NewString()
 
-	err := utils.AttemptWithDelayFast(func() error {
-		return utils.GormTransaction(GetDB(), func(tx *gorm.DB) error {
-			if queryDB := tx.Model(&IrType{}).Where("hash = ? ", irType.Hash).First(&irType); queryDB.Error != nil {
-				if !queryDB.RecordNotFound() {
-					log.Errorf("query error :%s", queryDB.Error)
-					return queryDB.Error
-				}
-			}
-
-			if saveDB := tx.Model(&IrType{}).Save(&irType); saveDB.Error != nil {
-				log.Errorf("save error :%s", saveDB.Error)
-				return saveDB.Error
-			}
-			return nil
-		})
-	})
+	// err := utils.AttemptWithDelayFast(func() error {
+	// return utils.GormTransaction(GetDB(), func(tx *gorm.DB) error {
+	// if queryDB := tx.Model(&IrType{}).Where("hash = ? ", irType.Hash).First(&irType); queryDB.Error != nil {
+	// 	if !queryDB.RecordNotFound() {
+	// 		log.Errorf("query error :%s", queryDB.Error)
+	// 		return queryDB.Error
+	// 	}
+	// }
+	// if saveDB := tx.Model(&IrType{}).Save(&irType); saveDB.Error != nil {
+	// 	log.Errorf("save error :%s", saveDB.Error)
+	// 	return saveDB.Error
+	// }
+	// return nil
+	// })
+	// })
+	err := GetDB().Model(&IrType{}).Save(&irType).Error
 	if err != nil {
 		log.Errorf("SaveType error: %v", err)
 		return -1
