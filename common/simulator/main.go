@@ -29,9 +29,18 @@ func HttpBruteForce(targetUrl string, opts ...BruteConfigOpt) (chan Result, erro
 	}
 	go func() {
 		defer close(ch)
-		err := bruteForce.Start()
-		if err != nil {
-			log.Error(err)
+		bruteError := bruteForce.Start()
+		if bruteError != nil {
+			ch <- &BruteResult{
+				username:        "",
+				password:        "",
+				status:          false,
+				bruteInfo:       bruteError.Error(),
+				b64:             "",
+				token:           "",
+				loginSuccessUrl: "",
+			}
+			log.Error(bruteError)
 		}
 	}()
 	return ch, nil

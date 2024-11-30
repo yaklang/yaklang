@@ -71,7 +71,7 @@ type BrowserStarter struct {
 	// use info
 	urlsExploit          func(string, string) error
 	clickElementsExploit func(*rod.Page, string, string) error
-	inputElementsExploit func(*rod.Element) error
+	inputElementsExploit func(*rod.Element, interface{}) error
 	eventElementsExploit func(*rod.Page, string, string) error
 
 	headers []*headers
@@ -86,6 +86,9 @@ type BrowserStarter struct {
 	jsResultSend func(string)
 	sourceType   string
 	fromPlugin   string
+
+	aiInputUrl  string
+	aiInputInfo string
 }
 
 func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
@@ -128,6 +131,9 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		evalJs:     make([]*JSEval, 0),
 		sourceType: baseConfig.sourceType,
 		fromPlugin: baseConfig.fromPlugin,
+
+		aiInputUrl:  baseConfig.aiInputUrl,
+		aiInputInfo: baseConfig.aiInputInfo,
 	}
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -281,7 +287,11 @@ func (starter *BrowserStarter) pageActionGenerator() {
 	starter.getEventElements = starter.generateGetEventElements()
 
 	starter.urlsExploit = starter.generateUrlsExploit()
-	starter.inputElementsExploit = starter.generateInputElementsExploit()
+	if starter.baseConfig.aiInputUrl != "" {
+		starter.inputElementsExploit = starter.generateAIInputElementsExploit()
+	} else {
+		starter.inputElementsExploit = starter.generateInputElementsExploit()
+	}
 	starter.clickElementsExploit = starter.generateClickElementsExploit()
 	//starter.eventElementsExploit = starter.generateEventElementsExploit()
 	starter.eventElementsExploit = starter.newEventElementsExploit()
@@ -380,7 +390,6 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 	if starter.baseConfig.pageTimeout != 0 {
 		page = page.Timeout(time.Duration(starter.baseConfig.pageTimeout) * time.Second)
 	}
-	//err = starter.actionOnPage(page)
 	err = starter.ActionOnPage(page)
 	if err != nil {
 		log.Errorf(`TargetID %s get page do action error: %s`, targetID, err)

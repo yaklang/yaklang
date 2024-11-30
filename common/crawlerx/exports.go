@@ -40,6 +40,8 @@ var CrawlerXExports = map[string]interface{}{
 	"sourceType":        WithSourceType,
 	"fromPlugin":        WithFromPlugin,
 	"urlCheck":          WithUrlCheck,
+	"aiInputUrl":        WithAIInputUrl,
+	"aiInputInfo":       WithAIInputInf,
 
 	"UnLimitRepeat":      unlimited,
 	"LowRepeatLevel":     lowLevel,
