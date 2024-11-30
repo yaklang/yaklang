@@ -3,10 +3,13 @@
 package crawlerx
 
 import (
+	"encoding/json"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -25,75 +28,6 @@ const findHref = `() => {
     }
     return hrefs
 }`
-
-func (starter *BrowserStarter) actionOnPage(page *rod.Page) error {
-	originUrl, _ := getCurrentUrl(page)
-	log.Debugf(`Crawler on page %s`, originUrl)
-
-	urls, err := starter.getUrls(page)
-	if err != nil {
-		return utils.Errorf(`Page %s get urls error: %s`, originUrl, err)
-	}
-	submitInfo := map[string]map[string][]string{
-		"input": {
-			"type": {
-				"submit",
-			},
-		},
-		"button": {
-			"type": {
-				"submit",
-			},
-		},
-	}
-	submitElements, err := customizedGetElement(page, submitInfo)
-	if err != nil {
-		return utils.Errorf(`Page %s get submit elements error: %s`, originUrl, err)
-	}
-	inputElements, err := starter.getInputElements(page)
-	if err != nil {
-		return utils.Errorf(`Page %s get input elements error: %s`, originUrl, err)
-	}
-	for _, inputElement := range inputElements {
-		err = starter.inputElementsExploit(inputElement)
-		if err != nil {
-			return utils.Errorf(`Page %v input element %v error: %v`, originUrl, inputElement, err.Error())
-		}
-	}
-	if len(urls) == 0 && len(submitElements) == 0 {
-		eventSelectors, err := starter.getEventElements(page)
-		if err != nil {
-			return utils.Errorf(`Page %s get event elements error: %s`, originUrl, err)
-		}
-		for _, eventSelector := range eventSelectors {
-			err = starter.eventElementsExploit(page, originUrl, eventSelector)
-			if err != nil {
-				return utils.Errorf(`Page %v click element %v error: %v`, originUrl, eventSelector, err.Error())
-			}
-		}
-	} else {
-		for _, url := range urls {
-			if starter.banList.Exist(url) {
-				continue
-			}
-			err = starter.urlsExploit(originUrl, url)
-			if err != nil {
-				return utils.Errorf(`Url %v from %v exploit error: %v`, url, originUrl, err.Error())
-			}
-		}
-		clickSelectors, err := starter.getClickElements(page)
-		if err != nil {
-			return utils.Errorf(`Page %s get click elements error: %s`, originUrl, err)
-		}
-		for _, clickSelector := range clickSelectors {
-			err = starter.clickElementsExploit(page, originUrl, clickSelector)
-			if err != nil {
-				return utils.Errorf(`Page %v click selector %v error: %v`, originUrl, clickSelector, err.Error())
-			}
-		}
-	}
-	return nil
-}
 
 func (starter *BrowserStarter) normalActionOnPage(page *rod.Page) error {
 	var err error
@@ -215,15 +149,20 @@ func (starter *BrowserStarter) doInput(originUrl string, page *rod.Page) error {
 	if err != nil {
 		return utils.Errorf(`Page %s get input elements error: %s`, originUrl, err)
 	}
+	baseInfo, err := getBaseInfo(page)
+	if err != nil {
+		return utils.Errorf(`Page %s get base info error: %s`, originUrl, err)
+	}
 	for _, inputElement := range inputElements {
-		visible, err := inputElement.Visible()
+		var visible bool
+		visible, err = inputElement.Visible()
 		if err != nil {
 			return utils.Errorf(`get element visible error: %v`, err)
 		}
 		if !visible {
 			continue
 		}
-		err = starter.inputElementsExploit(inputElement)
+		err = starter.inputElementsExploit(inputElement, baseInfo)
 		if err != nil {
 			return utils.Errorf(`Page %v input element %v error: %v`, originUrl, inputElement, err.Error())
 		}
@@ -405,8 +344,8 @@ func (starter *BrowserStarter) generateClickElementsExploit() func(*rod.Page, st
 	}
 }
 
-func (starter *BrowserStarter) generateInputElementsExploit() func(*rod.Element) error {
-	return func(element *rod.Element) error {
+func (starter *BrowserStarter) generateInputElementsExploit() func(*rod.Element, interface{}) error {
+	return func(element *rod.Element, _ interface{}) error {
 		attribute, _ := getAttribute(element, "type")
 		switch attribute {
 		case "text", "password":
@@ -418,6 +357,36 @@ func (starter *BrowserStarter) generateInputElementsExploit() func(*rod.Element)
 		default:
 			return nil
 		}
+	}
+}
+
+func (starter *BrowserStarter) generateAIInputElementsExploit() func(*rod.Element, interface{}) error {
+	return func(element *rod.Element, pageData interface{}) error {
+		dataStr, ok := pageData.(string)
+		if !ok {
+			return nil
+		}
+		text, err := element.HTML()
+		if err != nil {
+			return err
+		}
+		if len(text) > 200 {
+			reg, _ := regexp.Compile("style=\".+?\"|size=\".+?\"")
+			text = reg.ReplaceAllLiteralString(text, "")[:200]
+		}
+		parent, _ := element.Parent()
+		if parent != nil {
+			//text += parent.
+			class, _ := getAttribute(parent, "class")
+			if class != "" {
+				text += " " + class
+			}
+		}
+		output, err := starter.getElementInputByAI(dataStr + " " + text)
+		if err != nil {
+			return err
+		}
+		return element.Input(output.TextInput)
 	}
 }
 
@@ -600,6 +569,36 @@ func (starter *BrowserStarter) extraInputElementsOperator(page *rod.Page) error 
 	return nil
 }
 
+type AIInput struct {
+	HtmlCod   string `json:"html_cod"`
+	OtherInfo string `json:"other_info"`
+}
+
+type AIInputResult struct {
+	Element   string `json:"element"`
+	DButt     bool   `json:"dButt"`
+	TextInput string `json:"text_input"`
+}
+
+func (starter *BrowserStarter) getElementInputByAI(data string) (output AIInputResult, err error) {
+	// request
+	var input AIInput
+	var inputResult AIInputResult
+	input.HtmlCod = data
+	input.OtherInfo = starter.aiInputInfo
+	inputBytes, _ := json.Marshal(input)
+	opts := []poc.PocConfigOption{
+		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+		poc.WithReplaceHttpPacketBody(inputBytes, false),
+	}
+	result, _, err := poc.DoPOST(starter.aiInputUrl, opts...)
+	if err != nil {
+		return inputResult, err
+	}
+	err = json.Unmarshal(result.RawPacket, &inputResult)
+	return inputResult, err
+}
+
 func inputStr(element *rod.Element, dict map[string]string, keywordStr string) error {
 	for k, v := range dict {
 		if strings.Contains(keywordStr, k) {
@@ -607,4 +606,12 @@ func inputStr(element *rod.Element, dict map[string]string, keywordStr string) e
 		}
 	}
 	return element.Input("test")
+}
+
+func getBaseInfo(page *rod.Page) (string, error) {
+	info, err := page.Info()
+	if err != nil {
+		return "", err
+	}
+	return info.Title, nil
 }
