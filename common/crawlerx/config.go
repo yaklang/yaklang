@@ -62,6 +62,9 @@ type BaseConfig struct {
 
 	sourceType string
 	fromPlugin string
+
+	aiInputUrl  string
+	aiInputInfo string
 }
 
 type BrowserConfig struct {
@@ -444,5 +447,17 @@ func WithFromPlugin(fromPlugin string) ConfigOpt {
 func WithUrlCheck(check bool) ConfigOpt {
 	return func(config *Config) {
 		config.urlCheck = check
+	}
+}
+
+func WithAIInputUrl(url string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.aiInputUrl = url
+	}
+}
+
+func WithAIInputInf(info string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.aiInputInfo = info
 	}
 }

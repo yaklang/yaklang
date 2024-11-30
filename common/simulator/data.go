@@ -13,14 +13,14 @@ var ElementProperty = []string{
 var ElementKeyword = append(ElementAttribute, ElementProperty...)
 
 var usernameKeyword = []string{
-	"username", "admin",
+	"username", "admin", "account",
 	"用户名", "账户名", "账号",
 	"telephone", "email",
 	"手机", "电话", "邮箱",
 }
 
 var simpleUsernameKeyword = []string{
-	"user", "admin", "tele", "email",
+	"user", "admin", "tele", "email", "account",
 	"用户", "账户", "账号", "手机", "电话", "邮箱",
 }
 
@@ -34,11 +34,11 @@ var simplePasswordKeyword = []string{
 
 var captchaKeyword = []string{
 	"captcha", "register", "check", "validate",
-	"验证码", "校验码", "注册码", "verifica", "verify",
+	"验证码", "校验码", "注册码", "verifica", "verify", "image",
 }
 
 var simpleCaptchaKeyword = []string{
-	"capt", "reg", "验证", "校验", "注册", "validate", "verif",
+	"capt", "reg", "验证", "校验", "注册", "validate", "verif", "image",
 }
 
 var loginKeyword = []string{
