@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/java/template2java"
 	"regexp"
 	"strconv"
 	"strings"
@@ -134,9 +135,92 @@ const (
 
 	// NativeCall_IsSanitizeName checks for potential sanitization function names
 	NativeCall_IsSanitizeName = "isSanitizeName"
+
+	// NativeCall_Java_UnEscape_Output  is used to show output in java template languages that has not been escape,
+	// and is generally used to audit XSS vulnerabilities
+	NativeCall_Java_UnEscape_Output = "javaUnescapeOutput"
 )
 
 func init() {
+	registerNativeCall(NativeCall_Java_UnEscape_Output, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var res []sfvm.ValueOperator
+
+		// 模板语言输出的标志位
+		flag := template2java.JAVA_REQUEST_PATH
+		unEscapeKey := template2java.JAVA_UNESCAPE_OUTPUT_PRINT
+
+		checkUnEscape := func(value *Value) bool {
+			if !value.IsCall() {
+
+			}
+			t := value.GetType()
+			if t == nil || t.t == nil {
+				return false
+			}
+			name := t.t.GetFullTypeNames()
+			if len(name) == 0 {
+				return false
+			}
+
+			for _, n := range name {
+				if strings.Contains(n, flag) {
+					return true
+				}
+			}
+			return false
+		}
+
+		getCalledAndCheck := func(value *Value) []sfvm.ValueOperator {
+			var vals []sfvm.ValueOperator
+			if value.IsCall() {
+				if checkUnEscape(value) {
+					vals = append(vals, value.GetCallArgs())
+				}
+			} else {
+				call2fun := value.GetCalledBy()
+				call2fun.ForEach(func(call *Value) {
+					if checkUnEscape(call) {
+						res = append(res, call.GetCallArgs())
+					}
+				})
+			}
+			return vals
+		}
+
+		match, outValue, err := v.GlobMatch(frame.GetContext(), ssadb.NameMatch, `out`)
+		if !match || err != nil {
+			return false, nil, utils.Errorf("no value found")
+		}
+
+		match, printValue, err := outValue.GlobMatch(frame.GetContext(), ssadb.KeyMatch, unEscapeKey)
+		if !match || err != nil {
+			return false, nil, utils.Errorf("no value found")
+		}
+
+		switch i := printValue.(type) {
+		case *Value:
+			vals := getCalledAndCheck(i)
+			res = append(res, vals...)
+		case Values:
+			i.Recursive(func(operator sfvm.ValueOperator) error {
+				value, ok := operator.(*Value)
+				if !ok {
+					return nil
+				}
+				vals := getCalledAndCheck(value)
+				res = append(res, vals...)
+				return nil
+			})
+		default:
+			return false, nil, utils.Errorf("invalid value type %T", i)
+		}
+
+		if len(res) > 0 {
+			return true, sfvm.NewValues(res), nil
+		}
+		return false, nil, nil
+	}), nc_desc("获取Java模板语言中未转义的输出"))
+
 	registerNativeCall(NativeCall_IsSanitizeName, nc_func(nativeCallSanitizeNames), nc_desc("检查是否为潜在的过滤函数名称"))
 
 	registerNativeCall(NativeCall_VersionIn, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {

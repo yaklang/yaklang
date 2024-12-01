@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"github.com/samber/lo"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"path/filepath"
 	"sort"

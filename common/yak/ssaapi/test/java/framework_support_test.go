@@ -33,14 +33,14 @@ public class DemoServlet extends HttpServlet {
 } `)
 		vf.AddFile("src\\main\\webapp\\WEB-INF\\jsp\\demo.jsp", `
 <html>
-	<c:out value="${userInput}" />
+	<c:out value="${userInput}" escapeXml="false" />
 <html>
 `)
 		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 			prog := programs[0]
 			prog.Show()
 			rule := `
-print?{<typeName>?{have:'syntaxflow.template.java.HttpServletRequest'}}(,* #-> as $out);
+print?{<typeName>?{have:'syntaxflow.template.java.HttpServletRequest'}}(* #-> as $out);
 request?{opcode:param  && <typeName>?{have:'javax.servlet.http.HttpServlet'}} as $source;
 		$out #{
 until:<<<UNTIL
