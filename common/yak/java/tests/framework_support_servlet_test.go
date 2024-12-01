@@ -38,8 +38,8 @@ public class DemoServlet extends HttpServlet {
 		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 			prog := programs[0]
 			prog.Show()
-			res := prog.SyntaxFlowChain("print()?{<typeName>?{have:'syntaxflow.template.java.HttpServletRequest'}} as $print")
-			require.Contains(t, res.String(), `Undefined-out.print(ParameterMember-parameter[1].getOut(Parameter-request),Undefined-escapeHtml(ParameterMember-parameter[1].getAttribute(Parameter-request,"message")))`)
+			res := prog.SyntaxFlowChain("printWithEscape()?{<typeName>?{have:'syntaxflow.template.java.HttpServletRequest'}} as $print")
+			require.Contains(t, res.String(), "Undefined-out.printWithEscape(ParameterMember-parameter[1].getOut(Parameter-request),Undefined-elExpr.parse(Undefined-elExpr,\"${message}\"))\n")
 			return nil
 		})
 	})

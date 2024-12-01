@@ -26,7 +26,7 @@ func TestCreateJavaTemplate(t *testing.T) {
 			"public class demo_jsp",
 			`out.write("<html>");`,
 			`public void _JavaTemplateService(HttpServletRequest request, HttpServletResponse response)`,
-			`var1 = request.getAttribute("var1")`,
+			`out.print(var1);`,
 		}},
 		{"++dmo.jsp.", "../com/org", "demo", []string{
 			"package com.org;",
