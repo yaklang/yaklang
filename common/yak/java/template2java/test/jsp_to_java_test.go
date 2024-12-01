@@ -58,7 +58,7 @@ func TestJSP2Java_Content(t *testing.T) {
 		{"test jstl-core foreach tag ", ` 
 		<c:forEach var="item" items="${items}">
         <li>${item}</li>
-   	 	</c:forEach>`, []string{"a"}},
+   	 	</c:forEach>`, []string{"Object item : elExpr.parse(\"${items}\"", "out.print(elExpr.parse(\"${item}\"));"}},
 	}
 	check := func(jspCode string, wants []string) {
 		codeInfo, err := tj.ConvertTemplateToJava(tj.JSP, jspCode, "test.jsp")
