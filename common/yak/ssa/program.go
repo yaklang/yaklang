@@ -3,6 +3,7 @@ package ssa
 import (
 	"github.com/samber/lo"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -409,6 +410,26 @@ func (p *Program) GetTemplate(path string) tl.TemplateGeneratedInfo {
 		return nil
 	}
 	return p.Template[path]
+}
+
+func (p *Program) TryGetTemplate(path string) tl.TemplateGeneratedInfo {
+	if p == nil {
+		return nil
+	}
+	if t := p.GetTemplate(path); t != nil {
+		return t
+	}
+	fileName := filepath.Base(path)
+	var rets []tl.TemplateGeneratedInfo
+	for tp, t := range p.Template {
+		if strings.Contains(tp, fileName) {
+			rets = append(rets, t)
+		}
+	}
+	if len(rets) == 1 {
+		return rets[0]
+	}
+	return nil
 }
 
 func (p *Program) SetTemplate(path string, info tl.TemplateGeneratedInfo) {
