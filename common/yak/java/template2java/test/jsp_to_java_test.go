@@ -25,7 +25,7 @@ func TestJSP2Java_Content(t *testing.T) {
 		{"test jsp directive script import", `<%@ page import="java.util.*, com.example.model.User" %>`, []string{`import  com.example.model.User;`, `import java.util.*;`}},
 		// core tag
 		// core out tag
-		{"test jstl-core out tag", "<c:out value='${name}'/>", []string{`out.print(escapeHtml(elExpr.parse("${name}")));`}},
+		{"test jstl-core out tag", "<c:out value='${name}'/>", []string{`out.printWithEscape(elExpr.parse("${name}"));`}},
 		{"test jstl-core out tag without escaping", "<c:out value='${name}' escapeXml=\"false\"/>", []string{`out.print(elExpr.parse("${name}"));`}},
 		// core set tag
 		{"test jstl-core set tag", "<c:set var='name' value='John'/>", []string{`request.setAttribute("name", John);`}},
