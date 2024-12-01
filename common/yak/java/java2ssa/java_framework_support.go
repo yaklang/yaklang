@@ -40,7 +40,7 @@ func (y *builder) RegisterServletSupport(obj ssa.Value, key ssa.Value, args ...s
 		}
 		jspPath := args[0].String()
 		path := filepath.Join(FRAMEWORK_DEFAULT_CLASSPATH, SERVLET_TEMPLATE_PREFIX, jspPath)
-		t := app.GetTemplate(path)
+		t := app.TryGetTemplate(path)
 		if t == nil {
 			return
 		}

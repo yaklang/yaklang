@@ -99,9 +99,9 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		if err != nil {
 			return utils.Errorf("convert jsp to java error: %v", err)
 		}
+		prog.SetTemplate(path, info)
 		saveExtraFile(path, raw)
 		javaPath := path[:len(path)-4] + "_jsp.java"
-		prog.SetTemplate(javaPath, info)
 		err = prog.Build(javaPath, memedit.NewMemEditor(info.GetContent()), fb)
 		if err != nil {
 			return err
