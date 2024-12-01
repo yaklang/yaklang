@@ -7,8 +7,11 @@ import (
 	"strings"
 )
 
-// TEMPLATE_JAVA_REQUEST_PATH 作为flag,方便进行SyntaxFlow审计
-const TEMPLATE_JAVA_REQUEST_PATH = "syntaxflow.template.java"
+// JAVA_REQUEST_PATH 作为flag,方便进行SyntaxFlow审计
+const (
+	JAVA_REQUEST_PATH          = "syntaxflow.template.java"
+	JAVA_UNESCAPE_OUTPUT_PRINT = "print"
+)
 
 var _ tl.TemplateRender = (*JavaTemplate)(nil)
 
@@ -52,11 +55,11 @@ func (t *JavaTemplate) WriteGetAttribute(variable string) {
 }
 
 func (t *JavaTemplate) WriteOutput(variable string) {
-	t.builder.WriteString("\tout.print(" + variable + ");\r\n")
+	t.builder.WriteString("\tout." + JAVA_UNESCAPE_OUTPUT_PRINT + "(" + variable + ");\r\n")
 }
 
 func (t *JavaTemplate) WriteEscapeOutput(variable string) {
-	t.builder.WriteString("\tout.print(escapeHtml(" + variable + "));\r\n")
+	t.builder.WriteString("\tout.printWithEscape(" + variable + ");\r\n")
 }
 
 func (t *JavaTemplate) Finish() {
@@ -81,8 +84,8 @@ func (t *JavaTemplate) generateTemplate() {
 	if t.pkgName != "" {
 		t.builder.WriteString("package " + t.pkgName + ";\r\n")
 	}
-	t.builder.WriteString("import " + TEMPLATE_JAVA_REQUEST_PATH + ".HttpServletRequest;\r\n")
-	t.builder.WriteString("import " + TEMPLATE_JAVA_REQUEST_PATH + ".HttpServletResponse;\r\n")
+	t.builder.WriteString("import " + JAVA_REQUEST_PATH + ".HttpServletRequest;\r\n")
+	t.builder.WriteString("import " + JAVA_REQUEST_PATH + ".HttpServletResponse;\r\n")
 	t.builder.WriteString("\n")
 	t.builder.WriteString("public class " + t.className + " {\r\n")
 	t.builder.WriteString("public void _JavaTemplateService(" + "HttpServletRequest request, HttpServletResponse response" + ") {\r\n")
