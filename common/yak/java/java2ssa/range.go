@@ -22,11 +22,10 @@ func (y *builder) SetRange(token ssa.CanStartStopToken) func() {
 	if prog == nil {
 		return func() {}
 	}
-	if t := prog.GetTemplate(editor.GetFilename()); t != nil {
+	if t := prog.TryGetTemplate(editor.GetFilename()); t != nil {
 		m := t.GetRangeMap()
-
 		line := y.CurrentRange.GetStart().GetLine()
-		if tr, ok := m[line]; ok {
+		if tr, ok := m[line]; ok && tr != nil {
 			backup = tr
 			y.CurrentRange = tr
 		}
