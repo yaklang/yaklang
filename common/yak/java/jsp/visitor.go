@@ -321,7 +321,7 @@ func (y *JSPVisitor) VisitScriptlet(raw jspparser.IScriptletContext) {
 
 	if i.ECHO_EXPRESSION_OPEN() != nil {
 		if i.BLOB_CONTENT() != nil {
-			y.EmitPureOutput(i.BLOB_CONTENT().GetText())
+			y.EmitOutput(i.BLOB_CONTENT().GetText())
 			return
 		}
 	}
@@ -376,6 +376,6 @@ func (y *JSPVisitor) VisitHtmlCharData(raw jspparser.IHtmlChardataContext) {
 	}
 	if el := i.EL_EXPR(); el != nil {
 		expr := y.fixElExpr(el.GetText())
-		y.EmitPureOutput(expr)
+		y.EmitOutput(expr)
 	}
 }

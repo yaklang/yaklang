@@ -71,6 +71,11 @@ func ConvertTemplateToJava(typ JavaTemplateType, content, filePath string) (tl.T
 		if err != nil {
 			return nil, err
 		}
+	case Freemarker:
+		visitor, err = NewTemplateVisitor(memedit.NewMemEditor(content), tl.TEMPLATE_JAVA_FREEMARKER)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, utils.Errorf("not support java template type: %v", typ)
 	}

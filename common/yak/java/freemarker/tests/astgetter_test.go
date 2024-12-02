@@ -1,9 +1,12 @@
-package freemarker
+package tests
 
-import "testing"
+import (
+	"github.com/yaklang/yaklang/common/yak/java/freemarker"
+	"testing"
+)
 
 func TestGetAST(t *testing.T) {
-	result, err := GetAST(`<#-- Freemarker 模板用法示例 -->
+	result, err := freemarker.GetAST(`<#-- Freemarker 模板用法示例 -->
 
 <#-- 注释：单行注释 -->
 

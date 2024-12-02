@@ -1000,6 +1000,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 			if funcTyp := y.GetCurrentReturnType(); funcTyp != nil {
 				value.SetType(funcTyp)
 			}
+			y.HookReturn(value)
 			y.EmitReturn([]ssa.Value{value})
 		} else {
 			y.EmitReturn(nil)

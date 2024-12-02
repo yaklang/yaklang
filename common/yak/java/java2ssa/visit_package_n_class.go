@@ -598,6 +598,10 @@ func (y *builder) VisitMethodDeclaration(
 		y.VisitFormalParameters(i.FormalParameters())
 		y.VisitMethodBody(i.MethodBody())
 		y.Finish()
+		// framework support for spring boot
+		y.ResetUIModel()
+		y.isInController = false
+
 		newFunc.Type.AddAnnotationFunc(annotationFunc...)
 		y.FunctionBuilder = y.PopFunction()
 		if len(annotationFunc) > 0 || len(defCallback) > 0 {

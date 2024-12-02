@@ -18,12 +18,6 @@ func (y *Visitor) EmitEscapeOutput(variable string) {
 	y.Instructions = append(y.Instructions, inst)
 }
 
-func (y *Visitor) EmitPureOutput(expression string) {
-	inst := newInstruction(OpPureOutPut, y.CurrentRange)
-	inst.Text = expression
-	y.Instructions = append(y.Instructions, inst)
-}
-
 func (y *Visitor) EmitPureCode(code string) {
 	inst := newInstruction(OpPureCode, y.CurrentRange)
 	inst.Text = code

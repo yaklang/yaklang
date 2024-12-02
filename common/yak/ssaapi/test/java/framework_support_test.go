@@ -59,3 +59,63 @@ $request.setAttribute(,,* as $result)
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})
 }
+
+func Test_Template_To_Spring(t *testing.T) {
+	t.Run("test  freemarker", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("application.properties", `
+	# application.properties
+spring.freemarker.enabled=true
+spring.freemarker.suffix=.ABC
+spring.freemarker.charset=UTF-8
+spring.freemarker.content-type=text/html
+spring.freemarker.check-template-location=true
+spring.freemarker.cache=false
+`)
+		vf.AddFile("controller.java", `import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+
+@Controller
+public class GreetingController {
+
+    @GetMapping("/greeting")
+    public String greeting(Model model) {
+        model.addAttribute("name", "World");
+        return "greeting"; 
+    }
+}
+`)
+		vf.AddFile("greeting.ABC", `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Greeting</title>
+</head>
+<body>
+    <h1>Hello, ${name}!</h1>
+</body>
+</html>
+`)
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			prog := programs[0]
+			prog.Show()
+
+			rule := `
+print?{<typeName>?{have:'syntaxflow.template.java.HttpServletRequest'}}(* #-> as $out);
+model?{opcode:param  && <typeName>?{have:'org.springframework.ui.Model'}} as $source;
+		$out #{
+until:<<<UNTIL
+	<self> & $source
+UNTIL
+}-> as $model
+$model.addAttribute(,* as $res)
+`
+			vals, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			res := vals.GetValues("res")
+			require.NotNil(t, res)
+			return nil
+		})
+	})
+}
