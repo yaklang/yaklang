@@ -1,5 +1,7 @@
 package ssautil
 
+import "github.com/yaklang/yaklang/common/log"
+
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
 func ForEachCapturedVariable[T versionedValue](
 	scope ScopedVersionedTableIF[T],
@@ -22,7 +24,7 @@ func ForEachCapturedSideEffect[T versionedValue](
 		if ver.GetValue().IsSideEffect() {
 			handler(name, ver)
 		} else {
-			panic("link-SideEffect must be side effect type")
+			log.Warnf("link-SideEffect must be side effect type")
 		}
 	})
 }
