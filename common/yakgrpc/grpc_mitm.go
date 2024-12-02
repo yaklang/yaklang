@@ -831,7 +831,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 			// 处理响应规则
 			if replacer.haveHijackingRules() {
-				rules, rspHooked, dropped := replacer.hook(false, true, rsp)
+
+				rules, rspHooked, dropped := replacer.hook(false, true, httpctx.GetRequestURL(req), rsp)
 				if dropped {
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 					log.Warn("response should be dropped(VIA replacer.hook)")
@@ -848,7 +849,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 非自动转发的情况下处理替换器
-		rules, rsp1, shouldBeDropped := replacer.hook(false, true, rsp)
+		rules, rsp1, shouldBeDropped := replacer.hook(false, true, httpctx.GetRequestURL(req), rsp)
 		if shouldBeDropped {
 			log.Warn("response should be dropped(VIA replacer.hook)")
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
@@ -1184,7 +1185,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}()
 
-		rules, req1, shouldBeDropped := replacer.hook(true, false, req, isHttps)
+		rules, req1, shouldBeDropped := replacer.hook(true, false, httpctx.GetRequestURL(originReqIns), req, isHttps)
 		if shouldBeDropped {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 			log.Warn("MITM: request dropped by hook (VIA replacer.hook)")
