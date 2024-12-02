@@ -444,6 +444,7 @@ var Exports = map[string]any{
 	"ParseLocalProject":  ParseProjectFromPath,
 	"ParseProject":       ParseProject,
 	"NewFromProgramName": FromDatabase,
+	"NewProgramFromDB":   FromDatabase,
 
 	"withLanguage":      WithRawLanguage,
 	"withConfigInfo":    WithConfigInfo,

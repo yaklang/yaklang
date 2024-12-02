@@ -235,6 +235,12 @@ func init() {
 			withPluginEnableGenerateParam(true),
 		)
 		registerBuildInPlugin(
+			"yak", "SSA 项目重编译",
+			withPluginHelp("将以编译项目使用当前引擎重新编译。用于引擎编译策略更新或代码有变动时使用。"),
+			withPluginAuthors("令则"),
+			withPluginEnableGenerateParam(true),
+		)
+		registerBuildInPlugin(
 			"yak", "SyntaxFlow 规则执行",
 			withPluginHelp("执行 SyntaxFlow 规则"),
 			withPluginAuthors("令则"),

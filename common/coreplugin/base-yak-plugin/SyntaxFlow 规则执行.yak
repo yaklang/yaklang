@@ -13,7 +13,7 @@ ruleContext := cli.Text("ruleContext",
 cli.check()
 
 
-prog, err := ssa.NewFromProgramName(ProgramName)
+prog, err := ssa.NewProgramFromDB(ProgramName)
 if err !=nil{
     yakit.Error("load program %s from db err: %s",ProgramName, err)
     return 
