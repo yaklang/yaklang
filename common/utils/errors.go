@@ -25,6 +25,19 @@ func Error(i interface{}) error {
 	}
 }
 
+type RequireTestingT struct {
+	AssertTestingT
+	FalNow func()
+}
+
+func NewRequireTestT(a AssertTestingT, f func()) *RequireTestingT {
+	return &RequireTestingT{AssertTestingT: a, FalNow: f}
+}
+
+func (r *RequireTestingT) FailNow() {
+	r.FalNow()
+}
+
 type AssertTestingT func(msg string, args ...any)
 
 func (a AssertTestingT) Errorf(format string, args ...interface{}) {
