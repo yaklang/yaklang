@@ -139,6 +139,17 @@ func WithFileSystem(fs fi.FileSystem) Option {
 	}
 }
 
+func WithConfigInfoRaw(info string) Option {
+	return func(c *config) error {
+		c.info = info
+		fs, err := parseFSFromInfo(info)
+		if err != nil {
+			return err
+		}
+		c.fs = fs
+		return nil
+	}
+}
 func WithConfigInfo(input map[string]any) Option {
 	return func(c *config) error {
 		if input == nil {
@@ -151,13 +162,7 @@ func WithConfigInfo(input map[string]any) Option {
 		}
 		info := string(raw)
 
-		c.info = info
-		fs, err := initializeFromInfo(info)
-		if err != nil {
-			return err
-		}
-		c.fs = fs
-		return nil
+		return WithConfigInfoRaw(info)(c)
 	}
 }
 
