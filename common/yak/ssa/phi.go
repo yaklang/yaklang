@@ -2,11 +2,12 @@ package ssa
 
 import (
 	"fmt"
+	"runtime"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
-	"runtime"
 )
 
 func NewPhi(block *BasicBlock, variable string) *Phi {
@@ -114,12 +115,7 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		typeMerge := make(map[Type]struct{})
 
 		for _, v := range vst {
-			if v != nil {
-				vs = append(vs, v)
-			} else {
-				log.Errorf("[BUG]: generate phi value is nil,check it. name: %s,currentFile: %s", name, builder.CurrentFile)
-				continue
-			}
+			vs = append(vs, v)
 		}
 		if len(vs) == 0 {
 			return nil

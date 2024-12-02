@@ -10,8 +10,19 @@ func ForEachCapturedVariable[T versionedValue](
 		if ver.CanCaptureInScope(base) || scope.GetForceCapture() {
 			handler(name, ver)
 		}
+	})
+}
+
+func ForEachCapturedSideEffect[T versionedValue](
+	scope ScopedVersionedTableIF[T],
+	base ScopedVersionedTableIF[T],
+	handler VariableHandler[T],
+) {
+	scope.ForEachCapturedSideEffect(func(name string, ver VersionedIF[T]) {
 		if ver.GetValue().IsSideEffect() {
 			handler(name, ver)
+		} else {
+			panic("link-SideEffect must be side effect type")
 		}
 	})
 }
@@ -23,6 +34,10 @@ func (base *ScopedVersionedTable[T]) CoverBy(scope ScopedVersionedTableIF[T]) {
 
 	baseScope := ScopedVersionedTableIF[T](base)
 	ForEachCapturedVariable(scope, baseScope, func(name string, ver VersionedIF[T]) {
+		// v := base.CreateVariable(name, false)
+		base.AssignVariable(ver, ver.GetValue())
+	})
+	ForEachCapturedSideEffect(scope, baseScope, func(name string, ver VersionedIF[T]) {
 		// v := base.CreateVariable(name, false)
 		base.AssignVariable(ver, ver.GetValue())
 	})
