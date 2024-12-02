@@ -187,7 +187,7 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 func (b FunctionBuilder) HandlerEllipsis() {
 	if ins, ok := b.Params[len(b.Params)-1].(*Parameter); ins != nil {
 		_ = ok
-		ins.SetType(NewSliceType(BasicTypes[AnyTypeKind]))
+		ins.SetType(NewSliceType(CreateAnyType()))
 	} else {
 		log.Warnf("param contains (%T) cannot be set type and ellipsis", ins)
 	}
