@@ -58,6 +58,7 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 
 	// use in ssautil, handle inner member
 	ForEachCapturedVariable(VariableHandler[T])
+	ForEachCapturedSideEffect(VariableHandler[T])
 	SetCapturedVariable(string, VersionedIF[T])
 	SetCapturedSideEffect(string, VersionedIF[T])
 
@@ -404,6 +405,9 @@ func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(handler VariableHandl
 	for name, ver := range ps.linkCaptured {
 		handler(name, ver)
 	}
+}
+
+func (ps *ScopedVersionedTable[T]) ForEachCapturedSideEffect(handler VariableHandler[T]) {
 	for name, ver := range ps.linkSideEffect {
 		handler(name, ver)
 	}
