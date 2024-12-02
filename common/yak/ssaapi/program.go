@@ -7,6 +7,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -16,8 +17,8 @@ import (
 type Program struct {
 	// TODO: one program may have multiple program,
 	// 	 	 only one Application and multiple Library
-	ProgramID int
-	Program   *ssa.Program
+	Program    *ssa.Program
+	ssaProgram *schema.SSAProgram
 	// DBCache *ssa.Cache
 	config *config
 

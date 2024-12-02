@@ -86,7 +86,7 @@ func TestJar(t *testing.T) {
 		require.Greater(t, len(fileList), 0)
 	})
 }
-func check(t *testing.T, language string, info map[string]any) {
+func checkFilelist(t *testing.T, language string, info map[string]any) {
 	progName := uuid.NewString()
 	res, err := ssaapi.ParseProject(
 		ssaapi.WithRawLanguage(language),
@@ -119,6 +119,9 @@ func check(t *testing.T, language string, info map[string]any) {
 	log.Infof("config input: %v", ssaprog)
 	require.True(t, len(ssaprog.ConfigInput) > 0)
 
+	progDB, err := ssaapi.FromDatabase(progName)
+	require.NoError(t, err)
+	require.NotNil(t, progDB)
 }
 
 func Test_Multiple_input(t *testing.T) {
@@ -133,7 +136,7 @@ func Test_Multiple_input(t *testing.T) {
 		err = os.WriteFile(zipPath, zipData, 0644)
 		require.NoError(t, err)
 
-		check(t, "java", map[string]any{
+		checkFilelist(t, "java", map[string]any{
 			"kind":       "compression",
 			"local_file": zipPath,
 		})
@@ -148,7 +151,7 @@ func Test_Multiple_input(t *testing.T) {
 		err = os.WriteFile(jarPath, jar, 0644)
 		require.NoError(t, err)
 
-		check(t, "java", map[string]any{
+		checkFilelist(t, "java", map[string]any{
 			"kind":       "jar",
 			"local_file": jarPath,
 		})
@@ -211,7 +214,7 @@ func Test_Multiple_input_git(t *testing.T) {
 	})
 
 	t.Run("test ssa compile", func(t *testing.T) {
-		check(t, "java", map[string]any{
+		checkFilelist(t, "java", map[string]any{
 			"kind": "git",
 			"url":  url,
 		})
