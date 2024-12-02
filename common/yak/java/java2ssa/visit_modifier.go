@@ -97,6 +97,11 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 	var annotationContainerVariable *ssa.Variable
 	var annotationContainerInstance ssa.Value
 	if annotationName != "" {
+		// support for spring boot
+		if annotationName == "Controller" || annotationName == "RestController" {
+			y.isInController = true
+		}
+
 		val := y.CreateVariable(annotationName, annotationContext)
 		container := y.EmitEmptyContainer()
 		log.Infof("create annotation container[%v]: %v", container.GetId(), annotationName)

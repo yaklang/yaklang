@@ -1325,6 +1325,12 @@ type IDirectiveIfContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// GetElse_ returns the else_ token.
+	GetElse_() antlr.Token
+
+	// SetElse_ sets the else_ token.
+	SetElse_(antlr.Token)
+
 	// IsDirectiveIfContext differentiates from other interfaces.
 	IsDirectiveIfContext()
 }
@@ -1332,6 +1338,7 @@ type IDirectiveIfContext interface {
 type DirectiveIfContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
+	else_  antlr.Token
 }
 
 func NewEmptyDirectiveIfContext() *DirectiveIfContext {
@@ -1355,6 +1362,10 @@ func NewDirectiveIfContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 }
 
 func (s *DirectiveIfContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *DirectiveIfContext) GetElse_() antlr.Token { return s.else_ }
+
+func (s *DirectiveIfContext) SetElse_(v antlr.Token) { s.else_ = v }
 
 func (s *DirectiveIfContext) AllSTART_DIRECTIVE_TAG() []antlr.TerminalNode {
 	return s.GetTokens(FreemarkerParserSTART_DIRECTIVE_TAG)
@@ -1506,10 +1517,6 @@ func (s *DirectiveIfContext) DirectiveIfElseIfElements(i int) IDirectiveIfElseIf
 	return t.(IDirectiveIfElseIfElementsContext)
 }
 
-func (s *DirectiveIfContext) EXPR_ELSE() antlr.TerminalNode {
-	return s.GetToken(FreemarkerParserEXPR_ELSE, 0)
-}
-
 func (s *DirectiveIfContext) DirectiveIfElseElements() IDirectiveIfElseElementsContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
@@ -1524,6 +1531,10 @@ func (s *DirectiveIfContext) DirectiveIfElseElements() IDirectiveIfElseElementsC
 	}
 
 	return t.(IDirectiveIfElseElementsContext)
+}
+
+func (s *DirectiveIfContext) EXPR_ELSE() antlr.TerminalNode {
+	return s.GetToken(FreemarkerParserEXPR_ELSE, 0)
 }
 
 func (s *DirectiveIfContext) GetRuleContext() antlr.RuleContext {
@@ -1634,7 +1645,10 @@ func (p *FreemarkerParser) DirectiveIf() (localctx IDirectiveIfContext) {
 		}
 		{
 			p.SetState(116)
-			p.Match(FreemarkerParserEXPR_ELSE)
+
+			var _m = p.Match(FreemarkerParserEXPR_ELSE)
+
+			localctx.(*DirectiveIfContext).else_ = _m
 		}
 		{
 			p.SetState(117)

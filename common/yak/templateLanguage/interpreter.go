@@ -93,8 +93,6 @@ func (i *Interpreter) GenerateCode() (err error) {
 			i.template.WriteOutput(ins.Text)
 		case OpEscapeOutput:
 			i.template.WriteEscapeOutput(ins.Text)
-		case OpPureOutPut:
-			i.template.WritePureOut(ins.Text)
 		case OpPureCode:
 			i.template.WritePureCode(ins.Text)
 		case OpImport:

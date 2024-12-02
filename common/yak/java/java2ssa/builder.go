@@ -62,6 +62,10 @@ type builder struct {
 	fullTypeNameMap   map[string][]string
 	allImportPkgSlice [][]string
 	selfPkgPath       []string
+
+	// framework support for spring boot
+	currentUIModel ssa.Value
+	isInController bool
 }
 
 func (b *builder) PushBluePrint(bp *ssa.Blueprint) {
