@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"net/http"
 	"sort"
 	"strconv"
@@ -588,6 +589,14 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 			continue
 		}
 
+		if rule.EffectiveURL != "" {
+			yakRegexp := regexp_utils.DefaultYakRegexpManager.GetYakRegexp(rule.EffectiveURL)
+			matchString, err := yakRegexp.MatchString(httpctx.GetRequestURL(req))
+			if err == nil && !matchString {
+				continue
+			}
+		}
+
 		if rule.EnableForRequest {
 			_, newMatchResults, err = rule.MatchPacket(request, true)
 			if err != nil && !isMatchTimeout(err) {
@@ -812,7 +821,7 @@ func (m *mitmReplacer) replaceBody(rule *ypb.MITMContentReplacer, bodyMerged []b
 	return []byte(merged), true
 }
 
-func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...any) ([]*ypb.MITMContentReplacer, []byte, bool) {
+func (m *mitmReplacer) hook(isRequest, isResponse bool, url string, origin []byte, args ...any) ([]*ypb.MITMContentReplacer, []byte, bool) {
 	var matchedRules Rules
 	if m == nil {
 		return matchedRules.MITMContentReplacers(), origin, false
@@ -885,6 +894,13 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 		}
 		if !((rule.EnableForRequest && isRequest) || (rule.EnableForResponse && isResponse) || rule.GetEnableForURI()) {
 			continue
+		}
+		if rule.EffectiveURL != "" {
+			yakRegexp := regexp_utils.DefaultYakRegexpManager.GetYakRegexp(rule.EffectiveURL)
+			matchString, err := yakRegexp.MatchString(url)
+			if err == nil && !matchString {
+				continue
+			}
 		}
 		matched, packet, err := rule.MatchAndReplacePacket(modifiedPacket, isRequest)
 		if err != nil && !isMatchTimeout(err) {

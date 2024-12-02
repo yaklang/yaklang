@@ -23,7 +23,7 @@ func TestReplaceString(t *testing.T) {
 		Disabled:         false,
 		VerboseName:      "",
 	})
-	matched, data, _ := replacer.hook(true, false, []byte(`GET / HTTP/1.1
+	matched, data, _ := replacer.hook(true, false, "", []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: abc=123
 
@@ -49,7 +49,7 @@ func TestReplaceString2(t *testing.T) {
 		Disabled:         false,
 		VerboseName:      "",
 	})
-	matched, data, _ := replacer.hook(true, false, []byte(`GET /content-search.xml HTTP/1.1
+	matched, data, _ := replacer.hook(true, false, "", []byte(`GET /content-search.xml HTTP/1.1
 Host: www.baidu.com
 Accept-Encoding: gzip, deflate, br
 Accept-Language: zh-CN,zh;q=0.9
@@ -84,7 +84,7 @@ func TestReplaceString23(t *testing.T) {
 		Disabled:         false,
 		VerboseName:      "",
 	})
-	matched, data, _ := replacer.hook(true, false, []byte(`GET /content-search.xml HTTP/1.1
+	matched, data, _ := replacer.hook(true, false, "", []byte(`GET /content-search.xml HTTP/1.1
 Host: www.baidu.com
 Accept-Encoding: gzip, deflate, br
 Accept-Language: zh-CN,zh;q=0.9
@@ -119,7 +119,7 @@ func TestReplaceString233(t *testing.T) {
 		Disabled:         false,
 		VerboseName:      "",
 	})
-	matched, data, _ := replacer.hook(true, false, []byte(`GET /content-search.xml HTTP/1.1
+	matched, data, _ := replacer.hook(true, false, "", []byte(`GET /content-search.xml HTTP/1.1
 Host: www.baidu.com
 Accept-Encoding: gzip, deflate, br
 Accept-Language: zh-CN,zh;q=0.9
