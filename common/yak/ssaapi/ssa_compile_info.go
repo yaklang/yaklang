@@ -66,7 +66,7 @@ type proxy struct {
 	PassWord string `json:"password"`
 }
 
-func initializeFromInfo(raw string) (fi.FileSystem, error) {
+func parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	if raw == "" {
 		return nil, utils.Errorf("info is empty ")
 	}
