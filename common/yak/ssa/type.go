@@ -596,7 +596,7 @@ func GetNullType() Type {
 }
 
 func GetAnyType() Type {
-	return BasicTypes[AnyTypeKind]
+	return CreateAnyType()
 }
 
 func GetErrorType() Type {
@@ -624,7 +624,7 @@ func GetTypeByStr(typ string) Type {
 	case "bytes", "[]uint8", "[]byte":
 		return BasicTypes[BytesTypeKind]
 	case "interface {}", "var", "any":
-		return BasicTypes[AnyTypeKind]
+		return CreateAnyType()
 	case "error":
 		return BasicTypes[ErrorTypeKind]
 	default:
@@ -1002,11 +1002,11 @@ func (itype *ObjectType) RawString() string {
 		// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
 		keyTyp := itype.KeyTyp
 		if utils.IsNil(keyTyp) {
-			keyTyp = BasicTypes[AnyTypeKind]
+			keyTyp = CreateAnyType()
 		}
 		fieldType := itype.FieldType
 		if utils.IsNil(fieldType) {
-			fieldType = BasicTypes[AnyTypeKind]
+			fieldType = CreateAnyType()
 		}
 		ret += fmt.Sprintf("map[%s]%s", keyTyp.String(), fieldType.String())
 	case StructTypeKind:
@@ -1036,7 +1036,7 @@ func (itype *ObjectType) RawString() string {
 func (s *ObjectType) AddField(key Value, field Type) {
 	keyTyp := key.GetType()
 	if field == nil {
-		field = BasicTypes[AnyTypeKind]
+		field = CreateAnyType()
 	}
 
 	if index, ok := s.keymap[key.String()]; ok {
@@ -1095,12 +1095,12 @@ func (s *ObjectType) Finish() {
 	if len(fieldTypes) == 1 {
 		s.FieldType = fieldTypes[0]
 	} else {
-		s.FieldType = BasicTypes[AnyTypeKind]
+		s.FieldType = CreateAnyType()
 	}
 	if len(keyTypes) == 1 {
 		s.KeyTyp = keyTypes[0]
 	} else {
-		s.KeyTyp = BasicTypes[AnyTypeKind]
+		s.KeyTyp = CreateAnyType()
 	}
 }
 

@@ -135,7 +135,7 @@ $a = new A();
 println($a->a);
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
-			"end": {`"B.C.D"`, `"any"`},
+			"end": {`"B.C.D"`, `"main.A"`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 
@@ -152,7 +152,7 @@ namespace {
     println($a->a);
 }`
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
-			"end": {`"any"`},
+			"end": {`"main.A"`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("parent class", func(t *testing.T) {

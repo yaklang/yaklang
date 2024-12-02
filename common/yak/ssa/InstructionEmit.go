@@ -349,7 +349,7 @@ func (f *FunctionBuilder) EmitMakeBuildWithType(typ Type, Len, Cap Value) *Make 
 }
 
 func (f *FunctionBuilder) EmitMakeWithoutType(Len, Cap Value) *Make {
-	return f.emitMake(nil, BasicTypes[AnyTypeKind], nil, nil, nil, Len, Cap)
+	return f.emitMake(nil, CreateAnyType(), nil, nil, nil, Len, Cap)
 }
 
 func (f *FunctionBuilder) EmitEmptyContainer() *Make {
@@ -457,7 +457,7 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 	r := &Recover{
 		anValue: NewValue(),
 	}
-	r.SetType(BasicTypes[AnyTypeKind])
+	r.SetType(CreateAnyType())
 	f.emit(r)
 	return r
 }
