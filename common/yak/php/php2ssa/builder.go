@@ -430,3 +430,16 @@ var phpBuildIn = map[string]any{
 	"empty":      func(vars any) any { return any("") },
 	"instanceOf": func(val1, val2 any) {},
 }
+
+func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
+	t := b.StoreFunctionBuilder()
+	b.LoadBuilder(s)
+	return func() {
+		b.LoadBuilder(t)
+	}
+}
+
+func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
+	b.FunctionBuilder = s.Current
+	b.LoadFunctionBuilder(s.Store)
+}

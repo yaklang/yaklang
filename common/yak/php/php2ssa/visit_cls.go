@@ -133,13 +133,10 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			y.GetProgram().SetExportType(className, class)
 			if i.Extends() != nil {
 				parentClassName = i.QualifiedStaticTypeRef().GetText()
-				fb := y.FunctionBuilder
+				store := y.StoreFunctionBuilder()
 				class.AddLazyBuilder(func() {
-					currentbuilder := y.FunctionBuilder
-					y.FunctionBuilder = fb
-					defer func() {
-						y.FunctionBuilder = currentbuilder
-					}()
+					switchHandler := y.SwitchFunctionBuilder(store)
+					defer switchHandler()
 					if parentClass := y.GetBluePrint(parentClassName); parentClass != nil {
 						//感觉在ssa-classBlue中做更好，暂时修复
 						class.AddParentClass(parentClass)
@@ -192,11 +189,10 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				class.RegisterNormalMember(name, value)
 			}
 			currentBuilder := y.FunctionBuilder
+			store := y.StoreFunctionBuilder()
 			class.AddLazyBuilder(func() {
-				lazyCurrentBuilder := y.FunctionBuilder
-				defer func() {
-					y.FunctionBuilder = lazyCurrentBuilder
-				}()
+				switchHandler := y.SwitchFunctionBuilder(store)
+				defer switchHandler()
 				y.FunctionBuilder = currentBuilder
 				typ := y.VisitTypeHint(ret.TypeHint())
 				value.SetType(typ)
@@ -221,7 +217,10 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
 		newFunction := y.NewFunc(funcName)
 		newFunction.SetMethodName(methodName)
+		store := y.StoreFunctionBuilder()
 		newFunction.AddLazyBuilder(func() {
+			switchHandler := y.SwitchFunctionBuilder(store)
+			defer switchHandler()
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
 				var param ssa.Value
