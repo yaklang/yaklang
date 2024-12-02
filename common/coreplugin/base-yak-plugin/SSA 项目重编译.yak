@@ -1,0 +1,31 @@
+yakit.AutoInitYakit()
+
+// {{ 必填项
+programName := cli.String("programName", 
+    cli.setRequired(true),
+    cli.setVerboseName("项目名")
+)
+// }}
+cli.check()
+
+prog, err := ssa.NewProgramFromDB(programName)
+if err != nil {
+    yakit.Error("获取项目错误：%v", err)
+    return 
+}
+
+
+opts = [
+    ssa.withProcess((msg , process )=>{
+        yakit.SetProgressEx("complile", process)
+        yakit.Info("%s: %f",msg, process)
+    }), 
+    //ssa.withDatabasePath(dbPath),
+    ssa.withContext(context.Background()),
+] 
+
+err := prog.Recompile(opts...)
+if err != nil {
+    yakit.Text("编译错误信息:\n" + err.Error())
+    yakit.Error("项目名：%s", programName)
+}

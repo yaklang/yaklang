@@ -70,7 +70,6 @@ opts = [
     ssa.withProcess((msg , process )=>{
         yakit.SetProgressEx("complile", process)
         yakit.Info("%s: %f",msg, process)
-        log.info("%s: %f",msg, process)
     }), 
     ssa.withLanguage(language), 
     ssa.withReCompile(reCompile), 
@@ -87,7 +86,7 @@ if len(entry) != 0{
 
 progs, err := ssa.ParseLocalProject(path, opts...)
 if err != nil {
-     yakit.Text("编译错误信息:\n" + err.Error())
+    yakit.Text("编译错误信息:\n" + err.Error())
     yakit.Error("路径： %s", path)
     yakit.Error("语言： %s", language)
     yakit.Error("项目名：%s", programName)
