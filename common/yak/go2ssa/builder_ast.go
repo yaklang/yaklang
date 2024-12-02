@@ -619,10 +619,11 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.AssignVariable(variable, newFunc)
 	}
 
-	editor := b.GetEditor() // 为了区分不同函数所属的文件
+	store := b.StoreFunctionBuilder()
 	newFunc.AddLazyBuilder(func() {
-		b.SetEditor(editor)
+		switchHandler := b.SwitchFunctionBuilder(store)
 		defer func() {
+			switchHandler()
 			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
 				tph()
 				delete(b.tpHandler, newFunc.GetName())
@@ -747,13 +748,11 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		b.FunctionBuilder = b.PopFunction()
 	}
 
-	PreHandlerBlock := b.CurrentBlock
+	store := b.StoreFunctionBuilder()
 	newFunc.AddLazyBuilder(func() {
-		CurrentBlock := b.CurrentBlock
-		b.CurrentBlock = PreHandlerBlock
-
+		switchHandler := b.SwitchFunctionBuilder(store)
 		defer func() {
-			b.CurrentBlock = CurrentBlock
+			switchHandler()
 			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
 				tph()
 				delete(b.tpHandler, newFunc.GetName())

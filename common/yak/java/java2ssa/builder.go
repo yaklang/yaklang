@@ -125,3 +125,16 @@ func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
 	name := fmt.Sprintf("%s_%s", className, key)
 	return b.ReadConst(name)
 }
+
+func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
+	t := b.StoreFunctionBuilder()
+	b.LoadBuilder(s)
+	return func() {
+		b.LoadBuilder(t)
+	}
+}
+
+func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
+	b.FunctionBuilder = s.Current
+	b.LoadFunctionBuilder(s.Store)
+}
