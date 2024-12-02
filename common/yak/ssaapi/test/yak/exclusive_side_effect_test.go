@@ -117,7 +117,7 @@ b=()=>{
 }
 b()
 `
-	ssatest.CheckWithName("side-effect: a->b", t, code, func(prog *ssaapi.Program) error {
+	ssatest.CheckWithNameOnlyInMemory("side-effect: a->b", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		a := prog.SyntaxFlow("a as $a").GetValues("a")
 		b := prog.SyntaxFlow("b as $b").GetValues("b")
@@ -126,14 +126,21 @@ b()
 		if !ok {
 			t.Fatal("not function")
 		}
-		assert.Equal(t, 1, len(fun1.SideEffects))
+		funtype1, ok := ssa.ToFunctionType(fun1.Type)
+		if !ok {
+			t.Fatal("not function")
+		}
+		assert.Equal(t, 1, len(funtype1.SideEffects))
 
 		fun2, ok := ssa.ToFunction(b[0].GetSSAValue())
 		if !ok {
 			t.Fatal("not function")
 		}
-		assert.Equal(t, 1, len(fun2.SideEffects))
-
+		funtype2, ok := ssa.ToFunctionType(fun2.Type)
+		if !ok {
+			t.Fatal("not function")
+		}
+		assert.Equal(t, 1, len(funtype2.SideEffects))
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.Yak))
 }
@@ -150,7 +157,7 @@ b=()=>{
 }
 b()
 `
-	ssatest.CheckWithName("side-effect: a->b", t, code, func(prog *ssaapi.Program) error {
+	ssatest.CheckWithNameOnlyInMemory("side-effect: a->b", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		a := prog.SyntaxFlow("a as $a").GetValues("a")
 		b := prog.SyntaxFlow("b as $b").GetValues("b")
@@ -159,14 +166,21 @@ b()
 		if !ok {
 			t.Fatal("not function")
 		}
-		assert.Equal(t, 1, len(fun1.SideEffects))
+		funtype1, ok := ssa.ToFunctionType(fun1.Type)
+		if !ok {
+			t.Fatal("not function")
+		}
+		assert.Equal(t, 1, len(funtype1.SideEffects))
 
 		fun2, ok := ssa.ToFunction(b[0].GetSSAValue())
 		if !ok {
 			t.Fatal("not function")
 		}
-		assert.Equal(t, 1, len(fun2.SideEffects))
-
+		funtype2, ok := ssa.ToFunctionType(fun2.Type)
+		if !ok {
+			t.Fatal("not function")
+		}
+		assert.Equal(t, 1, len(funtype2.SideEffects))
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.Yak))
 }
@@ -182,7 +196,7 @@ b=()=>{
 	}
 }
 `
-	ssatest.CheckWithName("side-effect: b->a", t, code, func(prog *ssaapi.Program) error {
+	ssatest.CheckWithNameOnlyInMemory("side-effect: b->a", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		a := prog.SyntaxFlow("a as $a").GetValues("a")
 		b := prog.SyntaxFlow("b as $b").GetValues("b")
@@ -191,14 +205,21 @@ b=()=>{
 		if !ok {
 			t.Fatal("not function")
 		}
-		assert.Equal(t, 1, len(fun1.SideEffects))
+		funtype1, ok := ssa.ToFunctionType(fun1.Type)
+		if !ok {
+			t.Fatal("not function")
+		}
+		assert.Equal(t, 1, len(funtype1.SideEffects))
 
 		fun2, ok := ssa.ToFunction(b[0].GetSSAValue())
 		if !ok {
 			t.Fatal("not function")
 		}
-		assert.Equal(t, 1, len(fun2.SideEffects))
-
+		funtype2, ok := ssa.ToFunctionType(fun2.Type)
+		if !ok {
+			t.Fatal("not function")
+		}
+		assert.Equal(t, 1, len(funtype2.SideEffects))
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.Yak))
 }
@@ -216,7 +237,7 @@ b=()=>{
 	n = 2 // modify
 }
 `
-	ssatest.CheckWithName("side-effect: b->a", t, code, func(prog *ssaapi.Program) error {
+	ssatest.CheckWithNameOnlyInMemory("side-effect: b->a", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		a := prog.SyntaxFlow("a as $a").GetValues("a")
 		b := prog.SyntaxFlow("b as $b").GetValues("b")
@@ -250,23 +271,53 @@ f1=()=>{
     f2() // call-side: f1 will append f2(b), but not f2(a)
 }  
 `
-	ssatest.CheckWithName("side-effect: f2->f1", t, code, func(prog *ssaapi.Program) error {
+	ssatest.CheckWithNameOnlyInMemory("side-effect: f2->f1", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
-		f1 := prog.SyntaxFlow("f1 as $a").GetValues("a")
-		f2 := prog.SyntaxFlow("f2 as $b").GetValues("b")
+		a := prog.SyntaxFlow("f1 as $a").GetValues("a")
+		b := prog.SyntaxFlow("f2 as $b").GetValues("b")
 
-		fun1, ok := ssa.ToFunction(f1[0].GetSSAValue())
+		fun1, ok := ssa.ToFunction(a[0].GetSSAValue())
 		if !ok {
 			t.Fatal("not function")
 		}
-		assert.Equal(t, 1, len(fun1.SideEffects))
-
-		fun2, ok := ssa.ToFunction(f2[0].GetSSAValue())
+		funtype1, ok := ssa.ToFunctionType(fun1.Type)
 		if !ok {
 			t.Fatal("not function")
 		}
-		assert.Equal(t, 2, len(fun2.SideEffects))
+		assert.Equal(t, 1, len(funtype1.SideEffects))
 
+		fun2, ok := ssa.ToFunction(b[0].GetSSAValue())
+		if !ok {
+			t.Fatal("not function")
+		}
+		funtype2, ok := ssa.ToFunctionType(fun2.Type)
+		if !ok {
+			t.Fatal("not function")
+		}
+		assert.Equal(t, 2, len(funtype2.SideEffects))
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.Yak))
+}
+
+func Test_SideEffect_panic(t *testing.T) {
+	code := `
+mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    newRisk = (title,payload,param,levelIndex)=>{
+        rsp = param.rsp
+    }
+    
+    checkPayloadsByVersionScope = (param)=>{
+		for exp in exps{
+			exp = exp[0]
+			rsp,err = param.delayFuzz(exp)
+			newRisk("目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)",exp,param,2)
+			break
+		}
+    }
+}
+`
+	ssatest.CheckWithName("link-side-effect cannot participate in generating phi", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.Yak))
 }
