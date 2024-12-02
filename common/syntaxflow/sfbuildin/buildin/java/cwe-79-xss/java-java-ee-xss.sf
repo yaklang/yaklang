@@ -1,0 +1,54 @@
+desc(
+    title: "Check Java EE's XSS Vulnerability",
+    title_zh: "检测Java EE的XSS漏洞",
+    type:vuln,
+    risk:"xss",
+)
+
+<javaUnescapeOutput> as $sink;
+check $sink then "发现JSP中存在未转义的输出"
+HttpServletRequest?{opcode:param  && <typeName>?{have:'javax.servlet.http.HttpServletRequest'}} as $param;
+$sink #{
+    until: `<self> & $param`
+}-> as $req;
+
+$req.getParameter<getCall> as $source;
+$req.getInputStream<getCall> as $source;
+$req.setAttribute(,,* as  $attribute) ;
+$attribute & $source as $res;
+alert $res for {
+    message: "Find Java EE's XSS Vulnerability",
+    type: vuln,
+    level: high,
+};
+
+desc(
+    alert_min:1,
+    lang: "java",
+    'file://xss-vulnerable.jsp': <<<EOF
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<html>
+<head>
+    <title>XSS Vulnerability Example</title>
+</head>
+<body>
+    <h2>User Input:</h2>
+    <div>${sessionScope.userInput}</div>
+</body>
+</html>
+EOF,
+ 'file://servletDemo.java': <<<EOF
+import java.io.*;
+import javax.servlet.*;
+import javax.servlet.http.*;
+
+public class XSSVulnerableServlet extends HttpServlet {
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String userInput = request.getParameter("input");
+        request.setAttribute("userInput", userInput);
+       request.getRequestDispatcher("/xss-vulnerable.jsp").forward(request, response);
+    }
+}
+EOF,
+);
+
