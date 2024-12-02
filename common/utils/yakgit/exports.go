@@ -11,6 +11,10 @@ var Exports = map[string]any{
 	"Checkout":      checkout,
 	"IterateCommit": EveryCommit,
 
+	"FileSystemFromCommit":      FromCommit,
+	"FileSystemFromCommits":     FromCommits,
+	"FileSystemFromCommitRange": FromCommitRange,
+
 	"auth":           WithUsernamePassword,
 	"context":        WithContext,
 	"depth":          WithDepth,

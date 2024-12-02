@@ -1,6 +1,7 @@
 package yakgit
 
 import (
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"os"
 
 	"github.com/go-git/go-git/v5/utils/merkletrie"
@@ -22,7 +23,30 @@ func fetchRespos(res *git.Repository, commitHash string) (*filesys.VirtualFS, er
 	// 获取父提交
 	parentCommits, err := commit.Parents().Next()
 	if err != nil {
-		return nil, err
+		// no parent commit
+		// orphan commit
+		// just return the commit's tree
+		tree, err := commit.Tree()
+		if err != nil {
+			return nil, err
+		}
+		vfs := filesys.NewVirtualFs()
+		files := tree.Files()
+		count := 0
+		files.ForEach(func(file *object.File) error {
+			raw, err := file.Contents()
+			if err != nil {
+				log.Warn(utils.Wrapf(err, "read file %s failed", file.Name))
+				return nil
+			}
+			vfs.AddFile(file.Name, raw)
+			count++
+			return nil
+		})
+		if count <= 0 {
+			return nil, utils.Error("no file changed")
+		}
+		return vfs, nil
 	}
 
 	// 获取父提交的树
@@ -79,6 +103,13 @@ func fetchRespos(res *git.Repository, commitHash string) (*filesys.VirtualFS, er
 	return vfs, nil
 }
 
+// FileSystemFromCommit 从指定的commit中获取文件系统
+//
+// Example:
+// ```
+// fs := git.FileSystemFromCommit("path/to/repo", "2871a988b2ed7ec10a1fd45eca248a96a99a8560")~
+// fs, err := git.FileSystemFromCommit("path/to/repo", "2871a988b2ed7ec10a1fd45eca248a96a99a8560")
+// ```
 func FromCommit(repos string, commitHash string) (filesys_interface.FileSystem, error) {
 	res, err := git.PlainOpen(repos)
 	if err != nil {
@@ -87,6 +118,13 @@ func FromCommit(repos string, commitHash string) (filesys_interface.FileSystem, 
 	return fetchRespos(res, commitHash)
 }
 
+// FileSystemFromCommits 从多个commit中获取文件系统
+//
+// Example:
+// ```
+// fs := git.FileSystemFromCommits("path/to/repo", "2871a988b2ed7ec10a1fd45eca248a96a99a8560", "54165a396a219d085980dca623ae1ff6582033ad")~
+// fs, err := git.FileSystemFromCommits("path/to/repo", "54165a396a219d085980dca623ae1ff6582033ad", "2871a988b2ed7ec10a1fd45eca248a96a99a8560")
+// ```
 func FromCommits(repos string, commitHashes ...string) (filesys_interface.FileSystem, error) {
 	res, err := git.PlainOpen(repos)
 	if err != nil {
@@ -130,6 +168,12 @@ func FromCommits(repos string, commitHashes ...string) (filesys_interface.FileSy
 	return base, nil
 }
 
+// FileSystemFromCommitRange 从commit范围中获取文件系统
+//
+// Example:
+// ```
+// fs := git.FileSystemFromCommitRange("path/to/repo", "2871a988b2ed7ec10a1fd45eca248a96a99a8560", "54165a396a219d085980dca623ae1ff6582033ad")~
+// ```
 func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error) {
 	res, err := git.PlainOpen(repos)
 	if err != nil {
@@ -146,6 +190,11 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 		return nil, utils.Wrap(err, "get end commit")
 	}
 
+	basevfs, err := fetchRespos(res, start)
+	if err != nil {
+		return nil, err
+	}
+
 	// 获取两个commit的tree
 	startTree, err := startCommit.Tree()
 	if err != nil {
@@ -157,13 +206,13 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 	}
 
 	// 计算diff
-	changes, err := endTree.Diff(startTree)
+	changes, err := startTree.Diff(endTree)
 	if err != nil {
 		return nil, utils.Wrap(err, "calculate diff")
 	}
 
 	// 创建虚拟文件系统
-	fs := filesys.NewVirtualFs()
+	fs := basevfs
 
 	count := 0
 	// 遍历所有变更
@@ -187,6 +236,14 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 				log.Warnf("read file %s content failed: %s", dst.Name, err)
 				continue
 			}
+
+			if a, _ := fs.Exists(dst.Name); a {
+				err := fs.RemoveFileOrDir(dst.Name)
+				if err != nil {
+					log.Warn(err)
+				}
+			}
+
 			count++
 			fs.AddFile(dst.Name, content)
 		case merkletrie.Delete:

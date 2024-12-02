@@ -1,39 +1,112 @@
 package yakgit
 
 import (
+	"bytes"
+	_ "embed"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/go-rod/rod/lib/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
+//go:embed test-repo.zip
+var testRepo []byte
+
 func TestFSConverter(t *testing.T) {
-	fs, err := FromCommit("/Users/v1ll4n/Projects/yaklang", "f80b290a346dffaafb15964c4e10801066a8fccf")
+	zfs, err := filesys.NewZipFSRaw(bytes.NewReader(testRepo), int64(len(testRepo)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(filesys.DumpTreeView(fs))
 
-	fs, err = FromCommits("/Users/v1ll4n/Projects/yaklang", "f80b290a346dffaafb15964c4e10801066a8fccf", "54165a396a219d085980dca623ae1ff6582033ad")
+	baseDir := filepath.Join(consts.GetDefaultYakitBaseTempDir(), utils.RandString(8)) + "/"
+	filesys.SimpleRecursive(
+		filesys.WithFileSystem(zfs),
+		filesys.WithDirStat(func(s string, info fs.FileInfo) error {
+			os.MkdirAll(filepath.Join(baseDir, s), 0755)
+			return nil
+		}),
+		filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+			raw, err := zfs.ReadFile(s)
+			if err != nil {
+				return nil
+			}
+			err = os.WriteFile(filepath.Join(baseDir, s), raw, 0644)
+			return nil
+		}))
+	fmt.Println(baseDir)
+	repo := filepath.Join(baseDir, "test-repo")
+	f, err := FromCommit(repo, `184d4e3f162cf58da2a4acf4346005a82cf97606`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(filesys.DumpTreeView(fs))
+	var raw []byte
+	raw, _ = f.ReadFile("./file1.txt")
+	assert.Contains(t, string(raw), "Modified content of file1")
+	raw, _ = f.ReadFile("file3.txt")
+	assert.Contains(t, string(raw), `New file3 content`)
+	raw, _ = f.ReadFile("file2.txt")
+	assert.Empty(t, raw)
 
-	fs, err = FromCommitRange("/Users/v1ll4n/Projects/yaklang", "54165a396a219d085980dca623ae1ff6582033ad", "f80b290a346dffaafb15964c4e10801066a8fccf")
+	f, err = FromCommit(repo, `745f35e4fd4c1d8cfbc12495f04b989abf9f3437`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(filesys.DumpTreeView(fs))
+	showFS(f)
+	raw, _ = f.ReadFile("./file1.txt")
+	assert.Contains(t, string(raw), "Initial content of file1\n")
+	raw, _ = f.ReadFile("file2.txt")
+	assert.Contains(t, string(raw), "Initial content of file2\n")
+	raw, _ = f.ReadFile("file3.txt")
+	assert.Empty(t, raw)
 
-	filesys.SimpleRecursive(filesys.WithFileSystem(fs), filesys.WithFileStat(func(s string, info os.FileInfo) error {
-		fmt.Println("--------------------------------")
-		fmt.Println(s)
-		raw, err := fs.ReadFile(s)
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(raw))
-		return nil
-	}))
+	f, err = FromCommits(repo, "184d4e3f162cf58da2a4acf4346005a82cf97606", `745f35e4fd4c1d8cfbc12495f04b989abf9f3437`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	showFS(f)
+	raw, _ = f.ReadFile("./file1.txt")
+	assert.Contains(t, string(raw), "Initial content of file1\n")
+	raw, _ = f.ReadFile("file2.txt")
+	assert.Contains(t, string(raw), "Initial content of file2\n")
+	raw, _ = f.ReadFile("file3.txt")
+	assert.Contains(t, string(raw), `New file3 content`)
+
+	f, err = FromCommits(repo, `745f35e4fd4c1d8cfbc12495f04b989abf9f3437`, "184d4e3f162cf58da2a4acf4346005a82cf97606")
+	if err != nil {
+		t.Fatal(err)
+	}
+	showFS(f)
+	raw, _ = f.ReadFile("./file1.txt")
+	assert.Contains(t, string(raw), "Modified content of file1")
+	raw, _ = f.ReadFile("file2.txt")
+	assert.Contains(t, string(raw), "Initial content of file2\n")
+	raw, _ = f.ReadFile("file3.txt")
+	assert.Contains(t, string(raw), `New file3 content`)
+
+	f, err = FromCommitRange(repo, `745f35e4fd4c1d8cfbc12495f04b989abf9f3437`, "184d4e3f162cf58da2a4acf4346005a82cf97606")
+	if err != nil {
+		t.Fatal(err)
+	}
+	showFS(f)
+	raw, _ = f.ReadFile("./file1.txt")
+	spew.Dump(raw)
+	assert.Contains(t, string(raw), "Modified content of file1")
+	raw, _ = f.ReadFile("file2.txt")
+	assert.Contains(t, string(raw), "Initial content of file2\n")
+	spew.Dump(raw)
+	raw, _ = f.ReadFile("file3.txt")
+	spew.Dump(raw)
+	assert.Contains(t, string(raw), `New file3 content`)
+
+}
+
+func showFS(fi filesys_interface.FileSystem) {
+	fmt.Println(filesys.DumpTreeView(fi))
 }
