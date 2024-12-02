@@ -211,6 +211,14 @@ func init() {
 				res = append(res, vals...)
 				return nil
 			})
+		case *sfvm.ValueList:
+			values, err := SFValueListToValues(i)
+			if err == nil {
+				values.ForEach(func(value *Value) {
+					vals := getCalledAndCheck(value)
+					res = append(res, vals...)
+				})
+			}
 		default:
 			return false, nil, utils.Errorf("invalid value type %T", i)
 		}

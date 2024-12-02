@@ -1,0 +1,60 @@
+desc(
+    title: "Check Java Spring Boot's Template Language XSS Vulnerability",
+    title_zh: "检测Java Spring Boot框架模板语言XSS漏洞",
+    type:vuln,
+    risk:"xss",
+)
+
+<javaUnescapeOutput> as $sink;
+check $sink then "发现模板语言中存在未转义的输出"
+Model?{opcode:param  && <typeName>?{have:'org.springframework.ui.Model'}} as $source;
+$sink #{
+    until: `<self> & $source`,
+    exclude:`<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`
+}->as $res;
+
+alert $res for {
+    message: "Find Java Spring Boot's Template Language XSS Vulnerability",
+    type: vuln,
+    level: high,
+};
+
+desc(
+    alert_min:1,
+    lang: "java",
+    'file://src/main/resource/greeting.ftl': <<<EOF
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Greeting</title>
+    </head>
+    <body>
+        <h1>Hello, ${name}!</h1>
+    </body>
+    </html>
+    EOF,
+    'file://application.properties': <<<EOF
+spring.freemarker.enabled=true
+spring.freemarker.suffix=.ftl
+spring.freemarker.charset=UTF-8
+spring.freemarker.content-type=text/html
+spring.freemarker.check-template-location=true
+spring.freemarker.cache=false
+EOF,
+    'file://controller.java': <<<EOF
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+
+@Controller
+public class GreetingController {
+
+    @GetMapping("/greeting")
+    public String greeting(Model model) {
+        model.addAttribute("name", "World");
+        return "greeting";
+    }
+}
+EOF,
+
+);

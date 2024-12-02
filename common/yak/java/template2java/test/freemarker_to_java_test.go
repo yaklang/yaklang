@@ -15,7 +15,7 @@ func TestFreeMarker2Java_Content(t *testing.T) {
 	}{
 		{"test  freemarker pure html  ", "<body>\n <h1> hello </h1>\n</body>", []string{
 			"out.write(\"<body>\");",
-			"out.write(\" <h1> hello </h1>\")",
+			"out.write(\"<h1> hello </h1>\");",
 			"out.write(\"</body>\");"},
 		},
 		{"test freemarker el expression", "<h1>${name}</h1>", []string{

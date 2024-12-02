@@ -78,6 +78,7 @@ func (y *FreeMarkerVisitor) VisitRawTextElement(raw freemarkerparser.IRawTextCon
 	}
 	texts := i.GetText()
 	for _, text := range strings.Split(texts, "\n") {
+		text = strings.TrimSpace(text)
 		y.EmitPureText(text)
 	}
 }
