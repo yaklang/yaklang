@@ -693,12 +693,12 @@ var nucleiDSLFunctions = map[string]interface{}{
 
 	"generate_jwt": func(args ...interface{}) string {
 		var optionalAlgorithm jwt.SigningMethod
-		var optionalKey []byte = []byte{}
+		var optionalKey interface{}
 		var optionalMaxAgeUnix int64
 
 		argSize := len(args)
 
-		if argSize < 1 || argSize > 4 {
+		if argSize < 2 || argSize > 4 {
 			log.Errorf("invalid number of arguments: %d", argSize)
 			return ""
 		}
@@ -712,18 +712,18 @@ var nucleiDSLFunctions = map[string]interface{}{
 			return ""
 		}
 
-		if argSize > 1 {
-			alg := toString(args[1])
-			optionalAlgorithm = jwt.GetSigningMethod(alg)
-			if alg == "" {
-				optionalAlgorithm = jwt.SigningMethodNone
-			}
-			if optionalAlgorithm == nil {
-				log.Errorf("invalid algorithm: %s", alg)
-				return ""
-			}
+		alg := toString(args[1])
+		if alg == "" {
+			alg = "none" // fix input ,if alg is empty ,set to none
 		}
-
+		optionalAlgorithm = jwt.GetSigningMethod(alg)
+		if optionalAlgorithm == nil {
+			log.Errorf("invalid algorithm: %s", alg)
+			return ""
+		}
+		if optionalAlgorithm == jwt.SigningMethodNone {
+			optionalKey = jwt.UnsafeAllowNoneSignatureType // if alg is none ,should set to unsafe type
+		}
 		if argSize > 2 {
 			optionalKey = toBytes(args[2])
 		}
