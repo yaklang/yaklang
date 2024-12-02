@@ -59,15 +59,30 @@ func TestNewNucleiDSLSandbox3(t *testing.T) {
 }
 
 func TestNewNucleiDSLSandbox_GenerateJWT(t *testing.T) {
-	raw := `generate_jwt("{\"name\":\"John Doe\",\"foo\":\"bar\"}", "HS256", "hello-world")`
-	box := NewNucleiDSLYakSandbox()
-	results, err := box.Execute(raw, map[string]interface{}{})
-	if err != nil {
-		panic(err)
-	}
-	if toString(results) != "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYW1lIjoiSm9obiBEb2UifQ.EsrL8lIcYJR_Ns-JuhF3VCllCP7xwbpMCCfHin_WT6U" {
-		panic("generate_jwt failed")
-	}
+	t.Run("generate_jwt usually", func(t *testing.T) {
+		raw := `generate_jwt("{\"name\":\"John Doe\",\"foo\":\"bar\"}", "HS256", "hello-world")`
+		box := NewNucleiDSLYakSandbox()
+		results, err := box.Execute(raw, map[string]interface{}{})
+		if err != nil {
+			panic(err)
+		}
+		if toString(results) != "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYW1lIjoiSm9obiBEb2UifQ.EsrL8lIcYJR_Ns-JuhF3VCllCP7xwbpMCCfHin_WT6U" {
+			panic("generate_jwt failed")
+		}
+	})
+
+	t.Run("generate_jwt with none alg", func(t *testing.T) {
+		raw := `generate_jwt("{\"name\":\"John Doe\",\"foo\":\"bar\"}", "")`
+		box := NewNucleiDSLYakSandbox()
+		results, err := box.Execute(raw, map[string]interface{}{})
+		if err != nil {
+			panic(err)
+		}
+		if toString(results) != "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJmb28iOiJiYXIiLCJuYW1lIjoiSm9obiBEb2UifQ." {
+			panic("generate_jwt failed")
+		}
+	})
+
 }
 
 func TestNewNucleiDSLSandbox2_Response(t *testing.T) {
