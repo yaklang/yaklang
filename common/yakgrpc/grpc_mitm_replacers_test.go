@@ -408,7 +408,7 @@ testBody`
 				} else {
 					packet = responseBytes
 				}
-				_, modified, _ := replacer.hook(rule.EnableForRequest, rule.EnableForResponse, packet)
+				_, modified, _ := replacer.hook(rule.EnableForRequest, rule.EnableForResponse, "", packet)
 				packetLines := strings.Split(string(modified), "\n")
 				targetLine := expectLines[i] - 1
 				if targetLine == -1 {
@@ -472,7 +472,7 @@ testBody`
 		t.Run(testCase.name, func(t *testing.T) {
 			ConfigRuleByFlags(rule, testCase.flags)
 			replacer.SetRules(rule)
-			_, modifiedPacket, _ := replacer.hook(true, false, []byte(reqRaw))
+			_, modifiedPacket, _ := replacer.hook(true, false, "", []byte(reqRaw))
 			packetLines := strings.Split(string(modifiedPacket), "\n")
 			p := 0
 			m := map[int]struct{}{}
@@ -517,12 +517,12 @@ func TestExtraHeaders(t *testing.T) {
 	reqRaw := `POST /testUri HTTP/1.1
 Host: www.baidu.com
 aa: 1`
-	_, modifiedPacket, _ := replacer.hook(true, false, []byte(reqRaw))
+	_, modifiedPacket, _ := replacer.hook(true, false, "", []byte(reqRaw))
 	assert.NotContains(t, string(modifiedPacket), "aa: 1")
 	assert.Contains(t, string(modifiedPacket), "aa: a")
 	reqRaw = `POST /testUri HTTP/1.1
 Host: www.baidu.com`
-	_, modifiedPacket, _ = replacer.hook(true, false, []byte(reqRaw))
+	_, modifiedPacket, _ = replacer.hook(true, false, "", []byte(reqRaw))
 	assert.NotContains(t, string(modifiedPacket), "aa: 1")
 	assert.Contains(t, string(modifiedPacket), "aa: a")
 }
@@ -560,12 +560,12 @@ func TestExtraCookie(t *testing.T) {
 	reqRaw := `POST /testUri HTTP/1.1
 Host: www.baidu.com
 Cookie: cc=1`
-	_, modifiedPacket, _ := replacer.hook(true, false, []byte(reqRaw))
+	_, modifiedPacket, _ := replacer.hook(true, false, "", []byte(reqRaw))
 	assert.Contains(t, string(modifiedPacket), "Cookie: cc=1; aa=a")
 	reqRaw = `POST /testUri HTTP/1.1
 Host: www.baidu.com
 `
-	_, modifiedPacket, _ = replacer.hook(true, false, []byte(reqRaw))
+	_, modifiedPacket, _ = replacer.hook(true, false, "", []byte(reqRaw))
 	assert.Contains(t, string(modifiedPacket), "Cookie: aa=a")
 }
 
@@ -592,7 +592,7 @@ header: 1
 
 body
 `))
-	_, modifiedPacket, _ := replacer.hook(true, false, []byte(reqRaw))
+	_, modifiedPacket, _ := replacer.hook(true, false, "", []byte(reqRaw))
 	require.Contains(t, string(modifiedPacket), "Content-Length: 6==ok==")
 	// if !strings.Contains(string(modifiedPacket), "Content-Length: 6==ok==\n") {
 	// 	t.Fatalf("replace failed: %s", string(modifiedPacket))
@@ -783,7 +783,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	if err != nil {
 		t.Fatal(err)
 	}
-	rules, _, _ := replacer.hook(true, false, requestBytes)
+	rules, _, _ := replacer.hook(true, false, "", requestBytes)
 	httpctx.AppendMatchedRule(req, rules...)
 	flow := &schema.HTTPFlow{}
 	replacer.hookColor(requestBytes, []byte(""), req, flow)
@@ -826,11 +826,11 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	defer func() {
 		yakit.RegisterLowHTTPSaveCallback()
 	}()
-	replacer.hook(true, false, requestBytes)
+	replacer.hook(true, false, "", requestBytes)
 	replacer.WaitTasks()
 	assert.Equal(t, "[重发]tag1|YAKIT_COLOR_red", tags)
 	replacer.rules[0].ExtraTag = nil
-	replacer.hook(true, false, requestBytes)
+	replacer.hook(true, false, "", requestBytes)
 	tags = ""
 	replacer.WaitTasks()
 	assert.Equal(t, "[重发]|YAKIT_COLOR_red", tags)
@@ -872,7 +872,7 @@ Host: example.com
 	req, err := lowhttp.ParseBytesToHttpRequest(requestBytes)
 	require.NoError(t, err)
 	flow := &schema.HTTPFlow{}
-	matchRules, modifiedBytes, isDrop := replacer.hook(true, false, requestBytes)
+	matchRules, modifiedBytes, isDrop := replacer.hook(true, false, "", requestBytes)
 	require.False(t, isDrop)
 	require.Len(t, matchRules, 1)
 	require.Equal(t, "file=", matchRules[0].Rule)
@@ -883,4 +883,42 @@ Host: example.com
 	extractedData := replacer.hookColor(requestBytes, []byte(""), req, flow)
 	require.Len(t, extractedData, 1)
 	require.Equal(t, "YAKIT_COLOR_RED|example", flow.Tags)
+}
+
+func TestGRPCMUSTPASS_ReplaceWithEffectiveURL(t *testing.T) {
+	urlToken := utils.RandStringBytes(10)
+	token := utils.RandStringBytes(10)
+	replacer := NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:             `百度`,
+		Result:           token,
+		Color:            "",
+		EnableForRequest: true,
+		EnableForHeader:  true,
+		EnableForBody:    true,
+		Index:            0,
+		ExtraTag:         nil,
+		Disabled:         false,
+		VerboseName:      "",
+		EffectiveURL:     urlToken,
+	})
+	requestBytes := []byte(`GET / HTTP/1.1
+Host: www.baidu.com
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Cookie: BAIDUID_BFESS=D541A87Daaa50ACC658F7405F62B195D8AA:FG=1; ZFY=Xx1VJGFY2aaHQ2vrOIEsC83loAk0wEEIPY3nVfBgtxymQ:C
+Sec-Fetch-Dest: empty
+Sec-Fetch-Mode: no-cors
+Sec-Fetch-Site: same-origin
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36
+
+{"product": "百度"}`)
+
+	_, res, drop := replacer.hook(true, false, "http://www.baidu.com/", requestBytes)
+	require.NotContains(t, string(res), token)
+	require.False(t, drop)
+
+	_, res, drop = replacer.hook(true, false, "http://www.baidu.com/"+urlToken, requestBytes)
+	require.Contains(t, string(res), token)
+	require.False(t, drop)
 }
