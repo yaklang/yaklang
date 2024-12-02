@@ -141,11 +141,10 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	/*
 		该lazyBuilder顺序按照cls解析顺序
 	*/
-	current := y.FunctionBuilder
-	currentEditor := y.FunctionBuilder.GetEditor()
+	store := y.StoreFunctionBuilder()
 	class.AddLazyBuilder(func() {
-		f := y.SwitchProg(current, currentEditor)
-		defer f()
+		switchHandler := y.SwitchFunctionBuilder(store)
+		defer switchHandler()
 		for _, parentClass := range mergedTemplate {
 			if bluePrint := y.GetBluePrint(parentClass); bluePrint != nil {
 				class.AddParentClass(bluePrint)
@@ -220,8 +219,6 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	if i.ConstructorDeclaration() != nil {
 		y.VisitConstructorDeclaration(i.ConstructorDeclaration(), class)
 	} else if i.FieldDeclaration() != nil {
-		currentBuilder := y.FunctionBuilder
-		currentEditor := y.FunctionBuilder.GetEditor()
 		setMember := class.RegisterNormalMember
 		if isStatic {
 			setMember = class.RegisterStaticMember
@@ -233,9 +230,10 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 			undefined := ssa.Value(ssa.NewUndefined(namex))
 			setMember(namex, undefined, false)
 		}
+		store := y.StoreFunctionBuilder()
 		class.AddLazyBuilder(func() {
-			f := y.SwitchProg(currentBuilder, currentEditor)
-			defer f()
+			switchHandler := y.SwitchFunctionBuilder(store)
+			defer switchHandler()
 			var fieldType ssa.Type
 			if field.TypeType() != nil {
 				typex := field.TypeType().GetText()
@@ -516,12 +514,11 @@ func (y *builder) VisitClassBodyDeclaration(
 	}
 
 	if ret := i.Block(); ret != nil {
-		currentFb := y.FunctionBuilder
-		currentEditor := y.FunctionBuilder.GetEditor()
+		store := y.StoreFunctionBuilder()
 		class.AddLazyBuilder(func() {
-			f := y.SwitchProg(currentFb, currentEditor)
+			switchHandler := y.SwitchFunctionBuilder(store)
+			defer switchHandler()
 			y.VisitBlock(i.Block())
-			f()
 		})
 	} else if ret := i.MemberDeclaration(); ret != nil {
 		if class != nil {
@@ -587,12 +584,11 @@ func (y *builder) VisitMethodDeclaration(
 	} else {
 		class.RegisterNormalMethod(key, newFunc)
 	}
-	currentBuilder := y.FunctionBuilder
-	currentEditor := y.FunctionBuilder.GetEditor()
+	store := y.StoreFunctionBuilder()
 	newFunc.AddLazyBuilder(func() {
 		log.Infof("lazybuild: %s %s ", funcName, key)
-		f := y.SwitchProg(currentBuilder, currentEditor)
-		defer f()
+		switchHandler := y.SwitchFunctionBuilder(store)
+		defer switchHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)
 		if isStatic {
 			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
@@ -833,12 +829,11 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	funcName := fmt.Sprintf("%s_%s_%s_%s", pkgName.Name, class.Name, key, uuid.NewString()[:4])
 	newFunc := y.NewFunc(funcName)
 	class.Constructor = newFunc
-	currentBuilder := y.FunctionBuilder
-	currentEditor := y.FunctionBuilder.GetEditor()
 	class.RegisterMagicMethod(ssa.Constructor, newFunc)
+	store := y.StoreFunctionBuilder()
 	newFunc.AddLazyBuilder(func() {
-		f := y.SwitchProg(currentBuilder, currentEditor)
-		defer f()
+		switchHandler := y.SwitchFunctionBuilder(store)
+		defer switchHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)
 		{
 			y.NewParam("$this")

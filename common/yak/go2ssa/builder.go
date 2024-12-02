@@ -343,3 +343,16 @@ type PackageInfo struct {
 	Path string
 	Pos  ssa.CanStartStopToken
 }
+
+func (b *astbuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
+	t := b.StoreFunctionBuilder()
+	b.LoadBuilder(s)
+	return func() {
+		b.LoadBuilder(t)
+	}
+}
+
+func (b *astbuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
+	b.FunctionBuilder = s.Current
+	b.LoadFunctionBuilder(s.Store)
+}
