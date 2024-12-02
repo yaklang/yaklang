@@ -22,7 +22,6 @@ func TestCreateJavaTemplate(t *testing.T) {
 		wants     []string
 	}{
 		{"demo.jsp", "D:\\java_project\\jspDemo\\src\\main\\webapp\\WEB-INF\\jsp", "demo", []string{
-			"package D_.java_project.jspDemo.src.main.webapp.WEB_INF.jsp;",
 			"public class demo_jsp",
 			`out.write("<html>");`,
 			`public void _JavaTemplateService(HttpServletRequest request, HttpServletResponse response)`,

@@ -101,8 +101,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		}
 		prog.SetTemplate(path, info)
 		saveExtraFile(path, raw)
-		javaPath := path[:len(path)-4] + "_jsp.java"
-		err = prog.Build(javaPath, memedit.NewMemEditor(info.GetContent()), fb)
+		err = prog.Build(path, memedit.NewMemEditor(info.GetContent()), fb)
 		if err != nil {
 			return err
 		}
@@ -122,6 +121,27 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 			log.Warnf("open file %s error: %v", path, err)
 			return nil
 		}
+
+		if isFreemarkerFile(prog, path) {
+			raw, err := fileSystem.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			saveExtraFile(path, raw)
+			var info tl.TemplateGeneratedInfo
+			info, err = tj.ConvertTemplateToJava(tj.Freemarker, string(raw), path)
+			if err != nil {
+				return utils.Errorf("convert freemarker to java error: %v", err)
+			}
+			prog.SetTemplate(path, info)
+			saveExtraFile(path, raw)
+			err = prog.Build(path, memedit.NewMemEditor(info.GetContent()), fb)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
 		info, err := fs.Stat()
 		if err != nil {
 			return nil

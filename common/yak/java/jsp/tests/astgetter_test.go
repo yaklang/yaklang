@@ -1,9 +1,12 @@
-package jsp
+package tests
 
-import "testing"
+import (
+	"github.com/yaklang/yaklang/common/yak/java/jsp"
+	"testing"
+)
 
 func TestGetAST(t *testing.T) {
-	result, err := GetAST(`<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
+	result, err := jsp.GetAST(`<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
     import="java.util.*, java.text.*" session="true" buffer="8kb" autoFlush="true" isThreadSafe="true" errorPage="error.jsp" %>
 
 <%@ include file="header.jsp" %>
