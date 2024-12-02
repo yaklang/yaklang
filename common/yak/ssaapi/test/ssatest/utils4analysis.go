@@ -21,7 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
@@ -40,15 +40,15 @@ const (
 	OnlyDatabase
 )
 
-func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
+func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
 	// only in memory
 	{
 		prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		log.Infof("only in memory ")
 		err = handler(prog)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 
 	programID := uuid.NewString()
@@ -63,21 +63,21 @@ func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(ssaapi.Progra
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
 		}()
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		log.Infof("with database ")
 		err = handler(prog)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 
 	// just use database
 	{
 		prog, err := ssaapi.FromDatabase(programID)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		log.Infof("only use database ")
 		err = handler([]*ssaapi.Program{prog})
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 }
 
@@ -90,11 +90,11 @@ func CheckWithName(
 	// only in memory
 	{
 		prog, err := ssaapi.Parse(code, opt...)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		log.Infof("only in memory ")
 		err = handler(prog)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 
 	programID := uuid.NewString()
@@ -112,22 +112,22 @@ func CheckWithName(
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
 		}()
-		assert.Nil(t, err)
+		require.Nil(t, err)
 		// prog.Show()
 
 		log.Infof("with database ")
 		err = handler(prog)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 
 	// just use database
 	{
 		prog, err := ssaapi.FromDatabase(programID)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		log.Infof("only use database ")
 		err = handler(prog)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 }
 
@@ -140,11 +140,11 @@ func CheckWithNameOnlyInMemory(
 	// only in memory
 	{
 		prog, err := ssaapi.Parse(code, opt...)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		log.Infof("only in memory ")
 		err = handler(prog)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 
 	programID := uuid.NewString()
@@ -190,18 +190,18 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 		parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 		ast := parser.CompilationUnit()
 		_ = ast
-		assert.NoError(t, handler(true, nil, start))
+		require.NoError(t, handler(true, nil, start))
 	}
 
 	// only in memory
 	{
 		start := time.Now()
 		prog, err := ssaapi.Parse(code, opt...)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		log.Infof("only in memory ")
 		err = handler(true, prog, start)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 
 	programID := uuid.NewString()
@@ -212,23 +212,23 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 		start := time.Now()
 		opt = append(opt, ssaapi.WithProgramName(programID))
 		prog, err := ssaapi.Parse(code, opt...)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 		log.Infof("with database ")
 		err = handler(false, prog, start)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 }
 
-func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p ParseStage, prog ssaapi.Programs, start time.Time) error, opt ...ssaapi.Option) {
+func CheckProfileWithFS(fs fi.FileSystem, t require.TestingT, handler func(p ParseStage, prog ssaapi.Programs, start time.Time) error, opt ...ssaapi.Option) {
 	// only in memory
 	{
 		start := time.Now()
 		prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		log.Infof("only in memory ")
 		err = handler(OnlyMemory, prog, start)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 
 	programID := uuid.NewString()
@@ -244,21 +244,21 @@ func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p Pars
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
 		}()
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		log.Infof("with database ")
 		err = handler(WithDatabase, prog, start)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 
 	// just use database
 	{
 		start := time.Now()
 		prog, err := ssaapi.FromDatabase(programID)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 		log.Infof("only use database ")
 		err = handler(OnlyDatabase, []*ssaapi.Program{prog}, start)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 }
 
@@ -322,8 +322,8 @@ func CheckSyntaxFlowWithFS(t *testing.T, fs fi.FileSystem, sf string, wants map[
 			program.Show()
 		}
 		results, err := p.SyntaxFlowWithError(sf, ssaapi.QueryWithEnableDebug())
-		assert.Nil(t, err)
-		assert.NotNil(t, results)
+		require.Nil(t, err)
+		require.NotNil(t, results)
 		CompareResult(t, contain, results, wants)
 		return nil
 	}, opt...)
@@ -346,8 +346,8 @@ func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants
 		prog.Show()
 		sfOpt = append(sfOpt, ssaapi.QueryWithEnableDebug(true))
 		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
-		assert.Nil(t, err)
-		assert.NotNil(t, results)
+		require.Nil(t, err)
+		require.NotNil(t, results)
 		CompareResult(t, contain, results, wants)
 		return nil
 	}, ssaOpt...)
@@ -357,7 +357,7 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 	results.Show()
 	for k, want := range wants {
 		gotVs := results.GetValues(k)
-		assert.Greater(t, len(gotVs), 0, "key[%s] not found", k)
+		require.Greater(t, len(gotVs), 0, "key[%s] not found", k)
 		got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
 		sort.Strings(got)
 		sort.Strings(want)
@@ -376,8 +376,8 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 				}
 			}
 		} else {
-			assert.Equal(t, len(want), len(gotVs))
-			assert.Equal(t, want, got)
+			require.Equal(t, len(want), len(gotVs))
+			require.Equal(t, want, got)
 		}
 	}
 }
@@ -658,7 +658,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 	return nil
 }
 
-func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
+func EvaluateVerifyFilesystem(i string, t require.TestingT) error {
 	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(i)
 	if err != nil {
 		return err

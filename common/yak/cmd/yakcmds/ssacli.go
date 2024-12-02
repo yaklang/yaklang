@@ -290,9 +290,10 @@ var SSACompilerCommands = []*cli.Command{
 		Name:    "syntaxflow-test",
 		Aliases: []string{"sftest", "sf-test"},
 		Action: func(c *cli.Context) error {
-			testingTInstance := utils.AssertTestingT(func(msg string, args ...any) {
+			testingTInstance := utils.NewRequireTestT(func(msg string, args ...any) {
 				log.Errorf(msg, args...)
-			})
+			}, func() {})
+
 			fsi := filesys.NewLocalFs()
 
 			checkViaPath := func(pathRaw string) error {
