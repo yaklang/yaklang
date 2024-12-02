@@ -238,7 +238,7 @@ type anValue struct {
 func NewValue() anValue {
 	return anValue{
 		anInstruction: NewInstruction(),
-		typ:           BasicTypes[AnyTypeKind],
+		typ:           CreateAnyType(),
 		userList:      make(Users, 0),
 		object:        nil,
 		key:           nil,

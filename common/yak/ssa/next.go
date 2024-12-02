@@ -29,8 +29,8 @@ func newNextType(iterType Type, isIn bool) Type {
 		typ.AddField(NextKey, it.Elem)
 		typ.AddField(NextField, BasicTypes[NullTypeKind])
 	default:
-		typ.AddField(NextKey, BasicTypes[AnyTypeKind])
-		typ.AddField(NextField, BasicTypes[AnyTypeKind])
+		typ.AddField(NextKey, CreateAnyType())
+		typ.AddField(NextField, CreateAnyType())
 	}
 
 	return typ
