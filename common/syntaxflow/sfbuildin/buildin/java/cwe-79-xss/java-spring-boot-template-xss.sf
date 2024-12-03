@@ -7,11 +7,14 @@ desc(
 
 <javaUnescapeOutput> as $sink;
 check $sink then "发现模板语言中存在未转义的输出"
-Model?{opcode:param  && <typeName>?{have:'org.springframework.ui.Model'}} as $source;
+<include('java-spring-param')>?{!<typeName>?{have:'org.springframework.ui.Model'}} as $input;
+Model?{opcode:param  && <typeName>?{have:'org.springframework.ui.Model'}} as $model;
 $sink #{
-    until: `<self> & $source`,
-    exclude:`<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`
-}->as $res;
+    until: `<self> & $model`,
+}->as $sinkModel;
+
+$sinkModel.addAttribute(,,* as $attribute);
+$attribute & $input ->as $res;
 
 alert $res for {
     message: "Find Java Spring Boot's Template Language XSS Vulnerability",
@@ -50,11 +53,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class GreetingController {
 
     @GetMapping("/greeting")
-    public String greeting(Model model) {
-        model.addAttribute("name", "World");
-        return "greeting";
-    }
+       public String submit(@RequestParam("input") String input, Model model) {
+           model.addAttribute("userInput", input);
+           return "greeting";
+       }
 }
 EOF,
-
 );
