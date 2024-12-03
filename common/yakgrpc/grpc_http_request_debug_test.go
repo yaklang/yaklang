@@ -1369,3 +1369,38 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	})
 	require.NoError(t, err)
 }
+
+func TestGRPCMUSTPASS_DebugPlugin_Codec_Support_Cli(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	token := utils.RandStringBytes(20)
+	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code: `
+	test = cli.String("test", cli.setRequired(true))	
+	handle = func(i) {
+return test
+}
+`,
+		PluginType: "codec",
+		Input:      "123",
+		ExecParams: []*ypb.KVPair{{Key: "test", Value: token}},
+	})
+	require.NoError(t, err)
+	cliCheck := false
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		spew.Dump(rsp)
+		if rsp.IsMessage {
+			if bytes.Contains(rsp.Message, []byte("feature-text-data")) && bytes.Contains(rsp.Message, []byte(token)) {
+				cliCheck = true
+			}
+		}
+	}
+	require.True(t, cliCheck)
+
+}
