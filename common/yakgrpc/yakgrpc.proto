@@ -5021,6 +5021,9 @@ message MITMRequest {
 
   // random JA3 fingerprint
   bool RandomJA3 = 62;
+
+  // disable websocket compression
+  bool DisableWebsocketCompression = 64;
 }
 
 message FilterDataItem {

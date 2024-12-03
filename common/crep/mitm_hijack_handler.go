@@ -30,6 +30,7 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 	wsModifier := &WebSocketModifier{
 		websocketHijackMode:            m.websocketHijackMode,
 		forceTextFrame:                 m.forceTextFrame,
+		enableCompression:              m.enableWebsocketCompression,
 		websocketRequestHijackHandler:  m.websocketRequestHijackHandler,
 		websocketResponseHijackHandler: m.websocketResponseHijackHandler,
 		websocketRequestMirror:         m.websocketRequestMirror,
