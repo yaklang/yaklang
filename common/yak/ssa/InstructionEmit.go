@@ -318,6 +318,9 @@ func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 	f.CurrentBlock.finish = true
 	f.IsReturn = true
 	f.Return = append(f.Return, r)
+
+	//f.SwitchSideEffects()
+
 	return r
 }
 
@@ -475,4 +478,20 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 		v.AddOccultation(p)
 	}
 	return p
+}
+
+func (f *FunctionBuilder) SwitchSideEffects() {
+	for _, se := range f.SideEffects {
+		if value := f.PeekValue(se.Name); value != nil {
+			if phi, ok := ToPhi(value); ok {
+				for _, o := range se.Modify.GetOccultation() {
+					phi.AddOccultation(o)
+				}
+				se.Modify = value
+				f.SideEffectsReturn = append(f.SideEffectsReturn, se)
+				continue
+			}
+		}
+		f.SideEffectsReturn = append(f.SideEffectsReturn, se)
+	}
 }

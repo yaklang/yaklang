@@ -181,3 +181,73 @@ func Test_SideEffect_Bind(t *testing.T) {
 		}, t)
 	})
 }
+
+func Test_SideEffect_Return(t *testing.T) {
+	t.Run("side-effect with full path", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`package main
+
+		func main(){
+		    a := 0
+			f := func() {
+			    if true {
+			        a = 2
+			    }else{
+					a = 3
+				}
+				println(a)
+			}
+			a = 1
+			f()
+			println(a)
+		}
+		`, []string{
+			"1",
+		}, t)
+	})
+
+	t.Run("side-effect with empty path", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`package main
+
+		func main(){
+		    a := 0
+			f := func() {
+			    if true {
+			        a = 2
+			    }else{
+	
+				}
+				println(a)
+			}
+			a = 1
+			f()
+			println(a)
+		}
+		`, []string{
+			"1",
+		}, t)
+	})
+	t.Run("side-effect with empty path extend", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`package main
+
+		func main(){
+		    a := 0
+			f := func() {
+			    if true {
+			        a = 2
+			    }else{
+	
+				}
+				println(a)
+			}
+			a = 1
+			f()
+			println(a)
+			a = 3
+			f()
+			println(a)
+		}
+		`, []string{
+			"1",
+		}, t)
+	})
+}
