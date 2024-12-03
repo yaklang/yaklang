@@ -315,3 +315,11 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 		b.AssignVariable(pkgItem, sub)
 	}
 }
+
+func (b *FunctionBuilder) SetForceCapture(bo bool) {
+	b.CurrentBlock.ScopeTable.SetForceCapture(bo)
+}
+
+func (b *FunctionBuilder) GetForceCapture() bool {
+	return b.CurrentBlock.ScopeTable.GetForceCapture()
+}

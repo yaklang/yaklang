@@ -36,14 +36,14 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	CreateVariable(name string, isLocal bool) VersionedIF[T]
 
 	// assign a value to the variable
-	AssignVariable(VersionedIF[T], T)
+	AssignVariable(VersionedIF[T], T, ...func() T)
 
 	GetVariableFromValue(T) VersionedIF[T]
 
 	// this scope
 	SetThis(ScopedVersionedTableIF[T])
 	GetThis() ScopedVersionedTableIF[T]
-	SetForceCapture()
+	SetForceCapture(bool)
 	GetForceCapture() bool
 
 	// create sub scope
@@ -53,6 +53,7 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	GetScopeLevel() int
 	GetParent() ScopedVersionedTableIF[T]
 	SetParent(ScopedVersionedTableIF[T])
+	GetHead() ScopedVersionedTableIF[T]
 
 	IsSameOrSubScope(ScopedVersionedTableIF[T]) bool
 	Compare(ScopedVersionedTableIF[T]) bool
@@ -163,8 +164,8 @@ func (s *ScopedVersionedTable[T]) SetCallback(f func(VersionedIF[T])) {
 	s.callback = f
 }
 
-func (s *ScopedVersionedTable[T]) SetForceCapture() {
-	s.ForceCapture = true
+func (s *ScopedVersionedTable[T]) SetForceCapture(b bool) {
+	s.ForceCapture = b
 }
 
 func NewScope[T versionedValue](
@@ -233,6 +234,7 @@ func NewRootVersionedTable[T versionedValue](
 
 func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 	sub := NewScope[T](v.ProgramName, v.offsetFetcher, v.newVersioned, v)
+	sub.SetForceCapture(v.GetForceCapture())
 	for _, variable := range v.linkSideEffect {
 		sub.linkValues.Append(variable.GetName(), variable)
 	}
@@ -241,6 +243,7 @@ func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 
 func (v *ScopedVersionedTable[T]) CreateShadowScope() ScopedVersionedTableIF[T] {
 	sub := NewScope[T](v.ProgramName, v.offsetFetcher, v.newVersioned, v)
+	sub.SetForceCapture(v.GetForceCapture())
 	for _, variable := range v.linkSideEffect {
 		sub.linkValues.Append(variable.GetName(), variable)
 	}
@@ -258,6 +261,14 @@ func (v *ScopedVersionedTable[T]) GetParent() ScopedVersionedTableIF[T] {
 		panic("UNFINISHED for loading parent from database")
 	}
 	return v._parent
+}
+
+func (v *ScopedVersionedTable[T]) GetHead() ScopedVersionedTableIF[T] {
+	var headScope ScopedVersionedTableIF[T]
+	for headScope = v; headScope.GetParent() != nil; headScope = headScope.GetParent() {
+
+	}
+	return headScope
 }
 
 func (v *ScopedVersionedTable[T]) SetParent(parent ScopedVersionedTableIF[T]) {
@@ -394,7 +405,7 @@ func (v *ScopedVersionedTable[T]) CreateVariable(name string, isLocal bool) Vers
 }
 
 // ---------------- Assign
-func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], value T) {
+func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], value T, getValue ...func() T) {
 	// assign
 	err := variable.Assign(value)
 	if err != nil {
@@ -416,7 +427,14 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 				return
 			}
 		}
-		scope.tryRegisterCapturedVariable(variable.GetName(), variable)
+		if len(getValue) > 0 {
+			scope.tryRegisterCapturedVariable(variable.GetName(), variable, getValue[0])
+		} else {
+			scope.tryRegisterCapturedVariable(variable.GetName(), variable, func() T {
+				return variable.GetValue()
+			})
+		}
+
 	}
 }
 
@@ -469,7 +487,7 @@ func (scope *ScopedVersionedTable[T]) SetCapturedSideEffect(name string, ver Ver
 // }
 
 // try register captured variable
-func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver VersionedIF[T]) {
+func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver VersionedIF[T], getValue func() T) {
 	if v.IsRoot() {
 		return
 	}
@@ -481,8 +499,8 @@ func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver V
 	if parentVariable != nil {
 		ver.SetCaptured(parentVariable)
 	} else {
-		variable := v.GetParent().CreateVariable(name, false)
-		v.GetParent().AssignVariable(variable, ver.GetValue())
+		variable := v.GetHead().CreateVariable(name, false)
+		v.GetHead().AssignVariable(variable, getValue())
 	}
 	// mark original captured variable
 	v.linkCaptured[name] = ver
