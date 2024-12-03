@@ -11,7 +11,7 @@ import (
 func init() {
 	//plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, DisableCli)
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypePortScan, DisableCli)
-	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeCodec, DisableCli)
+	//plugin_type.RegisterCheckRuler(plugin_type.PluginTypeCodec, DisableCli)
 
 	//plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, DisableMitmExternLib)
 }
