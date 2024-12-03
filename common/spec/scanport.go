@@ -64,6 +64,7 @@ type PortFingerprint struct {
 	CPEs        []string          `json:"cpes"`
 	Banner      string            `json:"banner"`
 	ServiceName string            `json:"service_name"`
+	Title       string            `json:"title"`
 }
 
 func NewHTTPFlowScanResult(isHttps bool, req *http.Request, rsp *http.Response) (*ScanResult, error) {
@@ -95,6 +96,7 @@ func NewScanFingerprintResult(m *fp.MatchResult) (*ScanResult, error) {
 		CPEs:        m.GetCPEs(),
 		Banner:      m.GetBanner(),
 		ServiceName: m.GetServiceName(),
+		Title:       m.GetHtmlTitle(),
 	}
 
 	raw, err := json.Marshal(f)
