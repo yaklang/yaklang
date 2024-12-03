@@ -29,12 +29,14 @@ var (
 	ExportFileMagicNumber = []byte{0xff, 0xff, 0xee, 0xee}
 )
 
+type MetaData = map[string]any
+
 type ExportConfig struct {
 	FilePath          string
 	IsEncrypted       bool
-	PreWriteHandler   func(name string, b []byte, metadata map[string]string) (newName string, new []byte)
-	AfterWriteHandler func(name string, b []byte, metadata map[string]string)
-	Metadata          map[string]string
+	PreWriteHandler   func(name string, b []byte, metadata MetaData) (newName string, new []byte)
+	AfterWriteHandler func(name string, b []byte, metadata MetaData)
+	MetaData          MetaData
 	Password          string // Password for encrypted file
 }
 
@@ -51,29 +53,31 @@ func WithExportPassword(password string) ExportOption {
 	}
 }
 
-func WithExportPreWriteHandler(handler func(name string, w []byte, metadata map[string]string) (newName string, new []byte)) ExportOption {
+func WithExportPreWriteHandler(handler func(name string, w []byte, metadata MetaData) (newName string, new []byte)) ExportOption {
 	return func(config *ExportConfig) {
 		config.PreWriteHandler = handler
 	}
 }
 
-func WithExportAfterWriteHandler(handler func(name string, w []byte, metadata map[string]string)) ExportOption {
+func WithExportAfterWriteHandler(handler func(name string, w []byte, metadata MetaData)) ExportOption {
 	return func(config *ExportConfig) {
 		config.AfterWriteHandler = handler
 	}
 }
 
-func WithExportMetadata(metadata map[string]string) ExportOption {
+func WithExportMetadata(metadata MetaData) ExportOption {
 	return func(config *ExportConfig) {
-		config.Metadata = metadata
+		config.MetaData = metadata
 	}
 }
 
 type ImportConfig struct {
-	FilePath       string
-	IsEncrypted    bool
-	Password       string // Password for encrypted file
-	PreReadHandler func(name string, b []byte, metadata map[string]string) (new []byte, err error)
+	FilePath         string
+	IsEncrypted      bool
+	Password         string // Password for encrypted file
+	MetaDataHandler  func(metadata MetaData) error
+	PreReadHandler   func(name string, b []byte, metadata MetaData) (new []byte, err error)
+	AfterReadHandler func(name string, b []byte, metadata MetaData)
 }
 
 func NewImportConfig(filepath string) *ImportConfig {
@@ -89,9 +93,21 @@ func WithImportPassword(password string) ImportOption {
 	}
 }
 
-func WithImportPreReadHandler(handler func(name string, b []byte, metadata map[string]string) (new []byte, err error)) ImportOption {
+func WithMetaDataHandler(handler func(metadata MetaData) error) ImportOption {
+	return func(config *ImportConfig) {
+		config.MetaDataHandler = handler
+	}
+}
+
+func WithImportPreReadHandler(handler func(name string, b []byte, metadata MetaData) (new []byte, err error)) ImportOption {
 	return func(config *ImportConfig) {
 		config.PreReadHandler = handler
+	}
+}
+
+func WithImportAfterReadHandler(handler func(name string, b []byte, metadata MetaData)) ImportOption {
+	return func(config *ImportConfig) {
+		config.AfterReadHandler = handler
 	}
 }
 
@@ -164,7 +180,7 @@ func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 	if err != nil {
 		return err
 	}
-	var metadata map[string]string
+	var metadata MetaData
 	// read meta.json first
 	if f, err := zipReader.Open(MetaJSONFileName); err == nil {
 		defer f.Close()
@@ -174,6 +190,12 @@ func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 			return err
 		}
 		if err = json.Unmarshal(b, &metadata); err != nil {
+			return err
+		}
+	}
+	if config.MetaDataHandler != nil {
+		err = config.MetaDataHandler(metadata)
+		if err != nil {
 			return err
 		}
 	}
@@ -205,6 +227,9 @@ func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 		}
 		if err = db.Create(d).Error; err != nil {
 			return err
+		}
+		if config.AfterReadHandler != nil {
+			config.AfterReadHandler(name, b, metadata)
 		}
 	}
 
@@ -243,7 +268,7 @@ func ExportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 	zipWriter := zip.NewWriter(w)
 	contentCh := make(chan []byte, 16)
 
-	preWriteHandler := func(b []byte, name string, metadata map[string]string) (string, []byte) {
+	preWriteHandler := func(b []byte, name string, metadata MetaData) (string, []byte) {
 		if config.PreWriteHandler != nil {
 			name, b = config.PreWriteHandler(name, b, metadata)
 		}
@@ -271,9 +296,9 @@ func ExportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 		return n, nil
 	}
 
-	metadata := config.Metadata
-	if config.Metadata == nil {
-		metadata = make(map[string]string)
+	metadata := config.MetaData
+	if config.MetaData == nil {
+		metadata = make(MetaData)
 	}
 	chErr := make(chan error, 1)
 	go func() {

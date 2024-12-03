@@ -63,7 +63,7 @@ func TestExportAndImport(t *testing.T) {
 	t.Run("export: no encrypt with pre handler", func(t *testing.T) {
 		fp := filepath.Join(t.TempDir(), "test2.zip")
 		count := 0
-		err := ExportTableZip[*schema.HTTPFlow](context.Background(), queryDB, fp, WithExportPreWriteHandler(func(_ string, w []byte, _ map[string]string) (name string, new []byte) {
+		err := ExportTableZip[*schema.HTTPFlow](context.Background(), queryDB, fp, WithExportPreWriteHandler(func(_ string, w []byte, _ map[string]any) (name string, new []byte) {
 			count++
 			return strconv.Itoa(count), w
 		}))
@@ -99,9 +99,9 @@ func TestExportAndImport(t *testing.T) {
 
 	t.Run("export: no encrypt with metadata", func(t *testing.T) {
 		fp := filepath.Join(t.TempDir(), "test2.zip")
-		m := map[string]string{"test": ksuid.New().String()}
+		m := map[string]any{"test": ksuid.New().String()}
 		token := ksuid.New().String()
-		err := ExportTableZip[*schema.HTTPFlow](context.Background(), queryDB, fp, WithExportPreWriteHandler(func(name string, w []byte, metadata map[string]string) (newName string, new []byte) {
+		err := ExportTableZip[*schema.HTTPFlow](context.Background(), queryDB, fp, WithExportPreWriteHandler(func(name string, w []byte, metadata map[string]any) (newName string, new []byte) {
 			m["test2"] = token
 			return name, w
 		}), WithExportMetadata(m))
@@ -123,7 +123,7 @@ func TestExportAndImport(t *testing.T) {
 			require.NoError(t, err)
 			if name == MetaJSONFileName {
 				foundMeta = true
-				var metadata map[string]string
+				var metadata map[string]any
 				require.NoError(t, json.Unmarshal(data, &metadata))
 				require.Equal(t, m, metadata)
 			} else {
@@ -150,7 +150,7 @@ func TestExportAndImport(t *testing.T) {
 		require.Equal(t, ExportFileMagicNumber, gotMagicNumber, "magic number not match")
 	})
 
-	exportHelper := func(t *testing.T, newRuntimeID string, password string, metadatas ...map[string]string) string {
+	exportHelper := func(t *testing.T, newRuntimeID string, password string, metadatas ...map[string]any) string {
 		t.Helper()
 
 		fp := filepath.Join(t.TempDir(), fmt.Sprintf("%s.zip", ksuid.New().String()))
@@ -159,7 +159,7 @@ func TestExportAndImport(t *testing.T) {
 		}
 
 		options := make([]ExportOption, 0)
-		options = append(options, WithExportPreWriteHandler(func(name string, w []byte, _ map[string]string) (newName string, new []byte) {
+		options = append(options, WithExportPreWriteHandler(func(name string, w []byte, _ map[string]any) (newName string, new []byte) {
 			s, err := jsonpath.ReplaceStringWithError(string(w), "$.RuntimeId", newRuntimeID)
 			require.NoError(t, err)
 			s, err = jsonpath.ReplaceStringWithError(s, "$.Request", ksuid.New().String())
@@ -201,10 +201,10 @@ func TestExportAndImport(t *testing.T) {
 
 	t.Run("import: no encrypt with metadata", func(t *testing.T) {
 		runtimeID := ksuid.New().String()
-		m := map[string]string{"test": ksuid.New().String()}
+		m := map[string]any{"test": ksuid.New().String()}
 		fp := exportHelper(t, runtimeID, "", m)
 
-		err := ImportTableZip[schema.HTTPFlow](context.Background(), db, fp, WithImportPreReadHandler(func(name string, b []byte, metadata map[string]string) (new []byte, err error) {
+		err := ImportTableZip[schema.HTTPFlow](context.Background(), db, fp, WithImportPreReadHandler(func(name string, b []byte, metadata map[string]any) (new []byte, err error) {
 			if name != MetaJSONFileName {
 				require.Equalf(t, m, metadata, "metadata not match")
 			}
