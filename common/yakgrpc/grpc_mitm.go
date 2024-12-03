@@ -200,17 +200,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		return downstreamProxy, nil
 	}
 	var (
-		host                  string = "127.0.0.1"
-		port                  int    = 8089
-		enableGMTLS                  = firstReq.GetEnableGMTLS()
-		preferGMTLS                  = firstReq.GetPreferGMTLS()
-		onlyGMTLS                    = firstReq.GetOnlyEnableGMTLS()
-		proxyUsername                = firstReq.GetProxyUsername()
-		proxyPassword                = firstReq.GetProxyPassword()
-		dnsServers                   = firstReq.GetDnsServers()
-		forceDisableKeepAlive        = firstReq.GetForceDisableKeepAlive()
-		disableCACertPage            = firstReq.GetDisableCACertPage()
-		randomJA3                    = firstReq.GetRandomJA3()
+		host                        string = "127.0.0.1"
+		port                        int    = 8089
+		enableGMTLS                        = firstReq.GetEnableGMTLS()
+		preferGMTLS                        = firstReq.GetPreferGMTLS()
+		onlyGMTLS                          = firstReq.GetOnlyEnableGMTLS()
+		proxyUsername                      = firstReq.GetProxyUsername()
+		proxyPassword                      = firstReq.GetProxyPassword()
+		dnsServers                         = firstReq.GetDnsServers()
+		forceDisableKeepAlive              = firstReq.GetForceDisableKeepAlive()
+		disableCACertPage                  = firstReq.GetDisableCACertPage()
+		disableWebsocketCompression        = firstReq.GetDisableWebsocketCompression()
+		randomJA3                          = firstReq.GetRandomJA3()
 	)
 	downstreamProxy, err := getDownstreamProxy(firstReq)
 	if err != nil {
@@ -1604,7 +1605,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	for _, cert := range firstReq.GetCertificates() {
 		opts = append(opts, crep.MITM_MutualTLSClient(cert.CrtPem, cert.KeyPem, cert.GetCaCertificates()...))
 	}
-	opts = append(opts, crep.MITM_EnableMITMCACertPage(!disableCACertPage),
+	opts = append(opts,
+		crep.MITM_EnableMITMCACertPage(!disableCACertPage),
+		crep.MITM_EnableWebsocketCompression(!disableWebsocketCompression),
 		crep.MITM_RandomJA3(randomJA3),
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),
 		crep.MITM_SetHijackedMaxContentLength(packetLimit),

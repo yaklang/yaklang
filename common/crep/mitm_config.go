@@ -56,6 +56,16 @@ func MITM_EnableMITMCACertPage(b bool) MITMConfig {
 	}
 }
 
+func MITM_EnableWebsocketCompression(b bool) MITMConfig {
+	return func(server *MITMServer) error {
+		if server.enableWebsocketCompression == nil {
+			server.enableWebsocketCompression = utils.NewAtomicBool()
+		}
+		server.enableWebsocketCompression.SetTo(b)
+		return nil
+	}
+}
+
 func MITM_RandomJA3(b bool) MITMConfig {
 	return func(server *MITMServer) error {
 		server.randomJA3 = b

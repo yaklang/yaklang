@@ -266,6 +266,8 @@ type MITMServer struct {
 
 	// disable mitm ca cert page
 	enableMITMCACertPage bool
+	// disable websocket compression
+	enableWebsocketCompression *utils.AtomicBool
 
 	// random JA3 fingerprint
 	randomJA3 bool

@@ -32,6 +32,7 @@ type WebSocketModifier struct {
 	ProxyStr                       string
 	websocketHijackMode            *utils.AtomicBool
 	forceTextFrame                 *utils.AtomicBool
+	enableCompression              *utils.AtomicBool
 	websocketRequestHijackHandler  websocketHijackHandler
 	websocketResponseHijackHandler websocketHijackHandler
 	websocketRequestMirror         websocketMirrorHandler
@@ -177,6 +178,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		lowhttp.WithWebsocketPort(port),
 		lowhttp.WithWebsocketProxy(w.ProxyStr),
 		lowhttp.WithWebsocketTLS(isTLS),
+		lowhttp.WithWebsocketCompress(w.enableCompression.IsSet()),
 		lowhttp.WithWebsocketDisableReassembly(!isHijack), // if transparent mode, disable reassembly
 		lowhttp.WithWebsocketUpgradeResponseHandler(func(rsp *http.Response, rspRaw []byte, ext *lowhttp.WebsocketExtensions, err error) []byte {
 			if err != nil {
@@ -214,6 +216,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		toServer.Extensions,
 		lowhttp.WithWebsocketDisableReassembly(!isHijack),
 		lowhttp.WithWebsocketAllFrameHandler(clientAllFrameCallback),
+		lowhttp.WithWebsocketCompress(w.enableCompression.IsSet()),
 	)
 
 	toServer.Start()
