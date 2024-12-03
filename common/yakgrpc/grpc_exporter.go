@@ -58,15 +58,27 @@ func (s *Server) ExtractDataToFile(input ypb.Yak_ExtractDataToFileServer) error 
 
 		if csvOutput {
 			// 处理 CSV 数据
+
+			fixCSV := func(content string) string {
+				// 如果字段包含逗号、引号或者换行符，则需要用引号包围
+				if strings.ContainsAny(content, ",\"\n") {
+					content = strings.ReplaceAll(content, `"`, `""`)
+					return fmt.Sprintf(`"%s"`, content)
+				}
+				return content
+			}
+
 			values := make([]string, len(existedKeys))
 			for key, value := range data {
 				if value == nil || (value.GetStringValue() == "" && len(value.GetBytesValue()) <= 0) {
 					continue
 				}
 				if len(value.GetBytesValue()) > 0 {
-					values[existedKeys[key]] = strings.ReplaceAll(utils.ParseStringToVisible(value.GetBytesValue()), ",", " ")
+					content := utils.ParseStringToVisible(value.GetBytesValue())
+					values[existedKeys[key]] = fixCSV(content)
 				} else {
-					values[existedKeys[key]] = strings.ReplaceAll(utils.ParseStringToVisible(value.GetStringValue()), ",", " ")
+					content := utils.ParseStringToVisible(value.GetStringValue())
+					values[existedKeys[key]] = fixCSV(content)
 				}
 			}
 			csvData = append(csvData, values)
