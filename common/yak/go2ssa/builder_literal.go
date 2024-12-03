@@ -65,6 +65,7 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 		recoverRange := b.SetRange(exp.BaseParserRuleContext)
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = true
+		b.SetForceCapture(true)
 
 		if para, ok := exp.Signature().(*gol.SignatureContext); ok {
 			b.buildSignature(para)
@@ -78,6 +79,7 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 		}
 
 		b.Finish()
+		b.SetForceCapture(false)
 		b.SupportClosure = false
 		b.FunctionBuilder = b.PopFunction()
 		if hitDefinedFunction {

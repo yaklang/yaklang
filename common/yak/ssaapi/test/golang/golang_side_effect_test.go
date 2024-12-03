@@ -300,7 +300,7 @@ func main() {
 	})
 }
 
-func Test_Captured_SideEffect(t *testing.T) {
+func Test_SideEffect_Capture(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
 		code := `package main
 

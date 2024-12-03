@@ -31,6 +31,7 @@ func (f *Function) AddForceSideEffect(name string, v Value) {
 		},
 	})
 }
+
 func (f *Function) AddSideEffect(variable *Variable, v Value) {
 	var bind *Variable
 	if p := f.builder.parentBuilder; p != nil {

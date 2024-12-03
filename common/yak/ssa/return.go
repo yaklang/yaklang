@@ -219,6 +219,7 @@ func (f *Function) Finish() {
 		}
 	}
 	funType.SetFreeValue(result)
+	//f.builder.SwitchSideEffects()
 	ses := funType.SideEffects
 	for _, se := range f.SideEffects {
 		if se.Modify.GetBlock() != nil {
