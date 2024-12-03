@@ -170,7 +170,7 @@ func DESECBEnc(key []byte, data []byte) ([]byte, error) {
 }
 
 func TripleDES_ECBEnc(key []byte, data []byte) ([]byte, error) {
-	return TripleDESEncryptCBCWithZeroPadding(key, data, nil)
+	return TripleDESEncryptECBWithZeroPadding(key, data, nil)
 }
 
 func DESECBDec(key []byte, data []byte) ([]byte, error) {
@@ -178,7 +178,7 @@ func DESECBDec(key []byte, data []byte) ([]byte, error) {
 }
 
 func TripleDES_ECBDec(key []byte, data []byte) ([]byte, error) {
-	return TripleDESDecryptCBCWithZeroPadding(key, data, nil)
+	return TripleDESDecryptECBWithZeroPadding(key, data, nil)
 }
 
 // Des
