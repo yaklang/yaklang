@@ -1399,13 +1399,19 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
 		addCounter()
 
+		isFilteredByIP := false
+		ip, _, _ := utils.ParseStringToHostPort(remoteAddr)
+		if ip != "" {
+			isFilteredByIP = !filterManager.IsIPPasswed(ip)
+		}
+
 		// 不符合劫持条件就不劫持
 		isFilteredByResponse := httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered)
 		isFilteredByRequest := httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered)
 		isRequestModified := httpctx.GetRequestIsModified(req)
 		isResponseModified := httpctx.GetResponseIsModified(req)
 		isResponseDropped := httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped)
-		isFiltered := isFilteredByResponse || isFilteredByRequest || (filterWebSocket.IsSet() && httpctx.GetIsWebWebsocketRequest(req))
+		isFiltered := isFilteredByResponse || isFilteredByRequest || (filterWebSocket.IsSet() && httpctx.GetIsWebWebsocketRequest(req)) || isFilteredByIP
 		isViewed := httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 		isModified := isRequestModified || isResponseModified
 

@@ -1402,6 +1402,14 @@ func IsPlainText(raw []byte) bool {
 	return true
 }
 
+func CIDRContains(ip string, cidr string) bool {
+	_, CIDR, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return false
+	}
+	return CIDR.Contains(net.ParseIP(ip))
+}
+
 func MIMEGlobRuleCheck(target string, rule string) bool {
 	if strings.Contains(rule, "/") && strings.Contains(target, "/") { // 如果两个都包含/，则进行分割匹配
 		ruleType := strings.SplitN(rule, "/", 2)

@@ -5040,6 +5040,9 @@ message MITMFilterData {
 
   repeated FilterDataItem ExcludeMethods = 7;
   repeated FilterDataItem ExcludeMIME = 8;
+
+  repeated FilterDataItem IncludeIP = 9;
+  repeated FilterDataItem ExcludeIP = 10;
 }
 
 message Certificate {

@@ -100,6 +100,9 @@ type FilterMatcher struct {
 	IncludeUriMatcher *httptpl.YakMatcher
 	ExcludeUriMatcher *httptpl.YakMatcher
 
+	IncludeIPMatcher *httptpl.YakMatcher
+	ExcludeIPMatcher *httptpl.YakMatcher
+
 	ExcludeMethodsMatcher *httptpl.YakMatcher
 	ExcludeMIMEMatcher    *httptpl.YakMatcher
 }
@@ -133,6 +136,9 @@ func (m *MITMFilter) updateMatcher() {
 
 	m.Filters.ExcludeMethodsMatcher = FilterDataToMatchers(m.Data.ExcludeMethods)
 	m.Filters.ExcludeMIMEMatcher = FilterDataToMatchers(m.Data.ExcludeMIME)
+
+	m.Filters.ExcludeIPMatcher = FilterDataToMatchers(m.Data.ExcludeIP)
+	m.Filters.IncludeIPMatcher = FilterDataToMatchers(m.Data.IncludeIP)
 }
 
 func (m *MITMFilter) Recover() {
@@ -265,7 +271,7 @@ func (m *MITMFilter) IsEmpty() bool {
 	return len(data.ExcludeMIME) <= 0 && len(data.ExcludeMethods) <= 0 &&
 		len(data.ExcludeSuffix) <= 0 && len(data.ExcludeHostnames) <= 0 &&
 		len(data.IncludeHostnames) <= 0 && len(data.IncludeSuffix) <= 0 &&
-		len(data.ExcludeUri) <= 0 && len(data.IncludeUri) <= 0
+		len(data.ExcludeUri) <= 0 && len(data.IncludeUri) <= 0 && len(data.ExcludeIP) <= 0 && len(data.IncludeIP) <= 0
 }
 
 func (m *MITMFilter) Save() {
@@ -329,6 +335,13 @@ func (m *MITMFilter) IsMIMEPassed(ct string) bool {
 		return true
 	}
 	return _FilterCheck(nil, m.Filters.ExcludeMIMEMatcher, ct)
+}
+
+func (m *MITMFilter) IsIPPasswed(ip string) bool {
+	if m.Filters == nil {
+		return true
+	}
+	return _FilterCheck(m.Filters.IncludeIPMatcher, m.Filters.ExcludeIPMatcher, ip)
 }
 
 // IsPassed return true if passed, false if filtered out

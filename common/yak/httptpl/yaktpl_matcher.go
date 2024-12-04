@@ -48,6 +48,7 @@ const (
 	MATCHER_TYPE_EXPR        = "expr"
 	MATCHER_TYPE_GLOB        = "glob"
 	MATCHER_TYPE_MIME        = "mime"
+	MATCHER_TYPE_CIDR        = "cidr"
 )
 
 const (
@@ -365,6 +366,8 @@ func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, dura
 		matcherFunc = strings.HasSuffix
 	case MATCHER_TYPE_MIME:
 		matcherFunc = utils.MIMEGlobRuleCheck
+	case MATCHER_TYPE_CIDR:
+		matcherFunc = utils.CIDRContains
 	case MATCHER_TYPE_REGEXP, "re", "regex":
 		matcherFunc = func(s string, sub string) bool {
 			regUtils := regexp_utils.DefaultYakRegexpManager.GetYakRegexp(sub)
