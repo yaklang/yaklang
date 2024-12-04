@@ -83,8 +83,9 @@ func (s *RewriteManager) MergeIf() {
 							ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
 							ifStat2 := childNode.Statement.(*statements.ConditionStatement)
 							ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, ifStat2.Condition, "||", types.NewJavaPrimer(types.JavaBoolean))
+							originNext := parentNode.Next[i]
 							parentNode.Next[i] = childNode.FalseNode()
-							parentNode.Next[i].RemoveSource(childNode)
+							originNext.RemoveSource(childNode)
 							parentNode.Next[i].AddSource(parentNode)
 							delNodesSet.Add(childNode)
 						} else {
@@ -95,8 +96,9 @@ func (s *RewriteManager) MergeIf() {
 							}, func() types.JavaType {
 								return types.NewJavaPrimer(types.JavaBoolean)
 							}), "&&", types.NewJavaPrimer(types.JavaBoolean))
+							originNext := parentNode.Next[i]
 							parentNode.Next[i] = childNode.TrueNode()
-							parentNode.Next[i].RemoveSource(childNode)
+							originNext.RemoveSource(childNode)
 							parentNode.Next[i].AddSource(parentNode)
 							delNodesSet.Add(childNode)
 						}
@@ -105,8 +107,9 @@ func (s *RewriteManager) MergeIf() {
 							ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
 							ifStat2 := childNode.Statement.(*statements.ConditionStatement)
 							ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, ifStat2.Condition, "||", types.NewJavaPrimer(types.JavaBoolean))
+							originNext := parentNode.Next[i]
 							parentNode.Next[i] = childNode.TrueNode()
-							parentNode.Next[i].RemoveSource(childNode)
+							originNext.RemoveSource(childNode)
 							parentNode.Next[i].AddSource(parentNode)
 							delNodesSet.Add(childNode)
 						} else {
@@ -117,8 +120,9 @@ func (s *RewriteManager) MergeIf() {
 							}, func() types.JavaType {
 								return types.NewJavaPrimer(types.JavaBoolean)
 							}), "&&", types.NewJavaPrimer(types.JavaBoolean))
+							originNext := parentNode.Next[i]
 							parentNode.Next[i] = childNode.FalseNode()
-							parentNode.Next[i].RemoveSource(childNode)
+							originNext.RemoveSource(childNode)
 							parentNode.Next[i].AddSource(parentNode)
 							delNodesSet.Add(childNode)
 						}
