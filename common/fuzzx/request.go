@@ -34,6 +34,7 @@ func MustNewFuzzHTTPRequest(raw []byte) *FuzzRequest {
 
 func (f *FuzzRequest) Clone() *FuzzRequest {
 	return &FuzzRequest{
+		origin:   f.origin,
 		requests: slices.Clone(f.requests), // shadow copy
 	}
 }

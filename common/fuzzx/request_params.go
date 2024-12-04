@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type FuzzParam struct {
@@ -22,6 +23,7 @@ type FuzzParam struct {
 	value    any    // usually a string, or other type(int, bool)
 	pathKey  string // xpath or jsonpath key
 	path     string // xpath or jsonpath
+	n        int    // If there are duplicate parameters, it indicates which parameter it is
 }
 
 func (p *FuzzParam) IsPostParams() bool {
@@ -116,7 +118,8 @@ func (p *FuzzParam) FirstFuzzRequestBytes() []byte {
 }
 
 func (p *FuzzParam) Fuzz(values ...string) *FuzzParam {
-	req := p.origin
+	req := p.origin.Clone()
+	p.origin = req
 	for _, i := range values {
 		switch p.position {
 		case lowhttp.PosPath:
@@ -128,13 +131,13 @@ func (p *FuzzParam) Fuzz(values ...string) *FuzzParam {
 		case lowhttp.PosMethod:
 			req.FuzzMethod(i)
 		case lowhttp.PosGetQuery:
-			req.FuzzGetParams(p.param, i)
+			req.fuzzGetParams(p.param, i, nil, p.n)
 		case lowhttp.PosGetQueryBase64:
-			req.FuzzGetBase64Params(p.param, i)
+			req.fuzzGetParams(p.param, i, codec.EncodeBase64, p.n)
 		case lowhttp.PosGetQueryJson:
-			req.FuzzGetJsonPathParams(p.param, p.path, i)
+			req.fuzzGetJsonPathParams(p.param, p.path, i, nil, p.n)
 		case lowhttp.PosGetQueryBase64Json:
-			req.FuzzGetBase64JsonPathParams(p.param, p.path, i)
+			req.fuzzGetJsonPathParams(p.param, p.path, i, codec.EncodeBase64, p.n)
 		case lowhttp.PosHeader:
 			req.FuzzHTTPHeader(p.param, i)
 		case lowhttp.PosCookie:
@@ -148,9 +151,9 @@ func (p *FuzzParam) Fuzz(values ...string) *FuzzParam {
 		case lowhttp.PosPostJson:
 			req.FuzzPostJson(p.path, i)
 		case lowhttp.PosPostQuery:
-			req.FuzzPostParams(p.param, i)
+			req.fuzzPostParams(p.param, i, nil, p.n)
 		case lowhttp.PosPostQueryBase64:
-			req.FuzzPostBase64Params(p.param, i)
+			req.fuzzPostParams(p.param, i, codec.EncodeBase64, p.n)
 		case lowhttp.PosPostQueryJson:
 			req.FuzzPostJsonPathParams(p.param, p.path, i)
 		case lowhttp.PosPostQueryBase64Json:
@@ -232,53 +235,59 @@ func (f *FuzzRequest) GetRawBodyParams() []*FuzzParam {
 
 func (f *FuzzRequest) GetQueryParams() []*FuzzParam {
 	fuzzParams := make([]*FuzzParam, 0)
-	params := lowhttp.GetAllHTTPRequestQueryParams(f.origin)
+	params := lowhttp.GetFullHTTPRequestQueryParams(f.origin)
 
-	for key, value := range params {
-		if raw, ok := utils.IsJSON(value); ok {
-			fixRaw := strings.TrimSpace(raw)
-			walkJson([]byte(fixRaw), func(k, v gjson.Result, jsonPath string) {
-				fuzzParams = append(fuzzParams, &FuzzParam{
-					position: lowhttp.PosGetQueryJson,
-					param:    key,
-					path:     jsonPath,
-					pathKey:  k.String(),
-					value:    v.String(),
-					origin:   f,
-				})
-			})
-		}
-
-		if bs64Raw, ok := mutate.IsStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
-			if raw, ok := utils.IsJSON(bs64Raw); ok {
+	for key, values := range params {
+		for i, value := range values {
+			if raw, ok := utils.IsJSON(value); ok {
 				fixRaw := strings.TrimSpace(raw)
 				walkJson([]byte(fixRaw), func(k, v gjson.Result, jsonPath string) {
 					fuzzParams = append(fuzzParams, &FuzzParam{
-						position: lowhttp.PosGetQueryBase64Json,
+						position: lowhttp.PosGetQueryJson,
 						param:    key,
 						path:     jsonPath,
 						pathKey:  k.String(),
 						value:    v.String(),
 						origin:   f,
+						n:        i,
 					})
 				})
 			}
-			// 优化显示效果
-			fuzzParams = append(fuzzParams, &FuzzParam{
-				position: lowhttp.PosGetQueryBase64,
-				param:    key,
-				value:    bs64Raw,
-				origin:   f,
-			})
-		}
 
-		param := &FuzzParam{
-			position: lowhttp.PosGetQuery,
-			param:    key,
-			value:    value,
-			origin:   f,
+			if bs64Raw, ok := mutate.IsStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+				if raw, ok := utils.IsJSON(bs64Raw); ok {
+					fixRaw := strings.TrimSpace(raw)
+					walkJson([]byte(fixRaw), func(k, v gjson.Result, jsonPath string) {
+						fuzzParams = append(fuzzParams, &FuzzParam{
+							position: lowhttp.PosGetQueryBase64Json,
+							param:    key,
+							path:     jsonPath,
+							pathKey:  k.String(),
+							value:    v.String(),
+							origin:   f,
+							n:        i,
+						})
+					})
+				}
+				// 优化显示效果
+				fuzzParams = append(fuzzParams, &FuzzParam{
+					position: lowhttp.PosGetQueryBase64,
+					param:    key,
+					value:    bs64Raw,
+					origin:   f,
+					n:        i,
+				})
+			}
+
+			param := &FuzzParam{
+				position: lowhttp.PosGetQuery,
+				param:    key,
+				value:    value,
+				origin:   f,
+				n:        i,
+			}
+			fuzzParams = append(fuzzParams, param)
 		}
-		fuzzParams = append(fuzzParams, param)
 	}
 	return fuzzParams
 }
@@ -404,53 +413,60 @@ func (f *FuzzRequest) GetPostXMLParams() []*FuzzParam {
 
 func (f *FuzzRequest) GetPostParams() []*FuzzParam {
 	fuzzParams := make([]*FuzzParam, 0)
-	params := lowhttp.GetAllHTTPRequestPostParams(f.origin)
+	params := lowhttp.GetFullHTTPRequestPostParams(f.origin)
 
-	for key, value := range params {
-		if raw, ok := utils.IsJSON(value); ok {
-			fixRaw := strings.TrimSpace(raw)
-			walkJson([]byte(fixRaw), func(k, v gjson.Result, jsonPath string) {
-				fuzzParams = append(fuzzParams, &FuzzParam{
-					position: lowhttp.PosPostQueryJson,
-					param:    key,
-					path:     jsonPath,
-					pathKey:  k.String(),
-					value:    v.String(),
-					origin:   f,
-				})
-			})
-		}
-
-		if bs64Raw, ok := mutate.IsStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
-			if raw, ok := utils.IsJSON(bs64Raw); ok {
+	for key, values := range params {
+		for i, value := range values {
+			if raw, ok := utils.IsJSON(value); ok {
 				fixRaw := strings.TrimSpace(raw)
 				walkJson([]byte(fixRaw), func(k, v gjson.Result, jsonPath string) {
 					fuzzParams = append(fuzzParams, &FuzzParam{
-						position: lowhttp.PosPostQueryBase64Json,
+						position: lowhttp.PosPostQueryJson,
 						param:    key,
 						path:     jsonPath,
 						pathKey:  k.String(),
 						value:    v.String(),
 						origin:   f,
+						n:        i,
 					})
 				})
 			}
-			// 优化显示效果
-			fuzzParams = append(fuzzParams, &FuzzParam{
-				position: lowhttp.PosPostQueryBase64,
+
+			if bs64Raw, ok := mutate.IsStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+				if raw, ok := utils.IsJSON(bs64Raw); ok {
+					fixRaw := strings.TrimSpace(raw)
+					walkJson([]byte(fixRaw), func(k, v gjson.Result, jsonPath string) {
+						fuzzParams = append(fuzzParams, &FuzzParam{
+							position: lowhttp.PosPostQueryBase64Json,
+							param:    key,
+							path:     jsonPath,
+							pathKey:  k.String(),
+							value:    v.String(),
+							origin:   f,
+							n:        i,
+						})
+					})
+				}
+				// 优化显示效果
+				fuzzParams = append(fuzzParams, &FuzzParam{
+					position: lowhttp.PosPostQueryBase64,
+					param:    key,
+					value:    bs64Raw,
+					origin:   f,
+					n:        i,
+				})
+			}
+
+			param := &FuzzParam{
+				position: lowhttp.PosPostQuery,
 				param:    key,
-				value:    bs64Raw,
+				value:    value,
 				origin:   f,
-			})
+				n:        i,
+			}
+			fuzzParams = append(fuzzParams, param)
 		}
 
-		param := &FuzzParam{
-			position: lowhttp.PosPostQuery,
-			param:    key,
-			value:    value,
-			origin:   f,
-		}
-		fuzzParams = append(fuzzParams, param)
 	}
 	return fuzzParams
 }
