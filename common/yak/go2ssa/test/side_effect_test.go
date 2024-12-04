@@ -8,7 +8,7 @@ import (
 )
 
 func Test_SideEffect(t *testing.T) {
-	t.Run("side-effect bind", func(t *testing.T) {
+	t.Run("side-effect", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		
 	func main(){
@@ -26,7 +26,7 @@ func Test_SideEffect(t *testing.T) {
 		`, []string{"1", "side-effect(3, a)"}, t)
 	})
 
-	t.Run("side-effect nesting bind", func(t *testing.T) {
+	t.Run("side-effect inherit", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		
 	func main(){
@@ -45,7 +45,68 @@ func Test_SideEffect(t *testing.T) {
 		`, []string{"side-effect(2, a)", "1", "side-effect(side-effect(2, a), a)"}, t)
 	})
 
-	t.Run("side-effect nesting bind have local", func(t *testing.T) {
+	t.Run("side-effect muti value", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		
+	func main(){
+		a := 1
+		f1 := func() {
+			a = 2
+			a = 3
+			a = 4
+		}
+		println(a) // 1
+		f1()
+		println(a) // side-effect(4, a)
+	}
+		`, []string{"1", "side-effect(4, a)"}, t)
+	})
+
+	t.Run("side-effect muti value with phi", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		
+	func main(){
+		a := 1
+		f1 := func() {
+			a = 2
+			a = 3
+			a = 4
+			if a == 1 {
+			    a = 5
+			}
+		}
+		println(a) // 1
+		f1()
+		println(a) // side-effect(phi(a)[5,4], a)
+	}
+		`, []string{"1", "side-effect(phi(a)[5,4], a)"}, t)
+	})
+
+	t.Run("side-effect method", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`package main
+
+	import "fmt"
+
+	func (t *T)setA(a int) {
+	    t.a = a
+	}
+
+	type T struct {
+	    a int
+	}
+
+	func test() {
+		t := T{1}
+		t.setA(2)
+
+		println(t.a)// 2 会被side-effect影响
+	}
+		`, []string{
+			"side-effect(Parameter-a, t.a)",
+		}, t)
+	})
+
+	t.Run("side-effect nesting bind with local", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		
 	func main(){
@@ -97,7 +158,7 @@ func Test_SideEffect(t *testing.T) {
 			a := 3	 
 			f2 := func() {
 				f1()
-				println(a) // 3
+				println(a) // freevalue
 			}
 			println(a) // 3
 			f2()
@@ -110,7 +171,7 @@ func Test_SideEffect(t *testing.T) {
 		}, t)
 	})
 
-	t.Run("side-effect cross block nesting bind have local", func(t *testing.T) {
+	t.Run("side-effect cross block nesting bind with local", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`package main
 
 	func main(){
@@ -136,6 +197,64 @@ func Test_SideEffect(t *testing.T) {
 		}, t)
 	})
 
+	t.Run("side-effect cross block nesting bind with phi", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`package main
+
+	func main(){
+		a := 1
+		f1 := func() {
+			a = 2
+		}
+		{
+			a := 3	 
+			f2 := func() {
+				if true{
+					f1()
+				}else{
+					a = 4
+				}
+				println(a) // freevalue
+			}
+			println(a) // 3
+			f2()
+			println(a) // 3
+		}
+		println(a) // side-effect(2, a)
+	}
+		`, []string{
+			"phi(a)[FreeValue-a,4]", "3", "3", "side-effect(phi(a)[FreeValue-a,4], a)",
+		}, t)
+	})
+
+	t.Run("side-effect cross block nesting bind with local and phi", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`package main
+
+	func main(){
+		a := 1
+		f1 := func() {
+			a = 2
+		}
+		{
+			a := 3	 
+			f2 := func() {
+				a := 4
+				if a == 4 {
+				    a = 5
+				}
+				f1()
+				println(a) // phi(a)[5,4]
+			}
+			println(a) // 3
+			f2()
+			println(a) // 3
+		}
+		println(a) // side-effect(2, a)
+	}
+		`, []string{
+			"phi(a)[5,4]", "3", "3", "side-effect(2, a)",
+		}, t)
+	})
+
 	t.Run("side-effect cross global", func(t *testing.T) {
 		// TODO: handle global and side-effect
 		t.Skip()
@@ -152,32 +271,6 @@ func Test_SideEffect(t *testing.T) {
 	}
 		`, []string{
 			"side-effect(2, a)",
-		}, t)
-	})
-}
-
-func Test_SideEffect_Bind(t *testing.T) {
-	t.Run("side-effect method", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`package main
-
-	import "fmt"
-
-	func (t *T)setA(a int) {
-	    t.a = a
-	}
-
-	type T struct {
-	    a int
-	}
-
-	func test() {
-		t := T{1}
-		t.setA(2)
-
-		println(t.a)// 2 会被side-effect影响
-	}
-		`, []string{
-			"side-effect(Parameter-a, t.a)",
 		}, t)
 	})
 }
@@ -201,7 +294,7 @@ func Test_SideEffect_Return(t *testing.T) {
 			println(a)
 		}
 		`, []string{
-			"1",
+			"phi(a)[2,3]", "side-effect(phi(a)[2,3], a)",
 		}, t)
 	})
 
@@ -223,7 +316,7 @@ func Test_SideEffect_Return(t *testing.T) {
 			println(a)
 		}
 		`, []string{
-			"1",
+			"phi(a)[2,FreeValue-a]", "side-effect(phi(a)[2,1], a)",
 		}, t)
 	})
 	t.Run("side-effect with empty path extend", func(t *testing.T) {
@@ -247,7 +340,7 @@ func Test_SideEffect_Return(t *testing.T) {
 			println(a)
 		}
 		`, []string{
-			"1",
+			"phi(a)[2,FreeValue-a]", "side-effect(phi(a)[2,1], a)", "side-effect(phi(a)[2,3], a)",
 		}, t)
 	})
 }
