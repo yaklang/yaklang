@@ -1,6 +1,7 @@
 package yakcmds
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"fmt"
@@ -8,15 +9,20 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/format/diff"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/samber/lo"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -172,6 +178,118 @@ var GitCommands = []*cli.Command{
 			if err != nil {
 				return utils.Wrap(err, `auto-commit changes failed`)
 			}
+			return nil
+		},
+	},
+	{
+		Name:    "git-extract-fs",
+		Aliases: []string{"gitefs"},
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name: "repository,repo,r", Usage: "Set Repository, default PWD",
+			},
+			cli.StringFlag{
+				Name: "start", Usage: "start ref hash (range)",
+			},
+			cli.StringFlag{
+				Name:  "end",
+				Usage: "end ref hash(range)",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			start := c.String("start")
+			end := c.String("end")
+
+			repos := c.String("repo")
+			if repos == "" {
+				pwd, err := os.Getwd()
+				if err != nil {
+					return utils.Wrap(err, "(emtpy repos parameter )get pwd failed")
+				}
+				repos = pwd
+			}
+
+			handleResult := func(i filesys_interface.FileSystem) {
+				filesys.TreeView(i)
+				suffix := ""
+				if start == "" && end == "" {
+					suffix = strings.Join(lo.Map(c.Args(), func(i string, _ int) string {
+						if len(i) > 7 {
+							return i[:7]
+						}
+						return i
+					}), "-")
+				} else if start == "" {
+					suffix = end
+					if len(suffix) > 7 {
+						suffix = suffix[:7]
+					}
+				} else {
+					if len(start) > 7 {
+						start = start[:7]
+					}
+					if len(end) > 7 {
+						end = end[:7]
+					}
+					suffix = start + "-" + end
+				}
+				fileName := fmt.Sprintf("commitfs-%v.zip", suffix)
+				log.Infof("start to prepare writing zip file: %v", fileName)
+				var buf bytes.Buffer
+				zw := zip.NewWriter(&buf)
+				filesys.SimpleRecursive(filesys.WithFileSystem(i), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					fw, err := zw.Create(s)
+					if err != nil {
+						return err
+					}
+					raw, err := i.ReadFile(s)
+					if err != nil {
+						return err
+					}
+					_, err = fw.Write([]byte(raw))
+					return nil
+				}))
+				zw.Flush()
+				zw.Close()
+				err := os.WriteFile(fileName, buf.Bytes(), 0644)
+				if err != nil {
+					log.Warnf("write zip failed: %v", err)
+					return
+				}
+				log.Infof("write zip file: %v", fileName)
+			}
+
+			if start == "" && end == "" {
+				args := c.Args()
+				if len(args) <= 0 {
+					return utils.Error("no start and end ref hash and args")
+				}
+				lfs, err := yakgit.FromCommits(repos, args...)
+				if err != nil {
+					return utils.Wrap(err, "fetch commits failed")
+				}
+				handleResult(lfs)
+				return nil
+			}
+
+			if start == "" {
+				lfs, err := yakgit.FromCommit(repos, end)
+				if err != nil {
+					return utils.Wrap(err, "fetch commit failed")
+				}
+				handleResult(lfs)
+				return nil
+			}
+
+			if end == "" {
+				end = yakgit.GetHeadHash(repos)
+			}
+			// start - n end
+			lfs, err := yakgit.FromCommits(repos, start, end)
+			if err != nil {
+				return err
+			}
+			handleResult(lfs)
 			return nil
 		},
 	},
