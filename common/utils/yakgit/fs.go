@@ -1,8 +1,10 @@
 package yakgit
 
 import (
+	"fmt"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"os"
+	"strings"
 
 	"github.com/go-git/go-git/v5/utils/merkletrie"
 	"github.com/yaklang/yaklang/common/log"
@@ -15,7 +17,7 @@ import (
 )
 
 func fetchRespos(res *git.Repository, commitHash string) (*filesys.VirtualFS, error) {
-	commit, err := res.CommitObject(plumbing.NewHash(commitHash))
+	commit, err := GetCommitHashEx(res, commitHash)
 	if err != nil {
 		return nil, err
 	}
@@ -180,12 +182,12 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 		return nil, err
 	}
 
-	startCommit, err := res.CommitObject(plumbing.NewHash(start))
+	startCommit, err := GetCommitHashEx(res, start)
 	if err != nil {
 		return nil, utils.Wrap(err, "get start commit")
 	}
 
-	endCommit, err := res.CommitObject(plumbing.NewHash(end))
+	endCommit, err := GetCommitHashEx(res, end)
 	if err != nil {
 		return nil, utils.Wrap(err, "get end commit")
 	}
@@ -257,4 +259,74 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 	}
 
 	return fs, nil
+}
+
+func GetHeadHash(repos string) string {
+	res, err := git.PlainOpen(repos)
+	if err != nil {
+		return ""
+	}
+
+	ref, err := res.Head()
+	if err != nil {
+		return ""
+	}
+
+	return ref.Hash().String()
+}
+
+func ShortHashToFullHash(repo *git.Repository, hash string) (string, error) {
+	// 获取对象数据库
+	objDB, err := repo.Objects()
+	if err != nil {
+		return "", fmt.Errorf("failed to get object database: %w", err)
+	}
+
+	var foundHash string
+	var matchCount int
+
+	// 遍历所有对象
+	err = objDB.ForEach(func(obj object.Object) error {
+		fullHash := obj.ID().String()
+		if strings.HasPrefix(fullHash, hash) {
+			foundHash = fullHash
+			matchCount++
+			if matchCount > 1 {
+				return fmt.Errorf("ambiguous hash prefix: %s matches multiple objects", hash)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if matchCount == 0 {
+		return "", fmt.Errorf("no matching hash found for %s", hash)
+	}
+
+	return foundHash, nil
+}
+
+// GetCommitHashEx 获取完整的commit hash
+// 如果hash不是完整的commit hash,则尝试查找匹配的commit hash
+func GetCommitHashEx(repo *git.Repository, hash string) (*object.Commit, error) {
+	if len(hash) < 7 {
+		return nil, fmt.Errorf("invalid commit hash: %s (too short)", hash)
+	}
+	if len(hash) > 40 {
+		return nil, fmt.Errorf("invalid commit hash: %s (too long)", hash)
+	}
+	commit, err := repo.CommitObject(plumbing.NewHash(hash))
+	if err != nil {
+		fullHash, err := ShortHashToFullHash(repo, hash)
+		if err != nil {
+			return nil, err
+		}
+		commit, err = repo.CommitObject(plumbing.NewHash(fullHash))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return commit, nil
 }
