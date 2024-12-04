@@ -3,11 +3,12 @@ package rewriter
 import (
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/maps"
@@ -50,6 +51,82 @@ func (s *RewriteManager) CheckVisitedNode(node *core.Node) error {
 func (s *RewriteManager) NewLoopLabel() string {
 	s.LabelId++
 	return fmt.Sprintf("LOOP_%d", s.LabelId)
+}
+
+func (s *RewriteManager) MergeIf() {
+	ifNodes := utils2.NodeFilter(WalkNodeToList(s.RootNode), func(node *core.Node) bool {
+		_, ok := node.Statement.(*statements.ConditionStatement)
+		return ok
+	})
+	ifNodes = NodeDeduplication(ifNodes)
+	delNodesSet := utils.NewSet[*core.Node]()
+	for _, node := range ifNodes {
+		if delNodesSet.Has(node) {
+			continue
+		}
+		for i, n := range node.Next {
+			if slices.Contains(ifNodes, n) {
+				parentNode := node
+				childNode := n
+				if parentNode.Id >= childNode.Id {
+					continue
+				}
+				if !slices.Contains(childNode.Next, node.Next[1-i]) {
+					continue
+				}
+				s.DominatorMap = GenerateDominatorTree(s.RootNode)
+				CalcEnd(s.DominatorMap, parentNode)
+				CalcEnd(s.DominatorMap, childNode)
+				if parentNode.MergeNode != nil && parentNode.MergeNode == childNode.MergeNode {
+					if parentNode.TrueNode() == parentNode.Next[1-i] {
+						if parentNode.TrueNode() == childNode.TrueNode() {
+							ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
+							ifStat2 := childNode.Statement.(*statements.ConditionStatement)
+							ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, ifStat2.Condition, "||", types.NewJavaPrimer(types.JavaBoolean))
+							parentNode.Next[i] = childNode.FalseNode()
+							parentNode.Next[i].RemoveSource(childNode)
+							parentNode.Next[i].AddSource(parentNode)
+							delNodesSet.Add(childNode)
+						} else {
+							ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
+							ifStat2 := childNode.Statement.(*statements.ConditionStatement)
+							ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+								return fmt.Sprintf("!%s", ifStat2.Condition.String(funcCtx))
+							}, func() types.JavaType {
+								return types.NewJavaPrimer(types.JavaBoolean)
+							}), "&&", types.NewJavaPrimer(types.JavaBoolean))
+							parentNode.Next[i] = childNode.TrueNode()
+							parentNode.Next[i].RemoveSource(childNode)
+							parentNode.Next[i].AddSource(parentNode)
+							delNodesSet.Add(childNode)
+						}
+					} else {
+						if parentNode.FalseNode() == childNode.FalseNode() {
+							ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
+							ifStat2 := childNode.Statement.(*statements.ConditionStatement)
+							ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, ifStat2.Condition, "||", types.NewJavaPrimer(types.JavaBoolean))
+							parentNode.Next[i] = childNode.TrueNode()
+							parentNode.Next[i].RemoveSource(childNode)
+							parentNode.Next[i].AddSource(parentNode)
+							delNodesSet.Add(childNode)
+						} else {
+							ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
+							ifStat2 := childNode.Statement.(*statements.ConditionStatement)
+							ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+								return fmt.Sprintf("!%s", ifStat2.Condition.String(funcCtx))
+							}, func() types.JavaType {
+								return types.NewJavaPrimer(types.JavaBoolean)
+							}), "&&", types.NewJavaPrimer(types.JavaBoolean))
+							parentNode.Next[i] = childNode.FalseNode()
+							parentNode.Next[i].RemoveSource(childNode)
+							parentNode.Next[i].AddSource(parentNode)
+							delNodesSet.Add(childNode)
+						}
+					}
+				}
+			}
+		}
+	}
 }
 func (s *RewriteManager) SetId(id int) {
 	s.currentNodeId = id
@@ -110,16 +187,13 @@ func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(no
 		if _, ok := current.Statement.(*statements.MiddleStatement); !ok {
 			result = append(result, current)
 		}
-		next := lo.Filter(current.Next, func(item *core.Node, index int) bool {
-			return !IsEndNode(item)
-		})
-		if len(next) == 0 {
+		if len(current.Next) == 0 {
 			break
 		}
-		if len(next) > 1 {
+		if len(current.Next) > 1 {
 			return nil, ErrMultipleNext
 		}
-		current = next[0]
+		current = current.Next[0]
 	}
 	return result, nil
 }

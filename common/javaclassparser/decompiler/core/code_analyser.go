@@ -26,7 +26,6 @@ type Decompiler struct {
 	opcodeToSimulateStack         map[*OpCode]*StackSimulationImpl
 	FunctionContext               *class_context.ClassContext
 	varTable                      map[int]*values.JavaRef
-	idToValue                     map[int]values.JavaValue
 	valueToRef                    map[values.JavaValue][2]any
 	currentVarId                  int
 	bytecodes                     []byte
@@ -51,7 +50,6 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 		opcodeIndexToOffset: map[int]uint16{},
 		varTable:            map[int]*values.JavaRef{},
 		currentVarId:        -1,
-		idToValue:           map[int]values.JavaValue{},
 		valueToRef:          map[values.JavaValue][2]any{},
 	}
 }
@@ -250,32 +248,7 @@ func (d *Decompiler) DropUnreachableOpcode() error {
 func (d *Decompiler) getPoolValue(index int) values.JavaValue {
 	return d.constantPoolGetter(index)
 }
-func (d *Decompiler) GetRealValue(value values.JavaValue) values.JavaValue {
-	if ref, ok := value.(*values.JavaRef); ok {
-		val := d.idToValue[ref.Id]
-		return d.GetRealValue(val)
-	}
-	return value
-}
-func (d *Decompiler) NewVar(val values.JavaValue) *values.JavaRef {
-	d.currentVarId++
-	newRef := values.NewJavaRef(d.currentVarId, val.Type())
-	d.idToValue[d.currentVarId] = val
-	return newRef
-}
-func (d *Decompiler) AssignVar(slot int, val values.JavaValue) (*values.JavaRef, bool) {
-	typ := val.Type()
-	ref, ok := d.varTable[slot]
-	if !ok || ref.Type().String(d.FunctionContext) != typ.String(d.FunctionContext) {
-		newRef := d.NewVar(val)
-		d.varTable[slot] = newRef
-		return newRef, true
-	}
-	return ref, false
-}
-func (d *Decompiler) GetVar(slot int) *values.JavaRef {
-	return d.varTable[slot]
-}
+
 func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation, opcode *OpCode) error {
 	funcCtx := d.FunctionContext
 	lambdaIndex := 0
@@ -288,7 +261,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	checkAndConvertRef := func(value values.JavaValue) {
 		if _, ok := runtimeStackSimulation.Peek().(*values.JavaRef); !ok {
 			val := runtimeStackSimulation.Pop().(values.JavaValue)
-			ref := d.NewVar(val)
+			ref := runtimeStackSimulation.NewVar(val)
 			runtimeStackSimulation.Push(ref)
 			//appendNode(statements.NewAssignStatement(ref, val, true))
 		}
@@ -309,7 +282,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			slot = GetRetrieveIdx(opcode)
 		}
 
-		runtimeStackSimulation.Push(d.GetVar(slot))
+		runtimeStackSimulation.Push(runtimeStackSimulation.GetVar(slot))
 		////return mkRetrieve(variableFactory);
 	case OP_ACONST_NULL:
 		runtimeStackSimulation.Push(values.NewJavaLiteral("null", types.NewJavaClass("java.lang.Object")))
@@ -348,7 +321,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE, OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0, OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1, OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2, OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3:
 		slot := GetStoreIdx(opcode)
 		value := runtimeStackSimulation.Pop().(values.JavaValue)
-		ref, isFirst := d.AssignVar(slot, value)
+		ref, isFirst := runtimeStackSimulation.AssignVar(slot, value)
 		statements.NewAssignStatement(ref, value, isFirst)
 		d.valueToRef[value] = [2]any{ref, isFirst}
 	case OP_NEW:
@@ -503,7 +476,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		}, func() types.JavaType {
 			return classInfo
 		})
-		ref := d.NewVar(value)
+		ref := runtimeStackSimulation.NewVar(value)
 		runtimeStackSimulation.Push(ref)
 	case OP_INVOKESTATIC:
 		classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
@@ -793,6 +766,14 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_TABLESWITCH, OP_LOOKUPSWITCH:
 		statements.NewMiddleStatement(statements.MiddleSwitch, []any{opcode.SwitchJmpCase1, runtimeStackSimulation.Pop().(values.JavaValue)})
 	case OP_IINC:
+		var index int
+		if opcode.IsWide {
+			index = int(Convert2bytesToInt(opcode.Data))
+		} else {
+			index = int(opcode.Data[0])
+		}
+		ref := runtimeStackSimulation.GetVar(index)
+		opcode.Ref = ref
 	case OP_DNEG, OP_FNEG, OP_LNEG, OP_INEG:
 		v := runtimeStackSimulation.Pop().(values.JavaValue)
 		runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
@@ -860,18 +841,20 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		d.FunctionType.ParamTypes = append([]types.JavaType{types.NewJavaClass(d.FunctionContext.ClassName)}, d.FunctionType.ParamTypes...)
 	}
 
-	i := 0
-	for _, paramType := range d.FunctionType.ParamTypes {
-		//assignStackVar(values.NewJavaRef(stackVarIndex, paramType))
-		d.AssignVar(i, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-			return ""
-		}, func() types.JavaType {
-			return paramType
-		}))
-		i += GetTypeSize(paramType)
-	}
-	if !d.FunctionContext.IsStatic {
-		d.GetVar(0).IsThis = true
+	initMethodVar := func(runtimeSim StackSimulation) {
+		i := 0
+		for _, paramType := range d.FunctionType.ParamTypes {
+			//assignStackVar(values.NewJavaRef(stackVarIndex, paramType))
+			runtimeSim.AssignVar(i, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				return ""
+			}, func() types.JavaType {
+				return paramType
+			}))
+			i += GetTypeSize(paramType)
+		}
+		if !d.FunctionContext.IsStatic {
+			runtimeSim.GetVar(0).IsThis = true
+		}
 	}
 	isIfNode := func(code *OpCode) bool {
 		switch code.Instr.OpCode {
@@ -896,11 +879,23 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			mergeNodeToIfNode[mergeNode] = append(mergeNodeToIfNode[mergeNode], opcode)
 		}
 	}
+	nodeToVarTable := map[*OpCode][]any{}
+	getVarTable := func(code *OpCode) (map[int]*values.JavaRef, int) {
+		if vt, ok := nodeToVarTable[code]; ok {
+			return vt[0].(map[int]*values.JavaRef), vt[1].(int)
+		}
+		return nil, 0
+	}
+	setVarTable := func(code *OpCode, vt map[int]*values.JavaRef, id int) {
+		nodeToVarTable[code] = []any{vt, id}
+	}
 	err = WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
 		var runtimeStackSimulation *StackSimulationImpl
 		if len(code.Source) == 0 {
 			if code.Instr.OpCode == OP_START {
-				runtimeStackSimulation = NewStackSimulation(startStackEntry)
+				emptySim := NewEmptyStackEntry()
+				runtimeStackSimulation = NewStackSimulation(emptySim, map[int]*values.JavaRef{}, 0)
+				initMethodVar(runtimeStackSimulation)
 			} else {
 				return nil, fmt.Errorf("opcode %d has no source", code.Id)
 			}
@@ -909,7 +904,8 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			if entry == nil {
 				return nil, fmt.Errorf("not found simuation stack for opcode %d", code.Source[0].Id)
 			}
-			runtimeStackSimulation = NewStackSimulation(entry)
+			varTable, id := getVarTable(code.Source[0])
+			runtimeStackSimulation = NewStackSimulation(entry, varTable, id)
 		} else if len(code.Source) > 0 {
 			//ifNodes := mergeNodeToIfNode[code]
 			//for _, opCode := range code.Source {
@@ -931,13 +927,13 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			sources := lo.Filter(code.Source, func(item *OpCode, index int) bool {
 				return item.StackEntry != nil
 			})
-			stackEntries := []*StackItem{}
+			validSources := []*OpCode{}
 			for _, source := range sources {
 				entry := source.StackEntry
 				if entry == nil {
 					return nil, fmt.Errorf("not found simuation stack for opcode %d", source.Id)
 				}
-				stackEntries = append(stackEntries, entry)
+				validSources = append(validSources, source)
 			}
 			//sourceIfCodes := []*OpCode{}
 			//for _, opCode := range code.Source {
@@ -965,12 +961,14 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			//	ifStackEntries = append(stackEntries, entry)
 			//}
 
-			if len(stackEntries) == 0 {
+			if len(validSources) == 0 {
 				return nil, errors.New("invalid if merge node")
 			}
 			size := -1
-			for _, stackEntry := range stackEntries {
-				stackSize := NewStackSimulation(stackEntry).Size()
+			for _, validSource := range validSources {
+				stackEntry := validSource.StackEntry
+				varTable, id := getVarTable(validSource)
+				stackSize := NewStackSimulation(stackEntry, varTable, id).Size()
 				//if stackSize > 1 {
 				//	return nil, fmt.Errorf("invalid stack size %d for opcode %d", stackSize, code.Id)
 				//}
@@ -1006,7 +1004,8 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 					if ifNode.StackEntry == nil {
 						continue
 					}
-					stackSize := NewStackSimulation(ifNode.StackEntry).Size()
+					varTable, id := getVarTable(ifNode)
+					stackSize := NewStackSimulation(ifNode.StackEntry, varTable, id).Size()
 					if ifSize == -1 {
 						ifSize = stackSize
 					} else {
@@ -1020,23 +1019,28 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				}
 			}
 			if isIfMergeNode {
-				preSim := NewStackSimulation(stackEntries[0])
+				validSource := validSources[0]
+				varTable, id := getVarTable(validSource)
+				preSim := NewStackSimulation(validSource.StackEntry, varTable, id)
 				preSim.Pop()
-				runtimeStackSimulation = NewStackSimulation(preSim.stackEntry)
+				runtimeStackSimulation = NewStackSimulation(preSim.stackEntry, varTable, id)
 				slotVal := values.NewSlotValue(nil)
-				slotVal.TmpType = stackEntries[0].value.Type()
+				slotVal.TmpType = validSource.StackEntry.value.Type()
 				runtimeStackSimulation.Push(slotVal)
 				ternaryExpMergeNodeSlot[code] = slotVal
 
 				ternaryExpMergeNode = append(ternaryExpMergeNode, code)
 				mergeToIfNode[code] = append(mergeToIfNode[code], ifNodes...)
 			} else {
-				runtimeStackSimulation = NewStackSimulation(stackEntries[0])
+				validSource := validSources[0]
+				varTable, id := getVarTable(validSource)
+				runtimeStackSimulation = NewStackSimulation(validSource.StackEntry, varTable, id)
 			}
 		} else {
 			for _, opCode := range code.Source {
 				if opCode.StackEntry != nil {
-					runtimeStackSimulation = NewStackSimulation(opCode.StackEntry)
+					varTable, id := getVarTable(opCode)
+					runtimeStackSimulation = NewStackSimulation(opCode.StackEntry, varTable, id)
 					break
 				}
 			}
@@ -1068,6 +1072,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			return nil, err
 		}
 		code.StackEntry = runtimeStackSimulation.stackEntry
+		setVarTable(code, runtimeStackSimulation.varTable, runtimeStackSimulation.currentVarId)
 		return code.Target, nil
 	})
 	if err != nil {
@@ -1147,7 +1152,9 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			newOpcode.stackProduced = []values.JavaValue{val}
 			newOpcode.Target = append(newOpcode.Target, code)
 			code.Source = append(code.Source, newOpcode)
-			sim := NewStackSimulation(startStackEntry)
+			emptySim := NewEmptyStackEntry()
+			sim := NewStackSimulation(emptySim, map[int]*values.JavaRef{}, 0)
+			initMethodVar(sim)
 			sim.Push(val)
 			newOpcode.StackEntry = sim.stackEntry
 			sources := slices.Clone(ifCode.Source)
@@ -1250,7 +1257,14 @@ func (d *Decompiler) ParseStatement() error {
 			appendNode(assignSt)
 		case OP_CHECKCAST:
 			leftRef := opcode.stackProduced[0].(*values.JavaRef)
-			val := d.idToValue[leftRef.Id]
+			val := leftRef.Val
+			for {
+				if v, ok := val.(*values.JavaRef); ok {
+					val = v.Val
+				} else {
+					break
+				}
+			}
 			appendNode(statements.NewAssignStatement(leftRef, val, true))
 		case OP_INVOKESTATIC:
 			if len(opcode.stackProduced) == 0 {
@@ -1286,7 +1300,15 @@ func (d *Decompiler) ParseStatement() error {
 						return
 					}
 					if len(funcCallValue.Arguments) != 0 {
-						value := d.GetRealValue(funcCallValue.Object)
+						val := funcCallValue.Object
+						for {
+							if v, ok := val.(*values.JavaRef); ok {
+								val = v.Val
+							} else {
+								break
+							}
+						}
+						value := val
 						if value == nil {
 							return
 						}
@@ -1444,15 +1466,13 @@ func (d *Decompiler) ParseStatement() error {
 			switchStatement := statements.NewMiddleStatement(statements.MiddleSwitch, []any{opcode.SwitchJmpCase1, opcode.stackConsumed[0]})
 			appendNode(switchStatement)
 		case OP_IINC:
-			var index, inc int
+			var inc int
 			if opcode.IsWide {
-				index = int(Convert2bytesToInt(opcode.Data))
 				inc = int(Convert2bytesToInt(opcode.Data[2:]))
 			} else {
-				index = int(opcode.Data[0])
 				inc = int(opcode.Data[1])
 			}
-			ref := d.GetVar(int(index))
+			ref := opcode.Ref
 			appendNode(values.NewBinaryExpression(ref, values.NewJavaLiteral(inc, types.NewJavaPrimer(types.JavaInteger)), INC, ref.Type()))
 		case OP_END:
 			endNode := statements.NewMiddleStatement("end", nil)
@@ -1551,10 +1571,6 @@ func (d *Decompiler) ParseStatement() error {
 		}
 		return node.Next, nil
 	})
-	err = d.StandardStatement()
-	if err != nil {
-		return err
-	}
 	err = WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
 		if node.IsTryCatch {
 			tryNodeId := getStatementNextIdByOpcodeId(node.TryNodeId)
@@ -1597,6 +1613,10 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
+	err = d.RemoveGotoStatement()
+	if err != nil {
+		return err
+	}
 	err = d.ReGenerateNodeId()
 	if err != nil {
 		return err
@@ -1612,7 +1632,7 @@ func (d *Decompiler) ReGenerateNodeId() error {
 		return node.Next, nil
 	})
 }
-func (d *Decompiler) StandardStatement() error {
+func (d *Decompiler) RemoveGotoStatement() error {
 	return WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
 		if _, ok := node.Statement.(*statements.GOTOStatement); ok {
 			for _, source := range node.Source {

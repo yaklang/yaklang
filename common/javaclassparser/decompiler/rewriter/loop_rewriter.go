@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
 
@@ -269,9 +270,18 @@ func LoopRewriter(manager *RewriteManager, node *core.Node) error {
 }
 func getCircleElementSet(circleNode *core.Node, loopStart *core.Node) *utils2.Set[*core.Node] {
 	finalSet := utils2.NewSet[*core.Node]()
+	walkedNodes := utils2.NewSet[*core.Node]()
+	haltRoutes := map[*core.Node][][]*core.Node{}
 	var walkNodes func(start *core.Node, route []*core.Node)
 	walkNodes = func(start *core.Node, route []*core.Node) {
+		route = slices.Clone(route)
+		if walkedNodes.Has(start) {
+			haltRoutes[start] = append(haltRoutes[start], route)
+			return
+		}
+		walkedNodes.Add(start)
 		if slices.Contains(route, start) {
+			haltRoutes[start] = append(haltRoutes[start], route)
 			return
 		}
 		if start == circleNode {
@@ -286,6 +296,23 @@ func getCircleElementSet(circleNode *core.Node, loopStart *core.Node) *utils2.Se
 	}
 	walkNodes(loopStart, []*core.Node{})
 	finalSet.Add(circleNode)
+	for {
+		var hasNew bool
+		newM := map[*core.Node][][]*core.Node{}
+		maps.Copy(newM, haltRoutes)
+		for k, v := range newM {
+			if finalSet.Has(k) {
+				hasNew = true
+				for _, nodes := range v {
+					finalSet.AddList(nodes)
+				}
+				delete(haltRoutes, k)
+			}
+		}
+		if !hasNew {
+			break
+		}
+	}
 	return finalSet
 }
 func searchCircleEndNode(circleNode *core.Node, loopStart *core.Node) *core.Node {

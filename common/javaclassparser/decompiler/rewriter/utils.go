@@ -18,3 +18,11 @@ func IsEndNode(node *core.Node) bool {
 	}
 	return false
 }
+func WalkNodeToList(node *core.Node) []*core.Node {
+	var list []*core.Node
+	core.WalkGraph[*core.Node](node, func(node *core.Node) ([]*core.Node, error) {
+		list = append(list, node)
+		return node.Next, nil
+	})
+	return list
+}

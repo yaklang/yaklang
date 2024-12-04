@@ -334,7 +334,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		c.CurrentMethod = method
 		funcCtx := c.FuncCtx
 		funcCtx.FunctionName = name
-		//if name != "toArray" {
+		//if name != "crt_data_by_Attrs" {
 		//	continue
 		//}
 		//println(name)

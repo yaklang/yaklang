@@ -11,6 +11,22 @@ import (
 	"testing"
 )
 
+func TestParseSingleClass(t *testing.T) {
+	content, _ := os.ReadFile("/Users/z3/Code/go/yaklang/build/error/decompiler-block-ResImportAction-2pjTfd5cwevyaiBd040bZJpR2x2.class")
+	cf, err := Parse(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	//if path != "/Users/z3/Downloads/compiling-failed-files 3/decompiler-err-LinkedBlockingDeque-2oO3vnOHDunZXdMyn8b5VRlh1bt.class" {
+	//	return nil
+	//}
+	source, err := cf.Dump()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(source)
+}
 func TestParseClass(t *testing.T) {
 	err := filepath.Walk("/Users/z3/Downloads/compiling-failed-files 3", func(path string, info fs.FileInfo, err error) error {
 		if info.IsDir() {
@@ -42,7 +58,7 @@ func TestParseClass(t *testing.T) {
 
 }
 func TestParseJar(t *testing.T) {
-	jarFs, err := NewJarFSFromLocal("/Users/z3/Downloads/ysoserial-for-woodpecker-0.5.2.jar")
+	jarFs, err := NewJarFSFromLocal("/Users/z3/Downloads/iam.app.5.0.enc.jar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,6 +73,10 @@ func TestParseJar(t *testing.T) {
 		if jarFs.Ext(path) != ".class" {
 			return nil
 		}
+		fmt.Printf("file: %s\n", path)
+		//if path != "com/simp/action/audit/access/MouseLogListAction.class" {
+		//	return nil
+		//}
 		data, err := jarFs.ReadFile(path)
 		if err != nil {
 			failedFils = append(failedFils, path)
@@ -64,7 +84,6 @@ func TestParseJar(t *testing.T) {
 			return nil
 			//return err
 		}
-		fmt.Printf("file: %s\n", path)
 
 		_ = data
 		return nil

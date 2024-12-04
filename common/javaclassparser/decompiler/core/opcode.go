@@ -7,19 +7,20 @@ import (
 )
 
 type OpCode struct {
-	Id                             int
-	Instr                          *Instruction
-	CurrentOffset                  uint16
-	Data                           []byte
-	Jmp                            int
-	IsWide                         bool
-	IsCatch                        bool
-	GetStackChange                 func()
-	IsTryCatchParent               bool
-	TryNode                        *OpCode
-	CatchNode                      []*OpCode
+	Id               int
+	Instr            *Instruction
+	CurrentOffset    uint16
+	Data             []byte
+	Jmp              int
+	IsWide           bool
+	IsCatch          bool
+	GetStackChange   func()
+	IsTryCatchParent bool
+	TryNode          *OpCode
+	CatchNode        []*OpCode
 	//StackSimulation                *StackSimulationImpl
 	StackEntry                     *StackItem
+	Ref                            *values.JavaRef
 	ExceptionTypeIndex             uint16
 	SwitchJmpCase                  *omap.OrderedMap[int, int32]
 	SwitchJmpCase1                 *omap.OrderedMap[int, int]
