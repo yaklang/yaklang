@@ -680,6 +680,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_Https(req.GetIsHTTPS()),
 			mutate.WithPoolOpt_GmTLS(req.GetIsGmTLS()),
 			mutate.WithPoolOpt_Context(stream.Context()),
+			mutate.WithPoolOpt_ConnPool(true),
 			mutate.WithPoolOpt_FollowJSRedirect(req.GetFollowJSRedirect()),
 			mutate.WithPoolOpt_RedirectTimes(int(req.GetRedirectTimes())),
 			mutate.WithPoolOpt_NoFollowRedirect(req.GetNoFollowRedirect()),

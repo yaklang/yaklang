@@ -110,3 +110,39 @@ func TestFSConverter(t *testing.T) {
 func showFS(fi filesys_interface.FileSystem) {
 	fmt.Println(filesys.DumpTreeView(fi))
 }
+
+func TestFSConverter_Short(t *testing.T) {
+	zfs, err := filesys.NewZipFSRaw(bytes.NewReader(testRepo), int64(len(testRepo)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	baseDir := filepath.Join(consts.GetDefaultYakitBaseTempDir(), utils.RandString(8)) + "/"
+	filesys.SimpleRecursive(
+		filesys.WithFileSystem(zfs),
+		filesys.WithDirStat(func(s string, info fs.FileInfo) error {
+			os.MkdirAll(filepath.Join(baseDir, s), 0755)
+			return nil
+		}),
+		filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+			raw, err := zfs.ReadFile(s)
+			if err != nil {
+				return nil
+			}
+			err = os.WriteFile(filepath.Join(baseDir, s), raw, 0644)
+			return nil
+		}))
+	fmt.Println(baseDir)
+	repo := filepath.Join(baseDir, "test-repo")
+	f, err := FromCommit(repo, `184d4e3f162`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw []byte
+	raw, _ = f.ReadFile("./file1.txt")
+	assert.Contains(t, string(raw), "Modified content of file1")
+	raw, _ = f.ReadFile("file3.txt")
+	assert.Contains(t, string(raw), `New file3 content`)
+	raw, _ = f.ReadFile("file2.txt")
+	assert.Empty(t, raw)
+}
