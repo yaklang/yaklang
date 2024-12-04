@@ -1,14 +1,21 @@
 package authhack
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 func TestJwtParse(t *testing.T) {
@@ -59,32 +66,20 @@ func TestJwtParse(t *testing.T) {
 
 func TestJwtParse2(t *testing.T) {
 	token, secret, err := JwtParse("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXUyJ9.eyJsb2dpbiI6InRlc3RhYmMiLCJpYXQiOiIxNjM4MzMyMzI5In0.ZDJjYmVkZTJjYmExNzhhYzA2ZWJiZDAwMTJjYmQ1ZTFkOWM4MGE4MDNkNjQxOTgwMWNjNTIwMGEwODgxM2RkNw")
-	if err != nil {
-		spew.Dump(err)
-		t.FailNow()
-	}
-	spew.Dump(token, secret)
+	require.ErrorIs(t, err, ErrKeyNotFound)
+	require.NotNil(t, token)
+	require.Nil(t, secret)
 
 	testToken, err := JwtGenerate("None", map[string]interface{}{
 		"login": "admin",
 	}, "JWS", nil)
-	if err != nil {
-		spew.Dump(err)
-		t.FailNow()
-		return
-	}
-	println(testToken)
+	require.NoError(t, err)
+	token, secret, err = JwtParse(testToken)
+	require.NoError(t, err)
+	require.NotNil(t, token)
+	require.Nil(t, secret)
 
-	// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXUyJ9.eyJpYXQiOiIxIiwibG9naW4iOiJhZG1pbiJ9.am57cdFRRffycP0Wr5OC9Ron18N7YP8431rZCESAJiQ
-	// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXUyJ9.eyJsb2dpbiI6InRlc3RhYmMiLCJpYXQiOiIxNjM4MzMyMzI5In0.ZDJjYmVkZTJjYmExNzhhYzA2ZWJiZDAwMTJjYmQ1ZTFkOWM4MGE4MDNkNjQxOTgwMWNjNTIwMGEwODgxM2RkNw
-
-	token, _, err = JwtParse(testToken)
-	if err != nil {
-		println(err.Error())
-		t.FailNow()
-	}
 	spew.Dump(token)
-	_ = token
 }
 
 func TestJwtParse3(t *testing.T) {
@@ -100,33 +95,100 @@ func TestJwtParse3(t *testing.T) {
 }
 
 func TestJwtParse4(t *testing.T) {
-	test := assert.New(t)
 	newToken, secret, err := JwtParse(
-		"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJsb2dpbiI6InRlc3RhYmMifQ.SnEUbh5ykeQFGwvzTHscLr1CurDfRVVUxktT3_G5PIUCueoJdJpTkEf1Z9g4jjfK8Z-rTwwTbHfw8owkQn61alilEMRAwOT5jA9-BVMh90qfBDDTkrLNsT2jfznAGFqDdGzI2Q9KDYSr46_DKobkqqxWvfuJFxYAy3MFyPJAXSE3rF4yGvYD5NLW6mwZgYZvnQARNPhIvJe2UD5IAYjFL82myIi0j4sPLm103qPI6hkQ-7Erv8_1Q_WDiF-Xp3l8OmJbJbMgHfv7sDMxfrvxQfnUCck1Oubq_Vj-1hfuUSbbhS-BQBZUykZ0o9KRVD5uY_bmcEfHbJm2i6eqrf_B3A",
-	)
-	if err != nil {
-		test.FailNow(err.Error())
-	}
-	println(string(secret))
+		"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJsb2dpbiI6InRlc3RhYmMifQ.SnEUbh5ykeQFGwvzTHscLr1CurDfRVVUxktT3_G5PIUCueoJdJpTkEf1Z9g4jjfK8Z-rTwwTbHfw8owkQn61alilEMRAwOT5jA9-BVMh90qfBDDTkrLNsT2jfznAGFqDdGzI2Q9KDYSr46_DKobkqqxWvfuJFxYAy3MFyPJAXSE3rF4yGvYD5NLW6mwZgYZvnQARNPhIvJe2UD5IAYjFL82myIi0j4sPLm103qPI6hkQ-7Erv8_1Q_WDiF-Xp3l8OmJbJbMgHfv7sDMxfrvxQfnUCck1Oubq_Vj-1hfuUSbbhS-BQBZUykZ0o9KRVD5uY_bmcEfHbJm2i6eqrf_B3A")
+	require.NotNil(t, newToken)
+	require.ErrorIs(t, err, ErrKeyNotFound)
+	require.Nil(t, secret)
 	spew.Dump(newToken)
 }
 
 func TestJwtParse5(t *testing.T) {
-	test := assert.New(t)
 	token, err := JwtGenerate("HS256", map[string]interface{}{
 		"test": "value",
 	}, "", []byte("secrjasdfasdfasdfhasdfasdfasdfet"))
-	if err != nil {
-		test.FailNow(err.Error())
-		return
-	}
+	require.NoError(t, err)
 	println(token)
 
-	tokenIns, secret, err := JwtParse(token)
-	if err != nil {
-		test.FailNow(err.Error())
-		return
-	}
-	println(string(secret))
-	spew.Dump(tokenIns)
+	newToken, secret, err := JwtParse(token, WeakJWTTokenKeys...)
+	require.ErrorIs(t, err, ErrKeyNotFound)
+	require.NotNil(t, newToken)
+	require.Nil(t, secret)
+
+	spew.Dump(newToken)
+}
+
+func TestJwt(t *testing.T) {
+	t.Run("None alg", func(t *testing.T) {
+		s, err := JwtGenerate("None", nil, "JWT", nil)
+		require.NoError(t, err)
+		token, key, err := JwtParse(s)
+		require.NoError(t, err)
+		require.Nil(t, key)
+		require.NotNil(t, token)
+	})
+	t.Run("invalid alg", func(t *testing.T) {
+		s, err := JwtGenerate("None", nil, "JWT", nil)
+		require.NoError(t, err)
+		splited := strings.SplitN(s, ".", 3)
+		decoded, err := base64.RawURLEncoding.DecodeString(splited[0])
+		require.NoError(t, err)
+		decoded = bytes.Replace(decoded, []byte(`"alg":"None"`), []byte(`"alg":"invalid"`), 1)
+		splited[0] = base64.StdEncoding.EncodeToString(decoded)
+		s = strings.Join(splited, ".")
+
+		token, key, err := JwtParse(s)
+		require.ErrorContains(t, err, "unverifiable token")
+		require.Nil(t, key)
+		require.NotNil(t, token)
+
+	})
+	t.Run("iat", func(t *testing.T) {
+		password := uuid.NewString()
+		s, err := JwtGenerate("HS256", map[string]any{
+			"iat": float64(time.Now().Add(100 * time.Second).Unix()),
+		}, "", []byte(password))
+		require.NoError(t, err)
+		token, key, err := JwtParse(s, password)
+		require.ErrorContains(t, err, "token IAT validation failed")
+		require.NotNil(t, token)
+		require.Equal(t, password, string(key))
+	})
+
+	t.Run("exp", func(t *testing.T) {
+		password := uuid.NewString()
+		s, err := JwtGenerate("HS256", map[string]any{
+			"exp": float64(time.Now().Add(-100 * time.Second).Unix()),
+		}, "", []byte(password))
+		require.NoError(t, err)
+		token, key, err := JwtParse(s, password)
+		require.ErrorContains(t, err, "token EXP validation failed")
+		require.NotNil(t, token)
+		require.Equal(t, password, string(key))
+	})
+
+	t.Run("nbf", func(t *testing.T) {
+		password := uuid.NewString()
+		s, err := JwtGenerate("HS256", map[string]any{
+			"nbf": float64(time.Now().Add(100 * time.Second).Unix()),
+		}, "", []byte(password))
+		require.NoError(t, err)
+		token, key, err := JwtParse(s, password)
+		require.ErrorContains(t, err, "token NBF validation failed")
+		require.NotNil(t, token)
+		require.Equal(t, password, string(key))
+	})
+
+	t.Run("normal", func(t *testing.T) {
+		password := uuid.NewString()
+		u := uuid.NewString()
+		m := map[string]any{"test": u}
+		s, err := JwtGenerate("HS256", m, "", []byte(password))
+		require.NoError(t, err)
+		token, key, err := JwtParse(s, password)
+		require.NoError(t, err)
+		require.NotNil(t, token)
+		require.Equal(t, password, string(key))
+		require.Equal(t, m["test"], token.Claims.(jwt.MapClaims)["test"])
+	})
 }

@@ -1,14 +1,17 @@
 package authhack
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 var (
-	jwtWeakkeyRaw = `secret
+	ErrKeyNotFound = utils.Errorf("key not found")
+	jwtWeakkeyRaw  = `secret
 ...
 012345678901234567890123456789XY
 12345
@@ -124,14 +127,14 @@ AC8d83&21Almnis710sds
 		&AuthHackJWTSigningNone{},
 	}
 	algsToAlgsInstance = map[string]jwt.SigningMethod{}
-	weakJWTTokenKeys   = utils.ParseStringToLines(jwtWeakkeyRaw)
+	WeakJWTTokenKeys   = utils.ParseStringToLines(jwtWeakkeyRaw)
 )
 
 func init() {
 	for _, i := range JwtAlgs {
 		algsToAlgsInstance[i.Alg()] = i
 	}
-	weakJWTTokenKeys = utils.RemoveRepeatedWithStringSlice(weakJWTTokenKeys)
+	WeakJWTTokenKeys = utils.RemoveRepeatedWithStringSlice(WeakJWTTokenKeys)
 }
 
 func NewJWTHelper(alg string) (*jwt.Token, error) {
@@ -184,23 +187,60 @@ func JwtGenerateEx(alg string, extraHeader map[string]interface{}, extraData map
 }
 
 func JwtParse(tokenStr string, keys ...string) (*jwt.Token, []byte, error) {
-	firstToken, _ := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+	var jwtErr *jwt.ValidationError
+
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		return nil, nil
 	})
-	if firstToken != nil && len(firstToken.Header) > 0 {
-		if utils.StringArrayContains([]string{
-			"None", "none",
-		}, fmt.Sprint(firstToken.Header["alg"])) {
-			return firstToken, nil, nil
+	if err != nil {
+		if !errors.As(err, &jwtErr) {
+			return nil, nil, utils.Wrap(err, "Unexpected error")
+		}
+		if jwtErr.Errors == jwt.ValidationErrorMalformed {
+			return nil, nil, utils.Errorf("malformed token: %v", err)
+		} else if jwtErr.Errors == jwt.ValidationErrorUnverifiable {
+			if token != nil && len(token.Header) > 0 {
+				alg := strings.ToLower(fmt.Sprint(token.Header["alg"]))
+				if alg == "none" {
+					return token, nil, nil
+				}
+			}
+			return token, nil, utils.Errorf("unverifiable token: %v", err)
 		}
 	}
 
-	for _, i := range append(weakJWTTokenKeys, keys...) {
+	for _, i := range keys {
+		key := []byte(i)
 		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 			return []byte(i), nil
 		})
 		if err != nil {
-			continue
+			if !errors.As(err, &jwtErr) {
+				return nil, nil, utils.Wrap(err, "Unexpected error")
+			}
+			if jwtErr.Errors == jwt.ValidationErrorMalformed {
+				return nil, nil, utils.Errorf("malformed token: %v", err)
+			} else if jwtErr.Errors == jwt.ValidationErrorUnverifiable {
+				return token, nil, utils.Errorf("unverifiable token: %v", err)
+			} else if jwtErr.Errors&jwt.ValidationErrorSignatureInvalid == jwt.ValidationErrorSignatureInvalid && jwtErr.Inner != nil {
+				continue
+			} else if jwtErr.Errors&jwt.ValidationErrorAudience == jwt.ValidationErrorAudience {
+				return token, key, utils.Errorf("token AUD validation failed: %v", jwtErr.Inner)
+			} else if jwtErr.Errors&jwt.ValidationErrorExpired == jwt.ValidationErrorExpired {
+				return token, key, utils.Errorf("token EXP validation failed: %v", err)
+			} else if jwtErr.Errors&jwt.ValidationErrorIssuedAt == jwt.ValidationErrorIssuedAt {
+				return token, key, utils.Errorf("token IAT validation failed: %v", jwtErr.Inner)
+			} else if jwtErr.Errors&jwt.ValidationErrorIssuer == jwt.ValidationErrorIssuer {
+				return token, key, utils.Errorf("token ISS validation failed: %v", jwtErr.Inner)
+			} else if jwtErr.Errors&jwt.ValidationErrorNotValidYet == jwt.ValidationErrorNotValidYet {
+				return token, key, utils.Errorf("token NBF validation failed: %v", jwtErr.Inner)
+			} else if jwtErr.Errors&jwt.ValidationErrorId == jwt.ValidationErrorId {
+				return token, key, utils.Errorf("token JTI validation failed: %v", jwtErr.Inner)
+			} else if jwtErr.Errors&jwt.ValidationErrorClaimsInvalid == jwt.ValidationErrorClaimsInvalid {
+				return token, nil, utils.Errorf("token claims validation failed: %v", err)
+			} else {
+				return token, nil, jwtErr
+			}
 		}
 
 		if len(token.Header) <= 0 {
@@ -214,13 +254,12 @@ func JwtParse(tokenStr string, keys ...string) (*jwt.Token, []byte, error) {
 		return token, []byte(i), nil
 	}
 
-	return firstToken, nil, nil
-	// return nil, nil, utils.Errorf("cannot guess jwt key token: %v", tokenStr)
+	return token, nil, ErrKeyNotFound
 }
 
 func JwtChangeAlgToNone(token string) (string, error) {
 	t, _, err := JwtParse(token)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrKeyNotFound) {
 		return "", utils.Errorf("invalid token: %v", token)
 	}
 	newToken := jwt.New(&AuthHackJWTSigningNone{})

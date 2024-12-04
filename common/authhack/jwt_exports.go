@@ -32,6 +32,7 @@ var JWTExports = map[string]interface{}{
 	"JWSGenerateEx": func(alg string, extraHeader, i map[string]any, key []byte) (string, error) {
 		return JwtGenerateEx(alg, utils.InterfaceToMapInterface(extraHeader), utils.InterfaceToMapInterface(i), "JWS", key)
 	},
-	"RemoveAlg": JwtChangeAlgToNone,
-	"AllAlgs":   AvailableJWTTokensAlgs,
+	"RemoveAlg":         JwtChangeAlgToNone,
+	"AllAlgs":           AvailableJWTTokensAlgs,
+	"CommonWeakJWTKeys": WeakJWTTokenKeys,
 }
