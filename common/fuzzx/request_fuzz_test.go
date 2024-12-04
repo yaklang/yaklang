@@ -256,6 +256,20 @@ Host: www.baidu.com`)
 	}
 }
 
+func TestDuplicate_FuzzGetParams(t *testing.T) {
+	iFuzztag := "3"
+	key := "a"
+	excepts := QuickMutateSimple(iFuzztag)
+	raw := []byte(`GET /?a=1&a=2 HTTP/1.1
+Host: www.baidu.com`)
+	freq := MustNewFuzzHTTPRequest(raw)
+	results := freq.FuzzGetParams(key, iFuzztag, 1).Results()
+	require.Len(t, results, len(excepts))
+	for i, r := range results {
+		require.Equal(t, "/?a=1&"+key+"="+excepts[i], lowhttp.GetHTTPRequestPath(r))
+	}
+}
+
 func TestFuzzGetBase64Params(t *testing.T) {
 	iFuzztag := "{{char(a-z)}}"
 	key := "a[]"
@@ -282,6 +296,28 @@ Host: www.baidu.com`)
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
 		v := lowhttp.GetHTTPRequestQueryParam(r, key)
+		v, ok := utils.IsJSON(v)
+		require.True(t, ok)
+		got := utils.InterfaceToString(jsonpath.Find(v, jsonPath))
+		require.NotEmpty(t, got)
+		require.Equal(t, excepts[i], got)
+	}
+}
+
+func TestDuplicate_FuzzGetJsonPathParams(t *testing.T) {
+	iFuzztag := "{{char(a-z)}}"
+	key := "a"
+	jsonPath := "$.c.d"
+	excepts := QuickMutateSimple(iFuzztag)
+	raw := []byte(`GET /?a=1&a={"c":{"d":"123"}} HTTP/1.1
+Host: www.baidu.com`)
+	freq := MustNewFuzzHTTPRequest(raw)
+	results := freq.FuzzGetJsonPathParams(key, jsonPath, iFuzztag, 1).Results()
+	require.Len(t, results, len(excepts))
+	for i, r := range results {
+		vs := lowhttp.GetHTTPRequestQueryParamFull(r, key)
+		require.Len(t, vs, 2)
+		v := vs[1]
 		v, ok := utils.IsJSON(v)
 		require.True(t, ok)
 		got := utils.InterfaceToString(jsonpath.Find(v, jsonPath))
@@ -343,6 +379,24 @@ a=b`)
 	}
 }
 
+func TestDuplicate_FuzzPostParams(t *testing.T) {
+	iFuzztag := "d"
+	key := "a"
+	excepts := QuickMutateSimple(iFuzztag)
+	raw := []byte(`POST / HTTP/1.1
+Host: www.baidu.com
+	
+a=b&a=c`)
+	freq := MustNewFuzzHTTPRequest(raw)
+	results := freq.FuzzPostParams(key, iFuzztag, 1).Results()
+	require.Len(t, results, len(excepts))
+	for i, r := range results {
+		vs := lowhttp.GetHTTPRequestPostParamFull(r, key)
+		require.Len(t, vs, 2)
+		require.Equal(t, excepts[i], vs[1])
+	}
+}
+
 func TestFuzzPostBase64Params(t *testing.T) {
 	iFuzztag := "{{char(a-z)}}"
 	key := "c"
@@ -392,6 +446,30 @@ a={"c":{"d":"123"}}`)
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
 		v := lowhttp.GetHTTPRequestPostParam(r, key)
+		v, ok := utils.IsJSON(v)
+		require.True(t, ok)
+		got := utils.InterfaceToString(jsonpath.Find(v, jsonPath))
+		require.NotEmpty(t, got)
+		require.Equal(t, excepts[i], got)
+	}
+}
+
+func TestDuplicate_FuzzPostJsonPathParams(t *testing.T) {
+	iFuzztag := "{{char(a-z)}}"
+	key := "a"
+	jsonPath := "$.c.d"
+	excepts := QuickMutateSimple(iFuzztag)
+	raw := []byte(`POST / HTTP/1.1
+Host: www.baidu.com
+	
+a=1&a={"c":{"d":"123"}}`)
+	freq := MustNewFuzzHTTPRequest(raw)
+	results := freq.FuzzPostJsonPathParams(key, jsonPath, iFuzztag, 1).Results()
+	require.Len(t, results, len(excepts))
+	for i, r := range results {
+		vs := lowhttp.GetHTTPRequestPostParamFull(r, key)
+		require.Len(t, vs, 2)
+		v := vs[1]
 		v, ok := utils.IsJSON(v)
 		require.True(t, ok)
 		got := utils.InterfaceToString(jsonpath.Find(v, jsonPath))

@@ -22,6 +22,9 @@ func compareParams(t *testing.T, wants, gots []*FuzzParam) {
 		if got.pathKey != "" {
 			require.Equalf(t, want.pathKey, got.pathKey, "[%d] pathKey want: %v, got: %v", i, want.pathKey, got.pathKey)
 		}
+		if want.n != 0 {
+			require.Equalf(t, want.n, got.n, "[%d] n want: %v, got: %v", i, want.n, got.n)
+		}
 	}
 }
 
@@ -98,10 +101,13 @@ Host: www.baidu.com
 }
 
 func TestGetQueryParams(t *testing.T) {
-	gots := MustNewFuzzHTTPRequest([]byte(`GET /?a=1&b={"c":"d"}&c=MTIz&d=eyJjIjoiZCJ9 HTTP/1.1
+	gots := MustNewFuzzHTTPRequest([]byte(`GET /?a=1&a=2&b={"c":"d"}&c=MTIz&d=eyJjIjoiZCJ9 HTTP/1.1
 Host: www.baidu.com`)).GetQueryParams()
 	sort.SliceStable(gots, func(i, j int) bool {
 		if gots[i].param == gots[j].param {
+			if gots[i].position == gots[j].position {
+				return gots[i].n < gots[j].n
+			}
 			return gots[i].position < gots[j].position
 		}
 		return gots[i].param < gots[j].param
@@ -110,6 +116,12 @@ Host: www.baidu.com`)).GetQueryParams()
 		{
 			param:    "a",
 			position: lowhttp.PosGetQuery,
+			n:        0,
+		},
+		{
+			param:    "a",
+			position: lowhttp.PosGetQuery,
+			n:        1,
 		},
 		{
 			param:    "b",
@@ -284,9 +296,12 @@ func TestGetPostParams(t *testing.T) {
 	gots := MustNewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.baidu.com
 
-a=1&b={"c":"d"}&c=MTIz&d=eyJjIjoiZCJ9`)).GetPostParams()
+a=1&a=2&b={"c":"d"}&c=MTIz&d=eyJjIjoiZCJ9`)).GetPostParams()
 	sort.SliceStable(gots, func(i, j int) bool {
 		if gots[i].param == gots[j].param {
+			if gots[i].position == gots[j].position {
+				return gots[i].n == gots[j].n
+			}
 			return gots[i].position < gots[j].position
 		}
 		return gots[i].param < gots[j].param
@@ -295,6 +310,12 @@ a=1&b={"c":"d"}&c=MTIz&d=eyJjIjoiZCJ9`)).GetPostParams()
 		{
 			param:    "a",
 			position: lowhttp.PosPostQuery,
+			n:        0,
+		},
+		{
+			param:    "a",
+			position: lowhttp.PosPostQuery,
+			n:        1,
 		},
 		{
 			param:    "b",
@@ -330,4 +351,44 @@ a=1&b={"c":"d"}&c=MTIz&d=eyJjIjoiZCJ9`)).GetPostParams()
 		},
 	}
 	compareParams(t, wants, gots)
+}
+func TestFuzzParams_CloneFuzzRequest(t *testing.T) {
+	freq := MustNewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
+	Host: www.baidu.com
+	
+	a=1&a=2`))
+	params := freq.GetPostParams()
+	for _, param := range params {
+		rs := param.Fuzz("c").Fuzz("d").Results()
+		require.Len(t, rs, 2)
+	}
+	params = freq.GetPostParams()
+	for _, param := range params {
+		rs := param.Fuzz("c", "d").Results()
+		require.Len(t, rs, 2)
+	}
+	params = freq.GetPostParams()
+	for _, param := range params {
+		rs := param.Fuzz("c").Results()
+		require.Len(t, rs, 1)
+		rs = param.Fuzz("d").Results()
+		require.Len(t, rs, 2)
+	}
+}
+
+func TestFuzzParams_Duplicate(t *testing.T) {
+	gots := MustNewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1&a=2`)).GetPostParams()
+	for _, param := range gots {
+		rs := param.Fuzz("3").Results()
+		require.Len(t, rs, 1)
+		body := lowhttp.GetHTTPPacketBody(rs[0])
+		if param.n == 0 {
+			require.Equal(t, "a=3&a=2", string(body))
+		} else if param.n == 1 {
+			require.Equal(t, "a=1&a=3", string(body))
+		}
+	}
 }
