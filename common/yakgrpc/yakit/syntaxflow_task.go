@@ -31,6 +31,11 @@ func FilterSyntaxFlowScanTask(db *gorm.DB, filter *ypb.SyntaxFlowScanTaskFilter)
 	if filter.GetUntilId() > 0 {
 		db = db.Where("id <= ?", filter.GetUntilId())
 	}
+	if filter.GetKeyword() != "" {
+		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
+			"programs",
+		}, []string{filter.GetKeyword()}, false)
+	}
 	return db
 }
 
