@@ -11,11 +11,11 @@ type JavaRef struct {
 	StackVar    JavaValue
 	CustomValue *CustomValue
 	IsThis      bool
-	JavaType    types.JavaType
+	Val         JavaValue
 }
 
 func (j *JavaRef) Type() types.JavaType {
-	return j.JavaType
+	return j.Val.Type()
 }
 
 func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
@@ -31,10 +31,10 @@ func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("var%d", j.Id)
 }
 
-func NewJavaRef(id int, typ types.JavaType) *JavaRef {
+func NewJavaRef(id int, val JavaValue) *JavaRef {
 	return &JavaRef{
-		Id:       id,
-		JavaType: typ,
+		Id:  id,
+		Val: val,
 	}
 }
 

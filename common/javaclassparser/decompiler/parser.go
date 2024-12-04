@@ -25,6 +25,7 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 
 	statementManager := rewriter.NewRootStatementManager(decompiler.RootNode)
 	statementManager.SetId(decompiler.CurrentId)
+	statementManager.MergeIf()
 	err = statementManager.Rewrite()
 	if err != nil {
 		return nil, err

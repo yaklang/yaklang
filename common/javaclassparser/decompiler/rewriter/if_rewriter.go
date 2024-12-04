@@ -161,6 +161,8 @@ func CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
 	ifNode.MergeNode = nil
 	trueNode := ifNode.TrueNode()
 	falseNode := ifNode.FalseNode()
+
+	domTree = GenerateDominatorTree(ifNode)
 	doms := domTree[ifNode]
 	switch len(doms) {
 	case 1:

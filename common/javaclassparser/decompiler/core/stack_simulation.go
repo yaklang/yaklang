@@ -1,6 +1,10 @@
 package core
 
-import "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+import (
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"golang.org/x/exp/maps"
+)
 
 type StackItem struct {
 	parent *StackItem
@@ -53,22 +57,58 @@ type StackSimulation interface {
 	PopN(n int) []values.JavaValue
 	Push(values.JavaValue)
 	Peek() values.JavaValue
+	NewVar(val values.JavaValue) *values.JavaRef
+	AssignVar(slot int, val values.JavaValue) (*values.JavaRef, bool)
+	GetVar(slot int) *values.JavaRef
 }
+
+var _ StackSimulation = &StackSimulationImpl{}
+var _ StackSimulation = &StackSimulationProxy{}
+
 type StackSimulationImpl struct {
-	stackEntry *StackItem
+	stackEntry   *StackItem
+	varTable     map[int]*values.JavaRef
+	currentVarId int
 }
 
-var startStackEntry = &StackItem{}
+func (s *StackSimulationImpl) GetVar(slot int) *values.JavaRef {
+	return s.varTable[slot]
+}
 
-func NewStackSimulation(entry *StackItem) *StackSimulationImpl {
-	return &StackSimulationImpl{
-		stackEntry: entry,
+func (s *StackSimulationImpl) NewVar(val values.JavaValue) *values.JavaRef {
+	s.currentVarId++
+	newRef := values.NewJavaRef(s.currentVarId, val)
+	//d.idToValue[d.currentVarId] = val
+	return newRef
+}
+
+func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values.JavaRef, bool) {
+	typ := val.Type()
+	ref, ok := s.varTable[slot]
+	if !ok || ref.Type().String(&class_context.ClassContext{}) != typ.String(&class_context.ClassContext{}) {
+		newRef := s.NewVar(val)
+		s.varTable[slot] = newRef
+		return newRef, true
 	}
+	return ref, false
+}
+
+func NewEmptyStackEntry() *StackItem {
+	return newStackItem(nil, nil)
+}
+func NewStackSimulation(entry *StackItem, varTable map[int]*values.JavaRef, id int) *StackSimulationImpl {
+	sim := &StackSimulationImpl{
+		stackEntry:   entry,
+		varTable:     map[int]*values.JavaRef{},
+		currentVarId: id,
+	}
+	maps.Copy(sim.varTable, varTable)
+	return sim
 }
 
 func (s *StackSimulationImpl) Size() int {
 	size := 0
-	for entry := s.stackEntry; entry != startStackEntry; entry = entry.GetParent() {
+	for entry := s.stackEntry; entry.parent != nil; entry = entry.GetParent() {
 		size++
 	}
 	return size
@@ -78,13 +118,13 @@ func (s *StackSimulationImpl) Push(value values.JavaValue) {
 }
 
 func (s *StackSimulationImpl) Peek() values.JavaValue {
-	if s.stackEntry == startStackEntry {
+	if s.stackEntry.parent == nil {
 		panic("Stack is empty")
 	}
 	return s.stackEntry.value
 }
 func (s *StackSimulationImpl) Pop() values.JavaValue {
-	if s.stackEntry == startStackEntry {
+	if s.stackEntry.parent == nil {
 		panic("Stack is empty")
 	}
 	val := s.stackEntry.value
