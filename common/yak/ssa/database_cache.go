@@ -78,9 +78,8 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 
 	if databaseEnable {
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
-		cache.InstructionCache.SetCheckExpirationCallback(func(key int64, value instructionIrCode) bool {
+		cache.InstructionCache.SetExpirationCallback(func(key int64, value instructionIrCode) {
 			cache.saveInstruct <- value
-			return true
 		})
 		cache.waitGroup.Add(1)
 		go func() {
