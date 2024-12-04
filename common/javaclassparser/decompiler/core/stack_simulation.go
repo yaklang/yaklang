@@ -76,7 +76,9 @@ func (s *StackSimulationImpl) GetVar(slot int) *values.JavaRef {
 }
 
 func (s *StackSimulationImpl) NewVar(val values.JavaValue) *values.JavaRef {
-	s.currentVarId++
+	defer func() {
+		s.currentVarId++
+	}()
 	newRef := values.NewJavaRef(s.currentVarId, val)
 	//d.idToValue[d.currentVarId] = val
 	return newRef
