@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"github.com/yaklang/yaklang/common/utils"
 	"slices"
 )
 
@@ -16,9 +17,11 @@ func TryRewriter(manager *RewriteManager, node *core.Node) error {
 	node.Replace(tryNode)
 	tryNode.RemoveAllNext()
 	var endNodes []*core.Node
+	visitedSet := utils.NewSet[*core.Node]()
 	getBody := func(startNode *core.Node) ([]statements.Statement, error) {
 		var sts []statements.Statement
 		err := core.WalkGraph[*core.Node](startNode, func(node *core.Node) ([]*core.Node, error) {
+			visitedSet.Add(node)
 			err := manager.CheckVisitedNode(node)
 			if err != nil {
 				return nil, err
@@ -29,7 +32,9 @@ func TryRewriter(manager *RewriteManager, node *core.Node) error {
 				if slices.Contains(manager.DominatorMap[node], n) {
 					next = append(next, n)
 				} else {
-					endNodes = append(endNodes, n)
+					if !visitedSet.Has(n) {
+						endNodes = append(endNodes, n)
+					}
 				}
 			}
 			return next, nil
@@ -52,16 +57,23 @@ func TryRewriter(manager *RewriteManager, node *core.Node) error {
 		catchBodies = append(catchBodies, catchBody)
 	}
 	for i, body := range catchBodies {
+		var foundException bool
 		if len(body) > 0 {
 			if v, ok := body[0].(*statements.AssignStatement); ok {
 				if v1, ok := v.LeftValue.(*values.JavaRef); ok {
 					tryCatchSt.Exception = append(tryCatchSt.Exception, v1)
 					catchBodies[i] = body[1:]
+					foundException = true
 				}
 			}
 		}
+		if !foundException {
+			catchBodies[i] = nil
+		}
 	}
-
+	catchBodies = lo.Filter(catchBodies, func(item []statements.Statement, index int) bool {
+		return item != nil
+	})
 	tryCatchSt.TryBody = append(tryCatchSt.TryBody, tryBody...)
 	tryCatchSt.CatchBodies = append(tryCatchSt.CatchBodies, catchBodies...)
 	endNodes = lo.Filter(endNodes, func(item *core.Node, index int) bool {

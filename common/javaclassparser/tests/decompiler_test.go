@@ -21,6 +21,9 @@ func TestDecompiler(t *testing.T) {
 		//	"LambdaTest",
 		//},
 		{
+			"IfTest",
+		},
+		{
 			"InterfaceTest",
 		},
 		{

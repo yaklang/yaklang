@@ -220,11 +220,9 @@ func ParseAnnotationElementValue(cp *ClassParser) *ElementValuePairAttribute {
 		return s
 	}
 	reader := cp.reader
-	nameIndex := reader.readUint16()
 	tag := reader.readUint8()
 	ele := &ElementValuePairAttribute{
-		Name: getUtf8(nameIndex),
-		Tag:  tag,
+		Tag: tag,
 	}
 	switch tag {
 	case 'B', 'C', 'D', 'F', 'I', 'J', 'S', 'Z':
@@ -259,6 +257,21 @@ func ParseAnnotationElementValue(cp *ClassParser) *ElementValuePairAttribute {
 	}
 	return ele
 }
+func ParseAnnotationElementValuePair(cp *ClassParser) *ElementValuePairAttribute {
+	getUtf8 := func(index uint16) string {
+		s, err := cp.classObj.getUtf8(index)
+		if err != nil {
+			panic(fmt.Errorf("get utf8 error: %s", err))
+		}
+		return s
+	}
+	reader := cp.reader
+	nameIndex := reader.readUint16()
+	name := getUtf8(nameIndex)
+	value := ParseAnnotationElementValue(cp)
+	value.Name = name
+	return value
+}
 func ParseAnnotation(cp *ClassParser) *AnnotationAttribute {
 	getUtf8 := func(index uint16) string {
 		s, err := cp.classObj.getUtf8(index)
@@ -277,7 +290,7 @@ func ParseAnnotation(cp *ClassParser) *AnnotationAttribute {
 		ElementValuePairs: make([]*ElementValuePairAttribute, elementLen),
 	}
 	for j := range anno.ElementValuePairs {
-		anno.ElementValuePairs[j] = ParseAnnotationElementValue(cp)
+		anno.ElementValuePairs[j] = ParseAnnotationElementValuePair(cp)
 	}
 	return anno
 }
