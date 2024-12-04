@@ -383,6 +383,53 @@ sleep(0.5)
 	})
 }
 
+func TestMITMFilterManager_IPFilter(t *testing.T) {
+	type Case struct {
+		Filter *MITMFilter
+		IP     []string
+		Count  int
+	}
+	cases := []Case{
+		{
+			Filter: NewMITMFilter(&ypb.MITMFilterData{
+				ExcludeIP: []*ypb.FilterDataItem{{MatcherType: "cidr", Group: []string{"192.168.3.1/8"}}}, // exclude
+			}),
+			IP: []string{
+				"192.168.3.1",
+				"192.168.3.2",
+				"192.168.4.1",
+				"192.167.3.1",
+				"1.1.1.1",
+			},
+			Count: 1,
+		},
+
+		{
+			Filter: NewMITMFilter(&ypb.MITMFilterData{
+				IncludeIP: []*ypb.FilterDataItem{{MatcherType: "cidr", Group: []string{"192.168.3.1/8"}}}, // include
+			}),
+			IP: []string{
+				"192.168.3.1",
+				"192.168.3.2",
+				"192.168.4.1",
+				"192.167.3.1",
+				"1.1.1.1",
+			},
+			Count: 4,
+		},
+	}
+
+	for _, c := range cases {
+		var count int
+		for _, send := range c.IP {
+			if c.Filter.IsIPPasswed(send) {
+				count++
+			}
+		}
+		assert.Equal(t, c.Count, count)
+	}
+}
+
 func TestMITMFilterManager_Filter(t *testing.T) {
 	type Case struct {
 		Filter *MITMFilter
@@ -635,4 +682,72 @@ func TestGRPCMUSTPASS_MITM_Filter_Set_Get(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "word", filter.FilterData.IncludeUri[0].MatcherType)
 	require.Equal(t, []string{"abc"}, filter.FilterData.IncludeUri[0].Group)
+}
+
+func TestGRPCMUSTPASS_MITM_Filter_IP(t *testing.T) {
+	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nD: 1\r\n\r\n" + time.Now().String()))
+		return rsp
+	})
+
+	client, err := NewLocalClient(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+
+	RunMITMTestServer(client, ctx, &ypb.MITMRequest{
+		Port: uint32(mitmPort),
+		Host: "127.0.0.1",
+	}, func(mitmClient ypb.Yak_MITMClient) {
+		packet := []byte("GET / HTTP/1.1\r\nHost: " + utils.HostPort("127.0.0.1", mockPort))
+		params := map[string]any{"proxy": proxy, "mockHost": "127.0.0.1", "mockPort": mockPort}
+
+		token := utils.RandStringBytes(10)
+		packet = lowhttp.ReplaceHTTPPacketHeader(packet, "X-TOKEN", token)
+		params["packet"] = packet
+
+		_, err = yak.Execute(`
+rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
+sleep(0.3)
+`, params)
+		require.NoError(t, err)
+		time.Sleep(1 * time.Second)
+
+		_, err = QueryHTTPFlows(ctx, client, &ypb.QueryHTTPFlowRequest{Keyword: token, SourceType: "mitm"}, 1)
+		require.NoError(t, err)
+
+		mitmClient.Send(&ypb.MITMRequest{
+			FilterData: &ypb.MITMFilterData{
+				ExcludeIP: []*ypb.FilterDataItem{
+					{
+						MatcherType: "cidr",
+						Group:       []string{"127.0.0.2/24"},
+					},
+				},
+			},
+			UpdateFilter: true,
+		})
+		defer func() {
+			GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
+		}()
+		time.Sleep(1 * time.Second)
+		token2 := utils.RandStringBytes(10)
+		packet = lowhttp.ReplaceHTTPPacketHeader(packet, "X-TOKEN", token2)
+		params["packet"] = packet
+		_, err = yak.Execute(`
+rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
+sleep(0.3)
+`, params)
+		require.NoError(t, err)
+		for i := 0; i < 3; i++ {
+			count := yakit.QuickSearchMITMHTTPFlowCount(token2)
+			require.Zero(t, count)
+			time.Sleep(300 * time.Millisecond)
+		}
+		cancel()
+	})
 }
