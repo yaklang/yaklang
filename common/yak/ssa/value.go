@@ -177,7 +177,8 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 
 	// if not freeValue, or not `a = a`(just create FreeValue)
 	if !variable.GetLocal() && b.SupportClosure {
-		if parentValue, ok := b.getParentFunctionVariable(variable.GetName()); ok {
+		if parentValue, ok := b.getParentFunctionVariable(variable.GetName()); ok &&
+			GetLocalVariableFromScope(scope, variable.GetName()) == nil {
 			parentValue.AddMask(value)
 			v := parentValue.GetVariable(variable.GetName())
 			b.AddSideEffect(v, value)

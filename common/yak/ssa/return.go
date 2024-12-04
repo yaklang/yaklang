@@ -219,9 +219,9 @@ func (f *Function) Finish() {
 		}
 	}
 	funType.SetFreeValue(result)
-	//f.builder.SwitchSideEffects()
+	f.builder.SetReturnSideEffects()
 	ses := funType.SideEffects
-	for _, se := range f.SideEffects {
+	for _, se := range f.SideEffectsReturn {
 		if se.Modify.GetBlock() != nil {
 			scope := se.Modify.GetBlock().ScopeTable
 			if ret := GetLocalVariableFromScope(scope, se.Name); ret != nil {

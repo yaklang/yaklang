@@ -140,7 +140,7 @@ func ReadVariableFromCurrentScope(scope ScopeIF, name string) *Variable {
 	return nil
 }
 
-// 查找当前scope中的第一个local Variable
+// 查找当前以及父类scope中的第一个local Variable
 func GetLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 	if variables := scope.GetVariables(name); variables != nil {
 		for _, variable := range variables {
@@ -154,7 +154,7 @@ func GetLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 	return nil
 }
 
-// 查找当前scope中的第一个Variable
+// 查找当前以及父类scope中的第一个Variable
 func GetVariableFromScope(scope ScopeIF, name string) *Variable {
 	if variables := scope.GetVariables(name); variables != nil {
 		for _, variable := range variables {
@@ -166,7 +166,7 @@ func GetVariableFromScope(scope ScopeIF, name string) *Variable {
 	return nil
 }
 
-// 查找当前scope中的所有Variable
+// 查找当前以及父类scope中的所有Variable
 func GetVariablesFromScope(scope ScopeIF, name string) []*Variable {
 	var rets []*Variable
 	if variables := scope.GetVariables(name); variables != nil {
