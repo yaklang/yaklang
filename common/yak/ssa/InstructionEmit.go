@@ -480,18 +480,43 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 	return p
 }
 
-func (f *FunctionBuilder) SwitchSideEffects() {
+func (f *FunctionBuilder) SetReturnSideEffects() {
+	seMap := map[string]struct{}{}
 	for _, se := range f.SideEffects {
+		if _, ok := seMap[se.Name]; ok {
+			continue
+		}
+		seMap[se.Name] = struct{}{}
 		if value := f.PeekValue(se.Name); value != nil {
-			if phi, ok := ToPhi(value); ok {
-				for _, o := range se.Modify.GetOccultation() {
-					phi.AddOccultation(o)
-				}
-				se.Modify = value
+			if _, ok := value.(*SideEffect); ok {
 				f.SideEffectsReturn = append(f.SideEffectsReturn, se)
 				continue
 			}
+			ser := se
+			ser.Modify = value
+			f.SideEffectsReturn = append(f.SideEffectsReturn, ser)
+			continue
 		}
+
 		f.SideEffectsReturn = append(f.SideEffectsReturn, se)
 	}
+}
+
+func (f *FunctionBuilder) SwitchFreevalueInSideEffects(name string, se *SideEffect) *SideEffect {
+	edge := make([]Value, 0)
+	if phi, ok := ToPhi(se.Value); ok {
+		phit := *phi
+		for i, e := range phit.Edge {
+			edge = append(edge, e)
+			if p, ok := ToParameter(e); ok && p.IsFreeValue {
+				if value := f.PeekValue(name); value != nil {
+					edge[i] = value
+				}
+			}
+		}
+		phit.Edge = edge
+		sideEffect := f.EmitSideEffect(name, se.CallSite.(*Call), &phit)
+		return sideEffect
+	}
+	return se
 }
