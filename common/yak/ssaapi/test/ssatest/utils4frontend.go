@@ -137,25 +137,16 @@ func CheckPrintf(t *testing.T, tc TestCase) {
 		// sort.Strings(want)
 		log.Info("want :", want)
 
-		equalSlices := func(a, b []string) bool {
-			if len(a) != len(b) {
-				return false
-			}
-
+		equalSlices := func(a, b []string) {
 			// Sort both slices
 			sort.Strings(a)
 			sort.Strings(b)
 
 			// Compare the sorted slices
-			for i := range a {
-				if a[i] != b[i] {
-					return false
-				}
-			}
-			return true
+			require.Equal(t, a, b)
 		}
 
-		require.True(t, equalSlices(want, got))
+		equalSlices(want, got)
 	}
 	CheckTestCase(t, tc)
 }
