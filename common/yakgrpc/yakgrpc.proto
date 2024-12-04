@@ -5762,6 +5762,8 @@ message SyntaxFlowScanTaskFilter{
   repeated string TaskIds = 3;
   int64 FromId = 4;
   int64  UntilId = 5;
+  string Keyword = 6; // fuzz search program-name 
+  repeated string Kind = 7; // "debug" | "scan";
 }
 
 message QuerySyntaxFlowScanTaskResponse{

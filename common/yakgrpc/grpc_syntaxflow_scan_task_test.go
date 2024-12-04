@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"io"
+	"slices"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -328,7 +329,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		}()
 		require.NoError(t, err)
 		require.NotNil(t, prog)
-		//start
+		//start and finish task
 		taskID, stream := startScan([]string{progID})
 		defer deleteTasks([]string{taskID})
 		for {
@@ -340,6 +341,48 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		data := queryTasks([]string{taskID})
 		require.Equal(t, 1, len(data))
 		require.Equal(t, "done", data[0].Status)
+
+		{
+			// test query by program name
+			rsp, err := client.QuerySyntaxFlowScanTask(context.Background(), &ypb.QuerySyntaxFlowScanTaskRequest{
+				Pagination: &ypb.Paging{},
+				Filter: &ypb.SyntaxFlowScanTaskFilter{
+					Programs: []string{progID},
+				},
+			})
+			require.NoError(t, err)
+			data := rsp.GetData()
+			require.Equal(t, 1, len(data))
+			require.Equal(t, "done", data[0].Status)
+		}
+		{
+			// query by status
+			rsp, err := client.QuerySyntaxFlowScanTask(context.Background(), &ypb.QuerySyntaxFlowScanTaskRequest{
+				Pagination: &ypb.Paging{},
+				Filter: &ypb.SyntaxFlowScanTaskFilter{
+					Status: []string{"done"},
+				},
+			})
+			require.NoError(t, err)
+			data := rsp.GetData()
+			hasProgram := slices.ContainsFunc(data, func(item *ypb.SyntaxFlowScanTask) bool {
+				return slices.Contains(item.Programs, progID)
+			})
+			require.True(t, hasProgram)
+		}
+		{
+			// query by fuzz search keyword
+			rsp, err := client.QuerySyntaxFlowScanTask(context.Background(), &ypb.QuerySyntaxFlowScanTaskRequest{
+				Pagination: &ypb.Paging{},
+				Filter: &ypb.SyntaxFlowScanTaskFilter{
+					Keyword: progID[:len(progID)-5],
+				},
+			})
+			require.NoError(t, err)
+			data := rsp.GetData()
+			require.Equal(t, 1, len(data))
+			require.Equal(t, "done", data[0].Status)
+		}
 	})
 
 	t.Run("test query and delete mutli tasks", func(t *testing.T) {
