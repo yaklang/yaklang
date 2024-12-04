@@ -704,6 +704,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_RuntimeId(runtimeID),
 			mutate.WithPoolOpt_WithPayloads(true),
 			mutate.WithPoolOpt_RandomSession(true),
+			mutate.WithPoolOpt_ConnPool(req.GetUseConnPool()),
 		}
 
 		if req.GetOverwriteSNI() {
