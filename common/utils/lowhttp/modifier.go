@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 	"io"
 	"mime"
 	"net/http"
@@ -16,6 +15,8 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+
+	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -356,9 +357,21 @@ func ReplaceHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 	})
 }
 
-func ReplaceHTTPPacketQueryParamWithoutEncoding(packet []byte, key, value string) []byte {
+func ReplaceHTTPPacketQueryParamWithoutEncoding(packet []byte, key, value string, n int) []byte {
 	return handleHTTPPacketQueryParam(packet, true, func(q *QueryParams) {
-		q.Set(key, value)
+		i := 0
+		for j, item := range q.Items {
+			if item.Key != key || item.Position != q.Position {
+				continue
+			}
+			if i != n {
+				i++
+				continue
+			}
+			q.Items[j].Value = value
+			return
+		}
+		q.Add(key, value)
 	})
 }
 
@@ -500,6 +513,24 @@ func ReplaceFullHTTPPacketPostParamsWithoutEscape(packet []byte, values map[stri
 func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
 	return handleHTTPPacketPostParam(packet, false, true, func(p *QueryParams) {
 		p.Set(key, value)
+	})
+}
+
+func ReplaceHTTPPacketPostParamWithoutEncoding(packet []byte, key, value string, n int) []byte {
+	return handleHTTPPacketPostParam(packet, false, true, func(q *QueryParams) {
+		i := 0
+		for j, item := range q.Items {
+			if item.Key != key || item.Position != q.Position {
+				continue
+			}
+			if i != n {
+				i++
+				continue
+			}
+			q.Items[j].Value = value
+			return
+		}
+		q.Add(key, value)
 	})
 }
 

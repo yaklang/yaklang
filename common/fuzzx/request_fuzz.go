@@ -196,7 +196,7 @@ func (f *FuzzRequest) FuzzGetParamsRaw(raw ...string) *FuzzRequest {
 	return f
 }
 
-func (f *FuzzRequest) fuzzGetParams(key, value string, encoded codec.EncodedFunc) *FuzzRequest {
+func (f *FuzzRequest) fuzzGetParams(key, value string, encoded codec.EncodedFunc, n int) *FuzzRequest {
 	keys := QuickMutateSimple(key)
 	values := QuickMutateSimple(value)
 
@@ -213,28 +213,37 @@ func (f *FuzzRequest) fuzzGetParams(key, value string, encoded codec.EncodedFunc
 			v = encoded(v)
 		}
 
-		f.requests = append(f.requests, lowhttp.ReplaceHTTPPacketQueryParamWithoutEncoding(origin, k, v))
+		f.requests = append(f.requests, lowhttp.ReplaceHTTPPacketQueryParamWithoutEncoding(origin, k, v, n))
 		err = m.Next()
 	}
 	return f
 }
 
-func (f *FuzzRequest) FuzzGetParams(key, value string) *FuzzRequest {
-	return f.fuzzGetParams(key, value, nil)
+func (f *FuzzRequest) FuzzGetParams(key, value string, n ...int) *FuzzRequest {
+	i := 0
+	if len(n) > 0 {
+		i = n[0]
+	}
+	return f.fuzzGetParams(key, value, nil, i)
 }
 
-func (f *FuzzRequest) FuzzGetBase64Params(key, value string) *FuzzRequest {
-	return f.fuzzGetParams(key, value, codec.EncodeBase64)
+func (f *FuzzRequest) FuzzGetBase64Params(key, value string, n ...int) *FuzzRequest {
+	i := 0
+	if len(n) > 0 {
+		i = n[0]
+	}
+	return f.fuzzGetParams(key, value, codec.EncodeBase64, i)
 }
 
-func (f *FuzzRequest) fuzzGetJsonPathParams(key, jsonPath, value string, encoded codec.EncodedFunc) *FuzzRequest {
+func (f *FuzzRequest) fuzzGetJsonPathParams(key, jsonPath, value string, encoded codec.EncodedFunc, n int) *FuzzRequest {
 	origin := f.origin
 
 	keyToValueMap := make(map[string]string)
 
 	// check if origin value is json
 	keys := lo.FilterMap(QuickMutateSimple(key), func(k string, _ int) (string, bool) {
-		v := lowhttp.GetHTTPRequestQueryParam(origin, k)
+		vs := lowhttp.GetHTTPRequestQueryParamFull(origin, k)
+		v := vs[n]
 
 		if _, ok := utils.IsJSON(v); ok {
 			keyToValueMap[k] = v
@@ -267,18 +276,26 @@ func (f *FuzzRequest) fuzzGetJsonPathParams(key, jsonPath, value string, encoded
 			err = m.Next()
 			continue
 		}
-		f.requests = append(f.requests, lowhttp.ReplaceHTTPPacketQueryParamWithoutEncoding(origin, k, newValue))
+		f.requests = append(f.requests, lowhttp.ReplaceHTTPPacketQueryParamWithoutEncoding(origin, k, newValue, n))
 		err = m.Next()
 	}
 	return f
 }
 
-func (f *FuzzRequest) FuzzGetJsonPathParams(key, jsonPath, value string) *FuzzRequest {
-	return f.fuzzGetJsonPathParams(key, jsonPath, value, nil)
+func (f *FuzzRequest) FuzzGetJsonPathParams(key, jsonPath, value string, n ...int) *FuzzRequest {
+	i := 0
+	if len(n) > 0 {
+		i = n[0]
+	}
+	return f.fuzzGetJsonPathParams(key, jsonPath, value, nil, i)
 }
 
-func (f *FuzzRequest) FuzzGetBase64JsonPathParams(key, jsonPath, value string) *FuzzRequest {
-	return f.fuzzGetJsonPathParams(key, jsonPath, value, codec.EncodeBase64)
+func (f *FuzzRequest) FuzzGetBase64JsonPathParams(key, jsonPath, value string, n ...int) *FuzzRequest {
+	i := 0
+	if len(n) > 0 {
+		i = n[0]
+	}
+	return f.fuzzGetJsonPathParams(key, jsonPath, value, codec.EncodeBase64, i)
 }
 
 func (f *FuzzRequest) FuzzPostRaw(raw ...string) *FuzzRequest {
@@ -290,7 +307,7 @@ func (f *FuzzRequest) FuzzPostRaw(raw ...string) *FuzzRequest {
 	return f
 }
 
-func (f *FuzzRequest) fuzzPostParams(key, value string, encoded codec.EncodedFunc) *FuzzRequest {
+func (f *FuzzRequest) fuzzPostParams(key, value string, encoded codec.EncodedFunc, n int) *FuzzRequest {
 	keys := QuickMutateSimple(key)
 	values := QuickMutateSimple(value)
 
@@ -306,18 +323,26 @@ func (f *FuzzRequest) fuzzPostParams(key, value string, encoded codec.EncodedFun
 		if encoded != nil {
 			v = encoded(v)
 		}
-		f.requests = append(f.requests, lowhttp.ReplaceHTTPPacketPostParam(origin, k, v))
+		f.requests = append(f.requests, lowhttp.ReplaceHTTPPacketPostParamWithoutEncoding(origin, k, v, n))
 		err = m.Next()
 	}
 	return f
 }
 
-func (f *FuzzRequest) FuzzPostParams(key, value string) *FuzzRequest {
-	return f.fuzzPostParams(key, value, nil)
+func (f *FuzzRequest) FuzzPostParams(key, value string, n ...int) *FuzzRequest {
+	i := 0
+	if len(n) > 0 {
+		i = n[0]
+	}
+	return f.fuzzPostParams(key, value, nil, i)
 }
 
-func (f *FuzzRequest) FuzzPostBase64Params(key, value string) *FuzzRequest {
-	return f.fuzzPostParams(key, value, codec.EncodeBase64)
+func (f *FuzzRequest) FuzzPostBase64Params(key, value string, n ...int) *FuzzRequest {
+	i := 0
+	if len(n) > 0 {
+		i = n[0]
+	}
+	return f.fuzzPostParams(key, value, codec.EncodeBase64, i)
 }
 
 func (f *FuzzRequest) FuzzPostJson(jsonPath, value string) *FuzzRequest {
@@ -348,14 +373,15 @@ func (f *FuzzRequest) FuzzPostJson(jsonPath, value string) *FuzzRequest {
 	return f
 }
 
-func (f *FuzzRequest) fuzzPostJsonPathParams(key, jsonPath, value string, encoded codec.EncodedFunc) *FuzzRequest {
+func (f *FuzzRequest) fuzzPostJsonPathParams(key, jsonPath, value string, encoded codec.EncodedFunc, n int) *FuzzRequest {
 	origin := f.origin
 
 	keyToValueMap := make(map[string]string)
 
 	// check if origin value is json
 	keys := lo.FilterMap(QuickMutateSimple(key), func(k string, _ int) (string, bool) {
-		v := lowhttp.GetHTTPRequestPostParam(origin, k)
+		vs := lowhttp.GetHTTPRequestPostParamFull(origin, k)
+		v := vs[n]
 		if _, ok := utils.IsJSON(v); ok {
 			keyToValueMap[k] = v
 			return k, true
@@ -388,18 +414,26 @@ func (f *FuzzRequest) fuzzPostJsonPathParams(key, jsonPath, value string, encode
 			continue
 		}
 
-		f.requests = append(f.requests, lowhttp.ReplaceHTTPPacketPostParam(origin, k, newValue))
+		f.requests = append(f.requests, lowhttp.ReplaceHTTPPacketPostParamWithoutEncoding(origin, k, newValue, n))
 		err = m.Next()
 	}
 	return f
 }
 
-func (f *FuzzRequest) FuzzPostJsonPathParams(key, jsonPath, value string) *FuzzRequest {
-	return f.fuzzPostJsonPathParams(key, jsonPath, value, nil)
+func (f *FuzzRequest) FuzzPostJsonPathParams(key, jsonPath, value string, n ...int) *FuzzRequest {
+	i := 0
+	if len(n) > 0 {
+		i = n[0]
+	}
+	return f.fuzzPostJsonPathParams(key, jsonPath, value, nil, i)
 }
 
-func (f *FuzzRequest) FuzzPostBase64JsonPathParams(key, jsonPath, value string) *FuzzRequest {
-	return f.fuzzPostJsonPathParams(key, jsonPath, value, codec.EncodeBase64)
+func (f *FuzzRequest) FuzzPostBase64JsonPathParams(key, jsonPath, value string, n ...int) *FuzzRequest {
+	i := 0
+	if len(n) > 0 {
+		i = n[0]
+	}
+	return f.fuzzPostJsonPathParams(key, jsonPath, value, codec.EncodeBase64, i)
 }
 
 func (f *FuzzRequest) FuzzPostXMLParams(xpath, value string) *FuzzRequest {
