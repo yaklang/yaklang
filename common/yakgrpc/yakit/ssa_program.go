@@ -44,6 +44,7 @@ func FilterSSAProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
 
 // when filter == nil delete all program
 func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
+	// db is profile database
 	db := DB.Model(&schema.SSAProgram{})
 	db = FilterSSAProgram(db, filter)
 	// get all program
@@ -54,10 +55,18 @@ func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
 	}
 	// delete schema program
 	result := db.Unscoped().Delete(&schema.SSAProgram{})
+
 	// delete ssadb program
+	programNames := make([]string, 0, len(programs))
 	for _, prog := range programs {
 		ssadb.DeleteProgram(ssadb.GetDB(), prog.Name)
+		programNames = append(programNames, prog.Name)
 	}
+	// delete risk create by this program
+	DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
+		SSAProgramNames: programNames,
+	})
+	// DeleteRisk()
 	return len(programs), result.Error
 }
 

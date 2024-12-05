@@ -3047,6 +3047,9 @@ message QueryRisksRequest {
   repeated int64 Ids = 14;
 
   string RuntimeId = 15;
+
+  // ssa program 
+  repeated string SSAProgramNames = 16;
 }
 
 message QueryRisksResponse {
