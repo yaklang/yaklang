@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
