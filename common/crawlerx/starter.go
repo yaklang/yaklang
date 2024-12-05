@@ -287,7 +287,7 @@ func (starter *BrowserStarter) pageActionGenerator() {
 	starter.getEventElements = starter.generateGetEventElements()
 
 	starter.urlsExploit = starter.generateUrlsExploit()
-	if starter.baseConfig.aiInputUrl != "" {
+	if starter.aiInputUrl != "" {
 		starter.inputElementsExploit = starter.generateAIInputElementsExploit()
 	} else {
 		starter.inputElementsExploit = starter.generateInputElementsExploit()

@@ -6,6 +6,7 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -16,9 +17,10 @@ func (starter *BrowserStarter) clickElementOnPageBySelector(page *rod.Page, sele
 		log.Errorf("page %v get info error: %v", page, err)
 		return false
 	}
-	var url string
+	var url, title string
 	if info != nil {
 		url = info.URL
+		title = info.Title
 	}
 	if strings.HasSuffix(url, "#") {
 		url = url[:len(url)-1]
@@ -36,6 +38,37 @@ func (starter *BrowserStarter) clickElementOnPageBySelector(page *rod.Page, sele
 	if element == nil {
 		log.Debugf("On page %s element %s not found.", url, selector)
 		return false
+	}
+	if starter.aiInputUrl != "" {
+		var elementHTML string
+		elementHTML, err = element.HTML()
+		if err != nil {
+			log.Debugf("On page %s element %s get html error: %s", url, selector, err)
+			return false
+		}
+		if len(elementHTML) > 200 {
+			reg, _ := regexp.Compile("style=\".+?\"|size=\".+?\"")
+			elementHTML = reg.ReplaceAllLiteralString(elementHTML, "")[:200]
+		}
+		parent, _ := element.Parent()
+		if parent != nil {
+			//text += parent.
+			class, _ := getAttribute(parent, "class")
+			elementHTML += " " + class
+			grandParent, _ := element.Parent()
+			if grandParent != nil {
+				grandClass, _ := getAttribute(grandParent, "class")
+				elementHTML += " " + grandClass
+			}
+		}
+		var output AIInputResult
+		var aiInput string
+		aiInput = title + " " + elementHTML
+		output, _ = starter.getElementInputByAI(aiInput)
+		if output.DButt == true {
+			log.Debugf("On page %s element %s is dangerous button", url, selector)
+			return false
+		}
 	}
 	if visible, _ := element.Visible(); !visible {
 		log.Debugf(`On page %s element %s not visible`, url, selector)
