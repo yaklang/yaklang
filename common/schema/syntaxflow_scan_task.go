@@ -1,9 +1,11 @@
 package schema
 
 import (
+	"encoding/json"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 const (
@@ -20,7 +22,6 @@ type SyntaxFlowScanTask struct {
 	Programs string
 	// rules
 	RulesCount int64
-	RuleFilter []byte `gorm:"type:text"`
 
 	Status string // executing / done / paused / error
 	Reason string // user cancel / finished / recover failed so on
@@ -33,6 +34,9 @@ type SyntaxFlowScanTask struct {
 	RiskCount int64
 	// query process
 	TotalQuery int64
+
+	// config
+	Config []byte `gorm:"type:text"` // new data
 }
 
 func (s *SyntaxFlowScanTask) ToGRPCModel() *ypb.SyntaxFlowScanTask {
@@ -50,6 +54,9 @@ func (s *SyntaxFlowScanTask) ToGRPCModel() *ypb.SyntaxFlowScanTask {
 		SuccessQuery: s.SuccessQuery,
 		RiskCount:    s.RiskCount,
 		TotalQuery:   s.TotalQuery,
+	}
+	if len(s.Config) != 0 {
+		_ = json.Unmarshal(s.Config, &res.Config)
 	}
 	return res
 }
