@@ -163,6 +163,7 @@ func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB,
 		"title", "title_verbose",
 	}, params.GetTitle(), false)
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.GetIds())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", params.GetSSAProgramNames())
 	// db = bizhelper.ExactQueryString(db, "reverse_token", params.GetToken())
 	return db, nil
 }
