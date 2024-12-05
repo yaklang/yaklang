@@ -64,7 +64,7 @@ func (prog *Program) GetFunctionEx(name, pkg string) *Function {
 			if !prog.PreHandler() {
 				fun.Build()
 			}
-			return fun, true
+			return fun[0], true
 		}
 		return nil, false
 	}

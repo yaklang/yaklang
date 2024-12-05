@@ -166,7 +166,6 @@ func TestCompileProgram_OnlyDatabase(t *testing.T) {
 }
 
 func TestCompileProgram_Delete(t *testing.T) {
-
 	pkgName := "a" + strings.ReplaceAll(uuid.NewString(), "-", "")
 	programId := uuid.NewString()
 	// compile
@@ -175,7 +174,7 @@ func TestCompileProgram_Delete(t *testing.T) {
 	package %s; 
 	public class A {
 		int a;
-	} 
+	}
 		`, pkgName)
 		ssadb.DeleteProgram(ssadb.GetDB(), pkgName)
 		// compile with database

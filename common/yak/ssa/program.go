@@ -27,7 +27,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		astMap:                  make(map[string]struct{}),
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
-		Funcs:                   omap.NewEmptyOrderedMap[string, *Function](),
+		Funcs:                   omap.NewEmptyOrderedMap[string, Functions](),
 		Blueprint:               omap.NewEmptyOrderedMap[string, *Blueprint](),
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
@@ -200,6 +200,11 @@ func (prog *Program) SetPackageName(name string) {
 
 func (prog *Program) EachFunction(handler func(*Function)) {
 	var handFunc func(*Function)
+	var handlerFuncs = func(functions []*Function) {
+		for _, function := range functions {
+			handFunc(function)
+		}
+	}
 	handFunc = func(f *Function) {
 		handler(f)
 		for _, s := range f.ChildFuncs {
@@ -211,17 +216,20 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 			handFunc(f)
 		}
 	}
-
-	prog.Funcs.ForEach(func(i string, v *Function) bool {
-		handFunc(v)
+	prog.Funcs.ForEach(func(i string, v Functions) bool {
+		handlerFuncs(v)
 		return true
 	})
 	// for _, f := range prog.Funcs {
 	// 	handFunc(f)
 	// }
 	prog.UpStream.ForEach(func(i string, v *Program) bool {
-		v.Funcs.ForEach(func(i string, v *Function) bool {
-			handFunc(v)
+		v.Funcs.ForEach(func(i string, v Functions) bool {
+			handlerFuncs(v)
+			return true
+		})
+		v.Funcs.ForEach(func(i string, v Functions) bool {
+			handlerFuncs(v)
 			return true
 		})
 		return true

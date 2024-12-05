@@ -25,6 +25,7 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 	var callbacks []func(ssa.Value)
 	var inherits []string
 	if i.EXTENDS() != nil {
+
 		extends := utils.PrettifyListFromStringSplited(i.TypeList(0).GetText(), ",")
 		if len(extends) > 0 {
 			inherits = append(inherits, extends...)

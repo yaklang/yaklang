@@ -160,7 +160,8 @@ func CreateInstruction(op Opcode) Instruction {
 	switch op {
 	case SSAOpcodeFunction:
 		return &Function{
-			anValue: NewValue(),
+			anValue:      NewValue(),
+			FunctionSign: &FunctionSign{},
 		}
 	case SSAOpcodeBasicBlock:
 		return &BasicBlock{

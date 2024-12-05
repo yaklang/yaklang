@@ -142,7 +142,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		该lazyBuilder顺序按照cls解析顺序
 	*/
 	store := y.StoreFunctionBuilder()
-	class.AddLazyBuilder(func() {
+	class.AddClassBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		for _, parentClass := range mergedTemplate {
@@ -231,7 +231,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 			setMember(namex, undefined, false)
 		}
 		store := y.StoreFunctionBuilder()
-		class.AddLazyBuilder(func() {
+		class.AddClassBuilder(func() {
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
 			var fieldType ssa.Type
@@ -515,7 +515,7 @@ func (y *builder) VisitClassBodyDeclaration(
 
 	if ret := i.Block(); ret != nil {
 		store := y.StoreFunctionBuilder()
-		class.AddLazyBuilder(func() {
+		class.AddClassBuilder(func() {
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
 			y.VisitBlock(i.Block())
@@ -585,10 +585,12 @@ func (y *builder) VisitMethodDeclaration(
 		class.RegisterNormalMethod(key, newFunc)
 	}
 	store := y.StoreFunctionBuilder()
-	newFunc.AddLazyBuilder(func() {
-		log.Infof("lazybuild: %s %s ", funcName, key)
-		switchHandler := y.SwitchFunctionBuilder(store)
-		defer switchHandler()
+
+	//generate sign lazyBuilder
+	newFunc.AddFunctionSignBuilder(func() {
+		log.Infof("lazybuild: %s %s function sign", funcName, key)
+		swichHandler := y.SwitchFunctionBuilder(store)
+		defer swichHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)
 		if isStatic {
 			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
@@ -600,6 +602,15 @@ func (y *builder) VisitMethodDeclaration(
 		y.MarkedThisClassBlueprint = class
 		y.SetCurrentReturnType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 		y.VisitFormalParameters(i.FormalParameters())
+		y.PopFunction()
+		newFunc.GenerateSign()
+	})
+	newFunc.AddFunctionBodyBuilder(func() {
+		log.Infof("lazybuild: %s %s ", funcName, key)
+		switchHandler := y.SwitchFunctionBuilder(store)
+		defer switchHandler()
+		y.FunctionBuilder = y.PushFunction(newFunc)
+		y.MarkedThisClassBlueprint = class
 		y.VisitMethodBody(i.MethodBody())
 		y.Finish()
 		newFunc.Type.AddAnnotationFunc(annotationFunc...)
@@ -823,7 +834,6 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	if i == nil {
 		return
 	}
-
 	key := i.Identifier().GetText()
 	pkgName := y.GetProgram()
 	funcName := fmt.Sprintf("%s_%s_%s_%s", pkgName.Name, class.Name, key, uuid.NewString()[:4])
@@ -831,24 +841,30 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	class.Constructor = newFunc
 	class.RegisterMagicMethod(ssa.Constructor, newFunc)
 	store := y.StoreFunctionBuilder()
-	newFunc.AddLazyBuilder(func() {
+	newFunc.AddFunctionSignBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)
-		{
-			y.NewParam("$this")
-			container := y.EmitEmptyContainer()
-			variable := y.CreateVariable("this")
-			y.AssignVariable(variable, container)
-			container.SetType(class)
-			y.VisitFormalParameters(i.FormalParameters())
-			y.VisitBlock(i.Block())
-			y.EmitReturn([]ssa.Value{container})
-			y.Finish()
-		}
+		param := y.NewParam("$this")
+		param.SetType(class)
+		y.SetCurrentReturnType(class)
+		y.VisitFormalParameters(i.FormalParameters())
+		y.PopFunction()
+	})
+	newFunc.AddFunctionBodyBuilder(func() {
+		switchHandler := y.SwitchFunctionBuilder(store)
+		defer switchHandler()
+		y.FunctionBuilder = y.PushFunction(newFunc)
+		container := y.EmitEmptyContainer()
+		variable := y.CreateVariable("this")
+		y.AssignVariable(variable, container)
+		container.SetType(class)
+		y.VisitBlock(i.Block())
 		if i.THROWS() != nil {
 			y.VisitQualifiedNameList(i.QualifiedNameList())
 		}
+		y.EmitReturn([]ssa.Value{container})
+		y.Finish()
 		y.FunctionBuilder = y.PopFunction()
 	})
 }

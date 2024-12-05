@@ -23,17 +23,18 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 	}
 	f := &Function{
-		anValue:     NewValue(),
-		Params:      make([]Value, 0),
-		hasEllipsis: false,
-		Blocks:      make([]Instruction, 0),
-		EnterBlock:  nil,
-		ExitBlock:   nil,
-		ChildFuncs:  make([]Value, 0),
-		parent:      nil,
-		FreeValues:  make(map[string]Value),
-		SideEffects: make([]*FunctionSideEffect, 0),
-		builder:     nil,
+		anValue:      NewValue(),
+		Params:       make([]Value, 0),
+		hasEllipsis:  false,
+		Blocks:       make([]Instruction, 0),
+		EnterBlock:   nil,
+		ExitBlock:    nil,
+		ChildFuncs:   make([]Value, 0),
+		parent:       nil,
+		FreeValues:   make(map[string]Value),
+		SideEffects:  make([]*FunctionSideEffect, 0),
+		builder:      nil,
+		FunctionSign: &FunctionSign{},
 	}
 	f.SetName(name)
 	f.SetProgram(p)
@@ -43,8 +44,11 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		// Pos: parent.CurrentPos,
 		f.SetRange(parent.builder.CurrentRange)
 	} else {
-		// p.Funcs[name] = f
-		p.Funcs.Set(name, f)
+		if funcs, b := p.Funcs.Get(name); b {
+			funcs = append(funcs, f)
+		} else {
+			p.Funcs.Set(name, []*Function{f})
+		}
 	}
 	p.SetVirtualRegister(f)
 	// function 's Range is essential!

@@ -30,7 +30,7 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	y.AssignVariable(variable, newFunction)
 	y.GetProgram().SetExportValue(funcName, newFunction)
 	store := y.StoreFunctionBuilder()
-	newFunction.AddLazyBuilder(func() {
+	newFunction.AddFunctionBodyBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		y.SetMarkedFunction(funcName)

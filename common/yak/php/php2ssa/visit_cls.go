@@ -134,7 +134,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			if i.Extends() != nil {
 				parentClassName = i.QualifiedStaticTypeRef().GetText()
 				store := y.StoreFunctionBuilder()
-				class.AddLazyBuilder(func() {
+				class.AddClassBuilder(func() {
 					switchHandler := y.SwitchFunctionBuilder(store)
 					defer switchHandler()
 					if parentClass := y.GetBluePrint(parentClassName); parentClass != nil {
@@ -190,7 +190,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			}
 			currentBuilder := y.FunctionBuilder
 			store := y.StoreFunctionBuilder()
-			class.AddLazyBuilder(func() {
+			class.AddClassBuilder(func() {
 				switchHandler := y.SwitchFunctionBuilder(store)
 				defer switchHandler()
 				y.FunctionBuilder = currentBuilder
@@ -218,7 +218,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		newFunction := y.NewFunc(funcName)
 		newFunction.SetMethodName(methodName)
 		store := y.StoreFunctionBuilder()
-		newFunction.AddLazyBuilder(func() {
+		newFunction.AddFunctionBodyBuilder(func() {
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
 			y.FunctionBuilder = y.PushFunction(newFunction)
@@ -703,8 +703,8 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 	program := y.GetProgram()
 	library, b := program.GetLibrary(strings.Join(pkgPath, "."))
 	if b {
-		if function, ok := library.Funcs.Get(identifier); ok && !utils.IsNil(function) {
-			return function
+		if function, ok := library.Funcs.Get(identifier); ok && !utils.IsNil(function) && len(function) > 0 {
+			return function[0]
 		} else if cls := library.GetBluePrint(identifier); !utils.IsNil(cls) {
 			inst := y.EmitConstInst("")
 			inst.SetType(cls)

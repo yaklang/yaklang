@@ -240,7 +240,11 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					for _, value := range namespace.ExportValue {
 						if function, b := ssa.ToFunction(value); b {
 							name := fmt.Sprintf("%s\\%s", currentName, function.GetName())
-							prog.Funcs.Set(name, function)
+							if get, exit := prog.Funcs.Get(name); exit {
+								prog.Funcs.Set(name, get)
+							} else {
+								prog.Funcs.Set(name, ssa.Functions{function})
+							}
 						}
 					}
 					for _, t := range namespace.ExportType {

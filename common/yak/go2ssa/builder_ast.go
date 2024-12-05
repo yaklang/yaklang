@@ -24,9 +24,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		for aliasName, aliasType := range b.GetAliasAll() {
 			lib.SetExportType(aliasName, aliasType)
 		}
-		b.GetProgram().Funcs.ForEach(func(funcName string, funcValue *ssa.Function) bool {
-			if !funcValue.IsMethod() && funcValue.GetName() != "@init" {
-				lib.SetExportValue(funcName, funcValue)
+		b.GetProgram().Funcs.ForEach(func(funcName string, funcValue ssa.Functions) bool {
+			for _, function := range funcValue {
+				if !function.IsMethod() && function.GetName() != "@init" {
+					lib.SetExportValue(funcName, function)
+				}
 			}
 			return true
 		})
@@ -620,7 +622,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
-	newFunc.AddLazyBuilder(func() {
+	newFunc.AddFunctionBodyBuilder(func() {
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer func() {
 			switchHandler()
@@ -655,7 +657,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 
-	}, false)
+	})
 }
 
 func (b *astbuilder) getReceiver(stmt *gol.ReceiverContext) []string {
@@ -749,7 +751,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
-	newFunc.AddLazyBuilder(func() {
+	newFunc.AddFunctionBodyBuilder(func() {
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer func() {
 			switchHandler()
@@ -780,7 +782,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 
-	}, false)
+	})
 }
 
 func (b *astbuilder) buildReceiver(stmt *gol.ReceiverContext) []ssa.Type {

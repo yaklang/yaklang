@@ -4,6 +4,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -238,7 +239,7 @@ type Program struct {
 	//consts
 	Consts map[string]Value
 	// function list
-	Funcs       *omap.OrderedMap[string, *Function]
+	Funcs       *omap.OrderedMap[string, Functions]
 	Blueprint   *omap.OrderedMap[string, *Blueprint]
 	ExportValue map[string]Value
 	ExportType  map[string]Type
@@ -284,16 +285,15 @@ type Program struct {
 type Function struct {
 	anValue
 	lazyBuilder
+	*FunctionSign
 
-	isMethod   bool
-	methodName string
+	isMethod bool
 
 	// Type
 	Type *FunctionType
 
 	// just function parameter
-	Params      []Value
-	ParamLength int
+	Params []Value
 	// for closure function
 	FreeValues map[string]Value // store the captured variable form parent-function, just contain name, and type is Parameter
 	// parameter member call
@@ -335,6 +335,23 @@ type Function struct {
 	// static CallBack
 }
 
+func (f *Function) GenerateSign() {
+	for _, param := range f.Params {
+		f.FunctionSign.ParamsType = append(f.FunctionSign.ParamsType, param.GetType())
+	}
+	for _, value := range f.Return {
+		f.FunctionSign.ReturnType = append(f.FunctionSign.ReturnType, value.GetType())
+	}
+	f.FunctionSign.ReturnLength = len(f.Return)
+	/*
+		methodName
+		returnLength
+		paramLength
+		returnTypeString
+		paramTypeString
+	*/
+	f.hash = utils.CalcMd5(f.methodName, f.ReturnLength, f.ParamLength, f.ReturnType.String(), f.ParamsType.String())
+}
 func (f *Function) SetCurrentReturnType(t Type) {
 	f.currentReturnType = t
 }

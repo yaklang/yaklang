@@ -5,9 +5,22 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type lazyBuilder struct {
-	_build  []func()
+type LazyBuildType int
+
+const (
+	_FunctionSign LazyBuildType = iota + 1
+	_FunctionBody
+	_Class
+)
+
+type buildItem struct {
+	build   func()
 	isBuild bool
+	typ     LazyBuildType
+}
+
+type lazyBuilder struct {
+	items []*buildItem
 }
 
 /*
@@ -15,24 +28,49 @@ type lazyBuilder struct {
 
 just call AddLazyBuilder function, this function will be create in PreHandlerTime and build in BuildTime
 */
-func (l *lazyBuilder) AddLazyBuilder(Builder func(), async ...bool) {
-	l._build = append(l._build, Builder)
+func (l *lazyBuilder) addLazyBuilderEx(Builder func(), typ LazyBuildType) {
+	l.items = append(l.items, &buildItem{
+		build:   Builder,
+		isBuild: false,
+		typ:     typ,
+	})
+}
+func (l *lazyBuilder) AddFunctionSignBuilder(builder func()) {
+	l.addLazyBuilderEx(builder, _FunctionSign)
+}
+func (l *lazyBuilder) AddFunctionBodyBuilder(builder func()) {
+	l.addLazyBuilderEx(builder, _FunctionBody)
+}
+func (l *lazyBuilder) AddClassBuilder(builder func()) {
+	l.addLazyBuilderEx(builder, _Class)
 }
 
-func (n *lazyBuilder) Build() {
-	if len(n._build) == 0 || n.isBuild {
-		return
-	}
+func (l *lazyBuilder) buildEx(buildItem func(item *buildItem)) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic in LazyBuild: %v", err)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	n.isBuild = true
-	for _, f := range n._build {
-		f()
+	for _, item := range l.items {
+		if !item.isBuild {
+			buildItem(item)
+		}
 	}
+}
+func (l *lazyBuilder) BuildFunctionSign() {
+	l.buildEx(func(item *buildItem) {
+		if item.typ == _FunctionSign {
+			item.isBuild = true
+			item.build()
+		}
+	})
+}
+func (n *lazyBuilder) Build() {
+	n.buildEx(func(item *buildItem) {
+		item.isBuild = true
+		item.build()
+	})
 }
 
 type ASTIF interface {
@@ -71,13 +109,23 @@ func (p *Program) VisitAst(ast ASTIF) {
 }
 
 func (p *Program) LazyBuild() {
+	buildFunction := func(build func(*Function)) {
+		for _, functions := range p.Funcs.GetMap() {
+			for _, function := range functions {
+				build(function)
+			}
+		}
+	}
+	buildFunction(func(function *Function) {
+		function.BuildFunctionSign()
+	})
 	for _, blueprint := range p.Blueprint.GetMap() {
 		blueprint.Build()
 		blueprint.BuildConstructorAndDestructor()
 	}
-	for _, fun := range p.Funcs.GetMap() {
-		fun.Build()
-	}
+	buildFunction(func(function *Function) {
+		function.Build()
+	})
 	for _, f := range p.fixImportCallback {
 		f()
 	}
