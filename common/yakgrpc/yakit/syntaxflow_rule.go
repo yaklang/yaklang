@@ -66,11 +66,11 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 			"rule_name", "title", "title_zh", "description", "content", "tag",
 		}, []string{params.GetKeyword()}, false)
 	}
-	if params.GetFromId() > 0 {
-		db = db.Where("id > ?", params.GetFromId())
+	if params.GetAfterId() > 0 {
+		db = db.Where("id > ?", params.GetAfterId())
 	}
-	if params.GetUntilId() > 0 {
-		db = db.Where("id <= ?", params.GetUntilId())
+	if params.GetBeforeId() > 0 {
+		db = db.Where("id <= ?", params.GetBeforeId())
 	}
 	return db
 }
