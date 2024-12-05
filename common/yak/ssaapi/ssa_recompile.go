@@ -18,7 +18,8 @@ func (prog *Program) Recompile(opts ...Option) error {
 
 	// check file system
 	if !hasFS {
-		return utils.Errorf("no config info found")
+		return utils.Errorf("该项目编译时引擎版本过旧，无法重新编译。")
+		// return utils.Errorf("The project compilation engine version is too old to recompile.\n该项目编译时引擎版本过旧，无法重新编译。")
 	}
 
 	// append other options
