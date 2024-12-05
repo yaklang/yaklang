@@ -162,6 +162,14 @@ func (starter *BrowserStarter) doInput(originUrl string, page *rod.Page) error {
 		if !visible {
 			continue
 		}
+		var elementType string
+		elementType, err = getAttribute(inputElement, "type")
+		if err != nil {
+			return utils.Errorf(`get element type error: %v`, err)
+		}
+		if elementType == "submit" {
+			continue
+		}
 		err = starter.inputElementsExploit(inputElement, baseInfo)
 		if err != nil {
 			return utils.Errorf(`Page %v input element %v error: %v`, originUrl, inputElement, err.Error())
@@ -378,14 +386,14 @@ func (starter *BrowserStarter) generateAIInputElementsExploit() func(*rod.Elemen
 		if parent != nil {
 			//text += parent.
 			class, _ := getAttribute(parent, "class")
-			if class != "" {
-				text += " " + class
+			text += " " + class
+			grandParent, _ := element.Parent()
+			if grandParent != nil {
+				grandClass, _ := getAttribute(grandParent, "class")
+				text += " " + grandClass
 			}
 		}
-		output, err := starter.getElementInputByAI(dataStr + " " + text)
-		if err != nil {
-			return err
-		}
+		output, _ := starter.getElementInputByAI(dataStr + " " + text)
 		return element.Input(output.TextInput)
 	}
 }
@@ -584,18 +592,25 @@ func (starter *BrowserStarter) getElementInputByAI(data string) (output AIInputR
 	// request
 	var input AIInput
 	var inputResult AIInputResult
+	inputResult.DButt = false
+	inputResult.TextInput = "test"
 	input.HtmlCod = data
 	input.OtherInfo = starter.aiInputInfo
 	inputBytes, _ := json.Marshal(input)
 	opts := []poc.PocConfigOption{
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(inputBytes, false),
+		poc.WithTimeout(10),
+	}
+	if starter.browserConfig.proxyAddress != nil {
+		opts = append(opts, poc.WithProxy(starter.browserConfig.proxyAddress.String()))
 	}
 	result, _, err := poc.DoPOST(starter.aiInputUrl, opts...)
 	if err != nil {
 		return inputResult, err
 	}
-	err = json.Unmarshal(result.RawPacket, &inputResult)
+	log.Debugf("ai check input: %v, output: %v", starter.aiInputUrl+" "+data+" "+starter.aiInputInfo, string(result.GetBody()))
+	err = json.Unmarshal(result.GetBody(), &inputResult)
 	return inputResult, err
 }
 
