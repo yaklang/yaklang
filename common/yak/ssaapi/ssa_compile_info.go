@@ -66,7 +66,7 @@ type proxy struct {
 	PassWord string `json:"password"`
 }
 
-func parseFSFromInfo(raw string) (fi.FileSystem, error) {
+func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	if raw == "" {
 		return nil, utils.Errorf("info is empty ")
 	}
@@ -74,6 +74,12 @@ func parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	if err := json.Unmarshal([]byte(raw), &info); err != nil {
 		return nil, utils.Errorf("error unmarshal info: %v", err)
 	}
+	process := func(percent float64, msg string, arg ...any) {
+		if c.process != nil {
+			c.process(fmt.Sprintf(msg, arg), percent)
+		}
+	}
+	process(0, "start parse info", info.Kind)
 	switch info.Kind {
 	case "local":
 		return filesys.NewRelLocalFs(info.LocalFile), nil
@@ -90,7 +96,7 @@ func parseFSFromInfo(raw string) (fi.FileSystem, error) {
 		}
 		return fs, nil
 	case "git":
-		return gitFs(&info)
+		return gitFs(&info, process)
 	case "svn":
 		return svnFs(&info)
 	}
@@ -102,10 +108,11 @@ func (info config_info) String() string {
 	return string(b)
 }
 
-func gitFs(info *config_info) (fi.FileSystem, error) {
+func gitFs(info *config_info, process func(float64, string, ...any)) (fi.FileSystem, error) {
 	if info.URL == "" {
 		return nil, utils.Errorf("git url is empty ")
 	}
+	process(0, "start git clone process from %s", info.URL)
 	local := path.Join(os.TempDir(), fmt.Sprintf("%s-%s", "yakgit", utils.RandStringBytes(8)))
 	// create template director
 	if err := os.MkdirAll(local, 0755); err != nil {
@@ -124,6 +131,7 @@ func gitFs(info *config_info) (fi.FileSystem, error) {
 	if err := yakgit.Clone(info.URL, local, opts...); err != nil {
 		return nil, err
 	}
+	process(0, "git clone finish start compile...")
 	return filesys.NewRelLocalFs(local), nil
 }
 
