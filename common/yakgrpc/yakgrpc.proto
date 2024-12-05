@@ -5564,7 +5564,7 @@ message SyntaxFlowRule{
 }
 
 message  SyntaxFlowRuleInput{
-  string RuleName = 1;
+  string RuleName = 1; // RuleName作为索引，因此不能update RuleName
   string Content = 2;
   string Language = 3;
   repeated string Tags = 4;
