@@ -142,7 +142,7 @@ func WithFileSystem(fs fi.FileSystem) Option {
 func WithConfigInfoRaw(info string) Option {
 	return func(c *config) error {
 		c.info = info
-		fs, err := parseFSFromInfo(info)
+		fs, err := c.parseFSFromInfo(info)
 		if err != nil {
 			return err
 		}
