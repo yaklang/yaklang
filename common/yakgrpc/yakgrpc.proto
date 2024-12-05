@@ -718,10 +718,10 @@ service Yak {
   // SyntaxFlow Rule
   rpc QuerySyntaxFlowRule(QuerySyntaxFlowRuleRequest) returns (QuerySyntaxFlowRuleResponse);
   rpc CreateSyntaxFlowRule(CreateSyntaxFlowRuleRequest) returns (DbOperateMessage);
+  rpc CreateSyntaxFlowRuleEx(CreateSyntaxFlowRuleRequest) returns (CreateSyntaxFlowRuleResponse);
   rpc UpdateSyntaxFlowRule(UpdateSyntaxFlowRuleRequest) returns (DbOperateMessage);
+  rpc UpdateSyntaxFlowRuleEx(UpdateSyntaxFlowRuleRequest) returns (UpdateSyntaxFlowRuleResponse);
   rpc DeleteSyntaxFlowRule(DeleteSyntaxFlowRuleRequest) returns (DbOperateMessage);
-  rpc CreateSyntaxFlowRuleEx(CreateSyntaxFlowRuleRequest) returns (SyntaxFlowRuleResult);
-  rpc UpdateSyntaxFlowRuleEx(UpdateSyntaxFlowRuleRequest) returns (SyntaxFlowRuleResult);
   // SyntaxFlow Group
   rpc QuerySyntaxFlowRuleGroup(QuerySyntaxFlowRuleGroupRequest)returns (QuerySyntaxFlowRuleGroupResponse);
   rpc DeleteSyntaxFlowRuleGroup(DeleteSyntaxFlowRuleGroupRequest) returns (DbOperateMessage);
@@ -5649,16 +5649,22 @@ message QuerySSAProgramResponse{
   int64 Total = 3;
 }
 
-message SyntaxFlowRuleResult{
-  SyntaxFlowRule rule = 1;
-}
-
 message CreateSyntaxFlowRuleRequest{
   SyntaxFlowRuleInput SyntaxFlowInput = 1;
 }
 
+message CreateSyntaxFlowRuleResponse {
+  DbOperateMessage Message = 1; 
+  SyntaxFlowRule Rule = 2;
+}
+
 message UpdateSyntaxFlowRuleRequest{
   SyntaxFlowRuleInput SyntaxFlowInput = 1;
+}
+
+message UpdateSyntaxFlowRuleResponse{
+  DbOperateMessage Message = 1; 
+  SyntaxFlowRule Rule = 2;
 }
 
 message QuerySyntaxFlowRuleResponse{
