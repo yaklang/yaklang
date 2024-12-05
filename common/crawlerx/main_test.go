@@ -3,12 +3,11 @@
 package crawlerx
 
 import (
-	_ "github.com/yaklang/yaklang/common/yakgrpc/yakit"
-
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/stretchr/testify/assert"
+	_ "github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/embed"
 	"net/http"
 	"net/http/httptest"
@@ -172,6 +171,7 @@ func TestStartCrawler(t *testing.T) {
 	//server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	//	_, _ = w.Write([]byte(crawlerTestHtml))
 	//}))
+	//log.SetLevel(log.DebugLevel)
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(CrawlerTestHtml))
 	}))
@@ -189,7 +189,7 @@ func TestStartCrawler(t *testing.T) {
 		WithConcurrent(3),
 		WithStealth(true),
 		WithFullTimeout(10),
-		WithScanRangeLevel(unlimitedDomain),
+		WithScanRangeLevel(mainDomain),
 		//WithPageTimeout(1),
 		//WithBrowserInfo(`{"ws_address":"","exe_path":"","proxy_address":"http://127.0.0.1:8099","proxy_username":"","proxy_password":""}`),
 		//WithRuntimeID("abc123-123-123"),
@@ -198,6 +198,8 @@ func TestStartCrawler(t *testing.T) {
 		WithJsResultSave(func(s string) {
 			resultSave = append(resultSave, s)
 		}),
+		//WithAIInputUrl("http://192.168.0.150:6007/CrawlerEnhancer"),
+		//WithAIInputInf("测试账户填admin，密码填password"),
 	)
 	//ch, err := StartCrawler("http://testphp.vulnweb.com/", opts...)
 	ch, err := StartCrawler(server.URL, opts...)

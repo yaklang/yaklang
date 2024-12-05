@@ -3,6 +3,7 @@
 package crawlerx
 
 import (
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	_ "github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"context"
@@ -74,6 +75,13 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	} else {
 		checkedUrl = targetUrl
 	}
+	if config.baseConfig.aiInputUrl != "" {
+		err = connectTest(config.baseConfig.aiInputUrl, proxy)
+		if err != nil {
+			cancel()
+			return nil, utils.Errorf(`ai input url %s check failed: %s`, config.baseConfig.aiInputUrl, err)
+		}
+	}
 	WithTargetUrl(checkedUrl)(config)
 	WithUrlTree(tools.CreateTree(checkedUrl))(config)
 	core := CrawlerCore{
@@ -136,6 +144,18 @@ func (core *CrawlerCore) Test() {
 	time.Sleep(2 * time.Second)
 }
 
+// StartCrawler 开启一个无头浏览器模拟点击爬虫任务 第一个参数为目标url，后面可以添加零个或多个请求选项，用于对此次请求进行配置 返回值包括channel和错误，从channel中获取爬虫结果
+//
+// Examples:
+// ```
+//
+//	targetUrl = "http://testphp.vulnweb.com/"
+//	ch, err = crawlerx.StartCrawler(targetUrl, crawlerx.pageTimeout(30), crawlerx.concurrent(3))
+//	for item = range ch {
+//		yakit.Info(item.Method() + " " + item.Url())
+//	}
+//
+// ```
 func StartCrawler(url string, opts ...ConfigOpt) (chan ReqInfo, error) {
 	ch := make(chan ReqInfo)
 	opts = append(opts, WithResultChannel(ch))
@@ -194,4 +214,15 @@ func TargetUrlCheck(targetUrl string, proxy *url.URL) (string, error) {
 		return tempTargetUrl, nil
 	}
 	return finalUrl, nil
+}
+
+func connectTest(targetUrl string, proxy *url.URL) error {
+	opts := []poc.PocConfigOption{
+		poc.WithTimeout(10),
+	}
+	if proxy != nil {
+		opts = append(opts, poc.WithProxy(proxy.String()))
+	}
+	_, _, err := poc.DoGET(targetUrl, opts...)
+	return err
 }
