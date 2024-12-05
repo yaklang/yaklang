@@ -720,6 +720,8 @@ service Yak {
   rpc CreateSyntaxFlowRule(CreateSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc UpdateSyntaxFlowRule(UpdateSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc DeleteSyntaxFlowRule(DeleteSyntaxFlowRuleRequest) returns (DbOperateMessage);
+  rpc CreateSyntaxFlowRuleEx(CreateSyntaxFlowRuleRequest) returns (SyntaxFlowRule);
+  rpc UpdateSyntaxFlowRuleEx(UpdateSyntaxFlowRuleRequest) returns (SyntaxFlowRule);
   // SyntaxFlow Group
   rpc QuerySyntaxFlowRuleGroup(QuerySyntaxFlowRuleGroupRequest)returns (QuerySyntaxFlowRuleGroupResponse);
   rpc DeleteSyntaxFlowRuleGroup(DeleteSyntaxFlowRuleGroupRequest) returns (DbOperateMessage);
@@ -5569,6 +5571,7 @@ message  SyntaxFlowRuleInput{
 }
 
 message SyntaxFlowRuleFilter {
+  repeated int64 Ids = 11;
   repeated string RuleNames = 1;
   repeated string Language = 2;
   repeated string GroupNames = 3;
