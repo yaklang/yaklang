@@ -104,19 +104,19 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		finishProcess := 0.0
 		var finishStatus string
 
-		handlerStatus := func(status string) {
+		// pause task
+		checkSfScanRecvMsg(t, stream, func(status string) {
 			finishStatus = status
-		}
-		handlerProcess := func(process float64) {
+		}, func(process float64) {
 			if 0.5 < process && process < 0.7 {
 				pauseTask(stream)
 			}
 			finishProcess = process
-		}
-		checkSfScanRecvMsg(t, stream, handlerStatus, handlerProcess)
+		})
 		require.LessOrEqual(t, finishProcess, 0.7)
 		require.GreaterOrEqual(t, finishProcess, 0.5)
 		require.Equal(t, "paused", finishStatus)
+
 		// status
 		var havePause bool
 		var processStatus float64
@@ -133,16 +133,14 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		// resume
 		resumeStream := resumeTask(taskID)
 		haveExecute := false
-		handlerAfterResumeStatus := func(status string) {
+		checkSfScanRecvMsg(t, resumeStream, func(status string) {
 			if status == "executing" {
 				haveExecute = true
 			}
 			finishStatus = status
-		}
-		handlerAfterResumeProcess := func(process float64) {
+		}, func(process float64) {
 			finishProcess = process
-		}
-		checkSfScanRecvMsg(t, resumeStream, handlerAfterResumeStatus, handlerAfterResumeProcess)
+		})
 		require.True(t, haveExecute)
 		require.Equal(t, "done", finishStatus)
 		require.Equal(t, 1.0, finishProcess)
@@ -200,67 +198,78 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), progID2)
 		}()
-		//start
-		taskID1, stream1 := startScan([]string{progID1})
-		defer deleteTask(taskID1)
 
-		taskID2, _ := startScan([]string{progID2})
-		defer deleteTask(taskID2)
+		var taskID1, taskID2 string
+		var stream1 ypb.Yak_SyntaxFlowScanClient
+		{
+			//start
+			taskID1, stream1 = startScan([]string{progID1})
+			defer deleteTask(taskID1)
 
-		finishProcess := 0.0
-		var finishStatus string
+			taskID2, _ = startScan([]string{progID2})
+			defer deleteTask(taskID2)
+		}
+		{
+			// pause task 1
+			finishProcess := 0.0
+			var finishStatus string
+			checkSfScanRecvMsg(t, stream1, func(status string) {
+				finishStatus = status
+			}, func(process float64) {
+				if 0.5 < process && process < 0.7 {
+					pauseTask(stream1)
+				}
+				finishProcess = process
+			})
+			require.LessOrEqual(t, finishProcess, 0.7)
+			require.GreaterOrEqual(t, finishProcess, 0.5)
+			require.Equal(t, "paused", finishStatus)
 
-		handlerStatus := func(status string) {
-			finishStatus = status
+			// status task 1
+			var havePause bool
+			var processStatus1 float64
+			statusStream1 := statusTask(taskID1)
+			checkSfScanRecvMsg(t, statusStream1, func(status string) {
+				if status == "paused" {
+					havePause = true
+				}
+			}, func(process float64) {
+				processStatus1 = process
+			})
+			require.True(t, havePause)
+			require.Equal(t, finishProcess, processStatus1)
 		}
-		handlerProcess := func(process float64) {
-			if 0.5 < process && process < 0.7 {
-				pauseTask(stream1)
-			}
-			finishProcess = process
-		}
-		checkSfScanRecvMsg(t, stream1, handlerStatus, handlerProcess)
-		require.LessOrEqual(t, finishProcess, 0.7)
-		require.GreaterOrEqual(t, finishProcess, 0.5)
-		require.Equal(t, "paused", finishStatus)
-		// status
-		var havePause bool
-		var processStatus1 float64
-		statusStream1 := statusTask(taskID1)
-		checkSfScanRecvMsg(t, statusStream1, func(status string) {
-			if status == "paused" {
-				havePause = true
-			}
-		}, func(process float64) {
-			processStatus1 = process
-		})
-		require.True(t, havePause)
-		require.Equal(t, finishProcess, processStatus1)
 
-		var haveExecute bool
-		statusStream2 := statusTask(taskID2)
-		checkSfScanRecvMsg(t, statusStream2, func(status string) {
-			if status == "executing" {
-				haveExecute = true // query status when executing
-			}
-		}, func(process float64) {})
-		require.True(t, haveExecute)
-		// resume
-		resumeStream := resumeTask(taskID1)
-		haveExecute = false
-		handlerAfterResumeStatus := func(status string) {
-			if status == "executing" {
-				haveExecute = true
-			}
-			finishStatus = status
+		{
+			// status task 2
+			var haveExecute bool
+			statusStream2 := statusTask(taskID2)
+			checkSfScanRecvMsg(t, statusStream2, func(status string) {
+				if status == "executing" {
+					haveExecute = true // query status when executing
+				}
+			}, func(process float64) {})
+			require.True(t, haveExecute)
+
 		}
-		handlerAfterResumeProcess := func(process float64) {
-			finishProcess = process
+		{
+			// resume task 1
+			finishProcess := 0.0
+			var finishStatus string
+			haveExecute := false
+			resumeStream := resumeTask(taskID1)
+			checkSfScanRecvMsg(t, resumeStream, func(status string) {
+				if status == "executing" {
+					haveExecute = true
+				}
+				finishStatus = status
+			}, func(process float64) {
+				finishProcess = process
+			})
+			require.True(t, haveExecute)
+			require.Equal(t, "done", finishStatus)
+			require.Equal(t, 1.0, finishProcess)
 		}
-		checkSfScanRecvMsg(t, resumeStream, handlerAfterResumeStatus, handlerAfterResumeProcess)
-		require.True(t, haveExecute)
-		require.Equal(t, "done", finishStatus)
-		require.Equal(t, 1.0, finishProcess)
 	})
 }
 
@@ -341,6 +350,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		data := queryTasks([]string{taskID})
 		require.Equal(t, 1, len(data))
 		require.Equal(t, "done", data[0].Status)
+		require.NotNil(t, data[0].Config)
 
 		{
 			// test query by program name
@@ -391,7 +401,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			taskId := uuid.NewString()
 			taskIds = append(taskIds, taskId)
-			task, err := CreateSyntaxFlowTask(taskId, context.Background())
+			task, err := createEmptySyntaxFlowTaskByID(taskId, context.Background())
 			if i%3 == 1 {
 				task.status = schema.SYNTAXFLOWSCAN_PAUSED // flag
 			}
