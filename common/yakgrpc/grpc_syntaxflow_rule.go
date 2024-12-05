@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -43,6 +44,35 @@ func (s *Server) QuerySyntaxFlowRule(ctx context.Context, req *ypb.QuerySyntaxFl
 	return rsp, nil
 }
 
+func (s *Server) CreateSyntaxFlowRuleEx(ctx context.Context, req *ypb.CreateSyntaxFlowRuleRequest) (*ypb.SyntaxFlowRule, error) {
+	rule, err := ParseSyntaxFlowInput(req.GetSyntaxFlowInput())
+	if err != nil {
+		return nil, err
+	}
+	err = yakit.CreateSyntaxFlowRule(s.GetProfileDatabase(), rule)
+	if err != nil {
+		return nil, err
+	}
+	_, createdRule, err := yakit.QuerySyntaxFlowRule(s.GetProfileDatabase(), &ypb.QuerySyntaxFlowRuleRequest{
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			RuleNames: []string{rule.RuleName},
+		},
+		Pagination: &ypb.Paging{
+			Page:    1,
+			Limit:   30,
+			OrderBy: "updated_at",
+			Order:   "desc",
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(createdRule) == 0 {
+		return nil, utils.Errorf("create syntax flow rule by name %s failed", rule.RuleName)
+	}
+	return createdRule[0].ToGRPCModel(), nil
+}
+
 func (s *Server) CreateSyntaxFlowRule(ctx context.Context, req *ypb.CreateSyntaxFlowRuleRequest) (*ypb.DbOperateMessage, error) {
 	msg := &ypb.DbOperateMessage{
 		TableName:  "syntax_flow_rule",
@@ -58,6 +88,35 @@ func (s *Server) CreateSyntaxFlowRule(ctx context.Context, req *ypb.CreateSyntax
 		return nil, err
 	}
 	return msg, nil
+}
+
+func (s *Server) UpdateSyntaxFlowRuleEx(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleRequest) (*ypb.SyntaxFlowRule, error) {
+	rule, err := ParseSyntaxFlowInput(req.GetSyntaxFlowInput())
+	if err != nil {
+		return nil, err
+	}
+	err = yakit.UpdateSyntaxFlowRule(s.GetProfileDatabase(), rule)
+	if err != nil {
+		return nil, err
+	}
+	_, updatedRule, err := yakit.QuerySyntaxFlowRule(s.GetProfileDatabase(), &ypb.QuerySyntaxFlowRuleRequest{
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			RuleNames: []string{rule.RuleName},
+		},
+		Pagination: &ypb.Paging{
+			Page:    1,
+			Limit:   30,
+			OrderBy: "updated_at",
+			Order:   "desc",
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(updatedRule) == 0 {
+		return nil, utils.Errorf("create syntax flow rule by name %s failed", rule.RuleName)
+	}
+	return updatedRule[0].ToGRPCModel(), nil
 }
 
 func (s *Server) UpdateSyntaxFlowRule(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleRequest) (*ypb.DbOperateMessage, error) {
