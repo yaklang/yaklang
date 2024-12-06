@@ -5,10 +5,12 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
 	"time"
 )
 
@@ -23,10 +25,8 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 		},
 	})
 
-	yakit.YakitDuplexConnectionServer.Server(stream.Context(), stream)
-
-	startOnce := new(sync.Once)
-	startOnce.Do(func() {
+	// http flow  server push
+	{
 		var httpFlowsSeq int64
 		var changed bool
 		go func() {
@@ -49,9 +49,46 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 				}
 			}
 		}()
-	})
+	}
 
-	<-stream.Context().Done()
+	// rps cps server push
+	{
+		var lastRPS int64 //
+		go func() {
+			for {
+				select {
+				case <-stream.Context().Done():
+					return
+				default:
+					if currentRPS := lowhttp.GetLowhttpRPS(); currentRPS != lastRPS {
+						log.Infof("current lowhttp rps:%d", currentRPS)
+						yakit.BroadcastData(yakit.ServerPushType_RPS, currentRPS)
+						lastRPS = currentRPS
+					}
+					time.Sleep(time.Second)
+				}
+			}
+		}()
+
+		var lastCPS int64
+		go func() {
+			for {
+				select {
+				case <-stream.Context().Done():
+					return
+				default:
+					if currentCPS := netx.GetDialxCPS(); currentCPS != lastCPS {
+						log.Infof("current dialx cps:%d", currentCPS)
+						yakit.BroadcastData(yakit.ServerPushType_CPS, currentCPS)
+						lastCPS = currentCPS
+					}
+					time.Sleep(time.Second)
+				}
+			}
+		}()
+	}
+
+	yakit.YakitDuplexConnectionServer.Server(stream.Context(), stream)
 	return stream.Context().Err()
 }
 

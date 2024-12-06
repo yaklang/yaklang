@@ -34,6 +34,7 @@ func (s *DuplexConnectionServer) Server(ctx context.Context, stream ypb.Yak_Dupl
 	for {
 		select {
 		case <-ctx.Done():
+			return
 		default:
 			req, err := stream.Recv()
 			if err != nil {

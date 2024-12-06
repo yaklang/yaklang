@@ -39,6 +39,8 @@ var (
 	ServerPushType_File_Monitor = "file_monitor"
 	ServerPushType_Error        = "error"
 	ServerPushType_Warning      = "warning"
+	ServerPushType_RPS          = "rps"
+	ServerPushType_CPS          = "cps"
 )
 
 func RegisterServerPushCallback(id string, stream ypb.Yak_DuplexConnectionServer) {
