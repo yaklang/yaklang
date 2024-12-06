@@ -2,9 +2,10 @@ package rule
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/suricata/config"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math/rand"
 	"slices"
 	"sort"
@@ -20,7 +21,7 @@ type PortRule struct {
 	Ports    []int
 
 	envTable map[string]string
-
+	Config   *config.Config
 	// rule cache
 	negativeRules []*PortRule
 	positiveRules []*PortRule
@@ -95,15 +96,13 @@ func (p *PortRule) _matchWithoutNegative(i int) bool {
 			}
 		}
 	}
-
-	if p.Env != "" && p.envTable != nil {
-		result, ok := p.envTable[p.Env]
-		result = strings.TrimSpace(result)
-		if ok && codec.Atoi(result) == i {
+	if p.Env != "" && p.Config != nil {
+		if !p.Config.HasVar(p.Env) {
+			log.Warnf("suricata env %s not found, fallback to any", p.Env)
 			return true
 		}
+		return p.Config.MatchVar(p.Env, i)
 	}
-
 	return false
 }
 
@@ -181,7 +180,7 @@ func (v *RuleSyntaxVisitor) VisitPortRule(i *parser.PortContext) *PortRule {
 	if i == nil {
 		return nil
 	}
-	r := &PortRule{envTable: v.Environment}
+	r := &PortRule{Config: v.Config}
 	if i.Any() != nil {
 		r.Any = true
 		return r
