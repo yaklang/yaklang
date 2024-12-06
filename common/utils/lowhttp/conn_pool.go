@@ -478,8 +478,11 @@ func (pc *persistConn) readLoop() {
 		}
 		// peek is executed, so we can read without timeout
 		// for long time chunked supported
+
+		var respBuffer bytes.Buffer
+		httpResponseReader := io.TeeReader(pc.br, &respBuffer)
 		_ = pc.Conn.SetReadDeadline(time.Time{})
-		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(pc.br, pc.Conn, stashRequest)
+		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, pc.Conn, stashRequest)
 		if resp != nil {
 			resp.Request = nil
 		}
@@ -507,7 +510,7 @@ func (pc *persistConn) readLoop() {
 		var respClose bool
 		if resp != nil {
 			respClose = resp.Close
-			respPacket = httpctx.GetBareResponseBytes(stashRequest)
+			respPacket = respBuffer.Bytes()
 		}
 		if len(respPacket) > 0 {
 			responseRaw.Write(respPacket)
@@ -548,11 +551,10 @@ func (pc *persistConn) readLoop() {
 }
 
 func (pc *persistConn) writeLoop() {
-	count := 0
 	for {
 		select {
 		case wr := <-pc.writeCh:
-			count++
+			currentRPS.Add(1)
 			_, err := pc.bw.Write(wr.reqPacket)
 			if err == nil {
 				err = pc.bw.Flush()
