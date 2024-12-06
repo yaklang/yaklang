@@ -23,8 +23,8 @@ var JavaDecompilerCommand = &cli.Command{
 	Aliases: []string{"jd"},
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "jar,j",
-			Usage: "--jar <jar file> to decompile",
+			Name:  "jar,j,input,in",
+			Usage: "--input <jar/class/zip/war file> to decompile",
 		},
 		cli.StringFlag{
 			Name:  "jar-directory,jardir,dir",
@@ -47,24 +47,24 @@ var JavaDecompilerCommand = &cli.Command{
 			log.SetLevel(log.WarnLevel)
 		}
 		if c.IsSet("jar") && c.IsSet("jar-directory") {
-			return errors.New("only one of --jar and --jar-directory can be set")
+			return errors.New("only one of --input and --jar-directory can be set")
 		}
 		if !c.IsSet("jar") && !c.IsSet("jar-directory") {
 			return errors.New("one of --jar and --jar-directory must be set")
 		}
-		var jars []string
+		var inputs []string
 		var handledClass []string
 		if c.IsSet("jar") {
-			jarPath := c.String("jar")
-			jarPaths := strings.Split(jarPath, ",")
-			for _, jar := range jarPaths {
-				jars = append(jars, jar)
+			inputPaths := c.String("jar")
+			inputPathList := strings.Split(inputPaths, ",")
+			for _, jar := range inputPathList {
+				inputs = append(inputs, jar)
 			}
 		} else {
 			dirMode := c.String("jar-directory")
 			err := filesys.Recursive(dirMode, filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 				if strings.HasSuffix(s, ".jar") {
-					jars = append(jars, s)
+					inputs = append(inputs, s)
 					return nil
 				}
 				if strings.HasSuffix(s, ".class") {
@@ -90,7 +90,7 @@ var JavaDecompilerCommand = &cli.Command{
 				return err
 			}
 		}
-		jars = lo.Filter(jars, func(jar string, _ int) bool {
+		inputs = lo.Filter(inputs, func(jar string, _ int) bool {
 			jar = strings.TrimSpace(jar)
 			if utils.GetFirstExistedFile(jar) != "" {
 				log.Infof("find jar: %v", jar)
@@ -100,15 +100,15 @@ var JavaDecompilerCommand = &cli.Command{
 			return false
 		})
 
-		if len(jars) > 1 {
-			for _, jarPath := range jars {
+		if len(inputs) > 1 {
+			for _, jarPath := range inputs {
 				err := jarAction(true, jarPath, c)
 				if err != nil {
 					log.Warnf("jarAction failed: %v", err)
 				}
 			}
-		} else if len(jars) == 1 {
-			return jarAction(false, jars[0], c)
+		} else if len(inputs) == 1 {
+			return jarAction(false, inputs[0], c)
 		} else {
 			if len(handledClass) > 0 {
 				log.Infof("compile %v java class files", len(handledClass))
@@ -133,6 +133,20 @@ func classDecompiler(raw []byte, targetFile string) error {
 }
 
 func jarAction(multiMode bool, jarPath string, c *cli.Context) error {
+	if filepath.Ext(jarPath) == ".class" {
+		log.Infof("start to decompile %v", jarPath)
+		target := strings.TrimSuffix(jarPath, ".class") + ".java"
+		raw, err := os.ReadFile(jarPath)
+		if err != nil {
+			return err
+		}
+		err = classDecompiler(raw, target)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
 	jarfs, err := javaclassparser.NewJarFSFromLocal(jarPath)
 	if err != nil {
 		return err
