@@ -25,12 +25,12 @@ const (
 )
 
 type LowhttpExecConfig struct {
-	Host                             string
-	Port                             int
-	Packet                           []byte
-	VerifyCertificate                bool
-	Https                            bool
-	ResponseCallback                 func(response *LowhttpResponse)
+	Host              string
+	Port              int
+	Packet            []byte
+	VerifyCertificate bool
+	Https             bool
+	//ResponseCallback                 func(response *LowhttpResponse) have same option SaveHTTPFlowHandler
 	Http2                            bool
 	Http3                            bool
 	GmTLS                            bool
@@ -493,12 +493,6 @@ func WithBeforeDoRequest(h func([]byte) []byte) LowhttpOpt {
 func WithHttps(https bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Https = https
-	}
-}
-
-func WithResponseCallback(h func(i *LowhttpResponse)) LowhttpOpt {
-	return func(o *LowhttpExecConfig) {
-		o.ResponseCallback = h
 	}
 }
 
