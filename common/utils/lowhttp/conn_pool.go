@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net"
 	"net/http"
@@ -17,7 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 )
@@ -529,13 +529,12 @@ func (pc *persistConn) readLoop() {
 				if len(restBytes) > 0 {
 					responseRaw.Write(restBytes)
 					respPacket = responseRaw.Bytes()
+					if len(respPacket) > 0 {
+						httpctx.SetBareResponseBytesForce(stashRequest, respPacket) // 强制修改原始响应包
+						err = nil
+					}
 				}
 			}
-		}
-
-		if len(respPacket) > 0 {
-			httpctx.SetBareResponseBytesForce(stashRequest, respPacket) // 强制修改原始响应包
-			err = nil
 		}
 
 		pc.mu.Lock()
