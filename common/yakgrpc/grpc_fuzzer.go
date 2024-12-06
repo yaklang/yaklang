@@ -386,7 +386,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					httptpl.ScanPacket(
 						rsp.RequestRaw, lowhttp.WithHttps(rsp.IsHTTPS),
 						httptpl.WithTemplateRaw(poc.Content),
-						lowhttp.WithResponseCallback(func(i *lowhttp.LowhttpResponse) {
+						lowhttp.WithSaveHTTPFlowHandler(func(i *lowhttp.LowhttpResponse) {
 							err := stream.Send(ConvertLowhttpResponseToFuzzerResponseBase(i))
 							if err != nil {
 								log.Errorf("yaml poc send failed")
@@ -688,7 +688,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			// mutate.WithPoolOpt_ExtraMutateCondition(yak.MutateWithYaklang(req.GetHotPatchCode())),
 			mutate.WithPoolOpt_DelayMinSeconds(req.GetDelayMinSeconds()),
 			mutate.WithPoolOPt_DelayMaxSeconds(req.GetDelayMaxSeconds()),
-			mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)),
 			mutate.WithPoolOpt_Source("webfuzzer"),
 			mutate.WithPoolOpt_RetryTimes(int(req.GetMaxRetryTimes())),
 			mutate.WithPoolOpt_MaxContentLength(int(maxBodySize)),
@@ -705,6 +704,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_WithPayloads(true),
 			mutate.WithPoolOpt_RandomSession(true),
 			mutate.WithPoolOpt_ConnPool(!req.GetDisableUseConnPool()),
+			//mutate.WithPoolOpt_ConnPool(true),
+		}
+
+		if !req.GetDisableHotpot() {
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)))
 		}
 
 		if req.GetOverwriteSNI() {
