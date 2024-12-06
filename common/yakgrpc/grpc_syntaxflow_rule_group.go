@@ -61,7 +61,7 @@ func (s *Server) UpdateSyntaxFlowRuleAndGroup(ctx context.Context, req *ypb.Upda
 		return nil, utils.Errorf("update syntax flow rule group failed:rule name is empty")
 	}
 	for _, group := range req.GetAddGroups() {
-		count, err := yakit.AddSyntaxFlowRuleGroup(s.GetProfileDatabase(), rules, group)
+		count, err := yakit.AddSFRuleAndGroupRelation(s.GetProfileDatabase(), rules, group)
 		if err != nil {
 			errs = utils.JoinErrors(errs, err)
 		} else {
@@ -69,7 +69,7 @@ func (s *Server) UpdateSyntaxFlowRuleAndGroup(ctx context.Context, req *ypb.Upda
 		}
 	}
 	for _, group := range req.GetRemoveGroups() {
-		count, err := yakit.RemoveSyntaxFlowRuleGroup(s.GetProfileDatabase(), rules, group)
+		count, err := yakit.RemoveSFRuleAndGroupRelation(s.GetProfileDatabase(), rules, group)
 		if err != nil {
 			errs = utils.JoinErrors(errs, err)
 		} else {

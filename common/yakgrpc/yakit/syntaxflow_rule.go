@@ -42,7 +42,7 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 	}
 
 	if len(params.GetGroupNames()) > 0 {
-		db = db.Joins("LEFT JOIN syntax_flow_rule_groups P ON syntax_flow_rules.rule_name = P.rule_name")
+		db = db.Joins("LEFT JOIN syntax_flow_rule_and_group_relations P ON syntax_flow_rules.rule_name = P.rule_name")
 		db = bizhelper.ExactQueryStringArrayOr(db, "`group_name`", params.GetGroupNames())
 	}
 

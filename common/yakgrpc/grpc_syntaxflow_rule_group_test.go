@@ -2,82 +2,87 @@ package yakgrpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
+
+func createGroups(client ypb.YakClient, groupNames []string) error {
+	for _, group := range groupNames {
+		req := &ypb.CreateSyntaxFlowGroupRequest{
+			GroupName: group,
+		}
+		_, err := client.CreateSyntaxFlowRuleGroup(context.Background(), req)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addGroups(client ypb.YakClient, ruleNames []string, groupNames []string) error {
+	req := &ypb.UpdateSyntaxFlowRuleAndGroupRequest{
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			RuleNames: ruleNames,
+		},
+		AddGroups: groupNames,
+	}
+	_, err := client.UpdateSyntaxFlowRuleAndGroup(context.Background(), req)
+	return err
+}
+
+func removeGroups(client ypb.YakClient, ruleNames []string, groupNames []string) error {
+	req := &ypb.UpdateSyntaxFlowRuleAndGroupRequest{
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			RuleNames: ruleNames,
+		},
+		RemoveGroups: groupNames,
+	}
+	_, err := client.UpdateSyntaxFlowRuleAndGroup(context.Background(), req)
+	return err
+}
+
+func queryRuleGroupCount(client ypb.YakClient, groupName string) (int, error) {
+	req := &ypb.QuerySyntaxFlowRuleGroupRequest{
+		Filter: &ypb.SyntaxFlowRuleGroupFilter{
+			KeyWord: groupName,
+		},
+	}
+	rsp, err := client.QuerySyntaxFlowRuleGroup(context.Background(), req)
+	if err != nil {
+		return 0, err
+	}
+	if len(rsp.GetGroup()) == 0 {
+		return 0, nil
+	} else if len(rsp.GetGroup()) == 1 {
+		return int(rsp.GetGroup()[0].Count), nil
+	} else {
+		return 0, errors.New("query group count failed")
+	}
+}
+
+func deleteRuleGroup(client ypb.YakClient, groupNames []string) (int64, error) {
+	req := &ypb.DeleteSyntaxFlowRuleGroupRequest{
+		Filter: &ypb.SyntaxFlowRuleGroupFilter{
+			GroupNames: groupNames,
+		},
+	}
+	rsp, err := client.DeleteSyntaxFlowRuleGroup(context.Background(), req)
+	if err != nil {
+		return 0, err
+	}
+	return rsp.EffectRows, nil
+}
 
 func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
-
-	createGroups := func(groupNames []string) {
-
-		for _, group := range groupNames {
-			req := &ypb.CreateSyntaxFlowGroupRequest{
-				GroupName: group,
-			}
-			_, err = client.CreateSyntaxFlowRuleGroup(context.Background(), req)
-			if err != nil {
-				return
-			}
-			require.NoError(t, err)
-		}
-	}
-	_ = createGroups
-
-	addGroups := func(ruleNames []string, groupNames []string) {
-		req := &ypb.UpdateSyntaxFlowRuleAndGroupRequest{
-			Filter: &ypb.SyntaxFlowRuleFilter{
-				RuleNames: ruleNames,
-			},
-			AddGroups: groupNames,
-		}
-		_, err := client.UpdateSyntaxFlowRuleAndGroup(context.Background(), req)
-		require.NoError(t, err)
-	}
-
-	removeGroups := func(ruleNames []string, groupNames []string) {
-		req := &ypb.UpdateSyntaxFlowRuleAndGroupRequest{
-			Filter: &ypb.SyntaxFlowRuleFilter{
-				RuleNames: ruleNames,
-			},
-			RemoveGroups: groupNames,
-		}
-		_, err := client.UpdateSyntaxFlowRuleAndGroup(context.Background(), req)
-		require.NoError(t, err)
-	}
-
-	queryRuleGroupCount := func(groupName string) int {
-		req := &ypb.QuerySyntaxFlowRuleGroupRequest{
-			Filter: &ypb.SyntaxFlowRuleGroupFilter{
-				KeyWord: groupName,
-			},
-		}
-		rsp, err := client.QuerySyntaxFlowRuleGroup(context.Background(), req)
-		require.NoError(t, err)
-		if len(rsp.GetGroup()) == 0 {
-			return 0
-		} else if len(rsp.GetGroup()) == 1 {
-			return int(rsp.GetGroup()[0].Count)
-		} else {
-			require.Fail(t, "query group count failed")
-			return 0
-		}
-	}
-
-	deleteRuleGroup := func(groupNames []string) int64 {
-		req := &ypb.DeleteSyntaxFlowRuleGroupRequest{
-			Filter: &ypb.SyntaxFlowRuleGroupFilter{
-				GroupNames: groupNames,
-			},
-		}
-		m, err := client.DeleteSyntaxFlowRuleGroup(context.Background(), req)
-		require.NoError(t, err)
-		return m.EffectRows
-	}
 
 	t.Run("test create and delete syntax flow rule group", func(t *testing.T) {
 		var groupNames []string
@@ -86,15 +91,20 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 			groupName := fmt.Sprintf("group_%s", uuid.NewString())
 			groupNames = append(groupNames, groupName)
 		}
-		createGroups(groupNames)
+		err = createGroups(client, groupNames)
+		require.NoError(t, err)
 		for _, groupName := range groupNames {
-			afterSaveCount := queryRuleGroupCount(groupName)
-			require.Equal(t, 1, afterSaveCount)
+			afterSaveCount, err := queryRuleGroupCount(client, groupName)
+			require.NoError(t, err)
+			require.Equal(t, 0, afterSaveCount)
 		}
-		count := deleteRuleGroup(groupNames)
-		require.Equal(t, count, int64(10))
+		_, err := deleteRuleGroup(client, groupNames)
+		require.NoError(t, err)
+		count := yakit.QuerySyntaxFlowGroupCount(consts.GetGormProfileDatabase(), groupNames)
+		require.Equal(t, int64(0), count)
 		for _, groupName := range groupNames {
-			afterDeleteCount := queryRuleGroupCount(groupName)
+			afterDeleteCount, err := queryRuleGroupCount(client, groupName)
+			require.NoError(t, err)
 			require.Equal(t, afterDeleteCount, 0)
 		}
 	})
@@ -104,26 +114,31 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		var ruleNames []string
 		for i := 0; i < 10; i++ {
 			groupName := fmt.Sprintf("group_%s", uuid.NewString())
-			err = createSfRule(client, groupName)
 			require.NoError(t, err)
 			groupNames = append(groupNames, groupName)
 		}
 		for i := 0; i < 10; i++ {
 			ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
-			ruleNames = append(groupNames, ruleName)
+			createSfRule(client, ruleName)
+			ruleNames = append(ruleNames, ruleName)
 		}
-		createGroups(groupNames)
-		addGroups(ruleNames, groupNames)
+		err = createGroups(client, groupNames)
+		require.NoError(t, err)
+		err = addGroups(client, ruleNames, groupNames)
+		require.NoError(t, err)
 
 		for _, groupName := range groupNames {
-			afterSaveCount := queryRuleGroupCount(groupName)
-			require.Equal(t, 11, afterSaveCount) // 10条rule-group relation,和1条空rule的group
+			afterSaveCount, err := queryRuleGroupCount(client, groupName)
+			require.NoError(t, err)
+			require.Equal(t, 10, afterSaveCount)
 		}
 
-		count := deleteRuleGroup(groupNames)
-		require.Equal(t, count, int64(110))
+		count, err := deleteRuleGroup(client, groupNames)
+		require.NoError(t, err)
+		require.Equal(t, int64(100), count)
 		for _, groupName := range groupNames {
-			afterDeleteCount := queryRuleGroupCount(groupName)
+			afterDeleteCount, err := queryRuleGroupCount(client, groupName)
+			require.NoError(t, err)
 			require.Equal(t, afterDeleteCount, 0)
 		}
 	})
@@ -141,21 +156,29 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 			ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
 			ruleNames = append(groupNames, ruleName)
 		}
-		createGroups(groupNames)
-		addGroups(ruleNames, groupNames)
+		err = createGroups(client, groupNames)
+		require.NoError(t, err)
+		err = addGroups(client, ruleNames, groupNames)
+		require.NoError(t, err)
 		for _, groupName := range groupNames {
-			afterSaveCount := queryRuleGroupCount(groupName)
-			require.Equal(t, 11, afterSaveCount) // 10条rule-group relation,和1条空rule的group
+			afterSaveCount, err := queryRuleGroupCount(client, groupName)
+			require.NoError(t, err)
+			require.Equal(t, 10, afterSaveCount)
 		}
-		removeGroups(ruleNames, groupNames)
+		err = removeGroups(client, ruleNames, groupNames)
+		require.NoError(t, err)
 		for _, groupName := range groupNames {
-			afterSaveCount := queryRuleGroupCount(groupName)
-			require.Equal(t, 1, afterSaveCount) // 1条空rule的group
+			afterSaveCount, err := queryRuleGroupCount(client, groupName)
+			require.NoError(t, err)
+			require.Equal(t, 0, afterSaveCount)
 		}
-		count := deleteRuleGroup(groupNames)
-		require.Equal(t, count, int64(10))
+		_, err := deleteRuleGroup(client, groupNames)
+		require.NoError(t, err)
+		count := yakit.QuerySyntaxFlowGroupCount(consts.GetGormProfileDatabase(), groupNames)
+		require.Equal(t, int64(0), count)
 		for _, groupName := range groupNames {
-			afterDeleteCount := queryRuleGroupCount(groupName)
+			afterDeleteCount, err := queryRuleGroupCount(client, groupName)
+			require.NoError(t, err)
 			require.Equal(t, afterDeleteCount, 0)
 		}
 	})
