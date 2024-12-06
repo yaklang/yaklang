@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/generate"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func init() {
@@ -45,6 +46,11 @@ type udpGenerator struct {
 }
 
 func (t *udpGenerator) generator(count int) {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Errorf("udp generator panic: %v", utils.ErrorStack(e))
+		}
+	}()
 	defer close(t.out)
 
 	surigen, err := generate.New(t.originRule)

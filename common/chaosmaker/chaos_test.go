@@ -3,14 +3,10 @@ package chaosmaker
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gopacket/gopacket/layers"
-	"github.com/stretchr/testify/assert"
-	"os"
-	"strings"
-	"testing"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -19,6 +15,9 @@ import (
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"os"
+	"strings"
+	"testing"
 )
 
 var rules = []string{
@@ -396,6 +395,10 @@ func TestGenerateHttpTrafficBug(t *testing.T) {
 		{
 			name:    "pcre bug",
 			ruleStr: "alert http any any -> any any (msg:\"Exploit CVE-2020-27131 on Cisco Security Manager\"; flow:to_server,established; content:\"POST\"; http_method; content:\"/CSCOnm/servlet/com.cisco.nm.cmf.servlet.\"; startswith; http_uri; pcre:\"/^(AuthTokenServlet|ClientServicesServlet|SecretServiceServlet)/UR\"; content:\"|ac ed 00 05|\"; startswith; http_client_body; content:\"java.rmi.server.RemoteObject\"; distance:0; http_client_body; reference:cve,CVE-2020-27131; classtype:web-application-attack; sid:2020271313; rev:1;)",
+		},
+		{
+			name:    "unnamed bug1",
+			ruleStr: "alert http $HOME_NET any -> $EXTERNAL_NET any (msg: \"CobaltStrike download.windowsupdate.com C2 Profile\"; flow: established; content:\"msdownload\"; http_uri; pcre:\"/\\/c\\/msdownload\\/update\\/others\\/[\\d]{4}/\\d{2}/\\d{7,8}_[\\d\\w-_]{50,}\\.cab/UR\"; reference:url,github.com/bluscreenofjeff/MalleableC2Profiles/blob/master/microsoftupdate_getonly.profile; classtype:exploit-kit; sid: 3016002; rev: 1; metadata:created_at 2018_09_25,by al0ne; )",
 		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {

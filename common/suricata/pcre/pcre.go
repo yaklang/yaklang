@@ -47,6 +47,10 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 	normailized := strings.Contains(pattern[idx+1:], "U")
 	unnormalized := strings.Contains(pattern[idx+1:], "D")
 	pcre.expr = pattern[1:idx]
+	_, err := syntax.Parse(pcre.expr, syntax.Perl)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid pcre pattern")
+	}
 	if idx != len(pattern)-1 {
 		optstr := pattern[idx+1:]
 		for _, v := range optstr {
@@ -97,7 +101,7 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 			case 'Y':
 				pcre.modifier = modifier.HTTPStatMsg
 			case 'B':
-				log.Warnf("pcre modifier B not implemented, %s may not works as expected\n", pattern)
+				//log.Warnf("pcre modifier B not implemented, %s may not works as expected\n", pattern)
 			case 'O':
 				log.Warnf("pcre modifier O not implemented, %s may not works as expected\n", pattern)
 			case 'V':
@@ -195,6 +199,9 @@ func (p *Matcher) Match(content []byte) []data.Matched {
 }
 
 func (p *Generator) Generate() []byte {
+	if p.generator == nil {
+		return nil
+	}
 	strs := p.generator.Generate()
 	if len(strs) == 0 {
 		return nil

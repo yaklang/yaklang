@@ -3,6 +3,7 @@ package rule
 import (
 	"encoding/binary"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/suricata/config"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/big"
@@ -27,8 +28,8 @@ type AddressRule struct {
 	SubRules      []*AddressRule
 
 	// envtable
-	envtable map[string]string
-	Env      string
+	Config *config.Config
+	Env    string
 }
 
 func (a *AddressRule) _matchWithoutNegative(i string) bool {
@@ -39,13 +40,12 @@ func (a *AddressRule) _matchWithoutNegative(i string) bool {
 		return true
 	}
 
-	if a.Env != "" && a.envtable != nil {
-		raw, existed := a.envtable[a.Env]
-		if !existed {
+	if a.Env != "" && a.Config != nil {
+		if !a.Config.HasVar(a.Env) {
 			log.Warnf("suricata env %s not found, fallback to any", a.Env)
 			return true
 		}
-		return raw == i
+		return a.Config.MatchVar(a.Env, i)
 	}
 
 	for _, n := range a.negativeRules {
@@ -113,14 +113,14 @@ func (a *AddressRule) Generate() string {
 		return utils.GetRandomIPAddress()
 	}
 
-	if a.Env != "" && a.envtable != nil {
-		raw, existed := a.envtable[a.Env]
+	if a.Env != "" && a.Config != nil {
+		existed := a.Config.HasVar(a.Env)
 		if !existed {
 			log.Warnf("suricata env %s not found, fallback to any", a.Env)
 			//return utils.GetRandomLocalAddr()
-			return "127.0.0.1"
+			return a.Config.RandIpVar("ANY_IP")
 		}
-		return raw
+		return a.Config.RandIpVar(a.Env)
 	}
 
 	if a.Negative {
@@ -199,7 +199,7 @@ func (v *RuleSyntaxVisitor) VisitAddress(i *parser.AddressContext) (addr *Addres
 	if i == nil {
 		return nil
 	}
-	addr = &AddressRule{envtable: v.Environment}
+	addr = &AddressRule{Config: v.Config}
 	defer func() {
 		if addr != nil {
 			addr.parseSubRules()

@@ -3,7 +3,6 @@ package chaosmaker
 import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/generate"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
@@ -55,6 +54,11 @@ type tcpGenerator struct {
 }
 
 func (t *tcpGenerator) generator(count int) {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Errorf("tcp generator panic: %v", utils.ErrorStack(e))
+		}
+	}()
 	defer close(t.out)
 
 	surigen, err := generate.New(t.originRule)
@@ -68,10 +72,7 @@ func (t *tcpGenerator) generator(count int) {
 		if raw == nil {
 			return
 		}
-		flow, err := pcapx.CompleteTCPFlow(raw)
-		if err != nil {
-			log.Errorf("complete tcp flow failed: %v", err)
-		}
+		flow := CompleteTCPFlow(raw, 1500)
 		for _, f := range flow {
 			t.out <- f
 		}
