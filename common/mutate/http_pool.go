@@ -858,12 +858,12 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						if err != nil {
 							log.Errorf("exec packet raw failed: %s", err)
 							failedResult := &HttpResult{
-								Url:             urlStr,
-								Request:         reqIns,
-								Error:           err,
-								RequestRaw:      targetRequest,
-								ResponseRaw:     nil,
-								DurationMs:      rspInstance.TraceInfo.GetServerDurationMS(),
+								Url:         urlStr,
+								Request:     reqIns,
+								Error:       err,
+								RequestRaw:  targetRequest,
+								ResponseRaw: nil,
+								//DurationMs:      rspInstance.TraceInfo.GetServerDurationMS(),
 								Timestamp:       time.Now().Unix(),
 								Payloads:        payloads,
 								Source:          config.Source,
