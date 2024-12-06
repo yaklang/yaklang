@@ -181,22 +181,54 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	return rule, nil
 }
 
-// ImportRuleDefaultGroupName 导入规则默认分组，默认使用language,purpose,severity作为分组名
-func ImportRuleDefaultGroupName(rule *schema.SyntaxFlowRule) error {
+// CreateSfDefaultGroup 导入规则内置分组,默认使用language,purpose,severity作为内置分组
+func CreateSfDefaultGroup() {
+	db := consts.GetGormProfileDatabase()
+
+	var buildinGroups []string
+	buildinGroups = append(buildinGroups, schema.GetAllSFSupportLanguage()...)
+	buildinGroups = append(buildinGroups, schema.GetAllSFPurposeTypes()...)
+	buildinGroups = append(buildinGroups, schema.GetAllSFSeverityTypes()...)
+
+	for _, groupName := range buildinGroups {
+		err := InitSFBuildInGroup(db, groupName)
+		if err != nil {
+			log.Warnf("create syntax flow group error: %s", err)
+		}
+	}
+}
+
+// UpdateSFRuleGroup 更新规则分组
+func UpdateSFRuleGroup(rule *schema.SyntaxFlowRule) error {
 	ruleName := rule.RuleName
-	saveSfGroup := func(groupName string) error {
+	if ruleName == "" {
+		return utils.Error("rule name is empty")
+	}
+
+	updateRuleGroupRelation := func(groupName string) error {
 		if groupName == "" {
 			return nil
 		}
 		saveData := &schema.SyntaxFlowRuleGroup{
 			RuleName:  ruleName,
 			GroupName: groupName,
+			IsBuildIn: true,
 		}
 		hash := saveData.CalcHash()
 		return CreateOrUpdateSyntaxFlowGroup(hash, saveData)
 	}
-	for _, n := range []string{string(rule.Language), string(rule.Purpose), string(rule.Severity)} {
-		err := saveSfGroup(n)
+
+	db := consts.GetGormProfileDatabase()
+	for _, n := range []string{rule.Language, string(rule.Purpose), string(rule.Severity)} {
+		if n == "" {
+			continue
+		}
+		exist := QuerySFDefaultGroup(db, n)
+		if !exist {
+			log.Errorf("add group for buildin syntaxflow rule failed:group %s not exist", n)
+			continue
+		}
+		err := updateRuleGroupRelation(n)
 		if err != nil {
 			return err
 		}
@@ -253,6 +285,8 @@ func CheckSyntaxFlowLanguage(languageRaw string) (consts.Language, error) {
 		return consts.JS, nil
 	case "golang", "go":
 		return consts.GO, nil
+	case "general":
+		return consts.General, nil
 	}
 	return "", utils.Errorf("invalid language: %v is not supported yet", languageRaw)
 }
