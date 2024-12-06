@@ -253,7 +253,7 @@ type RawTag struct {
 }
 
 func (r *RawTag) Exec(ctx context.Context, raw *parser.FuzzResult, yield func(result *parser.FuzzResult), methodTable map[string]*parser.TagMethod) error {
-	yield(raw)
+	yield(parser.NewFuzzResultWithData(raw.GetData()))
 	return nil
 }
 
@@ -286,11 +286,21 @@ func isIdentifyString(s string) bool {
 }
 
 func GetResultVerbose(f *parser.FuzzResult) []string {
+	return getResultVerbose(f, map[*parser.FuzzResult]struct{}{})
+}
+func getResultVerbose(f *parser.FuzzResult, visitedMap map[*parser.FuzzResult]struct{}) []string {
+	if visitedMap != nil {
+		if _, ok := visitedMap[f]; ok {
+			return []string{}
+		} else {
+			visitedMap[f] = struct{}{}
+		}
+	}
 	var verboses []string
 	for _, datum := range f.Source {
 		switch ret := datum.(type) {
 		case *parser.FuzzResult:
-			verboses = append(verboses, GetResultVerbose(ret)...)
+			verboses = append(verboses, getResultVerbose(ret, visitedMap)...)
 		}
 	}
 	if !f.ByTag {

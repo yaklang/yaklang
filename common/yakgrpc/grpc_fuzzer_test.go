@@ -34,6 +34,36 @@ import (
 func init() {
 	yakit.InitialDatabase()
 }
+
+func TestGRPCMUSTPASS_RawFuzztagBug(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Length: 1\r\n\r\n"))
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: fmt.Sprintf(`GET / HTTP/1.1
+Host: %v 
+
+{{yak(handle|{{=xxx=}})}}
+`, utils.HostPort(host, port)),
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			break
+		}
+		if !rsp.Ok {
+			t.Fatal("request failed")
+		}
+	}
+}
+
 func TestGRPCMUSTPASS_CheckResponseValid(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 1\r\n\r\n"))
