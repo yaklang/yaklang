@@ -4,7 +4,6 @@ import (
 	"github.com/dlclark/regexp2"
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/rule"
-	"github.com/yaklang/yaklang/common/utils"
 	"time"
 )
 
@@ -28,7 +27,7 @@ func newPCREMatch(r *rule.ContentRule) matchHandler {
 		}
 		allPrevMatchs, existed := c.GetPrevMatched(r.PCREParsed.Modifier())
 		if existed && r.PCREParsed.Relative() {
-			preMatch := utils.GetLastElement(allPrevMatchs)
+			preMatch := allPrevMatchs[0]
 			buffer = buffer[preMatch.Pos+preMatch.Len:]
 		}
 

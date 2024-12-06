@@ -53,6 +53,11 @@ type dnsGenerator struct {
 }
 
 func (g *dnsGenerator) generator(count int) {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Errorf("dns generator panic: %v", utils.ErrorStack(e))
+		}
+	}()
 	defer close(g.out)
 
 	surigen, err := generate.New(g.originRule)

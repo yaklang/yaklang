@@ -3,12 +3,16 @@ package chaosmaker
 import (
 	"encoding/json"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"net"
 )
 
 func ParseRuleFromRawSuricataRules(content string) []*rule.Storage {
@@ -54,4 +58,36 @@ func ParseRuleFromHTTPRequestRawJSON(content string) []*rule.Storage {
 		}
 	}
 	return rules
+}
+func CompleteTCPFlow(raw []byte, mtu int) [][]byte {
+	var flow [][]byte
+	var err error
+	if len(raw) <= mtu {
+		flow, err = pcapx.CompleteTCPFlow(raw)
+	} else {
+		// 分片, 如果需要的话
+		pk := gopacket.NewPacket(raw, layers.LayerTypeEthernet, gopacket.Default)
+		if pk == nil {
+			return nil
+		}
+		nw := pk.NetworkLayer()
+		if nw == nil {
+			return nil
+		}
+		tcp := pk.TransportLayer()
+		if tcp == nil {
+			return nil
+		}
+		payload := tcp.LayerPayload()
+		flow, err = pcapx.CreateTCPFlowFromPayload(
+			net.JoinHostPort(nw.NetworkFlow().Src().String(), tcp.TransportFlow().Src().String()),
+			net.JoinHostPort(nw.NetworkFlow().Dst().String(), tcp.TransportFlow().Dst().String()),
+			payload,
+		)
+	}
+	if err != nil {
+		log.Errorf("complete tcp flow failed: %v", err)
+		return nil
+	}
+	return flow
 }

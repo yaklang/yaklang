@@ -1,15 +1,12 @@
 package chaosmaker
 
 import (
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/generate"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
-	"net"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func init() {
@@ -51,6 +48,11 @@ type httpGenerator struct {
 }
 
 func (h *httpGenerator) generator(count int) {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Errorf("http generator panic: %v", utils.ErrorStack(e))
+		}
+	}()
 	defer close(h.out)
 
 	surigen, err := generate.New(h.originRule)
@@ -63,36 +65,7 @@ func (h *httpGenerator) generator(count int) {
 		if raw == nil {
 			return
 		}
-
-		var flow [][]byte
-		var err error
-		if len(raw) <= 1500 {
-			flow, err = pcapx.CompleteTCPFlow(raw)
-		} else {
-			// 分片, 如果需要的话
-			pk := gopacket.NewPacket(raw, layers.LayerTypeEthernet, gopacket.Default)
-			if pk == nil {
-				continue
-			}
-			nw := pk.NetworkLayer()
-			if nw == nil {
-				continue
-			}
-			tcp := pk.TransportLayer()
-			if tcp == nil {
-				continue
-			}
-			payload := tcp.LayerPayload()
-			flow, err = pcapx.CreateTCPFlowFromPayload(
-				net.JoinHostPort(nw.NetworkFlow().Src().String(), tcp.TransportFlow().Src().String()),
-				net.JoinHostPort(nw.NetworkFlow().Dst().String(), tcp.TransportFlow().Dst().String()),
-				payload,
-			)
-		}
-		if err != nil {
-			log.Errorf("complete tcp flow failed: %v", err)
-			continue
-		}
+		flow := CompleteTCPFlow(raw, 1500)
 		for _, packet := range flow {
 			h.out <- packet
 		}

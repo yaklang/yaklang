@@ -2,25 +2,22 @@ package rule
 
 import (
 	"bufio"
+	"errors"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
+	config2 "github.com/yaklang/yaklang/common/suricata/config"
 	rule "github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"reflect"
 	"strings"
 )
 
-var presetEnv = map[string]string{
-	"HOME_NET": utils.GetLocalIPAddress(),
-}
-
-func init() {
-	for _, varName := range []string{"HTTP_SERVERS", "SMTP_SERVERS", "SQL_SERVERS", "DNS_SERVERS", "TELNET_SERVERS"} {
-		presetEnv[varName] = presetEnv["HOME_NET"]
-	}
-}
-
 func Parse(data string, envs ...string) ([]*Rule, error) {
+	config, err := config2.ParseSuricataConfig(config2.DefaultConfigYaml)
+	if err != nil {
+		log.Errorf("initing suricata default config failed: %v", err)
+	}
 	var buf strings.Builder
 	var dataBuf = bufio.NewReader(strings.NewReader(data))
 	for {
@@ -42,23 +39,22 @@ func Parse(data string, envs ...string) ([]*Rule, error) {
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := rule.NewSuricataRuleParser(tokenStream)
 	parser.RemoveErrorListeners()
-	//for _, t := range lexer.GetAllTokens() {
-	//	fmt.Println(t)
-	//}
-	v := &RuleSyntaxVisitor{Raw: []byte(data), CompileRaw: compileRaw}
-	v.Environment = make(map[string]string)
-	for k, val := range presetEnv {
-		v.Environment[k] = val
-	}
+	errListener := antlr4util.NewErrorListener()
+	parser.AddErrorListener(errListener)
+	v := &RuleSyntaxVisitor{Raw: []byte(data), CompileRaw: compileRaw, Config: config}
 	for _, e := range envs {
 		before, after, cut := strings.Cut(e, "=")
 		if !cut {
 			log.Warnf("env input:[%v] cannot parse as key=value", e)
 			continue
 		}
-		v.Environment[before] = after
+		v.Config.AddVar(before, after)
 	}
-	v.VisitRules(parser.Rules().(*rule.RulesContext))
+	ruleCtx := parser.Rules().(*rule.RulesContext)
+	if len(errListener.GetErrors()) > 0 {
+		return nil, errors.New(errListener.GetErrorString())
+	}
+	v.VisitRules(ruleCtx)
 	for _, r := range v.Rules {
 		ParseRuleMetadata(r)
 	}

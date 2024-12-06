@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/generate"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func init() {
@@ -46,6 +47,11 @@ type icmpGenerator struct {
 }
 
 func (h *icmpGenerator) generator(count int) {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Errorf("icmp generator panic: %v", utils.ErrorStack(e))
+		}
+	}()
 	defer close(h.out)
 
 	surigen, err := generate.New(h.rule)
