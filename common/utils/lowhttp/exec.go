@@ -212,11 +212,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 	response.RequestInstance = reqIns
 
-	// connection pool
-	if option.WithConnPool && option.ConnPool == nil {
-		option.ConnPool = DefaultLowHttpConnPool
+	if connPool == nil {
 		connPool = DefaultLowHttpConnPool
 	}
+
 	// ctx
 	if ctx == nil {
 		ctx = context.Background()
