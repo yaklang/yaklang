@@ -47,10 +47,26 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 	normailized := strings.Contains(pattern[idx+1:], "U")
 	unnormalized := strings.Contains(pattern[idx+1:], "D")
 	pcre.expr = pattern[1:idx]
-	_, err := syntax.Parse(pcre.expr, syntax.Perl)
+	re, err := syntax.Parse(pcre.expr, syntax.Perl)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid pcre pattern")
 	}
+
+	var beginText bool
+	var walkPositionControlOp func(regexpIns *syntax.Regexp)
+	walkPositionControlOp = func(regexpIns *syntax.Regexp) {
+		if regexpIns.Op == syntax.OpConcat {
+			if len(regexpIns.Sub) > 0 {
+				walkPositionControlOp(regexpIns.Sub[0])
+				return
+			}
+		}
+		if regexpIns.Op == syntax.OpBeginText {
+			beginText = true
+		}
+	}
+	walkPositionControlOp(re)
+
 	if idx != len(pattern)-1 {
 		optstr := pattern[idx+1:]
 		for _, v := range optstr {
@@ -118,6 +134,7 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 		}
 	}
 	pcre.opts = opt
+	pcre.startsWith = pcre.startsWith || beginText
 	return &pcre, nil
 }
 
@@ -159,21 +176,6 @@ func (p *PCRE) Generator() (*Generator, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid pcre pattern")
 	}
-	var beginText bool
-	var walkPositionControlOp func(regexpIns *syntax.Regexp)
-	walkPositionControlOp = func(regexpIns *syntax.Regexp) {
-		if regexpIns.Op == syntax.OpConcat {
-			if len(regexpIns.Sub) > 0 {
-				walkPositionControlOp(regexpIns.Sub[0])
-				return
-			}
-		}
-		if regexpIns.Op == syntax.OpBeginText {
-			beginText = true
-		}
-	}
-	walkPositionControlOp(re)
-	p.startsWith = beginText
 	return &Generator{
 		reSyntax:  re,
 		PCRE:      p,
