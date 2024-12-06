@@ -14,9 +14,31 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+var currentCPS atomic.Int64
+var lastCPS int64
+
+func GetDialxCPS() int64 {
+	return (lastCPS + currentCPS.Load()) / 2
+}
+
+func init() {
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			lastCPS = currentCPS.Load()
+			currentCPS.Store(0)
+		}
+	}()
+}
+
 // dialPlainTCPConnWithRetry just handle plain tcp connection
 // no tls here, but proxy here
-func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (net.Conn, error) {
+func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.Conn, err error) {
+	defer func() {
+		if retConn != nil {
+			currentCPS.Add(1)
+		}
+	}()
 	var timeoutRetryMax int64 = 1
 	if config.EnableTimeoutRetry {
 		timeoutRetryMax = config.TimeoutRetryMax

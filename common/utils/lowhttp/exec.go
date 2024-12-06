@@ -163,6 +163,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		opt(option)
 	}
 
+	/*
+		init option config
+	*/
 	var (
 		https                = option.Https
 		forceHttp2           = option.Http2
@@ -209,12 +212,37 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 	response.RequestInstance = reqIns
 
+	// connection pool
+	if option.WithConnPool && option.ConnPool == nil {
+		option.ConnPool = DefaultLowHttpConnPool
+		connPool = DefaultLowHttpConnPool
+	}
+	// ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// fix some field
+	response.Source = source
+	response.Payloads = payloads
+	response.Tags = tags
+
+	if option.EnableMaxContentLength && maxContentLength > 0 {
+		httpctx.SetResponseMaxContentLength(reqIns, maxContentLength)
+	}
+
+	/*
+		save http flow defer
+	*/
 	defer func() {
+		if httpctx.GetResponseTooLarge(reqIns) {
+			response.TooLarge = true
+			response.TooLargeLimit = int64(maxContentLength)
+		}
+
 		if response == nil || !saveHTTPFlow {
 			return
 		}
 
-		// 保存 http flow
 		log.Debugf("should save url: %v", response.Url)
 		saveCtx, cancel := context.WithCancel(ctx)
 
@@ -225,13 +253,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				}
 				cancel()
 			}()
-			if option.ResponseCallback != nil {
-				option.ResponseCallback(response)
-			}
-			if httpctx.GetResponseTooLarge(reqIns) {
-				response.TooLarge = true
-				response.TooLargeLimit = int64(maxContentLength)
-			}
 
 			if saveHTTPFlowHandler != nil {
 				saveHTTPFlowHandler(response)
@@ -244,28 +265,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		}
 	}()
 
-	// connection pool
-	if option.WithConnPool && option.ConnPool == nil {
-		option.ConnPool = DefaultLowHttpConnPool
-		connPool = DefaultLowHttpConnPool
-	}
-	// ctx
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	// fix some field
-	if response.Source == "" {
-		response.Source = source
-	}
-	response.Payloads = payloads
-	response.Tags = tags
-
-	if option.EnableMaxContentLength && maxContentLength > 0 {
-		httpctx.SetResponseMaxContentLength(reqIns, maxContentLength)
-	}
-
-	// proxy
-	var newProxy []string
+	/*
+	   proxy
+	*/
+	var regulatoryProxy []string
 	for _, p := range proxy {
 		i, err := url.Parse(p)
 		if err != nil {
@@ -274,9 +277,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		if i.Hostname() == "" {
 			continue
 		}
-		newProxy = append(newProxy, p)
+		regulatoryProxy = append(regulatoryProxy, p)
 	}
-	proxy = newProxy
+	proxy = regulatoryProxy
 
 	forceProxy := len(proxy) > 0
 	var legacyProxy []string
@@ -292,6 +295,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		proxy = ordinaryProxy
 	}
 
+	/*
+	   get some config from packet
+	*/
 	var forceOverrideURL string
 	var requestURI string
 	var hostInPacket string
@@ -327,12 +333,12 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		}
 	})
 
-	if gmTLS || enableHttp3 {
-		https = true
-	}
 	/*
 	   extract url
 	*/
+	if gmTLS || enableHttp3 {
+		https = true
+	}
 	var urlBuf bytes.Buffer
 	if https {
 		urlBuf.WriteString("https://")
@@ -340,7 +346,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		urlBuf.WriteString("http://")
 	}
 
-	connPool = DefaultLowHttpConnPool
 	if hostInPacket == "" && host == "" {
 		return response, utils.Errorf("host not found in packet and option (Check your `Host: ` header)")
 	}
@@ -652,6 +657,7 @@ RECONNECT:
 
 		h2Stream := h2Conn.newStream(reqIns, requestPacket)
 
+		currentRPS.Add(1)
 		if err := h2Stream.doRequest(); err != nil {
 			if h2Stream.ID == 1 { // first stream
 				return nil, err
@@ -755,6 +761,7 @@ RECONNECT:
 		if haveNativeHTTPRequestInstance {
 			httpctx.SetBareRequestBytes(reqIns, requestPacket)
 		}
+		currentRPS.Add(1)
 		if oldVersionProxyChecking {
 			var legacyRequest []byte
 			legacyRequest, err = BuildLegacyProxyRequest(requestPacket)
@@ -929,16 +936,16 @@ RECONNECT:
 			}
 		}
 		response.MultiResponseInstances = multiResponses
-
 		rawBytes = responseRaw.Bytes()
-		if option.EnableMaxContentLength && maxContentLength > 0 {
-			if body := GetHTTPPacketBody(rawBytes); len(body) > maxContentLength {
-				rawBytes = ReplaceHTTPPacketBodyRaw(rawBytes, body[:maxContentLength], true)
-			}
+	}
+
+	if option.EnableMaxContentLength && maxContentLength > 0 {
+		if body := GetHTTPPacketBody(rawBytes); len(body) > maxContentLength {
+			rawBytes = ReplaceHTTPPacketBodyRaw(rawBytes, body[:maxContentLength], true)
 		}
-		if haveNativeHTTPRequestInstance {
-			httpctx.SetBareResponseBytes(reqIns, rawBytes)
-		}
+	}
+	if haveNativeHTTPRequestInstance {
+		httpctx.SetBareResponseBytes(reqIns, rawBytes)
 	}
 
 	// 更新cookiejar中的cookie
