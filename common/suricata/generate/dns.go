@@ -2,6 +2,7 @@ package generate
 
 import (
 	"errors"
+	"fmt"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -35,9 +36,9 @@ func newDNSGen(r *rule.Rule) (Generator, error) {
 			g.query = parse2ContentGen(rr, WithNoise(noiseDigitChar))
 		case modifier.Default:
 			// won't support
-			log.Warnf("default modifier won't support in dns")
+			return nil, errors.New("default modifier won't support in dns")
 		default:
-			log.Warnf("not support modifier %v", mdf)
+			return nil, fmt.Errorf("not support modifier %v", mdf)
 		}
 	}
 

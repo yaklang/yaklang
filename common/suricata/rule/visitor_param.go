@@ -451,7 +451,7 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			contentRule.PCRE = unquoteString(vStr)
 			parsed, err := pcre.ParsePCREStr(contentRule.PCRE)
 			if err != nil {
-				log.Errorf("parsePCREStr err:%v", err)
+				v.Errorf("parsePCREStr err:%v", err)
 			}
 			contentRule.PCREParsed = parsed
 			contentRule.Modifier = parsed.Modifier()
