@@ -59,6 +59,7 @@ var ProfileTables = []interface{}{
 	//syntaxFlow rule
 	&SyntaxFlowRule{},
 	&SyntaxFlowRuleGroup{},
+	&SyntaxFlowGroup{},
 	&PluginEnv{},
 }
 

@@ -13,14 +13,15 @@ func QuerySyntaxFlowRuleGroup(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleGroupR
 		return nil, utils.Error("query syntax flow rule group failed: query params is nil")
 	}
 	db = db.Model(&schema.SyntaxFlowRuleGroup{})
-	db = FilterSyntaxFlowGroup(db, params.GetFilter())
-	db = db.Select("group_name, count(*) as count").Where("group_name != '' AND group_name IS NOT NULL").Group("group_name").Order("count desc")
+	db = FilterSyntaxFlowGroups(db, params.GetFilter())
+	db = db.Select("group_name, count(*) as count").
+		Group("group_name").Order("count desc")
 	db = db.Scan(&result)
 	err = db.Error
 	return
 }
 
-func FilterSyntaxFlowGroup(db *gorm.DB, filter *ypb.SyntaxFlowRuleGroupFilter) *gorm.DB {
+func FilterSyntaxFlowGroups(db *gorm.DB, filter *ypb.SyntaxFlowRuleGroupFilter) *gorm.DB {
 	if filter == nil {
 		return db
 	}
@@ -33,20 +34,20 @@ func FilterSyntaxFlowGroup(db *gorm.DB, filter *ypb.SyntaxFlowRuleGroupFilter) *
 }
 
 func CreateSyntaxFlowRuleGroup(db *gorm.DB, group string) error {
-	db = db.Model(&schema.SyntaxFlowRuleGroup{})
+	db = db.Model(&schema.SyntaxFlowGroup{})
 	if group == "" {
 		return utils.Errorf("add syntax flow rule group failed:group name is empty")
 	}
-	i := &schema.SyntaxFlowRuleGroup{
+	i := &schema.SyntaxFlowGroup{
 		GroupName: group,
 	}
-	if db := db.Create(i); db.Error != nil {
+	if db = db.Create(i); db.Error != nil {
 		return utils.Errorf("create SyntaxFlowGroup failed: %s", db.Error)
 	}
 	return nil
 }
 
-func AddSyntaxFlowRuleGroup(db *gorm.DB, rules []string, group string) (int64, error) {
+func AddSFRuleAndGroupRelation(db *gorm.DB, rules []string, group string) (int64, error) {
 	if len(rules) == 0 {
 		return 0, utils.Errorf("add syntax flow rule group failed:rule name is empty")
 	}
@@ -72,7 +73,7 @@ func AddSyntaxFlowRuleGroup(db *gorm.DB, rules []string, group string) (int64, e
 	return count, errs
 }
 
-func RemoveSyntaxFlowRuleGroup(db *gorm.DB, rules []string, group string) (int64, error) {
+func RemoveSFRuleAndGroupRelation(db *gorm.DB, rules []string, group string) (int64, error) {
 	if len(rules) == 0 {
 		return 0, utils.Errorf("add syntax flow rule group failed:rule name is empty")
 	}
@@ -98,15 +99,47 @@ func RemoveSyntaxFlowRuleGroup(db *gorm.DB, rules []string, group string) (int64
 	return count, errs
 }
 
-func DeleteSyntaxFlowRuleGroup(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleGroupRequest) (int64, error) {
+func RemoveSFRuleAndGroupRelationByGroupNames(db *gorm.DB, groupNames []string) (int64, error) {
+	if len(groupNames) == 0 {
+		return 0, utils.Errorf("add syntax flow rule group failed:group name is empty")
+	}
+
 	db = db.Model(&schema.SyntaxFlowRuleGroup{})
+	if db = db.Where("group_name IN (?)", groupNames).Unscoped().Delete(&schema.SyntaxFlowRuleGroup{}); db.Error != nil {
+		return 0, db.Error
+	} else {
+		return db.RowsAffected, nil
+	}
+}
+
+func DeleteSyntaxFlowRuleGroup(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleGroupRequest) (int64, error) {
 	if params == nil {
 		return 0, utils.Error("delete syntax flow rule group failed: delete syntaxflow rule request is nil")
 	}
 	if params.GetFilter() == nil {
 		return 0, utils.Error("delete syntax flow rule group failed: delete filter is nil")
 	}
-	db = FilterSyntaxFlowGroup(db, params.GetFilter())
-	db = db.Unscoped().Delete(&schema.SyntaxFlowRuleGroup{})
-	return db.RowsAffected, db.Error
+	ruleDb := FilterSyntaxFlowGroups(db, params.GetFilter())
+
+	var (
+		groupNames []string
+		errs       error
+	)
+
+	ruleDb.Model(&schema.SyntaxFlowGroup{}).Pluck("DISTINCT group_name", &groupNames)
+	count, err := RemoveSFRuleAndGroupRelationByGroupNames(db, groupNames)
+	if err != nil {
+		errs = utils.JoinErrors(errs, err)
+	}
+	if db = db.Model(&schema.SyntaxFlowGroup{}).Where("group_name IN (?)", groupNames).Unscoped().Delete(&schema.SyntaxFlowGroup{}); db.Error != nil {
+		errs = utils.JoinErrors(errs, db.Error)
+	}
+	return count, db.Error
+}
+
+func QuerySyntaxFlowGroupCount(db *gorm.DB, groupNames []string) int64 {
+	db = db.Model(&schema.SyntaxFlowGroup{})
+	var count int64
+	db.Where("group_name IN (?)", groupNames).Count(&count)
+	return count
 }
