@@ -24,6 +24,26 @@ const (
 	SFR_PURPOSE_SECURITY SyntaxFlowRulePurposeType = "security"
 )
 
+func GetAllSFPurposeTypes() []string {
+	return []string{
+		string(SFR_PURPOSE_AUDIT),
+		string(SFR_PURPOSE_VULN),
+		string(SFR_PURPOSE_CONFIG),
+		string(SFR_PURPOSE_SECURITY),
+	}
+}
+
+func GetAllSFSupportLanguage() []string {
+	return []string{
+		"yak",
+		"java",
+		"javaScript",
+		"php",
+		"golang",
+		"general", // 通用规则
+	}
+}
+
 const (
 	SFR_SEVERITY_INFO     = "info"
 	SFR_SEVERITY_LOW      = "low"
@@ -31,6 +51,16 @@ const (
 	SFR_SEVERITY_CRITICAL = "critical"
 	SFR_SEVERITY_HIGH     = "high"
 )
+
+func GetAllSFSeverityTypes() []string {
+	return []string{
+		SFR_SEVERITY_INFO,
+		SFR_SEVERITY_LOW,
+		SFR_SEVERITY_WARNING,
+		SFR_SEVERITY_CRITICAL,
+		SFR_SEVERITY_HIGH,
+	}
+}
 
 const (
 	SFR_RULE_TYPE_YAK SyntaxFlowRuleType = "yak"

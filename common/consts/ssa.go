@@ -19,11 +19,12 @@ import (
 type Language string
 
 const (
-	Yak  Language = "yak"
-	JS   Language = "js"
-	PHP  Language = "php"
-	JAVA Language = "java"
-	GO   Language = "golang"
+	Yak     Language = "yak"
+	JS      Language = "js"
+	PHP     Language = "php"
+	JAVA    Language = "java"
+	GO      Language = "golang"
+	General Language = "general"
 )
 
 func GetAllSupportedLanguages() []Language {
