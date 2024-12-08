@@ -303,4 +303,55 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, afterUpdateCount-afterCreateCount, 0)
 	})
+
+	t.Run("test create rule with group", func(t *testing.T) {
+		ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
+		groupName := fmt.Sprintf("group_%s", uuid.NewString())
+
+		req := &ypb.CreateSyntaxFlowRuleRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+				RuleName:   ruleName,
+				Language:   "java",
+				GroupNames: []string{groupName},
+			},
+		}
+
+		_, err = client.CreateSyntaxFlowRule(context.Background(), req)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName})
+			require.NoError(t, err)
+		})
+
+		queryRule, err := queryRulesByName(client, []string{ruleName})
+		require.NoError(t, err)
+		require.Equal(t, groupName, queryRule[0].GetGroupName()[0])
+
+		count, err := queryRuleGroupCount(client, groupName)
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("test create rule with description", func(t *testing.T) {
+		ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
+		des := uuid.NewString()
+		req := &ypb.CreateSyntaxFlowRuleRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+				RuleName:    ruleName,
+				Language:    "java",
+				Description: des,
+			},
+		}
+
+		_, err = client.CreateSyntaxFlowRule(context.Background(), req)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName})
+			require.NoError(t, err)
+		})
+
+		queryRule, err := queryRulesByName(client, []string{ruleName})
+		require.NoError(t, err)
+		require.Equal(t, des, queryRule[0].Description)
+	})
 }

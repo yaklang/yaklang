@@ -70,6 +70,7 @@ func (s *Server) CreateSyntaxFlowRule(ctx context.Context, req *ypb.CreateSyntax
 		return ret.Message, nil
 	}
 }
+
 func (s *Server) UpdateSyntaxFlowRuleEx(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleRequest) (*ypb.UpdateSyntaxFlowRuleResponse, error) {
 	if req == nil || req.SyntaxFlowInput == nil {
 		return nil, utils.Error("update syntax flow rule failed: request is nil")
@@ -118,5 +119,7 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.RuleName = ruleInput.RuleName
 	rule.Tag = strings.Join(ruleInput.Tags, "|")
 	rule.Title = ruleInput.RuleName
+	rule.Groups = sfdb.GetOrCreatGroupsByName(ruleInput.GroupNames)
+	rule.Description = ruleInput.Description
 	return rule, nil
 }

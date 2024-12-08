@@ -159,4 +159,21 @@ func TestRule_Group_OP(t *testing.T) {
 		require.Contains(t, ret, groupA)
 		require.Contains(t, ret, groupB)
 	})
+
+	t.Run("test GetOrCreatGroupsByName", func(t *testing.T) {
+		groupName1 := uuid.NewString()
+		err := CreateGroupByName(groupName1)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = DeleteGroupByName(groupName1)
+			require.NoError(t, err)
+		})
+
+		groupName2 := uuid.NewString()
+		ret := GetOrCreatGroupsByName([]string{groupName1, groupName2})
+		require.Equal(t, 2, len(ret))
+		groupNames := []string{ret[0].GroupName, ret[1].GroupName}
+		require.Contains(t, groupNames, groupName1)
+		require.Contains(t, groupNames, groupName2)
+	})
 }

@@ -5568,6 +5568,8 @@ message  SyntaxFlowRuleInput{
   string Content = 2;
   string Language = 3;
   repeated string Tags = 4;
+  repeated string GroupNames = 5;
+  string Description = 6;
 }
 
 message SyntaxFlowRuleFilter {
