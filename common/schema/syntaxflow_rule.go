@@ -213,6 +213,10 @@ func (s *SyntaxFlowRule) GetAlertInfo(msg string) (*SyntaxFlowDescInfo, bool) {
 }
 
 func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
+	groupNames := make([]string, 0, len(s.Groups))
+	for _, group := range s.Groups {
+		groupNames = append(groupNames, group.GroupName)
+	}
 	sfRule := &ypb.SyntaxFlowRule{
 		Id:            int64(s.ID),
 		IsBuildInRule: s.IsBuildInRule,
@@ -230,6 +234,7 @@ func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
 		IncludedName:  s.IncludedName,
 		Hash:          s.Hash,
 		Tag:           s.Tag,
+		GroupName:     groupNames,
 	}
 	return sfRule
 }
