@@ -68,36 +68,6 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 	return db
 }
 
-func CreateSyntaxFlowRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
-	if rule == nil {
-		return utils.Errorf("create syntaxFlow rule failed: rule is nil")
-	}
-	if rule.RuleName == "" {
-		return utils.Errorf("create syntaxFlow rule failed: rule name is empty")
-	}
-
-	db = db.Model(&schema.SyntaxFlowRule{})
-	if err := db.Create(rule).Error; err != nil {
-		return utils.Errorf("create syntaxFlow rule failed: %s", err)
-	}
-	return nil
-}
-
-func UpdateSyntaxFlowRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
-	if rule == nil {
-		return utils.Errorf("update syntaxFlow rule failed: rule is nil")
-	}
-	if rule.RuleName == "" {
-		return utils.Errorf("update syntaxFlow rule failed: rule name is empty")
-	}
-
-	db = db.Model(&schema.SyntaxFlowRule{})
-	if err := db.Where("rule_name = ?", rule.RuleName).Update(rule).Error; err != nil {
-		return utils.Errorf("update syntaxFlow rule failed: %s", err)
-	}
-	return nil
-}
-
 func DeleteSyntaxFlowRule(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest) (int64, error) {
 	db = db.Model(&schema.SyntaxFlowRule{})
 	if params == nil || params.Filter == nil {
