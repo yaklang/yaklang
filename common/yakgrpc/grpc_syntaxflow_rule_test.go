@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"testing"
 
 	"github.com/google/uuid"
@@ -109,6 +110,17 @@ func queryRulesByName(client ypb.YakClient, ruleNames []string) ([]*ypb.SyntaxFl
 	return rsp.GetRule(), nil
 }
 
+func createSfRuleEx(client ypb.YakClient, ruleName string) (*ypb.SyntaxFlowRule, error) {
+	rule := &ypb.CreateSyntaxFlowRuleRequest{
+		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+			RuleName: ruleName,
+			Language: "java",
+		},
+	}
+	rsp, err := client.CreateSyntaxFlowRuleEx(context.Background(), rule)
+	return rsp.Rule, err
+}
+
 func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -209,5 +221,86 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		require.Equal(t, len(rules), 40)
 		err = deleteRuleByNames(client, ruleNames)
 		require.NoError(t, err)
+	})
+
+	t.Run("test createSyntaxFlowEx", func(t *testing.T) {
+		ids := make(map[int]struct{})
+		var ruleNames []string
+
+		beforeCreateCount, err := queryRulesCount(client)
+		require.NoError(t, err)
+		for i := 0; i < 100; i++ {
+			ruleName := fmt.Sprintf("test_%s.sf", uuid.NewString())
+			rsp, err := createSfRuleEx(client, ruleName)
+			log.Infof("rule created: %v", rsp)
+			require.NotNil(t, rsp)
+			require.NoError(t, err)
+			require.Equal(t, rsp.RuleName, ruleName)
+			ruleNames = append(ruleNames, ruleName)
+
+			if _, ok := ids[int(rsp.Id)]; ok {
+				t.Fatalf("id %d already exists", rsp.Id)
+			} else {
+				ids[int(rsp.Id)] = struct{}{}
+			}
+		}
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, ruleNames)
+			require.NoError(t, err)
+		})
+		afterCreateCount, err := queryRulesCount(client)
+		require.NoError(t, err)
+		require.Equal(t, afterCreateCount-beforeCreateCount, 100)
+	})
+
+	t.Run("test updateSyntaxFlowEx ", func(t *testing.T) {
+		var ids []int64
+		var ruleNames []string
+
+		beforeCreateCount, err := queryRulesCount(client)
+		require.NoError(t, err)
+		for i := 0; i < 100; i++ {
+			ruleName := fmt.Sprintf("test_%s.sf", uuid.NewString())
+			rsp, err := createSfRuleEx(client, ruleName)
+			require.NotNil(t, rsp)
+			require.NoError(t, err)
+			require.Equal(t, rsp.RuleName, ruleName)
+			ruleNames = append(ruleNames, ruleName)
+			ids = append(ids, (rsp.Id))
+		}
+		afterCreateCount, err := queryRulesCount(client)
+		require.NoError(t, err)
+		require.Equal(t, afterCreateCount-beforeCreateCount, 100)
+
+		updateToPHPByRuleName := func(name string) (*ypb.SyntaxFlowRule, error) {
+			req := &ypb.UpdateSyntaxFlowRuleRequest{
+				SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+					RuleName: name,
+					Language: "php",
+					Content:  "desc(\n  title: 'AAA',\n  type: audit,\n  level: warning,\n)",
+				},
+			}
+			rsp, err := client.UpdateSyntaxFlowRuleEx(context.Background(), req)
+			require.NoError(t, err)
+			require.NotNil(t, rsp)
+			return rsp.Rule, err
+		}
+
+		for idx, name := range ruleNames {
+			rsp, err := updateToPHPByRuleName(name)
+			require.NotNil(t, rsp)
+			require.NoError(t, err)
+			require.Equal(t, rsp.RuleName, name)
+			require.Equal(t, rsp.Language, "php")
+			require.Contains(t, rsp.Content, "desc(")
+			require.Equal(t, rsp.Id, ids[idx])
+		}
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, ruleNames)
+			require.NoError(t, err)
+		})
+		afterUpdateCount, err := queryRulesCount(client)
+		require.NoError(t, err)
+		require.Equal(t, afterUpdateCount-afterCreateCount, 0)
 	})
 }

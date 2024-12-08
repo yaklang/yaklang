@@ -3,9 +3,11 @@ package yakit
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 )
 
 func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*bizhelper.Paginator, []*schema.SyntaxFlowRule, error) {
@@ -91,4 +93,27 @@ func QuerySyntaxFlowRuleCount(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter) (in
 	var count int64
 	db.Count(&count)
 	return count, db.Error
+}
+
+func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlowRule, error) {
+	if rule == nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: rule is nil")
+	}
+	if rule.RuleName == "" {
+		return nil, utils.Errorf("update syntaxFlow rule failed: rule name is empty")
+	}
+
+	updateRule, err := sfdb.QueryRuleByName(rule.GetRuleName())
+	if err != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+
+	updateRule.Language = rule.GetLanguage()
+	updateRule.Content = rule.GetContent()
+	updateRule.Tag = strings.Join(rule.GetTags(), ",")
+	db = db.Model(&schema.SyntaxFlowRule{})
+	if err := db.Save(updateRule).Error; err != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+	return updateRule, nil
 }
