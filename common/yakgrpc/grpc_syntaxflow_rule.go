@@ -53,7 +53,7 @@ func (s *Server) CreateSyntaxFlowRule(ctx context.Context, req *ypb.CreateSyntax
 	if err != nil {
 		return nil, err
 	}
-	err = yakit.CreateSyntaxFlowRule(s.GetProfileDatabase(), rule)
+	err = sfdb.CreateRule(rule)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (s *Server) UpdateSyntaxFlowRule(ctx context.Context, req *ypb.UpdateSyntax
 	if err != nil {
 		return nil, err
 	}
-	err = yakit.UpdateSyntaxFlowRule(s.GetProfileDatabase(), rule)
+	err = sfdb.UpdateRule(rule)
 	if err != nil {
 		return nil, err
 	}

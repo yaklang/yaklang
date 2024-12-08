@@ -67,7 +67,7 @@ func ImportDatabase(reader io.Reader) error {
 		if refRule.IsBuildInRule {
 			refRule.IsBuildInRule = false
 		}
-		err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), refRule)
+		err = CreateOrUpdateRule(rule.CalcHash(), refRule)
 		if err != nil {
 			log.Errorf("create or update syntax flow rule error: %s", err)
 			continue
@@ -111,7 +111,7 @@ func MigrateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
 	return nil
 }
 
-func CreateOrUpdateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
+func CreateOrUpdateRule(hash string, i *schema.SyntaxFlowRule) error {
 	db := consts.GetGormProfileDatabase()
 
 	if hash == "" {
@@ -174,66 +174,11 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	if err != nil {
 		return nil, err
 	}
-	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
+	err = CreateOrUpdateRule(rule.CalcHash(), rule)
 	if err != nil {
 		return nil, utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
 	}
 	return rule, nil
-}
-
-// CreateSfDefaultGroup 导入规则内置分组,默认使用language,purpose,severity作为内置分组
-func CreateSfDefaultGroup() {
-	db := consts.GetGormProfileDatabase()
-
-	var buildinGroups []string
-	buildinGroups = append(buildinGroups, schema.GetAllSFSupportLanguage()...)
-	buildinGroups = append(buildinGroups, schema.GetAllSFPurposeTypes()...)
-	buildinGroups = append(buildinGroups, schema.GetAllSFSeverityTypes()...)
-
-	for _, groupName := range buildinGroups {
-		err := InitSFBuildInGroup(db, groupName)
-		if err != nil {
-			log.Warnf("create syntax flow group error: %s", err)
-		}
-	}
-}
-
-// UpdateSFRuleGroup 更新规则分组
-func UpdateSFRuleGroup(rule *schema.SyntaxFlowRule) error {
-	ruleName := rule.RuleName
-	if ruleName == "" {
-		return utils.Error("rule name is empty")
-	}
-
-	updateRuleGroupRelation := func(groupName string) error {
-		if groupName == "" {
-			return nil
-		}
-		saveData := &schema.SyntaxFlowRuleGroup{
-			RuleName:  ruleName,
-			GroupName: groupName,
-			IsBuildIn: true,
-		}
-		hash := saveData.CalcHash()
-		return CreateOrUpdateSyntaxFlowGroup(hash, saveData)
-	}
-
-	db := consts.GetGormProfileDatabase()
-	for _, n := range []string{rule.Language, string(rule.Purpose), string(rule.Severity)} {
-		if n == "" {
-			continue
-		}
-		exist := QuerySFDefaultGroup(db, n)
-		if !exist {
-			log.Errorf("add group for buildin syntaxflow rule failed:group %s not exist", n)
-			continue
-		}
-		err := updateRuleGroupRelation(n)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func ImportValidRule(system fi.FileSystem, ruleName string, content string) error {
@@ -266,7 +211,7 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 		}
 	}
 
-	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
+	err = CreateOrUpdateRule(rule.CalcHash(), rule)
 	if err != nil {
 		return utils.Wrap(err, "create or update syntax flow rule error")
 	}
@@ -326,7 +271,7 @@ func SaveSyntaxFlowRule(ruleName, language, content string, tags ...string) erro
 	rule.RuleName = ruleName
 	rule.Language = string(languageType)
 	rule.Tag = strings.Join(tags, "|")
-	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
+	err = CreateOrUpdateRule(rule.CalcHash(), rule)
 	if err != nil {
 		return utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
 	}
@@ -479,4 +424,43 @@ func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxF
 func YieldSyntaxFlowRulesWithoutLib(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
 	db = db.Where("allow_included = ?", false)
 	return YieldSyntaxFlowRules(db, ctx)
+}
+
+func QueryRuleByName(ruleName string) (*schema.SyntaxFlowRule, error) {
+	db := consts.GetGormProfileDatabase()
+	var rule schema.SyntaxFlowRule
+	if err := db.Preload("Groups").Where("rule_name = ?", ruleName).First(&rule).Error; err != nil {
+		return nil, err
+	}
+	return &rule, nil
+}
+
+func UpdateRule(rule *schema.SyntaxFlowRule) error {
+	if rule == nil {
+		return utils.Errorf("update syntaxFlow rule failed: rule is nil")
+	}
+	if rule.RuleName == "" {
+		return utils.Errorf("update syntaxFlow rule failed: rule name is empty")
+	}
+	db := consts.GetGormProfileDatabase()
+	db = db.Model(&schema.SyntaxFlowRule{})
+	if err := db.Where("rule_name = ?", rule.RuleName).Update(rule).Error; err != nil {
+		return utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+	return nil
+}
+
+func CreateRule(rule *schema.SyntaxFlowRule) error {
+	if rule == nil {
+		return utils.Errorf("create syntaxFlow rule failed: rule is nil")
+	}
+	if rule.RuleName == "" {
+		return utils.Errorf("create syntaxFlow rule failed: rule name is empty")
+	}
+	db := consts.GetGormProfileDatabase()
+	db = db.Model(&schema.SyntaxFlowRule{})
+	if err := db.Create(rule).Error; err != nil {
+		return utils.Errorf("create syntaxFlow rule failed: %s", err)
+	}
+	return nil
 }
