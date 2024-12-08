@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -33,7 +34,7 @@ func (s *Server) CreateSyntaxFlowRuleGroup(ctx context.Context, req *ypb.CreateS
 	if req.GetGroupName() == "" {
 		return nil, utils.Errorf("add syntax flow rule group failed:group name is empty")
 	}
-	err := yakit.CreateSyntaxFlowRuleGroup(s.GetProfileDatabase(), req.GetGroupName())
+	err := sfdb.CreateGroupByName(req.GetGroupName())
 	if err != nil {
 		return nil, err
 	} else {
@@ -47,7 +48,6 @@ func (s *Server) UpdateSyntaxFlowRuleAndGroup(ctx context.Context, req *ypb.Upda
 		return nil, utils.Errorf("update syntax flow rule group failed:filter is empty")
 	}
 
-	// update or remove  rule-group relationship
 	var errs error
 	msg := &ypb.DbOperateMessage{
 		TableName: "syntax_flow_rule_group",
@@ -60,21 +60,15 @@ func (s *Server) UpdateSyntaxFlowRuleAndGroup(ctx context.Context, req *ypb.Upda
 	if len(rules) == 0 {
 		return nil, utils.Errorf("update syntax flow rule group failed:rule name is empty")
 	}
-	for _, group := range req.GetAddGroups() {
-		count, err := yakit.AddSFRuleAndGroupRelation(s.GetProfileDatabase(), rules, group)
-		if err != nil {
-			errs = utils.JoinErrors(errs, err)
-		} else {
-			msg.EffectRows += count
-		}
+	count, err := sfdb.AddGroupsForRulesByName(rules, req.GetAddGroups())
+	msg.EffectRows += count
+	if err != nil {
+		errs = utils.JoinErrors(errs, err)
 	}
-	for _, group := range req.GetRemoveGroups() {
-		count, err := yakit.RemoveSFRuleAndGroupRelation(s.GetProfileDatabase(), rules, group)
-		if err != nil {
-			errs = utils.JoinErrors(errs, err)
-		} else {
-			msg.EffectRows += count
-		}
+	count, err = sfdb.RemoveGroupsForRulesByName(rules, req.GetRemoveGroups())
+	msg.EffectRows += count
+	if err != nil {
+		errs = utils.JoinErrors(errs, err)
 	}
 	return msg, errs
 }

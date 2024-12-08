@@ -33,7 +33,7 @@ func init() {
 			}()
 		}
 		// 创建默认规则组
-		sfdb.CreateSfDefaultGroup()
+		sfdb.ImportBuildInGroup()
 		fsInstance := filesys.NewEmbedFS(ruleFS)
 		err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 			dirName, name := fsInstance.PathSplit(s)
@@ -77,8 +77,8 @@ func init() {
 				log.Warnf("import rule %s error: %s", name, err)
 				return err
 			}
-			// builtin rule use language,purpose,severity as group name
-			err = sfdb.UpdateSFRuleGroup(rule)
+
+			_, err = sfdb.AddGroupsForRulesByName([]string{rule.RuleName}, []string{})
 			if err != nil {
 				return err
 			}
