@@ -73,6 +73,22 @@ func QueryGroupByName(db *gorm.DB, groupName string) (*schema.SyntaxFlowGroup, e
 	return i, nil
 }
 
+func GetIntersectionGroups(groups []*schema.SyntaxFlowGroup) []*schema.SyntaxFlowGroup {
+	if len(groups) == 0 {
+		return nil
+	}
+	var result []*schema.SyntaxFlowGroup
+	groupMap := make(map[string]struct{})
+	for _, group := range groups {
+		if _, ok := groupMap[group.GroupName]; !ok {
+			groupMap[group.GroupName] = struct{}{}
+			continue
+		}
+		result = append(result, group)
+	}
+	return result
+}
+
 // AddGroupsForBuildInRule 为内置规则添加默认分组
 // 默认分组为：语言、严重程度、规则类型
 func AddGroupsForBuildInRule(db *gorm.DB, buildInRule *schema.SyntaxFlowRule) error {
