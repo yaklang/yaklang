@@ -15,14 +15,23 @@ func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*
 		params = &ypb.QuerySyntaxFlowRuleRequest{}
 	}
 	db = db.Model(&schema.SyntaxFlowRule{})
-
 	p := params.Pagination
 	db = bizhelper.OrderByPaging(db, p)
 	db = FilterSyntaxFlowRule(db, params.GetFilter())
 	var ret []*schema.SyntaxFlowRule
+	db = db.Preload("Groups")
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
+	}
+
+	var groups []*schema.SyntaxFlowGroup
+	for _, rule := range ret {
+		groups = append(groups, rule.Groups...)
+	}
+	igs := sfdb.GetIntersectionGroups(groups)
+	for _, rule := range ret {
+		rule.Groups = igs
 	}
 	return paging, ret, nil
 }

@@ -184,4 +184,46 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 			require.Equal(t, afterDeleteCount, 0)
 		}
 	})
+
+	t.Run("test intersection group of query rules", func(t *testing.T) {
+		ruleName1 := fmt.Sprintf("rule_%s", uuid.NewString())
+		_, err = createSfRuleEx(client, ruleName1)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName1})
+			require.NoError(t, err)
+		})
+
+		ruleName2 := fmt.Sprintf("rule_%s", uuid.NewString())
+		_, err = createSfRuleEx(client, ruleName2)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName2})
+			require.NoError(t, err)
+		})
+
+		groupNameA := fmt.Sprintf("group_%s", uuid.NewString())
+		groupNameB := fmt.Sprintf("group_%s", uuid.NewString())
+		groupNameC := fmt.Sprintf("group_%s", uuid.NewString())
+
+		t.Cleanup(func() {
+			_, err = deleteRuleGroup(client, []string{groupNameA, groupNameB, groupNameC})
+			require.NoError(t, err)
+		})
+
+		err = createGroups(client, []string{groupNameA, groupNameB, groupNameC})
+		require.NoError(t, err)
+
+		err = addGroups(client, []string{ruleName1}, []string{groupNameA, groupNameB})
+		require.NoError(t, err)
+
+		err = addGroups(client, []string{ruleName2}, []string{groupNameB, groupNameC})
+		require.NoError(t, err)
+
+		rule, err := queryRulesByName(client, []string{ruleName1, ruleName2})
+		require.NoError(t, err)
+		require.Equal(t, groupNameB, rule[0].GetGroupName()[0])
+		require.Equal(t, groupNameB, rule[1].GetGroupName()[0])
+	})
+
 }
