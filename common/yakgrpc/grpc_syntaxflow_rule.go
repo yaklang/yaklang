@@ -44,41 +44,7 @@ func (s *Server) QuerySyntaxFlowRule(ctx context.Context, req *ypb.QuerySyntaxFl
 	return rsp, nil
 }
 
-func (s *Server) CreateSyntaxFlowRuleEx(ctx context.Context, req *ypb.CreateSyntaxFlowRuleRequest) (*ypb.SyntaxFlowRule, error) {
-	rule, err := ParseSyntaxFlowInput(req.GetSyntaxFlowInput())
-	if err != nil {
-		return nil, err
-	}
-	err = yakit.CreateSyntaxFlowRule(s.GetProfileDatabase(), rule)
-	if err != nil {
-		return nil, err
-	}
-	_, createdRule, err := yakit.QuerySyntaxFlowRule(s.GetProfileDatabase(), &ypb.QuerySyntaxFlowRuleRequest{
-		Filter: &ypb.SyntaxFlowRuleFilter{
-			RuleNames: []string{rule.RuleName},
-		},
-		Pagination: &ypb.Paging{
-			Page:    1,
-			Limit:   30,
-			OrderBy: "updated_at",
-			Order:   "desc",
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(createdRule) == 0 {
-		return nil, utils.Errorf("create syntax flow rule by name %s failed", rule.RuleName)
-	}
-	return createdRule[0].ToGRPCModel(), nil
-}
-
-func (s *Server) CreateSyntaxFlowRule(ctx context.Context, req *ypb.CreateSyntaxFlowRuleRequest) (*ypb.DbOperateMessage, error) {
-	msg := &ypb.DbOperateMessage{
-		TableName:  "syntax_flow_rule",
-		Operation:  DbOperationCreate,
-		EffectRows: 1,
-	}
+func (s *Server) CreateSyntaxFlowRuleEx(ctx context.Context, req *ypb.CreateSyntaxFlowRuleRequest) (*ypb.CreateSyntaxFlowRuleResponse, error) {
 	rule, err := ParseSyntaxFlowInput(req.GetSyntaxFlowInput())
 	if err != nil {
 		return nil, err
@@ -87,53 +53,47 @@ func (s *Server) CreateSyntaxFlowRule(ctx context.Context, req *ypb.CreateSyntax
 	if err != nil {
 		return nil, err
 	}
-	return msg, nil
+	return &ypb.CreateSyntaxFlowRuleResponse{
+		Rule: rule.ToGRPCModel(),
+		Message: &ypb.DbOperateMessage{
+			TableName:  "syntax_flow_rule",
+			Operation:  DbOperationCreate,
+			EffectRows: 1,
+		},
+	}, nil
 }
 
-func (s *Server) UpdateSyntaxFlowRuleEx(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleRequest) (*ypb.SyntaxFlowRule, error) {
-	rule, err := ParseSyntaxFlowInput(req.GetSyntaxFlowInput())
+func (s *Server) CreateSyntaxFlowRule(ctx context.Context, req *ypb.CreateSyntaxFlowRuleRequest) (*ypb.DbOperateMessage, error) {
+	if ret, err := s.CreateSyntaxFlowRuleEx(ctx, req); err != nil {
+		return nil, err
+	} else {
+		return ret.Message, nil
+	}
+}
+func (s *Server) UpdateSyntaxFlowRuleEx(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleRequest) (*ypb.UpdateSyntaxFlowRuleResponse, error) {
+	if req == nil || req.SyntaxFlowInput == nil {
+		return nil, utils.Error("update syntax flow rule failed: request is nil")
+	}
+	updatedRule, err := yakit.UpdateSyntaxFlowRule(s.GetProfileDatabase(), req.SyntaxFlowInput)
 	if err != nil {
 		return nil, err
 	}
-	err = yakit.UpdateSyntaxFlowRule(s.GetProfileDatabase(), rule)
-	if err != nil {
-		return nil, err
-	}
-	_, updatedRule, err := yakit.QuerySyntaxFlowRule(s.GetProfileDatabase(), &ypb.QuerySyntaxFlowRuleRequest{
-		Filter: &ypb.SyntaxFlowRuleFilter{
-			RuleNames: []string{rule.RuleName},
+	return &ypb.UpdateSyntaxFlowRuleResponse{
+		Message: &ypb.DbOperateMessage{
+			TableName:  "syntax_flow_rule",
+			Operation:  DbOperationCreateOrUpdate,
+			EffectRows: 1,
 		},
-		Pagination: &ypb.Paging{
-			Page:    1,
-			Limit:   30,
-			OrderBy: "updated_at",
-			Order:   "desc",
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(updatedRule) == 0 {
-		return nil, utils.Errorf("create syntax flow rule by name %s failed", rule.RuleName)
-	}
-	return updatedRule[0].ToGRPCModel(), nil
+		Rule: updatedRule.ToGRPCModel(),
+	}, nil
 }
 
 func (s *Server) UpdateSyntaxFlowRule(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleRequest) (*ypb.DbOperateMessage, error) {
-	msg := &ypb.DbOperateMessage{
-		TableName:  "syntax_flow_rule",
-		Operation:  DbOperationCreateOrUpdate,
-		EffectRows: 1,
-	}
-	rule, err := ParseSyntaxFlowInput(req.GetSyntaxFlowInput())
-	if err != nil {
+	if ret, err := s.UpdateSyntaxFlowRuleEx(ctx, req); err != nil {
 		return nil, err
+	} else {
+		return ret.Message, nil
 	}
-	err = sfdb.UpdateRule(rule)
-	if err != nil {
-		return nil, err
-	}
-	return msg, nil
 }
 
 func (s *Server) DeleteSyntaxFlowRule(ctx context.Context, req *ypb.DeleteSyntaxFlowRuleRequest) (*ypb.DbOperateMessage, error) {
