@@ -53,6 +53,31 @@ func CreateGroup(db *gorm.DB, groupName string, isBuildIn ...bool) (*schema.Synt
 	return i, nil
 }
 
+func GetOrCreatGroupsByName(groupNames []string) []*schema.SyntaxFlowGroup {
+	var groups []*schema.SyntaxFlowGroup
+	for _, groupName := range groupNames {
+		group, err := QueryGroupByName(groupName)
+		if err == nil {
+			groups = append(groups, group)
+			continue
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Errorf("get group %s failed: %s", groupName, err)
+			continue
+		}
+		// if not found, create it
+		if err = CreateGroupByName(groupName); err != nil {
+			log.Errorf("create group %s failed: %s", groupName, err)
+			continue
+		}
+		group, err = QueryGroupByName(groupName)
+		if err == nil {
+			groups = append(groups, group)
+		}
+	}
+	return groups
+}
+
 // QueryAllGroups 查询所有的SyntaxFlow规则组
 func QueryAllGroups(db *gorm.DB) ([]schema.SyntaxFlowGroup, error) {
 	var groups []schema.SyntaxFlowGroup
@@ -74,8 +99,8 @@ func QueryGroupByName(db *gorm.DB, groupName string) (*schema.SyntaxFlowGroup, e
 }
 
 func GetIntersectionGroups(groups []*schema.SyntaxFlowGroup) []*schema.SyntaxFlowGroup {
-	if len(groups) == 0 {
-		return nil
+	if len(groups) <= 1 {
+		return groups
 	}
 	var result []*schema.SyntaxFlowGroup
 	groupMap := make(map[string]struct{})
