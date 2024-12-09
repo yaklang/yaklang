@@ -75,3 +75,20 @@ func (s *Server) UpdateSyntaxFlowRuleAndGroup(ctx context.Context, req *ypb.Upda
 	}
 	return msg, errs
 }
+
+func (s *Server) UpdateSyntaxFlowRuleGroup(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleGroupRequest) (*ypb.DbOperateMessage, error) {
+	if req.GetOldGroupName() == "" || req.GetNewGroupName() == "" {
+		return nil, utils.Errorf("update syntax flow rule group failed:group name is empty")
+	}
+	msg := &ypb.DbOperateMessage{
+		TableName: "syntax_flow_rule_group",
+		Operation: DbOperationUpdate,
+	}
+	err := sfdb.RenameGroup(req.GetOldGroupName(), req.GetNewGroupName())
+	if err != nil {
+		return nil, err
+	} else {
+		msg.EffectRows = 1
+		return msg, nil
+	}
+}

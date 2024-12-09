@@ -226,4 +226,58 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		require.Equal(t, groupNameB, rule[1].GetGroupName()[0])
 	})
 
+	t.Run("test rename group", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		oldGroupName := uuid.NewString()
+		createReq := &ypb.CreateSyntaxFlowRuleRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+				RuleName:   ruleName,
+				GroupNames: []string{oldGroupName},
+				Language:   "java",
+			},
+		}
+		_, err := client.CreateSyntaxFlowRuleEx(context.Background(), createReq)
+		require.NoError(t, err)
+
+		newGroupName := uuid.NewString()
+		updateReq := &ypb.UpdateSyntaxFlowRuleGroupRequest{
+			OldGroupName: oldGroupName,
+			NewGroupName: newGroupName,
+		}
+		_, err = client.UpdateSyntaxFlowRuleGroup(context.Background(), updateReq)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName})
+			require.NoError(t, err)
+		})
+
+		newRule, err := queryRulesByName(client, []string{ruleName})
+		require.NoError(t, err)
+		require.Equal(t, newGroupName, newRule[0].GetGroupName()[0])
+	})
+
+	t.Run("query buildin group", func(t *testing.T) {
+		// create build in group
+		groupName1 := uuid.NewString()
+		sfdb.CreateGroupByName(groupName1, true)
+		// create not build in group
+		groupName2 := uuid.NewString()
+		sfdb.CreateGroupByName(groupName2, false)
+		t.Cleanup(func() {
+			err = sfdb.DeleteGroupByName(groupName1)
+			require.NoError(t, err)
+			err = sfdb.DeleteGroupByName(groupName2)
+			require.NoError(t, err)
+		})
+		// query build in group
+		group, err := client.QuerySyntaxFlowRuleGroup(context.Background(), &ypb.QuerySyntaxFlowRuleGroupRequest{
+			Filter: &ypb.SyntaxFlowRuleGroupFilter{
+				GroupNames: []string{groupName2, groupName1},
+				IsBuildIn:  "true",
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(group.Group))
+		require.True(t, group.Group[0].IsBuildIn)
+	})
 }
