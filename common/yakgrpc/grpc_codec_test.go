@@ -21,19 +21,33 @@ func TestGRPCMUSTPASS_COMMON_CODEC_AUTODECODE(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	rsp, err := client.AutoDecode(utils.TimeoutContextSeconds(1), &ypb.AutoDecodeRequest{Data: `MTI3LjAuMC4xICAgbG9jYWxob3N0IGxvY2FsaG9zdC5sb2NhbGRvbWFpbiBsb2NhbGhvc3Q0IGxvY2FsaG9zdDQubG9jYWxkb21haW40Cjo6MSAgICAgICAgIGxvY2FsaG9zdCBsb2NhbGhvc3QubG9jYWxkb21haW4gbG9jYWxob3N0NiBsb2NhbGhvc3Q2LmxvY2FsZG9tYWluNgoxMC4xOC4zLjEzNyBob3N0LTEwLTE4LTMtMTM3CjEwLjE4LjMuNzcgeXVubmFuCjEwLjE4LjMuMjU0IG1hc3Rlcgo=`})
-	if err != nil {
-		panic(err)
-	}
-	check := false
-	for _, r := range rsp.GetResults() {
-		if strings.Contains(string(r.Result), `ocalhost.localdoma`) {
-			check = true
+
+	t.Run("test auto decode ", func(t *testing.T) {
+		rsp, err := client.AutoDecode(utils.TimeoutContextSeconds(1), &ypb.AutoDecodeRequest{Data: `MTI3LjAuMC4xICAgbG9jYWxob3N0IGxvY2FsaG9zdC5sb2NhbGRvbWFpbiBsb2NhbGhvc3Q0IGxvY2FsaG9zdDQubG9jYWxkb21haW40Cjo6MSAgICAgICAgIGxvY2FsaG9zdCBsb2NhbGhvc3QubG9jYWxkb21haW4gbG9jYWxob3N0NiBsb2NhbGhvc3Q2LmxvY2FsZG9tYWluNgoxMC4xOC4zLjEzNyBob3N0LTEwLTE4LTMtMTM3CjEwLjE4LjMuNzcgeXVubmFuCjEwLjE4LjMuMjU0IG1hc3Rlcgo=`})
+		if err != nil {
+			panic(err)
 		}
-	}
-	if !check {
-		t.Fatal("AUTO DECODE BASE64 SMOKING TEST FAILED")
-	}
+		check := false
+		for _, r := range rsp.GetResults() {
+			if strings.Contains(string(r.Result), `ocalhost.localdoma`) {
+				check = true
+			}
+		}
+		if !check {
+			t.Fatal("AUTO DECODE BASE64 SMOKING TEST FAILED")
+		}
+	})
+
+	t.Run("test repeated auto decode", func(t *testing.T) {
+		rsp, err := client.AutoDecode(context.Background(), &ypb.AutoDecodeRequest{Data: `%7B%22pctag%22%3A%22pc%22%2C%22appid%22%3A%221026%22%7D`})
+		if err != nil {
+			panic(err)
+		}
+		require.Len(t, rsp.GetResults(), 2)
+		require.Equal(t, `UrlDecode`, string(rsp.GetResults()[0].Type))
+		require.Equal(t, `Charset Decode`, string(rsp.GetResults()[1].Type))
+	})
+
 }
 
 func TestGRPCMUSTPASS_COMMON_CODEC_Filetag(t *testing.T) {
@@ -530,4 +544,8 @@ aaa=bbb&ccc=ddd`, "上传数据包(仅POST参数)", func(packet string, packetBy
 			require.NotContains(t, body, "\r\n\r\nr\r\n")
 		})
 	})
+}
+
+func Tes() {
+
 }
