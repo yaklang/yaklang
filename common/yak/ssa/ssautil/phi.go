@@ -18,10 +18,10 @@ func ForEachCapturedVariable[T versionedValue](
 func ForEachCapturedSideEffect[T versionedValue](
 	scope ScopedVersionedTableIF[T],
 	base ScopedVersionedTableIF[T],
-	handler VariableHandler[T],
+	handler func(string, []VersionedIF[T]),
 ) {
-	scope.ForEachCapturedSideEffect(func(name string, ver VersionedIF[T]) {
-		if ver.GetValue().IsSideEffect() {
+	scope.ForEachCapturedSideEffect(func(name string, ver []VersionedIF[T]) {
+		if ver[0].GetValue().IsSideEffect() {
 			handler(name, ver)
 		} else {
 			log.Warnf("link-SideEffect must be side effect type")
@@ -39,9 +39,13 @@ func (base *ScopedVersionedTable[T]) CoverBy(scope ScopedVersionedTableIF[T]) {
 		// v := base.CreateVariable(name, false)
 		base.AssignVariable(ver, ver.GetValue())
 	})
-	ForEachCapturedSideEffect(scope, baseScope, func(name string, ver VersionedIF[T]) {
+	ForEachCapturedSideEffect(scope, baseScope, func(name string, ver []VersionedIF[T]) {
 		// v := base.CreateVariable(name, false)
-		base.AssignVariable(ver, ver.GetValue())
+		if baseScope.GetParent() == ver[1].GetScope() {
+			baseScope.AssignVariable(ver[0], ver[0].GetValue())
+		} else {
+			baseScope.SetCapturedSideEffect(ver[0].GetName(), ver[0], ver[1])
+		}
 	})
 }
 
@@ -98,6 +102,9 @@ func (base *ScopedVersionedTable[T]) Merge(
 	for index, sub := range subScopes {
 		ForEachCapturedVariable(sub, baseScope, func(name string, ver VersionedIF[T]) {
 			addPhiContent(index, name, ver)
+		})
+		ForEachCapturedSideEffect(sub, baseScope, func(name string, ver []VersionedIF[T]) {
+			baseScope.SetCapturedSideEffect(ver[0].GetName(), ver[0], ver[1])
 		})
 	}
 

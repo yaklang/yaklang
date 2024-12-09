@@ -157,13 +157,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		return
 	}
 	scope := b.CurrentBlock.ScopeTable
-	if headScope := scope.GetHead(); headScope != nil && b.GetForceCapture() {
-		scope.AssignVariable(variable, value, func() Value {
-			return NewParam(name, true, b)
-		})
-	} else {
-		scope.AssignVariable(variable, value)
-	}
+	scope.AssignVariable(variable, value)
 
 	if value.GetName() == variable.GetName() {
 		if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
@@ -182,6 +176,8 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			parentValue.AddMask(value)
 			v := parentValue.GetVariable(variable.GetName())
 			b.AddSideEffect(v, value)
+			freeValue := b.PeekValue(variable.GetName())
+			_ = freeValue
 		}
 	}
 	if _, ok := b.RefParameter[variable.GetName()]; ok {

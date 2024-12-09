@@ -314,6 +314,10 @@ func (c *Call) handleCalleeFunction() {
 			}
 
 			if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
+				if builder.SupportClosure {
+					builder.BuildFreeValue(variable.GetName())
+				}
+
 				AddSideEffect := func() {
 					// TODO: handle side effect in loop scope,
 					// will replace value in scope and create new phi
@@ -330,26 +334,50 @@ func (c *Call) handleCalleeFunction() {
 						return
 					}
 					sideEffect.SetVerboseName(se.VerboseName)
-					currentScope.SetCapturedSideEffect(se.VerboseName, variable)
+					currentScope.SetCapturedSideEffect(se.VerboseName, variable, se.BindVariable)
 
 					function.SideEffects = append(function.SideEffects, se)
 				}
 
 				CheckSideEffect := func(find *Variable) {
-					if bindScope.IsSameOrSubScope(find.GetScope()) {
-						AddSideEffect()
-					} else {
-						SetCapturedSideEffect()
+					Check := func(scope ScopeIF) {
+						if bindScope.IsSameOrSubScope(scope) {
+							AddSideEffect()
+						} else {
+							SetCapturedSideEffect()
+						}
 					}
+
+					if freevalue, ok := ToParameter(find.Value); ok {
+						if defaultValue := freevalue.defaultValue; defaultValue != nil {
+							scope := defaultValue.GetBlock().ScopeTable
+							Check(scope)
+							return
+						}
+					}
+					Check(find.GetScope())
 				}
 
-				GetScope := func(scope ScopeIF, name string) *Variable {
-					if ret := GetLocalVariableFromScope(scope, name); ret != nil {
-						return ret
-					} else if ret := GetVariableFromScope(scope, name); ret != nil {
-						return ret
+				var GetScope func(ScopeIF, string, *FunctionBuilder) *Variable
+				GetScope = func(scope ScopeIF, name string, builder *FunctionBuilder) *Variable {
+					var ret *Variable
+					if vairable := GetLocalVariableFromScope(scope, name); vairable != nil {
+						ret = vairable
+					} else if vairable := GetVariableFromScope(scope, name); vairable != nil {
+						ret = vairable
 					}
-					return nil
+					if ret == nil {
+						return nil
+					}
+					if _, ok := ToParameter(ret.GetValue()); ok {
+						parentBuilder := builder.parentBuilder
+						if parentBuilder != nil {
+							parentScope := parentBuilder.CurrentBlock.ScopeTable
+							return GetScope(parentScope, name, parentBuilder)
+						}
+					}
+
+					return ret
 				}
 
 				if _, ok := se.Modify.(*Parameter); ok {
@@ -358,10 +386,10 @@ func (c *Call) handleCalleeFunction() {
 				}
 
 				obj := se.parameterMemberInner
-				if ret := GetScope(currentScope, se.Name); ret != nil {
+				if ret := GetScope(currentScope, se.Name, builder); ret != nil {
 					CheckSideEffect(ret)
 					continue
-				} else if ret := GetScope(currentScope, obj.ObjectName); ret != nil {
+				} else if ret := GetScope(currentScope, obj.ObjectName, builder); ret != nil {
 					CheckSideEffect(ret)
 					continue
 				} else if obj.ObjectName == "this" {
@@ -377,11 +405,11 @@ func (c *Call) handleCalleeFunction() {
 				// 处理跨闭包的side-effect
 				if block := function.GetBlock(); block != nil {
 					functionScope := block.ScopeTable
-					if ret := GetScope(functionScope, se.Name); ret != nil {
+					if ret := GetScope(functionScope, se.Name, builder); ret != nil {
 						CheckSideEffect(ret)
 						continue
 					} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
-						if ret := GetScope(functionScope, obj.ObjectName); ret != nil {
+						if ret := GetScope(functionScope, obj.ObjectName, builder); ret != nil {
 							CheckSideEffect(ret)
 							continue
 						} else {
