@@ -2,8 +2,8 @@ package ssa
 
 import "github.com/samber/lo"
 
-func (s *FunctionType) SetFreeValue(fv map[string]*Parameter) {
-	s.FreeValue = lo.MapToSlice(fv, func(name string, para *Parameter) *Parameter { return para })
+func (s *FunctionType) SetFreeValue(fv map[*Variable]*Parameter) {
+	s.FreeValue = lo.MapToSlice(fv, func(name *Variable, para *Parameter) *Parameter { return para })
 }
 
 // FunctionSideEffect is a side-effect in a closure

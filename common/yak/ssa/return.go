@@ -78,7 +78,8 @@ func (b *FunctionBuilder) Finish() {
 	b.fixupParameterWithThis()
 
 	for _, fun := range b.MarkedFunctions {
-		for name, fv := range fun.FreeValues {
+		for variable, fv := range fun.FreeValues {
+			name := variable.GetName()
 			param, ok := ToParameter(fv)
 			if ok {
 				if param.GetDefault() != nil {
@@ -209,7 +210,7 @@ func (f *Function) Finish() {
 	funType.ParameterMember = lo.FilterMap(f.ParameterMembers, func(i Value, _ int) (*ParameterMember, bool) {
 		return ToParameterMember(i)
 	})
-	result := make(map[string]*Parameter)
+	result := make(map[*Variable]*Parameter)
 	for n, p := range f.FreeValues {
 		if param, ok := ToParameter(p); ok {
 			result[n] = param

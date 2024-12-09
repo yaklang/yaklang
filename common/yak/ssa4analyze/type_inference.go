@@ -60,7 +60,7 @@ func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 		if param.GetDefault() != nil {
 			continue
 		}
-		fv.NewError(ssa.Warn, TITAG, FreeValueUndefine(name))
+		fv.NewError(ssa.Warn, TITAG, FreeValueUndefine(name.GetName()))
 	}
 }
 
