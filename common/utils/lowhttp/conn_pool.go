@@ -194,19 +194,19 @@ type persistConn struct {
 	alive    bool             // 存活判断
 	sawEOF   bool             // 连接是否EOF
 
-	idleAt               time.Time                 // 进入空闲的时间
-	closeTimer           *time.Timer               // 关闭定时器
-	dialOption           []netx.DialXOption        // dial 选项
-	br                   *bufio.Reader             // from conn
-	bw                   *bufio.Writer             // to conn
-	reqCh                chan requestAndResponseCh // 读取管道
-	writeCh              chan writeRequest         // 写入管道
-	closeCh              chan struct{}             // 关闭信号
-	writeErrCh           chan error                // 写入错误信号
-	serverStartTime      time.Time                 // 响应时间
-	numExpectedResponses int                       // 预期的响应数量
-	reused               bool                      // 是否复用
-	closed               error                     // 连接关闭原因
+	idleAt          time.Time                 // 进入空闲的时间
+	closeTimer      *time.Timer               // 关闭定时器
+	dialOption      []netx.DialXOption        // dial 选项
+	br              *bufio.Reader             // from conn
+	bw              *bufio.Writer             // to conn
+	reqCh           chan requestAndResponseCh // 读取管道
+	writeCh         chan writeRequest         // 写入管道
+	closeCh         chan struct{}             // 关闭信号
+	writeErrCh      chan error                // 写入错误信号
+	serverStartTime time.Time                 // 响应时间
+	//numExpectedResponses int                       // 预期的响应数量
+	reused bool  // 是否复用
+	closed error // 连接关闭原因
 
 	inPool bool
 	isIdle bool
@@ -341,23 +341,23 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 
 	// 初始化连接
 	pc := &persistConn{
-		Conn:                 newConn,
-		mu:                   sync.Mutex{},
-		p:                    pool,
-		cacheKey:             key,
-		isProxy:              needProxy,
-		sawEOF:               false,
-		idleAt:               time.Time{},
-		closeTimer:           nil,
-		dialOption:           opt,
-		reqCh:                make(chan requestAndResponseCh, 1),
-		writeCh:              make(chan writeRequest, 1),
-		closeCh:              make(chan struct{}, 1),
-		writeErrCh:           make(chan error, 1),
-		serverStartTime:      time.Time{},
-		wPacket:              make([]packetInfo, 0),
-		rPacket:              make([]packetInfo, 0),
-		numExpectedResponses: 0,
+		Conn:            newConn,
+		mu:              sync.Mutex{},
+		p:               pool,
+		cacheKey:        key,
+		isProxy:         needProxy,
+		sawEOF:          false,
+		idleAt:          time.Time{},
+		closeTimer:      nil,
+		dialOption:      opt,
+		reqCh:           make(chan requestAndResponseCh, 1),
+		writeCh:         make(chan writeRequest, 1),
+		closeCh:         make(chan struct{}, 1),
+		writeErrCh:      make(chan error, 1),
+		serverStartTime: time.Time{},
+		wPacket:         make([]packetInfo, 0),
+		rPacket:         make([]packetInfo, 0),
+		//numExpectedResponses: 0,
 	}
 
 	if key.scheme == H2 {
@@ -448,11 +448,11 @@ func (pc *persistConn) readLoop() {
 		_, err := pc.br.Peek(1)
 
 		// 检查是否有需要返回的响应,如果没有则可以直接返回,不需要往管道里返回数据（err）
-		if pc.numExpectedResponses == 0 {
+		if err != nil {
 			if err == io.EOF {
 				pc.closeConn(errServerClosedIdle)
 			} else {
-				pc.closeConn(err)
+				pc.closeConn(utils.Errorf("read error: %v", err))
 			}
 			return
 		}
@@ -537,9 +537,9 @@ func (pc *persistConn) readLoop() {
 			}
 		}
 
-		pc.mu.Lock()
-		pc.numExpectedResponses-- // 减少预期响应数量
-		pc.mu.Unlock()
+		//pc.mu.Lock()
+		////pc.numExpectedResponses-- // 减少预期响应数量
+		//pc.mu.Unlock()
 
 		rc.ch <- responseInfo{resp: resp, respBytes: respPacket, info: info, err: err}
 		firstAuth = true
@@ -564,9 +564,9 @@ func (pc *persistConn) writeLoop() {
 				pc.writeErrCh <- err
 				return
 			}
-			pc.mu.Lock()
-			pc.numExpectedResponses++
-			pc.mu.Unlock()
+			//pc.mu.Lock()
+			//pc.numExpectedResponses++
+			//pc.mu.Unlock()
 		case <-pc.closeCh:
 			return
 		}
