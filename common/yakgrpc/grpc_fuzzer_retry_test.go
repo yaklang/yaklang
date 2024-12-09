@@ -12,6 +12,12 @@ import (
 	"testing"
 )
 
+func TestAccccccc(t *testing.T) {
+	for i := 0; i < 20; i++ {
+		TestGRPCMUSTPASS_HTTPFuzzer_Retry(t)
+	}
+}
+
 func TestGRPCMUSTPASS_HTTPFuzzer_Retry(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
@@ -21,9 +27,10 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Retry(t *testing.T) {
 	token := utils.RandStringBytes(16)
 	count := uint64(0)
 	targetHost, targetPort := utils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
-		atomic.AddUint64(&count, 1)
-		if count%2 == 0 {
-			conn.Close()
+		defer conn.Close()
+		currentCount := atomic.AddUint64(&count, 1)
+		_, err := conn.Read(make([]byte, 1))
+		if err != nil || currentCount%2 == 0 {
 			return
 		}
 		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello\r\n"))
