@@ -136,7 +136,7 @@ func (b *FunctionBuilder) writeUndefine(variable string, names ...string) *Undef
 		name = names[0]
 	}
 	undefine := b.EmitUndefined(name)
-	v := b.CreateVariable(variable)
+	v := b.CreateVariableForce(variable)
 	b.AssignVariable(v, undefine)
 	return undefine
 }
@@ -196,7 +196,18 @@ func (b *FunctionBuilder) CreateLocalVariable(name string) *Variable {
 	return b.createVariableEx(name, true)
 }
 
+func (b *FunctionBuilder) CreateVariableForce(name string, pos ...CanStartStopToken) *Variable {
+	return b.createVariableEx(name, false, pos...)
+}
+
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
+	if variable := b.getCurrentScopeVariable(name); variable != nil {
+		if value := variable.GetValue(); value != nil {
+			if _, ok := ToConst(value); ok {
+				return variable
+			}
+		}
+	}
 	return b.createVariableEx(name, false, pos...)
 }
 
@@ -257,4 +268,12 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 		parentScope = parentScope.next
 	}
 	return nil, false
+}
+
+func (b *FunctionBuilder) getCurrentScopeVariable(name string) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+	if variable := ReadVariableFromCurrentScope(scope, name); variable != nil {
+		return variable
+	}
+	return nil
 }

@@ -102,6 +102,27 @@ func TestStmt_normol(t *testing.T) {
 		}
 		`, []string{"Undefined-i(valid)", "Undefined-d(valid)"}, t)
 	})
+
+	// todo
+	t.Run("for global Spin", func(t *testing.T) {
+		t.Skip()
+		test.CheckPrintlnValue(`package A
+
+	var str = []string{
+		"hello world",
+	}
+
+	func main() {
+		for true {
+			if true {
+
+			}else{
+				println(str[0])
+			}
+		}
+	}
+		`, []string{"\"hello world\""}, t)
+	})
 }
 
 func TestStmt_const(t *testing.T) {
