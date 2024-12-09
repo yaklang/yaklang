@@ -174,7 +174,7 @@ HandleExpect100Continue:
 		switch lowerKey {
 		case "content-length":
 			useContentLength = true
-			contentLengthInt = codec.Atoi(valStr)
+			contentLengthInt = codec.Atoi(strings.TrimSpace(valStr))
 			if contentLengthInt != 0 {
 				header.Set(keyStr, valStr)
 				rsp.ContentLength = int64(contentLengthInt)
