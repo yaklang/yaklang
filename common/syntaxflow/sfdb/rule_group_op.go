@@ -250,3 +250,26 @@ func ImportBuildInGroup(db *gorm.DB) {
 		}
 	}
 }
+
+// RenameGroup 重命名组
+func RenameGroup(oldName, newName string) error {
+	db := consts.GetGormProfileDatabase()
+	db = db.Model(&schema.SyntaxFlowGroup{})
+	var existingGroup schema.SyntaxFlowGroup
+	err := db.Where("group_name = ? ", newName).First(&existingGroup).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return utils.Errorf("rename group failed: %s", err)
+	} else if err == nil {
+		return utils.Errorf("rename group failed: new group name %s already exist.", newName)
+	}
+
+	updatedGroup, err := QueryGroupByName(oldName)
+	if err != nil {
+		return utils.Errorf("rename group failed: %s", err)
+	}
+	updatedGroup.GroupName = newName
+	if err = db.Update(updatedGroup).Error; err != nil {
+		return utils.Errorf("rename group failed: %s", err)
+	}
+	return nil
+}

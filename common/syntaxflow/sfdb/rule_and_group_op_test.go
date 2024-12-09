@@ -176,4 +176,25 @@ func TestRule_Group_OP(t *testing.T) {
 		require.Contains(t, groupNames, groupName1)
 		require.Contains(t, groupNames, groupName2)
 	})
+
+	t.Run("test rename group", func(t *testing.T) {
+		groupName1 := uuid.NewString()
+		err := CreateGroupByName(groupName1)
+		require.NoError(t, err)
+
+		group1, err := QueryGroupByName(groupName1)
+		require.NoError(t, err)
+
+		groupName2 := uuid.NewString()
+		err = RenameGroup(groupName1, groupName2)
+		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			err = DeleteGroupByName(groupName2)
+			require.NoError(t, err)
+		})
+		group2, err := QueryGroupByName(groupName2)
+		require.NoError(t, err)
+		require.Equal(t, group1.ID, group2.ID)
+	})
 }
