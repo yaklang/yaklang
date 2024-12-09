@@ -5,14 +5,14 @@ version: '3'
 tasks:
   yak_doc:
     silent: true
-    dir: common/yak/yakdoc
+    dir: yak/yakdoc
     cmds:
       - go run -gcflags=all="-N -l" ./generate_doc/generate_doc.go ./doc/doc.gob.gzip
     generates:
       - ./doc/doc.gob.gzip
   codec_doc:
     silent: true
-    dir: common/yak/yaklib/codec/codegrpc/doc
+    dir: yak/yaklib/codec/codegrpc/doc
     cmds:
       - go run -gcflags=all="-N -l" codec_doc.go ../codec.gob.gzip
     generates:
@@ -27,6 +27,6 @@ tasks:
       - ./ypb/yakgrpc_grpc.pb.go
   embed_fs:
     silent: true
-    dir: common/yak/cmd
+    dir: yak/cmd
     cmds:
       - go run yak.go embed-fs-hash --override --all
