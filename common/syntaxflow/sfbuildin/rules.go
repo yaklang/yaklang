@@ -80,7 +80,7 @@ func init() {
 				return err
 			}
 
-			_, err = sfdb.BatchAddGroupsForRules(db, []string{rule.RuleName}, []string{})
+			err = sfdb.AddGroupsForBuildInRule(db,rule)
 			if err != nil {
 				return err
 			}
