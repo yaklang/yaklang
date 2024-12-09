@@ -78,8 +78,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 
 	if len(f.FreeValues) > 0 {
 		ret += "freeValue: " + strings.Join(
-			lo.MapToSlice(f.FreeValues, func(name string, item Value) string {
-				return fmt.Sprintf("%s:(%d)%s", name, item.GetId(), item.GetName())
+			lo.MapToSlice(f.FreeValues, func(name *Variable, item Value) string {
+				return fmt.Sprintf("%s:(%d)%s", name.GetName(), item.GetId(), item.GetName())
 			}),
 			// f.FreeValue,
 			", ") + "\n"

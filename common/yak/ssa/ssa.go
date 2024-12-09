@@ -295,7 +295,7 @@ type Function struct {
 	Params      []Value
 	ParamLength int
 	// for closure function
-	FreeValues map[string]Value // store the captured variable form parent-function, just contain name, and type is Parameter
+	FreeValues map[*Variable]Value // store the captured variable form parent-function, just contain name, and type is Parameter
 	// parameter member call
 	// ParameterMembers []*ParameterMember
 	ParameterMembers []Value
