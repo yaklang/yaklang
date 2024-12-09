@@ -56,6 +56,17 @@ func YieldRiskByTarget(target string) chan *schema.Risk {
 	return yakit.YieldRisksByTarget(consts.GetGormProjectDatabase(), context.Background(), target)
 }
 
+// YieldRiskByIds 根据 Risk ID 获取风险记录，返回风险记录的管道
+// Example:
+// ```
+// for risk := range YieldRiskByIds([1,2,3]) {
+// println(risk)
+// }
+// ```
+func YieldRiskByIds(ids []int) chan *schema.Risk {
+	return yakit.YieldRisksByIds(consts.GetGormProjectDatabase(), context.Background(), ids)
+}
+
 // YieldRiskByRuntimeId 根据 RuntimeID 获取风险记录，返回风险记录的管道
 // Example:
 // ```
@@ -166,6 +177,7 @@ var (
 		"NewRisk":                   YakitNewRiskBuilder(GetYakitClientInstance()),
 		"RegisterBeforeRiskSave":    yakit.RegisterBeforeRiskSave,
 		"YieldRiskByTarget":         YieldRiskByTarget,
+		"YieldRiskByIds":            YieldRiskByIds,
 		"YieldRiskByRuntimeId":      YieldRiskByRuntimeId,
 		"YieldRiskByCreateAt":       YieldRiskByCreateAt,
 		"YieldRiskByScriptName":     YieldRiskByScriptName,
