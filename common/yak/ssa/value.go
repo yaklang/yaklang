@@ -243,11 +243,30 @@ func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...Can
 
 // --------------- `f.freeValue`
 
-func (b *FunctionBuilder) BuildFreeValue(variable string) *Parameter {
-	freeValue := NewParam(variable, true, b)
-	b.FreeValues[variable] = freeValue
+func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
+	scope := b.CurrentBlock.ScopeTable
+	freeValue := NewParam(name, true, b)
+	if variable := ReadVariableFromScope(scope, name); variable != nil {
+		b.FreeValues[variable] = freeValue
+	} else {
+		v := scope.CreateVariable(name, false)
+		scope.AssignVariable(v, freeValue)
+		b.FreeValues[v.(*Variable)] = freeValue
+	}
+
 	// b.WriteVariable(variable, freeValue)
-	v := b.CreateVariable(variable)
+	v := b.CreateVariable(name)
+	b.AssignVariable(v, freeValue)
+	return freeValue
+}
+
+func (b *FunctionBuilder) BuildFreeValueByVariable(variable *Variable) *Parameter {
+	name := variable.GetName()
+	freeValue := NewParam(name, true, b)
+	b.FreeValues[variable] = freeValue
+
+	// b.WriteVariable(variable, freeValue)
+	v := b.CreateVariable(name)
 	b.AssignVariable(v, freeValue)
 	return freeValue
 }

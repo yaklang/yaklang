@@ -88,9 +88,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	case *Function:
 		params["params"] = fetchIds(ret.Params)
 		params["param_length"] = ret.ParamLength
-		freeValues := make(map[string]int64)
+		freeValues := make(map[int64]int64)
 		for k, v := range ret.FreeValues {
-			freeValues[k] = v.GetId()
+			freeValues[k.GetId()] = v.GetId()
 		}
 		params["is_method"] = ret.isMethod
 		params["method_name"] = ret.methodName
@@ -364,6 +364,18 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		return vs
 	}
 
+	unmarshalMapVariables := func(p any) map[*Variable]Value {
+		vs := make(map[*Variable]Value)
+		switch ret := p.(type) {
+		case map[*Variable]any:
+			for k, id := range ret {
+				vs[k] = newLazyInstruction(id)
+			}
+		default:
+		}
+		return vs
+	}
+
 	toInt := func(i any) int {
 		switch ret := i.(type) {
 		case float64:
@@ -521,7 +533,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.ParamLength = toInt(params["param_length"])
 		ret.isMethod = toBool(params["is_method"])
 		ret.methodName = toString(params["method_name"])
-		ret.FreeValues = unmarshalMapValues(params["free_values"])
+		ret.FreeValues = unmarshalMapVariables(params["free_values"])
 		ret.ParameterMembers = unmarshalValues(params["parameter_members"])
 		if ses := params["side_effect"]; ses != nil && funk.IsIteratee(ses) {
 			var se []*FunctionSideEffect

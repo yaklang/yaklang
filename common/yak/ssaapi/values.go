@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -456,10 +457,11 @@ func (v *Value) GetFreeValue(name string) *Value {
 	if v.IsNil() {
 		return nil
 	}
-
-	if f, ok := ssa.ToFunction(v.node); ok {
-		if fv, ok := f.FreeValues[name]; ok {
-			return v.NewValue(fv)
+	if variable := v.GetVariable(name); variable != nil {
+		if f, ok := ssa.ToFunction(v.node); ok {
+			if fv, ok := f.FreeValues[variable]; ok {
+				return v.NewValue(fv)
+			}
 		}
 	}
 	return nil

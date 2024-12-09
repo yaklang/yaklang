@@ -31,7 +31,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		ExitBlock:   nil,
 		ChildFuncs:  make([]Value, 0),
 		parent:      nil,
-		FreeValues:  make(map[string]Value),
+		FreeValues:  make(map[*Variable]Value),
 		SideEffects: make([]*FunctionSideEffect, 0),
 		builder:     nil,
 	}
