@@ -12,12 +12,6 @@ import (
 	"testing"
 )
 
-func TestAccccccc(t *testing.T) {
-	for i := 0; i < 20; i++ {
-		TestGRPCMUSTPASS_HTTPFuzzer_Retry(t)
-	}
-}
-
 func TestGRPCMUSTPASS_HTTPFuzzer_Retry(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
