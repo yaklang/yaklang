@@ -272,11 +272,15 @@ func ParseFuzztag(code string, simple bool) ([]parser.Node, error) {
 }
 
 func NewGenerator(code string, table map[string]*parser.TagMethod, isSimple, syncTag bool) (*parser.Generator, error) {
+	return NewGeneratorEx(context.Background(), code, table, isSimple, syncTag)
+}
+
+func NewGeneratorEx(ctx context.Context, code string, table map[string]*parser.TagMethod, isSimple, syncTag bool) (*parser.Generator, error) {
 	nodes, err := ParseFuzztag(code, isSimple)
 	if err != nil {
 		return nil, err
 	}
-	gener := parser.NewGenerator(nil, nodes, table)
+	gener := parser.NewGenerator(ctx, nodes, table)
 	gener.SetTagsSync(syncTag)
 	return gener, nil
 }

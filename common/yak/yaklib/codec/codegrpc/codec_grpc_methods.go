@@ -13,11 +13,12 @@ import (
 	_ "embed"
 	"encoding/gob"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 	"hash"
 	"regexp"
 	"strconv"
 	"strings"
+
+	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 
 	"github.com/yaklang/yaklang/common/gmsm/sm4"
 	charsetLib "golang.org/x/net/html/charset"
@@ -1097,8 +1098,31 @@ func (flow *CodecExecFlow) JwtSign(algorithm string, key []byte, isBase64 bool) 
 // Tag = "其他"
 // CodecName = "fuzztag渲染"
 // Desc = """渲染fuzztag"""
-func (flow *CodecExecFlow) Fuzz() error {
-	res, err := mutate.FuzzTagExec(flow.Text, mutate.Fuzz_WithEnableDangerousTag())
+// Params = [
+// { Name = "timeout", Type = "input", Label = "超时时间"},
+// { Name = "limit", Type = "input", Label = "生成个数"},
+// ]
+func (flow *CodecExecFlow) Fuzz(timeout, limit string) error {
+
+	opts := []mutate.FuzzConfigOpt{
+		mutate.Fuzz_WithEnableDangerousTag(),
+	}
+	if timeout != "" {
+		t, err := strconv.ParseFloat(timeout, 64)
+		if err != nil {
+			return utils.Error("invalid timeout")
+		}
+		opts = append(opts, mutate.Fuzz_WithContext(utils.TimeoutContextSeconds(t)))
+	}
+	if limit != "" {
+		l, err := strconv.Atoi(limit)
+		if err != nil {
+			return utils.Error("invalid limit")
+		}
+		opts = append(opts, mutate.Fuzz_WithResultLimit(l))
+	}
+
+	res, err := mutate.FuzzTagExec(flow.Text, opts...)
 	if err != nil {
 		return err
 	}
