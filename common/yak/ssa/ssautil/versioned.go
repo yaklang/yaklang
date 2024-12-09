@@ -204,8 +204,8 @@ func (v *Versioned[T]) Assign(val T) error {
 		if !isZeroValue(val) && val.GetId() == v.Value.GetId() {
 			return nil
 		}
-		log.Warnf("ssa: #%v have been assigned by %v (%v), but u are trying to re-assign to: %v(%v)", v.globalIndex, v.Value, v.Value.GetId(), val, val.GetId())
-		return utils.Error("ssautil.VersionedVar should be assigned once")
+		// log.Warnf("ssa: #%v have been assigned by %v (%v), but u are trying to re-assign to: %v(%v)", v.globalIndex, v.Value, v.Value.GetId(), val, val.GetId())
+		// return utils.Error("ssautil.VersionedVar should be assigned once")
 	}
 
 	if isZeroValue(val) {

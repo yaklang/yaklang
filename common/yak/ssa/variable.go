@@ -131,6 +131,15 @@ func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
 	return nil
 }
 
+func ReadVariableFromCurrentScope(scope ScopeIF, name string) *Variable {
+	if ret := scope.ReadVariableFromCurrentScope(name); ret != nil {
+		if variable, ok := ret.(*Variable); ok {
+			return variable
+		}
+	}
+	return nil
+}
+
 // 查找当前scope中的第一个local Variable
 func GetLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 	if variables := scope.GetVariables(name); variables != nil {

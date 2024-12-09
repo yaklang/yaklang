@@ -98,12 +98,10 @@ func TestPackage_muti_file_init(t *testing.T) {
 	}
 
 	func main() {
-		for true {
-			if true {
+		if true {
 
-			}else{
-				println(str[0])
-			}
+		}else{
+			println(str[0])
 		}
 	}
 	`)
@@ -142,12 +140,10 @@ func Test_Package_muti_file_meminit(t *testing.T) {
 	}
 
 	func main() {
-		for true {
-			if true {
+		if true {
 
-			}else{
-				println(str[0])
-			}
+		}else{
+			println(str[0])
 		}
 	}
 	`)

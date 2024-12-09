@@ -26,6 +26,7 @@ type MergeHandle[T comparable] func(string, []T) T
 type ScopedVersionedTableIF[T versionedValue] interface {
 	// Read Variable by name
 	ReadVariable(name string) VersionedIF[T]
+	ReadVariableFromCurrentScope(name string) VersionedIF[T]
 	// read value by name
 	ReadValue(name string) T
 
@@ -315,6 +316,31 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 		} else {
 			ret = nil
 		}
+	}
+	if ret != nil && !scope.Compare(ret.GetScope()) {
+		// not in current scope
+		if scope.spin {
+			if scope.GetParent() == ret.GetScope() {
+				isLocal = ret.GetLocal()
+			}
+			t := scope.CreateVariable(name, isLocal)
+			scope.AssignVariable(t, scope.createEmptyPhi(name))
+			// t.origin = ret
+			scope.linkIncomingPhi[name] = t
+			ret = t
+		}
+	}
+
+	return ret
+}
+
+func (scope *ScopedVersionedTable[T]) ReadVariableFromCurrentScope(name string) VersionedIF[T] {
+	// var parent = v
+	// for parent != nil {
+	var ret VersionedIF[T]
+	var isLocal bool = false
+	if result := scope.getLatestVersionInCurrentLexicalScope(name); result != nil {
+		ret = result
 	}
 	if ret != nil && !scope.Compare(ret.GetScope()) {
 		// not in current scope

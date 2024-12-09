@@ -303,7 +303,7 @@ func (c *Call) handleCalleeFunction() {
 					}
 				}
 
-				variable = builder.CreateVariable(se.Name)
+				variable = builder.CreateVariableForce(se.Name)
 			} else {
 				// is object
 				obj, ok := se.Get(c)
