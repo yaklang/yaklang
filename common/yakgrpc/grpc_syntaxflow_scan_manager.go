@@ -179,7 +179,7 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 	defer m.SaveTask()
 	// log.Infof("executing rule %s", rule.RuleName)
 	if !m.ignoreLanguage {
-		if string(rule.Language) != prog.GetLanguage() || rule.Language == string(consts.General) {
+		if string(rule.Language) != prog.GetLanguage() && rule.Language != string(consts.General) {
 			atomic.AddInt64(&m.skipQuery, 1)
 			// m.client.YakitInfo("program %s(lang:%s) exec rule %s(lang:%s) failed: language not match", programName, prog.GetLanguage(), rule.RuleName, rule.Language)
 			return

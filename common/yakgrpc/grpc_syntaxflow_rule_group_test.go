@@ -184,5 +184,4 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 			require.Equal(t, afterDeleteCount, 0)
 		}
 	})
-
 }
