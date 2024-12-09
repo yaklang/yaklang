@@ -42,8 +42,7 @@ func WithPeepholeCallback(i func(system fi.FileSystem)) PeepholeConfigOption {
 
 func defaultPeepholeConfig(opts ...PeepholeConfigOption) (*PeepholeConfig, error) {
 	config := &PeepholeConfig{
-		Callback: nil,
-		// triggerCache:     utils.NewSafeMap[*PeepholeTrigger](),
+		Callback:         nil,
 		fileContentCache: utils.NewSafeMap[[]byte](),
 	}
 
