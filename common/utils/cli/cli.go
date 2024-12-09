@@ -751,6 +751,27 @@ func (c *CliApp) StringSlice(name string, options ...SetCliExtraParam) []string 
 	return utils.PrettifyListFromStringSplited(rawStr, ",")
 }
 
+// IntSlice 获取对应名称的命令行参数，将其字符串根据","切割并尝试转换为 int 类型返回 []int 类型
+// Example:
+// ```
+// ports = cli.IntSlice("ports")
+// // --ports 80,443,8080 则 ports 为 [80, 443, 8080]
+// ```
+func (c *CliApp) IntSlice(name string, options ...SetCliExtraParam) []int {
+	rawStr, p := c._cliFromString(name, options...)
+	p._type = "int-slice"
+
+	if rawStr == "" {
+		return []int{}
+	}
+
+	var ret []int
+	for _, s := range utils.PrettifyListFromStringSplited(rawStr, ",") {
+		ret = append(ret, parseInt(s))
+	}
+	return ret
+}
+
 // setVerboseName 是一个选项函数，设置参数的中文名
 // Example:
 // ```
@@ -890,6 +911,7 @@ var CliExports = map[string]interface{}{
 	"Double":      DefaultCliApp.Double,
 	"YakitPlugin": DefaultCliApp.YakitPlugin,
 	"StringSlice": DefaultCliApp.StringSlice,
+	"IntSlice":    DefaultCliApp.IntSlice,
 
 	// 解析成 URL
 	"Urls": DefaultCliApp.Urls,

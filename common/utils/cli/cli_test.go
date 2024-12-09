@@ -69,6 +69,18 @@ func TestCliParam(t *testing.T) {
 		)
 	})
 
+	t.Run("IntSlice", func(t *testing.T) {
+		testCliParam(
+			t,
+			[]string{"--int-slice", "1,2,3"},
+			func(test *assert.Assertions, app *CliApp, check func()) {
+				is := app.IntSlice("int-slice")
+				check()
+				test.ElementsMatch(is, []int{1, 2, 3})
+			},
+		)
+	})
+
 	t.Run("Urls", func(t *testing.T) {
 		testCliParam(
 			t,
