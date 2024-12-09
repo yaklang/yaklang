@@ -132,14 +132,14 @@ func TestGRPCMUSTPASS_MaxSize(t *testing.T) {
 	})
 }
 
-func TestGRPCMUSTPASS_SNI(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_SNI(t *testing.T) {
 	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	dataToken := utils.RandStringBytes(10)
 	addr := utils.GetRandomLocalAddr()
 	address, port := utils.DebugMockHTTPServerWithContextWithAddress(utils.TimeoutContext(30*time.Second), addr, true, false, false, false, false, true, func(bytes []byte) []byte {
-		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length:10 \r\n\r\n%s", dataToken))
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length:10\r\n\r\n%s", dataToken))
 	})
 	target := utils.HostPort(address, port)
 
