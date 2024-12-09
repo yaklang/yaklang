@@ -530,7 +530,12 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 	ssatyp := b.buildType(typedef.Type_().(*gol.Type_Context))
 
 	switch ssatyp.GetTypeKind() {
-	case ssa.StructTypeKind, ssa.InterfaceTypeKind:
+	case ssa.StructTypeKind:
+		ssatyp.(*ssa.ObjectType).VerboseName = name
+		b.AddStruct(name, ssatyp)
+		bp := b.CreateBluePrintAndSetConstruct(name)
+		_ = bp
+	case ssa.InterfaceTypeKind:
 		b.AddStruct(name, ssatyp)
 		bp := b.CreateBluePrintAndSetConstruct(name)
 		_ = bp
