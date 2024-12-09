@@ -188,7 +188,7 @@ type SyntaxFlowRule struct {
 	IncludedName  string
 	OpCodes       string
 
-	Groups []*SyntaxFlowGroup `json:"syntaxFlowGroup" gorm:"many2many:syntax_flow_rule_and_group;"`
+	Groups []*SyntaxFlowGroup `gorm:"many2many:syntax_flow_rule_and_group;"`
 
 	Hash string `json:"hash" gorm:"unique_index"`
 }

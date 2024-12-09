@@ -12,7 +12,7 @@ func TestRule_OP(t *testing.T) {
 	t.Run("create and delete rule", func(t *testing.T) {
 		ruleName := uuid.NewString()
 		rule := &schema.SyntaxFlowRule{RuleName: ruleName}
-		err := CreateRule(rule)
+		_, err := CreateRule(rule)
 		require.NoError(t, err)
 		got, err := QueryRuleByName(ruleName)
 		require.Equal(t, ruleName, got.RuleName)
@@ -25,7 +25,7 @@ func TestRule_OP(t *testing.T) {
 	t.Run("create and update rule", func(t *testing.T) {
 		ruleName := uuid.NewString()
 		rule := &schema.SyntaxFlowRule{RuleName: ruleName}
-		err := CreateRule(rule)
+		_, err := CreateRule(rule)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			err = DeleteRuleByRuleName(ruleName)
@@ -45,7 +45,7 @@ func TestRule_OP(t *testing.T) {
 func TestRule_Group_OP(t *testing.T) {
 	t.Run("test create and delete group", func(t *testing.T) {
 		groupName := uuid.NewString()
-		err := CreateGroupByName(groupName)
+		_, err := CreateGroupByName(groupName)
 		require.NoError(t, err)
 
 		got, err := QueryGroupByName(groupName)
@@ -61,7 +61,7 @@ func TestRule_Group_OP(t *testing.T) {
 	t.Run("test add remove rule group", func(t *testing.T) {
 		// create group
 		groupName := uuid.NewString()
-		err := CreateGroupByName(groupName)
+		_, err := CreateGroupByName(groupName)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			err = DeleteGroupByName(groupName)
@@ -70,7 +70,7 @@ func TestRule_Group_OP(t *testing.T) {
 		// create rule
 		ruleName := uuid.NewString()
 		rule := &schema.SyntaxFlowRule{RuleName: ruleName}
-		err = CreateRule(rule)
+		_, err = CreateRule(rule)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			err = DeleteRuleByRuleName(ruleName)
@@ -100,4 +100,32 @@ func TestRule_Group_OP(t *testing.T) {
 		require.Equal(t, int32(1), QueryGroupCountInRule(ruleName))
 	})
 
+	t.Run("test create and delete group for rule", func(t *testing.T) {
+		// create group
+		groupName := uuid.NewString()
+		_, err := CreateGroupByName(groupName)
+		require.NoError(t, err)
+
+		// create rule
+		ruleName := uuid.NewString()
+		rule := &schema.SyntaxFlowRule{RuleName: ruleName}
+		_, err = CreateRule(rule)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = DeleteRuleByRuleName(ruleName)
+			require.NoError(t, err)
+		})
+		// add rule to group
+		err = AddGroupForRuleByName(ruleName, groupName)
+		require.NoError(t, err)
+		require.Equal(t, int32(1), QueryRuleCountInGroup(groupName))
+
+		// delete group
+		err = DeleteGroupByName(groupName)
+		require.NoError(t, err)
+
+		queryRule, err := QueryRuleByName(ruleName)
+		require.NoError(t, err)
+		require.Equal(t, 0, len(queryRule.Groups))
+	})
 }
