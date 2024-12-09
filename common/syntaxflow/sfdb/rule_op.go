@@ -426,8 +426,7 @@ func YieldSyntaxFlowRulesWithoutLib(db *gorm.DB, ctx context.Context) chan *sche
 	return YieldSyntaxFlowRules(db, ctx)
 }
 
-func QueryRuleByName(ruleName string) (*schema.SyntaxFlowRule, error) {
-	db := consts.GetGormProfileDatabase()
+func QueryRuleByName(db *gorm.DB, ruleName string) (*schema.SyntaxFlowRule, error) {
 	var rule schema.SyntaxFlowRule
 	if err := db.Preload("Groups").Where("rule_name = ?", ruleName).First(&rule).Error; err != nil {
 		return nil, err

@@ -2,9 +2,10 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"io"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -410,7 +411,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 			RuleName: uuid.NewString(),
 			Language: "general",
 		})
-		defer sfdb.DeleteGroupByName(rule.RuleName)
+		defer sfdb.DeleteGroup(consts.GetGormProfileDatabase(), rule.RuleName)
 
 		taskIdB, streamB := startScan([]string{progIdB})
 		defer deleteTasks([]string{taskIdB})
