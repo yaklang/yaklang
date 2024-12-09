@@ -74,12 +74,7 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	if err := json.Unmarshal([]byte(raw), &info); err != nil {
 		return nil, utils.Errorf("error unmarshal info: %v", err)
 	}
-	process := func(percent float64, msg string, arg ...any) {
-		if c.process != nil {
-			c.process(fmt.Sprintf(msg, arg), percent)
-		}
-	}
-	process(0, "start parse info", info.Kind)
+	c.Processf(0, "start parse info: %s", info.Kind)
 	switch info.Kind {
 	case "local":
 		return filesys.NewRelLocalFs(info.LocalFile), nil
@@ -96,7 +91,7 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 		}
 		return fs, nil
 	case "git":
-		return gitFs(&info, process)
+		return gitFs(&info, c.Processf)
 	case "svn":
 		return svnFs(&info)
 	}

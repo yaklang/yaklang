@@ -94,7 +94,7 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		c.LanguageBuilder = c.SelectedLanguageBuilder
 	}
 	c.LanguageBuilder = c.LanguageBuilder.Create()
-	prog, builder, err := c.init()
+	prog, builder, err := c.init(c.fs)
 	prog.SetPreHandler(true)
 	c.LanguageBuilder.InitHandler(builder)
 	// builder.SetRangeInit(r)

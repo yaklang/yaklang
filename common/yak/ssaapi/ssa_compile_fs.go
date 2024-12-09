@@ -1,19 +1,21 @@
 package ssaapi
 
 import (
-	"fmt"
 	"io/fs"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
 
-func (c *config) parseProject() (Programs, error) {
+func (c *config) parseProjectWithFS(
+	filesystem filesys_interface.FileSystem,
+	processCallback func(float64, string, ...any),
+) (*Program, error) {
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -23,15 +25,8 @@ func (c *config) parseProject() (Programs, error) {
 		}
 	}()
 
-	if c.reCompile {
-		ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
-		ssadb.DeleteSSAProgram(c.ProgramName)
-	}
-	if c.databasePath != "" {
-		consts.SetSSADataBasePath(c.databasePath)
-	}
 	programPath := c.programPath
-	prog, builder, err := c.init()
+	prog, builder, err := c.init(filesystem)
 
 	if err != nil {
 		return nil, err
@@ -43,32 +38,30 @@ func (c *config) parseProject() (Programs, error) {
 	totalProcess := 0
 	handledProcess := 0
 	prog.ProcessInfof = func(s string, v ...any) {
-		msg := fmt.Sprintf(s, v...)
-		// handled := len(prog.FileList)
-		if c.process != nil {
-			c.process(msg, float64(handledProcess)/float64(totalProcess))
-		} else {
-			log.Info(msg)
-		}
+		processCallback(
+			float64(handledProcess)/float64(totalProcess),
+			s, v...,
+		)
 	}
+
 	preHandlerSize := 0
 	parseSize := 0
 
-	prog.ProcessInfof("parse project in fs: %v, path: %v", c.fs, c.info)
+	prog.ProcessInfof("parse project in fs: %v, path: %v", filesystem, c.info)
 	prog.ProcessInfof("calculate total size of project")
 	// get total size
 	filesys.Recursive(programPath,
-		filesys.WithFileSystem(c.fs),
+		filesys.WithFileSystem(filesystem),
 		filesys.WithContext(c.ctx),
 		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-			_, name := c.fs.PathSplit(s)
+			_, name := filesystem.PathSplit(s)
 			if name == "test" || name == ".git" {
 				return filesys.SkipDir
 			}
 			return nil
 		}),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
-			log.Infof("calc total: %s", path)
+			// log.Infof("calc total: %s", path)
 			if fi.Size() == 0 {
 				return nil
 			}
@@ -83,22 +76,22 @@ func (c *config) parseProject() (Programs, error) {
 		}),
 	)
 	if c.isStop() {
-		return nil, utils.Errorf("parse project stop")
+		return nil, ErrContextCancel
 	}
 	if (parseSize + preHandlerSize) == 0 {
-		return nil, utils.Errorf("no file can compile with language[%s]", c.language)
+		return nil, ErrNoFoundCompiledFile
 	}
 	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerSize, parseSize)
 	totalProcess = parseSize + preHandlerSize + 1
 
 	// pre handler
 	prog.SetPreHandler(true)
-	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", c.fs, c.info)
+	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
 	filesys.Recursive(programPath,
-		filesys.WithFileSystem(c.fs),
+		filesys.WithFileSystem(filesystem),
 		filesys.WithContext(c.ctx),
 		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-			_, name := c.fs.PathSplit(s)
+			_, name := filesystem.PathSplit(s)
 			if name == "test" || name == ".git" {
 				return filesys.SkipDir
 			}
@@ -121,13 +114,13 @@ func (c *config) parseProject() (Programs, error) {
 			handledProcess++
 			if language := c.LanguageBuilder; language != nil {
 				language.InitHandler(builder)
-				language.PreHandlerProject(c.fs, builder, path)
+				language.PreHandlerProject(filesystem, builder, path)
 			}
 			return nil
 		}),
 	)
 	if c.isStop() {
-		return nil, utils.Errorf("parse project stop")
+		return nil, ErrContextCancel
 	}
 	prog.ProcessInfof("pre-handler parse project finish")
 	handledProcess = preHandlerSize // finish pre-handler 50%
@@ -137,7 +130,7 @@ func (c *config) parseProject() (Programs, error) {
 	prog.SetPreHandler(false)
 	err = ssareducer.ReducerCompile(
 		programPath, // base
-		ssareducer.WithFileSystem(c.fs),
+		ssareducer.WithFileSystem(filesystem),
 		ssareducer.WithProgramName(c.ProgramName),
 		ssareducer.WithEntryFiles(c.entryFile...),
 		ssareducer.WithContext(c.ctx),
@@ -178,14 +171,13 @@ func (c *config) parseProject() (Programs, error) {
 		return nil, utils.Wrap(err, "parse project error")
 	}
 	if c.isStop() {
-		return nil, utils.Errorf("parse project stop")
+		return nil, ErrContextCancel
 	}
 	handledProcess = preHandlerSize + parseSize
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, prog.Cache.CountInstruction()) // %99
 	prog.Finish()
-	var progs = []*Program{NewProgram(prog, c)}
 	c.SaveProfile()
 	handledProcess = preHandlerSize + parseSize + 1
 	prog.ProcessInfof("program %s finish", prog.Name) // %100
-	return progs, nil
+	return NewProgram(prog, c), nil
 }

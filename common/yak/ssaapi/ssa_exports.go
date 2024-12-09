@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
@@ -58,6 +59,9 @@ type config struct {
 	externMethod            ssa.MethodBuilder
 	externBuildValueHandler map[string]func(b *ssa.FunctionBuilder, id string, v any) (value ssa.Value)
 
+	// peephole
+	peepholeSize int
+
 	// other build options
 	DatabaseProgramCacheHitter func(any)
 	EnableCache                bool
@@ -96,6 +100,15 @@ func (c *config) CalcHash() string {
 }
 
 type Option func(*config) error
+
+func (c *config) Processf(process float64, format string, arg ...any) {
+	msg := fmt.Sprintf(format, arg...)
+	if c.process != nil {
+		c.process(msg, process)
+	} else {
+		log.Infof(msg)
+	}
+}
 
 func WithProcess(process ProcessFunc) Option {
 	return func(c *config) error {
@@ -249,6 +262,13 @@ func WithExternBuildValueHandler(id string, callback func(b *ssa.FunctionBuilder
 	}
 }
 
+func WithPeepholeSize(size int) Option {
+	return func(c *config) error {
+		c.peepholeSize = size
+		return nil
+	}
+}
+
 func WithIgnoreSyntaxError(b ...bool) Option {
 	return func(c *config) error {
 		if len(b) > 0 {
@@ -352,26 +372,6 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
-func ParseProjectFromPath(path string, opts ...Option) (Programs, error) {
-	if path != "" {
-		opts = append(opts, WithLocalFs(path))
-	}
-	return ParseProject(opts...)
-}
-
-func ParseProjectWithFS(fs fi.FileSystem, opts ...Option) (Programs, error) {
-	opts = append(opts, WithFileSystem(fs))
-	return ParseProject(opts...)
-}
-
-func ParseProject(opts ...Option) (Programs, error) {
-	config, err := defaultConfig(opts...)
-	if err != nil {
-		return nil, err
-	}
-	return config.parseProject()
-}
-
 var ttlSSAParseCache = createCache(10 * time.Second)
 
 func createCache(ttl time.Duration) *utils.CacheWithKey[string, *Program] {
@@ -430,15 +430,6 @@ func (p *Program) Feed(code io.Reader) error {
 	return p.config.feed(p.Program, memedit.NewMemEditor(string(raw)))
 }
 
-// FromDatabase get program from database by program name
-func FromDatabase(programName string) (*Program, error) {
-	config, err := defaultConfig(WithProgramName(programName))
-	if err != nil {
-		return nil, err
-	}
-	return config.fromDatabase()
-}
-
 var Exports = map[string]any{
 	"Parse":              Parse,
 	"ParseLocalProject":  ParseProjectFromPath,
@@ -459,6 +450,7 @@ var Exports = map[string]any{
 	"withStrictMode":    WithStrictMode,
 	"withSaveToProfile": WithSaveToProfile,
 	"withContext":       WithContext,
+	"withPeepholeSize":  WithPeepholeSize,
 	// language:
 	"Javascript": JS,
 	"Yak":        Yak,

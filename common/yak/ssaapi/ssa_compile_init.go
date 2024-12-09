@@ -7,15 +7,16 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
+func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	programName := c.ProgramName
-	application := ssa.NewProgram(programName, c.ProgramName != "", ssa.Application, c.fs, c.programPath)
+	application := ssa.NewProgram(programName, c.ProgramName != "", ssa.Application, filesystem, c.programPath)
 	application.Language = string(c.language)
 
 	application.ProcessInfof = func(s string, v ...any) {
@@ -54,10 +55,10 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		// this check should be more readable, we should use Editor and `prog.PushEditor..` save sourceDB.
 		if _, exist := application.FileList[filePath]; !exist {
 			if programName != "" {
-				folderName, fileName := c.fs.PathSplit(filePath)
+				folderName, fileName := filesystem.PathSplit(filePath)
 				folders := []string{programName}
 				folders = append(folders,
-					strings.Split(folderName, string(c.fs.GetSeparators()))...,
+					strings.Split(folderName, string(filesystem.GetSeparators()))...,
 				)
 				src.ResetSourceCodeHash()
 				ssadb.SaveFile(fileName, src.GetSourceCode(), folders)
