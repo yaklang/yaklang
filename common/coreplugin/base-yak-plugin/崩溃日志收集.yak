@@ -1,0 +1,133 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+
+// fetch local panic info
+status = i => {
+    yakit.StatusCard("状态", i)
+}
+
+status("开始收集崩溃日志")
+
+yakitHome = yakit.GetHomeDir()
+log.Info("HOME: %v", yakitHome)
+
+infos, err = file.ReadDirInfoInDirectory(yakitHome)
+die(err)
+
+zipMaterial = {}
+
+handle = filePath => {
+    status("正在分析 %v" % filePath)
+
+    f = file.Open(filePath)~
+    defer f.Close()
+
+    lastBuf = []
+    for {
+        try {
+            i = f.ReadLine()~
+            prefix = ""
+            havePanic = i.Contains(`Current goroutine call stack:`)
+            haveASTErr = false // i.Contains("parse AST FrontEnd error:")
+            haveError = havePanic || haveASTErr
+            if havePanic {
+                prefix = "panic"
+            }
+
+            lastBuf.Push(i)
+            if lastBuf.Len() >= 200 {
+                lastBuf.Shift()
+            }
+
+            if haveASTErr {
+                prefix = "ast-error"
+            }
+
+
+            if haveError {
+                buf = bufio.NewBuffer()
+                for in 200 {
+                    line, err = f.ReadLine()
+                    if err != nil {
+                        break
+                    }
+
+                    buf.WriteString(line)
+                    buf.WriteByte('\n')
+                }
+
+
+                results = buf.String()
+                a = codec.Sha256((results))
+                if prefix == "panic" {
+                    hashed = bufio.NewBuffer()
+                    for ret in re.FindAll(
+                        results[:2048],
+                        `yaklang/(.*)\.go\:\d+`,
+                    ) {
+                        hashed.WriteString(ret)
+                        hashed.Write("\n")
+                    }
+                    println(string(hashed))
+                    a = codec.Sha256(hashed.String())
+                }
+
+
+                lastBufBytes = str.Join(lastBuf, "\n")
+                lastBuf = []
+
+                fileName = "sample/%v-%v.txt" % [prefix, a]
+                if fileName in zipMaterial {
+                    println("%v is existed" % fileName)
+                    continue
+                }
+                println("sample: %v" % fileName)
+                zipMaterial[fileName] = lastBufBytes + "\n" + results
+            }
+
+        } catch e {
+            break
+        }
+    }
+
+}
+
+for i in infos {
+    if !i.IsDir {
+        continue
+    }
+
+
+    dir, name = file.Split(i.Path)
+    name = name.Trim("/", "\\")
+    if name == "engine-log" || name == "temp" {
+        file.Walk(
+            i.Path,
+            logFile => {
+                if !logFile.Path.HasSuffix(".txt") {return true}
+                println(logFile.Path)
+                handle(logFile.Path)
+                return true
+            },
+        )
+    }
+}
+
+
+log.Info("fetch zip material: %v", len(zipMaterial))
+if zipMaterial.Len() <= 0 {
+    status("未发现历史崩溃")
+    return
+}
+
+yakit.StatusCard("已收集崩溃数", f`${len(zipMaterial)}`)
+bytes, err = zip.CompressRaw(zipMaterial)
+die(err)
+
+ts = timestampToDatetime(timestamp()).ReplaceAll(" ", "-").ReplaceAll(":", "-")
+targetFile = file.Join(yakitHome, "temp", f"yaklang-panic-log-${ts}.zip")
+file.Save(targetFile, bytes)
+
+yakit.StatusCard("崩溃文件", targetFile)
+yakit.File(targetFile, "Yaklang Panic Log Collected")

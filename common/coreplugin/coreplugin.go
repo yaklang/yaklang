@@ -229,6 +229,12 @@ func init() {
 			withPluginEnableGenerateParam(true),
 		)
 		registerBuildInPlugin(
+			"yak", "崩溃日志收集",
+			withPluginHelp("收集本地项目日志中的崩溃信息，保存成 zip 以便分析"),
+			withPluginAuthors("V1ll4n"),
+			withPluginEnableGenerateParam(true),
+		)
+		registerBuildInPlugin(
 			"yak", "SSA 项目编译",
 			withPluginHelp("将选择的项目编译到 SSA 数据库内，用于后续的代码查询和分析。"),
 			withPluginAuthors("令则"),
