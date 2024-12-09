@@ -2,10 +2,11 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -855,14 +856,15 @@ func (c ChanType) RawString() string {
 // ==================== interface type
 type ObjectType struct {
 	*baseType
-	Name       string
-	pkgPath    string
-	Kind       TypeKind
-	Len        int
-	Keys       []Value
-	keymap     map[string]int // remove duplicate key
-	keyTypes   []Type
-	FieldTypes []Type
+	Name        string
+	VerboseName string
+	pkgPath     string
+	Kind        TypeKind
+	Len         int
+	Keys        []Value
+	keymap      map[string]int // remove duplicate key
+	keyTypes    []Type
+	FieldTypes  []Type
 
 	AnonymousField map[string]*ObjectType
 
