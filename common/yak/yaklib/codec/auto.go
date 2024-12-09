@@ -91,6 +91,7 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 	var (
 		results     []*AutoDecodeResult
 		sameMap     = make(map[string]struct{})
+		resultMap   = make(map[string]struct{})
 		base32Bytes []byte
 		base64Bytes []byte
 		jwtBuf      bytes.Buffer
@@ -106,6 +107,14 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		}
 		return new == origin
 	}
+	checkRepeatedDecode := func(new string, typ string) bool {
+		hash := Sha256(fmt.Sprintf("%s%s", new, typ))
+		if _, ok := resultMap[hash]; !ok {
+			resultMap[hash] = struct{}{}
+			return false
+		}
+		return true
+	}
 	isSame := func(new string) bool {
 		_, ok := sameMap[new]
 		return ok
@@ -116,7 +125,7 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			if err != nil {
 				return false
 			}
-			if decoded != "" && !checkNewIsSameToOrigin(decoded, typ) {
+			if decoded != "" && !checkNewIsSameToOrigin(decoded, typ) && !checkRepeatedDecode(decoded, typ) {
 				if !utf8.ValidString(decoded) {
 					decoded = EscapeInvalidUTF8Byte([]byte(decoded))
 				}
