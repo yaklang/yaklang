@@ -28,7 +28,7 @@ func TestJarRecompile(t *testing.T) {
 	res, err := ssaapi.ParseProject(
 		ssaapi.WithRawLanguage("java"),
 		ssaapi.WithConfigInfo(map[string]any{
-			"kind":       "compression",
+			"kind":       "jar",
 			"local_file": jarPath,
 		}),
 		ssaapi.WithProgramName(progName),
@@ -94,4 +94,11 @@ func TestJarRecompile(t *testing.T) {
 	require.Greater(t, len(fileList), 0)
 	log.Infof("file list: %v", fileList)
 
+	// check info in ssa-program
+	ssaprogRecompile := ssadb.CheckAndSwitchDB(progName)
+	log.Infof("info: %v", ssaprogRecompile)
+	require.NotNil(t, ssaprogRecompile)
+	log.Infof("config input: %v", ssaprogRecompile.ConfigInput)
+	require.True(t, len(ssaprog.ConfigInput) > 0)
+	require.Equal(t, ssaprogRecompile.Language, ssaprog.Language)
 }

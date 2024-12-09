@@ -23,7 +23,8 @@ func (prog *Program) Recompile(opts ...Option) error {
 	}
 
 	// append other options
-	opts = append(opts, WithProgramName(prog.Program.Name))
+	opts = append(opts, WithProgramName(prog.GetProgramName()))
+	opts = append(opts, WithRawLanguage(prog.GetLanguage()))
 	opts = append(opts, WithSaveToProfile())
 	opts = append(opts, WithReCompile(true))
 
