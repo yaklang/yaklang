@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"io"
 	"testing"
 
@@ -362,5 +363,106 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 				t.Errorf("task status not match")
 			}
 		}
+	})
+
+	t.Run("test ignore language", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("/a.java", `package com.example.apackage;`)
+
+		progIDA := uuid.NewString()
+		progA, err := ssaapi.ParseProjectWithFS(vf,
+			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithProgramName(progIDA),
+		)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progIDA)
+		}()
+		require.NoError(t, err)
+		require.NotNil(t, progA)
+		//start without ignore language
+		taskIDA, stream := startScan([]string{progIDA})
+		defer deleteTasks([]string{taskIDA})
+		for {
+			_, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+		}
+		dataA := queryTasks([]string{taskIDA})
+		require.Equal(t, 1, len(dataA))
+		require.NotEqual(t, 0, dataA[0].SkipQuery)
+
+		// start without ignore language and have general language rule
+		progIdB := uuid.NewString()
+		progB, err := ssaapi.ParseProjectWithFS(vf,
+			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithProgramName(progIdB),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, progB)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progIdB)
+		}()
+		require.NoError(t, err)
+		require.NotNil(t, progA)
+
+		rule, err := sfdb.CreateRule(&schema.SyntaxFlowRule{
+			RuleName: uuid.NewString(),
+			Language: "general",
+		})
+		defer sfdb.DeleteGroupByName(rule.RuleName)
+
+		taskIdB, streamB := startScan([]string{progIdB})
+		defer deleteTasks([]string{taskIdB})
+		for {
+			_, err := streamB.Recv()
+			if err == io.EOF {
+				break
+			}
+		}
+		dataB := queryTasks([]string{taskIdB})
+		require.Equal(t, 1, len(dataB))
+		require.Equal(t, dataA[0].SkipQuery+1, dataB[0].SkipQuery)
+
+		//start with ignore language
+		startScanWithIgnoreLanguage := func(progIds []string) (string, ypb.Yak_SyntaxFlowScanClient) {
+			stream, err := client.SyntaxFlowScan(context.Background())
+			require.NoError(t, err)
+
+			stream.Send(&ypb.SyntaxFlowScanRequest{
+				ControlMode:    "start",
+				Filter:         &ypb.SyntaxFlowRuleFilter{},
+				ProgramName:    progIds,
+				IgnoreLanguage: true,
+			})
+			resp, err := stream.Recv()
+			require.NoError(t, err)
+			log.Infof("resp: %v", resp)
+			taskID := resp.TaskID
+			return taskID, stream
+		}
+
+		progIdC := uuid.NewString()
+		progC, err := ssaapi.ParseProjectWithFS(vf,
+			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithProgramName(progIdC),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, progC)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progIdC)
+		}()
+
+		taskIdC, streamC := startScanWithIgnoreLanguage([]string{progIdC})
+		defer deleteTasks([]string{taskIdC})
+		for {
+			_, err := streamC.Recv()
+			if err == io.EOF {
+				break
+			}
+		}
+		dataC := queryTasks([]string{taskIdC})
+		require.Equal(t, 1, len(dataC))
+		require.Equal(t, int64(0), dataC[0].SkipQuery)
 	})
 }

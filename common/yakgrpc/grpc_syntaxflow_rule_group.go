@@ -34,7 +34,7 @@ func (s *Server) CreateSyntaxFlowRuleGroup(ctx context.Context, req *ypb.CreateS
 	if req.GetGroupName() == "" {
 		return nil, utils.Errorf("add syntax flow rule group failed:group name is empty")
 	}
-	err := sfdb.CreateGroupByName(req.GetGroupName())
+	_, err := sfdb.CreateGroupByName(req.GetGroupName())
 	if err != nil {
 		return nil, err
 	} else {

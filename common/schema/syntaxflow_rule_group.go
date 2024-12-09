@@ -27,5 +27,5 @@ type SyntaxFlowGroup struct {
 	gorm.Model
 	GroupName string            `json:"group_name" gorm:"unique_index"`
 	IsBuildIn bool              `json:"is_build_in" gorm:"index"`
-	Rules     []*SyntaxFlowRule `json:"syntaxFlowRule" gorm:"many2many:syntax_flow_rule_and_group;"`
+	Rules     []*SyntaxFlowRule `gorm:"many2many:syntax_flow_rule_and_group;"`
 }

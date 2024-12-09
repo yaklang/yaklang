@@ -47,7 +47,7 @@ func CreateGroupsByName(groupNames []string, isBuildIn ...bool) (int64, error) {
 	var count int64
 	var errs error
 	for _, groupName := range groupNames {
-		if err := CreateGroupByName(groupName, isBuildIn...); err != nil {
+		if _, err := CreateGroupByName(groupName, isBuildIn...); err != nil {
 			errs = utils.JoinErrors(errs, err)
 			continue
 		} else {
@@ -58,7 +58,7 @@ func CreateGroupsByName(groupNames []string, isBuildIn ...bool) (int64, error) {
 }
 
 // CreateGroupByName 通过组名创建SyntaxFlow规则组
-func CreateGroupByName(groupName string, isBuildIn ...bool) error {
+func CreateGroupByName(groupName string, isBuildIn ...bool) (*schema.SyntaxFlowGroup, error) {
 	buildIn := false
 	if len(isBuildIn) > 0 {
 		buildIn = isBuildIn[0]
@@ -71,9 +71,9 @@ func CreateGroupByName(groupName string, isBuildIn ...bool) error {
 		IsBuildIn: buildIn,
 	}
 	if db = db.Create(&i); db.Error != nil {
-		return db.Error
+		return nil, db.Error
 	}
-	return nil
+	return i, nil
 }
 
 // QueryAllGroups 查询所有的SyntaxFlow规则组
@@ -164,7 +164,7 @@ func AddGroupForRuleByName(ruleName, groupName string) error {
 	}
 	group, err := QueryGroupByName(groupName)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if err = CreateGroupByName(groupName); err != nil {
+		if _, err = CreateGroupByName(groupName); err != nil {
 			return err
 		}
 		group, err = QueryGroupByName(groupName)
@@ -235,7 +235,7 @@ func ImportBuildInGroup() {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			continue
 		}
-		if err = CreateGroupByName(groupName, true); err != nil {
+		if _, err = CreateGroupByName(groupName, true); err != nil {
 			log.Errorf("create group %s failed: %s", groupName, err)
 		}
 	}

@@ -450,17 +450,17 @@ func UpdateRule(rule *schema.SyntaxFlowRule) error {
 	return nil
 }
 
-func CreateRule(rule *schema.SyntaxFlowRule) error {
+func CreateRule(rule *schema.SyntaxFlowRule) (*schema.SyntaxFlowRule, error) {
 	if rule == nil {
-		return utils.Errorf("create syntaxFlow rule failed: rule is nil")
+		return nil, utils.Errorf("create syntaxFlow rule failed: rule is nil")
 	}
 	if rule.RuleName == "" {
-		return utils.Errorf("create syntaxFlow rule failed: rule name is empty")
+		return nil, utils.Errorf("create syntaxFlow rule failed: rule name is empty")
 	}
 	db := consts.GetGormProfileDatabase()
 	db = db.Model(&schema.SyntaxFlowRule{})
-	if err := db.Create(rule).Error; err != nil {
-		return utils.Errorf("create syntaxFlow rule failed: %s", err)
+	if err := db.Create(&rule).Error; err != nil {
+		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)
 	}
-	return nil
+	return rule, nil
 }
