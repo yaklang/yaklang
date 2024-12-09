@@ -53,7 +53,7 @@ func (s *Server) CreateSyntaxFlowRule(ctx context.Context, req *ypb.CreateSyntax
 	if err != nil {
 		return nil, err
 	}
-	err = sfdb.CreateRule(rule)
+	_, err = sfdb.CreateRule(rule)
 	if err != nil {
 		return nil, err
 	}
