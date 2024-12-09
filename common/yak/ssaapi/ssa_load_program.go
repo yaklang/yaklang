@@ -6,6 +6,15 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+// FromDatabase get program from database by program name
+func FromDatabase(programName string) (*Program, error) {
+	config, err := defaultConfig(WithProgramName(programName))
+	if err != nil {
+		return nil, err
+	}
+	return config.fromDatabase()
+}
+
 func (c *config) fromDatabase() (*Program, error) {
 	// get program from database
 	// packages := ssadb.GetPackageFunction()
