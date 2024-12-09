@@ -1,0 +1,47 @@
+raw = zip.CompressRaw({
+    "a.txt": "Content in a.txt",
+    "b.txt": "Content in b.txt",
+})~
+
+a = yakit.GetHomeTempDir()
+
+fileName = f"${str.RandStr(10)}.zip"
+baseFile = file.Join(a, fileName)
+println(baseFile)
+file.Save(baseFile, raw)
+
+// defer file.Remove(baseFile)
+
+
+count=0
+files = []
+zip.Recursive(baseFile, (dir, path, info) => {
+    count++
+    if dir {
+        return
+    }
+    files = append(files, path)
+})
+println(count)
+println(files)
+assert "a.txt" in files
+assert "b.txt" in files
+assert 2 == count
+
+count = 0
+files = []
+rawFile = file.ReadFile(baseFile)~
+zip.RecursiveFromRaw(rawFile, (dir, path, info) => {
+    count++
+    if dir {
+        return
+    }
+    files = append(files, path)
+})
+println(count)
+println(files)
+assert "a.txt" in files
+assert "b.txt" in files
+assert 2 == count
+
+
