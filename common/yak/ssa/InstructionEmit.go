@@ -481,24 +481,23 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 }
 
 func (f *FunctionBuilder) SetReturnSideEffects() {
-	seMap := map[string]struct{}{}
-	for _, se := range f.SideEffects {
-		if _, ok := seMap[se.Name]; ok {
-			continue
-		}
-		seMap[se.Name] = struct{}{}
-		if value := f.PeekValue(se.Name); value != nil {
-			if _, ok := value.(*SideEffect); ok {
-				f.SideEffectsReturn = append(f.SideEffectsReturn, se)
-				continue
-			}
-			ser := se
-			ser.Modify = value
-			f.SideEffectsReturn = append(f.SideEffectsReturn, ser)
-			continue
-		}
+	scope := f.CurrentBlock.ScopeTable
+	if f.SideEffectsReturn == nil {
+		f.SideEffectsReturn = make(map[string]*FunctionSideEffect)
+	}
 
-		f.SideEffectsReturn = append(f.SideEffectsReturn, se)
+	for _, se := range f.SideEffects {
+		ser := se
+
+		if variable := scope.ReadVariable(se.Name); variable != nil {
+			value := variable.GetValue()
+			if _, ok := value.(*SideEffect); ok {
+			} else if p, ok := value.(*Parameter); ok && p.IsFreeValue {
+			} else {
+				ser.Modify = value
+			}
+		}
+		f.SideEffectsReturn[se.Name] = se
 	}
 }
 
