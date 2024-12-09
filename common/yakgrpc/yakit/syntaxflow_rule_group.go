@@ -20,15 +20,14 @@ func QuerySyntaxFlowRuleGroup(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleGroupR
 		return nil, utils.Error("query syntax flow rule group failed: query params is nil")
 	}
 
-	var errs error
 	db = db.Model(&schema.SyntaxFlowGroup{})
-	db = FilterSyntaxFlowGroups(db, params.GetFilter())
-	if err = db.Scan(&result).Error; err != nil {
-		errs = utils.JoinErrors(errs, err)
+	querydb := FilterSyntaxFlowGroups(db, params.GetFilter())
+	if err = querydb.Scan(&result).Error; err != nil {
+		return nil, err
 	}
 
 	for i, group := range result {
-		count := sfdb.QueryRuleCountInGroup(group.GetGroupName())
+		count := sfdb.GetRuleCountByGroupName(db, group.GetGroupName())
 		result[i].Count = count
 	}
 	return

@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -101,7 +102,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		}
 		_, err := deleteRuleGroup(client, groupNames)
 		require.NoError(t, err)
-		count := sfdb.QueryRuleCountInGroups(groupNames)
+		count := sfdb.GetRuleCountByGroupName(consts.GetGormProfileDatabase(), groupNames...)
 		require.Equal(t, int32(0), count)
 		for _, groupName := range groupNames {
 			afterDeleteCount, err := queryRuleGroupCount(client, groupName)

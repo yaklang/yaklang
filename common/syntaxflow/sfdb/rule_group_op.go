@@ -2,69 +2,46 @@ package sfdb
 
 import (
 	"errors"
+
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// QueryGroupCountInRule 统计规则中的组数量
-func QueryGroupCountInRule(ruleName string) int32 {
-	db := consts.GetGormProfileDatabase()
+// GetGroupCountByRuleName 统计规则中的组数量
+func GetGroupCountByRuleName(db *gorm.DB, ruleName string) int32 {
 	db = db.Model(&schema.SyntaxFlowRule{})
 	var rule schema.SyntaxFlowRule
 	db.Preload("Groups").Where("rule_name = ?", ruleName).First(&rule)
 	return int32(len(rule.Groups))
 }
 
-// QueryRuleCountInGroup 统计某个组中的规则数量
-func QueryRuleCountInGroup(groupName string) int32 {
-	db := consts.GetGormProfileDatabase()
+// GetRuleCountByGroupName 统计某个组中的规则数量
+func GetRuleCountByGroupName(db *gorm.DB, groupName ...string) int32 {
 	db = db.Model(&schema.SyntaxFlowGroup{})
-	var group schema.SyntaxFlowGroup
-	db.Preload("Rules").Where("group_name = ?", groupName).First(&group)
-	return int32(len(group.Rules))
-}
-
-// QueryRuleCountInGroups 统计多个组中的规则数量
-func QueryRuleCountInGroups(groupNames []string) int32 {
-	db := consts.GetGormProfileDatabase()
-	db = db.Model(&schema.SyntaxFlowGroup{})
-	var groups []schema.SyntaxFlowGroup
-	db.Preload("Rules").
-		Where("group_name IN (?)", groupNames).
-		Find(&groups)
-	var count int32
-	for _, group := range groups {
-		count += int32(len(group.Rules))
-	}
-	return count
-}
-
-// CreateGroupsByName 通过多个组名创建多个SyntaxFlow规则组
-func CreateGroupsByName(groupNames []string, isBuildIn ...bool) (int64, error) {
-	var count int64
-	var errs error
-	for _, groupName := range groupNames {
-		if _, err := CreateGroupByName(groupName, isBuildIn...); err != nil {
-			errs = utils.JoinErrors(errs, err)
-			continue
-		} else {
-			count++
+	if len(groupName) == 1 {
+		var group schema.SyntaxFlowGroup
+		db.Preload("Rules").Where("group_name = ?", groupName).First(&group)
+		return int32(len(group.Rules))
+	} else {
+		var groups []schema.SyntaxFlowGroup
+		db.Preload("Rules").Where("group_name IN (?)", groupName).Find(&groups)
+		var count int32
+		for _, group := range groups {
+			count += int32(len(group.Rules))
 		}
+		return count
 	}
-	return count, errs
 }
 
-// CreateGroupByName 通过组名创建SyntaxFlow规则组
-func CreateGroupByName(groupName string, isBuildIn ...bool) (*schema.SyntaxFlowGroup, error) {
+// CreateGroup 通过组名创建SyntaxFlow规则组
+func CreateGroup(db *gorm.DB, groupName string, isBuildIn ...bool) (*schema.SyntaxFlowGroup, error) {
 	buildIn := false
 	if len(isBuildIn) > 0 {
 		buildIn = isBuildIn[0]
 	}
 
-	db := consts.GetGormProfileDatabase()
 	db = db.Model(&schema.SyntaxFlowGroup{})
 	i := &schema.SyntaxFlowGroup{
 		GroupName: groupName,
@@ -77,8 +54,7 @@ func CreateGroupByName(groupName string, isBuildIn ...bool) (*schema.SyntaxFlowG
 }
 
 // QueryAllGroups 查询所有的SyntaxFlow规则组
-func QueryAllGroups() ([]schema.SyntaxFlowGroup, error) {
-	db := consts.GetGormProfileDatabase()
+func QueryAllGroups(db *gorm.DB) ([]schema.SyntaxFlowGroup, error) {
 	var groups []schema.SyntaxFlowGroup
 	db = db.Model(&schema.SyntaxFlowGroup{})
 	if db = db.Find(&groups); db.Error != nil {
@@ -88,8 +64,7 @@ func QueryAllGroups() ([]schema.SyntaxFlowGroup, error) {
 }
 
 // QueryGroupByName 根据组名查询组
-func QueryGroupByName(groupName string) (*schema.SyntaxFlowGroup, error) {
-	db := consts.GetGormProfileDatabase()
+func QueryGroupByName(db *gorm.DB, groupName string) (*schema.SyntaxFlowGroup, error) {
 	db = db.Model(&schema.SyntaxFlowGroup{})
 	i := &schema.SyntaxFlowGroup{}
 	if db = db.Preload("Rules").Where("group_name = ?", groupName).First(i); db.Error != nil {
@@ -100,7 +75,7 @@ func QueryGroupByName(groupName string) (*schema.SyntaxFlowGroup, error) {
 
 // AddGroupsForBuildInRule 为内置规则添加默认分组
 // 默认分组为：语言、严重程度、规则类型
-func AddGroupsForBuildInRule(buildInRule *schema.SyntaxFlowRule) error {
+func AddGroupsForBuildInRule(db *gorm.DB, buildInRule *schema.SyntaxFlowRule) error {
 	if buildInRule == nil {
 		return utils.Errorf("add build in rule group failed:rule is empty")
 	}
@@ -109,133 +84,124 @@ func AddGroupsForBuildInRule(buildInRule *schema.SyntaxFlowRule) error {
 	groups = append(groups, string(buildInRule.Severity))
 	groups = append(groups, string(buildInRule.Severity))
 
-	_, err := AddGroupsForRulesByName([]string{buildInRule.RuleName}, groups)
+	_, err := BatchAddGroupsForRules(db, []string{buildInRule.RuleName}, groups)
 	return err
 }
 
-// AddGroupsForRulesByName 为多个规则添加多个组
+// BatchAddGroupsForRules 为多个规则添加多个组
 // 如果要添加的组不存在，会自动创建
-func AddGroupsForRulesByName(ruleNames, groupNames []string) (int64, error) {
-	db := consts.GetGormProfileDatabase()
+func BatchAddGroupsForRules(db *gorm.DB, ruleNames, groupNames []string) (int64, error) {
 	db = db.Model(&schema.SyntaxFlowGroup{})
-	var errs error
 	var count int64
-	for _, groupName := range groupNames {
-		for _, ruleName := range ruleNames {
-			err := AddGroupForRuleByName(ruleName, groupName)
-			if err != nil {
-				errs = utils.JoinErrors(errs, err)
-				continue
-			} else {
-				count++
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		for _, groupName := range groupNames {
+			for _, ruleName := range ruleNames {
+				err := AddGroupForRule(tx, ruleName, groupName)
+				if err != nil {
+					return err
+				} else {
+					count++
+				}
 			}
 		}
-	}
-	return count, errs
+		return nil
+	})
+	return count, err
 }
 
-// RemoveGroupsForRulesByName 为多个规则移除多个组
-func RemoveGroupsForRulesByName(ruleNames, groupNames []string) (int64, error) {
-	db := consts.GetGormProfileDatabase()
+// BatchRemoveGroupsForRules 为多个规则移除多个组
+func BatchRemoveGroupsForRules(db *gorm.DB, ruleNames, groupNames []string) (int64, error) {
 	db = db.Model(&schema.SyntaxFlowGroup{})
-	var errs error
 	var count int64
-	for _, groupName := range groupNames {
-		for _, ruleName := range ruleNames {
-			err := RemoveGroupForRuleByName(ruleName, groupName)
-			if err != nil {
-				errs = utils.JoinErrors(errs, err)
-				continue
-			} else {
-				count++
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		for _, groupName := range groupNames {
+			for _, ruleName := range ruleNames {
+				err := RemoveGroupForRule(tx, ruleName, groupName)
+				if err != nil {
+					return err
+				} else {
+					count++
+				}
 			}
 		}
-	}
-	return count, errs
+		return nil
+	})
+
+	return count, err
 }
 
-// AddGroupForRuleByName 为规则添加组
+// AddGroupForRule 为规则添加组
 // 如果要添加的组不存在，会自动创建
-func AddGroupForRuleByName(ruleName, groupName string) error {
-	db := consts.GetGormProfileDatabase()
-	rule, err := QueryRuleByName(ruleName)
-	if err != nil {
-		return err
-	}
-	group, err := QueryGroupByName(groupName)
+func AddGroupForRule(db *gorm.DB, ruleName, groupName string) error {
+	group, err := QueryGroupByName(db, groupName)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if _, err = CreateGroupByName(groupName); err != nil {
+		if group, err = CreateGroup(db, groupName); err != nil {
 			return err
 		}
-		group, err = QueryGroupByName(groupName)
 	}
+	rule, err := QueryRuleByName(db, ruleName)
 	if err != nil {
 		return err
 	}
-	if rule != nil && group != nil {
-		if err = db.Model(group).Association("Rules").Append(rule).Error; err != nil {
-			return err
-		}
+
+	if err = db.Model(group).Association("Rules").Append(rule).Error; err != nil {
+		return err
 	}
 	return nil
 }
 
-// RemoveGroupForRuleByName 为规则移除组
-func RemoveGroupForRuleByName(ruleName, groupName string) error {
-	db := consts.GetGormProfileDatabase()
-	db = db.Model(&schema.SyntaxFlowGroup{})
-	rule, err := QueryRuleByName(ruleName)
+// RemoveGroupForRule 为规则移除组
+func RemoveGroupForRule(db *gorm.DB, ruleName, groupName string) error {
+	rule, err := QueryRuleByName(db, ruleName)
 	if err != nil {
 		return err
 	}
-	group, err := QueryGroupByName(groupName)
+	group, err := QueryGroupByName(db, groupName)
 	if err != nil {
 		return err
 	}
-	if rule != nil && group != nil {
-		if err = db.Model(group).Association("Rules").Delete(rule).Error; err != nil {
-			return err
-		}
+
+	if err := db.Model(group).Association("Rules").Delete(rule).Error; err != nil {
+		return err
 	}
 	return nil
 }
 
-// DeleteGroupsByName 通过多个组名删除多个SyntaxFlow规则组
-func DeleteGroupsByName(groupNames []string) (int64, error) {
+// DeleteGroups 通过多个组名删除多个SyntaxFlow规则组
+func DeleteGroups(db *gorm.DB, groupNames []string) (int64, error) {
 	var count int64
-	var errs error
-	for _, groupName := range groupNames {
-		if err := DeleteGroupByName(groupName); err != nil {
-			errs = utils.JoinErrors(errs, err)
-			continue
-		} else {
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		for _, groupName := range groupNames {
+			if err := DeleteGroup(tx, groupName); err != nil {
+				return err
+			}
 			count++
 		}
-	}
-	return count, errs
+		return nil
+	})
+	return count, err
 }
 
-// DeleteGroupByName 通过组名删除SyntaxFlow规则组
-func DeleteGroupByName(groupName string) error {
-	db := consts.GetGormProfileDatabase()
+// DeleteGroup 通过组名删除SyntaxFlow规则组
+func DeleteGroup(db *gorm.DB, groupName string) error {
 	db = db.Model(&schema.SyntaxFlowGroup{})
 	db = db.Where("group_name = ?", groupName).Unscoped().Delete(&schema.SyntaxFlowGroup{})
 	return db.Error
 }
 
 // ImportBuildInGroup 导入规则内置分组,默认使用language,purpose,severity作为内置分组
-func ImportBuildInGroup() {
+func ImportBuildInGroup(db *gorm.DB) {
 	var buildInGroups []string
 	buildInGroups = append(buildInGroups, schema.GetAllSFSupportLanguage()...)
 	buildInGroups = append(buildInGroups, schema.GetAllSFPurposeTypes()...)
 	buildInGroups = append(buildInGroups, schema.GetAllSFSeverityTypes()...)
 
 	for _, groupName := range buildInGroups {
-		_, err := QueryGroupByName(groupName)
+		_, err := QueryGroupByName(db, groupName)
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			continue
 		}
-		if _, err = CreateGroupByName(groupName, true); err != nil {
+		if _, err = CreateGroup(db, groupName, true); err != nil {
 			log.Errorf("create group %s failed: %s", groupName, err)
 		}
 	}

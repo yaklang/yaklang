@@ -32,8 +32,10 @@ func init() {
 				yakit.Set(key, hash)
 			}()
 		}
+
+		db := consts.GetGormProfileDatabase()
 		// 创建默认规则组
-		sfdb.ImportBuildInGroup()
+		sfdb.ImportBuildInGroup(db)
 		fsInstance := filesys.NewEmbedFS(ruleFS)
 		err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 			dirName, name := fsInstance.PathSplit(s)
@@ -78,7 +80,7 @@ func init() {
 				return err
 			}
 
-			_, err = sfdb.AddGroupsForRulesByName([]string{rule.RuleName}, []string{})
+			_, err = sfdb.BatchAddGroupsForRules(db, []string{rule.RuleName}, []string{})
 			if err != nil {
 				return err
 			}
