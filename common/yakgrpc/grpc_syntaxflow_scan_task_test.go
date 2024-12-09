@@ -370,6 +370,50 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("/a.java", `package com.example.apackage;`)
 
+		startScanWithGroup := func(progIds []string, groupName string, isIgnoreLanguage bool) (string, ypb.Yak_SyntaxFlowScanClient) {
+			stream, err := client.SyntaxFlowScan(context.Background())
+			require.NoError(t, err)
+
+			stream.Send(&ypb.SyntaxFlowScanRequest{
+				ControlMode: "start",
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					GroupNames: []string{groupName},
+				},
+				IgnoreLanguage: isIgnoreLanguage,
+				ProgramName:    progIds,
+			})
+
+			resp, err := stream.Recv()
+			require.NoError(t, err)
+			log.Infof("resp: %v", resp)
+			taskID := resp.TaskID
+			return taskID, stream
+		}
+
+		languages := []string{string(consts.JAVA), string(consts.General), string(consts.PHP), string(consts.GO)}
+
+		groupName := uuid.NewString()
+		_, err := sfdb.CreateGroupByName(groupName)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = sfdb.DeleteGroupByName(groupName)
+			require.NoError(t, err)
+		})
+
+		// create some rule with different language
+		for _, language := range languages {
+			rule, err := sfdb.CreateRule(&schema.SyntaxFlowRule{
+				RuleName: uuid.NewString(),
+				Language: language,
+			})
+			err = sfdb.AddGroupForRuleByName(rule.RuleName, groupName)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				err = sfdb.DeleteRuleByRuleName(rule.RuleName)
+				require.NoError(t, err)
+			})
+		}
+
 		progIDA := uuid.NewString()
 		progA, err := ssaapi.ParseProjectWithFS(vf,
 			ssaapi.WithLanguage(consts.JAVA),
@@ -381,7 +425,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, progA)
 		//start without ignore language
-		taskIDA, stream := startScan([]string{progIDA})
+		taskIDA, stream := startScanWithGroup([]string{progIDA}, groupName, false)
 		defer deleteTasks([]string{taskIDA})
 		for {
 			_, err := stream.Recv()
@@ -391,7 +435,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		}
 		dataA := queryTasks([]string{taskIDA})
 		require.Equal(t, 1, len(dataA))
-		require.NotEqual(t, 0, dataA[0].SkipQuery)
+		require.Equal(t, int64(2), dataA[0].SkipQuery)
 
 		// start without ignore language and have general language rule
 		progIdB := uuid.NewString()
@@ -407,13 +451,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, progA)
 
-		rule, err := sfdb.CreateRule(&schema.SyntaxFlowRule{
-			RuleName: uuid.NewString(),
-			Language: "general",
-		})
-		defer sfdb.DeleteGroup(consts.GetGormProfileDatabase(), rule.RuleName)
-
-		taskIdB, streamB := startScan([]string{progIdB})
+		taskIdB, streamB := startScanWithGroup([]string{progIdB}, groupName, true)
 		defer deleteTasks([]string{taskIdB})
 		for {
 			_, err := streamB.Recv()
@@ -423,47 +461,6 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		}
 		dataB := queryTasks([]string{taskIdB})
 		require.Equal(t, 1, len(dataB))
-		require.Equal(t, dataA[0].SkipQuery+1, dataB[0].SkipQuery)
-
-		//start with ignore language
-		startScanWithIgnoreLanguage := func(progIds []string) (string, ypb.Yak_SyntaxFlowScanClient) {
-			stream, err := client.SyntaxFlowScan(context.Background())
-			require.NoError(t, err)
-
-			stream.Send(&ypb.SyntaxFlowScanRequest{
-				ControlMode:    "start",
-				Filter:         &ypb.SyntaxFlowRuleFilter{},
-				ProgramName:    progIds,
-				IgnoreLanguage: true,
-			})
-			resp, err := stream.Recv()
-			require.NoError(t, err)
-			log.Infof("resp: %v", resp)
-			taskID := resp.TaskID
-			return taskID, stream
-		}
-
-		progIdC := uuid.NewString()
-		progC, err := ssaapi.ParseProjectWithFS(vf,
-			ssaapi.WithLanguage(consts.JAVA),
-			ssaapi.WithProgramName(progIdC),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, progC)
-		defer func() {
-			ssadb.DeleteProgram(ssadb.GetDB(), progIdC)
-		}()
-
-		taskIdC, streamC := startScanWithIgnoreLanguage([]string{progIdC})
-		defer deleteTasks([]string{taskIdC})
-		for {
-			_, err := streamC.Recv()
-			if err == io.EOF {
-				break
-			}
-		}
-		dataC := queryTasks([]string{taskIdC})
-		require.Equal(t, 1, len(dataC))
-		require.Equal(t, int64(0), dataC[0].SkipQuery)
+		require.Equal(t, int64(0), dataB[0].SkipQuery)
 	})
 }

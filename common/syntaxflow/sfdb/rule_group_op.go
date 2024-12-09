@@ -96,6 +96,9 @@ func BatchAddGroupsForRules(db *gorm.DB, ruleNames, groupNames []string) (int64,
 	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
 		for _, groupName := range groupNames {
 			for _, ruleName := range ruleNames {
+				if ruleName == "" || groupName == "" {
+					continue
+				}
 				err := AddGroupForRule(tx, ruleName, groupName)
 				if err != nil {
 					return err

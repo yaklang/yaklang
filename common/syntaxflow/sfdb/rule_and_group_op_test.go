@@ -76,7 +76,7 @@ func TestRule_Group_OP(t *testing.T) {
 		// create rule
 		ruleName := uuid.NewString()
 		rule := &schema.SyntaxFlowRule{RuleName: ruleName}
-		_, err = CreateRule(rule)
+		_,err = CreateRule(rule)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			err = DeleteRuleByRuleName(ruleName)
