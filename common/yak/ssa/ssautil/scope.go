@@ -36,7 +36,7 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	CreateVariable(name string, isLocal bool) VersionedIF[T]
 
 	// assign a value to the variable
-	AssignVariable(VersionedIF[T], T, ...func() T)
+	AssignVariable(VersionedIF[T], T)
 
 	GetVariableFromValue(T) VersionedIF[T]
 
@@ -60,9 +60,9 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 
 	// use in ssautil, handle inner member
 	ForEachCapturedVariable(VariableHandler[T])
-	ForEachCapturedSideEffect(VariableHandler[T])
+	ForEachCapturedSideEffect(func(string, []VersionedIF[T]))
 	SetCapturedVariable(string, VersionedIF[T])
-	SetCapturedSideEffect(string, VersionedIF[T])
+	SetCapturedSideEffect(string, VersionedIF[T], VersionedIF[T])
 
 	// use in phi
 	CoverBy(ScopedVersionedTableIF[T])
@@ -132,7 +132,7 @@ type ScopedVersionedTable[T versionedValue] struct {
 	linkVariable    map[T]VersionedIF[T]
 	linkCaptured    map[string]VersionedIF[T]
 	linkIncomingPhi map[string]VersionedIF[T]
-	linkSideEffect  map[string]VersionedIF[T]
+	linkSideEffect  map[string][]VersionedIF[T]
 
 	//// record the lexical variable
 	//values   *omap.OrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]] // from variable get value, assigned variable
@@ -188,7 +188,7 @@ func NewScope[T versionedValue](
 		// linkValues:      newLinkNodeMap[T](callback),
 		linkVariable:    make(map[T]VersionedIF[T]),
 		linkCaptured:    make(map[string]VersionedIF[T]),
-		linkSideEffect:  make(map[string]VersionedIF[T]),
+		linkSideEffect:  make(map[string][]VersionedIF[T]),
 		linkIncomingPhi: make(map[string]VersionedIF[T]),
 	}
 	s.linkValues = newLinkNodeMap[T](func(i VersionedIF[T]) {
@@ -235,20 +235,20 @@ func NewRootVersionedTable[T versionedValue](
 func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 	sub := NewScope[T](v.ProgramName, v.offsetFetcher, v.newVersioned, v)
 	sub.SetForceCapture(v.GetForceCapture())
-	for _, variable := range v.linkSideEffect {
-		sub.linkValues.Append(variable.GetName(), variable)
-	}
+	v.ForEachCapturedSideEffect(func(s string, vi []VersionedIF[T]) {
+		sub.SetCapturedSideEffect(s, vi[0], vi[1])
+	})
 	return sub
 }
 
 func (v *ScopedVersionedTable[T]) CreateShadowScope() ScopedVersionedTableIF[T] {
 	sub := NewScope[T](v.ProgramName, v.offsetFetcher, v.newVersioned, v)
 	sub.SetForceCapture(v.GetForceCapture())
-	for _, variable := range v.linkSideEffect {
-		sub.linkValues.Append(variable.GetName(), variable)
-	}
 	v.ForEachCapturedVariable(func(s string, vi VersionedIF[T]) {
 		sub.SetCapturedVariable(s, vi)
+	})
+	v.ForEachCapturedSideEffect(func(s string, vi []VersionedIF[T]) {
+		sub.SetCapturedSideEffect(s, vi[0], vi[1])
 	})
 	return sub
 }
@@ -405,7 +405,7 @@ func (v *ScopedVersionedTable[T]) CreateVariable(name string, isLocal bool) Vers
 }
 
 // ---------------- Assign
-func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], value T, getValue ...func() T) {
+func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], value T) {
 	// assign
 	err := variable.Assign(value)
 	if err != nil {
@@ -427,14 +427,7 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 				return
 			}
 		}
-		if len(getValue) > 0 {
-			scope.tryRegisterCapturedVariable(variable.GetName(), variable, getValue[0])
-		} else {
-			scope.tryRegisterCapturedVariable(variable.GetName(), variable, func() T {
-				return variable.GetValue()
-			})
-		}
-
+		scope.tryRegisterCapturedVariable(variable.GetName(), variable)
 	}
 }
 
@@ -451,7 +444,7 @@ func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(handler VariableHandl
 	}
 }
 
-func (ps *ScopedVersionedTable[T]) ForEachCapturedSideEffect(handler VariableHandler[T]) {
+func (ps *ScopedVersionedTable[T]) ForEachCapturedSideEffect(handler func(string, []VersionedIF[T])) {
 	for name, ver := range ps.linkSideEffect {
 		handler(name, ver)
 	}
@@ -461,8 +454,8 @@ func (scope *ScopedVersionedTable[T]) SetCapturedVariable(name string, ver Versi
 	scope.linkCaptured[name] = ver
 }
 
-func (scope *ScopedVersionedTable[T]) SetCapturedSideEffect(name string, ver VersionedIF[T]) {
-	scope.linkSideEffect[name] = ver
+func (scope *ScopedVersionedTable[T]) SetCapturedSideEffect(name string, ver, bind VersionedIF[T]) {
+	scope.linkSideEffect[name] = []VersionedIF[T]{ver, bind}
 }
 
 // CreateSymbolicVariable create a non-lexical and no named variable
@@ -487,7 +480,7 @@ func (scope *ScopedVersionedTable[T]) SetCapturedSideEffect(name string, ver Ver
 // }
 
 // try register captured variable
-func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver VersionedIF[T], getValue func() T) {
+func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver VersionedIF[T]) {
 	if v.IsRoot() {
 		return
 	}
@@ -499,8 +492,8 @@ func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver V
 	if parentVariable != nil {
 		ver.SetCaptured(parentVariable)
 	} else {
-		variable := v.GetHead().CreateVariable(name, false)
-		v.GetHead().AssignVariable(variable, getValue())
+		// variable := v.GetParent().CreateVariable(name, false)
+		// v.GetParent().AssignVariable(variable, ver.GetValue())
 	}
 	// mark original captured variable
 	v.linkCaptured[name] = ver
