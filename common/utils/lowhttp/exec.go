@@ -571,6 +571,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		gmTls:           option.GmTLS,
 		clientHelloSpec: clientHelloSpec,
 	}
+	if sni != nil {
+		cacheKey.sni = *sni
+	}
 	haveNativeHTTPRequestInstance := reqIns != nil
 	if haveNativeHTTPRequestInstance {
 		httpctx.SetRequestHTTPS(reqIns, https)

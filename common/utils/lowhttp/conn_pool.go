@@ -653,10 +653,11 @@ type connectKey struct {
 	https           bool
 	gmTls           bool
 	clientHelloSpec *utls.ClientHelloSpec
+	sni             string
 }
 
 func (c connectKey) hash() string {
-	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec)
+	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.sni)
 }
 
 type connLRU struct {
