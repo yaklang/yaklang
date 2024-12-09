@@ -1,6 +1,8 @@
 package mutate
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/fuzztagx"
@@ -15,6 +17,7 @@ type FuzzTagConfig struct {
 	isSimple          bool
 	syncRootNodeIndex bool
 	resultLimit       int
+	context           context.Context
 }
 
 func NewFuzzTagConfig() *FuzzTagConfig {
@@ -124,6 +127,12 @@ func Fuzz_WithResultLimit(limit int) FuzzConfigOpt {
 	}
 }
 
+func Fuzz_WithContext(ctx context.Context) FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		config.context = ctx
+	}
+}
+
 func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err error) {
 	config := NewFuzzTagConfig()
 	for k, method := range tagMethodMap {
@@ -131,6 +140,10 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 	}
 	for _, opt := range opts {
 		opt(config)
+	}
+	ctx := config.context
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	if v, ok := config.tagMethodMap["params"]; ok {
 		config.tagMethodMap["param"] = v
@@ -144,7 +157,7 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 			}
 		}
 	}()
-	generator, err := fuzztagx.NewGenerator(utils2.InterfaceToString(input), config.tagMethodMap, config.isSimple, config.syncRootNodeIndex)
+	generator, err := fuzztagx.NewGeneratorEx(ctx, utils2.InterfaceToString(input), config.tagMethodMap, config.isSimple, config.syncRootNodeIndex)
 	if err != nil {
 		return nil, err
 	}
