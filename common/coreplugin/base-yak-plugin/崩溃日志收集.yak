@@ -7,6 +7,14 @@ status = i => {
     yakit.StatusCard("状态", i)
 }
 
+go func{
+    start = now()
+    for {
+        sleep(1)
+        yakit.StatusCard("已耗时", `%.0f Sec`% now().Sub(start).Seconds())
+    }
+}
+
 status("开始收集崩溃日志")
 
 yakitHome = yakit.GetHomeDir()
@@ -93,6 +101,8 @@ handle = filePath => {
 
 }
 
+files = []
+
 for i in infos {
     if !i.IsDir {
         continue
@@ -106,12 +116,29 @@ for i in infos {
             i.Path,
             logFile => {
                 if !logFile.Path.HasSuffix(".txt") {return true}
-                println(logFile.Path)
-                handle(logFile.Path)
+                files.Push(logFile.Path)
                 return true
             },
         )
     }
+}
+
+if files.Len() <= 0 {
+    status("无法找到崩溃日志")
+}
+
+fileTotal = files.Len()
+counter = i => {
+    yakit.StatusCard("正在分析...", f"${i}/${fileTotal}")
+}
+
+yakit.SetProgress(0)
+fileCounter := 0
+for fileName in files {
+    fileCounter++
+    counter(fileCounter)
+    handle(fileName)
+    yakit.SetProgress(float64(fileCounter) / float64(fileTotal))
 }
 
 
