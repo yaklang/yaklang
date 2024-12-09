@@ -42,7 +42,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 	// extern lib
 	if extern, ok := ToExternLib(object); ok {
 		name := getExternLibMemberCall(object, key)
-		ret := b.CreateVariable(name)
+		ret := b.CreateVariableForce(name)
 		ret.SetMemberCall(extern, key)
 		return ret
 	}
@@ -56,7 +56,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 		b.checkAndCreatDefaultMember(res, object, key)
 	}
 	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
-	ret := b.CreateVariable(name)
+	ret := b.CreateVariableForce(name)
 	ret.SetMemberCall(object, key)
 	return ret
 }

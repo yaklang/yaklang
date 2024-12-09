@@ -168,6 +168,27 @@ func TestBasic_Variable_Inblock(t *testing.T) {
 			"2", "2",
 		}, t)
 	})
+
+	t.Run("test assign cross block", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main() {
+			a := 1
+			{
+				a = 2
+				println(a)
+				a := 3
+				println(a)
+				a = 4
+				println(a)
+			}
+			println(a)
+		}
+	`, []string{
+			"2", "3", "4", "2",
+		}, t)
+	})
+
 }
 
 func TestBasic_Variable_InIf(t *testing.T) {
