@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
@@ -119,7 +120,7 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.RuleName = ruleInput.RuleName
 	rule.Tag = strings.Join(ruleInput.Tags, "|")
 	rule.Title = ruleInput.RuleName
-	rule.Groups = sfdb.GetOrCreatGroupsByName(ruleInput.GroupNames)
+	rule.Groups = sfdb.GetOrCreatGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
 	rule.Description = ruleInput.Description
 	return rule, nil
 }

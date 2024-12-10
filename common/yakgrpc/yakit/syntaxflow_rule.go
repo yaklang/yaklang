@@ -54,10 +54,6 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 
 	db.Model(&schema.SyntaxFlowRule{})
 
-	if len(params.GetIds()) > 0 {
-		db = db.Where("id IN (?)", params.GetIds())
-	}
-
 	if len(params.GetGroupNames()) > 0 {
 		db = db.Joins("JOIN syntax_flow_rule_and_group ON syntax_flow_rule_and_group.syntax_flow_rule_id = syntax_flow_rules.id").
 			Joins("JOIN syntax_flow_groups ON syntax_flow_groups.id = syntax_flow_rule_and_group.syntax_flow_group_id").
@@ -112,7 +108,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 		return nil, utils.Errorf("update syntaxFlow rule failed: rule name is empty")
 	}
 
-	updateRule, err := sfdb.QueryRuleByName(rule.GetRuleName())
+	updateRule, err := sfdb.QueryRuleByName(db, rule.GetRuleName())
 	if err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
