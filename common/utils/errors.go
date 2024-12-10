@@ -3,8 +3,11 @@ package utils
 import (
 	"fmt"
 	"io"
+	"net"
+	"os"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/samber/lo"
 )
@@ -209,4 +212,21 @@ func ErrorStack(origin any) (err error) {
 	}
 	err = Wrapf(originErr, "%s", sb.String())
 	return
+}
+
+func IsConnectResetError(err error) bool { // check net error like "an existing connection was forcibly closed by the remote host"
+	if opErr, ok := err.(*net.OpError); ok {
+		if opErr.Err == syscall.ECONNRESET {
+			return true
+		} else if runtime.GOOS == "windows" {
+			if se, ok := opErr.Err.(*os.SyscallError); ok {
+				if errno, ok := se.Err.(syscall.Errno); ok {
+					if errno == 10054 {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
 }
