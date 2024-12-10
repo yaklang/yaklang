@@ -226,44 +226,8 @@ func DeleteRiskByTarget(db *gorm.DB, target string) error {
 }
 
 func YieldRisksByIds(db *gorm.DB, ctx context.Context, ids []int) chan *schema.Risk {
-	outC := make(chan *schema.Risk)
-	db = db.Model(&schema.Risk{})
-	var idsInt64 []int64
-	for _, id := range ids {
-		idsInt64 = append(idsInt64, int64(id))
-	}
-	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", idsInt64)
-
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.Risk
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
+	db = bizhelper.ExactQueryIntArrayOr(db, "id", ids)
+	outC := bizhelper.YieldModel[*schema.Risk](ctx, db)
 	return outC
 }
 
