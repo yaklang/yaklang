@@ -23,10 +23,13 @@ func GetDialxCPS() int64 {
 
 func init() {
 	go func() {
+		rpsTick := time.NewTicker(1 * time.Second)
 		for {
-			time.Sleep(time.Second)
-			lastCPS = currentCPS.Load()
-			currentCPS.Store(0)
+			select {
+			case <-rpsTick.C:
+				lastCPS = currentCPS.Load()
+				currentCPS.Store(0)
+			}
 		}
 	}()
 }
