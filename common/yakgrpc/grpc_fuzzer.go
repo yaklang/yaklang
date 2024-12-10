@@ -707,7 +707,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			//mutate.WithPoolOpt_ConnPool(true),
 		}
 
-		if !req.GetDisableHotpot() {
+		if !req.GetDisableHotPatch() {
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)))
 		}
 
