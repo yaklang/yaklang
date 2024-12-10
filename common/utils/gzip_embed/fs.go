@@ -115,5 +115,5 @@ func (c *PreprocessingEmbed) ReadFile(name string) ([]byte, error) {
 	if successful {
 		return content, nil
 	}
-	return nil, errors.New("file not found")
+	return nil, errors.New("file does not exist")
 }
