@@ -28,10 +28,14 @@ func (y *YakCompiler) VisitStatementList(raw yak.IStatementListContext, inline .
 	defer recoverRange()
 	allStatement := i.AllStatement()
 	lenOfAllStatement := len(allStatement)
+	t := i.GetText()
+	_ = t
 	for index, s := range allStatement {
 		stmt := s.(*yak.StatementContext)
 		if index == 0 && len(inline) > 0 && inline[0] {
-		} else if index == lenOfAllStatement-1 && stmt.Empty() != nil {
+		} else if index >= lenOfAllStatement-2 && stmt.Empty() != nil {
+			// 最后两个为空的语句不需要换行,本来是最后一个为空的语句
+			// 改成最后2个为空的语句是因为lexer现在右大括号或者EOF时插入分号
 			continue
 		} else {
 			y.writeIndent()

@@ -110,7 +110,7 @@ func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 	// build check list
 	for index := range allcases {
 		recoverFormatBufferFunc := y.switchFormatBuffer()
-		y.writeString("case ")
+		y.writeStringWithIndent("case ")
 
 		if exprs, ok := i.ExpressionList(index).(*yak.ExpressionListContext); ok {
 			if len(exprs.AllExpression()) == 1 {
@@ -195,7 +195,9 @@ func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 		buf = strings.Trim(buf, "\n")
 		y.writeString(conditionbuf[index] + buf)
 		y.decIndent()
-		y.writeNewLine()
+		if len(buf) > 0 {
+			y.writeNewLine()
+		}
 
 		// end scope
 		recoverSymtbl()
@@ -209,7 +211,7 @@ func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 		// default body scope
 		recoverSymtbl = y.SwitchSymbolTableInNewScope("default", uuid.New().String())
 
-		y.writeString("default:")
+		y.writeStringWithIndent("default:")
 		y.writeNewLine()
 		y.incIndent()
 
@@ -240,7 +242,9 @@ func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 		buf = strings.Trim(buf, "\n")
 		y.writeString(buf)
 		y.decIndent()
-		y.writeNewLine()
+		if len(buf) > 0 {
+			y.writeNewLine()
+		}
 
 		// end scope
 		recoverSymtbl()
@@ -277,7 +281,7 @@ func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 	// handler break
 	y.exitSwitchContext(endCodewithScopeEnd)
 
-	y.writeString("}")
+	y.writeStringWithIndent("}")
 
 	return nil
 }

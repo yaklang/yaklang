@@ -1593,6 +1593,23 @@ case false:
 default:
     f++
 }`
+
+	switchTestCase2 := `i => {
+    switch i {
+        case "abc":
+        println(i)
+        default:
+        println(i)
+    }
+}`
+	switchExpected2 := `i => {
+    switch i {
+    case "abc":
+        println(i)
+    default:
+        println(i)
+    }
+}`
 	forTestCase := `for i=0;i<5;i++ {print(i)}`
 	forExpected := `for i = 0; i < 5; i++ {
     print(i)
@@ -1690,6 +1707,7 @@ b = 1 + 1`,
 		funcTestCase:               funcExpected,
 		ifTestCase:                 ifExpected,
 		switchTestCase:             switchExpected,
+		switchTestCase2:            switchExpected2,
 		forTestCase:                forExpected,
 		forRangeTestCase:           forRangeExpected,
 		forRangeTestCase2:          forRangeExpected2,
@@ -1717,7 +1735,8 @@ b = 1 + 1`,
 			}
 		}
 		if vt.GetFormattedCode() != expected {
-			t.Errorf("input:\n%s\n-------------\ngot:\n%#v\n-------------\nexpected:\n%#v", testcase, vt.GetFormattedCode(), expected)
+			t.Logf("got:\n%#v\n-------------\nexpected:\n%#v", vt.GetFormattedCode(), expected)
+			t.Errorf("input:\n%s\n-------------\ngot:\n%s\n-------------\nexpected:\n%s", testcase, vt.GetFormattedCode(), expected)
 		}
 	}
 }
