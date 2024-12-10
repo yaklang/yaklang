@@ -48,7 +48,7 @@ func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.
 // YieldRiskByTarget 根据目标(ip或ip:port)获取风险记录，返回风险记录的管道
 // Example:
 // ```
-// for risk := range YieldRiskByTarget("example.com") {
+// for risk := range risk.YieldRiskByTarget("example.com") {
 // println(risk)
 // }
 // ```
@@ -59,7 +59,7 @@ func YieldRiskByTarget(target string) chan *schema.Risk {
 // YieldRiskByIds 根据 Risk ID 获取风险记录，返回风险记录的管道
 // Example:
 // ```
-// for risk := range YieldRiskByIds([1,2,3]) {
+// for risk := range risk.YieldRiskByIds([1,2,3]) {
 // println(risk)
 // }
 // ```
@@ -70,7 +70,7 @@ func YieldRiskByIds(ids []int) chan *schema.Risk {
 // YieldRiskByRuntimeId 根据 RuntimeID 获取风险记录，返回风险记录的管道
 // Example:
 // ```
-// for risk := range YieldRiskByRuntimeId("161c5372-3e75-46f6-a6bf-1a3182da625e") {
+// for risk := range risk.YieldRiskByRuntimeId("161c5372-3e75-46f6-a6bf-1a3182da625e") {
 // println(risk)
 // }
 // ```
@@ -82,7 +82,7 @@ func YieldRiskByRuntimeId(runtimeId string) chan *schema.Risk {
 // Example:
 // ```
 // ts = time.Parse("2006-01-02 15:04:05", "2020-01-01 00:00:00")~.Unix()
-// for risk := range YieldRiskByCreateAt(ts) {
+// for risk := range risk.YieldRiskByCreateAt(ts) {
 // println(risk)
 // }
 // ```
@@ -93,7 +93,7 @@ func YieldRiskByCreateAt(timestamp int64) chan *schema.Risk {
 // YieldRiskByScriptName 根据插件名戳获取风险记录，返回风险记录的管道
 // Example:
 // ```
-// for risk := range YieldRiskByScriptName("基础 XSS 检测") {
+// for risk := range risk.YieldRiskByScriptName("基础 XSS 检测") {
 // println(risk)
 // }
 // ```
@@ -104,7 +104,7 @@ func YieldRiskByScriptName(scriptName string) chan *schema.Risk {
 // DeleteRiskByTarget 根据目标(ip或ip:port)删除风险记录
 // Example:
 // ```
-// DeleteRiskByTarget("example.com")
+// risk.DeleteRiskByTarget("example.com")
 // ```
 func DeleteRiskByTarget(addr string) error {
 	return yakit.DeleteRiskByTarget(consts.GetGormProjectDatabase(), addr)
@@ -118,7 +118,7 @@ func DeleteRiskByID(id int64) error {
 // NewPublicReverseRMIUrl 返回一个公网 Bridge 的反向 RMI URL
 // Example:
 // ```
-// url := NewPublicReverseRMIUrl()
+// url := risk.NewPublicReverseRMIUrl()
 // ```
 func NewPublicReverseRMIUrl() string {
 	return yakit.NewPublicReverseProtoUrl("rmi")()
@@ -127,7 +127,7 @@ func NewPublicReverseRMIUrl() string {
 // NewPublicReverseHTTPSUrl 返回一个公网 Bridge 的反向 HTTPS URL
 // Example:
 // ```
-// url := NewPublicReverseHTTPSUrl()
+// url := risk.NewPublicReverseHTTPSUrl()
 // ```
 func NewPublicReverseHTTPSUrl() string {
 	return yakit.NewPublicReverseProtoUrl("https")()
@@ -136,7 +136,7 @@ func NewPublicReverseHTTPSUrl() string {
 // NewPublicReverseHTTPUrl 返回一个公网 Bridge 的反向 HTTP URL
 // Example:
 // ```
-// url := NewPublicReverseHTTPUrl()
+// url := risk.NewPublicReverseHTTPUrl()
 // ```
 func NewPublicReverseHTTPUrl() string {
 	return yakit.NewPublicReverseProtoUrl("http")()
@@ -145,7 +145,7 @@ func NewPublicReverseHTTPUrl() string {
 // NewLocalReverseRMIUrl 返回一个本地 Bridge 的反向 RMI URL
 // Example:
 // ```
-// url := NewLocalReverseRMIUrl()
+// url := risk.NewLocalReverseRMIUrl()
 // ```
 func NewLocalReverseRMIUrl() string {
 	return yakit.NewLocalReverseProtoUrl("rmi")()
@@ -154,7 +154,7 @@ func NewLocalReverseRMIUrl() string {
 // NewLocalReverseHTTPSUrl 返回一个本地 Bridge 的反向 HTTPS URL
 // Example:
 // ```
-// url := NewLocalReverseHTTPSUrl()
+// url := risk.NewLocalReverseHTTPSUrl()
 // ```
 func NewLocalReverseHTTPSUrl() string {
 	return yakit.NewLocalReverseProtoUrl("https")()
@@ -163,7 +163,7 @@ func NewLocalReverseHTTPSUrl() string {
 // NewLocalReverseHTTPUrl 返回一个本地 Bridge 的反向 HTTP URL
 // Example:
 // ```
-// url := NewLocalReverseHTTPUrl()
+// url := risk.NewLocalReverseHTTPUrl()
 // ```
 func NewLocalReverseHTTPUrl() string {
 	return yakit.NewLocalReverseProtoUrl("http")()
