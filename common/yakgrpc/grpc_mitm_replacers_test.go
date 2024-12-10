@@ -922,3 +922,48 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	require.Contains(t, string(res), token)
 	require.False(t, drop)
 }
+
+func TestGRPCMUSTPASS_ReplaceWithHeaderCookie(t *testing.T) {
+	// extra header > extra cookie
+
+	oldCookieValue := "BAIDUID_BFESS=D541A87Daaa50ACC658F7405F62B195D8AA:FG=1; ZFY=Xx1VJGFY2aaHQ2vrOIEsC83loAk0wEEIPY3nVfBgtxymQ:C"
+	wantCookieValue := fmt.Sprintf("%s=%s", utils.RandStringBytes(10), utils.RandStringBytes(10))
+	extraCookieKey, extraCookieValue := utils.RandStringBytes(10), utils.RandStringBytes(10)
+	replacer := NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:             `www\.baidu\.com`,
+		Result:           ``,
+		Color:            "",
+		EnableForRequest: true,
+		EnableForHeader:  true,
+		EnableForBody:    true,
+		Index:            0,
+		ExtraTag:         nil,
+		Disabled:         false,
+		VerboseName:      "",
+		ExtraHeaders: []*ypb.HTTPHeader{
+			{
+				Header: `Cookie`,
+				Value:  wantCookieValue,
+			},
+		},
+		ExtraCookies: []*ypb.HTTPCookieSetting{
+			{
+				Key:   extraCookieKey,
+				Value: extraCookieValue,
+			},
+		},
+	})
+	requestBytes := []byte(fmt.Sprintf(`GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: %s
+
+`, oldCookieValue))
+
+	_, res, drop := replacer.hook(true, false, "http://www.baidu.com/", requestBytes)
+	require.False(t, drop)
+	require.Contains(t, string(res), wantCookieValue)
+	require.NotContains(t, string(res), oldCookieValue)
+	require.NotContains(t, string(res), extraCookieKey)
+	require.NotContains(t, string(res), extraCookieValue)
+}
