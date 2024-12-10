@@ -4499,8 +4499,8 @@ message FuzzerRequest {
   // use tcp conn pool
   bool DisableUseConnPool = 58;
 
-  // disable hotpot
-  bool DisableHotpot = 59;
+  // disable hotPatch
+  bool DisableHotPatch = 59;
 }
 
 message MutateMethod {
