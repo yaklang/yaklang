@@ -1,3 +1,15 @@
+// Package pprofutils provides utilities for runtime profiling of Go applications.
+// It supports both CPU and memory profiling with customizable thresholds and callbacks.
+//
+// Example usage:
+//
+//	pprofutils.AddCPUProfileCallback(func(stats []FunctionStat) {
+//	    // Handle CPU profile data
+//	})
+//
+//	pprofutils.AddMemProfileCallback(func(metrics MemMetrics) {
+//	    // Handle memory metrics
+//	})
 package pprofutils
 
 import (
@@ -90,6 +102,8 @@ var cpuThreshold = 0.8
 var (
 	cpuCallbackMutex sync.RWMutex
 	cpuCallbacks     []func(stats []FunctionStat)
+	memCallbackMutex sync.RWMutex
+	memCallbacks     []func(metrics MemMetrics)
 )
 
 // 添加CPU分析回调函数
@@ -99,6 +113,13 @@ func AddCPUProfileCallback(callback func(stats []FunctionStat)) {
 	cpuCallbacks = append(cpuCallbacks, callback)
 }
 
+// 添加内存分析回调函数
+func AddMemProfileCallback(callback func(metrics MemMetrics)) {
+	memCallbackMutex.Lock()
+	defer memCallbackMutex.Unlock()
+	memCallbacks = append(memCallbacks, callback)
+}
+
 // 清空CPU分析回调函数
 func ClearCPUProfileCallbacks() {
 	cpuCallbackMutex.Lock()
@@ -106,7 +127,14 @@ func ClearCPUProfileCallbacks() {
 	cpuCallbacks = nil
 }
 
-// 执行所有回调函数
+// 清空内存分析回调函数
+func ClearMemProfileCallbacks() {
+	memCallbackMutex.Lock()
+	defer memCallbackMutex.Unlock()
+	memCallbacks = nil
+}
+
+// 执行所有CPU回调函数
 func executeCPUCallbacks(stats []FunctionStat) {
 	cpuCallbackMutex.RLock()
 	defer cpuCallbackMutex.RUnlock()
@@ -116,9 +144,21 @@ func executeCPUCallbacks(stats []FunctionStat) {
 	}
 }
 
+// 执行所有内存回调函数
+func executeMemCallbacks(metrics MemMetrics) {
+	memCallbackMutex.RLock()
+	defer memCallbackMutex.RUnlock()
+
+	for _, callback := range memCallbacks {
+		callback(metrics)
+	}
+}
+
 func init() {
+	// CPU分析协程
 	go func() {
 		cpuPprofileOnce.Do(func() {
+			var buf = bytes.NewBuffer(nil)
 			for {
 				time.Sleep(time.Second)
 
@@ -129,9 +169,9 @@ func init() {
 				}
 				cpuCallbackMutex.RUnlock()
 
-				var buf bytes.Buffer
 				start := time.Now()
-				err := pprof.StartCPUProfile(&buf)
+				buf.Reset()
+				err := pprof.StartCPUProfile(buf)
 				if err != nil {
 					randInt := rand.Intn(10) + 1
 					fmt.Printf("CPU Profile error: %v, retry after %d seconds\n", err, randInt)
@@ -140,7 +180,7 @@ func init() {
 				}
 				time.Sleep(time.Second)
 				pprof.StopCPUProfile()
-				stats, err := AutoAnalyzeRaw(&buf)
+				stats, err := AutoAnalyzeRaw(buf)
 				if err != nil && len(stats) == 0 {
 					log.Debugf("finished pprofiling for cpu duration: %v, profile: %v", time.Now().Sub(start), utils.ByteSize(uint64(buf.Len())))
 					continue
@@ -150,5 +190,28 @@ func init() {
 				executeCPUCallbacks(stats)
 			}
 		})
+	}()
+
+	// 内存分析协程
+	go func() {
+		for {
+			time.Sleep(time.Second)
+
+			memCallbackMutex.RLock()
+			if len(memCallbacks) == 0 {
+				memCallbackMutex.RUnlock()
+				continue
+			}
+			memCallbackMutex.RUnlock()
+
+			metrics, err := metricsForMem()
+			if err != nil {
+				log.Errorf("获取内存指标失败: %v", err)
+				continue
+			}
+
+			// 执行内存回调函数
+			executeMemCallbacks(metrics)
+		}
 	}()
 }
