@@ -391,12 +391,12 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		}
 
 		languages := []string{string(consts.JAVA), string(consts.General), string(consts.PHP), string(consts.GO)}
-
+		db := consts.GetGormProfileDatabase()
 		groupName := uuid.NewString()
-		_, err := sfdb.CreateGroupByName(groupName)
+		_, err := sfdb.CreateGroup(db, groupName)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			err = sfdb.DeleteGroupByName(groupName)
+			err = sfdb.DeleteGroup(db, groupName)
 			require.NoError(t, err)
 		})
 
@@ -406,7 +406,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 				RuleName: uuid.NewString(),
 				Language: language,
 			})
-			err = sfdb.AddGroupForRuleByName(rule.RuleName, groupName)
+			err = sfdb.AddGroupForRule(db, rule.RuleName, groupName)
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				err = sfdb.DeleteRuleByRuleName(rule.RuleName)
