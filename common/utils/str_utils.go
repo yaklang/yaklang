@@ -1574,3 +1574,18 @@ func UnquoteANSICWithQuote(s string, quote rune) (string, error) {
 func UnquoteANSIC(s string) (string, error) {
 	return UnquoteANSICWithQuote(s, '\'')
 }
+
+func QuoteCSV(s string) string {
+	if strings.ContainsAny(s, ",\"\n") {
+		s = strings.ReplaceAll(s, `"`, `""`)
+		return fmt.Sprintf(`"%s"`, s)
+	}
+	return s
+}
+
+func UnquoteCSV(s string) string {
+	if strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"") {
+		s = strings.ReplaceAll(s, `""`, `"`)
+	}
+	return s
+}
