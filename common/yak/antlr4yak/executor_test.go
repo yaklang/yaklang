@@ -1631,6 +1631,9 @@ continue
 	goExpected2 := "go func() { print(\"test\") }()"
 	deferTestCase := `defer func(){print("test")}()`
 	deferExpected := `defer func() { print("test") }()`
+	deferTestCase2 := `defer println(1)
+println(2)`
+	deferTestExpected2 := deferTestCase2
 	inlineTestCase := `abc = func() {return "short"}`
 	inlineExpected := `abc = func() { return "short" }`
 	inlineTestCase2 := `abc = func() {return "longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong"}`
@@ -1714,6 +1717,7 @@ b = 1 + 1`,
 		goTestCase:                 goExpected,
 		goTestCase2:                goExpected2,
 		deferTestCase:              deferExpected,
+		deferTestCase2:             deferTestExpected2,
 		inlineTestCase:             inlineExpected,
 		inlineTestCase2:            inlineExpected2,
 		assertTestCase:             assertExpected,
