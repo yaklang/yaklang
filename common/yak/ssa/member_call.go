@@ -1,10 +1,12 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 // get field value
-func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Value {
-	res := checkCanMemberCallExist(object, key, wantFunction)
+func (b *FunctionBuilder) getFieldValue(object, key Value, process ...FunctionProcess) Value {
+	res := checkCanMemberCallExist(object, key, process...)
 	// normal member
 	// use name  peek value
 	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
@@ -12,24 +14,22 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 	}
 
 	// default member
-	value := b.createDefaultMember(res, object, key, wantFunction)
+	value := b.createDefaultMember(res, object, key, process...)
 	return value
 }
 
-func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bool) Value {
+func (b *FunctionBuilder) getStaticFieldValue(object, key Value, process ...FunctionProcess) Value {
 	// only static member and method need to be checked
 	if !b.SupportClassStaticModifier {
 		return nil
 	}
 	// get member or method
 	getValueFromClass := func(class *Blueprint) Value {
-		var get func(string) Value
-		if wantFunction {
-			get = class.GetStaticMethod
+		if len(process) > 0 {
+			return class.GetStaticMethod(key.String(), process...)
 		} else {
-			get = class.GetStaticMember
+			return class.GetStaticMember(key.String())
 		}
-		return get(key.String())
 	}
 	// className.Key
 	if un, ok := ToUndefined(object); ok && un.Kind == UndefinedValueInValid {
@@ -76,7 +76,7 @@ func (b *FunctionBuilder) InterfaceAddFieldBuild(size int, keys func(int) Value,
 	return itf
 }
 
-func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, method bool) Value {
+func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, process ...FunctionProcess) Value {
 	if !b.SupportClass {
 		return nil
 	}
@@ -85,10 +85,8 @@ func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, met
 	if !ok {
 		return nil
 	}
-	if method {
-		if normalMethod := bluePrint.GetNormalMethod(key.String()); !utils.IsNil(normalMethod) {
-			return normalMethod
-		}
+	if method := bluePrint.GetNormalMethod(key.String(), process...); utils.IsNil(method) {
+		return method
 	}
 	if member := bluePrint.GetNormalMember(key.String()); !utils.IsNil(member) {
 		return member
@@ -96,13 +94,13 @@ func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, met
 	return nil
 }
 
-func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key Value, wantFunction bool) Value {
+func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key Value, process ...FunctionProcess) Value {
 	// create undefined memberCall value if the value can not be peeked
 	name := res.name
 	memberHandler := func(typ Type, member Value) {
 		// todo: phi type is anytype,unknown other value
 		if typ == nil || typ.GetTypeKind() == AnyTypeKind {
-			if wantFunction {
+			if len(process) != 0 {
 				t := NewFunctionTypeDefine(name, nil, nil, false)
 				t.SetIsMethod(true, object.GetType())
 				typ = t
@@ -136,13 +134,11 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		return un
 	}
 	// normal method
-	if wantFunction {
-		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
+	if len(process) != 0 {
+		if fun := GetMethod(object.GetType(), key.String(), process...); fun != nil {
 			fun.SetObject(object)
 			un := writeUndefind()
 			memberHandler(res.typ, un)
-			// un := writeUndefind()
-			// memberHandler(res.typ, un)
 			return un
 		}
 	}
@@ -154,10 +150,10 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		memberHandler(res.typ, member)
 		return member
 	}
-	if ret := b.getStaticFieldValue(object, key, wantFunction); ret != nil {
+	if ret := b.getStaticFieldValue(object, key, process...); ret != nil {
 		return ret
 	}
-	if field := b.getDefaultMemberOrMethodByClass(object, key, wantFunction); !utils.IsNil(field) {
+	if field := b.getDefaultMemberOrMethodByClass(object, key, process...); !utils.IsNil(field) {
 		return field
 	}
 	un := writeUndefind()
@@ -172,5 +168,5 @@ func (b *FunctionBuilder) checkAndCreatDefaultMember(res checkMemberResult, obje
 	}
 
 	// need default member
-	return b.createDefaultMember(res, object, key, false)
+	return b.createDefaultMember(res, object, key)
 }

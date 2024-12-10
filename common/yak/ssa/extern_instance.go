@@ -314,9 +314,9 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 	}
 
 	// handler method
-	ret.SetMethodGetter(func() map[string]*Function {
+	ret.SetMethodGetter(func() map[string]Functions {
 		pTyp := reflect.PointerTo(typ)
-		methods := make(map[string]*Function, typ.NumMethod()+pTyp.NumMethod())
+		methods := make(map[string]Functions, typ.NumMethod()+pTyp.NumMethod())
 		handlerMethod := func(typ reflect.Type) {
 			for i := 0; i < typ.NumMethod(); i++ {
 				method := typ.Method(i)
@@ -325,7 +325,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 					funTyp.Parameter = utils.InsertSliceItem(funTyp.Parameter, ret, 0)
 				}
 				funTyp.SetName(fmt.Sprintf("%s.%s", pkgPathName, method.Name))
-				methods[method.Name] = NewFunctionWithType(method.Name, funTyp)
+				methods[method.Name] = Functions{NewFunctionWithType(method.Name, funTyp)}
 			}
 		}
 		handlerMethod(typ)

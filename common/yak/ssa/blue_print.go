@@ -37,9 +37,9 @@ const (
 type Blueprint struct {
 	Name string
 
-	NormalMethod map[string]*Function
-	StaticMethod map[string]*Function
-	MagicMethod  map[BlueprintMagicMethodKind]Value
+	NormalMethod map[string]Functions
+	StaticMethod map[string]Functions
+	MagicMethod  map[BlueprintMagicMethodKind]Functions
 
 	NormalMember map[string]Value
 	StaticMember map[string]Value
@@ -54,7 +54,7 @@ type Blueprint struct {
 	// _container is an inner ssa.Valueorigin cls container
 	_container Value
 
-	GeneralUndefined func(string) *Undefined
+	GenerateFunction func(string) *Function
 
 	ParentClass []*Blueprint
 	// full Type Name
@@ -71,13 +71,21 @@ func NewClassBluePrint(name string) *Blueprint {
 		StaticMember: make(map[string]Value),
 		ConstValue:   make(map[string]Value),
 
-		NormalMethod: make(map[string]*Function),
-		StaticMethod: make(map[string]*Function),
-		MagicMethod:  make(map[BlueprintMagicMethodKind]Value),
+		NormalMethod: make(map[string]Functions),
+		StaticMethod: make(map[string]Functions),
+		MagicMethod:  make(map[BlueprintMagicMethodKind]Functions),
 
 		fullTypeName: make([]string, 0),
 	}
 	return class
+}
+
+func apply[T string | BlueprintMagicMethodKind](methods map[T]Functions, applyMethod func(name T, function *Function)) {
+	for name, functions := range methods {
+		for _, function := range functions {
+			applyMethod(name, function)
+		}
+	}
 }
 
 // ======================= class blue print
@@ -87,15 +95,15 @@ func (c *Blueprint) AddParentClass(parent *Blueprint) {
 		return
 	}
 	c.ParentClass = append(c.ParentClass, parent)
-	for name, f := range parent.NormalMethod {
-		c.RegisterNormalMethod(name, f, false)
-	}
-	for name, f := range parent.StaticMethod {
-		c.RegisterStaticMethod(name, f)
-	}
-	for name, f := range parent.MagicMethod {
-		c.RegisterMagicMethod(name, f)
-	}
+	apply(parent.NormalMethod, func(name string, function *Function) {
+		c.RegisterNormalMethod(name, function, false)
+	})
+	apply(parent.StaticMethod, func(name string, function *Function) {
+		c.RegisterStaticMethod(name, function)
+	})
+	apply(parent.MagicMethod, func(name BlueprintMagicMethodKind, function *Function) {
+		c.RegisterMagicMethod(name, function)
+	})
 	for name, value := range parent.NormalMember {
 		c.RegisterNormalMember(name, value)
 	}
@@ -152,4 +160,17 @@ func (b *Blueprint) InitializeWithContainer(con *Make) error {
 }
 func (b *Blueprint) GetClassContainer() Value {
 	return b._container
+}
+
+func (c *Blueprint) IsParent(p Type) bool {
+	if typ, b := ToClassBluePrintType(p); !b {
+		return false
+	} else {
+		for _, class := range typ.ParentClass {
+			if c == class {
+				return true
+			}
+		}
+	}
+	return false
 }

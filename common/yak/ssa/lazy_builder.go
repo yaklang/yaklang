@@ -132,11 +132,8 @@ func (p *Program) LazyBuild() {
 }
 
 func (c *Blueprint) BuildConstructorAndDestructor() {
-	for _, value := range c.MagicMethod {
-		if function, b := ToFunction(value); b {
-			function.Build()
-		}
-
+	for _, methods := range c.MagicMethod {
+		methods.Build()
 	}
 	for _, m := range c.NormalMethod {
 		m.Build()

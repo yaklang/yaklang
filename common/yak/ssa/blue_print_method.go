@@ -20,15 +20,20 @@ func (c *Blueprint) IsMagicMethodName(name BlueprintMagicMethodKind) bool {
 	return slices.Contains(c._container.GetProgram().magicMethodName, string(name))
 }
 
-func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value) {
+func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val *Function) {
 	if !c.IsMagicMethodName(name) {
 		log.Warnf("register magic method fail: not magic method")
 		//return
 	}
-	if method, exit := c.MagicMethod[name]; exit {
-		Point(val, method)
+	functions, ok := c.MagicMethod[name]
+	if !ok {
+		c.MagicMethod[name] = append(c.MagicMethod[name], val)
 	} else {
-		c.MagicMethod[name] = val
+		if method := functions.GetFunctionByHash(val.hash); method != nil {
+			Point(val, method)
+		} else {
+			c.MagicMethod[name] = append(c.MagicMethod[name], val)
+		}
 	}
 	switch name {
 	case Constructor:
@@ -42,7 +47,7 @@ func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value
 	c.storeInContainer(val.GetName(), val, BluePrintMagicMethod)
 }
 
-func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
+func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, process ...FunctionProcess) Value {
 	var _method Value
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		switch name {
@@ -61,28 +66,33 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 				return true
 			}
 		default:
-			if value := bluePrint.MagicMethod[name]; utils.IsNil(value) {
-				return false
-			} else {
-				_method = value
-				return true
+			if functions, ok := bluePrint.MagicMethod[name]; ok {
+				if method := functions.GetFunctionByProcess(process); method != nil {
+					_method = method
+					return true
+				}
 			}
+			return false
 		}
 	})
 	if utils.IsNil(_method) {
 		switch name {
 		case Constructor:
 			_name := fmt.Sprintf("%s-constructor", c.Name)
-			constructor := c.GeneralUndefined(_name)
+			constructor := c.GenerateFunction(_name)
+			constructor.ParamsType = []Type{c}
+			constructor.ParamLength = 1
+			constructor.SetType(NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true))
 			_method = constructor
-			_method.SetType(NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true))
-			c.RegisterMagicMethod(Constructor, _method)
+			c.RegisterMagicMethod(Constructor, constructor)
 		case Destructor:
 			_name := fmt.Sprintf("%s-destructor", c.Name)
-			destructor := c.GeneralUndefined(_name)
+			destructor := c.GenerateFunction(_name)
+			destructor.ParamsType = []Type{c}
+			destructor.ParamLength = 1
+			destructor.SetType(NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true))
 			_method = destructor
-			_method.SetType(NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true))
-			c.RegisterMagicMethod(Destructor, _method)
+			c.RegisterMagicMethod(Destructor, destructor)
 		default:
 			return nil
 		}
@@ -104,17 +114,23 @@ func (c *Blueprint) RegisterNormalMethod(name string, val *Function, store ...bo
 	if f, ok := ToFunction(val); ok {
 		f.SetMethod(true, c)
 	}
-	if method := c.NormalMethod[name]; !utils.IsNil(method) {
+	functions, ok := c.NormalMethod[name]
+	if !ok {
+		c.NormalMethod[name] = append(c.NormalMethod[name], val)
+		return
+	}
+	if method := functions.GetFunctionByHash(val.hash); method != nil {
 		Point(method, val)
 	} else {
-		c.NormalMethod[name] = val
+		c.NormalMethod[name] = append(c.NormalMethod[name], val)
 	}
 }
 
-func (c *Blueprint) GetNormalMethod(key string) Value {
+func (c *Blueprint) GetNormalMethod(key string, process ...FunctionProcess) Value {
 	var f Value
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
-		if function, ok := bluePrint.NormalMethod[key]; ok {
+		if functions, ok := bluePrint.NormalMethod[key]; ok {
+			function := functions.GetFunctionByProcess(process)
 			f = function
 			function.Build()
 			return true
@@ -126,18 +142,24 @@ func (c *Blueprint) GetNormalMethod(key string) Value {
 
 // static method
 func (c *Blueprint) RegisterStaticMethod(name string, val *Function) {
-	if method := c.StaticMethod[name]; !utils.IsNil(method) {
+	methods, ok := c.StaticMethod[name]
+	if !ok {
+		c.storeInContainer(name, val, BluePrintStaticMember)
+		c.StaticMethod[name] = append(c.StaticMethod[name], val)
+	}
+	if method := methods.GetFunctionByHash(val.hash); method != nil {
 		Point(method, val)
 	} else {
 		c.storeInContainer(name, val, BluePrintStaticMember)
-		c.StaticMethod[name] = val
+		c.StaticMethod[name] = append(c.StaticMethod[name], val)
 	}
 }
 
-func (c *Blueprint) GetStaticMethod(key string) Value {
+func (c *Blueprint) GetStaticMethod(key string, process ...FunctionProcess) Value {
 	var f Value
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
-		if function, ok := bluePrint.StaticMethod[key]; ok {
+		if functions, ok := bluePrint.StaticMethod[key]; ok {
+			function := functions.GetFunctionByProcess(process)
 			f = function
 			function.Build()
 			return true

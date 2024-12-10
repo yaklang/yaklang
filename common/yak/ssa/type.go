@@ -208,14 +208,14 @@ type MethodBuilder interface {
 
 var ExternMethodBuilder MethodBuilder
 
-func GetMethod(t Type, id string) *Function {
+func GetMethod(t Type, id string, process ...FunctionProcess) *Function {
 	var f *Function
 	if utils.IsNil(t) {
 		log.Error("[BUG]: type is nil")
 		return f
 	}
 	if fun, ok := t.GetMethod()[id]; ok {
-		f = fun
+		f = fun.GetFunctionByProcess(process)
 		f.Build()
 	}
 
@@ -281,10 +281,10 @@ type Type interface {
 	GetFullTypeNames() []string
 	SetFullTypeNames([]string)
 	// set/get method, method is a function
-	SetMethod(map[string]*Function)
-	SetMethodGetter(func() map[string]*Function)
+	SetMethod(map[string]Functions)
+	SetMethodGetter(func() map[string]Functions)
 	AddMethod(string, *Function)
-	GetMethod() map[string]*Function
+	GetMethod() map[string]Functions
 }
 
 type Types []Type
@@ -378,8 +378,8 @@ const (
 )
 
 type baseType struct {
-	method       map[string]*Function
-	methodGetter func() map[string]*Function
+	method       map[string]Functions
+	methodGetter func() map[string]Functions
 	methodOnce   sync.Once
 	methodLock   sync.RWMutex
 }
@@ -388,11 +388,11 @@ func NewBaseType() *baseType {
 	return &baseType{}
 }
 
-func (b *baseType) SetMethodGetter(f func() map[string]*Function) {
+func (b *baseType) SetMethodGetter(f func() map[string]Functions) {
 	b.methodGetter = f
 }
 
-func (b *baseType) SetMethod(m map[string]*Function) {
+func (b *baseType) SetMethod(m map[string]Functions) {
 	b.method = m
 }
 
@@ -403,15 +403,15 @@ func (b *baseType) AddMethod(id string, f *Function) {
 	}
 	b.methodLock.Lock()
 	defer b.methodLock.Unlock()
-	b.method[id] = f
+	importFunction(id, f, b.method)
 }
 
-func (b *baseType) GetMethod() map[string]*Function {
+func (b *baseType) GetMethod() map[string]Functions {
 	if b.method == nil {
 		// 防止并发
 		b.methodOnce.Do(func() {
 			if b.methodGetter == nil {
-				b.method = make(map[string]*Function)
+				b.method = make(map[string]Functions)
 			} else {
 				b.method = b.methodGetter()
 			}
@@ -423,8 +423,10 @@ func (b *baseType) GetMethod() map[string]*Function {
 func (b *baseType) RangeMethod(f func(string, *Function)) {
 	b.methodLock.RLock()
 	defer b.methodLock.RUnlock()
-	for k, v := range b.method {
-		f(k, v)
+	for k, functions := range b.method {
+		for _, function := range functions {
+			f(k, function)
+		}
 	}
 }
 

@@ -6,16 +6,16 @@ import (
 )
 
 // read member call variable, want method
-func (b *FunctionBuilder) ReadMemberCallMethod(object, key Value) Value {
-	return b.readMemberCallValueEx(object, key, true)
+func (b *FunctionBuilder) ReadMemberCallMethod(object, key Value, sign ...FunctionProcess) Value {
+	return b.readMemberCallValueEx(object, key, sign...)
 }
 
 // read member call variable, want variable
 func (b *FunctionBuilder) ReadMemberCallValue(object, key Value) Value {
-	return b.readMemberCallValueEx(object, key, false)
+	return b.readMemberCallValueEx(object, key)
 }
 
-func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction bool) Value {
+func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, sign ...FunctionProcess) Value {
 	if res := b.CheckMemberCallNilValue(object, key, "readMemberCallVariableEx"); res != nil {
 		return res
 	}
@@ -26,7 +26,7 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 	}
 
 	// normal member call
-	return b.getFieldValue(object, key, wantFunction)
+	return b.getFieldValue(object, key, sign...)
 }
 
 // create member call variable

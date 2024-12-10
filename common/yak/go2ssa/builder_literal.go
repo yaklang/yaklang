@@ -258,10 +258,16 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 	}
 
 	rvalue := typeHandler(typ, kvs)
+
+	type Name struct {
+		Name string
+	}
 	if typ.GetTypeKind() == ssa.StructTypeKind {
 		bp := b.CreateBluePrint("")
-		for n, f := range typ.GetMethod() {
-			bp.AddMethod(n, f)
+		for n, fs := range typ.GetMethod() {
+			for _, function := range fs {
+				bp.AddMethod(n, function)
+			}
 		}
 		rvalue.SetType(typ)
 	}

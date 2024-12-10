@@ -243,6 +243,7 @@ type Program struct {
 	Blueprint   *omap.OrderedMap[string, *Blueprint]
 	ExportValue map[string]Value
 	ExportType  map[string]Type
+	ExportFunc  map[string]Functions
 
 	//store import
 
@@ -294,8 +295,6 @@ type Function struct {
 
 	// just function parameter
 	Params []Value
-	// for closure function
-	FreeValues map[string]Value // store the captured variable form parent-function, just contain name, and type is Parameter
 	// parameter member call
 	// ParameterMembers []*ParameterMember
 	ParameterMembers []Value
@@ -326,8 +325,6 @@ type Function struct {
 	scopeId int
 	// builder
 	builder *FunctionBuilder
-	// this function is variadic parameter, for function type create
-	hasEllipsis bool
 	// generic
 	isGeneric bool
 	// runtime function return type
@@ -343,13 +340,6 @@ func (f *Function) GenerateSign() {
 		f.FunctionSign.ReturnType = append(f.FunctionSign.ReturnType, value.GetType())
 	}
 	f.FunctionSign.ReturnLength = len(f.Return)
-	/*
-		methodName
-		returnLength
-		paramLength
-		returnTypeString
-		paramTypeString
-	*/
 	f.hash = utils.CalcMd5(f.methodName, f.ReturnLength, f.ParamLength, f.ReturnType.String(), f.ParamsType.String())
 }
 func (f *Function) SetCurrentReturnType(t Type) {

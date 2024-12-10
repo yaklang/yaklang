@@ -10,11 +10,19 @@ func (p *Program) GenerateVirtualLib(packagePath string) (*Program, error) {
 	return lib, err
 }
 
-func fakeImportValue(lib *Program, name string) Value {
+func getOrFakeImportValue(lib *Program, name string, isFunc bool) Value {
 	builder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(VirtualFunctionName))
 	if value, ok := lib.ExportValue[name]; !ok && lib.VirtualImport {
-		val := builder.EmitUndefined(name)
-		lib.ExportValue[name] = val
+		var val Value
+		if !isFunc {
+			val = builder.EmitUndefined(name)
+			lib.SetExportValue(name, val)
+		} else {
+			_func := builder.NewFunc(name)
+			_func.SetType(NewFunctionType(name, []Type{}, nil, false))
+			val = _func
+			lib.SetExportFunction(name, _func)
+		}
 		if b, ok := ToBasicType(val.GetType()); ok {
 			packagename := lib.PkgName
 			if packagename == "" {

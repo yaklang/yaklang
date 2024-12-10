@@ -10,8 +10,23 @@ type importDeclareItem struct {
 	pkgName      string
 	aliasPkgName string
 	// all          bool
-	typ map[string]Type
-	val map[string]Value
+	typ   map[string]Type
+	val   map[string]Value
+	_func map[string]Functions
+}
+
+func importFunction(name string, _func *Function, table map[string]Functions) {
+	if table == nil {
+		table = make(map[string]Functions)
+	}
+	functions, exit := table[name]
+	if !exit {
+		table[name] = Functions{_func}
+	} else {
+		if !functions.CheckFunctionExitByHash(_func.hash) {
+			functions = append(functions, _func)
+		}
+	}
 }
 
 func readImportDecl(p *Program, get func(*importDeclareItem) bool) {
@@ -100,6 +115,7 @@ func (p *Program) checkImportRelationship(lib *Program) (*importDeclareItem, err
 			pkgName: lib.Name,
 			typ:     make(map[string]Type),
 			val:     make(map[string]Value),
+			_func:   make(map[string]Functions),
 		}
 		importDecl.Set(lib.Name, pkg)
 	}
@@ -124,10 +140,23 @@ func (p *Program) ImportValueFromLib(lib *Program, names ...string) error {
 		return err
 	}
 	for _, name := range names {
-		value := fakeImportValue(lib, name)
+		value := getOrFakeImportValue(lib, name, false)
 		pkg.val[name] = value
 	}
 	return err
+}
+func (p *Program) ImportFunctionFromLib(lib *Program, names ...string) error {
+	pkg, err := p.checkImportRelationship(lib)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		_func := getOrFakeImportValue(lib, name, true)
+		if function, b := ToFunction(_func); b {
+			importFunction(name, function, pkg._func)
+		}
+	}
+	return nil
 }
 func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
 	pkg, err := p.checkImportRelationship(lib)
@@ -147,15 +176,18 @@ func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
 		for s, value := range blueprint.StaticMember {
 			pkg.val[s] = value
 		}
-		for s, function := range blueprint.StaticMethod {
-			pkg.val[s] = function
+		for s, functions := range blueprint.StaticMethod {
+			pkg._func[s] = functions
 		}
 	})
 	for s, value := range blueprint.StaticMember {
 		pkg.val[s] = value
 	}
-	for s, function := range blueprint.StaticMethod {
-		pkg.val[s] = function
+
+	for s, functions := range blueprint.StaticMethod {
+		for _, f := range functions {
+			importFunction(s, f, pkg._func)
+		}
 	}
 	return nil
 }
@@ -173,7 +205,7 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 			}
 			for s, function := range blueprint.StaticMethod {
 				if name == s {
-					pkg.val[s] = function
+					pkg._func[s] = function
 				}
 			}
 		})
@@ -184,7 +216,7 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 		}
 		for s, function := range blueprint.StaticMethod {
 			if name == s {
-				pkg.val[s] = function
+				pkg._func[s] = function
 			}
 		}
 	}

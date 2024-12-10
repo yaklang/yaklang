@@ -23,27 +23,28 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 	}
 	f := &Function{
-		anValue:      NewValue(),
-		Params:       make([]Value, 0),
-		hasEllipsis:  false,
-		Blocks:       make([]Instruction, 0),
-		EnterBlock:   nil,
-		ExitBlock:    nil,
-		ChildFuncs:   make([]Value, 0),
-		parent:       nil,
-		FreeValues:   make(map[string]Value),
-		SideEffects:  make([]*FunctionSideEffect, 0),
-		builder:      nil,
-		FunctionSign: &FunctionSign{},
+		anValue:     NewValue(),
+		Params:      make([]Value, 0),
+		Blocks:      make([]Instruction, 0),
+		EnterBlock:  nil,
+		ExitBlock:   nil,
+		ChildFuncs:  make([]Value, 0),
+		parent:      nil,
+		SideEffects: make([]*FunctionSideEffect, 0),
+		builder:     nil,
+		FunctionSign: &FunctionSign{
+			FreeValues:  make(map[string]Value),
+			hasEllipsis: false,
+		},
 	}
 	f.SetName(name)
 	f.SetProgram(p)
-
 	if parent != nil {
 		parent.addAnonymous(f)
 		// Pos: parent.CurrentPos,
 		f.SetRange(parent.builder.CurrentRange)
 	} else {
+		//todo：应该在确定函数签名之后，再添加到function中
 		if funcs, b := p.Funcs.Get(name); b {
 			funcs = append(funcs, f)
 		} else {

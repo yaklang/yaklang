@@ -25,3 +25,12 @@ func (p *Program) SetExportValue(name string, v Value) {
 	}
 	p.ExportValue[name] = v
 }
+
+func (p *Program) SetExportFunction(name string, v *Function) {
+	importFunction(name, v, p.ExportFunc)
+}
+func (p *Program) SetExportFunctions(name string, v Functions) {
+	for _, function := range v {
+		importFunction(name, function, p.ExportFunc)
+	}
+}

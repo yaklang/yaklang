@@ -41,8 +41,9 @@ func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...C
 	if prog.Blueprint == nil {
 		prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
 	}
-	blueprint.GeneralUndefined = func(s string) *Undefined {
-		return b.EmitUndefined(s)
+	blueprint.GenerateFunction = func(s string) *Function {
+		newFunc := b.NewFunc(s)
+		return newFunc
 	}
 	b.SetClassBluePrint(name, blueprint)
 	klassvar := b.CreateVariable(name, tokenizer...)

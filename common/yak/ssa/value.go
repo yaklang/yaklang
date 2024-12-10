@@ -28,7 +28,7 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 		if val := b.PeekValueInThisFunction(ret.name); !utils.IsNil(val) {
 			return val
 		}
-		if val := b.getDefaultMemberOrMethodByClass(v.object, v.key, false); !utils.IsNil(val) {
+		if val := b.getDefaultMemberOrMethodByClass(v.object, v.key); !utils.IsNil(val) {
 			return val
 		}
 	}

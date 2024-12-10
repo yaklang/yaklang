@@ -26,7 +26,7 @@ func (c *Blueprint) GetTypeKind() TypeKind {
 	return ClassBluePrintTypeKind
 }
 
-func (c *Blueprint) SetMethod(m map[string]*Function) {
+func (c *Blueprint) SetMethod(m map[string]Functions) {
 	c.NormalMethod = m
 }
 
@@ -34,11 +34,11 @@ func (c *Blueprint) AddMethod(key string, fun *Function) {
 	c.RegisterNormalMethod(key, fun)
 }
 
-func (c *Blueprint) GetMethod() map[string]*Function {
+func (c *Blueprint) GetMethod() map[string]Functions {
 	return c.NormalMethod
 }
 
-func (c *Blueprint) SetMethodGetter(f func() map[string]*Function) {
+func (c *Blueprint) SetMethodGetter(f func() map[string]Functions) {
 }
 
 func (c *Blueprint) AddFullTypeName(name string) {

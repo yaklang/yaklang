@@ -55,7 +55,7 @@ type checkMemberResult struct {
 }
 
 // check can member call, return member name and type
-func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMemberResult) {
+func checkCanMemberCallExist(value, key Value, sign ...FunctionProcess) (ret checkMemberResult) {
 	ret.exist = true
 	if constInst, ok := ToConst(key); ok {
 		if constInst.IsNumber() {
@@ -86,17 +86,17 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	// }
 
 	// check is method
-	if method := GetMethod(value.GetType(), key.String()); !utils.IsNil(method) {
+	if method := GetMethod(value.GetType(), key.String(), sign...); !utils.IsNil(method) {
 		ret.typ = method.GetType()
 		return
 	}
 	if blueprint, b := ToClassBluePrintType(value.GetType()); b {
-		if method := blueprint.GetStaticMethod(key.String()); !utils.IsNil(method) {
+		if method := blueprint.GetStaticMethod(key.String(), sign...); !utils.IsNil(method) {
 			ret.typ = method.GetType()
 			return
 		}
 	}
-	if len(function) > 0 && function[0] {
+	if len(sign) != 0 {
 		if ret.typ == nil {
 			ret.exist = false
 		}
