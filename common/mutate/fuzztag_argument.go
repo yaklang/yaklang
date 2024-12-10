@@ -225,6 +225,7 @@ func GenerateExampleTags(tag *FuzzTagDescription) ([]string, error) {
 			}
 			return utils.InterfaceToString(typ.Default)
 		}
+		endFlagMap := map[int]struct{}{}
 		if types[0].IsList {
 			for _, sep := range types[0].Separator {
 				p := getDefaultVal(types[0]) + sep
@@ -234,8 +235,10 @@ func GenerateExampleTags(tag *FuzzTagDescription) ([]string, error) {
 		} else if types[0].IsOptional {
 			for _, sep := range types[0].Separator {
 				p := getDefaultVal(types[0]) + sep
+				l := len(res)
 				res = append(res, "")
 				res = append(res, p)
+				endFlagMap[l] = struct{}{}
 			}
 		} else {
 			for _, sep := range types[0].Separator {
@@ -245,8 +248,12 @@ func GenerateExampleTags(tag *FuzzTagDescription) ([]string, error) {
 		}
 		tags := generateParams(types[1:])
 		newRes := []string{}
-		for _, tag := range tags {
-			for _, re := range res {
+		for _, re := range res {
+			if _, ok := endFlagMap[len(newRes)]; ok {
+				newRes = append(newRes, re)
+				continue
+			}
+			for _, tag := range tags {
 				newRes = append(newRes, re+tag)
 			}
 		}

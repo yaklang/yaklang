@@ -1206,9 +1206,9 @@ func init() {
 			return nil
 		},
 		Alias:               []string{"ri", "rand:int", "randi"},
-		Description:         "随机生成整数，定义为 {{randint(10)}} 生成0-10中任意一个随机数，{{randint(1,50)}} 生成 1-50 任意一个随机数，{{randint(1,50,10)}} 生成 1-50 任意一个随机数，重复 10 次",
+		Description:         "随机生成整数，定义为 {{randint(10)}} 生成0-10中任意一个随机数，{{randint(1,50)}} 生成 1-50 任意一个随机数，{{randint(1,50,10)}} 生成 1-50 任意一个随机数，重复 10 次，{{randint(1,50,10|-4)}} 生成 1-50 任意一个随机数，重复 10 次，对于长度不足4的随机数在右侧进行填充",
 		TagNameVerbose:      "随机生成整数",
-		ArgumentDescription: "{{range(1-5:整数范围或逗号分割的整数列表)}}{{optional(number_split(4:填充长度))}}{{optional(number(2:步长))}}",
+		ArgumentDescription: "{{number_dot(1:随机数最小长度)}}{{number_dot(50:随机数最大长度)}}{{optional(number_split(4:重复次数))}}{{optional(number(4:填充长度，如果是负数，则从右侧填充))}}",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "randstr",
