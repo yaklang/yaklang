@@ -81,12 +81,12 @@ func queryRulesId(client ypb.YakClient, ruleName []string) ([]int64, error) {
 	return ids, nil
 }
 
-func queryRulesById(client ypb.YakClient, fromId, utilId int64) ([]*ypb.SyntaxFlowRule, error) {
+func queryRulesById(client ypb.YakClient, afterID, beforeId int64) ([]*ypb.SyntaxFlowRule, error) {
 	req := &ypb.QuerySyntaxFlowRuleRequest{
 		Pagination: &ypb.Paging{Limit: -1},
 		Filter: &ypb.SyntaxFlowRuleFilter{
-			FromId:  fromId,
-			UntilId: utilId,
+			AfterId:  afterID,
+			BeforeId: beforeId,
 		},
 	}
 	rsp, err := client.QuerySyntaxFlowRule(context.Background(), req)

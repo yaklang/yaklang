@@ -76,7 +76,7 @@ func TestRule_Group_OP(t *testing.T) {
 		// create rule
 		ruleName := uuid.NewString()
 		rule := &schema.SyntaxFlowRule{RuleName: ruleName}
-		_,err = CreateRule(rule)
+		_, err = CreateRule(rule)
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			err = DeleteRuleByRuleName(ruleName)
@@ -160,17 +160,17 @@ func TestRule_Group_OP(t *testing.T) {
 		require.Contains(t, ret, groupB)
 	})
 
-	t.Run("test GetOrCreatGroupsByName", func(t *testing.T) {
+	t.Run("test GetOrCreatGroups", func(t *testing.T) {
 		groupName1 := uuid.NewString()
-		err := CreateGroupByName(groupName1)
+		_, err := CreateGroup(db, groupName1)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			err = DeleteGroupByName(groupName1)
+			err = DeleteGroup(db, groupName1)
 			require.NoError(t, err)
 		})
 
 		groupName2 := uuid.NewString()
-		ret := GetOrCreatGroupsByName([]string{groupName1, groupName2})
+		ret := GetOrCreatGroups(db, []string{groupName1, groupName2})
 		require.Equal(t, 2, len(ret))
 		groupNames := []string{ret[0].GroupName, ret[1].GroupName}
 		require.Contains(t, groupNames, groupName1)
@@ -179,21 +179,21 @@ func TestRule_Group_OP(t *testing.T) {
 
 	t.Run("test rename group", func(t *testing.T) {
 		groupName1 := uuid.NewString()
-		err := CreateGroupByName(groupName1)
+		_, err := CreateGroup(db, groupName1)
 		require.NoError(t, err)
 
-		group1, err := QueryGroupByName(groupName1)
+		group1, err := QueryGroupByName(db, groupName1)
 		require.NoError(t, err)
 
 		groupName2 := uuid.NewString()
-		err = RenameGroup(groupName1, groupName2)
+		err = RenameGroup(db, groupName1, groupName2)
 		require.NoError(t, err)
 
 		t.Cleanup(func() {
-			err = DeleteGroupByName(groupName2)
+			err = DeleteGroup(db, groupName2)
 			require.NoError(t, err)
 		})
-		group2, err := QueryGroupByName(groupName2)
+		group2, err := QueryGroupByName(db, groupName2)
 		require.NoError(t, err)
 		require.Equal(t, group1.ID, group2.ID)
 	})

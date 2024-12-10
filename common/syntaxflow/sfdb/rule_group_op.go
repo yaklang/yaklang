@@ -2,7 +2,6 @@ package sfdb
 
 import (
 	"errors"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -53,10 +52,10 @@ func CreateGroup(db *gorm.DB, groupName string, isBuildIn ...bool) (*schema.Synt
 	return i, nil
 }
 
-func GetOrCreatGroupsByName(groupNames []string) []*schema.SyntaxFlowGroup {
+func GetOrCreatGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGroup {
 	var groups []*schema.SyntaxFlowGroup
 	for _, groupName := range groupNames {
-		group, err := QueryGroupByName(groupName)
+		group, err := QueryGroupByName(db, groupName)
 		if err == nil {
 			groups = append(groups, group)
 			continue
@@ -66,11 +65,11 @@ func GetOrCreatGroupsByName(groupNames []string) []*schema.SyntaxFlowGroup {
 			continue
 		}
 		// if not found, create it
-		if err = CreateGroupByName(groupName); err != nil {
+		if _, err = CreateGroup(db, groupName); err != nil {
 			log.Errorf("create group %s failed: %s", groupName, err)
 			continue
 		}
-		group, err = QueryGroupByName(groupName)
+		group, err = QueryGroupByName(db, groupName)
 		if err == nil {
 			groups = append(groups, group)
 		}
@@ -252,8 +251,7 @@ func ImportBuildInGroup(db *gorm.DB) {
 }
 
 // RenameGroup 重命名组
-func RenameGroup(oldName, newName string) error {
-	db := consts.GetGormProfileDatabase()
+func RenameGroup(db *gorm.DB, oldName, newName string) error {
 	db = db.Model(&schema.SyntaxFlowGroup{})
 	var existingGroup schema.SyntaxFlowGroup
 	err := db.Where("group_name = ? ", newName).First(&existingGroup).Error
@@ -263,7 +261,7 @@ func RenameGroup(oldName, newName string) error {
 		return utils.Errorf("rename group failed: new group name %s already exist.", newName)
 	}
 
-	updatedGroup, err := QueryGroupByName(oldName)
+	updatedGroup, err := QueryGroupByName(db, oldName)
 	if err != nil {
 		return utils.Errorf("rename group failed: %s", err)
 	}

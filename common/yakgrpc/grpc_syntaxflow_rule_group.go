@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
@@ -84,7 +85,7 @@ func (s *Server) UpdateSyntaxFlowRuleGroup(ctx context.Context, req *ypb.UpdateS
 		TableName: "syntax_flow_rule_group",
 		Operation: DbOperationUpdate,
 	}
-	err := sfdb.RenameGroup(req.GetOldGroupName(), req.GetNewGroupName())
+	err := sfdb.RenameGroup(consts.GetGormProfileDatabase(), req.GetOldGroupName(), req.GetNewGroupName())
 	if err != nil {
 		return nil, err
 	} else {

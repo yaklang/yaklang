@@ -259,14 +259,15 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 	t.Run("query buildin group", func(t *testing.T) {
 		// create build in group
 		groupName1 := uuid.NewString()
-		sfdb.CreateGroupByName(groupName1, true)
+		db := consts.GetGormProfileDatabase()
+		sfdb.CreateGroup(db, groupName1, true)
 		// create not build in group
 		groupName2 := uuid.NewString()
-		sfdb.CreateGroupByName(groupName2, false)
+		sfdb.CreateGroup(db, groupName2, false)
 		t.Cleanup(func() {
-			err = sfdb.DeleteGroupByName(groupName1)
+			err = sfdb.DeleteGroup(db, groupName1)
 			require.NoError(t, err)
-			err = sfdb.DeleteGroupByName(groupName2)
+			err = sfdb.DeleteGroup(db, groupName2)
 			require.NoError(t, err)
 		})
 		// query build in group
