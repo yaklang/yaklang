@@ -65,24 +65,37 @@ func (m MemMetrics) Percent() MemMetricsPercent {
 
 	// 计算占系统总物理内存百分比
 	if m.SystemMemory > 0 {
-		result.SystemMemoryUsage = float64(m.HeapSys) / float64(m.SystemMemory) * 100
+		result.SystemMemoryUsage = float64(m.HeapSys) / float64(m.SystemMemory)
 	}
 
 	// 计算占系统可用内存百分比
 	if m.AvailableMemory > 0 {
-		result.AvailableMemoryUsage = float64(m.HeapSys) / float64(m.AvailableMemory) * 100
+		result.AvailableMemoryUsage = float64(m.HeapSys) / float64(m.AvailableMemory)
 	}
 
 	return result
 }
+
+var (
+	memInfoOnce sync.Once
+	memInfo     *mem.VirtualMemoryStat
+	memInfoErr  error
+)
+
 func metricsForMem() (MemMetrics, error) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	// 获取系统内存信息
-	memInfo, err := mem.VirtualMemory()
-	if err != nil {
-		return MemMetrics{}, fmt.Errorf("failed to get system memory info: %v", err)
+	// 只执行一次获取系统内存信息
+	memInfoOnce.Do(func() {
+		memInfo, memInfoErr = mem.VirtualMemory()
+		if memInfoErr != nil {
+			memInfoErr = fmt.Errorf("failed to get system memory info: %v", memInfoErr)
+		}
+	})
+
+	if memInfoErr != nil {
+		return MemMetrics{}, memInfoErr
 	}
 
 	return MemMetrics{
@@ -97,13 +110,14 @@ func metricsForMem() (MemMetrics, error) {
 
 var cpuPprofileOnce sync.Once
 var cpuThreshold = 0.8
+var memThreshold = 0.7
 
 // 回调函数列表和锁
 var (
 	cpuCallbackMutex sync.RWMutex
 	cpuCallbacks     []func(stats []FunctionStat)
 	memCallbackMutex sync.RWMutex
-	memCallbacks     []func(metrics MemMetrics)
+	memCallbacks     []func(metrics []FunctionStat)
 )
 
 // 添加CPU分析回调函数
@@ -114,7 +128,7 @@ func AddCPUProfileCallback(callback func(stats []FunctionStat)) {
 }
 
 // 添加内存分析回调函数
-func AddMemProfileCallback(callback func(metrics MemMetrics)) {
+func AddMemProfileCallback(callback func(metrics []FunctionStat)) {
 	memCallbackMutex.Lock()
 	defer memCallbackMutex.Unlock()
 	memCallbacks = append(memCallbacks, callback)
@@ -145,7 +159,7 @@ func executeCPUCallbacks(stats []FunctionStat) {
 }
 
 // 执行所有内存回调函数
-func executeMemCallbacks(metrics MemMetrics) {
+func executeMemCallbacks(metrics []FunctionStat) {
 	memCallbackMutex.RLock()
 	defer memCallbackMutex.RUnlock()
 
@@ -155,8 +169,17 @@ func executeMemCallbacks(metrics MemMetrics) {
 }
 
 func init() {
+	AddCPUProfileCallback(func(stats []FunctionStat) {
+		log.Infof("High CPU usage detected, top consuming function: %v", stats[0].Dump())
+	})
+	AddMemProfileCallback(func(stats []FunctionStat) {
+		log.Infof("High memory usage detected, top consuming function: %v", stats[0].Dump())
+	})
+
 	// CPU分析协程
 	go func() {
+		// 获取CPU核心数
+		numCPU := runtime.NumCPU()
 		cpuPprofileOnce.Do(func() {
 			var buf = bytes.NewBuffer(nil)
 			for {
@@ -186,14 +209,27 @@ func init() {
 					continue
 				}
 
-				// 执行回调函数
-				executeCPUCallbacks(stats)
+				// 获取CPU使用率
+				cpuPercent := stats[0].Percent
+				// 如果CPU使用率超过单核100%,则需要除以CPU核心数来获得平均使用率
+				if cpuPercent > 1.0 {
+					cpuPercent = cpuPercent / float64(numCPU)
+				}
+
+				if cpuPercent >= cpuThreshold {
+					// 执行回调函数
+					if len(stats) > 0 {
+						log.Infof("High CPU usage detected (%v%%), top consuming function: %v", cpuPercent, stats[0].Dump())
+					}
+					executeCPUCallbacks(stats)
+				}
 			}
 		})
 	}()
 
 	// 内存分析协程
 	go func() {
+		var buf = bytes.NewBuffer(nil)
 		for {
 			time.Sleep(time.Second)
 
@@ -204,14 +240,26 @@ func init() {
 			}
 			memCallbackMutex.RUnlock()
 
+			buf.Reset()
+			pprof.WriteHeapProfile(buf)
+			stats, err := AutoAnalyzeRaw(buf)
+			if err != nil {
+				log.Errorf("内存分析失败: %v", err)
+				continue
+			}
+
 			metrics, err := metricsForMem()
 			if err != nil {
 				log.Errorf("获取内存指标失败: %v", err)
 				continue
 			}
 
-			// 执行内存回调函数
-			executeMemCallbacks(metrics)
+			// 只有当内存使用率超过阈值时才触发回调
+			percent := metrics.Percent()
+			if percent.SystemMemoryUsage >= memThreshold {
+				// 执行内存回调函数
+				executeMemCallbacks(stats)
+			}
 		}
 	}()
 }
