@@ -83,11 +83,32 @@ func DeleteExtractedDataByID(db *gorm.DB, id int64) error {
 	return nil
 }
 
-func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest) (*bizhelper.Paginator, []*schema.ExtractedData, error) {
+func FilterExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) *gorm.DB {
+	if filter == nil {
+		return db
+	}
+	db = bizhelper.ExactQueryStringArrayOr(db, "trace_id", filter.GetTraceID())
+	db = bizhelper.ExactQueryStringArrayOr(db, "rule_verbose", filter.GetRuleVerbose())
+	return db
+}
+
+func QueryExtractedDataPagination(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest) (*bizhelper.Paginator, []*schema.ExtractedData, error) {
 	db = db.Model(&schema.ExtractedData{})
+	filter := req.GetFilter()
+	if filter == nil {
+		if req.GetHTTPFlowHiddenIndex() != "" {
+			filter = &ypb.ExtractedDataFilter{
+				TraceID: []string{req.GetHTTPFlowHiddenIndex()},
+			}
+		} else if req.GetHTTPFlowHash() != "" {
+			filter = &ypb.ExtractedDataFilter{
+				TraceID: []string{req.GetHTTPFlowHash()},
+			}
+		}
+	}
 
+	db = FilterExtractedData(db, filter)
 	params := req.GetPagination()
-
 	if params == nil {
 		params = &ypb.Paging{
 			Page:    1,
@@ -98,14 +119,22 @@ func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest)
 	}
 
 	db = bizhelper.QueryOrder(db, params.OrderBy, params.Order)
-
 	var ret []*schema.ExtractedData
 	paging, db := bizhelper.Paging(db, int(params.GetPage()), int(params.GetLimit()), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
-
 	return paging, ret, nil
+}
+
+func CountExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) (float64, error) {
+	db = db.Model(&schema.ExtractedData{})
+	db = FilterExtractedData(db, filter)
+	var count float64
+	if db := db.Count(&count); db.Error != nil {
+		return 0, db.Error
+	}
+	return count, nil
 }
 
 func ExtractedDataFromHTTPFlow(hiddenIndex string, ruleName string, matchResult *MatchResult, data string, regexpStr ...string) *schema.ExtractedData {
