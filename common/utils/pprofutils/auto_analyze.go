@@ -3,6 +3,7 @@ package pprofutils
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -153,4 +154,18 @@ func AutoAnalyzeFile(filename string) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func AutoAnalyzeRaw(reader io.Reader) ([]FunctionStat, error) {
+	prof, err := profile.Parse(reader)
+	if err != nil {
+		return nil, fmt.Errorf("解析 pprof 文件失败: %v", err)
+	}
+
+	stats := analyzePprof(prof)
+	if len(stats) == 0 {
+		return nil, fmt.Errorf("未发现性能数据")
+	}
+
+	return stats, nil
 }
