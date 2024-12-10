@@ -14,10 +14,13 @@ func GetLowhttpRPS() int64 {
 
 func init() {
 	go func() {
+		rpsTicker := time.NewTicker(1 * time.Second)
 		for {
-			time.Sleep(time.Second)
-			lastRPS = currentRPS.Load()
-			currentRPS.Store(0)
+			select {
+			case <-rpsTicker.C:
+				lastRPS = currentRPS.Load()
+				currentRPS.Store(0)
+			}
 		}
 	}()
 }

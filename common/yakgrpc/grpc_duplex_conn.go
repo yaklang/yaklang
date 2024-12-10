@@ -54,35 +54,35 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 	// rps cps server push
 	{
 		var lastRPS int64 //
+		var rpsTicker = time.NewTicker(time.Second)
 		go func() {
 			for {
 				select {
 				case <-stream.Context().Done():
 					return
-				default:
+				case <-rpsTicker.C:
 					if currentRPS := lowhttp.GetLowhttpRPS(); currentRPS != lastRPS {
 						log.Infof("current lowhttp rps:%d", currentRPS)
 						yakit.BroadcastData(yakit.ServerPushType_RPS, currentRPS)
 						lastRPS = currentRPS
 					}
-					time.Sleep(time.Second)
 				}
 			}
 		}()
 
 		var lastCPS int64
+		var cpsTicker = time.NewTicker(time.Second)
 		go func() {
 			for {
 				select {
 				case <-stream.Context().Done():
 					return
-				default:
+				case <-cpsTicker.C:
 					if currentCPS := netx.GetDialxCPS(); currentCPS != lastCPS {
 						log.Infof("current dialx cps:%d", currentCPS)
 						yakit.BroadcastData(yakit.ServerPushType_CPS, currentCPS)
 						lastCPS = currentCPS
 					}
-					time.Sleep(time.Second)
 				}
 			}
 		}()
