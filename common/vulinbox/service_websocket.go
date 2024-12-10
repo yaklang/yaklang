@@ -2,6 +2,7 @@ package vulinbox
 
 import (
 	_ "embed"
+	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/yaklang/yaklang/common/log"
 	"net/http"
@@ -34,24 +35,20 @@ func (s *VulinServer) registerWebsocket() {
 				ws.SetCompressionLevel(compress)
 			}
 
-			go func() {
-				for {
-					_, message, err := ws.ReadMessage()
-					if err != nil {
-						log.Errorf("websocket read message failed: %s", err)
-						return
-					}
-					log.Infof("websocket recv message: %s", message)
-				}
-			}()
-
 			for {
-				err = ws.WriteMessage(websocket.TextMessage, []byte("hello yaklang.io / yaklang.com, time now: "+time.Now().String()))
+				_, message, err := ws.ReadMessage()
 				if err != nil {
-					log.Errorf("websocket write message failed: %s", err)
+					log.Printf("websocket read message failed: %v", err)
 					return
 				}
-				time.Sleep(time.Second)
+				log.Printf("websocket recv message: %s", message)
+
+				reply := fmt.Sprintf(`Recive websocket message:%s, time:%s`, message, time.Now().String())
+				err = ws.WriteMessage(websocket.TextMessage, []byte(reply))
+				if err != nil {
+					log.Printf("websocket write message failed: %v", err)
+					return
+				}
 			}
 		}
 	}
