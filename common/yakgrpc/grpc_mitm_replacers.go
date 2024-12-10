@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -322,19 +323,19 @@ func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*y
 			key := c[0]
 			val := c[1]
 			if strings.ToLower(key) == "cookie" {
-				buf.WriteString("Cookie: " + lowhttp.MergeCookies(append(packetInfo.Cookies, extCookies...)...))
-				buf.WriteString(lowhttp.CRLF)
+				key = "Cookie"
+				val = lowhttp.MergeCookies(append(packetInfo.Cookies, extCookies...)...)
 				setCookie = true
-			} else {
-				i, ok := keyHeader[key]
-				if ok {
-					buf.WriteString(fmt.Sprintf("%v: %v", key, i.Value))
-					delete(keyHeader, key) // just replace once
-				} else {
-					buf.WriteString(fmt.Sprintf("%v: %v", key, val))
-				}
-				buf.WriteString(lowhttp.CRLF)
 			}
+
+			i, ok := keyHeader[key]
+			if ok {
+				buf.WriteString(fmt.Sprintf("%v: %v", key, i.Value))
+				delete(keyHeader, key) // just replace once
+			} else {
+				buf.WriteString(fmt.Sprintf("%v: %v", key, val))
+			}
+			buf.WriteString(lowhttp.CRLF)
 		}
 
 		// is origin header not contains extheaders, append it
