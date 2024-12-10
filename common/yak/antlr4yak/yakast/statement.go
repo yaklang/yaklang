@@ -200,7 +200,7 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 
 	if s := i.DeferStmt(); s != nil {
 		y.VisitDeferStmt(s)
-		return true
+		return false
 	}
 
 	if s := i.Empty(); s != nil {
