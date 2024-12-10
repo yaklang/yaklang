@@ -449,25 +449,19 @@ func (pc *persistConn) readLoop() {
 
 		// 检查是否有需要返回的响应,如果没有则可以直接返回,不需要往管道里返回数据（err）
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
+				pc.sawEOF = true
 				pc.closeConn(errServerClosedIdle)
 			} else {
-				pc.closeConn(utils.Errorf("read error: %v", err))
+				pc.closeConn(connPoolReadFromServerError{err})
 			}
+			rc.ch <- responseInfo{err: connPoolReadFromServerError{err: err}}
 			return
 		}
 		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
 
 		if firstAuth {
 			rc = <-pc.reqCh
-		}
-
-		if err != nil { // 需要向主进程返回一个带标识的错误,主进程用于判断是否重试
-			if errors.Is(err, io.EOF) {
-				pc.sawEOF = true
-			}
-			rc.ch <- responseInfo{err: connPoolReadFromServerError{err: err}}
-			return
 		}
 
 		var resp *http.Response

@@ -27,7 +27,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Retry(t *testing.T) {
 		if err != nil || currentCount%2 == 0 {
 			return
 		}
-		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello\r\n"))
+		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello"))
 	})
 
 	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
