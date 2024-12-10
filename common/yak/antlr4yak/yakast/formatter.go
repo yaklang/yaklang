@@ -100,6 +100,12 @@ func (y *YakCompiler) writeString(i string) {
 	y.formatted.WriteString(i)
 }
 
+func (y *YakCompiler) writeStringWithIndent(i string) {
+	y.writeIndent()
+	y.currentLineLength += len(i)
+	y.formatted.WriteString(i)
+}
+
 func (y *YakCompiler) writeNewLine() {
 	y.currentLineLength = 0
 	y.formatted.WriteString("\n")
