@@ -115,9 +115,9 @@ var JavaDecompilerSelfChecking = &cli.Command{
 				}()
 				return nil
 			}))
-			swg.Wait()
 			return nil
 		}))
+		swg.Wait()
 		return nil
 	},
 }
