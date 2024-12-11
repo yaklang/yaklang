@@ -315,7 +315,11 @@ func (c *Call) handleCalleeFunction() {
 
 			if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
 				if builder.SupportClosure {
-					builder.BuildFreeValue(variable.GetName())
+					if se.BindVariable != nil {
+						para := builder.BuildFreeValueByVariable(se.BindVariable)
+						para.SetDefault(se.Modify)
+						para.SetType(se.Modify.GetType())
+					}
 				}
 
 				AddSideEffect := func() {
