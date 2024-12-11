@@ -1,21 +1,48 @@
-headerKey = cli.String("key", cli.setRequired(true), cli.setVerboseName("Header Key"))
-headerVal = cli.String("val", cli.setRequired(true), cli.setVerboseName("Header Value"))
-
+args = cli.Json("cookie", cli.setJsonSchema(<<<JSON
+{
+  "type": "object",
+  "properties": {
+    "header": {
+      "type": "array",
+      "title": "Header",
+      "items": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "require": [
+          "key",
+          "value"
+        ]
+      }
+    }
+  }
+}
+JSON), cli.setRequired(true))
 keyword = cli.String("url-keyword", cli.setRequired(false), cli.setCliGroup("前提条件"), cli.setVerboseName("URL 前提条件"))
-
 cli.check()
 
 m = {}
 lock = sync.NewRWMutex()
 
 hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
-   if !url.Contains(keyword) {
-         return
+    if keyword != "" && !url.Contains(keyword) {
+        return
     }
     lock.Lock()
     m[PLUGIN_RUNTIME_ID] = true 
     lock.Unlock()
-    forward(poc.ReplaceHTTPPacketHeader(req, headerKey, headerVal))
+    header = args["header"]
+    for _, item := range header {
+      key := item.key 
+      val := item.value
+      req = poc.ReplaceHTTPPacketHeader(req, key, val)
+    }
+    forward(req)
 }
 hijackSaveHTTPFlow = func(flow , modify, drop) {
     lock.RLock()
