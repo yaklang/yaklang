@@ -21,6 +21,7 @@ import (
 
 var JavaDecompilerSelfChecking = &cli.Command{
 	Name:    "java-decompiler-self-checking",
+	Usage:   `use 'cd /tmp/error-jdsc && echo "Syntax Error: $(ls syntax-error*.class 2>/dev/null | wc -l), Decompile Error: $(ls decompile-err*.class 2>/dev/null | wc -l)" && cd -' to check quick! compile with yak jdsc --output /tmp/error-jdsc`,
 	Aliases: []string{"jdsc"},
 	Flags: []cli.Flag{
 		cli.StringFlag{
