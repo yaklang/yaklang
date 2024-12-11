@@ -13,6 +13,13 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func init() {
+	RegisterPostInitDatabaseFunction(func() error {
+		go SSAProgramExistClear(consts.GetGormProfileDatabase())
+		return nil
+	})
+}
+
 func FilterSSAProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
 	db = db.Model(&schema.SSAProgram{})
 	if filter == nil {
@@ -144,4 +151,28 @@ func UpdateSSAProgram(DB *gorm.DB, input *ypb.SSAProgramInput) (int64, error) {
 	db := DB.Model(&schema.SSAProgram{})
 	db = db.Where("name = ?", input.GetName()).Update("description", input.Description)
 	return db.RowsAffected, db.Error
+}
+
+func SSAProgramExistClear(DB *gorm.DB) {
+	var programs []*schema.SSAProgram
+	if DB = DB.Model(&schema.SSAProgram{}).Find(&programs); DB.Error != nil {
+		log.Errorf("query ssa program fail: %s", DB.Error)
+		return
+	}
+
+	var invalidPrograms []string
+	for _, prog := range programs {
+		if ok, _ := utils.PathExists(prog.DBPath); !ok {
+			invalidPrograms = append(invalidPrograms, prog.Name)
+		}
+	}
+	if len(invalidPrograms) > 0 {
+		log.Infof("delete invalid ssa program: %v", invalidPrograms)
+		_, err := DeleteSSAProgram(DB, &ypb.SSAProgramFilter{
+			ProgramNames: invalidPrograms,
+		})
+		if err != nil {
+			log.Errorf("delete invalid ssa program fail: %s", err)
+		}
+	}
 }
