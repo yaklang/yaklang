@@ -63,18 +63,34 @@ func (base *ScopedVersionedTable[T]) Merge(
 	if hasSelf {
 		length++
 	}
-	tmp := make(map[string][]T)
+	tmpVariable := make(map[VersionedIF[T]][]T)
+	tmpName := make(map[string][]T)
+	phi := make(map[VersionedIF[T]]T)
+	_ = tmpVariable
+	_ = tmpName
 
-	addPhiContent := func(index int, name string, ver VersionedIF[T]) {
-		m, ok := tmp[name]
+	addPhiContent := func(index int, name string, ver VersionedIF[T], sub ScopedVersionedTableIF[T]) {
+		variable := ver
+		if find := sub.GetParent().ReadVariable(name); find != nil {
+			if sub.IsSameOrSubScope(find.GetScope()) {
+				variable = find
+			}
+		}
+
+		m, ok := tmpVariable[variable]
 		if !ok {
 			m = make([]T, length)
 		}
 		m[index] = ver.GetValue()
-		tmp[name] = m
+		tmpVariable[variable] = m
 	}
 	generatePhi := func(name string, m []T) {
-		origin := base.ReadValue(name)
+		variable := base.ReadVariable(name)
+		if variable == nil {
+			return
+		}
+		origin := variable.GetValue()
+
 		// fill the missing value
 		// if len(m) != length {
 		if hasSelf {
@@ -94,22 +110,35 @@ func (base *ScopedVersionedTable[T]) Merge(
 		//	log.Infof("merge phi %s: edges count: %v", name, len(m))
 		//}
 		ret := merge(name, m)
-		v := base.CreateVariable(name, false)
-		base.AssignVariable(v, ret)
+		if base.GetParent().GetParent() == variable.GetScope() {
+			v := base.CreateVariable(name, variable.GetLocal())
+			phi[v] = ret
+		} else {
+			v := base.CreateVariable(name, false)
+			phi[v] = ret
+		}
 	}
+
+	defer func() {
+		for v, ret := range phi {
+			base.tryRegisterCapturedVariable(v.GetName(), v)
+			base.AssignVariable(v, ret)
+		}
+	}()
 
 	baseScope := ScopedVersionedTableIF[T](base)
 	for index, sub := range subScopes {
 		ForEachCapturedVariable(sub, baseScope, func(name string, ver VersionedIF[T]) {
-			addPhiContent(index, name, ver)
+			addPhiContent(index, name, ver, sub)
 		})
 		ForEachCapturedSideEffect(sub, baseScope, func(name string, ver []VersionedIF[T]) {
+			addPhiContent(index, name, ver[0], sub)
 			baseScope.SetCapturedSideEffect(ver[0].GetName(), ver[0], ver[1])
 		})
 	}
 
-	for name, m := range tmp {
-		generatePhi(name, m)
+	for ver, m := range tmpVariable {
+		generatePhi(ver.GetName(), m)
 	}
 }
 

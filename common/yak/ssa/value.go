@@ -176,8 +176,10 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			parentValue.AddMask(value)
 			v := parentValue.GetVariable(variable.GetName())
 			b.AddSideEffect(v, value)
-			freeValue := b.PeekValue(variable.GetName())
-			_ = freeValue
+			para := b.BuildFreeValue(variable.GetName())
+			para.SetDefault(parentValue)
+			para.SetType(parentValue.GetType())
+			parentValue.AddOccultation(para)
 		}
 	}
 	if _, ok := b.RefParameter[variable.GetName()]; ok {
@@ -248,29 +250,40 @@ func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...Can
 
 func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 	scope := b.CurrentBlock.ScopeTable
+	headScope := scope.GetHead()
+	if value := headScope.ReadValue(name); value != nil {
+		if freeValue, ok := ToParameter(value); ok {
+			return freeValue
+		}
+	}
 	freeValue := NewParam(name, true, b)
-	if variable := ReadVariableFromScope(scope, name); variable != nil {
+	if variable := ReadVariableFromScope(headScope, name); variable != nil {
 		b.FreeValues[variable] = freeValue
 	} else {
-		v := scope.CreateVariable(name, false)
-		scope.AssignVariable(v, freeValue)
+		v := headScope.CreateVariable(name, false)
+		headScope.AssignVariable(v, freeValue)
 		b.FreeValues[v.(*Variable)] = freeValue
 	}
 
 	// b.WriteVariable(variable, freeValue)
-	v := b.CreateVariable(name)
-	b.AssignVariable(v, freeValue)
 	return freeValue
 }
 
 func (b *FunctionBuilder) BuildFreeValueByVariable(variable *Variable) *Parameter {
 	name := variable.GetName()
+	scope := b.CurrentBlock.ScopeTable
+	headScope := scope.GetHead()
 	freeValue := NewParam(name, true, b)
-	b.FreeValues[variable] = freeValue
-
-	// b.WriteVariable(variable, freeValue)
-	v := b.CreateVariable(name)
-	b.AssignVariable(v, freeValue)
+	if value := headScope.ReadValue(name); value != nil {
+		if freeValueFinded, ok := ToParameter(value); ok {
+			return freeValueFinded
+		}
+	} else {
+		b.FreeValues[variable] = freeValue
+		// b.WriteVariable(variable, freeValue)
+		v := headScope.CreateVariable(name, false)
+		headScope.AssignVariable(v, freeValue)
+	}
 	return freeValue
 }
 

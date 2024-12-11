@@ -196,7 +196,7 @@ func Test_SideEffect(t *testing.T) {
 		}, t)
 	})
 
-	// Todo: side-effect in phi with different bind value
+	// ToDo: side-effect in phi with different bind value
 	t.Run("side-effect cross block nesting bind with phi", func(t *testing.T) {
 		t.Skip()
 		test.CheckPrintlnValue(`package main
@@ -288,11 +288,11 @@ func Test_SideEffect_Return(t *testing.T) {
 			    }else{
 					a = 3
 				}
-				println(a)
+				println(a) // phi(a)[2,3]
 			}
 			a = 1
 			f()
-			println(a)
+			println(a) // side-effect(phi(a)[2,3], a)
 		}
 		`, []string{
 			"phi(a)[2,3]", "side-effect(phi(a)[2,3], a)",
@@ -310,11 +310,11 @@ func Test_SideEffect_Return(t *testing.T) {
 			    }else{
 	
 				}
-				println(a)
+				println(a) // phi(a)[2,FreeValue-a]
 			}
 			a = 1
 			f()
-			println(a)
+			println(a) // side-effect(phi(a)[2,1], a)
 		}
 		`, []string{
 			"phi(a)[2,FreeValue-a]", "side-effect(phi(a)[2,1], a)",
@@ -331,14 +331,14 @@ func Test_SideEffect_Return(t *testing.T) {
 			    }else{
 	
 				}
-				println(a)
+				println(a) // phi(a)[2,FreeValue-a]
 			}
 			a = 1
 			f()
-			println(a)
+			println(a) // side-effect(phi(a)[2,1], a)
 			a = 3
 			f()
-			println(a)
+			println(a) // side-effect(phi(a)[2,3], a)
 		}
 		`, []string{
 			"phi(a)[2,FreeValue-a]", "side-effect(phi(a)[2,1], a)", "side-effect(phi(a)[2,3], a)",
