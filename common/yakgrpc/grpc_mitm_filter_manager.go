@@ -269,9 +269,9 @@ func (m *MITMFilter) IsEmpty() bool {
 }
 
 func (m *MITMFilter) Save() {
-	if m.IsEmpty() { // if filter is empty ,recover to default
-		m.Update(defaultMITMFilterData)
-	}
+	//if m.IsEmpty() { // if filter is empty ,recover to default
+	//	m.Update(defaultMITMFilterData)
+	//}
 	if err := m.SaveToDb(); err != nil {
 		log.Errorf("save mitm filter failed: %s", err)
 	}
