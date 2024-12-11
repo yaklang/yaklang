@@ -43748,7 +43748,7 @@ type UpdateSyntaxFlowRuleAndGroupRequest struct {
 	Filter       *SyntaxFlowRuleFilter `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
 	AddGroups    []string              `protobuf:"bytes,2,rep,name=AddGroups,proto3" json:"AddGroups,omitempty"`
 	RemoveGroups []string              `protobuf:"bytes,3,rep,name=RemoveGroups,proto3" json:"RemoveGroups,omitempty"`
-	All          bool                  `protobuf:"varint,4,opt,name=All,proto3" json:"All,omitempty"`
+	All          bool                  `protobuf:"varint,4,opt,name=All,proto3" json:"All,omitempty"` // abort
 }
 
 func (x *UpdateSyntaxFlowRuleAndGroupRequest) Reset() {
