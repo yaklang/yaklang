@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/consts"
-
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -92,4 +91,19 @@ func (s *Server) UpdateSyntaxFlowRuleGroup(ctx context.Context, req *ypb.UpdateS
 		msg.EffectRows = 1
 		return msg, nil
 	}
+}
+
+func (s *Server) QuerySyntaxFlowSameGroup(ctx context.Context, req *ypb.QuerySyntaxFlowSameGroupRequest) (*ypb.QuerySyntaxFlowSameGroupResponse, error) {
+	if req == nil || req.Filter == nil {
+		return nil, utils.Errorf("query syntax flow same group failed:filter is empty")
+	}
+	groups, err := yakit.QuerySameGroupByRule(s.GetProfileDatabase(), req.GetFilter())
+	if err != nil {
+		return nil, utils.Errorf("query syntax flow same group failed:%s", err)
+	}
+	var result []*ypb.SyntaxFlowGroup
+	for _, group := range groups {
+		result = append(result, group.ToGRPCModel())
+	}
+	return &ypb.QuerySyntaxFlowSameGroupResponse{Group: result}, nil
 }

@@ -2,6 +2,7 @@ package schema
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 //// SyntaxFlowRuleGroup Syntax Flow规则和组的关系表
@@ -28,4 +29,11 @@ type SyntaxFlowGroup struct {
 	GroupName string            `json:"group_name" gorm:"unique_index"`
 	IsBuildIn bool              `json:"is_build_in" gorm:"index"`
 	Rules     []*SyntaxFlowRule `gorm:"many2many:syntax_flow_rule_and_group;"`
+}
+
+func (s *SyntaxFlowGroup) ToGRPCModel() *ypb.SyntaxFlowGroup {
+	return &ypb.SyntaxFlowGroup{
+		GroupName: s.GroupName,
+		IsBuildIn: s.IsBuildIn,
+	}
 }
