@@ -482,9 +482,9 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 
 func (f *FunctionBuilder) SetReturnSideEffects() {
 	scope := f.CurrentBlock.ScopeTable
-	if f.SideEffectsReturn == nil {
-		f.SideEffectsReturn = make(map[string]*FunctionSideEffect)
-	}
+	// if f.SideEffectsReturn == nil {
+	// 	f.SideEffectsReturn = make(map[string]*FunctionSideEffect)
+	// }
 
 	for _, se := range f.SideEffects {
 		ser := se
@@ -497,24 +497,28 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 				ser.Modify = value
 			}
 		}
-		f.SideEffectsReturn[se.Name] = se
+		f.SideEffectsReturn = append(f.SideEffectsReturn, ser)
 	}
 }
 
 func (f *FunctionBuilder) SwitchFreevalueInSideEffects(name string, se *SideEffect) *SideEffect {
-	edge := make([]Value, 0)
+	vs := make([]Value, 0)
 	if phi, ok := ToPhi(se.Value); ok {
-		phit := *phi
-		for i, e := range phit.Edge {
-			edge = append(edge, e)
+		for i, e := range phi.Edge {
+			vs = append(vs, e)
 			if p, ok := ToParameter(e); ok && p.IsFreeValue {
 				if value := f.PeekValue(name); value != nil {
-					edge[i] = value
+					vs[i] = value
 				}
 			}
 		}
-		phit.Edge = edge
-		sideEffect := f.EmitSideEffect(name, se.CallSite.(*Call), &phit)
+		phit := &Phi{
+			anValue:            phi.anValue,
+			CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
+			Edge:               vs,
+		}
+
+		sideEffect := f.EmitSideEffect(name, se.CallSite.(*Call), phit)
 		return sideEffect
 	}
 	return se
