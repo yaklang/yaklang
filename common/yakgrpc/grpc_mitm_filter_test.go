@@ -636,3 +636,22 @@ func TestGRPCMUSTPASS_MITM_Filter_Set_Get(t *testing.T) {
 	require.Equal(t, "word", filter.FilterData.IncludeUri[0].MatcherType)
 	require.Equal(t, []string{"abc"}, filter.FilterData.IncludeUri[0].Group)
 }
+
+func TestGRPCMUSTPASS_MITM_Filter_Reset(t *testing.T) {
+	ctx := utils.TimeoutContextSeconds(5)
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	token := uuid.NewString()
+	data := &ypb.MITMFilterData{
+		IncludeUri: []*ypb.FilterDataItem{{MatcherType: "word", Group: []string{token}}},
+	}
+
+	_, err = client.SetMITMFilter(ctx, &ypb.SetMITMFilterRequest{
+		FilterData: data,
+	})
+	require.NoError(t, err)
+	rsp, err := client.ResetMITMFilter(ctx, &ypb.Empty{})
+	require.NoError(t, err)
+	require.NotContains(t, rsp.FilterData.String(), token)
+	require.Contains(t, rsp.FilterData.String(), "google.com")
+}
