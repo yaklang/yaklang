@@ -97,10 +97,7 @@ func QueryGroupByName(db *gorm.DB, groupName string) (*schema.SyntaxFlowGroup, e
 	return i, nil
 }
 
-func GetIntersectionGroups(groups []*schema.SyntaxFlowGroup) []*schema.SyntaxFlowGroup {
-	if len(groups) <= 1 {
-		return groups
-	}
+func GetIntersectionGroup(groups []*schema.SyntaxFlowGroup) []*schema.SyntaxFlowGroup {
 	var result []*schema.SyntaxFlowGroup
 	groupMap := make(map[string]struct{})
 	for _, group := range groups {

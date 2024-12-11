@@ -185,47 +185,6 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		}
 	})
 
-	t.Run("test intersection group of query rules", func(t *testing.T) {
-		ruleName1 := fmt.Sprintf("rule_%s", uuid.NewString())
-		_, err = createSfRuleEx(client, ruleName1)
-		require.NoError(t, err)
-		t.Cleanup(func() {
-			err = deleteRuleByNames(client, []string{ruleName1})
-			require.NoError(t, err)
-		})
-
-		ruleName2 := fmt.Sprintf("rule_%s", uuid.NewString())
-		_, err = createSfRuleEx(client, ruleName2)
-		require.NoError(t, err)
-		t.Cleanup(func() {
-			err = deleteRuleByNames(client, []string{ruleName2})
-			require.NoError(t, err)
-		})
-
-		groupNameA := fmt.Sprintf("group_%s", uuid.NewString())
-		groupNameB := fmt.Sprintf("group_%s", uuid.NewString())
-		groupNameC := fmt.Sprintf("group_%s", uuid.NewString())
-
-		t.Cleanup(func() {
-			_, err = deleteRuleGroup(client, []string{groupNameA, groupNameB, groupNameC})
-			require.NoError(t, err)
-		})
-
-		err = createGroups(client, []string{groupNameA, groupNameB, groupNameC})
-		require.NoError(t, err)
-
-		err = addGroups(client, []string{ruleName1}, []string{groupNameA, groupNameB})
-		require.NoError(t, err)
-
-		err = addGroups(client, []string{ruleName2}, []string{groupNameB, groupNameC})
-		require.NoError(t, err)
-
-		rule, err := queryRulesByName(client, []string{ruleName1, ruleName2})
-		require.NoError(t, err)
-		require.Equal(t, groupNameB, rule[0].GetGroupName()[0])
-		require.Equal(t, groupNameB, rule[1].GetGroupName()[0])
-	})
-
 	t.Run("test rename group", func(t *testing.T) {
 		ruleName := uuid.NewString()
 		oldGroupName := uuid.NewString()
@@ -280,5 +239,88 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, len(group.Group))
 		require.True(t, group.Group[0].IsBuildIn)
+	})
+}
+
+func TestGRPCMUSTPASS_SynatxFlow_Query_Same_Group(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	querySameGroup := func(ruleNames []string) ([]*ypb.SyntaxFlowGroup, error) {
+		rsp, err := client.QuerySyntaxFlowSameGroup(context.Background(), &ypb.QuerySyntaxFlowSameGroupRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: ruleNames,
+			},
+		})
+		require.NoError(t, err)
+		return rsp.GetGroup(), nil
+	}
+	t.Run("test same group of query  rules", func(t *testing.T) {
+		// 多个规则获取其交集组
+		ruleName1 := fmt.Sprintf("rule_%s", uuid.NewString())
+		_, err = createSfRuleEx(client, ruleName1)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName1})
+			require.NoError(t, err)
+		})
+
+		ruleName2 := fmt.Sprintf("rule_%s", uuid.NewString())
+		_, err = createSfRuleEx(client, ruleName2)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName2})
+			require.NoError(t, err)
+		})
+
+		groupNameA := fmt.Sprintf("group_%s", uuid.NewString())
+		groupNameB := fmt.Sprintf("group_%s", uuid.NewString())
+		groupNameC := fmt.Sprintf("group_%s", uuid.NewString())
+
+		t.Cleanup(func() {
+			_, err = deleteRuleGroup(client, []string{groupNameA, groupNameB, groupNameC})
+			require.NoError(t, err)
+		})
+
+		err = createGroups(client, []string{groupNameA, groupNameB, groupNameC})
+		require.NoError(t, err)
+
+		err = addGroups(client, []string{ruleName1}, []string{groupNameA, groupNameB})
+		require.NoError(t, err)
+
+		err = addGroups(client, []string{ruleName2}, []string{groupNameB, groupNameC})
+		require.NoError(t, err)
+
+		groups, err := querySameGroup([]string{ruleName1, ruleName2})
+		require.NoError(t, err)
+		require.Equal(t, groupNameB, groups[0].GroupName)
+		require.Equal(t, 1, len(groups))
+	})
+
+	t.Run("test same group of query rule", func(t *testing.T) {
+		// 单个规则获取其本身的组
+		ruleName1 := fmt.Sprintf("rule_%s", uuid.NewString())
+		_, err = createSfRuleEx(client, ruleName1)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName1})
+			require.NoError(t, err)
+		})
+
+		groupNameA := fmt.Sprintf("group_%s", uuid.NewString())
+		groupNameB := fmt.Sprintf("group_%s", uuid.NewString())
+		groupNameC := fmt.Sprintf("group_%s", uuid.NewString())
+
+		t.Cleanup(func() {
+			_, err = deleteRuleGroup(client, []string{groupNameA, groupNameB, groupNameC})
+			require.NoError(t, err)
+		})
+
+		err = addGroups(client, []string{ruleName1}, []string{groupNameA, groupNameB, groupNameC})
+		require.NoError(t, err)
+
+		groups, err := querySameGroup([]string{ruleName1})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(groups))
 	})
 }
