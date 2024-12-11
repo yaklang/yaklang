@@ -18,19 +18,15 @@ var countMap = map[string]int{
     ssa.Java:1,
     ssa.Yak: 1,
 }
-/*
-kind type:
-    remote-url
-    git
-    compress
-    file
- */
-
 params ={
     "json_schema":{
         "kind": "",
         "local_file": "",
-        "url": ""
+        "url": "",
+        "proxy":{
+            "proxy": false,
+            "url": ""
+        }
 
     },
     "language": "",
@@ -40,6 +36,10 @@ params ={
         "kind": "",
         "msg": ""
    }
+}
+if proxy!=""{
+    params.json_schema.proxy.proxy=true
+    params.json_schema.proxy.url = proxy
 }
 func detectiveType(data){
     return data==codec.DecodeHex("504b0304")~
@@ -71,6 +71,7 @@ func AutoParseLanguage(){
         params.language = maxinfo.key
     }
 }
+//获取zip中的信息，确定语言
 func getZipinfo(basePath){
     zip.Recursive(basePath,(dir,path,info)=>{
         if !info.IsDir(){
@@ -79,7 +80,7 @@ func getZipinfo(basePath){
         ext = file.GetExt(path).Lower().TrimLeft(".")
         countinfo = countMap[ext]
         if countinfo!=nil{
-            countinfo++
+            countMap[ext] = countinfo+1
         }
         if params.language=="" {
             if info.IsDir(){
@@ -145,6 +146,7 @@ if target.HasPrefix("http://") ||target.HasPrefix("https://"){
                 if detectiveType(res.GetBody()[:4]){
                     params.json_schema.kind = "compress"
                     params.json_schema.url = target
+                    params.program_name = generateFileName("compress", httpUrl)
                 }else{
                     newFileTypeException(sprint("connect success,but not found match the file type"))
                 }
@@ -181,14 +183,12 @@ if target.HasPrefix("file://") {
             default:
                 if file.IsDir(localFile){
                     filesys.Recursive(localFile, filesys.onDirStat(func(path,info){
-                        if params.language==""{
-                            switch {
-                                case info.Name().Lower() in javaFiles:
+                        if params.language == ""{
+                            switch{
+                                case info.Name().Lower() in javaDir:
                                     params.language = ssa.Java
-                                case info.Name().Lower() in phpFiles:
-                                    params.language = ssa.PHP
-                                case info.Name().Lower() in jsFiles:
-                                    params.language =ssa.Javascript
+                                case info.Name().Lower() in jsDir:
+                                    params.language = ssa.Javascript
                             }
                         }
                     }),filesys.onFileStat(func(path,info){
@@ -199,12 +199,14 @@ if target.HasPrefix("file://") {
                         if countinfo!=nil{
                         countMap[ext] = countinfo+1
                         }
-                        if params.language == ""{
-                            switch{
-                                case info.Name().Lower() in javaDir:
+                        if params.language==""{
+                            switch {
+                                case info.Name().Lower() in javaFiles:
                                     params.language = ssa.Java
-                                case info.Name().Lower() in jsDir:
-                                    params.language = ssa.Javascript
+                                case info.Name().Lower() in phpFiles:
+                                    params.language = ssa.PHP
+                                case info.Name().Lower() in jsFiles:
+                                    params.language =ssa.Javascript
                             }
                         }
                     }))
