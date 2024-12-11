@@ -2,12 +2,6 @@ package yakcmds
 
 import (
 	"errors"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
-
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -15,7 +9,118 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
 )
+
+var JavaDecompilerSelfChecking = &cli.Command{
+	Name:    "java-decompiler-self-checking",
+	Aliases: []string{"jdsc"},
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "error-output,output",
+			Value: "decompiler-self-checking-failed-files",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		// search .m2 directory
+		homeDir, err := filepath.Abs(utils.GetHomeDirDefault("."))
+		if err != nil {
+			return utils.Error(err)
+		}
+		m2Dir := filepath.Join(homeDir, ".m2")
+
+		outputDir := c.String("output")
+		outputDir, err = filepath.Abs(outputDir)
+		if err != nil {
+			return utils.Error(err)
+		}
+		os.MkdirAll(outputDir, 0755)
+
+		swg := utils.NewSizedWaitGroup(100)
+
+		var visitedCompiledError sync.Map
+
+		handle := func(s string, raw []byte) error {
+			log.Infof("checking: %v", s)
+			hash := codec.Sha256(raw)
+			if len(hash) > 24 {
+				hash = hash[:24]
+			}
+			results, err := javaclassparser.Decompile(raw)
+			if err != nil {
+				errHash := codec.Sha256([]byte(err.Error()))
+				if _, ok := visitedCompiledError.Load(errHash); ok {
+					return nil
+				} else {
+					visitedCompiledError.Store(errHash, struct{}{})
+				}
+				// decompiler error
+				//          "syntax-error--
+				fileName := "decompile-err-" + hash
+				originCls := filepath.Join(outputDir, fileName+".class")
+				os.WriteFile(originCls, raw, 0755)
+				log.Errorf("javaclassparser.Decompile failed: %v", err)
+				return nil
+			}
+
+			//vfs := filesys.NewVirtualFs()
+			//vfs.AddFile("origin.java", results)
+
+			_, err = java2ssa.Frontend(results, false)
+			if err != nil {
+				log.Errorf("java2ssa.Frontend failed: %v", err)
+				fileName := "syntax-error--" + hash
+				originCls := filepath.Join(outputDir, fileName+".class")
+				target := filepath.Join(outputDir, fileName+".java")
+				os.WriteFile(originCls, raw, 0755)
+				os.WriteFile(target, []byte(results), 0755)
+				return nil
+			}
+			return nil
+		}
+		filesys.Recursive(m2Dir, filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+			if filepath.Ext(s) != ".jar" {
+				return nil
+			}
+			log.Infof("start to decompile %v", s)
+			zfs, err := filesys.NewZipFSFromLocal(s)
+			if err != nil {
+				return err
+			}
+			filesys.SimpleRecursive(filesys.WithFileSystem(zfs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				if zfs.Ext(s) != ".class" {
+					return nil
+				}
+
+				raw, err := zfs.ReadFile(s)
+				if err != nil {
+					log.Error(err)
+					return nil
+				}
+
+				swg.Add()
+				go func() {
+					defer swg.Done()
+					err := handle(s, raw)
+					if err != nil {
+						log.Errorf("handle failed: %v", err)
+					}
+				}()
+				return nil
+			}))
+			swg.Wait()
+			return nil
+		}))
+		return nil
+	},
+}
 
 var JavaDecompilerCommand = &cli.Command{
 	Name:    "java-decompiler",

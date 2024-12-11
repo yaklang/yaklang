@@ -105,6 +105,9 @@ func (prog *Program) GetErrors() SSAErrors {
 }
 
 func (errs SSAErrors) String() string {
+	if len(errs) <= 0 {
+		return ""
+	}
 	ret := "error:\n"
 	for _, e := range errs {
 		ret += "\t" + e.String() + "\n"

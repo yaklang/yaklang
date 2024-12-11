@@ -279,3 +279,11 @@ func Parse(classData []byte) (cf *ClassObject, err error) {
 	cp := NewClassParser(classData)
 	return cp.Parse()
 }
+
+func Decompile(i []byte) (string, error) {
+	obj, err := Parse(i)
+	if err != nil {
+		return "", err
+	}
+	return obj.Dump()
+}
