@@ -525,6 +525,8 @@ type YakClient interface {
 	CreateSyntaxFlowRuleGroup(ctx context.Context, in *CreateSyntaxFlowGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateSyntaxFlowRuleGroup(ctx context.Context, in *UpdateSyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateSyntaxFlowRuleAndGroup(ctx context.Context, in *UpdateSyntaxFlowRuleAndGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	// 查找多个规则的交集组，一个规则则为其组本身
+	QuerySyntaxFlowSameGroup(ctx context.Context, in *QuerySyntaxFlowSameGroupRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowSameGroupResponse, error)
 	// syntaxflow scan
 	SyntaxFlowScan(ctx context.Context, opts ...grpc.CallOption) (Yak_SyntaxFlowScanClient, error)
 	QuerySyntaxFlowScanTask(ctx context.Context, in *QuerySyntaxFlowScanTaskRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowScanTaskResponse, error)
@@ -5643,6 +5645,15 @@ func (c *yakClient) UpdateSyntaxFlowRuleAndGroup(ctx context.Context, in *Update
 	return out, nil
 }
 
+func (c *yakClient) QuerySyntaxFlowSameGroup(ctx context.Context, in *QuerySyntaxFlowSameGroupRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowSameGroupResponse, error) {
+	out := new(QuerySyntaxFlowSameGroupResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QuerySyntaxFlowSameGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) SyntaxFlowScan(ctx context.Context, opts ...grpc.CallOption) (Yak_SyntaxFlowScanClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[68], "/ypb.Yak/SyntaxFlowScan", opts...)
 	if err != nil {
@@ -6302,6 +6313,8 @@ type YakServer interface {
 	CreateSyntaxFlowRuleGroup(context.Context, *CreateSyntaxFlowGroupRequest) (*DbOperateMessage, error)
 	UpdateSyntaxFlowRuleGroup(context.Context, *UpdateSyntaxFlowRuleGroupRequest) (*DbOperateMessage, error)
 	UpdateSyntaxFlowRuleAndGroup(context.Context, *UpdateSyntaxFlowRuleAndGroupRequest) (*DbOperateMessage, error)
+	// 查找多个规则的交集组，一个规则则为其组本身
+	QuerySyntaxFlowSameGroup(context.Context, *QuerySyntaxFlowSameGroupRequest) (*QuerySyntaxFlowSameGroupResponse, error)
 	// syntaxflow scan
 	SyntaxFlowScan(Yak_SyntaxFlowScanServer) error
 	QuerySyntaxFlowScanTask(context.Context, *QuerySyntaxFlowScanTaskRequest) (*QuerySyntaxFlowScanTaskResponse, error)
@@ -7504,6 +7517,9 @@ func (UnimplementedYakServer) UpdateSyntaxFlowRuleGroup(context.Context, *Update
 }
 func (UnimplementedYakServer) UpdateSyntaxFlowRuleAndGroup(context.Context, *UpdateSyntaxFlowRuleAndGroupRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSyntaxFlowRuleAndGroup not implemented")
+}
+func (UnimplementedYakServer) QuerySyntaxFlowSameGroup(context.Context, *QuerySyntaxFlowSameGroupRequest) (*QuerySyntaxFlowSameGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySyntaxFlowSameGroup not implemented")
 }
 func (UnimplementedYakServer) SyntaxFlowScan(Yak_SyntaxFlowScanServer) error {
 	return status.Errorf(codes.Unimplemented, "method SyntaxFlowScan not implemented")
@@ -14888,6 +14904,24 @@ func _Yak_UpdateSyntaxFlowRuleAndGroup_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QuerySyntaxFlowSameGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySyntaxFlowSameGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySyntaxFlowSameGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QuerySyntaxFlowSameGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySyntaxFlowSameGroup(ctx, req.(*QuerySyntaxFlowSameGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_SyntaxFlowScan_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).SyntaxFlowScan(&yakSyntaxFlowScanServer{stream})
 }
@@ -16454,6 +16488,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateSyntaxFlowRuleAndGroup",
 			Handler:    _Yak_UpdateSyntaxFlowRuleAndGroup_Handler,
+		},
+		{
+			MethodName: "QuerySyntaxFlowSameGroup",
+			Handler:    _Yak_QuerySyntaxFlowSameGroup_Handler,
 		},
 		{
 			MethodName: "QuerySyntaxFlowScanTask",

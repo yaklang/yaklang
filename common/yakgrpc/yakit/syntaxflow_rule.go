@@ -24,15 +24,6 @@ func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
-
-	var groups []*schema.SyntaxFlowGroup
-	for _, rule := range ret {
-		groups = append(groups, rule.Groups...)
-	}
-	igs := sfdb.GetIntersectionGroups(groups)
-	for _, rule := range ret {
-		rule.Groups = igs
-	}
 	return paging, ret, nil
 }
 
@@ -121,4 +112,18 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
 	return updateRule, nil
+}
+
+func QuerySameGroupByRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowGroup, error) {
+	db = FilterSyntaxFlowRule(db, req)
+	var rules []*schema.SyntaxFlowRule
+	db.Model(&schema.SyntaxFlowRule{}).Preload("Groups").Find(&rules)
+	var groups []*schema.SyntaxFlowGroup
+	for _, rule := range rules {
+		groups = append(groups, rule.Groups...)
+	}
+	if len(rules) > 1 {
+		groups = sfdb.GetIntersectionGroup(groups)
+	}
+	return groups, nil
 }

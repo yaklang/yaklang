@@ -134,7 +134,7 @@ func TestRule_Group_OP(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, len(queryRule.Groups))
 	})
-	t.Run("test GetIntersectionGroups", func(t *testing.T) {
+	t.Run("test GetIntersectionGroup", func(t *testing.T) {
 		creatGroup := func(groupName string) *schema.SyntaxFlowGroup {
 			group := &schema.SyntaxFlowGroup{GroupName: groupName}
 			return group
@@ -145,16 +145,16 @@ func TestRule_Group_OP(t *testing.T) {
 		groupC := creatGroup(uuid.NewString())
 
 		groups := []*schema.SyntaxFlowGroup{groupA, groupB, groupC}
-		ret := GetIntersectionGroups(groups)
+		ret := GetIntersectionGroup(groups)
 		require.Nil(t, ret)
 
 		groups = []*schema.SyntaxFlowGroup{groupA, groupB, groupA}
-		ret = GetIntersectionGroups(groups)
+		ret = GetIntersectionGroup(groups)
 		require.Equal(t, 1, len(ret))
 		require.Equal(t, groupA, ret[0])
 
 		groups = []*schema.SyntaxFlowGroup{groupA, groupB, groupC, groupA, groupB}
-		ret = GetIntersectionGroups(groups)
+		ret = GetIntersectionGroup(groups)
 		require.Equal(t, 2, len(ret))
 		require.Contains(t, ret, groupA)
 		require.Contains(t, ret, groupB)
