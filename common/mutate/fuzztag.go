@@ -14,6 +14,7 @@ import (
 	"time"
 	_ "time/tzdata"
 
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
@@ -1623,6 +1624,22 @@ func init() {
 		Description:         "随机大小写，{{randomupper(abc)}} => aBc",
 		TagNameVerbose:      "随机大小写",
 		ArgumentDescription: "{{string(abc:字符串)}}",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "jsonpath",
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			args := utils.PrettifyListFromStringSplited(s, "|")
+			if len(args) == 2 {
+				return tryYield(ctx, yield, utils.InterfaceToString(jsonpath.FindFirst(args[0], args[1])))
+			} else if len(args) >= 3 {
+				return tryYield(ctx, yield, utils.InterfaceToString(jsonpath.ReplaceAll(args[0], args[1], args[2])))
+			}
+			return tryYield(ctx, yield, s)
+		},
+		Description:         "将内容JSON解码并通过JsonPath寻找或替换对应的值",
+		TagNameVerbose:      "JsonPath",
+		ArgumentDescription: "{{string_split(value:json字符串)}}{{string_split($.key:JsonPath)}}{{optional(string(replaced:替换的字符串))}}",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
