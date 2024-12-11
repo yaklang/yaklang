@@ -22,3 +22,11 @@ func (s *Server) GetMITMFilter(ctx context.Context, req *ypb.Empty) (*ypb.SetMIT
 		FilterData: filterManager.Data,
 	}, nil
 }
+
+func (s *Server) ResetMITMFilter(ctx context.Context, req *ypb.Empty) (*ypb.SetMITMFilterRequest, error) {
+	filterManager := GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
+	filterManager.Recover()
+	return &ypb.SetMITMFilterRequest{
+		FilterData: filterManager.Data,
+	}, nil
+}
