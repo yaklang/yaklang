@@ -5717,7 +5717,7 @@ message UpdateSyntaxFlowRuleAndGroupRequest{
    SyntaxFlowRuleFilter Filter = 1;
    repeated string AddGroups= 2;
    repeated string RemoveGroups = 3;
-   bool All = 4;
+   bool All = 4; // abort
 }
 
 message DeleteSyntaxFlowRuleGroupRequest{
