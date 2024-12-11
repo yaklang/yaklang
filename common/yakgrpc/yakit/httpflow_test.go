@@ -441,3 +441,93 @@ func TestExcludeKeywords(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, httpflows, 1)
 }
+
+func TestKeywordType(t *testing.T) {
+
+	db := consts.GetGormProjectDatabase()
+	insertFlowAndCheck := func(flow *schema.HTTPFlow) int64 {
+		err := InsertHTTPFlow(db, flow)
+		require.NoError(t, err)
+		require.Greater(t, flow.ID, uint(0))
+		return int64(flow.ID)
+	}
+
+	t.Run("all", func(t *testing.T) {
+		t.Parallel()
+
+		ids := make([]int64, 0, 2)
+		t.Cleanup(func() {
+			DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+				Id: ids,
+			})
+		})
+
+		token := uuid.NewString()
+		ids = append(ids, insertFlowAndCheck(&schema.HTTPFlow{
+			Path: token,
+		}))
+		ids = append(ids, insertFlowAndCheck(&schema.HTTPFlow{
+			Url: token,
+		}))
+
+		_, httpflows, err := QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+			Keyword:     token,
+			KeywordType: "all",
+		})
+		require.NoError(t, err)
+		require.Len(t, httpflows, 2)
+	})
+
+	t.Run("request", func(t *testing.T) {
+		t.Parallel()
+
+		ids := make([]int64, 0, 2)
+		t.Cleanup(func() {
+			DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+				Id: ids,
+			})
+		})
+		token := uuid.NewString()
+		ids = append(ids, insertFlowAndCheck(&schema.HTTPFlow{
+			Path: token,
+			Tags: token,
+		}))
+		ids = append(ids, insertFlowAndCheck(&schema.HTTPFlow{
+			Request: token,
+		}))
+
+		_, httpflows, err := QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+			Keyword:     token,
+			KeywordType: "request",
+		})
+		require.NoError(t, err)
+		require.Len(t, httpflows, 1)
+	})
+
+	t.Run("response", func(t *testing.T) {
+		t.Parallel()
+
+		ids := make([]int64, 0, 2)
+		t.Cleanup(func() {
+			DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+				Id: ids,
+			})
+		})
+		token := uuid.NewString()
+		ids = append(ids, insertFlowAndCheck(&schema.HTTPFlow{
+			Path: token,
+			Tags: token,
+		}))
+		ids = append(ids, insertFlowAndCheck(&schema.HTTPFlow{
+			Response: token,
+		}))
+
+		_, httpflows, err := QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+			Keyword:     token,
+			KeywordType: "response",
+		})
+		require.NoError(t, err)
+		require.Len(t, httpflows, 1)
+	})
+
+}

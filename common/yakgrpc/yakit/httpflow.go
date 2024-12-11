@@ -685,10 +685,18 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	if params.GetAfterUpdatedAt() > 0 {
 		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", params.GetAfterUpdatedAt(), time.Now().Add(10*time.Minute).Unix())
 	}
-	db = bizhelper.FuzzSearchEx(db, []string{
+	keywordType := strings.ToLower(params.GetKeywordType())
+	keywordFields := []string{
 		"tags", "url", "path", "request",
 		"response", "remote_addr",
-	}, params.GetKeyword(), false)
+	}
+	if keywordType == "request" {
+		keywordFields = []string{"request"}
+	} else if keywordType == "response" {
+		keywordFields = []string{"response"}
+	}
+
+	db = bizhelper.FuzzSearchEx(db, keywordFields, params.GetKeyword(), false)
 	if len(params.GetExcludeKeywords()) > 0 {
 		for _, keyword := range params.GetExcludeKeywords() {
 			db = bizhelper.FuzzSearchNotEx(db, []string{
