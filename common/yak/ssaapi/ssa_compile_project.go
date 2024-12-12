@@ -51,13 +51,19 @@ func (c *config) parseProject() (Programs, error) {
 		if progs, err := c.peephole(); err != nil {
 			return nil, err
 		} else {
+			c.SaveProfile()
+			c.Processf(1, "programs finish")
 			return progs, nil
 		}
 	} else {
 		// normal compile
-		if prog, err := c.parseProjectWithFS(c.fs, c.Processf); err != nil {
+		if prog, err := c.parseProjectWithFS(c.fs, func(f float64, s string, a ...any) {
+			c.Processf(f*0.99, s, a...)
+		}); err != nil {
 			return nil, err
 		} else {
+			c.SaveProfile()
+			c.Processf(1, "program %s finish", prog.GetProgramName())
 			return Programs{prog}, nil
 		}
 	}
@@ -73,15 +79,16 @@ func (c *config) peephole() (Programs, error) {
 	progs := make(Programs, 0)
 	var errs error
 
-	//TODO: calculate process in peephole compile
-	process := func(f float64, s string, a ...any) {
-		c.Processf(f, s, a...)
-	}
-
 	filesys.Peephole(originFs,
 		filesys.WithPeepholeSize(c.peepholeSize),
-		filesys.WithPeepholeCallback(func(system filesys_interface.FileSystem) {
-			prog, err := c.parseProjectWithFS(system, process)
+		filesys.WithPeepholeCallback(func(count, totalCount int, system filesys_interface.FileSystem) {
+			totalCount = totalCount + 1
+			baseProcess := float64(count-1) / float64(totalCount)
+			prog, err := c.parseProjectWithFS(system, func(f float64, s string, a ...any) {
+				c.Processf(baseProcess+f/float64(totalCount), s, a)
+			})
+			process := float64(count) / float64(totalCount) // max is 99%
+			c.Processf(process, "finish peephole filesystem")
 			// if no err just append and return
 			if err == nil {
 				progs = append(progs, prog)
