@@ -351,6 +351,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 				}
 			}
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
+				if name == "main" {
+					log.Debug("decompile main func")
+				}
 				statementList, err := ParseBytesCode(c, codeAttr)
 				if err != nil {
 					return nil, utils.Wrap(err, "ParseBytesCode failed")

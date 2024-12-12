@@ -493,11 +493,12 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			runtimeStackSimulation.Push(funcCallValue)
 		}
 	case OP_INVOKEDYNAMIC:
-		_, desc := d.ConstantPoolInvokeDynamicInfo(int(Convert2bytesToInt(opcode.Data)))
+		name, desc := d.ConstantPoolInvokeDynamicInfo(int(Convert2bytesToInt(opcode.Data)))
 		typ, err := types.ParseMethodDescriptor(desc)
 		if err != nil {
 			return err
 		}
+		_ = name
 		lambdaCall := values.NewLambdaFuncRef(getLambdaIndex(), nil, typ.FunctionType().ReturnType)
 		for i := 0; i < len(typ.FunctionType().ParamTypes); i++ {
 			lambdaCall.Arguments = append(lambdaCall.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
