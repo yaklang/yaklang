@@ -226,7 +226,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 		case "RemovePrefix", "RemoveSuffix":
 			arg = append(arg, StrTyp)
 			ret = append(ret, StrTyp)
-		case "Zfill", "Rfill", "Lfill":
+		case "Zfill", "Rzfill":
 			arg = append(arg, NumberTyp)
 			ret = append(ret, StrTyp)
 		case "Ljust", "Rjust":
@@ -317,7 +317,8 @@ func (b *Builder) GetMethodNames(t ssa.Type) []string {
 		}
 	case ssa.StringTypeKind:
 		return []string{
-			"Reverse", "Shuffle", "Fuzz", "Contains", "IContains", "ReplaceN", "ReplaceAll", "Replace", "Split", "SplitN", "Join", "Trim", "TrimLeft", "TrimRight", "HasPrefix", "HasSuffix", "StartsWith", "EndsWith", "RemovePrefix", "RemoveSuffix", "Zfill", "Rfill", "Lfill", "Ljust", "Rjust", "Count", "Find", "RFind", "IndexOf", "LastIndexOf", "Lower", "Upper", "Title", "IsLower", "IsUpper", "IsTitle", "IsAlpha", "IsDigit", "IsAlnum", "IsPrintable",
+			"Reverse", "Shuffle", "Fuzz", "Contains", "IContains", "ReplaceN", "ReplaceAll", "Replace", "Split", "SplitN", "Join", "Trim", "TrimLeft", "TrimRight", "HasPrefix", "HasSuffix", "StartsWith", "EndsWith", "RemovePrefix", "RemoveSuffix", "Zfill",
+			"Rzfill", "Ljust", "Rjust", "Count", "Find", "RFind", "IndexOf", "LastIndexOf", "Lower", "Upper", "Title", "IsLower", "IsUpper", "IsTitle", "IsAlpha", "IsDigit", "IsAlnum", "IsPrintable",
 		}
 	case ssa.MapTypeKind:
 		return []string{
