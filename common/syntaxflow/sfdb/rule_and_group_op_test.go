@@ -207,4 +207,15 @@ func TestRule_Group_OP(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, group1.ID, group2.ID)
 	})
+
+	t.Run("test save group", func(t *testing.T) {
+		groupName := uuid.NewString()
+		group, err := SaveGroup(db, groupName)
+		require.NoError(t, err)
+		require.False(t, group.IsBuildIn)
+
+		group, err = SaveGroup(db, groupName, true)
+		require.NoError(t, err)
+		require.True(t, group.IsBuildIn)
+	})
 }
