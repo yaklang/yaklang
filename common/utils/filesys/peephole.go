@@ -1,6 +1,7 @@
 package filesys
 
 import (
+	"context"
 	"io/fs"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -12,8 +13,24 @@ type PeepholeConfig struct {
 	// peephole handler
 	Size int
 
+	// context
+	ctx context.Context
+
 	Callback         func(count, total int, f fi.FileSystem)
 	fileContentCache *utils.SafeMap[[]byte]
+}
+
+func (c *PeepholeConfig) isStop() bool {
+	if c == nil || c.ctx == nil {
+		return false
+	}
+
+	select {
+	case <-c.ctx.Done():
+		return true
+	default:
+		return false
+	}
 }
 
 type PeepholeTrigger struct {
@@ -33,6 +50,13 @@ func WithPeepholeSize(i int) PeepholeConfigOption {
 	}
 }
 
+func WithPeepholeContext(ctx context.Context) PeepholeConfigOption {
+	return func(c *PeepholeConfig) error {
+		c.ctx = ctx
+		return nil
+	}
+}
+
 func WithPeepholeCallback(i func(int, int, fi.FileSystem)) PeepholeConfigOption {
 	return func(config *PeepholeConfig) error {
 		config.Callback = i
@@ -42,6 +66,7 @@ func WithPeepholeCallback(i func(int, int, fi.FileSystem)) PeepholeConfigOption 
 
 func defaultPeepholeConfig(opts ...PeepholeConfigOption) (*PeepholeConfig, error) {
 	config := &PeepholeConfig{
+		ctx:              context.Background(),
 		Callback:         nil,
 		fileContentCache: utils.NewSafeMap[[]byte](),
 	}
@@ -97,9 +122,11 @@ func (c *PeepholeConfig) CallbackFS(f fi.FileSystem, triggers *utils.SafeMap[*Pe
 	}
 
 	triggers.ForEach(func(key string, trigger *PeepholeTrigger) bool {
-
 		// foreach trigger.Infos with size as step
 		for i := 0; i < len(trigger.Infos); i += step {
+			if c.isStop() {
+				return false
+			}
 			end := i + step
 			if end > len(trigger.Infos) {
 				end = len(trigger.Infos)
@@ -137,6 +164,7 @@ func Peephole(f fi.FileSystem, opts ...PeepholeConfigOption) error {
 	recursiveErr := Recursive(
 		start,
 		WithFileSystem(f),
+		WithContext(c.ctx),
 		WithFileStat(func(s string, info fs.FileInfo) error {
 			dirName, fileName := f.PathSplit(s)
 			if fileName == "" {
@@ -154,10 +182,6 @@ func Peephole(f fi.FileSystem, opts ...PeepholeConfigOption) error {
 		}),
 	)
 
-	// triggerCache.ForEach(func(key string, trigger *PeepholeTrigger) bool {
 	c.CallbackFS(f, triggerCache)
-	// 	return true
-	// })
-
 	return recursiveErr
 }

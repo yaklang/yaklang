@@ -1,6 +1,7 @@
 package ssatest
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"testing"
@@ -149,5 +150,26 @@ $para #-> * as $target
 		require.False(t, greaterThanOne)
 		require.True(t, hasProcess)
 		require.Equal(t, maxProcess, 1.0)
+	})
+
+	t.Run("test context cancel", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		_, err := ssaapi.ParseProject(
+			ssaapi.WithFileSystem(vf),
+			ssaapi.WithRawLanguage("java"),
+			ssaapi.WithPeepholeSize(1),
+			ssaapi.WithContext(ctx),
+			ssaapi.WithProcess(func(msg string, process float64) {
+				log.Infof("%f : %s", process, msg)
+				if process > 0.3 {
+					cancel()
+				}
+				if process > 0.5 {
+					t.Errorf("should not reach here")
+				}
+			}),
+		)
+		_ = err
+		require.Contains(t, err.Error(), ssaapi.ErrContextCancel.Error())
 	})
 }
