@@ -244,7 +244,12 @@ JSON),
 ) 
 
 // }}
-
+peepholeSize := cli.Int("peepholeSize", 
+    cli.setVerboseName("文件分片大小"),
+    cli.setCliGroup("compile"),
+    cli.setDefault(0),
+    cli.setHelp("0 表示禁用")
+)
 // {{ compile option 
 entry := cli.FileNames("entry", 
     cli.setVerboseName("项目入口文件"),
@@ -303,6 +308,7 @@ opts = [
     ssa.withSaveToProfile(true),
     ssa.withContext(context.Background()),
     ssa.withConfigInfo(info), 
+    ssa.withPeepholeSize(peepholeSize),
 ] 
 if len(entry) != 0{
     opts = append(opts, ssa.withEntryFile(entry...))

@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -39,20 +40,12 @@ func GetSSAProgram(name string) *schema.SSAProgram {
 	return programs[0]
 }
 
-func SaveSSAProgram(name, desc, language, info string) error {
-	db := consts.GetGormProfileDatabase()
-
-	prog := &schema.SSAProgram{
-		Name:          name,
-		Description:   desc,
-		DBPath:        consts.GetSSADataBasePath(),
-		Language:      language,
-		EngineVersion: consts.GetYakVersion(),
-		ConfigInput:   info,
+func SaveSSAProgram(prog *schema.SSAProgram) error {
+	if prog == nil {
+		return utils.Errorf("Save SSAProgram is nil ")
 	}
-
-	Programs.Set(name, prog)
-
+	db := consts.GetGormProfileDatabase()
+	Programs.Set(prog.Name, prog)
 	return db.Model(&schema.SSAProgram{}).Save(prog).Error
 }
 

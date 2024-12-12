@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
@@ -152,13 +151,4 @@ func (c *config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 	}
 	c.LanguageBuilder = LanguageBuilder.Create()
 	return nil
-}
-
-func (c *config) SaveProfile() {
-	if c.toProfile {
-		ssadb.SaveSSAProgram(
-			c.ProgramName, c.ProgramDescription,
-			string(c.language), c.info,
-		)
-	}
 }
