@@ -274,7 +274,7 @@ func init() {
 		registerBuildInPlugin(
 			"yak", "代码扫描默认参数探测",
 			withPluginHelp("代码扫描默认规则探测，根据传入的url来提供代码扫描的默认参数"),
-			withPluginHelp("Q16G"),
+			withPluginAuthors("Q16G"),
 			withPluginEnableGenerateParam(true))
 		return nil
 	})
