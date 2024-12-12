@@ -22,6 +22,11 @@ func (s *Server) DeleteSyntaxFlowRuleGroup(ctx context.Context, req *ypb.DeleteS
 		TableName: "syntax_flow_rule_group",
 		Operation: DbOperationDelete,
 	}
+	if req.GetFilter() == nil {
+		return nil, utils.Errorf("delete syntax flow rule group failed:filter is empty")
+	}
+	// 内置组默认不允许删除
+	req.Filter.IsBuildIn = "false"
 	count, err := yakit.DeleteSyntaxFlowRuleGroup(s.GetProfileDatabase(), req)
 	msg.EffectRows = count
 	return msg, err
