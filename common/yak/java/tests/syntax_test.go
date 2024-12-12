@@ -41,3 +41,13 @@ func TestAllSyntaxForJava_G4(t *testing.T) {
 		validateSource(t, codePath, string(raw))
 	}
 }
+
+func TestCheck1(t *testing.T) {
+	badCode := `package org.apache.avalon.framework.logger;
+
+public interface LogEnabled {
+	public abstract void enableLogging(Logger var1) {	}
+}
+`
+	validateSource(t, "", badCode)
+}

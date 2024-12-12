@@ -1,0 +1,190 @@
+Classfile /Users/v1ll4n/Projects/yaklang/common/javaclassparser/tests/basic1.class
+  Last modified 2024年12月12日; size 1273 bytes
+  SHA-256 checksum b1983f2a609bedf7c1d6f985536d7858a3aebd31514f5127ea8c04d886d653d6
+  Compiled from "SimpleCalculator.java"
+public class SimpleCalculator
+  minor version: 0
+  major version: 55
+  flags: (0x0021) ACC_PUBLIC, ACC_SUPER
+  this_class: #3                          // SimpleCalculator
+  super_class: #13                        // java/lang/Object
+  interfaces: 0, fields: 1, methods: 5, attributes: 3
+Constant pool:
+   #1 = Methodref          #13.#29        // java/lang/Object."<init>":()V
+   #2 = Fieldref           #3.#30         // SimpleCalculator.value:I
+   #3 = Class              #31            // SimpleCalculator
+   #4 = Methodref          #3.#29         // SimpleCalculator."<init>":()V
+   #5 = Fieldref           #32.#33        // java/lang/System.out:Ljava/io/PrintStream;
+   #6 = Methodref          #3.#34         // SimpleCalculator.getValue:()I
+   #7 = InvokeDynamic      #0:#38         // #0:makeConcatWithConstants:(I)Ljava/lang/String;
+   #8 = Methodref          #39.#40        // java/io/PrintStream.println:(Ljava/lang/String;)V
+   #9 = Methodref          #3.#41         // SimpleCalculator.add:(I)I
+  #10 = InvokeDynamic      #1:#38         // #1:makeConcatWithConstants:(I)Ljava/lang/String;
+  #11 = Methodref          #3.#43         // SimpleCalculator.subtract:(I)I
+  #12 = InvokeDynamic      #2:#38         // #2:makeConcatWithConstants:(I)Ljava/lang/String;
+  #13 = Class              #45            // java/lang/Object
+  #14 = Utf8               value
+  #15 = Utf8               I
+  #16 = Utf8               <init>
+  #17 = Utf8               ()V
+  #18 = Utf8               Code
+  #19 = Utf8               LineNumberTable
+  #20 = Utf8               add
+  #21 = Utf8               (I)I
+  #22 = Utf8               subtract
+  #23 = Utf8               getValue
+  #24 = Utf8               ()I
+  #25 = Utf8               main
+  #26 = Utf8               ([Ljava/lang/String;)V
+  #27 = Utf8               SourceFile
+  #28 = Utf8               SimpleCalculator.java
+  #29 = NameAndType        #16:#17        // "<init>":()V
+  #30 = NameAndType        #14:#15        // value:I
+  #31 = Utf8               SimpleCalculator
+  #32 = Class              #46            // java/lang/System
+  #33 = NameAndType        #47:#48        // out:Ljava/io/PrintStream;
+  #34 = NameAndType        #23:#24        // getValue:()I
+  #35 = Utf8               BootstrapMethods
+  #36 = MethodHandle       6:#49          // REF_invokeStatic java/lang/invoke/StringConcatFactory.makeConcatWithConstants:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;
+  #37 = String             #50            // Initial value: \u0001
+  #38 = NameAndType        #51:#52        // makeConcatWithConstants:(I)Ljava/lang/String;
+  #39 = Class              #53            // java/io/PrintStream
+  #40 = NameAndType        #54:#55        // println:(Ljava/lang/String;)V
+  #41 = NameAndType        #20:#21        // add:(I)I
+  #42 = String             #56            // After adding 5: \u0001
+  #43 = NameAndType        #22:#21        // subtract:(I)I
+  #44 = String             #57            // After subtracting 2: \u0001
+  #45 = Utf8               java/lang/Object
+  #46 = Utf8               java/lang/System
+  #47 = Utf8               out
+  #48 = Utf8               Ljava/io/PrintStream;
+  #49 = Methodref          #58.#59        // java/lang/invoke/StringConcatFactory.makeConcatWithConstants:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;
+  #50 = Utf8               Initial value: \u0001
+  #51 = Utf8               makeConcatWithConstants
+  #52 = Utf8               (I)Ljava/lang/String;
+  #53 = Utf8               java/io/PrintStream
+  #54 = Utf8               println
+  #55 = Utf8               (Ljava/lang/String;)V
+  #56 = Utf8               After adding 5: \u0001
+  #57 = Utf8               After subtracting 2: \u0001
+  #58 = Class              #60            // java/lang/invoke/StringConcatFactory
+  #59 = NameAndType        #51:#64        // makeConcatWithConstants:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;
+  #60 = Utf8               java/lang/invoke/StringConcatFactory
+  #61 = Class              #66            // java/lang/invoke/MethodHandles$Lookup
+  #62 = Utf8               Lookup
+  #63 = Utf8               InnerClasses
+  #64 = Utf8               (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;
+  #65 = Class              #67            // java/lang/invoke/MethodHandles
+  #66 = Utf8               java/lang/invoke/MethodHandles$Lookup
+  #67 = Utf8               java/lang/invoke/MethodHandles
+{
+  public SimpleCalculator();
+    descriptor: ()V
+    flags: (0x0001) ACC_PUBLIC
+    Code:
+      stack=2, locals=1, args_size=1
+         0: aload_0
+         1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+         4: aload_0
+         5: iconst_0
+         6: putfield      #2                  // Field value:I
+         9: return
+      LineNumberTable:
+        line 5: 0
+        line 6: 4
+        line 7: 9
+
+  public int add(int);
+    descriptor: (I)I
+    flags: (0x0001) ACC_PUBLIC
+    Code:
+      stack=3, locals=2, args_size=2
+         0: aload_0
+         1: dup
+         2: getfield      #2                  // Field value:I
+         5: iload_1
+         6: iadd
+         7: putfield      #2                  // Field value:I
+        10: aload_0
+        11: getfield      #2                  // Field value:I
+        14: ireturn
+      LineNumberTable:
+        line 10: 0
+        line 11: 10
+
+  public int subtract(int);
+    descriptor: (I)I
+    flags: (0x0001) ACC_PUBLIC
+    Code:
+      stack=3, locals=2, args_size=2
+         0: aload_0
+         1: dup
+         2: getfield      #2                  // Field value:I
+         5: iload_1
+         6: isub
+         7: putfield      #2                  // Field value:I
+        10: aload_0
+        11: getfield      #2                  // Field value:I
+        14: ireturn
+      LineNumberTable:
+        line 15: 0
+        line 16: 10
+
+  public int getValue();
+    descriptor: ()I
+    flags: (0x0001) ACC_PUBLIC
+    Code:
+      stack=1, locals=1, args_size=1
+         0: aload_0
+         1: getfield      #2                  // Field value:I
+         4: ireturn
+      LineNumberTable:
+        line 20: 0
+
+  public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: (0x0009) ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=3, locals=2, args_size=1
+         0: new           #3                  // class SimpleCalculator
+         3: dup
+         4: invokespecial #4                  // Method "<init>":()V
+         7: astore_1
+         8: getstatic     #5                  // Field java/lang/System.out:Ljava/io/PrintStream;
+        11: aload_1
+        12: invokevirtual #6                  // Method getValue:()I
+        15: invokedynamic #7,  0              // InvokeDynamic #0:makeConcatWithConstants:(I)Ljava/lang/String;
+        20: invokevirtual #8                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+        23: getstatic     #5                  // Field java/lang/System.out:Ljava/io/PrintStream;
+        26: aload_1
+        27: iconst_5
+        28: invokevirtual #9                  // Method add:(I)I
+        31: invokedynamic #10,  0             // InvokeDynamic #1:makeConcatWithConstants:(I)Ljava/lang/String;
+        36: invokevirtual #8                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+        39: getstatic     #5                  // Field java/lang/System.out:Ljava/io/PrintStream;
+        42: aload_1
+        43: iconst_2
+        44: invokevirtual #11                 // Method subtract:(I)I
+        47: invokedynamic #12,  0             // InvokeDynamic #2:makeConcatWithConstants:(I)Ljava/lang/String;
+        52: invokevirtual #8                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+        55: return
+      LineNumberTable:
+        line 24: 0
+        line 25: 8
+        line 26: 23
+        line 27: 39
+        line 28: 55
+}
+SourceFile: "SimpleCalculator.java"
+InnerClasses:
+  public static final #62= #61 of #65;    // Lookup=class java/lang/invoke/MethodHandles$Lookup of class java/lang/invoke/MethodHandles
+BootstrapMethods:
+  0: #36 REF_invokeStatic java/lang/invoke/StringConcatFactory.makeConcatWithConstants:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #37 Initial value: \u0001
+  1: #36 REF_invokeStatic java/lang/invoke/StringConcatFactory.makeConcatWithConstants:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #42 After adding 5: \u0001
+  2: #36 REF_invokeStatic java/lang/invoke/StringConcatFactory.makeConcatWithConstants:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #44 After subtracting 2: \u0001
