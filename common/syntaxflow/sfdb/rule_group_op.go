@@ -256,12 +256,8 @@ func RenameGroup(db *gorm.DB, oldName, newName string) error {
 		return utils.Errorf("rename group failed: new group name %s already exist.", newName)
 	}
 
-	updatedGroup, err := QueryGroupByName(db, oldName)
+	err = db.Where("group_name = ?", oldName).Update("group_name", newName).Error
 	if err != nil {
-		return utils.Errorf("rename group failed: %s", err)
-	}
-	updatedGroup.GroupName = newName
-	if err = db.Update(updatedGroup).Error; err != nil {
 		return utils.Errorf("rename group failed: %s", err)
 	}
 	return nil
