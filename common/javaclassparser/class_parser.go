@@ -45,7 +45,7 @@ func (this *ClassParser) Parse() (*ClassObject, error) {
 	err = this.readAndCheckVersion()
 	err = this.readConstantPool()
 	this.classObj.AccessFlags = this.reader.readUint16()
-	this.classObj.AccessFlagsVerbose = getAccessFlagsVerbose(this.classObj.AccessFlags)
+	this.classObj.AccessFlagsVerbose = getClassAccessFlagsVerbose(this.classObj.AccessFlags)
 	this.classObj.ThisClass = this.reader.readUint16()
 	this.classObj.SuperClass = this.reader.readUint16()
 	this.classObj.Interfaces = this.reader.readUint16s()

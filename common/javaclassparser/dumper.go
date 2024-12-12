@@ -187,7 +187,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 	result := []string{}
 	for _, field := range c.obj.Fields {
-		accessFlagsVerbose := getAccessFlagsVerbose(field.AccessFlags)
+		accessFlagsVerbose := getFieldAccessFlagsVerbose(field.AccessFlags)
 		//if len(accessFlagsVerbose) < 1 {
 		//	return nil, utils.Error("fields accessFlagsVerbose is empty")
 		//}
@@ -334,7 +334,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	}
 
 	c.FuncCtx.IsStatic = method.AccessFlags&StaticFlag == StaticFlag
-	accessFlagsVerbose := getAccessFlagsVerbose(method.AccessFlags)
+		accessFlagsVerbose := getMethodAccessFlagsVerbose(method.AccessFlags)
 	//if len(accessFlagsVerbose) < 1 {
 	//	return nil, utils.Error("method accessFlagsVerbose is empty")
 	//}
