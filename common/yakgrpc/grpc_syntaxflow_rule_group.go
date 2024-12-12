@@ -54,13 +54,16 @@ func (s *Server) UpdateSyntaxFlowRuleAndGroup(ctx context.Context, req *ypb.Upda
 	if req.GetFilter() == nil {
 		return nil, utils.Errorf("update syntax flow rule group failed:filter is empty")
 	}
+	var (
+		errs  error
+		count int64
+	)
 	db := s.GetProfileDatabase()
-
-	var errs error
 	msg := &ypb.DbOperateMessage{
 		TableName: "syntax_flow_rule_group",
 		Operation: DbOperationUpdate,
 	}
+
 	rules, err := yakit.QuerySyntaxFlowRuleNames(db, req.GetFilter())
 	if err != nil {
 		return nil, err
@@ -68,15 +71,20 @@ func (s *Server) UpdateSyntaxFlowRuleAndGroup(ctx context.Context, req *ypb.Upda
 	if len(rules) == 0 {
 		return nil, utils.Errorf("update syntax flow rule group failed:rule name is empty")
 	}
-	count, err := sfdb.BatchAddGroupsForRules(db, rules, req.GetAddGroups())
-	msg.EffectRows += count
-	if err != nil {
-		errs = utils.JoinErrors(errs, err)
+
+	if req.GetAddGroups() != nil {
+		count, err = sfdb.BatchAddGroupsForRules(db, rules, req.GetAddGroups())
+		msg.EffectRows += count
+		if err != nil {
+			errs = utils.JoinErrors(errs, err)
+		}
 	}
-	count, err = sfdb.BatchRemoveGroupsForRules(db, rules, req.GetRemoveGroups())
-	msg.EffectRows += count
-	if err != nil {
-		errs = utils.JoinErrors(errs, err)
+	if req.GetRemoveGroups() != nil {
+		count, err = sfdb.BatchRemoveGroupsForRules(db, rules, req.GetRemoveGroups())
+		msg.EffectRows += count
+		if err != nil {
+			errs = utils.JoinErrors(errs, err)
+		}
 	}
 	return msg, errs
 }

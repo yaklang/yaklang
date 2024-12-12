@@ -434,6 +434,14 @@ func QueryRuleByName(db *gorm.DB, ruleName string) (*schema.SyntaxFlowRule, erro
 	return &rule, nil
 }
 
+func QueryRulesByName(db *gorm.DB, ruleNames []string) ([]*schema.SyntaxFlowRule, error) {
+	var rules []*schema.SyntaxFlowRule
+	if err := db.Preload("Groups").Where("rule_name IN (?)", ruleNames).Find(&rules).Error; err != nil {
+		return nil, err
+	}
+	return rules, nil
+}
+
 func UpdateRule(rule *schema.SyntaxFlowRule) error {
 	if rule == nil {
 		return utils.Errorf("update syntaxFlow rule failed: rule is nil")
