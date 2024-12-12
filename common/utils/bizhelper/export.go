@@ -121,11 +121,6 @@ func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 	for _, option := range options {
 		option(config)
 	}
-	fp := config.FilePath
-	if config.IsEncrypted && !strings.HasSuffix(fp, ".enc") {
-		return utils.Error("file is encrypted but not end with .enc")
-	}
-
 	f, err := os.OpenFile(config.FilePath, os.O_RDONLY, 0644)
 	if err != nil {
 		return err
