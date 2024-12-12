@@ -4,14 +4,13 @@ target = cli.String("target", cli.setRequired(true))
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
 timeout = cli.Int("timeout", cli.setDefault(5))
 cli.check()
-target = str.TrimSpace(target.Lower())
 origin = target
 proxy = str.TrimSpace(proxy.Lower())
-javaDir = ["webapp","resources","root"]
+javaDir = ["webapp","resources","web-inf","meta-inf","classes"]
 jsDir = ["node_modules"]
 jsFiles = ["package-lock.json","package.json","yarn.lock"]
-phpFiles = ["index.php","composer.json","composer.lock"]
-javaFiles = ["web.xml","pom.xml","application.properties"]
+phpFiles = ["index.php","composer.json","composer.lock","wp-config.php","config.php"]
+javaFiles = ["web.xml","pom.xml","application.properties","struts.xml","application.yml","log4j2.xml","log4j.properties","shiro.ini"]
 var countMap = map[string]int{
     ssa.PHP: 1,
     ssa.Javascript:1,
@@ -106,9 +105,9 @@ func getZipinfo(basePath){
 }
 func generateFileName(kind,filename){
     //转换为合格的file格式
-    filename = filename+"_"+time.Now().Format("2006_01_02_15_04_05")
-    filename = re2.ReplaceAll(filename, '[/\\?%*.:-|"<>]', "_")
-    return sprintf("%s_%s", kind,filename)
+    filename2 = filename+"_"+time.Now().Format("2006_01_02_15_04_05")
+    filename2 = re2.ReplaceAll(filename2, `[\\/:*?"<>|]`, "_")
+    return sprintf("%s_%s", kind,filename2)
 }
 if target.HasPrefix("git://"){
     gitUrl = target[6:]
@@ -143,7 +142,7 @@ if target.HasPrefix("http://") ||target.HasPrefix("https://"){
                 params.language = ssa.Java
                 params.program_name = generateFileName("jar",httpUrl)
             default:
-                if detectiveType(res.GetBody()[:4]){
+                if res.GetBody()!=nil && len(res.GetBody())>=4&&detectiveType(res.GetBody()[:4]){
                     params.json_schema.kind = "compress"
                     params.json_schema.url = target
                     params.program_name = generateFileName("compress", httpUrl)
@@ -154,7 +153,11 @@ if target.HasPrefix("http://") ||target.HasPrefix("https://"){
         }
     }else{
         switch{
-            case string(rsp.GetBody()[:4096]).Contains("git-upload-pack"),str.MatchAllOfGlob(rsp.GetContentType(), "application/x-*-advertisement") :
+            case rsp.GetBody()!=nil&&string(rsp.GetBody()).Contains("git-upload-pack"):
+                params.json_schema.kind = "git"
+                params.json_schema.url = target
+                params.program_name = generateFileName("git",httpUrl)
+            case str.MatchAllOfGlob(rsp.GetContentType(), "application/x-*-advertisement"):
                 params.json_schema.kind = "git"
                 params.json_schema.url = target
                 params.program_name = generateFileName("git",httpUrl)
@@ -173,7 +176,7 @@ if target.HasPrefix("file://") {
                 params.json_schema.local_file = localFile
                 params.json_schema.url = target
                 params.language = "java"
-                params.program_name = generateFileName("compress", localFile)
+                params.program_name = generateFileName("jar", localFile)
             case ".zip":
                 params.json_schema.kind = "compress"
                 params.json_schema.local_file = localFile
@@ -182,6 +185,7 @@ if target.HasPrefix("file://") {
                 getZipinfo(localFile)
             default:
                 if file.IsDir(localFile){
+                    params.json_schema.kind = "local"
                     filesys.Recursive(localFile, filesys.onDirStat(func(path,info){
                         if params.language == ""{
                             switch{
@@ -194,7 +198,6 @@ if target.HasPrefix("file://") {
                     }),filesys.onFileStat(func(path,info){
                         params.file_count++
                         ext = file.GetExt(path).Lower().TrimLeft(".")
-                        log.info("ext: %s", ext)
                         countinfo = countMap[ext]
                         if countinfo!=nil{
                         countMap[ext] = countinfo+1
@@ -210,13 +213,18 @@ if target.HasPrefix("file://") {
                             }
                         }
                     }))
+                    params.json_schema.local_file = localFile
                 }else{
                     newFileTypeException(sprint("file exits,but only support jar、war、zip compress"))
                 }
+                params.program_name = generateFileName("local", localFile)
         }
     }else{
         newFileNotFoundExcption(sprintf("not found this file in local,check path: %s", localFile))
     }
+}
+if params.program_name==""{
+    params.program_name = generateFileName("unknown",target)
 }
  if params.language==""{
     AutoParseLanguage()
