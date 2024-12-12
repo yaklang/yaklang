@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io/ioutil"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 var ValueTypeError = utils.Error("error value type")
@@ -175,33 +177,7 @@ func bytes2bcel(data []byte) (string, error) {
 	}
 	return "$$BCEL$$" + buf.String(), nil
 }
-func getAccessFlagsVerbose(u uint16) []string {
-	result := []string{}
-	maskMap := map[uint16]string{
-		0x0001: "public",
-		0x0002: "private",
-		0x0004: "protected",
-		0x0008: "static",
-		0x0010: "final",
-		//0x0020: "super",
-		0x0040: "volatile",
-		0x0080: "transient",
-		0x0100: "native",
-		0x0200: "interface",
-		0x0400: "abstract",
-		0x1000: "synthetic",
-		0x2000: "annotation",
-		0x4000: "enum",
-	}
-	keys := []uint16{0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0040, 0x0080, 0x0100, 0x0200, 0x0400, 0x1000, 0x2000, 0x4000}
-	for _, mask := range keys {
-		if u&mask == mask {
-			result = append(result, maskMap[mask])
-		}
-	}
-	return result
 
-}
 func ParseAnnotationElementValue(cp *ClassParser) *ElementValuePairAttribute {
 	getUtf8 := func(index uint16) string {
 		s, err := cp.classObj.getUtf8(index)
