@@ -81,6 +81,7 @@ func (c *config) peephole() (Programs, error) {
 
 	filesys.Peephole(originFs,
 		filesys.WithPeepholeSize(c.peepholeSize),
+		filesys.WithPeepholeContext(c.ctx),
 		filesys.WithPeepholeCallback(func(count, totalCount int, system filesys_interface.FileSystem) {
 			totalCount = totalCount + 1
 			baseProcess := float64(count-1) / float64(totalCount)
