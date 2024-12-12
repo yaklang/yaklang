@@ -224,9 +224,14 @@ func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "fuzz:username",
 		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
-			origin, level := sepToEnd(s, "|")
-			levelInt := atoi(level)
-			fuzzuserWithCallback(origin, levelInt, func(s string) bool {
+			origin, levelString := sepToEnd(s, "|")
+			level := 1
+			if levelInt, err := strconv.Atoi(levelString); err != nil {
+				origin = s
+			} else {
+				level = levelInt
+			}
+			fuzzuserWithCallback(origin, level, func(s string) bool {
 				err := tryYield(ctx, yield, s)
 				return err != nil
 			})
@@ -235,15 +240,20 @@ func init() {
 		Alias:               []string{"fuzz:user"},
 		Description:         "根据给定的用户名列表生成更多用于模糊测试的用户名",
 		TagNameVerbose:      "模糊测试用户名",
-		ArgumentDescription: "{{list(string_split(admin:用户名))}}{{optional(enum({{number(1:1级)}}{{number(1:2级)}}{{number(1:3级)}}:1:等级))}}",
+		ArgumentDescription: "{{list(string_split(admin:用户名))}}{{optional(enum({{number(1:1级)}}{{number(2:2级)}}{{number(3:3级)}}:1:等级))}}",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "fuzz:password",
 		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
-			origin, level := sepToEnd(s, "|")
-			levelInt := atoi(level)
-			fuzzpassWithCallback(origin, levelInt, func(s string) bool {
+			origin, levelString := sepToEnd(s, "|")
+			level := 1
+			if levelInt, err := strconv.Atoi(levelString); err != nil {
+				origin = s
+			} else {
+				level = levelInt
+			}
+			fuzzpassWithCallback(origin, level, func(s string) bool {
 				err := tryYield(ctx, yield, s)
 				return err != nil
 			})
@@ -252,7 +262,7 @@ func init() {
 		Alias:               []string{"fuzz:pass"},
 		Description:         "根据给定的密码列表生成更多用于模糊测试的密码",
 		TagNameVerbose:      "模糊测试密码",
-		ArgumentDescription: "{{list(string_split(admin:密码))}}{{optional(enum({{number(1:1级)}}{{number(1:2级)}}{{number(1:3级)}}:1:等级))}}",
+		ArgumentDescription: "{{list(string_split(password:密码))}}{{optional(enum({{number(1:1级)}}{{number(2:2级)}}{{number(3:3级)}}:1:等级))}}",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
@@ -669,7 +679,7 @@ func init() {
 			}
 			return tryYield(ctx, yield, s)
 		},
-		Description:         "重复一个字符串，并把重复步骤全都输出出来，例如：`{{repeat(abc|3)}}`，结果为：['' abc abcabc abcabcabc]",
+		Description:         "重复一个字符串，并把重复步骤全都输出出来，例如：`{{repeat:range(abc|3)}}`，结果为：[abc abcabc abcabcabc]",
 		TagNameVerbose:      "重复生成字符串列表",
 		ArgumentDescription: "{{string_split(abc:字符串)}}{{number(3:重复次数)}}",
 	})
@@ -1029,7 +1039,7 @@ func init() {
 			return nil
 		},
 		Alias:               []string{"range:char", "range"},
-		Description:         "按顺序生成一个 range 字符集，例如 `{{rangechar(20,7e)}}` 生成 0x20 - 0x7e 的字符集",
+		Description:         "按顺序生成一个 range 字符集，例如 `{{rangechar(20,7e)}}` 生成 0x20 - 0x7e 的字符集，默认最大值是 0xff",
 		TagNameVerbose:      "生成字符集",
 		ArgumentDescription: "{{number(20:开始字符)}}{{optional(number(7e:结束字符,默认值ff))}}",
 	})
@@ -1042,9 +1052,9 @@ func init() {
 			return nil
 		},
 		Alias:               []string{"host", "hosts", "cidr", "ip", "net"},
-		Description:         "生成一个网络地址，例如 `{{network(192.168.1.1/24)}}` 对应 cidr 192.168.1.1/24 所有地址，可以逗号分隔，例如 `{{network(8.8.8.8,192.168.1.1/25,example.com)}}`",
+		Description:         "生成一个网络地址，例如 `{{network(192.168.1.1/24)}}` 对应 cidr 192.168.1.1/24 所有地址，可以通过逗号传入多个，例如 `{{network(8.8.8.8,192.168.1.1/25,example.com)}}`",
 		TagNameVerbose:      "生成网络地址",
-		ArgumentDescription: "{{string(192.168.1.1/24:网络地址,可以用ip段表示也可以用逗号分割)}}",
+		ArgumentDescription: "{{list(string(192.168.1.1/24:网络地址,可使用ip段和CIDR无类别域间路由))}}",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "int",
@@ -1209,7 +1219,7 @@ func init() {
 		Alias:               []string{"ri", "rand:int", "randi"},
 		Description:         "随机生成整数，定义为 {{randint(10)}} 生成0-10中任意一个随机数，{{randint(1,50)}} 生成 1-50 任意一个随机数，{{randint(1,50,10)}} 生成 1-50 任意一个随机数，重复 10 次，{{randint(1,50,10|-4)}} 生成 1-50 任意一个随机数，重复 10 次，对于长度不足4的随机数在右侧进行填充",
 		TagNameVerbose:      "随机生成整数",
-		ArgumentDescription: "{{number_dot(1:随机数最小长度)}}{{number_dot(50:随机数最大长度)}}{{optional(number_split(4:重复次数))}}{{optional(number(4:填充长度，如果是负数，则从右侧填充))}}",
+		ArgumentDescription: "{{number_dot(1:随机数最下限<单独存在的时候表达随机数的上限[下限是0]>)}}{{optional(number_dot(50:随机数的上限))}}{{optional(number_split(4:重复次数))}}{{optional(number(4:填充长度，如果是负数，则从右侧填充))}}",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "randstr",
@@ -1295,7 +1305,7 @@ func init() {
 		Alias:               []string{"rand:str", "rs", "rands"},
 		Description:         "随机生成个字符串，定义为 {{randstr(10)}} 生成长度为 10 的随机字符串，{{randstr(1,30)}} 生成长度为 1-30 为随机字符串，{{randstr(1,30,10)}} 生成 10 个随机字符串，长度为 1-30",
 		TagNameVerbose:      "随机生成字符串",
-		ArgumentDescription: "{{number(10:最小长度)}}{{optional(number(20:最大长度))}}{{optional(number(2:数量))}}",
+		ArgumentDescription: "{{number(10:最小长度<单独存在的时候指定随机字符的长度>)}}{{optional(number(20:最大长度))}}{{optional(number(2:数量))}}",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
@@ -1612,7 +1622,7 @@ func init() {
 		Alias:               []string{"repeat:str"},
 		Description:         "重复字符串，`{{repeatstr(abc|3)}}` => abcabcabc",
 		TagNameVerbose:      "重复字符串",
-		ArgumentDescription: "{{string(abc:字符串)}}{{number(3:重复次数)}}",
+		ArgumentDescription: "{{string_split(abc:字符串)}}{{number(3:重复次数)}}",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
@@ -1734,7 +1744,7 @@ func init() {
 			return []*fuzztag.FuzzExecResult{fuzztag.NewFuzzExecResult([]byte(s), []string{s})}
 		},
 		TagNameVerbose:      "生成所有 DNSLog payload",
-		ArgumentDescription: "{{string(xxx.dnslog.cn:Dnslog域名)}}{{string(flag:前缀)}}",
+		ArgumentDescription: "{{string_split(xxx.dnslog.cn:Dnslog域名)}}{{string(flag:前缀)}}",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "yso:urldns",
@@ -1842,7 +1852,7 @@ func init() {
 		},
 		Description:         "生成多条可以header回显的payload进行爆破，注意：此标签需要设置 headerauth 标签",
 		TagNameVerbose:      "爆破header回显链",
-		ArgumentDescription: "{{string(key:header头的key)}}{{string(value:header头的value)}}",
+		ArgumentDescription: "{{string_split(key:header头的key)}}{{string(value:header头的value)}}",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName:     "yso:bodyexec",
@@ -1963,7 +1973,7 @@ func CodecTag() []*FuzzTagDescription {
 			},
 			Description:         "调用 Yakit Codec 插件",
 			TagNameVerbose:      "调用Codec插件",
-			ArgumentDescription: "{{string(name:插件名)}}{{string(params:参数)}}",
+			ArgumentDescription: "{{string_split(name:插件名)}}{{string(params:参数)}}",
 		},
 		{
 			TagName: "codec:line",
@@ -1992,7 +2002,7 @@ func CodecTag() []*FuzzTagDescription {
 			},
 			Description:         "调用 Yakit Codec 插件，把结果解析成行",
 			TagNameVerbose:      "调用Codec插件，结果按行解析",
-			ArgumentDescription: "{{string(name:插件名)}}{{string(params:参数)}}",
+			ArgumentDescription: "{{string_split(name:插件名)}}{{string(params:参数)}}",
 		},
 	}
 }
