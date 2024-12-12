@@ -68,7 +68,7 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 		db = db.Where("id > ?", params.GetAfterId())
 	}
 	if params.GetBeforeId() > 0 {
-		db = db.Where("id <= ?", params.GetBeforeId())
+		db = db.Where("id < ?", params.GetBeforeId())
 	}
 	return db
 }

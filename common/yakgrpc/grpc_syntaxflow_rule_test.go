@@ -218,7 +218,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, len(ids), 100)
 		rules, err := queryRulesById(client, ids[20], ids[60])
-		require.Equal(t, len(rules), 40)
+		require.Equal(t, len(rules), 39)
 		err = deleteRuleByNames(client, ruleNames)
 		require.NoError(t, err)
 	})
