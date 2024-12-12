@@ -244,13 +244,13 @@ func init() {
 			pprof.WriteHeapProfile(buf)
 			stats, err := AutoAnalyzeRaw(buf)
 			if err != nil {
-				log.Errorf("内存分析失败: %v", err)
+				log.Debugf("memory analyze failed, reason: %v", err)
 				continue
 			}
 
 			metrics, err := metricsForMem()
 			if err != nil {
-				log.Errorf("获取内存指标失败: %v", err)
+				log.Debugf("memory metrics generating failed, reason: %v", err)
 				continue
 			}
 
