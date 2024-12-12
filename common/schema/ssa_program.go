@@ -16,5 +16,6 @@ type SSAProgram struct {
 	EngineVersion string `json:"engine_version" gorm:"type:varchar(255)"`
 
 	// compile argument
-	ConfigInput string `json:"config_input" gorm:"type:text"`
+	ConfigInput  string `json:"config_input" gorm:"type:text"`
+	PeepholeSize int    `json:"peephole_size"`
 }
