@@ -68,6 +68,33 @@ func CreateGroup(db *gorm.DB, groupName string, isBuildIn ...bool) (*schema.Synt
 	return i, nil
 }
 
+// SaveGroup 保存SyntaxFlow规则组
+// 如果组不存在，则创建；如果存在，则更新。
+func SaveGroup(db *gorm.DB, groupName string, isBuildIn ...bool) (*schema.SyntaxFlowGroup, error) {
+	buildIn := false
+	if len(isBuildIn) > 0 {
+		buildIn = isBuildIn[0]
+	}
+	db = db.Model(&schema.SyntaxFlowGroup{})
+	i := &schema.SyntaxFlowGroup{
+		GroupName: groupName,
+		IsBuildIn: buildIn,
+	}
+
+	queryGroup := schema.SyntaxFlowGroup{}
+	err := db.Where("group_name = ?", groupName).First(&queryGroup).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, utils.Errorf("save group failed: %s", err)
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+		return CreateGroup(db, groupName, buildIn)
+	}
+	queryGroup.IsBuildIn = buildIn
+	if db = db.Update(&queryGroup); db.Error != nil {
+		return nil, db.Error
+	}
+	return i, nil
+}
+
 func GetOrCreatGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGroup {
 	var groups []*schema.SyntaxFlowGroup
 	for _, groupName := range groupNames {
@@ -144,7 +171,14 @@ func AddDefaultGroupForRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
 	groups = append(groups, string(rule.Severity))
 	groups = append(groups, string(rule.Purpose))
 	groups = lo.Filter(groups, func(item string, _ int) bool {
-		return isDefaultGroup(item) && item != ""
+		if isBuildInGroup(item) && item != "" {
+			_, err := SaveGroup(db, item, true)
+			if err != nil {
+				return false
+			}
+			return true
+		}
+		return false
 	})
 	_, err := BatchAddGroupsForRules(db, []string{rule.RuleName}, groups)
 	return err
@@ -263,7 +297,7 @@ func RenameGroup(db *gorm.DB, oldName, newName string) error {
 	return nil
 }
 
-func isDefaultGroup(groupName string) bool {
+func isBuildInGroup(groupName string) bool {
 	_, ok := buildInGroupsMap[groupName]
 	return ok
 }
