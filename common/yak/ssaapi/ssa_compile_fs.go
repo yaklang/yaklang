@@ -82,7 +82,7 @@ func (c *config) parseProjectWithFS(
 		return nil, ErrNoFoundCompiledFile
 	}
 	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerSize, parseSize)
-	totalProcess = parseSize + preHandlerSize + 1
+	totalProcess = parseSize + preHandlerSize
 
 	// pre handler
 	prog.SetPreHandler(true)
@@ -176,8 +176,5 @@ func (c *config) parseProjectWithFS(
 	handledProcess = preHandlerSize + parseSize
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, prog.Cache.CountInstruction()) // %99
 	prog.Finish()
-	c.SaveProfile()
-	handledProcess = preHandlerSize + parseSize + 1
-	prog.ProcessInfof("program %s finish", prog.Name) // %100
 	return NewProgram(prog, c), nil
 }

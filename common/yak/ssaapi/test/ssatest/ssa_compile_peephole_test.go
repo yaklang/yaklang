@@ -116,6 +116,38 @@ $para #-> * as $target
 	})
 
 	t.Run("test compile process", func(t *testing.T) {
+		maxProcess := 0.0
+		reduce := false
+		greaterThanOne := false
+		hasProcess := false
 
+		_, err := ssaapi.ParseProject(
+			ssaapi.WithFileSystem(vf),
+			ssaapi.WithRawLanguage("java"),
+			ssaapi.WithPeepholeSize(1),
+			ssaapi.WithProcess(func(msg string, process float64) {
+				log.Infof("%f : %s", process, msg)
+				if 0 < process && process < 1 {
+					hasProcess = true
+				}
+				if process > 1 {
+					greaterThanOne = true
+				}
+
+				if maxProcess < process {
+					maxProcess = process
+				}
+
+				if process < maxProcess {
+					t.Logf("process reduce ")
+					reduce = true
+				}
+			}),
+		)
+		require.NoError(t, err)
+		require.False(t, reduce)
+		require.False(t, greaterThanOne)
+		require.True(t, hasProcess)
+		require.Equal(t, maxProcess, 1.0)
 	})
 }

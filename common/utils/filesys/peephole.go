@@ -12,7 +12,7 @@ type PeepholeConfig struct {
 	// peephole handler
 	Size int
 
-	Callback         func(f fi.FileSystem)
+	Callback         func(count, total int, f fi.FileSystem)
 	fileContentCache *utils.SafeMap[[]byte]
 }
 
@@ -33,7 +33,7 @@ func WithPeepholeSize(i int) PeepholeConfigOption {
 	}
 }
 
-func WithPeepholeCallback(i func(system fi.FileSystem)) PeepholeConfigOption {
+func WithPeepholeCallback(i func(int, int, fi.FileSystem)) PeepholeConfigOption {
 	return func(config *PeepholeConfig) error {
 		config.Callback = i
 		return nil
@@ -57,25 +57,25 @@ func defaultPeepholeConfig(opts ...PeepholeConfigOption) (*PeepholeConfig, error
 	return config, nil
 }
 
-func (c *PeepholeConfig) CallbackFS(f fi.FileSystem, trigger *PeepholeTrigger) {
+func (c *PeepholeConfig) CallbackFS(f fi.FileSystem, triggers *utils.SafeMap[*PeepholeTrigger]) {
 	if c == nil || c.Callback == nil {
 		return
 	}
+
 	// calculate step
-	step := len(trigger.Infos)
-	if c.Size != 0 {
-		step = c.Size
-	}
+	step := c.Size
 
-	// foreach trigger.Infos with size as step
-	for i := 0; i < len(trigger.Infos); i += step {
-		end := i + step
-		if end > len(trigger.Infos) {
-			end = len(trigger.Infos)
+	totalCount := 0
+	triggers.ForEach(func(key string, trigger *PeepholeTrigger) bool {
+		for i := 0; i < len(trigger.Infos); i += step {
+			totalCount++
 		}
-		infos := trigger.Infos[i:end]
-		path := trigger.Path
+		return true
+	})
 
+	count := 0
+	createFS := func(path string, infos []fs.FileInfo) {
+		count++
 		// create virtual fs
 		vfs := NewVirtualFs()
 		for _, i := range infos {
@@ -93,8 +93,25 @@ func (c *PeepholeConfig) CallbackFS(f fi.FileSystem, trigger *PeepholeTrigger) {
 			}
 			vfs.AddFile(name, string(raw))
 		}
-		c.Callback(vfs)
+		c.Callback(count, totalCount, vfs)
 	}
+
+	triggers.ForEach(func(key string, trigger *PeepholeTrigger) bool {
+
+		// foreach trigger.Infos with size as step
+		for i := 0; i < len(trigger.Infos); i += step {
+			end := i + step
+			if end > len(trigger.Infos) {
+				end = len(trigger.Infos)
+			}
+			infos := trigger.Infos[i:end]
+			path := trigger.Path
+
+			createFS(path, infos)
+		}
+		return true
+	})
+
 }
 
 func Peephole(f fi.FileSystem, opts ...PeepholeConfigOption) error {
@@ -137,10 +154,10 @@ func Peephole(f fi.FileSystem, opts ...PeepholeConfigOption) error {
 		}),
 	)
 
-	triggerCache.ForEach(func(key string, trigger *PeepholeTrigger) bool {
-		c.CallbackFS(f, trigger)
-		return true
-	})
+	// triggerCache.ForEach(func(key string, trigger *PeepholeTrigger) bool {
+	c.CallbackFS(f, triggerCache)
+	// 	return true
+	// })
 
 	return recursiveErr
 }
