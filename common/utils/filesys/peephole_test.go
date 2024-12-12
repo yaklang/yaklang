@@ -49,7 +49,7 @@ func TestPeephole(t *testing.T) {
 		count := 0
 		filesys.Peephole(vfs,
 			filesys.WithPeepholeSize(3),
-			filesys.WithPeepholeCallback(func(system fi.FileSystem) {
+			filesys.WithPeepholeCallback(func(c, c2 int, system fi.FileSystem) {
 				count++
 				checkFilesystem(t, system)
 			}),
