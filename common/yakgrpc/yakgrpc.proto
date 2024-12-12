@@ -5592,9 +5592,6 @@ message SyntaxFlowRuleFilter {
   int64 BeforeId = 12;
 }
 
-message QuerySyntaxFlowRuleIntersectionGroupsResult{
-  repeated SyntaxFlowGroup Groups = 1 ;
-}
 
 message SSAProgram{
   // basic info

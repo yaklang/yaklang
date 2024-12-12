@@ -224,8 +224,6 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		groupName2 := uuid.NewString()
 		sfdb.CreateGroup(db, groupName2, false)
 		t.Cleanup(func() {
-			err = sfdb.DeleteGroup(db, groupName1)
-			require.NoError(t, err)
 			err = sfdb.DeleteGroup(db, groupName2)
 			require.NoError(t, err)
 		})
@@ -239,6 +237,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, len(group.Group))
 		require.True(t, group.Group[0].IsBuildIn)
+
+		count, err := deleteRuleGroup(client, []string{groupName1, groupName2})
+		require.Equal(t, int64(1), count)
 	})
 }
 
