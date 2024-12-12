@@ -60,7 +60,7 @@ func (s *Server) ExportMITMRuleExtractedData(req *ypb.ExportMITMRuleExtractedDat
 	} else if !path.IsAbs(exportPath) {
 		exportPath = filepath.Join(consts.GetDefaultYakitBaseTempDir(), exportPath)
 	}
-	if filepath.Ext(exportPath) != "csv" {
+	if filepath.Ext(exportPath) != ".csv" {
 		exportPath = exportPath + ".csv"
 	}
 
