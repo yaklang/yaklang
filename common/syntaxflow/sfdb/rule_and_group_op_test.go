@@ -10,6 +10,16 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
+func AddGroupForRule(db *gorm.DB, ruleName, groupName string) error {
+	_, err := BatchAddGroupsForRules(db, []string{ruleName}, []string{groupName})
+	return err
+}
+
+func RemoveGroupForRule(db *gorm.DB, ruleName, groupName string) error {
+	_, err := BatchRemoveGroupsForRules(db, []string{ruleName}, []string{groupName})
+	return err
+}
+
 func TestRule_OP(t *testing.T) {
 	db := consts.GetGormProfileDatabase()
 

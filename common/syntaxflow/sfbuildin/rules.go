@@ -34,8 +34,6 @@ func init() {
 		}
 
 		db := consts.GetGormProfileDatabase()
-		// 创建默认规则组
-		sfdb.ImportBuildInGroup(db)
 		fsInstance := filesys.NewEmbedFS(ruleFS)
 		err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 			dirName, name := fsInstance.PathSplit(s)
@@ -80,7 +78,7 @@ func init() {
 				return err
 			}
 
-			err = sfdb.AddGroupsForBuildInRule(db,rule)
+			err = sfdb.AddDefaultGroupForRule(db, rule)
 			if err != nil {
 				return err
 			}

@@ -28,6 +28,7 @@ type YakClient interface {
 	MITM(ctx context.Context, opts ...grpc.CallOption) (Yak_MITMClient, error)
 	SetMITMFilter(ctx context.Context, in *SetMITMFilterRequest, opts ...grpc.CallOption) (*SetMITMFilterResponse, error)
 	GetMITMFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error)
+	ResetMITMFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error)
 	DownloadMITMCert(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MITMCert, error)
 	// 开启端口
 	OpenPort(ctx context.Context, opts ...grpc.CallOption) (Yak_OpenPortClient, error)
@@ -633,6 +634,15 @@ func (c *yakClient) SetMITMFilter(ctx context.Context, in *SetMITMFilterRequest,
 func (c *yakClient) GetMITMFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error) {
 	out := new(SetMITMFilterRequest)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/GetMITMFilter", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ResetMITMFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error) {
+	out := new(SetMITMFilterRequest)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/ResetMITMFilter", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5816,6 +5826,7 @@ type YakServer interface {
 	MITM(Yak_MITMServer) error
 	SetMITMFilter(context.Context, *SetMITMFilterRequest) (*SetMITMFilterResponse, error)
 	GetMITMFilter(context.Context, *Empty) (*SetMITMFilterRequest, error)
+	ResetMITMFilter(context.Context, *Empty) (*SetMITMFilterRequest, error)
 	DownloadMITMCert(context.Context, *Empty) (*MITMCert, error)
 	// 开启端口
 	OpenPort(Yak_OpenPortServer) error
@@ -6359,6 +6370,9 @@ func (UnimplementedYakServer) SetMITMFilter(context.Context, *SetMITMFilterReque
 }
 func (UnimplementedYakServer) GetMITMFilter(context.Context, *Empty) (*SetMITMFilterRequest, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMITMFilter not implemented")
+}
+func (UnimplementedYakServer) ResetMITMFilter(context.Context, *Empty) (*SetMITMFilterRequest, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResetMITMFilter not implemented")
 }
 func (UnimplementedYakServer) DownloadMITMCert(context.Context, *Empty) (*MITMCert, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DownloadMITMCert not implemented")
@@ -7706,6 +7720,24 @@ func _Yak_GetMITMFilter_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).GetMITMFilter(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ResetMITMFilter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ResetMITMFilter(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/ResetMITMFilter",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ResetMITMFilter(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -15212,6 +15244,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMITMFilter",
 			Handler:    _Yak_GetMITMFilter_Handler,
+		},
+		{
+			MethodName: "ResetMITMFilter",
+			Handler:    _Yak_ResetMITMFilter_Handler,
 		},
 		{
 			MethodName: "DownloadMITMCert",

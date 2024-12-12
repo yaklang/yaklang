@@ -406,7 +406,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 				RuleName: uuid.NewString(),
 				Language: language,
 			})
-			err = sfdb.AddGroupForRule(db, rule.RuleName, groupName)
+			_, err = sfdb.BatchAddGroupsForRules(db, []string{rule.RuleName}, []string{groupName})
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				err = sfdb.DeleteRuleByRuleName(rule.RuleName)
