@@ -9,11 +9,19 @@ import (
 )
 
 const (
-	SYNTAXFLOWSCAN_EXECUTING     = "executing"
-	SYNTAXFLOWSCAN_PAUSED        = "paused"
-	SYNTAXFLOWSCAN_DONE          = "done"
-	SYNTAXFLOWSCAN_ERROR         = "error"
-	SYNTAXFLOWSCAN_PROGRAM_SPLIT = ","
+	SYNTAXFLOWSCAN_EXECUTING = "executing"
+	SYNTAXFLOWSCAN_PAUSED    = "paused"
+	SYNTAXFLOWSCAN_DONE      = "done"
+	SYNTAXFLOWSCAN_ERROR     = "error"
+)
+const SYNTAXFLOWSCAN_PROGRAM_SPLIT = ","
+
+type SyntaxflowResultKind string
+
+const (
+	SFResultKindDebug SyntaxflowResultKind = "debug" // 新建插件 调试
+	SFResultKindScan  SyntaxflowResultKind = "scan"  // 代码扫描 自动执行
+	SFResultKindQuery SyntaxflowResultKind = "query" // 代码审计 手动执行
 )
 
 type SyntaxFlowScanTask struct {
@@ -25,6 +33,8 @@ type SyntaxFlowScanTask struct {
 
 	Status string // executing / done / paused / error
 	Reason string // user cancel / finished / recover failed so on
+
+	Kind SyntaxflowResultKind `json:"kind"` // debug / scan / query
 
 	// query execute
 	FailedQuery  int64 // query failed
@@ -54,6 +64,7 @@ func (s *SyntaxFlowScanTask) ToGRPCModel() *ypb.SyntaxFlowScanTask {
 		SuccessQuery: s.SuccessQuery,
 		RiskCount:    s.RiskCount,
 		TotalQuery:   s.TotalQuery,
+		Kind:         string(s.Kind),
 	}
 	if len(s.Config) != 0 {
 		_ = json.Unmarshal(s.Config, &res.Config)

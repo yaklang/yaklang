@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
@@ -65,7 +66,7 @@ HOOK
 	require.Len(t, prog, 1)
 	res, err := prog[0].SyntaxFlowWithError(query)
 	require.NoError(t, err)
-	resultID, err := res.Save()
+	resultID, err := res.Save(schema.SFResultKindDebug)
 	require.NoError(t, err)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), progID)
@@ -166,7 +167,7 @@ public interface RemoteLogService
 	log.Infof("dot: \n%v", memDot)
 	require.Equal(t, len(path), 1)
 
-	resultID, err := res.Save()
+	resultID, err := res.Save(schema.SFResultKindDebug)
 	require.NoError(t, err)
 
 	result, err := ssaapi.LoadResultByID(resultID)

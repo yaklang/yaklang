@@ -33,6 +33,8 @@ type AuditResult struct {
 	ProgramName string `json:"program_name"`
 	Language    string `json:"language"`
 
+	Kind schema.SyntaxflowResultKind `json:"kind"` // debug / scan / query
+
 	RiskCount uint64                       `json:"risk_count"`
 	RiskHashs schema.MapEx[string, string] `json:"risk_hashs" gorm:"type:text"`
 
