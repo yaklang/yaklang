@@ -5795,6 +5795,7 @@ message SyntaxFlowScanTask {
     int64 TotalQuery =13;
 
     SyntaxFlowScanRequest Config = 14;
+    string Kind =  15; // "debug" | "scan"
 }
 
 message DeleteSyntaxFlowScanTaskRequest{
@@ -5830,6 +5831,7 @@ message SyntaxFlowResultFilter {
   int64 BeforeID = 8;
 
   repeated string Severity = 9;  //  "info", "low", "middle", "critical", "high"
+  repeated string Kind = 10 ; //   "query" | "debug" | "scan"
 }
 
 message QuerySyntaxFlowResultRequest{
@@ -5866,6 +5868,7 @@ message SyntaxFlowResult {
   uint64 RiskCount = 11;
 
   string RuleContent = 12;
+  string Kind =  13; // "query" | "debug" | "scan"
 }
 
 message QueryPluginEnvRequest {
