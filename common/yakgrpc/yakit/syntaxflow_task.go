@@ -25,6 +25,7 @@ func FilterSyntaxFlowScanTask(db *gorm.DB, filter *ypb.SyntaxFlowScanTaskFilter)
 	db = bizhelper.ExactQueryStringArrayOr(db, "programs", filter.GetPrograms())
 	db = bizhelper.ExactQueryStringArrayOr(db, "task_id", filter.GetTaskIds())
 	db = bizhelper.ExactQueryStringArrayOr(db, "status", filter.GetStatus())
+	db = bizhelper.ExactQueryStringArrayOr(db, "kind", filter.GetKind())
 	if filter.GetFromId() > 0 {
 		db = db.Where("id > ?", filter.GetFromId())
 	}

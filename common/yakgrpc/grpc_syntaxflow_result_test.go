@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -38,10 +39,10 @@ func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
 
 	taskID2 := uuid.NewString()
 	res = prog.SyntaxFlow(syntaxFlowCode)
-	resultID2, err := res.Save(schema.SFResultKindDebug, taskID2)
+	resultID2, err := res.Save(schema.SFResultKindScan, taskID2)
 	require.NoError(t, err)
 	res = prog.SyntaxFlow(syntaxFlowCode)
-	resultID3, err := res.Save(schema.SFResultKindDebug, taskID2)
+	resultID3, err := res.Save(schema.SFResultKindQuery, taskID2)
 	require.NoError(t, err)
 
 	t.Run("test query result by taskID", func(t *testing.T) {
@@ -92,6 +93,63 @@ func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
 		require.Equal(t, resultID1, uint(rsp.GetResults()[0].GetResultID()))
 		require.Equal(t, resultID2, uint(rsp.GetResults()[1].GetResultID()))
 		require.Equal(t, resultID3, uint(rsp.GetResults()[2].GetResultID()))
+	})
+
+	t.Run("test query kind", func(t *testing.T) {
+		// kind Debug (resultID1)
+		rsp, err := local.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
+			Pagination: &ypb.Paging{},
+			Filter: &ypb.SyntaxFlowResultFilter{
+				ProgramNames: []string{progName},
+				Kind:         []string{string(schema.SFResultKindDebug)},
+			},
+		})
+		require.NoError(t, err)
+		spew.Dump(rsp)
+
+		require.Equal(t, 1, len(rsp.GetResults()))
+		require.Equal(t, resultID1, uint(rsp.GetResults()[0].GetResultID()))
+
+		// kind Scan (resultID2)
+		rsp, err = local.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
+			Pagination: &ypb.Paging{},
+			Filter: &ypb.SyntaxFlowResultFilter{
+				ProgramNames: []string{progName},
+				Kind:         []string{string(schema.SFResultKindScan)},
+			},
+		})
+		require.NoError(t, err)
+		spew.Dump(rsp)
+
+		require.Equal(t, 1, len(rsp.GetResults()))
+		require.Equal(t, resultID2, uint(rsp.GetResults()[0].GetResultID()))
+
+		// kind Query (resultID3)
+		rsp, err = local.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
+			Pagination: &ypb.Paging{},
+			Filter: &ypb.SyntaxFlowResultFilter{
+				ProgramNames: []string{progName},
+				Kind:         []string{string(schema.SFResultKindQuery)},
+			},
+		})
+		require.NoError(t, err)
+		spew.Dump(rsp)
+
+		require.Equal(t, 1, len(rsp.GetResults()))
+		require.Equal(t, resultID3, uint(rsp.GetResults()[0].GetResultID()))
+
+		// query resultID1 check kind Debug
+		rsp, err = local.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
+			Pagination: &ypb.Paging{},
+			Filter: &ypb.SyntaxFlowResultFilter{
+				ResultIDs: []string{fmt.Sprintf("%d", resultID1)},
+			},
+		})
+		require.NoError(t, err)
+		spew.Dump(rsp)
+		require.Equal(t, 1, len(rsp.GetResults()))
+		require.Equal(t, string(schema.SFResultKindDebug), rsp.GetResults()[0].GetKind())
+
 	})
 
 }

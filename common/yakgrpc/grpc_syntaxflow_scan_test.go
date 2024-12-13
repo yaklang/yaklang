@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -132,6 +133,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 					})
 					require.NoError(t, err)
 					require.Greater(t, len(res.Results), 0)
+					require.Equal(t, res.Results[0].Kind, string(schema.SFResultKindScan))
 				}
 			}
 		}
@@ -308,5 +310,6 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_WithContent(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Equal(t, len(res.GetResults()), 1)
+		require.Equal(t, res.GetResults()[0].Kind, string(schema.SFResultKindDebug))
 	})
 }
