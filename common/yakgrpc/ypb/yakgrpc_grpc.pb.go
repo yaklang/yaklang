@@ -419,6 +419,7 @@ type YakClient interface {
 	MigrateLegacyDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(ctx context.Context, in *QueryMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*QueryMITMRuleExtractedDataResponse, error)
+	ExportMITMRuleExtractedData(ctx context.Context, in *ExportMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (Yak_ExportMITMRuleExtractedDataClient, error)
 	// ChaosMakerRule: Bas
 	ImportChaosMakerRules(ctx context.Context, in *ImportChaosMakerRulesRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryChaosMakerRule(ctx context.Context, in *QueryChaosMakerRuleRequest, opts ...grpc.CallOption) (*QueryChaosMakerRuleResponse, error)
@@ -4501,6 +4502,38 @@ func (c *yakClient) QueryMITMRuleExtractedData(ctx context.Context, in *QueryMIT
 	return out, nil
 }
 
+func (c *yakClient) ExportMITMRuleExtractedData(ctx context.Context, in *ExportMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (Yak_ExportMITMRuleExtractedDataClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[49], "/ypb.Yak/ExportMITMRuleExtractedData", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &yakExportMITMRuleExtractedDataClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Yak_ExportMITMRuleExtractedDataClient interface {
+	Recv() (*ExportMITMRuleExtractedDataResponse, error)
+	grpc.ClientStream
+}
+
+type yakExportMITMRuleExtractedDataClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakExportMITMRuleExtractedDataClient) Recv() (*ExportMITMRuleExtractedDataResponse, error) {
+	m := new(ExportMITMRuleExtractedDataResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *yakClient) ImportChaosMakerRules(ctx context.Context, in *ImportChaosMakerRulesRequest, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/ImportChaosMakerRules", in, out, opts...)
@@ -4529,7 +4562,7 @@ func (c *yakClient) DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChao
 }
 
 func (c *yakClient) ExecuteChaosMakerRule(ctx context.Context, in *ExecuteChaosMakerRuleRequest, opts ...grpc.CallOption) (Yak_ExecuteChaosMakerRuleClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[49], "/ypb.Yak/ExecuteChaosMakerRule", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[50], "/ypb.Yak/ExecuteChaosMakerRule", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4606,7 +4639,7 @@ func (c *yakClient) IsCVEDatabaseReady(ctx context.Context, in *IsCVEDatabaseRea
 }
 
 func (c *yakClient) UpdateCVEDatabase(ctx context.Context, in *UpdateCVEDatabaseRequest, opts ...grpc.CallOption) (Yak_UpdateCVEDatabaseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[50], "/ypb.Yak/UpdateCVEDatabase", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[51], "/ypb.Yak/UpdateCVEDatabase", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4638,7 +4671,7 @@ func (x *yakUpdateCVEDatabaseClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) ExportsProfileDatabase(ctx context.Context, in *ExportsProfileDatabaseRequest, opts ...grpc.CallOption) (Yak_ExportsProfileDatabaseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[51], "/ypb.Yak/ExportsProfileDatabase", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[52], "/ypb.Yak/ExportsProfileDatabase", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4670,7 +4703,7 @@ func (x *yakExportsProfileDatabaseClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) ImportsProfileDatabase(ctx context.Context, in *ImportsProfileDatabaseRequest, opts ...grpc.CallOption) (Yak_ImportsProfileDatabaseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[52], "/ypb.Yak/ImportsProfileDatabase", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[53], "/ypb.Yak/ImportsProfileDatabase", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4738,7 +4771,7 @@ func (c *yakClient) IsScrecorderReady(ctx context.Context, in *IsScrecorderReady
 }
 
 func (c *yakClient) InstallScrecorder(ctx context.Context, in *InstallScrecorderRequest, opts ...grpc.CallOption) (Yak_InstallScrecorderClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[53], "/ypb.Yak/InstallScrecorder", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[54], "/ypb.Yak/InstallScrecorder", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4770,7 +4803,7 @@ func (x *yakInstallScrecorderClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) StartScrecorder(ctx context.Context, in *StartScrecorderRequest, opts ...grpc.CallOption) (Yak_StartScrecorderClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[54], "/ypb.Yak/StartScrecorder", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[55], "/ypb.Yak/StartScrecorder", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4856,7 +4889,7 @@ func (c *yakClient) IsVulinboxReady(ctx context.Context, in *IsVulinboxReadyRequ
 }
 
 func (c *yakClient) InstallVulinbox(ctx context.Context, in *InstallVulinboxRequest, opts ...grpc.CallOption) (Yak_InstallVulinboxClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[55], "/ypb.Yak/InstallVulinbox", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[56], "/ypb.Yak/InstallVulinbox", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4888,7 +4921,7 @@ func (x *yakInstallVulinboxClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) StartVulinbox(ctx context.Context, in *StartVulinboxRequest, opts ...grpc.CallOption) (Yak_StartVulinboxClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[56], "/ypb.Yak/StartVulinbox", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[57], "/ypb.Yak/StartVulinbox", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4920,7 +4953,7 @@ func (x *yakStartVulinboxClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) GenQualityInspectionReport(ctx context.Context, in *GenQualityInspectionReportRequest, opts ...grpc.CallOption) (Yak_GenQualityInspectionReportClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[57], "/ypb.Yak/GenQualityInspectionReport", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[58], "/ypb.Yak/GenQualityInspectionReport", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4961,7 +4994,7 @@ func (c *yakClient) HTTPRequestBuilder(ctx context.Context, in *HTTPRequestBuild
 }
 
 func (c *yakClient) DebugPlugin(ctx context.Context, in *DebugPluginRequest, opts ...grpc.CallOption) (Yak_DebugPluginClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[58], "/ypb.Yak/DebugPlugin", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[59], "/ypb.Yak/DebugPlugin", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5002,7 +5035,7 @@ func (c *yakClient) SmokingEvaluatePlugin(ctx context.Context, in *SmokingEvalua
 }
 
 func (c *yakClient) SmokingEvaluatePluginBatch(ctx context.Context, in *SmokingEvaluatePluginBatchRequest, opts ...grpc.CallOption) (Yak_SmokingEvaluatePluginBatchClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[59], "/ypb.Yak/SmokingEvaluatePluginBatch", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[60], "/ypb.Yak/SmokingEvaluatePluginBatch", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5043,7 +5076,7 @@ func (c *yakClient) GetSystemDefaultDnsServers(ctx context.Context, in *Empty, o
 }
 
 func (c *yakClient) DiagnoseNetwork(ctx context.Context, in *DiagnoseNetworkRequest, opts ...grpc.CallOption) (Yak_DiagnoseNetworkClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[60], "/ypb.Yak/DiagnoseNetwork", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[61], "/ypb.Yak/DiagnoseNetwork", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5075,7 +5108,7 @@ func (x *yakDiagnoseNetworkClient) Recv() (*DiagnoseNetworkResponse, error) {
 }
 
 func (c *yakClient) DiagnoseNetworkDNS(ctx context.Context, in *DiagnoseNetworkDNSRequest, opts ...grpc.CallOption) (Yak_DiagnoseNetworkDNSClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[61], "/ypb.Yak/DiagnoseNetworkDNS", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[62], "/ypb.Yak/DiagnoseNetworkDNS", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5107,7 +5140,7 @@ func (x *yakDiagnoseNetworkDNSClient) Recv() (*DiagnoseNetworkResponse, error) {
 }
 
 func (c *yakClient) TraceRoute(ctx context.Context, in *TraceRouteRequest, opts ...grpc.CallOption) (Yak_TraceRouteClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[62], "/ypb.Yak/TraceRoute", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[63], "/ypb.Yak/TraceRoute", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5184,7 +5217,7 @@ func (c *yakClient) RequestYakURL(ctx context.Context, in *RequestYakURLParams, 
 }
 
 func (c *yakClient) ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (Yak_ReadFileClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[63], "/ypb.Yak/ReadFile", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[64], "/ypb.Yak/ReadFile", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5225,7 +5258,7 @@ func (c *yakClient) GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest
 }
 
 func (c *yakClient) PcapX(ctx context.Context, opts ...grpc.CallOption) (Yak_PcapXClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[64], "/ypb.Yak/PcapX", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[65], "/ypb.Yak/PcapX", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5292,7 +5325,7 @@ func (c *yakClient) ParseTraffic(ctx context.Context, in *ParseTrafficRequest, o
 }
 
 func (c *yakClient) DuplexConnection(ctx context.Context, opts ...grpc.CallOption) (Yak_DuplexConnectionClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[65], "/ypb.Yak/DuplexConnection", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[66], "/ypb.Yak/DuplexConnection", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5323,7 +5356,7 @@ func (x *yakDuplexConnectionClient) Recv() (*DuplexConnectionResponse, error) {
 }
 
 func (c *yakClient) HybridScan(ctx context.Context, opts ...grpc.CallOption) (Yak_HybridScanClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[66], "/ypb.Yak/HybridScan", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[67], "/ypb.Yak/HybridScan", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5399,7 +5432,7 @@ func (c *yakClient) GetSpaceEngineAccountStatusV2(ctx context.Context, in *Third
 }
 
 func (c *yakClient) FetchPortAssetFromSpaceEngine(ctx context.Context, in *FetchPortAssetFromSpaceEngineRequest, opts ...grpc.CallOption) (Yak_FetchPortAssetFromSpaceEngineClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[67], "/ypb.Yak/FetchPortAssetFromSpaceEngine", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[68], "/ypb.Yak/FetchPortAssetFromSpaceEngine", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5665,7 +5698,7 @@ func (c *yakClient) QuerySyntaxFlowSameGroup(ctx context.Context, in *QuerySynta
 }
 
 func (c *yakClient) SyntaxFlowScan(ctx context.Context, opts ...grpc.CallOption) (Yak_SyntaxFlowScanClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[68], "/ypb.Yak/SyntaxFlowScan", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[69], "/ypb.Yak/SyntaxFlowScan", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6217,6 +6250,7 @@ type YakServer interface {
 	MigrateLegacyDatabase(context.Context, *Empty) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(context.Context, *QueryMITMRuleExtractedDataRequest) (*QueryMITMRuleExtractedDataResponse, error)
+	ExportMITMRuleExtractedData(*ExportMITMRuleExtractedDataRequest, Yak_ExportMITMRuleExtractedDataServer) error
 	// ChaosMakerRule: Bas
 	ImportChaosMakerRules(context.Context, *ImportChaosMakerRulesRequest) (*Empty, error)
 	QueryChaosMakerRule(context.Context, *QueryChaosMakerRuleRequest) (*QueryChaosMakerRuleResponse, error)
@@ -7291,6 +7325,9 @@ func (UnimplementedYakServer) MigrateLegacyDatabase(context.Context, *Empty) (*E
 }
 func (UnimplementedYakServer) QueryMITMRuleExtractedData(context.Context, *QueryMITMRuleExtractedDataRequest) (*QueryMITMRuleExtractedDataResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryMITMRuleExtractedData not implemented")
+}
+func (UnimplementedYakServer) ExportMITMRuleExtractedData(*ExportMITMRuleExtractedDataRequest, Yak_ExportMITMRuleExtractedDataServer) error {
+	return status.Errorf(codes.Unimplemented, "method ExportMITMRuleExtractedData not implemented")
 }
 func (UnimplementedYakServer) ImportChaosMakerRules(context.Context, *ImportChaosMakerRulesRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ImportChaosMakerRules not implemented")
@@ -13424,6 +13461,27 @@ func _Yak_QueryMITMRuleExtractedData_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_ExportMITMRuleExtractedData_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportMITMRuleExtractedDataRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ExportMITMRuleExtractedData(m, &yakExportMITMRuleExtractedDataServer{stream})
+}
+
+type Yak_ExportMITMRuleExtractedDataServer interface {
+	Send(*ExportMITMRuleExtractedDataResponse) error
+	grpc.ServerStream
+}
+
+type yakExportMITMRuleExtractedDataServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakExportMITMRuleExtractedDataServer) Send(m *ExportMITMRuleExtractedDataResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 func _Yak_ImportChaosMakerRules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ImportChaosMakerRulesRequest)
 	if err := dec(in); err != nil {
@@ -16833,6 +16891,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "ImportProject",
 			Handler:       _Yak_ImportProject_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ExportMITMRuleExtractedData",
+			Handler:       _Yak_ExportMITMRuleExtractedData_Handler,
 			ServerStreams: true,
 		},
 		{
