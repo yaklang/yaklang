@@ -861,9 +861,8 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 	}
 
 	initMethodVar := func(runtimeSim StackSimulation) {
-		i := 0
 		params := []values.JavaValue{}
-		for _, paramType := range d.FunctionType.ParamTypes {
+		for i, paramType := range d.FunctionType.ParamTypes {
 			//assignStackVar(values.NewJavaRef(stackVarIndex, paramType))
 			runtimeSim.AssignVar(i, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return ""
@@ -1461,6 +1460,10 @@ func (d *Decompiler) ParseStatement() error {
 			appendNode(assignSt)
 			opcodeIdToNode[opcode.Id] = func(f func(val values.JavaValue) values.JavaValue) {
 				assignSt.JavaValue = f(assignSt.JavaValue)
+			}
+		case OP_DUP, OP_DUP_X1, OP_DUP_X2, OP_DUP2, OP_DUP2_X1, OP_DUP2_X2:
+			for i, value := range opcode.stackConsumed {
+				appendNode(statements.NewAssignStatement(opcode.stackProduced[i], value, true))
 			}
 		case OP_MONITORENTER:
 			v := opcode.stackConsumed[0]
