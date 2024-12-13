@@ -8,9 +8,6 @@ desc(
 // FileReader reader = new FileReader("example.txt");
 FileReader(,* as $fileReader);
 
-// BufferedReader reader = new BufferedReader(new FileReader("example.txt"));
-BufferedReader(,* as $bufferedReader);
-
 // FileInputStream inputStream = new FileInputStream("example.txt");
 FileInputStream(,* as $fileInputStream);
 
@@ -25,7 +22,6 @@ Files?{<typeName>?{have: 'java.nio'}}.newInputStream(,* as $nioInputStream);
 
 
 $fileReader as $output;
-$bufferedReader as $output;
 $fileInputStream as $output;
 $nioFileRead as $output;
 $nioBufferedReader as $output;
