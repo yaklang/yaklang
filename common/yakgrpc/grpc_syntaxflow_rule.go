@@ -120,7 +120,7 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.RuleName = ruleInput.RuleName
 	rule.Tag = strings.Join(ruleInput.Tags, "|")
 	rule.Title = ruleInput.RuleName
-	rule.Groups = sfdb.GetOrCreatGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
+	rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
 	rule.Description = ruleInput.Description
 	return rule, nil
 }

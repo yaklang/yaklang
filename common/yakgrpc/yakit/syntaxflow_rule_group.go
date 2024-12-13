@@ -3,7 +3,6 @@ package yakit
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -15,22 +14,16 @@ type GroupAndRuleCount struct {
 }
 
 // QuerySyntaxFlowRuleGroup 查询规则组中相关规则的个数
-func QuerySyntaxFlowRuleGroup(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleGroupRequest) (result []*ypb.SyntaxFlowGroup, err error) {
+func QuerySyntaxFlowRuleGroup(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleGroupRequest) (result []*schema.SyntaxFlowGroup, err error) {
 	if params == nil {
 		return nil, utils.Error("query syntax flow rule group failed: query params is nil")
 	}
-
-	db = db.Model(&schema.SyntaxFlowGroup{})
-	querydb := FilterSyntaxFlowGroups(db, params.GetFilter())
-	if err = querydb.Scan(&result).Error; err != nil {
+	db = db.Model(&schema.SyntaxFlowGroup{}).Preload("Rules")
+	db = FilterSyntaxFlowGroups(db, params.GetFilter())
+	if err = db.Find(&result).Error; err != nil {
 		return nil, err
 	}
-
-	for i, group := range result {
-		count := sfdb.GetRuleCountByGroupName(db, group.GetGroupName())
-		result[i].Count = count
-	}
-	return
+	return result, nil
 }
 
 func FilterSyntaxFlowGroups(db *gorm.DB, filter *ypb.SyntaxFlowRuleGroupFilter) *gorm.DB {
