@@ -552,7 +552,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			"unsafe":              false,
 			"req-condition":       false,
 			"redirects":           false,
-			"cookie-reuse":        false,
+			"disable-cookie":      false,
 			"max-redirects":       0,
 			"matchers-condition":  "or",
 		})
@@ -605,7 +605,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		sequenceItem.Set("max-redirects", sequence.MaxRedirects)
 
 		sequenceItem.Set("stop-at-first-macth", sequence.StopAtFirstMatch)
-		sequenceItem.Set("cookie-reuse", sequence.CookieInherit)
+		sequenceItem.Set("disable-cookie", !sequence.CookieInherit)
 		sequenceItem.Set("max-size", sequence.MaxSize)
 		sequenceItem.Set("unsafe", sequence.NoFixContentLength)
 		sequenceItem.Set("req-condition", sequence.AfterRequested)
