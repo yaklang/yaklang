@@ -32,8 +32,10 @@ type SyntaxFlowGroup struct {
 }
 
 func (s *SyntaxFlowGroup) ToGRPCModel() *ypb.SyntaxFlowGroup {
+	count := int32(len(s.Rules))
 	return &ypb.SyntaxFlowGroup{
 		GroupName: s.GroupName,
 		IsBuildIn: s.IsBuildIn,
+		Count:     count,
 	}
 }

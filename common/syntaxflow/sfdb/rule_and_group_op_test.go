@@ -20,6 +20,30 @@ func RemoveGroupForRule(db *gorm.DB, ruleName, groupName string) error {
 	return err
 }
 
+func GetRuleCountByGroupName(db *gorm.DB, groupName ...string) int32 {
+	db = db.Model(&schema.SyntaxFlowGroup{})
+	if len(groupName) == 1 {
+		var group schema.SyntaxFlowGroup
+		db.Preload("Rules").Where("group_name = ?", groupName).First(&group)
+		return int32(len(group.Rules))
+	} else {
+		var groups []schema.SyntaxFlowGroup
+		db.Preload("Rules").Where("group_name IN (?)", groupName).Find(&groups)
+		var count int32
+		for _, group := range groups {
+			count += int32(len(group.Rules))
+		}
+		return count
+	}
+}
+
+func GetGroupCountByRuleName(db *gorm.DB, ruleName string) int32 {
+	db = db.Model(&schema.SyntaxFlowRule{})
+	var rule schema.SyntaxFlowRule
+	db.Preload("Groups").Where("rule_name = ?", ruleName).First(&rule)
+	return int32(len(rule.Groups))
+}
+
 func TestRule_OP(t *testing.T) {
 	db := consts.GetGormProfileDatabase()
 
@@ -153,6 +177,14 @@ func TestRule_Group_OP(t *testing.T) {
 		groupA := creatGroup(uuid.NewString())
 		groupB := creatGroup(uuid.NewString())
 		groupC := creatGroup(uuid.NewString())
+		t.Cleanup(func() {
+			err := DeleteGroup(db, groupA.GroupName)
+			require.NoError(t, err)
+			err = DeleteGroup(db, groupB.GroupName)
+			require.NoError(t, err)
+			err = DeleteGroup(db, groupC.GroupName)
+			require.NoError(t, err)
+		})
 
 		groups := []*schema.SyntaxFlowGroup{groupA, groupB, groupC}
 		ret := GetIntersectionGroup(groups)
@@ -170,7 +202,7 @@ func TestRule_Group_OP(t *testing.T) {
 		require.Contains(t, ret, groupB)
 	})
 
-	t.Run("test GetOrCreatGroups", func(t *testing.T) {
+	t.Run("test GetOrCreateGroups", func(t *testing.T) {
 		groupName1 := uuid.NewString()
 		_, err := CreateGroup(db, groupName1)
 		require.NoError(t, err)
@@ -180,7 +212,7 @@ func TestRule_Group_OP(t *testing.T) {
 		})
 
 		groupName2 := uuid.NewString()
-		ret := GetOrCreatGroups(db, []string{groupName1, groupName2})
+		ret := GetOrCreateGroups(db, []string{groupName1, groupName2})
 		require.Equal(t, 2, len(ret))
 		groupNames := []string{ret[0].GroupName, ret[1].GroupName}
 		require.Contains(t, groupNames, groupName1)
@@ -208,14 +240,4 @@ func TestRule_Group_OP(t *testing.T) {
 		require.Equal(t, group1.ID, group2.ID)
 	})
 
-	t.Run("test save group", func(t *testing.T) {
-		groupName := uuid.NewString()
-		group, err := SaveGroup(db, groupName)
-		require.NoError(t, err)
-		require.False(t, group.IsBuildIn)
-
-		group, err = SaveGroup(db, groupName, true)
-		require.NoError(t, err)
-		require.True(t, group.IsBuildIn)
-	})
 }
