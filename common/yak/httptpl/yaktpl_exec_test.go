@@ -2206,7 +2206,7 @@ http:
 	require.Equal(t, 2, n)
 }
 
-func TestHttpTplCookieReuse(t *testing.T) {
+func TestHttpTplDisableCookie(t *testing.T) {
 	token := utils.RandStringBytes(10)
 	cookieCheck := false
 	server, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
@@ -2231,7 +2231,7 @@ http:
   headers: {}
 
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
 `
 	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
@@ -2243,5 +2243,33 @@ http:
 		lowhttp.WithHost(server), lowhttp.WithPort(port),
 	)
 	require.NoError(t, err)
+	require.False(t, cookieCheck)
+
+	demo = `
+id: test1
+info:
+  name: test1
+  author: v1ll4n
+
+http:
+- method: GET
+  path:
+  - '{{RootURL}}/'
+  - '{{RootURL}}/1'
+  headers: {}
+
+  max-redirects: 3
+  matchers-condition: and
+`
+	ytpl, err = CreateYakTemplateFromNucleiTemplateRaw(demo)
+	require.NoError(t, err)
+
+	_, err = ytpl.Exec(
+		nil, false,
+		[]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"),
+		lowhttp.WithHost(server), lowhttp.WithPort(port),
+	)
+	require.NoError(t, err)
 	require.True(t, cookieCheck)
+
 }
