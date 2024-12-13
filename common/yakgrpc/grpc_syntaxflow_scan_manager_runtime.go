@@ -6,7 +6,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -50,31 +49,40 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 	if start > m.totalQuery || start < 0 {
 		return utils.Errorf("SyntaxFlow scan start with a wrong task index")
 	}
+
+	cache := make(map[string]*ssaapi.Program)
+	getProgram := func(name string) (*ssaapi.Program, error) {
+		if prog, ok := cache[name]; ok {
+			return prog, nil
+		}
+		prog, err := ssaapi.FromDatabase(name)
+		if err != nil {
+			return nil, err
+		}
+		cache[name] = prog
+		return prog, nil
+	}
+
 	var errs error
 	var taskIndex int64 // when taskIndex == totalQuery, the task start to run.
-	for _, progName := range m.programs {
+	for rule := range m.ruleChan {
 		if m.IsPause() || m.IsStop() {
 			break
 		}
-		nextIndex := taskIndex + m.rulesCount
-		if nextIndex <= start {
-			taskIndex = nextIndex
-		}
-		prog, err := ssaapi.FromDatabase(progName)
-		if err != nil {
-			errs = utils.JoinErrors(errs, err)
-			atomic.AddInt64(&m.skipQuery, m.rulesCount) // skip all rules for this program // skip all rules for this program
-			taskIndex += m.rulesCount
-			m.SaveTask()
-			continue
-		}
-		for rule := range sfdb.YieldSyntaxFlowRules(m.rules, m.ctx) {
+		for _, progName := range m.programs {
 			taskIndex++
+			if m.IsPause() || m.IsStop() {
+				break
+			}
 			if taskIndex <= start {
 				continue
 			}
-			if m.IsPause() || m.IsStop() {
-				break
+
+			prog, err := getProgram(progName)
+			if err != nil {
+				errs = utils.JoinErrors(errs, err)
+				atomic.AddInt64(&m.skipQuery, 1)
+				continue
 			}
 			m.Query(rule, prog)
 		}

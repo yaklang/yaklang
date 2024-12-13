@@ -18,11 +18,53 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func prepareProgram(t *testing.T, progID string) func() {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
+	package com.example.apackage; 
+	import com.example.bpackage.sub.B;
+	class A {
+		public static void main(String[] args) {
+			B b = new B();
+			// for test 1: A->B
+			target1(b.get());
+			// for test 2: B->A
+			b.show(1);
+		}
+	}
+	`)
+
+	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
+	package com.example.bpackage.sub; 
+	class B {
+		public  int get() {
+			return 	 1;
+		}
+		public void show(int a) {
+			target2(a);
+		}
+	}
+	`)
+	prog, err := ssaapi.ParseProjectWithFS(vf,
+		ssaapi.WithLanguage(consts.JAVA),
+		ssaapi.WithProgramPath("example"),
+		ssaapi.WithProgramName(progID),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+	return func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progID)
+	}
+}
+
 func checkSfScanRecvMsg(t *testing.T, stream ypb.Yak_SyntaxFlowScanClient, handlerStatus func(status string), handlerProcess func(process float64)) {
 	for {
 		resp, err := stream.Recv()
-		if err == io.EOF {
-			return
+		if err != nil {
+			if err == io.EOF || strings.Contains(err.Error(), "context canceled") {
+				return
+			}
+			t.Fatalf("err : %v", err.Error())
 		}
 		require.NoError(t, err)
 		log.Infof("resp %v", resp)
@@ -62,44 +104,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-		package com.example.apackage; 
-		import com.example.bpackage.sub.B;
-		class A {
-			public static void main(String[] args) {
-				B b = new B();
-				// for test 1: A->B
-				target1(b.get());
-				// for test 2: B->A
-				b.show(1);
-			}
-		}
-		`)
-
-	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
-		package com.example.bpackage.sub; 
-		class B {
-			public  int get() {
-				return 	 1;
-			}
-			public void show(int a) {
-				target2(a);
-			}
-		}
-		`)
 	progID := uuid.NewString()
-	prog, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(consts.JAVA),
-		ssaapi.WithProgramPath("example"),
-		ssaapi.WithProgramName(progID),
-	)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), progID)
-	}()
-	require.NoError(t, err)
-	require.NotNil(t, prog)
-
+	f := prepareProgram(t, progID)
+	defer f()
 	taskID, stream := startScan(client, t, progID, context.Background())
 	require.NoError(t, err)
 
@@ -152,43 +159,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-		package com.example.apackage; 
-		import com.example.bpackage.sub.B;
-		class A {
-			public static void main(String[] args) {
-				B b = new B();
-				// for test 1: A->B
-				target1(b.get());
-				// for test 2: B->A
-				b.show(1);
-			}
-		}
-		`)
-
-	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
-		package com.example.bpackage.sub; 
-		class B {
-			public  int get() {
-				return 	 1;
-			}
-			public void show(int a) {
-				target2(a);
-			}
-		}
-		`)
 	progID := uuid.NewString()
-	prog, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(consts.JAVA),
-		ssaapi.WithProgramPath("example"),
-		ssaapi.WithProgramName(progID),
-	)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), progID)
-	}()
-	require.NoError(t, err)
-	require.NotNil(t, prog)
+	f := prepareProgram(t, progID)
+	defer f()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -198,39 +171,18 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel(t *testing.T) {
 	hasProcess := false
 	finishProcess := 0.0
 	var finishStatus string
-
-	for {
-		resp, err := stream.Recv()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			if strings.Contains(err.Error(), "context canceled") {
-				break
-			}
-			require.NoError(t, err)
+	checkSfScanRecvMsg(t, stream, func(status string) {
+		finishStatus = status
+	}, func(process float64) {
+		if 0 < process && process < 1 {
+			hasProcess = true
 		}
-		log.Infof("resp %v", resp)
-		if resp.ExecResult != nil && resp.ExecResult.IsMessage {
-			rawMsg := resp.ExecResult.GetMessage()
-			var msg msg
-			json.Unmarshal(rawMsg, &msg)
-			if msg.Type == "progress" {
-				log.Infof("msg: %v", msg)
-				process := msg.Content.Process
-				// check process
-				if 0 < process && process < 1 {
-					hasProcess = true
-				}
-				if process > 0.5 {
-					// cancel context
-					cancel()
-				}
-				finishProcess = process
-			}
+		if process > 0.5 {
+			// cancel context
+			cancel()
 		}
-		finishStatus = resp.Status
-	}
+		finishProcess = process
+	})
 	require.True(t, hasProcess)
 	require.Less(t, finishProcess, 1.0)
 	require.Equal(t, "executing", finishStatus)
@@ -240,43 +192,9 @@ func TestGRPCMUSTPASS_Syntaxflow_Scan_Cancel_Multiple(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-		package com.example.apackage; 
-		import com.example.bpackage.sub.B;
-		class A {
-			public static void main(String[] args) {
-				B b = new B();
-				// for test 1: A->B
-				target1(b.get());
-				// for test 2: B->A
-				b.show(1);
-			}
-		}
-		`)
-
-	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
-		package com.example.bpackage.sub; 
-		class B {
-			public  int get() {
-				return 	 1;
-			}
-			public void show(int a) {
-				target2(a);
-			}
-		}
-		`)
 	progID := uuid.NewString()
-	prog, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(consts.JAVA),
-		ssaapi.WithProgramPath("example"),
-		ssaapi.WithProgramName(progID),
-	)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), progID)
-	}()
-	require.NoError(t, err)
-	require.NotNil(t, prog)
+	f := prepareProgram(t, progID)
+	defer f()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	id1, stream1 := startScan(client, t, progID, ctx)
@@ -310,39 +228,18 @@ func TestGRPCMUSTPASS_Syntaxflow_Scan_Cancel_Multiple(t *testing.T) {
 		hasProcess := false
 		finishProcess := 0.0
 		var finishStatus string
-
-		for {
-			resp, err := stream1.Recv()
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				if strings.Contains(err.Error(), "context canceled") {
-					break
-				}
-				require.NoError(t, err)
+		checkSfScanRecvMsg(t, stream1, func(status string) {
+			finishStatus = status
+		}, func(process float64) {
+			if 0 < process && process < 1 {
+				hasProcess = true
 			}
-			log.Infof("resp %v", resp)
-			if resp.ExecResult != nil && resp.ExecResult.IsMessage {
-				rawMsg := resp.ExecResult.GetMessage()
-				var msg msg
-				json.Unmarshal(rawMsg, &msg)
-				if msg.Type == "progress" {
-					log.Infof("msg: %v", msg)
-					process := msg.Content.Process
-					// check process
-					if 0 < process && process < 1 {
-						hasProcess = true
-					}
-					if process > 0.5 {
-						// cancel context
-						cancel()
-					}
-					finishProcess = process
-				}
+			if process > 0.5 {
+				// cancel context
+				cancel()
 			}
-			finishStatus = resp.Status
-		}
+			finishProcess = process
+		})
 		require.True(t, hasProcess)
 		require.Less(t, finishProcess, 1.0)
 		require.Equal(t, "executing", finishStatus)
@@ -358,4 +255,58 @@ type msg struct {
 		ID      string  `json:"id"`
 		Process float64 `json:"progress"`
 	}
+}
+
+func TestGRPCMUSTPASS_SyntaxFlow_Scan_WithContent(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	progID := uuid.NewString()
+	f := prepareProgram(t, progID)
+	defer f()
+
+	t.Run("test scan task with content", func(t *testing.T) {
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			ProgramName: []string{
+				progID,
+			},
+			RuleInput: &ypb.SyntaxFlowRuleInput{
+				RuleName: "aa",
+				Content: `
+			this as $this 
+			`,
+				Language: "java",
+				Tags:     []string{},
+			},
+		})
+
+		resp, err := stream.Recv()
+		require.NoError(t, err)
+		log.Infof("resp: %v", resp)
+		taskID := resp.TaskID
+		_ = taskID
+
+		finishStatus := ""
+		finishProcess := 0.0
+		checkSfScanRecvMsg(t, stream, func(status string) {
+			finishStatus = status
+		}, func(process float64) {
+			finishProcess = process
+		})
+		require.Equal(t, finishStatus, "done")
+		require.Equal(t, finishProcess, 1.0)
+
+		res, err := client.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
+			Filter: &ypb.SyntaxFlowResultFilter{
+				TaskIDs: []string{taskID},
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Equal(t, len(res.GetResults()), 1)
+	})
 }
