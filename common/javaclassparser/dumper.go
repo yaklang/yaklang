@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -374,7 +375,11 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			if err != nil {
 				return "", utils.Wrap(err, "ParseBytesCode failed")
 			}
-
+			if len(params) > 0 {
+				if v, ok := params[0].(*values.JavaRef); ok && v.IsThis {
+					params = params[1:]
+				}
+			}
 			paramsNewStrList := []string{}
 			for _, val := range params {
 				paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
