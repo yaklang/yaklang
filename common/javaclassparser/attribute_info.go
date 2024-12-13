@@ -14,6 +14,84 @@ type AttributeInfo interface {
 	readInfo(reader *ClassParser)
 }
 
+/*
+	InnerClasses_attribute {
+	    u2 attribute_name_index;
+	    u4 attribute_length;
+	    u2 number_of_classes;
+	    {   u2 inner_class_info_index;
+	        u2 outer_class_info_index;
+	        u2 inner_name_index;
+	        u2 inner_class_access_flags;
+	    } classes[number_of_classes];
+	}
+*/
+type InnerClassesAttribute struct {
+	Type            string
+	AttrLen         uint32
+	NumberOfClasses uint16
+	Classes         []*InnerClassInfo
+}
+
+type InnerClassInfo struct {
+	InnerClassInfoIndex   uint16
+	OuterClassInfoIndex   uint16
+	InnerNameIndex        uint16
+	InnerClassAccessFlags uint16
+}
+
+func (i *InnerClassesAttribute) readInfo(cp *ClassParser) {
+	i.NumberOfClasses = cp.reader.readUint16()
+	i.Classes = make([]*InnerClassInfo, i.NumberOfClasses)
+	for j := range i.Classes {
+		i.Classes[j] = &InnerClassInfo{
+			InnerClassInfoIndex:   cp.reader.readUint16(),
+			OuterClassInfoIndex:   cp.reader.readUint16(),
+			InnerNameIndex:        cp.reader.readUint16(),
+			InnerClassAccessFlags: cp.reader.readUint16(),
+		}
+	}
+}
+
+/*
+	BootstrapMethods_attribute {
+	    u2 attribute_name_index;
+	    u4 attribute_length;
+	    u2 num_bootstrap_methods;
+	    {   u2 bootstrap_method_ref;
+	        u2 num_bootstrap_arguments;
+	        u2 bootstrap_arguments[num_bootstrap_arguments];
+	    } bootstrap_methods[num_bootstrap_methods];
+	}
+*/
+type BootstrapMethodsAttribute struct {
+	AttributeNameIndex  uint16
+	AttributeLength     uint32
+	NumBootstrapMethods uint16
+	BootstrapMethods    []*BootstrapMethod
+}
+
+func (r *BootstrapMethodsAttribute) readInfo(cp *ClassParser) {
+	r.NumBootstrapMethods = cp.reader.readUint16()
+	r.BootstrapMethods = make([]*BootstrapMethod, r.NumBootstrapMethods)
+	for i := range r.BootstrapMethods {
+		m := &BootstrapMethod{
+			BootstrapMethodRef:    cp.reader.readUint16(),
+			NumBootstrapArguments: cp.reader.readUint16(),
+		}
+		for j := 0; j < int(m.NumBootstrapArguments); j++ {
+			m.BootstrapArguments = append(m.BootstrapArguments, cp.reader.readUint16())
+		}
+		r.BootstrapMethods[i] = m
+	}
+}
+
+type BootstrapMethod struct {
+	BootstrapMethodRef    uint16
+	NumBootstrapArguments uint16
+	BootstrapArguments    []uint16
+}
+
 // 没解析的属性
 type UnparsedAttribute struct {
 	Type   string
@@ -237,6 +315,10 @@ func newAttributeInfo(attrName string, attrLen uint32) AttributeInfo {
 		return &SyntheticAttribute{AttrLen: attrLen}
 	case "RuntimeVisibleAnnotations":
 		return &RuntimeVisibleAnnotationsAttribute{AttrLen: attrLen}
+	case "BootstrapMethods":
+		return &BootstrapMethodsAttribute{AttributeLength: attrLen}
+	case "InnerClasses":
+		return &InnerClassesAttribute{AttrLen: attrLen}
 	default:
 		return &UnparsedAttribute{Name: attrName, Length: attrLen, Info: nil}
 

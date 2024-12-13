@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"slices"
 	"strings"
 )
 
@@ -26,6 +27,7 @@ type ClassObjectDumper struct {
 	ConstantPool  []ConstantInfo
 	deepStack     *utils.Stack[int]
 	MethodType    *types.JavaFuncType
+	lambdaMethods map[string][]string
 }
 
 func (c *ClassObjectDumper) GetConstructorMethodName() string {
@@ -41,10 +43,11 @@ func (c *ClassObjectDumper) GetConstructorMethodName() string {
 }
 func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
 	return &ClassObjectDumper{
-		obj:          obj,
-		ConstantPool: obj.ConstantPool,
-		imports:      make(map[string]struct{}),
-		deepStack:    utils.NewStack[int](),
+		obj:           obj,
+		ConstantPool:  obj.ConstantPool,
+		imports:       make(map[string]struct{}),
+		deepStack:     utils.NewStack[int](),
+		lambdaMethods: map[string][]string{},
 	}
 }
 func (c *ClassObjectDumper) TabNumber() int {
@@ -299,17 +302,213 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 	return result, nil
 }
 
+func (c *ClassObjectDumper) DumpMethod(methodName, desc string) (string, error) {
+	return c.DumpMethodWithInitialId(methodName, desc, 0)
+}
+func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id int) (string, error) {
+	var method *MemberInfo
+	var name, descriptor string
+	var err error
+	for _, info := range c.obj.Methods {
+		name, err = c.obj.getUtf8(info.NameIndex)
+		if err != nil {
+			return "", utils.Wrapf(err, "getUtf8(%v) failed", info.NameIndex)
+		}
+		descriptor, err = c.obj.getUtf8(info.DescriptorIndex)
+		if err != nil {
+			return "", utils.Wrapf(err, "getUtf8(%v) failed", info.DescriptorIndex)
+		}
+		if name == methodName && descriptor == desc {
+			method = info
+			break
+		}
+	}
+	if method == nil {
+		return "", fmt.Errorf("method %s not found", methodName)
+	}
+
+	var isLambda bool
+	if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
+		isLambda = true
+	}
+
+	c.FuncCtx.IsStatic = method.AccessFlags&StaticFlag == StaticFlag
+	accessFlagsVerbose := getAccessFlagsVerbose(method.AccessFlags)
+	//if len(accessFlagsVerbose) < 1 {
+	//	return nil, utils.Error("method accessFlagsVerbose is empty")
+	//}
+	accessFlags := strings.Join(accessFlagsVerbose, " ")
+	methodType, err := types.ParseMethodDescriptor(descriptor)
+	if err != nil {
+		return "", utils.Wrapf(err, "ParseMethodDescriptor(%v) failed", descriptor)
+	}
+	c.MethodType = methodType.FunctionType()
+	returnTypeStr := methodType.FunctionType().ReturnType.String(c.FuncCtx)
+	code := ""
+	c.Tab()
+	c.CurrentMethod = method
+	funcCtx := c.FuncCtx
+	funcCtx.FunctionName = name
+	//if name != "crt_data_by_Attrs" {
+	//	continue
+	//}
+	//println(name)
+	annoStrs := []string{}
+	funcCtx.FunctionType = c.MethodType
+	var paramsNewStr string
+	for _, attribute := range method.Attributes {
+		if anno, ok := attribute.(*RuntimeVisibleAnnotationsAttribute); ok {
+			for _, annotation := range anno.Annotations {
+				res, err := c.DumpAnnotation(annotation)
+				if err != nil {
+					return "", err
+				}
+				annoStrs = append(annoStrs, res)
+			}
+		}
+		if codeAttr, ok := attribute.(*CodeAttribute); ok {
+			if name == "main" {
+				log.Debug("decompile main func")
+			}
+			params, statementList, err := ParseBytesCode(c, codeAttr, id)
+			if err != nil {
+				return "", utils.Wrap(err, "ParseBytesCode failed")
+			}
+
+			paramsNewStrList := []string{}
+			for _, val := range params {
+				paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.String(c.FuncCtx), val.String(c.FuncCtx)))
+			}
+			c.MethodType = methodType.FunctionType()
+			paramsNewStr = strings.Join(paramsNewStrList, ", ")
+
+			sourceCode := "\n"
+			statementSet := utils.NewSet[statements.Statement]()
+			var statementToString func(statement statements.Statement) string
+			var statementListToString func(statements []statements.Statement) string
+			statementListToString = func(statementList []statements.Statement) string {
+				c.Tab()
+				defer c.UnTab()
+				var res []string
+				for _, statement := range statementList {
+					if _, ok := statement.(*statements.MiddleStatement); ok {
+						continue
+					}
+					_, ok := statement.(*statements.StackAssignStatement)
+					if ok {
+						continue
+					}
+					res = append(res, statementToString(statement))
+				}
+				return strings.Join(res, "\n")
+			}
+			statementToString = func(statement statements.Statement) (statementStr string) {
+				//if statementSet.Has(statement) {
+				//	panic("statement already exists")
+				//}
+				statementSet.Add(statement)
+				switch ret := statement.(type) {
+				case *statements.TryCatchStatement:
+					statementStr = fmt.Sprintf(c.GetTabString()+"try{\n"+
+						"%s\n"+
+						c.GetTabString()+"}", statementListToString(ret.TryBody))
+					for i, body := range ret.CatchBodies {
+						statementStr += fmt.Sprintf("catch(%s %s){\n"+
+							"%s\n"+
+							c.GetTabString()+"}", ret.Exception[i].Type().String(funcCtx), ret.Exception[i].String(funcCtx), statementListToString(body))
+					}
+				case *statements.WhileStatement:
+					statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
+						"%s\n"+
+						c.GetTabString()+"}", ret.ConditionValue.String(funcCtx), statementListToString(ret.Body))
+				case *statements.DoWhileStatement:
+					statementStr = fmt.Sprintf(c.GetTabString()+"do{\n"+
+						"%s\n"+
+						c.GetTabString()+"} while (%s);", statementListToString(ret.Body), ret.ConditionValue.String(funcCtx))
+					if ret.Label != "" {
+						statementStr = fmt.Sprintf("%s%s:\n%s", c.GetTabString(), ret.Label, statementStr)
+					}
+				case *statements.SwitchStatement:
+					getBody := func(caseItems []*statements.CaseItem) string {
+						var res []string
+						for _, st := range caseItems {
+							if st.IsDefault {
+								res = append(res, c.GetTabString()+fmt.Sprintf("default:\n%s", statementListToString(st.Body)))
+								continue
+							}
+							res = append(res, c.GetTabString()+fmt.Sprintf("case %d:\n%s", st.IntValue, statementListToString(st.Body)))
+						}
+						return strings.Join(res, "\n")
+					}
+					statementStr = fmt.Sprintf(c.GetTabString()+"switch (%s){\n"+
+						"%s\n"+
+						c.GetTabString()+"}", ret.Value.String(funcCtx), getBody(ret.Cases))
+				case *statements.IfStatement:
+					statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
+						"%s\n"+
+						c.GetTabString()+"}", ret.Condition.String(funcCtx), statementListToString(ret.IfBody))
+					if len(ret.ElseBody) > 0 {
+						statementStr += fmt.Sprintf("else{\n"+
+							"%s\n"+
+							c.GetTabString()+"}", statementListToString(ret.ElseBody))
+					}
+				case *statements.ReturnStatement:
+					statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
+				case *statements.ForStatement:
+					datas := []string{}
+					datas = append(datas, ret.InitVar.String(funcCtx))
+					datas = append(datas, fmt.Sprintf("%s", ret.Condition.String(funcCtx)))
+					datas = append(datas, ret.EndExp.String(funcCtx))
+					var lines []string
+					for _, subStatement := range ret.SubStatements {
+						lines = append(lines, c.GetTabString()+"\t"+subStatement.String(funcCtx)+";")
+					}
+					s := fmt.Sprintf("%sfor(%s; %s; %s) {\n%s\n%s}", c.GetTabString(), datas[0], datas[1], datas[2], strings.Join(lines, "\n"), c.GetTabString())
+					statementStr = s
+				default:
+					statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
+				}
+				return statementStr
+			}
+			for _, statement := range statementList {
+				statementStr := statementToString(statement)
+				sourceCode += fmt.Sprintf("%s\n", statementStr)
+			}
+			code = sourceCode
+		}
+	}
+	c.UnTab()
+	if isLambda {
+		res := fmt.Sprintf("(%s) -> {%s", paramsNewStr, code)
+		res += strings.Repeat("\t", c.TabNumber()) + "}"
+		return res, nil
+	}
+	methodSource := ""
+	switch name {
+	case "<init>":
+		name = fmt.Sprintf("%s(%s)", c.GetConstructorMethodName(), paramsNewStr)
+		methodSource = fmt.Sprintf("%s %s {%s", accessFlags, name, code)
+	case "<clinit>":
+		methodSource = fmt.Sprintf("%s {%s", accessFlags, code)
+	default:
+		name = fmt.Sprintf("%s(%s)", name, paramsNewStr)
+		methodSource = fmt.Sprintf(`%s %s %s {%s`, accessFlags, returnTypeStr, name, code)
+	}
+	methodSource += strings.Repeat("\t", c.TabNumber()) + "}"
+	if len(annoStrs) == 0 {
+		return methodSource, nil
+	} else {
+		c.Tab()
+		annoStr := strings.Join(annoStrs, c.GetTabString()+"\n")
+		c.UnTab()
+		return annoStr + "\n" + c.GetTabString() + methodSource, nil
+	}
+}
 func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 	c.Tab()
 	defer c.UnTab()
 	result := []string{}
 	for _, method := range c.obj.Methods {
-		c.FuncCtx.IsStatic = method.AccessFlags&StaticFlag == StaticFlag
-		accessFlagsVerbose := getAccessFlagsVerbose(method.AccessFlags)
-		//if len(accessFlagsVerbose) < 1 {
-		//	return nil, utils.Error("method accessFlagsVerbose is empty")
-		//}
-		accessFlags := strings.Join(accessFlagsVerbose, " ")
 		name, err := c.obj.getUtf8(method.NameIndex)
 		if err != nil {
 			return nil, utils.Wrapf(err, "getUtf8(%v) failed", method.NameIndex)
@@ -318,162 +517,14 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		if err != nil {
 			return nil, utils.Wrapf(err, "getUtf8(%v) failed", method.DescriptorIndex)
 		}
-		methodType, err := types.ParseMethodDescriptor(descriptor)
+		if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
+			continue
+		}
+		res, err := c.DumpMethod(name, descriptor)
 		if err != nil {
-			return nil, utils.Wrapf(err, "ParseMethodDescriptor(%v) failed", descriptor)
+			return nil, fmt.Errorf("dump method %s failed, %w", name, err)
 		}
-		paramsNewStrList := []string{}
-		for i, paramsType := range methodType.FunctionType().ParamTypes {
-			paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s var%d", paramsType.String(c.FuncCtx), i+1))
-		}
-		c.MethodType = methodType.FunctionType()
-		returnTypeStr := methodType.FunctionType().ReturnType.String(c.FuncCtx)
-		paramsNewStr := strings.Join(paramsNewStrList, ", ")
-		code := ""
-		c.Tab()
-		c.CurrentMethod = method
-		funcCtx := c.FuncCtx
-		funcCtx.FunctionName = name
-		//if name != "crt_data_by_Attrs" {
-		//	continue
-		//}
-		//println(name)
-		annoStrs := []string{}
-		funcCtx.FunctionType = c.MethodType
-		for _, attribute := range method.Attributes {
-			if anno, ok := attribute.(*RuntimeVisibleAnnotationsAttribute); ok {
-				for _, annotation := range anno.Annotations {
-					res, err := c.DumpAnnotation(annotation)
-					if err != nil {
-						return nil, err
-					}
-					annoStrs = append(annoStrs, res)
-				}
-			}
-			if codeAttr, ok := attribute.(*CodeAttribute); ok {
-				if name == "main" {
-					log.Debug("decompile main func")
-				}
-				statementList, err := ParseBytesCode(c, codeAttr)
-				if err != nil {
-					return nil, utils.Wrap(err, "ParseBytesCode failed")
-				}
-				sourceCode := "\n"
-				statementSet := utils.NewSet[statements.Statement]()
-				var statementToString func(statement statements.Statement) string
-				var statementListToString func(statements []statements.Statement) string
-				statementListToString = func(statementList []statements.Statement) string {
-					c.Tab()
-					defer c.UnTab()
-					var res []string
-					for _, statement := range statementList {
-						if _, ok := statement.(*statements.MiddleStatement); ok {
-							continue
-						}
-						_, ok := statement.(*statements.StackAssignStatement)
-						if ok {
-							continue
-						}
-						res = append(res, statementToString(statement))
-					}
-					return strings.Join(res, "\n")
-				}
-				statementToString = func(statement statements.Statement) (statementStr string) {
-					//if statementSet.Has(statement) {
-					//	panic("statement already exists")
-					//}
-					statementSet.Add(statement)
-					switch ret := statement.(type) {
-					case *statements.TryCatchStatement:
-						statementStr = fmt.Sprintf(c.GetTabString()+"try{\n"+
-							"%s\n"+
-							c.GetTabString()+"}", statementListToString(ret.TryBody))
-						for i, body := range ret.CatchBodies {
-							statementStr += fmt.Sprintf("catch(%s %s){\n"+
-								"%s\n"+
-								c.GetTabString()+"}", ret.Exception[i].Type().String(funcCtx), ret.Exception[i].String(funcCtx), statementListToString(body))
-						}
-					case *statements.WhileStatement:
-						statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
-							"%s\n"+
-							c.GetTabString()+"}", ret.ConditionValue.String(funcCtx), statementListToString(ret.Body))
-					case *statements.DoWhileStatement:
-						statementStr = fmt.Sprintf(c.GetTabString()+"do{\n"+
-							"%s\n"+
-							c.GetTabString()+"} while (%s);", statementListToString(ret.Body), ret.ConditionValue.String(funcCtx))
-						if ret.Label != "" {
-							statementStr = fmt.Sprintf("%s%s:\n%s", c.GetTabString(), ret.Label, statementStr)
-						}
-					case *statements.SwitchStatement:
-						getBody := func(caseItems []*statements.CaseItem) string {
-							var res []string
-							for _, st := range caseItems {
-								if st.IsDefault {
-									res = append(res, c.GetTabString()+fmt.Sprintf("default:\n%s", statementListToString(st.Body)))
-									continue
-								}
-								res = append(res, c.GetTabString()+fmt.Sprintf("case %d:\n%s", st.IntValue, statementListToString(st.Body)))
-							}
-							return strings.Join(res, "\n")
-						}
-						statementStr = fmt.Sprintf(c.GetTabString()+"switch (%s){\n"+
-							"%s\n"+
-							c.GetTabString()+"}", ret.Value.String(funcCtx), getBody(ret.Cases))
-					case *statements.IfStatement:
-						statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
-							"%s\n"+
-							c.GetTabString()+"}", ret.Condition.String(funcCtx), statementListToString(ret.IfBody))
-						if len(ret.ElseBody) > 0 {
-							statementStr += fmt.Sprintf("else{\n"+
-								"%s\n"+
-								c.GetTabString()+"}", statementListToString(ret.ElseBody))
-						}
-					case *statements.ReturnStatement:
-						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
-					case *statements.ForStatement:
-						datas := []string{}
-						datas = append(datas, ret.InitVar.String(funcCtx))
-						datas = append(datas, fmt.Sprintf("%s", ret.Condition.String(funcCtx)))
-						datas = append(datas, ret.EndExp.String(funcCtx))
-						var lines []string
-						for _, subStatement := range ret.SubStatements {
-							lines = append(lines, c.GetTabString()+"\t"+subStatement.String(funcCtx)+";")
-						}
-						s := fmt.Sprintf("%sfor(%s; %s; %s) {\n%s\n%s}", c.GetTabString(), datas[0], datas[1], datas[2], strings.Join(lines, "\n"), c.GetTabString())
-						statementStr = s
-					default:
-						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
-					}
-					return statementStr
-				}
-				for _, statement := range statementList {
-					statementStr := statementToString(statement)
-					sourceCode += fmt.Sprintf("%s\n", statementStr)
-				}
-				code = sourceCode
-			}
-		}
-		c.UnTab()
-		methodSource := ""
-		switch name {
-		case "<init>":
-			name = fmt.Sprintf("%s(%s)", c.GetConstructorMethodName(), paramsNewStr)
-			methodSource = fmt.Sprintf("%s %s {%s", accessFlags, name, code)
-		case "<clinit>":
-			methodSource = fmt.Sprintf("%s {%s", accessFlags, code)
-		default:
-			name = fmt.Sprintf("%s(%s)", name, paramsNewStr)
-			methodSource = fmt.Sprintf(`%s %s %s {%s`, accessFlags, returnTypeStr, name, code)
-		}
-		methodSource += strings.Repeat("\t", c.TabNumber()) + "}"
-		if len(annoStrs) == 0 {
-			result = append(result, methodSource)
-		} else {
-			c.Tab()
-			annoStr := strings.Join(annoStrs, c.GetTabString()+"\n")
-			c.UnTab()
-			result = append(result, annoStr+"\n"+c.GetTabString()+methodSource)
-		}
+		result = append(result, res)
 	}
 	return result, nil
 }
