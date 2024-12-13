@@ -237,8 +237,8 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		// query build in group
 		group, err := client.QuerySyntaxFlowRuleGroup(context.Background(), &ypb.QuerySyntaxFlowRuleGroupRequest{
 			Filter: &ypb.SyntaxFlowRuleGroupFilter{
-				GroupNames: []string{groupName2, groupName1},
-				IsBuildIn:  "true",
+				GroupNames:      []string{groupName2, groupName1},
+				FilterGroupKind: "buildIn",
 			},
 		})
 		require.NoError(t, err)
