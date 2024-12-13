@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -42,7 +42,7 @@ type SyntaxFlowScanManager struct {
 	client *yaklib.YakitClient
 
 	// rules
-	rules      *gorm.DB
+	ruleChan   chan *schema.SyntaxFlowRule
 	rulesCount int64
 
 	// program
@@ -178,20 +178,12 @@ func (m *SyntaxFlowScanManager) initByConfig(config *ypb.SyntaxFlowScanRequest, 
 	}
 	m.programs = config.GetProgramName()
 	m.ignoreLanguage = config.GetIgnoreLanguage()
-	m.config = config
-	m.rules = yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), config.GetFilter())
-
-	if rulesCount, err := yakit.QuerySyntaxFlowRuleCount(consts.GetGormProfileDatabase(), config.GetFilter()); err != nil {
-		return utils.Errorf("count rules failed: %s", err)
-	} else {
-		m.rulesCount = rulesCount
-	}
 
 	// init by stream
 	taskId := m.TaskId()
 
 	m.stream = stream
-	m.totalQuery = m.rulesCount * int64(len(m.programs))
+	m.config = config
 	yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
 		result.RuntimeID = taskId
 		return m.stream.Send(&ypb.SyntaxFlowScanResponse{
@@ -201,6 +193,32 @@ func (m *SyntaxFlowScanManager) initByConfig(config *ypb.SyntaxFlowScanRequest, 
 		})
 	}, taskId)
 	m.client = yakitClient
+
+	if input := config.GetRuleInput(); input != nil {
+		ruleCh := make(chan *schema.SyntaxFlowRule)
+		go func() {
+			defer close(ruleCh)
+			if rule, err := ParseSyntaxFlowInput(input); err != nil {
+				m.client.YakitError("compile rule failed: %s", err)
+			} else {
+				ruleCh <- rule
+			}
+		}()
+		m.ruleChan = ruleCh
+		m.rulesCount = 1
+
+	} else if config.GetFilter() != nil {
+		m.ruleChan = sfdb.YieldSyntaxFlowRules(
+			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), config.GetFilter()),
+			m.ctx,
+		)
+		if rulesCount, err := yakit.QuerySyntaxFlowRuleCount(consts.GetGormProfileDatabase(), config.GetFilter()); err != nil {
+			return utils.Errorf("count rules failed: %s", err)
+		} else {
+			m.rulesCount = rulesCount
+		}
+	}
+	m.totalQuery = m.rulesCount * int64(len(m.programs))
 	m.SaveTask()
 
 	return nil

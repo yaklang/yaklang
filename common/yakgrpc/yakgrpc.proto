@@ -5749,6 +5749,9 @@ message SyntaxFlowScanRequest{
 
   // 其他参数 
   bool IgnoreLanguage = 4; // 是否忽略语言 默认为false 将会只运行和当前项目语言一致的规则，最后运行的规则可能会比当前选中的规则少一些。
+
+  // for new rule scan task 
+  SyntaxFlowRuleInput RuleInput = 6; // 用于新建规则时的调试功能
 }
 
 message QuerySyntaxFlowScanTaskRequest{
