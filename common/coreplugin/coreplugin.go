@@ -129,6 +129,12 @@ func init() {
 			withPluginAuthors("z3", "go0p"),
 		)
 		registerBuildInPlugin(
+			"mitm", "Shiro 自定义检测",
+			withPluginHelp("识别Shiro应用，用户可以自行指定密钥，gadget，加密模式进行检测"),
+			withPluginAuthors("z3", "go0p"),
+			withPluginEnableGenerateParam(true),
+		)
+		registerBuildInPlugin(
 			"mitm", "SSRF HTTP Public",
 			withPluginHelp("检测参数中的 SSRF 漏洞"),
 		)
