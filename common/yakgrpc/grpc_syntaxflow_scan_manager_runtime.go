@@ -104,14 +104,11 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 	}
 
 	// if language match or ignore language
-	if res, err := prog.SyntaxFlowRule(rule, ssaapi.QueryWithContext(m.ctx)); err == nil {
-		if _, err := res.Save(m.taskID); err == nil {
-			atomic.AddInt64(&m.successQuery, 1)
-			m.notifyResult(res)
-		} else {
-			atomic.AddInt64(&m.failedQuery, 1)
-			m.client.YakitError("program %s exec rule %s result save failed: %s", prog.GetProgramName(), rule.RuleName, err)
-		}
+	if res, err := prog.SyntaxFlowRule(rule, ssaapi.QueryWithContext(m.ctx),
+		ssaapi.QueryWithTaskID(m.taskID), ssaapi.QueryWithSave(m.kind),
+	); err == nil {
+		atomic.AddInt64(&m.successQuery, 1)
+		m.notifyResult(res)
 	} else {
 		atomic.AddInt64(&m.failedQuery, 1)
 		m.client.YakitError("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)

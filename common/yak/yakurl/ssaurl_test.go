@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -112,7 +113,7 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 		prog, err := ssaapi.FromDatabase(programName)
 		require.NoError(t, err)
 		result := prog.SyntaxFlow(sfCode)
-		resultID, err := result.Save()
+		resultID, err := result.Save(schema.SFResultKindDebug)
 		require.NoError(t, err)
 		url := &ypb.RequestYakURLParams{
 			Method: "GET",

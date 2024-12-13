@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -89,7 +90,7 @@ func (a *SyntaxFlowAction) getResult(programName, code string, resultID uint) (*
 		return nil, 0, utils.Errorf("query syntaxflow failed: %v", err)
 	}
 	// save result to db
-	resultID, err = result.Save()
+	resultID, err = result.Save(schema.SFResultKindQuery)
 	if err != nil {
 		return nil, 0, utils.Errorf("save result failed: %v", err)
 	}

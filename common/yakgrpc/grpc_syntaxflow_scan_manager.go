@@ -33,6 +33,7 @@ type SyntaxFlowScanManager struct {
 	// }}
 
 	// config {{
+	kind           schema.SyntaxflowResultKind
 	ignoreLanguage bool
 	// }}
 
@@ -141,6 +142,7 @@ func (m *SyntaxFlowScanManager) SaveTask() error {
 	m.taskRecorder.SkipQuery = m.skipQuery
 	m.taskRecorder.RiskCount = m.riskCount
 	m.taskRecorder.TotalQuery = m.totalQuery
+	m.taskRecorder.Kind = m.kind
 	m.taskRecorder.Config, _ = json.Marshal(m.config)
 	return schema.SaveSyntaxFlowScanTask(consts.GetGormProjectDatabase(), m.taskRecorder)
 }
@@ -159,6 +161,7 @@ func (m *SyntaxFlowScanManager) RestoreTask(stream ypb.Yak_SyntaxFlowScanServer)
 	m.skipQuery = task.SkipQuery
 	m.riskCount = task.RiskCount
 	m.totalQuery = task.TotalQuery
+	m.kind = task.Kind
 	m.config = &ypb.SyntaxFlowScanRequest{}
 	if len(task.Config) == 0 {
 		return utils.Errorf("Config is empty")
@@ -206,7 +209,7 @@ func (m *SyntaxFlowScanManager) initByConfig(config *ypb.SyntaxFlowScanRequest, 
 		}()
 		m.ruleChan = ruleCh
 		m.rulesCount = 1
-
+		m.kind = schema.SFResultKindDebug
 	} else if config.GetFilter() != nil {
 		m.ruleChan = sfdb.YieldSyntaxFlowRules(
 			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), config.GetFilter()),
@@ -217,6 +220,7 @@ func (m *SyntaxFlowScanManager) initByConfig(config *ypb.SyntaxFlowScanRequest, 
 		} else {
 			m.rulesCount = rulesCount
 		}
+		m.kind = schema.SFResultKindScan
 	}
 	m.totalQuery = m.rulesCount * int64(len(m.programs))
 	m.SaveTask()

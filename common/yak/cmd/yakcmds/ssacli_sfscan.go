@@ -3,6 +3,9 @@ package yakcmds
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"path/filepath"
+
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,8 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"io/fs"
-	"path/filepath"
 )
 
 var SSACompilerSyntaxFlowCommand = &cli.Command{
@@ -146,7 +147,7 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 		for _, result := range results {
 			fmt.Println("-----------------------------------------")
 			fmt.Println(result.Dump(c.Bool("code")))
-			_, err := result.Save()
+			_, err := result.Save(schema.SFResultKindDebug)
 			if err != nil {
 				log.Warnf("save result into database failed: %s", err)
 			}

@@ -40,7 +40,7 @@ func LoadResultByID(resultID uint) (*SyntaxFlowResult, error) {
 	return res, nil
 }
 
-func (r *SyntaxFlowResult) Save(TaskIDs ...string) (uint, error) {
+func (r *SyntaxFlowResult) Save(kind schema.SyntaxflowResultKind, TaskIDs ...string) (uint, error) {
 	if r == nil || r.memResult == nil || r.program == nil {
 		return 0, utils.Error("result or program  is nil")
 	}
@@ -56,6 +56,7 @@ func (r *SyntaxFlowResult) Save(TaskIDs ...string) (uint, error) {
 		result.RuleName = rule.RuleName
 	}
 	// save info in result
+	result.Kind = kind
 	result.RuleTitle = rule.Title
 	result.RuleSeverity = string(schema.ValidSeverityType(rule.Severity))
 	result.RuleDesc = rule.Description
