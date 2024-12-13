@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -32,15 +33,15 @@ func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
 	require.NoError(t, err)
 	taskID1 := uuid.NewString()
 	res := prog.SyntaxFlow(syntaxFlowCode)
-	resultID1, err := res.Save(taskID1)
+	resultID1, err := res.Save(schema.SFResultKindDebug, taskID1)
 	require.NoError(t, err)
 
 	taskID2 := uuid.NewString()
 	res = prog.SyntaxFlow(syntaxFlowCode)
-	resultID2, err := res.Save(taskID2)
+	resultID2, err := res.Save(schema.SFResultKindDebug, taskID2)
 	require.NoError(t, err)
 	res = prog.SyntaxFlow(syntaxFlowCode)
-	resultID3, err := res.Save(taskID2)
+	resultID3, err := res.Save(schema.SFResultKindDebug, taskID2)
 	require.NoError(t, err)
 
 	t.Run("test query result by taskID", func(t *testing.T) {
@@ -146,7 +147,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 		require.NoError(t, err)
 
 		res := prog.SyntaxFlow(`println(* as $para); alert $para`)
-		resultID1, err := res.Save(taskID1)
+		resultID1, err := res.Save(schema.SFResultKindDebug, taskID1)
 		defer ssadb.DeleteResultByID(resultID1)
 		defer yakit.DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
 			RuntimeId: taskID1,

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -41,7 +42,7 @@ func queryAndSave(t *testing.T) (func(), *ssaapi.SyntaxFlowResult) {
 	require.NotNil(t, res)
 
 	// save result
-	resultID, err := res.Save()
+	resultID, err := res.Save(schema.SFResultKindDebug)
 	require.NoError(t, err)
 	_ = resultID
 	return func() {
@@ -172,7 +173,7 @@ func TestRuleAlertMsg(t *testing.T) {
 		res, err := prog.SyntaxFlowWithError(syntaxFlowCode)
 		require.NoError(t, err)
 
-		resultID, err := res.Save()
+		resultID, err := res.Save(schema.SFResultKindDebug)
 		defer ssadb.DeleteResultByID(resultID)
 		require.NoError(t, err)
 
@@ -201,7 +202,7 @@ func TestRuleAlertMsg(t *testing.T) {
 		res, err := prog.SyntaxFlowRuleName(ruleName)
 		require.NoError(t, err)
 
-		resultID, err := res.Save()
+		resultID, err := res.Save(schema.SFResultKindDebug)
 		defer ssadb.DeleteResultByID(resultID)
 		require.NoError(t, err)
 
@@ -251,7 +252,7 @@ func TestRuleRisk(t *testing.T) {
 	require.NoError(t, err)
 
 	taskID := uuid.NewString()
-	resultID, err := res.Save(taskID)
+	resultID, err := res.Save(schema.SFResultKindDebug, taskID)
 	defer ssadb.DeleteResultByID(resultID)
 	defer yakit.DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
 		RuntimeId: taskID,

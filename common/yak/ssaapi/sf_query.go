@@ -31,6 +31,7 @@ type queryConfig struct {
 
 	// save
 	save   bool
+	kind   schema.SyntaxflowResultKind
 	taskID string
 
 	// control
@@ -118,7 +119,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	// runtime
 	res, err := frame.Feed(value, config.opts...)
 	if err != nil {
-		return nil, utils.Wrap(err, "SyntaxflowQuery: feed failed")
+		return nil, utils.Wrap(err, "SyntaxflowQuery: query rule failed")
 	}
 	ret := CreateResultFromQuery(res)
 
@@ -129,10 +130,10 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		// save ret
 		if config.save {
 			process(float64(total-1)/float64(total), "save result")
-			resultID, err := ret.Save(config.taskID)
+			resultID, err := ret.Save(config.kind, config.taskID)
 			_ = resultID
 			if err != nil {
-				return ret, utils.Wrap(err, "SyntaxflowQuery: save failed")
+				return ret, utils.Wrap(err, "SyntaxflowQuery: save to DB failed")
 			}
 		}
 	}
@@ -179,9 +180,10 @@ func QueryWithVM(vm *sfvm.SyntaxFlowVirtualMachine) QueryOption {
 	}
 }
 
-func QueryWithSave() QueryOption {
+func QueryWithSave(kind schema.SyntaxflowResultKind) QueryOption {
 	return func(c *queryConfig) {
 		c.save = true
+		c.kind = kind
 	}
 }
 

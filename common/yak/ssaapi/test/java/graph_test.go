@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
@@ -77,7 +78,7 @@ check $source then "XXE Attack" else "XXE Safe";
 		require.NoError(t, err)
 		require.NotNil(t, res)
 
-		resultID, err := res.Save()
+		resultID, err := res.Save(schema.SFResultKindDebug)
 		require.NoError(t, err)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programName)

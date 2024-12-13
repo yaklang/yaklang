@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -86,7 +87,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_SSAPrograms_Query(t *testing.T) {
 		}
 		`)
 		require.NoError(t, err)
-		resultId, err := res.Save()
+		resultId, err := res.Save(schema.SFResultKindDebug)
 		_ = resultId
 		require.NoError(t, err)
 
