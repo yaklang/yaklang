@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -53,7 +55,7 @@ func removeGroups(client ypb.YakClient, ruleNames []string, groupNames []string)
 func queryRuleGroupCount(client ypb.YakClient, groupName string) (int, error) {
 	req := &ypb.QuerySyntaxFlowRuleGroupRequest{
 		Filter: &ypb.SyntaxFlowRuleGroupFilter{
-			KeyWord: groupName,
+			GroupNames: []string{groupName},
 		},
 	}
 	rsp, err := client.QuerySyntaxFlowRuleGroup(context.Background(), req)
@@ -102,8 +104,13 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		}
 		_, err := deleteRuleGroup(client, groupNames)
 		require.NoError(t, err)
-		count := sfdb.GetRuleCountByGroupName(consts.GetGormProfileDatabase(), groupNames...)
-		require.Equal(t, int32(0), count)
+		afterDeleteGroup, err := client.QuerySyntaxFlowRuleGroup(context.Background(), &ypb.QuerySyntaxFlowRuleGroupRequest{
+			Filter: &ypb.SyntaxFlowRuleGroupFilter{
+				GroupNames: groupNames,
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 0, len(afterDeleteGroup.GetGroup()))
 		for _, groupName := range groupNames {
 			afterDeleteCount, err := queryRuleGroupCount(client, groupName)
 			require.NoError(t, err)
@@ -323,5 +330,20 @@ func TestGRPCMUSTPASS_SynatxFlow_Query_Same_Group(t *testing.T) {
 		groups, err := querySameGroup([]string{ruleName1})
 		require.NoError(t, err)
 		require.Equal(t, 3, len(groups))
+	})
+
+	t.Run("aa", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		groupName := uuid.NewString()
+		sfdb.CreateRule(&schema.SyntaxFlowRule{
+			RuleName: ruleName,
+		})
+		sfdb.BatchAddGroupsForRules(consts.GetGormProfileDatabase(), []string{ruleName}, []string{groupName})
+		db := consts.GetGormProfileDatabase()
+		var group schema.SyntaxFlowGroup
+		db = db.Preload("Rules")
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "group_name", []string{groupName})
+		db.First(&group)
+		require.Equal(t, 1, len(group.Rules))
 	})
 }

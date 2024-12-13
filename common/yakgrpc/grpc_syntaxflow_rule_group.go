@@ -14,7 +14,11 @@ func (s *Server) QuerySyntaxFlowRuleGroup(ctx context.Context, req *ypb.QuerySyn
 	if err != nil {
 		return nil, err
 	}
-	return &ypb.QuerySyntaxFlowRuleGroupResponse{Group: result}, nil
+	var groups []*ypb.SyntaxFlowGroup
+	for _, group := range result {
+		groups = append(groups, group.ToGRPCModel())
+	}
+	return &ypb.QuerySyntaxFlowRuleGroupResponse{Group: groups}, nil
 }
 
 func (s *Server) DeleteSyntaxFlowRuleGroup(ctx context.Context, req *ypb.DeleteSyntaxFlowRuleGroupRequest) (*ypb.DbOperateMessage, error) {
