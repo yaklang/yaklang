@@ -377,7 +377,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 
 			paramsNewStrList := []string{}
 			for _, val := range params {
-				paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.String(c.FuncCtx), val.String(c.FuncCtx)))
+				paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
 			}
 			c.MethodType = methodType.FunctionType()
 			paramsNewStr = strings.Join(paramsNewStrList, ", ")
