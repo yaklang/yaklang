@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
@@ -107,6 +108,8 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.Language = rule.GetLanguage()
 	updateRule.Content = rule.GetContent()
 	updateRule.Tag = strings.Join(rule.GetTags(), ",")
+	updateRule.Description = rule.GetDescription()
+	updateRule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
 	db = db.Model(&schema.SyntaxFlowRule{})
 	if err := db.Save(updateRule).Error; err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
@@ -117,13 +120,16 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 func QuerySameGroupByRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowGroup, error) {
 	db = FilterSyntaxFlowRule(db, req)
 	var rules []*schema.SyntaxFlowRule
-	db.Model(&schema.SyntaxFlowRule{}).Preload("Groups").Find(&rules)
-	var groups []*schema.SyntaxFlowGroup
+	err := db.Model(&schema.SyntaxFlowRule{}).Preload("Groups").Find(&rules).Error
+	if err != nil {
+		return nil, err
+	}
+	var groups [][]*schema.SyntaxFlowGroup
 	for _, rule := range rules {
-		groups = append(groups, rule.Groups...)
+		groups = append(groups, rule.Groups)
 	}
-	if len(rules) > 1 {
-		groups = sfdb.GetIntersectionGroup(groups)
+	if len(rules) == 1 {
+		return rules[0].Groups, nil
 	}
-	return groups, nil
+	return sfdb.GetIntersectionGroup(consts.GetGormProfileDatabase(), groups), nil
 }

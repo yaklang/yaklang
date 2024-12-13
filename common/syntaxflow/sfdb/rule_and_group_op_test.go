@@ -169,14 +169,13 @@ func TestRule_Group_OP(t *testing.T) {
 		require.Equal(t, 0, len(queryRule.Groups))
 	})
 	t.Run("test GetIntersectionGroup", func(t *testing.T) {
-		creatGroup := func(groupName string) *schema.SyntaxFlowGroup {
-			group := &schema.SyntaxFlowGroup{GroupName: groupName}
-			return group
-		}
+		groupA, err := CreateGroup(db, uuid.NewString())
+		require.NoError(t, err)
+		groupB, err := CreateGroup(db, uuid.NewString())
+		require.NoError(t, err)
+		groupC, err := CreateGroup(db, uuid.NewString())
+		require.NoError(t, err)
 
-		groupA := creatGroup(uuid.NewString())
-		groupB := creatGroup(uuid.NewString())
-		groupC := creatGroup(uuid.NewString())
 		t.Cleanup(func() {
 			err := DeleteGroup(db, groupA.GroupName)
 			require.NoError(t, err)
@@ -186,20 +185,22 @@ func TestRule_Group_OP(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		groups := []*schema.SyntaxFlowGroup{groupA, groupB, groupC}
-		ret := GetIntersectionGroup(groups)
-		require.Nil(t, ret)
+		groups := [][]*schema.SyntaxFlowGroup{{groupA}, {groupB}, {groupC}}
+		ret := GetIntersectionGroup(db, groups)
+		require.Equal(t, 0, len(ret))
 
-		groups = []*schema.SyntaxFlowGroup{groupA, groupB, groupA}
-		ret = GetIntersectionGroup(groups)
+		groups = [][]*schema.SyntaxFlowGroup{{groupA, groupB}, {groupB, groupC}}
+		ret = GetIntersectionGroup(db, groups)
 		require.Equal(t, 1, len(ret))
-		require.Equal(t, groupA, ret[0])
+		require.Equal(t, groupB.GroupName, ret[0].GroupName)
 
-		groups = []*schema.SyntaxFlowGroup{groupA, groupB, groupC, groupA, groupB}
-		ret = GetIntersectionGroup(groups)
-		require.Equal(t, 2, len(ret))
-		require.Contains(t, ret, groupA)
-		require.Contains(t, ret, groupB)
+		groups = [][]*schema.SyntaxFlowGroup{{groupA, groupB, groupC}, {groupA, groupB, groupC}}
+		ret = GetIntersectionGroup(db, groups)
+		require.Equal(t, 3, len(ret))
+
+		groups = [][]*schema.SyntaxFlowGroup{{groupA, groupB, groupC}, {groupB, groupC}, {groupC}}
+		ret = GetIntersectionGroup(db, groups)
+		require.Equal(t, 1, len(ret))
 	})
 
 	t.Run("test GetOrCreateGroups", func(t *testing.T) {
