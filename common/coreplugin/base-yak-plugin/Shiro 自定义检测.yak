@@ -182,12 +182,14 @@ keys = [
 
 if keyMode == "cover" {
     keys = str.ParseStringToLines(extraKey)
-    if len(keys) == 0 {
+    k = str.RemoveRepeat(keys)
+    if len(k) == 0 {
         yakit.Error("密钥不能为空")
         return
     }
 }else if keyMode =="append" {
     eks =  str.ParseStringToLines(extraKey)
+    k = str.RemoveRepeat(eks)
     keys = append(keys, eks...)
 }
 
