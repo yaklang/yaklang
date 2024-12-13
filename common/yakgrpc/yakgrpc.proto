@@ -5690,7 +5690,7 @@ message SyntaxFlowRuleGroupFilter {
   repeated string GroupNames = 2;
   // for fuzzing search
   string KeyWord = 1;
-  string  IsBuildIn = 3; // "true"表示获取内置组，其它字符串表示获取非内置组，填空表示获取所有组
+  string  FilterGroupKind = 3; // "buildIn"内置组，"unBuildIn"非内置组, 空为所有
 }
 
 message SyntaxFlowGroup{
