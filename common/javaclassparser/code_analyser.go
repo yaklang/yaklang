@@ -2,8 +2,10 @@ package javaclassparser
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
@@ -50,9 +52,12 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		if err != nil {
 			log.Errorf("parse descriptor failed:%s", desc)
 		}
-		return values.NewJavaClassMember(className, name, typ)
+		val := values.NewJavaClassMember(className, name, desc, typ)
+		return val
 	}
 	switch ret := constant.(type) {
+	case *ConstantMethodHandleInfo:
+		return GetValueFromCP(pool, int(ret.ReferenceIndex))
 	case *ConstantMemberrefInfo:
 		return convertMemberInfo(ret)
 	case *ConstantInterfaceMethodrefInfo:
@@ -61,7 +66,6 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	case *ConstantFieldrefInfo:
 		classInfo := indexFromPool(int(ret.ClassIndex)).(*ConstantClassInfo)
 		nameInfo := indexFromPool(int(classInfo.NameIndex)).(*ConstantUtf8Info)
-
 		nameAndType := indexFromPool(int(ret.NameAndTypeIndex)).(*ConstantNameAndTypeInfo)
 		refNameInfo := indexFromPool(int(nameAndType.NameIndex)).(*ConstantUtf8Info)
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
@@ -71,7 +75,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		if err != nil {
 			log.Errorf("parse descriptor failed:%s", descInfo.Value)
 		}
-		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, typ)
+		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value, typ)
 		return classIns
 	case *ConstantMethodrefInfo:
 		classInfo := indexFromPool(int(ret.ClassIndex)).(*ConstantClassInfo)
@@ -86,7 +90,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		if err != nil {
 			log.Errorf("parse descriptor failed:%s", descInfo.Value)
 		}
-		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, typ)
+		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value, typ)
 		return classIns
 	case *ConstantClassInfo:
 		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
@@ -105,6 +109,18 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		typeName = strings.Replace(typeName, "/", ".", -1)
 		log.Warn("TODO: the java module should be a new java type")
 		return values.NewJavaClassValue(types.NewJavaClass(typeName))
+	case *ConstantMethodTypeInfo:
+		descInfo := indexFromPool(int(ret.DescriptorIndex)).(*ConstantUtf8Info)
+		typ, err := types.ParseMethodDescriptor(descInfo.Value)
+		if err != nil {
+			log.Errorf("parse descriptor failed:%s", descInfo.Value)
+		}
+		_ = typ
+		return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+			return "<MethodType Class Instance>"
+		}, func() types.JavaType {
+			return types.NewJavaClass("java.lang.invoke.MethodType")
+		})
 	default:
 		panic("failed")
 	}
@@ -129,7 +145,7 @@ func GetLiteralFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	case *ConstantPackageInfo:
 		return GetValueFromCP(pool, index)
 	default:
-		panic("failed")
+		return GetValueFromCP(pool, index)
 	}
 }
 
@@ -138,11 +154,16 @@ type VarMap struct {
 	val values.JavaValue
 }
 
-func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute) ([]statements.Statement, error) {
+func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id int) ([]values.JavaValue,[]statements.Statement, error) {
 	pool := dumper.ConstantPool
 	parser := core.NewDecompiler(codeAttr.Code, func(id int) values.JavaValue {
 		return GetValueFromCP(dumper.ConstantPool, id)
 	})
+	parser.BaseVarId = id
+	parser.DumpClassLambdaMethod = func(name, desc string, id int) (string, error) {
+		dumper.lambdaMethods[name] = append(dumper.lambdaMethods[name], desc)
+		return dumper.DumpMethodWithInitialId(name, desc, id)
+	}
 	parser.FunctionContext = dumper.FuncCtx
 	parser.FunctionType = dumper.MethodType
 	//parser.FunctionContext.FunctionName
@@ -157,21 +178,39 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute) ([]state
 			CatchType: entry.CatchType,
 		})
 	}
-
-	parser.ConstantPoolInvokeDynamicInfo = func(index int) (string, string) {
-		indexFromPool := func(i int) ConstantInfo {
-			return pool[i-1]
+	attrInterfaces := lo.Filter(dumper.obj.Attributes, func(item AttributeInfo, index int) bool {
+		_, ok := item.(*BootstrapMethodsAttribute)
+		return ok
+	})
+	attrs := lo.Map(attrInterfaces, func(item AttributeInfo, index int) *BootstrapMethodsAttribute {
+		return item.(*BootstrapMethodsAttribute)
+	})
+	var bootstrapMethod []*BootstrapMethod
+	if len(attrs) > 0 {
+		bootstrapMethod = attrs[0].BootstrapMethods
+	}
+	for _, method := range bootstrapMethod {
+		val := GetValueFromCP(pool, int(method.BootstrapMethodRef))
+		arguments := make([]values.JavaValue, len(method.BootstrapArguments))
+		for i, arg := range method.BootstrapArguments {
+			arguments[i] = GetLiteralFromCP(pool, int(arg))
 		}
+		parser.BootstrapMethods = append(parser.BootstrapMethods, &core.BootstrapMethod{
+			Ref:       val,
+			Arguments: arguments,
+		})
+	}
+
+	parser.ConstantPoolInvokeDynamicInfo = func(index int) (uint16, string, string) {
 		constant := pool[index-1]
 		switch ret := constant.(type) {
 		case *ConstantInvokeDynamicInfo:
-			nameAndTypeInfo := indexFromPool(int(ret.NameAndTypeIndex)).(*ConstantNameAndTypeInfo)
-			name := indexFromPool(int(nameAndTypeInfo.NameIndex)).(*ConstantUtf8Info).Value
-			desc := indexFromPool(int(nameAndTypeInfo.DescriptorIndex)).(*ConstantUtf8Info).Value
-			return name, desc
+			name, desc := getNameAndType(dumper.ConstantPool, ret.NameAndTypeIndex)
+			return ret.BootstrapMethodAttrIndex, name, desc
 		default:
 			panic("error")
 		}
 	}
-	return decompiler.ParseBytesCode(parser)
+	st,err := decompiler.ParseBytesCode(parser)
+	return parser.Params, st, err
 }

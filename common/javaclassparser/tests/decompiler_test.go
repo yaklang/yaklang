@@ -17,9 +17,9 @@ func TestDecompiler(t *testing.T) {
 	testCase := []struct {
 		name string
 	}{
-		//{
-		//	"LambdaTest",
-		//},
+		{
+			"LambdaTest",
+		},
 		{
 			"IfTest",
 		},
