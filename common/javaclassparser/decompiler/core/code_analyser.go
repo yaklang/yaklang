@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/utils"
@@ -15,30 +16,38 @@ import (
 	"strings"
 )
 
+type BootstrapMethod struct {
+	Ref       values.JavaValue
+	Arguments []values.JavaValue
+}
 type ExceptionTableEntry struct {
 	StartPc   uint16
 	EndPc     uint16
 	HandlerPc uint16
 	CatchType uint16
 }
+
 type Decompiler struct {
 	FunctionType                  *types.JavaFuncType
 	opcodeToSimulateStack         map[*OpCode]*StackSimulationImpl
 	FunctionContext               *class_context.ClassContext
 	varTable                      map[int]*values.JavaRef
 	valueToRef                    map[values.JavaValue][2]any
-	currentVarId                  int
 	bytecodes                     []byte
 	opCodes                       []*OpCode
 	RootOpCode                    *OpCode
 	RootNode                      *Node
 	constantPoolGetter            func(id int) values.JavaValue
 	ConstantPoolLiteralGetter     func(constantPoolGetterid int) values.JavaValue
-	ConstantPoolInvokeDynamicInfo func(id int) (string, string)
+	ConstantPoolInvokeDynamicInfo func(id int) (uint16, string, string)
 	offsetToOpcodeIndex           map[uint16]int
 	opcodeIndexToOffset           map[int]uint16
 	ExceptionTable                []*ExceptionTableEntry
+	BootstrapMethods              []*BootstrapMethod
+	DumpClassLambdaMethod         func(name, desc string, id int) (string, error)
 	CurrentId                     int
+	BaseVarId                     int
+	Params                        []values.JavaValue
 }
 
 func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.JavaValue) *Decompiler {
@@ -49,7 +58,6 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 		offsetToOpcodeIndex: map[uint16]int{},
 		opcodeIndexToOffset: map[int]uint16{},
 		varTable:            map[int]*values.JavaRef{},
-		currentVarId:        -1,
 		valueToRef:          map[values.JavaValue][2]any{},
 	}
 }
@@ -251,13 +259,6 @@ func (d *Decompiler) getPoolValue(index int) values.JavaValue {
 
 func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation, opcode *OpCode) error {
 	funcCtx := d.FunctionContext
-	lambdaIndex := 0
-	getLambdaIndex := func() int {
-		defer func() {
-			lambdaIndex++
-		}()
-		return lambdaIndex
-	}
 	checkAndConvertRef := func(value values.JavaValue) {
 		if _, ok := runtimeStackSimulation.Peek().(*values.JavaRef); !ok {
 			val := runtimeStackSimulation.Pop().(values.JavaValue)
@@ -493,18 +494,35 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			runtimeStackSimulation.Push(funcCallValue)
 		}
 	case OP_INVOKEDYNAMIC:
-		name, desc := d.ConstantPoolInvokeDynamicInfo(int(Convert2bytesToInt(opcode.Data)))
-		typ, err := types.ParseMethodDescriptor(desc)
+		index, name, desc := d.ConstantPoolInvokeDynamicInfo(int(Convert2bytesToInt(opcode.Data)))
+		_ = name
+		_ = desc
+		callSiteReturnType, err := types.ParseMethodDescriptor(desc)
 		if err != nil {
 			return err
 		}
-		_ = name
-		lambdaCall := values.NewLambdaFuncRef(getLambdaIndex(), nil, typ.FunctionType().ReturnType)
-		for i := 0; i < len(typ.FunctionType().ParamTypes); i++ {
-			lambdaCall.Arguments = append(lambdaCall.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
+		//callerClassName := callSiteReturnType.String(d.FunctionContext)
+		//values.NewJavaClassMember(callerClassName, name, callSiteReturnType)
+		//var typ types.JavaType
+		args := []values.JavaValue{}
+		paramLen := len(callSiteReturnType.FunctionType().ParamTypes)
+		for i := 0; i < paramLen; i++ {
+			args = append(args, runtimeStackSimulation.Pop())
 		}
-		if typ.FunctionType().ReturnType.String(funcCtx) != types.NewJavaPrimer(types.JavaVoid).String(funcCtx) {
-			runtimeStackSimulation.Push(lambdaCall)
+		refMethod := d.BootstrapMethods[index]
+		memberInfo := refMethod.Ref.(*values.JavaClassMember)
+		var callResult values.JavaValue
+		if f := buildinBootstrapMethods[fmt.Sprintf("%s.%s", memberInfo.Name, memberInfo.Member)]; f != nil {
+			callResult, err = f(refMethod.Arguments...)(d, runtimeStackSimulation, callSiteReturnType.FunctionType().ReturnType, args...)
+			if err != nil {
+				return fmt.Errorf("call bootstrap method error: %v", err)
+			}
+		} else {
+			callResult, err = buildinBootstrapMethods["defaultBootstrapMethod"]()(d, runtimeStackSimulation, callSiteReturnType.FunctionType().ReturnType, args...)
+			return fmt.Errorf("call bootstrap method error: %v", err)
+		}
+		if callResult.String(funcCtx) != types.NewJavaPrimer(types.JavaVoid).String(funcCtx) {
+			runtimeStackSimulation.Push(callResult)
 		}
 	case OP_INVOKESPECIAL:
 		classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
@@ -844,6 +862,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 
 	initMethodVar := func(runtimeSim StackSimulation) {
 		i := 0
+		params := []values.JavaValue{}
 		for _, paramType := range d.FunctionType.ParamTypes {
 			//assignStackVar(values.NewJavaRef(stackVarIndex, paramType))
 			runtimeSim.AssignVar(i, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
@@ -851,8 +870,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			}, func() types.JavaType {
 				return paramType
 			}))
-			i += GetTypeSize(paramType)
+			val := runtimeSim.GetVar(i)
+			params = append(params, val)
 		}
+		d.Params = params
 		if !d.FunctionContext.IsStatic {
 			runtimeSim.GetVar(0).IsThis = true
 		}
@@ -881,13 +902,13 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		}
 	}
 	nodeToVarTable := map[*OpCode][]any{}
-	getVarTable := func(code *OpCode) (map[int]*values.JavaRef, int) {
+	getVarTable := func(code *OpCode) (map[int]*values.JavaRef, *utils2.VariableId) {
 		if vt, ok := nodeToVarTable[code]; ok {
-			return vt[0].(map[int]*values.JavaRef), vt[1].(int)
+			return vt[0].(map[int]*values.JavaRef), vt[1].(*utils2.VariableId)
 		}
-		return nil, 0
+		return nil, utils2.NewVariableId(&d.BaseVarId)
 	}
-	setVarTable := func(code *OpCode, vt map[int]*values.JavaRef, id int) {
+	setVarTable := func(code *OpCode, vt map[int]*values.JavaRef, id *utils2.VariableId) {
 		nodeToVarTable[code] = []any{vt, id}
 	}
 	err = WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
@@ -895,7 +916,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		if len(code.Source) == 0 {
 			if code.Instr.OpCode == OP_START {
 				emptySim := NewEmptyStackEntry()
-				runtimeStackSimulation = NewStackSimulation(emptySim, map[int]*values.JavaRef{}, 0)
+				runtimeStackSimulation = NewStackSimulation(emptySim, map[int]*values.JavaRef{}, utils2.NewVariableId(&d.BaseVarId))
 				initMethodVar(runtimeStackSimulation)
 			} else {
 				return nil, fmt.Errorf("opcode %d has no source", code.Id)
@@ -1154,7 +1175,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			newOpcode.Target = append(newOpcode.Target, code)
 			code.Source = append(code.Source, newOpcode)
 			emptySim := NewEmptyStackEntry()
-			sim := NewStackSimulation(emptySim, map[int]*values.JavaRef{}, 0)
+			sim := NewStackSimulation(emptySim, map[int]*values.JavaRef{}, utils2.NewVariableId(&d.BaseVarId))
 			initMethodVar(sim)
 			sim.Push(val)
 			newOpcode.StackEntry = sim.stackEntry

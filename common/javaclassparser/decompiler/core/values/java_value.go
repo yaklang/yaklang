@@ -3,11 +3,12 @@ package values
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 )
 
 type JavaRef struct {
-	Id          int
+	Id          *utils.VariableId
 	StackVar    JavaValue
 	CustomValue *CustomValue
 	IsThis      bool
@@ -28,10 +29,10 @@ func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
 	if j.StackVar != nil {
 		return j.StackVar.String(funcCtx)
 	}
-	return fmt.Sprintf("var%d", j.Id)
+	return j.Id.String()
 }
 
-func NewJavaRef(id int, val JavaValue) *JavaRef {
+func NewJavaRef(id *utils.VariableId, val JavaValue) *JavaRef {
 	return &JavaRef{
 		Id:  id,
 		Val: val,
@@ -124,11 +125,12 @@ func (j *JavaClassMember) String(funcCtx *class_context.ClassContext) string {
 	name := funcCtx.ShortTypeName(j.Name)
 	return fmt.Sprintf("%s.%s", name, j.Member)
 }
-func NewJavaClassMember(typeName, member string, typ types.JavaType) *JavaClassMember {
+func NewJavaClassMember(typeName, member string, desc string, typ types.JavaType) *JavaClassMember {
 	return &JavaClassMember{
-		Name:     typeName,
-		Member:   member,
-		JavaType: typ,
+		Name:        typeName,
+		Member:      member,
+		Description: desc,
+		JavaType:    typ,
 	}
 }
 

@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"golang.org/x/exp/maps"
 )
@@ -58,6 +59,8 @@ type StackSimulation interface {
 	Push(values.JavaValue)
 	Peek() values.JavaValue
 	NewVar(val values.JavaValue) *values.JavaRef
+	GetVarId() *utils.VariableId
+	SetVarId(*utils.VariableId)
 	AssignVar(slot int, val values.JavaValue) (*values.JavaRef, bool)
 	GetVar(slot int) *values.JavaRef
 }
@@ -68,7 +71,15 @@ var _ StackSimulation = &StackSimulationProxy{}
 type StackSimulationImpl struct {
 	stackEntry   *StackItem
 	varTable     map[int]*values.JavaRef
-	currentVarId int
+	currentVarId *utils.VariableId
+}
+
+func (s *StackSimulationImpl) GetVarId() *utils.VariableId {
+	return s.currentVarId
+}
+
+func (s *StackSimulationImpl) SetVarId(id *utils.VariableId) {
+	s.currentVarId = id
 }
 
 func (s *StackSimulationImpl) GetVar(slot int) *values.JavaRef {
@@ -77,7 +88,7 @@ func (s *StackSimulationImpl) GetVar(slot int) *values.JavaRef {
 
 func (s *StackSimulationImpl) NewVar(val values.JavaValue) *values.JavaRef {
 	defer func() {
-		s.currentVarId++
+		s.currentVarId = s.currentVarId.Next()
 	}()
 	newRef := values.NewJavaRef(s.currentVarId, val)
 	//d.idToValue[d.currentVarId] = val
@@ -98,11 +109,11 @@ func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values
 func NewEmptyStackEntry() *StackItem {
 	return newStackItem(nil, nil)
 }
-func NewStackSimulation(entry *StackItem, varTable map[int]*values.JavaRef, id int) *StackSimulationImpl {
+func NewStackSimulation(entry *StackItem, varTable map[int]*values.JavaRef, generator *utils.VariableId) *StackSimulationImpl {
 	sim := &StackSimulationImpl{
 		stackEntry:   entry,
 		varTable:     map[int]*values.JavaRef{},
-		currentVarId: id,
+		currentVarId: generator,
 	}
 	maps.Copy(sim.varTable, varTable)
 	return sim
