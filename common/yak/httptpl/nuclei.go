@@ -260,7 +260,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 			hasMatcherOrExtractor = true
 		}
 		reqIns.StopAtFirstMatch = nodeGetBool(node, "stop-at-first-match")
-		reqIns.CookieInherit = nodeGetBool(node, "cookie-reuse")
+		reqIns.CookieInherit = !nodeGetBool(node, "disable-cookie")
 		reqIns.MaxSize = int(nodeGetInt64(node, "max-size"))
 		reqIns.NoFixContentLength = nodeGetBool(node, "unsafe")
 		reqIns.AfterRequested = nodeGetBool(node, "req-condition")
