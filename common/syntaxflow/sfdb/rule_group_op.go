@@ -104,17 +104,49 @@ func QueryGroupsByName(db *gorm.DB, groupNames []string) ([]*schema.SyntaxFlowGr
 	return groups, nil
 }
 
-func GetIntersectionGroup(groups []*schema.SyntaxFlowGroup) []*schema.SyntaxFlowGroup {
-	var result []*schema.SyntaxFlowGroup
-	groupMap := make(map[string]struct{})
-	for _, group := range groups {
-		if _, ok := groupMap[group.GroupName]; !ok {
-			groupMap[group.GroupName] = struct{}{}
-			continue
-		}
-		result = append(result, group)
+func GetIntersectionGroup(db *gorm.DB, groups [][]*schema.SyntaxFlowGroup) []*schema.SyntaxFlowGroup {
+	var groupNames [][]string
+	lo.ForEach(groups, func(group []*schema.SyntaxFlowGroup, _ int) {
+		var names []string
+		lo.ForEach(group, func(item *schema.SyntaxFlowGroup, _ int) {
+			names = append(names, item.GroupName)
+		})
+		groupNames = append(groupNames, names)
+	})
+
+	if len(groupNames) == 0 {
+		return []*schema.SyntaxFlowGroup{}
 	}
+
+	groupCount := make(map[string]int)
+	for _, names := range groupNames {
+		lo.ForEach(names, func(name string, _ int) {
+			if _, ok := groupCount[name]; ok {
+				groupCount[name]++
+			} else {
+				groupCount[name] = 1
+			}
+		})
+	}
+
+	var resultName []string
+	for name, count := range groupCount {
+		if count == len(groupNames) {
+			resultName = append(resultName, name)
+		}
+	}
+	result, _ := QueryGroupsByName(db, resultName)
 	return result
+
+	//set := utils.NewSet[](groupNames)
+	//for i := 1; i < len(groupNames); i++ {
+	//	other := utils.NewSet[[]string](groupNames[i])
+	//	set = set.And(other)
+	//	if set.IsEmpty() {
+	//		return []*schema.SyntaxFlowGroup{}
+	//	}
+	//}
+
 }
 
 // AddDefaultGroupForRule 为规则添加默认分组
@@ -217,15 +249,7 @@ func DeleteGroup(db *gorm.DB, groupName string) error {
 // RenameGroup 重命名组
 func RenameGroup(db *gorm.DB, oldName, newName string) error {
 	db = db.Model(&schema.SyntaxFlowGroup{})
-	var existingGroup schema.SyntaxFlowGroup
-	err := db.Where("group_name = ? ", newName).First(&existingGroup).Error
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return utils.Errorf("rename group failed: %s", err)
-	} else if err == nil {
-		return utils.Errorf("rename group failed: new group name %s already exist.", newName)
-	}
-
-	err = db.Where("group_name = ?", oldName).Update("group_name", newName).Error
+	err := db.Where("group_name = ?", oldName).Update("group_name", newName).Error
 	if err != nil {
 		return utils.Errorf("rename group failed: %s", err)
 	}
