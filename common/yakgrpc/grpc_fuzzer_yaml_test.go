@@ -72,7 +72,7 @@ func CompareNucleiYaml(yaml1, yaml2 string) error {
 		}
 		for k, v := range req1 {
 			switch k {
-			case "stop-at-first-macth", "cookie-reuse", "max-size", "unsafe", "redirects", "max-redirects":
+			case "stop-at-first-macth", "disable-cookie", "max-size", "unsafe", "redirects", "max-redirects":
 				if v != req2[k] {
 					return errors.New(fmt.Sprintf("key %s not equal", k))
 				}
@@ -114,7 +114,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_CompareNucleiYamlFunc(t *testing.T) {
       password:
         - admin
     attack: pitchfork
-    cookie-reuse: true
+    disable-cookie: true
     matchers:
       - type: dsl
         dsl:
@@ -147,7 +147,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_CompareNucleiYamlFunc(t *testing.T) {
       password:
         - admin
     attack: pitchfork
-    cookie-reuse: true
+    disable-cookie: true
     matchers:
       - type: dsl
         dsl:
@@ -182,7 +182,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_CompareNucleiYamlFunc(t *testing.T) {
       password:
         - admin
     attack: pitchfork
-    cookie-reuse: true
+    disable-cookie: true
     redirects: true
     max-redirects: 10
     matchers:
@@ -217,7 +217,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_CompareNucleiYamlFunc(t *testing.T) {
       password:
         - admin
     attack: pitchfork
-    cookie-reuse: true
+    disable-cookie: true
     matchers:
       - type: dsl
         dsl:
@@ -252,7 +252,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_CompareNucleiYamlFunc(t *testing.T) {
       password:
         - admin
     attack: pitchfork
-    cookie-reuse: true
+    disable-cookie: true
     redirects: true
     max-redirects: 10
     matchers:
@@ -287,7 +287,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_CompareNucleiYamlFunc(t *testing.T) {
       password:
         - admin
     attack: pitchfork
-    cookie-reuse: true
+    disable-cookie: true
     redirects: true
     max-redirects: 10
     matchers:
@@ -614,7 +614,7 @@ http:
 
         action=parse-media-shortcode&shortcode=[wptripadvisor_usetemplate+tid="1+AND+(SELECT+42+FROM+(SELECT(SLEEP(6)))b)"]
 
-    cookie-reuse: true
+    disable-cookie: true
     matchers:
       - type: dsl
         dsl:
@@ -645,7 +645,7 @@ http:
 
         action=parse-media-shortcode&shortcode=[wptripadvisor_usetemplate+tid="1+AND+(SELECT+42+FROM+(SELECT(SLEEP(6)))b)"]
 
-    cookie-reuse: true
+    disable-cookie: true
     matchers:
       - type: dsl
         dsl:
@@ -710,7 +710,7 @@ http:
 
         searchinput=%E2%80%9C%2F%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E&submit=
 
-    cookie-reuse: true
+    disable-cookie: true
     redirects: true
     matchers:
       - type: dsl
@@ -728,7 +728,7 @@ http:
 
         searchinput=%E2%80%9C%2F%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E&submit=
 
-    cookie-reuse: true
+    disable-cookie: true
     redirects: true
     matchers:
       - type: dsl
@@ -768,7 +768,7 @@ http:
       password:
         - admin
     attack: pitchfork
-    cookie-reuse: true
+    disable-cookie: true
     matchers:
       - type: dsl
         dsl:
@@ -800,7 +800,7 @@ http:
         X-Requested-With: XMLHttpRequest
         Referer: http://www.example.com
 
-    cookie-reuse: true
+    disable-cookie: true
     matchers:
       - type: dsl
         dsl:
@@ -841,7 +841,7 @@ http:
   - '{{RootURL}}/?action=getTitle2'
   - '{{RootURL}}/?check={{title}}'
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
   extractors:
   - id: 1
@@ -864,7 +864,7 @@ http:
   - '{{RootURL}}/?action=getTitle2'
   - '{{RootURL}}/?check={{title}}'
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
   extractors:
   - name: title
@@ -926,7 +926,7 @@ http:
   - '{{RootURL}}/?action=getTitle1'
   - '{{RootURL}}/?action=getTitle2'
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
   matchers:
   - id: 1
@@ -948,7 +948,7 @@ http:
   - '{{RootURL}}/?action=getTitle1'
   - '{{RootURL}}/?action=getTitle2'
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
   matchers:
   - id: 2
@@ -970,7 +970,7 @@ http:
   - '{{RootURL}}/?action=getTitle1'
   - '{{RootURL}}/?action=getTitle2'
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
   matchers:
   - type: word
@@ -991,7 +991,7 @@ http:
   - '{{RootURL}}/?action=getTitle1'
   - '{{RootURL}}/?action=getTitle2'
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
   matchers:
   - type: word
@@ -1012,7 +1012,7 @@ http:
   - '{{RootURL}}/?action=getTitle1'
   - '{{RootURL}}/?action=getTitle2'
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
   matchers:
   - id: 1
@@ -1052,7 +1052,7 @@ http:
   - '{{RootURL}}/?action=getTitle1'
   - '{{RootURL}}/?action=getTitle2'
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
   matchers:
   - id: 1
@@ -1128,7 +1128,7 @@ http:
   path:
   - '{{RootURL}}/?action=getTitle1'
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
   matchers:
   - id: 1
@@ -1144,7 +1144,7 @@ http:
   - '{{RootURL}}/?action=getTitle1'
   - '{{RootURL}}/?action=getTitle1'
   max-redirects: 3
-  cookie-reuse: true
+  disable-cookie: true
   matchers-condition: and
   matchers:
   - id: 1
