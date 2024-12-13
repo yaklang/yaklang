@@ -23,6 +23,7 @@ func FilterSyntaxFlowResult(rawDB *gorm.DB, filter *ypb.SyntaxFlowResultFilter) 
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", filter.GetRuleNames())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramNames())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_severity", filter.GetSeverity())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "kind", filter.GetKind())
 
 	if filter.GetAfterID() > 0 {
 		db = db.Where("id > ?", filter.GetAfterID())

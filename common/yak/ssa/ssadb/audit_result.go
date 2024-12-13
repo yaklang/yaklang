@@ -117,6 +117,7 @@ func (r *AuditResult) ToGRPCModel() *ypb.SyntaxFlowResult {
 		Language:    r.Language,
 		RiskCount:   r.RiskCount,
 		RuleContent: r.RuleContent,
+		Kind:        string(r.Kind),
 	}
 	return res
 }
