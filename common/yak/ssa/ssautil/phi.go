@@ -52,7 +52,7 @@ func (base *ScopedVersionedTable[T]) CoverBy(scope ScopedVersionedTableIF[T]) {
 // Merge merge the sub-scope to current scope,
 // if hasSelf is true: the current scope will be merged to the result
 func (base *ScopedVersionedTable[T]) Merge(
-	hasSelf bool,
+	hasSelf, setLocal bool,
 	merge MergeHandle[T],
 	subScopes ...ScopedVersionedTableIF[T],
 ) {
@@ -71,11 +71,23 @@ func (base *ScopedVersionedTable[T]) Merge(
 
 	addPhiContent := func(index int, name string, ver VersionedIF[T], sub ScopedVersionedTableIF[T]) {
 		variable := ver
-		if find := sub.GetParent().ReadVariable(name); find != nil {
-			if sub.IsSameOrSubScope(find.GetScope()) {
-				variable = find
+		parentScope := sub.GetParent()
+
+		var Check func(scope ScopedVersionedTableIF[T])
+		Check = func(scope ScopedVersionedTableIF[T]) {
+			if scope == nil {
+				return
+			}
+			if find := scope.ReadVariable(name); find != nil {
+				if sub.IsSameOrSubScope(find.GetScope()) {
+					variable = find
+				}
+				if !find.GetLocal() {
+					Check(scope.GetParent())
+				}
 			}
 		}
+		Check(parentScope)
 
 		m, ok := tmpVariable[variable]
 		if !ok {
@@ -110,7 +122,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 		//	log.Infof("merge phi %s: edges count: %v", name, len(m))
 		//}
 		ret := merge(name, m)
-		if base.GetParent().GetParent() == variable.GetScope() {
+		if base.GetParent().GetParent() == variable.GetScope() && setLocal {
 			v := base.CreateVariable(name, variable.GetLocal())
 			phi[v] = ret
 		} else {

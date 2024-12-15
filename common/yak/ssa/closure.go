@@ -34,10 +34,16 @@ func (f *Function) AddForceSideEffect(name string, v Value) {
 
 func (f *Function) AddSideEffect(variable *Variable, v Value) {
 	var bind *Variable
-	if p := f.builder.parentBuilder; p != nil {
-		if value := p.PeekValue(variable.GetName()); value != nil {
-			bind = value.GetVariable(variable.GetName())
+
+	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
+		parentScope := p.CurrentBlock.ScopeTable
+		if find := ReadVariableFromScopeAndParent(parentScope, variable.GetName()); find != nil {
+			bind = find
+			break
 		}
+	}
+	if bind == nil {
+		bind = variable
 	}
 
 	f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
@@ -54,18 +60,21 @@ func (f *Function) AddSideEffect(variable *Variable, v Value) {
 
 func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
 	var bind *Variable
-	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
-		if value := p.PeekValue(variable.GetName()); value != nil {
-			bind = value.GetVariable(variable.GetName())
-			break
-		} else {
-			if obj := variable.object; obj == nil {
 
-			} else if value := p.PeekValue(obj.GetName()); value != nil {
-				bind = value.GetVariable(obj.GetName())
+	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
+		parentScope := p.CurrentBlock.ScopeTable
+		if find := ReadVariableFromScopeAndParent(parentScope, variable.GetName()); find != nil {
+			bind = find
+			break
+		} else if obj := variable.object; obj != nil {
+			if find := ReadVariableFromScopeAndParent(parentScope, obj.GetName()); find != nil {
+				bind = find
 				break
 			}
 		}
+	}
+	if bind == nil {
+		bind = variable
 	}
 
 	if variable.IsMemberCall() {

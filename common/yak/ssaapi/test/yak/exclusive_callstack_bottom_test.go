@@ -72,7 +72,7 @@ func TestYaklang_SideEffect(t *testing.T) {
 		c = a+1;
 		`
 		ssatest.Check(t, code,
-			ssatest.CheckBottomUser_Contain("o", []string{"phi(a)["}, true),
+			ssatest.CheckBottomUser_Contain("o", []string{"phi(a)[", "FreeValue-a"}, true),
 		)
 	})
 

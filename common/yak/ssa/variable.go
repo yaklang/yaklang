@@ -123,6 +123,15 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 }
 
 func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
+	if ret := scope.ReadVariable(name, true); ret != nil {
+		if variable, ok := ret.(*Variable); ok {
+			return variable
+		}
+	}
+	return nil
+}
+
+func ReadVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
 	if ret := scope.ReadVariable(name); ret != nil {
 		if variable, ok := ret.(*Variable); ok {
 			return variable
@@ -131,18 +140,30 @@ func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
 	return nil
 }
 
-func ReadVariableFromCurrentScope(scope ScopeIF, name string) *Variable {
-	if ret := scope.ReadVariableFromCurrentScope(name); ret != nil {
-		if variable, ok := ret.(*Variable); ok {
-			return variable
+func GetFristVariableFromScope(scope ScopeIF, name string) *Variable {
+	if variables := scope.GetAllVariables(name, true); variables != nil {
+		for _, variable := range variables {
+			if ret, ok := variable.(*Variable); ok {
+				return ret
+			}
 		}
 	}
 	return nil
 }
 
-// 查找当前以及父类scope中的第一个local Variable
-func GetLocalVariableFromScope(scope ScopeIF, name string) *Variable {
-	if variables := scope.GetVariables(name); variables != nil {
+func GetFristVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
+	if variables := scope.GetAllVariables(name); variables != nil {
+		for _, variable := range variables {
+			if ret, ok := variable.(*Variable); ok {
+				return ret
+			}
+		}
+	}
+	return nil
+}
+
+func GetFristLocalVariableFromScope(scope ScopeIF, name string) *Variable {
+	if variables := scope.GetAllVariables(name, true); variables != nil {
 		for _, variable := range variables {
 			if variable.GetLocal() {
 				if ret, ok := variable.(*Variable); ok {
@@ -154,22 +175,34 @@ func GetLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 	return nil
 }
 
-// 查找当前以及父类scope中的第一个Variable
-func GetVariableFromScope(scope ScopeIF, name string) *Variable {
-	if variables := scope.GetVariables(name); variables != nil {
+func GetFristLocalVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
+	if variables := scope.GetAllVariables(name); variables != nil {
 		for _, variable := range variables {
-			if ret, ok := variable.(*Variable); ok {
-				return ret
+			if variable.GetLocal() {
+				if ret, ok := variable.(*Variable); ok {
+					return ret
+				}
 			}
 		}
 	}
 	return nil
 }
 
-// 查找当前以及父类scope中的所有Variable
-func GetVariablesFromScope(scope ScopeIF, name string) []*Variable {
+func GetAllVariablesFromScope(scope ScopeIF, name string) []*Variable {
 	var rets []*Variable
-	if variables := scope.GetVariables(name); variables != nil {
+	if variables := scope.GetAllVariables(name, true); variables != nil {
+		for _, variable := range variables {
+			if ret, ok := variable.(*Variable); ok {
+				rets = append(rets, ret)
+			}
+		}
+	}
+	return rets
+}
+
+func GetAllVariablesFromScopeAndParent(scope ScopeIF, name string) []*Variable {
+	var rets []*Variable
+	if variables := scope.GetAllVariables(name); variables != nil {
 		for _, variable := range variables {
 			if ret, ok := variable.(*Variable); ok {
 				rets = append(rets, ret)

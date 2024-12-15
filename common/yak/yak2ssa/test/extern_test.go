@@ -49,6 +49,19 @@ func TestExternValue(t *testing.T) {
 		test.CheckTestCase(t, tc)
 	}
 
+	checkIsFunctionOrFreeValue := func(t *testing.T, tc test.TestCase) {
+		tc.ExternValue = map[string]any{
+			"println": func(v ...any) {},
+		}
+		tc.Check = func(prog *ssaapi.Program, want []string) {
+			ps := prog.Ref("target").ShowWithSource()
+			require.NotEqual(t, 0, len(ps), "target should has value")
+			require.Equal(t, true, ps[0].IsFunction(), "target should all is function")
+			require.Equal(t, true, ps[1].IsFreeValue(), "target should all is free value")
+		}
+		test.CheckTestCase(t, tc)
+	}
+
 	t.Run("use normal", func(t *testing.T) {
 		checkIsFunction(t, test.TestCase{
 			Code: `
@@ -78,7 +91,8 @@ func TestExternValue(t *testing.T) {
 	})
 
 	t.Run("use in closure can capture", func(t *testing.T) {
-		checkIsFunction(t, test.TestCase{
+		// 目前捕获到的side-effect会格外生成一个freevalue
+		checkIsFunctionOrFreeValue(t, test.TestCase{
 			Code: `
 			target = println
 			f = () => {

@@ -152,10 +152,11 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 					for key, value := range result.GetAllMember() {
 						variable := value.GetLastVariable()
 						functionType.SideEffects = append(functionType.SideEffects, &FunctionSideEffect{
-							Name:        variable.GetName(),
-							VerboseName: getMemberVerboseName(result, key),
-							Variable:    variable,
-							Modify:      value,
+							Name:         variable.GetName(),
+							VerboseName:  getMemberVerboseName(result, key),
+							Variable:     variable,
+							BindVariable: variable,
+							Modify:       value,
 							parameterMemberInner: &parameterMemberInner{
 								MemberCallKind: CallMemberCall,
 								MemberCallKey:  key,
@@ -224,7 +225,7 @@ func (f *Function) Finish() {
 	for _, se := range f.SideEffectsReturn {
 		if se.Modify.GetBlock() != nil {
 			scope := se.Modify.GetBlock().ScopeTable
-			if ret := GetLocalVariableFromScope(scope, se.Name); ret != nil {
+			if ret := GetFristLocalVariableFromScopeAndParent(scope, se.Name); ret != nil {
 				if ret.GetLocal() {
 					continue
 				}

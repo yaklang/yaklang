@@ -264,6 +264,14 @@ func (lz *LazyInstruction) IsSideEffect() bool {
 	return lz.ir.Opcode == int64(SSAOpcodeSideEffect)
 }
 
+func (lz *LazyInstruction) IsPhi() bool {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return false
+	}
+	return lz.ir.Opcode == int64(SSAOpcodePhi)
+}
+
 func (lz *LazyInstruction) GetProgramName() string {
 	if lz.ir == nil {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")

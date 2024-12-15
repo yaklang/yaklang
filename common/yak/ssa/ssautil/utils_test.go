@@ -11,6 +11,7 @@ type value interface {
 	IsUndefined() bool
 	IsParameter() bool
 	IsSideEffect() bool
+	IsPhi() bool
 	SelfDelete()
 	GetId() int64
 }
@@ -50,6 +51,7 @@ func (p *phi) String() string {
 func (p *phi) IsUndefined() bool  { return false }
 func (p *phi) IsParameter() bool  { return false }
 func (p *phi) IsSideEffect() bool { return false }
+func (p *phi) IsPhi() bool        { return true }
 func (p *phi) SelfDelete()        {}
 
 type constsIns struct {
@@ -74,6 +76,7 @@ func (c *constsIns) String() string {
 func (p *constsIns) IsUndefined() bool  { return false }
 func (p *constsIns) IsParameter() bool  { return false }
 func (p *constsIns) IsSideEffect() bool { return false }
+func (p *constsIns) IsPhi() bool        { return false }
 func (p *constsIns) SelfDelete()        {}
 
 type binary struct {
@@ -107,6 +110,7 @@ func (b *binary) String() string {
 func (p *binary) IsUndefined() bool  { return false }
 func (p *binary) IsParameter() bool  { return false }
 func (p *binary) IsSideEffect() bool { return false }
+func (p *binary) IsPhi() bool        { return false }
 func (p *binary) SelfDelete()        {}
 
 // ======== builder
