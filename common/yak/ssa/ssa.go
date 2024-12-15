@@ -90,6 +90,7 @@ type Node interface {
 	IsUndefined() bool
 	IsParameter() bool
 	IsSideEffect() bool
+	IsPhi() bool
 }
 
 type Typed interface {
@@ -508,6 +509,10 @@ type Phi struct {
 	// branch *Instruction // loop or if :
 }
 
+func (p *Phi) IsPhi() bool {
+	return true
+}
+
 var (
 	_ Node        = (*Phi)(nil)
 	_ Value       = (*Phi)(nil)
@@ -632,10 +637,6 @@ func (p *Parameter) SetDefault(v Value) {
 
 func (p *Parameter) IsParameter() bool {
 	return true
-}
-
-func (p *Parameter) IsSideEffect() bool {
-	return false
 }
 
 var (
@@ -764,14 +765,6 @@ type SideEffect struct {
 	anValue
 	CallSite Value // call instruction
 	Value    Value // modify to this value
-}
-
-func (p *SideEffect) IsUndefined() bool {
-	return false
-}
-
-func (p *SideEffect) IsParameter() bool {
-	return false
 }
 
 func (p *SideEffect) IsSideEffect() bool {

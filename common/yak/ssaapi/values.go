@@ -351,14 +351,14 @@ func (v *Value) GetUsers() Values {
 	}
 
 	appendUser := func(node ssa.Value) {
-		v.users = lo.FilterMap(node.GetUsers(),
-			func(ssaVal ssa.User, _ int) (*Value, bool) {
+		v.users = append(v.users,
+			lo.FilterMap(node.GetUsers(), func(ssaVal ssa.User, _ int) (*Value, bool) {
 				if value, ok := ssa.ToValue(ssaVal); ok {
 					return v.NewValue(value), true
 				}
 				return nil, false
 			},
-		)
+			)...)
 	}
 
 	if v.users == nil {
