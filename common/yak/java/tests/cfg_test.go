@@ -201,9 +201,9 @@ func TestJavaBasic_Variable_Switch(t *testing.T) {
 			a = 22;
 			println(a);
 		case 3,4:
-			 a=33;
+			a = 33;
 			println(a);
-}
+		}
 	    println(a);
 		`, []string{
 			"22",

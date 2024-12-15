@@ -55,6 +55,10 @@ func (i *anInstruction) IsSideEffect() bool {
 	return false
 }
 
+func (i *anInstruction) IsPhi() bool {
+	return false
+}
+
 func (i *anInstruction) IsBlock(name string) bool {
 	if i.GetOpcode() == SSAOpcodeBasicBlock {
 		return strings.HasPrefix(i.GetName(), name)

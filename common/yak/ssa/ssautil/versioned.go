@@ -19,6 +19,7 @@ type SSAValue interface {
 	IsUndefined() bool
 	IsParameter() bool
 	IsSideEffect() bool
+	IsPhi() bool
 	SelfDelete()
 	GetId() int64
 }

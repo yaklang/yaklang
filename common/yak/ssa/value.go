@@ -76,7 +76,7 @@ func (b *FunctionBuilder) readValueEx(
 ) Value {
 	scope := b.CurrentBlock.ScopeTable
 	program := b.GetProgram()
-	if ret := ReadVariableFromScope(scope, name); ret != nil {
+	if ret := ReadVariableFromScopeAndParent(scope, name); ret != nil {
 		if b.CurrentRange != nil {
 			ret.AddRange(b.CurrentRange, false)
 			// set offset variable
@@ -172,7 +172,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	// if not freeValue, or not `a = a`(just create FreeValue)
 	if !variable.GetLocal() && b.SupportClosure {
 		if parentValue, ok := b.getParentFunctionVariable(variable.GetName()); ok &&
-			GetLocalVariableFromScope(scope, variable.GetName()) == nil {
+			GetFristLocalVariableFromScopeAndParent(scope, variable.GetName()) == nil {
 			parentValue.AddMask(value)
 			v := parentValue.GetVariable(variable.GetName())
 			b.AddSideEffect(v, value)
@@ -198,11 +198,11 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 
 // CreateVariable create variable
 func (b *FunctionBuilder) CreateLocalVariable(name string) *Variable {
-	return b.createVariableEx(name, true)
+	return b.createVariableEx(name, true, false)
 }
 
 func (b *FunctionBuilder) CreateVariableForce(name string, pos ...CanStartStopToken) *Variable {
-	return b.createVariableEx(name, false, pos...)
+	return b.createVariableEx(name, false, false, pos...)
 }
 
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
@@ -213,25 +213,54 @@ func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) 
 			}
 		}
 	}
-	return b.createVariableEx(name, false, pos...)
+	return b.createVariableEx(name, false, b.SupportClosure, pos...)
 }
 
-func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...CanStartStopToken) *Variable {
+func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, createFreeValue bool, pos ...CanStartStopToken) *Variable {
 	scope := b.CurrentBlock.ScopeTable
-	ret := scope.CreateVariable(name, isLocal).(*Variable)
+
+	ret := scope.CreateVariable(name, isLocal)
+	variable := ret.(*Variable)
+
 	r := b.CurrentRange
 	if r == nil && len(pos) > 0 {
 		r = b.GetCurrentRange(pos[0])
 	}
 	if r != nil {
-		ret.SetDefRange(r)
+		variable.SetDefRange(r)
 	}
 	// set offset variable for program
 	program := b.GetProgram()
 	if program != nil {
-		program.SetOffsetVariable(ret, b.CurrentRange)
+		program.SetOffsetVariable(variable, b.CurrentRange)
 	}
-	return ret
+	return variable
+}
+
+func (b *FunctionBuilder) CreateVariableHead(name string, pos ...CanStartStopToken) *Variable {
+	return b.CreateVariableHeadEx(name, false, pos...)
+}
+
+func (b *FunctionBuilder) CreateVariableHeadEx(name string, isLocal bool, pos ...CanStartStopToken) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+	headScope := scope.GetHead()
+
+	ret := headScope.CreateVariable(name, isLocal)
+	variable := ret.(*Variable)
+
+	r := b.CurrentRange
+	if r == nil && len(pos) > 0 {
+		r = b.GetCurrentRange(pos[0])
+	}
+	if r != nil {
+		variable.SetDefRange(r)
+	}
+	// set offset variable for program
+	program := b.GetProgram()
+	if program != nil {
+		program.SetOffsetVariable(variable, b.CurrentRange)
+	}
+	return variable
 }
 
 // // CreateLocalVariable create local variable
@@ -251,38 +280,41 @@ func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...Can
 func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 	scope := b.CurrentBlock.ScopeTable
 	headScope := scope.GetHead()
-	if value := headScope.ReadValue(name); value != nil {
-		if freeValue, ok := ToParameter(value); ok {
+	if variable := headScope.ReadVariable(name); variable != nil {
+		value := variable.GetValue()
+		// TODO: 这里读取到的freevalue可能是同名但是不同variable的情况（由side-effect生成的修改外部的freevalue）
+		if freeValue, ok := ToParameter(value); ok && freeValue.IsFreeValue && name == freeValue.GetName() {
+			return freeValue
+		} else {
+			freeValue := NewParam(name, true, b)
+			b.FreeValues[variable.(*Variable)] = freeValue
 			return freeValue
 		}
 	}
+
 	freeValue := NewParam(name, true, b)
-	if variable := ReadVariableFromScope(headScope, name); variable != nil {
-		b.FreeValues[variable] = freeValue
-	} else {
-		v := headScope.CreateVariable(name, false)
-		headScope.AssignVariable(v, freeValue)
-		b.FreeValues[v.(*Variable)] = freeValue
-	}
+	v := b.CreateVariableHead(name)
+	headScope.AssignVariable(v, freeValue)
+	b.FreeValues[v] = freeValue
 
 	// b.WriteVariable(variable, freeValue)
 	return freeValue
 }
 
 func (b *FunctionBuilder) BuildFreeValueByVariable(variable *Variable) *Parameter {
-	name := variable.GetName()
 	scope := b.CurrentBlock.ScopeTable
 	headScope := scope.GetHead()
+
+	name := variable.GetName()
 	freeValue := NewParam(name, true, b)
-	if value := headScope.ReadValue(name); value != nil {
-		if freeValueFinded, ok := ToParameter(value); ok {
+	freeValue.SetRange(b.CurrentRange)
+	if find := headScope.ReadVariable(name); find != nil && variable != find {
+		if freeValueFinded, ok := ToParameter(find.GetValue()); ok {
 			return freeValueFinded
 		}
 	} else {
 		b.FreeValues[variable] = freeValue
 		// b.WriteVariable(variable, freeValue)
-		v := headScope.CreateVariable(name, false)
-		headScope.AssignVariable(v, freeValue)
 	}
 	return freeValue
 }
@@ -297,7 +329,7 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 	// check is Capture parent-function value
 	parentScope := b.parentScope
 	for parentScope != nil {
-		if parentVariable := ReadVariableFromScope(parentScope.scope, name); parentVariable != nil {
+		if parentVariable := ReadVariableFromScopeAndParent(parentScope.scope, name); parentVariable != nil {
 			return parentVariable.Value, true
 		}
 		parentScope = parentScope.next
@@ -307,7 +339,7 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 
 func (b *FunctionBuilder) getCurrentScopeVariable(name string) *Variable {
 	scope := b.CurrentBlock.ScopeTable
-	if variable := ReadVariableFromCurrentScope(scope, name); variable != nil {
+	if variable := ReadVariableFromScope(scope, name); variable != nil {
 		return variable
 	}
 	return nil

@@ -25,12 +25,11 @@ type MergeHandle[T comparable] func(string, []T) T
 // ScopedVersionedTableIF is the interface for scope versioned table
 type ScopedVersionedTableIF[T versionedValue] interface {
 	// Read Variable by name
-	ReadVariable(name string) VersionedIF[T]
-	ReadVariableFromCurrentScope(name string) VersionedIF[T]
+	ReadVariable(name string, iscurrent ...bool) VersionedIF[T]
 	// read value by name
 	ReadValue(name string) T
 
-	GetVariables(name string) []VersionedIF[T]
+	GetAllVariables(name string, iscurrent ...bool) []VersionedIF[T]
 
 	// create variable, if isLocal is true, the variable is local
 	CreateVariable(name string, isLocal bool) VersionedIF[T]
@@ -66,7 +65,7 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 
 	// use in phi
 	CoverBy(ScopedVersionedTableIF[T])
-	Merge(bool, MergeHandle[T], ...ScopedVersionedTableIF[T])
+	Merge(bool, bool, MergeHandle[T], ...ScopedVersionedTableIF[T])
 	Spin(ScopedVersionedTableIF[T], ScopedVersionedTableIF[T], SpinHandle[T])
 	SetSpin(func(string) T)
 
@@ -314,16 +313,21 @@ func (v *ScopedVersionedTable[T]) getAllVersionInCurrentLexicalScope(name string
 	return v.linkValues.GetAll(name)
 }
 
-func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
+func (scope *ScopedVersionedTable[T]) ReadVariable(name string, current ...bool) VersionedIF[T] {
 	// var parent = v
 	// for parent != nil {
 	var ret VersionedIF[T]
 	var isLocal bool = false
+	isCurrent := false
+	if len(current) > 0 {
+		isCurrent = current[0]
+	}
+
 	if result := scope.getLatestVersionInCurrentLexicalScope(name); result != nil {
 		ret = result
 	} else {
-		if scope.GetParent() != nil {
-			ret = scope.GetParent().ReadVariable(name)
+		if scope.GetParent() != nil && !isCurrent {
+			ret = scope.GetParent().ReadVariable(name, current...)
 		} else {
 			ret = nil
 		}
@@ -345,39 +349,18 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 	return ret
 }
 
-func (scope *ScopedVersionedTable[T]) ReadVariableFromCurrentScope(name string) VersionedIF[T] {
-	// var parent = v
-	// for parent != nil {
-	var ret VersionedIF[T]
-	var isLocal bool = false
-	if result := scope.getLatestVersionInCurrentLexicalScope(name); result != nil {
-		ret = result
-	}
-	if ret != nil && !scope.Compare(ret.GetScope()) {
-		// not in current scope
-		if scope.spin {
-			if scope.GetParent() == ret.GetScope() {
-				isLocal = ret.GetLocal()
-			}
-			t := scope.CreateVariable(name, isLocal)
-			scope.AssignVariable(t, scope.createEmptyPhi(name))
-			// t.origin = ret
-			scope.linkIncomingPhi[name] = t
-			ret = t
-		}
-	}
-
-	return ret
-}
-
-func (scope *ScopedVersionedTable[T]) GetVariables(name string) []VersionedIF[T] {
+func (scope *ScopedVersionedTable[T]) GetAllVariables(name string, current ...bool) []VersionedIF[T] {
 	var ret []VersionedIF[T]
+	isCurrent := false
+	if len(current) > 0 {
+		isCurrent = current[0]
+	}
 
 	if result := scope.getAllVersionInCurrentLexicalScope(name); result != nil {
 		ret = append(result, ret...)
 	}
-	if scope.GetParent() != nil {
-		ret = append(ret, scope.GetParent().GetVariables(name)...)
+	if scope.GetParent() != nil && !isCurrent {
+		ret = append(ret, scope.GetParent().GetAllVariables(name, current...)...)
 	}
 	return ret
 }

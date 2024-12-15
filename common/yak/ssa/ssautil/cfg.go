@@ -108,7 +108,7 @@ func (i *IfStmt[T]) BuildFinish(
 
 	endScopec := i.lastConditionScope.CreateShadowScope()
 	endScopec.Merge(
-		!i.hasElse, // has base
+		!i.hasElse, true, // has base
 		mergeHandler,
 		i.BodyScopes...,
 	)
@@ -204,7 +204,7 @@ func (l *LoopStmt[T]) Build(
 	// latch
 	latch := l.body.CreateSubScope()
 	latch.Merge(
-		true,
+		true, true,
 		mergeLatch,
 		l.MergeToLatch...,
 	)
@@ -223,7 +223,7 @@ func (l *LoopStmt[T]) Build(
 	end.CoverBy(l.header)
 
 	end.Merge(
-		true,
+		true, true,
 		mergeEnd,
 		l.MergeToEnd...,
 	)
@@ -264,7 +264,7 @@ func (t *TryStmt[T]) SetError(name string) {
 func (t *TryStmt[T]) AddCache(build func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T]) {
 	catchBody := t.global.CreateSubScope()
 	catchBody.Merge(
-		true,
+		true, true,
 		t.mergeHandler,
 		t.tryBody,
 	)
@@ -282,7 +282,7 @@ func (t *TryStmt[T]) CreateFinally() ScopedVersionedTableIF[T] {
 
 func (t *TryStmt[T]) SetFinal(build func() ScopedVersionedTableIF[T]) {
 	t.finalBody.Merge(
-		false, t.mergeHandler,
+		false, true, t.mergeHandler,
 		t.mergeBody...,
 	)
 	ret := build()
@@ -305,7 +305,7 @@ func (t *TryStmt[T]) Build() ScopedVersionedTableIF[T] {
 		end.CoverBy(t.finalBody)
 	} else {
 		end.Merge(
-			false, t.mergeHandler,
+			false, true, t.mergeHandler,
 			t.mergeBody...,
 		)
 	}
@@ -347,7 +347,7 @@ func (s *SwitchStmt[T]) BuildBody(
 ) {
 	sub := s.condition.CreateSubScope()
 	if s.mergeToNextBody != nil {
-		sub.Merge(true, merge, s.mergeToNextBody)
+		sub.Merge(true, false, merge, s.mergeToNextBody)
 		s.mergeToNextBody = nil
 	}
 	retBody, retSvt := body(sub)
@@ -389,7 +389,7 @@ func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[
 		// if switch default break to switch end
 		// just merge
 		endc.Merge(
-			false,
+			false, true,
 			merge,
 			s.mergeToSwitchEnd...,
 		)
@@ -404,7 +404,7 @@ func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[
 			// has default, no break, just cover by default
 			endc.CoverBy(s.mergeToSwitchEnd[0])
 		default:
-			endc.Merge(false, merge, s.mergeToSwitchEnd...)
+			endc.Merge(false, true, merge, s.mergeToSwitchEnd...)
 		}
 	}
 
@@ -430,7 +430,7 @@ func (s *GotoStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[T]
 	parent := s._goto.GetParent()
 	end := parent.CreateShadowScope()
 	end.Merge(
-		false,
+		false, true,
 		merge,
 		s._goto,
 		s.enter,

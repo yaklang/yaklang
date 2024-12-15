@@ -289,6 +289,8 @@ func (c *Call) handleCalleeFunction() {
 			if se.BindVariable != nil {
 				// BindVariable大多数时候和Variable相同，除非遇到object
 				bindScope = se.BindVariable.GetScope()
+			} else if se.Variable != nil {
+				bindScope = se.Variable.GetScope()
 			} else {
 				bindScope = currentScope
 			}
@@ -297,7 +299,7 @@ func (c *Call) handleCalleeFunction() {
 
 			// is object
 			if se.MemberCallKind == NoMemberCall {
-				if ret := GetLocalVariableFromScope(currentScope, se.Name); ret != nil {
+				if ret := GetFristLocalVariableFromScopeAndParent(currentScope, se.Name); ret != nil {
 					if modifyScope.IsSameOrSubScope(ret.GetScope()) {
 						continue
 					}
@@ -315,10 +317,12 @@ func (c *Call) handleCalleeFunction() {
 
 			if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
 				if builder.SupportClosure {
-					if se.BindVariable != nil {
+					if parentValue, ok := builder.getParentFunctionVariable(se.Name); ok && se.BindVariable != nil {
+						// the ret variable should be FreeValue
 						para := builder.BuildFreeValueByVariable(se.BindVariable)
-						para.SetDefault(se.Modify)
-						para.SetType(se.Modify.GetType())
+						para.SetDefault(parentValue)
+						para.SetType(parentValue.GetType())
+						parentValue.AddOccultation(para)
 					}
 				}
 
@@ -365,9 +369,9 @@ func (c *Call) handleCalleeFunction() {
 				var GetScope func(ScopeIF, string, *FunctionBuilder) *Variable
 				GetScope = func(scope ScopeIF, name string, builder *FunctionBuilder) *Variable {
 					var ret *Variable
-					if vairable := GetLocalVariableFromScope(scope, name); vairable != nil {
+					if vairable := GetFristLocalVariableFromScopeAndParent(scope, name); vairable != nil {
 						ret = vairable
-					} else if vairable := GetVariableFromScope(scope, name); vairable != nil {
+					} else if vairable := GetFristVariableFromScopeAndParent(scope, name); vairable != nil {
 						ret = vairable
 					}
 					if ret == nil {
