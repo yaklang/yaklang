@@ -11,12 +11,10 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"io"
 	"slices"
 	"strings"
 )
-
-const classTemplate = "%s class %s%s {%s}"
-const attrTemplate = `%s %s %s {%s}`
 
 type ClassObjectDumper struct {
 	imports       map[string]struct{}
@@ -69,7 +67,6 @@ func (c *ClassObjectDumper) UnTab() {
 	c.deepStack.Pop()
 }
 func (c *ClassObjectDumper) DumpClass() (string, error) {
-	result := classTemplate
 	accessFlagsVerbose := c.obj.AccessFlagsVerbose
 	//if len(accessFlagsVerbose) < 1 {
 	//	return "", utils.Error("accessFlagsVerbose is empty")
@@ -158,8 +155,10 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			attrs += fmt.Sprintf("\t%s\n", method)
 		}
 	}
-
-	result = fmt.Sprintf(result, accessFlags, className, superStr, attrs)
+	if accessFlags != "" {
+		accessFlags = accessFlags + " "
+	}
+	result := fmt.Sprintf("%sclass %s%s {%s}", accessFlags, className, superStr, attrs)
 	if len(annoStrs) > 0 {
 		result = fmt.Sprintf("%s\n%s", strings.Join(annoStrs, "\n"), result)
 	}
@@ -334,10 +333,17 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	}
 
 	c.FuncCtx.IsStatic = method.AccessFlags&StaticFlag == StaticFlag
-		accessFlagsVerbose := getMethodAccessFlagsVerbose(method.AccessFlags)
-	//if len(accessFlagsVerbose) < 1 {
-	//	return nil, utils.Error("method accessFlagsVerbose is empty")
-	//}
+	accessFlagsVerbose := getMethodAccessFlagsVerbose(method.AccessFlags)
+
+	var isVarArgs bool
+	accessFlagsVerbose = lo.Filter(accessFlagsVerbose, func(item string, index int) bool {
+		if item == "varargs" {
+			isVarArgs = true
+			return false
+		}
+		return true
+	})
+
 	accessFlags := strings.Join(accessFlagsVerbose, " ")
 	methodType, err := types.ParseMethodDescriptor(descriptor)
 	if err != nil {
@@ -368,9 +374,6 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			}
 		}
 		if codeAttr, ok := attribute.(*CodeAttribute); ok {
-			if name == "main" {
-				log.Debug("decompile main func")
-			}
 			params, statementList, err := ParseBytesCode(c, codeAttr, id)
 			if err != nil {
 				return "", utils.Wrap(err, "ParseBytesCode failed")
@@ -381,8 +384,12 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				}
 			}
 			paramsNewStrList := []string{}
-			for _, val := range params {
-				paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
+			for i, val := range params {
+				if i == len(params)-1 && isVarArgs {
+					paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", val.Type().ElementType().String(c.FuncCtx), val.String(c.FuncCtx)))
+				} else {
+					paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
+				}
 			}
 			c.MethodType = methodType.FunctionType()
 			paramsNewStr = strings.Join(paramsNewStrList, ", ")
@@ -413,6 +420,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				//}
 				statementSet.Add(statement)
 				switch ret := statement.(type) {
+				case *statements.SynchronizedStatement:
+					statementStr = fmt.Sprintf(c.GetTabString()+"synchronized(%s){\n"+
+						"%s\n"+
+						c.GetTabString()+"}", ret.Argument.String(funcCtx), statementListToString(ret.Body))
 				case *statements.TryCatchStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"try{\n"+
 						"%s\n"+
@@ -475,7 +486,12 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				}
 				return statementStr
 			}
-			for _, statement := range statementList {
+			for i, statement := range statementList {
+				if i == len(statementList)-1 && methodType.FunctionType().ReturnType.String(funcCtx) == "void" {
+					if _, ok := statement.(*statements.ReturnStatement); ok {
+						continue
+					}
+				}
 				statementStr := statementToString(statement)
 				sourceCode += fmt.Sprintf("%s\n", statementStr)
 			}
@@ -488,18 +504,56 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		res += strings.Repeat("\t", c.TabNumber()) + "}"
 		return res, nil
 	}
-	methodSource := ""
+	methodSourceBuffer := strings.Builder{}
+	writeAccessFlags := func(buffer io.Writer) {
+		if accessFlags != "" {
+			methodSourceBuffer.Write([]byte(accessFlags + " "))
+		}
+	}
+	writeName := func(buffer io.Writer) {
+		if name == "<init>" {
+			methodSourceBuffer.Write([]byte(c.GetConstructorMethodName()))
+		} else {
+			methodSourceBuffer.Write([]byte(name))
+		}
+	}
+	writeArguments := func(buffer io.Writer) {
+		methodSourceBuffer.Write([]byte(fmt.Sprintf("(%s)", paramsNewStr)))
+	}
+	writeBlock := func(buffer io.Writer) {
+		methodSourceBuffer.Write([]byte(fmt.Sprintf(" {%s%s}", code, strings.Repeat("\t", c.TabNumber()))))
+	}
+	writeReturnType := func(buffer io.Writer) {
+		methodSourceBuffer.Write([]byte(returnTypeStr + " "))
+	}
+	var writerSeq []func(io.Writer)
 	switch name {
 	case "<init>":
-		name = fmt.Sprintf("%s(%s)", c.GetConstructorMethodName(), paramsNewStr)
-		methodSource = fmt.Sprintf("%s %s {%s", accessFlags, name, code)
+		writerSeq = []func(io.Writer){
+			writeAccessFlags,
+			writeName,
+			writeArguments,
+			writeBlock,
+		}
 	case "<clinit>":
-		methodSource = fmt.Sprintf("%s {%s", accessFlags, code)
+		writerSeq = []func(io.Writer){
+			writeAccessFlags,
+			writeBlock,
+		}
 	default:
-		name = fmt.Sprintf("%s(%s)", name, paramsNewStr)
-		methodSource = fmt.Sprintf(`%s %s %s {%s`, accessFlags, returnTypeStr, name, code)
+		writerSeq = []func(io.Writer){
+			writeAccessFlags,
+			writeReturnType,
+			writeName,
+			writeArguments,
+			writeBlock,
+		}
 	}
-	methodSource += strings.Repeat("\t", c.TabNumber()) + "}"
+	methodSource := ""
+	for _, writer := range writerSeq {
+		writer(&methodSourceBuffer)
+	}
+	methodSource = methodSourceBuffer.String()
 	if len(annoStrs) == 0 {
 		return methodSource, nil
 	} else {

@@ -2,9 +2,8 @@ package org.benf.cfr.reader;
 
 public class TryCatch {
 	public TryCatch() {
-		return;
 	}
-	 void main() {
+	void main() {
 		int var1 = 1;
 		try{
 			var1 = 2;
@@ -14,6 +13,5 @@ public class TryCatch {
 			System.out.println(1);
 		}
 		System.out.println(var1);
-		return;
 	}
 }

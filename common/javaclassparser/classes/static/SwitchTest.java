@@ -2,9 +2,8 @@ package org.benf.cfr.reader;
 
 public class SwitchTest {
 	public SwitchTest() {
-		return;
 	}
-	 void main() {
+	void main() {
 		switch (1){
 		case 1:
 			int var1 = 1;
