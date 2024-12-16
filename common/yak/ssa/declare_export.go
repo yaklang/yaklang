@@ -27,9 +27,15 @@ func (p *Program) SetExportValue(name string, v Value) {
 }
 
 func (p *Program) SetExportFunction(name string, v *Function) {
+	if p.ExportFunc == nil {
+		p.ExportFunc = make(map[string]Functions)
+	}
 	importFunction(name, v, p.ExportFunc)
 }
 func (p *Program) SetExportFunctions(name string, v Functions) {
+	if p.ExportFunc == nil {
+		p.ExportFunc = make(map[string]Functions)
+	}
 	for _, function := range v {
 		importFunction(name, function, p.ExportFunc)
 	}

@@ -1,5 +1,7 @@
 package ssa
 
+import "github.com/yaklang/yaklang/common/utils"
+
 func (p *Program) GenerateVirtualLib(packagePath string) (*Program, error) {
 	app := p.GetApplication()
 	lib := app.NewLibrary(packagePath, []string{})
@@ -10,32 +12,42 @@ func (p *Program) GenerateVirtualLib(packagePath string) (*Program, error) {
 	return lib, err
 }
 
-func getOrFakeImportValue(lib *Program, name string, isFunc bool) Value {
+func getOrFakeImportValue(lib *Program, name string, isFunc bool) (val Value) {
 	builder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(VirtualFunctionName))
-	if value, ok := lib.ExportValue[name]; !ok && lib.VirtualImport {
-		var val Value
-		if !isFunc {
-			val = builder.EmitUndefined(name)
-			lib.SetExportValue(name, val)
-		} else {
-			_func := builder.NewFunc(name)
-			_func.SetType(NewFunctionType(name, []Type{}, nil, false))
-			val = _func
-			lib.SetExportFunction(name, _func)
-		}
-		if b, ok := ToBasicType(val.GetType()); ok {
-			packagename := lib.PkgName
-			if packagename == "" {
-				packagename = "main"
+	defer func() {
+		if utils.IsNil(val) {
+			if isFunc {
+				_func := builder.NewFunc(name)
+				_func.SetType(NewFunctionType(name, []Type{}, nil, false))
+				lib.SetExportFunction(name, _func)
+				val = _func
+			} else {
+				val = builder.EmitUndefined(name)
+				lib.SetExportValue(name, val)
 			}
-			t := NewBasicType(b.Kind, b.GetName())
-			t.AddFullTypeName(packagename)
-			val.SetType(t)
 		}
-		return val
+		if isFunc {
+			if b, ok := ToBasicType(val.GetType()); ok {
+				packagename := lib.PkgName
+				if packagename == "" {
+					packagename = "main"
+				}
+				t := NewBasicType(b.Kind, b.GetName())
+				t.AddFullTypeName(packagename)
+				val.SetType(t)
+			}
+		}
+	}()
+	if isFunc {
+		if functions, ok := lib.ExportFunc[name]; ok {
+			val = functions[0]
+		}
 	} else {
-		return value
+		if v, ok := lib.ExportValue[name]; ok {
+			val = v
+		}
 	}
+	return val
 }
 func fakeImportType(lib *Program, name string) Type {
 	builder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(VirtualFunctionName))

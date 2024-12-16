@@ -93,6 +93,27 @@ func (p *Program) ReadImportValueWithPkg(pkgName, name string) (Value, bool) {
 	}
 }
 
+func (p *Program) ReadImportFunction(name string) (Value, bool) {
+	var ret *Function = nil
+	readImportDecl(p, func(idi *importDeclareItem) bool {
+		v, ok := idi._func[name]
+		if ok {
+			ret = v[0]
+			return ok
+		} else {
+			return false
+		}
+	})
+	return ret, !utils.IsNil(ret)
+}
+func (p *Program) ReadImportFunctionWithPkg(pkgName, name string) (Value, bool) {
+	if declareItem, ok := p.importDeclares.Get(pkgName); ok {
+		functions := declareItem._func[name]
+		return functions[0], ok
+	}
+	return nil, false
+}
+
 /// ===================================== import
 
 func (p *Program) checkImportRelationship(lib *Program) (*importDeclareItem, error) {
@@ -163,6 +184,7 @@ func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
 	if err != nil {
 		return err
 	}
+
 	t, ok := lib.ExportType[classname]
 	if !ok {
 		return utils.Errorf("library %s not contain type: %s", lib.Name, classname)
@@ -243,6 +265,7 @@ func (p *Program) ImportAll(lib *Program) error {
 	}
 	maps.Copy(pkg.typ, lib.externType)
 	maps.Copy(pkg.val, lib.ExportValue)
+	maps.Copy(pkg._func, lib.ExportFunc)
 	_ = pkg
 	return nil
 }

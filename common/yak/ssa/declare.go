@@ -70,8 +70,8 @@ func (prog *Program) GetFunctionEx(name, pkg string) *Function {
 	}
 
 	if val, ok := readDeclareWithImport[Value](prog, pkg, name,
-		prog.ReadImportValueWithPkg,
-		prog.ReadImportValue,
+		prog.ReadImportFunctionWithPkg,
+		prog.ReadImportFunction,
 		getFunc,
 	); ok {
 		if fun, ok := ToFunction(val); ok {
