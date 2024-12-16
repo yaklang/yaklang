@@ -287,6 +287,6 @@ func (m *SyntaxFlowScanManager) ResumeTask() error {
 }
 
 func (m *SyntaxFlowScanManager) StatusTask() error {
-	m.notifyStatus()
+	m.notifyStatus("")
 	return nil
 }
