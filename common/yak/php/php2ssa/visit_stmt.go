@@ -212,10 +212,16 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 
 		for realName, currentName := range aliasMap {
 			switch opmode {
-			case "const", "function":
+			case "const":
 				if namespace != nil {
 					if err := prog.ImportValueFromLib(namespace, realName); err != nil {
-						log.Errorf("get namespace value fail: %s", err)
+						log.Errorf("import function from lib fail: %s", err)
+					}
+				}
+			case "function":
+				if namespace != nil {
+					if err := prog.ImportFunctionFromLib(namespace, realName); err != nil {
+						log.Errorf("import function from lib fail: %s", err)
 					}
 				}
 			default:
@@ -237,17 +243,18 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					}
 
 					//todo:
-					for _, value := range namespace.ExportValue {
-						if function, b := ssa.ToFunction(value); b {
-							name := fmt.Sprintf("%s\\%s", currentName, function.GetName())
-							if get, exit := prog.Funcs.Get(name); exit {
-								prog.Funcs.Set(name, get)
-							} else {
-								prog.Funcs.Set(name, ssa.Functions{function})
-							}
+					for s, funs := range namespace.ExportFunc {
+						if err := prog.ImportFunctionFromLib(namespace, s); err != nil {
+							log.Errorf("import function fail: %s", err)
 						}
+						name := fmt.Sprintf("%s\\%s", currentName, s)
+						prog.Funcs.Set(name, funs)
 					}
-					for _, t := range namespace.ExportType {
+					for name, t := range namespace.ExportType {
+						err := prog.ImportTypeFromLib(namespace, name)
+						if err != nil {
+							log.Errorf("import type fail: %s", err)
+						}
 						if bluePrint, ok := t.(*ssa.Blueprint); ok {
 							name := fmt.Sprintf("%s\\%s", currentName, bluePrint.Name)
 							prog.Blueprint.Set(name, bluePrint)

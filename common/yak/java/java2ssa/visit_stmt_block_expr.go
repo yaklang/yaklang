@@ -710,13 +710,17 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 			memberKey = y.EmitConstInst(ret.GetText())
 			// get parent class
 		}
-		methodCall := y.ReadMemberCallMethod(object, memberKey)
-		var args []ssa.Value
-		if argument := i.Arguments(); argument != nil {
-			args = y.VisitArguments(i.Arguments())
-			c := y.NewCall(methodCall, args)
-			return y.EmitCall(c)
+		var process []ssa.FunctionProcess
+		args := y.VisitArguments(i.Arguments())
+		process = append(process, ssa.WithCheckProcessParamsLength(len(args)+1))
+		var argsParameterType = ssa.Types{object.GetType()}
+		for _, arg := range args {
+			argsParameterType = append(argsParameterType, arg.GetType())
 		}
+		process = append(process, ssa.WithCheckProcessParamsType(argsParameterType))
+		methodCall := y.ReadMemberCallMethod(object, memberKey, process...)
+		c := y.NewCall(methodCall, args)
+		return y.EmitCall(c)
 	}
 
 	return y.EmitUndefined(raw.GetText())
@@ -1627,6 +1631,7 @@ func (y *builder) VisitBlockStatementList(raw javaparser.IBlockStatementListCont
 	}
 	for _, stmt := range i.AllBlockStatement() {
 		if stmt != nil {
+			log.Infof("current statement: %s", stmt.GetText())
 			y.VisitBlockStatement(stmt)
 		}
 	}
@@ -1745,7 +1750,6 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 		arguments := y.VisitClassCreatorRest(ret, className)
 		args = append(args, arguments...)
 		return nil, y.ClassConstructor(class, args)
-		//return obj, y.EmitCall(y.NewCall(constructor, args))
 	}
 	//array init
 	if ret := i.ArrayCreatorRest(); ret != nil {

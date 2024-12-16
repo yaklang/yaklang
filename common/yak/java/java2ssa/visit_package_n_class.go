@@ -202,7 +202,6 @@ func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext)
 	} else if i.FormalParameterList() != nil && i.COMMA() == nil {
 		y.VisitFormalParameterList(i.FormalParameterList())
 	}
-
 }
 
 func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.Blueprint) {
@@ -579,18 +578,18 @@ func (y *builder) VisitMethodDeclaration(
 	newFunc := y.NewFunc(funcName)
 	newFunc.SetMethodName(methodName)
 	annotationFunc, defCallback, _ := y.VisitModifiers(modify)
+	store := y.StoreFunctionBuilder()
+	y.FunctionBuilder = y.PushFunction(newFunc)
 	if isStatic {
 		class.RegisterStaticMethod(key, newFunc)
 	} else {
 		class.RegisterNormalMethod(key, newFunc)
 	}
-	store := y.StoreFunctionBuilder()
-
-	//generate sign lazyBuilder
+	y.PopFunction()
 	newFunc.AddFunctionSignBuilder(func() {
 		log.Infof("lazybuild: %s %s function sign", funcName, key)
-		swichHandler := y.SwitchFunctionBuilder(store)
-		defer swichHandler()
+		switchHandler := y.SwitchFunctionBuilder(store)
+		defer switchHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)
 		if isStatic {
 			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
@@ -604,6 +603,11 @@ func (y *builder) VisitMethodDeclaration(
 		y.VisitFormalParameters(i.FormalParameters())
 		y.PopFunction()
 		newFunc.GenerateSign()
+		if isStatic {
+			class.RegisterStaticMethod(key, newFunc)
+		} else {
+			class.RegisterNormalMethod(key, newFunc)
+		}
 	})
 	newFunc.AddFunctionBodyBuilder(func() {
 		log.Infof("lazybuild: %s %s ", funcName, key)
@@ -836,10 +840,8 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	}
 	key := i.Identifier().GetText()
 	pkgName := y.GetProgram()
-	funcName := fmt.Sprintf("%s_%s_%s_%s", pkgName.Name, class.Name, key, uuid.NewString()[:4])
+	funcName := fmt.Sprintf("%s_%s_%s", pkgName.Name, class.Name, key)
 	newFunc := y.NewFunc(funcName)
-	class.Constructor = newFunc
-	class.RegisterMagicMethod(ssa.Constructor, newFunc)
 	store := y.StoreFunctionBuilder()
 	newFunc.AddFunctionSignBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)
@@ -850,6 +852,9 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		y.SetCurrentReturnType(class)
 		y.VisitFormalParameters(i.FormalParameters())
 		y.PopFunction()
+		newFunc.GenerateSign()
+		class.Constructor = newFunc
+		class.RegisterMagicMethod(ssa.Constructor, newFunc)
 	})
 	newFunc.AddFunctionBodyBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)
@@ -865,6 +870,7 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		}
 		y.EmitReturn([]ssa.Value{container})
 		y.Finish()
+
 		y.FunctionBuilder = y.PopFunction()
 	})
 }
