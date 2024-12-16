@@ -1,3 +1,10 @@
 a = 1
 eval("a++")
 assert a == 2
+
+b = func(){
+    c = 1
+    eval("c++")
+    assert c == 2
+}
+b()
