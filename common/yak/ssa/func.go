@@ -10,7 +10,7 @@ func (p *Program) NewFunction(name string) *Function {
 	return p.NewFunctionWithParent(name, nil)
 }
 
-func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function {
+func (p *Program) NewFunctionEx(name string, parent *Function) (*Function, func()) {
 	index := p.Funcs.Len()
 	if index == 0 && name == "" {
 		name = "main"
@@ -39,34 +39,36 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	f.SetName(name)
 	f.SetProgram(p)
-	if parent != nil {
-		parent.addAnonymous(f)
-		// Pos: parent.CurrentPos,
-		f.SetRange(parent.builder.CurrentRange)
-	} else {
-		//todo：应该在确定函数签名之后，再添加到function中
-		if funcs, b := p.Funcs.Get(name); b {
-			funcs = append(funcs, f)
-		} else {
-			p.Funcs.Set(name, []*Function{f})
-		}
-	}
-	p.SetVirtualRegister(f)
-	// function 's Range is essential!
 	if f.GetRange() == nil {
-		// if editor := p.getCurrentEditor(); editor != nil {
-		// 	f.SetRangeInit(editor)
-		// } else {
 		if f.GetParent() != nil {
 			log.Warnf("the program must contains a editor to init function range: %v", p.Name)
 		}
-		// }
 	}
-
 	enter := f.NewBasicBlock("entry")
 	enter.SetScope(NewScope(f, p.GetProgramName()))
 	f.EnterBlock = enter
-	return f
+	return f, func() {
+		/*
+			record function
+		*/
+		if parent != nil {
+			parent.addAnonymous(f)
+			f.SetRange(parent.builder.CurrentRange)
+		} else {
+			if funcs, b := p.Funcs.Get(name); b {
+				funcs = append(funcs, f)
+				p.Funcs.Set(name, funcs)
+			} else {
+				p.Funcs.Set(name, []*Function{f})
+			}
+		}
+		p.SetVirtualRegister(f)
+	}
+}
+func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function {
+	_func, f := p.NewFunctionEx(name, parent)
+	f()
+	return _func
 }
 
 func (f *Function) GetType() Type {
@@ -167,7 +169,8 @@ func (f *Function) GetParent() *Function {
 // just create a function define, only function parameter type \ return type \ ellipsis
 func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	f := &Function{
-		anValue: NewValue(),
+		anValue:      NewValue(),
+		FunctionSign: &FunctionSign{},
 	}
 	f.SetType(typ)
 	f.SetName(name)

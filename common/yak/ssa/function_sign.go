@@ -122,3 +122,8 @@ func WithCheckProcessReturnType(types Types) FunctionProcess {
 		return flag
 	})
 }
+func WithNullProcess() FunctionProcess {
+	return withProcessFunctions(func(function *Function) bool {
+		return true
+	})
+}

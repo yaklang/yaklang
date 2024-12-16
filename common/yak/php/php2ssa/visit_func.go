@@ -26,9 +26,9 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	_ = isRef
 	funcName := i.Identifier().GetText()
 	newFunction := y.NewFunc(funcName)
+	y.GetProgram().SetExportFunction(funcName, newFunction)
 	variable := y.CreateVariable(funcName)
 	y.AssignVariable(variable, newFunction)
-	y.GetProgram().SetExportValue(funcName, newFunction)
 	store := y.StoreFunctionBuilder()
 	newFunction.AddFunctionBodyBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)

@@ -220,14 +220,7 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 		handlerFuncs(v)
 		return true
 	})
-	// for _, f := range prog.Funcs {
-	// 	handFunc(f)
-	// }
 	prog.UpStream.ForEach(func(i string, v *Program) bool {
-		v.Funcs.ForEach(func(i string, v Functions) bool {
-			handlerFuncs(v)
-			return true
-		})
 		v.Funcs.ForEach(func(i string, v Functions) bool {
 			handlerFuncs(v)
 			return true

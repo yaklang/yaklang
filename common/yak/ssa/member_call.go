@@ -85,7 +85,7 @@ func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, pro
 	if !ok {
 		return nil
 	}
-	if method := bluePrint.GetNormalMethod(key.String(), process...); utils.IsNil(method) {
+	if method := bluePrint.GetNormalMethod(key.String(), process...); !utils.IsNil(method) {
 		return method
 	}
 	if member := bluePrint.GetNormalMember(key.String()); !utils.IsNil(member) {

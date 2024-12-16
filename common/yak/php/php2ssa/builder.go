@@ -137,7 +137,7 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		defer func() {
 			childProgram.VisitAst(ast)
 		}()
-		functionBuilder := childProgram.GetAndCreateFunctionBuilder("main", "main")
+		functionBuilder := childProgram.GetAndCreateFunctionBuilder("", "main")
 		startParse(functionBuilder)
 	} else {
 		startParse(b)

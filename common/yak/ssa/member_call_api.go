@@ -7,6 +7,7 @@ import (
 
 // read member call variable, want method
 func (b *FunctionBuilder) ReadMemberCallMethod(object, key Value, sign ...FunctionProcess) Value {
+	sign = append(sign, WithNullProcess())
 	return b.readMemberCallValueEx(object, key, sign...)
 }
 

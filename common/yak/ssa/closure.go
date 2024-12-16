@@ -53,7 +53,7 @@ func (f *Function) AddSideEffect(variable *Variable, v Value) {
 
 func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
 	var bind *Variable
-	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
+	for p := f.parentBuilder; p != nil; p = p.parentBuilder {
 		if value := p.PeekValue(variable.GetName()); value != nil {
 			bind = value.GetVariable(variable.GetName())
 			break
