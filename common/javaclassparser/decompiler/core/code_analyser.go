@@ -760,17 +760,9 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		v := d.ConstantPoolLiteralGetter(int(Convert2bytesToInt(opcode.Data)))
 		runtimeStackSimulation.Push(v)
 	case OP_MONITORENTER:
-		v := runtimeStackSimulation.Pop().(values.JavaValue)
-		st := statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-			return fmt.Sprintf("synchronized (%s)", v.String(funcCtx))
-		})
-		st.Name = "monitor_enter"
-		st.Info = v
+		runtimeStackSimulation.Pop()
 	case OP_MONITOREXIT:
-		st := statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-			return ""
-		})
-		st.Name = "monitor_exit"
+		runtimeStackSimulation.Pop()
 	case OP_NOP:
 		return nil
 	case OP_POP:
@@ -1467,17 +1459,10 @@ func (d *Decompiler) ParseStatement() error {
 			}
 		case OP_MONITORENTER:
 			v := opcode.stackConsumed[0]
-			st := statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-				return fmt.Sprintf("synchronized (%s)", v.String(funcCtx))
-			})
-			st.Name = "monitor_enter"
-			st.Info = v
+			st := statements.NewMiddleStatement("monitor_enter", v)
 			appendNode(st)
 		case OP_MONITOREXIT:
-			st := statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-				return ""
-			})
-			st.Name = "monitor_exit"
+			st := statements.NewMiddleStatement("monitor_exit", nil)
 			appendNode(st)
 		case OP_NOP:
 			return nil
