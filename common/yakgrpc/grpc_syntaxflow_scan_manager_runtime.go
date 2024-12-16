@@ -20,7 +20,7 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 			m.taskRecorder.Reason = fmt.Sprintf("%v", err)
 			m.status = schema.SYNTAXFLOWSCAN_ERROR
 		}
-		m.notifyStatus()
+		m.notifyStatus("")
 		m.SaveTask()
 	}()
 
@@ -87,12 +87,12 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 			m.Query(rule, prog)
 		}
 	}
-	m.notifyProgress("")
+	m.notifyStatus("")
 	return errs
 }
 
 func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
-	m.notifyProgress(rule.RuleName)
+	m.notifyStatus(rule.RuleName)
 	defer m.SaveTask()
 	// log.Infof("executing rule %s", rule.RuleName)
 	if !m.ignoreLanguage {
@@ -106,6 +106,9 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 	// if language match or ignore language
 	if res, err := prog.SyntaxFlowRule(rule, ssaapi.QueryWithContext(m.ctx),
 		ssaapi.QueryWithTaskID(m.taskID), ssaapi.QueryWithSave(m.kind),
+		ssaapi.QueryWithProcessCallback(func(f float64, s string) {
+			m.client.StatusCard("当前执行规则进度", fmt.Sprintf("%.2f%%", f*100), "规则执行进度")
+		}),
 	); err == nil {
 		atomic.AddInt64(&m.successQuery, 1)
 		m.notifyResult(res)
@@ -127,29 +130,25 @@ func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	})
 }
 
-func (m *SyntaxFlowScanManager) notifyProgress(ruleName string) {
-	m.client.StatusCard("当前执行规则", ruleName, "规则执行进度")
-	m.notifyStatus()
-}
-
-func (m *SyntaxFlowScanManager) notifyStatus() {
+func (m *SyntaxFlowScanManager) notifyStatus(ruleName string) {
 	finishQuery := m.successQuery + m.failedQuery + m.skipQuery
-	if finishQuery == m.totalQuery {
-		m.status = schema.SYNTAXFLOWSCAN_DONE
-		m.client.StatusCard("当前执行规则", "已执行完毕", "规则执行进度")
-	}
-	m.client.YakitSetProgress(float64(finishQuery) / float64(m.totalQuery))
-
 	// process
-	m.client.StatusCard("已执行规则", fmt.Sprintf("%d/%d", finishQuery, m.totalQuery), "规则执行进度")
-	m.client.StatusCard("已跳过规则", m.skipQuery, "规则执行进度")
+	m.client.StatusCard("已执行规则", fmt.Sprintf("%d/%d", finishQuery, m.totalQuery), "规则执行状态")
+	m.client.StatusCard("已跳过规则", m.skipQuery, "规则执行状态")
 	// runtime status
 	m.client.StatusCard("执行成功个数", m.successQuery, "规则执行状态")
 	m.client.StatusCard("执行失败个数", m.failedQuery, "规则执行状态")
 	// risk status
 	m.client.StatusCard("检出漏洞/风险个数", m.riskCount, "漏洞/风险状态")
-	m.stream.Send(&ypb.SyntaxFlowScanResponse{
-		TaskID: m.taskID,
-		Status: m.status,
-	})
+
+	// current rule  status
+	if finishQuery == m.totalQuery {
+		m.status = schema.SYNTAXFLOWSCAN_DONE
+		m.client.StatusCard("当前执行规则", "已执行完毕", "规则执行进度")
+	} else {
+		if ruleName != "" {
+			m.client.StatusCard("当前执行规则", ruleName, "规则执行进度")
+		}
+	}
+	m.client.YakitSetProgress(float64(finishQuery) / float64(m.totalQuery))
 }
