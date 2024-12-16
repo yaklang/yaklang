@@ -109,7 +109,9 @@ func (p *Program) ReadImportFunction(name string) (Value, bool) {
 func (p *Program) ReadImportFunctionWithPkg(pkgName, name string) (Value, bool) {
 	if declareItem, ok := p.importDeclares.Get(pkgName); ok {
 		functions := declareItem._func[name]
-		return functions[0], ok
+		if len(functions) > 0 {
+			return functions[0], ok
+		}
 	}
 	return nil, false
 }

@@ -266,8 +266,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
+			"Undefined-$a.getA(valid)(Function-A(Undefined-A)) member[0]",
+			"Undefined-$a.getA(valid)(Function-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -356,8 +356,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
+			"Undefined-$a.getA(valid)(Function-A(Undefined-A)) member[0]",
+			"Undefined-$a.getA(valid)(Function-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -379,8 +379,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-$par, $this.a)]",
+			"Undefined-$a.getA(valid)(Function-A(Undefined-A)) member[0]",
+			"Undefined-$a.getA(valid)(Function-A(Undefined-A)) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -398,7 +398,7 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-$a.getNum(valid)(Function-A(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -474,7 +474,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A();
 		println($a);`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-A(Undefined-A)",
+			"Function-A(Undefined-A)",
 		}, t)
 	})
 
@@ -490,7 +490,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A(); 
 		println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-$a.getNum(valid)(Function-A(Undefined-A)) member[0]",
 		}, t)
 	})
 }
@@ -899,5 +899,20 @@ function main(){
 	println($a->A_method());
 }
 `
-	ssatest.CheckPrintlnValue(code, []string{"Undefined-$a.A_method(valid)(Undefined-A(Undefined-A))"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"Undefined-$a.A_method(valid)(Function-A(Undefined-A))"}, t)
+}
+
+func TestClosure1(t *testing.T) {
+	code := `<?php
+
+function a(){
+    $a = 1;
+    return function()use($a){
+        echo $a;
+    };
+}
+
+$c = a();
+$c();`
+	ssatest.NonStrictMockSSA(t, code)
 }

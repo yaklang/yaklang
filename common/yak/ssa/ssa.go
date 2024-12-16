@@ -340,6 +340,8 @@ func (f *Function) GenerateSign() {
 		f.FunctionSign.ReturnType = append(f.FunctionSign.ReturnType, value.GetType())
 	}
 	f.FunctionSign.ReturnLength = len(f.Return)
+	f.FunctionSign.ParamLength = len(f.Params)
+	f.FunctionSign.ReturnLength = len(f.ReturnType)
 	f.hash = utils.CalcMd5(f.methodName, f.ReturnLength, f.ParamLength, f.ReturnType.String(), f.ParamsType.String())
 }
 func (f *Function) SetCurrentReturnType(t Type) {

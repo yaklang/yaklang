@@ -101,6 +101,7 @@ class A {
  		A a = new A();
 		a.set(12);
 		println(a.get());
+		println(a.value);
 	}
 }
 		`
@@ -170,5 +171,4 @@ class A {
 		)
 	})
 
-	
 }

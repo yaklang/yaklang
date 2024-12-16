@@ -138,7 +138,7 @@ func (c *Blueprint) BuildConstructorAndDestructor() {
 	for _, m := range c.NormalMethod {
 		m.Build()
 	}
-	for _, function := range c.StaticMethod {
-		function.Build()
+	for _, m := range c.StaticMethod {
+		m.Build()
 	}
 }

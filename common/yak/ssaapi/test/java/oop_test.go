@@ -1,6 +1,7 @@
 package java
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -105,7 +106,35 @@ class test{
 }
 `
 		ssatest.CheckSyntaxFlow(t, code, `test() as $output`, map[string][]string{
-			"output": {"Undefined-test(Undefined-test)"},
+			"output": {"Function-test(Undefined-test)"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
+}
+
+func TestOopMember(t *testing.T) {
+	code := `package main;
+class B{
+	public int aa(int a){
+		return a;
+	}
+	public int aa(int a,int b){
+		return a+b;
+	}
+}
+class A{
+	public static void a(){
+		B b = new B();
+		%s
+		println(c);
+	}
+}
+`
+	code1 := fmt.Sprintf(code, "int c = b.aa(1,2);")
+	ssatest.CheckSyntaxFlow(t, code1, `println(* #-> * as $param)`, map[string][]string{
+		"param": {"1", "2"},
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	code2 := fmt.Sprintf(code, "int c = b.aa(1);")
+	ssatest.CheckSyntaxFlow(t, code2, `println(* #-> * as $param)`, map[string][]string{
+		"param": {"1"},
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }

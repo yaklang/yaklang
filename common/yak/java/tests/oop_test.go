@@ -68,8 +68,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
+			"Undefined-a.getA(valid)(Function-A(Undefined-A)) member[0]",
+			"Undefined-a.getA(valid)(Function-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -94,8 +94,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Undefined-a.getA(valid)(Function-A(Undefined-A)) member[0]",
+			"Undefined-a.getA(valid)(Function-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -136,8 +136,8 @@ func TestJava_Extend_Class(t *testing.T) {
 	}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
+			"Undefined-a.getA(valid)(Function-A(Undefined-A)) member[0]",
+			"Undefined-a.getA(valid)(Function-A(Undefined-A)) member[1]",
 		}, t)
 	})
 	t.Run("test function call", func(t *testing.T) {
@@ -180,8 +180,8 @@ public class main{
 			}
 		}
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Undefined-a.getA(valid)(Function-A(Undefined-A)) member[0]",
+			"Undefined-a.getA(valid)(Function-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -204,7 +204,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-a.getNum(valid)(Function-A(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -432,7 +432,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-a.getNum(valid)(Function-A(Undefined-A)) member[0]",
 		}, t)
 	})
 	t.Run("test no package with constructor and direct use member", func(t *testing.T) {
@@ -552,7 +552,7 @@ public class Main{
     }
 }`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-File(Undefined-File)",
+			"Function-File(Undefined-File)",
 		}, t)
 	})
 	t.Run("test undefind function call", func(t *testing.T) {

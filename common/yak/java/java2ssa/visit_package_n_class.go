@@ -579,13 +579,13 @@ func (y *builder) VisitMethodDeclaration(
 	newFunc.SetMethodName(methodName)
 	annotationFunc, defCallback, _ := y.VisitModifiers(modify)
 	store := y.StoreFunctionBuilder()
-	y.FunctionBuilder = y.PushFunction(newFunc)
+
+	//import static
 	if isStatic {
 		class.RegisterStaticMethod(key, newFunc)
 	} else {
 		class.RegisterNormalMethod(key, newFunc)
 	}
-	y.PopFunction()
 	newFunc.AddFunctionSignBuilder(func() {
 		log.Infof("lazybuild: %s %s function sign", funcName, key)
 		switchHandler := y.SwitchFunctionBuilder(store)
@@ -603,11 +603,6 @@ func (y *builder) VisitMethodDeclaration(
 		y.VisitFormalParameters(i.FormalParameters())
 		y.PopFunction()
 		newFunc.GenerateSign()
-		if isStatic {
-			class.RegisterStaticMethod(key, newFunc)
-		} else {
-			class.RegisterNormalMethod(key, newFunc)
-		}
 	})
 	newFunc.AddFunctionBodyBuilder(func() {
 		log.Infof("lazybuild: %s %s ", funcName, key)
