@@ -342,8 +342,20 @@ func (n *Engine) SetVars(m map[string]any) {
 	n.vm.SetVars(m)
 }
 
+func (n *Engine) CompileWithCurrentScope(code string) ([]*yakvm.Code, error) {
+	scope, err := n.GetCurrentScope()
+	if err != nil {
+		return nil, err
+	}
+	compiler, err := n._compile(code, scope.GetSymTable())
+	if err != nil {
+		return nil, err
+	}
+	return compiler.GetOpcodes(), err
+}
+
 func (n *Engine) Compile(code string) ([]*yakvm.Code, error) {
-	compiler, err := n._compile(code)
+	compiler, err := n._compile(code, n.rootSymbol)
 	if err != nil {
 		return nil, err
 	}
@@ -351,15 +363,15 @@ func (n *Engine) Compile(code string) ([]*yakvm.Code, error) {
 }
 
 func (n *Engine) MustCompile(code string) []*yakvm.Code {
-	compiler, err := n._compile(code)
+	compiler, err := n._compile(code, n.rootSymbol)
 	if err != nil {
 		panic(err)
 	}
 	return compiler.GetOpcodes()
 }
 
-func (n *Engine) _compile(code string) (*yakast.YakCompiler, error) {
-	compiler := yakast.NewYakCompilerWithSymbolTable(n.rootSymbol)
+func (n *Engine) _compile(code string, symbolTable *yakvm.SymbolTable) (*yakast.YakCompiler, error) {
+	compiler := yakast.NewYakCompilerWithSymbolTable(symbolTable)
 	compiler.SetStrictMode(n.strictMode)
 	if n.strictMode {
 		compiler.SetExternalVariableNames(n.vm.GetExternalVariableNames())
@@ -402,7 +414,7 @@ func (n *Engine) EvalWithInline(ctx context.Context, code string, inline bool) e
 		flag = yakvm.Inline
 	}
 
-	compiler, err := n._compile(code)
+	compiler, err := n._compile(code, n.rootSymbol)
 	if err != nil {
 		return utils.Errorf("compile error: \n%s", err)
 	}
@@ -451,7 +463,7 @@ func (n *Engine) SafeEvalInline(ctx context.Context, code string) (err error) {
 }
 
 func (n *Engine) FormattedAndSyntaxChecking(code string) (string, error) {
-	compiler, err := n._compile(code)
+	compiler, err := n._compile(code, n.rootSymbol)
 	if err != nil {
 		return "", err
 	}
