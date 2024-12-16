@@ -170,7 +170,7 @@ func (n *Engine) _marshal(symtbl *yakvm.SymbolTable, codes []*yakvm.Code, key []
 }
 
 func (n *Engine) Marshal(code string, key []byte) ([]byte, error) {
-	cl, err := n._compile(code)
+	cl, err := n._compile(code, n.rootSymbol)
 	if err != nil {
 		return nil, err
 	}
