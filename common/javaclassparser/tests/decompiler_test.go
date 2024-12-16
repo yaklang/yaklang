@@ -2,6 +2,7 @@ package tests
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -17,6 +18,9 @@ func TestDecompiler(t *testing.T) {
 	testCase := []struct {
 		name string
 	}{
+		{
+			"SynchronizedTest",
+		},
 		{
 			"LambdaTest",
 		},
@@ -107,4 +111,38 @@ func TestDisCompilerJar(t *testing.T) {
 		)
 		require.True(t, len(fileList) > 0)
 	})
+}
+
+func TestSyntax(t *testing.T) {
+	testCase := []struct {
+		name string
+	}{
+		{
+			"VarArgs",
+		},
+	}
+	for _, testItem := range testCase {
+		t.Run(testItem.name, func(t *testing.T) {
+			t.Parallel()
+			fileName := filepath.Join("syntax_test", testItem.name)
+			classRaw, err := classes.FS.ReadFile(fileName + ".class")
+			if err != nil {
+				t.Fatal(err)
+			}
+			sourceCode, err := classes.FS.ReadFile(fileName + ".java")
+			if err != nil {
+				t.Fatal(err)
+			}
+			ins, err := javaclassparser.Parse(classRaw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			source, err := ins.Dump()
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, string(sourceCode), source)
+		})
+	}
+
 }

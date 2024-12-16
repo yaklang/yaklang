@@ -28,7 +28,7 @@ func TestParseSingleClass(t *testing.T) {
 	println(source)
 }
 func TestParseClass(t *testing.T) {
-	err := filepath.Walk("/Users/z3/Downloads/compiling-failed-files 3", func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk("/Users/z3/Downloads/error-jdsc 2", func(path string, info fs.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
@@ -44,6 +44,7 @@ func TestParseClass(t *testing.T) {
 		//	return nil
 		//}
 		source, err := cf.Dump()
+
 		if err != nil {
 			//return err
 			println(path)

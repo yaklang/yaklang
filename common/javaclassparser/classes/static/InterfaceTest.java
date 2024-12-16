@@ -4,10 +4,8 @@ import java.util.ArrayList;
 import java.io.Serializable;
 public class InterfaceTest extends ArrayList implements Serializable {
 	public InterfaceTest() {
-		return;
 	}
-	 void main() {
+	void main() {
 		System.out.println(1);
-		return;
 	}
 }

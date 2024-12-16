@@ -3,6 +3,7 @@ package rewriter
 import (
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
@@ -436,23 +437,7 @@ func (s *RewriteManager) ScanCoreInfo() error {
 			}
 		}
 	}
-	//mergeNodeToCircleNode := map[*core.Node][]*core.Node{}
-	//for circleNodeEntry, _ := range circleNodeEntryToOutPoint {
-	//	if circleNodeEntry.MergeNode != nil {
-	//		mergeNodeToCircleNode[circleNodeEntry.MergeNode] = append(mergeNodeToCircleNode[circleNodeEntry.MergeNode], circleNodeEntry)
-	//	}
-	//}
-	//for mergeNode, circleNodes := range mergeNodeToCircleNode {
-	//	if len(circleNodes) == 1 {
-	//		continue
-	//	}
-	//	sort.Slice(circleNodes, func(i, j int) bool {
-	//		return circleNodes[i].Id < circleNodes[j].Id
-	//	})
-	//	for _, node := range circleNodes {
-	//
-	//	}
-	//}
+
 	s.CircleEntryPoint = circleNodes
 	s.IfNodes = ifNodes
 	//for _, node := range circleNodes {
@@ -480,7 +465,6 @@ func (s *RewriteManager) Rewrite() error {
 		nodeToRewriter[node] = LoopRewriter
 		keyNodes = append(keyNodes, node)
 	}
-
 	for _, node := range s.SwitchNode {
 		nodeToRewriter[node] = SwitchRewriter
 		keyNodes = append(keyNodes, node)
@@ -493,6 +477,16 @@ func (s *RewriteManager) Rewrite() error {
 		nodeToRewriter[node] = TryRewriter
 		keyNodes = append(keyNodes, node)
 	}
+
+	lo.ForEach(WalkNodeToList(s.RootNode), func(item *core.Node, index int) {
+		if v, ok := item.Statement.(*statements.MiddleStatement); ok {
+			if v.Flag == "monitor_enter" {
+				nodeToRewriter[item] = SynchronizeRewriter
+				keyNodes = append(keyNodes, item)
+			}
+		}
+	})
+
 	for _, node := range s.TopologicalSortReverse(s.SwitchNode) {
 		err := SwitchRewriter1(s, node)
 		if err != nil {
