@@ -24,7 +24,7 @@ func (e *Engine) YakBuiltinEval(code string) {
 		ctx = context.Background()
 	}
 
-	codes, err := e.Compile(code)
+	codes, err := e.CompileWithCurrentScope(code)
 	if err != nil {
 		panic(err)
 	}
