@@ -419,6 +419,7 @@ const (
 	Yak_QuerySyntaxFlowScanTask_FullMethodName                    = "/ypb.Yak/QuerySyntaxFlowScanTask"
 	Yak_DeleteSyntaxFlowScanTask_FullMethodName                   = "/ypb.Yak/DeleteSyntaxFlowScanTask"
 	Yak_QuerySyntaxFlowResult_FullMethodName                      = "/ypb.Yak/QuerySyntaxFlowResult"
+	Yak_DeleteSyntaxFlowResult_FullMethodName                     = "/ypb.Yak/DeleteSyntaxFlowResult"
 	Yak_QuerySSAPrograms_FullMethodName                           = "/ypb.Yak/QuerySSAPrograms"
 	Yak_UpdateSSAProgram_FullMethodName                           = "/ypb.Yak/UpdateSSAProgram"
 	Yak_DeleteSSAPrograms_FullMethodName                          = "/ypb.Yak/DeleteSSAPrograms"
@@ -952,6 +953,7 @@ type YakClient interface {
 	DeleteSyntaxFlowScanTask(ctx context.Context, in *DeleteSyntaxFlowScanTaskRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	// query result
 	QuerySyntaxFlowResult(ctx context.Context, in *QuerySyntaxFlowResultRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowResultResponse, error)
+	DeleteSyntaxFlowResult(ctx context.Context, in *DeleteSyntaxFlowResultRequest, opts ...grpc.CallOption) (*DeleteSyntaxFlowResultResponse, error)
 	// query ssa program
 	QuerySSAPrograms(ctx context.Context, in *QuerySSAProgramRequest, opts ...grpc.CallOption) (*QuerySSAProgramResponse, error)
 	UpdateSSAProgram(ctx context.Context, in *UpdateSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
@@ -6172,6 +6174,15 @@ func (c *yakClient) QuerySyntaxFlowResult(ctx context.Context, in *QuerySyntaxFl
 	return out, nil
 }
 
+func (c *yakClient) DeleteSyntaxFlowResult(ctx context.Context, in *DeleteSyntaxFlowResultRequest, opts ...grpc.CallOption) (*DeleteSyntaxFlowResultResponse, error) {
+	out := new(DeleteSyntaxFlowResultResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteSyntaxFlowResult_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) QuerySSAPrograms(ctx context.Context, in *QuerySSAProgramRequest, opts ...grpc.CallOption) (*QuerySSAProgramResponse, error) {
 	out := new(QuerySSAProgramResponse)
 	err := c.cc.Invoke(ctx, Yak_QuerySSAPrograms_FullMethodName, in, out, opts...)
@@ -6783,6 +6794,7 @@ type YakServer interface {
 	DeleteSyntaxFlowScanTask(context.Context, *DeleteSyntaxFlowScanTaskRequest) (*DbOperateMessage, error)
 	// query result
 	QuerySyntaxFlowResult(context.Context, *QuerySyntaxFlowResultRequest) (*QuerySyntaxFlowResultResponse, error)
+	DeleteSyntaxFlowResult(context.Context, *DeleteSyntaxFlowResultRequest) (*DeleteSyntaxFlowResultResponse, error)
 	// query ssa program
 	QuerySSAPrograms(context.Context, *QuerySSAProgramRequest) (*QuerySSAProgramResponse, error)
 	UpdateSSAProgram(context.Context, *UpdateSSAProgramRequest) (*DbOperateMessage, error)
@@ -8000,6 +8012,9 @@ func (UnimplementedYakServer) DeleteSyntaxFlowScanTask(context.Context, *DeleteS
 }
 func (UnimplementedYakServer) QuerySyntaxFlowResult(context.Context, *QuerySyntaxFlowResultRequest) (*QuerySyntaxFlowResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QuerySyntaxFlowResult not implemented")
+}
+func (UnimplementedYakServer) DeleteSyntaxFlowResult(context.Context, *DeleteSyntaxFlowResultRequest) (*DeleteSyntaxFlowResultResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSyntaxFlowResult not implemented")
 }
 func (UnimplementedYakServer) QuerySSAPrograms(context.Context, *QuerySSAProgramRequest) (*QuerySSAProgramResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QuerySSAPrograms not implemented")
@@ -15509,6 +15524,24 @@ func _Yak_QuerySyntaxFlowResult_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_DeleteSyntaxFlowResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSyntaxFlowResultRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteSyntaxFlowResult(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteSyntaxFlowResult_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteSyntaxFlowResult(ctx, req.(*DeleteSyntaxFlowResultRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_QuerySSAPrograms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QuerySSAProgramRequest)
 	if err := dec(in); err != nil {
@@ -17015,6 +17048,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QuerySyntaxFlowResult",
 			Handler:    _Yak_QuerySyntaxFlowResult_Handler,
+		},
+		{
+			MethodName: "DeleteSyntaxFlowResult",
+			Handler:    _Yak_DeleteSyntaxFlowResult_Handler,
 		},
 		{
 			MethodName: "QuerySSAPrograms",

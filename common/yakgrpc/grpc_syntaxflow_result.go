@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -50,5 +51,40 @@ func (s *Server) QuerySyntaxFlowResult(ctx context.Context, req *ypb.QuerySyntax
 			EffectRows: int64(p.TotalRecord),
 		},
 		Results: res,
+	}, nil
+}
+
+func (s *Server) DeleteSyntaxFlowResult(ctx context.Context, req *ypb.DeleteSyntaxFlowResultRequest) (*ypb.DeleteSyntaxFlowResultResponse, error) {
+	db := ssadb.GetDB()
+	if req.GetFilter() == nil && !req.GetDeleteAll() {
+		return nil, utils.Errorf("parameter error: filter is required or set DeleteAll")
+	}
+	db = yakit.FilterSyntaxFlowResult(db, req.GetFilter())
+	if req.GetDeleteContainRisk() {
+		// if set DeleteContainRisk, delete all, and clear up risk
+		// clear up risk
+		resultID := make([]int64, 0)
+		if err := db.Where("risk_count != 0").Pluck("id", &resultID).Error; err == nil {
+			if err := yakit.DeleteRiskBySFResult(consts.GetGormProjectDatabase(), resultID); err != nil {
+				return nil, utils.Errorf("delete risk failed: %s", err)
+			}
+		}
+	} else {
+		// if not set, only delete risk_count = 0
+		db = db.Where("risk_count = 0")
+	}
+	// delete
+	db = db.Unscoped().Delete(&ssadb.AuditResult{})
+	if err := db.Error; err != nil {
+		return nil, utils.Errorf("delete failed: %s", err)
+	}
+
+	return &ypb.DeleteSyntaxFlowResultResponse{
+		Message: &ypb.DbOperateMessage{
+			TableName:    "audit_result",
+			Operation:    "delete",
+			EffectRows:   db.RowsAffected,
+			ExtraMessage: "",
+		},
 	}, nil
 }
