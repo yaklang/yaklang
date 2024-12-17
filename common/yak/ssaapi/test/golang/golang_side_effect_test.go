@@ -611,3 +611,33 @@ func main() {
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }
+
+func Test_SideEffect_Type(t *testing.T) {
+
+	code := `
+package main
+
+import (
+	"test"
+)
+
+func main(){
+	a = 1
+	f1 := func() {
+		a = test.a
+	}
+	println(a) // 1
+	f1()
+	println(a) // side-effect(3, a)
+}
+
+`
+	ssatest.CheckSyntaxFlowContain(t, code, `
+a as $a
+$a?{<fullTypeName>?{have: 'test'}} as $output;
+		`,
+		map[string][]string{
+			"output": {"ParameterMember-freeValue-test.a", "side-effect(ParameterMember-freeValue-test.a, a)"},
+		}, ssaapi.WithLanguage(ssaapi.GO),
+	)
+}
