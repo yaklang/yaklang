@@ -501,13 +501,40 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 	f.SideEffects = SideEffectsReturn
 }
 
-func (f *FunctionBuilder) SwitchFreevalueInSideEffects(name string, se *SideEffect) *SideEffect {
+func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffect) *SideEffect {
 	vs := make([]Value, 0)
+	scope := f.CurrentBlock.ScopeTable
 	if phi, ok := ToPhi(se.Value); ok {
 		for i, e := range phi.Edge {
 			vs = append(vs, e)
 			if p, ok := ToParameter(e); ok && p.IsFreeValue {
-				if value := f.PeekValue(name); value != nil {
+				if value := scope.ReadValue(name); value != nil {
+					vs[i] = value
+				}
+			}
+		}
+		phit := &Phi{
+			anValue:            phi.anValue,
+			CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
+			Edge:               vs,
+		}
+
+		sideEffect := f.EmitSideEffect(name, se.CallSite.(*Call), phit)
+		return sideEffect
+	}
+	return se
+}
+
+func (f *FunctionBuilder) SwitchFreevalueInSideEffectFromScope(name string, se *SideEffect, scope ScopeIF) *SideEffect {
+	vs := make([]Value, 0)
+	if scope == nil {
+		return se
+	}
+	if phi, ok := ToPhi(se.Value); ok {
+		for i, e := range phi.Edge {
+			vs = append(vs, e)
+			if p, ok := ToParameter(e); ok && p.IsFreeValue {
+				if value := scope.ReadValue(name); value != nil {
 					vs[i] = value
 				}
 			}

@@ -69,6 +69,16 @@ func (b *FunctionBuilder) BuildSyntaxBlock(builder func()) {
 		return b.CurrentBlock.ScopeTable
 	})
 
+	for _, se := range b.SideEffects {
+		if variable := endScope.ReadVariable(se.Name); variable != nil {
+			value := variable.GetValue()
+			if sideEffect, ok := value.(*SideEffect); ok {
+				sideEffect = b.SwitchFreevalueInSideEffectFromScope(se.Name, sideEffect, endScope.GetParent())
+				variable.Assign(sideEffect)
+			}
+		}
+	}
+
 	if b.CurrentBlock.finish {
 		return
 	}
