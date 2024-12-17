@@ -3,12 +3,13 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -30,6 +31,9 @@ func (s *Server) countRisk(runtimeId string, yakClient *yaklib.YakitClient) erro
 	risks, err := yakit.GetRisksByRuntimeId(s.GetProjectDatabase(), runtimeId)
 	if err != nil {
 		return utils.Errorf("get risk count error %v", err)
+	}
+	if len(risks) == 0 {
+		return nil
 	}
 	err = yakClient.Output(&yaklib.YakitStatusCard{ // card
 		Id: "漏洞/风险/指纹", Data: strconv.Itoa(len(risks)), Tags: nil,
