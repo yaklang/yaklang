@@ -100,7 +100,7 @@ var SSACompilerSyntaxFlowCommand = &cli.Command{
 					log.Warnf("read file: %s failed: %s", s, err)
 					return nil
 				}
-				rule, err := sfdb.OnlyCreateSyntaxFlow(s, string(raw), false)
+				rule, err := sfdb.CreateRuleByContent(s, string(raw), false)
 				if err != nil {
 					return err
 				}

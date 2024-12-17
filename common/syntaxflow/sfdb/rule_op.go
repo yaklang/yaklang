@@ -67,7 +67,7 @@ func ImportDatabase(reader io.Reader) error {
 		if refRule.IsBuildInRule {
 			refRule.IsBuildInRule = false
 		}
-		err = CreateOrUpdateRule(rule.CalcHash(), refRule)
+		err = MigrateSyntaxFlow(rule.CalcHash(), refRule)
 		if err != nil {
 			log.Errorf("create or update syntax flow rule error: %s", err)
 			continue
@@ -105,24 +105,11 @@ func MigrateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
 		if err := db.Where("rule_name = ?", i.RuleName).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error; err != nil {
 			return err
 		}
+		return db.Create(i).Error
 	} else {
 		return db.Create(i).Error
 	}
 	return nil
-}
-
-func CreateOrUpdateRule(hash string, i *schema.SyntaxFlowRule) error {
-	db := consts.GetGormProfileDatabase()
-
-	if hash == "" {
-		hash = i.CalcHash()
-	}
-	var rule schema.SyntaxFlowRule
-	if db.Where("hash = ?", hash).First(&rule); rule.ID > 0 {
-		return db.Model(&rule).Updates(i).Error
-	} else {
-		return db.Create(i).Error
-	}
 }
 
 func DeleteRuleByRuleName(name string) error {
@@ -143,7 +130,7 @@ func DeleteRuleByTitle(name string) error {
 	return db.Where("title = ? or title_zh = ?", name, name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
-func OnlyCreateSyntaxFlow(ruleName string, content string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+func CreateRuleByContent(ruleName string, content string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
 	language, err := CheckSyntaxFlowLanguage(languageRaw)
 	if err != nil {
@@ -161,22 +148,19 @@ func OnlyCreateSyntaxFlow(ruleName string, content string, buildin bool, tags ..
 	rule.RuleName = ruleName
 	rule.Language = string(language)
 	rule.Tag = strings.Join(tags, "|")
-	rule.IsBuildInRule = buildin
+	rule.IsBuildInRule = buildIn
 	err = MigrateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
 		return nil, utils.Wrap(err, "migrate syntax flow rule error")
 	}
+	AddDefaultGroupForRule(consts.GetGormProfileDatabase(), rule)
 	return rule, nil
 }
 
 func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
-	rule, err := OnlyCreateSyntaxFlow(ruleName, content, buildin, tags...)
+	rule, err := CreateRuleByContent(ruleName, content, buildin, tags...)
 	if err != nil {
-		return nil, err
-	}
-	err = CreateOrUpdateRule(rule.CalcHash(), rule)
-	if err != nil {
-		return nil, utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
+		return nil, utils.Errorf("create build in rule failed: %s", err)
 	}
 	return rule, nil
 }
@@ -211,7 +195,7 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 		}
 	}
 
-	err = CreateOrUpdateRule(rule.CalcHash(), rule)
+	err = MigrateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
 		return utils.Wrap(err, "create or update syntax flow rule error")
 	}
@@ -252,30 +236,6 @@ func CheckSyntaxFlowRuleContent(content string) (*schema.SyntaxFlowRule, error) 
 	}
 	rule := frame.GetRule()
 	return rule, nil
-}
-
-func SaveSyntaxFlowRule(ruleName, language, content string, tags ...string) error {
-	languageType, err := CheckSyntaxFlowLanguage(language)
-	if err != nil {
-		return err
-	}
-	ruleType, err := CheckSyntaxFlowRuleType(ruleName)
-	if err != nil {
-		return err
-	}
-	rule, err := CheckSyntaxFlowRuleContent(content)
-	if err != nil {
-		return err
-	}
-	rule.Type = ruleType
-	rule.RuleName = ruleName
-	rule.Language = string(languageType)
-	rule.Tag = strings.Join(tags, "|")
-	err = CreateOrUpdateRule(rule.CalcHash(), rule)
-	if err != nil {
-		return utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
-	}
-	return nil
 }
 
 var (
@@ -457,7 +417,7 @@ func UpdateRule(rule *schema.SyntaxFlowRule) error {
 	return nil
 }
 
-func CreateRule(rule *schema.SyntaxFlowRule) (*schema.SyntaxFlowRule, error) {
+func CreateRule(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFlowRule, error) {
 	if rule == nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: rule is nil")
 	}
@@ -466,8 +426,10 @@ func CreateRule(rule *schema.SyntaxFlowRule) (*schema.SyntaxFlowRule, error) {
 	}
 	db := consts.GetGormProfileDatabase()
 	db = db.Model(&schema.SyntaxFlowRule{})
+	rule.Groups = nil
 	if err := db.Create(&rule).Error; err != nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)
 	}
+	AddDefaultGroupForRule(db, rule, groups...)
 	return rule, nil
 }

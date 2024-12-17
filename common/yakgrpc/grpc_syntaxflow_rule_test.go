@@ -325,7 +325,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 
 		queryRule, err := queryRulesByName(client, []string{ruleName})
 		require.NoError(t, err)
-		require.Equal(t, groupName, queryRule[0].GetGroupName()[0])
+		require.Contains(t, queryRule[0].GetGroupName(), groupName)
 
 		count, err := queryRuleGroupCount(client, groupName)
 		require.NoError(t, err)
