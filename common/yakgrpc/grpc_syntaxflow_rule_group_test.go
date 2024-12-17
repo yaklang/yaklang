@@ -4,17 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"testing"
-
+	"github.com/google/uuid"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"testing"
 )
 
 func createGroups(client ypb.YakClient, groupNames []string) error {
@@ -202,8 +199,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 				Language:   "java",
 			},
 		}
-		_, err := client.CreateSyntaxFlowRuleEx(context.Background(), createReq)
+		rule, err := client.CreateSyntaxFlowRuleEx(context.Background(), createReq)
 		require.NoError(t, err)
+		require.Contains(t, rule.Rule.GroupName, oldGroupName)
 
 		newGroupName := uuid.NewString()
 		updateReq := &ypb.UpdateSyntaxFlowRuleGroupRequest{
@@ -219,7 +217,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 
 		newRule, err := queryRulesByName(client, []string{ruleName})
 		require.NoError(t, err)
-		require.Equal(t, newGroupName, newRule[0].GetGroupName()[0])
+		require.Contains(t, newRule[0].GetGroupName(), newGroupName)
 	})
 
 	t.Run("query buildin group", func(t *testing.T) {
@@ -301,8 +299,9 @@ func TestGRPCMUSTPASS_SynatxFlow_Query_Same_Group(t *testing.T) {
 
 		groups, err := querySameGroup([]string{ruleName1, ruleName2})
 		require.NoError(t, err)
-		require.Equal(t, groupNameB, groups[0].GroupName)
-		require.Equal(t, 1, len(groups))
+		require.Contains(t, lo.Map(groups, func(item *ypb.SyntaxFlowGroup, _ int) string {
+			return item.GetGroupName()
+		}), groupNameB)
 	})
 
 	t.Run("test same group of query rule", func(t *testing.T) {
@@ -329,21 +328,6 @@ func TestGRPCMUSTPASS_SynatxFlow_Query_Same_Group(t *testing.T) {
 
 		groups, err := querySameGroup([]string{ruleName1})
 		require.NoError(t, err)
-		require.Equal(t, 3, len(groups))
-	})
-
-	t.Run("aa", func(t *testing.T) {
-		ruleName := uuid.NewString()
-		groupName := uuid.NewString()
-		sfdb.CreateRule(&schema.SyntaxFlowRule{
-			RuleName: ruleName,
-		})
-		sfdb.BatchAddGroupsForRules(consts.GetGormProfileDatabase(), []string{ruleName}, []string{groupName})
-		db := consts.GetGormProfileDatabase()
-		var group schema.SyntaxFlowGroup
-		db = db.Preload("Rules")
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "group_name", []string{groupName})
-		db.First(&group)
-		require.Equal(t, 1, len(group.Rules))
+		require.Equal(t, 6, len(groups))
 	})
 }

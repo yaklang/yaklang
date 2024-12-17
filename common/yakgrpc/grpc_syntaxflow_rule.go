@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
@@ -46,11 +45,16 @@ func (s *Server) QuerySyntaxFlowRule(ctx context.Context, req *ypb.QuerySyntaxFl
 }
 
 func (s *Server) CreateSyntaxFlowRuleEx(ctx context.Context, req *ypb.CreateSyntaxFlowRuleRequest) (*ypb.CreateSyntaxFlowRuleResponse, error) {
-	rule, err := ParseSyntaxFlowInput(req.GetSyntaxFlowInput())
+	if req == nil || req.GetSyntaxFlowInput() == nil {
+		return nil, utils.Error("create syntax flow rule failed: request is nil")
+	}
+
+	input := req.GetSyntaxFlowInput()
+	rule, err := ParseSyntaxFlowInput(input)
 	if err != nil {
 		return nil, err
 	}
-	_, err = sfdb.CreateRule(rule)
+	_, err = sfdb.CreateRule(rule, input.GetGroupNames()...)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +124,7 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.RuleName = ruleInput.RuleName
 	rule.Tag = strings.Join(ruleInput.Tags, "|")
 	rule.Title = ruleInput.RuleName
-	rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
+	//rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
 	rule.Description = ruleInput.Description
 	return rule, nil
 }

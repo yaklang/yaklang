@@ -47,9 +47,9 @@ func GetOrCreateGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGro
 	// 更新内置组
 	updateBuildInGroup := func(group *schema.SyntaxFlowGroup, isBuildIn bool) (*schema.SyntaxFlowGroup, error) {
 		if group.IsBuildIn != isBuildIn {
-			group.IsBuildIn = isBuildIn
-			err := db.Update(group).Error
-			return group, err
+			//group.IsBuildIn = isBuildIn
+			//err := db.Update(group).Error
+			//return group, err
 		}
 		return group, nil
 	}
@@ -151,11 +151,10 @@ func GetIntersectionGroup(db *gorm.DB, groups [][]*schema.SyntaxFlowGroup) []*sc
 
 // AddDefaultGroupForRule 为规则添加默认分组
 // 默认分组为：语言、严重程度、规则类型
-func AddDefaultGroupForRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
+func AddDefaultGroupForRule(db *gorm.DB, rule *schema.SyntaxFlowRule, groups ...string) error {
 	if rule == nil {
 		return utils.Errorf("add default group for rule failed:rule is empty")
 	}
-	var groups []string
 	groups = append(groups, rule.Language)
 	groups = append(groups, string(rule.Severity))
 	groups = append(groups, string(rule.Purpose))
@@ -163,6 +162,7 @@ func AddDefaultGroupForRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
 		return item != ""
 	})
 	_, err := BatchAddGroupsForRules(db, []string{rule.RuleName}, groups)
+	db.Where("rule_name = ?", rule.RuleName).Preload("Groups").First(&rule)
 	return err
 }
 
