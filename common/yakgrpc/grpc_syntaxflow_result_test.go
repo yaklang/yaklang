@@ -224,3 +224,139 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 	wg.Wait()
 
 }
+
+func TestGRPCMUSTPASS_SyntaxFlow_ResultDelete(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	progName := uuid.NewString()
+	prog, err := ssaapi.Parse(`println("araa")`,
+		ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.Yak),
+	)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+	require.NoError(t, err)
+
+	query := func() []uint {
+		rsp, err := local.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
+			Pagination: &ypb.Paging{
+				Page:     0,
+				Limit:    0,
+				OrderBy:  "id",
+				Order:    "",
+				RawOrder: "",
+			},
+			Filter: &ypb.SyntaxFlowResultFilter{
+				ProgramNames: []string{progName},
+			},
+		})
+		require.NoError(t, err)
+		resultIDs := make([]uint, 0, len(rsp.GetResults()))
+		for _, res := range rsp.GetResults() {
+			resultIDs = append(resultIDs, uint(res.GetResultID()))
+		}
+		return resultIDs
+	}
+
+	deleteAllResult := func(deleteContainRisk bool) {
+		rsp, err := local.DeleteSyntaxFlowResult(context.Background(), &ypb.DeleteSyntaxFlowResultRequest{
+			DeleteContainRisk: deleteContainRisk,
+			DeleteAll:         true,
+			Filter: &ypb.SyntaxFlowResultFilter{
+				ProgramNames: []string{progName},
+			},
+		})
+		require.NoError(t, err)
+		_ = rsp
+	}
+	deleteResult := func(deleteContainRisk bool, resultIDs ...string) int {
+		rsp, err := local.DeleteSyntaxFlowResult(context.Background(), &ypb.DeleteSyntaxFlowResultRequest{
+			DeleteContainRisk: deleteContainRisk,
+			Filter: &ypb.SyntaxFlowResultFilter{
+				ResultIDs: resultIDs,
+			},
+		})
+		require.NoError(t, err)
+		_ = rsp
+		return int(rsp.Message.EffectRows)
+	}
+	_ = deleteResult
+
+	syntaxflowCodeWithRisk := `
+	println(* as $para)
+	alert $para for {
+		"level": "info", 
+	}
+	`
+	syntaxFlowCode := `println(* as $para)`
+
+	t.Run("test delete all result", func(t *testing.T) {
+		res := prog.SyntaxFlow(syntaxflowCodeWithRisk)
+		resultID1, err := res.Save(schema.SFResultKindDebug) // risk
+		require.NoError(t, err)
+
+		res = prog.SyntaxFlow(syntaxFlowCode)
+		resultID2, err := res.Save(schema.SFResultKindScan) // no  risk
+		_ = resultID2
+		require.NoError(t, err)
+
+		res = prog.SyntaxFlow(syntaxFlowCode)
+		resultID3, err := res.Save(schema.SFResultKindQuery) // no risk
+		_ = resultID3
+		require.NoError(t, err)
+
+		// delete normal result, risk result will not deleted
+		// now: [risk, no-risk, no-risk]
+		deleteAllResult(false)
+		require.Equal(t, []uint{resultID1}, query())
+
+		res = prog.SyntaxFlow(syntaxFlowCode)
+		_, err = res.Save(schema.SFResultKindScan) // no  risk
+		require.NoError(t, err)
+		res = prog.SyntaxFlow(syntaxFlowCode)
+		_, err = res.Save(schema.SFResultKindQuery) // no risk
+		require.NoError(t, err)
+
+		// delete all, risk result will be deleted, and risk will be deleted
+		// now [risk, no-risk, no-risk]
+		deleteAllResult(true)
+		require.Equal(t, len(query()), 0)
+
+		riskCount := 0
+		err = consts.GetGormProjectDatabase().Model(&schema.Risk{}).Where("result_id = ?", resultID1).Count(&riskCount).Error
+		require.NoError(t, err)
+		require.Equal(t, 0, riskCount)
+	})
+
+	t.Run("test delete contain risk", func(t *testing.T) {
+		res := prog.SyntaxFlow(syntaxflowCodeWithRisk)
+		resultID1, err := res.Save(schema.SFResultKindDebug) // risk
+		require.NoError(t, err)
+
+		res = prog.SyntaxFlow(syntaxFlowCode)
+		resultID2, err := res.Save(schema.SFResultKindScan) // no  risk
+		require.NoError(t, err)
+
+		res = prog.SyntaxFlow(syntaxFlowCode)
+		resultID3, err := res.Save(schema.SFResultKindQuery) // no risk
+		require.NoError(t, err)
+
+		// delete normal result by id
+		{
+			count := deleteResult(false, fmt.Sprintf("%d", resultID2))
+			require.Equal(t, []uint{resultID1, resultID3}, query())
+			require.Equal(t, 1, count)
+		}
+
+		// delete contain risk result, but false
+		{
+			count := deleteResult(false, fmt.Sprintf("%d", resultID1))
+			require.Equal(t, 0, count)
+			require.Equal(t, []uint{resultID1, resultID3}, query())
+		}
+
+		// delete contain risk result
+		deleteResult(true, fmt.Sprintf("%d", resultID1))
+		require.Equal(t, []uint{resultID3}, query())
+
+	})
+}
