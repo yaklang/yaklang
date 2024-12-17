@@ -52,6 +52,7 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 			Where("syntax_flow_groups.group_name IN (?)", params.GetGroupNames())
 	}
 
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", params.GetSeverity())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", params.GetRuleNames())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", params.GetLanguage())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", params.GetPurpose())
