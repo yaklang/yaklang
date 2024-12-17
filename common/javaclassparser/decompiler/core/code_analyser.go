@@ -1086,7 +1086,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 	sort.Slice(ternaryExpMergeNode, func(i, j int) bool {
 		return ternaryExpMergeNode[i].Id > ternaryExpMergeNode[j].Id
 	})
-	customId := 0
 	for _, code := range ternaryExpMergeNode {
 		mergeNode := code
 		ifNodes := mergeToIfNode[code]
@@ -1140,33 +1139,36 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				return errors.New("invalid if opcode")
 			}
 			val := values.NewTernaryExpression(condition, source[0].StackEntry.value, source[1].StackEntry.value)
-			//preVal = val
-			newOpcode := &OpCode{
-				Info: val,
-				Instr: &Instruction{
-					OpCode: OP_NOP,
-					Name:   "custom",
-				},
-				Id: customId,
-			}
-			customId++
-			newOpcode.stackConsumed = ifCode.stackConsumed
-			newOpcode.stackProduced = []values.JavaValue{val}
-			newOpcode.Target = append(newOpcode.Target, code)
-			code.Source = append(code.Source, newOpcode)
-			emptySim := NewEmptyStackEntry()
-			sim := NewStackSimulation(emptySim, map[int]*values.JavaRef{}, utils2.NewVariableId(&d.BaseVarId))
-			initMethodVar(sim)
-			sim.Push(val)
-			newOpcode.StackEntry = sim.stackEntry
 			sources := slices.Clone(ifCode.Source)
 			for _, source := range sources {
 				source.Target = lo.Filter(source.Target, func(item *OpCode, index int) bool {
 					return item != ifCode
 				})
-				source.Target = append(source.Target, newOpcode)
-				newOpcode.Source = append(newOpcode.Source, source)
+				for _, opCode := range ifCode.Target {
+					opCode.Source = lo.Filter(opCode.Source, func(item *OpCode, index int) bool {
+						return item != ifCode
+					})
+					source.Target = append(source.Target, opCode)
+					opCode.Source = append(opCode.Source, source)
+				}
 			}
+
+			//for _, opCode := range code.Source {
+			//	opCode.Target = lo.Filter(opCode.Target, func(item *OpCode, index int) bool {
+			//		return item != code
+			//	})
+			//	opCode.Target = append(opCode.Target, newOpcode)
+			//}
+			//
+			//newOpcode.stackConsumed = ifCode.stackConsumed
+			//newOpcode.stackProduced = []values.JavaValue{val}
+			//newOpcode.Target = append(newOpcode.Target, code)
+			//code.Source = append(code.Source, newOpcode)
+			//emptySim := NewEmptyStackEntry()
+			//sim := NewStackSimulation(emptySim, map[int]*values.JavaRef{}, utils2.NewVariableId(&d.BaseVarId))
+			//initMethodVar(sim)
+			//sim.Push(val)
+			//newOpcode.StackEntry = sim.stackEntry
 			ternaryExpMergeNodeSlot[code].Value = val
 			//
 			//for _, opCode := range source {
