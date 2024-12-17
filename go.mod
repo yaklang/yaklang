@@ -70,7 +70,7 @@ require (
 	github.com/kataras/golog v0.0.10
 	github.com/kataras/pio v0.0.2
 	github.com/kevinburke/ssh_config v1.2.0
-	github.com/klauspost/compress v1.17.4
+	github.com/klauspost/compress v1.17.11
 	github.com/knqyf263/go-rpmdb v0.1.0
 	github.com/lestrrat/go-file-rotatelogs v0.0.0-20180223000712-d3151e2a480f
 	github.com/liamg/jfather v0.0.7
@@ -192,12 +192,14 @@ require (
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc3 // indirect
+	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/segmentio/kafka-go v0.4.47 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/shoenig/go-m1cpu v0.1.5 // indirect
 	github.com/skeema/knownhosts v1.2.1 // indirect
