@@ -71,22 +71,25 @@ const (
 	*/
 )
 
-var MITMAndPortScanHooks = []string{
-	HOOK_MirrorFilteredHTTPFlow,
-	HOOK_MirrorHTTPFlow,
-	HOOK_MirrorNewWebsite,
-	HOOK_MirrorNewWebsitePath,
-	HOOK_MirrorNewWebsitePathParams,
-	HOOK_CLAER,
+var (
+	MITMAndPortScanHooks = []string{
+		HOOK_MirrorFilteredHTTPFlow,
+		HOOK_MirrorHTTPFlow,
+		HOOK_MirrorNewWebsite,
+		HOOK_MirrorNewWebsitePath,
+		HOOK_MirrorNewWebsitePathParams,
+		HOOK_CLAER,
 
-	HOOK_HijackHTTPRequest,
-	HOOK_HijackHTTPResponse,
-	HOOK_HijackHTTPResponseEx,
-	HOOK_hijackSaveHTTPFlow,
+		HOOK_HijackHTTPRequest,
+		HOOK_HijackHTTPResponse,
+		HOOK_HijackHTTPResponseEx,
+		HOOK_hijackSaveHTTPFlow,
 
-	// port-scan
-	HOOK_PortScanHandle,
-}
+		// port-scan
+		HOOK_PortScanHandle,
+	}
+	HotPatchScriptName = "@HotPatchCode"
+)
 
 type MixPluginCaller struct {
 	ctx context.Context // 整个 mix plugin caller 的上下文
@@ -343,8 +346,14 @@ func (c *MixPluginCaller) LoadHotPatch(ctx context.Context, params []*ypb.ExecPa
 	for _, param := range params {
 		paramsMap[param.GetKey()] = param.GetValue()
 	}
+	c.callers.Remove(&ypb.RemoveHookParams{
+		HookName:     MITMAndPortScanHooks,
+		RemoveHookID: []string{HotPatchScriptName},
+	})
 
-	err := c.callers.SetForYakit(ctx, code, paramsMap, YakitCallerIf(c.feedbackHandler), MITMAndPortScanHooks...)
+	err := c.callers.AddForYakit(ctx, &schema.YakScript{
+		ScriptName: HotPatchScriptName,
+	}, paramsMap, code, YakitCallerIf(c.feedbackHandler), MITMAndPortScanHooks...)
 	if err != nil {
 		c.FeedbackOrdinary(fmt.Sprintf("Initialized HotPatched MITM HOOKS FAILED: %v", err.Error()))
 		return err

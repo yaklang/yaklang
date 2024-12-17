@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
@@ -300,4 +302,84 @@ aaa`)
 	case <-callCheckChan:
 	}
 	require.True(t, check)
+}
+
+func TestMixCaller_LoadHotPatch(t *testing.T) {
+	caller, err := NewMixPluginCaller()
+	require.NoError(t, err)
+	caller.SetLoadPluginTimeout(1)
+	code := fmt.Sprintf(`
+mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
+	s = "%s"
+}
+hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
+	s = "%s"
+}
+`, ksuid.New().String(), ksuid.New().String())
+	checkCallerLoads := func(funcName string, wantLength int, hashes ...string) {
+		res, ok := caller.callers.table.Load(funcName)
+		require.True(t, ok)
+		require.Len(t, res, wantLength, "callers length not match")
+		require.Lenf(t, hashes, wantLength, "hashes length not match")
+		callers := res.([]*Caller)
+		for i, caller := range callers {
+			require.Equalf(t, hashes[i], caller.Hash, "hash not match funcName: %s index: %d", funcName, i)
+		}
+	}
+
+	// load hot patch
+	err = caller.LoadHotPatch(utils.TimeoutContextSeconds(2), []*ypb.ExecParamItem{}, code)
+	require.NoError(t, err)
+	checkCallerLoads(HOOK_HijackHTTPRequest, 1, utils.CalcSha1(code, HOOK_HijackHTTPRequest, HotPatchScriptName))
+	checkCallerLoads(HOOK_MirrorHTTPFlow, 1, utils.CalcSha1(code, HOOK_MirrorHTTPFlow, HotPatchScriptName))
+
+	// load a plugin, check if mirrorHTTPFlow has two callers
+	pluginName := utils.RandStringBytes(16)
+	pluginCode := fmt.Sprintf(`
+mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
+	s = "%s"
+}
+`, ksuid.New().String())
+	err = caller.LoadPluginEx(utils.TimeoutContextSeconds(2), &schema.YakScript{
+		ScriptName: pluginName,
+		Content:    pluginCode,
+	})
+	require.NoError(t, err)
+	checkCallerLoads(HOOK_HijackHTTPRequest, 1, utils.CalcSha1(code, HOOK_HijackHTTPRequest, HotPatchScriptName))
+	checkCallerLoads(HOOK_MirrorHTTPFlow, 2, utils.CalcSha1(code, HOOK_MirrorHTTPFlow, HotPatchScriptName), utils.CalcSha1(pluginCode, HOOK_MirrorHTTPFlow, pluginName))
+
+	// reload plugin, overwrite mirrorHTTPFlow
+	reloadPluginCode := fmt.Sprintf(`
+mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
+	s = "%s"	
+}
+`, ksuid.New().String())
+	err = caller.LoadPluginEx(utils.TimeoutContextSeconds(2), &schema.YakScript{
+		ScriptName: pluginName,
+		Content:    reloadPluginCode,
+	})
+	require.NoError(t, err)
+	checkCallerLoads(HOOK_HijackHTTPRequest, 1, utils.CalcSha1(code, HOOK_HijackHTTPRequest, HotPatchScriptName))
+	checkCallerLoads(HOOK_MirrorHTTPFlow, 2, utils.CalcSha1(code, HOOK_MirrorHTTPFlow, HotPatchScriptName), utils.CalcSha1(reloadPluginCode, HOOK_MirrorHTTPFlow, pluginName))
+
+	// reload hot patch, overwrite hijackHTTPRequest and mirrorHTTPFlow
+	reloadHotPatchCode := fmt.Sprintf(`
+mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
+	s = "%s"
+}
+hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
+	s = "%s"
+}
+`, ksuid.New().String(), ksuid.New().String())
+	err = caller.LoadHotPatch(utils.TimeoutContextSeconds(2), []*ypb.ExecParamItem{}, reloadHotPatchCode)
+	require.NoError(t, err)
+	checkCallerLoads(HOOK_HijackHTTPRequest, 1, utils.CalcSha1(reloadHotPatchCode, HOOK_HijackHTTPRequest, HotPatchScriptName))
+	// because hot patch mirrorHTTPFlow caller remove first then add, so it should be second
+	checkCallerLoads(HOOK_MirrorHTTPFlow, 2, utils.CalcSha1(reloadPluginCode, HOOK_MirrorHTTPFlow, pluginName), utils.CalcSha1(reloadHotPatchCode, HOOK_MirrorHTTPFlow, HotPatchScriptName))
+
+	// reload hot patch with empty, check if hijackHTTPRequest and mirrorHTTPFlow is removed
+	err = caller.LoadHotPatch(utils.TimeoutContextSeconds(2), []*ypb.ExecParamItem{}, "")
+	require.NoError(t, err)
+	checkCallerLoads(HOOK_HijackHTTPRequest, 0)
+	checkCallerLoads(HOOK_MirrorHTTPFlow, 1, utils.CalcSha1(reloadPluginCode, HOOK_MirrorHTTPFlow, pluginName))
 }

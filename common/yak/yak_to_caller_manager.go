@@ -520,7 +520,7 @@ func (y *YakToCallerManager) Set(ctx context.Context, code string, paramMap map[
 		return nil
 	}, funcName...)
 	if err != nil {
-		return utils.Errorf(err.Error())
+		return err
 	}
 
 	if y.table == nil {
@@ -1417,9 +1417,18 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		}
 	}()
 
-	var engine *antlr4yak.Engine
+	var (
+		engine  *antlr4yak.Engine
+		ctxInfo map[string]any
+		ok      bool
+	)
 	id := script.ScriptName
-	if _, ok := ctx.Value("ctx_info").(map[string]any)["isNaslScript"]; ok {
+	iCtxInfo := ctx.Value("ctx_info")
+	ctxInfo, ok = iCtxInfo.(map[string]any)
+	if !ok {
+		ctxInfo = make(map[string]any)
+	}
+	if _, ok := ctxInfo["isNaslScript"]; ok {
 		if v, ok := y.table.Load(HOOK_LoadNaslScriptByNameFunc); ok {
 			v.(func(string))(id)
 			return nil
@@ -1452,10 +1461,10 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		return nil
 	}, funcName...)
 	if err != nil {
-		return utils.Errorf(err.Error())
+		return err
 	}
 	// 对于nasl插件还需要提取加载函数
-	if _, ok := ctx.Value("ctx_info").(map[string]any)["isNaslScript"]; ok {
+	if _, ok := ctxInfo["isNaslScript"]; ok {
 		f := func(name string) {
 			if !strings.HasSuffix(strings.ToLower(name), ".nasl") {
 				log.Errorf("call hook function `%v` of `%v` plugin failed: %s", HOOK_LoadNaslScriptByNameFunc, id, "nasl script name must end with .nasl")
