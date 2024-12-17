@@ -58,6 +58,9 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 	for _, value := range j.Values {
 		vs = append(vs, value.String(funcCtx))
 	}
+	if len(vs) == 1 {
+		return fmt.Sprintf("%s%s", j.Op, vs[0])
+	}
 	switch j.Op {
 	case ADD:
 		return fmt.Sprintf("(%s) + (%s)", vs[0], vs[1])
@@ -70,6 +73,13 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 	}
 }
 
+func NewUnaryExpression(value1 JavaValue, op string, typ types.JavaType) *JavaExpression {
+	return &JavaExpression{
+		Values: []JavaValue{value1},
+		Op:     op,
+		Typ:    typ.Copy(),
+	}
+}
 func NewBinaryExpression(value1, value2 JavaValue, op string, typ types.JavaType) *JavaExpression {
 	return &JavaExpression{
 		Values: []JavaValue{value1, value2},
@@ -82,6 +92,7 @@ type FunctionCallExpression struct {
 	IsStatic     bool
 	Object       JavaValue
 	FunctionName string
+	ClassName    string
 	Arguments    []JavaValue
 	FuncType     *types.JavaFuncType
 }
@@ -91,13 +102,33 @@ func (f *FunctionCallExpression) Type() types.JavaType {
 }
 
 func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) string {
+	if f.FunctionName == "<init>" {
+		println()
+	}
 	paramStrs := []string{}
-	for _, arg := range f.Arguments {
+	for i, arg := range f.Arguments {
+		argType := f.FuncType.ParamTypes[i]
+		argTypeStr := argType.String(funcCtx)
+		if arg.Type().String(funcCtx) != argTypeStr {
+			argStr := arg.String(funcCtx)
+			arg = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				return fmt.Sprintf("(%s)(%s)", funcCtx.ShortTypeName(argTypeStr), argStr)
+			}, func() types.JavaType {
+				return argType
+			})
+		}
 		paramStrs = append(paramStrs, arg.String(funcCtx))
 	}
 	if f.FunctionName == "<init>" {
-		return fmt.Sprintf("%s(%s)", f.Object.String(funcCtx), strings.Join(paramStrs, ","))
+		if f.ClassName == funcCtx.ClassName {
+			return fmt.Sprintf("%s(%s)", f.Object.String(funcCtx), strings.Join(paramStrs, ","))
+		} else if f.ClassName == funcCtx.SupperClassName {
+			return fmt.Sprintf("super(%s)", strings.Join(paramStrs, ","))
+		} else {
+			panic("invalid <init> method")
+		}
 	}
+
 	if v, ok := f.Object.(*JavaClassValue); ok {
 		if v.Type().RawType().(*types.JavaClass).Name == funcCtx.ClassName {
 			return fmt.Sprintf("%s(%s)", f.FunctionName, strings.Join(paramStrs, ","))
@@ -106,10 +137,11 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 	return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
 }
 
-func NewFunctionCallExpression(object JavaValue, name string, funcType *types.JavaFuncType) *FunctionCallExpression {
+func NewFunctionCallExpression(object JavaValue, methodMember *JavaClassMember, funcType *types.JavaFuncType) *FunctionCallExpression {
 	return &FunctionCallExpression{
 		FuncType:     funcType,
 		Object:       object,
-		FunctionName: name,
+		FunctionName: methodMember.Member,
+		ClassName:    methodMember.Name,
 	}
 }

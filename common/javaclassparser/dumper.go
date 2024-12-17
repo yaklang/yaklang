@@ -17,16 +17,17 @@ import (
 )
 
 type ClassObjectDumper struct {
-	imports       map[string]struct{}
-	obj           *ClassObject
-	FuncCtx       *class_context.ClassContext
-	ClassName     string
-	PackageName   string
-	CurrentMethod *MemberInfo
-	ConstantPool  []ConstantInfo
-	deepStack     *utils.Stack[int]
-	MethodType    *types.JavaFuncType
-	lambdaMethods map[string][]string
+	imports           map[string]struct{}
+	obj               *ClassObject
+	FuncCtx           *class_context.ClassContext
+	ClassName         string
+	PackageName       string
+	CurrentMethod     *MemberInfo
+	ConstantPool      []ConstantInfo
+	deepStack         *utils.Stack[int]
+	MethodType        *types.JavaFuncType
+	lambdaMethods     map[string][]string
+	fieldDefaultValue map[string]string
 }
 
 func (c *ClassObjectDumper) GetConstructorMethodName() string {
@@ -42,11 +43,12 @@ func (c *ClassObjectDumper) GetConstructorMethodName() string {
 }
 func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
 	return &ClassObjectDumper{
-		obj:           obj,
-		ConstantPool:  obj.ConstantPool,
-		imports:       make(map[string]struct{}),
-		deepStack:     utils.NewStack[int](),
-		lambdaMethods: map[string][]string{},
+		obj:               obj,
+		ConstantPool:      obj.ConstantPool,
+		imports:           make(map[string]struct{}),
+		deepStack:         utils.NewStack[int](),
+		lambdaMethods:     map[string][]string{},
+		fieldDefaultValue: map[string]string{},
 	}
 }
 func (c *ClassObjectDumper) TabNumber() int {
@@ -77,14 +79,18 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	packageName := strings.Join(splits[:len(splits)-1], ".")
 	c.PackageName = packageName
 	className := splits[len(splits)-1]
+	supperClassName := c.obj.GetSupperClassName()
+	supperClassName = strings.Replace(supperClassName, "/", ".", -1)
 	c.ClassName = strings.Replace(name, "/", ".", -1)
 	funcCtx := &class_context.ClassContext{
-		ClassName:   c.ClassName,
-		PackageName: c.PackageName,
+		ClassName:       c.ClassName,
+		SupperClassName: supperClassName,
+		PackageName:     c.PackageName,
 	}
 	c.FuncCtx = funcCtx
 	buildInLib := []string{
-		c.PackageName + ".*",
+		//c.PackageName + ".*",
+		c.ClassName,
 		"java.lang.*",
 		//"java.io.*",
 	}
@@ -92,8 +98,6 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 		funcCtx.Import(s)
 	}
 	superStr := ""
-	supperClassName := c.obj.GetSupperClassName()
-	supperClassName = strings.Replace(supperClassName, "/", ".", -1)
 	if supperClassName != "java.lang.Object" {
 		funcCtx.Import(supperClassName)
 		supperClassName = funcCtx.ShortTypeName(supperClassName)
@@ -121,17 +125,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	if className == "" {
 		return "", utils.Error("className is empty")
 	}
-	attrs := ""
-	fields, err := c.DumpFields()
-	if err != nil {
-		return "", utils.Wrap(err, "DumpFields failed")
-	}
-	if len(fields) > 0 {
-		attrs += "\n\t// Fields\n"
-		for _, field := range fields {
-			attrs += fmt.Sprintf("\t%s\n", field)
-		}
-	}
+
 	annoStrs := []string{}
 	for _, info := range lo.Filter(c.obj.Attributes, func(item AttributeInfo, index int) bool {
 		_, ok := item.(*RuntimeVisibleAnnotationsAttribute)
@@ -148,6 +142,17 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	methods, err := c.DumpMethods()
 	if err != nil {
 		return "", utils.Wrap(err, "DumpMethods failed")
+	}
+	attrs := ""
+	fields, err := c.DumpFields()
+	if err != nil {
+		return "", utils.Wrap(err, "DumpFields failed")
+	}
+	if len(fields) > 0 {
+		attrs += "\n\t// Fields\n"
+		for _, field := range fields {
+			attrs += fmt.Sprintf("\t%s\n", field)
+		}
 	}
 	if len(methods) > 0 {
 		attrs += "\n"
@@ -204,7 +209,11 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 			return nil, err
 		}
 		lastPacket := c.parseImportCLass(fieldType.String(c.FuncCtx))
-		result = append(result, fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, name))
+		if slices.Contains(accessFlagsVerbose, "final") && c.fieldDefaultValue[name] != "" {
+			result = append(result, fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, c.fieldDefaultValue[name]))
+		} else {
+			result = append(result, fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, name))
+		}
 	}
 	return result, nil
 }
@@ -420,6 +429,17 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				//}
 				statementSet.Add(statement)
 				switch ret := statement.(type) {
+				case *statements.AssignStatement:
+					foundFieldInit := false
+					if v, ok := ret.LeftValue.(*values.RefMember); ok {
+						if v1, ok := v.Object.(*values.JavaRef); ok && v1.IsThis {
+							foundFieldInit = true
+							c.fieldDefaultValue[v.Member] = ret.JavaValue.String(funcCtx)
+						}
+					}
+					if !foundFieldInit {
+						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
+					}
 				case *statements.SynchronizedStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"synchronized(%s){\n"+
 						"%s\n"+
@@ -493,6 +513,9 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					}
 				}
 				statementStr := statementToString(statement)
+				if statementStr == "" {
+					continue
+				}
 				sourceCode += fmt.Sprintf("%s\n", statementStr)
 			}
 			code = sourceCode
