@@ -19,6 +19,22 @@ func (r *ConditionStatement) String(funcCtx *class_context.ClassContext) string 
 func NewConditionStatement(cmp values.JavaValue, op string) *ConditionStatement {
 	cmp.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
 	if v, ok := cmp.(*values.JavaCompare); ok {
+		if op == values.NEQ {
+			if literal, ok := v.JavaValue2.(*values.JavaLiteral); ok {
+				if v1, ok := v.JavaValue1.Type().RawType().(*types.JavaPrimer); ok && v1.Name == types.JavaBoolean {
+					if literal.Data == 0 {
+						return &ConditionStatement{
+							Condition: v.JavaValue1,
+						}
+					}
+					if literal.Data == 1 {
+						return &ConditionStatement{
+							Condition: values.NewUnaryExpression(v.JavaValue1, values.Not, types.NewJavaPrimer(types.JavaBoolean)),
+						}
+					}
+				}
+			}
+		}
 		if op == values.EQ {
 			if literal, ok := v.JavaValue2.(*values.JavaLiteral); ok {
 				if v1, ok := v.JavaValue1.Type().RawType().(*types.JavaPrimer); ok && v1.Name == types.JavaBoolean {

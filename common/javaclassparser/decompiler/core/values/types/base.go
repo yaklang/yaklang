@@ -75,7 +75,64 @@ type javaType interface {
 	String(funcCtx *class_context.ClassContext) string
 	IsJavaType()
 }
+type MergeType struct {
+	typs []JavaType
+}
 
+func (m *MergeType) String(funcCtx *class_context.ClassContext) string {
+	s := ""
+	for _, typ := range m.typs {
+		if s == "" {
+			s = typ.String(funcCtx)
+			continue
+		}
+		newS := typ.String(funcCtx)
+		if newS != s {
+			panic("MergeType: different types")
+		}
+	}
+	return s
+}
+
+func (m *MergeType) IsJavaType() {
+}
+
+func (m *MergeType) ResetType(t JavaType) {
+	for _, typ := range m.typs {
+		typ.ResetType(t)
+	}
+}
+
+func (m *MergeType) IsArray() bool {
+	return false
+}
+
+func (m *MergeType) ElementType() JavaType {
+	return nil
+}
+
+func (m *MergeType) ArrayDim() int {
+	return 0
+}
+
+func (m *MergeType) FunctionType() *JavaFuncType {
+	return nil
+}
+
+func (m *MergeType) RawType() javaType {
+	return m.typs[0].RawType()
+}
+
+func (m *MergeType) Copy() JavaType {
+	return NewMergeType(m.typs...)
+}
+func NewMergeType(typs ...JavaType) *MergeType {
+	return &MergeType{
+		typs: typs,
+	}
+}
+
+var _ JavaType = &MergeType{}
 var _ javaType = &JavaClass{}
 var _ javaType = &JavaPrimer{}
 var _ javaType = &JavaArrayType{}

@@ -223,9 +223,19 @@ type TernaryExpression struct {
 }
 
 func (j *TernaryExpression) Type() types.JavaType {
-	return j.TrueValue.Type()
+	return types.NewMergeType(j.TrueValue.Type(), j.FalseValue.Type())
 }
 func (j *TernaryExpression) String(funcCtx *class_context.ClassContext) string {
+	truePrimer, ok1 := j.TrueValue.Type().RawType().(*types.JavaPrimer)
+	falsePrimer, ok2 := j.FalseValue.Type().RawType().(*types.JavaPrimer)
+	if ok1 && ok2 && truePrimer.Name == types.JavaBoolean && falsePrimer.Name == types.JavaBoolean {
+		if j.TrueValue.String(funcCtx) == "true" && j.FalseValue.String(funcCtx) == "false" {
+			return j.Condition.String(funcCtx)
+		}
+		if j.TrueValue.String(funcCtx) == "false" && j.FalseValue.String(funcCtx) == "true" {
+			return NewUnaryExpression(j.Condition, Not, types.NewJavaPrimer(types.JavaBoolean)).String(funcCtx)
+		}
+	}
 	return fmt.Sprintf("(%s) ? (%s) : (%s)", j.Condition.String(funcCtx), j.TrueValue.String(funcCtx), j.FalseValue.String(funcCtx))
 }
 

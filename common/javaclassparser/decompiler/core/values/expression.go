@@ -59,7 +59,7 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 		vs = append(vs, value.String(funcCtx))
 	}
 	if len(vs) == 1 {
-		return fmt.Sprintf("%s%s", j.Op, vs[0])
+		return fmt.Sprintf("%s(%s)", j.Op, vs[0])
 	}
 	switch j.Op {
 	case ADD:
@@ -102,17 +102,16 @@ func (f *FunctionCallExpression) Type() types.JavaType {
 }
 
 func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) string {
-	if f.FunctionName == "<init>" {
-		println()
-	}
 	paramStrs := []string{}
 	for i, arg := range f.Arguments {
 		argType := f.FuncType.ParamTypes[i]
-		argTypeStr := argType.String(funcCtx)
-		if arg.Type().String(funcCtx) != argTypeStr {
+		expectClassType, ok1 := argType.RawType().(*types.JavaClass)
+		atcClassType, ok2 := arg.Type().RawType().(*types.JavaClass)
+		if ok1 && ok2 && expectClassType.Name != atcClassType.Name {
 			argStr := arg.String(funcCtx)
+			argTypeStr := argType.String(funcCtx)
 			arg = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-				return fmt.Sprintf("(%s)(%s)", funcCtx.ShortTypeName(argTypeStr), argStr)
+				return fmt.Sprintf("(%s)(%s)", argTypeStr, argStr)
 			}, func() types.JavaType {
 				return argType
 			})
