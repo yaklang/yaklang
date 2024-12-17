@@ -320,6 +320,7 @@ func Test_SideEffect_Return(t *testing.T) {
 			"phi(a)[2,FreeValue-a]", "side-effect(phi(a)[2,1], a)",
 		}, t)
 	})
+
 	t.Run("side-effect with empty path extend", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -369,8 +370,6 @@ func Test_SideEffect_Return(t *testing.T) {
 	})
 
 	t.Run("side-effect nesting bind with closu", func(t *testing.T) {
-		// Todo: 从CapturedSideEffect获取的side-effect忽略了cfg信息，导致没有生成phi值
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 		func main(){
@@ -386,14 +385,100 @@ func Test_SideEffect_Return(t *testing.T) {
 					} else {
 						f1() 
 					}
-					println(a) // phi(a)[4,3]
+					println(a) // phi(a)[4,side-effect(2, a)]
 				}
 
-				println(a) // phi(a)[1,2]
+				println(a) // phi(a)[4,side-effect(2, a)]
 			}
 		}
 		`, []string{
-			"phi(a)[4,3]", "phi(a)[1,2]",
+			"phi(a)[4,side-effect(2, a)]", "phi(a)[4,side-effect(2, a)]",
+		}, t)
+	})
+
+	t.Run("side-effect nesting bind with closu and local", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			f := func() {
+				a = 1 
+				f1 := func() {
+					a = 2
+				}
+				{
+					a := 3 
+					if c {
+						a = 4
+					} else {
+						f1() 
+					}
+					println(a) // phi(a)[4,3]
+				}
+
+				println(a) // phi(a)[1,side-effect(2, a)]
+			}
+		}
+		`, []string{
+			"phi(a)[4,3]", "phi(a)[1,side-effect(2, a)]",
+		}, t)
+	})
+
+	t.Run("side-effect nesting bind with closu and local cross block", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			f := func() {
+				a = 1 
+				f1 := func() {
+					a = 2
+				}
+				{
+					a := 3 
+					{
+						a = 4 
+						if c {
+							a = 5
+						} else {
+							f1() 
+						}
+						println(a) // phi(a)[5,4]
+					}
+				}
+
+				println(a) // phi(a)[1,side-effect(2, a)]
+			}
+		}
+		`, []string{
+			"phi(a)[5,4]", "phi(a)[1,side-effect(2, a)]",
+		}, t)
+	})
+
+	t.Run("side-effect nesting bind with closu and local cross empty block", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			f := func() {
+				a = 1 
+				f1 := func() {
+					a = 2
+				}
+				{
+					a := 4 
+					{
+						if c {
+							a = 5
+						} else {
+							f1() 
+						}
+						println(a) // phi(a)[5,4]
+					}
+				}
+
+				println(a) // phi(a)[1,side-effect(2, a)]
+			}
+		}
+		`, []string{
+			"phi(a)[5,4]", "phi(a)[1,side-effect(2, a)]",
 		}, t)
 	})
 }

@@ -63,6 +63,7 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	ForEachCapturedSideEffect(func(string, []VersionedIF[T]))
 	SetCapturedVariable(string, VersionedIF[T])
 	SetCapturedSideEffect(string, VersionedIF[T], VersionedIF[T])
+	ChangeCapturedSideEffect(string, VersionedIF[T])
 
 	// use in phi
 	CoverBy(ScopedVersionedTableIF[T])
@@ -453,6 +454,12 @@ func (scope *ScopedVersionedTable[T]) SetCapturedVariable(name string, ver Versi
 
 func (scope *ScopedVersionedTable[T]) SetCapturedSideEffect(name string, ver, bind VersionedIF[T]) {
 	scope.linkSideEffect[name] = []VersionedIF[T]{ver, bind}
+}
+
+func (scope *ScopedVersionedTable[T]) ChangeCapturedSideEffect(name string, ver VersionedIF[T]) {
+	if vers, ok := scope.linkSideEffect[name]; ok {
+		vers[0] = ver
+	}
 }
 
 // CreateSymbolicVariable create a non-lexical and no named variable
