@@ -222,7 +222,7 @@ func (f *Function) Finish() {
 	funType.SetFreeValue(result)
 	f.builder.SetReturnSideEffects()
 	ses := funType.SideEffects
-	for _, se := range f.SideEffectsReturn {
+	for _, se := range f.SideEffects {
 		if se.Modify.GetBlock() != nil {
 			scope := se.Modify.GetBlock().ScopeTable
 			if ret := GetFristLocalVariableFromScopeAndParent(scope, se.Name); ret != nil {
