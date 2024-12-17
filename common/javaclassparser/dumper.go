@@ -616,9 +616,6 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
 			continue
 		}
-		if name != "performSetCompressedSize" {
-			continue
-		}
 		res, err := c.DumpMethod(name, descriptor)
 		if err != nil {
 			return nil, fmt.Errorf("dump method %s failed, %w", name, err)
