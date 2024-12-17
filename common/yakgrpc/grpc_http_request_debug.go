@@ -27,21 +27,44 @@ type sender interface {
 	Context() context.Context
 }
 
-func (s *Server) countRisk(runtimeId string, yakClient *yaklib.YakitClient) error {
-	risks, err := yakit.GetRisksByRuntimeId(s.GetProjectDatabase(), runtimeId)
+func (s *Server) tickerRiskCountFeedback(ctx context.Context, tickerTime time.Duration, runtimeId string, yakClient *yaklib.YakitClient) {
+	ticker := time.NewTicker(tickerTime)
+	go func() {
+		defer ticker.Stop()
+		lastCount := 0
+		feedbackRiskCount := func() {
+			currentCount, err := yakit.CountRiskByRuntimeId(s.GetProjectDatabase(), runtimeId)
+			if err != nil {
+				log.Errorf("count risk failed: %v", err)
+			} else if lastCount != currentCount {
+				yakClient.Output(&yaklib.YakitStatusCard{
+					Id: "漏洞/风险/指纹", Data: strconv.Itoa(currentCount), Tags: nil,
+				})
+			}
+			lastCount = currentCount
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				feedbackRiskCount()
+				return
+			case <-ticker.C:
+				feedbackRiskCount()
+			}
+		}
+	}()
+}
+
+func (s *Server) forceRiskCountFeedback(runtimeId string, yakClient *yaklib.YakitClient) (int, error) {
+	riskCount, err := yakit.CountRiskByRuntimeId(s.GetProjectDatabase(), runtimeId)
 	if err != nil {
-		return utils.Errorf("get risk count error %v", err)
+		log.Errorf("count risk failed: %v", err)
+	} else {
+		yakClient.Output(&yaklib.YakitStatusCard{ // card
+			Id: "漏洞/风险/指纹", Data: strconv.Itoa(riskCount), Tags: nil,
+		})
 	}
-	if len(risks) == 0 {
-		return nil
-	}
-	err = yakClient.Output(&yaklib.YakitStatusCard{ // card
-		Id: "漏洞/风险/指纹", Data: strconv.Itoa(len(risks)), Tags: nil,
-	})
-	if err != nil {
-		return utils.Errorf("yakit client output error: %v", err)
-	}
-	return nil
+	return riskCount, err
 }
 
 func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string, stream sender, params []*ypb.KVPair, runtimeId string) error {
@@ -62,22 +85,8 @@ func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string,
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
 	}, runtimeId) // set risk count
-	go func() {
-		for {
-			select {
-			case <-streamCtx.Done():
-				return
-			default:
-				err := s.countRisk(runtimeId, feedbackClient)
-				if err != nil {
-					log.Errorf("count risk failed: %v", err)
-					return
-				}
-				time.Sleep(2 * time.Second)
-			}
-		}
-	}()
-	defer s.countRisk(runtimeId, feedbackClient)
+	s.tickerRiskCountFeedback(streamCtx, 2*time.Second, runtimeId, feedbackClient)
+	defer s.forceRiskCountFeedback(runtimeId, feedbackClient)
 
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
@@ -255,22 +264,8 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
 	}, runtimeId) // set risk count
-	go func() {
-		for {
-			select {
-			case <-streamCtx.Done():
-				return
-			default:
-				err := s.countRisk(runtimeId, feedbackClient)
-				if err != nil {
-					log.Errorf("count risk failed: %v", err)
-					return
-				}
-				time.Sleep(2 * time.Second)
-			}
-		}
-	}()
-	defer s.countRisk(runtimeId, feedbackClient)
+	s.tickerRiskCountFeedback(streamCtx, 2*time.Second, runtimeId, feedbackClient)
+	defer s.forceRiskCountFeedback(runtimeId, feedbackClient)
 
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
