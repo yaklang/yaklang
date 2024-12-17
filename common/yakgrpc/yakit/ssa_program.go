@@ -70,9 +70,7 @@ func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
 		programNames = append(programNames, prog.Name)
 	}
 	// delete risk create by this program
-	DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
-		SSAProgramNames: programNames,
-	})
+	DeleteRiskByProgram(consts.GetGormProjectDatabase(), programNames)
 	// DeleteRisk()
 	return len(programs), result.Error
 }
