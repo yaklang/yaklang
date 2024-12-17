@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
@@ -17,7 +16,6 @@ import (
 )
 
 type ClassObjectDumper struct {
-	imports           map[string]struct{}
 	obj               *ClassObject
 	FuncCtx           *class_context.ClassContext
 	ClassName         string
@@ -45,7 +43,6 @@ func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
 	return &ClassObjectDumper{
 		obj:               obj,
 		ConstantPool:      obj.ConstantPool,
-		imports:           make(map[string]struct{}),
 		deepStack:         utils.NewStack[int](),
 		lambdaMethods:     map[string][]string{},
 		fieldDefaultValue: map[string]string{},
@@ -174,18 +171,9 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 		}
 		importsStr += fmt.Sprintf("import %s;\n", s)
 	}
-	for lib, _ := range c.imports {
-		if strings.HasPrefix(lib, "java.lang") {
-			continue
-		}
-		importsStr += fmt.Sprintf("import %s;\n", lib)
+	if len(importsStr) > 0 {
+		importsStr += "\n"
 	}
-	//constantPool, err := c.dumpConstantPool()
-	//if err != nil {
-	//	return "", err
-	//}
-	//constantPoolStr := strings.Join(constantPool, "\n// ")
-	//constantPoolStr = "\n// Constant Pool\n// " + constantPoolStr
 	return packageSource + importsStr + result, nil
 }
 func (c *ClassObjectDumper) DumpFields() ([]string, error) {
@@ -208,7 +196,9 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		lastPacket := c.parseImportCLass(fieldType.String(c.FuncCtx))
+		fieldTypeStr := fieldType.String(c.FuncCtx)
+		c.FuncCtx.Import(fieldTypeStr)
+		lastPacket := c.FuncCtx.ShortTypeName(fieldTypeStr)
 		if slices.Contains(accessFlagsVerbose, "final") && c.fieldDefaultValue[name] != "" {
 			result = append(result, fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, c.fieldDefaultValue[name]))
 		} else {
@@ -314,6 +304,7 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 func (c *ClassObjectDumper) DumpMethod(methodName, desc string) (string, error) {
 	return c.DumpMethodWithInitialId(methodName, desc, 0)
 }
+
 func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id int) (string, error) {
 	var method *MemberInfo
 	var name, descriptor string
@@ -372,7 +363,30 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	annoStrs := []string{}
 	funcCtx.FunctionType = c.MethodType
 	var paramsNewStr string
+	var exceptions string
 	for _, attribute := range method.Attributes {
+		if exceptionAttr, ok := attribute.(*ExceptionsAttribute); ok {
+			exceptions = " throws "
+			expList := []string{}
+			for _, u := range exceptionAttr.ExceptionIndexTable {
+				info, err := c.obj.getConstantInfo(u)
+				if err != nil {
+					continue
+				}
+				classInfo := info.(*ConstantClassInfo)
+				name, err := c.obj.getUtf8(classInfo.NameIndex)
+				if err != nil {
+					continue
+				}
+				name = strings.Replace(name, "/", ".", -1)
+				funcCtx.Import(name)
+				name = funcCtx.ShortTypeName(name)
+				if name != "" {
+					expList = append(expList, name)
+				}
+			}
+			exceptions += strings.Join(expList, ", ")
+		}
 		if anno, ok := attribute.(*RuntimeVisibleAnnotationsAttribute); ok {
 			for _, annotation := range anno.Annotations {
 				res, err := c.DumpAnnotation(annotation)
@@ -541,7 +555,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		}
 	}
 	writeArguments := func(buffer io.Writer) {
-		methodSourceBuffer.Write([]byte(fmt.Sprintf("(%s)", paramsNewStr)))
+		methodSourceBuffer.Write([]byte(fmt.Sprintf("(%s)%s", paramsNewStr, exceptions)))
 	}
 	writeBlock := func(buffer io.Writer) {
 		methodSourceBuffer.Write([]byte(fmt.Sprintf(" {%s%s}", code, strings.Repeat("\t", c.TabNumber()))))
@@ -602,6 +616,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
 			continue
 		}
+		if name != "performSetCompressedSize" {
+			continue
+		}
 		res, err := c.DumpMethod(name, descriptor)
 		if err != nil {
 			return nil, fmt.Errorf("dump method %s failed, %w", name, err)
@@ -610,13 +627,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 	}
 	return result, nil
 }
-func (c *ClassObjectDumper) parseImportCLass(name string) string {
-	packageName, className := core.SplitPackageClassName(name)
-	if packageName != "" {
-		c.imports[packageName] = struct{}{}
-	}
-	return className
-}
+
 func (c *ClassObjectDumper) dumpConstantPool() ([]string, error) {
 	result := []string{}
 	for _, constant := range c.obj.ConstantPool {
