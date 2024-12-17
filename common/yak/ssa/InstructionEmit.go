@@ -482,10 +482,8 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 }
 
 func (f *FunctionBuilder) SetReturnSideEffects() {
+	var SideEffectsReturn []*FunctionSideEffect
 	scope := f.CurrentBlock.ScopeTable
-	// if f.SideEffectsReturn == nil {
-	// 	f.SideEffectsReturn = make(map[string]*FunctionSideEffect)
-	// }
 
 	for _, se := range f.SideEffects {
 		ser := se
@@ -498,8 +496,9 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 				ser.Modify = value
 			}
 		}
-		f.SideEffectsReturn = append(f.SideEffectsReturn, ser)
+		SideEffectsReturn = append(SideEffectsReturn, ser)
 	}
+	f.SideEffects = SideEffectsReturn
 }
 
 func (f *FunctionBuilder) SwitchFreevalueInSideEffects(name string, se *SideEffect) *SideEffect {
