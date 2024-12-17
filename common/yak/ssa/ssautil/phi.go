@@ -21,10 +21,10 @@ func ForEachCapturedSideEffect[T versionedValue](
 	handler func(string, []VersionedIF[T]),
 ) {
 	scope.ForEachCapturedSideEffect(func(name string, ver []VersionedIF[T]) {
-		if ver[0].GetValue().IsSideEffect() {
+		if ver[0].GetValue().IsSideEffect() || ver[0].GetValue().IsPhi() {
 			handler(name, ver)
 		} else {
-			log.Warnf("link-SideEffect must be side effect type")
+			log.Warnf("link-SideEffect must be side effect or phi")
 		}
 	})
 }
@@ -64,14 +64,16 @@ func (base *ScopedVersionedTable[T]) Merge(
 		length++
 	}
 	tmpVariable := make(map[VersionedIF[T]][]T)
-	tmpName := make(map[string][]T)
-	phi := make(map[VersionedIF[T]]T)
-	_ = tmpVariable
-	_ = tmpName
+	tmpPhiScope := make(map[VersionedIF[T]]T)
+	tmpPhiCapture := make(map[VersionedIF[T]]T)
+	tmpIsCapture := make(map[VersionedIF[T]]bool)
 
-	addPhiContent := func(index int, name string, ver VersionedIF[T], sub ScopedVersionedTableIF[T]) {
+	addPhiContent := func(index int, name string, ver VersionedIF[T], sub ScopedVersionedTableIF[T], forceScope ...ScopedVersionedTableIF[T]) VersionedIF[T] {
 		variable := ver
 		parentScope := sub.GetParent()
+		if len(forceScope) > 0 {
+			parentScope = forceScope[0]
+		}
 
 		var Check func(scope ScopedVersionedTableIF[T])
 		Check = func(scope ScopedVersionedTableIF[T]) {
@@ -95,13 +97,22 @@ func (base *ScopedVersionedTable[T]) Merge(
 		}
 		m[index] = ver.GetValue()
 		tmpVariable[variable] = m
+		return variable
 	}
-	generatePhi := func(name string, m []T) {
+
+	generatePhi := func(ver VersionedIF[T], m []T, canCapture bool) {
+		var v VersionedIF[T]
+		name := ver.GetName()
 		variable := base.ReadVariable(name)
 		if variable == nil {
 			return
 		}
 		origin := variable.GetValue()
+		if capturedVariable := variable.GetCaptured(); capturedVariable.GetLocal() {
+			if canCapture {
+				origin = ver.GetValue()
+			}
+		}
 
 		// fill the missing value
 		// if len(m) != length {
@@ -123,34 +134,47 @@ func (base *ScopedVersionedTable[T]) Merge(
 		//}
 		ret := merge(name, m)
 		if base.GetParent().GetParent() == variable.GetScope() && setLocal {
-			v := base.CreateVariable(name, variable.GetLocal())
-			phi[v] = ret
+			v = base.CreateVariable(name, variable.GetLocal())
 		} else {
-			v := base.CreateVariable(name, false)
-			phi[v] = ret
+			v = base.CreateVariable(name, false)
+		}
+		if canCapture {
+			// 在当前scope中尝试修改外部的某个variable
+			tmpPhiCapture[v] = ret
+		}
+		if variable.GetCaptured().GetScope() == ver.GetScope() {
+			tmpPhiScope[v] = ret
 		}
 	}
 
 	defer func() {
-		for v, ret := range phi {
+		for v, ret := range tmpPhiScope {
 			base.tryRegisterCapturedVariable(v.GetName(), v)
 			base.AssignVariable(v, ret)
+		}
+		for v, ret := range tmpPhiCapture {
+			err := v.Assign(ret)
+			if err != nil {
+				log.Warnf("BUG: variable.Assign error: %v", err)
+				return
+			}
+			base.ChangeCapturedSideEffect(v.GetName(), v)
 		}
 	}()
 
 	baseScope := ScopedVersionedTableIF[T](base)
 	for index, sub := range subScopes {
 		ForEachCapturedVariable(sub, baseScope, func(name string, ver VersionedIF[T]) {
-			addPhiContent(index, name, ver, sub)
+			tmpIsCapture[addPhiContent(index, name, ver, sub)] = false
 		})
 		ForEachCapturedSideEffect(sub, baseScope, func(name string, ver []VersionedIF[T]) {
-			addPhiContent(index, name, ver[0], sub)
+			tmpIsCapture[addPhiContent(index, name, ver[0], sub, ver[1].GetScope())] = true
 			baseScope.SetCapturedSideEffect(ver[0].GetName(), ver[0], ver[1])
 		})
 	}
 
 	for ver, m := range tmpVariable {
-		generatePhi(ver.GetName(), m)
+		generatePhi(ver, m, tmpIsCapture[ver])
 	}
 }
 
