@@ -329,7 +329,7 @@ func (c *Call) handleCalleeFunction() {
 				AddSideEffect := func() {
 					// TODO: handle side effect in loop scope,
 					// will replace value in scope and create new phi
-					sideEffect = builder.SwitchFreevalueInSideEffects(se.Name, sideEffect)
+					sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
 					builder.AssignVariable(variable, sideEffect)
 					sideEffect.SetVerboseName(se.VerboseName)
 					c.SideEffectValue[se.VerboseName] = sideEffect
