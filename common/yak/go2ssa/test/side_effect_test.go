@@ -196,9 +196,7 @@ func Test_SideEffect(t *testing.T) {
 		}, t)
 	})
 
-	// ToDo: side-effect in phi with different bind value
 	t.Run("side-effect cross block nesting bind with phi", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 	func main(){
