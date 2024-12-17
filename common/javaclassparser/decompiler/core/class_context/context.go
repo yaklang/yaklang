@@ -19,6 +19,7 @@ type ClassContext struct {
 	KeySet          *utils.Set[string]
 	Arguments       []string
 	IsStatic        bool
+	IsVarArgs       bool
 }
 
 func (f *ClassContext) GetAllImported() []string {
@@ -32,9 +33,6 @@ func (f *ClassContext) GetAllImported() []string {
 	return imports
 }
 func (f *ClassContext) Import(name string) {
-	if strings.Contains(name, "Object") {
-		println()
-	}
 	if f.KeySet == nil {
 		f.KeySet = utils.NewSet[string]()
 	}
@@ -43,6 +41,9 @@ func (f *ClassContext) Import(name string) {
 	}
 	pkg, className := SplitPackageClassName(name)
 	if f.KeySet.Has(className) {
+		return
+	}
+	if pkg == "" {
 		return
 	}
 	key, ok := f.BuildInLibsMap.Get(pkg)
@@ -55,6 +56,7 @@ func (f *ClassContext) Import(name string) {
 	f.KeySet.Add(className)
 }
 func (f *ClassContext) ShortTypeName(name string) string {
+	f.Import(name)
 	pkg, className := SplitPackageClassName(name)
 	if pkg == "" {
 		return className

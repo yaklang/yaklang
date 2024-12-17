@@ -1223,8 +1223,14 @@ func (d *Decompiler) ParseStatement() error {
 	var nodes []*Node
 	statementsIndex := 0
 	var tryCatchOpcode *OpCode
+	refToNewExpressionAssignNode := map[string]*Node{}
 	appendNode := func(statement statements.Statement) *Node {
 		node := NewNode(statement)
+		if v, ok := statement.(*statements.AssignStatement); ok {
+			if v1, ok := v.LeftValue.(*values.JavaRef); ok {
+				refToNewExpressionAssignNode[v1.Id.String()] = node
+			}
+		}
 		node.Id = statementsIndex
 		nodes = append(nodes, node)
 		if tryCatchOpcode != nil {
@@ -1326,7 +1332,17 @@ func (d *Decompiler) ParseStatement() error {
 						skip = true
 					}
 				}()
-				if !skip {
+				if skip {
+					assignNode := refToNewExpressionAssignNode[funcCallValue.Object.String(funcCtx)]
+					if assignNode == nil {
+						panic("not found assign node")
+					}
+					assignSt := assignNode.Statement
+					assignNode.IsDel = true
+					appendNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+						return assignSt.String(funcCtx)
+					}))
+				} else {
 					appendNode(statements.NewExpressionStatement(funcCallValue))
 				}
 			}
