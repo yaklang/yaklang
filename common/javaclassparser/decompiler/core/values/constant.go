@@ -10,6 +10,7 @@ const (
 	GTE  = ">="
 	GT   = ">"
 	NE   = "!="
+	Not   = "!"
 	LTE  = "<="
 	SUB  = "-"
 	REM  = "%"

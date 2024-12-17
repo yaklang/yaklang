@@ -6,12 +6,16 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func TestParseClass(t *testing.T) {
 	err := filepath.Walk("/Users/z3/Downloads/error-jdsc 2", func(path string, info fs.FileInfo, err error) error {
 		if info.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".class") {
 			return nil
 		}
 		data, err := os.ReadFile(path)
@@ -22,7 +26,7 @@ func TestParseClass(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if path != "/Users/z3/Downloads/error-jdsc 2/decompile-err-12828d0c8622c36004bfe797.class" {
+		if path != "/Users/z3/Downloads/error-jdsc 2/decompile-err-a0b54633356cde4c0f53b665.class" {
 			return nil
 		}
 		source, err := cf.Dump()

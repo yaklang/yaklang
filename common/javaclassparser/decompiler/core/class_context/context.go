@@ -3,18 +3,22 @@ package class_context
 import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"slices"
 	"strings"
 )
 
 type ClassContext struct {
-	ClassName        string
-	FunctionName     string
-	FunctionType     any
-	PackageName      string
-	BuildInLibsMap   *omap.OrderedMap[string, []string]
-	Arguments        []string
-	IsStatic         bool
+	ClassName       string
+	FunctionName    string
+	SupperClassName string
+	FunctionType    any
+	PackageName     string
+	BuildInLibsMap  *omap.OrderedMap[string, []string]
+	KeySet          *utils.Set[string]
+	Arguments       []string
+	IsStatic        bool
 }
 
 func (f *ClassContext) GetAllImported() []string {
@@ -28,26 +32,42 @@ func (f *ClassContext) GetAllImported() []string {
 	return imports
 }
 func (f *ClassContext) Import(name string) {
+	if strings.Contains(name, "Object") {
+		println()
+	}
+	if f.KeySet == nil {
+		f.KeySet = utils.NewSet[string]()
+	}
 	if f.BuildInLibsMap == nil {
 		f.BuildInLibsMap = omap.NewEmptyOrderedMap[string, []string]()
 	}
 	pkg, className := SplitPackageClassName(name)
+	if f.KeySet.Has(className) {
+		return
+	}
+	key, ok := f.BuildInLibsMap.Get(pkg)
+	if ok {
+		if slices.Contains(key, className) || slices.Contains(key, "*") {
+			return
+		}
+	}
 	f.BuildInLibsMap.Set(pkg, append(f.BuildInLibsMap.GetMust(pkg), className))
+	f.KeySet.Add(className)
 }
 func (f *ClassContext) ShortTypeName(name string) string {
-	if f.BuildInLibsMap == nil {
-		return name
-	}
 	pkg, className := SplitPackageClassName(name)
 	if pkg == "" {
 		return className
+	}
+	if f.BuildInLibsMap == nil {
+		f.BuildInLibsMap = omap.NewEmptyOrderedMap[string, []string]()
 	}
 	libs := f.BuildInLibsMap.GetMust(pkg)
 	if len(libs) > 0 && (funk.Contains(libs, className) || libs[0] == "*") {
 		return className
 	}
-	f.BuildInLibsMap.Set(pkg, append(f.BuildInLibsMap.GetMust(pkg), className))
-	return className
+	//f.BuildInLibsMap.Set(pkg, append(f.BuildInLibsMap.GetMust(pkg), className))
+	return name
 }
 
 func SplitPackageClassName(s string) (string, string) {
