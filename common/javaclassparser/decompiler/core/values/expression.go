@@ -133,7 +133,12 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 			return fmt.Sprintf("%s(%s)", f.FunctionName, strings.Join(paramStrs, ","))
 		}
 	}
-	return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
+	switch f.Object.(type) {
+	case *JavaExpression, *TernaryExpression, *SlotValue:
+		return fmt.Sprintf("(%s).%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
+	default:
+		return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
+	}
 }
 
 func NewFunctionCallExpression(object JavaValue, methodMember *JavaClassMember, funcType *types.JavaFuncType) *FunctionCallExpression {
