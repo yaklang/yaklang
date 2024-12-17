@@ -112,22 +112,8 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		currentStatus.ExecResult = result
 		return stream.Send(currentStatus)
 	})
-	go func() {
-		for {
-			select {
-			case <-manager.Context().Done():
-				return
-			default:
-				err := s.countRisk(task.TaskId, countRiskClient)
-				if err != nil {
-					log.Errorf("count risk failed: %v", err)
-					return
-				}
-				time.Sleep(2 * time.Second)
-			}
-		}
-	}()
-	defer s.countRisk(task.TaskId, countRiskClient)
+	s.tickerRiskCountFeedback(manager.Context(), 2*time.Second, task.TaskId, countRiskClient)
+	defer s.forceRiskCountFeedback(task.TaskId, countRiskClient)
 
 	matcher, err := fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
 	if err != nil {
