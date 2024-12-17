@@ -373,7 +373,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_LCMP, OP_DCMPG, OP_DCMPL, OP_FCMPG, OP_FCMPL:
 		var1 := runtimeStackSimulation.Pop().(values.JavaValue)
 		var2 := runtimeStackSimulation.Pop().(values.JavaValue)
-		runtimeStackSimulation.Push(values.NewBinaryExpression(var1, var2, "compare", types.NewJavaPrimer(types.JavaBoolean)))
+		runtimeStackSimulation.Push(values.NewJavaCompare(var2, var1))
 	case OP_LSUB, OP_ISUB, OP_DSUB, OP_FSUB, OP_LADD, OP_IADD, OP_FADD, OP_DADD, OP_IREM, OP_FREM, OP_LREM, OP_DREM, OP_IDIV, OP_FDIV, OP_DDIV, OP_LDIV, OP_IMUL, OP_DMUL, OP_FMUL, OP_LMUL, OP_LAND, OP_LOR, OP_LXOR, OP_ISHR, OP_ISHL, OP_LSHL, OP_LSHR, OP_IUSHR, OP_LUSHR, OP_IOR, OP_IAND, OP_IXOR:
 		var op string
 		switch opcode.Instr.OpCode {
@@ -481,8 +481,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		runtimeStackSimulation.Push(ref)
 	case OP_INVOKESTATIC:
 		classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
-		methodName := classInfo.Member
-		funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+		funcCallValue := values.NewFunctionCallExpression(nil, classInfo, classInfo.JavaType.FunctionType()) // 不push到栈中
 		//funcCallValue.JavaType = classInfo.JavaType
 		funcCallValue.Object = values.NewJavaClassValue(types.NewJavaClass(classInfo.Name))
 		funcCallValue.IsStatic = true
@@ -526,8 +525,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		}
 	case OP_INVOKESPECIAL:
 		classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
-		methodName := classInfo.Member
-		funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+		funcCallValue := values.NewFunctionCallExpression(nil, classInfo, classInfo.JavaType.FunctionType()) // 不push到栈中
 		for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 			funcCallValue.Arguments = append(funcCallValue.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
 		}
@@ -539,8 +537,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		}
 	case OP_INVOKEINTERFACE:
 		classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
-		methodName := classInfo.Member
-		funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+		funcCallValue := values.NewFunctionCallExpression(nil, classInfo, classInfo.JavaType.FunctionType()) // 不push到栈中
 		for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 			funcCallValue.Arguments = append(funcCallValue.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
 		}
@@ -551,8 +548,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		}
 	case OP_INVOKEVIRTUAL:
 		classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
-		methodName := classInfo.Member
-		funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+		funcCallValue := values.NewFunctionCallExpression(nil, classInfo, classInfo.JavaType.FunctionType()) // 不push到栈中
 		for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 			funcCallValue.Arguments = append(funcCallValue.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
 		}
@@ -566,6 +562,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		op := GetNotOp(opcode)
 		rv := runtimeStackSimulation.Pop().(values.JavaValue)
 		lv := runtimeStackSimulation.Pop().(values.JavaValue)
+
 		statements.NewConditionStatement(values.NewJavaCompare(lv, rv), op)
 	case OP_IFNONNULL:
 		statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), values.JavaNull), EQ)
@@ -588,15 +585,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			op = ">="
 		}
 		op = GetReverseOp(op)
-		v := runtimeStackSimulation.Pop()
-		if v == nil {
-			panic("not support")
-		}
-		cmp, ok := v.(values.JavaValue)
-		if !ok {
-			panic("not support")
-		}
-		statements.NewConditionStatement(values.NewJavaCompare(cmp, values.NewJavaLiteral(0, types.NewJavaPrimer(types.JavaInteger))), op)
+		runtimeStackSimulation.Pop()
 	case OP_JSR, OP_JSR_W:
 		return errors.New("not support opcode: jsr")
 	case OP_RET:
@@ -1282,8 +1271,7 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_INVOKESTATIC:
 			if len(opcode.stackProduced) == 0 {
 				classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
-				methodName := classInfo.Member
-				funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+				funcCallValue := values.NewFunctionCallExpression(nil, classInfo, classInfo.JavaType.FunctionType()) // 不push到栈中
 				//funcCallValue.JavaType = classInfo.JavaType
 				funcCallValue.Object = values.NewJavaClassValue(types.NewJavaClass(classInfo.Name))
 				funcCallValue.IsStatic = true
@@ -1299,7 +1287,7 @@ func (d *Decompiler) ParseStatement() error {
 			if len(opcode.stackProduced) == 0 {
 				classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
 				methodName := classInfo.Member
-				funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+				funcCallValue := values.NewFunctionCallExpression(nil, classInfo, classInfo.JavaType.FunctionType()) // 不push到栈中
 				n := 0
 				for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 					funcCallValue.Arguments = append(funcCallValue.Arguments, opcode.stackConsumed[n])
@@ -1345,8 +1333,7 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_INVOKEINTERFACE:
 			if len(opcode.stackProduced) == 0 {
 				classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
-				methodName := classInfo.Member
-				funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+				funcCallValue := values.NewFunctionCallExpression(nil, classInfo, classInfo.JavaType.FunctionType()) // 不push到栈中
 				n := 0
 				for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 					funcCallValue.Arguments = append(funcCallValue.Arguments, opcode.stackConsumed[n])
@@ -1359,8 +1346,7 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_INVOKEVIRTUAL:
 			if len(opcode.stackProduced) == 0 {
 				classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
-				methodName := classInfo.Member
-				funcCallValue := values.NewFunctionCallExpression(nil, methodName, classInfo.JavaType.FunctionType()) // 不push到栈中
+				funcCallValue := values.NewFunctionCallExpression(nil, classInfo, classInfo.JavaType.FunctionType()) // 不push到栈中
 				n := 0
 				for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 					funcCallValue.Arguments = append(funcCallValue.Arguments, opcode.stackConsumed[n])
@@ -1411,12 +1397,14 @@ func (d *Decompiler) ParseStatement() error {
 			if v == nil {
 				panic("not support")
 			}
-			cmp, ok := v.(values.JavaValue)
-			if !ok {
-				panic("not support")
+			cmp, ok := v.(*values.JavaCompare)
+			if ok {
+				st := statements.NewConditionStatement(cmp, op)
+				appendNode(st)
+			} else {
+				st := statements.NewConditionStatement(values.NewJavaCompare(v, values.NewJavaLiteral(0, types.NewJavaPrimer(types.JavaInteger))), op)
+				appendNode(st)
 			}
-			st := statements.NewConditionStatement(values.NewJavaCompare(cmp, values.NewJavaLiteral(0, types.NewJavaPrimer(types.JavaInteger))), op)
-			appendNode(st)
 		case OP_JSR, OP_JSR_W:
 			return errors.New("not support opcode: jsr")
 		case OP_RET:
