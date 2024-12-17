@@ -33,7 +33,6 @@ func init() {
 			}()
 		}
 
-		db := consts.GetGormProfileDatabase()
 		fsInstance := filesys.NewEmbedFS(ruleFS)
 		err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 			dirName, name := fsInstance.PathSplit(s)
@@ -72,14 +71,9 @@ func init() {
 			}
 			content := string(raw)
 			// import builtin rule
-			rule, err := sfdb.ImportRuleWithoutValid(name, content, true, tags...)
+			_, err = sfdb.ImportRuleWithoutValid(name, content, true, tags...)
 			if err != nil {
 				log.Warnf("import rule %s error: %s", name, err)
-				return err
-			}
-
-			err = sfdb.AddDefaultGroupForRule(db, rule)
-			if err != nil {
 				return err
 			}
 			return nil
