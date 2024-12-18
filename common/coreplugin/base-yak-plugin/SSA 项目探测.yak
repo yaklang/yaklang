@@ -1,0 +1,269 @@
+yakit.AutoInitYakit()
+
+target = cli.String("target", cli.setRequired(true))
+languages = cli.StringSlice("language", 
+    cli.setMultipleSelect(false), 
+    cli.setSelectOption("Java", "java"), 
+    cli.setSelectOption("PHP", "php"), 
+    cli.setSelectOption("Yaklang", "yak"), 
+    cli.setSelectOption("Golang", "go"), 
+)
+description := cli.Text("description", 
+    cli.setVerboseName("项目描述"),
+)
+proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
+timeout = cli.Int("timeout", cli.setDefault(5))
+cli.check()
+
+origin = target
+proxy = str.TrimSpace(proxy.Lower())
+javaDir = ["webapp","resources","web-inf","meta-inf","classes"]
+jsDir = ["node_modules"]
+jsFiles = ["package-lock.json","package.json","yarn.lock"]
+phpFiles = ["index.php","composer.json","composer.lock","wp-config.php","config.php"]
+javaFiles = ["web.xml","pom.xml","application.properties","struts.xml","application.yml","log4j2.xml","log4j.properties","shiro.ini"]
+var countMap = map[string]int{
+    "php": 0,
+    "go": 0, 
+    "java":0,
+    "yak": 0,
+}
+
+params ={
+    "json_schema":{
+        "language": "",
+        "program_name": "",
+        "kind": "",
+        "local_file": "",
+        "url": "",
+        "proxy":{
+            "proxy": false,
+            "url": ""
+        }
+    },
+    "description":"",
+    "file_count": 0,
+    "error": {
+        "kind": "",
+        "msg": ""
+    }
+}
+func setLanguage(language) {
+    params.json_schema.language = language
+}
+if proxy!=""{
+    params.json_schema.proxy.proxy=true
+    params.json_schema.proxy.url = proxy
+}
+if len(languages) == 1 {
+    setLanguage(languages[0])
+}
+func detectiveType(data){
+    return data==codec.DecodeHex("504b0304")~
+}
+func newConnectException(err){
+    params.error.kind = "connectFailException"
+    params.error.msg = err
+    yakit.Code(params)
+}
+func newFileTypeException(err){
+    params.error.kind = "fileTypeException"
+    params.error.msg = err
+    yakit.Code(params)
+}
+func newFileNotFoundExcption(err){
+    params.error.kind = "fileNotFoundException"
+    params.error.msg = err
+    yakit.Code(params)
+}
+func newLanguageNeedSelectExcption(err) {
+    params.error.kind = "languageNeedSelectException"
+    params.error.msg = err 
+}
+
+func generateFileName(kind,filename){
+    //转换为合格的file格式
+    filename2 = str.Split(filename, "/")[-1]
+    filename2 = str.Split(filename2, "\\")[-1]
+    name :=  sprintf("[%s]%s(%s)", kind, filename2, time.Now().Format("2006-01-02 15:04"))
+    params.json_schema.program_name = name
+}
+func AutoParseLanguage(){
+    maxinfo = {
+        "key": "",
+        "value": 0,
+    }
+    for key,value :=range countMap{
+        if maxinfo.value < value{
+            maxinfo.key = key
+            maxinfo.value = value
+        }
+    }
+    if maxinfo.value!=0 {
+        setLanguage(maxinfo.key)
+    }else {
+        newLanguageNeedSelectExcption(f`${params.json_schema.kind} con't auto select language, please select.`)
+    }
+}
+func generateDesc() {
+    descript := description
+    params.description = f`desc: 
+compile from [${params.json_schema}] 
+description: ${params.description} 
+    `
+}
+
+
+//获取zip中的信息，确定语言
+func getZipinfo(basePath){
+    if params.json_schema.language != "" {
+        return 
+    }
+    zip.Recursive(basePath,(dir,path,info) => {
+        if !info.IsDir(){
+            params.file_count++
+        }
+        ext = file.GetExt(path).Lower().TrimLeft(".")
+        countinfo = countMap[ext]
+        if countinfo!=nil{
+            countMap[ext] = countinfo+1
+        }
+        if params.language=="" {
+            if info.IsDir(){
+                if info.Name().Lower() in javaDir{
+                setLanguage(ssa.Java)
+            }
+            if info.Name().Lower() in jsDir{
+                setLanguage( ssa.Javascript)
+            }
+            }else{
+                if info.Name().Lower() in javaFiles{
+                    setLanguage( ssa.Java)
+                }
+                if info.Name().Lower() in jsFiles{
+                    setLanguage( ssa.Javascript)
+                }
+                if info.Name().Lower() in phpFiles{
+                    setLanguage( ssa.PHP)
+                }
+            }
+        }
+    })
+}
+
+if target.HasPrefix("git://"){
+    gitUrl = target[6:]
+    params.json_schema.kind = "git"
+    params.json_schema.url = target
+    generateFileName("git",gitUrl)
+    // setLanguage( "")
+    if params.json_schema.language == "" {
+        newLanguageNeedSelectExcption("git input con't auto select language")
+    }
+}
+
+if target.HasPrefix("http://") ||target.HasPrefix("https://"){
+    httpUrl= ""
+    if target.HasPrefix("http://"){
+        httpUrl = target[7:]
+    }else{
+        httpUrl = target[8:]
+    }
+    if !target.HasSuffix("/"){
+        target+="/"
+    }
+    gitUrl = target + "info/refs?service=git-upload-pack"
+    rsp, req, err = poc.Get(gitUrl,poc.connectTimeout(timeout),poc.timeout(timeout),poc.proxy(proxy))
+    if err == nil && rsp.GetStatusCode() == 200 {
+        // if !(rsp.GetBody()!=nil && string(rsp.GetBody()).Contains("git-upload-pack")){
+        //     newFileTypeException("connect success,but not match git type")
+        //     return 
+        // }
+        params.json_schema.kind = "git"
+        params.json_schema.url = target
+        generateFileName("git",httpUrl)
+    }
+    if err!=nil || rsp.GetStatusCode()!=200{
+        res,req,err2 = poc.Get(origin,poc.connectTimeout(timeout),poc.timeout(timeout),poc.proxy(proxy))
+        if err2!=nil || res.GetStatusCode()!=200{
+            generateFileName("http", target)
+            newConnectException(sprintf("connect url: %s fail:%s,", target,err2.Error()))
+            return 
+        }
+        if str.MatchAllOfSubString(res.GetContentType(), "jar") {
+            params.json_schema.kind = "jar"
+            params.json_schema.url = target
+            setLanguage( ssa.Java)
+            generateFileName("jar",httpUrl)
+        }else if res.GetBody()!=nil && len(res.GetBody())>=4&&detectiveType(res.GetBody()[:4]) {
+            params.json_schema.kind = "compress"
+            params.json_schema.url = target
+            generateFileName("compress", httpUrl)
+        }else {
+                newFileTypeException(sprint("connect success,but not found match the file type"))
+        }
+    }
+}
+if target.HasPrefix("file://") {
+    localFile = target[7:]
+    if !file.IsExisted(localFile){
+        newFileNotFoundExcption(sprintf("not found this file in local,check path: %s", localFile))
+        return 
+    }
+    ext := file.GetExt(localFile).Lower()
+    switch ext{
+        case ".jar",".war":
+            params.json_schema.kind = "jar"
+            params.json_schema.local_file = localFile
+            setLanguage( "java")
+            generateFileName("jar", localFile)
+        case ".zip":
+            params.json_schema.kind = "compress"
+            params.json_schema.local_file = localFile
+            generateFileName("compress", localFile)
+            getZipinfo(localFile)
+        default:
+            params.json_schema.kind = "local"
+            if !file.IsDir(localFile){
+                newFileTypeException(sprint("file exits,but only support jar、war、zip compress"))
+                return
+            }
+            params.json_schema.local_file = localFile
+            filesys.Recursive(localFile, filesys.onDirStat(func(path,info){
+                if params.json_schema.language == ""{
+                    switch{
+                        case info.Name().Lower() in javaDir:
+                            setLanguage( ssa.Java)
+                        case info.Name().Lower() in jsDir:
+                            setLanguage( ssa.Javascript)
+                    }
+                }
+            }),filesys.onFileStat(func(path,info){
+                params.file_count++
+                ext = file.GetExt(path).Lower().TrimLeft(".")
+                countinfo = countMap[ext]
+                if countinfo!=nil{
+                countMap[ext] = countinfo+1
+                }
+                if params.language==""{
+                    switch {
+                        case info.Name().Lower() in javaFiles:
+                            setLanguage( ssa.Java)
+                        case info.Name().Lower() in phpFiles:
+                            setLanguage( ssa.PHP)
+                        case info.Name().Lower() in jsFiles:
+                            setLanguage(ssa.Javascript)
+                    }
+                }
+            }))
+            generateFileName("local", localFile)
+    }
+}
+if params.json_schema.program_name ==""{
+    generateFileName(params.json_schema.kind,target)
+}
+if params.json_schema.language ==""{
+    AutoParseLanguage()
+}
+generateDesc()
+yakit.Code(params)
