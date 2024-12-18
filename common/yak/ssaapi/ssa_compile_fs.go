@@ -50,7 +50,7 @@ func (c *config) parseProjectWithFS(
 	prog.ProcessInfof("parse project in fs: %v, path: %v", filesystem, c.info)
 	prog.ProcessInfof("calculate total size of project")
 	// get total size
-	filesys.Recursive(programPath,
+	err = filesys.Recursive(programPath,
 		filesys.WithFileSystem(filesystem),
 		filesys.WithContext(c.ctx),
 		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
@@ -75,6 +75,9 @@ func (c *config) parseProjectWithFS(
 			return nil
 		}),
 	)
+	if err != nil {
+		return nil, err
+	}
 	if c.isStop() {
 		return nil, ErrContextCancel
 	}
