@@ -46,7 +46,7 @@ info = cli.Json("info",
         "properties": {
           "local_file": {
             "title": "项目路径",
-            "yakit_type":"upload-folder-path",
+            "yakit_type":"folder",
             "type": "string"
           }
         },
@@ -67,7 +67,7 @@ info = cli.Json("info",
         "properties": {
           "local_file": {
             "title": "压缩包路径",
-            "yakit_type":"upload-path",
+            "yakit_type":"file",
             "type": "string"
           }
         },
@@ -88,7 +88,7 @@ info = cli.Json("info",
         "properties": {
           "local_file": {
             "title": "Jar包路径",
-            "yakit_type":"upload-path",
+            "yakit_type":"file",
             "type": "string"
           }
         },
@@ -166,7 +166,7 @@ info = cli.Json("info",
                   "properties": {
                     "key_path": {
                       "title": "认证私钥地址",
-                      "yakit_type":"upload-path",
+                      "yakit_type":"file",
                       "type": "string"
                     },
                     "user_name": {

@@ -104,7 +104,7 @@ func (o *OrderedMap) MergeStringMap(m map[string]string) {
 }
 
 func (o OrderedMap) String() string {
-	return fmt.Sprintf("map[%s]", strings.Join(
+	return fmt.Sprintf("map[%v]", strings.Join(
 		lo.Map(o.keys, func(k string, _ int) string {
 			return fmt.Sprintf("%#v:%v", k, o.values[k])
 		}), " "))

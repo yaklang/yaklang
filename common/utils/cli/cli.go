@@ -3,8 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"io/ioutil"
 	"os"
@@ -13,6 +11,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -156,7 +157,7 @@ func (param *cliExtraParams) GetDefaultValue(i interface{}) interface{} {
 
 type (
 	SetCliExtraParam func(c *cliExtraParams)
-	UIParams         func()
+	UIParams         func() // not used yet
 )
 
 var defaultUIParams = func() {}
@@ -835,7 +836,7 @@ func (c *CliApp) SetSelectOption(name, value string) SetCliExtraParam {
 	return func(cep *cliExtraParams) {}
 }
 
-func (c *CliApp) SetJsonSchema(schema string) SetCliExtraParam {
+func (c *CliApp) SetJsonSchema(schema string, uis ...*UISchema) SetCliExtraParam {
 	return func(c *cliExtraParams) {}
 }
 
@@ -965,6 +966,35 @@ var CliExports = map[string]interface{}{
 	"whenNotEqual": DefaultCliApp.whenEqual,
 	"whenDefault":  DefaultCliApp.whenDefault,
 	"when":         DefaultCliApp.when,
+
+	// UI Schema
+	"setUISchema":           DefaultCliApp.SetUISchema,
+	"uiGlobalFieldPosition": DefaultCliApp.SetUISchemaGlobalFieldPosition,
+	"uiGroups":              DefaultCliApp.SetUISchemaGroups,
+	"uiGroup":               DefaultCliApp.NewUISchemaGroup,
+	"uiField":               DefaultCliApp.NewUISchemaField,
+	"uiFieldPosition":       DefaultCliApp.SetUISchemaFieldPosition,
+	"uiFieldComponentStyle": DefaultCliApp.SetUISchemaFieldComponentStyle,
+	"uiFieldWidget":         DefaultCliApp.SetUISchemaFieldWidget,
+	"uiFieldGroups":         DefaultCliApp.SetUISchemaInnerGroups,
+	"uiPosDefault":          UISchemaFieldPosDefault,
+	"uiPosHorizontal":       UISchemaFieldPosHorizontal,
+	"uiWidgetRadio":         UISchemaWidgetRadio,
+	"uiWidgetSelect":        UISchemaWidgetSelect,
+	"uiWidgetCheckbox":      UISchemaWidgetCheckbox,
+	"uiWidgetTextarea":      UISchemaWidgetTextArea,
+	"uiWidgetPassword":      UISchemaWidgetPassword,
+	"uiWidgetColor":         UISchemaWidgetColor,
+	"uiWidgetEmail":         UISchemaWidgetEmail,
+	"uiWidgetUri":           UISchemaWidgetUri,
+	"uiWidgetDate":          UISchemaWidgetDate,
+	"uiWidgetDateTime":      UISchemaWidgetDateTime,
+	"uiWidgetTime":          UISchemaWidgetTime,
+	"uiWidgetUpdown":        UISchemaWidgetUpdown,
+	"uiWidgetRange":         UISchemaWidgetRange,
+	"uiWidgetFile":          UISchemaWidgetFile,
+	"uiWidgetFiles":         UISchemaWidgetFiles,
+	"uiWidgetFolder":        UISchemaWidgetFolder,
 
 	// 设置cli属性
 	"SetCliName": DefaultCliApp.SetCliName,
