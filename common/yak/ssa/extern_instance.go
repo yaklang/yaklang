@@ -102,10 +102,29 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 		return ret
 	}
 
-	// handler
-	// want := b.TryGetSimilarityKey(pa.GetName(), ci.String())
-	want := b.TryGetSimilarityKey(extern.GetName(), key.String())
-	b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), key.String(), want))
+	tryBuildFieldForPhi := func(phiIns *Phi) Value {
+		var possibleRet Value // use last possibleRet as return value
+		for _, possibleKey := range phiIns.GetValues() {
+			if ret := extern.BuildField(possibleKey.String()); ret == nil {
+				want := b.TryGetSimilarityKey(extern.GetName(), possibleKey.String())
+				b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), possibleKey.String(), want))
+				return possibleRet
+			} else {
+				possibleRet = ret
+			}
+		}
+		// all possibleKey exist
+		return possibleRet
+	}
+	// try build field for phi
+	if phiIns, ok := ToPhi(key); ok {
+		if ret := tryBuildFieldForPhi(phiIns); ret != nil {
+			return ret
+		}
+	} else {
+		want := b.TryGetSimilarityKey(extern.GetName(), key.String())
+		b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), key.String(), want))
+	}
 	un := b.EmitUndefined(name)
 	un.Kind = UndefinedMemberInValid
 	un.SetExtern(true)
