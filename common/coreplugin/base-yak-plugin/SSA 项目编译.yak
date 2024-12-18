@@ -1,26 +1,26 @@
 yakit.AutoInitYakit()
 
 // {{ 必填项
-programName := cli.String("programName", 
-    cli.setRequired(true),
-    cli.setVerboseName("项目名")
-)
-languages = cli.StringSlice("language", 
-    cli.setMultipleSelect(false), 
-    cli.setSelectOption("Java", "java"), 
-    cli.setSelectOption("PHP", "php"), 
-    cli.setSelectOption("Yaklang", "yak"), 
-    // cli.setSelectOption("JavaScript", "js"), 
-    cli.setSelectOption("Golang", "go"), 
-    cli.setRequired(true)
-)
-
 info = cli.Json("info", 
     cli.setVerboseName("项目信息"),
     cli.setJsonSchema(<<<JSON
 {
   "type": "object",
   "properties": {
+    "programName": {
+      "title": "项目名",
+      "type": "string"
+    },
+    "language": {
+      "title": "语言",
+      "type": "string",
+      "enum": [
+        "Java",
+        "PHP",
+        "Yaklang",
+        "Golang"
+      ]
+    },
     "kind": {
       "title": "项目类型",
       "type": "string",
@@ -46,7 +46,7 @@ info = cli.Json("info",
         "properties": {
           "local_file": {
             "title": "项目路径",
-            "yakit_type":"folder",
+            "yakit_type": "folder",
             "type": "string"
           }
         },
@@ -67,7 +67,7 @@ info = cli.Json("info",
         "properties": {
           "local_file": {
             "title": "压缩包路径",
-            "yakit_type":"file",
+            "yakit_type": "file",
             "type": "string"
           }
         },
@@ -88,7 +88,7 @@ info = cli.Json("info",
         "properties": {
           "local_file": {
             "title": "Jar包路径",
-            "yakit_type":"file",
+            "yakit_type": "file",
             "type": "string"
           }
         },
@@ -140,11 +140,11 @@ info = cli.Json("info",
                 "then": {
                   "properties": {
                     "user_name": {
-                      "title": "认证用户名",
+                      "title": "用户名",
                       "type": "string"
                     },
                     "password": {
-                      "title": "认证密码",
+                      "title": "密码或AK",
                       "type": "string"
                     }
                   },
@@ -165,16 +165,16 @@ info = cli.Json("info",
                 "then": {
                   "properties": {
                     "key_path": {
-                      "title": "认证私钥地址",
-                      "yakit_type":"file",
+                      "title": "私钥地址",
+                      "yakit_type": "file",
                       "type": "string"
                     },
                     "user_name": {
-                      "title": "认证用户名",
+                      "title": "用户名",
                       "type": "string"
                     },
                     "password": {
-                      "title": "认证密码",
+                      "title": "密码",
                       "type": "string"
                     }
                   },
@@ -210,11 +210,11 @@ info = cli.Json("info",
                       "type": "string"
                     },
                     "user": {
-                      "title": "代理认证用户名",
+                      "title": "用户名",
                       "type": "string"
                     },
                     "password": {
-                      "title": "代理认证用密码",
+                      "title": "密码",
                       "type": "string"
                     }
                   },
@@ -222,28 +222,72 @@ info = cli.Json("info",
                     "url"
                   ]
                 }
-
               }
             ]
           }
         },
-         "required": [
-        "url"
-      ]
+        "required": [
+          "url"
+        ]
       }
     },
     {
       "required": [
+        "programName",
+        "language",
         "kind"
       ]
     }
   ]
 }
-JSON),
+JSON,cli.setUISchema(
+    cli.uiGroups(
+        cli.uiGroup(
+            cli.uiField("programName", 0.35),
+            cli.uiField("language", 0.2),
+            cli.uiField("kind", 0.2),
+        ),
+        cli.uiGroup(
+            cli.uiField("local_file", 0.55),
+        ),
+        cli.uiGroup(
+            cli.uiField("url", 0.55),
+            cli.uiField("branch", 0.2),
+        ),
+        cli.uiGroup(
+            cli.uiField(
+                "auth", 
+                1,
+                cli.uiFieldGroups(
+                    cli.uiGroup(cli.uiField("auth", 1, cli.uiFieldComponentStyle({"width": "10%"}))),
+                    cli.uiGroup(
+                        cli.uiField("key_path", 0.35, cli.uiFieldWidget(cli.uiWidgetFile)),
+                        cli.uiField("user_name", 0.15),
+                        cli.uiField("password", 0.15, cli.uiFieldWidget(cli.uiWidgetPassword)),
+                    ),
+                ),
+            ),
+        ),
+        cli.uiGroup(
+            cli.uiField(
+                "proxy", 
+                1,
+                cli.uiFieldGroups(
+                    cli.uiGroup(cli.uiField("proxy", 1)),
+                    cli.uiGroup(
+                        cli.uiField("url", 0.35),
+                        cli.uiField("user", 0.15),
+                        cli.uiField("password", 0.15, cli.uiFieldWidget(cli.uiWidgetPassword)),
+                    ),
+                ),
+            ),
+        ),
+    ),
+)
+),
     cli.setRequired(true)
-) 
+)
 
-// }}
 peepholeSize := cli.Int("peepholeSize", 
     cli.setVerboseName("文件分片大小"),
     cli.setCliGroup("compile"),
@@ -289,10 +333,8 @@ cli.check()
 //    dbPath = dbPaths[0]
 //}
 
-var language
-if len(languages) == 1 {
-    language = languages[0]
-}
+programName = sprint(info["programName"])
+language = sprint(info["language"])
 
 opts = [
     ssa.withProgramName(programName), 
