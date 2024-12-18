@@ -457,6 +457,37 @@ func TestErrorMemberCall(t *testing.T) {
 			`,
 		})
 	})
+
+	t.Run("test the extern key of phi for member call 1 ", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `  
+  isPost := cli.Bool("isPost")
+  cli.check()
+  Location = "AppendHTTPPacketQueryParam"
+  if isPost {
+    Location = "appendHeade"
+  }
+  poc[Location]`,
+			Want: []string{
+				ssa.ExternFieldError("Lib", "poc", "appendHeade", "appendHeader"),
+				ssa4analyze.InvalidField("any", "Location"),
+			},
+		})
+	})
+
+	t.Run("test the extern key of phi for member call 2", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `  
+  isPost := cli.Bool("isPost")
+  cli.check()
+  Location = "AppendHTTPPacketQueryParam"
+  if isPost {
+    Location = "appendHeader"
+  }
+  poc[Location]`,
+			Want: []string{},
+		})
+	})
 }
 
 func TestSliceCall(t *testing.T) {
