@@ -104,6 +104,22 @@ c = a;
 			"Undefined-e",
 		}, true))
 	})
+
+	t.Run("side-effect without bind", func(t *testing.T) {
+		code := `
+n = 1
+b=()=>{
+	n = 2 // modify
+}
+{
+	var n = 3
+	b()
+	println(n)
+}
+println(n)
+`
+		ssatest.CheckPrintlnValue(code, []string{"1", "side-effect(2, n)"}, t)
+	})
 }
 func checkSideeffect(values ssaapi.Values, num int) error {
 	have := false

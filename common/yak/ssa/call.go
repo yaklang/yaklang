@@ -1,9 +1,10 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -227,7 +228,7 @@ func (c *Call) handlerReturnType() {
 func (c *Call) handleCalleeFunction() {
 	// get function type
 	funcTyp, ok := ToFunctionType(c.Method.GetType())
-	if !ok {
+	if !ok { // for Test_SideEffect_Double_more
 		if param, ok := ToParameter(c.Method); ok {
 			caller := param.GetFunc()
 			callee := caller.anValue.GetFunc()
@@ -241,7 +242,6 @@ func (c *Call) handleCalleeFunction() {
 		function := c.GetFunc()
 		builder := function.builder
 		recoverBuilder := builder.SetCurrent(c)
-		currentScope := c.GetBlock().ScopeTable
 		defer func() {
 			recoverBuilder()
 		}()
@@ -283,174 +283,12 @@ func (c *Call) handleCalleeFunction() {
 			}
 			break
 		}
+	}
 
-		for _, se := range funcTyp.SideEffects {
-			var variable, bindVariable *Variable
-			var bindScope, modifyScope ScopeIF
-			if se.BindVariable != nil {
-				// BindVariable大多数时候和Variable相同，除非遇到object
-				bindScope = se.BindVariable.GetScope()
-				bindVariable = se.BindVariable
-			} else if se.Variable != nil {
-				bindScope = se.Variable.GetScope()
-				bindVariable = se.Variable
-			} else {
-				bindScope = currentScope
-			}
-			modifyScope = se.Modify.GetBlock().ScopeTable
-			_ = modifyScope
-			_ = bindScope
-
-			// is object
-
-			switch se.MemberCallKind {
-			case NoMemberCall:
-				if ret := GetFristLocalVariableFromScopeAndParent(currentScope, se.Name); ret != nil {
-					if modifyScope.IsSameOrSubScope(ret.GetScope()) {
-						continue
-					}
-				}
-				variable = builder.CreateVariableForce(se.Name)
-				if se.BindVariable != nil {
-					variable.SetCaptured(se.BindVariable)
-				}
-			case ParameterCall:
-				val, exists := se.Get(c)
-				if !exists || utils.IsNil(val) {
-					continue
-				}
-				//直接找到variable来生成sideEffect
-				//modify side-effect name
-				if val.GetName() != "" {
-					se.Name = val.GetName()
-				} else {
-					se.Name = val.GetLastVariable().GetName()
-				}
-				se.Variable = val.GetLastVariable()
-				se.BindVariable = val.GetLastVariable()
-				variable = builder.CreateVariable(se.Name)
-			default:
-				obj, ok := se.Get(c)
-				if !ok {
-					continue
-				}
-				// is object
-				variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
-				if se.BindVariable != nil {
-					variable.SetCaptured(se.BindVariable)
-				}
-			}
-
-			if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
-				if builder.SupportClosure {
-					if parentValue, ok := builder.getParentFunctionVariable(se.Name); ok && se.BindVariable != nil {
-						// the ret variable should be FreeValue
-						para := builder.BuildFreeValueByVariable(se.BindVariable)
-						para.SetDefault(parentValue)
-						para.SetType(parentValue.GetType())
-						parentValue.AddOccultation(para)
-					}
-				}
-
-				AddSideEffect := func() {
-					// TODO: handle side effect in loop scope,
-					// will replace value in scope and create new phi
-					sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
-					builder.AssignVariable(variable, sideEffect)
-					sideEffect.SetVerboseName(se.VerboseName)
-					c.SideEffectValue[se.VerboseName] = sideEffect
-				}
-
-				SetCapturedSideEffect := func() {
-					err := variable.Assign(sideEffect)
-					if err != nil {
-						log.Warnf("BUG: variable.Assign error: %v", err)
-						return
-					}
-					sideEffect.SetVerboseName(se.VerboseName)
-					currentScope.SetCapturedSideEffect(se.VerboseName, variable, se.BindVariable)
-
-					function.SideEffects = append(function.SideEffects, se)
-				}
-
-				CheckSideEffect := func(find *Variable) {
-					// Check := func(scope ScopeIF) {
-					// 	if bindScope.IsSameOrSubScope(scope) {
-					// 		AddSideEffect()
-					// 	} else {
-					// 		SetCapturedSideEffect()
-					// 	}
-					// }
-
-					if bindVariable == nil || find.GetCaptured() == bindVariable.GetCaptured() {
-						AddSideEffect()
-					} else {
-						SetCapturedSideEffect()
-					}
-				}
-
-				var GetScope func(ScopeIF, string, *FunctionBuilder) *Variable
-				GetScope = func(scope ScopeIF, name string, builder *FunctionBuilder) *Variable {
-					var ret *Variable
-					if vairable := GetFristLocalVariableFromScopeAndParent(scope, name); vairable != nil {
-						ret = vairable
-					} else if vairable := GetFristVariableFromScopeAndParent(scope, name); vairable != nil {
-						ret = vairable
-					}
-					if ret == nil {
-						return nil
-					}
-					if _, ok := ToParameter(ret.GetValue()); ok {
-						parentBuilder := builder.parentBuilder
-						if parentBuilder != nil {
-							parentScope := parentBuilder.CurrentBlock.ScopeTable
-							return GetScope(parentScope, name, parentBuilder)
-						}
-					}
-
-					return ret
-				}
-
-				if _, ok := se.Modify.(*Parameter); ok {
-					AddSideEffect()
-					continue
-				}
-
-				obj := se.parameterMemberInner
-				if ret := GetScope(currentScope, se.Name, builder); ret != nil {
-					CheckSideEffect(ret)
-					continue
-				} else if ret := GetScope(currentScope, obj.ObjectName, builder); ret != nil {
-					CheckSideEffect(ret)
-					continue
-				} else if obj.ObjectName == "this" {
-					AddSideEffect()
-					continue
-				}
-
-				if obj.MemberCallKind == ParameterMemberCall || obj.MemberCallKind == CallMemberCall {
-					AddSideEffect()
-					continue
-				}
-
-				// 处理跨闭包的side-effect
-				if block := function.GetBlock(); block != nil {
-					functionScope := block.ScopeTable
-					if ret := GetScope(functionScope, se.Name, builder); ret != nil {
-						CheckSideEffect(ret)
-						continue
-					} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
-						if ret := GetScope(functionScope, obj.ObjectName, builder); ret != nil {
-							CheckSideEffect(ret)
-							continue
-						} else {
-							AddSideEffect()
-							continue
-						}
-					}
-				}
-			}
-		}
+	if c.GetProgram().Language == "yak" {
+		handleSideEffect(c, funcTyp)
+	} else {
+		handleSideEffectBind(c, funcTyp)
 	}
 
 	// only handler in method call
