@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 )
 
@@ -38,8 +40,8 @@ type config_info struct {
 	*/
 
 	LocalFile string `json:"local_file"`
+	URL       string `json:"url"` //  for git/svn/tar/jar
 	// git or svn
-	URL    string `json:"url"`
 	Branch string `json:"branch"`
 	Auth   *auth  `json:"ce"`
 	Proxy  *proxy `json:"proxy"`
@@ -79,17 +81,13 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	case "local":
 		return filesys.NewRelLocalFs(info.LocalFile), nil
 	case "compression":
-		fs, err := filesys.NewZipFSFromLocal(info.LocalFile)
-		if err != nil {
-			return nil, utils.Errorf("compression file error: %v", err)
-		}
-		return fs, nil
+		return getZipFile(&info)
 	case "jar":
-		fs, err := javaclassparser.NewJarFSFromLocal(info.LocalFile)
+		zipfs, err := getZipFile(&info)
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
 		}
-		return fs, nil
+		return javaclassparser.NewJarFS(zipfs), nil
 	case "git":
 		return gitFs(&info, c.Processf)
 	case "svn":
@@ -101,6 +99,27 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 func (info config_info) String() string {
 	b, _ := json.Marshal(info)
 	return string(b)
+}
+
+func getZipFile(info *config_info) (*filesys.ZipFS, error) {
+	// use local
+	if info.LocalFile != "" {
+		return filesys.NewZipFSFromLocal(info.LocalFile)
+	}
+	if info.URL == "" {
+		return nil, utils.Errorf("url is empty ")
+	}
+	// download file
+	resp, _, err := poc.DoGET(info.URL)
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetStatusCode() != 200 {
+		return nil, utils.Errorf("download file error: %v", resp.GetStatusCode())
+	}
+
+	bytes.NewReader(resp.GetBody())
+	return filesys.NewZipFSRaw(bytes.NewReader(resp.GetBody()), int64(len(resp.GetBody())))
 }
 
 func gitFs(info *config_info, process func(float64, string, ...any)) (fi.FileSystem, error) {
