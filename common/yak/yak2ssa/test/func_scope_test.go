@@ -275,15 +275,15 @@ func TestClosure_SideEffect(t *testing.T) {
 			}
 			println(a) // 1
 			f()
-			println(a) // 2
+			println(a) // side-effect(2, a)
 		}
 		a = 1
-		println(a) // 1 
-		f() 
 		println(a) // 1
+		f() 
+		println(a) // side-effect(2, a)
 		`, []string{
 			"1", "side-effect(2, a)",
-			"1", "1",
+			"1", "side-effect(2, a)",
 		}, t)
 	})
 

@@ -105,7 +105,41 @@ func Test_SideEffect(t *testing.T) {
 		}, t)
 	})
 
-	t.Run("side-effect nesting bind with local", func(t *testing.T) {
+	t.Run("side-effect bind normal", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		
+	func main(){
+		n := 1
+		b := func() {
+			n = 2 // modify
+		}
+		{
+			n = 3
+			b()
+			println(n)
+		}
+		println(n)
+	}
+		`, []string{"side-effect(2, n)", "side-effect(2, n)"}, t)
+
+		test.CheckPrintlnValue(`package main
+		
+		func main(){
+			n := 1
+			b := func() {
+				n = 2 // modify
+			}
+			{
+				n := 3
+				b()
+				println(n)
+			}
+			println(n)
+		}
+			`, []string{"3", "side-effect(2, n)"}, t)
+	})
+
+	t.Run("side-effect bind with local", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		
 	func main(){

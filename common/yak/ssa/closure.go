@@ -1,6 +1,9 @@
 package ssa
 
-import "github.com/samber/lo"
+import (
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
+)
 
 func (s *FunctionType) SetFreeValue(fv map[*Variable]*Parameter) {
 	s.FreeValue = lo.MapToSlice(fv, func(name *Variable, para *Parameter) *Parameter { return para })
@@ -106,4 +109,264 @@ func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
 
 func (s *FunctionType) SetSideEffect(se []*FunctionSideEffect) {
 	s.SideEffects = se
+}
+
+func handleSideEffect(c *Call, funcTyp *FunctionType) {
+	currentScope := c.GetBlock().ScopeTable
+	function := c.GetFunc()
+	builder := function.builder
+
+	for _, se := range funcTyp.SideEffects {
+		var variable *Variable
+		var modifyScope ScopeIF
+		modifyScope = se.Modify.GetBlock().ScopeTable
+		_ = modifyScope
+
+		// is object
+		if se.MemberCallKind == NoMemberCall {
+			if ret := GetFristLocalVariableFromScopeAndParent(currentScope, se.Name); ret != nil {
+				if modifyScope.IsSameOrSubScope(ret.GetScope()) {
+					continue
+				}
+			}
+			variable = builder.CreateVariableForce(se.Name)
+		} else {
+			// is object
+			obj, ok := se.Get(c)
+			if !ok {
+				continue
+			}
+			variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
+		}
+
+		if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
+			// TODO: handle side effect in loop scope,
+			// will replace value in scope and create new phi
+			sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
+			builder.AssignVariable(variable, sideEffect)
+			sideEffect.SetVerboseName(se.VerboseName)
+			c.SideEffectValue[se.VerboseName] = sideEffect
+		}
+	}
+}
+
+func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
+	currentScope := c.GetBlock().ScopeTable
+	function := c.GetFunc()
+	builder := function.builder
+
+	for _, se := range funcTyp.SideEffects {
+		var variable *Variable
+		var bindScope, modifyScope ScopeIF
+		if se.BindVariable != nil {
+			// BindVariable大多数时候和Variable相同，除非遇到object
+			bindScope = se.BindVariable.GetScope()
+		} else if se.Variable != nil {
+			bindScope = se.Variable.GetScope()
+		} else {
+			bindScope = currentScope
+		}
+		modifyScope = se.Modify.GetBlock().ScopeTable
+		_ = modifyScope
+
+		// is object
+		if se.MemberCallKind == NoMemberCall {
+			if ret := GetFristLocalVariableFromScopeAndParent(currentScope, se.Name); ret != nil {
+				if modifyScope.IsSameOrSubScope(ret.GetScope()) {
+					continue
+				}
+			}
+			variable = builder.CreateVariableForce(se.Name)
+		} else {
+			// is object
+			obj, ok := se.Get(c)
+			if !ok {
+				continue
+			}
+			variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
+		}
+
+		if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
+			if builder.SupportClosure {
+				if parentValue, ok := builder.getParentFunctionVariable(se.Name); ok && se.BindVariable != nil {
+					// the ret variable should be FreeValue
+					para := builder.BuildFreeValueByVariable(se.BindVariable)
+					para.SetDefault(parentValue)
+					para.SetType(parentValue.GetType())
+					parentValue.AddOccultation(para)
+				}
+			}
+
+			AddSideEffect := func() {
+				// TODO: handle side effect in loop scope,
+				// will replace value in scope and create new phi
+				sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
+				builder.AssignVariable(variable, sideEffect)
+				sideEffect.SetVerboseName(se.VerboseName)
+				c.SideEffectValue[se.VerboseName] = sideEffect
+			}
+
+			SetCapturedSideEffect := func() {
+				err := variable.Assign(sideEffect)
+				if err != nil {
+					log.Warnf("BUG: variable.Assign error: %v", err)
+					return
+				}
+				sideEffect.SetVerboseName(se.VerboseName)
+				currentScope.SetCapturedSideEffect(se.VerboseName, variable, se.BindVariable)
+
+				function.SideEffects = append(function.SideEffects, se)
+			}
+
+			CheckSideEffect := func(find *Variable) {
+				Check := func(scope ScopeIF) {
+					if bindScope.IsSameOrSubScope(scope) {
+						AddSideEffect()
+					} else {
+						SetCapturedSideEffect()
+					}
+				}
+
+				if freevalue, ok := ToParameter(find.Value); ok {
+					if defaultValue := freevalue.defaultValue; defaultValue != nil {
+						scope := defaultValue.GetBlock().ScopeTable
+						Check(scope)
+						return
+					}
+				}
+				Check(find.GetScope())
+			}
+
+			var GetScope func(ScopeIF, string, *FunctionBuilder) *Variable
+			GetScope = func(scope ScopeIF, name string, builder *FunctionBuilder) *Variable {
+				var ret *Variable
+				if vairable := GetFristLocalVariableFromScopeAndParent(scope, name); vairable != nil {
+					ret = vairable
+				} else if vairable := GetFristVariableFromScopeAndParent(scope, name); vairable != nil {
+					ret = vairable
+				}
+				if ret == nil {
+					return nil
+				}
+				if _, ok := ToParameter(ret.GetValue()); ok {
+					parentBuilder := builder.parentBuilder
+					if parentBuilder != nil {
+						parentScope := parentBuilder.CurrentBlock.ScopeTable
+						return GetScope(parentScope, name, parentBuilder)
+					}
+				}
+
+				return ret
+			}
+
+			if _, ok := se.Modify.(*Parameter); ok {
+				AddSideEffect()
+				continue
+			}
+
+			obj := se.parameterMemberInner
+			if ret := GetScope(currentScope, se.Name, builder); ret != nil {
+				CheckSideEffect(ret)
+				continue
+			} else if ret := GetScope(currentScope, obj.ObjectName, builder); ret != nil {
+				CheckSideEffect(ret)
+				continue
+			} else if obj.ObjectName == "this" {
+				AddSideEffect()
+				continue
+			}
+
+			if obj.MemberCallKind == ParameterMemberCall || obj.MemberCallKind == CallMemberCall {
+				AddSideEffect()
+				continue
+			}
+
+			// 处理跨闭包的side-effect
+			if block := function.GetBlock(); block != nil {
+				functionScope := block.ScopeTable
+				if ret := GetScope(functionScope, se.Name, builder); ret != nil {
+					CheckSideEffect(ret)
+					continue
+				} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
+					if ret := GetScope(functionScope, obj.ObjectName, builder); ret != nil {
+						CheckSideEffect(ret)
+						continue
+					} else {
+						AddSideEffect()
+						continue
+					}
+				}
+			}
+		}
+	}
+}
+
+func (f *FunctionBuilder) SetReturnSideEffects() {
+	var SideEffectsReturn []*FunctionSideEffect
+	scope := f.CurrentBlock.ScopeTable
+
+	for _, se := range f.SideEffects {
+		ser := se
+
+		if variable := scope.ReadVariable(se.Name); variable != nil {
+			value := variable.GetValue()
+			if _, ok := value.(*SideEffect); ok {
+			} else if p, ok := value.(*Parameter); ok && p.IsFreeValue {
+			} else {
+				ser.Modify = value
+			}
+		}
+		SideEffectsReturn = append(SideEffectsReturn, ser)
+	}
+	f.SideEffects = SideEffectsReturn
+}
+
+func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffect) *SideEffect {
+	vs := make([]Value, 0)
+	scope := f.CurrentBlock.ScopeTable
+	if phi, ok := ToPhi(se.Value); ok {
+		for i, e := range phi.Edge {
+			vs = append(vs, e)
+			if p, ok := ToParameter(e); ok && p.IsFreeValue {
+				if value := scope.ReadValue(name); value != nil {
+					vs[i] = value
+				}
+			}
+		}
+		phit := &Phi{
+			anValue:            phi.anValue,
+			CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
+			Edge:               vs,
+		}
+
+		sideEffect := f.EmitSideEffect(name, se.CallSite.(*Call), phit)
+		return sideEffect
+	}
+	return se
+}
+
+func (f *FunctionBuilder) SwitchFreevalueInSideEffectFromScope(name string, se *SideEffect, scope ScopeIF) *SideEffect {
+	vs := make([]Value, 0)
+	if scope == nil {
+		return se
+	}
+	if phi, ok := ToPhi(se.Value); ok {
+		for i, e := range phi.Edge {
+			vs = append(vs, e)
+			if p, ok := ToParameter(e); ok && p.IsFreeValue {
+				if value := scope.ReadValue(name); value != nil {
+					vs[i] = value
+				}
+			}
+		}
+		phit := &Phi{
+			anValue:            phi.anValue,
+			CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
+			Edge:               vs,
+		}
+
+		sideEffect := f.EmitSideEffect(name, se.CallSite.(*Call), phit)
+		return sideEffect
+	}
+	return se
 }
