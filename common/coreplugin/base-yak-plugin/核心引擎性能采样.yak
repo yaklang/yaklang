@@ -46,15 +46,42 @@ go fn() {
 
 }()
 
+autoAnalyze = i =>{
+    if !i.HasSuffix(".prof") {
+       return
+    }
+    content,err = file.ReadFile(i)
+    if err != nil {
+        return
+    }
+    path = i.ReplaceAll(".prof", "_自动分析结果.txt")
+    f,err=file.Create(path)
+    defer f.Close()
+    if err != nil {
+        return
+    }
+    msg,err = pprof.AutoAnalyzeFile(i)
+    if err != nil {
+        return
+    }
+    f.WriteString(msg)
+    return path
+}
 
 sampleHandler = i => {
+     path = autoAnalyze(i)
     _, fileName := file.Split(i)
     if fileName.HasPrefix("cpu-") {
         yakit.File(i, "CPU采样", "性能优化采样")
+        if path != "" {
+            yakit.File(path, "CPU采样自动分析", "性能优化采样")
+        }
     } else if fileName.HasPrefix("mem-") {
         yakit.File(i, "内存采样", "性能优化采样")
+        if path != "" {
+            yakit.File(path, "内存采样自动分析", "性能优化采样")
+        }
     }
-
 }
 
 if checkMemory && checkCpu {
