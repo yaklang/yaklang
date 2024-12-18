@@ -15,6 +15,8 @@ package pprofutils
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"runtime"
 	"runtime/pprof"
@@ -25,6 +27,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+const PPROFILEAUTOANALYZE_KEY = "Pprof_File_Auto_Analyze"
 
 type MemMetrics struct {
 	// 当前分配的内存大小(字节)
@@ -176,6 +180,7 @@ func init() {
 		log.Infof("High memory usage detected, top consuming function: %v", stats[0].Dump())
 	})
 
+	db := consts.GetGormProfileDatabase()
 	// CPU分析协程
 	go func() {
 		// 获取CPU核心数
@@ -184,7 +189,9 @@ func init() {
 			var buf = bytes.NewBuffer(nil)
 			for {
 				time.Sleep(time.Second)
-
+				if yakit.GetKey(db, PPROFILEAUTOANALYZE_KEY) != "true" {
+					continue
+				}
 				cpuCallbackMutex.RLock()
 				if len(cpuCallbacks) == 0 {
 					cpuCallbackMutex.RUnlock()
@@ -232,7 +239,9 @@ func init() {
 		var buf = bytes.NewBuffer(nil)
 		for {
 			time.Sleep(time.Second)
-
+			if yakit.GetKey(db, PPROFILEAUTOANALYZE_KEY) != "true" {
+				continue
+			}
 			memCallbackMutex.RLock()
 			if len(memCallbacks) == 0 {
 				memCallbackMutex.RUnlock()
