@@ -408,7 +408,7 @@ primaryExpr
     : operand
     | conversion
     | methodExpr
-    | primaryExpr ( DOT IDENTIFIER typeArgs? | index | slice_ | typeAssertion | arguments)
+    | primaryExpr ( DOT eos* IDENTIFIER typeArgs? | index | slice_ | typeAssertion | arguments)
     ;
 
 conversion
