@@ -47,9 +47,9 @@ func GetOrCreateGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGro
 	// 更新内置组
 	updateBuildInGroup := func(group *schema.SyntaxFlowGroup, isBuildIn bool) (*schema.SyntaxFlowGroup, error) {
 		if group.IsBuildIn != isBuildIn {
-			//group.IsBuildIn = isBuildIn
-			//err := db.Update(group).Error
-			//return group, err
+			group.IsBuildIn = isBuildIn
+			err := db.Update(group).Error
+			return group, err
 		}
 		return group, nil
 	}
