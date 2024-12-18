@@ -691,7 +691,20 @@ func (c *CliApp) LineDict(name string, opts ...SetCliExtraParam) []string {
 	return utils.ParseStringToLines(string(raw))
 }
 
-// JsonSchema 获取对应名称的命令行参数
+// Json 获取对应名称的命令行参数, 与cli.JsonSchema一起使用以构建复杂参数
+// 详情参考:
+// 1. https://json-schema.org/docs
+// 2. https://rjsf-team.github.io/react-jsonschema-form/
+// Example:
+// ```
+// info = cli.Json("info",
+// cli.setVerboseName("项目信息"),
+// cli.setJsonSchema(<<<JSON
+// {"title":"A registration form","description":"A simple form example.","type":"object","required":["firstName","lastName"],"properties":{"name":{"type":"string","title":"Name","default":"Chuck"},"password":{"type":"string","title":"Password","minLength":3},"telephone":{"type":"string","title":"Telephone","minLength":10}}}
+// JSON,cli.setUISchema()),
+// )
+// cli.check()
+// ```
 func (c *CliApp) Json(name string, opts ...SetCliExtraParam) map[string]any {
 	s, p := c._cliFromString(name, opts...)
 	p._type = "json"
@@ -836,6 +849,20 @@ func (c *CliApp) SetSelectOption(name, value string) SetCliExtraParam {
 	return func(cep *cliExtraParams) {}
 }
 
+// setJsonSchema 是一个选项参数,用于在cli.Json中使用JsonSchema构建复杂参数
+// 详情参考:
+// 1. https://json-schema.org/docs
+// 2. https://rjsf-team.github.io/react-jsonschema-form/
+// Example:
+// ```
+// info = cli.Json("info",
+// cli.setVerboseName("项目信息"),
+// cli.setJsonSchema(<<<JSON
+// {"title":"A registration form","description":"A simple form example.","type":"object","required":["firstName","lastName"],"properties":{"name":{"type":"string","title":"Name","default":"Chuck"},"password":{"type":"string","title":"Password","minLength":3},"telephone":{"type":"string","title":"Telephone","minLength":10}}}
+// JSON,cli.setUISchema()),
+// )
+// cli.check()
+// ```
 func (c *CliApp) SetJsonSchema(schema string, uis ...*UISchema) SetCliExtraParam {
 	return func(c *cliExtraParams) {}
 }
@@ -984,17 +1011,17 @@ var CliExports = map[string]interface{}{
 	"uiWidgetCheckbox":      UISchemaWidgetCheckbox,
 	"uiWidgetTextarea":      UISchemaWidgetTextArea,
 	"uiWidgetPassword":      UISchemaWidgetPassword,
-	"uiWidgetColor":         UISchemaWidgetColor,
-	"uiWidgetEmail":         UISchemaWidgetEmail,
-	"uiWidgetUri":           UISchemaWidgetUri,
-	"uiWidgetDate":          UISchemaWidgetDate,
-	"uiWidgetDateTime":      UISchemaWidgetDateTime,
-	"uiWidgetTime":          UISchemaWidgetTime,
-	"uiWidgetUpdown":        UISchemaWidgetUpdown,
-	"uiWidgetRange":         UISchemaWidgetRange,
-	"uiWidgetFile":          UISchemaWidgetFile,
-	"uiWidgetFiles":         UISchemaWidgetFiles,
-	"uiWidgetFolder":        UISchemaWidgetFolder,
+	// "uiWidgetColor":         UISchemaWidgetColor,
+	// "uiWidgetEmail":         UISchemaWidgetEmail,
+	// "uiWidgetUri":           UISchemaWidgetUri,
+	// "uiWidgetDate":          UISchemaWidgetDate,
+	// "uiWidgetDateTime":      UISchemaWidgetDateTime,
+	// "uiWidgetTime":          UISchemaWidgetTime,
+	"uiWidgetUpdown": UISchemaWidgetUpdown,
+	// "uiWidgetRange":         UISchemaWidgetRange,
+	"uiWidgetFile":   UISchemaWidgetFile,
+	"uiWidgetFiles":  UISchemaWidgetFiles,
+	"uiWidgetFolder": UISchemaWidgetFolder,
 
 	// 设置cli属性
 	"SetCliName": DefaultCliApp.SetCliName,
