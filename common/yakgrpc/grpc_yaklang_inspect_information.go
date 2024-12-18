@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/go-funk"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -83,7 +84,8 @@ func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 			SuggestionDataExpression: param.SuggestionValueExpression,
 			ExtraSetting:             string(extra),
 			MethodType:               param.MethodType,
-			JsonSchema:   param.JsonSchema,
+			JsonSchema:               param.JsonSchema,
+			UISchema:                 param.UISchema,
 		})
 	}
 

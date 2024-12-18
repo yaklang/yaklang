@@ -1,9 +1,13 @@
 package information
 
 import (
+	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -20,7 +24,8 @@ type CliParameter struct {
 	SuggestionValueExpression string
 	MultipleSelect            bool
 	SelectOption              *orderedmap.OrderedMap
-	JsonSchema     string
+	JsonSchema                string
+	UISchema                  string
 }
 
 type UIInfo struct {
@@ -28,6 +33,97 @@ type UIInfo struct {
 	Effected       []string // parameter names
 	effectGroup    []string // group names, will turn to `effected`
 	WhenExpression string   // when expression
+}
+
+type UISchemaInfo struct {
+	Grid                 *UISchemaGrid
+	GlobalFieldClassName cli.UISchemaFieldClassName
+}
+
+type UISchemaGrid struct {
+	Groups []*UISchemaGroup
+}
+
+type UISchemaGroup struct {
+	Fields []*UISchemaField
+}
+
+type UISchemaField struct {
+	FieldName      string
+	Width          int
+	ClassName      cli.UISchemaFieldClassName
+	Widget         cli.UISchemaWidgetType
+	ComponentStyle map[string]any
+	InnerGroups    []*UISchemaGroup
+}
+
+func (info *UISchemaInfo) ToUISchema() (string, error) {
+
+	globalMap := orderedmap.New()
+	addToOrderedMap := func(tmp *orderedmap.OrderedMap, field, k string, v any) *orderedmap.OrderedMap {
+		if _, ok := tmp.Get(field); !ok {
+			tmp.Set(field, orderedmap.New())
+		}
+		i, _ := tmp.Get(field)
+		m := i.(*orderedmap.OrderedMap)
+		m.Set(k, v)
+		return m
+	}
+
+	var (
+		handleGroups func(innerMap *orderedmap.OrderedMap, groups []*UISchemaGroup) []*orderedmap.OrderedMap
+		handleField  func(gridMap, innerMap *orderedmap.OrderedMap, field *UISchemaField)
+	)
+
+	handleGroups = func(innerMap *orderedmap.OrderedMap, groups []*UISchemaGroup) []*orderedmap.OrderedMap {
+		gridMaps := make([]*orderedmap.OrderedMap, 0)
+		for _, group := range groups {
+			gridMap := orderedmap.New()
+			for _, field := range group.Fields {
+				handleField(gridMap, innerMap, field)
+			}
+			gridMaps = append(gridMaps, gridMap)
+		}
+		return gridMaps
+	}
+
+	handleField = func(gridMap, innerMap *orderedmap.OrderedMap, field *UISchemaField) {
+		if field == nil {
+			return
+		}
+		gridMap.Set(field.FieldName, field.Width)
+		if field.ClassName != cli.UISchemaFieldPosDefault {
+			addToOrderedMap(innerMap, field.FieldName, "ui:classNames", string(field.ClassName))
+		}
+		if len(field.ComponentStyle) > 0 {
+			addToOrderedMap(innerMap, field.FieldName, "ui:component_style", field.ComponentStyle)
+		}
+		if field.Widget != cli.UISchemaWidgetDefault {
+			addToOrderedMap(innerMap, field.FieldName, "ui:widget", string(field.Widget))
+		}
+		if len(field.InnerGroups) > 0 {
+			newInnerMap := orderedmap.New()
+			gridMaps := handleGroups(newInnerMap, field.InnerGroups)
+			newInnerMap.ForEach(func(key string, value any) {
+				addToOrderedMap(innerMap, field.FieldName, key, value)
+			})
+			addToOrderedMap(innerMap, field.FieldName, "ui:grid", gridMaps)
+		}
+	}
+
+	if grid := info.Grid; grid != nil {
+
+		globalMap.Set("ui:grid", handleGroups(globalMap, grid.Groups))
+	}
+	if info.GlobalFieldClassName != "" {
+		globalMap.Set("ui:classNames", string(info.GlobalFieldClassName))
+	}
+
+	bytes, err := json.Marshal(globalMap)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }
 
 func newCliParameter(name, typ, methodTyp string) *CliParameter {
@@ -112,6 +208,195 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo, []stri
 		}
 	}
 
+	handleUIFieldPosition := func(s string) cli.UISchemaFieldClassName {
+		switch s {
+		case "cli.uiPosDefault":
+			return cli.UISchemaFieldPosDefault
+		case "cli.uiPosHorizontal":
+			return cli.UISchemaFieldPosHorizontal
+		default:
+			return cli.UISchemaFieldPosDefault
+		}
+	}
+
+	handleUIFieldWidget := func(s string) cli.UISchemaWidgetType {
+		switch s {
+		case "cli.uiWidgetRadio":
+			return cli.UISchemaWidgetRadio
+		case "cli.uiWidgetSelect":
+			return cli.UISchemaWidgetSelect
+		case "cli.uiWidgetCheckbox":
+			return cli.UISchemaWidgetCheckbox
+		case "cli.uiWidgetTextarea":
+			return cli.UISchemaWidgetTextArea
+		case "cli.uiWidgetPassword":
+			return cli.UISchemaWidgetPassword
+		case "cli.uiWidgetColor":
+			return cli.UISchemaWidgetColor
+		case "cli.uiWidgetEmail":
+			return cli.UISchemaWidgetEmail
+		case "cli.uiWidgetUri":
+			return cli.UISchemaWidgetUri
+		case "cli.uiWidgetDate":
+			return cli.UISchemaWidgetDate
+		case "cli.uiWidgetDateTime":
+			return cli.UISchemaWidgetDateTime
+		case "cli.uiWidgetTime":
+			return cli.UISchemaWidgetTime
+		case "cli.uiWidgetUpdown":
+			return cli.UISchemaWidgetUpdown
+		case "cli.uiWidgetRange":
+			return cli.UISchemaWidgetRange
+		case "cli.uiWidgetFile":
+			return cli.UISchemaWidgetFile
+		case "cli.uiWidgetFiles":
+			return cli.UISchemaWidgetFiles
+		case "cli.uiWidgetFolder":
+			return cli.UISchemaWidgetFolder
+		default:
+			return cli.UISchemaWidgetDefault
+		}
+	}
+
+	handleUIFieldMap := func(value *ssaapi.Value) map[string]any {
+		res := make(map[string]any)
+		members := value.GetMembers()
+		for _, item := range members {
+			if len(item) < 2 {
+				continue
+			}
+			key, value := item[0], item[1]
+			keyConst := key.GetConst()
+			if keyConst == nil {
+				continue
+			}
+			res[keyConst.String()] = value.GetConstValue()
+		}
+		return res
+	}
+
+	var (
+		handleUISchemaGroup func(opt *ssaapi.Value) *UISchemaGroup
+		handleUISchemaField func(opt *ssaapi.Value) *UISchemaField
+	)
+
+	handleUISchemaField = func(opt *ssaapi.Value) *UISchemaField {
+		fieldArgs := opt.GetOperands()
+		if len(fieldArgs) == 0 {
+			return nil
+		}
+		if fieldArgs[0].GetName() != "cli.uiField" {
+			return nil
+		}
+		field := new(UISchemaField)
+		field.FieldName = getConstString(fieldArgs[1])
+		secondFieldConst := fieldArgs[2].GetConst()
+		widthPercent := 1.0
+		if secondFieldConst.IsFloat() {
+			widthPercent = secondFieldConst.Float()
+		} else if secondFieldConst.IsNumber() {
+			widthPercent = float64(secondFieldConst.Number())
+		} else {
+			log.Errorf("field width is invalid: %v", secondFieldConst)
+		}
+
+		field.Width = int(math.Round(widthPercent * 24.0))
+
+		if len(fieldArgs) > 2 {
+			for _, fieldArg := range fieldArgs[3:] {
+				if !fieldArg.IsCall() {
+					continue
+				}
+				fieldParamArg := fieldArg.GetOperands()
+				if len(fieldParamArg) < 2 {
+					continue
+				}
+				switch fieldParamArg[0].GetName() {
+				case "cli.uiFieldPosition":
+					field.ClassName = handleUIFieldPosition(fieldParamArg[1].GetName())
+				case "cli.uiFieldWidget":
+					field.Widget = handleUIFieldWidget(fieldParamArg[1].GetName())
+				case "cli.uiFieldComponentStyle":
+					field.ComponentStyle = handleUIFieldMap(fieldParamArg[1])
+				case "cli.uiFieldGroups":
+					for _, arg := range fieldParamArg[1:] {
+						field.InnerGroups = append(field.InnerGroups, handleUISchemaGroup(arg))
+					}
+				}
+			}
+		}
+		return field
+	}
+
+	handleUISchemaGroup = func(opt *ssaapi.Value) *UISchemaGroup {
+		if !opt.IsCall() {
+			// skip no function call
+			return nil
+		}
+		args := opt.GetOperands()
+		if len(args) == 0 {
+			return nil
+		}
+		group := new(UISchemaGroup)
+		for _, arg := range args[1:] {
+			field := handleUISchemaField(arg)
+			if field == nil {
+				continue
+			}
+			group.Fields = append(group.Fields, field)
+		}
+		return group
+	}
+
+	handleUISchemaOption := func(ui *UISchemaInfo, opt *ssaapi.Value) {
+		if !opt.IsCall() {
+			// skip no function call
+			return
+		}
+		args := opt.GetOperands()
+		if len(args) == 0 {
+			return
+		}
+		switch args[0].GetName() {
+		case "cli.uiGlobalFieldPosition":
+			ui.GlobalFieldClassName = handleUIFieldPosition(args[1].GetName())
+		case "cli.uiGroups":
+			if ui.Grid == nil {
+				ui.Grid = new(UISchemaGrid)
+			}
+			for _, arg := range args[1:] {
+				ui.Grid.Groups = append(ui.Grid.Groups, handleUISchemaGroup(arg))
+			}
+		}
+	}
+
+	handleUISchema := func(cli *CliParameter, opt *ssaapi.Value) {
+		// opt.ShowUseDefChain()
+		if !opt.IsCall() {
+			// skip no function call
+			return
+		}
+		// check option function, get information
+		args := opt.GetOperands()
+		if len(args) == 0 {
+			return
+		}
+		switch args[0].GetName() {
+		case "cli.setUISchema":
+			if len(args) > 1 {
+				info := new(UISchemaInfo)
+				for _, arg := range args[1:] {
+					handleUISchemaOption(info, arg)
+				}
+				if uiSchema, err := info.ToUISchema(); err != nil {
+					log.Errorf("convert ui schema error: %v", err)
+				} else {
+					cli.UISchema = uiSchema
+				}
+			}
+		}
+	}
+
 	handleOption := func(cli *CliParameter, opt *ssaapi.Value) (skip bool) {
 		// opt.ShowUseDefChain()
 		if !opt.IsCall() {
@@ -157,6 +442,10 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo, []stri
 				break
 			}
 			cli.JsonSchema = arg1
+			args := opt.GetOperands()
+			if len(args) > 2 {
+				handleUISchema(cli, args[2])
+			}
 		case "cli.setYakitPayload":
 			if getConstBool(opt.GetOperand(1)) {
 				cli.SuggestionValueExpression = "db.GetAllPayloadGroupsName()"

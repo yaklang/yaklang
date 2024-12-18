@@ -112,14 +112,20 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	check := func(code string, want []*ypb.YakScriptParam, t *testing.T) {
+	check := func(code string, want []*ypb.YakScriptParam, t *testing.T, callbacks ...func(t *testing.T, params []*ypb.YakScriptParam)) {
 		rsp := yaklangInspectInformationSend(local, "yak", code, nil)
 		if rsp == nil {
 			t.Fatal("no response")
 		}
 		// check cli parameter
-		if err := CompareScriptParams(rsp.GetCliParameter(), want); err != nil {
+		params := rsp.GetCliParameter()
+		if err := CompareScriptParams(params, want); err != nil {
 			t.Fatal(err)
+		}
+		if len(callbacks) > 0 {
+			for _, callback := range callbacks {
+				callback(t, params)
+			}
 		}
 	}
 	t.Run("simple cli parameter not string name", func(t *testing.T) {
@@ -212,7 +218,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 	})
 
 	t.Run("cli json schema", func(t *testing.T) {
-		json := `
+		s := `
 {
   "type": "object",
   "properties": {
@@ -262,8 +268,31 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 		check(fmt.Sprintf(`
 	cli.Json("a", cli.setJsonSchema(<<<JSON
 %s
-JSON))
-		`, json),
+JSON, cli.setUISchema(
+    cli.uiGlobalFieldPosition(cli.uiPosDefault),
+    cli.uiGroups(
+        cli.uiGroup(
+            cli.uiField(
+				"field1",
+				0.5,
+				cli.uiFieldComponentStyle({"width":"50%%"}),
+				cli.uiFieldPosition(cli.uiPosHorizontal),
+				cli.uiFieldWidget(cli.uiWidgetTextarea),
+				cli.uiFieldGroups(
+					cli.uiGroup(
+					cli.uiField("field11", 0.3, cli.uiFieldWidget(cli.uiWidgetPassword)),
+					cli.uiField("field12", 0.7, cli.uiFieldWidget(cli.uiWidgetEmail)),
+					),
+				),
+			),
+            cli.uiField("field2", 0.5, cli.uiFieldPosition(cli.uiPosHorizontal), cli.uiFieldWidget(cli.uiWidgetPassword)),
+        ),
+        cli.uiGroup(
+             cli.uiField("field3", 1),
+        ),
+    ),
+)))
+		`, s),
 
 			[]*ypb.YakScriptParam{
 				{
@@ -271,10 +300,22 @@ JSON))
 					TypeVerbose:  "json",
 					MethodType:   "json",
 					FieldVerbose: "a",
-					JsonSchema:   json,
+					JsonSchema:   s,
 				},
 			},
 			t,
+			func(t *testing.T, params []*ypb.YakScriptParam) {
+				require.Len(t, params, 1)
+				uiSchema := params[0].UISchema
+				wantJson := `{"field1":{"ui:classNames":"json-schema-row-form","ui:widget":"textarea","ui:component_style":{"width":"50%"},"field11":{"ui:widget":"password"},"field12":{"ui:widget":"email"},"ui:grid":[{"field11":7,"field12":17}]},"field2":{"ui:classNames":"json-schema-row-form","ui:widget":"password"},"ui:grid":[{"field1":12,"field2":12},{"field3":24}]}`
+				got, want := make(map[string]any), make(map[string]any)
+				err := json.Unmarshal([]byte(wantJson), &want)
+				require.NoError(t, err)
+				err = json.Unmarshal([]byte(uiSchema), &got)
+				require.NoError(t, err)
+
+				require.Equal(t, want, got)
+			},
 		)
 	})
 }

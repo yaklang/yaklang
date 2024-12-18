@@ -3974,6 +3974,8 @@ message YakScriptParam {
   string JsonSchema = 10;
 
   string SuggestionDataExpression = 11;
+
+  string UISchema = 12;
 }
 
 message YakScript {
