@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 )
 
-func SyntaxBase(code string, info bool) (*gol.SourceFileContext,error){
+func SyntaxBase(code string, info bool) (*gol.SourceFileContext, error) {
 	lexer := gol.NewGoLexer(antlr.NewInputStream(code))
 	lexer.RemoveErrorListeners()
 
@@ -31,7 +31,7 @@ func SyntaxBase(code string, info bool) (*gol.SourceFileContext,error){
 			fmt.Printf("%v\n", t)
 		}
 	}
-	
+
 	errListener := antlr4util.NewErrorListener()
 	lexer = gol.NewGoLexer(antlr.NewInputStream(code))
 	lexer.RemoveErrorListeners()
@@ -43,46 +43,45 @@ func SyntaxBase(code string, info bool) (*gol.SourceFileContext,error){
 	ast := parser.SourceFile().(*gol.SourceFileContext)
 	if len(errListener.GetErrors()) != 0 {
 		err := utils.Errorf("[-]parse AST FrontEnd error : %v", errListener.GetErrorString())
-		return ast,err
+		return ast, err
 	}
 	tree := ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser())
 	fmt.Printf("[+]tree: %v\n", tree)
-	return ast,nil
+	return ast, nil
 }
 
-type Container[] struct {
+type Container []struct {
 	Items int
 }
 
 func TestExample(t *testing.T) {
-    code := `package main
+	code := `package main
 
     import "fmt"
 
     func main() { 
 		fmt.Println("Hello, world!") 
 	}`
-	_,err := SyntaxBase(code,true)
+	_, err := SyntaxBase(code, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-
-func TestExamplesALl(t *testing.T){
+func TestExamplesALl(t *testing.T) {
 	exdir := "./examples"
 	err := filepath.Walk(exdir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			fmt.Println("[+]start test:",path) 
-			data ,err := os.ReadFile(path)
+			fmt.Println("[+]start test:", path)
+			data, err := os.ReadFile(path)
 			if err != nil {
 				fmt.Println("Error reading the file:", err)
 				return nil
 			}
-			_, err = SyntaxBase(string(data),false)
+			_, err = SyntaxBase(string(data), false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -93,5 +92,20 @@ func TestExamplesALl(t *testing.T){
 
 	if err != nil {
 		fmt.Println("Error walking the path:", err)
+	}
+}
+
+func TestExample_Dot(t *testing.T) {
+	code := `package main
+
+func (m Migrator) GetTables() (tableList []string, err error) {
+	err = m.DB.Raw("SELECT TABLE_NAME FROM information_schema.tables where TABLE_SCHEMA=?", m.CurrentDatabase()).
+		Scan(&tableList).Error
+	return
+}
+`
+	_, err := SyntaxBase(code, true)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
