@@ -2,6 +2,8 @@ package pprofutils
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math"
 	"runtime"
 	"strings"
@@ -189,6 +191,10 @@ func TestBasicMetrics(t *testing.T) {
 // 测试CPU监控器的基本功能
 func TestNewCPUMonitor(t *testing.T) {
 	checked := false
+
+	db := consts.GetGormProfileDatabase()
+	yakit.SetKey(db, PPROFILEAUTOANALYZE_KEY, "true")
+	defer yakit.DelKey(db, PPROFILEAUTOANALYZE_KEY)
 	AddCPUProfileCallback(func(stats []FunctionStat) {
 		for _, i := range stats {
 			fmt.Println(i.Dump())
