@@ -1,0 +1,17 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+tempDir = yakit.GetHomeTempDir()
+inputFile = cli.String("input_file",cli.setRequired(true),cli.setVerboseName("pprof文件路径"),cli.setDefault(tempDir))
+cli.check()
+
+_,err=file.Open(inputFile)
+if err !=nil {
+    yakit.Error("打开pprof文件失败：%v",err)
+}
+msg = pprof.AutoAnalyzeFile(inputFile)~
+outputFile = inputFile.ReplaceAll(".prof","_自动分析结果.txt")
+f=file.Create(outputFile)~
+defer f.Close()
+f.Write(msg)
+yakit.File(outputFile,"采样自动分析", "性能优化采样自动分析")

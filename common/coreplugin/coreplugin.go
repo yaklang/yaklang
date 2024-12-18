@@ -258,6 +258,12 @@ func init() {
 			withPluginAuthors("令则"),
 			withPluginEnableGenerateParam(true),
 		)
+		registerBuildInPlugin(
+			"yak", "引擎性能采样自动分析",
+			withPluginHelp("自动分析PPROF文件，生成可阅读文件。"),
+			withPluginAuthors("intSheep"),
+			withPluginEnableGenerateParam(true),
+		)
 		return nil
 	})
 }

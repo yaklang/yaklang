@@ -9,6 +9,7 @@ var Exports = map[string]any{
 	"StartCPUAndMemoryProfile": StartCPUAndMemoryProfile,
 	"StartCPUProfile":          StartCPUProfile,
 	"StartMemoryProfile":       StartMemoryProfile,
+	"AutoAnalyzeFile":          AutoAnalyzeFile,
 
 	"cpuProfilePath":       WithCPUProfileFile,
 	"memProfilePath":       WithMemProfileFile,
