@@ -463,6 +463,15 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 	return paging, ret, nil
 }
 
+func QueryYakScriptByType(db *gorm.DB, t string) []*schema.YakScript {
+	db = db.Model(&schema.YakScript{})
+	var yakScripts []*schema.YakScript
+	if err := db.Where("type = ?", t).Find(&yakScripts).Error; err != nil {
+		log.Errorf("dberror(query yak scripts): %v", err)
+	}
+	return yakScripts
+}
+
 /*
 YieldYakScripts no use spec, checking
 
