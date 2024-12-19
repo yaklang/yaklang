@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -144,11 +145,11 @@ func (m *SyntaxFlowScanManager) SaveTask() error {
 	m.taskRecorder.TotalQuery = m.totalQuery
 	m.taskRecorder.Kind = m.kind
 	m.taskRecorder.Config, _ = json.Marshal(m.config)
-	return schema.SaveSyntaxFlowScanTask(consts.GetGormProjectDatabase(), m.taskRecorder)
+	return schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
 }
 
 func (m *SyntaxFlowScanManager) RestoreTask(stream ypb.Yak_SyntaxFlowScanServer) error {
-	task, err := schema.GetSyntaxFlowScanTaskById(consts.GetGormProjectDatabase(), m.TaskId())
+	task, err := schema.GetSyntaxFlowScanTaskById(ssadb.GetDB(), m.TaskId())
 	if err != nil {
 		return utils.Wrapf(err, "Resume SyntaxFlow task by is failed")
 	}

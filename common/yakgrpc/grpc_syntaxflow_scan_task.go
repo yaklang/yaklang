@@ -5,6 +5,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -18,7 +19,7 @@ func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.Query
 			Order:   "desc",
 		}
 	}
-	p, tasks, err := yakit.QuerySyntaxFlowScanTask(s.GetProjectDatabase(), request)
+	p, tasks, err := yakit.QuerySyntaxFlowScanTask(ssadb.GetDB(), request)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +46,7 @@ func (s *Server) DeleteSyntaxFlowScanTask(ctx context.Context, request *ypb.Dele
 		Operation: DbOperationDelete,
 	}
 	if request.GetDeleteAll() {
-		deleted, err := yakit.DeleteAllSyntaxFlowScanTask(s.GetProjectDatabase())
+		deleted, err := yakit.DeleteAllSyntaxFlowScanTask(ssadb.GetDB())
 		if err != nil {
 			return nil, err
 		}
@@ -53,7 +54,7 @@ func (s *Server) DeleteSyntaxFlowScanTask(ctx context.Context, request *ypb.Dele
 		return dbMsg, nil
 	}
 	if request.GetFilter() != nil {
-		deleted, err := yakit.DeleteSyntaxFlowScanTask(s.GetProjectDatabase(), request)
+		deleted, err := yakit.DeleteSyntaxFlowScanTask(ssadb.GetDB(), request)
 		if err != nil {
 			return nil, err
 		}
