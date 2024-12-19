@@ -9,16 +9,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-var _ ValueOperator = &ValueList{}
+var _ ValueOperator = (*ValueList)(nil)
 
 func NewValues(values []ValueOperator) ValueOperator {
-	if len(values) == 0 {
-		return nil
-	}
-
-	ret, err := values[0].Merge(values[0:]...)
+	var zero *ValueList
+	ret, err := zero.Merge(values...)
 	if err != nil {
-		return nil
+		return zero
 	}
 	return ret
 }
@@ -28,7 +25,7 @@ func NewEmptyValues() ValueOperator {
 }
 
 type ValueList struct {
-	values []ValueOperator
+	Values []ValueOperator
 }
 
 func (v *ValueList) AppendPredecessor(value ValueOperator, opts ...AnalysisContextOption) error {
@@ -38,6 +35,9 @@ func (v *ValueList) AppendPredecessor(value ValueOperator, opts ...AnalysisConte
 }
 
 func (v *ValueList) Merge(values ...ValueOperator) (ValueOperator, error) {
+	if utils.IsNil(v) && len(values) == 0 {
+		return nil, utils.Errorf("no value to merge")
+	}
 	var res []ValueOperator
 	v.Recursive(func(operator ValueOperator) error {
 		res = append(res, operator)
@@ -49,7 +49,17 @@ func (v *ValueList) Merge(values ...ValueOperator) (ValueOperator, error) {
 			return nil
 		})
 	}
-	return NewValues(res), nil
+	if len(res) > 1 {
+		if ret, err := res[0].Merge(res[1:]...); err == nil {
+			return ret, nil
+		} else {
+			return &ValueList{Values: res}, nil
+		}
+	} else if len(res) == 1 {
+		return res[0], nil
+	} else {
+		return nil, utils.Errorf("no value to merge")
+	}
 }
 
 func (v *ValueList) Remove(values ...ValueOperator) (ValueOperator, error) {
@@ -81,12 +91,13 @@ func (v *ValueList) GetOpcode() string {
 }
 
 func (v *ValueList) Recursive(f func(operator ValueOperator) error) error {
-	if len(v.values) > 0 {
-		for _, sub := range v.values {
-			err := sub.Recursive(f)
-			if err != nil {
-				return err
-			}
+	if v == nil {
+		return utils.Errorf("value is nil")
+	}
+	for _, sub := range v.Values {
+		err := sub.Recursive(f)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -94,7 +105,7 @@ func (v *ValueList) Recursive(f func(operator ValueOperator) error) error {
 
 func (v *ValueList) GetCalled() (ValueOperator, error) {
 	var res []ValueOperator
-	for _, v := range v.values {
+	for _, v := range v.Values {
 		called, err := v.GetCalled()
 		if err != nil {
 			continue
@@ -106,7 +117,7 @@ func (v *ValueList) GetCalled() (ValueOperator, error) {
 
 func (v *ValueList) GetFields() (ValueOperator, error) {
 	var res []ValueOperator
-	for _, v := range v.values {
+	for _, v := range v.Values {
 		fields, err := v.GetFields()
 		if err != nil {
 			continue
@@ -117,7 +128,7 @@ func (v *ValueList) GetFields() (ValueOperator, error) {
 }
 
 func (v *ValueList) ForEach(h func(i any)) {
-	funk.ForEach(v.values, func(i any) {
+	funk.ForEach(v.Values, func(i any) {
 		h(i)
 	})
 }
@@ -132,7 +143,7 @@ func (v *ValueList) GetUnaryOperator() string {
 
 func (v *ValueList) String() string {
 	var res []string
-	for _, v := range v.values {
+	for _, v := range v.Values {
 		res = append(res, v.String())
 	}
 	return strings.Join(res, "; ")
@@ -140,7 +151,7 @@ func (v *ValueList) String() string {
 
 func (v *ValueList) GetCallActualParams(i int) (ValueOperator, error) {
 	var res []ValueOperator
-	for _, v := range v.values {
+	for _, v := range v.Values {
 		def, err := v.GetCallActualParams(i)
 		if err != nil {
 			return nil, err
@@ -151,7 +162,7 @@ func (v *ValueList) GetCallActualParams(i int) (ValueOperator, error) {
 }
 func (v *ValueList) GetAllCallActualParams() (ValueOperator, error) {
 	var res []ValueOperator
-	for _, v := range v.values {
+	for _, v := range v.Values {
 		def, err := v.GetAllCallActualParams()
 		if err != nil {
 			return nil, err
@@ -163,7 +174,7 @@ func (v *ValueList) GetAllCallActualParams() (ValueOperator, error) {
 
 func (v *ValueList) GetSyntaxFlowDef() (ValueOperator, error) {
 	var res []ValueOperator
-	for _, v := range v.values {
+	for _, v := range v.Values {
 		def, err := v.GetSyntaxFlowDef()
 		if err != nil {
 			return nil, err
@@ -175,7 +186,7 @@ func (v *ValueList) GetSyntaxFlowDef() (ValueOperator, error) {
 
 func (v *ValueList) GetSyntaxFlowUse() (ValueOperator, error) {
 	var res []ValueOperator
-	for _, v := range v.values {
+	for _, v := range v.Values {
 		use, err := v.GetSyntaxFlowUse()
 		if err != nil {
 			return nil, err
@@ -186,7 +197,7 @@ func (v *ValueList) GetSyntaxFlowUse() (ValueOperator, error) {
 }
 func (v *ValueList) GetSyntaxFlowTopDef(sfResult *SFFrameResult, sfConfig *Config, config ...*RecursiveConfigItem) (ValueOperator, error) {
 	var res []ValueOperator
-	for _, v := range v.values {
+	for _, v := range v.Values {
 		topDef, err := v.GetSyntaxFlowTopDef(sfResult, sfConfig, config...)
 		if err != nil {
 			return nil, err
@@ -198,7 +209,7 @@ func (v *ValueList) GetSyntaxFlowTopDef(sfResult *SFFrameResult, sfConfig *Confi
 
 func (v *ValueList) GetSyntaxFlowBottomUse(sfResult *SFFrameResult, sfConfig *Config, config ...*RecursiveConfigItem) (ValueOperator, error) {
 	var res []ValueOperator
-	for _, v := range v.values {
+	for _, v := range v.Values {
 		bottomUse, err := v.GetSyntaxFlowBottomUse(sfResult, sfConfig, config...)
 		if err != nil {
 			return nil, err
@@ -209,10 +220,10 @@ func (v *ValueList) GetSyntaxFlowBottomUse(sfResult *SFFrameResult, sfConfig *Co
 }
 
 func (v *ValueList) ListIndex(i int) (ValueOperator, error) {
-	if i < 0 || i >= len(v.values) {
+	if i < 0 || i >= len(v.Values) {
 		return nil, utils.Error("index out of range")
 	}
-	return v.values[i], nil
+	return v.Values[i], nil
 }
 
 func (v *ValueList) IsMap() bool {
@@ -225,7 +236,7 @@ func (v *ValueList) IsList() bool {
 
 func (v *ValueList) ExactMatch(ctx context.Context, mod int, s string) (bool, ValueOperator, error) {
 	var res []ValueOperator
-	for _, value := range v.values {
+	for _, value := range v.Values {
 		match, next, err := value.ExactMatch(ctx, mod, s)
 		if err != nil {
 			return false, nil, err
@@ -241,7 +252,7 @@ func (v *ValueList) ExactMatch(ctx context.Context, mod int, s string) (bool, Va
 
 func (v *ValueList) GlobMatch(ctx context.Context, mod int, s string) (bool, ValueOperator, error) {
 	var res []ValueOperator
-	for _, value := range v.values {
+	for _, value := range v.Values {
 		match, next, err := value.GlobMatch(ctx, mod, s)
 		if err != nil {
 			return false, nil, err
@@ -257,7 +268,7 @@ func (v *ValueList) GlobMatch(ctx context.Context, mod int, s string) (bool, Val
 
 func (v *ValueList) RegexpMatch(ctx context.Context, mod int, regexp string) (bool, ValueOperator, error) {
 	var res []ValueOperator
-	for _, value := range v.values {
+	for _, value := range v.Values {
 		match, next, err := value.RegexpMatch(ctx, mod, regexp)
 		if err != nil {
 			return false, nil, err
@@ -274,7 +285,7 @@ func (v *ValueList) RegexpMatch(ctx context.Context, mod int, regexp string) (bo
 func (v *ValueList) FileFilter(path string, mode string, rule1 map[string]string, rule2 []string) (ValueOperator, error) {
 	var res []ValueOperator
 	var errs error
-	for _, value := range v.values {
+	for _, value := range v.Values {
 		filtered, err := value.FileFilter(path, mode, rule1, rule2)
 		if err != nil {
 			errs = utils.JoinErrors(errs, err)

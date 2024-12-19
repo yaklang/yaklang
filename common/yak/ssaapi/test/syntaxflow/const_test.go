@@ -1,10 +1,11 @@
 package syntaxflow
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"strconv"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestNativeCallConst(t *testing.T) {
@@ -99,7 +100,10 @@ func TestSyntacticSugar_ConstInRecursive(t *testing.T) {
 	d = test(c)
 	query(d)`
 	t.Run("const_global", func(t *testing.T) {
-		ssatest.CheckSyntaxFlow(t, code, "query(* #{until: `\"a*\" as $output`}->*)",
+		ssatest.CheckSyntaxFlow(t, code, `
+query(* #{until: <<<UNTIL
+	"a*" as $output 
+UNTIL}->*)`,
 			map[string][]string{
 				"output": {`"abcabcabc"`},
 			}, ssaapi.WithLanguage(ssaapi.Yak))

@@ -100,9 +100,9 @@ func (r *RecursiveConfig) compileAndRun(value sf.ValueOperator) map[sf.Recursive
 	}
 	ret := make(map[sfvm.RecursiveConfigKey]struct{})
 	for _, item := range r.configItems {
-		if !item.SyntaxFlowRule {
-			continue
-		}
+		// if !item.SyntaxFlowRule {
+		// 	continue
+		// }
 		res, err := QuerySyntaxflow(
 			QueryWithVM(r.vm),
 			QueryWithInitVar(r.contextResult.SymbolTable),

@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func WithSyntaxFlowConfig(
+func DataFlowWithSFConfig(
 	sfResult *sf.SFFrameResult,
 	config *sf.Config,
 	dataflowRecursiveFunc func(...OperationOption) Values,
@@ -124,7 +124,7 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 	if len(ret) > 0 {
 		return true, ret, nil
 	}
-	return false, sfvm.NewValues(nil), nil
+	return false, sfvm.NewEmptyValues(), nil
 }
 
 func dataFlowFilter(

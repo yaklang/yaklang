@@ -31,7 +31,7 @@ func (p *Program) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextO
 }
 
 func (p *Program) GetFields() (sfvm.ValueOperator, error) {
-	return sfvm.NewValues(nil), nil
+	return sfvm.NewEmptyValues(), nil
 }
 
 func (p *Program) IsList() bool {
@@ -100,8 +100,9 @@ func (p *Program) ListIndex(i int) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported list index")
 }
 
-func (p *Program) Merge(...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ssa.Program is not supported merge")
+func (p *Program) Merge(sfv ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+	sfv = append(sfv, p)
+	return MergeSFValueOperator(sfv...), nil
 }
 
 func (p *Program) Remove(...sfvm.ValueOperator) (sfvm.ValueOperator, error) {

@@ -61,15 +61,15 @@ func (s *SFFrame) IterLatch(val ValueOperator) error {
 	iter.counter++
 
 	finished := false
-	if val.IsList() {
-		ele, _ := val.ListIndex(0)
-		if ele != nil {
-			s.debugLog("   peeked idx: %v", iter.counter)
-			iter.results = append(iter.results, true)
-			finished = true
-		}
-	} else {
-		if val != nil {
+	if !utils.IsNil(val) {
+		if val.IsList() {
+			ele, _ := val.ListIndex(0)
+			if !utils.IsNil(ele) {
+				s.debugLog("   peeked idx: %v", iter.counter)
+				iter.results = append(iter.results, true)
+				finished = true
+			}
+		} else {
 			iter.results = append(iter.results, true)
 			finished = true
 		}

@@ -150,11 +150,11 @@ func (value Values) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
 	return value.GetOperands(), nil
 }
 func (value Values) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return WithSyntaxFlowConfig(sfResult, sfConfig, value.GetTopDefs, config...), nil
+	return DataFlowWithSFConfig(sfResult, sfConfig, value.GetTopDefs, config...), nil
 }
 
 func (value Values) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return WithSyntaxFlowConfig(sfResult, sfConfig, value.GetBottomUses, config...), nil
+	return DataFlowWithSFConfig(sfResult, sfConfig, value.GetBottomUses, config...), nil
 }
 
 func (value Values) ListIndex(i int) (sfvm.ValueOperator, error) {
@@ -166,8 +166,7 @@ func (value Values) ListIndex(i int) (sfvm.ValueOperator, error) {
 
 func (vs Values) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 	sf = append(sf, vs)
-	vals := MergeValues(SyntaxFlowVariableToValues(sf...))
-	return ValuesToSFValueList(vals), nil
+	return MergeSFValueOperator(sf...), nil
 }
 
 func (value Values) Remove(values ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
