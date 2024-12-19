@@ -1,4 +1,7 @@
-args = cli.Json("cookie", cli.setJsonSchema(<<<JSON
+args = cli.Json(
+    "header", 
+    cli.setJsonSchema(
+        <<<JSON
 {
   "type": "object",
   "properties": {
@@ -8,10 +11,12 @@ args = cli.Json("cookie", cli.setJsonSchema(<<<JSON
       "items": {
         "properties": {
           "key": {
-            "type": "string"
+            "type": "string",
+            "title": "键"
           },
           "value": {
-            "type": "string"
+            "type": "string",
+            "title": "值"
           }
         },
         "require": [
@@ -22,7 +27,22 @@ args = cli.Json("cookie", cli.setJsonSchema(<<<JSON
     }
   }
 }
-JSON), cli.setRequired(true))
+JSON, 
+        cli.setUISchema(
+            cli.uiGroups(cli.uiGroup(cli.uiField(
+                "header", 
+                1, 
+                cli.uiFieldGroups(cli.uiGroup(cli.uiField(
+                    "items", 
+                    1, 
+                    cli.uiFieldGroups(cli.uiGroup(cli.uiField("key", 0.4), cli.uiField("value", 0.4))), 
+                ))), 
+            ))), 
+            cli.uiGlobalFieldPosition(cli.uiPosHorizontal), 
+        ), 
+    ), 
+    cli.setRequired(true), 
+)
 keyword = cli.String("url-keyword", cli.setRequired(false), cli.setCliGroup("前提条件"), cli.setVerboseName("URL 前提条件"))
 cli.check()
 
@@ -33,23 +53,26 @@ hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
     if keyword != "" && !url.Contains(keyword) {
         return
     }
+    
     lock.Lock()
-    m[PLUGIN_RUNTIME_ID] = true 
+    m[PLUGIN_RUNTIME_ID] = true
     lock.Unlock()
     header = args["header"]
     for _, item := range header {
-      key := item.key 
-      val := item.value
-      req = poc.ReplaceHTTPPacketHeader(req, key, val)
+        key := item.key
+        val := item.value
+        req = poc.ReplaceHTTPPacketHeader(req, key, val)
     }
+    
     forward(req)
 }
-hijackSaveHTTPFlow = func(flow , modify, drop) {
+hijackSaveHTTPFlow = func(flow, modify, drop) {
     lock.RLock()
     ok = PLUGIN_RUNTIME_ID in m
     lock.RUnlock()
     if !ok {
-        return 
+        return
     }
-    flow.FromPlugin="修改 HTTP 请求 Header"
+    
+    flow.FromPlugin = "修改 HTTP 请求 Header"
 }
