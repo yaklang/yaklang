@@ -470,6 +470,7 @@ func TestErrorMemberCall(t *testing.T) {
   poc[Location]`,
 			Want: []string{
 				ssa.ExternFieldError("Lib", "poc", "appendHeade", "appendHeader"),
+				ssa.ExternFieldError("Lib", "poc", "appendHeade", "appendHeader"),
 				ssa4analyze.InvalidField("any", "Location"),
 			},
 		})
