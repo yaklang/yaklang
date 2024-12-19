@@ -2,6 +2,9 @@ desc(
     title: "golang SQL Injection(Reform)",
     type: audit,
     severity: high,
+    desc: <<<TEXT
+SQL注入漏洞允许攻击者通过输入恶意的SQL代码来操纵后端数据库。在本规则中，我们关注的是在使用Reform库进行数据库操作时，由于未对输入进行适当的参数化处理或转义，导致的SQL注入风险。这种不安全的查询方式可能允许攻击者绕过正常的身份验证流程，执行任意SQL命令，访问或修改敏感数据，甚至可能导致数据库崩溃。为了防止SQL注入，建议使用参数化查询或ORM（对象关系映射）库提供的查询构建方法，确保所有用户输入都被正确处理，无法被解释为SQL代码的一部分。
+TEXT
 )
 
 <include('golang-database-reform')> as $sink;

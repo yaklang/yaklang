@@ -4,6 +4,9 @@ desc(
     type: audit,
     level: mid,
     risk:ssti,
+    desc: <<<TEXT
+    在Java Spring Framework中，如果处理ModelAndView时直接传入String类型参数，可能会导致SSTI漏洞。攻击者可以通过构造恶意输入，执行模板注入，进而控制服务器。为了防止SSTI漏洞，需要对用户输入的参数进行严格的过滤，包括验证参数的合法性、长度、字符等，并尽量避免直接将用户输入的参数传递给模板执行函数。
+TEXT
 )
 
 <include('java-spring-param')>?{<typeName>?{have: "String"}} as $param;

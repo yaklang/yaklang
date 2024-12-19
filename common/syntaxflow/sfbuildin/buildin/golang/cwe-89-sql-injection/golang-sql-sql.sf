@@ -2,6 +2,9 @@ desc(
     title: "golang SQL Injection(database/sql)",
     type: audit,
     severity: high,
+    desc: <<<TEXT
+SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过输入恶意的SQL代码来操纵后端数据库。在Golang中，如果开发者不正确地使用`database/sql`包，特别是当直接将用户输入拼接到SQL查询中时，就可能导致SQL注入漏洞。攻击者可以利用这个漏洞来绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或数据。为了防止SQL注入，开发者应该使用参数化查询或预处理语句，确保用户输入不会被解释为SQL代码的一部分。
+TEXT
 )
 
 <include('golang-database-sql')> as $sink;

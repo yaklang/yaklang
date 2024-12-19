@@ -2,6 +2,9 @@ desc(
     title: "golang SQL Injection(pop)",
     type: audit,
     severity: high,
+    desc: <<<TEXT
+SQL注入漏洞允许攻击者通过操纵应用程序中的SQL查询来执行恶意SQL代码。在Go语言中，如果使用`pop`库进行数据库操作时，未正确地对用户输入进行参数化处理，就可能导致SQL注入漏洞。攻击者可以利用此漏洞绕过身份验证、访问敏感数据或执行其他恶意操作。
+TEXT
 )
 
 <include('golang-database-pop')> as $sink;
