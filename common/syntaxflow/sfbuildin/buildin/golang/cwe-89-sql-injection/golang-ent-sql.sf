@@ -2,6 +2,9 @@ desc(
     title: "golang SQL Injection(ent)",
     type: audit,
     severity: high,
+    desc: <<<TEXT
+SQL注入漏洞允许攻击者通过向SQL查询注入恶意SQL代码，从而操控后端数据库。在使用`entgo.io/ent`框架时，如果未正确构建查询条件，而是直接将用户输入拼接到SQL查询中，将会导致SQL注入漏洞。攻击者可以利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，严重危害应用程序的数据安全。
+TEXT
 )
 
 ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $entry;

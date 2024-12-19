@@ -2,7 +2,10 @@ desc(
     title: "Servlet Command Injection",
     type: vuln,
     level: high,
-    risk:rce,
+    risk: rce,
+    desc: <<<TEXT
+Servlet 命令注入漏洞允许攻击者通过操控应用程序接收的用户输入来执行任意命令。在易受攻击的应用程序中，攻击者可以通过发送恶意构造的请求参数来在服务器上执行任意命令，这可能导致远程代码执行（RCE）。此漏洞的危害极高，因为它允许攻击者完全控制受影响的服务器，进而窃取敏感数据、破坏数据或执行其他恶意活动。
+TEXT
 )
 
 <include('java-servlet-param')> as $source;

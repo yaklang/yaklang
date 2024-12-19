@@ -3,6 +3,9 @@ desc(
     type: vuln,
     level: low,
     risk : "risky_crypt",
+    desc: <<<TEXT
+使用已破解或存在风险的加密算法可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，可能无法为数据提供足够的安全性。建议采用经过时间验证且广泛认可的加密算法，如AES，以确保数据的机密性和完整性。
+TEXT
 )
 
 SecretKeySpec(* as $algorithm);
