@@ -6,11 +6,22 @@ import (
 )
 
 type TaskManagerConfig struct {
-	OnTaskBeforeFunc      func(taskId, nodeId string)
-	OnTaskRunProcess      func(taskId string, process int, msg string)
-	OnTaskRunErrorFunc    func(taskId string, err error)
-	OnTaskOtherStatusFunc func(taskId string, msg string)
+	debug              bool
+	OnTaskBeforeFunc   func(taskId, nodeId string, agent *Agent)
+	OnTaskRunProcess   func(taskId string, process int, agent *Agent)
+	OnTaskRunErrorFunc func(taskId string, err error, agent *Agent)
 }
+
+func defaultTaskManagerConfig() *TaskManagerConfig {
+	return &TaskManagerConfig{
+		OnTaskBeforeFunc: func(taskId, nodeId string, agent *Agent) {
+			agent.writeHeathMessage()
+		},
+		OnTaskRunProcess:   nil,
+		OnTaskRunErrorFunc: nil,
+	}
+}
+
 type TaskOptions func(config *TaskManagerConfig)
 type TaskManager struct {
 	ctx     context.Context
@@ -20,6 +31,9 @@ type TaskManager struct {
 }
 
 func NewTaskManager(ctx context.Context, opts ...TaskOptions) *TaskManager {
+	if opts == nil || len(opts) == 0 {
+
+	}
 	childCtx, cancelFunc := context.WithCancel(ctx)
 	t := new(TaskManager)
 	t.ctx = childCtx
