@@ -1,13 +1,7 @@
-// mode = cli.StringSlice(
-//     "mode", 
-//     cli.setVerboseName("认证模式"), 
-//     cli.setRequired(true), 
-//     cli.setDefault("Cookie"), 
-//     cli.setSelectOption("Cookie 认证", "Cookie"), 
-//     cli.setSelectOption("Header Auth 认证", "Header"), 
-// )
-// mode = str.Join(mode, " ")
-args = cli.Json("kv", cli.setJsonSchema(<<<JSON
+args = cli.Json(
+    "kv", 
+    cli.setJsonSchema(
+        <<<JSON
 {
   "type": "object",
   "properties": {
@@ -35,70 +29,58 @@ args = cli.Json("kv", cli.setJsonSchema(<<<JSON
             "type": "string",
             "title": "值"
           },
-          "forceAdd": {
+          "force": {
             "type": "boolean",
             "default": true,
-            "title":"强制添加值",
-            "description":"本开关将会控制是否对不存在 Key 的数据包进行测试"
+            "description":"控制是否强制添加键值对"
           }
         },
         "require": [
           "key",
           "value",
           "kind",
-          "forceAdd"
+          "force"
         ]
       }
     }
   }
 }
-JSON), cli.setRequired(true))
-
-base = cli.String(
-    "base", 
-    cli.setRequired(false), 
-    cli.setVerboseName("基准值"), 
-    cli.setCliGroup("高级（可选参数）"), 
+JSON, 
+        cli.setUISchema(
+            cli.uiGroups(cli.uiGroup(cli.uiField(
+                "kvs", 
+                1, 
+                cli.uiFieldGroups(cli.uiGroup(cli.uiField(
+                    "items", 
+                    1, 
+                    cli.uiFieldGroups(cli.uiGroup(
+                        cli.uiField("kind", 0.2), 
+                        cli.uiField("key", 0.3), 
+                        cli.uiField("value", 0.3), 
+                        cli.uiField("force", 0.2), 
+                    )), 
+                ))), 
+            ))),
+        ), 
+    ), 
+    cli.setRequired(true), 
 )
 
-disableDomain = cli.String(
-    "disable-domain",
-    cli.setRequired(false),
-    cli.setVerboseName("不检测的域名"),
-    cli.setCliGroup("高级（可选参数）"),
-)
-disablePath = cli.String(
-    "disable-path",
-    cli.setRequired(false),
-    cli.setVerboseName("不检测的路径"),
-    cli.setCliGroup("高级（可选参数）"),
-)
+base = cli.String("base", cli.setRequired(false), cli.setVerboseName("基准值"), cli.setCliGroup("高级（可选参数）"))
 
-enableDomain = cli.String(
-    "enable-domain",
-    cli.setRequired(false),
-    cli.setVerboseName("需检测域名"),
-    cli.setCliGroup("高级（可选参数）"),
-)
-enablePath = cli.String(
-    "enable-path",
-    cli.setRequired(false),
-    cli.setVerboseName("需检测路径"),
-    cli.setCliGroup("高级（可选参数）"),
-)
+disableDomain = cli.String("disable-domain", cli.setRequired(false), cli.setVerboseName("不检测的域名"), cli.setCliGroup("高级（可选参数）"))
+disablePath = cli.String("disable-path", cli.setRequired(false), cli.setVerboseName("不检测的路径"), cli.setCliGroup("高级（可选参数）"))
 
-enableResponseKeyword = cli.Text(
-    "enable-response-content",
-    cli.setRequired(false),
-    cli.setVerboseName("需检测响应内容标志值"),
-    cli.setCliGroup("高级（可选参数）"),
-)
+enableDomain = cli.String("enable-domain", cli.setRequired(false), cli.setVerboseName("需检测域名"), cli.setCliGroup("高级（可选参数）"))
+enablePath = cli.String("enable-path", cli.setRequired(false), cli.setVerboseName("需检测路径"), cli.setCliGroup("高级（可选参数）"))
+
+enableResponseKeyword = cli.Text("enable-response-content", cli.setRequired(false), cli.setVerboseName("需检测响应内容标志值"), cli.setCliGroup("高级（可选参数）"))
 
 enableResponseKeywordRegexp = cli.Bool(
-    "enable-response-content-regexp",
-    cli.setRequired(false),
-    cli.setVerboseName("响应内容标志值开启正则"),
-    cli.setCliGroup("高级（可选参数）"),
+    "enable-response-content-regexp", 
+    cli.setRequired(false), 
+    cli.setVerboseName("响应内容标志值开启正则"), 
+    cli.setCliGroup("高级（可选参数）"), 
 )
 
 cli.check()
@@ -108,11 +90,11 @@ once = sync.NewOnce()
 
 mirrorHTTPFlow = (https, url, req, rsp, body) => {
     for _, item = range args["kvs"] {
-        key = item.key 
+        key = item.key
         value = item.value
         kind = item.kind
-        forceAdd = item.forceAdd
-        if !forceAdd {
+        force = item.force
+        if !force {
             if kind == "Cookie" {
                 if poc.GetHTTPPacketCookie(req, key) == "" {
                     return
@@ -123,7 +105,7 @@ mirrorHTTPFlow = (https, url, req, rsp, body) => {
                 }
             }
         }
-
+        
 
         skipped = false
         host, _, _ = str.ParseStringToHostPort(url)
@@ -133,50 +115,54 @@ mirrorHTTPFlow = (https, url, req, rsp, body) => {
             rules = disableDomain.Split(",").Map(i => i.Trim())
             skipped = str.MatchAnyOfGlob(host, rules...)
         }
-
+        
 
         if !skipped && disablePath != "" {
             skipped = str.MatchAnyOfGlob(path, disablePath.Split(",").Map(i => i.Trim())...)
         }
-
+        
 
         if !skipped && enableDomain {
             skipped = !str.MatchAnyOfGlob(host, enableDomain.Split(",").Map(i => i.Trim())...)
         }
-
+        
 
         if !skipped && enablePath {
             skipped = !str.MatchAnyOfGlob(path, enablePath.Split(",").Map(i => i.Trim())...)
         }
+        
 
         respMatch = str.MatchAnyOfRegexp
         if !enableResponseKeywordRegexp {
             respMatch = str.MatchAnyOfSubString
         }
+        
 
         enableResponseKeywordList = []
         if !skipped && enableResponseKeyword {
             enableResponseKeywordList = enableResponseKeyword.Split("\n")
-            skipped = !respMatch(rsp,enableResponseKeywordList...)
+            skipped = !respMatch(rsp, enableResponseKeywordList...)
         }
-
+        
 
         if skipped {
             return
         }
-
+        
 
         replace = (origin, newValue) => {
-            if kind =="Cookie" {
+            if kind == "Cookie" {
                 if newValue == "" {
                     return poc.DeleteHTTPPacketCookie(origin, key)
                 }
+                
 
                 return poc.ReplaceHTTPPacketCookie(origin, key, newValue)
             } elif kind == "Header" {
                 if newValue == "" {
                     return poc.DeleteHTTPPacketHeader(origin, key)
                 }
+                
 
                 return poc.ReplaceHTTPPacketHeader(origin, key, newValue)
             }
@@ -190,30 +176,30 @@ mirrorHTTPFlow = (https, url, req, rsp, body) => {
                 yakit.Error(f"${url} 基准值(${base})测试失败")
                 return
             }
+            
             req = baseRequest
             rsp = baseResponse
             db.SaveHTTPFlowFromRawWithOption(url, baseRequest, baseResponse)
         } else {
             db.SaveHTTPFlowFromRawWithOption(url, req, rsp)
         }
-
+        
 
         handleReq = (reqBytes, newValue) => {
             poc.HTTP(
-                reqBytes,
-                poc.https(https),
+                reqBytes, 
+                poc.https(https), 
                 poc.saveHandler(response => {
-                    tag= ""
+                    tag = ""
                     if len(enableResponseKeywordList) > 0 {
-
-                        if respMatch(response.RawPacket,enableResponseKeywordList...){
+                        if respMatch(response.RawPacket, enableResponseKeywordList...) {
                             tag = "响应内容标志值匹配"
                             response.Red()
-                        }else {
+                        } else {
                             tag = "响应内容标志值消失"
                             response.Green()
                         }
-                    }else{
+                    } else {
                         sim := str.CalcSimilarity(baseResponse, response.RawPacket)
                         if sim > 0.95 {
                             response.Red()
@@ -222,14 +208,17 @@ mirrorHTTPFlow = (https, url, req, rsp, body) => {
                         } else {
                             response.Grey()
                         }
+                        
                         showSim = "%.2f" % (sim * 100.0)
                         tag = f"相似：${showSim}% "
                     }
+                    
                     if newValue == "" {
                         tag = f"${tag} 移除 ${kind}[${key}]"
-                    }else{
+                    } else {
                         tag = f"${tag} 值: ${newValue}"
                     }
+                    
                     response.AddTag(tag)
                 }), 
             )
@@ -237,7 +226,7 @@ mirrorHTTPFlow = (https, url, req, rsp, body) => {
 
         reqBytes = replace(req, value)
         handleReq(reqBytes, value)
-        
+
         emptyReq = replace(req, "")
         handleReq(emptyReq, "")
     }
