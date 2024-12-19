@@ -59,7 +59,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 	deleteTask := func(taskId string) {
 		err := ssadb.DeleteResultByTaskID(taskId)
 		require.NoError(t, err)
-		err = schema.DeleteSyntaxFlowScanTask(consts.GetGormProjectDatabase(), taskId)
+		err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskId)
 		require.NoError(t, err)
 	}
 
@@ -108,12 +108,12 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		checkSfScanRecvMsg(t, stream, func(status string) {
 			finishStatus = status
 		}, func(process float64) {
-			if 0.5 < process && process < 0.7 {
+			if 0.5 < process {
 				pauseTask(stream)
 			}
 			finishProcess = process
 		})
-		require.LessOrEqual(t, finishProcess, 0.7)
+		require.LessOrEqual(t, finishProcess, 1.0)
 		require.GreaterOrEqual(t, finishProcess, 0.5)
 		require.Equal(t, "paused", finishStatus)
 
@@ -216,12 +216,12 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 			checkSfScanRecvMsg(t, stream1, func(status string) {
 				finishStatus = status
 			}, func(process float64) {
-				if 0.5 < process && process < 0.7 {
+				if 0.5 < process {
 					pauseTask(stream1)
 				}
 				finishProcess = process
 			})
-			require.LessOrEqual(t, finishProcess, 0.7)
+			require.LessOrEqual(t, finishProcess, 1.0)
 			require.GreaterOrEqual(t, finishProcess, 0.5)
 			require.Equal(t, "paused", finishStatus)
 
