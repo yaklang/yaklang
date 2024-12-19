@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"io"
 	"path"
 	"strings"
@@ -428,6 +429,10 @@ func CreateRule(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFl
 	db = db.Model(&schema.SyntaxFlowRule{})
 	// 只是创建规则而不带着组去创建，后续再添加组。
 	// 因为多对多的表直接创建会导致和该组相关的规则都被更新。
+	backUp := lo.Map(rule.Groups, func(group *schema.SyntaxFlowGroup, _ int) string {
+		return group.GroupName
+	})
+	groups = append(groups, backUp...)
 	rule.Groups = nil
 	if err := db.Create(&rule).Error; err != nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)

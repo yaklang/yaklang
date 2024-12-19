@@ -162,6 +162,7 @@ func AddDefaultGroupForRule(db *gorm.DB, rule *schema.SyntaxFlowRule, groups ...
 		return item != ""
 	})
 	_, err := BatchAddGroupsForRules(db, []string{rule.RuleName}, groups)
+	// 更新组完后再查一下，用以返回更新后的rule
 	db.Where("rule_name = ?", rule.RuleName).Preload("Groups").First(&rule)
 	return err
 }
