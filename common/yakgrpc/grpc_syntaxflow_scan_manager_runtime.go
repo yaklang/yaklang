@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/errtype"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -113,6 +114,10 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 		atomic.AddInt64(&m.successQuery, 1)
 		m.notifyResult(res)
 	} else {
+		if errtype.IsError[errtype.ErrContextCanceled](err) {
+			return // context canceled
+			// just skip, don't add failedQueryCount
+		}
 		atomic.AddInt64(&m.failedQuery, 1)
 		m.client.YakitError("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
 	}

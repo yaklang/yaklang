@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/errtype"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
@@ -251,7 +252,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		}
 		select {
 		case <-s.GetContext().Done():
-			return utils.Errorf("context done")
+			return errtype.NewContextCanceled()
 		default:
 		}
 
