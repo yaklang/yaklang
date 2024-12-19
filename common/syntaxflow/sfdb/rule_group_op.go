@@ -149,15 +149,15 @@ func GetIntersectionGroup(db *gorm.DB, groups [][]*schema.SyntaxFlowGroup) []*sc
 
 }
 
-// AddDefaultGroupForRule 为规则添加默认分组
-// 默认分组为：语言、严重程度、规则类型
-func AddDefaultGroupForRule(db *gorm.DB, rule *schema.SyntaxFlowRule, groups ...string) error {
+func addGroupsForRule(db *gorm.DB, rule *schema.SyntaxFlowRule, needDefaultGroup bool, groups ...string) error {
 	if rule == nil {
 		return utils.Errorf("add default group for rule failed:rule is empty")
 	}
-	groups = append(groups, rule.Language)
-	groups = append(groups, string(rule.Severity))
-	groups = append(groups, string(rule.Purpose))
+	if needDefaultGroup {
+		groups = append(groups, rule.Language)
+		groups = append(groups, string(rule.Severity))
+		groups = append(groups, string(rule.Purpose))
+	}
 	groups = lo.Filter(groups, func(item string, _ int) bool {
 		return item != ""
 	})

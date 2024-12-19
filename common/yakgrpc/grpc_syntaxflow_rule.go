@@ -54,7 +54,7 @@ func (s *Server) CreateSyntaxFlowRuleEx(ctx context.Context, req *ypb.CreateSynt
 	if err != nil {
 		return nil, err
 	}
-	_, err = sfdb.CreateRule(rule, input.GetGroupNames()...)
+	_, err = sfdb.CreateRuleWithDefaultGroup(rule, input.GetGroupNames()...)
 	if err != nil {
 		return nil, err
 	}
