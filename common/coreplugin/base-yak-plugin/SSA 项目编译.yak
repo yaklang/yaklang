@@ -241,29 +241,40 @@ info = cli.Json("info",
   ]
 }
 JSON,cli.setUISchema(
+    cli.uiGlobalFieldPosition(cli.uiPosHorizontal), 
     cli.uiGroups(
         cli.uiGroup(
-            cli.uiField("programName", 0.35),
-            cli.uiField("language", 0.2),
-            cli.uiField("kind", 0.2),
+            cli.uiField("programName", 1),
+        ), 
+        cli.uiGroup(
+            cli.uiField("language", 1),
         ),
         cli.uiGroup(
-            cli.uiField("local_file", 0.55),
+            cli.uiField("kind", 1),
         ),
         cli.uiGroup(
-            cli.uiField("url", 0.55),
-            cli.uiField("branch", 0.2),
+            cli.uiField("local_file", 1),
+        ),
+        cli.uiGroup(
+            cli.uiField("url", 1),
+        ),
+        cli.uiGroup(
+            cli.uiField("branch", 1),
         ),
         cli.uiGroup(
             cli.uiField(
                 "auth", 
                 1,
                 cli.uiFieldGroups(
-                    cli.uiGroup(cli.uiField("auth", 1, cli.uiFieldComponentStyle({"width": "10%"}))),
+                    cli.uiGroup(cli.uiField("auth", 1)),
                     cli.uiGroup(
-                        cli.uiField("key_path", 0.35, cli.uiFieldWidget(cli.uiWidgetFile)),
-                        cli.uiField("user_name", 0.15),
-                        cli.uiField("password", 0.15, cli.uiFieldWidget(cli.uiWidgetPassword)),
+                        cli.uiField("key_path", 1, cli.uiFieldWidget(cli.uiWidgetFile)),
+                    ),
+                     cli.uiGroup(
+                        cli.uiField("user_name",1),
+                    ),
+                     cli.uiGroup(
+                        cli.uiField("password", 1, cli.uiFieldWidget(cli.uiWidgetPassword)),
                     ),
                 ),
             ),
@@ -275,9 +286,13 @@ JSON,cli.setUISchema(
                 cli.uiFieldGroups(
                     cli.uiGroup(cli.uiField("proxy", 1)),
                     cli.uiGroup(
-                        cli.uiField("url", 0.35),
-                        cli.uiField("user", 0.15),
-                        cli.uiField("password", 0.15, cli.uiFieldWidget(cli.uiWidgetPassword)),
+                        cli.uiField("url", 1),
+                    ),
+                       cli.uiGroup(
+                        cli.uiField("url", 1),
+                    ),
+                       cli.uiGroup(
+                        cli.uiField("password", 1, cli.uiFieldWidget(cli.uiWidgetPassword)),
                     ),
                 ),
             ),
