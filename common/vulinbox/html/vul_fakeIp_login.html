@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .login-form {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 300px;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            display: inline-block;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 14px 20px;
+            margin: 8px 0;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        button:hover {
+            opacity: 0.8;
+        }
+
+        .error {
+            color: red;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="login-form">
+    <form id="loginForm">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required>
+
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+
+        <button type="submit">Login</button>
+        <p class="error" id="errorMsg"></p>
+    </form>
+</div>
+
+<script>
+    document.getElementById('loginForm').onsubmit = function (event) {
+        event.preventDefault(); // 阻止表单默认提交行为
+        var username = document.getElementById('username').value;
+        var password = document.getElementById('password').value;
+
+        // 发送登录请求到服务器
+        fetch('{{.action}}', { // 确保这里的 URL 是正确的服务器端点
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({username: username, password: password})
+        })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error("登录失败，服务器响应异常");
+                }
+            })
+            .then(data => {
+                if (data.success) {
+                    window.location.href = "/fakeIp/success"; // 登录成功，重定向到成功页面
+                } else {
+                    document.getElementById('errorMsg').textContent = '登录失败: ' + data.message; // 显示错误信息
+                }
+            })
+            .catch(error => {
+                document.getElementById('errorMsg').textContent = error.message; // 显示错误信息
+            });
+    };
+</script>
+</body>
+</html>

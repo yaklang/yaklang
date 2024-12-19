@@ -125,6 +125,7 @@ func (s *VulinServer) init() {
 	s.registerCryptoJS()
 	s.registerCryptoSM()
 	s.registerUploadCases()
+	s.registerFakeIp()
 	s.registerFastjson()
 	s.registerCsrf()
 

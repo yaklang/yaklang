@@ -17,441 +17,452 @@
 
 <body>
 
-    <header>
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-            <div class="container">
-                <a class="navbar-brand" href="/common/vulinbox/static">Vulinbox - Agent</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+<header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/common/vulinbox/static">Vulinbox - Agent</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                     aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav">
-                        <li class="nav-item">
-                            <a class="nav-link" target="_blank" href="https://yaklang.com">yaklang.io</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" target="_blank" href="/_/ws">WS Proto Agent</a>
-                        </li>
-                    </ul>
-                </div>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="https://yaklang.com">yaklang.io</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="/_/ws">WS Proto Agent</a>
+                    </li>
+                </ul>
             </div>
-        </nav>
-    </header>
+        </div>
+    </nav>
+</header>
 
-    <div class="container mt-3">
-        <input type="text" class="form-control" id="search-input" placeholder="快速过滤筛选案例">
-    </div>
+<div class="container mt-3">
+    <input type="text" class="form-control" id="search-input" placeholder="快速过滤筛选案例">
+</div>
 
-    <!-- Your page content goes here -->
-    <div class="container mt-5">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        SQL注入漏洞案例（复杂度递增）
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a target="_blank"
-                                href="/user/by-id-safe?id=1">不存在SQL注入的情况（数字严格校验）</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank" href="/user/id?id=1">ID 为数字型的简单边界 SQL
-                                注入</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/user/id-json?id=%7B%22uid%22%3A1%2C%22id%22%3A%221%22%7D">GET
-                                参数是 JSON，JSON中字段存在SQL注入</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/user/id-b64-json?id=eyJ1aWQiOjEsImlkIjoiMSJ9">GET参数是被编码的JSON，JSON中字段存在SQL注入</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank" href="/user/id-error?id=1">ID 为数字型的简单边界
-                                SQL报错检测</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank" href="/user/cookie-id">Cookie-ID SQL注入</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank" href="/user/name?name=admin">字符串为注入点的 SQL
-                                注入</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/user/name/like?name=a">字符串注入点模糊查询</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/user/name/like/2?name=a">字符串注入点模糊查询(括号边界)</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/user/name/like/b64?nameb64=%59%51%3d%3d">参数编码字符串注入点模糊查询(括号边界)</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/user/name/like/b64j?data=eyJuYW1lYjY0aiI6ImEifQ%3D%3D">Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/user/limit/int?limit=3">LIMIT（语句结尾）注入案例</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/user/limit/4/order1?order=desc">ORDER
-                                注入：单个条件排序位于 LIMIT 之前</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/user/limit/4/order2?order=desc">ORDER
-                                注入：多条件排序位于 LIMIT 之前</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/user/order3?order=desc">ORDER
-                                注入：多条件排序位（无LIMIT）</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/user/limit/4/orderby?orderby=username">ORDER
-                                BY 注入：多字段</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/user/limit/4/orderby1?orderby=id">ORDER BY
-                                注入：反引号+排序</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/user/limit/4/orderby2?orderby=id">ORDER BY
-                                注入：反引号+多字段</a></li>
-                    </ul>
+<!-- Your page content goes here -->
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    SQL注入漏洞案例（复杂度递增）
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/by-id-safe?id=1">不存在SQL注入的情况（数字严格校验）</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/user/id?id=1">ID 为数字型的简单边界 SQL
+                        注入</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/id-json?id=%7B%22uid%22%3A1%2C%22id%22%3A%221%22%7D">GET
+                        参数是 JSON，JSON中字段存在SQL注入</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/id-b64-json?id=eyJ1aWQiOjEsImlkIjoiMSJ9">GET参数是被编码的JSON，JSON中字段存在SQL注入</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/user/id-error?id=1">ID 为数字型的简单边界
+                        SQL报错检测</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/user/cookie-id">Cookie-ID SQL注入</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/user/name?name=admin">字符串为注入点的 SQL
+                        注入</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/name/like?name=a">字符串注入点模糊查询</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like/2?name=a">字符串注入点模糊查询(括号边界)</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like/b64?nameb64=%59%51%3d%3d">参数编码字符串注入点模糊查询(括号边界)</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like/b64j?data=eyJuYW1lYjY0aiI6ImEifQ%3D%3D">Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/limit/int?limit=3">LIMIT（语句结尾）注入案例</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/limit/4/order1?order=desc">ORDER
+                        注入：单个条件排序位于 LIMIT 之前</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/limit/4/order2?order=desc">ORDER
+                        注入：多条件排序位于 LIMIT 之前</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/order3?order=desc">ORDER
+                        注入：多条件排序位（无LIMIT）</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/limit/4/orderby?orderby=username">ORDER
+                        BY 注入：多字段</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/limit/4/orderby1?orderby=id">ORDER BY
+                        注入：反引号+排序</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/limit/4/orderby2?orderby=id">ORDER BY
+                        注入：反引号+多字段</a></li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        XSS 多场景
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a target="_blank" href="/xss/safe?name=admin">安全实体转义</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/xss/echo?name=admin">直接拼接导致XSS注入</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/xss/replace/nocase?name=admin">不安全的过滤导致XSS</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/xss/js/in-str">XSS: 存在于 JS
-                                代码中(字符串中)</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/xss/js/in-str2">XSS: 存在于 JS 代码中(字符串中
-                                2)</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/xss/js/in-str-temp">XSS: 存在于 JS
-                                代码中(字符串模版中)</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="#">由于Content-Type设置，虽然回显，但无法触发的XSS（低危/中危）</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/xss/attr/onclick?code=1-1">输出存在于HTML节点on...属性中</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/xss/attr/alt?value=visitor-name">输出存在于HTML节点属性中，但是不再on属性中(IMG
-                                ALT)</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/xss/attr/alt/json?json=%7B%22value%22%3A%22value%3Dvisitor-name%22%7D">进阶1：输出存在于HTML节点属性中，但是不再on属性中(IMG
-                                ALT)</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/xss/attr/alt/b64/json?b64json=eyJ2YWx1ZSI6InZhbHVlPXZpc2l0b3ItbmFtZSJ9">进阶2：输出存在于HTML节点属性中，但是不再on属性中(IMG
-                                ALT)</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/xss/attr/src?src=/static/logo.png">输出存在于HTML节点属性中，但是不再on属性中(IMG
-                                SRC)</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/xss/attr/href?href=/static/logo.png">输出存在于HTML节点属性中，但是不再on属性中(HREF)</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/xss/attr/onclick2?code=2-1">输出存在于HTML节点on...属性中的部分代码属性</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/xss/attr/script?name=OrdinaryVisitor">script标签的某些属性中</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank" href="/xss/cookie/name">Cookie 中的 XSS</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/xss/cookie/b64/name">Cookie 中的
-                                XSS（Base64）</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/xss/cookie/b64/json/name">Cookie 中的
-                                XSS（Base64-JSON）</a></li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    XSS 多场景
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/xss/safe?name=admin">安全实体转义</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/echo?name=admin">直接拼接导致XSS注入</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/xss/replace/nocase?name=admin">不安全的过滤导致XSS</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/js/in-str">XSS: 存在于 JS
+                        代码中(字符串中)</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/js/in-str2">XSS: 存在于 JS 代码中(字符串中
+                        2)</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/js/in-str-temp">XSS: 存在于 JS
+                        代码中(字符串模版中)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="#">由于Content-Type设置，虽然回显，但无法触发的XSS（低危/中危）</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/xss/attr/onclick?code=1-1">输出存在于HTML节点on...属性中</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/xss/attr/alt?value=visitor-name">输出存在于HTML节点属性中，但是不再on属性中(IMG
+                        ALT)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/xss/attr/alt/json?json=%7B%22value%22%3A%22value%3Dvisitor-name%22%7D">进阶1：输出存在于HTML节点属性中，但是不再on属性中(IMG
+                        ALT)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/xss/attr/alt/b64/json?b64json=eyJ2YWx1ZSI6InZhbHVlPXZpc2l0b3ItbmFtZSJ9">进阶2：输出存在于HTML节点属性中，但是不再on属性中(IMG
+                        ALT)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/xss/attr/src?src=/static/logo.png">输出存在于HTML节点属性中，但是不再on属性中(IMG
+                        SRC)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/xss/attr/href?href=/static/logo.png">输出存在于HTML节点属性中，但是不再on属性中(HREF)</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/xss/attr/onclick2?code=2-1">输出存在于HTML节点on...属性中的部分代码属性</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/xss/attr/script?name=OrdinaryVisitor">script标签的某些属性中</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/cookie/name">Cookie 中的 XSS</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/cookie/b64/name">Cookie 中的
+                        XSS（Base64）</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/cookie/b64/json/name">Cookie 中的
+                        XSS（Base64-JSON）</a></li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        ShiroVuls Simulation
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a target="_blank" href="/shiro/cbc">Shiro CBC 默认KEY(<1.4.2)< /a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank" href="/shiro/gcm">Shiro GCM 默认KEY(>=1.4.2)</a>
-                        </li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    ShiroVuls Simulation
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/shiro/cbc">Shiro CBC 默认KEY(<1.4.2)< /a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/shiro/gcm">Shiro GCM 默认KEY(>=1.4.2)</a>
+                    </li>
+                </ul>
             </div>
-            <div class="col-md-6" id="safestyle">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        命令注入测试案例
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a target="_blank" href="/ping/cmd/shlex?ip=127.0.0.1">Shlex
-                                解析的命令注入</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/ping/cmd/bash?ip=127.0.0.1">Bash
-                                解析的命令注入</a></li>
-                    </ul>
+        </div>
+        <div class="col-md-6" id="safestyle">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    命令注入测试案例
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/ping/cmd/shlex?ip=127.0.0.1">Shlex
+                        解析的命令注入</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/ping/cmd/bash?ip=127.0.0.1">Bash
+                        解析的命令注入</a></li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        CSRF 案例
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a target="_blank" href="/csrf">CSRF基础案例</a></li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    CSRF 案例
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/csrf">CSRF基础案例</a></li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        文件上传与特定文件格式漏洞
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a target="_blank" href="/upload/main?case=safe">基础文件上传案例</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank" href="/upload/main?case=nullbyte">图片上传：nullbyte
-                                可绕过</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/upload/main?case=mime">图片上传：MIME
-                                类型可绕过</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/upload/main?case=cve-2017-15715">图片上传：Apache
-                                HTTPD 换行解析漏洞(CVE-2017-15715)</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href="/upload/main?case=fileheader">图片上传：检查文件头，需配合包含</a>
-                        </li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    文件上传与特定文件格式漏洞
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=safe">基础文件上传案例</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=nullbyte">图片上传：nullbyte
+                        可绕过</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=mime">图片上传：MIME
+                        类型可绕过</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/upload/main?case=cve-2017-15715">图片上传：Apache
+                        HTTPD 换行解析漏洞(CVE-2017-15715)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/upload/main?case=fileheader">图片上传：检查文件头，需配合包含</a>
+                    </li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        Pipeline 仿真请求走私
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a target="_blank" href="/csrf">使用请求走私访问中间件不应该转发访问的
-                                /admin </a></li>
-                        <li class="list-group-item"><a target="_blank" href="/csrf">使用请求走私绕过一个WAF进行SQL注入 </a>
-                        </li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    Pipeline 仿真请求走私
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/csrf">使用请求走私访问中间件不应该转发访问的
+                        /admin </a></li>
+                    <li class="list-group-item"><a target="_blank" href="/csrf">使用请求走私绕过一个WAF进行SQL注入 </a>
+                    </li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        Dedicated & Shared Worker 案例
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a target="_blank" href="/csrf">在当前页面中使用的 Worker</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/csrf">可以跨页面调用服务的 SharedWorker</a>
-                        </li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    Dedicated & Shared Worker 案例
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/csrf">在当前页面中使用的 Worker</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/csrf">可以跨页面调用服务的 SharedWorker</a>
+                    </li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        SSRF 与开放重定向
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a target="_blank"
-                                href="/ssrf-in-get?url=http://www.baidu.com/">SSRF
-                                GET 中 URL
-                                参数</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/ssrf-in-post">SSRF POST 中 URL 参数</a></li>
-                        <li class="list-group-item"><a target="_blank" href="/ssrf-in-post-multipart">SSRF POST 中 URL
-                                参数(Multipart)</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank" href="/ssrf-in-json-body">SSRF JSON Body SSRF</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank" href="/ssrf-json-in-post-param">SSRF
-                                POST参数是JSON（包含URL）的情况</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href='/ssrf-json-in-get?json={"abc":%20123,%20"ref":%20"http://www.baidu.com"}'>SSRF
-                                GET参数JSON包含URL</a></li>
-                        <li class="list-group-item">
-                            <a target="_blank" href='redirect/basic?destUrl=/redirect/main'>完全开放重定向</a>
-                        </li>
-                        <li class="list-group-item">
-                            <a target="_blank" href='redirect/redirect-hell?destUrl=/redirect/main'>完全开放重定向(无限重定向)</a>
-                        </li>
-                        <li class="list-group-item">
-                            <a target="_blank" href='/redirect/js/basic?redUrl=/redirect/main'>完全开放重定向（JS
-                                location.href）</a>
-                        </li>
-                        <li class="list-group-item">
-                            <a target="_blank" href='/redirect/js/basic1?redirect_to=/redirect/main'>完全开放重定向（JS
-                                location.replace）</a>
-                        </li>
-                        <li class="list-group-item">
-                            <a target="_blank" href='/redirect/js/basic2?redirect=/redirect/main'>完全开放重定向（JS
-                                location.assign）</a>
-                        </li>
-                        <li class="list-group-item">
-                            <a target="_blank" href='/redirect/meta/case1?redirect=/redirect/main'>完全开放重定向（meta
-                                延迟跳转）</a>
-                        </li>
-                        <li class="list-group-item">
-                            <a target="_blank" href='/redirect/meta/case2?redirect=/redirect/main'>完全开放重定向（meta）</a>
-                        </li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    SSRF 与开放重定向
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/ssrf-in-get?url=http://www.baidu.com/">SSRF
+                        GET 中 URL
+                        参数</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/ssrf-in-post">SSRF POST 中 URL 参数</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/ssrf-in-post-multipart">SSRF POST 中 URL
+                        参数(Multipart)</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/ssrf-in-json-body">SSRF JSON Body SSRF</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/ssrf-json-in-post-param">SSRF
+                        POST参数是JSON（包含URL）的情况</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href='/ssrf-json-in-get?json={"abc":%20123,%20"ref":%20"http://www.baidu.com"}'>SSRF
+                        GET参数JSON包含URL</a></li>
+                    <li class="list-group-item">
+                        <a target="_blank" href='redirect/basic?destUrl=/redirect/main'>完全开放重定向</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank" href='redirect/redirect-hell?destUrl=/redirect/main'>完全开放重定向(无限重定向)</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank" href='/redirect/js/basic?redUrl=/redirect/main'>完全开放重定向（JS
+                            location.href）</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank" href='/redirect/js/basic1?redirect_to=/redirect/main'>完全开放重定向（JS
+                            location.replace）</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank" href='/redirect/js/basic2?redirect=/redirect/main'>完全开放重定向（JS
+                            location.assign）</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank" href='/redirect/meta/case1?redirect=/redirect/main'>完全开放重定向（meta
+                            延迟跳转）</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank" href='/redirect/meta/case2?redirect=/redirect/main'>完全开放重定向（meta）</a>
+                    </li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        表达式注入或 SSTI 仿真
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a target="_blank" href='/expr/injection?a=1'>表达式注入GET参数基础</a>
-                        </li>
-                        <li class="list-group-item"><a target="_blank"
-                                href='/expr/injection?b={"a":1}'>表达式注入GET参数JSON</a></li>
-                        <li class="list-group-item"><a target="_blank"
-                                href='/expr/injection?c=abc'>表达式注入GET参数初始参数为abc</a></li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    表达式注入或 SSTI 仿真
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href='/expr/injection?a=1'>表达式注入GET参数基础</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href='/expr/injection?b={"a":1}'>表达式注入GET参数JSON</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href='/expr/injection?c=abc'>表达式注入GET参数初始参数为abc</a></li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        Websocket 仿真测试
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a href='/websocket/' target="_blank">Websocket基础案例</a></li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    Websocket 仿真测试
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/websocket/' target="_blank">Websocket基础案例</a></li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        登陆 JWT
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a href='/jwt/login' target="_blank">登陆(JWT)</a></li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    登陆 JWT
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/jwt/login' target="_blank">登陆(JWT)</a></li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        JSONP 通信与 iframe postMessage 通信案例
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a href='/jsonp/basic' target="_blank">JSONP 的最基础案例</a></li>
-                        <li class="list-group-item"><a href='/iframe/post/message/basic' target="_blank">postMessage
-                                基础案例</a></li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    JSONP 通信与 iframe postMessage 通信案例
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/jsonp/basic' target="_blank">JSONP 的最基础案例</a></li>
+                    <li class="list-group-item"><a href='/iframe/post/message/basic' target="_blank">postMessage
+                        基础案例</a></li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        高级场景前端加密
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a href='/crypto/js/basic' target="_blank">AES-ECB 加密表单（附密码）</a>
-                        </li>
-                        <li class="list-group-item"><a href='/crypto/js/rsa' target="_blank">RSA：加密表单，附密钥</a></li>
-                        <li class="list-group-item"><a href='/crypto/js/rsa/fromserver' target="_blank">RSA：加密表单
-                                服务器传输密钥</a></li>
-                        <li class="list-group-item"><a href='/crypto/js/rsa/fromserver/response'
-                                target="_blank">RSA：加密表单
-                                服务器传输密钥+响应加密</a></li>
-                        <li class="list-group-item"><a href='/crypto/js/rsa/fromserver/response/aes-gcm'
-                                target="_blank">前端RSA加密AES密钥，服务器传输</a>
-                        </li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    高级场景前端加密
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/crypto/js/basic' target="_blank">AES-ECB 加密表单（附密码）</a>
+                    </li>
+                    <li class="list-group-item"><a href='/crypto/js/rsa' target="_blank">RSA：加密表单，附密钥</a></li>
+                    <li class="list-group-item"><a href='/crypto/js/rsa/fromserver' target="_blank">RSA：加密表单
+                        服务器传输密钥</a></li>
+                    <li class="list-group-item"><a href='/crypto/js/rsa/fromserver/response'
+                                                   target="_blank">RSA：加密表单
+                        服务器传输密钥+响应加密</a></li>
+                    <li class="list-group-item"><a href='/crypto/js/rsa/fromserver/response/aes-gcm'
+                                                   target="_blank">前端RSA加密AES密钥，服务器传输</a>
+                    </li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        逻辑场景
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a href='/user/login' target="_blank">Web 后台</a></li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    逻辑场景
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/user/login' target="_blank">Web 后台</a></li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        综合场景
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a href='/mall/shop/index' target="_blank">购物商城</a></li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    综合场景
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/mall/shop/index' target="_blank">购物商城</a></li>
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card" style="margin-top: 12px">
-                    <div class="card-header">
-                        验证码场景
-                    </div>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a href='/verification/op' target="_blank">基础验证码拦截的表单提交（无法爆破）</a>
-                        </li>
-                    </ul>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><a href='/verification/bad/op' target="_blank">有验证码拦截的表单提交（逻辑问题）</a>
-                        </li>
-                    </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    验证码场景
                 </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/verification/op' target="_blank">基础验证码拦截的表单提交（无法爆破）</a>
+                    </li>
+                </ul>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/verification/bad/op' target="_blank">有验证码拦截的表单提交（逻辑问题）</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    IP伪造
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/fakeIp/login?case=local">本地IP伪造</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/fakeIp/login?case=random">登陆爆破(IP限制)</a></li>
+                </ul>
             </div>
         </div>
     </div>
+</div>
 
-    <br>
-    <br>
-    <br>
+<br>
+<br>
+<br>
 
-    {{.safescript}}
+{{.safescript}}
 
-    <script>
-        const inputForm = document.getElementById("search-input");
-        const items = document.querySelectorAll(".list-group-item")
+<script>
+    const inputForm = document.getElementById("search-input");
+    const items = document.querySelectorAll(".list-group-item")
 
-        function syncHash() {
-            inputForm.value = decodeURIComponent(location.hash.substring(1));
-            inputForm.dispatchEvent(new Event("input"))
-        }
+    function syncHash() {
+        inputForm.value = decodeURIComponent(location.hash.substring(1));
+        inputForm.dispatchEvent(new Event("input"))
+    }
 
-        window.addEventListener("load", function () {
-            syncHash()
-        })
-        window.addEventListener("hashchange", function () {
-            syncHash()
-        })
-        inputForm.addEventListener("input", function () {
-            const searchData = decodeURIComponent(`${inputForm.value.toLowerCase()}`);
-            items.forEach(function (item) {
-                item.childNodes.forEach(function (child) {
-                    if (child.nodeName.toLowerCase() === 'a') {
-                        const alink = child;
-                        if (alink.nodeType === Node.ELEMENT_NODE) {
-                            let searchItem = (alink.getAttribute("href") + "|" + item.textContent).toLowerCase();
-                            if (searchItem.indexOf(searchData) !== -1) {
-                                item.style.display = "block";
-                            } else {
-                                item.style.display = "none";
-                            }
+    window.addEventListener("load", function () {
+        syncHash()
+    })
+    window.addEventListener("hashchange", function () {
+        syncHash()
+    })
+    inputForm.addEventListener("input", function () {
+        const searchData = decodeURIComponent(`${inputForm.value.toLowerCase()}`);
+        items.forEach(function (item) {
+            item.childNodes.forEach(function (child) {
+                if (child.nodeName.toLowerCase() === 'a') {
+                    const alink = child;
+                    if (alink.nodeType === Node.ELEMENT_NODE) {
+                        let searchItem = (alink.getAttribute("href") + "|" + item.textContent).toLowerCase();
+                        if (searchItem.indexOf(searchData) !== -1) {
+                            item.style.display = "block";
+                        } else {
+                            item.style.display = "none";
                         }
                     }
-                });
-            });
-            document.querySelectorAll(".col-md-6").forEach(function (cardWrapper) {
-                if (cardWrapper.querySelectorAll(".list-group-item").length === cardWrapper.querySelectorAll(".list-group-item[style='display: none;']").length) {
-                    cardWrapper.style.display = "none";
-                } else {
-                    cardWrapper.style.display = "block";
-                }
-            })
-            location.hash = encodeURIComponent(searchData)
-        })
-    </script>
-    <!-- 引入 Bootstrap JavaScript -->
-    <script src="/static/js/bootstrap_5.3/popper.min.js"></script>
-    <script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const listItems = document.querySelectorAll('.list-group-item');
-
-            listItems.forEach(function (listItem) {
-                const anchor = listItem.querySelector('a');
-
-                if (anchor) {
-                    listItem.addEventListener('click', function () {
-                        anchor.click()
-                    });
                 }
             });
         });
-    </script>
+        document.querySelectorAll(".col-md-6").forEach(function (cardWrapper) {
+            if (cardWrapper.querySelectorAll(".list-group-item").length === cardWrapper.querySelectorAll(".list-group-item[style='display: none;']").length) {
+                cardWrapper.style.display = "none";
+            } else {
+                cardWrapper.style.display = "block";
+            }
+        })
+        location.hash = encodeURIComponent(searchData)
+    })
+</script>
+<!-- 引入 Bootstrap JavaScript -->
+<script src="/static/js/bootstrap_5.3/popper.min.js"></script>
+<script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const listItems = document.querySelectorAll('.list-group-item');
+
+        listItems.forEach(function (listItem) {
+            const anchor = listItem.querySelector('a');
+
+            if (anchor) {
+                listItem.addEventListener('click', function () {
+                    anchor.click()
+                });
+            }
+        });
+    });
+</script>
 </body>
 
 </html>
