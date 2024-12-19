@@ -131,12 +131,12 @@ func TestRule_Group_OP(t *testing.T) {
 
 		gotRule, err := QueryRuleByName(db, ruleName)
 		require.NoError(t, err)
-		require.Equal(t, 4, len(gotRule.Groups))
+		require.Equal(t, 2, len(gotRule.Groups))
 
 		// remove rule from group
 		err = RemoveGroupForRule(db, ruleName, groupName)
 		require.NoError(t, err)
-		require.Equal(t, int32(3), GetGroupCountByRuleName(db, ruleName))
+		require.Equal(t, int32(1), GetGroupCountByRuleName(db, ruleName))
 	})
 
 	t.Run("test create and delete group for rule", func(t *testing.T) {
@@ -165,7 +165,7 @@ func TestRule_Group_OP(t *testing.T) {
 
 		queryRule, err := QueryRuleByName(db, ruleName)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(queryRule.Groups))
+		require.Equal(t, 0, len(queryRule.Groups))
 	})
 	t.Run("test GetIntersectionGroup", func(t *testing.T) {
 		groupA, err := CreateGroup(db, uuid.NewString())
@@ -240,4 +240,18 @@ func TestRule_Group_OP(t *testing.T) {
 		require.Equal(t, group1.ID, group2.ID)
 	})
 
+	t.Run("test create rule with default group", func(t *testing.T) {
+		rule := &schema.SyntaxFlowRule{
+			RuleName: uuid.NewString(),
+			Language: "java",
+			Severity: schema.SFR_SEVERITY_INFO,
+			Purpose:  schema.SFR_PURPOSE_AUDIT,
+		}
+		newRule, err := CreateRuleWithDefaultGroup(rule)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			DeleteRuleByRuleName(rule.RuleName)
+		})
+		require.Equal(t, 3, len(newRule.Groups))
+	})
 }

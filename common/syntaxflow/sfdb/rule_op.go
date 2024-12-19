@@ -154,7 +154,7 @@ func CreateRuleByContent(ruleName string, content string, buildIn bool, tags ...
 	if err != nil {
 		return nil, utils.Wrap(err, "migrate syntax flow rule error")
 	}
-	AddDefaultGroupForRule(consts.GetGormProfileDatabase(), rule)
+	addGroupsForRule(consts.GetGormProfileDatabase(), rule, true)
 	return rule, nil
 }
 
@@ -418,7 +418,7 @@ func UpdateRule(rule *schema.SyntaxFlowRule) error {
 	return nil
 }
 
-func CreateRule(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFlowRule, error) {
+func createRuleEx(rule *schema.SyntaxFlowRule, needDefaultGroup bool, groups ...string) (*schema.SyntaxFlowRule, error) {
 	if rule == nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: rule is nil")
 	}
@@ -437,6 +437,14 @@ func CreateRule(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFl
 	if err := db.Create(&rule).Error; err != nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)
 	}
-	AddDefaultGroupForRule(db, rule, groups...)
+	addGroupsForRule(db, rule, needDefaultGroup, groups...)
 	return rule, nil
+}
+
+func CreateRule(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFlowRule, error) {
+	return createRuleEx(rule, false, groups...)
+}
+
+func CreateRuleWithDefaultGroup(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFlowRule, error) {
+	return createRuleEx(rule, true, groups...)
 }
