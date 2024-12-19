@@ -4,7 +4,7 @@ desc(
     type: audit,
     risk: "xxe",
     desc: <<<TEXT
-XML External Entity (XXE) vulnerability occurs when an application processes XML data and includes user-supplied input in that data without proper validation or sanitization. The use of `simplexml_load_string` with the `LIBXML_NOENT` option enabled allows the parser to load external entities referenced in the XML, which can lead to the disclosure of sensitive data, server-side request forgery (SSRF), or denial of service (DoS) attacks. It is crucial to avoid using `LIBXML_NOENT` or ensure that all external entities are properly restricted or disabled.
+    XXE漏洞是一种常见的安全漏洞，攻击者可以通过构造恶意XML文件，读取服务器上的敏感文件，甚至执行远程代码。在PHP应用程序中，如果开发者未能正确处理XML文件,可能会导致XXE漏洞。建议在使用simplexml_load_string函数时，设置第三个参数为LIBXML_NOENT，以防止XXE漏洞。
 TEXT
 )
 
