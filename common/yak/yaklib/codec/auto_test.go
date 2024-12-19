@@ -74,6 +74,7 @@ func TestAutoDecodeMultiTimes(t *testing.T) {
 	t.Run("base64-jwt", func(t *testing.T) {
 		checkAutoDecode(t, `ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnpkV0lpT2lJeE1qTTBOVFkzT0Rrd0lpd2libUZ0WlNJNklrcHZhRzRnUkc5bElpd2lhV0YwSWpveE5URTJNak01TURJeWZRLlNmbEt4d1JKU01lS0tGMlFUNGZ3cE1lSmYzNlBPazZ5SlZfYWRRc3N3NWM=`, []string{`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c`, `{"alg":"HS256","typ":"JWT"}.{"sub":"1234567890","name":"John Doe","iat":1516239022}.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c`})
 	})
+
 }
 
 func TestAutoDecodeRandomString(t *testing.T) {
@@ -104,4 +105,14 @@ func TestAutoDecodeRandomString(t *testing.T) {
 		gots = append([]string{randStr}, gots...)
 		require.Equal(t, wants, gots)
 	}
+}
+
+func TestAutoDecode_BUG(t *testing.T) {
+	t.Run("charset unexpected decode", func(t *testing.T) {
+		testStr := `F8B4FC3F012D882489F98C2289583882789F9B1DA4A27EF15AFC28C412FCAF2629AC757AEDDE1DAE31415E792E8F8ACF2CEDAFFD84A9B085360A6E6ECF9852F0770DCA61452236B038C1953AD60E29B48794F9E6A178794175182E239500B81EC23C9AAB982471C18D6E41853843F6B3ABB1E96C201BA85A60534132ECF816DDEAFE052CA8496204C6634E81AF6508F2`
+
+		want, err := DecodeHex(testStr)
+		require.NoError(t, err)
+		checkAutoDecode(t, testStr, []string{EscapeInvalidUTF8Byte(want)})
+	})
 }
