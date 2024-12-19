@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -73,6 +74,8 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 	case <-streamCtx.Done():
 		m.Stop()
 		RemoveSyntaxFlowTaskByID(taskId)
+		m.status = schema.SYNTAXFLOWSCAN_DONE
+		m.SaveTask()
 		return utils.Error("client canceled")
 	}
 }
