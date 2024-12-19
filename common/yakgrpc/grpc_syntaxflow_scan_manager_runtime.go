@@ -70,10 +70,10 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 			break
 		}
 		for _, progName := range m.programs {
-			taskIndex++
 			if m.IsPause() || m.IsStop() {
 				break
 			}
+			taskIndex++
 			if taskIndex <= start {
 				continue
 			}

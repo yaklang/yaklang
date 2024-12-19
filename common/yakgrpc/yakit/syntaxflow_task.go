@@ -21,7 +21,8 @@ func QuerySyntaxFlowScanTask(db *gorm.DB, params *ypb.QuerySyntaxFlowScanTaskReq
 	return p, data, nil
 }
 
-func FilterSyntaxFlowScanTask(db *gorm.DB, filter *ypb.SyntaxFlowScanTaskFilter) *gorm.DB {
+func FilterSyntaxFlowScanTask(DB *gorm.DB, filter *ypb.SyntaxFlowScanTaskFilter) *gorm.DB {
+	db := DB.Debug()
 	db = bizhelper.ExactQueryStringArrayOr(db, "programs", filter.GetPrograms())
 	db = bizhelper.ExactQueryStringArrayOr(db, "task_id", filter.GetTaskIds())
 	db = bizhelper.ExactQueryStringArrayOr(db, "status", filter.GetStatus())
