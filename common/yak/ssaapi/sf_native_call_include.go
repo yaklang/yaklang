@@ -32,6 +32,10 @@ func ValidSyntaxFlowRule(s *schema.SyntaxFlowRule) error {
 	return nil
 }
 
+func GetSFIncludeCache() *utils.Cache[sfvm.ValueOperator] {
+	return includeCache
+}
+
 var includeCache = createIncludeCache()
 
 func createIncludeCache() *utils.Cache[sfvm.ValueOperator] {
@@ -84,7 +88,11 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	}
 
 	config := frame.GetConfig()
-	result, err := SyntaxFlowWithVMContext(parent, rule.Content, sfvm.NewSFResult(rule, config), config)
+	result, err := QuerySyntaxflow(
+		QueryWithProgram(parent),
+		QueryWithRule(rule),
+		QueryWithSFConfig(config),
+	)
 	if err != nil {
 		return false, nil, err
 	}

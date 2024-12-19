@@ -155,7 +155,15 @@ func TestSF_config_WithNameVariableInner(t *testing.T) {
 		check(t, "b* #{until:`* ?{opcode:call} as $name`}-> as $result")
 	})
 
-	t.Run("check magic name", func(t *testing.T) {
+	t.Run("check only magic name", func(t *testing.T) {
+		check(t, `
+b* #{until: <<<UNTIL
+	* ?{opcode:call} as $__next__
+UNTIL
+}-> as $result`)
+	})
+
+	t.Run("check mix magic name", func(t *testing.T) {
 		check(t, `
 b* #{until: <<<UNTIL
 	* as $value;

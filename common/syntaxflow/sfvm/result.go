@@ -50,8 +50,8 @@ func (s *SFFrameResult) GetRule() *schema.SyntaxFlowRule {
 
 func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
 	result.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
-		if get, b := s.SymbolTable.Get(i); b {
-			if merge, err := get.Merge(v); err != nil {
+		if value, ok := s.SymbolTable.Get(i); ok {
+			if merge, err := value.Merge(v); err != nil {
 				log.Errorf("merge value fail: %v", err)
 				return true
 			} else {

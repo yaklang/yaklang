@@ -2,11 +2,13 @@ package syntaxflow
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestFindPathFromSyntaxFlow(t *testing.T) {
@@ -22,18 +24,28 @@ if e {
 }
 h = f + g
 `, func(prog *ssaapi.Program) error {
-		results := prog.SyntaxFlow("h as $start; $start #-> *?{<name>?{have: a}} as $end; alert $start; alert $end")
+		results, err := prog.SyntaxFlowWithError(`
+		h as $start
+		$start #-> *?{<name>?{have: a}} as $end
+		alert $start
+		alert $end
+		`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		require.NotNil(t, results)
 		fmt.Println(results.Dump(false))
 		start := results.GetValues("start")
+		log.Infof("start: %v", start)
 		start.ShowDot()
 		end := results.GetValues("end")
+		log.Infof("end: %v", end)
+		end.ShowDot()
 		paths := start.GetPaths(end)
 		for _, item := range paths {
-			assert.Equal(t, item[0].GetSSAValue().GetOpcode(), ssa.SSAOpcodeBinOp)
-			assert.Equal(t, item[len(item)-1].GetSSAValue().GetOpcode(), ssa.SSAOpcodeConstInst)
+			require.Equal(t, item[0].GetSSAValue().GetOpcode(), ssa.SSAOpcodeBinOp)
+			require.Equal(t, item[len(item)-1].GetSSAValue().GetOpcode(), ssa.SSAOpcodeConstInst)
 			fmt.Println(item.String())
 		}
-		assert.Greater(t, len(paths), 0)
+		require.Greater(t, len(paths), 0)
 		return nil
 	})
 }

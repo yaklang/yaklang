@@ -669,7 +669,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			s.debugSubLog("error: %v", err)
 			s.debugSubLog("recover origin value")
-			s.stack.Push(NewValues(nil))
+			s.stack.Push(NewEmptyValues())
 			s.debugSubLog("<< push")
 			return err
 		}
@@ -796,30 +796,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("ERROR: %v", err)
 			return err
 		}
-
-		result, ok := s.GetSymbol(i)
-		if ok {
-			res := make([]ValueOperator, 0, ValuesLen(result))
-			tmp := make(map[int64]struct{})
-			_ = result.Recursive(func(operator ValueOperator) error {
-				if i, ok := operator.(ssa.GetIdIF); ok {
-					if i.GetId() == -1 {
-						// syntax-flow  runtime will create new template value
-						// the "fileFilter" function will create.
-						res = append(res, operator)
-					} else {
-						_, ok := tmp[i.GetId()]
-						if !ok {
-							res = append(res, operator)
-							tmp[i.GetId()] = struct{}{}
-						}
-					}
-				}
-				return nil
-			})
-			s.GetSymbolTable().Set(i.UnaryStr, NewValues(res))
-		}
-
 		s.debugSubLog(" -> save $" + i.UnaryStr)
 	case OpAddDescription:
 		if i.UnaryStr == "" {
@@ -1153,7 +1129,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			if value == nil {
 				return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 			}
-			s.stack.Push(NewValues(nil))
+			s.stack.Push(NewEmptyValues())
 			return nil
 		}
 		s.debugLog(">> pop")
@@ -1186,7 +1162,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		})
 		if len(vals) == 0 {
 			s.debugSubLog("no intersection")
-			s.stack.Push(NewValues(nil))
+			s.stack.Push(NewEmptyValues())
 		} else {
 			s.debugSubLog("intersection:%v", buf.String())
 			s.stack.Push(NewValues(vals))
@@ -1203,14 +1179,14 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			s.debugSubLog("Err: %v", err)
 			log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
-			s.stack.Push(NewValues(nil))
+			s.stack.Push(NewEmptyValues())
 			return utils.Errorf("get native call failed: %v", err)
 		}
 
 		ok, ret, err := call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
 		if err != nil || !ok {
 			s.debugSubLog("No Result in [%v]", i.UnaryStr)
-			s.stack.Push(NewValues(nil))
+			s.stack.Push(NewEmptyValues())
 			if errors.Is(err, CriticalError) {
 				return err
 			}
@@ -1289,34 +1265,15 @@ func (s *SFFrame) execStatement(i *SFI) error {
 // }
 
 func (s *SFFrame) output(resultName string, operator ValueOperator) error {
-	var value = operator
-	originValue, existed := s.GetSymbolTable().Get(resultName)
-	if existed {
-		if originList, ok := originValue.(*ValueList); ok {
-			newList, isListToo := operator.(*ValueList)
-			if isListToo {
-				value = NewValues(append(originList.values, newList.values...))
-			} else {
-				value = NewValues(append(originList.values, operator))
-			}
-		} else {
-			newList, isListToo := operator.(*ValueList)
-			if isListToo {
-				value = NewValues(append([]ValueOperator{
-					operator,
-				}, newList.values...))
-			} else {
-				value = NewValues([]ValueOperator{
-					originValue, operator,
-				})
-			}
-		}
+	var values = []ValueOperator{operator}
+	if originValue, existed := s.GetSymbolTable().Get(resultName); existed {
+		values = append(values, originValue)
 	}
-
+	value := NewValues(values) // for merge
+	// save to result, even if value is empty or nil
 	if resultName == "_" {
 		s.result.UnNameValue = append(s.result.UnNameValue, value)
 	} else {
-
 		s.GetSymbolTable().Set(resultName, value)
 	}
 	if s.config != nil {
