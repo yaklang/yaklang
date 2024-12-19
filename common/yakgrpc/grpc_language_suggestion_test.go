@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 	"testing"
 
@@ -1356,5 +1358,49 @@ func Test_SyntaxflowCompletion(t *testing.T) {
 		}, id)
 
 		require.True(t, len(resp.SuggestionMessage) > 0)
+	})
+}
+
+func Test_FuzztagCompletion(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	t.Run("fuzztag name", func(t *testing.T) {
+		id := uuid.NewString()
+		resp := GetSuggestion(local, "completion", "fuzztag", t, `
+{{
+		`, &ypb.Range{
+			Code:        "{{",
+			StartLine:   2,
+			StartColumn: 2,
+			EndLine:     2,
+			EndColumn:   3,
+		}, id)
+		require.True(t, len(resp.SuggestionMessage) > 0)
+	})
+
+	token := utils.RandStringBytes(10)
+	err = yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, &schema.YakScript{
+		Type:       "codec",
+		ScriptName: token,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), token)
+	})
+
+	t.Run("code plugin", func(t *testing.T) {
+		id := uuid.NewString()
+		resp := GetSuggestion(local, "completion", "fuzztag", t, fmt.Sprintf(`
+{{codec(%s
+`, token[:5]), &ypb.Range{
+			Code:        fmt.Sprintf(`{{codec(%s`, token[:5]),
+			StartLine:   2,
+			StartColumn: 10,
+			EndLine:     2,
+			EndColumn:   10,
+		}, id)
+		require.True(t, len(resp.SuggestionMessage) > 0)
+
 	})
 }
