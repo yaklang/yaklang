@@ -1139,9 +1139,21 @@ var fuzztagSuggestionsOnce sync.Once
 func getFuzztagName() []*ypb.SuggestionDescription {
 	fuzztagSuggestionsOnce.Do(func() {
 		allTag := append(mutate.GetAllFuzztags(), append(mutate.FileTag(), mutate.CodecTag()...)...)
+		maxTagNameLength := 0
+		lo.ForEach(allTag, func(item *mutate.FuzzTagDescription, index int) {
+			if len(item.TagName) > maxTagNameLength {
+				maxTagNameLength = len(item.TagName)
+			}
+			lo.ForEach(item.Alias, func(alias string, index int) {
+				if len(alias) > maxTagNameLength {
+					maxTagNameLength = len(alias)
+				}
+			})
+		})
+		formatString := fmt.Sprintf("%%-%ds[%%s]", maxTagNameLength+4)
 		for _, tag := range allTag {
 			fuzztagSuggestions = append(fuzztagSuggestions, &ypb.SuggestionDescription{
-				Label:       tag.TagName + "\t[" + tag.TagNameVerbose + "]",
+				Label:       fmt.Sprintf(formatString, tag.TagName, tag.TagNameVerbose),
 				Description: tag.Description,
 				InsertText:  fmt.Sprintf(`%s($1)}}`, tag.TagName),
 				Kind:        CompletionKindFunction,
@@ -1149,7 +1161,7 @@ func getFuzztagName() []*ypb.SuggestionDescription {
 
 			for _, alias := range tag.Alias {
 				fuzztagSuggestions = append(fuzztagSuggestions, &ypb.SuggestionDescription{
-					Label:       alias + "\t[" + tag.TagNameVerbose + "]",
+					Label:       fmt.Sprintf(formatString, alias, tag.TagNameVerbose),
 					Description: tag.Description,
 					InsertText:  fmt.Sprintf(`%s($1)}}`, alias),
 					Kind:        CompletionKindFunction,
