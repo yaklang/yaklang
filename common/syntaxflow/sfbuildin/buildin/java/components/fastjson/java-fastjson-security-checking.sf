@@ -2,6 +2,10 @@ desc(
     title: 'FastJson Security Checking',
     title_zh: 'FastJson 安全检查',
     type: vuln,
+    level: high,
+    desc: <<<TEXT
+FastJson 是一个流行的 Java 库，用于将 Java 对象转换为 JSON 格式的字符串，以及将 JSON 字符串解析为 Java 对象。然而，FastJson 在某些版本中存在多个安全漏洞，这些漏洞允许攻击者执行远程代码执行（RCE）攻击。如果应用程序使用了易受攻击的 FastJson 版本，并且未对输入进行适当验证或转义，攻击者可以通过发送恶意构造的 JSON 数据来利用这些漏洞，从而完全控制应用程序服务器。因此，建议升级到 FastJson 的最新版本，并对所有 JSON 输入进行严格的验证和转义，以防止潜在的安全风险。
+TEXT
 )
 
 __dependency__.*alibaba*fastjson.version as $ver;

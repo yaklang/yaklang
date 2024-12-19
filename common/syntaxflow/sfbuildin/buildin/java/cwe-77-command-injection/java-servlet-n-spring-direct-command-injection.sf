@@ -3,6 +3,9 @@ desc(
     title: 'Servlet & Springframewor 基础参数直接命令注入',
     type: vuln,
     risk:rce,
+    desc: <<<TEXT
+    在Java中，如果用户输入的参数直接传递给命令执行函数，可能会导致命令注入漏洞。攻击者可以通过构造恶意输入，执行系统命令，进而控制服务器。为了防止命令注入漏洞，需要对用户输入的参数进行严格的过滤，包括验证参数的合法性、长度、字符等，并尽量避免直接将用户输入的参数传递给命令执行函数。
+TEXT
 )
 
 <include('java-servlet-param')> as $source;

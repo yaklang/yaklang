@@ -2,7 +2,10 @@ desc(
     title: "Find Springframework MultipartFile.transferTo use",
     type: audit,
     level: info,
-    risk:"rce",
+    risk: "rce",
+    desc: <<<TEXT
+使用 `MultipartFile.transferTo` 方法时，如果目标路径处理不当，可能会导致远程代码执行（RCE）风险。攻击者可能通过上传恶意文件并利用路径遍历漏洞将其写入服务器上的任意位置，从而执行恶意代码。建议对 `transferTo` 的目标路径进行严格验证和清理，确保文件只能被写入预期的安全目录中。
+TEXT
 )
 
 

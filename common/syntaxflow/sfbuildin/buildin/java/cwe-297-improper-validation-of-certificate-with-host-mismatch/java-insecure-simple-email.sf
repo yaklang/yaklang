@@ -4,6 +4,9 @@ desc(
     level: info,
     lang: java,
     risk:"auth-bypass",
+    desc: <<<TEXT
+    Apache Commons Email是一个用于发送电子邮件的Java库。在使用SimpleEmail发送邮件时，如果未验证服务器的SSL证书，可能会导致SSL证书验证绕过漏洞。攻击者可以通过中间人攻击，窃取邮件内容，造成信息泄露等安全问题。建议开发者在使用SimpleEmail发送邮件时，确保验证服务器的SSL证书，防止SSL证书验证绕过漏洞。
+TEXT
 )
 
 SimpleEmail()?{<typeName>?{have:'org.apache.commons.mail'}} as $simpleEmail;
