@@ -22,6 +22,8 @@ var SSAProjectTables = []any{
 	&AuditResult{},
 	&AuditNode{},
 	&AuditEdge{},
+
+	&schema.SyntaxFlowScanTask{},
 }
 
 func init() {
