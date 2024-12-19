@@ -3,9 +3,13 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/samber/lo"
@@ -1129,9 +1133,82 @@ func OnCompletion(
 	return ret
 }
 
+var fuzztagSuggestions []*ypb.SuggestionDescription
+var fuzztagSuggestionsOnce sync.Once
+
+func getFuzztagName() []*ypb.SuggestionDescription {
+	fuzztagSuggestionsOnce.Do(func() {
+		allTag := append(mutate.GetAllFuzztags(), append(mutate.FileTag(), mutate.CodecTag()...)...)
+		for _, tag := range allTag {
+			fuzztagSuggestions = append(fuzztagSuggestions, &ypb.SuggestionDescription{
+				Label:       tag.TagName + "\t[" + tag.TagNameVerbose + "]",
+				Description: tag.Description,
+				InsertText:  fmt.Sprintf(`%s($1)}}`, tag.TagName),
+				Kind:        CompletionKindFunction,
+			})
+
+			for _, alias := range tag.Alias {
+				fuzztagSuggestions = append(fuzztagSuggestions, &ypb.SuggestionDescription{
+					Label:       alias + "\t[" + tag.TagNameVerbose + "]",
+					Description: tag.Description,
+					InsertText:  fmt.Sprintf(`%s($1)}}`, alias),
+					Kind:        CompletionKindFunction,
+				})
+			}
+
+		}
+	})
+	return fuzztagSuggestions
+}
+
+func getCodecPluginList() []*ypb.SuggestionDescription {
+	var ret []*ypb.SuggestionDescription
+	for _, codecScript := range yakit.QueryYakScriptByType(consts.GetGormProfileDatabase(), "codec") {
+		ret = append(ret, &ypb.SuggestionDescription{
+			Label:       codecScript.ScriptName,
+			Description: codecScript.Help,
+			InsertText:  codecScript.ScriptName,
+		})
+	}
+	return ret
+}
+
+func FuzztagServer(req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, bool) {
+	if req.GetYakScriptType() != "fuzztag" {
+		return nil, false
+	}
+	ret := &ypb.YaklangLanguageSuggestionResponse{}
+	switch req.GetInspectType() {
+	case COMPLETION:
+		// ret
+		ret.SuggestionMessage = append(ret.SuggestionMessage, fuzztagCompletion(req.GetRange())...)
+	}
+	return ret, true
+}
+
+func fuzztagCompletion(rng *ypb.Range) []*ypb.SuggestionDescription {
+	var suggestions []*ypb.SuggestionDescription
+	if rng == nil {
+		return suggestions
+	}
+
+	if strings.HasPrefix(rng.Code, "{{") {
+		if strings.HasPrefix(rng.Code, "{{codec(") {
+			return getCodecPluginList()
+		}
+		return getFuzztagName()
+	}
+
+	return suggestions
+}
+
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
 	// check syntaxflow
 	if resp, match := SyntaxFlowServer(req); match {
+		return resp, nil
+	}
+
+	if resp, match := FuzztagServer(req); match {
 		return resp, nil
 	}
 
