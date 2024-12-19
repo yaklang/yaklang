@@ -84,8 +84,7 @@ func EncodeByType(t string, i interface{}) string {
 }
 
 func AutoDecode(i interface{}) []*AutoDecodeResult {
-	rawBytes := interfaceToBytes(i)
-	rawStr := string(rawBytes)
+	rawStr := string(interfaceToBytes(i))
 	origin := rawStr
 
 	var (
@@ -200,11 +199,19 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 	charsetDetect := func(rawStr string) bool {
 		var err error
 		mimeResult, err = MatchMIMEType(rawStr)
-		return err == nil
+		if err != nil {
+			return false
+		}
+		if !mimeResult.NeedCharset || mimeResult.Charset == "" {
+			return false
+		}
+
+		return true
 	}
 	charsetDecode := func(rawStr string) (string, error) {
-		newBytes, changed := mimeResult.TryUTF8Convertor(rawBytes)
-		if changed {
+		rawBytes := []byte(rawStr)
+		newBytes, ok := mimeResult.TryUTF8Convertor(rawBytes)
+		if ok && !bytes.Equal(newBytes, rawBytes) {
 			return string(newBytes), nil
 		}
 		return "", fmt.Errorf("no changed")
