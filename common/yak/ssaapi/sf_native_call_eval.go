@@ -22,7 +22,12 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 	}
 
 	exec := func(codeRaw string) (bool, sfvm.ValueOperator, error) {
-		newResult, err := SyntaxFlowWithVMContext(program, codeRaw, contextResult, frame.GetVM().GetConfig())
+		newResult, err := QuerySyntaxflow(
+			QueryWithProgram(program),
+			QueryWithRuleContent(codeRaw),
+			QueryWithInitVar(contextResult.SymbolTable),
+			QueryWithSFConfig(frame.GetConfig()),
+		)
 		if err != nil {
 			return false, nil, err
 		}

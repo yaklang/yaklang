@@ -89,18 +89,27 @@ func (i *Value) AppendEffectOn(vs ...*Value) *Value {
 }
 
 func MergeValues(vs ...Values) Values {
-	mapx := make(map[int64]*Value)
+	tmp := make(map[int64]*Value)
+	templateValue := make(Values, 0)
 	checkAndMerge := func(v *Value) {
-		if exist, has := mapx[v.GetId()]; has {
+		if utils.IsNil(v) {
+			return
+		}
+		// template value will not merge, this value create in query Runtime
+		if v.GetId() == -1 {
+			templateValue = append(templateValue, v)
+			return
+		}
+		if exist, has := tmp[v.GetId()]; has {
 			// merge v to existValue
 			for _, effect := range v.EffectOn {
-				exist.AppendEffectOn(effect)
 				effect.DependOn = utils.RemoveSliceItem(effect.DependOn, v)
+				exist.AppendEffectOn(effect)
 			}
 
 			for _, depend := range v.DependOn {
-				exist.AppendDependOn(depend)
 				depend.EffectOn = utils.RemoveSliceItem(depend.EffectOn, v)
+				exist.AppendDependOn(depend)
 			}
 
 			for _, pred := range v.Predecessors {
@@ -108,7 +117,7 @@ func MergeValues(vs ...Values) Values {
 			}
 		} else {
 			// set v is exist
-			mapx[v.GetId()] = v
+			tmp[v.GetId()] = v
 		}
 	}
 	for _, vs := range vs {
@@ -116,5 +125,5 @@ func MergeValues(vs ...Values) Values {
 			checkAndMerge(v)
 		}
 	}
-	return lo.Values(mapx)
+	return append(lo.Values(tmp), templateValue...)
 }

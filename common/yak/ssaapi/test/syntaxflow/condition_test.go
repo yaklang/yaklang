@@ -1,8 +1,9 @@
 package syntaxflow
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )

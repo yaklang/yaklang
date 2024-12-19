@@ -1,13 +1,13 @@
 package syntaxflow
 
 import (
+	"fmt"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -146,9 +146,10 @@ func TestLib_ServletParam(t *testing.T) {
 	vfs := createTestVFS()
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		results := prog.SyntaxFlowChain(`<include('java-servlet-param')> as $params`)
+		results, err := prog.SyntaxFlowWithError(`<include('java-servlet-param')> as $params`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
 		results.Show()
-		assert.Greater(t, len(results), 7)
+		require.Greater(t, len(results.GetValues("params")), 7)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
@@ -161,15 +162,15 @@ func Test_Include_HitCache(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, prog)
 
-	start := time.Now()
-	prog.SyntaxFlowWithError(`<include('java-servlet-param')>`)
-	elapsed := time.Since(start)
+	ruleName := "java-servlet-param"
+	prog.SyntaxFlowWithError(fmt.Sprintf(`<include('%s')>`, ruleName))
 
-	start = time.Now()
-	prog.SyntaxFlowWithError(`<include('java-servlet-param')>`)
-	elapsed2 := time.Since(start)
+	cache := ssaapi.GetSFIncludeCache()
+	require.Greater(t, cache.Count(), 0)
+	cache.ForEach(func(s string, vo sfvm.ValueOperator) {
+		t.Logf("key: %s, value: %v", s, vo)
+	})
+	_, exist := ssaapi.GetSFIncludeCache().Get(utils.CalcSha256(ruleName, programName))
+	require.True(t, exist)
 
-	log.Infof("elapsed: %v, elapsed2: %v", elapsed, elapsed2)
-	// assert that the second call is faster than the first call
-	assert.Less(t, elapsed2*10, elapsed)
 }

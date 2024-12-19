@@ -296,15 +296,24 @@ func (ps Programs) SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFl
 	return QuerySyntaxflow(opts...)
 }
 
-func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config) (*SyntaxFlowResult, error) {
-	opts := []QueryOption{
-		QueryWithValue(p),
-		QueryWithRuleContent(sfCode),
-		QueryWithSFConfig(sfConfig),
-		QueryWithInitVar(sfResult.SymbolTable),
-	}
-	return QuerySyntaxflow(opts...)
-}
+// func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config) (*SyntaxFlowResult, error) {
+// 	opts := []QueryOption{
+// 		QueryWithValue(p),
+// 		QueryWithRuleContent(sfCode),
+// 		QueryWithSFConfig(sfConfig),
+// 		QueryWithInitVar(sfResult.SymbolTable),
+// 	}
+// 	return QuerySyntaxflow(opts...)
+// }
+// func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config) (*SyntaxFlowResult, error) {
+// 	opts := []QueryOption{
+// 		QueryWithValue(p),
+// 		QueryWithRuleContent(sfCode),
+// 		QueryWithSFConfig(sfConfig),
+// 		QueryWithInitVar(sfResult.SymbolTable),
+// 	}
+// 	return QuerySyntaxflow(opts...)
+// }
 
 func (p *Program) SyntaxFlowRuleName(ruleName string, opts ...QueryOption) (*SyntaxFlowResult, error) {
 	opts = append(opts, QueryWithProgram(p), QueryWithRuleName(ruleName))

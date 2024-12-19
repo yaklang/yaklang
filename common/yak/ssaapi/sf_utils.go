@@ -151,3 +151,23 @@ func ValuesToSFValueList(values Values) sfvm.ValueOperator {
 	}
 	return sfvm.NewValues(list)
 }
+
+func MergeSFValueOperator(sfv ...sfvm.ValueOperator) sfvm.ValueOperator {
+	ret := []sfvm.ValueOperator{}
+	values := make(Values, 0)
+	for _, item := range sfv {
+		item.Recursive(func(vo sfvm.ValueOperator) error {
+			switch v := vo.(type) {
+			case *Program:
+				ret = append(ret, v)
+			case *Value:
+				values = append(values, v)
+			}
+			return nil
+		})
+	}
+	for _, v := range MergeValues(values) {
+		ret = append(ret, v)
+	}
+	return &sfvm.ValueList{Values: ret}
+}

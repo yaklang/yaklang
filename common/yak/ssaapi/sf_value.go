@@ -73,8 +73,7 @@ func (v *Value) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.Va
 
 func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 	sf = append(sf, v)
-	vals := MergeValues(SyntaxFlowVariableToValues(sf...))
-	return vals, nil
+	return MergeSFValueOperator(sf...), nil
 }
 
 func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
@@ -94,7 +93,7 @@ func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 		return nil
 	})
 	if err != nil {
-		return sfvm.NewValues(nil), nil
+		return sfvm.NewEmptyValues(), nil
 	}
 	return v, nil
 }
@@ -157,7 +156,7 @@ func (v *Value) GetFields() (sfvm.ValueOperator, error) {
 		})
 		return sfvm.NewValues(members), nil
 	}
-	return sfvm.NewValues(nil), nil
+	return sfvm.NewEmptyValues(), nil
 }
 
 func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, error) {
@@ -175,11 +174,11 @@ func (v *Value) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
 	return v.GetOperands(), nil
 }
 func (v *Value) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return WithSyntaxFlowConfig(sfResult, sfConfig, v.GetTopDefs, config...), nil
+	return DataFlowWithSFConfig(sfResult, sfConfig, v.GetTopDefs, config...), nil
 }
 
 func (v *Value) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return WithSyntaxFlowConfig(sfResult, sfConfig, v.GetBottomUses, config...), nil
+	return DataFlowWithSFConfig(sfResult, sfConfig, v.GetBottomUses, config...), nil
 }
 
 func (v *Value) ListIndex(i int) (sfvm.ValueOperator, error) {
