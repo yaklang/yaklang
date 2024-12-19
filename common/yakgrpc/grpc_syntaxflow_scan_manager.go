@@ -30,7 +30,7 @@ type SyntaxFlowScanManager struct {
 	// task record
 	taskRecorder *schema.SyntaxFlowScanTask
 	// config record
-	config *ypb.SyntaxFlowScanRequest
+	config *SyntaxFlowScanTaskConfig
 	// }}
 
 	// config {{
@@ -108,14 +108,17 @@ func createEmptySyntaxFlowTaskByID(
 
 func CreateSyntaxflowTaskById(
 	taskId string, ctx context.Context,
-	config *ypb.SyntaxFlowScanRequest,
+	req *ypb.SyntaxFlowScanRequest,
 	stream ypb.Yak_SyntaxFlowScanServer,
 ) (*SyntaxFlowScanManager, error) {
 	m, err := createEmptySyntaxFlowTaskByID(taskId, ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := m.initByConfig(config, stream); err != nil {
+	m.config = &SyntaxFlowScanTaskConfig{
+		SyntaxFlowScanRequest: req,
+	}
+	if err := m.initByConfig(stream); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -145,6 +148,7 @@ func (m *SyntaxFlowScanManager) SaveTask() error {
 	m.taskRecorder.TotalQuery = m.totalQuery
 	m.taskRecorder.Kind = m.kind
 	m.taskRecorder.Config, _ = json.Marshal(m.config)
+	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
 	return schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
 }
 
@@ -163,19 +167,24 @@ func (m *SyntaxFlowScanManager) RestoreTask(stream ypb.Yak_SyntaxFlowScanServer)
 	m.riskCount = task.RiskCount
 	m.totalQuery = task.TotalQuery
 	m.kind = task.Kind
-	m.config = &ypb.SyntaxFlowScanRequest{}
+	m.config = &SyntaxFlowScanTaskConfig{}
 	if len(task.Config) == 0 {
 		return utils.Errorf("Config is empty")
 	}
-	err = json.Unmarshal(task.Config, m.config)
-	if err != nil {
+	if err = json.Unmarshal(task.Config, m.config); err != nil {
 		return utils.Wrapf(err, "Unmarshal SyntaxFlowScan Config: %v", task.Config)
 	}
-	m.initByConfig(m.config, stream)
+	if err := m.initByConfig(stream); err != nil {
+		return utils.Wrapf(err, "initByConfig failed")
+	}
 	return nil
 }
 
-func (m *SyntaxFlowScanManager) initByConfig(config *ypb.SyntaxFlowScanRequest, stream ypb.Yak_SyntaxFlowScanServer) error {
+func (m *SyntaxFlowScanManager) initByConfig(stream ypb.Yak_SyntaxFlowScanServer) error {
+	config := m.config
+	if config == nil {
+		return utils.Errorf("config is nil")
+	}
 	// init by config
 	if len(config.GetProgramName()) == 0 {
 		return utils.Errorf("program name is empty")
@@ -187,7 +196,6 @@ func (m *SyntaxFlowScanManager) initByConfig(config *ypb.SyntaxFlowScanRequest, 
 	taskId := m.TaskId()
 
 	m.stream = stream
-	m.config = config
 	yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
 		result.RuntimeID = taskId
 		return m.stream.Send(&ypb.SyntaxFlowScanResponse{
@@ -199,6 +207,7 @@ func (m *SyntaxFlowScanManager) initByConfig(config *ypb.SyntaxFlowScanRequest, 
 	m.client = yakitClient
 
 	if input := config.GetRuleInput(); input != nil {
+		// start debug mode scan task
 		ruleCh := make(chan *schema.SyntaxFlowRule)
 		go func() {
 			defer close(ruleCh)
@@ -211,17 +220,39 @@ func (m *SyntaxFlowScanManager) initByConfig(config *ypb.SyntaxFlowScanRequest, 
 		m.ruleChan = ruleCh
 		m.rulesCount = 1
 		m.kind = schema.SFResultKindDebug
+	} else if len(config.RuleNames) != 0 {
+		// resume task, use ruleNames
+		m.ruleChan = sfdb.YieldSyntaxFlowRules(
+			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), &ypb.SyntaxFlowRuleFilter{
+				RuleNames: config.RuleNames,
+			}),
+			m.ctx,
+		)
+		m.rulesCount = int64(len(config.RuleNames))
+		m.kind = schema.SFResultKindScan
 	} else if config.GetFilter() != nil {
 		m.ruleChan = sfdb.YieldSyntaxFlowRules(
 			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), config.GetFilter()),
 			m.ctx,
 		)
-		if rulesCount, err := yakit.QuerySyntaxFlowRuleCount(consts.GetGormProfileDatabase(), config.GetFilter()); err != nil {
+		var err error
+		{
+			db := consts.GetGormProfileDatabase()
+			db = db.Model(&schema.SyntaxFlowRule{})
+			db = yakit.FilterSyntaxFlowRule(db, config.GetFilter())
+			// get all rule name
+			var ruleNames []string
+			err = db.Pluck("rule_name", &ruleNames).Error
+			config.RuleNames = ruleNames
+		}
+		if err != nil {
 			return utils.Errorf("count rules failed: %s", err)
 		} else {
-			m.rulesCount = rulesCount
+			m.rulesCount = int64(len(config.RuleNames))
 		}
 		m.kind = schema.SFResultKindScan
+	} else {
+		return utils.Errorf("config is invalid")
 	}
 	m.totalQuery = m.rulesCount * int64(len(m.programs))
 	m.SaveTask()
