@@ -10,6 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+type SyntaxFlowScanTaskConfig struct {
+	*ypb.SyntaxFlowScanRequest
+	RuleNames []string `json:"rule_names"`
+}
+
 func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 	config, err := stream.Recv()
 	if err != nil {
