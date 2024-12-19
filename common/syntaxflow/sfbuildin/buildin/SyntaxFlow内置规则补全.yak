@@ -1,0 +1,39 @@
+path := cli.String("path", cli.setVerboseName("内置规则路径"),cli.setRequired(true),cli.setHelp("需要修改的内置规则组文件夹路径"))
+demoRule := cli.String("demo_rule", cli.setVerboseName("示例规则"),cli.setRequired(true),cli.setHelp("给Ai参考的标准规则的路径"))
+
+cli.check()
+aiChat = i => {
+    demoData = string(file.ReadFile(demoRule)~)
+    data = string(file.ReadFile(i)~)
+    prompt = f`
+    我会给你一些用于代码审计的规则，如下面这个例子:
+    ${demoData}
+    你需要完成以下要求：
+    1.其中desc是对规则进行描述，描述这个规则需要审计的是什么漏洞，并描述漏洞的危害;risk描述规则的风险类型;level描述规则的风险等级。
+    2.不要提及本规则相关的例子，因为这个例子不是给用户看的。
+    3.下面我要给你一些规则，如果规则有desc描述漏洞,risk和level，那么你不需要进行任何修改，返回一个"nochange"就行，
+    4.如果规则缺乏desc,risk或者level，请你进行补充，
+    5.你的回答只有返回补全后的规则就行。
+    6.你是一个专业的网络安全工程师，你补全的时候可以尽量使用网络安全领域的术语
+    ${data}
+    `
+    print(prompt)
+    rsp=ai.Chat(prompt)~
+    return rsp
+}
+
+filesys.Recursive(
+    path,
+    filesys.onFileStat(func(fileName ,info){
+        if !fileName.HasSuffix(".sf"){
+            return nil
+        }
+        rsp = aiChat(fileName)
+        if !rsp.Contains("nochange"){
+            f = file.Open(fileName)~
+            defer f.Close()
+            f.WriteString(rsp)
+        }
+    })
+)~
+
