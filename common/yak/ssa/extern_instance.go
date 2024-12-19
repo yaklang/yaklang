@@ -108,6 +108,7 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 			if ret := extern.BuildField(possibleKey.String()); ret == nil {
 				want := b.TryGetSimilarityKey(extern.GetName(), possibleKey.String())
 				b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), possibleKey.String(), want))
+				b.NewErrorWithPos(Error, SSATAG, possibleKey.GetRange(), ExternFieldError("Lib", extern.GetName(), possibleKey.String(), want))
 				return possibleRet
 			} else {
 				possibleRet = ret
