@@ -196,11 +196,15 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		return utils.Error("group is empty")
 	}
 
-	if isNew {
-		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
+	if payload, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
+		if !isNew {
 			return utils.Wrapf(err, "check group[%s]", group)
-		} else if ok {
+		}
+	} else if payload != nil {
+		if isNew {
 			return utils.Errorf("group[%s] exist", group)
+		} else if payload.Folder != nil && *payload.Folder != folder {
+			return utils.Error("group folder not match, maybe need to upgrade yakit")
 		}
 	}
 
@@ -312,11 +316,15 @@ func (s Server) SaveLargePayloadToFileStream(req *ypb.SavePayloadRequest, stream
 		return utils.Error("group is empty")
 	}
 
-	if isNew {
-		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
+	if payload, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
+		if !isNew {
 			return utils.Wrapf(err, "check group[%s]", group)
-		} else if ok {
+		}
+	} else if payload != nil {
+		if isNew {
 			return utils.Errorf("group[%s] exist", group)
+		} else if payload.Folder != nil && *payload.Folder != folder {
+			return utils.Error("group folder not match, maybe need to upgrade yakit")
 		}
 	}
 
@@ -424,11 +432,15 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 		return utils.Error("group is empty")
 	}
 
-	if isNew {
-		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
+	if payload, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
+		if !isNew {
 			return utils.Wrapf(err, "check group[%s]", group)
-		} else if ok {
+		}
+	} else if payload != nil {
+		if isNew {
 			return utils.Errorf("group[%s] exist", group)
+		} else if payload.Folder != nil && *payload.Folder != folder {
+			return utils.Error("group folder not match, maybe need to upgrade yakit")
 		}
 	}
 
