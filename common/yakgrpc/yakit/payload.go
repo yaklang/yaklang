@@ -104,12 +104,14 @@ func TrimWhitespaceExceptSpace(r rune) bool {
 	return false
 }
 
-func CheckExistGroup(db *gorm.DB, group string) (bool, error) {
-	var count int64
-	if db := db.Model(&schema.Payload{}).Where("`group` = ?", group).Count(&count); db.Error != nil {
-		return false, db.Error
+func CheckExistGroup(db *gorm.DB, group string) (*schema.Payload, error) {
+	var (
+		payload schema.Payload
+	)
+	if db := db.Model(&schema.Payload{}).Select("folder").Where("`group` = ?", group).First(&payload); db.Error != nil {
+		return nil, db.Error
 	}
-	return count > 0, nil
+	return &payload, nil
 }
 
 // save payload from file

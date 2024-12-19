@@ -148,6 +148,7 @@ func save2database(local ypb.YakClient, t *testing.T, group, folder, data string
 		FileName: []string{
 			fileName,
 		},
+		IsNew: true,
 	})
 
 	for {
@@ -189,6 +190,7 @@ func save2file(local ypb.YakClient, t *testing.T, group, folder, data string, er
 		FileName: []string{
 			fileName,
 		},
+		IsNew: true,
 	})
 
 	for {
@@ -220,6 +222,7 @@ func save2LargeFile(local ypb.YakClient, t *testing.T, ctx context.Context, grou
 		FileName: []string{
 			filename,
 		},
+		IsNew: true,
 	})
 
 	for {
@@ -789,7 +792,13 @@ func TestPayload(t *testing.T) {
 		group := uuid.NewString()
 		// save twice
 		save2database(local, t, group, "", data)
-		save2database(local, t, group, "", data)
+		save2database(local, t, group, "", data, func(t *testing.T, err error) {
+			if err == nil {
+				t.Fatal("expect error but got nil")
+			} else {
+				t.Log(err)
+			}
+		})
 		defer deleteGroup(local, t, group) // delete group
 
 		// query payload
