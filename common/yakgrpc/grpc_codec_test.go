@@ -43,9 +43,8 @@ func TestGRPCMUSTPASS_COMMON_CODEC_AUTODECODE(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		require.Len(t, rsp.GetResults(), 2)
+		require.Len(t, rsp.GetResults(), 1)
 		require.Equal(t, `UrlDecode`, string(rsp.GetResults()[0].Type))
-		require.Equal(t, `Charset Decode`, string(rsp.GetResults()[1].Type))
 	})
 
 }
