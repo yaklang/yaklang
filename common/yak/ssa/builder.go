@@ -169,6 +169,10 @@ func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 		// update parent  scope
 		build.parentScope.scope = newParentScopeLevel
 	}
+	if b.MarkedThisClassBlueprint != nil {
+		build.MarkedThisClassBlueprint = b.MarkedThisClassBlueprint
+	}
+
 	if build.CurrentRange == nil {
 		build.CurrentRange = newFunc.R
 	}

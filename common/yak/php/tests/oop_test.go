@@ -901,3 +901,93 @@ function main(){
 `
 	ssatest.CheckPrintlnValue(code, []string{"Undefined-$a.A_method(valid)(Undefined-A(Undefined-A))"}, t)
 }
+
+func TestOOP_Super_Class(t *testing.T) {
+	t.Run("test super class's field", func(t *testing.T) {
+		code := `
+<?php
+class ParentClass {
+    protected $name = "Parent";
+}
+
+class ChildClass extends ParentClass {
+    protected static $name = "Child";
+
+    public function display() {
+       println(parent::$name);
+    }
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			"\"Parent\"",
+		}, t)
+	})
+
+	t.Run("test super class's static field", func(t *testing.T) {
+		code := `
+<?php
+class ParentClass {
+    protected static $name = "Parent";
+}
+
+class ChildClass extends ParentClass {
+    protected static $name = "Child";
+
+    public function display() {
+       println(parent::$name);
+    }
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			"\"Parent\"",
+		}, t)
+	})
+
+	t.Run("test super class's static method", func(t *testing.T) {
+		code := `
+<?php
+class ParentClass {
+    public static function staticMethod() {
+        echo "This is the parent static method.";
+    }
+}
+
+class ChildClass extends ParentClass {
+    public static function staticMethod() {
+        echo "This is the child static method, overriding the parent static method.";
+    }
+
+    public static function callParentStaticMethod() {
+        println(parent::staticMethod());
+    }
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			"Function-ParentClass.staticMethod()",
+		}, t)
+	})
+
+	t.Run("test super class's  method", func(t *testing.T) {
+		code := `
+<?php
+class ParentClass {
+    public  function Method() {
+        echo "This is the parent static method.";
+    }
+}
+
+class ChildClass extends ParentClass {
+    public static function Method() {
+        echo "This is the child static method, overriding the parent static method.";
+    }
+
+    public static function callParentStaticMethod() {
+        println(parent::Method());
+    }
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			`Undefined-.Method(valid)("parent")`,
+		}, t)
+	})
+}
