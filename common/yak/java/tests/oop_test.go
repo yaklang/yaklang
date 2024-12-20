@@ -751,3 +751,78 @@ public class Encryption {
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+
+func TestJava_Super_Class(t *testing.T) {
+	t.Run("test super class's field", func(t *testing.T) {
+		code := `
+		class ParentClass {
+			public String parentString = "This is a parent string.";
+		}
+
+		class ChildClass extends ParentClass {
+			public String childString = "This is a child string.";
+
+			public void printParentString() {
+			println(super.parentString);
+		}
+		}
+		`
+		ssatest.CheckPrintlnValue(code, []string{"\"This is a parent string.\""}, t)
+	})
+
+	t.Run("test super class's static field", func(t *testing.T) {
+		code := `
+class ParentClass {
+    public static String parentString = "This is a parent string.";
+}
+
+class ChildClass extends ParentClass {
+    public String childString = "This is a child string.";
+
+    public void printParentString() {
+        println(super.parentString);
+    }
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{"\"This is a parent string.\""}, t)
+	})
+
+	t.Run("test super class method", func(t *testing.T) {
+		code := `
+class ParentClass {
+    public String getName() {
+		return "Parent";
+    }
+}
+
+class ChildClass extends ParentClass {
+    @Override
+    public String getName() {
+		println(super.getName());
+    }
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			`Undefined-.getName(valid)("super")`,
+		}, t)
+	})
+
+	t.Run("test super class static method", func(t *testing.T) {
+		code := `
+class ParentClass {
+    public static String getName() {
+		return "Parent";
+    }
+}
+
+class ChildClass extends ParentClass {
+    public String getName() {
+		println(super.getName());
+    }
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			"Function-ChildClass.getName()",
+		}, t)
+	})
+}

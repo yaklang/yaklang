@@ -550,7 +550,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		case ">>=":
 			opcode = ssa.OpShr
 		case ">>>=":
-			opcode = ssa.OpShr //todo: 无符号右移运算符
+			opcode = ssa.OpShr
 		case "&=":
 			opcode = ssa.OpAnd
 		case "|=":
@@ -589,7 +589,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		case ">>=":
 			opcode = ssa.OpShr
 		case ">>>=":
-			opcode = ssa.OpShr //todo: 无符号右移运算符
+			opcode = ssa.OpShr
 		case "&=":
 			opcode = ssa.OpAnd
 		case "|=":
@@ -740,24 +740,28 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 	if ret := i.Expression(); ret != nil {
 		return y.VisitExpression(ret)
 	}
+
 	if ret := i.THIS(); ret != nil {
-		//return y.ReadValue(ret.GetText())
 		text := ret.GetText()
 		if value := y.PeekValue(text); value != nil {
 			return value
-		} else {
-			return y.EmitConstInst(text)
 		}
+		return y.EmitConstInst(text)
 	}
+
 	if ret := i.SUPER(); ret != nil {
-		//return y.ReadValue(ret.GetText())
 		text := ret.GetText()
-		if value := y.PeekValue(text); value != nil {
-			return value
-		} else {
-			return y.EmitConstInst(text)
+		parent := y.PeekValue(text)
+		if parent == nil {
+			parent = y.EmitConstInst(text)
 		}
+		cls := y.MarkedThisClassBlueprint.GetSuperClass()
+		if parent != nil {
+			parent.SetType(cls)
+		}
+		return parent
 	}
+
 	if ret := i.Literal(); ret != nil {
 		return y.VisitLiteral(ret)
 	}
@@ -772,7 +776,6 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 		// TODO:  if not found class, not return any, create undefine class
 		return y.EmitTypeValue(typ)
 	}
-
 	return y.EmitUndefined(raw.GetText())
 }
 

@@ -395,6 +395,10 @@ func (v *BasePHPParserVisitor) VisitBackQuoteStringExpression(ctx *BackQuoteStri
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitMemberCallExpression(ctx *MemberCallExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitArrayCreationUnpackExpression(ctx *ArrayCreationUnpackExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -420,10 +424,6 @@ func (v *BasePHPParserVisitor) VisitPrintExpression(ctx *PrintExpressionContext)
 }
 
 func (v *BasePHPParserVisitor) VisitPostfixIncDecExpression(ctx *PostfixIncDecExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasePHPParserVisitor) VisitMemerCallExpression(ctx *MemerCallExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -488,6 +488,10 @@ func (v *BasePHPParserVisitor) VisitPrefixIncDecExpression(ctx *PrefixIncDecExpr
 }
 
 func (v *BasePHPParserVisitor) VisitComparisonExpression(ctx *ComparisonExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitParentExpression(ctx *ParentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

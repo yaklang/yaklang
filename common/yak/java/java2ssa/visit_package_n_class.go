@@ -98,9 +98,11 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 
 	var classContainerCallback []func(ssa.Value)
 	var classlessParents []string
+	var extendName string
 	if i.EXTENDS() != nil {
 		if extend := i.TypeType(); extend != nil {
 			parentName := extend.GetText()
+			extendName = parentName
 			classContainerCallback = append(classContainerCallback, func(value ssa.Value) {
 				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("extends"))
 				y.AssignVariable(variable, y.EmitConstInst(parentName))
@@ -110,9 +112,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		}
 	}
 
-	//haveImplements := false
 	if i.IMPLEMENTS() != nil {
-		//haveImplements = true
 		var implName []string
 		for _, val := range i.AllTypeList() {
 			implName = append(implName, val.GetText())
@@ -142,12 +142,17 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		for _, parentClass := range mergedTemplate {
-			if bluePrint := y.GetBluePrint(parentClass); bluePrint != nil {
+			bluePrint := y.GetBluePrint(parentClass)
+			if bluePrint != nil {
 				class.AddParentClass(bluePrint)
 			} else {
-				parentX := y.CreateBluePrint(parentClass)
-				y.AddFullTypeNameForAllImport(parentClass, parentX)
-				class.AddParentClass(parentX)
+				bluePrint = y.CreateBluePrint(parentClass)
+				y.AddFullTypeNameForAllImport(parentClass, bluePrint)
+				class.AddParentClass(bluePrint)
+			}
+
+			if parentClass == extendName {
+				class.SetSuperClass(bluePrint)
 			}
 		}
 	})

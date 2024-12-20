@@ -512,7 +512,8 @@ expression
     : Clone expression                                            # CloneExpression
     | newExpr                                                     # KeywordNewExpression
     | fullyQualifiedNamespaceExpr                                 # FullyQualifiedNamespaceExpression
-    | expression ObjectOperator memberCallKey                               #MemerCallExpression
+    | Parent_ DoubleColon memberCallKey                          # ParentExpression
+    | expression ObjectOperator memberCallKey                               #MemberCallExpression
     | expression '[' indexMemberCallKey ']'                       # IndexCallExpression
     | expression ObjectOperator?  OpenCurlyBracket indexMemberCallKey? CloseCurlyBracket  # IndexLegacyCallExpression
     | expression arguments                                        # FunctionCallExpression

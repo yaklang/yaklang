@@ -71,7 +71,22 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		return y.EmitCall(y.NewCall(val, []ssa.Value{}))
 	case *phpparser.VariableExpressionContext:
 		return y.VisitRightValue(ret.FlexiVariable())
-	case *phpparser.MemerCallExpressionContext:
+	case *phpparser.ParentExpressionContext:
+		text := ret.Parent_().GetText()
+		parent := y.PeekValue(text)
+		if parent == nil {
+			parent = y.EmitConstInst(text)
+		}
+		cls := y.MarkedThisClassBlueprint.GetSuperClass()
+		if cls != nil {
+			parent.SetType(cls)
+		}
+		key := y.VisitMemberCallKey(ret.MemberCallKey())
+		if y.isFunction {
+			return y.ReadMemberCallMethod(parent, key)
+		}
+		return y.ReadMemberCallValue(parent, key)
+	case *phpparser.MemberCallExpressionContext:
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitMemberCallKey(ret.MemberCallKey())
 		return y.ReadMemberCallValue(obj, key)
