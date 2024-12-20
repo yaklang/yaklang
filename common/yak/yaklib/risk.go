@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bot"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // NewRisk 创建一条漏洞记录结构体并保存到数据库中，第一个参数是目标URL，后面可以传入零个或多个选项参数，用于指定 risk 的结构
@@ -43,6 +44,45 @@ func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.
 		}
 		client.Output(risk)
 	}
+}
+
+// QueryRisks 根据风险记录的结构体查询风险记录，返回风险记录的管道
+// Example:
+// ```
+// for risk := range risk.QueryRisks(risk.severity("high"), risk.type("sqli"), risk.title("SQL注入漏洞")) {
+// println(risk)
+// }
+// ```
+func QueryRisks(opts ...yakit.RiskParamsOpt) chan *schema.Risk {
+	return queryRiskEx("", opts...)
+}
+
+// QueryRisksByKeyword 根据关键字查询风险记录，返回风险记录的管道
+// Example:
+// ```
+// for risk := range risk.QueryRisksByKeyword("SQL注入", risk.severity("high")) {
+// println(risk)
+// }
+// ```
+func QueryRisksByKeyword(keyword string, opts ...yakit.RiskParamsOpt) chan *schema.Risk {
+	return queryRiskEx(keyword, opts...)
+}
+
+func queryRiskEx(keyword string, opts ...yakit.RiskParamsOpt) chan *schema.Risk {
+	db := consts.GetGormProjectDatabase()
+	queryParams := &ypb.QueryRisksRequest{}
+	risk := &schema.Risk{}
+	for _, opt := range opts {
+		opt(risk)
+	}
+	queryParams.Severity = risk.Severity
+	queryParams.RiskType = risk.RiskType
+	queryParams.Title = risk.Title
+	queryParams.Network = risk.IP
+	queryParams.Tags = risk.Tags
+	queryParams.Search = keyword
+	db, _ = yakit.FilterByQueryRisks(db, queryParams)
+	return yakit.YieldRisks(db, context.Background())
 }
 
 // YieldRiskByTarget 根据目标(ip或ip:port)获取风险记录，返回风险记录的管道
@@ -174,6 +214,7 @@ var (
 	RiskExports = map[string]interface{}{
 		"CreateRisk":                yakit.CreateRisk,
 		"Save":                      yakit.SaveRisk,
+		"QueryRisksByKeyword":       QueryRisksByKeyword,
 		"NewRisk":                   YakitNewRiskBuilder(GetYakitClientInstance()),
 		"RegisterBeforeRiskSave":    yakit.RegisterBeforeRiskSave,
 		"YieldRiskByTarget":         YieldRiskByTarget,
@@ -219,7 +260,8 @@ var (
 		"level":                     yakit.WithRiskParam_Severity,
 		"fromYakScript":             yakit.WithRiskParam_FromScript,
 		"ignore":                    yakit.WithRiskParam_Ignore,
-
+		"ip":                        yakit.WithRiskParam_IP,
+		"tag":                       yakit.WithRiskParam_Tags,
 		// RandomPortTrigger
 
 	}
