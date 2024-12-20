@@ -397,8 +397,6 @@ func WithRiskParam_Severity(i string) RiskParamsOpt {
 			r.Severity = "info"
 		case "low", "default":
 			r.Severity = "low"
-		default:
-			r.Severity = "low"
 		}
 	}
 }
@@ -423,6 +421,18 @@ func WithRiskParam_FromScript(i string) RiskParamsOpt {
 func WithRiskParam_Ignore(i bool) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.Ignore = true
+	}
+}
+
+func WithRiskParam_IP(i string) RiskParamsOpt {
+	return func(r *schema.Risk) {
+		r.IP = i
+	}
+}
+
+func WithRiskParam_Tags(i string) RiskParamsOpt {
+	return func(r *schema.Risk) {
+		r.Tags = i
 	}
 }
 
@@ -484,7 +494,9 @@ func _createRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
 		r.RiskType = "info"
 		r.RiskTypeVerbose = "信息[默认]"
 	}
-
+	if r.Severity == "" {
+		r.Severity = "low"
+	}
 	return r
 }
 
