@@ -24,14 +24,15 @@ type Rule struct {
 	SourcePort         *PortRule    `json:"source_port"`
 	DestinationPort    *PortRule    `json:"destination_port"`
 
-	Sid       int
-	Rev       int
-	Gid       int
-	ClassType string
-	Reference map[string]string
-	Priority  int
-	Metadata  []string
-	Target    string // src_ip/dest_ip
+	SettingMap map[string]string
+	Sid        int
+	Rev        int
+	Gid        int
+	ClassType  string
+	Reference  map[string]string
+	Priority   int
+	Metadata   []string
+	Target     string // src_ip/dest_ip
 
 	ContentRuleConfig *ContentRuleConfig
 
