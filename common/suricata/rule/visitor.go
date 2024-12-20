@@ -7,7 +7,6 @@ type RuleSyntaxVisitor struct {
 	CompileRaw string
 	Errors     []error
 	Rules      []*Rule
-
 	// 设置环境变量规则
 	Config *config.Config
 }
