@@ -140,7 +140,10 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			vStr = strings.TrimSpace(setting.GetText())
 			ssts = setting.AllSingleSetting()
 		}
-
+		if rule.SettingMap == nil {
+			rule.SettingMap = make(map[string]string)
+		}
+		rule.SettingMap[key] = vStr
 		switch STATUS {
 		case HasNone:
 			if modifierMapping(key) != modifier.Default {
