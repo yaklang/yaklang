@@ -148,11 +148,7 @@ func AutoAnalyzeFile(filename string) (string, error) {
 	var buf strings.Builder
 	buf.WriteString(fmt.Sprintf("分析文件: %s\n", filename))
 	buf.WriteString("----------------------------------------\n")
-	for _, stat := range stats {
-		buf.WriteString(stat.Dump())
-		buf.WriteString("\n")
-	}
-
+	buf.WriteString(DumpFunctionStats(stats))
 	return buf.String(), nil
 }
 
@@ -168,4 +164,13 @@ func AutoAnalyzeRaw(reader io.Reader) ([]FunctionStat, error) {
 	}
 
 	return stats, nil
+}
+
+func DumpFunctionStats(stats []FunctionStat) string {
+	var buf strings.Builder
+	for _, f := range stats {
+		buf.WriteString(f.Dump())
+		buf.WriteString("\n")
+	}
+	return buf.String()
 }
