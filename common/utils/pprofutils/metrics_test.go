@@ -193,8 +193,8 @@ func TestNewCPUMonitor(t *testing.T) {
 	checked := false
 
 	db := consts.GetGormProfileDatabase()
-	yakit.SetKey(db, PPROFILEAUTOANALYZE_KEY, "true")
-	defer yakit.DelKey(db, PPROFILEAUTOANALYZE_KEY)
+	yakit.SetKey(db, consts.PPROFILEAUTOANALYZE_KEY, "true")
+	defer yakit.DelKey(db, consts.PPROFILEAUTOANALYZE_KEY)
 	AddCPUProfileCallback(func(stats []FunctionStat) {
 		for _, i := range stats {
 			fmt.Println(i.Dump())
