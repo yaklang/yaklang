@@ -17,12 +17,12 @@ func TestRuleStatistics(t *testing.T) {
 	for _, s := range rules {
 		var err error
 		func() {
-			//defer func() {
-			//	e := recover()
-			//	if e != nil {
-			//		err = fmt.Errorf("parse error: %v", e)
-			//	}
-			//}()
+			defer func() {
+				e := recover()
+				if e != nil {
+					err = fmt.Errorf("parse error: %v", e)
+				}
+			}()
 			mk := chaosmaker.NewChaosMaker()
 			if !strings.Contains(s, "webshell_caidao_php") {
 				return
