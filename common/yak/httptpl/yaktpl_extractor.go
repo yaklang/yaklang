@@ -11,6 +11,7 @@ import (
 
 	"github.com/antchfx/xmlquery"
 	"github.com/itchyny/gojq"
+	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -89,16 +90,20 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 					continue
 				}
 
-				for _, groupName := range y.RegexpMatchGroupName {
-					y.RegexpMatchGroup = append(y.RegexpMatchGroup, r.SubexpIndex(groupName))
+				var regexpMatchGroup []int
+				if len(y.RegexpMatchGroupName) > 0 {
+					for _, groupName := range y.RegexpMatchGroupName {
+						regexpMatchGroup = append(regexpMatchGroup, r.SubexpIndex(groupName))
+					}
 				}
-				// default match group 0
-				if len(y.RegexpMatchGroup) == 0 {
-					y.RegexpMatchGroup = []int{0}
+				regexpMatchGroup = lo.Uniq(append(regexpMatchGroup, y.RegexpMatchGroup...))
+				if len(regexpMatchGroup) == 0 {
+					regexpMatchGroup = []int{0}
 				}
+
 				// just append result which in match group
 				for _, res := range r.FindAllStringSubmatch(material, -1) {
-					for _, i := range y.RegexpMatchGroup {
+					for _, i := range regexpMatchGroup {
 						if i < len(res) {
 							addResult(res[i])
 						}
@@ -107,7 +112,7 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 			}
 		}
 	case "kv", "key-value", "kval":
-		kvResult := make(map[string]interface{}, 5)
+		var kvResult map[string]any
 		if y.Scope == "body" {
 			kvResult = ExtractKValFromBody(material)
 		} else {
