@@ -1404,3 +1404,22 @@ func Test_FuzztagCompletion(t *testing.T) {
 
 	})
 }
+
+func Test_FuzztagHover(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	t.Run("fuzztag name", func(t *testing.T) {
+		id := uuid.NewString()
+		resp := GetSuggestion(local, "hover", "fuzztag", t, ``, &ypb.Range{
+			Code:        "null",
+			StartLine:   2,
+			StartColumn: 2,
+			EndLine:     2,
+			EndColumn:   3,
+		}, id)
+		require.True(t, len(resp.SuggestionMessage) > 0)
+		require.Contains(t, resp.SuggestionMessage[0].Label, "生成一个空字节，如果指定了数量，将生成指定数量的空字节 {{null(5)}} 表示生成 5 个空字节")
+	})
+
+}
