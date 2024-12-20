@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/bytemap"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
 	"math"
-	"math/rand"
 )
 
 type ByteMapModifier interface {
@@ -34,7 +33,12 @@ func (m *ContentModifier) Modify(payload *bytemap.ByteMap) error {
 		lastpos, lastlen := payload.Last()
 		begin += lastpos + lastlen
 	}
-	begin = (begin + payload.Size()) % payload.Size()
+	ps := payload.Size()
+	if ps != 0 {
+		begin = (begin + payload.Size()) % payload.Size()
+	} else {
+		return nil
+	}
 
 	var end int
 	if m.Range == math.MaxInt {
@@ -53,9 +57,9 @@ func (m *ContentModifier) Modify(payload *bytemap.ByteMap) error {
 	}
 
 	if m.NoCase {
-		payload.Fill(allfree[rand.Intn(len(allfree))], nocaseFilter(m.Content))
+		payload.Fill(allfree, nocaseFilter(m.Content))
 	} else {
-		payload.Fill(allfree[rand.Intn(len(allfree))], m.Content)
+		payload.Fill(allfree, m.Content)
 	}
 	return nil
 }
@@ -92,9 +96,9 @@ func (m *RegexpModifier) Modify(payload *bytemap.ByteMap) error {
 	}
 
 	if m.Generator.IgnoreCase() {
-		payload.Fill(allfree[rand.Intn(len(allfree))], nocaseFilter(content))
+		payload.Fill(allfree, nocaseFilter(content))
 	} else {
-		payload.Fill(allfree[rand.Intn(len(allfree))], content)
+		payload.Fill(allfree, content)
 	}
 	return nil
 }

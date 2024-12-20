@@ -61,6 +61,9 @@ type ContentGen struct {
 }
 
 func (c *ContentGen) Gen() []byte {
+	if c.Len == 0 {
+		return nil
+	}
 	if c.Len >= 1<<20 {
 		log.Warnf("content length too large, generator aborted, plz check rules")
 		return nil

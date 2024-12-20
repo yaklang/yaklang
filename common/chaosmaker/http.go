@@ -65,7 +65,8 @@ func (h *httpGenerator) generator(count int) {
 		if raw == nil {
 			return
 		}
-		flow := CompleteTCPFlow(raw, 1500)
+		toClient := h.originRule.ContentRuleConfig.Flow != nil && h.originRule.ContentRuleConfig.Flow.ToClient
+		flow := MockCompleteTCPFlow(raw, toClient, 1500)
 		for _, packet := range flow {
 			h.out <- packet
 		}

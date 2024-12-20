@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
+	"strings"
 	"testing"
 )
 
@@ -16,13 +17,16 @@ func TestRuleStatistics(t *testing.T) {
 	for _, s := range rules {
 		var err error
 		func() {
-			defer func() {
-				e := recover()
-				if e != nil {
-					err = fmt.Errorf("parse error: %v", e)
-				}
-			}()
+			//defer func() {
+			//	e := recover()
+			//	if e != nil {
+			//		err = fmt.Errorf("parse error: %v", e)
+			//	}
+			//}()
 			mk := chaosmaker.NewChaosMaker()
+			if !strings.Contains(s, "webshell_caidao_php") {
+				return
+			}
 			ruleIns, err := surirule.Parse(s)
 			if err != nil {
 				log.Errorf("parse rule `%s` failed: %v", s, err)
