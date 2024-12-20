@@ -1,8 +1,8 @@
 package bytemap
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"math"
+	"math/rand"
 )
 
 // MAXLEN 1MB
@@ -46,7 +46,8 @@ func (m *ByteMap) Resize(size int) {
 
 // Fill without check if filled
 // if content is too large ByteMap will be resized to fit in
-func (m *ByteMap) Fill(offset int, content []byte) {
+func (m *ByteMap) Fill(offsetList []int, content []byte) {
+	offset := offsetList[rand.Intn(len(offsetList))]
 	if len(content)+offset > len(m.mp) {
 		m.Resize(1 << (math.Ilogb(float64(len(content)+offset)) + 1))
 	}
@@ -113,6 +114,9 @@ func (m *ByteMap) FindFreeRange(Len, begin, end int) []int {
 		return res
 	}
 	for i := begin; i < end; i++ {
+		if i < 0 {
+			println()
+		}
 		if m.filled[i] {
 			emptyLen = 0
 			continue
@@ -146,23 +150,23 @@ func (m *ByteMap) Trim(trimleft bool, trimright bool, targetLen int) {
 			lpos++
 		}
 	}
-
-	if rpos-lpos < targetLen {
-		remain := targetLen - (lpos - rpos)
-		lremain := lpos
-		rremain := len(m.mp) - rpos
-		minremain := utils.Min(lremain, rremain)
-		if remain <= 2*minremain {
-			lpos = lpos - remain/2
-			rpos = rpos + remain - remain/2
-		} else if lremain < rremain {
-			lpos = 0
-			rpos = rpos + (remain - lremain)
-		} else if lremain >= rremain {
-			lpos = lpos - (remain - rremain)
-			rpos = len(m.mp)
-		}
-	}
+	//
+	//if rpos-lpos < targetLen {
+	//	remain := targetLen - (lpos - rpos)
+	//	lremain := lpos
+	//	rremain := len(m.mp) - rpos
+	//	minremain := utils.Min(lremain, rremain)
+	//	if remain <= 2*minremain {
+	//		lpos = lpos - remain/2
+	//		rpos = rpos + remain - remain/2
+	//	} else if lremain < rremain {
+	//		lpos = 0
+	//		rpos = rpos + (remain - lremain)
+	//	} else if lremain >= rremain {
+	//		lpos = lpos - (remain - rremain)
+	//		rpos = len(m.mp)
+	//	}
+	//}
 
 	m.filled = m.filled[lpos:rpos]
 	m.mp = m.mp[lpos:rpos]
