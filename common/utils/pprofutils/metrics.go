@@ -18,6 +18,8 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"sync"
@@ -171,11 +173,23 @@ func executeMemCallbacks(metrics []FunctionStat) {
 }
 
 func init() {
+	exportReport := func(stats []FunctionStat) {
+		msg := DumpFunctionStats(stats)
+		path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), fmt.Sprintf("pprof_auto_analyze_%s.txt", time.Now().Format("20060102150405")))
+		err := os.WriteFile(path, []byte(msg), 0644)
+		if err != nil {
+			log.Errorf("write auto analyze report failed: %s", err)
+			return
+		}
+		log.Infof("auto analyze report exported to: %s", path)
+	}
 	AddCPUProfileCallback(func(stats []FunctionStat) {
 		log.Infof("High CPU usage detected, top consuming function: %v", stats[0].Dump())
+		exportReport(stats)
 	})
 	AddMemProfileCallback(func(stats []FunctionStat) {
 		log.Infof("High memory usage detected, top consuming function: %v", stats[0].Dump())
+		exportReport(stats)
 	})
 
 	db := consts.GetGormProfileDatabase()
