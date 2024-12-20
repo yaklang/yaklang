@@ -426,3 +426,17 @@ func Test_Return_phi(t *testing.T) {
 
 	})
 }
+
+func Test_Object_Type_Kind_Compare(t *testing.T) {
+	t.Run("cli.uiSchemaField and cli.uiSchemaGroup", func(t *testing.T) {
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: `
+cli.uiFieldGroups(
+	cli.uiField("a", 1),
+)`,
+			Want: []string{
+				ssa4analyze.ArgumentTypeError(1, "cli.uiSchemaField", "cli.uiSchemaGroup", "cli.uiFieldGroups"),
+			},
+		})
+	})
+}
