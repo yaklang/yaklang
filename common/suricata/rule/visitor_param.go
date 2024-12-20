@@ -104,7 +104,7 @@ func (m *MultipleBufferMatching) transfer(mdf modifier.Modifier) modifier.Modifi
 	return mdf
 }
 
-func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
+func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (parseError error) {
 	const (
 		HasNone = iota
 		HasContent
@@ -251,9 +251,9 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			if rule.ContentRuleConfig.Flow == nil {
 				lvstr := strings.ToLower(vStr)
 				rule.ContentRuleConfig.Flow = &FlowRule{
-					ToClient:    strings.Contains(lvstr, "to_client"),
+					ToClient:    strings.Contains(lvstr, "to_client") || strings.Contains(lvstr, "from_server"),
 					Established: strings.Contains(lvstr, "established"),
-					ToServer:    strings.Contains(lvstr, "to_server"),
+					ToServer:    strings.Contains(lvstr, "to_server") || strings.Contains(lvstr, "from_client"),
 				}
 			}
 		case "ttl":
@@ -452,6 +452,8 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			parsed, err := pcre.ParsePCREStr(contentRule.PCRE)
 			if err != nil {
 				v.Errorf("parsePCREStr err:%v", err)
+				parseError = fmt.Errorf("parsePCREStr err:%v", err)
+				return
 			}
 			contentRule.PCREParsed = parsed
 			contentRule.Modifier = parsed.Modifier()
@@ -502,4 +504,5 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 	}
 
 	rule.ContentRuleConfig.ContentRules = append(rule.ContentRuleConfig.ContentRules, contents...)
+	return
 }

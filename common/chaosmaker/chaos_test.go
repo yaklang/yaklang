@@ -400,6 +400,14 @@ func TestGenerateHttpTrafficBug(t *testing.T) {
 			name:    "unnamed bug1",
 			ruleStr: "alert http $HOME_NET any -> $EXTERNAL_NET any (msg: \"CobaltStrike download.windowsupdate.com C2 Profile\"; flow: established; content:\"msdownload\"; http_uri; pcre:\"/\\/c\\/msdownload\\/update\\/others\\/[\\d]{4}/\\d{2}/\\d{7,8}_[\\d\\w-_]{50,}\\.cab/UR\"; reference:url,github.com/bluscreenofjeff/MalleableC2Profiles/blob/master/microsoftupdate_getonly.profile; classtype:exploit-kit; sid: 3016002; rev: 1; metadata:created_at 2018_09_25,by al0ne; )",
 		},
+		{
+			name:    "from_server rule",
+			ruleStr: `alert tcp $HOME_NET 3306 -> any any (msg:"ET SCAN Non-Allowed Host Tried to Connect to MySQL Server"; flow:from_server,established; content:"|6A 04|Host|20 27|"; depth:70; content:"|27 20|is not allowed to connect to this MySQL server"; distance:0; reference:url,www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html; reference:url,doc.emergingthreats.net/2010493; classtype:attempted-recon; sid:2010493; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
+		},
+		{
+			name:    "pcre bug",
+			ruleStr: `alert http $HOME_NET any -> $EXTERNAL_NET any (msg: "CobaltStrike download.windowsupdate.com C2 Profile"; flow: established; content:"msdownload"; http_uri; pcre:"/\/c\/msdownload\/update\/others\/[\d]{4}/\d{2}/\d{7,8}_[\d\w-_]{50,}\.cab/UR"; reference:url,github.com/bluscreenofjeff/MalleableC2Profiles/blob/master/microsoftupdate_getonly.profile; classtype:exploit-kit; sid: 3016002; rev: 1; metadata:created_at 2018_09_25,by al0ne; )`,
+		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
 			ruleStr := testcase.ruleStr
@@ -422,5 +430,27 @@ func TestGenerateHttpTrafficBug(t *testing.T) {
 			}
 			assert.Equal(t, true, ok)
 		})
+	}
+}
+
+func _TestMatchFromServerKeywordBug(t *testing.T) {
+	ruleForMatch := "alert tcp $HOME_NET 3306 -> any any (msg:\"ET SCAN Non-Allowed Host Tried to Connect to MySQL Server\"; flow:from_server,established; content:\"|6A 04|Host|20 27|\"; depth:70; content:\"|27 20|is not allowed to connect to this MySQL server\"; distance:0; reference:url,www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html; reference:url,doc.emergingthreats.net/2010493; classtype:attempted-recon; sid:2010493; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)"
+	matcherRules, err := surirule.Parse(ruleForMatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	matcher := match.New(matcherRules[0])
+
+	ruleForMock := "alert tcp $HOME_NET 3306 -> any any (msg:\"ET SCAN Non-Allowed Host Tried to Connect to MySQL Server\"; flow:established; content:\"|6A 04|Host|20 27|\"; depth:70; content:\"|27 20|is not allowed to connect to this MySQL server\"; distance:0; reference:url,www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html; reference:url,doc.emergingthreats.net/2010493; classtype:attempted-recon; sid:2010493; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)"
+	rules, err := surirule.Parse(ruleForMock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mk := NewChaosMaker()
+	mk.FeedRule(rule.NewRuleFromSuricata(rules[0]))
+	for traffic := range mk.Generate() {
+		if matcher.Match(traffic) {
+			t.Fatal("should not match")
+		}
 	}
 }

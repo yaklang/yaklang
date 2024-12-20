@@ -118,6 +118,7 @@ func (g *TCPGen) Gen() []byte {
 	opts = append(opts, pcapx.WithIPv4_DstIP(g.r.DestinationAddress.Generate()))
 	opts = append(opts, pcapx.WithTCP_SrcPort(g.r.SourcePort.GetAvailablePort()))
 	opts = append(opts, pcapx.WithTCP_DstPort(g.r.DestinationPort.GetAvailablePort()))
+
 	opts = append(opts, pcapx.WithPayload(g.payload.Gen()))
 
 	raw, err := pcapx.PacketBuilder(opts...)

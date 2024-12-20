@@ -59,19 +59,6 @@ func (v *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 		return nil
 	}
 
-	defer func() {
-		if err := recover(); err != nil {
-			start := rule.GetStart()
-			end := rule.GetStop()
-			log.Errorf("visit rule %v (%v:%v-%v:%v) failed: %s",
-				rule.GetText(),
-				start.GetLine(), start.GetColumn(),
-				end.GetLine(), end.GetColumn(),
-				err,
-			)
-			//panic(err)
-		}
-	}()
 	ruleIns := &Rule{
 		Raw: strings.TrimSpace(rule.GetText()),
 	}
@@ -113,7 +100,11 @@ func (v *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 		return nil
 	}
 
-	v.VisitParams(params.(*parser.ParamsContext), ruleIns)
+	err := v.VisitParams(params.(*parser.ParamsContext), ruleIns)
+	if err != nil {
+		v.Errorf("visit params failed: %v", err)
+		return nil
+	}
 	v.Rules = append(v.Rules, ruleIns)
 	return nil
 }
