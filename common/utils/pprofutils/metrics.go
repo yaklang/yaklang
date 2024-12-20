@@ -28,8 +28,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-const PPROFILEAUTOANALYZE_KEY = "Pprof_File_Auto_Analyze"
-
 type MemMetrics struct {
 	// 当前分配的内存大小(字节)
 	// 这个值表示当前正在使用的内存量,会随着内存分配和垃圾回收而变化
@@ -189,7 +187,7 @@ func init() {
 			var buf = bytes.NewBuffer(nil)
 			for {
 				time.Sleep(time.Second)
-				if yakit.GetKey(db, PPROFILEAUTOANALYZE_KEY) != "true" {
+				if yakit.GetKey(db, consts.PPROFILEAUTOANALYZE_KEY) != "true" {
 					continue
 				}
 				cpuCallbackMutex.RLock()
@@ -239,7 +237,7 @@ func init() {
 		var buf = bytes.NewBuffer(nil)
 		for {
 			time.Sleep(time.Second)
-			if yakit.GetKey(db, PPROFILEAUTOANALYZE_KEY) != "true" {
+			if yakit.GetKey(db, consts.PPROFILEAUTOANALYZE_KEY) != "true" {
 				continue
 			}
 			memCallbackMutex.RLock()
