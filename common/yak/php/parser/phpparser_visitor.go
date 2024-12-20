@@ -298,6 +298,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#BackQuoteStringExpression.
 	VisitBackQuoteStringExpression(ctx *BackQuoteStringExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#MemberCallExpression.
+	VisitMemberCallExpression(ctx *MemberCallExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#ArrayCreationUnpackExpression.
 	VisitArrayCreationUnpackExpression(ctx *ArrayCreationUnpackExpressionContext) interface{}
 
@@ -318,9 +321,6 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#PostfixIncDecExpression.
 	VisitPostfixIncDecExpression(ctx *PostfixIncDecExpressionContext) interface{}
-
-	// Visit a parse tree produced by PHPParser#MemerCallExpression.
-	VisitMemerCallExpression(ctx *MemerCallExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#IncludeExpression.
 	VisitIncludeExpression(ctx *IncludeExpressionContext) interface{}
@@ -369,6 +369,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#ComparisonExpression.
 	VisitComparisonExpression(ctx *ComparisonExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#ParentExpression.
+	VisitParentExpression(ctx *ParentExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#IndexLegacyCallExpression.
 	VisitIndexLegacyCallExpression(ctx *IndexLegacyCallExpressionContext) interface{}

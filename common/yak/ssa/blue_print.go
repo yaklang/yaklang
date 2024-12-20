@@ -56,7 +56,9 @@ type Blueprint struct {
 
 	GeneralUndefined func(string) *Undefined
 
-	ParentClass []*Blueprint
+	ParentClass []*Blueprint // ParentClass All classes, including interfaces and parent classes
+	SuperClass  *Blueprint
+
 	// full Type Name
 	fullTypeName []string
 
@@ -106,6 +108,21 @@ func (c *Blueprint) AddParentClass(parent *Blueprint) {
 		c.RegisterConstMember(name, value)
 	}
 }
+
+func (c *Blueprint) SetSuperClass(parent *Blueprint) {
+	if parent == nil || c == nil {
+		return
+	}
+	c.SuperClass = parent
+}
+
+func (c *Blueprint) GetSuperClass() *Blueprint {
+	if c == nil {
+		return nil
+	}
+	return c.SuperClass
+}
+
 func (c *Blueprint) CheckExtendBy(kls string) bool {
 	for _, class := range c.ParentClass {
 		if strings.EqualFold(class.Name, kls) {
