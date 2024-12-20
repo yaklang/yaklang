@@ -114,9 +114,6 @@ func (m *ByteMap) FindFreeRange(Len, begin, end int) []int {
 		return res
 	}
 	for i := begin; i < end; i++ {
-		if i < 0 {
-			println()
-		}
 		if m.filled[i] {
 			emptyLen = 0
 			continue
