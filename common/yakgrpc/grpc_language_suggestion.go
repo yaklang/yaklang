@@ -1133,44 +1133,41 @@ func OnCompletion(
 	return ret
 }
 
-var fuzztagSuggestions []*ypb.SuggestionDescription
-var fuzztagSuggestionsOnce sync.Once
+var _fuzztagSuggestions []*ypb.SuggestionDescription
+var _fuzztagDescMap = make(map[string]string)
+var _fuzztagSuggestionsOnce sync.Once
+var tagDescFormatString = "**%s**\n\n%s\n\n**Example:**\n\n```http\n%s\n```"
 
-func getFuzztagName() []*ypb.SuggestionDescription {
-	fuzztagSuggestionsOnce.Do(func() {
+func getFuzztagSuggestion(tagName string, labelFormatString string, tagDesc *mutate.FuzzTagDescription) (string, *ypb.SuggestionDescription) {
+	tagLabel := fmt.Sprintf(labelFormatString, tagName, tagDesc.TagNameVerbose)
+	return tagLabel, &ypb.SuggestionDescription{
+		Label:       tagLabel,
+		Description: tagDesc.Description,
+		InsertText:  fmt.Sprintf(`%s($1)}}`, tagName),
+		Kind:        CompletionKindFunction,
+	}
+}
+
+func _getAllFuzztagSuggestionInfo() ([]*ypb.SuggestionDescription, map[string]string) {
+	_fuzztagSuggestionsOnce.Do(func() {
 		allTag := append(mutate.GetAllFuzztags(), append(mutate.FileTag(), mutate.CodecTag()...)...)
-		maxTagNameLength := 0
-		lo.ForEach(allTag, func(item *mutate.FuzzTagDescription, index int) {
-			if len(item.TagName) > maxTagNameLength {
-				maxTagNameLength = len(item.TagName)
-			}
-			lo.ForEach(item.Alias, func(alias string, index int) {
-				if len(alias) > maxTagNameLength {
-					maxTagNameLength = len(alias)
-				}
-			})
-		})
-		formatString := fmt.Sprintf("%%-%ds[%%s]", maxTagNameLength+4)
+		tagLabelFormatString := fmt.Sprintf("%%-%ds[%%s]", mutate.GetFuzztagMaxLength(allTag)+4)
 		for _, tag := range allTag {
-			fuzztagSuggestions = append(fuzztagSuggestions, &ypb.SuggestionDescription{
-				Label:       fmt.Sprintf(formatString, tag.TagName, tag.TagNameVerbose),
-				Description: tag.Description,
-				InsertText:  fmt.Sprintf(`%s($1)}}`, tag.TagName),
-				Kind:        CompletionKindFunction,
-			})
+			// tag name suggestion
+			tagLabel, tagSuggestion := getFuzztagSuggestion(tag.TagName, tagLabelFormatString, tag)
+			_fuzztagSuggestions = append(_fuzztagSuggestions, tagSuggestion)
+			_fuzztagDescMap[tag.TagName] = fmt.Sprintf(tagDescFormatString, tagLabel, tag.Description, strings.Join(tag.Examples, "\n"))
 
-			for _, alias := range tag.Alias {
-				fuzztagSuggestions = append(fuzztagSuggestions, &ypb.SuggestionDescription{
-					Label:       fmt.Sprintf(formatString, alias, tag.TagNameVerbose),
-					Description: tag.Description,
-					InsertText:  fmt.Sprintf(`%s($1)}}`, alias),
-					Kind:        CompletionKindFunction,
-				})
+			for _, alias := range tag.Alias { // alias suggesion
+				aliasLabel, aliasTagSuggestion := getFuzztagSuggestion(alias, tagLabelFormatString, tag)
+				_fuzztagSuggestions = append(_fuzztagSuggestions, aliasTagSuggestion)
+				_fuzztagDescMap[alias] = fmt.Sprintf(tagDescFormatString, aliasLabel, tag.Description, strings.Join(lo.Map(tag.Examples, func(item string, index int) string {
+					return strings.Replace(item, tag.TagName, alias, 1)
+				}), "\n"))
 			}
-
 		}
 	})
-	return fuzztagSuggestions
+	return _fuzztagSuggestions, _fuzztagDescMap
 }
 
 func getCodecPluginList() []*ypb.SuggestionDescription {
@@ -1194,8 +1191,27 @@ func FuzztagServer(req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLangu
 	case COMPLETION:
 		// ret
 		ret.SuggestionMessage = append(ret.SuggestionMessage, fuzztagCompletion(req.GetRange())...)
+	case HOVER:
+		// ret
+		ret.SuggestionMessage = append(ret.SuggestionMessage, fuzztagHover(req.GetRange())...)
 	}
 	return ret, true
+}
+
+func fuzztagHover(rng *ypb.Range) []*ypb.SuggestionDescription {
+	var suggestions []*ypb.SuggestionDescription
+	if rng == nil {
+		return suggestions
+	}
+
+	_, descMap := _getAllFuzztagSuggestionInfo()
+	desc, ok := descMap[rng.Code]
+	if ok {
+		suggestions = append(suggestions, &ypb.SuggestionDescription{
+			Label: desc,
+		})
+	}
+	return suggestions
 }
 
 func fuzztagCompletion(rng *ypb.Range) []*ypb.SuggestionDescription {
@@ -1208,7 +1224,7 @@ func fuzztagCompletion(rng *ypb.Range) []*ypb.SuggestionDescription {
 		if strings.HasPrefix(rng.Code, "{{codec(") {
 			return getCodecPluginList()
 		}
-		return getFuzztagName()
+		suggestions, _ = _getAllFuzztagSuggestionInfo()
 	}
 
 	return suggestions

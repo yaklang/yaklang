@@ -146,6 +146,22 @@ var (
 func GetAllFuzztags() []*FuzzTagDescription {
 	return existedFuzztag
 }
+
+func GetFuzztagMaxLength(tags []*FuzzTagDescription) int {
+	maxTagNameLength := 0
+	lo.ForEach(tags, func(item *FuzzTagDescription, index int) {
+		if len(item.TagName) > maxTagNameLength {
+			maxTagNameLength = len(item.TagName)
+		}
+		lo.ForEach(item.Alias, func(alias string, index int) {
+			if len(alias) > maxTagNameLength {
+				maxTagNameLength = len(alias)
+			}
+		})
+	})
+	return maxTagNameLength
+}
+
 func GetExistedFuzzTagMap() map[string]*parser.TagMethod {
 	if tagMethodMap == nil {
 		tagMethodMap = map[string]*parser.TagMethod{}
