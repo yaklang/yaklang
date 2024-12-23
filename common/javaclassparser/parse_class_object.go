@@ -1,10 +1,11 @@
 package javaclassparser
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io/ioutil"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type ClassObject struct {
@@ -17,6 +18,7 @@ type ClassObject struct {
 	ConstantPoolManager *ConstantPool
 	AccessFlags         uint16
 	AccessFlagsVerbose  []string
+	AccessFlagsToCode   string
 	ThisClass           uint16
 	ThisClassVerbose    string
 	SuperClass          uint16

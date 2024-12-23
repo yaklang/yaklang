@@ -270,7 +270,7 @@ func AddVerboseAndType(classObj *ClassObject, obj interface{}) {
 		}
 	case *MemberInfo:
 		ret.Type = MemberInfoType
-		ret.AccessFlagsVerbose = getFieldAccessFlagsVerbose(ret.AccessFlags)
+		ret.AccessFlagsVerbose, _ = getFieldAccessFlagsVerbose(ret.AccessFlags)
 		ret.NameIndexVerbose, _ = classObj.getUtf8(ret.NameIndex)
 		ret.DescriptorIndexVerbose, _ = classObj.getUtf8(ret.DescriptorIndex)
 		//ret.AccessFlagsVerbose, _ = classObj.getUtf8(ret.AccessFlags)

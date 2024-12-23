@@ -3,6 +3,10 @@ package javaclassparser
 import (
 	"errors"
 	"fmt"
+	"io"
+	"slices"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
@@ -10,9 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
-	"slices"
-	"strings"
 )
 
 type ClassObjectDumper struct {
@@ -66,11 +67,21 @@ func (c *ClassObjectDumper) UnTab() {
 	c.deepStack.Pop()
 }
 func (c *ClassObjectDumper) DumpClass() (string, error) {
-	accessFlagsVerbose := c.obj.AccessFlagsVerbose
+	// accessFlagsVerbose := c.obj.AccessFlagsVerbose
+	accessFlagsToCode := c.obj.AccessFlagsToCode
+
+	nonClassKeyword := false
+	for _, k := range c.obj.AccessFlagsVerbose {
+		if k == "interface" || k == "enum" || k == "annotation" {
+			nonClassKeyword = true
+			break
+		}
+	}
+
 	//if len(accessFlagsVerbose) < 1 {
 	//	return "", utils.Error("accessFlagsVerbose is empty")
 	//}
-	accessFlags := strings.Join(accessFlagsVerbose, " ")
+	accessFlags := accessFlagsToCode
 	name := c.obj.GetClassName()
 	splits := strings.Split(name, "/")
 	packageName := strings.Join(splits[:len(splits)-1], ".")
@@ -157,10 +168,11 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			attrs += fmt.Sprintf("\t%s\n", method)
 		}
 	}
-	if accessFlags != "" {
-		accessFlags = accessFlags + " "
+	var classKeyword string
+	if !nonClassKeyword {
+		classKeyword = "class"
 	}
-	result := fmt.Sprintf("%sclass %s%s {%s}", accessFlags, className, superStr, attrs)
+	result := fmt.Sprintf("%s%s %s%s {%s}", accessFlags, classKeyword, className, superStr, attrs)
 	if len(annoStrs) > 0 {
 		result = fmt.Sprintf("%s\n%s", strings.Join(annoStrs, "\n"), result)
 	}
@@ -179,11 +191,12 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 	result := []string{}
 	for _, field := range c.obj.Fields {
-		accessFlagsVerbose := getFieldAccessFlagsVerbose(field.AccessFlags)
+		accessFlagsVerbose, accessCode := getFieldAccessFlagsVerbose(field.AccessFlags)
 		//if len(accessFlagsVerbose) < 1 {
 		//	return nil, utils.Error("fields accessFlagsVerbose is empty")
 		//}
-		accessFlags := strings.Join(accessFlagsVerbose, " ")
+		_ = accessFlagsVerbose
+		accessFlags := accessCode
 		name, err := c.obj.getUtf8(field.NameIndex)
 		if err != nil {
 			return nil, err
@@ -333,18 +346,23 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	}
 
 	c.FuncCtx.IsStatic = method.AccessFlags&StaticFlag == StaticFlag
-	accessFlagsVerbose := getMethodAccessFlagsVerbose(method.AccessFlags)
+	accessFlagsVerbose, accessFlagCode := getMethodAccessFlagsVerbose(method.AccessFlags)
 
 	var isVarArgs bool
+	var abstractMethod bool
 	accessFlagsVerbose = lo.Filter(accessFlagsVerbose, func(item string, index int) bool {
 		if item == "varargs" {
 			isVarArgs = true
 			return false
 		}
+		if item == "abstract" {
+			abstractMethod = true
+		}
 		return true
 	})
+	_ = abstractMethod
 
-	accessFlags := strings.Join(accessFlagsVerbose, " ")
+	accessFlags := accessFlagCode
 	methodType, err := types.ParseMethodDescriptor(descriptor)
 	if err != nil {
 		return "", utils.Wrapf(err, "ParseMethodDescriptor(%v) failed", descriptor)
@@ -558,7 +576,14 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		methodSourceBuffer.Write([]byte(fmt.Sprintf("(%s)%s", paramsNewStr, exceptions)))
 	}
 	writeBlock := func(buffer io.Writer) {
-		methodSourceBuffer.Write([]byte(fmt.Sprintf(" {%s%s}", code, strings.Repeat("\t", c.TabNumber()))))
+		if abstractMethod {
+			methodSourceBuffer.Write([]byte(";"))
+		} else if code == "" {
+			methodSourceBuffer.Write([]byte(" {}"))
+		} else {
+			body := fmt.Sprintf(" {%s%s}", code, strings.Repeat("\t", c.TabNumber()))
+			methodSourceBuffer.WriteString(body)
+		}
 	}
 	writeReturnType := func(buffer io.Writer) {
 		methodSourceBuffer.Write([]byte(returnTypeStr + " "))
