@@ -157,28 +157,24 @@ func AvailableJWTTokensAlgs() []string {
 	return res
 }
 
-func JwtGenerate(alg string, extraData map[string]interface{}, typ string, key []byte) (string, error) {
-	return JwtGenerateEx(alg, nil, extraData, typ, key)
+func JwtGenerate(alg string, claims map[string]interface{}, typ string, key []byte) (string, error) {
+	return JwtGenerateEx(alg, nil, claims, typ, key)
 }
 
-func JwtGenerateEx(alg string, extraHeader map[string]interface{}, extraData map[string]interface{}, typ string, key []byte) (string, error) {
+func JwtGenerateEx(alg string, header map[string]interface{}, claims map[string]interface{}, typ string, key []byte) (string, error) {
 	token, err := NewJWTHelper(alg)
 	if err != nil {
 		return "", err
 	}
-	claims := make(jwt.MapClaims)
-	for k, v := range extraData {
-		claims[k] = v
-	}
-	token.Claims = claims
+	token.Claims = jwt.MapClaims(claims)
 	if typ == "" {
 		token.Header["typ"] = "JWT"
 	} else {
 		token.Header["typ"] = typ
 	}
 
-	if extraHeader != nil && len(extraHeader) > 0 {
-		for k, v := range extraHeader {
+	if header != nil && len(header) > 0 {
+		for k, v := range header {
 			token.Header[k] = v
 		}
 	}
