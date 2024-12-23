@@ -554,6 +554,22 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		}
 	}
 	c.UnTab()
+
+	if paramsNewStr == "" && abstractMethod {
+		paramList := []string{}
+		// fetch from method type
+		paramTypes := methodType.FunctionType().ParamTypes
+		for idx, t := range paramTypes {
+			typeName := t.String(funcCtx)
+			if isVarArgs && idx == len(paramTypes)-1 {
+				paramList = append(paramList, fmt.Sprintf("%s... var%d", typeName, idx))
+			} else {
+				paramList = append(paramList, fmt.Sprintf("%s var%d", typeName, idx))
+			}
+		}
+		paramsNewStr = strings.Join(paramList, ", ")
+	}
+
 	if isLambda {
 		res := fmt.Sprintf("(%s) -> {%s", paramsNewStr, code)
 		res += strings.Repeat("\t", c.TabNumber()) + "}"
