@@ -170,7 +170,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 	var classKeyword string
 	if !nonClassKeyword {
-		classKeyword = "class"
+		classKeyword = " class"
 	}
 	result := fmt.Sprintf("%s%s %s%s {%s}", accessFlags, classKeyword, className, superStr, attrs)
 	if len(annoStrs) > 0 {
