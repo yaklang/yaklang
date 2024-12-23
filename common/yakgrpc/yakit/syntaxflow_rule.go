@@ -76,11 +76,22 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 }
 
 func DeleteSyntaxFlowRule(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest) (int64, error) {
+	return deleteSyntaxFlowRuleEx(db, params)
+}
+
+func DeleteSyntaxFlowNonBuildInRule(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest) (int64, error) {
+	return deleteSyntaxFlowRuleEx(db, params, false)
+}
+
+func deleteSyntaxFlowRuleEx(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest, isBuildIn ...bool) (int64, error) {
 	db = db.Model(&schema.SyntaxFlowRule{})
 	if params == nil || params.Filter == nil {
 		return 0, utils.Errorf("delete syntaxFlow rule failed: synatx flow filter is nil")
 	}
 	db = FilterSyntaxFlowRule(db, params.Filter)
+	if len(isBuildIn) > 0 {
+		db = bizhelper.QueryByBool(db, "is_build_in_rule", isBuildIn[0])
+	}
 	db = db.Unscoped().Delete(&schema.SyntaxFlowRule{})
 	return db.RowsAffected, db.Error
 }
