@@ -316,7 +316,7 @@ lastFormalParameter
     ;
 
 // local variable type inference
-lambdaLVTIList
+ lambdaLVTIList
     : lambdaLVTIParameter (',' lambdaLVTIParameter)*
     ;
 
@@ -748,10 +748,10 @@ lambdaExpression
 
 // Java8
 lambdaParameters
-    : identifier
-    | '(' formalParameterList? ')'
-    | '(' identifier (',' identifier)* ')'
-    | '(' lambdaLVTIList? ')'
+    : identifier                            # SingleLambdaParameter
+    | '(' formalParameterList? ')'          # FormalLambdaParameters
+    | '(' identifier (',' identifier)* ')'  # MultiLambdaParameters
+    | '(' lambdaLVTIList? ')'               # LambdaLVTIParameters
     ;
 
 // Java8

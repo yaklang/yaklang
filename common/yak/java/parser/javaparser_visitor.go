@@ -499,8 +499,17 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#lambdaExpression.
 	VisitLambdaExpression(ctx *LambdaExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#lambdaParameters.
-	VisitLambdaParameters(ctx *LambdaParametersContext) interface{}
+	// Visit a parse tree produced by JavaParser#SingleLambdaParameter.
+	VisitSingleLambdaParameter(ctx *SingleLambdaParameterContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#FormalLambdaParameters.
+	VisitFormalLambdaParameters(ctx *FormalLambdaParametersContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#MultiLambdaParameters.
+	VisitMultiLambdaParameters(ctx *MultiLambdaParametersContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#LambdaLVTIParameters.
+	VisitLambdaLVTIParameters(ctx *LambdaLVTIParametersContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#lambdaBody.
 	VisitLambdaBody(ctx *LambdaBodyContext) interface{}

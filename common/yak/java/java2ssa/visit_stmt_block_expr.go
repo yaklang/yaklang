@@ -1019,15 +1019,15 @@ func (y *builder) VisitLocalTypeDeclaration(raw javaparser.ILocalTypeDeclaration
 	return nil
 }
 
-func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDeclarationContext) interface{} {
+func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDeclarationContext) {
 	if y == nil || raw == nil || y.IsStop() {
-		return nil
+		return
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.LocalVariableDeclarationContext)
 	if i == nil {
-		return nil
+		return
 	}
 
 	if ret := i.Identifier(); ret != nil {
@@ -1046,8 +1046,7 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 			y.VisitVariableDeclarator(decl, typ)
 		}
 	}
-
-	return nil
+	return
 }
 
 func (y *builder) OnlyVisitVariableDeclaratorName(raw javaparser.IVariableDeclaratorContext) string {
@@ -1827,8 +1826,86 @@ func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext)
 	if i == nil {
 		return nil
 	}
-	return y.EmitConstInstNil()
-	// todo lambda表达式
+	newFunc := y.NewFunc("")
+	y.FunctionBuilder = y.PushFunction(newFunc)
+	{
+		y.VisitLambdaParameters(i.LambdaParameters())
+		y.VisitLamdaBody(i.LambdaBody())
+		y.Finish()
+	}
+	y.FunctionBuilder = y.PopFunction()
+	return newFunc
+}
+
+func (y *builder) VisitLambdaParameters(raw javaparser.ILambdaParametersContext) {
+	if y == nil || raw == nil || y.IsStop() {
+		return
+	}
+
+	switch ret := raw.(type) {
+	case *javaparser.SingleLambdaParameterContext:
+		y.NewParam(ret.Identifier().GetText())
+	case *javaparser.FormalLambdaParametersContext:
+		y.VisitFormalParameterList(ret.FormalParameterList())
+	case *javaparser.MultiLambdaParametersContext:
+		for _, id := range ret.AllIdentifier() {
+			y.NewParam(id.GetText())
+		}
+	case *javaparser.LambdaLVTIParametersContext:
+		if ret.LambdaLVTIList() != nil {
+			y.VisitLambdaLVTIList(ret.LambdaLVTIList())
+		}
+	}
+}
+
+func (y *builder) VisitLamdaBody(raw javaparser.ILambdaBodyContext) {
+	if y == nil || raw == nil || y.IsStop() {
+		return
+	}
+	i := raw.(*javaparser.LambdaBodyContext)
+	if i == nil {
+		return
+	}
+
+	if i.Expression() != nil {
+		y.VisitExpression(i.Expression())
+	} else if i.Block() != nil {
+		y.VisitBlock(i.Block())
+	}
+}
+
+func (y *builder) VisitLambdaLVTIList(raw javaparser.ILambdaLVTIListContext) {
+	if y == nil || raw == nil || y.IsStop() {
+		return
+	}
+
+	i := raw.(*javaparser.LambdaLVTIListContext)
+	if i == nil {
+		return
+	}
+	for _, lv := range i.AllLambdaLVTIParameter() {
+		y.VisitLambdaLVTIParameter(lv)
+	}
+}
+
+func (y *builder) VisitLambdaLVTIParameter(raw javaparser.ILambdaLVTIParameterContext) {
+	if y == nil || raw == nil || y.IsStop() {
+		return
+	}
+	i := raw.(*javaparser.LambdaLVTIParameterContext)
+	if i == nil {
+		return
+	}
+
+	var insCallbacks []func(ssa.Value)
+	for _, modifier := range i.AllVariableModifier() {
+		_, insCallback := y.VisitVariableModifier(modifier)
+		insCallbacks = append(insCallbacks, insCallback)
+	}
+	param := y.NewParam(i.Identifier().GetText())
+	for _, insCallback := range insCallbacks {
+		insCallback(param)
+	}
 }
 
 func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
