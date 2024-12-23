@@ -175,7 +175,11 @@ func executeMemCallbacks(metrics []FunctionStat) {
 func init() {
 	exportReport := func(stats []FunctionStat) {
 		msg := DumpFunctionStats(stats)
-		path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), fmt.Sprintf("pprof_auto_analyze_%s.txt", time.Now().Format("20060102150405")))
+		now := time.Now()
+		formattedTime := fmt.Sprintf("%d-%02d-%02d-%02d-%02d-%02d",
+			now.Year(), now.Month(), now.Day(),
+			now.Hour(), now.Minute(), now.Second())
+		path := filepath.Join(consts.GetDefaultYakitPprofDir(), fmt.Sprintf("pprof-log-%s.txt", formattedTime))
 		err := os.WriteFile(path, []byte(msg), 0644)
 		if err != nil {
 			log.Errorf("write auto analyze report failed: %s", err)

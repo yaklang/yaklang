@@ -269,3 +269,11 @@ func GetDefaultYakitEngineDir() string {
 	}
 	return pt
 }
+
+func GetDefaultYakitPprofDir() string {
+	pt := filepath.Join(GetDefaultYakitBaseDir(), "pprof-log")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
