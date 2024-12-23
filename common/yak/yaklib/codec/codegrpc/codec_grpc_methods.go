@@ -1048,6 +1048,9 @@ func (flow *CodecExecFlow) Packet2cURL(https bool) error {
 // Desc = """JWT（JSON Web Token）是一种开放标准（RFC 7519），用于在网络应用间安全地传输声明信息，通常用于身份验证和信息交换。"""
 func (flow *CodecExecFlow) JwtParse() error {
 	token, key, err := authhack.JwtParse(string(flow.Text))
+	if err == authhack.ErrKeyNotFound {
+		err = nil
+	}
 	if err != nil || token == nil {
 		return utils.Errorf("codec JWT解析 failed: %s", err)
 	}
@@ -1060,7 +1063,7 @@ func (flow *CodecExecFlow) JwtParse() error {
 		"claims":                    token.Claims,
 		"secret_key":                utils.EscapeInvalidUTF8Byte(key),
 	}, "", "    ")
-	return nil
+	return err
 }
 
 // Tag = "其他"
@@ -1068,10 +1071,13 @@ func (flow *CodecExecFlow) JwtParse() error {
 // Desc = """JWT（JSON Web Token）是一种开放标准（RFC 7519），用于在网络应用间安全地传输声明信息，通常用于身份验证和信息交换。"""
 // Params = [
 // { Name = "algorithm", Type = "select",DefaultValue = "HS256",Options = ["ES384","ES256","ES512","HS256","HS384","HS512","PS256","PS384","PS512","RS256","RS384","RS512","None"], Required = true , Label = "签名算法"},
-// { Name = "key", Type = "input", Required = true , Label = "JWT密钥"},
+// { Name = "key", Type = "input", Required = false , Label = "JWT密钥"},
 // { Name = "isBase64", Type = "checkbox", Required = true , Label = "base64编码"},
 // ]
 func (flow *CodecExecFlow) JwtSign(algorithm string, key []byte, isBase64 bool) error {
+	if len(key) == 0 && algorithm != "None" {
+		return utils.Error("codec JWT签名失败: 未提供密钥")
+	}
 	if !gjson.Valid(string(flow.Text)) {
 		return utils.Error("codec JWT签名失败: json格式错误")
 	}
@@ -1088,6 +1094,41 @@ func (flow *CodecExecFlow) JwtSign(algorithm string, key []byte, isBase64 bool) 
 		}
 	}
 	jwtSign, err := authhack.JwtGenerate(algorithm, data, "", key)
+	if err != nil {
+		return utils.Wrapf(err, "codec JWT签名失败")
+	}
+	flow.Text = []byte(jwtSign)
+	return nil
+}
+
+// Tag = "其他"
+// CodecName = "JWT解析签名"
+// Desc = """JWT（JSON Web Token）是一种开放标准（RFC 7519），用于在网络应用间安全地传输声明信息，通常用于身份验证和信息交换。此处提供了JWT解析签名功能,将JWT解析中返回的json格式重新签名为JWT。"""
+// Params = [
+// ]
+func (flow *CodecExecFlow) JwtReverseSign() error {
+	if !gjson.Valid(string(flow.Text)) {
+		return utils.Error("codec JWT解析签名失败: json格式错误")
+	}
+	res := gjson.ParseBytes(flow.Text)
+	alg := res.Get("alg").String()
+	claims := make(map[string]any)
+	res.Get("claims").ForEach(func(key, value gjson.Result) bool {
+		claims[key.String()] = value.Value()
+		return true
+	})
+	headers := make(map[string]any)
+	headerMap := res.Get("header").Map()
+	for k, v := range headerMap {
+		headers[k] = v.Value()
+	}
+	typ := "None"
+	if iTyp, ok := headerMap["typ"]; ok {
+		typ = iTyp.String()
+	}
+	key := res.Get("secret_key").String()
+
+	jwtSign, err := authhack.JwtGenerateEx(alg, headers, claims, typ, []byte(key))
 	if err != nil {
 		return utils.Wrapf(err, "codec JWT签名失败")
 	}
