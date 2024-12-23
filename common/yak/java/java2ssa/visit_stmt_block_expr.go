@@ -76,12 +76,8 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
-	// fmt.Printf("exp = %v\n", raw.GetText())
-
 	var opcode ssa.BinaryOpcode
 	var unaryOpcode ssa.UnaryOpcode
-	var variable *ssa.Variable
-	var value ssa.Value
 	var handlerJumpExpression = func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value) ssa.Value {
 		// 为了聚合产生Phi指令
 		id := uuid.NewString()
@@ -193,35 +189,31 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return value
 	case *javaparser.PostfixExpression1Context:
 		// 处理后缀表达式，如自增、自减操作
-		expr := y.VisitExpression(ret.Expression())
-		if sliceCall := ret.LeftSliceCall(); sliceCall != nil {
-			if s := sliceCall.(*javaparser.LeftSliceCallContext).Expression(); s != nil {
-				index := y.VisitExpression(s)
-				variable = y.CreateMemberCallVariable(expr, index)
-			}
-		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
-			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-				object := expr
-				key := y.VisitLeftMemberCall(memberCall)
-				variable = y.CreateMemberCallVariable(object, key)
-			}
+		var variable *ssa.Variable
+		var value ssa.Value
+
+		obj := y.VisitExpression(ret.Expression())
+		if lsc := ret.LeftSliceCall(); lsc != nil {
+			variable = y.VisitLeftSliceCall(lsc, obj)
+		} else if lmc := ret.LeftMemberCall(); lmc != nil {
+			variable = y.VisitLeftMemberCall(lmc, obj)
 		}
 
 		if variable == nil {
-			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
-			return nil
+			//log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
+			return y.EmitUndefined(raw.GetText())
 		}
-
 		if postfix := ret.GetPostfix().GetText(); postfix == "++" {
 			value = y.EmitBinOp(ssa.OpAdd, y.ReadValueByVariable(variable), y.EmitConstInst(1))
 		} else if postfix == "--" {
 			value = y.EmitBinOp(ssa.OpSub, y.ReadValueByVariable(variable), y.EmitConstInst(1))
 		}
-
 		y.AssignVariable(variable, value)
 		return value
 
 	case *javaparser.PostfixExpression2Context:
+		var variable *ssa.Variable
+		var value ssa.Value
 		if s := ret.Identifier(); s != nil {
 			text := s.GetText()
 			variable = y.CreateVariable(text)
@@ -242,6 +234,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 
 	case *javaparser.PrefixUnaryExpressionContext:
 		// 处理前缀表达式，如正负号、逻辑非等
+		var value ssa.Value
 		if ret.Expression() != nil {
 			value = y.VisitExpression(ret.Expression())
 		} else {
@@ -264,23 +257,16 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return y.EmitUnOp(unaryOpcode, value)
 	case *javaparser.PrefixBinayExpression1Context:
 		// 处理前缀表达式中的"--"和"++"
-		expr := y.VisitExpression(ret.Expression())
-
-		if sliceCall := ret.LeftSliceCall(); sliceCall != nil {
-			if s := sliceCall.(*javaparser.LeftSliceCallContext).Expression(); s != nil {
-				index := y.VisitExpression(s)
-				variable = y.CreateMemberCallVariable(expr, index)
-			}
-		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
-			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-				object := expr
-				key := y.VisitLeftMemberCall(memberCall)
-				variable = y.CreateMemberCallVariable(object, key)
-			}
+		var variable *ssa.Variable
+		var value ssa.Value
+		obj := y.VisitExpression(ret.Expression())
+		if lsc := ret.LeftSliceCall(); lsc != nil {
+			variable = y.VisitLeftSliceCall(lsc, obj)
+		} else if lmc := ret.LeftMemberCall(); lmc != nil {
+			variable = y.VisitLeftMemberCall(lmc, obj)
 		}
-
 		if variable == nil {
-			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
+			//log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
 			return y.EmitUndefined(raw.GetText())
 		}
 
@@ -293,6 +279,8 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return value
 
 	case *javaparser.PrefixBinayExpression2Context:
+		var variable *ssa.Variable
+		var value ssa.Value
 		if s := ret.Identifier(); s != nil {
 			text := s.GetText()
 			variable = y.CreateVariable(text)
@@ -515,20 +503,14 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		}
 	case *javaparser.AssignmentExpression1Context:
 		// 处理赋值表达式，包括所有赋值运算符
-		expr := y.VisitExpression(ret.Expression(0))
-		if sliceCall := ret.LeftSliceCall(); sliceCall != nil {
-			if s := sliceCall.(*javaparser.LeftSliceCallContext).Expression(); s != nil {
-				index := y.VisitExpression(s)
-				variable = y.CreateMemberCallVariable(expr, index)
-			}
-		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
-			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-				object := expr
-				key := y.VisitLeftMemberCall(memberCall)
-				variable = y.CreateMemberCallVariable(object, key)
-			}
+		var variable *ssa.Variable
+		var value ssa.Value
+		obj := y.VisitExpression(ret.Expression(0))
+		if lsc := ret.LeftSliceCall(); lsc != nil {
+			variable = y.VisitLeftSliceCall(lsc, obj)
+		} else if lmc := ret.LeftMemberCall(); lmc != nil {
+			variable = y.VisitLeftMemberCall(lmc, obj)
 		}
-
 		if variable == nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
 			return y.EmitUndefined(raw.GetText())
@@ -561,12 +543,14 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
 			return y.EmitUndefined(raw.GetText())
 		}
-		value := y.EmitBinOp(opcode, y.ReadValueByVariable(variable), v)
+		value = y.EmitBinOp(opcode, y.ReadValueByVariable(variable), v)
 		y.AssignVariable(variable, value)
 		return value
 
 	case *javaparser.AssignmentExpression2Context:
 		// 处理赋值表达式，包括所有赋值运算符
+		var variable *ssa.Variable
+		var value ssa.Value
 		variable = y.CreateVariable(ret.Identifier().GetText())
 		if variable == nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignLeftSideEmpty())
@@ -600,31 +584,22 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
 			return y.EmitUndefined(raw.GetText())
 		}
-		value := y.EmitBinOp(opcode, y.ReadValueByVariable(variable), v)
+		value = y.EmitBinOp(opcode, y.ReadValueByVariable(variable), v)
 		y.AssignVariable(variable, value)
 		return value
 
 	case *javaparser.AssignmentEqExpression1Context:
 		// 处理赋值表达式的等于号
-		expr := y.VisitExpression(ret.Expression(0))
-		if sliceCall := ret.LeftSliceCall(); sliceCall != nil {
-			if s := sliceCall.(*javaparser.LeftSliceCallContext).Expression(); s != nil {
-				index := y.VisitExpression(s)
-				variable = y.CreateMemberCallVariable(expr, index)
-			}
-		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
-			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-				object := expr
-				key := y.VisitLeftMemberCall(memberCall)
-				member := y.CreateMemberCallVariable(object, key)
-				if id := ret.Identifier(); id != nil {
-					value = y.ReadValue(id.GetText())
-				} else if ret.Expression(1) != nil {
-					value = y.VisitExpression(ret.Expression(1))
-				}
-				y.AssignVariable(member, value)
-				return value
-			}
+		var variable *ssa.Variable
+		var value ssa.Value
+		obj := y.VisitExpression(ret.Expression(0))
+		if lsc := ret.LeftSliceCall(); lsc != nil {
+			variable = y.VisitLeftSliceCall(lsc, obj)
+		} else if lmc := ret.LeftMemberCall(); lmc != nil {
+			variable = y.VisitLeftMemberCall(lmc, obj)
+		}
+		if variable == nil {
+			return y.EmitUndefined(raw.GetText())
 		}
 
 		if id := ret.Identifier(); id != nil {
@@ -634,10 +609,12 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		}
 		y.AssignVariable(variable, value)
 		return value
-
 	case *javaparser.AssignmentEqExpression2Context:
 		// 处理赋值表达式的等于号
-		if s := ret.Identifier(0); s != nil {
+		var variable *ssa.Variable
+		var value ssa.Value
+		s := ret.Identifier(0)
+		if s != nil {
 			recoverRange := y.SetRange(s)
 			name := s.GetText()
 			if clazz := y.MarkedThisClassBlueprint; clazz != nil {
@@ -659,7 +636,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			value = y.VisitExpression(expr)
 		}
 		y.AssignVariable(variable, value)
-		return nil
+		return value
 	case *javaparser.Java8LambdaExpressionContext:
 		// 处理 Java 8 的 lambda 表达式
 		return y.VisitLambdaExpression(ret.LambdaExpression())
@@ -775,23 +752,6 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 		typ := y.VisitTypeTypeOrVoid(ret)
 		// TODO:  if not found class, not return any, create undefine class
 		return y.EmitTypeValue(typ)
-	}
-	return y.EmitUndefined(raw.GetText())
-}
-
-func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext) ssa.Value {
-	if y == nil || raw == nil || y.IsStop() {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*javaparser.LeftMemberCallContext)
-	if i == nil {
-		return nil
-	}
-	if i.Identifier() != nil {
-		return y.EmitConstInst(i.Identifier().GetText())
 	}
 	return y.EmitUndefined(raw.GetText())
 }
@@ -2101,4 +2061,32 @@ func (y *builder) VisitSwitchLabel(raw javaparser.ISwitchLabelContext) (JavaSwit
 		return DEFAULT, y.VisitExpressionList(i.ExpressionList())
 	}
 	return "", nil
+}
+
+func (y *builder) VisitLeftSliceCall(raw javaparser.ILeftSliceCallContext, object ssa.Value) *ssa.Variable {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.LeftSliceCallContext)
+	if i == nil {
+		return nil
+	}
+	index := y.VisitExpression(i.Expression())
+	return y.CreateMemberCallVariable(object, index)
+}
+
+func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext, object ssa.Value) *ssa.Variable {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.LeftMemberCallContext)
+	if i == nil {
+		return nil
+	}
+	name := i.Identifier().GetText()
+	return y.CreateMemberCallVariable(object, y.EmitConstInst(name))
 }
