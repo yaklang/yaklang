@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/samber/lo"
@@ -212,7 +213,29 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 		fieldTypeStr := fieldType.String(c.FuncCtx)
 		c.FuncCtx.Import(fieldTypeStr)
 		lastPacket := c.FuncCtx.ShortTypeName(fieldTypeStr)
-		if slices.Contains(accessFlagsVerbose, "final") && c.fieldDefaultValue[name] != "" {
+
+		valueLiteral := ""
+		for _, attr := range field.Attributes {
+			switch ret := attr.(type) {
+			case *ConstantValueAttribute:
+				value, err := c.obj.getConstantInfo(ret.ConstantValueIndex)
+				if err != nil {
+					log.Errorf("getConstantInfo(%d) failed", ret.ConstantValueIndex)
+					continue
+				}
+				switch constVal := value.(type) {
+				case *ConstantStringInfo:
+					constStr, _ := c.obj.getUtf8(constVal.StringIndex)
+					valueLiteral = strconv.Quote(constStr)
+				case *ConstantIntegerInfo:
+					valueLiteral = strconv.Itoa(int(constVal.Value))
+				}
+			}
+		}
+
+		if valueLiteral != "" {
+			result = append(result, fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, valueLiteral))
+		} else if slices.Contains(accessFlagsVerbose, "final") && c.fieldDefaultValue[name] != "" {
 			result = append(result, fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, c.fieldDefaultValue[name]))
 		} else {
 			result = append(result, fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, name))
