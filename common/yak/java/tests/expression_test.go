@@ -8,97 +8,110 @@ import (
 
 func TestJava_Simple_Expression(t *testing.T) {
 	t.Run("test PostfixExpression", func(t *testing.T) {
-		CheckJavaCode(`
-		a++;
-		a--;`, t)
+		CheckJavaPrintlnValue(`
+		a=1;
+		println(a++);
+		println(a--);`, []string{"2", "1"}, t)
 	})
 	t.Run("test PrefixUnaryExpression", func(t *testing.T) {
-		CheckJavaCode(`
-        +a;
-		-a;
-		~a;
-		!a;`, t)
+		CheckJavaPrintlnValue(`
+		a=11;
+        println(+a);
+		println(-a);
+		int b = 5;
+		println(~b);
+		c=true;
+		println(!c);`, []string{"11", "-11", "-6", "false"}, t)
 	})
 	t.Run("test PrefixBinaryExpression", func(t *testing.T) {
-		CheckJavaCode(`
-		++a;
-		--a;`, t)
+		CheckJavaPrintlnValue(`
+		a=11;
+		b=++a;
+		println(b);
+		b=--a;
+		println(b);`, []string{"12", "11"}, t)
 	})
 	t.Run("test MultiplicativeExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-         a * b;
-         b / a;
-         a % b;`, t)
+		CheckJavaPrintlnValue(` 
+		a = 2;
+		b=4;
+		println(a*b);
+		println(b/a);
+		println(b%a);`, []string{"8", "2", "0"}, t)
 	})
 	t.Run("test AdditiveExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-		a + b;
-		b - a;`, t)
+		CheckJavaPrintlnValue(` 
+		a=2;
+		b=4;
+		println(a + b);
+		println(a - b);`, []string{"6", "-2"}, t)
 	})
 	t.Run("test ShiftExpression", func(t *testing.T) {
-		CheckJavaCode(`
-         a << b;
-         a >>>b  ; //无符号位移
-         a >> b  ; //有符号位移`, t)
+		CheckJavaPrintlnValue(`
+		a=8;
+		b=2;
+         println(a << b);
+         println(a >>>b); 
+         println(a >> b); `, []string{"32", "2", "2"}, t)
 	})
 	t.Run("test RelationalExpression", func(t *testing.T) {
-		CheckJavaCode(`
-		 a < b;
-		 b > a;
-		 a <= b;
-		 b >= a;`, t)
+		CheckJavaPrintlnValue(`
+		a=11;
+		b=22;
+		println( a < b);
+		println( a > b);
+		println( a <= b);
+		println( a >= b);`, []string{"false", "true", "false", "true"}, t)
 	})
 	t.Run("test EqualityExpression", func(t *testing.T) {
-		CheckJavaCode(`
-		 a == b;
-		 b != a;`, t)
+		CheckJavaPrintlnValue(`
+		 a=11;
+		 b=22;
+		 println(a == b);
+		 println(b != a);`, []string{"false", "true"}, t)
 	})
-	t.Run("test AndExpression", func(t *testing.T) {
-		CheckJavaCode(`
-		 a & b;`, t)
-	})
-	t.Run("test XorExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-		 a ^ b;`, t)
-	})
-	t.Run("test OrExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-		 a | b;`, t)
-	})
-	t.Run("test LogicalAndExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-		a && b;`, t)
-	})
-	t.Run("test LogicalOrExpression", func(t *testing.T) {
-		CheckJavaCode(` 	
-		a||b;`, t)
+	t.Run("test AndE,xor,or,logicand,logicor expression", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		 println(12 & 5);
+		 println(12 ^ 5);
+		 println(12 | 5);
+			`, []string{"4", "9", "13"}, t)
 	})
 	t.Run("test TernaryExpression", func(t *testing.T) {
-		CheckJavaCode(` int a = 1;
+		CheckJavaPrintlnValue(` int a = 1;
 		int b = 0;
 		int ret;
-		ret = a > b ? a : b;`, t)
+		ret = a > b ? a : b;
+		println(ret);
+		`, []string{"0"}, t)
 	})
 	t.Run("test AssignmentExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-		a=b;
-		c+=b;
-		a+=b;
-		a-=b;
-		a*=b;
-		a/=b;
-		a&=b;
-		a|=b;
-		a^=b;
-		a>>=b;
-		a>>>=b;
-		a<<=b;
-		a%=b;`, t)
+		CheckJavaPrintlnValue(` 
+		b=12;
+		c=0;
+		println(c=b);
+		println(c+=b);
+		println(c+=b);
+		println(c-=b);
+		println(c*=b);
+		println(c/=b);
+		println(c&=b);
+		println(c|=b);
+		println(c^=b);
+		println(c>>=b);
+		println(c>>>=b);
+		println(c<<=b);
+		println(c%=b);`, []string{"12", "24", "36", "24", "288", "24", "8", "12",
+			"0", "0", "0", "0", "0"}, t)
 	})
 	t.Run("test SliceCallExpression", func(t *testing.T) {
-		CheckJavaCode(` a[1];
-	a[b];
-	`, t)
+		CheckJavaPrintlnValue(` 
+		int[] numbers = new int[10];
+       numbers[0] = 1;
+       numbers[1] = 2;
+		println(numbers[0]);
+		println(numbers[1]);
+	`, []string{"1", "2"}, t)
 	})
 
 	t.Run("test FunctionCallExpression", func(t *testing.T) {

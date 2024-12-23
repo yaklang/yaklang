@@ -662,19 +662,14 @@ func (y *builder) VisitFormalParameterList(raw javaparser.IFormalParameterListCo
 		return
 	}
 
-	if allFormalParam := i.AllFormalParameter(); allFormalParam != nil {
-		for _, param := range allFormalParam {
+	if parms := i.AllFormalParameter(); parms != nil {
+		for _, param := range parms {
 			y.VisitFormalParameter(param)
 		}
-		if lastFormalParam := i.LastFormalParameter(); lastFormalParam != nil {
-			y.VisitLastFormalParameter(lastFormalParam)
-		}
-	} else {
-		if lastFormalParam := i.LastFormalParameter(); lastFormalParam != nil {
-			y.VisitLastFormalParameter(lastFormalParam)
-		}
 	}
-
+	if last := i.LastFormalParameter(); last != nil {
+		y.VisitLastFormalParameter(last)
+	}
 }
 
 func (y *builder) VisitReceiverParameter(raw javaparser.IReceiverParameterContext) {
@@ -703,22 +698,20 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (
 	if i == nil {
 		return
 	}
+
 	for _, modifier := range i.AllVariableModifier() {
 		typeCallback, insCallback := y.VisitVariableModifier(modifier)
 		typeCallbacks = append(typeCallbacks, typeCallback)
 		insCallbacks = append(insCallbacks, insCallback)
 	}
-	typeType := y.VisitTypeType(i.TypeType())
-	formalParams := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
-	param := y.NewParam(formalParams)
-	if typeType != nil {
-		param.SetType(typeType)
+	typ := y.VisitTypeType(i.TypeType())
+	param := y.NewParam(y.VisitVariableDeclaratorId(i.VariableDeclaratorId()))
+	if typ != nil {
+		param.SetType(typ)
 	}
 
 	if len(typeCallbacks) > 0 || len(insCallbacks) > 0 {
-		log.Infof("start to apply annotation to formal-param: %v", param.String())
-
-		if typeType != nil {
+		if typ != nil {
 			for _, callback := range typeCallbacks {
 				_ = callback
 				log.Warn("TBD: treat type callback plz")
@@ -728,7 +721,6 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (
 			callback(param)
 		}
 	}
-
 	return
 }
 
@@ -799,7 +791,6 @@ func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext)
 	}
 
 	if i.FINAL() != nil {
-		log.Info("VariableModifier: FINAL is ignored by ssa")
 		return
 	}
 	return y.VisitAnnotation(i.Annotation())
