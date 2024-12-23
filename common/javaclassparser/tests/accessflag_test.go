@@ -20,4 +20,7 @@ func TestAccessFlag(t *testing.T) {
 	assert.Contains(t, results, "public interface RegexpMatcher")
 	assert.Contains(t, results, "throws BuildException;")
 	assert.Contains(t, results, "matches(String var")
+	assert.Contains(t, results, "public interface RegexpMatcher")
+	assert.Contains(t, results, "INSENSITIVE = 256")
+	assert.Contains(t, results, `apache.tools.ant.BuildExcept`)
 }
