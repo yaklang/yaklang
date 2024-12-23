@@ -229,7 +229,11 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 					valueLiteral = strconv.Quote(constStr)
 				case *ConstantIntegerInfo:
 					valueLiteral = strconv.Itoa(int(constVal.Value))
+				default:
+					log.Errorf("when handling for fields unknown constant type: %T", constVal)
 				}
+			default:
+				log.Errorf("when handling for fields unknown attribute type: %T", ret)
 			}
 		}
 
