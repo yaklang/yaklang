@@ -26437,7 +26437,137 @@ func NewLambdaParametersContext(parser antlr.Parser, parent antlr.ParserRuleCont
 
 func (s *LambdaParametersContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *LambdaParametersContext) AllIdentifier() []IIdentifierContext {
+func (s *LambdaParametersContext) CopyFrom(ctx *LambdaParametersContext) {
+	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+}
+
+func (s *LambdaParametersContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *LambdaParametersContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+type SingleLambdaParameterContext struct {
+	*LambdaParametersContext
+}
+
+func NewSingleLambdaParameterContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *SingleLambdaParameterContext {
+	var p = new(SingleLambdaParameterContext)
+
+	p.LambdaParametersContext = NewEmptyLambdaParametersContext()
+	p.parser = parser
+	p.CopyFrom(ctx.(*LambdaParametersContext))
+
+	return p
+}
+
+func (s *SingleLambdaParameterContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *SingleLambdaParameterContext) Identifier() IIdentifierContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IIdentifierContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IIdentifierContext)
+}
+
+func (s *SingleLambdaParameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case JavaParserVisitor:
+		return t.VisitSingleLambdaParameter(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+type LambdaLVTIParametersContext struct {
+	*LambdaParametersContext
+}
+
+func NewLambdaLVTIParametersContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *LambdaLVTIParametersContext {
+	var p = new(LambdaLVTIParametersContext)
+
+	p.LambdaParametersContext = NewEmptyLambdaParametersContext()
+	p.parser = parser
+	p.CopyFrom(ctx.(*LambdaParametersContext))
+
+	return p
+}
+
+func (s *LambdaLVTIParametersContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *LambdaLVTIParametersContext) LPAREN() antlr.TerminalNode {
+	return s.GetToken(JavaParserLPAREN, 0)
+}
+
+func (s *LambdaLVTIParametersContext) RPAREN() antlr.TerminalNode {
+	return s.GetToken(JavaParserRPAREN, 0)
+}
+
+func (s *LambdaLVTIParametersContext) LambdaLVTIList() ILambdaLVTIListContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(ILambdaLVTIListContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(ILambdaLVTIListContext)
+}
+
+func (s *LambdaLVTIParametersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case JavaParserVisitor:
+		return t.VisitLambdaLVTIParameters(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+type MultiLambdaParametersContext struct {
+	*LambdaParametersContext
+}
+
+func NewMultiLambdaParametersContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *MultiLambdaParametersContext {
+	var p = new(MultiLambdaParametersContext)
+
+	p.LambdaParametersContext = NewEmptyLambdaParametersContext()
+	p.parser = parser
+	p.CopyFrom(ctx.(*LambdaParametersContext))
+
+	return p
+}
+
+func (s *MultiLambdaParametersContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *MultiLambdaParametersContext) LPAREN() antlr.TerminalNode {
+	return s.GetToken(JavaParserLPAREN, 0)
+}
+
+func (s *MultiLambdaParametersContext) AllIdentifier() []IIdentifierContext {
 	children := s.GetChildren()
 	len := 0
 	for _, ctx := range children {
@@ -26458,7 +26588,7 @@ func (s *LambdaParametersContext) AllIdentifier() []IIdentifierContext {
 	return tst
 }
 
-func (s *LambdaParametersContext) Identifier(i int) IIdentifierContext {
+func (s *MultiLambdaParametersContext) Identifier(i int) IIdentifierContext {
 	var t antlr.RuleContext
 	j := 0
 	for _, ctx := range s.GetChildren() {
@@ -26478,15 +26608,55 @@ func (s *LambdaParametersContext) Identifier(i int) IIdentifierContext {
 	return t.(IIdentifierContext)
 }
 
-func (s *LambdaParametersContext) LPAREN() antlr.TerminalNode {
-	return s.GetToken(JavaParserLPAREN, 0)
-}
-
-func (s *LambdaParametersContext) RPAREN() antlr.TerminalNode {
+func (s *MultiLambdaParametersContext) RPAREN() antlr.TerminalNode {
 	return s.GetToken(JavaParserRPAREN, 0)
 }
 
-func (s *LambdaParametersContext) FormalParameterList() IFormalParameterListContext {
+func (s *MultiLambdaParametersContext) AllCOMMA() []antlr.TerminalNode {
+	return s.GetTokens(JavaParserCOMMA)
+}
+
+func (s *MultiLambdaParametersContext) COMMA(i int) antlr.TerminalNode {
+	return s.GetToken(JavaParserCOMMA, i)
+}
+
+func (s *MultiLambdaParametersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case JavaParserVisitor:
+		return t.VisitMultiLambdaParameters(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+type FormalLambdaParametersContext struct {
+	*LambdaParametersContext
+}
+
+func NewFormalLambdaParametersContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FormalLambdaParametersContext {
+	var p = new(FormalLambdaParametersContext)
+
+	p.LambdaParametersContext = NewEmptyLambdaParametersContext()
+	p.parser = parser
+	p.CopyFrom(ctx.(*LambdaParametersContext))
+
+	return p
+}
+
+func (s *FormalLambdaParametersContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *FormalLambdaParametersContext) LPAREN() antlr.TerminalNode {
+	return s.GetToken(JavaParserLPAREN, 0)
+}
+
+func (s *FormalLambdaParametersContext) RPAREN() antlr.TerminalNode {
+	return s.GetToken(JavaParserRPAREN, 0)
+}
+
+func (s *FormalLambdaParametersContext) FormalParameterList() IFormalParameterListContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
 		if _, ok := ctx.(IFormalParameterListContext); ok {
@@ -26502,42 +26672,10 @@ func (s *LambdaParametersContext) FormalParameterList() IFormalParameterListCont
 	return t.(IFormalParameterListContext)
 }
 
-func (s *LambdaParametersContext) AllCOMMA() []antlr.TerminalNode {
-	return s.GetTokens(JavaParserCOMMA)
-}
-
-func (s *LambdaParametersContext) COMMA(i int) antlr.TerminalNode {
-	return s.GetToken(JavaParserCOMMA, i)
-}
-
-func (s *LambdaParametersContext) LambdaLVTIList() ILambdaLVTIListContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(ILambdaLVTIListContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(ILambdaLVTIListContext)
-}
-
-func (s *LambdaParametersContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *LambdaParametersContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
-	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *LambdaParametersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *FormalLambdaParametersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case JavaParserVisitor:
-		return t.VisitLambdaParameters(s)
+		return t.VisitFormalLambdaParameters(s)
 
 	default:
 		return t.VisitChildren(s)
@@ -26572,6 +26710,7 @@ func (p *JavaParser) LambdaParameters() (localctx ILambdaParametersContext) {
 	p.GetErrorHandler().Sync(p)
 	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 187, p.GetParserRuleContext()) {
 	case 1:
+		localctx = NewSingleLambdaParameterContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1574)
@@ -26579,6 +26718,7 @@ func (p *JavaParser) LambdaParameters() (localctx ILambdaParametersContext) {
 		}
 
 	case 2:
+		localctx = NewFormalLambdaParametersContext(p, localctx)
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1575)
@@ -26601,6 +26741,7 @@ func (p *JavaParser) LambdaParameters() (localctx ILambdaParametersContext) {
 		}
 
 	case 3:
+		localctx = NewMultiLambdaParametersContext(p, localctx)
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(1580)
@@ -26634,6 +26775,7 @@ func (p *JavaParser) LambdaParameters() (localctx ILambdaParametersContext) {
 		}
 
 	case 4:
+		localctx = NewLambdaLVTIParametersContext(p, localctx)
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(1591)
