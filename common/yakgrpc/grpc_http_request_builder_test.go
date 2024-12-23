@@ -86,6 +86,148 @@ Host: ` + target + `
 	}
 }
 
+func TestGRPCMUSTPASS_HTTP_DebugPlugin_Extractors_YamlPoc(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	yamlPoc := `id: WebFuzzer-Template-gPdWZhvP
+
+info:
+  name: WebFuzzer Template gPdWZhvP
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 1
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: a948d87b1972d786c871bb68ef43b6b6
+
+http:
+  - raw:
+      - |
+        GET /{{Path}} HTTP/1.1
+        Host: {{Hostname}}
+      - |
+        GET /{{core}} HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/json
+
+      - |
+        GET /{{core}} HTTP/1.1
+        Host: {{Hostname}}
+
+    extractors:
+      - type: regex
+        name: core
+        group: 1
+        regex:
+          - '"name"\:"(.*?)"'
+        internal: true
+`
+	t.Run("extractor update", func(t *testing.T) {
+		tokenFile1 := utils.RandStringBytes(10)
+		tokenCheck1 := false
+
+		tokenFile2 := utils.RandStringBytes(10)
+		tokenCheck2 := false
+
+		tokenFile3 := utils.RandStringBytes(10)
+		tokenCheck3 := false
+
+		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if strings.Contains(request.URL.Path, tokenFile1) {
+				tokenCheck1 = true
+				writer.Write([]byte(fmt.Sprintf(`{"name":"%s"}`, tokenFile2)))
+			} else if strings.Contains(request.URL.Path, tokenFile2) {
+				tokenCheck2 = true
+				writer.Write([]byte(fmt.Sprintf(`{"name":"%s"}`, tokenFile3)))
+			} else if strings.Contains(request.URL.Path, tokenFile3) {
+				tokenCheck3 = true
+			}
+		})
+		target := utils.HostPort(host, port)
+		stream, err := client.DebugPlugin(utils.TimeoutContextSeconds(4), &ypb.DebugPluginRequest{
+			Code:       yamlPoc,
+			PluginType: "nuclei",
+			HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+				IsRawHTTPRequest: true,
+				RawHTTPRequest: []byte(`GET /` + tokenFile1 + ` HTTP/1.1
+Host: ` + target + `
+`),
+			},
+		})
+		if err != nil {
+			return
+		}
+		for {
+			data, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			spew.Dump(data)
+		}
+		require.True(t, tokenCheck1, "tokenCheck1")
+		require.True(t, tokenCheck2, "tokenCheck2")
+		require.True(t, tokenCheck3, "tokenCheck3")
+	})
+
+	t.Run("extractor not update(extractor fail)", func(t *testing.T) {
+
+		tokenFile1 := utils.RandStringBytes(10)
+		tokenCheck1 := false
+
+		tokenFile2 := utils.RandStringBytes(10)
+		tokenCheck2 := false
+		tokenCheck2_Second := false
+
+		tokenFile3 := utils.RandStringBytes(10)
+		tokenCheck3 := false
+
+		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if strings.Contains(request.URL.Path, tokenFile1) {
+				tokenCheck1 = true
+				writer.Write([]byte(fmt.Sprintf(`{"name":"%s"}`, tokenFile2)))
+			} else if strings.Contains(request.URL.Path, tokenFile2) {
+				tokenCheck2 = true
+				if tokenCheck2 {
+					tokenCheck2_Second = true
+				}
+			} else if strings.Contains(request.URL.Path, tokenFile3) {
+				tokenCheck3 = true
+			}
+		})
+		target := utils.HostPort(host, port)
+		stream, err := client.DebugPlugin(utils.TimeoutContextSeconds(4), &ypb.DebugPluginRequest{
+			Code:       yamlPoc,
+			PluginType: "nuclei",
+			HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+				IsRawHTTPRequest: true,
+				RawHTTPRequest: []byte(`GET /` + tokenFile1 + ` HTTP/1.1
+Host: ` + target + `
+`),
+			},
+		})
+		if err != nil {
+			return
+		}
+		for {
+			data, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			spew.Dump(data)
+		}
+		require.True(t, tokenCheck1, "tokenCheck1")
+		require.True(t, tokenCheck2, "tokenCheck2")
+		require.False(t, tokenCheck3, "tokenCheck3")
+		require.True(t, tokenCheck2_Second, "tokenCheck2_Second")
+	})
+}
+
 func TestGRPCMUSTPASS_HTTP_DebugPlugin_SmockingWithEmptyInput(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
