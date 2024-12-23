@@ -19,4 +19,5 @@ func TestAccessFlag(t *testing.T) {
 	fmt.Println(results)
 	assert.Contains(t, results, "public interface RegexpMatcher")
 	assert.Contains(t, results, "throws BuildException;")
+	assert.Contains(t, results, "matches(String var")
 }
