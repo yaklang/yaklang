@@ -242,7 +242,9 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 		return nil, utils.Errorf("unknown extractor type: %s", t)
 	}
 
-	if len(results) == 1 {
+	if len(results) == 0 {
+		return nil, nil
+	} else if len(results) == 1 {
 		resultsMap[tag] = results[0]
 	} else {
 		resultsMap[tag] = results
