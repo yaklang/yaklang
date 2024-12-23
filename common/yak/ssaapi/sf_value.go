@@ -21,6 +21,10 @@ func (v *Value) IsMap() bool {
 	return kind == ssa.MapTypeKind || kind == ssa.ObjectTypeKind
 }
 
+func (v *Value) IsEmpty() bool {
+	return v == nil
+}
+
 func (v *Value) GetOpcode() string {
 	return ssa.SSAOpcode2Name[v.getOpcode()]
 }

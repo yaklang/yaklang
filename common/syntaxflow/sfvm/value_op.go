@@ -105,6 +105,7 @@ type ValueOperator interface {
 	String() string
 	IsMap() bool
 	IsList() bool
+	IsEmpty() bool
 	GetOpcode() string
 	GetBinaryOperator() string
 	GetUnaryOperator() string

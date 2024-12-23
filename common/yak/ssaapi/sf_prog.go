@@ -24,6 +24,10 @@ func (p *Program) String() string {
 }
 func (p *Program) IsMap() bool { return false }
 
+func (p *Program) IsEmpty() bool {
+	return p == nil || p.Program == nil
+}
+
 func (p *Program) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextOption) error {
 	// return nil will not change the predecessor
 	// no not return any error here!!!!!
