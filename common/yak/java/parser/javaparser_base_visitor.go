@@ -663,7 +663,19 @@ func (v *BaseJavaParserVisitor) VisitLambdaExpression(ctx *LambdaExpressionConte
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitLambdaParameters(ctx *LambdaParametersContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitSingleLambdaParameter(ctx *SingleLambdaParameterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitFormalLambdaParameters(ctx *FormalLambdaParametersContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitMultiLambdaParameters(ctx *MultiLambdaParametersContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitLambdaLVTIParameters(ctx *LambdaLVTIParametersContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

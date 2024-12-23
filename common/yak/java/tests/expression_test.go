@@ -289,3 +289,33 @@ class A {
 			"close": []string{"\"java.io.FileInputStream\"", "\"java.io.FileOutputStream\"", "\"java.io.InputStream\"", "\"java.io.OutputStream\""},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+
+func TestJava_Lambda(t *testing.T) {
+	t.Run("test lambda expression SingleLambdaParameter", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		Calculator doubleNumber = number -> println(number * 2);
+		println(doubleNumber);
+	`, []string{"mul(Parameter-number, 2)", "Function-doubleNumber"}, t)
+	})
+
+	t.Run("test lambda expression FormalLambdaParameters", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		Calculator doubleNumber =(int number) ->{ println(number * 2);};
+		println(doubleNumber);
+	`, []string{"mul(Parameter-number, 2)", "Function-doubleNumber"}, t)
+	})
+
+	t.Run("test lambda expression MultiLambdaParameters", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		Calculator Mux =(number,times) ->{ println(number * times);};
+		println(Mux);
+	`, []string{"mul(Parameter-number, Parameter-times)", "Function-Mux"}, t)
+	})
+
+	t.Run("test lambda expression lambdaLVTIParameter", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		Calculator Mux =(var number,var times) ->{ println(number * times);};
+		println(Mux);
+`, []string{"mul(Parameter-number, Parameter-times)", "Function-Mux"}, t)
+	})
+}
