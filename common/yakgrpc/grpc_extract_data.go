@@ -80,6 +80,9 @@ func execExtractRequest(req *ypb.ExtractDataRequest) (string, error) {
 		_cacheForExtractingRequest.Set(reRuleSha1, extractor)
 	}
 	resMap, err := extractor.Execute(data)
+	if resMap == nil {
+		return "", utils.Error("extracted result is nil")
+	}
 	if extractData, ok := resMap["data"]; err != nil || !ok {
 		return "", utils.Errorf("extract error: %s", err)
 	} else {
