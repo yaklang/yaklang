@@ -78,6 +78,7 @@ HOOK
 	var memPath [][]string
 	// var memTime time.Duration
 	{
+		res.Show()
 		start := time.Now()
 		valueMem := res.GetValues("para_top_def")
 		require.NotNil(t, valueMem)

@@ -77,6 +77,10 @@ func (value Values) IsList() bool {
 	return true
 }
 
+func (vs Values) IsEmpty() bool {
+	return len(vs) == 0
+}
+
 func (value Values) Len() int {
 	return len(value)
 }

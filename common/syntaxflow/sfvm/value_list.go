@@ -12,7 +12,7 @@ import (
 var _ ValueOperator = (*ValueList)(nil)
 
 func NewValues(values []ValueOperator) ValueOperator {
-	var zero *ValueList
+	zero := NewEmptyValues()
 	ret, err := zero.Merge(values...)
 	if err != nil {
 		return zero
@@ -20,8 +20,12 @@ func NewValues(values []ValueOperator) ValueOperator {
 	return ret
 }
 
+func (v *ValueList) IsEmpty() bool {
+	return ValuesLen(v) == 0
+}
+
 func NewEmptyValues() ValueOperator {
-	return NewValues(nil)
+	return &ValueList{Values: nil}
 }
 
 type ValueList struct {
@@ -35,8 +39,8 @@ func (v *ValueList) AppendPredecessor(value ValueOperator, opts ...AnalysisConte
 }
 
 func (v *ValueList) Merge(values ...ValueOperator) (ValueOperator, error) {
-	if utils.IsNil(v) && len(values) == 0 {
-		return nil, utils.Errorf("no value to merge")
+	if v.IsEmpty() && len(values) == 0 {
+		return NewEmptyValues(), nil
 	}
 	var res []ValueOperator
 	v.Recursive(func(operator ValueOperator) error {
@@ -58,7 +62,7 @@ func (v *ValueList) Merge(values ...ValueOperator) (ValueOperator, error) {
 	} else if len(res) == 1 {
 		return res[0], nil
 	} else {
-		return nil, utils.Errorf("no value to merge")
+		return NewEmptyValues(), nil
 	}
 }
 

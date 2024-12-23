@@ -1094,7 +1094,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if value == nil {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		value.IsList()
 		val, err := value.Merge(vs)
 		if err != nil {
 			return utils.Wrapf(CriticalError, "merge failed: %v", err)
