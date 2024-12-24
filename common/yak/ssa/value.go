@@ -198,11 +198,11 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 
 // CreateVariable create variable
 func (b *FunctionBuilder) CreateLocalVariable(name string) *Variable {
-	return b.createVariableEx(name, true, false)
+	return b.createVariableEx(name, true)
 }
 
 func (b *FunctionBuilder) CreateVariableForce(name string, pos ...CanStartStopToken) *Variable {
-	return b.createVariableEx(name, false, false, pos...)
+	return b.createVariableEx(name, false, pos...)
 }
 
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
@@ -211,12 +211,15 @@ func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) 
 			if _, ok := ToConst(value); ok {
 				return variable
 			}
+			if _, ok := value.(*SideEffect); ok {
+				return variable
+			}
 		}
 	}
-	return b.createVariableEx(name, false, b.SupportClosure, pos...)
+	return b.createVariableEx(name, false, pos...)
 }
 
-func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, createFreeValue bool, pos ...CanStartStopToken) *Variable {
+func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...CanStartStopToken) *Variable {
 	scope := b.CurrentBlock.ScopeTable
 
 	ret := scope.CreateVariable(name, isLocal)
@@ -313,7 +316,7 @@ func (b *FunctionBuilder) BuildFreeValueByVariable(variable *Variable) *Paramete
 			return freeValueFinded
 		}
 	} else {
-		b.FreeValues[variable] = freeValue
+		//b.FreeValues[variable] = freeValue
 		// b.WriteVariable(variable, freeValue)
 	}
 	return freeValue

@@ -73,7 +73,7 @@ func (b *FunctionBuilder) BuildSyntaxBlock(builder func()) {
 		if variable := endScope.ReadVariable(se.Name); variable != nil {
 			value := variable.GetValue()
 			if sideEffect, ok := value.(*SideEffect); ok {
-				sideEffect = b.SwitchFreevalueInSideEffectFromScope(se.Name, sideEffect, endScope.GetParent())
+				sideEffect = b.SwitchFreevalueInSideEffect(se.Name, sideEffect, endScope.GetParent())
 				variable.Assign(sideEffect)
 			}
 		}

@@ -29,6 +29,9 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	// read value by name
 	ReadValue(name string) T
 
+	// Read Variable from linkSideEffect
+	ReadVariableFromLinkSideEffect(name string) (VersionedIF[T], VersionedIF[T])
+
 	GetAllVariables() []VersionedIF[T]
 	GetAllVariablesByName(name string, iscurrent ...bool) []VersionedIF[T]
 
@@ -313,6 +316,17 @@ func (v *ScopedVersionedTable[T]) getHeadVersionInCurrentLexicalScope(name strin
 
 func (v *ScopedVersionedTable[T]) getAllVersionInCurrentLexicalScope(name string) []VersionedIF[T] {
 	return v.linkValues.GetAll(name)
+}
+
+func (scope *ScopedVersionedTable[T]) ReadVariableFromLinkSideEffect(name string) (VersionedIF[T], VersionedIF[T]) {
+	var find, bind VersionedIF[T]
+	scope.ForEachCapturedSideEffect(func(s string, vi []VersionedIF[T]) {
+		if s == name {
+			find = vi[0]
+			bind = vi[1]
+		}
+	})
+	return find, bind
 }
 
 func (scope *ScopedVersionedTable[T]) ReadVariable(name string, current ...bool) VersionedIF[T] {

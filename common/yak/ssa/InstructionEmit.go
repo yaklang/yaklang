@@ -483,70 +483,79 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 
 func (f *FunctionBuilder) SetReturnSideEffects() {
 	var SideEffectsReturn []*FunctionSideEffect
+	var value Value
 	scope := f.CurrentBlock.ScopeTable
 
 	for _, se := range f.SideEffects {
 		ser := se
 
 		if variable := scope.ReadVariable(se.Name); variable != nil {
-			value := variable.GetValue()
+			if find, bind := scope.ReadVariableFromLinkSideEffect(se.Name); find != nil && bind == se.BindVariable {
+				value = find.GetValue()
+			} else {
+				value = variable.GetValue()
+			}
 			if _, ok := value.(*SideEffect); ok {
 			} else if p, ok := value.(*Parameter); ok && p.IsFreeValue {
 			} else {
 				ser.Modify = value
 			}
 		}
+
 		SideEffectsReturn = append(SideEffectsReturn, ser)
 	}
 	f.SideEffects = SideEffectsReturn
 }
 
-func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffect) *SideEffect {
-	vs := make([]Value, 0)
-	scope := f.CurrentBlock.ScopeTable
-	if phi, ok := ToPhi(se.Value); ok {
-		for i, e := range phi.Edge {
-			vs = append(vs, e)
-			if p, ok := ToParameter(e); ok && p.IsFreeValue {
-				if value := scope.ReadValue(name); value != nil {
-					vs[i] = value
+func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffect, scopeif ...ScopeIF) *SideEffect {
+	var bindVariableId, findVariableId int64
+	var bindVariable func(*SideEffect)
+	var findVariable func()
+	var scope ScopeIF
+	if len(scopeif) == 0 {
+		scope = f.CurrentBlock.ScopeTable
+	} else {
+		scope = scopeif[0]
+	}
+
+	if variable := ReadVariableFromScopeAndParent(scope, name); variable != nil {
+		bindVariable = func(se *SideEffect) {
+			if callSide := se.CallSite; callSide != nil {
+				if bind, ok := callSide.(*Call).Binding[name]; ok {
+					bindVariableId = bind.GetLastVariable().GetId()
+					_ = bindVariableId
 				}
 			}
 		}
-		phit := &Phi{
-			anValue:            phi.anValue,
-			CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
-			Edge:               vs,
+		findVariable = func() {
+			if capture := variable.GetCaptured(); capture != nil {
+				findVariableId = capture.GetId()
+				_ = findVariableId
+			}
 		}
 
-		sideEffect := f.EmitSideEffect(name, se.CallSite.(*Call), phit)
-		return sideEffect
-	}
-	return se
-}
-
-func (f *FunctionBuilder) SwitchFreevalueInSideEffectFromScope(name string, se *SideEffect, scope ScopeIF) *SideEffect {
-	vs := make([]Value, 0)
-	if scope == nil {
-		return se
-	}
-	if phi, ok := ToPhi(se.Value); ok {
-		for i, e := range phi.Edge {
-			vs = append(vs, e)
-			if p, ok := ToParameter(e); ok && p.IsFreeValue {
-				if value := scope.ReadValue(name); value != nil {
-					vs[i] = value
+		bindVariable(se)
+		findVariable()
+		if phi, ok := ToPhi(se.Value); ok {
+			for _, e := range phi.Edge {
+				if se, ok := e.(*SideEffect); ok {
+					bindVariable(se)
 				}
 			}
 		}
-		phit := &Phi{
-			anValue:            phi.anValue,
-			CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
-			Edge:               vs,
+		if phi, ok := ToPhi(se.Value); ok {
+			for i, e := range phi.Edge {
+				if p, ok := ToParameter(e); ok && p.IsFreeValue {
+					newParam := NewParam(name, true, f)
+					if bindVariableId == findVariableId {
+						value := variable.GetValue()
+						newParam.defaultValue = value
+						phi.Edge[i] = newParam
+					}
+				}
+			}
 		}
-
-		sideEffect := f.EmitSideEffect(name, se.CallSite.(*Call), phit)
-		return sideEffect
 	}
+
 	return se
 }
