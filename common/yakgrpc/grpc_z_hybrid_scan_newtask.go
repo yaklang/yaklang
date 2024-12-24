@@ -7,6 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
@@ -22,11 +28,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"math/rand"
-	"os"
-	"strings"
-	"sync"
-	"time"
 )
 
 func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream HybridScanRequestStream, firstRequest *ypb.HybridScanRequest) error {
@@ -121,7 +122,6 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		return utils.Errorf("marshal targets failed: %s", err)
 	}
 	taskRecorder.Targets = string(targetsBytes)
-
 	// generate plugin list
 	pluginCache := list.New()
 	pluginChan, err := s.PluginGenerator(pluginCache, manager.Context(), plugin)
@@ -159,7 +159,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	stream.Send(currentStatus)
 
 	// init some config
-	hasUnavailableTarget := false
+	unreachableTargets := make([]string, 0)
 	scanFilterManager := filter.NewFilterManager(12, 1<<15, 30)
 
 	countRiskClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
@@ -204,11 +204,12 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		statusManager.DoActiveTarget()
 		targetWg := new(sync.WaitGroup)
 
-		conn, err := netx.DialX(utils.ExtractHostPort(__currentTarget.Url))
+		target := utils.ExtractHostPort(__currentTarget.Url)
+		conn, err := netx.DialX(target)
 		if err != nil {
 			log.Errorf("dial target failed: %s", err)
-			hasUnavailableTarget = true
-			statusManager.DoneTarget()
+			unreachableTargets = append(unreachableTargets, target)
+			statusManager.DoneFailureTarget()
 			feedbackStatus()
 			continue
 		}
@@ -331,8 +332,8 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	}
 	feedbackStatus()
 	quickSave()
-	if hasUnavailableTarget {
-		return utils.Errorf("Has unreachable target")
+	if len(unreachableTargets) > 0 {
+		return utils.Errorf("Has un-reachable targets: %v", strings.Join(unreachableTargets, ", "))
 	}
 	return nil
 }
