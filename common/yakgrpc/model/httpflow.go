@@ -39,6 +39,20 @@ func SetHTTPFlowCacheGRPCModel(f *schema.HTTPFlow, full bool, m *ypb.HTTPFlow) {
 	GlobalHTTPFlowCache.Set(f.CalcCacheHash(full), m)
 }
 
+func DeleteHTTPFlowCacheGRPCModel(f *schema.HTTPFlow) {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	// delete both full and not full cache
+	GlobalHTTPFlowCache.Delete(f.CalcCacheHash(false))
+	GlobalHTTPFlowCache.Delete(f.CalcCacheHash(true))
+}
+
+func DropHTTPFlowCacheGRPCModelByFlow() {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	GlobalHTTPFlowCache.DeleteAll()
+}
+
 func getCacheHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) *ypb.HTTPFlow {
 	if f == nil {
 		return nil
