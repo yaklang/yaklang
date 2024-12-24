@@ -2,13 +2,14 @@ package yakgrpc
 
 import (
 	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"sync"
-	"sync/atomic"
 )
 
 type HybridScanStatusManager struct {
@@ -142,6 +143,11 @@ func (h *HybridScanStatusManager) DoneTask(index int64, task ...*schema.HybridSc
 func (h *HybridScanStatusManager) DoneTarget() {
 	atomic.AddInt64(&h.TargetFinished, 1)
 	atomic.AddInt64(&h.ActiveTarget, -1)
+}
+
+func (h *HybridScanStatusManager) DoneFailureTarget() {
+	atomic.AddInt64(&h.TaskFinished, h.PluginTotal)
+	h.DoneTarget()
 }
 
 func (h *HybridScanStatusManager) Feedback(stream HybridScanRequestStream) error {
