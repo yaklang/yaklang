@@ -58,7 +58,7 @@ public class A {
 	prog.Show()
 	assert.Equal(t, 1, prog.Program.UpStream.Len())
 	assert.Equal(t, 0, len(prog.Program.DownStream))
-	if slices.Contains(ssadb.AllPrograms(ssadb.GetDB()), pkgName) {
+	if slices.Contains(ssadb.AllProgramNames(ssadb.GetDB()), pkgName) {
 		t.Fatalf("package %s should not be in the database", pkgName)
 	}
 }
