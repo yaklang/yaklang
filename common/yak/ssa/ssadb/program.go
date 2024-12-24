@@ -8,7 +8,7 @@ import (
 type IrProgram struct {
 	gorm.Model
 
-	ProgramName string `json:"program_name" gorm:"index"`
+	ProgramName string `json:"program_name" gorm:"unique_index"`
 	Version     string `json:"package_version" gorm:"index"`
 
 	// Language: yak, java, php, js, etc
@@ -90,8 +90,15 @@ func DeleteProgram(db *gorm.DB, program string) {
 	deleteProgramDBOnly(db, program)
 }
 
-func AllPrograms(db *gorm.DB) []string {
+func AllProgramNames(db *gorm.DB) []string {
 	var programs []string
 	db.Model(&IrProgram{}).Select("DISTINCT(program_name)").Pluck("program_name", &programs)
 	return programs
+}
+
+func AllPrograms(db *gorm.DB) []*IrProgram {
+	db = db.Debug()
+	var prorams []*IrProgram
+	db.Model(&IrProgram{}).Find(&prorams)
+	return prorams
 }

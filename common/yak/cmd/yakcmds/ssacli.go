@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -36,7 +37,7 @@ var SSACompilerCommands = []*cli.Command{
 		Action: func(c *cli.Context) {
 			for _, name := range c.Args() {
 				if name == "*" {
-					for _, name := range ssadb.AllPrograms(ssadb.GetDB()) {
+					for _, name := range ssadb.AllProgramNames(ssadb.GetDB()) {
 						log.Infof("Start to delete program: %v", name)
 						ssadb.DeleteProgram(ssadb.GetDB(), name)
 					}
@@ -50,6 +51,45 @@ var SSACompilerCommands = []*cli.Command{
 				ssadb.DeleteProgram(ssadb.GetDB(), name)
 				_ = ssadb.DeleteSSAProgram(name)
 			}
+		},
+	},
+	{
+		Name:  "ssa-import",
+		Usage: "Import SSA IR From SSA Database",
+		Action: func(c *cli.Context) error {
+			for _, dbPath := range c.Args() {
+				if dbPath == "" &&
+					utils.GetFirstExistedFile(dbPath) == "" {
+					// no compile ,database not existed
+					log.Errorf("database file not found: %v", dbPath)
+					continue
+				}
+
+				log.Infof("switch to db:%s", dbPath)
+				consts.SetSSADataBasePath(dbPath)
+				progs := ssadb.AllPrograms(ssadb.GetDB())
+				if len(progs) == 0 {
+					log.Errorf("no program found in database: %v", dbPath)
+					continue
+				}
+				for _, prog := range progs {
+					log.Infof("improt program : %v [%s]", prog.ProgramName, prog.Language)
+					ssaProg := &schema.SSAProgram{
+						Name:          prog.ProgramName,
+						Description:   "",
+						DBPath:        dbPath,
+						Language:      prog.Language,
+						EngineVersion: consts.GetYakVersion(),
+						ConfigInput:   "",
+						PeepholeSize:  0,
+					}
+					if err := ssadb.SaveSSAProgram(ssaProg); err != nil {
+						log.Errorf("save ssa program failed: %v", err)
+						continue
+					}
+				}
+			}
+			return nil
 		},
 	},
 	{
@@ -142,7 +182,7 @@ var SSACompilerCommands = []*cli.Command{
 			saveProfile := !c.Bool("no-frontend")
 
 			// check program name duplicate
-			if slices.Contains(ssadb.AllPrograms(ssadb.GetDB()), programName) {
+			if prog, err := ssadb.GetProgram(programName, string(ssa.Application)); prog != nil && err == nil {
 				if !reCompile {
 					return utils.Errorf(
 						"program name %v existed in this database, please use `re-compile` flag to re-compile or change program name",
