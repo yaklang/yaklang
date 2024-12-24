@@ -39,7 +39,7 @@ func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowReque
 		)
 
 		db = yakit.QueryWebsocketFlowsByHTTPFlowHash(db, r)
-		// db = db.Select([]string{"websocket_hash", "hash"}) //  just select websocket_hash and hash
+		db = db.Select([]string{"id", "websocket_hash", "hash"}) //  just select websocket_hash and hash
 		res := yakit.YieldHTTPFlows(db, ctx)
 		for flow := range res {
 			if flow.WebsocketHash != "" {
