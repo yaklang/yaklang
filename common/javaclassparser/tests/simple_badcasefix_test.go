@@ -25,8 +25,7 @@ func TestStrconv(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkJavaCode(t, results)
-	assert.Contains(t, results, "enum Node$Type")
-	assert.Contains(t, results, "\tLITERAL,\n\tVARIABLE;\n")
+	assert.Contains(t, results, `he value \"\" is not a legal value for attribute \""`)
 }
 
 func TestEnumBasic(t *testing.T) {
