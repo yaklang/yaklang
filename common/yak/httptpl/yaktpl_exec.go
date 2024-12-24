@@ -410,9 +410,11 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				}
 				if varIns != nil {
 					for k, v := range varIns {
-						v := ExtractResultToString(v)
-						y.Variables.Set(k, v)
-						extracted[k] = v
+						if v != nil { // if v is nil, not cover last value
+							v := ExtractResultToString(v)
+							y.Variables.Set(k, v)
+							extracted[k] = v
+						}
 					}
 				}
 			}

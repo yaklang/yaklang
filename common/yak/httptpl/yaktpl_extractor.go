@@ -243,7 +243,7 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 	}
 
 	if len(results) == 0 {
-		return nil, nil
+		resultsMap[tag] = nil // extract empty string are different from not being extracted
 	} else if len(results) == 1 {
 		resultsMap[tag] = results[0]
 	} else {
