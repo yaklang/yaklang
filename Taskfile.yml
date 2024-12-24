@@ -12,3 +12,13 @@ includes:
   generate: 
     taskfile: ./common/generate_Taskfile.yml
     dir: ./common
+
+tasks:
+  install_dep:
+    silent: true
+    desc: Install golang dependencies and protoc
+    cmds:
+     - go mod tidy
+     - go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
+     - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
+     - echo "download protoc from https://github.com/protocolbuffers/protobuf/releases/tag/v27.3"
