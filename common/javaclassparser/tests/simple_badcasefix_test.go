@@ -19,6 +19,18 @@ var enumClass []byte
 //go:embed strconv.class
 var strconvClass []byte
 
+//go:embed badstrconv.class
+var badstrconvClass []byte
+
+func TestStrconv2(t *testing.T) {
+	results, err := javaclassparser.Decompile(badstrconvClass)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkJavaCode(t, results)
+	assert.Contains(t, results, `ement [" + this.tag + "] near line " + Action.getLineNumber(this.intercon));`)
+}
+
 func TestStrconv(t *testing.T) {
 	results, err := javaclassparser.Decompile(strconvClass)
 	if err != nil {

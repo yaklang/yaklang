@@ -5,7 +5,10 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strconv"
+	"strings"
 )
 
 type JavaRef struct {
@@ -81,7 +84,30 @@ func (j *JavaLiteral) String(funcCtx *class_context.ClassContext) string {
 		}
 	}
 	if j.JavaType.String(funcCtx) == "java.lang.String" || j.JavaType.String(funcCtx) == "String" {
-		return strconv.Quote(fmt.Sprint(j.Data))
+		data := fmt.Sprint(j.Data)
+
+		mimeType, _ := codec.MatchMIMEType(data)
+		if mimeType != nil && mimeType.IsChineseCharset() {
+			result, ok := mimeType.TryUTF8Convertor([]byte(data))
+			if ok {
+				return strconv.Quote(string(result))
+			}
+		}
+
+		raw := strconv.Quote(data)
+		results, err := regexp_utils.NewRegexpWrapper(`(\\+)x[0-9a-fA-F]{2}`).ReplaceAllStringFunc(raw, func(s string) string {
+			if strings.Count(s, `\`)%2 == 0 {
+				return s
+			}
+			// return \u00xx
+			length := len(s)
+			pre, after := s[:length-3], "u00"+s[length-2:]
+			return pre + after
+		})
+		if err != nil {
+			return raw
+		}
+		return results
 	} else {
 		return fmt.Sprint(j.Data)
 	}

@@ -33,6 +33,14 @@ type MIMEResult struct {
 	Charset     string
 }
 
+func (t *MIMEResult) IsChineseCharset() bool {
+	switch strings.ToLower(t.Charset) {
+	case "gb18030", "gb-18030", "gbk", "gb2312", "gb-2312":
+		return true
+	}
+	return false
+}
+
 func (t *MIMEResult) TryUTF8Convertor(raw []byte) ([]byte, bool) {
 	result, ok := t._tryUTF8Convertor(raw)
 	if ok {
