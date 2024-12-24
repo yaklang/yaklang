@@ -39,13 +39,14 @@ func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowReque
 		)
 
 		db = yakit.QueryWebsocketFlowsByHTTPFlowHash(db, r)
-		db = db.Select([]string{"websocket_hash", "hash"}) //  just select websocket_hash and hash
+		// db = db.Select([]string{"websocket_hash", "hash"}) //  just select websocket_hash and hash
 		res := yakit.YieldHTTPFlows(db, ctx)
-		for v := range res {
-			if v.WebsocketHash != "" {
-				websocketHash = append(websocketHash, v.WebsocketHash)
+		for flow := range res {
+			if flow.WebsocketHash != "" {
+				websocketHash = append(websocketHash, flow.WebsocketHash)
 			}
-			httpFlowsHash = append(httpFlowsHash, v.Hash)
+			httpFlowsHash = append(httpFlowsHash, flow.Hash)
+			model.DeleteHTTPFlowCacheGRPCModel(flow)
 		}
 		err := utils.GormTransaction(s.GetProjectDatabase(), func(tx *gorm.DB) error {
 			for _, hash := range httpFlowsHash {
@@ -74,6 +75,7 @@ func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowReque
 	} else {
 		yakit.DropWebsocketFlowTable(db)
 		yakit.DropExtractedDataTable(db)
+		model.DropHTTPFlowCacheGRPCModelByFlow()
 	}
 	err := yakit.DeleteHTTPFlow(s.GetProjectDatabase(), r)
 	if err != nil {

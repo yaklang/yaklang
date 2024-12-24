@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -24,6 +25,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -838,4 +840,76 @@ func TestGetHttpFlowByIdOrRuntimeId(t *testing.T) {
 		RuntimeId: runtimeId,
 	})
 	require.NoError(t, err2)
+}
+
+func TestHTTPFlowFieldGroup(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+
+	// create httpflow
+	url1 := fmt.Sprintf("http://%s.com", utils.RandStringBytes(5))
+	flow, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url1))
+	require.NoError(t, err)
+	err = yakit.InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
+	require.NoError(t, err)
+
+	// query and check tag
+	{
+		rsp, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+			IncludeHash: []string{flow.Hash},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(rsp.Data))
+		require.Equal(t, flow.Tags, rsp.Data[0].Tags)
+	}
+	// set uuidTag and check
+	uuidTag := uuid.NewString()
+	{
+		_, err = client.SetTagForHTTPFlow(context.Background(), &ypb.SetTagForHTTPFlowRequest{
+			Id:   int64(flow.ID),
+			Tags: []string{uuidTag},
+		})
+		require.NoError(t, err)
+
+		// query from db
+		flow, err = yakit.GetHTTPFlow(consts.GetGormProjectDatabase(), int64(flow.ID))
+		require.NoError(t, err)
+		require.Contains(t, flow.Tags, uuidTag)
+
+		// query and check tag
+		rsp, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+			IncludeHash: []string{flow.Hash},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(rsp.Data))
+		require.Contains(t, rsp.Data[0].Tags, uuidTag)
+
+		// check cache
+		flow, have := model.GlobalHTTPFlowCache.Get(flow.CalcCacheHash(false))
+		require.True(t, have)
+		require.Contains(t, flow.Tags, uuidTag)
+
+		// get filed group
+		rsp1, err := client.HTTPFlowsFieldGroup(context.Background(), &ypb.HTTPFlowsFieldGroupRequest{})
+		require.NoError(t, err)
+		tags := lo.Map(rsp1.Tags, func(item *ypb.TagsCode, _ int) string { return item.Value })
+		require.Contains(t, tags, uuidTag)
+	}
+
+	// delete httpflow  and check field group
+	{
+		spew.Dump(flow)
+		_, err = client.DeleteHTTPFlows(context.Background(), &ypb.DeleteHTTPFlowRequest{
+			Id: []int64{int64(flow.ID)},
+		})
+		require.NoError(t, err)
+		// check cache
+		_, have := model.GlobalHTTPFlowCache.Get(flow.CalcCacheHash(false))
+		require.False(t, have)
+		// check  grpc
+		rsp, err := client.HTTPFlowsFieldGroup(context.Background(), &ypb.HTTPFlowsFieldGroupRequest{})
+		require.NoError(t, err)
+		tags := lo.Map(rsp.Tags, func(item *ypb.TagsCode, _ int) string { return item.Value })
+		require.NotContains(t, tags, uuidTag)
+	}
 }
