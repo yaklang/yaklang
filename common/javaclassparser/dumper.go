@@ -306,13 +306,18 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 				modifier:  accessFlags,
 				typeName:  lastPacket,
 			})
-		} else if slices.Contains(accessFlagsVerbose, "final") && c.fieldDefaultValue[name] != "" {
+		} else if slices.Contains(accessFlagsVerbose, "final") {
+			defaultValue := "null"
+			if c.fieldDefaultValue[name] != "" {
+				defaultValue = c.fieldDefaultValue[name]
+			}
 			dumped := dumpedFields{
-				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, c.fieldDefaultValue[name]),
+				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, defaultValue),
 				fieldName: name,
 				modifier:  accessFlags,
 				typeName:  lastPacket,
 			}
+
 			fields = append(fields, dumped)
 		} else {
 			fields = append(fields, dumpedFields{
