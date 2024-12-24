@@ -8,11 +8,18 @@ import (
 
 type TaskType int
 type TaskStatus int
+type TaskResultType int
 
 const (
-	PortScan TaskType = iota + 1
-	FingerPrint
+	Script TaskType = iota + 1
 )
+
+const (
+	FingerprintResponse TaskResultType = iota + 1
+	PortScanResponse
+	AssetsResponse
+)
+
 const (
 	Prepare TaskStatus = iota + 1
 	Running

@@ -3,13 +3,10 @@ package kafka
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/kafka/health"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"sync/atomic"
 	"time"
 )
-
-var agentLogger = log.GetLogger("agent")
 
 // Agent 负责执行任务，然后将结果返回
 type Agent struct {

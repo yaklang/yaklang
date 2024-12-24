@@ -121,7 +121,7 @@ func (m *Manager) Start(ctx context.Context) error {
 	m.ctx = childCtx
 	m.cancel = cancelFunc
 	m.reader = append(m.reader, NewReader[*Request](m.ctx, m.address, fmt.Sprintf("palm-%s", uuid.NewString()), ManagerTopic, m.config.KafkaConfig))
-	//m.reader = append(m.reader, NewReader[*Request](m.ctx, m.address, "palm-task", TaskTopic, m.config.KafkaConfig))
+	m.reader = append(m.reader, NewReader[*Request](m.ctx, m.address, "palm-task", TaskTopic, m.config.KafkaConfig))
 	m.writer = NewWriter(m.ctx, m.address, m.config.KafkaConfig)
 	go func() {
 		for _, reader := range m.reader {
@@ -131,9 +131,9 @@ func (m *Manager) Start(ctx context.Context) error {
 				defer m.wg.Done()
 				for {
 					select {
-					case <-ctx.Done():
+					case <-m.ctx.Done():
 						return
-					case m.message <- <-_reader.ReadMessage(ctx):
+					case m.message <- <-_reader.ReadMessage(m.ctx):
 					}
 				}
 			}()
@@ -222,5 +222,5 @@ func NewManager(id string, address string, opts ...ManagerConfigOpts) *Manager {
 }
 
 func (m *Manager) Finish() {
-	m.ctx.Done()
+	m.cancel()
 }
