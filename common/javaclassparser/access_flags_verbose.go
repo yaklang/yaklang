@@ -66,7 +66,15 @@ func getClassAccessFlagsVerbose(u uint16) ([]string, string) {
 		}
 	}
 
-	return result, strings.TrimSpace(target.String())
+	results := strings.TrimSpace(target.String())
+	if strings.Contains(results, "enum") {
+		results = strings.ReplaceAll(results, "final ", "")
+		results = strings.ReplaceAll(results, "abstract ", "")
+		results = strings.ReplaceAll(results, "annotation ", "")
+		results = strings.ReplaceAll(results, "interface ", "")
+	}
+
+	return result, results
 }
 
 // 用于解析方法的访问标志
@@ -123,6 +131,12 @@ func getMethodAccessFlagsVerbose(u uint16) ([]string, string) {
 			}
 
 			result = append(result, verbose)
+			if verbose == "varargs" {
+				continue
+			} else if verbose == "native" {
+				continue
+			} else if verbose == "strict" {
+			}
 			target.WriteString(verbose)
 			target.WriteByte(' ')
 		}
@@ -170,6 +184,9 @@ func getFieldAccessFlagsVerbose(u uint16) ([]string, string) {
 			}
 
 			result = append(result, verbose)
+			if verbose == "enum" {
+				continue
+			}
 			target.WriteString(verbose)
 			target.WriteByte(' ')
 		}
