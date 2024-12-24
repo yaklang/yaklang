@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/filter"
-	"github.com/yaklang/yaklang/common/schema"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,6 +11,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/copier"
@@ -303,11 +304,10 @@ func (s *Server) UnIgnoreYakScript(ctx context.Context, req *ypb.DeleteYakScript
 }
 
 func (s *Server) DeleteYakScript(ctx context.Context, req *ypb.DeleteYakScriptRequest) (*ypb.Empty, error) {
-	for _, i := range req.GetIds() {
-		_ = yakit.DeleteYakScriptByID(s.GetProfileDatabase(), i)
-	}
-	err := yakit.DeleteYakScriptByID(s.GetProfileDatabase(), req.Id)
-	if err != nil {
+	ids := append(req.GetIds(), req.GetId())
+	db := s.GetProfileDatabase()
+	db = db.Where("is_core_plugin = ?", false)
+	if err := yakit.DeleteYakScriptByIDs(db, ids...); err != nil {
 		return nil, err
 	}
 	return &ypb.Empty{}, nil
