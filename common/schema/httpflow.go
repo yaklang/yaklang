@@ -137,7 +137,7 @@ func (f *HTTPFlow) CalcHash() string {
 }
 
 func (f *HTTPFlow) CalcCacheHash(full bool) string {
-	return utils.CalcSha1(f.ID, f.IsHTTPS, f.Url, f.Path, f.Method, f.BodyLength, f.ContentType, f.StatusCode, f.SourceType, f.Tags, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin, f.Response, full)
+	return utils.CalcSha1(f.ID, f.Hash, full)
 }
 
 func (f *HTTPFlow) BeforeSave() error {
