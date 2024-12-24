@@ -115,6 +115,8 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 		funcCtx.Import(s)
 	}
 	superStr := ""
+	ifaces := c.obj.Interfaces
+	interfaceLists := make([]string, 0, len(ifaces)+1)
 	if supperClassName != "java.lang.Object" {
 		if isEnum && (supperClassName == "java.lang.Enum" || supperClassName == "Enum") {
 			supperClassName = ""
@@ -123,13 +125,15 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			funcCtx.Import(supperClassName)
 			supperClassName = funcCtx.ShortTypeName(supperClassName)
 			if supperClassName != "" {
-				superStr += fmt.Sprintf(" extends %s", supperClassName)
+				if !isEnum {
+					superStr += fmt.Sprintf(" extends %s", supperClassName)
+				} else {
+					interfaceLists = append(interfaceLists, supperClassName)
+				}
 			}
 		}
 	}
 
-	ifaces := c.obj.Interfaces
-	interfaceLists := make([]string, 0, len(ifaces))
 	for _, u := range ifaces {
 		info, err := c.obj.getConstantInfo(u)
 		if err != nil {
@@ -307,7 +311,7 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 				typeName:  lastPacket,
 			})
 		} else if slices.Contains(accessFlagsVerbose, "final") {
-			defaultValue := "null"
+			defaultValue := "0"
 			if c.fieldDefaultValue[name] != "" {
 				defaultValue = c.fieldDefaultValue[name]
 			}
