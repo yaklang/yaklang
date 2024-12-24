@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
+	"strings"
 )
 
 type BuildinBootstrapMethod func(d *Decompiler, sim StackSimulation, typ types.JavaType, args ...values.JavaValue) (values.JavaValue, error)
@@ -14,11 +15,32 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 		return func(d *Decompiler, sim StackSimulation, typ types.JavaType, args2 ...values.JavaValue) (values.JavaValue, error) {
 			return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				str1 := args1[0].String(funcCtx)
-				str2 := args2[0].String(funcCtx)
-				if len(str1) > 2 && str1[0] == '"' && str1[len(str1)-1] == '"' {
-					str1 = string(append([]byte(str1[:len(str1)-2]), '"'))
+
+				for i := 0; i < len(args2); i++ {
+					idx := len(args2) - 1 - i
+					if idx < 0 || idx >= len(args2) {
+						break
+					}
+					arg := args2[idx]
+					newStr := arg.String(funcCtx)
+					tag := `\u0001`
+					str1 = strings.Replace(str1, tag, `" + `+newStr+` + "`, 1)
 				}
-				return fmt.Sprintf("%s + %s", str1, str2)
+
+				if strings.HasSuffix(str1, ` + ""`) {
+					str1 = strings.TrimSuffix(str1, ` + ""`)
+				}
+				return str1
+
+				//str2 := args2[0].String(funcCtx)
+				//if len(str1) > 2 && str1[0] == '"' && str1[len(str1)-1] == '"' && strings.HasSuffix(str1, `\u0000`) {
+				//	var ok bool
+				//	str1, ok = strings.CutSuffix(str1, `\u0000"`)
+				//	if ok {
+				//		str1 = str1 + `"`
+				//	}
+				//}
+				//return fmt.Sprintf("%s + %s", str1, str2)
 			}, func() types.JavaType {
 				return typ
 			}), nil
