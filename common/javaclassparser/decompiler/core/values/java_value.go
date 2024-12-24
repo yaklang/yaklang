@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
+	"strconv"
 )
 
 type JavaRef struct {
@@ -80,7 +81,7 @@ func (j *JavaLiteral) String(funcCtx *class_context.ClassContext) string {
 		}
 	}
 	if j.JavaType.String(funcCtx) == "java.lang.String" || j.JavaType.String(funcCtx) == "String" {
-		return fmt.Sprintf(`"%s"`, j.Data)
+		return strconv.Quote(fmt.Sprint(j.Data))
 	} else {
 		return fmt.Sprint(j.Data)
 	}
