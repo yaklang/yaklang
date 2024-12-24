@@ -356,7 +356,7 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 				if err != nil {
 					return "", err
 				}
-				valStr = fmt.Sprintf("\"%s\"", s)
+				valStr = values.JavaStringToLiteral(s)
 			case *ConstantLongInfo:
 				valStr = fmt.Sprintf("%dL", ret.Value)
 			case *ConstantIntegerInfo:
@@ -369,15 +369,7 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 				return "", errors.New("parse annotation error, unknown constant type")
 			}
 		case 's':
-			valStr = fmt.Sprintf("\"%s\"", element.Value.(string))
-		case 'e':
-			//val := &EnumConstValue{
-			//	TypeName:  getUtf8(reader.readUint16()),
-			//	ConstName: getUtf8(reader.readUint16()),
-			//}
-			//ele.Value = val
-			enum := element.Value.(*EnumConstValue)
-			valStr = fmt.Sprintf("%s.%s", enum.TypeName, enum.ConstName)
+			valStr = values.JavaStringToLiteral(element.Value) // fmt.Sprintf("\"%s\"", element.Value.(string))
 		case 'c':
 			//ele.Value = getUtf8(reader.readUint16())
 			valStr = element.Value.(string)
@@ -407,6 +399,24 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 				eleList = append(eleList, res)
 			}
 			valStr = fmt.Sprintf("{%s}", strings.Join(eleList, ", "))
+		case 'e':
+			// fullname
+			switch ret := element.Value.(type) {
+			case *EnumConstValue:
+				if len(ret.TypeName) <= 2 {
+					return "", fmt.Errorf("parse annotation error, invalid enum type name: %s", ret.TypeName)
+				}
+				fullqualifiedName := ret.TypeName[1 : len(ret.TypeName)-1]
+				fullqualifiedName = strings.Replace(fullqualifiedName, "/", ".", -1)
+				c.FuncCtx.Import(fullqualifiedName)
+				last := strings.LastIndex(fullqualifiedName, ".")
+				if last == -1 {
+					return fullqualifiedName + "." + ret.ConstName, nil
+				}
+				return fullqualifiedName[last+1:] + "." + ret.ConstName, nil
+			default:
+				return "", fmt.Errorf("parse annotation error, unknown tag: %c, ret: %T", element.Tag, ret)
+			}
 		default:
 			return "", fmt.Errorf("parse annotation error, unknown tag: %c", element.Tag)
 		}

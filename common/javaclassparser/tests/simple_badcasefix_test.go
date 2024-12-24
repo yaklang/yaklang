@@ -22,6 +22,20 @@ var strconvClass []byte
 //go:embed badstrconv.class
 var badstrconvClass []byte
 
+//go:embed annotationParam.class
+var annotationParam []byte
+
+func TestAnnotationParam(t *testing.T) {
+	results, err := javaclassparser.Decompile(annotationParam)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkJavaCode(t, results)
+	assert.Contains(t, results, "phase=")
+	assert.Contains(t, results, `ndicator(phase=ProcessingPhase.DEPENDENCY_ANALY`)
+	assert.Contains(t, results, `import ch.qos.logback.core.model.processor.ProcessingPhase;`)
+}
+
 func TestStrconv2(t *testing.T) {
 	results, err := javaclassparser.Decompile(badstrconvClass)
 	if err != nil {
