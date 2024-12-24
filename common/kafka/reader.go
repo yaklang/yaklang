@@ -8,73 +8,33 @@ import (
 	"time"
 )
 
-type ReaderConfig struct {
-	timeout  int
-	maxBytes int64
-	retry    int
-}
-
-func defaultReaderConfig() *ReaderConfig {
-	return &ReaderConfig{
-		timeout:  3,
-		maxBytes: 1024 * 1024 * 10,
-		retry:    3,
-	}
-}
-
-type ReaderOptions func(config *ReaderConfig)
-
-func WithReadMaxBytes(maxBytes int64) ReaderOptions {
-	return func(config *ReaderConfig) {
-		config.maxBytes = maxBytes
-	}
-}
-func WithRetry(retry int) ReaderOptions {
-	return func(config *ReaderConfig) {
-		config.retry = retry
-	}
-}
-func WithTimeout(timeout int) ReaderOptions {
-	return func(config *ReaderConfig) {
-		config.timeout = timeout
-	}
-}
-
 type AgentReader[T any] struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	reader  *kafka.Reader
-	message chan T
-	config  *ReaderConfig
+	ctx    context.Context
+	cancel context.CancelFunc
+	reader *kafka.Reader
+	config *KafkaConfig
 }
 
-func NewReader[T any](ctx context.Context, address string, groupId string, topic string, opts ...ReaderOptions) *AgentReader[T] {
-	config := defaultReaderConfig()
+func NewReader[T any](ctx context.Context, address string, groupId string, topic Topic, config *KafkaConfig) *AgentReader[T] {
 	childCtx, cancelFunc := context.WithCancel(ctx)
-	for _, i := range opts {
-		i(config)
-	}
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        []string{address},
-		Topic:          topic,
+		Topic:          string(topic),
 		StartOffset:    kafka.FirstOffset,
 		CommitInterval: 1 * time.Second,
 		GroupID:        groupId,
 	})
 	r := &AgentReader[T]{
-		ctx:     childCtx,
-		cancel:  cancelFunc,
-		reader:  reader,
-		message: make(chan T, 1024),
-		config:  config,
+		ctx:    childCtx,
+		cancel: cancelFunc,
+		reader: reader,
+		config: config,
 	}
 	return r
 }
 func (r *AgentReader[T]) ReadMessage(ctx context.Context) <-chan T {
+	var msgChannel = make(chan T, 1024)
 	go func() {
-		defer func() {
-			close(r.message)
-		}()
 		var errorCount int
 		for {
 			message, err := r.reader.ReadMessage(ctx)
@@ -95,10 +55,15 @@ func (r *AgentReader[T]) ReadMessage(ctx context.Context) <-chan T {
 			}
 			select {
 			case <-r.ctx.Done():
-				return
-			case r.message <- msg:
+				break
+			case msgChannel <- msg:
 			}
 		}
+		close(msgChannel)
+		if err := r.reader.Close(); err != nil {
+			log.Errorf("failed to closed reader: %s", err)
+		}
+		return
 	}()
-	return r.message
+	return msgChannel
 }

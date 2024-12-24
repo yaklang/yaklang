@@ -9,12 +9,15 @@ import (
 type MessageType int
 
 const (
-	Register MessageType = iota + 1
-	Heart
-	Log
+	TaskRequest MessageType = iota + 1
+	ManagerRequest
 
-	TaskRequest
 	TaskResponse
+	ManagerResponse
+	Health
+	Register
+	AgentLog
+	TaskProcess
 )
 
 type Message struct {
@@ -23,9 +26,22 @@ type Message struct {
 }
 type Request struct {
 	Message
-	id        string
-	Token     string
+	Id        string
+	Token     string //指定token去进行执行
 	RequestId string
+}
+
+type Response struct {
+	Message
+	ResponseId    string
+	id            string
+	Token         string
+	FromRequestId string
+}
+
+type TopicResponse struct {
+	Topic    Topic
+	Response *Response
 }
 
 func (r *Request) String() string {
@@ -42,14 +58,21 @@ func newRequest(typ MessageType, id string, token string, msg []byte) *Request {
 			Type: typ,
 			Msg:  msg,
 		},
-		id:        id,
+		Id:        id,
 		Token:     token,
 		RequestId: uuid.NewString(),
 	}
 }
 
-type Response struct {
-	Message
-	ResponseId    string
-	FromRequestId string
+func NewResponse(typ MessageType, id string, fromRequestId, token string, msg []byte) *Response {
+	return &Response{
+		Message: Message{
+			Type: typ,
+			Msg:  msg,
+		},
+		ResponseId:    uuid.NewString(),
+		id:            id,
+		Token:         token,
+		FromRequestId: fromRequestId,
+	}
 }

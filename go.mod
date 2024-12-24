@@ -96,6 +96,7 @@ require (
 	github.com/refraction-networking/utls v1.6.7
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
 	github.com/samber/lo v1.38.1
+	github.com/segmentio/kafka-go v0.4.47
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shirou/gopsutil/v3 v3.23.4
 	github.com/sijms/go-ora/v2 v2.7.19
@@ -199,7 +200,6 @@ require (
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/segmentio/kafka-go v0.4.47 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/shoenig/go-m1cpu v0.1.5 // indirect
 	github.com/skeema/knownhosts v1.2.1 // indirect

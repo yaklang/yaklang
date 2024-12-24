@@ -12,6 +12,7 @@ type ManagerConfig struct {
 
 type AgentConfig struct {
 	*TaskConfig
+	OnHealthFunc func(msg []byte)
 }
 type TaskConfig struct {
 	OnTaskStartFunc  func(requestId, taskId string, message TaskRequestMessage)
@@ -20,4 +21,10 @@ type TaskConfig struct {
 
 	OnTaskResultBackFunc func(requestId, taskId string, message []byte)
 	TaskProcess          func(taskId string, msg []byte) //任务的扫描进度
+}
+
+type KafkaConfig struct {
+	timeout  int
+	maxBytes int64
+	retry    int
 }

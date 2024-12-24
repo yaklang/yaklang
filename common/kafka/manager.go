@@ -24,6 +24,7 @@ type Manager struct {
 	message  chan *Request
 	response chan *TopicResponse
 	config   *ManagerConfig
+	wg       *sync.WaitGroup
 	agent    *Agent
 }
 
@@ -39,6 +40,10 @@ func (m *Manager) defaultConfig() {
 		},
 		OnConnectAfterFunc: func(requestId, msg string) {
 			go func() {
+				m.response <- &TopicResponse{
+					Topic:    CallBack,
+					Response: NewResponse(Register, m.id, "", m.token, nil),
+				}
 				m.response <- &TopicResponse{
 					Topic:    Log,
 					Response: NewResponse(AgentLog, m.id, requestId, m.token, []byte(msg)),
@@ -60,7 +65,7 @@ func (m *Manager) defaultConfig() {
 			retry:    3,
 		},
 		AgentConfig: &AgentConfig{
-			&TaskConfig{
+			TaskConfig: &TaskConfig{
 				OnTaskStartFunc: func(requestId, taskId string, message TaskRequestMessage) {
 					go func() {
 						m.response <- &TopicResponse{
@@ -72,7 +77,7 @@ func (m *Manager) defaultConfig() {
 				OnTaskResultBackFunc: func(requestId, taskId string, message []byte) {
 					go func() {
 						m.response <- &TopicResponse{
-							Topic:    TaskResponseCallBack,
+							Topic:    CallBack,
 							Response: NewResponse(TaskResponse, m.id, requestId, m.token, message),
 						}
 					}()
@@ -96,11 +101,17 @@ func (m *Manager) defaultConfig() {
 				TaskProcess: func(taskId string, msg []byte) {
 					go func() {
 						m.response <- &TopicResponse{
-							Topic:    TaskResponseCallBack,
-							Response: NewResponse(AgentProcess, m.id, "", m.token, msg),
+							Topic:    CallBack,
+							Response: NewResponse(TaskProcess, m.id, "", m.token, msg),
 						}
 					}()
 				},
+			},
+			OnHealthFunc: func(msg []byte) {
+				m.response <- &TopicResponse{
+					Topic:    CallBack,
+					Response: NewResponse(Health, m.id, "", m.token, msg),
+				}
 			},
 		},
 	}
@@ -109,33 +120,56 @@ func (m *Manager) Start(ctx context.Context) error {
 	childCtx, cancelFunc := context.WithCancel(ctx)
 	m.ctx = childCtx
 	m.cancel = cancelFunc
-	for _, a := range m.reader {
-		reader := a
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-				case m.message <- <-reader.ReadMessage(ctx):
+	m.reader = append(m.reader, NewReader[*Request](m.ctx, m.address, fmt.Sprintf("palm-%s", uuid.NewString()), ManagerTopic, m.config.KafkaConfig))
+	//m.reader = append(m.reader, NewReader[*Request](m.ctx, m.address, "palm-task", TaskTopic, m.config.KafkaConfig))
+	m.writer = NewWriter(m.ctx, m.address, m.config.KafkaConfig)
+	go func() {
+		for _, reader := range m.reader {
+			_reader := reader
+			m.wg.Add(1)
+			go func() {
+				defer m.wg.Done()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case m.message <- <-_reader.ReadMessage(ctx):
+					}
 				}
-			}
-		}()
+			}()
+		}
+		m.wg.Wait()
+		close(m.message)
+	}()
+	m.config.OnConnectBeforeFunc("", "start agent")
+	err := m.agent.Start(m.ctx)
+	if err != nil {
+		m.config.OnAgentErrorFunc("", err)
+		return err
 	}
+	m.config.OnConnectAfterFunc("", "agent connect success")
 	go func() {
 		for response := range m.response {
-			err := m.writer.writeMessage(response.Response, response.Topic)
-			if err != nil {
-				log.Errorf("write response fail: %s", err)
+			select {
+			case <-m.ctx.Done():
+				return
+			default:
+				err2 := m.writer.writeMessage(response.Response, response.Topic)
+				if err2 != nil {
+					log.Errorf("write message fail: %s", err2)
+					return
+				}
 			}
 		}
 	}()
-	go m.service()
+	m.service()
 	return nil
 }
 func (m *Manager) service() {
 	for request := range m.message {
 		select {
 		case <-m.ctx.Done():
-			break
+			return
 		default:
 			if request.Token != "" {
 				if m.token != request.Token {
@@ -145,10 +179,6 @@ func (m *Manager) service() {
 			}
 		}
 	}
-	close(m.message)
-}
-func (m *Manager) Health() {
-
 }
 
 func (m *Manager) processMessage(request *Request) {
@@ -184,8 +214,10 @@ func NewManager(id string, address string, opts ...ManagerConfigOpts) *Manager {
 	m.id = id
 	m.address = address
 	m.mux = &sync.Mutex{}
+	m.agent = NewAgent(m.config.AgentConfig)
 	m.message = make(chan *Request, 1024)
 	m.response = make(chan *TopicResponse, 1024)
+	m.wg = &sync.WaitGroup{}
 	return m
 }
 

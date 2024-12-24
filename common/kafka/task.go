@@ -2,71 +2,102 @@ package kafka
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 type TaskType int
 type TaskStatus int
 
 const (
-	Scan TaskType = iota + 1
+	PortScan TaskType = iota + 1
 	FingerPrint
 )
 const (
-	Start TaskStatus = iota + 1
+	Prepare TaskStatus = iota + 1
+	Running
 	Stop
-	Recover
 	Done
 )
 
-type Task struct {
-	ctx        context.Context
-	TaskType   TaskType
-	TaskId     string
-	SubTaskId  string
-	CreateTime time.Time
-	UpdateTime time.Time
-	DeleteTime time.Time
-	Runtime    time.Time
-	Content    json.RawMessage
-
-	status TaskStatus //记录任务状态
+// TasksItem 最小的任务执行单元
+type TasksItem struct {
+	typ         TaskType
+	ctx         context.Context
+	cancel      context.CancelFunc
+	mux         *sync.Mutex
+	wg          *sync.WaitGroup
+	status      TaskStatus
+	Content     []byte //yak脚本
+	taskId      string
+	items       chan *TaskRequestMessage
+	Total       *atomic.Int64
+	ReceiveTask *atomic.Bool
 }
 
-func (t *Task) GetTaskStatus() TaskStatus {
-	return t.status
+func NewTasksItem(id string, typ TaskType, content []byte) *TasksItem {
+	return &TasksItem{
+		typ:         typ,
+		mux:         &sync.Mutex{},
+		status:      Prepare,
+		Content:     content,
+		taskId:      id,
+		items:       make(chan *TaskRequestMessage, 1024),
+		ReceiveTask: &atomic.Bool{},
+		wg:          &sync.WaitGroup{},
+	}
 }
 
-type Tasks struct {
-	ctx               context.Context
-	wg                *sync.WaitGroup
-	currentTaskNumber atomic.Int64
-	allTaskNumber     atomic.Int64
-	taskChannel       chan *Task
+// StopReceive 停止接收任务，当manager发送完毕的时候，就关闭管道
+func (t *TasksItem) StopReceive() {
+	if t.ReceiveTask.Load() {
+		t.mux.Lock()
+		t.ReceiveTask.Store(false)
+		go func() {
+			t.wg.Wait()
+			close(t.items)
+		}()
+		t.mux.Unlock()
+	}
 }
 
-func NewTasks(ctx context.Context) *Tasks {
-	t := new(Tasks)
-	t.ctx = ctx
-	t.wg = &sync.WaitGroup{}
-	t.taskChannel = make(chan *Task, 1024)
-	return t
-}
-func (t *Tasks) AddTask(task *Task) {
-	go func() {
+func (t *TasksItem) Start(ctx context.Context) {
+	childCtx, cancelFunc := context.WithCancel(ctx)
+	t.ctx = childCtx
+	t.cancel = cancelFunc
+	t.SetStatus(Running)
+	t.mux.Lock()
+	defer t.SetStatus(Done)
+	defer t.mux.Unlock()
+	for item := range t.items {
 		select {
 		case <-t.ctx.Done():
-			close(t.taskChannel)
-			return
-		case t.taskChannel <- task:
-			t.allTaskNumber.Add(1)
+		default:
+			//todo: process task item
+			_ = item
 		}
-	}()
+	}
 }
 
-func (t *Tasks) GetTaskProcess() float64 {
-	return float64(t.currentTaskNumber.Load()) / float64(t.allTaskNumber.Load())
+func (t *TasksItem) AddTask(message *TaskRequestMessage) {
+	if t.ReceiveTask.Load() {
+		t.wg.Add(1)
+		go func() {
+			defer t.wg.Done()
+			t.items <- message
+		}()
+	}
+}
+
+func (t *TasksItem) SetStatus(status TaskStatus) {
+	t.mux.Lock()
+	t.status = status
+	t.mux.Unlock()
+}
+
+func (t *TasksItem) Stop() {
+	t.mux.Lock()
+	t.cancel()
+	t.SetStatus(Stop)
+	t.mux.Unlock()
 }

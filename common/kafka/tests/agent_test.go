@@ -14,10 +14,9 @@ func TestAgent(t *testing.T) {
 	go func() {
 		time.Sleep(time.Duration(10) * time.Second)
 		cancelFunc()
+		time.Sleep(time.Duration(5) * time.Second)
 	}()
-	agent, err := kafka.NewScanAgent(uuid.NewString(), "127.0.0.1:9092", ctx)
+	manager := kafka.NewManager(uuid.NewString(), "127.0.0.1:9092")
+	err := manager.Start(ctx)
 	require.NoError(t, err)
-	agent.Start()
-	time.Sleep(time.Duration(3) * time.Second)
-	agent.ShutDown()
 }
