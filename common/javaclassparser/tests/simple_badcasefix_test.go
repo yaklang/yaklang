@@ -16,6 +16,19 @@ var interfaceExtends []byte
 //go:embed enum.class
 var enumClass []byte
 
+//go:embed strconv.class
+var strconvClass []byte
+
+func TestStrconv(t *testing.T) {
+	results, err := javaclassparser.Decompile(strconvClass)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkJavaCode(t, results)
+	assert.Contains(t, results, "enum Node$Type")
+	assert.Contains(t, results, "\tLITERAL,\n\tVARIABLE;\n")
+}
+
 func TestEnumBasic(t *testing.T) {
 	results, err := javaclassparser.Decompile(enumClass)
 	if err != nil {
@@ -24,7 +37,7 @@ func TestEnumBasic(t *testing.T) {
 	checkJavaCode(t, results)
 	fmt.Println(results)
 	assert.Contains(t, results, "enum Node$Type")
-	assert.Contains(t, results, "\tLITERAL,\n\rVARIABLE;\n")
+	assert.Contains(t, results, "\tLITERAL,\n\tVARIABLE;\n")
 }
 
 func TestInterfaceExtends(t *testing.T) {
@@ -32,14 +45,17 @@ func TestInterfaceExtends(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	checkJavaCode(t, results)
 	fmt.Println(results)
 	assert.Contains(t, results, "NavigableSet extends SortedSet")
 }
 
 // checkjavacode
-func checkJavaCode(t *testing.T, path string) {
-	ssatest.CheckJava(t, path, func(prog *ssaapi.Program) error {
+func checkJavaCode(t *testing.T, code string) {
+	fmt.Println(code)
+	ssatest.CheckJava(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		return nil
 	})
+	fmt.Println(code)
 }
