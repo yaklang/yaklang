@@ -118,6 +118,11 @@ func DeleteRuleByRuleName(name string) error {
 	return db.Where("rule_name = ?", name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
+func DeleteBuildInRule() error {
+	db := consts.GetGormProfileDatabase()
+	return db.Where("is_build_in_rule = ?", true).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
+}
+
 func DeleteRuleByLibName(name string) error {
 	if name == "" {
 		return nil
