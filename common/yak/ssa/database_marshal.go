@@ -30,6 +30,12 @@ func fetchIds(origin any) any {
 			params[k] = v.GetId()
 		}
 		return params
+	case map[string]*Variable:
+		params := make(map[string]any)
+		for k, v := range ret {
+			params[k] = v.GetId()
+		}
+		return params
 	case []SwitchLabel:
 		results := make([]map[string]int64, len(ret))
 		for i := 0; i < len(ret); i++ {
@@ -367,9 +373,10 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	unmarshalMapVariables := func(p any) map[*Variable]Value {
 		vs := make(map[*Variable]Value)
 		switch ret := p.(type) {
-		case map[*Variable]any:
-			for k, id := range ret {
-				vs[k] = newLazyInstruction(id)
+		case map[string]any:
+			for _, id := range ret {
+				value := newLazyInstruction(id)
+				vs[value.GetLastVariable()] = newLazyInstruction(id)
 			}
 		default:
 		}

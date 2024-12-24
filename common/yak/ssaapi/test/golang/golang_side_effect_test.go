@@ -271,23 +271,24 @@ func Test_SideEffect_Bind(t *testing.T) {
 
 	code = `package main
 
-func main() {
-	a := 1
-	{
-		a = 2
-		a := 3
-		f1 := func() {
-			a = 4
-		}
-		f1()
-		b := a
+	func main() {
+		a := 1
 		{
-			a = 5
+			a = 2
+			a := 3
+			f1 := func() {
+				a = 4
+			}
+			f1()
+			b := a // 4
+			{
+				a = 5
+			}
+			f1()
+			c := a // 4
 		}
-		f1()
-		c := a
 	}
-}`
+	`
 
 	t.Run("side-effect muti nesting bind", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
@@ -296,6 +297,130 @@ func main() {
 	`, map[string][]string{
 			"b": {"4"},
 			"c": {"4"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	code = `package main
+
+	func main(){
+		a := 0
+		f := func() {
+			if true {
+				a = 2
+			}else{
+
+			}
+			b := a // phi(a)[2,FreeValue-a]
+		}
+		a = 1
+		f()
+		c := a // side-effect(phi(a)[2,FreeValue-a], a)
+	}
+	`
+
+	t.Run("side-effect with empty path", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+			b #-> as $b
+			c #-> as $c
+	`, map[string][]string{
+			"b": {"2", "1", "true"},
+			"c": {"2", "1", "true"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	code = `package main
+
+	func main(){
+		a := 0
+		f := func() {
+			if true {
+				a = 2
+			}else{
+
+			}
+			b := a // phi(a)[2,FreeValue-a]
+		}
+		a := 1
+		f()
+		c := a // phi(a)[2,FreeValue-a]
+	}
+	`
+
+	t.Run("side-effect with empty path have local", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+			b #-> as $b
+			c #-> as $c
+	`, map[string][]string{
+			"b": {"2", "0", "true"},
+			"c": {"2", "0", "true"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	code = `package main
+
+		func main(){
+		    a := 0
+			f := func() {
+			    if true {
+			        a = 2
+			    }else{
+	
+				}
+				b := a // phi(a)[2,FreeValue-a]
+			}
+			a = 1
+			f()
+			c := a // side-effect(phi(a)[2,FreeValue-a], a)
+			a = 3
+			f()
+			d := a // side-effect(phi(a)[2,FreeValue-a], a)
+		}
+	`
+
+	t.Run("side-effect with empty path extend", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+			b #-> as $b
+			c #-> as $c
+			d #-> as $d
+	`, map[string][]string{
+			"b": {"2", "3", "true"},
+			"c": {"2", "3", "true"},
+			"d": {"2", "3", "true"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	code = `package main
+
+	func main(){
+		a := 1
+		f1 := func() {
+			a = 2
+		}
+		{
+			a := 3	 
+			f2 := func() {
+				if true{
+					f1()
+				}else{
+					a = 4
+				}
+				b := a // phi(a)[FreeValue-a,4]
+			}
+			f2()
+			c := a // side-effect(phi(a)[FreeValue-a,4], a)
+		}
+		d := a // side-effect(phi(a)[side-effect(2, a),FreeValue-a], a)
+	}`
+
+	t.Run("side-effect cross block nesting bind with phi", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+			b #-> as $b
+			c #-> as $c
+			d #-> as $d
+	`, map[string][]string{
+			"b": {"3", "4", "true"},
+			"c": {"3", "4", "true"},
+			"d": {"1", "2", "true"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }

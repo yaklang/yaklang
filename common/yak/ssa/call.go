@@ -14,7 +14,6 @@ func NewCall(target Value, args []Value, binding map[string]Value, block *BasicB
 	if binding == nil {
 		binding = make(map[string]Value)
 	}
-
 	c := &Call{
 		anValue:         NewValue(),
 		Method:          target,
@@ -306,6 +305,9 @@ func (c *Call) handleCalleeFunction() {
 				}
 
 				variable = builder.CreateVariableForce(se.Name)
+				if se.BindVariable != nil {
+					variable.SetCaptured(se.BindVariable)
+				}
 			} else {
 				// is object
 				obj, ok := se.Get(c)
@@ -313,6 +315,9 @@ func (c *Call) handleCalleeFunction() {
 					continue
 				}
 				variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
+				if se.BindVariable != nil {
+					variable.SetCaptured(se.BindVariable)
+				}
 			}
 
 			if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
@@ -452,6 +457,7 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 		val.AddUser(c)
 		c.Binding[name] = val
 	}
+
 	for _, fv := range fvs {
 		// if freeValue has default value, skip
 		if fv.GetDefault() != nil {
@@ -459,10 +465,10 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 			continue
 		}
 
-		v := builder.PeekValue(fv.GetName())
+		value := builder.PeekValue(fv.GetName())
 
-		if v != nil {
-			bindAndHandler(fv.GetName(), v)
+		if value != nil {
+			bindAndHandler(fv.GetName(), value)
 			//c.Binding[fv.GetName()] = v
 		} else {
 			// mark error in freeValue.Variable
