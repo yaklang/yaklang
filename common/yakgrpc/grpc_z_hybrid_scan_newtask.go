@@ -152,6 +152,17 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	feedbackStatus := func() {
 		statusManager.Feedback(stream)
 	}
+	globalFeedbackClient := yaklib.NewVirtualYakitClientWithRuntimeID(
+		func(result *ypb.ExecResult) error {
+			if manager.IsStop() || manager.IsPaused() {
+				return nil
+			}
+			result.RuntimeID = taskId
+			status := &ypb.HybridScanResponse{
+				ExecResult: result,
+			}
+			return stream.Send(status)
+		}, taskId)
 
 	// Send RuntimeID immediately
 	currentStatus := statusManager.GetStatus(taskRecorder)
@@ -204,11 +215,12 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		statusManager.DoActiveTarget()
 		targetWg := new(sync.WaitGroup)
 
-		target := utils.ExtractHostPort(__currentTarget.Url)
-		conn, err := netx.DialX(target)
+		targetHostPort := utils.ExtractHostPort(__currentTarget.Url)
+		conn, err := netx.DialX(targetHostPort)
 		if err != nil {
-			log.Errorf("dial target failed: %s", err)
-			unreachableTargets = append(unreachableTargets, target)
+			log.Errorf("dial target[%s] failed: %s", targetHostPort, err)
+			globalFeedbackClient.YakitError("dial target[%s] failed: %s", targetHostPort, err)
+			unreachableTargets = append(unreachableTargets, targetHostPort)
 			statusManager.DoneFailureTarget()
 			feedbackStatus()
 			continue
@@ -284,6 +296,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				// shrink context
 				if manager.IsStop() {
 					log.Infof("skip task %d via canceled", taskIndex)
+					globalFeedbackClient.YakitInfo("skip task %d via canceled", taskIndex)
 					return
 				}
 				statusManager.PushActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
@@ -302,7 +315,8 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 					}, taskId)
 				err := ScanHybridTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, proxy, feedbackClient, callerFilter)
 				if err != nil {
-					log.Warnf("scan target failed: %s", err)
+					log.Errorf("scan target[%s] failed: %s", targetHostPort, err)
+					globalFeedbackClient.YakitError("scan target[%s] failed: %s", targetHostPort, err)
 				}
 				time.Sleep(time.Duration(300+rand.Int63n(700)) * time.Millisecond)
 			}()
