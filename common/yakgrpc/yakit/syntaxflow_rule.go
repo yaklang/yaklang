@@ -49,7 +49,8 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 	if len(params.GetGroupNames()) > 0 {
 		db = db.Joins("JOIN syntax_flow_rule_and_group ON syntax_flow_rule_and_group.syntax_flow_rule_id = syntax_flow_rules.id").
 			Joins("JOIN syntax_flow_groups ON syntax_flow_groups.id = syntax_flow_rule_and_group.syntax_flow_group_id").
-			Where("syntax_flow_groups.group_name IN (?)", params.GetGroupNames())
+			Where("syntax_flow_groups.group_name IN (?)", params.GetGroupNames()).
+			Select("DISTINCT syntax_flow_rules.*")
 	}
 
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", params.GetSeverity())
