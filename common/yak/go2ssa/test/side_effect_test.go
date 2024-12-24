@@ -216,12 +216,12 @@ func Test_SideEffect(t *testing.T) {
 			}
 			println(a) // 3
 			f2()
-			println(a) // side-effect(phi(a)[3,4], a)
+			println(a) // side-effect(phi(a)[FreeValue-a,4], a)
 		}
-		println(a) // side-effect(phi(a)[1,4], a)
+		println(a) // side-effect(phi(a)[side-effect(2, a),FreeValue-a], a)
 	}
 		`, []string{
-			"phi(a)[FreeValue-a,4]", "3", "side-effect(phi(a)[3,4], a)", "side-effect(phi(a)[1,4], a)",
+			"phi(a)[FreeValue-a,4]", "3", "side-effect(phi(a)[FreeValue-a,4], a)", "side-effect(phi(a)[side-effect(2, a),FreeValue-a], a)",
 		}, t)
 	})
 
@@ -312,10 +312,10 @@ func Test_SideEffect_Return(t *testing.T) {
 			}
 			a = 1
 			f()
-			println(a) // side-effect(phi(a)[2,1], a)
+			println(a) // side-effect(phi(a)[2,FreeValue-a], a)
 		}
 		`, []string{
-			"phi(a)[2,FreeValue-a]", "side-effect(phi(a)[2,1], a)",
+			"phi(a)[2,FreeValue-a]", "side-effect(phi(a)[2,FreeValue-a], a)",
 		}, t)
 	})
 
@@ -334,13 +334,13 @@ func Test_SideEffect_Return(t *testing.T) {
 			}
 			a = 1
 			f()
-			println(a) // side-effect(phi(a)[2,1], a)
+			println(a) // side-effect(phi(a)[2,FreeValue-a], a)
 			a = 3
 			f()
-			println(a) // side-effect(phi(a)[2,3], a)
+			println(a) // side-effect(phi(a)[2,FreeValue-a], a)
 		}
 		`, []string{
-			"phi(a)[2,FreeValue-a]", "side-effect(phi(a)[2,1], a)", "side-effect(phi(a)[2,3], a)",
+			"phi(a)[2,FreeValue-a]", "side-effect(phi(a)[2,FreeValue-a], a)", "side-effect(phi(a)[2,FreeValue-a], a)",
 		}, t)
 	})
 

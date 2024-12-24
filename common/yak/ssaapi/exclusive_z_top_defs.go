@@ -357,7 +357,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			var actualParam ssa.Value
 			if inst.IsFreeValue {
 				// free value
-				if tmp, ok := calledInstance.Binding[inst.GetName()]; ok {
+				if tmp := inst.GetDefault(); tmp != nil {
+					actualParam = tmp
+				} else if tmp, ok := calledInstance.Binding[inst.GetName()]; ok {
 					actualParam = tmp
 				} else {
 					log.Errorf("free value: %v is not found in binding", inst.GetName())

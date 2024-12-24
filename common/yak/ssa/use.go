@@ -181,6 +181,7 @@ func (c *Call) GetValues() Values {
 	}
 	return lo.Filter(ret, filterNilValue)
 }
+
 func (c *Call) ReplaceValue(v Value, to Value) {
 	if c.Method == v {
 		c.Method = to
