@@ -326,7 +326,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		if err != nil {
 			log.Error(err)
 		}
-		err := yakit.DeleteYakScriptByID(consts.GetGormProfileDatabase(), int64(databasePlugin.ID))
+		err := yakit.DeleteYakScriptByIDs(consts.GetGormProfileDatabase(), int64(databasePlugin.ID))
 		if err != nil {
 			log.Warnf("delete legacy script reason: overrid")
 		}

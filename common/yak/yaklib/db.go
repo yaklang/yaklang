@@ -165,7 +165,9 @@ var DatabaseExports = map[string]interface{}{
 }
 
 func _deleteYakScriptByName(i string) error {
-	return yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), i)
+	db := consts.GetGormProfileDatabase()
+	db = db.Where("is_core_plugin = ?", false)
+	return yakit.DeleteYakScriptByName(db, i)
 }
 
 func _yieldYakScript() chan *schema.YakScript {
