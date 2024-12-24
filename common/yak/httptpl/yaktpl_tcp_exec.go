@@ -101,7 +101,9 @@ func (y *YakNetworkBulkConfig) handleConn(
 				}
 				vars = utils.MergeGeneralMap(vars, extractorVars)
 				for k, v := range extractorVars {
-					extractorResults[k] = v
+					if v != nil {
+						extractorResults[k] = v
+					}
 				}
 			}
 			if len(response) > 0 {
