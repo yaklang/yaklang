@@ -2,8 +2,10 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
 	"testing"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -363,4 +365,75 @@ func TestQueryYakScript(t *testing.T) {
 		})
 
 	}
+}
+
+func TestYakScriptDelete(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	create := func(corePlugin bool) int64 {
+		name := uuid.NewString()
+		err := yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, &schema.YakScript{
+			Type:         "mitm",
+			Content:      `target = cli.String("target")`,
+			ScriptName:   name,
+			IsCorePlugin: corePlugin,
+		})
+		require.NoError(t, err)
+		script, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), name)
+		require.NoError(t, err)
+		return int64(script.ID)
+	}
+
+	delete := func(ids ...int64) {
+		req := &ypb.DeleteYakScriptRequest{}
+		if len(ids) == 1 {
+			req.Id = ids[0]
+		} else {
+			req.Ids = ids
+		}
+		_, err := client.DeleteYakScript(context.Background(), req)
+		require.NoError(t, err)
+	}
+
+	query := func(id int64) (*ypb.YakScript, error) {
+		return client.GetYakScriptById(context.Background(), &ypb.GetYakScriptByIdRequest{Id: id})
+	}
+
+	t.Run("test query", func(t *testing.T) {
+		id := create(false)
+		script, err := query(id)
+		require.NoError(t, err)
+		require.NotNil(t, script)
+	})
+
+	t.Run("test delete", func(t *testing.T) {
+		id := create(false)
+		log.Infof("id:%d", id)
+		delete(id)
+		_, err := query(id)
+		require.Error(t, err)
+	})
+
+	t.Run("test delete multiple", func(t *testing.T) {
+		id1 := create(false)
+		id2 := create(false)
+		delete(id1, id2)
+		_, err := query(id1)
+		require.Error(t, err)
+		_, err = query(id2)
+		require.Error(t, err)
+	})
+
+	t.Run("con't delete core plugin", func(t *testing.T) {
+		id1 := create(false)
+		id2 := create(true) // this is core plugin and can't be deleted
+		delete(id1, id2)
+		_, err := query(id1)
+		require.Error(t, err)
+		script2, err := query(id2)
+		require.NoError(t, err)
+		require.NotNil(t, script2)
+	})
+
 }

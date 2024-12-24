@@ -230,13 +230,12 @@ func GetYakScriptByUUID(db *gorm.DB, uuid string) (*schema.YakScript, error) {
 	return &req, nil
 }
 
-func DeleteYakScriptByID(db *gorm.DB, id int64) error {
+func DeleteYakScriptByIDs(db *gorm.DB, ids ...int64) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	if db := db.Model(&schema.YakScript{}).Where(
-		"id = ?", id,
-	).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
+	if db := db.Model(&schema.YakScript{}).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
