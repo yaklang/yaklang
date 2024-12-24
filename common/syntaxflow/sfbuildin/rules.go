@@ -27,6 +27,7 @@ func init() {
 			if yakit.Get(key) == consts.ExistedSyntaxFlowEmbedFSHash {
 				return nil
 			}
+			sfdb.DeleteBuildInRule()
 			defer func() {
 				hash, _ := SyntaxFlowRuleHash()
 				yakit.Set(key, hash)
