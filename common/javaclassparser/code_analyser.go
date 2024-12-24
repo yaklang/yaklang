@@ -154,7 +154,7 @@ type VarMap struct {
 	val values.JavaValue
 }
 
-func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id int) ([]values.JavaValue,[]statements.Statement, error) {
+func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id int) ([]values.JavaValue, []statements.Statement, error) {
 	pool := dumper.ConstantPool
 	parser := core.NewDecompiler(codeAttr.Code, func(id int) values.JavaValue {
 		return GetValueFromCP(dumper.ConstantPool, id)
@@ -162,7 +162,11 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id int) 
 	parser.BaseVarId = id
 	parser.DumpClassLambdaMethod = func(name, desc string, id int) (string, error) {
 		dumper.lambdaMethods[name] = append(dumper.lambdaMethods[name], desc)
-		return dumper.DumpMethodWithInitialId(name, desc, id)
+		dumped, err := dumper.DumpMethodWithInitialId(name, desc, id)
+		if err != nil {
+			return "", err
+		}
+		return dumped.code, nil
 	}
 	parser.FunctionContext = dumper.FuncCtx
 	parser.FunctionType = dumper.MethodType
@@ -211,6 +215,6 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id int) 
 			panic("error")
 		}
 	}
-	st,err := decompiler.ParseBytesCode(parser)
+	st, err := decompiler.ParseBytesCode(parser)
 	return parser.Params, st, err
 }

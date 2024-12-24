@@ -72,8 +72,16 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	accessFlagsToCode := c.obj.AccessFlagsToCode
 
 	nonClassKeyword := false
+	isInterface := false
+	isEnum := false
 	for _, k := range c.obj.AccessFlagsVerbose {
 		if k == "interface" || k == "enum" || k == "annotation" {
+			if k == "interface" {
+				isInterface = true
+			} else if k == "enum" {
+				isEnum = true
+			}
+
 			nonClassKeyword = true
 			break
 		}
@@ -108,13 +116,21 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 	superStr := ""
 	if supperClassName != "java.lang.Object" {
-		funcCtx.Import(supperClassName)
-		supperClassName = funcCtx.ShortTypeName(supperClassName)
-		if supperClassName != "" {
-			superStr += fmt.Sprintf(" extends %s", supperClassName)
+		if isEnum && (supperClassName == "java.lang.Enum" || supperClassName == "Enum") {
+			supperClassName = ""
+			superStr = ""
+		} else {
+			funcCtx.Import(supperClassName)
+			supperClassName = funcCtx.ShortTypeName(supperClassName)
+			if supperClassName != "" {
+				superStr += fmt.Sprintf(" extends %s", supperClassName)
+			}
 		}
 	}
-	for _, u := range c.obj.Interfaces {
+
+	ifaces := c.obj.Interfaces
+	interfaceLists := make([]string, 0, len(ifaces))
+	for _, u := range ifaces {
 		info, err := c.obj.getConstantInfo(u)
 		if err != nil {
 			continue
@@ -126,7 +142,15 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 		}
 		name = funcCtx.ShortTypeName(strings.Replace(name, "/", ".", -1))
 		if name != "" {
-			superStr += fmt.Sprintf(" implements %s", name)
+			interfaceLists = append(interfaceLists, name)
+
+		}
+	}
+	if len(interfaceLists) > 0 {
+		if isInterface {
+			superStr += fmt.Sprintf(" extends %s", strings.Join(interfaceLists, ", "))
+		} else {
+			superStr += fmt.Sprintf(" implements %s", strings.Join(interfaceLists, ", "))
 		}
 	}
 
@@ -159,14 +183,39 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 	if len(fields) > 0 {
 		attrs += "\n\t// Fields\n"
+		enumFields := make([]dumpedFields, 0, len(fields))
+		ordinaryFields := make([]string, 0, len(fields))
 		for _, field := range fields {
-			attrs += fmt.Sprintf("\t%s\n", field)
+			if isEnum && field.typeName == className && (field.modifier == "public static final enum" || field.modifier == "public static final") {
+				enumFields = append(enumFields, field)
+				continue
+			}
+			ordinaryFields = append(ordinaryFields, field.code)
+		}
+		for idx, enumSimple := range enumFields {
+			attrs += fmt.Sprintf("\t%s", enumSimple.fieldName)
+			if idx == len(enumFields)-1 {
+				attrs += ";\n"
+			} else {
+				attrs += ",\n"
+			}
+		}
+		for _, ordinaryField := range ordinaryFields {
+			attrs += fmt.Sprintf("\t%s\n", ordinaryField)
 		}
 	}
 	if len(methods) > 0 {
 		attrs += "\n"
 		for _, method := range methods {
-			attrs += fmt.Sprintf("\t%s\n", method)
+			if isEnum {
+				//if method.methodName == "values" {
+				//	continue
+				//}
+				//if method.methodName == "valueOf" {
+				//	continue
+				//}
+			}
+			attrs += fmt.Sprintf("\t%s\n", method.code)
 		}
 	}
 	var classKeyword string
@@ -189,8 +238,16 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 	return packageSource + importsStr + result, nil
 }
-func (c *ClassObjectDumper) DumpFields() ([]string, error) {
-	result := []string{}
+
+type dumpedFields struct {
+	code      string
+	fieldName string
+	modifier  string
+	typeName  string
+}
+
+func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
+	fields := make([]dumpedFields, 0, len(c.obj.Fields))
 	for _, field := range c.obj.Fields {
 		accessFlagsVerbose, accessCode := getFieldAccessFlagsVerbose(field.AccessFlags)
 		//if len(accessFlagsVerbose) < 1 {
@@ -229,6 +286,11 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 					valueLiteral = strconv.Quote(constStr)
 				case *ConstantIntegerInfo:
 					valueLiteral = strconv.Itoa(int(constVal.Value))
+				case *ConstantLongInfo:
+					valueLiteral = strconv.Itoa(int(constVal.Value))
+					if !strings.HasSuffix(valueLiteral, "L") {
+						valueLiteral += "L"
+					}
 				default:
 					log.Errorf("when handling for fields unknown constant type: %T", constVal)
 				}
@@ -238,14 +300,30 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 		}
 
 		if valueLiteral != "" {
-			result = append(result, fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, valueLiteral))
+			fields = append(fields, dumpedFields{
+				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, valueLiteral),
+				fieldName: name,
+				modifier:  accessFlags,
+				typeName:  lastPacket,
+			})
 		} else if slices.Contains(accessFlagsVerbose, "final") && c.fieldDefaultValue[name] != "" {
-			result = append(result, fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, c.fieldDefaultValue[name]))
+			dumped := dumpedFields{
+				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, c.fieldDefaultValue[name]),
+				fieldName: name,
+				modifier:  accessFlags,
+				typeName:  lastPacket,
+			}
+			fields = append(fields, dumped)
 		} else {
-			result = append(result, fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, name))
+			fields = append(fields, dumpedFields{
+				code:      fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, name),
+				fieldName: name,
+				modifier:  accessFlags,
+				typeName:  lastPacket,
+			})
 		}
 	}
-	return result, nil
+	return fields, nil
 }
 
 func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, error) {
@@ -341,22 +419,23 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 	return result, nil
 }
 
-func (c *ClassObjectDumper) DumpMethod(methodName, desc string) (string, error) {
+func (c *ClassObjectDumper) DumpMethod(methodName, desc string) (dumpedMethods, error) {
 	return c.DumpMethodWithInitialId(methodName, desc, 0)
 }
 
-func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id int) (string, error) {
+func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id int) (dumpedMethods, error) {
 	var method *MemberInfo
 	var name, descriptor string
 	var err error
+	var dumped dumpedMethods
 	for _, info := range c.obj.Methods {
 		name, err = c.obj.getUtf8(info.NameIndex)
 		if err != nil {
-			return "", utils.Wrapf(err, "getUtf8(%v) failed", info.NameIndex)
+			return dumped, utils.Wrapf(err, "getUtf8(%v) failed", info.NameIndex)
 		}
 		descriptor, err = c.obj.getUtf8(info.DescriptorIndex)
 		if err != nil {
-			return "", utils.Wrapf(err, "getUtf8(%v) failed", info.DescriptorIndex)
+			return dumped, utils.Wrapf(err, "getUtf8(%v) failed", info.DescriptorIndex)
 		}
 		if name == methodName && descriptor == desc {
 			method = info
@@ -364,7 +443,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		}
 	}
 	if method == nil {
-		return "", fmt.Errorf("method %s not found", methodName)
+		return dumped, fmt.Errorf("method %s not found", methodName)
 	}
 
 	var isLambda bool
@@ -392,7 +471,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	accessFlags := accessFlagCode
 	methodType, err := types.ParseMethodDescriptor(descriptor)
 	if err != nil {
-		return "", utils.Wrapf(err, "ParseMethodDescriptor(%v) failed", descriptor)
+		return dumped, utils.Wrapf(err, "ParseMethodDescriptor(%v) failed", descriptor)
 	}
 	c.MethodType = methodType.FunctionType()
 	returnTypeStr := methodType.FunctionType().ReturnType.String(c.FuncCtx)
@@ -436,7 +515,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			for _, annotation := range anno.Annotations {
 				res, err := c.DumpAnnotation(annotation)
 				if err != nil {
-					return "", err
+					return dumped, err
 				}
 				annoStrs = append(annoStrs, res)
 			}
@@ -444,7 +523,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		if codeAttr, ok := attribute.(*CodeAttribute); ok {
 			params, statementList, err := ParseBytesCode(c, codeAttr, id)
 			if err != nil {
-				return "", utils.Wrap(err, "ParseBytesCode failed")
+				return dumped, utils.Wrap(err, "ParseBytesCode failed")
 			}
 			if len(params) > 0 {
 				if v, ok := params[0].(*values.JavaRef); ok && v.IsThis {
@@ -600,7 +679,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	if isLambda {
 		res := fmt.Sprintf("(%s) -> {%s", paramsNewStr, code)
 		res += strings.Repeat("\t", c.TabNumber()) + "}"
-		return res, nil
+		dumped.methodName = name
+		dumped.code = res
+		dumped.bodyCode = code
+		return dumped, nil
 	}
 	methodSourceBuffer := strings.Builder{}
 	writeAccessFlags := func(buffer io.Writer) {
@@ -660,18 +742,32 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	}
 	methodSource = methodSourceBuffer.String()
 	if len(annoStrs) == 0 {
-		return methodSource, nil
+		dumped.code = methodSource
+		dumped.methodName = name
+		dumped.bodyCode = code
+		return dumped, nil
 	} else {
 		c.Tab()
 		annoStr := strings.Join(annoStrs, c.GetTabString()+"\n")
 		c.UnTab()
-		return annoStr + "\n" + c.GetTabString() + methodSource, nil
+		originCode := annoStr + "\n" + c.GetTabString() + methodSource
+		dumped.code = originCode
+		dumped.methodName = name
+		dumped.bodyCode = code
+		return dumped, nil
 	}
 }
-func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
+
+type dumpedMethods struct {
+	methodName string
+	code       string
+	bodyCode   string
+}
+
+func (c *ClassObjectDumper) DumpMethods() ([]dumpedMethods, error) {
 	c.Tab()
 	defer c.UnTab()
-	result := []string{}
+	var result []dumpedMethods
 	for _, method := range c.obj.Methods {
 		name, err := c.obj.getUtf8(method.NameIndex)
 		if err != nil {
