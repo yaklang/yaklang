@@ -141,7 +141,7 @@ func ReadVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
 }
 
 func GetFristVariableFromScope(scope ScopeIF, name string) *Variable {
-	if variables := scope.GetAllVariables(name, true); variables != nil {
+	if variables := scope.GetAllVariablesByName(name, true); variables != nil {
 		for _, variable := range variables {
 			if ret, ok := variable.(*Variable); ok {
 				return ret
@@ -152,7 +152,7 @@ func GetFristVariableFromScope(scope ScopeIF, name string) *Variable {
 }
 
 func GetFristVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
-	if variables := scope.GetAllVariables(name); variables != nil {
+	if variables := scope.GetAllVariablesByName(name); variables != nil {
 		for _, variable := range variables {
 			if ret, ok := variable.(*Variable); ok {
 				return ret
@@ -163,7 +163,7 @@ func GetFristVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
 }
 
 func GetFristLocalVariableFromScope(scope ScopeIF, name string) *Variable {
-	if variables := scope.GetAllVariables(name, true); variables != nil {
+	if variables := scope.GetAllVariablesByName(name, true); variables != nil {
 		for _, variable := range variables {
 			if variable.GetLocal() {
 				if ret, ok := variable.(*Variable); ok {
@@ -176,7 +176,7 @@ func GetFristLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 }
 
 func GetFristLocalVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
-	if variables := scope.GetAllVariables(name); variables != nil {
+	if variables := scope.GetAllVariablesByName(name); variables != nil {
 		for _, variable := range variables {
 			if variable.GetLocal() {
 				if ret, ok := variable.(*Variable); ok {
@@ -190,7 +190,7 @@ func GetFristLocalVariableFromScopeAndParent(scope ScopeIF, name string) *Variab
 
 func GetAllVariablesFromScope(scope ScopeIF, name string) []*Variable {
 	var rets []*Variable
-	if variables := scope.GetAllVariables(name, true); variables != nil {
+	if variables := scope.GetAllVariablesByName(name, true); variables != nil {
 		for _, variable := range variables {
 			if ret, ok := variable.(*Variable); ok {
 				rets = append(rets, ret)
@@ -202,7 +202,7 @@ func GetAllVariablesFromScope(scope ScopeIF, name string) []*Variable {
 
 func GetAllVariablesFromScopeAndParent(scope ScopeIF, name string) []*Variable {
 	var rets []*Variable
-	if variables := scope.GetAllVariables(name); variables != nil {
+	if variables := scope.GetAllVariablesByName(name); variables != nil {
 		for _, variable := range variables {
 			if ret, ok := variable.(*Variable); ok {
 				rets = append(rets, ret)

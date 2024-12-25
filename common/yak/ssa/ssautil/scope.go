@@ -29,7 +29,8 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	// read value by name
 	ReadValue(name string) T
 
-	GetAllVariables(name string, iscurrent ...bool) []VersionedIF[T]
+	GetAllVariables() []VersionedIF[T]
+	GetAllVariablesByName(name string, iscurrent ...bool) []VersionedIF[T]
 
 	// create variable, if isLocal is true, the variable is local
 	CreateVariable(name string, isLocal bool) VersionedIF[T]
@@ -349,7 +350,20 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string, current ...bool)
 	return ret
 }
 
-func (scope *ScopedVersionedTable[T]) GetAllVariables(name string, current ...bool) []VersionedIF[T] {
+func (scope *ScopedVersionedTable[T]) GetAllVariables() []VersionedIF[T] {
+	var ret []VersionedIF[T]
+
+	scope.linkValues.ForEach(func(s string, vi VersionedIF[T]) {
+		if s == "" || s == "_" {
+			return
+		}
+		ret = append(ret, vi)
+	})
+
+	return ret
+}
+
+func (scope *ScopedVersionedTable[T]) GetAllVariablesByName(name string, current ...bool) []VersionedIF[T] {
 	var ret []VersionedIF[T]
 	isCurrent := false
 	if len(current) > 0 {
@@ -360,7 +374,7 @@ func (scope *ScopedVersionedTable[T]) GetAllVariables(name string, current ...bo
 		ret = append(result, ret...)
 	}
 	if scope.GetParent() != nil && !isCurrent {
-		ret = append(ret, scope.GetParent().GetAllVariables(name, current...)...)
+		ret = append(ret, scope.GetParent().GetAllVariablesByName(name, current...)...)
 	}
 	return ret
 }
