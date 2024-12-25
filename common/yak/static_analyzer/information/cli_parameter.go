@@ -37,6 +37,7 @@ type UIInfo struct {
 
 type UISchemaInfo struct {
 	Grid                 *UISchemaGrid
+	TablePageWidth       int
 	GlobalFieldClassName cli.UISchemaFieldClassName
 }
 
@@ -112,11 +113,13 @@ func (info *UISchemaInfo) ToUISchema() (string, error) {
 	}
 
 	if grid := info.Grid; grid != nil {
-
 		globalMap.Set("ui:grid", handleGroups(globalMap, grid.Groups))
 	}
 	if info.GlobalFieldClassName != "" {
 		globalMap.Set("ui:classNames", string(info.GlobalFieldClassName))
+	}
+	if info.TablePageWidth != 0 {
+		globalMap.Set("x", info.TablePageWidth)
 	}
 
 	bytes, err := json.Marshal(globalMap)
@@ -221,6 +224,8 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo, []stri
 
 	handleUIFieldWidget := func(s string) cli.UISchemaWidgetType {
 		switch s {
+		case "cli.uiWidgetTable":
+			return cli.UISchemaWidgetTable
 		case "cli.uiWidgetRadio":
 			return cli.UISchemaWidgetRadio
 		case "cli.uiWidgetSelect":
@@ -285,22 +290,39 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo, []stri
 		if len(fieldArgs) == 0 {
 			return nil
 		}
-		if fieldArgs[0].GetName() != "cli.uiField" {
+		isTableField := false
+		switch fieldArgs[0].GetName() {
+		case "cli.uiTableField":
+			isTableField = true
+		case "cli.uiField":
+		default:
 			return nil
 		}
 		field := new(UISchemaField)
 		field.FieldName = getConstString(fieldArgs[1])
 		secondFieldConst := fieldArgs[2].GetConst()
-		widthPercent := 1.0
-		if secondFieldConst.IsFloat() {
-			widthPercent = secondFieldConst.Float()
-		} else if secondFieldConst.IsNumber() {
-			widthPercent = float64(secondFieldConst.Number())
-		} else {
-			log.Errorf("field width is invalid: %v", secondFieldConst)
-		}
+		if !isTableField {
+			widthPercent := 1.0
+			if secondFieldConst.IsFloat() {
+				widthPercent = secondFieldConst.Float()
+			} else if secondFieldConst.IsNumber() {
+				widthPercent = float64(secondFieldConst.Number())
+			} else {
+				log.Errorf("field width is invalid: %v", secondFieldConst)
+			}
 
-		field.Width = int(math.Round(widthPercent * 24.0))
+			field.Width = int(math.Round(widthPercent * 24.0))
+		} else {
+			width := 0.0
+			if secondFieldConst.IsFloat() {
+				width = secondFieldConst.Float()
+			} else if secondFieldConst.IsNumber() {
+				width = float64(secondFieldConst.Number())
+			} else {
+				log.Errorf("field width is invalid: %v", secondFieldConst)
+			}
+			field.Width = int(width)
+		}
 
 		if len(fieldArgs) > 2 {
 			for _, fieldArg := range fieldArgs[3:] {
