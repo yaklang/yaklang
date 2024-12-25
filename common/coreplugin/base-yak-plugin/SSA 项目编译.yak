@@ -1,26 +1,26 @@
 yakit.AutoInitYakit()
 
 // {{ 必填项
+programName := cli.String("programName", 
+    cli.setRequired(true),
+    cli.setVerboseName("项目名")
+)
+languages = cli.StringSlice("language", 
+    cli.setMultipleSelect(false), 
+    cli.setSelectOption("Java", "java"), 
+    cli.setSelectOption("PHP", "php"), 
+    cli.setSelectOption("Yaklang", "yak"), 
+    // cli.setSelectOption("JavaScript", "js"), 
+    cli.setSelectOption("Golang", "go"), 
+    cli.setRequired(true)
+)
+
 info = cli.Json("info", 
     cli.setVerboseName("项目信息"),
     cli.setJsonSchema(<<<JSON
 {
   "type": "object",
   "properties": {
-    "programName": {
-      "title": "项目名",
-      "type": "string"
-    },
-    "language": {
-      "title": "语言",
-      "type": "string",
-      "enum": [
-        "Java",
-        "PHP",
-        "Yaklang",
-        "Golang"
-      ]
-    },
     "kind": {
       "title": "项目类型",
       "type": "string",
@@ -233,8 +233,6 @@ info = cli.Json("info",
     },
     {
       "required": [
-        "programName",
-        "language",
         "kind"
       ]
     }
@@ -243,12 +241,6 @@ info = cli.Json("info",
 JSON,cli.setUISchema(
     cli.uiGlobalFieldPosition(cli.uiPosHorizontal), 
     cli.uiGroups(
-        cli.uiGroup(
-            cli.uiField("programName", 1),
-        ), 
-        cli.uiGroup(
-            cli.uiField("language", 1),
-        ),
         cli.uiGroup(
             cli.uiField("kind", 1),
         ),
@@ -348,8 +340,10 @@ cli.check()
 //    dbPath = dbPaths[0]
 //}
 
-programName = sprint(info["programName"])
-language = sprint(info["language"])
+var language
+if len(languages) > 0 {
+    language = languages[0]
+}
 
 opts = [
     ssa.withProgramName(programName), 
