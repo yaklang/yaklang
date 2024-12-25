@@ -34,6 +34,7 @@ func TestParseClass(t *testing.T) {
 		if err != nil {
 			//return err
 			println(path)
+
 		}
 		_ = source
 		_, err = ssaapi.Parse(source, ssaapi.WithLanguage(ssaapi.JAVA))

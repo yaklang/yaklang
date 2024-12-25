@@ -10,6 +10,8 @@ import (
 
 type ConditionStatement struct {
 	Condition values.JavaValue
+	Neg       bool
+	Callback  func(values.JavaValue)
 }
 
 func (r *ConditionStatement) String(funcCtx *class_context.ClassContext) string {
