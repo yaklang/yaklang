@@ -105,7 +105,13 @@ func GetFfmpegPath() string {
 func GetVulinboxPath() string {
 	defaultPath := GetDefaultYakitProjectsDir()
 	var paths []string
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == "windows" {
+		paths = append(paths, filepath.Join(defaultPath, "base", "vulinbox.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "vulinbox.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "vulinbox.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "vulinbox.exe"))
+		paths = append(paths, "vulinbox.exe")
+	} else {
 		paths = append(paths, filepath.Join(defaultPath, "libs", "vulinbox"))
 		paths = append(paths, filepath.Join(defaultPath, "base", "vulinbox"))
 		paths = append(paths, filepath.Join(defaultPath, "engine", "vulinbox"))
@@ -114,14 +120,6 @@ func GetVulinboxPath() string {
 		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "vulinbox"))
 		paths = append(paths, filepath.Join("/", "bin", "vulinbox"))
 		paths = append(paths, filepath.Join("/", "usr", "bin", "vulinbox"))
-	}
-
-	if runtime.GOOS == "windows" {
-		paths = append(paths, filepath.Join(defaultPath, "base", "vulinbox.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "libs", "vulinbox.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "vulinbox.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "vulinbox.exe"))
-		paths = append(paths, "vulinbox.exe")
 	}
 	return utils.GetFirstExistedFile(paths...)
 }
