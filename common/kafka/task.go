@@ -18,6 +18,7 @@ const (
 	FingerprintResponse TaskResultType = iota + 1
 	PortScanResponse
 	AssetsResponse
+	Process
 )
 
 const (

@@ -20,8 +20,8 @@ func NewReader[T any](ctx context.Context, address string, groupId string, topic
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        []string{address},
 		Topic:          string(topic),
-		StartOffset:    kafka.FirstOffset,
-		CommitInterval: 1 * time.Second,
+		StartOffset:    kafka.LastOffset,
+		CommitInterval: time.Microsecond * 500,
 		GroupID:        groupId,
 	})
 	r := &AgentReader[T]{

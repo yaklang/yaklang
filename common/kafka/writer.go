@@ -14,7 +14,6 @@ const (
 	TaskTopic    Topic = "task"
 
 	CallBack Topic = "callback"
-	Log      Topic = "log"
 )
 
 type AgentWriter struct {
@@ -36,6 +35,7 @@ func NewWriter(ctx context.Context, address string, config *KafkaConfig) *AgentW
 			Addr:         tcp,
 			WriteTimeout: time.Second * time.Duration(config.timeout),
 			ReadTimeout:  time.Second * time.Duration(config.timeout),
+			MaxAttempts:  3,
 		},
 		config: config,
 	}

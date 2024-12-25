@@ -38,6 +38,7 @@ func (a *Agent) Start(ctx context.Context) error {
 	a.agentEnvironment = environment
 	return nil
 }
+
 func (a *Agent) healthCallback() {
 	ticker := time.NewTicker(time.Second)
 	for {
@@ -49,13 +50,13 @@ func (a *Agent) healthCallback() {
 		}
 	}
 }
-func (a *Agent) AddTask(taskId string, message *TaskRequestMessage) {
-	if tasksItem, exit := a.taskManager.Get(taskId); exit {
+func (a *Agent) AddTask(message *TaskRequestMessage) {
+	if tasksItem, exit := a.taskManager.Get(message.taskId); exit {
 		tasksItem.AddTask(message)
 	} else {
-		item := NewTasksItem(taskId, message.typ, message.Content)
+		item := NewTasksItem(message.taskId, message.typ, message.Content)
 		item.AddTask(message)
-		a.taskManager.Set(taskId, item)
+		a.taskManager.Set(message.taskId, item)
 	}
 }
 
@@ -70,6 +71,9 @@ func (a *Agent) StopTask(id string) {
 	if exit {
 		tasks.Stop()
 	}
+}
+func (a *Agent) shutDown() {
+	a.cancel()
 }
 func (a *Agent) StopReceive(id string) {
 	tasks, exit := a.taskManager.Get(id)

@@ -12,6 +12,8 @@ import (
 type ManagerConfigOpts func(config *ManagerConfig)
 
 type Manager struct {
+	*managerHelper
+
 	token   string
 	id      string
 	address string
@@ -30,33 +32,15 @@ type Manager struct {
 
 func (m *Manager) defaultConfig() {
 	m.config = &ManagerConfig{
-		OnConnectBeforeFunc: func(requestId, msg string) {
-			go func() {
-				m.response <- &TopicResponse{
-					Topic:    Log,
-					Response: NewResponse(AgentLog, m.id, requestId, m.token, []byte(msg)),
-				}
-			}()
-		},
 		OnConnectAfterFunc: func(requestId, msg string) {
-			go func() {
-				m.response <- &TopicResponse{
-					Topic:    CallBack,
-					Response: NewResponse(Register, m.id, "", m.token, nil),
-				}
-				m.response <- &TopicResponse{
-					Topic:    Log,
-					Response: NewResponse(AgentLog, m.id, requestId, m.token, []byte(msg)),
-				}
-			}()
+			register := m.newRegister(m.token, m.id)
+			m.writerResponse(register)
+			logMsg := m.newLogMsg(m.token, m.id, []byte(msg))
+			m.writerResponse(logMsg)
 		},
 		OnAgentErrorFunc: func(requestId string, err error) {
-			go func() {
-				m.response <- &TopicResponse{
-					Topic:    Log,
-					Response: NewResponse(AgentLog, m.id, requestId, m.token, []byte(fmt.Sprintf("agent start fail：%s", err))),
-				}
-			}()
+			msg := m.newLogMsg(m.token, m.id, []byte(fmt.Sprintf("agent error: %s", err)))
+			m.writerResponse(msg)
 		},
 		debug: false,
 		KafkaConfig: &KafkaConfig{
@@ -67,51 +51,31 @@ func (m *Manager) defaultConfig() {
 		AgentConfig: &AgentConfig{
 			TaskConfig: &TaskConfig{
 				OnTaskStartFunc: func(requestId, taskId string, message TaskRequestMessage) {
-					go func() {
-						m.response <- &TopicResponse{
-							Topic:    Log,
-							Response: NewResponse(AgentLog, m.id, requestId, m.token, []byte(fmt.Sprintf("task: %s is prepare running.params is: %s", taskId, string(message.Params)))),
-						}
-					}()
+					msg := m.newLogMsg(m.token, m.id, []byte(fmt.Sprintf("task: %s prepare running. params is: %s", taskId, string(message.Params))))
+					m.writerResponse(msg)
 				},
-				OnTaskResultBackFunc: func(requestId, taskId string, message []byte) {
-					go func() {
-						m.response <- &TopicResponse{
-							Topic:    CallBack,
-							Response: NewResponse(TaskResponse, m.id, requestId, m.token, message),
-						}
-					}()
+				OnTaskResultBackFunc: func(requestId, taskId string, message any) {
+					response := m.newTaskResponse(m.token, m.id, message)
+					m.writerResponse(response)
 				},
 				OnTaskFinishFunc: func(taskId string) {
-					go func() {
-						m.response <- &TopicResponse{
-							Topic:    Log,
-							Response: NewResponse(AgentLog, m.id, "", m.token, []byte(fmt.Sprintf("task finish: %s", taskId))),
-						}
-					}()
+					//process := m.newTaskProcess(m.token, m.id, taskId, 100)
+					//m.writerResponse(process)
+					msg := m.newLogMsg(m.token, m.id, []byte(fmt.Sprintf("task: %s is finish", taskId)))
+					m.writerResponse(msg)
 				},
 				OnTaskStopFunc: func(requestId, taskId string) {
-					go func() {
-						m.response <- &TopicResponse{
-							Topic:    Log,
-							Response: NewResponse(AgentLog, m.id, requestId, m.token, []byte(fmt.Sprintf("task: %s is stop", taskId))),
-						}
-					}()
+					msg := m.newLogMsg(m.token, m.id, []byte(fmt.Sprintf("task: %s is stop", taskId)))
+					m.writerResponse(msg)
 				},
 				TaskProcess: func(taskId string, msg []byte) {
-					go func() {
-						m.response <- &TopicResponse{
-							Topic:    CallBack,
-							Response: NewResponse(TaskProcess, m.id, "", m.token, msg),
-						}
-					}()
+					process := m.newTaskProcess(m.token, m.id, taskId, 100)
+					m.writerResponse(process)
 				},
 			},
 			OnHealthFunc: func(msg []byte) {
-				m.response <- &TopicResponse{
-					Topic:    CallBack,
-					Response: NewResponse(Health, m.id, "", m.token, msg),
-				}
+				hearth := m.newHearth(m.token, m.id, msg)
+				m.writerResponse(hearth)
 			},
 		},
 	}
@@ -141,7 +105,6 @@ func (m *Manager) Start(ctx context.Context) error {
 		m.wg.Wait()
 		close(m.message)
 	}()
-	m.config.OnConnectBeforeFunc("", "start agent")
 	err := m.agent.Start(m.ctx)
 	if err != nil {
 		m.config.OnAgentErrorFunc("", err)
@@ -167,6 +130,7 @@ func (m *Manager) Start(ctx context.Context) error {
 }
 func (m *Manager) service() {
 	for request := range m.message {
+		log.Infof("process message id: %s,content: %s", string(request.RequestId), string(request.Msg))
 		select {
 		case <-m.ctx.Done():
 			return
@@ -175,8 +139,8 @@ func (m *Manager) service() {
 				if m.token != request.Token {
 					continue
 				}
-				m.processMessage(request)
 			}
+			m.processMessage(request)
 		}
 	}
 }
@@ -198,10 +162,41 @@ func (m *Manager) processMessage(request *Request) {
 			writeError(err)
 			return
 		}
-		m.agent.AddTask(request.Id, &req)
+		m.agent.AddTask(&req)
 	case ManagerRequest:
-
+		var req = ManagerMsg{}
+		if err := json.Unmarshal(request.Msg, &req); err != nil {
+			writeError(err)
+			return
+		}
+		m.processManagerMessage(request.RequestId, &req)
 	default:
+	}
+}
+func (m *Manager) writerResponse(response *TopicResponse) {
+	go func() {
+		select {
+		case <-m.ctx.Done():
+		case m.response <- response:
+		}
+	}()
+}
+func (m *Manager) processManagerMessage(rid string, request *ManagerMsg) {
+	switch request.Typ {
+	case StartTask:
+		m.agent.starkTask(request.TaskId)
+	case StopTask:
+		m.agent.StopTask(request.TaskId)
+	case ReuseTask:
+	case ShutDownAgent:
+		m.agent.shutDown()
+	case RestartAgent:
+		err := m.agent.Start(m.ctx)
+		if err != nil {
+			m.config.OnAgentErrorFunc(rid, err)
+		}
+	default:
+		m.config.OnAgentErrorFunc(rid, fmt.Errorf("no process this manager type"))
 	}
 }
 func NewManager(id string, address string, opts ...ManagerConfigOpts) *Manager {
@@ -218,6 +213,7 @@ func NewManager(id string, address string, opts ...ManagerConfigOpts) *Manager {
 	m.message = make(chan *Request, 1024)
 	m.response = make(chan *TopicResponse, 1024)
 	m.wg = &sync.WaitGroup{}
+	m.managerHelper = new(managerHelper)
 	return m
 }
 

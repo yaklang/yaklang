@@ -26,7 +26,6 @@ type Message struct {
 }
 type Request struct {
 	Message
-	Id        string
 	Token     string //指定token去进行执行
 	RequestId string
 }
@@ -52,13 +51,12 @@ func (r *Request) String() string {
 	return string(marshal)
 }
 
-func newRequest(typ MessageType, id string, token string, msg []byte) *Request {
+func newRequest(typ MessageType, token string, msg []byte) *Request {
 	return &Request{
 		Message: Message{
 			Type: typ,
 			Msg:  msg,
 		},
-		Id:        id,
 		Token:     token,
 		RequestId: uuid.NewString(),
 	}
@@ -74,5 +72,17 @@ func NewResponse(typ MessageType, id string, fromRequestId, token string, msg []
 		id:            id,
 		Token:         token,
 		FromRequestId: fromRequestId,
+	}
+}
+
+func NewLogResponse(id, token string, msg []byte) *Response {
+	return &Response{
+		Message: Message{
+			Type: AgentLog,
+			Msg:  msg,
+		},
+		ResponseId: uuid.NewString(),
+		id:         id,
+		Token:      token,
 	}
 }
