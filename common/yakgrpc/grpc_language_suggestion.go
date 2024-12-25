@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sort"
 	"strconv"
@@ -1182,6 +1184,19 @@ func getCodecPluginList() []*ypb.SuggestionDescription {
 	return ret
 }
 
+func getPayloadGroup() []*ypb.SuggestionDescription {
+	var ret []*ypb.SuggestionDescription
+	allPayloadGroup, _ := yakit.GetAllPayloadGroupName(consts.GetGormProfileDatabase())
+	for _, groupName := range allPayloadGroup {
+		ret = append(ret, &ypb.SuggestionDescription{
+			Label:       groupName,
+			Description: "",
+			InsertText:  groupName,
+		})
+	}
+	return ret
+}
+
 func FuzztagServer(req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, bool) {
 	if req.GetYakScriptType() != "fuzztag" {
 		return nil, false
@@ -1190,22 +1205,18 @@ func FuzztagServer(req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLangu
 	switch req.GetInspectType() {
 	case COMPLETION:
 		// ret
-		ret.SuggestionMessage = append(ret.SuggestionMessage, fuzztagCompletion(req.GetRange())...)
+		ret.SuggestionMessage = append(ret.SuggestionMessage, fuzztagCompletion(req.GetRange().GetCode(), "")...)
 	case HOVER:
 		// ret
-		ret.SuggestionMessage = append(ret.SuggestionMessage, fuzztagHover(req.GetRange())...)
+		ret.SuggestionMessage = append(ret.SuggestionMessage, fuzztagHover(req.GetRange().Code, "")...)
 	}
 	return ret, true
 }
 
-func fuzztagHover(rng *ypb.Range) []*ypb.SuggestionDescription {
+func fuzztagHover(fuzztagCode string, hotPatchCode string) []*ypb.SuggestionDescription {
 	var suggestions []*ypb.SuggestionDescription
-	if rng == nil {
-		return suggestions
-	}
-
 	_, descMap := _getAllFuzztagSuggestionInfo()
-	desc, ok := descMap[rng.Code]
+	desc, ok := descMap[fuzztagCode]
 	if ok {
 		suggestions = append(suggestions, &ypb.SuggestionDescription{
 			Label: desc,
@@ -1214,15 +1225,37 @@ func fuzztagHover(rng *ypb.Range) []*ypb.SuggestionDescription {
 	return suggestions
 }
 
-func fuzztagCompletion(rng *ypb.Range) []*ypb.SuggestionDescription {
+func fuzztagCompletion(fuzztagCode string, hotPatchCode string) []*ypb.SuggestionDescription {
 	var suggestions []*ypb.SuggestionDescription
-	if rng == nil {
-		return suggestions
+	var hotPatchSuggestions []*ypb.SuggestionDescription
+
+	if hotPatchCode != "" {
+		prog, err := static_analyzer.SSAParse(hotPatchCode, string(plugin_type.PluginTypeYak), ssaapi.WithIgnoreSyntaxError(true))
+		if err == nil {
+			mainFunc, ok := prog.Program.Funcs.Get("main")
+			if ok {
+				for _, childFunc := range mainFunc.ChildFuncs {
+					funcTyp, _ := ssa.ToFunctionType(childFunc.GetType())
+					hotPatchSuggestions = append(hotPatchSuggestions, &ypb.SuggestionDescription{
+						Label:       childFunc.GetName(),
+						InsertText:  childFunc.GetName(),
+						Kind:        CompletionKindFunction,
+						Description: funcTyp.String(),
+					})
+				}
+			}
+		}
 	}
 
-	if strings.HasPrefix(rng.Code, "{{") {
-		if strings.HasPrefix(rng.Code, "{{codec(") {
+	if strings.HasPrefix(fuzztagCode, "{{") {
+		if strings.HasPrefix(fuzztagCode, "{{codec(") {
 			return getCodecPluginList()
+		}
+		if strings.HasPrefix(fuzztagCode, "{{payload(") {
+			return getPayloadGroup()
+		}
+		if strings.HasPrefix(fuzztagCode, "{{yak(") {
+			return hotPatchSuggestions
 		}
 		suggestions, _ = _getAllFuzztagSuggestionInfo()
 	}
@@ -1268,6 +1301,16 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 		ret.SuggestionMessage = OnHover(prog, word, containPoint, ssaRange, v)
 	case SIGNATURE:
 		ret.SuggestionMessage = OnSignature(prog, word, containPoint, ssaRange, v)
+	}
+	return ret, nil
+}
+
+func (s *Server) FuzzTagSuggestion(ctx context.Context, req *ypb.FuzzTagSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
+	ret := &ypb.YaklangLanguageSuggestionResponse{}
+	if req.GetInspectType() == HOVER {
+		ret.SuggestionMessage = append(ret.SuggestionMessage, fuzztagHover(req.GetFuzztagCode(), "")...)
+	} else if req.GetInspectType() == COMPLETION {
+		ret.SuggestionMessage = append(ret.SuggestionMessage, fuzztagCompletion(req.GetFuzztagCode(), req.GetHotPatchCode())...)
 	}
 	return ret, nil
 }
