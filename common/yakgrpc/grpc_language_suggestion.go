@@ -1153,6 +1153,8 @@ func getFuzztagSuggestion(tagName string, labelFormatString string, tagDesc *mut
 func _getAllFuzztagSuggestionInfo() ([]*ypb.SuggestionDescription, map[string]string) {
 	_fuzztagSuggestionsOnce.Do(func() {
 		allTag := append(mutate.GetAllFuzztags(), append(mutate.FileTag(), mutate.CodecTag()...)...)
+		allTag = append(allTag, mutate.HotPatchFuzztag(func(s string, f func(string)) error { return nil }))
+		allTag = append(allTag, &mutate.FuzzTagDescription{TagName: "request", Description: "原始请求", TagNameVerbose: "request", Examples: []string{"{{request}}"}})
 		tagLabelFormatString := fmt.Sprintf("%%-%ds[%%s]", mutate.GetFuzztagMaxLength(allTag)+4)
 		for _, tag := range allTag {
 			// tag name suggestion
@@ -1225,6 +1227,8 @@ func fuzztagHover(fuzztagCode string, hotPatchCode string) []*ypb.SuggestionDesc
 	return suggestions
 }
 
+var hotPatchBlacklist = []string{"afterRequest", "beforeRequest", "mirrorHTTPFlow"}
+
 func fuzztagCompletion(fuzztagCode string, hotPatchCode string) []*ypb.SuggestionDescription {
 	var suggestions []*ypb.SuggestionDescription
 	var hotPatchSuggestions []*ypb.SuggestionDescription
@@ -1235,6 +1239,9 @@ func fuzztagCompletion(fuzztagCode string, hotPatchCode string) []*ypb.Suggestio
 			mainFunc, ok := prog.Program.Funcs.Get("main")
 			if ok {
 				for _, childFunc := range mainFunc.ChildFuncs {
+					if utils.StringArrayContains(hotPatchBlacklist, childFunc.GetName()) {
+						continue
+					}
 					funcTyp, _ := ssa.ToFunctionType(childFunc.GetType())
 					hotPatchSuggestions = append(hotPatchSuggestions, &ypb.SuggestionDescription{
 						Label:       childFunc.GetName(),
