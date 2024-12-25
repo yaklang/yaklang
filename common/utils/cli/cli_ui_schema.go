@@ -26,6 +26,7 @@ type UISchemaWidgetType string
 
 const (
 	UISchemaWidgetDefault  UISchemaWidgetType = ""
+	UISchemaWidgetTable    UISchemaWidgetType = "table"
 	UISchemaWidgetRadio    UISchemaWidgetType = "radio"
 	UISchemaWidgetSelect   UISchemaWidgetType = "select"
 	UISchemaWidgetCheckbox UISchemaWidgetType = "checkbox"
@@ -198,6 +199,51 @@ func (c *CliApp) NewUISchemaGroup(fields ...uiSchemaField) *uiSchemaGroup {
 // cli.check()
 // ```
 func (c *CliApp) NewUISchemaField(name string, widthPercent float64, opts ...UISchemaFieldParams) *uiSchemaField {
+	return new(uiSchemaField)
+}
+
+// uiTableField 是一个选项参数,用于指定UISchema中的一个表格字段
+// 第一个参数指定字段名
+// 第二个参数指定这个字段所占宽度
+// 接下来可以接收零个到多个选项，用于对此字段进行其他的设置,例如内嵌分组(cli.uiFieldGroups)或者指定其部件(cli.uiFieldWidget)
+// Example:
+// ```
+// args = cli.Json(
+//
+//	"kv",
+//	cli.setVerboseName("键值对abc"),
+//	cli.setJsonSchema(
+//	    <<<JSON
+//
+// {"type":"object","properties":{"kvs":{"type":"array","title":"键值对","minItems":1,"items":{"properties":{"key":{"type":"string","title":"键"},"value":{"type":"string","title":"值"}},"require":["key","value"]}}}}
+// JSON,
+// cli.setUISchema(
+//
+//	cli.uiGroups(
+//	    cli.uiGroup(
+//	        cli.uiField("kvs", 1, cli.uiFieldWidget(cli.uiWidgetTable), cli.uiFieldGroups(
+//	            cli.uiGroup(
+//	                cli.uiField("items", 1, cli.uiFieldGroups(
+//	                    cli.uiGroup(
+//	                        cli.uiTableField("key", 100),
+//	                        cli.uiTableField("value", 100),
+//	                    )
+//	                ))
+//	            )
+//	        ))
+//	    )
+//	)
+//
+// ),
+//
+// ),
+//
+//	cli.setRequired(true),
+//
+// )
+// cli.check()
+// ```
+func (c *CliApp) NewUISchemaTableField(name string, width float64, opts ...UISchemaFieldParams) *uiSchemaField {
 	return new(uiSchemaField)
 }
 
