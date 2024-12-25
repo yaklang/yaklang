@@ -185,9 +185,16 @@ func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.GO
 }
 
-func (b *astbuilder) AddGlobalVariable(name string, v ssa.Value) {
+func (b *astbuilder) AddGlobalVariable(name string, value ssa.Value) {
+	scope := b.CurrentBlock.ScopeTable
+	for _, v := range scope.GetAllVariables() {
+		if object := v.GetValue().GetObject(); object != nil && object.GetId() == value.GetId() {
+			variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInst(v.GetName()))
+			b.AssignVariable(variable, v.GetValue())
+		}
+	}
 	variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInst(name))
-	b.AssignVariable(variable, v)
+	b.AssignVariable(variable, value)
 }
 
 func (b *astbuilder) CheckGlobalVariablePhi(l *ssa.Variable, r ssa.Value) bool {
