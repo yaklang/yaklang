@@ -248,6 +248,92 @@ func TestExpr_normol(t *testing.T) {
 	})
 }
 
+func TestExpr_global(t *testing.T) {
+	t.Run("global array", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		var arr = []string{"a", "b", "c"}
+		
+		func main(){
+			println(arr[0])
+			println(arr[1])
+			println(arr[2])
+		}
+		`, []string{"\"a\"", "\"b\"", "\"c\""}, t)
+	})
+
+	t.Run("global map", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		var ma = map[string]int{"a": 1, "b": 2, "c": 3}
+		
+		func main(){
+			println(ma["a"])
+			println(ma["b"])
+			println(ma["c"])
+		}
+		`, []string{"1", "2", "3"}, t)
+	})
+
+	t.Run("global struct", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type t struct {
+		    a int
+		    b string
+			c bool
+		}
+
+		var stru = &t{a: 1, b: "hello", c: true}
+		
+		func main(){
+			println(stru.a)
+			println(stru.b)
+			println(stru.c)
+		}
+		`, []string{"1", "\"hello\"", "true"}, t)
+	})
+
+	t.Run("global array assign add", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		var arr = []string{1, 2, 3}
+		
+		func main(){
+			println(arr[0] + arr[1] + arr[2])
+		}
+		`, []string{"6"}, t)
+	})
+
+	t.Run("global map assign add", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		var ma = map[string]int{"a": 1, "b": 2, "c": 3}
+		
+		func main(){
+			println(ma["a"] + ma["b"] + ma["c"])
+		}
+		`, []string{"6"}, t)
+	})
+
+	t.Run("global struct assign add", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type t struct {
+		    a int
+		    b int
+			c int
+		}
+
+		var stru = &t{a: 1, b: 2, c: 3}
+		
+		func main(){
+			println(stru.a + stru.b + stru.c)
+		}
+		`, []string{"6"}, t)
+	})
+}
+
 func TestFuntion_normol(t *testing.T) {
 	t.Run("call", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
