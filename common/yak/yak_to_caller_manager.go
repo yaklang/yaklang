@@ -66,66 +66,61 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 			return []string{s}
 		})
 	}
-	return mutate.Fuzz_WithExtraFuzzTag("yak", &mutate.FuzzTagDescription{
-		TagName: "yak",
-		HandlerAndYieldString: func(s string, yield func(s string)) (err error) {
-			handle, params, _ := strings.Cut(s, "|")
-			logAndWrapError := func(errStr string) error {
-				errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, errStr)
-				log.Errorf("call hotPatch code error: %v", errStr)
-				return utils.Error(errInfo)
+	hotPatchHandler := func(s string, yield func(s string)) (err error) {
+		handle, params, _ := strings.Cut(s, "|")
+		logAndWrapError := func(errStr string) error {
+			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, errStr)
+			log.Errorf("call hotPatch code error: %v", errStr)
+			return utils.Error(errInfo)
+		}
+
+		defer func() {
+			if r := recover(); r != nil {
+				if e, ok := r.(*yakvm.VMPanic); ok {
+					log.Errorf("call hotPatch code error: %v", e.GetData())
+					err = fmt.Errorf("%v", e.GetData())
+				}
+			}
+		}()
+		yakVar, ok := codeEnv.GetVar(handle)
+		if !ok {
+			return logAndWrapError(fmt.Sprintf("function %s not found", handle))
+		}
+		yakFunc, ok := yakVar.(*yakvm.Function)
+		if !ok {
+			return logAndWrapError(fmt.Sprintf("function %s not found", handle))
+		}
+		iparams := make([]any, 0, 1)
+		numIn := yakFunc.GetNumIn()
+		if numIn == 1 {
+			// func handle(params) params , return []string
+			iparams = append(iparams, params)
+			data, err := codeEnv.CallYakFunction(ctx, handle, iparams)
+			if err != nil {
+				return logAndWrapError(err.Error())
+			}
+			if data == nil {
+				return logAndWrapError("return nil")
 			}
 
-			defer func() {
-				if r := recover(); r != nil {
-					if e, ok := r.(*yakvm.VMPanic); ok {
-						log.Errorf("call hotPatch code error: %v", e.GetData())
-						err = fmt.Errorf("%v", e.GetData())
-					}
-				}
-			}()
-			yakVar, ok := codeEnv.GetVar(handle)
-			if !ok {
-				return logAndWrapError(fmt.Sprintf("function %s not found", handle))
+			res := utils.InterfaceToStringSlice(data)
+			for _, item := range res {
+				yield(item)
 			}
-			yakFunc, ok := yakVar.(*yakvm.Function)
-			if !ok {
-				return logAndWrapError(fmt.Sprintf("function %s not found", handle))
+			return nil
+		} else if numIn == 2 {
+			// func handle(params, yield), return nil
+			iparams = append(iparams, params)
+			iparams = append(iparams, yield)
+			_, err := codeEnv.CallYakFunction(ctx, handle, iparams)
+			if err != nil {
+				return logAndWrapError(err.Error())
 			}
-			iparams := make([]any, 0, 1)
-			numIn := yakFunc.GetNumIn()
-			if numIn == 1 {
-				// func handle(params) params , return []string
-				iparams = append(iparams, params)
-				data, err := codeEnv.CallYakFunction(ctx, handle, iparams)
-				if err != nil {
-					return logAndWrapError(err.Error())
-				}
-				if data == nil {
-					return logAndWrapError("return nil")
-				}
-
-				res := utils.InterfaceToStringSlice(data)
-				for _, item := range res {
-					yield(item)
-				}
-				return nil
-			} else if numIn == 2 {
-				// func handle(params, yield), return nil
-				iparams = append(iparams, params)
-				iparams = append(iparams, yield)
-				_, err := codeEnv.CallYakFunction(ctx, handle, iparams)
-				if err != nil {
-					return logAndWrapError(err.Error())
-				}
-				return nil
-			}
-			return logAndWrapError("invalid function params")
-		},
-		Description:         "执行热加载代码",
-		TagNameVerbose:      "执行热加载代码",
-		ArgumentDescription: "{{string_split(handle:函数名)}}{{optional(string(params:参数))}}",
-	})
+			return nil
+		}
+		return logAndWrapError("invalid function params")
+	}
+	return mutate.Fuzz_WithExtraFuzzTag("yak", mutate.HotPatchFuzztag(hotPatchHandler))
 	// return mutate.Fuzz_WithExtraFuzzErrorTagHandler("yak", func(s string) (result []*parser.FuzzResult, err error) {
 	// 	handle, params, _ := strings.Cut(s, "|")
 
