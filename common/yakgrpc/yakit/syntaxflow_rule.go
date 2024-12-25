@@ -117,7 +117,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 		return nil, utils.Errorf("update syntaxFlow rule failed: rule name is empty")
 	}
 
-	updateRule, err := sfdb.QueryRuleByName(db, rule.GetRuleName())
+	updateRule, err := sfdb.QueryRuleByName(consts.GetGormProfileDatabase(), rule.GetRuleName())
 	if err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
@@ -126,9 +126,11 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.Content = rule.GetContent()
 	updateRule.Tag = strings.Join(rule.GetTags(), ",")
 	updateRule.Description = rule.GetDescription()
-	updateRule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
-	db = db.Model(&schema.SyntaxFlowRule{})
-	if err := db.Save(updateRule).Error; err != nil {
+	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
+	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+	if err := db.Model(&updateRule).Association("Groups").Replace(groups).Error; err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
 	return updateRule, nil

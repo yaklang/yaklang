@@ -44,12 +44,13 @@ func queryRulesCount(client ypb.YakClient) (int, error) {
 	return len(rsp.GetRule()), nil
 }
 
-func updateRuleByNames(client ypb.YakClient, names []string) error {
+func updateRuleByNames(client ypb.YakClient, names []string, des string) error {
 	for _, name := range names {
 		req := &ypb.UpdateSyntaxFlowRuleRequest{
 			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
-				RuleName: name,
-				Language: "php",
+				RuleName:    name,
+				Language:    "php",
+				Description: des,
 			},
 		}
 		_, err := client.UpdateSyntaxFlowRule(context.Background(), req)
@@ -162,17 +163,62 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, afterCreateCount-beforeCreateCount, 100)
 
-		err = updateRuleByNames(client, ruleNames)
+		flag := uuid.NewString()
+		err = updateRuleByNames(client, ruleNames, flag)
 		require.NoError(t, err)
 		afterUpdateCount, err := queryRulesCount(client)
 		require.NoError(t, err)
 		require.Equal(t, afterUpdateCount-afterCreateCount, 0)
+
+		rsp, err := client.QuerySyntaxFlowRule(context.Background(), &ypb.QuerySyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				Keyword: flag,
+			},
+			Pagination: &ypb.Paging{Limit: -1},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 100, len(rsp.GetRule()))
 
 		err = deleteRuleByNames(client, ruleNames)
 		require.NoError(t, err)
 		afterDeleteCount, err := queryRulesCount(client)
 		require.NoError(t, err)
 		require.Equal(t, afterDeleteCount-beforeCreateCount, 0)
+	})
+
+	t.Run("test update group", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		group1 := uuid.NewString()
+		group2 := uuid.NewString()
+		_, err = client.CreateSyntaxFlowRule(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+				RuleName:   ruleName,
+				Language:   "java",
+				GroupNames: []string{group1},
+			},
+		})
+		require.NoError(t, err)
+		_, err = client.UpdateSyntaxFlowRule(context.Background(), &ypb.UpdateSyntaxFlowRuleRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+				RuleName:   ruleName,
+				GroupNames: []string{group2},
+			},
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			deleteRuleByNames(client, []string{ruleName})
+			deleteRuleGroup(client, []string{group2, group1})
+		})
+
+		rsp, err := client.QuerySyntaxFlowRule(context.Background(), &ypb.QuerySyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: []string{ruleName},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(rsp.GetRule()))
+		require.Contains(t, rsp.GetRule()[0].GetGroupName(), group2)
+		require.NotContains(t, rsp.GetRule()[0].GetGroupName(), group1)
 	})
 
 	t.Run("test query syntax rule by key word", func(t *testing.T) {
