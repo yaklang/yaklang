@@ -23,7 +23,7 @@ func (t *TaskRequestMessage) String() string {
 }
 
 type TaskResponseMessage struct {
-	typ    TaskResultType
+	Typ    TaskResultType
 	TaskId string
 	Msg    []byte //根据type进行区分
 }
@@ -47,7 +47,8 @@ func NewTaskRequestMessage(typ TaskType, taskId string, Content []byte) *TaskReq
 
 func NewTaskResponseMessage(taskType TaskResultType, taskId string, Msg []byte) *TaskResponseMessage {
 	return &TaskResponseMessage{
-		typ: taskType,
-		Msg: Msg,
+		Typ:    taskType,
+		TaskId: taskId,
+		Msg:    Msg,
 	}
 }

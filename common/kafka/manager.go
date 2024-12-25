@@ -32,23 +32,23 @@ type Manager struct {
 
 func (m *Manager) defaultConfig() {
 	m.config = &ManagerConfig{
-		OnConnectAfterFunc: func(requestId, msg string) {
-			register := m.newRegister(m.token, m.id)
-			m.writerResponse(register)
-			logMsg := m.newLogMsg(m.token, m.id, []byte(msg))
-			m.writerResponse(logMsg)
-		},
 		OnAgentErrorFunc: func(requestId string, err error) {
 			msg := m.newLogMsg(m.token, m.id, []byte(fmt.Sprintf("agent error: %s", err)))
 			m.writerResponse(msg)
 		},
 		debug: false,
 		KafkaConfig: &KafkaConfig{
-			timeout:  3,
-			maxBytes: 1024 * 1024 * 10,
-			retry:    3,
+			Timeout:  3,
+			MaxBytes: 1024 * 1024 * 10,
+			Retry:    3,
 		},
 		AgentConfig: &AgentConfig{
+			OnRegisterFunc: func(msg []byte) {
+				registerMsg := m.newRegister(m.token, m.id, msg)
+				m.writerResponse(registerMsg)
+				logMsg := m.newLogMsg(m.token, m.id, []byte("agent success connect"))
+				m.writerResponse(logMsg)
+			},
 			TaskConfig: &TaskConfig{
 				OnTaskStartFunc: func(requestId, taskId string, message TaskRequestMessage) {
 					msg := m.newLogMsg(m.token, m.id, []byte(fmt.Sprintf("task: %s prepare running. params is: %s", taskId, string(message.Params))))
@@ -73,8 +73,8 @@ func (m *Manager) defaultConfig() {
 					m.writerResponse(process)
 				},
 			},
-			OnHealthFunc: func(msg []byte) {
-				hearth := m.newHearth(m.token, m.id, msg)
+			OnHealthFunc: func() {
+				hearth := m.newHearth(m.token, m.id)
 				m.writerResponse(hearth)
 			},
 		},
@@ -110,14 +110,13 @@ func (m *Manager) Start(ctx context.Context) error {
 		m.config.OnAgentErrorFunc("", err)
 		return err
 	}
-	m.config.OnConnectAfterFunc("", "agent connect success")
 	go func() {
 		for response := range m.response {
 			select {
 			case <-m.ctx.Done():
 				return
 			default:
-				err2 := m.writer.writeMessage(response.Response, response.Topic)
+				err2 := m.writer.WriteMessage(response.Response, response.Topic)
 				if err2 != nil {
 					log.Errorf("write message fail: %s", err2)
 					return

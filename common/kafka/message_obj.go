@@ -17,9 +17,6 @@ func NewManagerRequest(id, token string, msg []byte) *Request {
 func NewTaskResponse(id, token, requestId string, msg []byte) *Response {
 	return NewResponse(TaskResponse, id, requestId, token, msg)
 }
-func NewManagerResponse(id, token, fromRequestId string, msg []byte) *Response {
-	return NewResponse(ManagerResponse, id, fromRequestId, token, msg)
-}
 
 type ManagerMsgType int
 

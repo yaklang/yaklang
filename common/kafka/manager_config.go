@@ -1,17 +1,17 @@
 package kafka
 
 type ManagerConfig struct {
-	OnConnectAfterFunc func(requestId, msg string)
-	OnAgentErrorFunc   func(requestId string, err error)
-	OnHealthFunc       func(health []byte)
-	debug              bool
+	OnAgentErrorFunc func(requestId string, err error)
+	OnHealthFunc     func(health []byte)
+	debug            bool
 	*KafkaConfig
 	*AgentConfig
 }
 
 type AgentConfig struct {
 	*TaskConfig
-	OnHealthFunc func(msg []byte)
+	OnHealthFunc   func()
+	OnRegisterFunc func(msg []byte)
 }
 type TaskConfig struct {
 	OnTaskStartFunc  func(requestId, taskId string, message TaskRequestMessage)
@@ -23,7 +23,7 @@ type TaskConfig struct {
 }
 
 type KafkaConfig struct {
-	timeout  int
-	maxBytes int64
-	retry    int
+	Timeout  int
+	MaxBytes int64
+	Retry    int
 }

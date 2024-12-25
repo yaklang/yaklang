@@ -34,6 +34,7 @@ func (a *Agent) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	a.config.OnRegisterFunc([]byte(a.agentEnvironment.String()))
 	go a.healthCallback()
 	a.agentEnvironment = environment
 	return nil
@@ -46,7 +47,7 @@ func (a *Agent) healthCallback() {
 		case <-a.ctx.Done():
 			return
 		case <-ticker.C:
-			a.config.OnHealthFunc([]byte(a.agentEnvironment.String()))
+			a.config.OnHealthFunc()
 		}
 	}
 }

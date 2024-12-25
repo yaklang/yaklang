@@ -40,7 +40,7 @@ func (r *AgentReader[T]) ReadMessage(ctx context.Context) <-chan T {
 			message, err := r.reader.ReadMessage(ctx)
 			if err != nil {
 				errorCount++
-				if errorCount < r.config.retry {
+				if errorCount < r.config.Retry {
 					log.Infof("read message fail: %s,retry count: %v", err, errorCount)
 					continue
 				} else {

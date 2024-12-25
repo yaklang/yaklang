@@ -17,16 +17,16 @@ func (m *managerHelper) newLogMsg(token, id string, log []byte) *TopicResponse {
 		Response: NewLogResponse(id, token, []byte(msg.String())),
 	}
 }
-func (m *managerHelper) newRegister(token, id string) *TopicResponse {
+func (m *managerHelper) newRegister(token, id string, msg []byte) *TopicResponse {
 	return &TopicResponse{
 		Topic:    CallBack,
-		Response: NewResponse(Register, id, "", token, nil),
+		Response: NewResponse(Register, id, "", token, msg),
 	}
 }
-func (m *managerHelper) newHearth(token, id string, msg []byte) *TopicResponse {
+func (m *managerHelper) newHearth(token, id string) *TopicResponse {
 	return &TopicResponse{
 		Topic:    CallBack,
-		Response: NewResponse(Health, id, "", token, msg),
+		Response: NewResponse(Health, id, "", token, nil),
 	}
 }
 func (m *managerHelper) newTaskProcess(token, id string, taskId string, process float64) *TopicResponse {

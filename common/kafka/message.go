@@ -13,11 +13,9 @@ const (
 	ManagerRequest
 
 	TaskResponse
-	ManagerResponse
 	Health
 	Register
 	AgentLog
-	TaskProcess
 )
 
 type Message struct {
@@ -33,7 +31,7 @@ type Request struct {
 type Response struct {
 	Message
 	ResponseId    string
-	id            string
+	Id            string
 	Token         string
 	FromRequestId string
 }
@@ -69,7 +67,7 @@ func NewResponse(typ MessageType, id string, fromRequestId, token string, msg []
 			Msg:  msg,
 		},
 		ResponseId:    uuid.NewString(),
-		id:            id,
+		Id:            id,
 		Token:         token,
 		FromRequestId: fromRequestId,
 	}
@@ -82,7 +80,7 @@ func NewLogResponse(id, token string, msg []byte) *Response {
 			Msg:  msg,
 		},
 		ResponseId: uuid.NewString(),
-		id:         id,
+		Id:         id,
 		Token:      token,
 	}
 }

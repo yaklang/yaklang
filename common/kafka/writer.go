@@ -33,15 +33,15 @@ func NewWriter(ctx context.Context, address string, config *KafkaConfig) *AgentW
 		address: address,
 		writer: kafka.Writer{
 			Addr:         tcp,
-			WriteTimeout: time.Second * time.Duration(config.timeout),
-			ReadTimeout:  time.Second * time.Duration(config.timeout),
+			WriteTimeout: time.Second * time.Duration(config.Timeout),
+			ReadTimeout:  time.Second * time.Duration(config.Timeout),
 			MaxAttempts:  3,
 		},
 		config: config,
 	}
 }
 
-func (w *AgentWriter) writeMessage(msg any, topic Topic) error {
+func (w *AgentWriter) WriteMessage(msg any, topic Topic) error {
 	marshal, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ RETRY:
 	})
 	if err != nil {
 		currentRetry++
-		if currentRetry < w.config.retry {
+		if currentRetry < w.config.Retry {
 			goto RETRY
 		} else {
 			return err
