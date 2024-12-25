@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	"sort"
 	"strings"
 )
 
@@ -60,73 +61,109 @@ func (s *RewriteManager) MergeIf() {
 		return ok
 	})
 	ifNodes = NodeDeduplication(ifNodes)
+	sort.Slice(ifNodes, func(i, j int) bool {
+		return ifNodes[i].Id > ifNodes[j].Id
+	})
 	delNodesSet := utils.NewSet[*core.Node]()
 	for _, node := range ifNodes {
 		if delNodesSet.Has(node) {
 			continue
 		}
-		for i, n := range node.Next {
-			if slices.Contains(ifNodes, n) {
-				parentNode := node
-				childNode := n
+		var nextStNode *core.Node
+		if len(utils.NewSet(node.Next).List()) == 1 {
+			if node.Next[0].SourceConditionNode != node {
+				continue
+			}
+			nextStNode = node.Next[0]
+		}
+
+		for _, n := range node.Source {
+			mergeCondition := func(parentNode, childNode *core.Node) {
+				if parentNode.TrueNode() != childNode { // or logic
+					if parentNode.TrueNode() == childNode.TrueNode() { // same direction
+						ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
+						ifStat2 := childNode.Statement.(*statements.ConditionStatement)
+						ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, ifStat2.Condition, "||", types.NewJavaPrimer(types.JavaBoolean))
+						trueNode := parentNode.TrueNode()
+						parentNode.RemoveAllNext()
+						childFalseNode := childNode.FalseNode()
+						childNode.RemoveAllNext()
+						parentNode.AddNext(childFalseNode)
+						parentNode.AddNext(trueNode)
+						delNodesSet.Add(childNode)
+					} else {
+						ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
+						ifStat2 := childNode.Statement.(*statements.ConditionStatement)
+						ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+							return fmt.Sprintf("!%s", ifStat2.Condition.String(funcCtx))
+						}, func() types.JavaType {
+							return types.NewJavaPrimer(types.JavaBoolean)
+						}), "||", types.NewJavaPrimer(types.JavaBoolean))
+						trueNode := parentNode.TrueNode()
+						parentNode.RemoveAllNext()
+						childTrueNode := childNode.TrueNode()
+						childNode.RemoveAllNext()
+						parentNode.AddNext(childTrueNode)
+						parentNode.AddNext(trueNode)
+						delNodesSet.Add(childNode)
+					}
+				} else { // and logic: if true node is next if node
+					if parentNode.FalseNode() == childNode.FalseNode() { // same direction
+						ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
+						ifStat2 := childNode.Statement.(*statements.ConditionStatement)
+						ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, ifStat2.Condition, "&&", types.NewJavaPrimer(types.JavaBoolean))
+						falseNode := parentNode.FalseNode()
+						parentNode.RemoveAllNext()
+						childTrueNode := childNode.TrueNode()
+						childNode.RemoveAllNext()
+						parentNode.AddNext(falseNode)
+						parentNode.AddNext(childTrueNode)
+						delNodesSet.Add(childNode)
+					} else {
+						ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
+						ifStat2 := childNode.Statement.(*statements.ConditionStatement)
+						ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+							return fmt.Sprintf("!%s", ifStat2.Condition.String(funcCtx))
+						}, func() types.JavaType {
+							return types.NewJavaPrimer(types.JavaBoolean)
+						}), "&&", types.NewJavaPrimer(types.JavaBoolean))
+						falseNode := parentNode.FalseNode()
+						parentNode.RemoveAllNext()
+						childFalseNode := childNode.FalseNode()
+						childNode.RemoveAllNext()
+						parentNode.AddNext(falseNode)
+						parentNode.AddNext(childFalseNode)
+						delNodesSet.Add(childNode)
+					}
+				}
+			}
+			if slices.Contains(ifNodes, n) && !delNodesSet.Has(n) {
+				parentNode := n
+				childNode := node
 				if parentNode.Id >= childNode.Id {
 					continue
 				}
-				if !slices.Contains(childNode.Next, node.Next[1-i]) {
+				var ok bool
+				for _, n2 := range parentNode.Next {
+					ok = ok || slices.Contains(childNode.Next, n2)
+				}
+				if !ok {
 					continue
 				}
 				s.DominatorMap = GenerateDominatorTree(s.RootNode)
 				CalcEnd(s.DominatorMap, parentNode)
-				CalcEnd(s.DominatorMap, childNode)
+				if len(childNode.Next) == 1 {
+					childNode.MergeNode = childNode.Next[0]
+				} else {
+					CalcEnd(s.DominatorMap, childNode)
+				}
 				if parentNode.MergeNode != nil && parentNode.MergeNode == childNode.MergeNode {
-					if parentNode.TrueNode() == parentNode.Next[1-i] {
-						if parentNode.TrueNode() == childNode.TrueNode() {
-							ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
-							ifStat2 := childNode.Statement.(*statements.ConditionStatement)
-							ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, ifStat2.Condition, "||", types.NewJavaPrimer(types.JavaBoolean))
-							originNext := parentNode.Next[i]
-							parentNode.Next[i] = childNode.FalseNode()
-							originNext.RemoveSource(childNode)
-							parentNode.Next[i].AddSource(parentNode)
-							delNodesSet.Add(childNode)
-						} else {
-							ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
-							ifStat2 := childNode.Statement.(*statements.ConditionStatement)
-							ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-								return fmt.Sprintf("!%s", ifStat2.Condition.String(funcCtx))
-							}, func() types.JavaType {
-								return types.NewJavaPrimer(types.JavaBoolean)
-							}), "&&", types.NewJavaPrimer(types.JavaBoolean))
-							originNext := parentNode.Next[i]
-							parentNode.Next[i] = childNode.TrueNode()
-							originNext.RemoveSource(childNode)
-							parentNode.Next[i].AddSource(parentNode)
-							delNodesSet.Add(childNode)
-						}
-					} else {
-						if parentNode.FalseNode() == childNode.FalseNode() {
-							ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
-							ifStat2 := childNode.Statement.(*statements.ConditionStatement)
-							ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, ifStat2.Condition, "||", types.NewJavaPrimer(types.JavaBoolean))
-							originNext := parentNode.Next[i]
-							parentNode.Next[i] = childNode.TrueNode()
-							originNext.RemoveSource(childNode)
-							parentNode.Next[i].AddSource(parentNode)
-							delNodesSet.Add(childNode)
-						} else {
-							ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
-							ifStat2 := childNode.Statement.(*statements.ConditionStatement)
-							ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-								return fmt.Sprintf("!%s", ifStat2.Condition.String(funcCtx))
-							}, func() types.JavaType {
-								return types.NewJavaPrimer(types.JavaBoolean)
-							}), "&&", types.NewJavaPrimer(types.JavaBoolean))
-							originNext := parentNode.Next[i]
-							parentNode.Next[i] = childNode.FalseNode()
-							originNext.RemoveSource(childNode)
-							parentNode.Next[i].AddSource(parentNode)
-							delNodesSet.Add(childNode)
-						}
+					if len(childNode.Next) == 1 {
+						childNode.Next = append(childNode.Next, childNode.Next[0])
+					}
+					mergeCondition(parentNode, childNode)
+					if nextStNode != nil {
+						nextStNode.SourceConditionNode = parentNode
 					}
 				}
 			}

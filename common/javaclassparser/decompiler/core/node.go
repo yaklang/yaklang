@@ -35,6 +35,7 @@ type Node struct {
 	OutNodeMap          map[*Node]*Node
 	LoopEndNode         *Node
 	UncertainBreakNodes map[*Node]*Node
+	SourceConditionNode *Node
 	//CircleRoute         *SubNodeMap
 	//PreNodeRoute          *SubNodeMap
 	//AllPreNodeRoute       []*SubNodeMap
