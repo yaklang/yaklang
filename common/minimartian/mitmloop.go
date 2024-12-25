@@ -880,6 +880,8 @@ func (p *Proxy) connectResponse(req *http.Request) *http.Response {
 	// "Connection Established" is the standard status for connect request. ref-link https://github.com/google/martian/issues/306
 	// Content-Length  should not be set, otherwise awvs will not work ref-link https://github.com/chaitin/xray/issues/627
 	resp := proxyutil.NewResponse(200, nil, req)
+	resp.Header.Del("Content-Type")
+	resp.Close = false
 	resp.Status = fmt.Sprintf("%d %s", 200, "Connection established")
 	resp.Proto = "HTTP/1.0"
 	resp.ProtoMajor = 1
