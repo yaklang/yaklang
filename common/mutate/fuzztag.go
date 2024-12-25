@@ -1440,7 +1440,7 @@ func init() {
 			}
 			return []string{string(raw)}
 		},
-		Alias:               []string{"hexd", "hexdec", "hexdecode"},
+		Alias:               []string{"hexd", "hexdecode"},
 		Description:         "HEX 解码，{{hexdec(616263)}} => abc",
 		TagNameVerbose:      "HEX解码",
 		ArgumentDescription: "{{string(616263:HEX字符串)}}",
