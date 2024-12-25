@@ -1423,3 +1423,85 @@ func Test_FuzztagHover(t *testing.T) {
 	})
 
 }
+
+func Test_NewFuzztagCompletion(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	t.Run("fuzztag name", func(t *testing.T) {
+		resp, err := client.FuzzTagSuggestion(context.Background(), &ypb.FuzzTagSuggestionRequest{
+			HotPatchCode: "",
+			FuzztagCode:  "{{",
+			InspectType:  COMPLETION,
+		})
+		require.NoError(t, err)
+		require.True(t, len(resp.SuggestionMessage) > 0)
+	})
+
+	t.Run("hotPatch", func(t *testing.T) {
+		resp, err := client.FuzzTagSuggestion(context.Background(), &ypb.FuzzTagSuggestionRequest{
+			HotPatchCode: "handle = func(){}",
+			FuzztagCode:  "{{yak(",
+			InspectType:  COMPLETION,
+		})
+		require.NoError(t, err)
+		require.True(t, len(resp.SuggestionMessage) > 0)
+		require.Contains(t, resp.SuggestionMessage[0].Label, "handle")
+	})
+
+	token := utils.RandStringBytes(10)
+	err = yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, &schema.YakScript{
+		Type:       "codec",
+		ScriptName: token,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), token)
+	})
+
+	t.Run("code plugin", func(t *testing.T) {
+		resp, err := client.FuzzTagSuggestion(context.Background(), &ypb.FuzzTagSuggestionRequest{
+			FuzztagCode: fmt.Sprintf(`{{codec(%s`, token[:5]),
+			InspectType: COMPLETION,
+		})
+		require.NoError(t, err)
+		require.True(t, len(resp.SuggestionMessage) > 0)
+	})
+
+	groupName := utils.RandStringBytes(10)
+	err = yakit.CreatePayload(consts.GetGormProfileDatabase(), "qqqq", groupName, "", 0, false)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		yakit.DeletePayloadByGroup(consts.GetGormProfileDatabase(), token)
+	})
+
+	t.Run("payload", func(t *testing.T) {
+		resp, err := client.FuzzTagSuggestion(context.Background(), &ypb.FuzzTagSuggestionRequest{
+			FuzztagCode: `{{payload(`,
+			InspectType: COMPLETION,
+		})
+		require.NoError(t, err)
+		require.True(t, len(resp.SuggestionMessage) > 0)
+		utils.StringArrayContains(lo.Map(resp.SuggestionMessage, func(item *ypb.SuggestionDescription, _ int) string {
+			return item.InsertText
+		}), groupName)
+	})
+
+}
+
+func Test_NewFuzztagHover(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	t.Run("fuzztag name", func(t *testing.T) {
+
+		resp, err := client.FuzzTagSuggestion(context.Background(), &ypb.FuzzTagSuggestionRequest{
+			FuzztagCode: "null",
+			InspectType: HOVER,
+		})
+		require.NoError(t, err)
+		require.True(t, len(resp.SuggestionMessage) > 0)
+		require.Contains(t, resp.SuggestionMessage[0].Label, "生成一个空字节，如果指定了数量，将生成指定数量的空字节 {{null(5)}} 表示生成 5 个空字节")
+	})
+
+}
