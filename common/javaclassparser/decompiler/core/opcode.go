@@ -29,8 +29,11 @@ type OpCode struct {
 	Source                         []*OpCode
 	Target                         []*OpCode
 	TrueNode, FalseNode, MergeNode *OpCode
+	Negative                       bool
 	StackInfo                      *utils.Stack[*values.JavaValue]
 	IsTernaryNode                  bool
 	IfNode                         *OpCode
 	Info                           any
+	IsCustom                       bool
+	conditionOpId                  int
 }

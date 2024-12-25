@@ -247,26 +247,28 @@ func (j javaNull) IsJavaType() {
 var JavaNull = javaNull{}
 
 type TernaryExpression struct {
-	Condition  JavaValue
-	TrueValue  JavaValue
-	FalseValue JavaValue
+	Condition     JavaValue
+	ConditionFromOp int
+	TrueValue     JavaValue
+	FalseValue    JavaValue
 }
 
 func (j *TernaryExpression) Type() types.JavaType {
 	return types.NewMergeType(j.TrueValue.Type(), j.FalseValue.Type())
 }
 func (j *TernaryExpression) String(funcCtx *class_context.ClassContext) string {
+	condition := SimplifyConditionValue(j.Condition)
 	truePrimer, ok1 := j.TrueValue.Type().RawType().(*types.JavaPrimer)
 	falsePrimer, ok2 := j.FalseValue.Type().RawType().(*types.JavaPrimer)
 	if ok1 && ok2 && truePrimer.Name == types.JavaBoolean && falsePrimer.Name == types.JavaBoolean {
 		if j.TrueValue.String(funcCtx) == "true" && j.FalseValue.String(funcCtx) == "false" {
-			return j.Condition.String(funcCtx)
+			return condition.String(funcCtx)
 		}
 		if j.TrueValue.String(funcCtx) == "false" && j.FalseValue.String(funcCtx) == "true" {
-			return NewUnaryExpression(j.Condition, Not, types.NewJavaPrimer(types.JavaBoolean)).String(funcCtx)
+			return NewUnaryExpression(condition, Not, types.NewJavaPrimer(types.JavaBoolean)).String(funcCtx)
 		}
 	}
-	return fmt.Sprintf("(%s) ? (%s) : (%s)", j.Condition.String(funcCtx), j.TrueValue.String(funcCtx), j.FalseValue.String(funcCtx))
+	return fmt.Sprintf("(%s) ? (%s) : (%s)", condition.String(funcCtx), j.TrueValue.String(funcCtx), j.FalseValue.String(funcCtx))
 }
 
 func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {
@@ -289,11 +291,15 @@ func (s *SlotValue) Type() types.JavaType {
 	return s.Value.Type()
 }
 func (s *SlotValue) String(funcCtx *class_context.ClassContext) string {
+	if s.Value == nil {
+		return "empty slot value"
+	}
 	return s.Value.String(funcCtx)
 }
 
-func NewSlotValue(val JavaValue) *SlotValue {
+func NewSlotValue(val JavaValue, typ types.JavaType) *SlotValue {
 	return &SlotValue{
-		Value: val,
+		Value:   val,
+		TmpType: typ,
 	}
 }

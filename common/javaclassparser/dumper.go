@@ -613,11 +613,11 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				case *statements.WhileStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
 						"%s\n"+
-						c.GetTabString()+"}", ret.ConditionValue.String(funcCtx), statementListToString(ret.Body))
+						c.GetTabString()+"}", values.SimplifyConditionValue(ret.ConditionValue).String(funcCtx), statementListToString(ret.Body))
 				case *statements.DoWhileStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"do{\n"+
 						"%s\n"+
-						c.GetTabString()+"} while (%s);", statementListToString(ret.Body), ret.ConditionValue.String(funcCtx))
+						c.GetTabString()+"} while (%s);", statementListToString(ret.Body), values.SimplifyConditionValue(ret.ConditionValue).String(funcCtx))
 					if ret.Label != "" {
 						statementStr = fmt.Sprintf("%s%s:\n%s", c.GetTabString(), ret.Label, statementStr)
 					}
@@ -639,7 +639,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				case *statements.IfStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
 						"%s\n"+
-						c.GetTabString()+"}", ret.Condition.String(funcCtx), statementListToString(ret.IfBody))
+						c.GetTabString()+"}", values.SimplifyConditionValue(ret.Condition).String(funcCtx), statementListToString(ret.IfBody))
 					if len(ret.ElseBody) > 0 {
 						statementStr += fmt.Sprintf("else{\n"+
 							"%s\n"+
@@ -650,7 +650,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				case *statements.ForStatement:
 					datas := []string{}
 					datas = append(datas, ret.InitVar.String(funcCtx))
-					datas = append(datas, fmt.Sprintf("%s", ret.Condition.String(funcCtx)))
+					datas = append(datas, fmt.Sprintf("%s", values.SimplifyConditionValue(ret.Condition.Condition).String(funcCtx)))
 					datas = append(datas, ret.EndExp.String(funcCtx))
 					var lines []string
 					for _, subStatement := range ret.SubStatements {
