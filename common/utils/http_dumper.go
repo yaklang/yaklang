@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 var _noContentLengthHeader = map[string]struct{}{
@@ -271,17 +272,24 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 		}
 	} else {
 		// handle content-length
-		if haveBody || contentLengthExisted {
-			rsp.ContentLength = int64(len(rawBody))
-			contentLengthInt = rsp.ContentLength
-			buf.WriteString("Content-Length: ")
-			buf.WriteString(strconv.FormatInt(contentLengthInt, 10))
-			buf.WriteString(CRLF)
-			buf.Flush()
+		if rsp.StatusCode == 204 || rsp.StatusCode == 304 || (rsp.StatusCode >= 100 && rsp.StatusCode < 200) {
+			// omit content-length for 204/304 and 1xx response codes without body
+		} else if rsp.Request != nil && rsp.Request.Method == http.MethodConnect && (rsp.StatusCode >= 200 && rsp.StatusCode < 300) {
+			// For CONNECT method, omit content-length
 		} else {
-			buf.WriteString("Content-Length: 0\r\n")
-			buf.Flush()
+			if haveBody || contentLengthExisted {
+				rsp.ContentLength = int64(len(rawBody))
+				contentLengthInt = rsp.ContentLength
+				buf.WriteString("Content-Length: ")
+				buf.WriteString(strconv.FormatInt(contentLengthInt, 10))
+				buf.WriteString(CRLF)
+				buf.Flush()
+			} else {
+				buf.WriteString("Content-Length: 0\r\n")
+				buf.Flush()
+			}
 		}
+
 	}
 
 	buf.WriteString(CRLF)
