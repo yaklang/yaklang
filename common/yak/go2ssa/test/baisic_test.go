@@ -102,10 +102,68 @@ func TestStmt_normol(t *testing.T) {
 		}
 		`, []string{"Undefined-i(valid)", "Undefined-d(valid)"}, t)
 	})
+}
 
-	// todo
-	t.Run("for global Spin", func(t *testing.T) {
-		t.Skip()
+func TestStmt_spin(t *testing.T) {
+	t.Run("for Spin value", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	func main() {
+		var a = 1
+		
+		for true {
+			println(a)
+		}
+	}
+		`, []string{"1"}, t)
+	})
+
+	t.Run("for Spin array", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+
+	func main() {
+		var str = []string{
+			"hello world",
+		}
+
+		for true {
+			println(str[0])
+		}
+	}
+		`, []string{"\"hello world\""}, t)
+	})
+
+	t.Run("for Spin struct", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	type A struct {
+	    s string
+	}
+
+	func main() {
+		var str = A{s: "hello world"}
+		for true {
+			println(str.s)
+		}
+	}
+		`, []string{"\"hello world\""}, t)
+	})
+
+	t.Run("for Spin value global", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	var a = 1
+	func main() {
+		
+		for true {
+			println(a)
+		}
+	}
+		`, []string{"1"}, t)
+	})
+
+	t.Run("for Spin array global", func(t *testing.T) {
 		test.CheckPrintlnValue(`package A
 
 	var str = []string{
@@ -114,14 +172,90 @@ func TestStmt_normol(t *testing.T) {
 
 	func main() {
 		for true {
-			if true {
-
-			}else{
-				println(str[0])
-			}
+			println(str[0])
 		}
 	}
 		`, []string{"\"hello world\""}, t)
+	})
+
+	t.Run("for Spin struct global", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	type A struct {
+	    s string
+	}
+
+	var str = A{s: "hello world"}
+	
+	func main() {
+		for true {
+			println(str.s)
+		}
+	}
+		`, []string{"\"hello world\""}, t)
+	})
+
+	t.Run("muti for Spin value", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	func main() {
+		var a = 1
+		for true {
+			a = 2
+		    for true {
+				a = 3
+				println(a)
+			}
+			println(a)
+		}
+		println(a)
+	}
+		`, []string{"1"}, t)
+	})
+
+	t.Run("for Spin side-effect", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+func main() {
+	a := 0
+	f := func() func() {
+		return func() {
+			a = 1
+		}
+	}
+	f2 := func(){
+		a = 2
+	}
+
+	for true {
+		f2()
+		println(a)
+	}
+}
+		`, []string{"side-effect(2, a)"}, t)
+	})
+
+	t.Run("for Spin side-effect and function assignment", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+func main() {
+	a := 0
+	f := func() func() {
+		return func() {
+			a = 1
+		}
+	}
+	f2 := func(){
+		a = 2
+	}
+
+	for true {
+		f2 = f()
+		f2()
+		println(a)
+	}
+}
+		`, []string{"side-effect(1, a)"}, t)
 	})
 }
 

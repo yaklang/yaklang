@@ -692,6 +692,18 @@ type Undefined struct {
 
 func (u *Undefined) IsUndefined() bool { return true }
 
+// func (u *Undefined) ReplaceValue(v Value, to Value) {
+// 	builder := u.GetFunc().builder
+// 	if v.GetId() == -1 { // 用于处理spin中的empty phi
+// 		index := u.GetKey()
+// 		for _, user := range u.GetUsers() {
+// 			value := builder.ReadMemberCallValue(to, index)
+// 			user.ReplaceValue(u, value)
+// 			to.AddUser(user)
+// 		}
+// 	}
+// }
+
 var (
 	_ Node        = (*Undefined)(nil)
 	_ Value       = (*Undefined)(nil)

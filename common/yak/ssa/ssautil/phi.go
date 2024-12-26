@@ -1,6 +1,8 @@
 package ssautil
 
-import "github.com/yaklang/yaklang/common/log"
+import (
+	"github.com/yaklang/yaklang/common/log"
+)
 
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
 func ForEachCapturedVariable[T versionedValue](
