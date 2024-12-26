@@ -125,6 +125,16 @@ func TestSyntaxInOne(t *testing.T) {
 		"check $abc then Finished else BAD;;;; desc{a: b};; desc{title: SprintChecking}",
 		"desc(a: b, c: eee, e,e,e,e)",
 		`desc(title: "你好,世界，你可以在这里输入任何内容")`,
+		`desc(
+			// a, 
+			title:"aaa", // aa
+		)`,
+		`desc(
+			// a, 
+			// a, 
+			// a, 
+			title:"aaa", 
+		)`,
 		"desc(a: b, c: eee, e,e,e,e);;;;check $abc then GOOD else BAD",
 		`"abc";'abc';` + "'abcasdfasdf'",
 		`"a\"bc";'a\'bc';` + "'abcasdfasdfaaa'",
