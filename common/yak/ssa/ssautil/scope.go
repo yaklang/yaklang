@@ -108,6 +108,10 @@ func (s *ScopedVersionedTable[T]) SetScopeID(i int64) {
 	s.ScopeId = i
 }
 
+// func (s *ScopedVersionedTable[T]) SetlinkIncomingPhi(name string, v VersionedIF[T]) {
+// 	s.linkIncomingPhi[name] = v
+// }
+
 // // func (s *ScopedVersionedTable[T]) SetPersistentId(i int64) {
 // // 	s.persistentId = i
 // // }
