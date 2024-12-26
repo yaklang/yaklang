@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
 	"io"
 	"path"
 	"strings"
 	"sync"
+
+	"github.com/samber/lo"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
@@ -155,6 +156,14 @@ func CreateRuleByContent(ruleName string, content string, buildIn bool, tags ...
 	rule.Language = string(language)
 	rule.Tag = strings.Join(tags, "|")
 	rule.IsBuildInRule = buildIn
+	if buildIn {
+		// build in rule, use rule.title if exist
+		if rule.TitleZh != "" {
+			rule.RuleName = rule.TitleZh
+		} else if rule.Title != "" {
+			rule.RuleName = rule.Title
+		}
+	}
 	err = MigrateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
 		return nil, utils.Wrap(err, "migrate syntax flow rule error")

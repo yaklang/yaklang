@@ -103,7 +103,7 @@ func startScan(client ypb.YakClient, t *testing.T, progID string, ctx context.Co
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	progID := uuid.NewString()
@@ -129,7 +129,6 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 					res, err := client.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
 						Filter: &ypb.SyntaxFlowResultFilter{
 							TaskIDs: []string{taskID},
-							Keyword: "java",
 						},
 					})
 					require.NoError(t, err)
