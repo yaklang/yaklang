@@ -22,6 +22,10 @@ import (
 type AstPointer interface {
 }
 
+type AstCache[T AstPointer] struct {
+	astCache T
+}
+
 var _ AstPointer = (*gol.SourceFileContext)(nil)
 var _ AstPointer = (*java.CompilationUnitContext)(nil)
 var _ AstPointer = (*js.ProgramContext)(nil)
@@ -45,7 +49,7 @@ type MemEditor struct {
 	lineStartOffsetMap map[int]int
 	cursor             int // 模拟光标位置（指针功能）
 
-	astCache AstPointer
+	AstCache[AstPointer]
 }
 
 func NewMemEditor(sourceCode string) *MemEditor {
@@ -717,10 +721,10 @@ func (e *MemEditor) GetTextContextWithPrompt(p RangeIf, n int, msg ...string) st
 	return raw
 }
 
-func (e *MemEditor) GetAstCache() (ret AstPointer) {
-	return e.astCache
+func (a *AstCache[T]) GetAstCache() T {
+	return a.astCache
 }
 
-func (e *MemEditor) SetAstCache(ast AstPointer) {
-	e.astCache = ast
+func (a *AstCache[T]) SetAstCache(ast T) {
+	a.astCache = ast
 }

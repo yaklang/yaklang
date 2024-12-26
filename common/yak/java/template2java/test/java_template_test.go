@@ -2,15 +2,16 @@ package test
 
 import (
 	"fmt"
+	"path/filepath"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/java/template2java"
-	"path/filepath"
-	"testing"
 )
 
 func checkJavaFront(t *testing.T, code string) {
-	_, err := java2ssa.Frontend(code, false)
+	_, err := java2ssa.FrontEnd(code, false)
 	require.NoError(t, err)
 }
 

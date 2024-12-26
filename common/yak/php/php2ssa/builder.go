@@ -102,16 +102,14 @@ func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.Functi
 func (s *SSABuild) Build(editor *memedit.MemEditor, force bool, b *ssa.FunctionBuilder) error {
 	var ast phpparser.IHtmlDocumentContext
 	var err error
-
-	switch a := editor.GetAstCache().(type) {
-	case *phpparser.HtmlDocumentContext:
-		ast = a
-	default:
-		ast, err = FrondEnd(editor.GetSourceCode(), force)
+	if a := editor.GetAstCache(); a == nil {
+		ast, err = FrontEnd(editor.GetSourceCode(), force)
 		editor.SetAstCache(ast)
 		if err != nil {
 			return err
 		}
+	} else {
+		ast = a.(*phpparser.HtmlDocumentContext)
 	}
 
 	// log.Infof("parse AST FrontEnd success: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
@@ -173,7 +171,7 @@ type builder struct {
 	fetchDollarId func() int
 }
 
-func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
+func FrontEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := phpparser.NewPHPLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()

@@ -30,15 +30,14 @@ func (*SSABuild) Build(editor *memedit.MemEditor, force bool, builder *ssa.Funct
 	var ast *JS.ProgramContext
 	var err error
 
-	switch a := editor.GetAstCache().(type) {
-	case *JS.ProgramContext:
-		ast = a
-	default:
-		ast, err = Frontend(editor.GetSourceCode(), force)
+	if a := editor.GetAstCache(); a == nil {
+		ast, err = FrontEnd(editor.GetSourceCode(), force)
 		editor.SetAstCache(ast)
 		if err != nil {
 			return err
 		}
+	} else {
+		ast = a.(*JS.ProgramContext)
 	}
 
 	builder.SupportClosure = true
@@ -66,7 +65,7 @@ type astbuilder struct {
 	cmap map[string]struct{}
 }
 
-func Frontend(src string, must bool) (*JS.ProgramContext, error) {
+func FrontEnd(src string, must bool) (*JS.ProgramContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()

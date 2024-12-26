@@ -29,15 +29,14 @@ func (*SSABuilder) Build(editor *memedit.MemEditor, force bool, b *ssa.FunctionB
 	var ast *yak.ProgramContext
 	var err error
 
-	switch a := editor.GetAstCache().(type) {
-	case *yak.ProgramContext:
-		ast = a
-	default:
+	if a := editor.GetAstCache(); a == nil {
 		ast, err = FrontEnd(editor.GetSourceCode(), force)
 		editor.SetAstCache(ast)
 		if err != nil {
 			return err
 		}
+	} else {
+		ast = a.(*yak.ProgramContext)
 	}
 
 	b.SupportClosure = true

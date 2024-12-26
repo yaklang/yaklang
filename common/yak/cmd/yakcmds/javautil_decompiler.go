@@ -2,6 +2,13 @@ package yakcmds
 
 import (
 	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -11,12 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
-	"time"
 )
 
 var JavaDecompilerSelfChecking = &cli.Command{
@@ -74,7 +75,7 @@ var JavaDecompilerSelfChecking = &cli.Command{
 			//vfs := filesys.NewVirtualFs()
 			//vfs.AddFile("origin.java", results)
 
-			_, err = java2ssa.Frontend(results, false)
+			_, err = java2ssa.FrontEnd(results, false)
 			if err != nil {
 				log.Errorf("java2ssa.Frontend failed: %v", err)
 				fileName := "syntax-error--" + hash

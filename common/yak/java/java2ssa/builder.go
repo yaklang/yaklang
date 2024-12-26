@@ -29,16 +29,17 @@ func (*SSABuilder) Build(editor *memedit.MemEditor, force bool, b *ssa.FunctionB
 
 	b.SupportClass = true
 	b.GetProgram().VirtualImport = true
-	switch a := editor.GetAstCache().(type) {
-	case *javaparser.CompilationUnitContext:
-		ast = a
-	default:
-		ast, err = Frontend(editor.GetSourceCode(), force)
+
+	if a := editor.GetAstCache(); a == nil {
+		ast, err = FrontEnd(editor.GetSourceCode(), force)
 		editor.SetAstCache(ast)
 		if err != nil {
 			return err
 		}
+	} else {
+		ast = a.(*javaparser.CompilationUnitContext)
 	}
+
 	build := &builder{
 		FunctionBuilder:   b,
 		ast:               ast,
@@ -100,7 +101,7 @@ func (b *builder) PopBluePrint() *ssa.Blueprint {
 	return b.bluePrintStack.Pop()
 }
 
-func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error) {
+func FrontEnd(src string, force bool) (javaparser.ICompilationUnitContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := javaparser.NewJavaLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()

@@ -93,15 +93,14 @@ func (s *SSABuilder) Build(editor *memedit.MemEditor, force bool, builder *ssa.F
 	var ast *gol.SourceFileContext
 	var err error
 
-	switch a := editor.GetAstCache().(type) {
-	case *gol.SourceFileContext:
-		ast = a
-	default:
-		ast, err = Frontend(editor.GetSourceCode(), force)
+	if a := editor.GetAstCache(); a == nil {
+		ast, err = FrontEnd(editor.GetSourceCode(), force)
 		editor.SetAstCache(ast)
 		if err != nil {
 			return err
 		}
+	} else {
+		ast = a.(*gol.SourceFileContext)
 	}
 
 	SpecialTypes := map[string]ssa.Type{
@@ -150,7 +149,7 @@ type astbuilder struct {
 	SetGlobal      bool
 }
 
-func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
+func FrontEnd(src string, must bool) (*gol.SourceFileContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := gol.NewGoLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
