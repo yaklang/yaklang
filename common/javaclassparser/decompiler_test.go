@@ -12,7 +12,7 @@ import (
 )
 
 func TestParseSingleClass(t *testing.T) {
-	content, _ := os.ReadFile("/Users/z3/Code/go/yaklang/build/error/decompiler-err-Policy-2pkCnMhN5xbG4Q7zkVDvQsszN0o.class")
+	content, _ := os.ReadFile("/Users/z3/Downloads/JarEntry.class")
 	cf, err := Parse(content)
 	if err != nil {
 		t.Fatal(err)
