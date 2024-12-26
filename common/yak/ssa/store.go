@@ -7,19 +7,19 @@ type StoredFunctionBuilder struct {
 
 func (b *FunctionBuilder) LoadFunctionBuilder(s *FunctionBuilder) {
 	b._editor = s._editor
-	b.IncludeStack = s.IncludeStack
-	b.target = s.target
-	b.CurrentBlock = s.CurrentBlock
-	b.CurrentRange = s.CurrentRange
-	b.parentScope = s.parentScope
+	// b.IncludeStack = s.IncludeStack
+	// b.target = s.target
+	// b.CurrentBlock = s.CurrentBlock
+	// b.CurrentRange = s.CurrentRange
+	// b.parentScope = s.parentScope
 	b.parentBuilder = s.parentBuilder
 
 	b.Function.Type = s.Function.Type
-	b.Function.FreeValues = s.Function.FreeValues
-	b.Function.ParameterMembers = s.Function.ParameterMembers
-	b.Function.SideEffects = s.Function.SideEffects
+	// b.Function.FreeValues = s.Function.FreeValues
+	// b.Function.ParameterMembers = s.Function.ParameterMembers
+	// b.Function.SideEffects = s.Function.SideEffects
 	b.Function.Return = s.Function.Return
-	b.Function.Blocks = s.Function.Blocks
+	// b.Function.Blocks = s.Function.Blocks
 
 	b.SetProgram(s.GetProgram())
 }
@@ -57,13 +57,13 @@ func (b *FunctionBuilder) StoreFunctionBuilder() *StoredFunctionBuilder {
 			Type: b.Function.Type,
 			// Params:            b.Function.Params,
 			// ParamLength:       b.Function.ParamLength,
-			FreeValues:       b.Function.FreeValues,
-			ParameterMembers: b.Function.ParameterMembers,
-			SideEffects:      b.Function.SideEffects,
+			// FreeValues:       b.Function.FreeValues,
+			// ParameterMembers: b.Function.ParameterMembers,
+			// SideEffects:      b.Function.SideEffects,
 			// parent:            b.Function.parent,
 			// ChildFuncs:        b.Function.ChildFuncs,
 			Return: b.Function.Return,
-			Blocks: b.Function.Blocks,
+			// Blocks: b.Function.Blocks,
 			// EnterBlock:        b.Function.EnterBlock,
 			// ExitBlock:         b.Function.ExitBlock,
 			// DeferBlock:        b.Function.DeferBlock,
@@ -79,16 +79,16 @@ func (b *FunctionBuilder) StoreFunctionBuilder() *StoredFunctionBuilder {
 		// SupportClosure:             b.SupportClosure,
 		// SupportClassStaticModifier: b.SupportClassStaticModifier,
 		// SupportClass:               b.SupportClass,
-		IncludeStack: b.IncludeStack,
+		// IncludeStack: b.IncludeStack,
 		// Included:                   b.Included,
 		// IsReturn:                   b.IsReturn,
 		// RefParameter:               b.RefParameter,
-		target:       b.target,
-		labels:       b.labels,
-		CurrentBlock: b.CurrentBlock,
+		// target:       b.target,
+		// labels:       b.labels,
+		// CurrentBlock: b.CurrentBlock,
 		CurrentRange: b.CurrentRange,
-		CurrentFile:  b.CurrentFile,
-		parentScope:  b.parentScope,
+		// CurrentFile:  b.CurrentFile,
+		// parentScope:  b.parentScope,
 		// DefineFunc:                 b.DefineFunc,
 		// MarkedFuncName:             b.MarkedFuncName,
 		// MarkedFuncType:             b.MarkedFuncType,
