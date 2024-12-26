@@ -502,6 +502,7 @@ func checkFunctionEx(
 }
 
 func checkResult(frame *sfvm.SFFrame, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult) (errs error) {
+	result.Show()
 	if len(result.GetErrors()) > 0 {
 		for _, e := range result.GetErrors() {
 			errs = utils.JoinErrors(errs, utils.Errorf("syntax flow failed: %v", e))

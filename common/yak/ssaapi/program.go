@@ -86,6 +86,13 @@ func (p *Program) Show() *Program {
 	return p
 }
 
+func (p Programs) Show() Programs {
+	for _, prog := range p {
+		prog.Show()
+	}
+	return p
+}
+
 func (p *Program) IsNil() bool {
 	return utils.IsNil(p) || utils.IsNil(p.Program)
 }
