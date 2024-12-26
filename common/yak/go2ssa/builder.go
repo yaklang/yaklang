@@ -89,10 +89,19 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 	return nil
 }
 
-func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
-	ast, err := Frontend(src, force)
-	if err != nil {
-		return err
+func (s *SSABuilder) Build(editor *memedit.MemEditor, force bool, builder *ssa.FunctionBuilder) error {
+	var ast *gol.SourceFileContext
+	var err error
+
+	switch a := editor.GetAstCache().(type) {
+	case *gol.SourceFileContext:
+		ast = a
+	default:
+		ast, err = Frontend(editor.GetSourceCode(), force)
+		editor.SetAstCache(ast)
+		if err != nil {
+			return err
+		}
 	}
 
 	SpecialTypes := map[string]ssa.Type{

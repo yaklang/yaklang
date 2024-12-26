@@ -97,7 +97,7 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 		} else {
 			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 		}
-		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
+		return LanguageBuilder.Build(src, c.ignoreSyntaxErr, fb)
 	}
 	builder := application.GetAndCreateFunctionBuilder("main", "main")
 	// TODO: this extern info should be set in program

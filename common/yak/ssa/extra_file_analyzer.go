@@ -19,7 +19,7 @@ type Builder interface {
 	// create a new builder
 	Create() Builder
 
-	Build(string, bool, *FunctionBuilder) error
+	Build(*memedit.MemEditor, bool, *FunctionBuilder) error
 	FilterFile(string) bool
 	GetLanguage() consts.Language
 	PreHandlerAnalyzer

@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
@@ -25,11 +26,21 @@ func (s *SSABuild) Create() ssa.Builder {
 	}
 }
 
-func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
-	ast, err := Frontend(src, force)
-	if err != nil {
-		return err
+func (*SSABuild) Build(editor *memedit.MemEditor, force bool, builder *ssa.FunctionBuilder) error {
+	var ast *JS.ProgramContext
+	var err error
+
+	switch a := editor.GetAstCache().(type) {
+	case *JS.ProgramContext:
+		ast = a
+	default:
+		ast, err = Frontend(editor.GetSourceCode(), force)
+		editor.SetAstCache(ast)
+		if err != nil {
+			return err
+		}
 	}
+
 	builder.SupportClosure = true
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,

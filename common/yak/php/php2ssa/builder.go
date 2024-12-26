@@ -99,11 +99,21 @@ func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.Functi
 	builder.GetProgram().GetApplication().Build("", editor, builder)
 }
 
-func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	ast, err := FrondEnd(src, force)
-	if err != nil {
-		return err
+func (s *SSABuild) Build(editor *memedit.MemEditor, force bool, b *ssa.FunctionBuilder) error {
+	var ast phpparser.IHtmlDocumentContext
+	var err error
+
+	switch a := editor.GetAstCache().(type) {
+	case *phpparser.HtmlDocumentContext:
+		ast = a
+	default:
+		ast, err = FrondEnd(editor.GetSourceCode(), force)
+		editor.SetAstCache(ast)
+		if err != nil {
+			return err
+		}
 	}
+
 	// log.Infof("parse AST FrontEnd success: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	b.WithExternValue(phpBuildIn)
 	startParse := func(functionBuilder *ssa.FunctionBuilder) {

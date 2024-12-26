@@ -2,15 +2,17 @@ package java2ssa
 
 import (
 	"fmt"
+	"path/filepath"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
-	"path/filepath"
 )
 
 // ========================================== For SSAAPI ==========================================
@@ -21,12 +23,21 @@ type SSABuilder struct {
 
 var Builder ssa.Builder = &SSABuilder{}
 
-func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
+func (*SSABuilder) Build(editor *memedit.MemEditor, force bool, b *ssa.FunctionBuilder) error {
+	var ast javaparser.ICompilationUnitContext
+	var err error
+
 	b.SupportClass = true
 	b.GetProgram().VirtualImport = true
-	ast, err := Frontend(src, force)
-	if err != nil {
-		return err
+	switch a := editor.GetAstCache().(type) {
+	case *javaparser.CompilationUnitContext:
+		ast = a
+	default:
+		ast, err = Frontend(editor.GetSourceCode(), force)
+		editor.SetAstCache(ast)
+		if err != nil {
+			return err
+		}
 	}
 	build := &builder{
 		FunctionBuilder:   b,

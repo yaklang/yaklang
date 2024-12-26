@@ -11,7 +11,22 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+
+	js "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
+	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+	java "github.com/yaklang/yaklang/common/yak/java/parser"
+	php "github.com/yaklang/yaklang/common/yak/php/parser"
 )
+
+type AstPointer interface {
+}
+
+var _ AstPointer = (*gol.SourceFileContext)(nil)
+var _ AstPointer = (*java.CompilationUnitContext)(nil)
+var _ AstPointer = (*js.ProgramContext)(nil)
+var _ AstPointer = (*php.HtmlDocumentContext)(nil)
+var _ AstPointer = (*yak.ProgramContext)(nil)
 
 type MemEditor struct {
 	sourceCodeCtxStack []string
@@ -29,6 +44,8 @@ type MemEditor struct {
 	lineLensMap        map[int]int
 	lineStartOffsetMap map[int]int
 	cursor             int // 模拟光标位置（指针功能）
+
+	astCache AstPointer
 }
 
 func NewMemEditor(sourceCode string) *MemEditor {
@@ -698,4 +715,12 @@ func (e *MemEditor) GetTextContextWithPrompt(p RangeIf, n int, msg ...string) st
 		return ""
 	}
 	return raw
+}
+
+func (e *MemEditor) GetAstCache() (ret AstPointer) {
+	return e.astCache
+}
+
+func (e *MemEditor) SetAstCache(ast AstPointer) {
+	e.astCache = ast
 }
