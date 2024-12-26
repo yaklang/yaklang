@@ -22,7 +22,7 @@ var FuzzxExports = map[string]interface{}{
 	"redirectTimes":      mutate.WithPoolOpt_RedirectTimes,
 	"noRedirect":         mutate.WithPoolOpt_NoFollowRedirect,
 	"noFixContentLength": mutate.WithPoolOpt_noFixContentLength,
-	"connPool":           mutate.WithPoolOpt_ConnPool,
+	"connPool":           mutate.WithPoolOpt_UseConnPool,
 	"delay":              mutate.WithPoolOPt_DelaySeconds,
 	"namingContext":      mutate.WithPoolOpt_NamingContext,
 }
