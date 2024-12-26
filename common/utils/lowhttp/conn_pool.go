@@ -130,6 +130,7 @@ func (l *LowHttpConnPool) putIdleConn(conn *persistConn) error {
 	defer l.idleConnMux.Unlock()
 	// 如果超过池规定的单个host可以拥有的最大连接数量则直接放弃添加连接
 	if len(l.idleConn[cacheKeyHash]) >= l.maxIdleConnPerHost {
+		conn.Conn.Close() // if too many, close it
 		return nil
 	}
 
@@ -455,13 +456,19 @@ func (pc *persistConn) readLoop() {
 			} else {
 				pc.closeConn(connPoolReadFromServerError{err})
 			}
-			rc.ch <- responseInfo{err: connPoolReadFromServerError{err: err}}
+			select {
+			case rc.ch <- responseInfo{err: connPoolReadFromServerError{err: err}}:
+			default: // nonblocking
+			}
 			return
 		}
 		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
 
 		if firstAuth {
-			rc = <-pc.reqCh
+			select {
+			case rc = <-pc.reqCh:
+			default: // nonblocking
+			}
 		}
 
 		var resp *http.Response
