@@ -28,6 +28,7 @@ type ClassObjectDumper struct {
 	MethodType        *types.JavaFuncType
 	lambdaMethods     map[string][]string
 	fieldDefaultValue map[string]string
+	dumpedMethodsSet  map[string]*dumpedMethods
 }
 
 func (c *ClassObjectDumper) GetConstructorMethodName() string {
@@ -48,6 +49,7 @@ func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
 		deepStack:         utils.NewStack[int](),
 		lambdaMethods:     map[string][]string{},
 		fieldDefaultValue: map[string]string{},
+		dumpedMethodsSet:  map[string]*dumpedMethods{},
 	}
 }
 func (c *ClassObjectDumper) TabNumber() int {
@@ -438,15 +440,20 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 	return result, nil
 }
 
-func (c *ClassObjectDumper) DumpMethod(methodName, desc string) (dumpedMethods, error) {
+func (c *ClassObjectDumper) DumpMethod(methodName, desc string) (*dumpedMethods, error) {
 	return c.DumpMethodWithInitialId(methodName, desc, 0)
 }
 
-func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id int) (dumpedMethods, error) {
+func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id int) (*dumpedMethods, error) {
+	traitId := fmt.Sprintf("name:%s,desc:%s", methodName, desc)
+	if v, ok := c.dumpedMethodsSet[traitId]; ok {
+		return v, nil
+	}
 	var method *MemberInfo
 	var name, descriptor string
 	var err error
-	var dumped dumpedMethods
+	var dumped = &dumpedMethods{}
+	c.dumpedMethodsSet[traitId] = dumped
 	for _, info := range c.obj.Methods {
 		name, err = c.obj.getUtf8(info.NameIndex)
 		if err != nil {
@@ -783,10 +790,10 @@ type dumpedMethods struct {
 	bodyCode   string
 }
 
-func (c *ClassObjectDumper) DumpMethods() ([]dumpedMethods, error) {
+func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 	c.Tab()
 	defer c.UnTab()
-	var result []dumpedMethods
+	var result []*dumpedMethods
 	for _, method := range c.obj.Methods {
 		name, err := c.obj.getUtf8(method.NameIndex)
 		if err != nil {
