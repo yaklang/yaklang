@@ -36,6 +36,159 @@ type BuildinRuleTestCase struct {
 	NotContainsAny []string
 }
 
+var Cases = []BuildinRuleTestCase{
+	{
+		Name: "检测Java任意文件下载(attachment)",
+		// Rule: `java-filedownload-attachment-filename`,
+		Rule: "Checking [Filename Attachment when Filedownloading]",
+		FS: map[string]string{
+			"download.java": "download.java",
+		},
+		ContainsAll: []string{"attachment", "filename"},
+	},
+	{
+		Name: "XStream 基础使用",
+		// Rule: `java-xstream-unsafe`,
+		Rule: "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
+		FS: map[string]string{
+			"xstream.java": "xstream.java",
+		},
+		ContainsAll: []string{"xstream.fromXML"},
+	},
+
+	{
+		Name: "XStream 类成员 - 基础使用",
+		// Rule: `java-xstream-unsafe`,
+		Rule: "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
+		FS: map[string]string{
+			"xstream-2.java": "xstream-2.java",
+		},
+		ContainsAll: []string{"xstreamInstance.fromXML"},
+	},
+
+	{
+		Name: "XStream 类成员(空成员) - 基础使用",
+		// Rule: `java-xstream-unsafe`,
+		Rule: "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
+		FS: map[string]string{
+			"xstream-3.java": "xstream-3.java",
+		},
+		ContainsAll: []string{"xstreamInstance.fromXML"},
+	},
+
+	{
+		Name: "XStream 基础使用(negative)",
+		// Rule: `java-xstream-unsafe`,
+		Rule: "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
+		FS: map[string]string{
+			"xstream-safe.java": "xstream-safe.java",
+		},
+		NegativeTest: true,
+	},
+
+	{
+		Name: "SAXBuilder 基础使用(安全)",
+		// Rule: `java-saxbuilder-unsafe`,
+		Rule: "SAXBuilder 未明确设置安全策略（.setFeature(...)）",
+		FS: map[string]string{
+			"saxbuilder-safe.java": "saxbuilder-safe.java",
+		},
+		NegativeTest: true,
+	},
+	{
+		Name: "SAXBuilder 基础使用不安全",
+		// Rule: `java-saxbuilder-unsafe`,
+		Rule: "SAXBuilder 未明确设置安全策略（.setFeature(...)）",
+		FS: map[string]string{
+			"saxbuilder-unsafe.java": "saxbuilder-unsafe.java",
+		},
+		NegativeTest: false,
+		ContainsAll:  []string{"SAXBuilder"},
+	},
+	{
+		Name: "SAXParserFactory 基础检查",
+		// Rule: `java-saxparser-factory-unsafe`,
+		Rule: "SAXParserFactory. 未明确设置安全策略（.setFeature(...)）",
+		FS: map[string]string{
+			"saxparser-factory-unsafe.java": "saxparser-factory-unsafe.java",
+		},
+		NegativeTest: false,
+		ContainsAll:  []string{"SAXParserFactory"},
+	},
+	{
+		Name: "SAXParserFactory 基础检查(安全)",
+		// Rule: `java-saxparser-factory-unsafe`,
+		Rule: "SAXParserFactory. 未明确设置安全策略（.setFeature(...)）",
+		FS: map[string]string{
+			"saxparser-factory-safe.java": "saxparser-factory-safe.java",
+		},
+		NegativeTest: true,
+	},
+	{
+		Name: "SAXReader 基础检查(安全)",
+		// Rule: `java-saxreader-unsafe`,
+		Rule: "SAXReader 未明确设置安全策略（.setFeature(...) ...）",
+		FS: map[string]string{
+			"saxreazder.java": "saxreader/safe.java",
+		},
+		NegativeTest: true,
+	},
+	{
+		Name: "SAXReader 基础检查(不安全)",
+		// Rule: `java-saxreader-unsafe`,
+		Rule: "SAXReader 未明确设置安全策略（.setFeature(...) ...）",
+		FS: map[string]string{
+			"saxreazder.java": "saxreader/unsafe.java",
+		},
+		ContainsAll: []string{"SAXReader"},
+	},
+
+	{
+		Name: "XMLReaderFactory 基础检查(不安全)",
+		// Rule: `java-xmlreader-factory-unsafe`,
+		Rule: "检查 XMLReaderFactory.createXMLReader() 不安全使用",
+		FS: map[string]string{
+			"xmlreaderfactory.java": "org-xml-sax-xmlreader/unsafe.java",
+		},
+		ContainsAll: []string{"createXMLReade", "example.xml"},
+	},
+	{
+		Name: "XMLReaderFactory 基础检查(消极测试)",
+		// Rule: `java-xmlreader-factory-unsafe`,
+		Rule: "检查 XMLReaderFactory.createXMLReader() 不安全使用",
+		FS: map[string]string{
+			"xmlreaderfactory.java": "org-xml-sax-xmlreader/safe.java",
+		},
+		NegativeTest: true,
+	},
+}
+
+func TestBuildInRule(t *testing.T) {
+	for i := 0; i < len(Cases); i++ {
+		c := Cases[i]
+		run(t, c.Name, c)
+	}
+}
+
+func TestBuildInRule_DEBUG(t *testing.T) {
+	if utils.InGithubActions() {
+		t.SkipNow()
+		return
+	}
+
+	var name = "php-custom_param.sf"
+
+	for i := 0; i < len(Cases); i++ {
+		c := Cases[i]
+
+		if !utils.MatchAllOfSubString(c.Name, name) {
+			t.Log("skip " + c.Name)
+			continue
+		}
+		run(t, c.Name, c)
+	}
+}
+
 func run(t *testing.T, name string, c BuildinRuleTestCase) {
 	t.Run(name, func(t *testing.T) {
 		rules, err := sfdb.GetRules(c.Rule)
