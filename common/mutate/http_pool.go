@@ -82,6 +82,7 @@ type httpPoolConfig struct {
 
 	// with conn_pool
 	WithConnPool bool
+	ConnPool     *lowhttp.LowHttpConnPool
 
 	EnableMaxContentLength bool
 	MaxContentLength       int64
@@ -507,6 +508,12 @@ func _httpPool_withConnPool(b bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_ConnPool(pool *lowhttp.LowHttpConnPool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.ConnPool = pool
+	}
+}
+
 func _httpPool_ExternSwitch(sw *utils.Switch) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.ExternSwitch = sw
@@ -780,6 +787,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithETCHosts(config.EtcHosts),
 							lowhttp.WithGmTLS(config.IsGmTLS),
 							lowhttp.WithConnPool(config.WithConnPool),
+						}
+
+						if config.ConnPool != nil {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.ConnPool(config.ConnPool))
 						}
 
 						if config.SNI != nil {
@@ -1097,7 +1108,8 @@ var (
 	WithPoolOpt_EtcHosts                   = _httpPool_EtcHosts
 	WithPoolOpt_NoSystemProxy              = _httpPool_NoSystemProxy
 	WithPoolOpt_RequestCountLimiter        = _httpPool_RequestCountLimiter
-	WithPoolOpt_ConnPool                   = _httpPool_withConnPool
+	WithPoolOpt_UseConnPool                = _httpPool_withConnPool
+	WithPoolOpt_ConnPool                   = _httpPool_ConnPool
 	WithPoolOpt_ExternSwitch               = _httpPool_ExternSwitch
 	WithPoolOpt_WithPayloads               = _httpPool_withPayloads
 	WithPoolOpt_RandomSession              = _httpPool_withRandomSession

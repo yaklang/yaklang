@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"container/list"
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -28,18 +29,11 @@ var (
 )
 
 var (
-	DefaultLowHttpConnPool = &LowHttpConnPool{
-		maxIdleConn:        100,
-		maxIdleConnPerHost: 2,
-		connCount:          0,
-		idleConnTimeout:    90 * time.Second,
-		idleConn:           make(map[string][]*persistConn),
-		keepAliveTimeout:   30 * time.Second,
-	}
-	errServerClosedIdle = errors.New("conn pool: server closed idle connection")
+	DefaultLowHttpConnPool = NewHttpConnPool(context.Background())
+	errServerClosedIdle    = errors.New("conn pool: server closed idle connection")
 )
 
-func NewDefaultHttpConnPool() *LowHttpConnPool {
+func NewHttpConnPool(ctx context.Context) *LowHttpConnPool {
 	return &LowHttpConnPool{
 		maxIdleConn:        100,
 		maxIdleConnPerHost: 2,
@@ -47,6 +41,7 @@ func NewDefaultHttpConnPool() *LowHttpConnPool {
 		idleConnTimeout:    90 * time.Second,
 		idleConn:           make(map[string][]*persistConn),
 		keepAliveTimeout:   30 * time.Second,
+		ctx:                ctx,
 	}
 }
 
@@ -59,11 +54,38 @@ type LowHttpConnPool struct {
 	idleConnTimeout    time.Duration             // 连接过期时间
 	idleLRU            connLRU                   // 连接池 LRU
 	keepAliveTimeout   time.Duration
+	ctx                context.Context
+}
+
+func (l *LowHttpConnPool) clear() {
+	l.idleConnMux.Lock()
+	defer l.idleConnMux.Unlock()
+	if l == nil {
+		return
+	}
+	for _, pcs := range l.idleConn {
+		for _, pc := range pcs {
+			l.removeConnLocked(pc)
+		}
+	}
+}
+
+func (l *LowHttpConnPool) contextDone() bool {
+	select {
+	case <-l.ctx.Done():
+		return true
+	default:
+		return false
+	}
 }
 
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
 func (l *LowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+	if l.contextDone() {
+		return nil, utils.Error("lowhttp: context done")
+	}
+
 	// 尝试获取复用连接
 	if oldPc, ok := l.getFromConn(key); ok {
 		return oldPc, nil
@@ -77,6 +99,9 @@ func (l *LowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) 
 }
 
 func (l *LowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getConn bool) {
+	if l.contextDone() {
+		return nil, false
+	}
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
 	getConn = false
@@ -129,7 +154,7 @@ func (l *LowHttpConnPool) putIdleConn(conn *persistConn) error {
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
 	// 如果超过池规定的单个host可以拥有的最大连接数量则直接放弃添加连接
-	if len(l.idleConn[cacheKeyHash]) >= l.maxIdleConnPerHost {
+	if len(l.idleConn[cacheKeyHash]) >= l.maxIdleConnPerHost || l.contextDone() {
 		conn.Conn.Close() // if too many, close it
 		return nil
 	}
