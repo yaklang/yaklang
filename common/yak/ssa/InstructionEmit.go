@@ -522,7 +522,7 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 		bindVariable = func(se *SideEffect) {
 			if callSide := se.CallSite; callSide != nil {
 				if bind, ok := callSide.(*Call).Binding[name]; ok {
-					bindVariableId = bind.GetLastVariable().GetId()
+					bindVariableId = bind.GetLastVariable().GetCaptured().GetId()
 					_ = bindVariableId
 				}
 			}
@@ -536,25 +536,30 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 
 		bindVariable(se)
 		findVariable()
+
+		edge := []Value{}
 		if phi, ok := ToPhi(se.Value); ok {
 			for _, e := range phi.Edge {
 				if se, ok := e.(*SideEffect); ok {
 					bindVariable(se)
 				}
 			}
-		}
-		if phi, ok := ToPhi(se.Value); ok {
-			for i, e := range phi.Edge {
+			edge = append(edge, phi.Edge...)
+			phit := f.EmitPhi(name, edge)
+
+			for i, e := range phit.Edge {
 				if p, ok := ToParameter(e); ok && p.IsFreeValue {
 					newParam := NewParam(name, true, f)
 					if bindVariableId == findVariableId {
 						value := variable.GetValue()
 						newParam.defaultValue = value
-						phi.Edge[i] = newParam
+						phit.Edge[i] = newParam
 					}
 				}
 			}
+			se.Value = phit
 		}
+
 	}
 
 	return se

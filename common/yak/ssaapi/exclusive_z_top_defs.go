@@ -335,10 +335,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals
 	case *ssa.Parameter:
-		getCalledByValue := func(called *Value) Values {
+		getCalledByValue := func(called *Value, isInners ...bool) Values {
 			if called == nil {
 				return nil
 			}
+			isInner := true
+			if len(isInners) > 0 {
+				isInner = isInners[0]
+			}
+
 			calledInstance, ok := ssa.ToCall(called.node)
 			if !ok {
 				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
@@ -357,9 +362,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			var actualParam ssa.Value
 			if inst.IsFreeValue {
 				// free value
-				if tmp := inst.GetDefault(); tmp != nil {
+				if tmp := inst.GetDefault(); tmp != nil && !isInner {
 					actualParam = tmp
-				} else if tmp, ok := calledInstance.Binding[inst.GetName()]; ok {
+				} else if tmp, ok := calledInstance.Binding[inst.GetName()]; ok && isInner {
 					actualParam = tmp
 				} else {
 					log.Errorf("free value: %v is not found in binding", inst.GetName())
@@ -402,7 +407,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				call2fun := fun.GetCalledBy()
 				call2fun.AppendEffectOn(fun)
 				call2fun.ForEach(func(call *Value) {
-					val := getCalledByValue(call)
+					val := getCalledByValue(call, true)
 					vals = append(vals, val...)
 				})
 			}
