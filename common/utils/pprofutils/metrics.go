@@ -15,8 +15,6 @@ package pprofutils
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -24,6 +22,9 @@ import (
 	"runtime/pprof"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/yaklang/yaklang/common/log"
@@ -173,13 +174,9 @@ func executeMemCallbacks(metrics []FunctionStat) {
 }
 
 func init() {
-	exportReport := func(stats []FunctionStat) {
+	exportReport := func(prefix string, stats []FunctionStat) {
 		msg := DumpFunctionStats(stats)
-		now := time.Now()
-		formattedTime := fmt.Sprintf("%d-%02d-%02d-%02d-%02d-%02d",
-			now.Year(), now.Month(), now.Day(),
-			now.Hour(), now.Minute(), now.Second())
-		path := filepath.Join(consts.GetDefaultYakitPprofDir(), fmt.Sprintf("pprof-log-%s.txt", formattedTime))
+		path := filepath.Join(consts.GetDefaultYakitPprofDir(), fmt.Sprintf("%s-%s.txt", prefix, utils.DatetimePretty2()))
 		err := os.WriteFile(path, []byte(msg), 0644)
 		if err != nil {
 			log.Errorf("write auto analyze report failed: %s", err)
@@ -189,11 +186,11 @@ func init() {
 	}
 	AddCPUProfileCallback(func(stats []FunctionStat) {
 		log.Infof("High CPU usage detected, top consuming function: %v", stats[0].Dump())
-		exportReport(stats)
+		exportReport("cpu", stats)
 	})
 	AddMemProfileCallback(func(stats []FunctionStat) {
 		log.Infof("High memory usage detected, top consuming function: %v", stats[0].Dump())
-		exportReport(stats)
+		exportReport("mem", stats)
 	})
 
 	db := consts.GetGormProfileDatabase()
