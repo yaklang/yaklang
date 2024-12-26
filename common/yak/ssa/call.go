@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
 
@@ -283,18 +284,21 @@ func (c *Call) handleCalleeFunction() {
 		}
 
 		for _, se := range funcTyp.SideEffects {
-			var variable *Variable
+			var variable, bindVariable *Variable
 			var bindScope, modifyScope ScopeIF
 			if se.BindVariable != nil {
 				// BindVariable大多数时候和Variable相同，除非遇到object
 				bindScope = se.BindVariable.GetScope()
+				bindVariable = se.BindVariable
 			} else if se.Variable != nil {
 				bindScope = se.Variable.GetScope()
+				bindVariable = se.Variable
 			} else {
 				bindScope = currentScope
 			}
 			modifyScope = se.Modify.GetBlock().ScopeTable
 			_ = modifyScope
+			_ = bindScope
 
 			// is object
 			if se.MemberCallKind == NoMemberCall {
@@ -353,22 +357,19 @@ func (c *Call) handleCalleeFunction() {
 				}
 
 				CheckSideEffect := func(find *Variable) {
-					Check := func(scope ScopeIF) {
-						if bindScope.IsSameOrSubScope(scope) {
-							AddSideEffect()
-						} else {
-							SetCapturedSideEffect()
-						}
-					}
+					// Check := func(scope ScopeIF) {
+					// 	if bindScope.IsSameOrSubScope(scope) {
+					// 		AddSideEffect()
+					// 	} else {
+					// 		SetCapturedSideEffect()
+					// 	}
+					// }
 
-					if freevalue, ok := ToParameter(find.Value); ok {
-						if defaultValue := freevalue.defaultValue; defaultValue != nil {
-							scope := defaultValue.GetBlock().ScopeTable
-							Check(scope)
-							return
-						}
+					if bindVariable == nil || find.GetCaptured() == bindVariable.GetCaptured() {
+						AddSideEffect()
+					} else {
+						SetCapturedSideEffect()
 					}
-					Check(find.GetScope())
 				}
 
 				var GetScope func(ScopeIF, string, *FunctionBuilder) *Variable
@@ -459,18 +460,7 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 	}
 
 	for _, fv := range fvs {
-		// if freeValue has default value, skip
-		if fv.GetDefault() != nil {
-			bindAndHandler(fv.GetName(), fv.GetDefault())
-			continue
-		}
-
-		value := builder.PeekValue(fv.GetName())
-
-		if value != nil {
-			bindAndHandler(fv.GetName(), value)
-			//c.Binding[fv.GetName()] = v
-		} else {
+		handleError := func() {
 			// mark error in freeValue.Variable
 			// get freeValue
 			if variable := fv.GetVariable(fv.GetName()); variable != nil {
@@ -481,11 +471,42 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 			// we don't mark error in call-site.
 			if fun, ok := ToFunction(c.Method); ok {
 				if len(fun.GetAllVariables()) == 0 {
-					continue
+					return
 				}
 			}
 			// other code will mark error in function call-site
 			c.NewError(Error, SSATAG, BindingNotFoundInCall(fv.GetName()))
+		}
+
+		value := builder.PeekValue(fv.GetName())
+		if fv.GetDefault() == nil && value != nil {
+			bindAndHandler(fv.GetName(), value)
+			continue
+		} else if fv.GetDefault() == nil && value == nil {
+			handleError()
+			continue
+		}
+
+		var findVariableCaptured, bindVariableCaptured ssautil.VersionedIF[Value]
+		if value != nil {
+			if findVariable := value.GetLastVariable(); findVariable != nil {
+				findVariableCaptured = findVariable.GetCaptured()
+			}
+		}
+		if fv.GetDefault() != nil {
+			if bindVariable := fv.GetDefault().GetLastVariable(); bindVariable != nil {
+				bindVariableCaptured = bindVariable.GetCaptured()
+			}
+		}
+
+		if value != nil && findVariableCaptured == bindVariableCaptured {
+			bindAndHandler(fv.GetName(), value)
+		} else {
+			bindAndHandler(fv.GetName(), fv.GetDefault())
+		}
+
+		if _, ok := c.Binding[fv.GetName()]; !ok {
+			handleError()
 		}
 	}
 }
