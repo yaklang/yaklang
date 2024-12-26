@@ -249,23 +249,31 @@ func (b *astbuilder) SetImportPackage(useName, trueName string, path string, pos
 	b.importMap[useName] = p
 }
 
-func (b *astbuilder) GetImportPackage(name string) (*ssa.Program, string) {
+func (b *astbuilder) GetImportPackage(n string) (*ssa.Program, string) {
 	prog := b.GetProgram()
 	path := ""
-	if b.importMap[name] != nil {
-		path = b.importMap[name].Path
+	name := n
+
+	if m, ok := b.importMap[n]; ok {
+		path = m.Path
+		name = m.Name
 	}
-	lib, _ := prog.GetOrCreateLibrary(b.importMap[name].Name)
+
+	lib, _ := prog.GetOrCreateLibrary(name)
 	return lib, path
 }
 
-func (b *astbuilder) GetImportPackageUser(name string) (*ssa.Program, string) {
+func (b *astbuilder) GetImportPackageUser(n string) (*ssa.Program, string) {
 	prog := b.GetProgram()
 	path := ""
-	if b.importMap[name] != nil {
-		path = b.importMap[name].Path
+	name := n
+
+	if m, ok := b.importMap[n]; ok {
+		path = m.Path
+		name = m.Name
 	}
-	lib, _ := prog.GetLibrary(b.importMap[name].Name)
+
+	lib, _ := prog.GetLibrary(name)
 	return lib, path
 }
 
