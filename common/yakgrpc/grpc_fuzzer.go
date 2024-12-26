@@ -703,8 +703,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_RuntimeId(runtimeID),
 			mutate.WithPoolOpt_WithPayloads(true),
 			mutate.WithPoolOpt_RandomSession(true),
-			mutate.WithPoolOpt_ConnPool(!req.GetDisableUseConnPool()),
+			mutate.WithPoolOpt_UseConnPool(!req.GetDisableUseConnPool()),
 			//mutate.WithPoolOpt_ConnPool(true),
+		}
+
+		if !req.GetDisableUseConnPool() {
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ConnPool(lowhttp.NewHttpConnPool(stream.Context())))
 		}
 
 		if !req.GetDisableHotPatch() {
