@@ -25,6 +25,75 @@ var badstrconvClass []byte
 //go:embed annotationParam.class
 var annotationParam []byte
 
+//go:embed finallydemo.class
+var finallydemo []byte
+
+//go:embed tryonly.class
+var tryonly []byte
+
+//go:embed synchronizeddemo.class
+var synchronizeddemo []byte
+
+//go:embed selfadd.class
+var selfadd []byte
+
+//go:embed objectinit.class
+var objectinit []byte
+
+func TestObjectInit(t *testing.T) {
+	results, err := javaclassparser.Decompile(objectinit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkJavaCode(t, results)
+}
+
+/*
+try (File o = StaticUtils.OpenFile(...)) {
+
+}
+
+==>
+
+File o = StaticUtils.OpenFile(...);
+try {} finally { o.close() }
+*/
+
+func TestSelfAdd(t *testing.T) {
+	results, err := javaclassparser.Decompile(selfadd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkJavaCode(t, results)
+	assert.Contains(t, results, "++;")
+}
+
+func TestSynchronizeddemo(t *testing.T) {
+	results, err := javaclassparser.Decompile(synchronizeddemo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkJavaCode(t, results)
+	assert.Contains(t, results, "this.count = (this.count) + (1);")
+}
+
+func TestTryCatchFinally(t *testing.T) {
+	results, err := javaclassparser.Decompile(finallydemo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Contains(t, results, "System.out.println(\"Finally block")
+	checkJavaCode(t, results)
+}
+
+func TestTryOnly(t *testing.T) {
+	results, err := javaclassparser.Decompile(tryonly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkJavaCode(t, results)
+}
+
 func TestAnnotationParam(t *testing.T) {
 	results, err := javaclassparser.Decompile(annotationParam)
 	if err != nil {
