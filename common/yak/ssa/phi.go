@@ -38,16 +38,54 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 			jump loop-header;
 	*/
 	ret := make(map[string]Value)
+	retT := make(map[string]Value)
 	func() {
 		// step 1
 		// this  value not change in this loop, should replace phi-value to header value
 		if phiValue == latch {
 			ReplaceAllValue(phiValue, header)
-
 			DeleteInst(phiValue)
 
 			for name, v := range ReplaceMemberCall(phiValue, header) {
 				ret[name] = v
+			}
+
+			var CreatePhi func(Value)
+			pass := make(map[Value]struct{})
+			CreatePhi = func(start Value) {
+				if _, ok := pass[start]; ok { // Avoid loops
+					return
+				} else {
+					pass[start] = struct{}{}
+				}
+
+				for k, v := range start.GetAllMember() {
+					res := checkCanMemberCallExist(start, k)
+					if find, ok := ret[res.name]; ok {
+						phi, ok := ToPhi(phiValue)
+						if !ok {
+							log.Errorf("phiValue is not a phi %s: %v", name, phiValue)
+							return
+						}
+						if find != v {
+							phit := NewPhi(phi.GetBlock(), res.name)
+							phit.Edge = append(phit.Edge, find)
+							phit.Edge = append(phit.Edge, v)
+							phit.SetName(res.name)
+							phit.GetProgram().SetVirtualRegister(phit)
+							retT[res.name] = phit
+						}
+					}
+				}
+				for _, v := range start.GetAllMember() {
+					CreatePhi(v)
+				}
+			}
+
+			CreatePhi(header)
+
+			for n, r := range retT {
+				ret[n] = r
 			}
 
 			ret[name] = header

@@ -47,10 +47,17 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			if utils.IsNil(toMember) {
 				toMember = builder.ReadMemberCallValue(to, key)
 			}
-			ReplaceAllValue(member, toMember)
-			DeleteInst(member)
+			if member.GetOpcode() == SSAOpcodeUndefined {
+				ReplaceAllValue(member, toMember)
+				DeleteInst(member)
+			}
 
-			ret[name] = toMember
+			for name, v := range ReplaceMemberCall(member, toMember) {
+				ret[name] = v
+			}
+			if !member.IsObject() {
+				ret[name] = member
+			}
 		}
 	}
 

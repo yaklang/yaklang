@@ -191,6 +191,7 @@ func (condition *ScopedVersionedTable[T]) Spin(
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)
+		_ = res
 		for name, value := range res {
 			v := condition.CreateVariable(name, ver.GetLocal())
 			condition.AssignVariable(v, value)
