@@ -66,68 +66,71 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 	}
 
 	for _, item := range i.DescriptionItems().(*sf.DescriptionItemsContext).AllDescriptionItem() {
-		if ret, ok := item.(*sf.DescriptionItemContext); ok {
-			key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
-			value := ""
-			if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok && valueItem != nil {
-				if valueItem.HereDoc() != nil {
-					value = y.VisitHereDoc(valueItem.HereDoc())
-				} else if valueItem.StringLiteral() != nil {
-					value = mustUnquoteSyntaxFlowString(valueItem.StringLiteral().GetText())
-				} else {
-					value = valueItem.GetText()
-				}
+		ret, ok := item.(*sf.DescriptionItemContext)
+		if !ok || ret.Comment() != nil { // skip comment
+			continue
+		}
+		key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
+		value := ""
+		if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok && valueItem != nil {
+			if valueItem.HereDoc() != nil {
+				value = y.VisitHereDoc(valueItem.HereDoc())
+			} else if valueItem.StringLiteral() != nil {
+				value = mustUnquoteSyntaxFlowString(valueItem.StringLiteral().GetText())
+			} else {
+				value = valueItem.GetText()
 			}
+		}
 
-			if value != "" {
-				switch keyLower := strings.ToLower(key); keyLower {
-				case "title":
+		if value != "" {
+			switch keyLower := strings.ToLower(key); keyLower {
+			case "title":
+				y.rule.Title = value
+			case "title_zh":
+				y.rule.TitleZh = value
+			case "description", "desc", "note":
+				y.rule.Description = value
+			case "type", "purpose":
+				y.rule.Purpose = schema.ValidPurpose(value)
+			case "lib", "allow_include", "as_library", "as_lib", "library_name":
+				y.rule.AllowIncluded = !strings.EqualFold(value, "")
+				if y.rule.AllowIncluded {
+					y.rule.IncludedName = value
 					y.rule.Title = value
-				case "title_zh":
-					y.rule.TitleZh = value
-				case "description", "desc", "note":
-					y.rule.Description = value
-				case "type", "purpose":
-					y.rule.Purpose = schema.ValidPurpose(value)
-				case "lib", "allow_include", "as_library", "as_lib", "library_name":
-					y.rule.AllowIncluded = !strings.EqualFold(value, "")
-					if y.rule.AllowIncluded {
-						y.rule.IncludedName = value
-						y.rule.Title = value
-					}
-				case "level", "severity", "sev":
-					y.rule.Severity = schema.ValidSeverityType(value)
-				case "language", "lang":
-					y.rule.Language = value
-				case "cve":
-					y.rule.CVE = value
-				case "risk_type", "risk":
-					y.rule.RiskType = value
-				default:
-					if strings.Contains(keyLower, "://") {
-						urlIns, _ := url.Parse(keyLower)
-						if urlIns != nil {
-							switch ret := urlIns.Scheme; ret {
-							case "file", "fs", "filesystem":
-								if strings.HasPrefix(keyLower, ret+"://") {
-									filename := strings.TrimPrefix(keyLower, ret+"://")
-									y.verifyFilesystem[filename] = value
-									continue
-								}
-							case "safe-file", "safefile", "safe-fs", "safefs", "safe-filesystem", "safefilesystem", "negative-file", "negativefs", "nfs":
-								if strings.HasPrefix(keyLower, ret+"://") {
-									filename := strings.TrimPrefix(keyLower, ret+"://")
-									y.negativeFilesystem[filename] = value
-									continue
-								}
+				}
+			case "level", "severity", "sev":
+				y.rule.Severity = schema.ValidSeverityType(value)
+			case "language", "lang":
+				y.rule.Language = value
+			case "cve":
+				y.rule.CVE = value
+			case "risk_type", "risk":
+				y.rule.RiskType = value
+			default:
+				if strings.Contains(keyLower, "://") {
+					urlIns, _ := url.Parse(keyLower)
+					if urlIns != nil {
+						switch ret := urlIns.Scheme; ret {
+						case "file", "fs", "filesystem":
+							if strings.HasPrefix(keyLower, ret+"://") {
+								filename := strings.TrimPrefix(keyLower, ret+"://")
+								y.verifyFilesystem[filename] = value
+								continue
+							}
+						case "safe-file", "safefile", "safe-fs", "safefs", "safe-filesystem", "safefilesystem", "negative-file", "negativefs", "nfs":
+							if strings.HasPrefix(keyLower, ret+"://") {
+								filename := strings.TrimPrefix(keyLower, ret+"://")
+								y.negativeFilesystem[filename] = value
+								continue
 							}
 						}
 					}
-					y.rawDesc[key] = value
 				}
+				y.rawDesc[key] = value
 			}
-			y.EmitAddDescription(key, value)
 		}
+		y.EmitAddDescription(key, value)
+
 	}
 
 	return nil

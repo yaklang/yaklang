@@ -111,6 +111,10 @@ func (v *BaseSyntaxFlowParserVisitor) VisitDescriptionItem(ctx *DescriptionItemC
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowParserVisitor) VisitDescriptionSep(ctx *DescriptionSepContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowParserVisitor) VisitDescriptionItemValue(ctx *DescriptionItemValueContext) interface{} {
 	return v.VisitChildren(ctx)
 }
