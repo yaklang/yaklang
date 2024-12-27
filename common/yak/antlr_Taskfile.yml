@@ -11,7 +11,7 @@ tasks:
       - | 
         rm ./parser/*.tokens
         rm ./parser/*.interp
-        antlr4 -Dlanguage=Go YaklangLexer.g4 YaklangParser.g4 -o parser -no-listener -visitor  
+        java -jar ../antlr4thirdparty/antlr-4.11.1-complete.jar -Dlanguage=Go YaklangLexer.g4 YaklangParser.g4 -o parser -no-listener -visitor  
     generates:
       - parser
   java:
@@ -22,7 +22,7 @@ tasks:
       - |
         rm ./parser/*.tokens
         rm ./parser/*.interp
-        antlr -Dlanguage=Go -package javaparser ./JavaLexer.g4 ./JavaParser.g4 -o parser -no-listener -visitor
+        java -jar ../antlr4thirdparty/antlr-4.11.1-complete.jar -Dlanguage=Go -package javaparser ./JavaLexer.g4 ./JavaParser.g4 -o parser -no-listener -visitor
     generates:
       - parser
   java_jsp:
@@ -33,7 +33,7 @@ tasks:
       - |
         rm ./parser/*.tokens
         rm ./parser/*.interp
-        antlr -Dlanguage=Go -package jspparser ./JSPLexer.g4 ./JSPParser.g4 -o parser -no-listener -visitor
+        java -jar ../../antlr4thirdparty/antlr-4.11.1-complete.jar -Dlanguage=Go -package jspparser ./JSPLexer.g4 ./JSPParser.g4 -o parser -no-listener -visitor
     generates:
       - parser
   java_spel:
@@ -44,7 +44,7 @@ tasks:
       - |
         rm ./parser/*.tokens
         rm ./parser/*.interp
-        antlr -Dlanguage=Go -package spelparser ./SpelLexer.g4 ./SpelParser.g4 -o parser -no-listener -visitor
+        java -jar ../antlr4thirdparty/antlr-4.11.1-complete.jar -Dlanguage=Go -package spelparser ./SpelLexer.g4 ./SpelParser.g4 -o parser -no-listener -visitor
     generates:
       - parser
   java_freemarker:
@@ -55,7 +55,7 @@ tasks:
       - |
         rm ./parser/*.tokens
         rm ./parser/*.interp
-        antlr -Dlanguage=Go -package freemarkerparser ./FreemarkerLexer.g4 ./FreemarkerParser.g4 -o parser -no-listener -visitor
+        java -jar ../../antlr4thirdparty/antlr-4.11.1-complete.jar -Dlanguage=Go -package freemarkerparser ./FreemarkerLexer.g4 ./FreemarkerParser.g4 -o parser -no-listener -visitor
     generates:
       - parser
   php:
@@ -66,7 +66,7 @@ tasks:
       - |
         rm ./parser/*.tokens
         rm ./parser/*.interp
-        antlr -Dlanguage=Go -package phpparser ./PHPLexer.g4 ./PHPParser.g4 -o parser -no-listener -visitor
+        java -jar ../antlr4thirdparty/antlr-4.11.1-complete.jar -Dlanguage=Go -package phpparser ./PHPLexer.g4 ./PHPParser.g4 -o parser -no-listener -visitor
     generates:
       - parser
   go:
@@ -77,7 +77,7 @@ tasks:
       - |
         rm ./parser/*.tokens
         rm ./parser/*.interp
-        antlr -Dlanguage=Go -package goparser ./GoLexer.g4 ./GoParser.g4 -o parser -no-listener -visitor
+        java -jar ../antlr4thirdparty/antlr-4.11.1-complete.jar -Dlanguage=Go -package gol ./GoLexer.g4 ./GoParser.g4 -o parser -no-listener -visitor
     generates:
       - parser
   syntaxflow:
@@ -88,6 +88,6 @@ tasks:
       - |
         rm ./parser/*.tokens
         rm ./parser/*.interp
-        antlr -Dlanguage=Go ./SyntaxFlowLexer.g4 ./SyntaxFlowParser.g4 -o sf -package sf -no-listener -visitor
+        java -jar ../antlr4thirdparty/antlr-4.11.1-complete.jar -Dlanguage=Go ./SyntaxFlowLexer.g4 ./SyntaxFlowParser.g4 -o sf -package sf -no-listener -visitor
     generates:
       - parser
