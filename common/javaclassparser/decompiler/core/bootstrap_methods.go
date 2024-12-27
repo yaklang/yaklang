@@ -52,7 +52,7 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 			if classMember.Name != d.FunctionContext.ClassName {
 				return nil, fmt.Errorf("call external lamada: %s.%s", classMember.Name, classMember.Member)
 			}
-			methodStr, err := d.DumpClassLambdaMethod(classMember.Member, classMember.Description, sim.GetVarId().Int())
+			methodStr, err := d.DumpClassLambdaMethod(classMember.Member, classMember.Description, sim.GetVarId())
 			if err != nil {
 				return nil, fmt.Errorf("dump lambda method `%s.%s` error: %w", classMember.Name, classMember.Member, err)
 			}

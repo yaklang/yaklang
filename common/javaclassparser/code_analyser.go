@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
@@ -154,13 +155,12 @@ type VarMap struct {
 	val values.JavaValue
 }
 
-func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id int) ([]values.JavaValue, []statements.Statement, error) {
+func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id *utils.VariableId) ([]values.JavaValue, []statements.Statement, error) {
 	pool := dumper.ConstantPool
 	parser := core.NewDecompiler(codeAttr.Code, func(id int) values.JavaValue {
 		return GetValueFromCP(dumper.ConstantPool, id)
 	})
-	parser.BaseVarId = id
-	parser.DumpClassLambdaMethod = func(name, desc string, id int) (string, error) {
+	parser.DumpClassLambdaMethod = func(name, desc string, id *utils.VariableId) (string, error) {
 		dumper.lambdaMethods[name] = append(dumper.lambdaMethods[name], desc)
 		dumped, err := dumper.DumpMethodWithInitialId(name, desc, id)
 		if err != nil {
@@ -168,6 +168,7 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id int) 
 		}
 		return dumped.code, nil
 	}
+	parser.BaseVarId = id
 	parser.FunctionContext = dumper.FuncCtx
 	parser.FunctionType = dumper.MethodType
 	//parser.FunctionContext.FunctionName
