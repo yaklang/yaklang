@@ -3,6 +3,7 @@ package javaclassparser
 import (
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"io"
 	"slices"
 	"strconv"
@@ -305,7 +306,13 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 				}
 			case *SyntheticAttribute:
 				log.Infof("field %s is synthetic", name)
+			case *DeprecatedAttribute:
+				// log.Infof("field %s is deprecated", name)
+			case *UnparsedAttribute:
+				log.Error("cannot handle attribute type: UnparsedAttribute")
+				spew.Dump(ret)
 			default:
+				log.Info(spew.Sdump(ret))
 				log.Errorf("when handling for fields unknown attribute type: %T", ret)
 			}
 		}
@@ -458,6 +465,15 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	var name, descriptor string
 	var err error
 	var dumped = &dumpedMethods{}
+
+	debugMode := false
+	defer func() {
+		if debugMode && method != nil {
+			fmt.Println("DumpMethodWithInitialId done")
+			fmt.Println(dumped.code)
+		}
+	}()
+
 	c.dumpedMethodsSet[traitId] = dumped
 	for _, info := range c.obj.Methods {
 		name, err = c.obj.getUtf8(info.NameIndex)
@@ -511,10 +527,6 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	c.CurrentMethod = method
 	funcCtx := c.FuncCtx
 	funcCtx.FunctionName = name
-	//if name != "crt_data_by_Attrs" {
-	//	continue
-	//}
-	//println(name)
 	annoStrs := []string{}
 	funcCtx.FunctionType = c.MethodType
 	var paramsNewStr string
@@ -592,7 +604,6 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				}
 				return strings.Join(res, "\n")
 			}
-			debugMode := false
 			statementToString = func(statement statements.Statement) (statementStr string) {
 				defer func() {
 					if debugMode {
@@ -620,11 +631,6 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						"%s\n"+
 						c.GetTabString()+"}", ret.Argument.String(funcCtx), statementListToString(ret.Body))
 				case *statements.TryCatchStatement:
-					haveCatch := len(ret.CatchBodies) > 0
-
-					if !haveCatch {
-						return ""
-					}
 					statementStr = fmt.Sprintf(c.GetTabString()+"try{\n"+
 						"%s\n"+
 						c.GetTabString()+"}", statementListToString(ret.TryBody))
@@ -633,9 +639,9 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 							"%s\n"+
 							c.GetTabString()+"}", ret.Exception[i].Type().String(funcCtx), ret.Exception[i].String(funcCtx), statementListToString(body))
 					}
-					if len(ret.CatchBodies) <= 0 {
-						log.Info("met catch body is empty")
-						// debugMode = true
+					haveCatch := len(ret.CatchBodies) > 0
+					if !haveCatch {
+						statementStr += "catch(Exception e) { throw e }"
 					}
 				case *statements.WhileStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+

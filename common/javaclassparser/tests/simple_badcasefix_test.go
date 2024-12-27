@@ -40,6 +40,79 @@ var selfadd []byte
 //go:embed objectinit.class
 var objectinit []byte
 
+//go:embed attribute-demo.class
+var attributeDemo []byte
+
+func TestAttributeDemo(t *testing.T) {
+	results, err := javaclassparser.Decompile(attributeDemo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	/*
+		import java.lang.annotation.ElementType;
+		import java.lang.annotation.Retention;
+		import java.lang.annotation.RetentionPolicy;
+		import java.lang.annotation.Target;
+		import java.util.List;
+		import java.util.ArrayList;
+		import java.util.function.Function;
+
+		// 自定义注解定义
+		@Retention(RetentionPolicy.CLASS)
+		@Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD})
+		@interface CustomAttribute {
+		    String value() default "";
+		}
+
+		// 主类
+		@CustomAttribute("class-level-attribute")
+		public class AttributeDemo<T> {
+
+		    // 内部类
+		    private class InnerClass {
+		        private void innerMethod() {
+		            outerMethod();
+		        }
+		    }
+
+		    // 泛型字段
+		    @CustomAttribute("field-level")
+		    private List<T> genericList = new ArrayList<>();
+
+		    // Lambda表达式
+		    private Function<String, Integer> lambda = str -> {
+		        System.out.println("Converting: " + str);
+		        return Integer.parseInt(str);
+		    };
+
+		    // 带注解的方法
+		    @CustomAttribute("method-level")
+		    private void outerMethod() {
+		        System.out.println("Outer method called");
+		    }
+
+		    // 泛型方法
+		    public <E extends Comparable<E>> E genericMethod(E input) {
+		        return input;
+		    }
+
+		    // 测试方法
+		    public static void main(String[] args) {
+		        AttributeDemo<String> demo = new AttributeDemo<>();
+		        demo.outerMethod();
+
+		        // 测试 Lambda
+		        System.out.println(demo.lambda.apply("123"));
+
+		        // 测试泛型方法
+		        String result = demo.genericMethod("test");
+		        System.out.println(result);
+		    }
+		}
+	*/
+	checkJavaCode(t, results)
+}
+
 func TestObjectInit(t *testing.T) {
 	results, err := javaclassparser.Decompile(objectinit)
 	if err != nil {
