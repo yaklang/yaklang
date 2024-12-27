@@ -1,10 +1,11 @@
 package codec
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDESCBCDec(t *testing.T) {
@@ -12,13 +13,13 @@ func TestDESCBCDec(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	println(StrConvQuote(string(origin)))
+	println(StrConvQuoteHex(string(origin)))
 
 	data, err := DESDecryptCBCWithZeroPadding(ZeroPadding([]byte("test"), 8), origin, nil)
 	if err != nil {
 		panic(err)
 	}
-	println(StrConvQuote(string(data)))
+	println(StrConvQuoteHex(string(data)))
 }
 
 func TestDesECB(t *testing.T) {

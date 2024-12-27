@@ -3,12 +3,13 @@ package codec
 import (
 	"bytes"
 	"fmt"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/gmsm/sm4"
 	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 	"github.com/yaklang/yaklang/common/log"
-	"testing"
 )
 
 func TestSM4(t *testing.T) {
@@ -38,13 +39,13 @@ func TestSM4(t *testing.T) {
 				log.Error(err)
 				t.FailNow()
 			}
-			log.Infof("enc %v finished: %v", method, StrConvQuote(string(tm)))
+			log.Infof("enc %v finished: %v", method, StrConvQuoteHex(string(tm)))
 			origin, err := dec(key, tm, nil)
 			if err != nil {
 				log.Error(err)
 				t.FailNow()
 			}
-			log.Infof("dec %v finished: %v", method, StrConvQuote(string(origin)))
+			log.Infof("dec %v finished: %v", method, StrConvQuoteHex(string(origin)))
 
 			if target != string(origin) {
 				log.Errorf("failed for %#v", method)

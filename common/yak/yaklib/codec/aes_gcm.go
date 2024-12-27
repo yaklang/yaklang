@@ -5,8 +5,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	cryptorand "crypto/rand"
-	"github.com/pkg/errors"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
 /*
@@ -87,7 +88,7 @@ func AESGCMDecryptWithNonceSize(key []byte, data interface{}, nonceRaw []byte, n
 		copy(nonce, nonceRaw)
 	} else {
 		if len(dataRaw) < nonceSize {
-			return nil, errors.Errorf("nonce is empty, data[%v] is too short(cannot found nonce), ", StrConvQuote(string(dataRaw)))
+			return nil, errors.Errorf("nonce is empty, data[%v] is too short(cannot found nonce), ", StrConvQuoteHex(string(dataRaw)))
 		}
 
 		nonceFromData, encryptedData := dataRaw[:nonceSize], dataRaw[nonceSize:]

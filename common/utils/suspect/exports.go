@@ -448,4 +448,5 @@ var GuessExports = map[string]interface{}{
 	"IsSha256Value":         isSha256Value,
 	"IsXmlRequest":          isXMLRequest,
 	"IsXmlValue":            isXmlValue,
+	"IsAllVisibleASCII":     isAllVisibleASCII,
 }
