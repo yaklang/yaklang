@@ -160,6 +160,9 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 		}
 	}
 
+	if packageName == "" {
+		packageName = "defaultpackagename"
+	}
 	packageSource := fmt.Sprintf("package %s;\n\n", packageName)
 	if className == "" {
 		return "", utils.Error("className is empty")
@@ -300,6 +303,8 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 				default:
 					log.Errorf("when handling for fields unknown constant type: %T", constVal)
 				}
+			case *SyntheticAttribute:
+				log.Infof("field %s is synthetic", name)
 			default:
 				log.Errorf("when handling for fields unknown attribute type: %T", ret)
 			}
@@ -587,7 +592,13 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				}
 				return strings.Join(res, "\n")
 			}
+			debugMode := false
 			statementToString = func(statement statements.Statement) (statementStr string) {
+				defer func() {
+					if debugMode {
+						fmt.Println(statementStr)
+					}
+				}()
 				//if statementSet.Has(statement) {
 				//	panic("statement already exists")
 				//}
@@ -596,7 +607,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				case *statements.AssignStatement:
 					foundFieldInit := false
 					if v, ok := ret.LeftValue.(*values.RefMember); ok {
-						if v1, ok := v.Object.(*values.JavaRef); ok && v1.IsThis {
+						if v1, ok := v.Object.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<cinit>" || funcCtx.FunctionName == funcCtx.ClassName) {
 							foundFieldInit = true
 							c.fieldDefaultValue[v.Member] = ret.JavaValue.String(funcCtx)
 						}
@@ -609,6 +620,11 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						"%s\n"+
 						c.GetTabString()+"}", ret.Argument.String(funcCtx), statementListToString(ret.Body))
 				case *statements.TryCatchStatement:
+					haveCatch := len(ret.CatchBodies) > 0
+
+					if !haveCatch {
+						return ""
+					}
 					statementStr = fmt.Sprintf(c.GetTabString()+"try{\n"+
 						"%s\n"+
 						c.GetTabString()+"}", statementListToString(ret.TryBody))
@@ -616,6 +632,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						statementStr += fmt.Sprintf("catch(%s %s){\n"+
 							"%s\n"+
 							c.GetTabString()+"}", ret.Exception[i].Type().String(funcCtx), ret.Exception[i].String(funcCtx), statementListToString(body))
+					}
+					if len(ret.CatchBodies) <= 0 {
+						log.Info("met catch body is empty")
+						// debugMode = true
 					}
 				case *statements.WhileStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
