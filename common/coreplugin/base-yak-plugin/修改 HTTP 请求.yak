@@ -41,16 +41,22 @@ args = cli.Json(
   }
 }
 JSON, 
-        cli.setUISchema(cli.uiGroups(cli.uiGroup(cli.uiField(
-            "kvs", 
-            1, 
-            cli.uiFieldGroups(cli.uiGroup(cli.uiField(
-                "items", 
+        cli.setUISchema(
+            cli.uiGroups(cli.uiGroup(cli.uiField(
+                "kvs", 
                 1, 
-                cli.uiFieldGroups(cli.uiGroup(cli.uiField("kind", 0.15), cli.uiField("key", 0.25), cli.uiField("value", 0.25))), 
+                cli.uiFieldWidget(cli.uiWidgetTable), 
+                cli.uiFieldGroups(cli.uiGroup(cli.uiField(
+                    "items", 
+                    1, 
+                    cli.uiFieldGroups(cli.uiGroup(
+                        cli.uiTableField("kind", 150), 
+                        cli.uiTableField("key", 300), 
+                        cli.uiTableField("value", 300), 
+                    )), 
+                ))), 
             ))), 
-        ))),
-        cli.uiGlobalFieldPosition(cli.uiPosHorizontal),
+            cli.uiGlobalFieldPosition(cli.uiPosHorizontal), 
         ), 
     ), 
     cli.setRequired(true), 
