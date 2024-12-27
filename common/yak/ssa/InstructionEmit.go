@@ -320,7 +320,7 @@ func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 	f.IsReturn = true
 	f.Return = append(f.Return, r)
 
-	//f.SwitchSideEffects()
+	f.builder.SetReturnSideEffects()
 
 	return r
 }
@@ -482,12 +482,20 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 }
 
 func (f *FunctionBuilder) SetReturnSideEffects() {
-	var SideEffectsReturn []*FunctionSideEffect
+	SideEffectsReturn := make(map[*Variable]*FunctionSideEffect)
 	var value Value
 	scope := f.CurrentBlock.ScopeTable
 
 	for _, se := range f.SideEffects {
-		ser := se
+		ser := &FunctionSideEffect{
+			Name:                 se.Name,
+			VerboseName:          se.VerboseName,
+			Modify:               se.Modify,
+			forceCreate:          se.forceCreate,
+			Variable:             se.Variable,
+			BindVariable:         se.BindVariable,
+			parameterMemberInner: se.parameterMemberInner,
+		}
 
 		if variable := scope.ReadVariable(se.Name); variable != nil {
 			if find, bind := scope.ReadVariableFromLinkSideEffect(se.Name); find != nil && bind == se.BindVariable {
@@ -501,10 +509,18 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 				ser.Modify = value
 			}
 		}
+		variable := se.BindVariable
+		if variable == nil {
+			variable = se.Variable
+		}
+		if variable == nil {
+			variable = value.GetLastVariable()
+		}
 
-		SideEffectsReturn = append(SideEffectsReturn, ser)
+		SideEffectsReturn[variable] = ser
 	}
-	f.SideEffects = SideEffectsReturn
+	f.SideEffects = nil
+	f.SideEffectsReturn = append(f.SideEffectsReturn, SideEffectsReturn)
 }
 
 func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffect, scopeif ...ScopeIF) *SideEffect {

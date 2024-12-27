@@ -310,7 +310,8 @@ type Function struct {
 	// ParameterMembers []*ParameterMember
 	ParameterMembers []Value
 	// function side effects
-	SideEffects []*FunctionSideEffect
+	SideEffects       []*FunctionSideEffect
+	SideEffectsReturn []map[*Variable]*FunctionSideEffect
 
 	// closure function double link. parentFunc <-> childFuncs
 	parent     Value   // parent function;  can be nil if there is no parent function
