@@ -1,8 +1,10 @@
 package ssaapi
 
 import (
+	"slices"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -28,24 +30,24 @@ func TestRange_normol(t *testing.T) {
 	}
 `
 	ssatest.CheckWithName("range", t, code, func(prog *ssaapi.Program) error {
-		target := prog.SyntaxFlow("println( * #-> as $target )").GetValues("target")
-		a := target[0].GetSSAValue()
-		b := target[1].GetSSAValue()
-		if ca, ok := ssa.ToConst(a); ok {
-			ra := ca.GetRange()
-			assert.Equal(t, 4, ra.GetStart().GetLine())
-			assert.Equal(t, 10, ra.GetStart().GetColumn())
-			assert.Equal(t, 4, ra.GetEnd().GetLine())
-			assert.Equal(t, 14, ra.GetEnd().GetColumn())
+		res := prog.SyntaxFlow("println( * #-> as $target )")
+		res.Show()
+		targets := res.GetValues("target")
+		want := []string{
+			"4:10 - 4:14: true",
+			"8:10 - 8:15: false",
 		}
-		if cb, ok := ssa.ToConst(b); ok {
-			rb := cb.GetRange()
-			assert.Equal(t, 8, rb.GetStart().GetLine())
-			assert.Equal(t, 10, rb.GetStart().GetColumn())
-			assert.Equal(t, 8, rb.GetEnd().GetLine())
-			assert.Equal(t, 15, rb.GetEnd().GetColumn())
+		got := []string{}
+		for _, target := range targets {
+			ca, ok := ssa.ToConst(target.GetSSAValue())
+			if !ok {
+				continue
+			}
+			got = append(got, ca.GetRange().String())
 		}
-
+		slices.Sort(want)
+		slices.Sort(got)
+		require.Equal(t, want, got)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.GO))
 
