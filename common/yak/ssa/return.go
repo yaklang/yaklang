@@ -222,7 +222,31 @@ func (f *Function) Finish() {
 	funType.SetFreeValue(result)
 	f.builder.SetReturnSideEffects()
 	ses := funType.SideEffects
-	for _, se := range f.SideEffects {
+	tmpSideEffects := make(map[*Variable]*FunctionSideEffect)
+
+	for _, seReturn := range f.SideEffectsReturn {
+		for v, se := range seReturn {
+			tmpSideEffects[v] = se
+		}
+	}
+
+	for variable, _ := range tmpSideEffects {
+		vm := make(map[Value]struct{})
+		vs := []Value{}
+		for _, ses := range f.SideEffectsReturn {
+			if value, ok := ses[variable]; ok {
+				vm[value.Modify] = struct{}{}
+			}
+		}
+		if len(vm) > 1 {
+			for v, _ := range vm {
+				vs = append(vs, v)
+			}
+			tmpSideEffects[variable].Modify = f.builder.EmitPhi(variable.GetName(), vs)
+		}
+	}
+
+	for _, se := range tmpSideEffects {
 		if se.Modify.GetBlock() != nil {
 			scope := se.Modify.GetBlock().ScopeTable
 			if ret := GetFristLocalVariableFromScopeAndParent(scope, se.Name); ret != nil {

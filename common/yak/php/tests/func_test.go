@@ -216,7 +216,7 @@ println($d);
 `
 		test.CheckPrintlnValue(code, []string{"1"}, t)
 	})
-	t.Run("use Closure but not use", func(t *testing.T) {
+	t.Run("use Closure but not use extend", func(t *testing.T) {
 		code := `<?php
 $d = 1;
 $a = function()use(&$d){
