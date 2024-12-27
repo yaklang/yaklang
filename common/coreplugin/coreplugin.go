@@ -209,6 +209,13 @@ func init() {
 			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
 		)
 		registerBuildInPlugin(
+			"mitm", "修改 HTTP 请求",
+			withPluginHelp("允许用户加载该插件修改/增加/删除请求的 Header/Cookie/GetParams/PostParams，可以设置 URL 关键字作为前提条件"),
+			withPluginAuthors("WaY"),
+			withPluginEnableGenerateParam(true),
+			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
+		)
+		registerBuildInPlugin(
 			"mitm", "多认证综合越权测试",
 			withPluginHelp("可以设置 Cookie 和 Header 的多个认证信息进行越权测试，结果包含相似度"),
 			withPluginAuthors("V1ll4n"),
