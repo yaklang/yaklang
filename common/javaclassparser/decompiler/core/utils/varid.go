@@ -5,24 +5,29 @@ import (
 )
 
 type VariableId struct {
-	base *int
-	id   int
+	parent *VariableId
 }
 
-func NewVariableId(base *int) *VariableId {
-	return &VariableId{
-		base: base,
+func NewRootVariableId() *VariableId {
+	return &VariableId{}
+}
+
+//	func (v *VariableId) Uid() string {
+//		return fmt.Sprintf("var%d", v.Uid())
+//	}
+func (v *VariableId) Id() int {
+	if v.parent == nil {
+		return 0
 	}
+	return v.parent.Id() + 1
+}
+func (v *VariableId) String() string {
+	return fmt.Sprintf("var%d", v.Id())
 }
 
-func (v *VariableId) String() string {
-	return fmt.Sprintf("var%d", v.id+*v.base)
-}
-func (v *VariableId) Int() int {
-	return v.id + *v.base
-}
 func (v *VariableId) Next() *VariableId {
-	newV := *v
-	newV.id++
-	return &newV
+	newV := &VariableId{
+		parent: v,
+	}
+	return newV
 }

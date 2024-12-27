@@ -3,6 +3,7 @@ package javaclassparser
 import (
 	"errors"
 	"fmt"
+	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/davecgh/go-spew/spew"
 	"io"
 	"slices"
@@ -453,10 +454,10 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 }
 
 func (c *ClassObjectDumper) DumpMethod(methodName, desc string) (*dumpedMethods, error) {
-	return c.DumpMethodWithInitialId(methodName, desc, 0)
+	return c.DumpMethodWithInitialId(methodName, desc, utils2.NewRootVariableId())
 }
 
-func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id int) (*dumpedMethods, error) {
+func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id *utils2.VariableId) (*dumpedMethods, error) {
 	traitId := fmt.Sprintf("name:%s,desc:%s", methodName, desc)
 	if v, ok := c.dumpedMethodsSet[traitId]; ok {
 		return v, nil
@@ -527,6 +528,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	c.CurrentMethod = method
 	funcCtx := c.FuncCtx
 	funcCtx.FunctionName = name
+	//if name != "crt_data_by_Attrs" {
+	//	continue
+	//}
+	//println(name)
 	annoStrs := []string{}
 	funcCtx.FunctionType = c.MethodType
 	var paramsNewStr string

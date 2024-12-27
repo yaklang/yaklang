@@ -44,9 +44,9 @@ type Decompiler struct {
 	opcodeIndexToOffset           map[int]uint16
 	ExceptionTable                []*ExceptionTableEntry
 	BootstrapMethods              []*BootstrapMethod
-	DumpClassLambdaMethod         func(name, desc string, id int) (string, error)
+	DumpClassLambdaMethod         func(name, desc string, id *utils2.VariableId) (string, error)
 	CurrentId                     int
-	BaseVarId                     int
+	BaseVarId                     *utils2.VariableId
 	Params                        []values.JavaValue
 	ifNodeConditionCallback       map[*OpCode]func(value values.JavaValue)
 }
@@ -875,7 +875,8 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		if vt, ok := nodeToVarTable[code]; ok {
 			return vt[0].(map[int]*values.JavaRef), vt[1].(*utils2.VariableId)
 		}
-		return nil, utils2.NewVariableId(&d.BaseVarId)
+		panic("not found var table")
+		//return nil, utils2.NewVariableId(&d.BaseVarId)
 	}
 	setVarTable := func(code *OpCode, vt map[int]*values.JavaRef, id *utils2.VariableId) {
 		nodeToVarTable[code] = []any{vt, id}
@@ -886,7 +887,11 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		if len(code.Source) == 0 {
 			if code.Instr.OpCode == OP_START {
 				emptySim := NewEmptyStackEntry()
-				runtimeStackSimulation = NewStackSimulation(emptySim, map[int]*values.JavaRef{}, utils2.NewVariableId(&d.BaseVarId))
+				varId := d.BaseVarId
+				if varId == nil {
+					varId = utils2.NewRootVariableId()
+				}
+				runtimeStackSimulation = NewStackSimulation(emptySim, map[int]*values.JavaRef{}, varId)
 				initMethodVar(runtimeStackSimulation)
 			} else {
 				return nil, fmt.Errorf("opcode %d has no source", code.Id)
@@ -1071,6 +1076,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 	}
 	d.opCodes = GraphToList(d.RootOpCode)
 	d.opcodeToSimulateStack = opcodeToSim
+	DumpOpcodesToDotExp(d.RootOpCode)
 	ternaryExpMergeNode = utils.NewSet(ternaryExpMergeNode).List()
 	sort.Slice(ternaryExpMergeNode, func(i, j int) bool {
 		return ternaryExpMergeNode[i].Id > ternaryExpMergeNode[j].Id
@@ -1658,6 +1664,8 @@ func (d *Decompiler) ParseStatement() error {
 			}
 			tryStartNode := tryNodes[0]
 			tryNode := NewNode(statements.NewMiddleStatement(statements.MiddleTryStart, nil))
+			tryNode.Id = statementsIndex
+			statementsIndex++
 			node.RemoveNext(tryNode)
 			node.AddNext(tryNode)
 			tryNode.AddNext(tryStartNode)
