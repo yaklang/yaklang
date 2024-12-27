@@ -2,6 +2,14 @@ package yakcmds
 
 import (
 	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -11,12 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
-	"time"
 )
 
 var JavaDecompilerSelfChecking = &cli.Command{
@@ -27,6 +29,9 @@ var JavaDecompilerSelfChecking = &cli.Command{
 		cli.StringFlag{
 			Name:  "error-output,output",
 			Value: "decompiler-self-checking-failed-files",
+		},
+		cli.BoolFlag{
+			Name: "verbose,v",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -48,14 +53,42 @@ var JavaDecompilerSelfChecking = &cli.Command{
 
 		var visitedCompiledError sync.Map
 
+		var decompilerFinishedCount *int64 = new(int64)
+		var decompilerFailedCount *int64 = new(int64)
+		var decompilerSyntaxErrorCount *int64 = new(int64)
+
+		go func() {
+			var lastFinished, lastFailed, lastSyntax int64
+			for {
+				time.Sleep(time.Second)
+				finished := atomic.LoadInt64(decompilerFinishedCount)
+				failed := atomic.LoadInt64(decompilerFailedCount)
+				syntax := atomic.LoadInt64(decompilerSyntaxErrorCount)
+
+				if finished != lastFinished || failed != lastFailed || syntax != lastSyntax {
+					total := finished + failed + syntax
+					var failedPercent, syntaxPercent float64
+					if total > 0 {
+						failedPercent = float64(failed) / float64(total) * 100
+						syntaxPercent = float64(syntax) / (float64(total) - float64(failed)) * 100
+					}
+					log.Infof("Decompiler Status - Total: %v, Success: %v, Failed: %v (%.1f%%), Syntax Errors: %v (%.1f%%)",
+						total, finished, failed, failedPercent, syntax, syntaxPercent)
+					lastFinished = finished
+					lastFailed = failed
+					lastSyntax = syntax
+				}
+			}
+		}()
+
 		handle := func(s string, raw []byte) error {
-			log.Infof("checking: %v", s)
 			hash := codec.Sha256(raw)
 			if len(hash) > 24 {
 				hash = hash[:24]
 			}
 			results, err := javaclassparser.Decompile(raw)
 			if err != nil {
+				atomic.AddInt64(decompilerFailedCount, 1)
 				errHash := codec.Sha256([]byte(err.Error()))
 				if _, ok := visitedCompiledError.Load(errHash); ok {
 					return nil
@@ -67,16 +100,23 @@ var JavaDecompilerSelfChecking = &cli.Command{
 				fileName := "decompile-err-" + hash
 				originCls := filepath.Join(outputDir, fileName+".class")
 				os.WriteFile(originCls, raw, 0755)
-				log.Errorf("javaclassparser.Decompile failed: %v", err)
+
+				if c.Bool("verbose") {
+					log.Errorf("javaclassparser.Decompile failed: %v", err)
+				}
 				return nil
 			}
+			atomic.AddInt64(decompilerFinishedCount, 1)
 
 			//vfs := filesys.NewVirtualFs()
 			//vfs.AddFile("origin.java", results)
 
 			_, err = java2ssa.Frontend(results, false)
 			if err != nil {
-				log.Errorf("java2ssa.Frontend failed: %v", err)
+				atomic.AddInt64(decompilerSyntaxErrorCount, 1)
+				if c.Bool("verbose") {
+					log.Errorf("java2ssa.Frontend failed: %v", err)
+				}
 				fileName := "syntax-error--" + hash
 				originCls := filepath.Join(outputDir, fileName+".class")
 				target := filepath.Join(outputDir, fileName+".java")
@@ -90,7 +130,10 @@ var JavaDecompilerSelfChecking = &cli.Command{
 			if filepath.Ext(s) != ".jar" {
 				return nil
 			}
-			log.Infof("start to decompile %v", s)
+
+			if c.Bool("verbose") {
+				log.Infof("start to decompile %v", s)
+			}
 			zfs, err := filesys.NewZipFSFromLocal(s)
 			if err != nil {
 				return err
@@ -102,7 +145,9 @@ var JavaDecompilerSelfChecking = &cli.Command{
 
 				raw, err := zfs.ReadFile(s)
 				if err != nil {
-					log.Error(err)
+					if c.Bool("verbose") {
+						log.Error(err)
+					}
 					return nil
 				}
 
@@ -111,7 +156,9 @@ var JavaDecompilerSelfChecking = &cli.Command{
 					defer swg.Done()
 					err := handle(s, raw)
 					if err != nil {
-						log.Errorf("handle failed: %v", err)
+						if c.Bool("verbose") {
+							log.Errorf("handle failed: %v", err)
+						}
 					}
 				}()
 				return nil
