@@ -55,7 +55,7 @@ func (a *Agent) AddTask(message *TaskRequestMessage) {
 	if tasksItem, exist := a.taskManager.Get(message.TaskId); exist {
 		tasksItem.AddTask(message)
 	} else {
-		item := NewTasksItem(message.TaskId, message.typ, a.config.TaskConfig)
+		item := NewTasksItem(message.TaskId, message.Typ, a.config.TaskConfig)
 		item.AddTask(message)
 		a.taskManager.Set(message.TaskId, item)
 	}

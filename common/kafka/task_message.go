@@ -7,7 +7,7 @@ import (
 
 // TaskRequestMessage 任务消息
 type TaskRequestMessage struct {
-	typ        TaskType
+	Typ        TaskType
 	Content    []byte
 	Params     []byte //脚本参数
 	CreateTime time.Time
@@ -38,7 +38,7 @@ func (t *TaskResponseMessage) String() string {
 
 func NewTaskRequestMessage(typ TaskType, taskId string, Content []byte) *TaskRequestMessage {
 	return &TaskRequestMessage{
-		typ:        typ,
+		Typ:        typ,
 		Content:    Content,
 		CreateTime: time.Now(),
 		TaskId:     taskId,

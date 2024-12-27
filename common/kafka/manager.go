@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/kataras/golog"
 	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"os/signal"
@@ -94,6 +95,9 @@ func (m *Manager) defaultConfig() {
 	}
 }
 func (m *Manager) Start(ctx context.Context) error {
+	if m.config.debug {
+		log.SetLevel(golog.DebugLevel)
+	}
 	log.Debugf("token: %s", m.token)
 	childCtx, cancelFunc := context.WithCancel(ctx)
 	m.ctx = childCtx
