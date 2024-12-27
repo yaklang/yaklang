@@ -5,11 +5,13 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	"github.com/yaklang/yaklang/common/utils"
 	"slices"
 )
 
 func TryRewriter(manager *RewriteManager, node *core.Node) error {
+	utils2.DumpNodesToDotExp(manager.RootNode)
 	next := make([]*core.Node, len(node.Next))
 	copy(next, node.Next)
 	tryCatchSt := statements.NewTryCatchStatement(nil, nil)

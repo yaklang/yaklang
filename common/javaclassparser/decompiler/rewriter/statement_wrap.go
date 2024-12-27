@@ -495,6 +495,7 @@ func (s *RewriteManager) Rewrite() error {
 	if err != nil {
 		return err
 	}
+	utils2.DumpNodesToDotExp(s.RootNode)
 	s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	nodeToRewriter := map[*core.Node]rewriterFunc{}
 	keyNodes := []*core.Node{}
@@ -523,7 +524,7 @@ func (s *RewriteManager) Rewrite() error {
 			}
 		}
 	})
-
+	utils2.DumpNodesToDotExp(s.RootNode)
 	for _, node := range s.TopologicalSortReverse(s.SwitchNode) {
 		err := SwitchRewriter1(s, node)
 		if err != nil {
@@ -536,6 +537,7 @@ func (s *RewriteManager) Rewrite() error {
 	for i := 0; i < len(order); i++ {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 		node := order[i]
+
 		if slices.Contains(s.IfNodes, node) {
 			for j := i; j < len(order); j++ {
 				n := order[j]
