@@ -150,17 +150,88 @@ func TestStmt_spin(t *testing.T) {
 		`, []string{"\"hello world\""}, t)
 	})
 
-	t.Run("for Spin value global", func(t *testing.T) {
+	t.Run("for Spin secondary array", func(t *testing.T) {
 		test.CheckPrintlnValue(`package A
 
-	var a = 1
 	func main() {
-		
+		var array2D [3][3]int
+		array2D[0] = [3]int{1, 2, 3}
+		array2D[1] = [3]int{4, 5, 6}
+		array2D[2] = [3]int{7, 8, 9}
+
+		println(array2D[0][0])
+		println(array2D[1][1])
 		for true {
-			println(a)
+			println(array2D[2][2])
 		}
 	}
-		`, []string{"1"}, t)
+		`, []string{"1", "5", "9"}, t)
+	})
+
+	t.Run("for Spin value assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	func main() {
+		var a = 1
+		var b = 2
+		
+		for true {
+			a = a + b
+		}
+		println(a)
+	}
+		`, []string{"phi(a)[1,add(a, 2)]"}, t)
+	})
+
+	t.Run("for Spin array assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	func main() {
+		var str = []int{1, 2, 3}
+
+		for true {
+			str[0] = str[1] + str[2]
+		}
+		println(str[0])
+	}
+		`, []string{"phi(#18[0])[add(2, 3),1]"}, t)
+	})
+
+	t.Run("for Spin struct assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	type A struct {
+	    a int 
+		b int
+		c int
+	}
+
+	func main() {
+		var str = A{a: 1, b: 2, c: 3}
+
+		for true {
+			str.a = str.b + str.c
+		}
+		println(str.a)
+	}
+		`, []string{"phi(#29.a)[add(2, 3),1]"}, t)
+	})
+
+	t.Run("for Spin secondary array assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	func main() {
+		var array2D [3][3]int
+		array2D[0] = [3]int{1, 2, 3}
+		array2D[1] = [3]int{4, 5, 6}
+		array2D[2] = [3]int{7, 8, 9}
+
+		for true {
+			array2D[2][2] = array2D[0][0] + array2D[1][1]
+		}
+		println(array2D[2][2])
+	}
+		`, []string{"phi(#50[2])[add(1, 5),9]"}, t)
 	})
 
 	t.Run("for Spin array global", func(t *testing.T) {
@@ -210,7 +281,7 @@ func TestStmt_spin(t *testing.T) {
 		}
 		println(a)
 	}
-		`, []string{"1"}, t)
+		`, []string{"3", "phi(a)[2,3]", "phi(a)[1,phi(a)[2,3]]"}, t)
 	})
 
 	t.Run("for Spin side-effect", func(t *testing.T) {
