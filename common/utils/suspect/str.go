@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
 	"regexp"
 	"strings"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
@@ -128,6 +129,15 @@ func IsBase64(s string) bool {
 	return utils.IsBase64(s)
 }
 
+func isAllVisibleASCII(s string) bool {
+	for _, r := range s {
+		if !unicode.IsPrint(r) || r < 32 || r > 126 {
+			return false
+		}
+	}
+	return true
+}
+
 func IsBase64Password(s string) bool {
 	if !IsBase64(s) {
 		return false
@@ -136,12 +146,7 @@ func IsBase64Password(s string) bool {
 	if err != nil {
 		return false
 	}
-	for _, item := range string(password) {
-		if unicode.IsControl(item) {
-			return false
-		}
-	}
-	return true
+	return isAllVisibleASCII(string(password))
 }
 
 func IsMD5Data(s string) bool {

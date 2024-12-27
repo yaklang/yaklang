@@ -75,26 +75,29 @@ func QueryEscape(s string) string {
 var (
 	EscapeHtmlString   = html.EscapeString
 	UnescapeHtmlString = html.UnescapeString
-	StrConvQuote       = func(s string) string {
-		raw := []byte(s)
-		var buf bytes.Buffer
-		buf.WriteString("\"")
-		for _, b := range raw {
-			switch true {
-			case b >= 'a' && b <= 'z':
-				fallthrough
-			case b >= 'A' && b <= 'Z':
-				fallthrough
-			case b >= '0' && b <= '9':
-				buf.WriteByte(b)
-			default:
-				buf.WriteString(fmt.Sprintf(`\x%02x`, b))
-			}
-		}
-		buf.WriteString("\"")
-		return buf.String()
-	}
+	StrConvUnquote     = strconv.Unquote
+	StrConvQuote       = strconv.Quote
 )
+
+func StrConvQuoteHex(s string) string {
+	raw := []byte(s)
+	var buf bytes.Buffer
+	buf.WriteString("\"")
+	for _, b := range raw {
+		switch true {
+		case b >= 'a' && b <= 'z':
+			fallthrough
+		case b >= 'A' && b <= 'Z':
+			fallthrough
+		case b >= '0' && b <= '9':
+			buf.WriteByte(b)
+		default:
+			buf.WriteString(fmt.Sprintf(`\x%02x`, b))
+		}
+	}
+	buf.WriteString("\"")
+	return buf.String()
+}
 
 func StrConvUnquoteForce(s string) []byte {
 	raw, err := StrConvUnquote(s)
@@ -103,8 +106,6 @@ func StrConvUnquoteForce(s string) []byte {
 	}
 	return []byte(raw)
 }
-
-var StrConvUnquote = strconv.Unquote
 
 var DoubleEncodeUrl = func(i interface{}) string {
 	return url.QueryEscape(EncodeUrlCode(i))
