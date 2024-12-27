@@ -36,6 +36,7 @@ func NewWriter(ctx context.Context, address string, config *KafkaConfig) *AgentW
 			WriteTimeout: time.Second * time.Duration(config.Timeout),
 			ReadTimeout:  time.Second * time.Duration(config.Timeout),
 			MaxAttempts:  3,
+			RequiredAcks: kafka.RequireOne,
 		},
 		config: config,
 	}
@@ -61,4 +62,8 @@ RETRY:
 		}
 	}
 	return nil
+}
+
+func (r *AgentWriter) Close() {
+	r.writer.Close()
 }

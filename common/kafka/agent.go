@@ -34,9 +34,9 @@ func (a *Agent) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	a.agentEnvironment = environment
 	a.config.OnRegisterFunc([]byte(a.agentEnvironment.String()))
 	go a.healthCallback()
-	a.agentEnvironment = environment
 	return nil
 }
 
@@ -52,24 +52,24 @@ func (a *Agent) healthCallback() {
 	}
 }
 func (a *Agent) AddTask(message *TaskRequestMessage) {
-	if tasksItem, exit := a.taskManager.Get(message.taskId); exit {
+	if tasksItem, exist := a.taskManager.Get(message.TaskId); exist {
 		tasksItem.AddTask(message)
 	} else {
-		item := NewTasksItem(message.taskId, message.typ, message.Content)
+		item := NewTasksItem(message.TaskId, message.typ, a.config.TaskConfig)
 		item.AddTask(message)
-		a.taskManager.Set(message.taskId, item)
+		a.taskManager.Set(message.TaskId, item)
 	}
 }
 
 func (a *Agent) starkTask(id string) {
-	tasks, exit := a.taskManager.Get(id)
-	if exit {
+	tasks, exist := a.taskManager.Get(id)
+	if exist {
 		go tasks.Start(a.ctx)
 	}
 }
 func (a *Agent) StopTask(id string) {
-	tasks, exit := a.taskManager.Get(id)
-	if exit {
+	tasks, exist := a.taskManager.Get(id)
+	if exist {
 		tasks.Stop()
 	}
 }

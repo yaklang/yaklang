@@ -11,7 +11,7 @@ type TaskRequestMessage struct {
 	Content    []byte
 	Params     []byte //脚本参数
 	CreateTime time.Time
-	taskId     string
+	TaskId     string
 }
 
 func (t *TaskRequestMessage) String() string {
@@ -41,7 +41,7 @@ func NewTaskRequestMessage(typ TaskType, taskId string, Content []byte) *TaskReq
 		typ:        typ,
 		Content:    Content,
 		CreateTime: time.Now(),
-		taskId:     taskId,
+		TaskId:     taskId,
 	}
 }
 

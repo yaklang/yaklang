@@ -21,8 +21,11 @@ func NewReader[T any](ctx context.Context, address string, groupId string, topic
 		Brokers:        []string{address},
 		Topic:          string(topic),
 		StartOffset:    kafka.LastOffset,
-		CommitInterval: time.Microsecond * 500,
+		CommitInterval: time.Second * 1,
 		GroupID:        groupId,
+		MaxAttempts:    3,
+		//ErrorLogger:    golog.New().SetOutput(os.Stdout),
+		//Logger:         golog.New().SetOutput(os.Stdout),
 	})
 	r := &AgentReader[T]{
 		ctx:    childCtx,
@@ -48,6 +51,11 @@ func (r *AgentReader[T]) ReadMessage(ctx context.Context) <-chan T {
 					break
 				}
 			}
+			marshal, err := json.Marshal(message)
+			if err != nil {
+				continue
+			}
+			log.Debug(string(marshal))
 			var msg T
 			if err = json.Unmarshal(message.Value, &msg); err != nil {
 				log.Errorf("unmarshal msg fail: %s", err)
@@ -57,6 +65,7 @@ func (r *AgentReader[T]) ReadMessage(ctx context.Context) <-chan T {
 			case <-r.ctx.Done():
 				break
 			case msgChannel <- msg:
+				continue
 			}
 		}
 		close(msgChannel)
@@ -66,4 +75,7 @@ func (r *AgentReader[T]) ReadMessage(ctx context.Context) <-chan T {
 		return
 	}()
 	return msgChannel
+}
+func (r *AgentReader[T]) Close() {
+	r.reader.Close()
 }

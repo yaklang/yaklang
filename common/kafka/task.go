@@ -41,18 +41,19 @@ type TasksItem struct {
 	items       chan *TaskRequestMessage
 	Total       *atomic.Int64
 	ReceiveTask *atomic.Bool
+	config      *TaskConfig
 }
 
-func NewTasksItem(id string, typ TaskType, content []byte) *TasksItem {
+func NewTasksItem(id string, typ TaskType, config *TaskConfig) *TasksItem {
 	return &TasksItem{
 		typ:         typ,
 		mux:         &sync.Mutex{},
 		status:      Prepare,
-		Content:     content,
 		taskId:      id,
 		items:       make(chan *TaskRequestMessage, 1024),
 		ReceiveTask: &atomic.Bool{},
 		wg:          &sync.WaitGroup{},
+		config:      config,
 	}
 }
 
@@ -77,14 +78,27 @@ func (t *TasksItem) Start(ctx context.Context) {
 	t.mux.Lock()
 	defer t.SetStatus(Done)
 	defer t.mux.Unlock()
-	for item := range t.items {
-		select {
-		case <-t.ctx.Done():
-		default:
-			//todo: process task item
-			_ = item
-		}
+	var wg = &sync.WaitGroup{}
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for item := range t.items {
+				select {
+				case <-t.ctx.Done():
+					return
+				default:
+					processor, exist := registerProcess[t.typ]
+					if !exist {
+						return
+					}
+					processor.Process(t.ctx, item)
+					_ = item
+				}
+			}
+		}()
 	}
+	wg.Wait()
 }
 
 func (t *TasksItem) AddTask(message *TaskRequestMessage) {

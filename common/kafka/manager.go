@@ -6,8 +6,17 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 )
+
+var registerProcess map[TaskType]Processor
+
+func RegisterProcess(processor Processor) {
+	registerProcess[processor.Type()] = processor
+}
 
 type ManagerConfigOpts func(config *ManagerConfig)
 
@@ -68,9 +77,13 @@ func (m *Manager) defaultConfig() {
 					msg := m.newLogMsg(m.token, m.id, []byte(fmt.Sprintf("task: %s is stop", taskId)))
 					m.writerResponse(msg)
 				},
-				TaskProcess: func(taskId string, msg []byte) {
+				OnTaskProcess: func(taskId string, msg []byte) {
 					process := m.newTaskProcess(m.token, m.id, taskId, 100)
 					m.writerResponse(process)
+				},
+				OnTaskErrorFunc: func(taskId string, err error) {
+					msg := m.newLogMsg(m.token, m.id, []byte(fmt.Sprintf("process this task fail: %s", err)))
+					m.writerResponse(msg)
 				},
 			},
 			OnHealthFunc: func() {
@@ -81,30 +94,31 @@ func (m *Manager) defaultConfig() {
 	}
 }
 func (m *Manager) Start(ctx context.Context) error {
+	log.Debugf("token: %s", m.token)
 	childCtx, cancelFunc := context.WithCancel(ctx)
 	m.ctx = childCtx
 	m.cancel = cancelFunc
-	m.reader = append(m.reader, NewReader[*Request](m.ctx, m.address, fmt.Sprintf("palm-%s", uuid.NewString()), ManagerTopic, m.config.KafkaConfig))
 	m.reader = append(m.reader, NewReader[*Request](m.ctx, m.address, "palm-task", TaskTopic, m.config.KafkaConfig))
+	m.reader = append(m.reader, NewReader[*Request](m.ctx, m.address, fmt.Sprintf("palm-%s", uuid.NewString()), ManagerTopic, m.config.KafkaConfig))
 	m.writer = NewWriter(m.ctx, m.address, m.config.KafkaConfig)
-	go func() {
-		for _, reader := range m.reader {
-			_reader := reader
-			m.wg.Add(1)
-			go func() {
-				defer m.wg.Done()
-				for {
-					select {
-					case <-m.ctx.Done():
-						return
-					case m.message <- <-_reader.ReadMessage(m.ctx):
-					}
+	for _, processor := range registerProcess {
+		processor.Init(m.ctx, m.config.TaskConfig)
+	}
+	for _, reader := range m.reader {
+		reader_ := reader
+		m.wg.Add(1)
+		go func() {
+			defer m.wg.Done()
+			for request := range reader_.ReadMessage(m.ctx) {
+				select {
+				case <-m.ctx.Done():
+					return
+				case m.message <- request:
+					continue
 				}
-			}()
-		}
-		m.wg.Wait()
-		close(m.message)
-	}()
+			}
+		}()
+	}
 	err := m.agent.Start(m.ctx)
 	if err != nil {
 		m.config.OnAgentErrorFunc("", err)
@@ -124,12 +138,24 @@ func (m *Manager) Start(ctx context.Context) error {
 			}
 		}
 	}()
+	go func() {
+		signalChannel := make(chan os.Signal, 1)
+		signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
+		select {
+		case <-m.ctx.Done():
+		case <-signalChannel:
+			m.Finish()
+		}
+		os.Exit(1)
+	}()
 	m.service()
+	m.wg.Wait()
+	close(m.message)
 	return nil
 }
 func (m *Manager) service() {
 	for request := range m.message {
-		log.Infof("process message id: %s,content: %s", string(request.RequestId), string(request.Msg))
+		log.Debugf("process message id: %s,content: %s", string(request.RequestId), string(request.Msg))
 		select {
 		case <-m.ctx.Done():
 			return
@@ -218,4 +244,8 @@ func NewManager(id string, address string, opts ...ManagerConfigOpts) *Manager {
 
 func (m *Manager) Finish() {
 	m.cancel()
+	for _, reader := range m.reader {
+		reader.Close()
+	}
+	m.writer.Close()
 }

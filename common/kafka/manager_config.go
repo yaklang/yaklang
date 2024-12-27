@@ -19,7 +19,8 @@ type TaskConfig struct {
 	OnTaskStopFunc   func(requestId, taskId string)
 
 	OnTaskResultBackFunc func(requestId, taskId string, message any)
-	TaskProcess          func(taskId string, msg []byte) //任务的扫描进度
+	OnTaskProcess        func(taskId string, msg []byte) //任务的扫描进度
+	OnTaskErrorFunc      func(taskId string, err error)
 }
 
 type KafkaConfig struct {
