@@ -57,11 +57,17 @@ lines: line+;
 
 // descriptionStatement will describe the filterExpr with stringLiteral
 descriptionStatement: Desc ('(' descriptionItems? ')') | ('{' descriptionItems? '}');
-descriptionItems: lines? descriptionItem (',' lines? descriptionItem)* ','? comment* lines?;
+descriptionItems: lines? (descriptionItem descriptionSep)* descriptionItem descriptionSep? ;
 descriptionItem
-    : (comment lines)* stringLiteral  lines?
-    | (comment lines)* stringLiteral ':' descriptionItemValue lines?
+    : comment
+    | stringLiteral
+    | stringLiteral ':' descriptionItemValue
     ;
+descriptionSep
+    : ',' lines?
+    | lines
+    ;
+
 descriptionItemValue: stringLiteral | hereDoc | numberLiteral;
 crlfHereDoc: CRLFHereDocIdentifierBreak crlfText? CRLFEndDoc;
 lfHereDoc: LFHereDocIdentifierBreak lfText? LFEndDoc;
