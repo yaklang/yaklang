@@ -273,7 +273,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		raw, err = codec.DecodeHex(text)
 		result = string(raw)
 	case "str-quote":
-		result = codec.StrConvQuote(text)
+		result = codec.StrConvQuoteHex(text)
 	case "str-unquote":
 		result, err = codec.StrConvUnquote(text)
 	case "http-chunked-encode":

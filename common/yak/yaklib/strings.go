@@ -3,6 +3,7 @@ package yaklib
 import (
 	"encoding/json"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -478,6 +479,8 @@ var StringsExport = map[string]interface{}{
 	"ToLowerSpecial": strings.ToLowerSpecial,
 	"ToUpperSpecial": strings.ToUpperSpecial,
 	"ToValidUTF8":    ToValidUTF8,
+	"Quote":          strconv.Quote,
+	"Unquote":        strconv.Unquote,
 
 	// 特有的
 	"RandStr":                utils.RandStringBytes,

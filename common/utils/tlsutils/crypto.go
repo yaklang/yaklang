@@ -57,7 +57,7 @@ func Decrypt(r string, priPem []byte) ([]byte, error) {
 
 		res, err := rsa.DecryptPKCS1v15(cryptorand.Reader, pri, lRaw)
 		if err != nil {
-			return nil, utils.Errorf("dec block[%s] failed: %s", codec.StrConvQuote(string(lRaw)), err)
+			return nil, utils.Errorf("dec block[%s] failed: %s", codec.StrConvQuoteHex(string(lRaw)), err)
 		}
 
 		groups = append(groups, string(res))
