@@ -130,6 +130,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType) {
 				}
 			}
 			variable = builder.CreateVariableForce(se.Name)
+			if se.BindVariable != nil {
+				variable.SetCaptured(se.BindVariable)
+			}
 		} else {
 			// is object
 			obj, ok := se.Get(c)
@@ -137,6 +140,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType) {
 				continue
 			}
 			variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
+			if se.BindVariable != nil {
+				variable.SetCaptured(se.BindVariable)
+			}
 		}
 
 		if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
@@ -156,18 +162,21 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 	builder := function.builder
 
 	for _, se := range funcTyp.SideEffects {
-		var variable *Variable
+		var variable, bindVariable *Variable
 		var bindScope, modifyScope ScopeIF
 		if se.BindVariable != nil {
 			// BindVariable大多数时候和Variable相同，除非遇到object
 			bindScope = se.BindVariable.GetScope()
+			bindVariable = se.BindVariable
 		} else if se.Variable != nil {
 			bindScope = se.Variable.GetScope()
+			bindVariable = se.Variable
 		} else {
 			bindScope = currentScope
 		}
 		modifyScope = se.Modify.GetBlock().ScopeTable
 		_ = modifyScope
+		_ = bindScope
 
 		// is object
 		if se.MemberCallKind == NoMemberCall {
@@ -177,6 +186,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				}
 			}
 			variable = builder.CreateVariableForce(se.Name)
+			if se.BindVariable != nil {
+				variable.SetCaptured(se.BindVariable)
+			}
 		} else {
 			// is object
 			obj, ok := se.Get(c)
@@ -184,6 +196,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				continue
 			}
 			variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
+			if se.BindVariable != nil {
+				variable.SetCaptured(se.BindVariable)
+			}
 		}
 
 		if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
@@ -219,22 +234,19 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			}
 
 			CheckSideEffect := func(find *Variable) {
-				Check := func(scope ScopeIF) {
-					if bindScope.IsSameOrSubScope(scope) {
-						AddSideEffect()
-					} else {
-						SetCapturedSideEffect()
-					}
-				}
+				// Check := func(scope ScopeIF) {
+				// 	if bindScope.IsSameOrSubScope(scope) {
+				// 		AddSideEffect()
+				// 	} else {
+				// 		SetCapturedSideEffect()
+				// 	}
+				// }
 
-				if freevalue, ok := ToParameter(find.Value); ok {
-					if defaultValue := freevalue.defaultValue; defaultValue != nil {
-						scope := defaultValue.GetBlock().ScopeTable
-						Check(scope)
-						return
-					}
+				if bindVariable == nil || find.GetCaptured() == bindVariable.GetCaptured() {
+					AddSideEffect()
+				} else {
+					SetCapturedSideEffect()
 				}
-				Check(find.GetScope())
 			}
 
 			var GetScope func(ScopeIF, string, *FunctionBuilder) *Variable
@@ -263,6 +275,12 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				AddSideEffect()
 				continue
 			}
+			// if v := se.Variable; v != nil {
+			// 	if _, ok := v.GetValue().(*Parameter); ok {
+			// 		AddSideEffect()
+			// 		continue
+			// 	}
+			// }
 
 			obj := se.parameterMemberInner
 			if ret := GetScope(currentScope, se.Name, builder); ret != nil {
@@ -299,50 +317,6 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			}
 		}
 	}
-}
-
-func (f *FunctionBuilder) SetReturnSideEffects() {
-	var SideEffectsReturn []*FunctionSideEffect
-	scope := f.CurrentBlock.ScopeTable
-
-	for _, se := range f.SideEffects {
-		ser := se
-
-		if variable := scope.ReadVariable(se.Name); variable != nil {
-			value := variable.GetValue()
-			if _, ok := value.(*SideEffect); ok {
-			} else if p, ok := value.(*Parameter); ok && p.IsFreeValue {
-			} else {
-				ser.Modify = value
-			}
-		}
-		SideEffectsReturn = append(SideEffectsReturn, ser)
-	}
-	f.SideEffects = SideEffectsReturn
-}
-
-func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffect) *SideEffect {
-	vs := make([]Value, 0)
-	scope := f.CurrentBlock.ScopeTable
-	if phi, ok := ToPhi(se.Value); ok {
-		for i, e := range phi.Edge {
-			vs = append(vs, e)
-			if p, ok := ToParameter(e); ok && p.IsFreeValue {
-				if value := scope.ReadValue(name); value != nil {
-					vs[i] = value
-				}
-			}
-		}
-		phit := &Phi{
-			anValue:            phi.anValue,
-			CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
-			Edge:               vs,
-		}
-
-		sideEffect := f.EmitSideEffect(name, se.CallSite.(*Call), phit)
-		return sideEffect
-	}
-	return se
 }
 
 func (f *FunctionBuilder) SwitchFreevalueInSideEffectFromScope(name string, se *SideEffect, scope ScopeIF) *SideEffect {
