@@ -7,7 +7,7 @@ args = cli.Json(
   "properties": {
     "kvs": {
       "type": "array",
-      "title": "键值对",
+      "title": "配置认证信息",
       "minItems": 1,
       "items": {
         "properties": {
@@ -18,21 +18,22 @@ args = cli.Json(
                 "Header",
                 "Cookie"
             ],
-            "title": "类型",
+            "title": "认证类型",
             "default": "Header"
             },
           "key": {
             "type": "string",
-            "title": "键"
+            "title": "Key"
           },
           "value": {
-            "type": "string",
-            "title": "值"
+            "type": "text",
+            "title": "Value"
           },
           "force": {
             "type": "boolean",
             "default": true,
-            "description":"控制是否强制添加键值对"
+            "title": "强制添加",
+            "description":"默认如果源数据包不存在这个认证信息，则不测试，勾选本选项后，即使源数据包不存在这个认证信息，也会测试"
           }
         },
         "require": [
@@ -55,8 +56,8 @@ JSON,
                     "items", 
                     1, 
                     cli.uiFieldGroups(cli.uiGroup(
-                        cli.uiTableField("kind", 150), 
-                        cli.uiTableField("key", 150),
+                        cli.uiTableField("kind", 100),
+                        cli.uiTableField("key", 100),
                         cli.uiTableField("value", 300, cli.uiFieldWidget(cli.uiWidgetTextarea)), 
                         cli.uiTableField("force", 85),
                     )), 
