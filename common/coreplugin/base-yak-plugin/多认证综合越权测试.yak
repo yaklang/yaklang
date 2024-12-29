@@ -19,21 +19,42 @@ args = cli.Json(
                 "Cookie"
             ],
             "title": "认证类型",
-            "default": "Header"
+            "default": "Header",
+            "description": "设置认证信息，如果需要对整体 Cookie 进行测试，请使用 Header 模式，Key 填写 Cookie 即可"
             },
-          "key": {
-            "type": "string",
-            "title": "Key"
-          },
-          "value": {
-            "type": "text",
-            "title": "Value"
-          },
           "force": {
             "type": "boolean",
             "default": true,
             "title": "强制添加",
             "description":"默认如果源数据包不存在这个认证信息，则不测试，勾选本选项后，即使源数据包不存在这个认证信息，也会测试"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "认证字段名，如果需要测试 Cookie，仅填写 Cookie Key 即可，例如 PHPSESSION 或 JSESSION 等"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value",
+            "description": "认证字段值（单行），如果需要多个认证，请添加新的认证信息，如果有多个关联的认证信息，请设置分组"
+          },
+          "group": {
+            "type": "string",
+            "title": "关联分组",
+            "description": "关联分组，用于关联多个认证信息，同一个分组ID的认证信息会同时被添加测试，不同分组ID的认证信息会分别测试",
+            "enum": [
+              "",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10"
+            ]
           }
         },
         "require": [
@@ -58,8 +79,9 @@ JSON,
                     cli.uiFieldGroups(cli.uiGroup(
                         cli.uiTableField("kind", 100),
                         cli.uiTableField("key", 100),
-                        cli.uiTableField("value", 300, cli.uiFieldWidget(cli.uiWidgetTextarea)), 
-                        cli.uiTableField("force", 85),
+                        cli.uiTableField("value", 260, cli.uiFieldWidget(cli.uiWidgetTextarea)),
+                        cli.uiTableField("force", 86),
+                        cli.uiTableField("group", 86)
                     )), 
                 ))), 
             ))),
