@@ -333,3 +333,13 @@ func CalcMergeOpcode(ifOpcode *OpCode) *OpCode {
 	})
 	return utils.GetLastElement(mergeNodes)
 }
+
+func GetRealValue(value values.JavaValue) values.JavaValue {
+	if ref, ok := value.(*values.JavaRef); ok {
+		return GetRealValue(ref.Val)
+	}
+	if ref, ok := value.(*values.SlotValue); ok {
+		return GetRealValue(ref.Value)
+	}
+	return value
+}

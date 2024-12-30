@@ -18,6 +18,8 @@ func TestDecompiler(t *testing.T) {
 	testCase := []struct {
 		name string
 	}{
+		{"VarFold"},
+		{"SuperTest"},
 		{"FinalTest"},
 		{
 			"SynchronizedTest",

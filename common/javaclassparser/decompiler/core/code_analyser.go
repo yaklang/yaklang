@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"golang.org/x/exp/slices"
 	"sort"
 	"strings"
@@ -49,6 +50,9 @@ type Decompiler struct {
 	BaseVarId                     *utils2.VariableId
 	Params                        []values.JavaValue
 	ifNodeConditionCallback       map[*OpCode]func(value values.JavaValue)
+
+	varUserMap     *omap.OrderedMap[*values.JavaRef, [][]any]
+	delRefUserAttr map[*values.JavaRef][2]any // [0] = del amount, [1] = self assign
 }
 
 func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.JavaValue) *Decompiler {
@@ -60,6 +64,8 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 		opcodeIndexToOffset: map[int]uint16{},
 		varTable:            map[int]*values.JavaRef{},
 		valueToRef:          map[values.JavaValue][2]any{},
+		varUserMap:          omap.NewEmptyOrderedMap[*values.JavaRef, [][]any](),
+		delRefUserAttr:      map[*values.JavaRef][2]any{},
 	}
 }
 
@@ -260,13 +266,44 @@ func (d *Decompiler) getPoolValue(index int) values.JavaValue {
 
 func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation, opcode *OpCode) error {
 	funcCtx := d.FunctionContext
-	checkAndConvertRef := func(value values.JavaValue) {
+	checkAndConvertRef := func(value values.JavaValue) func(int) {
 		if _, ok := runtimeStackSimulation.Peek().(*values.JavaRef); !ok {
 			val := runtimeStackSimulation.Pop().(values.JavaValue)
 			ref := runtimeStackSimulation.NewVar(val)
-			runtimeStackSimulation.Push(ref)
+			attr := d.delRefUserAttr[ref]
+			if attr[0] == nil {
+				attr = [2]any{0, false}
+			}
+			attr[1] = true
+			d.delRefUserAttr[ref] = attr
+			slotVal := values.NewSlotValue(ref, ref.Type())
+			addUser := func(n int) {
+				for i := 0; i < n; i++ {
+					d.varUserMap.Set(ref, append(d.varUserMap.GetMust(ref), []any{
+						func(v values.JavaValue) {
+							slotVal.Value = v
+						}, opcode,
+					}))
+				}
+			}
+			runtimeStackSimulation.Push(slotVal)
+			addUser(1)
+			return addUser
 			//appendNode(statements.NewAssignStatement(ref, val, true))
 		}
+		return func(n int) {
+		}
+	}
+	loadVarBySlot := func(slot int) values.JavaValue {
+		varRef := runtimeStackSimulation.GetVar(slot)
+		slotvalue := values.NewSlotValue(varRef, varRef.Type())
+		users := d.varUserMap.GetMust(varRef)
+		d.varUserMap.Set(varRef, append(users, []any{
+			func(v values.JavaValue) {
+				slotvalue.Value = v
+			}, opcode,
+		}))
+		return slotvalue
 	}
 	switch opcode.Instr.OpCode {
 	case OP_ALOAD, OP_ILOAD, OP_LLOAD, OP_DLOAD, OP_FLOAD, OP_ALOAD_0, OP_ILOAD_0, OP_LLOAD_0, OP_DLOAD_0, OP_FLOAD_0, OP_ALOAD_1, OP_ILOAD_1, OP_LLOAD_1, OP_DLOAD_1, OP_FLOAD_1, OP_ALOAD_2, OP_ILOAD_2, OP_LLOAD_2, OP_DLOAD_2, OP_FLOAD_2, OP_ALOAD_3, OP_ILOAD_3, OP_LLOAD_3, OP_DLOAD_3, OP_FLOAD_3:
@@ -284,7 +321,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			slot = GetRetrieveIdx(opcode)
 		}
 
-		runtimeStackSimulation.Push(runtimeStackSimulation.GetVar(slot))
+		runtimeStackSimulation.Push(loadVarBySlot(slot))
 		////return mkRetrieve(variableFactory);
 	case OP_ACONST_NULL:
 		runtimeStackSimulation.Push(values.NewJavaLiteral("null", types.NewJavaClass("java.lang.Object")))
@@ -626,17 +663,17 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		runtimeStackSimulation.Push(v1)
 		runtimeStackSimulation.Push(v2)
 	case OP_DUP:
-		checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+		checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))(1)
 		runtimeStackSimulation.Push(runtimeStackSimulation.Peek())
 	case OP_DUP_X1:
-		checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+		checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))(3)
 		v1 := runtimeStackSimulation.Pop()
 		v2 := runtimeStackSimulation.Pop()
 		runtimeStackSimulation.Push(v1)
 		runtimeStackSimulation.Push(v2)
 		runtimeStackSimulation.Push(v1)
 	case OP_DUP_X2:
-		checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+		adduser := checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 		v1 := runtimeStackSimulation.Pop()
 		runtimeStackSimulationPopN := func(n int) []values.JavaValue {
 			datas := []values.JavaValue{}
@@ -656,9 +693,12 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		runtimeStackSimulation.Push(v1)
 		for i := len(datas) - 1; i >= 0; i-- {
 			runtimeStackSimulation.Push(datas[i])
+			adduser(1)
 		}
 		runtimeStackSimulation.Push(v1)
+		adduser(1)
 	case OP_DUP2:
+		var addUser func(int2 int)
 		runtimeStackSimulationPopN := func(n int) []values.JavaValue {
 			datas := []values.JavaValue{}
 			current := 0
@@ -666,7 +706,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 				if current >= n {
 					break
 				}
-				checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+				addUser = checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 				v := runtimeStackSimulation.Pop()
 				current += GetTypeSize(v.(values.JavaValue).Type())
 				datas = append(datas, v)
@@ -676,12 +716,14 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		runtimeStackSimulationPushReverse := func(datas []values.JavaValue) {
 			for i := len(datas) - 1; i >= 0; i-- {
 				runtimeStackSimulation.Push(datas[i])
+				addUser(1)
 			}
 		}
 		datas := runtimeStackSimulationPopN(2)
 		runtimeStackSimulationPushReverse(datas)
 		runtimeStackSimulationPushReverse(datas)
 	case OP_DUP2_X1:
+		var addUser func(int)
 		runtimeStackSimulationPopN := func(n int) []values.JavaValue {
 			datas := []values.JavaValue{}
 			current := 0
@@ -689,7 +731,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 				if current >= n {
 					break
 				}
-				checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+				addUser = checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 				v := runtimeStackSimulation.Pop()
 				current += GetTypeSize(v.(values.JavaValue).Type())
 				datas = append(datas, v)
@@ -699,12 +741,14 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		runtimeStackSimulationPushReverse := func(datas []values.JavaValue) {
 			for i := len(datas) - 1; i >= 0; i-- {
 				runtimeStackSimulation.Push(datas[i])
+				addUser(1)
 			}
 		}
 		datas := runtimeStackSimulationPopN(2)
 		v1 := runtimeStackSimulation.Pop()
 		runtimeStackSimulationPushReverse(datas)
 		runtimeStackSimulation.Push(v1)
+		addUser(1)
 		runtimeStackSimulationPushReverse(datas)
 		//checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 		//v1 := runtimeStackSimulation.Pop()
@@ -718,6 +762,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		//runtimeStackSimulation.Push(v2)
 		//runtimeStackSimulation.Push(v1)
 	case OP_DUP2_X2:
+		var addUser func(int2 int)
 		runtimeStackSimulationPopN := func(n int) []values.JavaValue {
 			datas := []values.JavaValue{}
 			current := 0
@@ -725,7 +770,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 				if current >= n {
 					break
 				}
-				checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+				addUser = checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 				v := runtimeStackSimulation.Pop()
 				current += GetTypeSize(v.(values.JavaValue).Type())
 				datas = append(datas, v)
@@ -735,6 +780,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		runtimeStackSimulationPushReverse := func(datas []values.JavaValue) {
 			for i := len(datas) - 1; i >= 0; i-- {
 				runtimeStackSimulation.Push(datas[i])
+				addUser(1)
 			}
 		}
 		datas1 := runtimeStackSimulationPopN(2)
@@ -1133,13 +1179,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 					defaultTarnaryValue = tarnaryValue
 				}
 				if i != 0 {
-					var toRealValue func(val values.JavaValue) values.JavaValue
-					toRealValue = func(val values.JavaValue) values.JavaValue {
-						if v, ok := val.(*values.JavaRef); ok {
-							return toRealValue(v.Val)
-						}
-						return val
-					}
 					var routeToCode bool
 					var target *OpCode
 					WalkGraph[*OpCode](opCode.Target[0], func(code *OpCode) ([]*OpCode, error) {
@@ -1156,11 +1195,11 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 						return code.Target, nil
 					})
 					if routeToCode {
-						if toRealValue(target.StackEntry.value) == toRealValue(trueFalseValuePair[0]) {
+						if GetRealValue(target.StackEntry.value) == GetRealValue(trueFalseValuePair[0]) {
 							ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
 								defaultTarnaryValue.Condition = value
 							}
-						} else if toRealValue(target.StackEntry.value) == toRealValue(trueFalseValuePair[1]) {
+						} else if GetRealValue(target.StackEntry.value) == GetRealValue(trueFalseValuePair[1]) {
 							opCode.Negative = !opCode.Negative
 							ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
 								defaultTarnaryValue.Condition = value
@@ -1191,11 +1230,11 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 						return code.Target, nil
 					})
 					if routeToCode {
-						if toRealValue(target.StackEntry.value) == toRealValue(trueFalseValuePair[1]) {
+						if GetRealValue(target.StackEntry.value) == GetRealValue(trueFalseValuePair[1]) {
 							ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
 								defaultTarnaryValue.Condition = value
 							}
-						} else if toRealValue(target.StackEntry.value) == toRealValue(trueFalseValuePair[0]) {
+						} else if GetRealValue(target.StackEntry.value) == GetRealValue(trueFalseValuePair[0]) {
 							opCode.Negative = !opCode.Negative
 							ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
 								defaultTarnaryValue.Condition = value
@@ -1301,14 +1340,7 @@ func (d *Decompiler) ParseStatement() error {
 			appendNode(assignSt)
 		case OP_CHECKCAST:
 			leftRef := opcode.stackProduced[0].(*values.JavaRef)
-			val := leftRef.Val
-			for {
-				if v, ok := val.(*values.JavaRef); ok {
-					val = v.Val
-				} else {
-					break
-				}
-			}
+			val := GetRealValue(leftRef.Val)
 			appendNode(statements.NewAssignStatement(leftRef, val, true))
 		case OP_INVOKESTATIC:
 			if len(opcode.stackProduced) == 0 {
@@ -1343,15 +1375,7 @@ func (d *Decompiler) ParseStatement() error {
 						return
 					}
 					if len(funcCallValue.Arguments) != 0 {
-						val := funcCallValue.Object
-						for {
-							if v, ok := val.(*values.JavaRef); ok {
-								val = v.Val
-							} else {
-								break
-							}
-						}
-						value := val
+						value := GetRealValue(funcCallValue.Object)
 						if value == nil {
 							return
 						}
@@ -1369,6 +1393,24 @@ func (d *Decompiler) ParseStatement() error {
 					}
 				}()
 				if skip {
+					for _, argument := range append(funcCallValue.Arguments, funcCallValue.Object) {
+						val := argument
+						for {
+							if v, ok := val.(*values.SlotValue); ok {
+								val = v.Value
+							} else {
+								break
+							}
+						}
+						if v, ok := val.(*values.JavaRef); ok {
+							attr := d.delRefUserAttr[v]
+							if attr[0] == nil {
+								attr = [2]any{0, false}
+							}
+							attr[0] = attr[0].(int) + 1
+							d.delRefUserAttr[v] = attr
+						}
+					}
 					assignNode := refToNewExpressionAssignNode[funcCallValue.Object.String(funcCtx)]
 					if assignNode != nil {
 						assignSt := assignNode.Statement
@@ -1626,6 +1668,46 @@ func (d *Decompiler) ParseStatement() error {
 		idToNode[toNodeId].SourceConditionNode = idToNode[conditionId]
 	}
 	d.RootNode = nodes[0]
+
+	d.varUserMap.ForEach(func(ref *values.JavaRef, pairs [][]any) bool {
+		val := GetRealValue(ref.Val)
+		attr := d.delRefUserAttr[ref]
+		if attr[0] == nil {
+			attr = [2]any{0, false}
+		}
+		if len(pairs)-attr[0].(int) == 1 {
+			pair := pairs[0]
+			nodeId := getStatementNextIdByOpcodeId(pair[1].(*OpCode).Id)
+			node := idToNode[nodeId]
+			if len(node.Source) == 1 {
+				if v, ok := node.Source[0].Statement.(*statements.AssignStatement); ok && v.LeftValue == ref {
+					sourceNode := node.Source[0]
+					preSources := slices.Clone(sourceNode.Source)
+					sourceNode.RemoveAllSource()
+					sourceNode.RemoveAllNext()
+					for _, source := range preSources {
+						source.AddNext(node)
+					}
+					ref.Id.Delete()
+					(pair[0]).(func(value values.JavaValue))(val)
+				}
+			}
+			if attr[1].(bool) {
+				source := slices.Clone(node.Source)
+				node.RemoveAllSource()
+				next := slices.Clone(node.Next)
+				node.RemoveAllNext()
+				for _, source := range source {
+					for _, n := range next {
+						source.AddNext(n)
+					}
+				}
+				ref.Id.Delete()
+				(pair[0]).(func(value values.JavaValue))(val)
+			}
+		}
+		return true
+	})
 	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
 		if v, ok := node.Statement.(*statements.ConditionStatement); ok && v.Neg {
 			node.Next[0], node.Next[1] = node.Next[1], node.Next[0]

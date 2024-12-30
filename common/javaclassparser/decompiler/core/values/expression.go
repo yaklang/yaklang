@@ -101,6 +101,12 @@ func (f *FunctionCallExpression) Type() types.JavaType {
 	return f.FuncType.ReturnType
 }
 
+func (f *FunctionCallExpression) IsSupperConstructorInvoke(funcCtx *class_context.ClassContext) bool {
+	if f.FunctionName == "<init>" && f.ClassName == funcCtx.SupperClassName {
+		return true
+	}
+	return false
+}
 func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) string {
 	paramStrs := []string{}
 	for i, arg := range f.Arguments {
@@ -123,8 +129,6 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 			return fmt.Sprintf("%s(%s)", f.Object.String(funcCtx), strings.Join(paramStrs, ","))
 		} else if f.ClassName == funcCtx.SupperClassName {
 			return fmt.Sprintf("super(%s)", strings.Join(paramStrs, ","))
-		} else {
-			panic("invalid <init> method")
 		}
 	}
 
