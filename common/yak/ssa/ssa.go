@@ -4,6 +4,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -240,10 +241,11 @@ type Program struct {
 	//consts
 	Consts map[string]Value
 	// function list
-	Funcs       *omap.OrderedMap[string, *Function]
-	Blueprint   *omap.OrderedMap[string, *Blueprint]
-	ExportValue map[string]Value
-	ExportType  map[string]Type
+	Funcs          *omap.OrderedMap[string, *Function]
+	Blueprint      *omap.OrderedMap[string, *Blueprint]
+	BlueprintStack *utils.Stack[*Blueprint]
+	ExportValue    map[string]Value
+	ExportType     map[string]Type
 
 	//store import
 

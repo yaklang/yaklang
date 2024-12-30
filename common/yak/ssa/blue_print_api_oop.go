@@ -114,3 +114,47 @@ func (b *FunctionBuilder) ReadSelfMember(name string) Value {
 	}
 	return nil
 }
+
+func (b *FunctionBuilder) PushBlueprint(bp *Blueprint) {
+	prog := b.GetProgram()
+	if prog == nil {
+		return
+	}
+	if prog.BlueprintStack == nil {
+		prog.BlueprintStack = utils.NewStack[*Blueprint]()
+	}
+	prog.BlueprintStack.Push(bp)
+}
+
+func (b *FunctionBuilder) PeekBlueprint() *Blueprint {
+	prog := b.GetProgram()
+	if prog == nil {
+		return nil
+	}
+	if prog.BlueprintStack == nil {
+		return nil
+	}
+	return prog.BlueprintStack.Peek()
+}
+
+func (b *FunctionBuilder) PopBlueprint() *Blueprint {
+	prog := b.GetProgram()
+	if prog == nil {
+		return nil
+	}
+	if prog.BlueprintStack == nil {
+		return nil
+	}
+	return prog.BlueprintStack.Pop()
+}
+
+func (b *FunctionBuilder) PeekNBlueprint(n int) *Blueprint {
+	prog := b.GetProgram()
+	if prog == nil {
+		return nil
+	}
+	if prog.BlueprintStack == nil {
+		return nil
+	}
+	return prog.BlueprintStack.PeekN(n)
+}

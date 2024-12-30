@@ -356,28 +356,15 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		// 处理位移表达式
 		op1 := y.VisitExpression(ret.Expression(0))
 		op2 := y.VisitExpression(ret.Expression(1))
-		var ltNum int
-		var rtNum int
-
-		for index, _ := range ret.AllLT() {
-			_ = index
-			ltNum++
-		}
-		for index, _ := range ret.AllGT() {
-			_ = index
-			rtNum++
-		}
-
+		ltNum := len(ret.AllLT())
+		rtNum := len(ret.AllGT())
 		if ltNum != 0 && rtNum != 0 {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
 			return y.EmitUndefined(raw.GetText())
 		}
 		if ltNum == 2 {
 			opcode = ssa.OpShl
-		} else if rtNum == 2 {
-			opcode = ssa.OpShr
-		} else if rtNum == 3 {
-			//todo: 无符号右移运算符
+		} else if rtNum == 2 || rtNum == 3 {
 			opcode = ssa.OpShr
 		} else {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
@@ -615,23 +602,10 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		var value ssa.Value
 		s := ret.Identifier(0)
 		if s != nil {
-			recoverRange := y.SetRange(s)
-			name := s.GetText()
-			if clazz := y.MarkedThisClassBlueprint; clazz != nil {
-				if clazz.GetNormalMember(name) != nil {
-					obj := y.PeekValue("this")
-					if obj != nil {
-						variable = y.CreateMemberCallVariable(obj, y.EmitConstInst(name))
-					}
-				}
-			}
-			if variable == nil {
-				variable = y.CreateVariable(name)
-			}
-			recoverRange()
+			variable, _ = y.VisitIdentifier(s, true)
 		}
 		if id := ret.Identifier(1); id != nil {
-			value = y.ReadValue(id.GetText())
+			_, value = y.VisitIdentifier(id)
 		} else if expr := ret.Expression(); expr != nil {
 			value = y.VisitExpression(expr)
 		}
@@ -663,7 +637,7 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 	if utils.IsNil(object) {
 		var v ssa.Value
 		if ret := i.Identifier(); ret != nil {
-			v = y.VisitIdentifier(ret.GetText())
+			_, v = y.VisitIdentifier(ret)
 		} else if ret := i.THIS(); ret != nil {
 			v = y.ReadValue(ret.GetText())
 		} else if ret = i.SUPER(); ret != nil {
@@ -744,8 +718,8 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 	}
 
 	if ret := i.Identifier(); ret != nil {
-		text := ret.GetText()
-		return y.VisitIdentifier(text)
+		_, v := y.VisitIdentifier(ret)
+		return v
 	}
 
 	if ret := i.TypeTypeOrVoid(); ret != nil {
@@ -1080,19 +1054,13 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		return
 	}
 
-	id, ok := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext)
-	if !ok {
+	var variable *ssa.Variable
+	if ret := i.VariableDeclaratorId(); ret != nil {
+		name, variable = y.VisitVariableDeclaratorId(ret, true)
+	}
+	if variable == nil {
 		return
 	}
-	name = id.Identifier().GetText()
-	recoverRange2 := y.SetRange(id)
-	variable := y.CreateVariable(name)
-	defer func() {
-		if utils.IsNil(value) {
-			y.AssignVariable(variable, y.EmitUndefined(name))
-		}
-	}()
-	recoverRange2()
 
 	if i.VariableInitializer() != nil {
 		value := y.VisitVariableInitializer(i.VariableInitializer())
@@ -1120,7 +1088,6 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		y.AssignVariable(variable, value)
 		return name, value
 	}
-
 }
 
 func (y *builder) VisitVariableInitializer(raw javaparser.IVariableInitializerContext) ssa.Value {
@@ -1157,13 +1124,7 @@ func (y *builder) VisitArguments(raw javaparser.IArgumentsContext) []ssa.Value {
 
 	var args []ssa.Value
 	if ret := i.ExpressionList(); ret != nil {
-		exprs := ret.(*javaparser.ExpressionListContext)
-		for _, expr := range exprs.AllExpression() {
-			a := y.VisitExpression(expr)
-			if a != nil {
-				args = append(args, a)
-			}
-		}
+		args = y.VisitExpressionList(ret)
 	}
 	return args
 }
@@ -1179,37 +1140,30 @@ func (y *builder) VisitExpressionList(raw javaparser.IExpressionListContext) []s
 	if i == nil {
 		return nil
 	}
-	exprs := i.AllExpression()
-	valueLen := len(exprs)
-	values := make([]ssa.Value, 0, valueLen)
-	for _, expr := range exprs {
-		if expr != nil {
-			if v := y.VisitExpression(expr); !utils.IsNil(v) {
-				values = append(values, v)
-			}
+	values := make([]ssa.Value, 0, len(i.AllExpression()))
+	for _, expr := range i.AllExpression() {
+		if v := y.VisitExpression(expr); !utils.IsNil(v) {
+			values = append(values, v)
 		}
 	}
 	return values
 }
 
-func (y *builder) VisitStatementList(raw javaparser.IStatementListContext) interface{} {
+func (y *builder) VisitStatementList(raw javaparser.IStatementListContext) {
 	if y == nil || raw == nil || y.IsStop() {
-		return nil
+		return
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*javaparser.StatementListContext)
 	if i == nil {
-		return nil
+		return
 	}
 
 	for _, stmt := range i.AllStatement() {
-		if stmt != nil {
-			y.VisitStatement(stmt)
-		}
+		y.VisitStatement(stmt)
 	}
-	return nil
 }
 
 func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBuilder {
@@ -1655,9 +1609,11 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 	if nonWildcard := i.NonWildcardTypeArguments(); nonWildcard != nil {
 	}
 
-	var p ssa.Type
-	var createdName []string
-	var nameValues []ssa.Value
+	var (
+		p           ssa.Type
+		createdName []string
+		nameValues  []ssa.Value
+	)
 	if ret := i.CreatedName(); ret != nil {
 		p, createdName, nameValues = y.VisitCreatedName(ret)
 	}
@@ -1720,7 +1676,6 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 	obj = y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(ssa.CreateAnyType())
 	return obj, nil
-
 }
 
 func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext, oldClassName string) []ssa.Value {
@@ -1908,51 +1863,80 @@ func (y *builder) VisitLambdaLVTIParameter(raw javaparser.ILambdaLVTIParameterCo
 	}
 }
 
-func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
+func (y *builder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariable ...bool) (variable *ssa.Variable, value ssa.Value) {
+	if y == nil || raw == nil || y.IsStop() {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.IdentifierContext)
+	if i == nil {
+		return
+	}
+	name := i.GetText()
+	class := y.MarkedThisClassBlueprint
+	// create variable
+	if len(wantVariable) != 0 && wantVariable[0] == true {
+		if class == nil {
+			return
+		}
+		if class.GetNormalMember(name) != nil {
+			obj := y.PeekValue("this")
+			if obj != nil {
+				variable = y.CreateMemberCallVariable(obj, y.EmitConstInst(name))
+				return variable, nil
+			}
+		}
+		if variable = y.GetOuterClassFieldVariable(name); variable != nil {
+			return variable, nil
+		}
+		variable = y.CreateVariable(name)
+		return variable, nil
+	}
+	// get value
+	//set full type name for value
 	defer func() {
-		//set full type name
 		if utils.IsNil(value) {
 			return
 		}
 		t := value.GetType()
-		if t != nil {
-			if len(t.GetFullTypeNames()) == 0 {
-				newType := y.AddFullTypeNameFromMap(name, value.GetType())
-				value.SetType(newType)
-			}
+		if t != nil && len(t.GetFullTypeNames()) == 0 {
+			newType := y.AddFullTypeNameFromMap(name, value.GetType())
+			value.SetType(newType)
 		}
 	}()
 
 	if value = y.PeekValue(name); value != nil {
 		// found
-		return value
+		return nil, value
 	}
 	//if in this class, return
-	if class := y.MarkedThisClassBlueprint; class != nil {
+	if class != nil {
 		if method := class.GetStaticMethod(name); !utils.IsNil(method) {
 			value = method
-			return method
+			return nil, method
 		}
 		if class.GetNormalMember(name) != nil {
 			obj := y.PeekValue("this")
 			if obj != nil {
 				if value = y.ReadMemberCallValue(obj, y.EmitConstInst(name)); value != nil {
-					return value
+					return nil, value
 				}
 			}
 		}
 		value = y.ReadSelfMember(name)
 		if value != nil {
-			return value
+			return nil, value
 		}
 	}
+
 	var ok bool
 	if value, ok = y.ReadConst(name); ok {
-		return value
+		return nil, value
 	}
 	if importValue, b := y.GetProgram().ReadImportValue(name); b {
 		value = importValue
-		return importValue
+		return nil, importValue
 	}
 	value = y.ReadValue(name)
 	return
@@ -2166,4 +2150,28 @@ func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext, obj
 	}
 	name := i.Identifier().GetText()
 	return y.CreateMemberCallVariable(object, y.EmitConstInst(name))
+}
+
+func (y *builder) GetOuterClassFieldVariable(name string) *ssa.Variable {
+	bp := y.MarkedThisClassBlueprint
+	if bp == nil {
+		return nil
+	}
+	s := strings.Split(bp.Name, INNER_CLASS_SPLIT)
+	if len(s) != 2 {
+		return nil
+	}
+	bp = y.GetBluePrint(s[0])
+	if bp == nil {
+		return nil
+	}
+	var variable *ssa.Variable
+	if ret := bp.GetNormalMember(name); ret != nil {
+		obj := y.PeekValue("this")
+		if obj != nil {
+			variable = y.CreateMemberCallVariable(obj, y.EmitConstInst(name))
+			return variable
+		}
+	}
+	return nil
 }
