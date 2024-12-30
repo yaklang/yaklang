@@ -400,7 +400,23 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 
 	case *javaparser.InstanceofExpressionContext:
 		// 处理 instanceof 表达式
-		// todo instanceof 表达式
+		value := y.VisitExpression(ret.Expression())
+		var typ ssa.Type
+		if ret.TypeType() != nil {
+			typ = y.VisitTypeType(ret.TypeType())
+		} else if ret.Pattern() != nil {
+			typ = y.VisitPattern(ret.Pattern(), value)
+		}
+		t := value.GetType()
+		if typ == nil || t == nil {
+			return y.EmitConstInst(true)
+		} else {
+			if ssa.TypeCompare(t, typ) {
+				return y.EmitConstInst(true)
+			} else {
+				return y.EmitConstInst(false)
+			}
+		}
 	case *javaparser.EqualityExpressionContext:
 		// 处理等于和不等于表达式
 		op1 := y.VisitExpression(ret.Expression(0))
@@ -2196,4 +2212,28 @@ func (y *builder) VisitExplicitGenericInvocation(raw javaparser.IExplicitGeneric
 		return nil
 	}
 	return y.VisitMethodCall(i.MethodCall(), obj)
+}
+
+func (y *builder) VisitPattern(raw javaparser.IPatternContext, value ssa.Value) ssa.Type {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.PatternContext)
+	if i == nil {
+		return nil
+	}
+
+	var typ ssa.Type
+	for _, m := range i.AllVariableModifier() {
+		y.VisitVariableModifier(m)
+	}
+	typ = y.VisitTypeType(i.TypeType())
+	for _, a := range i.AllAnnotation() {
+		y.VisitAnnotation(a)
+	}
+	variable, _ := y.VisitIdentifier(i.Identifier(), true)
+	y.AssignVariable(variable, value)
+	return typ
 }
