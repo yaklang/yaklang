@@ -2,10 +2,12 @@ package utils
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 )
 
 type VariableId struct {
-	parent *VariableId
+	parent   *VariableId
+	children []*VariableId
 }
 
 func NewRootVariableId() *VariableId {
@@ -25,9 +27,23 @@ func (v *VariableId) String() string {
 	return fmt.Sprintf("var%d", v.Id())
 }
 
+func (v *VariableId) Delete() {
+	for _, child := range v.children {
+		child.parent = nil
+	}
+	if v.parent != nil {
+		v.parent.children = lo.Filter(v.parent.children, func(item *VariableId, index int) bool {
+			return item != v
+		})
+		for _, child := range v.children {
+			child.parent = v.parent
+		}
+	}
+}
 func (v *VariableId) Next() *VariableId {
 	newV := &VariableId{
 		parent: v,
 	}
+	v.children = append(v.children, newV)
 	return newV
 }
