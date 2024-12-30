@@ -293,7 +293,7 @@ func handleHTTPPacketQueryParam(packet []byte, noAutoEncode bool, callback func(
 			}()
 
 			urlIns := ForceStringToUrl(requestUri)
-			u := ParseQueryParams(urlIns.RawQuery).DisableAutoEncode(noAutoEncode)
+			u := ParseQueryParams(urlIns.RawQuery, WithDisableAutoEncode(noAutoEncode))
 			callback(u)
 			urlIns.RawQuery = u.Encode()
 			requestUri = urlIns.String()
@@ -454,7 +454,7 @@ func handleHTTPPacketPostParam(packet []byte, noAutoEncode, autoAddContentType b
 
 	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
 	bodyString := string(bodyRaw)
-	u := ParseQueryParams(bodyString).DisableAutoEncode(noAutoEncode)
+	u := ParseQueryParams(bodyString, WithDisableAutoEncode(noAutoEncode))
 	callback(u)
 	newBody := u.Encode()
 
@@ -517,7 +517,7 @@ func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
 }
 
 func ReplaceHTTPPacketPostParamWithoutEncoding(packet []byte, key, value string, n int) []byte {
-	return handleHTTPPacketPostParam(packet, false, true, func(q *QueryParams) {
+	return handleHTTPPacketPostParam(packet, true, true, func(q *QueryParams) {
 		i := 0
 		for j, item := range q.Items {
 			if item.Key != key || item.Position != q.Position {
