@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 )
 
+var INNER_CLASS_SPLIT = "$"
+
 // ========================================== For SSAAPI ==========================================
 
 type SSABuilder struct {
@@ -53,9 +55,8 @@ func (*SSABuilder) GetLanguage() consts.Language {
 
 type builder struct {
 	*ssa.FunctionBuilder
-	ast            javaparser.ICompilationUnitContext
-	constMap       map[string]ssa.Value
-	bluePrintStack *utils.Stack[*ssa.Blueprint]
+	ast      javaparser.ICompilationUnitContext
+	constMap map[string]ssa.Value
 
 	// for full type name
 	fullTypeNameMap   map[string][]string
@@ -65,27 +66,6 @@ type builder struct {
 	// framework support for spring boot
 	currentUIModel ssa.Value
 	isInController bool
-}
-
-func (b *builder) PushBluePrint(bp *ssa.Blueprint) {
-	if b.bluePrintStack == nil {
-		b.bluePrintStack = utils.NewStack[*ssa.Blueprint]()
-	}
-	b.bluePrintStack.Push(bp)
-}
-
-func (b *builder) PeekCurrentBluePrint() *ssa.Blueprint {
-	if b.bluePrintStack == nil {
-		return nil
-	}
-	return b.bluePrintStack.Peek()
-}
-
-func (b *builder) PopBluePrint() *ssa.Blueprint {
-	if b.bluePrintStack == nil {
-		return nil
-	}
-	return b.bluePrintStack.Pop()
 }
 
 func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error) {

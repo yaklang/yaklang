@@ -76,15 +76,21 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	if i == nil {
 		return y.EmitEmptyContainer()
 	}
-	var mergedTemplate []string
-	// 声明的类为外部类情况
-	var class *ssa.Blueprint
+
+	var (
+		mergedTemplate         []string
+		class                  *ssa.Blueprint
+		classContainerCallback []func(ssa.Value)
+		classlessParents       []string
+		extendName             string
+	)
+
 	if outClass == nil {
 		className := i.Identifier().GetText()
 		class = y.CreateBluePrint(className)
 		y.GetProgram().SetExportType(className, class)
 	} else {
-		className := fmt.Sprintf("%s.%s", outClass.Name, i.Identifier().GetText())
+		className := outClass.Name + INNER_CLASS_SPLIT + i.Identifier().GetText()
 		class = y.CreateBluePrint(className)
 	}
 	// set full type name for class's self
@@ -93,12 +99,8 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.Blueprint)
 	}
 	if ret := i.TypeParameters(); ret != nil {
-		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
 
-	var classContainerCallback []func(ssa.Value)
-	var classlessParents []string
-	var extendName string
 	if i.EXTENDS() != nil {
 		if extend := i.TypeType(); extend != nil {
 			parentName := extend.GetText()
@@ -175,8 +177,8 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Bl
 		return nil
 	}
 
-	y.PushBluePrint(class)
-	defer y.PopBluePrint()
+	y.PushBlueprint(class)
+	defer y.PopBlueprint()
 
 	for _, ret := range i.AllClassBodyDeclaration() {
 		y.VisitClassBodyDeclaration(ret, class)
@@ -705,7 +707,11 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (
 		insCallbacks = append(insCallbacks, insCallback)
 	}
 	typ := y.VisitTypeType(i.TypeType())
-	param := y.NewParam(y.VisitVariableDeclaratorId(i.VariableDeclaratorId()))
+	name, _ := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
+	if name == "" {
+		return
+	}
+	param := y.NewParam(name)
 	if typ != nil {
 		param.SetType(typ)
 	}
@@ -724,21 +730,31 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (
 	return
 }
 
-func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorIdContext) string {
+func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorIdContext, wantVariable ...bool) (string, *ssa.Variable) {
 	if y == nil || raw == nil || y.IsStop() {
-		return ""
+		return "", nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
+
+	want := false
+	if len(wantVariable) > 0 {
+		want = wantVariable[0]
+	}
 	i, _ := raw.(*javaparser.VariableDeclaratorIdContext)
 	if i == nil {
-		return ""
+		return "", nil
 	}
-	text := i.Identifier().GetText()
-	if text == "" {
-		return ""
+	name := i.Identifier().GetText()
+	if name == "" {
+		return "", nil
 	}
-	return text
+
+	if want {
+		return name, y.CreateVariable(name)
+	}
+
+	return name, nil
 }
 
 func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterContext) {
@@ -766,7 +782,7 @@ func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterCo
 		_ = annotation
 		//y.VisitAnnotation(annotation)
 	}
-	formalParams := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
+	formalParams, _ := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
 	typeType := y.VisitTypeType(i.TypeType())
 	isVariadic := i.ELLIPSIS()
 	_ = isVariadic
@@ -832,7 +848,7 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		defer switchHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)
 		{
-			y.NewParam("$this")
+			y.NewParam("this")
 			container := y.EmitEmptyContainer()
 			variable := y.CreateVariable("this")
 			y.AssignVariable(variable, container)
