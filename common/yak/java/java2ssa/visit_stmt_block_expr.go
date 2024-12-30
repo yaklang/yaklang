@@ -128,30 +128,38 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return y.ReadMemberCallValue(expr, key)
 	case *javaparser.MemberCallExpressionContext:
 		// 处理成员调用表达式，如通过点操作符访问成员
+		objName := ret.Expression().GetText()
+		bp := y.GetBluePrint(objName)
 		obj := y.VisitExpression(ret.Expression())
 		if utils.IsNil(obj) {
 			return y.EmitUndefined(raw.GetText())
 		}
-		var key ssa.Value
-		var res ssa.Value
+		var key, res ssa.Value
+
 		if id := ret.Identifier(); id != nil {
 			key = y.EmitConstInst(id.GetText())
 		} else if method := ret.MethodCall(); method != nil {
 			res = y.VisitMethodCall(method, obj)
 		} else if this := ret.THIS(); this != nil {
-			key = y.EmitConstInst(this.GetText())
+			res = y.EmitUndefined(objName)
+			if bp != nil {
+				res.SetType(bp)
+			}
 		} else if super := ret.SUPER(); super != nil {
-			// todo: 访问父类成员
-			key = y.EmitConstInst(super.GetText())
+			res = y.EmitUndefined(objName)
+			if bp != nil {
+				if sbp := bp.GetSuperBlueprint(); sbp != nil {
+					res.SetType(sbp)
+				}
+			}
 		} else if creator := ret.InnerCreator(); creator != nil {
 			if ret.NonWildcardTypeArguments() != nil {
-				// todo:泛型
 			}
 			res = y.VisitInnerCreator(ret.InnerCreator(), ret.Expression().GetText())
 		} else if explicit := ret.ExplicitGenericInvocation(); explicit != nil {
-			//todo : 显式泛型调用
-			key = y.EmitConstInst(explicit.GetText())
+			res = y.VisitExplicitGenericInvocation(explicit, obj)
 		}
+
 		if utils.IsNil(res) {
 			res = y.ReadMemberCallValue(obj, key)
 			if utils.IsNil(res) {
@@ -706,7 +714,7 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 		if parent == nil {
 			parent = y.EmitConstInst(text)
 		}
-		cls := y.MarkedThisClassBlueprint.GetSuperClass()
+		cls := y.MarkedThisClassBlueprint.GetSuperBlueprint()
 		if parent != nil {
 			parent.SetType(cls)
 		}
@@ -2174,4 +2182,18 @@ func (y *builder) GetOuterClassFieldVariable(name string) *ssa.Variable {
 		}
 	}
 	return nil
+}
+
+func (y *builder) VisitExplicitGenericInvocation(raw javaparser.IExplicitGenericInvocationContext, obj ssa.Value) ssa.Value {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*javaparser.ExplicitGenericInvocationContext)
+	if i == nil {
+		return nil
+	}
+	return y.VisitMethodCall(i.MethodCall(), obj)
 }
