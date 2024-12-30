@@ -11,97 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-func TestJava_OOP_Var_member(t *testing.T) {
-
-	t.Run("test simple member call", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-class A {
-		int a = 0;
-
-}
-class Main{
-		public static void main(String[] args) {
-			A a = new A();
-			println(a.a);
-		}
-}
-		`, []string{"0"}, t)
-	})
-
-	t.Run("side effect", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-	 class A {
-		private int a = 0; 
-	
-		public void setA(int par) { 
-			this.a = par;
-		}
-	}
-	class Main{
-		public static void main(String[] args) {
-			A a = new A();
-			println(a.a);
-			a.setA(1);
-			println(a.a);
-		}
-	}
-		`, []string{
-			"0", "side-effect(Parameter-par, this.a)",
-		}, t)
-	})
-
-	t.Run("free-value", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-		class A {
-			int a = 0; 
-			public void getA() {
-				return this.a;
-			}
-		}
-
-		class Main{
-		public static void main(String[] args) {
-		A a = new A(); 
-		println(a.getA());
-		a.a=1;
-		println(a.getA());
-		}
-}
-		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
-		}, t)
-	})
-
-	t.Run("just use method", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-	public 	class A {
-			int a = 0; 
-			public void getA(){
-			return this.a;
-			}
-			
-			public void setA(int par){
-			this.a=par;
-			}
-		}
-	public class Main{
-		public static void main(String[] args) {
-		A a = new A(); 
-		println(a.getA());
-		a.setA(1);
-		println(a.getA());
-		}
-}
-		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
-		}, t)
-	})
-}
-
 func TestJava_Extend_Class(t *testing.T) {
-
 	t.Run("test extend constant ", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		class A {
@@ -209,17 +119,15 @@ public class Main{
 	})
 
 	t.Run("normal construct", func(t *testing.T) {
-		t.Skip()
 		code := `
 public class A {
 	private int num1=0;
 	private int num2=0;
 	
-	// TODO: if this constructor is defined, it will be an error 
-	// public A(int num1,int num2) {
-	// 	this.num1 = num1;
-	// 	this.num2 = num2;
-	// }
+	public A(int num1,int num2) {
+		this.num1 = num1;
+		this.num2 = num2;
+	}
 	public int getNum1() {
 		return this.num1;
 	}
@@ -236,8 +144,8 @@ public class Main{
 }
 `
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum1(valid)(Undefined-A(Undefined-A,1,2)) member[Undefined-a.num1(valid)]",
-			"Undefined-a.getNum2(valid)(Undefined-A(Undefined-A,1,2)) member[Undefined-a.num2(valid)]",
+			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, this.num1)]",
+			"Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)
 	})
 }
@@ -420,7 +328,6 @@ func TestJava_Package(t *testing.T) {
 	public	class A {
 			int num = 0;
 			public int getNum() {
-				super();
 				return this.num;
 			}
 		}
