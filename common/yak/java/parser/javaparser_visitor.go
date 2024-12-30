@@ -574,11 +574,11 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#typeArguments.
 	VisitTypeArguments(ctx *TypeArgumentsContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#superSuffix.
-	VisitSuperSuffix(ctx *SuperSuffixContext) interface{}
+	// Visit a parse tree produced by JavaParser#SuperSuffixArguments.
+	VisitSuperSuffixArguments(ctx *SuperSuffixArgumentsContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#explicitGenericInvocationSuffix.
-	VisitExplicitGenericInvocationSuffix(ctx *ExplicitGenericInvocationSuffixContext) interface{}
+	// Visit a parse tree produced by JavaParser#SuperSuffixIdentifier.
+	VisitSuperSuffixIdentifier(ctx *SuperSuffixIdentifierContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#arguments.
 	VisitArguments(ctx *ArgumentsContext) interface{}

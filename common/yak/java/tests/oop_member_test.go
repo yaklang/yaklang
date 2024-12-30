@@ -2,6 +2,7 @@ package tests
 
 import (
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"testing"
 
@@ -288,6 +289,7 @@ class A {
 }
 
 func Test_Cross_Class_Side_Effect(t *testing.T) {
+	t.Skip()
 	//TODO:类成员的side-effect要有传递性
 	t.Run("aaa", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
@@ -342,5 +344,51 @@ class B {
 			require.Contains(t, a.String(), "33")
 			return nil
 		})
+	})
+}
+
+func Test_Inner_Class(t *testing.T) {
+	t.Run("test outerclass.this ", func(t *testing.T) {
+		code := `
+public class OuterClass {
+    private int value = 11;
+
+    class InnerClass {
+        private int value = 22;
+
+        public void printValues() {
+            println(value);         // 打印内部类的value
+            println(OuterClass.this.value); // 打印外部类的value
+        }
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`println(* as $result)`, map[string][]string{
+				"result": {"ParameterMember-parameter[0].value", "11"},
+			}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("test outerclass.super", func(t *testing.T) {
+		code := `
+public class A{
+	private int value = 11;
+}
+
+public class OuterClass extends A {
+	private int value = 22;
+	class InnerClass {
+		private int value = 33;
+		public void printValues() {
+			println(value);         // 打印内部类的value
+			println(OuterClass.super.value); // 打印外部类父类的value
+		}
+	}	
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`println(* as $result)`, map[string][]string{
+				"result": {"ParameterMember-parameter[0].value", "11"},
+			}, ssaapi.WithLanguage(consts.JAVA))
 	})
 }

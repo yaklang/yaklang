@@ -763,11 +763,11 @@ func (v *BaseJavaParserVisitor) VisitTypeArguments(ctx *TypeArgumentsContext) in
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitSuperSuffix(ctx *SuperSuffixContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitSuperSuffixArguments(ctx *SuperSuffixArgumentsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitExplicitGenericInvocationSuffix(ctx *ExplicitGenericInvocationSuffixContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitSuperSuffixIdentifier(ctx *SuperSuffixIdentifierContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
