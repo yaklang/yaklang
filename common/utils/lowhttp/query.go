@@ -142,12 +142,10 @@ func ParseQueryParams(s string, options ...QueryOption) *QueryParams {
 
 	scanner := bufio.NewReaderSize(bytes.NewBufferString(s), len(s))
 	var items []*QueryParamItem
-	var position HttpParamPositionType
 
 	// 获取 position，如果有的话
-	if len(query.Items) > 0 {
-		position = query.Items[0].Position
-	}
+	position := query.Position
+
 	handle := func(pair string) {
 		if len(pair) <= 0 {
 			return
@@ -164,16 +162,18 @@ func ParseQueryParams(s string, options ...QueryOption) *QueryParams {
 				pair = fmt.Sprintf("%s=%s", key, val)
 			}
 			items = append(items, &QueryParamItem{
-				Raw:      codec.ForceQueryUnescape(pair),
-				Key:      codec.ForceQueryUnescape(key),
-				Value:    codec.ForceQueryUnescape(val),
-				ValueRaw: val,
-				Position: position,
+				Raw:          codec.ForceQueryUnescape(pair),
+				Key:          codec.ForceQueryUnescape(key),
+				Value:        codec.ForceQueryUnescape(val),
+				ValueRaw:     val,
+				Position:     position,
+				NoAutoEncode: query.NoAutoEncode,
 			})
 		} else {
 			items = append(items, &QueryParamItem{
-				Raw:      codec.ForceQueryUnescape(pair),
-				Position: position,
+				Raw:          codec.ForceQueryUnescape(pair),
+				Position:     position,
+				NoAutoEncode: query.NoAutoEncode,
 			})
 		}
 	}
@@ -192,11 +192,7 @@ func ParseQueryParams(s string, options ...QueryOption) *QueryParams {
 
 func WithPosition(p HttpParamPositionType) QueryOption {
 	return func(q *QueryParams) {
-		if q.Items == nil {
-			q.Items = make([]*QueryParamItem, 0)
-		}
 		q.Position = p
-		q.Items = append(q.Items, &QueryParamItem{Position: p})
 	}
 }
 
