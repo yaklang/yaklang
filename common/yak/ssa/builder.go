@@ -46,7 +46,7 @@ type FunctionBuilder struct {
 	Included bool
 	IsReturn bool
 
-	RefParameter map[string]struct{}
+	RefParameter map[string]struct{ Index int }
 
 	target *target // for break and continue
 	labels map[string]*BasicBlock
@@ -82,7 +82,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		CurrentBlock:  nil,
 		CurrentRange:  nil,
 		parentBuilder: parent,
-		RefParameter:  make(map[string]struct{}),
+		RefParameter:  make(map[string]struct{ Index int }),
 		IncludeStack:  utils.NewStack[string](),
 	}
 	if parent != nil {
@@ -244,8 +244,8 @@ func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 	return b.MarkedFuncType
 }
 
-func (b *FunctionBuilder) ReferenceParameter(name string) {
-	b.RefParameter[name] = struct{}{}
+func (b *FunctionBuilder) ReferenceParameter(name string, index int) {
+	b.RefParameter[name] = struct{ Index int }{Index: index}
 }
 func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) Value {
 	method := bluePrint.GetMagicMethod(Constructor)

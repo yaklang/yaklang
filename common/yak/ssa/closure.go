@@ -21,13 +21,14 @@ type FunctionSideEffect struct {
 	*parameterMemberInner
 }
 
-func (f *Function) AddForceSideEffect(name string, v Value) {
+func (f *Function) AddForceSideEffect(name string, v Value, index int) {
 	f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
 		Name:        name,
 		Modify:      v,
 		forceCreate: true,
 		parameterMemberInner: &parameterMemberInner{
-			MemberCallKind: NoMemberCall,
+			MemberCallKind:        ParameterCall,
+			MemberCallObjectIndex: index,
 		},
 	})
 }

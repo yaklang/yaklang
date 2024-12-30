@@ -182,8 +182,8 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			parentValue.AddOccultation(para)
 		}
 	}
-	if _, ok := b.RefParameter[variable.GetName()]; ok {
-		b.AddForceSideEffect(variable.GetName(), value)
+	if val, ok := b.RefParameter[variable.GetName()]; ok {
+		b.AddForceSideEffect(variable.GetName(), value, val.Index)
 	}
 	b.CheckAndSetSideEffect(variable, value)
 
