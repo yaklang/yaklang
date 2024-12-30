@@ -1902,6 +1902,7 @@ func (y *builder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariabl
 	// create variable
 	if len(wantVariable) != 0 && wantVariable[0] == true {
 		if class == nil {
+			variable = y.CreateVariable(name)
 			return
 		}
 		if class.GetNormalMember(name) != nil {
@@ -1914,11 +1915,12 @@ func (y *builder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariabl
 		if variable = y.GetOuterClassFieldVariable(name); variable != nil {
 			return variable, nil
 		}
-		variable = y.CreateVariable(name)
-		return variable, nil
+		if variable == nil {
+			variable = y.CreateVariable(name)
+		}
+		return
 	}
 	// get value
-	//set full type name for value
 	defer func() {
 		if utils.IsNil(value) {
 			return
@@ -1929,7 +1931,6 @@ func (y *builder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariabl
 			value.SetType(newType)
 		}
 	}()
-
 	if value = y.PeekValue(name); value != nil {
 		// found
 		return nil, value
