@@ -375,7 +375,8 @@ a=b`)
 	results := freq.FuzzPostParams(key, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
-		require.Equal(t, excepts[i], lowhttp.GetHTTPRequestPostParam(r, key))
+		body := lowhttp.GetHTTPPacketBody(r)
+		require.Equal(t, fmt.Sprintf("a=b&c=%s", excepts[i]), string(body))
 	}
 }
 
