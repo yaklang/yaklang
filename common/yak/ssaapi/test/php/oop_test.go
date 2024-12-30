@@ -177,4 +177,28 @@ namespace{
 			},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	t.Run("anymous-class with parent2", func(t *testing.T) {
+		code := `<?php
+
+
+class A extends B{
+}
+
+$c= 1;
+$a = new class($c) extends A{
+	public function __construct($c){
+        echo $c;
+	}
+};
+println($a->AA());
+
+class B{
+    public function AA(){
+        return 1;
+    }
+}`
+		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
+			"param": []string{"1"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }

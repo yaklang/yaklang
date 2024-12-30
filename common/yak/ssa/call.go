@@ -7,7 +7,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
 
@@ -15,6 +14,7 @@ func NewCall(target Value, args []Value, binding map[string]Value, block *BasicB
 	if binding == nil {
 		binding = make(map[string]Value)
 	}
+
 	c := &Call{
 		anValue:         NewValue(),
 		Method:          target,
@@ -301,23 +301,39 @@ func (c *Call) handleCalleeFunction() {
 			_ = bindScope
 
 			// is object
-			if se.MemberCallKind == NoMemberCall {
+
+			switch se.MemberCallKind {
+			case NoMemberCall:
 				if ret := GetFristLocalVariableFromScopeAndParent(currentScope, se.Name); ret != nil {
 					if modifyScope.IsSameOrSubScope(ret.GetScope()) {
 						continue
 					}
 				}
-
 				variable = builder.CreateVariableForce(se.Name)
 				if se.BindVariable != nil {
 					variable.SetCaptured(se.BindVariable)
 				}
-			} else {
-				// is object
+			case ParameterCall:
+				val, exists := se.Get(c)
+				if !exists || utils.IsNil(val) {
+					continue
+				}
+				//直接找到variable来生成sideEffect
+				//modify side-effect name
+				if val.GetName() != "" {
+					se.Name = val.GetName()
+				} else {
+					se.Name = val.GetLastVariable().GetName()
+				}
+				se.Variable = val.GetLastVariable()
+				se.BindVariable = val.GetLastVariable()
+				variable = builder.CreateVariable(se.Name)
+			default:
 				obj, ok := se.Get(c)
 				if !ok {
 					continue
 				}
+				// is object
 				variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
 				if se.BindVariable != nil {
 					variable.SetCaptured(se.BindVariable)
