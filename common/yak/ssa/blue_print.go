@@ -56,8 +56,8 @@ type Blueprint struct {
 
 	GeneralUndefined func(string) *Undefined
 
-	ParentClass []*Blueprint // ParentClass All classes, including interfaces and parent classes
-	SuperClass  *Blueprint
+	ParentBlueprint []*Blueprint // ParentBlueprint All classes, including interfaces and parent classes
+	SuperBlueprint  *Blueprint
 
 	// full Type Name
 	fullTypeName []string
@@ -88,7 +88,7 @@ func (c *Blueprint) AddParentClass(parent *Blueprint) {
 	if parent == nil {
 		return
 	}
-	c.ParentClass = append(c.ParentClass, parent)
+	c.ParentBlueprint = append(c.ParentBlueprint, parent)
 	for name, f := range parent.NormalMethod {
 		c.RegisterNormalMethod(name, f, false)
 	}
@@ -109,22 +109,22 @@ func (c *Blueprint) AddParentClass(parent *Blueprint) {
 	}
 }
 
-func (c *Blueprint) SetSuperClass(parent *Blueprint) {
+func (c *Blueprint) SetSuperBlueprint(parent *Blueprint) {
 	if parent == nil || c == nil {
 		return
 	}
-	c.SuperClass = parent
+	c.SuperBlueprint = parent
 }
 
-func (c *Blueprint) GetSuperClass() *Blueprint {
+func (c *Blueprint) GetSuperBlueprint() *Blueprint {
 	if c == nil {
 		return nil
 	}
-	return c.SuperClass
+	return c.SuperBlueprint
 }
 
 func (c *Blueprint) CheckExtendBy(kls string) bool {
-	for _, class := range c.ParentClass {
+	for _, class := range c.ParentBlueprint {
 		if strings.EqualFold(class.Name, kls) {
 			return true
 		}
@@ -138,7 +138,7 @@ func (c *Blueprint) getFieldWithParent(get func(bluePrint *Blueprint) bool) bool
 		return true
 	} else {
 		// if current class can't get this field, then check the parent class
-		for _, class := range c.ParentClass {
+		for _, class := range c.ParentBlueprint {
 			// if parent class can get this field, just return true
 			if ex := class.getFieldWithParent(get); ex {
 				return true
