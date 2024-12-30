@@ -544,6 +544,8 @@ const (
 	FreeValueMemberCall
 	CallMemberCall
 	SideEffectMemberCall
+
+	ParameterCall
 )
 
 type parameterMemberInner struct {
@@ -576,7 +578,6 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 		return
 	case ParameterMemberCall:
 		if p.MemberCallObjectIndex >= len(c.Args) {
-			// log.Errorf("handleCalleeFunction: memberCallObjectIndex out of range %d vs len: %d", p.MemberCallObjectIndex, len(c.Args))
 			return
 		}
 		return c.Args[p.MemberCallObjectIndex], true
@@ -588,6 +589,11 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 	case SideEffectMemberCall:
 		value, ok := c.SideEffectValue[p.MemberCallObjectName]
 		return value, ok
+	case ParameterCall:
+		if p.MemberCallObjectIndex >= len(c.Args) {
+			return
+		}
+		return c.Args[p.MemberCallObjectIndex], true
 	}
 	return
 }

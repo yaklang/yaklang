@@ -66,7 +66,19 @@ func TestParseSSA_Function_SideEffect(t *testing.T) {
 			"side-effect(33, $a)",
 		}, t)
 	})
+	t.Run("reference2", func(t *testing.T) {
+		code := `<?php
 
+$c = 1;
+function A(&$a){
+    $a = 2;
+}
+
+A($c);
+println($c);
+`
+		test.CheckPrintlnValue(code, []string{"side-effect(2, $c)"}, t)
+	})
 	t.Run("multiple mix reference parameter", func(t *testing.T) {
 		test.CheckPrintlnValue(`<?php
 		function A(&$a, $b, &$c){
@@ -215,7 +227,30 @@ println($d);
 `
 		test.CheckPrintlnValue(code, []string{"side-effect(2, $d)"}, t)
 	})
+	t.Run("closure2", func(t *testing.T) {
+		code := `<?php
 
+$d = 1;
+function A(&$a){
+    $a = 2;
+}
+A($d);
+println($d);
+`
+		test.CheckPrintlnValue(code, []string{"side-effect(2, $d)"}, t)
+	})
+	t.Run("closure3", func(t *testing.T) {
+		code := `<?php
+
+$d[0] = 1;
+function A(&$a){
+    $a = 2;
+}
+A($d[0]);
+println($d[0]);
+`
+		test.CheckPrintlnValue(code, []string{"side-effect(2, #14[0])"}, t)
+	})
 }
 func TestParseSSA_DefinedFunc(t *testing.T) {
 	t.Run("include", func(t *testing.T) {

@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -95,14 +96,14 @@ func (y *builder) VisitFormalParameterList(raw phpparser.IFormalParameterListCon
 		return nil
 	}
 
-	for _, param := range i.AllFormalParameter() {
-		y.VisitFormalParameter(param)
+	for index, param := range i.AllFormalParameter() {
+		y.VisitFormalParameter(param, index)
 	}
 
 	return nil
 }
 
-func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) {
+func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext, index int) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -141,7 +142,7 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) {
 		param.SetType(typeHint)
 	}
 	if isRef {
-		y.ReferenceParameter(formalParams)
+		y.ReferenceParameter(formalParams, index)
 	}
 	return
 }
@@ -204,22 +205,24 @@ func (y *builder) VisitLambdaFunctionUseVar(raw phpparser.ILambdaFunctionUseVarC
 	if i == nil {
 		return nil
 	}
-	if i.Ampersand() != nil {
-		y.ReferenceParameter(i.VarName().GetText())
-		return nil
-	}
 	current := y.SupportClosure
 	y.SupportClosure = true
 	defer func() {
 		y.SupportClosure = current
 	}()
-	if value := y.ReadValue(i.VarName().GetText()); value != nil {
-		freeValue := y.BuildFreeValue(i.VarName().GetText())
-		p, ok := ssa.ToParameter(value)
-		if ok && p.GetDefault() != nil {
-			freeValue.SetDefault(p.GetDefault())
+	value := y.PeekValue(i.VarName().GetText())
+	if i.Ampersand() != nil {
+		if !utils.IsNil(value) {
+			freeValue := y.BuildFreeValue(i.VarName().GetText())
+			p, ok := ssa.ToParameter(value)
+			if ok && p.GetDefault() != nil {
+				freeValue.SetDefault(p.GetDefault())
+			}
+			freeValue.SetType(value.GetType())
 		}
-		freeValue.SetType(value.GetType())
+	} else {
+		variable := y.CreateLocalVariable(i.VarName().GetText())
+		variable.Assign(value)
 	}
 	return nil
 }
