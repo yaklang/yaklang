@@ -646,7 +646,7 @@ expression
         | methodCall
         | THIS
         | NEW nonWildcardTypeArguments? innerCreator
-        | SUPER superSuffix
+        | SUPER
         | explicitGenericInvocation
     )                                                               # MemberCallExpression
     // Method calls and method references are part of primary, and hence level 16 precedence
@@ -767,7 +767,7 @@ primary
     | literal
     | identifier
     | typeTypeOrVoid '.' CLASS
-    | nonWildcardTypeArguments (explicitGenericInvocationSuffix | THIS arguments)
+    | nonWildcardTypeArguments (methodCall | THIS arguments)
     ;
 
 // Java17
@@ -826,7 +826,7 @@ classCreatorRest
     ;
 
 explicitGenericInvocation
-    : nonWildcardTypeArguments explicitGenericInvocationSuffix
+    : nonWildcardTypeArguments methodCall
     ;
 
 typeArgumentsOrDiamond
@@ -867,13 +867,8 @@ typeArguments
     ;
 
 superSuffix
-    : arguments
-    | '.' typeArguments? identifier arguments?
-    ;
-
-explicitGenericInvocationSuffix
-    : SUPER superSuffix
-    | identifier arguments
+    : arguments # SuperSuffixArguments
+    | '.' typeArguments? identifier arguments? # SuperSuffixIdentifier
     ;
 
 arguments
