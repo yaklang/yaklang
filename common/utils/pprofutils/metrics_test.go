@@ -190,6 +190,7 @@ func TestBasicMetrics(t *testing.T) {
 
 // 测试CPU监控器的基本功能
 func TestNewCPUMonitor(t *testing.T) {
+	yakit.InitialDatabase()
 	checked := false
 
 	db := consts.GetGormProfileDatabase()
