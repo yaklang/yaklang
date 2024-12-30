@@ -469,8 +469,8 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	debugMode := false
 	defer func() {
 		if debugMode && method != nil {
-			fmt.Println("DumpMethodWithInitialId done")
-			fmt.Println(dumped.code)
+			log.Info("DumpMethodWithInitialId done")
+			log.Info("\n" + dumped.code)
 		}
 	}()
 
@@ -607,7 +607,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			statementToString = func(statement statements.Statement) (statementStr string) {
 				defer func() {
 					if debugMode {
-						fmt.Println(statementStr)
+						log.Info("\n" + statementStr)
 					}
 				}()
 				//if statementSet.Has(statement) {
@@ -618,7 +618,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				case *statements.AssignStatement:
 					foundFieldInit := false
 					if v, ok := ret.LeftValue.(*values.RefMember); ok {
-						if v1, ok := v.Object.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<cinit>" || funcCtx.FunctionName == funcCtx.ClassName) {
+						if v1, ok := v.Object.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<cinit>" || funcCtx.FunctionName == "<init>" || funcCtx.FunctionName == funcCtx.ClassName) {
 							foundFieldInit = true
 							c.fieldDefaultValue[v.Member] = ret.JavaValue.String(funcCtx)
 						}
