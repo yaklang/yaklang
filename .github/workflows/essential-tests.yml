@@ -7,6 +7,7 @@ on:
     paths:
       - "common/**"
       - ".github/workflows/essential-tests.yml"
+      - "go.mod"
 
 jobs:
   setup:
