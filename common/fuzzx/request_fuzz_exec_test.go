@@ -44,3 +44,24 @@ a=!@&b=2`)
 	results = p.Fuzz("2").Results()
 	require.Len(t, results, 1)
 }
+
+func TestParams_FuzzQueryParams_Encoding(t *testing.T) {
+	raw := []byte(`GET /?a=!@&b=2 HTTP/1.1
+Host: www.baidu.com
+`)
+	freq := MustNewFuzzHTTPRequest(raw)
+	results := freq.FuzzGetParams("b", "3").Results()
+	require.Len(t, results, 1)
+	require.Equal(t, "GET /?a=!@&b=3 HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n", string(results[0]))
+}
+
+func TestParams_FuzzPostParams_Encoding(t *testing.T) {
+	raw := []byte(`POST / HTTP/1.1
+Host: www.baidu.com
+
+a=!@&b=2`)
+	freq := MustNewFuzzHTTPRequest(raw)
+	results := freq.FuzzPostParams("b", "3").Results()
+	require.Len(t, results, 1)
+	require.Equal(t, "POST / HTTP/1.1\r\nHost: www.baidu.com\r\nContent-Length: 8\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\na=!@&b=3", string(results[0]))
+}
