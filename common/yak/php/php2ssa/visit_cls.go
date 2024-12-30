@@ -141,7 +141,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 					if parentClass := y.GetBluePrint(parentClassName); parentClass != nil {
 						//感觉在ssa-classBlue中做更好，暂时修复
 						class.AddParentClass(parentClass)
-						class.SetSuperClass(parentClass)
+						class.SetSuperBlueprint(parentClass)
 						for _, s := range parentClass.GetFullTypeNames() {
 							class.AddFullTypeName(s)
 						}
@@ -480,7 +480,7 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Bluep
 	} else if i.Identifier() != nil {
 		className = i.Identifier().GetText()
 		if className == "parent" {
-			parentClass := y.MarkedThisClassBlueprint.GetSuperClass()
+			parentClass := y.MarkedThisClassBlueprint.GetSuperBlueprint()
 			if parentClass != nil {
 				return parentClass
 			}

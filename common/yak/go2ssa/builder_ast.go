@@ -105,7 +105,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					b.NewError(ssa.Warn, TAG, StructNotFind(n))
 					pbp = b.CreateBluePrint(pn)
 				}
-				bp.ParentClass = append(bp.ParentClass, pbp)
+				bp.ParentBlueprint = append(bp.ParentBlueprint, pbp)
 			}
 		}
 

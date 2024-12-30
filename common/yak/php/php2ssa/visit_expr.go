@@ -77,7 +77,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		if parent == nil {
 			parent = y.EmitConstInst(text)
 		}
-		cls := y.MarkedThisClassBlueprint.GetSuperClass()
+		cls := y.MarkedThisClassBlueprint.GetSuperBlueprint()
 		if cls != nil {
 			parent.SetType(cls)
 		}
