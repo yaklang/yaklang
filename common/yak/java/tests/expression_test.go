@@ -104,6 +104,18 @@ func TestJava_Simple_Expression(t *testing.T) {
 		println(c%=b);`, []string{"12", "24", "36", "24", "288", "24", "8", "12",
 			"0", "0", "0", "0", "0"}, t)
 	})
+
+	t.Run("test instanceof expression ", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		String name = "James";
+		println(name instanceof String);
+		println(name instanceof int);
+		if (name instanceof String s) {
+           println(s);
+        }
+	`, []string{`true`, `false`, `"James"`}, t)
+	})
+
 	t.Run("test SliceCallExpression", func(t *testing.T) {
 		CheckJavaPrintlnValue(` 
 		int[] numbers = new int[10];
