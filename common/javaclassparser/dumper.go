@@ -528,8 +528,8 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	c.CurrentMethod = method
 	funcCtx := c.FuncCtx
 	funcCtx.FunctionName = name
-	//if name != "crt_data_by_Attrs" {
-	//	continue
+	//if name != "checkSCS" {
+	//	return &dumpedMethods{}, nil
 	//}
 	//println(name)
 	annoStrs := []string{}
@@ -701,9 +701,17 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				}
 				return statementStr
 			}
+			statementCodes := []string{}
+			supperInvokeStr := ""
 			for i, statement := range statementList {
 				if i == len(statementList)-1 && methodType.FunctionType().ReturnType.String(funcCtx) == "void" {
 					if _, ok := statement.(*statements.ReturnStatement); ok {
+						continue
+					}
+				}
+				if v, ok := statement.(*statements.ExpressionStatement); ok {
+					if v1, ok := v.Expression.(*values.FunctionCallExpression); ok && v1.IsSupperConstructorInvoke(funcCtx) {
+						supperInvokeStr = fmt.Sprintf("%s\n", statementToString(statement))
 						continue
 					}
 				}
@@ -711,8 +719,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				if statementStr == "" {
 					continue
 				}
-				sourceCode += fmt.Sprintf("%s\n", statementStr)
+				statementCodes = append(statementCodes, fmt.Sprintf("%s\n", statementStr))
 			}
+
+			sourceCode += supperInvokeStr + strings.Join(statementCodes, "")
 			code = sourceCode
 		}
 	}
