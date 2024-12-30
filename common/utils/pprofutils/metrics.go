@@ -15,6 +15,11 @@ package pprofutils
 import (
 	"bytes"
 	"fmt"
+	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -22,13 +27,6 @@ import (
 	"runtime/pprof"
 	"sync"
 	"time"
-
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-
-	"github.com/shirou/gopsutil/v3/mem"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 type MemMetrics struct {
@@ -174,114 +172,117 @@ func executeMemCallbacks(metrics []FunctionStat) {
 }
 
 func init() {
-	exportReport := func(prefix string, stats []FunctionStat) {
-		msg := DumpFunctionStats(stats)
-		path := filepath.Join(consts.GetDefaultYakitPprofDir(), fmt.Sprintf("%s-%s.txt", prefix, utils.DatetimePretty2()))
-		err := os.WriteFile(path, []byte(msg), 0644)
-		if err != nil {
-			log.Errorf("write auto analyze report failed: %s", err)
-			return
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		exportReport := func(prefix string, stats []FunctionStat) {
+			msg := DumpFunctionStats(stats)
+			path := filepath.Join(consts.GetDefaultYakitPprofDir(), fmt.Sprintf("%s-%s.txt", prefix, utils.DatetimePretty2()))
+			err := os.WriteFile(path, []byte(msg), 0644)
+			if err != nil {
+				log.Errorf("write auto analyze report failed: %s", err)
+				return
+			}
+			log.Infof("auto analyze report exported to: %s", path)
 		}
-		log.Infof("auto analyze report exported to: %s", path)
-	}
-	AddCPUProfileCallback(func(stats []FunctionStat) {
-		log.Infof("High CPU usage detected, top consuming function: %v", stats[0].Dump())
-		exportReport("cpu", stats)
-	})
-	AddMemProfileCallback(func(stats []FunctionStat) {
-		log.Infof("High memory usage detected, top consuming function: %v", stats[0].Dump())
-		exportReport("mem", stats)
-	})
+		AddCPUProfileCallback(func(stats []FunctionStat) {
+			log.Infof("High CPU usage detected, top consuming function: %v", stats[0].Dump())
+			exportReport("cpu", stats)
+		})
+		AddMemProfileCallback(func(stats []FunctionStat) {
+			log.Infof("High memory usage detected, top consuming function: %v", stats[0].Dump())
+			exportReport("mem", stats)
+		})
 
-	db := consts.GetGormProfileDatabase()
-	// CPU分析协程
-	go func() {
-		// 获取CPU核心数
-		numCPU := runtime.NumCPU()
-		cpuPprofileOnce.Do(func() {
+		db := consts.GetGormProfileDatabase()
+		// CPU分析协程
+		go func() {
+			// 获取CPU核心数
+			numCPU := runtime.NumCPU()
+			cpuPprofileOnce.Do(func() {
+				var buf = bytes.NewBuffer(nil)
+				for {
+					time.Sleep(time.Second)
+					if yakit.GetKey(db, consts.PPROFILEAUTOANALYZE_KEY) != "true" {
+						continue
+					}
+					cpuCallbackMutex.RLock()
+					if len(cpuCallbacks) == 0 {
+						cpuCallbackMutex.RUnlock()
+						continue
+					}
+					cpuCallbackMutex.RUnlock()
+
+					start := time.Now()
+					buf.Reset()
+					err := pprof.StartCPUProfile(buf)
+					if err != nil {
+						randInt := rand.Intn(10) + 1
+						fmt.Printf("CPU Profile error: %v, retry after %d seconds\n", err, randInt)
+						time.Sleep(time.Duration(randInt) * time.Second)
+						continue
+					}
+					time.Sleep(time.Second)
+					pprof.StopCPUProfile()
+					stats, err := AutoAnalyzeRaw(buf)
+					if err != nil && len(stats) == 0 {
+						log.Debugf("finished pprofiling for cpu duration: %v, profile: %v", time.Now().Sub(start), utils.ByteSize(uint64(buf.Len())))
+						continue
+					}
+
+					// 获取CPU使用率
+					cpuPercent := stats[0].Percent
+					// 如果CPU使用率超过单核100%,则需要除以CPU核心数来获得平均使用率
+					if cpuPercent > 1.0 {
+						cpuPercent = cpuPercent / float64(numCPU)
+					}
+
+					if cpuPercent >= cpuThreshold {
+						// 执行回调函数
+						if len(stats) > 0 {
+							log.Infof("High CPU usage detected (%v%%), top consuming function: %v", cpuPercent, stats[0].Dump())
+						}
+						executeCPUCallbacks(stats)
+					}
+				}
+			})
+		}()
+
+		// 内存分析协程
+		go func() {
 			var buf = bytes.NewBuffer(nil)
 			for {
 				time.Sleep(time.Second)
 				if yakit.GetKey(db, consts.PPROFILEAUTOANALYZE_KEY) != "true" {
 					continue
 				}
-				cpuCallbackMutex.RLock()
-				if len(cpuCallbacks) == 0 {
-					cpuCallbackMutex.RUnlock()
+				memCallbackMutex.RLock()
+				if len(memCallbacks) == 0 {
+					memCallbackMutex.RUnlock()
 					continue
 				}
-				cpuCallbackMutex.RUnlock()
-
-				start := time.Now()
-				buf.Reset()
-				err := pprof.StartCPUProfile(buf)
-				if err != nil {
-					randInt := rand.Intn(10) + 1
-					fmt.Printf("CPU Profile error: %v, retry after %d seconds\n", err, randInt)
-					time.Sleep(time.Duration(randInt) * time.Second)
-					continue
-				}
-				time.Sleep(time.Second)
-				pprof.StopCPUProfile()
-				stats, err := AutoAnalyzeRaw(buf)
-				if err != nil && len(stats) == 0 {
-					log.Debugf("finished pprofiling for cpu duration: %v, profile: %v", time.Now().Sub(start), utils.ByteSize(uint64(buf.Len())))
-					continue
-				}
-
-				// 获取CPU使用率
-				cpuPercent := stats[0].Percent
-				// 如果CPU使用率超过单核100%,则需要除以CPU核心数来获得平均使用率
-				if cpuPercent > 1.0 {
-					cpuPercent = cpuPercent / float64(numCPU)
-				}
-
-				if cpuPercent >= cpuThreshold {
-					// 执行回调函数
-					if len(stats) > 0 {
-						log.Infof("High CPU usage detected (%v%%), top consuming function: %v", cpuPercent, stats[0].Dump())
-					}
-					executeCPUCallbacks(stats)
-				}
-			}
-		})
-	}()
-
-	// 内存分析协程
-	go func() {
-		var buf = bytes.NewBuffer(nil)
-		for {
-			time.Sleep(time.Second)
-			if yakit.GetKey(db, consts.PPROFILEAUTOANALYZE_KEY) != "true" {
-				continue
-			}
-			memCallbackMutex.RLock()
-			if len(memCallbacks) == 0 {
 				memCallbackMutex.RUnlock()
-				continue
-			}
-			memCallbackMutex.RUnlock()
 
-			buf.Reset()
-			pprof.WriteHeapProfile(buf)
-			stats, err := AutoAnalyzeRaw(buf)
-			if err != nil {
-				log.Debugf("memory analyze failed, reason: %v", err)
-				continue
-			}
+				buf.Reset()
+				pprof.WriteHeapProfile(buf)
+				stats, err := AutoAnalyzeRaw(buf)
+				if err != nil {
+					log.Debugf("memory analyze failed, reason: %v", err)
+					continue
+				}
 
-			metrics, err := metricsForMem()
-			if err != nil {
-				log.Debugf("memory metrics generating failed, reason: %v", err)
-				continue
-			}
+				metrics, err := metricsForMem()
+				if err != nil {
+					log.Debugf("memory metrics generating failed, reason: %v", err)
+					continue
+				}
 
-			// 只有当内存使用率超过阈值时才触发回调
-			percent := metrics.Percent()
-			if percent.SystemMemoryUsage >= memThreshold {
-				// 执行内存回调函数
-				executeMemCallbacks(stats)
+				// 只有当内存使用率超过阈值时才触发回调
+				percent := metrics.Percent()
+				if percent.SystemMemoryUsage >= memThreshold {
+					// 执行内存回调函数
+					executeMemCallbacks(stats)
+				}
 			}
-		}
-	}()
+		}()
+		return nil
+	})
 }
