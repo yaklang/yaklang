@@ -21,11 +21,7 @@ func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*
 	db = FilterSyntaxFlowRule(db, params.GetFilter())
 	var ret []*schema.SyntaxFlowRule
 	db = db.Preload("Groups")
-	// 联表查询会导致paging的TotalRecord不准确，因此需要通过rule id获取总数
-	var count int
-	db.Group("syntax_flow_rules.id").Count(&count)
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
-	paging.TotalRecord = count
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
@@ -54,7 +50,7 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 		db = db.Joins("JOIN syntax_flow_rule_and_group ON syntax_flow_rule_and_group.syntax_flow_rule_id = syntax_flow_rules.id").
 			Joins("JOIN syntax_flow_groups ON syntax_flow_groups.id = syntax_flow_rule_and_group.syntax_flow_group_id").
 			Where("syntax_flow_groups.group_name IN (?)", params.GetGroupNames()).
-			Select("DISTINCT syntax_flow_rules.*")
+			Group("syntax_flow_rules.id")
 	}
 
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", params.GetSeverity())
