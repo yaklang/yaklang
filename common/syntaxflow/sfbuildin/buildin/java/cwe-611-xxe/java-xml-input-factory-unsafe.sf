@@ -1,0 +1,147 @@
+desc(
+    title: "Check STAX XMLInputFactory() Unsafe Use",
+    title_zh: "检测 STAX（Streaming API for XML） XMLInputFactory() 不安全使用",
+    type: vuln,
+    desc: <<<TEXT
+使用 STAX（Streaming API for XML）中的 `XMLInputFactory` 时，如果未明确设置安全策略，可能会导致应用程序容易受到 XML 外部实体（XXE）攻击。XXE 攻击允许攻击者访问本地文件系统、执行。
+TEXT
+)
+
+XMLInputFactory.newInstance() as $factory;
+check $factory;
+
+$factory?{!.setProperty}...createXMLStreamReader() as $vulnCall;
+check $vulnCall;
+
+alert $vulnCall for {
+    message: "STAX XMLInputFactory() Unsafe Use",
+    risk: "xxe",
+    level: "warning",
+}
+
+desc(
+    lang: "java",
+    alert_num: 2,
+    "file://cve_2018_15531.java": <<<UNSAFE
+import java.util.NoSuchElementException;
+import java.util.Scanner;
+import java.util.regex.Pattern;
+
+import javax.servlet.ReadListener;
+import javax.servlet.ServletInputStream;
+import javax.servlet.ServletRequest;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletRequestWrapper;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import net.bull.javamelody.internal.common.LOG;
+
+public class PayloadNameRequestWrapper extends HttpServletRequestWrapper {
+private static String parseSoapMethodName(InputStream stream, String charEncoding) {
+		try {
+			// newInstance() et pas newFactory() pour java 1.5 (issue 367)
+			final XMLInputFactory factory = XMLInputFactory.newInstance();
+			final XMLStreamReader xmlReader;
+			if (charEncoding != null) {
+				xmlReader = factory.createXMLStreamReader(stream, charEncoding);
+			} else {
+				xmlReader = factory.createXMLStreamReader(stream);
+			}
+
+			//best-effort parsing
+
+			//start document, go to first tag
+			xmlReader.nextTag();
+
+			//expect first tag to be "Envelope"
+			if (!"Envelope".equals(xmlReader.getLocalName())) {
+				LOG.debug("Unexpected first tag of SOAP request: '" + xmlReader.getLocalName()
+						+ "' (expected 'Envelope')");
+				return null; //failed
+			}
+
+			//scan for body tag
+			if (!scanForChildTag(xmlReader, "Body")) {
+				LOG.debug("Unable to find SOAP 'Body' tag");
+				return null; //failed
+			}
+
+			xmlReader.nextTag();
+
+			//tag is method name
+			return "." + xmlReader.getLocalName();
+		} catch (final XMLStreamException e) {
+			LOG.debug("Unable to parse SOAP request", e);
+			//failed
+			return null;
+		}
+	}
+}
+UNSAFE
+)
+
+desc(
+    lang: "java",
+    "safefile://cve_2018_15531_safe.java": <<<SAFE
+    import java.util.NoSuchElementException;
+    import java.util.Scanner;
+    import java.util.regex.Pattern;
+
+    import javax.servlet.ReadListener;
+    import javax.servlet.ServletInputStream;
+    import javax.servlet.ServletRequest;
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletRequestWrapper;
+    import javax.xml.stream.XMLInputFactory;
+    import javax.xml.stream.XMLStreamException;
+    import javax.xml.stream.XMLStreamReader;
+    import net.bull.javamelody.internal.common.LOG;
+
+    public class PayloadNameRequestWrapper extends HttpServletRequestWrapper {
+    private static String parseSoapMethodName(InputStream stream, String charEncoding) {
+    		try {
+    			// newInstance() et pas newFactory() pour java 1.5 (issue 367)
+    			final XMLInputFactory factory = XMLInputFactory.newInstance();
+    			factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+                factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+    			final XMLStreamReader xmlReader;
+    			if (charEncoding != null) {
+    				xmlReader = factory.createXMLStreamReader(stream, charEncoding);
+    			} else {
+    				xmlReader = factory.createXMLStreamReader(stream);
+    			}
+
+    			//best-effort parsing
+
+    			//start document, go to first tag
+    			xmlReader.nextTag();
+
+    			//expect first tag to be "Envelope"
+    			if (!"Envelope".equals(xmlReader.getLocalName())) {
+    				LOG.debug("Unexpected first tag of SOAP request: '" + xmlReader.getLocalName()
+    						+ "' (expected 'Envelope')");
+    				return null; //failed
+    			}
+
+    			//scan for body tag
+    			if (!scanForChildTag(xmlReader, "Body")) {
+    				LOG.debug("Unable to find SOAP 'Body' tag");
+    				return null; //failed
+    			}
+
+    			xmlReader.nextTag();
+
+    			//tag is method name
+    			return "." + xmlReader.getLocalName();
+    		} catch (final XMLStreamException e) {
+    			LOG.debug("Unable to parse SOAP request", e);
+    			//failed
+    			return null;
+    		}
+    	}
+    }
+SAFE
+)
+
+
