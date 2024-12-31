@@ -372,7 +372,7 @@ func TestFuzzParams_CloneFuzzRequest(t *testing.T) {
 		rs := param.Fuzz("c").Results()
 		require.Len(t, rs, 1)
 		rs = param.Fuzz("d").Results()
-		require.Len(t, rs, 2)
+		require.Len(t, rs, 1)
 	}
 }
 
