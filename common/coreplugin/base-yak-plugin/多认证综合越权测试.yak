@@ -90,169 +90,215 @@ JSON,
     ), 
     cli.setRequired(true), 
 )
-
-base = cli.String("base", cli.setRequired(false), cli.setVerboseName("基准值"), cli.setCliGroup("高级（可选参数）"))
-
 disableDomain = cli.String("disable-domain", cli.setRequired(false), cli.setVerboseName("不检测的域名"), cli.setCliGroup("高级（可选参数）"))
 disablePath = cli.String("disable-path", cli.setRequired(false), cli.setVerboseName("不检测的路径"), cli.setCliGroup("高级（可选参数）"))
 
 enableDomain = cli.String("enable-domain", cli.setRequired(false), cli.setVerboseName("需检测域名"), cli.setCliGroup("高级（可选参数）"))
 enablePath = cli.String("enable-path", cli.setRequired(false), cli.setVerboseName("需检测路径"), cli.setCliGroup("高级（可选参数）"))
-
 enableResponseKeyword = cli.Text("enable-response-content", cli.setRequired(false), cli.setVerboseName("需检测响应内容标志值"), cli.setCliGroup("高级（可选参数）"))
-
 enableResponseKeywordRegexp = cli.Bool(
     "enable-response-content-regexp", 
     cli.setRequired(false), 
     cli.setVerboseName("响应内容标志值开启正则"), 
     cli.setCliGroup("高级（可选参数）"), 
 )
-
 cli.check()
 
 yakit.AutoInitYakit()
 once = sync.NewOnce()
+groupMap = make(map[string][]any)
+for _, item = range args["kvs"] {
+    group = item["group"]
+    if group == "" {
+        group = uuid()
+    }
+    if group not in groupMap {
+        groupMap[group] = make([]any, 0, 1)
+    }
+    groupMap[group] = append(groupMap[group], item)
+}
+
+
+func product(sli, curr) {
+    ret = make([][]any, 0, len(sli)*len(curr))
+    for i in len(sli) {
+        for j in len(curr) {
+            tmp := make([]any, len(sli[i]))
+            for n in len(sli[i]) {
+                tmp[n] = sli[i][n]
+            }
+            ret.Append(append(tmp, curr[j]))
+        }
+    }
+    return ret
+}
+
+func Product(sli) {
+    if len(sli) == 0 {
+        return sli
+    }
+    ret = make([][]any, 0, len(sli[0]))
+    for i in len(sli[0]) {
+        ret = append(ret, [sli[0][i]])
+    }
+    for i =1;i<len(sli);i++ {
+        ret = product(ret, sli[i])
+    }
+    return ret
+}
+
+handleReq = (https, reqBytes, baseResponse, handleTag) => {
+    // yakit.Code(reqBytes)
+    poc.HTTP(
+        reqBytes, 
+        poc.https(https), 
+        poc.saveHandler(response => {
+            tag = ""
+            if len(enableResponseKeywordList) > 0 {
+                if respMatch(response.RawPacket, enableResponseKeywordList...) {
+                    tag = "响应内容标志值匹配"
+                    response.Red()
+                } else {
+                    tag = "响应内容标志值消失"
+                    response.Green()
+                }
+            } else {
+                sim := str.CalcSimilarity(baseResponse, response.RawPacket)
+                if sim > 0.95 {
+                    response.Red()
+                } elif sim <= 0.4 {
+                    response.Green()
+                } else {
+                    response.Grey()
+                }
+
+                showSim = "%.2f" % (sim * 100.0)
+                tag = f"相似：${showSim}% "
+            }
+            response.AddTag(tag)
+            response.AddTag(handleTag)
+        }), 
+    )
+}
 
 mirrorHTTPFlow = (https, url, req, rsp, body) => {
-    for _, item = range args["kvs"] {
-        key = item.key
-        value = item.value
-        kind = item.kind
-        force = item.force
-        if !force {
-            if kind == "Cookie" {
-                if poc.GetHTTPPacketCookie(req, key) == "" {
-                    return
-                }
-            } elif kind == "Header" {
-                if poc.GetHTTPPacketHeader(req, key) == "" {
-                    return
-                }
-            }
-        }
-        
+    replaceResults = []
+    emptyResults = []
+    originReq = req
+    for _, items = range groupMap {
+        replacedTmp = []
+        emptyTmp  = []
+        for _, item = range items {
+            key = item.key
+            values = str.ParseStringToLines(item.value)
+            kind = item.kind
+            force = item.force
 
-        skipped = false
-        host, _, _ = str.ParseStringToHostPort(url)
-        path = poc.GetHTTPRequestPath(req)
+            skipped = false
+            host, _, _ = str.ParseStringToHostPort(url)
+            path = poc.GetHTTPRequestPath(req)
 
-        if disableDomain != "" {
-            rules = disableDomain.Split(",").Map(i => i.Trim())
-            skipped = str.MatchAnyOfGlob(host, rules...)
-        }
-        
-
-        if !skipped && disablePath != "" {
-            skipped = str.MatchAnyOfGlob(path, disablePath.Split(",").Map(i => i.Trim())...)
-        }
-        
-
-        if !skipped && enableDomain {
-            skipped = !str.MatchAnyOfGlob(host, enableDomain.Split(",").Map(i => i.Trim())...)
-        }
-        
-
-        if !skipped && enablePath {
-            skipped = !str.MatchAnyOfGlob(path, enablePath.Split(",").Map(i => i.Trim())...)
-        }
-        
-
-        respMatch = str.MatchAnyOfRegexp
-        if !enableResponseKeywordRegexp {
-            respMatch = str.MatchAnyOfSubString
-        }
-        
-
-        enableResponseKeywordList = []
-        if !skipped && enableResponseKeyword {
-            enableResponseKeywordList = enableResponseKeyword.Split("\n")
-            skipped = !respMatch(rsp, enableResponseKeywordList...)
-        }
-        
-
-        if skipped {
-            return
-        }
-        
-
-        replace = (origin, newValue) => {
-            if kind == "Cookie" {
-                if newValue == "" {
-                    return poc.DeleteHTTPPacketCookie(origin, key)
-                }
-                
-
-                return poc.ReplaceHTTPPacketCookie(origin, key, newValue)
-            } elif kind == "Header" {
-                if newValue == "" {
-                    return poc.DeleteHTTPPacketHeader(origin, key)
-                }
-                
-
-                return poc.ReplaceHTTPPacketHeader(origin, key, newValue)
-            }
-        }
-
-        baseResponse = rsp
-        if base != "" {
-            newReqBase = replace(req, base)
-            baseResponse, baseRequest, err = poc.HTTP(newReqBase, poc.https(https))
-            if err != nil {
-                yakit.Error(f"${url} 基准值(${base})测试失败")
-                return
+            if disableDomain != "" {
+                rules = disableDomain.Split(",").Map(i => i.Trim())
+                skipped = str.MatchAnyOfGlob(host, rules...)
             }
             
-            req = baseRequest
-            rsp = baseResponse
-            db.SaveHTTPFlowFromRawWithOption(url, baseRequest, baseResponse)
+
+            if !skipped && disablePath != "" {
+                skipped = str.MatchAnyOfGlob(path, disablePath.Split(",").Map(i => i.Trim())...)
+            }
+
+
+            if !skipped && enableDomain {
+                skipped = !str.MatchAnyOfGlob(host, enableDomain.Split(",").Map(i => i.Trim())...)
+            }
+            
+
+            if !skipped && enablePath {
+                skipped = !str.MatchAnyOfGlob(path, enablePath.Split(",").Map(i => i.Trim())...)
+            }
+
+
+            respMatch = str.MatchAnyOfRegexp
+            if !enableResponseKeywordRegexp {
+                respMatch = str.MatchAnyOfSubString
+            }
+
+
+            enableResponseKeywordList = []
+            if !skipped && enableResponseKeyword {
+                enableResponseKeywordList = enableResponseKeyword.Split("\n")
+                skipped = !respMatch(rsp, enableResponseKeywordList...)
+            }
+            
+
+            if skipped {
+                return
+            }
+
+            
+            if !force {
+                if kind == "Cookie" {
+                    if poc.GetHTTPPacketCookie(req, key) == "" {
+                        continue
+                    }
+                } elif kind == "Header" {
+                    if poc.GetHTTPPacketHeader(req, key) == "" {
+                        continue
+                    }
+                }
+            }
+
+            if kind == "Header" || kind == "Cookie" {
+                 for v in values {
+                    replacedTmp.Append({"key": key, "kind": kind, "value": v})
+                }
+                emptyTmp.Append({"key": key, "kind": kind, "value": ""})
+            }
+        }
+        if len(replacedTmp) == 0 {
+            replacedTmp.Append({"key": "", "kind": "", "value": ""})
+            emptyResults.Append({"key": "", "kind": "", "value": ""})
         } else {
-            db.SaveHTTPFlowFromRawWithOption(url, req, rsp)
+            replaceResults.Append(replacedTmp)
+            emptyResults.Append(emptyTmp)
         }
+    }
+    dump(replaceResults)
+
+    replaceReq = originReq
+    for seq in Product(replaceResults) {
+        tags = []
+        for m in seq {
+            kind, key, value = m.kind, m.key, m.value
+            if kind == "Header" {
+                replaceReq = poc.ReplaceHTTPPacketHeader(replaceReq, key, value)
+            } else if kind == "Cookie" {
+                replaceReq = poc.ReplaceHTTPPacketCookie(replaceReq, key, value)
+            }
+            tags = append(tags, f"${kind}[${key}: ${value}]")
+        }
+        tag = f"值 ${str.Join(tags, ", ")}"
+        handleReq(https, replaceReq, rsp, tag)
+    }
         
-
-        handleReq = (reqBytes, newValue) => {
-            poc.HTTP(
-                reqBytes, 
-                poc.https(https), 
-                poc.saveHandler(response => {
-                    tag = ""
-                    if len(enableResponseKeywordList) > 0 {
-                        if respMatch(response.RawPacket, enableResponseKeywordList...) {
-                            tag = "响应内容标志值匹配"
-                            response.Red()
-                        } else {
-                            tag = "响应内容标志值消失"
-                            response.Green()
-                        }
-                    } else {
-                        sim := str.CalcSimilarity(baseResponse, response.RawPacket)
-                        if sim > 0.95 {
-                            response.Red()
-                        } elif sim <= 0.4 {
-                            response.Green()
-                        } else {
-                            response.Grey()
-                        }
-                        
-                        showSim = "%.2f" % (sim * 100.0)
-                        tag = f"相似：${showSim}% "
-                    }
-                    
-                    if newValue == "" {
-                        tag = f"${tag} 移除 ${kind}[${key}]"
-                    } else {
-                        tag = f"${tag} 值: ${newValue}"
-                    }
-                    
-                    response.AddTag(tag)
-                }), 
-            )
+    emptyReq = originReq
+    for seq in Product(emptyResults) {
+        tags = []
+        for m in seq {
+            kind, key, value = m.kind, m.key, m.value
+            if kind == "Header" {
+                if poc.GetHTTPPacketHeader(emptyReq, key) {
+                    emptyReq = poc.ReplaceHTTPPacketHeader(emptyReq, key, value)
+                }
+            } else if kind == "Cookie" {
+                if poc.GetHTTPPacketCookie(emptyReq, key) {
+                    emptyReq = poc.ReplaceHTTPPacketCookie(emptyReq, key, value)
+                }
+            }
+            tags = append(tags, f"${kind}[${key}]")
         }
-
-        reqBytes = replace(req, value)
-        handleReq(reqBytes, value)
-
-        emptyReq = replace(req, "")
-        handleReq(emptyReq, "")
+        tag = f"移除 ${str.Join(tags, ", ")}"
+        handleReq(https, emptyReq, rsp, tag)
     }
 }
