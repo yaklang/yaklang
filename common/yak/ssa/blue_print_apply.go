@@ -68,11 +68,11 @@ func (c *Blueprint) Apply(obj Value) Type {
 	}
 	prog := builder.GetProgram()
 
-	for _, parent := range c.ParentBlueprint {
+	for _, parent := range c.ParentBlueprints {
 		if parent == nil {
-			log.Warn("ClassBluePrint.ParentBlueprint is nil")
-			log.Warn("ClassBluePrint.ParentBlueprint is nil")
-			log.Warn("ClassBluePrint.ParentBlueprint is nil")
+			log.Warn("ClassBluePrint.ParentBlueprints is nil")
+			log.Warn("ClassBluePrint.ParentBlueprints is nil")
+			log.Warn("ClassBluePrint.ParentBlueprints is nil")
 			continue
 		}
 		parent.Apply(obj)
@@ -94,7 +94,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 	objTyp := NewObjectType()
 	objTyp.SetName(c.Name)
 	objTyp.SetMethod(c.GetMethod())
-	for _, parent := range c.ParentBlueprint {
+	for _, parent := range c.ParentBlueprints {
 		parent.Apply(obj)
 	}
 
