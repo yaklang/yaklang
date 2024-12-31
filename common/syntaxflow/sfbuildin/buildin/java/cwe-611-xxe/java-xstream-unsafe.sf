@@ -2,8 +2,6 @@ desc(
     title: "Find XStream Unsafe Use in Context Sink",
     title_zh: "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
     type: vuln,
-    level: warning,
-    risk: xxe,
     desc: <<<TEXT
 XStream 是一个流行的 Java 库，用于将 Java 对象序列化为 XML，并从 XML 反序列化为 Java 对象。如果不正确地配置 XStream，攻击者可以利用它执行远程代码执行（RCE）或执行其他恶意操作。特别是，当 XStream 未明确设置安全策略时（例如，未调用 `.setMode(XStream.NO_REFERENCES)` 禁用引用，未配置 `.allowType`、`.setupDefaultSecurity`、`.addPermission`、`.allowTypeHierarchy` 等方法），它可能会允许反序列化不受信任的数据，从而导致安全漏洞。建议开发者明确配置 XStream 的安全策略，以防止潜在的安全风险。
 TEXT
@@ -13,4 +11,56 @@ fromXML as $fromXML;
 $fromXML?{ <getObject>?{!.setMode && !.allowType* && !.setupDefaultSecurity && !.addPermission && !.allowTypeHierarchy && <typeName>?{have: XStream} } }() as $vuln;
 
 check $vuln;
-alert $vuln;
+alert $vuln for {
+    message: "XStream Unsafe Use in Context Sink",
+    risk: "xxe",
+    level: "warning",
+}
+
+desc(
+    lang: "java",
+    alert_num: 1,
+    "file://unsafe.java": <<<UNSAFE
+import com.thoughtworks.xstream.XStream;
+import com.thoughtworks.xstream.io.xml.DomDriver;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+
+public class XStreamUnsafe {
+    public void deserialize(String xml) {
+        XStream xstream = new XStream(new DomDriver());
+        try {
+            xstream.fromXML(new FileInputStream(new File(xml)));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+}
+UNSAFE
+)
+
+desc(
+    lang: "java",
+    "safefile://safe.java": <<<SAFE
+import com.thoughtworks.xstream.XStream;
+import com.thoughtworks.xstream.io.xml.DomDriver;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+
+public class XStreamSafe {
+    public void deserialize(String xml) {
+        XStream xstream = new XStream(new DomDriver());
+        xstream.setMode(XStream.NO_REFERENCES);
+        try {
+            xstream.fromXML(new FileInputStream(new File(xml)));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+}
+SAFE
+);
