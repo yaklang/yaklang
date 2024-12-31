@@ -382,7 +382,7 @@ $a = function($ba)use($d){
     println($d);
 };
 $a(1);`
-			test.CheckPrintlnValue(code, []string{`FreeValue-$d`}, t)
+			test.CheckPrintlnValue(code, []string{`Undefined-$d`}, t)
 		})
 	})
 	t.Run("test-function", func(t *testing.T) {
