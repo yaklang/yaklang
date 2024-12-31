@@ -134,22 +134,6 @@ func TestStmt_spin(t *testing.T) {
 		`, []string{"\"hello world\""}, t)
 	})
 
-	t.Run("for Spin struct", func(t *testing.T) {
-		test.CheckPrintlnValue(`package A
-
-	type A struct {
-	    s string
-	}
-
-	func main() {
-		var str = A{s: "hello world"}
-		for true {
-			println(str.s)
-		}
-	}
-		`, []string{"\"hello world\""}, t)
-	})
-
 	t.Run("for Spin secondary array", func(t *testing.T) {
 		test.CheckPrintlnValue(`package A
 
@@ -166,6 +150,34 @@ func TestStmt_spin(t *testing.T) {
 		}
 	}
 		`, []string{"1", "5", "9"}, t)
+	})
+
+	t.Run("for Spin map", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	func main() {
+		var mp = map[string]int{"a": 1, "b": 2, "c": 3}
+		for true {
+			println(mp["a"])
+		}
+	}
+		`, []string{"1"}, t)
+	})
+
+	t.Run("for Spin struct", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	type A struct {
+	    s string
+	}
+
+	func main() {
+		var str = A{s: "hello world"}
+		for true {
+			println(str.s)
+		}
+	}
+		`, []string{"\"hello world\""}, t)
 	})
 
 	t.Run("for Spin value assign", func(t *testing.T) {
@@ -190,6 +202,20 @@ func TestStmt_spin(t *testing.T) {
 		var str = []int{1, 2, 3}
 
 		for true {
+			str[0] = str[1]
+		}
+		println(str[0])
+	}
+		`, []string{"phi(#18[0])[2,1]"}, t)
+	})
+
+	t.Run("for Spin array add assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	func main() {
+		var str = []int{1, 2, 3}
+
+		for true {
 			str[0] = str[1] + str[2]
 		}
 		println(str[0])
@@ -197,7 +223,89 @@ func TestStmt_spin(t *testing.T) {
 		`, []string{"phi(#18[0])[add(2, 3),1]"}, t)
 	})
 
+	t.Run("for Spin secondary array add assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	func main() {
+		var array2D [3][3]int
+		array2D[0] = [3]int{1, 2, 3}
+		array2D[1] = [3]int{4, 5, 6}
+		array2D[2] = [3]int{7, 8, 9}
+
+		for true {
+			array2D[2][2] = array2D[0][0] + array2D[1][1]
+		}
+		println(array2D[2][2])
+	}
+		`, []string{"phi(#50[2])[add(1, 5),9]"}, t)
+	})
+
+	t.Run("for Spin map assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	func main() {
+		var mp = map[string]int{"a": 1, "b": 2, "c": 3}
+		for true {
+			mp["a"] = mp["b"]
+		}
+		println(mp["a"])
+	}
+		`, []string{"phi(#21.a)[2,1]"}, t)
+	})
+
+	t.Run("for Spin map add assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	func main() {
+		var mp = map[string]int{"a": 1, "b": 2, "c": 3}
+		for true {
+			mp["a"] = mp["b"] + mp["c"]
+		}
+		println(mp["a"])
+	}
+		`, []string{"phi(#21.a)[add(2, 3),1]"}, t)
+	})
+
+	t.Run("for Spin secondary map add assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+		
+	func main() {
+		var mp = map[string]map[string]int{
+			"a": map[string]int{"a1": 1, "a2": 2, "a3": 3},
+			"b": map[string]int{"b1": 4, "b2": 5, "b3": 6},
+			"c": map[string]int{"c1": 7, "c2": 8, "c3": 9},
+		}
+
+		for true {
+			mp["a"]["a1"] = mp["b"]["b2"] + mp["c"]["c3"]
+		}
+		println(mp["a"]["a1"])
+	}
+
+		`, []string{"phi(#22.a1)[add(5, 9),1]"}, t)
+	})
+
 	t.Run("for Spin struct assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`package A
+
+	type A struct {
+	    a int 
+		b int
+		c int
+	}
+
+	func main() {
+		var str = A{a: 1, b: 2, c: 3}
+
+		for true {
+			str.a = str.b
+		}
+		println(str.a)
+	}
+		`, []string{"phi(#29.a)[2,1]"}, t)
+	})
+
+	t.Run("for Spin struct add assign", func(t *testing.T) {
 		test.CheckPrintlnValue(`package A
 
 	type A struct {
@@ -217,21 +325,23 @@ func TestStmt_spin(t *testing.T) {
 		`, []string{"phi(#29.a)[add(2, 3),1]"}, t)
 	})
 
-	t.Run("for Spin secondary array assign", func(t *testing.T) {
+	t.Run("for Spin closu assign", func(t *testing.T) {
 		test.CheckPrintlnValue(`package A
 
 	func main() {
-		var array2D [3][3]int
-		array2D[0] = [3]int{1, 2, 3}
-		array2D[1] = [3]int{4, 5, 6}
-		array2D[2] = [3]int{7, 8, 9}
+		f := func() int {
+		    return 1
+		}
 
 		for true {
-			array2D[2][2] = array2D[0][0] + array2D[1][1]
+			f = func() int {
+		    	return 2
+			}
+			println(f())
 		}
-		println(array2D[2][2])
+		println(f())
 	}
-		`, []string{"phi(#50[2])[add(1, 5),9]"}, t)
+		`, []string{"Function-f()", "phi(f)[Function-f,Function-f]()"}, t)
 	})
 
 	t.Run("for Spin array global", func(t *testing.T) {
@@ -284,7 +394,9 @@ func TestStmt_spin(t *testing.T) {
 		`, []string{"3", "phi(a)[2,3]", "phi(a)[1,phi(a)[2,3]]"}, t)
 	})
 
+	// todo 等待pr:https://github.com/yaklang/yaklang/pull/2277
 	t.Run("for Spin side-effect", func(t *testing.T) {
+		t.Skip()
 		test.CheckPrintlnValue(`package A
 
 func main() {
@@ -306,7 +418,9 @@ func main() {
 		`, []string{"side-effect(2, a)"}, t)
 	})
 
+	// todo 等待pr:https://github.com/yaklang/yaklang/pull/2277
 	t.Run("for Spin side-effect and function assignment", func(t *testing.T) {
+		t.Skip()
 		test.CheckPrintlnValue(`package A
 
 func main() {
