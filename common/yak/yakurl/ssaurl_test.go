@@ -417,7 +417,6 @@ func TestSFURl_golang(t *testing.T) {
 	require.NotNil(t, prog)
 
 	t.Run("check syntaxflow variable", func(t *testing.T) {
-		t.Skip()
 		CheckSSAURL(t, local, progID, "/",
 			`	
 			fmt?{<fullTypeName>?{have: 'fmt'}} as $entry;
@@ -431,11 +430,11 @@ func TestSFURl_golang(t *testing.T) {
 
 	t.Run("check syntaxflow information package with different filename", func(t *testing.T) {
 		query := `
-			fmt.Println as $a
-		`
+				fmt.Println as $a
+			`
 
 		graphInfoMap := map[int]string{}
-		CheckSSAURL(t, local, progID, "/a/0", query, func(res []*ypb.YakURLResource) {
+		CheckSSAURL(t, local, progID, "/a", query, func(res []*ypb.YakURLResource) {
 			require.NoError(t, err)
 			spew.Dump(res)
 			check := func(path string) {
@@ -445,44 +444,32 @@ func TestSFURl_golang(t *testing.T) {
 			}
 
 			for _, extra := range res[0].Extra {
-				if extra.Key == "graph_info" {
-					log.Infof("graph info: %v", extra.Value)
-					var graphInfo []*yakurl.NodeInfo
-					if err := json.Unmarshal([]byte(extra.Value), &graphInfo); err != nil {
+				if extra.Key == "code_range" {
+					log.Infof("code_range: %v", extra.Value)
+					var codeRange yakurl.CodeRange
+					if err := json.Unmarshal([]byte(extra.Value), &codeRange); err != nil {
 						t.Error(err)
 					}
-					for _, info := range graphInfo {
-						check(info.CodeRange.URL)
-						graphInfoMap[0] = info.CodeRange.URL
-					}
+
+					check(codeRange.URL)
+					graphInfoMap[0] = codeRange.URL
 				}
 			}
-		})
 
-		CheckSSAURL(t, local, progID, "/a/1", query, func(res []*ypb.YakURLResource) {
-			require.NoError(t, err)
-			spew.Dump(res)
-			check := func(path string) {
-				log.Infof("check path: %s", path)
-				_, err := ssadb.NewIrSourceFs().Stat(path)
-				require.NoError(t, err)
-			}
-
-			for _, extra := range res[0].Extra {
-				if extra.Key == "graph_info" {
-					log.Infof("graph info: %v", extra.Value)
-					var graphInfo []*yakurl.NodeInfo
-					if err := json.Unmarshal([]byte(extra.Value), &graphInfo); err != nil {
+			for _, extra := range res[1].Extra {
+				if extra.Key == "code_range" {
+					log.Infof("code_range: %v", extra.Value)
+					var codeRange yakurl.CodeRange
+					if err := json.Unmarshal([]byte(extra.Value), &codeRange); err != nil {
 						t.Error(err)
 					}
-					for _, info := range graphInfo {
-						check(info.CodeRange.URL)
-						graphInfoMap[1] = info.CodeRange.URL
-					}
+
+					check(codeRange.URL)
+					graphInfoMap[1] = codeRange.URL
 				}
 			}
-		})
 
+		})
 		require.NotEqual(t, graphInfoMap[0], graphInfoMap[1], "The two strings should not be equal")
 	})
 }
