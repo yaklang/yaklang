@@ -29,3 +29,18 @@ Host: www.baidu.com
 		require.Equal(t, excepts[i], got)
 	}
 }
+
+func TestParams_FuzzPostParams_Clone(t *testing.T) {
+	raw := []byte(`POST / HTTP/1.1
+Host: www.baidu.com
+
+a=!@&b=2`)
+	freq := MustNewFuzzHTTPRequest(raw)
+	params := freq.GetPostParams()
+	require.Len(t, params, 2)
+	p := params[0]
+	results := p.Fuzz("1").Results()
+	require.Len(t, results, 1)
+	results = p.Fuzz("2").Results()
+	require.Len(t, results, 1)
+}
