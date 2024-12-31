@@ -56,8 +56,8 @@ type Blueprint struct {
 
 	GeneralUndefined func(string) *Undefined
 
-	ParentBlueprint []*Blueprint // ParentBlueprint All classes, including interfaces and parent classes
-	SuperBlueprint  *Blueprint
+	ParentBlueprints []*Blueprint // ParentBlueprints All classes, including interfaces and parent classes
+	SuperBlueprints  []*Blueprint
 
 	// full Type Name
 	fullTypeName []string
@@ -88,7 +88,7 @@ func (c *Blueprint) AddParentClass(parent *Blueprint) {
 	if parent == nil {
 		return
 	}
-	c.ParentBlueprint = append(c.ParentBlueprint, parent)
+	c.ParentBlueprints = append(c.ParentBlueprints, parent)
 	for name, f := range parent.NormalMethod {
 		c.RegisterNormalMethod(name, f, false)
 	}
@@ -109,22 +109,34 @@ func (c *Blueprint) AddParentClass(parent *Blueprint) {
 	}
 }
 
-func (c *Blueprint) SetSuperBlueprint(parent *Blueprint) {
+func (c *Blueprint) AddSuperBlueprint(parent *Blueprint) {
 	if parent == nil || c == nil {
 		return
 	}
-	c.SuperBlueprint = parent
+	c.SuperBlueprints = append(c.SuperBlueprints, parent)
 }
 
+// GetSuperBlueprint 获取父类，用于单继承
 func (c *Blueprint) GetSuperBlueprint() *Blueprint {
 	if c == nil {
 		return nil
 	}
-	return c.SuperBlueprint
+	if c.SuperBlueprints == nil || len(c.SuperBlueprints) == 0 {
+		return nil
+	}
+	return c.SuperBlueprints[0]
+}
+
+// GetSuperBlueprints 获取父类，用于多继承
+func (c *Blueprint) GetSuperBlueprints() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+	return c.SuperBlueprints
 }
 
 func (c *Blueprint) CheckExtendBy(kls string) bool {
-	for _, class := range c.ParentBlueprint {
+	for _, class := range c.ParentBlueprints {
 		if strings.EqualFold(class.Name, kls) {
 			return true
 		}
@@ -138,7 +150,7 @@ func (c *Blueprint) getFieldWithParent(get func(bluePrint *Blueprint) bool) bool
 		return true
 	} else {
 		// if current class can't get this field, then check the parent class
-		for _, class := range c.ParentBlueprint {
+		for _, class := range c.ParentBlueprints {
 			// if parent class can get this field, just return true
 			if ex := class.getFieldWithParent(get); ex {
 				return true
