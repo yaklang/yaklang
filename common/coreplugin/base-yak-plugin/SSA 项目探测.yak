@@ -109,7 +109,7 @@ func newFileNotFoundExcption(err) {
     params.error.kind = "fileNotFoundException"
     params.error.msg = err
 }
-func newLanguageNeedSelectExcption(err) {
+func newLanguageNeedSelectException(err) {
     if  params.error.kind!= "" {
         return 
     }
@@ -139,7 +139,7 @@ func AutoParseLanguage() {
     if maxinfo.value != 0 {
         setLanguage(maxinfo.key)
     } else {
-        newLanguageNeedSelectExcption(f`${params.info.kind} con't auto select language, please select.`)
+        newLanguageNeedSelectException(f`${params.info.kind} 无法自动检测项目的语言，请手动指定语言。`)
     }
 }
 func generateDesc() {
@@ -213,7 +213,7 @@ func getLocalInfo(localFile) {
     default:
         params.info.kind = "local"
         if !file.IsDir(localFile) {
-            newFileTypeException(sprint("file exits,but only support jar、war、zip compression"))
+            newFileTypeException(sprint("文件存在，但仅支持jar、war、zip压缩格式。"))
             return
         }
         
@@ -279,9 +279,9 @@ func getHttpInfo(target) {
         if err2 != nil || res.GetStatusCode() != 200 {
             generateFileName("http", target)
             if err2 == nil {
-                newConnectException(sprintf("connect url: %s fail: response:%d", target, res.GetStatusCode()))
+                newConnectException(sprintf("连接URL: %s 失败，状态码:%d", target, res.GetStatusCode()))
             }else {
-                newConnectException(sprintf("connect url: %s fail:%s", target, err2.Error()))
+                newConnectException(sprintf("连接URL: %s 失败:%s", target, err2.Error()))
 
             }
             return
@@ -297,7 +297,7 @@ func getHttpInfo(target) {
             params.info.url = target
             generateFileName("compression", httpUrl)
         } else {
-            newFileTypeException(sprint("connect success,but not found match the file type"))
+            newFileTypeException(sprint("连接成功，但未找到匹配的文件类型。"))
         }
     }
 }
@@ -309,7 +309,7 @@ if target.HasPrefix("git://") {
     generateFileName("git", gitUrl)
     // setLanguage( "")
     if params.language == "" {
-        newLanguageNeedSelectExcption("git input con't auto select language")
+        newLanguageNeedSelectException("git 无法自动检测项目的语言，请手动指定语言。")
     }
 } else if target.HasPrefix("http://") || target.HasPrefix("https://") {
     getHttpInfo(target)
