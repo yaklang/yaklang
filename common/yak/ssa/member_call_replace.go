@@ -16,7 +16,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 
 	// replace object member-call
 	if v.IsObject() {
-		for _, member := range v.GetAllMember() {
+		for index, member := range v.GetAllMember() {
 			// replace this member object to to
 			key := member.GetKey()
 			// remove this member from v
@@ -27,8 +27,9 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			// 	return NewClassMethod(fun, value)
 			// }
 			// re-set type
-			res := checkCanMemberCallExist(to, key)
-			name, typ := res.name, res.typ
+			resKey := checkCanMemberCallExist(to, key)
+			resIndex := checkCanMemberCallExist(to, index)
+			name, typ := resKey.name, resKey.typ
 			// toMember := builder.getOriginMember(name, typ, to, key)
 			toMember := builder.PeekValue(name)
 
@@ -39,24 +40,30 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 				setMemberCallRelationship(to, key, member)
 				log.Warn("ReplaceMemberCall can create phi, but we cannot find cfgEntryBlock")
 				if utils.IsNil(toMember) {
-					ret[name] = member
+					ret[resIndex.name] = member
 				} else {
-					ret[name] = createPhi(name, []Value{toMember, member})
+					ret[resIndex.name] = createPhi(name, []Value{toMember, member})
 				}
 			}
 			if utils.IsNil(toMember) {
 				toMember = builder.ReadMemberCallValue(to, key)
 			}
-			if member.GetOpcode() == SSAOpcodeUndefined {
+
+			memberT := member
+			switch member.GetOpcode() {
+			// Do nothing, it will be replaced later
+			case SSAOpcodeBinOp:
+			case SSAOpcodeUnOp:
+			default:
 				ReplaceAllValue(member, toMember)
 				DeleteInst(member)
+				memberT = toMember
 			}
-
-			for name, v := range ReplaceMemberCall(member, toMember) {
-				ret[name] = v
+			for n, v := range ReplaceMemberCall(member, toMember) {
+				ret[n] = v
 			}
 			if !member.IsObject() {
-				ret[name] = member
+				ret[resIndex.name] = memberT
 			}
 		}
 	}

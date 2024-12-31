@@ -23,6 +23,35 @@ func Test_Express(t *testing.T) {
 	})
 }
 
+func Test_Stmt(t *testing.T) {
+	code := `package main
+
+	func main() {
+		f := func() int {
+		    return 1
+		}
+
+		for true {
+			f = func() int {
+		    	return 2
+			}
+			b := f()
+		}
+		a := f()
+	}
+		`
+
+	ssatest.CheckSyntaxFlowContain(t, code, `
+			b #-> as $b
+			a #-> as $a
+			`,
+		map[string][]string{
+			"b": {"2"},
+			"a": {"1", "2"},
+		}, ssaapi.WithLanguage(ssaapi.GO),
+	)
+}
+
 /* // TODO: select send and recv
 func Test_Statement(t *testing.T) {
 	t.Run("select send and recv", func(t *testing.T) {
