@@ -253,7 +253,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		expression := y.VisitExpression(ret.Expression(0))
 		visitExpression := y.VisitExpression(ret.Expression(1))
 		call := y.NewCall(instace, []ssa.Value{expression, visitExpression})
-		return call
+		return y.EmitCall(call)
 	case *phpparser.ComparisonExpressionContext:
 		switch ret.GetOp().GetText() {
 		case "<<":
