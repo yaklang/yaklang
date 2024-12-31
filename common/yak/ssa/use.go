@@ -32,6 +32,10 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 			continue
 		}
 		user.ReplaceValue(v, to)
+		if ex, ok := ToExternLib(user); ok {
+			ReplaceMemberCall(ex, to)
+		}
+
 		to.AddUser(user)
 		deleteInst = append(deleteInst, user)
 	}
@@ -107,8 +111,6 @@ func (e *ExternLib) ReplaceValue(v Value, to Value) {
 	if index := slices.Index(e.Member, v); index != -1 {
 		e.Member[index] = to
 		e.MemberMap[v.GetName()] = to
-	} else {
-		panic("extern lib not use this value")
 	}
 }
 

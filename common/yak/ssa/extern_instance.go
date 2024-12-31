@@ -104,11 +104,11 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 
 	tryBuildFieldForPhi := func(phiIns *Phi) Value {
 		var possibleRet Value // use last possibleRet as return value
-		if len(phiIns.GetValues()) == 0 {
-			u := b.EmitUndefined(name)
-			u.Kind = UndefinedMemberValid
-			return u
-		}
+		// if len(phiIns.GetValues()) == 0 {
+		// 	u := b.EmitUndefined(name)
+		// 	u.Kind = UndefinedMemberValid
+		// 	return u
+		// }
 		for _, possibleKey := range phiIns.GetValues() {
 			if ret := extern.BuildField(possibleKey.String()); ret == nil {
 				want := b.TryGetSimilarityKey(extern.GetName(), possibleKey.String())
