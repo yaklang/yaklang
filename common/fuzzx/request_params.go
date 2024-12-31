@@ -113,13 +113,23 @@ func (p *FuzzParam) Show() *FuzzParam {
 	return p
 }
 
+func (p *FuzzParam) Clone() *FuzzParam {
+	return &FuzzParam{
+		origin:   p.origin.Clone(),
+		position: p.position,
+		param:    p.param,
+		value:    p.value,
+		pathKey:  p.pathKey,
+	}
+}
+
 func (p *FuzzParam) FirstFuzzRequestBytes() []byte {
 	return p.origin.FirstFuzzRequestBytes()
 }
 
 func (p *FuzzParam) Fuzz(values ...string) *FuzzParam {
-	req := p.origin.Clone()
-	p.origin = req
+	np := p.Clone()
+	req := np.origin
 	for _, i := range values {
 		switch p.position {
 		case lowhttp.PosPath:
@@ -166,7 +176,7 @@ func (p *FuzzParam) Fuzz(values ...string) *FuzzParam {
 			log.Warnf("cannot found fuzz params method identify: %v", p.position)
 		}
 	}
-	return p
+	return np
 }
 
 func (f *FuzzRequest) GetCommonParams() []*FuzzParam {
