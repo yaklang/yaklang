@@ -71,19 +71,23 @@ type FunctionBuilder struct {
 
 	MarkedMemberCallWantMethod bool
 	parentBuilder              *FunctionBuilder
+
+	//External variables acquired by use will determine whether sideEffect should be generated when assign variable is assigned
+	captureFreeValue map[string]struct{}
 }
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	b := &FunctionBuilder{
-		_editor:       editor,
-		Function:      f,
-		target:        &target{},
-		labels:        make(map[string]*BasicBlock),
-		CurrentBlock:  nil,
-		CurrentRange:  nil,
-		parentBuilder: parent,
-		RefParameter:  make(map[string]struct{ Index int }),
-		IncludeStack:  utils.NewStack[string](),
+		_editor:          editor,
+		Function:         f,
+		target:           &target{},
+		labels:           make(map[string]*BasicBlock),
+		CurrentBlock:     nil,
+		CurrentRange:     nil,
+		parentBuilder:    parent,
+		RefParameter:     make(map[string]struct{ Index int }),
+		IncludeStack:     utils.NewStack[string](),
+		captureFreeValue: make(map[string]struct{}),
 	}
 	if parent != nil {
 		b.DefineFunc = parent.DefineFunc
@@ -108,6 +112,9 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 	}
 	f.builder = b
 	return b
+}
+func (f *FunctionBuilder) AddCaptureFreevalue(name string) {
+	f.captureFreeValue[name] = struct{}{}
 }
 func (b *FunctionBuilder) GetFunc(name, pkg string) *Function {
 	return b.GetProgram().GetFunction(name, pkg)
