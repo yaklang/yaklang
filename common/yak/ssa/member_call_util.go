@@ -14,6 +14,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 	if !member.IsMember() {
 		member.SetObject(obj)
 		member.SetKey(key)
+		key.AddUser(obj.(User))
 	}
 
 	handlerMemberCall := func(obj Value) {
