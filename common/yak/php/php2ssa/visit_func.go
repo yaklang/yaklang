@@ -1,7 +1,6 @@
 package php2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -210,17 +209,18 @@ func (y *builder) VisitLambdaFunctionUseVar(raw phpparser.ILambdaFunctionUseVarC
 	defer func() {
 		y.SupportClosure = current
 	}()
-	value := y.PeekValue(i.VarName().GetText())
 	if i.Ampersand() != nil {
-		if !utils.IsNil(value) {
-			freeValue := y.BuildFreeValue(i.VarName().GetText())
-			p, ok := ssa.ToParameter(value)
-			if ok && p.GetDefault() != nil {
-				freeValue.SetDefault(p.GetDefault())
-			}
-			freeValue.SetType(value.GetType())
-		}
+		y.FunctionBuilder.AddCaptureFreevalue(i.VarName().GetText())
+		//if !utils.IsNil(value) {
+		//	freeValue := y.BuildFreeValue(i.VarName().GetText())
+		//	p, ok := ssa.ToParameter(value)
+		//	if ok && p.GetDefault() != nil {
+		//		freeValue.SetDefault(p.GetDefault())
+		//	}
+		//	freeValue.SetType(value.GetType())
+		//}
 	} else {
+		value := y.PeekValue(i.VarName().GetText())
 		variable := y.CreateLocalVariable(i.VarName().GetText())
 		variable.Assign(value)
 	}

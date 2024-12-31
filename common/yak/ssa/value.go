@@ -170,7 +170,8 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 
 	// if not freeValue, or not `a = a`(just create FreeValue)
-	if !variable.GetLocal() && b.SupportClosure {
+	_, exist := b.captureFreeValue[name]
+	if !variable.GetLocal() && (exist || b.SupportClosure) {
 		if parentValue, ok := b.getParentFunctionVariable(variable.GetName()); ok &&
 			GetFristLocalVariableFromScopeAndParent(scope, variable.GetName()) == nil {
 			parentValue.AddMask(value)
