@@ -2,8 +2,6 @@ desc(
     title: "Find SAXParserFactory() Unsafe Use in Context Sink",
     title_zh: "SAXParserFactory. 未明确设置安全策略（.setFeature(...)）",
     type: vuln,
-    level: warning,
-    risk: xxe,
     desc: <<<TEXT
 使用 `SAXParserFactory` 时未明确设置安全策略（如禁用外部实体解析），可能会导致应用程序容易受到XXE（XML External Entity）攻击。XXE攻击允许攻击者利用应用程序解析不受信任的XML输入时，访问本地文件系统或发起网络请求，从而泄露敏感信息或执行恶意操作。建议在创建 `SAXParserFactory` 实例后，使用 `.setFeature` 方法禁用外部实体解析，以增强应用程序的安全性。
 TEXT
@@ -14,4 +12,65 @@ check $factory;
 $factory?{!.setFeature}...newSAXParser()...parse() as $vulnCall
 
 check $vulnCall;
-alert $vulnCall;
+alert $vulnCall for {
+    message: "SAXParserFactory() Unsafe Use in Context Sink",
+    risk: "xxe",
+    level: "warning",
+}
+
+desc(
+    lang: "java",
+    alert_num: 1,
+    "file://unsafe.java": <<<UNSAFE
+package com.example.sax;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+import org.xml.sax.InputSource;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import java.io.IOException;
+import java.io.StringReader;
+
+public class SAXParserFactoryUnsafe {
+    public void parseXml(String xml) {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        try {
+            SAXParser parser = factory.newSAXParser();
+            parser.parse(new InputSource(new StringReader(xml)), new DefaultHandler());
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+UNSAFE
+)
+
+desc(
+    lang: "java",
+    "file://safefile.java": <<<SAFE
+package com.example.sax;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+import org.xml.sax.InputSource;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import java.io.IOException;
+import java.io.StringReader;
+
+class SAXParserFactorySafe {
+    public void parseXml(String xml) {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        try {
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            SAXParser parser = factory.newSAXParser();
+            parser.parse(new InputSource(new StringReader(xml)), new DefaultHandler());
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+SAFE
+)

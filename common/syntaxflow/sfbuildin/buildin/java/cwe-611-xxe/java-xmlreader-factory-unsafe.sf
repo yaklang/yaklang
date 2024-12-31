@@ -2,8 +2,6 @@ desc(
     title: "Checking XMLReaderFactory.createXMLReader() Unsafe Use",
     title_zh: "检查 XMLReaderFactory.createXMLReader() 不安全使用",
     type: vuln,
-    level: warning,
-    risk: xxe,
     desc: <<<TEXT
 使用 `XMLReaderFactory.createXMLReader()` 而不设置适当的安全特性或属性可能会使应用程序容易受到 XML 外部实体 (XXE) 攻击。XXE 攻击允许攻击者访问本地文件系统、执行服务器上的任意代码或进行网络攻击。为了确保安全性，应当禁用外部实体解析，并限制对系统资源的访问。
 TEXT
@@ -11,4 +9,65 @@ TEXT
 
 XMLReaderFactory.createXMLReader()?{!.setFeature* && !.setProp* && !.allowT* }./((parse*)|(read*))/() as $vulCall;
 check $vulCall;
-alert $vulCall;
+alert $vulCall for {
+    message: "XMLReaderFactory.createXMLReader() Unsafe Use",
+    risk: "xxe",
+    level: "warning",
+}
+
+desc(
+    lang: "java",
+    alert_num: 1,
+    "file://unsafe.java": <<<UNSAFE
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.xml.sax.helpers.DefaultHandler;
+
+public class XMLReaderFactoryUnsafe {
+    public void parseXml(String xml) {
+        try {
+            XMLReader reader = XMLReaderFactory.createXMLReader();
+            reader.setContentHandler(new DefaultHandler());
+            reader.parse(xml);
+        } catch (SAXException | ParserConfigurationException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+UNSAFE
+)
+
+desc(
+    lang: "java",
+    "safefile://safe.java": <<<SAFE
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.xml.sax.helpers.DefaultHandler;
+
+public class XMLReaderFactorySafe {
+    public void parseXml(String xml) {
+        try {
+            XMLReader reader = XMLReaderFactory.createXMLReader();
+            reader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            reader.setContentHandler(new DefaultHandler());
+            reader.parse(xml);
+        } catch (SAXException | ParserConfigurationException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+}
+SAFE
+)
