@@ -154,7 +154,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 			}
 
 			if parentClass == extendName {
-				class.SetSuperBlueprint(bluePrint)
+				class.AddSuperBlueprint(bluePrint)
 			}
 		}
 	})
