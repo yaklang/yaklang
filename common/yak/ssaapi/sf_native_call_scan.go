@@ -9,8 +9,9 @@ import (
 type direction string
 
 const (
-	Previous direction = "Previous"
-	Next     direction = "Next"
+	Previous direction = "previous"
+	Current  direction = "current"
+	Next     direction = "next"
 )
 
 type basicBlockInfo struct {
@@ -23,50 +24,30 @@ type basicBlockInfo struct {
 	hasInclude      bool
 	results         []sfvm.ValueOperator
 	isFinish        bool
+	index           int
 }
 
-var nativeCallScanPrevious = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-	var vals []sfvm.ValueOperator
-	prog, err := fetchProgram(v)
-	if err != nil {
-		return false, nil, err
+var nativeCallScan = func(direction direction) func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	return func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var vals []sfvm.ValueOperator
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			val, ok := operator.(*Value)
+			if !ok {
+				return nil
+			}
+			results := searchAlongBasicBlock(val.node, prog, frame, params, direction)
+			if !ok {
+				return nil
+			}
+			vals = append(vals, results...)
+			return nil
+		})
+		return true, sfvm.NewValues(vals), nil
 	}
-
-	v.Recursive(func(operator sfvm.ValueOperator) error {
-		val, ok := operator.(*Value)
-		if !ok {
-			return nil
-		}
-		results := searchAlongBasicBlock(val.node, prog, frame, params, Previous)
-		if !ok {
-			return nil
-		}
-		vals = append(vals, results...)
-		return nil
-	})
-	return true, sfvm.NewValues(vals), nil
-}
-
-var nativeCallScanNext = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-	var vals []sfvm.ValueOperator
-	prog, err := fetchProgram(v)
-	if err != nil {
-		return false, nil, err
-	}
-
-	v.Recursive(func(operator sfvm.ValueOperator) error {
-		val, ok := operator.(*Value)
-		if !ok {
-			return nil
-		}
-		results := searchAlongBasicBlock(val.node, prog, frame, params, Next)
-		if !ok {
-			return nil
-		}
-		vals = append(vals, results...)
-		return nil
-	})
-	return true, sfvm.NewValues(vals), nil
 }
 
 func searchAlongBasicBlock(
@@ -118,26 +99,34 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 		return
 	}
 	b.visited[blockId] = struct{}{}
-
-	b.searchInsts()
-	if b.isFinish {
-		return
+	if b.index != 0 {
+		b.searchInsts()
+		if b.isFinish {
+			return
+		}
 	}
-	if b.direction == Previous {
+	b.index++
+	switch b.direction {
+	case Previous:
 		for _, pred := range block.Preds {
 			b.searchBlock(pred)
 			if b.isFinish {
 				break
 			}
 		}
-	}
-	if b.direction == Next {
-		for _, next := range block.Succs {
-			b.searchBlock(next)
+	case Next:
+		for _, succs := range block.Succs {
+			b.searchBlock(succs)
 			if b.isFinish {
 				break
 			}
 		}
+	case Current:
+		b.searchInsts()
+		if b.isFinish {
+			break
+		}
+		return
 	}
 }
 
