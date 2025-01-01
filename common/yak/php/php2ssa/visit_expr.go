@@ -1289,8 +1289,8 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 	} else {
 		//todo： __dir__ 等魔术方法的转换
 		file := value.String()
-		y.IncludeStack.Push(file)
-		defer y.IncludeStack.Pop()
+		y.PushInclude(file)
+		defer y.PopInclude()
 		if err := y.BuildFilePackage(file, once); err != nil {
 			//todo: 目前拿不到include的返回值
 			//flag = ssa.NewConst(false)

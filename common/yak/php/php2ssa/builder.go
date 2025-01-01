@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/sca"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -119,6 +120,7 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 				}()
 				return id
 			},
+			currentInclude: make(map[string]struct{}),
 		}
 		build.callback = func(str string, filename string) {
 			files, ok := b.GetProgram().GetApplication().LibraryFile[str]
@@ -157,10 +159,11 @@ func (*SSABuild) GetLanguage() consts.Language {
 
 type builder struct {
 	*ssa.FunctionBuilder
-	constMap      map[string]ssa.Value
-	isFunction    bool
-	callback      func(str string, filename string)
-	fetchDollarId func() int
+	constMap       map[string]ssa.Value
+	isFunction     bool
+	callback       func(str string, filename string)
+	fetchDollarId  func() int
+	currentInclude map[string]struct{}
 }
 
 func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
@@ -202,6 +205,14 @@ func (b *builder) AssignClassConst(className, key string, value ssa.Value) {
 func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
 	name := fmt.Sprintf("%s_%s", className, key)
 	return b.ReadConst(name)
+}
+func (y *builder) PushInclude(path string) {
+	y.currentInclude[strings.ToLower(path)] = struct{}{}
+	y.IncludeStack.Push(path)
+}
+func (y *builder) PopInclude() {
+	pathx := y.IncludeStack.Pop()
+	delete(y.currentInclude, strings.ToLower(pathx))
 }
 
 var phpBuildIn = map[string]any{
