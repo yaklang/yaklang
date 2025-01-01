@@ -48,7 +48,7 @@ func TestScanWithForStatement(t *testing.T) {
 	ssatest.CheckSyntaxFlow(t, code, `bb2<scanPrevious> as $target1;bb1<scanNext> as $target2`,
 		map[string][]string{
 			"target1": {"1", "10", "Undefined-a", "Undefined-bb1", "Undefined-i", "add(Undefined-a, phi(i)[Undefined-i,add(i, 1)])", "add(phi(i)[Undefined-i,add(i, 1)], 1)", "lt(phi(i)[Undefined-i,add(i, 1)], 10)"},
-			"target2": {"1", "10", "Undefined-a", "Undefined-i", "add(Undefined-a, phi(i)[Undefined-i,add(i, 1)])", "add(phi(i)[Undefined-i,add(i, 1)], 1)", "lt(phi(i)[Undefined-i,add(i, 1)], 10)"},
+			"target2": {"1", "10", "Undefined-a", "Undefined-i", "Undefined-bb2", "add(Undefined-a, phi(i)[Undefined-i,add(i, 1)])", "add(phi(i)[Undefined-i,add(i, 1)], 1)", "lt(phi(i)[Undefined-i,add(i, 1)], 10)"},
 		},
 		ssaapi.WithRawLanguage("java"))
 }
