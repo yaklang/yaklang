@@ -111,6 +111,9 @@ const (
 	// NativeCall_ScanNext is used to scan next
 	NativeCall_ScanNext = "scanNext"
 
+	//NatiCall_ScanCurrent is used to scan current block
+	NatiCall_ScanCurrent = "scanCurrent"
+
 	//NativeCall_DeleteVariable is used to delete a variable
 	NativeCall_DeleteVariable = "delete"
 
@@ -139,9 +142,33 @@ const (
 	// NativeCall_Java_UnEscape_Output  is used to show output in java template languages that has not been escape,
 	// and is generally used to audit XSS vulnerabilities
 	NativeCall_Java_UnEscape_Output = "javaUnescapeOutput"
+
+	NatiCall_Foeach_Func_Inst = "foreach_function_inst"
 )
 
 func init() {
+	//<foreach_function_inst(hook=`xxx` as $result)> as $result
+	registerNativeCall(NatiCall_Foeach_Func_Inst, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			value, ok := operator.(*Value)
+			if !ok {
+				return nil
+			}
+			function, flag := ssa.ToFunction(value.node)
+			if !flag {
+				return nil
+			}
+			result1 := searchAlongBasicBlock(function.EnterBlock.GetBlock(), prog, frame, params, Next)
+			result = append(result, result1...)
+			return nil
+		})
+		return true, sfvm.NewValues(result), nil
+	}))
 	registerNativeCall(NativeCall_Java_UnEscape_Output, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var res []sfvm.ValueOperator
 
@@ -411,8 +438,9 @@ func init() {
 		}
 		return true, v, nil
 	}))
-	registerNativeCall(NativeCall_ScanNext, nc_func(nativeCallScanNext))
-	registerNativeCall(NativeCall_ScanPrevious, nc_func(nativeCallScanPrevious))
+	registerNativeCall(NativeCall_ScanNext, nc_func(nativeCallScan(Next)))
+	registerNativeCall(NativeCall_ScanPrevious, nc_func(nativeCallScan(Previous)))
+	registerNativeCall(NatiCall_ScanCurrent, nc_func(nativeCallScan(Current)))
 	registerNativeCall(NativeCall_SourceCode, nc_func(nativeCallSourceCode))
 	registerNativeCall(NativeCall_OpCodes, nc_func(nativeCallOpCodes))
 	registerNativeCall(NativeCall_Slice, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
