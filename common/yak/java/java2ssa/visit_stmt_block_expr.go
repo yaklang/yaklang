@@ -2075,9 +2075,8 @@ func (y *builder) VisitSwitchStatement(raw javaparser.ISwitchStatementContext) {
 
 	var defaultStatement func()
 	caseLen := 0
-	caseValueMap := make(map[int]ssa.Values)
+	caseValueMap := make(map[int]func() ssa.Values)
 	caseStatementMap := make(map[int]func())
-
 	for _, s := range i.AllSwitchBlockStatementGroup() {
 		labelType, labelValues, visitStatement := y.VisitSwitchBlockStatementGroup(s)
 		if labelType == CASE {
@@ -2089,10 +2088,11 @@ func (y *builder) VisitSwitchStatement(raw javaparser.ISwitchStatementContext) {
 			defaultStatement = visitStatement
 		}
 	}
-	SwitchBuilder.BuildCaseSize(caseLen)
+	SwitchBuilder.BuildCaseSize(caseLen + 1)
 	SwitchBuilder.SetCase(func(i int) []ssa.Value {
 		if v, ok := caseValueMap[i]; ok {
-			return v
+			values := v()
+			return values
 		}
 		return nil
 	})
@@ -2107,7 +2107,7 @@ func (y *builder) VisitSwitchStatement(raw javaparser.ISwitchStatementContext) {
 	SwitchBuilder.Finish()
 }
 
-func (y *builder) VisitSwitchBlockStatementGroup(raw javaparser.ISwitchBlockStatementGroupContext) (labelType JavaSwitchLabel, labelValues ssa.Values, visitStatement func()) {
+func (y *builder) VisitSwitchBlockStatementGroup(raw javaparser.ISwitchBlockStatementGroupContext) (labelType JavaSwitchLabel, labelValues func() ssa.Values, visitStatement func()) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -2128,7 +2128,7 @@ func (y *builder) VisitSwitchBlockStatementGroup(raw javaparser.ISwitchBlockStat
 	return
 }
 
-func (y *builder) VisitSwitchLabel(raw javaparser.ISwitchLabelContext) (JavaSwitchLabel, ssa.Values) {
+func (y *builder) VisitSwitchLabel(raw javaparser.ISwitchLabelContext) (JavaSwitchLabel, func() ssa.Values) {
 	if y == nil || raw == nil || y.IsStop() {
 		return "", nil
 	}
@@ -2141,10 +2141,14 @@ func (y *builder) VisitSwitchLabel(raw javaparser.ISwitchLabelContext) (JavaSwit
 		return "", nil
 	}
 	if i.CASE() != nil {
-		return CASE, y.VisitExpressionList(i.ExpressionList())
+		return CASE, func() ssa.Values {
+			return y.VisitExpressionList(i.ExpressionList())
+		}
 	}
 	if i.DEFAULT() != nil {
-		return DEFAULT, y.VisitExpressionList(i.ExpressionList())
+		return DEFAULT, func() ssa.Values {
+			return y.VisitExpressionList(i.ExpressionList())
+		}
 	}
 	return "", nil
 }
