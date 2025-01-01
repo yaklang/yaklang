@@ -121,13 +121,10 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 		} else {
 			log.Errorf("BUG: set CurrentFunction[%d]: %v", ir.CurrentFunction, err)
 		}
-
-		if !ir.IsBlock {
-			if block, err := NewInstructionFromLazy(ir.CurrentBlock, ToBasicBlock); err == nil {
-				inst.SetBlock(block)
-			} else {
-				log.Errorf("BUG: set CurrentBlock[%d]: %v", ir.CurrentBlock, err)
-			}
+		if block, err := NewInstructionFromLazy(ir.CurrentBlock, ToBasicBlock); err == nil {
+			inst.SetBlock(block)
+		} else {
+			log.Errorf("BUG: set CurrentBlock[%d]: %v", ir.CurrentBlock, err)
 		}
 	}
 
