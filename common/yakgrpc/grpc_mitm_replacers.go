@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"net/http"
 	"sort"
 	"strconv"
@@ -536,27 +537,28 @@ func (m *mitmReplacer) GetHijackingRules() []*ypb.MITMContentReplacer {
 	return m._hijackingRules.MITMContentReplacers()
 }
 
-func stringForSettingColor(s string, extraTag []string, flow *schema.HTTPFlow) {
+func stringForSettingColor(s []string, flow *schema.HTTPFlow) {
 	log.Debugf("set color[%v] for %v", s, flow.Url)
-	switch strings.ToLower(s) {
-	case "red":
-		flow.Red()
-	case "green":
-		flow.Green()
-	case "blue":
-		flow.Blue()
-	case "yellow":
-		flow.Yellow()
-	case "orange":
-		flow.Orange()
-	case "purple":
-		flow.Purple()
-	case "cyan":
-		flow.Cyan()
-	case "grey":
-		flow.Grey()
+	for _, c := range lo.Union(s) {
+		switch strings.ToLower(c) {
+		case "red":
+			flow.Red()
+		case "green":
+			flow.Green()
+		case "blue":
+			flow.Blue()
+		case "yellow":
+			flow.Yellow()
+		case "orange":
+			flow.Orange()
+		case "purple":
+			flow.Purple()
+		case "cyan":
+			flow.Cyan()
+		case "grey":
+			flow.Grey()
+		}
 	}
-	flow.AddTag(extraTag...)
 	return
 }
 
@@ -572,15 +574,15 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 	}()
 
 	var (
-		colorName string
+		colorName []string
 		tagNames  []string
 		extracted []*schema.ExtractedData
-
-		err error
+		err       error
 	)
 
 	defer func() {
-		stringForSettingColor(colorName, tagNames, flow)
+		flow.AddTag(tagNames...)
+		stringForSettingColor(colorName, flow)
 	}()
 
 	for _, rule := range m._mirrorRules {
@@ -619,7 +621,7 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 			continue
 		}
 		if rule.Color != "" {
-			colorName = rule.Color
+			colorName = append(colorName, rule.Color)
 		}
 		tagNames = append(tagNames, rule.ExtraTag...) // merge tag name
 
@@ -652,7 +654,7 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
 		lastRule := ret[len(ret)-1]
 		if lastRule.Color != "" {
-			colorName = lastRule.Color
+			colorName = append(colorName, lastRule.Color)
 		}
 		tagNames = append(lastRule.ExtraTag, tagNames...) // merge tag name
 	}
