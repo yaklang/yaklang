@@ -27,12 +27,16 @@ func NewCall(target Value, args []Value, binding map[string]Value, block *BasicB
 		IsDropError:     false,
 		IsEllipsis:      false,
 		SideEffectValue: map[string]Value{},
+		isBindLanguage:  true,
 	}
 	return c
 }
 
 func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 	call := NewCall(target, args, nil, f.CurrentBlock)
+	if f.GetProgram().Language == "yak" {
+		call.isBindLanguage = false
+	}
 	return call
 }
 
@@ -285,10 +289,10 @@ func (c *Call) handleCalleeFunction() {
 		}
 	}
 
-	if c.GetProgram().Language == "yak" {
-		handleSideEffect(c, funcTyp)
-	} else {
+	if c.isBindLanguage {
 		handleSideEffectBind(c, funcTyp)
+	} else {
+		handleSideEffect(c, funcTyp)
 	}
 
 	// only handler in method call

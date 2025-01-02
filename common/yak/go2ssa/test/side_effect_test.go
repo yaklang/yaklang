@@ -519,42 +519,42 @@ func Test_SideEffect_MutiReturn(t *testing.T) {
 	t.Run("muti return", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
-	func main(){
-		a := 1
-		f := func(){
-			if c {
-				a = 2
-				return
+		func main(){
+			a := 1
+			f := func(){
+				if c {
+					a = 2
+					return
+				}
+				a = 3
+				println(a) // 3
 			}
-			a = 3
-			println(a) // 3
+			f()
+			println(a) // side-effect(phi(a)[2,3], a)
 		}
-		f()
-		println(a) // side-effect(phi(a)[2,3], a)
-	}
 		`, []string{"3", "side-effect(phi(a)[2,3], a)"}, t)
 	})
 
 	t.Run("different variable", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
-
-	func main(){
-		a := 1
-		b := 1
-		f := func(){
-			if c {
-				a = 2
-				return
+	
+		func main(){
+			a := 1
+			b := 1
+			f := func(){
+				if c {
+					a = 2
+					return
+				}
+				a = 3
+				b = 4
+				println(a) // 3
 			}
-			a = 3
-			b = 4
-			println(a) // 3
+			f()
+			println(a) // side-effect(phi(a)[2,3], a)
+			println(b) // side-effect(4, b)
 		}
-		f()
-		println(a) // side-effect(phi(a)[2,3], a)
-		println(b) // side-effect(4, b)
-	}
-		`, []string{"3", "side-effect(phi(a)[2,3], a)", "side-effect(4, b)"}, t)
+			`, []string{"3", "side-effect(phi(a)[2,3], a)", "side-effect(4, b)"}, t)
 	})
 
 	t.Run("different variable(same name)", func(t *testing.T) {

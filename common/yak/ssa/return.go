@@ -231,17 +231,13 @@ func (f *Function) Finish() {
 	}
 
 	for variable, _ := range tmpSideEffects {
-		vm := make(map[Value]struct{})
 		vs := []Value{}
 		for _, ses := range f.SideEffectsReturn {
 			if value, ok := ses[variable]; ok {
-				vm[value.Modify] = struct{}{}
+				vs = append(vs, value.Modify)
 			}
 		}
-		if len(vm) > 1 {
-			for v, _ := range vm {
-				vs = append(vs, v)
-			}
+		if len(vs) > 1 {
 			tmpSideEffects[variable].Modify = f.builder.EmitPhi(variable.GetName(), vs)
 		}
 	}
