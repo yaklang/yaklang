@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
+	uuid "github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 )
@@ -90,7 +91,7 @@ func TestAutoDecodeRandomString(t *testing.T) {
 	}
 	keys := lo.Keys(encodeFuncMap)
 	for i := 0; i < 10; i++ {
-		randStr := RandStringBytes(16)
+		randStr := uuid.NewString()
 		randTimes := rand.Intn(2) + 3
 		encodePaths := make([]string, 0, randTimes)
 		encodePaths = append(encodePaths, randStr)
