@@ -758,6 +758,12 @@ service Yak {
   // 导入导出SyntaxFlow规则
   rpc ExportSyntaxFlows(ExportSyntaxFlowsRequest) returns (stream SyntaxflowsProgress);
   rpc ImportSyntaxFlows(ImportSyntaxFlowsRequest) returns (stream SyntaxflowsProgress);
+
+  // hot-patch template
+  rpc CreateHotPatchTemplate(HotPatchTemplate) returns (CreateHotPatchTemplateResponse);
+  rpc DeleteHotPatchTemplate(DeleteHotPatchTemplateRequest) returns (DeleteHotPatchTemplateResponse);
+  rpc UpdateHotPatchTemplate(UpdateHotPatchTemplateRequest) returns (UpdateHotPatchTemplateResponse);
+  rpc QueryHotPatchTemplate(HotPatchTemplateRequest) returns (QueryHotPatchTemplateResponse);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -5960,4 +5966,45 @@ message SyntaxflowsProgress {
   double Progress = 1;
   // 展示的提示语，可能是中断原因或者错误原因之类的
   string Verbose = 2;
+}
+
+// hot-patch template
+message HotPatchTemplate {
+    string Name = 1;
+    string Content = 2;
+    string Type = 3;
+}
+
+message HotPatchTemplateRequest {
+    repeated int64 Id = 1;
+    repeated string Name = 2;
+    repeated string ContentKeyword = 3;
+    string Type = 4;
+}
+
+message UpdateHotPatchTemplateRequest {
+    HotPatchTemplateRequest condition = 1;
+    HotPatchTemplate data = 2;
+}
+
+message DeleteHotPatchTemplateRequest {
+    HotPatchTemplateRequest condition = 1;
+    bool All = 2;
+}
+
+message CreateHotPatchTemplateResponse {
+    DbOperateMessage Message = 1;
+}
+
+message DeleteHotPatchTemplateResponse {
+    DbOperateMessage Message = 1;
+}
+
+message UpdateHotPatchTemplateResponse {
+    DbOperateMessage Message = 1;
+}
+
+message QueryHotPatchTemplateResponse {
+    DbOperateMessage Message = 1;
+    repeated HotPatchTemplate Data = 2;
 }

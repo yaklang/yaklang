@@ -431,8 +431,15 @@ const (
 	Yak_DeletePluginEnv_FullMethodName                            = "/ypb.Yak/DeletePluginEnv"
 	Yak_GetAllFuzztagInfo_FullMethodName                          = "/ypb.Yak/GetAllFuzztagInfo"
 	Yak_GenerateFuzztag_FullMethodName                            = "/ypb.Yak/GenerateFuzztag"
+<<<<<<< HEAD
 	Yak_ExportSyntaxFlows_FullMethodName                          = "/ypb.Yak/ExportSyntaxFlows"
 	Yak_ImportSyntaxFlows_FullMethodName                          = "/ypb.Yak/ImportSyntaxFlows"
+=======
+	Yak_CreateHotPatchTemplate_FullMethodName                     = "/ypb.Yak/CreateHotPatchTemplate"
+	Yak_DeleteHotPatchTemplate_FullMethodName                     = "/ypb.Yak/DeleteHotPatchTemplate"
+	Yak_UpdateHotPatchTemplate_FullMethodName                     = "/ypb.Yak/UpdateHotPatchTemplate"
+	Yak_QueryHotPatchTemplate_FullMethodName                      = "/ypb.Yak/QueryHotPatchTemplate"
+>>>>>>> 0511e6b47 (feat(hotpatch-template):)
 )
 
 // YakClient is the client API for Yak service.
@@ -970,9 +977,17 @@ type YakClient interface {
 	DeletePluginEnv(ctx context.Context, in *DeletePluginEnvRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetAllFuzztagInfo(ctx context.Context, in *GetAllFuzztagInfoRequest, opts ...grpc.CallOption) (*GetAllFuzztagInfoResponse, error)
 	GenerateFuzztag(ctx context.Context, in *GenerateFuzztagRequest, opts ...grpc.CallOption) (*GenerateFuzztagResponse, error)
+<<<<<<< HEAD
 	// 导入导出SyntaxFlow规则
 	ExportSyntaxFlows(ctx context.Context, in *ExportSyntaxFlowsRequest, opts ...grpc.CallOption) (Yak_ExportSyntaxFlowsClient, error)
 	ImportSyntaxFlows(ctx context.Context, in *ImportSyntaxFlowsRequest, opts ...grpc.CallOption) (Yak_ImportSyntaxFlowsClient, error)
+=======
+	// hot-patch template
+	CreateHotPatchTemplate(ctx context.Context, in *HotPatchTemplate, opts ...grpc.CallOption) (*CreateHotPatchTemplateResponse, error)
+	DeleteHotPatchTemplate(ctx context.Context, in *DeleteHotPatchTemplateRequest, opts ...grpc.CallOption) (*DeleteHotPatchTemplateResponse, error)
+	UpdateHotPatchTemplate(ctx context.Context, in *UpdateHotPatchTemplateRequest, opts ...grpc.CallOption) (*UpdateHotPatchTemplateResponse, error)
+	QueryHotPatchTemplate(ctx context.Context, in *HotPatchTemplateRequest, opts ...grpc.CallOption) (*QueryHotPatchTemplateResponse, error)
+>>>>>>> 0511e6b47 (feat(hotpatch-template):)
 }
 
 type yakClient struct {
@@ -6290,6 +6305,7 @@ func (c *yakClient) GenerateFuzztag(ctx context.Context, in *GenerateFuzztagRequ
 	return out, nil
 }
 
+<<<<<<< HEAD
 func (c *yakClient) ExportSyntaxFlows(ctx context.Context, in *ExportSyntaxFlowsRequest, opts ...grpc.CallOption) (Yak_ExportSyntaxFlowsClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[70], Yak_ExportSyntaxFlows_FullMethodName, opts...)
 	if err != nil {
@@ -6352,6 +6368,42 @@ func (x *yakImportSyntaxFlowsClient) Recv() (*SyntaxflowsProgress, error) {
 		return nil, err
 	}
 	return m, nil
+=======
+func (c *yakClient) CreateHotPatchTemplate(ctx context.Context, in *HotPatchTemplate, opts ...grpc.CallOption) (*CreateHotPatchTemplateResponse, error) {
+	out := new(CreateHotPatchTemplateResponse)
+	err := c.cc.Invoke(ctx, Yak_CreateHotPatchTemplate_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteHotPatchTemplate(ctx context.Context, in *DeleteHotPatchTemplateRequest, opts ...grpc.CallOption) (*DeleteHotPatchTemplateResponse, error) {
+	out := new(DeleteHotPatchTemplateResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteHotPatchTemplate_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateHotPatchTemplate(ctx context.Context, in *UpdateHotPatchTemplateRequest, opts ...grpc.CallOption) (*UpdateHotPatchTemplateResponse, error) {
+	out := new(UpdateHotPatchTemplateResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateHotPatchTemplate_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryHotPatchTemplate(ctx context.Context, in *HotPatchTemplateRequest, opts ...grpc.CallOption) (*QueryHotPatchTemplateResponse, error) {
+	out := new(QueryHotPatchTemplateResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryHotPatchTemplate_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+>>>>>>> 0511e6b47 (feat(hotpatch-template):)
 }
 
 // YakServer is the server API for Yak service.
@@ -6889,9 +6941,17 @@ type YakServer interface {
 	DeletePluginEnv(context.Context, *DeletePluginEnvRequest) (*Empty, error)
 	GetAllFuzztagInfo(context.Context, *GetAllFuzztagInfoRequest) (*GetAllFuzztagInfoResponse, error)
 	GenerateFuzztag(context.Context, *GenerateFuzztagRequest) (*GenerateFuzztagResponse, error)
+<<<<<<< HEAD
 	// 导入导出SyntaxFlow规则
 	ExportSyntaxFlows(*ExportSyntaxFlowsRequest, Yak_ExportSyntaxFlowsServer) error
 	ImportSyntaxFlows(*ImportSyntaxFlowsRequest, Yak_ImportSyntaxFlowsServer) error
+=======
+	// hot-patch template
+	CreateHotPatchTemplate(context.Context, *HotPatchTemplate) (*CreateHotPatchTemplateResponse, error)
+	DeleteHotPatchTemplate(context.Context, *DeleteHotPatchTemplateRequest) (*DeleteHotPatchTemplateResponse, error)
+	UpdateHotPatchTemplate(context.Context, *UpdateHotPatchTemplateRequest) (*UpdateHotPatchTemplateResponse, error)
+	QueryHotPatchTemplate(context.Context, *HotPatchTemplateRequest) (*QueryHotPatchTemplateResponse, error)
+>>>>>>> 0511e6b47 (feat(hotpatch-template):)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -8135,11 +8195,25 @@ func (UnimplementedYakServer) GetAllFuzztagInfo(context.Context, *GetAllFuzztagI
 func (UnimplementedYakServer) GenerateFuzztag(context.Context, *GenerateFuzztagRequest) (*GenerateFuzztagResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateFuzztag not implemented")
 }
+<<<<<<< HEAD
 func (UnimplementedYakServer) ExportSyntaxFlows(*ExportSyntaxFlowsRequest, Yak_ExportSyntaxFlowsServer) error {
 	return status.Errorf(codes.Unimplemented, "method ExportSyntaxFlows not implemented")
 }
 func (UnimplementedYakServer) ImportSyntaxFlows(*ImportSyntaxFlowsRequest, Yak_ImportSyntaxFlowsServer) error {
 	return status.Errorf(codes.Unimplemented, "method ImportSyntaxFlows not implemented")
+=======
+func (UnimplementedYakServer) CreateHotPatchTemplate(context.Context, *HotPatchTemplate) (*CreateHotPatchTemplateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateHotPatchTemplate not implemented")
+}
+func (UnimplementedYakServer) DeleteHotPatchTemplate(context.Context, *DeleteHotPatchTemplateRequest) (*DeleteHotPatchTemplateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteHotPatchTemplate not implemented")
+}
+func (UnimplementedYakServer) UpdateHotPatchTemplate(context.Context, *UpdateHotPatchTemplateRequest) (*UpdateHotPatchTemplateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateHotPatchTemplate not implemented")
+}
+func (UnimplementedYakServer) QueryHotPatchTemplate(context.Context, *HotPatchTemplateRequest) (*QueryHotPatchTemplateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryHotPatchTemplate not implemented")
+>>>>>>> 0511e6b47 (feat(hotpatch-template):)
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -15835,6 +15909,7 @@ func _Yak_GenerateFuzztag_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+<<<<<<< HEAD
 func _Yak_ExportSyntaxFlows_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(ExportSyntaxFlowsRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -15875,6 +15950,78 @@ type yakImportSyntaxFlowsServer struct {
 
 func (x *yakImportSyntaxFlowsServer) Send(m *SyntaxflowsProgress) error {
 	return x.ServerStream.SendMsg(m)
+=======
+func _Yak_CreateHotPatchTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HotPatchTemplate)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateHotPatchTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateHotPatchTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateHotPatchTemplate(ctx, req.(*HotPatchTemplate))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteHotPatchTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteHotPatchTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteHotPatchTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteHotPatchTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteHotPatchTemplate(ctx, req.(*DeleteHotPatchTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateHotPatchTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateHotPatchTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateHotPatchTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateHotPatchTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateHotPatchTemplate(ctx, req.(*UpdateHotPatchTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryHotPatchTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HotPatchTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryHotPatchTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryHotPatchTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryHotPatchTemplate(ctx, req.(*HotPatchTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+>>>>>>> 0511e6b47 (feat(hotpatch-template):)
 }
 
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
@@ -17251,6 +17398,22 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateFuzztag",
 			Handler:    _Yak_GenerateFuzztag_Handler,
+		},
+		{
+			MethodName: "CreateHotPatchTemplate",
+			Handler:    _Yak_CreateHotPatchTemplate_Handler,
+		},
+		{
+			MethodName: "DeleteHotPatchTemplate",
+			Handler:    _Yak_DeleteHotPatchTemplate_Handler,
+		},
+		{
+			MethodName: "UpdateHotPatchTemplate",
+			Handler:    _Yak_UpdateHotPatchTemplate_Handler,
+		},
+		{
+			MethodName: "QueryHotPatchTemplate",
+			Handler:    _Yak_QueryHotPatchTemplate_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
