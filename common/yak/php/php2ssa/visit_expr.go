@@ -359,15 +359,13 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		}).Build()
 		return y.ReadValue(variableName)
 	case *phpparser.NullCoalescingExpressionContext:
-		name := "unknown-variableEx"
+		name := uuid.NewString()
 		variable := y.CreateVariable(name)
-		y.AssignVariable(variable, y.EmitUndefined(name))
+		y.AssignVariable(variable, y.VisitExpression(ret.Expression(0)))
 		y.CreateIfBuilder().SetCondition(func() ssa.Value {
-			return y.VisitExpression(ret.Expression(0))
+			return y.VisitExpression(ret.Expression(1))
 		}, func() {
 			y.AssignVariable(y.CreateVariable(name), y.VisitExpression(ret.Expression(1)))
-		}).SetElse(func() {
-			y.AssignVariable(y.CreateVariable(name), y.VisitExpression(ret.Expression(0)))
 		}).Build()
 		return y.ReadValue(name)
 	case *phpparser.DefinedOrScanDefinedExpressionContext:

@@ -252,6 +252,7 @@ func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 func (v *ScopedVersionedTable[T]) CreateShadowScope() ScopedVersionedTableIF[T] {
 	sub := NewScope[T](v.ProgramName, v.offsetFetcher, v.newVersioned, v)
 	sub.SetForceCapture(v.GetForceCapture())
+
 	v.ForEachCapturedVariable(func(s string, vi VersionedIF[T]) {
 		sub.SetCapturedVariable(s, vi)
 	})
@@ -435,7 +436,6 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 		// value to variable
 		scope.linkVariable[value] = variable
 	}
-
 	// capture variable
 	if !variable.GetLocal() && !scope.IsRoot() {
 		for _, variable := range scope.GetCurrentVariables(variable.GetName()) {
