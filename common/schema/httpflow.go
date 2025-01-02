@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -106,54 +105,81 @@ func (f *HTTPFlow) AddTagToFirst(appendTags ...string) {
 	f.Tags = strings.Join(utils.RemoveRepeatStringSlice(append(appendTags, existed...)), "|")
 }
 
-func (f *HTTPFlow) RemoveColor() {
-	f.Tags = strings.Join(lo.Filter(utils.PrettifyListFromStringSplited(f.Tags, "|"), func(i string, _ int) bool {
-		return !strings.HasPrefix(i, COLORPREFIX)
-	}), "|")
+func (f *HTTPFlow) HasColor(color string) bool {
+	return utils.StringArrayContains(utils.PrettifyListFromStringSplited(f.Tags, "|"), color)
 }
 
+var (
+	FLOW_COLOR_RED    = yakitColor("RED")
+	FLOW_COLOR_GREEN  = yakitColor("GREEN")
+	FLOW_COLOR_BLUE   = yakitColor("BLUE")
+	FLOW_COLOR_YELLOW = yakitColor("YELLOW")
+	FLOW_COLOR_ORANGE = yakitColor("ORANGE")
+	FLOW_COLOR_PURPLE = yakitColor("PURPLE")
+	FLOW_COLOR_CYAN   = yakitColor("CYAN")
+	FLOW_COLOR_GREY   = yakitColor("GREY")
+)
+
 func (f *HTTPFlow) Red() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("RED"))
+	if f.HasColor(FLOW_COLOR_RED) {
+		return
+	}
+	f.AddTag(FLOW_COLOR_RED)
 }
 
 func (f *HTTPFlow) Green() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("GREEN"))
+	if f.HasColor(FLOW_COLOR_GREEN) {
+		return
+	}
+	f.AddTag(FLOW_COLOR_GREEN)
 }
 
 func (f *HTTPFlow) Blue() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("BLUE"))
+	if f.HasColor(FLOW_COLOR_BLUE) {
+		return
+	}
+	f.AddTag(FLOW_COLOR_BLUE)
 }
 
 func (f *HTTPFlow) Yellow() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("YELLOW"))
+	if f.HasColor(FLOW_COLOR_YELLOW) {
+		return
+	}
+	f.AddTag(FLOW_COLOR_YELLOW)
 }
 
 func (f *HTTPFlow) Orange() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("ORANGE"))
+	if f.HasColor(FLOW_COLOR_ORANGE) {
+		return
+	}
+	f.AddTag(FLOW_COLOR_ORANGE)
 }
 
 func (f *HTTPFlow) Purple() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("PURPLE"))
+	if f.HasColor(FLOW_COLOR_PURPLE) {
+		return
+	}
+	f.AddTag(FLOW_COLOR_PURPLE)
 }
 
 func (f *HTTPFlow) Cyan() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("CYAN"))
+	if f.HasColor(FLOW_COLOR_CYAN) {
+		return
+	}
+	f.AddTag(FLOW_COLOR_CYAN)
 }
 
 func (f *HTTPFlow) Grey() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("GREY"))
+	if f.HasColor(FLOW_COLOR_GREY) {
+		return
+	}
+	f.AddTag(FLOW_COLOR_GREY)
 }
 
 func (f *HTTPFlow) ColorSharp(rgbHex string) {
-	f.RemoveColor()
+	if f.HasColor(yakitColor(rgbHex)) {
+		return
+	}
 	f.AddTag(yakitColor(rgbHex))
 }
 
