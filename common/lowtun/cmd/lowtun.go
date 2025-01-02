@@ -2,14 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/lowtun"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/lowtun"
+	"github.com/yaklang/yaklang/common/pcapx"
 )
 
 var (
@@ -58,18 +61,36 @@ func main() {
 
 		log.Infof("lowtun start success: %v", ifc.Name())
 
-		var buf = make([]byte, 1400)
+		var buf = make([]byte, 1500)
 		for {
 			n, err := ifc.Read(buf)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("%#v", string(n))
 
-			// clean buffer
-			for i := 0; i < n; i++ {
-				buf[i] = 0
+			spew.Dump(buf[:n])
+
+			_, network, transport, payload, err := pcapx.ParseAuto(buf[:n])
+			if err != nil {
+				log.Error(err)
+				// clean buffer
+				for i := 0; i < n; i++ {
+					buf[i] = 0
+				}
+				continue
 			}
+
+			// copy network to modify source
+
+			// pcapx.InjectRaw()
+
+			_ = network
+			_ = transport
+			_ = payload
+			fmt.Println(network)
+			// handle buf[:n] to next hop, iface is en0
+			// send to en0
+			ifc.Write(buf[:n])
 		}
 	}
 

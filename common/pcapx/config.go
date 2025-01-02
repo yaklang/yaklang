@@ -2,11 +2,12 @@ package pcapx
 
 import (
 	"errors"
+	"sync"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
 )
 
 var (
@@ -198,4 +199,112 @@ func ParseEthernetLinkLayer(raw []byte) (gopacket.LinkLayer, gopacket.NetworkLay
 
 func ParseRaw(raw []byte) (gopacket.LinkLayer, gopacket.NetworkLayer, gopacket.TransportLayer, gopacket.Payload, error) {
 	return parseFromLinkLayer(layers.LinkTypeRaw, raw)
+}
+
+func ParseAutoLinkType(raw []byte) (gopacket.LinkLayer, gopacket.NetworkLayer, gopacket.TransportLayer, gopacket.Payload, error) {
+	// Try different link types
+	linkTypes := []layers.LinkType{
+		layers.LinkTypeEthernet,
+		layers.LinkTypeRaw,
+		layers.LinkTypeLoop,
+		layers.LinkTypeNull,
+		layers.LinkTypePPP,
+	}
+
+	for _, linkType := range linkTypes {
+		link, net, trans, payload, err := parseFromLinkLayer(linkType, raw)
+		if err == nil {
+			return link, net, trans, payload, nil
+		}
+	}
+	return nil, nil, nil, nil, utils.Error("failed to parse packet with any link type")
+}
+
+func ParseNetworkLayer(networkLayer gopacket.LayerType, raw []byte) (gopacket.LinkLayer, gopacket.NetworkLayer, gopacket.TransportLayer, gopacket.Payload, error) {
+	// try to parse the packet with ethernet layer
+	packet := gopacket.NewPacket(raw, networkLayer, gopacket.Default)
+	if packet.ErrorLayer() != nil && packet.ErrorLayer().Error() != nil {
+		return nil, nil, nil, nil, utils.Errorf("parse packet failed: %v", packet.ErrorLayer().Error())
+	}
+
+	// 获取链路层
+	linkLayer := packet.LinkLayer()
+	if linkLayer == nil {
+		// 如果没有链路层,则使用默认的以太网链路层
+		linkLayer = &layers.Ethernet{}
+	}
+
+	netLayer := packet.NetworkLayer()
+	transLayer := packet.TransportLayer()
+
+	var payload = linkLayer.LayerPayload()
+	if netLayer != nil {
+		payload = netLayer.LayerPayload()
+	}
+	if transLayer != nil {
+		payload = transLayer.LayerPayload()
+	}
+	return linkLayer, netLayer, transLayer, payload, nil
+}
+
+func ParseAutoNetwork(raw []byte) (gopacket.LinkLayer, gopacket.NetworkLayer, gopacket.TransportLayer, gopacket.Payload, error) {
+	// try all network layer
+	for _, layerType := range []gopacket.LayerType{
+		layers.LayerTypeIPv4,
+		layers.LayerTypeIPv6,
+		layers.LayerTypeARP,
+		layers.LayerTypeICMPv4,
+		layers.LayerTypeICMPv6,
+		layers.LayerTypeIPv6HopByHop,
+		layers.LayerTypeIPv6Routing,
+		layers.LayerTypeIPv6Fragment,
+		layers.LayerTypeIPv6Destination,
+		layers.LayerTypeIPSecAH,
+		layers.LayerTypeIPSecESP,
+		layers.LayerTypeGRE,
+		layers.LayerTypeSCTP,
+		layers.LayerTypeUDP,
+		layers.LayerTypeTCP,
+		layers.LayerTypeIGMP,
+		layers.LayerTypeUDPLite,
+		layers.LayerTypeEAP,
+		layers.LayerTypeEAPOL,
+		layers.LayerTypePPP,
+		layers.LayerTypePPPoE,
+		layers.LayerTypeRUDP,
+		layers.LayerTypeLLC,
+		layers.LayerTypeSNAP,
+		layers.LayerTypeMPLS,
+		layers.LayerTypeDot1Q,
+		layers.LayerTypeEtherIP,
+		layers.LayerTypeEthernet,
+		layers.LayerTypeCiscoDiscovery,
+		layers.LayerTypeLoopback,
+		layers.LayerTypeFDDI,
+		layers.LayerTypePFLog,
+		layers.LayerTypeRadioTap,
+		layers.LayerTypeDot11,
+		layers.LayerTypeDot11Ctrl,
+		layers.LayerTypeDot11Data,
+	} {
+		link, net, trans, payload, err := ParseNetworkLayer(layerType, raw)
+		if err != nil {
+			continue
+		}
+		return link, net, trans, payload, nil
+	}
+	return nil, nil, nil, nil, utils.Error("parse packet failed")
+}
+
+func ParseAuto(raw []byte) (gopacket.LinkLayer, gopacket.NetworkLayer, gopacket.TransportLayer, gopacket.Payload, error) {
+	// try linktype first
+	// then try ethernet
+	link, net, trans, payload, err := ParseAutoLinkType(raw)
+	if err != nil {
+		link, net, trans, payload, err = ParseAutoNetwork(raw)
+		if err != nil {
+			return nil, nil, nil, nil, utils.Errorf("parse packet failed: %v", err)
+		}
+	}
+	return link, net, trans, payload, nil
 }
