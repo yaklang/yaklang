@@ -1,6 +1,6 @@
 desc(
     title: "Check The Use Of Broken Or Risky Encryption Algorithm",
-    type: vuln,
+    type: security,
     level: low,
     risk : "risky_crypt",
     desc: <<<TEXT
@@ -9,16 +9,18 @@ TEXT
 )
 
 SecretKeySpec(* as $algorithm);
-$algorithm?{have:'DES'||'DESede'||'RC4'||'RC2'} as $sink;
+$algorithm#{
+    until:<<<UNTIL
+   <self>?{opcode:const}?{have:'DES'||'DESede'||'RC4'||'RC2'}
+UNTIL
+}-> as $sink;
 alert $sink for {
     message:"Find the use of broken or risky encryption algorithm",
-    type: vuln,
-    level:low,
 }
 
 desc(
     lang:java,
-    alert_min:4,
+    alert_num:5,
     'file://unsafe.java':<<<EOF
     import javax.crypto.Cipher;
     import javax.crypto.spec.SecretKeySpec;
@@ -26,6 +28,7 @@ desc(
 
     public class RC4Cipher {
 
+        private static final String ALGORITHM = "DES/ECB/PKCS5Padding";
         private static final String ALGORITHM1 = "RC4";
         private static final String ALGORITHM2 = "RC2";
         private static final String ALGORITHM3 = "DES";
@@ -62,7 +65,18 @@ desc(
                  byte[] encrypted = cipher.doFinal(data.getBytes());
                  return Base64.getEncoder().encodeToString(encrypted);
            }
-        }
+
+            private static String encrypt(String algorithm, String key, String data) throws Exception {
+                Cipher cipher = Cipher.getInstance(ALGORITHM);
+                SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), algorithm);
+                cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+                byte[] encrypted = cipher.doFinal(data.getBytes());
+                return Base64.getEncoder().encodeToString(encrypted);
+            }
+
+            private static MessageDigest getDESMessageDigest() throws NoSuchAlgorithmException {
+                return encrypt("DES", "key", "data");
+            }
     }
 EOF
 )
