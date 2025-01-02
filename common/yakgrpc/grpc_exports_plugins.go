@@ -89,7 +89,7 @@ func (s *Server) ImportYakScriptStream(
 		if script.ScriptName == "" {
 			log.Warnf("yakit script name is empty: %v", name)
 		}
-		err = yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, &script)
+		err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), script.ScriptName, &script)
 		if err != nil {
 			log.Warnf("create or update yakit script failed: %v", script.ScriptName)
 		}
