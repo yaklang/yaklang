@@ -1724,7 +1724,7 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 		className := uuid.NewString()
 		class := y.CreateBluePrint(className)
 		if oldClassName != "" {
-			class.AddParentClass(y.GetBluePrint(oldClassName))
+			class.AddParentBlueprint(y.GetBluePrint(oldClassName))
 		}
 		y.VisitClassBody(i.ClassBody(), class)
 	}
