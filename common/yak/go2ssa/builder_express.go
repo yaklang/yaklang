@@ -25,7 +25,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 		}
 	}
 
-	fmt.Printf("exp = %v\n", exp.GetText())
+	// fmt.Printf("exp = %v\n", exp.GetText())
 
 	if ret := exp.PrimaryExpr(); ret != nil {
 		return b.buildPrimaryExpression(ret.(*gol.PrimaryExprContext), IslValue)
