@@ -16,7 +16,7 @@ import (
 )
 
 type Range struct {
-	Min, Max int64
+	Min, Max uint64
 }
 
 func QueryBySpecificPorts(db *gorm.DB, field string, ports string) *gorm.DB {
@@ -145,6 +145,19 @@ func FuzzQueryArrayOr(db *gorm.DB, field string, s []interface{}) *gorm.DB {
 	}
 
 	return db.Where(strings.Join(querys, " OR "), items...)
+}
+
+func FuzzQueryArrayStringOrLike(db *gorm.DB, field string, s []string) *gorm.DB {
+	s = utils.StringArrayFilterEmpty(s)
+	if len(s) <= 0 {
+		return db
+	}
+
+	raw := make([]interface{}, len(s))
+	for index, sub := range s {
+		raw[index] = sub
+	}
+	return FuzzQueryArrayOrLike(db, field, raw)
 }
 
 // FuzzQueryArrayOrLike
@@ -357,14 +370,22 @@ func ExactQueryExcludeArrayOr(db *gorm.DB, field string, s []interface{}) *gorm.
 }
 
 func ExactQueryIntArrayOr(db *gorm.DB, field string, s []int) *gorm.DB {
-	raw := make([]int64, len(s))
+	raw := make([]uint64, len(s))
 	for index, sub := range s {
-		raw[index] = int64(sub)
+		raw[index] = uint64(sub)
 	}
-	return ExactQueryInt64ArrayOr(db, field, raw)
+	return ExactExcludeQueryUInt64Array(db, field, raw)
 }
 
 func ExactExcludeQueryInt64Array(db *gorm.DB, field string, s []int64) *gorm.DB {
+	raw := make([]uint64, len(s))
+	for index, sub := range s {
+		raw[index] = uint64(sub)
+	}
+	return ExactExcludeQueryUInt64Array(db, field, raw)
+}
+
+func ExactExcludeQueryUInt64Array(db *gorm.DB, field string, s []uint64) *gorm.DB {
 	if len(s) <= 0 {
 		return db
 	}
@@ -402,6 +423,14 @@ func ExactExcludeQueryInt64Array(db *gorm.DB, field string, s []int64) *gorm.DB 
 }
 
 func ExactQueryInt64ArrayOr(db *gorm.DB, field string, s []int64) *gorm.DB {
+	raw := make([]uint64, len(s))
+	for index, sub := range s {
+		raw[index] = uint64(sub)
+	}
+	return ExactQueryUInt64ArrayOr(db, field, raw)
+}
+
+func ExactQueryUInt64ArrayOr(db *gorm.DB, field string, s []uint64) *gorm.DB {
 	if len(s) <= 0 {
 		return db
 	}
