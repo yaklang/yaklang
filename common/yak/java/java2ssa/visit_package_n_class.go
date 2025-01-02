@@ -848,7 +848,7 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		defer switchHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)
 		{
-			y.NewParam("this")
+			y.NewParam("$this")
 			container := y.EmitEmptyContainer()
 			variable := y.CreateVariable("this")
 			y.AssignVariable(variable, container)
