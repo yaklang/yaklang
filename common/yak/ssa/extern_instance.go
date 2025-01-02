@@ -102,33 +102,9 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 		return ret
 	}
 
-	tryBuildFieldForPhi := func(phiIns *Phi) Value {
-		var possibleRet Value // use last possibleRet as return value
-		// if len(phiIns.GetValues()) == 0 {
-		// 	u := b.EmitUndefined(name)
-		// 	u.Kind = UndefinedMemberValid
-		// 	return u
-		// }
-		for _, possibleKey := range phiIns.GetValues() {
-			// skip emptyphi
-			if possibleKey.GetId() == -1 && len(possibleKey.GetValues()) == 0 {
-				continue
-			}
-			if ret := extern.BuildField(possibleKey.String()); ret == nil {
-				want := b.TryGetSimilarityKey(extern.GetName(), possibleKey.String())
-				b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), possibleKey.String(), want))
-				b.NewErrorWithPos(Error, SSATAG, possibleKey.GetRange(), ExternFieldError("Lib", extern.GetName(), possibleKey.String(), want))
-				return possibleRet
-			} else {
-				possibleRet = ret
-			}
-		}
-		// all possibleKey exist
-		return possibleRet
-	}
 	// try build field for phi
 	if phiIns, ok := ToPhi(key); ok {
-		if ret := tryBuildFieldForPhi(phiIns); ret != nil {
+		if ret := b.tryBuildFieldForPhi(extern, phiIns); ret != nil {
 			return ret
 		}
 	} else {
@@ -140,6 +116,40 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 	un.SetExtern(true)
 	setMemberCallRelationship(extern, key, un)
 	return un
+}
+
+func (b *FunctionBuilder) tryBuildFieldForPhi(extern *ExternLib, phiIns *Phi) Value {
+	errorNotice := func(v Value) {
+		want := b.TryGetSimilarityKey(extern.GetName(), v.String())
+		b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), v.String(), want))
+		b.NewErrorWithPos(Error, SSATAG, v.GetRange(), ExternFieldError("Lib", extern.GetName(), v.String(), want))
+	}
+
+	var possibleRet Value // use last possibleRet as return value
+	for _, possibleKey := range phiIns.GetValues() {
+		// skip empty phi
+		if possibleKey.GetId() == -1 && len(possibleKey.GetValues()) == 0 {
+			continue
+		}
+		// recursive check phi
+		if phiKey, ok := ToPhi(possibleKey); ok {
+			if ret := b.tryBuildFieldForPhi(extern, phiKey); ret == nil {
+				errorNotice(possibleKey)
+				return possibleRet
+			} else {
+				possibleRet = ret
+			}
+		} else {
+			if ret := extern.BuildField(possibleKey.String()); ret == nil {
+				errorNotice(possibleKey)
+				return possibleRet
+			} else {
+				possibleRet = ret
+			}
+		}
+	}
+	// all possibleKey exist
+	return possibleRet
 }
 
 func (prog *Program) TryBuildExternValue(b *FunctionBuilder, id string) Value {
