@@ -1,6 +1,6 @@
 desc(
     title: "Check The Use Of Broken Or Risky Hash Algorithm",
-    type: vuln,
+    type: security,
     level: low,
     risk : "risky_crypt",
     desc: <<<TEXT
@@ -9,21 +9,22 @@ TEXT
 )
 
 MessageDigest.getInstance(* as $algorithm);
-$algorithm?{have:'SHA-0' || 'SHA-1'|| 'MD5' || 'MD4'} as $sink;
+$algorithm#{
+    until:<<<UNTIL
+   <self>?{opcode:const}?{have:/^SHA$/ || 'SHA-0' || 'SHA-1'|| 'MD5' || 'MD4' || 'MD2' || 'RIPEMD160'}
+UNTIL
+}-> as $sink;
 alert $sink for{
     message:"Find the use of broken or risky encryption algorithm",
-    type: vuln,
-    level:low,
 }
 
 desc(
     lang:java,
-    alert_min:4,
+    alert_num:6,
     'file://unsafe.java': <<<EOF
      import java.security.MessageDigest;
      import java.security.NoSuchAlgorithmException;
      import java.util.Formatter;
-
      public class UnsafeHashExample {
           public static String md4(String input) throws NoSuchAlgorithmException {
                              MessageDigest md = MessageDigest.getInstance("MD4");
@@ -74,6 +75,19 @@ desc(
              formatter.close();
              return result;
          }
+         static MessageDigest getDigest(String algorithm) throws ServiceException {
+                     try {
+                         return MessageDigest.getInstance(algorithm);
+                     } catch (NoSuchAlgorithmException e) {
+                         throw new ServiceException(e.getMessage());
+                     }
+                 }
+             private static MessageDigest getMd5Digest() throws ServiceException {
+                 return getDigest("MD5");
+             }
+             private static MessageDigest getShaDigest() throws ServiceException {
+                 return getDigest("SHA");
+             }
 
      }
 EOF
