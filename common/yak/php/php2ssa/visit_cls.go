@@ -65,7 +65,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	bluePrint := y.CreateBluePrint(cname)
 	if i.QualifiedStaticTypeRef() != nil {
 		if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
-			bluePrint.AddParentClass(ref)
+			bluePrint.AddParentBlueprint(ref)
 		}
 	}
 	for _, statement := range i.AllClassStatement() {
@@ -140,7 +140,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 					defer switchHandler()
 					if parentClass := y.GetBluePrint(parentClassName); parentClass != nil {
 						//感觉在ssa-classBlue中做更好，暂时修复
-						class.AddParentClass(parentClass)
+						class.AddParentBlueprint(parentClass)
 						class.AddSuperBlueprint(parentClass)
 						for _, s := range parentClass.GetFullTypeNames() {
 							class.AddFullTypeName(s)

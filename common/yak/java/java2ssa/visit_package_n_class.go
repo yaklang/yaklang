@@ -146,11 +146,11 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		for _, parentClass := range mergedTemplate {
 			bluePrint := y.GetBluePrint(parentClass)
 			if bluePrint != nil {
-				class.AddParentClass(bluePrint)
+				class.AddParentBlueprint(bluePrint)
 			} else {
 				bluePrint = y.CreateBluePrint(parentClass)
 				y.AddFullTypeNameForAllImport(parentClass, bluePrint)
-				class.AddParentClass(bluePrint)
+				class.AddParentBlueprint(bluePrint)
 			}
 
 			if parentClass == extendName {
@@ -405,9 +405,9 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 
 	for _, parentClass := range mergedTemplate {
 		if parent := y.GetBluePrint(parentClass); parent != nil {
-			class.AddParentClass(parent)
+			class.AddParentBlueprint(parent)
 		} else {
-			class.AddParentClass(y.CreateBluePrint(parentClass))
+			class.AddParentBlueprint(y.CreateBluePrint(parentClass))
 		}
 	}
 

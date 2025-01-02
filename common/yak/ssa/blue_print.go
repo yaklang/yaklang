@@ -83,8 +83,8 @@ func NewClassBluePrint(name string) *Blueprint {
 }
 
 // ======================= class blue print
-// AddParentClass is used to add a parent class to the class,
-func (c *Blueprint) AddParentClass(parent *Blueprint) {
+// AddParentBlueprint is used to add a parent class to the class,
+func (c *Blueprint) AddParentBlueprint(parent *Blueprint) {
 	if parent == nil {
 		return
 	}
