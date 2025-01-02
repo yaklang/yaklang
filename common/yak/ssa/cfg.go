@@ -645,7 +645,7 @@ func (t *SwitchBuilder) Finish() {
 			bodyEnd := svt.CreateShadowScope()
 			bodyEnd.CoverBy(builder.CurrentBlock.ScopeTable)
 			return bodyEnd, svt
-		}, generatePhi(builder, blocks[i], condb))
+		}, generatePhi(builder, handlers[i], condb))
 
 		builder.EmitJump(NextBlock(i))
 
@@ -819,6 +819,14 @@ func (t *LabelBuilder) Finish() {
 	builder.PopTarget()
 }
 
+/*
+	if(cc){
+		a =1
+		return
+	}
+
+undefind
+*/
 func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 	parent := s.GetParent()
 	end := parent.CreateSubScope()
