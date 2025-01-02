@@ -374,7 +374,7 @@ func ExactQueryIntArrayOr(db *gorm.DB, field string, s []int) *gorm.DB {
 	for index, sub := range s {
 		raw[index] = uint64(sub)
 	}
-	return ExactExcludeQueryUInt64Array(db, field, raw)
+	return ExactQueryUInt64ArrayOr(db, field, raw)
 }
 
 func ExactExcludeQueryInt64Array(db *gorm.DB, field string, s []int64) *gorm.DB {
