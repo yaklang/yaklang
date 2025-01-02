@@ -98,6 +98,21 @@ set a =1;
 */`
 	ssatest.NonStrictMockSSA(t, code)
 }
+func TestSwitch(t *testing.T) {
+	code := `<?php
+function data_get($data, $key, $default = null)
+{
+    switch (true) {
+        case $data:
+            return $data;
+        case $data3:
+            $data ?? $default;
+        case $data->getIterator():
+    }
+}
+`
+	ssatest.NonStrictMockSSA(t, code)
+}
 
 func TestBadPanic4(t *testing.T) {
 	code := `#!/usr/bin/php
