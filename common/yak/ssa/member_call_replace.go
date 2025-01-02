@@ -20,33 +20,33 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			// replace this member object to to
 			key := member.GetKey()
 			// remove this member from v
-			v.DeleteMember(key)
+			v.DeleteMember(index)
 
 			// create member of `to` value with key
 			// if fun := GetMethod(value.GetType(), key.String()); fun != nil {
 			// 	return NewClassMethod(fun, value)
 			// }
 			// re-set type
-			resKey := checkCanMemberCallExist(to, key)
-			resIndex := checkCanMemberCallExist(to, index)
-			name, typ := resKey.name, resKey.typ
+			res := checkCanMemberCallExist(to, index)
+			resk := checkCanMemberCallExist(to, key)
+			name, typ := res.name, res.typ
 			// toMember := builder.getOriginMember(name, typ, to, key)
-			toMember := builder.PeekValue(name)
+			toMember := builder.PeekValue(resk.name)
 
 			// then, we will replace value, `member` to `toMember`
 			if member.GetOpcode() != SSAOpcodeUndefined {
 				member.SetName(name)
 				member.SetType(typ)
-				setMemberCallRelationship(to, key, member)
+				setMemberCallRelationship(to, index, member)
 				log.Warn("ReplaceMemberCall can create phi, but we cannot find cfgEntryBlock")
 				if utils.IsNil(toMember) {
-					ret[resIndex.name] = member
+					ret[name] = member
 				} else {
-					ret[resIndex.name] = createPhi(name, []Value{toMember, member})
+					ret[name] = createPhi(name, []Value{toMember, member})
 				}
 			}
 			if utils.IsNil(toMember) {
-				toMember = builder.ReadMemberCallValue(to, key)
+				toMember = builder.ReadMemberCallValue(to, index)
 			}
 
 			memberT := member
@@ -63,7 +63,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 				ret[n] = v
 			}
 			if !member.IsObject() {
-				ret[resIndex.name] = memberT
+				ret[name] = memberT
 			}
 		}
 	}
