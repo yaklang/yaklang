@@ -93,21 +93,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				b.buildDeclaration(decl, true)
 			}
 		}
-		for n, s := range b.GetStructAll() {
-			bp := b.GetBluePrint(n)
-			if bp == nil {
-				b.NewError(ssa.Error, TAG, NotCreateBluePrint(n))
-				continue
-			}
-			for pn, _ := range s.AnonymousField {
-				pbp := b.GetBluePrint(pn)
-				if pbp != nil {
-					b.NewError(ssa.Warn, TAG, StructNotFind(n))
-					pbp = b.CreateBluePrint(pn)
-				}
-				bp.ParentBlueprints = append(bp.ParentBlueprints, pbp)
-			}
-		}
 
 		for _, meth := range ast.AllMethodDecl() {
 			if meth, ok := meth.(*gol.MethodDeclContext); ok {
@@ -118,6 +103,32 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		for _, fun := range ast.AllFunctionDecl() {
 			if fun, ok := fun.(*gol.FunctionDeclContext); ok {
 				b.buildFunctionDeclFront(fun)
+			}
+		}
+
+		for n, s := range b.GetStructAll() {
+			bp := b.GetBluePrint(n)
+			if bp == nil {
+				b.NewError(ssa.Error, TAG, NotCreateBluePrint(n))
+				continue
+			}
+			if o, ok := s.(*ssa.ObjectType); ok {
+				for pn, _ := range o.AnonymousField {
+					pbp := b.GetBluePrint(pn)
+					if pbp != nil {
+						b.NewError(ssa.Warn, TAG, StructNotFind(n))
+						pbp = b.CreateBluePrint(pn)
+					}
+					bp.ParentBlueprints = append(bp.ParentBlueprints, pbp)
+				}
+			}
+
+			if s.GetTypeKind() == ssa.InterfaceTypeKind {
+				if fun, ok := ssa.ToFunction(bp.Constructor); ok {
+					fun.AddLazyBuilder(func() {
+
+					}, false)
+				}
 			}
 		}
 
@@ -700,19 +711,26 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 
 	var params []ssa.Type
 	var result ssa.Type
+	var ssatypName []string
 
 	funcName := ""
 	methodName := ""
 	if Name := fun.IDENTIFIER(); Name != nil {
 		methodName = Name.GetText()
 		if recove := fun.Receiver(); recove != nil {
-			ssatypName := b.getReceiver(recove.(*gol.ReceiverContext))
+			ssatypName = b.getReceiver(recove.(*gol.ReceiverContext))
 			funcName = fmt.Sprintf("%s_%s", ssatypName[0], methodName)
 		}
 	}
 
 	newFunc := b.NewFunc(funcName)
 	newFunc.SetMethodName(methodName)
+
+	for _, n := range ssatypName {
+		if bp := b.GetBluePrint(n); bp != nil {
+			bp.AddMethod(n, newFunc)
+		}
+	}
 
 	hitDefinedFunction := false
 	MarkedFunctionType := b.GetMarkedFunction()

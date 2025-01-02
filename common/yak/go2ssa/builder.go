@@ -296,12 +296,10 @@ func (b *astbuilder) GetStructByStr(name string) ssa.Type {
 	return nil
 }
 
-func (b *astbuilder) GetStructAll() map[string]*ssa.ObjectType {
-	var objs map[string]*ssa.ObjectType = make(map[string]*ssa.ObjectType)
+func (b *astbuilder) GetStructAll() map[string]ssa.Type {
+	objs := make(map[string]ssa.Type)
 	for s, o := range b.GetProgram().ExportType {
-		if o, ok := o.(*ssa.ObjectType); ok {
-			objs[s] = o
-		}
+		objs[s] = o
 	}
 
 	return objs
