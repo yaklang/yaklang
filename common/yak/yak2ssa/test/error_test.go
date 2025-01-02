@@ -503,6 +503,24 @@ func TestErrorMemberCall(t *testing.T) {
 			Want: []string{},
 		})
 	})
+
+	t.Run("test the extern key of phi for member call in for stmt extend", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `  
+	ispost = cli.Bool("ispost")
+	cli.check()
+	Location = "AppendHTTPPacketQueryParam"
+	
+	for true {
+		if ispost{
+			Location = "AppendHTTPPacketPostParam"
+		}
+		packetRaw = poc[Location]
+	}
+ `,
+			Want: []string{},
+		})
+	})
 }
 
 func TestSliceCall(t *testing.T) {
