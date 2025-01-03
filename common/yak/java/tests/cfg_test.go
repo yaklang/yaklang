@@ -208,7 +208,7 @@ func TestJavaBasic_Variable_Switch(t *testing.T) {
 		`, []string{
 			"22",
 			"33",
-			"phi(a)[33,1]"},
+			"phi(a)[phi(a)[33,1],1]"},
 			t)
 	})
 	t.Run("simple switch, has default but nothing", func(t *testing.T) {
@@ -225,8 +225,23 @@ func TestJavaBasic_Variable_Switch(t *testing.T) {
 		}
 		println(a); // phi[1, 22, 33]
 		`, []string{
-			"22", "33", "phi(a)[33,1]",
+			"22", "33", "phi(a)[phi(a)[33,1],1]",
 		}, t)
+	})
+	t.Run("switch build", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		var a = 1;
+		switch (a) {
+		case 2: 
+			a = 22;
+			println(a);
+		default: 
+			a = 44;
+			println(44);
+		}
+		println(a); // 4
+}
+`, []string{"22", "44", "44"}, t)
 	})
 	t.Run("simple switch, has default", func(t *testing.T) {
 		CheckJavaPrintlnValue(`
@@ -242,7 +257,7 @@ func TestJavaBasic_Variable_Switch(t *testing.T) {
 			a = 44;
 			println(a);
 		}
-		println(a); // phi[22, 33, 44]
+		println(a); // 4
 		`, []string{
 			"22", "33", "44", "44",
 		}, t)
@@ -437,11 +452,11 @@ func TestYaklangBasic_CFG_Break(t *testing.T) {
 
 	t.Run("simple break in switch", func(t *testing.T) {
 		CheckJavaPrintlnValue(`
-		int a = 1;
+		a = 1;
 		switch (a) {
 		case 1:
 			if (c) {
-				 int a = 2;
+				 a = 2;
 				 break;
 			}
 			a = 4;
@@ -450,7 +465,7 @@ func TestYaklangBasic_CFG_Break(t *testing.T) {
 		}
 		println(a) ;
 		`, []string{
-			"phi(a)[2,phi(a)[3,1]]",
+			"phi(a)[2,phi(a)[phi(a)[3,1],1]]",
 		}, t)
 	})
 
