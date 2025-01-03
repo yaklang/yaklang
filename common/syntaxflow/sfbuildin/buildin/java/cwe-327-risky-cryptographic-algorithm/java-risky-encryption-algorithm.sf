@@ -11,8 +11,11 @@ TEXT
 SecretKeySpec(* as $algorithm);
 $algorithm#{
     until:<<<UNTIL
-   <self>?{opcode:const}?{have:'DES'||'DESede'||'RC4'||'RC2'}
-UNTIL
+   <self>?{opcode:const}?{have:/^DES$/ || 'DESede' || 'RC4' || 'RC2'}
+UNTIL,
+    exclude:<<<EXCLUDE
+    <self>?{have:'3DES'}
+EXCLUDE
 }-> as $sink;
 alert $sink for {
     message:"Find the use of broken or risky encryption algorithm",
@@ -76,6 +79,10 @@ desc(
 
             private static MessageDigest getDESMessageDigest() throws NoSuchAlgorithmException {
                 return encrypt("DES", "key", "data");
+            }
+
+            private static MessageDigest get3DESMessageDigest() throws NoSuchAlgorithmException {
+                            return encrypt("3"+"DES", "key", "data");
             }
     }
 EOF
