@@ -160,7 +160,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 	}
 	// 匹配响应
 	var httpTPLmatchersResult bool
-	var hitColor string
+	var hitColor []string
 	if len(req.GetMatchers()) != 0 {
 		httpTplMatcher := make([]*YakFuzzerMatcher, 0)
 		for _, matcher := range req.GetMatchers() {
@@ -192,7 +192,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		RequestRaw:            resultRequest,
 		ExtractedResults:      extractResults,
 		MatchedByMatcher:      httpTPLmatchersResult,
-		HitColor:              hitColor,
+		HitColor:              strings.Join(hitColor, "|"),
 	}
 	rsp.UUID = uuid.New().String()
 	rsp.Timestamp = start.Unix()
@@ -465,7 +465,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						}
 					}
 					var httpTPLmatchersResult bool
-					var hitColor string
+					var hitColor []string
 					for mergedParams := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS(), false) {
 						existedParams := make(map[string]string) // 传入的参数
 						if mergedParams != nil {
@@ -492,7 +492,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							matcherParams)
 						if httpTPLmatchersResult {
 							respModel.MatchedByMatcher = true
-							respModel.HitColor = hitColor
+							respModel.HitColor = strings.Join(hitColor, "|")
 							break
 						}
 					}
@@ -846,7 +846,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			var httpTPLmatchersResult, discard bool
-			var hitColor string
+			var hitColor []string
 			lowhttpResponse := result.LowhttpResponse
 
 			if haveHTTPTplMatcher && lowhttpResponse != nil {
@@ -908,7 +908,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				IsHTTPS:                    strings.HasPrefix(strings.ToLower(result.Url), "https://"),
 				ExtractedResults:           extractorResults,
 				MatchedByMatcher:           httpTPLmatchersResult,
-				HitColor:                   hitColor,
+				HitColor:                   strings.Join(hitColor, "|"),
 				IsTooLargeResponse:         tooLarge,
 				TooLargeResponseBodyFile:   tooLargeBodyFile,
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
@@ -1021,7 +1021,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					redirectRes := redirectPacket[i].RespRecord
 					method, _, _ := lowhttp.GetHTTPPacketFirstLine(redirectRes.RawRequest)
 					var redirectMatchersResult, redirectDiscard bool
-					var redirectHitColor string
+					var redirectHitColor []string
 					if haveHTTPTplMatcher {
 						matcherParams := utils.CopyMapInterface(mergedParams)
 						for _, kv := range extractorResultsOrigin {
@@ -1041,7 +1041,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						Payloads:              payloads,
 						IsHTTPS:               redirectRes.Https,
 						MatchedByMatcher:      redirectMatchersResult,
-						HitColor:              redirectHitColor,
+						HitColor:              strings.Join(redirectHitColor, "|"),
 						RuntimeID:             runtimeID,
 						Discard:               redirectDiscard,
 					}
@@ -1665,7 +1665,8 @@ func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakFuzzerMatch
 	return res
 }
 
-func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[string]interface{}, suf ...string) (matched bool, hitColor string, discard bool) {
+func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[string]interface{}, suf ...string) (matched bool, hitColor []string, discard bool) {
+
 	for _, flowMatcher := range m {
 		res, err := flowMatcher.Matcher.Execute(rsp, vars, suf...)
 		if err != nil {
@@ -1675,13 +1676,13 @@ func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[strin
 		if CheckShouldDiscard(flowMatcher.Action, res) { // if should discard, return directly
 			matched = res
 			if res {
-				hitColor = flowMatcher.Color
+				hitColor = append(hitColor, flowMatcher.Color)
 			}
 			discard = true
 			return
 		} else if res { // has not action and match success ,update match info
 			matched = true
-			hitColor = flowMatcher.Color
+			hitColor = append(hitColor, flowMatcher.Color)
 		}
 	}
 	return
