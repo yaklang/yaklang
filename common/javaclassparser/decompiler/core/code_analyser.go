@@ -1068,7 +1068,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				preSim.Pop()
 				runtimeStackSimulation = NewStackSimulation(preSim.stackEntry, varTable, id)
 				slotVal := values.NewSlotValue(nil, validSource.StackEntry.value.Type())
-				slotVal.UnpackAble = false
 				runtimeStackSimulation.Push(slotVal)
 				ternaryExpMergeNodeSlot[code] = slotVal
 				ternaryExpMergeNode = append(ternaryExpMergeNode, code)
@@ -1123,7 +1122,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 	}
 	d.opCodes = GraphToList(d.RootOpCode)
 	d.opcodeToSimulateStack = opcodeToSim
-	DumpOpcodesToDotExp(d.RootOpCode)
 	ternaryExpMergeNode = utils.NewSet(ternaryExpMergeNode).List()
 	sort.Slice(ternaryExpMergeNode, func(i, j int) bool {
 		return ternaryExpMergeNode[i].Id > ternaryExpMergeNode[j].Id
@@ -1271,7 +1269,6 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
-	DumpOpcodesToDotExp(d.RootOpCode)
 	err = d.CalcOpcodeStackInfo()
 	if err != nil {
 		return err
