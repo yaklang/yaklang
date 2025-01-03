@@ -37,9 +37,6 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	indexFromPool := func(i int) ConstantInfo {
 		return pool[i-1]
 	}
-	if index == 0 {
-		print(1)
-	}
 	constant := pool[index-1]
 	getClassName := func(index uint16) string {
 		classInfo := indexFromPool(int(index)).(*ConstantClassInfo)
