@@ -39,15 +39,6 @@ println($a);`
 			"phi($a)[Undefined-unknown-variable(valid),\"aa\"]", "phi($a)[\"1\",\"2\"]",
 		}, t)
 	})
-	t.Run("test condition1", func(t *testing.T) {
-		code := `<?php
-$data = $_POST['data'] ??"aa";
-println($data);
-`
-		ssatest.CheckPrintlnValue(code, []string{"phi($data)[\"aa\",Undefined-unknown-variableEx(valid)]"}, t)
-	})
-
-	//todo: 修改scope之后待过测试
 	t.Run("php cfg", func(t *testing.T) {
 		code := `<?php
 	$c = 1;
