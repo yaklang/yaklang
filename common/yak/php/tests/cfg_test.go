@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -184,6 +185,18 @@ endif;
 println($a);`
 		ssatest.CheckPrintf(t, ssatest.TestCase{
 			Want: []string{"1", "2", "3", "phi($a)[2,3,1]"},
+			Code: code,
+		})
+	})
+	t.Run("if value not find", func(t *testing.T) {
+		code := `<?php
+if($a){
+    $b = 2;
+}
+println($b);
+`
+		ssatest.CheckPrintf(t, ssatest.TestCase{
+			Want: []string{"2"},
 			Code: code,
 		})
 	})
