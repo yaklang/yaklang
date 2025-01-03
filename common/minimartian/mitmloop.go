@@ -379,6 +379,10 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 						if ret.ConnectionState().NegotiatedProtocol == "h2" {
 							serverUseH2 = true
 						}
+					case *gmtls.Conn:
+						if ret.ConnectionState().NegotiatedProtocol == "h2" {
+							serverUseH2 = true
+						}
 					}
 					netConn.Close()
 				}
