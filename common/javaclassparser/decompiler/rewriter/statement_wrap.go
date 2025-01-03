@@ -162,6 +162,7 @@ func (s *RewriteManager) MergeIf() {
 						childNode.Next = append(childNode.Next, childNode.Next[0])
 					}
 					mergeCondition(parentNode, childNode)
+					utils2.DumpNodesToDotExp(s.RootNode)
 					if nextStNode != nil {
 						nextStNode.SourceConditionNode = parentNode
 					}

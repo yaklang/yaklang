@@ -27,14 +27,15 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 
 	statementManager := rewriter.NewRootStatementManager(decompiler.RootNode)
 	statementManager.SetId(decompiler.CurrentId)
+	utils2.DumpNodesToDotExp(decompiler.RootNode)
 	statementManager.MergeIf()
+	utils2.DumpNodesToDotExp(decompiler.RootNode)
 	allNodes := []*core.Node{}
 	core.WalkGraph[*core.Node](decompiler.RootNode, func(node *core.Node) ([]*core.Node, error) {
 		allNodes = append(allNodes, node)
 		return node.Next, nil
 	})
 	slices.Reverse(allNodes)
-	utils2.DumpNodesToDotExp(decompiler.RootNode)
 	for _, node := range allNodes {
 		if v, ok := node.Statement.(*statements.ConditionStatement); ok {
 			if v.Callback != nil {
