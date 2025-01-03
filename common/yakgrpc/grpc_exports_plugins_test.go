@@ -1,9 +1,11 @@
 package yakgrpc
 
 import (
+	"archive/zip"
 	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
+	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -167,64 +169,55 @@ func TestServerExportsPlugins_Enc(t *testing.T) {
 func TestServerImportsPlugins(t *testing.T) {
 	client, _ := NewLocalClient()
 
-	createScript := func(name, content string) func() {
-		script := &schema.YakScript{
-			ScriptName: name,
-			Content:    content,
-			Author:     "temp",
-			Ignored:    true,
-		}
-		err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, script)
+	content := "hello 1; " + uuid.NewString()
+	name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("yak", content)
+	t.Cleanup(clearFunc)
+
+	createYakOutputZip := func() (string, string) {
+		newContent := uuid.NewString()
+		script, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), name)
 		require.NoError(t, err)
-		return func() {
-			yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
-		}
+		script.ID = 0
+		require.Contains(t, script.Content, content)
+		script.Content = newContent
+
+		scriptRaw, err := json.Marshal(script)
+		require.NoError(t, err)
+		// create output plugin file
+		path := t.TempDir() + "/final.zip"
+		fp, err := os.Create(path)
+		defer fp.Close()
+
+		zipWriter := zip.NewWriter(fp)
+		fileName := uuid.NewString() + ".json"
+		fileSaver, err := zipWriter.Create(fileName)
+		require.NoError(t, err)
+		_, err = fileSaver.Write(scriptRaw)
+		require.NoError(t, err)
+		var output = make([]map[string]interface{}, 0, 64)
+		output = append(output, map[string]any{
+			"filename":    fileName,
+			"script_name": script.ScriptName,
+		})
+		err = zipWriter.Flush()
+		require.NoError(t, err)
+		writer, err := zipWriter.Create("meta.json")
+		require.NoError(t, err)
+		raw, err := json.Marshal(output)
+		require.NoError(t, err)
+		_, err = writer.Write(raw)
+		require.NoError(t, err)
+		err = zipWriter.Close()
+		require.NoError(t, err)
+		return path, newContent
 	}
-
-	name := uuid.NewString()
-	content1 := uuid.NewString()
-	clearFunc1 := createScript(name, "hello 1; "+content1)
-	t.Cleanup(clearFunc1)
-
-	// import script firstly
-	exportStream1, err := client.ExportYakScriptStream(
-		context.Background(),
-		&ypb.ExportYakScriptStreamRequest{
-			Filter: &ypb.QueryYakScriptRequest{
-				Keyword:  name,
-				IsIgnore: true,
-			},
-			OutputFilename: "",
-			Password:       "",
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	outputFile1 := ""
-	for {
-		client, err := exportStream1.Recv()
-		if err != nil {
-			break
-		}
-		if client.IsMessage {
-			data := gjson.ParseBytes(client.Message).Get("content").Get("data")
-			pathName := gjson.Parse(data.Str).Get("path").Str
-			if pathName != "" {
-				outputFile1 = pathName
-			}
-		}
-	}
-	require.NotEmpty(t, outputFile1)
-	require.NotEmpty(t, utils.GetFirstExistedFile(outputFile1))
-
-	importStream1, err := client.ImportYakScriptStream(context.Background(), &ypb.ImportYakScriptStreamRequest{
-		Filename: outputFile1,
+	outputFile, newContent := createYakOutputZip()
+	importStream, err := client.ImportYakScriptStream(context.Background(), &ypb.ImportYakScriptStreamRequest{
+		Filename: outputFile,
 	})
 	require.NoError(t, err)
 	for {
-		client, err := importStream1.Recv()
+		client, err := importStream.Recv()
 		if err != nil {
 			break
 		}
@@ -233,55 +226,8 @@ func TestServerImportsPlugins(t *testing.T) {
 		}
 	}
 
-	// import script secondly. Old script will be replaced by new one.
-	content2 := uuid.NewString()
-	createScript(name, "hello 2; "+content2)
-	exportStream2, err := client.ExportYakScriptStream(
-		context.Background(),
-		&ypb.ExportYakScriptStreamRequest{
-			Filter: &ypb.QueryYakScriptRequest{
-				Keyword:  content2,
-				IsIgnore: true,
-			},
-			OutputFilename: "",
-			Password:       "",
-		},
-	)
-	require.NoError(t, err)
-
-	outputFile2 := ""
-	for {
-		client, err := exportStream2.Recv()
-		if err != nil {
-			break
-		}
-		if client.IsMessage {
-			data := gjson.ParseBytes(client.Message).Get("content").Get("data")
-			pathName := gjson.Parse(data.Str).Get("path").Str
-			if pathName != "" {
-				outputFile2 = pathName
-			}
-		}
-	}
-
-	require.NotEmpty(t, outputFile2)
-	require.NotEmpty(t, utils.GetFirstExistedFile(outputFile2))
-	importStream2, err := client.ImportYakScriptStream(context.Background(), &ypb.ImportYakScriptStreamRequest{
-		Filename: outputFile2,
-	})
-	require.NoError(t, err)
-	for {
-		client, err := importStream2.Recv()
-		if err != nil {
-			break
-		}
-		if client.IsMessage {
-			log.Infof("message: %s", client.Message)
-		}
-	}
-
-	t1, _ := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), name)
-	require.NotNil(t, t1)
-	require.Contains(t, t1.Content, content2)
-	require.NotContains(t, t1.Content, content1)
+	newScript, _ := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), name)
+	require.NotNil(t, newScript)
+	require.Contains(t, newScript.Content, newContent)
+	require.NotContains(t, newScript.Content, content)
 }
