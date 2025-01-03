@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ var errH2ConnClosed = utils.Error("http2 client conn closed")
 
 type http2ClientConn struct {
 	conn net.Conn
+	ctx  context.Context
 
 	mu              *sync.Mutex
 	streams         map[uint32]*http2ClientStream
@@ -39,8 +41,9 @@ type http2ClientConn struct {
 	headerListMaxSize uint32
 	connWindowControl *windowSizeControl
 
-	full       bool
-	readGoAway bool
+	full         bool
+	readGoAway   bool
+	lastStreamID uint32
 
 	closeCond   *sync.Cond
 	closed      bool
@@ -156,11 +159,12 @@ func (h2Conn *http2ClientConn) setPreface() {
 	h2Conn.preFaceCond.Broadcast()
 }
 
+var CreateStreamAfterGoAwayErr = utils.Errorf("h2 conn can not create new stream, because read go away flag")
+
 // new stream
-func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte) *http2ClientStream {
+func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte) (*http2ClientStream, error) {
 	if h2Conn.readGoAway {
-		log.Error("h2 conn can not create new stream, because read go away flag")
-		return nil
+		return nil, CreateStreamAfterGoAwayErr
 	}
 
 	newStreamID := h2Conn.getNewStreamID()
@@ -186,7 +190,7 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte) *http
 	if (cs.ID/2)+1 >= h2Conn.maxStreamsCount {
 		h2Conn.full = true
 	}
-	return cs
+	return cs, nil
 }
 
 // get new stream id
@@ -199,19 +203,25 @@ func (h2Conn *http2ClientConn) getNewStreamID() uint32 {
 // read frame loop
 func (h2Conn *http2ClientConn) readLoop() {
 	h2Conn.idleTimer.Reset(h2Conn.idleTimeout) // read new frame reset timer
-	rl := http2ClientConnReadLoop{h2Conn: h2Conn}
-	gotSettings := false
-	readIdleTimeout := h2Conn.idleTimeout
+	var rl = http2ClientConnReadLoop{h2Conn: h2Conn}
+	var gotSettings = false
+	var readIdleTimeout = h2Conn.idleTimeout
 	var t *time.Timer
 
 	for !h2Conn.closed {
+		select {
+		case <-h2Conn.ctx.Done():
+			h2Conn.setClose()
+		default:
+		}
+
 		frame, err := h2Conn.fr.ReadFrame()
 		if t != nil {
 			t.Reset(readIdleTimeout)
 		}
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
-				log.Errorf("http2: Transport readFrame error on conn %p: %v", rl.h2Conn.conn, err)
+				log.Debugf("http2: Transport readFrame error on conn %p: %v", rl.h2Conn.conn, err)
 			}
 			h2Conn.setClose()
 			return
@@ -384,7 +394,7 @@ func (cs *http2ClientStream) doRequest() error {
 
 func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response, []byte, error) {
 	flow := fmt.Sprintf("%v->%v", cs.h2Conn.conn.LocalAddr(), cs.h2Conn.conn.RemoteAddr())
-	closeFlag := make(chan struct{}, 1) // get read frame err
+	closeFlag := make(chan struct{}, 10) // get read frame err
 	go func() {
 		cs.h2Conn.closeCond.L.Lock()
 		for !cs.h2Conn.closed {
@@ -404,9 +414,6 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 	}
 	cs.resp.Body = io.NopCloser(cs.bodyBuffer)
 	cs.respPacket, _ = utils.DumpHTTPResponse(cs.resp, len(cs.bodyBuffer.Bytes()) > 0)
-	cs.h2Conn.mu.Lock()
-	cs.h2Conn.streams[cs.ID] = nil
-	cs.h2Conn.mu.Unlock()
 	cs.h2Conn.http2StreamPool.Put(cs) // gc
 	return *cs.resp, cs.respPacket, err
 }
@@ -609,5 +616,6 @@ func (rl *http2ClientConnReadLoop) processGoAway(f *http2.GoAwayFrame) {
 	log.Infof("connection: %s is going away by %v", flow, f.ErrCode.String())
 	log.Infof("flow: %v last stream id: %v", flow, f.LastStreamID)
 	rl.h2Conn.readGoAway = true
+	rl.h2Conn.lastStreamID = f.LastStreamID
 	return
 }
