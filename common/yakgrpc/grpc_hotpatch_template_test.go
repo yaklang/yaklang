@@ -107,6 +107,13 @@ func TestHotPatchTemplate(t *testing.T) {
 		checkYpbHotPatchTemplate(t, i, gots[i])
 	}
 
+	// list
+	listResp, err := local.QueryHotPatchTemplateList(ctx, &ypb.QueryHotPatchTemplateListRequest{
+		Type: typ,
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, listResp.GetName(), names)
+
 	// update
 	// content
 	newContent := "new" + contents[0]
