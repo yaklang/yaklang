@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/rewriter"
+	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	"github.com/yaklang/yaklang/common/utils"
 	"slices"
 )
@@ -50,7 +51,11 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 			}
 		}
 	}
+	utils2.DumpNodesToDotExp(decompiler.RootNode)
+
 	err = statementManager.Rewrite()
+	utils2.DumpNodesToDotExp(decompiler.RootNode)
+
 	if err != nil {
 		return nil, err
 	}

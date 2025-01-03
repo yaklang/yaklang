@@ -528,7 +528,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	c.CurrentMethod = method
 	funcCtx := c.FuncCtx
 	funcCtx.FunctionName = name
-	//if name != "newExpression" {
+	//if name != "scope" {
 	//	return &dumpedMethods{}, nil
 	//}
 	//println(name)

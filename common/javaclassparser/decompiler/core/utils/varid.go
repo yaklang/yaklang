@@ -40,6 +40,10 @@ func (v *VariableId) Delete() {
 		}
 	}
 }
+func (v *VariableId) Horizontal() *VariableId {
+	newV := v.parent.Next()
+	return newV
+}
 func (v *VariableId) Next() *VariableId {
 	newV := &VariableId{
 		parent: v,
