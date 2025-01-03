@@ -344,7 +344,7 @@ func GetRealValue(value values.JavaValue) values.JavaValue {
 	if ref, ok := value.(*values.JavaRef); ok {
 		return GetRealValue(ref.Val)
 	}
-	if ref, ok := value.(*values.SlotValue); ok && ref.UnpackAble {
+	if ref, ok := value.(*values.SlotValue); ok {
 		return GetRealValue(ref.Value)
 	}
 	return value

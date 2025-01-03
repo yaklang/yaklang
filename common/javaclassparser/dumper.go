@@ -3,8 +3,8 @@ package javaclassparser
 import (
 	"errors"
 	"fmt"
-	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/davecgh/go-spew/spew"
+	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"io"
 	"slices"
 	"strconv"
@@ -528,7 +528,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	c.CurrentMethod = method
 	funcCtx := c.FuncCtx
 	funcCtx.FunctionName = name
-	//if name != "checkSCS" {
+	//if name != "newExpression" {
 	//	return &dumpedMethods{}, nil
 	//}
 	//println(name)

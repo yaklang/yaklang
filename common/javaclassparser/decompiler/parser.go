@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/rewriter"
-	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	"github.com/yaklang/yaklang/common/utils"
 	"slices"
 )
@@ -27,9 +26,7 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 
 	statementManager := rewriter.NewRootStatementManager(decompiler.RootNode)
 	statementManager.SetId(decompiler.CurrentId)
-	utils2.DumpNodesToDotExp(decompiler.RootNode)
 	statementManager.MergeIf()
-	utils2.DumpNodesToDotExp(decompiler.RootNode)
 	allNodes := []*core.Node{}
 	core.WalkGraph[*core.Node](decompiler.RootNode, func(node *core.Node) ([]*core.Node, error) {
 		allNodes = append(allNodes, node)
@@ -53,7 +50,6 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 			}
 		}
 	}
-	utils2.DumpNodesToDotExp(decompiler.RootNode)
 	err = statementManager.Rewrite()
 	if err != nil {
 		return nil, err
