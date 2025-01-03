@@ -247,10 +247,10 @@ func (j javaNull) IsJavaType() {
 var JavaNull = javaNull{}
 
 type TernaryExpression struct {
-	Condition     JavaValue
+	Condition       JavaValue
 	ConditionFromOp int
-	TrueValue     JavaValue
-	FalseValue    JavaValue
+	TrueValue       JavaValue
+	FalseValue      JavaValue
 }
 
 func (j *TernaryExpression) Type() types.JavaType {
@@ -280,8 +280,9 @@ func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {
 }
 
 type SlotValue struct {
-	Value   JavaValue
-	TmpType types.JavaType
+	Value      JavaValue
+	UnpackAble bool
+	TmpType    types.JavaType
 }
 
 func (s *SlotValue) Type() types.JavaType {
