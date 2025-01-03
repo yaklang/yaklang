@@ -565,7 +565,7 @@ func checkResult(frame *sfvm.SFFrame, rule *schema.SyntaxFlowRule, result *ssaap
 	num := frame.GetExtraInfoInt("alert_exact", "alertExact", "vulnExact", "alert_num", "vulnNum")
 	if num > 0 {
 		if alertCount != num {
-			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is not equal alert_exact config: %v, actual got: %v", num, alert_info))
+			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is not equal alert_exact config: %v, actual got: %v", num, alertCount))
 			return
 		}
 	}

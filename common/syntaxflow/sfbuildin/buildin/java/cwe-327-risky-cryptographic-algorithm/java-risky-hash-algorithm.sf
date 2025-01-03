@@ -12,7 +12,10 @@ MessageDigest.getInstance(* as $algorithm);
 $algorithm#{
     until:<<<UNTIL
    <self>?{opcode:const}?{have:/^SHA$/ || 'SHA-0' || 'SHA-1'|| 'MD5' || 'MD4' || 'MD2' || 'RIPEMD160'}
-UNTIL
+UNTIL,
+    exclude:<<<EXCLUDE
+    <self>?{have:'SHA256' || have:'SHA384' || have:'SHA512' }
+EXCLUDE
 }-> as $sink;
 alert $sink for{
     message:"Find the use of broken or risky encryption algorithm",
@@ -88,6 +91,9 @@ desc(
              private static MessageDigest getShaDigest() throws ServiceException {
                  return getDigest("SHA");
              }
+              private static MessageDigest getShs256Digest() throws ServiceException {
+                              return getDigest("SHA"+"256");
+              }
 
      }
 EOF
