@@ -65,7 +65,7 @@ handleResult = result => {
 swg = sync.NewSizedWaitGroup(concurrent)
 resultMutex = sync.NewMutex()
 results = []
-for result in syntaxflow.QuerySyntaxFlowRules("-") {
+for result in syntaxflow.QuerySyntaxFlowRules("") {
     result := result
     swg.Add()
     go func {
