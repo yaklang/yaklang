@@ -52,7 +52,7 @@ type Decompiler struct {
 	ifNodeConditionCallback       map[*OpCode]func(value values.JavaValue)
 
 	varUserMap     *omap.OrderedMap[*values.JavaRef, [][]any]
-	delRefUserAttr map[*values.JavaRef][2]any // [0] = del amount, [1] = self assign
+	delRefUserAttr map[*values.JavaRef][3]int // [0] = del times,[1] = assign times, [2] = self assign
 }
 
 func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.JavaValue) *Decompiler {
@@ -65,7 +65,7 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 		varTable:            map[int]*values.JavaRef{},
 		valueToRef:          map[values.JavaValue][2]any{},
 		varUserMap:          omap.NewEmptyOrderedMap[*values.JavaRef, [][]any](),
-		delRefUserAttr:      map[*values.JavaRef][2]any{},
+		delRefUserAttr:      map[*values.JavaRef][3]int{},
 	}
 }
 
@@ -139,6 +139,9 @@ func (d *Decompiler) ScanJmp() error {
 	endOp := &OpCode{Instr: InstrInfos[OP_END], Id: d.CurrentId}
 	var walkNode func(start int)
 	walkNode = func(start int) {
+		if start == 35 {
+			println()
+		}
 		deferWalkId := []int{}
 		defer func() {
 			for _, id := range deferWalkId {
@@ -267,14 +270,11 @@ func (d *Decompiler) getPoolValue(index int) values.JavaValue {
 func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation, opcode *OpCode) error {
 	funcCtx := d.FunctionContext
 	checkAndConvertRef := func(value values.JavaValue) func(int) {
-		if _, ok := runtimeStackSimulation.Peek().(*values.JavaRef); !ok {
+		if _, ok := UnpackSoltValue(runtimeStackSimulation.Peek()).(*values.JavaRef); !ok {
 			val := runtimeStackSimulation.Pop().(values.JavaValue)
 			ref := runtimeStackSimulation.NewVar(val)
 			attr := d.delRefUserAttr[ref]
-			if attr[0] == nil {
-				attr = [2]any{0, false}
-			}
-			attr[1] = true
+			attr[2] = 1
 			d.delRefUserAttr[ref] = attr
 			slotVal := values.NewSlotValue(ref, ref.Type())
 			addUser := func(n int) {
@@ -363,6 +363,9 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		ref, isFirst := runtimeStackSimulation.AssignVar(slot, value)
 		statements.NewAssignStatement(ref, value, isFirst)
 		d.valueToRef[value] = [2]any{ref, isFirst}
+		attr := d.delRefUserAttr[ref]
+		attr[1]++
+		d.delRefUserAttr[ref] = attr
 	case OP_NEW:
 		n := Convert2bytesToInt(opcode.Data)
 		javaClass := d.constantPoolGetter(int(n)).(*values.JavaClassValue)
@@ -634,6 +637,8 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_IRETURN:
 		v := runtimeStackSimulation.Pop().(values.JavaValue)
 		v.Type().ResetType(funcCtx.FunctionType.(*types.JavaFuncType).ReturnType)
+		val := v.(*values.SlotValue)
+		println("return", val)
 		statements.NewReturnStatement(v)
 	case OP_ARETURN, OP_LRETURN, OP_DRETURN, OP_FRETURN:
 		v := runtimeStackSimulation.Pop().(values.JavaValue)
@@ -928,7 +933,11 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		nodeToVarTable[code] = []any{vt, id}
 	}
 	ifNodeToConditionCallback := map[*OpCode]func(values.JavaValue){}
+	var SlotValue *values.SlotValue
 	err := WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
+		if code.Id == 36 {
+			println()
+		}
 		var runtimeStackSimulation *StackSimulationImpl
 		if len(code.Source) == 0 {
 			if code.Instr.OpCode == OP_START {
@@ -1068,9 +1077,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				preSim.Pop()
 				runtimeStackSimulation = NewStackSimulation(preSim.stackEntry, varTable, id)
 				slotVal := values.NewSlotValue(nil, validSource.StackEntry.value.Type())
+				slotVal.UnpackAble = false
 				runtimeStackSimulation.Push(slotVal)
 				ternaryExpMergeNodeSlot[code] = slotVal
-
+				SlotValue = slotVal
 				ternaryExpMergeNode = append(ternaryExpMergeNode, code)
 				mergeToIfNode[code] = append(mergeToIfNode[code], ifNodes...)
 			} else {
@@ -1088,6 +1098,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			}
 		}
 		opcodeToSim[code] = runtimeStackSimulation
+
 		sim := NewStackSimulationProxy(runtimeStackSimulation, func(value values.JavaValue) {
 			runtimeStackSimulation.Push(value)
 			code.stackProduced = append(code.stackProduced, value)
@@ -1113,6 +1124,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		if err != nil {
 			return nil, err
 		}
+		if code.Id == 36 {
+			runtimeStackSimulation.stackEntry.value.(*values.SlotValue).Value = values.NewJavaClassValue(types.NewJavaClass("java.lang.String"))
+		}
+		println(SlotValue)
 		code.StackEntry = runtimeStackSimulation.stackEntry
 		setVarTable(code, runtimeStackSimulation.varTable, runtimeStackSimulation.currentVarId)
 		return code.Target, nil
@@ -1177,6 +1192,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 						tarnaryValue.Condition = value
 					}
 					defaultTarnaryValue = tarnaryValue
+					if len(ifNodes) == 3 {
+						println("if set", ternaryExpMergeNodeSlot[code])
+						//println(defaultTarnaryValue)
+					}
 				}
 				if i != 0 {
 					var routeToCode bool
@@ -1270,6 +1289,7 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
+	DumpOpcodesToDotExp(d.RootOpCode)
 	err = d.CalcOpcodeStackInfo()
 	if err != nil {
 		return err
@@ -1322,6 +1342,9 @@ func (d *Decompiler) ParseStatement() error {
 	var runCode func(startNode *OpCode) error
 	var parseOpcode func(opcode *OpCode) error
 	parseOpcode = func(opcode *OpCode) error {
+		if opcode.Id == 35 {
+			print()
+		}
 		appendNode := func(statement statements.Statement) *Node {
 			return appendNodeWithOpcode(statement, opcode)
 		}
@@ -1404,10 +1427,7 @@ func (d *Decompiler) ParseStatement() error {
 						}
 						if v, ok := val.(*values.JavaRef); ok {
 							attr := d.delRefUserAttr[v]
-							if attr[0] == nil {
-								attr = [2]any{0, false}
-							}
-							attr[0] = attr[0].(int) + 1
+							attr[0]++
 							d.delRefUserAttr[v] = attr
 						}
 					}
@@ -1672,10 +1692,7 @@ func (d *Decompiler) ParseStatement() error {
 	d.varUserMap.ForEach(func(ref *values.JavaRef, pairs [][]any) bool {
 		val := GetRealValue(ref.Val)
 		attr := d.delRefUserAttr[ref]
-		if attr[0] == nil {
-			attr = [2]any{0, false}
-		}
-		if len(pairs)-attr[0].(int) == 1 {
+		if len(pairs)-attr[0] == 1 && attr[1] == 1 {
 			pair := pairs[0]
 			nodeId := getStatementNextIdByOpcodeId(pair[1].(*OpCode).Id)
 			node := idToNode[nodeId]
@@ -1690,9 +1707,10 @@ func (d *Decompiler) ParseStatement() error {
 					}
 					ref.Id.Delete()
 					(pair[0]).(func(value values.JavaValue))(val)
+					node.SourceConditionNode = sourceNode.SourceConditionNode
 				}
 			}
-			if attr[1].(bool) {
+			if attr[2] == 1 {
 				source := slices.Clone(node.Source)
 				node.RemoveAllSource()
 				next := slices.Clone(node.Next)

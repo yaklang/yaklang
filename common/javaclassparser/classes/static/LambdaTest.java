@@ -3,14 +3,21 @@ package org.benf.cfr.reader;
 import java.util.ArrayList;
 
 public class LambdaTest {
+	// Fields
+	 int a;
+
 	public LambdaTest() {
+		this.a = (this.a) + (1);
 	}
 	void main() {
-		ArrayList var1 = new ArrayList();
-		ArrayList var2 = var1;
-		var2.forEach((Object var3) -> {
-			int var4 = 1;
+		(new ArrayList()).forEach((Object var4) -> {
+			int var5 = 1;
 		});
-		int var3 = 1;
+		int var1 = 1;
+		ArrayList var2 = new ArrayList();
+		(var2).add((Object)(Integer.valueOf(1)));
+		(var2).forEach((Object var7) -> {
+			System.out.println(var7);
+		});
 	}
 }
