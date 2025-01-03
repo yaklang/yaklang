@@ -57,6 +57,12 @@ type LowHttpConnPool struct {
 	ctx                context.Context
 }
 
+func (l *LowHttpConnPool) HostConnFull(key connectKey) bool {
+	l.idleConnMux.RLock()
+	defer l.idleConnMux.RUnlock()
+	return len(l.idleConn[key.hash()]) >= l.maxIdleConnPerHost
+}
+
 func (l *LowHttpConnPool) clear() {
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
@@ -65,7 +71,7 @@ func (l *LowHttpConnPool) clear() {
 	}
 	for _, pcs := range l.idleConn {
 		for _, pc := range pcs {
-			l.removeConnLocked(pc)
+			l.removeConnLocked(pc, true)
 		}
 	}
 }
@@ -104,101 +110,108 @@ func (l *LowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getCo
 	}
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
-	getConn = false
+
 	var oldTime time.Time
 	if l.idleConnTimeout > 0 {
 		oldTime = time.Now().Add(-l.idleConnTimeout)
 	}
 
 	// 从连接池中取出一个连接
-	if connList, ok := l.idleConn[key.hash()]; ok {
-		if key.scheme == H2 { // h2 连接 不用取出
-			for len(connList) > 0 {
-				oldPc = connList[len(connList)-1]
-
-				// 检查获取的连接是否可用
-				canUse := !(oldPc.alt.readGoAway || oldPc.alt.closed || oldPc.alt.full)
-				if canUse {
-					getConn = true
-					break
-				}
-				connList = connList[:len(connList)-1]
-			}
-		} else {
-			for len(connList) > 0 {
-				oldPc = connList[len(connList)-1]
-				// 检查获取的连接是否空闲超时，若超时再取下一个
-				tooOld := !oldTime.Before(oldPc.idleAt)
-				if !tooOld {
-					l.idleLRU.remove(oldPc)
-					connList = connList[:len(connList)-1]
-					getConn = true
-					break
-				}
-				oldPc.Conn.Close()
-				l.idleLRU.remove(oldPc)
-				connList = connList[:len(connList)-1]
-			}
-		}
-		if len(connList) > 0 {
-			l.idleConn[key.hash()] = connList
-		} else {
-			delete(l.idleConn, key.hash())
-		}
+	connList, ok := l.idleConn[key.hash()]
+	if !ok { // if not get return
+		return
 	}
+
+	for len(connList) > 0 {
+		oldPc = connList[len(connList)-1]
+
+		if key.scheme == H2 {
+			// 检查获取的连接是否可用
+			canUse := !(oldPc.alt.readGoAway || oldPc.alt.closed || oldPc.alt.full)
+			if canUse {
+				// h2 conn not need leave
+				getConn = true
+				break
+			}
+		} else {
+			l.idleLRU.remove(oldPc)
+			tooOld := !oldTime.Before(oldPc.idleAt)
+			if !tooOld {
+				oldPc.closeTimer.Stop()
+				connList = connList[:len(connList)-1] // h1 conn need leave conn
+				getConn = true
+				break
+			}
+			oldPc.closeNetConn() // close too old conn
+		}
+		connList = connList[:len(connList)-1]
+	}
+
+	// clear empty list
+	if len(connList) > 0 {
+		l.idleConn[key.hash()] = connList
+	} else {
+		delete(l.idleConn, key.hash())
+	}
+
 	return
 }
 
-func (l *LowHttpConnPool) putIdleConn(conn *persistConn) error {
-	cacheKeyHash := conn.cacheKey.hash()
+func (l *LowHttpConnPool) putIdleConn(pc *persistConn) error {
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
+
+	cacheKeyHash := pc.cacheKey.hash()
 	// 如果超过池规定的单个host可以拥有的最大连接数量则直接放弃添加连接
 	if len(l.idleConn[cacheKeyHash]) >= l.maxIdleConnPerHost || l.contextDone() {
-		conn.Conn.Close() // if too many, close it
+		if !pc.IsH2Conn() {
+			pc.closeNetConn() // if too many, close it
+		}
 		return nil
 	}
 
 	// 添加一个连接到连接池,转化连接状态,刷新空闲时间
-	conn.idleAt = time.Now()
-	if l.idleConnTimeout > 0 { // 判断空闲时间,若为0则不设限
-		if conn.closeTimer != nil {
-			conn.closeTimer.Reset(l.idleConnTimeout)
+	pc.idleAt = time.Now()
+	if l.idleConnTimeout > 0 && !pc.IsH2Conn() { // 判断空闲时间,若为0则不设限
+		if pc.closeTimer != nil {
+			pc.closeTimer.Reset(l.idleConnTimeout)
 		} else {
-			conn.closeTimer = time.AfterFunc(l.idleConnTimeout, conn.removeConn)
+			pc.closeTimer = time.AfterFunc(l.idleConnTimeout, pc.removeConn)
 		}
 	}
 
-	if l.connCount >= l.maxIdleConn {
+	if l.connCount >= l.maxIdleConn { // if conn pool is full, remove oldest
 		oldPconn := l.idleLRU.removeOldest()
-		err := l.removeConnLocked(oldPconn)
+		err := l.removeConnLocked(oldPconn, !oldPconn.IsH2Conn())
 		if err != nil {
 			return err
 		}
 	}
-	l.idleConn[cacheKeyHash] = append(l.idleConn[cacheKeyHash], conn)
-	conn.markReused()
+	l.idleConn[cacheKeyHash] = append(l.idleConn[cacheKeyHash], pc)
+	pc.markReused()
 	return nil
 }
 
 // 在有写锁的环境中从池子里删除一个空闲连接
-func (l *LowHttpConnPool) removeConnLocked(pConn *persistConn) error {
-	if pConn.closeTimer != nil {
-		pConn.closeTimer.Stop()
+func (l *LowHttpConnPool) removeConnLocked(pc *persistConn, needClose bool) error {
+	if pc.closeTimer != nil {
+		pc.closeTimer.Stop()
 	}
-	key := pConn.cacheKey.hash()
-	connList := l.idleConn[pConn.cacheKey.hash()]
-	pConn.Conn.Close()
+	if needClose {
+		pc.closeNetConn()
+	}
+	key := pc.cacheKey.hash()
+	connList := l.idleConn[pc.cacheKey.hash()]
 	switch len(connList) {
 	case 0:
 		return nil
 	case 1:
-		if connList[0] == pConn {
+		if connList[0] == pc {
 			delete(l.idleConn, key)
 		}
 	default:
 		for i, v := range connList {
-			if v != pConn {
+			if v != pc {
 				continue
 			}
 			copy(connList[i:], connList[i+1:])
@@ -212,7 +225,7 @@ func (l *LowHttpConnPool) removeConnLocked(pConn *persistConn) error {
 // 长连接
 type persistConn struct {
 	alt      *http2ClientConn
-	net.Conn // conn本体
+	conn     net.Conn // conn本体
 	mu       sync.Mutex
 	p        *LowHttpConnPool // 连接对应的连接池
 	cacheKey connectKey       // 连接池缓存key
@@ -278,12 +291,12 @@ type persistConnWriter struct {
 }
 
 func (w persistConnWriter) Write(p []byte) (n int, err error) {
-	n, err = w.pc.Conn.Write(p)
+	n, err = w.pc.conn.Write(p)
 	return
 }
 
 func (w persistConnWriter) ReadFrom(r io.Reader) (n int64, err error) {
-	n, err = io.Copy(w.pc.Conn, r)
+	n, err = io.Copy(w.pc.conn, r)
 	return
 }
 
@@ -367,7 +380,7 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 
 	// 初始化连接
 	pc := &persistConn{
-		Conn:            newConn,
+		conn:            newConn,
 		mu:              sync.Mutex{},
 		p:               pool,
 		cacheKey:        key,
@@ -390,10 +403,7 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 		pc.h2Conn()
 		go pc.alt.readLoop()
 		if err = pc.alt.preface(); err == nil {
-			err = pool.putIdleConn(pc)
-			if err != nil {
-				return nil, err
-			}
+			pool.putIdleConn(pc)
 			return pc, nil
 		}
 		newH1Conn, err := netx.DialX(key.addr, opt...) // 降级
@@ -401,7 +411,7 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 			return nil, err
 		}
 		pc.alt = nil
-		pc.Conn = newH1Conn
+		pc.conn = newH1Conn
 		pc.cacheKey.scheme = H1
 		return pc, nil // 降级之后应不使用连接池，因为是一个意外的请求做过一次兼容了，不再需要复用
 	}
@@ -417,7 +427,8 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 
 func (pc *persistConn) h2Conn() {
 	newH2Conn := &http2ClientConn{
-		conn:              pc.Conn,
+		conn:              pc.conn,
+		ctx:               pc.p.ctx,
 		mu:                new(sync.Mutex),
 		streams:           make(map[uint32]*http2ClientStream),
 		currentStreamID:   1,
@@ -427,7 +438,7 @@ func (pc *persistConn) h2Conn() {
 		headerListMaxSize: defaultHeaderTableSize,
 		connWindowControl: newControl(defaultStreamReceiveWindowSize),
 		maxStreamsCount:   defaultMaxConcurrentStreamSize,
-		fr:                http2.NewFramer(pc.Conn, bufio.NewReader(pc.Conn)),
+		fr:                http2.NewFramer(pc.conn, bufio.NewReader(pc.conn)),
 		frWriteMutex:      new(sync.Mutex),
 		hDec:              hpack.NewDecoder(defaultHeaderTableSize, nil),
 		closeCond:         sync.NewCond(new(sync.Mutex)),
@@ -470,7 +481,7 @@ func (pc *persistConn) readLoop() {
 	firstAuth := true
 	for alive {
 		// if failed, handle it (re-conn / or abandoned)
-		_ = pc.Conn.SetReadDeadline(time.Time{})
+		_ = pc.conn.SetReadDeadline(time.Time{})
 		_, err := pc.br.Peek(1)
 
 		// 检查是否有需要返回的响应,如果没有则可以直接返回,不需要往管道里返回数据（err）
@@ -507,8 +518,8 @@ func (pc *persistConn) readLoop() {
 
 		var respBuffer bytes.Buffer
 		httpResponseReader := io.TeeReader(pc.br, &respBuffer)
-		_ = pc.Conn.SetReadDeadline(time.Time{})
-		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, pc.Conn, stashRequest)
+		_ = pc.conn.SetReadDeadline(time.Time{})
+		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, pc.conn, stashRequest)
 		if resp != nil {
 			resp.Request = nil
 		}
@@ -516,7 +527,7 @@ func (pc *persistConn) readLoop() {
 		if firstAuth && resp != nil && resp.StatusCode == http.StatusUnauthorized {
 			if authHeader := IGetHeader(resp, "WWW-Authenticate"); len(authHeader) > 0 {
 				if auth := GetHttpAuth(authHeader[0], rc.option); auth != nil {
-					authReq, err := auth.Authenticate(pc.Conn, rc.option)
+					authReq, err := auth.Authenticate(pc.conn, rc.option)
 					if err == nil {
 						pc.writeCh <- writeRequest{
 							reqPacket:   authReq,
@@ -550,7 +561,7 @@ func (pc *persistConn) readLoop() {
 				if respClose {
 					timeout = 1 * time.Second // 如果 http close 了 则只等待1秒
 				}
-				restBytes, _ := utils.ReadUntilStable(pc.br, pc.Conn, timeout, 300*time.Millisecond)
+				restBytes, _ := utils.ReadUntilStable(pc.br, pc.conn, timeout, 300*time.Millisecond)
 				pc.sawEOF = true // 废弃连接
 				if len(restBytes) > 0 {
 					responseRaw.Write(restBytes)
@@ -608,31 +619,68 @@ func (pc *persistConn) closeConn(err error) {
 	if err == nil {
 		err = errors.New("lowhttp: conn pool unknown error")
 	}
-	pc.Conn.Close()
 	pc.closed = err
 	close(pc.closeCh)
-}
-
-func (pc *persistConn) Close() error {
-	return pc.p.putIdleConn(pc)
+	pc.removeConn()
 }
 
 func (pc *persistConn) removeConn() {
 	l := pc.p
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
-	err := l.removeConnLocked(pc)
+	err := l.removeConnLocked(pc, true)
 	if err != nil {
 		log.Error(err)
 	}
 }
 
+func (pc *persistConn) closeNetConn() error {
+	if pc.IsH2Conn() && pc.alt != nil {
+		pc.alt.setClose()
+		return nil
+	}
+	return pc.conn.Close()
+}
+
+func (pc *persistConn) IsH2Conn() bool {
+	return pc.cacheKey.scheme == H2
+}
+
+// implement net.Conn
+func (pc *persistConn) Close() error {
+	return pc.p.putIdleConn(pc)
+}
+
 func (pc *persistConn) Read(b []byte) (n int, err error) {
-	n, err = pc.Conn.Read(b)
+	n, err = pc.conn.Read(b)
 	if err == io.EOF {
 		pc.sawEOF = true
 	}
 	return
+}
+
+func (pc *persistConn) Write(b []byte) (n int, err error) {
+	return pc.conn.Write(b)
+}
+
+func (pc *persistConn) LocalAddr() net.Addr {
+	return pc.conn.LocalAddr()
+}
+
+func (pc *persistConn) RemoteAddr() net.Addr {
+	return pc.conn.RemoteAddr()
+}
+
+func (pc *persistConn) SetDeadline(t time.Time) error {
+	return pc.conn.SetDeadline(t)
+}
+
+func (pc *persistConn) SetReadDeadline(t time.Time) error {
+	return pc.conn.SetReadDeadline(t)
+}
+
+func (pc *persistConn) SetWriteDeadline(t time.Time) error {
+	return pc.conn.SetWriteDeadline(t)
 }
 
 // markReused 标识此连接已经被复用
