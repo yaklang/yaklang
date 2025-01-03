@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -135,6 +136,12 @@ func (b *FunctionBuilder) SetEditor(editor *memedit.MemEditor) {
 
 func (b *FunctionBuilder) GetEditor() *memedit.MemEditor {
 	return b._editor
+}
+
+func (b *FunctionBuilder) GetLanguage() consts.Language {
+	lang, err := consts.ValidateLanguage(b.GetProgram().Language)
+	_ = err
+	return lang
 }
 
 // current block is finish?
