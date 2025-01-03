@@ -335,7 +335,7 @@ func CalcMergeOpcode(ifOpcode *OpCode) *OpCode {
 }
 
 func UnpackSoltValue(value values.JavaValue) values.JavaValue {
-	if ref, ok := value.(*values.SlotValue); ok && ref.UnpackAble {
+	if ref, ok := value.(*values.SlotValue); ok {
 		return UnpackSoltValue(ref.Value)
 	}
 	return value

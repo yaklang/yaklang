@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"io"
 	"slices"
@@ -532,6 +533,13 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	//	return &dumpedMethods{}, nil
 	//}
 	//println(name)
+	finalFieldMap := map[string]struct{}{}
+	for _, field := range c.obj.Fields {
+		var finalFalg uint16 = 0x0010
+		if field.AccessFlags&finalFalg == finalFalg {
+			finalFieldMap[c.obj.ConstantPoolManager.GetUtf8(int(field.NameIndex)).Value] = struct{}{}
+		}
+	}
 	annoStrs := []string{}
 	funcCtx.FunctionType = c.MethodType
 	var paramsNewStr string
@@ -623,9 +631,12 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				case *statements.AssignStatement:
 					foundFieldInit := false
 					if v, ok := ret.LeftValue.(*values.RefMember); ok {
-						if v1, ok := v.Object.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<cinit>" || funcCtx.FunctionName == "<init>" || funcCtx.FunctionName == funcCtx.ClassName) {
-							foundFieldInit = true
-							c.fieldDefaultValue[v.Member] = ret.JavaValue.String(funcCtx)
+						obj := core.UnpackSoltValue(v.Object)
+						if v1, ok := obj.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<cinit>" || funcCtx.FunctionName == "<init>" || funcCtx.FunctionName == funcCtx.ClassName) {
+							if _, ok := finalFieldMap[v.Member]; ok {
+								foundFieldInit = true
+								c.fieldDefaultValue[v.Member] = ret.JavaValue.String(funcCtx)
+							}
 						}
 					}
 					if !foundFieldInit {

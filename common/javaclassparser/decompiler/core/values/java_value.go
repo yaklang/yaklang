@@ -281,7 +281,6 @@ func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {
 
 type SlotValue struct {
 	Value      JavaValue
-	UnpackAble bool
 	TmpType    types.JavaType
 }
 
