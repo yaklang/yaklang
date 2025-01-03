@@ -647,17 +647,25 @@ RECONNECT:
 	response.PortIsOpen = true
 
 	if enableHttp2 {
-		if conn.(*persistConn).cacheKey.scheme != H2 { // http2 downgrade to http1.1
+		pc := conn.(*persistConn)
+		if pc.cacheKey.scheme != H2 { // http2 downgrade to http1.1
 			enableHttp2 = false
 			method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
 			requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
 		}
-		h2Conn := conn.(*persistConn).alt
+		h2Conn := pc.alt
 		if h2Conn == nil {
 			return nil, utils.Error("conn h2 Processor is nil")
 		}
 
-		h2Stream := h2Conn.newStream(reqIns, requestPacket)
+		h2Stream, err := h2Conn.newStream(reqIns, requestPacket)
+		if err != nil {
+			if err == CreateStreamAfterGoAwayErr {
+				goto RECONNECT
+			} else {
+				return nil, err
+			}
+		}
 
 		currentRPS.Add(1)
 		if err := h2Stream.doRequest(); err != nil {
@@ -710,7 +718,6 @@ RECONNECT:
 			option:      option,
 			writeErrCh:  writeErrCh,
 		}
-		pcClosed := pc.closeCh
 	LOOP:
 		for {
 			select {
@@ -718,7 +725,7 @@ RECONNECT:
 				// 写入失败，退出等待
 				if err != nil {
 					if pc.shouldRetryRequest(err) {
-						conn.(*persistConn).removeConn()
+						pc.removeConn()
 						goto RECONNECT
 					}
 					return nil, err
@@ -739,8 +746,7 @@ RECONNECT:
 				response.MultiResponse = false
 				traceInfo.ServerTime = re.info.ServerTime
 				break LOOP
-			case <-pcClosed:
-				pcClosed = nil
+			case <-pc.closeCh:
 				if pc.shouldRetryRequest(pc.closed) {
 					goto RECONNECT
 				}
