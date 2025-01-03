@@ -230,7 +230,7 @@ func (f *Function) Finish() {
 		}
 	}
 
-	for variable, _ := range tmpSideEffects {
+	for variable, tse := range tmpSideEffects {
 		vs := []Value{}
 		for _, ses := range f.SideEffectsReturn {
 			if value, ok := ses[variable]; ok {
@@ -238,7 +238,7 @@ func (f *Function) Finish() {
 			}
 		}
 		if len(vs) > 1 {
-			tmpSideEffects[variable].Modify = f.builder.EmitPhi(variable.GetName(), vs)
+			tse.Modify = f.builder.EmitPhi(variable.GetName(), vs)
 		}
 	}
 

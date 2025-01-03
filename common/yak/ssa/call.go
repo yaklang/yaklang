@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 
 	"github.com/samber/lo"
@@ -27,16 +28,12 @@ func NewCall(target Value, args []Value, binding map[string]Value, block *BasicB
 		IsDropError:     false,
 		IsEllipsis:      false,
 		SideEffectValue: map[string]Value{},
-		isBindLanguage:  true,
 	}
 	return c
 }
 
 func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 	call := NewCall(target, args, nil, f.CurrentBlock)
-	if f.GetProgram().Language == "yak" {
-		call.isBindLanguage = false
-	}
 	return call
 }
 
@@ -230,6 +227,9 @@ func (c *Call) handlerReturnType() {
 
 // handler if method, set object for first argument
 func (c *Call) handleCalleeFunction() {
+	function := c.GetFunc()
+	builder := function.builder
+
 	// get function type
 	funcTyp, ok := ToFunctionType(c.Method.GetType())
 	if !ok { // for Test_SideEffect_Double_more
@@ -243,8 +243,6 @@ func (c *Call) handleCalleeFunction() {
 	}
 
 	{
-		function := c.GetFunc()
-		builder := function.builder
 		recoverBuilder := builder.SetCurrent(c)
 		defer func() {
 			recoverBuilder()
@@ -289,10 +287,10 @@ func (c *Call) handleCalleeFunction() {
 		}
 	}
 
-	if c.isBindLanguage {
-		handleSideEffectBind(c, funcTyp)
-	} else {
+	if builder.GetLanguage() == consts.Yak {
 		handleSideEffect(c, funcTyp)
+	} else {
+		handleSideEffectBind(c, funcTyp)
 	}
 
 	// only handler in method call
