@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -163,6 +164,10 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
 			return
 		}
+	}
+
+	if consts.Language(b.GetProgram().Language) == consts.PHP {
+		b.TryBuildValueWithoutParent(variable.GetName(), value)
 	}
 
 	if b.TryBuildExternValue(variable.GetName()) != nil {

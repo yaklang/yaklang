@@ -400,3 +400,16 @@ func (b *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type, level int
 func (b *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	return b.GetProgram().handlerType(typ, level)
 }
+
+func (b *FunctionBuilder) TryBuildValueWithoutParent(name string, value Value) {
+	scope := b.CurrentBlock.ScopeTable
+	head := scope.GetHead()
+	if scope.GetParent() == nil || value == nil {
+		return
+	}
+	parentVariable := scope.GetParent().ReadVariable(name)
+	if parentVariable == nil {
+		variable := head.CreateVariable(name, false)
+		head.AssignVariable(variable, value)
+	}
+}
