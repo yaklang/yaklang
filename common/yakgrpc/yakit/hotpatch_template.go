@@ -4,8 +4,11 @@ import (
 	"fmt"
 
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type QueryHotPatchTemplateConfig struct {
@@ -154,4 +157,20 @@ func QueryHotPatchTemplate(db *gorm.DB, opts ...HotPatchTemplateOption) ([]*sche
 		return nil, err
 	}
 	return templates, nil
+}
+
+func QueryHotPatchTemplateList(db *gorm.DB, typ string, p *ypb.Paging) (*bizhelper.Paginator, []string, error) {
+	db = db.Model(&schema.HotPatchTemplate{}).Where("type = ?", typ).Select("name")
+
+	var templates []*schema.HotPatchTemplate
+	paging, db := bizhelper.PagingByPagination(db, p, &templates)
+	if db.Error != nil {
+		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
+	}
+
+	names := lo.Map(templates, func(t *schema.HotPatchTemplate, _ int) string {
+		return t.Name
+	})
+
+	return paging, names, nil
 }
