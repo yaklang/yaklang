@@ -521,6 +521,43 @@ func TestErrorMemberCall(t *testing.T) {
 			Want: []string{},
 		})
 	})
+
+	t.Run("test recursive extern phi key", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `  
+	ispost = cli.Bool("ispost")
+	cli.check()
+	Location = "AppendHTTPPacketQueryParam"
+	
+	if ispost{
+		if ispost{
+			Location = "AppendHTTPPacketPostParam"
+		}
+	}
+	packetRaw = poc[Location]
+ `,
+			Want: []string{},
+		})
+	})
+
+	t.Run("test extern key: for stmt + if stmt", func(t *testing.T) {
+		t.Skip("Location in if stmt should be replaced")
+		test.CheckError(t, test.TestCase{
+			Code: `  
+ispost = cli.Bool("ispost")
+cli.check()
+Location = "AppendHTTPPacketQueryParam"
+for true {
+    if ispost {
+         poc[Location]
+    }
+    packetRaw = poc[Location]
+}
+
+ `,
+			Want: []string{},
+		})
+	})
 }
 
 func TestSliceCall(t *testing.T) {
