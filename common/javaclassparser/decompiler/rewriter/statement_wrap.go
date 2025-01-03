@@ -162,7 +162,6 @@ func (s *RewriteManager) MergeIf() {
 						childNode.Next = append(childNode.Next, childNode.Next[0])
 					}
 					mergeCondition(parentNode, childNode)
-					utils2.DumpNodesToDotExp(s.RootNode)
 					if nextStNode != nil {
 						nextStNode.SourceConditionNode = parentNode
 					}
@@ -496,7 +495,6 @@ func (s *RewriteManager) Rewrite() error {
 	if err != nil {
 		return err
 	}
-	utils2.DumpNodesToDotExp(s.RootNode)
 	s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	nodeToRewriter := map[*core.Node]rewriterFunc{}
 	keyNodes := []*core.Node{}
@@ -525,7 +523,6 @@ func (s *RewriteManager) Rewrite() error {
 			}
 		}
 	})
-	utils2.DumpNodesToDotExp(s.RootNode)
 	for _, node := range s.TopologicalSortReverse(s.SwitchNode) {
 		err := SwitchRewriter1(s, node)
 		if err != nil {

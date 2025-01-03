@@ -139,9 +139,6 @@ func (d *Decompiler) ScanJmp() error {
 	endOp := &OpCode{Instr: InstrInfos[OP_END], Id: d.CurrentId}
 	var walkNode func(start int)
 	walkNode = func(start int) {
-		if start == 35 {
-			println()
-		}
 		deferWalkId := []int{}
 		defer func() {
 			for _, id := range deferWalkId {
@@ -637,8 +634,6 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_IRETURN:
 		v := runtimeStackSimulation.Pop().(values.JavaValue)
 		v.Type().ResetType(funcCtx.FunctionType.(*types.JavaFuncType).ReturnType)
-		val := v.(*values.SlotValue)
-		println("return", val)
 		statements.NewReturnStatement(v)
 	case OP_ARETURN, OP_LRETURN, OP_DRETURN, OP_FRETURN:
 		v := runtimeStackSimulation.Pop().(values.JavaValue)
@@ -933,11 +928,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		nodeToVarTable[code] = []any{vt, id}
 	}
 	ifNodeToConditionCallback := map[*OpCode]func(values.JavaValue){}
-	var SlotValue *values.SlotValue
 	err := WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
-		if code.Id == 36 {
-			println()
-		}
 		var runtimeStackSimulation *StackSimulationImpl
 		if len(code.Source) == 0 {
 			if code.Instr.OpCode == OP_START {
@@ -1080,7 +1071,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				slotVal.UnpackAble = false
 				runtimeStackSimulation.Push(slotVal)
 				ternaryExpMergeNodeSlot[code] = slotVal
-				SlotValue = slotVal
 				ternaryExpMergeNode = append(ternaryExpMergeNode, code)
 				mergeToIfNode[code] = append(mergeToIfNode[code], ifNodes...)
 			} else {
@@ -1124,10 +1114,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		if err != nil {
 			return nil, err
 		}
-		if code.Id == 36 {
-			runtimeStackSimulation.stackEntry.value.(*values.SlotValue).Value = values.NewJavaClassValue(types.NewJavaClass("java.lang.String"))
-		}
-		println(SlotValue)
 		code.StackEntry = runtimeStackSimulation.stackEntry
 		setVarTable(code, runtimeStackSimulation.varTable, runtimeStackSimulation.currentVarId)
 		return code.Target, nil
@@ -1192,10 +1178,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 						tarnaryValue.Condition = value
 					}
 					defaultTarnaryValue = tarnaryValue
-					if len(ifNodes) == 3 {
-						println("if set", ternaryExpMergeNodeSlot[code])
-						//println(defaultTarnaryValue)
-					}
 				}
 				if i != 0 {
 					var routeToCode bool
@@ -1342,9 +1324,6 @@ func (d *Decompiler) ParseStatement() error {
 	var runCode func(startNode *OpCode) error
 	var parseOpcode func(opcode *OpCode) error
 	parseOpcode = func(opcode *OpCode) error {
-		if opcode.Id == 35 {
-			print()
-		}
 		appendNode := func(statement statements.Statement) *Node {
 			return appendNodeWithOpcode(statement, opcode)
 		}
@@ -1692,11 +1671,11 @@ func (d *Decompiler) ParseStatement() error {
 	d.varUserMap.ForEach(func(ref *values.JavaRef, pairs [][]any) bool {
 		val := GetRealValue(ref.Val)
 		attr := d.delRefUserAttr[ref]
-		if len(pairs)-attr[0] == 1 && attr[1] == 1 {
+		if len(pairs)-attr[0] == 1 {
 			pair := pairs[0]
 			nodeId := getStatementNextIdByOpcodeId(pair[1].(*OpCode).Id)
 			node := idToNode[nodeId]
-			if len(node.Source) == 1 {
+			if len(node.Source) == 1 && attr[1] == 1 {
 				if v, ok := node.Source[0].Statement.(*statements.AssignStatement); ok && v.LeftValue == ref {
 					sourceNode := node.Source[0]
 					preSources := slices.Clone(sourceNode.Source)
