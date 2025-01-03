@@ -52,7 +52,7 @@ type Decompiler struct {
 	ifNodeConditionCallback       map[*OpCode]func(value values.JavaValue)
 
 	varUserMap     *omap.OrderedMap[*values.JavaRef, [][]any]
-	delRefUserAttr map[*values.JavaRef][3]int // [0] = del times,[1] = assign times, [2] = self assign
+	delRefUserAttr map[*utils2.VariableId][3]int // [0] = del times,[1] = assign times, [2] = self assign
 }
 
 func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.JavaValue) *Decompiler {
@@ -65,7 +65,7 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 		varTable:            map[int]*values.JavaRef{},
 		valueToRef:          map[values.JavaValue][2]any{},
 		varUserMap:          omap.NewEmptyOrderedMap[*values.JavaRef, [][]any](),
-		delRefUserAttr:      map[*values.JavaRef][3]int{},
+		delRefUserAttr:      map[*utils2.VariableId][3]int{},
 	}
 }
 
@@ -270,9 +270,9 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		if _, ok := UnpackSoltValue(runtimeStackSimulation.Peek()).(*values.JavaRef); !ok {
 			val := runtimeStackSimulation.Pop().(values.JavaValue)
 			ref := runtimeStackSimulation.NewVar(val)
-			attr := d.delRefUserAttr[ref]
+			attr := d.delRefUserAttr[ref.Id]
 			attr[2] = 1
-			d.delRefUserAttr[ref] = attr
+			d.delRefUserAttr[ref.Id] = attr
 			slotVal := values.NewSlotValue(ref, ref.Type())
 			addUser := func(n int) {
 				for i := 0; i < n; i++ {
@@ -360,9 +360,9 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		ref, isFirst := runtimeStackSimulation.AssignVar(slot, value)
 		statements.NewAssignStatement(ref, value, isFirst)
 		d.valueToRef[value] = [2]any{ref, isFirst}
-		attr := d.delRefUserAttr[ref]
+		attr := d.delRefUserAttr[ref.Id]
 		attr[1]++
-		d.delRefUserAttr[ref] = attr
+		d.delRefUserAttr[ref.Id] = attr
 	case OP_NEW:
 		n := Convert2bytesToInt(opcode.Data)
 		javaClass := d.constantPoolGetter(int(n)).(*values.JavaClassValue)
@@ -1405,9 +1405,9 @@ func (d *Decompiler) ParseStatement() error {
 							}
 						}
 						if v, ok := val.(*values.JavaRef); ok {
-							attr := d.delRefUserAttr[v]
+							attr := d.delRefUserAttr[v.Id]
 							attr[0]++
-							d.delRefUserAttr[v] = attr
+							d.delRefUserAttr[v.Id] = attr
 						}
 					}
 					assignNode := refToNewExpressionAssignNode[funcCallValue.Object.String(funcCtx)]
@@ -1670,23 +1670,28 @@ func (d *Decompiler) ParseStatement() error {
 
 	d.varUserMap.ForEach(func(ref *values.JavaRef, pairs [][]any) bool {
 		val := GetRealValue(ref.Val)
-		attr := d.delRefUserAttr[ref]
+		attr := d.delRefUserAttr[ref.Id]
 		if len(pairs)-attr[0] == 1 {
 			pair := pairs[0]
 			nodeId := getStatementNextIdByOpcodeId(pair[1].(*OpCode).Id)
 			node := idToNode[nodeId]
-			if len(node.Source) == 1 && attr[1] == 1 {
+			if len(node.Source) == 1 && len(node.Source[0].Next) == 1 {
 				if v, ok := node.Source[0].Statement.(*statements.AssignStatement); ok && v.LeftValue == ref {
-					sourceNode := node.Source[0]
-					preSources := slices.Clone(sourceNode.Source)
-					sourceNode.RemoveAllSource()
-					sourceNode.RemoveAllNext()
-					for _, source := range preSources {
-						source.AddNext(node)
+					assignNode := node.Source[0]
+					beforeNodes := slices.Clone(assignNode.Source)
+					assignNode.RemoveAllNext()
+					for _, beforeNode := range beforeNodes {
+						for i, n := range beforeNode.Next {
+							if n == assignNode {
+								beforeNode.Next[i] = node
+								node.Source = append(node.Source, beforeNode)
+								assignNode.RemoveSource(beforeNode)
+							}
+						}
 					}
 					ref.Id.Delete()
 					(pair[0]).(func(value values.JavaValue))(val)
-					node.SourceConditionNode = sourceNode.SourceConditionNode
+					node.SourceConditionNode = assignNode.SourceConditionNode
 				}
 			}
 			if attr[2] == 1 {
