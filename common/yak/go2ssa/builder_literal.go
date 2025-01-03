@@ -482,6 +482,9 @@ func (b *astbuilder) buildInterfaceTypeLiteral(stmt *gol.InterfaceTypeContext) s
 		switch t := ssatyp.(type) {
 		case *ssa.InterfaceType:
 			interfacetyp.AddFatherInterfaceType(t)
+			for n, m := range t.GetMethod() {
+				interfacetyp.AddMethod(n, m)
+			}
 		case *ssa.ObjectType:
 			interfacetyp.AddStructure(t.Name, t)
 		}
