@@ -123,10 +123,34 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				}
 			}
 
-			if s.GetTypeKind() == ssa.InterfaceTypeKind {
+			if i, ok := s.(*ssa.InterfaceType); ok {
 				if fun, ok := ssa.ToFunction(bp.Constructor); ok {
+					store := b.StoreFunctionBuilder()
 					fun.AddLazyBuilder(func() {
-
+						switchHandler := b.SwitchFunctionBuilder(store)
+						defer func() {
+							switchHandler()
+						}()
+						for funcName, _ := range i.GetMethod() {
+							for typeName, t := range b.GetStructAll() {
+								if t.GetTypeKind() == ssa.InterfaceTypeKind {
+									continue
+								}
+								if _, ok := t.GetMethod()[funcName]; ok {
+									childBp := b.GetBluePrint(typeName)
+									if childBp == nil {
+										b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
+										continue
+									}
+									parentBp := b.GetBluePrint(n)
+									if parentBp == nil {
+										b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
+										continue
+									}
+									parentBp.AddSuperBlueprint(childBp)
+								}
+							}
+						}
 					}, false)
 				}
 			}

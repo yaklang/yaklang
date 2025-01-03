@@ -419,35 +419,139 @@ func TestType_struct(t *testing.T) {
 }
 
 func TestType_interface(t *testing.T) {
-	t.Skip()
-	t.Run("interface type", func(t *testing.T) {
+	t.Run("interface", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		
+		type s struct {
+			a, b int
+		}
+
+		type i interface {
+			Add() int
+			Sub() int
+		}
+
+		func (i *s) Add() int {
+			return i.a + i.b
+		}
+
+		func (i *s) Sub() int {
+			return i.a - i.b
+		}
+
+		func do(i i) {
+			println(i.Add())
+			println(i.Sub())
+		}
+
+		func main(){
+			b := &s{a: 3, b: 3}
+			do(b)
+		}
+		`, []string{
+			"ParameterMember-parameter[0].Add(Parameter-i)", "ParameterMember-parameter[0].Sub(Parameter-i)",
+		}, t)
+	})
+
+	t.Run("interface inherit", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		
+		type s struct {
+			a, b int
+		}
+		
+		type i interface {
+			Add() int
+			Sub() int
+		}
+		
+		type i2 interface {
+			i
+			Mul() int
+			Div() int
+		}
+		
+		func (i *s) Add() int {
+			return i.a + i.b
+		}
+		
+		func (i *s) Sub() int {
+			return i.a - i.b
+		}
+		
+		func (i2 *s) Div() int {
+			return i2.a / i2.b
+		}
+		
+		func (i2 *s) Mul() int {
+			return i2.a * i2.b
+		}
+		
+		func do(i i2) {
+			println(i.Add())
+			println(i.Sub())
+			println(i.Mul())
+			println(i.Div())
+		}
+		
+		func main() {
+			b := &s{a: 3, b: 3}
+			do(b)
+		}
+		
+		`, []string{
+			"ParameterMember-parameter[0].Add(Parameter-i)", "ParameterMember-parameter[0].Sub(Parameter-i)",
+			"ParameterMember-parameter[0].Mul(Parameter-i)", "ParameterMember-parameter[0].Div(Parameter-i)",
+		}, t)
+	})
+
+	t.Run("interface cover", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
-	type IA interface {
-		Get(key string) int
-	}
+		import (
+			"strconv"
+		)
 
-	type B1 struct {
-		mp map[string]int
-	}
+		type IA interface {
+			Get(key string) int
+		}
 
-	type B2 struct {
-		arr int
-	}
+		type B1 struct {
+			mp map[string]int
+		}
 
-	func (b *B1) Get(key string) int {
-		return b.mp[key]
-	}
+		type B2 struct {
+			arr []int
+		}
 
-	func (b *B2) Get(key string) int {
-		return b.arr
-	}
+		func (b *B1) Get(key string) int {
+			return b.mp[key]
+		}
 
-	var (
-		_ IA = (*B1)(nil)
-		_ IA = (*B2)(nil)
-	)
-		`, []string{""}, t)
+		func (b *B2) Get(key string) int {
+			num, _ := strconv.Atoi(key)
+			return b.arr[int(num)]
+		}
+
+		var (
+			_ IA = (*B1)(nil)
+			_ IA = (*B2)(nil)
+		)
+
+		func main() {
+			b1 := &B1{mp: map[string]int{
+				"a": 1,
+				"b": 2,
+			}}
+			b2 := &B2{
+				arr: []int{1, 2, 3},
+			}
+			println(b1.Get("a"))
+			println(b2.Get("2"))
+		}
+
+		`, []string{"Undefined-b1.Get(valid)(make(struct {map[string]number}),\"a\") member[make(map[string]number)]",
+			"Undefined-b2.Get(valid)(make(struct {[]number}),\"2\") member[make([]number)]"}, t)
 	})
 }
 
