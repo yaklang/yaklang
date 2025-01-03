@@ -835,17 +835,19 @@ for fileReader.Next(){
 
     if count == concurrent {
         wgScan.Add(1)
-        go func() {
+        currentBatch := targetBatch
+        go func(batch) {
             defer wgScan.Done()
-            handleTCP(targetBatch)
-        }()
+            handleTCP(batch)
+        }(currentBatch)
 
         if synscanEnable {
             wgScan.Add(1)
-            go func() {
+            go func(batch) {
                 defer wgScan.Done()
-                handleSYN(targetBatch)
-            }()
+                yakit.Info("handleSYN batch %s",batch)
+                handleSYN(batch)
+            }(currentBatch)
         }
         targetBatch = ""
         count = 0
