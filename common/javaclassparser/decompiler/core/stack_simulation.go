@@ -103,7 +103,9 @@ func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values
 		s.varTable[slot] = newRef
 		return newRef, true
 	}
-	return ref, false
+	newRef := *ref
+	newRef.Id = newRef.Id.Horizontal()
+	return &newRef, false
 }
 
 func NewEmptyStackEntry() *StackItem {
