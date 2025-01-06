@@ -116,7 +116,7 @@ namespacePath
 namespaceDeclaration
     : Namespace (
         namespacePath? OpenCurlyBracket namespaceStatement* CloseCurlyBracket
-        | namespacePath SemiColon
+        | namespacePath SemiColon namespaceStatement*
     )
     ;
 
