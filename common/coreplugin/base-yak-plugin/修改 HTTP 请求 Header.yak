@@ -12,11 +12,11 @@ args = cli.Json(
         "properties": {
           "key": {
             "type": "string",
-            "title": "键"
+            "title": "HTTP Header"
           },
           "value": {
             "type": "string",
-            "title": "值"
+            "title": "Value"
           }
         },
         "require": [
@@ -36,7 +36,7 @@ JSON,
                 cli.uiFieldGroups(cli.uiGroup(cli.uiField(
                     "items", 
                     1, 
-                    cli.uiFieldGroups(cli.uiGroup(cli.uiTableField("key", 350), cli.uiTableField("value", 350))), 
+                    cli.uiFieldGroups(cli.uiGroup(cli.uiTableField("key", 120), cli.uiTableField("value", 350))),
                 ))), 
             ))), 
             cli.uiGlobalFieldPosition(cli.uiPosHorizontal), 

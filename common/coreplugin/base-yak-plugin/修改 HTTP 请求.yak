@@ -23,11 +23,11 @@ args = cli.Json(
             "default": "Header"
             },
           "key": {
-            "title": "键",
+            "title": "Key",
             "type": "string"
           },
           "value": {
-            "title": "值",
+            "title": "Value",
             "type": "string"
           }
         },
@@ -50,8 +50,8 @@ JSON,
                     "items", 
                     1, 
                     cli.uiFieldGroups(cli.uiGroup(
-                        cli.uiTableField("kind", 150), 
-                        cli.uiTableField("key", 300), 
+                        cli.uiTableField("kind", 120),
+                        cli.uiTableField("key", 120),
                         cli.uiTableField("value", 300), 
                     )), 
                 ))), 
