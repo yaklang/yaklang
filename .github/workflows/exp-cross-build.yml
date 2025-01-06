@@ -292,10 +292,16 @@ jobs:
             echo "::error::Failed to download syntaxflow meta info, empty file will create it "
           fi
           
-          wget -O summary-syntaxflow-meta.yak  https://aliyun-oss.yaklang.com/syntaxflow/summary-syntaxflow-meta.yak
-          if [ $? -ne 0 ]; then
-            echo "::error::Failed to download syntaxflow meta info generator"
-            exit 1
+          if [ -f "scripts/summary-syntaxflow-meta.yak" ]; then
+            echo "Using local syntaxflow meta info generator"
+            cp scripts/summary-syntaxflow-meta.yak summary-syntaxflow-meta.yak
+          else
+            echo "Downloading syntaxflow meta info generator..."
+            wget -O summary-syntaxflow-meta.yak https://aliyun-oss.yaklang.com/syntaxflow/summary-syntaxflow-meta.yak
+            if [ $? -ne 0 ]; then
+              echo "::error::Failed to download syntaxflow meta info generator"
+              exit 1
+            fi
           fi
           
           echo "Checking downloaded file..."
