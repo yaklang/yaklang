@@ -5834,6 +5834,7 @@ message SyntaxFlowScanResponse{
   // result 
   SyntaxFlowResult Result = 4;
   repeated Risk risks = 5;
+  repeated SSARisk SSARisks = 6;
 }
 
 
