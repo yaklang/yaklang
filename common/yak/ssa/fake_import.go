@@ -32,7 +32,7 @@ func fakeImportValue(lib *Program, name string) Value {
 func fakeImportType(lib *Program, name string) Type {
 	builder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(VirtualFunctionName))
 	if t, ok := lib.ExportType[name]; !ok && lib.VirtualImport {
-		bluePrint := builder.CreateBluePrint(name)
+		bluePrint := builder.CreateBlueprint(name)
 		lib.ExportType[name] = bluePrint
 		builder.ClassConstructor(bluePrint, []Value{})
 		return bluePrint

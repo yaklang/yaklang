@@ -1722,10 +1722,12 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 	if i.ClassBody() != nil {
 		// 匿名类
 		className := uuid.NewString()
-		class := y.CreateBluePrint(className)
-		if oldClassName != "" {
-			class.AddParentBlueprint(y.GetBluePrint(oldClassName))
+		class := y.CreateBlueprint(className)
+		bp := y.GetBluePrint(oldClassName)
+		if bp == nil {
+			bp = y.CreateBlueprint(oldClassName)
 		}
+		class.AddParentBlueprint(y.GetBluePrint(oldClassName))
 		y.VisitClassBody(i.ClassBody(), class)
 	}
 	return args

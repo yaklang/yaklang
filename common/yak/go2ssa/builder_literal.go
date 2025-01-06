@@ -311,7 +311,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			}
 		}
 
-		bp := b.CreateBluePrint(o.VerboseName)
+		bp := b.CreateBlueprint(o.VerboseName)
 		for n, f := range typ.GetMethod() {
 			bp.AddMethod(n, f)
 		}

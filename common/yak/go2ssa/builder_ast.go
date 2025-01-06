@@ -567,11 +567,11 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 	case ssa.StructTypeKind:
 		ssatyp.(*ssa.ObjectType).VerboseName = name
 		b.AddStruct(name, ssatyp)
-		bp := b.CreateBluePrintAndSetConstruct(name)
+		bp := b.CreateBlueprintAndSetConstruct(name)
 		_ = bp
 	case ssa.InterfaceTypeKind:
 		b.AddStruct(name, ssatyp)
-		bp := b.CreateBluePrintAndSetConstruct(name)
+		bp := b.CreateBlueprintAndSetConstruct(name)
 		_ = bp
 	default:
 		aliast := ssa.NewAliasType(name, ssatyp.PkgPathString(), ssatyp)
