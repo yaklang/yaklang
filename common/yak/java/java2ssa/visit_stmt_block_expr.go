@@ -1702,7 +1702,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 	return obj, nil
 }
 
-func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext, oldClassName string) []ssa.Value {
+func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext, parentName string) []ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1723,11 +1723,19 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 		// 匿名类
 		className := uuid.NewString()
 		class := y.CreateBlueprint(className)
-		bp := y.GetBluePrint(oldClassName)
-		if bp == nil {
-			bp = y.CreateBlueprint(oldClassName)
+
+		parent := y.GetBluePrint(parentName)
+		if parent == nil {
+			parent = y.CreateBlueprint(parentName)
 		}
-		class.AddParentBlueprint(y.GetBluePrint(oldClassName))
+		class.AddParentBlueprint(parent)
+		if parent.IsInterface() {
+			class.SetKind(ssa.BlueprintInterface)
+			class.AddInterfaceBlueprint(parent)
+		} else if parent.IsClass() {
+			class.SetKind(ssa.BlueprintClass)
+			class.AddSuperBlueprint(parent)
+		}
 		y.VisitClassBody(i.ClassBody(), class)
 	}
 	return args

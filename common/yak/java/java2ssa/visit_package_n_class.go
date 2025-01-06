@@ -87,10 +87,12 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	if outClass == nil {
 		className := i.Identifier().GetText()
 		blueprint = y.CreateBlueprint(className)
+		blueprint.SetKind(ssa.BlueprintClass)
 		y.GetProgram().SetExportType(className, blueprint)
 	} else {
 		className := outClass.Name + INNER_CLASS_SPLIT + i.Identifier().GetText()
 		blueprint = y.CreateBlueprint(className)
+		blueprint.SetKind(ssa.BlueprintClass)
 	}
 
 	// set full type name for blueprint's self
@@ -139,6 +141,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 				bp = y.CreateBlueprint(extendName)
 				y.AddFullTypeNameForAllImport(extendName, bp)
 			}
+			bp.SetKind(ssa.BlueprintClass)
 			blueprint.AddSuperBlueprint(bp)
 		}
 
@@ -148,6 +151,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 				bp = y.CreateBlueprint(implName)
 				y.AddFullTypeNameForAllImport(implName, bp)
 			}
+			bp.SetKind(ssa.BlueprintInterface)
 			blueprint.AddInterfaceBlueprint(bp)
 		}
 	})
