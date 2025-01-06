@@ -100,3 +100,82 @@ func TestNativeCall_Include(t *testing.T) {
 		"params": {"Undefined-$password(valid)", "Undefined-$user2(valid)", "Undefined-$username(valid)", "Undefined-_GET", "Undefined-_POST", "Undefined-_POST"},
 	}, false, ssaapi.WithLanguage(ssaapi.PHP))
 }
+
+func TestNamespace2(t *testing.T) {
+	t.Run("namespace", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("a.php", `<?php
+
+namespace lemo\helper;
+class FileHelper
+{
+    public static function getFileList($path,$type='')
+    {
+		scan($path);
+}
+}`)
+		fs.AddFile("b.php", `<?php
+namespace app\admin\controller\sys;
+use lemo\helper\FileHelper;
+
+class Uploads extends Backend{
+    public function getList(){
+        $path = input('path','uploads');
+        $paths = app()->getRootPath().'public/storage/'.$path;
+        $type = input('type','image');
+        $list = FileHelper::getFileList($paths,$type);
+        $data = ['state'=>'SUCCESS','start'=>0,'total'=>count($list),'list'=>[]];
+        if($list){
+            foreach ($list[0] as $k=>$v) {
+                $data['list'][$k]['url'] = str_replace( app()->getRootPath().'public','',$v);
+                $data['list'][$k]['mtime'] = mime_content_type($v);
+            }
+        }
+        return json($data);
+    }
+
+}`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `scandir(* as $param)
+
+scan(* as $param)
+input() as $source
+$param#{include: <<<CODE
+* & $source
+CODE}-> as $sink`, map[string][]string{"sink": {"input"}}, true, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("same namespace name", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("a.php", `<?php
+
+namespace b\c\a;
+
+class A{
+    public static function getA($a){
+        scandir($a);
+    }
+}
+`)
+		fs.AddFile("b.php", `<?php
+
+namespace b\c\a;
+
+class B{
+    public static function getB($a){
+    }
+}
+`)
+		fs.AddFile("c.php", `<?php
+
+namespace d\b\c;
+use b\c\a\A;
+
+class AA{
+    public function A(){
+        $a = input("a");
+        A::getA($a);
+    }
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `scandir(* #->* as $param)`, map[string][]string{}, true, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+}

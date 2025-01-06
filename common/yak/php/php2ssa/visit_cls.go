@@ -341,7 +341,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 					param = y.EmitEmptyContainer()
 					y.AssignVariable(y.CreateVariable("$this"), param)
 					param.SetType(class)
-				} else {
+				} else if !isStatic {
 					param = y.NewParam("$this")
 					param.SetType(class)
 				}
