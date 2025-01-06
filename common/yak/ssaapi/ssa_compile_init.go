@@ -48,6 +48,7 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 		if src == nil {
 			return fmt.Errorf("origin source code (MemEditor) is nil")
 		}
+		src.SetUrl(filePath)
 		// backup old editor (source code)
 		originEditor := fb.GetEditor()
 		// TODO: check prog.FileList avoid duplicate file save to sourceDB,
@@ -60,8 +61,7 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 				folders = append(folders,
 					strings.Split(folderName, string(filesystem.GetSeparators()))...,
 				)
-				src.ResetSourceCodeHash()
-				ssadb.SaveFile(fileName, src.GetSourceCode(), folders)
+				ssadb.SaveFile(fileName, src.GetSourceCode(), src.GetIrSourceHash(programName), folders)
 			}
 		}
 		// include source code will change the context of the origin editor
