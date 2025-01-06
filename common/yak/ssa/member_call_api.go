@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -13,6 +15,14 @@ func (b *FunctionBuilder) ReadMemberCallMethod(object, key Value) Value {
 // read member call variable, want variable
 func (b *FunctionBuilder) ReadMemberCallValue(object, key Value) Value {
 	return b.readMemberCallValueEx(object, key, false)
+}
+
+func (b *FunctionBuilder) ReadMemberCallValueByName(object Value, key string) Value {
+	name := fmt.Sprintf("#%d.%s", object.GetId(), key)
+	if ret := b.PeekValueInThisFunction(name); ret != nil {
+		return ret
+	}
+	return nil
 }
 
 func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction bool) Value {

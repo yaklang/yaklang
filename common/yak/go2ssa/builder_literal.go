@@ -260,8 +260,24 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 	}
 
 	rvalue := typeHandler(typ, kvs)
-	if typ.GetTypeKind() == ssa.StructTypeKind {
-		bp := b.CreateBluePrint(typ.(*ssa.ObjectType).VerboseName)
+	if o, ok := typ.(*ssa.ObjectType); ok {
+		// 非指针匿名结构体，需要创建对象
+		for n, a := range o.AnonymousField {
+			isFind := false
+			for k, _ := range rvalue.GetAllMember() {
+				if k.GetName() == n {
+					isFind = true
+					break
+				}
+			}
+			if !isFind {
+				newObject := typeHandler(a, nil)
+				variable := b.CreateMemberCallVariable(rvalue, b.EmitConstInst(n))
+				b.AssignVariable(variable, newObject)
+			}
+		}
+
+		bp := b.CreateBluePrint(o.VerboseName)
 		for n, f := range typ.GetMethod() {
 			bp.AddMethod(n, f)
 		}
@@ -621,7 +637,6 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 				b.tpHandler[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
 			}
 			if p, ok := parent.(*ssa.ObjectType); ok {
-				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), p)
 				structTyp.AnonymousField[typ.TypeName().GetText()] = p
 			} else if a, ok := parent.(*ssa.AliasType); ok {
 				structTyp.AddField(b.EmitConstInst(a.Name), a.GetType())

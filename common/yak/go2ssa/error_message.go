@@ -134,3 +134,7 @@ func NotFunction(name string) string {
 func NotCreateBluePrint(name string) string {
 	return fmt.Sprintf("[BUG]struct %v is not create blueprint", name)
 }
+
+func NotFindAnonymousFieldObject(a string) string {
+	return fmt.Sprintf("[BUG]anonymous object %v not find (The anonymous will be created when its parent is created)", a)
+}
