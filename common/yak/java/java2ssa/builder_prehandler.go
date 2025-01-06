@@ -76,7 +76,10 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 			folders = append(folders,
 				strings.Split(dirname, string(fileSystem.GetSeparators()))...,
 			)
-			prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
+			content := string(raw)
+			editor := memedit.NewMemEditor(content)
+			editor.SetUrl(path)
+			prog.ExtraFile[path] = ssadb.SaveFile(filename, content, editor.GetIrSourceHash(prog.GetProgramName()), folders)
 		}
 	}
 	switch strings.ToLower(fileSystem.Ext(path)) {

@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"path"
 	"strconv"
 	"strings"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 var irSourceCache = utils.NewTTLCache[*memedit.MemEditor]()
@@ -59,7 +59,7 @@ func GetEditorByFileName(name string) (*memedit.MemEditor, error) {
 	return ret, nil
 }
 
-func SaveFile(filename, content string, folderPath []string) string {
+func SaveFile(filename, content string, hash string, folderPath []string) string {
 	start := time.Now()
 	defer func() {
 		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
@@ -69,7 +69,6 @@ func SaveFile(filename, content string, folderPath []string) string {
 		return ""
 	}
 	programName := folderPath[0]
-	hash := codec.Sha256(content)
 	irSource := &IrSource{
 		ProgramName:    programName,
 		SourceCodeHash: hash,
@@ -79,7 +78,7 @@ func SaveFile(filename, content string, folderPath []string) string {
 		IsBigFile:      false,
 	}
 	irSource.save()
-	return hash
+	return irSource.SourceCodeHash
 }
 
 func SaveFolder(folderName string, folderPaths []string) error {

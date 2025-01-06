@@ -16,6 +16,8 @@ type irSourceFS struct {
 	virtual map[string]*filesys.VirtualFS // echo program -> virtual fs
 }
 
+var IrSourceFsSeparators = '/'
+
 var _ filesys_interface.ReadOnlyFileSystem = (*irSourceFS)(nil)
 var _ filesys_interface.FileSystem = (*irSourceFS)(nil)
 
@@ -142,7 +144,11 @@ func (fs *irSourceFS) getProgram(path string) (string, bool) {
 	return dir[1], len(dir) == 2
 }
 
-func (f *irSourceFS) GetSeparators() rune         { return '/' }
+func GetIrSourceFsSeparators() rune {
+	return IrSourceFsSeparators
+}
+
+func (f *irSourceFS) GetSeparators() rune         { return IrSourceFsSeparators }
 func (f *irSourceFS) Join(paths ...string) string { return path.Join(paths...) }
 func (f *irSourceFS) IsAbs(name string) bool {
 	return len(name) > 0 && name[0] == byte(f.GetSeparators())

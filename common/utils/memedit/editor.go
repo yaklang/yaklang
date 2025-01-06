@@ -49,6 +49,10 @@ func (ve *MemEditor) SetUrl(url string) {
 	ve.fileUrl = url
 }
 
+func (ve *MemEditor) GetIrSourceHash(programName string) string {
+	return codec.Md5(strings.Join([]string{programName, ve.GetFilename()}, "/"))
+}
+
 func (ve *MemEditor) GetFormatedUrl() string {
 	u := ve.fileUrl
 	if strings.HasPrefix(u, "file://") {
