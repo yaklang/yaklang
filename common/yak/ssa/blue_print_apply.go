@@ -13,7 +13,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	if !this.IsObject() {
 		return
 	}
-	blue := NewClassBluePrint("")
+	blue := NewBlueprint("")
 
 	for key, member := range this.GetAllMember() {
 		// if not function , just append this field to normal field

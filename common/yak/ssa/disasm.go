@@ -360,8 +360,8 @@ func (i *Make) String() string {
 		)
 	} else {
 		return fmt.Sprintf(
-			"%s = make %s [%s, %s]",
-			getStr(i), i.GetType(), getStr(i.Len), getStr(i.Cap),
+			"%s = make %s [%s, %s] // %s",
+			getStr(i), i.GetType(), getStr(i.Len), getStr(i.Cap), i.name,
 		)
 	}
 }

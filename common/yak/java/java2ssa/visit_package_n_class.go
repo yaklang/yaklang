@@ -78,91 +78,82 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	}
 
 	var (
-		mergedTemplate         []string
-		class                  *ssa.Blueprint
-		classContainerCallback []func(ssa.Value)
-		classlessParents       []string
-		extendName             string
+		blueprint  *ssa.Blueprint
+		parents    []string
+		implNames  []string
+		extendName string
 	)
 
 	if outClass == nil {
 		className := i.Identifier().GetText()
-		class = y.CreateBluePrint(className)
-		y.GetProgram().SetExportType(className, class)
+		blueprint = y.CreateBlueprint(className)
+		y.GetProgram().SetExportType(className, blueprint)
 	} else {
 		className := outClass.Name + INNER_CLASS_SPLIT + i.Identifier().GetText()
-		class = y.CreateBluePrint(className)
+		blueprint = y.CreateBlueprint(className)
 	}
-	// set full type name for class's self
+
+	// set full type name for blueprint's self
 	if len(y.selfPkgPath) != 0 {
-		ftRaw := fmt.Sprintf("%s.%s", strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
-		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.Blueprint)
+		ftRaw := fmt.Sprintf("%s.%s", strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), blueprint.Name)
+		blueprint = y.AddFullTypeNameRaw(ftRaw, blueprint).(*ssa.Blueprint)
 	}
 	if ret := i.TypeParameters(); ret != nil {
 	}
 
 	if i.EXTENDS() != nil {
 		if extend := i.TypeType(); extend != nil {
-			parentName := extend.GetText()
-			extendName = parentName
-			classContainerCallback = append(classContainerCallback, func(value ssa.Value) {
-				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("extends"))
-				y.AssignVariable(variable, y.EmitConstInst(parentName))
-				classlessParents = append(classlessParents, parentName)
-			})
-			mergedTemplate = append(mergedTemplate, parentName)
+			extendName = extend.GetText()
 		}
+		parents = append(parents, extendName)
 	}
 
 	if i.IMPLEMENTS() != nil {
-		var implName []string
 		for _, val := range i.AllTypeList() {
-			implName = append(implName, val.GetText())
-			classlessParents = append(classlessParents, val.GetText())
+			implNames = append(implNames, val.GetText())
+			parents = append(parents, val.GetText())
 		}
-		if len(implName) > 0 {
-			classContainerCallback = append(classContainerCallback, func(value ssa.Value) {
-				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("implements"))
-				y.AssignVariable(variable, y.EmitConstInst(strings.Join(implName, ",")))
-			})
-		}
-		mergedTemplate = append(mergedTemplate, i.TypeList(0).GetText())
 	}
 
-	classlessParents = utils.StringArrayFilterEmpty(classlessParents)
-	if len(classlessParents) > 0 {
-		classContainerCallback = append(classContainerCallback, func(value ssa.Value) {
-			variable := y.CreateMemberCallVariable(value, y.EmitConstInst("inherits"))
-			y.AssignVariable(variable, y.EmitConstInst(strings.Join(classlessParents, ",")))
-		})
-	}
+	parents = utils.StringArrayFilterEmpty(parents)
 	/*
 		该lazyBuilder顺序按照cls解析顺序
 	*/
 	store := y.StoreFunctionBuilder()
-	class.AddLazyBuilder(func() {
+	blueprint.AddLazyBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
-		for _, parentClass := range mergedTemplate {
-			bluePrint := y.GetBluePrint(parentClass)
-			if bluePrint != nil {
-				class.AddParentBlueprint(bluePrint)
-			} else {
-				bluePrint = y.CreateBluePrint(parentClass)
-				y.AddFullTypeNameForAllImport(parentClass, bluePrint)
-				class.AddParentBlueprint(bluePrint)
-			}
 
-			if parentClass == extendName {
-				class.AddSuperBlueprint(bluePrint)
+		for _, parent := range parents {
+			bp := y.GetBluePrint(parent)
+			if bp == nil {
+				bp = y.CreateBlueprint(parent)
+				y.AddFullTypeNameForAllImport(parent, bp)
 			}
+			blueprint.AddParentBlueprint(bp)
+		}
+
+		if extendName != "" {
+			bp := y.GetBluePrint(extendName)
+			if bp == nil {
+				bp = y.CreateBlueprint(extendName)
+				y.AddFullTypeNameForAllImport(extendName, bp)
+			}
+			blueprint.AddSuperBlueprint(bp)
+		}
+
+		for _, implName := range implNames {
+			bp := y.GetBluePrint(implName)
+			if bp == nil {
+				bp = y.CreateBlueprint(implName)
+				y.AddFullTypeNameForAllImport(implName, bp)
+			}
+			blueprint.AddInterfaceBlueprint(bp)
 		}
 	})
-	container := class.GetClassContainer()
-	y.VisitClassBody(i.ClassBody(), class)
-	for _, callback := range classContainerCallback {
-		callback(container)
-	}
+
+	container := blueprint.Container()
+	y.VisitClassBody(i.ClassBody(), blueprint)
 	return container
 }
 
@@ -346,7 +337,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 		}
 		return typ
 	} else {
-		typ = ssa.NewClassBluePrint(className)
+		typ = ssa.NewBlueprint(className)
 		typ = y.AddFullTypeNameFromMap(className, typ)
 		return typ
 	}
@@ -396,7 +387,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 
 	enumName := i.Identifier().GetText()
 	if class == nil {
-		class = y.CreateBluePrint(enumName)
+		class = y.CreateBlueprint(enumName)
 	}
 
 	if i.IMPLEMENTS() != nil {
@@ -407,7 +398,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 		if parent := y.GetBluePrint(parentClass); parent != nil {
 			class.AddParentBlueprint(parent)
 		} else {
-			class.AddParentBlueprint(y.CreateBluePrint(parentClass))
+			class.AddParentBlueprint(y.CreateBlueprint(parentClass))
 		}
 	}
 
