@@ -515,3 +515,70 @@ func TestProgram_NewProgram(t *testing.T) {
 		assert.Equal(t, fmt.Sprintf("/%s", progName), newProgs[0])
 	})
 }
+
+func TestIrSourceFS_File_URL(t *testing.T) {
+	content := `package org.example
+		public class A {
+			public void test() {
+				println("hello");
+			}
+		}
+	`
+
+	t.Run("test compile the same content in different project", func(t *testing.T) {
+		compileAndGetSource := func() *ssadb.IrSource {
+			vf := filesys.NewVirtualFs()
+			fileName := "file_name_" + uuid.NewString()
+			programID := "prog_" + uuid.NewString()
+			path := "path_" + uuid.NewString()
+			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName), content)
+
+			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID), ssaapi.WithSaveToProfile())
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				ssadb.DeleteProgram(ssadb.GetDB(), programID)
+				ssadb.DeleteSSAProgram(programID)
+			})
+			fullPath := fmt.Sprintf("/%s/%s", programID, path)
+			irSource, err := ssadb.GetIrSourceByPathAndName(fullPath, fileName)
+			require.NoError(t, err)
+			return irSource
+		}
+
+		// 相同内容，不同文件的source code hash不应该一样
+		source1 := compileAndGetSource()
+		require.NotNil(t, source1)
+		source2 := compileAndGetSource()
+		require.NotNil(t, source2)
+		require.NotEqual(t, source1.SourceCodeHash, source2.SourceCodeHash)
+	})
+
+	t.Run("test compile the same content in the same project", func(t *testing.T) {
+		compileAndGetSource := func() []*ssadb.IrSource {
+			vf := filesys.NewVirtualFs()
+			fileName1 := "file_name_" + uuid.NewString()
+			fileName2 := "file_name_" + uuid.NewString()
+
+			programID := "prog_" + uuid.NewString()
+			path := "path_" + uuid.NewString()
+
+			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName1), content)
+			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName2), content)
+
+			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID), ssaapi.WithSaveToProfile())
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				ssadb.DeleteProgram(ssadb.GetDB(), programID)
+				ssadb.DeleteSSAProgram(programID)
+			})
+			fullPath := fmt.Sprintf("/%s/%s", programID, path)
+			irSources, err := ssadb.GetIrSourceByPath(fullPath)
+			require.NoError(t, err)
+			return irSources
+		}
+
+		source := compileAndGetSource()
+		require.Equal(t, 2, len(source))
+		require.NotEqual(t, source[0].SourceCodeHash, source[1].SourceCodeHash)
+	})
+}
