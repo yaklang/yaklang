@@ -18,6 +18,7 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 
 	name := i.Identifier().GetText()
 	bluePrint := y.CreateBlueprint(name)
+	bluePrint.SetKind(ssa.BlueprintInterface)
 	y.GetProgram().SetExportType(name, bluePrint)
 	var extendNames []string
 	if i.EXTENDS() != nil {
@@ -37,6 +38,7 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 				bp = y.CreateBlueprint(extendName)
 				y.AddFullTypeNameForAllImport(extendName, bp)
 			}
+			bp.SetKind(ssa.BlueprintInterface)
 			bluePrint.AddSuperBlueprint(bp)
 			bluePrint.AddParentBlueprint(bp)
 		}

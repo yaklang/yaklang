@@ -39,7 +39,27 @@ func Test_Blueprint_name2declare(t *testing.T) {
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
-	t.Run("search class relationship", func(t *testing.T) {
+	t.Run("search parent and children relationship", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+		A.__sub__ as $retA // B  E 
+		C.__impl__ as $retB // D E 
+		B.__super__ as $retC // A 
+		CC.__super__  as $retD // C
+		D.__interface__ as $retE // C
+		E.__interface__ as $retF //  C
+		E.__super__ as $retG // A
+		`, map[string][]string{
+			"retA": {"B_declare", "E_declare"},
+			"retB": {"D_declare", "E_declare"},
+			"retC": {"A_declare"},
+			"retD": {"C_declare"},
+			"retE": {"C_declare"},
+			"retF": {"C_declare"},
+			"retG": {"A_declare"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("test class and interface relation ", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 		A.__children__ as $retA // B  E 
 		C.__children__ as $retB // D E CC
@@ -72,20 +92,24 @@ func Test_Blueprint_anonyous_name2declare(t *testing.T) {
 
 	t.Run("search class relation-ship", func(t *testing.T) {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
 			res, err := prog.SyntaxFlowWithError(`
-			A.__children__ as $classA 
-			C.__children__ as $classC
+			A.__children__ as $retA1
+			A.__sub__ as $retA2
+
+			C.__children__ as $retC1
+			C.__impl__ as $retC2
 			`)
 			require.NoError(t, err)
 			res.Show()
 
-			require.True(t, res.GetValues("classA").Len() == 1)
-			require.True(t, res.GetValues("classC").Len() == 1)
-
+			require.Equal(t, res.GetValues("retA1").Len(), 1)
+			require.Equal(t, res.GetValues("retA2").Len(), 1)
+			require.Equal(t, res.GetValues("retC1").Len(), 1)
+			require.Equal(t, res.GetValues("retC2").Len(), 1)
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
-
 }
 
 func Test_Blueprint_no_declare(t *testing.T) {
