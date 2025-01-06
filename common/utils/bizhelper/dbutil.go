@@ -356,6 +356,14 @@ func ExactQueryExcludeArrayOr(db *gorm.DB, field string, s []interface{}) *gorm.
 	return db.Where(strings.Join(querys, " AND "), items...)
 }
 
+func ExactQueryUint64ArrayOr(db *gorm.DB, field string, s []uint64) *gorm.DB {
+	raw := make([]int64, len(s))
+	for index, sub := range s {
+		raw[index] = int64(sub)
+	}
+	return ExactQueryInt64ArrayOr(db, field, raw)
+}
+
 func ExactQueryIntArrayOr(db *gorm.DB, field string, s []int) *gorm.DB {
 	raw := make([]int64, len(s))
 	for index, sub := range s {
