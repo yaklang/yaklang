@@ -287,16 +287,8 @@ func DeleteYakScriptAll(db *gorm.DB) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	if db := db.Model(&schema.YakScript{}).Where(
-		"true",
-	).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
-		return db.Error
-	}
-	return nil
-}
-
-func DeleteYakScriptByWhere(db *gorm.DB) error {
-	if db = db.Delete(&schema.YakScript{}); db.Error != nil {
+	if db := db.Model(&schema.YakScript{}).Where("is_core_plugin = ?", false).
+		Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
@@ -560,6 +552,7 @@ func DeleteYakScript(db *gorm.DB, params *ypb.DeleteLocalPluginsByWhereRequest) 
 	defer yakScriptOpLock.Unlock()
 
 	db = db.Model(&schema.YakScript{}).Unscoped()
+	db = db.Where("is_core_plugin = ?", false)
 	db = bizhelper.ExactQueryStringArrayOr(db, "type", utils.PrettifyListFromStringSplited(params.GetType(), ","))
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 		"script_name", "content", "help", "author", "tags",
