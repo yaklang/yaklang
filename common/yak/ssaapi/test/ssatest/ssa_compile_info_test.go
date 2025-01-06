@@ -1,38 +1,24 @@
 package ssatest
 
 import (
-	"embed"
 	"fmt"
 	"io/fs"
-	"net"
-	"net/http"
 	"os"
 	"path"
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
-	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
-//go:embed testfile
-var javazip embed.FS
-
 func TestJar(t *testing.T) {
-	dir := os.TempDir()
-	jar, err := javazip.ReadFile("testfile/test.jar")
-	require.NoError(t, err)
-
-	jarPath := dir + "/test.jar"
-	err = os.WriteFile(jarPath, jar, 0644)
+	jarPath, err := GetJarFile()
 	require.NoError(t, err)
 	// test jar filesystem
 	jarFs, err := javaclassparser.NewJarFSFromLocal(jarPath)
@@ -128,12 +114,7 @@ func Test_Multiple_input(t *testing.T) {
 
 	t.Run("test compression input", func(t *testing.T) {
 		// write java zip file to template directory
-		dir := os.TempDir()
-		zipData, err := javazip.ReadFile("testfile/java-realworld.zip")
-		require.NoError(t, err)
-
-		zipPath := dir + "/java-realworld.zip"
-		err = os.WriteFile(zipPath, zipData, 0644)
+		zipPath, err := GetZipFile()
 		require.NoError(t, err)
 
 		checkFilelist(t, "java", map[string]any{
@@ -143,12 +124,7 @@ func Test_Multiple_input(t *testing.T) {
 	})
 
 	t.Run("test jar input", func(t *testing.T) {
-		dir := os.TempDir()
-		jar, err := javazip.ReadFile("testfile/test.jar")
-		require.NoError(t, err)
-
-		jarPath := dir + "/test.jar"
-		err = os.WriteFile(jarPath, jar, 0644)
+		jarPath, err := GetJarFile()
 		require.NoError(t, err)
 
 		checkFilelist(t, "java", map[string]any{
@@ -160,32 +136,8 @@ func Test_Multiple_input(t *testing.T) {
 }
 
 func Test_Multiple_input_git(t *testing.T) {
-	// address, err := vulinbox.NewVulinServerEx(context.Background(), true, false, "127.0.0.1")
-	// require.NoError(t, err)
-	var url string
-	{
-		// address
-		address := fmt.Sprintf("127.0.0.1:%d", utils.GetRandomAvailableTCPPort())
-		lis, err := net.Listen("tcp", address)
-		require.NoError(t, err)
-		// path route
-		zipData, err := javazip.ReadFile("testfile/java-realworld.git.zip")
-		require.NoError(t, err)
-		var router = mux.NewRouter()
-		routePath, handler := vulinbox.GeneratorGitHTTPHandler("", "java-realworld.git", zipData)
-		router.PathPrefix(routePath).HandlerFunc(handler)
-		// serve
-		go func() {
-			err := http.Serve(lis, router)
-			if err != nil {
-				log.Errorf("serve failed: %v", err)
-			}
-		}()
-
-		url = "http://" + address + routePath
-		log.Infof("Url: %s", url)
-	}
-	// _ = url
+	url, err := GetLocalGit()
+	require.NoError(t, err)
 
 	t.Run("test git clone", func(t *testing.T) {
 		targetPath := path.Join(os.TempDir(), "java-real")

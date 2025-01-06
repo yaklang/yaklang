@@ -3,7 +3,6 @@ package ssatest
 import (
 	"fmt"
 	"io/fs"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,12 +14,7 @@ import (
 )
 
 func TestJarRecompile(t *testing.T) {
-	dir := os.TempDir()
-	jar, err := javazip.ReadFile("testfile/test.jar")
-	require.NoError(t, err)
-
-	jarPath := dir + "/test.jar"
-	err = os.WriteFile(jarPath, jar, 0644)
+	jarPath, err := GetJarFile()
 	require.NoError(t, err)
 
 	// compile

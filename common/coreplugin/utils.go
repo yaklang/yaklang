@@ -3,10 +3,11 @@ package coreplugin
 import (
 	"embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"path"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/log"
 )
