@@ -62,7 +62,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	}
 	// cname := uuid.NewString()
 	cname := fmt.Sprintf("anonymous_%s_%s", y.CurrentFile, y.CurrentRange.GetStart())
-	bluePrint := y.CreateBluePrint(cname)
+	bluePrint := y.CreateBlueprint(cname)
 	if i.QualifiedStaticTypeRef() != nil {
 		if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
 			bluePrint.AddParentBlueprint(ref)
@@ -129,7 +129,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 
 			parentClassName := ""
 
-			class := y.CreateBluePrint(className)
+			class := y.CreateBlueprint(className)
 			y.MarkedThisClassBlueprint = class
 			y.GetProgram().SetExportType(className, class)
 			if i.Extends() != nil {
@@ -582,8 +582,8 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 
 /// class modifier
 
-func (y *builder) VisitPropertyModifiers(raw phpparser.IPropertyModifiersContext) map[ssa.ClassModifier]struct{} {
-	ret := make(map[ssa.ClassModifier]struct{})
+func (y *builder) VisitPropertyModifiers(raw phpparser.IPropertyModifiersContext) map[ssa.BlueprintModifier]struct{} {
+	ret := make(map[ssa.BlueprintModifier]struct{})
 	i, ok := raw.(*phpparser.PropertyModifiersContext)
 	if !ok {
 		return ret
@@ -596,8 +596,8 @@ func (y *builder) VisitPropertyModifiers(raw phpparser.IPropertyModifiersContext
 	}
 }
 
-func (y *builder) VisitMemberModifiers(raw phpparser.IMemberModifiersContext) map[ssa.ClassModifier]struct{} {
-	ret := make(map[ssa.ClassModifier]struct{})
+func (y *builder) VisitMemberModifiers(raw phpparser.IMemberModifiersContext) map[ssa.BlueprintModifier]struct{} {
+	ret := make(map[ssa.BlueprintModifier]struct{})
 	i, ok := raw.(*phpparser.MemberModifiersContext)
 	if !ok {
 		return ret
@@ -610,7 +610,7 @@ func (y *builder) VisitMemberModifiers(raw phpparser.IMemberModifiersContext) ma
 	return ret
 }
 
-func (y *builder) VisitMemberModifier(raw phpparser.IMemberModifierContext) ssa.ClassModifier {
+func (y *builder) VisitMemberModifier(raw phpparser.IMemberModifierContext) ssa.BlueprintModifier {
 	i, ok := raw.(*phpparser.MemberModifierContext)
 	if !ok {
 		return ssa.NoneModifier

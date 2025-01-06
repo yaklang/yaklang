@@ -43,14 +43,14 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.Blueprint, string) {
 	if y == nil || raw == nil || y.IsStop() {
 		log.Errorf("[BUG]: TypeRef is nil")
-		return y.CreateBluePrint(raw.GetText()), raw.GetText()
+		return y.CreateBlueprint(raw.GetText()), raw.GetText()
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TypeRefContext)
 	if i == nil {
-		return y.CreateBluePrint(raw.GetText()), raw.GetText()
+		return y.CreateBlueprint(raw.GetText()), raw.GetText()
 	}
 	if i.FlexiVariable() != nil {
 		//todo: flexivariable
@@ -79,7 +79,7 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.Blueprint, s
 		y.GetBluePrint(i.Static().GetText())
 	}
 	log.Warnf("[BUG]: fix it")
-	return y.CreateBluePrint(raw.GetText()), raw.GetText()
+	return y.CreateBlueprint(raw.GetText()), raw.GetText()
 }
 
 func (y *builder) VisitPrimitiveType(raw phpparser.IPrimitiveTypeContext) ssa.Type {
@@ -172,5 +172,5 @@ func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticType
 		}
 	}
 	log.Warnf("classBlue print not found: %s", raw.GetText())
-	return y.CreateBluePrint(yakunquote.TryUnquote(raw.GetText()))
+	return y.CreateBlueprint(yakunquote.TryUnquote(raw.GetText()))
 }

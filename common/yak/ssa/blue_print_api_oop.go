@@ -20,36 +20,46 @@ func (b *FunctionBuilder) GetBluePrint(name string) *Blueprint {
 	return p.GetBluePrint(name)
 }
 
-func (b *FunctionBuilder) SetClassBluePrint(name string, class *Blueprint) {
+func (b *FunctionBuilder) SetBlueprint(name string, class *Blueprint) {
 	p := b.prog
 	_, exit := p.Blueprint.Get(name)
 	if exit {
-		log.Errorf("SetClassBluePrint: this class redeclare")
+		log.Errorf("SetBlueprint: this class redeclare")
 	}
 	p.Blueprint.Set(name, class)
 }
 
-// CreateClassBluePrint will create object template (maybe class)
+// CreateBlueprintWithPkgName will create object template (maybe class)
 // in dynamic and classless language, we can create object without class
 // but because of the 'this/super', we will still keep the concept 'Class'
 // for ref the method/function, the blueprint is a container too,
 // saving the static variables and util methods.
-
-func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...CanStartStopToken) *Blueprint {
+func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...CanStartStopToken) *Blueprint {
+	if len(tokenizer) > 0 {
+		recoverRange := b.SetRange(tokenizer[0])
+		defer recoverRange()
+	}
 	prog := b.prog
-	blueprint := NewClassBluePrint(name)
+	blueprint := NewBlueprint(name)
 	if prog.Blueprint == nil {
 		prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
 	}
 	blueprint.GeneralUndefined = func(s string) *Undefined {
 		return b.EmitUndefined(s)
 	}
-	b.SetClassBluePrint(name, blueprint)
-	klassvar := b.CreateVariable(name, tokenizer...)
-	klassContainer := b.EmitEmptyContainer()
-	b.AssignVariable(klassvar, klassContainer)
-	if err := blueprint.InitializeWithContainer(klassContainer); err != nil {
-		log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
+	b.SetBlueprint(name, blueprint)
+	blueprintContainer := b.EmitEmptyContainer()
+	variableName := fmt.Sprintf("%s_declare", name)
+	blueprintContainer.SetName(variableName)
+
+	// search this blueprint-declare can use ${blueprint-name} or ${blueprint-name}_declare
+	var1 := b.CreateVariable(name, tokenizer...)
+	b.AssignVariable(var1, blueprintContainer)
+	var2 := b.CreateVariable(variableName, tokenizer...)
+	b.AssignVariable(var2, blueprintContainer)
+
+	if err := blueprint.InitializeWithContainer(blueprintContainer); err != nil {
+		log.Errorf("CreateBluePrintWithPkgName.InitializeWithContainer error: %s", err)
 	}
 
 	if prog.VirtualImport {
@@ -64,11 +74,11 @@ func (b *FunctionBuilder) CreateBluePrintWithPkgName(name string, tokenizer ...C
 	return blueprint
 }
 
-func (b *FunctionBuilder) CreateBluePrint(name string, tokenizer ...CanStartStopToken) *Blueprint {
-	return b.CreateBluePrintWithPkgName(name, tokenizer...)
+func (b *FunctionBuilder) CreateBlueprint(name string, tokenizer ...CanStartStopToken) *Blueprint {
+	return b.CreateBlueprintWithPkgName(name, tokenizer...)
 }
 
-func (b *FunctionBuilder) CreateBluePrintAndSetConstruct(typName string, libName ...string) *Blueprint {
+func (b *FunctionBuilder) CreateBlueprintAndSetConstruct(typName string, libName ...string) *Blueprint {
 	var name string
 	if len(libName) > 0 {
 		name = fmt.Sprintf("%s_%s", libName[0], typName)
@@ -80,7 +90,7 @@ func (b *FunctionBuilder) CreateBluePrintAndSetConstruct(typName string, libName
 		return bp
 	}
 
-	bp := b.CreateBluePrint(name)
+	bp := b.CreateBlueprint(name)
 	newFunction := b.NewFunc(typName)
 	newFunction.SetMethodName(typName)
 	newFunction.SetType(NewFunctionType(fmt.Sprintf("%s-__construct", typName), []Type{}, nil, true))

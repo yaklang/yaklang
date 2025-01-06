@@ -185,8 +185,11 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 	case *SideEffect:
 		return fmt.Sprintf("side-effect(%s, %s)", liner.DisasmValue(v.Value), v.GetVerboseName())
 	case *Make:
+		if v.name != "" {
+			return v.name
+		}
 		typ := v.GetType()
-		return fmt.Sprintf("make(%v)", typ.String())
+		return fmt.Sprintf("make(%v):%s", typ.String(), v.name)
 	case *Next:
 		return fmt.Sprintf("next(%s)", liner.DisasmValue(v.Iter))
 	case *TypeCast:

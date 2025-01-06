@@ -168,11 +168,11 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 		}
 }
 
-func (y *builder) VisitStaticModifier(raw javaparser.IStaticModifierContext) ssa.ClassModifier {
+func (y *builder) VisitStaticModifier(raw javaparser.IStaticModifierContext) ssa.BlueprintModifier {
 	return ssa.NoneModifier
 }
 
-func (y *builder) VisitStaticClassModifier(raw javaparser.IStaticClassModifierContext) ssa.ClassModifier {
+func (y *builder) VisitStaticClassModifier(raw javaparser.IStaticClassModifierContext) ssa.BlueprintModifier {
 	if y == nil || raw == nil || y.IsStop() {
 		return ssa.NoneModifier
 	}

@@ -1,9 +1,6 @@
 package java2ssa
 
 import (
-	"strings"
-
-	"github.com/yaklang/yaklang/common/utils"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -19,45 +16,33 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 		return y.EmitEmptyContainer()
 	}
 
-	ifaceName := i.Identifier().GetText()
-	interfaceClass := y.CreateBluePrint(ifaceName)
-	y.GetProgram().SetExportType(ifaceName, interfaceClass)
-	var callbacks []func(ssa.Value)
-	var inherits []string
+	name := i.Identifier().GetText()
+	bluePrint := y.CreateBlueprint(name)
+	y.GetProgram().SetExportType(name, bluePrint)
+	var extendNames []string
 	if i.EXTENDS() != nil {
-		extends := utils.PrettifyListFromStringSplited(i.TypeList(0).GetText(), ",")
-		if len(extends) > 0 {
-			inherits = append(inherits, extends...)
-			callbacks = append(callbacks, func(value ssa.Value) {
-				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("extends"))
-				y.AssignVariable(variable, y.EmitConstInst(strings.Join(extends, ",")))
-			})
-		}
-	}
-	if i.PERMITS() != nil {
-		permits := utils.PrettifyListFromStringSplited(i.TypeList(1).GetText(), ",")
-		if len(permits) > 0 {
-			inherits = append(inherits, permits...)
-			callbacks = append(callbacks, func(value ssa.Value) {
-				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("permits"))
-				y.AssignVariable(variable, y.EmitConstInst(strings.Join(permits, ",")))
-			})
+		for _, extend := range i.AllTypeList() {
+			extendNames = append(extendNames, extend.GetText())
 		}
 	}
 
-	if len(inherits) > 0 {
-		callbacks = append(callbacks, func(value ssa.Value) {
-			variable := y.CreateMemberCallVariable(value, y.EmitConstInst("inherits"))
-			y.AssignVariable(variable, y.EmitConstInst(strings.Join(inherits, ",")))
-		})
-	}
+	store := y.StoreFunctionBuilder()
+	bluePrint.AddLazyBuilder(func() {
+		switchHandler := y.SwitchFunctionBuilder(store)
+		defer switchHandler()
 
-	y.VisitInterfaceBody(i.InterfaceBody().(*javaparser.InterfaceBodyContext), interfaceClass)
-
-	container := interfaceClass.GetClassContainer()
-	for _, cb := range callbacks {
-		cb(container)
-	}
+		for _, extendName := range extendNames {
+			bp := y.GetBluePrint(extendName)
+			if bp == nil {
+				bp = y.CreateBlueprint(extendName)
+				y.AddFullTypeNameForAllImport(extendName, bp)
+			}
+			bluePrint.AddSuperBlueprint(bp)
+			bluePrint.AddParentBlueprint(bp)
+		}
+	})
+	y.VisitInterfaceBody(i.InterfaceBody().(*javaparser.InterfaceBodyContext), bluePrint)
+	container := bluePrint.Container()
 	return container
 }
 

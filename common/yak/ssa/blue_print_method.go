@@ -33,13 +33,13 @@ func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value
 	switch name {
 	case Constructor:
 		c.Constructor = val
-		c.storeInContainer(c.Name, val, BluePrintMagicMethod)
+		c.storeField(c.Name, val, BluePrintMagicMethod)
 		val.SetVerboseName(c.Name)
 		return
 	case Destructor:
 		c.Destructor = val
 	}
-	c.storeInContainer(val.GetName(), val, BluePrintMagicMethod)
+	c.storeField(val.GetName(), val, BluePrintMagicMethod)
 }
 
 func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
@@ -99,7 +99,7 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 // normal method
 func (c *Blueprint) RegisterNormalMethod(name string, val *Function, store ...bool) {
 	if len(store) == 0 || store[0] == true {
-		c.storeInContainer(name, val, BluePrintNormalMethod)
+		c.storeField(name, val, BluePrintNormalMethod)
 	}
 	if f, ok := ToFunction(val); ok {
 		f.SetMethod(true, c)
@@ -129,7 +129,7 @@ func (c *Blueprint) RegisterStaticMethod(name string, val *Function) {
 	if method := c.StaticMethod[name]; !utils.IsNil(method) {
 		Point(method, val)
 	} else {
-		c.storeInContainer(name, val, BluePrintStaticMember)
+		c.storeField(name, val, BluePrintStaticMember)
 		c.StaticMethod[name] = val
 	}
 }
