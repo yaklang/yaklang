@@ -29,15 +29,15 @@ type SyntaxFlowResult struct {
 
 	unName Values
 
-	riskMap map[string]*schema.Risk
+	riskMap map[string]*schema.SSARisk
 	// cache
-	riskGRPCCache []*ypb.Risk
+	riskGRPCCache []*ypb.SSARisk
 }
 
 func createEmptyResult() *SyntaxFlowResult {
 	return &SyntaxFlowResult{
 		symbol:  make(map[string]Values),
-		riskMap: make(map[string]*schema.Risk),
+		riskMap: make(map[string]*schema.SSARisk),
 	}
 }
 

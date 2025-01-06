@@ -2,7 +2,6 @@ package yakurl
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -229,7 +227,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 			if v == nil {
 				continue
 			}
-			codeRange, source := coverCodeRange(programName, v.GetRange())
+			codeRange, source := ssaapi.CoverCodeRange(programName, "", v.GetRange())
 			res := createNewRes(url, 0, []extra{
 				{"index", index},
 				{"code_range", codeRange},
@@ -331,61 +329,50 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 	return resources
 }
 
-type CodeRange struct {
-	URL            string `json:"url"`
-	StartLine      int64  `json:"start_line"`
-	StartColumn    int64  `json:"start_column"`
-	EndLine        int64  `json:"end_line"`
-	EndColumn      int64  `json:"end_column"`
-	SourceCodeLine int64  `json:"source_code_line"`
-}
-
-const CodeContextLine = 3
-
-func coverCodeRange(programName string, r memedit.RangeIf) (*CodeRange, string) {
-	// url := ""
-	source := ""
-	ret := &CodeRange{
-		URL:            "",
-		StartLine:      0,
-		StartColumn:    0,
-		EndLine:        0,
-		EndColumn:      0,
-		SourceCodeLine: 0,
-	}
-	if r == nil {
-		return ret, source
-	}
-	if editor := r.GetEditor(); editor != nil {
-		ret.URL = fmt.Sprintf("/%s/%s", programName, editor.GetFilename())
-		source = editor.GetTextFromRangeContext(r, CodeContextLine)
-	}
-	if start := r.GetStart(); start != nil {
-		ret.StartLine = int64(start.GetLine())
-		ret.StartColumn = int64(start.GetColumn())
-	}
-	if end := r.GetEnd(); end != nil {
-		ret.EndLine = int64(end.GetLine())
-		ret.EndColumn = int64(end.GetColumn())
-	}
-	if start := ret.StartLine - CodeContextLine - 1; start > 0 {
-		ret.SourceCodeLine = start
-	}
-	return ret, source
-}
+//func coverCodeRange(programName string, r memedit.RangeIf) (*ssaapi.CodeRange, string) {
+//	// url := ""
+//	source := ""
+//	ret := &ssaapi.CodeRange{
+//		URL:            "",
+//		StartLine:      0,
+//		StartColumn:    0,
+//		EndLine:        0,
+//		EndColumn:      0,
+//		SourceCodeLine: 0,
+//	}
+//	if r == nil {
+//		return ret, source
+//	}
+//	if editor := r.GetEditor(); editor != nil {
+//		ret.URL = fmt.Sprintf("/%s/%s", programName, editor.GetFilename())
+//		source = editor.GetTextFromRangeContext(r, ssaapi.CodeContextLine)
+//	}
+//	if start := r.GetStart(); start != nil {
+//		ret.StartLine = int64(start.GetLine())
+//		ret.StartColumn = int64(start.GetColumn())
+//	}
+//	if end := r.GetEnd(); end != nil {
+//		ret.EndLine = int64(end.GetLine())
+//		ret.EndColumn = int64(end.GetColumn())
+//	}
+//	if start := ret.StartLine - ssaapi.CodeContextLine - 1; start > 0 {
+//		ret.SourceCodeLine = start
+//	}
+//	return ret, source
+//}
 
 type NodeInfo struct {
-	NodeID          string     `json:"node_id"`
-	IRCode          string     `json:"ir_code"`
-	SourceCode      string     `json:"source_code"`
-	SourceCodeStart int        `json:"source_code_start"`
-	CodeRange       *CodeRange `json:"code_range"`
+	NodeID          string            `json:"node_id"`
+	IRCode          string            `json:"ir_code"`
+	SourceCode      string            `json:"source_code"`
+	SourceCodeStart int               `json:"source_code_start"`
+	CodeRange       *ssaapi.CodeRange `json:"code_range"`
 }
 
 func coverNodeInfos(graph *ssaapi.ValueGraph, programName string) []*NodeInfo {
 	res := make([]*NodeInfo, 0, len(graph.Node2Value))
 	for id, node := range graph.Node2Value {
-		codeRange, source := coverCodeRange(programName, node.GetRange())
+		codeRange, source := ssaapi.CoverCodeRange(programName, "", node.GetRange())
 		ret := &NodeInfo{
 			NodeID:     dot.NodeName(id),
 			IRCode:     node.String(),
