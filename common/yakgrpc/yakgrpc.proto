@@ -745,6 +745,10 @@ service Yak {
   rpc QuerySSAPrograms(QuerySSAProgramRequest)returns(QuerySSAProgramResponse);
   rpc UpdateSSAProgram(UpdateSSAProgramRequest)returns(DbOperateMessage);
   rpc DeleteSSAPrograms(DeleteSSAProgramRequest)returns(DbOperateMessage);
+  // SSA Risk CURD
+  rpc QuerySSARisks(QuerySSARisksRequest)returns(QuerySSARisksResponse);
+  rpc DeleteSSARisks(DeleteSSARisksRequest)returns(DbOperateMessage);
+  rpc UpdateSSARiskTags(UpdateSSARiskTagsRequest)returns(DbOperateMessage);
 
   rpc GetAllPluginEnv(Empty) returns (PluginEnvData);
   rpc QueryPluginEnv(QueryPluginEnvRequest) returns (PluginEnvData);
@@ -5944,6 +5948,74 @@ message FuzzTagSuggestionRequest{
   string InspectType = 3;
 }
 
+message SSARisk {
+  int64 Id = 1;
+  int64 CreatedAt = 2;
+  int64 UpdatedAt = 3;
+
+  string Hash = 4;
+
+  string ProgramName = 5;
+  string CodeSourceUrl = 6;
+  string CodeRange = 7;
+  string CodeFragment = 8;
+
+  string Title = 9;
+  string TitleVerbose = 10;
+  string RiskType = 11;
+  string RiskTypeVerbose = 12;
+  string Details = 13;
+  string Severity = 14;
+
+  string FromRule = 15;
+  string RuntimeID = 16;
+
+  bool IsPotential = 17;
+
+  string CVE = 18;
+  string CveAccessVector = 19;
+  string CveAccessComplexity = 20;
+  string Tags = 21;
+  uint64 ResultID = 22;
+}
+
+message SSARisksFilter {
+  repeated int64 ID = 1;
+
+  string Search = 2;
+  repeated string ProgramName = 3;
+  repeated string CodeSourceUrl = 4;
+  repeated string RiskType = 5;
+  repeated string Severity = 6;
+  repeated string FromRule = 7;
+  repeated string RuntimeID = 8;
+  repeated uint64 ResultID = 9;
+  repeated string Tags = 10;
+
+  int64 FromId = 11;
+  int64 UntilId = 12;
+}
+
+message QuerySSARisksRequest {
+  Paging Pagination = 1;
+  SSARisksFilter Filter = 2;
+}
+
+message QuerySSARisksResponse {
+  Paging Pagination = 1;
+  repeated SSARisk Data = 2;
+  int64 Total = 3;
+}
+
+message DeleteSSARisksRequest {
+  SSARisksFilter Filter = 1;
+}
+
+message UpdateSSARiskTagsRequest {
+  int64 ID = 1;
+  repeated string Tags = 2;
+}
+
 message ExportSyntaxFlowsRequest {
   repeated string GroupName = 1;
   string Password = 2;
@@ -5953,7 +6025,7 @@ message ImportSyntaxFlowsRequest {
   string InputPath = 1;
   string Password = 2;
 }
-  
+
 message SyntaxflowsProgress {
   // 进度  0-1.0
   double Progress = 1;

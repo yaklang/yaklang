@@ -424,6 +424,9 @@ const (
 	Yak_QuerySSAPrograms_FullMethodName                           = "/ypb.Yak/QuerySSAPrograms"
 	Yak_UpdateSSAProgram_FullMethodName                           = "/ypb.Yak/UpdateSSAProgram"
 	Yak_DeleteSSAPrograms_FullMethodName                          = "/ypb.Yak/DeleteSSAPrograms"
+	Yak_QuerySSARisks_FullMethodName                              = "/ypb.Yak/QuerySSARisks"
+	Yak_DeleteSSARisks_FullMethodName                             = "/ypb.Yak/DeleteSSARisks"
+	Yak_UpdateSSARiskTags_FullMethodName                          = "/ypb.Yak/UpdateSSARiskTags"
 	Yak_GetAllPluginEnv_FullMethodName                            = "/ypb.Yak/GetAllPluginEnv"
 	Yak_QueryPluginEnv_FullMethodName                             = "/ypb.Yak/QueryPluginEnv"
 	Yak_CreatePluginEnv_FullMethodName                            = "/ypb.Yak/CreatePluginEnv"
@@ -963,6 +966,10 @@ type YakClient interface {
 	QuerySSAPrograms(ctx context.Context, in *QuerySSAProgramRequest, opts ...grpc.CallOption) (*QuerySSAProgramResponse, error)
 	UpdateSSAProgram(ctx context.Context, in *UpdateSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteSSAPrograms(ctx context.Context, in *DeleteSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	// SSA Risk CURD
+	QuerySSARisks(ctx context.Context, in *QuerySSARisksRequest, opts ...grpc.CallOption) (*QuerySSARisksResponse, error)
+	DeleteSSARisks(ctx context.Context, in *DeleteSSARisksRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	UpdateSSARiskTags(ctx context.Context, in *UpdateSSARiskTagsRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error)
 	QueryPluginEnv(ctx context.Context, in *QueryPluginEnvRequest, opts ...grpc.CallOption) (*PluginEnvData, error)
 	CreatePluginEnv(ctx context.Context, in *PluginEnvData, opts ...grpc.CallOption) (*Empty, error)
@@ -6227,6 +6234,33 @@ func (c *yakClient) DeleteSSAPrograms(ctx context.Context, in *DeleteSSAProgramR
 	return out, nil
 }
 
+func (c *yakClient) QuerySSARisks(ctx context.Context, in *QuerySSARisksRequest, opts ...grpc.CallOption) (*QuerySSARisksResponse, error) {
+	out := new(QuerySSARisksResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySSARisks_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteSSARisks(ctx context.Context, in *DeleteSSARisksRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteSSARisks_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateSSARiskTags(ctx context.Context, in *UpdateSSARiskTagsRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_UpdateSSARiskTags_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error) {
 	out := new(PluginEnvData)
 	err := c.cc.Invoke(ctx, Yak_GetAllPluginEnv_FullMethodName, in, out, opts...)
@@ -6882,6 +6916,10 @@ type YakServer interface {
 	QuerySSAPrograms(context.Context, *QuerySSAProgramRequest) (*QuerySSAProgramResponse, error)
 	UpdateSSAProgram(context.Context, *UpdateSSAProgramRequest) (*DbOperateMessage, error)
 	DeleteSSAPrograms(context.Context, *DeleteSSAProgramRequest) (*DbOperateMessage, error)
+	// SSA Risk CURD
+	QuerySSARisks(context.Context, *QuerySSARisksRequest) (*QuerySSARisksResponse, error)
+	DeleteSSARisks(context.Context, *DeleteSSARisksRequest) (*DbOperateMessage, error)
+	UpdateSSARiskTags(context.Context, *UpdateSSARiskTagsRequest) (*DbOperateMessage, error)
 	GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error)
 	QueryPluginEnv(context.Context, *QueryPluginEnvRequest) (*PluginEnvData, error)
 	CreatePluginEnv(context.Context, *PluginEnvData) (*Empty, error)
@@ -8113,6 +8151,15 @@ func (UnimplementedYakServer) UpdateSSAProgram(context.Context, *UpdateSSAProgra
 }
 func (UnimplementedYakServer) DeleteSSAPrograms(context.Context, *DeleteSSAProgramRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSSAPrograms not implemented")
+}
+func (UnimplementedYakServer) QuerySSARisks(context.Context, *QuerySSARisksRequest) (*QuerySSARisksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySSARisks not implemented")
+}
+func (UnimplementedYakServer) DeleteSSARisks(context.Context, *DeleteSSARisksRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSSARisks not implemented")
+}
+func (UnimplementedYakServer) UpdateSSARiskTags(context.Context, *UpdateSSARiskTagsRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSSARiskTags not implemented")
 }
 func (UnimplementedYakServer) GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllPluginEnv not implemented")
@@ -15709,6 +15756,60 @@ func _Yak_DeleteSSAPrograms_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QuerySSARisks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySSARisksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySSARisks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySSARisks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySSARisks(ctx, req.(*QuerySSARisksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteSSARisks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSSARisksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteSSARisks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteSSARisks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteSSARisks(ctx, req.(*DeleteSSARisksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateSSARiskTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSSARiskTagsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateSSARiskTags(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateSSARiskTags_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateSSARiskTags(ctx, req.(*UpdateSSARiskTagsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetAllPluginEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -17223,6 +17324,18 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteSSAPrograms",
 			Handler:    _Yak_DeleteSSAPrograms_Handler,
+		},
+		{
+			MethodName: "QuerySSARisks",
+			Handler:    _Yak_QuerySSARisks_Handler,
+		},
+		{
+			MethodName: "DeleteSSARisks",
+			Handler:    _Yak_DeleteSSARisks_Handler,
+		},
+		{
+			MethodName: "UpdateSSARiskTags",
+			Handler:    _Yak_UpdateSSARiskTags_Handler,
 		},
 		{
 			MethodName: "GetAllPluginEnv",
