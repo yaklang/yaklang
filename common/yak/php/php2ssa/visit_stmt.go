@@ -116,8 +116,8 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	nameSpacePath := y.VisitNamespacePath(i.NamespacePath())
 	namespaceName := strings.Join(nameSpacePath, ".")
 	switchToNamespace := func() (*ssa.Program, func()) {
-		library, ok := prog.GetLibrary(namespaceName)
-		if library == nil || !ok {
+		library, _ := prog.GetLibrary(namespaceName)
+		if library == nil {
 			library = prog.NewLibrary(namespaceName, []string{prog.Loader.GetBasePath()})
 		}
 		library.VisitAst(raw)
