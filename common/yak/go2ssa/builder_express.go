@@ -200,8 +200,13 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 					leftv = b.CreateMemberCallVariable(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {
-						rv = b.ReadMemberCallValue(rv, b.EmitConstInst(n))
-						handleObjectType(rv, a)
+						rv = b.ReadMemberCallValueByName(rv, n)
+						if rv == nil {
+							b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
+						}
+						if key := a.GetKeybyName(test); key != nil {
+							handleObjectType(rv, a)
+						}
 					}
 				}
 			}
@@ -244,8 +249,23 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 					rightv = b.ReadMemberCallValue(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {
-						rv = b.ReadMemberCallValue(rv, b.EmitConstInst(n))
-						handleObjectType(rv, a)
+						if test == n {
+							rightv = b.ReadMemberCallValueByName(rv, n)
+							if rightv == nil {
+								b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
+							}
+							break
+						} else {
+							if key := a.GetKeybyName(test); key != nil {
+								rv = b.ReadMemberCallValueByName(rv, n)
+								if rightv == nil {
+									b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
+								}
+							} else {
+								// rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(n))
+							}
+							handleObjectType(rv, a)
+						}
 					}
 				}
 			}

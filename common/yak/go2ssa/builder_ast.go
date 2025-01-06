@@ -115,44 +115,43 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			if o, ok := s.(*ssa.ObjectType); ok {
 				for pn, _ := range o.AnonymousField {
 					pbp := b.GetBluePrint(pn)
-					if pbp != nil {
+					if pbp == nil {
 						b.NewError(ssa.Warn, TAG, StructNotFind(n))
 						pbp = b.CreateBluePrint(pn)
 					}
-					bp.ParentBlueprints = append(bp.ParentBlueprints, pbp)
+					bp.AddParentBlueprint(pbp)
 				}
 			}
 
 			if i, ok := s.(*ssa.InterfaceType); ok {
-				if fun, ok := ssa.ToFunction(bp.Constructor); ok {
-					store := b.StoreFunctionBuilder()
-					fun.AddLazyBuilder(func() {
-						switchHandler := b.SwitchFunctionBuilder(store)
-						defer func() {
-							switchHandler()
-						}()
-						for funcName, _ := range i.GetMethod() {
-							for typeName, t := range b.GetStructAll() {
-								if t.GetTypeKind() == ssa.InterfaceTypeKind {
+				store := b.StoreFunctionBuilder()
+				fun, _ := ssa.ToFunction(bp.Constructor)
+				fun.AddLazyBuilder(func() {
+					switchHandler := b.SwitchFunctionBuilder(store)
+					defer func() {
+						switchHandler()
+					}()
+					for funcName, _ := range i.GetMethod() {
+						for typeName, t := range b.GetStructAll() {
+							if t.GetTypeKind() == ssa.InterfaceTypeKind {
+								continue
+							}
+							if _, ok := t.GetMethod()[funcName]; ok {
+								childBp := b.GetBluePrint(typeName)
+								if childBp == nil {
+									b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
 									continue
 								}
-								if _, ok := t.GetMethod()[funcName]; ok {
-									childBp := b.GetBluePrint(typeName)
-									if childBp == nil {
-										b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
-										continue
-									}
-									parentBp := b.GetBluePrint(n)
-									if parentBp == nil {
-										b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
-										continue
-									}
-									parentBp.AddSuperBlueprint(childBp)
+								parentBp := b.GetBluePrint(n)
+								if parentBp == nil {
+									b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
+									continue
 								}
+								parentBp.AddSuperBlueprint(childBp)
 							}
 						}
-					}, false)
-				}
+					}
+				}, false)
 			}
 		}
 
