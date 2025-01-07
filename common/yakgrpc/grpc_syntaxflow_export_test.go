@@ -116,7 +116,9 @@ func TestGRPCMUSTPASS_Syntaxflow_Export_And_Import(t *testing.T) {
 		exportAndImportTest(t, &ypb.ImportSyntaxFlowsRequest{
 			InputPath: p,
 		}, &ypb.ExportSyntaxFlowsRequest{
-			GroupName:  groupNames,
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				GroupNames: groupNames,
+			},
 			TargetPath: p,
 		})
 	})
@@ -128,7 +130,9 @@ func TestGRPCMUSTPASS_Syntaxflow_Export_And_Import(t *testing.T) {
 			InputPath: p,
 			Password:  password,
 		}, &ypb.ExportSyntaxFlowsRequest{
-			GroupName:  groupNames,
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				GroupNames: groupNames,
+			},
 			TargetPath: p,
 			Password:   password,
 		})

@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -8,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*bizhelper.Paginator, []*schema.SyntaxFlowRule, error) {
@@ -44,7 +45,7 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 		return db
 	}
 
-	db.Model(&schema.SyntaxFlowRule{})
+	db = db.Model(&schema.SyntaxFlowRule{})
 
 	if len(params.GetGroupNames()) > 0 {
 		db = db.Joins("JOIN syntax_flow_rule_and_group ON syntax_flow_rule_and_group.syntax_flow_rule_id = syntax_flow_rules.id").
