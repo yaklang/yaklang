@@ -578,7 +578,7 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Bluep
 	var value ssa.Value
 	var className string
 	if full := i.FullyQualifiedNamespaceExpr(); full != nil {
-		value = y.VisitFullyQualifiedNamespaceExpr(full)
+		value = y.VisitFullyQualifiedNamespaceExpr(full, true)
 	} else if variable := i.Variable(); variable != nil {
 		name := y.VisitVariable(variable)
 		value = y.ReadValue(name)
@@ -594,6 +594,13 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Bluep
 			if parentClass != nil {
 				return parentClass
 			}
+		} else {
+			blueprint := y.GetBluePrint(className)
+			if blueprint != nil {
+				return blueprint
+			}
+			blueprint = y.CreateBlueprint(className)
+			return blueprint
 		}
 	} else {
 		return nil
@@ -673,7 +680,9 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 				} else if member := bluePrint.GetConstMember(key); !utils.IsNil(member) {
 					return member
 				}
-				return y.EmitUndefined(raw.GetText())
+				undefined := y.EmitUndefined(key)
+				bluePrint.RegisterStaticMember(key, undefined)
+				return undefined
 			}
 		}
 		if i.StaticClassExprVariableMember() != nil {
@@ -804,7 +813,7 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 	return y.EmitUndefined(raw.GetText())
 }
 
-func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualifiedNamespaceExprContext) ssa.Value {
+func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualifiedNamespaceExprContext, blueprint bool) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -822,19 +831,30 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 	//获取最后一个identifier
 	identifier := y.VisitIdentifier(i.Identifier(len(i.AllIdentifier()) - 1))
 	program := y.GetProgram()
-	library, b := program.GetLibrary(strings.Join(pkgPath, "."))
-	if b {
-		if function, ok := library.Funcs.Get(identifier); ok && !utils.IsNil(function) {
-			return function
-		} else if cls := library.GetBluePrint(identifier); !utils.IsNil(cls) {
-			inst := y.EmitConstInst("")
-			inst.SetType(cls)
-			return inst
+	library, err := program.GetOrCreateLibrary(strings.Join(pkgPath, "."))
+	if err != nil {
+		log.Errorf("create library fail: %s", err)
+	} else if library != nil {
+		if !blueprint {
+			if value, ok := library.ExportValue[identifier]; ok {
+				return value
+			}
 		} else {
-			return y.EmitUndefined(raw.GetText())
+			if t, ok := library.ExportType[identifier]; ok {
+				undefined := y.EmitUndefined(identifier)
+				undefined.SetType(t)
+				return undefined
+			}
 		}
 	}
-	return y.EmitUndefined(raw.GetText())
+	undefined := y.EmitUndefined(identifier)
+	if blueprint {
+		bluePrint := y.CreateBlueprint(identifier)
+		bluePrint.SetFullTypeNames(pkgPath)
+		return undefined
+	} else {
+		return undefined
+	}
 }
 
 func (y *builder) ResolveValue(name string) ssa.Value {

@@ -93,7 +93,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
 	case *phpparser.FullyQualifiedNamespaceExpressionContext:
-		return y.VisitFullyQualifiedNamespaceExpr(ret.FullyQualifiedNamespaceExpr())
+		return y.VisitFullyQualifiedNamespaceExpr(ret.FullyQualifiedNamespaceExpr(), false)
 	case *phpparser.IndexCallExpressionContext: // $a[1]
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
@@ -119,9 +119,9 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 			if tmpValue := y.GetFunc(target.GetName(), ""); tmpValue != nil {
 				target = tmpValue
 			}
-			if undefind, ok := ssa.ToUndefined(target); ok && !target.IsObject() {
-				target = y.ReadValue(undefind.GetName())
-			}
+			//if undefind, ok := ssa.ToUndefined(target); ok && !target.IsObject() {
+			//	target = y.ReadValue(undefind.GetName())
+			//}
 		}
 		args, ellipsis := y.VisitArguments(ret.Arguments())
 		callInst := y.NewCall(target, args)
