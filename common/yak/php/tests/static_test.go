@@ -31,3 +31,15 @@ class A{
 `
 	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
 }
+func TestStatic2(t *testing.T) {
+	code := `<?php
+class A{
+	public function test(){
+		Request::post();
+	}
+}
+`
+	ssatest.CheckSyntaxFlow(t, code, `.post() as $sink`, map[string][]string{
+		"sink": {"Undefined-Request.post()"},
+	}, ssaapi.WithLanguage(ssaapi.PHP))
+}
