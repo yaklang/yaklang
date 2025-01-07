@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"strings"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -48,7 +48,9 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 		if src == nil {
 			return fmt.Errorf("origin source code (MemEditor) is nil")
 		}
-		src.SetUrl(filePath)
+		if src.GetFilename() == "" {
+			src.SetUrl(filePath)
+		}
 		// backup old editor (source code)
 		originEditor := fb.GetEditor()
 		// TODO: check prog.FileList avoid duplicate file save to sourceDB,

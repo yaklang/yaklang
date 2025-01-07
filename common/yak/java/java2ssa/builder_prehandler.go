@@ -54,8 +54,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 			log.Warnf("read pom.xml error: %v", err)
 			return nil
 		}
-		editor := memedit.NewMemEditor(string(raw))
-		editor.SetUrl(path)
+		editor := memedit.NewMemEditorWithFileUrl(string(raw), path)
 		fb.SetEditor(editor)
 		vfs := filesys.NewVirtualFs()
 		vfs.AddFile(filename, string(raw))
