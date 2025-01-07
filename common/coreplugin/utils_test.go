@@ -64,13 +64,14 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 		// mock DNSLog server
 		var mockMutex sync.Mutex
 		mockDomainToTokenMap := make(map[string]string, 0)
+		mockTokenToResultMapLock := sync.Mutex{}
 		mockTokenToResultMap := make(map[string]*tpb.DNSLogEvent, 0)
 
 		Mock(yakit.NewDNSLogDomain).To(func() (domain string, token string, _ error) {
 			mockToken := utils.RandStringBytes(16)
 			host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
-				mockMutex.Lock()
-				defer mockMutex.Unlock()
+				mockTokenToResultMapLock.Lock()
+				defer mockTokenToResultMapLock.Unlock()
 				mockTokenToResultMap[mockToken] = &tpb.DNSLogEvent{Domain: ""}
 				return []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
 			})
@@ -83,13 +84,16 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 			return mockDomain, mockToken, nil
 		}).Build()
 		Mock(yakit.CheckDNSLogByToken).When(func(token string, yakitInfo yakit.YakitPluginInfo, timeout ...float64) bool {
+			mockTokenToResultMapLock.Lock()
 			_, ok := mockTokenToResultMap[token]
+			mockTokenToResultMapLock.Unlock()
 			return ok
 		}).To(func(token string, yakitInfo yakit.YakitPluginInfo, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+			mockTokenToResultMapLock.Lock()
 			events, ok := mockTokenToResultMap[token]
+			mockTokenToResultMapLock.Unlock()
 			if !ok {
 				return nil, nil
-
 			} else {
 				return []*tpb.DNSLogEvent{events}, nil
 			}
