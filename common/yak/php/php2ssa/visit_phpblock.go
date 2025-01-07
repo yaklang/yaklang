@@ -15,40 +15,39 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	if i == nil {
 		return nil
 	}
-
-	//==================================================================== visitor
-	if y.PreHandler() && len(i.AllNamespaceDeclaration()) == 0 {
-		return nil
-	}
-	if !y.PreHandler() {
-		//todo: fix function lz builder
-		for _, context := range i.AllNamespaceDeclaration() {
-			y.VisitNamespaceOnlyUse(context)
+	if y.IncludeStack.Len() <= 0 {
+		if !y.PreHandler() {
+			for _, context := range i.AllNamespaceDeclaration() {
+				y.VisitNamespaceOnlyUse(context)
+			}
+		}
+		for _, namespace := range i.AllNamespaceDeclaration() {
+			y.VisitNamespaceDeclaration(namespace)
 		}
 	}
-
-	//syntax use for lib
-	for _, namespace := range i.AllNamespaceDeclaration() {
-		y.VisitNamespaceDeclaration(namespace)
+	if len(i.AllNamespaceDeclaration()) <= 0 {
+		y.GetProgram().VisitAst(raw)
 	}
-	for _, usedecl := range i.AllUseDeclaration() {
-		y.VisitUseDeclaration(usedecl)
+	if y.PreHandler() {
+		for _, functiondecl := range i.AllFunctionDeclaration() {
+			y.VisitFunctionDeclaration(functiondecl)
+		}
+		for _, classdecl := range i.AllClassDeclaration() {
+			y.VisitClassDeclaration(classdecl)
+		}
+	} else {
+		for _, usedecl := range i.AllUseDeclaration() {
+			y.VisitUseDeclaration(usedecl)
+		}
+		for _, global := range i.AllGlobalConstantDeclaration() {
+			y.VisitGlobalConstantDeclaration(global)
+		}
+		for _, stmt := range i.AllStatement() {
+			y.VisitStatement(stmt)
+		}
+		for _, enum := range i.AllEnumDeclaration() {
+			y.VisitEnumDeclaration(enum)
+		}
 	}
-	for _, global := range i.AllGlobalConstantDeclaration() {
-		y.VisitGlobalConstantDeclaration(global)
-	}
-	for _, functiondecl := range i.AllFunctionDeclaration() {
-		y.VisitFunctionDeclaration(functiondecl)
-	}
-	for _, classdecl := range i.AllClassDeclaration() {
-		y.VisitClassDeclaration(classdecl)
-	}
-	for _, stmt := range i.AllStatement() {
-		y.VisitStatement(stmt)
-	}
-	for _, enum := range i.AllEnumDeclaration() {
-		y.VisitEnumDeclaration(enum)
-	}
-
 	return nil
 }

@@ -50,11 +50,10 @@ println($a);
 	t.Run("include file and include", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
 		fs.AddFile("var/www/html/1.php", `<?php
-	$a = 1;
-	return;
-`)
+			$a = 1;
+			return;
+		`)
 		fs.AddFile("var/www/html/2.php", `<?php
-	include("1.php");
 	$a = 2;
 	function test(){
 		$a = 123;

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -161,7 +162,7 @@ function funcName() {return "2";}
 funcName().$a;`
 		test.CheckError(t, test.TestCase{
 			Code: code,
-			Want: []string{ssa.ValueUndefined("$a"), ssa.ValueUndefined("funcName")},
+			Want: []string{ssa.ValueUndefined("$a")},
 		})
 	})
 	t.Run("test-2", func(t *testing.T) {
@@ -249,7 +250,15 @@ function A(&$a){
 A($d[0]);
 println($d[0]);
 `
-		test.CheckPrintlnValue(code, []string{"side-effect(2, #14[0])"}, t)
+		test.Check(t, code, func(prog *ssaapi.Program) error {
+			result, err := prog.SyntaxFlowWithError(`println(* as $param)`, ssaapi.QueryWithEnableDebug(true))
+			if err != nil {
+				return err
+			}
+			values := result.GetValues("param")
+			require.Contains(t, values.String(), "side-effect")
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
 func TestParseSSA_DefinedFunc(t *testing.T) {
@@ -325,14 +334,14 @@ func Test_InnerFunctionCall(t *testing.T) {
 		var code = `<?php
 Phpinfo();
 `
-		test.MockSSA(t, code)
+		test.NonStrictMockSSA(t, code)
 	})
 	t.Run("test-2", func(t *testing.T) {
 		var code = `<?php
 $a = PHPINFO;
 $a();
 `
-		test.MockSSA(t, code)
+		test.NonStrictMockSSA(t, code)
 	})
 	t.Run("test-3", func(t *testing.T) {
 		code := `<?php

@@ -115,14 +115,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 			y.isFunction = tmp
 		}()
 		target := y.VisitExpression(ret.Expression())
-		if !strings.HasPrefix(strings.ToLower(target.GetName()), "anonymousfunc") && !target.IsExtern() {
-			if tmpValue := y.GetFunc(target.GetName(), ""); tmpValue != nil {
-				target = tmpValue
-			}
-			//if undefind, ok := ssa.ToUndefined(target); ok && !target.IsObject() {
-			//	target = y.ReadValue(undefind.GetName())
-			//}
-		}
 		args, ellipsis := y.VisitArguments(ret.Arguments())
 		callInst := y.NewCall(target, args)
 		if ellipsis {
@@ -447,22 +439,22 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		} else {
 			unquote = _unquote
 		}
-		// 先在常量表中查询
+		valName := y.VisitIdentifier(ret.Identifier())
 		if !y.isFunction {
 			if s, ok := y.ReadConst(unquote); ok {
 				return s
 			}
-			log.Warnf("const map not found %v", unquote)
-		}
-		_value := y.VisitIdentifier(ret.Identifier())
-		if _, exit := y.GetProgram().ExternInstance[strings.ToLower(y.VisitIdentifier(ret.Identifier()))]; exit {
-			_value = strings.ToLower(_value)
-			return y.ReadValue(_value)
 		} else {
-			val := y.EmitUndefined(y.VisitIdentifier(ret.Identifier()))
-			y.AssignVariable(y.CreateVariable(y.VisitIdentifier(ret.Identifier())), val)
-			return val
+			if value := y.PeekValue(valName); !utils.IsNil(value) {
+				return value
+			}
+			if funcx := y.GetFunc(valName, ""); !utils.IsNil(funcx) {
+				return funcx
+			}
 		}
+		undefined := y.EmitUndefined(valName)
+		y.AssignVariable(y.CreateVariable(valName), undefined)
+		return undefined
 
 	case *phpparser.StaticClassAccessExpressionContext:
 		if expr := y.VisitStaticClassExpr(ret.StaticClassExpr()); utils.IsNil(expr) {
