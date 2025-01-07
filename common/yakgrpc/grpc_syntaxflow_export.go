@@ -7,32 +7,31 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) ExportSyntaxFlows(req *ypb.ExportSyntaxFlowsRequest, stream ypb.Yak_ExportSyntaxFlowsServer) error {
 	db := consts.GetGormProfileDatabase()
-	groupDB := db.Model(&schema.SyntaxFlowGroup{}).Preload("Rules")
-	groupDB = bizhelper.ExactQueryStringArrayOr(groupDB, "group_name", req.GetGroupName())
-	var groups []*schema.SyntaxFlowGroup
-	if groupDB := groupDB.Find(&groups); groupDB.Error != nil {
-		return utils.Wrap(groupDB.Error, "get syntax flow rule group failed")
+	ruleDB := yakit.FilterSyntaxFlowRule(db, req.GetFilter())
+	ruleGroupDB := ruleDB.Select(`"syntax_flow_rules".id, "syntax_flow_rules".rule_name`).Preload("Groups")
+	var rules []*schema.SyntaxFlowRule
+	if ruleDB := ruleGroupDB.Find(&rules); ruleDB.Error != nil {
+		return utils.Wrap(ruleDB.Error, "get syntax flow group failed")
 	}
-	totalRuleNames := make([]string, 0, len(groups))
-
+	totalGroupNames := make([]string, 0, len(rules))
 	metadata := make(bizhelper.MetaData)
-	metadata["group"] = lo.Map(groups, func(item *schema.SyntaxFlowGroup, index int) map[string]any {
-		ruleNames := lo.Map(item.Rules, func(item *schema.SyntaxFlowRule, index int) string {
-			return item.RuleName
+	metadata["relationship"] = lo.Map(rules, func(item *schema.SyntaxFlowRule, index int) map[string]any {
+		groupNames := lo.Map(item.Groups, func(item *schema.SyntaxFlowGroup, index int) string {
+			return item.GroupName
 		})
-		totalRuleNames = append(totalRuleNames, ruleNames...)
+		totalGroupNames = append(totalGroupNames, groupNames...)
 		return map[string]any{
-			"group_name": item.GroupName,
-			"rule_names": ruleNames,
+			"rule_name":   item.RuleName,
+			"group_names": groupNames,
 		}
 	})
 
-	ruleDB := bizhelper.ExactQueryStringArrayOr(db.Model(&schema.SyntaxFlowRule{}), "rule_name", totalRuleNames)
 	ruleCount, handled := 0, 0
 	progress := 0.0
 	if ruleDB := ruleDB.Count(&ruleCount); ruleDB.Error != nil {
@@ -96,7 +95,7 @@ func (s *Server) ImportSyntaxFlows(req *ypb.ImportSyntaxFlowsRequest, stream ypb
 	}
 
 	// recover groups
-	iGroups, ok := metadata["group"]
+	iGroups, ok := metadata["relationship"]
 	if !ok {
 		return utils.Error("metadata: invalid metadata")
 	}
@@ -109,17 +108,18 @@ func (s *Server) ImportSyntaxFlows(req *ypb.ImportSyntaxFlowsRequest, stream ypb
 		if !ok {
 			return utils.Error("metadata: invalid metadata item")
 		}
-		groupName, ok := item["group_name"].(string)
+		ruleName, ok := item["rule_name"].(string)
 		if !ok {
-			return utils.Error("metadata: group_name invalid")
+			return utils.Error("metadata: rule_name invalid")
 		}
-		iRuleNames, ok := item["rule_names"].([]any)
+		iGroupNames, ok := item["group_names"].([]any)
 		if !ok {
-			return utils.Error("metadata: rule_names invalid")
+			return utils.Error("metadata: group_names invalid")
 		}
-		if len(iRuleNames) > 0 {
-			ruleNames := lo.Map(iRuleNames, func(item any, index int) string { return utils.InterfaceToString(item) })
-			_, err := sfdb.BatchAddGroupsForRules(db, ruleNames, []string{groupName})
+		if len(iGroupNames) > 0 {
+			groupNames := lo.Map(iGroupNames, func(item any, index int) string { return utils.InterfaceToString(item) })
+
+			_, err := sfdb.BatchAddGroupsForRules(db, []string{ruleName}, groupNames)
 			if err != nil {
 				return utils.Wrap(err, "batch add groups for rules failed")
 			}
