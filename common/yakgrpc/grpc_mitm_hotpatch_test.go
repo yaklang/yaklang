@@ -209,6 +209,7 @@ hijackHTTPResponse = func(isHttps, url, rsp, forward, drop) {
 }
 
 afterRequest = func(ishttps,oreq,req,orsp,rsp){
+
 	if !oreq.Contains("` + originReqToken + `") { // check oreq correct
 		println("oreq error")
 		return rsp

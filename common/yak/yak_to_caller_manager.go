@@ -46,10 +46,8 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-const HOOK_CLAER = "clear"
-
 type YakFunctionCaller struct {
-	Handler func(callback func(*yakvm.Frame), args ...interface{})
+	Handler func(callback func(*yakvm.Frame), args ...any) any
 }
 
 func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
@@ -181,10 +179,110 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 	// })
 }
 
-func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPluginContext, script *schema.YakScript, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
+type callArgumentHookFunc func(name string, numIn int, args []any) []any
+
+func DefaultBeforeRequestCallArgumentHook(name string, numIn int, args []any) []any {
+	// fallback
+	if len(args) < 3 {
+		return args
+	}
+	if numIn == 3 {
+		// isHttps, originReq, req
+		// full version, return
+		return args
+	} else if numIn == 1 {
+		// req
+		// short version
+		args = []any{args[2]}
+	}
+	return args
+}
+
+func DefaultAfterRequestCallArgumentHook(name string, numIn int, args []any) []any {
+	// fallback
+	if len(args) < 5 {
+		return args
+	}
+	if numIn == 5 {
+		// isHttps, originReq, req, originRsp, rsp
+		// full version, return
+		return args
+	} else if numIn == 1 {
+		// rsp
+		// short version
+		args = []any{args[4]}
+	}
+	return args
+}
+
+type fetchFuncFromSrcCodeConfig struct {
+	script            *schema.YakScript
+	code              string
+	engineHook        func(e *antlr4yak.Engine) error
+	callArgumentHooks map[string]callArgumentHookFunc
+	functionNames     []string
+}
+type fetchFuncFromSrcCodeOptions func(*fetchFuncFromSrcCodeConfig)
+
+func NewFetchFuncFromSrcCodeConfig() *fetchFuncFromSrcCodeConfig {
+	return &fetchFuncFromSrcCodeConfig{}
+}
+
+func NewYakitFetchFuncFromSrcCodeConfig() *fetchFuncFromSrcCodeConfig {
+	cfg := NewFetchFuncFromSrcCodeConfig()
+	cfg.callArgumentHooks = make(map[string]callArgumentHookFunc)
+	cfg.callArgumentHooks[HOOK_BeforeRequest] = DefaultBeforeRequestCallArgumentHook
+	cfg.callArgumentHooks[HOOK_AfterRequest] = DefaultAfterRequestCallArgumentHook
+	return cfg
+}
+
+func WithFetchScript(script *schema.YakScript) fetchFuncFromSrcCodeOptions {
+	return func(c *fetchFuncFromSrcCodeConfig) {
+		c.script = script
+	}
+}
+
+func WithFetchCode(code string) fetchFuncFromSrcCodeOptions {
+	return func(c *fetchFuncFromSrcCodeConfig) {
+		c.code = code
+	}
+}
+
+func WithFetchEngineHook(hook func(e *antlr4yak.Engine) error) fetchFuncFromSrcCodeOptions {
+	return func(c *fetchFuncFromSrcCodeConfig) {
+		c.engineHook = hook
+	}
+}
+
+func WithFetchCallArgumentHook(name string, hook callArgumentHookFunc) fetchFuncFromSrcCodeOptions {
+	return func(c *fetchFuncFromSrcCodeConfig) {
+		if c.callArgumentHooks == nil {
+			c.callArgumentHooks = make(map[string]callArgumentHookFunc)
+		}
+		c.callArgumentHooks[name] = hook
+	}
+}
+
+func WithFetchFunctionNames(names ...string) fetchFuncFromSrcCodeOptions {
+	return func(c *fetchFuncFromSrcCodeConfig) {
+		c.functionNames = names
+	}
+}
+
+func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPluginContext, opts ...fetchFuncFromSrcCodeOptions) (map[string]*YakFunctionCaller, error) {
+	cfg := NewYakitFetchFuncFromSrcCodeConfig()
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	engineHook := cfg.engineHook
+	callArgumentHooks := cfg.callArgumentHooks
+	script := cfg.script
+	code := cfg.code
+	functionNames := cfg.functionNames
+
 	fTable := map[string]*YakFunctionCaller{}
 	engine := NewScriptEngine(1) // 因为需要在 hook 里传回执行引擎, 所以这里不能并发
-	engine.RegisterEngineHooks(hook)
+	engine.RegisterEngineHooks(engineHook)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		if script != nil {
 			pluginContext.PluginName = script.ScriptName
@@ -227,13 +325,19 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 			continue
 		}
 
+		numIn := f.GetNumIn()
+
 		nIns := ins
 		fTable[funcName] = &YakFunctionCaller{
-			Handler: func(callback func(*yakvm.Frame), args ...interface{}) {
+			Handler: func(callback func(*yakvm.Frame), args ...any) any {
 				subCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.callTimeout)
 				defer cancel()
+				if callArgHook, ok := callArgumentHooks[funcName]; ok {
+					args = callArgHook(funcName, numIn, args)
+				}
 
-				done := make(chan error, 1)
+				errCh := make(chan error)
+				valueCh := make(chan any)
 				go func() {
 					defer func() {
 						if err := recover(); err != nil {
@@ -244,21 +348,27 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 								utils.PrintCurrentGoroutineRuntimeStack()
 							}
 						}
-						close(done)
+						close(errCh)
 					}()
-					_, err = nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
-					done <- err
+					value, err := nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
+					if err != nil {
+						errCh <- err
+					} else {
+						valueCh <- value
+					}
 				}()
 
 				select {
-				case err := <-done:
+				case value := <-valueCh:
+					return value
+				case err := <-errCh:
 					if err != nil && !errors.Is(err, context.Canceled) {
 						log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
 					}
 				case <-subCtx.Done():
 					log.Errorf("call %s YakFunction timeout after %v seconds", scriptName, y.callTimeout)
-					return
 				}
+				return nil
 			},
 		}
 
@@ -505,15 +615,19 @@ func (y *YakToCallerManager) Set(ctx context.Context, code string, paramMap map[
 	}
 	app := GetHookCliApp(args)
 	var engine *antlr4yak.Engine
-	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx).WithCliApp(app), nil, code, func(e *antlr4yak.Engine) error {
-		if engine == nil {
-			engine = e
-		}
-		if hook != nil {
-			return hook(e)
-		}
-		return nil
-	}, funcName...)
+	cTable, err := y.fetchFunctionFromSourceCode(
+		y.getYakitPluginContext(ctx).WithCliApp(app),
+		WithFetchCode(code),
+		WithFetchEngineHook(func(e *antlr4yak.Engine) error {
+			if engine == nil {
+				engine = e
+			}
+			if hook != nil {
+				return hook(e)
+			}
+			return nil
+		}),
+		WithFetchFunctionNames(funcName...))
 	if err != nil {
 		return err
 	}
@@ -637,6 +751,7 @@ func (y YakitCallerIf) Send(i *ypb.ExecResult) error {
 	return y(i)
 }
 
+// deprecated
 func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...interface{})) {
 	if cb == nil {
 		return
@@ -652,7 +767,7 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 
 	ins := &Caller{
 		Core: &YakFunctionCaller{
-			Handler: func(callback func(*yakvm.Frame), args ...interface{}) {
+			Handler: func(callback func(*yakvm.Frame), args ...any) any {
 				defer func() {
 					if err := recover(); err != nil {
 						log.Errorf("call go native code failed: %s", err)
@@ -660,8 +775,8 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 				}()
 				if cb != nil {
 					cb(args...)
-					return
 				}
+				return nil
 			},
 			// NativeYakFunction: nil,
 		},
@@ -1441,23 +1556,26 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		args = append(args, "--"+key, fmt.Sprintf("%s", value))
 	}
 	app := GetHookCliApp(args)
-	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx).WithCliApp(app), script, code, func(e *antlr4yak.Engine) error {
-		if engine == nil {
-			engine = e
-		}
-		e.SetVars(map[string]any{
-			"MITM_PARAMS": paramMap,
-			"MITM_PLUGIN": id,
-		})
+	cTable, err := y.fetchFunctionFromSourceCode(y.getYakitPluginContext(ctx).WithCliApp(app),
+		WithFetchScript(script),
+		WithFetchCode(code),
+		WithFetchEngineHook(func(e *antlr4yak.Engine) error {
+			if engine == nil {
+				engine = e
+			}
+			e.SetVars(map[string]any{
+				"MITM_PARAMS": paramMap,
+				"MITM_PLUGIN": id,
+			})
 
-		if hook != nil {
-			return hook(e)
-		}
-		return nil
-	}, funcName...)
-	if err != nil {
-		return err
-	}
+			if hook != nil {
+				return hook(e)
+			}
+			return nil
+		}),
+		WithFetchFunctionNames(funcName...),
+	)
+
 	// 对于nasl插件还需要提取加载函数
 	if _, ok := ctxInfo["isNaslScript"]; ok {
 		f := func(name string) {
@@ -1598,7 +1716,8 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(runtimeCtx context.C
 	)
 }
 
-func (y *YakToCallerManager) Call(name string, opts ...CallOpt) {
+// only forceSync can get results
+func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) {
 	config := NewCallConfig()
 	for _, opt := range opts {
 		opt(config)
@@ -1660,7 +1779,7 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) {
 		return
 	}
 
-	call := func(pluginRuntimeID string, i *Caller) {
+	call := func(pluginRuntimeID string, i *Caller) any {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("call failed: \n%v\n, stack: %v", err, utils.ErrorStack(err))
@@ -1673,13 +1792,13 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) {
 				items = append(items, i())
 			}
 			log.Debugf("call %v.%v(params...)", i.Id, name)
-			i.Core.Handler(
+			return i.Core.Handler(
 				func(frame *yakvm.Frame) {
 					frame.GlobalVariables = frame.GlobalVariables.Deep1Clone()
 					frame.GlobalVariables.Store(consts.PLUGIN_CONTEXT_KEY_RUNTIME_ID, pluginRuntimeID)
 				}, items...)
-			return
 		}
+		return nil
 	}
 
 	pluginRuntimeID := utils.InterfaceToString(runtimeCtx.Value(consts.PLUGIN_CONTEXT_KEY_RUNTIME_ID))
@@ -1692,7 +1811,8 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) {
 		// 没有设置并发控制，就直接顺序执行，需要处理上下文
 		if isSync {
 			log.Debugf("Start Call Plugin: %v", verbose)
-			call(pluginRuntimeID, iRaw)
+			result := call(pluginRuntimeID, iRaw)
+			results = append(results, result)
 			continue
 		} else {
 			taskWG.Add(1)
@@ -1720,6 +1840,7 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) {
 			}()
 		}()
 	}
+	return results
 }
 
 func (y *YakToCallerManager) Wait() {
