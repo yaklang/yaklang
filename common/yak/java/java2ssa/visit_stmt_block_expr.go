@@ -1722,7 +1722,7 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 	if i.ClassBody() != nil {
 		// 匿名类
 		className := uuid.NewString()
-		class := y.CreateBlueprint(className)
+		class := y.CreateBlueprint(className, i.ClassBody())
 
 		parent := y.GetBluePrint(parentName)
 		if parent == nil {

@@ -83,15 +83,16 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		implNames  []string
 		extendName string
 	)
+	tokenMap := make(map[string]ssa.CanStartStopToken)
 
 	if outClass == nil {
 		className := i.Identifier().GetText()
-		blueprint = y.CreateBlueprint(className)
+		blueprint = y.CreateBlueprint(className, i.Identifier())
 		blueprint.SetKind(ssa.BlueprintClass)
 		y.GetProgram().SetExportType(className, blueprint)
 	} else {
 		className := outClass.Name + INNER_CLASS_SPLIT + i.Identifier().GetText()
-		blueprint = y.CreateBlueprint(className)
+		blueprint = y.CreateBlueprint(className, i.Identifier())
 		blueprint.SetKind(ssa.BlueprintClass)
 	}
 
@@ -108,11 +109,13 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 			extendName = extend.GetText()
 		}
 		parents = append(parents, extendName)
+		tokenMap[extendName] = i.TypeType()
 	}
 
 	if i.IMPLEMENTS() != nil {
 		for _, val := range i.AllTypeList() {
 			implNames = append(implNames, val.GetText())
+			tokenMap[val.GetText()] = val
 			parents = append(parents, val.GetText())
 		}
 	}
@@ -129,7 +132,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		for _, parent := range parents {
 			bp := y.GetBluePrint(parent)
 			if bp == nil {
-				bp = y.CreateBlueprint(parent)
+				bp = y.CreateBlueprint(parent, tokenMap[parent])
 				y.AddFullTypeNameForAllImport(parent, bp)
 			}
 			blueprint.AddParentBlueprint(bp)
@@ -138,7 +141,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		if extendName != "" {
 			bp := y.GetBluePrint(extendName)
 			if bp == nil {
-				bp = y.CreateBlueprint(extendName)
+				bp = y.CreateBlueprint(extendName, tokenMap[extendName])
 				y.AddFullTypeNameForAllImport(extendName, bp)
 			}
 			bp.SetKind(ssa.BlueprintClass)
@@ -148,7 +151,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		for _, implName := range implNames {
 			bp := y.GetBluePrint(implName)
 			if bp == nil {
-				bp = y.CreateBlueprint(implName)
+				bp = y.CreateBlueprint(implName, tokenMap[implName])
 				y.AddFullTypeNameForAllImport(implName, bp)
 			}
 			bp.SetKind(ssa.BlueprintInterface)

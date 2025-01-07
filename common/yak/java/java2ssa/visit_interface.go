@@ -17,13 +17,15 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 	}
 
 	name := i.Identifier().GetText()
-	bluePrint := y.CreateBlueprint(name)
+	bluePrint := y.CreateBlueprint(name, i.Identifier())
 	bluePrint.SetKind(ssa.BlueprintInterface)
 	y.GetProgram().SetExportType(name, bluePrint)
 	var extendNames []string
+	tokenMap := make(map[string]ssa.CanStartStopToken)
 	if i.EXTENDS() != nil {
 		for _, extend := range i.AllTypeList() {
 			extendNames = append(extendNames, extend.GetText())
+			tokenMap[extend.GetText()] = extend
 		}
 	}
 
@@ -35,7 +37,7 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 		for _, extendName := range extendNames {
 			bp := y.GetBluePrint(extendName)
 			if bp == nil {
-				bp = y.CreateBlueprint(extendName)
+				bp = y.CreateBlueprint(extendName, tokenMap[extendName])
 				y.AddFullTypeNameForAllImport(extendName, bp)
 			}
 			bp.SetKind(ssa.BlueprintInterface)
