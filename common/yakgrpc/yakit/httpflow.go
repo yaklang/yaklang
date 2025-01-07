@@ -575,6 +575,29 @@ func CreateOrUpdateHTTPFlowExg(hash string, i *schema.HTTPFlow) error {
 	}
 }
 
+func AppendHTTPFlowTagsByHiddenIndexEx(hiddenIndex string, tags ...string) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		flow, err := GetHTTPFlowByHiddenIndex(consts.GetGormProjectDatabase(), hiddenIndex)
+		if err != nil {
+			return err
+		} else {
+			flow.AddTag(tags...)
+		}
+		return UpdateHTTPFlowTags(consts.GetGormProjectDatabase(), flow)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
+			flow, err := GetHTTPFlowByHiddenIndex(db, hiddenIndex)
+			if err != nil {
+				return err
+			} else {
+				flow.AddTag(tags...)
+			}
+			return UpdateHTTPFlowTags(db, flow)
+		}
+		return nil
+	}
+}
+
 func GetHTTPFlow(db *gorm.DB, id int64) (*schema.HTTPFlow, error) {
 	var req schema.HTTPFlow
 	if db := db.Model(&schema.HTTPFlow{}).Where("id = ?", id).First(&req); db.Error != nil {
@@ -604,6 +627,15 @@ func GetHttpFlowByRuntimeId(db *gorm.DB, rid string) (*schema.HTTPFlow, error) {
 func GetHTTPFlowByHash(db *gorm.DB, hash string) (*schema.HTTPFlow, error) {
 	var req schema.HTTPFlow
 	if db := db.Model(&schema.HTTPFlow{}).Where("hash = ?", hash).First(&req); db.Error != nil {
+		return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
+	}
+
+	return &req, nil
+}
+
+func GetHTTPFlowByHiddenIndex(db *gorm.DB, index string) (*schema.HTTPFlow, error) {
+	var req schema.HTTPFlow
+	if db := db.Model(&schema.HTTPFlow{}).Where("hidden_index = ?", index).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
 	}
 

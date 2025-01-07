@@ -183,6 +183,12 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 
 		matcherParams := utils.CopyMapInterface(mergedParams)
 		httpTPLmatchersResult, hitColor, _ = MatchColor(httpTplMatcher, &httptpl.RespForMatch{RawPacket: rspRaw}, matcherParams)
+		if httpTPLmatchersResult {
+			err := yakit.AppendHTTPFlowTagsByHiddenIndexEx(rspIns.HiddenIndex, hitColor...)
+			if err != nil {
+				log.Errorf("append http flow tags failed: %s", err)
+			}
+		}
 	}
 
 	rsp := &ypb.FuzzerResponse{
@@ -869,6 +875,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					Duration:  lowhttpResponse.GetDurationFloat(),
 				}, matcherParams)
 
+				if httpTPLmatchersResult {
+					err := yakit.AppendHTTPFlowTagsByHiddenIndexEx(lowhttpResponse.HiddenIndex, hitColor...)
+					if err != nil {
+						log.Errorf("append http flow tags failed: %s", err)
+					}
+				}
+
 				//httpTPLmatchersResult, err = ins.Execute(&httptpl.RespForMatch{
 				//	RawPacket: result.ResponseRaw,
 				//	Duration:  lowhttpResponse.GetDurationFloat(),
@@ -1031,6 +1044,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							RawPacket: redirectRes.RawPacket,
 							Duration:  redirectRes.GetDurationFloat(),
 						}, matcherParams)
+						if redirectMatchersResult {
+							err := yakit.AppendHTTPFlowTagsByHiddenIndexEx(redirectRes.HiddenIndex, redirectHitColor...)
+							if err != nil {
+								log.Errorf("append http flow tags failed: %s", err)
+							}
+						}
 					}
 					redirectRsp := &ypb.FuzzerResponse{
 						Url:                   utils.EscapeInvalidUTF8Byte([]byte(redirectRes.Url)),
