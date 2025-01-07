@@ -41,6 +41,17 @@ func NewMemEditor(sourceCode string) *MemEditor {
 	return editor
 }
 
+func NewMemEditorWithFileUrl(sourceCode string, fileUrl string) *MemEditor {
+	editor := &MemEditor{
+		safeSourceCode:     NewSafeString(sourceCode),
+		lineLensMap:        make(map[int]int),
+		lineStartOffsetMap: make(map[int]int),
+		fileUrl:            fileUrl,
+	}
+	editor.recalculateLineMappings()
+	return editor
+}
+
 func (ve *MemEditor) CodeLength() int {
 	return ve.safeSourceCode.Len()
 }
@@ -49,8 +60,9 @@ func (ve *MemEditor) SetUrl(url string) {
 	ve.fileUrl = url
 }
 
+// GetIrSourceHash 使用程序名称、路径和源代码计算哈希值
 func (ve *MemEditor) GetIrSourceHash(programName string) string {
-	return codec.Md5(strings.Join([]string{programName, ve.GetFilename()}, "/"))
+	return codec.Md5(programName + ve.GetFilename() + ve.GetSourceCode())
 }
 
 func (ve *MemEditor) GetFormatedUrl() string {
