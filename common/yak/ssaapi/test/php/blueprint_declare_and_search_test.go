@@ -78,18 +78,17 @@ func Test_Blueprint_name2declare(t *testing.T) {
 	})
 }
 
-func Test_Blueprint_anonyous_name2declare(t *testing.T) {
+func Test_Blueprint_Anonymous_Name2declare(t *testing.T) {
 	code := `
-	class A {} 
-	interface C {} 
-	class O {
-		static void main(){
-			A a = new A() {}; // anonymous class extends A
-			C c = new C() {}; // anonymous class implements C 
-		}
-	}
-	`
+	<?php
+class A {}
+interface C {}
 
+$a = new class extends A {};
+
+$c = new class implements C {};
+
+	`
 	t.Run("search class relation-ship", func(t *testing.T) {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			prog.Show()
@@ -108,18 +107,17 @@ func Test_Blueprint_anonyous_name2declare(t *testing.T) {
 			require.Equal(t, res.GetValues("retC1").Len(), 1)
 			require.Equal(t, res.GetValues("retC2").Len(), 1)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
 
 func Test_Blueprint_Range(t *testing.T) {
 	code := `
-	// in class declaration
-	class A extends AA {}    // AA is no declare class 
-	class B implements BB {} // BB  is no declare interface 
-	// in interface declaration
-	interface C extends CC {} // CC is no declare interface 
-	class D extends AA implements BB {}
+<?php
+class A extends AA {} 
+class B implements BB {} 
+interface C extends CC {} 
+class D extends AA implements BB {} 
 	`
 	t.Run("can search and range correct", func(t *testing.T) {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
@@ -152,6 +150,6 @@ func Test_Blueprint_Range(t *testing.T) {
 			require.Equal(t, classAs.Len(), 1)
 			require.Equal(t, classAs[0].GetRange().GetText(), "A")
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
