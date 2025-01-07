@@ -5945,7 +5945,7 @@ message FuzzTagSuggestionRequest{
 }
 
 message ExportSyntaxFlowsRequest {
-  repeated string GroupName = 1;
+  SyntaxFlowRuleFilter Filter = 1;
   string Password = 2;
   string TargetPath = 3;
 }
@@ -5953,7 +5953,7 @@ message ImportSyntaxFlowsRequest {
   string InputPath = 1;
   string Password = 2;
 }
-  
+
 message SyntaxflowsProgress {
   // 进度  0-1.0
   double Progress = 1;
