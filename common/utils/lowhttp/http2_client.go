@@ -45,10 +45,9 @@ type http2ClientConn struct {
 	readGoAway   bool
 	lastStreamID uint32
 
-	closeCond   *sync.Cond
-	closed      bool
-	preFaceCond *sync.Cond
-	prefaceOk   bool
+	closeCond       *sync.Cond
+	closed          bool
+	clientPrefaceOk *utils.AtomicBool
 
 	hDec *hpack.Decoder
 
@@ -115,33 +114,35 @@ func (h2Conn *http2ClientConn) preface() error {
 	if err != nil {
 		return utils.Wrapf(err, "write h2 setting failed")
 	}
+	h2Conn.setPreface()
+	return nil
 
-	prefaceFlag := make(chan struct{}, 1) // get preface ok
-	go func() {
-		h2Conn.preFaceCond.L.Lock()
-		for !h2Conn.prefaceOk {
-			h2Conn.preFaceCond.Wait()
-		}
-		prefaceFlag <- struct{}{}
-		h2Conn.preFaceCond.L.Unlock()
-	}()
-
-	closeFlag := make(chan struct{}, 1) // get read frame err
-	go func() {
-		h2Conn.closeCond.L.Lock()
-		for !h2Conn.closed {
-			h2Conn.closeCond.Wait()
-		}
-		closeFlag <- struct{}{}
-		h2Conn.closeCond.L.Unlock()
-	}()
-
-	select {
-	case <-closeFlag:
-		return utils.Errorf("h2 preface read err")
-	case <-prefaceFlag:
-		return nil
-	}
+	//prefaceFlag := make(chan struct{}, 1) // get preface ok
+	//go func() {
+	//	h2Conn.preFaceCond.L.Lock()
+	//	for !h2Conn.prefaceOk {
+	//		h2Conn.preFaceCond.Wait()
+	//	}
+	//	prefaceFlag <- struct{}{}
+	//	h2Conn.preFaceCond.L.Unlock()
+	//}()
+	//
+	//closeFlag := make(chan struct{}, 1) // get read frame err
+	//go func() {
+	//	h2Conn.closeCond.L.Lock()
+	//	for !h2Conn.closed {
+	//		h2Conn.closeCond.Wait()
+	//	}
+	//	closeFlag <- struct{}{}
+	//	h2Conn.closeCond.L.Unlock()
+	//}()
+	//
+	//select {
+	//case <-closeFlag:
+	//	return utils.Errorf("h2 preface read err")
+	//case <-prefaceFlag:
+	//	return nil
+	//}
 }
 
 func (h2Conn *http2ClientConn) setClose() {
@@ -153,10 +154,7 @@ func (h2Conn *http2ClientConn) setClose() {
 }
 
 func (h2Conn *http2ClientConn) setPreface() {
-	h2Conn.preFaceCond.L.Lock()
-	h2Conn.prefaceOk = true
-	h2Conn.preFaceCond.L.Unlock()
-	h2Conn.preFaceCond.Broadcast()
+	h2Conn.clientPrefaceOk.Set()
 }
 
 var CreateStreamAfterGoAwayErr = utils.Errorf("h2 conn can not create new stream, because read go away flag")
@@ -204,7 +202,7 @@ func (h2Conn *http2ClientConn) getNewStreamID() uint32 {
 func (h2Conn *http2ClientConn) readLoop() {
 	h2Conn.idleTimer.Reset(h2Conn.idleTimeout) // read new frame reset timer
 	var rl = http2ClientConnReadLoop{h2Conn: h2Conn}
-	var gotSettings = false
+	//var gotSettings = false
 	var readIdleTimeout = h2Conn.idleTimeout
 	var t *time.Timer
 
@@ -226,13 +224,13 @@ func (h2Conn *http2ClientConn) readLoop() {
 			h2Conn.setClose()
 			return
 		}
-		if !gotSettings {
+		if !h2Conn.clientPrefaceOk.IsSet() {
 			if _, ok := frame.(*http2.SettingsFrame); !ok {
-				log.Errorf("protocol error: received %T before a SETTINGS frame", frame)
+				log.Errorf("http2: Transport received non-SETTINGS frame before SETTINGS: %v", frame)
+				h2Conn.setClose()
 				return
 			}
-			h2Conn.setPreface()
-			gotSettings = true
+			return
 		}
 
 		// log.Infof("h2 stream-id %v found frame: %v", frame.Header().StreamID, frame)
