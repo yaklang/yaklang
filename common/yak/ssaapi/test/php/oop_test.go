@@ -135,7 +135,7 @@ $a = new A();
 println($a->a);
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
-			"end": {`"B.C.D"`, `"main.A"`},
+			"end": {`"B.C.D"`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 
