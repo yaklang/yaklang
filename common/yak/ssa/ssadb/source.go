@@ -45,8 +45,8 @@ func GetIrSourceByPathAndName(path, name string) (*IrSource, error) {
 	return &source, nil
 }
 
-func GetEditorByFileName(name string) (*memedit.MemEditor, error) {
-	dir, name := pathSplit(name)
+func GetEditorByFileName(fileName string) (*memedit.MemEditor, error) {
+	dir, name := pathSplit(fileName)
 	source, err := GetIrSourceByPathAndName(dir, name)
 	if err != nil {
 		return nil, err
@@ -56,6 +56,8 @@ func GetEditorByFileName(name string) (*memedit.MemEditor, error) {
 		code = s
 	}
 	ret := memedit.NewMemEditor(code)
+	_, filePath := splitProjectPath(fileName)
+	ret.SetUrl(filePath)
 	return ret, nil
 }
 
