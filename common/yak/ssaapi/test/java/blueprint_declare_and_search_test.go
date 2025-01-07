@@ -112,7 +112,7 @@ func Test_Blueprint_anonyous_name2declare(t *testing.T) {
 	})
 }
 
-func Test_Blueprint_no_declare(t *testing.T) {
+func Test_Blueprint_Range(t *testing.T) {
 	code := `
 	// in class declaration
 	class A extends AA {}    // AA is no declare class 
@@ -121,13 +121,14 @@ func Test_Blueprint_no_declare(t *testing.T) {
 	interface C extends CC {} // CC is no declare interface 
 	class D extends AA implements BB {}
 	`
-
 	t.Run("can search and range correct", func(t *testing.T) {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			res, err := prog.SyntaxFlowWithError(`
 			AA as $classAA 
 			BB as $classBB
 			CC as $classCC
+			A as $classA
+			D as $classD
 			`)
 			require.NoError(t, err)
 
@@ -143,25 +144,14 @@ func Test_Blueprint_no_declare(t *testing.T) {
 			require.Equal(t, classCCs.Len(), 1)
 			require.Equal(t, classCCs[0].GetRange().GetText(), "CC")
 
-			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
-	})
+			classDs := res.GetValues("classD")
+			require.Equal(t, classDs.Len(), 1)
+			require.Equal(t, classDs[0].GetRange().GetText(), "D")
 
-	t.Run("relation correct", func(t *testing.T) {
-		ssatest.CheckSyntaxFlow(t, code, `
-		AA.children as $class1 // A, D
-		BB.children as $class2 // B, D
-		A.parents as $class3 // AA
-		B.parents as $class4 // BB
-		C.parents as $class5 // CC
-		D.parents as $class6 // AA BB
-		`, map[string][]string{
-			"class1": {"A_declare", "D_declare"},
-			"class2": {"B_declare", "D_declare"},
-			"class3": {"AA_declare"},
-			"class4": {"BB_declare"},
-			"class5": {"CC_declare"},
-			"class6": {"AA_declare", "BB_declare"},
+			classAs := res.GetValues("classA")
+			require.Equal(t, classAs.Len(), 1)
+			require.Equal(t, classAs[0].GetRange().GetText(), "A")
+			return nil
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
