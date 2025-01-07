@@ -86,16 +86,16 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	return y.ClassConstructor(bluePrint, args)
 }
 
-func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) interface{} {
+func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) {
 	if y == nil || raw == nil || y.IsStop() {
-		return nil
+		return
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ClassDeclarationContext)
 	if i == nil {
-		return nil
+		return
 	}
 
 	// notes #[...] for dec
@@ -116,8 +116,15 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		// not in PHP, as abnormal
 	}
 
-	var className string
-	var mergedTemplate []string
+	var (
+		parents         []string
+		extendName      string
+		implNames       []string
+		implExtendNames []string
+		blueprint       *ssa.Blueprint
+	)
+	tokenMap := make(map[string]ssa.CanStartStopToken)
+
 	if i.ClassEntryType() != nil {
 		switch strings.ToLower(i.ClassEntryType().GetText()) {
 		case "trait":
@@ -125,44 +132,91 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			// as class alias is right as compiler! XD
 			fallthrough
 		case "class":
-			className = y.VisitIdentifier(i.Identifier())
-
-			parentClassName := ""
-
-			class := y.CreateBlueprint(className)
-			y.MarkedThisClassBlueprint = class
-			y.GetProgram().SetExportType(className, class)
-			if i.Extends() != nil {
-				parentClassName = i.QualifiedStaticTypeRef().GetText()
-				store := y.StoreFunctionBuilder()
-				class.AddLazyBuilder(func() {
-					switchHandler := y.SwitchFunctionBuilder(store)
-					defer switchHandler()
-					if parentClass := y.GetBluePrint(parentClassName); parentClass != nil {
-						//感觉在ssa-classBlue中做更好，暂时修复
-						class.AddParentBlueprint(parentClass)
-						class.AddSuperBlueprint(parentClass)
-						for _, s := range parentClass.GetFullTypeNames() {
-							class.AddFullTypeName(s)
-						}
-					}
-				})
+			name := y.VisitIdentifier(i.Identifier())
+			blueprint = y.GetBluePrint(name)
+			if blueprint == nil {
+				blueprint = y.CreateBlueprint(name, i.Identifier())
 			}
-			for _, statement := range i.AllClassStatement() {
-				y.VisitClassStatement(statement, class)
+			blueprint.SetKind(ssa.BlueprintClass)
+			y.MarkedThisClassBlueprint = blueprint
+			y.GetProgram().SetExportType(name, blueprint)
+
+			if i.Extends() != nil {
+				super := i.QualifiedStaticTypeRef().GetText()
+				extendName = super
+				parents = append(parents, super)
+				tokenMap[super] = i.QualifiedStaticTypeRef()
+			}
+			if i.Implements() != nil {
+				for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
+					implNames = append(implNames, impl.GetText())
+					tokenMap[impl.GetText()] = impl
+					parents = append(parents, impl.GetText())
+				}
 			}
 		}
-	} else {
-		// as interface
-		className = y.VisitIdentifier(i.Identifier())
+	} else if i.Interface() != nil {
+		name := y.VisitIdentifier(i.Identifier())
+		blueprint = y.GetBluePrint(name)
+		if blueprint == nil {
+			blueprint = y.CreateBlueprint(name, i.Identifier())
+		}
+		blueprint.SetKind(ssa.BlueprintInterface)
+		y.GetProgram().SetExportType(name, blueprint)
 		if i.Extends() != nil {
-			for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
-				mergedTemplate = append(mergedTemplate, impl.GetText())
+			if i.InterfaceList() != nil {
+				for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
+					implExtendNames = append(implExtendNames, impl.GetText())
+					tokenMap[impl.GetText()] = impl
+					parents = append(parents, impl.GetText())
+				}
 			}
 		}
 	}
+	if blueprint == nil {
+		return
+	}
 
-	return nil
+	store := y.StoreFunctionBuilder()
+	blueprint.AddLazyBuilder(func() {
+		switchHandler := y.SwitchFunctionBuilder(store)
+		defer switchHandler()
+		for _, parent := range parents {
+			bp := y.GetBluePrint(parent)
+			if bp == nil {
+				bp = y.CreateBlueprint(parent, tokenMap[parent])
+			}
+			bp.SetKind(ssa.BlueprintInterface)
+			blueprint.AddParentBlueprint(bp)
+		}
+		for _, impl := range implNames {
+			bp := y.GetBluePrint(impl)
+			if bp == nil {
+				bp = y.CreateBlueprint(impl, tokenMap[impl])
+			}
+			bp.SetKind(ssa.BlueprintInterface)
+			blueprint.AddInterfaceBlueprint(bp)
+		}
+		if extendName != "" {
+			bp := y.GetBluePrint(extendName)
+			if bp == nil {
+				bp = y.CreateBlueprint(extendName, tokenMap[extendName])
+			}
+			bp.SetKind(ssa.BlueprintClass)
+			blueprint.AddSuperBlueprint(bp)
+		}
+		for _, impl := range implExtendNames {
+			bp := y.GetBluePrint(impl)
+			if bp == nil {
+				bp = y.CreateBlueprint(impl, tokenMap[impl])
+			}
+			bp.SetKind(ssa.BlueprintInterface)
+			blueprint.AddSuperBlueprint(bp)
+		}
+		for _, statement := range i.AllClassStatement() {
+			y.VisitClassStatement(statement, blueprint)
+		}
+	})
 }
 
 func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, class *ssa.Blueprint) {
