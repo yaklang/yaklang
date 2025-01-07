@@ -24,8 +24,7 @@ func SaveValueOffset(inst Instruction) {
 		log.Errorf("%v: CreateOffset: rng or editor is nil", inst.GetVerboseName())
 		return
 	}
-	irOffset := ssadb.CreateOffset(rng)
-
+	irOffset := ssadb.CreateOffset(rng, inst.GetProgram().GetApplication().GetProgramName())
 	// program name \ file name \ offset
 	irOffset.ProgramName = inst.GetProgram().GetProgramName()
 	// value id
@@ -41,7 +40,7 @@ func SaveVariableOffset(v *Variable, variableName string) {
 		if utils.IsNil(rng) || utils.IsNil(rng.GetEditor()) {
 			return
 		}
-		irOffset := ssadb.CreateOffset(rng)
+		irOffset := ssadb.CreateOffset(rng, v.GetProgram().GetApplication().GetProgramName())
 		// program name \ file name \ offset
 		irOffset.ProgramName = v.GetProgram().GetProgramName()
 		// variable name

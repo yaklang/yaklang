@@ -20,9 +20,9 @@ type IrOffset struct {
 	ValueID int64 `json:"value_id"` // this id will set
 }
 
-func CreateOffset(rng memedit.RangeIf) *IrOffset {
+func CreateOffset(rng memedit.RangeIf, projectName string) *IrOffset {
 	ret := &IrOffset{}
-	ret.FileHash = rng.GetEditor().GetPureSourceHash()
+	ret.FileHash = rng.GetEditor().GetIrSourceHash(projectName)
 	ret.StartOffset = int64(rng.GetStartOffset())
 	ret.EndOffset = int64(rng.GetEndOffset())
 	ret.VariableName = ""
@@ -43,9 +43,10 @@ func GetOffsetByVariable(name string, valueID int64) []*IrOffset {
 	return ir
 }
 
-func GetValueBeforeEndOffset(DB *gorm.DB, rng memedit.RangeIf) (int64, error) {
+func GetValueBeforeEndOffset(DB *gorm.DB, rng memedit.RangeIf, programName string) (int64, error) {
 	// get the last ir code before the end offset, and the source code hash must be the same
-	db := DB.Model(&IrOffset{}).Where("end_offset <= ? and  file_hash = ?", rng.GetEndOffset(), rng.GetEditor().GetPureSourceHash())
+	hash := rng.GetEditor().GetIrSourceHash(programName)
+	db := DB.Model(&IrOffset{}).Where("end_offset <= ? and  file_hash = ?", rng.GetEndOffset(), hash)
 	var ir IrOffset
 	if err := db.Order("end_offset desc").First(&ir).Error; err != nil {
 		return -1, err
