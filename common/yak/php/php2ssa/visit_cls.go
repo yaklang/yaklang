@@ -625,6 +625,9 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 	}
 
 	key := i.Identifier().GetText()
+	if i.StaticClass().GetText() == "self" {
+		return y.MarkedThisClassBlueprint, key
+	}
 	bluePrint := y.VisitStaticClass(i.StaticClass())
 	return bluePrint, key
 }
