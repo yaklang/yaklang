@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *ssa.FunctionBuilder, error) {
@@ -92,7 +91,8 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 
 		if ret := fb.GetEditor(); ret != nil {
 			cache := application.Cache
-			progName, hash := application.GetProgramName(), codec.Sha256(ret.GetSourceCode())
+			progName := application.GetProgramName()
+			hash := ret.GetIrSourceHash(programName)
 			if cache.IsExistedSourceCodeHash(progName, hash) {
 				c.DatabaseProgramCacheHitter(fb)
 			}

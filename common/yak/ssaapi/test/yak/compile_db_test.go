@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"os"
 	"strconv"
 	"testing"
@@ -145,8 +146,11 @@ c("d")
 	} else {
 		t.Logf("IRCODE Fetch: %v", count)
 	}
-	if includeFile.Len() != 2 {
-		t.Fatal("have 2 source code hash")
+	// 创建依赖的ircode为第一个sourcecode hash
+	// 解析文件为第二个
+	// 解析include的文件为第三个
+	if includeFile.Len() != 3 {
+		t.Fatal("have not 3 source code hash")
 	}
 }
 
@@ -168,7 +172,7 @@ c("d")
 
 	haveIncluded := false
 	includeFile := omap.NewOrderedMap(make(map[string]any))
-	includeHash := codec.Sha256(includeCode)
+	includeHash := memedit.NewMemEditorWithFileUrl(includeCode, filename).GetIrSourceHash(progName)
 	for result := range ssadb.YieldIrCodesProgramName(ssadb.GetDB(), context.Background(), progName) {
 		if result.IsEmptySourceCodeHash() {
 			log.Warn("source code hash is empty")
@@ -182,8 +186,8 @@ c("d")
 			haveIncluded = true
 		}
 	}
-	if includeFile.Len() != 2 {
-		t.Fatal("have 2 source code hash")
+	if includeFile.Len() != 3 {
+		t.Fatal("have not 3 source code hash")
 	}
 	if !haveIncluded {
 		t.Fatal("not included")
@@ -216,8 +220,8 @@ dump(a(3))
 		}
 		m.Set(result.SourceCodeHash, struct{}{})
 	}
-	if m.Len() != 1 {
-		t.Fatal("source code hash is not unique")
+	if m.Len() != 2 {
+		t.Fatal("have not 2 source code hash")
 	}
 	if count <= 0 {
 		t.Fatal("no result in ir code database")
