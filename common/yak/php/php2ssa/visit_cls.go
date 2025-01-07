@@ -61,20 +61,79 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 		return nil
 	}
 	// cname := uuid.NewString()
+
+	var (
+		parents    []string
+		interfaces []string
+		extendName string
+	)
+	tokenMap := make(map[string]ssa.CanStartStopToken)
+
 	cname := fmt.Sprintf("anonymous_%s_%s", y.CurrentFile, y.CurrentRange.GetStart())
-	bluePrint := y.CreateBlueprint(cname)
-	if i.QualifiedStaticTypeRef() != nil {
-		if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
-			bluePrint.AddParentBlueprint(ref)
+	blueprint := y.CreateBlueprint(cname)
+
+	if i.ClassEntryType() != nil {
+		blueprint.SetKind(ssa.BlueprintClass)
+		if i.Extends() != nil {
+			if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
+				extendName = ref.Name
+				parents = append(parents, extendName)
+				tokenMap[extendName] = i.QualifiedStaticTypeRef()
+			}
+		}
+		if i.Implements() != nil {
+			for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
+				interfaces = append(interfaces, impl.GetText())
+				tokenMap[impl.GetText()] = impl
+				parents = append(parents, impl.GetText())
+			}
 		}
 	}
-	for _, statement := range i.AllClassStatement() {
-		y.VisitClassStatement(statement, bluePrint)
-	}
+	//if i.Interface() != nil {
+	//	blueprint.SetKind(ssa.BlueprintInterface)
+	//	if i.Extends() != nil {
+	//		if i.InterfaceList() != nil {
+	//			for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
+	//				extendImpls = append(extendImpls, impl.GetText())
+	//				tokenMap[impl.GetText()] = impl
+	//				parents = append(parents, impl.GetText())
+	//			}
+	//		}
+	//	}
+	//}
+	store := y.StoreFunctionBuilder()
+	blueprint.AddLazyBuilder(func() {
+		switchHandler := y.SwitchFunctionBuilder(store)
+		defer switchHandler()
+		for _, parent := range parents {
+			bp := y.GetBluePrint(parent)
+			if bp == nil {
+				bp = y.CreateBlueprint(parent, tokenMap[parent])
+			}
+			blueprint.AddParentBlueprint(bp)
+		}
+		for _, impl := range interfaces {
+			bp := y.GetBluePrint(impl)
+			if bp == nil {
+				bp = y.CreateBlueprint(impl, tokenMap[impl])
+			}
+			blueprint.AddInterfaceBlueprint(bp)
+		}
+		if extendName != "" {
+			bp := y.GetBluePrint(extendName)
+			if bp == nil {
+				bp = y.CreateBlueprint(extendName, tokenMap[extendName])
+			}
+			blueprint.AddSuperBlueprint(bp)
+		}
+		for _, statement := range i.AllClassStatement() {
+			y.VisitClassStatement(statement, blueprint)
+		}
+	})
 	//todo: 可能会有问题
 	// bluePrint.Build()
 	obj := y.EmitMakeWithoutType(nil, nil)
-	obj.SetType(bluePrint)
+	obj.SetType(blueprint)
 	args := []ssa.Value{obj}
 	ellipsis := false
 	if i.Arguments() != nil {
@@ -83,7 +142,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 		args = append(args, tmp...)
 	}
 	_ = ellipsis
-	return y.ClassConstructor(bluePrint, args)
+	return y.ClassConstructor(blueprint, args)
 }
 
 func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) {
