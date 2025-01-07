@@ -100,6 +100,18 @@ func pathSplit(p string) (string, string) {
 	return dir, name
 }
 
+// splitProjectPath传入全路径，会以路径分隔符分割，分割后的第一个元素为项目名，后面的元素为文件路径
+func splitProjectPath(p string) (projectPath string, fileName string) {
+	paths := strings.Split(p, string(IrSourceFsSeparators))
+	paths = utils.StringArrayFilterEmpty(paths)
+	if len(paths) == 1 {
+		return paths[0], ""
+	} else if len(paths) > 1 {
+		return paths[0], strings.Join(paths[1:], string(IrSourceFsSeparators))
+	}
+	return "", ""
+}
+
 func (f *irSourceFS) ExtraInfo(path string) map[string]any {
 	m := make(map[string]any)
 	programName, isProgram := f.getProgram(path)
