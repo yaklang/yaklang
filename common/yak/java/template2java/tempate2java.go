@@ -67,12 +67,12 @@ func ConvertTemplateToJava(typ JavaTemplateType, content, filePath string) (tl.T
 	var err error
 	switch typ {
 	case JSP:
-		visitor, err = NewTemplateVisitor(memedit.NewMemEditor(content), tl.TEMPLATE_JAVA_JSP)
+		visitor, err = NewTemplateVisitor(memedit.NewMemEditorWithFileUrl(content, filePath), tl.TEMPLATE_JAVA_JSP)
 		if err != nil {
 			return nil, err
 		}
 	case Freemarker:
-		visitor, err = NewTemplateVisitor(memedit.NewMemEditor(content), tl.TEMPLATE_JAVA_FREEMARKER)
+		visitor, err = NewTemplateVisitor(memedit.NewMemEditorWithFileUrl(content, filePath), tl.TEMPLATE_JAVA_FREEMARKER)
 		if err != nil {
 			return nil, err
 		}
