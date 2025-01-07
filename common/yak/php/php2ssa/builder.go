@@ -140,9 +140,12 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	}
 	if b.IncludeStack.Len() <= 0 {
 		childProgram := b.GetProgram().GetSubProgram(b.GetEditor().GetPureSourceHash())
-		functionBuilder := childProgram.GetAndCreateFunctionBuilder("main", "main")
+		functionBuilder := childProgram.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
 		startParse(functionBuilder)
 	} else {
+		b.GetProgram().SetPreHandler(true)
+		startParse(b)
+		b.GetProgram().SetPreHandler(false)
 		startParse(b)
 	}
 	return nil
