@@ -78,7 +78,7 @@ func Test_Blueprint_name2declare(t *testing.T) {
 	})
 }
 
-func Test_Blueprint_anonyous_name2declare(t *testing.T) {
+func Test_Blueprint_Anonymous_Name2declare(t *testing.T) {
 	code := `
 	class A {} 
 	interface C {} 
