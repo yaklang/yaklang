@@ -442,7 +442,7 @@ func (pc *persistConn) h2Conn() {
 		frWriteMutex:      new(sync.Mutex),
 		hDec:              hpack.NewDecoder(defaultHeaderTableSize, nil),
 		closeCond:         sync.NewCond(new(sync.Mutex)),
-		preFaceCond:       sync.NewCond(new(sync.Mutex)),
+		clientPrefaceOk:   utils.NewAtomicBool(),
 		http2StreamPool: &sync.Pool{
 			New: func() interface{} {
 				return new(http2ClientStream)
