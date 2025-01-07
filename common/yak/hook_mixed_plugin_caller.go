@@ -62,6 +62,12 @@ const (
 	HOOK_NaslScanHandle           = "execNasl"
 	HOOK_LoadNaslScriptByNameFunc = "loadNaslScriptByNameFunc"
 
+	// beforeRequest, afterRequest
+	HOOK_BeforeRequest = "beforeRequest"
+	HOOK_AfterRequest  = "afterRequest"
+
+	HOOK_CLAER = "clear"
+
 	/*
 		hijackSaveHTTPFlow = func(flow, forward, drop) {
 		    println(flow.Url)
@@ -87,6 +93,10 @@ var (
 
 		// port-scan
 		HOOK_PortScanHandle,
+
+		// beforeRequest, afterRequest
+		HOOK_BeforeRequest,
+		HOOK_AfterRequest,
 	}
 	HotPatchScriptName = "@HotPatchCode"
 )
@@ -497,6 +507,59 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 	if err != nil {
 		m.FeedbackOrdinary(fmt.Sprintf("Initailzed MITM/ScanPort Plugin[%v] Failed: %v", name, err))
 		return err
+	}
+	return nil
+}
+
+func (m *MixPluginCaller) CallBeforeRequestWithCtx(
+	runtimeCtx context.Context,
+	isHttps bool, u string,
+	originReq, req []byte,
+) []byte {
+	if !m.IsPassed(u) {
+		log.Infof("call HijackRequest error: url[%v] not passed", u)
+		return nil
+	}
+	callers := m.callers
+	if callers.ShouldCallByName(HOOK_BeforeRequest) {
+		results := callers.Call(
+			HOOK_BeforeRequest,
+			WithCallConfigForceSync(true),
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigItems(
+				isHttps, originReq, req,
+			),
+		)
+		if len(results) > 0 {
+			return utils.InterfaceToBytes(results[0])
+		}
+	}
+	return nil
+}
+
+func (m *MixPluginCaller) CallAfterRequestWithCtx(
+	runtimeCtx context.Context,
+	isHttps bool, u string,
+	originReq, req []byte,
+	originRsp, rsp []byte,
+) []byte {
+	if !m.IsPassed(u) {
+		log.Infof("call HijackRequest error: url[%v] not passed", u)
+		return nil
+	}
+	callers := m.callers
+	if callers.ShouldCallByName(HOOK_AfterRequest) {
+		results := callers.Call(
+			HOOK_AfterRequest,
+			WithCallConfigForceSync(true),
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigItems(
+				isHttps, originReq, req, originRsp, rsp,
+			),
+		)
+		if len(results) > 0 {
+			return utils.InterfaceToBytes(results[0])
+		}
 	}
 	return nil
 }
