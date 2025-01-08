@@ -5,10 +5,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 
 	"github.com/davecgh/go-spew/spew"
@@ -16,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -511,4 +515,161 @@ func TestGRPCMUSTPASS_MITM_HotPatch_HijackSaveHTTPFlow(t *testing.T) {
 	for _, flow := range rsp.GetData() {
 		require.Containsf(t, flow.Tags, "YAKIT_COLOR_BLUE", "flow tags not contains COLOR_BLUE")
 	}
+}
+
+func TestGRPCMUSTPASS_MITM_HotPatch_PluginRuntimeID(t *testing.T) {
+	hotPatchCode := `
+u = "%s"
+opts = [poc.save(false),%s]
+
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	poc.Get(f"${u}?from=mirrorHTTPFlow&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	poc.Get(f"${u}?from=mirrorFilteredHTTPFlow&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+
+mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	poc.Get(f"${u}?from=mirrorNewWebsite&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+
+mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	poc.Get(f"${u}?from=mirrorNewWebsitePath&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+
+mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	poc.Get(f"${u}?from=mirrorNewWebsitePathParams&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+
+hijackHTTPRequest = func(isHttps, url, req, forward /*func(modifiedRequest []byte)*/, drop /*func()*/) {
+    poc.Get(f"${u}?from=hijackHTTPRequest&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+
+
+hijackHTTPResponse = func(isHttps  /*bool*/, url  /*string*/, rsp /*[]byte*/, forward /*func(modifiedResponse []byte)*/, drop /*func()*/) {
+    poc.Get(f"${u}?from=hijackHTTPResponse&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+
+hijackHTTPResponseEx = func(isHttps  /*bool*/, url  /*string*/, req/*[]byte*/, rsp /*[]byte*/, forward /*func(modifiedResponse []byte)*/, drop /*func()*/) {
+    poc.Get(f"${u}?from=hijackHTTPResponseEx&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+
+beforeRequest = func(ishttps /*bool*/, oreq /*[]byte*/, req/*[]byte*/){
+    poc.Get(f"${u}?from=beforeRequest&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+
+afterRequest = func(ishttps, oreq/*原始请求*/ ,req/*hiajck修改之后的请求*/ ,orsp/*原始响应*/ ,rsp/*hijack修改后的响应*/){
+    poc.Get(f"${u}?from=afterRequest&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+
+hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+    poc.Get(f"${u}?from=hijackSaveHTTPFlow&id=${PLUGIN_RUNTIME_ID}", opts...)
+}
+`
+	check := func(t *testing.T, http2 bool) {
+		ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(10))
+		defer cancel()
+
+		checkMap := make(map[string]string)
+		checkFuncs := []string{"mirrorHTTPFlow", "mirrorFilteredHTTPFlow", "mirrorNewWebsite", "mirrorNewWebsitePath", "mirrorNewWebsitePathParams", "hijackHTTPRequest", "hijackHTTPResponse", "hijackHTTPResponseEx", "beforeRequest", "afterRequest", "hijackSaveHTTPFlow"}
+		sort.Strings(checkFuncs)
+		sig := make(chan struct{})
+
+		var (
+			host string
+			port int
+		)
+		handler := func(req []byte) []byte {
+			query := lowhttp.GetAllHTTPRequestQueryParams(req)
+			from, ok1 := query["from"]
+			runtimeID, ok2 := query["id"]
+			if ok1 && ok2 {
+				fmt.Printf("[%s] %s\n", from, runtimeID)
+				checkMap[from] = runtimeID
+				keys := lo.Keys(checkMap)
+				sort.Strings(keys)
+				if slices.Equal(keys, checkFuncs) {
+					close(sig)
+				}
+			}
+			return []byte("Hello")
+		}
+		if http2 {
+			host, port = utils.DebugMockHTTP2(ctx, handler)
+		} else {
+			host, port = utils.DebugMockHTTPSEx(handler)
+		}
+		mockURL := fmt.Sprintf("https://%s", utils.HostPort(host, port))
+
+		mitmPort := utils.GetRandomAvailableTCPPort()
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+
+		RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+			message := &ypb.MITMRequest{
+				Host:             "127.0.0.1",
+				Port:             uint32(mitmPort),
+				Recover:          true,
+				Forward:          true,
+				SetAutoForward:   true,
+				AutoForwardValue: true,
+			}
+			if http2 {
+				message.EnableHttp2 = true
+			}
+			stream.Send(message)
+		}, func(stream ypb.Yak_MITMClient) {
+			var script string
+			if http2 {
+				script = fmt.Sprintf(hotPatchCode, mockURL, "poc.https(true), poc.http2(true)")
+			} else {
+				script = fmt.Sprintf(hotPatchCode, mockURL, "")
+			}
+			stream.Send(&ypb.MITMRequest{
+				SetYakScript:     true,
+				YakScriptContent: script,
+			})
+			stream.Send(&ypb.MITMRequest{
+				SetContentReplacers: true,
+				Replacers:           make([]*ypb.MITMContentReplacer, 0),
+			})
+
+		}, func(mitmClient ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+			if msg.GetCurrentHook && len(msg.GetHooks()) > 0 {
+				opts := []poc.PocConfigOption{
+					poc.WithForceHTTPS(true),
+					poc.WithSave(false),
+					poc.WithProxy(`http://` + utils.HostPort("127.0.0.1", mitmPort)),
+				}
+				if http2 {
+					opts = append(opts, poc.WithForceHTTP2(true))
+				}
+				_, _, err := poc.DoGET(mockURL, opts...)
+				require.NoError(t, err)
+				select {
+				case <-sig:
+					cancel()
+				case <-ctx.Done():
+				}
+			}
+		})
+
+		require.ElementsMatch(t, lo.Keys(checkMap), checkFuncs)
+		onlyPluginRuntimeID := ""
+		for _, v := range checkMap {
+			if onlyPluginRuntimeID == "" {
+				onlyPluginRuntimeID = v
+			} else {
+				require.Equal(t, onlyPluginRuntimeID, v)
+			}
+		}
+	}
+	t.Run("http1.1", func(t *testing.T) {
+		check(t, false)
+	})
+
+	t.Run("http2", func(t *testing.T) {
+		check(t, true)
+	})
 }
