@@ -156,7 +156,6 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["block_name"] = ret.GetName()
 		params["block_preds"] = fetchIds(ret.Preds)
 		params["block_succs"] = fetchIds(ret.Succs)
-		params["block_set_reachable"] = ret.setReachable
 		params["block_can_be_reached"] = ret.canBeReached
 		if ret.Condition != nil {
 			if id := ret.Condition.GetId(); id > 0 {
@@ -450,8 +449,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		if cond, ok := params["block_condition"]; ok {
 			ret.Condition = unmarshalValue(cond)
 		}
-		ret.setReachable = codec.Atob(fmt.Sprint(params["block_set_reachable"]))
-		ret.canBeReached = codec.Atoi(fmt.Sprint(params["block_can_be_reached"]))
+		ret.canBeReached = BasicBlockReachableKind(codec.Atoi(fmt.Sprint(params["block_can_be_reached"])))
 		ret.Insts = unmarshalInstructions(params["block_insts"])
 		ret.Phis = unmarshalValues(params["block_phis"])
 		ret.finish = toBool(params["block_finish"])
