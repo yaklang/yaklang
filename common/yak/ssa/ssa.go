@@ -388,6 +388,14 @@ var (
 	_ Value = (*Function)(nil)
 )
 
+type BasicBlockReachableKind int
+
+const (
+	BasicBlockUnknown     BasicBlockReachableKind = 0
+	BasicBlockReachable                           = 1
+	BasicBlockUnReachable                         = -1
+)
+
 // implement Value
 type BasicBlock struct {
 	anValue
@@ -403,8 +411,7 @@ type BasicBlock struct {
 	/*
 		if Condition == true: this block reach
 	*/
-	setReachable bool
-	canBeReached int
+	canBeReached BasicBlockReachableKind
 	Condition    Value
 
 	// instruction list
@@ -420,11 +427,10 @@ type BasicBlock struct {
 }
 
 func (b *BasicBlock) SetReachable(boolean bool) {
-	b.setReachable = true
 	if boolean {
-		b.canBeReached = 1
+		b.canBeReached = BasicBlockReachable
 	} else {
-		b.canBeReached = -1
+		b.canBeReached = BasicBlockUnReachable
 	}
 }
 
