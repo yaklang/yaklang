@@ -101,35 +101,30 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	//		}
 	//	}
 	//}
-	store := y.StoreFunctionBuilder()
-	blueprint.AddLazyBuilder(func() {
-		switchHandler := y.SwitchFunctionBuilder(store)
-		defer switchHandler()
-		for _, parent := range parents {
-			bp := y.GetBluePrint(parent)
-			if bp == nil {
-				bp = y.CreateBlueprint(parent, tokenMap[parent])
-			}
-			blueprint.AddParentBlueprint(bp)
+	for _, parent := range parents {
+		bp := y.GetBluePrint(parent)
+		if bp == nil {
+			bp = y.CreateBlueprint(parent, tokenMap[parent])
 		}
-		for _, impl := range interfaces {
-			bp := y.GetBluePrint(impl)
-			if bp == nil {
-				bp = y.CreateBlueprint(impl, tokenMap[impl])
-			}
-			blueprint.AddInterfaceBlueprint(bp)
+		blueprint.AddParentBlueprint(bp)
+	}
+	for _, impl := range interfaces {
+		bp := y.GetBluePrint(impl)
+		if bp == nil {
+			bp = y.CreateBlueprint(impl, tokenMap[impl])
 		}
-		if extendName != "" {
-			bp := y.GetBluePrint(extendName)
-			if bp == nil {
-				bp = y.CreateBlueprint(extendName, tokenMap[extendName])
-			}
-			blueprint.AddSuperBlueprint(bp)
+		blueprint.AddInterfaceBlueprint(bp)
+	}
+	if extendName != "" {
+		bp := y.GetBluePrint(extendName)
+		if bp == nil {
+			bp = y.CreateBlueprint(extendName, tokenMap[extendName])
 		}
-		for _, statement := range i.AllClassStatement() {
-			y.VisitClassStatement(statement, blueprint)
-		}
-	})
+		blueprint.AddSuperBlueprint(bp)
+	}
+	for _, statement := range i.AllClassStatement() {
+		y.VisitClassStatement(statement, blueprint)
+	}
 	//todo: 可能会有问题
 	// bluePrint.Build()
 	obj := y.EmitMakeWithoutType(nil, nil)
@@ -201,10 +196,9 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			y.GetProgram().SetExportType(name, blueprint)
 
 			if i.Extends() != nil {
-				super := i.QualifiedStaticTypeRef().GetText()
-				extendName = super
-				parents = append(parents, super)
-				tokenMap[super] = i.QualifiedStaticTypeRef()
+				extendName = i.QualifiedStaticTypeRef().GetText()
+				parents = append(parents, extendName)
+				tokenMap[extendName] = i.QualifiedStaticTypeRef()
 			}
 			if i.Implements() != nil {
 				for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
@@ -247,6 +241,9 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			}
 			bp.SetKind(ssa.BlueprintInterface)
 			blueprint.AddParentBlueprint(bp)
+			for _, s := range bp.GetFullTypeNames() {
+				blueprint.AddFullTypeName(s)
+			}
 		}
 		for _, impl := range implNames {
 			bp := y.GetBluePrint(impl)
@@ -272,10 +269,10 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			bp.SetKind(ssa.BlueprintInterface)
 			blueprint.AddSuperBlueprint(bp)
 		}
-		for _, statement := range i.AllClassStatement() {
-			y.VisitClassStatement(statement, blueprint)
-		}
 	})
+	for _, statement := range i.AllClassStatement() {
+		y.VisitClassStatement(statement, blueprint)
+	}
 }
 
 func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, class *ssa.Blueprint) {
