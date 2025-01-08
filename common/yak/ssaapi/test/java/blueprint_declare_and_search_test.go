@@ -26,8 +26,8 @@ func Test_Blueprint_name2declare(t *testing.T) {
 			A as $classA
 			C as $classC // interface 
 			`, map[string][]string{
-				"classA": {"A_declare"},
-				"classC": {"C_declare"},
+				"classA": {"A"},
+				"classC": {"C"},
 			}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
@@ -35,7 +35,7 @@ func Test_Blueprint_name2declare(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 		A_declare as $classA;
 		`, map[string][]string{
-			"classA": {"A_declare"},
+			"classA": {"A"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
@@ -49,13 +49,13 @@ func Test_Blueprint_name2declare(t *testing.T) {
 		E.__interface__ as $retF //  C
 		E.__super__ as $retG // A
 		`, map[string][]string{
-			"retA": {"B_declare", "E_declare"},
-			"retB": {"D_declare", "E_declare"},
-			"retC": {"A_declare"},
-			"retD": {"C_declare"},
-			"retE": {"C_declare"},
-			"retF": {"C_declare"},
-			"retG": {"A_declare"},
+			"retA": {"B", "E"},
+			"retB": {"D", "E"},
+			"retC": {"A"},
+			"retD": {"C"},
+			"retE": {"C"},
+			"retF": {"C"},
+			"retG": {"A"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
@@ -68,12 +68,12 @@ func Test_Blueprint_name2declare(t *testing.T) {
 		D.__parents__ as $retE // C
 		E.__parents__ as $retF // A C
 		`, map[string][]string{
-			"retA": {"B_declare", "E_declare"},
-			"retB": {"D_declare", "E_declare", "CC_declare"},
-			"retC": {"A_declare"},
-			"retD": {"C_declare"},
-			"retE": {"C_declare"},
-			"retF": {"A_declare", "C_declare"},
+			"retA": {"B", "E"},
+			"retB": {"D", "E", "CC"},
+			"retC": {"A"},
+			"retD": {"C"},
+			"retE": {"C"},
+			"retF": {"A", "C"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
