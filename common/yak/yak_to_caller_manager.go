@@ -366,7 +366,13 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 						log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
 					}
 				case <-subCtx.Done():
-					log.Errorf("call %s YakFunction timeout after %v seconds", scriptName, y.callTimeout)
+					if err := subCtx.Err(); err == context.DeadlineExceeded {
+						log.Errorf("call %s YakFunction timeout after %v seconds", scriptName, y.callTimeout)
+					} else if err == context.Canceled {
+
+					} else {
+						log.Errorf("call %s YakFunction done by unknown error: %v", scriptName, err)
+					}
 				}
 				return nil
 			},
