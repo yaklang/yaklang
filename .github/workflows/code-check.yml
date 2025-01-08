@@ -1,0 +1,57 @@
+name: code-check
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+jobs:
+  setup:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Cache YakLang Project
+        uses: actions/cache@v3
+        id: cache-project
+        with:
+          path: |
+            ~/yakit-projects
+            ${{ github.workspace }}
+          key: go-${{ github.event.pull_request.head.sha }}
+      - name: Check out code into the Go module directory
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Fetch Main And Reset Main
+        run: |
+          git fetch origin main:main
+          git checkout main
+          git reset --hard origin/main
+          git status
+          git branch
+          git checkout ${{github.event.pull_request.head.sha}}
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: "./go.mod"
+        id: go
+      - name: Dependence
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libpcap-dev
+          version: 1.9.1-3
+      - name: Init Module
+        run: |
+          go mod tidy
+      - name: Init Project
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        run: |
+          go build common/yak/cmd/yak.go 
+          ./yak --help
+      - name: Set Current Directory as Env Var
+        run: echo "GIT_DIR=$(pwd)" >> $GITHUB_ENV
+      - name: Check Diff Code
+        run: |
+          ls -al ./.git/*/*
+          go test -timeout 5m ./common/ssa_bootstrapping/...
+        env:
+          GIT_DIR: ${{env.GIT_DIR}}
