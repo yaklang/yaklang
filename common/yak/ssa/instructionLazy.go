@@ -176,7 +176,9 @@ func (lz *LazyInstruction) ShouldSave() bool {
 		return false
 	}
 
-	return lz.Modify
+	// TODO: use this flag to check if need save
+	// return lz.Modify
+	return lz.Instruction != nil
 }
 
 // just use lazy instruction
