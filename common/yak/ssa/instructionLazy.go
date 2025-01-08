@@ -149,11 +149,13 @@ func (lz *LazyInstruction) check() {
 }
 
 func (lz *LazyInstruction) ShouldSave() bool {
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return false
 	}
 
-	return lz.Modify
+	// TODO: use this flag to check if need save
+	// return lz.Modify
+	return lz.Instruction != nil
 }
 
 // just use lazy instruction
