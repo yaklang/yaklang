@@ -161,12 +161,28 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	// log.Infof("AssignVariable: %v, %v typ %s", variable.GetName(), value.GetName(), value.GetType())
 	name := variable.GetName()
-	_ = name
+	scope := b.CurrentBlock.ScopeTable
+
 	if utils.IsNil(value) {
 		log.Infof("assign nil value to variable: %v, it will not work on ssa ir format", name)
 		return
 	}
-	scope := b.CurrentBlock.ScopeTable
+
+	if value.GetOpcode() == SSAOpcodeUnOp {
+		if un := value.(*UnOp); un.Op == OpAddress {
+			un.X.SetVerboseName(name)
+			un.AddOccultation(un.X)
+		}
+	}
+
+	if v := variable.GetValue(); v != nil && v.GetOpcode() == SSAOpcodeUnOp {
+		if un := v.(*UnOp); un.Op == OpAddress {
+			for _, o := range un.GetOccultation() {
+				scope.AssignVariable(o.GetLastVariable(), value)
+			}
+		}
+	}
+
 	scope.AssignVariable(variable, value)
 
 	if value.GetName() == variable.GetName() {
@@ -223,10 +239,7 @@ func (b *FunctionBuilder) CreateVariableForce(name string, pos ...CanStartStopTo
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
 	if variable := b.getCurrentScopeVariable(name); variable != nil {
 		if value := variable.GetValue(); value != nil {
-			if _, ok := ToConst(value); ok {
-				return variable
-			}
-			if _, ok := value.(*SideEffect); ok {
+			if _, ok := ToParameter(value); !ok {
 				return variable
 			}
 		}
