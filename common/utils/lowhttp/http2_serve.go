@@ -281,19 +281,20 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 			}
 		case *http2.DataFrame:
 			// update window
-			frWriteMutex.Lock()
-			err := frame.WriteWindowUpdate(0, uint32(len(ret.Data())))
-			frWriteMutex.Unlock()
-			if err != nil {
-				return utils.Errorf("h2 server write window update error: %v", err)
+			if len(ret.Data()) > 0 {
+				frWriteMutex.Lock()
+				err := frame.WriteWindowUpdate(0, uint32(len(ret.Data())))
+				frWriteMutex.Unlock()
+				if err != nil {
+					return utils.Errorf("h2 server write window update error: %v", err)
+				}
+				frWriteMutex.Lock()
+				err = frame.WriteWindowUpdate(ret.StreamID, uint32(len(ret.Data())))
+				frWriteMutex.Unlock()
+				if err != nil {
+					return utils.Errorf("h2 server write window update error: %v", err)
+				}
 			}
-			frWriteMutex.Lock()
-			err = frame.WriteWindowUpdate(ret.StreamID, uint32(len(ret.Data())))
-			frWriteMutex.Unlock()
-			if err != nil {
-				return utils.Errorf("h2 server write window update error: %v", err)
-			}
-
 			req := getReq(ret.StreamID)
 			if len(ret.Data()) > 0 {
 				req.bodyBuf.Write(ret.Data())
