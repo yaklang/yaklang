@@ -7,10 +7,12 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"io/fs"
+	"os"
 	"strings"
 	"testing"
 )
@@ -19,6 +21,11 @@ import (
 var ruleFS embed.FS
 
 func TestSSACI(t *testing.T) {
+	if !utils.InGithubActions() {
+		t.Skip()
+	}
+	repos := os.Getenv("GIT_DIR")
+	log.Infof("repos: %s", repos)
 	fsInstance := filesys.NewEmbedFS(ruleFS)
 	sfRules := []*schema.SyntaxFlowRule{}
 	err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
@@ -39,17 +46,16 @@ func TestSSACI(t *testing.T) {
 		return nil
 	}))
 	require.NoError(t, err)
-
-	baseCommit, currentCommit, err := yakgit.GetHeadCommitRange("./")
+	baseCommit, currentCommit, err := yakgit.GetHeadCommitRange(repos)
 	require.NoError(t, err)
 
-	gitFs, err := yakgit.FromCommitRange("./", baseCommit.Hash.String(), currentCommit.Hash.String())
+	gitFs, err := yakgit.FromCommitRange(repos, baseCommit.Hash.String(), currentCommit.Hash.String())
 	require.NoError(t, err)
 	progs, err := ssaapi.ParseProjectWithFS(gitFs, ssaapi.WithLanguage(ssaapi.GO))
 	require.NoError(t, err)
 	var errs error
 	for _, rule := range sfRules {
-		result, err2 := progs.SyntaxFlowRule(rule)
+		result, err2 := progs.SyntaxFlowRule(rule, ssaapi.QueryWithEnableDebug())
 		if err2 != nil {
 			errs = errors.Wrapf(errs, "syntaxflow rule execute error: %s", err2)
 			continue
