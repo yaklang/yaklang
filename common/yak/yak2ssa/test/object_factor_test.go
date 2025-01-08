@@ -22,7 +22,7 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 			println(f(a))
 			`,
 			Want: []string{
-				"Function-f(make(map[string]number)) member[1]",
+				"Function-f(a) member[1]",
 			},
 		})
 	})
@@ -52,7 +52,7 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 			println(a.get())
 			`,
 			Want: []string{
-				"Function-a.get(make(map[string]any)) member[1]",
+				"Function-a.get(a) member[1]",
 			},
 		})
 	})
