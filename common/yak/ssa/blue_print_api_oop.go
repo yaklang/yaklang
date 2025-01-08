@@ -49,13 +49,13 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...C
 	}
 	b.SetBlueprint(name, blueprint)
 	blueprintContainer := b.EmitEmptyContainer()
-	variableName := fmt.Sprintf("%s_declare", name)
-	blueprintContainer.SetName(variableName)
-
+	blueprintContainer.SetName(name)
+	blueprintContainer.SetVerboseName(name)
 	// search this blueprint-declare can use ${blueprint-name} or ${blueprint-name}_declare
-	var1 := b.CreateVariable(name, tokenizer...)
+	variableName := fmt.Sprintf("%s_declare", name)
+	var1 := b.CreateVariable(variableName, tokenizer...)
 	b.AssignVariable(var1, blueprintContainer)
-	var2 := b.CreateVariable(variableName, tokenizer...)
+	var2 := b.CreateVariable(name, tokenizer...)
 	b.AssignVariable(var2, blueprintContainer)
 
 	if err := blueprint.InitializeWithContainer(blueprintContainer); err != nil {

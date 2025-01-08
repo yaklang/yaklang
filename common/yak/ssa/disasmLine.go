@@ -189,7 +189,7 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 			return v.name
 		}
 		typ := v.GetType()
-		return fmt.Sprintf("make(%v):%s", typ.String(), v.name)
+		return fmt.Sprintf("make(%v)", typ.String())
 	case *Next:
 		return fmt.Sprintf("next(%s)", liner.DisasmValue(v.Iter))
 	case *TypeCast:
