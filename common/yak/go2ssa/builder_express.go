@@ -24,6 +24,15 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 			return b.EmitConstInst(0)
 		}
 	}
+	getVariable := func(single getSingleExpr, i int) *ssa.Variable {
+		if s := single.Expression(i); s != nil {
+			_, rightl := b.buildExpression(s.(*gol.ExpressionContext), IslValue)
+			return rightl
+		} else {
+			b.NewError(ssa.Error, TAG, "can't get expression")
+			return b.CreateVariable("")
+		}
+	}
 
 	// fmt.Printf("exp = %v\n", exp.GetText())
 
@@ -47,9 +56,9 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 			case "<-":
 				ssaop = ssa.OpChan
 			case "*":
-				ssaop = ""
+				ssaop = ssa.OpDereference
 			case "&":
-				ssaop = ""
+				ssaop = ssa.OpAddress
 			default:
 				b.NewError(ssa.Error, TAG, UnaryOperatorNotSupport(op.GetText()))
 			}
@@ -59,7 +68,10 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 				b.NewError(ssa.Error, TAG, NeedTwoExpression())
 				return b.EmitConstInst(0), b.CreateVariable("")
 			}
-			if ssaop == "" {
+			if ssaop == ssa.OpDereference {
+				if un, ok := op1.(*ssa.UnOp); ok {
+					return un.X, nil
+				}
 				return op1, nil
 			}
 			return b.EmitUnOp(ssaop, op1), nil
@@ -159,7 +171,19 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 			return b.EmitBinOp(ssaop, op1, op2), nil
 		}
 	} else { // left
+		if op := exp.GetUnary_op(); op != nil {
+			var ssaop ssa.UnaryOpcode
+			_ = ssaop
+			switch op.GetText() {
+			case "*":
+				ssaop = ssa.OpDereference
+			default:
+				b.NewError(ssa.Error, TAG, UnaryOperatorNotSupport(op.GetText()))
+			}
 
+			va1 := getVariable(exp, 0)
+			return nil, va1
+		}
 	}
 
 	return b.EmitConstInst(0), b.CreateVariable("")
@@ -272,6 +296,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				}
 			}
 
+			if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+				rv = un.X
+			}
 			if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 				handleObjectType(rv, typ)
 			} else if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), test); ok {
