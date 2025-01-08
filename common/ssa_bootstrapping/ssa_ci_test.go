@@ -2,7 +2,9 @@ package ssa_bootstrapping
 
 import (
 	"embed"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -17,7 +19,6 @@ import (
 var ruleFS embed.FS
 
 func TestSSACI(t *testing.T) {
-
 	fsInstance := filesys.NewEmbedFS(ruleFS)
 	sfRules := []*schema.SyntaxFlowRule{}
 	err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
@@ -44,14 +45,21 @@ func TestSSACI(t *testing.T) {
 
 	gitFs, err := yakgit.FromCommitRange("./", baseCommit.Hash.String(), currentCommit.Hash.String())
 	require.NoError(t, err)
-
 	progs, err := ssaapi.ParseProjectWithFS(gitFs, ssaapi.WithLanguage(ssaapi.GO))
 	require.NoError(t, err)
-	require.Len(t, progs, 1)
-	prog := progs[0]
-
-	res, err := prog.SyntaxFlowRule(&schema.SyntaxFlowRule{})
-	require.NoError(t, err)
-
-	_ = res
+	var errs error
+	for _, rule := range sfRules {
+		result, err2 := progs.SyntaxFlowRule(rule)
+		if err2 != nil {
+			errs = errors.Wrapf(errs, "syntaxflow rule execute error: %s", err2)
+			continue
+		}
+		risks := result.GetValues("risk")
+		if risks.Len() != 0 {
+			log.Errorf("this pr have risk. check it. rule[%s]", rule.RuleName)
+			risks.ShowWithSource(true)
+			errs = errors.Wrapf(errs, "this pr have risk. rule[%s],", rule.RuleName)
+		}
+	}
+	require.NoError(t, errs)
 }

@@ -1,0 +1,10 @@
+/InitializeYakitDatabase|GetGormProjectDatabase|GetGormProfileDatabase/ as $source
+
+$source<getObject>?{have: consts} as $risk1
+$source()<getFunc>?{have: init} as $risk2
+$source()<getFunc>?{have: Anonymous} as $Anonymous
+$Anonymous-{hook: `*<getFunc()>?{have: init} as $risk3`}->
+
+$risk1+$risk2+$risk3 as $risk
+
+alert $risk
