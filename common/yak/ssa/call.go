@@ -279,7 +279,23 @@ func (c *Call) handleCalleeFunction() {
 					)
 					continue
 				}
-				val := builder.ReadMemberCallValue(object, key)
+
+				var val Value
+				if val = builder.ReadMemberCallValueByName(object, key.String()); val == nil {
+					if o, ok := object.GetType().(*ObjectType); ok {
+						for n, a := range o.AnonymousField {
+							if k := a.GetKeybyName(key.String()); k != nil {
+								objectt := builder.ReadMemberCallValueByName(object, n)
+								if objectt == nil {
+									log.Warnf("anonymous object %v not find", n)
+									continue
+								}
+								val = builder.ReadMemberCallValueByName(objectt, k.String())
+							}
+						}
+					}
+				}
+				val = builder.ReadMemberCallValue(object, key)
 				val.AddUser(c)
 				c.ArgMember = append(c.ArgMember, val)
 			}

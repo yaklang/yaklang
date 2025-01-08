@@ -237,7 +237,7 @@ func TestStmt_spin(t *testing.T) {
 		}
 		println(array2D[2][2])
 	}
-		`, []string{"phi(#50[2])[add(1, 5),9]"}, t)
+		`, []string{"phi(#52[2])[add(1, 5),9]"}, t)
 	})
 
 	t.Run("for Spin map assign", func(t *testing.T) {
