@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
 	"github.com/yaklang/yaklang/common/utils"
@@ -34,12 +35,14 @@ func (p *Proxy) proxyH2(closing chan bool, cc net.Conn, url *url.URL, ctx *Conte
 			return nil, nil, err
 		}
 		inherit := func(i string) {
-			httpctx.SetContextValueInfoFromRequest(req, i, ctx.GetSessionStringValue(i))
+			v := ctx.GetSessionValue(i)
+			httpctx.SetContextValueInfoFromRequest(req, i, v)
 		}
 		inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
 		inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 		inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 		httpctx.SetRequestHTTPS(req, true)
+		httpctx.SetPluginContext(req, consts.NewPluginContext())
 		if req.URL != nil {
 			req.URL.Scheme = "https"
 		}

@@ -332,24 +332,24 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 		return
 	}
 
-	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "http")
+	s.Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "http")
 	// s5 proxy needs to have higher priority than http proxy
 	if s5ProxyAddr, ok := rootCtx.Value(S5_CONNECT_ADDR).(string); ok && s5ProxyAddr != "" {
-		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, s5ProxyAddr)
+		s.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, s5ProxyAddr)
 		if s5ProxyHost, ok := rootCtx.Value(S5_CONNECT_HOST).(string); ok && s5ProxyHost != "" {
-			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, rootCtx.Value(S5_CONNECT_HOST).(string))
+			s.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, rootCtx.Value(S5_CONNECT_HOST).(string))
 		}
 		if s5ProxyPort, ok := rootCtx.Value(S5_CONNECT_PORT).(string); ok && s5ProxyPort != "" {
-			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, rootCtx.Value(S5_CONNECT_PORT).(string))
+			s.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, rootCtx.Value(S5_CONNECT_PORT).(string))
 		}
-		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "socks5")
-		ctx.Session().Set(AUTH_FINISH, true)
+		s.Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "socks5")
+		s.Set(AUTH_FINISH, true)
 	}
 
 	/* TLS */
 	if isTLSConn {
-		ctx.Session().MarkSecure()
-		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, true)
+		s.MarkSecure()
+		s.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, true)
 		var serverUseH2 bool
 		if p.http2 {
 			// does remote server use h2?
@@ -455,10 +455,10 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 	// set session ctx, session > httpctx
 	parsedConnectedToPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 	parsedConnectedToHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
-	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
-	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
-	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
-	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ViaConnect, true)
+	session.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
+	session.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
+	session.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
+	session.Set(httpctx.REQUEST_CONTEXT_KEY_ViaConnect, true)
 
 	if err := p.reqmod.ModifyRequest(req); err != nil {
 		if !strings.Contains(err.Error(), "ignore connect") {
@@ -517,19 +517,19 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 
 	// 22 is the TLS handshake.
 	isHttps := b[0] == 0x16
-	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
+	session.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
 	if parsedConnectedToPort == 0 {
 		if isHttps {
 			parsedConnectedToPort = 443
 		} else {
 			parsedConnectedToPort = 80
 		}
-		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
+		session.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
 	}
 
 	// https://tools.ietf.org/html/rfc5246#section-6.2.1
 	if isHttps {
-		ctx.Session().MarkSecure()
+		session.MarkSecure()
 
 		var serverUseH2 bool
 		if p.http2 {
@@ -657,8 +657,6 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 			httpctx.SetProcessName(req, name)
 		}
 	}
-	httpctx.SetMITMFrontendReadWriter(req, brw)
-	httpctx.SetPluginContext(req, consts.NewPluginContext())
 
 	session := ctx.Session()
 	ctx, err := withSession(session)
@@ -667,9 +665,15 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 		return err
 	}
 
+	httpctx.SetMITMFrontendReadWriter(req, brw)
+
 	link(req, ctx, p)
 	defer unlink(req, p)
 
+	// set plugin context
+	httpctx.SetPluginContext(req, consts.NewPluginContext())
+
+	// auth
 	proxyProtocol := ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol)
 	authFinish := ctx.GetSessionBoolValue(AUTH_FINISH)
 	needAuth := p.proxyUsername != "" || p.proxyPassword != ""
@@ -756,7 +760,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 					// 认证失败
 					return failed("username/password is not valid!")
 				}
-				ctx.Session().Set(AUTH_FINISH, true)
+				session.Set(AUTH_FINISH, true)
 			} else {
 				return failed("empty Proxy-Authorization Header")
 			}
