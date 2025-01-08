@@ -103,6 +103,14 @@ func (r *MITMReplaceRule) compile() (*regexp2.Regexp, error) {
 	return re, nil
 }
 
+func (m *MITMReplaceRule) matchRawSimple(rawPacket []byte) (bool, error) {
+	r, err := m.compile()
+	if err != nil {
+		return false, err
+	}
+	return r.MatchString(string(rawPacket))
+}
+
 func (m *MITMReplaceRule) matchByPacketInfo(info *yakit.PacketInfo) ([]*yakit.MatchResult, error) {
 	r, err := m.compile()
 	if err != nil {
@@ -537,8 +545,18 @@ func (m *mitmReplacer) GetHijackingRules() []*ypb.MITMContentReplacer {
 	return m._hijackingRules.MITMContentReplacers()
 }
 
-func stringForSettingColor(s []string, flow *schema.HTTPFlow) {
-	log.Debugf("set color[%v] for %v", s, flow.Url)
+type ColorFlow interface {
+	Red()
+	Green()
+	Blue()
+	Yellow()
+	Orange()
+	Purple()
+	Cyan()
+	Grey()
+}
+
+func stringForSettingColor(s []string, flow ColorFlow) {
 	for _, c := range lo.Union(s) {
 		switch strings.ToLower(c) {
 		case "red":
@@ -560,6 +578,49 @@ func stringForSettingColor(s []string, flow *schema.HTTPFlow) {
 		}
 	}
 	return
+}
+
+func (m *mitmReplacer) hookColorWs(rawPacket []byte, flow *schema.WebsocketFlow) {
+	if m == nil {
+		return
+	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("colorize failed: %v", strconv.Quote(string(rawPacket)))
+		}
+	}()
+
+	var (
+		colorName []string
+		tagNames  []string
+	)
+
+	defer func() {
+		flow.AddTag(tagNames...)
+		stringForSettingColor(colorName, flow)
+	}()
+
+	for _, rule := range m._mirrorRules {
+		if !rule.EnableForRequest && !rule.EnableForResponse {
+			continue
+		}
+
+		match, err := rule.matchRawSimple(rawPacket)
+		if err != nil {
+			log.Errorf("match package failed: %v", err)
+			continue
+		}
+
+		if !match {
+			continue
+		}
+
+		if rule.Color != "" {
+			colorName = append(colorName, rule.Color)
+		}
+		tagNames = append(tagNames, rule.ExtraTag...) // merge tag name
+	}
 }
 
 func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *schema.HTTPFlow) []*schema.ExtractedData {

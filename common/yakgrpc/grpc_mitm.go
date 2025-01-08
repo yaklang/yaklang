@@ -666,11 +666,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			wshash = utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), ts)
 		}
 
-		yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), true, wshash, requireWsFrameIndexByWSHash(wshash), raw[:], func(err error) {
-			if err != nil {
-				log.Warnf("save websocket flow(from server) failed: %s", err)
-			}
-		})
+		defer func() {
+			wsFlow := yakit.BuildWebsocketFlow(true, wshash, requireWsFrameIndexByWSHash(wshash), finalResult[:])
+			replacer.hookColorWs(finalResult, wsFlow)
+			yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), wsFlow, func(err error) {
+				if err != nil {
+					log.Warnf("save websocket flow(from server) failed: %s", err)
+				}
+			})
+		}()
 
 		if autoForward.IsSet() {
 			// 自动转发的内容，按理说这儿应该接入内部规则
@@ -984,12 +988,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		originReqRaw := raw[:]
 		finalResult = originReqRaw
 
-		// 保存 Websocket Flow
-		yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), false, wshash, requireWsFrameIndexByWSHash(wshash), raw[:], func(err error) {
-			if err != nil {
-				log.Warnf("save to websocket flow failed: %s", err)
-			}
-		})
+		defer func() {
+			wsFlow := yakit.BuildWebsocketFlow(true, wshash, requireWsFrameIndexByWSHash(wshash), finalResult[:])
+			replacer.hookColorWs(finalResult, wsFlow)
+			yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), wsFlow, func(err error) {
+				if err != nil {
+					log.Warnf("save websocket flow(from server) failed: %s", err)
+				}
+			})
+		}()
 
 		// MITM 自动转发
 		if autoForward.IsSet() {
