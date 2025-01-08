@@ -451,8 +451,8 @@ func (y *YakToCallerManager) SetForYakit(
 	ctx context.Context,
 	code string,
 	paramMap map[string]any, callerIf interface {
-		Send(result *ypb.ExecResult) error
-	},
+	Send(result *ypb.ExecResult) error
+},
 	hooks ...string,
 ) error {
 	caller := func(result *ypb.ExecResult) error {
@@ -1364,8 +1364,8 @@ func (y *YakToCallerManager) AddForYakit(
 	ctx context.Context, script *schema.YakScript,
 	paramMap map[string]any,
 	code string, callerIf interface {
-		Send(result *ypb.ExecResult) error
-	},
+	Send(result *ypb.ExecResult) error
+},
 	hooks ...string,
 ) error {
 	caller := func(result *ypb.ExecResult) error {
@@ -1626,7 +1626,7 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) {
 
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("call [%v] failed: %v", name, err)
+			log.Errorf("call [%v] failed: %v， stack: %v", name, err, utils.ErrorStack(err))
 			return
 		}
 	}()
@@ -1663,7 +1663,7 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) {
 	call := func(pluginRuntimeID string, i *Caller) {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Errorf("call failed: \n%v", err)
+				log.Errorf("call failed: \n%v\n, stack: %v", err, utils.ErrorStack(err))
 			}
 		}()
 		if (pluginId == "" /*执行所有该类型的插件*/) || (i.Id == pluginId /*执行当前插件*/) {
@@ -1707,7 +1707,7 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) {
 					taskWG.Done()
 					y.swg.Done()
 					if err := recover(); err != nil {
-						log.Errorf("panic from call[%v]: %v", verbose, err)
+						log.Errorf("panic from call[%v]: %v\nstack: %v", verbose, err, utils.ErrorStack(err))
 					}
 				}()
 				if verbose != "" {
