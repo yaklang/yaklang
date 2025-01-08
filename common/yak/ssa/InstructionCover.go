@@ -157,3 +157,4 @@ func ToAliasType(t Type) (*AliasType, bool)          { a, ok := t.(*AliasType); 
 func ToFunctionType(t Type) (*FunctionType, bool)    { f, ok := t.(*FunctionType); return f, ok }
 func ToBasicType(t Type) (*BasicType, bool)          { b, ok := t.(*BasicType); return b, ok }
 func ToClassBluePrintType(t Type) (*Blueprint, bool) { c, ok := t.(*Blueprint); return c, ok }
+func ToPointerType(t Type) (*PointerType, bool)      { p, ok := t.(*PointerType); return p, ok }

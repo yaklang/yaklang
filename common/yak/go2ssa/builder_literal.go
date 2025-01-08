@@ -167,6 +167,12 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				func(i int) ssa.Value {
 					return typeHandler(objt.FieldType, kvs[i].kv)
 				})
+		case ssa.PointerTypeKind:
+			pt := typ.(*ssa.PointerType)
+			if kvs[0].value != nil {
+				return kvs[0].value.(*ssa.UnOp).X
+			}
+			return typeHandler(pt.GetOrigin(), kvs)
 		case ssa.StructTypeKind:
 			objt := typ.(*ssa.ObjectType)
 
@@ -231,6 +237,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				partInit()
 				for _, kv := range kvs {
 					if a, ok := objt.AnonymousField[kv.key.String()]; ok {
+						if _, ok := obj.GetAllMember()[objt.GetKeybyName(kv.key.String())]; ok {
+							continue
+						}
 						newObject := typeHandler(a, kv.kv)
 						variable := b.CreateMemberCallVariable(obj, b.EmitConstInst(kv.key.String()))
 						b.AssignVariable(variable, newObject)
@@ -654,6 +663,7 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 	defer recoverRange()
 
 	var ssatyp ssa.Type = nil
+	var key ssa.Value
 	if typ := stmt.Type_(); typ != nil {
 		ssatyp = b.buildType(typ.(*gol.Type_Context))
 	}
@@ -675,11 +685,16 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			}
 			if p, ok := parent.(*ssa.ObjectType); ok {
 				structTyp.AnonymousField[typ.TypeName().GetText()] = p
-				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), p)
+				key = b.EmitConstInst(typ.TypeName().GetText())
 			} else if a, ok := parent.(*ssa.AliasType); ok {
-				structTyp.AddField(b.EmitConstInst(a.Name), a.GetType())
+				key = b.EmitConstInst(a.Name)
 			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
-				structTyp.AddField(b.EmitConstInst(ba.GetName()), ba)
+				key = b.EmitConstInst(ba.GetName())
+			}
+			if typ.STAR() != nil {
+				structTyp.AddField(key, ssa.NewPointerType(parent))
+			} else {
+				structTyp.AddField(key, parent)
 			}
 		}
 	}
