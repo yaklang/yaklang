@@ -261,6 +261,39 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 	return fs, nil
 }
 
+func GetHeadCommitRange(repos string) (*object.Commit, *object.Commit, error) {
+	repo, err := git.PlainOpen(repos)
+	if err != nil {
+		return nil, nil, err
+	}
+	currentRef, err := repo.Head()
+	if err != nil {
+		return nil, nil, err
+	}
+	currentCommit, err := repo.CommitObject(currentRef.Hash())
+	if err != nil {
+		return nil, nil, err
+	}
+	upstreamRef, err := repo.Reference("refs/heads/main", true)
+	if err != nil {
+		return nil, nil, err
+	}
+	upstreamCommit, err := repo.CommitObject(upstreamRef.Hash())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	base, err := currentCommit.MergeBase(upstreamCommit)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(base) <= 0 {
+		return nil, nil, utils.Error("no merge base")
+	}
+	return base[0], currentCommit, nil
+}
+
 func GetHeadHash(repos string) string {
 	res, err := git.PlainOpen(repos)
 	if err != nil {

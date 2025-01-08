@@ -39,7 +39,10 @@ func TestSSACI(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	gitFs, err := yakgit.FromCommitRange("./", "a4cf4db245366393e99d9496498c4c64802c5cc3", "c2dcc262ad9abb4a47746e1ddf53d3f5131d30cf")
+	baseCommit, currentCommit, err := yakgit.GetHeadCommitRange("./")
+	require.NoError(t, err)
+
+	gitFs, err := yakgit.FromCommitRange("./", baseCommit.Hash.String(), currentCommit.Hash.String())
 	require.NoError(t, err)
 
 	progs, err := ssaapi.ParseProjectWithFS(gitFs, ssaapi.WithLanguage(ssaapi.GO))
