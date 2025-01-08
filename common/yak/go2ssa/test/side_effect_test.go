@@ -626,3 +626,44 @@ func Test_SideEffect_MutiReturn(t *testing.T) {
 		`, []string{"side-effect(2, a)"}, t)
 	})
 }
+
+func Test_SideEffect_Object(t *testing.T) {
+	t.Run("side-effect value", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			a int
+			b int
+		}
+
+		func main(){
+			o := &T{a: 1, b: 2}
+			f1 := func() {
+				o.a = 2
+			}
+			f1()
+			println(o.a)
+		}
+		`, []string{"side-effect(2, o.a)"}, t)
+	})
+
+	t.Run("side-effect object", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			a int
+			b int
+		}
+
+		func main(){
+			o := &T{a: 1, b: 2}
+			f1 := func() {
+				o = &T{a: 3, b: 4}
+			}
+			f1()
+			println(o.a)
+		}
+		`, []string{"side-effect(2, o.a)"}, t)
+	})
+
+}
