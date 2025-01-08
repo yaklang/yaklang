@@ -59,11 +59,11 @@ public class MyClass extends MyParentClass implements MyInterface {
 func TestJavaClassRelationship(t *testing.T) {
 	ssatest.CheckJava(t, javaClassRelationShipCode, func(prog *ssaapi.Program) error {
 		var ret ssaapi.Values
-		ret = prog.SyntaxFlowChain(`MyClass?{.inherits?{have: Parent,MyInterf}}`).Show()
+		ret = prog.SyntaxFlowChain(`MyClass_declare?{.__parents__?{have: MyParentClass || have: MyInterface}}`).Show()
 		assert.Equal(t, 1, len(ret))
-		ret = prog.SyntaxFlowChain(`MyClass?{.extends?{have: Parent && !have: MyInterf}}`).Show()
+		ret = prog.SyntaxFlowChain(`MyClass?{.__super__?{have: MyParentClass && !have: MyInterface}}`).Show()
 		assert.Equal(t, 1, len(ret))
-		ret = prog.SyntaxFlowChain(`MyClass?{.implements?{!have: Parent && have: MyInterf}}`).Show()
+		ret = prog.SyntaxFlowChain(`MyClass?{.__interface__?{!have: MyParentClass && have: MyInterface}}`).Show()
 		assert.Equal(t, 1, len(ret))
 		return nil
 	})
@@ -72,9 +72,9 @@ func TestJavaClassRelationship(t *testing.T) {
 func TestJavaClassRelationship_2(t *testing.T) {
 	ssatest.CheckJava(t, javaClassRelationShipCode, func(prog *ssaapi.Program) error {
 		var ret ssaapi.Values
-		ret = prog.SyntaxFlowChain(`.inherits?{have: ABC}<getObject>`).Show()
+		ret = prog.SyntaxFlowChain(`.__parents__?{have: ABC}<getObject>`).Show()
 		assert.Equal(t, 1, len(ret))
-		ret = prog.SyntaxFlowChain(`.inherits?{have: Parent,MyInterf}<getObject>`).Show()
+		ret = prog.SyntaxFlowChain(`*declare?{.__parents__?{have: Parent}}?{.__parents__?{have:MyInterface}} `).Show()
 		assert.Equal(t, 1, len(ret))
 		return nil
 	})
