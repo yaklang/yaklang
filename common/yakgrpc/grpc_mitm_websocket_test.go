@@ -308,7 +308,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_RULE(t *testing.T) {
 	token2 := utils.RandStringBytes(60)
 	tagToken := utils.RandStringBytes(10)
 
-	host, port := utils.DebugMockEchoWs("enPayload")
+	host, port := utils.DebugMockEchoWs("ruleCheck")
 	log.Infof("addr: %s:%d", host, port)
 	client, err := NewLocalClient()
 	if err != nil {
@@ -344,7 +344,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_RULE(t *testing.T) {
 		})
 		time.Sleep(3 * time.Second)
 		defer cancel()
-		wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /enPayload?token=%s HTTP/1.1
+		wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /ruleCheck?token=%s HTTP/1.1
 Host: %s
 Accept-Encoding: gzip, deflate
 Sec-WebSocket-Extensions: permessage-deflate
