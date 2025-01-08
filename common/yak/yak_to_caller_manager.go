@@ -451,8 +451,8 @@ func (y *YakToCallerManager) SetForYakit(
 	ctx context.Context,
 	code string,
 	paramMap map[string]any, callerIf interface {
-	Send(result *ypb.ExecResult) error
-},
+		Send(result *ypb.ExecResult) error
+	},
 	hooks ...string,
 ) error {
 	caller := func(result *ypb.ExecResult) error {
@@ -1364,8 +1364,8 @@ func (y *YakToCallerManager) AddForYakit(
 	ctx context.Context, script *schema.YakScript,
 	paramMap map[string]any,
 	code string, callerIf interface {
-	Send(result *ypb.ExecResult) error
-},
+		Send(result *ypb.ExecResult) error
+	},
 	hooks ...string,
 ) error {
 	caller := func(result *ypb.ExecResult) error {
