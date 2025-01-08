@@ -22,8 +22,6 @@ import (
 	"bytes"
 	"os"
 	"strconv"
-
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/log"
 )
 
 // cpuididFunction is a useful type wrapper. The format is eax | (ecx << 32).

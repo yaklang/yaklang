@@ -18,12 +18,11 @@
 package cpuid
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/log"
 )
 
 // hostFeatureSet is initialized at startup.

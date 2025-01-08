@@ -17,9 +17,9 @@ package tcp
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/atomicbitops"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/sync"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"

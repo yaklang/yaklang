@@ -21,7 +21,7 @@ import (
 )
 
 type rateLimitedLogger struct {
-	logger Logger
+	logger *Logger
 	limit  *rate.Limiter
 }
 
@@ -39,25 +39,44 @@ func (rl *rateLimitedLogger) Infof(format string, v ...any) {
 
 func (rl *rateLimitedLogger) Warningf(format string, v ...any) {
 	if rl.limit.Allow() {
-		rl.logger.Warningf(format, v...)
+		rl.logger.Warnf(format, v...)
 	}
 }
 
-func (rl *rateLimitedLogger) IsLogging(level Level) bool {
-	return rl.logger.IsLogging(level)
+func (rl *rateLimitedLogger) IsLogging(level LevelEnum) bool {
+	return LevelEnum(rl.logger.Level) == level
 }
 
 // BasicRateLimitedLogger returns a Logger that logs to the global logger no
 // more than once per the provided duration.
-func BasicRateLimitedLogger(every time.Duration) Logger {
-	return RateLimitedLogger(Log(), every)
+func BasicRateLimitedLogger(every time.Duration) LoggerIf {
+	return RateLimitedLogger(DefaultLogger, every)
 }
 
 // RateLimitedLogger returns a Logger that logs to the provided logger no more
 // than once per the provided duration.
-func RateLimitedLogger(logger Logger, every time.Duration) Logger {
+func RateLimitedLogger(logger *Logger, every time.Duration) LoggerIf {
 	return &rateLimitedLogger{
 		logger: logger,
 		limit:  rate.NewLimiter(rate.Every(every), 1),
 	}
+}
+
+// Logger is a high-level logging interface. It is in fact, not used within the
+// log package. Rather it is provided for others to provide contextual loggers
+// that may append some addition information to log statement. BasicLogger
+// satisfies this interface, and may be passed around as a Logger.
+type LoggerIf interface {
+	// Debugf logs a debug statement.
+	Debugf(format string, v ...any)
+
+	// Infof logs at an info level.
+	Infof(format string, v ...any)
+
+	// Warningf logs at a warning level.
+	Warningf(format string, v ...any)
+
+	// IsLogging returns true iff this level is being logged. This may be
+	// used to short-circuit expensive operations for debugging calls.
+	IsLogging(level LevelEnum) bool
 }
