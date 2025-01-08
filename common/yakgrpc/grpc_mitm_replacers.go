@@ -597,8 +597,8 @@ func (m *mitmReplacer) hookColorWs(rawPacket []byte, flow *schema.WebsocketFlow)
 	)
 
 	defer func() {
-		flow.AddTag(tagNames...)
 		stringForSettingColor(colorName, flow)
+		flow.AddTag(tagNames...)
 	}()
 
 	for _, rule := range m._mirrorRules {
@@ -642,8 +642,8 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 	)
 
 	defer func() {
-		flow.AddTag(tagNames...)
 		stringForSettingColor(colorName, flow)
+		flow.AddTag(tagNames...)
 	}()
 
 	for _, rule := range m._mirrorRules {
