@@ -31,6 +31,7 @@ func (s *SSABuilder) Create() ssa.Builder {
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
+	fb.SetLanguageConfig(ssa.NewLanguageConfig(true, false))
 	container := fb.EmitEmptyContainer()
 	fb.GetProgram().GlobalScope = container
 }

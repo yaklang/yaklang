@@ -4,7 +4,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 
 	"github.com/samber/lo"
@@ -303,10 +302,10 @@ func (c *Call) handleCalleeFunction() {
 		}
 	}
 
-	if builder.GetLanguage() == consts.Yak {
-		handleSideEffect(c, funcTyp)
-	} else {
+	if builder.isBindLanguage() {
 		handleSideEffectBind(c, funcTyp)
+	} else {
+		handleSideEffect(c, funcTyp)
 	}
 
 	// only handler in method call
