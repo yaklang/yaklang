@@ -288,6 +288,8 @@ type Program struct {
 
 	// Template Language
 	Template map[string]tl.TemplateGeneratedInfo
+
+	config *LanguageConfig
 }
 
 // implement Value
@@ -379,6 +381,26 @@ var (
 	_ Node  = (*Function)(nil)
 	_ Value = (*Function)(nil)
 )
+
+type LanguageConfig struct {
+	isBindLanguage  bool
+	isTryBuildValue bool
+}
+
+func NewLanguageConfig(isBindLanguage, isTryBuildValue bool) *LanguageConfig {
+	return &LanguageConfig{
+		isBindLanguage:  isBindLanguage,
+		isTryBuildValue: isTryBuildValue,
+	}
+}
+
+func (c *LanguageConfig) SetBindLanguage(b bool) {
+	c.isBindLanguage = b
+}
+
+func (c *LanguageConfig) SetTryBuildValue(b bool) {
+	c.isTryBuildValue = b
+}
 
 // implement Value
 type BasicBlock struct {
@@ -765,7 +787,6 @@ type Call struct {
 	Async  bool
 	Unpack bool
 
-	isBindLanguage bool
 	// caller
 	// caller Value
 	// ~ drop error

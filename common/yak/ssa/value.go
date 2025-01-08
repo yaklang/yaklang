@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -166,7 +165,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		}
 	}
 
-	if consts.Language(b.GetProgram().Language) == consts.PHP {
+	if b.isTryBuildValue() {
 		b.TryBuildValueWithoutParent(variable.GetName(), value)
 	}
 

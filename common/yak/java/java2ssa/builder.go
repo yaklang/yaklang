@@ -2,6 +2,8 @@ package java2ssa
 
 import (
 	"fmt"
+	"path/filepath"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -9,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"path/filepath"
 )
 
 var INNER_CLASS_SPLIT = "$"
@@ -121,4 +122,8 @@ func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
 	b.LoadFunctionBuilder(s.Store)
+}
+
+func initHandler(fb *ssa.FunctionBuilder) {
+	fb.SetLanguageConfig(ssa.NewLanguageConfig(true, false))
 }
