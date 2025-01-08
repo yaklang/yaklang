@@ -33,7 +33,7 @@ type Decompiler struct {
 	opcodeToSimulateStack         map[*OpCode]*StackSimulationImpl
 	FunctionContext               *class_context.ClassContext
 	varTable                      map[int]*values.JavaRef
-	valueToRef                    map[values.JavaValue][2]any
+	opcodeIdToRef                 map[*OpCode][2]any
 	bytecodes                     []byte
 	opCodes                       []*OpCode
 	RootOpCode                    *OpCode
@@ -63,7 +63,7 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 		offsetToOpcodeIndex: map[uint16]int{},
 		opcodeIndexToOffset: map[int]uint16{},
 		varTable:            map[int]*values.JavaRef{},
-		valueToRef:          map[values.JavaValue][2]any{},
+		opcodeIdToRef:       map[*OpCode][2]any{},
 		varUserMap:          omap.NewEmptyOrderedMap[*values.JavaRef, [][]any](),
 		delRefUserAttr:      map[*utils2.VariableId][3]int{},
 	}
@@ -358,11 +358,18 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		slot := GetStoreIdx(opcode)
 		value := runtimeStackSimulation.Pop().(values.JavaValue)
 		ref, isFirst := runtimeStackSimulation.AssignVar(slot, value)
+		println(ref.Id.String())
 		statements.NewAssignStatement(ref, value, isFirst)
-		d.valueToRef[value] = [2]any{ref, isFirst}
+		d.opcodeIdToRef[opcode] = [2]any{ref, isFirst}
 		attr := d.delRefUserAttr[ref.Id]
 		attr[1]++
 		d.delRefUserAttr[ref.Id] = attr
+
+		if v, ok := value.(*values.CustomValue); ok {
+			if v.Flag == "exception" {
+				loadVarBySlot(slot)
+			}
+		}
 	case OP_NEW:
 		n := Convert2bytesToInt(opcode.Data)
 		javaClass := d.constantPoolGetter(int(n)).(*values.JavaClassValue)
@@ -372,9 +379,6 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_NEWARRAY:
 		length := runtimeStackSimulation.Pop().(values.JavaValue)
 		primerTypeName := types.GetPrimerArrayType(int(opcode.Data[0]))
-		if primerTypeName == nil {
-
-		}
 		runtimeStackSimulation.Push(values.NewNewArrayExpression(types.NewJavaArrayType(primerTypeName), length))
 	case OP_ANEWARRAY:
 		value := d.getPoolValue(int(Convert2bytesToInt(opcode.Data)))
@@ -1103,11 +1107,13 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			} else {
 				typ = types.NewJavaClass("Throwable")
 			}
-			runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+			exceptionValue := values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return "Exception"
 			}, func() types.JavaType {
 				return typ
-			}))
+			})
+			exceptionValue.Flag = "exception"
+			runtimeStackSimulation.Push(exceptionValue)
 		}
 		err := d.calcOpcodeStackInfo(sim, code)
 		if err != nil {
@@ -1278,7 +1284,7 @@ func (d *Decompiler) ParseStatement() error {
 	var nodes []*Node
 	statementsIndex := 0
 	var tryCatchOpcode *OpCode
-	refToNewExpressionAssignNode := map[string]*Node{}
+	refToNewExpressionAssignNode := map[*utils2.VariableId]*Node{}
 	conditionOpToAssignNode := map[int]int{}
 	appendNodeWithOpcode := func(statement statements.Statement, opcode *OpCode) *Node {
 		if opcode.conditionOpId != 0 {
@@ -1300,7 +1306,7 @@ func (d *Decompiler) ParseStatement() error {
 		node := NewNode(statement)
 		if v, ok := statement.(*statements.AssignStatement); ok {
 			if v1, ok := v.LeftValue.(*values.JavaRef); ok {
-				refToNewExpressionAssignNode[v1.Id.String()] = node
+				refToNewExpressionAssignNode[v1.Id] = node
 			}
 		}
 		node.Id = statementsIndex
@@ -1332,7 +1338,7 @@ func (d *Decompiler) ParseStatement() error {
 		switch opcode.Instr.OpCode {
 		case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE, OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0, OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1, OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2, OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3:
 			value := opcode.stackConsumed[0]
-			refInfo := d.valueToRef[value]
+			refInfo := d.opcodeIdToRef[opcode]
 			ref := refInfo[0].(*values.JavaRef)
 			isFirst := refInfo[1].(bool)
 			assignSt := statements.NewAssignStatement(ref, value, isFirst)
@@ -1407,7 +1413,8 @@ func (d *Decompiler) ParseStatement() error {
 							d.delRefUserAttr[v.Id] = attr
 						}
 					}
-					assignNode := refToNewExpressionAssignNode[funcCallValue.Object.String(funcCtx)]
+					val := UnpackSoltValue(funcCallValue.Object)
+					assignNode := refToNewExpressionAssignNode[val.(*values.JavaRef).Id]
 					if assignNode != nil {
 						assignSt := assignNode.Statement
 						assignNode.IsDel = true
@@ -1627,6 +1634,7 @@ func (d *Decompiler) ParseStatement() error {
 	for _, opcode := range d.opCodes {
 		idToOpcode[opcode.Id] = opcode
 	}
+	DumpOpcodesToDotExp(d.RootOpCode)
 	for _, node := range nodes {
 		node := node
 		opcode := idToOpcode[node.Id]
@@ -1658,13 +1666,14 @@ func (d *Decompiler) ParseStatement() error {
 			idToNode[id].Source = append(idToNode[id].Source, node)
 		}
 	}
+
 	for conditionId, toNodeId := range conditionOpToAssignNode {
 		conditionId = getStatementNextIdByOpcodeId(conditionId)
 		toNodeId = getStatementNextIdByOpcodeId(toNodeId)
 		idToNode[toNodeId].SourceConditionNode = idToNode[conditionId]
 	}
 	d.RootNode = nodes[0]
-
+	DumpNodesToDotExp(d.RootNode)
 	d.varUserMap.ForEach(func(ref *values.JavaRef, pairs [][]any) bool {
 		val := GetRealValue(ref.Val)
 		attr := d.delRefUserAttr[ref.Id]
@@ -1707,6 +1716,7 @@ func (d *Decompiler) ParseStatement() error {
 		}
 		return true
 	})
+
 	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
 		if v, ok := node.Statement.(*statements.ConditionStatement); ok && v.Neg {
 			node.Next[0], node.Next[1] = node.Next[1], node.Next[0]
@@ -1725,8 +1735,20 @@ func (d *Decompiler) ParseStatement() error {
 		}
 		return node.Next, nil
 	})
+	DumpNodesToDotExp(d.RootNode)
+	idToNode = map[int]*Node{}
+	nodes = []*Node{}
+	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
+		nodes = append(nodes, node)
+		idToNode[node.Id] = node
+		return node.Next, nil
+	})
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].Id < nodes[j].Id
+	})
 	err = WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
 		if node.IsTryCatch {
+			DumpNodesToDotExp(d.RootNode)
 			tryNodeId := getStatementNextIdByOpcodeId(node.TryNodeId)
 			catchNodeIds := funk.Map(node.CatchNodeId, func(id int) int {
 				return getStatementNextIdByOpcodeId(id)
@@ -1738,6 +1760,7 @@ func (d *Decompiler) ParseStatement() error {
 				return slices.Contains(catchNodeIds, n.Id)
 			})
 			if len(tryNodes) == 0 {
+				DumpOpcodesToDotExp(d.RootOpCode)
 				return nil, errors.New("not found try body")
 			}
 			if len(catchNodes) == 0 {

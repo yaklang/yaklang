@@ -18,10 +18,13 @@ func NewRootVariableId() *VariableId {
 //		return fmt.Sprintf("var%d", v.Uid())
 //	}
 func (v *VariableId) Id() int {
+	return v._id() - 1
+}
+func (v *VariableId) _id() int {
 	if v.parent == nil {
 		return 0
 	}
-	return v.parent.Id() + 1
+	return v.parent._id() + 1
 }
 func (v *VariableId) String() string {
 	return fmt.Sprintf("var%d", v.Id())

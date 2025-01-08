@@ -95,7 +95,7 @@ func TestParseJar(t *testing.T) {
 }
 
 func TestParseJar2(t *testing.T) {
-	jarFs, err := NewJarFSFromLocal("/Users/v1ll4n/.m2/repository/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.15.4/jackson-datatype-jdk8-2.15.4.jar")
+	jarFs, err := NewJarFSFromLocal("/Users/z3/.m2/repository/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.12.5/jackson-datatype-jdk8-2.12.5.jar")
 	if err != nil {
 		t.Fatal(err)
 	}
