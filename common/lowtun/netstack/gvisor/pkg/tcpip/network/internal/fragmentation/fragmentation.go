@@ -19,10 +19,10 @@ package fragmentation
 import (
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"time"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/buffer"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/sync"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"

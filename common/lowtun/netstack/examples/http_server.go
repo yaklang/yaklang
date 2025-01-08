@@ -9,7 +9,6 @@ package main
 
 import (
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/netip"

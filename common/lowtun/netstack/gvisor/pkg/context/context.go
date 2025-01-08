@@ -25,10 +25,9 @@ package context
 import (
 	"context"
 	"errors"
-	"sync"
+	"github.com/yaklang/yaklang/common/log"
 	"time"
 
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/waiter"
 )
 
@@ -170,59 +169,6 @@ func (*NoTask) UninterruptibleSleepFinish(bool) {}
 // In both cases, values extracted from the Context should be used instead.
 type Context interface {
 	context.Context
-	log.Logger
+	log.LoggerIf
 	Blocker
-}
-
-// logContext implements basic logging.
-type logContext struct {
-	NoTask
-	log.Logger
-	context.Context
-}
-
-// bgContext is the context returned by context.Background.
-var bgContext Context
-var bgOnce sync.Once
-
-// Background returns an empty context using the default logger.
-// Generally, one should use the Task as their context when available, or avoid
-// having to use a context in places where a Task is unavailable.
-//
-// Using a Background context for tests is fine, as long as no values are
-// needed from the context in the tested code paths.
-//
-// The global log.SetTarget() must be called before context.Background()
-func Background() Context {
-	bgOnce.Do(func() {
-		bgContext = &logContext{
-			Context: context.Background(),
-			Logger:  log.Log(),
-		}
-	})
-	return bgContext
-}
-
-// WithValue returns a copy of parent in which the value associated with key is
-// val.
-func WithValue(parent Context, key, val any) Context {
-	return &withValue{
-		Context: parent,
-		key:     key,
-		val:     val,
-	}
-}
-
-type withValue struct {
-	Context
-	key any
-	val any
-}
-
-// Value implements Context.Value.
-func (ctx *withValue) Value(key any) any {
-	if key == ctx.key {
-		return ctx.val
-	}
-	return ctx.Context.Value(key)
 }

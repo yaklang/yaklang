@@ -30,11 +30,11 @@ package cpuid
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"runtime"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/sync"
 )
 

@@ -9,7 +9,6 @@ package main
 
 import (
 	"bytes"
-	"log"
 	"math/rand"
 	"net/netip"
 	"time"

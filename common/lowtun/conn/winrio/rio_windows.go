@@ -6,11 +6,11 @@
 package winrio
 
 import (
-	"log"
 	"sync"
 	"syscall"
 	"unsafe"
 
+	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/sys/windows"
 )
 
@@ -103,7 +103,7 @@ func Initialize() bool {
 			if maj, _, _ := windows.RtlGetNtVersionNumbers(); maj <= 7 {
 				return
 			}
-			log.Printf("Registered I/O is unavailable: %v", err)
+			log.Infof("Registered I/O is unavailable: %v", err)
 		}()
 		socket, err = Socket(windows.AF_INET, windows.SOCK_DGRAM, windows.IPPROTO_UDP)
 		if err != nil {

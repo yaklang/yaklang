@@ -6,8 +6,8 @@
 package device
 
 import (
-	"log"
-	"os"
+	"github.com/yaklang/yaklang/common/log"
+	"strings"
 )
 
 // A Logger provides logging for a Device.
@@ -36,7 +36,15 @@ func DiscardLogf(format string, args ...any) {}
 func NewLogger(level int, prepend string) *Logger {
 	logger := &Logger{DiscardLogf, DiscardLogf}
 	logf := func(prefix string) func(string, ...any) {
-		return log.New(os.Stdout, prefix+": "+prepend, log.Ldate|log.Ltime).Printf
+		// return log.New(os.Stdout, prefix+": "+prepend, log.Ldate|log.Ltime).Printf
+		switch strings.ToLower(prefix) {
+		case "debug":
+			return log.Debugf
+		case "error":
+			return log.Errorf
+		default:
+			return log.Infof
+		}
 	}
 	if level >= LogLevelVerbose {
 		logger.Verbosef = logf("DEBUG")

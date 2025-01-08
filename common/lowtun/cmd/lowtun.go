@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/kataras/golog"
 	"github.com/yaklang/yaklang/common/lowtun/conn"
 	"github.com/yaklang/yaklang/common/lowtun/device"
 	"github.com/yaklang/yaklang/common/lowtun/netstack"
@@ -59,6 +60,7 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
+		log.SetLevel(golog.DebugLevel)
 		log.Info("lowtun start")
 		tun, tnet, err := netstack.CreateNetTUN(
 			[]netip.Addr{netip.MustParseAddr("192.168.4.29")},

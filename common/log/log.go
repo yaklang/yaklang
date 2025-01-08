@@ -25,14 +25,16 @@ var (
 	ErrUnknowLevel = errors.New("unknown log level")
 )
 
+type LevelEnum golog.Level
+
 const (
-	DebugLevel = golog.DebugLevel
-	InfoLevel  = golog.InfoLevel
-	WarnLevel  = golog.WarnLevel
-	ErrorLevel = golog.ErrorLevel
-	FatalLevel = golog.FatalLevel
-	PanicLevel = golog.FatalLevel
-	TraceLevel = golog.DebugLevel
+	DebugLevel = LevelEnum(golog.DebugLevel)
+	InfoLevel  = LevelEnum(golog.InfoLevel)
+	WarnLevel  = LevelEnum(golog.WarnLevel)
+	ErrorLevel = LevelEnum(golog.ErrorLevel)
+	FatalLevel = LevelEnum(golog.FatalLevel)
+	PanicLevel = LevelEnum(golog.FatalLevel)
+	TraceLevel = LevelEnum(golog.DebugLevel)
 )
 
 type Logger struct {
