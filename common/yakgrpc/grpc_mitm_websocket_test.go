@@ -300,3 +300,104 @@ Accept: */*
 		t.Fatalf("TestGRPCMUSTPASS_MITM_WebSocket_Payload hijackClientPayload(%v) hijackServerPayload(%v)", hijackClientPayload, hijackServerPayload)
 	}
 }
+
+func TestGRPCMUSTPASS_MITM_WebSocket_RULE(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(20))
+	defer cancel()
+	token := utils.RandStringBytes(60)
+	token2 := utils.RandStringBytes(60)
+	tagToken := utils.RandStringBytes(10)
+
+	host, port := utils.DebugMockEchoWs("enPayload")
+	log.Infof("addr: %s:%d", host, port)
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host:        "127.0.0.1",
+			Port:        uint32(mitmPort),
+			EnableGMTLS: true,
+			PreferGMTLS: true,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			SetContentReplacers: true,
+			Replacers: []*ypb.MITMContentReplacer{
+				{
+					Rule:             token,
+					NoReplace:        true,
+					Result:           ``,
+					Color:            "red",
+					EnableForRequest: true,
+					EnableForHeader:  true,
+					EnableForBody:    true,
+					Index:            0,
+					ExtraTag:         []string{tagToken},
+					Disabled:         false,
+					VerboseName:      "",
+				},
+			},
+		})
+		time.Sleep(3 * time.Second)
+		defer cancel()
+		wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /enPayload?token=%s HTTP/1.1
+Host: %s
+Accept-Encoding: gzip, deflate
+Sec-WebSocket-Extensions: permessage-deflate
+Sec-WebSocket-Key: 3o0bLKJzcaNwhJQs4wBw2g==
+Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+Cache-Control: no-cache
+Pragma: no-cache
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Connection: keep-alive, Upgrade
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0
+Accept: */*
+`, token2, utils.HostPort(host, port))), lowhttp.WithWebsocketProxy(proxy), lowhttp.WithWebsocketFromServerHandler(func(bytes []byte) {
+			if string(bytes) == "server: "+token {
+				log.Infof("client recv: %s", bytes)
+				cancel()
+			}
+		}))
+		if err != nil {
+			t.Fatalf("send websocket request err: %v", err)
+		}
+		wsClient.Start()
+		err = wsClient.WriteText([]byte(token))
+		log.Infof("client send: %s", token)
+		if err != nil {
+			t.Fatalf("send websocket request err: %v", err)
+		}
+		defer wsClient.WriteClose()
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+
+	})
+
+	rsp, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+		Keyword: token2,
+	}, 1)
+	require.NoError(t, err)
+	flow := rsp.Data[0]
+	require.True(t, flow.IsWebsocket, "flow is not websocket")
+	hash := flow.WebsocketHash
+
+	var wsFlows []*schema.WebsocketFlow
+	err = utils.AttemptWithDelayFast(func() error {
+		_, wsFlows, err = yakit.QueryWebsocketFlowByWebsocketHash(consts.GetGormProjectDatabase(), hash, 1, 10)
+		if len(wsFlows) != 2 {
+			return utils.Errorf("len(wsFlows) != 6, got %d", len(wsFlows))
+		}
+		return err
+	})
+
+	require.NoError(t, err)
+	require.Len(t, wsFlows, 2, "len(wsFlows) != 6")
+	require.Contains(t, wsFlows[0].Tags, tagToken, "wsFlows[0].Tags not contains tagToken")
+	require.Contains(t, wsFlows[1].Tags, tagToken, "wsFlows[1].Tags not contains tagToken")
+	require.Contains(t, wsFlows[0].Tags, schema.FLOW_COLOR_RED, "wsFlows[0].Tags not contains color tag")
+	require.Contains(t, wsFlows[1].Tags, schema.FLOW_COLOR_RED, "wsFlows[1].Tags not contains color tag")
+}
