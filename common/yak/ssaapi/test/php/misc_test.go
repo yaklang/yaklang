@@ -1,23 +1,11 @@
 package php
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 )
-
-func TestMiscSyntaxPrompt(t *testing.T) {
-	_, err := ssaapi.Parse(`<?php
-echo 1
-1+1
-
-`, ssaapi.WithLanguage(ssaapi.PHP))
-	if err != nil {
-		fmt.Println(err)
-	}
-}
 
 func TestSearchMember(t *testing.T) {
 	code := `<?php

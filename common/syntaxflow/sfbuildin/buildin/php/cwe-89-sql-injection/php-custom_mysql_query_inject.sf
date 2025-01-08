@@ -10,7 +10,9 @@ TEXT
 <include('php-param')> as $params;
 <include('php-filter-function')> as $filter;
 
-mysql_query(* as $query);
+mysql_query(* as $query1);
+mysqli_query(* as $query2);
+$query1 + $query2  as $query;
 
 $query #{
     include: `<self> & $params`,

@@ -304,9 +304,9 @@ func (f *FunctionBuilder) EmitSideEffect(name string, call *Call, value Value) *
 		return nil
 	}
 	s := NewSideEffect(name, call, value)
+	f.emit(s)
 	s.SetType(value.GetType())
 	value.AddOccultation(s)
-	f.emit(s)
 	return s
 }
 
