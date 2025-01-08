@@ -256,15 +256,17 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 							}
 							break
 						} else {
+							rvt := rv
 							if key := a.GetKeybyName(test); key != nil {
-								rv = b.ReadMemberCallValueByName(rv, n)
-								if rightv == nil {
-									b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
+								rvt = b.ReadMemberCallValueByName(rv, n)
+								if rvt == nil {
+									rvt = b.ReadMemberCallValue(rv, key)
+									//b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
 								}
 							} else {
 								// rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(n))
 							}
-							handleObjectType(rv, a)
+							handleObjectType(rvt, a)
 						}
 					}
 				}

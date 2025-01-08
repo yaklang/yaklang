@@ -168,17 +168,10 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					return typeHandler(objt.FieldType, kvs[i].kv)
 				})
 		case ssa.StructTypeKind:
-			if len(kvs) == 0 {
-				obj = b.CreateObjectWithMap(nil, nil)
-				obj.SetType(typ)
-				return obj
-			}
-			if kvs[0].value != nil {
-				return kvs[0].value
-			}
 			objt := typ.(*ssa.ObjectType)
-			if kvs[0].key == nil { // 全部初始化
-				obj = b.InterfaceAddFieldBuild(len(kvs),
+
+			fullInit := func() {
+				obj = b.InterfaceAddFieldBuild(len(objt.Keys),
 					func(i int) ssa.Value {
 						if i < len(objt.Keys) {
 							return objt.Keys[i]
@@ -189,7 +182,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					func(i int) ssa.Value {
 						return typeHandler(objt.FieldTypes[i], kvs[i].kv)
 					})
-			} else { // 部分初始化
+			}
+
+			partInit := func() {
 				obj = b.InterfaceAddFieldBuild(len(objt.Keys),
 					func(i int) ssa.Value {
 						return objt.Keys[i]
@@ -202,6 +197,45 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 						}
 						return b.GetDefaultValue(objt.FieldTypes[i])
 					})
+			}
+
+			if len(kvs) == 0 {
+				partInit()
+				return obj
+			}
+
+			if kvs[0].value != nil {
+				// todo: 只有指针才会复用object，目前默认非指针
+				if m, ok := kvs[0].value.(*ssa.Make); ok {
+					var mkeys, mmembers []ssa.Value
+					for k, m := range m.GetAllMember() {
+						mkeys = append(mkeys, k)
+						mmembers = append(mmembers, m)
+					}
+					newObject := b.InterfaceAddFieldBuild(len(mkeys),
+						func(i int) ssa.Value {
+							return mkeys[i]
+						},
+						func(i int) ssa.Value {
+							return mmembers[i]
+						})
+					return newObject
+				}
+
+				return kvs[0].value
+			}
+
+			if kvs[0].key == nil { // 全部初始化
+				fullInit()
+			} else { // 部分初始化
+				partInit()
+				for _, kv := range kvs {
+					if a, ok := objt.AnonymousField[kv.key.String()]; ok {
+						newObject := typeHandler(a, kv.kv)
+						variable := b.CreateMemberCallVariable(obj, b.EmitConstInst(kv.key.String()))
+						b.AssignVariable(variable, newObject)
+					}
+				}
 			}
 		case ssa.InterfaceTypeKind:
 			// TODO
@@ -265,7 +299,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 		for n, a := range o.AnonymousField {
 			isFind := false
 			for k, _ := range rvalue.GetAllMember() {
-				if k.GetName() == n {
+				if k.String() == n {
 					isFind = true
 					break
 				}
@@ -638,6 +672,7 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			}
 			if p, ok := parent.(*ssa.ObjectType); ok {
 				structTyp.AnonymousField[typ.TypeName().GetText()] = p
+				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), p)
 			} else if a, ok := parent.(*ssa.AliasType); ok {
 				structTyp.AddField(b.EmitConstInst(a.Name), a.GetType())
 			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
