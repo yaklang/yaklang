@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"sync"
 	"time"
@@ -212,6 +213,9 @@ func (c *Cache) AddClassInstance(name string, inst Instruction) {
 // =============================================== Database =======================================================
 // only LazyInstruction and false marshal will not be saved to database
 func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
+	if instIr.inst.GetId() == -1 {
+		log.Errorf("[BUG]: instruction id is -1: %s", codec.AnyToString(instIr.inst))
+	}
 	// log.Infof("save instruction : %v", instIr.inst.GetId())
 	start := time.Now()
 	if !c.HaveDatabaseBackend() {
