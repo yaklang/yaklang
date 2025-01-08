@@ -359,10 +359,14 @@ func (i *Make) String() string {
 			getStr(i), getStr(i.parentI), getStr(i.low), getStr(i.high), getStr(i.step),
 		)
 	} else {
-		return fmt.Sprintf(
-			"%s = make %s [%s, %s] // %s",
-			getStr(i), i.GetType(), getStr(i.Len), getStr(i.Cap), i.name,
+		str := fmt.Sprintf(
+			"%s = make %s [%s, %s]",
+			getStr(i), i.GetType(), getStr(i.Len), getStr(i.Cap),
 		)
+		if i.name != "" {
+			str += "// " + i.name
+		}
+		return str
 	}
 }
 
