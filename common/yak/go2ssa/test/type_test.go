@@ -302,7 +302,57 @@ func TestType_struct(t *testing.T) {
 		`, []string{"1", "3", "3"}, t)
 	})
 
-	t.Run("struct inheritance extend", func(t *testing.T) {
+	t.Run("struct inheritance full", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type A struct {
+			a int
+		}
+
+		type B struct {
+			A
+		}
+
+		func main() {
+			a := A{}
+			b := B{a}
+
+			a.a = 1
+			b.a = 2
+			b.A.a = 3
+
+			println(a.a) 	// 1
+			println(b.a) 	// 3
+			println(b.A.a)  // 3
+		}
+		`, []string{"1", "3", "3"}, t)
+	})
+
+	t.Run("struct inheritance full extend", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type A struct {
+			a int
+		}
+
+		type B struct {
+			A
+		}
+
+		func main() {
+			b := B{A{a: 1}}
+
+			b.a = 2
+			println(b.a) 	// 2
+			b.A.a = 3
+
+			println(b.a) 	// 3
+			println(b.A.a)  // 3
+		}
+		`, []string{"2", "3", "3"}, t)
+	})
+
+	t.Run("struct inheritance part", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
 		type A struct {
@@ -326,6 +376,30 @@ func TestType_struct(t *testing.T) {
 			println(b.A.a)  // 3
 		}
 		`, []string{"1", "3", "3"}, t)
+	})
+
+	t.Run("struct inheritance part extend", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type A struct {
+			a int
+		}
+
+		type B struct {
+			A
+		}
+
+		func main() {
+			b := B{A: A{a: 1}}
+			println(b.a) 	// 1
+
+			b.a = 2
+			println(b.a) 	// 2
+
+			b.A.a = 3
+			println(b.a) 	// 3
+		}
+		`, []string{"1", "2", "3"}, t)
 	})
 
 	t.Run("struct inheritance with same name", func(t *testing.T) {
