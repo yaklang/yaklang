@@ -3,13 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/kataras/golog"
-	"github.com/yaklang/yaklang/common/lowtun/conn"
-	"github.com/yaklang/yaklang/common/lowtun/device"
-	"github.com/yaklang/yaklang/common/lowtun/netstack"
-	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/net/icmp"
-	"golang.org/x/net/ipv4"
 	"math/rand"
 	"net/netip"
 	"os"
@@ -18,6 +11,14 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/kataras/golog"
+	"github.com/yaklang/yaklang/common/lowtun/conn"
+	"github.com/yaklang/yaklang/common/lowtun/device"
+	"github.com/yaklang/yaklang/common/lowtun/netstack"
+	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv4"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
@@ -47,7 +48,15 @@ func init() {
 func main() {
 	app := cli.NewApp()
 
-	app.Commands = []cli.Command{}
+	app.Commands = []cli.Command{
+		{
+			Name:    "transparent-route",
+			Aliases: []string{"tr"},
+			Action: func(c *cli.Context) error {
+				return nil
+			},
+		},
+	}
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{

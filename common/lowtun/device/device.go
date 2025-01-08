@@ -281,6 +281,10 @@ func (device *Device) SetPrivateKey(sk NoisePrivateKey) error {
 	return nil
 }
 
+func NewDeviceWithDefaultLogger(tunDevice tun.Device, bind conn.Bind) *Device {
+	return NewDevice(tunDevice, bind, NewLogger(LogLevelError, ""))
+}
+
 func NewDevice(tunDevice tun.Device, bind conn.Bind, logger *Logger) *Device {
 	device := new(Device)
 	device.state.state.Store(uint32(deviceStateDown))
