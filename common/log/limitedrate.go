@@ -15,6 +15,7 @@
 package log
 
 import (
+	"github.com/kataras/golog"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -43,8 +44,8 @@ func (rl *rateLimitedLogger) Warningf(format string, v ...any) {
 	}
 }
 
-func (rl *rateLimitedLogger) IsLogging(level LevelEnum) bool {
-	return LevelEnum(rl.logger.Level) == level
+func (rl *rateLimitedLogger) IsLogging(level golog.Level) bool {
+	return rl.logger.Level == level
 }
 
 // BasicRateLimitedLogger returns a Logger that logs to the global logger no
@@ -78,5 +79,5 @@ type LoggerIf interface {
 
 	// IsLogging returns true iff this level is being logged. This may be
 	// used to short-circuit expensive operations for debugging calls.
-	IsLogging(level LevelEnum) bool
+	IsLogging(level golog.Level) bool
 }
