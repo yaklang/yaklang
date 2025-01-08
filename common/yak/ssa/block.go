@@ -121,32 +121,26 @@ func (b *BasicBlock) HaveSubBlock(sub Value) bool {
 	}
 }
 
-/*
-	if condition is true  :  1 reach
-	if condition is false : -1 unreachable
-	if condition need calc: 0  unknown
-*/
-
-func (b *BasicBlock) Reachable() int {
-	if b.setReachable {
+func (b *BasicBlock) Reachable() BasicBlockReachableKind {
+	if b.canBeReached != BasicBlockUnknown {
 		return b.canBeReached
 	}
 
-	if b.Condition == nil {
-		return 0
+	if b.Condition != nil {
+		return BasicBlockUnknown
 	}
 
 	if c, ok := b.Condition.(*ConstInst); ok {
 		if c.IsBoolean() {
 			if c.Boolean() {
-				return 1
+				return BasicBlockReachable
 			} else {
-				return -1
+				return BasicBlockUnReachable
 			}
 		}
 	}
 
-	return 0
+	return BasicBlockUnknown
 }
 
 func (b *BasicBlock) AddSucc(succ *BasicBlock) {
