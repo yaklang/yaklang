@@ -212,7 +212,7 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		s.Finish[bb] = struct{}{}
 		bb.Condition = cond
 
-		if bb.Reachable() == -1 {
+		if bb.Reachable() == ssa.BasicBlockUnReachable {
 			bb.NewError(ssa.Warn, BCTag, BlockUnreachable())
 		}
 
