@@ -1054,3 +1054,7 @@ func (tnet *Net) DialContext(ctx context.Context, network, address string) (net.
 func (tnet *Net) Dial(network, address string) (net.Conn, error) {
 	return tnet.DialContext(context.Background(), network, address)
 }
+
+func (tnet *Net) Stack() *stack.Stack {
+	return tnet.stack
+}
