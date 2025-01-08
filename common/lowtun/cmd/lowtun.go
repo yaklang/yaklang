@@ -1,27 +1,16 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"math/rand"
-	"net/netip"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/log"
+	tun "github.com/yaklang/yaklang/common/lowtun"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
-	"time"
-
-	"github.com/kataras/golog"
-	"github.com/yaklang/yaklang/common/lowtun/conn"
-	"github.com/yaklang/yaklang/common/lowtun/device"
-	"github.com/yaklang/yaklang/common/lowtun/netstack"
-	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/net/icmp"
-	"golang.org/x/net/ipv4"
-
-	"github.com/urfave/cli"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 var (
@@ -48,15 +37,7 @@ func init() {
 func main() {
 	app := cli.NewApp()
 
-	app.Commands = []cli.Command{
-		{
-			Name:    "transparent-route",
-			Aliases: []string{"tr"},
-			Action: func(c *cli.Context) error {
-				return nil
-			},
-		},
-	}
+	app.Commands = []cli.Command{}
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -69,57 +50,56 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		log.SetLevel(golog.DebugLevel)
-		log.Info("lowtun start")
-		tun, tnet, err := netstack.CreateNetTUN(
-			[]netip.Addr{netip.MustParseAddr("192.168.4.29")},
-			[]netip.Addr{netip.MustParseAddr("8.8.8.8")},
-			1420)
+		// ifconfig utun113 10.1.1.1 10.2.2.2 up && route add -host 8.8.8.8/32 10.1.1.1 && curl https://8.8.8.8
+		tdev, err := tun.CreateTUN("utun113", 1420)
 		if err != nil {
 			return err
 		}
-		dev := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(device.LogLevelVerbose, ""))
-		err = dev.IpcSet(`private_key=087ec6e14bbed210e7215cdc73468dfa23f080a1bfb8665b2fd809bd99d28379
-public_key=c4c8e984c5322c8184c72265b92b250fdb63688705f504ba003c88f03393cf28
-allowed_ip=0.0.0.0/0
-endpoint=127.0.0.1:58120
-`)
+		defer tdev.Close()
+		name, err := tdev.Name()
+		if err != nil {
+			return err
+		}
+		log.Infof("tun device name: %v", name)
+		// 创建缓冲区用于读取数据
+		// WireGuard 默认 MTU 是 1420，我们使用这个大小作为缓冲区
+		buf := make([][]byte, 1)
+		buf[0] = make([]byte, 1420)
+		sizes := make([]int, 1)
 
-		_ = tun
+		// 持续读取数据
+		for {
+			// 从 TUN 设备读取数据包
+			// offset 通常设置为 0
+			n, err := tdev.Read(buf, sizes, 16)
+			if err != nil {
+				log.Errorf("Error reading from TUN: %v", err)
+				continue
+			}
 
-		socket, err := tnet.Dial("ping4", "zx2c4.com")
-		if err != nil {
-			return err
+			if n > 0 {
+				// 获取实际收到的数据
+				packet := buf[0][:sizes[0]]
+				if len(packet) > 16 {
+					packet = packet[16:]
+				}
+				// 解析 IP 包头
+				version := packet[0] >> 4
+
+				// 根据 IP 版本处理数据
+				switch version {
+				case 4:
+					log.Infof("IPv4 packet")
+					spew.Dump(packet)
+				case 6:
+					log.Infof("IPv6 packet")
+					spew.Dump(packet)
+				default:
+					log.Warnf("Unknown IP version: %d", version)
+				}
+			}
 		}
-		requestPing := icmp.Echo{
-			Seq:  rand.Intn(1 << 16),
-			Data: []byte("gopher burrow"),
-		}
-		icmpBytes, _ := (&icmp.Message{Type: ipv4.ICMPTypeEcho, Code: 0, Body: &requestPing}).Marshal(nil)
-		socket.SetReadDeadline(time.Now().Add(time.Second * 10))
-		start := time.Now()
-		_, err = socket.Write(icmpBytes)
-		if err != nil {
-			return err
-		}
-		n, err := socket.Read(icmpBytes[:])
-		if err != nil {
-			return err
-		}
-		replyPacket, err := icmp.ParseMessage(1, icmpBytes[:n])
-		if err != nil {
-			return err
-		}
-		replyPing, ok := replyPacket.Body.(*icmp.Echo)
-		if !ok {
-			// log.Panicf("invalid reply type: %v", replyPacket)
-			return utils.Errorf("invalid reply type: %v", replyPacket)
-		}
-		if !bytes.Equal(replyPing.Data, requestPing.Data) || replyPing.Seq != requestPing.Seq {
-			// log.Panicf("invalid ping reply: %v", replyPing)
-			return utils.Errorf("invalid ping reply: %v", replyPing)
-		}
-		log.Printf("Ping latency: %v", time.Since(start))
+
 		return nil
 	}
 

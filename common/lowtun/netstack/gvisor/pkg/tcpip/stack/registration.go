@@ -16,6 +16,7 @@ package stack
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"time"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/buffer"
@@ -170,6 +171,18 @@ type PacketEndpoint interface {
 	// HandlePacket may modify pkt.
 	HandlePacket(nicID tcpip.NICID, netProto tcpip.NetworkProtocolNumber, pkt *PacketBuffer)
 }
+
+type PacketEndpointHandler func(nicID tcpip.NICID, netProto tcpip.NetworkProtocolNumber, pkt *PacketBuffer)
+
+func (t PacketEndpointHandler) HandlePacket(nicID tcpip.NICID, netProto tcpip.NetworkProtocolNumber, pkt *PacketBuffer) {
+	if t == nil {
+		log.Error("PacketEndpointHandler is nil")
+		return
+	}
+	t(nicID, netProto, pkt)
+}
+
+var _ PacketEndpoint = PacketEndpointHandler(nil)
 
 // UnknownDestinationPacketDisposition enumerates the possible return values from
 // HandleUnknownDestinationPacket().
