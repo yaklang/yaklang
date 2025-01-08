@@ -2,6 +2,7 @@ package schema
 
 import (
 	"database/sql"
+	"strconv"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -61,6 +62,30 @@ type HTTPFlow struct {
 	TooLargeResponseBodyFile   string
 	// 同步到企业端
 	UploadOnline bool `json:"upload_online"`
+}
+
+func (f *HTTPFlow) GetRequest() string {
+	unquoted, err := strconv.Unquote(f.Request)
+	if err != nil {
+		return ""
+	}
+	return unquoted
+}
+
+func (f *HTTPFlow) GetResponse() string {
+	unquoted, err := strconv.Unquote(f.Response)
+	if err != nil {
+		return ""
+	}
+	return unquoted
+}
+
+func (f *HTTPFlow) SetRequest(req string) {
+	f.Request = strconv.Quote(req)
+}
+
+func (f *HTTPFlow) SetResponse(rsp string) {
+	f.Response = strconv.Quote(rsp)
 }
 
 // 颜色与 Tag API
