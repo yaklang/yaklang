@@ -19,10 +19,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"net/http"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // Context provides information and storage for a single request/response pair.
@@ -37,6 +38,17 @@ type Context struct {
 	skipRoundTrip bool
 	skipLogging   bool
 	apiRequest    bool
+}
+
+func (c *Context) GetSessionValue(i string) any {
+	if c == nil {
+		return nil
+	}
+	if s := c.Session(); s != nil {
+		i, _ := s.Get(i)
+		return i
+	}
+	return nil
 }
 
 func (c *Context) GetSessionBoolValue(i string) bool {
