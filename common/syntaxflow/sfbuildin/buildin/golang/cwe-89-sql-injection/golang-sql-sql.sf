@@ -1,5 +1,5 @@
 desc(
-    title: "golang SQL Injection(database/sql)",
+    title: "golang SQL Injection(database-sql)",
     type: audit,
     severity: high,
     desc: <<<TEXT

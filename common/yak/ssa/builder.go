@@ -341,3 +341,23 @@ func (b *FunctionBuilder) SetForceCapture(bo bool) {
 func (b *FunctionBuilder) GetForceCapture() bool {
 	return b.CurrentBlock.ScopeTable.GetForceCapture()
 }
+
+func (b *FunctionBuilder) isBindLanguage() bool {
+	config := b.GetProgram().Application.config
+	if config == nil {
+		return false
+	}
+	return config.isBindLanguage
+}
+
+func (b *FunctionBuilder) isTryBuildValue() bool {
+	config := b.GetProgram().Application.config
+	if config == nil {
+		return false
+	}
+	return config.isTryBuildValue
+}
+
+func (b *FunctionBuilder) SetLanguageConfig(config *LanguageConfig) {
+	b.GetProgram().Application.config = config
+}

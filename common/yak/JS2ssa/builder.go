@@ -25,6 +25,10 @@ func (s *SSABuild) Create() ssa.Builder {
 	}
 }
 
+func initHandler(fb *ssa.FunctionBuilder) {
+	fb.SetLanguageConfig(ssa.NewLanguageConfig(true, false))
+}
+
 func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {
