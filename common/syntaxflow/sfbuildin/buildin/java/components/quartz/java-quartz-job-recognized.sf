@@ -9,10 +9,12 @@ TEXT
 )
 
 .execute as $execute;
-$execute?{<getObject>.inherits?{have: 'Job'}} as $jobClass;
+$execute?{<getObject>.__interface__?{have: 'Job'}} as $jobClass;
 check $jobClass;
 $jobClass(*<show>);
-alert $jobClass;
+alert $jobClass for {
+    message:" Found Java Quartz Job Class",
+}
 
 desc(
 lang: java,
