@@ -59,9 +59,15 @@ func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintR
 		return
 	}
 
+	// assign will fix value's verbose name
+	// but for blueprint, we need to keep the original verbose name
+	cName := c._container.GetVerboseName()
+	otherName := other._container.GetVerboseName()
+
 	builder := c._container.GetFunc().builder
 	val := builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(string(relation)))
 	builder.AssignVariable(val, other._container)
+	other._container.SetVerboseName(otherName)
 	// set relative relation
 	otherBuilder := other._container.GetFunc().builder
 	relativeRela := relation.getRelativeRelation()
@@ -70,6 +76,7 @@ func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintR
 	}
 	otherVal := otherBuilder.CreateMemberCallVariable(other._container, otherBuilder.EmitConstInst(string(relativeRela)))
 	otherBuilder.AssignVariable(otherVal, c._container)
+	c._container.SetVerboseName(cName)
 }
 
 func (c *Blueprint) IsInterface() bool {
