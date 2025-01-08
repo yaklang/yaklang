@@ -6,6 +6,7 @@ import (
 )
 
 type CustomValue struct {
+	Flag       string
 	StringFunc func(funcCtx *class_context.ClassContext) string
 	TypeFunc   func() types.JavaType
 }

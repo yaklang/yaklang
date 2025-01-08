@@ -349,3 +349,32 @@ func GetRealValue(value values.JavaValue) values.JavaValue {
 	}
 	return value
 }
+func DumpNodesToDotExp(code *Node) string {
+	var visitor func(node *Node, visited map[*Node]bool, sb *strings.Builder)
+	visitor = func(node *Node, visited map[*Node]bool, sb *strings.Builder) {
+		if node == nil {
+			return
+		}
+		if visited[node] {
+			return
+		}
+		visited[node] = true
+		toString := func(node *Node) string {
+			//return strconv.Quote(node.Statement.String(&ClassContext{}))
+			s := strings.Replace(node.Statement.String(&class_context.ClassContext{}), "\"", "", -1)
+			s = strings.Replace(s, "\n", " ", -1)
+			return s
+		}
+		for _, nextNode := range node.Next {
+			sb.WriteString(fmt.Sprintf("  \"%d%s\" -> \"%d%s\";\n", node.Id, toString(node), nextNode.Id, toString(nextNode)))
+			visitor(nextNode, visited, sb)
+		}
+	}
+	var sb strings.Builder
+	sb.WriteString("digraph G {\n")
+	visited := make(map[*Node]bool)
+	visitor(code, visited, &sb)
+	sb.WriteString("}\n")
+	println(sb.String())
+	return sb.String()
+}
