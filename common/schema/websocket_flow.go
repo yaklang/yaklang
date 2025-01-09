@@ -44,6 +44,7 @@ func (i *WebsocketFlow) ToGRPCModel() *ypb.WebsocketFlow {
 		DataVerbose:          utils.DataVerbose(raw),
 		IsJson:               isJson,
 		IsProtobuf:           utils.IsProtobuf([]byte(raw)),
+		Tags:                 i.Tags,
 	}
 }
 
