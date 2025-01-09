@@ -2,27 +2,31 @@ parser grammar JSPParser;
 
 options { tokenVocab=JSPLexer; }
 
-jspDocuments
-    : jspDocument+
+jspDocuents
+    :jspStart* jspDocument+
     ;
 
 jspDocument
-    : jspStart* xml
-    | jspStart* dtd
-    | jspStart* jspElements+
+    : xml
+    | dtd
+    | jspElements
     ;
 
 jspStart
-    :jspDirective
-    |scriptlet
+    :jspScript
     |WHITESPACES
     ;
 
 jspElements
-    : htmlMisc* (jspElement|jspDirective| scriptlet) htmlMisc*
+    : htmlMisc* (htmlElement|jspScript ) htmlMisc*
     ;
 
-jspElement
+jspScript
+    :jspDirective
+    |jspScriptlet
+    ;
+
+htmlElement
     :htmlBegin  (TAG_CLOSE (htmlContents CLOSE_TAG_BEGIN htmlTag TAG_CLOSE)? | TAG_SLASH_END)
     ;
 
@@ -34,24 +38,25 @@ htmlTag
     : htmlTagName (JSP_JSTL_COLON htmlTagName)?
     ;
 
+// jsp页面指令
 jspDirective
     : DIRECTIVE_BEGIN htmlTagName htmlAttribute*? TAG_WHITESPACE* DIRECTIVE_END
     ;
 
+// html元素中间的内容
 htmlContents
-    : htmlChardata?  (htmlContent htmlChardata?)*
+    : htmlChardata? (htmlContent htmlChardata?)*
     ;
 
 htmlContent
-    : jspExpression
+    : elExpression
     | jspElements
     | xhtmlCDATA
     | htmlComment
-    | scriptlet
-    | jspDirective
     ;
 
-jspExpression
+// EL表达式
+elExpression
     :  EL_EXPR
     ;
 
@@ -59,7 +64,7 @@ htmlAttribute
     //: jspElement
     : htmlAttributeName EQUALS htmlAttributeValue
     | htmlAttributeName
-    | scriptlet
+    | jspScript
     ;
 
 htmlAttributeName
@@ -67,49 +72,44 @@ htmlAttributeName
     ;
 
 htmlAttributeValue
-    : QUOTE jspElement QUOTE
-    | QUOTE? htmlAttributeValueExpr  QUOTE?
-    | QUOTE htmlAttributeValueConstant? QUOTE
+    :QUOTE? elExpression QUOTE?
+    |QUOTE htmlAttributeValueElement* QUOTE
     ;
 
-htmlAttributeValueExpr
-    : EL_EXPR
-    ;
-
-htmlAttributeValueConstant
-    : ATTVAL_ATTRIBUTE
+htmlAttributeValueElement
+    :ATTVAL_ATTRIBUTE
+    |jspExpression
+    |elExpression
     ;
 
 htmlTagName
     : TAG_IDENTIFIER
     ;
 
+// 静态内容
 htmlChardata
     : JSP_STATIC_CONTENT_CHARS_MIXED
     | JSP_STATIC_CONTENT_CHARS
     | WHITESPACES
-    | HTML_TEXT? EL_EXPR? HTML_TEXT?
     ;
 
 htmlMisc
     : htmlComment
-    | jspExpression
-    | scriptlet
+    | elExpression
+    | jspScriptlet
     | WHITESPACES
     ;
 
+// HTML注释
 htmlComment
-    : JSP_COMMENT_START htmlCommentText? JSP_COMMENT_END
-    | JSP_CONDITIONAL_COMMENT_START htmlConditionalCommentText? JSP_CONDITIONAL_COMMENT_END
+    : JSP_COMMENT
+    | JSP_CONDITIONAL_COMMENT
     ;
 
 htmlCommentText
     : JSP_COMMENT_TEXT+?
     ;
 
-htmlConditionalCommentText
-    : JSP_CONDITIONAL_COMMENT
-    ;
 xhtmlCDATA
     : CDATA
     ;
@@ -131,8 +131,22 @@ systemId
 xml: XML_DECLARATION name=htmlTagName atts+=htmlAttribute*? TAG_END
     ;
 
-scriptlet
-    : SCRIPTLET_OPEN BLOB_CONTENT BLOB_CLOSE
-    | ECHO_EXPRESSION_OPEN  BLOB_CONTENT BLOB_CLOSE
-    | DECLARATION_BEGIN BLOB_CONTENT BLOB_CLOSE
+// JSP脚本
+jspScriptlet
+    : scriptletStart scriptletContent
+    | jspExpression
+    ;
+
+// JSP表达式
+jspExpression
+    :ECHO_EXPRESSION_OPEN scriptletContent
+    ;
+
+scriptletStart
+    :SCRIPTLET_OPEN
+    |DECLARATION_BEGIN
+    ;
+
+scriptletContent
+    : BLOB_CONTENT BLOB_CLOSE
     ;

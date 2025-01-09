@@ -1,37 +1,11 @@
 lexer grammar  JSPLexer;
 
-JSP_COMMENT_START
-    : JSP_COMMENT_START_TAG -> pushMode(IN_JSP_COMMENT)
-    ;
+JSP_COMMENT: '<!--' .*? '-->'->skip;
 
-JSP_COMMENT_END
-    : JSP_COMMENT_END_TAG
-    ;
-
-JSP_COMMENT_START_TAG
-    :'<!--'
-    ;
+JSP_CONDITIONAL_COMMENT: '<!--[' .*? ']]>'->skip;
 
 WHITESPACES
     :  (' ' | '\t' | '\r'? '\n')+
-    ;
-
-HTML_TEXT: ~('<'|'$')+;
-
-JSP_COMMENT_END_TAG
-    : '-->'
-    ;
-
-JSP_CONDITIONAL_COMMENT_START
-    : JSP_CONDITIONAL_COMMENT_START_TAG -> pushMode(IN_CONDITIONAL_COMMENT)
-    ;
-
-JSP_CONDITIONAL_COMMENT_START_TAG
-    : '<!['
-    ;
-
-JSP_CONDITIONAL_COMMENT_END_TAG
-    : ']>'
     ;
 
 XML_DECLARATION
@@ -63,37 +37,28 @@ TAG_BEGIN
     ;
 
 DIRECTIVE_BEGIN
-    : ('<%@'|'<jsp:directive') -> pushMode(TAG)
+    : DIRECTIVE_BEGIN_TAG -> pushMode(TAG)
     ;
 
 DECLARATION_BEGIN
-    : ('<%!'|'<jsp:declaration') -> pushMode(JSP_BLOB)
+    : DECLARATION_BEGIN_TAG -> pushMode(JSP_BLOB)
     ;
 
 ECHO_EXPRESSION_OPEN
-    : ('<%='|'<jsp:expression') -> pushMode(JSP_BLOB)
+    : ECHO_EXPRESSION_OPEN_TAG -> pushMode(JSP_BLOB)
     ;
 
 SCRIPTLET_OPEN
-    : ('<%'|'jsp:scriptlet') -> pushMode(JSP_BLOB)
+    : SCRIPTLET_OPEN_TAG -> pushMode(JSP_BLOB)
     ;
 
 EXPRESSION_OPEN
-    : ('${'|'#{') ->pushMode(IN_JSP_EXPRESSION)
-    ;
-
-
-
-
-DOUBLE_QUOTE
-    : '"'
-    ;
-SINGLE_QUOTE
-    : '\''
+    : EXPRESSION_OPEN_TAG ->pushMode(JSP_EXPRESSION)
     ;
 
 QUOTE
-    : SINGLE_QUOTE|DOUBLE_QUOTE
+    : SINGLE_QUOTE
+    | DOUBLE_QUOTE
     ;
 
 TAG_END
@@ -101,13 +66,60 @@ TAG_END
    ;
 
 EQUALS
-    : EQUALS_CHAR
+    : EQUALS_CHAR -> pushMode(ATTVALUE)
+    ;
+
+EL_EXPR
+    : EL_EXPR_TXT
+    ;
+
+JSP_STATIC_CONTENT_CHARS_MIXED
+    :   JSP_STATIC_CONTENT_CHAR+?
+        {
+            if ((this.LA(1) == '$') && (this.LA(2) == '{')) {
+                pushMode(JSP_EXPRESSION);
+            }
+        }
+    ;
+
+JSP_STATIC_CONTENT_CHARS
+    :
+        JSP_STATIC_CONTENT_CHAR+? {(this.LA(1) == '<') }?
+    ;
+
+JSP_STATIC_CONTENT_CHAR
+    : ~[<\\$]+
+    | ESCAPED_DOLLAR
+    ;
+
+JSP_END
+    : '%>' ->popMode
+    ;
+
+ATTVAL_ATTRIBUTE
+    : ATTCHARS
+    | HEXCHARS
+    | DECCHARS;
+
+HTML_TEXT
+    : HTML_TEXT_FRAGMENT+
+    ;
+
+fragment HTML_TEXT_FRAGMENT
+    : ~('<'|'$')
     ;
 
 fragment CLOSE_TAG
     : '>'
     ;
 
+fragment DOUBLE_QUOTE
+    : '"'
+    ;
+
+fragment SINGLE_QUOTE
+    : '\''
+    ;
 
 fragment IDENTIFIER
     : TAG_NameStartChar TAG_NameChar*
@@ -145,51 +157,29 @@ fragment ESCAPED_DOLLAR
     : '\\$'
     ;
 
-TOP_EL_EXPR
-    : EL_EXPR_TXT -> type(EL_EXPR)
+fragment DIRECTIVE_BEGIN_TAG
+    :'<%@'
+    |'<jsp:directive'
     ;
 
-
-JSP_STATIC_CONTENT_CHARS_MIXED
-    :
-        JSP_STATIC_CONTENT_CHAR+? { (this.LA(1) == '\$') && (this.LA(2) == '{')}? -> pushMode(IN_JSP_EXPRESSION)
+fragment DECLARATION_BEGIN_TAG
+    : '<%!'
+    |'<jsp:declaration'
     ;
 
-JSP_STATIC_CONTENT_CHARS
-    :
-        JSP_STATIC_CONTENT_CHAR+? {(this.LA(1) == '<') }?
+fragment ECHO_EXPRESSION_OPEN_TAG
+    : '<%='
+    |'<jsp:expression'
     ;
 
-JSP_STATIC_CONTENT_CHAR
-    : ~[<\\$]+
-    | ESCAPED_DOLLAR
+fragment SCRIPTLET_OPEN_TAG
+    : '<%'
+    |'jsp:scriptlet'
     ;
 
-JSP_END
-    : '%>' ->popMode
-    ;
-
-mode IN_CONDITIONAL_COMMENT;
-
-JSP_CONDITIONAL_COMMENT_END
-    : JSP_CONDITIONAL_COMMENT_END_TAG -> popMode
-    ;
-
-JSP_CONDITIONAL_COMMENT
-    : ~[\]]+
-    | ']' ~[>]
-    ;
-
-mode IN_JSP_COMMENT;
-
-IN_COMMENT_JSP_COMMENT_END_TAG
-    : JSP_COMMENT_END_TAG -> type(JSP_COMMENT_END),popMode
-    ;
-
-JSP_COMMENT_TEXT
-    : ~[-]+
-    | '-' ~[-]
-    | '--' ~[>]
+fragment EXPRESSION_OPEN_TAG
+    :'${'
+    |'#{'
     ;
 
 mode IN_DTD;
@@ -233,7 +223,7 @@ fragment BLOB_CONTENT_FRAGMENT
     : ~('<' | '%' | '>' )
     ;
 
-mode IN_JSP_EXPRESSION;
+mode JSP_EXPRESSION;
 
 JSPEXPR_CONTENT
     : EL_EXPR -> type(EL_EXPR),popMode
@@ -372,10 +362,9 @@ mode ATTVALUE;
 ATTVAL_END_TAG_OPEN:
     END_ELEMENT_OPEN_TAG -> type(CLOSE_TAG_BEGIN),pushMode(TAG);
 
-
 ATTVAL_TAG_OPEN
-    :  BEGIN_ELEMENT_OPEN_TAG -> type(TAG_BEGIN),pushMode(TAG)
-;
+    : BEGIN_ELEMENT_OPEN_TAG -> type(TAG_BEGIN),pushMode(TAG)
+    ;
 
 ATTVAL_SINGLE_QUOTE_OPEN
     : SINGLE_QUOTE -> type(QUOTE),pushMode(ATTVALUE_SINGLE_QUOTE)
@@ -389,11 +378,9 @@ ATTVAL_CONST_VALUE
     : WHITESPACES? ATTVAL_ATTRIBUTE  -> type(ATTVAL_ATTRIBUTE),popMode
     ;
 
-ATTVAL_ATTRIBUTE
-    : ATTCHARS
-    | HEXCHARS
-    | DECCHARS;
-
+ATTVAL_EL_EXPR
+    : EL_EXPR -> type(EL_EXPR),popMode
+    ;
 
 mode ATTVALUE_SINGLE_QUOTE;
 
@@ -402,7 +389,7 @@ ATTVAL_SINGLE_QUOTE_CLOSING_QUOTE
     ;
 
 ATTVAL_SINGLE_QUOTE_EXPRESSION
-    : EL_EXPR -> type(EL_EXPR)
+    : EL_EXPR_TXT -> type(EL_EXPR)
     ;
 
 ATTVAL_SINGLE_QUOTE_END_TAG_OPEN
@@ -417,6 +404,9 @@ ATTVAL_SINGLE_QUOTE_TEXT
     : SINGLE_QUOTE_STRING_CONTENT+ ->type(ATTVAL_ATTRIBUTE)
     ;
 
+ATTVAL_JSP_IN_SINGLE_QUOTE
+    :ECHO_EXPRESSION_OPEN ->type(ECHO_EXPRESSION_OPEN), pushMode(JSP_BLOB)
+    ;
 
 mode ATTVALUE_DOUBLE_QUOTE;
 
@@ -425,12 +415,13 @@ ATTVAL_DOUBLE_QUOTE_CLOSING_QUOTE
     ;
 
 ATTVAL_DOUBLE_QUOTE_EXPRESSION
-    : EL_EXPR -> type(EL_EXPR)
+    : EL_EXPR_TXT -> type(EL_EXPR)
     ;
 
 ATTVAL_DOUBLE_QUOTE_END_TAG_OPEN
     :  END_ELEMENT_OPEN_TAG -> type(CLOSE_TAG_BEGIN),pushMode(TAG)
     ;
+
 ATTVAL_DOUBLE_QUOTE_TAG_OPEN
     :  BEGIN_ELEMENT_OPEN_TAG -> type(TAG_BEGIN),pushMode(TAG)
     ;
@@ -439,6 +430,9 @@ ATTVAL_DOUBLE_QUOTE_TEXT
     : DOUBLE_QUOTE_STRING_CONTENT+ -> type(ATTVAL_ATTRIBUTE)
     ;
 
+ATTVAL_JSP_IN_DOUBLE_QUOTE
+    :ECHO_EXPRESSION_OPEN ->type(ECHO_EXPRESSION_OPEN), pushMode(JSP_BLOB)
+    ;
 
 fragment ATTCHAR
     : '-'
@@ -469,10 +463,6 @@ fragment HEXCHARS
 
 fragment DECCHARS
     : [0-9]+ '%'?
-    ;
-
-EL_EXPR
-    : '${' ~[}]* '}'
     ;
 
 fragment ESCAPED_SINGLE_QUOTE
