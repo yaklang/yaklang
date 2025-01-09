@@ -96,7 +96,7 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 		log.Info("start to create net tun in gvisor")
 		sdev, sdial, err := netstack.CreateNetTUN([]netip.Addr{
-			netip.MustParseAddr("10.252.252.252"),
+			netip.MustParseAddr("172.18.172.18"),
 		}, []netip.Addr{
 			netip.MustParseAddr("8.8.8.8"),
 		}, 1420)
