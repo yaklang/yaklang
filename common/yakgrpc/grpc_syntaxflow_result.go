@@ -65,7 +65,7 @@ func (s *Server) DeleteSyntaxFlowResult(ctx context.Context, req *ypb.DeleteSynt
 		// clear up risk
 		resultID := make([]int64, 0)
 		if err := db.Where("risk_count != 0").Pluck("id", &resultID).Error; err == nil {
-			if err := yakit.DeleteRiskBySFResult(consts.GetGormProjectDatabase(), resultID); err != nil {
+			if err := yakit.DeleteSSARiskBySFResult(consts.GetGormProjectDatabase(), resultID); err != nil {
 				return nil, utils.Errorf("delete risk failed: %s", err)
 			}
 		}

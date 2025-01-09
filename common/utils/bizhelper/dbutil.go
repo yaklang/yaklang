@@ -629,21 +629,35 @@ func QueryLargerThanFloatOr_AboveZero(db *gorm.DB, field string, value float64) 
 	return db.Where(fmt.Sprintf("%v >= ?", field), value)
 }
 
-func QueryLargerThanIntOr_AboveZero(db *gorm.DB, field string, value int64) *gorm.DB {
+func QueryLargerOrEqualThanIntOr_AboveZero(db *gorm.DB, field string, value int64) *gorm.DB {
 	if value <= 0 {
 		return db
 	}
 	return db.Where(fmt.Sprintf("%v >= ?", field), value)
 }
 
-func QueryLargerThanInt(db *gorm.DB, field string, value *int64) *gorm.DB {
+func QueryLargerThanIntOr_AboveZero(db *gorm.DB, field string, value int64) *gorm.DB {
+	if value <= 0 {
+		return db
+	}
+	return db.Where(fmt.Sprintf("%v > ?", field), value)
+}
+
+func QueryLargerOrEqualThanInt(db *gorm.DB, field string, value *int64) *gorm.DB {
 	if value == nil {
 		return db
 	}
 	return db.Where(fmt.Sprintf("%v >= ?", field), *value)
 }
 
-func QueryLessThanInt(db *gorm.DB, field string, value *int64) *gorm.DB {
+func QueryLessThanIntOr_AboveZero(db *gorm.DB, field string, value int64) *gorm.DB {
+	if value <= 0 {
+		return db
+	}
+	return db.Where(fmt.Sprintf("%v < ?", field), value)
+}
+
+func QueryLessOrEqualThanInt(db *gorm.DB, field string, value *int64) *gorm.DB {
 	if value == nil {
 		return db
 	}
@@ -1156,4 +1170,40 @@ func GetTableCurrentId(db *gorm.DB, tableName string) (int64, error) {
 		return 0, db.Error
 	}
 	return result.Count, nil
+}
+
+func YakitPagingQuery(db *gorm.DB, p *ypb.Paging, data any) (*Paginator, *gorm.DB) {
+	db = QueryOrder(db, p.OrderBy, p.Order)          // set order by
+	if p.GetBeforeId() <= 0 && p.GetAfterId() <= 0 { // if not set after_id and before_id, use page and limit
+		return NewPagination(&Param{
+			DB:    db,
+			Page:  int(p.GetPage()),
+			Limit: int(p.GetLimit()),
+		}, data)
+	}
+
+	var count int
+	if db.Model(data).Count(&count); db.Error != nil { // get total count
+		log.Errorf("query count failed: %s", db.Error)
+	}
+
+	// Incremental query
+	db = QueryLargerThanIntOr_AboveZero(db, "id", p.GetAfterId()) // if set after_id, use after_id, not page data ,just query
+	db = QueryLessThanIntOr_AboveZero(db, "id", p.GetBeforeId())
+	var paginator *Paginator
+	if p.Limit == -1 {
+		db.Find(data)
+		paginator.Limit = count
+	} else {
+		db.Limit(p.Limit).Find(data)
+	}
+	paginator.TotalRecord = count
+	paginator.Records = data
+	return paginator, db
+}
+
+func GroupCount(db *gorm.DB, tableName string, column string) []*ypb.FieldGroup {
+	var res []*ypb.FieldGroup
+	db.Table(tableName).Select(fmt.Sprintf("%v as name , count(*) as total", column)).Group(column).Scan(&res)
+	return res
 }
