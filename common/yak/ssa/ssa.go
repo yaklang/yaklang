@@ -385,12 +385,17 @@ var (
 type LanguageConfig struct {
 	isBindLanguage  bool
 	isTryBuildValue bool
+	// Support obtaining static members and static method, even if the class is not instantiated.
+	isSupportClass               bool
+	isSupportClassStaticModifier bool
 }
 
 func NewLanguageConfig() *LanguageConfig {
 	return &LanguageConfig{
-		isBindLanguage:  false,
-		isTryBuildValue: false,
+		isBindLanguage:               false,
+		isTryBuildValue:              false,
+		isSupportClass:               false,
+		isSupportClassStaticModifier: false,
 	}
 }
 

@@ -20,7 +20,7 @@ var Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(),
+		PreHandlerInit: ssa.NewPreHandlerInit(initHandler),
 	}
 }
 
