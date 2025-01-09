@@ -3,9 +3,14 @@ package lowhttp
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/netx"
+	"golang.org/x/net/http2"
 	"io"
 	"net"
 	"net/http"
@@ -545,4 +550,69 @@ Host: ` + utils.HostPort(host, port) + `
 	rsp, err = HTTPWithoutRedirect(WithPacketBytes(ReplaceHTTPPacketCookie(rsp.RawRequest, "a", "c")), WithSession("test"))
 	require.NoError(t, err)
 	require.Equal(t, "a=c;", GetHTTPPacketHeader(rsp.RawRequest, "Cookie"))
+}
+
+func TestPoCH2Preface(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	token := uuid.NewString()
+	host, port := utils.DebugMockHTTP2(ctx, func(req []byte) []byte {
+		return []byte(token)
+	})
+
+	middlewarePort := utils.GetRandomAvailableTCPPort()
+	tlsConfig := utils.GetDefaultTLSConfig(5)
+	copied := *tlsConfig
+	copied.NextProtos = []string{"h2"}
+	listen, err := tls.Listen("tcp", utils.HostPort(host, middlewarePort), &copied)
+	require.NoError(t, err)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			conn, err := listen.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				clientConn := conn
+				defer clientConn.Close()
+				serverConn, err := netx.DialX(utils.HostPort(host, port), netx.DialX_WithTLS(true), netx.DialX_WithTLSNextProto("h2"))
+				if err != nil {
+					return
+				}
+				defer serverConn.Close()
+				middlewareReader, middlewareWriter := utils.NewBufPipe(nil)
+				_ = middlewareReader
+				copyReader := io.TeeReader(clientConn, middlewareWriter)
+				go func() {
+					io.Copy(serverConn, copyReader)
+				}()
+
+				buf := make([]byte, len(http2.ClientPreface)) // trim client preface
+				if _, err := io.ReadFull(middlewareReader, buf); err != nil {
+					cancel()
+				}
+				frameReader := http2.NewFramer(nil, middlewareReader)
+				for {
+					frame, err := frameReader.ReadFrame()
+					if err != nil && !errors.Is(err, io.EOF) {
+						return
+					}
+					if _, ok := frame.(*http2.HeadersFrame); ok {
+						io.Copy(clientConn, serverConn)
+						return
+					}
+				}
+
+			}()
+
+		}
+	}()
+
+	rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte("GET / HTTP/2.0\r\nHost: "+utils.HostPort(host, middlewarePort)+"\r\nContent-Length: 1\r\n\r\na")), WithHttp2(true), WithHttps(true))
+	require.NoError(t, err)
+	require.Contains(t, string(rsp.RawPacket), token)
+
 }
