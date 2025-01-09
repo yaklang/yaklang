@@ -97,7 +97,8 @@ func CreateNetTUN(localAddresses, dnsServers []netip.Addr, mtu int) (tun.Device,
 			dev.hasV6 = true
 		}
 	}
-	if dev.hasV4 {
+
+	if dev.hasV4 || len(localAddresses) <= 0 {
 		dev.stack.AddRoute(tcpip.Route{Destination: header.IPv4EmptySubnet, NIC: 1})
 	}
 	if dev.hasV6 {
