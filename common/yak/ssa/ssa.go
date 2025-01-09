@@ -387,10 +387,10 @@ type LanguageConfig struct {
 	isTryBuildValue bool
 }
 
-func NewLanguageConfig(isBindLanguage, isTryBuildValue bool) *LanguageConfig {
+func NewLanguageConfig() *LanguageConfig {
 	return &LanguageConfig{
-		isBindLanguage:  isBindLanguage,
-		isTryBuildValue: isTryBuildValue,
+		isBindLanguage:  false,
+		isTryBuildValue: false,
 	}
 }
 

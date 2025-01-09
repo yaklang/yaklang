@@ -125,5 +125,7 @@ func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
-	fb.SetLanguageConfig(ssa.NewLanguageConfig(true, false))
+	fb.SetLanguageConfig(
+		ssa.LanguageConfigIsBinding,
+	)
 }
