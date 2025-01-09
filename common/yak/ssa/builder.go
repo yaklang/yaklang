@@ -342,9 +342,28 @@ func (b *FunctionBuilder) GetForceCapture() bool {
 	return b.CurrentBlock.ScopeTable.GetForceCapture()
 }
 
+type languageConfigOpt func(*LanguageConfig)
+
+func (b *FunctionBuilder) SetLanguageConfig(opt ...languageConfigOpt) {
+	newConfig := NewLanguageConfig()
+	b.GetProgram().Application.config = newConfig
+	for _, o := range opt {
+		o(newConfig)
+	}
+}
+
+func LanguageConfigIsBinding(config *LanguageConfig) {
+	config.isBindLanguage = true
+}
+
+func LanguageConfigTryBuildValue(config *LanguageConfig) {
+	config.isTryBuildValue = true
+}
+
 func (b *FunctionBuilder) isBindLanguage() bool {
 	config := b.GetProgram().Application.config
 	if config == nil {
+		log.Errorf("[BUG]config is not init")
 		return false
 	}
 	return config.isBindLanguage
@@ -353,11 +372,8 @@ func (b *FunctionBuilder) isBindLanguage() bool {
 func (b *FunctionBuilder) isTryBuildValue() bool {
 	config := b.GetProgram().Application.config
 	if config == nil {
+		log.Errorf("[BUG]config is not init")
 		return false
 	}
 	return config.isTryBuildValue
-}
-
-func (b *FunctionBuilder) SetLanguageConfig(config *LanguageConfig) {
-	b.GetProgram().Application.config = config
 }
