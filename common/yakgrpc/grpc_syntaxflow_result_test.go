@@ -207,15 +207,15 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 		res := prog.SyntaxFlow(`println(* as $para); alert $para`)
 		resultID1, err := res.Save(schema.SFResultKindDebug, taskID1)
 		defer ssadb.DeleteResultByID(resultID1)
-		defer yakit.DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
-			RuntimeId: taskID1,
+		defer yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskID1},
 		})
 		require.NoError(t, err)
 
 		// check have risk
-		_, risks, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
-			RuntimeId: taskID1,
-		})
+		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskID1},
+		}, nil)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(risks))
 		require.Equal(t, taskID1, risks[0].RuntimeId)
