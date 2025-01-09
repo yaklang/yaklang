@@ -229,7 +229,13 @@ func (b *FunctionBuilder) CreateVariableForce(name string, pos ...CanStartStopTo
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
 	if variable := b.getCurrentScopeVariable(name); variable != nil {
 		if value := variable.GetValue(); value != nil {
-			if _, ok := ToParameter(value); !ok {
+			if _, ok := ToConst(value); ok {
+				return variable
+			}
+			if un, ok := ToUnOp(value); ok && un.Op == OpAddress {
+				return variable
+			}
+			if _, ok := value.(*SideEffect); ok {
 				return variable
 			}
 		}
