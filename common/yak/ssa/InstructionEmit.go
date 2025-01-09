@@ -497,12 +497,11 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 			Modify:               se.Modify,
 			forceCreate:          se.forceCreate,
 			Variable:             se.Variable,
-			BindVariable:         se.BindVariable,
 			parameterMemberInner: se.parameterMemberInner,
 		}
 
 		if variable := scope.ReadVariable(se.Name); variable != nil {
-			if find, bind := scope.ReadVariableFromLinkSideEffect(se.Name); find != nil && bind == se.BindVariable {
+			if find, bind := scope.ReadVariableFromLinkSideEffect(se.Name); find != nil && bind == se.Variable {
 				value = find.GetValue()
 			} else {
 				value = variable.GetValue()
@@ -513,15 +512,11 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 				ser.Modify = value
 			}
 		}
-		variable := se.BindVariable
-		if variable == nil {
-			variable = se.Variable
+		bindVariable := se.Variable
+		if bindVariable == nil {
+			bindVariable = value.GetLastVariable()
 		}
-		if variable == nil {
-			variable = value.GetLastVariable()
-		}
-
-		SideEffectsReturn[variable] = ser
+		SideEffectsReturn[bindVariable] = ser
 	}
 	f.SideEffects = nil
 	f.SideEffectsReturn = append(f.SideEffectsReturn, SideEffectsReturn)
