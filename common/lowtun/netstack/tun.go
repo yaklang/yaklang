@@ -104,6 +104,8 @@ func CreateNetTUN(localAddresses, dnsServers []netip.Addr, mtu int) (tun.Device,
 		dev.stack.AddRoute(tcpip.Route{Destination: header.IPv6EmptySubnet, NIC: 1})
 	}
 
+	dev.stack.SetForwardingDefaultAndAllNICs(ipv4.ProtocolNumber, true)
+	dev.stack.SetForwardingDefaultAndAllNICs(ipv6.ProtocolNumber, true)
 	dev.events <- tun.EventUp
 	return dev, (*Net)(dev), nil
 }
