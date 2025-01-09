@@ -262,7 +262,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	/*
 		设置过滤器
 	*/
-	filterManager := GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
+	var (
+		filterManager       = GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
+		hijackFilterManager *MITMFilter
+	)
 
 	/*
 		设置内容替换模块，通过正则驱动
@@ -577,6 +580,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				filterManager.Update(reqInstance.FilterData)
 				filterManager.Save()
 				recoverFilterAndReplacerSend()
+				continue
+			}
+
+			if reqInstance.UpdateHijackFilter {
+				if hijackFilterManager == nil {
+					hijackFilterManager = NewMITMFilter(reqInstance.HijackFilterData)
+				} else {
+					hijackFilterManager.Update(reqInstance.HijackFilterData)
+				}
 				continue
 			}
 
@@ -973,6 +985,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				extName = "." + extName
 			}
 		}
+
 		if !filterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return raw
@@ -994,6 +1007,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 			})
 		}()
+		// 条件劫持
+		if hijackFilterManager != nil && hijackFilterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
+			autoForward.SetTo(false)
+		}
 
 		// MITM 自动转发
 		if autoForward.IsSet() {
@@ -1235,10 +1252,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			req = httpctx.GetHijackedRequestBytes(originReqIns)
 		}
 
-		// 过滤
-		if !filterManager.IsPassed(method, hostname, urlStr, extName) {
-			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
-			return req
+		// 条件劫持
+		if hijackFilterManager != nil && hijackFilterManager.IsPassed(method, hostname, urlStr, extName) {
+			autoForward.SetTo(false)
 		}
 
 		// MITM 手动劫持放行
