@@ -1076,12 +1076,19 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, syntaxBlocks ...bool) {
 	}
 
 	handleGlobal := func() {
-		if global := b.GetProgram().GlobalScope; global != nil && !b.SetGlobal {
+		var checkGlobal func(ssa.Value)
+		checkGlobal = func(value ssa.Value) {
 			b.SetGlobal = true
-			for i, m := range global.GetAllMember() {
+			for i, m := range value.GetAllMember() {
 				variable := b.CreateLocalVariable(i.String())
 				b.AssignVariable(variable, m)
+				if un, ok := m.(*ssa.UnOp); ok {
+					checkGlobal(un.X)
+				}
 			}
+		}
+		if global := b.GetProgram().GlobalScope; global != nil && !b.SetGlobal {
+			checkGlobal(global)
 		}
 	}
 
