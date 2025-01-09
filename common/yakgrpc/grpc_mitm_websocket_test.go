@@ -395,7 +395,7 @@ Accept: */*
 	})
 
 	require.NoError(t, err)
-	require.Len(t, wsFlows, 2, "len(wsFlows) != 6")
+	require.Len(t, wsFlows, 2, "len(wsFlows) != 2")
 	require.Contains(t, wsFlows[0].Tags, tagToken, "wsFlows[0].Tags not contains tagToken")
 	require.Contains(t, wsFlows[1].Tags, tagToken, "wsFlows[1].Tags not contains tagToken")
 	require.Contains(t, wsFlows[0].Tags, schema.FLOW_COLOR_RED, "wsFlows[0].Tags not contains color tag")
