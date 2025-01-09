@@ -461,7 +461,6 @@ func init() {
 	}))
 	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatisXML), nc_desc("Fins MyBatis Sink for default searching"))
 	registerNativeCall(NativeCall_FreeMarkerSink, nc_func(nativeCallFreeMarker))
-	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatisXML))
 	registerNativeCall(NativeCall_Var, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		varName := params.GetString(0)
 		//log.Info("syntax flow native call 'as' to", varName)
