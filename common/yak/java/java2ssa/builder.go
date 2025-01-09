@@ -24,7 +24,6 @@ type SSABuilder struct {
 var Builder ssa.Builder = &SSABuilder{}
 
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	b.SupportClass = true
 	b.GetProgram().VirtualImport = true
 	ast, err := Frontend(src, force)
 	if err != nil {
@@ -38,7 +37,6 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		allImportPkgSlice: make([][]string, 0),
 		selfPkgPath:       make([]string, 0),
 	}
-	build.SupportClassStaticModifier = true
 	build.VisitCompilationUnit(ast)
 	return nil
 }
@@ -122,10 +120,4 @@ func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
 	b.LoadFunctionBuilder(s.Store)
-}
-
-func initHandler(fb *ssa.FunctionBuilder) {
-	fb.SetLanguageConfig(
-		ssa.LanguageConfigIsBinding,
-	)
 }

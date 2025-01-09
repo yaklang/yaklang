@@ -21,7 +21,7 @@ var Builder ssa.Builder = &SSABuild{}
 
 func (s *SSABuild) Create() ssa.Builder {
 	return &SSABuild{
-		PreHandlerInit: ssa.NewPreHandlerInit(),
+		PreHandlerInit: ssa.NewPreHandlerInit(initHandler),
 	}
 }
 

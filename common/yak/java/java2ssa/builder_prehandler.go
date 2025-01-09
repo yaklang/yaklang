@@ -1,11 +1,12 @@
 package java2ssa
 
 import (
+	"path/filepath"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
-	"path/filepath"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -22,8 +23,16 @@ var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(),
+		PreHandlerInit: ssa.NewPreHandlerInit(initHandler),
 	}
+}
+
+func initHandler(fb *ssa.FunctionBuilder) {
+	fb.SetLanguageConfig(
+		ssa.LanguageConfigIsBinding,
+		ssa.LanguageConfigIsSupportClass,
+		ssa.LanguageConfigIsSupportClassStaticModifier,
+	)
 }
 
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {

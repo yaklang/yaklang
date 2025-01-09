@@ -18,7 +18,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 
 func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bool) Value {
 	// only static member and method need to be checked
-	if !b.SupportClassStaticModifier {
+	if !b.isSupportClassStaticModifier() {
 		return nil
 	}
 	// get member or method
@@ -77,7 +77,7 @@ func (b *FunctionBuilder) InterfaceAddFieldBuild(size int, keys func(int) Value,
 }
 
 func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, method bool) Value {
-	if !b.SupportClass {
+	if !b.isSupportClass() {
 		return nil
 	}
 	// class blue print
