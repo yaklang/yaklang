@@ -85,7 +85,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 	}
 
 	// if this builder support class, just return the class
-	if builder.SupportClass {
+	if builder.isSupportClass() {
 		return c
 	}
 

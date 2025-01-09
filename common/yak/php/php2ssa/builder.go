@@ -40,6 +40,8 @@ func initHandler(fb *ssa.FunctionBuilder) {
 	fb.SetLanguageConfig(
 		ssa.LanguageConfigIsBinding,
 		ssa.LanguageConfigTryBuildValue,
+		ssa.LanguageConfigIsSupportClass,
+		ssa.LanguageConfigIsSupportClassStaticModifier,
 	)
 	fb.SetEmptyRange()
 	container := fb.EmitEmptyContainer()
@@ -112,8 +114,6 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	// log.Infof("parse AST FrontEnd success: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	b.WithExternValue(phpBuildIn)
 	startParse := func(functionBuilder *ssa.FunctionBuilder) {
-		functionBuilder.SupportClassStaticModifier = true
-		functionBuilder.SupportClass = true
 		var id = 0
 		build := builder{
 			constMap:        make(map[string]ssa.Value),
