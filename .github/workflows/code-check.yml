@@ -1,4 +1,4 @@
-name: code-check
+name: Code-Check
 on:
   pull_request:
     branches: [ main ]
@@ -26,9 +26,9 @@ jobs:
           git fetch origin main:main
           git checkout main
           git reset --hard origin/main
+          git checkout ${{github.event.pull_request.head.sha}}
           git status
           git branch
-          git checkout ${{github.event.pull_request.head.sha}}
       - name: Set up Go 1.x
         uses: actions/setup-go@v4
         with:
@@ -51,7 +51,6 @@ jobs:
         run: echo "GIT_DIR=$(pwd)" >> $GITHUB_ENV
       - name: Check Diff Code
         run: |
-          ls -al ./.git/*/*
-          go test -timeout 5m ./common/ssa_bootstrapping/...
+          go test -v -timeout 5m ./common/ssa_bootstrapping/...
         env:
           GIT_DIR: ${{env.GIT_DIR}}
