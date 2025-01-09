@@ -183,7 +183,7 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 					}
 					results, ok := frame.GetSymbolTable().Get("_" + token)
 					if !ok {
-						return
+						continue
 					}
 					results.Recursive(func(operator sfvm.ValueOperator) error {
 						vals = append(vals, operator)
