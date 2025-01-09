@@ -749,6 +749,7 @@ service Yak {
   rpc QuerySSARisks(QuerySSARisksRequest)returns(QuerySSARisksResponse);
   rpc DeleteSSARisks(DeleteSSARisksRequest)returns(DbOperateMessage);
   rpc UpdateSSARiskTags(UpdateSSARiskTagsRequest)returns(DbOperateMessage);
+  rpc GetSSARiskFieldGroup(Empty) returns (SSARiskFieldGroupResponse);
 
   rpc GetAllPluginEnv(Empty) returns (PluginEnvData);
   rpc QueryPluginEnv(QueryPluginEnvRequest) returns (PluginEnvData);
@@ -4670,6 +4671,8 @@ message Paging {
   string OrderBy = 53;
   string Order = 54;
   string RawOrder = 55;
+  int64 BeforeId = 56;
+  int64 AfterId = 57;
 }
 
 message GetHTTPFlowByHashRequest {
@@ -5992,9 +5995,6 @@ message SSARisksFilter {
   repeated string RuntimeID = 8;
   repeated uint64 ResultID = 9;
   repeated string Tags = 10;
-
-  int64 FromId = 11;
-  int64 UntilId = 12;
 }
 
 message QuerySSARisksRequest {
@@ -6015,6 +6015,12 @@ message DeleteSSARisksRequest {
 message UpdateSSARiskTagsRequest {
   int64 ID = 1;
   repeated string Tags = 2;
+}
+
+message SSARiskFieldGroupResponse {
+  repeated FieldGroup ProgramNameField = 1;
+  repeated FieldGroup SeverityField = 2;
+  repeated FieldGroup RiskTypeField = 3;
 }
 
 message ExportSyntaxFlowsRequest {

@@ -427,6 +427,7 @@ const (
 	Yak_QuerySSARisks_FullMethodName                              = "/ypb.Yak/QuerySSARisks"
 	Yak_DeleteSSARisks_FullMethodName                             = "/ypb.Yak/DeleteSSARisks"
 	Yak_UpdateSSARiskTags_FullMethodName                          = "/ypb.Yak/UpdateSSARiskTags"
+	Yak_GetSSARiskFieldGroup_FullMethodName                       = "/ypb.Yak/GetSSARiskFieldGroup"
 	Yak_GetAllPluginEnv_FullMethodName                            = "/ypb.Yak/GetAllPluginEnv"
 	Yak_QueryPluginEnv_FullMethodName                             = "/ypb.Yak/QueryPluginEnv"
 	Yak_CreatePluginEnv_FullMethodName                            = "/ypb.Yak/CreatePluginEnv"
@@ -970,6 +971,7 @@ type YakClient interface {
 	QuerySSARisks(ctx context.Context, in *QuerySSARisksRequest, opts ...grpc.CallOption) (*QuerySSARisksResponse, error)
 	DeleteSSARisks(ctx context.Context, in *DeleteSSARisksRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateSSARiskTags(ctx context.Context, in *UpdateSSARiskTagsRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	GetSSARiskFieldGroup(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SSARiskFieldGroupResponse, error)
 	GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error)
 	QueryPluginEnv(ctx context.Context, in *QueryPluginEnvRequest, opts ...grpc.CallOption) (*PluginEnvData, error)
 	CreatePluginEnv(ctx context.Context, in *PluginEnvData, opts ...grpc.CallOption) (*Empty, error)
@@ -6261,6 +6263,15 @@ func (c *yakClient) UpdateSSARiskTags(ctx context.Context, in *UpdateSSARiskTags
 	return out, nil
 }
 
+func (c *yakClient) GetSSARiskFieldGroup(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SSARiskFieldGroupResponse, error) {
+	out := new(SSARiskFieldGroupResponse)
+	err := c.cc.Invoke(ctx, Yak_GetSSARiskFieldGroup_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error) {
 	out := new(PluginEnvData)
 	err := c.cc.Invoke(ctx, Yak_GetAllPluginEnv_FullMethodName, in, out, opts...)
@@ -6920,6 +6931,7 @@ type YakServer interface {
 	QuerySSARisks(context.Context, *QuerySSARisksRequest) (*QuerySSARisksResponse, error)
 	DeleteSSARisks(context.Context, *DeleteSSARisksRequest) (*DbOperateMessage, error)
 	UpdateSSARiskTags(context.Context, *UpdateSSARiskTagsRequest) (*DbOperateMessage, error)
+	GetSSARiskFieldGroup(context.Context, *Empty) (*SSARiskFieldGroupResponse, error)
 	GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error)
 	QueryPluginEnv(context.Context, *QueryPluginEnvRequest) (*PluginEnvData, error)
 	CreatePluginEnv(context.Context, *PluginEnvData) (*Empty, error)
@@ -8160,6 +8172,9 @@ func (UnimplementedYakServer) DeleteSSARisks(context.Context, *DeleteSSARisksReq
 }
 func (UnimplementedYakServer) UpdateSSARiskTags(context.Context, *UpdateSSARiskTagsRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSSARiskTags not implemented")
+}
+func (UnimplementedYakServer) GetSSARiskFieldGroup(context.Context, *Empty) (*SSARiskFieldGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSSARiskFieldGroup not implemented")
 }
 func (UnimplementedYakServer) GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllPluginEnv not implemented")
@@ -15810,6 +15825,24 @@ func _Yak_UpdateSSARiskTags_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetSSARiskFieldGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetSSARiskFieldGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetSSARiskFieldGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetSSARiskFieldGroup(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetAllPluginEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -17336,6 +17369,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateSSARiskTags",
 			Handler:    _Yak_UpdateSSARiskTags_Handler,
+		},
+		{
+			MethodName: "GetSSARiskFieldGroup",
+			Handler:    _Yak_GetSSARiskFieldGroup_Handler,
 		},
 		{
 			MethodName: "GetAllPluginEnv",

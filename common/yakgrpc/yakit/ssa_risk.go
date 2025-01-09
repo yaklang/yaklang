@@ -9,19 +9,19 @@ import (
 	"strings"
 )
 
-func DeleteRiskByProgram(DB *gorm.DB, programNames []string) error {
-	db := DB.Model(&schema.Risk{})
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", programNames)
-	if db := db.Unscoped().Delete(&schema.Risk{}); db.Error != nil {
-		return db.Error
-	}
-	return nil
-}
+//func DeleteRiskByProgram(DB *gorm.DB, programNames []string) error {
+//	db := DB.Model(&schema.Risk{})
+//	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", programNames)
+//	if db := db.Unscoped().Delete(&schema.Risk{}); db.Error != nil {
+//		return db.Error
+//	}
+//	return nil
+//}
 
-func DeleteRiskBySFResult(DB *gorm.DB, resultIDs []int64) error {
-	db := DB.Model(&schema.Risk{})
+func DeleteSSARiskBySFResult(DB *gorm.DB, resultIDs []int64) error {
+	db := DB.Model(&schema.SSARisk{})
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "result_id", resultIDs)
-	if db := db.Unscoped().Delete(&schema.Risk{}); db.Error != nil {
+	if db := db.Unscoped().Delete(&schema.SSARisk{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
@@ -32,6 +32,14 @@ func CreateSSARisk(DB *gorm.DB, r *schema.SSARisk) error {
 		return db.Error
 	}
 	return nil
+}
+
+func GetSSARiskByID(db *gorm.DB, id int64) (*schema.SSARisk, error) {
+	var r schema.SSARisk
+	if db := db.Model(&schema.SSARisk{}).Where("id = ?", id).First(&r); db.Error != nil {
+		return nil, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+	return &r, nil
 }
 
 func GetSSARiskByHash(db *gorm.DB, hash string) (*schema.SSARisk, error) {
@@ -74,18 +82,8 @@ func QuerySSARisk(db *gorm.DB, filter *ypb.SSARisksFilter, paging *ypb.Paging) (
 	var risks []*schema.SSARisk
 
 	db = db.Model(&schema.SSARisk{})
-	db = bizhelper.QueryOrder(db, paging.OrderBy, paging.Order)
-
-	if filter.GetFromId() > 0 {
-		db = db.Where("id > ?", filter.GetFromId())
-	}
-
-	if filter.GetUntilId() > 0 {
-		db = db.Where("id < ?", filter.GetUntilId())
-	}
-
 	db = FilterSSARisk(db, filter)
-	queryPaging, queryDb := bizhelper.Paging(db, int(paging.Page), int(paging.Limit), &risks)
+	queryPaging, queryDb := bizhelper.YakitPagingQuery(db, paging, &risks)
 	if queryDb.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
@@ -107,4 +105,8 @@ func UpdateSSARiskTags(DB *gorm.DB, id int64, tags []string) error {
 		return db.Error
 	}
 	return nil
+}
+
+func SSARiskColumnGroupCount(db *gorm.DB, column string) []*ypb.FieldGroup {
+	return bizhelper.GroupCount(db, "ssa_risks", column)
 }
