@@ -96,10 +96,8 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 		log.Info("start to create net tun in gvisor")
 		sdev, sdial, err := netstack.CreateNetTUN([]netip.Addr{
-			netip.MustParseAddr("172.18.172.18"),
-		}, []netip.Addr{
 			netip.MustParseAddr("8.8.8.8"),
-		}, 1420)
+		}, []netip.Addr{}, 1420)
 		if err != nil {
 			return err
 		}
@@ -123,7 +121,11 @@ func main() {
 
 		st := sdial.Stack()
 		st.SetTransportProtocolHandler(tcp.ProtocolNumber, func(id stack.TransportEndpointID, buffer *stack.PacketBuffer) bool {
-			spew.Dump(buffer, id)
+			//tcpHeader := header.TCP(buffer.TransportHeader().View())
+			//if tcpHeader.Flags() == header.TCPFlagSyn {
+			//	st.WritePacketToRemote(1, id.RemoteAddress, tcp.ProtocolNumber)
+			//	return true
+			//}
 			return false
 		})
 
