@@ -44,3 +44,12 @@ func (s *Server) UpdateSSARiskTags(ctx context.Context, req *ypb.UpdateSSARiskTa
 		EffectRows: 1,
 	}, nil
 }
+
+func (s *Server) GetSSARiskFieldGroup(ctx context.Context, req *ypb.Empty) (*ypb.SSARiskFieldGroupResponse, error) {
+	db := s.GetSSADatabase()
+	return &ypb.SSARiskFieldGroupResponse{
+		ProgramNameField: yakit.SSARiskColumnGroupCount(db, "program_name"),
+		SeverityField:    yakit.SSARiskColumnGroupCount(db, "severity"),
+		RiskTypeField:    yakit.SSARiskColumnGroupCount(db, "risk_type"),
+	}, nil
+}
