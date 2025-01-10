@@ -1,8 +1,12 @@
 name: Update Syntaxflow meta
 
 on:
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      publish_version:
+        description: "Version to publish (e.g. v1.3.0)"
+        type: string
+        required: true
 
 
 jobs:
@@ -15,13 +19,13 @@ jobs:
       - name: Get Yak binary Lastest
         run: |
           wget https://aliyun-oss.yaklang.com/yak/latest/yak_linux_amd64
+          pwd && ls -lh && chmod +x ./yak_linux_amd64
 
 
       - name: Get Repo tags
         run: |
-          pwd && ls -lh && chmod +x ./yak_linux_amd64
-          ./yak_linux_amd64 repos-tag -o tags.txt
-          echo "YAK_TAG=$(cat tags.txt)" >> $GITHUB_ENV
+          VERSION_INPUT="${{ github.event.inputs.publish_version }}"
+          echo "YAK_TAG=$YAK_VERSION" >> $GITHUB_ENV 
 
       - name: Checkout Tags Version
         run: echo ${{ env.YAK_TAG }}
@@ -63,8 +67,7 @@ jobs:
             --ai-type chatglm \
             --apikey ${{ secrets.CHATGLM_APIKEY }} \
             --ai-model glm-4 \
-            --concurrent 5 \
-            --force
+            --concurrent 5 
           
           echo "Checking generated files..."
           ls -l | grep syntaxflow
@@ -96,4 +99,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: grpc.log
-          path: ${github.workspace}/syntaxflow-meta.json
+          path: ${{github.workspace}}/syntaxflow-meta.json
