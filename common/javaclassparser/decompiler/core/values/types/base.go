@@ -1,25 +1,31 @@
 package types
 
-import "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+import (
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+)
 
 type JavaType interface {
 	javaType
 	ResetType(t JavaType)
+	ResetTypeRef(t JavaType)
 	IsArray() bool
 	ElementType() JavaType
 	ArrayDim() int
 	FunctionType() *JavaFuncType
 	RawType() javaType
 	Copy() JavaType
+	GetJavaTypeRef() *javaTypeRef
 }
-
-type JavaTypeWrap struct {
+type javaTypeRef struct {
 	javaType
+}
+type JavaTypeWrap struct {
+	*javaTypeRef
 }
 
 func (j *JavaTypeWrap) Copy() JavaType {
 	return &JavaTypeWrap{
-		javaType: j.javaType,
+		javaTypeRef: &javaTypeRef{j.javaType},
 	}
 }
 func (j *JavaTypeWrap) ArrayDim() int {
@@ -57,8 +63,14 @@ func (j *JavaTypeWrap) ElementType() JavaType {
 	}
 	return nil
 }
+func (j *JavaTypeWrap) GetJavaTypeRef() *javaTypeRef {
+	return j.javaTypeRef
+}
+func (j *JavaTypeWrap) ResetTypeRef(t JavaType) {
+	j.javaTypeRef = t.GetJavaTypeRef()
+}
 func (j *JavaTypeWrap) ResetType(t JavaType) {
-	if t.String(&class_context.ClassContext{}) == JavaBoolean {
+	if j.String(&class_context.ClassContext{}) == JavaInteger && t.String(&class_context.ClassContext{}) == JavaBoolean {
 		j.javaType = t.RawType()
 	}
 	if j.String(&class_context.ClassContext{}) == JavaVoid {
@@ -67,7 +79,7 @@ func (j *JavaTypeWrap) ResetType(t JavaType) {
 }
 func newJavaTypeWrap(t javaType) *JavaTypeWrap {
 	return &JavaTypeWrap{
-		javaType: t,
+		javaTypeRef: &javaTypeRef{t},
 	}
 }
 
@@ -75,64 +87,46 @@ type javaType interface {
 	String(funcCtx *class_context.ClassContext) string
 	IsJavaType()
 }
-type MergeType struct {
-	typs []JavaType
-}
 
-func (m *MergeType) String(funcCtx *class_context.ClassContext) string {
-	s := ""
-	for _, typ := range m.typs {
-		if s == "" {
-			s = typ.String(funcCtx)
-			continue
-		}
-		newS := typ.String(funcCtx)
-		if newS != s {
-			panic("MergeType: different types")
+func MergeTypes(types ...JavaType) JavaType {
+	typesMap := map[string][]JavaType{}
+	for _, j := range types {
+		typesMap[j.String(&class_context.ClassContext{})] = append(typesMap[j.String(&class_context.ClassContext{})], j)
+	}
+	if len(typesMap) == 1 {
+		for _, javaTypes := range typesMap {
+			if len(javaTypes) > 0 {
+				baseRef := javaTypes[0]
+				for _, j := range javaTypes[1:] {
+					j.ResetTypeRef(baseRef)
+				}
+			}
 		}
 	}
-	return s
-}
-
-func (m *MergeType) IsJavaType() {
-}
-
-func (m *MergeType) ResetType(t JavaType) {
-	for _, typ := range m.typs {
-		typ.ResetType(t)
+	if v, ok := typesMap[JavaBoolean]; ok {
+		baseRef := v[0]
+		for _, j := range v[1:] {
+			j.ResetTypeRef(baseRef)
+		}
+		for key, javaTypes := range typesMap {
+			if key == JavaBoolean {
+				continue
+			}
+			if key == JavaInteger || key == JavaVoid {
+				for _, j := range javaTypes {
+					j.ResetTypeRef(baseRef)
+				}
+			} else {
+				panic("unsupported type")
+			}
+		}
 	}
-}
-
-func (m *MergeType) IsArray() bool {
-	return false
-}
-
-func (m *MergeType) ElementType() JavaType {
+	if len(types) > 0 {
+		return types[0]
+	}
 	return nil
 }
 
-func (m *MergeType) ArrayDim() int {
-	return 0
-}
-
-func (m *MergeType) FunctionType() *JavaFuncType {
-	return nil
-}
-
-func (m *MergeType) RawType() javaType {
-	return m.typs[0].RawType()
-}
-
-func (m *MergeType) Copy() JavaType {
-	return NewMergeType(m.typs...)
-}
-func NewMergeType(typs ...JavaType) *MergeType {
-	return &MergeType{
-		typs: typs,
-	}
-}
-
-var _ JavaType = &MergeType{}
 var _ javaType = &JavaClass{}
 var _ javaType = &JavaPrimer{}
 var _ javaType = &JavaArrayType{}

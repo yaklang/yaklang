@@ -167,33 +167,38 @@ func CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
 	switch len(doms) {
 	case 1:
 		ok1 := false
-		err := core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
-			if node == ifNode {
-				return nil, nil
+		if trueNode != nil {
+			err := core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
+				if node == ifNode {
+					return nil, nil
+				}
+				if node == doms[0] {
+					ok1 = true
+					return nil, nil
+				}
+				return node.Next, nil
+			})
+			if err != nil {
+				return err
 			}
-			if node == doms[0] {
-				ok1 = true
-				return nil, nil
-			}
-			return node.Next, nil
-		})
-		if err != nil {
-			return err
 		}
 		ok2 := false
-		err = core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
-			if node == ifNode {
-				return nil, nil
+		if falseNode != nil {
+			err := core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
+				if node == ifNode {
+					return nil, nil
+				}
+				if node == doms[0] {
+					ok2 = true
+					return nil, nil
+				}
+				return node.Next, nil
+			})
+			if err != nil {
+				return err
 			}
-			if node == doms[0] {
-				ok2 = true
-				return nil, nil
-			}
-			return node.Next, nil
-		})
-		if err != nil {
-			return err
 		}
+
 		if ok1 && ok2 {
 			ifNode.MergeNode = doms[0]
 		}

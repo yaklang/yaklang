@@ -17,10 +17,11 @@ type JavaRef struct {
 	CustomValue *CustomValue
 	IsThis      bool
 	Val         JavaValue
+	typ         types.JavaType
 }
 
 func (j *JavaRef) Type() types.JavaType {
-	return j.Val.Type()
+	return j.typ
 }
 
 func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
@@ -36,10 +37,11 @@ func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
 	return j.Id.String()
 }
 
-func NewJavaRef(id *utils.VariableId, val JavaValue) *JavaRef {
+func NewJavaRef(id *utils.VariableId, val JavaValue, typ types.JavaType) *JavaRef {
 	return &JavaRef{
 		Id:  id,
 		Val: val,
+		typ: typ,
 	}
 }
 
@@ -254,7 +256,7 @@ type TernaryExpression struct {
 }
 
 func (j *TernaryExpression) Type() types.JavaType {
-	return types.NewMergeType(j.TrueValue.Type(), j.FalseValue.Type())
+	return types.MergeTypes(j.TrueValue.Type(), j.FalseValue.Type())
 }
 func (j *TernaryExpression) String(funcCtx *class_context.ClassContext) string {
 	condition := SimplifyConditionValue(j.Condition)
@@ -280,26 +282,32 @@ func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {
 }
 
 type SlotValue struct {
-	Value      JavaValue
-	TmpType    types.JavaType
+	val     JavaValue
+	TmpType types.JavaType
 }
 
 func (s *SlotValue) Type() types.JavaType {
-	if s.Value == nil {
+	if s.val == nil {
 		return s.TmpType
 	}
-	return s.Value.Type()
+	return s.val.Type()
 }
 func (s *SlotValue) String(funcCtx *class_context.ClassContext) string {
-	if s.Value == nil {
+	if s.val == nil {
 		return "empty slot value"
 	}
-	return s.Value.String(funcCtx)
+	return s.val.String(funcCtx)
 }
-
+func (s *SlotValue) GetValue() JavaValue {
+	return s.val
+}
+func (s *SlotValue) ResetValue(val JavaValue) {
+	s.val = val
+	s.val.Type().ResetTypeRef(s.TmpType)
+}
 func NewSlotValue(val JavaValue, typ types.JavaType) *SlotValue {
 	return &SlotValue{
-		Value:   val,
+		val:     val,
 		TmpType: typ,
 	}
 }

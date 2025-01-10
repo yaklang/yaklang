@@ -1,7 +1,5 @@
 package org.benf.cfr.reader;
 
-import org.benf.cfr.reader.VarFold;
-
  class VarFold$Test extends VarFold {
 	// Fields
 	final VarFold this$0 = var1;

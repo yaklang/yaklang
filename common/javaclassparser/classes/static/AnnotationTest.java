@@ -1,20 +1,21 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by FernFlower decompiler)
-//
-
 package org.benf.cfr.reader;
 
-@MyAnnotation("test")
-public class AnnotationTest {
-    @MyAnnotation("field")
+@MyAnnotation(value="test")
+public class AnnotationTest<@MyAnnotation(value="test1") T> {
+    @MyAnnotation(value="field")
     String field;
+    @MyAnnotation(value="test1")
+    int main(@MyAnnotation(value="test1")int p){
+        @MyAnnotation(value="test1")
+        int a;
+        String str = (@MyAnnotation(value="test1") String) "a";
 
-    public AnnotationTest() {
-    }
-
-    @MyAnnotation("test1")
-    void main(@MyAnnotation("test1") int p) {
         System.out.println("123");
+
+        @MyAnnotation(value="test1")
+        int v = 1;
+        return 1;
     }
+    @MyAnnotation(value="constructor")
+    AnnotationTest(){}
 }

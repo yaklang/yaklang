@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"golang.org/x/exp/maps"
 )
 
@@ -88,7 +89,7 @@ func (s *StackSimulationImpl) GetVar(slot int) *values.JavaRef {
 
 func (s *StackSimulationImpl) NewVar(val values.JavaValue) *values.JavaRef {
 	s.currentVarId = s.currentVarId.Next()
-	newRef := values.NewJavaRef(s.currentVarId, val)
+	newRef := values.NewJavaRef(s.currentVarId, val, val.Type())
 	//d.idToValue[d.currentVarId] = val
 	return newRef
 }
@@ -101,6 +102,7 @@ func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values
 		s.varTable[slot] = newRef
 		return newRef, true
 	}
+	types.MergeTypes(ref.Type(), val.Type())
 	newRef := *ref
 	newRef.Id = newRef.Id.Horizontal()
 	newRef.Val = val
