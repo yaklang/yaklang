@@ -85,7 +85,6 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-
 	i, _ := raw.(*phpparser.NamespaceDeclarationContext)
 	if i == nil {
 		return nil
@@ -120,7 +119,6 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		if library == nil {
 			library = prog.NewLibrary(namespaceName, []string{prog.Loader.GetBasePath()})
 		}
-		library.VisitAst(raw)
 		//if custom syntax, only syntax it
 		library.PushEditor(prog.GetCurrentEditor())
 		functionBuilder := library.GetAndCreateFunctionBuilder(namespaceName, "init")
@@ -129,6 +127,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		currentBuilder := y.FunctionBuilder
 		y.FunctionBuilder = functionBuilder
 		return library, func() {
+			library.VisitAst(raw)
 			y.FunctionBuilder = currentBuilder
 		}
 	}

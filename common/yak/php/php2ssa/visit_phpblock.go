@@ -25,9 +25,6 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 			y.VisitNamespaceDeclaration(namespace)
 		}
 	}
-	if len(i.AllNamespaceDeclaration()) <= 0 {
-		y.GetProgram().VisitAst(raw)
-	}
 	if y.PreHandler() {
 		for _, functiondecl := range i.AllFunctionDeclaration() {
 			y.VisitFunctionDeclaration(functiondecl)
@@ -48,6 +45,9 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 		for _, enum := range i.AllEnumDeclaration() {
 			y.VisitEnumDeclaration(enum)
 		}
+	}
+	if len(i.AllNamespaceDeclaration()) <= 0 {
+		y.GetProgram().VisitAst(raw)
 	}
 	return nil
 }

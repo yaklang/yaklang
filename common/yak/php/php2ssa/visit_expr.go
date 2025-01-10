@@ -446,6 +446,12 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 			}
 		} else {
 			if value := y.PeekValue(valName); !utils.IsNil(value) {
+				if function, b := ssa.ToFunction(value); b {
+					function.Build()
+				}
+				if printType, b := ssa.ToClassBluePrintType(value.GetType()); b {
+					printType.Build()
+				}
 				return value
 			}
 			if funcx := y.GetFunc(valName, ""); !utils.IsNil(funcx) {
