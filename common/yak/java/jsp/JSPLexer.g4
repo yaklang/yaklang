@@ -4,6 +4,11 @@ JSP_COMMENT: '<!--' .*? '-->'->skip;
 
 JSP_CONDITIONAL_COMMENT: '<!--[' .*? ']]>'->skip;
 
+SCRIPT_OPEN: '<script' .*? '>' -> pushMode(SCRIPT);
+
+STYLE_OPEN: '<style' .*? '>' -> pushMode(STYLE);
+
+
 WHITESPACES
     :  (' ' | '\t' | '\r'? '\n')+
     ;
@@ -93,13 +98,18 @@ JSP_STATIC_CONTENT_CHAR
     ;
 
 JSP_END
-    : '%>' ->popMode
+    : JSP_END_TAG ->popMode
     ;
 
 ATTVAL_ATTRIBUTE
+    :' '* ATTVAL_VALUE
+    ;
+
+ATTVAL_VALUE
     : ATTCHARS
     | HEXCHARS
-    | DECCHARS;
+    | DECCHARS
+    ;
 
 HTML_TEXT
     : HTML_TEXT_FRAGMENT+
@@ -182,6 +192,10 @@ fragment EXPRESSION_OPEN_TAG
     |'#{'
     ;
 
+fragment JSP_END_TAG
+    : '%>'
+    ;
+
 mode IN_DTD;
 //<!DOCTYPE doctypename PUBLIC "publicId" "systemId">
 
@@ -220,7 +234,8 @@ BLOB_CONTENT
     ;
 
 fragment BLOB_CONTENT_FRAGMENT
-    : ~('<' | '%' | '>' )
+    : ~('%')
+    | '%' ~'>'
     ;
 
 mode JSP_EXPRESSION;
@@ -232,7 +247,6 @@ JSPEXPR_CONTENT
 JSPEXPR_CONTENT_CLOSE
     : ('}' | '%>') -> popMode
     ;
-
 
 
 //
@@ -260,6 +274,10 @@ TAG_CLOSE
 
 TAG_SLASH
     : '/'
+    ;
+
+TAG_JSP_EXPRESSION_OPEN
+    :ECHO_EXPRESSION_OPEN ->type(ECHO_EXPRESSION_OPEN), pushMode(JSP_BLOB)
     ;
 
 DIRECTIVE_END

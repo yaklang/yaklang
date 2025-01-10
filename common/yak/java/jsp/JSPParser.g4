@@ -18,7 +18,7 @@ jspStart
     ;
 
 jspElements
-    : htmlMisc* (htmlElement|jspScript ) htmlMisc*
+    : htmlMisc* (htmlElement|jspScript|jspExpression|style|javaScript) htmlMisc*
     ;
 
 jspScript
@@ -27,7 +27,9 @@ jspScript
     ;
 
 htmlElement
-    :htmlBegin  (TAG_CLOSE (htmlContents CLOSE_TAG_BEGIN htmlTag TAG_CLOSE)? | TAG_SLASH_END)
+    :htmlBegin  (
+        TAG_CLOSE (htmlContents CLOSE_TAG_BEGIN htmlTag TAG_CLOSE)?
+        | TAG_SLASH_END)
     ;
 
 htmlBegin
@@ -61,10 +63,9 @@ elExpression
     ;
 
 htmlAttribute
-    //: jspElement
     : htmlAttributeName EQUALS htmlAttributeValue
     | htmlAttributeName
-    | jspScript
+    | jspExpression
     ;
 
 htmlAttributeName
@@ -72,8 +73,7 @@ htmlAttributeName
     ;
 
 htmlAttributeValue
-    :QUOTE? elExpression QUOTE?
-    |QUOTE htmlAttributeValueElement* QUOTE
+    :QUOTE? htmlAttributeValueElement* QUOTE?
     ;
 
 htmlAttributeValueElement
@@ -149,4 +149,12 @@ scriptletStart
 
 scriptletContent
     : BLOB_CONTENT BLOB_CLOSE
+    ;
+
+javaScript
+    : SCRIPT_OPEN (SCRIPT_BODY | SCRIPT_SHORT_BODY)
+    ;
+
+style
+    : STYLE_OPEN (STYLE_BODY | STYLE_SHORT_BODY)
     ;
