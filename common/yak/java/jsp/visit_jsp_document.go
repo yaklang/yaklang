@@ -59,6 +59,10 @@ func (y *JSPVisitor) VisitJspDocuments(raw jspparser.IJspDocumentsContext) {
 	for _, doc := range i.AllJspDocument() {
 		y.VisitJspDocument(doc)
 	}
+
+	for _, start := range i.AllJspStart() {
+		y.VisitJspStart(start)
+	}
 }
 
 func (y *JSPVisitor) VisitJspDocument(raw jspparser.IJspDocumentContext) {
@@ -72,17 +76,12 @@ func (y *JSPVisitor) VisitJspDocument(raw jspparser.IJspDocumentContext) {
 		return
 	}
 
-	for _, start := range i.AllJspStart() {
-		y.VisitJspStart(start)
-	}
 	if i.Xml() != nil {
 		return
 	} else if i.Dtd() != nil {
 		return
-	} else {
-		for _, element := range i.AllJspElements() {
-			y.VisitJspElements(element)
-		}
+	} else if i.JspElements() != nil {
+		y.VisitJspElements(i.JspElements())
 	}
 }
 
@@ -96,12 +95,7 @@ func (y *JSPVisitor) VisitJspStart(raw jspparser.IJspStartContext) {
 	if i == nil {
 		return
 	}
-	if i.JspDirective() != nil {
-		y.VisitJspDirective(i.JspDirective())
-	}
-	if i.Scriptlet() != nil {
-		y.VisitScriptlet(i.Scriptlet())
-	}
+
 }
 
 func (y *JSPVisitor) VisitJspElements(raw jspparser.IJspElementsContext) {
@@ -115,23 +109,76 @@ func (y *JSPVisitor) VisitJspElements(raw jspparser.IJspElementsContext) {
 		return
 	}
 
-	if i.JspElement() != nil {
-		y.VisitJspElement(i.JspElement())
-	} else if i.JspDirective() != nil {
-		y.VisitJspDirective(i.JspDirective())
-	} else if i.Scriptlet() != nil {
-		y.VisitScriptlet(i.Scriptlet())
+	if i.GetBeforeContent() != nil {
+		y.VisitHtmlMiscs(i.AllHtmlMiscs()[0])
+	}
+
+	if i.HtmlElement() != nil {
+		y.VisitHtmlElement(i.HtmlElement())
+	} else if i.JspScript() != nil {
+		y.VisitJspScript(i.JspScript())
+	} else if i.JspExpression() != nil {
+		y.VisitJspExpression(i.JspExpression())
+	} else if i.Style() != nil {
+		return
+	} else if i.JavaScript() != nil {
+		return
+	}
+
+	if i.GetAfterContent() != nil {
+		y.VisitHtmlMiscs(i.AllHtmlMiscs()[1])
 	}
 }
 
-func (y *JSPVisitor) VisitJspElement(raw jspparser.IJspElementContext) {
+func (y *JSPVisitor) VisitHtmlMiscs(raw jspparser.IHtmlMiscsContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i := raw.(*jspparser.HtmlMiscsContext)
+	for _, misc := range i.AllHtmlMisc() {
+		y.VisitHtmlMisc(misc)
+	}
+}
+
+func (y *JSPVisitor) VisitHtmlMisc(raw jspparser.IHtmlMiscContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i := raw.(*jspparser.HtmlMiscContext)
+	if i == nil {
+		return
+	}
+
+	if i.HtmlComment() != nil {
+		return
+	} else if i.ElExpression() != nil {
+		y.VisitElExpression(i.ElExpression())
+	} else if i.JspScriptlet() != nil {
+		y.VisitJspScriptlet(i.JspScriptlet())
+	}
+}
+
+func (y *JSPVisitor) VisitElExpression(raw jspparser.IElExpressionContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i := raw.(*jspparser.ElExpressionContext)
+	if i == nil {
+		return
+	}
+}
+
+func (y *JSPVisitor) VisitHtmlElement(raw jspparser.IHtmlElementContext) {
 	if y == nil || raw == nil {
 		return
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
-	i := raw.(*jspparser.JspElementContext)
+	i := raw.(*jspparser.HtmlElementContext)
 	if i == nil {
 		return
 	}
@@ -238,15 +285,15 @@ func (y *JSPVisitor) VisitAttribute(raw jspparser.IHtmlAttributeContext) (key st
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-	i := raw.(*jspparser.HtmlAttributeContext)
-	if i == nil {
-		return
-	}
-	if i.HtmlAttributeName() != nil {
-		key = i.HtmlAttributeName().GetText()
-		if i.HtmlAttributeValue() != nil {
-			value = y.VisitHtmlAttributeValue(i.HtmlAttributeValue())
-		}
+
+	switch ret := raw.(type) {
+	case *jspparser.PureHTMLAttributeContext:
+		key = ret.HtmlAttributeName().GetText()
+	case *jspparser.EqualHTMLAttributeContext:
+		key = ret.HtmlAttributeName().GetText()
+		value = y.VisitHtmlAttributeValue(ret.HtmlAttributeValue())
+	case *jspparser.JSPExpressionAttributeContext:
+		y.VisitJspExpression(ret.JspExpression())
 	}
 	key = yakunquote.TryUnquote(key)
 	value = yakunquote.TryUnquote(value)
@@ -263,16 +310,31 @@ func (y *JSPVisitor) VisitHtmlAttributeValue(raw jspparser.IHtmlAttributeValueCo
 	if i == nil {
 		return ""
 	}
-	if i.HtmlAttributeValueExpr() != nil {
-		elExpr := i.HtmlAttributeValueExpr().GetText()
-		elExpr = y.fixElExpr(elExpr)
-		return elExpr
-	} else if i.JspElement() != nil {
-		y.VisitJspElement(i.JspElement())
-	} else if i.HtmlAttributeValueConstant() != nil {
-		return i.HtmlAttributeValueConstant().GetText()
+	// TODO:return value
+	for _, element := range i.AllHtmlAttributeValueElement() {
+		y.VisitHtmlAttributeValueElement(element)
 	}
 	return ""
+}
+
+func (y *JSPVisitor) VisitHtmlAttributeValueElement(raw jspparser.IHtmlAttributeValueElementContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i := raw.(*jspparser.HtmlAttributeValueElementContext)
+	if i == nil {
+		return
+	}
+	if i.ATTVAL_ATTRIBUTE() != nil {
+		y.EmitPureText(i.ATTVAL_ATTRIBUTE().GetText())
+	} else if i.JspExpression() != nil {
+		y.VisitJspExpression(i.JspExpression())
+	} else if i.ElExpression() != nil {
+		y.VisitElExpression(i.ElExpression())
+	}
 }
 
 func (y *JSPVisitor) VisitHtmlContent(raw jspparser.IHtmlContentContext) {
@@ -285,76 +347,15 @@ func (y *JSPVisitor) VisitHtmlContent(raw jspparser.IHtmlContentContext) {
 	if i == nil {
 		return
 	}
-	if i.JspExpression() != nil {
-
+	if i.ElExpression() != nil {
+		y.VisitElExpression(i.ElExpression())
 	} else if i.JspElements() != nil {
 		y.VisitJspElements(i.JspElements())
 	} else if i.XhtmlCDATA() != nil {
-
+		return
 	} else if i.HtmlComment() != nil {
-
-	} else if i.Scriptlet() != nil {
-		y.VisitScriptlet(i.Scriptlet())
-	} else if i.JspDirective() != nil {
-		y.VisitJspDirective(i.JspDirective())
-	}
-}
-
-func (y *JSPVisitor) VisitScriptlet(raw jspparser.IScriptletContext) {
-	if y == nil || raw == nil {
 		return
 	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i := raw.(*jspparser.ScriptletContext)
-	if i == nil {
-		return
-	}
-
-	if i.SCRIPTLET_OPEN() != nil || i.DECLARATION_BEGIN() != nil {
-		if i.BLOB_CONTENT() != nil {
-			y.EmitPureCode(i.BLOB_CONTENT().GetText())
-			return
-		}
-	}
-
-	if i.ECHO_EXPRESSION_OPEN() != nil {
-		if i.BLOB_CONTENT() != nil {
-			y.EmitOutput(i.BLOB_CONTENT().GetText())
-			return
-		}
-	}
-
-}
-
-func (y *JSPVisitor) VisitJspDirective(raw jspparser.IJspDirectiveContext) {
-	if y == nil || raw == nil {
-		return
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i := raw.(*jspparser.JspDirectiveContext)
-	if i == nil {
-		return
-	}
-
-	if i.HtmlTagName() == nil {
-		return
-	}
-
-	name := i.HtmlTagName().GetText()
-	tag := y.GetDirectiveTag(name)
-
-	attrs := make(map[string]string)
-	for _, attr := range i.AllHtmlAttribute() {
-		key, value := y.VisitAttribute(attr)
-		attrs[key] = value
-	}
-	y.PushTagInfo(tag, attrs)
-	defer y.PopTagInfo()
-	y.ParseSingleTag(i.GetText())
 }
 
 func (y *JSPVisitor) VisitHtmlCharData(raw jspparser.IHtmlChardataContext) {
@@ -367,15 +368,9 @@ func (y *JSPVisitor) VisitHtmlCharData(raw jspparser.IHtmlChardataContext) {
 	if i == nil {
 		return
 	}
-	for _, data := range i.AllHTML_TEXT() {
-		texts := data.GetText()
-		for _, text := range strings.Split(texts, "\n") {
-			text = strings.TrimSpace(text)
-			y.EmitPureText(text)
-		}
-	}
-	if el := i.EL_EXPR(); el != nil {
-		expr := y.fixElExpr(el.GetText())
-		y.EmitOutput(expr)
+
+	if i.JSP_STATIC_CONTENT_CHARS() != nil {
+		str := i.JSP_STATIC_CONTENT_CHARS().GetText()
+		y.EmitPureText(str)
 	}
 }
