@@ -446,7 +446,7 @@ func TestSFURl_golang(t *testing.T) {
 			for _, extra := range res[0].Extra {
 				if extra.Key == "code_range" {
 					log.Infof("code_range: %v", extra.Value)
-					var codeRange yakurl.CodeRange
+					var codeRange ssaapi.CodeRange
 					if err := json.Unmarshal([]byte(extra.Value), &codeRange); err != nil {
 						t.Error(err)
 					}
@@ -459,7 +459,7 @@ func TestSFURl_golang(t *testing.T) {
 			for _, extra := range res[1].Extra {
 				if extra.Key == "code_range" {
 					log.Infof("code_range: %v", extra.Value)
-					var codeRange yakurl.CodeRange
+					var codeRange ssaapi.CodeRange
 					if err := json.Unmarshal([]byte(extra.Value), &codeRange); err != nil {
 						t.Error(err)
 					}
