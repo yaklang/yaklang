@@ -5,13 +5,17 @@ enableCustomAI := cli.Bool("custom-ai")
 aiType := cli.String("ai-type", cli.setDefault("chatglm"))
 aiModel := cli.String("ai-model", cli.setDefault("glm-4-long"))
 aiAPIKEY = cli.String("apikey", cli.setDefault(""))
+forceUpdate = cli.Bool("force")
 cli.check()
 
 existed = {}
 try {
-    for element in json.loads(file.ReadFile(outputFile)~).rules {
+    if !forceUpdate {
+        for element in json.loads(file.ReadFile(outputFile)~).rules {
         try { existed[element.sha256] = element } catch e { log.info("load rule %v failed" % sdump(element)) }
+        }
     }
+
 } catch e {
     die("load existed " + outputFile + f" failed: ${e}")
 }
@@ -46,6 +50,7 @@ handleResult = result => {
                 opts...
             )~
             obj["rule"] = m.RuleName
+            obj["language"] = m.Language
             obj["sha256"] = hash
             obj["is_lib"] = m.IncludedName != "" ? true : false
             if obj["detail"] == "" || obj["detail_en"] == "" {
