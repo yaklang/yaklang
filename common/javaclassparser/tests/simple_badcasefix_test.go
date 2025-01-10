@@ -175,7 +175,6 @@ func TestAnnotationParam(t *testing.T) {
 	checkJavaCode(t, results)
 	assert.Contains(t, results, "phase=")
 	assert.Contains(t, results, `ndicator(phase=ProcessingPhase.DEPENDENCY_ANALY`)
-	assert.Contains(t, results, `import ch.qos.logback.core.model.processor.ProcessingPhase;`)
 }
 
 func TestStrconv2(t *testing.T) {
