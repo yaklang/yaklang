@@ -46,6 +46,8 @@ when build, each program should call visitAST
   - when not preHandler: delete ast hash from prog.astMap
 
 when all ast visit done, build instruction and save to database
+
+note: need defer func\visit stmt finish\...
 */
 func (p *Program) VisitAst(ast ASTIF) {
 	hash := utils.CalcSha256(ast.GetText())

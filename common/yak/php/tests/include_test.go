@@ -175,6 +175,8 @@ class AA{
     }
 }
 `)
-		ssatest.CheckSyntaxFlowWithFS(t, fs, `scandir(* #->* as $param)`, map[string][]string{}, true, ssaapi.WithLanguage(ssaapi.PHP))
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `scandir(* #->* as $param)`, map[string][]string{
+			"param": {"input"},
+		}, true, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
