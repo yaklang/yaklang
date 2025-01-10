@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
@@ -1286,8 +1287,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					RemoteAddr:          httpctx.GetRemoteAddr(originReqIns),
 				}
 
-				isMultipartData := lowhttp.IsMultipartFormDataRequest(fixReq)
-				if isMultipartData {
+				if lowhttp.IsMultipartFormDataRequest(fixReq) || !utf8.Valid(fixReq) {
 					feedbackOrigin.Request = lowhttp.ConvertHTTPRequestToFuzzTag(fixReq)
 				}
 
