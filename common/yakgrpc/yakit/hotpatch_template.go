@@ -18,69 +18,35 @@ type QueryHotPatchTemplateConfig struct {
 	Type            string
 }
 
-func NewQueryHotPatchTemplateConfig() *QueryHotPatchTemplateConfig {
-	return new(QueryHotPatchTemplateConfig)
-}
-
-type HotPatchTemplateOption func(*QueryHotPatchTemplateConfig)
-
-func WithHotPatchTemplateIDs(ids ...int64) HotPatchTemplateOption {
-	return func(c *QueryHotPatchTemplateConfig) {
-		if len(ids) == 0 {
-			return
-		}
-		c.IDs = ids
-	}
-}
-
-func WithHotPatchTemplateNames(names ...string) HotPatchTemplateOption {
-	return func(c *QueryHotPatchTemplateConfig) {
-		if len(names) == 0 {
-			return
-		}
-		c.Names = names
-	}
-}
-
-func WithHotPatchTemplateContentKeyWords(contentKeyWords ...string) HotPatchTemplateOption {
-	return func(c *QueryHotPatchTemplateConfig) {
-		if len(contentKeyWords) == 0 {
-			return
-		}
-		c.ContentKeyWords = contentKeyWords
-	}
-}
-
-func WithHotPatchTemplateType(typ string) HotPatchTemplateOption {
-	return func(c *QueryHotPatchTemplateConfig) {
-		c.Type = typ
-	}
-}
-
-func (cfg *QueryHotPatchTemplateConfig) ToDBQuery(db *gorm.DB) *gorm.DB {
-	db = db.Model(&schema.HotPatchTemplate{})
-	if len(cfg.IDs) > 0 {
-		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", cfg.IDs)
-	}
-	if len(cfg.Names) > 0 {
-		db = bizhelper.ExactQueryStringArrayOr(db, "name", cfg.Names)
-	}
-
-	if len(cfg.ContentKeyWords) > 0 {
-		db = bizhelper.FuzzQueryArrayStringOrLike(db, "content", cfg.ContentKeyWords)
-	}
-	if cfg.Type != "" {
-		db = db.Where("type = ?", cfg.Type)
-	}
-	return db
-}
-
 func NewHotPatchTemplate(name, content, typ string) *schema.HotPatchTemplate {
 	return &schema.HotPatchTemplate{
 		Name:    name,
 		Content: content,
 		Type:    typ,
 	}
+}
+
+func FilterHotPatchTemplateIsEmpty(filter *ypb.HotPatchTemplateRequest) bool {
+	if len(filter.GetId()) == 0 && len(filter.GetName()) == 0 && len(filter.GetContentKeyword()) == 0 && filter.GetType() == "" {
+		return true
+	}
+	return false
+}
+
+func FilterHotPatchTemplate(db *gorm.DB, filter *ypb.HotPatchTemplateRequest) *gorm.DB {
+	if ids := filter.GetId(); len(ids) > 0 {
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
+	}
+	if names := filter.GetName(); len(names) > 0 {
+		db = bizhelper.ExactQueryStringArrayOr(db, "name", names)
+	}
+	if keywords := filter.GetContentKeyword(); len(keywords) > 0 {
+		db = bizhelper.FuzzQueryArrayStringOrLike(db, "content", keywords)
+	}
+	if typ := filter.GetType(); typ != "" {
+		db = db.Where("type = ?", typ)
+	}
+	return db
 }
 
 func CreateHotPatchTemplate(db *gorm.DB, name, content, typ string) error {
@@ -101,24 +67,21 @@ func DeleteAllHotPatchTemplate(db *gorm.DB) error {
 	return nil
 }
 
-func DeleteHotPatchTemplate(db *gorm.DB, opts ...HotPatchTemplateOption) (int64, error) {
-	cfg := NewQueryHotPatchTemplateConfig()
-	for _, opt := range opts {
-		opt(cfg)
+func DeleteHotPatchTemplate(db *gorm.DB, filter *ypb.HotPatchTemplateRequest) (int64, error) {
+	if FilterHotPatchTemplateIsEmpty(filter) {
+		return 0, utils.Error(`empty filter`)
 	}
-	db = cfg.ToDBQuery(db)
+	db = db.Model(&schema.HotPatchTemplate{})
+	db = FilterHotPatchTemplate(db, filter)
 
 	db = db.Unscoped().Delete(&schema.HotPatchTemplate{})
 	return db.RowsAffected, db.Error
 }
 
-func UpdateHotPatchTemplate(db *gorm.DB, name, content, typ string, opts ...HotPatchTemplateOption) (int64, error) {
-	cfg := NewQueryHotPatchTemplateConfig()
-	for _, opt := range opts {
-		opt(cfg)
-	}
+func UpdateHotPatchTemplate(db *gorm.DB, name, content, typ string, filter *ypb.HotPatchTemplateRequest) (int64, error) {
+	db = db.Model(&schema.HotPatchTemplate{})
+	db = FilterHotPatchTemplate(db, filter)
 
-	db = cfg.ToDBQuery(db)
 	m := make(map[string]any)
 	if name != "" {
 		m["name"] = name
@@ -133,36 +96,31 @@ func UpdateHotPatchTemplate(db *gorm.DB, name, content, typ string, opts ...HotP
 	return db.RowsAffected, db.Error
 }
 
-func UpdateHotPatchTemplateForce(db *gorm.DB, name, content, typ string, opts ...HotPatchTemplateOption) (int64, error) {
-	cfg := NewQueryHotPatchTemplateConfig()
-	for _, opt := range opts {
-		opt(cfg)
-	}
-
-	db = cfg.ToDBQuery(db)
+func UpdateHotPatchTemplateForce(db *gorm.DB, name, content, typ string, filter *ypb.HotPatchTemplateRequest) (int64, error) {
+	db = db.Model(&schema.HotPatchTemplate{})
+	db = FilterHotPatchTemplate(db, filter)
 
 	db = db.Updates(map[string]any{"name": name, "content": content, "type": typ})
 	return db.RowsAffected, db.Error
 }
 
-func QueryHotPatchTemplate(db *gorm.DB, opts ...HotPatchTemplateOption) ([]*schema.HotPatchTemplate, error) {
-	cfg := NewQueryHotPatchTemplateConfig()
-	for _, opt := range opts {
-		opt(cfg)
-	}
+func QueryHotPatchTemplate(db *gorm.DB, filter *ypb.HotPatchTemplateRequest) ([]*schema.HotPatchTemplate, error) {
+	db = db.Model(&schema.HotPatchTemplate{})
+	db = FilterHotPatchTemplate(db, filter)
 
 	var templates []*schema.HotPatchTemplate
-	db = cfg.ToDBQuery(db)
 	if err := db.Find(&templates).Error; err != nil {
 		return nil, err
 	}
 	return templates, nil
 }
 
-func QueryHotPatchTemplateList(db *gorm.DB, typ string, p *ypb.Paging) (*bizhelper.Paginator, []string, error) {
-	db = db.Model(&schema.HotPatchTemplate{}).Where("type = ?", typ).Select("name")
-
+func QueryHotPatchTemplateList(db *gorm.DB, filter *ypb.HotPatchTemplateRequest, p *ypb.Paging) (*bizhelper.Paginator, []string, error) {
 	var templates []*schema.HotPatchTemplate
+
+	db = db.Model(&schema.HotPatchTemplate{}).Select("name")
+	db = FilterHotPatchTemplate(db, filter)
+	db = bizhelper.OrderByPaging(db, p)
 	paging, db := bizhelper.PagingByPagination(db, p, &templates)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
