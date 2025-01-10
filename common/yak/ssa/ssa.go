@@ -382,31 +382,6 @@ var (
 	_ Value = (*Function)(nil)
 )
 
-type LanguageConfig struct {
-	isBindLanguage  bool
-	isTryBuildValue bool
-	// Support obtaining static members and static method, even if the class is not instantiated.
-	isSupportClass               bool
-	isSupportClassStaticModifier bool
-}
-
-func NewLanguageConfig() *LanguageConfig {
-	return &LanguageConfig{
-		isBindLanguage:               false,
-		isTryBuildValue:              false,
-		isSupportClass:               false,
-		isSupportClassStaticModifier: false,
-	}
-}
-
-func (c *LanguageConfig) SetBindLanguage(b bool) {
-	c.isBindLanguage = b
-}
-
-func (c *LanguageConfig) SetTryBuildValue(b bool) {
-	c.isTryBuildValue = b
-}
-
 // implement Value
 type BasicBlock struct {
 	anValue
