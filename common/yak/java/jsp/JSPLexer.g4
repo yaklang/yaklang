@@ -69,27 +69,12 @@ EQUALS
     : EQUALS_CHAR -> pushMode(ATTVALUE)
     ;
 
-EL_EXPR
-    : EL_EXPR_TXT
-    ;
-
-JSP_STATIC_CONTENT_CHARS_MIXED
-    :   JSP_STATIC_CONTENT_CHAR+?
-        {
-            if ((this.LA(1) == '$') && (this.LA(2) == '{')) {
-                pushMode(JSP_EXPRESSION);
-            }
-        }
+EL_EXPR_START
+    : EL_EXPR_START_TAG ->pushMode(EL_EXPR_MODE)
     ;
 
 JSP_STATIC_CONTENT_CHARS
-    :
-        JSP_STATIC_CONTENT_CHAR+? {(this.LA(1) == '<') }?
-    ;
-
-JSP_STATIC_CONTENT_CHAR
-    : ~[<\\$]+
-    | ESCAPED_DOLLAR
+    :  JSP_STATIC_CONTENT_CHAR+
     ;
 
 JSP_END
@@ -101,17 +86,13 @@ ATTVAL_ATTRIBUTE
     ;
 
 ATTVAL_VALUE
-    : ATTCHARS
+    : ATT_CONSTANTS
     | HEXCHARS
     | DECCHARS
     ;
 
-HTML_TEXT
-    : HTML_TEXT_FRAGMENT+
-    ;
-
-fragment HTML_TEXT_FRAGMENT
-    : ~('<'|'$')
+EL_EXPR_END
+    : EL_EXPR_END_TAG
     ;
 
 fragment CLOSE_TAG
@@ -138,9 +119,6 @@ fragment EL_EXPR_OPEN
     : ('${'|'#{')
     ;
 
-fragment EL_EXPR_CLOSE
-    : '}'
-    ;
 
 fragment EL_EXPR_TXT
     : EL_EXPR_OPEN EL_EXPR_BODY EL_EXPR_CLOSE
@@ -191,6 +169,19 @@ fragment JSP_END_TAG
     : '%>'
     ;
 
+fragment JSP_STATIC_CONTENT_CHAR
+    : ~[<\\$]+
+    | ESCAPED_DOLLAR
+    ;
+
+fragment EL_EXPR_START_TAG
+    : '${'
+    ;
+
+fragment EL_EXPR_END_TAG
+    :'}'
+    ;
+
 mode IN_DTD;
 //<!DOCTYPE doctypename PUBLIC "publicId" "systemId">
 
@@ -235,14 +226,13 @@ fragment BLOB_CONTENT_FRAGMENT
 
 mode JSP_EXPRESSION;
 
-JSPEXPR_CONTENT
-    : EL_EXPR -> type(EL_EXPR),popMode
+JSPEXPR_EL_EXPR
+    : EL_EXPR_START -> pushMode(EL_EXPR_MODE)
     ;
 
 JSPEXPR_CONTENT_CLOSE
-    : ('}' | '%>') -> popMode
+    : '%>'-> popMode
     ;
-
 
 //
 // tag declarations
@@ -392,7 +382,7 @@ ATTVAL_CONST_VALUE
     ;
 
 ATTVAL_EL_EXPR
-    : EL_EXPR -> type(EL_EXPR),popMode
+    : EL_EXPR_START -> pushMode(EL_EXPR_MODE)
     ;
 
 mode ATTVALUE_SINGLE_QUOTE;
@@ -402,7 +392,7 @@ ATTVAL_SINGLE_QUOTE_CLOSING_QUOTE
     ;
 
 ATTVAL_SINGLE_QUOTE_EXPRESSION
-    : EL_EXPR_TXT -> type(EL_EXPR)
+    : EL_EXPR_START-> pushMode(EL_EXPR_MODE)
     ;
 
 ATTVAL_SINGLE_QUOTE_END_TAG_OPEN
@@ -428,7 +418,7 @@ ATTVAL_DOUBLE_QUOTE_CLOSING_QUOTE
     ;
 
 ATTVAL_DOUBLE_QUOTE_EXPRESSION
-    : EL_EXPR_TXT -> type(EL_EXPR)
+    : EL_EXPR_START -> pushMode(EL_EXPR_MODE)
     ;
 
 ATTVAL_DOUBLE_QUOTE_END_TAG_OPEN
@@ -459,16 +449,23 @@ fragment ATTCHAR
     | ':'
     | ';'
     | '#'
-    | ALPHA_CHAR
+    | '('
+    | ')'
     ;
 
 fragment ALPHA_CHAR
     : [0-9a-zA-Z]
     ;
 
-fragment ATTCHARS
-    : ALPHA_CHAR ATTCHAR* ' '?
+// char and alpha
+fragment ATT_CONSTANT
+    : ALPHA_CHAR
+    | ATTCHAR
     ;
+
+fragment ATT_CONSTANTS
+   : ATT_CONSTANT+
+   ;
 
 fragment HEXCHARS
     : '#' [0-9a-fA-F]+
@@ -489,3 +486,18 @@ fragment EQUALS_CHAR
 fragment ESCAPED_DOUBLE_QUOTE
     : '\\\''
     ;
+
+mode EL_EXPR_MODE;
+
+EL_EXPR_CLOSE
+   : EL_EXPR_END_TAG ->type(EL_EXPR_END), popMode
+   ;
+
+EL_EXPR_CONTENT
+    : EL_EXPR_CONTENT_FRAGMENT+
+    ;
+
+fragment EL_EXPR_CONTENT_FRAGMENT
+    : ~('}')
+    ;
+

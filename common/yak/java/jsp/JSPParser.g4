@@ -2,7 +2,7 @@ parser grammar JSPParser;
 
 options { tokenVocab=JSPLexer; }
 
-jspDocuents
+jspDocuments
     :jspStart* jspDocument+
     ;
 
@@ -18,7 +18,11 @@ jspStart
     ;
 
 jspElements
-    : htmlMisc* (htmlElement|jspScript|jspExpression|style|javaScript) htmlMisc*
+    :beforeContent=htmlMiscs (htmlElement|jspScript|jspExpression|style|javaScript) afterContent=htmlMiscs
+    ;
+
+htmlMiscs
+    :htmlMisc *
     ;
 
 jspScript
@@ -59,13 +63,13 @@ htmlContent
 
 // EL表达式
 elExpression
-    :  EL_EXPR
+    :  EL_EXPR_START EL_EXPR_CONTENT EL_EXPR_END
     ;
 
 htmlAttribute
-    : htmlAttributeName EQUALS htmlAttributeValue
-    | htmlAttributeName
-    | jspExpression
+    : htmlAttributeName EQUALS htmlAttributeValue #EqualHTMLAttribute
+    | htmlAttributeName #PureHTMLAttribute
+    | jspExpression     #JSPExpressionAttribute
     ;
 
 htmlAttributeName
@@ -88,8 +92,7 @@ htmlTagName
 
 // 静态内容
 htmlChardata
-    : JSP_STATIC_CONTENT_CHARS_MIXED
-    | JSP_STATIC_CONTENT_CHARS
+    : JSP_STATIC_CONTENT_CHARS
     | WHITESPACES
     ;
 
@@ -104,10 +107,6 @@ htmlMisc
 htmlComment
     : JSP_COMMENT
     | JSP_CONDITIONAL_COMMENT
-    ;
-
-htmlCommentText
-    : JSP_COMMENT_TEXT+?
     ;
 
 xhtmlCDATA

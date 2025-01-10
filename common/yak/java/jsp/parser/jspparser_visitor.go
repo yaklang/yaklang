@@ -19,8 +19,14 @@ type JSPParserVisitor interface {
 	// Visit a parse tree produced by JSPParser#jspElements.
 	VisitJspElements(ctx *JspElementsContext) interface{}
 
-	// Visit a parse tree produced by JSPParser#jspElement.
-	VisitJspElement(ctx *JspElementContext) interface{}
+	// Visit a parse tree produced by JSPParser#htmlMiscs.
+	VisitHtmlMiscs(ctx *HtmlMiscsContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#jspScript.
+	VisitJspScript(ctx *JspScriptContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#htmlElement.
+	VisitHtmlElement(ctx *HtmlElementContext) interface{}
 
 	// Visit a parse tree produced by JSPParser#htmlBegin.
 	VisitHtmlBegin(ctx *HtmlBeginContext) interface{}
@@ -37,11 +43,17 @@ type JSPParserVisitor interface {
 	// Visit a parse tree produced by JSPParser#htmlContent.
 	VisitHtmlContent(ctx *HtmlContentContext) interface{}
 
-	// Visit a parse tree produced by JSPParser#jspExpression.
-	VisitJspExpression(ctx *JspExpressionContext) interface{}
+	// Visit a parse tree produced by JSPParser#elExpression.
+	VisitElExpression(ctx *ElExpressionContext) interface{}
 
-	// Visit a parse tree produced by JSPParser#htmlAttribute.
-	VisitHtmlAttribute(ctx *HtmlAttributeContext) interface{}
+	// Visit a parse tree produced by JSPParser#EqualHTMLAttribute.
+	VisitEqualHTMLAttribute(ctx *EqualHTMLAttributeContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#PureHTMLAttribute.
+	VisitPureHTMLAttribute(ctx *PureHTMLAttributeContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#JSPExpressionAttribute.
+	VisitJSPExpressionAttribute(ctx *JSPExpressionAttributeContext) interface{}
 
 	// Visit a parse tree produced by JSPParser#htmlAttributeName.
 	VisitHtmlAttributeName(ctx *HtmlAttributeNameContext) interface{}
@@ -49,11 +61,8 @@ type JSPParserVisitor interface {
 	// Visit a parse tree produced by JSPParser#htmlAttributeValue.
 	VisitHtmlAttributeValue(ctx *HtmlAttributeValueContext) interface{}
 
-	// Visit a parse tree produced by JSPParser#htmlAttributeValueExpr.
-	VisitHtmlAttributeValueExpr(ctx *HtmlAttributeValueExprContext) interface{}
-
-	// Visit a parse tree produced by JSPParser#htmlAttributeValueConstant.
-	VisitHtmlAttributeValueConstant(ctx *HtmlAttributeValueConstantContext) interface{}
+	// Visit a parse tree produced by JSPParser#htmlAttributeValueElement.
+	VisitHtmlAttributeValueElement(ctx *HtmlAttributeValueElementContext) interface{}
 
 	// Visit a parse tree produced by JSPParser#htmlTagName.
 	VisitHtmlTagName(ctx *HtmlTagNameContext) interface{}
@@ -66,12 +75,6 @@ type JSPParserVisitor interface {
 
 	// Visit a parse tree produced by JSPParser#htmlComment.
 	VisitHtmlComment(ctx *HtmlCommentContext) interface{}
-
-	// Visit a parse tree produced by JSPParser#htmlCommentText.
-	VisitHtmlCommentText(ctx *HtmlCommentTextContext) interface{}
-
-	// Visit a parse tree produced by JSPParser#htmlConditionalCommentText.
-	VisitHtmlConditionalCommentText(ctx *HtmlConditionalCommentTextContext) interface{}
 
 	// Visit a parse tree produced by JSPParser#xhtmlCDATA.
 	VisitXhtmlCDATA(ctx *XhtmlCDATAContext) interface{}
@@ -91,6 +94,21 @@ type JSPParserVisitor interface {
 	// Visit a parse tree produced by JSPParser#xml.
 	VisitXml(ctx *XmlContext) interface{}
 
-	// Visit a parse tree produced by JSPParser#scriptlet.
-	VisitScriptlet(ctx *ScriptletContext) interface{}
+	// Visit a parse tree produced by JSPParser#jspScriptlet.
+	VisitJspScriptlet(ctx *JspScriptletContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#jspExpression.
+	VisitJspExpression(ctx *JspExpressionContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#scriptletStart.
+	VisitScriptletStart(ctx *ScriptletStartContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#scriptletContent.
+	VisitScriptletContent(ctx *ScriptletContentContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#javaScript.
+	VisitJavaScript(ctx *JavaScriptContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#style.
+	VisitStyle(ctx *StyleContext) interface{}
 }
