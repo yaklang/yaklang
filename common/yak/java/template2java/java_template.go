@@ -45,9 +45,11 @@ func (t *JavaTemplate) String() string {
 	return t.builder.String()
 }
 
-func (t *JavaTemplate) WritePureText(text string) {
-	text = strings.ReplaceAll(text, "\"", "\\\"")
-	t.builder.WriteString("\tout.write(\"" + text + "\");\r\n")
+func (t *JavaTemplate) WritePureText(texts string) {
+	texts = strings.ReplaceAll(texts, "\"", "\\\"")
+	for _, text := range strings.Split(texts, "\n") {
+		t.builder.WriteString("\tout.write(\"" + text + "\");\r\n")
+	}
 }
 
 func (t *JavaTemplate) WriteGetAttribute(variable string) {
