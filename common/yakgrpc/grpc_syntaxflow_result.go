@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -65,7 +64,7 @@ func (s *Server) DeleteSyntaxFlowResult(ctx context.Context, req *ypb.DeleteSynt
 		// clear up risk
 		resultID := make([]int64, 0)
 		if err := db.Where("risk_count != 0").Pluck("id", &resultID).Error; err == nil {
-			if err := yakit.DeleteSSARiskBySFResult(consts.GetGormProjectDatabase(), resultID); err != nil {
+			if err := yakit.DeleteSSARiskBySFResult(ssadb.GetDB(), resultID); err != nil {
 				return nil, utils.Errorf("delete risk failed: %s", err)
 			}
 		}
