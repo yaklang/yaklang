@@ -1,0 +1,99 @@
+name: Update Syntaxflow meta
+
+on:
+  pull_request:
+    branches: [ main ]
+
+
+jobs:
+  update-syntaxflow-meta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      - name: Get Yak binary Lastest
+        run: |
+          wget https://aliyun-oss.yaklang.com/yak/latest/yak_linux_amd64
+
+
+      - name: Get Repo tags
+        run: |
+          pwd && ls -lh && chmod +x ./yak_linux_amd64
+          ./yak_linux_amd64 repos-tag -o tags.txt
+          echo "YAK_TAG=$(cat tags.txt)" >> $GITHUB_ENV
+
+      - name: Checkout Tags Version
+        run: echo ${{ env.YAK_TAG }}
+          
+      - name: Generate SyntaxFlow Meta Info
+        run: |
+          echo "::group::Generate SyntaxFlow Meta Info"
+          
+          echo "Current working directory: $(pwd)"
+          echo "YAK_TAG version: ${{ env.YAK_TAG }}"
+
+
+          echo "Downloading latest syntaxflow rule info..."
+          wget -O syntaxflow-meta.json https://aliyun-oss.yaklang.com/yak/latest/syntaxflow-meta.json
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to download syntaxflow meta info, empty file will create it "
+          fi
+          
+          if [ -f "scripts/summary-syntaxflow-meta.yak" ]; then
+            echo "Using local syntaxflow meta info generator"
+            cp scripts/summary-syntaxflow-meta.yak summary-syntaxflow-meta.yak
+          else
+            echo "Downloading syntaxflow meta info generator..."
+            wget -O summary-syntaxflow-meta.yak https://aliyun-oss.yaklang.com/syntaxflow/summary-syntaxflow-meta.yak
+            if [ $? -ne 0 ]; then
+              echo "::error::Failed to download syntaxflow meta info generator"
+              exit 1
+            fi
+          fi
+
+          echo "Checking downloaded file..."
+          ls -l  | grep syntaxflow
+          
+          echo "Generating meta info with yak script..."
+          ./yak_linux_amd64 ./scripts/summary-syntaxflow-meta.yak \
+            --output syntaxflow-meta.json \
+            --version ${{ env.YAK_TAG }} \
+            --custom-ai \
+            --ai-type chatglm \
+            --apikey ${{ secrets.CHATGLM_APIKEY }} \
+            --ai-model glm-4 \
+            --concurrent 5 \
+            --force
+          
+          echo "Checking generated files..."
+          ls -l | grep syntaxflow
+          
+          # echo "Uploading to versioned OSS path..."
+          # ./yak_linux_amd64 upload-oss \
+          #   -f "syntaxflow-meta.json:/yak/${{ env.YAK_TAG }}/syntaxflow-meta.json" \
+          #   -ak ${{ secrets.OSS_KEY_ID }} \
+          #   -sk ${{ secrets.OSS_KEY_SECRET }} \
+          #   -t 5
+          # if [ $? -ne 0 ]; then
+          #   echo "::warning::Failed to upload versioned meta info"
+          # fi
+          
+          # echo "Uploading to latest OSS path..."
+          # ./yak_linux_amd64 upload-oss \
+          #   -f "syntaxflow-meta.json:/yak/latest/syntaxflow-meta.json" \
+          #   -ak ${{ secrets.OSS_KEY_ID }} \
+          #   -sk ${{ secrets.OSS_KEY_SECRET }} \
+          #   -t 5
+          # if [ $? -ne 0 ]; then
+          #   echo "::warning::Failed to upload latest meta info"
+          # fi
+          
+          echo "::endgroup::"
+        continue-on-error: true
+      
+      - name: Upload meta json 
+        uses: actions/upload-artifact@v4
+        with:
+          name: grpc.log
+          path: ${github.workspace}/syntaxflow-meta.json
