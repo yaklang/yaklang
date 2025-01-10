@@ -2,16 +2,24 @@ package main
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/gopacket/gopacket"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/adapters/gonet"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/waiter"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/common/utils"
 	"net/netip"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
 	tun "github.com/yaklang/yaklang/common/lowtun"
@@ -65,11 +73,10 @@ func TUNCopy(prompt string, w, r RWTun, mtu int, offset int) {
 
 			switch version {
 			case 4:
-				log.Infof("%v: IPv4 packet", prompt)
-				spew.Dump(packet)
+				log.Infof("%v: IPv4 packet, len: %v", prompt, len(packet))
 			case 6:
 				log.Infof("%v: IPv6 packet", prompt)
-				spew.Dump(packet)
+				// spew.Dump(packet)
 			default:
 				log.Warnf("Unknown IP version: %d", version)
 			}
@@ -119,15 +126,104 @@ func main() {
 		wg := new(sync.WaitGroup)
 		wg.Add(2)
 
+		log.Info("start to sniff in en1")
+
+		go func() {
+			sniffErr := pcaputil.Sniff(""+
+				"en1",
+				pcaputil.WithBPFFilter(`tcp and host 8.8.8.8`),
+				pcaputil.WithEnableCache(true),
+				pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
+					fmt.Println(packet.String())
+				}),
+			)
+			if sniffErr != nil {
+				log.Errorf("failed to sniff en0: %v", err)
+			}
+		}()
+
+		log.Infof("start to fetch stack")
 		st := sdial.Stack()
+
 		st.SetTransportProtocolHandler(tcp.ProtocolNumber, func(id stack.TransportEndpointID, buffer *stack.PacketBuffer) bool {
-			//tcpHeader := header.TCP(buffer.TransportHeader().View())
-			//if tcpHeader.Flags() == header.TCPFlagSyn {
-			//	st.WritePacketToRemote(1, id.RemoteAddress, tcp.ProtocolNumber)
-			//	return true
-			//}
+			ipHeader := header.IPv4(buffer.NetworkHeader().View().ToSlice())
+			tcpHeader := header.TCP(buffer.TransportHeader().View().ToSlice())
+			_ = ipHeader
+			_ = tcpHeader
+
+			if tcpHeader.Flags() == header.TCPFlagSyn {
+				// first syn
+				var wq waiter.Queue
+				ep, err := st.NewEndpoint(tcp.ProtocolNumber, header.IPv4ProtocolNumber, &wq)
+				if err != nil {
+					log.Errorf("create endpoint failed: %v", err)
+					return false
+				}
+				if err := ep.Bind(tcpip.FullAddress{
+					NIC:  1,
+					Addr: id.LocalAddress,
+					Port: id.LocalPort,
+				}); err != nil {
+					log.Errorf("bind to %v failed: %v", id.LocalAddress, err)
+					return false
+				}
+
+				sopt := ep.SocketOptions()
+				sopt.SetKeepAlive(true)
+
+				if err := ep.Listen(1); err != nil {
+					ep.Close()
+					return false
+				}
+
+				go func() {
+					waitEntry, notifyCh := waiter.NewChannelEntry(waiter.ReadableEvents)
+					wq.EventRegister(&waitEntry)
+					defer wq.EventUnregister(&waitEntry)
+					_ = notifyCh
+
+					for {
+						newEp, wq, err := ep.Accept(&tcpip.FullAddress{
+							NIC:  1,
+							Addr: id.LocalAddress,
+							Port: id.LocalPort,
+						})
+						if _, ok := err.(*tcpip.ErrWouldBlock); ok {
+							select {
+							case <-notifyCh:
+								continue
+							case <-time.After(30 * time.Second):
+							}
+						} else if err != nil {
+							log.Errorf("accept failed: %v", err)
+							spew.Dump(ep.Stats())
+							ep.Close()
+							return
+						}
+
+						conn := gonet.NewTCPConn(wq, newEp)
+						go func() {
+							for {
+								results := utils.StableReaderEx(conn, 1*time.Second, 1024)
+								if len(results) > 0 {
+									log.Infof("read %v bytes\n%v", len(results), spew.Sdump(results))
+								}
+								if results == nil || results[0] == 0 {
+									continue
+								}
+								conn.Write([]byte(fmt.Sprintf("Echo %v", spew.Sdump(results))))
+							}
+						}()
+					}
+				}()
+
+				return true
+			}
 			return false
 		})
+
+		// tun -> gvisor -> en0
+		// en0 -> gvisor -> tun
 
 		go func() {
 			defer func() {
@@ -136,6 +232,7 @@ func main() {
 					log.Errorf("panic: %v", err)
 				}
 			}()
+			// tun -> gvsior
 			TUNCopy("tun -> gvisor", sdev, tdev, 1420, 16)
 		}()
 
