@@ -227,6 +227,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 	if IslValue {
 		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
+		if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+			rv = un.X
+		}
 
 		if ret := exp.Index(); ret != nil {
 			index := b.buildIndexExpression(ret.(*gol.IndexContext))
@@ -238,6 +241,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			test := id.GetText()
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
+				if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+					rv = un.X
+				}
 				if key := typ.GetKeybyName(test); key != nil {
 					leftv = b.CreateMemberCallVariable(rv, key)
 				} else {
@@ -288,6 +294,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
+				if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+					rv = un.X
+				}
 				if key := typ.GetKeybyName(test); key != nil {
 					rightv = b.ReadMemberCallValue(rv, key)
 				} else {

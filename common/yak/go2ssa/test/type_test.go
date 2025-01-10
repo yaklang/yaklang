@@ -648,6 +648,28 @@ func TestType_pointer(t *testing.T) {
 		`, []string{"2", "\"world\"", "2", "\"world\""}, t)
 	})
 
+	t.Run("basic pointer switch", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			var a int = 1
+			var b int = 2
+			var p *int = &a
+	
+			*p = 3
+			p = &b
+			*p = 4
+			p = &a
+		
+			println(a)
+			println(b)
+			println(*p)
+		}
+			
+		`, []string{"3", "4", "3"}, t)
+	})
+
 	t.Run("slice array pointer", func(t *testing.T) {
 
 		test.CheckPrintlnValue(`package main
