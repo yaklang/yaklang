@@ -15,9 +15,33 @@ import (
 )
 
 type OrderedMap struct {
-	keys       []string
-	values     map[string]any
+	*OrderedMapEx[string, any]
+}
+
+type OrderedMapEx[K comparable, V any] struct {
+	keys       []K
+	values     map[K]V
 	escapeHTML bool
+}
+
+func NewOrderMapEx[K comparable, V any](key []K, value map[K]V, escapeHTML bool) *OrderedMapEx[K, V] {
+	if value == nil {
+		value = make(map[K]V)
+	}
+	if key == nil {
+		key = make([]K, 0, len(value))
+	}
+	return &OrderedMapEx[K, V]{
+		keys:       key,
+		values:     value,
+		escapeHTML: escapeHTML,
+	}
+}
+
+func NewOrderMap(key []string, value map[string]any, escapeHTML bool) *OrderedMap {
+	return &OrderedMap{
+		OrderedMapEx: NewOrderMapEx(key, value, escapeHTML),
+	}
 }
 
 func SetAny(o *OrderedMap, key any, value any) {
@@ -62,11 +86,18 @@ func New(maps ...any) *OrderedMap {
 		}
 	}
 
-	o := &OrderedMap{
-		keys:   lo.Keys(m),
-		values: m,
+	return NewOrderMap(lo.Keys(m), m, false)
+}
+
+func (o *OrderedMapEx[K, V]) Copy() *OrderedMapEx[K, V] {
+	m := make(map[K]V, len(o.values))
+	for k, v := range o.values {
+		if utils.IsNil(v) {
+			continue
+		}
+		m[k] = v
 	}
-	return o
+	return NewOrderMapEx(o.keys, m, o.escapeHTML)
 }
 
 func (o *OrderedMap) Copy() *OrderedMap {
@@ -80,24 +111,19 @@ func (o *OrderedMap) Copy() *OrderedMap {
 		}
 	}
 
-	ret := &OrderedMap{
-		keys:   o.keys,
-		values: m,
-	}
-
-	return ret
+	return NewOrderMap(o.keys, m, o.escapeHTML)
 }
 
 func (o *OrderedMap) SetEscapeHTML(on bool) {
 	o.escapeHTML = on
 }
 
-func (o *OrderedMap) Get(key string) (any, bool) {
+func (o *OrderedMapEx[K, V]) Get(key K) (V, bool) {
 	val, exists := o.values[key]
 	return val, exists
 }
 
-func (o *OrderedMap) Set(key string, value any) {
+func (o *OrderedMapEx[K, V]) Set(key K, value V) {
 	_, exists := o.values[key]
 	if !exists {
 		o.keys = append(o.keys, key)
@@ -150,8 +176,16 @@ func (o *OrderedMap) Delete(key string) bool {
 	return true
 }
 
-func (o *OrderedMap) Keys() []string {
+func (o *OrderedMapEx[K, V]) Keys() []K {
 	return o.keys
+}
+
+func (o *OrderedMapEx[K, V]) Values() []V {
+	values := make([]V, len(o.keys))
+	for i, k := range o.keys {
+		values[i] = o.values[k]
+	}
+	return values
 }
 
 func (o *OrderedMap) ToStringMap() map[string]any {
@@ -272,22 +306,21 @@ func xmlDecodeOrderedMap(dec *yakxml.Decoder, o *OrderedMap) error {
 		}
 		if _, ok := token.(yakxml.StartElement); ok {
 			if values, ok := o.values[key].(map[string]any); ok {
-				newMap := OrderedMap{
-					keys:       make([]string, 0, len(values)),
-					values:     values,
-					escapeHTML: o.escapeHTML,
-				}
-				if err = xmlDecodeOrderedMap(dec, &newMap); err != nil {
+				keys := make([]string, 0, len(values))
+				newMap := NewOrderMap(keys, values, o.escapeHTML)
+				// newMap := OrderedMap{
+				// 	keys:       make([]string, 0, len(values)),
+				// 	values:     values,
+				// 	escapeHTML: o.escapeHTML,
+				// }
+				if err = xmlDecodeOrderedMap(dec, newMap); err != nil {
 					return err
 				}
 				o.values[key] = newMap
 			} else if oldMap, ok := o.values[key].(OrderedMap); ok {
-				newMap := OrderedMap{
-					keys:       make([]string, 0, len(oldMap.values)),
-					values:     oldMap.values,
-					escapeHTML: o.escapeHTML,
-				}
-				if err = xmlDecodeOrderedMap(dec, &newMap); err != nil {
+				keys := make([]string, 0, len(oldMap.values))
+				newMap := NewOrderMap(keys, oldMap.values, oldMap.escapeHTML)
+				if err = xmlDecodeOrderedMap(dec, newMap); err != nil {
 					return err
 				}
 				o.values[key] = newMap
@@ -331,22 +364,16 @@ func jsonDecodeOrderedMap(dec *json.Decoder, o *OrderedMap) error {
 			switch delim {
 			case '{':
 				if values, ok := o.values[key].(map[string]any); ok {
-					newMap := OrderedMap{
-						keys:       make([]string, 0, len(values)),
-						values:     values,
-						escapeHTML: o.escapeHTML,
-					}
-					if err = jsonDecodeOrderedMap(dec, &newMap); err != nil {
+					keys := make([]string, 0, len(values))
+					newMap := NewOrderMap(keys, values, o.escapeHTML)
+					if err = jsonDecodeOrderedMap(dec, newMap); err != nil {
 						return err
 					}
 					o.values[key] = newMap
 				} else if oldMap, ok := o.values[key].(OrderedMap); ok {
-					newMap := OrderedMap{
-						keys:       make([]string, 0, len(oldMap.values)),
-						values:     oldMap.values,
-						escapeHTML: o.escapeHTML,
-					}
-					if err = jsonDecodeOrderedMap(dec, &newMap); err != nil {
+					keys := make([]string, 0, len(oldMap.values))
+					newMap := NewOrderMap(keys, oldMap.values, oldMap.escapeHTML)
+					if err = jsonDecodeOrderedMap(dec, newMap); err != nil {
 						return err
 					}
 					o.values[key] = newMap
@@ -377,22 +404,16 @@ func jsonDecodeSlice(dec *json.Decoder, s []any, escapeHTML bool) error {
 			case '{':
 				if index < len(s) {
 					if values, ok := s[index].(map[string]any); ok {
-						newMap := OrderedMap{
-							keys:       make([]string, 0, len(values)),
-							values:     values,
-							escapeHTML: escapeHTML,
-						}
-						if err = jsonDecodeOrderedMap(dec, &newMap); err != nil {
+						keys := make([]string, 0, len(values))
+						newMap := NewOrderMap(keys, values, escapeHTML)
+						if err = jsonDecodeOrderedMap(dec, newMap); err != nil {
 							return err
 						}
 						s[index] = newMap
 					} else if oldMap, ok := s[index].(OrderedMap); ok {
-						newMap := OrderedMap{
-							keys:       make([]string, 0, len(oldMap.values)),
-							values:     oldMap.values,
-							escapeHTML: escapeHTML,
-						}
-						if err = jsonDecodeOrderedMap(dec, &newMap); err != nil {
+						keys := make([]string, 0, len(oldMap.values))
+						newMap := NewOrderMap(keys, oldMap.values, escapeHTML)
+						if err = jsonDecodeOrderedMap(dec, newMap); err != nil {
 							return err
 						}
 						s[index] = newMap
