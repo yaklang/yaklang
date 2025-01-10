@@ -36,6 +36,9 @@ const (
 
 	// 发现域名资产啥的
 	ScanResult_Domain ScanResultType = "domain"
+
+	//扫描任务进度
+	ScanResult_Process ScanResultType = "process"
 )
 
 type ScanResult struct {
@@ -130,6 +133,18 @@ func NewScanTCPOpenPortResult(ip net.IP, port int, state PortStateType) (*ScanRe
 
 	return &ScanResult{
 		Type:    ScanResult_PortState,
+		Content: raw,
+	}, nil
+}
+func NewScanProcessResult(process float64) (*ScanResult, error) {
+	raw, err := json.Marshal(map[string]any{
+		"process": process,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &ScanResult{
+		Type:    ScanResult_Process,
 		Content: raw,
 	}, nil
 }
