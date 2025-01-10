@@ -52,6 +52,7 @@ handleResult = result => {
             obj["rule"] = m.RuleName
             obj["language"] = m.Language
             obj["sha256"] = hash
+            obj["code"] = m.Content
             obj["is_lib"] = m.IncludedName != "" ? true : false
             if obj["detail"] == "" || obj["detail_en"] == "" {
                 continue
