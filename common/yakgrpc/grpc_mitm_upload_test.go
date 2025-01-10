@@ -91,3 +91,49 @@ func TestMITM_UploadFile(t *testing.T) {
 			cancel()
 		}))
 }
+
+func TestMITM_InvalidUTF8Request(t *testing.T) {
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		return []byte("HTTP/1.1 200 OK\n\n")
+	})
+	target := "http://" + utils.HostPort(host, port)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	isRecvRequest := false
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host: "127.0.0.1",
+			Port: uint32(mitmPort),
+		})
+
+		stream.Send(&ypb.MITMRequest{
+			SetAutoForward:   true,
+			AutoForwardValue: false,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		b, _ := codec.Utf8ToGB18030([]byte(`你好`))
+		poc.DoPOST(target, poc.WithProxy(fmt.Sprintf("http://127.0.0.1:%d", mitmPort)), poc.WithBody(b))
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+		request := msg.GetRequest()
+		if len(request) == 0 {
+			return
+		}
+
+		defer cancel()
+		isRecvRequest = true
+		require.Contains(t, string(request), `{{unquote("\xc4\xe3\xba\xc3")}}`, "request should be wrapped by unquote fuzztag")
+
+		stream.Send(&ypb.MITMRequest{
+			Forward: true,
+		})
+	})
+
+	require.True(t, isRecvRequest, "mitm server should hijack request")
+
+}
