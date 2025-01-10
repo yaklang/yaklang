@@ -26,8 +26,8 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 	}
 	getVariable := func(single getSingleExpr, i int) *ssa.Variable {
 		if s := single.Expression(i); s != nil {
-			_, rightl := b.buildExpression(s.(*gol.ExpressionContext), IslValue)
-			return rightl
+			_, leftv := b.buildExpression(s.(*gol.ExpressionContext), IslValue)
+			return leftv
 		} else {
 			b.NewError(ssa.Error, TAG, "can't get expression")
 			return b.CreateVariable("")
@@ -69,10 +69,10 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 				return b.EmitConstInst(0), b.CreateVariable("")
 			}
 			if ssaop == ssa.OpDereference {
-				if un, ok := op1.(*ssa.UnOp); ok {
-					return un.X, nil
-				}
-				return op1, nil
+
+			}
+			if ssaop == ssa.OpAddress {
+
 			}
 			return b.EmitUnOp(ssaop, op1), nil
 		}
@@ -181,8 +181,11 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 				b.NewError(ssa.Error, TAG, UnaryOperatorNotSupport(op.GetText()))
 			}
 
-			va1 := getVariable(exp, 0)
-			return nil, va1
+			val := getVariable(exp, 0)
+			if ssaop == ssa.OpDereference {
+				val.SetKind(ssa.DereferenceVariable)
+			}
+			return nil, val
 		}
 	}
 
@@ -196,8 +199,11 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 	if ret := exp.Operand(); ret != nil {
 		return b.buildOperandExpression(ret.(*gol.OperandContext), IslValue)
 	}
-	if ret := exp.MethodExpr(); ret != nil {
-		return b.buildMethodExpression(ret.(*gol.MethodExprContext), IslValue)
+	// if ret := exp.MethodExpr(); ret != nil {
+	// 	return b.buildMethodExpression(ret.(*gol.MethodExprContext), IslValue)
+	// }
+	if ret := exp.StarExpr(); ret != nil {
+		return b.buildStarExpression(ret.(*gol.StarExprContext), IslValue)
 	}
 	if ret := exp.Conversion(); ret != nil {
 		return b.buildConversion(ret.(*gol.ConversionContext), IslValue)
@@ -209,6 +215,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 	if IslValue {
 		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
+		if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+			rv = un.X
+		}
 
 		if ret := exp.Index(); ret != nil {
 			index := b.buildIndexExpression(ret.(*gol.IndexContext))
@@ -220,6 +229,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			test := id.GetText()
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
+				if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+					rv = un.X
+				}
 				if key := typ.GetKeybyName(test); key != nil {
 					leftv = b.CreateMemberCallVariable(rv, key)
 				} else {
@@ -245,6 +257,10 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 		}
 	} else {
 		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
+		if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+			rv = un.X
+		}
+
 		if ret := exp.Arguments(); ret != nil {
 			args := b.buildArgumentsExpression(ret.(*gol.ArgumentsContext))
 			rightv = b.EmitCall(b.NewCall(rv, args))
@@ -269,6 +285,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
+				if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+					rv = un.X
+				}
 				if key := typ.GetKeybyName(test); key != nil {
 					rightv = b.ReadMemberCallValue(rv, key)
 				} else {
@@ -296,9 +315,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				}
 			}
 
-			if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
-				rv = un.X
-			}
+			// if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+			// 	rv = un.X
+			// }
 			if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 				handleObjectType(rv, typ)
 			} else if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), test); ok {
@@ -320,6 +339,27 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 		}
 	}
 	return rightv, leftv
+}
+
+func (b *astbuilder) buildStarExpression(exp *gol.StarExprContext, IslValue bool) (ssa.Value, *ssa.Variable) {
+	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	defer recoverRange()
+
+	if ret := exp.Expression(); ret != nil {
+		rightv, leftv := b.buildExpression(ret.(*gol.ExpressionContext), IslValue)
+		if leftv != nil {
+			leftv.SetKind(ssa.DereferenceVariable)
+		}
+		if rightv != nil {
+			if un, ok := rightv.(*ssa.UnOp); ok {
+				rightv = un.X
+			}
+		}
+		return rightv, leftv
+	}
+
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return b.EmitConstInst(0), b.CreateVariable("")
 }
 
 func (b *astbuilder) buildMethodExpression(exp *gol.MethodExprContext, IslValue bool) (ssa.Value, *ssa.Variable) {

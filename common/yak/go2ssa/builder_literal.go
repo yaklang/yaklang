@@ -169,9 +169,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				})
 		case ssa.PointerTypeKind:
 			pt := typ.(*ssa.PointerType)
-			if kvs[0].value != nil {
-				return kvs[0].value.(*ssa.UnOp).X
-			}
+			// if kvs[0].value != nil {
+			// 	return kvs[0].value.(*ssa.UnOp).X
+			// }
 			return typeHandler(pt.GetOrigin(), kvs)
 		case ssa.StructTypeKind:
 			objt := typ.(*ssa.ObjectType)
