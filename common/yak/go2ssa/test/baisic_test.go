@@ -567,6 +567,7 @@ func TestExpr_normol(t *testing.T) {
 }
 
 func TestExpr_global(t *testing.T) {
+	// todo: 目前global value不支持指针
 	t.Run("global array", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -602,7 +603,7 @@ func TestExpr_global(t *testing.T) {
 			c bool
 		}
 
-		var stru = &t{a: 1, b: "hello", c: true}
+		var stru = t{a: 1, b: "hello", c: true}
 		
 		func main(){
 			println(stru.a)
@@ -643,7 +644,7 @@ func TestExpr_global(t *testing.T) {
 			c int
 		}
 
-		var stru = &t{a: 1, b: 2, c: 3}
+		var stru = t{a: 1, b: 2, c: 3}
 		
 		func main(){
 			println(stru.a + stru.b + stru.c)

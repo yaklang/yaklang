@@ -407,7 +407,8 @@ expression
 primaryExpr
     : operand
     | conversion
-    | methodExpr
+    // | methodExpr
+    | starExpr
     | primaryExpr ( DOT eos* IDENTIFIER typeArgs? | index | slice_ | typeAssertion | arguments)
     ;
 
@@ -524,6 +525,10 @@ typeAssertion
 
 arguments
     : L_PAREN eos* ((expressionList | type_ (COMMA expressionList)?) ELLIPSIS? eos* COMMA? eos*)? R_PAREN
+    ;
+
+starExpr
+    : STAR expression
     ;
 
 methodExpr

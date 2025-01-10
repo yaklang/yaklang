@@ -66,7 +66,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 		b.checkAndCreatDefaultMember(res, object, key)
 	}
 	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
-	ret := b.CreateVariableForce(name)
+	ret := b.CreateVariable(name)
 	ret.SetMemberCall(object, key)
 	return ret
 }
