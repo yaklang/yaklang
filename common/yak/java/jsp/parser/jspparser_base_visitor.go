@@ -23,7 +23,15 @@ func (v *BaseJSPParserVisitor) VisitJspElements(ctx *JspElementsContext) interfa
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJSPParserVisitor) VisitJspElement(ctx *JspElementContext) interface{} {
+func (v *BaseJSPParserVisitor) VisitHtmlMiscs(ctx *HtmlMiscsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitJspScript(ctx *JspScriptContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitHtmlElement(ctx *HtmlElementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -47,11 +55,19 @@ func (v *BaseJSPParserVisitor) VisitHtmlContent(ctx *HtmlContentContext) interfa
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJSPParserVisitor) VisitJspExpression(ctx *JspExpressionContext) interface{} {
+func (v *BaseJSPParserVisitor) VisitElExpression(ctx *ElExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJSPParserVisitor) VisitHtmlAttribute(ctx *HtmlAttributeContext) interface{} {
+func (v *BaseJSPParserVisitor) VisitEqualHTMLAttribute(ctx *EqualHTMLAttributeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitPureHTMLAttribute(ctx *PureHTMLAttributeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitJSPExpressionAttribute(ctx *JSPExpressionAttributeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -63,11 +79,7 @@ func (v *BaseJSPParserVisitor) VisitHtmlAttributeValue(ctx *HtmlAttributeValueCo
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJSPParserVisitor) VisitHtmlAttributeValueExpr(ctx *HtmlAttributeValueExprContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJSPParserVisitor) VisitHtmlAttributeValueConstant(ctx *HtmlAttributeValueConstantContext) interface{} {
+func (v *BaseJSPParserVisitor) VisitHtmlAttributeValueElement(ctx *HtmlAttributeValueElementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -84,14 +96,6 @@ func (v *BaseJSPParserVisitor) VisitHtmlMisc(ctx *HtmlMiscContext) interface{} {
 }
 
 func (v *BaseJSPParserVisitor) VisitHtmlComment(ctx *HtmlCommentContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJSPParserVisitor) VisitHtmlCommentText(ctx *HtmlCommentTextContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJSPParserVisitor) VisitHtmlConditionalCommentText(ctx *HtmlConditionalCommentTextContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -119,6 +123,26 @@ func (v *BaseJSPParserVisitor) VisitXml(ctx *XmlContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJSPParserVisitor) VisitScriptlet(ctx *ScriptletContext) interface{} {
+func (v *BaseJSPParserVisitor) VisitJspScriptlet(ctx *JspScriptletContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitJspExpression(ctx *JspExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitScriptletStart(ctx *ScriptletStartContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitScriptletContent(ctx *ScriptletContentContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitJavaScript(ctx *JavaScriptContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitStyle(ctx *StyleContext) interface{} {
 	return v.VisitChildren(ctx)
 }
