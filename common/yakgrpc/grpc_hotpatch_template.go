@@ -31,13 +31,9 @@ func (s *Server) DeleteHotPatchTemplate(ctx context.Context, req *ypb.DeleteHotP
 	if isAll {
 		err = yakit.DeleteAllHotPatchTemplate(s.GetProfileDatabase())
 	} else {
-		condition := req.GetCondition()
 		rowsAffected, err = yakit.DeleteHotPatchTemplate(
 			s.GetProfileDatabase(),
-			yakit.WithHotPatchTemplateIDs(condition.GetId()...),
-			yakit.WithHotPatchTemplateNames(condition.GetName()...),
-			yakit.WithHotPatchTemplateContentKeyWords(condition.GetContentKeyword()...),
-			yakit.WithHotPatchTemplateType(condition.GetType()),
+			req.GetCondition(),
 		)
 	}
 	if err != nil {
@@ -59,16 +55,12 @@ func (s *Server) DeleteHotPatchTemplate(ctx context.Context, req *ypb.DeleteHotP
 
 func (s *Server) UpdateHotPatchTemplate(ctx context.Context, req *ypb.UpdateHotPatchTemplateRequest) (*ypb.UpdateHotPatchTemplateResponse, error) {
 	template := req.GetData()
-	condition := req.GetCondition()
 	rowAffected, err := yakit.UpdateHotPatchTemplate(
 		s.GetProfileDatabase(),
 		template.GetName(),
 		template.GetContent(),
 		template.GetType(),
-		yakit.WithHotPatchTemplateIDs(condition.GetId()...),
-		yakit.WithHotPatchTemplateNames(condition.GetName()...),
-		yakit.WithHotPatchTemplateContentKeyWords(condition.GetContentKeyword()...),
-		yakit.WithHotPatchTemplateType(condition.GetType()),
+		req.GetCondition(),
 	)
 
 	if err != nil {
@@ -86,10 +78,7 @@ func (s *Server) UpdateHotPatchTemplate(ctx context.Context, req *ypb.UpdateHotP
 func (s *Server) QueryHotPatchTemplate(ctx context.Context, req *ypb.HotPatchTemplateRequest) (*ypb.QueryHotPatchTemplateResponse, error) {
 	templates, err := yakit.QueryHotPatchTemplate(
 		s.GetProfileDatabase(),
-		yakit.WithHotPatchTemplateIDs(req.GetId()...),
-		yakit.WithHotPatchTemplateNames(req.GetName()...),
-		yakit.WithHotPatchTemplateContentKeyWords(req.GetContentKeyword()...),
-		yakit.WithHotPatchTemplateType(req.GetType()),
+		req,
 	)
 	if err != nil {
 		return nil, err
@@ -110,7 +99,9 @@ func (s *Server) QueryHotPatchTemplate(ctx context.Context, req *ypb.HotPatchTem
 func (s *Server) QueryHotPatchTemplateList(ctx context.Context, req *ypb.QueryHotPatchTemplateListRequest) (*ypb.QueryHotPatchTemplateListResponse, error) {
 	_, names, err := yakit.QueryHotPatchTemplateList(
 		s.GetProfileDatabase(),
-		req.GetType(),
+		&ypb.HotPatchTemplateRequest{
+			Type: req.GetType(),
+		},
 		&ypb.Paging{
 			Page:    1,
 			Limit:   -1,
