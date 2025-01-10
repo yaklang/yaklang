@@ -65,7 +65,10 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 	res := scanrpc.SCAN_InvokeScriptResponse{}
 	yakitServer := yaklib.NewYakitServer(
 		0,
-		yaklib.SetYakitServer_ProgressHandler(func(id string, progress float64) { return }),
+		yaklib.SetYakitServer_ProgressHandler(func(id string, progress float64) {
+			reportor.ReportProcess(progress)
+			return
+		}),
 		yaklib.SetYakitServer_LogHandler(func(level string, info string) {
 			log.Infof("LEVEL: %v INFO: %v", level, info)
 			switch strings.ToLower(level) {

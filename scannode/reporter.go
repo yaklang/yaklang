@@ -228,6 +228,17 @@ func (r *ScannerAgentReporter) ReportFingerprint(i interface{}) error {
 	}
 }
 
+func (r *ScannerAgentReporter) ReportProcess(process float64) error {
+	res, err := spec.NewScanProcessResult(process)
+	if err != nil {
+		return err
+	}
+	res.RuntimeId = r.RuntimeId
+	res.TaskId = r.TaskId
+	res.SubTaskId = r.SubTaskId
+	r.agent.feedback(res)
+	return nil
+}
 func (r *ScannerAgentReporter) ReportTCPOpenPort(host interface{}, port interface{}) error {
 	var s = r.agent
 
