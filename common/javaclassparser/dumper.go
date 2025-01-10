@@ -862,9 +862,6 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
 			continue
 		}
-		if name != "getSupportedModelClass" {
-			continue
-		}
 		res, err := c.DumpMethod(name, descriptor)
 		if err != nil {
 			return nil, fmt.Errorf("dump method %s failed, %w", name, err)
