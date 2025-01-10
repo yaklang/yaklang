@@ -7,6 +7,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
+type VariableKind int
+
+const (
+	NormalVariable VariableKind = iota
+	PointerVariable
+	DereferenceVariable
+)
+
 type Variable struct {
 	*ssautil.Versioned[Value]
 	DefRange memedit.RangeIf
@@ -16,15 +24,23 @@ type Variable struct {
 	object      Value
 	key         Value
 	verboseName string
+
+	kind             VariableKind
+	directVariable   *Variable           // A pointer has only one direct reference
+	indirectVariable map[int64]*Variable // may be multiple indirect references
+	hideVariable     map[int64]*Variable // which variables are referenced
 }
 
 var _ ssautil.VersionedIF[Value] = (*Variable)(nil)
 
 func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedVersionedTableIF[Value]) ssautil.VersionedIF[Value] {
 	ret := &Variable{
-		Versioned: ssautil.NewVersioned[Value](globalIndex, name, local, scope).(*ssautil.Versioned[Value]),
-		DefRange:  nil,
-		UseRange:  map[memedit.RangeIf]struct{}{},
+		Versioned:        ssautil.NewVersioned[Value](globalIndex, name, local, scope).(*ssautil.Versioned[Value]),
+		DefRange:         nil,
+		UseRange:         map[memedit.RangeIf]struct{}{},
+		indirectVariable: map[int64]*Variable{},
+		hideVariable:     map[int64]*Variable{},
+		kind:             NormalVariable,
 	}
 	return ret
 }
@@ -119,6 +135,53 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 	value.GetFunc().NewErrorWithPos(kind, tag, v.DefRange, msg)
 	for rangePos := range v.UseRange {
 		value.GetFunc().NewErrorWithPos(kind, tag, rangePos, msg)
+	}
+}
+
+func (v *Variable) GetKind() VariableKind {
+	return v.kind
+}
+
+func (v *Variable) SetKind(kind VariableKind) {
+	v.kind = kind
+}
+
+func (v *Variable) AddPointVariable(p *Variable) {
+	if p == nil {
+		return
+	}
+	v.directVariable = p
+	for _, h := range p.hideVariable { // 遍历所有引用过p的指针
+		v.indirectVariable[h.GetId()] = h
+		h.indirectVariable[v.GetId()] = v
+		delete(h.indirectVariable, h.GetId())
+	}
+	delete(v.indirectVariable, v.GetId())
+	p.hideVariable[v.GetId()] = v
+}
+
+func (v *Variable) GetDirectVariable() *Variable {
+	return v.directVariable
+}
+
+func (v *Variable) GetIndirectVariable() map[int64]*Variable {
+	return v.indirectVariable
+}
+
+func (v *Variable) HandlePointerVariable(value Value) {
+	v.SetKind(PointerVariable)
+	v.AddPointVariable(value.GetLastVariable())
+}
+
+func (v *Variable) HandleDereferenceVariable(value Value) {
+	scope := v.GetScope()
+	v.SetKind(PointerVariable) // 需要复原标志位
+
+	if d := v.GetDirectVariable(); d != nil {
+		scope.AssignVariable(d, value)
+	}
+	for _, id := range v.GetIndirectVariable() {
+		scope.AssignVariable(id, value)
 	}
 }
 

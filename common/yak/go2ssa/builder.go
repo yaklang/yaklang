@@ -190,9 +190,9 @@ func (*SSABuilder) GetLanguage() consts.Language {
 
 func (b *astbuilder) AddGlobalVariable(name string, value ssa.Value) {
 	scope := b.CurrentBlock.ScopeTable
-	if un, ok := value.(*ssa.UnOp); ok {
-		value = un.X
-	}
+	// if un, ok := value.(*ssa.UnOp); ok {
+	// 	value = un.X
+	// }
 	for _, v := range scope.GetAllVariables() {
 		if object := v.GetValue().GetObject(); object != nil && object.GetId() == value.GetId() {
 			variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInst(v.GetName()))
