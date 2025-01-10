@@ -8,6 +8,13 @@ SCRIPT_OPEN: '<script' .*? '>' -> pushMode(SCRIPT);
 
 STYLE_OPEN: '<style' .*? '>' -> pushMode(STYLE);
 
+DTD
+    : '<!DOCTYPE' -> pushMode(IN_DTD)
+    ;
+
+CDATA
+    : '<![CDATA[' .*? ']]>'
+    ;
 
 WHITESPACES
     :  (' ' | '\t' | '\r'? '\n')+
@@ -15,18 +22,6 @@ WHITESPACES
 
 XML_DECLARATION
     : '<?xml' -> pushMode(TAG)
-    ;
-
-CDATA
-    : '<![CDATA[' .*? ']]>'
-    ;
-
-DTD
-    : DTD_START -> pushMode(IN_DTD)
-    ;
-
-DTD_START
-    : '<!DOCTYPE'
     ;
 
 WHITESPACE_SKIP
