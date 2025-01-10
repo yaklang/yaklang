@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
 	"net"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -61,7 +62,7 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.
 	}
 
 	var lastError error
-	proxyHaveTimeoutError := false
+	shouldRetryError := false
 RETRY:
 	if ret := addRetry(); ret > timeoutRetryMax {
 		if timeoutRetryMax > 0 {
@@ -147,10 +148,10 @@ RETRY:
 		conn, err := getConnForceProxy(target, proxy, config.Timeout)
 		if err != nil {
 			log.Errorf("proxy conn failed: %s", err)
-			if !proxyHaveTimeoutError {
+			if !shouldRetryError {
 				var opError *net.OpError
-				if errors.As(err, &opError) {
-					proxyHaveTimeoutError = true
+				if errors.As(err, &opError) && (opError.Timeout() || opError.Temporary()) {
+					shouldRetryError = true
 				}
 			}
 			errs = utils.JoinErrors(errs, err)
@@ -158,8 +159,9 @@ RETRY:
 		}
 		return conn, nil
 	}
-	if proxyHaveTimeoutError {
-		proxyHaveTimeoutError = false
+	if shouldRetryError {
+		shouldRetryError = false
+		lastError = errs
 		goto RETRY
 	}
 	return nil, utils.Wrapf(errs, "connect: %v failed: no proxy available (in %v)", target, config.Proxy)
