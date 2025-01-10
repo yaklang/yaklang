@@ -46,11 +46,3 @@ func (j *LambdaFuncRef) String(funcCtx *class_context.ClassContext) string {
 	}
 	return fmt.Sprintf("getLambda(%d)(%s)", j.Id, args)
 }
-
-func NewLambdaFuncRef(id int, Arguments []JavaValue, typ types.JavaType) *LambdaFuncRef {
-	return &LambdaFuncRef{
-		Id:        id,
-		JavaType:  typ,
-		Arguments: Arguments,
-	}
-}

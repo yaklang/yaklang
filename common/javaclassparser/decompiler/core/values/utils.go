@@ -35,7 +35,11 @@ func SimplifyConditionValue(condition JavaValue) JavaValue {
 		}
 		if val.Op == Not {
 			if v1, ok := vals[0].(*JavaExpression); ok {
-				resVal = NewBinaryExpression(v1.Values[0], v1.Values[1], GetNotOp(v1.Op), types.NewJavaPrimer(types.JavaBoolean))
+				if v1.Op == Not {
+					return v1.Values[0]
+				} else {
+					resVal = NewBinaryExpression(v1.Values[0], v1.Values[1], GetNotOp(v1.Op), types.NewJavaPrimer(types.JavaBoolean))
+				}
 			}
 		}
 	}

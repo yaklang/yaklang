@@ -25,6 +25,9 @@ type ClassContext struct {
 func (f *ClassContext) GetAllImported() []string {
 	imports := []string{}
 	f.BuildInLibsMap.ForEach(func(pkg string, classes []string) bool {
+		if pkg == f.PackageName {
+			return true
+		}
 		for _, className := range classes {
 			imports = append(imports, pkg+"."+className)
 		}
@@ -59,6 +62,9 @@ func (f *ClassContext) ShortTypeName(name string) string {
 	f.Import(name)
 	pkg, className := SplitPackageClassName(name)
 	if pkg == "" {
+		return className
+	}
+	if pkg == f.PackageName {
 		return className
 	}
 	if f.BuildInLibsMap == nil {

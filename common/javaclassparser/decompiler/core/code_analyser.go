@@ -278,7 +278,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 				for i := 0; i < n; i++ {
 					d.varUserMap.Set(ref, append(d.varUserMap.GetMust(ref), []any{
 						func(v values.JavaValue) {
-							slotVal.Value = v
+							slotVal.ResetValue(v)
 						}, opcode,
 					}))
 				}
@@ -297,7 +297,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		users := d.varUserMap.GetMust(varRef)
 		d.varUserMap.Set(varRef, append(users, []any{
 			func(v values.JavaValue) {
-				slotvalue.Value = v
+				slotvalue.ResetValue(v)
 			}, opcode,
 		}))
 		return slotvalue
@@ -358,7 +358,6 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		slot := GetStoreIdx(opcode)
 		value := runtimeStackSimulation.Pop().(values.JavaValue)
 		ref, isFirst := runtimeStackSimulation.AssignVar(slot, value)
-		println(ref.Id.String())
 		statements.NewAssignStatement(ref, value, isFirst)
 		d.opcodeIdToRef[opcode] = [2]any{ref, isFirst}
 		attr := d.delRefUserAttr[ref.Id]
@@ -882,15 +881,25 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 
 	initMethodVar := func(runtimeSim StackSimulation) {
 		params := []values.JavaValue{}
-		for i, paramType := range d.FunctionType.ParamTypes {
+		slotIndex := 0
+		for _, paramType := range d.FunctionType.ParamTypes {
 			//assignStackVar(values.NewJavaRef(stackVarIndex, paramType))
-			runtimeSim.AssignVar(i, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+			var isDouble bool
+			if v, ok := paramType.RawType().(*types.JavaPrimer); ok {
+				isDouble = v.Name == types.JavaDouble || v.Name == types.JavaLong
+			}
+			runtimeSim.AssignVar(slotIndex, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return ""
 			}, func() types.JavaType {
 				return paramType
 			}))
-			val := runtimeSim.GetVar(i)
+			val := runtimeSim.GetVar(slotIndex)
 			params = append(params, val)
+			if isDouble {
+				slotIndex += 2
+			} else {
+				slotIndex += 1
+			}
 		}
 		d.Params = params
 		if !d.FunctionContext.IsStatic {
@@ -1158,6 +1167,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				}
 				return code.Target, nil
 			})
+			source = utils.NewSet(source).List()
 			if len(source) != 2 {
 				isTernaryExp := false
 				if len(source) == 1 {
@@ -1174,14 +1184,13 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			for i, opCode := range ifNodes {
 				if i == 0 {
 					trueFalseValuePair = []values.JavaValue{source[0].StackEntry.value, source[1].StackEntry.value}
-					tarnaryValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), source[1].StackEntry.value, source[0].StackEntry.value)
-					tarnaryValue.Type().ResetType(ternaryExpMergeNodeSlot[code].TmpType)
+					ternaryValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), source[1].StackEntry.value, source[0].StackEntry.value)
 					code.conditionOpId = opCode.Id
-					ternaryExpMergeNodeSlot[code].Value = tarnaryValue
+					ternaryExpMergeNodeSlot[code].ResetValue(ternaryValue)
 					ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
-						tarnaryValue.Condition = value
+						ternaryValue.Condition = value
 					}
-					defaultTarnaryValue = tarnaryValue
+					defaultTarnaryValue = ternaryValue
 				}
 				if i != 0 {
 					var routeToCode bool
@@ -1210,13 +1219,13 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 								defaultTarnaryValue.Condition = value
 							}
 						} else {
-							newValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), ternaryExpMergeNodeSlot[code].Value, target.StackEntry.value)
+							newValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), ternaryExpMergeNodeSlot[code].GetValue(), target.StackEntry.value)
 							newValue.Type().ResetType(ternaryExpMergeNodeSlot[code].TmpType)
 							newValue.ConditionFromOp = opCode.Id
 							ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
 								newValue.Condition = value
 							}
-							ternaryExpMergeNodeSlot[code].Value = newValue
+							ternaryExpMergeNodeSlot[code].ResetValue(newValue)
 							code.conditionOpId = 0
 						}
 					}
@@ -1245,19 +1254,23 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 								defaultTarnaryValue.Condition = value
 							}
 						} else {
-							newValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), target.StackEntry.value, ternaryExpMergeNodeSlot[code].Value)
+							newValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), target.StackEntry.value, ternaryExpMergeNodeSlot[code].GetValue())
 							newValue.Type().ResetType(ternaryExpMergeNodeSlot[code].TmpType)
 							newValue.ConditionFromOp = opCode.Id
 							ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
 								newValue.Condition = value
 							}
-							ternaryExpMergeNodeSlot[code].Value = newValue
+							ternaryExpMergeNodeSlot[code].ResetValue(newValue)
 							code.conditionOpId = 0
 						}
 					}
 				}
 			}
 		}
+	}
+	for _, slotVal := range ternaryExpMergeNodeSlot {
+		ternaryExp := slotVal.GetValue().(*values.TernaryExpression)
+		types.MergeTypes(ternaryExp.TrueValue.Type(), ternaryExp.FalseValue.Type())
 	}
 	return nil
 }
@@ -1402,7 +1415,7 @@ func (d *Decompiler) ParseStatement() error {
 						val := argument
 						for {
 							if v, ok := val.(*values.SlotValue); ok {
-								val = v.Value
+								val = v.GetValue()
 							} else {
 								break
 							}
@@ -1414,13 +1427,15 @@ func (d *Decompiler) ParseStatement() error {
 						}
 					}
 					val := UnpackSoltValue(funcCallValue.Object)
-					assignNode := refToNewExpressionAssignNode[val.(*values.JavaRef).Id]
-					if assignNode != nil {
-						assignSt := assignNode.Statement
-						assignNode.IsDel = true
-						appendNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
-							return assignSt.String(funcCtx)
-						}))
+					if val, ok := val.(*values.JavaRef); ok {
+						assignNode := refToNewExpressionAssignNode[val.Id]
+						if assignNode != nil {
+							assignSt := assignNode.Statement
+							assignNode.IsDel = true
+							appendNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+								return assignSt.String(funcCtx)
+							}))
+						}
 					}
 				} else {
 					appendNode(statements.NewExpressionStatement(funcCallValue))
@@ -1634,7 +1649,6 @@ func (d *Decompiler) ParseStatement() error {
 	for _, opcode := range d.opCodes {
 		idToOpcode[opcode.Id] = opcode
 	}
-	DumpOpcodesToDotExp(d.RootOpCode)
 	for _, node := range nodes {
 		node := node
 		opcode := idToOpcode[node.Id]
@@ -1673,7 +1687,6 @@ func (d *Decompiler) ParseStatement() error {
 		idToNode[toNodeId].SourceConditionNode = idToNode[conditionId]
 	}
 	d.RootNode = nodes[0]
-	DumpNodesToDotExp(d.RootNode)
 	d.varUserMap.ForEach(func(ref *values.JavaRef, pairs [][]any) bool {
 		val := GetRealValue(ref.Val)
 		attr := d.delRefUserAttr[ref.Id]
@@ -1735,7 +1748,6 @@ func (d *Decompiler) ParseStatement() error {
 		}
 		return node.Next, nil
 	})
-	DumpNodesToDotExp(d.RootNode)
 	idToNode = map[int]*Node{}
 	nodes = []*Node{}
 	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
@@ -1748,7 +1760,6 @@ func (d *Decompiler) ParseStatement() error {
 	})
 	err = WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
 		if node.IsTryCatch {
-			DumpNodesToDotExp(d.RootNode)
 			tryNodeId := getStatementNextIdByOpcodeId(node.TryNodeId)
 			catchNodeIds := funk.Map(node.CatchNodeId, func(id int) int {
 				return getStatementNextIdByOpcodeId(id)
@@ -1760,7 +1771,6 @@ func (d *Decompiler) ParseStatement() error {
 				return slices.Contains(catchNodeIds, n.Id)
 			})
 			if len(tryNodes) == 0 {
-				DumpOpcodesToDotExp(d.RootOpCode)
 				return nil, errors.New("not found try body")
 			}
 			if len(catchNodes) == 0 {

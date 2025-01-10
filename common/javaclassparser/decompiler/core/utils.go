@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -147,6 +148,9 @@ func Convert4bytesToInt(data []byte) uint32 {
 }
 
 func WalkGraph[T any](node T, next func(T) ([]T, error)) error {
+	if reflect.ValueOf(node).IsNil() {
+		return nil
+	}
 	stack := utils.NewStack[T]()
 	visited := utils.NewSet[any]()
 	stack.Push(node)
@@ -336,7 +340,7 @@ func CalcMergeOpcode(ifOpcode *OpCode) *OpCode {
 
 func UnpackSoltValue(value values.JavaValue) values.JavaValue {
 	if ref, ok := value.(*values.SlotValue); ok {
-		return UnpackSoltValue(ref.Value)
+		return UnpackSoltValue(ref.GetValue())
 	}
 	return value
 }
@@ -345,7 +349,7 @@ func GetRealValue(value values.JavaValue) values.JavaValue {
 		return GetRealValue(ref.Val)
 	}
 	if ref, ok := value.(*values.SlotValue); ok {
-		return GetRealValue(ref.Value)
+		return GetRealValue(ref.GetValue())
 	}
 	return value
 }
