@@ -75,7 +75,7 @@ func TestParseJar(t *testing.T) {
 			return nil
 		}
 		fmt.Printf("file: %s\n", path)
-		//if path != "com/simp/action/audit/access/MouseLogListAction.class" {
+		//if path != "net/lingala/zip4j/core/HeaderReader.class" {
 		//	return nil
 		//}
 		data, err := jarFs.ReadFile(path)
@@ -95,7 +95,7 @@ func TestParseJar(t *testing.T) {
 }
 
 func TestParseJar2(t *testing.T) {
-	jarFs, err := NewJarFSFromLocal("/Users/z3/.m2/repository/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.12.5/jackson-datatype-jdk8-2.12.5.jar")
+	jarFs, err := NewJarFSFromLocal("/Users/z3/Downloads/iam.app.5.0.enc.jar")
 	if err != nil {
 		t.Fatal(err)
 	}

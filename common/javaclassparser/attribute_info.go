@@ -15,6 +15,23 @@ type AttributeInfo interface {
 }
 
 /*
+	Signature_attribute {
+		u2 attribute_name_index;
+		u4 attribute_length;
+		u2 signature_index;
+	}
+*/
+type SignatureAttribute struct {
+	Type           string
+	AttrLen        uint32
+	SignatureIndex uint16
+}
+
+func (i *SignatureAttribute) readInfo(cp *ClassParser) {
+	i.SignatureIndex = cp.reader.readUint16()
+}
+
+/*
 	InnerClasses_attribute {
 	    u2 attribute_name_index;
 	    u4 attribute_length;
@@ -253,6 +270,53 @@ type AnnotationAttribute struct {
 	ElementValuePairs []*ElementValuePairAttribute
 }
 
+/*
+		RuntimeVisibleParameterAnnotations_attribute {
+	    u2 attribute_name_index;
+	    u4 attribute_length;
+	    u1 num_parameters;
+	    {   u2         num_annotations;
+	        annotation annotations[num_annotations];
+	    } parameter_annotations[num_parameters];
+	}
+*/
+type RuntimeVisibleParameterAnnotationsAttribute struct {
+}
+
+/*
+	RuntimeInvisibleParameterAnnotations_attribute {
+	    u2 attribute_name_index;
+	    u4 attribute_length;
+	    u1 num_parameters;
+	    {   u2         num_annotations;
+	        annotation annotations[num_annotations];
+	    } parameter_annotations[num_parameters];
+	}
+*/
+type RuntimeInvisibleParameterAnnotationsAttribute struct {
+}
+
+/*
+	AnnotationDefault_attribute {
+	    u2            attribute_name_index;
+	    u4            attribute_length;
+	    element_value default_value;
+	}
+*/
+type AnnotationDefaultAttribute struct {
+}
+
+/*
+	RuntimeVisibleTypeAnnotations_attribute {
+	    u2 attribute_name_index;
+	    u4 attribute_length;
+	    u2 num_annotations;
+	    type_annotation annotations[num_annotations];
+	}
+*/
+type RuntimeVisibleTypeAnnotationsAttribute struct {
+	RuntimeVisibleAnnotationsAttribute
+}
 type RuntimeVisibleAnnotationsAttribute struct {
 	Type        string
 	AttrLen     uint32
@@ -319,6 +383,10 @@ func newAttributeInfo(attrName string, attrLen uint32) AttributeInfo {
 		return &BootstrapMethodsAttribute{AttributeLength: attrLen}
 	case "InnerClasses":
 		return &InnerClassesAttribute{AttrLen: attrLen}
+	case "Signature":
+		return &SignatureAttribute{AttrLen: attrLen}
+	case "RuntimeVisibleTypeAnnotations":
+		return &RuntimeVisibleTypeAnnotationsAttribute{}
 	default:
 		return &UnparsedAttribute{Name: attrName, Length: attrLen, Info: nil}
 

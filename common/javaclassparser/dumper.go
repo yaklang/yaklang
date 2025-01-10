@@ -309,10 +309,14 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			case *SyntheticAttribute:
 				log.Infof("field %s is synthetic", name)
 			case *DeprecatedAttribute:
-				// log.Infof("field %s is deprecated", name)
+			// log.Infof("field %s is deprecated", name)
+			case *SignatureAttribute:
+
 			case *UnparsedAttribute:
 				log.Error("cannot handle attribute type: UnparsedAttribute")
 				spew.Dump(ret)
+			case *RuntimeVisibleAnnotationsAttribute:
+
 			default:
 				log.Info(spew.Sdump(ret))
 				log.Errorf("when handling for fields unknown attribute type: %T", ret)
@@ -858,6 +862,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
 			continue
 		}
+		//if name != "chk_excel" {
+		//	continue
+		//}
 		res, err := c.DumpMethod(name, descriptor)
 		if err != nil {
 			return nil, fmt.Errorf("dump method %s failed, %w", name, err)
