@@ -115,7 +115,7 @@ xhtmlCDATA
     ;
 
 dtd
-    : DTD dtdElementName (DTD_PUBLIC publicId)? (DTD_SYSTEM systemId)?  TAG_END
+    : DTD dtdElementName (DTD_PUBLIC publicId*)? (DTD_SYSTEM systemId)?  TAG_END
     ;
 
 dtdElementName
