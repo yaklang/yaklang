@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/samber/lo"
@@ -21,6 +22,11 @@ type CodeRange struct {
 	EndLine        int64  `json:"end_line"`
 	EndColumn      int64  `json:"end_column"`
 	SourceCodeLine int64  `json:"source_code_line"`
+}
+
+func (c *CodeRange) GetPath() string {
+	urlIns := utils.ParseStringToUrl(c.URL)
+	return urlIns.Path
 }
 
 func (c *CodeRange) JsonString() string {
@@ -124,16 +130,16 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) 
 		log.Infof("no alert msg for %s; skip", variable)
 		return
 	}
-	r.GetValues(variable).ForEach(func(value *Value) {
+
+	for i, value := range r.GetValues(variable) {
 		valueRange := value.GetRange()
 		ssaRisk := buildSSARisk(r, valueRange, alertInfo, result)
 		err := yakit.CreateSSARisk(consts.GetGormDefaultSSADataBase(), ssaRisk)
 		if err != nil {
 			log.Errorf("save risk failed: %s", err)
 		}
-		r.riskMap[fmt.Sprintf("%s-%s", variable, value.String())] = ssaRisk
-	})
-
+		r.riskMap[fmt.Sprintf("%s-%d", variable, i)] = ssaRisk
+	}
 }
 
 func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.SSARisk {
@@ -144,7 +150,7 @@ func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.SSARisk {
 	// load risk from database
 	if r.dbResult != nil && len(r.riskMap) != len(r.dbResult.RiskHashs) {
 		for name, hash := range r.dbResult.RiskHashs {
-			risk, err := yakit.GetSSARiskByHash(consts.GetGormProjectDatabase(), hash)
+			risk, err := yakit.GetSSARiskByHash(ssadb.GetDB(), hash)
 			if err != nil {
 				log.Errorf("get risk by hash failed: %s", err)
 				continue
@@ -162,6 +168,13 @@ func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.SSARisk {
 	return r.riskGRPCCache
 }
 
+func (r *SyntaxFlowResult) GetRiskByValue(variable string, i int) *schema.SSARisk {
+	if r == nil {
+		return nil
+	}
+	return r.GetRisk(fmt.Sprintf("%s-%d", variable, i))
+}
+
 func (r *SyntaxFlowResult) GetRisk(name string) *schema.SSARisk {
 	if r == nil {
 		return nil
@@ -172,7 +185,7 @@ func (r *SyntaxFlowResult) GetRisk(name string) *schema.SSARisk {
 	// from db
 	if r.dbResult != nil {
 		if hash, ok := r.dbResult.RiskHashs[name]; ok {
-			risk, err := yakit.GetSSARiskByHash(consts.GetGormProjectDatabase(), hash)
+			risk, err := yakit.GetSSARiskByHash(ssadb.GetDB(), hash)
 			if err != nil {
 				log.Errorf("get risk by hash failed: %s", err)
 				return nil

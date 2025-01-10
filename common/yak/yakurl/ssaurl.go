@@ -228,11 +228,15 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 				continue
 			}
 			codeRange, source := ssaapi.CoverCodeRange(programName, "", v.GetRange())
-			res := createNewRes(url, 0, []extra{
+			extraData := []extra{
 				{"index", index},
 				{"code_range", codeRange},
-				{"source", source},
-			})
+				{"source", source}}
+			if ssaRisk := result.GetRiskByValue(variable, index); ssaRisk != nil {
+				extraData = append(extraData, extra{"risk_hash", ssaRisk.Hash})
+			}
+
+			res := createNewRes(url, 0, extraData)
 			res.ResourceType = "value"
 			res.ResourceName = v.String()
 			resources = append(resources, res)
@@ -300,12 +304,6 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 			if msg, ok := result.GetAlertMsg(variable); ok {
 				res.VerboseType = "alert"
 				res.VerboseName = codec.AnyToString(msg)
-				if risk := result.GetRisk(variable); risk != nil {
-					res.Extra = append(res.Extra, &ypb.KVPair{
-						Key:   "risk_hash",
-						Value: risk.Hash,
-					})
-				}
 				resources = append(resources, res)
 			} else {
 				res.VerboseType = "normal"
