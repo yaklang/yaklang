@@ -287,7 +287,9 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 					done <- true
 					return
 				}
-				log.Debugf("conn[%s] met error: %v", conn.RemoteAddr().String(), err)
+				if conn.RemoteAddr() != nil {
+					log.Debugf("conn[%s] met error: %v", conn.RemoteAddr().String(), err)
+				}
 			}
 
 			select {

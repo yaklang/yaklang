@@ -12,6 +12,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+
 	// "github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/link/tun"
 	"io"
 	"net"
@@ -51,6 +56,109 @@ type netTun struct {
 }
 
 type Net netTun
+
+func CreateFromIface(iface *net.Interface, c *channel.Endpoint, dnsServers []netip.Addr) (tun.Device, *Net, error) {
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ipv4addr := ""
+	ipv6addr := ""
+
+	for _, addr := range addrs {
+		ipAddr, _, ipNetErr := net.ParseCIDR(addr.String())
+		if ipNetErr != nil {
+			continue
+		}
+
+		ip := ipAddr.String()
+		if strings.Contains(ip, ":") {
+			ipv6addr = ip
+		} else {
+			ipv4addr = ip
+		}
+	}
+
+	if ipv4addr == "" && ipv6addr == "" {
+		return nil, nil, errors.New("no address found for interface")
+	}
+
+	var (
+		ipv4addrIns, ipv6addrIns netip.Addr
+	)
+	if ipv4addr != "" {
+		ipv4addrIns, err = netip.ParseAddr(ipv4addr)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	if ipv6addr != "" {
+		ipv6addrIns, err = netip.ParseAddr(ipv6addr)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	log.Infof("start to create netstack from iface:%s ipv4:%s ipv6:[%s]", iface.Name, ipv4addr, ipv6addr)
+	mtu := iface.MTU
+	opts := stack.Options{
+		NetworkProtocols:   []stack.NetworkProtocolFactory{ipv4.NewProtocol, ipv6.NewProtocol},
+		TransportProtocols: []stack.TransportProtocolFactory{tcp.NewProtocol, udp.NewProtocol, icmp.NewProtocol6, icmp.NewProtocol4},
+		HandleLocal:        true,
+	}
+	dev := &netTun{
+		ep:             c,
+		stack:          stack.New(opts),
+		events:         make(chan tun.Event, 10),
+		incomingPacket: make(chan *buffer.View),
+		dnsServers:     dnsServers,
+		mtu:            mtu,
+	}
+	sackEnabledOpt := tcpip.TCPSACKEnabled(true) // TCP SACK is disabled by default
+	tcpipErr := dev.stack.SetTransportProtocolOption(tcp.ProtocolNumber, &sackEnabledOpt)
+	if tcpipErr != nil {
+		return nil, nil, fmt.Errorf("could not enable TCP SACK: %v", tcpipErr)
+	}
+	dev.ep.AddNotify(dev)
+
+	nicErr := dev.stack.CreateNIC(1, dev.ep)
+	if nicErr != nil {
+		return nil, nil, utils.Errorf("create netstack nic failed: %s", nicErr)
+	}
+
+	routes := []tcpip.Route{}
+	if ipv4addrIns.IsValid() {
+		log.Infof("add ipv4 route %v -> %v", header.IPv4EmptySubnet, 1)
+		dev.hasV4 = true
+		routes = append(routes, tcpip.Route{Destination: header.IPv4EmptySubnet, NIC: 1})
+	}
+	if ipv6addrIns.IsValid() {
+		log.Infof("add ipv6 route %v -> %v", header.IPv6EmptySubnet, 1)
+		dev.hasV6 = true
+		routes = append(routes, tcpip.Route{Destination: header.IPv6EmptySubnet, NIC: 1})
+	}
+	dev.stack.SetRouteTable(routes)
+
+	if ipv4addr != "" {
+		dev.stack.AddProtocolAddress(1, tcpip.ProtocolAddress{
+			Protocol:          header.IPv4ProtocolNumber,
+			AddressWithPrefix: tcpip.AddrFromSlice(ipv4addrIns.AsSlice()).WithPrefix(),
+		}, stack.AddressProperties{})
+	}
+
+	if ipv6addr != "" {
+		dev.stack.AddProtocolAddress(1, tcpip.ProtocolAddress{
+			Protocol:          header.IPv6ProtocolNumber,
+			AddressWithPrefix: tcpip.AddrFromSlice(ipv6addrIns.AsSlice()).WithPrefix(),
+		}, stack.AddressProperties{})
+	}
+
+	dev.stack.SetForwardingDefaultAndAllNICs(ipv4.ProtocolNumber, true)
+	dev.stack.SetForwardingDefaultAndAllNICs(ipv6.ProtocolNumber, true)
+	dev.events <- tun.EventUp
+	return dev, (*Net)(dev), nil
+}
 
 func CreateNetTUN(localAddresses, dnsServers []netip.Addr, mtu int) (tun.Device, *Net, error) {
 	opts := stack.Options{
@@ -987,10 +1095,14 @@ func (tnet *Net) DialContext(ctx context.Context, network, address string) (net.
 			return nil, &net.OpError{Op: "dial", Err: errNumericPort}
 		}
 	}
+
+	log.Infof("start to lookup host %s", host)
 	allAddr, err := tnet.LookupContextHost(ctx, host)
 	if err != nil {
+		log.Errorf("lookup host %s failed: %s", host, err)
 		return nil, &net.OpError{Op: "dial", Err: err}
 	}
+	log.Infof("lookup host %s finished: %v", host, spew.Sdump(allAddr))
 	var addrs []netip.AddrPort
 	for _, addr := range allAddr {
 		ip, err := netip.ParseAddr(addr)

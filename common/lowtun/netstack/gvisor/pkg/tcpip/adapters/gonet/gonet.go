@@ -24,6 +24,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
+
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/sync"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
@@ -506,7 +508,8 @@ func DialTCPWithBind(ctx context.Context, s *stack.Stack, localAddr, remoteAddr 
 	}
 
 	// Bind before connect if requested.
-	if localAddr != (tcpip.FullAddress{}) {
+	if localAddr.Addr.Unspecified() || localAddr.Port == 0 {
+		log.Info("start to bind local address from nic")
 		if err = ep.Bind(localAddr); err != nil {
 			return nil, fmt.Errorf("ep.Bind(%+v) = %s", localAddr, err)
 		}
