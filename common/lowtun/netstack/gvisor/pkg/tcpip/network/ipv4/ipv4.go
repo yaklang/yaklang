@@ -546,7 +546,8 @@ func (e *endpoint) writePacket(r *stack.Route, pkt *stack.PacketBuffer) tcpip.Er
 	// We should do this for every packet, rather than only DNATted packets, but
 	// removing this check short circuits broadcasts before they are sent out to
 	// other hosts.
-	if newDstAddr := netHeader.DestinationAddress(); dstAddr != newDstAddr {
+	newDstAddr := netHeader.DestinationAddress()
+	if dstAddr != newDstAddr {
 		if ep := e.protocol.findEndpointWithAddress(newDstAddr); ep != nil {
 			// Since we rewrote the packet but it is being routed back to us, we
 			// can safely assume the checksum is valid.
@@ -554,6 +555,7 @@ func (e *endpoint) writePacket(r *stack.Route, pkt *stack.PacketBuffer) tcpip.Er
 			return nil
 		}
 	}
+	_ = dstAddr
 
 	return e.writePacketPostRouting(r, pkt, false /* headerIncluded */)
 }
