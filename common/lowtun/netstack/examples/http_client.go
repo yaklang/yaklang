@@ -1,5 +1,3 @@
-//go:build ignore
-
 /* SPDX-License-Identifier: MIT
  *
  * Copyright (C) 2017-2023 WireGuard LLC. All Rights Reserved.
@@ -42,7 +40,7 @@ endpoint=127.0.0.1:58120
 			DialContext: tnet.DialContext,
 		},
 	}
-	resp, err := client.Get("http://192.168.4.29/")
+	resp, err := client.Get("http://www.example.com/")
 	if err != nil {
 		log.Panic(err)
 	}
