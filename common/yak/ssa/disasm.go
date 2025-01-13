@@ -125,8 +125,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			for _, p := range b.Phis {
 				ret += fmt.Sprintf("\t%s\n", p)
 			}
-			for _, i := range b.Insts {
-				if _, ok := ToConst(i); ok {
+				if _, ok := ToConstInst(i); ok {
 					continue
 				}
 				ret += fmt.Sprintf("\t%s\n", i)
