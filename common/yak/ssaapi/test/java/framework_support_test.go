@@ -40,7 +40,7 @@ public class DemoServlet extends HttpServlet {
 			prog := programs[0]
 			prog.Show()
 			rule := `
-print?{<typeName>?{have:'syntaxflow.template.java.HttpServletRequest'}}(* #-> as $out);
+print?{<typeName>?{have:'javax.servlet.http.HttpServletRequest'}}(* #-> as $out);
 request?{opcode:param  && <typeName>?{have:'javax.servlet.http.HttpServlet'}} as $source;
 		$out #{
 until:<<<UNTIL

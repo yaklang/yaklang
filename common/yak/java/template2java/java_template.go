@@ -7,9 +7,8 @@ import (
 	"strings"
 )
 
-// JAVA_REQUEST_PATH 作为flag,方便进行SyntaxFlow审计
 const (
-	JAVA_REQUEST_PATH          = "syntaxflow.template.java"
+	JAVA_REQUEST_PATH          = "javax.servlet.http"
 	JAVA_UNESCAPE_OUTPUT_PRINT = "print"
 )
 
