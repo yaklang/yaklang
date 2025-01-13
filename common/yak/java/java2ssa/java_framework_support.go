@@ -3,19 +3,57 @@ package java2ssa
 import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"path/filepath"
-	"strings"
-)
-
-const (
-	SERVLET_PATH              = "javax.servlet"
-	SERVLET_REQUEST_DISPATHCE = "getRequestDispatcher"
-	SERVLET_TEMPLATE_PREFIX   = "webapp"
-
-	SPRING_PATH          = "org.springframework"
-	SPRING_UI_MODEL_NAME = "org.springframework.ui.Model"
 )
 
 const FRAMEWORK_DEFAULT_CLASSPATH = "src/main"
+
+type (
+	HookReturnFunc           = func(*builder, ssa.Value)
+	HookMemberCallMethodFunc = func(*builder, ssa.Value, ssa.Value, ...ssa.Value)
+)
+
+type JavaFramework struct {
+	name                     string
+	hookReturnFunc           []HookReturnFunc
+	hookMemberCallMethodFunc []HookMemberCallMethodFunc
+}
+
+const (
+	FrameworkSupportJAVAEE     = "java_ee"
+	FrameworkSupportSpringBoot = "spring_boot"
+)
+
+var frameworks = make(map[string]*JavaFramework)
+
+func init() {
+	registerFrameworkSupport(FrameworkSupportJAVAEE, hookMemberCallMethod(hookJavaEEReturn))
+	registerFrameworkSupport(FrameworkSupportSpringBoot, hookReturn(hookSpringBootReturn), hookMemberCallMethod(hookSpringBootMemberCallMethod))
+}
+
+func registerFrameworkSupport(name string, options ...func(*JavaFramework)) {
+	if name == "" {
+		return
+	}
+	f := &JavaFramework{
+		name: name,
+	}
+	for _, option := range options {
+		option(f)
+	}
+	frameworks[name] = f
+}
+
+func hookReturn(hook HookReturnFunc) func(*JavaFramework) {
+	return func(f *JavaFramework) {
+		f.hookReturnFunc = append(f.hookReturnFunc, hook)
+	}
+}
+
+func hookMemberCallMethod(hook HookMemberCallMethodFunc) func(*JavaFramework) {
+	return func(f *JavaFramework) {
+		f.hookMemberCallMethodFunc = append(f.hookMemberCallMethodFunc, hook)
+	}
+}
 
 func (y *builder) HookMemberCallMethod(obj ssa.Value, key ssa.Value, args ...ssa.Value) {
 	if y == nil || y.IsStop() {
@@ -24,123 +62,22 @@ func (y *builder) HookMemberCallMethod(obj ssa.Value, key ssa.Value, args ...ssa
 	if obj == nil || key == nil {
 		return
 	}
-	y.RegisterMemberCallMethodHookForServlet(obj, key, args...)
-	y.RegisterMemberCallMethodHookForSpring(obj, key, args...)
+
+	for _, f := range frameworks {
+		for _, hook := range f.hookMemberCallMethodFunc {
+			hook(y, obj, key, args...)
+		}
+	}
 }
 
 func (y *builder) HookReturn(val ssa.Value) {
 	if y == nil || y.IsStop() {
 		return
 	}
-	if val == nil {
-		return
-	}
-	y.RegisterReturnHookForSpring(val)
-}
-
-func (y *builder) RegisterMemberCallMethodHookForServlet(obj ssa.Value, key ssa.Value, args ...ssa.Value) {
-	typ := obj.GetType()
-	if typ == nil || !strings.Contains(strings.Join(typ.GetFullTypeNames(), "."), SERVLET_PATH) {
-		return
-	}
-	app := y.GetProgram().GetApplication()
-	if app == nil {
-		return
-	}
-	if key.String() == SERVLET_REQUEST_DISPATHCE {
-		if len(args) != 1 {
-			return
+	for _, f := range frameworks {
+		for _, hook := range f.hookReturnFunc {
+			hook(y, val)
 		}
-		jspPath := args[0].String()
-		path := filepath.Join(FRAMEWORK_DEFAULT_CLASSPATH, SERVLET_TEMPLATE_PREFIX, jspPath)
-		t := app.TryGetTemplate(path)
-		if t == nil {
-			return
-		}
-
-		var jspBlueprint *ssa.Blueprint
-		if t.GetPkgName() != "" {
-			p := app.GetSubProgram(t.GetPkgName())
-			jspBlueprint = p.GetBluePrint(t.GetClassName())
-		} else {
-			jspBlueprint = app.GetBluePrint(t.GetClassName())
-		}
-
-		if jspBlueprint == nil {
-			return
-		}
-
-		jspMethod := t.GetTemplateServerName()
-		jspObj := y.EmitUndefined(t.GetClassName())
-		jspObj.SetType(jspBlueprint)
-		methodCall := y.ReadMemberCallMethod(jspObj, y.EmitConstInst(jspMethod))
-		jspArgs := []ssa.Value{obj, y.EmitConstInstNil()}
-		y.EmitCall(y.NewCall(methodCall, jspArgs))
-	}
-}
-
-func (y *builder) RegisterMemberCallMethodHookForSpring(obj ssa.Value, key ssa.Value, args ...ssa.Value) {
-	typ := obj.GetType()
-	if typ == nil {
-		return
-	}
-	typeName := strings.Join(typ.GetFullTypeNames(), ".")
-	if !strings.Contains(typeName, SPRING_PATH) {
-		return
-	}
-
-	app := y.GetProgram().GetApplication()
-	if app == nil {
-		return
-	}
-	if strings.Contains(typeName, SPRING_UI_MODEL_NAME) {
-		y.SetUIModel(obj)
-	}
-}
-
-func (y *builder) RegisterReturnHookForSpring(val ssa.Value) {
-	if y == nil || y.IsStop() {
-		return
-	}
-	if val == nil {
-		return
-	}
-	app := y.GetProgram().GetApplication()
-	if app == nil {
-		return
-	}
-
-	// check if is in controller
-	if y.isInController {
-		// check if is freemarker file
-		path := val.String()
-		fPath := app.GetProjectConfig("spring.freemarker.prefix") + path + app.GetProjectConfig("spring.freemarker.suffix")
-		t := app.TryGetTemplate(fPath)
-		if t == nil {
-			return
-		}
-
-		var fBlueprint *ssa.Blueprint
-		if t.GetPkgName() != "" {
-			p := app.GetSubProgram(t.GetPkgName())
-			fBlueprint = p.GetBluePrint(t.GetClassName())
-		} else {
-			fBlueprint = app.GetBluePrint(t.GetClassName())
-		}
-		if fBlueprint == nil {
-			return
-		}
-
-		if y.GetUIModel() == nil {
-			return
-		}
-		fbMethod := t.GetTemplateServerName()
-		fbObj := y.EmitUndefined(t.GetClassName())
-
-		fbObj.SetType(fBlueprint)
-		methodCall := y.ReadMemberCallMethod(fbObj, y.EmitConstInst(fbMethod))
-		jspArgs := []ssa.Value{y.GetUIModel(), y.EmitConstInstNil()}
-		y.EmitCall(y.NewCall(methodCall, jspArgs))
 	}
 }
 

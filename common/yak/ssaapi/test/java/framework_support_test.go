@@ -102,7 +102,7 @@ public class GreetingController {
 			prog.Show()
 
 			rule := `
-print?{<typeName>?{have:'syntaxflow.template.java.HttpServletRequest'}}(* #-> as $out);
+print?{<typeName>?{have:'javax.servlet.http.HttpServletRequest'}}(* #-> as $out);
 model?{opcode:param  && <typeName>?{have:'org.springframework.ui.Model'}} as $source;
 		$out #{
 until:<<<UNTIL
