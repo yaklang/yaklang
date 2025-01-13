@@ -235,6 +235,12 @@ func (c *Cache) saveInstruction(instIr *instructionCachePair) bool {
 		}
 	}
 
+	if fun, ok := ToFunction(instIr.inst); ok {
+		if !fun.IsBuilded() {
+			return false
+		}
+	}
+
 	err := Instruction2IrCode(instIr.inst, instIr.irCode)
 	if err != nil {
 		log.Errorf("FitIRCode error: %s", err)

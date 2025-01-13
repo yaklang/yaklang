@@ -19,8 +19,8 @@ func (l *lazyBuilder) AddLazyBuilder(Builder func(), async ...bool) {
 	l._build = append(l._build, Builder)
 }
 
-func (n *lazyBuilder) Build() {
-	if len(n._build) == 0 || n.isBuild {
+func (l *lazyBuilder) Build() {
+	if len(l._build) == 0 || l.isBuild {
 		return
 	}
 	defer func() {
@@ -29,10 +29,17 @@ func (n *lazyBuilder) Build() {
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	n.isBuild = true
-	for _, f := range n._build {
+	l.isBuild = true
+	for _, f := range l._build {
 		f()
 	}
+}
+
+func (l *lazyBuilder) IsBuilded() bool {
+	if len(l._build) == 0 {
+		return true
+	}
+	return l.isBuild
 }
 
 type ASTIF interface {
