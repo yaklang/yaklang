@@ -38,14 +38,12 @@ func (y *JSPVisitor) VisitJspDirective(raw jspparser.IJspDirectiveContext) {
 	name := i.HtmlTagName().GetText()
 	tag := y.GetDirectiveTag(name)
 
-	attrs := make(map[string]string)
-	for _, attr := range i.AllHtmlAttribute() {
-		key, value := y.VisitAttribute(attr)
-		attrs[key] = value
-	}
-	y.PushTagInfo(tag, attrs)
+	y.PushTagInfo(tag)
 	defer y.PopTagInfo()
-	y.ParseSingleTag(i.GetText())
+	for _, attr := range i.AllHtmlAttribute() {
+		y.VisitAttribute(attr)
+	}
+	y.ParseSingleTag()
 }
 
 func (y *JSPVisitor) VisitJspScriptlet(raw jspparser.IJspScriptletContext) {
@@ -70,23 +68,25 @@ func (y *JSPVisitor) VisitJspScriptlet(raw jspparser.IJspScriptletContext) {
 	}
 }
 
-func (y *JSPVisitor) VisitJspExpression(raw jspparser.IJspExpressionContext) {
+func (y *JSPVisitor) VisitJspExpression(raw jspparser.IJspExpressionContext) string {
 	if y == nil || raw == nil {
-		return
+		return ""
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i := raw.(*jspparser.JspExpressionContext)
 	if i == nil {
-		return
+		return ""
 	}
 	if i.ScriptletContent() != nil {
 		expr := y.VisitScriptletContent(i.ScriptletContent())
 		if expr != "" {
 			y.EmitOutput(expr)
 		}
+		return expr
 	}
+	return ""
 }
 
 func (y *JSPVisitor) VisitScriptletContent(raw jspparser.IScriptletContentContext) string {

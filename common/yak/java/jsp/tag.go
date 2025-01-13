@@ -3,6 +3,7 @@ package jsp
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"regexp"
 	"strings"
 )
 
@@ -30,6 +31,53 @@ const (
 	JSP_TAG_CORE_URL
 	JSP_TAG_CORE_PARAM
 )
+
+type TagInfo struct {
+	typ   TagType
+	attrs map[string]string
+	funcs []func()
+}
+
+func newTagInfo(tag TagType) *TagInfo {
+	return &TagInfo{
+		typ:   tag,
+		attrs: map[string]string{},
+	}
+}
+
+func (y *JSPVisitor) PushTagInfo(tag TagType) {
+	y.tagStack.Push(newTagInfo(tag))
+}
+
+func (y *JSPVisitor) PopTagInfo() {
+	y.tagStack.Pop()
+}
+
+func (y *JSPVisitor) AddTagAttr(key, value string) {
+	tagInfo := y.PeekTagInfo()
+	if tagInfo == nil {
+		return
+	}
+	tagInfo.attrs[key] = value
+}
+
+func (y *JSPVisitor) AddAttrFunc(f func()) {
+	tagInfo := y.PeekTagInfo()
+	if tagInfo == nil {
+		return
+	}
+	tagInfo.funcs = append(tagInfo.funcs, f)
+}
+
+func (y *JSPVisitor) EmitAttrFunc() {
+	tagInfo := y.PeekTagInfo()
+	if tagInfo == nil {
+		return
+	}
+	for _, f := range tagInfo.funcs {
+		f()
+	}
+}
 
 func (y *JSPVisitor) GetCoreJSTLTag(name string) TagType {
 	switch name {
@@ -68,14 +116,14 @@ func (y *JSPVisitor) GetDirectiveTag(name string) TagType {
 }
 
 // ParseSingleTag parse only open or close tag
-func (y *JSPVisitor) ParseSingleTag(text string) {
+func (y *JSPVisitor) ParseSingleTag() {
 	tagInfo := y.PeekTagInfo()
 	if tagInfo == nil {
 		return
 	}
 	switch tagInfo.typ {
 	case JSP_TAG_PURE_HTML:
-		y.EmitPureText(text)
+		y.EmitAttrFunc()
 	case JSP_DIRECTIVE_PAGE:
 		value, ok := tagInfo.attrs["import"]
 		if ok {
@@ -86,13 +134,11 @@ func (y *JSPVisitor) ParseSingleTag(text string) {
 		}
 		return
 	case JSP_TAG_CORE_OUT:
-		elExpr, ok := tagInfo.attrs["value"]
+		variable, ok := tagInfo.attrs["value"]
 		if !ok {
 			log.Errorf("JSTL out tag must have value attribute")
 			return
 		}
-		variable := y.fixElExpr(elExpr)
-
 		// check escapeXml attribute
 		var noEscape bool
 		if v, ok := tagInfo.attrs["escapeXml"]; ok {
@@ -109,31 +155,30 @@ func (y *JSPVisitor) ParseSingleTag(text string) {
 			log.Errorf("JSTL set tag must have var attribute")
 			return
 		}
-		elExpr, ok := tagInfo.attrs["value"]
-		value := y.fixElExpr(elExpr)
+		value, ok := tagInfo.attrs["value"]
 		y.EmitPureCode("request.setAttribute(\"" + variable + "\", " + value + ");")
 	default:
 		log.Errorf("Unknown JSTL tag type: %v", tagInfo.typ)
+		y.EmitAttrFunc()
 	}
 }
 
-func (y *JSPVisitor) ParseDoubleTag(openTag string, closedTag string, visitContent func()) {
+func (y *JSPVisitor) ParseDoubleTag(endText string, visitContent func()) {
 	tagInfo := y.PeekTagInfo()
 	if tagInfo == nil {
 		return
 	}
 	switch tagInfo.typ {
 	case JSP_TAG_PURE_HTML:
-		y.EmitPureText(openTag)
+		y.EmitAttrFunc()
 		visitContent()
-		y.EmitPureText(closedTag)
+		y.EmitPureText(endText)
 	case JSP_TAG_CORE_IF:
 		condition, ok := tagInfo.attrs["test"]
 		if !ok {
 			log.Errorf("JSTL if tag must have test attribute")
 			return
 		}
-		condition = y.fixElExpr(condition)
 		y.EmitPureCode("if (" + condition + ") {")
 		visitContent()
 		y.EmitPureCode("}")
@@ -147,7 +192,6 @@ func (y *JSPVisitor) ParseDoubleTag(openTag string, closedTag string, visitConte
 			log.Errorf("JSTL when tag must have test attribute")
 			return
 		}
-		condition = y.fixElExpr(condition)
 		y.EmitPureCode("case " + condition + ":")
 		visitContent()
 	case JSP_TAG_CORE_OTHERWISE:
@@ -169,13 +213,17 @@ func (y *JSPVisitor) ParseDoubleTag(openTag string, closedTag string, visitConte
 		y.EmitPureCode("}")
 	default:
 		log.Errorf("Unknown JSTL tag type: %v", tagInfo.typ)
+		y.EmitAttrFunc()
 	}
 }
 
-func (y *JSPVisitor) fixElExpr(expr string) string {
+func (y *JSPVisitor) appendElParseMethod(expr string) string {
 	expr = strings.TrimSpace(expr)
-	if strings.HasPrefix(expr, "${") && strings.HasSuffix(expr, "}") {
-		expr = fmt.Sprintf("%s(\"%s\")", JSP_EL_PARSE_METHOD, expr)
-	}
+	expr = fmt.Sprintf("%s(\"%s\")", JSP_EL_PARSE_METHOD, expr)
 	return expr
+}
+
+func (y *JSPVisitor) replaceElExprInText(text string) string {
+	re := regexp.MustCompile(`\$\{(.+?)\}`)
+	return re.ReplaceAllString(text, fmt.Sprintf("%s(\"$1\")", JSP_EL_PARSE_METHOD))
 }
