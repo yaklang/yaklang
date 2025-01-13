@@ -3,10 +3,11 @@ package ssaapi
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"os"
 	"strconv"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +58,8 @@ dump(c)
 	prog.Show()
 	funcIns := prog.Program.GetFunction(string(ssa.MainFunctionName), "")
 	assert.NotNil(t, funcIns)
-	br := funcIns.Blocks[len(funcIns.Blocks)-1]
+	brId := funcIns.Blocks[len(funcIns.Blocks)-1]
+	br := funcIns.GetBasicBlockByID(brId)
 	block, _ := ssa.ToBasicBlock(br)
 	scope := block.ScopeTable
 	name := scope.GetScopeName()

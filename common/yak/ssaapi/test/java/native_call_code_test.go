@@ -37,15 +37,15 @@ func TestNativeCallOpCode(t *testing.T) {
 			}
 		}
 	}	
-	`	
+	`
 	// 获取a所在函数所有的opcode
-	ssatest.CheckSyntaxFlowContain(t,code,`a<opcodes> as $result;`,map[string][]string{
-		"result": {"Parameter","ParameterMember","Return","Loop","Function","Call","Phi","Undefined","ConstInst","Jump","If","UnOp","Switch","ErrorHandler","Make","BinOp"},
-	},ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckSyntaxFlowContain(t, code, `a<opcodes> as $result;`, map[string][]string{
+		"result": {"Parameter", "ParameterMember", "Return", "Loop", "Function", "Call", "Phi", "Undefined", "ConstInst", "Jump", "If", "UnOp", "Switch", "ErrorHandler", "Make", "BinOp"},
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
 
-func TestGetSourceCode(t *testing.T){
-	code :=  `
+func TestGetSourceCode(t *testing.T) {
+	code := `
 	package com.org.B;
 	class B {
 		public static void main(String[] args) {
@@ -60,15 +60,14 @@ func TestGetSourceCode(t *testing.T){
 		}
 	}
 	`
-	ssatest.CheckSyntaxFlow(t,code,`bb1<sourceCode> as $result;`,
-	map[string][]string{
-		"result": {"\"\\t\\t\\t\\t\\tbb1;\\n\""},
-	},ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckSyntaxFlow(t, code, `bb1<sourceCode> as $result;`,
+		map[string][]string{
+			"result": {"\"\\t\\t\\t\\t\\tbb1;\\n\""},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
 
-	ssatest.CheckSyntaxFlow(t,code,`bb2<sourceCode(context=3)> as $result;`,
-	map[string][]string{
-		"result": {"\"\\t\\t\\t\\tif (c){\\n\\t\\t\\t\\t\\tbb1;\\n\\t\\t\\t\\t}else {\\n\\t\\t\\t\\t\\tbb2;\\n\\t\\t\\t\\t}\\n\\t\\t\\t\\tprinln(a);\\n\\t\\t}\\n\""},
-	},ssaapi.WithLanguage(ssaapi.JAVA))
-	
+	ssatest.CheckSyntaxFlow(t, code, `bb2<sourceCode(context=3)> as $result;`,
+		map[string][]string{
+			"result": {"\"\\t\\t\\t\\tif (c){\\n\\t\\t\\t\\t\\tbb1;\\n\\t\\t\\t\\t}else {\\n\\t\\t\\t\\t\\tbb2;\\n\\t\\t\\t\\t}\\n\\t\\t\\t\\tprinln(a);\\n\\t\\t}\\n\""},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+
 }
-

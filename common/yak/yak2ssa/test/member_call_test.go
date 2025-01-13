@@ -6,6 +6,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -295,6 +296,34 @@ func Test_CallMember_Cfg(t *testing.T) {
 		}, t)
 	})
 
+	t.Run("test loop variable", func(t *testing.T) {
+		code := `
+		a = 0 
+		for i=0; i<10; i++ {
+			a = 1
+		}
+		println(a)
+		`
+		test.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			result, err := prog.SyntaxFlowWithError(
+				`
+				println as $ppp 
+				println(* as $a ) as $call 
+				$a #-> as $p 
+				println(* #-> * as $param)
+				`,
+				ssaapi.QueryWithEnableDebug(),
+			)
+			result.Show(sfvm.WithShowAll(true))
+			require.NoError(t, err)
+			values := result.GetValues("param")
+			fmt.Println(values.String())
+			require.Contains(t, values.String(), "1")
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+
 	t.Run("test loop", func(t *testing.T) {
 		code := `
 		a = {} 
@@ -304,7 +333,11 @@ func Test_CallMember_Cfg(t *testing.T) {
 		println(a.b)
 		`
 		test.Check(t, code, func(prog *ssaapi.Program) error {
-			result, err := prog.SyntaxFlowWithError(`println(* #-> * as $param)`)
+			prog.Show()
+			result, err := prog.SyntaxFlowWithError(
+				`println(* #-> * as $param)`,
+				ssaapi.QueryWithEnableDebug(),
+			)
 			require.NoError(t, err)
 			values := result.GetValues("param")
 			fmt.Println(values.String())
@@ -347,7 +380,13 @@ for(x=1;;){
 	}()
 	println(b)
 }`
-		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"1"}}, ssaapi.WithLanguage(ssaapi.Yak))
+		test.CheckSyntaxFlow(t, code,
+			`println(* #-> * as $param)`,
+			map[string][]string{
+				"param": {"1"},
+			},
+			ssaapi.WithLanguage(ssaapi.Yak),
+		)
 	})
 	t.Run("check free value1", func(t *testing.T) {
 		code := `
