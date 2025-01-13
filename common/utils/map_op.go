@@ -3,11 +3,12 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -366,6 +367,28 @@ func MapGetInt64Or(m map[string]interface{}, key string, value int64) int64 {
 func MapGetInt64(m map[string]interface{}, key string) int64 {
 	return MapGetInt64Or(m, key, 0)
 }
+
+func MapGet[T any](m map[string]any, key string) T {
+	var zero T
+	return MapGetOr[T](m, key, zero)
+}
+
+func MapGetOr[T any](m map[string]any, key string, value T) T {
+	if m == nil {
+		return value
+	}
+
+	r, ok := m[key]
+	if ok {
+		v, typeOk := r.(T)
+		if typeOk {
+			return v
+		}
+	}
+	return value
+}
+
+// func MapGetInt64Slice(m map[string]any, key string, [])
 
 func InterfaceToGeneralMap(params interface{}) (finalResult map[string]interface{}) {
 	defer func() {

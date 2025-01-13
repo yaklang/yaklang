@@ -215,10 +215,11 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 	var handFunc func(*Function)
 	handFunc = func(f *Function) {
 		handler(f)
-		for _, s := range f.ChildFuncs {
-			f, ok := ToFunction(s)
+		for _, id := range f.ChildFuncs {
+			child := f.GetValueById(id)
+			f, ok := ToFunction(child)
 			if !ok {
-				log.Warnf("function %s is not a ssa.Function", s.GetName())
+				log.Warnf("function %s is not a ssa.Function", child.GetName())
 				continue
 			}
 			handFunc(f)

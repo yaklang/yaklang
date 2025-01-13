@@ -2,6 +2,7 @@ package ssa4analyze
 
 import (
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -35,7 +36,7 @@ func (s *BlockCondition) Run(prog *ssa.Program) {
 func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	s.edge = make(Edge)
 	s.Finish = make(map[ssa.Value]struct{})
-	newEdge := func(to, from, condition ssa.Value) {
+	newEdge := func(to, from *ssa.BasicBlock, condition ssa.Value) {
 		fromTable, ok := s.edge[to]
 		if !ok {
 			fromTable = make(map[ssa.Value]ssa.Value)
@@ -45,30 +46,34 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	}
 
 	handleIfEdge := func(i *ssa.If) {
-		from := i.GetBlock()
-		if cond := i.Cond; cond != nil && cond.GetOpcode() == ssa.SSAOpcodeConstInst {
+		cond := i.GetValueById(i.Cond)
+		fromBlock := i.GetBlock()
+		trueBlock := i.GetBasicBlockByID(i.True)
+		falseBlock := i.GetBasicBlockByID(i.False)
+		if utils.IsNil(cond) || cond.GetOpcode() == ssa.SSAOpcodeConstInst {
 			cond.NewError(ssa.Warn, BCTag, ConditionIsConst("if"))
 		}
-		newEdge(i.True, from, i.Cond)
-		newEdge(i.False, from, newUnOp(ssa.OpNot, i.Cond, i.GetBlock()))
+		newEdge(trueBlock, fromBlock, cond)
+		newEdge(falseBlock, fromBlock, newUnOp(ssa.OpNot, cond, i.GetBlock()))
 	}
 	handleLoopEdge := func(l *ssa.Loop) {
+		cond := l.GetValueById(l.Cond)
 		canReach := func() bool {
-			if l.Key == nil || l.Init == nil || l.Cond == nil {
+			if l.Key <= 0 || l.Init <= 0 || l.Cond <= 0 {
 				return true
 			}
-			cond, ok := l.Cond.(*ssa.BinOp)
+			cond, ok := ssa.ToBinOp(cond)
 			if !ok {
 				return true
 			}
 			var x, y ssa.Value
 
 			if l.Key == cond.X {
-				x = l.Init
-				y = cond.Y
+				x = l.GetValueById(l.Init)
+				y = l.GetValueById(cond.Y)
 			} else {
-				x = cond.X
-				y = l.Init
+				x = l.GetValueById(cond.X)
+				y = l.GetValueById(l.Init)
 			}
 			canReach := newBinOp(cond.Op, x, y, cond.GetBlock())
 			can, ok := canReach.(*ssa.ConstInst)
@@ -78,24 +83,28 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 			return true
 		}
 		from := l.GetBlock()
+		bodyBlock := l.GetBasicBlockByID(l.Body)
+		exitBlock := l.GetBasicBlockByID(l.Exit)
 		if !canReach() {
-			newEdge(l.Body, from, ssa.NewConst(false))
-			newEdge(l.Exit, from, ssa.NewConst(true))
+			newEdge(bodyBlock, from, ssa.NewConst(false))
+			newEdge(exitBlock, from, ssa.NewConst(true))
 		} else {
-			newEdge(l.Body, from, l.Cond)
-			newEdge(l.Exit, from, newUnOp(ssa.OpNot, l.Cond, l.GetBlock()))
+			newEdge(bodyBlock, from, cond)
+			newEdge(exitBlock, from, newUnOp(ssa.OpNot, cond, l.GetBlock()))
 		}
 	}
 
 	handleSwitchEdge := func(sw *ssa.Switch) {
-		from := sw.GetBlock()
-		if cond := sw.Cond; cond != nil && cond.GetOpcode() == ssa.SSAOpcodeConstInst {
+		fromBlock := sw.GetBlock()
+		cond := sw.GetValueById(sw.Cond)
+		if utils.IsNil(cond) || cond.GetOpcode() == ssa.SSAOpcodeConstInst {
 			cond.NewError(ssa.Warn, BCTag, ConditionIsConst("switch"))
 		}
 		var defaultCond ssa.Value
 		for _, lab := range sw.Label {
-			cond := newBinOp(ssa.OpEq, sw.Cond, lab.Value, lab.Dest)
-			newEdge(lab.Dest, from, cond)
+			value := sw.GetValueById(lab.Value)
+			cond := newBinOp(ssa.OpEq, cond, value, lab.Dest)
+			newEdge(lab.Dest, fromBlock, cond)
 			// lab.Dest.Condition = cond
 			if defaultCond == nil {
 				defaultCond = newUnOp(ssa.OpNot, cond, sw.DefaultBlock)
@@ -103,13 +112,14 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 				defaultCond = newBinOp(ssa.OpLogicOr, defaultCond, newUnOp(ssa.OpNot, cond, sw.DefaultBlock), sw.DefaultBlock)
 			}
 		}
-		newEdge(sw.DefaultBlock, from, defaultCond)
+		newEdge(sw.DefaultBlock, fromBlock, defaultCond)
 	}
 
 	fixupBlockPos := func(b *ssa.BasicBlock) memedit.RangeIf {
 		var start memedit.PositionIf
 		var end memedit.PositionIf
-		for _, inst := range b.Insts {
+		for _, instId := range b.Insts {
+			inst := b.GetInstructionById(instId)
 			// inst.GetPosition == nil, this inst is edge
 			if ssa.IsControlInstruction(inst) && inst.GetRange() != nil {
 				continue
@@ -125,7 +135,8 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		}
 
 		for i := len(b.Insts) - 1; i >= 0; i-- {
-			inst := b.Insts[i]
+			instId := b.Insts[i]
+			inst := b.GetInstructionById(instId)
 			if ssa.IsControlInstruction(inst) && inst.GetRange() != nil {
 				continue
 			}
@@ -139,7 +150,8 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		}
 
 		var editor *memedit.MemEditor
-		for _, inst := range b.Insts {
+		for _, instId := range b.Insts {
+			inst := b.GetInstructionById(instId)
 			if pos := inst.GetRange(); pos != nil {
 				editor = pos.GetEditor()
 				break
@@ -164,7 +176,8 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 			continue
 		}
 
-		for _, inst := range b.Insts {
+		for _, instId := range b.Insts {
+			inst := b.GetInstructionById(instId)
 			switch inst := inst.(type) {
 			// call function
 			case *ssa.Call:
@@ -198,6 +211,9 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	// deep first search
 	var handlerBlock func(*ssa.BasicBlock)
 	handlerBlock = func(bb *ssa.BasicBlock) {
+		if bb == nil {
+			return
+		}
 		// skip finish block
 		if _, ok := s.Finish[bb]; ok {
 			return
@@ -210,20 +226,16 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 		// set finish
 		s.Finish[bb] = struct{}{}
-		bb.Condition = cond
+		bb.Condition = cond.GetId()
 
 		if bb.Reachable() == ssa.BasicBlockUnReachable {
 			bb.NewError(ssa.Warn, BCTag, BlockUnreachable())
 		}
 
 		// dfs
-		for _, succRaw := range bb.Succs {
-			succ, ok := succRaw.(*ssa.BasicBlock)
-			if !ok {
-				log.Warn("BUG: succ is not *ssa.BasicBlock")
-				continue
-			}
-			handlerBlock(succ)
+		for _, succId := range bb.Succs {
+			succBlock := bb.GetBasicBlockByID(succId)
+			handlerBlock(succBlock)
 		}
 	}
 
@@ -245,10 +257,11 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 				edgeCond = value
 			}
 		}
+		cond := block.GetValueById(from.Condition)
 		if edgeCond == nil {
-			return from.Condition
+			return cond
 		} else {
-			return newBinOp(ssa.OpLogicAnd, from.Condition, edgeCond, from)
+			return newBinOp(ssa.OpLogicAnd, cond, edgeCond, from)
 		}
 	}
 
@@ -262,7 +275,8 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 
 	// handler normal
 	var cond ssa.Value
-	for _, preRaw := range block.Preds {
+	for _, id := range block.Preds {
+		preRaw := block.GetValueById(id)
 		pre, ok := preRaw.(*ssa.BasicBlock)
 		if !ok {
 			log.Warn("BUG: pre is not *ssa.BasicBlock")
@@ -274,7 +288,7 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 			continue
 		}
 		// check
-		if pre.Condition == nil {
+		if pre.Condition <= 0 {
 			// panic(fmt.Sprintf("this cond is null: %s", pre.Name))
 			return nil
 		}

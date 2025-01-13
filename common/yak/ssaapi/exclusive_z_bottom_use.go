@@ -95,12 +95,13 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	case *ssa.Phi:
 		return v.visitUserFallback(actx, opt...)
 	case *ssa.Call:
-		if ins.Method == nil {
+		if ins.Method <= 0 {
 			// log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
 			return v.visitUserFallback(actx, opt...)
 		}
+		method := ins.GetValueById(ins.Method)
 		// enter function via call
-		f, ok := ssa.ToFunction(ins.Method)
+		f, ok := ssa.ToFunction(method)
 		if !ok {
 			//log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
 			return v.visitUserFallback(actx, opt...)
@@ -125,21 +126,23 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 
 			var formalParamsIndex = make([]int, 0, len(ins.Args))
 			for argIndex, targetIndex := range ins.Args {
-				if _, ok := existed[targetIndex.GetId()]; ok {
+				if _, ok := existed[targetIndex]; ok {
 					formalParamsIndex = append(formalParamsIndex, argIndex)
 				}
 			}
 			var params = omap.NewOrderedMap(map[int64]ssa.Value{})
-			lo.ForEach(f.Params, func(param ssa.Value, index int) {
+			lo.ForEach(f.Params, func(param int64, index int) {
 				for _, i := range formalParamsIndex {
 					if index == i {
+						param := f.GetValueById(param)
 						params.Set(param.GetId(), param)
 					}
 				}
 			})
 			if lo.Max(formalParamsIndex) >= len(f.Params) && len(f.Params) > 0 {
 				last, _ := lo.Last(f.Params)
-				if last != nil {
+				if last >= 0 {
+					last := f.GetValueById(last)
 					params.Set(last.GetId(), last)
 				}
 			}
@@ -168,8 +171,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		// no formal parameters found!
 		// enter return
 		var vals Values
-		for _, retStmt := range f.Return {
-			retVals := funcValue.NewBottomUseValue(retStmt).getBottomUses(actx, opt...)
+		for _, retId := range f.Return {
+			retValue := f.GetValueById(retId)
+			retVals := funcValue.NewBottomUseValue(retValue).getBottomUses(actx, opt...)
 			vals = append(vals, retVals...)
 		}
 		return vals
@@ -190,7 +194,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if len(results) > 0 {
 				return results
 			}
-			for _, result := range ins.Results {
+			for _, resultId := range ins.Results {
+				result := ins.GetValueById(resultId)
 				results = append(results, v.NewBottomUseValue(result))
 			}
 			return results
@@ -203,7 +208,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		})
 		var indexes = make(map[int]struct{})
 		for idx, ret := range ins.Results {
-			if _, ok := existed[ret.GetId()]; ok {
+			if _, ok := existed[ret]; ok {
 				indexes[idx] = struct{}{}
 			}
 		}
@@ -217,7 +222,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			log.Warnf("BUG: (call's fun is not clean!) call stack's value is not call: %v", currentCallValue.String())
 			return fallback()
 		}
-		fun, ok := ssa.ToFunction(call.Method)
+		fun, ok := ssa.ToFunction(call.GetValueById(call.Method))
 		if !ok {
 			log.Warnf("BUG: (call's fun is not clean!) unknown function: %v", v.String())
 			return fallback()

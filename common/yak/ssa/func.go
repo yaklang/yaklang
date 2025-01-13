@@ -24,14 +24,13 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	f := &Function{
 		anValue:     NewValue(),
-		Params:      make([]Value, 0),
+		Params:      make([]int64, 0),
 		hasEllipsis: false,
 		Blocks:      make([]Instruction, 0),
 		EnterBlock:  nil,
 		ExitBlock:   nil,
-		ChildFuncs:  make([]Value, 0),
-		parent:      nil,
-		FreeValues:  make(map[*Variable]Value),
+		ChildFuncs:  make([]int64, 0),
+		FreeValues:  make(map[*Variable]int64),
 		SideEffects: make([]*FunctionSideEffect, 0),
 		builder:     nil,
 	}
@@ -99,8 +98,8 @@ func (f *Function) GetFunc() *Function {
 }
 
 func (f *Function) addAnonymous(anon *Function) {
-	f.ChildFuncs = append(f.ChildFuncs, anon)
-	anon.parent = f
+	f.ChildFuncs = append(f.ChildFuncs, anon.GetId())
+	anon.parent = f.GetId()
 }
 
 func (f *FunctionBuilder) NewParam(name string, pos ...CanStartStopToken) *Parameter {
@@ -111,7 +110,7 @@ func (f *FunctionBuilder) NewParam(name string, pos ...CanStartStopToken) *Param
 
 func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Value) *ParameterMember {
 	paraMember := NewParamMember(name, f, obj, key)
-	f.ParameterMembers = append(f.ParameterMembers, paraMember)
+	f.ParameterMembers = append(f.ParameterMembers, paraMember.GetId())
 	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
 	if f.MarkedThisObject != nil &&
 		obj.GetDefault() != nil &&
@@ -124,7 +123,7 @@ func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Va
 }
 
 func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) {
-	f.Params = append(f.Params, p)
+	f.Params = append(f.Params, p.GetId())
 	p.FormalParameterIndex = len(f.Params) - 1
 	p.IsFreeValue = false
 	variable := f.CreateVariableForce(p.GetName(), token...)
@@ -139,7 +138,7 @@ func (f *Function) ReturnValue() []Value {
 		return nil
 	}
 	ret := exitBlock.LastInst().(*Return)
-	return ret.Results
+	return f.GetValuesByIDs(ret.Results)
 }
 
 func (f *Function) IsMain() bool {
@@ -147,15 +146,16 @@ func (f *Function) IsMain() bool {
 }
 
 func (f *Function) GetParent() *Function {
-	if f.parent == nil {
+	if f.parent > 0 {
 		return nil
 	}
 
-	fu, ok := ToFunction(f.parent)
+	parent := f.GetValueById(f.parent)
+	fu, ok := ToFunction(parent)
 	if ok {
 		return fu
 	}
-	log.Warnf("function parent cannot convert to Function: %v", f.parent)
+	log.Warnf("function parent cannot convert to Function: %v", parent)
 	return nil
 }
 

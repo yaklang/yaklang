@@ -66,19 +66,22 @@ func (f *Function) String() string {
 func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	ret := f.GetName() + " "
 	ret += strings.Join(
-		lo.Map(f.Params, func(item Value, _ int) string {
+		lo.Map(f.Params, func(id int64, _ int) string {
+			item := f.GetValueById(id)
 			return fmt.Sprintf("%s(%d) %s", GetTypeStr(item), item.GetId(), item.GetName())
 		}),
 		", ")
 	ret += "\n"
 
-	if parent := f.parent; parent != nil {
+	if id := f.parent; id > 0 {
+		parent := f.GetValueById(id)
 		ret += fmt.Sprintf("parent: %s\n", parent.GetName())
 	}
 
 	if len(f.FreeValues) > 0 {
 		ret += "freeValue: " + strings.Join(
-			lo.MapToSlice(f.FreeValues, func(name *Variable, item Value) string {
+			lo.MapToSlice(f.FreeValues, func(name *Variable, id int64) string {
+				item := f.GetValueById(id)
 				return fmt.Sprintf("%s:(%d)%s", name.GetName(), item.GetId(), item.GetName())
 			}),
 			// f.FreeValue,
@@ -86,7 +89,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	}
 	if len(f.ParameterMembers) > 0 {
 		ret += "parameterMember: " + strings.Join(
-			lo.Map(f.ParameterMembers, func(item Value, _ int) string {
+			lo.Map(f.ParameterMembers, func(id int64, _ int) string {
+				item := f.GetValueById(id)
 				return fmt.Sprintf("%s(%d) %s", GetTypeStr(item), item.GetId(), item.GetName())
 			}),
 			", ") + "\n"
@@ -96,9 +100,9 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			lo.Map(f.SideEffects, func(se *FunctionSideEffect, _ int) string {
 				switch se.MemberCallKind {
 				case ParameterMemberCall:
-					return fmt.Sprintf("parameter[%d].%s", se.MemberCallObjectIndex, se.MemberCallKey)
+					return fmt.Sprintf("parameter[%d].%s", se.MemberCallObjectIndex, f.GetValueById(se.MemberCallKey))
 				case FreeValueMemberCall:
-					return fmt.Sprintf("freeValue[%s].%s", se.MemberCallObjectName, se.MemberCallKey)
+					return fmt.Sprintf("freeValue[%s].%s", se.MemberCallObjectName, f.GetValueById(se.MemberCallKey))
 				}
 				return se.Name
 			}),
@@ -123,8 +127,10 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		if flag&DisAsmWithSource == 0 {
 			ret += b.String() + "\n"
 			for _, p := range b.Phis {
-				ret += fmt.Sprintf("\t%s\n", p)
+				ret += fmt.Sprintf("\t%s\n", f.GetValueById(p))
 			}
+			for _, id := range b.Insts {
+				i := b.GetValueById(id)
 				if _, ok := ToConstInst(i); ok {
 					continue
 				}
@@ -138,7 +144,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			ret += "\n"
 			insts := make([]string, 0, len(b.Insts)+len(b.Phis))
 			pos := make([]string, 0, len(b.Insts)+len(b.Phis))
-			for _, p := range b.Phis {
+			for _, id := range b.Phis {
+				p := b.GetValueById(id)
 				insts = append(insts, fmt.Sprintf("\t%s", p))
 				r := p.GetRange()
 				if r == nil {
@@ -147,7 +154,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 					pos = append(pos, r.String())
 				}
 			}
-			for _, i := range b.Insts {
+			for _, id := range b.Insts {
+				i := b.GetValueById(id)
 				insts = append(insts, fmt.Sprintf("\t%s", i))
 				if p := i.GetRange(); p != nil {
 					pos = append(pos, i.GetRange().String())
@@ -181,12 +189,13 @@ func (b *BasicBlock) String() string {
 	ret := b.GetName() + ":"
 	if len(b.Preds) != 0 {
 		ret += " <- "
-		for _, pred := range b.Preds {
+		for _, id := range b.Preds {
+			pred := b.GetBasicBlockByID(id)
 			ret += pred.GetName() + " "
 		}
 	}
 	if !utils.IsNil(b.Condition) {
-		ret += " (" + getStrFlag(b.Condition, false) + ")"
+		ret += " (" + getStrFlag(b.GetValueById(b.Condition), false) + ")"
 	}
 	return ret
 }
@@ -222,8 +231,7 @@ func (u *Undefined) String() string {
 // ----------- Phi
 func (p *Phi) String() string {
 	ret := fmt.Sprintf("%s = phi ", getStr(p))
-	for i := range p.Edge {
-		v := p.Edge[i]
+	for _, v := range p.GetValues() {
 		if utils.IsNil(v) {
 			continue
 		}
@@ -239,9 +247,9 @@ func (p *ParameterMember) String() string {
 	case NoMemberCall:
 		return "normal-member-call"
 	case ParameterMemberCall:
-		return fmt.Sprintf("parameter[%d].%s", p.MemberCallObjectIndex, p.MemberCallKey)
+		return fmt.Sprintf("parameter[%d].%s", p.MemberCallObjectIndex, p.GetValueById(p.MemberCallKey))
 	case FreeValueMemberCall:
-		return fmt.Sprintf("freeValue-%s.%s", p.MemberCallObjectName, p.MemberCallKey)
+		return fmt.Sprintf("freeValue-%s.%s", p.MemberCallObjectName, p.GetValueById(p.MemberCallKey))
 	}
 	return ""
 }
@@ -255,18 +263,18 @@ func (e *ExternLib) String() string {
 
 // ----------- Jump
 func (j *Jump) String() string {
-	return fmt.Sprintf("jump -> %s", j.To.GetName())
+	return fmt.Sprintf("jump -> %s", j.GetValueById(j.To).GetName())
 }
 
 // ----------- IF
 func (i *If) String() string {
 	// return i.StringByFunc(DefaultValueString)
-	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.GetName(), i.False.GetName())
+	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.GetValueById(i.Cond)), i.GetValueById(i.True).GetName(), i.GetValueById(i.False).GetName())
 }
 
 // ----------- Loop
 func (l *Loop) String() string {
-	return fmt.Sprintf("Loop [%s; %s; %s] body -> %s, exit -> %s", getStr(l.Init), getStr(l.Cond), getStr(l.Step), l.Body.GetName(), l.Exit.GetName())
+	return fmt.Sprintf("Loop [%s; %s; %s] body -> %s, exit -> %s", getStr(l.GetValueById(l.Init)), getStr(l.GetValueById(l.Cond)), getStr(l.GetValueById(l.Step)), l.GetValueById(l.Body).GetName(), l.GetValueById(l.Exit).GetName())
 }
 
 // ----------- Return
@@ -274,7 +282,7 @@ func (r *Return) String() string {
 	return fmt.Sprintf(
 		"ret %s",
 		strings.Join(
-			lo.Map(r.Results, func(v Value, _ int) string { return getStr(v) }),
+			lo.Map(r.Results, func(v int64, _ int) string { return getStr(r.GetValueById(v)) }),
 			", ",
 		),
 	)
@@ -282,24 +290,24 @@ func (r *Return) String() string {
 
 // ----------- Call
 func (c *Call) String() string {
-	methodStr := getStr(c.Method)
+	methodStr := getStr(c.GetValueById(c.Method))
 	argStr := strings.Join(
-		lo.Map(c.Args, func(v Value, index int) string {
+		lo.Map(c.Args, func(id int64, index int) string {
 			// return fmt.Sprintf("%d: %s", index, getStr(v))
-			return getStr(v)
+			return getStr(c.GetValueById(id))
 		}),
 		", ",
 	)
 	binding := "binding[" + strings.Join(
-		lo.MapToSlice(c.Binding, func(name string, v Value) string {
+		lo.MapToSlice(c.Binding, func(name string, v int64) string {
 			// return fmt.Sprintf("%s: %s", name, getStr(v))
-			return getStr(v)
+			return getStr(c.GetValueById(v))
 		}),
 		", ",
 	) + "]"
 	member := "member[" + strings.Join(
-		lo.Map(c.ArgMember, func(v Value, _ int) string {
-			return getStr(v)
+		lo.Map(c.ArgMember, func(v int64, _ int) string {
+			return getStr(c.GetValueById(v))
 		}),
 		", ") + "]"
 	drop := ""
@@ -320,20 +328,19 @@ func (c *Call) String() string {
 		)
 	}
 }
-
 func (s *SideEffect) String() string {
-	return fmt.Sprintf("%s = side-effect %s [%s] by %s", getStr(s), getStr(s.Value), s.GetVerboseName(), getStr(s.CallSite))
+	return fmt.Sprintf("%s = side-effect %s [%s] by %s", getStr(s), getStr(s.GetValueById(s.Value)), s.GetVerboseName(), getStr(s.GetValueById(s.CallSite)))
 }
 
 // ----------- Switch
 func (sw *Switch) String() string {
 	return fmt.Sprintf(
 		"switch %s default:[%s] {%s}",
-		getStr(sw.Cond),
+		getStr(sw.GetValueById(sw.Cond)),
 		sw.DefaultBlock.GetName(),
 		strings.Join(
 			lo.Map(sw.Label, func(label SwitchLabel, _ int) string {
-				return fmt.Sprintf("%s:%s", getStr(label.Value), label.Dest.GetName())
+				return fmt.Sprintf("%s:%s", getStr(sw.GetValueById(label.Value)), label.Dest.GetName())
 			}),
 			", ",
 		),
@@ -342,25 +349,25 @@ func (sw *Switch) String() string {
 
 // ----------- BinOp
 func (b *BinOp) String() string {
-	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.X), b.Op, getStr(b.Y))
+	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.GetValueById(b.X)), b.Op, getStr(b.GetValueById(b.Y)))
 }
 
 // ----------- UnOp
 func (u *UnOp) String() string {
-	return fmt.Sprintf("%s = %s %s", getStr(u), u.Op, getStr(u.X))
+	return fmt.Sprintf("%s = %s %s", getStr(u), u.Op, getStr(u.GetValueById(u.X)))
 }
 
 // ----------- Interface
 func (i *Make) String() string {
-	if i.parentI != nil {
+	if i.parentI > 0 {
 		return fmt.Sprintf(
 			"%s = %s [%s:%s:%s]",
-			getStr(i), getStr(i.parentI), getStr(i.low), getStr(i.high), getStr(i.step),
+			getStr(i), getStr(i.GetValueById(i.parentI)), getStr(i.GetValueById(i.low)), getStr(i.GetValueById(i.high)), getStr(i.GetValueById(i.step)),
 		)
 	} else {
 		str := fmt.Sprintf(
 			"%s = make %s [%s, %s]",
-			getStr(i), i.GetType(), getStr(i.Len), getStr(i.Cap),
+			getStr(i), i.GetType(), getStr(i.GetValueById(i.Len)), getStr(i.GetValueById(i.Cap)),
 		)
 		if i.name != "" {
 			str += "// " + i.name
@@ -372,7 +379,7 @@ func (i *Make) String() string {
 func (t *TypeCast) String() string {
 	return fmt.Sprintf(
 		"%s = type-case[%s] %s",
-		getStr(t), t.GetType(), getStr(t.Value),
+		getStr(t), t.GetType(), getStr(t.GetValueById(t.Value)),
 	)
 }
 
@@ -385,39 +392,37 @@ func (t *TypeValue) String() string {
 
 func (a *Assert) String() string {
 	msg := a.Msg
-	if a.MsgValue != nil {
-		msg = getStr(a.MsgValue)
+	if a.MsgValue > 0 {
+		msg = getStr(a.GetValueById(a.MsgValue))
 	}
 
 	return fmt.Sprintf(
 		"assert[%s] %s",
-		getStr(a.Cond), msg,
+		getStr(a.GetValueById(a.Cond)), msg,
 	)
 }
 
 func (n *Next) String() string {
 	return fmt.Sprintf(
 		"%s = next[%s]",
-		getStr(n), getStr(n.Iter),
+		getStr(n), getStr(n.GetValueById(n.Iter)),
 	)
 }
 
 func (e *ErrorHandler) String() string {
 	finalName := "nil"
-	if e.final != nil {
-		finalName = e.final.GetName()
+	if e.final > 0 {
+		finalName = e.GetValueById(e.final).GetName()
 	}
 	return fmt.Sprintf(
 		"try %s; catch %s; final %s; rest %s",
-		// e.try.GetName(), e.catchs.GetName(), finalName, e.done.GetName(),
-		e.try.GetName(), "", finalName, e.done.GetName(),
+		e.GetValueById(e.try).GetName(), "", finalName, e.GetValueById(e.done).GetName(),
 	)
 }
-
 func (p *Panic) String() string {
 	return fmt.Sprintf(
 		"panic %s",
-		getStr(p.Info),
+		getStr(p.GetValueById(p.Info)),
 	)
 }
 

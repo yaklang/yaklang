@@ -56,6 +56,7 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 		}
 
 		for i, p := range fun.Params {
+			p := fun.GetValueById(p)
 			p.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true

@@ -80,7 +80,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		switch ret := inst.(type) {
 		case *BasicBlock:
 			if len(ret.Insts) > 0 {
-				codeRange = ret.Insts[0].GetRange()
+				codeRange = ret.GetInstructionById(ret.Insts[0]).GetRange()
 			}
 		case *Function:
 			if len(ret.Blocks) > 0 {
@@ -156,7 +156,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		ir.Users = append(ir.Users, user.GetId())
 
 		if call, ok := ToCall(user); ok {
-			if call.Method.GetId() == value.GetId() {
+			if call.Method == value.GetId() {
 				// ir.IsCalled
 				ir.CalledBy = append(ir.CalledBy, call.GetId())
 			}
@@ -282,24 +282,24 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.IsVariadic = f.hasEllipsis
 
 	for _, formArg := range f.Params {
-		if formArg == nil {
+		if formArg <= 0 {
 			continue
 		}
-		ir.FormalArgs = append(ir.FormalArgs, int64(formArg.GetId()))
+		ir.FormalArgs = append(ir.FormalArgs, formArg)
 	}
 
 	for _, fv := range f.FreeValues {
-		if fv == nil {
+		if fv <= 0 {
 			continue
 		}
-		ir.FreeValues = append(ir.FreeValues, int64(fv.GetId()))
+		ir.FreeValues = append(ir.FreeValues, fv)
 	}
 
 	for _, returnIns := range f.Return {
-		if returnIns == nil {
+		if returnIns <= 0 {
 			continue
 		}
-		ir.ReturnCodes = append(ir.ReturnCodes, int64(returnIns.GetId()))
+		ir.ReturnCodes = append(ir.ReturnCodes, returnIns)
 	}
 	for _, sideEffect := range f.SideEffects {
 		if sideEffect == nil {
@@ -325,7 +325,7 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	for _, subFunc := range f.ChildFuncs {
-		ir.ChildrenFunction = append(ir.ChildrenFunction, int64(subFunc.GetId()))
+		ir.ChildrenFunction = append(ir.ChildrenFunction, subFunc)
 	}
 }
 
@@ -338,17 +338,17 @@ func basicBlock2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.IsBlock = true
 	ir.PredBlock = make([]int64, 0, len(block.Preds))
 	for _, pred := range block.Preds {
-		ir.PredBlock = append(ir.PredBlock, int64(pred.GetId()))
+		ir.PredBlock = append(ir.PredBlock, pred)
 	}
 
 	ir.SuccBlock = make([]int64, 0, len(block.Succs))
 	for _, succ := range block.Succs {
-		ir.SuccBlock = append(ir.SuccBlock, int64(succ.GetId()))
+		ir.SuccBlock = append(ir.SuccBlock, succ)
 	}
 
 	ir.Phis = make([]int64, 0, len(block.Phis))
 	for _, phi := range block.Phis {
-		ir.Phis = append(ir.Phis, int64(phi.GetId()))
+		ir.Phis = append(ir.Phis, phi)
 	}
 }
 

@@ -33,8 +33,9 @@ var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 			names = append(names, udef.GetShortVerboseName())
 			names = append(names, udef.GetMethodName())
 		}
-		if call, b := ssa.ToCall(val.GetSSAValue()); b {
-			names = append(names, call.Method.GetName())
+		if call, ok := ssa.ToCall(val.GetSSAValue()); ok {
+			method := call.GetValueById(call.Method)
+			names = append(names, method.GetName())
 			//todo: args?
 		}
 

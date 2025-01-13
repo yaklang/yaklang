@@ -130,7 +130,7 @@ func ToMake(v Instruction) (*Make, bool) {
 
 // type cover
 
-func ToObjectType(t Type) (*ObjectType, bool)             { o, ok := t.(*ObjectType); return o, ok }
-func ToFunctionType(t Type) (*FunctionType, bool)         { f, ok := t.(*FunctionType); return f, ok }
-func ToBasicType(t Type) (*BasicType, bool)               { b, ok := t.(*BasicType); return b, ok }
+func ToObjectType(t Type) (*ObjectType, bool)        { o, ok := t.(*ObjectType); return o, ok }
+func ToFunctionType(t Type) (*FunctionType, bool)    { f, ok := t.(*FunctionType); return f, ok }
+func ToBasicType(t Type) (*BasicType, bool)          { b, ok := t.(*BasicType); return b, ok }
 func ToClassBluePrintType(t Type) (*Blueprint, bool) { c, ok := t.(*Blueprint); return c, ok }

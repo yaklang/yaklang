@@ -53,14 +53,14 @@ func TryGetSimilarityKey(table []string, name string) string {
 }
 
 func (ex *ExternLib) BuildField(key string) Value {
-	if ret, ok := ex.MemberMap[key]; ok {
-		return ret
+	if id, ok := ex.MemberMap[key]; ok {
+		return ex.GetValueById(id)
 	}
 	b := ex.builder
 	if v, ok := ex.table[key]; ok {
 		v := b.BuildValueFromAny(ex.GetName()+"."+key, v)
-		ex.MemberMap[key] = v
-		ex.Member = append(ex.Member, v)
+		ex.MemberMap[key] = v.GetId()
+		ex.Member = append(ex.Member, v.GetId())
 		return v
 	}
 	return nil

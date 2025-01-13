@@ -2,10 +2,11 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/java/template2java"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/java/template2java"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -633,6 +634,7 @@ func init() {
 						return nil
 					}
 					for _, param := range rets.Params {
+						param := rets.GetValueById(param)
 						newVal := val.NewValue(param)
 						newVal.AppendPredecessor(val, frame.WithPredecessorContext("getFormalParams"))
 						vals = append(vals, newVal)
@@ -663,11 +665,13 @@ func init() {
 					return nil
 				}
 				for _, ret := range funcIns.Return {
+					ret := funcIns.GetValueById(ret)
 					retVal, ok := ssa.ToReturn(ret)
 					if !ok {
 						continue
 					}
 					for _, retIns := range retVal.Results {
+						retIns := funcIns.GetValueById(retIns)
 						new := val.NewValue(retIns)
 						new.AppendPredecessor(val, frame.WithPredecessorContext("getReturns"))
 						vals = append(vals, new)

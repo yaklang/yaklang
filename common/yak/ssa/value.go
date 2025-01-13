@@ -295,7 +295,7 @@ func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 			return freeValue
 		} else {
 			freeValue := NewParam(name, true, b)
-			b.FreeValues[variable.(*Variable)] = freeValue
+			b.FreeValues[variable.(*Variable)] = freeValue.GetId()
 			return freeValue
 		}
 	}
@@ -303,7 +303,7 @@ func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 	freeValue := NewParam(name, true, b)
 	v := b.CreateVariableHead(name)
 	headScope.AssignVariable(v, freeValue)
-	b.FreeValues[v] = freeValue
+	b.FreeValues[v] = freeValue.GetId()
 
 	// b.WriteVariable(variable, freeValue)
 	return freeValue

@@ -3,7 +3,6 @@ package ssa
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -40,7 +39,7 @@ func fetchIds(origin any) any {
 		results := make([]map[string]int64, len(ret))
 		for i := 0; i < len(ret); i++ {
 			results[i] = map[string]int64{
-				"value": ret[i].Value.GetId(),
+				"value": ret[i].Value,
 				"dest":  ret[i].Dest.GetId(),
 			}
 		}
@@ -77,18 +76,6 @@ func fetchIds(origin any) any {
 }
 
 func marshalExtraInformation(raw Instruction) map[string]any {
-	marshalValues := func(vs []Value) []int64 {
-		ids := make([]int64, len(vs))
-		for index, v := range vs {
-			if v == nil {
-				log.Errorf("BUG: marshalValues[%s: %s]: nil value in slice", raw, raw.GetRange())
-				continue
-			}
-			ids[index] = v.GetId()
-		}
-		return ids
-	}
-
 	params := make(map[string]any)
 	switch ret := raw.(type) {
 	case *Function:
@@ -96,7 +83,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["param_length"] = ret.ParamLength
 		freeValues := make(map[int64]int64)
 		for k, v := range ret.FreeValues {
-			freeValues[k.GetId()] = v.GetId()
+			freeValues[k.GetId()] = v
 		}
 		params["is_method"] = ret.isMethod
 		params["method_name"] = ret.methodName
@@ -115,8 +102,8 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 				element["member_call_kind"] = se.MemberCallKind
 				element["member_call_object_index"] = se.MemberCallObjectIndex
 				element["member_call_name"] = se.MemberCallObjectName
-				if se.MemberCallKey != nil {
-					element["member_call_key"] = se.MemberCallKey.GetId()
+				if se.MemberCallKey > 0 {
+					element["member_call_key"] = se.MemberCallKey
 				}
 			}
 			sideEffects = append(sideEffects, element)
@@ -141,9 +128,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["reference_files"] = files
 		params["has_ellipsis"] = ret.hasEllipsis
 	case *Assert:
-		params["assert_condition_id"] = ret.Cond.GetId()
-		if ret.MsgValue != nil {
-			params["assert_message_id"] = ret.MsgValue.GetId()
+		params["assert_condition_id"] = ret.Cond
+		if ret.MsgValue > 0 {
+			params["assert_message_id"] = ret.MsgValue
 		}
 		params["assert_message_string"] = ret.Msg
 	case *BasicBlock:
@@ -152,11 +139,11 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["block_preds"] = fetchIds(ret.Preds)
 		params["block_succs"] = fetchIds(ret.Succs)
 		params["block_can_be_reached"] = ret.canBeReached
-		if ret.Condition != nil {
-			if id := ret.Condition.GetId(); id > 0 {
-				params["block_condition"] = id
+		if ret.Condition > 0 {
+			if ret.Condition > 0 {
+				params["block_condition"] = ret.Condition
 			} else {
-				log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: %v) id: %v", ret.Condition, ret.Condition.String(), id)
+				log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: %v) ", ret.Condition, ret.GetValueById(ret.Condition).String())
 			}
 		}
 		params["block_insts"] = fetchIds(ret.Insts)
@@ -167,96 +154,96 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		}
 	case *BinOp:
 		params["binop_op"] = ret.Op
-		if ret.X != nil {
-			params["binop_x"] = ret.X.GetId()
+		if ret.X > 0 {
+			params["binop_x"] = ret.X
 		}
-		if ret.Y != nil {
-			params["binop_y"] = ret.Y.GetId()
+		if ret.Y > 0 {
+			params["binop_y"] = ret.Y
 		}
 	case *Call:
-		params["call_method"] = ret.Method.GetId()
-		params["call_args"] = marshalValues(ret.Args)
-		params["call_binding"] = fetchIds(ret.Binding)
-		params["call_arg_member"] = marshalValues(ret.ArgMember)
+		params["call_method"] = ret.Method
+		params["call_args"] = ret.Args
+		params["call_binding"] = ret.Binding
+		params["call_arg_member"] = ret.ArgMember
 		params["call_async"] = ret.Async
 		params["call_unpack"] = ret.Unpack
 		params["call_drop_error"] = ret.IsDropError
 		params["call_ellipsis"] = ret.IsEllipsis
 	case *ErrorHandler:
 		// try-catch-finally-done
-		if ret.try != nil {
-			params["errorhandler_try"] = ret.try.GetId()
+		if ret.try > 0 {
+			params["errorhandler_try"] = ret.try
 		}
 		if len(ret.catchs) != 0 {
 			params["errorhandler_catch"] = fetchIds(ret.catchs)
 		}
-		if ret.final != nil {
-			params["errorhandler_finally"] = ret.final.GetId()
+		if ret.final > 0 {
+			params["errorhandler_finally"] = ret.final
 		}
-		if ret.done != nil {
-			params["errorhandler_done"] = ret.done.GetId()
+		if ret.done > 0 {
+			params["errorhandler_done"] = ret.done
 		}
 	case *ExternLib:
 		log.Warnf("TBD: marshal ExternLib: %v", ret)
 		// return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
 	case *If:
-		if ret.Cond != nil {
-			params["if_cond"] = ret.Cond.GetId()
+		if ret.Cond > 0 {
+			params["if_cond"] = ret.Cond
 		}
-		if ret.True != nil {
-			params["if_true"] = ret.True.GetId()
+		if ret.True > 0 {
+			params["if_true"] = ret.True
 		}
-		if ret.False != nil {
-			params["if_false"] = ret.False.GetId()
+		if ret.False > 0 {
+			params["if_false"] = ret.False
 		}
 	case *Jump:
-		params["jump_to"] = ret.To.GetId()
+		params["jump_to"] = ret.To
 	case *Loop:
-		params["loop_body"] = ret.Body.GetId()
-		if ret.Exit != nil {
-			params["loop_exit"] = ret.Exit.GetId()
+		params["loop_body"] = ret.Body
+		if ret.Exit > 0 {
+			params["loop_exit"] = ret.Exit
 		}
-		if ret.Init != nil {
-			params["loop_init"] = ret.Init.GetId()
+		if ret.Init > 0 {
+			params["loop_init"] = ret.Init
 		}
-		if ret.Cond != nil {
-			params["loop_cond"] = ret.Cond.GetId()
+		if ret.Cond > 0 {
+			params["loop_cond"] = ret.Cond
 		}
-		if ret.Step != nil {
-			params["loop_step"] = ret.Step.GetId()
+		if ret.Step > 0 {
+			params["loop_step"] = ret.Step
 		}
-		if ret.Key != nil {
-			params["loop_key"] = ret.Key.GetId()
+		if ret.Key > 0 {
+			params["loop_key"] = ret.Key
 		}
 	case *Make:
-		if ret.low != nil {
-			params["make_low"] = ret.low.GetId()
+		if ret.low > 0 {
+			params["make_low"] = ret.low
 		}
-		if ret.high != nil {
-			params["make_high"] = ret.high.GetId()
+		if ret.high > 0 {
+			params["make_high"] = ret.high
 		}
-		if ret.step != nil {
-			params["make_step"] = ret.step.GetId()
+		if ret.step > 0 {
+			params["make_step"] = ret.step
 		}
-		if ret.Len != nil {
-			params["make_len"] = ret.Len.GetId()
+		if ret.Len > 0 {
+			params["make_len"] = ret.Len
 		}
-		if ret.Cap != nil {
-			params["make_cap"] = ret.Cap.GetId()
+		if ret.Cap > 0 {
+			params["make_cap"] = ret.Cap
 		}
 	case *Next:
-		if ret.Iter != nil {
-			params["next_iter"] = ret.Iter.GetId()
+		if ret.Iter > 0 {
+			params["next_iter"] = ret.Iter
 		}
 		params["next_in_next"] = ret.InNext
 	case *Panic:
-		if ret.Info != nil {
-			params["panic_value"] = ret.Info.GetId()
+		if ret.Info > 0 {
+			params["panic_value"] = ret.Info
 		}
 	case *Parameter:
 		params["formalParam_is_freevalue"] = ret.IsFreeValue
-		if ret.defaultValue != nil {
-			params["formalParam_default"] = ret.defaultValue.GetId()
+		if ret.defaultValue > 0 {
+			params["formalParam_default"] = ret.defaultValue
 		}
 		params["formalParam_index"] = ret.FormalParameterIndex
 	case *ParameterMember:
@@ -264,42 +251,42 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["member_call_kind"] = ret.MemberCallKind
 		params["member_call_index"] = ret.MemberCallObjectIndex
 		params["member_call_name"] = ret.MemberCallObjectName
-		if ret.MemberCallKey != nil {
-			params["member_call_key"] = ret.MemberCallKey.GetId()
+		if ret.MemberCallKey > 0 {
+			params["member_call_key"] = ret.MemberCallKey
 		}
-		// params["member_call_obj"] = ret.GetObject().GetId()
+		// params["member_call_obj"] = ret.GetObject()
 	case *Phi:
-		params["phi_edges"] = marshalValues(ret.Edge)
-		if ret.CFGEntryBasicBlock != nil {
-			params["cfg_entry"] = ret.CFGEntryBasicBlock.GetId()
+		params["phi_edges"] = ret.Edge
+		if ret.CFGEntryBasicBlock > 0 {
+			params["cfg_entry"] = ret.CFGEntryBasicBlock
 		}
 	case *Return:
-		params["return_results"] = marshalValues(ret.Results)
+		params["return_results"] = ret.Results
 	case *SideEffect:
-		params["sideEffect_call"] = ret.CallSite.GetId()
-		params["sideEffect_value"] = ret.Value.GetId()
+		params["sideEffect_call"] = ret.CallSite
+		params["sideEffect_value"] = ret.Value
 	case *Switch:
-		if ret.Cond != nil {
-			params["switch_cond"] = ret.Cond.GetId()
+		if ret.Cond > 0 {
+			params["switch_cond"] = ret.Cond
 		}
 		params["switch_label"] = fetchIds(ret.Label)
 	case *TypeCast:
-		if ret.Value != nil {
-			params["typecast_value"] = ret.Value.GetId()
+		if ret.Value > 0 {
+			params["typecast_value"] = ret.Value
 		}
 	case *TypeValue:
 		// nothing to do
 	case *UnOp:
 		params["unop_op"] = ret.Op
-		if ret.X != nil {
-			params["unop_x"] = ret.X.GetId()
+		if ret.X > 0 {
+			params["unop_x"] = ret.X
 		}
 	case *Undefined:
 		params["undefined_kind"] = ret.Kind
 	case *ConstInst:
 		params["const_value"] = ret.Const.GetRawValue()
-		if ret.Origin != nil {
-			params["const_origin"] = ret.Origin.GetId()
+		if ret.Origin > 0 {
+			params["const_origin"] = ret.Origin
 		}
 	default:
 		log.Warnf("marshalExtraInformation: unknown type: %v", reflect.TypeOf(raw).String())
@@ -308,7 +295,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 }
 
 func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
-	newLazyInstruction := func(input any) Value {
+	toInt64 := func(input any) int64 {
 		var id int64
 		switch result := input.(type) {
 		case int64:
@@ -318,7 +305,10 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		default:
 			id = codec.Atoi64(fmt.Sprint(input))
 		}
-
+		return id
+	}
+	newLazyInstruction := func(input any) Value {
+		id := toInt64(input)
 		if id <= 0 {
 			log.Infof("unmarshalExtraInformation: invalid id: %v if u want to check why? enable DEBUG=1", id)
 			utils.Debug(func() {
@@ -335,16 +325,6 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		}
 		return lz
 	}
-	unmarshalValues := func(p any) []Value {
-		vs := make([]Value, 0)
-		for _, id := range utils.InterfaceToSliceInterface(p) {
-			lazyIns := newLazyInstruction(id)
-			if lazyIns != nil {
-				vs = append(vs, lazyIns)
-			}
-		}
-		return vs
-	}
 	unmarshalInstructions := func(p any) []Instruction {
 		vs := make([]Instruction, 0)
 		switch ret := p.(type) {
@@ -357,141 +337,77 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		}
 		return vs
 	}
-	unmarshalMapValues := func(p any) map[string]Value {
-		vs := make(map[string]Value)
-		switch ret := p.(type) {
-		case map[string]any:
-			for k, id := range ret {
-				vs[k] = newLazyInstruction(id)
-			}
-		default:
-		}
-		return vs
-	}
 
-	unmarshalMapVariables := func(p any) map[*Variable]Value {
-		vs := make(map[*Variable]Value)
+	unmarshalMapVariables := func(p any) map[*Variable]int64 {
+		vs := make(map[*Variable]int64)
 		switch ret := p.(type) {
 		case map[string]any:
 			for _, id := range ret {
 				value := newLazyInstruction(id)
-				vs[value.GetLastVariable()] = newLazyInstruction(id)
+				vs[value.GetLastVariable()] = toInt64(id)
 			}
 		default:
 		}
 		return vs
 	}
 
-	toInt := func(i any) int {
-		switch ret := i.(type) {
-		case float64:
-			return int(ret)
-		case int64:
-			return int(ret)
-		default:
-			return codec.Atoi(fmt.Sprint(i))
-		}
-	}
-
-	toBool := func(i any) bool {
-		switch ret := i.(type) {
-		case bool:
-			return ret
-		default:
-			res, _ := strconv.ParseBool(fmt.Sprint(i))
-			return res
-		}
-	}
-
-	toString := func(i any) string {
-		return codec.AnyToString(i)
-	}
-
-	//toInt64 := func(i any) int64 {
-	//	switch ret := i.(type) {
-	//	case float64:
-	//		return int64(ret)
-	//	case int64:
-	//		return ret
-	//	default:
-	//		return codec.Atoi64(fmt.Sprint(i))
-	//	}
-	//}
-
 	params := ir.GetExtraInfo()
 	switch ret := inst.(type) {
 	case *Assert:
-		ret.Cond = newLazyInstruction(params["assert_condition_id"])
-		if msg, ok := params["assert_message_id"]; ok {
-			ret.MsgValue = newLazyInstruction(msg)
-		}
-		ret.Msg = params["assert_message_string"].(string)
+		ret.Cond = utils.MapGetInt64(params, "assert_condition_id")
+		ret.MsgValue = utils.MapGetInt64(params, "assert_message_id")
+		ret.Msg = utils.MapGetString(params, "assert_message_string")
 	case *BasicBlock:
-		ret.Preds = unmarshalValues(params["block_preds"])
-		ret.Succs = unmarshalValues(params["block_succs"])
-		if cond, ok := params["block_condition"]; ok {
-			ret.Condition = newLazyInstruction(cond)
-		}
-		ret.canBeReached = BasicBlockReachableKind(codec.Atoi(fmt.Sprint(params["block_can_be_reached"])))
-		ret.Insts = unmarshalInstructions(params["block_insts"])
-		ret.Phis = unmarshalValues(params["block_phis"])
-		ret.finish = toBool(params["block_finish"])
-		// if scopeTable, ok := params["block_scope_table"]; ok {
-		// ret.ScopeTable = GetLazyScopeFromIrScopeId(int64(toInt(scopeTable)))
-		// }
+		ret.Preds = utils.MapGet[[]int64](params, "block_preds")
+		ret.Succs = utils.MapGet[[]int64](params, "block_succs")
+		ret.Condition = utils.MapGetInt64(params, "block_condition")
+		ret.canBeReached = BasicBlockReachableKind(utils.MapGetInt(params, "block_can_be_reached"))
+		ret.Insts = utils.MapGet[[]int64](params, "block_insts")
+		ret.Phis = utils.MapGet[[]int64](params, "block_phis")
+		ret.finish = utils.MapGetBool(params, "block_finish")
 	case *BinOp:
 		ret.Op = BinaryOpcode(params["binop_op"].(string))
-		if x, ok := params["binop_x"]; ok {
-			ret.X = newLazyInstruction(x)
-		}
-		if y, ok := params["binop_y"]; ok {
-			ret.Y = newLazyInstruction(y)
-		}
+		ret.X = utils.MapGetInt64(params, "binop_x")
+		ret.Y = utils.MapGetInt64(params, "binop_y")
 	case *Call:
-		ret.Method = newLazyInstruction(params["call_method"])
-		ret.Args = unmarshalValues(params["call_args"])
-		ret.ArgMember = unmarshalValues(params["call_arg_member"])
-		ret.Binding = unmarshalMapValues(params["call_binding"])
-		ret.Async = toBool(params["call_async"])
-		ret.Unpack = toBool(params["call_unpack"])
-		ret.IsDropError = toBool(params["call_drop_error"])
-		ret.IsEllipsis = toBool(params["call_ellipsis"])
+		ret.Method = utils.MapGetInt64(params, "call_method")
+		ret.Args = utils.MapGet[[]int64](params, "call_args")
+		ret.ArgMember = utils.MapGet[[]int64](params, "call_arg_member")
+		ret.Binding = utils.MapGet[map[string]int64](params, "call_binding")
+		ret.Async = utils.MapGetBool(params, "call_async")
+		ret.Unpack = utils.MapGetBool(params, "call_unpack")
+		ret.IsDropError = utils.MapGetBool(params, "call_drop_error")
+		ret.IsEllipsis = utils.MapGetBool(params, "call_ellipsis")
 	case *Next:
-		ret.InNext = toBool(params["next_in_next"])
-		ret.Iter = newLazyInstruction(params["next_iter"])
+		ret.InNext = utils.MapGetBool(params, "next_item")
+		ret.Iter = utils.MapGetInt64(params, "next_iter")
 	case *Parameter:
-		ret.IsFreeValue = params["formalParam_is_freevalue"].(bool)
-		if defaultValue, ok := params["formalParam_default"]; ok {
-			ret.SetDefault(newLazyInstruction(defaultValue))
-		}
-		ret.FormalParameterIndex = int(params["formalParam_index"].(float64))
+		ret.IsFreeValue = utils.MapGetBool(params, "formalParam_is_freevalue")
+		ret.defaultValue = utils.MapGetInt64(params, "formalParam_default")
+		ret.FormalParameterIndex = utils.MapGetInt(params, "formalParam_index")
 	case *ParameterMember:
-		ret.FormalParameterIndex = int(params["formalParamMember_index"].(float64))
-		ret.MemberCallKind = ParameterMemberCallKind(params["member_call_kind"].(float64))
-		ret.MemberCallObjectIndex = int(params["member_call_index"].(float64))
-		ret.MemberCallObjectName = params["member_call_name"].(string)
-		if key, ok := params["member_call_key"]; ok {
-			ret.MemberCallKey = newLazyInstruction(key)
-		}
+		ret.FormalParameterIndex = utils.MapGetInt(params, "formalParamMember_index")
+		ret.MemberCallKind = ParameterMemberCallKind(utils.MapGetInt(params, "member_call_kind"))
+		ret.MemberCallObjectIndex = utils.MapGetInt(params, "member_call_index")
+		ret.MemberCallObjectName = utils.MapGetString(params, "member_call_name")
+		ret.MemberCallKey = utils.MapGetInt64(params, "member_call_key")
 	case *Phi:
-		ret.Edge = unmarshalValues(params["phi_edges"])
+		ret.Edge = params["phi_edges"].([]int64)
 		if cfgEntry, ok := params["cfg_entry"]; ok {
-			ret.CFGEntryBasicBlock = newLazyInstruction(cfgEntry)
+			ret.CFGEntryBasicBlock = cfgEntry.(int64)
 		}
 	case *Return:
-		ret.Results = unmarshalValues(params["return_results"])
+		ret.Results = utils.MapGet[[]int64](params, "return_results")
 	case *SideEffect:
-		ret.CallSite = newLazyInstruction(params["sideEffect_call"])
-		ret.Value = newLazyInstruction(params["sideEffect_value"])
+		ret.CallSite = utils.MapGetInt64(params, "sideEffect_call")
+		ret.Value = utils.MapGetInt64(params, "sideEffect_value")
 	case *UnOp:
-		ret.Op = UnaryOpcode(params["unop_op"].(string))
-		ret.X = newLazyInstruction(params["unop_x"])
+		ret.Op = UnaryOpcode(utils.MapGetString(params, "unop_op"))
+		ret.X = utils.MapGetInt64(params, "unop_x")
 	case *Undefined:
-		ret.Kind = UndefinedKind(params["undefined_kind"].(float64))
+		ret.Kind = UndefinedKind(utils.MapGetInt(params, "undefined_kind"))
 	case *Jump:
-		if to, ok := params["jump_to"]; ok {
-			ret.To = newLazyInstruction(to)
-		}
+		ret.To = utils.MapGetInt64(params, "jump_to")
 	case *ConstInst:
 		i := params["const_value"]
 		c := newConstByMap(i)
@@ -499,47 +415,25 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			c = newConstCreate(i)
 		}
 		ret.Const = c
-		if origin, ok := params["const_origin"]; ok {
-			id := int64(origin.(float64))
-			if lz, err := NewInstructionFromLazy(id, ToUser); err == nil {
-				ret.Origin = lz
-			} else {
-				log.Errorf("BUG: unmatched instruction create lazyInstruction: %v", err)
-			}
-		}
+		ret.Origin = utils.MapGetInt64(params, "const_origin")
 	case *If:
-		if cond, ok := params["if_cond"]; ok {
-			ret.Cond = newLazyInstruction(cond)
-		}
-		if trueBlock, ok := params["if_true"]; ok {
-			ret.True = newLazyInstruction(trueBlock)
-		}
-		if falseBlock, ok := params["if_false"]; ok {
-			ret.False = newLazyInstruction(falseBlock)
-		}
+		ret.Cond = utils.MapGetInt64(params, "if_cond")
+		ret.True = utils.MapGetInt64(params, "if_true")
+		ret.False = utils.MapGetInt64(params, "if_false")
 	case *Make:
-		if low, ok := params["make_low"]; ok {
-			ret.low = newLazyInstruction(low)
-		}
-		if high, ok := params["make_high"]; ok {
-			ret.high = newLazyInstruction(high)
-		}
-		if step, ok := params["make_step"]; ok {
-			ret.step = newLazyInstruction(step)
-		}
-		if l, ok := params["make_len"]; ok {
-			ret.Len = newLazyInstruction(l)
-		}
-		if c, ok := params["make_cap"]; ok {
-			ret.Cap = newLazyInstruction(c)
-		}
+		ret.low = utils.MapGetInt64(params, "make_low")
+		ret.high = utils.MapGetInt64(params, "make_high")
+		ret.step = utils.MapGetInt64(params, "make_step")
+		ret.Len = utils.MapGetInt64(params, "make_len")
+		ret.Cap = utils.MapGetInt64(params, "make_cap")
 	case *Function:
-		ret.Params = unmarshalValues(params["params"])
-		ret.ParamLength = toInt(params["param_length"])
-		ret.isMethod = toBool(params["is_method"])
-		ret.methodName = toString(params["method_name"])
+		ret.Params = utils.MapGet[[]int64](params, "params")
+		ret.ParamLength = utils.MapGetInt(params, "param_length")
+		ret.isMethod = utils.MapGetBool(params, "is_method")
+		ret.methodName = utils.MapGetString(params, "method_name")
 		ret.FreeValues = unmarshalMapVariables(params["free_values"])
-		ret.ParameterMembers = unmarshalValues(params["parameter_members"])
+		ret.ParameterMembers = utils.MapGet[[]int64](params, "parameter_members")
+
 		if ses := params["side_effect"]; ses != nil && funk.IsIteratee(ses) {
 			var se []*FunctionSideEffect
 			funk.ForEach(params["side_effect"], func(a any) {
@@ -555,17 +449,17 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 				ins.MemberCallObjectIndex = utils.MapGetInt(extra, "member_call_object_index")
 				ins.MemberCallObjectName = utils.MapGetString(extra, "member_call_name")
 				if extra["member_call_key"] != nil {
-					ins.MemberCallKey = newLazyInstruction(extra["member_call_key"])
+					ins.MemberCallKey = utils.MapGetInt64(extra, "member_call_key")
 				}
 				se = append(se, ins)
 			})
 			ret.SideEffects = se
 		}
-		if parent, ok := params["parent"]; ok {
-			ret.parent = newLazyInstruction(parent)
+		if parent, ok := params["parent"].(int64); ok {
+			ret.parent = parent
 		}
-		ret.ChildFuncs = unmarshalValues(params["child_funcs"])
-		ret.Return = unmarshalValues(params["return"])
+		ret.ChildFuncs = params["child_funcs"].([]int64)
+		ret.Return = params["return"].([]int64)
 		ret.Blocks = unmarshalInstructions(params["blocks"])
 		if enter, ok := params["enter_block"]; ok {
 			ret.EnterBlock = newLazyInstruction(enter)

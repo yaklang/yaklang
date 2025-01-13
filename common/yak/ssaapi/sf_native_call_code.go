@@ -20,9 +20,11 @@ func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 			log.Warnf("function %s has a non-block instruction: %T", f, block)
 		}
 		for _, p := range b.Phis {
+			p := b.GetValueById(p)
 			opCodeMap[p.GetOpcode()] = struct{}{}
 		}
 		for _, i := range b.Insts {
+			i := b.GetValueById(i)
 			opCodeMap[i.GetOpcode()] = struct{}{}
 		}
 	}
@@ -40,15 +42,19 @@ func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		opCodeMap[f.GetOpcode()] = struct{}{}
 
 		for _, freeValue := range f.FreeValues {
+			freeValue := f.GetValueById(freeValue)
 			opCodeMap[freeValue.GetOpcode()] = struct{}{}
 		}
 		for _, param := range f.Params {
+			param := f.GetValueById(param)
 			opCodeMap[param.GetOpcode()] = struct{}{}
 		}
 		for _, paramMember := range f.ParameterMembers {
+			paramMember := f.GetValueById(paramMember)
 			opCodeMap[paramMember.GetOpcode()] = struct{}{}
 		}
 		for _, returnIns := range f.Return {
+			returnIns := f.GetValueById(returnIns)
 			opCodeMap[returnIns.GetOpcode()] = struct{}{}
 		}
 

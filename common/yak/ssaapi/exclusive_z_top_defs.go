@@ -135,10 +135,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return result
 	case *ssa.Call:
-		calleeInst := inst.Method
-		if calleeInst == nil {
+		calleeId := inst.Method
+		if calleeId <= 0 {
 			return Values{i} // return self
 		}
+		calleeInst := inst.GetValueById(calleeId)
 
 		fun, isFunc := ssa.ToFunction(calleeInst)
 		if !isFunc && calleeInst.GetReference() != nil {
@@ -161,10 +162,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			callee := i.NewTopDefValue(calleeInst)
 			nodes := Values{callee}
 			for _, val := range inst.Args {
+				val := inst.GetValueById(val)
 				arg := i.NewTopDefValue(val)
 				nodes = append(nodes, arg)
 			}
 			for _, value := range inst.Binding {
+				value := inst.GetValueById(value)
 				arg := i.NewTopDefValue(value)
 				nodes = append(nodes, arg)
 			}
@@ -188,14 +191,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if utils.IsValidInteger(retIndexRawStr) {
 				targetIdx := codec.Atoi(retIndexRawStr)
 				var traceRets Values
-				for _, retInsRaw := range inst.Return {
-					retIns, ok := ssa.ToReturn(retInsRaw)
+				for _, retId := range inst.Return {
+					retInst := inst.GetValueById(retId)
+					retIns, ok := ssa.ToReturn(retInst)
 					if !ok {
-						log.Warnf("BUG: %T is not *Return", retInsRaw)
+						log.Warnf("BUG: %T is not *Return", retInst)
 						continue
 					}
-					for idx, traceVal := range retIns.Results {
+					for idx, traceId := range retIns.Results {
 						if idx == targetIdx {
+							traceVal := inst.GetValueById(traceId)
 							traceRets = append(traceRets, i.NewTopDefValue(traceVal))
 						}
 					}
@@ -206,19 +211,21 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			} else {
 				// string literal member
 				var traceRets Values
-				for _, retInsRaw := range inst.Return {
-					retIns, ok := ssa.ToReturn(retInsRaw)
+				for _, retId := range inst.Return {
+					retInst := inst.GetValueById(retId)
+					retIns, ok := ssa.ToReturn(retInst)
 					if !ok {
-						log.Warnf("BUG: %T is not *Return", retInsRaw)
+						log.Warnf("BUG: %T is not *Return", retInst)
 						continue
 					}
-					for _, traceVal := range retIns.Results {
-						val, ok := traceVal.GetStringMember(retIndexRawStr)
+					for _, traceId := range retIns.Results {
+						traceValue := inst.GetValueById(traceId)
+						val, ok := traceValue.GetStringMember(retIndexRawStr)
 						if ok {
 							traceRets = append(traceRets, i.NewTopDefValue(val))
 							// trace mask ?
 							if len(inst.Blocks) > 0 {
-								name, ok := ssa.CombineMemberCallVariableName(traceVal, ssa.NewConst(retIndexRawStr))
+								name, ok := ssa.CombineMemberCallVariableName(traceValue, ssa.NewConst(retIndexRawStr))
 								if ok {
 									lastBlockRaw, _ := lo.Last(inst.Blocks)
 									lastBlock, ok := ssa.ToBasicBlock(lastBlockRaw)
@@ -242,8 +249,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if !ok {
 				return
 			}
-			for _, r := range fun.Return {
-				for _, subVal := range r.GetValues() {
+			for _, retId := range fun.Return {
+				retInst := fun.GetValueById(retId)
+				for _, subVal := range retInst.GetValues() {
 					if ret := value.NewTopDefValue(subVal).getTopDefs(actx, opt...); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
@@ -289,7 +297,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
 				return getParameter()
 			}
-			actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
+			actualParam = inst.GetValueById(calledInstance.ArgMember[inst.FormalParameterIndex])
 			traced := i.NewTopDefValue(actualParam)
 			if !actx.needCrossProcess(i, traced) {
 				return Values{}
@@ -340,9 +348,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 
 			thisFunc := i.GetFunction()
-			if !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) {
+			method := inst.GetValueById(calledInstance.Method)
+			if !ValueCompare(i.NewValue(method), thisFunc) {
 				log.Errorf("call stack function %s(%d) not same with Parameter function %s(%d)",
-					calledInstance.Method.GetName(), calledInstance.Method.GetId(),
+					method.GetName(), method.GetId(),
 					thisFunc.GetName(), thisFunc.GetId(),
 				)
 				return Values{}
@@ -354,7 +363,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				if tmp := inst.GetDefault(); tmp != nil && !isInner {
 					actualParam = tmp
 				} else if tmp, ok := calledInstance.Binding[inst.GetName()]; ok && isInner {
-					actualParam = tmp
+					actualParam = inst.GetValueById(tmp)
 				} else {
 					log.Errorf("free value: %v is not found in binding", inst.GetName())
 					return getMemberCall(i, i.node, actx)
@@ -365,7 +374,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 					log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
 					return getMemberCall(i, i.node, actx)
 				}
-				actualParam = calledInstance.Args[inst.FormalParameterIndex]
+				actualParam = inst.GetValueById(calledInstance.Args[inst.FormalParameterIndex])
 			}
 			traced := i.NewTopDefValue(actualParam)
 			if !actx.needCrossProcess(i, traced) {
@@ -412,9 +421,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		return vals
 	case *ssa.SideEffect:
 		callIns := inst.CallSite
-		if callIns != nil {
-			call := i.NewTopDefValue(callIns)
-			v := i.NewTopDefValue(inst.Value)
+		if callIns >= 0 {
+			call := i.NewTopDefValue(inst.GetValueById(callIns))
+			v := i.NewTopDefValue(inst.GetValueById(inst.Value))
 			actx.setCauseValue(call)
 			return v.getTopDefs(actx, opt...)
 		} else {

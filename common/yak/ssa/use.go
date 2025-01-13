@@ -3,7 +3,6 @@ package ssa
 import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
 
@@ -44,14 +43,6 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	}
 }
 
-func filterNilValue(v Value, _ int) bool {
-	if utils.IsNil(v) {
-		return false
-	} else {
-		return true
-	}
-}
-
 // ----------- Function
 func (f *Function) HasValues() bool   { return false }
 func (f *Function) GetValues() Values { return nil }
@@ -62,12 +53,12 @@ func (b *BasicBlock) GetValues() Values { return nil }
 
 // ----------- Phi
 func (p *Phi) HasValues() bool   { return true }
-func (p *Phi) GetValues() Values { return lo.Filter(p.Edge, filterNilValue) }
+func (p *Phi) GetValues() Values { return p.GetValuesByIDs(p.Edge) }
 
 func (p *Phi) ReplaceValue(v Value, to Value) {
 	// p.Edge = slices.Replace(p.Edge, 0, len(p.Edge), v, to)
-	if index := slices.Index(p.Edge, v); index != -1 {
-		p.Edge[index] = to
+	if index := slices.Index(p.Edge, v.GetId()); index != -1 {
+		p.Edge[index] = to.GetId()
 	} else {
 		log.Warnf("phi not use this value")
 	}
@@ -77,11 +68,11 @@ func (p *Phi) GetControlFlowConditions() []Value {
 	if p == nil {
 		return nil
 	}
-	if p.CFGEntryBasicBlock == nil {
+	if p.CFGEntryBasicBlock <= 0 {
 		return nil
 	}
 
-	block, ok := ToBasicBlock(p.CFGEntryBasicBlock)
+	block, ok := ToBasicBlock(p.GetInstructionById(p.CFGEntryBasicBlock))
 	if !ok {
 		log.Warnf("phi's cfg block enter is not a valid *BasicBlock")
 		return nil
@@ -93,7 +84,7 @@ func (p *Phi) GetControlFlowConditions() []Value {
 	return lo.FilterMap(relative, func(ins Instruction, i int) (Value, bool) {
 		switch ret := ins.(type) {
 		case *If:
-			return ret.Cond, true
+			return p.GetValueById(ret.Cond), true
 		default:
 			result, ok := ret.(Value)
 			if ok {
@@ -106,11 +97,11 @@ func (p *Phi) GetControlFlowConditions() []Value {
 
 // / ---- extern lib
 func (e *ExternLib) HasValues() bool   { return true }
-func (e *ExternLib) GetValues() Values { return lo.Filter(e.Member, filterNilValue) }
+func (e *ExternLib) GetValues() Values { return e.GetValuesByIDs(e.Member) }
 func (e *ExternLib) ReplaceValue(v Value, to Value) {
-	if index := slices.Index(e.Member, v); index != -1 {
-		e.Member[index] = to
-		e.MemberMap[v.GetName()] = to
+	if index := slices.Index(e.Member, v.GetId()); index != -1 {
+		e.Member[index] = to.GetId()
+		e.MemberMap[v.GetName()] = to.GetId()
 	}
 }
 
@@ -123,20 +114,20 @@ func (p *ParameterMember) GetValues() Values { return nil }
 
 // ----------- ConstInst
 func (c *ConstInst) HasValues() bool {
-	return c.Origin != nil
+	return c.Origin > 0
 }
 
 func (c *ConstInst) GetValues() Values {
-	if c.Origin != nil {
-		return c.Origin.GetValues()
+	if c.Origin > 0 {
+		return c.GetValueById(c.Origin).GetValues()
 	} else {
 		return nil
 	}
 }
 
 func (c *ConstInst) ReplaceValue(v Value, to Value) {
-	if c.Origin != nil {
-		c.Origin.ReplaceValue(v, to)
+	if c.Origin > 0 {
+		c.GetUsersByID(c.Origin).ReplaceValue(v, to)
 	}
 }
 
@@ -146,13 +137,13 @@ func (u *Undefined) GetValues() Values { return nil }
 
 // ----------- BinOp
 func (b *BinOp) HasValues() bool   { return true }
-func (b *BinOp) GetValues() Values { return []Value{b.X, b.Y} }
+func (b *BinOp) GetValues() Values { return b.GetValuesByIDs([]int64{b.X, b.Y}) }
 
 func (b *BinOp) ReplaceValue(v Value, to Value) {
-	if b.X == v {
-		b.X = to
-	} else if b.Y == v {
-		b.Y = to
+	if b.X == v.GetId() {
+		b.X = to.GetId()
+	} else if b.Y == v.GetId() {
+		b.Y = to.GetId()
 	} else {
 		panic("BinOp not use this value")
 	}
@@ -160,11 +151,11 @@ func (b *BinOp) ReplaceValue(v Value, to Value) {
 
 // ----------- UnOp
 func (n *UnOp) HasValues() bool   { return true }
-func (n *UnOp) GetValues() Values { return []Value{n.X} }
+func (n *UnOp) GetValues() Values { return n.GetValuesByIDs([]int64{n.X}) }
 
 func (u *UnOp) ReplaceValue(v Value, to Value) {
-	if u.X == v {
-		u.X = to
+	if u.X == v.GetId() {
+		u.X = to.GetId()
 	} else {
 		panic("UnOp not use this value")
 	}
@@ -174,28 +165,26 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 func (c *Call) HasValues() bool { return true }
 func (c *Call) GetValues() Values {
 	ret := make(Values, 0, len(c.Args)+len(c.Binding)+1)
-	ret = append(ret, c.Method)
-	for _, v := range c.Args {
-		ret = append(ret, v)
-	}
+	ret = append(ret, c.GetValueById(c.Method))
+	ret = append(ret, c.GetValuesByIDs(c.Args)...)
 	for _, v := range c.Binding {
-		ret = append(ret, v)
+		ret = append(ret, c.GetValueById(v))
 	}
-	return lo.Filter(ret, filterNilValue)
+	return ret
 }
 
 func (c *Call) ReplaceValue(v Value, to Value) {
-	if c.Method == v {
-		c.Method = to
+	if c.Method == v.GetId() {
+		c.Method = to.GetId()
 		c.handlerObjectMethod()
 		c.handleCalleeFunction()
 		c.handlerReturnType()
-	} else if index := slices.Index(c.Args, v); index > -1 {
-		c.Args[index] = to
-	} else if binding, ok := c.Binding[v.GetName()]; ok && binding == v {
-		c.Binding[v.GetName()] = to
-	} else if index := slices.Index(c.ArgMember, v); index > -1 {
-		c.ArgMember[index] = to
+	} else if index := slices.Index(c.Args, v.GetId()); index > -1 {
+		c.Args[index] = to.GetId()
+	} else if binding, ok := c.Binding[v.GetName()]; ok && binding == v.GetId() {
+		c.Binding[v.GetName()] = to.GetId()
+	} else if index := slices.Index(c.ArgMember, v.GetId()); index > -1 {
+		c.ArgMember[index] = to.GetId()
 	} else {
 		panic("call not use this value")
 	}
@@ -203,17 +192,12 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 
 // ------------ SideEffect
 func (s *SideEffect) HasValues() bool   { return true }
-func (s *SideEffect) GetValues() Values { return []Value{s.CallSite, s.Value} }
+func (s *SideEffect) GetValues() Values { return s.GetValuesByIDs([]int64{s.CallSite, s.Value}) }
 func (s *SideEffect) ReplaceValue(v Value, to Value) {
-	if s.CallSite == v {
-		c, ok := ToCall(to)
-		if !ok {
-			log.Errorf("SideEffect not use this value")
-			return
-		}
-		s.CallSite = c
-	} else if s.Value == v {
-		s.Value = to
+	if s.CallSite == v.GetId() {
+		s.CallSite = to.GetId()
+	} else if s.Value == v.GetId() {
+		s.Value = to.GetId()
 	} else {
 		panic("SideEffect not use this value")
 	}
@@ -221,38 +205,36 @@ func (s *SideEffect) ReplaceValue(v Value, to Value) {
 
 // ----------- Return
 func (r *Return) HasValues() bool   { return true }
-func (r *Return) GetValues() Values { return r.Results }
+func (r *Return) GetValues() Values { return r.GetValuesByIDs(r.Results) }
 func (r *Return) ReplaceValue(v Value, to Value) {
-	if index := slices.Index(r.Results, v); index > -1 {
-		r.Results[index] = to
+	if index := slices.Index(r.Results, v.GetId()); index > -1 {
+		r.Results[index] = to.GetId()
 	} else {
 		panic("return not use this value")
 	}
 }
-
-// node
 func (r *Return) HasUsers() bool  { return false }
 func (r *Return) GetUsers() Users { return nil }
 
 // // ----------- Make
 func (i *Make) HasValues() bool { return true }
 func (i *Make) GetValues() Values {
-	vs := []Value{i.Cap, i.Len, i.high, i.low, i.step, i.parentI}
-	return lo.Filter(vs, filterNilValue)
+	ids := []int64{i.Cap, i.Len, i.high, i.low, i.step, i.parentI}
+	return i.GetValuesByIDs(ids)
 }
 func (i *Make) ReplaceValue(v, to Value) {
-	if i.Cap == v {
-		i.Cap = to
-	} else if i.Len == v {
-		i.Len = v
-	} else if i.high == v {
-		i.high = v
-	} else if i.low == v {
-		i.low = v
-	} else if i.step == v {
-		i.step = v
-	} else if i.parentI == v {
-		i.parentI = v
+	if i.Cap == v.GetId() {
+		i.Cap = to.GetId()
+	} else if i.Len == v.GetId() {
+		i.Len = to.GetId()
+	} else if i.high == v.GetId() {
+		i.high = to.GetId()
+	} else if i.low == v.GetId() {
+		i.low = to.GetId()
+	} else if i.step == v.GetId() {
+		i.step = to.GetId()
+	} else if i.parentI == v.GetId() {
+		i.parentI = to.GetId()
 	} else {
 		log.Errorf("======================\n"+
 			"BUG or make not use this value: object not use this value: %v"+
@@ -262,10 +244,10 @@ func (i *Make) ReplaceValue(v, to Value) {
 
 // // ----------- Next
 func (n *Next) HasValues() bool   { return true }
-func (n *Next) GetValues() Values { return []Value{n.Iter} }
+func (n *Next) GetValues() Values { return n.GetValuesByIDs([]int64{n.Iter}) }
 func (n *Next) ReplaceValue(v, to Value) {
-	if n.Iter == v {
-		n.Iter = to
+	if n.Iter == v.GetId() {
+		n.Iter = to.GetId()
 	} else {
 		panic("next instruction not use this value")
 	}
@@ -274,15 +256,15 @@ func (n *Next) ReplaceValue(v, to Value) {
 // ----------- Assert
 func (a *Assert) HasValues() bool { return true }
 func (a *Assert) GetValues() Values {
-	ret := []Value{a.Cond, a.MsgValue}
-	return lo.Filter(ret, filterNilValue)
+	ret := a.GetValuesByIDs([]int64{a.Cond, a.MsgValue})
+	return ret
 }
 
 func (a *Assert) ReplaceValue(v, to Value) {
-	if a.Cond == v {
-		a.Cond = to
-	} else if a.MsgValue == v {
-		a.MsgValue = to
+	if a.Cond == v.GetId() {
+		a.Cond = to.GetId()
+	} else if a.MsgValue == v.GetId() {
+		a.MsgValue = to.GetId()
 	} else {
 		panic("assert not use this value")
 	}
@@ -292,10 +274,10 @@ func (r *Assert) GetUsers() Users { return nil }
 
 // // ----------- Typecast
 func (t *TypeCast) HasValues() bool   { return true }
-func (t *TypeCast) GetValues() Values { return []Value{t.Value} }
+func (t *TypeCast) GetValues() Values { return t.GetValuesByIDs([]int64{t.Value}) }
 func (t *TypeCast) ReplaceValue(v, to Value) {
-	if t.Value == v {
-		t.Value = to
+	if t.Value == v.GetId() {
+		t.Value = to.GetId()
 	} else {
 		panic("type cast not use this value")
 	}
@@ -307,10 +289,10 @@ func (t *TypeValue) GetValues() Values { return nil }
 
 // ------------- PANIC
 func (p *Panic) HasValues() bool   { return true }
-func (p *Panic) GetValues() Values { return []Value{p.Info} }
+func (p *Panic) GetValues() Values { return p.GetValuesByIDs([]int64{p.Info}) }
 func (p *Panic) ReplaceValue(v, to Value) {
-	if p.Info == v {
-		p.Info = to
+	if p.Info == v.GetId() {
+		p.Info = to.GetId()
 	} else {
 		panic("panic instruction not use this value")
 	}
@@ -324,14 +306,14 @@ func (r *Recover) GetValues() Values { return nil }
 func (i *If) HasValues() bool { return true }
 func (i *If) GetValues() Values {
 	// return lo.Filter([]Value{i.Cond}, filterNilValue)
-	if i.Cond == nil {
+	if i.Cond == 0 {
 		return []Value{}
 	}
-	return []Value{i.Cond}
+	return i.GetValuesByIDs([]int64{i.Cond})
 }
 func (i *If) ReplaceValue(v Value, to Value) {
-	if i.Cond == v {
-		i.Cond = to
+	if i.Cond == v.GetId() {
+		i.Cond = to.GetId()
 	} else {
 		panic("if not use this value")
 	}
@@ -342,17 +324,17 @@ func (r *If) GetUsers() Users { return nil }
 // ----------- Loop
 func (l *Loop) HasValues() bool { return true }
 func (l *Loop) GetValues() Values {
-	return lo.Filter([]Value{l.Cond, l.Init, l.Step, l.Key}, filterNilValue)
+	return l.GetValuesByIDs([]int64{l.Cond, l.Init, l.Step, l.Key})
 }
 func (l *Loop) ReplaceValue(v Value, to Value) {
-	if l.Cond == v {
-		l.Cond = to
-	} else if l.Init == v {
-		l.Init = to
-	} else if l.Step == v {
-		l.Step = to
-	} else if l.Key == v {
-		l.Key = to
+	if l.Cond == v.GetId() {
+		l.Cond = to.GetId()
+	} else if l.Init == v.GetId() {
+		l.Init = to.GetId()
+	} else if l.Step == v.GetId() {
+		l.Step = to.GetId()
+	} else if l.Key == v.GetId() {
+		l.Key = to.GetId()
 	} else {
 		panic("loop not use this value")
 	}
@@ -366,23 +348,23 @@ func (sw *Switch) GetValues() Values {
 	ret := make(Values, 0, len(sw.Label)+1)
 	lo.ForEach(sw.Label,
 		func(label SwitchLabel, _ int) {
-			if v := label.Value; v != nil {
-				ret = append(ret, v)
+			if v := label.Value; v != 0 {
+				ret = append(ret, sw.GetValueById(v))
 			}
 		},
 	)
-	if sw.Cond != nil {
-		ret = append(ret, sw.Cond)
+	if sw.Cond != 0 {
+		ret = append(ret, sw.GetValueById(sw.Cond))
 	}
 	return ret
 }
 func (sw *Switch) ReplaceValue(v Value, to Value) {
-	if sw.Cond == v {
-		sw.Cond = to
+	if sw.Cond == v.GetId() {
+		sw.Cond = to.GetId()
 	}
 	for _, c := range sw.Label {
-		if c.Value == v {
-			c.Value = to
+		if c.Value == v.GetId() {
+			c.Value = to.GetId()
 		}
 	}
 }

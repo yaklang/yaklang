@@ -42,10 +42,10 @@ func (f *Function) NewBasicBlockNotAddUnSealed(name string) *BasicBlock {
 func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bool) *BasicBlock {
 	b := &BasicBlock{
 		anValue: NewValue(),
-		Preds:   make([]Value, 0),
-		Succs:   make([]Value, 0),
-		Insts:   make([]Instruction, 0),
-		Phis:    make([]Value, 0),
+		Preds:   make([]int64, 0),
+		Succs:   make([]int64, 0),
+		Insts:   make([]int64, 0),
+		Phis:    make([]int64, 0),
 		Handler: nil,
 		finish:  false,
 	}
@@ -94,11 +94,11 @@ func (b *BasicBlock) Reachable() BasicBlockReachableKind {
 		return b.canBeReached
 	}
 
-	if b.Condition != nil {
+	if b.Condition > 0 {
 		return BasicBlockUnknown
 	}
 
-	if c, ok := b.Condition.(*ConstInst); ok {
+	if c, ok := ToConstInst(b.GetInstructionById(b.Condition)); ok {
 		if c.IsBoolean() {
 			if c.Boolean() {
 				return BasicBlockReachable
@@ -112,10 +112,10 @@ func (b *BasicBlock) Reachable() BasicBlockReachableKind {
 }
 
 func (b *BasicBlock) AddSucc(succ *BasicBlock) {
-	b.Succs = append(b.Succs, succ)
-	succ.Preds = append(succ.Preds, b)
+	b.Succs = append(b.Succs, succ.GetId())
+	succ.Preds = append(succ.Preds, b.GetId())
 }
 
 func (b *BasicBlock) LastInst() Instruction {
-	return b.Insts[len(b.Insts)-1]
+	return b.GetInstructionById(b.Insts[len(b.Insts)-1])
 }

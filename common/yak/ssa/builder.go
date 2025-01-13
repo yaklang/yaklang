@@ -201,7 +201,7 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 
 // function param
 func (b FunctionBuilder) HandlerEllipsis() {
-	if ins, ok := b.Params[len(b.Params)-1].(*Parameter); ins != nil {
+	if ins, ok := ToParameter(b.GetInstructionById(b.Params[len(b.Params)-1])); ok {
 		_ = ok
 		ins.SetType(NewSliceType(CreateAnyType()))
 	} else {
@@ -225,9 +225,9 @@ func (b *FunctionBuilder) EmitDefer(instruction Instruction) {
 			c.handleCalleeFunction()
 		}
 		if len(deferBlock.Insts) == 0 {
-			deferBlock.Insts = append(deferBlock.Insts, instruction)
+			deferBlock.Insts = append(deferBlock.Insts, instruction.GetId())
 		} else {
-			deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, instruction, 0)
+			deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, instruction.GetId(), 0)
 		}
 	})
 }

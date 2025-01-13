@@ -161,7 +161,7 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 					retVal.SetType(t)
 				}
 				fakeRet := y.EmitReturn([]ssa.Value{retVal})
-				fakeFunc.Return = append(fakeFunc.Return, fakeRet)
+				fakeFunc.Return = append(fakeFunc.Return, fakeRet.GetId())
 			}
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()

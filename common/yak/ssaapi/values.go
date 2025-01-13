@@ -435,6 +435,7 @@ func (v *Value) GetReturn() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.node); ok {
 		for _, r := range f.Return {
+			r := f.GetValueById(r)
 			ret = append(ret, v.NewValue(r))
 		}
 	}
@@ -448,7 +449,8 @@ func (v *Value) GetParameter(i int) *Value {
 
 	if f, ok := ssa.ToFunction(v.node); ok {
 		if i < len(f.Params) {
-			return v.NewValue(f.Params[i])
+			param := f.GetValueById(f.Params[i])
+			return v.NewValue(param)
 		}
 	}
 	return nil
@@ -460,6 +462,7 @@ func (v *Value) GetFreeValue(name string) *Value {
 	if variable := v.GetVariable(name); variable != nil {
 		if f, ok := ssa.ToFunction(v.node); ok {
 			if fv, ok := f.FreeValues[variable]; ok {
+				fv := f.GetValueById(fv)
 				return v.NewValue(fv)
 			}
 		}
@@ -475,6 +478,7 @@ func (v *Value) GetParameters() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.node); ok {
 		for _, param := range f.Params {
+			param := f.GetValueById(param)
 			ret = append(ret, v.NewValue(param))
 		}
 	}
@@ -487,7 +491,8 @@ func (v *Value) GetCallArgs() Values {
 	}
 
 	if f, ok := ssa.ToCall(v.node); ok {
-		return lo.Map(f.Args, func(item ssa.Value, index int) *Value {
+		return lo.Map(f.Args, func(itemId int64, index int) *Value {
+			item := f.GetValueById(itemId)
 			return v.NewValue(item)
 		})
 	}
@@ -785,10 +790,10 @@ func (v *Value) GetCalledBy() Values {
 			if !ok {
 				continue
 			}
-			if call == nil && call.Method == nil {
+			if call == nil && call.Method <= 0 {
 				continue
 			}
-			if call.Method.GetId() == nodeId {
+			if call.Method == nodeId {
 				vs = append(vs, v.NewValue(call))
 			}
 		}

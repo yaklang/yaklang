@@ -24,10 +24,11 @@ func (r *Return) calcType() Type {
 	case 0:
 		return BasicTypes[NullTypeKind]
 	case 1:
-		return handleType(r.Results[0])
+		return handleType(r.GetValueById(r.Results[0]))
 	default:
 		newObjTyp := NewObjectType()
 		for i, v := range r.Results {
+			v := r.GetValueById(v)
 			newObjTyp.AddField(NewConst(i), handleType(v))
 		}
 		newObjTyp.Finish()
@@ -46,17 +47,19 @@ func (b *FunctionBuilder) fixupParameterWithThis() {
 		return
 	}
 	// if this value is not object, and not user, should remove it.
-	para := b.Params[0]
+	paraId := b.Params[0]
+	para := b.GetValueById(paraId)
 	if para == nil || para.IsObject() || para.HasUsers() {
 		return
 	}
 
 	// remove from param
-	b.Params = utils.RemoveSliceItem(b.Params, para)
+	b.Params = utils.RemoveSliceItem(b.Params, paraId)
 	// fix other field in function
 	b.ParamLength--
 	// fix other parameter index
 	for i, p := range b.Params {
+		p := b.GetValueById(p)
 		param, ok := ToParameter(p)
 		if !ok {
 			log.Warnf("fixupParameterWithThis: parameter is not a Parameter, but is %s", p.GetName())
@@ -79,6 +82,7 @@ func (b *FunctionBuilder) Finish() {
 
 	for _, fun := range b.MarkedFunctions {
 		for variable, fv := range fun.FreeValues {
+			fv := b.GetValueById(fv)
 			name := variable.GetName()
 			param, ok := ToParameter(fv)
 			if ok {
@@ -112,7 +116,7 @@ func (b *FunctionBuilder) Finish() {
 			if !ok {
 				continue
 			}
-			if _, ok := ToConst(value); ok {
+			if _, ok := ToConstInst(value); ok {
 				continue
 			}
 			if value.GetOpcode() == SSAOpcodeReturn {
@@ -140,9 +144,10 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 		}
 		var opcode = []Opcode{SSAOpcodeParameter, SSAOpcodeFreeValue, SSAOpcodeParameterMember, SSAOpcodeSideEffect}
 		for _, result := range r.Results {
-			if utils.IsNil(result) {
+			if result <= 0 {
 				continue
 			}
+			result := r.GetValueById(result)
 			if !slices.Contains(opcode, result.GetOpcode()) {
 				if utils.IsNil(result.GetType()) {
 					log.Errorf("[BUG]: result type is null,check it: %v  name: %s", result.GetOpcode(), result.GetVerboseName())
@@ -159,7 +164,7 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 							Modify:       value,
 							parameterMemberInner: &parameterMemberInner{
 								MemberCallKind: CallMemberCall,
-								MemberCallKey:  key,
+								MemberCallKey:  key.GetId(),
 							},
 						})
 					}
@@ -195,24 +200,29 @@ func (f *Function) Finish() {
 	}
 	funType := f.Type
 
-	funType.Parameter = lo.Map(f.Params, func(p Value, _ int) Type {
+	funType.Parameter = lo.Map(f.Params, func(id int64, _ int) Type {
+		p := f.GetValueById(id)
 		t := p.GetType()
 		return t
 	})
-	funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i Value, _ int) (*Return, bool) {
-		return ToReturn(i)
+	funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i int64, _ int) (*Return, bool) {
+		inst := f.GetValueById(i)
+		return ToReturn(inst)
 	}), funType)
 	funType.IsVariadic = f.hasEllipsis
 	funType.This = f
 	funType.ParameterLen = f.ParamLength
-	funType.ParameterValue = lo.FilterMap(f.Params, func(i Value, _ int) (*Parameter, bool) {
-		return ToParameter(i)
+	funType.ParameterValue = lo.FilterMap(f.Params, func(i int64, _ int) (*Parameter, bool) {
+		inst := f.GetValueById(i)
+		return ToParameter(inst)
 	})
-	funType.ParameterMember = lo.FilterMap(f.ParameterMembers, func(i Value, _ int) (*ParameterMember, bool) {
-		return ToParameterMember(i)
+	funType.ParameterMember = lo.FilterMap(f.ParameterMembers, func(i int64, _ int) (*ParameterMember, bool) {
+		inst := f.GetValueById(i)
+		return ToParameterMember(inst)
 	})
 	result := make(map[*Variable]*Parameter)
 	for n, p := range f.FreeValues {
+		p := f.GetValueById(p)
 		if param, ok := ToParameter(p); ok {
 			result[n] = param
 		} else {
