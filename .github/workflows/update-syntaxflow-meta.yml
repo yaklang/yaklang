@@ -11,8 +11,11 @@ on:
         description: "Update last syntaxflow meta or not"
         type: boolean
         default: false
-
-
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+    paths:
+      - ".github/workflows/update-syntaxflow-meta.yml"
 jobs:
   update-syntaxflow-meta:
     runs-on: ubuntu-latest
@@ -27,8 +30,8 @@ jobs:
 
       - name: Get Repo tags
         run: |
-          VERSION_INPUT="${{ github.event.inputs.update_version }}"
-          echo "YAK_TAG=$YAK_VERSION" >> $GITHUB_ENV 
+          VERSION_INPUT="${{ github.event.inputs.update_version || "test-version" }}"
+          echo "YAK_TAG=$VERSION_INPUT" >> $GITHUB_ENV 
 
       - name: Checkout Tags Version
         run: echo ${{ env.YAK_TAG }}
