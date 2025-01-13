@@ -1,0 +1,53 @@
+desc(
+    title:"Check Unauthorized Access to Spring Boot Actuator",
+    title_zh:"检查Spring Boot Actuator未授权访问",
+    type:security,
+    desc:<<<TEXT
+Spring Boot Actuator 是 Spring Boot 提供的用于监控和管理应用程序的功能模块。如果未正确配置，Spring Boot Actuator 可能会导致应用程序的安全风险。攻击者可以通过未授权访问 Actuator 端点来获取应用程序的敏感信息，甚至执行恶意操作。
+TEXT
+)
+
+WebSecurity?{<typeName>?{have:'org.springframework.security.config.annotation.web.builders.WebSecurity'}}.ignoring().antMatchers(*?{opcode:const} as $allow)
+check $allow then "发现SpringSecurity放行的资源"
+$allow?{have:'actuator'} as $sink
+alert $sink{
+    message:"Spring Boot Actuator未授权访问",
+    severity:low,
+    risk:"unauth-access"
+}
+
+desc(
+    lang:java,
+    alert_num:1,
+    'file://unsafe.java':<<<UNSAFE
+package com.codermy.myspringsecurityplus.security.config;
+import com.codermy.myspringsecurityplus.security.UserDetailsServiceImpl;
+import org.springframework.security.config.annotation.web.builders.WebSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class SpringSecurityConfig extends WebSecurityConfigurerAdapter {
+    @Override
+    public void configure(WebSecurity web) throws Exception {
+        //放行静态资源
+        web.ignoring()
+                .antMatchers(HttpMethod.GET,
+                        "/swagger-resources/**",
+                        "/PearAdmin/**",
+                        "/component/**",
+                        "/admin/**",
+                        "/**/*.html",
+                        "/**/*.css",
+                        "/**/*.js",
+                        "/swagger-ui.html",
+                        "/webjars/**",
+                        "/v2/**",
+                        "/druid/**",
+                        "/actuator/**");
+        web.ignoring().antMatchers(HttpMethod.POST,"/druid/**");
+    }
+}
+UNSAFE
+)
