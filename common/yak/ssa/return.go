@@ -24,10 +24,11 @@ func (r *Return) calcType() Type {
 	case 0:
 		return BasicTypes[NullTypeKind]
 	case 1:
-		return handleType(r.Results[0])
+		return handleType(r.GetValueById(r.Results[0]))
 	default:
 		newObjTyp := NewObjectType()
 		for i, v := range r.Results {
+			v := r.GetValueById(v)
 			newObjTyp.AddField(NewConst(i), handleType(v))
 		}
 		newObjTyp.Finish()
@@ -46,17 +47,19 @@ func (b *FunctionBuilder) fixupParameterWithThis() {
 		return
 	}
 	// if this value is not object, and not user, should remove it.
-	para := b.Params[0]
+	paraId := b.Params[0]
+	para := b.GetValueById(paraId)
 	if para == nil || para.IsObject() || para.HasUsers() {
 		return
 	}
 
 	// remove from param
-	b.Params = utils.RemoveSliceItem(b.Params, para)
+	b.Params = utils.RemoveSliceItem(b.Params, paraId)
 	// fix other field in function
 	b.ParamLength--
 	// fix other parameter index
 	for i, p := range b.Params {
+		p := b.GetValueById(p)
 		param, ok := ToParameter(p)
 		if !ok {
 			log.Warnf("fixupParameterWithThis: parameter is not a Parameter, but is %s", p.GetName())
@@ -79,6 +82,7 @@ func (b *FunctionBuilder) Finish() {
 
 	for _, fun := range b.MarkedFunctions {
 		for variable, fv := range fun.FreeValues {
+			fv := b.GetValueById(fv)
 			name := variable.GetName()
 			param, ok := ToParameter(fv)
 			if ok {
@@ -101,18 +105,24 @@ func (b *FunctionBuilder) Finish() {
 	// skip no variable value
 	// skip return
 	for _, blockRaw := range b.Blocks {
-		block, ok := ToBasicBlock(blockRaw)
-		if !ok {
-			log.Warnf("function %s has a non-block instruction: %s", b.Function.GetName(), blockRaw.GetName())
+		block := b.GetInstructionById(blockRaw)
+		if block == nil {
+			log.Warnf("function %s has a non-block instruction: %v", b.Function.GetName(), blockRaw)
 			continue
 		}
 
-		for _, inst := range block.Insts {
-			value, ok := ToValue(inst)
-			if !ok {
+		basicBlock, ok := ToBasicBlock(block)
+		if !ok {
+			log.Warnf("function %s has a non-block instruction: %s", b.Function.GetName(), block.GetName())
+			continue
+		}
+
+		for _, inst := range basicBlock.Insts {
+			value := b.GetValueById(inst)
+			if value == nil {
 				continue
 			}
-			if _, ok := ToConst(value); ok {
+			if _, ok := ToConstInst(value); ok {
 				continue
 			}
 			if value.GetOpcode() == SSAOpcodeReturn {
@@ -140,9 +150,10 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 		}
 		var opcode = []Opcode{SSAOpcodeParameter, SSAOpcodeFreeValue, SSAOpcodeParameterMember, SSAOpcodeSideEffect}
 		for _, result := range r.Results {
-			if utils.IsNil(result) {
+			if result <= 0 {
 				continue
 			}
+			result := r.GetValueById(result)
 			if !slices.Contains(opcode, result.GetOpcode()) {
 				if utils.IsNil(result.GetType()) {
 					log.Errorf("[BUG]: result type is null,check it: %v  name: %s", result.GetOpcode(), result.GetVerboseName())
@@ -155,10 +166,10 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 							Name:        variable.GetName(),
 							VerboseName: getMemberVerboseName(result, key),
 							Variable:    variable,
-							Modify:      value,
+							Modify:      value.GetId(),
 							parameterMemberInner: &parameterMemberInner{
 								MemberCallKind: CallMemberCall,
-								MemberCallKey:  key,
+								MemberCallKey:  key.GetId(),
 							},
 						})
 					}
@@ -185,8 +196,13 @@ func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
 
-	if block, ok := ToBasicBlock(f.DeferBlock); ok {
-		addToBlocks(block)
+	if f.DeferBlock != 0 {
+		block := f.GetInstructionById(f.DeferBlock)
+		if block != nil {
+			if basicBlock, ok := ToBasicBlock(block); ok {
+				addToBlocks(basicBlock)
+			}
+		}
 	}
 
 	if f.Type == nil {
@@ -194,24 +210,29 @@ func (f *Function) Finish() {
 	}
 	funType := f.Type
 
-	funType.Parameter = lo.Map(f.Params, func(p Value, _ int) Type {
+	funType.Parameter = lo.Map(f.Params, func(id int64, _ int) Type {
+		p := f.GetValueById(id)
 		t := p.GetType()
 		return t
 	})
-	funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i Value, _ int) (*Return, bool) {
-		return ToReturn(i)
+	funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i int64, _ int) (*Return, bool) {
+		inst := f.GetValueById(i)
+		return ToReturn(inst)
 	}), funType)
 	funType.IsVariadic = f.hasEllipsis
 	funType.This = f
 	funType.ParameterLen = f.ParamLength
-	funType.ParameterValue = lo.FilterMap(f.Params, func(i Value, _ int) (*Parameter, bool) {
-		return ToParameter(i)
+	funType.ParameterValue = lo.FilterMap(f.Params, func(i int64, _ int) (*Parameter, bool) {
+		inst := f.GetValueById(i)
+		return ToParameter(inst)
 	})
-	funType.ParameterMember = lo.FilterMap(f.ParameterMembers, func(i Value, _ int) (*ParameterMember, bool) {
-		return ToParameterMember(i)
+	funType.ParameterMember = lo.FilterMap(f.ParameterMembers, func(i int64, _ int) (*ParameterMember, bool) {
+		inst := f.GetValueById(i)
+		return ToParameterMember(inst)
 	})
 	result := make(map[*Variable]*Parameter)
 	for n, p := range f.FreeValues {
+		p := f.GetValueById(p)
 		if param, ok := ToParameter(p); ok {
 			result[n] = param
 		} else {
@@ -233,17 +254,24 @@ func (f *Function) Finish() {
 		vs := []Value{}
 		for _, ses := range f.SideEffectsReturn {
 			if value, ok := ses[variable]; ok {
-				vs = append(vs, value.Modify)
+				modifyValue := f.GetValueById(value.Modify)
+				if modifyValue != nil {
+					vs = append(vs, modifyValue)
+				}
 			}
 		}
 		if len(vs) > 1 {
-			tse.Modify = f.builder.EmitPhi(variable.GetName(), vs)
+			phi := f.builder.EmitPhi(variable.GetName(), vs)
+			if phi != nil {
+				tse.Modify = phi.GetId()
+			}
 		}
 	}
 
 	for _, se := range tmpSideEffects {
-		if se.Modify.GetBlock() != nil {
-			scope := se.Modify.GetBlock().ScopeTable
+		modifyValue := f.GetValueById(se.Modify)
+		if modifyValue != nil && modifyValue.GetBlock() != nil {
+			scope := modifyValue.GetBlock().ScopeTable
 			if ret := GetFristLocalVariableFromScopeAndParent(scope, se.Name); ret != nil {
 				if ret.GetLocal() {
 					continue

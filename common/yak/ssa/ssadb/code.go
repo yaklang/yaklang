@@ -68,12 +68,10 @@ type IrCode struct {
 	Phis      Int64Slice `json:"phis_in_block" gorm:"type:text"`
 
 	// Use-Def Chains Relation
-	Defs  Int64Slice `json:"defs" gorm:"type:text"`
-	Users Int64Slice `json:"users" gorm:"type:text"`
+	HasDefs bool       `json:"has_defs"`
+	Users   Int64Slice `json:"users" gorm:"type:text"`
 	// Phi Chains Relation
 	Occulatation Int64Slice `json:"phis" gorm:"type:text"`
-	// this is user is call and method is this IR self
-	CalledBy Int64Slice `json:"is_called_by" gorm:"type:text"`
 
 	// OOP Supporting
 	IsObject       bool

@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -44,7 +45,7 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 	}
 	objectt := object
 	if se, ok := ToSideEffect(objectt); ok {
-		modify := se.Value
+		modify := se.GetValueById(se.Value)
 		if ref := modify.GetReference(); ref != nil {
 			objectt = ref
 		}
@@ -86,7 +87,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value, cross ...b
 	}
 	objectt := object
 	if se, ok := ToSideEffect(objectt); ok {
-		modify := se.Value
+		modify := se.GetValueById(se.Value)
 		if ref := modify.GetReference(); ref != nil {
 			objectt = ref
 		}

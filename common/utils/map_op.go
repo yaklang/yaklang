@@ -365,6 +365,88 @@ func MapGetInt64(m map[string]interface{}, key string) int64 {
 	return MapGetInt64Or(m, key, 0)
 }
 
+func MapGetMapStringInt64(m map[string]interface{}, key string) map[string]int64 {
+	if m == nil {
+		return map[string]int64{}
+	}
+
+	r, ok := m[key]
+	if !ok {
+		return map[string]int64{}
+	}
+
+	switch v := r.(type) {
+	case map[string]int64:
+		return v
+	case map[string]interface{}:
+		result := make(map[string]int64, len(v))
+		for k, item := range v {
+			result[k] = int64(InterfaceToInt(item))
+		}
+		return result
+	default:
+		return map[string]int64{}
+	}
+}
+
+func MapGetInt64Slice(m map[string]interface{}, key string) []int64 {
+	if m == nil {
+		return []int64{}
+	}
+
+	r, ok := m[key]
+	if !ok {
+		return []int64{}
+	}
+
+	switch v := r.(type) {
+	case []int64:
+		return v
+	case []interface{}:
+		result := make([]int64, 0, len(v))
+		for _, item := range v {
+			result = append(result, int64(InterfaceToInt(item)))
+		}
+		return result
+	default:
+		typ := reflect.TypeOf(r)
+		if typ == nil {
+			return nil
+		}
+		t := typ.Kind()
+		len := reflect.ValueOf(r).Len()
+		result := make([]int64, 0, len)
+
+		if t == reflect.Array || t == reflect.Slice {
+			for i := 0; i < len; i++ {
+				value := reflect.ValueOf(r).Index(i).Interface()
+				result = append(result, int64(InterfaceToInt(value)))
+			}
+		}
+		return result
+	}
+}
+
+func MapGet[T any](m map[string]any, key string) T {
+	var zero T
+	return MapGetOr[T](m, key, zero)
+}
+
+func MapGetOr[T any](m map[string]any, key string, value T) T {
+	if m == nil {
+		return value
+	}
+
+	r, ok := m[key]
+	if ok {
+		v, typeOk := r.(T)
+		if typeOk {
+			return v
+		}
+	}
+	return value
+}
+
 func InterfaceToGeneralMap(params interface{}) (finalResult map[string]interface{}) {
 	if IsNil(params) {
 		return map[string]any{}

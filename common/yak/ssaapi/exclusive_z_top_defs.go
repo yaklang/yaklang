@@ -165,10 +165,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return result
 	case *ssa.Call:
-		calleeInst := inst.Method
-		if calleeInst == nil {
+		calleeId := inst.Method
+		if calleeId <= 0 {
 			return Values{i} // return self
 		}
+		calleeInst := inst.GetValueById(calleeId)
 
 		fun, isFunc := ssa.ToFunction(calleeInst)
 		if !isFunc && calleeInst.GetReference() != nil {
@@ -189,10 +190,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			callee := i.NewTopDefValue(calleeInst)
 			nodes := Values{callee}
 			for _, val := range inst.Args {
+				val := inst.GetValueById(val)
 				arg := i.NewTopDefValue(val)
 				nodes = append(nodes, arg)
 			}
 			for _, value := range inst.Binding {
+				value := inst.GetValueById(value)
 				arg := i.NewTopDefValue(value)
 				nodes = append(nodes, arg)
 			}
@@ -216,14 +219,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if utils.IsValidInteger(retIndexRawStr) {
 				targetIdx := codec.Atoi(retIndexRawStr)
 				var traceRets Values
-				for _, retInsRaw := range inst.Return {
-					retIns, ok := ssa.ToReturn(retInsRaw)
+				for _, retId := range inst.Return {
+					retInst := inst.GetValueById(retId)
+					retIns, ok := ssa.ToReturn(retInst)
 					if !ok {
-						log.Warnf("BUG: %T is not *Return", retInsRaw)
+						log.Warnf("BUG: %T is not *Return", retInst)
 						continue
 					}
-					for idx, traceVal := range retIns.Results {
+					for idx, traceId := range retIns.Results {
 						if idx == targetIdx {
+							traceVal := inst.GetValueById(traceId)
 							traceRets = append(traceRets, i.NewTopDefValue(traceVal))
 						}
 					}
@@ -234,23 +239,25 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			} else {
 				// string literal member
 				var traceRets Values
-				for _, retInsRaw := range inst.Return {
-					retIns, ok := ssa.ToReturn(retInsRaw)
+				for _, retId := range inst.Return {
+					retInst := inst.GetValueById(retId)
+					retIns, ok := ssa.ToReturn(retInst)
 					if !ok {
-						log.Warnf("BUG: %T is not *Return", retInsRaw)
+						log.Warnf("BUG: %T is not *Return", retInst)
 						continue
 					}
-					for _, traceVal := range retIns.Results {
-						val, ok := traceVal.GetStringMember(retIndexRawStr)
+					for _, traceId := range retIns.Results {
+						traceValue := inst.GetValueById(traceId)
+						val, ok := traceValue.GetStringMember(retIndexRawStr)
 						if ok {
 							traceRets = append(traceRets, i.NewTopDefValue(val))
 							// trace mask ?
 							if len(inst.Blocks) > 0 {
-								name, ok := ssa.CombineMemberCallVariableName(traceVal, ssa.NewConst(retIndexRawStr))
+								name, ok := ssa.CombineMemberCallVariableName(traceValue, ssa.NewConst(retIndexRawStr))
 								if ok {
 									lastBlockRaw, _ := lo.Last(inst.Blocks)
-									lastBlock, ok := ssa.ToBasicBlock(lastBlockRaw)
-									if ok {
+									lastBlock := inst.GetBasicBlockByID(lastBlockRaw)
+									if lastBlock != nil {
 										variableInstance := lastBlock.ScopeTable.ReadVariable(name)
 										_ = variableInstance.String()
 									}
@@ -270,8 +277,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if !ok {
 				return
 			}
-			for _, r := range fun.Return {
-				for _, subVal := range r.GetValues() {
+			for _, retId := range fun.Return {
+				retInst := fun.GetValueById(retId)
+				for _, subVal := range retInst.GetValues() {
 					if ret := value.NewTopDefValue(subVal).getTopDefs(actx, opt...); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
@@ -299,15 +307,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			switch inst.MemberCallKind {
 			case ssa.ParameterMemberCall:
 				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
-					actx.pushObject(para, i.NewValue(inst.MemberCallKey), i.NewValue(ssa.NewConst("")))
-					// if i.GetTypeKind() == ssa.FunctionTypeKind {
-					// 	return append(para.AppendEffectOn(fun).getTopDefs(actx, opt...), i)
-					// }
+					actx.pushObject(para, i.NewValue(inst.GetValueById(inst.MemberCallKey)), i.NewValue(ssa.NewConst("")))
 					return para.AppendEffectOn(fun).getTopDefs(actx, opt...)
 				}
 			case ssa.FreeValueMemberCall:
 				if fv := fun.GetFreeValue(inst.MemberCallObjectName); fv != nil {
-					actx.pushObject(fv, i.NewValue(inst.MemberCallKey), i.NewValue(ssa.NewConst("")))
+					actx.pushObject(fv, i.NewValue(inst.GetValueById(inst.MemberCallKey)), i.NewValue(ssa.NewConst("")))
 					return fv.getTopDefs(actx, opt...)
 				}
 			}
@@ -326,7 +331,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
 				return getParameter()
 			}
-			actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
+			actualParam = inst.GetValueById(calledInstance.ArgMember[inst.FormalParameterIndex])
 			traced := i.NewTopDefValue(actualParam)
 			if !actx.needCrossProcess(i, traced) {
 				return Values{}
@@ -375,13 +380,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
 			}
+
 			var actualParam ssa.Value
 			if inst.IsFreeValue {
 				// free value
 				if tmp := inst.GetDefault(); tmp != nil && !isInner {
 					actualParam = tmp
-				} else if tmp, ok := calledInstance.Binding[inst.GetName()]; ok && isInner {
-					actualParam = tmp
+				} else if binding, ok := calledInstance.Binding[inst.GetName()]; ok && isInner {
+					actualParam = inst.GetValueById(binding)
 				} else {
 					log.Errorf("free value: %v is not found in binding", inst.GetName())
 					return getMemberCall(i, i.innerValue, actx)
@@ -392,7 +398,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
 					return getMemberCall(i, i.innerValue, actx)
 				}
-				actualParam = calledInstance.Args[inst.FormalParameterIndex]
+				actualParam = inst.GetValueById(calledInstance.Args[inst.FormalParameterIndex])
 			}
 			traced := i.NewTopDefValue(actualParam)
 			if !actx.needCrossProcess(i, traced) {
@@ -435,8 +441,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		return vals
 	case *ssa.SideEffect:
 		callIns := inst.CallSite
-		if callIns != nil {
-			v := i.NewTopDefValue(inst.Value)
+		if callIns >= 0 {
+			v := i.NewTopDefValue(inst.GetValueById(inst.Value))
 			return v.getTopDefs(actx, opt...)
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())

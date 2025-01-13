@@ -1,19 +1,39 @@
 package ssa
 
 import (
-	"fmt"
 	"reflect"
-	"strconv"
-
-	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
+
+func (i anInstruction) MarshalInstruction(code *ssadb.IrCode) {
+
+}
+
+func (anValue anValue) MarshalValue(ir *ssadb.IrCode) {
+	defer func() {
+		if msg := recover(); msg != nil {
+			log.Errorf("value2IrCode panic: %s", msg)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
+	// code.Defs == v.value
+
+	// // value
+	// for _, def := range value.GetValues() {
+	// 	if def == nil {
+	// 		log.Infof("BUG: value[%s: %s] def is nil", value, value.GetRange())
+	// 		continue
+	// 	}
+	// 	ir.Defs = append(ir.Defs, int64(def.GetId()))
+	// }
+
+}
 
 func fetchIds(origin any) any {
 	var ids []int64
@@ -40,8 +60,8 @@ func fetchIds(origin any) any {
 		results := make([]map[string]int64, len(ret))
 		for i := 0; i < len(ret); i++ {
 			results[i] = map[string]int64{
-				"value": ret[i].Value.GetId(),
-				"dest":  ret[i].Dest.GetId(),
+				"value": ret[i].Value,
+				"dest":  ret[i].Dest,
 			}
 		}
 		return results
@@ -57,6 +77,8 @@ func fetchIds(origin any) any {
 			ids[i] = ret[i].GetId()
 		}
 		return ids
+	case []int64:
+		return ret
 	default:
 		t := reflect.TypeOf(origin).Kind()
 		if t == reflect.Array || t == reflect.Slice {
@@ -77,27 +99,16 @@ func fetchIds(origin any) any {
 }
 
 func marshalExtraInformation(raw Instruction) map[string]any {
-	marshalValues := func(vs []Value) []int64 {
-		ids := make([]int64, len(vs))
-		for index, v := range vs {
-			if v == nil {
-				log.Errorf("BUG: marshalValues[%s: %s]: nil value in slice", raw, raw.GetRange())
-				continue
-			}
-			ids[index] = v.GetId()
-		}
-		return ids
-	}
-
 	params := make(map[string]any)
 	switch ret := raw.(type) {
 	case *Function:
 		params["params"] = fetchIds(ret.Params)
 		params["param_length"] = ret.ParamLength
-		freeValues := make(map[int64]int64)
+		freeValues := make(map[string]int64)
 		for k, v := range ret.FreeValues {
-			freeValues[k.GetId()] = v.GetId()
+			freeValues[k.GetName()] = v
 		}
+		params["free_values"] = freeValues
 		params["current_blueprint"] = -1
 		if ret.currentBlueprint != nil {
 			typID := SaveTypeToDB(ret.currentBlueprint, ret.GetProgramName())
@@ -105,14 +116,13 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		}
 		params["is_method"] = ret.isMethod
 		params["method_name"] = ret.methodName
-		params["free_values"] = freeValues
 		params["parameter_members"] = fetchIds(ret.ParameterMembers)
 		var sideEffects []map[string]any
 		for _, se := range ret.SideEffects {
 			element := map[string]any{
 				"name":         se.Name,
 				"verbose_name": se.VerboseName,
-				"modify":       se.Modify.GetId(),
+				"modify":       se.Modify,
 				"forceCreate":  se.forceCreate,
 			}
 			if se.parameterMemberInner != nil {
@@ -120,8 +130,8 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 				element["member_call_kind"] = se.MemberCallKind
 				element["member_call_object_index"] = se.MemberCallObjectIndex
 				element["member_call_name"] = se.MemberCallObjectName
-				if se.MemberCallKey != nil {
-					element["member_call_key"] = se.MemberCallKey.GetId()
+				if se.MemberCallKey > 0 {
+					element["member_call_key"] = se.MemberCallKey
 				}
 			}
 			sideEffects = append(sideEffects, element)
@@ -134,22 +144,16 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["child_funcs"] = fetchIds(ret.ChildFuncs)
 		params["return"] = fetchIds(ret.Return)
 		params["blocks"] = fetchIds(ret.Blocks)
-		if ret.EnterBlock != nil {
-			params["enter_block"] = ret.EnterBlock.GetId()
-		}
-		if ret.ExitBlock != nil {
-			params["exit_block"] = ret.ExitBlock.GetId()
-		}
-		if ret.DeferBlock != nil {
-			params["defer_block"] = ret.DeferBlock.GetId()
-		}
+		params["enter_block"] = ret.EnterBlock
+		params["exit_block"] = ret.ExitBlock
+		params["defer_block"] = ret.DeferBlock
 		var files [][2]string
 		params["reference_files"] = files
 		params["has_ellipsis"] = ret.hasEllipsis
 	case *Assert:
-		params["assert_condition_id"] = ret.Cond.GetId()
-		if ret.MsgValue != nil {
-			params["assert_message_id"] = ret.MsgValue.GetId()
+		params["assert_condition_id"] = ret.Cond
+		if ret.MsgValue > 0 {
+			params["assert_message_id"] = ret.MsgValue
 		}
 		params["assert_message_string"] = ret.Msg
 	case *BasicBlock:
@@ -158,11 +162,11 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["block_preds"] = fetchIds(ret.Preds)
 		params["block_succs"] = fetchIds(ret.Succs)
 		params["block_can_be_reached"] = ret.canBeReached
-		if ret.Condition != nil {
-			if id := ret.Condition.GetId(); id > 0 {
-				params["block_condition"] = id
+		if ret.Condition > 0 {
+			if ret.Condition > 0 {
+				params["block_condition"] = ret.Condition
 			} else {
-				log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: %v) id: %v", ret.Condition, ret.Condition.String(), id)
+				log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: %v) ", ret.Condition, ret.GetValueById(ret.Condition).String())
 			}
 		}
 		params["block_insts"] = fetchIds(ret.Insts)
@@ -171,23 +175,21 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		if ret.ScopeTable != nil {
 			// params["block_scope_table"] = ret.ScopeTable.GetPersistentId()
 		}
-		if ret.Parent != nil {
-			params["block_parent"] = ret.Parent.GetId()
-		}
+		params["block_parent"] = ret.Parent
 		params["block_child"] = fetchIds(ret.Child)
 	case *BinOp:
 		params["binop_op"] = ret.Op
-		if ret.X != nil {
-			params["binop_x"] = ret.X.GetId()
+		if ret.X > 0 {
+			params["binop_x"] = ret.X
 		}
-		if ret.Y != nil {
-			params["binop_y"] = ret.Y.GetId()
+		if ret.Y > 0 {
+			params["binop_y"] = ret.Y
 		}
 	case *Call:
-		params["call_method"] = ret.Method.GetId()
-		params["call_args"] = marshalValues(ret.Args)
-		params["call_binding"] = fetchIds(ret.Binding)
-		params["call_arg_member"] = marshalValues(ret.ArgMember)
+		params["call_method"] = ret.Method
+		params["call_args"] = ret.Args
+		params["call_binding"] = ret.Binding
+		params["call_arg_member"] = ret.ArgMember
 		params["call_async"] = ret.Async
 		params["call_unpack"] = ret.Unpack
 		params["call_drop_error"] = ret.IsDropError
@@ -195,82 +197,72 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		//params["mark_parameter_member"] = fetchIds(ret.MarkParameterMember)
 	case *ErrorHandler:
 		// try-catch-finally-done
-		if ret.Try != nil {
-			params["errorhandler_try"] = ret.Try.GetId()
-		}
-		if len(ret.Catch) != 0 {
-			params["errorhandler_catch"] = fetchIds(ret.Catch)
-		}
-		if ret.Final != nil {
-			params["errorhandler_finally"] = ret.Final.GetId()
-		}
-		if ret.Done != nil {
-			params["errorhandler_done"] = ret.Done.GetId()
-		}
+		params["errorhandler_try"] = ret.Try
+		params["errorhandler_catch"] = fetchIds(ret.Catch)
+		params["errorhandler_finally"] = ret.Final
+		params["errorhandler_done"] = ret.Done
 	case *ErrorCatch:
-		params["errorcatch_exception"] = ret.Exception.GetId()
-		params["errorcatch_catch"] = ret.CatchBody.GetId()
+		params["errorcatch_exception"] = ret.Exception
+		params["errorcatch_catch"] = ret.CatchBody
 	case *ExternLib:
 		log.Warnf("TBD: marshal ExternLib: %v", ret)
 		// return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
 	case *If:
-		if ret.Cond != nil {
-			params["if_cond"] = ret.Cond.GetId()
+		if ret.Cond > 0 {
+			params["if_cond"] = ret.Cond
 		}
-		if ret.True != nil {
-			params["if_true"] = ret.True.GetId()
+		if ret.True > 0 {
+			params["if_true"] = ret.True
 		}
-		if ret.False != nil {
-			params["if_false"] = ret.False.GetId()
+		if ret.False > 0 {
+			params["if_false"] = ret.False
 		}
 	case *Jump:
-		params["jump_to"] = ret.To.GetId()
+		params["jump_to"] = ret.To
 	case *Loop:
-		params["loop_body"] = ret.Body.GetId()
-		if ret.Exit != nil {
-			params["loop_exit"] = ret.Exit.GetId()
+		params["loop_body"] = ret.Body
+		if ret.Exit > 0 {
+			params["loop_exit"] = ret.Exit
 		}
-		if ret.Init != nil {
-			params["loop_init"] = ret.Init.GetId()
+		if ret.Init > 0 {
+			params["loop_init"] = ret.Init
 		}
-		if ret.Cond != nil {
-			params["loop_cond"] = ret.Cond.GetId()
+		if ret.Cond > 0 {
+			params["loop_cond"] = ret.Cond
 		}
-		if ret.Step != nil {
-			params["loop_step"] = ret.Step.GetId()
+		if ret.Step > 0 {
+			params["loop_step"] = ret.Step
 		}
-		if ret.Key != nil {
-			params["loop_key"] = ret.Key.GetId()
+		if ret.Key > 0 {
+			params["loop_key"] = ret.Key
 		}
 	case *Make:
-		if ret.low != nil {
-			params["make_low"] = ret.low.GetId()
+		if ret.low > 0 {
+			params["make_low"] = ret.low
 		}
-		if ret.high != nil {
-			params["make_high"] = ret.high.GetId()
+		if ret.high > 0 {
+			params["make_high"] = ret.high
 		}
-		if ret.step != nil {
-			params["make_step"] = ret.step.GetId()
+		if ret.step > 0 {
+			params["make_step"] = ret.step
 		}
-		if ret.Len != nil {
-			params["make_len"] = ret.Len.GetId()
+		if ret.Len > 0 {
+			params["make_len"] = ret.Len
 		}
-		if ret.Cap != nil {
-			params["make_cap"] = ret.Cap.GetId()
+		if ret.Cap > 0 {
+			params["make_cap"] = ret.Cap
 		}
 	case *Next:
-		if ret.Iter != nil {
-			params["next_iter"] = ret.Iter.GetId()
+		if ret.Iter > 0 {
+			params["next_iter"] = ret.Iter
 		}
 		params["next_in_next"] = ret.InNext
 	case *Panic:
-		if ret.Info != nil {
-			params["panic_value"] = ret.Info.GetId()
-		}
+		params["panic_value"] = ret.Info
 	case *Parameter:
 		params["formalParam_is_freevalue"] = ret.IsFreeValue
-		if ret.defaultValue != nil {
-			params["formalParam_default"] = ret.defaultValue.GetId()
+		if ret.defaultValue > 0 {
+			params["formalParam_default"] = ret.defaultValue
 		}
 		params["formalParam_index"] = ret.FormalParameterIndex
 	case *ParameterMember:
@@ -278,40 +270,42 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["member_call_kind"] = ret.MemberCallKind
 		params["member_call_index"] = ret.MemberCallObjectIndex
 		params["member_call_name"] = ret.MemberCallObjectName
-		if ret.MemberCallKey != nil {
-			params["member_call_key"] = ret.MemberCallKey.GetId()
+		if ret.MemberCallKey > 0 {
+			params["member_call_key"] = ret.MemberCallKey
 		}
-		// params["member_call_obj"] = ret.GetObject().GetId()
+		// params["member_call_obj"] = ret.GetObject()
 	case *Phi:
-		params["phi_edges"] = marshalValues(ret.Edge)
-		if ret.CFGEntryBasicBlock != nil {
-			params["cfg_entry"] = ret.CFGEntryBasicBlock.GetId()
+		params["phi_edges"] = ret.Edge
+		if ret.CFGEntryBasicBlock > 0 {
+			params["cfg_entry"] = ret.CFGEntryBasicBlock
 		}
 	case *Return:
-		params["return_results"] = marshalValues(ret.Results)
+		params["return_results"] = ret.Results
 	case *SideEffect:
-		params["sideEffect_call"] = ret.CallSite.GetId()
-		params["sideEffect_value"] = ret.Value.GetId()
+		params["sideEffect_call"] = ret.CallSite
+		params["sideEffect_value"] = ret.Value
 	case *Switch:
-		if ret.Cond != nil {
-			params["switch_cond"] = ret.Cond.GetId()
+		if ret.Cond > 0 {
+			params["switch_cond"] = ret.Cond
 		}
 		params["switch_label"] = fetchIds(ret.Label)
 	case *TypeCast:
-		params["typecast_value"] = ret.Value.GetId()
+		if ret.Value > 0 {
+			params["typecast_value"] = ret.Value
+		}
 	case *TypeValue:
 		// nothing to do
 	case *UnOp:
 		params["unop_op"] = ret.Op
-		if ret.X != nil {
-			params["unop_x"] = ret.X.GetId()
+		if ret.X > 0 {
+			params["unop_x"] = ret.X
 		}
 	case *Undefined:
 		params["undefined_kind"] = ret.Kind
 	case *ConstInst:
 		params["const_value"] = ret.Const.GetRawValue()
-		if ret.Origin != nil {
-			params["const_origin"] = ret.Origin.GetId()
+		if ret.Origin > 0 {
+			params["const_origin"] = ret.Origin
 		}
 	default:
 		log.Warnf("marshalExtraInformation: unknown type: %v", reflect.TypeOf(raw).String())
@@ -320,209 +314,73 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 }
 
 func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
-	unmarshalInstruction := func(input any) Instruction {
-		var id int64
-		switch result := input.(type) {
-		case int64:
-			id = result
-		case float64:
-			id = int64(result)
-		default:
-			id = codec.Atoi64(fmt.Sprint(input))
-		}
-
-		if id <= 0 {
-			log.Infof("unmarshalExtraInformation: invalid id: %v if u want to check why? enable DEBUG=1", id)
-			utils.Debug(func() {
-				spew.Dump(inst)
-				spew.Dump(ir)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			})
-			return nil
-		}
-
-		lz, err := NewLazyInstruction(id)
-		if err != nil {
-			log.Errorf("BUG: unmatched instruction create lazyInstruction: %v", err)
-		}
-		return lz
-	}
-	unmarshalValue := func(p any) Value {
-		lazyIns := unmarshalInstruction(p)
-		if value, ok := ToValue(lazyIns); ok {
-			return value
-		}
-		return nil
-	}
-	unmarshalValues := func(p any) []Value {
-		vs := make([]Value, 0)
-		for _, id := range utils.InterfaceToSliceInterface(p) {
-			if value := unmarshalValue(id); value != nil {
-				vs = append(vs, value)
-			}
-		}
-		return vs
-	}
-	unmarshalInstructions := func(p any) []Instruction {
-		vs := make([]Instruction, 0)
-		switch ret := p.(type) {
-		case []any:
-			for _, id := range ret {
-				vs = append(vs, unmarshalInstruction(id))
-			}
-
-		default:
-		}
-		return vs
-	}
-	unmarshalMapValues := func(p any) map[string]Value {
-		vs := make(map[string]Value)
-		switch ret := p.(type) {
-		case map[string]any:
-			for k, id := range ret {
-				vs[k] = unmarshalValue(id)
-			}
-		default:
-		}
-		return vs
-	}
-
-	unmarshalMapVariables := func(p any) map[*Variable]Value {
-		vs := make(map[*Variable]Value)
-		switch ret := p.(type) {
-		case map[string]any:
-			for _, id := range ret {
-				value := unmarshalValue(id)
-				vs[value.GetLastVariable()] = value
-			}
-		default:
-		}
-		return vs
-	}
-
-	toInt := func(i any) int {
-		switch ret := i.(type) {
-		case float64:
-			return int(ret)
-		case int64:
-			return int(ret)
-		default:
-			return codec.Atoi(fmt.Sprint(i))
-		}
-	}
-
-	toBool := func(i any) bool {
-		switch ret := i.(type) {
-		case bool:
-			return ret
-		default:
-			res, _ := strconv.ParseBool(fmt.Sprint(i))
-			return res
-		}
-	}
-
-	toString := func(i any) string {
-		return codec.AnyToString(i)
-	}
-
-	//toInt64 := func(i any) int64 {
-	//	switch ret := i.(type) {
-	//	case float64:
-	//		return int64(ret)
-	//	case int64:
-	//		return ret
-	//	default:
-	//		return codec.Atoi64(fmt.Sprint(i))
-	//	}
-	//}
-
 	params := ir.GetExtraInfo()
 	switch ret := inst.(type) {
 	case *Assert:
-		ret.Cond = unmarshalValue(params["assert_condition_id"])
-		if msg, ok := params["assert_message_id"]; ok {
-			ret.MsgValue = unmarshalValue(msg)
-		}
-		ret.Msg = params["assert_message_string"].(string)
+		ret.Cond = utils.MapGetInt64(params, "assert_condition_id")
+		ret.MsgValue = utils.MapGetInt64(params, "assert_message_id")
+		ret.Msg = utils.MapGetString(params, "assert_message_string")
 	case *BasicBlock:
-		ret.Preds = unmarshalValues(params["block_preds"])
-		ret.Succs = unmarshalValues(params["block_succs"])
-		if cond, ok := params["block_condition"]; ok {
-			ret.Condition = unmarshalValue(cond)
-		}
-		ret.canBeReached = BasicBlockReachableKind(codec.Atoi(fmt.Sprint(params["block_can_be_reached"])))
-		ret.Insts = unmarshalInstructions(params["block_insts"])
-		ret.Phis = unmarshalValues(params["block_phis"])
-		ret.finish = toBool(params["block_finish"])
-		// if scopeTable, ok := params["block_scope_table"]; ok {
-		// ret.ScopeTable = GetLazyScopeFromIrScopeId(int64(toInt(scopeTable)))
-		// }
-		ret.Parent = unmarshalValue(params["block_parent"])
-		ret.Child = unmarshalValues(params["block_child"])
+		ret.Preds = utils.MapGetInt64Slice(params, "block_preds")
+		ret.Succs = utils.MapGetInt64Slice(params, "block_succs")
+		ret.Condition = utils.MapGetInt64(params, "block_condition")
+		ret.canBeReached = BasicBlockReachableKind(utils.MapGetInt(params, "block_can_be_reached"))
+		ret.Insts = utils.MapGetInt64Slice(params, "block_insts")
+		ret.Phis = utils.MapGetInt64Slice(params, "block_phis")
+		ret.finish = utils.MapGetBool(params, "block_finish")
+		ret.Parent = utils.MapGetInt64(params, "block_parent")
+		ret.Child = utils.MapGetInt64Slice(params, "block_child")
 	case *BinOp:
 		ret.Op = BinaryOpcode(params["binop_op"].(string))
-		if x, ok := params["binop_x"]; ok {
-			ret.X = unmarshalValue(x)
-		}
-		if y, ok := params["binop_y"]; ok {
-			ret.Y = unmarshalValue(y)
-		}
+		ret.X = utils.MapGetInt64(params, "binop_x")
+		ret.Y = utils.MapGetInt64(params, "binop_y")
 	case *Call:
-		ret.Method = unmarshalValue(params["call_method"])
-		ret.Args = unmarshalValues(params["call_args"])
-		ret.ArgMember = unmarshalValues(params["call_arg_member"])
-		ret.Binding = unmarshalMapValues(params["call_binding"])
-		ret.Async = toBool(params["call_async"])
-		ret.Unpack = toBool(params["call_unpack"])
-		ret.IsDropError = toBool(params["call_drop_error"])
-		ret.IsEllipsis = toBool(params["call_ellipsis"])
-		//ret.MarkParameterMember = unmarshalMapValues(params["mark_parameter_member"])
+		ret.Method = utils.MapGetInt64(params, "call_method")
+		ret.Args = utils.MapGetInt64Slice(params, "call_args")
+		ret.ArgMember = utils.MapGetInt64Slice(params, "call_arg_member")
+		ret.Binding = utils.MapGetMapStringInt64(params, "call_binding")
+		ret.Async = utils.MapGetBool(params, "call_async")
+		ret.Unpack = utils.MapGetBool(params, "call_unpack")
+		ret.IsDropError = utils.MapGetBool(params, "call_drop_error")
+		ret.IsEllipsis = utils.MapGetBool(params, "call_ellipsis")
 	case *Next:
-		ret.InNext = toBool(params["next_in_next"])
-		ret.Iter = unmarshalValue(params["next_iter"])
+		ret.InNext = utils.MapGetBool(params, "next_item")
+		ret.Iter = utils.MapGetInt64(params, "next_iter")
 	case *Panic:
-		ret.Info = unmarshalValue(params["panic_value"])
+		ret.Info = utils.MapGetInt64(params, "panic_value")
 	case *Parameter:
-		ret.IsFreeValue = params["formalParam_is_freevalue"].(bool)
-		if defaultValue, ok := params["formalParam_default"]; ok {
-			ret.SetDefault(unmarshalValue(defaultValue))
-		}
-		ret.FormalParameterIndex = int(params["formalParam_index"].(float64))
+		ret.IsFreeValue = utils.MapGetBool(params, "formalParam_is_freevalue")
+		ret.defaultValue = utils.MapGetInt64(params, "formalParam_default")
+		ret.FormalParameterIndex = utils.MapGetInt(params, "formalParam_index")
 	case *ParameterMember:
-		ret.FormalParameterIndex = int(params["formalParamMember_index"].(float64))
-		ret.MemberCallKind = ParameterMemberCallKind(params["member_call_kind"].(float64))
-		ret.MemberCallObjectIndex = int(params["member_call_index"].(float64))
-		ret.MemberCallObjectName = params["member_call_name"].(string)
-		if key, ok := params["member_call_key"]; ok {
-			ret.MemberCallKey = unmarshalValue(key)
-		}
+		ret.FormalParameterIndex = utils.MapGetInt(params, "formalParamMember_index")
+		ret.MemberCallKind = ParameterMemberCallKind(utils.MapGetInt(params, "member_call_kind"))
+		ret.MemberCallObjectIndex = utils.MapGetInt(params, "member_call_index")
+		ret.MemberCallObjectName = utils.MapGetString(params, "member_call_name")
+		ret.MemberCallKey = utils.MapGetInt64(params, "member_call_key")
 	case *Phi:
-		ret.Edge = unmarshalValues(params["phi_edges"])
-		if cfgEntry, ok := params["cfg_entry"]; ok {
-			ret.CFGEntryBasicBlock = unmarshalValue(cfgEntry)
-		}
+		ret.Edge = utils.MapGetInt64Slice(params, "phi_edges")
+		ret.CFGEntryBasicBlock = utils.MapGetInt64(params, "cfg_entry")
 	case *Return:
-		ret.Results = unmarshalValues(params["return_results"])
+		ret.Results = utils.MapGetInt64Slice(params, "return_results")
 	case *SideEffect:
-		ret.CallSite = unmarshalValue(params["sideEffect_call"])
-		ret.Value = unmarshalValue(params["sideEffect_value"])
+		ret.CallSite = utils.MapGetInt64(params, "sideEffect_call")
+		ret.Value = utils.MapGetInt64(params, "sideEffect_value")
 	case *UnOp:
-		ret.Op = UnaryOpcode(params["unop_op"].(string))
-		ret.X = unmarshalValue(params["unop_x"])
+		ret.Op = UnaryOpcode(utils.MapGetString(params, "unop_op"))
+		ret.X = utils.MapGetInt64(params, "unop_x")
 	case *Undefined:
-		ret.Kind = UndefinedKind(params["undefined_kind"].(float64))
+		ret.Kind = UndefinedKind(utils.MapGetInt(params, "undefined_kind"))
 	case *ErrorHandler:
-		ret.Try = unmarshalValue(params["errorhandler_try"])
-		ret.Catch = unmarshalValues(params["errorhandler_catch"])
-		ret.Final = unmarshalValue(params["errorhandler_finally"])
-		ret.Done = unmarshalValue(params["errorhandler_done"])
+		ret.Try = utils.MapGetInt64(params, "errorhandler_try")
+		ret.Catch = utils.MapGetInt64Slice(params, "errorhandler_catch")
+		ret.Final = utils.MapGetInt64(params, "errorhandler_finally")
+		ret.Done = utils.MapGetInt64(params, "errorhandler_done")
 	case *ErrorCatch:
-		ret.Exception = unmarshalValue(params["errorcatch_exception"])
-		ret.CatchBody = unmarshalValue(params["errorcatch_catch"])
+		ret.Exception = utils.MapGetInt64(params, "errorcatch_exception")
+		ret.CatchBody = utils.MapGetInt64(params, "errorcatch_catch")
 	case *Jump:
-		if to, ok := params["jump_to"]; ok {
-			ret.To = unmarshalValue(to)
-		}
+		ret.To = utils.MapGetInt64(params, "jump_to")
 	case *ConstInst:
 		i := params["const_value"]
 		c := newConstByMap(i)
@@ -530,43 +388,20 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			c = newConstCreate(i)
 		}
 		ret.Const = c
-		if origin, ok := params["const_origin"]; ok {
-			id := int64(origin.(float64))
-			if lz, err := NewInstructionFromLazy(id, ToUser); err == nil {
-				ret.Origin = lz
-			} else {
-				log.Errorf("BUG: unmatched instruction create lazyInstruction: %v", err)
-			}
-		}
+		ret.Origin = utils.MapGetInt64(params, "const_origin")
 	case *If:
-		if cond, ok := params["if_cond"]; ok {
-			ret.Cond = unmarshalValue(cond)
-		}
-		if trueBlock, ok := params["if_true"]; ok {
-			ret.True = unmarshalValue(trueBlock)
-		}
-		if falseBlock, ok := params["if_false"]; ok {
-			ret.False = unmarshalValue(falseBlock)
-		}
+		ret.Cond = utils.MapGetInt64(params, "if_cond")
+		ret.True = utils.MapGetInt64(params, "if_true")
+		ret.False = utils.MapGetInt64(params, "if_false")
 	case *Loop:
-		ret.Body = unmarshalValue(params["loop_body"])
-		if exit, ok := params["loop_exit"]; ok {
-			ret.Exit = unmarshalValue(exit)
-		}
-		if init, ok := params["loop_init"]; ok {
-			ret.Init = unmarshalValue(init)
-		}
-		if cond, ok := params["loop_cond"]; ok {
-			ret.Cond = unmarshalValue(cond)
-		}
-		if step, ok := params["loop_step"]; ok {
-			ret.Step = unmarshalValue(step)
-		}
-		if key, ok := params["loop_key"]; ok {
-			ret.Key = unmarshalValue(key)
-		}
+		ret.Body = utils.MapGetInt64(params, "loop_body")
+		ret.Exit = utils.MapGetInt64(params, "loop_exit")
+		ret.Init = utils.MapGetInt64(params, "loop_init")
+		ret.Cond = utils.MapGetInt64(params, "loop_cond")
+		ret.Step = utils.MapGetInt64(params, "loop_step")
+		ret.Key = utils.MapGetInt64(params, "loop_key")
 	case *Switch:
-		ret.Cond = unmarshalValue(params["switch_cond"])
+		ret.Cond = utils.MapGetInt64(params, "switch_cond")
 		if labels, ok := params["switch_label"]; ok {
 			if _, isMap := labels.([]map[string]int64); !isMap {
 				log.Errorf("BUG: switch label should be map[string]int64, %v", labels)
@@ -574,36 +409,33 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			}
 			for _, label := range labels.([]map[string]int64) {
 				ret.Label = append(ret.Label, SwitchLabel{
-					Value: unmarshalValue(label["value"]),
-					Dest:  unmarshalValue(label["dest"]),
+					Value: int64(utils.InterfaceToInt(label["value"])),
+					Dest:  int64(utils.InterfaceToInt(label["dest"])),
 				})
 			}
 		}
 	case *Make:
-		if low, ok := params["make_low"]; ok {
-			ret.low = unmarshalValue(low)
-		}
-		if high, ok := params["make_high"]; ok {
-			ret.high = unmarshalValue(high)
-		}
-		if step, ok := params["make_step"]; ok {
-			ret.step = unmarshalValue(step)
-		}
-		if l, ok := params["make_len"]; ok {
-			ret.Len = unmarshalValue(l)
-		}
-		if c, ok := params["make_cap"]; ok {
-			ret.Cap = unmarshalValue(c)
-		}
+		ret.low = utils.MapGetInt64(params, "make_low")
+		ret.high = utils.MapGetInt64(params, "make_high")
+		ret.step = utils.MapGetInt64(params, "make_step")
+		ret.Len = utils.MapGetInt64(params, "make_len")
+		ret.Cap = utils.MapGetInt64(params, "make_cap")
 	case *Function:
-		ret.Params = unmarshalValues(params["params"])
-		ret.ParamLength = toInt(params["param_length"])
-		ret.isMethod = toBool(params["is_method"])
-		ret.methodName = toString(params["method_name"])
-		ret.FreeValues = unmarshalMapVariables(params["free_values"])
-		ret.ParameterMembers = unmarshalValues(params["parameter_members"])
+		ret.Params = utils.MapGetInt64Slice(params, "params")
+		ret.ParamLength = utils.MapGetInt(params, "param_length")
+		ret.isMethod = utils.MapGetBool(params, "is_method")
+		ret.methodName = utils.MapGetString(params, "method_name")
+		free_values := utils.MapGetMapStringInt64(params, "free_values")
+		if ret.FreeValues == nil {
+			ret.FreeValues = make(map[*Variable]int64)
+		}
+		for k, v := range free_values {
+			variable := GetVariableFromDB(v, k)
+			ret.FreeValues[variable] = v
+		}
+		ret.ParameterMembers = utils.MapGetInt64Slice(params, "parameter_members")
 
-		currentBlueprint := toInt(params["current_blueprint"])
+		currentBlueprint := utils.MapGetInt(params, "current_blueprint")
 		if currentBlueprint != -1 {
 			typ := GetTypeFromDB(currentBlueprint)
 			blueprint, ok := ToClassBluePrintType(typ)
@@ -619,35 +451,29 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 				// name / verbose_name / modified / forcecreate
 				ins.Name = utils.MapGetString(extra, "name")
 				ins.VerboseName = utils.MapGetString(extra, "verbose_name")
-				ins.Modify = unmarshalValue(extra["modify"])
+				ins.Modify = utils.MapGetInt64(extra, "modify")
 				ins.forceCreate = utils.MapGetBool(extra, "forceCreate")
 				ins.ObjectName = utils.MapGetString(extra, "object_name")
 				ins.MemberCallKind = ParameterMemberCallKind(utils.MapGetInt(extra, "member_call_kind"))
 				ins.MemberCallObjectIndex = utils.MapGetInt(extra, "member_call_object_index")
 				ins.MemberCallObjectName = utils.MapGetString(extra, "member_call_name")
 				if extra["member_call_key"] != nil {
-					ins.MemberCallKey = unmarshalValue(extra["member_call_key"])
+					ins.MemberCallKey = utils.MapGetInt64(extra, "member_call_key")
 				}
 				se = append(se, ins)
 			})
 			ret.SideEffects = se
 		}
-		if parent, ok := params["parent"]; ok {
-			ret.parent = unmarshalValue(parent)
+		if parent, ok := params["parent"].(int64); ok {
+			ret.parent = parent
 		}
-		ret.Throws = unmarshalValues(params["throws"])
-		ret.ChildFuncs = unmarshalValues(params["child_funcs"])
-		ret.Return = unmarshalValues(params["return"])
-		ret.Blocks = unmarshalInstructions(params["blocks"])
-		if enter, ok := params["enter_block"]; ok {
-			ret.EnterBlock = unmarshalValue(enter)
-		}
-		if exit, ok := params["exit_block"]; ok {
-			ret.ExitBlock = unmarshalValue(exit)
-		}
-		if deferBlock, ok := params["defer_block"]; ok {
-			ret.DeferBlock = unmarshalValue(deferBlock)
-		}
+		ret.Throws = utils.MapGetInt64Slice(params, "throws")
+		ret.ChildFuncs = utils.MapGetInt64Slice(params, "child_funcs")
+		ret.Return = utils.MapGetInt64Slice(params, "return")
+		ret.Blocks = utils.MapGetInt64Slice(params, "blocks")
+		ret.EnterBlock = utils.MapGetInt64(params, "enter_block")
+		ret.ExitBlock = utils.MapGetInt64(params, "exit_block")
+		ret.DeferBlock = utils.MapGetInt64(params, "defer_block")
 
 		if hasEllipsis, ok := params["has_ellipsis"].(bool); ok {
 			ret.hasEllipsis = hasEllipsis
@@ -655,7 +481,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *ExternLib:
 
 	case *TypeCast:
-		ret.Value = unmarshalValue(params["typecast_value"])
+		ret.Value = utils.MapGetInt64(params, "typecast_value")
 
 	default:
 		// log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())

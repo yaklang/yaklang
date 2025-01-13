@@ -32,3 +32,16 @@ func TestAnalyzeMustPASS_CorePlugin(t *testing.T) {
 		})
 	}
 }
+
+func TestAnalyzeMustPASS_CorePlugin_Debug(t *testing.T) {
+	target := "SSA 项目探测"
+	yakit.CallPostInitDatabase()
+	for _, plugin := range buildInPlugin {
+		if plugin.ScriptName != target {
+			continue
+		}
+		t.Run(fmt.Sprintf("plugin(%s) %s", plugin.Type, plugin.ScriptName), func(t *testing.T) {
+			staticCheck(plugin.Content, plugin.Type, t)
+		})
+	}
+}

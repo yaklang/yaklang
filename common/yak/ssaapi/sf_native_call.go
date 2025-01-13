@@ -596,7 +596,8 @@ func init() {
 			if !flag {
 				return nil
 			}
-			result1 := searchAlongBasicBlock(function.EnterBlock.GetBlock(), prog, frame, params, Next)
+			enter := function.GetBasicBlockByID(function.EnterBlock)
+			result1 := searchAlongBasicBlock(enter.GetBlock(), prog, frame, params, Next)
 			result = append(result, result1...)
 			return nil
 		})
@@ -1091,6 +1092,7 @@ func init() {
 						return nil
 					}
 					for _, param := range rets.Params {
+						param := rets.GetValueById(param)
 						newVal := val.NewValue(param)
 						newVal.AppendPredecessor(val, frame.WithPredecessorContext("getFormalParams"))
 						vals = append(vals, newVal)
@@ -1099,7 +1101,7 @@ func init() {
 				return nil
 			})
 			if len(vals) > 0 {
-				fmt.Println("getFormalParams: ", vals)
+				// fmt.Println("getFormalParams: ", vals)
 				return true, sfvm.NewValues(vals), nil
 			}
 			return false, nil, utils.Error("no value(formal params) found")
@@ -1122,11 +1124,13 @@ func init() {
 					return nil
 				}
 				for _, ret := range funcIns.Return {
+					ret := funcIns.GetValueById(ret)
 					retVal, ok := ssa.ToReturn(ret)
 					if !ok {
 						continue
 					}
 					for _, retIns := range retVal.Results {
+						retIns := funcIns.GetValueById(retIns)
 						new := val.NewValue(retIns)
 						new.AppendPredecessor(val, frame.WithPredecessorContext("getReturns"))
 						vals = append(vals, new)

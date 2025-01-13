@@ -415,6 +415,7 @@ func Test_Return_phi(t *testing.T) {
 			print( * as $para)
 			$para<typeName()> as $typeName 
 			`)
+			res.Show()
 			require.NoError(t, err)
 			typeName := res.GetValues("typeName")
 			// typeName

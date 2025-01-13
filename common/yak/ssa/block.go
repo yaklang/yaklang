@@ -4,24 +4,21 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (f *Function) GetDeferBlock() *BasicBlock {
 	newDefer := func() *BasicBlock {
 		block := f.NewBasicBlockNotAddBlocks("defer")
-		f.DeferBlock = block
+		f.DeferBlock = block.GetId()
 		// TODO: this Scope should be child Scope of other scope in function
 		block.SetScope(NewScope(f, f.GetProgram().GetProgramName()))
 		return block
 	}
-	if f.DeferBlock == nil {
+	if f.DeferBlock <= 0 {
 		return newDefer()
 	}
-	block, ok := f.DeferBlock.(*BasicBlock)
-	if !ok {
-		log.Warnf("defer block is not a basic block")
-		return newDefer()
-	}
+	block := f.GetBasicBlockByID(f.DeferBlock)
 	return block
 }
 
@@ -42,11 +39,11 @@ func (f *Function) NewBasicBlockNotAddUnSealed(name string) *BasicBlock {
 func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bool) *BasicBlock {
 	b := &BasicBlock{
 		anValue: NewValue(),
-		Preds:   make([]Value, 0),
-		Succs:   make([]Value, 0),
-		Insts:   make([]Instruction, 0),
-		Phis:    make([]Value, 0),
-		Handler: nil,
+		Preds:   make([]int64, 0),
+		Succs:   make([]int64, 0),
+		Insts:   make([]int64, 0),
+		Phis:    make([]int64, 0),
+		Handler: 0,
 		finish:  false,
 	}
 	b.SetName(name)
@@ -79,7 +76,7 @@ func addToBlocks(block *BasicBlock) {
 	block.SetName(name)
 
 	block.Index = index
-	f.Blocks = append(f.Blocks, block)
+	f.Blocks = append(f.Blocks, block.GetId())
 }
 
 func (b *BasicBlock) SetScope(s ScopeIF) {
@@ -95,8 +92,8 @@ func (b *BasicBlock) SetScope(s ScopeIF) {
 	}
 	{
 		if block := GetBlockByScope(s.GetParent()); block != nil {
-			b.Parent = block
-			block.Child = append(block.Child, b)
+			b.Parent = block.GetId()
+			block.Child = append(block.Child, b.GetId())
 		}
 	}
 }
@@ -108,7 +105,7 @@ func (b *BasicBlock) HaveSubBlock(sub Value) bool {
 
 	for {
 		subBlock, ok := ToBasicBlock(sub)
-		if !ok {
+		if !ok || utils.IsNil(subBlock) {
 			log.Errorf("BasicBlock.HaveSubBlock: sub %v is not a basic block", sub)
 			return false
 		}
@@ -117,7 +114,7 @@ func (b *BasicBlock) HaveSubBlock(sub Value) bool {
 			return true
 		}
 
-		sub = subBlock.Parent
+		sub = subBlock.GetBasicBlockByID(subBlock.Parent)
 	}
 }
 
@@ -126,11 +123,11 @@ func (b *BasicBlock) Reachable() BasicBlockReachableKind {
 		return b.canBeReached
 	}
 
-	if b.Condition != nil {
+	if b.Condition > 0 {
 		return BasicBlockUnknown
 	}
 
-	if c, ok := b.Condition.(*ConstInst); ok {
+	if c, ok := ToConstInst(b.GetInstructionById(b.Condition)); ok {
 		if c.IsBoolean() {
 			if c.Boolean() {
 				return BasicBlockReachable
@@ -144,10 +141,10 @@ func (b *BasicBlock) Reachable() BasicBlockReachableKind {
 }
 
 func (b *BasicBlock) AddSucc(succ *BasicBlock) {
-	b.Succs = append(b.Succs, succ)
-	succ.Preds = append(succ.Preds, b)
+	b.Succs = append(b.Succs, succ.GetId())
+	succ.Preds = append(succ.Preds, b.GetId())
 }
 
 func (b *BasicBlock) LastInst() Instruction {
-	return b.Insts[len(b.Insts)-1]
+	return b.GetInstructionById(b.Insts[len(b.Insts)-1])
 }

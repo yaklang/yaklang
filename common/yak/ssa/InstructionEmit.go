@@ -28,7 +28,7 @@ func fixupUseChain(node Instruction) {
 func DeleteInst(i Instruction) {
 	_, ok := i.(*anInstruction)
 	if ok {
-		i = i.GetProgram().GetInstructionById(i.GetId())
+		i = i.GetInstructionById(i.GetId())
 	}
 
 	b := i.GetBlock()
@@ -37,13 +37,13 @@ func DeleteInst(i Instruction) {
 		return
 	}
 	if phi, ok := ToPhi(i); ok {
-		b.Phis = lo.Filter(b.Phis, func(item Value, index int) bool {
-			return item.GetId() != phi.GetId()
+		b.Phis = lo.Filter(b.Phis, func(item int64, index int) bool {
+			return item != phi.GetId()
 		})
 	} else {
 		// b.Insts = utils.RemoveSliceItem(b.Insts, Instruction(i))
-		b.Insts = lo.Filter(b.Insts, func(item Instruction, index int) bool {
-			return item.GetId() != i.GetId()
+		b.Insts = lo.Filter(b.Insts, func(id int64, index int) bool {
+			return id != i.GetId()
 		})
 	}
 	if user, ok := ToUser(i); ok {
@@ -143,7 +143,7 @@ func (f *FunctionBuilder) SetCurrent(i Instruction, noChangeRanges ...bool) func
 }
 
 func (b *BasicBlock) EmitInst(i Instruction) {
-	if index := slices.Index(b.Insts, i); index == -1 {
+	if index := slices.Index(b.Insts, i.GetId()); index == -1 {
 		b.GetFunc().builder.EmitToBlock(i, b)
 	}
 }
@@ -164,20 +164,20 @@ func (b *FunctionBuilder) EmitFirst(i Instruction, blocks ...*BasicBlock) {
 	if len(block.Insts) == 0 {
 		b.emit(i)
 	} else {
-		b.EmitInstructionBefore(i, block.Insts[0])
+		b.EmitInstructionBefore(i, b.GetInstructionById(block.Insts[0]))
 	}
 }
 
 func (f *FunctionBuilder) EmitInstructionBefore(i, before Instruction) {
 	f.emitAroundInstruction(i, before, func(i Instruction) {
 		insts := f.CurrentBlock.Insts
-		if index := slices.Index(insts, before); index > -1 {
+		if index := slices.Index(insts, before.GetId()); index > -1 {
 			// Extend the slice
-			insts = append(insts, nil)
+			insts = append(insts, 0)
 			// Move elements to create a new space
 			copy(insts[index+1:], insts[index:])
 			// Insert new element
-			insts[index] = i
+			insts[index] = i.GetId()
 			f.CurrentBlock.Insts = insts
 		}
 	})
@@ -186,13 +186,13 @@ func (f *FunctionBuilder) EmitInstructionBefore(i, before Instruction) {
 func (f *FunctionBuilder) EmitInstructionAfter(i, after Instruction) {
 	f.emitAroundInstruction(i, after, func(i Instruction) {
 		insts := f.CurrentBlock.Insts
-		if index := slices.Index(insts, after); index > -1 {
+		if index := slices.Index(insts, after.GetId()); index > -1 {
 			// Extend the slice
-			insts = append(insts, nil)
+			insts = append(insts, 0)
 			// Move elements to create a new space
 			copy(insts[index+2:], insts[index+1:])
 			// Insert new element
-			insts[index+1] = i
+			insts[index+1] = i.GetId()
 			// block.Insts = insts
 			f.CurrentBlock.Insts = insts
 		}
@@ -218,11 +218,10 @@ func (f *FunctionBuilder) SetInstructionPosition(i Instruction) {
 }
 
 func (f *FunctionBuilder) EmitOnly(i Instruction) {
-	f.CurrentBlock.Insts = append(f.CurrentBlock.Insts, i)
+	f.CurrentBlock.Insts = append(f.CurrentBlock.Insts, i.GetId())
 }
 
 func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
-	fixupUseChain(i)
 	// i.SetScope(f.CurrentScope)
 	if i.GetRange() == nil {
 		i.SetRange(f.CurrentRange)
@@ -231,6 +230,7 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 	i.SetFunc(f.Function)
 	f.GetProgram().SetVirtualRegister(i)
 	insert(i)
+	fixupUseChain(i) // this function should after set Program
 }
 
 // EmitUndefined emit undefined value
@@ -294,11 +294,11 @@ func (f *FunctionBuilder) EmitLoop(body, exit *BasicBlock, cond Value) *Loop {
 		return nil
 	}
 	l := NewLoop(cond)
-	l.Body = body
-	l.Exit = exit
+	f.emit(l)
+	l.Body = body.GetId()
+	l.Exit = exit.GetId()
 	f.CurrentBlock.AddSucc(body)
 	f.CurrentBlock.AddSucc(exit)
-	f.emit(l)
 	f.CurrentBlock.finish = true
 	return l
 }
@@ -332,7 +332,7 @@ func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 	f.emit(r)
 	f.CurrentBlock.finish = true
 	f.IsReturn = true
-	f.Return = append(f.Return, r)
+	f.Return = append(f.Return, r.GetId())
 
 	f.builder.SetReturnSideEffects()
 
@@ -506,12 +506,15 @@ func (f *FunctionBuilder) EmitErrorHandler(try *BasicBlock) *ErrorHandler {
 	block := f.CurrentBlock
 	block.AddSucc(try)
 	f.emit(e)
+	block.Handler = e.GetId()
 	return e
 }
 
 func (f *FunctionBuilder) EmitErrorCatch(try *ErrorHandler, catchBody *BasicBlock, exception Value) *ErrorCatch {
 	e := NewErrorCatch(try, catchBody, exception)
 	f.EmitFirst(e)
+	try.Catch = append(try.Catch, e.GetId())
+	catchBody.Handler = try.GetId()
 	return e
 }
 
@@ -521,7 +524,7 @@ func (f *FunctionBuilder) EmitPanic(info Value) *Panic {
 	}
 	p := &Panic{
 		anValue: NewValue(),
-		Info:    info,
+		Info:    info.GetId(),
 	}
 	f.emit(p)
 	return p
@@ -539,14 +542,14 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 	return r
 }
 
-func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
+func (f *FunctionBuilder) EmitPhi(name string, vs Values) *Phi {
 	p := &Phi{
 		anValue: NewValue(),
-		Edge:    vs,
+		Edge:    vs.GetIds(),
 	}
 	p.SetName(name)
 	f.emitEx(p, func(i Instruction) {
-		f.CurrentBlock.Phis = append(f.CurrentBlock.Phis, p)
+		f.CurrentBlock.Phis = append(f.CurrentBlock.Phis, p.GetId())
 	})
 	for _, v := range vs {
 		v.AddOccultation(p)
@@ -578,7 +581,7 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 			if _, ok := value.(*SideEffect); ok {
 			} else if p, ok := value.(*Parameter); ok && p.IsFreeValue {
 			} else {
-				ser.Modify = value
+				ser.Modify = value.GetId()
 			}
 		}
 		variable := se.Variable
@@ -605,8 +608,10 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 
 	if variable := ReadVariableFromScopeAndParent(scope, name); variable != nil {
 		bindVariable = func(se *SideEffect) {
-			if callSide := se.CallSite; callSide != nil {
-				if bind, ok := callSide.(*Call).Binding[name]; ok {
+			if se.CallSite > 0 {
+				callSide := f.GetValueById(se.CallSite)
+				if bindId, ok := callSide.(*Call).Binding[name]; ok {
+					bind := f.GetValueById(bindId)
 					bindVariableId = bind.GetLastVariable().GetCaptured().GetId()
 					_ = bindVariableId
 				}
@@ -623,26 +628,26 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 		findVariable()
 
 		edge := []Value{}
-		if phi, ok := ToPhi(se.Value); ok {
-			for _, e := range phi.Edge {
+		if phi, ok := ToPhi(f.GetValueById(se.Value)); ok {
+			for _, e := range phi.GetValues() {
 				if se, ok := e.(*SideEffect); ok {
 					bindVariable(se)
 				}
 			}
-			edge = append(edge, phi.Edge...)
+			edge = append(edge, phi.GetValues()...)
 			phit := f.EmitPhi(name, edge)
 
-			for i, e := range phit.Edge {
+			for i, e := range phit.GetValues() {
 				if p, ok := ToParameter(e); ok && p.IsFreeValue {
 					newParam := NewParam(name, true, f)
 					if bindVariableId == findVariableId {
 						value := variable.GetValue()
-						newParam.defaultValue = value
-						phit.Edge[i] = newParam
+						newParam.defaultValue = value.GetId()
+						phit.Edge[i] = newParam.GetId()
 					}
 				}
 			}
-			se.Value = phit
+			se.Value = phit.GetId()
 		}
 
 	}
@@ -670,7 +675,11 @@ func (f *FunctionBuilder) CopyValue(v Value) Value {
 				return members[i]
 			})
 	case *Phi:
-		phi := f.EmitPhi(v.name, v.Edge)
+		edgeValues := make(Values, len(v.Edge))
+		for i, id := range v.Edge {
+			edgeValues[i] = f.GetValueById(id)
+		}
+		phi := f.EmitPhi(v.name, edgeValues)
 		phi.CFGEntryBasicBlock = v.CFGEntryBasicBlock
 		ret = phi
 	}
