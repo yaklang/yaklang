@@ -3,11 +3,12 @@ package ssa
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 
 	"github.com/samber/lo"
 
@@ -112,11 +113,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 
 	// b.ScopeStart()
 	// b.Function.SetScope(b.CurrentScope)
-	var ok bool
-	b.CurrentBlock, ok = ToBasicBlock(f.EnterBlock)
-	if !ok {
-		log.Errorf("function (%v) enter block is not a basic block", f.name)
-	}
+	b.CurrentBlock = f.GetBasicBlockByID(f.EnterBlock)
 	f.builder = b
 	return b
 }
@@ -222,7 +219,7 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 
 // function param
 func (b FunctionBuilder) HandlerEllipsis() {
-	if ins, ok := b.Params[len(b.Params)-1].(*Parameter); ins != nil {
+	if ins, ok := ToParameter(b.GetInstructionById(b.Params[len(b.Params)-1])); ok {
 		_ = ok
 		ins.SetType(NewSliceType(CreateAnyType()))
 	} else {
@@ -246,9 +243,9 @@ func (b *FunctionBuilder) EmitDefer(instruction Instruction) {
 			c.handleCalleeFunction()
 		}
 		if len(deferBlock.Insts) == 0 {
-			deferBlock.Insts = append(deferBlock.Insts, instruction)
+			deferBlock.Insts = append(deferBlock.Insts, instruction.GetId())
 		} else {
-			deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, instruction, 0)
+			deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, instruction.GetId(), 0)
 		}
 	})
 }

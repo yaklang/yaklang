@@ -1035,14 +1035,14 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 	if !ok {
 		return suggestions
 	}
-	funcTyp, ok := ssa.ToFunctionType(call.Method.GetType())
+	funcTyp, ok := ssa.ToFunctionType(call.GetValueById(call.Method).GetType())
 	if !ok {
 		return suggestions
 	}
 	// find index of call.Args
 	index := -1
 	for i, arg := range call.Args {
-		if arg == v.GetSSAInst() {
+		if arg == v.GetId() {
 			index = i
 		}
 	}
@@ -1245,6 +1245,7 @@ func fuzztagCompletion(fuzztagCode string, hotPatchCode string) []*ypb.Suggestio
 			mainFunc, ok := prog.Program.Funcs.Get(string(ssa.MainFunctionName))
 			if ok {
 				for _, childFunc := range mainFunc.ChildFuncs {
+					childFunc := mainFunc.GetValueById(childFunc)
 					if utils.StringArrayContains(hotPatchBlacklist, childFunc.GetName()) {
 						continue
 					}

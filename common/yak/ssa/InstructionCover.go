@@ -4,6 +4,7 @@ import "github.com/yaklang/yaklang/common/utils"
 
 // for DataFlowNode cover
 func ToNode(a any) (Node, bool) { u, ok := a.(Node); return u, ok }
+
 func ToValue(n Instruction) (Value, bool) {
 	if utils.IsNil(n) {
 		return nil, false

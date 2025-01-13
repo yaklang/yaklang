@@ -1,11 +1,13 @@
 package syntaxflow
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestLib_SpringControllerParam(t *testing.T) {
@@ -29,9 +31,15 @@ public class FastJSONDemoController {
 }`)
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		results := prog.SyntaxFlowChain(`<include('java-spring-mvc-param')> as $params`)
+		results, err := prog.SyntaxFlowWithError(`
+// 声明式参数绑定(注解方式)
+*Mapping.__ref__?{opcode: function} as $start;
+$start<getFormalParams>?{opcode: param && !have: this} as $params;
+$params?{!<typeName>?{have:'javax.servlet.http'}} as $output;
+		`)
+		require.NoError(t, err)
 		results.Show()
-		assert.Equal(t, 1, len(results))
+		assert.Equal(t, 1, len(results.GetValues("output")))
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }

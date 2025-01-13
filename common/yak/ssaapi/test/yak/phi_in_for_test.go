@@ -33,8 +33,9 @@ os.System(input)
 		if !ok {
 			t.Fatal("not phi")
 		}
-		if targetIns.CFGEntryBasicBlock != nil {
-			next, ok := targetIns.CFGEntryBasicBlock.IsCFGEnterBlock()
+		if targetIns.CFGEntryBasicBlock > 0 {
+			block := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
+			next, ok := block.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")
 			}
@@ -66,8 +67,9 @@ os.System(input)
 		if !ok {
 			t.Fatal("not phi")
 		}
-		if targetIns.CFGEntryBasicBlock != nil {
-			next, ok := targetIns.CFGEntryBasicBlock.IsCFGEnterBlock()
+		if targetIns.CFGEntryBasicBlock > 0 {
+			block := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
+			next, ok := block.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")
 			}
@@ -108,8 +110,9 @@ os.System(input)
 		conds := targetIns.GetControlFlowConditions()
 		assert.Equal(t, 2, len(conds))
 
-		if targetIns.CFGEntryBasicBlock != nil {
-			next, ok := targetIns.CFGEntryBasicBlock.IsCFGEnterBlock()
+		if targetIns.CFGEntryBasicBlock > 0 {
+			block := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
+			next, ok := block.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")
 			}
@@ -145,8 +148,9 @@ func TestPhiInCFG_If_Without_ElseStatement(t *testing.T) {
 		conds := targetIns.GetControlFlowConditions()
 		assert.Equal(t, 1, len(conds))
 
-		if targetIns.CFGEntryBasicBlock != nil {
-			next, ok := targetIns.CFGEntryBasicBlock.IsCFGEnterBlock()
+		if targetIns.CFGEntryBasicBlock > 0 {
+			block := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
+			next, ok := block.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")
 			}

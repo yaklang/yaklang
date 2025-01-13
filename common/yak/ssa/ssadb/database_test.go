@@ -124,7 +124,7 @@ func TestSyncFromDatabase(t *testing.T) {
 		require.NotNil(t, lazyInst)
 
 		lz, isLazyInstruction := ssa.ToLazyInstruction(lazyInst)
-		// spew.Dump(lazyInst)
+		spew.Dump(lazyInst)
 		require.True(t, isLazyInstruction)
 		require.Equal(t, ssa.SSAOpcodeConstInst, lz.GetOpcode())
 

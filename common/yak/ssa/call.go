@@ -11,21 +11,25 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func NewCall(target Value, args []Value, binding map[string]Value, block *BasicBlock) *Call {
-	if binding == nil {
-		binding = make(map[string]Value)
+func NewCall(target Value, args Values, binding map[string]Value, block *BasicBlock) *Call {
+	bind := make(map[string]int64, len(binding))
+	for name, value := range binding {
+		bind[name] = value.GetId()
 	}
 
 	c := &Call{
 		anValue:         NewValue(),
-		Method:          target,
-		Args:            args,
-		Binding:         binding,
+		Method:          target.GetId(),
+		Args:            args.GetIds(),
+		Binding:         bind,
 		Async:           false,
 		Unpack:          false,
 		IsDropError:     false,
 		IsEllipsis:      false,
-		SideEffectValue: map[string]Value{},
+		SideEffectValue: map[string]int64{},
+	}
+	if c.Method <= 0 {
+		log.Infof("bb")
 	}
 	return c
 }
@@ -50,7 +54,7 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 
 // handleMethod handle method for call,this call have more type,need handle this type
 func (c *Call) handleMethod() {
-	callMethod := c.Method
+	callMethod := c.GetValueById(c.Method)
 	/*
 		handle weakLanguage call
 	*/
@@ -84,7 +88,7 @@ func (c *Call) handleMethod() {
 			/*
 				from value to getFunc
 			*/
-			check(ret.Value)
+			check(ret.GetValueById(ret.Value))
 		case *Phi:
 			for _, value := range ret.GetValues() {
 				check(value)
@@ -97,7 +101,7 @@ func (c *Call) handleMethod() {
 }
 
 func (c *Call) handlerGeneric() {
-	newMethod := c.Method
+	newMethod := c.GetValueById(c.Method)
 	if !newMethod.IsExtern() || newMethod.GetOpcode() != SSAOpcodeFunction {
 		return
 	}
@@ -128,7 +132,8 @@ func (c *Call) handlerGeneric() {
 	returnType := fType.ReturnType
 
 	hasError := false
-	for i, arg := range c.Args {
+	for i, id := range c.Args {
+		arg := c.GetValueById(id)
 		index := i
 		argTyp := arg.GetType()
 		if isVariadic && i > fType.ParameterLen-1 {
@@ -198,24 +203,34 @@ func (c *Call) handlerGeneric() {
 		// create new function type and set cache
 
 		newFuncTyp := NewFunctionType(newMethod.GetName(), paramsType, returnType, fType.IsVariadic)
-		newMethod = NewFunctionWithType(newMethod.GetName(), newFuncTyp)
+		newMethod = prog.NewFunction(newMethod.GetName())
+		newMethod.SetType(newFuncTyp)
 		prog.SetCacheExternInstance(name, newMethod)
 	} else {
 		newMethod = value
 	}
-	c.Method = newMethod
+	c.Method = newMethod.GetId()
+	if c.Method <= 0 {
+		log.Infof("ab")
+	}
 }
 func (c *Call) handlerObjectMethod() {
 	args := c.Args
-	target := c.Method
+	target := c.GetValueById(c.Method)
 	// handler "this" in parameter
 	AddThis := func(this Value) {
 		if len(args) == 0 {
-			args = append(args, this)
+			args = append(args, this.GetId())
 		} else {
-			args = utils.InsertSliceItem(args, this, 0)
+			args = utils.InsertSliceItem(args, this.GetId(), 0)
 		}
 		this.AddUser(c)
+	}
+	if target == nil {
+		log.Infof("b")
+	}
+	if target.GetType() == nil {
+		log.Infof("aa")
 	}
 	switch t := target.GetType().(type) {
 	case *FunctionType:
@@ -236,7 +251,8 @@ func (c *Call) handlerObjectMethod() {
 // handler Return type, and handle drop error
 func (c *Call) handlerReturnType() {
 	// get function type
-	funcTyp, ok := ToFunctionType(c.Method.GetType())
+	method := c.GetValueById(c.Method)
+	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok {
 		return
 	}
@@ -283,9 +299,10 @@ func (c *Call) handleCalleeFunction() {
 	builder := function.builder
 
 	// get function type
-	funcTyp, ok := ToFunctionType(c.Method.GetType())
+	method := c.GetValueById(c.Method)
+	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok { // for Test_SideEffect_Double_more
-		if param, ok := ToParameter(c.Method); ok {
+		if param, ok := ToParameter(method); ok {
 			caller := param.GetFunc()
 			callee := caller.anValue.GetFunc()
 			caller.SideEffects = append(caller.SideEffects, callee.SideEffects...)
@@ -307,7 +324,7 @@ func (c *Call) handleCalleeFunction() {
 			for _, p := range funcTyp.ParameterMember {
 
 				objectName := p.ObjectName
-				key := p.MemberCallKey
+				key := p.GetValueById(p.MemberCallKey)
 				object, ok := p.Get(c)
 				if !ok {
 					continue
@@ -319,14 +336,14 @@ func (c *Call) handleCalleeFunction() {
 						ValueNotMember(
 							object.GetOpcode(),
 							objectName,
-							p.MemberCallKey.String(),
+							key.String(),
 							c.GetRange(),
 						),
 					)
 					c.NewError(Error, SSATAG,
 						ValueNotMemberInCall(
 							objectName,
-							p.MemberCallKey.String(),
+							key.String(),
 						),
 					)
 					continue
@@ -351,7 +368,7 @@ func (c *Call) handleCalleeFunction() {
 					val = builder.ReadMemberCallValue(object, key)
 				}
 				val.AddUser(c)
-				c.ArgMember = append(c.ArgMember, val)
+				c.ArgMember = append(c.ArgMember, val.GetId())
 			}
 			break
 		}
@@ -368,7 +385,7 @@ func (c *Call) handleCalleeFunction() {
 		return
 	}
 
-	is := c.Method.IsMember()
+	is := method.IsMember()
 	if !is {
 		// this function is method Function, but no member call get this.
 		// error
@@ -383,7 +400,7 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 
 	bindAndHandler := func(name string, val Value) {
 		val.AddUser(c)
-		c.Binding[name] = val
+		c.Binding[name] = val.GetId()
 	}
 
 	for _, fv := range fvs {
@@ -396,7 +413,8 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 			// skip instance function, or `go` with instance function,
 			// this function no variable, and code-range of call-site same as function.
 			// we don't mark error in call-site.
-			if fun, ok := ToFunction(c.Method); ok {
+			method := c.GetValueById(c.Method)
+			if fun, ok := ToFunction(method); ok {
 				if len(fun.GetAllVariables()) == 0 {
 					return
 				}

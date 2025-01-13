@@ -52,14 +52,14 @@ func TryGetSimilarityKey(table []string, name string) string {
 }
 
 func (ex *ExternLib) BuildField(key string) Value {
-	if ret, ok := ex.MemberMap[key]; ok {
-		return ret
+	if id, ok := ex.MemberMap[key]; ok {
+		return ex.GetValueById(id)
 	}
 	b := ex.builder
 	if v, ok := ex.table[key]; ok {
 		v := b.BuildValueFromAny(ex.GetName()+"."+key, v)
-		ex.MemberMap[key] = v
-		ex.Member = append(ex.Member, v)
+		ex.MemberMap[key] = v.GetId()
+		ex.Member = append(ex.Member, v.GetId())
 		return v
 	}
 	return nil
@@ -91,6 +91,9 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 		// create variable for extern value
 		variable := ret.GetVariable(name)
 		if variable == nil {
+			// b.AssignVariable(
+			// 	b.CreateMemberCallVariable(extern, key), ret,
+			// )
 			ret.AddVariable(b.CreateMemberCallVariable(extern, key))
 		} else {
 			variable.AddRange(b.CurrentRange, true)
@@ -138,6 +141,9 @@ func (b *FunctionBuilder) tryBuildExternFieldForPhi(extern *ExternLib, phiIns *P
 		}
 		// recursive check phi
 		if phiKey, ok := ToPhi(possibleKey); ok {
+			if len(phiKey.Edge) == 0 {
+				continue
+			}
 			if ret := b.tryBuildExternFieldForPhi(extern, phiKey, m); ret == nil {
 				errorNotice(possibleKey)
 				return possibleRet

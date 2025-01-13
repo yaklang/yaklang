@@ -7,8 +7,8 @@ import (
 func (p *Program) show(flag FunctionAsmFlag) {
 
 	var showFunc func(i *Function)
-	showFunc = func(i *Function) {
-		fmt.Println(i.DisAsm(flag))
+	showFunc = func(f *Function) {
+		fmt.Println(f.DisAsm(flag))
 		fmt.Println("extern type:")
 		// for name, typ := range i.externType {
 		// 	fmt.Printf("%s: %s\n", name, typ.RawString())
@@ -18,13 +18,18 @@ func (p *Program) show(flag FunctionAsmFlag) {
 		// 	fmt.Printf("%s: %s\n", name, v)
 		// }
 
-		for _, f := range i.ChildFuncs {
-			child, ok := ToFunction(f)
-			if !ok {
-				log.Warnf("function %s is not a ssa.Function", f.GetName())
+		for _, childID := range f.ChildFuncs {
+			childValue := f.GetValueById(childID)
+			if childValue == nil {
+				log.Warnf("function %d is not a ssa.Value", childID)
 				continue
 			}
-			showFunc(child)
+			childFunc, ok := ToFunction(childValue)
+			if !ok {
+				log.Warnf("function %s is not a ssa.Function", childValue.GetName())
+				continue
+			}
+			showFunc(childFunc)
 		}
 	}
 

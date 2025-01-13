@@ -4,13 +4,15 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
+
+	//js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/go2ssa"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
-	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
@@ -60,6 +62,8 @@ func (c *config) parseFile() (ret *Program, err error) {
 	if prog.EnableDatabase { // save program
 		prog.UpdateToDatabase()
 	}
+	total := prog.Cache.CountInstruction()
+	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
 	prog.Cache.SaveToDatabase()
 	c.SaveConfig()
 	return NewProgram(prog, c), nil

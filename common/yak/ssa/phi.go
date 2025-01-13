@@ -12,11 +12,12 @@ import (
 func NewPhi(block *BasicBlock, variable string) *Phi {
 	p := &Phi{
 		anValue: NewValue(),
-		Edge:    make([]Value, 0, len(block.Preds)),
+		Edge:    make([]int64, 0, len(block.Preds)),
 	}
 	p.SetName(variable)
 	p.SetBlock(block)
 	p.SetFunc(block.GetFunc())
+	p.GetProgram().SetVirtualRegister(p)
 	return p
 }
 
@@ -68,8 +69,8 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 						}
 						if find != v {
 							phit := NewPhi(phi.GetBlock(), res.name)
-							phit.Edge = append(phit.Edge, find)
-							phit.Edge = append(phit.Edge, v)
+							phit.Edge = append(phit.Edge, find.GetId())
+							phit.Edge = append(phit.Edge, v.GetId())
 							phit.SetName(res.name)
 							phit.GetProgram().SetVirtualRegister(phit)
 							retT[res.name] = phit
@@ -100,8 +101,8 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 
 		// step 2
 		if phi2, ok := ToPhi(latch); ok {
-			if index := slices.Index(phi2.Edge, phiValue); index != -1 {
-				phi2.Edge[index] = header
+			if index := slices.Index(phi2.Edge, phiValue.GetId()); index != -1 {
+				phi2.Edge[index] = header.GetId()
 				ret[name] = phi2
 				DeleteInst(phiValue)
 				ReplaceAllValue(phiValue, phi2)
@@ -113,8 +114,8 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 		}
 
 		// step 3
-		phi.Edge = append(phi.Edge, header)
-		phi.Edge = append(phi.Edge, latch)
+		phi.Edge = append(phi.Edge, header.GetId())
+		phi.Edge = append(phi.Edge, latch.GetId())
 		phi.SetName(name)
 		phi.GetProgram().SetVirtualRegister(phi)
 		ret[name] = phiValue
@@ -188,7 +189,7 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		phi.GetProgram().SetVirtualRegister(phi)
 		phi.GetProgram().SetInstructionWithName(name, phi)
 		phi.SetVerboseName(vs[0].GetVerboseName())
-		phi.CFGEntryBasicBlock = cfgEntryBlock
+		phi.CFGEntryBasicBlock = cfgEntryBlock.GetId()
 		return phi
 	}
 }

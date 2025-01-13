@@ -25,7 +25,10 @@ func TestScanWithIfStatement(t *testing.T) {
 		}
 	}
 	`
-	ssatest.CheckSyntaxFlow(t, code, `bb2<scanPrevious> as $target1;bb1<scanNext> as $target2`,
+	ssatest.CheckSyntaxFlow(t, code, `
+bb2<scanPrevious> as $target1
+bb1<scanNext> as $target2
+	`,
 		map[string][]string{
 			"target1": {"1", "2", "3", "if (Undefined-c)", "Undefined-bb1", "Undefined-c"},
 			"target2": {"2", "3", "if (Undefined-c)", "Undefined-bb2", "Undefined-c"},
