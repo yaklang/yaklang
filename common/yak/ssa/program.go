@@ -1,10 +1,12 @@
 package ssa
 
 import (
-	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
+
+	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -25,7 +27,7 @@ const (
 	PROJECT_CONFIG_PROPERTIES
 )
 
-func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
+func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string, ttl ...time.Duration) *Program {
 	prog := &Program{
 		Name:                    ProgramName,
 		ProgramKind:             kind,
@@ -33,7 +35,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
-		Cache:                   NewDBCache(ProgramName, enableDatabase),
+		Cache:                   NewDBCache(ProgramName, enableDatabase, ttl...),
 		astMap:                  make(map[string]struct{}),
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),

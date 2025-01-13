@@ -37,6 +37,28 @@ var (
 	_ User        = (*LazyInstruction)(nil)
 )
 
+func NewLazyInstructionPureFromIr(ir *ssadb.IrCode, cache *Cache) (Instruction, error) {
+	if ir == nil {
+		return nil, utils.Error("IrCode is nil")
+	}
+	if cache == nil {
+		cache = GetCacheFromPool(ir.ProgramName)
+	}
+	lz := &LazyInstruction{
+		id:          ir.GetIdInt64(),
+		ir:          ir,
+		variable:    make(map[string]*Variable),
+		programName: ir.ProgramName,
+		cache:       cache,
+	}
+	return lz, nil
+}
+
+func NewLazyInstructionPure(id int64) (Instruction, error) {
+	ir := ssadb.GetIrCodeById(ssadb.GetDB(), id)
+	return NewLazyInstructionPureFromIr(ir, nil)
+}
+
 func NewInstructionFromLazy[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, error) {
 	var zero T
 	lz, err := NewLazyInstruction(id)
@@ -59,7 +81,7 @@ func NewLazyInstruction(id int64) (Value, error) {
 
 func NewLazyInstructionFromIrCode(ir *ssadb.IrCode) (Value, error) {
 	if ir == nil {
-		return nil, utils.Error("ircode is nil")
+		return nil, utils.Error("IrCode is nil")
 	}
 	cache := GetCacheFromPool(ir.ProgramName)
 	return newLazyInstruction(int64(ir.ID), ir, cache)
@@ -87,7 +109,7 @@ func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) (Value, error)
 		programName: ir.ProgramName,
 	}
 	lz.cache = cache
-	lz.cache.InstructionCache.Set(lz.id, instructionIrCode{
+	lz.cache.InstructionCache.Set(lz.id, &instructionCachePair{
 		inst:   lz,
 		irCode: lz.ir,
 	})
@@ -381,8 +403,8 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 			switch ret := lz.Self().(type) {
 			case *BasicBlock:
 				if len(ret.Insts) > 0 {
-					startRng := ret.Insts[0].GetRange()
-					endRng := ret.Insts[len(ret.Insts)-1].GetRange()
+					startRng := ret.GetValueById(ret.Insts[0]).GetRange()
+					endRng := ret.GetValueById(ret.Insts[len(ret.Insts)-1]).GetRange()
 					fallbackRange := memedit.NewRange(startRng.GetStart(), endRng.GetEnd())
 					fallbackRange.SetEditor(startRng.GetEditor())
 					lz.Instruction.SetRange(fallbackRange)
@@ -391,14 +413,16 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 
 				// check if block has no instruction
 				var startRng memedit.RangeIf
-				for _, start := range ret.Preds {
+				for _, startId := range ret.Preds {
+					start := ret.GetValueById(startId)
 					if rng := start.GetRange(); rng != nil {
 						startRng = rng
 						break
 					}
 				}
 				var endRng memedit.RangeIf
-				for _, end := range ret.Succs {
+				for _, endId := range ret.Succs {
+					end := ret.GetValueById(endId)
 					if rng := end.GetRange(); rng != nil {
 						endRng = rng
 						break
@@ -736,22 +760,44 @@ func (lz *LazyInstruction) AddOccultation(p Value) {
 }
 
 func (lz *LazyInstruction) FlatOccultation() []Value {
-	var ret []Value
-	var handler func(i *anValue)
-
-	handler = func(i *anValue) {
-		for _, v := range i.occultation {
-			ret = append(ret, v)
-			if p, ok := ToPhi(v); ok {
-				handler(&p.anValue)
-			}
-		}
+	lz.check()
+	if lz.Value == nil {
+		return nil
 	}
-	if u, ok := ToUndefined(lz.Value); ok {
-		handler(&u.anValue)
-	} else if e, ok := ToExternLib(lz.Value); ok {
-		handler(&e.anValue)
-	}
+	return lz.Value.FlatOccultation()
+}
 
-	return ret
+func (i *LazyInstruction) GetInstructionById(id int64) Instruction {
+	if i == nil || i.cache == nil {
+		return nil
+	}
+	return GetEx[Instruction](i.cache, id)
+}
+
+func (i *LazyInstruction) GetValueById(id int64) Value {
+	if i == nil || i.cache == nil {
+		return nil
+	}
+	return GetEx[Value](i.cache, id)
+}
+
+func (i *LazyInstruction) GetUsersByID(id int64) User {
+	if i == nil || i.cache == nil {
+		return nil
+	}
+	return GetEx[User](i.cache, id)
+}
+
+func (i *LazyInstruction) GetValuesByIDs(ids []int64) Values {
+	if i == nil || i.cache == nil {
+		return nil
+	}
+	return GetExs[Value](i.cache, ids...)
+}
+
+func (i *LazyInstruction) GetUsersByIDs(ids []int64) Users {
+	if i == nil || i.cache == nil {
+		return nil
+	}
+	return GetExs[User](i.cache, ids...)
 }
