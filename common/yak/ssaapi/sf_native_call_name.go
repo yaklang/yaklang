@@ -1,10 +1,11 @@
 package ssaapi
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"strings"
 )
 
 func getValueNames(val *Value) []string {
