@@ -58,7 +58,7 @@ type checkMemberResult struct {
 // check can member call, return member name and type
 func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMemberResult) {
 	ret.exist = true
-	if constInst, ok := ToConst(key); ok {
+	if constInst, ok := ToConstInst(key); ok {
 		if constInst.IsNumber() {
 			ret.name = fmt.Sprintf("#%d[%d]", value.GetId(), constInst.Number())
 		}

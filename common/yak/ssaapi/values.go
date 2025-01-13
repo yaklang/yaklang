@@ -511,7 +511,7 @@ func (v *Value) GetConstValue() any {
 	if v == nil || v.node == nil {
 		return nil
 	}
-	if cInst, ok := ssa.ToConst(v.node); ok {
+	if cInst, ok := ssa.ToConstInst(v.node); ok {
 		return cInst.GetRawValue()
 	} else {
 		return nil
@@ -523,7 +523,7 @@ func (v *Value) GetConst() *ssa.Const {
 		return nil
 	}
 
-	if cInst, ok := ssa.ToConst(v.node); ok {
+	if cInst, ok := ssa.ToConstInst(v.node); ok {
 		return cInst.Const
 	} else {
 		return nil

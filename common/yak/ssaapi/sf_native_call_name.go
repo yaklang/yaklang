@@ -23,7 +23,7 @@ var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 		}
 
 		if val.IsMember() {
-			constVal, ok := ssa.ToConst(val.GetKey().GetSSAValue())
+			constVal, ok := ssa.ToConstInst(val.GetKey().GetSSAValue())
 			if ok {
 				names = append(names, constVal.VarString())
 			}

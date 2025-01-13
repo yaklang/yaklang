@@ -58,13 +58,13 @@ const (
 
 func HandlerBinOp(b *BinOp) (ret Value) {
 	defer func() {
-		if c, ok := ToConst(ret); ok {
+		if c, ok := ToConstInst(ret); ok {
 			c.Origin = b
 		}
 	}()
 
-	if cX, ok := ToConst(b.X); ok {
-		if cY, ok := ToConst(b.Y); ok {
+	if cX, ok := ToConstInst(b.X); ok {
+		if cY, ok := ToConstInst(b.Y); ok {
 			// both const
 			if v := CalcConstBinary(cX, cY, b.Op); v != nil {
 				return v
@@ -77,7 +77,7 @@ func HandlerBinOp(b *BinOp) (ret Value) {
 			}
 		}
 	}
-	if c, ok := ToConst(b.Y); ok {
+	if c, ok := ToConstInst(b.Y); ok {
 		// y const
 		if v := CalcConstBinarySide(c, b.X, b.Op); v != nil {
 			return v
@@ -91,12 +91,12 @@ func HandlerBinOp(b *BinOp) (ret Value) {
 
 func HandlerUnOp(u *UnOp) (ret Value) {
 	defer func() {
-		if c, ok := ToConst(ret); ok {
+		if c, ok := ToConstInst(ret); ok {
 			c.Origin = u
 		}
 	}()
 
-	if c, ok := ToConst(u.X); ok {
+	if c, ok := ToConstInst(u.X); ok {
 		if v := CalcConstUnary(c, u.Op); v != nil {
 			return v
 		}
@@ -198,7 +198,7 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 		}
 	case OpAdd:
 		if x.IsFloat() && y.IsFloat() {
-		    return NewConst(x.Float() + y.Float())
+			return NewConst(x.Float() + y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() + y.Number())
@@ -208,24 +208,24 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 		}
 	case OpSub:
 		if x.IsFloat() && y.IsFloat() {
-		    return NewConst(x.Float() - y.Float())
+			return NewConst(x.Float() - y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() - y.Number())
 		}
 	case OpMul:
 		if x.IsFloat() && y.IsFloat() {
-		    return NewConst(x.Float() * y.Float())
+			return NewConst(x.Float() * y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() * y.Number())
 		}
 	case OpDiv:
 		if x.IsFloat() && y.IsFloat() {
-		    if x.Float() == 0 || y.Float() == 0 {
-		        return NewConst(0)
+			if x.Float() == 0 || y.Float() == 0 {
+				return NewConst(0)
 			}
-		    return NewConst(x.Float() / y.Float())
+			return NewConst(x.Float() / y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			if x.Number() == 0 || y.Number() == 0 {
