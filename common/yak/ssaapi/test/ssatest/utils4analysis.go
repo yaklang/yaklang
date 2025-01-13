@@ -118,6 +118,7 @@ func CheckWithName(
 		// prog.Show()
 
 		log.Infof("with database ")
+		_ = prog
 		err = handler(prog)
 		require.Nil(t, err)
 	}

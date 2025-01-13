@@ -54,6 +54,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.Name = inst.GetName()
 	ir.VerboseName = inst.GetVerboseName()
 	ir.ShortVerboseName = inst.GetShortVerboseName()
+	ir.String = inst.String()
 	ir.ReadableName = LineDisASM(inst)
 	ir.ReadableNameShort = LineShortDisASM(inst)
 	// opcode
@@ -83,11 +84,11 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		switch ret := inst.(type) {
 		case *BasicBlock:
 			if len(ret.Insts) > 0 {
-				codeRange = ret.Insts[0].GetRange()
+				codeRange = ret.GetInstructionById(ret.Insts[0]).GetRange()
 			}
 		case *Function:
 			if len(ret.Blocks) > 0 {
-				codeRange = ret.Blocks[0].GetRange()
+				codeRange = ret.GetBasicBlockByID(ret.Blocks[0]).GetRange()
 			}
 		}
 	}
@@ -151,73 +152,62 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		return
 	}
 
-	// value
-	for _, def := range value.GetValues() {
-		if def == nil {
-			log.Infof("BUG: value[%s: %s] def is nil", value, value.GetRange())
-			continue
-		}
-		ir.Defs = append(ir.Defs, int64(def.GetId()))
-	}
+	// ir.String = value.String()
+	ir.HasDefs = value.HasValues()
+
+	anValue := value.getAnValue()
 
 	// user
-	for _, user := range value.GetUsers() {
-		ir.Users = append(ir.Users, user.GetId())
+	ir.Users = anValue.userList
 
-		if call, ok := ToCall(user); ok {
-			if call.Method.GetId() == value.GetId() {
-				// ir.IsCalled
-				ir.CalledBy = append(ir.CalledBy, call.GetId())
-			}
-		}
-	}
+	// occulatation
+	ir.Occulatation = anValue.occultation
 
-	for _, oc := range value.GetOccultation() {
-		ir.Occulatation = append(ir.Occulatation, oc.GetId())
-	}
-
-	// Object
-	ir.IsObject = value.IsObject()
+	// object
+	ir.IsObject = anValue.IsObject()
 	if ir.IsObject {
-		ir.ObjectMembers = make(ssadb.Int64Map, 0)
-		value.ForEachMember(func(k, v Value) bool {
-			ir.ObjectMembers.Append(k.GetId(), v.GetId())
+		ir.ObjectMembers = make(ssadb.Int64Map, 0, anValue.member.Len())
+		anValue.member.ForEach(func(i, v int64) bool {
+			ir.ObjectMembers.Append(i, v)
 			return true
 		})
 	}
 
 	// member
-	ir.IsObjectMember = value.IsMember()
+	ir.IsObjectMember = anValue.IsMember()
 	if ir.IsObjectMember {
-		ir.ObjectParent = value.GetObject().GetId()
-		ir.ObjectKey = value.GetKey().GetId()
+		ir.ObjectParent = anValue.object
+		ir.ObjectKey = anValue.key
 	}
 
 	// variable
-	for name, variable := range value.GetAllVariables() {
-		ir.Variable = append(ir.Variable, name)
-		SaveVariableOffset(variable, name)
-	}
+
+	ir.Variable = make(ssadb.StringSlice, 0, anValue.variables.Len())
+	anValue.variables.ForEach(func(i string, v *Variable) bool {
+		ir.Variable = append(ir.Variable, i)
+		if v.GetValue() == nil {
+			log.Errorf("aa")
+		}
+		go SaveVariableOffset(v, i, anValue.id)
+		return true
+	})
 
 	// mask
-	for _, m := range value.GetMask() {
-		ir.MaskedCodes = append(ir.MaskedCodes, m.GetId())
-	}
-	ir.String = value.String()
-	for _, r := range value.GetPointer() {
-		ir.Pointer = append(ir.Pointer, r.GetId())
-	}
-	if point := value.GetReference(); point != nil {
-		ir.Point = point.GetId()
-	}
+	anValue.mask.ForEach(func(i string, v int64) bool {
+		ir.MaskedCodes = append(ir.MaskedCodes, v)
+		return true
+	})
+
+	ir.Point = anValue.reference
+	ir.Pointer = anValue.pointer
 
 	if inst.GetOpcode() == SSAOpcodeConstInst {
-		if constInst, ok := ToConst(inst); ok {
+		if constInst, ok := ToConstInst(inst); ok {
 			ir.ConstType = string(constInst.ConstType)
 		}
 	}
 
-	ir.TypeID = SaveTypeToDB(value.GetType(), inst.GetProgramName())
+	ir.TypeID = SaveTypeToDB(anValue.GetType(), ir.ProgramName)
 }
 
 func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
@@ -226,60 +216,38 @@ func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 		return
 	}
 
-	getUser := func(id int64) User {
-		if user, ok := ToUser(c.GetInstruction(id)); ok {
-			return user
-		}
-		return nil
-	}
-	getValue := func(id int64) Value {
-		if value, ok := ToValue(c.GetInstruction(id)); ok {
-			return value
-		}
-		return nil
-	}
-	// value : none to do
+	anValue := value.getAnValue()
 
 	//  user
-	for _, user := range ir.Users {
-		value.AddUser(getUser(user))
-	}
+	anValue.userList = ir.Users
 
 	//  occulatation
-	for _, oc := range ir.Occulatation {
-		value.AddOccultation(getValue(oc))
-	}
+	anValue.occultation = ir.Occulatation
 
 	// object
-	if ir.IsObject {
-		ir.ObjectMembers.ForEach(func(k, v int64) {
-			value.AddMember(getValue(k), getValue(v))
-		})
-	}
+	ir.ObjectMembers.ForEach(func(key, value int64) {
+		anValue.member.Set(key, value)
+	})
 
 	// object member
 	if ir.IsObjectMember {
-		value.SetObject(getValue(ir.ObjectParent))
-		value.SetKey(getValue(ir.ObjectKey))
+		anValue.object = ir.ObjectParent
+		anValue.key = ir.ObjectKey
 	}
 
 	// variable
-	// for _, name := range ir.Variable {
-	// 	value.AddVariable(NewVariable(name))
-	// }
+	for _, name := range ir.Variable {
+		value.AddVariable(GetVariableFromDB(ir.GetIdInt64(), name))
+	}
 
 	// mask
 	for _, m := range ir.MaskedCodes {
-		value.AddMask(getValue(m))
+		anValue.mask.Add(m)
 	}
 
 	// reference
-	for _, r := range ir.Pointer {
-		value.AddPointer(getValue(r))
-	}
-	if ir.Point != 0 {
-		value.SetReference(getValue(ir.Point))
-	}
+	anValue.pointer = ir.Pointer
+	anValue.reference = ir.Point
 
 	// type
 	value.SetIsFromDB(true)
@@ -297,24 +265,24 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.IsVariadic = f.hasEllipsis
 
 	for _, formArg := range f.Params {
-		if formArg == nil {
+		if formArg <= 0 {
 			continue
 		}
-		ir.FormalArgs = append(ir.FormalArgs, int64(formArg.GetId()))
+		ir.FormalArgs = append(ir.FormalArgs, formArg)
 	}
 
 	for _, fv := range f.FreeValues {
-		if fv == nil {
+		if fv <= 0 {
 			continue
 		}
-		ir.FreeValues = append(ir.FreeValues, int64(fv.GetId()))
+		ir.FreeValues = append(ir.FreeValues, fv)
 	}
 
 	for _, returnIns := range f.Return {
-		if returnIns == nil {
+		if returnIns <= 0 {
 			continue
 		}
-		ir.ReturnCodes = append(ir.ReturnCodes, int64(returnIns.GetId()))
+		ir.ReturnCodes = append(ir.ReturnCodes, returnIns)
 	}
 	for _, sideEffect := range f.SideEffects {
 		if sideEffect == nil {
@@ -322,25 +290,25 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		}
 	}
 
-	for _, b := range f.Blocks {
-		if b == nil {
+	for _, blockID := range f.Blocks {
+		if blockID <= 0 {
 			continue
 		}
-		ir.CodeBlocks = append(ir.CodeBlocks, int64(b.GetId()))
+		ir.CodeBlocks = append(ir.CodeBlocks, blockID)
 	}
 
-	if f.EnterBlock != nil {
-		ir.EnterBlock = int64(f.EnterBlock.GetId())
+	if f.EnterBlock > 0 {
+		ir.EnterBlock = f.EnterBlock
 	}
-	if f.ExitBlock != nil {
-		ir.ExitBlock = int64(f.ExitBlock.GetId())
+	if f.ExitBlock > 0 {
+		ir.ExitBlock = f.ExitBlock
 	}
-	if f.DeferBlock != nil {
-		ir.DeferBlock = int64(f.DeferBlock.GetId())
+	if f.DeferBlock > 0 {
+		ir.DeferBlock = f.DeferBlock
 	}
 
 	for _, subFunc := range f.ChildFuncs {
-		ir.ChildrenFunction = append(ir.ChildrenFunction, int64(subFunc.GetId()))
+		ir.ChildrenFunction = append(ir.ChildrenFunction, subFunc)
 	}
 }
 
@@ -353,17 +321,17 @@ func basicBlock2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.IsBlock = true
 	ir.PredBlock = make([]int64, 0, len(block.Preds))
 	for _, pred := range block.Preds {
-		ir.PredBlock = append(ir.PredBlock, int64(pred.GetId()))
+		ir.PredBlock = append(ir.PredBlock, pred)
 	}
 
 	ir.SuccBlock = make([]int64, 0, len(block.Succs))
 	for _, succ := range block.Succs {
-		ir.SuccBlock = append(ir.SuccBlock, int64(succ.GetId()))
+		ir.SuccBlock = append(ir.SuccBlock, succ)
 	}
 
 	ir.Phis = make([]int64, 0, len(block.Phis))
 	for _, phi := range block.Phis {
-		ir.Phis = append(ir.Phis, int64(phi.GetId()))
+		ir.Phis = append(ir.Phis, phi)
 	}
 }
 

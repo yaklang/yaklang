@@ -84,6 +84,7 @@ func GetDatabaseCacheStatus[K comparable, T any](c *DataBaseCacheWithKey[K, T], 
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Set(key K, memValue T) {
+	// log.Errorf("Set key: %v", key)
 	if c.close.Load() {
 		log.Errorf("BUG:: cache is closed,  con't set value with key: %v", key)
 		return
@@ -117,6 +118,7 @@ func (c *DataBaseCacheWithKey[K, T]) GetPure(key K) (T, bool) {
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Get(key K) (T, bool) {
+	// log.Errorf("Get key: %v", key)
 	if item, ok := c.GetPure(key); ok {
 		return item, true
 	}

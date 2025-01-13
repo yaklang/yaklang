@@ -22,7 +22,7 @@ func getValueNames(val *Value) []string {
 		val.GetSSAInst().GetVerboseName(),
 	}
 	if val.IsMember() {
-		constVal, ok := ssa.ToConst(val.GetKey().GetSSAInst())
+		constVal, ok := ssa.ToConstInst(val.GetKey().GetSSAInst())
 		if ok {
 			names = append(names, constVal.VarString())
 		}
@@ -33,7 +33,8 @@ func getValueNames(val *Value) []string {
 		names = append(names, udef.GetMethodName())
 	}
 	if call, b := ssa.ToCall(val.GetSSAInst()); b {
-		names = append(names, call.Method.GetName())
+		method := call.GetValueById(call.Method)
+		names = append(names, method.GetName())
 		//todo: args?
 	}
 	return names

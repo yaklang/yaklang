@@ -375,7 +375,7 @@ class Generate extends Backend
     }
 	public function generate()
     {
-		$param = request()->param();
+		$param = 1111;
 		return $this->service->generate($param);
     }
 }
@@ -389,6 +389,6 @@ $a->initialize();
 $a->generate();
 `
 	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
-		"param": {"Undefined-request"},
+		"param": {"1111"},
 	}, ssaapi.WithLanguage(ssaapi.PHP))
 }

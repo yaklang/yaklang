@@ -446,6 +446,7 @@ func (v *Value) GetReturn() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		for _, r := range f.Return {
+			r := f.GetValueById(r)
 			ret = append(ret, v.NewValue(r))
 		}
 	}
@@ -459,7 +460,8 @@ func (v *Value) GetParameter(i int) *Value {
 
 	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		if i < len(f.Params) {
-			return v.NewValue(f.Params[i])
+			param := f.GetValueById(f.Params[i])
+			return v.NewValue(param)
 		}
 	}
 	return nil
@@ -471,6 +473,7 @@ func (v *Value) GetFreeValue(name string) *Value {
 	if variable := v.GetVariable(name); variable != nil {
 		if f, ok := ssa.ToFunction(v.innerValue); ok {
 			if fv, ok := f.FreeValues[variable]; ok {
+				fv := f.GetValueById(fv)
 				return v.NewValue(fv)
 			}
 		}
@@ -486,6 +489,7 @@ func (v *Value) GetParameters() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		for _, param := range f.Params {
+			param := f.GetValueById(param)
 			ret = append(ret, v.NewValue(param))
 		}
 	}
@@ -498,7 +502,8 @@ func (v *Value) GetCallArgs() Values {
 	}
 
 	if f, ok := ssa.ToCall(v.innerValue); ok {
-		return lo.FilterMap(f.Args, func(item ssa.Value, index int) (*Value, bool) {
+		return lo.FilterMap(f.Args, func(itemId int64, index int) (*Value, bool) {
+			item := f.GetValueById(itemId)
 			return v.NewValue(item), true
 		})
 	}
@@ -800,28 +805,30 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 			vs = append(vs, v.NewValue(ret).getCallByEx(tmp)...)
 		case *ssa.Call:
 			call := ret
-			if call == nil || call.Method == nil {
+			if call == nil || call.Method <= 0 {
 				return
 			}
-			if call.Method.GetId() == id {
+			method := call.GetValueById(call.Method)
+			if method.GetId() == id {
 				vs = append(vs, v.NewValue(call))
 				return
 			}
-			function, ok := ssa.ToFunction(call.Method)
+			function, ok := ssa.ToFunction(method)
 			if !ok {
-				reference := call.Method.GetReference()
+				reference := method.GetReference()
 				if refFunction, b := ssa.ToFunction(reference); b {
 					function = refFunction
 				} else {
 					return
 				}
 			}
-			for index, value := range call.ArgMember {
+			for index, valueId := range call.ArgMember {
 				if len(function.ParameterMembers) <= index {
 					break
 				}
+				value := call.GetValueById(valueId)
 				if value.GetId() == id {
-					vs = append(vs, v.NewValue(function.ParameterMembers[index]).getCallByEx(tmp)...)
+					vs = append(vs, v.NewValue(call.GetValueById(function.ParameterMembers[index])).getCallByEx(tmp)...)
 					return
 				}
 			}
@@ -829,21 +836,23 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 				if len(function.Params) <= index {
 					break
 				}
-				if arg.GetId() == id {
-					vs = append(vs, v.NewValue(function.Params[index]).getCallByEx(tmp)...)
+				if arg == id {
+					vv := v.NewValue(call.GetValueById(function.Params[index]))
+					vs = append(vs, vv.getCallByEx(tmp)...)
 					return
 				}
 			}
 			searchBindVariable := func(name string) {
-				for _, value := range function.FreeValues {
+				for _, valueId := range function.FreeValues {
+					value := call.GetValueById(valueId)
 					if value.GetName() == name {
 						vs = append(vs, v.NewValue(value).getCallByEx(tmp)...)
 						return
 					}
 				}
 			}
-			for name, value := range call.Binding {
-				if value.GetId() == id {
+			for name, valueId := range call.Binding {
+				if valueId == id {
 					searchBindVariable(name)
 					return
 				}

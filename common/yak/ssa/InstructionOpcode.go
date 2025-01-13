@@ -79,10 +79,10 @@ func (i *BasicBlock) _GetRange() memedit.RangeIf {
 		return i.anValue.R
 	}
 	if len(i.Insts) == 1 {
-		return i.Insts[0].GetRange()
+		return i.GetInstructionById(i.Insts[0]).GetRange()
 	} else if len(i.Insts) > 1 {
-		first := i.Insts[0]
-		last := i.Insts[len(i.Insts)-1]
+		first := i.GetInstructionById(i.Insts[0])
+		last := i.GetInstructionById(i.Insts[len(i.Insts)-1])
 		firstRange := first.GetRange()
 		lastRange := last.GetRange()
 		if firstRange != nil && lastRange != nil {
@@ -108,9 +108,14 @@ func (i *Function) _GetRange() memedit.RangeIf {
 		return i.anValue.R
 	}
 
-	if i.EnterBlock != nil {
+	if i.EnterBlock <= 0 {
+		log.Warnf("function: %v's enter_block is not set, use the entry_block's range fallback", i.GetName())
+		return nil
+	}
+	enter := i.GetBasicBlockByID(i.EnterBlock)
+	if enter != nil {
 		log.Warnf("funcion: %v's range is not set, use the entry_block's range fallback", i.GetName())
-		return i.EnterBlock.GetRange()
+		return enter.GetRange()
 	}
 
 	return nil
