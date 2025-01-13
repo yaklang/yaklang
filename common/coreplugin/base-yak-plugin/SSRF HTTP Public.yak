@@ -110,7 +110,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
             target = str.ParseStringUrlToWebsiteRootPath(url)
             events, _ = risk.CheckDNSLogByToken(token)
             if len(events) > 0 {
-                dnslogRiskTitle = "目标路径 %s 的 %s 参数收到 Dnslog 回显，可能存在SSRF漏洞" % [url,paramName]
+                dnslogRiskTitle = "疑似SSRF：目标路径 %s 的 %s 参数收到 Dnslog 回显" % [url,paramName]
                 yakit_output(dnslogRiskTitle)
                 haveHttpReverse = false
                 middleReason = "未收到HTTP反连请求"
@@ -133,7 +133,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
                 }
                 if haveHttpReverse{
                     title = "目标 %s 存在SSRF漏洞" % url
-                    titleVerbose = "目标路径 %s 的 %s 参数收到 HTTP 反连，存在 SSRF 漏洞" % [url,paramName]
+                    titleVerbose = "存在SSRF：目标路径 %s 的 %s 参数收到 HTTP 反连" % [url,paramName]
                     yakit_output(title)
                     risk.NewRisk(
                         url,
@@ -153,7 +153,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
                     )
                 }else{
                     title = "目标 %s 可能存在SSRF漏洞" % url
-                    titleVerbose = "收到Dnslog回显，但未收到HTTP回显(原因是 `%s`)，可能存在SSRF漏洞" % middleReason
+                    titleVerbose = "疑似SSRF：收到Dnslog回显，但未收到HTTP回显(原因是 `%s`)：%v" % [middleReason, url]
                     risk.NewRisk(
                         url,
                         risk.details({
