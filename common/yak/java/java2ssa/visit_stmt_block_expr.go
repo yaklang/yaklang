@@ -506,7 +506,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			},
 			ssa.TernaryExpressionVariable,
 		)
-		if condValue, ok := ssa.ToConst(conditionValue); ok {
+		if condValue, ok := ssa.ToConstInst(conditionValue); ok {
 			cond, ok := condValue.GetRawValue().(bool)
 			if !ok {
 				return value

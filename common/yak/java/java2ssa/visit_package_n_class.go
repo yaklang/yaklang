@@ -597,7 +597,7 @@ func (y *builder) VisitMethodDeclaration(
 	newFunc := y.NewFunc(funcName)
 	newFunc.SetMethodName(methodName)
 	vs := y.VisitThrowsClause(i)
-	newFunc.Throws = vs
+	newFunc.AddThrow(vs...)
 
 	annotationFunc, defCallback, isStatic := y.VisitModifiers(modify)
 	if isStatic {
@@ -874,7 +874,7 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	funcName := fmt.Sprintf("%s_%s_%s_%s", pkgName.Name, class.Name, key, uuid.NewString()[:4])
 	newFunc := y.NewFunc(funcName)
 	class.Constructor = newFunc
-	newFunc.Throws = y.VisitThrowsClause(i)
+	newFunc.AddThrow(y.VisitThrowsClause(i)...)
 	class.RegisterMagicMethod(ssa.Constructor, newFunc)
 	store := y.StoreFunctionBuilder()
 	newFunc.AddLazyBuilder(func() {

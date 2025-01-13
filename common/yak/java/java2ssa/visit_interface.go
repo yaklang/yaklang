@@ -154,7 +154,7 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 
 			fakeFunc := y.NewFunc(member.Identifier().GetText())
 			fakeFunc.SetMethodName(member.Identifier().GetText())
-			fakeFunc.Throws = y.VisitThrowsClause(member)
+			fakeFunc.AddThrow(y.VisitThrowsClause(member)...)
 			y.FunctionBuilder = y.PushFunction(fakeFunc)
 			thisPara := y.NewParam("this", raw)
 			thisPara.SetType(this)
@@ -166,7 +166,7 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 					retVal.SetType(t)
 				}
 				fakeRet := y.EmitReturn([]ssa.Value{retVal})
-				fakeFunc.Return = append(fakeFunc.Return, fakeRet)
+				fakeFunc.Return = append(fakeFunc.Return, fakeRet.GetId())
 			}
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()

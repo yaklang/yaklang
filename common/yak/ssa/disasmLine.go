@@ -121,10 +121,11 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 
 	// check cache and set cache
 
-	DisasmValues := func(vs Values) string {
+	DisasmValue := func(ids ...int64) string {
 		return strings.Join(
-			lo.Map(vs, func(a Value, _ int) string {
-				return liner.DisasmValue(a)
+			lo.Map(ids, func(id int64, _ int) string {
+				value := v.GetValueById(id)
+				return liner.DisasmValue(value)
 			}),
 			",",
 		)
@@ -152,7 +153,7 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 		return fmt.Sprintf("%s-%s", SSAOpcode2Name[v.GetOpcode()], v.GetVerboseName())
 	case *Phi:
 		liner.SetName(v, v.GetVerboseName())
-		ret = fmt.Sprintf("phi(%s)[%s]", v.GetVerboseName(), DisasmValues(v.Edge))
+		ret = fmt.Sprintf("phi(%s)[%s]", v.GetVerboseName(), DisasmValue(v.Edge...))
 		liner.DeleteName(v)
 		return ret
 	case *ConstInst:
@@ -161,29 +162,30 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 		}
 		return v.String()
 	case *BinOp:
-		return fmt.Sprintf("%s(%s, %s)", v.Op, liner.DisasmValue(v.X), liner.DisasmValue(v.Y))
+		return fmt.Sprintf("%s(%s, %s)", v.Op, DisasmValue(v.X), DisasmValue(v.Y))
 	case *UnOp:
-		return fmt.Sprintf("%s(%s)", v.Op, liner.DisasmValue(v.X))
+		return fmt.Sprintf("%s(%s)", v.Op, DisasmValue(v.X))
 	case *Call:
 		arg := ""
 		if len(v.Args) != 0 {
-			arg = DisasmValues(v.Args)
+			arg = DisasmValue(v.Args...)
 		}
 		binding := ""
 		if len(v.Binding) != 0 {
-			binding = " binding[" + DisasmValues(
+			binding = " binding[" + DisasmValue(
 				lo.MapToSlice(
 					v.Binding,
-					func(key string, item Value) Value { return item }),
+					func(key string, item int64) int64 { return item },
+				)...,
 			) + "]"
 		}
 		member := ""
 		if len(v.ArgMember) != 0 {
-			member = " member[" + DisasmValues(v.ArgMember) + "]"
+			member = " member[" + DisasmValue(v.ArgMember...) + "]"
 		}
-		return fmt.Sprintf("%s(%s)%s%s", liner.DisasmValue(v.Method), arg, binding, member)
+		return fmt.Sprintf("%s(%s)%s%s", DisasmValue(v.Method), arg, binding, member)
 	case *SideEffect:
-		return fmt.Sprintf("side-effect(%s, %s)", liner.DisasmValue(v.Value), v.GetVerboseName())
+		return fmt.Sprintf("side-effect(%s, %s)", DisasmValue(v.Value), v.GetVerboseName())
 	case *Make:
 		if v.name != "" {
 			return v.name
@@ -191,31 +193,31 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 		typ := v.GetType()
 		return fmt.Sprintf("make(%v)", typ.String())
 	case *Next:
-		return fmt.Sprintf("next(%s)", liner.DisasmValue(v.Iter))
+		return fmt.Sprintf("next(%s)", DisasmValue(v.Iter))
 	case *TypeCast:
-		return fmt.Sprintf("castType(%s, %s)", v.GetType().String(), liner.DisasmValue(v.Value))
+		return fmt.Sprintf("castType(%s, %s)", v.GetType().String(), DisasmValue(v.Value))
 	case *TypeValue:
 		return fmt.Sprintf("typeValue(%s)", v.GetType())
 	case *Recover:
 		return "recover"
 	case *Return:
-		return fmt.Sprintf("return(%s)", DisasmValues(v.Results))
+		return fmt.Sprintf("return(%s)", DisasmValue(v.Results...))
 	case *Assert:
-		return fmt.Sprintf("assert(%s, %s)", liner.DisasmValue(v.Cond), liner.DisasmValue(v.MsgValue))
+		return fmt.Sprintf("assert(%s, %s)", DisasmValue(v.Cond), DisasmValue(v.MsgValue))
 	case *Panic:
-		return fmt.Sprintf("panic(%s)", liner.DisasmValue(v.Info))
+		return fmt.Sprintf("panic(%s)", DisasmValue(v.Info))
 	case *Jump:
 		return "jump"
 	case *ErrorHandler:
 		return "error-handler"
 	case *ErrorCatch:
-		return fmt.Sprintf("error-catch(%s)", liner.DisasmValue(v.Exception))
+		return fmt.Sprintf("error-catch(%s)", liner.DisasmValue(v.GetValueById(v.Exception)))
 	case *If:
-		return fmt.Sprintf("if (%s)", liner.DisasmValue(v.Cond))
+		return fmt.Sprintf("if (%s)", DisasmValue(v.Cond))
 	case *Loop:
-		return fmt.Sprintf("loop(%s)", liner.DisasmValue(v.Cond))
+		return fmt.Sprintf("loop(%s)", DisasmValue(v.Cond))
 	case *Switch:
-		return fmt.Sprintf("switch(%s)", liner.DisasmValue(v.Cond))
+		return fmt.Sprintf("switch(%s)", DisasmValue(v.Cond))
 	case *LazyInstruction:
 		switch liner.(type) {
 		case *NameDisasmLiner:

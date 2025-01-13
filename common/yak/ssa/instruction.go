@@ -2,18 +2,32 @@ package ssa
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
 	i := &Make{
 		anValue: NewValue(),
-		low:     low,
-		high:    high,
-		step:    step,
-		parentI: parentI,
-		Len:     Len,
-		Cap:     Cap,
 	}
+	if !utils.IsNil(low) {
+		i.low = low.GetId()
+	}
+	if !utils.IsNil(high) {
+		i.high = high.GetId()
+	}
+	if !utils.IsNil(step) {
+		i.step = step.GetId()
+	}
+	if !utils.IsNil(parentI) {
+		i.parentI = parentI.GetId()
+	}
+	if !utils.IsNil(Len) {
+		i.Len = Len.GetId()
+	}
+	if !utils.IsNil(Cap) {
+		i.Cap = Cap.GetId()
+	}
+
 	i.SetType(typ)
 	return i
 }
@@ -21,7 +35,7 @@ func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
 func NewJump(to *BasicBlock) *Jump {
 	j := &Jump{
 		anInstruction: NewInstruction(),
-		To:            to,
+		To:            to.GetId(),
 	}
 	return j
 }
@@ -29,7 +43,7 @@ func NewJump(to *BasicBlock) *Jump {
 func NewLoop(cond Value) *Loop {
 	l := &Loop{
 		anInstruction: NewInstruction(),
-		Cond:          cond,
+		Cond:          cond.GetId(),
 	}
 	return l
 }
@@ -46,8 +60,8 @@ func NewBinOp(op BinaryOpcode, x, y Value) *BinOp {
 	b := &BinOp{
 		anValue: NewValue(),
 		Op:      op,
-		X:       x,
-		Y:       y,
+		X:       x.GetId(),
+		Y:       y.GetId(),
 	}
 	if op >= OpGt && op <= OpIn {
 		b.SetType(BasicTypes[BooleanTypeKind])
@@ -59,7 +73,7 @@ func NewUnOp(op UnaryOpcode, x Value) *UnOp {
 	u := &UnOp{
 		anValue: NewValue(),
 		Op:      op,
-		X:       x,
+		X:       x.GetId(),
 	}
 	return u
 }
@@ -74,17 +88,20 @@ func NewIf() *If {
 func NewSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel) *Switch {
 	sw := &Switch{
 		anInstruction: NewInstruction(),
-		Cond:          cond,
-		DefaultBlock:  defaultb,
-		Label:         label,
+		// Cond:          cond.GetId(),
+		DefaultBlock: defaultb,
+		Label:        label,
+	}
+	if !utils.IsNil(cond) {
+		sw.Cond = cond.GetId()
 	}
 	return sw
 }
 
-func NewReturn(vs []Value) *Return {
+func NewReturn(vs Values) *Return {
 	r := &Return{
 		anValue: NewValue(),
-		Results: vs,
+		Results: vs.GetIds(),
 	}
 	return r
 }
@@ -92,7 +109,7 @@ func NewReturn(vs []Value) *Return {
 func NewTypeCast(typ Type, v Value) *TypeCast {
 	t := &TypeCast{
 		anValue: NewValue(),
-		Value:   v,
+		Value:   v.GetId(),
 	}
 	t.SetType(typ)
 	return t
@@ -108,9 +125,11 @@ func NewTypeValue(typ Type) *TypeValue {
 func NewAssert(cond, msgValue Value, msg string) *Assert {
 	a := &Assert{
 		anInstruction: NewInstruction(),
-		Cond:          cond,
+		Cond:          cond.GetId(),
 		Msg:           msg,
-		MsgValue:      msgValue,
+	}
+	if !utils.IsNil(msgValue) {
+		a.MsgValue = msgValue.GetId()
 	}
 	return a
 }
@@ -118,7 +137,7 @@ func NewAssert(cond, msgValue Value, msg string) *Assert {
 func NewNext(iter Value, isIn bool) *Next {
 	n := &Next{
 		anValue: NewValue(),
-		Iter:    iter,
+		Iter:    iter.GetId(),
 		InNext:  isIn,
 	}
 	typ := newNextType(iter.GetType(), isIn)
@@ -129,20 +148,17 @@ func NewNext(iter Value, isIn bool) *Next {
 func NewErrorHandler(try *BasicBlock) *ErrorHandler {
 	e := &ErrorHandler{
 		anInstruction: NewInstruction(),
-		Try:           try,
+		Try:           try.GetId(),
 	}
-	try.Handler = e
 	return e
 }
 
 func NewErrorCatch(try *ErrorHandler, catch *BasicBlock, exception Value) *ErrorCatch {
 	e := &ErrorCatch{
 		anValue:   NewValue(),
-		CatchBody: catch,
-		Exception: exception,
+		CatchBody: catch.GetId(),
+		Exception: exception.GetId(),
 	}
-	catch.Handler = try
-	try.Catch = append(try.Catch, e)
 	return e
 }
 
@@ -151,13 +167,13 @@ func NewExternLib(variable string, builder *FunctionBuilder, table map[string]an
 		anValue:   NewValue(),
 		table:     table,
 		builder:   builder,
-		MemberMap: make(map[string]Value),
-		Member:    make([]Value, 0),
+		MemberMap: make(map[string]int64),
+		Member:    make([]int64, 0),
 	}
 	e.SetName(variable)
 	e.SetFunc(builder.Function)
-	block, ok := ToBasicBlock(builder.EnterBlock)
-	if ok {
+	block := builder.GetBasicBlockByID(builder.EnterBlock)
+	if block != nil {
 		e.SetBlock(block)
 	} else {
 		log.Warnf("ExternLib block cannot convert to BasicBlock: %v", builder.EnterBlock)
@@ -170,15 +186,14 @@ func NewExternLib(variable string, builder *FunctionBuilder, table map[string]an
 
 func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Parameter {
 	p := &Parameter{
-		anValue:      NewValue(),
-		IsFreeValue:  isFreeValue,
-		defaultValue: nil,
+		anValue:     NewValue(),
+		IsFreeValue: isFreeValue,
 	}
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
 
-	block, ok := ToBasicBlock(builder.EnterBlock)
-	if ok {
+	block := builder.GetBasicBlockByID(builder.EnterBlock)
+	if block != nil {
 		p.SetBlock(block)
 	} else {
 		log.Warnf("Parameter block cannot convert to BasicBlock: %v", builder.EnterBlock)
@@ -204,8 +219,8 @@ func NewParamMember(variable string, builder *FunctionBuilder, obj *Parameter, k
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
 
-	block, ok := ToBasicBlock(builder.EnterBlock)
-	if ok {
+	block := builder.GetBasicBlockByID(builder.EnterBlock)
+	if block != nil {
 		p.SetBlock(block)
 	} else {
 		log.Warnf("NewParamMember block cannot convert to BasicBlock: %v", builder.EnterBlock)
@@ -222,8 +237,8 @@ func NewMoreParamMember(variable string, builder *FunctionBuilder, member *Param
 	}
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
-	block, ok := ToBasicBlock(builder.EnterBlock)
-	if ok {
+	block := builder.GetBasicBlockByID(builder.EnterBlock)
+	if block != nil {
 		p.SetBlock(block)
 	} else {
 		log.Warnf("NewParamMember block cannot convert to BasicBlock: %v", builder.EnterBlock)
@@ -236,31 +251,32 @@ func NewMoreParamMember(variable string, builder *FunctionBuilder, member *Param
 func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 	s := &SideEffect{
 		anValue:  NewValue(),
-		CallSite: call,
-		Value:    value,
+		CallSite: call.GetId(),
+		Value:    value.GetId(),
 	}
 	s.SetName(variable)
 	return s
 }
 
 func (i *If) SetCondition(t Value) {
-	i.Cond = t
+	i.Cond = t.GetId()
 	fixupUseChain(i)
 }
 
 func (i *If) AddTrue(t *BasicBlock) {
-	i.True = t
+	i.True = t.GetId()
 	i.GetBlock().AddSucc(t)
 }
 
 func (i *If) AddFalse(f *BasicBlock) {
-	i.False = f
+	i.False = f.GetId()
 	i.GetBlock().AddSucc(f)
 }
 
 func (l *Loop) Finish(init, step []Value) {
 	// check cond
-	check := func(v Value) bool {
+	check := func(id int64) bool {
+		v := l.GetValueById(id)
 		if _, ok := ToPhi(v); ok {
 			return true
 		} else {
@@ -268,7 +284,8 @@ func (l *Loop) Finish(init, step []Value) {
 		}
 	}
 
-	if b, ok := l.Cond.(*BinOp); ok {
+	cond := l.GetValueById(l.Cond)
+	if b, ok := cond.(*BinOp); ok {
 		// if b.Op < OpGt || b.Op > OpNotEq {
 		// 	l.NewError(Error, SSATAG, "this condition not compare")
 		// }
@@ -281,18 +298,18 @@ func (l *Loop) Finish(init, step []Value) {
 		}
 	}
 
-	if l.Key == nil {
+	if l.Key > 0 {
 		return
 	}
-	tmp := lo.SliceToMap(l.Key.GetValues(), func(v Value) (Value, struct{}) { return v, struct{}{} })
+	tmp := lo.SliceToMap(l.GetValueById(l.Key).GetValues(), func(v Value) (Value, struct{}) { return v, struct{}{} })
 
-	set := func(vs []Value) Value {
+	set := func(vs []Value) int64 {
 		for _, v := range vs {
 			if _, ok := tmp[v]; ok {
-				return v
+				return v.GetId()
 			}
 		}
-		return nil
+		return 0
 	}
 
 	l.Init = set(init)
@@ -302,11 +319,11 @@ func (l *Loop) Finish(init, step []Value) {
 }
 
 func (e *ErrorHandler) AddFinal(f *BasicBlock) {
-	e.Final = f
-	f.Handler = e
+	e.Final = f.GetId()
+	f.Handler = e.GetId()
 }
 
 func (e *ErrorHandler) AddDone(d *BasicBlock) {
-	e.Done = d
-	d.Handler = e
+	e.Done = d.GetId()
+	d.Handler = e.GetId()
 }

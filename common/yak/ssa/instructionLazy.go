@@ -154,6 +154,7 @@ func (lz *LazyInstruction) check() {
 			log.Infof("unknown opcode: %d: %s", lz.GetOpcode(), lz.ir.OpcodeName)
 			return
 		}
+		inst.SetProgram(lz.prog)
 		lz.Instruction = inst
 		lz.cache.IrCodeToInstruction(inst, lz.ir)
 		// set range for instruction
@@ -230,7 +231,9 @@ func (lz *LazyInstruction) String() string {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return ""
 	}
-	return lz.ir.String
+	lz.check()
+	return lz.Instruction.String()
+	// return "lz:" + lz.ir.String
 }
 
 func (lz *LazyInstruction) HasUsers() bool {
@@ -241,12 +244,19 @@ func (lz *LazyInstruction) HasUsers() bool {
 	return len(lz.ir.Users) == 0
 }
 
+func (lz *LazyInstruction) AddUser(user User) {
+	lz.check()
+	lz.Modify = true
+	lz.Value.AddUser(user)
+}
+
 func (lz *LazyInstruction) HasValues() bool {
 	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
-	return len(lz.ir.Defs) == 0
+	// return len(lz.ir.Defs) == 0
+	return lz.ir.HasDefs
 }
 
 func (lz *LazyInstruction) IsMember() bool {
@@ -406,15 +416,23 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 				// check if block has no instruction
 				var startRng memedit.RangeIf
 				if len(ret.Insts) > 0 {
-					for _, start := range ret.Insts {
-						if rng := start.GetRange(); rng != nil {
+					for _, startId := range ret.Insts {
+						startInst := lz.prog.GetInstructionById(startId)
+						if startInst == nil {
+							continue
+						}
+						if rng := startInst.GetRange(); rng != nil {
 							startRng = rng
 							break
 						}
 					}
 				} else {
-					for _, start := range ret.Preds {
-						if rng := start.GetRange(); rng != nil {
+					for _, startId := range ret.Preds {
+						startInst := lz.prog.GetInstructionById(startId)
+						if startInst == nil {
+							continue
+						}
+						if rng := startInst.GetRange(); rng != nil {
 							startRng = rng
 							break
 						}
@@ -423,15 +441,25 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 
 				var endRng memedit.RangeIf
 				if len(ret.Insts) > 0 {
-					for _, end := range ret.Insts {
-						if rng := end.GetRange(); rng != nil {
+					// Iterate from the last instruction to find the end range
+					for i := len(ret.Insts) - 1; i >= 0; i-- {
+						endInstId := ret.Insts[i]
+						endInst := lz.prog.GetInstructionById(endInstId)
+						if endInst == nil {
+							continue
+						}
+						if rng := endInst.GetRange(); rng != nil {
 							endRng = rng
 							break
 						}
 					}
 				} else {
-					for _, end := range ret.Succs {
-						if rng := end.GetRange(); rng != nil {
+					for _, endId := range ret.Succs {
+						endInst := lz.prog.GetInstructionById(endId)
+						if endInst == nil {
+							continue
+						}
+						if rng := endInst.GetRange(); rng != nil {
 							endRng = rng
 							break
 						}
@@ -764,7 +792,12 @@ func (lz *LazyInstruction) FlatOccultation() []Value {
 	var handler func(i *anValue)
 
 	handler = func(i *anValue) {
-		for _, v := range i.occultation {
+		for _, vId := range i.occultation {
+			// Corrected: Use GetValueById from the program's cache
+			v := lz.GetValueById(vId)
+			if v == nil {
+				continue
+			}
 			ret = append(ret, v)
 			if p, ok := ToPhi(v); ok {
 				handler(&p.anValue)
@@ -778,4 +811,12 @@ func (lz *LazyInstruction) FlatOccultation() []Value {
 	}
 
 	return ret
+}
+
+func (lz *LazyInstruction) getAnInstruction() *anInstruction {
+	return lz.Instruction.getAnInstruction()
+}
+
+func (lz *LazyInstruction) getAnValue() *anValue {
+	return lz.Value.getAnValue()
 }

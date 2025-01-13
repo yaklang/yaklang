@@ -11,8 +11,8 @@ import (
 )
 
 type userNodeItems struct {
-	names []string
-	value []ssa.Value
+	names  []string
+	values ssa.Values
 }
 
 func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
@@ -35,10 +35,10 @@ func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm
 
 	items := []*userNodeItems{}
 
-	addItems := func(names []string, value ...ssa.Value) {
+	addItems := func(names []string, value ...int64) {
 		items = append(items, &userNodeItems{
-			names: names,
-			value: value,
+			names:  names,
+			values: inst.GetValuesByIDs(value),
 		})
 	}
 
@@ -58,7 +58,7 @@ func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm
 	for _, item := range items {
 		for _, name := range item.names {
 			if compare(name) {
-				add(item.value...)
+				add(item.values...)
 			}
 		}
 	}

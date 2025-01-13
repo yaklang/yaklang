@@ -145,15 +145,20 @@ func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 }
 
 func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator, error) {
+	call, isCall := ssa.ToCall(v.innerValue)
+	if !isCall {
+		return nil, utils.Errorf("ssa.Value is not a call")
+	}
+
 	rets := make(Values, 0)
-	addvalue := func(value ssa.Value) {
-		ret := v.NewValue(value)
+	addvalue := func(id int64) {
+		ret := v.NewValue(call.GetValueById(id))
 		ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label(
 			fmt.Sprintf("actual-args[%d](containRest:%v)", start, contain),
 		))
 		rets = append(rets, ret)
 	}
-	add := func(param []ssa.Value) {
+	add := func(param []int64) {
 		if len(param) <= start {
 			return
 		}
@@ -166,10 +171,6 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 			value := param[start]
 			addvalue(value)
 		}
-	}
-	call, isCall := ssa.ToCall(v.innerValue)
-	if !isCall {
-		return nil, utils.Errorf("ssa.Value is not a call")
 	}
 	add(call.Args)
 	if utils.IsNil(rets) {
