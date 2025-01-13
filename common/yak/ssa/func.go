@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -24,19 +25,19 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	f := &Function{
 		anValue:     NewValue(),
-		Params:      make([]Value, 0),
+		Params:      make([]int64, 0),
 		hasEllipsis: false,
-		Blocks:      make([]Instruction, 0),
-		EnterBlock:  nil,
-		ExitBlock:   nil,
-		ChildFuncs:  make([]Value, 0),
-		parent:      nil,
-		FreeValues:  make(map[*Variable]Value),
+		Blocks:      make([]int64, 0),
+		EnterBlock:  0,
+		ExitBlock:   0,
+		ChildFuncs:  make([]int64, 0),
+		FreeValues:  make(map[*Variable]int64),
 		SideEffects: make([]*FunctionSideEffect, 0),
 		builder:     nil,
 	}
 	f.SetName(name)
 	f.SetProgram(p)
+	p.SetVirtualRegister(f)
 
 	if parent != nil {
 		parent.addAnonymous(f)
@@ -50,7 +51,6 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 		p.Funcs.Set(name, f)
 	}
-	p.SetVirtualRegister(f)
 	// function 's Range is essential!
 	if f.GetRange() == nil {
 		// if editor := p.getCurrentEditor(); editor != nil {
@@ -64,7 +64,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 
 	enter := f.NewBasicBlock("entry")
 	enter.SetScope(NewScope(f, p.GetProgramName()))
-	f.EnterBlock = enter
+	f.EnterBlock = enter.GetId()
 	return f
 }
 
@@ -80,6 +80,12 @@ func (f *Function) GetType() Type {
 	} else {
 		return CreateAnyType()
 	}
+}
+
+func (f *Function) AddThrow(vs ...Value) {
+	f.Throws = append(f.Throws, lo.Map(vs, func(v Value, _ int) int64 {
+		return v.GetId()
+	})...)
 }
 
 func (f *Function) SetType(t Type) {
@@ -109,8 +115,8 @@ func (f *Function) GetFunc() *Function {
 }
 
 func (f *Function) addAnonymous(anon *Function) {
-	f.ChildFuncs = append(f.ChildFuncs, anon)
-	anon.parent = f
+	f.ChildFuncs = append(f.ChildFuncs, anon.GetId())
+	anon.parent = f.GetId()
 }
 
 func (f *FunctionBuilder) NewParam(name string, pos ...CanStartStopToken) *Parameter {
@@ -121,7 +127,7 @@ func (f *FunctionBuilder) NewParam(name string, pos ...CanStartStopToken) *Param
 
 func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Value) *ParameterMember {
 	paraMember := NewParamMember(name, f, obj, key)
-	f.ParameterMembers = append(f.ParameterMembers, paraMember)
+	f.ParameterMembers = append(f.ParameterMembers, paraMember.GetId())
 	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
 	if f.MarkedThisObject != nil &&
 		obj.GetDefault() != nil &&
@@ -136,13 +142,13 @@ func (f *FunctionBuilder) NewMoreParameterMember(name string, member *ParameterM
 	paraMember := NewMoreParamMember(name, f, member, key)
 	variable := f.CreateVariable(name)
 	f.AssignVariable(variable, paraMember)
-	f.ParameterMembers = append(f.ParameterMembers, paraMember)
+	f.ParameterMembers = append(f.ParameterMembers, paraMember.GetId())
 	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
 	return paraMember
 }
 
 func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) {
-	f.Params = append(f.Params, p)
+	f.Params = append(f.Params, p.GetId())
 	p.FormalParameterIndex = len(f.Params) - 1
 	p.IsFreeValue = false
 	variable := f.CreateVariableForce(p.GetName(), token...)
@@ -151,13 +157,13 @@ func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) 
 }
 
 func (f *Function) ReturnValue() []Value {
-	exitBlock, ok := ToBasicBlock(f.ExitBlock)
-	if !ok {
+	exitBlock := f.GetBasicBlockByID(f.ExitBlock)
+	if exitBlock == nil {
 		log.Warnf("function exit block cannot convert to BasicBlock: %v", f.ExitBlock)
 		return nil
 	}
 	ret := exitBlock.LastInst().(*Return)
-	return ret.Results
+	return f.GetValuesByIDs(ret.Results)
 }
 
 func (f *Function) IsMain() bool {
@@ -165,15 +171,16 @@ func (f *Function) IsMain() bool {
 }
 
 func (f *Function) GetParent() *Function {
-	if f.parent == nil {
+	if f.parent > 0 {
 		return nil
 	}
 
-	fu, ok := ToFunction(f.parent)
+	parent := f.GetValueById(f.parent)
+	fu, ok := ToFunction(parent)
 	if ok {
 		return fu
 	}
-	log.Warnf("function parent cannot convert to Function: %v", f.parent)
+	log.Warnf("function parent cannot convert to Function: %v", parent)
 	return nil
 }
 
@@ -184,6 +191,7 @@ func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	}
 	f.SetType(typ)
 	f.SetName(name)
+	f.GetProgram().SetVirtualRegister(f)
 	return f
 }
 

@@ -62,8 +62,8 @@ func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults 
 		hasCode := false
 		if f, ok := ssa.ToFunction(fun.GetSSAInst()); ok {
 			for _, block := range f.Blocks {
-				b, ok := ssa.ToBasicBlock(block)
-				if !ok {
+				b := f.GetBasicBlockByID(block)
+				if b == nil {
 					continue
 				}
 				if len(b.Insts) > 0 {

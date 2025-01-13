@@ -19,24 +19,26 @@ func setMemberCallRelationship(obj, key, member Value) {
 	}
 
 	handlerMemberCall := func(obj Value) {
-		for _, v := range obj.(*Phi).Edge {
-			if _, ok := v.GetMember(key); ok { // 避免循环
+		for _, edgeID := range obj.(*Phi).Edge {
+			edgeValue := obj.GetValueById(edgeID)
+			if _, ok := edgeValue.GetMember(key); ok { // 避免循环
 				continue
 			}
-			if _, ok := v.(*Call); ok {
-				setMemberCallRelationship(v, key, member)
+			if _, ok := edgeValue.(*Call); ok {
+				setMemberCallRelationship(edgeValue, key, member)
 			}
-			if und, ok := v.(*Undefined); ok {
+			if und, ok := edgeValue.(*Undefined); ok {
 				if und.Kind == UndefinedValueInValid {
-					setMemberCallRelationship(v, key, member)
+					setMemberCallRelationship(edgeValue, key, member)
 				}
 			}
 		}
 	}
 
 	if phi, ok := obj.(*Phi); ok {
-		for _, v := range phi.Edge {
-			if und, ok := ToUndefined(v); ok { // 遇到库类和return phi value
+		for _, edgeId := range phi.Edge {
+			edgeValue := obj.GetValueById(edgeId)
+			if und, ok := ToUndefined(edgeValue); ok { // 遇到库类和return phi value
 				if und.Kind == UndefinedValueValid || und.Kind == UndefinedValueReturn {
 					handlerMemberCall(obj)
 				}
@@ -235,7 +237,7 @@ func setMemberVerboseName(member Value) {
 
 func GetKeyString(key Value) string {
 	text := ""
-	if ci, ok := ToConst(key); ok {
+	if ci, ok := ToConstInst(key); ok {
 		text = ci.String()
 	}
 	if text == "" {
