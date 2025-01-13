@@ -82,8 +82,8 @@ htmlAttributeValue
 
 htmlAttributeValueElement
     :ATTVAL_ATTRIBUTE
-    |jspExpression
     |elExpression
+    |jspExpression
     ;
 
 htmlTagName
