@@ -33,22 +33,20 @@ func jspparserParserInit() {
 	staticData := &jspparserParserStaticData
 	staticData.literalNames = []string{
 		"", "", "", "", "", "'<!DOCTYPE'", "", "", "'<?xml'", "", "", "", "",
-		"", "", "", "", "", "", "", "", "", "", "", "", "", "'PUBLIC'", "'SYSTEM'",
-		"", "", "", "", "", "", "'%>'", "':'", "", "", "'/'",
+		"", "", "", "", "", "", "", "", "", "", "", "", "'PUBLIC'", "'SYSTEM'",
+		"", "", "", "", "", "':'", "", "", "'/'",
 	}
 	staticData.symbolicNames = []string{
 		"", "JSP_COMMENT", "JSP_CONDITIONAL_COMMENT", "SCRIPT_OPEN", "STYLE_OPEN",
 		"DTD", "CDATA", "WHITESPACES", "XML_DECLARATION", "WHITESPACE_SKIP",
 		"CLOSE_TAG_BEGIN", "TAG_BEGIN", "DIRECTIVE_BEGIN", "DECLARATION_BEGIN",
-		"ECHO_EXPRESSION_OPEN", "SCRIPTLET_OPEN", "EXPRESSION_OPEN", "QUOTE",
-		"TAG_END", "EQUALS", "EL_EXPR_START", "JSP_STATIC_CONTENT_CHARS", "JSP_END",
-		"ATTVAL_ATTRIBUTE", "ATTVAL_VALUE", "EL_EXPR_END", "DTD_PUBLIC", "DTD_SYSTEM",
-		"DTD_WHITESPACE_SKIP", "DTD_QUOTED", "DTD_IDENTIFIER", "BLOB_CLOSE",
-		"BLOB_CONTENT", "JSPEXPR_EL_EXPR", "JSPEXPR_CONTENT_CLOSE", "JSP_JSTL_COLON",
+		"ECHO_EXPRESSION_OPEN", "SCRIPTLET_OPEN", "QUOTE", "TAG_END", "EQUALS",
+		"EL_EXPR_START", "JSP_STATIC_CONTENT_CHARS", "JSP_END", "ATTVAL_ATTRIBUTE",
+		"ATTVAL_VALUE", "EL_EXPR_END", "DTD_PUBLIC", "DTD_SYSTEM", "DTD_WHITESPACE_SKIP",
+		"DTD_QUOTED", "DTD_IDENTIFIER", "BLOB_CLOSE", "BLOB_CONTENT", "JSP_JSTL_COLON",
 		"TAG_SLASH_END", "TAG_CLOSE", "TAG_SLASH", "DIRECTIVE_END", "TAG_IDENTIFIER",
 		"TAG_WHITESPACE", "SCRIPT_BODY", "SCRIPT_SHORT_BODY", "STYLE_BODY",
-		"STYLE_SHORT_BODY", "ATTVAL_EL_EXPR", "ATTVAL_SINGLE_QUOTE_EXPRESSION",
-		"ATTVAL_DOUBLE_QUOTE_EXPRESSION", "EL_EXPR_CONTENT",
+		"STYLE_SHORT_BODY", "ATTVAL_EL_EXPR", "EL_EXPR_CONTENT",
 	}
 	staticData.ruleNames = []string{
 		"jspDocuments", "jspDocument", "jspStart", "jspElements", "htmlMiscs",
@@ -61,7 +59,7 @@ func jspparserParserInit() {
 	}
 	staticData.predictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 49, 264, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 1, 44, 264, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
 		10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15, 7, 15,
 		2, 16, 7, 16, 2, 17, 7, 17, 2, 18, 7, 18, 2, 19, 7, 19, 2, 20, 7, 20, 2,
@@ -90,8 +88,8 @@ func jspparserParserInit() {
 		28, 1, 29, 1, 29, 1, 30, 1, 30, 1, 30, 1, 31, 1, 31, 1, 31, 1, 32, 1, 32,
 		1, 32, 1, 32, 2, 136, 238, 0, 33, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
 		22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56,
-		58, 60, 62, 64, 0, 5, 2, 0, 7, 7, 21, 21, 1, 0, 1, 2, 2, 0, 13, 13, 15,
-		15, 1, 0, 42, 43, 1, 0, 44, 45, 268, 0, 69, 1, 0, 0, 0, 2, 80, 1, 0, 0,
+		58, 60, 62, 64, 0, 5, 2, 0, 7, 7, 20, 20, 1, 0, 1, 2, 2, 0, 13, 13, 15,
+		15, 1, 0, 39, 40, 1, 0, 41, 42, 268, 0, 69, 1, 0, 0, 0, 2, 80, 1, 0, 0,
 		0, 4, 84, 1, 0, 0, 0, 6, 86, 1, 0, 0, 0, 8, 99, 1, 0, 0, 0, 10, 104, 1,
 		0, 0, 0, 12, 106, 1, 0, 0, 0, 14, 118, 1, 0, 0, 0, 16, 126, 1, 0, 0, 0,
 		18, 131, 1, 0, 0, 0, 20, 148, 1, 0, 0, 0, 22, 163, 1, 0, 0, 0, 24, 165,
@@ -115,21 +113,21 @@ func jspparserParserInit() {
 		19, 0, 97, 96, 1, 0, 0, 0, 98, 101, 1, 0, 0, 0, 99, 97, 1, 0, 0, 0, 99,
 		100, 1, 0, 0, 0, 100, 9, 1, 0, 0, 0, 101, 99, 1, 0, 0, 0, 102, 105, 3,
 		18, 9, 0, 103, 105, 3, 54, 27, 0, 104, 102, 1, 0, 0, 0, 104, 103, 1, 0,
-		0, 0, 105, 11, 1, 0, 0, 0, 106, 116, 3, 14, 7, 0, 107, 113, 5, 37, 0, 0,
+		0, 0, 105, 11, 1, 0, 0, 0, 106, 116, 3, 14, 7, 0, 107, 113, 5, 34, 0, 0,
 		108, 109, 3, 20, 10, 0, 109, 110, 5, 10, 0, 0, 110, 111, 3, 16, 8, 0, 111,
-		112, 5, 37, 0, 0, 112, 114, 1, 0, 0, 0, 113, 108, 1, 0, 0, 0, 113, 114,
-		1, 0, 0, 0, 114, 117, 1, 0, 0, 0, 115, 117, 5, 36, 0, 0, 116, 107, 1, 0,
+		112, 5, 34, 0, 0, 112, 114, 1, 0, 0, 0, 113, 108, 1, 0, 0, 0, 113, 114,
+		1, 0, 0, 0, 114, 117, 1, 0, 0, 0, 115, 117, 5, 33, 0, 0, 116, 107, 1, 0,
 		0, 0, 116, 115, 1, 0, 0, 0, 117, 13, 1, 0, 0, 0, 118, 119, 5, 11, 0, 0,
 		119, 123, 3, 16, 8, 0, 120, 122, 3, 26, 13, 0, 121, 120, 1, 0, 0, 0, 122,
 		125, 1, 0, 0, 0, 123, 121, 1, 0, 0, 0, 123, 124, 1, 0, 0, 0, 124, 15, 1,
-		0, 0, 0, 125, 123, 1, 0, 0, 0, 126, 129, 3, 34, 17, 0, 127, 128, 5, 35,
+		0, 0, 0, 125, 123, 1, 0, 0, 0, 126, 129, 3, 34, 17, 0, 127, 128, 5, 32,
 		0, 0, 128, 130, 3, 34, 17, 0, 129, 127, 1, 0, 0, 0, 129, 130, 1, 0, 0,
 		0, 130, 17, 1, 0, 0, 0, 131, 132, 5, 12, 0, 0, 132, 136, 3, 34, 17, 0,
 		133, 135, 3, 26, 13, 0, 134, 133, 1, 0, 0, 0, 135, 138, 1, 0, 0, 0, 136,
 		137, 1, 0, 0, 0, 136, 134, 1, 0, 0, 0, 137, 142, 1, 0, 0, 0, 138, 136,
-		1, 0, 0, 0, 139, 141, 5, 41, 0, 0, 140, 139, 1, 0, 0, 0, 141, 144, 1, 0,
+		1, 0, 0, 0, 139, 141, 5, 38, 0, 0, 140, 139, 1, 0, 0, 0, 141, 144, 1, 0,
 		0, 0, 142, 140, 1, 0, 0, 0, 142, 143, 1, 0, 0, 0, 143, 145, 1, 0, 0, 0,
-		144, 142, 1, 0, 0, 0, 145, 146, 5, 39, 0, 0, 146, 19, 1, 0, 0, 0, 147,
+		144, 142, 1, 0, 0, 0, 145, 146, 5, 36, 0, 0, 146, 19, 1, 0, 0, 0, 147,
 		149, 3, 36, 18, 0, 148, 147, 1, 0, 0, 0, 148, 149, 1, 0, 0, 0, 149, 156,
 		1, 0, 0, 0, 150, 152, 3, 22, 11, 0, 151, 153, 3, 36, 18, 0, 152, 151, 1,
 		0, 0, 0, 152, 153, 1, 0, 0, 0, 153, 155, 1, 0, 0, 0, 154, 150, 1, 0, 0,
@@ -137,39 +135,39 @@ func jspparserParserInit() {
 		21, 1, 0, 0, 0, 158, 156, 1, 0, 0, 0, 159, 164, 3, 24, 12, 0, 160, 164,
 		3, 6, 3, 0, 161, 164, 3, 42, 21, 0, 162, 164, 3, 40, 20, 0, 163, 159, 1,
 		0, 0, 0, 163, 160, 1, 0, 0, 0, 163, 161, 1, 0, 0, 0, 163, 162, 1, 0, 0,
-		0, 164, 23, 1, 0, 0, 0, 165, 166, 5, 20, 0, 0, 166, 167, 5, 49, 0, 0, 167,
-		168, 5, 25, 0, 0, 168, 25, 1, 0, 0, 0, 169, 170, 3, 28, 14, 0, 170, 171,
-		5, 19, 0, 0, 171, 172, 3, 30, 15, 0, 172, 176, 1, 0, 0, 0, 173, 176, 3,
+		0, 164, 23, 1, 0, 0, 0, 165, 166, 5, 19, 0, 0, 166, 167, 5, 44, 0, 0, 167,
+		168, 5, 24, 0, 0, 168, 25, 1, 0, 0, 0, 169, 170, 3, 28, 14, 0, 170, 171,
+		5, 18, 0, 0, 171, 172, 3, 30, 15, 0, 172, 176, 1, 0, 0, 0, 173, 176, 3,
 		28, 14, 0, 174, 176, 3, 56, 28, 0, 175, 169, 1, 0, 0, 0, 175, 173, 1, 0,
-		0, 0, 175, 174, 1, 0, 0, 0, 176, 27, 1, 0, 0, 0, 177, 178, 5, 40, 0, 0,
-		178, 29, 1, 0, 0, 0, 179, 181, 5, 17, 0, 0, 180, 179, 1, 0, 0, 0, 180,
+		0, 0, 175, 174, 1, 0, 0, 0, 176, 27, 1, 0, 0, 0, 177, 178, 5, 37, 0, 0,
+		178, 29, 1, 0, 0, 0, 179, 181, 5, 16, 0, 0, 180, 179, 1, 0, 0, 0, 180,
 		181, 1, 0, 0, 0, 181, 185, 1, 0, 0, 0, 182, 184, 3, 32, 16, 0, 183, 182,
 		1, 0, 0, 0, 184, 187, 1, 0, 0, 0, 185, 183, 1, 0, 0, 0, 185, 186, 1, 0,
-		0, 0, 186, 189, 1, 0, 0, 0, 187, 185, 1, 0, 0, 0, 188, 190, 5, 17, 0, 0,
+		0, 0, 186, 189, 1, 0, 0, 0, 187, 185, 1, 0, 0, 0, 188, 190, 5, 16, 0, 0,
 		189, 188, 1, 0, 0, 0, 189, 190, 1, 0, 0, 0, 190, 31, 1, 0, 0, 0, 191, 195,
-		5, 23, 0, 0, 192, 195, 3, 56, 28, 0, 193, 195, 3, 24, 12, 0, 194, 191,
+		5, 22, 0, 0, 192, 195, 3, 24, 12, 0, 193, 195, 3, 56, 28, 0, 194, 191,
 		1, 0, 0, 0, 194, 192, 1, 0, 0, 0, 194, 193, 1, 0, 0, 0, 195, 33, 1, 0,
-		0, 0, 196, 197, 5, 40, 0, 0, 197, 35, 1, 0, 0, 0, 198, 199, 7, 0, 0, 0,
+		0, 0, 196, 197, 5, 37, 0, 0, 197, 35, 1, 0, 0, 0, 198, 199, 7, 0, 0, 0,
 		199, 37, 1, 0, 0, 0, 200, 205, 3, 40, 20, 0, 201, 205, 3, 24, 12, 0, 202,
 		205, 3, 54, 27, 0, 203, 205, 5, 7, 0, 0, 204, 200, 1, 0, 0, 0, 204, 201,
 		1, 0, 0, 0, 204, 202, 1, 0, 0, 0, 204, 203, 1, 0, 0, 0, 205, 39, 1, 0,
 		0, 0, 206, 207, 7, 1, 0, 0, 207, 41, 1, 0, 0, 0, 208, 209, 5, 6, 0, 0,
 		209, 43, 1, 0, 0, 0, 210, 211, 5, 5, 0, 0, 211, 219, 3, 46, 23, 0, 212,
-		216, 5, 26, 0, 0, 213, 215, 3, 48, 24, 0, 214, 213, 1, 0, 0, 0, 215, 218,
+		216, 5, 25, 0, 0, 213, 215, 3, 48, 24, 0, 214, 213, 1, 0, 0, 0, 215, 218,
 		1, 0, 0, 0, 216, 214, 1, 0, 0, 0, 216, 217, 1, 0, 0, 0, 217, 220, 1, 0,
 		0, 0, 218, 216, 1, 0, 0, 0, 219, 212, 1, 0, 0, 0, 219, 220, 1, 0, 0, 0,
-		220, 223, 1, 0, 0, 0, 221, 222, 5, 27, 0, 0, 222, 224, 3, 50, 25, 0, 223,
+		220, 223, 1, 0, 0, 0, 221, 222, 5, 26, 0, 0, 222, 224, 3, 50, 25, 0, 223,
 		221, 1, 0, 0, 0, 223, 224, 1, 0, 0, 0, 224, 225, 1, 0, 0, 0, 225, 226,
-		5, 18, 0, 0, 226, 45, 1, 0, 0, 0, 227, 228, 5, 30, 0, 0, 228, 47, 1, 0,
-		0, 0, 229, 230, 5, 29, 0, 0, 230, 49, 1, 0, 0, 0, 231, 232, 5, 29, 0, 0,
+		5, 17, 0, 0, 226, 45, 1, 0, 0, 0, 227, 228, 5, 29, 0, 0, 228, 47, 1, 0,
+		0, 0, 229, 230, 5, 28, 0, 0, 230, 49, 1, 0, 0, 0, 231, 232, 5, 28, 0, 0,
 		232, 51, 1, 0, 0, 0, 233, 234, 5, 8, 0, 0, 234, 238, 3, 34, 17, 0, 235,
 		237, 3, 26, 13, 0, 236, 235, 1, 0, 0, 0, 237, 240, 1, 0, 0, 0, 238, 239,
 		1, 0, 0, 0, 238, 236, 1, 0, 0, 0, 239, 241, 1, 0, 0, 0, 240, 238, 1, 0,
-		0, 0, 241, 242, 5, 18, 0, 0, 242, 53, 1, 0, 0, 0, 243, 244, 3, 58, 29,
+		0, 0, 241, 242, 5, 17, 0, 0, 242, 53, 1, 0, 0, 0, 243, 244, 3, 58, 29,
 		0, 244, 245, 3, 60, 30, 0, 245, 248, 1, 0, 0, 0, 246, 248, 3, 56, 28, 0,
 		247, 243, 1, 0, 0, 0, 247, 246, 1, 0, 0, 0, 248, 55, 1, 0, 0, 0, 249, 250,
 		5, 14, 0, 0, 250, 251, 3, 60, 30, 0, 251, 57, 1, 0, 0, 0, 252, 253, 7,
-		2, 0, 0, 253, 59, 1, 0, 0, 0, 254, 255, 5, 32, 0, 0, 255, 256, 5, 31, 0,
+		2, 0, 0, 253, 59, 1, 0, 0, 0, 254, 255, 5, 31, 0, 0, 255, 256, 5, 30, 0,
 		0, 256, 61, 1, 0, 0, 0, 257, 258, 5, 3, 0, 0, 258, 259, 7, 3, 0, 0, 259,
 		63, 1, 0, 0, 0, 260, 261, 5, 4, 0, 0, 261, 262, 7, 4, 0, 0, 262, 65, 1,
 		0, 0, 0, 28, 69, 75, 80, 84, 92, 99, 104, 113, 116, 123, 129, 136, 142,
@@ -211,56 +209,51 @@ func NewJSPParser(input antlr.TokenStream) *JSPParser {
 
 // JSPParser tokens.
 const (
-	JSPParserEOF                            = antlr.TokenEOF
-	JSPParserJSP_COMMENT                    = 1
-	JSPParserJSP_CONDITIONAL_COMMENT        = 2
-	JSPParserSCRIPT_OPEN                    = 3
-	JSPParserSTYLE_OPEN                     = 4
-	JSPParserDTD                            = 5
-	JSPParserCDATA                          = 6
-	JSPParserWHITESPACES                    = 7
-	JSPParserXML_DECLARATION                = 8
-	JSPParserWHITESPACE_SKIP                = 9
-	JSPParserCLOSE_TAG_BEGIN                = 10
-	JSPParserTAG_BEGIN                      = 11
-	JSPParserDIRECTIVE_BEGIN                = 12
-	JSPParserDECLARATION_BEGIN              = 13
-	JSPParserECHO_EXPRESSION_OPEN           = 14
-	JSPParserSCRIPTLET_OPEN                 = 15
-	JSPParserEXPRESSION_OPEN                = 16
-	JSPParserQUOTE                          = 17
-	JSPParserTAG_END                        = 18
-	JSPParserEQUALS                         = 19
-	JSPParserEL_EXPR_START                  = 20
-	JSPParserJSP_STATIC_CONTENT_CHARS       = 21
-	JSPParserJSP_END                        = 22
-	JSPParserATTVAL_ATTRIBUTE               = 23
-	JSPParserATTVAL_VALUE                   = 24
-	JSPParserEL_EXPR_END                    = 25
-	JSPParserDTD_PUBLIC                     = 26
-	JSPParserDTD_SYSTEM                     = 27
-	JSPParserDTD_WHITESPACE_SKIP            = 28
-	JSPParserDTD_QUOTED                     = 29
-	JSPParserDTD_IDENTIFIER                 = 30
-	JSPParserBLOB_CLOSE                     = 31
-	JSPParserBLOB_CONTENT                   = 32
-	JSPParserJSPEXPR_EL_EXPR                = 33
-	JSPParserJSPEXPR_CONTENT_CLOSE          = 34
-	JSPParserJSP_JSTL_COLON                 = 35
-	JSPParserTAG_SLASH_END                  = 36
-	JSPParserTAG_CLOSE                      = 37
-	JSPParserTAG_SLASH                      = 38
-	JSPParserDIRECTIVE_END                  = 39
-	JSPParserTAG_IDENTIFIER                 = 40
-	JSPParserTAG_WHITESPACE                 = 41
-	JSPParserSCRIPT_BODY                    = 42
-	JSPParserSCRIPT_SHORT_BODY              = 43
-	JSPParserSTYLE_BODY                     = 44
-	JSPParserSTYLE_SHORT_BODY               = 45
-	JSPParserATTVAL_EL_EXPR                 = 46
-	JSPParserATTVAL_SINGLE_QUOTE_EXPRESSION = 47
-	JSPParserATTVAL_DOUBLE_QUOTE_EXPRESSION = 48
-	JSPParserEL_EXPR_CONTENT                = 49
+	JSPParserEOF                      = antlr.TokenEOF
+	JSPParserJSP_COMMENT              = 1
+	JSPParserJSP_CONDITIONAL_COMMENT  = 2
+	JSPParserSCRIPT_OPEN              = 3
+	JSPParserSTYLE_OPEN               = 4
+	JSPParserDTD                      = 5
+	JSPParserCDATA                    = 6
+	JSPParserWHITESPACES              = 7
+	JSPParserXML_DECLARATION          = 8
+	JSPParserWHITESPACE_SKIP          = 9
+	JSPParserCLOSE_TAG_BEGIN          = 10
+	JSPParserTAG_BEGIN                = 11
+	JSPParserDIRECTIVE_BEGIN          = 12
+	JSPParserDECLARATION_BEGIN        = 13
+	JSPParserECHO_EXPRESSION_OPEN     = 14
+	JSPParserSCRIPTLET_OPEN           = 15
+	JSPParserQUOTE                    = 16
+	JSPParserTAG_END                  = 17
+	JSPParserEQUALS                   = 18
+	JSPParserEL_EXPR_START            = 19
+	JSPParserJSP_STATIC_CONTENT_CHARS = 20
+	JSPParserJSP_END                  = 21
+	JSPParserATTVAL_ATTRIBUTE         = 22
+	JSPParserATTVAL_VALUE             = 23
+	JSPParserEL_EXPR_END              = 24
+	JSPParserDTD_PUBLIC               = 25
+	JSPParserDTD_SYSTEM               = 26
+	JSPParserDTD_WHITESPACE_SKIP      = 27
+	JSPParserDTD_QUOTED               = 28
+	JSPParserDTD_IDENTIFIER           = 29
+	JSPParserBLOB_CLOSE               = 30
+	JSPParserBLOB_CONTENT             = 31
+	JSPParserJSP_JSTL_COLON           = 32
+	JSPParserTAG_SLASH_END            = 33
+	JSPParserTAG_CLOSE                = 34
+	JSPParserTAG_SLASH                = 35
+	JSPParserDIRECTIVE_END            = 36
+	JSPParserTAG_IDENTIFIER           = 37
+	JSPParserTAG_WHITESPACE           = 38
+	JSPParserSCRIPT_BODY              = 39
+	JSPParserSCRIPT_SHORT_BODY        = 40
+	JSPParserSTYLE_BODY               = 41
+	JSPParserSTYLE_SHORT_BODY         = 42
+	JSPParserATTVAL_EL_EXPR           = 43
+	JSPParserEL_EXPR_CONTENT          = 44
 )
 
 // JSPParser rules.
@@ -485,7 +478,7 @@ func (p *JSPParser) JspDocuments() (localctx IJspDocumentsContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for ok := true; ok; ok = (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&1112510) != 0 {
+	for ok := true; ok; ok = (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&588222) != 0 {
 		{
 			p.SetState(72)
 			p.JspDocument()
@@ -2225,7 +2218,7 @@ func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&1112286) != 0 {
+	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&587998) != 0 {
 		{
 			p.SetState(150)
 			p.HtmlContent()
@@ -3108,22 +3101,6 @@ func (s *HtmlAttributeValueElementContext) ATTVAL_ATTRIBUTE() antlr.TerminalNode
 	return s.GetToken(JSPParserATTVAL_ATTRIBUTE, 0)
 }
 
-func (s *HtmlAttributeValueElementContext) JspExpression() IJspExpressionContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IJspExpressionContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IJspExpressionContext)
-}
-
 func (s *HtmlAttributeValueElementContext) ElExpression() IElExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
@@ -3138,6 +3115,22 @@ func (s *HtmlAttributeValueElementContext) ElExpression() IElExpressionContext {
 	}
 
 	return t.(IElExpressionContext)
+}
+
+func (s *HtmlAttributeValueElementContext) JspExpression() IJspExpressionContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspExpressionContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspExpressionContext)
 }
 
 func (s *HtmlAttributeValueElementContext) GetRuleContext() antlr.RuleContext {
@@ -3192,18 +3185,18 @@ func (p *JSPParser) HtmlAttributeValueElement() (localctx IHtmlAttributeValueEle
 			p.Match(JSPParserATTVAL_ATTRIBUTE)
 		}
 
-	case JSPParserECHO_EXPRESSION_OPEN:
+	case JSPParserEL_EXPR_START:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(192)
-			p.JspExpression()
+			p.ElExpression()
 		}
 
-	case JSPParserEL_EXPR_START:
+	case JSPParserECHO_EXPRESSION_OPEN:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(193)
-			p.ElExpression()
+			p.JspExpression()
 		}
 
 	default:

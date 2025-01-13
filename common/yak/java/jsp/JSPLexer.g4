@@ -52,9 +52,6 @@ SCRIPTLET_OPEN
     : SCRIPTLET_OPEN_TAG -> pushMode(JSP_BLOB)
     ;
 
-EXPRESSION_OPEN
-    : EXPRESSION_OPEN_TAG ->pushMode(JSP_EXPRESSION)
-    ;
 
 QUOTE
     : SINGLE_QUOTE
@@ -70,7 +67,7 @@ EQUALS
     ;
 
 EL_EXPR_START
-    : EL_EXPR_START_TAG ->pushMode(EL_EXPR_MODE)
+    : EL_EXPR_OPEN ->pushMode(EL_EXPR_MODE)
     ;
 
 JSP_STATIC_CONTENT_CHARS
@@ -92,7 +89,7 @@ ATTVAL_VALUE
     ;
 
 EL_EXPR_END
-    : EL_EXPR_END_TAG
+    : EL_EXPR_CLOSE
     ;
 
 fragment CLOSE_TAG
@@ -116,12 +113,12 @@ fragment EL_EXPR_BODY
     ;
 
 fragment EL_EXPR_OPEN
-    : ('${'|'#{')
+    : '${'
+    | '#{'
     ;
 
-
-fragment EL_EXPR_TXT
-    : EL_EXPR_OPEN EL_EXPR_BODY EL_EXPR_CLOSE
+fragment EL_EXPR_CLOSE
+    : '}'
     ;
 
 fragment BEGIN_ELEMENT_OPEN_TAG
@@ -174,13 +171,6 @@ fragment JSP_STATIC_CONTENT_CHAR
     | ESCAPED_DOLLAR
     ;
 
-fragment EL_EXPR_START_TAG
-    : '${'
-    ;
-
-fragment EL_EXPR_END_TAG
-    :'}'
-    ;
 
 mode IN_DTD;
 //<!DOCTYPE doctypename PUBLIC "publicId" "systemId">
@@ -224,15 +214,7 @@ fragment BLOB_CONTENT_FRAGMENT
     | '%' ~'>'
     ;
 
-mode JSP_EXPRESSION;
 
-JSPEXPR_EL_EXPR
-    : EL_EXPR_START -> pushMode(EL_EXPR_MODE)
-    ;
-
-JSPEXPR_CONTENT_CLOSE
-    : '%>'-> popMode
-    ;
 
 //
 // tag declarations
@@ -284,11 +266,15 @@ TAG_WHITESPACE
     ;
 
 fragment SINGLE_QUOTE_STRING_CONTENT
-    : ~[<'] | ESCAPED_SINGLE_QUOTE
+    : ~[<'$]
+    | '$' ~ '{'
+    | ESCAPED_SINGLE_QUOTE
     ;
 
 fragment DOUBLE_QUOTE_STRING_CONTENT
-    : ~[<"] | ESCAPED_DOUBLE_QUOTE
+    : ~[<"$]
+    | '$' ~ '{'
+    | ESCAPED_DOUBLE_QUOTE
     ;
 
 fragment WHITESPACE
@@ -378,7 +364,7 @@ ATTVAL_DOUBLE_QUOTE_OPEN
     ;
 
 ATTVAL_CONST_VALUE
-    : WHITESPACES? ATTVAL_ATTRIBUTE  -> type(ATTVAL_ATTRIBUTE),popMode
+    :  ATTVAL_ATTRIBUTE  -> type(ATTVAL_ATTRIBUTE), popMode
     ;
 
 ATTVAL_EL_EXPR
@@ -392,7 +378,7 @@ ATTVAL_SINGLE_QUOTE_CLOSING_QUOTE
     ;
 
 ATTVAL_SINGLE_QUOTE_EXPRESSION
-    : EL_EXPR_START-> pushMode(EL_EXPR_MODE)
+    :EL_EXPR_OPEN -> type(EL_EXPR_START),pushMode(EL_EXPR_MODE)
     ;
 
 ATTVAL_SINGLE_QUOTE_END_TAG_OPEN
@@ -418,7 +404,7 @@ ATTVAL_DOUBLE_QUOTE_CLOSING_QUOTE
     ;
 
 ATTVAL_DOUBLE_QUOTE_EXPRESSION
-    : EL_EXPR_START -> pushMode(EL_EXPR_MODE)
+    : EL_EXPR_OPEN -> type(EL_EXPR_START),pushMode(EL_EXPR_MODE)
     ;
 
 ATTVAL_DOUBLE_QUOTE_END_TAG_OPEN
@@ -489,15 +475,12 @@ fragment ESCAPED_DOUBLE_QUOTE
 
 mode EL_EXPR_MODE;
 
-EL_EXPR_CLOSE
-   : EL_EXPR_END_TAG ->type(EL_EXPR_END), popMode
+EL_EXPR_END_EX
+   : EL_EXPR_CLOSE -> type(EL_EXPR_END),popMode
    ;
 
 EL_EXPR_CONTENT
-    : EL_EXPR_CONTENT_FRAGMENT+
+    : EL_EXPR_BODY
     ;
 
-fragment EL_EXPR_CONTENT_FRAGMENT
-    : ~('}')
-    ;
 
