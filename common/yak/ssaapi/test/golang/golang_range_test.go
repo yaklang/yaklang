@@ -49,7 +49,7 @@ func TestRange_normol(t *testing.T) {
 			"4:10 - 4:14: true",
 			"8:10 - 8:15: false",
 		}
-		check(t, targets, want, ssa.ToConst)
+		check(t, targets, want, ssa.ToConstInst)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.GO))
 

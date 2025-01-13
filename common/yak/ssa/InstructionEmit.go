@@ -247,7 +247,7 @@ func (f *FunctionBuilder) EmitUnOp(op UnaryOpcode, v Value) Value {
 	}
 	u := NewUnOp(op, v)
 	f.emit(u)
-	if c, ok := ToConst(HandlerUnOp(u)); ok {
+	if c, ok := ToConstInst(HandlerUnOp(u)); ok {
 		f.emit(c)
 		return c
 	}
@@ -260,7 +260,7 @@ func (f *FunctionBuilder) EmitBinOp(op BinaryOpcode, x, y Value) Value {
 	}
 	binOp := NewBinOp(op, x, y)
 	f.emit(binOp)
-	if c, ok := ToConst(HandlerBinOp(binOp)); ok {
+	if c, ok := ToConstInst(HandlerBinOp(binOp)); ok {
 		f.emit(c)
 		return c
 	}

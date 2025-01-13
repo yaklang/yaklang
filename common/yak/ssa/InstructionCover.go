@@ -60,10 +60,10 @@ func ToFreeValue(n Node) (*Parameter, bool) {
 func ToLazyInstruction(n any) (*LazyInstruction, bool) { u, ok := n.(*LazyInstruction); return u, ok }
 
 // value
-func IsConst(v Instruction) bool { _, ok := ToConst(v); return ok }
-func ToConst(v Instruction) (*ConstInst, bool) {
+func IsConstInst(v Instruction) bool { _, ok := ToConstInst(v); return ok }
+func ToConstInst(v Instruction) (*ConstInst, bool) {
 	if lz, isLZ := ToLazyInstruction(v); isLZ {
-		return ToConst(lz.Self())
+		return ToConstInst(lz.Self())
 	}
 	c, ok := v.(*ConstInst)
 	return c, ok
