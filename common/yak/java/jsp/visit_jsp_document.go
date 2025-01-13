@@ -3,7 +3,6 @@ package jsp
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	jspparser "github.com/yaklang/yaklang/common/yak/java/jsp/parser"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"strings"
@@ -14,31 +13,11 @@ type JSPVisitor struct {
 	tagStack *utils.Stack[*TagInfo]
 }
 
-type TagInfo struct {
-	typ   TagType
-	attrs map[string]string
-}
-
-func newTagInfo(tag TagType, attrs map[string]string) *TagInfo {
-	return &TagInfo{
-		typ:   tag,
-		attrs: attrs,
-	}
-}
-
 func NewJSPVisitor() *JSPVisitor {
 	return &JSPVisitor{
 		tl.NewVisitor(),
 		utils.NewStack[*TagInfo](),
 	}
-}
-
-func (y *JSPVisitor) PushTagInfo(tag TagType, attrs map[string]string) {
-	y.tagStack.Push(newTagInfo(tag, attrs))
-}
-
-func (y *JSPVisitor) PopTagInfo() {
-	y.tagStack.Pop()
 }
 
 func (y *JSPVisitor) PeekTagInfo() *TagInfo {
@@ -154,21 +133,24 @@ func (y *JSPVisitor) VisitHtmlMisc(raw jspparser.IHtmlMiscContext) {
 	if i.HtmlComment() != nil {
 		return
 	} else if i.ElExpression() != nil {
-		y.VisitElExpression(i.ElExpression())
+		text := y.VisitElExpression(i.ElExpression())
+		y.EmitOutput(text)
 	} else if i.JspScriptlet() != nil {
 		y.VisitJspScriptlet(i.JspScriptlet())
 	}
 }
 
-func (y *JSPVisitor) VisitElExpression(raw jspparser.IElExpressionContext) {
+func (y *JSPVisitor) VisitElExpression(raw jspparser.IElExpressionContext) string {
 	if y == nil || raw == nil {
-		return
+		return ""
 	}
 
 	i := raw.(*jspparser.ElExpressionContext)
 	if i == nil {
-		return
+		return ""
 	}
+	content := i.GetText()
+	return y.appendElParseMethod(content)
 }
 
 func (y *JSPVisitor) VisitHtmlElement(raw jspparser.IHtmlElementContext) {
@@ -185,24 +167,34 @@ func (y *JSPVisitor) VisitHtmlElement(raw jspparser.IHtmlElementContext) {
 
 	if i.HtmlBegin() != nil {
 		y.VisitHtmlBegin(i.HtmlBegin())
+		defer y.PopTagInfo()
 	}
-	defer y.PopTagInfo()
 
-	// self closing tag
 	if i.TAG_SLASH_END() != nil {
-		y.ParseSingleTag(i.GetText())
-		return
-	}
-
-	if i.CLOSE_TAG_BEGIN() != nil {
-		openTag := i.HtmlBegin().GetText() + i.TAG_CLOSE(0).GetText()
-		closedTag := i.CLOSE_TAG_BEGIN().GetText() + i.HtmlTag().GetText() + i.TAG_CLOSE(1).GetText()
-		y.ParseDoubleTag(openTag, closedTag, func() {
-			y.VisitHtmlContents(i.HtmlContents())
+		// single tag
+		y.AddAttrFunc(func() {
+			y.EmitPureText(i.TAG_SLASH_END().GetText())
 		})
+		y.ParseSingleTag()
 	} else {
-		// only open tag
-		y.ParseSingleTag(i.GetText())
+		if i.CLOSE_TAG_BEGIN() != nil {
+			// double tag
+			y.AddAttrFunc(func() {
+				y.EmitPureText(i.TAG_CLOSE(0).GetText())
+			})
+			if i.HtmlContents() != nil {
+				end := i.CLOSE_TAG_BEGIN().GetText() + i.HtmlTag().GetText() + i.TAG_CLOSE(1).GetText()
+				y.ParseDoubleTag(end, func() {
+					y.VisitHtmlContents(i.HtmlContents())
+				})
+			}
+		} else {
+			// single tag
+			y.AddAttrFunc(func() {
+				y.EmitPureText(i.TAG_CLOSE(0).GetText())
+			})
+			y.ParseSingleTag()
+		}
 	}
 }
 
@@ -220,12 +212,13 @@ func (y *JSPVisitor) VisitHtmlBegin(raw jspparser.IHtmlBeginContext) {
 		return
 	}
 	tag := y.VisitHtmlTag(i.HtmlTag())
-	attrs := make(map[string]string)
+	y.PushTagInfo(tag)
+	y.AddAttrFunc(func() {
+		y.EmitPureText(i.TAG_BEGIN().GetText() + i.HtmlTag().GetText())
+	})
 	for _, attr := range i.AllHtmlAttribute() {
-		key, value := y.VisitAttribute(attr)
-		attrs[key] = value
+		y.VisitAttribute(attr)
 	}
-	y.PushTagInfo(tag, attrs)
 }
 
 func (y *JSPVisitor) VisitHtmlContents(raw jspparser.IHtmlContentsContext) {
@@ -238,11 +231,11 @@ func (y *JSPVisitor) VisitHtmlContents(raw jspparser.IHtmlContentsContext) {
 	if i == nil {
 		return
 	}
-	for _, content := range i.AllHtmlContent() {
-		y.VisitHtmlContent(content)
-	}
 	for _, data := range i.AllHtmlChardata() {
 		y.VisitHtmlCharData(data)
+	}
+	for _, content := range i.AllHtmlContent() {
+		y.VisitHtmlContent(content)
 	}
 }
 
@@ -279,7 +272,7 @@ func (y *JSPVisitor) VisitHtmlTag(raw jspparser.IHtmlTagContext) (tagType TagTyp
 	return
 }
 
-func (y *JSPVisitor) VisitAttribute(raw jspparser.IHtmlAttributeContext) (key string, value string) {
+func (y *JSPVisitor) VisitAttribute(raw jspparser.IHtmlAttributeContext) (key, value string) {
 	if y == nil || raw == nil {
 		return
 	}
@@ -292,11 +285,15 @@ func (y *JSPVisitor) VisitAttribute(raw jspparser.IHtmlAttributeContext) (key st
 	case *jspparser.EqualHTMLAttributeContext:
 		key = ret.HtmlAttributeName().GetText()
 		value = y.VisitHtmlAttributeValue(ret.HtmlAttributeValue())
+		y.AddTagAttr(key, value)
 	case *jspparser.JSPExpressionAttributeContext:
 		y.VisitJspExpression(ret.JspExpression())
 	}
-	key = yakunquote.TryUnquote(key)
-	value = yakunquote.TryUnquote(value)
+	y.AddAttrFunc(func() {
+		y.EmitPureText(key)
+		y.EmitPureText("=")
+		y.EmitPureText(value)
+	})
 	return
 }
 
@@ -310,31 +307,32 @@ func (y *JSPVisitor) VisitHtmlAttributeValue(raw jspparser.IHtmlAttributeValueCo
 	if i == nil {
 		return ""
 	}
-	// TODO:return value
+	value := ""
 	for _, element := range i.AllHtmlAttributeValueElement() {
-		y.VisitHtmlAttributeValueElement(element)
+		value += y.VisitHtmlAttributeValueElement(element)
 	}
-	return ""
+	return value
 }
 
-func (y *JSPVisitor) VisitHtmlAttributeValueElement(raw jspparser.IHtmlAttributeValueElementContext) {
+func (y *JSPVisitor) VisitHtmlAttributeValueElement(raw jspparser.IHtmlAttributeValueElementContext) string {
 	if y == nil || raw == nil {
-		return
+		return ""
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i := raw.(*jspparser.HtmlAttributeValueElementContext)
 	if i == nil {
-		return
+		return ""
 	}
 	if i.ATTVAL_ATTRIBUTE() != nil {
-		y.EmitPureText(i.ATTVAL_ATTRIBUTE().GetText())
+		return i.ATTVAL_ATTRIBUTE().GetText()
 	} else if i.JspExpression() != nil {
-		y.VisitJspExpression(i.JspExpression())
+		return y.VisitJspExpression(i.JspExpression())
 	} else if i.ElExpression() != nil {
-		y.VisitElExpression(i.ElExpression())
+		return y.VisitElExpression(i.ElExpression())
 	}
+	return ""
 }
 
 func (y *JSPVisitor) VisitHtmlContent(raw jspparser.IHtmlContentContext) {
@@ -348,7 +346,8 @@ func (y *JSPVisitor) VisitHtmlContent(raw jspparser.IHtmlContentContext) {
 		return
 	}
 	if i.ElExpression() != nil {
-		y.VisitElExpression(i.ElExpression())
+		text := y.VisitElExpression(i.ElExpression())
+		y.EmitOutput(text)
 	} else if i.JspElements() != nil {
 		y.VisitJspElements(i.JspElements())
 	} else if i.XhtmlCDATA() != nil {
@@ -373,4 +372,9 @@ func (y *JSPVisitor) VisitHtmlCharData(raw jspparser.IHtmlChardataContext) {
 		str := i.JSP_STATIC_CONTENT_CHARS().GetText()
 		y.EmitPureText(str)
 	}
+}
+
+func (y *JSPVisitor) EmitPureText(text string) {
+	text = y.replaceElExprInText(text)
+	y.Visitor.EmitPureText(text)
 }
