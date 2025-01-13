@@ -519,7 +519,7 @@ func (v *Value) GetConstValue() any {
 		return nil
 	}
 
-	if cInst, ok := ssa.ToConst(v.innerValue); ok {
+	if cInst, ok := ssa.ToConstInst(v.innerValue); ok {
 		return cInst.GetRawValue()
 	} else {
 		return nil
@@ -531,7 +531,7 @@ func (v *Value) GetConst() *ssa.Const {
 		return nil
 	}
 
-	if cInst, ok := ssa.ToConst(v.innerValue); ok {
+	if cInst, ok := ssa.ToConstInst(v.innerValue); ok {
 		return cInst.Const
 	} else {
 		return nil

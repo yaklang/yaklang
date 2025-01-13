@@ -164,7 +164,7 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 
 		objTyp := inst.GetObject().GetType()
 		key := inst.GetKey()
-		if ssa.IsConst(key) {
+		if ssa.IsConstInst(key) {
 			want := ssa.TryGetSimilarityKey(ssa.GetAllKey(objTyp), key.String())
 			if want != "" {
 				inst.NewError(
@@ -288,7 +288,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			if hasError {
 				hasError := true
 				for key := range c.GetAllMember() {
-					if c, ok := ssa.ToConst(key); ok {
+					if c, ok := ssa.ToConstInst(key); ok {
 						if c.IsNumber() {
 							if int(c.Number()) == len(objType.FieldTypes)-1 {
 								hasError = false
