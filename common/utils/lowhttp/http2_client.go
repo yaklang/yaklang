@@ -200,6 +200,9 @@ func (h2Conn *http2ClientConn) getNewStreamID() uint32 {
 
 // read frame loop
 func (h2Conn *http2ClientConn) readLoop() {
+	defer func() {
+		h2Conn.setClose()
+	}()
 	h2Conn.idleTimer.Reset(h2Conn.idleTimeout) // read new frame reset timer
 	var rl = http2ClientConnReadLoop{h2Conn: h2Conn}
 	//var gotSettings = false
@@ -209,7 +212,7 @@ func (h2Conn *http2ClientConn) readLoop() {
 	for !h2Conn.closed {
 		select {
 		case <-h2Conn.ctx.Done():
-			h2Conn.setClose()
+			return
 		default:
 		}
 
@@ -221,14 +224,11 @@ func (h2Conn *http2ClientConn) readLoop() {
 			if !errors.Is(err, io.EOF) {
 				log.Debugf("http2: Transport readFrame error on conn %p: %v", rl.h2Conn.conn, err)
 			}
-			h2Conn.setClose()
 			return
 		}
-		if !h2Conn.clientPrefaceOk.IsSet() {
+		if !h2Conn.clientPrefaceOk.IsSet() { // check start read frame after preface
 			if _, ok := frame.(*http2.SettingsFrame); !ok {
 				log.Errorf("http2: Transport received non-SETTINGS frame before SETTINGS: %v", frame)
-				h2Conn.setClose()
-				return
 			}
 			return
 		}
