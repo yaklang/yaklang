@@ -292,7 +292,7 @@ var GitCommands = []*cli.Command{
 				end = yakgit.GetHeadHash(repos)
 			}
 			// start - n end
-			lfs, err := yakgit.FromCommits(repos, start, end)
+			lfs, err := yakgit.FromCommitRange(repos, start, end)
 			if err != nil {
 				return err
 			}
