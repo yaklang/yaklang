@@ -10,22 +10,10 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	syncAtomic "sync/atomic"
 )
-
-var cachePool = omap.NewEmptyOrderedMap[string, *Cache]()
-
-func GetCacheFromPool(programName string) *Cache {
-	if cache, ok := cachePool.Get(programName); ok {
-		return cache
-	}
-	cache := NewDBCache(programName, true)
-	cachePool.Set(programName, cache)
-	return cache
-}
 
 type instructionCachePair struct {
 	inst   Instruction
@@ -39,7 +27,7 @@ type instructionCachePair struct {
 // and save the data to database when the data is expired,
 // and load the data from database when the data is not in cache.
 type Cache struct {
-	ProgramName      string // mark which program handled
+	program          *Program // mark which program handled
 	DB               *gorm.DB
 	fetchId          func() (int64, *ssadb.IrCode) // fetch a new id
 	InstructionCache *utils.DataBaseCacheWithKey[int64, *instructionCachePair]
@@ -51,7 +39,7 @@ type Cache struct {
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
-func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Duration) *Cache {
+func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) *Cache {
 	ttl := time.Duration(0)
 	if databaseEnable {
 		if len(ConfigTTL) > 0 {
@@ -62,7 +50,7 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 	}
 
 	cache := &Cache{
-		ProgramName:     programName,
+		program:         prog,
 		VariableCache:   make(map[string][]Instruction),
 		MemberCache:     make(map[string][]Instruction),
 		Class2InstIndex: make(map[string][]Instruction),
@@ -72,6 +60,7 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 	var save func(int64, *instructionCachePair) bool
 	var load func(int64) (*instructionCachePair, error)
 	if databaseEnable {
+		programName := prog.GetProgramName()
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
 		cache.fetchId = func() (int64, *ssadb.IrCode) {
 			return ssadb.RequireIrCode(cache.DB, programName)
@@ -79,9 +68,9 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 		save = func(i int64, s *instructionCachePair) bool {
 			return cache.saveInstruction(s)
 		}
-		load = func(i int64) (*instructionCachePair, error) {
-			irCode := ssadb.GetIrCodeById(cache.DB, i)
-			inst, err := NewLazyInstructionPureFromIr(irCode, cache)
+		load = func(id int64) (*instructionCachePair, error) {
+			irCode := ssadb.GetIrCodeById(cache.DB, id)
+			inst, err := NewLazyInstructionFromIrCode(irCode, cache.program, true)
 			if err != nil {
 				return nil, utils.Wrap(err, "NewLazyInstruction failed")
 			}
@@ -108,7 +97,7 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 }
 
 func (c *Cache) HaveDatabaseBackend() bool {
-	return c.DB != nil && c.ProgramName != ""
+	return c.DB != nil
 }
 
 // =============================================== Instruction =======================================================
@@ -138,24 +127,13 @@ func (c *Cache) DeleteInstruction(inst Instruction) {
 
 // GetInstruction : get instruction from cache.
 func (c *Cache) GetInstruction(id int64) Instruction {
-	log.Errorf("GetInstruction: %d", id)
+	if id == 0 {
+		return nil
+	}
 	if ret, ok := c.InstructionCache.Get(id); ok {
 		return ret.inst
 	}
-	if !c.HaveDatabaseBackend() || id <= 0 {
-		return nil
-	}
-
-	// if no in cache, get from database
-	// if found in database, create a new lazy instruction
-	// return c.newLazyInstructionWithoutCache(id)
-	v, err := newLazyInstruction(id, nil, c)
-	if err != nil {
-		log.Errorf("newLazyInstruction failed: %v", err)
-		return nil
-	}
-	return v
-	// all instruction from database will be lazy instruction
+	return nil
 }
 
 // =============================================== Variable =======================================================
@@ -247,7 +225,6 @@ func (c *Cache) saveInstruction(instIr *instructionCachePair) bool {
 		return false
 	}
 
-	log.Errorf("save instructon %d", instIr.inst.GetId())
 	if instIr.irCode.Opcode == 0 {
 		log.Errorf("BUG: saveInstruction called with empty opcode: %v", instIr.inst.GetName())
 	}

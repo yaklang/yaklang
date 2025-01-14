@@ -14,7 +14,7 @@ func GetScopeFromIrScopeName(programName, ScopeName string) (*ScopeInstance, err
 
 	for _, index := range insts {
 		variable := ret.CreateVariable(index.VariableName, false)
-		value, err := NewLazyInstruction(index.ValueID)
+		value, err := NewLazyEx(index.ValueID, ToValue)
 		if err != nil {
 			continue
 		}

@@ -31,10 +31,10 @@ func (p *Program) GetInstructionById(id int64) Instruction {
 	if p == nil {
 		return nil
 	}
-	return p.Cache.GetInstruction(id)
+	return GetEx[Instruction](p.Cache, id)
 }
 
-func GetEx[T any](c *Cache, id int64) T {
+func GetEx[T Instruction](c *Cache, id int64) T {
 	var zero T
 	if c == nil {
 		return zero
@@ -46,12 +46,15 @@ func GetEx[T any](c *Cache, id int64) T {
 	return slice[0]
 }
 
-func GetExs[T any](c *Cache, ids ...int64) []T {
+func GetExs[T Instruction](c *Cache, ids ...int64) []T {
 	if c == nil {
 		return nil
 	}
 	ret := make([]T, 0)
 	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
 		inst := c.GetInstruction(id)
 		v, ok := inst.(T)
 		if !ok {

@@ -110,7 +110,8 @@ func (f *FunctionBuilder) SetCurrent(i Instruction, noChangeRanges ...bool) func
 	currentBlock := f.CurrentBlock
 	Range := f.CurrentRange
 	fun := f.Function
-	builder := i.GetFunc().builder
+	iFunc := i.GetFunc()
+	builder := iFunc.builder
 	parentScope := f.parentScope
 
 	f.CurrentBlock = i.GetBlock()

@@ -24,9 +24,9 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 }
 
 // IrCodeToInstruction : unmarshal ir code to instruction, used in LazyInstruction
-func (c *Cache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode) Instruction {
+func IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, prog *Program) Instruction {
 	instructionFromIrCode(inst, ir)
-	c.valueFromIrCode(inst, ir)
+	valueFromIrCode(inst, ir, prog)
 	basicBlockFromIrCode(inst, ir)
 
 	// extern info
@@ -116,12 +116,12 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	// not function
 	if !ir.IsFunction {
-		if fun, err := NewInstructionFromLazy(ir.CurrentFunction, ToFunction); err == nil {
+		if fun, err := NewLazyEx(ir.CurrentFunction, ToFunction); err == nil {
 			inst.SetFunc(fun)
 		} else {
 			log.Errorf("BUG: set CurrentFunction[%d]: %v", ir.CurrentFunction, err)
 		}
-		if block, err := NewInstructionFromLazy(ir.CurrentBlock, ToBasicBlock); err == nil {
+		if block, err := NewLazyEx(ir.CurrentBlock, ToBasicBlock); err == nil {
 			inst.SetBlock(block)
 		} else {
 			log.Errorf("BUG: set CurrentBlock[%d]: %v", ir.CurrentBlock, err)
@@ -154,13 +154,6 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	// user
 	for _, user := range value.GetUsers() {
 		ir.Users = append(ir.Users, user.GetId())
-
-		if call, ok := ToCall(user); ok {
-			if call.Method == value.GetId() {
-				// ir.IsCalled
-				ir.CalledBy = append(ir.CalledBy, call.GetId())
-			}
-		}
 	}
 
 	for _, oc := range value.GetOccultation() {
@@ -205,20 +198,20 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.TypeID = SaveTypeToDB(value.GetType())
 }
 
-func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
+func valueFromIrCode(inst Instruction, ir *ssadb.IrCode, prog *Program) {
 	value, ok := ToValue(inst)
 	if !ok {
 		return
 	}
 
 	getUser := func(id int64) User {
-		if user, ok := ToUser(c.GetInstruction(id)); ok {
+		if user, ok := ToUser(prog.GetInstructionById(id)); ok {
 			return user
 		}
 		return nil
 	}
 	getValue := func(id int64) Value {
-		if value, ok := ToValue(c.GetInstruction(id)); ok {
+		if value, ok := ToValue(prog.GetInstructionById(id)); ok {
 			return value
 		}
 		return nil

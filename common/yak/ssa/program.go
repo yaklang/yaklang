@@ -19,6 +19,16 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
+var progPool = utils.NewSafeMap[*Program]()
+
+func GetProgramFromPool(name string) (*Program, bool) {
+	return progPool.Get(name)
+}
+
+// func DeleteProgramFromPool(names string) {
+// 	progPool.Delete(names)
+// }
+
 type ProjectConfigType int
 
 const (
@@ -35,7 +45,6 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
-		Cache:                   NewDBCache(ProgramName, enableDatabase, ttl...),
 		astMap:                  make(map[string]struct{}),
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
@@ -56,6 +65,8 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 	}
 	if kind == Application {
 		prog.Application = prog
+		prog.Cache = NewDBCache(prog, enableDatabase, ttl...)
+		progPool.Set(ProgramName, prog)
 	}
 	prog.EnableDatabase = enableDatabase
 	prog.Loader = ssautil.NewPackageLoader(
@@ -272,6 +283,7 @@ func (prog *Program) Finish() {
 		// save instruction
 		prog.Cache.SaveToDatabase()
 	}
+	progPool.Delete(prog.GetProgramName())
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
