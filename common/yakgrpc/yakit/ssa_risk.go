@@ -110,3 +110,15 @@ func UpdateSSARiskTags(DB *gorm.DB, id int64, tags []string) error {
 func SSARiskColumnGroupCount(db *gorm.DB, column string) []*ypb.FieldGroup {
 	return bizhelper.GroupCount(db, "ssa_risks", column)
 }
+
+func NewSSARiskReadRequest(db *gorm.DB, Ids []int64) error {
+	db = db.Model(&schema.SSARisk{})
+	if len(Ids) > 0 {
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", Ids)
+	}
+	db = db.UpdateColumn("is_read", true)
+	if db.Error != nil {
+		return utils.Errorf("NewSSARiskReadRequest failed %s", db.Error)
+	}
+	return nil
+}

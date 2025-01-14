@@ -750,6 +750,7 @@ service Yak {
   rpc DeleteSSARisks(DeleteSSARisksRequest)returns(DbOperateMessage);
   rpc UpdateSSARiskTags(UpdateSSARiskTagsRequest)returns(DbOperateMessage);
   rpc GetSSARiskFieldGroup(Empty) returns (SSARiskFieldGroupResponse);
+  rpc NewSSARiskRead(NewRiskReadRequest) returns (Empty);
 
   rpc GetAllPluginEnv(Empty) returns (PluginEnvData);
   rpc QueryPluginEnv(QueryPluginEnvRequest) returns (PluginEnvData);
@@ -5996,6 +5997,8 @@ message SSARisk {
   string CveAccessComplexity = 20;
   string Tags = 21;
   uint64 ResultID = 22;
+
+  bool IsRead = 23;
 }
 
 message SSARisksFilter {

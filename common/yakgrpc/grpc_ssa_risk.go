@@ -53,3 +53,11 @@ func (s *Server) GetSSARiskFieldGroup(ctx context.Context, req *ypb.Empty) (*ypb
 		RiskTypeField:    yakit.SSARiskColumnGroupCount(db, "risk_type"),
 	}, nil
 }
+
+func (s *Server) NewSSARiskRead(ctx context.Context, req *ypb.NewRiskReadRequest) (*ypb.Empty, error) {
+	err := yakit.NewSSARiskReadRequest(s.GetProjectDatabase(), req.GetIds())
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.Empty{}, nil
+}
