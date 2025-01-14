@@ -668,8 +668,6 @@ func Test_SideEffect_Object(t *testing.T) {
 	})
 
 	t.Run("side-effect object", func(t *testing.T) {
-		// todo
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 		type T struct {
@@ -685,7 +683,27 @@ func Test_SideEffect_Object(t *testing.T) {
 			f1()
 			println(o.a)
 		}
-		`, []string{"side-effect(2, o.a)"}, t)
+		`, []string{"3"}, t)
 	})
 
+	t.Run("side-effect object if", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			a int
+			b int
+		}
+
+		func main(){
+			o := &T{a: 1, b: 2}
+			f1 := func() {
+				if true {
+					o = &T{a: 3, b: 4}
+				}
+			}
+			f1()
+			println(o.a)
+		}
+		`, []string{"Undefined-o.a(valid)"}, t)
+	})
 }

@@ -17,6 +17,27 @@ func (b *FunctionBuilder) ReadMemberCallValue(object, key Value) Value {
 	return b.readMemberCallValueEx(object, key, false)
 }
 
+func (b *FunctionBuilder) ReadMemberCallValueByScope(object, key Value, scope ScopeIF) Value {
+	res := checkCanMemberCallExist(object, key)
+	program := b.GetProgram()
+
+	if ret := ReadVariableFromScopeAndParent(scope, res.name); ret != nil {
+		if b.CurrentRange != nil {
+			ret.AddRange(b.CurrentRange, false)
+			// set offset variable
+			if program != nil {
+				program.SetOffsetVariable(ret, b.CurrentRange)
+			}
+		}
+		if ret.Value != nil {
+			// has value, just return
+			return ret.Value
+		}
+	}
+
+	return nil
+}
+
 func (b *FunctionBuilder) ReadMemberCallValueByName(object Value, key string) Value {
 	name := fmt.Sprintf("#%d.%s", object.GetId(), key)
 	if ret := b.PeekValueInThisFunction(name); ret != nil {

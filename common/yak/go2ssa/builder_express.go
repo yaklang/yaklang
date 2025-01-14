@@ -289,7 +289,12 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
 				if key := typ.GetKeybyName(test); key != nil {
-					rightv = b.ReadMemberCallValue(rv, key)
+					if se, ok := rv.(*ssa.SideEffect); ok {
+						scope := se.Value.GetBlock().ScopeTable
+						rightv = b.ReadMemberCallValueByScope(se.Value, key, scope)
+					} else {
+						rightv = b.ReadMemberCallValue(rv, key)
+					}
 				} else {
 					for n, a := range typ.AnonymousField {
 						if test == n {
