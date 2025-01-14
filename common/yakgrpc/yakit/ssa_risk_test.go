@@ -100,3 +100,38 @@ func TestSSARisk_GroupCount(t *testing.T) {
 	check(SSARiskColumnGroupCount(db, "severity"))
 
 }
+
+func TestSSARisk_NewPaging(t *testing.T) {
+	db := ssadb.GetDB()
+	programNameToken := utils.RandStringBytes(10)
+	for i := 0; i < 10; i++ {
+		err := CreateSSARisk(db, &schema.SSARisk{
+			ProgramName: programNameToken,
+		})
+		require.NoError(t, err)
+	}
+	t.Cleanup(func() {
+		DeleteSSARisks(db, &ypb.SSARisksFilter{ProgramName: []string{programNameToken}})
+	})
+
+	_, risks, err := QuerySSARisk(db, &ypb.SSARisksFilter{ProgramName: []string{programNameToken}}, &ypb.Paging{
+		Limit:   6,
+		OrderBy: "id",
+	})
+	require.NoError(t, err)
+	require.Len(t, risks, 6)
+	maxID := 0
+	for _, risk := range risks {
+		if int(risk.ID) > maxID {
+			maxID = int(risk.ID)
+		}
+	}
+
+	_, risks, err = QuerySSARisk(db, &ypb.SSARisksFilter{ProgramName: []string{programNameToken}}, &ypb.Paging{
+		Limit:   -1,
+		OrderBy: "id",
+		AfterId: int64(maxID),
+	})
+	require.NoError(t, err)
+	require.Len(t, risks, 4)
+}
