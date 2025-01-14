@@ -1,0 +1,41 @@
+name: Code-Check
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+jobs:
+  setup:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Cache YakLang Project
+        uses: actions/cache@v3
+        id: cache-project
+        with:
+          path: |
+            ~/yakit-projects
+            ${{ github.workspace }}
+          key: go-${{ github.event.pull_request.head.sha }}
+      - name: Check out code into the Go module directory
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Get main Branch
+        run: |
+          git fetch --all
+          git checkout main
+          git reset --hard origin/main
+          git checkout ${{ github.event.pull_request.head.sha }}
+      - name: Get Yak binary Latest
+        run: |
+          wget https://aliyun-oss.yaklang.com/yak/latest/yak_linux_amd64
+          chmod +x ./yak_linux_amd64
+      - name: Fetch fs
+        run: |
+          MERGE_BASE=$(git merge-base main ${{ github.event.pull_request.head.sha }})
+          echo "Merge base is: $MERGE_BASE"
+          ./yak_linux_amd64 gitefs --start $MERGE_BASE --end ${{ github.event.pull_request.head.sha }} --output fs.zip
+      - name: Generate Prog and Check With SyntaxFlow
+        run: |
+          ./yak_linux_amd64 check --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule
