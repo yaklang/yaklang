@@ -24,6 +24,12 @@ func (y *Visitor) EmitPureCode(code string) {
 	y.Instructions = append(y.Instructions, inst)
 }
 
+func (y *Visitor) EmitDeclarationCode(code string) {
+	inst := newInstruction(OpDeclarationCode, y.CurrentRange)
+	inst.Text = code
+	y.Instructions = append(y.Instructions, inst)
+}
+
 func (y *Visitor) EmitImport(path string) {
 	inst := newInstruction(OpImport, y.CurrentRange)
 	inst.Text = path

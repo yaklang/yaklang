@@ -108,7 +108,6 @@ func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
 	return b.ReadConst(name)
 }
 
-// ========================================== For Template Language ==========================================
 func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 	t := b.StoreFunctionBuilder()
 	b.LoadBuilder(s)
