@@ -17,7 +17,7 @@ type TemplateRender interface {
 	WriteEscapeOutput(variable string) // Write variables to the template output, but they will be HTML escaped
 	WritePureCode(code string)         // Write pure code, usually used to write code in templates
 	WriteImport(path string)           // Write import dependency statement
-
+	WriteDeclaration(code string)
 	String() string
 	Finish()
 }

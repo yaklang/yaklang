@@ -19,7 +19,19 @@ type JavaTemplate struct {
 	pkgName   string
 	className string
 
-	builder strings.Builder
+	classDeclLine int
+	builder       strings.Builder
+}
+
+func (t *JavaTemplate) WriteDeclaration(code string) {
+	origin := t.builder.String()
+	lines := strings.Split(origin, "\r\n")
+	beforeClassDecl := strings.Join(lines[:t.classDeclLine], "\r\n")
+	afterClassDecl := strings.Join(lines[t.classDeclLine:], "\r\n")
+	t.builder.Reset()
+	t.builder.WriteString(beforeClassDecl)
+	t.builder.WriteString(code + "\r\n")
+	t.builder.WriteString(afterClassDecl)
 }
 
 func (t *JavaTemplate) WriteImport(path string) {
@@ -31,6 +43,7 @@ func (t *JavaTemplate) WriteImport(path string) {
 	t.builder.WriteString(pkgDel + "\r\n")
 	t.builder.WriteString("import " + path + ";\r\n")
 	t.builder.WriteString(backUp)
+	t.classDeclLine++
 }
 
 func (t *JavaTemplate) WritePureOut(expression string) {
@@ -94,6 +107,7 @@ func (t *JavaTemplate) generateTemplate() {
 	t.builder.WriteString("import " + JAVA_REQUEST_PATH + ".HttpServletResponse;\r\n")
 	t.builder.WriteString("\n")
 	t.builder.WriteString("public class " + t.className + " {\r\n")
+	t.classDeclLine = len(strings.Split(t.builder.String(), "\r\n")) - 1
 	t.builder.WriteString("public void _JavaTemplateService(" + "HttpServletRequest request, HttpServletResponse response" + ") {\r\n")
 	t.builder.WriteString("\tout = request.getOut(); \r\n")
 }

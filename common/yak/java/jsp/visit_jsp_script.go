@@ -59,9 +59,14 @@ func (y *JSPVisitor) VisitJspScriptlet(raw jspparser.IJspScriptletContext) {
 	}
 
 	if i.ScriptletStart() != nil {
+		start := i.ScriptletStart().(*jspparser.ScriptletStartContext)
 		code := y.VisitScriptletContent(i.ScriptletContent())
 		if code != "" {
-			y.EmitPureCode(code)
+			if start.SCRIPTLET_OPEN() != nil {
+				y.EmitPureCode(code)
+			} else if start.DECLARATION_BEGIN() != nil {
+				y.EmitDeclarationCode(code)
+			}
 		}
 	} else if i.JspExpression() != nil {
 		y.VisitJspExpression(i.JspExpression())

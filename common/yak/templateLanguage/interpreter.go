@@ -97,6 +97,8 @@ func (i *Interpreter) GenerateCode() (err error) {
 			i.template.WritePureCode(ins.Text)
 		case OpImport:
 			i.template.WriteImport(ins.Text)
+		case OpDeclarationCode:
+			i.template.WriteDeclaration(ins.Text)
 		default:
 			return utils.Errorf("unknown opcode: %v", ins.Opcode)
 		}
