@@ -73,6 +73,7 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 		CveAccessComplexity: s.CveAccessComplexity,
 		Tags:                s.Tags,
 		ResultID:            s.ResultID,
+		IsRead:              s.IsRead,
 	}
 }
 
