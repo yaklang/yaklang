@@ -94,8 +94,9 @@ func (t *Task) runWithContext(ctx context.Context) {
 
 	defer func() {
 		t.isScheduling.UnSet()
-		t.isFinished.Set()
-
+		if t.interval == 0 {
+			t.isFinished.Set()
+		}
 		callbackLock.Lock()
 		for _, f := range t.onFinished {
 			f(t)
@@ -137,45 +138,41 @@ func (t *Task) runWithContext(ctx context.Context) {
 	}
 
 	if t.Start.After(time.Now()) {
-		startCtx, _ := context.WithDeadline(ctx, t.Start)
-		select {
-		case <-startCtx.Done():
-			break
-		case <-ctx.Done():
-			callbackLock.Lock()
-			for _, f := range t.onCanceled {
-				f(t)
-			}
-			callbackLock.Unlock()
-			return
-		}
+		startCtx, cancel := context.WithDeadline(ctx, t.Start)
+		defer cancel()
+		<-startCtx.Done() // 直接等待开始时间到达
 	}
 
 	// 如果设置了第一次执行的话，则立即执行
-	if t.first.IsSet() {
-		taskFunc()
-	}
+	//if t.first.IsSet() {
+	//	taskFunc()
+	//}
 
-	// 进入循环模式
-	ticker := time.Tick(t.interval)
-	for {
-		if t.isFinished.IsSet() || !t.isScheduling.IsSet() {
-			if t.cancel != nil {
-				t.cancel()
-			}
-			return
+	// 执行任务
+	if t.interval == 0 {
+		// 定时任务：只执行一次
+		taskFunc()
+		return
+	} else {
+		// 周期任务：先执行一次（如果需要），然后进入定时循环
+		if t.first.IsSet() {
+			taskFunc()
 		}
 
-		select {
-		case <-taskCtx.Done():
-			callbackLock.Lock()
-			for _, f := range t.onCanceled {
-				f(t)
+		// 进入循环模式
+		ticker := time.NewTicker(t.interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-taskCtx.Done():
+				return
+			case <-ticker.C:
+				if t.IsDisabled() {
+					continue
+				}
+				taskFunc()
 			}
-			callbackLock.Unlock()
-			return
-		case <-ticker:
-			taskFunc()
 		}
 	}
 }
@@ -202,7 +199,7 @@ func (t *Task) Cancel() {
 		t.cancel()
 	}
 	t.isScheduling.UnSet()
-	t.isFinished.Set()
+	//t.isFinished.Set()
 }
 
 // 状态函数
