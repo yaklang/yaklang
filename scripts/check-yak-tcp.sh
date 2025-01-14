@@ -31,6 +31,7 @@ while true; do
         LISTEN=$(echo "$ALL_CONNECTIONS" | grep -c LISTEN)
         TIME_WAIT=$(echo "$ALL_CONNECTIONS" | grep -c TIME_WAIT)
         CLOSE_WAIT=$(echo "$ALL_CONNECTIONS" | grep -c CLOSE_WAIT)
+        CLOSE=$(echo "$ALL_CONNECTIONS" | grep -c CLOSE)
 
         # 显示统计信息
         echo -e "${BLUE}=== 连接统计 ===${NC}"
@@ -38,6 +39,7 @@ while true; do
         echo -e "ESTABLISHED: ${GREEN}$ESTABLISHED${NC}"
         echo -e "LISTEN: ${GREEN}$LISTEN${NC}"
         echo -e "TIME_WAIT: ${YELLOW}$TIME_WAIT${NC}"
+        echo -e "CLOSE: ${RED}$CLOSE${NC}"
         echo -e "CLOSE_WAIT: ${RED}$CLOSE_WAIT${NC}\n"
 
         # 只显示 LISTEN 状态的详细信息
