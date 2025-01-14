@@ -75,7 +75,7 @@ func TestJSP2Java_Content(t *testing.T) {
 			`<p>Welcome, Admin! Your user type is: ${sessionScope.userType}</p>`,
 			[]string{
 				`out.write("Welcome, Admin! Your user type is: ")`,
-				`out.print(elExpr.parse("${sessionScope.userType}"));`,
+				`elExpr.parse("sessionScope.userType"`,
 			}},
 		// core tag
 		// core out tag
@@ -83,14 +83,14 @@ func TestJSP2Java_Content(t *testing.T) {
 			"test jstl-core out tag",
 			"<c:out value='${name}'/>",
 			[]string{
-				`out.printWithEscape(elExpr.parse("${name}"));`,
+				`out.printWithEscape(elExpr.parse("name"));`,
 			},
 		},
 		{
 			"test jstl-core out tag without escaping",
 			"<c:out value='${name}' escapeXml=\"false\"/>",
 			[]string{
-				`out.print(elExpr.parse("${name}"));`,
+				`out.print(elExpr.parse("name"));`,
 			},
 		},
 		// core set tag
@@ -105,7 +105,7 @@ func TestJSP2Java_Content(t *testing.T) {
 		{"test jstl-core if tag 1",
 			"<c:if test='${age  <  16 }'>Hello John</c:if>",
 			[]string{
-				`if (elExpr.parse("${age  <  16 }")) {`,
+				`if (elExpr.parse("age  <  16 "))`,
 				`out.write("Hello John");`,
 			}},
 		{"test jstl-core if tag 2",
@@ -114,8 +114,9 @@ func TestJSP2Java_Content(t *testing.T) {
 			 </c:if>
         `,
 			[]string{
-				`if (elExpr.parse("${sessionScope.userType == 'admin'}")`,
-				`out.print(elExpr.parse("${sessionScope.userType}"))`,
+				`if (elExpr.parse("sessionScope.userType == 'admin'")) `,
+				`out.write("Welcome, Admin! Your user type is: ");`,
+				`out.print(elExpr.parse("sessionScope.userType"));`,
 			},
 		},
 		//core choose tag
@@ -139,7 +140,7 @@ func TestJSP2Java_Content(t *testing.T) {
 `,
 			[]string{
 				"switch (true) {",
-				`case elExpr.parse("${valueToSwitch eq 'case1'}"):`,
+				`case elExpr.parse("valueToSwitch eq 'case1'"):`,
 				`out.write("					Value is case1");`,
 				"default:"},
 		},
@@ -150,8 +151,17 @@ func TestJSP2Java_Content(t *testing.T) {
         <li>${item}</li>
    	 	</c:forEach>`,
 			[]string{
-				"Object item : elExpr.parse(\"${items}\"",
-				"out.print(elExpr.parse(\"${item}\"));",
+				"for (Object item : elExpr.parse(\"items\")) {",
+				"out.print(elExpr.parse(\"item\"));",
+			},
+		},
+		{
+			"test el expression in jstl ",
+			`
+        <p>日期：<fmt:formatDate value="${now}" pattern="yyyy-MM-dd HH:mm:ss" /></p>
+`,
+			[]string{
+				"out.print(elExpr.parse(\"now\"));",
 			},
 		},
 	}

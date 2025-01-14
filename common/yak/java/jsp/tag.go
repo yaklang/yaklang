@@ -3,6 +3,7 @@ package jsp
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 	"strings"
 )
@@ -103,8 +104,9 @@ func (y *JSPVisitor) GetCoreJSTLTag(name string) TagType {
 		return JSP_TAG_CORE_URL
 	case "param":
 		return JSP_TAG_CORE_PARAM
+	default:
+		return JSP_TAG_PURE_HTML
 	}
-	return -1
 }
 
 func (y *JSPVisitor) GetDirectiveTag(name string) TagType {
@@ -219,11 +221,26 @@ func (y *JSPVisitor) ParseDoubleTag(endText string, visitContent func()) {
 
 func (y *JSPVisitor) appendElParseMethod(expr string) string {
 	expr = strings.TrimSpace(expr)
-	expr = fmt.Sprintf("%s(\"%s\")", JSP_EL_PARSE_METHOD, expr)
-	return expr
+	re := regexp.MustCompile(`\$\{(.+?)\}`)
+	expr = yakunquote.TryUnquote(expr)
+	return re.ReplaceAllString(expr, fmt.Sprintf("%s(\"$1\")", JSP_EL_PARSE_METHOD))
 }
 
 func (y *JSPVisitor) replaceElExprInText(text string) string {
 	re := regexp.MustCompile(`\$\{(.+?)\}`)
-	return re.ReplaceAllString(text, fmt.Sprintf("%s(\"$1\")", JSP_EL_PARSE_METHOD))
+	expr := re.FindString(text)
+	if expr != "" {
+		expr = y.appendElParseMethod(expr)
+		y.EmitOutput(expr)
+	}
+	output := re.ReplaceAllString(text, "")
+
+	methodRe := regexp.MustCompile(`elExpr\.parse\(([^)]*)\)`)
+	expr = methodRe.FindString(output)
+	if expr != "" {
+		expr = y.appendElParseMethod(expr)
+		y.EmitOutput(expr)
+	}
+	output = methodRe.ReplaceAllString(output, "")
+	return output
 }
