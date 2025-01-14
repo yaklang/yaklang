@@ -451,6 +451,62 @@ func Test_SideEffect_Capture(t *testing.T) {
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 
+	t.Run("object if", func(t *testing.T) {
+		code := `package main
+
+	import "fmt"
+
+	type T struct {
+	    a int
+	}
+
+	func test() {
+		t := T{1}
+		f := func() {
+			if true {
+				t.a = 2
+			}
+		}
+		f()
+		c := t.a // 2 会被side-effect影响
+	}
+		`
+		ssatest.CheckSyntaxFlowContain(t, code, `
+			c #-> as $c
+		`, map[string][]string{
+			"c": {"2"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	t.Run("object extend if", func(t *testing.T) {
+		code := `package main
+
+		type T struct {
+			a int
+			b int
+		}
+
+		func main(){
+			o := &T{a: 1, b: 2}
+			f1 := func() {
+				if true {
+					o = &T{a: 3, b: 4}
+				}
+			}
+			f1()
+			c := o.a
+			d := o.b
+		}
+		`
+		ssatest.CheckSyntaxFlowContain(t, code, `
+			c #-> as $c
+			d #-> as $d
+		`, map[string][]string{
+			"c": {"3"},
+			"d": {"4"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
 	t.Run("object nesting", func(t *testing.T) {
 		code := `package main
 
