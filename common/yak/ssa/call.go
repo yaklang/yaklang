@@ -294,7 +294,9 @@ func (c *Call) handleCalleeFunction() {
 						}
 					}
 				}
-				val = builder.ReadMemberCallValue(object, key)
+				if val == nil {
+					val = builder.ReadMemberCallValue(object, key)
+				}
 				val.AddUser(c)
 				c.ArgMember = append(c.ArgMember, val)
 			}

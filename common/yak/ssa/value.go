@@ -158,38 +158,16 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		return
 	}
 
-	// if value.GetOpcode() == SSAOpcodeUnOp {
-	// 	if un := value.(*UnOp); un.Op == OpAddress {
-	// 		un.X.SetVerboseName(name)
-	// 		variable.HandlePointerVariable(un.X)
-	// 	}
-	// } else if variable.GetKind() == PointerVariable {
-	// 	variable.HandlePointerVariable(value)
-	// }
-
-	// if v := variable.GetValue(); v != nil && v.GetOpcode() == SSAOpcodeUnOp {
-	// 	if un := v.(*UnOp); un.Op == OpAddress {
-	// 		un.X = value
-	// 		value = un
-	// 		variable.HandleDereferenceVariable(value)
-	// 	}
-	// } else if variable.GetKind() == DereferenceVariable {
-	// 	variable.HandleDereferenceVariable(value)
-	// }
-
 	if variable.GetKind() == DereferenceVariable {
 		variable.HandleDereferenceVariable(value)
 	} else if variable.GetKind() == PointerVariable {
 		variable.HandlePointerVariable(value)
 	}
 
-	if value.GetOpcode() == SSAOpcodeUnOp {
-		if un := value.(*UnOp); un.Op == OpAddress {
-			un.X.SetVerboseName(name)
-			variable.HandlePointerVariable(un.X)
-		} else if un.Op == OpDereference {
-			un.X = value
-			value = un
+	if p, ok := ToPointerType(value.GetType()); ok {
+		if p.GetPointerKind() == PointerVariable {
+			variable.HandlePointerVariable(value)
+		} else if p.GetPointerKind() == DereferenceVariable {
 			variable.HandleDereferenceVariable(value)
 		}
 	}
