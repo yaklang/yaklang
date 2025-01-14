@@ -2,6 +2,7 @@ package vulinbox
 
 import (
 	"bytes"
+	_ "embed"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -19,7 +20,9 @@ func (s *VulinServer) registerBrutePlayground() {
 
 	infos := make(map[int]string)
 	for i := 0; i < 1000; i++ {
-		infos[i] = "13" + strconv.FormatInt(int64(10000000+rand.Intn(89999999)), 10)
+		// 生成随机的6位数字作为订单号
+		orderNum := rand.Intn(1000000)
+		infos[orderNum] = "13" + strconv.FormatInt(int64(10000000+rand.Intn(89999999)), 10)
 	}
 
 	render := func(writer http.ResponseWriter, orderId string) string {
