@@ -13,7 +13,7 @@ TEXT
 check $sink then "发现JSP中存在未转义的输出"
 HttpServletRequest?{opcode:param  && <typeName>?{have:'javax.servlet.http.HttpServletRequest'}} as $param;
 $sink #{
-    until: `<self> & $param`
+    include: `<self> & $param`
 }-> as $req;
 
 $req.getParameter<getCall> as $source;
