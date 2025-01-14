@@ -1,6 +1,10 @@
 package yakgrpc
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/mattn/go-sqlite3"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -86,6 +90,18 @@ func (s *Server) ImportSyntaxFlows(req *ypb.ImportSyntaxFlowsRequest, stream ypb
 		stream.Send(&ypb.SyntaxflowsProgress{
 			Progress: progress,
 		})
+	}))
+
+	opts = append(opts, bizhelper.WithImportErrorHandler(func(err error) (newErr error) {
+		var sqlErr sqlite3.Error
+		if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint {
+			// ignore duplicate error, just send message
+			err = nil
+			stream.Send(&ypb.SyntaxflowsProgress{
+				Verbose: fmt.Sprintf("duplicate rule, skip: %s", sqlErr.Error()),
+			})
+		}
+		return err
 	}))
 
 	ruleDB := db.Model(&schema.SyntaxFlowRule{})
