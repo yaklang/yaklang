@@ -3,6 +3,7 @@ package ssatest
 import (
 	"embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"net"
 	"net/http"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/vulinbox"
 )
 
 //go:embed testfile
@@ -60,7 +60,7 @@ func GetLocalGit() (string, error) {
 		return "", err
 	}
 	var router = mux.NewRouter()
-	routePath, handler := vulinbox.GeneratorGitHTTPHandler("", "java-realworld.git", zipData)
+	routePath, handler := yakgit.GeneratorGitHTTPHandler("", "java-realworld.git", zipData)
 	router.PathPrefix(routePath).HandlerFunc(handler)
 	// serve
 	go func() {
