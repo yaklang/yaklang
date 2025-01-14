@@ -128,6 +128,7 @@ func (s *VulinServer) init() {
 	s.registerFakeIp()
 	s.registerFastjson()
 	s.registerCsrf()
+	s.registerBrutePlayground()
 
 	// 业务型
 	s.registerUserRoute()
