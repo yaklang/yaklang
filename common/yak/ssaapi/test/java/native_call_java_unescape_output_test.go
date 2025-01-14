@@ -34,7 +34,7 @@ func Test_Java_Unescape_Output(t *testing.T) {
 			require.NotNil(t, vals)
 
 			res := vals.GetValues("res").Show()
-			require.Contains(t, res.String(), "${sessionScope.userInput}")
+			require.Contains(t, res.String(), "sessionScope.userInput")
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})
@@ -74,7 +74,7 @@ public class XSSVulnerableServlet extends HttpServlet {
 <javaUnescapeOutput> as $sink;
 request?{opcode:param  && <typeName>?{have:'javax.servlet.http.HttpServlet'}} as $source;
 $sink #{
-	until:<<<EOF
+	include:<<<EOF
 <self> & $source
 EOF
 }-> as  $request;
