@@ -169,9 +169,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				})
 		case ssa.PointerTypeKind:
 			pt := typ.(*ssa.PointerType)
-			// if kvs[0].value != nil {
-			// 	return kvs[0].value.(*ssa.UnOp).X
-			// }
 			return typeHandler(pt.GetOrigin(), kvs)
 		case ssa.StructTypeKind:
 			objt := typ.(*ssa.ObjectType)
@@ -211,21 +208,25 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			}
 
 			if kvs[0].value != nil {
-				// todo: 只有指针才会复用object，目前默认非指针
 				if m, ok := kvs[0].value.(*ssa.Make); ok {
-					var mkeys, mmembers []ssa.Value
-					for k, m := range m.GetAllMember() {
-						mkeys = append(mkeys, k)
-						mmembers = append(mmembers, m)
+					if m.GetType().GetTypeKind() == ssa.PointerTypeKind {
+						// 只有指针才会复用object
+						return kvs[0].value
+					} else {
+						var mkeys, mmembers []ssa.Value
+						for k, m := range m.GetAllMember() {
+							mkeys = append(mkeys, k)
+							mmembers = append(mmembers, m)
+						}
+						newObject := b.InterfaceAddFieldBuild(len(mkeys),
+							func(i int) ssa.Value {
+								return mkeys[i]
+							},
+							func(i int) ssa.Value {
+								return mmembers[i]
+							})
+						return newObject
 					}
-					newObject := b.InterfaceAddFieldBuild(len(mkeys),
-						func(i int) ssa.Value {
-							return mkeys[i]
-						},
-						func(i int) ssa.Value {
-							return mmembers[i]
-						})
-					return newObject
 				}
 
 				return kvs[0].value
@@ -689,7 +690,7 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 				key = b.EmitConstInst(ba.GetName())
 			}
 			if typ.STAR() != nil {
-				structTyp.AddField(key, ssa.NewPointerType(parent))
+				structTyp.AddField(key, ssa.NewPointerType(parent, ssa.DereferenceVariable))
 			} else {
 				structTyp.AddField(key, parent)
 			}

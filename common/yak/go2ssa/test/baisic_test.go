@@ -418,7 +418,7 @@ func main() {
 		`, []string{"side-effect(2, a)"}, t)
 	})
 
-	// todo 等待pr:https://github.com/yaklang/yaklang/pull/2277
+	// todo spin 中替换emptyphi时需要考虑side-effect的位置
 	t.Run("for Spin side-effect and function assignment", func(t *testing.T) {
 		t.Skip()
 		test.CheckPrintlnValue(`package A

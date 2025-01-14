@@ -1520,6 +1520,7 @@ func (c OrType) RawString() string {
 // ====================== pointer
 type PointerType struct {
 	*baseType
+	kind   VariableKind
 	origin Type
 }
 
@@ -1554,10 +1555,15 @@ func (c *PointerType) GetOrigin() Type {
 	return c.origin
 }
 
-func NewPointerType(origin Type) *PointerType {
+func NewPointerType(origin Type, kinds ...VariableKind) *PointerType {
+	kind := PointerVariable
+	if len(kinds) > 0 {
+		kind = kinds[0]
+	}
 	return &PointerType{
 		baseType: NewBaseType(),
 		origin:   origin,
+		kind:     kind,
 	}
 }
 
@@ -1571,4 +1577,8 @@ func (c *PointerType) PkgPathString() string {
 
 func (c *PointerType) RawString() string {
 	return c.origin.RawString()
+}
+
+func (c *PointerType) GetPointerKind() VariableKind {
+	return c.kind
 }
