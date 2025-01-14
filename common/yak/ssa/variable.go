@@ -26,9 +26,9 @@ type Variable struct {
 	verboseName string
 
 	kind             VariableKind
-	directVariable   *Variable           // A pointer has only one direct reference
-	indirectVariable map[int64]*Variable // may be multiple indirect references
-	hideVariable     map[int64]*Variable // which variables are referenced
+	directVariable   *Variable            // A pointer has only one direct reference
+	indirectVariable map[string]*Variable // may be multiple indirect references
+	hideVariable     map[string]*Variable // which variables are referenced
 }
 
 var _ ssautil.VersionedIF[Value] = (*Variable)(nil)
@@ -38,8 +38,8 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 		Versioned:        ssautil.NewVersioned[Value](globalIndex, name, local, scope).(*ssautil.Versioned[Value]),
 		DefRange:         nil,
 		UseRange:         map[memedit.RangeIf]struct{}{},
-		indirectVariable: map[int64]*Variable{},
-		hideVariable:     map[int64]*Variable{},
+		indirectVariable: map[string]*Variable{},
+		hideVariable:     map[string]*Variable{},
 		kind:             NormalVariable,
 	}
 	return ret
@@ -146,31 +146,51 @@ func (v *Variable) SetKind(kind VariableKind) {
 	v.kind = kind
 }
 
-func (v *Variable) AddPointVariable(p *Variable) {
-	if p == nil {
+func (v *Variable) AddPointVariable(p Value) {
+	if len(p.GetAllVariables()) == 0 {
 		return
 	}
-	v.directVariable = p
-	for _, h := range p.hideVariable { // 遍历所有引用过p的指针
-		v.indirectVariable[h.GetId()] = h
-		h.indirectVariable[v.GetId()] = v
-		delete(h.indirectVariable, h.GetId())
+	last := p.GetLastVariable()
+	v.directVariable = last
+	for _, va := range p.GetAllVariables() { // 遍历所有引用过last的指针
+		for _, h := range va.hideVariable {
+			v.indirectVariable[h.GetName()] = h
+			h.indirectVariable[v.GetName()] = v
+		}
 	}
-	delete(v.indirectVariable, v.GetId())
-	p.hideVariable[v.GetId()] = v
+
+	last.hideVariable[v.GetName()] = v
+}
+
+func (v *Variable) RemovePointVariable(p Value) {
+	for _, i := range v.GetIndirectVariable() {
+		for _, j := range i.GetIndirectVariable() {
+			if j == v {
+				delete(i.GetIndirectVariable(), v.GetName())
+			}
+		}
+	}
+	v.ClearIndirectVariable()
 }
 
 func (v *Variable) GetDirectVariable() *Variable {
 	return v.directVariable
 }
 
-func (v *Variable) GetIndirectVariable() map[int64]*Variable {
+func (v *Variable) GetIndirectVariable() map[string]*Variable {
 	return v.indirectVariable
+}
+
+func (v *Variable) ClearIndirectVariable() {
+	v.indirectVariable = make(map[string]*Variable)
 }
 
 func (v *Variable) HandlePointerVariable(value Value) {
 	v.SetKind(PointerVariable)
-	v.AddPointVariable(value.GetLastVariable())
+	if o := v.GetValue(); o != nil {
+		v.RemovePointVariable(o)
+	}
+	v.AddPointVariable(value)
 }
 
 func (v *Variable) HandleDereferenceVariable(value Value) {
