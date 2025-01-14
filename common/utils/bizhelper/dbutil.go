@@ -1190,7 +1190,7 @@ func YakitPagingQuery(db *gorm.DB, p *ypb.Paging, data any) (*Paginator, *gorm.D
 	// Incremental query
 	db = QueryLargerThanIntOr_AboveZero(db, "id", p.GetAfterId()) // if set after_id, use after_id, not page data ,just query
 	db = QueryLessThanIntOr_AboveZero(db, "id", p.GetBeforeId())
-	var paginator *Paginator
+	var paginator = &Paginator{}
 	if p.Limit == -1 {
 		db.Find(data)
 		paginator.Limit = count
