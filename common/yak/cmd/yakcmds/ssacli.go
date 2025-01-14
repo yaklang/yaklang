@@ -3,8 +3,8 @@ package yakcmds
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"io/fs"
 	"os"
@@ -55,7 +55,7 @@ var SSACompilerCommands = []*cli.Command{
 		},
 	},
 	{
-		Name:    "check-code",
+		Name:    "static-check",
 		Aliases: []string{"check"},
 		Usage:   "Check Code",
 		Flags: []cli.Flag{
@@ -88,6 +88,9 @@ var SSACompilerCommands = []*cli.Command{
 				if err != nil {
 					return err
 				}
+				if sfrule.RuleName == "" {
+					sfrule.RuleName = s
+				}
 				sfrules = append(sfrules, sfrule)
 				return nil
 			}))
@@ -96,16 +99,23 @@ var SSACompilerCommands = []*cli.Command{
 				return err
 			}
 			var ruleError error
+			addError := func(err error, ruleName string) {
+				if ruleError == nil {
+					ruleError = fmt.Errorf("execute syntaxRule[%s] fail,reason: %s", ruleName, err)
+				} else {
+					ruleError = fmt.Errorf("%w\n,execute syntaxRule[%s] fail,reason: %s", ruleError, ruleName, err)
+				}
+			}
 			for _, sfrule := range sfrules {
 				result, err := programs.SyntaxFlowRule(sfrule, ssaapi.QueryWithEnableDebug(true))
 				if err != nil {
-					ruleError = errors.Wrapf(ruleError, "execute syntax rule:[%s] fail, reason: %s\n", sfrule.RuleName, err)
+					addError(err, sfrule.RuleName)
 					continue
 				}
-				risk := result.GetValues("risk")
-				if risk.Len() != 0 {
-					ruleError = errors.Wrapf(ruleError, "execute syntax rule: [%s],risk is not zero", sfrule.RuleName)
-					risk.Show()
+				values := result.GetAlertValues()
+				if values.Len() != 0 {
+					addError(errors.New("alert number is not null"), sfrule.RuleName)
+					result.Show()
 				}
 			}
 			if ruleError != nil {
