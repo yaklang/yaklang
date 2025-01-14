@@ -2,6 +2,7 @@ package template2java
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,7 @@ func (t *JavaTemplate) WriteImport(path string) {
 }
 
 func (t *JavaTemplate) WritePureOut(expression string) {
+	expression = tryUnquote(expression)
 	t.builder.WriteString("\tout.print(" + expression + ");\r\n")
 }
 
@@ -45,21 +47,24 @@ func (t *JavaTemplate) String() string {
 }
 
 func (t *JavaTemplate) WritePureText(texts string) {
-	texts = strings.ReplaceAll(texts, "\"", "\\\"")
+	texts = tryUnquote(texts)
 	for _, text := range strings.Split(texts, "\n") {
 		t.builder.WriteString("\tout.write(\"" + text + "\");\r\n")
 	}
 }
 
 func (t *JavaTemplate) WriteGetAttribute(variable string) {
+	variable = tryUnquote(variable)
 	t.builder.WriteString("\t" + variable + " = request.getAttribute(\"" + variable + "\");\r\n")
 }
 
 func (t *JavaTemplate) WriteOutput(variable string) {
+	variable = tryUnquote(variable)
 	t.builder.WriteString("\tout." + JAVA_UNESCAPE_OUTPUT_PRINT + "(" + variable + ");\r\n")
 }
 
 func (t *JavaTemplate) WriteEscapeOutput(variable string) {
+	variable = tryUnquote(variable)
 	t.builder.WriteString("\tout.printWithEscape(" + variable + ");\r\n")
 }
 
@@ -91,4 +96,10 @@ func (t *JavaTemplate) generateTemplate() {
 	t.builder.WriteString("public class " + t.className + " {\r\n")
 	t.builder.WriteString("public void _JavaTemplateService(" + "HttpServletRequest request, HttpServletResponse response" + ") {\r\n")
 	t.builder.WriteString("\tout = request.getOut(); \r\n")
+}
+
+func tryUnquote(text string) string {
+	text = yakunquote.TryUnquote(text)
+	text = strings.ReplaceAll(text, "\r", "")
+	return text
 }
