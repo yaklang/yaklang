@@ -78,10 +78,20 @@ type ImportConfig struct {
 	MetaDataHandler  func(metadata MetaData) error
 	PreReadHandler   func(name string, b []byte, metadata MetaData) (new []byte, err error)
 	AfterReadHandler func(name string, b []byte, metadata MetaData)
+	ErrorHandler     func(err error) (newErr error)
 }
 
 func NewImportConfig(filepath string) *ImportConfig {
-	return &ImportConfig{FilePath: filepath}
+	return &ImportConfig{
+		FilePath: filepath,
+	}
+}
+
+func (cfg *ImportConfig) CallErrorHandler(err error) error {
+	if cfg.ErrorHandler != nil {
+		return cfg.ErrorHandler(err)
+	}
+	return err
 }
 
 type ImportOption func(*ImportConfig)
@@ -108,6 +118,12 @@ func WithImportPreReadHandler(handler func(name string, b []byte, metadata MetaD
 func WithImportAfterReadHandler(handler func(name string, b []byte, metadata MetaData)) ImportOption {
 	return func(config *ImportConfig) {
 		config.AfterReadHandler = handler
+	}
+}
+
+func WithImportErrorHandler(handler func(err error) (newErr error)) ImportOption {
+	return func(config *ImportConfig) {
+		config.ErrorHandler = handler
 	}
 }
 
@@ -182,10 +198,14 @@ func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 
 		b, err := io.ReadAll(f)
 		if err != nil {
-			return err
+			if err = config.CallErrorHandler(err); err != nil {
+				return err
+			}
 		}
 		if err = json.Unmarshal(b, &metadata); err != nil {
-			return err
+			if err = config.CallErrorHandler(err); err != nil {
+				return err
+			}
 		}
 	}
 	if config.MetaDataHandler != nil {
@@ -201,27 +221,35 @@ func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 		}
 		rc, err := f.Open()
 		if err != nil {
-			return err
+			if err = config.CallErrorHandler(err); err != nil {
+				return err
+			}
 		}
 		defer rc.Close()
 		name := f.Name
 
 		b, err := io.ReadAll(rc)
 		if err != nil {
-			return err
+			if err = config.CallErrorHandler(err); err != nil {
+				return err
+			}
 		}
 		if config.PreReadHandler != nil {
-			if b, err = config.PreReadHandler(name, b, metadata); err != nil {
+			if err = config.CallErrorHandler(err); err != nil {
 				return err
 			}
 		}
 
 		d := new(T)
 		if err = json.Unmarshal(b, d); err != nil {
-			return err
+			if err = config.CallErrorHandler(err); err != nil {
+				return err
+			}
 		}
 		if err = db.Create(d).Error; err != nil {
-			return err
+			if err = config.CallErrorHandler(err); err != nil {
+				return err
+			}
 		}
 		if config.AfterReadHandler != nil {
 			config.AfterReadHandler(name, b, metadata)
