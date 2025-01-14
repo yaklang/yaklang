@@ -39,23 +39,27 @@ jobs:
         with:
           go-version-file: "./go.mod"
         id: go
-
       - name: Dependence
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: libpcap-dev
           version: 1.9.1-3
+#      - name: Download From oos
+      #        run: |
+      #          wget https://aliyun-oss.yaklang.com/yak/latest/yak_linux_amd64
+      #          chmod +x ./yak_linux_amd64
       - name: Init Module
         run: |
           go mod tidy
+          go build ./common/yak/cmd/yak.go
       - name: Generate Prog And Check With SyntaxFlow
         run: |
           pwd && ls -al
-          go run ./common/yak/cmd/yak.go -h
+          ./yak -h
           MERGE_BASE=$(git merge-base main ${{ github.event.pull_request.head.sha }})
           echo "Merge base is: $MERGE_BASE"
-          go run ./common/yak/cmd/yak.go gitefs --start $MERGE_BASE --end ${{ github.event.pull_request.head.sha }} --output ./fs.zip
-          go run ./common/yak/cmd/yak.go check --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule > log.txt 2>&1 || exit 1
+          ./yak gitefs --start $MERGE_BASE --end ${{ github.event.pull_request.head.sha }} --output ./fs.zip
+          ./yak check --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule > log.txt 2>&1 || exit 1
       - name: Upload fail log
         if: failure()
         uses: actions/upload-artifact@v4
