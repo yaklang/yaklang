@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单详情</title>
+    <link rel="stylesheet" href="/static/js/bootstrap_5.3/bootstrap.min.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="/common/vulinbox/static">Vulinbox - Agent</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" target="_blank" href="https://yaklang.com">yaklang.io</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container py-5">
+        <h1 class="mb-5">订单详情页面</h1>
+        
+        <div class="alert alert-info mb-4" role="alert">
+            <p class="mb-0">提示：客户订单号为6位数字，其中约有1000个订单号包含有效信息。</p>
+
+            <p class="mb-0">数据包示例:</p>
+            <div class="position-relative">
+                <pre class="bg-light p-3 rounded"><code>GET /bruteplayground/by-order-id?orderId=12345 HTTP/1.1
+Host: <script>document.write(window.location.hostname + ':' + window.location.port)</script>
+User-Agent: Mozilla/5.0 
+Accept: */*
+Connection: close</code></pre>
+                <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2" 
+                        onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').innerText)">
+                    复制
+                </button>
+            </div>
+        </div>
+        {{if .OrderId}}
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">订单信息</h5>
+                <p class="card-text">订单ID: {{.OrderId}}</p>
+                <p class="card-text">客户姓名: {{.Name}}</p>
+                <p class="card-text">客户电话: {{.Phone}}</p>
+                <!-- 可以根据需要添加更多订单信息字段 -->
+            </div>
+        </div>
+    {{else}}
+        <div class="alert alert-warning" role="alert">
+            <p class="mb-1">当前查询的订单ID: {{.QueryId}}</p>
+            <p class="mb-0">当前没有数据</p>
+        </div>
+    {{end}}
+        </div>
+
+
+    </div>
+
+    <script src="/static/js/bootstrap_5.3/popper.min.js"></script>
+    <script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
+</body>
+</html>
