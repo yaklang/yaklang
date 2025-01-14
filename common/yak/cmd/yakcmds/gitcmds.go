@@ -195,11 +195,15 @@ var GitCommands = []*cli.Command{
 				Name:  "end",
 				Usage: "end ref hash(range)",
 			},
+			cli.StringFlag{
+				Name:  "output",
+				Usage: "output filename",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			start := c.String("start")
 			end := c.String("end")
-
+			output := c.String("output")
 			repos := c.String("repo")
 			if repos == "" {
 				pwd, err := os.Getwd()
@@ -234,6 +238,9 @@ var GitCommands = []*cli.Command{
 					suffix = start + "-" + end
 				}
 				fileName := fmt.Sprintf("commitfs-%v.zip", suffix)
+				if output != "" && strings.HasSuffix(output, ".zip") {
+					fileName = output
+				}
 				log.Infof("start to prepare writing zip file: %v", fileName)
 				var buf bytes.Buffer
 				zw := zip.NewWriter(&buf)
