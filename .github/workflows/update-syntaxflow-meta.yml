@@ -30,7 +30,10 @@ jobs:
 
       - name: Get Repo tags
         run: |
-          VERSION_INPUT="${{ github.event.inputs.update_version || "test-version" }}"
+          VERSION_INPUT="${{ github.event.inputs.update_version}}"
+          if [ -z "$VERSION_INPUT" ]; then
+            VERSION_INPUT="dev"
+          fi 
           echo "YAK_TAG=$VERSION_INPUT" >> $GITHUB_ENV 
 
       - name: Checkout Tags Version
