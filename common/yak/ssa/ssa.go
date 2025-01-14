@@ -330,14 +330,14 @@ type Function struct {
 	Return []int64 // return
 
 	// BasicBlock list
-	Blocks []Instruction
+	Blocks []int64
 	// First and End block
-	EnterBlock Instruction
-	ExitBlock  Instruction
+	EnterBlock int64
+	ExitBlock  int64
 	// For Defer  semantic
 	// this block will always execute when the function exits,
 	// regardless of whether the function returns normally or exits due to a panic.
-	DeferBlock Instruction
+	DeferBlock int64
 
 	// ssa error
 	errComment ErrorComment
@@ -376,7 +376,7 @@ func (f *Function) GetMethodName() string {
 func (f *Function) FirstBlockInstruction() []Instruction {
 	if len(f.Blocks) > 0 {
 		firstBlock := f.Blocks[0]
-		if block, ok := ToBasicBlock(firstBlock); ok {
+		if block := f.GetBasicBlockByID(firstBlock); block != nil {
 			return f.GetInstructionsByIDs(block.Insts)
 		} else {
 			log.Warnf("function %s first block is not a basic block", f.GetName())
@@ -1033,13 +1033,13 @@ var (
 // ----------- Switch
 type SwitchLabel struct {
 	Value int64
-	Dest  *BasicBlock
+	Dest  int64 // basic block
 }
 
 func NewSwitchLabel(v Value, dest *BasicBlock) SwitchLabel {
 	return SwitchLabel{
 		Value: v.GetId(),
-		Dest:  dest,
+		Dest:  dest.GetId(),
 	}
 }
 

@@ -84,7 +84,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 			}
 		case *Function:
 			if len(ret.Blocks) > 0 {
-				codeRange = ret.Blocks[0].GetRange()
+				codeRange = ret.GetBasicBlockByID(ret.Blocks[0]).GetRange()
 			}
 		}
 	}
@@ -307,22 +307,16 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		}
 	}
 
-	for _, b := range f.Blocks {
-		if b == nil {
+	for _, id := range f.Blocks {
+		if id <= 0 {
 			continue
 		}
-		ir.CodeBlocks = append(ir.CodeBlocks, int64(b.GetId()))
+		ir.CodeBlocks = append(ir.CodeBlocks, id)
 	}
 
-	if f.EnterBlock != nil {
-		ir.EnterBlock = int64(f.EnterBlock.GetId())
-	}
-	if f.ExitBlock != nil {
-		ir.ExitBlock = int64(f.ExitBlock.GetId())
-	}
-	if f.DeferBlock != nil {
-		ir.DeferBlock = int64(f.DeferBlock.GetId())
-	}
+	ir.EnterBlock = f.EnterBlock
+	ir.ExitBlock = f.ExitBlock
+	ir.DeferBlock = f.DeferBlock
 
 	for _, subFunc := range f.ChildFuncs {
 		ir.ChildrenFunction = append(ir.ChildrenFunction, subFunc)

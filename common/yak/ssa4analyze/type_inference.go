@@ -27,12 +27,8 @@ func (t *TypeInference) Run(prog *ssa.Program) {
 
 func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 	t.DeleteInst = make([]ssa.Instruction, 0)
-	for _, bRaw := range fun.Blocks {
-		b, ok := ssa.ToBasicBlock(bRaw)
-		if !ok {
-			log.Errorf("TypeInference: %s is not a basic block", bRaw.GetName())
-			continue
-		}
+	for _, blockId := range fun.Blocks {
+		b := fun.GetBasicBlockByID(blockId)
 		for _, instId := range b.Insts {
 			inst := b.GetValueById(instId)
 			t.InferenceOnInstruction(inst)

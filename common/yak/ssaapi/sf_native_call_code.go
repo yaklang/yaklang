@@ -14,11 +14,8 @@ func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		return false, nil, err
 	}
 
-	checkAndAddOpCode := func(block ssa.Instruction, f *ssa.Function) {
-		b, ok := ssa.ToBasicBlock(block)
-		if !ok {
-			log.Warnf("function %s has a non-block instruction: %T", f, block)
-		}
+	checkAndAddOpCode := func(blockId int64, f *ssa.Function) {
+		b := f.GetBasicBlockByID(blockId)
 		for _, p := range b.Phis {
 			p := b.GetValueById(p)
 			opCodeMap[p.GetOpcode()] = struct{}{}

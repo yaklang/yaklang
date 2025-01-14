@@ -26,9 +26,9 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		anValue:     NewValue(),
 		Params:      make([]int64, 0),
 		hasEllipsis: false,
-		Blocks:      make([]Instruction, 0),
-		EnterBlock:  nil,
-		ExitBlock:   nil,
+		Blocks:      make([]int64, 0),
+		EnterBlock:  0,
+		ExitBlock:   0,
 		ChildFuncs:  make([]int64, 0),
 		FreeValues:  make(map[*Variable]int64),
 		SideEffects: make([]*FunctionSideEffect, 0),
@@ -56,10 +56,9 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 		// }
 	}
-
 	enter := f.NewBasicBlock("entry")
 	enter.SetScope(NewScope(f, p.GetProgramName()))
-	f.EnterBlock = enter
+	f.EnterBlock = enter.GetId()
 	return f
 }
 
@@ -132,11 +131,7 @@ func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) 
 }
 
 func (f *Function) ReturnValue() []Value {
-	exitBlock, ok := ToBasicBlock(f.ExitBlock)
-	if !ok {
-		log.Warnf("function exit block cannot convert to BasicBlock: %v", f.ExitBlock)
-		return nil
-	}
+	exitBlock := f.GetBasicBlockByID(f.ExitBlock)
 	ret := exitBlock.LastInst().(*Return)
 	return f.GetValuesByIDs(ret.Results)
 }
@@ -146,7 +141,7 @@ func (f *Function) IsMain() bool {
 }
 
 func (f *Function) GetParent() *Function {
-	if f.parent > 0 {
+	if f.parent <= 0 {
 		return nil
 	}
 

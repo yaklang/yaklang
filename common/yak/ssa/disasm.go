@@ -178,6 +178,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	}
 
 	for _, b := range f.Blocks {
+		b := f.GetBasicBlockByID(b)
 		ShowBlock(b)
 	}
 
@@ -340,7 +341,7 @@ func (sw *Switch) String() string {
 		sw.DefaultBlock.GetName(),
 		strings.Join(
 			lo.Map(sw.Label, func(label SwitchLabel, _ int) string {
-				return fmt.Sprintf("%s:%s", getStr(sw.GetValueById(label.Value)), label.Dest.GetName())
+				return fmt.Sprintf("%s:%s", getStr(sw.GetValueById(label.Value)), sw.GetBasicBlockByID(label.Dest).GetName())
 			}),
 			", ",
 		),

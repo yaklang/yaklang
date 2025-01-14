@@ -527,11 +527,21 @@ func (i *anInstruction) GetUsersByIDs(ids []int64) Users {
 	return GetExs[User](i.GetProgram().Cache, ids...)
 }
 
-func (i *anInstruction) GetBasicBlockByID(id int64) *BasicBlock {
+func getStructByID[T Instruction](id int64, i *anInstruction, cover func(Instruction) (T, bool)) T {
+	var zero T
 	if i == nil || i.GetProgram() == nil || i.GetProgram().Cache == nil {
-		return nil
+		return zero
 	}
-	return GetEx[*BasicBlock](i.GetProgram().Cache, id)
+	inst := i.GetInstructionById(id)
+	if t, ok := cover(inst); ok {
+		return t
+	} else {
+		return zero
+	}
+}
+
+func (i *anInstruction) GetBasicBlockByID(id int64) *BasicBlock {
+	return getStructByID(id, i, ToBasicBlock)
 }
 
 func (v Values) GetIds() []int64 {

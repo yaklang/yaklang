@@ -9,19 +9,15 @@ import (
 func (f *Function) GetDeferBlock() *BasicBlock {
 	newDefer := func() *BasicBlock {
 		block := f.NewBasicBlockNotAddBlocks("defer")
-		f.DeferBlock = block
+		f.DeferBlock = block.GetId()
 		// TODO: this Scope should be child Scope of other scope in function
 		block.SetScope(NewScope(f, f.GetProgram().GetProgramName()))
 		return block
 	}
-	if f.DeferBlock == nil {
+	if f.DeferBlock <= 0 {
 		return newDefer()
 	}
-	block, ok := f.DeferBlock.(*BasicBlock)
-	if !ok {
-		log.Warnf("defer block is not a basic block")
-		return newDefer()
-	}
+	block := f.GetBasicBlockByID(f.DeferBlock)
 	return block
 }
 
@@ -78,8 +74,8 @@ func addToBlocks(block *BasicBlock) {
 	block.SetName(name)
 
 	block.Index = index
-	f.Blocks = append(f.Blocks, block)
 	block.GetProgram().SetVirtualRegister(block)
+	f.Blocks = append(f.Blocks, block.GetId())
 }
 
 func (b *BasicBlock) SetScope(s ScopeIF) {

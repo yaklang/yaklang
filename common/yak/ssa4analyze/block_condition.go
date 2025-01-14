@@ -103,8 +103,9 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		var defaultCond ssa.Value
 		for _, lab := range sw.Label {
 			value := sw.GetValueById(lab.Value)
-			cond := newBinOp(ssa.OpEq, cond, value, lab.Dest)
-			newEdge(lab.Dest, fromBlock, cond)
+			dest := sw.GetBasicBlockByID(lab.Dest)
+			cond := newBinOp(ssa.OpEq, cond, value, dest)
+			newEdge(dest, fromBlock, cond)
 			// lab.Dest.Condition = cond
 			if defaultCond == nil {
 				defaultCond = newUnOp(ssa.OpNot, cond, sw.DefaultBlock)
@@ -167,14 +168,10 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 	deleteInst := make([]ssa.Instruction, 0)
 	// handler instruction
-	for _, bRaw := range fun.Blocks {
+	for _, blockId := range fun.Blocks {
 		// fix block position
 		// b.SetRange(fixupBlockPos(b))
-		b, ok := ssa.ToBasicBlock(bRaw)
-		if !ok {
-			log.Warnf("function %s has a non-block instruction: %s", fun.GetName(), bRaw.GetName())
-			continue
-		}
+		b := fun.GetBasicBlockByID(blockId)
 
 		for _, instId := range b.Insts {
 			inst := b.GetInstructionById(instId)
@@ -201,12 +198,8 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	}
 
 	// handler
-	enter, ok := ssa.ToBasicBlock(fun.EnterBlock)
-	if ok {
-		enter.SetReachable(true)
-	} else {
-		log.Warnf("BUG: function %s has a non-block instruction: %s", fun.GetName(), fun.EnterBlock.GetName())
-	}
+	enter := fun.GetBasicBlockByID(fun.EnterBlock)
+	enter.SetReachable(true)
 
 	// deep first search
 	var handlerBlock func(*ssa.BasicBlock)
@@ -240,11 +233,7 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	}
 
 	for _, bb := range fun.Blocks {
-		block, ok := ssa.ToBasicBlock(bb)
-		if !ok {
-			log.Warnf("function %s has a non-block instruction: %s", fun.GetName(), bb.GetName())
-			continue
-		}
+		block := fun.GetBasicBlockByID(bb)
 		handlerBlock(block)
 	}
 }

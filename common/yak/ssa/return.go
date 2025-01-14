@@ -105,13 +105,8 @@ func (b *FunctionBuilder) Finish() {
 	// skip no variable value
 	// skip return
 	for _, blockRaw := range b.Blocks {
-		block, ok := ToBasicBlock(blockRaw)
-		if !ok {
-			log.Warnf("function %s has a non-block instruction: %s", b.Function.GetName(), blockRaw.GetName())
-			continue
-		}
-
-		for _, inst := range block.Insts {
+		block := b.GetBasicBlockByID(blockRaw)
+		for _, inst := range block.GetInstructionsByIDs(block.Insts) {
 			value, ok := ToValue(inst)
 			if !ok {
 				continue
@@ -191,7 +186,7 @@ func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
 
-	if block, ok := ToBasicBlock(f.DeferBlock); ok {
+	if block := f.GetBasicBlockByID(f.DeferBlock); block != nil {
 		addToBlocks(block)
 	}
 

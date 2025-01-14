@@ -164,7 +164,7 @@ func init() {
 			if !flag {
 				return nil
 			}
-			result1 := searchAlongBasicBlock(function.EnterBlock.GetBlock(), prog, frame, params, Next)
+			result1 := searchAlongBasicBlock(function.GetBasicBlockByID(function.EnterBlock), prog, frame, params, Next)
 			result = append(result, result1...)
 			return nil
 		})

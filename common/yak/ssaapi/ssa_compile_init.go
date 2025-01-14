@@ -2,9 +2,10 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -70,8 +71,8 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 		newCodeEditor.SetUrl(filePath)
 		fb.SetEditor(newCodeEditor)
 		if originEditor == nil && newCodeEditor != nil {
-			if fb.EnterBlock != nil && fb.EnterBlock.GetRange() == nil {
-				fb.EnterBlock.SetRange(src.GetFullRange())
+			if enter := fb.GetBasicBlockByID(fb.EnterBlock); enter != nil && enter.GetRange() == nil {
+				enter.SetRange(src.GetFullRange())
 			}
 		}
 		if originEditor != nil {

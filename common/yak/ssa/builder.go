@@ -104,11 +104,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 
 	// b.ScopeStart()
 	// b.Function.SetScope(b.CurrentScope)
-	var ok bool
-	b.CurrentBlock, ok = ToBasicBlock(f.EnterBlock)
-	if !ok {
-		log.Errorf("function (%v) enter block is not a basic block", f.name)
-	}
+	b.CurrentBlock = f.GetBasicBlockByID(f.EnterBlock)
 	f.builder = b
 	return b
 }

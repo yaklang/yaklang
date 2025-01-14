@@ -1,10 +1,9 @@
 package ssa
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
-
-	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,72 +13,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func fetchIds(origin any) any {
-	var ids []int64
-	switch ret := origin.(type) {
-	case []Instruction:
-		ids = make([]int64, len(ret))
-		for i := 0; i < len(ret); i++ {
-			ids[i] = ret[i].GetId()
-		}
-		return ids
-	case map[string]Value:
-		params := make(map[string]any)
-		for k, v := range ret {
-			params[k] = v.GetId()
-		}
-		return params
-	case map[string]*Variable:
-		params := make(map[string]any)
-		for k, v := range ret {
-			params[k] = v.GetId()
-		}
-		return params
-	case []SwitchLabel:
-		results := make([]map[string]int64, len(ret))
-		for i := 0; i < len(ret); i++ {
-			results[i] = map[string]int64{
-				"value": ret[i].Value,
-				"dest":  ret[i].Dest.GetId(),
-			}
-		}
-		return results
-	case []*Parameter:
-		ids = make([]int64, len(ret))
-		for i := 0; i < len(ret); i++ {
-			ids[i] = ret[i].GetId()
-		}
-		return ids
-	case []Value:
-		ids = make([]int64, len(ret))
-		for i := 0; i < len(ret); i++ {
-			ids[i] = ret[i].GetId()
-		}
-		return ids
-	default:
-		t := reflect.TypeOf(origin).Kind()
-		if t == reflect.Array || t == reflect.Slice {
-			ids := make([]int64, 0, reflect.ValueOf(origin).Len())
-			for i := 0; i < len(ids); i++ {
-				ins, ok := reflect.ValueOf(origin).Index(i).Interface().(Instruction)
-				if ok {
-					ids[i] = ins.GetId()
-				} else {
-					ids[i] = 0
-				}
-			}
-			return ids
-		}
-		log.Warnf("fetchIds: unknown type: %v", reflect.TypeOf(origin).String())
-	}
-	return ids
-}
-
 func marshalExtraInformation(raw Instruction) map[string]any {
 	params := make(map[string]any)
 	switch ret := raw.(type) {
+	case *LazyInstruction:
+		return marshalExtraInformation(ret.Instruction)
 	case *Function:
-		params["params"] = fetchIds(ret.Params)
+		params["params"] = ret.Params
 		params["param_length"] = ret.ParamLength
 		freeValues := make(map[int64]int64)
 		for k, v := range ret.FreeValues {
@@ -88,7 +28,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["is_method"] = ret.isMethod
 		params["method_name"] = ret.methodName
 		params["free_values"] = freeValues
-		params["parameter_members"] = fetchIds(ret.ParameterMembers)
+		params["parameter_members"] = ret.ParameterMembers
 		var sideEffects []map[string]any
 		for _, se := range ret.SideEffects {
 			element := map[string]any{
@@ -112,18 +52,12 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		if p := ret.GetParent(); p != nil {
 			params["parent"] = p.GetId()
 		}
-		params["child_funcs"] = fetchIds(ret.ChildFuncs)
-		params["return"] = fetchIds(ret.Return)
-		params["blocks"] = fetchIds(ret.Blocks)
-		if ret.EnterBlock != nil {
-			params["enter_block"] = ret.EnterBlock.GetId()
-		}
-		if ret.ExitBlock != nil {
-			params["exit_block"] = ret.ExitBlock.GetId()
-		}
-		if ret.DeferBlock != nil {
-			params["defer_block"] = ret.DeferBlock.GetId()
-		}
+		params["child_funcs"] = ret.ChildFuncs
+		params["return"] = ret.Return
+		params["blocks"] = ret.Blocks
+		params["enter_block"] = ret.EnterBlock
+		params["exit_block"] = ret.ExitBlock
+		params["defer_block"] = ret.DeferBlock
 		var files [][2]string
 		params["reference_files"] = files
 		params["has_ellipsis"] = ret.hasEllipsis
@@ -136,8 +70,8 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	case *BasicBlock:
 		params["block_id"] = ret.GetId()
 		params["block_name"] = ret.GetName()
-		params["block_preds"] = fetchIds(ret.Preds)
-		params["block_succs"] = fetchIds(ret.Succs)
+		params["block_preds"] = ret.Preds
+		params["block_succs"] = ret.Succs
 		params["block_can_be_reached"] = ret.canBeReached
 		if ret.Condition > 0 {
 			if ret.Condition > 0 {
@@ -146,8 +80,8 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 				log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: %v) ", ret.Condition, ret.GetValueById(ret.Condition).String())
 			}
 		}
-		params["block_insts"] = fetchIds(ret.Insts)
-		params["block_phis"] = fetchIds(ret.Phis)
+		params["block_insts"] = ret.Insts
+		params["block_phis"] = ret.Phis
 		params["block_finish"] = ret.finish
 		if ret.ScopeTable != nil {
 			// params["block_scope_table"] = ret.ScopeTable.GetPersistentId()
@@ -171,18 +105,10 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["call_ellipsis"] = ret.IsEllipsis
 	case *ErrorHandler:
 		// try-catch-finally-done
-		if ret.try > 0 {
-			params["errorhandler_try"] = ret.try
-		}
-		if len(ret.catchs) != 0 {
-			params["errorhandler_catch"] = fetchIds(ret.catchs)
-		}
-		if ret.final > 0 {
-			params["errorhandler_finally"] = ret.final
-		}
-		if ret.done > 0 {
-			params["errorhandler_done"] = ret.done
-		}
+		params["errorhandler_try"] = ret.try
+		params["errorhandler_catch"] = ret.catchs
+		params["errorhandler_finally"] = ret.final
+		params["errorhandler_done"] = ret.done
 	case *ExternLib:
 		log.Warnf("TBD: marshal ExternLib: %v", ret)
 		// return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
@@ -266,10 +192,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["sideEffect_call"] = ret.CallSite
 		params["sideEffect_value"] = ret.Value
 	case *Switch:
-		if ret.Cond > 0 {
-			params["switch_cond"] = ret.Cond
-		}
-		params["switch_label"] = fetchIds(ret.Label)
+		params["switch_cond"] = ret.Cond
+		data, _ := json.Marshal(ret.Label)
+		params["switch_label"] = string(data)
 	case *TypeCast:
 		if ret.Value > 0 {
 			params["typecast_value"] = ret.Value
@@ -310,32 +235,14 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	newLazyInstruction := func(input any) Value {
 		id := toInt64(input)
 		if id <= 0 {
-			log.Infof("unmarshalExtraInformation: invalid id: %v if u want to check why? enable DEBUG=1", id)
-			utils.Debug(func() {
-				spew.Dump(inst)
-				spew.Dump(ir)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			})
 			return nil
 		}
 
-		lz, err := NewLazyInstruction(id)
+		lz, err := NewLazyEx(id, ToValue)
 		if err != nil {
 			log.Errorf("BUG: unmatched instruction create lazyInstruction: %v", err)
 		}
 		return lz
-	}
-	unmarshalInstructions := func(p any) []Instruction {
-		vs := make([]Instruction, 0)
-		switch ret := p.(type) {
-		case []any:
-			for _, id := range ret {
-				vs = append(vs, newLazyInstruction(id))
-			}
-
-		default:
-		}
-		return vs
 	}
 
 	unmarshalMapVariables := func(p any) map[*Variable]int64 {
@@ -366,7 +273,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.Phis = utils.MapGet[[]int64](params, "block_phis")
 		ret.finish = utils.MapGetBool(params, "block_finish")
 	case *BinOp:
-		ret.Op = BinaryOpcode(params["binop_op"].(string))
+		ret.Op = BinaryOpcode(utils.MapGetString(params, "binop_op"))
 		ret.X = utils.MapGetInt64(params, "binop_x")
 		ret.Y = utils.MapGetInt64(params, "binop_y")
 	case *Call:
@@ -392,15 +299,16 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.MemberCallObjectName = utils.MapGetString(params, "member_call_name")
 		ret.MemberCallKey = utils.MapGetInt64(params, "member_call_key")
 	case *Phi:
-		ret.Edge = params["phi_edges"].([]int64)
-		if cfgEntry, ok := params["cfg_entry"]; ok {
-			ret.CFGEntryBasicBlock = cfgEntry.(int64)
-		}
+		ret.Edge = utils.MapGet[[]int64](params, "phi_edges")
+		ret.CFGEntryBasicBlock = utils.MapGetInt64(params, "cfg_entry")
 	case *Return:
 		ret.Results = utils.MapGet[[]int64](params, "return_results")
 	case *SideEffect:
 		ret.CallSite = utils.MapGetInt64(params, "sideEffect_call")
 		ret.Value = utils.MapGetInt64(params, "sideEffect_value")
+	case *Switch:
+		ret.Cond = utils.MapGetInt64(params, "switch_cond")
+		json.Unmarshal([]byte(utils.MapGetString(params, "switch_label")), &ret.Label)
 	case *UnOp:
 		ret.Op = UnaryOpcode(utils.MapGetString(params, "unop_op"))
 		ret.X = utils.MapGetInt64(params, "unop_x")
@@ -455,25 +363,14 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			})
 			ret.SideEffects = se
 		}
-		if parent, ok := params["parent"].(int64); ok {
-			ret.parent = parent
-		}
-		ret.ChildFuncs = params["child_funcs"].([]int64)
-		ret.Return = params["return"].([]int64)
-		ret.Blocks = unmarshalInstructions(params["blocks"])
-		if enter, ok := params["enter_block"]; ok {
-			ret.EnterBlock = newLazyInstruction(enter)
-		}
-		if exit, ok := params["exit_block"]; ok {
-			ret.ExitBlock = newLazyInstruction(exit)
-		}
-		if deferBlock, ok := params["defer_block"]; ok {
-			ret.DeferBlock = newLazyInstruction(deferBlock)
-		}
-
-		if hasEllipsis, ok := params["has_ellipsis"].(bool); ok {
-			ret.hasEllipsis = hasEllipsis
-		}
+		ret.parent = utils.MapGetInt64(params, "parent")
+		ret.ChildFuncs = utils.MapGet[[]int64](params, "child_funcs")
+		ret.Return = utils.MapGet[[]int64](params, "return")
+		ret.Blocks = utils.MapGet[[]int64](params, "blocks")
+		ret.EnterBlock = utils.MapGetInt64(params, "enter_block")
+		ret.ExitBlock = utils.MapGetInt64(params, "exit_block")
+		ret.DeferBlock = utils.MapGetInt64(params, "defer_block")
+		ret.hasEllipsis = utils.MapGetBool(params, "has_ellipsis")
 	case *ExternLib:
 
 	default:

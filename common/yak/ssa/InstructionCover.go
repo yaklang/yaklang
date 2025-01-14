@@ -1,8 +1,14 @@
 package ssa
 
 // for DataFlowNode cover
-func ToNode(a any) (Node, bool)         { u, ok := a.(Node); return u, ok }
-func ToValue(n any) (Value, bool)       { v, ok := n.(Value); return v, ok }
+func ToNode(a any) (Node, bool) { u, ok := a.(Node); return u, ok }
+func ToValue(n Instruction) (Value, bool) {
+	if lz, isLz := ToLazyInstruction(n); isLz {
+		return ToValue(lz.Self())
+	}
+	v, ok := n.(Value)
+	return v, ok
+}
 func ToUser(n Instruction) (User, bool) { u, ok := n.(User); return u, ok }
 
 func ToFunction(n Instruction) (*Function, bool) {
