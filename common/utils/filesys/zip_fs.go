@@ -228,13 +228,17 @@ func (z *ZipFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	var entries []fs.DirEntry
 	for _, c := range node.Children {
 		f, ok := c.Value.(*zip.File)
-		if !ok {
-			continue
+		if ok {
+			entries = append(entries, &ZipDirEntry{
+				name: c.Name,
+				info: f.FileInfo(),
+			})
+		} else {
+			entries = append(entries, &ZipDirEntry{
+				name: c.Name,
+				info: NewVirtualFileInfo(c.Name, 0, true),
+			})
 		}
-		entries = append(entries, &ZipDirEntry{
-			name: c.Name,
-			info: f.FileInfo(),
-		})
 	}
 	return entries, nil
 }

@@ -153,7 +153,6 @@ func (p *PathNode) getOrCreateChildByNodeName(nodeName, path string) *PathNode {
 	if p.ReadOnly {
 		return nil
 	}
-
 	n = &PathNode{
 		Parent:      p,
 		Path:        path,

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"io/fs"
 	"os"
@@ -51,6 +52,66 @@ var SSACompilerCommands = []*cli.Command{
 				ssadb.DeleteProgram(ssadb.GetDB(), name)
 				_ = ssadb.DeleteSSAProgram(name)
 			}
+		},
+	},
+	{
+		Name:    "check-code",
+		Aliases: []string{"check"},
+		Usage:   "Check Code",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:     "input-file,file",
+				Required: true,
+			},
+			cli.StringFlag{
+				Name:     "rules",
+				Required: true,
+			},
+		},
+		Action: func(c *cli.Context) error {
+			var sfrules []*schema.SyntaxFlowRule
+			file := c.String("file")
+			rules := c.String("rules")
+			zipfs, err2 := filesys.NewZipFSFromLocal(file)
+			if err2 != nil {
+				return err2
+			}
+			filesys.Recursive(rules, filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				if !strings.HasSuffix(s, ".sf") {
+					return nil
+				}
+				raw, err := os.ReadFile(s)
+				if err != nil {
+					return err
+				}
+				sfrule, err := sfdb.CheckSyntaxFlowRuleContent(string(raw))
+				if err != nil {
+					return err
+				}
+				sfrules = append(sfrules, sfrule)
+				return nil
+			}))
+			programs, err := ssaapi.ParseProjectWithFS(zipfs, ssaapi.WithLanguage(ssaapi.GO))
+			if err != nil {
+				return err
+			}
+			var ruleError error
+			for _, sfrule := range sfrules {
+				result, err := programs.SyntaxFlowRule(sfrule, ssaapi.QueryWithEnableDebug(true))
+				if err != nil {
+					ruleError = errors.Wrapf(ruleError, "execute syntax rule:[%s] fail, reason: %s\n", sfrule.RuleName, err)
+					continue
+				}
+				risk := result.GetValues("risk")
+				if risk.Len() != 0 {
+					ruleError = errors.Wrapf(ruleError, "execute syntax rule: [%s],risk is not zero", sfrule.RuleName)
+					risk.Show()
+				}
+			}
+			if ruleError != nil {
+				return ruleError
+			}
+			return nil
 		},
 	},
 	{
