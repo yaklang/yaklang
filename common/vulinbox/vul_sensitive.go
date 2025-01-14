@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"embed"
+	"github.com/yaklang/yaklang/common/utils/yakgit"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -148,13 +149,13 @@ func (s *VulinServer) registerSensitive() {
 
 	{
 		// "/gitserver/sca-testcase.git"
-		router, handler := GeneratorGitHTTPHandler("gitserver", "sca-testcase.git", _fakeGitSCARespos)
+		router, handler := yakgit.GeneratorGitHTTPHandler("gitserver", "sca-testcase.git", _fakeGitSCARespos)
 		s.router.PathPrefix(router).HandlerFunc(handler)
 	}
 
 	{
 		// "/gitserver/website-repository.git"
-		router, handler := GeneratorGitHTTPHandler("gitserver", "website-repository.git", _fakeGitRepository)
+		router, handler := yakgit.GeneratorGitHTTPHandler("gitserver", "website-repository.git", _fakeGitRepository)
 		s.router.PathPrefix(router).HandlerFunc(handler)
 	}
 }
