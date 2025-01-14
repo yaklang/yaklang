@@ -458,9 +458,7 @@ func (pc *persistConn) h2Conn() {
 
 func (pc *persistConn) readLoop() {
 	defer func() {
-		if pc.reused {
-			pc.removeConn()
-		}
+		pc.removeConn()
 	}()
 
 	tryPutIdleConn := func() bool {
