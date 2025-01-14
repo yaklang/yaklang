@@ -57,7 +57,7 @@ JSON,
                     cli.uiFieldGroups(cli.uiGroup(
                         cli.uiTableField("kind", 150), 
                         cli.uiTableField("key", 150),
-                        cli.uiTableField("value", 300), 
+                        cli.uiTableField("value", 300, cli.uiFieldWidget(cli.uiWidgetTextarea)), 
                         cli.uiTableField("force", 85),
                     )), 
                 ))), 
