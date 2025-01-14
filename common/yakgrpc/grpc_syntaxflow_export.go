@@ -41,6 +41,9 @@ func (s *Server) ExportSyntaxFlows(req *ypb.ExportSyntaxFlowsRequest, stream ypb
 	if ruleDB := ruleDB.Count(&ruleCount); ruleDB.Error != nil {
 		return utils.Wrap(ruleDB.Error, "get syntax flow rule count failed")
 	}
+	if ruleCount == 0 {
+		return utils.Error("no syntax flow rule found")
+	}
 	metadata["count"] = ruleCount
 
 	opts := make([]bizhelper.ExportOption, 0)
