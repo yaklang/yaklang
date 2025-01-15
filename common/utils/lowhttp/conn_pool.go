@@ -637,10 +637,10 @@ func (pc *persistConn) writeLoop() {
 func (pc *persistConn) closeConn(err error) { // when write loop break or read loop break and ideal timeout call
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
-	pc.closed = err
 	select {
 	case <-pc.ctx.Done(): // already closed
 	default:
+		pc.closed = err
 		pc.cancel()
 		pc.removeConn()
 	}
