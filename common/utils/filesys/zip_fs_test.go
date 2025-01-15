@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"testing"
 )
@@ -17,8 +19,7 @@ func TestCFRZip(t *testing.T) {
 		t.Fatal(err)
 	}
 	count := 0
-	Recursive(".", WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
-		count++
+	Recursive(".", WithFileSystem(z), WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
 		fmt.Println(pathname)
 		return nil
 	}))
@@ -33,4 +34,20 @@ func TestCFRZip(t *testing.T) {
 	assert.Greater(t, len(entry), 10)
 	entry, _ = z.ReadDir("/")
 	assert.Greater(t, len(entry), 10)
+}
+
+//go:embed fs.zip
+var badFs string
+
+func TestCode(t *testing.T) {
+	zipfs, err := NewZipFSFromString(badFs)
+	require.NoError(t, err)
+	var count int
+	err = Recursive(".", WithFileSystem(zipfs), WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
+		log.Infof("pathname: %s", pathname)
+		count++
+		return nil
+	}))
+	fmt.Println(count)
+	require.Greater(t, count, 0)
 }
