@@ -99,7 +99,7 @@ type WebFuzzerResponse struct {
 	StatusCode      int    `json:"status_code"`
 	DurationMs      int    `json:"duration_ms"`
 	Timestamp       int64  `json:"timestamp"`
-	HiddenIndex     string `json:"hidden_index"`
+	HiddenIndex     string `json:"hidden_index" gorm:"index"`
 }
 
 func (w *WebFuzzerResponse) CalcCacheHash() string {

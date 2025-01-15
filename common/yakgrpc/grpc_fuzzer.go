@@ -359,6 +359,14 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		feedbackWg.Wait()
 	}()
 	feedbackResponse := func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
+		startTime := time.Now()
+		defer func() {
+			duration := time.Now().Sub(startTime)
+			if duration > time.Second {
+				log.Infof("http fuzzer response feedback cost too much for %v", duration)
+			}
+		}()
+
 		if !req.GetReMatch() {
 			sw.WaitUntilOpen()
 		}
@@ -373,7 +381,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 
 		feedbackWg.Add(1)
-		defer func() {
+		go func() {
 			defer feedbackWg.Done()
 			for _, p := range pocs {
 				poc := p
@@ -766,7 +774,16 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		// 可以用于计算相似度
 		var firstHeader, firstBody []byte
+
+		nowTime := time.Now()
+		count := 0
 		for result := range res {
+			count++
+			if count > 2 && time.Now().Sub(nowTime).Seconds() > 1 {
+				log.Error("HELP! handle result cost too much time, can someone investigate it?")
+			}
+			nowTime = time.Now()
+			
 			// 2M
 			if len(result.RequestRaw) > 2*1024*1024 {
 				result.RequestRaw = result.RequestRaw[:2*1024*1024]
@@ -866,22 +883,30 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				//	SubMatcherCondition: cond,
 				//	SubMatchers:         httpTplMatcher,
 				//}
+
 				matcherParams := utils.CopyMapInterface(mergedParams)
 				for _, kv := range extractorResultsOrigin {
 					matcherParams[kv.GetKey()] = kv.GetValue()
 				}
+				matchColorStart := time.Now()
 				httpTPLmatchersResult, hitColor, discard = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
 					RawPacket: result.ResponseRaw,
 					Duration:  lowhttpResponse.GetDurationFloat(),
 				}, matcherParams)
+				if du := time.Now().Sub(matchColorStart); du > time.Second {
+					log.Warnf("match color and append httpflow tags cost too much time, can someone investigate it? cost: %v", du)
+				}
 
 				if httpTPLmatchersResult {
+					appendHttpflowTagsByHiddenIndexExStart := time.Now()
 					err := yakit.AppendHTTPFlowTagsByHiddenIndexEx(lowhttpResponse.HiddenIndex, hitColor...)
+					if time.Now().Sub(appendHttpflowTagsByHiddenIndexExStart).Seconds() > 1 {
+						log.Error("yakit.AppendHTTPFlowTagsByHiddenIndexEx cost too much time, can someone investigate it?")
+					}
 					if err != nil {
 						log.Errorf("append http flow tags failed: %s", err)
 					}
 				}
-
 				//httpTPLmatchersResult, err = ins.Execute(&httptpl.RespForMatch{
 				//	RawPacket: result.ResponseRaw,
 				//	Duration:  lowhttpResponse.GetDurationFloat(),
@@ -909,6 +934,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 			}
 
+			feedbackNormalResponseStart := time.Now()
 			task.HTTPFlowSuccessCount++
 			rsp := &ypb.FuzzerResponse{
 				Ok:                         true,
@@ -1140,6 +1166,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			rsp.TaskId = int64(taskID)
 			rsp.Discard = discard
 			err := feedbackResponse(rsp, false)
+			if du := time.Now().Sub(feedbackNormalResponseStart); du > time.Second {
+				log.Warnf("feedbackNormalResponse cost too much time, try investigate it, cost: %v", du)
+			}
 			if err != nil {
 				log.Errorf("send to client failed: %s", err)
 				continue
@@ -1685,9 +1714,13 @@ func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakFuzzerMatch
 }
 
 func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[string]interface{}, suf ...string) (matched bool, hitColor []string, discard bool) {
-
 	for _, flowMatcher := range m {
+		startTime := time.Now()
 		res, err := flowMatcher.Matcher.Execute(rsp, vars, suf...)
+		elapsed := time.Since(startTime)
+		if elapsed > time.Second {
+			log.Infof("matcher execution took %v, cost is too heavy", elapsed)
+		}
 		if err != nil {
 			log.Errorf("yak match err :%s", err)
 		}
