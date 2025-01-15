@@ -55,7 +55,7 @@ func (s *Server) GetSSARiskFieldGroup(ctx context.Context, req *ypb.Empty) (*ypb
 }
 
 func (s *Server) NewSSARiskRead(ctx context.Context, req *ypb.NewRiskReadRequest) (*ypb.Empty, error) {
-	err := yakit.NewSSARiskReadRequest(s.GetProjectDatabase(), req.GetIds())
+	err := yakit.NewSSARiskReadRequest(s.GetSSADatabase(), req.GetIds())
 	if err != nil {
 		return nil, err
 	}
