@@ -76,3 +76,47 @@ func TestParsePropertiesFile(t *testing.T) {
 	require.Equal(t, ".html", app.GetProjectConfig("spring.thymeleaf.suffix"))
 	require.Equal(t, "classpath:/templates/", app.GetProjectConfig("spring.thymeleaf.prefix"))
 }
+
+func TestParseYamlFile(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("application.yaml", `
+server:
+  port: 8080
+  servlet:
+    context-path: /myapp
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/mydb
+    username: user
+    password: pass
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    org.hibernate: ERROR
+
+# 自定义属性
+myapp:
+  welcome-message: Welcome to My Application
+  feature-enabled: true
+`)
+	programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.JAVA))
+	require.NoError(t, err)
+	app := programs[0].Program.GetApplication()
+	for k, v := range app.ProjectConfig {
+		t.Log(k + ":" + v)
+	}
+	require.Equal(t, "user", app.GetProjectConfig("spring.datasource.username"))
+	require.Equal(t, "Welcome to My Application", app.GetProjectConfig("myapp.welcome-message"))
+	require.Equal(t, "true", app.GetProjectConfig("myapp.feature-enabled"))
+}
