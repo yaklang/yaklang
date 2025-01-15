@@ -33,7 +33,7 @@ type Decompiler struct {
 	opcodeToSimulateStack         map[*OpCode]*StackSimulationImpl
 	FunctionContext               *class_context.ClassContext
 	varTable                      map[int]*values.JavaRef
-	opcodeIdToRef                 map[*OpCode][2]any
+	opcodeIdToRef                 map[*OpCode][][2]any
 	bytecodes                     []byte
 	opCodes                       []*OpCode
 	RootOpCode                    *OpCode
@@ -52,6 +52,7 @@ type Decompiler struct {
 	ifNodeConditionCallback       map[*OpCode]func(value values.JavaValue)
 
 	varUserMap     *omap.OrderedMap[*values.JavaRef, [][]any]
+	disFoldRef     []*values.JavaRef
 	delRefUserAttr map[*utils2.VariableId][3]int // [0] = del times,[1] = assign times, [2] = self assign
 }
 
@@ -63,7 +64,7 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 		offsetToOpcodeIndex: map[uint16]int{},
 		opcodeIndexToOffset: map[int]uint16{},
 		varTable:            map[int]*values.JavaRef{},
-		opcodeIdToRef:       map[*OpCode][2]any{},
+		opcodeIdToRef:       map[*OpCode][][2]any{},
 		varUserMap:          omap.NewEmptyOrderedMap[*values.JavaRef, [][]any](),
 		delRefUserAttr:      map[*utils2.VariableId][3]int{},
 	}
@@ -270,6 +271,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		if _, ok := UnpackSoltValue(runtimeStackSimulation.Peek()).(*values.JavaRef); !ok {
 			val := runtimeStackSimulation.Pop().(values.JavaValue)
 			ref := runtimeStackSimulation.NewVar(val)
+			d.opcodeIdToRef[opcode] = append(d.opcodeIdToRef[opcode], [2]any{ref, true})
 			attr := d.delRefUserAttr[ref.Id]
 			attr[2] = 1
 			d.delRefUserAttr[ref.Id] = attr
@@ -359,7 +361,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		value := runtimeStackSimulation.Pop().(values.JavaValue)
 		ref, isFirst := runtimeStackSimulation.AssignVar(slot, value)
 		statements.NewAssignStatement(ref, value, isFirst)
-		d.opcodeIdToRef[opcode] = [2]any{ref, isFirst}
+		d.opcodeIdToRef[opcode] = append(d.opcodeIdToRef[opcode], [2]any{ref, isFirst})
 		attr := d.delRefUserAttr[ref.Id]
 		attr[1]++
 		d.delRefUserAttr[ref.Id] = attr
@@ -368,6 +370,9 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			if v.Flag == "exception" {
 				loadVarBySlot(slot)
 			}
+		}
+		if !isFirst {
+			d.disFoldRef = append(d.disFoldRef, ref)
 		}
 	case OP_NEW:
 		n := Convert2bytesToInt(opcode.Data)
@@ -1292,7 +1297,6 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
-	//DumpOpcodesToDotExp(d.RootOpCode)
 	// convert opcode to statement
 	var nodes []*Node
 	statementsIndex := 0
@@ -1334,7 +1338,6 @@ func (d *Decompiler) ParseStatement() error {
 		}
 		return node
 	}
-	opcodeIdToNode := map[int]func(f func(value values.JavaValue) values.JavaValue){}
 	mapCodeToStackVarIndex := map[*OpCode]int{}
 	//DumpOpcodesToDotExp(d.RootOpCode)
 	var runCode func(startNode *OpCode) error
@@ -1350,12 +1353,14 @@ func (d *Decompiler) ParseStatement() error {
 		statementsIndex = opcode.Id
 		switch opcode.Instr.OpCode {
 		case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE, OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0, OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1, OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2, OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3:
-			value := opcode.stackConsumed[0]
-			refInfo := d.opcodeIdToRef[opcode]
-			ref := refInfo[0].(*values.JavaRef)
-			isFirst := refInfo[1].(bool)
-			assignSt := statements.NewAssignStatement(ref, value, isFirst)
-			appendNode(assignSt)
+			refInfos := d.opcodeIdToRef[opcode]
+			for i, refInfo := range refInfos {
+				value := opcode.stackConsumed[i]
+				ref := refInfo[0].(*values.JavaRef)
+				isFirst := refInfo[1].(bool)
+				assignSt := statements.NewAssignStatement(ref, value, isFirst)
+				appendNode(assignSt)
+			}
 		case OP_CHECKCAST:
 			leftRef := opcode.stackProduced[0].(*values.JavaRef)
 			val := GetRealValue(leftRef.Val)
@@ -1432,6 +1437,11 @@ func (d *Decompiler) ParseStatement() error {
 						if assignNode != nil {
 							assignSt := assignNode.Statement
 							assignNode.IsDel = true
+
+							users := d.varUserMap.GetMust(val)
+							for _, user := range users {
+								user[1] = opcode
+							}
 							appendNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 								return assignSt.String(funcCtx)
 							}))
@@ -1549,13 +1559,18 @@ func (d *Decompiler) ParseStatement() error {
 			field := values.NewRefMember(opcode.stackConsumed[1], staticVal.(*values.JavaClassMember).Member, staticVal.(*values.JavaClassMember).JavaType)
 			assignSt := statements.NewAssignStatement(field, value, false)
 			appendNode(assignSt)
-			opcodeIdToNode[opcode.Id] = func(f func(val values.JavaValue) values.JavaValue) {
-				assignSt.JavaValue = f(assignSt.JavaValue)
-			}
 		case OP_DUP, OP_DUP_X1, OP_DUP_X2, OP_DUP2, OP_DUP2_X1, OP_DUP2_X2:
-			for i, value := range opcode.stackConsumed {
-				appendNode(statements.NewAssignStatement(opcode.stackProduced[i], value, true))
+			refInfos := d.opcodeIdToRef[opcode]
+			for i, refInfo := range refInfos {
+				value := opcode.stackConsumed[i]
+				ref := refInfo[0].(*values.JavaRef)
+				isFirst := refInfo[1].(bool)
+				assignSt := statements.NewAssignStatement(ref, value, isFirst)
+				appendNode(assignSt)
 			}
+			//for i, value := range opcode.stackConsumed {
+			//	appendNode(statements.NewAssignStatement(opcode.stackProduced[i], value, true))
+			//}
 		case OP_MONITORENTER:
 			v := opcode.stackConsumed[0]
 			st := statements.NewMiddleStatement("monitor_enter", v)
@@ -1687,9 +1702,109 @@ func (d *Decompiler) ParseStatement() error {
 		idToNode[toNodeId].SourceConditionNode = idToNode[conditionId]
 	}
 	d.RootNode = nodes[0]
+	uidToPairs := omap.NewEmptyOrderedMap[string, [][]any]()
+	uidToRef := map[string]*values.JavaRef{}
+	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
+		if v, ok := node.Statement.(*statements.ConditionStatement); ok && v.Neg {
+			node.Next[0], node.Next[1] = node.Next[1], node.Next[0]
+		}
+		if node.IsDel {
+			sources := slices.Clone(node.Source)
+			next := slices.Clone(node.Next)
+			node.RemoveAllSource()
+			node.RemoveAllNext()
+			for _, source := range sources {
+				for _, n := range next {
+					n.AddSource(source)
+				}
+			}
+			return next, nil
+		}
+		return node.Next, nil
+	})
+	idToNode = map[int]*Node{}
+	nodes = []*Node{}
+	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
+		nodes = append(nodes, node)
+		idToNode[node.Id] = node
+		return node.Next, nil
+	})
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].Id < nodes[j].Id
+	})
 	d.varUserMap.ForEach(func(ref *values.JavaRef, pairs [][]any) bool {
+		uidToPairs.Set(ref.VarUid, append(uidToPairs.GetMust(ref.VarUid), pairs...))
+		uidToRef[ref.VarUid] = ref
+		return true
+	})
+	disRefUid := lo.Map(d.disFoldRef, func(item *values.JavaRef, index int) string {
+		return item.VarUid
+	})
+	uidToPairs.ForEach(func(uid string, pairs [][]any) bool {
+		ref := uidToRef[uid]
 		val := GetRealValue(ref.Val)
 		attr := d.delRefUserAttr[ref.Id]
+		if slices.Contains(disRefUid, ref.VarUid) {
+			return true
+		}
+
+		func() {
+			if len(pairs) != 2 {
+				return
+			}
+			isDup := pairs[0][1].(*OpCode).Instr.OpCode == OP_DUP && pairs[1][1].(*OpCode).Instr.OpCode == OP_DUP
+			isSameCode := pairs[0][1].(*OpCode).Id == pairs[1][1].(*OpCode).Id
+			if !isDup || !isSameCode {
+				return
+			}
+			nodeId := getStatementNextIdByOpcodeId(pairs[0][1].(*OpCode).Id)
+			currentNode := idToNode[nodeId]
+			v, ok := currentNode.Statement.(*statements.AssignStatement)
+			if !ok {
+				return
+			}
+			dupRef, ok := v.LeftValue.(*values.JavaRef)
+			if !ok {
+				return
+			}
+
+			if len(currentNode.Next) != 1 {
+				return
+			}
+			nextNode := currentNode.Next[0]
+			nextAssign, ok := nextNode.Statement.(*statements.AssignStatement)
+			if !ok {
+				return
+			}
+			rightRef, ok := UnpackSoltValue(nextAssign.JavaValue).(*values.JavaRef)
+			if !ok {
+				return
+			}
+			if dupRef.VarUid != ref.VarUid || rightRef.VarUid != ref.VarUid {
+				return
+			}
+			if len(nextNode.Next) != 1 {
+				return
+			}
+			if len(currentNode.Source) != 1 {
+				return
+			}
+			currentNodeSource := currentNode.Source[0]
+			nnext := nextNode.Next[0]
+			currentNode.RemoveNext(nextNode)
+			nextNode.RemoveNext(nnext)
+			currentNode.AddNext(nnext)
+			currentNodeSource.RemoveNext(currentNode)
+			currentNodeSource.AddNext(nnext)
+
+			pairs[1][0].(func(value values.JavaValue))(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				return statements.NewAssignStatement(nextAssign.LeftValue, val, false).String(funcCtx)
+			}, func() types.JavaType {
+				return val.Type()
+			}))
+
+		}()
+
 		if len(pairs)-attr[0] == 1 {
 			pair := pairs[0]
 			nodeId := getStatementNextIdByOpcodeId(pair[1].(*OpCode).Id)
@@ -1730,24 +1845,6 @@ func (d *Decompiler) ParseStatement() error {
 		return true
 	})
 
-	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
-		if v, ok := node.Statement.(*statements.ConditionStatement); ok && v.Neg {
-			node.Next[0], node.Next[1] = node.Next[1], node.Next[0]
-		}
-		if node.IsDel {
-			sources := slices.Clone(node.Source)
-			next := slices.Clone(node.Next)
-			node.RemoveAllSource()
-			node.RemoveAllNext()
-			for _, source := range sources {
-				for _, n := range next {
-					n.AddSource(source)
-				}
-			}
-			return next, nil
-		}
-		return node.Next, nil
-	})
 	idToNode = map[int]*Node{}
 	nodes = []*Node{}
 	WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {

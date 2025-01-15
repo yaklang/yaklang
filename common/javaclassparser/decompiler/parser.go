@@ -50,6 +50,7 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 			}
 		}
 	}
+
 	err = statementManager.Rewrite()
 	if err != nil {
 		return nil, err
