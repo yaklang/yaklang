@@ -21,6 +21,7 @@ func TestCFRZip(t *testing.T) {
 	count := 0
 	Recursive(".", WithFileSystem(z), WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
 		fmt.Println(pathname)
+		count++
 		return nil
 	}))
 	if count == 0 {

@@ -59,7 +59,7 @@ jobs:
           MERGE_BASE=$(git merge-base main ${{ github.event.pull_request.head.sha }})
           echo "Merge base is: $MERGE_BASE"
           ./yak gitefs --start $MERGE_BASE --end ${{ github.event.pull_request.head.sha }} --output ./fs.zip
-          ./yak check --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule > log.txt 2>&1 || exit 1
+          ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule > log.txt 2>&1 || exit 1
       - name: Upload fail log
         if: failure()
         uses: actions/upload-artifact@v4
