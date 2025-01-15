@@ -143,12 +143,14 @@ const (
 	// and is generally used to audit XSS vulnerabilities
 	NativeCall_Java_UnEscape_Output = "javaUnescapeOutput"
 
-	NatiCall_Foeach_Func_Inst = "foreach_function_inst"
+	NativeCall_Foeach_Func_Inst = "foreach_function_inst"
+
+	NativeCall_Project_Config = "projectConfig"
 )
 
 func init() {
 	//<foreach_function_inst(hook=`xxx` as $result)> as $result
-	registerNativeCall(NatiCall_Foeach_Func_Inst, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Foeach_Func_Inst, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
 		prog, err := fetchProgram(v)
 		if err != nil {
