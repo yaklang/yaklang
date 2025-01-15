@@ -35,7 +35,7 @@ func init() {
 				count++
 				if count%1000 == 0 {
 					throttle(func() {
-						log.Infof("Throttle sql exec count: %d", count)
+						//log.Infof("Throttle sql exec count: %d", count)
 					})
 				}
 				if err != nil {
