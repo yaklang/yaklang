@@ -3,11 +3,15 @@ package vulinbox
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
+
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 //go:embed html/vul_bruteplayground_orderpage.html
@@ -21,15 +25,33 @@ func (s *VulinServer) registerBrutePlayground() {
 	infos := make(map[int]string)
 	for i := 0; i < 1000; i++ {
 		// 生成随机的6位数字作为订单号
-		orderNum := rand.Intn(1000000)
+		orderNum := rand.Intn(10000)
 		infos[orderNum] = "13" + strconv.FormatInt(int64(10000000+rand.Intn(89999999)), 10)
 	}
 
-	render := func(writer http.ResponseWriter, orderId string) string {
+	render := func(
+		writer http.ResponseWriter,
+		orderId string, pathString string,
+		lastLevel, nextLevel string,
+		errReason string,
+	) string {
 		tmpl, err := template.New("vul_bruteplayground_orderpage").Parse(string(vulInBrutePlayground))
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return ""
+		}
+
+		if errReason != "" {
+			orderId = ""
+			var buf bytes.Buffer
+			tmpl.Execute(&buf, map[string]any{
+				"QueryId":   orderId,
+				"Path":      pathString,
+				"LastLevel": lastLevel,
+				"NextLevel": nextLevel,
+				"ErrReason": errReason,
+			})
+			return buf.String()
 		}
 
 		// 根据订单ID获取数据
@@ -38,7 +60,11 @@ func (s *VulinServer) registerBrutePlayground() {
 		if err != nil {
 			var buf bytes.Buffer
 			tmpl.Execute(&buf, map[string]any{
-				"QueryId": orderId,
+				"QueryId":   orderId,
+				"Path":      pathString,
+				"LastLevel": lastLevel,
+				"NextLevel": nextLevel,
+				"ErrReason": errReason,
 			})
 			return buf.String()
 		}
@@ -48,7 +74,11 @@ func (s *VulinServer) registerBrutePlayground() {
 		if !ok {
 			var buf bytes.Buffer
 			tmpl.Execute(&buf, map[string]any{
-				"QueryId": orderId,
+				"QueryId":   orderId,
+				"ErrReason": "订单号不存在",
+				"Path":      pathString,
+				"NextLevel": nextLevel,
+				"LastLevel": lastLevel,
 			})
 			return buf.String()
 		}
@@ -56,21 +86,95 @@ func (s *VulinServer) registerBrutePlayground() {
 		// 渲染订单详情
 		var buf bytes.Buffer
 		tmpl.Execute(&buf, map[string]any{
-			"OrderId": orderId,
-			"Name":    "客户" + orderId,
-			"Phone":   phone,
+			"OrderId":   orderId,
+			"Name":      "客户" + orderId,
+			"Phone":     phone,
+			"Path":      pathString,
+			"NextLevel": nextLevel,
+			"LastLevel": lastLevel,
+			"ErrReason": errReason,
 		})
 		return buf.String()
 	}
 
+	const (
+		baseOrderPath   = "/bruteplayground"
+		simpleOrderPath = baseOrderPath + "/by-order-id"
+		dateOrderPath   = baseOrderPath + "/by-order-id-2"
+		defaultOrderId  = "3321"
+	)
+
+	// 生成今日日期格式的订单号
+	todayOrderId := time.Now().Format("20060102") + "0001"
+
+	// 构建查询参数
+	simpleQuery := fmt.Sprintf("orderId=%s", defaultOrderId)
+	dateQuery := fmt.Sprintf("orderId=%s", todayOrderId)
+
+	var virtualRoute = omap.NewEmptyOrderedMap[string, map[string]string]()
+	virtualRoute.Push(map[string]string{
+		"path":  simpleOrderPath,
+		"title": "订单详情页面（订单号为4位数字 0-9999）",
+		"query": simpleQuery,
+	})
+	virtualRoute.Push(map[string]string{
+		"path":  dateOrderPath,
+		"title": "订单详情页面（订单号为今日日期+4位数字 0000-9999）",
+		"query": dateQuery,
+	})
+
+	getQuery := func(i int) string {
+		r := virtualRoute.GetByIndexMust(i)
+		return r["query"]
+	}
+	getPath := func(i int) string {
+		r := virtualRoute.GetByIndexMust(i)
+		return r["path"]
+	}
+	getPathWithQuery := func(i int) string {
+		return getPath(i) + "?" + getQuery(i)
+	}
+
 	routes := []*VulInfo{
 		{
-			DefaultQuery: "orderId=123456",
-			Path:         "/bruteplayground/by-order-id",
-			Title:        "订单详情页面",
+			DefaultQuery: getQuery(0),
+			Path:         getPath(0),
+			Title:        "订单详情页面（订单号为4位数字 0-9999）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				orderId := request.URL.Query().Get("orderId")
-				writer.Write([]byte(render(writer, orderId)))
+				writer.Write([]byte(render(
+					writer, orderId,
+					getPathWithQuery(0),
+					"",
+					getPathWithQuery(1),
+					"",
+				)))
+			},
+			RiskDetected: false,
+		},
+		{
+			DefaultQuery: dateQuery,
+			Path:         dateOrderPath,
+			Title:        "订单详情页面（订单号为今日日期+4位数字 0000-9999）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				orderId := request.URL.Query().Get("orderId")
+				if !strings.HasPrefix(orderId, time.Now().Format("20060102")) {
+					writer.Write([]byte(render(
+						writer, "",
+						getPathWithQuery(1),
+						getPathWithQuery(0),
+						"",
+						"订单号格式错误",
+					)))
+					return
+				}
+				writer.Write([]byte(render(
+					writer, orderId,
+					getPathWithQuery(1),
+					getPathWithQuery(0),
+					"",
+					"",
+				)))
 			},
 			RiskDetected: false,
 		},
