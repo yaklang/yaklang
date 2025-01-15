@@ -1181,7 +1181,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		handle vars
 	*/
 	wg := new(sync.WaitGroup)
-	mergedErr := make(chan error)
+
+	errReader, errWriter := utils.NewBufPipe(nil)
+	errFilter := filter2.NoCacheNewFilter()
+
+	mtx := new(sync.Mutex)
 	for _param := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS(), req.GetFuzzTagSyncIndex()) {
 		mergedParams := _param
 		wg.Add(1)
@@ -1189,27 +1193,28 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			defer wg.Done()
 			err := executeBatchRequestsWithParams(mergedParams)
 			if err != nil {
-				mergedErr <- err
+
+				mtx.Lock()
+				defer func() {
+					mtx.Unlock()
+				}()
+				msgs := err.Error()
+				if errFilter.Exist(msgs) {
+					return
+				}
+				errFilter.Insert(msgs)
+				if errReader.Count() > 0 {
+					errWriter.Write([]byte("\n"))
+				}
+				_, _ = errWriter.Write([]byte(msgs))
 			}
 		}()
 	}
-	go func() {
-		wg.Wait()
-		close(mergedErr)
-	}()
+	wg.Wait()
+	errWriter.Close()
 
-	errFilter := filter2.NewFilter()
 	var errBuf bytes.Buffer
-	for retErr := range mergedErr {
-		h := codec.Sha256(retErr.Error())
-		if errFilter.Exist(h) {
-			continue
-		}
-		errFilter.Insert(h)
-		errBuf.WriteString(retErr.Error())
-		errBuf.WriteString("\n")
-	}
-	errFilter.Close()
+	io.Copy(&errBuf, errReader)
 
 	if errBuf.Len() > 0 {
 		task.Ok = false
