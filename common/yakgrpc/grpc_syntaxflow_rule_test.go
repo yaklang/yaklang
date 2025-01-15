@@ -401,3 +401,34 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		require.Equal(t, des, queryRule[0].Description)
 	})
 }
+
+func TestGRPCMUSTPASS_DeleteSyntaxFlow_With_Group(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
+	groupName := uuid.NewString()
+	req := &ypb.CreateSyntaxFlowRuleRequest{
+		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+			RuleName:   ruleName,
+			GroupNames: []string{groupName},
+			Language:   "java",
+		},
+	}
+
+	_, err = client.CreateSyntaxFlowRule(context.Background(), req)
+	require.NoError(t, err)
+	beforeDelete, err := queryRulesByName(client, []string{ruleName})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(beforeDelete))
+
+	deleteReq := &ypb.DeleteSyntaxFlowRuleRequest{
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			GroupNames: []string{groupName},
+		},
+	}
+	_, err = client.DeleteSyntaxFlowRule(context.Background(), deleteReq)
+	require.NoError(t, err)
+	afterDelete, err := queryRulesByName(client, []string{ruleName})
+	require.NoError(t, err)
+	require.Equal(t, 0, len(afterDelete))
+}
