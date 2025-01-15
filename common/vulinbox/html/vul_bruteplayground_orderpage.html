@@ -28,14 +28,22 @@
     </header>
 
     <div class="container py-5">
-        <h1 class="mb-5">订单详情页面</h1>
+        <h1 class="mb-5 d-flex align-items-center">
+            订单详情页面
+            {{if .LastLevel}}
+            <a href="{{.LastLevel}}" target="_blank" class="btn btn-primary ms-3">上一关</a>
+            {{end}}
+            {{if .NextLevel}}
+            <a href="{{.NextLevel}}" target="_blank" class="btn btn-primary ms-3">下一关</a>
+            {{end}}
+        </h1>
         
         <div class="alert alert-info mb-4" role="alert">
-            <p class="mb-0">提示：客户订单号为6位数字，其中约有1000个订单号包含有效信息。</p>
+            <p class="mb-0">提示：客户订单号为4位数字，其中约有1000个订单号包含有效信息。</p>
 
             <p class="mb-0">数据包示例:</p>
             <div class="position-relative">
-                <pre class="bg-light p-3 rounded"><code>GET /bruteplayground/by-order-id?orderId=12345 HTTP/1.1
+                <pre class="bg-light p-3 rounded"><code>GET {{.Path}} HTTP/1.1
 Host: <script>document.write(window.location.hostname + ':' + window.location.port)</script>
 User-Agent: Mozilla/5.0 
 Accept: */*
@@ -59,7 +67,7 @@ Connection: close</code></pre>
     {{else}}
         <div class="alert alert-warning" role="alert">
             <p class="mb-1">当前查询的订单ID: {{.QueryId}}</p>
-            <p class="mb-0">当前没有数据</p>
+            <p class="mb-0">当前没有数据: {{.ErrReason}}</p>
         </div>
     {{end}}
         </div>
