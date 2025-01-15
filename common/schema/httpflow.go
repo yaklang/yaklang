@@ -18,7 +18,7 @@ func yakitColor(i string) string {
 type HTTPFlow struct {
 	gorm.Model
 
-	HiddenIndex        string
+	HiddenIndex        string `gorm:"index"`
 	NoFixContentLength bool   `json:"no_fix_content_length"`
 	Hash               string `gorm:"unique_index"`
 	IsHTTPS            bool
