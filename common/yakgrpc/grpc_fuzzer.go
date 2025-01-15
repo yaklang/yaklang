@@ -783,7 +783,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				log.Error("HELP! handle result cost too much time, can someone investigate it?")
 			}
 			nowTime = time.Now()
-			
+
 			// 2M
 			if len(result.RequestRaw) > 2*1024*1024 {
 				result.RequestRaw = result.RequestRaw[:2*1024*1024]
