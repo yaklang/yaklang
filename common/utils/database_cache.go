@@ -25,7 +25,7 @@ type databaseCacheItem[K comparable, T any] struct {
 
 // save to database
 // attention: this function should be blocking
-type SaveDatabase[K comparable, T any] func(K, T) bool
+type SaveDatabase[K comparable, T any] func(K, T, EvictionReason) bool
 
 // load data from database by key
 // attention: this function should be blocking
@@ -64,7 +64,7 @@ func NewDatabaseCacheWithKey[K comparable, T any](
 	}
 	cache.SetExpirationCallback(func(_ string, key K, reason EvictionReason) {
 		log.Debugf("expire key: %v", key)
-		ret.save(key)
+		ret.save(key, reason)
 	})
 	return ret
 }
@@ -126,7 +126,7 @@ func (c *DataBaseCacheWithKey[K, T]) GetAll() map[K]T {
 	return ret
 }
 
-func (c *DataBaseCacheWithKey[K, T]) save(key K) {
+func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
 	// in goroutine
 	item, ok := c.data.Get(key)
 	if !ok {
@@ -139,7 +139,7 @@ func (c *DataBaseCacheWithKey[K, T]) save(key K) {
 	c.updateStatus(item, DatabaseCacheItemSave)
 
 	// save to database
-	save_success := c.saveDatabase(item.key, item.memoryItem) // wait this
+	save_success := c.saveDatabase(item.key, item.memoryItem, reason) // wait this
 
 	// check status
 	item, ok = c.data.Get(key)

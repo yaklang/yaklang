@@ -16,7 +16,7 @@ func TestDatabaseCache(t *testing.T) {
 
 	cache := utils.NewDatabaseCacheWithKey[int, string](
 		ttl,
-		func(i int, s string) bool {
+		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
 			database.Set(i, s)
 			return true
@@ -64,7 +64,7 @@ func TestDatabaseCache_WithDatabaseTime(t *testing.T) {
 
 	cache := utils.NewDatabaseCacheWithKey[int, string](
 		ttl,
-		func(i int, s string) bool {
+		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
 			database.Set(i, s)
 			//  database need time
@@ -119,7 +119,7 @@ func TestDatabaseCache_ManualDelete(t *testing.T) {
 
 	cache := utils.NewDatabaseCacheWithKey[int, string](
 		time.Second*10,
-		func(i int, s string) bool {
+		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
 			database.Set(i, s)
 			return true
@@ -158,7 +158,7 @@ func TestDatabaseCache_NoDatabase(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	cache := utils.NewDatabaseCacheWithKey[int, string](
 		ttl,
-		func(i int, s string) bool {
+		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
 			return false // no save to database
 		},
@@ -191,7 +191,7 @@ func TestDatabaseCache_Close(t *testing.T) {
 
 	cache := utils.NewDatabaseCacheWithKey[int, string](
 		ttl,
-		func(i int, s string) bool {
+		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
 			database.Set(i, s)
 			return true

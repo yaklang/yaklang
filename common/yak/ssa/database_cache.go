@@ -57,7 +57,7 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		constCache:      make([]Instruction, 0),
 	}
 
-	var save func(int64, *instructionCachePair) bool
+	var save func(int64, *instructionCachePair, utils.EvictionReason) bool
 	var load func(int64) (*instructionCachePair, error)
 	if databaseEnable {
 		programName := prog.GetProgramName()
@@ -65,7 +65,13 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		cache.fetchId = func() (int64, *ssadb.IrCode) {
 			return ssadb.RequireIrCode(cache.DB, programName)
 		}
-		save = func(i int64, s *instructionCachePair) bool {
+		save = func(i int64, s *instructionCachePair, reason utils.EvictionReason) bool {
+			if reason == utils.EvictionReasonExpired {
+				if s.inst.GetOpcode() == SSAOpcodeFunction || s.inst.GetOpcode() == SSAOpcodeBasicBlock {
+					// function is not saved to database, because it is not changed
+					return false
+				}
+			}
 			return cache.saveInstruction(s)
 		}
 		load = func(id int64) (*instructionCachePair, error) {
@@ -87,7 +93,7 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		load = func(i int64) (*instructionCachePair, error) {
 			return nil, utils.Errorf("load from database is disabled")
 		}
-		save = func(i int64, icp *instructionCachePair) bool {
+		save = func(i int64, icp *instructionCachePair, reason utils.EvictionReason) bool {
 			return false // disable save to database
 		}
 	}
