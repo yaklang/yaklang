@@ -738,17 +738,12 @@ RECONNECT:
 		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns}
 		//beforeLog(option)
 		select {
-		case err := <-writeErrCh:
-			if pc.shouldRetryRequest(err) {
-				goto RECONNECT
-			}
-			return nil, err
 		case re := <-resc:
-			// 收到响应
+			// get response
 			if (re.resp == nil) == (re.err == nil) {
 				return nil, utils.Errorf("BUG: internal error: exactly one of res or err should be set; nil=%v", re.resp == nil)
 			}
-			if re.err != nil && len(rawBytes) == 0 {
+			if re.err != nil && len(rawBytes) == 0 { // get some bytes but get error too
 				if pc.shouldRetryRequest(re.err) {
 					goto RECONNECT
 				}
@@ -758,9 +753,9 @@ RECONNECT:
 			rawBytes = re.respBytes
 			response.MultiResponse = false
 			traceInfo.ServerTime = re.info.ServerTime
-		case <-pc.closeCh:
+		case <-pc.ctx.Done(): // if persistConn closed before read response , check error can retry or not
 			if pc.closed == nil {
-				log.Errorf("BUG: closeCh but closed is nil")
+				return nil, utils.Error("BUG: closeCh but closed is nil")
 			}
 			if pc.shouldRetryRequest(pc.closed) {
 				goto RECONNECT
