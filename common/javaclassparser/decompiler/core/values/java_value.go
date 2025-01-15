@@ -2,6 +2,7 @@ package values
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
@@ -12,6 +13,7 @@ import (
 )
 
 type JavaRef struct {
+	VarUid      string
 	Id          *utils.VariableId
 	StackVar    JavaValue
 	CustomValue *CustomValue
@@ -39,9 +41,10 @@ func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
 
 func NewJavaRef(id *utils.VariableId, val JavaValue, typ types.JavaType) *JavaRef {
 	return &JavaRef{
-		Id:  id,
-		Val: val,
-		typ: typ,
+		VarUid: uuid.NewString(),
+		Id:     id,
+		Val:    val,
+		typ:    typ,
 	}
 }
 

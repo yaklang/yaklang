@@ -18,6 +18,7 @@ func TestDecompiler(t *testing.T) {
 	testCase := []struct {
 		name string
 	}{
+		{"SelfOp"},
 		{"ContinuousAssign"},
 		{"TryCatch1"},
 		{"VarFold"},

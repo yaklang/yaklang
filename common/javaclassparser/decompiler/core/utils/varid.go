@@ -3,6 +3,8 @@ package utils
 import (
 	"fmt"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type VariableId struct {
@@ -18,13 +20,18 @@ func NewRootVariableId() *VariableId {
 //		return fmt.Sprintf("var%d", v.Uid())
 //	}
 func (v *VariableId) Id() int {
-	return v._id() - 1
+	return v._id(utils.NewSet[*VariableId]()) - 1
 }
-func (v *VariableId) _id() int {
+func (v *VariableId) _id(set *utils.Set[*VariableId]) int {
+	if set.Has(v) {
+		log.Errorf("cycle detected in variable id")
+		return 0
+	}
+	set.Add(v)
 	if v.parent == nil {
 		return 0
 	}
-	return v.parent._id() + 1
+	return v.parent._id(set) + 1
 }
 func (v *VariableId) String() string {
 	return fmt.Sprintf("var%d", v.Id())
