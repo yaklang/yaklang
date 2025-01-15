@@ -5,10 +5,9 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
-
-	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca"
@@ -90,6 +89,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 			prog.ExtraFile[path] = ssadb.SaveFile(filename, content, editor.GetIrSourceHash(prog.GetProgramName()), folders)
 		}
 	}
+
 	switch strings.ToLower(fileSystem.Ext(path)) {
 	case ".java", ".class":
 		raw, err := fileSystem.ReadFile(path)
@@ -179,4 +179,20 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		saveExtraFile(path, raw)
 	}
 	return nil
+}
+
+func (s *SSABuilder) AfterPreHandlerProject(fb *ssa.FunctionBuilder) {
+	prog := fb.GetProgram()
+	if prog == nil {
+		return
+	}
+	config := fb.PeekValue(ssa.ProjectConfigVariable)
+	if utils.IsNil(config) {
+		return
+	}
+	for k, v := range prog.ProjectConfig {
+		variable := fb.CreateMemberCallVariable(config, fb.EmitConstInst(k))
+		fb.AssignVariable(variable, fb.EmitConstInst(v))
+	}
+	return
 }

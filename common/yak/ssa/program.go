@@ -370,8 +370,10 @@ func (p *Program) ParseProjectConfig(raw []byte, typ ProjectConfigType) error {
 		if err != nil {
 			return err
 		}
+	default:
+		return utils.Errorf("not support project config type: %d", typ)
 	}
-	return utils.Errorf("not support project config type: %d", typ)
+	return nil
 }
 
 func (p *Program) parsePropertiesProjectConfig(raw []byte) error {

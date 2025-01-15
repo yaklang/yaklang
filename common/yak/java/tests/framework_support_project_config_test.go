@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 )
 
@@ -110,13 +111,36 @@ myapp:
   welcome-message: Welcome to My Application
   feature-enabled: true
 `)
-	programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.JAVA))
-	require.NoError(t, err)
-	app := programs[0].Program.GetApplication()
-	for k, v := range app.ProjectConfig {
-		t.Log(k + ":" + v)
-	}
-	require.Equal(t, "user", app.GetProjectConfig("spring.datasource.username"))
-	require.Equal(t, "Welcome to My Application", app.GetProjectConfig("myapp.welcome-message"))
-	require.Equal(t, "true", app.GetProjectConfig("myapp.feature-enabled"))
+
+	t.Run("test parse config", func(t *testing.T) {
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.JAVA))
+		require.NoError(t, err)
+		app := programs[0].Program.GetApplication()
+		for k, v := range app.ProjectConfig {
+			t.Log(k + ":" + v)
+		}
+		require.Equal(t, "user", app.GetProjectConfig("spring.datasource.username"))
+		require.Equal(t, "Welcome to My Application", app.GetProjectConfig("myapp.welcome-message"))
+		require.Equal(t, "true", app.GetProjectConfig("myapp.feature-enabled"))
+	})
+
+	t.Run("test syntaxflow search config", func(t *testing.T) {
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			prog := programs[0]
+			vals, err := prog.SyntaxFlowWithError(`
+__projectConfig__./spring.datasource.username/ as $username;
+__projectConfig__./myapp.welcome-message/ as $welcome
+`)
+			require.NoError(t, err)
+			userName := vals.GetValues("username")
+			userName.Show()
+			require.Contains(t, userName.String(), "user")
+
+			welcome := vals.GetValues("welcome")
+			welcome.Show()
+			require.Contains(t, welcome.String(), "Welcome to My Application")
+			return nil
+		})
+	})
+
 }
