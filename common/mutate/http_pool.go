@@ -661,7 +661,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 			config.Size = 50
 		}
 
-		results := make(chan *HttpResult, 10240)
+		results := make(chan *HttpResult, 20480)
 		go func() {
 			defer close(results)
 			defer func() {
