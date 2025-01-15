@@ -67,11 +67,16 @@ var SSACompilerCommands = []*cli.Command{
 				Name:     "rules",
 				Required: true,
 			},
+			cli.StringFlag{
+				Name: "language",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			var sfrules []*schema.SyntaxFlowRule
 			file := c.String("file")
 			rules := c.String("rules")
+			language := c.String("language")
+
 			zipfs, err2 := filesys.NewZipFSFromLocal(file)
 			if err2 != nil {
 				return err2
@@ -94,7 +99,7 @@ var SSACompilerCommands = []*cli.Command{
 				sfrules = append(sfrules, sfrule)
 				return nil
 			}))
-			programs, err := ssaapi.ParseProjectWithFS(zipfs, ssaapi.WithLanguage(ssaapi.GO))
+			programs, err := ssaapi.ParseProjectWithFS(zipfs, ssaapi.WithRawLanguage(language))
 			if err != nil {
 				return err
 			}
