@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	yaml "github.com/yaklang/yaklang/common/openapi/openapiyaml"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"path/filepath"
 	"sort"
@@ -357,10 +358,15 @@ func (p *Program) GetApplication() *Program {
 	return p.Application
 }
 
-func (p *Program) ParseProjectConfig(content string, typ ProjectConfigType) error {
+func (p *Program) ParseProjectConfig(raw []byte, typ ProjectConfigType) error {
 	switch typ {
 	case PROJECT_CONFIG_PROPERTIES:
-		err := p.parsePropertiesProjectConfig(content)
+		err := p.parsePropertiesProjectConfig(raw)
+		if err != nil {
+			return err
+		}
+	case PROJECT_CONFIG_YAML:
+		err := p.parseYamlProjectConfig(raw)
 		if err != nil {
 			return err
 		}
@@ -368,10 +374,11 @@ func (p *Program) ParseProjectConfig(content string, typ ProjectConfigType) erro
 	return utils.Errorf("not support project config type: %d", typ)
 }
 
-func (p *Program) parsePropertiesProjectConfig(content string) error {
+func (p *Program) parsePropertiesProjectConfig(raw []byte) error {
 	if p == nil {
 		return utils.Errorf("program is nil")
 	}
+	content := string(raw)
 	lines := strings.Split(content, "\n")
 	var errs error
 	for _, line := range lines {
@@ -387,6 +394,21 @@ func (p *Program) parsePropertiesProjectConfig(content string) error {
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
 		p.ProjectConfig[key] = value
+	}
+	return nil
+}
+
+func (p *Program) parseYamlProjectConfig(raw []byte) error {
+	if p == nil {
+		return utils.Errorf("program is nil")
+	}
+
+	config, err := yaml.YamlToKVParis(raw)
+	if err != nil {
+		return utils.Errorf("parse yaml project config error: %v", err)
+	}
+	for k, v := range config {
+		p.ProjectConfig[k] = v
 	}
 	return nil
 }
