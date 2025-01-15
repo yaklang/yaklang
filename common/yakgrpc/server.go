@@ -25,14 +25,18 @@ type Server struct {
 	cacheDir           string
 	_abandonedDatabase *gorm.DB
 	reverseServer      *facades.FacadeServer
+	profileDatabase    *gorm.DB
+	projectDatabase    *gorm.DB
 }
 
 type ServerOpts func(config *ServerConfig)
 
 type ServerConfig struct {
-	reverseServerPort int
-	initFacadeServer  bool
-	startCacheLog     bool
+	reverseServerPort   int
+	initFacadeServer    bool
+	startCacheLog       bool
+	profileDatabasePath string
+	projectDatabasePath string
 }
 
 func WithReverseServerPort(port int) ServerOpts {
@@ -53,11 +57,29 @@ func WithStartCacheLog() ServerOpts {
 	}
 }
 
-func (*Server) GetProfileDatabase() *gorm.DB {
+func WithProfileDatabasePath(p string) ServerOpts {
+	return func(config *ServerConfig) {
+		config.profileDatabasePath = p
+	}
+}
+
+func WithProjectDatabasePath(p string) ServerOpts {
+	return func(config *ServerConfig) {
+		config.projectDatabasePath = p
+	}
+}
+
+func (s *Server) GetProfileDatabase() *gorm.DB {
+	if s.profileDatabase != nil {
+		return s.profileDatabase
+	}
 	return consts.GetGormProfileDatabase()
 }
 
-func (*Server) GetProjectDatabase() *gorm.DB {
+func (s *Server) GetProjectDatabase() *gorm.DB {
+	if s.projectDatabase != nil {
+		return s.projectDatabase
+	}
 	return consts.GetGormProjectDatabase()
 }
 
@@ -85,10 +107,27 @@ func newServerEx(opts ...ServerOpts) (*Server, error) {
 	for _, opt := range opts {
 		opt(serverConfig)
 	}
+
 	yakitBase := consts.GetDefaultYakitBaseDir()
 	_ = os.MkdirAll(yakitBase, 0o777)
 	s := &Server{
 		cacheDir: yakitBase,
+	}
+
+	if len(serverConfig.profileDatabasePath) > 0 {
+		db, err := consts.CreateProfileDatabase(serverConfig.profileDatabasePath)
+		if err != nil {
+			return nil, err
+		}
+		s.profileDatabase = db
+	}
+
+	if len(serverConfig.projectDatabasePath) > 0 {
+		db, err := consts.CreateProjectDatabase(serverConfig.projectDatabasePath)
+		if err != nil {
+			return nil, err
+		}
+		s.projectDatabase = db
 	}
 
 	if serverConfig.initFacadeServer {
@@ -107,7 +146,7 @@ func newServerEx(opts ...ServerOpts) (*Server, error) {
 		s.reverseServer = facades.NewFacadeServer("0.0.0.0", 0)
 	}
 
-	err := s.initDatabase()
+	err := s.init()
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +160,7 @@ var YakitProfileTables = schema.ProfileTables
 
 var YakitAllTables = schema.ProjectTables
 
-func (s *Server) initDatabase() error {
+func (s *Server) init() error {
 	var err error
 
 	//fd, err := os.Stat(s.cacheDir)

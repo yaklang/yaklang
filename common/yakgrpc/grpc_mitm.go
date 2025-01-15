@@ -99,11 +99,6 @@ var constClujore = func(i interface{}) func() interface{} {
 	}
 }
 
-const (
-	MITMReplacerKeyRecords = "R1oHf8xca6CobwVg2_MITMReplacerKeyRecords"
-	MITMFilterKeyRecords   = "uWokegBnCQdnxezJtMVo_MITMFilterKeyRecords"
-)
-
 func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	defer func() {
 		if err := recover(); err != nil {
