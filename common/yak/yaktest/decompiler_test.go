@@ -11,7 +11,7 @@ import (
 )
 
 func TestParseClass(t *testing.T) {
-	err := filepath.Walk("/Users/z3/Downloads/error-jdsc 2", func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk("/Users/z3/Downloads/error-jdsc 3", func(path string, info fs.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
@@ -26,7 +26,7 @@ func TestParseClass(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if path != "/Users/z3/Downloads/error-jdsc 2/decompile-err-a0b54633356cde4c0f53b665.class" {
+		if path != "/Users/z3/Downloads/error-jdsc 3/decompile-err-02da3de4136c76a40f1b48fc.class" {
 			return nil
 		}
 		source, err := cf.Dump()
