@@ -250,6 +250,8 @@ func (l *LowHttpConnPool) removeConnLocked(pc *persistConn, needClose bool) erro
 
 // 长连接
 type persistConn struct {
+	ctx      context.Context
+	cancel   context.CancelFunc
 	alt      *http2ClientConn
 	conn     net.Conn // conn本体
 	mu       sync.Mutex
@@ -266,7 +268,6 @@ type persistConn struct {
 	bw              *bufio.Writer             // to conn
 	reqCh           chan requestAndResponseCh // 读取管道
 	writeCh         chan writeRequest         // 写入管道
-	closeCh         chan struct{}             // 关闭信号
 	writeErrCh      chan error                // 写入错误信号
 	serverStartTime time.Time                 // 响应时间
 	//numExpectedResponses int                       // 预期的响应数量
@@ -404,8 +405,11 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 		}
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	// 初始化连接
 	pc := &persistConn{
+		ctx:             ctx,
+		cancel:          cancel,
 		conn:            newConn,
 		mu:              sync.Mutex{},
 		p:               pool,
@@ -417,7 +421,6 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 		dialOption:      opt,
 		reqCh:           make(chan requestAndResponseCh, 2),
 		writeCh:         make(chan writeRequest, 2),
-		closeCh:         make(chan struct{}, 1),
 		writeErrCh:      make(chan error, 2),
 		serverStartTime: time.Time{},
 		wPacket:         make([]packetInfo, 0),
@@ -513,12 +516,7 @@ func (pc *persistConn) readLoop() {
 				closeErr = errServerClosedIdle
 			} else {
 				closeErr = connPoolReadFromServerError{err}
-			}
-			select {
-			case rc.ch <- responseInfo{err: connPoolReadFromServerError{err: err}}:
-			case <-time.After(time.Second * 3):
-				log.Warnf("lowhttp: readLoop responseInfo send timeout")
-			}
+			} // read error just return and close
 			return
 		}
 		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
@@ -627,12 +625,10 @@ func (pc *persistConn) writeLoop() {
 				pc.serverStartTime = time.Now()
 			}
 			if err != nil {
-				wr.ch <- err // to exec.go
-				pc.writeErrCh <- err
 				closeErr = err
 				return
 			}
-		case <-pc.closeCh:
+		case <-pc.ctx.Done():
 			return
 		}
 	}
@@ -643,9 +639,9 @@ func (pc *persistConn) closeConn(err error) { // when write loop break or read l
 	defer pc.mu.Unlock()
 	pc.closed = err
 	select {
-	case <-pc.closeCh: // already closed
+	case <-pc.ctx.Done(): // already closed
 	default:
-		close(pc.closeCh)
+		pc.cancel()
 		pc.removeConn()
 	}
 }
