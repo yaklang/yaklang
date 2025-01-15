@@ -51,6 +51,7 @@ func GetSSARiskByHash(db *gorm.DB, hash string) (*schema.SSARisk, error) {
 }
 
 func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "id", filter.GetRuntimeID())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramName())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "code_source_url", filter.GetCodeSourceUrl())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "risk_type", filter.GetRiskType())
@@ -63,7 +64,9 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 		"program_name", "code_source_url",
 		"risk_type", "severity", "from_rule", "tags",
 	}, filter.GetSearch(), false)
-
+	if filter.GetIsRead() != 0 {
+		db = bizhelper.QueryByBool(db, "is_read", filter.GetIsRead() > 0)
+	}
 	return db
 }
 

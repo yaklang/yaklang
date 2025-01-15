@@ -3,6 +3,7 @@ package consts
 import (
 	"database/sql"
 	"fmt"
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -73,6 +74,15 @@ func registerDriver() {
 				return nil
 			},
 		})
+}
+
+func GetTempTestDatabase() (string, *gorm.DB, error) {
+	dbPath := filepath.Join(GetDefaultYakitBaseTempDir(), fmt.Sprintf("temp-yaktest-%s.db", uuid.NewString()))
+	db, err := createAndConfigDatabase(dbPath, SQLiteExtend)
+	if err != nil {
+		return "", nil, err
+	}
+	return dbPath, db, nil
 }
 
 func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
