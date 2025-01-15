@@ -769,7 +769,14 @@ service Yak {
   rpc UploadHotPatchTemplateToOnline(UploadHotPatchTemplateToOnlineRequest) returns (Empty);
   rpc DownloadHotPatchTemplate(DownloadHotPatchTemplateRequest) returns (Empty);
 
+
+  // MITM hijack filter
+  rpc SetMITMHijackFilter(SetMITMFilterRequest) returns (SetMITMFilterResponse);
+  rpc GetMITMHijackFilter(Empty) returns (SetMITMFilterRequest);
+  rpc ResetMITMHijackFilter(Empty) returns (SetMITMFilterRequest);
 }
+
+
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
   string Key = 2;

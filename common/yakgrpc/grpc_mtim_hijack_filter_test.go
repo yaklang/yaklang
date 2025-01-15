@@ -3,13 +3,16 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -82,4 +85,100 @@ func TestGRPCMUSTTPASS_MITM_HijackFilter(t *testing.T) {
 
 	require.True(t, hijacked, "hijack filter not work")
 	require.False(t, unexpectedHijacked, "hijack filter not work, unexpected request hijacked")
+}
+
+func TestGRPCMUSTPASS_Get_Set_HijackFilter(t *testing.T) {
+	local, err := NewLocalClientWithTempDatabase(t)
+	require.NoError(t, err)
+
+	compareFilterDataItem := func(x, y *ypb.FilterDataItem) bool {
+		return x.MatcherType == y.MatcherType && reflect.DeepEqual(x.Group, y.Group)
+	}
+	compareFilterDataItems := func(x, y []*ypb.FilterDataItem) bool {
+		if len(x) != len(y) {
+			return false
+		}
+		for i := 0; i < len(x); i++ {
+			if !compareFilterDataItem(x[i], y[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	compareFilterData := func(x, y *ypb.MITMFilterData) bool {
+		if !compareFilterDataItems(x.ExcludeHostnames, y.ExcludeHostnames) {
+			return false
+		}
+		if !compareFilterDataItems(x.IncludeHostnames, y.IncludeHostnames) {
+			return false
+		}
+		if !compareFilterDataItems(x.ExcludeSuffix, y.ExcludeSuffix) {
+			return false
+		}
+		if !compareFilterDataItems(x.IncludeHostnames, y.IncludeHostnames) {
+			return false
+		}
+		if !compareFilterDataItems(x.ExcludeUri, y.ExcludeUri) {
+			return false
+		}
+		if !compareFilterDataItems(x.IncludeUri, y.IncludeUri) {
+			return false
+		}
+
+		if !compareFilterDataItems(x.ExcludeMIME, y.ExcludeMIME) {
+			return false
+		}
+		if !compareFilterDataItems(x.ExcludeMethods, y.ExcludeMethods) {
+			return false
+		}
+		return true
+	}
+
+	ctx := utils.TimeoutContextSeconds(5)
+	want := &ypb.SetMITMFilterRequest{
+		FilterData: &ypb.MITMFilterData{
+			IncludeHostnames: []*ypb.FilterDataItem{
+				{
+					MatcherType: httptpl.MATCHER_TYPE_GLOB,
+					Group: []string{
+						uuid.NewString(),
+						uuid.NewString(),
+					},
+				},
+			},
+			ExcludeHostnames: []*ypb.FilterDataItem{
+				{
+					MatcherType: httptpl.MATCHER_TYPE_GLOB,
+					Group: []string{
+						uuid.NewString(),
+						uuid.NewString(),
+					},
+				},
+			},
+			IncludeSuffix: []*ypb.FilterDataItem{
+				{
+					MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
+					Group: []string{
+						uuid.NewString(),
+						uuid.NewString(),
+					},
+				},
+			},
+			ExcludeSuffix: []*ypb.FilterDataItem{
+				{
+					MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
+					Group: []string{
+						uuid.NewString(),
+						uuid.NewString(),
+					},
+				},
+			},
+		},
+	}
+
+	_, err = local.SetMITMHijackFilter(ctx, want)
+	require.NoError(t, err)
+	got, err := local.GetMITMHijackFilter(ctx, &ypb.Empty{})
+
+	require.Truef(t, compareFilterData(want.FilterData, got.FilterData), "got:\n%s\n\nwant:\n%s", spew.Sdump(got), spew.Sdump(want))
 }

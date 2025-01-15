@@ -2,10 +2,11 @@ package yakgrpc
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/yak/httptpl"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"mime"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/httptpl"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -137,9 +138,17 @@ func (m *MITMFilter) updateMatcher() {
 
 func (m *MITMFilter) Recover() {
 	m.Update(defaultMITMFilterData)
-	err := m.SaveToDb()
+	err := m.SaveToDb(MITMFilterKeyRecords)
 	if err != nil {
 		log.Errorf("recover mitm filter failed: %s", err)
+	}
+}
+
+func (m *MITMFilter) RecoverHijackFIlter() {
+	m.Update(nil)
+	err := m.SaveToDb(MITMHijackFilterKeyRecords)
+	if err != nil {
+		log.Errorf("recover mitm hijack filter failed: %s", err)
 	}
 }
 
@@ -217,15 +226,15 @@ var defaultMITMFilterData = &ypb.MITMFilterData{
 	}},
 }
 
-func getInitFilterManager(db *gorm.DB) (*MITMFilter, error) {
+func getInitFilterManager(db *gorm.DB, key string) (*MITMFilter, error) {
 	if db == nil {
 		return nil, utils.Error("no database")
 	}
 	serializedFilter := ""
 	if db.HasTable(&schema.ProjectGeneralStorage{}) {
-		serializedFilter = yakit.GetProjectKey(db, MITMFilterKeyRecords)
+		serializedFilter = yakit.GetProjectKey(db, key)
 	} else {
-		serializedFilter = yakit.GetKey(db, MITMFilterKeyRecords)
+		serializedFilter = yakit.GetKey(db, key)
 	}
 
 	var filterData ypb.MITMFilterData
@@ -245,7 +254,7 @@ func getInitFilterManager(db *gorm.DB) (*MITMFilter, error) {
 func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilter {
 	// project first
 	for _, db := range []*gorm.DB{projectDB, profileDB} {
-		result, err := getInitFilterManager(db)
+		result, err := getInitFilterManager(db, MITMFilterKeyRecords)
 		if err != nil || result == nil {
 			continue
 		}
@@ -253,6 +262,16 @@ func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilter {
 		return result
 	}
 	filter := NewMITMFilter(defaultMITMFilterData)
+	filter.db = projectDB
+	return filter
+}
+
+func GetMITMHijackFilterManager(projectDB *gorm.DB) *MITMFilter {
+	filter, _ := getInitFilterManager(projectDB, MITMHijackFilterKeyRecords)
+	if filter != nil {
+		return filter
+	}
+	filter = NewMITMFilter(nil)
 	filter.db = projectDB
 	return filter
 }
@@ -268,17 +287,22 @@ func (m *MITMFilter) IsEmpty() bool {
 		len(data.ExcludeUri) <= 0 && len(data.IncludeUri) <= 0
 }
 
-func (m *MITMFilter) Save() {
+func (m *MITMFilter) Save(keys ...string) {
 	//if m.IsEmpty() { // if filter is empty ,recover to default
 	//	m.Update(defaultMITMFilterData)
 	//}
-	if err := m.SaveToDb(); err != nil {
+	if err := m.SaveToDb(keys...); err != nil {
 		log.Errorf("save mitm filter failed: %s", err)
 	}
 	return
 }
 
-func (m *MITMFilter) SaveToDb() error {
+func (m *MITMFilter) SaveToDb(keys ...string) error {
+	key := MITMFilterKeyRecords
+	if len(keys) > 0 {
+		key = keys[0]
+	}
+
 	db := m.db
 	if db == nil {
 		return utils.Error("mitm filter not set db")
@@ -290,9 +314,9 @@ func (m *MITMFilter) SaveToDb() error {
 	}
 	// project first
 	if db.HasTable(&schema.ProjectGeneralStorage{}) {
-		err = yakit.SetProjectKey(db, MITMFilterKeyRecords, string(result))
+		err = yakit.SetProjectKey(db, key, string(result))
 	} else {
-		err = yakit.SetKey(db, MITMFilterKeyRecords, string(result))
+		err = yakit.SetKey(db, key, string(result))
 	}
 	return err
 }
