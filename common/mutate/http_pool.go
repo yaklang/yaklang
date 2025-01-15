@@ -678,6 +678,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 				requestFeedbackCounter *int64 = new(int64)
 				debugCounter           *int64 = new(int64)
 				swg                           = utils.NewSizedWaitGroup(config.Size)
+
+				beforeCount *int64 = new(int64)
+				afterCount  *int64 = new(int64)
+
 				// extern swg for overall concurrency  control
 				externSwg = config.SizedWaitGroupInstance
 			)
@@ -840,6 +844,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithETCHosts(config.EtcHosts),
 							lowhttp.WithGmTLS(config.IsGmTLS),
 							lowhttp.WithConnPool(config.WithConnPool),
+							lowhttp.WithDebugCount(beforeCount, afterCount),
 						}
 
 						if config.ConnPool != nil {

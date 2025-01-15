@@ -90,6 +90,9 @@ type LowhttpExecConfig struct {
 	ClientHelloSpec      *utls.ClientHelloSpec
 
 	Tags []string
+
+	BeforeCount *int64
+	AfterCount  *int64
 }
 
 type LowhttpResponse struct {
@@ -643,6 +646,13 @@ func ConnPool(p *LowHttpConnPool) LowhttpOpt {
 func WithConnPool(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.WithConnPool = b
+	}
+}
+
+func WithDebugCount(before, after *int64) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.BeforeCount = before
+		o.AfterCount = after
 	}
 }
 
