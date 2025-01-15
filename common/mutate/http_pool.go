@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -660,7 +662,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 		}
 
 		results := make(chan *HttpResult, 10240)
-
 		go func() {
 			defer close(results)
 			defer func() {
@@ -673,14 +674,31 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 
 			maxSubmit := config.RequestCountLimiter
 			var (
-				requestCounter int
-				swg            = utils.NewSizedWaitGroup(config.Size)
+				requestCounter         *int64 = new(int64)
+				requestFeedbackCounter *int64 = new(int64)
+				debugCounter           *int64 = new(int64)
+				swg                           = utils.NewSizedWaitGroup(config.Size)
 				// extern swg for overall concurrency  control
 				externSwg = config.SizedWaitGroupInstance
 			)
 
+			requestCounterAdd := func() {
+				atomic.AddInt64(requestCounter, 1)
+				log.Infof("submit fuzzer task count: %v", atomic.LoadInt64(requestCounter))
+			}
+
+			requestFeedbackCounterAdd := func() {
+				atomic.AddInt64(requestFeedbackCounter, 1)
+				log.Infof("submit fuzzer result count: %v", atomic.LoadInt64(requestFeedbackCounter))
+			}
+
+			requestDebugCounterAdd := func(prompt string) {
+				atomic.AddInt64(debugCounter, 1)
+				log.Infof("debug counter: %v, %v", prompt, atomic.LoadInt64(debugCounter))
+			}
+
 			execSubmitTaskWithoutBatchTarget := func(overrideHttps bool, overrideHost string, originRequestRaw []byte, payloads ...string) {
-				if maxSubmit > 0 && requestCounter >= maxSubmit {
+				if maxSubmit > 0 && atomic.LoadInt64(requestCounter) >= int64(maxSubmit) {
 					return
 				}
 
@@ -693,7 +711,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 					if externSwg != nil {
 						externSwg.Add()
 					}
-					requestCounter++
+					requestCounterAdd()
+
 					go func() {
 						defer func() {
 							if delayer != nil {
@@ -703,6 +722,41 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							if externSwg != nil {
 								externSwg.Done()
 							}
+						}()
+
+						var finalResult *HttpResult
+						defer func() {
+							if finalResult == nil {
+								log.Errorf("submit fuzzer task failed: %s", "finalResult is nil")
+								var fallbackUrlStr string
+								_urlInsRaw, _ := lowhttp.ExtractURLFromHTTPRequestRaw(targetRequest, config.IsHttps)
+								if _urlInsRaw != nil {
+									fallbackUrlStr = _urlInsRaw.String()
+								}
+								fallbackRequestInstance, err := lowhttp.ParseBytesToHttpRequest(targetRequest)
+								if err != nil {
+									finalResult = &HttpResult{
+										Url:        fallbackUrlStr,
+										Error:      err,
+										RequestRaw: targetRequest,
+										Timestamp:  time.Now().Unix(),
+										Payloads:   payloads,
+										Source:     config.Source,
+									}
+								} else {
+									finalResult = &HttpResult{
+										Url:        fallbackUrlStr,
+										Request:    fallbackRequestInstance,
+										Error:      errors.New("finalResult is nil"),
+										RequestRaw: targetRequest,
+										Payloads:   payloads,
+										Timestamp:  time.Now().Unix(),
+										Source:     config.Source,
+									}
+								}
+							}
+							results <- finalResult
+							requestFeedbackCounterAdd()
 						}()
 
 						// 处理异常
@@ -732,7 +786,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						}
 						reqIns, err := lowhttp.ParseBytesToHttpRequest(targetRequest)
 						if err != nil {
-							failedResult := &HttpResult{
+							finalResult = &HttpResult{
 								Url:        urlStr,
 								Error:      err,
 								RequestRaw: targetRequest,
@@ -740,7 +794,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								Payloads:   payloads,
 								Source:     config.Source,
 							}
-							results <- failedResult
 							return
 						}
 
@@ -833,6 +886,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						}
 
 						rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
+						requestDebugCounterAdd("after lowhttp.HTTP")
+
 						var rsp []byte
 						if rspInstance != nil {
 							// 多请求的话，要保留原样
@@ -868,7 +923,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 
 						if err != nil {
 							log.Errorf("exec packet raw failed: %s", err)
-							failedResult := &HttpResult{
+							finalResult = &HttpResult{
 								Url:         urlStr,
 								Request:     reqIns,
 								Error:       err,
@@ -881,10 +936,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								LowhttpResponse: rspInstance,
 								ExtraInfo:       extra,
 							}
-							results <- failedResult
 							return
 						}
-						ret := &HttpResult{
+						finalResult = &HttpResult{
 							Url:              urlStr,
 							Request:          reqIns,
 							Error:            err,
@@ -898,19 +952,15 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							Source:           config.Source,
 							LowhttpResponse:  rspInstance,
 						}
-						utils.Debug(func() {
-							println(string(rsp))
-						})
 						if len(rsp) <= 0 {
-							ret.Error = utils.Error("服务端没有任何返回数据: empty response (timeout empty)")
+							finalResult.Error = utils.Error("服务端没有任何返回数据: empty response (timeout empty)")
 						}
-						if ret.Response == nil && rsp != nil && !config.NoFixContentLength {
-							ret.Response, err = utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewBuffer(rsp)), reqIns)
+						if finalResult.Response == nil && rsp != nil && !config.NoFixContentLength {
+							finalResult.Response, err = utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewBuffer(rsp)), reqIns)
 							if err != nil {
 								log.Errorf("parse bytes to response failed: %s", err)
 							}
 						}
-						results <- ret
 					}()
 				}
 
@@ -997,7 +1047,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								return false
 							default:
 							}
-							if maxSubmit > 0 && requestCounter >= maxSubmit {
+							if maxSubmit > 0 && atomic.LoadInt64(requestCounter) >= int64(maxSubmit) {
 								return false
 							}
 							submitTask([]byte(s), i...)

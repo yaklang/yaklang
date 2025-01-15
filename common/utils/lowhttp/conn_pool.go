@@ -39,7 +39,7 @@ func NewHttpConnPool(ctx context.Context) *LowHttpConnPool {
 		maxIdleConnPerHost: 2,
 		connCount:          0,
 		idleConnTimeout:    90 * time.Second,
-		idleConn:           make(map[string][]*persistConn),
+		idleConnMap:        make(map[string][]*persistConn),
 		keepAliveTimeout:   30 * time.Second,
 		ctx:                ctx,
 	}
@@ -50,7 +50,7 @@ type LowHttpConnPool struct {
 	maxIdleConn        int                       // 最大总连接
 	maxIdleConnPerHost int                       // 单host最大连接
 	connCount          int                       // 已有连接计数器
-	idleConn           map[string][]*persistConn // 空闲连接
+	idleConnMap        map[string][]*persistConn // 空闲连接
 	idleConnTimeout    time.Duration             // 连接过期时间
 	idleLRU            connLRU                   // 连接池 LRU
 	keepAliveTimeout   time.Duration
@@ -60,7 +60,7 @@ type LowHttpConnPool struct {
 func (l *LowHttpConnPool) HostConnFull(key connectKey) bool {
 	l.idleConnMux.RLock()
 	defer l.idleConnMux.RUnlock()
-	return len(l.idleConn[key.hash()]) >= l.maxIdleConnPerHost
+	return len(l.idleConnMap[key.hash()]) >= l.maxIdleConnPerHost
 }
 
 func (l *LowHttpConnPool) clear() {
@@ -69,9 +69,12 @@ func (l *LowHttpConnPool) clear() {
 	if l == nil {
 		return
 	}
-	for _, pcs := range l.idleConn {
+	for _, pcs := range l.idleConnMap {
 		for _, pc := range pcs {
-			l.removeConnLocked(pc, true)
+			err := l.removeConnLocked(pc, true)
+			if err != nil {
+				log.Warnf("lowhttp conn pool clear failed when calling removeConnLocked: %v", err)
+			}
 		}
 	}
 }
@@ -117,7 +120,7 @@ func (l *LowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getCo
 	}
 
 	// 从连接池中取出一个连接
-	connList, ok := l.idleConn[key.hash()]
+	connList, ok := l.idleConnMap[key.hash()]
 	if !ok { // if not get return
 		return
 	}
@@ -149,9 +152,9 @@ func (l *LowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getCo
 
 	// clear empty list
 	if len(connList) > 0 {
-		l.idleConn[key.hash()] = connList
+		l.idleConnMap[key.hash()] = connList
 	} else {
-		delete(l.idleConn, key.hash())
+		delete(l.idleConnMap, key.hash())
 	}
 
 	return
@@ -163,7 +166,7 @@ func (l *LowHttpConnPool) putIdleConn(pc *persistConn) error {
 
 	cacheKeyHash := pc.cacheKey.hash()
 	// 如果超过池规定的单个host可以拥有的最大连接数量则直接放弃添加连接
-	if len(l.idleConn[cacheKeyHash]) >= l.maxIdleConnPerHost || l.contextDone() {
+	if len(l.idleConnMap[cacheKeyHash]) >= l.maxIdleConnPerHost || l.contextDone() {
 		if !pc.IsH2Conn() {
 			pc.closeNetConn() // if too many, close it
 		}
@@ -187,7 +190,7 @@ func (l *LowHttpConnPool) putIdleConn(pc *persistConn) error {
 			return err
 		}
 	}
-	l.idleConn[cacheKeyHash] = append(l.idleConn[cacheKeyHash], pc)
+	l.idleConnMap[cacheKeyHash] = append(l.idleConnMap[cacheKeyHash], pc)
 	pc.markReused()
 	return nil
 }
@@ -201,13 +204,13 @@ func (l *LowHttpConnPool) removeConnLocked(pc *persistConn, needClose bool) erro
 		pc.closeNetConn()
 	}
 	key := pc.cacheKey.hash()
-	connList := l.idleConn[pc.cacheKey.hash()]
+	connList := l.idleConnMap[pc.cacheKey.hash()]
 	switch len(connList) {
 	case 0:
 		return nil
 	case 1:
 		if connList[0] == pc {
-			delete(l.idleConn, key)
+			delete(l.idleConnMap, key)
 		}
 	default:
 		for i, v := range connList {
@@ -215,7 +218,7 @@ func (l *LowHttpConnPool) removeConnLocked(pc *persistConn, needClose bool) erro
 				continue
 			}
 			copy(connList[i:], connList[i+1:])
-			l.idleConn[key] = connList[:len(connList)-1]
+			l.idleConnMap[key] = connList[:len(connList)-1]
 			break
 		}
 	}
