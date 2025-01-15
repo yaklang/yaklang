@@ -684,17 +684,17 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 
 			requestCounterAdd := func() {
 				atomic.AddInt64(requestCounter, 1)
-				log.Infof("submit fuzzer task count: %v", atomic.LoadInt64(requestCounter))
+				// log.Infof("submit fuzzer task count: %v", atomic.LoadInt64(requestCounter))
 			}
 
 			requestFeedbackCounterAdd := func() {
 				atomic.AddInt64(requestFeedbackCounter, 1)
-				log.Infof("submit fuzzer result count: %v", atomic.LoadInt64(requestFeedbackCounter))
+				// log.Infof("submit fuzzer result count: %v", atomic.LoadInt64(requestFeedbackCounter))
 			}
 
 			requestDebugCounterAdd := func(prompt string) {
 				atomic.AddInt64(debugCounter, 1)
-				log.Infof("debug counter: %v, %v", prompt, atomic.LoadInt64(debugCounter))
+				// log.Infof("debug counter: %v, %v", prompt, atomic.LoadInt64(debugCounter))
 			}
 
 			execSubmitTaskWithoutBatchTarget := func(overrideHttps bool, overrideHost string, originRequestRaw []byte, payloads ...string) {

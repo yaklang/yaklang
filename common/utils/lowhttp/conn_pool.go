@@ -46,7 +46,7 @@ func NewHttpConnPool(ctx context.Context) *LowHttpConnPool {
 }
 
 type LowHttpConnPool struct {
-	idleConnMux        sync.RWMutex              // 空闲连接访问锁
+	idleConnMux        sync.Mutex                // 空闲连接访问锁
 	maxIdleConn        int                       // 最大总连接
 	maxIdleConnPerHost int                       // 单host最大连接
 	connCount          int                       // 已有连接计数器
@@ -58,8 +58,8 @@ type LowHttpConnPool struct {
 }
 
 func (l *LowHttpConnPool) HostConnFull(key connectKey) bool {
-	l.idleConnMux.RLock()
-	defer l.idleConnMux.RUnlock()
+	l.idleConnMux.Lock()
+	defer l.idleConnMux.Unlock()
 	return len(l.idleConnMap[key.hash()]) >= l.maxIdleConnPerHost
 }
 
