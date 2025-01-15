@@ -200,7 +200,9 @@ func (l *LowHttpConnPool) putIdleConn(pc *persistConn) error {
 		if pc.closeTimer != nil {
 			pc.closeTimer.Reset(l.idleConnTimeout)
 		} else {
-			pc.closeTimer = time.AfterFunc(l.idleConnTimeout, pc.removeConn)
+			pc.closeTimer = time.AfterFunc(l.idleConnTimeout, func() {
+				pc.closeConn(utils.Error("lowhttp: idle timeout"))
+			})
 		}
 	}
 
@@ -413,10 +415,10 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 		idleAt:          time.Time{},
 		closeTimer:      nil,
 		dialOption:      opt,
-		reqCh:           make(chan requestAndResponseCh, 1),
-		writeCh:         make(chan writeRequest, 1),
+		reqCh:           make(chan requestAndResponseCh, 2),
+		writeCh:         make(chan writeRequest, 2),
 		closeCh:         make(chan struct{}, 1),
-		writeErrCh:      make(chan error, 1),
+		writeErrCh:      make(chan error, 2),
 		serverStartTime: time.Time{},
 		wPacket:         make([]packetInfo, 0),
 		rPacket:         make([]packetInfo, 0),
@@ -481,8 +483,9 @@ func (pc *persistConn) h2Conn() {
 }
 
 func (pc *persistConn) readLoop() {
+	var closeErr error
 	defer func() {
-		pc.removeConn()
+		pc.closeConn(closeErr)
 	}()
 
 	tryPutIdleConn := func() bool {
@@ -492,9 +495,6 @@ func (pc *persistConn) readLoop() {
 		}
 		return true
 	}
-
-	eofc := make(chan struct{})
-	defer close(eofc) // unblock reader on errors
 
 	var rc requestAndResponseCh
 
@@ -510,9 +510,9 @@ func (pc *persistConn) readLoop() {
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				pc.sawEOF = true
-				pc.closeConn(errServerClosedIdle)
+				closeErr = errServerClosedIdle
 			} else {
-				pc.closeConn(connPoolReadFromServerError{err})
+				closeErr = connPoolReadFromServerError{err}
 			}
 			select {
 			case rc.ch <- responseInfo{err: connPoolReadFromServerError{err: err}}:
@@ -527,9 +527,9 @@ func (pc *persistConn) readLoop() {
 			select {
 			case rc = <-pc.reqCh:
 			case <-time.After(time.Second * 5):
-				log.Error("lowhttp: readLoop reqCh timeout, met abnormal event: got response before request arrived")
-				alive = false
-				continue
+				closeErr = utils.Error("lowhttp: readLoop reqCh timeout, met abnormal event: got response before request arrived")
+				log.Error(closeErr)
+				return
 			}
 		}
 
@@ -613,6 +613,10 @@ func (pc *persistConn) readLoop() {
 }
 
 func (pc *persistConn) writeLoop() {
+	var closeErr error
+	defer func() {
+		pc.closeConn(closeErr)
+	}()
 	for {
 		select {
 		case wr := <-pc.writeCh:
@@ -622,32 +626,28 @@ func (pc *persistConn) writeLoop() {
 				err = pc.bw.Flush()
 				pc.serverStartTime = time.Now()
 			}
-			wr.ch <- err // to exec.go
 			if err != nil {
+				wr.ch <- err // to exec.go
 				pc.writeErrCh <- err
+				closeErr = err
 				return
 			}
-			//pc.mu.Lock()
-			//pc.numExpectedResponses++
-			//pc.mu.Unlock()
 		case <-pc.closeCh:
 			return
 		}
 	}
 }
 
-func (pc *persistConn) closeConn(err error) {
+func (pc *persistConn) closeConn(err error) { // when write loop break or read loop break and ideal timeout call
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
-	if pc.closed != nil {
-		return
-	}
-	if err == nil {
-		err = errors.New("lowhttp: conn pool unknown error")
-	}
 	pc.closed = err
-	close(pc.closeCh)
-	pc.removeConn()
+	select {
+	case <-pc.closeCh: // already closed
+	default:
+		close(pc.closeCh)
+		pc.removeConn()
+	}
 }
 
 func (pc *persistConn) removeConn() {
