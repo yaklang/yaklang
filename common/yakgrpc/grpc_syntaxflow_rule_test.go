@@ -415,6 +415,10 @@ func TestGRPCMUSTPASS_DeleteSyntaxFlow_With_Group(t *testing.T) {
 		},
 	}
 
+	t.Cleanup(func() {
+		_, err := deleteRuleGroup(client, []string{groupName})
+		require.NoError(t, err)
+	})
 	_, err = client.CreateSyntaxFlowRule(context.Background(), req)
 	require.NoError(t, err)
 	beforeDelete, err := queryRulesByName(client, []string{ruleName})
