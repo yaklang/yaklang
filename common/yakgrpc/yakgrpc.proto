@@ -771,6 +771,10 @@ service Yak {
   rpc UpdateHotPatchTemplate(UpdateHotPatchTemplateRequest) returns (UpdateHotPatchTemplateResponse);
   rpc QueryHotPatchTemplate(HotPatchTemplateRequest) returns (QueryHotPatchTemplateResponse);
   rpc QueryHotPatchTemplateList(QueryHotPatchTemplateListRequest) returns (QueryHotPatchTemplateListResponse);
+
+  // db common rpc
+  rpc GroupTableColumn(GroupTableColumnRequest) returns (GroupTableColumnResponse);
+
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -6006,6 +6010,7 @@ message SSARisksFilter {
   repeated string RuntimeID = 8;
   repeated uint64 ResultID = 9;
   repeated string Tags = 10;
+  int64 IsRead = 11; // >0 true  <0 false =0 all
 }
 
 message QuerySSARisksRequest {
@@ -6100,4 +6105,14 @@ message QueryHotPatchTemplateListResponse {
     Paging Pagination = 1;
     repeated string Name = 2;
     int64 Total = 3;
+}
+
+message GroupTableColumnRequest {
+  string DatabaseName = 1; //  enum    Project/Profile/SSA
+  string TableName = 2;
+  string ColumnName = 3;
+}
+
+message GroupTableColumnResponse {
+  repeated string Data = 1;
 }

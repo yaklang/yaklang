@@ -443,6 +443,7 @@ const (
 	Yak_UpdateHotPatchTemplate_FullMethodName                     = "/ypb.Yak/UpdateHotPatchTemplate"
 	Yak_QueryHotPatchTemplate_FullMethodName                      = "/ypb.Yak/QueryHotPatchTemplate"
 	Yak_QueryHotPatchTemplateList_FullMethodName                  = "/ypb.Yak/QueryHotPatchTemplateList"
+	Yak_GroupTableColumn_FullMethodName                           = "/ypb.Yak/GroupTableColumn"
 )
 
 // YakClient is the client API for Yak service.
@@ -995,6 +996,8 @@ type YakClient interface {
 	UpdateHotPatchTemplate(ctx context.Context, in *UpdateHotPatchTemplateRequest, opts ...grpc.CallOption) (*UpdateHotPatchTemplateResponse, error)
 	QueryHotPatchTemplate(ctx context.Context, in *HotPatchTemplateRequest, opts ...grpc.CallOption) (*QueryHotPatchTemplateResponse, error)
 	QueryHotPatchTemplateList(ctx context.Context, in *QueryHotPatchTemplateListRequest, opts ...grpc.CallOption) (*QueryHotPatchTemplateListResponse, error)
+	// db common rpc
+	GroupTableColumn(ctx context.Context, in *GroupTableColumnRequest, opts ...grpc.CallOption) (*GroupTableColumnResponse, error)
 }
 
 type yakClient struct {
@@ -6466,6 +6469,15 @@ func (c *yakClient) QueryHotPatchTemplateList(ctx context.Context, in *QueryHotP
 	return out, nil
 }
 
+func (c *yakClient) GroupTableColumn(ctx context.Context, in *GroupTableColumnRequest, opts ...grpc.CallOption) (*GroupTableColumnResponse, error) {
+	out := new(GroupTableColumnResponse)
+	err := c.cc.Invoke(ctx, Yak_GroupTableColumn_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -7016,6 +7028,8 @@ type YakServer interface {
 	UpdateHotPatchTemplate(context.Context, *UpdateHotPatchTemplateRequest) (*UpdateHotPatchTemplateResponse, error)
 	QueryHotPatchTemplate(context.Context, *HotPatchTemplateRequest) (*QueryHotPatchTemplateResponse, error)
 	QueryHotPatchTemplateList(context.Context, *QueryHotPatchTemplateListRequest) (*QueryHotPatchTemplateListResponse, error)
+	// db common rpc
+	GroupTableColumn(context.Context, *GroupTableColumnRequest) (*GroupTableColumnResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -8294,6 +8308,9 @@ func (UnimplementedYakServer) QueryHotPatchTemplate(context.Context, *HotPatchTe
 }
 func (UnimplementedYakServer) QueryHotPatchTemplateList(context.Context, *QueryHotPatchTemplateListRequest) (*QueryHotPatchTemplateListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryHotPatchTemplateList not implemented")
+}
+func (UnimplementedYakServer) GroupTableColumn(context.Context, *GroupTableColumnRequest) (*GroupTableColumnResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GroupTableColumn not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -16211,6 +16228,24 @@ func _Yak_QueryHotPatchTemplateList_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GroupTableColumn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GroupTableColumnRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GroupTableColumn(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GroupTableColumn_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GroupTableColumn(ctx, req.(*GroupTableColumnRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -17625,6 +17660,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryHotPatchTemplateList",
 			Handler:    _Yak_QueryHotPatchTemplateList_Handler,
+		},
+		{
+			MethodName: "GroupTableColumn",
+			Handler:    _Yak_GroupTableColumn_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
