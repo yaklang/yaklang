@@ -13,6 +13,7 @@ type PreHandlerAnalyzer interface {
 	FilterPreHandlerFile(string) bool
 	PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error
 	PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder)
+	AfterPreHandlerProject(builder *FunctionBuilder)
 }
 
 type Builder interface {
@@ -32,12 +33,18 @@ type PreHandlerInit struct {
 	initHandlerFunc []initHanlderFunc
 }
 
+func (d *PreHandlerInit) AfterPreHandlerProject(builder *FunctionBuilder) {
+	return
+}
+
 func NewPreHandlerInit(fs ...initHanlderFunc) *PreHandlerInit {
 	return &PreHandlerInit{
 		InitHandlerOnce: sync.Once{},
 		initHandlerFunc: fs,
 	}
 }
+
+var ProjectConfigVariable = "__projectConfig__"
 
 func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
 	d.InitHandlerOnce.Do(func() {
@@ -46,6 +53,10 @@ func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
 		variable := b.CreateVariable("__dependency__")
 		container := b.EmitEmptyContainer()
 		b.AssignVariable(variable, container)
+
+		configVariable := b.CreateVariable(ProjectConfigVariable)
+		configContainer := b.EmitEmptyContainer()
+		b.AssignVariable(configVariable, configContainer)
 
 		// run the init handler functions
 		for _, f := range d.initHandlerFunc {

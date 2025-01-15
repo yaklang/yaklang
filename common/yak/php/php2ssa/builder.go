@@ -24,6 +24,10 @@ type SSABuild struct {
 	*ssa.PreHandlerInit
 }
 
+func (*SSABuild) AfterPreHandlerPeoject(builder *ssa.FunctionBuilder) {
+	return
+}
+
 var Builder ssa.Builder = &SSABuild{}
 
 func (*SSABuild) FilterPreHandlerFile(path string) bool {

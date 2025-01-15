@@ -22,6 +22,10 @@ type SSABuilder struct {
 	*ssa.PreHandlerInit
 }
 
+func (s *SSABuilder) AfterPreHandlerPeoject(builder *ssa.FunctionBuilder) {
+	return
+}
+
 var Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {

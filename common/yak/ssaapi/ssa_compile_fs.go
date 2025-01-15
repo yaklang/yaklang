@@ -132,6 +132,9 @@ func (c *config) parseProjectWithFS(
 	if c.isStop() {
 		return nil, ErrContextCancel
 	}
+	if language := c.LanguageBuilder; language != nil {
+		language.AfterPreHandlerProject(builder)
+	}
 	prog.ProcessInfof("pre-handler parse project finish")
 	handledProcess = preHandlerSize // finish pre-handler 50%
 
