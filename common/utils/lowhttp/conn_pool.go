@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	utls "github.com/refraction-networking/utls"
@@ -88,15 +89,34 @@ func (l *LowHttpConnPool) contextDone() bool {
 	}
 }
 
+var (
+	getIdleConnRequiredCounter = new(int64)
+	getIdleConnFinishedCounter = new(int64)
+)
+
+func addGetIdleConnRequiredCounter() {
+	result := atomic.AddInt64(getIdleConnRequiredCounter, 1)
+	_ = result
+	log.Infof("get idle conn start counter: %d", result)
+}
+
+func addGetIdleConnFinishedCounter() {
+	result := atomic.AddInt64(getIdleConnFinishedCounter, 1)
+	_ = result
+	log.Infof("get idle conn finished counter: %d", result)
+}
+
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
 func (l *LowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+	//addGetIdleConnRequiredCounter()
 	if l.contextDone() {
 		return nil, utils.Error("lowhttp: context done")
 	}
 
 	// 尝试获取复用连接
 	if oldPc, ok := l.getFromConn(key); ok {
+		//addGetIdleConnFinishedCounter()
 		return oldPc, nil
 	}
 	// 没有复用连接则新建一个连接
@@ -104,6 +124,7 @@ func (l *LowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) 
 	if err != nil {
 		return nil, err
 	}
+	//addGetIdleConnFinishedCounter()
 	return pConn, nil
 }
 
@@ -495,7 +516,8 @@ func (pc *persistConn) readLoop() {
 			}
 			select {
 			case rc.ch <- responseInfo{err: connPoolReadFromServerError{err: err}}:
-			default: // nonblocking
+			case <-time.After(time.Second * 3):
+				log.Warnf("lowhttp: readLoop responseInfo send timeout")
 			}
 			return
 		}
@@ -504,7 +526,10 @@ func (pc *persistConn) readLoop() {
 		if firstAuth {
 			select {
 			case rc = <-pc.reqCh:
-			default: // nonblocking
+			case <-time.After(time.Second * 5):
+				log.Error("lowhttp: readLoop reqCh timeout, met abnormal event: got response before request arrived")
+				alive = false
+				continue
 			}
 		}
 

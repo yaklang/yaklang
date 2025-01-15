@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -154,6 +155,13 @@ var commonHTTPMethod = map[string]struct{}{
 	http.MethodOptions: {},
 	http.MethodConnect: {},
 	http.MethodTrace:   {},
+}
+
+var _debugCounter = new(int64)
+
+func addDebugCounter(prompt string) {
+	result := atomic.AddInt64(_debugCounter, 1)
+	log.Infof("%v: debug counter: %v", prompt, result)
 }
 
 // HTTPWithoutRedirect SendHttpRequestWithRawPacketWithOpt
@@ -710,7 +718,7 @@ RECONNECT:
 			}
 		}
 		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns}
-		resc := make(chan responseInfo)
+		resc := make(chan responseInfo, 1)
 		pc.reqCh <- requestAndResponseCh{
 			reqPacket:   requestPacket,
 			ch:          resc,
@@ -718,6 +726,8 @@ RECONNECT:
 			option:      option,
 			writeErrCh:  writeErrCh,
 		}
+
+		// addDebugCounter("finished submit request to conn pool")
 	LOOP:
 		for {
 			select {
