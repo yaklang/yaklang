@@ -6,6 +6,7 @@ import (
 
 	"github.com/mattn/go-sqlite3"
 	"github.com/samber/lo"
+	"github.com/tidwall/sjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -58,6 +59,21 @@ func (s *Server) ExportSyntaxFlows(req *ypb.ExportSyntaxFlowsRequest, stream ypb
 		stream.Send(&ypb.SyntaxflowsProgress{
 			Progress: progress,
 		})
+	}))
+	opts = append(opts, bizhelper.WithExportPreWriteHandler(func(name string, w []byte, metadata bizhelper.MetaData) (newName string, new []byte) {
+		nw, err := sjson.DeleteBytes(w, "CreatedAt")
+		if err != nil {
+			return name, w
+		}
+		w = nw
+
+		nw, err = sjson.DeleteBytes(w, "UpdatedAt")
+		if err != nil {
+			return name, w
+		}
+		w = nw
+
+		return name, w
 	}))
 	err := bizhelper.ExportTableZip[*schema.SyntaxFlowRule](stream.Context(), ruleDB, req.GetTargetPath(), opts...)
 	if err != nil {

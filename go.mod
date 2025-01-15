@@ -106,6 +106,7 @@ require (
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/tidwall/gjson v1.14.4
+	github.com/tidwall/sjson v1.2.5
 	github.com/twmb/murmur3 v1.1.6
 	github.com/urfave/cli v1.22.15
 	github.com/valyala/bytebufferpool v1.0.0
