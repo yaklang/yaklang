@@ -2,6 +2,10 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
@@ -117,4 +121,44 @@ func (s *Server) QueryHotPatchTemplateList(ctx context.Context, req *ypb.QueryHo
 		Total: int64(len(names)),
 	}, nil
 
+}
+
+func (s *Server) UploadHotPatchTemplateToOnline(ctx context.Context, req *ypb.UploadHotPatchTemplateToOnlineRequest) (*ypb.Empty, error) {
+	if req.Token == "" || req.Type == "" || req.Name == "" {
+		return nil, utils.Errorf("params is empty")
+	}
+	template, err := yakit.GetHotPatchTemplate(
+		s.GetProfileDatabase(),
+		req,
+	)
+	if err != nil {
+		return nil, err
+	}
+	data, err := json.Marshal(template)
+	if err != nil {
+		return nil, utils.Errorf(err.Error())
+	}
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	err = client.UploadHotPatchTemplateToOnline(ctx, req.Token, data)
+	if err != nil {
+		return nil, utils.Errorf("UploadHotPatchTemplate to online failed: %s" + err.Error())
+	}
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) DownloadHotPatchTemplate(ctx context.Context, req *ypb.DownloadHotPatchTemplateRequest) (*ypb.Empty, error) {
+	if req.Type == "" || req.Name == "" {
+		return nil, utils.Errorf("params is empty")
+	}
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	template, err := client.DownloadHotPatchTemplate(req.Name, req.Type)
+	if err != nil {
+		return nil, utils.Errorf("save HotPatchTemplate[%s] to database failed: %v", template.Name, err)
+	}
+
+	err = yakit.CreateOrUpdateHotPatchTemplate(s.GetProfileDatabase(), template.Name, template.TemplateType, template.Content)
+	if err != nil {
+		return nil, utils.Errorf("save HotPatchTemplate[%s] to database failed: %v", template.Name, err)
+	}
+	return &ypb.Empty{}, nil
 }
