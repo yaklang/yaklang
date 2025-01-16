@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -36,8 +35,8 @@ func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
 	}
 }
 
-func (b *FunctionBuilder) GetRangeByText(searchText string) []memedit.RangeIf {
-	return GetRangeByText(b.GetEditor(), searchText)
+func (b *FunctionBuilder) GetRangesByText(searchText string) []memedit.RangeIf {
+	return GetRangesByText(b.GetEditor(), searchText)
 }
 
 func (b *FunctionBuilder) SetRangeByRangeIf(rng memedit.RangeIf) {
@@ -121,14 +120,34 @@ func GetRange(editor *memedit.MemEditor, token CanStartStopToken) memedit.RangeI
 	)
 }
 
-func GetRangeByText(editor *memedit.MemEditor, searchText string) []memedit.RangeIf {
-	reg := regexp.MustCompile(searchText)
-	indices := reg.FindAllStringIndex(editor.GetSourceCode(), -1)
-	var rngs []memedit.RangeIf
-	for _, idx := range indices {
-		rngs = append(rngs, editor.GetRangeByPosition(editor.GetPositionByOffset(idx[0]), editor.GetPositionByOffset(idx[1])))
+func GetRangesByText(editor *memedit.MemEditor, searchText string) []memedit.RangeIf {
+	if editor == nil || searchText == "" {
+		return nil
 	}
-	return rngs
+	var ranges []memedit.RangeIf
+	content := editor.GetSourceCode()
+	indices := strings.Index(content, searchText)
+	offset := 0
+	for indices != -1 {
+		searchTextEnd := indices + len(searchText)
+		rng := editor.GetRangeByPosition(
+			editor.GetPositionByOffset(indices+offset),
+			editor.GetPositionByOffset(searchTextEnd+offset),
+		)
+		ranges = append(ranges, rng)
+		content = content[searchTextEnd:]
+		offset += searchTextEnd
+		indices = strings.Index(content, searchText)
+	}
+	return ranges
+}
+
+func GetFirstRangeByText(editor *memedit.MemEditor, searchText string) memedit.RangeIf {
+	if editor == nil {
+		return nil
+	}
+	indices := strings.Index(editor.GetSourceCode(), searchText)
+	return editor.GetRangeByPosition(editor.GetPositionByOffset(indices), editor.GetPositionByOffset(indices+len(searchText)))
 }
 
 type Token struct {
