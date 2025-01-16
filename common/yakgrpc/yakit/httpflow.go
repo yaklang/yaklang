@@ -70,11 +70,11 @@ func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
 	}
 	switch ret := strings.ToLower(reqSource); ret {
 	case "mitm":
-		flow.SourceType = "mitm"
+		flow.SourceType = schema.HTTPFlow_SourceType_MITM
 	case "basic-crawler", "crawler", "crawlerx":
-		flow.SourceType = "basic-crawler"
+		flow.SourceType = schema.HTTPFlow_SourceType_CRAWLER
 	case "scan", "port-scan", "plugin":
-		flow.SourceType = "scan"
+		flow.SourceType = schema.HTTPFlow_SourceType_SCAN
 
 	}
 	flow.FromPlugin = fromPlugin
