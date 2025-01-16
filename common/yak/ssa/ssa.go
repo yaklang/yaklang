@@ -284,7 +284,7 @@ type Program struct {
 	fixImportCallback []func()
 
 	// Project Config
-	ProjectConfig map[string]string
+	ProjectConfig map[string]*ProjectConfig
 
 	// Template Language
 	Template map[string]tl.TemplateGeneratedInfo

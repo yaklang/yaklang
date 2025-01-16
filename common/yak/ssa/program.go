@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	yaml "github.com/yaklang/yaklang/common/openapi/openapiyaml"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"path/filepath"
 	"sort"
@@ -16,14 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
-)
-
-type ProjectConfigType int
-
-const (
-	PROJECT_CONFIG_YAML ProjectConfigType = iota
-	PROJECT_CONFIG_JSON
-	PROJECT_CONFIG_PROPERTIES
 )
 
 func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
@@ -50,7 +41,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ExternInstance:          make(map[string]any),
 		ExternLib:               make(map[string]map[string]any),
 		importDeclares:          omap.NewOrderedMap(make(map[string]*importDeclareItem)),
-		ProjectConfig:           make(map[string]string),
+		ProjectConfig:           make(map[string]*ProjectConfig),
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
 	}
 	if kind == Application {
@@ -356,77 +347,6 @@ func (p *Program) GetApplication() *Program {
 		return nil
 	}
 	return p.Application
-}
-
-func (p *Program) ParseProjectConfig(raw []byte, typ ProjectConfigType) error {
-	switch typ {
-	case PROJECT_CONFIG_PROPERTIES:
-		err := p.parsePropertiesProjectConfig(raw)
-		if err != nil {
-			return err
-		}
-	case PROJECT_CONFIG_YAML:
-		err := p.parseYamlProjectConfig(raw)
-		if err != nil {
-			return err
-		}
-	default:
-		return utils.Errorf("not support project config type: %d", typ)
-	}
-	return nil
-}
-
-func (p *Program) parsePropertiesProjectConfig(raw []byte) error {
-	if p == nil {
-		return utils.Errorf("program is nil")
-	}
-	content := string(raw)
-	lines := strings.Split(content, "\n")
-	var errs error
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "!") {
-			continue
-		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			errs = utils.JoinErrors(errs, utils.Errorf("bad properties line: %s", line))
-			continue
-		}
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		p.ProjectConfig[key] = value
-	}
-	return nil
-}
-
-func (p *Program) parseYamlProjectConfig(raw []byte) error {
-	if p == nil {
-		return utils.Errorf("program is nil")
-	}
-
-	config, err := yaml.YamlToKVParis(raw)
-	if err != nil {
-		return utils.Errorf("parse yaml project config error: %v", err)
-	}
-	for k, v := range config {
-		p.ProjectConfig[k] = v
-	}
-	return nil
-}
-
-func (p *Program) GetProjectConfig(key string) string {
-	if p == nil {
-		return ""
-	}
-	return p.ProjectConfig[key]
-}
-
-func (p *Program) SetProjectConfig(key string, value string) {
-	if p == nil {
-		return
-	}
-	p.ProjectConfig[key] = value
 }
 
 func (p *Program) GetTemplate(path string) tl.TemplateGeneratedInfo {

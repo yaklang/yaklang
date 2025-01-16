@@ -122,17 +122,17 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 			return err
 		}
 		saveExtraFile(path, raw)
-		err = prog.ParseProjectConfig(raw, ssa.PROJECT_CONFIG_PROPERTIES)
+		err = prog.ParseProjectConfig(raw, path, ssa.PROJECT_CONFIG_PROPERTIES)
 		if err != nil {
 			return err
 		}
-	case ".yaml":
+	case ".yaml", ".yml":
 		raw, err := fileSystem.ReadFile(path)
 		if err != nil {
 			return err
 		}
 		saveExtraFile(path, raw)
-		err = prog.ParseProjectConfig(raw, ssa.PROJECT_CONFIG_YAML)
+		err = prog.ParseProjectConfig(raw, path, ssa.PROJECT_CONFIG_YAML)
 		if err != nil {
 			return err
 		}
