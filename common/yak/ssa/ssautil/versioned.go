@@ -79,15 +79,15 @@ type Versioned[T versionedValue] struct {
 	// the version of variable in current scope
 	scope ScopedVersionedTableIF[T]
 
-	isAssigned *utils.AtomicBool
-	Value      T
+	isAssigned     *utils.AtomicBool
+	variableMemory *VariableMemory[T]
 }
 
 func (v *Versioned[T]) GetId() int64 {
-	if isZeroValue(v.Value) {
+	if isZeroValue(v.variableMemory.Value) {
 		return 0
 	}
-	return v.Value.GetId()
+	return v.variableMemory.Value.GetId()
 }
 
 func (v *Versioned[T]) SetScope(s ScopedVersionedTableIF[T]) {
@@ -138,7 +138,7 @@ func (v *Versioned[T]) UnmarshalJSON(raw []byte) error {
 		if err != nil {
 			log.Warnf("TBD or BUG: lazy value for ssa.Value: %v, reason: %v", valIdx, err)
 		} else {
-			v.Value = raw.(T)
+			v.variableMemory.Value = raw.(T)
 		}
 	}
 
@@ -164,8 +164,8 @@ func (v *Versioned[T]) MarshalJSON() ([]byte, error) {
 	// params["scope"] = v.scope.GetPersistentId()
 	params["is_assigned"] = v.isAssigned.IsSet()
 	var valIdx int64 = 0
-	if !isZeroValue(v.Value) {
-		valIdx = v.Value.GetId()
+	if !isZeroValue(v.variableMemory.Value) {
+		valIdx = v.variableMemory.Value.GetId()
 	}
 	params["value"] = valIdx
 	return json.Marshal(params)
@@ -181,28 +181,36 @@ func NewVersioned[T versionedValue](globalIndex int, name string, local bool, sc
 		scope:           scope,
 		isAssigned:      utils.NewAtomicBool(),
 	}
+	ret.variableMemory = &VariableMemory[T]{
+		self: ret,
+		kind: NormalVariable,
+	}
 	ret.captureVariable = ret
 	return ret
 }
 
 func (v *Versioned[T]) IsNil() bool {
 	var zero T
-	return v.Value == zero
+	return v.variableMemory.Value == zero
 }
 
 func (v *Versioned[T]) GetValue() (ret T) {
-	return v.Value
+	return v.variableMemory.Value
+}
+
+func (v *Versioned[T]) GetVariableMemory() (ret *VariableMemory[T]) {
+	return v.variableMemory
 }
 
 func (v *Versioned[T]) Replace(val, to T) {
-	if v.Value == val {
-		v.Value = to
+	if v.variableMemory.Value == val {
+		v.variableMemory.Value = to
 	}
 }
 
 func (v *Versioned[T]) Assign(val T) error {
 	if v.isAssigned.IsSet() {
-		if !isZeroValue(val) && val.GetId() == v.Value.GetId() {
+		if !isZeroValue(val) && val.GetId() == v.variableMemory.Value.GetId() {
 			return nil
 		}
 		// log.Warnf("ssa: #%v have been assigned by %v (%v), but u are trying to re-assign to: %v(%v)", v.globalIndex, v.Value, v.Value.GetId(), val, val.GetId())
@@ -214,12 +222,12 @@ func (v *Versioned[T]) Assign(val T) error {
 	}
 	if !val.IsUndefined() {
 		v.isAssigned.Set()
-		rVal := reflect.ValueOf(v.Value)
-		if rVal.IsValid() && !rVal.IsZero() && v.Value.IsUndefined() {
-			v.Value.SelfDelete()
+		rVal := reflect.ValueOf(v.variableMemory.Value)
+		if rVal.IsValid() && !rVal.IsZero() && v.variableMemory.Value.IsUndefined() {
+			v.variableMemory.Value.SelfDelete()
 		}
 	}
-	v.Value = val
+	v.variableMemory.Value = val
 	return nil
 }
 

@@ -5,6 +5,7 @@ import (
 
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 type getSingleExpr interface {
@@ -44,6 +45,12 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 		if op := exp.GetUnary_op(); op != nil {
 			var ssaop ssa.UnaryOpcode
 
+			op1 := getValue(exp, 0)
+			if op1 == nil {
+				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+				return b.EmitConstInst(0), b.CreateVariable("")
+			}
+
 			switch op.GetText() {
 			case "+":
 				ssaop = ssa.OpPlus
@@ -56,26 +63,29 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 			case "<-":
 				ssaop = ssa.OpChan
 			case "*":
-				ssaop = ssa.OpDereference
+				//ssaop = ssa.OpDereference
+				if variable := op1.GetLastVariable(); variable != nil {
+					variable.SetKind(ssautil.DereferenceVariable)
+				}
+				return op1, nil
 			case "&":
-				ssaop = ssa.OpAddress
+				//ssaop = ssa.OpAddress
+				if variable := op1.GetLastVariable(); variable != nil {
+					variable.SetKind(ssautil.AddressVariable)
+				}
+				return op1, nil
 			default:
 				b.NewError(ssa.Error, TAG, UnaryOperatorNotSupport(op.GetText()))
 			}
 
-			op1 := getValue(exp, 0)
-			if op1 == nil {
-				b.NewError(ssa.Error, TAG, NeedTwoExpression())
-				return b.EmitConstInst(0), b.CreateVariable("")
-			}
-			if ssaop == ssa.OpDereference {
-				op1.SetType(ssa.NewPointerType(op1.GetType(), ssa.DereferenceVariable))
-				return op1, nil
-			}
-			if ssaop == ssa.OpAddress {
-				op1.SetType(ssa.NewPointerType(op1.GetType(), ssa.PointerVariable))
-				return op1, nil
-			}
+			// if ssaop == ssa.OpDereference {
+			// 	op1.SetType(ssa.NewPointerType(op1.GetType(), ssautil.DereferenceVariable))
+			// 	return op1, nil
+			// }
+			// if ssaop == ssa.OpAddress {
+			// 	op1.SetType(ssa.NewPointerType(op1.GetType(), ssautil.PointerVariable))
+			// 	return op1, nil
+			// }
 			return b.EmitUnOp(ssaop, op1), nil
 		}
 
@@ -185,7 +195,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 
 			val := getVariable(exp, 0)
 			if ssaop == ssa.OpDereference {
-				val.SetKind(ssa.DereferenceVariable)
+				val.SetKind(ssautil.DereferenceVariable)
 			}
 			return nil, val
 		}
@@ -346,7 +356,7 @@ func (b *astbuilder) buildStarExpression(exp *gol.StarExprContext, IslValue bool
 	if ret := exp.Expression(); ret != nil {
 		rightv, leftv := b.buildExpression(ret.(*gol.ExpressionContext), IslValue)
 		if leftv != nil {
-			leftv.SetKind(ssa.DereferenceVariable)
+			leftv.SetKind(ssautil.DereferenceVariable)
 		}
 		// if rightv != nil {
 		// 	if un, ok := rightv.(*ssa.UnOp); ok {

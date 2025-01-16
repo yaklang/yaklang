@@ -7,13 +7,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-type VariableKind int
+// type VariableKind int
 
-const (
-	NormalVariable VariableKind = iota
-	PointerVariable
-	DereferenceVariable
-)
+// const (
+// 	NormalVariable VariableKind = iota
+// 	PointerVariable
+// 	DereferenceVariable
+// )
 
 type Variable struct {
 	*ssautil.Versioned[Value]
@@ -25,7 +25,6 @@ type Variable struct {
 	key         Value
 	verboseName string
 
-	kind             VariableKind
 	directVariable   *Variable            // A pointer has only one direct reference
 	indirectVariable map[string]*Variable // may be multiple indirect references
 	hideVariable     map[string]*Variable // which variables are referenced
@@ -40,7 +39,6 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 		UseRange:         map[memedit.RangeIf]struct{}{},
 		indirectVariable: map[string]*Variable{},
 		hideVariable:     map[string]*Variable{},
-		kind:             NormalVariable,
 	}
 	return ret
 }
@@ -138,12 +136,14 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 	}
 }
 
-func (v *Variable) GetKind() VariableKind {
-	return v.kind
+func (v *Variable) GetKind() ssautil.VariableKind {
+	variableMemory := v.GetVariableMemory()
+	return variableMemory.GetKind()
 }
 
-func (v *Variable) SetKind(kind VariableKind) {
-	v.kind = kind
+func (v *Variable) SetKind(kind ssautil.VariableKind) {
+	variableMemory := v.GetVariableMemory()
+	variableMemory.SetKind(kind)
 }
 
 func (v *Variable) AddPointVariable(p Value) {
@@ -186,7 +186,7 @@ func (v *Variable) ClearIndirectVariable() {
 }
 
 func (v *Variable) HandlePointerVariable(value Value) {
-	v.SetKind(PointerVariable)
+	v.SetKind(ssautil.AddressVariable)
 	if o := v.GetValue(); o != nil {
 		v.RemovePointVariable(o)
 	}
@@ -195,7 +195,7 @@ func (v *Variable) HandlePointerVariable(value Value) {
 
 func (v *Variable) HandleDereferenceVariable(value Value) {
 	scope := v.GetScope()
-	v.SetKind(PointerVariable) // 需要复原标志位
+	v.SetKind(ssautil.AddressVariable) // 需要复原标志位
 
 	if d := v.GetDirectVariable(); d != nil {
 		scope.AssignVariable(d, value)

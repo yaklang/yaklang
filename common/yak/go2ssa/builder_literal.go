@@ -8,6 +8,7 @@ import (
 
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 func (b *astbuilder) buildBoolLiteral(name string) ssa.Value {
@@ -690,7 +691,7 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 				key = b.EmitConstInst(ba.GetName())
 			}
 			if typ.STAR() != nil {
-				structTyp.AddField(key, ssa.NewPointerType(parent, ssa.DereferenceVariable))
+				structTyp.AddField(key, ssa.NewPointerType(parent, ssautil.DereferenceVariable))
 			} else {
 				structTyp.AddField(key, parent)
 			}

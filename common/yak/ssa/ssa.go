@@ -144,6 +144,7 @@ type Value interface {
 	Occultation
 	AddUser(User)
 	RemoveUser(User)
+	GetVariableMemory() *ssautil.VariableMemory[Value]
 }
 
 type Occultation interface {
