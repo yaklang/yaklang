@@ -79,14 +79,9 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		if prog.GetProgramName() == "" {
 			prog.ExtraFile[path] = string(raw)
 		} else {
-			folders := []string{prog.GetProgramName()}
-			folders = append(folders,
-				strings.Split(dirname, string(fileSystem.GetSeparators()))...,
-			)
+			folders := strings.Split(dirname, string(fileSystem.GetSeparators()))
 			content := string(raw)
-			editor := memedit.NewMemEditor(content)
-			editor.SetUrl(path)
-			prog.ExtraFile[path] = ssadb.SaveFile(filename, content, editor.GetIrSourceHash(prog.GetProgramName()), folders)
+			prog.ExtraFile[path] = ssadb.SaveFile(filename, content, prog.GetProgramName(), folders)
 		}
 	}
 
@@ -182,17 +177,5 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 }
 
 func (s *SSABuilder) AfterPreHandlerProject(fb *ssa.FunctionBuilder) {
-	prog := fb.GetProgram()
-	if prog == nil {
-		return
-	}
-	config := fb.PeekValue(ssa.ProjectConfigVariable)
-	if utils.IsNil(config) {
-		return
-	}
-	for k, v := range prog.ProjectConfig {
-		variable := fb.CreateMemberCallVariable(config, fb.EmitConstInst(k))
-		fb.AssignVariable(variable, fb.EmitConstInst(v))
-	}
-	return
+	fb.GenerateProjectConfig()
 }
