@@ -139,7 +139,7 @@ func (s *VulinServer) registerBrutePlayground() {
 		{
 			DefaultQuery: getQuery(0),
 			Path:         getPath(0),
-			Title:        "订单详情页面（订单号为4位数字 0-9999）",
+			Title:        "订单详情页面（爆破 / 遍历订单号为4位数字 0-9999）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				orderId := request.URL.Query().Get("orderId")
 				writer.Write([]byte(render(
@@ -155,7 +155,7 @@ func (s *VulinServer) registerBrutePlayground() {
 		{
 			DefaultQuery: dateQuery,
 			Path:         dateOrderPath,
-			Title:        "订单详情页面（订单号为今日日期+4位数字 0000-9999）",
+			Title:        "订单详情页面（爆破 / 遍历订单号为今日日期+4位数字 0000-9999）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				orderId := request.URL.Query().Get("orderId")
 				if !strings.HasPrefix(orderId, time.Now().Format("20060102")) {

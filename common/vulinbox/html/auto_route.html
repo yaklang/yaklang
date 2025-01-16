@@ -91,6 +91,7 @@
                     const alink = child;
                     if (alink.nodeType === Node.ELEMENT_NODE) {
                         let searchItem = (alink.getAttribute("href") + "|" + item.textContent).toLowerCase();
+                        console.log(searchItem)
                         if (searchItem.indexOf(searchData) !== -1) {
                             item.style.display = "block";
                         } else {
