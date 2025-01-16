@@ -161,15 +161,15 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 
 	if variable.GetKind() == ssautil.DereferenceVariable {
 		variable.HandleDereferenceVariable(value)
-	} else if variable.GetKind() == ssautil.AddressVariable {
-		variable.HandlePointerVariable(value)
+		// } else if variable.GetKind() == ssautil.AddressVariable {
+		// 	variable.HandleAddressVariable(value)
 	}
 
 	if variableMemory := value.GetVariableMemory(); variableMemory != nil {
-		if variableMemory.GetKind() == ssautil.AddressVariable {
-			variable.HandlePointerVariable(value)
-		} else if variableMemory.GetKind() == ssautil.DereferenceVariable {
+		if variableMemory.GetKind() == ssautil.DereferenceVariable {
 			variable.HandleDereferenceVariable(value)
+		} else if variableMemory.GetKind() == ssautil.AddressVariable {
+			variable.HandleAddressVariable(value)
 		}
 	}
 

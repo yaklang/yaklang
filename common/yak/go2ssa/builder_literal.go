@@ -168,9 +168,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				func(i int) ssa.Value {
 					return typeHandler(objt.FieldType, kvs[i].kv)
 				})
-		case ssa.PointerTypeKind:
-			pt := typ.(*ssa.PointerType)
-			return typeHandler(pt.GetOrigin(), kvs)
 		case ssa.StructTypeKind:
 			objt := typ.(*ssa.ObjectType)
 
@@ -186,6 +183,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					func(i int) ssa.Value {
 						return typeHandler(objt.FieldTypes[i], kvs[i].kv)
 					})
+				b.AssignVariable(b.CreateLocalVariable(""), obj)
 			}
 
 			partInit := func() {
@@ -201,6 +199,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 						}
 						return b.GetDefaultValue(objt.FieldTypes[i])
 					})
+				b.AssignVariable(b.CreateLocalVariable(""), obj)
 			}
 
 			if len(kvs) == 0 {
@@ -210,7 +209,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 
 			if kvs[0].value != nil {
 				if m, ok := kvs[0].value.(*ssa.Make); ok {
-					if m.GetType().GetTypeKind() == ssa.PointerTypeKind {
+					if m.GetVariableMemory().GetKind() == ssautil.AddressVariable {
 						// 只有指针才会复用object
 						return kvs[0].value
 					} else {
@@ -690,11 +689,8 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
 				key = b.EmitConstInst(ba.GetName())
 			}
-			if typ.STAR() != nil {
-				structTyp.AddField(key, ssa.NewPointerType(parent, ssautil.DereferenceVariable))
-			} else {
-				structTyp.AddField(key, parent)
-			}
+
+			structTyp.AddField(key, parent)
 		}
 	}
 }

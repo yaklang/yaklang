@@ -9,9 +9,9 @@ const (
 )
 
 type VariableMemory[T versionedValue] struct {
-	Value T
-	self  VersionedIF[T]
-	kind  VariableKind
+	Value     T
+	variables map[string]VersionedIF[T]
+	kind      VariableKind
 }
 
 func (v *VariableMemory[T]) GetKind() VariableKind {
@@ -22,8 +22,17 @@ func (v *VariableMemory[T]) SetKind(kind VariableKind) {
 	v.kind = kind
 }
 
-func (v *VariableMemory[T]) GetSelf() VersionedIF[T] {
-	return v.self
+func (v *VariableMemory[T]) SetVariable(variable VersionedIF[T]) {
+	v.variables[variable.GetName()] = variable
+}
+
+func (v *VariableMemory[T]) GetVariableByName(name string) (VersionedIF[T], bool) {
+	s, ok := v.variables[name]
+	return s, ok
+}
+
+func (v *VariableMemory[T]) GetVariables() map[string]VersionedIF[T] {
+	return v.variables
 }
 
 func (v *VariableMemory[T]) GetValue() T {

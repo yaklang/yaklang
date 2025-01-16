@@ -182,9 +182,10 @@ func NewVersioned[T versionedValue](globalIndex int, name string, local bool, sc
 		isAssigned:      utils.NewAtomicBool(),
 	}
 	ret.variableMemory = &VariableMemory[T]{
-		self: ret,
-		kind: NormalVariable,
+		variables: make(map[string]VersionedIF[T]),
+		kind:      NormalVariable,
 	}
+	ret.variableMemory.variables[name] = ret
 	ret.captureVariable = ret
 	return ret
 }
@@ -200,6 +201,10 @@ func (v *Versioned[T]) GetValue() (ret T) {
 
 func (v *Versioned[T]) GetVariableMemory() (ret *VariableMemory[T]) {
 	return v.variableMemory
+}
+
+func (v *Versioned[T]) SetVariableMemory(variableMemory *VariableMemory[T]) {
+	v.variableMemory = variableMemory
 }
 
 func (v *Versioned[T]) Replace(val, to T) {

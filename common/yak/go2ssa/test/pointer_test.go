@@ -108,8 +108,33 @@ func Test_Pointer_normal(t *testing.T) {
 		`, []string{"2", "3"}, t)
 	})
 }
-func Test_Pointer_cfg(t *testing.T) {
 
+func Test_Pointer_cfg(t *testing.T) {
+	// todo: 指针需要支持phi
+	t.Run("pointer cfg if", func(t *testing.T) {
+		t.Skip()
+
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			var a int = 1
+			var b int = 2
+			var p *int
+		
+			if a > b {
+				p = &a
+			} else {
+				p = &b
+			}
+			*p = 3
+
+			println(*p) // 3
+			println(a)	// phi(a)[1,3]
+			println(b)	// phi(b)[2,3]
+		}
+			
+		`, []string{"3", "phi(a)[1,3]", "phi(b)[2,3]"}, t)
+	})
 }
 
 func Test_Pointer_sideEffect(t *testing.T) {
