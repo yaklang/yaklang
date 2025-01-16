@@ -502,12 +502,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 			// 设置自动转发
 			if reqInstance.GetSetAutoForward() {
-				clearPluginHTTPFlowCache()
-				beforeAuto := autoForward.IsSet() // 存当前状态
-				log.Debugf("mitm-auto-forward: %v", reqInstance.GetAutoForwardValue())
-				autoForward.SetTo(reqInstance.GetAutoForwardValue())
-				if !beforeAuto && autoForward.IsSet() { // 当 f -> t 时发送信号
-					autoForwardCh <- struct{}{}
+				autoForwardValue := reqInstance.GetAutoForwardValue()
+				if autoForwardValue != autoForward.IsSet() {
+					clearPluginHTTPFlowCache()
+					beforeAuto := autoForward.IsSet() // 存当前状态
+					log.Debugf("mitm-auto-forward: %v", autoForwardValue)
+					autoForward.SetTo(autoForwardValue)
+					if !beforeAuto && autoForwardValue { // 当 f -> t 时发送信号
+						autoForwardCh <- struct{}{}
+					}
 				}
 			}
 
@@ -1858,12 +1861,15 @@ func (h *hijackTaskController) clear() {
 		h.statusMapMux.Unlock()
 	}()
 
-	for _, t := range h.taskStatusMap {
+	for key, t := range h.taskStatusMap {
+		if key == h.currentTask {
+			continue
+		}
 		t.setStatus(autoFoward)
+		delete(h.taskStatusMap, key)
 	}
 	h.currentTask = ""
 	h.taskQueue = h.taskQueue[:0]
-	h.taskStatusMap = make(map[string]*taskStatus)
 	h.canDequeue.UnSet()
 }
 
