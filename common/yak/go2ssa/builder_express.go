@@ -255,10 +255,6 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 			if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 				handleObjectType(rv, typ)
-			} else if p, ok := ssa.ToPointerType(rv.GetType()); ok {
-				if typ, ok := ssa.ToObjectType(p.GetOrigin()); ok {
-					handleObjectType(rv, typ)
-				}
 			}
 
 			if leftv == nil {
@@ -321,10 +317,6 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 			if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 				handleObjectType(rv, typ)
-			} else if p, ok := ssa.ToPointerType(rv.GetType()); ok {
-				if typ, ok := ssa.ToObjectType(p.GetOrigin()); ok {
-					handleObjectType(rv, typ)
-				}
 			}
 
 			if rightv == nil {

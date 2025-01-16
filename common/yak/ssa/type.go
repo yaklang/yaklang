@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -1519,67 +1518,67 @@ func (c OrType) RawString() string {
 }
 
 // ====================== pointer
-type PointerType struct {
-	*baseType
-	kind   ssautil.VariableKind
-	origin Type
-}
+// type PointerType struct {
+// 	*baseType
+// 	kind   ssautil.VariableKind
+// 	origin Type
+// }
 
-var _ (Type) = (*PointerType)(nil)
+// var _ (Type) = (*PointerType)(nil)
 
-func (c *PointerType) GetFullTypeNames() []string {
-	if c == nil {
-		return nil
-	}
-	return c.origin.GetFullTypeNames()
-}
+// func (c *PointerType) GetFullTypeNames() []string {
+// 	if c == nil {
+// 		return nil
+// 	}
+// 	return c.origin.GetFullTypeNames()
+// }
 
-func (c *PointerType) SetFullTypeNames(names []string) {
-	if c == nil {
-		return
-	}
-	c.origin.SetFullTypeNames(names)
-}
+// func (c *PointerType) SetFullTypeNames(names []string) {
+// 	if c == nil {
+// 		return
+// 	}
+// 	c.origin.SetFullTypeNames(names)
+// }
 
-func (c *PointerType) AddFullTypeName(name string) {
-	if c == nil {
-		return
-	}
-	c.origin.AddFullTypeName(name)
-}
+// func (c *PointerType) AddFullTypeName(name string) {
+// 	if c == nil {
+// 		return
+// 	}
+// 	c.origin.AddFullTypeName(name)
+// }
 
-func (c *PointerType) GetTypeKind() TypeKind {
-	return PointerTypeKind
-}
+// func (c *PointerType) GetTypeKind() TypeKind {
+// 	return PointerTypeKind
+// }
 
-func (c *PointerType) GetOrigin() Type {
-	return c.origin
-}
+// func (c *PointerType) GetOrigin() Type {
+// 	return c.origin
+// }
 
-func NewPointerType(origin Type, kinds ...ssautil.VariableKind) *PointerType {
-	kind := ssautil.AddressVariable
-	if len(kinds) > 0 {
-		kind = kinds[0]
-	}
-	return &PointerType{
-		baseType: NewBaseType(),
-		origin:   origin,
-		kind:     kind,
-	}
-}
+// func NewPointerType(origin Type, kinds ...ssautil.VariableKind) *PointerType {
+// 	kind := ssautil.AddressVariable
+// 	if len(kinds) > 0 {
+// 		kind = kinds[0]
+// 	}
+// 	return &PointerType{
+// 		baseType: NewBaseType(),
+// 		origin:   origin,
+// 		kind:     kind,
+// 	}
+// }
 
-func (c *PointerType) String() string {
-	return c.origin.String()
-}
+// func (c *PointerType) String() string {
+// 	return c.origin.String()
+// }
 
-func (c *PointerType) PkgPathString() string {
-	return c.origin.PkgPathString()
-}
+// func (c *PointerType) PkgPathString() string {
+// 	return c.origin.PkgPathString()
+// }
 
-func (c *PointerType) RawString() string {
-	return c.origin.RawString()
-}
+// func (c *PointerType) RawString() string {
+// 	return c.origin.RawString()
+// }
 
-func (c *PointerType) GetPointerKind() ssautil.VariableKind {
-	return c.kind
-}
+// func (c *PointerType) GetPointerKind() ssautil.VariableKind {
+// 	return c.kind
+// }

@@ -228,7 +228,8 @@ type anValue struct {
 	key    Value
 	member *omap.OrderedMap[Value, Value] // map[Value]Value
 
-	variables *omap.OrderedMap[string, *Variable] // map[string]*Variable
+	variables      *omap.OrderedMap[string, *Variable] // map[string]*Variable
+	variableMemory *ssautil.VariableMemory[Value]
 
 	// mask is a map, key is variable name, value is variable value
 	// it record the variable is masked by closure function or some scope changed
@@ -351,11 +352,11 @@ func (n *anValue) RemoveUser(u User) {
 }
 
 func (n *anValue) GetVariableMemory() *ssautil.VariableMemory[Value] {
-	var ret *ssautil.VariableMemory[Value]
-	if va := n.GetLastVariable(); va != nil {
-		ret = va.GetVariableMemory()
-	}
-	return ret
+	return n.variableMemory
+}
+
+func (n *anValue) SetVariableMemory(variableMemory *ssautil.VariableMemory[Value]) {
+	n.variableMemory = variableMemory
 }
 
 // for Value : type
