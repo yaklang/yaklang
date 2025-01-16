@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
 
@@ -347,6 +348,14 @@ func (n *anValue) AddUser(u User) {
 
 func (n *anValue) RemoveUser(u User) {
 	n.userList = utils.RemoveSliceItem(n.userList, u)
+}
+
+func (n *anValue) GetVariableMemory() *ssautil.VariableMemory[Value] {
+	var ret *ssautil.VariableMemory[Value]
+	if va := n.GetLastVariable(); va != nil {
+		ret = va.GetVariableMemory()
+	}
+	return ret
 }
 
 // for Value : type

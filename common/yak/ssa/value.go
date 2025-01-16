@@ -3,6 +3,7 @@ package ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 // --------------- Read
@@ -84,9 +85,9 @@ func (b *FunctionBuilder) readValueEx(
 				program.SetOffsetVariable(ret, b.CurrentRange)
 			}
 		}
-		if ret.Value != nil {
+		if ret.GetVariableMemory().Value != nil {
 			// has value, just return
-			return ret.Value
+			return ret.GetVariableMemory().Value
 		}
 	}
 
@@ -158,16 +159,16 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		return
 	}
 
-	if variable.GetKind() == DereferenceVariable {
+	if variable.GetKind() == ssautil.DereferenceVariable {
 		variable.HandleDereferenceVariable(value)
-	} else if variable.GetKind() == PointerVariable {
+	} else if variable.GetKind() == ssautil.AddressVariable {
 		variable.HandlePointerVariable(value)
 	}
 
-	if p, ok := ToPointerType(value.GetType()); ok {
-		if p.GetPointerKind() == PointerVariable {
+	if variableMemory := value.GetVariableMemory(); variableMemory != nil {
+		if variableMemory.GetKind() == ssautil.AddressVariable {
 			variable.HandlePointerVariable(value)
-		} else if p.GetPointerKind() == DereferenceVariable {
+		} else if variableMemory.GetKind() == ssautil.DereferenceVariable {
 			variable.HandleDereferenceVariable(value)
 		}
 	}
@@ -356,7 +357,7 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 	parentScope := b.parentScope
 	for parentScope != nil {
 		if parentVariable := ReadVariableFromScopeAndParent(parentScope.scope, name); parentVariable != nil {
-			return parentVariable.Value, true
+			return parentVariable.GetVariableMemory().Value, true
 		}
 		parentScope = parentScope.next
 	}

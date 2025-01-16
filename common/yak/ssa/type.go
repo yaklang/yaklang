@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -1520,7 +1521,7 @@ func (c OrType) RawString() string {
 // ====================== pointer
 type PointerType struct {
 	*baseType
-	kind   VariableKind
+	kind   ssautil.VariableKind
 	origin Type
 }
 
@@ -1555,8 +1556,8 @@ func (c *PointerType) GetOrigin() Type {
 	return c.origin
 }
 
-func NewPointerType(origin Type, kinds ...VariableKind) *PointerType {
-	kind := PointerVariable
+func NewPointerType(origin Type, kinds ...ssautil.VariableKind) *PointerType {
+	kind := ssautil.AddressVariable
 	if len(kinds) > 0 {
 		kind = kinds[0]
 	}
@@ -1579,6 +1580,6 @@ func (c *PointerType) RawString() string {
 	return c.origin.RawString()
 }
 
-func (c *PointerType) GetPointerKind() VariableKind {
+func (c *PointerType) GetPointerKind() ssautil.VariableKind {
 	return c.kind
 }
