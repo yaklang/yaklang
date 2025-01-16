@@ -197,7 +197,7 @@ type YakClient interface {
 	// LSP
 	YaklangLanguageSuggestion(ctx context.Context, in *YaklangLanguageSuggestionRequest, opts ...grpc.CallOption) (*YaklangLanguageSuggestionResponse, error)
 	YaklangLanguageFind(ctx context.Context, in *YaklangLanguageSuggestionRequest, opts ...grpc.CallOption) (*YaklangLanguageFindResponse, error)
-	// fuzztag suggestion
+	//fuzztag suggestion
 	FuzzTagSuggestion(ctx context.Context, in *FuzzTagSuggestionRequest, opts ...grpc.CallOption) (*YaklangLanguageSuggestionResponse, error)
 	// 从代码中提取yaklang数据
 	YaklangInspectInformation(ctx context.Context, in *YaklangInspectInformationRequest, opts ...grpc.CallOption) (*YaklangInspectInformationResponse, error)
@@ -298,7 +298,7 @@ type YakClient interface {
 	DeleteReport(ctx context.Context, in *DeleteReportRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryAvailableReportFrom(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Fields, error)
 	DownloadReport(ctx context.Context, in *DownloadReportRequest, opts ...grpc.CallOption) (*Empty, error)
-	// Yso
+	//Yso
 	GetAllYsoGadgetOptions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoClassOptionsResponseWithVerbose, error)
@@ -422,7 +422,8 @@ type YakClient interface {
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(ctx context.Context, in *QueryMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*QueryMITMRuleExtractedDataResponse, error)
 	ExportMITMRuleExtractedData(ctx context.Context, in *ExportMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (Yak_ExportMITMRuleExtractedDataClient, error)
-	// ChaosMakerRule: Bas
+	//
+	//ChaosMakerRule: Bas
 	ImportChaosMakerRules(ctx context.Context, in *ImportChaosMakerRulesRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryChaosMakerRule(ctx context.Context, in *QueryChaosMakerRuleRequest, opts ...grpc.CallOption) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChaosMakerRuleByIDRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -538,7 +539,7 @@ type YakClient interface {
 	// query result
 	QuerySyntaxFlowResult(ctx context.Context, in *QuerySyntaxFlowResultRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowResultResponse, error)
 	DeleteSyntaxFlowResult(ctx context.Context, in *DeleteSyntaxFlowResultRequest, opts ...grpc.CallOption) (*DeleteSyntaxFlowResultResponse, error)
-	// query ssa program
+	//query ssa program
 	QuerySSAPrograms(ctx context.Context, in *QuerySSAProgramRequest, opts ...grpc.CallOption) (*QuerySSAProgramResponse, error)
 	UpdateSSAProgram(ctx context.Context, in *UpdateSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteSSAPrograms(ctx context.Context, in *DeleteSSAProgramRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
@@ -558,6 +559,8 @@ type YakClient interface {
 	UpdateHotPatchTemplate(ctx context.Context, in *UpdateHotPatchTemplateRequest, opts ...grpc.CallOption) (*UpdateHotPatchTemplateResponse, error)
 	QueryHotPatchTemplate(ctx context.Context, in *HotPatchTemplateRequest, opts ...grpc.CallOption) (*QueryHotPatchTemplateResponse, error)
 	QueryHotPatchTemplateList(ctx context.Context, in *QueryHotPatchTemplateListRequest, opts ...grpc.CallOption) (*QueryHotPatchTemplateListResponse, error)
+	UploadHotPatchTemplateToOnline(ctx context.Context, in *UploadHotPatchTemplateToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
+	DownloadHotPatchTemplate(ctx context.Context, in *DownloadHotPatchTemplateRequest, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type yakClient struct {
@@ -5984,6 +5987,24 @@ func (c *yakClient) QueryHotPatchTemplateList(ctx context.Context, in *QueryHotP
 	return out, nil
 }
 
+func (c *yakClient) UploadHotPatchTemplateToOnline(ctx context.Context, in *UploadHotPatchTemplateToOnlineRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/UploadHotPatchTemplateToOnline", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DownloadHotPatchTemplate(ctx context.Context, in *DownloadHotPatchTemplateRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/DownloadHotPatchTemplate", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -6167,7 +6188,7 @@ type YakServer interface {
 	// LSP
 	YaklangLanguageSuggestion(context.Context, *YaklangLanguageSuggestionRequest) (*YaklangLanguageSuggestionResponse, error)
 	YaklangLanguageFind(context.Context, *YaklangLanguageSuggestionRequest) (*YaklangLanguageFindResponse, error)
-	// fuzztag suggestion
+	//fuzztag suggestion
 	FuzzTagSuggestion(context.Context, *FuzzTagSuggestionRequest) (*YaklangLanguageSuggestionResponse, error)
 	// 从代码中提取yaklang数据
 	YaklangInspectInformation(context.Context, *YaklangInspectInformationRequest) (*YaklangInspectInformationResponse, error)
@@ -6268,7 +6289,7 @@ type YakServer interface {
 	DeleteReport(context.Context, *DeleteReportRequest) (*Empty, error)
 	QueryAvailableReportFrom(context.Context, *Empty) (*Fields, error)
 	DownloadReport(context.Context, *DownloadReportRequest) (*Empty, error)
-	// Yso
+	//Yso
 	GetAllYsoGadgetOptions(context.Context, *Empty) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoClassOptionsResponseWithVerbose, error)
@@ -6392,7 +6413,8 @@ type YakServer interface {
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(context.Context, *QueryMITMRuleExtractedDataRequest) (*QueryMITMRuleExtractedDataResponse, error)
 	ExportMITMRuleExtractedData(*ExportMITMRuleExtractedDataRequest, Yak_ExportMITMRuleExtractedDataServer) error
-	// ChaosMakerRule: Bas
+	//
+	//ChaosMakerRule: Bas
 	ImportChaosMakerRules(context.Context, *ImportChaosMakerRulesRequest) (*Empty, error)
 	QueryChaosMakerRule(context.Context, *QueryChaosMakerRuleRequest) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(context.Context, *DeleteChaosMakerRuleByIDRequest) (*Empty, error)
@@ -6508,7 +6530,7 @@ type YakServer interface {
 	// query result
 	QuerySyntaxFlowResult(context.Context, *QuerySyntaxFlowResultRequest) (*QuerySyntaxFlowResultResponse, error)
 	DeleteSyntaxFlowResult(context.Context, *DeleteSyntaxFlowResultRequest) (*DeleteSyntaxFlowResultResponse, error)
-	// query ssa program
+	//query ssa program
 	QuerySSAPrograms(context.Context, *QuerySSAProgramRequest) (*QuerySSAProgramResponse, error)
 	UpdateSSAProgram(context.Context, *UpdateSSAProgramRequest) (*DbOperateMessage, error)
 	DeleteSSAPrograms(context.Context, *DeleteSSAProgramRequest) (*DbOperateMessage, error)
@@ -6528,6 +6550,8 @@ type YakServer interface {
 	UpdateHotPatchTemplate(context.Context, *UpdateHotPatchTemplateRequest) (*UpdateHotPatchTemplateResponse, error)
 	QueryHotPatchTemplate(context.Context, *HotPatchTemplateRequest) (*QueryHotPatchTemplateResponse, error)
 	QueryHotPatchTemplateList(context.Context, *QueryHotPatchTemplateListRequest) (*QueryHotPatchTemplateListResponse, error)
+	UploadHotPatchTemplateToOnline(context.Context, *UploadHotPatchTemplateToOnlineRequest) (*Empty, error)
+	DownloadHotPatchTemplate(context.Context, *DownloadHotPatchTemplateRequest) (*Empty, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -7791,6 +7815,12 @@ func (UnimplementedYakServer) QueryHotPatchTemplate(context.Context, *HotPatchTe
 }
 func (UnimplementedYakServer) QueryHotPatchTemplateList(context.Context, *QueryHotPatchTemplateListRequest) (*QueryHotPatchTemplateListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryHotPatchTemplateList not implemented")
+}
+func (UnimplementedYakServer) UploadHotPatchTemplateToOnline(context.Context, *UploadHotPatchTemplateToOnlineRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UploadHotPatchTemplateToOnline not implemented")
+}
+func (UnimplementedYakServer) DownloadHotPatchTemplate(context.Context, *DownloadHotPatchTemplateRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DownloadHotPatchTemplate not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -15618,6 +15648,42 @@ func _Yak_QueryHotPatchTemplateList_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_UploadHotPatchTemplateToOnline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UploadHotPatchTemplateToOnlineRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UploadHotPatchTemplateToOnline(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/UploadHotPatchTemplateToOnline",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UploadHotPatchTemplateToOnline(ctx, req.(*UploadHotPatchTemplateToOnlineRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DownloadHotPatchTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DownloadHotPatchTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DownloadHotPatchTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/DownloadHotPatchTemplate",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DownloadHotPatchTemplate(ctx, req.(*DownloadHotPatchTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -17012,6 +17078,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryHotPatchTemplateList",
 			Handler:    _Yak_QueryHotPatchTemplateList_Handler,
+		},
+		{
+			MethodName: "UploadHotPatchTemplateToOnline",
+			Handler:    _Yak_UploadHotPatchTemplateToOnline_Handler,
+		},
+		{
+			MethodName: "DownloadHotPatchTemplate",
+			Handler:    _Yak_DownloadHotPatchTemplate_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
