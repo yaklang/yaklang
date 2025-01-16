@@ -26,7 +26,7 @@ func hookSpringBootReturn(y *builder, value ssa.Value) {
 	if y.isInController {
 		// check if is freemarker file
 		path := value.String()
-		fPath := app.GetProjectConfig("spring.freemarker.prefix") + path + app.GetProjectConfig("spring.freemarker.suffix")
+		fPath := app.GetProjectConfigValue("spring.freemarker.prefix") + path + app.GetProjectConfigValue("spring.freemarker.suffix")
 		t := app.TryGetTemplate(fPath)
 		if t == nil {
 			return
