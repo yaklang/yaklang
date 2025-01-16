@@ -6035,8 +6035,8 @@ message UpdateSSARiskTagsRequest {
 
 message SSARiskFieldGroupResponse {
   repeated FieldGroup ProgramNameField = 1;
-  repeated FieldGroup SeverityField = 2;
-  repeated FieldGroup RiskTypeField = 3;
+  repeated FieldName SeverityField = 2;
+  repeated FieldName RiskTypeField = 3;
 }
 
 message ExportSyntaxFlowsRequest {
