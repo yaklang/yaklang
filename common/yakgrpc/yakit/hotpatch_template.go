@@ -132,3 +132,22 @@ func QueryHotPatchTemplateList(db *gorm.DB, filter *ypb.HotPatchTemplateRequest,
 
 	return paging, names, nil
 }
+
+func GetHotPatchTemplate(db *gorm.DB, req *ypb.UploadHotPatchTemplateToOnlineRequest) (*schema.HotPatchTemplate, error) {
+	db = db.Model(&schema.HotPatchTemplate{})
+	db = db.Where("name = ?", req.GetName()).Where("type = ?", req.GetType())
+	var templates schema.HotPatchTemplate
+	if err := db.First(&templates).Error; err != nil {
+		return nil, err
+	}
+	return &templates, nil
+}
+
+func CreateOrUpdateHotPatchTemplate(db *gorm.DB, name, templateType, content string) error {
+	condition := NewHotPatchTemplate(name, content, templateType)
+	db = db.Model(&schema.HotPatchTemplate{})
+	if db = db.Where("name = ? AND type = ?", name, templateType).Assign(condition).FirstOrCreate(&schema.HotPatchTemplate{}); db.Error != nil {
+		return utils.Errorf("create or update HotPatchTemplate failed: %s", db.Error)
+	}
+	return nil
+}
