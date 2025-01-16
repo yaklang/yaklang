@@ -60,17 +60,20 @@ func NewConstWithUnary(i any, un int) *ConstInst {
 	return c
 }
 
-func NewConst(i any) *ConstInst {
+func SetConst(i any, inst *ConstInst) {
 	c := newConstByMap(i)
 	if c == nil {
 		c = newConstCreate(i)
 	}
+	inst.Const = c
+	inst.SetType(c.GetType())
+}
+
+func NewConst(i any) *ConstInst {
 	ci := &ConstInst{
-		Const:   c,
 		anValue: NewValue(),
-		Unary:   0,
 	}
-	ci.SetType(c.GetType())
+	SetConst(i, ci)
 	return ci
 }
 

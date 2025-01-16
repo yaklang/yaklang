@@ -209,7 +209,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	case *Undefined:
 		params["undefined_kind"] = ret.Kind
 	case *ConstInst:
-		params["const_value"] = ret.Const.GetRawValue()
+		if ret.Const != nil {
+			params["const_value"] = ret.Const.GetRawValue()
+		}
 		if ret.Origin > 0 {
 			params["const_origin"] = ret.Origin
 		}
@@ -260,17 +262,19 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 
 	params := ir.GetExtraInfo()
 	switch ret := inst.(type) {
+	case *LazyInstruction:
+		unmarshalExtraInformation(ret.Instruction, ir)
 	case *Assert:
 		ret.Cond = utils.MapGetInt64(params, "assert_condition_id")
 		ret.MsgValue = utils.MapGetInt64(params, "assert_message_id")
 		ret.Msg = utils.MapGetString(params, "assert_message_string")
 	case *BasicBlock:
-		ret.Preds = utils.MapGet[[]int64](params, "block_preds")
-		ret.Succs = utils.MapGet[[]int64](params, "block_succs")
+		ret.Preds = utils.MapGetInt64Slice(params, "block_preds")
+		ret.Succs = utils.MapGetInt64Slice(params, "block_succs")
 		ret.Condition = utils.MapGetInt64(params, "block_condition")
 		ret.canBeReached = BasicBlockReachableKind(utils.MapGetInt(params, "block_can_be_reached"))
-		ret.Insts = utils.MapGet[[]int64](params, "block_insts")
-		ret.Phis = utils.MapGet[[]int64](params, "block_phis")
+		ret.Insts = utils.MapGetInt64Slice(params, "block_insts")
+		ret.Phis = utils.MapGetInt64Slice(params, "block_phis")
 		ret.finish = utils.MapGetBool(params, "block_finish")
 	case *BinOp:
 		ret.Op = BinaryOpcode(utils.MapGetString(params, "binop_op"))
@@ -278,9 +282,9 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.Y = utils.MapGetInt64(params, "binop_y")
 	case *Call:
 		ret.Method = utils.MapGetInt64(params, "call_method")
-		ret.Args = utils.MapGet[[]int64](params, "call_args")
-		ret.ArgMember = utils.MapGet[[]int64](params, "call_arg_member")
-		ret.Binding = utils.MapGet[map[string]int64](params, "call_binding")
+		ret.Args = utils.MapGetInt64Slice(params, "call_args")
+		ret.ArgMember = utils.MapGetInt64Slice(params, "call_arg_member")
+		ret.Binding = utils.MapGetStringInt64Map(params, "call_binding")
 		ret.Async = utils.MapGetBool(params, "call_async")
 		ret.Unpack = utils.MapGetBool(params, "call_unpack")
 		ret.IsDropError = utils.MapGetBool(params, "call_drop_error")
@@ -299,10 +303,10 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.MemberCallObjectName = utils.MapGetString(params, "member_call_name")
 		ret.MemberCallKey = utils.MapGetInt64(params, "member_call_key")
 	case *Phi:
-		ret.Edge = utils.MapGet[[]int64](params, "phi_edges")
+		ret.Edge = utils.MapGetInt64Slice(params, "phi_edges")
 		ret.CFGEntryBasicBlock = utils.MapGetInt64(params, "cfg_entry")
 	case *Return:
-		ret.Results = utils.MapGet[[]int64](params, "return_results")
+		ret.Results = utils.MapGetInt64Slice(params, "return_results")
 	case *SideEffect:
 		ret.CallSite = utils.MapGetInt64(params, "sideEffect_call")
 		ret.Value = utils.MapGetInt64(params, "sideEffect_value")
@@ -317,12 +321,9 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *Jump:
 		ret.To = utils.MapGetInt64(params, "jump_to")
 	case *ConstInst:
-		i := params["const_value"]
-		c := newConstByMap(i)
-		if c == nil {
-			c = newConstCreate(i)
+		if v, ok := params["const_value"]; ok {
+			SetConst(v, ret)
 		}
-		ret.Const = c
 		ret.Origin = utils.MapGetInt64(params, "const_origin")
 	case *If:
 		ret.Cond = utils.MapGetInt64(params, "if_cond")
@@ -335,12 +336,12 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.Len = utils.MapGetInt64(params, "make_len")
 		ret.Cap = utils.MapGetInt64(params, "make_cap")
 	case *Function:
-		ret.Params = utils.MapGet[[]int64](params, "params")
+		ret.Params = utils.MapGetInt64Slice(params, "params")
 		ret.ParamLength = utils.MapGetInt(params, "param_length")
 		ret.isMethod = utils.MapGetBool(params, "is_method")
 		ret.methodName = utils.MapGetString(params, "method_name")
 		ret.FreeValues = unmarshalMapVariables(params["free_values"])
-		ret.ParameterMembers = utils.MapGet[[]int64](params, "parameter_members")
+		ret.ParameterMembers = utils.MapGetInt64Slice(params, "parameter_members")
 
 		if ses := params["side_effect"]; ses != nil && funk.IsIteratee(ses) {
 			var se []*FunctionSideEffect
@@ -364,9 +365,9 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			ret.SideEffects = se
 		}
 		ret.parent = utils.MapGetInt64(params, "parent")
-		ret.ChildFuncs = utils.MapGet[[]int64](params, "child_funcs")
-		ret.Return = utils.MapGet[[]int64](params, "return")
-		ret.Blocks = utils.MapGet[[]int64](params, "blocks")
+		ret.ChildFuncs = utils.MapGetInt64Slice(params, "child_funcs")
+		ret.Return = utils.MapGetInt64Slice(params, "return")
+		ret.Blocks = utils.MapGetInt64Slice(params, "blocks")
 		ret.EnterBlock = utils.MapGetInt64(params, "enter_block")
 		ret.ExitBlock = utils.MapGetInt64(params, "exit_block")
 		ret.DeferBlock = utils.MapGetInt64(params, "defer_block")

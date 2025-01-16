@@ -349,6 +349,19 @@ func MapGetBool(m map[string]interface{}, key string) bool {
 	return MapGetBoolOr(m, key, false)
 }
 
+func getInt64(r any) int64 {
+	switch ret := r.(type) {
+	case float64:
+		return int64(ret)
+	case int64:
+		return ret
+	case int:
+		return int64(ret)
+	default:
+		return codec.Atoi64(fmt.Sprint(r))
+	}
+
+}
 func MapGetInt64Or(m map[string]interface{}, key string, value int64) int64 {
 	if m == nil {
 		return value
@@ -356,10 +369,7 @@ func MapGetInt64Or(m map[string]interface{}, key string, value int64) int64 {
 
 	r, ok := m[key]
 	if ok {
-		v, typeOk := r.(int64)
-		if typeOk {
-			return v
-		}
+		return getInt64(r)
 	}
 	return value
 }
@@ -368,27 +378,48 @@ func MapGetInt64(m map[string]interface{}, key string) int64 {
 	return MapGetInt64Or(m, key, 0)
 }
 
-func MapGet[T any](m map[string]any, key string) T {
-	var zero T
-	return MapGetOr[T](m, key, zero)
+func MapGetInt64Slice(m map[string]any, key string) []int64 {
+	return MapGetInt64SliceOr(m, key, []int64{})
 }
 
-func MapGetOr[T any](m map[string]any, key string, value T) T {
+func MapGetInt64SliceOr(m map[string]any, key string, value []int64) []int64 {
+	if m == nil {
+		return value
+	}
+
+	if r, ok := m[key]; ok {
+		if ret, typeOk := r.([]interface{}); typeOk {
+			result := []int64{}
+			for _, i := range ret {
+				result = append(result, getInt64(i))
+			}
+			return result
+		}
+	}
+	return value
+}
+
+func MapGetStringInt64Map(m map[string]interface{}, key string) map[string]int64 {
+	return MapGetStringInt64MapOr(m, key, map[string]int64{})
+}
+
+func MapGetStringInt64MapOr(m map[string]interface{}, key string, value map[string]int64) map[string]int64 {
 	if m == nil {
 		return value
 	}
 
 	r, ok := m[key]
 	if ok {
-		v, typeOk := r.(T)
-		if typeOk {
-			return v
+		result := map[string]int64{}
+		if ret, typeOk := r.(map[string]interface{}); typeOk {
+			for k, v := range ret {
+				result[k] = getInt64(v)
+			}
 		}
+		return result
 	}
 	return value
 }
-
-// func MapGetInt64Slice(m map[string]any, key string, [])
 
 func InterfaceToGeneralMap(params interface{}) (finalResult map[string]interface{}) {
 	defer func() {

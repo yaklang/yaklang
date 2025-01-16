@@ -53,6 +53,9 @@ func NewLazyEx[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, e
 // // NewLazyInstruction : create a new lazy instruction, only create in cache
 func NewLazyInstruction(id int64) (Instruction, error) {
 	ir := ssadb.GetIrCodeById(ssadb.GetDB(), id)
+	if ir == nil {
+		return nil, utils.Error("IrCode is nil")
+	}
 	prog, ok := GetProgramFromPool(ir.ProgramName)
 	if !ok {
 		log.Errorf("program not found: %s", ir.ProgramName)
@@ -116,16 +119,23 @@ func (lz *LazyInstruction) IsBlock(name string) bool {
 // create real-instruction from lazy-instruction
 func (lz *LazyInstruction) check() {
 	if lz.Instruction == nil {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic: %v", err)
+				utils.PrintCurrentGoroutineRuntimeStack()
+				lz.Instruction = nil
+				lz.Value = nil
+				lz.User = nil
+			}
+		}()
 		inst := CreateInstruction(Opcode(lz.GetOpcode()))
 		if inst == nil {
 			log.Infof("unknown opcode: %d: %s", lz.GetOpcode(), lz.ir.OpcodeName)
 			return
 		}
 		inst.SetProgram(lz.prog)
+		InstructionFromIrCode(inst, lz.ir, lz.prog)
 		lz.Instruction = inst
-		// set range for instruction
-		lz.GetRange()
-		IrCodeToInstruction(lz.Instruction, lz.ir, lz.prog)
 	}
 	if lz.Value == nil {
 		if value, ok := ToValue(lz.Instruction); ok {
@@ -801,4 +811,17 @@ func (i *LazyInstruction) GetUsersByIDs(ids []int64) Users {
 		return nil
 	}
 	return GetExs[User](i.cache, ids...)
+}
+func (i *LazyInstruction) save(ir *ssadb.IrCode) {
+	if i == nil || i.Value == nil {
+		i.check()
+	}
+	i.Value.save(ir)
+}
+
+func (i *LazyInstruction) load(ir *ssadb.IrCode) {
+	if i == nil || i.Value == nil {
+		i.check()
+	}
+	i.Value.load(ir)
 }
