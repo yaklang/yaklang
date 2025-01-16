@@ -5722,10 +5722,12 @@ message SyntaxFlowGroup{
 
 message QuerySyntaxFlowRuleGroupRequest{
   SyntaxFlowRuleGroupFilter Filter = 1;
+  Paging Pagination = 2;
 }
 
 message QuerySyntaxFlowRuleGroupResponse{
   repeated SyntaxFlowGroup Group = 1;
+  Paging Pagination = 2;
 }
 
 message CreateSyntaxFlowGroupRequest{
