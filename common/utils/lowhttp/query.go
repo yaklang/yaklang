@@ -127,8 +127,13 @@ type QueryParams struct {
 	Items           []*QueryParamItem
 }
 
-func NewQueryParams() *QueryParams {
-	return new(QueryParams)
+func NewQueryParams(options ...QueryOption) *QueryParams {
+	query := &QueryParams{}
+
+	for _, option := range options {
+		option(query)
+	}
+	return query
 }
 
 type QueryOption func(q *QueryParams)
