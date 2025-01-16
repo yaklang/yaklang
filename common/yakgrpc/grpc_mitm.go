@@ -259,7 +259,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	*/
 	var (
 		filterManager       = GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
-		hijackFilterManager *MITMFilter
+		hijackFilterManager = GetMITMHijackFilterManager(s.GetProjectDatabase())
 	)
 
 	/*
