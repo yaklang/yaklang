@@ -45,12 +45,35 @@ func (s *Server) UpdateSSARiskTags(ctx context.Context, req *ypb.UpdateSSARiskTa
 	}, nil
 }
 
+func FieldGroup2FiledGroupName(fgs []*ypb.FieldGroup, verbose func(string) string) []*ypb.FieldName {
+	return lo.Map(fgs, func(f *ypb.FieldGroup, _ int) *ypb.FieldName {
+		return &ypb.FieldName{
+			Name:    f.GetName(),
+			Verbose: verbose(f.GetName()),
+			Total:   f.Total,
+		}
+	})
+}
+
+func SSARiskTypeVerbose(s string) string {
+	switch s {
+	case "cwe":
+		return "CWE"
+	case "owasp":
+		return "OWASP"
+	case "custom":
+		return "自定义"
+	default:
+		return "未知"
+	}
+}
+
 func (s *Server) GetSSARiskFieldGroup(ctx context.Context, req *ypb.Empty) (*ypb.SSARiskFieldGroupResponse, error) {
 	db := s.GetSSADatabase()
 	return &ypb.SSARiskFieldGroupResponse{
 		ProgramNameField: yakit.SSARiskColumnGroupCount(db, "program_name"),
-		SeverityField:    yakit.SSARiskColumnGroupCount(db, "severity"),
-		RiskTypeField:    yakit.SSARiskColumnGroupCount(db, "risk_type"),
+		SeverityField:    FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "severity"), severityVerbose),
+		RiskTypeField:    FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "risk_type"), SSARiskTypeVerbose),
 	}, nil
 }
 
