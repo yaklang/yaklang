@@ -11,6 +11,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -98,10 +99,11 @@ func (s *VulinServer) registerBrutePlayground() {
 	}
 
 	const (
-		baseOrderPath   = "/bruteplayground"
-		simpleOrderPath = baseOrderPath + "/by-order-id"
-		dateOrderPath   = baseOrderPath + "/by-order-id-2"
-		defaultOrderId  = "3321"
+		baseOrderPath       = "/bruteplayground"
+		simpleOrderPath     = baseOrderPath + "/by-order-id"
+		dateOrderPath       = baseOrderPath + "/by-order-id-2"
+		orderIdNTraceIdPath = baseOrderPath + "/by-order-id-3"
+		defaultOrderId      = "3321"
 	)
 
 	// 生成今日日期格式的订单号
@@ -110,6 +112,7 @@ func (s *VulinServer) registerBrutePlayground() {
 	// 构建查询参数
 	simpleQuery := fmt.Sprintf("orderId=%s", defaultOrderId)
 	dateQuery := fmt.Sprintf("orderId=%s", todayOrderId)
+	orderIdNTraceIdQuery := fmt.Sprintf("orderId=%s&tradeId=%s", defaultOrderId, "1234567890")
 
 	var virtualRoute = omap.NewEmptyOrderedMap[string, map[string]string]()
 	virtualRoute.Push(map[string]string{
@@ -121,6 +124,11 @@ func (s *VulinServer) registerBrutePlayground() {
 		"path":  dateOrderPath,
 		"title": "订单详情页面（订单号为今日日期+4位数字 0000-9999）",
 		"query": dateQuery,
+	})
+	virtualRoute.Push(map[string]string{
+		"path":  orderIdNTraceIdPath,
+		"title": "订单详情页面：traceId不重复（爆破/遍历订单号）",
+		"query": orderIdNTraceIdQuery,
 	})
 
 	getQuery := func(i int) string {
@@ -134,6 +142,8 @@ func (s *VulinServer) registerBrutePlayground() {
 	getPathWithQuery := func(i int) string {
 		return getPath(i) + "?" + getQuery(i)
 	}
+
+	traceIdFilter := filter.NoCacheNewFilter()
 
 	routes := []*VulInfo{
 		{
@@ -172,6 +182,46 @@ func (s *VulinServer) registerBrutePlayground() {
 					writer, orderId,
 					getPathWithQuery(1),
 					getPathWithQuery(0),
+					"",
+					"",
+				)))
+			},
+			RiskDetected: false,
+		},
+		{
+			DefaultQuery: orderIdNTraceIdQuery,
+			Path:         orderIdNTraceIdPath,
+			Title:        "订单详情页面：traceId不重复（爆破/遍历订单号）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				qrs := request.URL.Query()
+				traceId := qrs.Get("tradeId")
+				if traceId == "" {
+					writer.Write([]byte(render(
+						writer, "",
+						getPathWithQuery(2),
+						getPathWithQuery(1),
+						"",
+						"traceId is required",
+					)))
+					return
+				}
+
+				if traceIdFilter.Exist(traceId) {
+					writer.Write([]byte(render(
+						writer, "",
+						getPathWithQuery(2),
+						getPathWithQuery(1),
+						"",
+						"traceId is already used",
+					)))
+					return
+				}
+				traceIdFilter.Insert(traceId)
+				orderId := qrs.Get("orderId")
+				writer.Write([]byte(render(
+					writer, orderId,
+					getPathWithQuery(2),
+					getPathWithQuery(1),
 					"",
 					"",
 				)))
