@@ -83,7 +83,8 @@ func GetDatabaseCacheStatus[K comparable, T any](c *DataBaseCacheWithKey[K, T], 
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Set(key K, memValue T) {
-	if _, ok := c.data.Get(key); ok {
+	if item, ok := c.data.Get(key); ok {
+		_ = item
 		// already exist
 		log.Errorf("BUG:: already exist in cache, key: %v", key)
 		return
@@ -109,6 +110,9 @@ func (c *DataBaseCacheWithKey[K, T]) Get(key K) (T, bool) {
 
 	// no in cache, load from database
 	if memValue, err := c.loadFromDatabase(key); err == nil {
+		if item, ok := c.data.Get(key); ok {
+			return item.memoryItem, true
+		}
 		c.Set(key, memValue)
 		return memValue, true
 	}
@@ -135,6 +139,22 @@ func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
 		return
 	}
 
+	recoverData := func() {
+		// recover c.notifyCache
+		c.notifyCache.Set(InterfaceToString(key), key)
+		c.updateStatus(item, DatabaseCacheItemNormal)
+	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("save failed: %v", err)
+			PrintCurrentGoroutineRuntimeStack()
+
+			// recover data
+			recoverData()
+		}
+	}()
+
 	// update to save
 	c.updateStatus(item, DatabaseCacheItemSave)
 
@@ -156,17 +176,13 @@ func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
 			c.data.Delete(key)
 		case DatabaseCacheItemUpdate:
 			// someone peek the item when saving, update the item now
-			// recover c.notifyCache
-			c.notifyCache.Set(InterfaceToString(key), key)
-			c.updateStatus(item, DatabaseCacheItemNormal)
+			recoverData()
 		case DatabaseCacheItemNormal:
 			// not run here !
 			log.Errorf("BUG:: after save item status is Normal, key: %v", key)
 		}
 	} else {
-		// if save failed, update to normal
-		c.notifyCache.Set(InterfaceToString(key), key)
-		c.updateStatus(item, DatabaseCacheItemNormal)
+		recoverData()
 	}
 }
 
