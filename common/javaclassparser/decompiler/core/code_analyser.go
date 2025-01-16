@@ -1158,21 +1158,23 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		if len(ifNodes) > 0 {
 			ifNode := ifNodes[0]
 			var source []*OpCode
+			falseSource := []*OpCode{}
+			trueSource := []*OpCode{}
 			WalkGraph[*OpCode](ifNode.Target[0], func(code *OpCode) ([]*OpCode, error) {
 				if slices.Contains(code.Target, mergeNode) {
-					source = append(source, code)
+					falseSource = append(falseSource, code)
 					return nil, nil
 				}
 				return code.Target, nil
 			})
 			WalkGraph[*OpCode](ifNode.Target[1], func(code *OpCode) ([]*OpCode, error) {
 				if slices.Contains(code.Target, mergeNode) {
-					source = append(source, code)
+					trueSource = append(trueSource, code)
 					return nil, nil
 				}
 				return code.Target, nil
 			})
-			source = utils.NewSet(source).List()
+			source = utils.NewSet(append(trueSource, falseSource...)).List()
 			if len(source) != 2 {
 				isTernaryExp := false
 				if len(source) == 1 {
@@ -1188,8 +1190,16 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			var defaultTarnaryValue *values.TernaryExpression
 			for i, opCode := range ifNodes {
 				if i == 0 {
-					trueFalseValuePair = []values.JavaValue{source[0].StackEntry.value, source[1].StackEntry.value}
-					ternaryValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), source[1].StackEntry.value, source[0].StackEntry.value)
+					var falseRouteEnd, trueRouteEnd *OpCode
+					if slices.Contains(falseSource, source[0]) {
+						falseRouteEnd = source[0]
+						trueRouteEnd = source[1]
+					} else {
+						falseRouteEnd = source[1]
+						trueRouteEnd = source[0]
+					}
+					trueFalseValuePair = []values.JavaValue{falseRouteEnd.StackEntry.value, trueRouteEnd.StackEntry.value}
+					ternaryValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), trueRouteEnd.StackEntry.value, falseRouteEnd.StackEntry.value)
 					code.conditionOpId = opCode.Id
 					ternaryExpMergeNodeSlot[code].ResetValue(ternaryValue)
 					ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
