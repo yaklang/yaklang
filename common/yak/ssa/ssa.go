@@ -152,6 +152,10 @@ type Value interface {
 	Occultation
 	AddUser(User)
 	RemoveUser(User)
+
+	// for save
+	save(*ssadb.IrCode)
+	load(*ssadb.IrCode)
 }
 
 type Occultation interface {

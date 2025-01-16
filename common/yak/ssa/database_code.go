@@ -13,24 +13,25 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 		return utils.Errorf("marshal instruction id not match")
 	}
 
+	ir.SetExtraInfo(marshalExtraInformation(inst))
 	instruction2IrCode(inst, ir)
 	value2IrCode(inst, ir)
 
 	function2IrCode(inst, ir)
 	basicBlock2IrCode(inst, ir)
-	ir.SetExtraInfo(marshalExtraInformation(inst))
 	SaveValueOffset(inst)
 	return nil
 }
 
-// IrCodeToInstruction : unmarshal ir code to instruction, used in LazyInstruction
-func IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, prog *Program) Instruction {
+// InstructionFromIrCode : unmarshal ir code to instruction, used in LazyInstruction
+func InstructionFromIrCode(inst Instruction, ir *ssadb.IrCode, prog *Program) Instruction {
 	instructionFromIrCode(inst, ir)
 	valueFromIrCode(inst, ir, prog)
 	basicBlockFromIrCode(inst, ir)
 
 	// extern info
 	unmarshalExtraInformation(inst, ir)
+	inst.SetId(ir.GetIdInt64())
 
 	return inst
 }
@@ -116,15 +117,22 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	// not function
 	if !ir.IsFunction {
+		// all instruction
 		if fun, err := NewLazyEx(ir.CurrentFunction, ToFunction); err == nil {
 			inst.SetFunc(fun)
 		} else {
 			log.Errorf("BUG: set CurrentFunction[%d]: %v", ir.CurrentFunction, err)
 		}
-		if block, err := NewLazyEx(ir.CurrentBlock, ToBasicBlock); err == nil {
-			inst.SetBlock(block)
+		if ir.IsBlock {
+			// block is self
+			// inst.SetBlock(inst)
 		} else {
-			log.Errorf("BUG: set CurrentBlock[%d]: %v", ir.CurrentBlock, err)
+			// normal instruction
+			if block, err := NewLazyEx(ir.CurrentBlock, ToBasicBlock); err == nil {
+				inst.SetBlock(block)
+			} else {
+				log.Errorf("BUG: set CurrentBlock[%d]: %v", ir.CurrentBlock, err)
+			}
 		}
 	}
 
@@ -132,70 +140,50 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 }
 
 func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
-	defer func() {
-		if msg := recover(); msg != nil {
-			log.Errorf("value2IrCode panic: %s", msg)
-		}
-	}()
 	value, ok := ToValue(inst)
 	if !ok {
 		return
 	}
-
-	// value
 	for _, def := range value.GetValues() {
 		if def == nil {
 			log.Infof("BUG: value[%s: %s] def is nil", value, value.GetRange())
 			continue
 		}
-		ir.Defs = append(ir.Defs, int64(def.GetId()))
+		ir.Defs = append(ir.Defs, def.GetId())
 	}
+	ir.String = value.String()
+	ir.TypeID = SaveTypeToDB(value.GetType())
+	value.save(ir)
+}
 
-	// user
-	for _, user := range value.GetUsers() {
-		ir.Users = append(ir.Users, user.GetId())
-	}
-
-	for _, oc := range value.GetOccultation() {
-		ir.Occulatation = append(ir.Occulatation, oc.GetId())
-	}
-
-	// Object
-	ir.IsObject = value.IsObject()
-	if ir.IsObject {
+func (an *anValue) save(ir *ssadb.IrCode) {
+	// // user
+	ir.Users = an.userList
+	ir.Occulatation = an.occultation
+	// // Object
+	if an.IsObject() {
+		ir.IsObject = true
 		ir.ObjectMembers = make(ssadb.Int64Map, 0)
-		value.ForEachMember(func(k, v Value) bool {
-			ir.ObjectMembers.Append(k.GetId(), v.GetId())
+		an.member.ForEach(func(i, v int64) bool {
+			ir.ObjectMembers.Append(i, v)
 			return true
 		})
 	}
-
-	// member
-	ir.IsObjectMember = value.IsMember()
-	if ir.IsObjectMember {
-		ir.ObjectParent = value.GetObject().GetId()
-		ir.ObjectKey = value.GetKey().GetId()
+	// // member
+	if an.IsMember() {
+		ir.IsObjectMember = true
+		ir.ObjectParent = an.object
+		ir.ObjectKey = an.key
 	}
-
 	// variable
-	for name, variable := range value.GetAllVariables() {
+	for name, variable := range an.GetAllVariables() {
 		ir.Variable = append(ir.Variable, name)
 		SaveVariableOffset(variable, name)
 	}
-
-	// mask
-	for _, m := range value.GetMask() {
-		ir.MaskedCodes = append(ir.MaskedCodes, m.GetId())
-	}
-	ir.String = value.String()
-	for _, r := range value.GetPointer() {
-		ir.Pointer = append(ir.Pointer, r.GetId())
-	}
-	if point := value.GetReference(); point != nil {
-		ir.Point = point.GetId()
-	}
-
-	ir.TypeID = SaveTypeToDB(value.GetType())
+	// // mask
+	ir.MaskedCodes = an.mask.Values()
+	ir.Pointer = an.pointer
+	ir.Point = an.reference
 }
 
 func valueFromIrCode(inst Instruction, ir *ssadb.IrCode, prog *Program) {
@@ -203,65 +191,39 @@ func valueFromIrCode(inst Instruction, ir *ssadb.IrCode, prog *Program) {
 	if !ok {
 		return
 	}
+	value.SetIsFromDB(true)
+	value.SetType(GetTypeFromDB(ir.TypeID))
+	value.load(ir)
+}
 
-	getUser := func(id int64) User {
-		if user, ok := ToUser(prog.GetInstructionById(id)); ok {
-			return user
-		}
-		return nil
-	}
-	getValue := func(id int64) Value {
-		if value, ok := ToValue(prog.GetInstructionById(id)); ok {
-			return value
-		}
-		return nil
-	}
-	// value : none to do
-
+func (an *anValue) load(ir *ssadb.IrCode) {
 	//  user
-	for _, user := range ir.Users {
-		value.AddUser(getUser(user))
-	}
-
+	an.userList = ir.Users
 	//  occulatation
-	for _, oc := range ir.Occulatation {
-		value.AddOccultation(getValue(oc))
-	}
+	an.occultation = ir.Occulatation
 
 	// object
 	if ir.IsObject {
-		ir.ObjectMembers.ForEach(func(k, v int64) {
-			value.AddMember(getValue(k), getValue(v))
+		ir.ObjectMembers.ForEach(func(key, value int64) {
+			an.member.Set(key, value)
 		})
 	}
 
 	// object member
 	if ir.IsObjectMember {
-		value.SetObject(getValue(ir.ObjectParent))
-		value.SetKey(getValue(ir.ObjectKey))
+		an.object = ir.ObjectParent
+		an.key = ir.ObjectKey
 	}
 
-	// variable
-	// for _, name := range ir.Variable {
-	// 	value.AddVariable(NewVariable(name))
-	// }
-
 	// mask
+	// an.mask
 	for _, m := range ir.MaskedCodes {
-		value.AddMask(getValue(m))
+		an.mask.Add(m)
 	}
 
 	// reference
-	for _, r := range ir.Pointer {
-		value.AddPointer(getValue(r))
-	}
-	if ir.Point != 0 {
-		value.SetReference(getValue(ir.Point))
-	}
-
-	// type
-	value.SetIsFromDB(true)
-	value.SetType(GetTypeFromDB(ir.TypeID))
+	an.pointer = ir.Pointer
+	an.reference = ir.Point
 }
 
 func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
