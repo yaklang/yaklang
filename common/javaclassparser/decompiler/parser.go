@@ -54,6 +54,7 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	if err != nil {
 		return nil, err
 	}
+	core.DumpNodesToDotExp(decompiler.RootNode)
 	sts, err := statementManager.ToStatements(func(node *core.Node) bool {
 		return true
 	})

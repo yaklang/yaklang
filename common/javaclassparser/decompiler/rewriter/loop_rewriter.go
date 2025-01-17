@@ -37,6 +37,7 @@ func RebuildLoopNode(manager *RewriteManager) error {
 	return nil
 }
 func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
+	core.DumpNodesToDotExp(manager.RootNode)
 	loopEnd := searchCircleEndNode(circleNode, circleNode.Next[0])
 	preWhileNodes := utils.NodeFilter(manager.WhileNode, func(node *core.Node) bool {
 		return utils.IsDominate(manager.DominatorMap, node, circleNode)
@@ -140,6 +141,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 				breakNode.AddNext(circleNode)
 				circleNode.AddNext(next)
 				breakNode.IsJmp = true
+				utils.DumpNodesToDotExp(manager.RootNode)
 				continue
 			}
 			if node != circleNode {
@@ -215,9 +217,11 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 	if err != nil {
 		return err
 	}
+	utils.DumpNodesToDotExp(manager.RootNode)
 	return nil
 }
 func LoopRewriter(manager *RewriteManager, node *core.Node) error {
+	core.DumpNodesToDotExp(manager.RootNode)
 	circleNode := node
 	loopStart := circleNode.Next[0]
 	circleNode.RemoveNext(loopStart)
