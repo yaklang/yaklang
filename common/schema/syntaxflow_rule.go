@@ -174,8 +174,8 @@ type SyntaxFlowRule struct {
 
 	// Purpose is the purpose of the rule.
 	// audit / vuln / config / security / information
-	Purpose SyntaxFlowRulePurposeType
-
+	Purpose  SyntaxFlowRulePurposeType
+	Solution string
 	// DemoFileSystem will description the file system of the rule.
 	// This is a json string.
 	//    save map[string]quotedString
