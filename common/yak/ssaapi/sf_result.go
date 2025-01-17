@@ -86,7 +86,7 @@ func (r *SyntaxFlowResult) Name() string {
 }
 
 func (r *SyntaxFlowResult) GetAlertMsg(name string) (string, bool) {
-	if info, ok := r.rule.GetAlertInfo(name); ok {
+	if info, ok := r.GetAlertInfo(name); ok {
 		return info.Msg, true
 	}
 	return "", false
@@ -125,4 +125,14 @@ func (r *SyntaxFlowResult) GetCheckMsg() []string {
 	}
 
 	return nil
+}
+
+func (r *SyntaxFlowResult) GetProgramName() string {
+	if r == nil {
+		return ""
+	}
+	if r.program != nil {
+		return r.program.GetProgramName()
+	}
+	return ""
 }

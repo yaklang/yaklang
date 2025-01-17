@@ -153,6 +153,9 @@ func QueryWithProgram(program *Program) QueryOption {
 func QueryWithPrograms(programs Programs) QueryOption {
 	return func(c *queryConfig) {
 		c.value = sfvm.NewValues(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator { return p }))
+		if len(programs) == 1 {
+			c.program = programs[0]
+		}
 	}
 }
 

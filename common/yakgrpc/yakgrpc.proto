@@ -5993,9 +5993,15 @@ message SSARisk {
   string CveAccessVector = 19;
   string CveAccessComplexity = 20;
   string Tags = 21;
-  uint64 ResultID = 22;
 
   bool IsRead = 23;
+
+  uint64 ResultID = 22;
+  string Variable  = 24;
+  int64 Index = 25;
+
+  string FunctionName = 26;
+  int64 Line = 27;
 }
 
 message SSARisksFilter {
