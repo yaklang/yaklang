@@ -144,8 +144,6 @@ const (
 	NativeCall_Java_UnEscape_Output = "javaUnescapeOutput"
 
 	NativeCall_Foeach_Func_Inst = "foreach_function_inst"
-
-	NativeCall_Project_Config = "projectConfig"
 )
 
 func init() {
