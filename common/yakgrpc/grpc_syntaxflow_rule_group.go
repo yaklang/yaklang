@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Server) QuerySyntaxFlowRuleGroup(ctx context.Context, req *ypb.QuerySyntaxFlowRuleGroupRequest) (*ypb.QuerySyntaxFlowRuleGroupResponse, error) {
-	p, result, err := yakit.QuerySyntaxFlowRuleGroup(s.GetProfileDatabase(), req)
+	_, result, err := yakit.QuerySyntaxFlowRuleGroup(s.GetProfileDatabase(), req)
 	if err != nil {
 		return nil, err
 	}
@@ -19,14 +19,8 @@ func (s *Server) QuerySyntaxFlowRuleGroup(ctx context.Context, req *ypb.QuerySyn
 		groups = append(groups, group.ToGRPCModel())
 	}
 	return &ypb.QuerySyntaxFlowRuleGroupResponse{
-		Pagination: &ypb.Paging{
-			Page:     int64(p.Page),
-			Limit:    int64(p.Limit),
-			OrderBy:  req.Pagination.OrderBy,
-			Order:    req.Pagination.Order,
-			RawOrder: req.Pagination.RawOrder,
-		},
-		Group: groups,
+		Pagination: req.Pagination,
+		Group:      groups,
 	}, nil
 }
 
