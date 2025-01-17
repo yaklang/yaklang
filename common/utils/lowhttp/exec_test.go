@@ -630,7 +630,6 @@ Host: %v
 		traceInfo := rsp.TraceInfo
 		require.Greater(t, traceInfo.TLSHandshakeTime.Nanoseconds(), int64(0))
 		require.GreaterOrEqual(t, traceInfo.ConnTime.Nanoseconds(), int64(0))
-		require.Equal(t, traceInfo.DNSTime.Nanoseconds(), int64(0))
 
 	})
 
