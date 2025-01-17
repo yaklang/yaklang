@@ -74,8 +74,12 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 	if params.GetBeforeId() > 0 {
 		db = db.Where("id < ?", params.GetBeforeId())
 	}
-	if params.GetIsNotBuiltin() {
-		db = db.Where("is_build_in_rule = ?", false)
+	if kind := params.GetFilterRuleKind(); kind != "" {
+		if kind == "buildIn" {
+			db = bizhelper.QueryByBool(db, "is_build_in_rule", true)
+		} else if kind == "unBuildIn" {
+			db = bizhelper.QueryByBool(db, "is_build_in_rule", false)
+		}
 	}
 	return db
 }
