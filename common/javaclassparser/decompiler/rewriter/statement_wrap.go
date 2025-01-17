@@ -531,6 +531,7 @@ func (s *RewriteManager) Rewrite() error {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	}
 	order := s.TopologicalSortReverse(keyNodes)
+	utils2.DumpNodesToDotExp(s.RootNode)
 	loopJmpRewriterRecoed := map[*core.Node]struct{}{}
 	for i := 0; i < len(order); i++ {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
@@ -543,10 +544,12 @@ func (s *RewriteManager) Rewrite() error {
 					if _, ok := loopJmpRewriterRecoed[n]; ok {
 						break
 					}
+					utils2.DumpNodesToDotExp(s.RootNode)
 					err := LoopJmpRewriter(s, n)
 					if err != nil {
 						return err
 					}
+					utils2.DumpNodesToDotExp(s.RootNode)
 					loopJmpRewriterRecoed[n] = struct{}{}
 					s.DominatorMap = GenerateDominatorTree(s.RootNode)
 					break
