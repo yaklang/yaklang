@@ -616,3 +616,22 @@ func TestPoCH2Preface(t *testing.T) {
 	require.Contains(t, string(rsp.RawPacket), token)
 
 }
+
+func TestLowhttpTraceInfo(t *testing.T) {
+	httpsHost, httpsPort := utils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Length: 1\r\n\r\n"))
+	t.Run("https", func(t *testing.T) {
+		rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/1.1
+Host: %v 
+
+`, utils.HostPort(httpsHost, httpsPort)))), WithHttps(true))
+		require.NoError(t, err)
+
+		traceInfo := rsp.TraceInfo
+		require.Greater(t, traceInfo.TLSHandshakeTime.Nanoseconds(), int64(0))
+		require.GreaterOrEqual(t, traceInfo.ConnTime.Nanoseconds(), int64(0))
+		require.Equal(t, traceInfo.DNSTime.Nanoseconds(), int64(0))
+
+	})
+
+}
