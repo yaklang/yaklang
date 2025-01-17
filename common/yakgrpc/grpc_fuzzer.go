@@ -861,11 +861,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				rsp.Payloads = payloads
 				rsp.RuntimeID = runtimeID
 				if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
-					rsp.TotalDurationMs = result.LowhttpResponse.TraceInfo.TotalTime.Milliseconds()
-					rsp.DurationMs = result.LowhttpResponse.TraceInfo.ServerTime.Milliseconds()
-					rsp.FirstByteDurationMs = result.LowhttpResponse.TraceInfo.ServerTime.Milliseconds()
-					rsp.DNSDurationMs = result.LowhttpResponse.TraceInfo.DNSTime.Milliseconds()
-					rsp.Proxy = result.LowhttpResponse.Proxy
+					SetFuzzerRespTraceInfo(rsp, result.LowhttpResponse.TraceInfo)
 					rsp.RemoteAddr = result.LowhttpResponse.RemoteAddr
 					hiddenIndex = result.LowhttpResponse.HiddenIndex
 				}
@@ -1000,10 +996,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 			// 处理额外时间
 			if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
-				rsp.TotalDurationMs = result.LowhttpResponse.TraceInfo.TotalTime.Milliseconds()
-				rsp.DurationMs = result.LowhttpResponse.TraceInfo.ServerTime.Milliseconds()
-				rsp.FirstByteDurationMs = result.LowhttpResponse.TraceInfo.ServerTime.Milliseconds()
-				rsp.DNSDurationMs = result.LowhttpResponse.TraceInfo.DNSTime.Milliseconds()
+				SetFuzzerRespTraceInfo(rsp, result.LowhttpResponse.TraceInfo)
 				rsp.Proxy = result.LowhttpResponse.Proxy
 				rsp.RemoteAddr = result.LowhttpResponse.RemoteAddr
 			}
@@ -1132,10 +1125,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						Discard:               redirectDiscard,
 					}
 					if redirectRes != nil && redirectRes.TraceInfo != nil {
-						redirectRsp.TotalDurationMs = redirectRes.TraceInfo.TotalTime.Milliseconds()
-						redirectRsp.DurationMs = redirectRes.TraceInfo.ServerTime.Milliseconds()
-						redirectRsp.FirstByteDurationMs = redirectRes.TraceInfo.ServerTime.Milliseconds()
-						redirectRsp.DNSDurationMs = redirectRes.TraceInfo.DNSTime.Milliseconds()
+						SetFuzzerRespTraceInfo(redirectRsp, redirectRes.TraceInfo)
 						redirectRsp.Proxy = redirectRes.Proxy
 						redirectRsp.RemoteAddr = redirectRes.RemoteAddr
 					}
@@ -1787,4 +1777,17 @@ func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[strin
 
 func CheckShouldDiscard(action string, matchRes bool) bool {
 	return (action == Action_Retain && !matchRes) || (action == Action_Discard && matchRes)
+}
+
+func SetFuzzerRespTraceInfo(resp *ypb.FuzzerResponse, traceInfo *lowhttp.LowhttpTraceInfo) {
+	if traceInfo == nil {
+		return
+	}
+	resp.TotalDurationMs = traceInfo.TotalTime.Milliseconds()
+	resp.DurationMs = traceInfo.ServerTime.Milliseconds()
+	resp.FirstByteDurationMs = traceInfo.ServerTime.Milliseconds()
+	resp.DNSDurationMs = traceInfo.DNSTime.Milliseconds()
+	resp.TLSHandshakeDurationMs = traceInfo.TLSHandshakeTime.Milliseconds()
+	resp.TCPDurationMs = traceInfo.TCPTime.Milliseconds()
+	resp.ConnectDurationMs = traceInfo.ConnTime.Milliseconds()
 }
