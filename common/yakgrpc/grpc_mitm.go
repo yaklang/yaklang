@@ -1006,7 +1006,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			})
 		}()
 		// 条件劫持
-		if hijackFilterManager != nil && hijackFilterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
+		if hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
+			log.Infof("[mitm] hijack ws request by hijack filter")
 			autoForward.SetTo(false)
 		}
 
@@ -1251,7 +1252,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 条件劫持
-		if hijackFilterManager != nil && hijackFilterManager.IsPassed(method, hostname, urlStr, extName) {
+		if hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(method, hostname, urlStr, extName) {
+			log.Infof("[mitm] hijack request by hijack filter")
 			autoForward.SetTo(false)
 		}
 
