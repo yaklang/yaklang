@@ -6,6 +6,10 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+const (
+	ServerPushType_SSARisk = "ssa_risk"
+)
+
 type SSARisk struct {
 	gorm.Model
 
@@ -95,11 +99,17 @@ func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 func (s *SSARisk) AfterCreate(tx *gorm.DB) (err error) {
-	broadcastData.Call("ssa_risk", "create")
+	broadcastData.Call(ServerPushType_SSARisk, map[string]string{
+		"task_id": s.RuntimeId,
+		"action":  "create",
+	})
 	return nil
 }
 
 func (s *SSARisk) AfterUpdate(tx *gorm.DB) (err error) {
-	broadcastData.Call("ssa_risk", "update")
+	broadcastData.Call(ServerPushType_SSARisk, map[string]string{
+		"task_id": s.RuntimeId,
+		"action":  "update",
+	})
 	return nil
 }
