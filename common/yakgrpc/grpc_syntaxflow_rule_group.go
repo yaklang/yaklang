@@ -10,14 +10,6 @@ import (
 )
 
 func (s *Server) QuerySyntaxFlowRuleGroup(ctx context.Context, req *ypb.QuerySyntaxFlowRuleGroupRequest) (*ypb.QuerySyntaxFlowRuleGroupResponse, error) {
-	if req.Pagination == nil {
-		req.Pagination = &ypb.Paging{
-			Page:    1,
-			Limit:   30,
-			OrderBy: "updated_at",
-			Order:   "desc",
-		}
-	}
 	p, result, err := yakit.QuerySyntaxFlowRuleGroup(s.GetProfileDatabase(), req)
 	if err != nil {
 		return nil, err
