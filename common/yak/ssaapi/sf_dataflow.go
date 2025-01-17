@@ -169,9 +169,10 @@ func dataFlowFilter(
 			log.Warnf("dataFlowFilter: end type is not supported: %T", end)
 		}
 		for _, v := range vs {
-			paths := v.GetPaths(endValues)
+			paths := v.GetDataflowPath(endValues...)
 			pathNum := len(paths)
 			for _, path := range paths {
+				path := Values(path)
 				matchedConfigs := recursiveConfig.compileAndRun(path)
 				if _, ok := matchedConfigs[sf.RecursiveConfig_Exclude]; ok {
 					pathNum -= 1
@@ -186,10 +187,14 @@ func dataFlowFilter(
 		}
 	} else {
 		for _, v := range vs {
-			dataPaths := v.GetDataFlowPath()
+			dataPaths := v.GetDataflowPath()
 			var excludeFlag = 0
 			for _, dataPath := range dataPaths {
+				dataPath := Values(dataPath)
 				matchedConfigs := recursiveConfig.compileAndRun(dataPath)
+				log.Infof("dataPaths: ")
+				dataPath.Show()
+				log.Infof("dataPaths get %s", matchedConfigs)
 
 				if _, ok := matchedConfigs[sf.RecursiveConfig_Include]; ok {
 					ret = append(ret, v)

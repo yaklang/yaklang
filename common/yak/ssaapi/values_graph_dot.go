@@ -136,3 +136,31 @@ func (g *ValueGraph) DeepFirstGraph(valueID int64) [][]string {
 	}
 	return dot.GraphPathPrev(g.Graph, nodeID)
 }
+
+func (V Values) ShowDot() Values {
+	for _, v := range V {
+		v.ShowDot()
+	}
+	return V
+}
+
+func (v Values) DotGraphs() []string {
+	var ret []string
+	for _, val := range v {
+		ret = append(ret, val.DotGraph())
+	}
+	return ret
+}
+
+func (v *Value) DotGraph() string {
+	vg := NewValueGraph(v)
+	var buf bytes.Buffer
+	vg.GenerateDOT(&buf)
+	return buf.String()
+}
+
+func (v *Value) ShowDot() *Value {
+	dotGraph := v.DotGraph()
+	fmt.Println(dotGraph)
+	return v
+}

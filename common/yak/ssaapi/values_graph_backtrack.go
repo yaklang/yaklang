@@ -225,18 +225,3 @@ func (v Values) FlexibleDepends() Values {
 	}
 	return v
 }
-
-func (V Values) ShowDot() Values {
-	for _, v := range V {
-		v.ShowDot()
-	}
-	return V
-}
-
-func (v Values) DotGraphs() []string {
-	var ret []string
-	for _, val := range v {
-		ret = append(ret, val.DotGraph())
-	}
-	return ret
-}

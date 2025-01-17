@@ -39,8 +39,9 @@ h = f + g
 		end := results.GetValues("end")
 		log.Infof("end: %v", end)
 		end.ShowDot()
-		paths := start.GetPaths(end)
+		paths := start.GetDataflowPath(end...)
 		for _, item := range paths {
+			item := ssaapi.Values(item)
 			require.Equal(t, item[0].GetSSAValue().GetOpcode(), ssa.SSAOpcodeBinOp)
 			require.Equal(t, item[len(item)-1].GetSSAValue().GetOpcode(), ssa.SSAOpcodeConstInst)
 			fmt.Println(item.String())
