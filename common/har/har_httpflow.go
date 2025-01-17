@@ -1,4 +1,4 @@
-package lowhttp
+package har
 
 import (
 	"fmt"
@@ -10,64 +10,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
-
-type HTTPArchive struct {
-	Entries []*HAREntry `json:"entries"`
-}
-
-type HAREntry struct {
-	Request         *HARRequest  `json:"request"`
-	Response        *HARResponse `json:"response"`
-	ServerIPAddress string       `json:"serverIPAddress"`
-}
-
-type HARKVPair struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
-type HARHTTPParam struct {
-	Name        string `json:"name"`
-	Value       string `json:"value"`
-	FileName    string `json:"fileName"`
-	ContentType string `json:"contentType"`
-}
-
-type HARHTTPPostData struct {
-	MimeType string          `json:"mimeType"`
-	Params   []*HARHTTPParam `json:"params"`
-	Text     string          `json:"text"`
-}
-
-type HARRequest struct {
-	Method      string           `json:"method"`
-	URL         string           `json:"url"`
-	HTTPVersion string           `json:"httpVersion"`
-	QueryString []*HARKVPair     `json:"queryString"`
-	Headers     []*HARKVPair     `json:"headers"`
-	HeadersSize int              `json:"headersSize"`
-	BodySize    int              `json:"bodySize"`
-	PostData    *HARHTTPPostData `json:"postData"`
-}
-
-type HARHTTPContent struct {
-	Size     int    `json:"size"`
-	MimeType string `json:"mimeType"`
-	Text     string `json:"text"`
-	Encoding string `json:"encoding"`
-}
-
-type HARResponse struct {
-	StatusCode  int             `json:"status"`
-	StatusText  string          `json:"statusText"`
-	HTTPVersion string          `json:"httpVersion"`
-	Headers     []*HARKVPair    `json:"headers"`
-	Cookies     []*HARKVPair    `json:"cookies"`
-	Content     *HARHTTPContent `json:"content"`
-	HeadersSize int             `json:"headersSize"`
-	BodySize    int             `json:"bodySize"`
-}
 
 func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	//---------------- build request
@@ -83,12 +27,12 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	reqByte := []byte(reqRaw)
 
 	// get http version
-	_, _, request.HTTPVersion = GetHTTPPacketFirstLine(reqByte)
+	_, _, request.HTTPVersion = lowhttp.GetHTTPPacketFirstLine(reqByte)
 	isRequestHTTP2 := strings.Contains(strings.ToLower(request.HTTPVersion), "http/2")
 
 	// get query string
 	var requestQueryString []*HARKVPair
-	for key, values := range GetFullHTTPRequestQueryParams(reqByte) {
+	for key, values := range lowhttp.GetFullHTTPRequestQueryParams(reqByte) {
 		for _, value := range values {
 			requestQueryString = append(requestQueryString, &HARKVPair{
 				Name:  key,
@@ -103,7 +47,7 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	if isRequestHTTP2 {
 		requestHeaders = append(requestHeaders, &HARKVPair{
 			Name:  ":authority",
-			Value: GetHTTPPacketHeader(reqByte, "Host"),
+			Value: lowhttp.GetHTTPPacketHeader(reqByte, "Host"),
 		})
 		requestHeaders = append(requestHeaders, &HARKVPair{
 			Name:  ":method",
@@ -117,7 +61,7 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	}
 
 	// get headers
-	for key, values := range GetHTTPPacketHeadersFull(reqByte) {
+	for key, values := range lowhttp.GetHTTPPacketHeadersFull(reqByte) {
 		// skip host header in http2
 		if isRequestHTTP2 && strings.ToLower(key) == "host" {
 			continue
@@ -137,10 +81,10 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	request.HeadersSize = len(requestHeaders)
 
 	// get post data
-	contentType := GetHTTPPacketContentType(reqByte)
+	contentType := lowhttp.GetHTTPPacketContentType(reqByte)
 	var params []*HARHTTPParam
 	if contentType == "application/x-www-form-urlencoded" {
-		for postKey, postValues := range GetFullHTTPRequestPostParams(reqByte) {
+		for postKey, postValues := range lowhttp.GetFullHTTPRequestPostParams(reqByte) {
 			for _, value := range postValues {
 				params = append(params, &HARHTTPParam{
 					Name:  postKey,
@@ -152,7 +96,7 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	request.PostData = &HARHTTPPostData{
 		MimeType: contentType,
 		Params:   params,
-		Text:     string(GetHTTPPacketBody(reqByte)),
+		Text:     string(lowhttp.GetHTTPPacketBody(reqByte)),
 	}
 	request.BodySize = int(flow.BodyLength)
 
@@ -169,12 +113,12 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	respByte := []byte(respRaw)
 
 	// get http version
-	response.HTTPVersion, _, _ = GetHTTPPacketFirstLine(respByte)
+	response.HTTPVersion, _, _ = lowhttp.GetHTTPPacketFirstLine(respByte)
 	isResponseHTTP2 := strings.Contains(strings.ToLower(response.HTTPVersion), "http/2")
 
 	// get headers
 	var responseHeaders []*HARKVPair
-	for key, values := range GetHTTPPacketHeadersFull(respByte) {
+	for key, values := range lowhttp.GetHTTPPacketHeadersFull(respByte) {
 		if isResponseHTTP2 {
 			key = strings.ToLower(key)
 		}
@@ -188,12 +132,12 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	response.Headers = responseHeaders
 	response.HeadersSize = len(responseHeaders)
 
-	body := GetHTTPPacketBody(respByte)
+	body := lowhttp.GetHTTPPacketBody(respByte)
 
 	// get content
 	response.Content = &HARHTTPContent{
 		Size:     len(body),
-		MimeType: GetHTTPPacketContentType(respByte),
+		MimeType: lowhttp.GetHTTPPacketContentType(respByte),
 		Text:     string(body),
 	}
 	response.BodySize = len(body)
@@ -215,11 +159,11 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 		return nil, err
 	}
 
-	reqPacket := BasicRequest()
+	reqPacket := lowhttp.BasicRequest()
 	isRequestHTTP2 := strings.Contains(strings.ToLower(req.HTTPVersion), "http/2")
 
 	// build request first line
-	reqPacket = ReplaceHTTPPacketFirstLine(reqPacket, fmt.Sprintf("%s %s %s", req.Method, urlIns.RequestURI(), strings.ToUpper(req.HTTPVersion)))
+	reqPacket = lowhttp.ReplaceHTTPPacketFirstLine(reqPacket, fmt.Sprintf("%s %s %s", req.Method, urlIns.RequestURI(), strings.ToUpper(req.HTTPVersion)))
 
 	// build request headers
 	var ReqHeaders map[string]string
@@ -236,34 +180,34 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 		}
 		ReqHeaders[name] = value
 	})
-	reqPacket = ReplaceAllHTTPPacketHeaders(reqPacket, ReqHeaders)
+	reqPacket = lowhttp.ReplaceAllHTTPPacketHeaders(reqPacket, ReqHeaders)
 
 	// build request query string
-	params := NewQueryParams(WithDisableAutoEncode(true))
+	params := lowhttp.NewQueryParams(lowhttp.WithDisableAutoEncode(true))
 	for _, kv := range req.QueryString {
 		params.Add(kv.Name, kv.Value)
 	}
-	reqPacket = ReplaceHTTPPacketQueryParamRaw(reqPacket, params.Encode())
+	reqPacket = lowhttp.ReplaceHTTPPacketQueryParamRaw(reqPacket, params.Encode())
 
 	// build request post data
 	postData := req.PostData
 	if postData.Text != "" {
-		reqPacket = ReplaceHTTPPacketBody(reqPacket, []byte(postData.Text), false)
+		reqPacket = lowhttp.ReplaceHTTPPacketBody(reqPacket, []byte(postData.Text), false)
 	} else if len(postData.Params) > 0 {
-		postParams := NewQueryParams(WithDisableAutoEncode(true))
+		postParams := lowhttp.NewQueryParams(lowhttp.WithDisableAutoEncode(true))
 		for _, kv := range postData.Params {
 			postParams.Add(kv.Name, kv.Value)
 		}
-		reqPacket = ReplaceHTTPPacketBody(reqPacket, []byte(postParams.Encode()), false)
+		reqPacket = lowhttp.ReplaceHTTPPacketBody(reqPacket, []byte(postParams.Encode()), false)
 	}
 
 	//---------------- build response
 	resp := entry.Response
 
-	respPacket := BasicResponse()
+	respPacket := lowhttp.BasicResponse()
 
 	// build response first line
-	respPacket = ReplaceHTTPPacketFirstLine(respPacket, fmt.Sprintf("%s %d %s", strings.ToUpper(resp.HTTPVersion), resp.StatusCode, resp.StatusText))
+	respPacket = lowhttp.ReplaceHTTPPacketFirstLine(respPacket, fmt.Sprintf("%s %d %s", strings.ToUpper(resp.HTTPVersion), resp.StatusCode, resp.StatusText))
 	isResponseHTTP2 := strings.Contains(strings.ToLower(resp.HTTPVersion), "http/2")
 
 	// build response headers
@@ -275,11 +219,11 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 		}
 		RespHeaders[name] = value
 	})
-	reqPacket = ReplaceAllHTTPPacketHeaders(reqPacket, RespHeaders)
+	reqPacket = lowhttp.ReplaceAllHTTPPacketHeaders(reqPacket, RespHeaders)
 
 	// build response content
 	if resp.Content.Text != "" {
-		respPacket = ReplaceHTTPPacketBody(respPacket, []byte(resp.Content.Text), false)
+		respPacket = lowhttp.ReplaceHTTPPacketBody(respPacket, []byte(resp.Content.Text), false)
 	}
 
 	return &schema.HTTPFlow{

@@ -77,7 +77,7 @@ require (
 	github.com/liamg/jfather v0.0.7
 	github.com/lor00x/goldap v0.0.0-20180618054307-a546dffdd1a3
 	github.com/lunixbochs/struc v0.0.0-20200707160740-784aaebc1d40
-	github.com/mailru/easyjson v0.7.7
+	github.com/mailru/easyjson v0.9.0
 	github.com/mattn/go-sqlite3 v1.14.15
 	github.com/mdlayher/arp v0.0.0-20191213142603-f72070a231fc
 	github.com/mdlayher/netlink v1.1.1
