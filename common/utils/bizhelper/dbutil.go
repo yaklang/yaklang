@@ -1210,7 +1210,7 @@ func GroupCount(db *gorm.DB, tableName string, column string) []*ypb.FieldGroup 
 
 func GroupColumn(db *gorm.DB, tableName string, column string) ([]any, error) {
 	var res []any
-	if db := db.Table(tableName).Select(column).Group(column).Scan(&res); db.Error != nil {
+	if db := db.Table(tableName).Select(column).Group(column).Pluck(column, &res); db.Error != nil {
 		return nil, db.Error
 	}
 	return res, nil

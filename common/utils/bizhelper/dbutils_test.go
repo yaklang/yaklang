@@ -26,7 +26,7 @@ func TestGroupColumn(t *testing.T) {
 	db = db.Debug().AutoMigrate(&testData{}).Model(&testData{})
 
 	token1, token2, token3 := utils.RandStringBytes(10), utils.RandStringBytes(10), utils.RandStringBytes(10)
-	for i := 0; i < 5; i++ {
+	for i := 1; i < 6; i++ {
 		db.Save(&testData{Key: token1, Value: i})
 		db.Save(&testData{Key: token2, Value: i})
 		db.Save(&testData{Key: token3, Value: i})
@@ -36,6 +36,9 @@ func TestGroupColumn(t *testing.T) {
 	data, err := GroupColumn(db, "test_data", "Key")
 	require.NoError(t, err)
 	require.Len(t, data, 3)
+	for _, datum := range data {
+		require.NotEmpty(t, datum)
+	}
 
 	fieldGroup := GroupCount(db, "test_data", "Key")
 	require.Len(t, fieldGroup, 3)
@@ -47,6 +50,9 @@ func TestGroupColumn(t *testing.T) {
 	data, err = GroupColumn(db, "test_data", "Value")
 	require.NoError(t, err)
 	require.Len(t, data, 5)
+	for _, datum := range data {
+		require.NotEmpty(t, datum)
+	}
 
 	fieldGroup = GroupCount(db, "test_data", "Value")
 	require.Len(t, fieldGroup, 5)
