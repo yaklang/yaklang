@@ -562,6 +562,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	// retry use DialX
 	dnsStart := time.Now()
 	dnsEnd := time.Now()
+	dialTraceInfo := netx.NewDialXTraceInfo()
 	dialopts = append(
 		dialopts,
 		netx.DialX_WithTimeoutRetry(maxRetryTimes),
@@ -576,6 +577,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			netx.WithDNSServers(dnsServers...),
 			netx.WithTemporaryHosts(dnsHosts),
 		),
+		netx.DialX_WithDialTraceInfo(dialTraceInfo),
 	)
 
 	if option.OverrideEnableSystemProxyFromEnv {
@@ -614,6 +616,7 @@ RECONNECT:
 	}
 
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
+	traceInfo.ParseDialXTraceInfo(dialTraceInfo)
 	response.Https = https
 
 	// checking old proxy

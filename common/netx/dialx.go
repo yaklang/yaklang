@@ -43,6 +43,14 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.
 			currentCPS.Add(1)
 		}
 	}()
+
+	var startTCP = time.Now()
+	defer func() {
+		if retConn != nil {
+			config.TraceInfo.SetTCPDuration(time.Since(startTCP))
+		}
+	}()
+
 	var timeoutRetryMax int64 = 1
 	if config.EnableTimeoutRetry {
 		timeoutRetryMax = config.TimeoutRetryMax
@@ -195,6 +203,13 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		o(config)
 	}
 
+	startDialConn := time.Now() // dial all time
+	defer func() {
+		if config.TraceInfo != nil {
+			config.TraceInfo.SetTotalDuration(time.Since(startDialConn))
+		}
+	}()
+
 	clientHelloSpec := config.ClientHelloSpec
 	useTls := config.EnableTLS || config.GMTLSSupport
 
@@ -263,11 +278,14 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		default:
 			return nil, utils.Errorf("unknown tls strategy %v", strategy)
 		}
+
+		startTLSHandshake := time.Now()
 		tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tempTlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
+		config.TraceInfo.SetTLSHandshakeDuration(time.Since(startTLSHandshake))
 		return tlsConn, nil
 	}
 	if len(errs) > 0 {
