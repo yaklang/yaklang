@@ -1,4 +1,4 @@
-package lowhttp
+package har
 
 import (
 	"fmt"
