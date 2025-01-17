@@ -17,14 +17,8 @@ func (s *Server) QuerySyntaxFlowRule(ctx context.Context, req *ypb.QuerySyntaxFl
 		return nil, err
 	}
 	rsp := &ypb.QuerySyntaxFlowRuleResponse{
-		Pagination: &ypb.Paging{
-			Page:     int64(p.Page),
-			Limit:    int64(p.Limit),
-			OrderBy:  req.Pagination.OrderBy,
-			Order:    req.Pagination.Order,
-			RawOrder: req.Pagination.RawOrder,
-		},
-		Total: uint64(p.TotalRecord),
+		Pagination: req.GetPagination(),
+		Total:      uint64(p.TotalRecord),
 		DbMessage: &ypb.DbOperateMessage{
 			TableName: "syntax_flow_rule",
 			Operation: DbOperationQuery,
