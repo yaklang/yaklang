@@ -4634,7 +4634,7 @@ message FuzzerResponse {
   int64 DurationMs = 8; // FirstByte Duration
   int64 DNSDurationMs = 40;
   int64 FirstByteDurationMs = 41;
-  int64 TotalDurationMs = 55;
+  int64 TotalDurationMs = 42;
   int64 TLSHandshakeDurationMs = 56;
   int64 TCPDurationMs = 57;
   int64 ConnectDurationMs = 58;
