@@ -6009,6 +6009,10 @@ message SSARisk {
 
   string FunctionName = 26;
   int64 Line = 27;
+
+  // other mesg 
+  string Solution = 28;
+  string Description = 29 ;
 }
 
 message SSARisksFilter {

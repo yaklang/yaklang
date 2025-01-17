@@ -84,6 +84,8 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 		Index:               s.Index,
 		FunctionName:        s.FunctionName,
 		Line:                s.Line,
+		Description:         s.Description,
+		Solution:            s.Solution,
 	}
 }
 
