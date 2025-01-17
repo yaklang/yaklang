@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -28,8 +29,11 @@ func TestParseSingleClass(t *testing.T) {
 	println(source)
 }
 func TestParseClass(t *testing.T) {
-	err := filepath.Walk("/Users/z3/Downloads/error-jdsc 2", func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk("/Users/z3/Downloads/error-jdsc 3", func(path string, info fs.FileInfo, err error) error {
 		if info.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".class") {
 			return nil
 		}
 		data, err := os.ReadFile(path)
@@ -40,9 +44,9 @@ func TestParseClass(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		//if path != "/Users/z3/Downloads/compiling-failed-files 3/decompiler-err-LinkedBlockingDeque-2oO3vnOHDunZXdMyn8b5VRlh1bt.class" {
-		//	return nil
-		//}
+		if path != "/Users/z3/Downloads/error-jdsc 3/decompile-err-0891f02d99bd27aa6e82c8dd.class" {
+			return nil
+		}
 		source, err := cf.Dump()
 
 		if err != nil {

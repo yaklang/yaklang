@@ -50,11 +50,17 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 		}
 		node.AddNext(mergeNode)
 	}
+	if mergeNode == nil {
+		mergeNode = caseMap.GetMust(-1)
+	}
+	core.DumpNodesToDotExp(manager.RootNode)
 	node.MergeNode = mergeNode
 	return nil
 }
 func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
+	SwitchRewriter1(manager, node)
 	//switchNode := node
+	core.DumpNodesToDotExp(manager.RootNode)
 	middleStatement := node.Statement.(*statements.MiddleStatement)
 	switchData := middleStatement.Data.([]any)
 	caseToIndexMap := switchData[0].(*omap.OrderedMap[int, int])
@@ -143,5 +149,6 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 	sort.Slice(caseItems, func(i, j int) bool {
 		return caseItems[i].IntValue < caseItems[j].IntValue
 	})
+	utils.DumpNodesToDotExp(manager.RootNode)
 	return nil
 }
