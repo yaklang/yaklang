@@ -279,12 +279,12 @@ jobs:
             yak_darwin_amd64.sha256.txt
             yak_darwin_arm64.sha256.txt
 
-      - name: Generate SyntaxFlow Meta Info
-        uses: ./.github/workflows/update-syntaxflow-meta.yml
-        with:
-          update_version: ${{ env.YAK_TAG }}
-          update_last: true
-        secrets: inherit
+#      - name: Generate SyntaxFlow Meta Info
+#        uses: ./.github/workflows/update-syntaxflow-meta.yml
+#        with:
+#          update_version: ${{ env.YAK_TAG }}
+#          update_last: true
+#        secrets: inherit
 
       - name: Build Docker Image(Tag)
         run: |
