@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -75,24 +76,49 @@ func CoverCodeRange(programName string, codeSourceProto string, r memedit.RangeI
 	return ret, source
 }
 
-func buildSSARisk(r *SyntaxFlowResult, valueRange memedit.RangeIf, alertInfo *schema.SyntaxFlowDescInfo, res *ssadb.AuditResult) *schema.SSARisk {
-	riskCodeRange, CodeFragment := CoverCodeRange(r.program.GetProgramName(), "", valueRange)
-	rule := r.rule
+func buildSSARisk(
+	result *SyntaxFlowResult,
+	variable string, index int,
+	resultID uint64, runtimeId string,
+) *schema.SSARisk {
+	progName := result.GetProgramName()
+	if progName == "" {
+		return nil
+	}
+	var value *Value
+	if vs := result.GetValues(variable); len(vs) <= index {
+		return nil
+	} else {
+		value = vs[index]
+	}
+	riskCodeRange, CodeFragment := CoverCodeRange(progName, "", value.GetRange())
+	rule := result.rule
 	newSSARisk := &schema.SSARisk{
 		CodeSourceUrl: riskCodeRange.URL,
 		CodeRange:     riskCodeRange.JsonString(),
+		CodeFragment:  CodeFragment,
 		Title:         rule.Title,
 		TitleVerbose:  rule.TitleZh,
 		Description:   rule.Description,
 		RiskType:      rule.RiskType,
+		Severity:      string(rule.Severity),
 		CVE:           rule.CVE,
-		CodeFragment:  CodeFragment,
-		ProgramName:   res.ProgramName,
-		RuntimeId:     res.TaskID,
-		ResultID:      uint64(res.ID),
+
+		FromRule:    rule.RuleName,
+		RuntimeId:   runtimeId,
+		IsPotential: false,
+		ProgramName: progName,
+		// result
+		ResultID: resultID,
+		Variable: variable,
+		Index:    0,
+
+		FunctionName: value.GetFunction().GetName(),
+		Line:         riskCodeRange.StartLine,
 	}
 
 	// modify info by alertMsg
+	alertInfo, _ := result.GetAlertInfo(variable)
 	if alertInfo.OnlyMsg {
 		if alertInfo.Msg != "" {
 			newSSARisk.Details = alertInfo.Msg
@@ -125,15 +151,16 @@ func buildSSARisk(r *SyntaxFlowResult, valueRange memedit.RangeIf, alertInfo *sc
 }
 
 func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) {
-	alertInfo, ok := r.GetAlertInfo(variable)
+	_, ok := r.GetAlertInfo(variable)
 	if !ok {
 		log.Infof("no alert msg for %s; skip", variable)
 		return
 	}
-
-	for i, value := range r.GetValues(variable) {
-		valueRange := value.GetRange()
-		ssaRisk := buildSSARisk(r, valueRange, alertInfo, result)
+	for i := range r.GetValues(variable) {
+		ssaRisk := buildSSARisk(r, variable, i, uint64(result.ID), result.TaskID)
+		if ssaRisk == nil {
+			continue
+		}
 		err := yakit.CreateSSARisk(consts.GetGormDefaultSSADataBase(), ssaRisk)
 		if err != nil {
 			log.Errorf("save risk failed: %s", err)

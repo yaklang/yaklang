@@ -9,10 +9,10 @@ import (
 type SSARisk struct {
 	gorm.Model
 
-	Hash string `json:"hash"`
+	Hash string `json:"hash" gorm:"index"`
 
 	// file url yakurl
-	CodeSourceUrl string `json:"code_source_url"`
+	CodeSourceUrl string `json:"code_source_url" gorm:"index"`
 	CodeRange     string `json:"code_range"`
 	CodeFragment  string `json:"code_fragment"`
 	//
@@ -41,8 +41,14 @@ type SSARisk struct {
 	CveAccessComplexity string `json:"cve_access_complexity"`
 	Tags                string `json:"tags"`
 
-	ResultID    uint64 `json:"result_id"`
-	ProgramName string `json:"program_name"`
+	ProgramName string `json:"program_name" gorm:"index"`
+	// for query result
+	ResultID uint64 `json:"result_id"` // result
+	Variable string `json:"variable"`  // result/variable
+	Index    int64  `json:"index"`     // result/variable/index
+	// for query risk
+	FunctionName string `json:"function_name" gorm:"index"`
+	Line         int64  `json:"line" gorm:"index"`
 }
 
 func (s *SSARisk) CalcHash() string {
@@ -74,6 +80,10 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 		Tags:                s.Tags,
 		ResultID:            s.ResultID,
 		IsRead:              s.IsRead,
+		Variable:            s.Variable,
+		Index:               s.Index,
+		FunctionName:        s.FunctionName,
+		Line:                s.Line,
 	}
 }
 
