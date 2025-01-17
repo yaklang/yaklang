@@ -30,11 +30,11 @@ func PeepholeCompile(fs fi.FileSystem, size int, opts ...Option) (Programs, erro
 
 func ParseProject(opts ...Option) (Programs, error) {
 	config, err := defaultConfig(opts...)
+	config.fs = filesys.ConvertToUnifiedFs(config.fs)
 	if err != nil {
 		return nil, err
 	}
 	return config.parseProject()
-
 }
 
 func (c *config) parseProject() (Programs, error) {
