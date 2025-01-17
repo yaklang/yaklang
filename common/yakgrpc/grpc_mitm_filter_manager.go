@@ -277,14 +277,24 @@ func GetMITMHijackFilterManager(projectDB *gorm.DB) *MITMFilter {
 }
 
 func (m *MITMFilter) IsEmpty() bool {
-	data := m.Data
-	if data == nil {
+	if m == nil {
 		return true
 	}
-	return len(data.ExcludeMIME) <= 0 && len(data.ExcludeMethods) <= 0 &&
-		len(data.ExcludeSuffix) <= 0 && len(data.ExcludeHostnames) <= 0 &&
-		len(data.IncludeHostnames) <= 0 && len(data.IncludeSuffix) <= 0 &&
-		len(data.ExcludeUri) <= 0 && len(data.IncludeUri) <= 0
+	data := m.Data
+	if data != nil { // legacy
+		return len(data.ExcludeMIME) <= 0 && len(data.ExcludeMethods) <= 0 &&
+			len(data.ExcludeSuffix) <= 0 && len(data.ExcludeHostnames) <= 0 &&
+			len(data.IncludeHostnames) <= 0 && len(data.IncludeSuffix) <= 0 &&
+			len(data.ExcludeUri) <= 0 && len(data.IncludeUri) <= 0
+	}
+	matcher := m.Filters
+	if matcher != nil {
+		return matcher.ExcludeHostnamesMatcher == nil && matcher.ExcludeSuffixMatcher == nil &&
+			matcher.ExcludeMethodsMatcher == nil && matcher.ExcludeMIMEMatcher == nil &&
+			matcher.IncludeHostnamesMatcher == nil && matcher.IncludeSuffixMatcher == nil &&
+			matcher.ExcludeUriMatcher == nil && matcher.IncludeUriMatcher == nil
+	}
+	return true
 }
 
 func (m *MITMFilter) Save(keys ...string) {
