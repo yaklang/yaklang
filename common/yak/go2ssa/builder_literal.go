@@ -210,7 +210,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			if kvs[0].value != nil {
 				if m, ok := kvs[0].value.(*ssa.Make); ok {
 					if m.GetVariableMemory().GetKind() == ssautil.AddressVariable {
-						// 只有指针才会复用object
 						return kvs[0].value
 					} else {
 						var mkeys, mmembers []ssa.Value
@@ -291,7 +290,15 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					return b.EmitConstInst(i)
 				})
 		case ssa.NumberTypeKind, ssa.StringTypeKind, ssa.BooleanTypeKind:
-			return kvs[0].value
+			if kvs[0].value == nil {
+				return nil
+			}
+			cons := kvs[0].value.(*ssa.ConstInst)
+			if vam := cons.GetVariableMemory(); vam != nil && vam.GetKind() == ssautil.AddressVariable {
+				return cons
+			}
+
+			return b.CopyConstInst(cons)
 		default:
 			if kvs[0].value != nil {
 				return kvs[0].value
