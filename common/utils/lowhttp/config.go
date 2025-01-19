@@ -3,6 +3,7 @@ package lowhttp
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -289,6 +290,19 @@ type LowhttpTraceInfo struct {
 	ServerTime time.Duration
 	// 完整请求的耗时
 	TotalTime time.Duration
+	// tls 握手耗时
+	TLSHandshakeTime time.Duration
+	// tcp dial 耗时
+	TCPTime time.Duration
+}
+
+func (l *LowhttpTraceInfo) ParseDialXTraceInfo(info *netx.DialXTraceInfo) {
+	if info == nil {
+		return
+	}
+	l.ConnTime = info.TotalTime
+	l.TCPTime = info.TCPtime
+	l.TLSHandshakeTime = info.TLSHandshakeTime
 }
 
 func (l *LowhttpTraceInfo) GetServerDurationMS() int64 {
