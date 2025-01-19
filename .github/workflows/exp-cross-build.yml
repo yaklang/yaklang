@@ -43,6 +43,8 @@ jobs:
 
   build_and_upload_to_oss:
     needs: check_commit_msg
+    outputs:
+      YAK_TAG: ${{ steps.get_tag.outputs.YAK_TAG}}
     strategy:
       matrix:
         os:
@@ -97,9 +99,12 @@ jobs:
         id: go
 
       - name: Get Repo tags
+        id: get_tag
         run: |
           go run common/yak/cmd/yak.go repos-tag -o tags.txt
+          echo "$(cat tags.txt)"
           echo "YAK_TAG=$(cat tags.txt)" >> ${{ matrix.env }} 
+          echo "YAK_TAG=$(cat tags.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Go Patch for Win7
         if: matrix.os == 'windows7'
@@ -279,13 +284,6 @@ jobs:
             yak_darwin_amd64.sha256.txt
             yak_darwin_arm64.sha256.txt
 
-#      - name: Generate SyntaxFlow Meta Info
-#        uses: ./.github/workflows/update-syntaxflow-meta.yml
-#        with:
-#          update_version: ${{ env.YAK_TAG }}
-#          update_last: true
-#        secrets: inherit
-
       - name: Build Docker Image(Tag)
         run: |
           echo "start to format tag name: ${{ env.YAK_TAG }}"
@@ -310,3 +308,11 @@ jobs:
             echo "start to update latest tag"
             docker buildx build --platform linux/amd64,linux/arm64 -t v1ll4n/yaklang:latest --build-arg VERSION=${{ env.YAK_TAG }} ./common/yak/cmd/docker/ --push
           fi
+
+  update_syntaxflow_meta:
+    needs: build_and_upload_to_oss
+    uses: ./.github/workflows/update-syntaxflow-meta.yml
+    with:
+      update_version: ${{ needs.build_and_upload_to_oss.outputs.YAK_TAG }}
+      update_last: true
+    secrets: inherit
