@@ -130,6 +130,9 @@ func getHTTP3Conn(ctx context.Context, target string, opt ...netx.DialXOption) (
 		ServerName: sni,
 		NextProtos: []string{"h3"},
 	}, &quic.Config{})
+	if err != nil {
+		return nil, utils.Wrapf(err, "quic.Dial %v failed", remoteAddr.String())
+	}
 
 	return NewHTTP3ClientConn(conn), nil
 }
