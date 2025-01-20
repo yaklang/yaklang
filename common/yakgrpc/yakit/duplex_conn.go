@@ -41,6 +41,7 @@ var (
 	ServerPushType_Warning      = "warning"
 	ServerPushType_RPS          = "rps"
 	ServerPushType_CPS          = "cps"
+	ServerPushType_Fuzzer       = "fuzzer_server_push"
 )
 
 func RegisterServerPushCallback(id string, stream ypb.Yak_DuplexConnectionServer) {
