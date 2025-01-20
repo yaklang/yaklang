@@ -58,11 +58,8 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 		if _, exist := application.FileList[filePath]; !exist {
 			if programName != "" {
 				folderName, fileName := filesystem.PathSplit(filePath)
-				folders := []string{programName}
-				folders = append(folders,
-					strings.Split(folderName, string(filesystem.GetSeparators()))...,
-				)
-				ssadb.SaveFile(fileName, src.GetSourceCode(), src.GetIrSourceHash(programName), folders)
+				folders := strings.Split(folderName, string(filesystem.GetSeparators()))
+				ssadb.SaveFile(fileName, src.GetSourceCode(), programName, folders)
 			}
 		}
 		// include source code will change the context of the origin editor

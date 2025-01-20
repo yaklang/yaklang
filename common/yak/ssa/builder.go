@@ -3,6 +3,7 @@ package ssa
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"reflect"
 	"strings"
 
@@ -279,7 +280,7 @@ func (b *FunctionBuilder) GetStaticMember(classname *Blueprint, field string) *V
 func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename string) {
 	container := b.ReadValue("__dependency__")
 	if utils.IsNil(container) {
-		log.Warnf("not found __dependency")
+		log.Warnf("not found __dependency__")
 		return
 	}
 
@@ -289,12 +290,12 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 			return
 		}
 		group, artifact := id[0], id[1]
-		rs1 := b.GetRangeByText(artifact)
+		rs1 := b.GetRangesByText(artifact)
 		if len(rs1) == 1 {
 			b.SetRangeByRangeIf(rs1[0])
 			return
 		}
-		rs2 := b.GetRangeByText(group)
+		rs2 := b.GetRangesByText(group)
 		if len(rs2) == 1 {
 			b.SetRangeByRangeIf(rs2[0])
 			return
@@ -330,6 +331,46 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 		pkgItem := b.CreateMemberCallVariable(container, b.EmitUndefined(pkg.Name))
 		b.AssignVariable(pkgItem, sub)
 	}
+}
+
+func (b *FunctionBuilder) GenerateProjectConfig() {
+	prog := b.GetProgram()
+	if prog == nil {
+		return
+	}
+
+	config := b.PeekValue(ProjectConfigVariable)
+	if utils.IsNil(config) {
+		return
+	}
+	backUp := b.GetEditor()
+	defer b.SetEditor(backUp)
+
+	for k, pc := range prog.ProjectConfig {
+		cv := pc.ConfigValue
+		if content, ok := prog.ExtraFile[pc.Filepath]; ok {
+			var editor *memedit.MemEditor
+			if len(content) <= 128 {
+				hash := content
+				editor, _ = ssadb.GetIrSourceFromHash(hash)
+			} else {
+				editor = memedit.NewMemEditorWithFileUrl(content, pc.Filepath)
+			}
+			b.SetEditor(editor)
+			rng := b.GetRangesByText(k)
+			if len(rng) == 1 {
+				b.SetRangeByRangeIf(rng[0])
+			} else {
+				b.SetEmptyRange()
+			}
+			variable := b.CreateMemberCallVariable(config, b.EmitConstInst(k))
+			b.AssignVariable(variable, b.EmitConstInst(cv))
+
+			val := b.CreateVariable("test")
+			b.AssignVariable(val, b.EmitConstInst(cv))
+		}
+	}
+	return
 }
 
 func (b *FunctionBuilder) SetForceCapture(bo bool) {

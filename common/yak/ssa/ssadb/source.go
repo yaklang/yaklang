@@ -2,9 +2,7 @@ package ssadb
 
 import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"path"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -61,22 +59,31 @@ func GetEditorByFileName(fileName string) (*memedit.MemEditor, error) {
 	return ret, nil
 }
 
-func SaveFile(filename, content string, hash string, folderPath []string) string {
+func SaveFile(filename, content string, programName string, folderPaths []string) string {
 	start := time.Now()
 	defer func() {
 		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	}()
-	if len(folderPath) == 0 || folderPath[0] == "" {
+	if programName == "" {
 		// only use memory
 		return ""
 	}
-	programName := folderPath[0]
+	// append program name with folder path as full path
+	fullPathParts := []string{programName}
+	fullPathParts = append(fullPathParts, folderPaths...)
+	fullPath := irSourceJoin(fullPathParts...)
+	// calc file hash
+	folderPath := irSourceJoin(folderPaths...)
+	fileUrl := irSourceJoin(folderPath, filename)
+	editor := memedit.NewMemEditorWithFileUrl(content, fileUrl)
+	hash := editor.GetIrSourceHash(programName)
+
 	irSource := &IrSource{
 		ProgramName:    programName,
 		SourceCodeHash: hash,
 		QuotedCode:     strconv.Quote(content),
 		FileName:       filename,
-		FolderPath:     path.Join(folderPath...),
+		FolderPath:     fullPath,
 		IsBigFile:      false,
 	}
 	irSource.save()
@@ -93,7 +100,7 @@ func SaveFolder(folderName string, folderPaths []string) error {
 		return utils.Errorf("folder path is empty")
 	}
 	programName := folderPaths[0]
-	folderPath := path.Join(folderPaths...)
+	folderPath := irSourceJoin(folderPaths...)
 
 	irSource := &IrSource{
 		ProgramName:    programName,
@@ -146,9 +153,9 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 	if code == "" {
 		code = source.QuotedCode
 	}
-	editor := memedit.NewMemEditor(code)
-	// strings.Split( source.FolderPath, sou
-	_, folder, _ := strings.Cut(source.FolderPath, source.ProgramName)
-	editor.SetUrl(path.Join(".", folder, source.FileName))
+	//_, folder, _ := strings.Cut(source.FolderPath, source.ProgramName)
+	_, fileUrl := splitProjectPath(irSourceJoin(source.FolderPath, source.FileName))
+	editor := memedit.NewMemEditorWithFileUrl(code, fileUrl)
+	editor.SetUrl(fileUrl)
 	return editor, nil
 }

@@ -113,7 +113,7 @@ func isFreemarkerFile(prog *ssa.Program, path string) bool {
 	if ext == ".ftl" {
 		return true
 	}
-	configExt := prog.GetProjectConfig("spring.freemarker.suffix")
+	configExt := prog.GetProjectConfigValue("spring.freemarker.suffix")
 	if configExt == "" {
 		return false
 	}

@@ -314,3 +314,41 @@ func convertToJSONableObject(yamlObj interface{}, jsonTarget *reflect.Value) (in
 		return yamlObj, nil
 	}
 }
+
+// YamlToKVParis flattens a Yaml object into key-value pairs.
+func YamlToKVParis(y []byte) (map[string]string, error) {
+	jsonData, err := YAMLToJSON(y)
+	if err != nil {
+		return nil, fmt.Errorf("error converting YAML to JSON: %v", err)
+	}
+
+	var jsonObj map[string]interface{}
+	err = json.Unmarshal(jsonData, &jsonObj)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling JSON: %v", err)
+	}
+
+	result := make(map[string]string)
+	flattenJSON(jsonObj, "", result)
+	return result, nil
+}
+
+// flattenJSON flattens a JSON object into key-value pairs.
+func flattenJSON(data map[string]interface{}, prefix string, result map[string]string) {
+	for key, value := range data {
+		if reflect.ValueOf(value).Kind() == reflect.Map {
+			flattenJSON(value.(map[string]interface{}), prefix+key+".", result)
+		} else if reflect.ValueOf(value).Kind() == reflect.Slice {
+			slice := value.([]interface{})
+			for i, item := range slice {
+				if reflect.ValueOf(item).Kind() == reflect.Map {
+					flattenJSON(item.(map[string]interface{}), prefix+key+"["+strconv.Itoa(i)+"].", result)
+				} else {
+					result[prefix+key+"["+strconv.Itoa(i)+"]"] = fmt.Sprintf("%v", item)
+				}
+			}
+		} else {
+			result[prefix+key] = fmt.Sprintf("%v", value)
+		}
+	}
+}

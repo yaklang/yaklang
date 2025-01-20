@@ -5,10 +5,9 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
-
-	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca"
@@ -80,16 +79,12 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		if prog.GetProgramName() == "" {
 			prog.ExtraFile[path] = string(raw)
 		} else {
-			folders := []string{prog.GetProgramName()}
-			folders = append(folders,
-				strings.Split(dirname, string(fileSystem.GetSeparators()))...,
-			)
+			folders := strings.Split(dirname, string(fileSystem.GetSeparators()))
 			content := string(raw)
-			editor := memedit.NewMemEditor(content)
-			editor.SetUrl(path)
-			prog.ExtraFile[path] = ssadb.SaveFile(filename, content, editor.GetIrSourceHash(prog.GetProgramName()), folders)
+			prog.ExtraFile[path] = ssadb.SaveFile(filename, content, prog.GetProgramName(), folders)
 		}
 	}
+
 	switch strings.ToLower(fileSystem.Ext(path)) {
 	case ".java", ".class":
 		raw, err := fileSystem.ReadFile(path)
@@ -122,7 +117,17 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 			return err
 		}
 		saveExtraFile(path, raw)
-		err = prog.ParseProjectConfig(string(raw), ssa.PROJECT_CONFIG_PROPERTIES)
+		err = prog.ParseProjectConfig(raw, path, ssa.PROJECT_CONFIG_PROPERTIES)
+		if err != nil {
+			return err
+		}
+	case ".yaml", ".yml":
+		raw, err := fileSystem.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		saveExtraFile(path, raw)
+		err = prog.ParseProjectConfig(raw, path, ssa.PROJECT_CONFIG_YAML)
 		if err != nil {
 			return err
 		}
