@@ -205,8 +205,8 @@ func (s *SyntaxFlowRule) BeforeSave() error {
 	s.Severity = ValidSeverityType(s.Severity)
 	return nil
 }
-func (s *SyntaxFlowRule) GetAlertInfo(msg string) (*SyntaxFlowDescInfo, bool) {
-	if info, ok := s.AlertDesc[msg]; ok {
+func (s *SyntaxFlowRule) GetAlertInfo(name string) (*SyntaxFlowDescInfo, bool) {
+	if info, ok := s.AlertDesc[name]; ok {
 		return info, true
 	}
 	return nil, false

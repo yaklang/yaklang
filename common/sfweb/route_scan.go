@@ -52,7 +52,7 @@ type SyntaxFlowScanRisk struct {
 	Timestamp   int64  `json:"timestamp"`
 }
 
-func ypbToSyntaxFlowScanRisk(risk *ypb.Risk, result *ypb.SyntaxFlowResult) *SyntaxFlowScanRisk {
+func ypbToSyntaxFlowScanRisk(risk *ypb.SSARisk, result *ypb.SyntaxFlowResult) *SyntaxFlowScanRisk {
 	if risk == nil {
 		return nil
 	}
@@ -63,7 +63,7 @@ func ypbToSyntaxFlowScanRisk(risk *ypb.Risk, result *ypb.SyntaxFlowResult) *Synt
 		Timestamp:   risk.CreatedAt,
 		Title:       risk.Title,
 		Type:        risk.RiskType,
-		VarName:     risk.SyntaxFlowVariable,
+		VarName:     risk.Variable,
 		ProgramName: risk.ProgramName,
 		RiskHash:    risk.Hash,
 	}
@@ -163,8 +163,8 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 				break
 			}
 
-			if len(msg.GetRisks()) > 0 {
-				risks := lo.Map(msg.GetRisks(), func(risk *ypb.Risk, _ int) *SyntaxFlowScanRisk {
+			if len(msg.GetSSARisks()) > 0 {
+				risks := lo.Map(msg.GetSSARisks(), func(risk *ypb.SSARisk, _ int) *SyntaxFlowScanRisk {
 					return ypbToSyntaxFlowScanRisk(risk, msg.GetResult())
 				})
 				err = WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
