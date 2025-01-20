@@ -391,6 +391,10 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 	return ci
 }
 
+func (f *FunctionBuilder) CopyConstInst(i *ConstInst) *ConstInst {
+	return f.EmitConstInst(i.value)
+}
+
 func (f *FunctionBuilder) EmitTypeCast(v Value, typ Type) *TypeCast {
 	if f.CurrentBlock.finish {
 		return nil
