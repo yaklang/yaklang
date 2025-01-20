@@ -17,7 +17,7 @@ import (
 )
 
 func TestGRPCMUSTTPASS_MITM_HijackFilter(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClientWithTempDatabase(t)
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
 	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
