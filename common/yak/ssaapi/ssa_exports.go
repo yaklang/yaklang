@@ -70,6 +70,8 @@ type config struct {
 	externInfo string
 	// process ctx
 	ctx context.Context
+
+	excludeFile func(path, filename string) bool
 }
 
 func defaultConfig(opts ...Option) (*config, error) {
@@ -85,6 +87,9 @@ func defaultConfig(opts ...Option) (*config, error) {
 		defineFunc:                 make(map[string]any),
 		toProfile:                  false,
 		DatabaseProgramCacheHitter: func(any) {},
+		excludeFile: func(path, filename string) bool {
+			return false
+		},
 	}
 
 	for _, opt := range opts {
@@ -110,6 +115,12 @@ func (c *config) Processf(process float64, format string, arg ...any) {
 	}
 }
 
+func WithExcludeFile(f func(path, filename string) bool) Option {
+	return func(c *config) error {
+		c.excludeFile = f
+		return nil
+	}
+}
 func WithProcess(process ProcessFunc) Option {
 	return func(c *config) error {
 		c.process = process
