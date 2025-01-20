@@ -53,7 +53,6 @@ func RegisterServerPushCallback(id string, stream ypb.Yak_DuplexConnectionServer
 	serverPushCallback[id] = serverPushDescription{
 		Name: id,
 		Handle: func(response *ypb.DuplexConnectionResponse) {
-			log.Infof("Broadcast data: %v", response)
 			_ = stream.Send(response)
 		},
 	}
