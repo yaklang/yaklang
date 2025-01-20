@@ -70,14 +70,14 @@ func WithProjectDatabasePath(p string) ServerOpts {
 }
 
 func (s *Server) GetProfileDatabase() *gorm.DB {
-	if s.profileDatabase != nil {
+	if s != nil && s.profileDatabase != nil {
 		return s.profileDatabase
 	}
 	return consts.GetGormProfileDatabase()
 }
 
 func (s *Server) GetProjectDatabase() *gorm.DB {
-	if s.projectDatabase != nil {
+	if s != nil && s.projectDatabase != nil {
 		return s.projectDatabase
 	}
 	return consts.GetGormProjectDatabase()
