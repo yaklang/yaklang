@@ -20,14 +20,13 @@ type SSARisk struct {
 	CodeRange     string `json:"code_range"`
 	CodeFragment  string `json:"code_fragment"`
 	//
-	Title           string `json:"title"`
-	TitleVerbose    string `json:"title_verbose"`
-	Description     string `json:"description"`
-	Solution        string `json:"solution"`
-	RiskType        string `json:"risk_type"`
-	RiskTypeVerbose string `json:"risk_verbose"`
-	Details         string `json:"details"`
-	Severity        string `json:"severity"`
+	Title        string             `json:"title"`
+	TitleVerbose string             `json:"title_verbose"`
+	Description  string             `json:"description"`
+	Solution     string             `json:"solution"`
+	RiskType     string             `json:"risk_type"`
+	Details      string             `json:"details"`
+	Severity     SyntaxFlowSeverity `json:"severity"`
 
 	// 来源于哪个插件？
 	FromRule string `json:"from_rule"`
@@ -59,6 +58,18 @@ func (s *SSARisk) CalcHash() string {
 	return utils.CalcSha1(s.CodeSourceUrl, s.CodeRange, s.RuntimeId, s.ProgramName, s.Title, s.RiskType)
 }
 
+func SSARiskTypeVerbose(s string) string {
+	switch s {
+	case "cwe":
+		return "CWE"
+	case "owasp":
+		return "OWASP"
+	case "custom":
+		return "自定义"
+	default:
+		return s
+	}
+}
 func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 	return &ypb.SSARisk{
 		Id:                  int64(s.ID),
@@ -72,9 +83,9 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 		Title:               s.Title,
 		TitleVerbose:        s.TitleVerbose,
 		RiskType:            s.RiskType,
-		RiskTypeVerbose:     s.RiskTypeVerbose,
+		RiskTypeVerbose:     SSARiskTypeVerbose(s.RiskType),
 		Details:             s.Details,
-		Severity:            s.Severity,
+		Severity:            string(s.Severity),
 		FromRule:            s.FromRule,
 		RuntimeID:           s.RuntimeId,
 		IsPotential:         s.IsPotential,
@@ -94,6 +105,10 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 }
 
 func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
+	if s.RiskType == "" {
+		s.RiskType = "其他"
+	}
+	s.Severity = ValidSeverityType(s.Severity)
 	s.Hash = s.CalcHash()
 	return nil
 }

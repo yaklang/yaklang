@@ -101,7 +101,7 @@ func buildSSARisk(
 		TitleVerbose:  rule.TitleZh,
 		Description:   rule.Description,
 		RiskType:      rule.RiskType,
-		Severity:      string(rule.Severity),
+		Severity:      rule.Severity,
 		CVE:           rule.CVE,
 
 		FromRule:    rule.RuleName,
@@ -126,7 +126,7 @@ func buildSSARisk(
 	} else {
 		// cover info from alertMsg
 		if alertInfo.Severity != "" {
-			newSSARisk.Severity = string(alertInfo.Severity)
+			newSSARisk.Severity = alertInfo.Severity
 		}
 		if alertInfo.CVE != "" {
 			newSSARisk.CVE = alertInfo.CVE

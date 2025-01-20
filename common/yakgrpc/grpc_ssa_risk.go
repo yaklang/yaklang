@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -55,25 +56,12 @@ func FieldGroup2FiledGroupName(fgs []*ypb.FieldGroup, verbose func(string) strin
 	})
 }
 
-func SSARiskTypeVerbose(s string) string {
-	switch s {
-	case "cwe":
-		return "CWE"
-	case "owasp":
-		return "OWASP"
-	case "custom":
-		return "自定义"
-	default:
-		return "未知"
-	}
-}
-
 func (s *Server) GetSSARiskFieldGroup(ctx context.Context, req *ypb.Empty) (*ypb.SSARiskFieldGroupResponse, error) {
 	db := s.GetSSADatabase()
 	return &ypb.SSARiskFieldGroupResponse{
-		ProgramNameField: yakit.SSARiskColumnGroupCount(db, "program_name"),
-		SeverityField:    FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "severity"), severityVerbose),
-		RiskTypeField:    FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "risk_type"), SSARiskTypeVerbose),
+		FileField:     yakit.SSARiskColumnGroupCount(db, "code_source_url"),
+		SeverityField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "severity"), severityVerbose),
+		RiskTypeField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "risk_type"), schema.SSARiskTypeVerbose),
 	}, nil
 }
 

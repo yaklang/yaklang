@@ -1,13 +1,14 @@
 package yakit
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestSSARisk_CURD(t *testing.T) {
@@ -59,12 +60,10 @@ func TestSSARisk_GroupCount(t *testing.T) {
 
 	programNameToken1 := utils.RandStringBytes(10)
 	riskTypeToken1 := utils.RandStringBytes(10)
-	severityToke1 := utils.RandStringBytes(10)
 	for i := 0; i < 10; i++ {
 		err := CreateSSARisk(db, &schema.SSARisk{
 			ProgramName: programNameToken1,
 			RiskType:    riskTypeToken1,
-			Severity:    severityToke1,
 		})
 		require.NoError(t, err)
 	}
@@ -74,12 +73,10 @@ func TestSSARisk_GroupCount(t *testing.T) {
 	})
 	programNameToken2 := utils.RandStringBytes(10)
 	riskTypeToken2 := utils.RandStringBytes(10)
-	severityToke2 := utils.RandStringBytes(10)
 	for i := 0; i < 10; i++ {
 		err := CreateSSARisk(db, &schema.SSARisk{
 			ProgramName: programNameToken2,
 			RiskType:    riskTypeToken2,
-			Severity:    severityToke2,
 		})
 		require.NoError(t, err)
 	}
