@@ -99,11 +99,6 @@ var constClujore = func(i interface{}) func() interface{} {
 	}
 }
 
-const (
-	MITMReplacerKeyRecords = "R1oHf8xca6CobwVg2_MITMReplacerKeyRecords"
-	MITMFilterKeyRecords   = "uWokegBnCQdnxezJtMVo_MITMFilterKeyRecords"
-)
-
 func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	defer func() {
 		if err := recover(); err != nil {
@@ -262,7 +257,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	/*
 		设置过滤器
 	*/
-	filterManager := GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
+	var (
+		filterManager       = GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
+		hijackFilterManager = GetMITMHijackFilterManager(s.GetProjectDatabase())
+	)
 
 	/*
 		设置内容替换模块，通过正则驱动
@@ -504,12 +502,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 			// 设置自动转发
 			if reqInstance.GetSetAutoForward() {
-				clearPluginHTTPFlowCache()
-				beforeAuto := autoForward.IsSet() // 存当前状态
-				log.Debugf("mitm-auto-forward: %v", reqInstance.GetAutoForwardValue())
-				autoForward.SetTo(reqInstance.GetAutoForwardValue())
-				if !beforeAuto && autoForward.IsSet() { // 当 f -> t 时发送信号
-					autoForwardCh <- struct{}{}
+				autoForwardValue := reqInstance.GetAutoForwardValue()
+				if autoForwardValue != autoForward.IsSet() {
+					clearPluginHTTPFlowCache()
+					beforeAuto := autoForward.IsSet() // 存当前状态
+					log.Debugf("mitm-auto-forward: %v", autoForwardValue)
+					autoForward.SetTo(autoForwardValue)
+					if !beforeAuto && autoForwardValue { // 当 f -> t 时发送信号
+						autoForwardCh <- struct{}{}
+					}
 				}
 			}
 
@@ -577,6 +578,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				filterManager.Update(reqInstance.FilterData)
 				filterManager.Save()
 				recoverFilterAndReplacerSend()
+				continue
+			}
+
+			if reqInstance.UpdateHijackFilter {
+				if hijackFilterManager == nil {
+					hijackFilterManager = NewMITMFilter(reqInstance.HijackFilterData)
+				} else {
+					hijackFilterManager.Update(reqInstance.HijackFilterData)
+				}
 				continue
 			}
 
@@ -973,6 +983,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				extName = "." + extName
 			}
 		}
+
 		if !filterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return raw
@@ -994,6 +1005,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 			})
 		}()
+		// 条件劫持
+		if hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
+			log.Infof("[mitm] hijack ws request by hijack filter")
+			autoForward.SetTo(false)
+		}
 
 		// MITM 自动转发
 		if autoForward.IsSet() {
@@ -1235,10 +1251,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			req = httpctx.GetHijackedRequestBytes(originReqIns)
 		}
 
-		// 过滤
-		if !filterManager.IsPassed(method, hostname, urlStr, extName) {
-			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
-			return req
+		// 条件劫持
+		if hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(method, hostname, urlStr, extName) {
+			log.Infof("[mitm] hijack request by hijack filter")
+			autoForward.SetTo(false)
 		}
 
 		// MITM 手动劫持放行
@@ -1847,12 +1863,15 @@ func (h *hijackTaskController) clear() {
 		h.statusMapMux.Unlock()
 	}()
 
-	for _, t := range h.taskStatusMap {
+	for key, t := range h.taskStatusMap {
+		if key == h.currentTask {
+			continue
+		}
 		t.setStatus(autoFoward)
+		delete(h.taskStatusMap, key)
 	}
 	h.currentTask = ""
 	h.taskQueue = h.taskQueue[:0]
-	h.taskStatusMap = make(map[string]*taskStatus)
 	h.canDequeue.UnSet()
 }
 

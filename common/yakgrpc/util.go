@@ -8,13 +8,16 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/segmentio/ksuid"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,12 +28,13 @@ import (
 )
 
 const (
-	DbOperationCreate = "create"
-	DbOperationDelete = "delete"
-	DbOperationUpdate = "update"
-	DbOperationQuery  = "query"
+	DbOperationCreate         = "create"
+	DbOperationDelete         = "delete"
+	DbOperationUpdate         = "update"
+	DbOperationQuery          = "query"
 	DbOperationCreateOrUpdate = "create_or_update"
 )
+
 // OpenPortServerStreamerHelperRWC
 type OpenPortServerStreamerHelperRWC struct {
 	io.ReadWriteCloser
@@ -176,18 +180,67 @@ var (
 )
 
 func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
-	return newLocalClientEx(locals...)
-}
-
-func newLocalClientEx(locals ...bool) (ypb.YakClient, error) {
-	var port int
-	var addr string
-	netx.UnsetProxyFromEnv()
-
 	local := false
 	if len(locals) > 0 {
 		local = locals[0]
 	}
+	return newLocalClientEx(local)
+}
+
+func NewLocalClientWithTempDatabase(t *testing.T) (ypb.YakClient, error) {
+	var port int
+	var addr string
+	netx.UnsetProxyFromEnv()
+
+	dialServer := func(addr string) (ypb.YakClient, error) {
+		conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(100*1024*1045),
+			grpc.MaxCallRecvMsgSize(100*1024*1045),
+		))
+		return ypb.NewYakClient(conn), err
+	}
+
+	port = utils.GetRandomAvailableTCPPort()
+	addr = utils.HostPort("127.0.0.1", port)
+	grpcTrans := grpc.NewServer(
+		grpc.MaxRecvMsgSize(100*1024*1024),
+		grpc.MaxSendMsgSize(100*1024*1024),
+	)
+	profileDatabasePath := path.Join(os.TempDir(), fmt.Sprintf("%s.db", ksuid.New().String()))
+	projectDatabasePath := path.Join(os.TempDir(), fmt.Sprintf("%s.db", ksuid.New().String()))
+	s, err := newServerEx(WithInitFacadeServer(true), WithProfileDatabasePath(profileDatabasePath), WithProjectDatabasePath(projectDatabasePath))
+	if err != nil {
+		log.Errorf("build yakit server failed: %s", err)
+		return nil, err
+	}
+	ypb.RegisterYakServer(grpcTrans, s)
+	var lis net.Listener
+	lis, err = net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	t.Cleanup(func() {
+		os.Remove(profileDatabasePath)
+		os.Remove(projectDatabasePath)
+	})
+	go func() {
+		defer func() {
+
+		}()
+		err = grpcTrans.Serve(lis)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	time.Sleep(1 * time.Second)
+	return dialServer(addr)
+}
+
+func newLocalClientEx(local bool) (ypb.YakClient, error) {
+	var port int
+	var addr string
+	netx.UnsetProxyFromEnv()
+
 	dialServer := func(addr string) (ypb.YakClient, error) {
 		conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(100*1024*1045),
@@ -205,7 +258,11 @@ func newLocalClientEx(locals ...bool) (ypb.YakClient, error) {
 				grpc.MaxRecvMsgSize(100*1024*1024),
 				grpc.MaxSendMsgSize(100*1024*1024),
 			)
-			s, err := newServerEx(WithInitFacadeServer(true))
+			opts := []ServerOpts{WithInitFacadeServer(true)}
+			var (
+				profileDatabasePath, projectDatabasePath string
+			)
+			s, err := newServerEx(opts...)
 			if err != nil {
 				log.Errorf("build yakit server failed: %s", err)
 				finalErr = err
@@ -219,6 +276,14 @@ func newLocalClientEx(locals ...bool) (ypb.YakClient, error) {
 				return
 			}
 			go func() {
+				defer func() {
+					if profileDatabasePath != "" {
+						os.Remove(profileDatabasePath)
+					}
+					if projectDatabasePath != "" {
+						os.Remove(projectDatabasePath)
+					}
+				}()
 				err = grpcTrans.Serve(lis)
 				if err != nil {
 					log.Error(err)

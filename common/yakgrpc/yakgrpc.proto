@@ -769,7 +769,14 @@ service Yak {
   rpc UploadHotPatchTemplateToOnline(UploadHotPatchTemplateToOnlineRequest) returns (Empty);
   rpc DownloadHotPatchTemplate(DownloadHotPatchTemplateRequest) returns (Empty);
 
+
+  // MITM hijack filter
+  rpc SetMITMHijackFilter(SetMITMFilterRequest) returns (SetMITMFilterResponse);
+  rpc GetMITMHijackFilter(Empty) returns (SetMITMFilterRequest);
+  rpc ResetMITMHijackFilter(Empty) returns (SetMITMFilterRequest);
 }
+
+
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
   string Key = 2;
@@ -5033,7 +5040,7 @@ message MITMRequest {
   bool setPluginMode = 36;
   repeated string initPluginNames = 37;
 
-  // 设置内容替代器
+  // 设置规则
   bool setContentReplacers = 38;
   repeated MITMContentReplacer replacers = 39;
 
@@ -5081,6 +5088,10 @@ message MITMRequest {
 
   // disable websocket compression
   bool DisableWebsocketCompression = 64;
+
+  // hijack filter
+  MITMFilterData HijackFilterData = 65;
+  bool updateHijackFilter = 66;
 }
 
 message FilterDataItem {
@@ -5190,7 +5201,7 @@ message MITMResponse {
   repeated string includeUri = 115;
   MITMFilterData FilterData = 116;
 
-  // 替代过滤器的内容
+  // 替代规则的内容
   bool justContentReplacer = 120;
   repeated MITMContentReplacer replacers = 121;
 
