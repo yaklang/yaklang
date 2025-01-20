@@ -254,3 +254,7 @@ func loadIrSourceFS(path, progName string, isDir bool, fs *irSourceFS, vf *files
 		add2FS(source)
 	}
 }
+
+func irSourceJoin(element ...string) string {
+	return path.Join(element...)
+}
