@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"io/fs"
+	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -65,13 +66,15 @@ func (c *config) parseProjectWithFS(
 			if fi.Size() == 0 {
 				return nil
 			}
+			if c.excludeFile(path, fi.Name()) {
+				return nil
+			}
 			if c.checkLanguage(path) == nil {
 				parseSize++
 			}
 			if c.checkLanguagePreHandler(path) == nil {
 				preHandlerSize++
 			}
-			// log.Infof("nomatch when calc total: %s", path)
 			return nil
 		}),
 	)
@@ -108,6 +111,10 @@ func (c *config) parseProjectWithFS(
 				}
 			}()
 			if fi.Size() == 0 {
+				return nil
+			}
+			//check exclude_file
+			if c.excludeFile(path, fi.Name()) {
 				return nil
 			}
 			// check
@@ -150,6 +157,10 @@ func (c *config) parseProjectWithFS(
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
+			dir, file := filepath.Split(path)
+			if c.excludeFile(dir, file) {
+				return nil, nil
+			}
 
 			// check
 			if err := c.checkLanguage(path); err != nil {
