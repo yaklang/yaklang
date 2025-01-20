@@ -144,9 +144,27 @@ const (
 	NativeCall_Java_UnEscape_Output = "javaUnescapeOutput"
 
 	NativeCall_Foeach_Func_Inst = "foreach_function_inst"
+
+	NativeCall_GetUsers = "getUsers"
 )
 
 func init() {
+	registerNativeCall(NativeCall_GetUsers, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				result = append(result, ret.GetUsers())
+			case *Values:
+				result = append(result, ret.GetUsers())
+			}
+			return nil
+		})
+		if len(result) > 0 {
+			return true, sfvm.NewValues(result), nil
+		}
+		return false, nil, nil
+	}), nc_desc("获取值的Users"))
 	//<foreach_function_inst(hook=`xxx` as $result)> as $result
 	registerNativeCall(NativeCall_Foeach_Func_Inst, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
