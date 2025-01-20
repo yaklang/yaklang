@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/yaklang/yaklang/common/consts"
 	"net/http"
 	"reflect"
 	"strings"
@@ -98,6 +99,8 @@ type httpPoolConfig struct {
 	WithPayloads bool
 
 	RandomSession bool // for cookie jar
+
+	SaveHTTPFlow bool // 是否保存 HTTP 流量
 
 	FromPlugin string
 
@@ -534,6 +537,12 @@ func _httpPool_withRandomSession(randomSession bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_withSaveHTTPFlow(randomSession bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.SaveHTTPFlow = randomSession
+	}
+}
+
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type HttpResult struct {
@@ -569,6 +578,7 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 		FollowJSRedirect:   false,
 		Ctx:                context.Background(),
 		ForceFuzz:          true,
+		SaveHTTPFlow:       consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
 		ForceFuzzDangerous: false,
 	}
 	for _, opt := range opts {
@@ -845,6 +855,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithGmTLS(config.IsGmTLS),
 							lowhttp.WithConnPool(config.WithConnPool),
 							lowhttp.WithDebugCount(beforeCount, afterCount),
+							lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
 						}
 
 						if config.ConnPool != nil {
@@ -1168,4 +1179,5 @@ var (
 	WithPoolOpt_ExternSwitch               = _httpPool_ExternSwitch
 	WithPoolOpt_WithPayloads               = _httpPool_withPayloads
 	WithPoolOpt_RandomSession              = _httpPool_withRandomSession
+	WithPoolOpt_SaveHTTPFlow               = _httpPool_withSaveHTTPFlow
 )
