@@ -256,6 +256,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			response.TooLargeLimit = int64(maxContentLength)
 		}
 
+		if saveHTTPFlowHandler != nil {
+			saveHTTPFlowHandler(response)
+		}
+
 		if response == nil || !saveHTTPFlow {
 			return
 		}
@@ -270,10 +274,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				}
 				cancel()
 			}()
-
-			if saveHTTPFlowHandler != nil {
-				saveHTTPFlowHandler(response)
-			}
 
 			SaveLowHTTPResponse(response, saveHTTPFlowSync)
 		}()
