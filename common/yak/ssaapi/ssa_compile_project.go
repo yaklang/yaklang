@@ -30,7 +30,7 @@ func PeepholeCompile(fs fi.FileSystem, size int, opts ...Option) (Programs, erro
 
 func ParseProject(opts ...Option) (Programs, error) {
 	config, err := defaultConfig(opts...)
-	config.fs = filesys.ConvertToUnifiedFs(config.fs)
+	config.fs = filesys.ConvertToUnifiedFs(config.fs, ssadb.GetIrSourceFsSeparators())
 	if err != nil {
 		return nil, err
 	}

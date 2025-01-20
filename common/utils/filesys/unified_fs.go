@@ -4,27 +4,25 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"io/fs"
 	"os"
-	"path"
 	"strings"
 )
-
-var UnifiedFsSeparators = '/'
 
 // UnifiedFS is a unified file system that can handle both windows and unix paths
 type UnifiedFS struct {
 	fi.FileSystem
+	separators rune
 }
 
-func ConvertToUnifiedFs(fs fi.FileSystem) *UnifiedFS {
-	return &UnifiedFS{fs}
+func ConvertToUnifiedFs(fs fi.FileSystem, separators rune) *UnifiedFS {
+	return &UnifiedFS{fs, separators}
 }
 
 func (u *UnifiedFS) GetSeparators() rune {
-	return UnifiedFsSeparators
+	return u.separators
 }
 
 func (u *UnifiedFS) Join(elem ...string) string {
-	return path.Join(elem...)
+	return joinWithSeparators(u.GetSeparators(), elem...)
 }
 
 func (u *UnifiedFS) PathSplit(name string) (string, string) {
@@ -32,7 +30,7 @@ func (u *UnifiedFS) PathSplit(name string) (string, string) {
 }
 
 func (u *UnifiedFS) Base(name string) string {
-	return path.Base(name)
+	return baseWithSeparators(name, u.GetSeparators())
 }
 
 func (u *UnifiedFS) Stat(name string) (fs.FileInfo, error) {
@@ -52,7 +50,7 @@ func (u *UnifiedFS) Exists(name string) (bool, error) {
 }
 
 func (u *UnifiedFS) IsAbs(name string) bool {
-	return len(name) > 0 && name[0] == byte(UnifiedFsSeparators)
+	return len(name) > 0 && name[0] == byte(u.GetSeparators())
 }
 
 func (u *UnifiedFS) Getwd() (string, error) { return ".", nil }
@@ -84,6 +82,6 @@ func (u *UnifiedFS) MkdirAll(name string, perm os.FileMode) error {
 }
 
 func (u *UnifiedFS) convertToRealPath(name string) string {
-	path := strings.Split(name, string(UnifiedFsSeparators))
+	path := strings.Split(name, string(u.GetSeparators()))
 	return u.FileSystem.Join(path...)
 }
