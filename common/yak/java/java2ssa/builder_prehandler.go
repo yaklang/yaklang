@@ -175,7 +175,3 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 	}
 	return nil
 }
-
-func (s *SSABuilder) AfterPreHandlerProject(fb *ssa.FunctionBuilder) {
-	fb.GenerateProjectConfig()
-}
