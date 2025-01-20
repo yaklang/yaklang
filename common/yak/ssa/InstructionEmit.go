@@ -391,6 +391,31 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 	return ci
 }
 
+func (f *FunctionBuilder) CopyValue(v Value) Value {
+	switch i := v.(type) {
+	case *ConstInst:
+		return f.EmitConstInst(i.value)
+	case *Make:
+		var mkeys, mmembers []Value
+		for k, m := range i.GetAllMember() {
+			mkeys = append(mkeys, k)
+			mmembers = append(mmembers, m)
+		}
+		newObject := f.InterfaceAddFieldBuild(len(mkeys),
+			func(i int) Value {
+				return mkeys[i]
+			},
+			func(i int) Value {
+				return mmembers[i]
+			})
+		newObject.SetVerboseName(i.verboseName)
+		newObject.SetType(v.GetType())
+		return newObject
+	}
+
+	return v
+}
+
 func (f *FunctionBuilder) EmitTypeCast(v Value, typ Type) *TypeCast {
 	if f.CurrentBlock.finish {
 		return nil
@@ -493,12 +518,11 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 			Modify:               se.Modify,
 			forceCreate:          se.forceCreate,
 			Variable:             se.Variable,
-			BindVariable:         se.BindVariable,
 			parameterMemberInner: se.parameterMemberInner,
 		}
 
 		if variable := scope.ReadVariable(se.Name); variable != nil {
-			if find, bind := scope.ReadVariableFromLinkSideEffect(se.Name); find != nil && bind == se.BindVariable {
+			if find, bind := scope.ReadVariableFromLinkSideEffect(se.Name); find != nil && bind == se.Variable {
 				value = find.GetValue()
 			} else {
 				value = variable.GetValue()
@@ -509,15 +533,11 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 				ser.Modify = value
 			}
 		}
-		variable := se.BindVariable
-		if variable == nil {
-			variable = se.Variable
+		bindVariable := se.Variable
+		if bindVariable == nil {
+			bindVariable = value.GetLastVariable()
 		}
-		if variable == nil {
-			variable = value.GetLastVariable()
-		}
-
-		SideEffectsReturn[variable] = ser
+		SideEffectsReturn[bindVariable] = ser
 	}
 	f.SideEffects = nil
 	f.SideEffectsReturn = append(f.SideEffectsReturn, SideEffectsReturn)

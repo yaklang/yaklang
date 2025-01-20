@@ -419,6 +419,10 @@ func (v *BaseGoParserVisitor) VisitArguments(ctx *ArgumentsContext) interface{} 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseGoParserVisitor) VisitStarExpr(ctx *StarExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseGoParserVisitor) VisitMethodExpr(ctx *MethodExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }

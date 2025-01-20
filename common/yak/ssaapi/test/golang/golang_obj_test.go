@@ -25,7 +25,7 @@ func TestBasic_BasicObject(t *testing.T) {
 	`,
 			`d #-> as $target`,
 			map[string][]string{
-				"target": {"3", "1"},
+				"target": {"4"},
 			},
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
@@ -60,7 +60,7 @@ func TestBasic_BasicObject(t *testing.T) {
 }
 
 func TestBasic_BasicObjectEx(t *testing.T) {
-	ssatest.CheckSyntaxFlowContain(t,`
+	ssatest.CheckSyntaxFlowContain(t, `
 		package main
 
 		type Queue struct {
@@ -80,8 +80,8 @@ func TestBasic_BasicObjectEx(t *testing.T) {
 	`, `
 		b #-> as $target
 	`, map[string][]string{
-			"target": {"1"},
-		},
+		"target": {"1"},
+	},
 		ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
@@ -112,7 +112,7 @@ func TestBasic_Phi(t *testing.T) {
 	)
 }
 
-func TestBasic_BasicStruct(t *testing.T){
+func TestBasic_BasicStruct(t *testing.T) {
 	ssatest.CheckSyntaxFlowContain(t,
 		`package main
 
@@ -131,7 +131,7 @@ func main (){
 	`, `
 	println(* #-> as $a)
 	`, map[string][]string{
-			"a":  {"1"},
+			"a": {"1"},
 		},
 		ssaapi.WithLanguage(ssaapi.GO),
 	)
