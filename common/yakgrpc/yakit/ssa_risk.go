@@ -61,6 +61,7 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "runtime_id", filter.GetRuntimeID())
 	db = bizhelper.ExactQueryUint64ArrayOr(db, "result_id", filter.GetResultID())
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, filter.GetTags(), false)
+	db = bizhelper.FuzzSearchEx(db, []string{"title"}, filter.GetTitle(), false)
 	db = bizhelper.FuzzSearchEx(db, []string{
 		"program_name", "code_source_url",
 		"risk_type", "severity", "from_rule", "tags",
