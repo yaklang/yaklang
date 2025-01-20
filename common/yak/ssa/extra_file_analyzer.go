@@ -34,7 +34,7 @@ type PreHandlerInit struct {
 }
 
 func (d *PreHandlerInit) AfterPreHandlerProject(builder *FunctionBuilder) {
-	return
+	builder.GenerateProjectConfig()
 }
 
 func NewPreHandlerInit(fs ...initHanlderFunc) *PreHandlerInit {
