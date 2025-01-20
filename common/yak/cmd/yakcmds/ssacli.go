@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gobwas/glob"
 	"io"
 	"io/fs"
 	"os"
@@ -70,13 +71,24 @@ var SSACompilerCommands = []*cli.Command{
 			cli.StringFlag{
 				Name: "language",
 			},
+			cli.StringFlag{
+				Name: "exclude-file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			var sfrules []*schema.SyntaxFlowRule
 			file := c.String("file")
 			rules := c.String("rules")
 			language := c.String("language")
-
+			excludeFiles := c.StringSlice("exclude-file")
+			var excludeCompile []glob.Glob
+			for _, s := range excludeFiles {
+				compile, err := glob.Compile(s)
+				if err != nil {
+					return err
+				}
+				excludeCompile = append(excludeCompile, compile)
+			}
 			zipfs, err2 := filesys.NewZipFSFromLocal(file)
 			if err2 != nil {
 				return err2
@@ -99,7 +111,14 @@ var SSACompilerCommands = []*cli.Command{
 				sfrules = append(sfrules, sfrule)
 				return nil
 			}))
-			programs, err := ssaapi.ParseProjectWithFS(zipfs, ssaapi.WithRawLanguage(language))
+			programs, err := ssaapi.ParseProjectWithFS(zipfs, ssaapi.WithRawLanguage(language), ssaapi.WithExcludeFile(func(path, filename string) bool {
+				for _, g := range excludeCompile {
+					if g.Match(file) {
+						return true
+					}
+				}
+				return false
+			}))
 			if err != nil {
 				return err
 			}

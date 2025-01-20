@@ -1,15 +1,9 @@
 name: Diff-Code-Check
 on:
-  pull_request:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Essential Tests"]
     types:
-      - opened
-      - synchronize
-      - reopened
-    paths:
-      - ".github/workflows/diff-code-check.yml"
-      - "common/**"
+      - completed
 jobs:
   setup:
     runs-on: ubuntu-20.04
@@ -21,25 +15,27 @@ jobs:
           path: |
             ~/yakit-projects
             ${{ github.workspace }}
-          key: go-${{ github.event.pull_request.head.sha }}
+          key: go-${{ github.event.workflow_run.head_sha }}
 
       - name: Check out code into the Go module directory
         if: steps.cache-project.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+
       - name: Fetch Main And Reset Main
         run: |
           git fetch --all
           git checkout main
           git reset --hard origin/main
-          git checkout ${{ github.event.pull_request.head.sha }}
+          git checkout ${{ github.event.workflow_run.head_sha }}
       - name: Set up Go 1.x
         uses: actions/setup-go@v4
         with:
           go-version-file: "./go.mod"
         id: go
+
       - name: Dependence
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
@@ -57,12 +53,12 @@ jobs:
         run: |
           pwd && ls -al
           ./yak -h
-          MERGE_BASE=$(git merge-base main ${{ github.event.pull_request.head.sha }})
+          MERGE_BASE=$(git merge-base main ${{ github.event.workflow_run.head_sha }})
           echo "Merge base is: $MERGE_BASE"
-          ./yak gitefs --start $MERGE_BASE --end ${{ github.event.pull_request.head.sha }} --output ./fs.zip
-          ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule > log.txt 2>&1 || exit 1
+          ./yak gitefs --start $MERGE_BASE --end ${{ github.event.workflow_run.head_sha }} --output ./fs.zip
+          ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule --exclude-file *.pb.go > log.txt 2>&1 || exit 1
+
       - name: Upload fail log
-        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: log.txt
