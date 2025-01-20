@@ -17,10 +17,6 @@ type SSABuild struct {
 	*ssa.PreHandlerInit
 }
 
-func (s *SSABuild) AfterPreHandlerPeoject(builder *ssa.FunctionBuilder) {
-	return
-}
-
 var Builder ssa.Builder = &SSABuild{}
 
 func (s *SSABuild) Create() ssa.Builder {
