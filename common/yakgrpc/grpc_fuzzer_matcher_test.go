@@ -104,6 +104,37 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 		}
 	})
 
+	t.Run("re_matcher_with_discard_legacy", func(t *testing.T) {
+		matcher := &ypb.HTTPResponseMatcher{
+			MatcherType: "word",
+			Scope:       "raw",
+			Condition:   "and",
+			Group:       []string{"123"},
+			ExprType:    "nuclei-dsl",
+			Action:      Action_Discard,
+		}
+
+		matcherStream, err := client.HTTPFuzzer(context.Background(),
+			&ypb.FuzzerRequest{
+				Matchers:           []*ypb.HTTPResponseMatcher{matcher},
+				HistoryWebFuzzerId: int32(taskID),
+				ReMatch:            true,
+			})
+
+		require.NoError(t, err)
+		count := 0
+		for {
+			resp, err := matcherStream.Recv()
+			if err != nil {
+				break
+			}
+			if resp.Discard {
+				count++
+			}
+		}
+		require.Equal(t, 9, count, "discount count is not 9")
+	})
+
 	t.Run("re_matcher_with_discard", func(t *testing.T) {
 		matcher := &ypb.HTTPResponseMatcher{
 			MatcherType: "word",
@@ -119,6 +150,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 				Matchers:           []*ypb.HTTPResponseMatcher{matcher},
 				HistoryWebFuzzerId: int32(taskID),
 				ReMatch:            true,
+				EngineDropPacket:   true,
 			})
 
 		require.NoError(t, err)
@@ -452,9 +484,10 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 
 		target := utils.HostPort(host, port)
 		stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
-			Request:   "GET /?a={{i(0-10)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
-			ForceFuzz: true,
-			Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+			Request:          "GET /?a={{i(0-10)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+			ForceFuzz:        true,
+			Matchers:         []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+			EngineDropPacket: true,
 		})
 		require.NoError(t, err)
 		var retainCount int
@@ -476,6 +509,30 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 		}, 6)
 		require.NoError(t, err)
 
+		// legacy
+		stream, err = client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+			Request:   "GET /?a={{i(0-10)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+			ForceFuzz: true,
+			Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+		})
+		require.NoError(t, err)
+		retainCount = 0
+		var discardCount int
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			if resp.Discard {
+				discardCount++
+			} else {
+				require.Equal(t, "red", resp.HitColor, "retain color is not red")
+				retainCount++
+			}
+		}
+		require.Equal(t, 6, retainCount, "retain count is not 6")
+		require.Equal(t, 5, discardCount, "other count is not 5")
+		require.NoError(t, err)
 	})
 
 	t.Run("discard test", func(t *testing.T) {
@@ -510,9 +567,10 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 
 		target := utils.HostPort(host, port)
 		stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
-			Request:   "GET /?a={{i(0-10)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
-			ForceFuzz: true,
-			Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+			Request:          "GET /?a={{i(0-10)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+			ForceFuzz:        true,
+			Matchers:         []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+			EngineDropPacket: true,
 		})
 		require.NoError(t, err)
 		var retainCount int
@@ -533,5 +591,30 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 			RuntimeId: runtimeID,
 		}, 5)
 		require.NoError(t, err)
+
+		// legacy
+		stream, err = client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+			Request:   "GET /?a={{i(0-10)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+			ForceFuzz: true,
+			Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+		})
+		require.NoError(t, err)
+		retainCount = 0
+		var discardCount int
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			if resp.Discard {
+				require.Equal(t, "red", resp.HitColor, "discard return color is not red")
+				discardCount++
+			} else {
+				require.Equal(t, "blue", resp.HitColor, "not discard return color is not blue")
+				retainCount++
+			}
+		}
+		require.Equal(t, 6, discardCount, "discard count is not 6")
+		require.Equal(t, 5, retainCount, "other count is not 5")
 	})
 }
