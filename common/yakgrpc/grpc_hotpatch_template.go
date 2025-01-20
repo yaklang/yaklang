@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -136,12 +137,12 @@ func (s *Server) UploadHotPatchTemplateToOnline(ctx context.Context, req *ypb.Up
 	}
 	data, err := json.Marshal(template)
 	if err != nil {
-		return nil, utils.Errorf(err.Error())
+		return nil, err
 	}
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 	err = client.UploadHotPatchTemplateToOnline(ctx, req.Token, data)
 	if err != nil {
-		return nil, utils.Errorf("UploadHotPatchTemplate to online failed: %s" + err.Error())
+		return nil, utils.Errorf("UploadHotPatchTemplate to online failed: %v", err)
 	}
 	return &ypb.Empty{}, nil
 }
