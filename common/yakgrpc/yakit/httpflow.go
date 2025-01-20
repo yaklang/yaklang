@@ -32,62 +32,64 @@ func init() {
 	})
 }
 
+func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
+	var (
+		https       = r.Https
+		req         = r.RawRequest
+		rsp         = r.RawPacket
+		url         = r.Url
+		remoteAddr  = r.RemoteAddr
+		reqSource   = r.Source
+		runtimeId   = r.RuntimeId
+		fromPlugin  = r.FromPlugin
+		hiddenIndex = r.HiddenIndex
+		payloads    = r.Payloads
+		tags        = r.Tags
+		duration    = r.TraceInfo.TotalTime
+		reqIns      *http.Request
+	)
+
+	// fix some field
+	if r.HiddenIndex == "" {
+		r.HiddenIndex = uuid.NewString()
+		hiddenIndex = r.HiddenIndex
+	}
+	if r.TooLarge {
+		rsp = lowhttp.ReplaceHTTPPacketBodyFast(rsp, []byte(`[[response too large(`+utils.ByteSize(uint64(r.TooLargeLimit))+`), truncated]] find more in web fuzzer history!`))
+	}
+	if rsp == nil || len(rsp) == 0 {
+		return
+	}
+	reqIns = r.RequestInstance
+
+	// db := consts.GetGormProjectDatabase()
+	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns), CreateHTTPFlowWithTags(strings.Join(r.Tags, "|")), CreateHTTPFlowWithDuration(duration))
+	if err != nil {
+		log.Errorf("create httpflow from lowhttp failed: %s", err)
+		return
+	}
+	switch ret := strings.ToLower(reqSource); ret {
+	case "mitm":
+		flow.SourceType = "mitm"
+	case "basic-crawler", "crawler", "crawlerx":
+		flow.SourceType = "basic-crawler"
+	case "scan", "port-scan", "plugin":
+		flow.SourceType = "scan"
+
+	}
+	flow.FromPlugin = fromPlugin
+	flow.RuntimeId = runtimeId
+	flow.HiddenIndex = hiddenIndex
+	flow.Payload = strings.Join(payloads, ",")
+	flow.Tags = strings.Join(tags, "|")
+	err = InsertHTTPFlowEx(flow, forceSaveFlowSync)
+	if err != nil {
+		log.Errorf("insert httpflow failed: %s", err)
+	}
+}
+
 func RegisterLowHTTPSaveCallback() {
-	lowhttp.RegisterSaveHTTPFlowHandler(func(r *lowhttp.LowhttpResponse, saveFlowSync bool) {
-		var (
-			https       = r.Https
-			req         = r.RawRequest
-			rsp         = r.RawPacket
-			url         = r.Url
-			remoteAddr  = r.RemoteAddr
-			reqSource   = r.Source
-			runtimeId   = r.RuntimeId
-			fromPlugin  = r.FromPlugin
-			hiddenIndex = r.HiddenIndex
-			payloads    = r.Payloads
-			tags        = r.Tags
-			duration    = r.TraceInfo.TotalTime
-			reqIns      *http.Request
-		)
-
-		// fix some field
-		if r.HiddenIndex == "" {
-			r.HiddenIndex = uuid.NewString()
-			hiddenIndex = r.HiddenIndex
-		}
-		if r.TooLarge {
-			rsp = lowhttp.ReplaceHTTPPacketBodyFast(rsp, []byte(`[[response too large(`+utils.ByteSize(uint64(r.TooLargeLimit))+`), truncated]] find more in web fuzzer history!`))
-		}
-		if rsp == nil || len(rsp) == 0 {
-			return
-		}
-		reqIns = r.RequestInstance
-
-		// db := consts.GetGormProjectDatabase()
-		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns), CreateHTTPFlowWithTags(strings.Join(r.Tags, "|")), CreateHTTPFlowWithDuration(duration))
-		if err != nil {
-			log.Errorf("create httpflow from lowhttp failed: %s", err)
-			return
-		}
-		switch ret := strings.ToLower(reqSource); ret {
-		case "mitm":
-			flow.SourceType = "mitm"
-		case "basic-crawler", "crawler", "crawlerx":
-			flow.SourceType = "basic-crawler"
-		case "scan", "port-scan", "plugin":
-			flow.SourceType = "scan"
-
-		}
-		flow.FromPlugin = fromPlugin
-		flow.RuntimeId = runtimeId
-		flow.HiddenIndex = hiddenIndex
-		flow.Payload = strings.Join(payloads, ",")
-		flow.Tags = strings.Join(tags, "|")
-		err = InsertHTTPFlowEx(flow, saveFlowSync)
-		if err != nil {
-			log.Errorf("insert httpflow failed: %s", err)
-		}
-	})
+	lowhttp.RegisterSaveHTTPFlowHandler(SaveLowHTTPFlow)
 }
 
 type TagAndStatusCode struct {

@@ -258,6 +258,11 @@ func (s *Server) PreloadHTTPFuzzerParams(ctx context.Context, req *ypb.PreloadHT
 	return &ypb.PreloadHTTPFuzzerParamsResponse{Values: results}, nil
 }
 
+type fuzzerServerPush struct {
+	FuzzerTabIndex string `json:"fuzzer_tab_index"`
+	DiscardCount   int    `json:"discard_count"`
+}
+
 func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerServer) (finalError error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -273,6 +278,17 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	} else {
 		runtimeID = uuid.NewString()
 	}
+
+	// server push info
+	discardCount := new(atomic.Int64)
+	fuzzerIndex := req.GetFuzzerTabIndex()
+	doFuzzerServerPush := func() {
+		yakit.BroadcastData(yakit.ServerPushType_Fuzzer, &fuzzerServerPush{
+			FuzzerTabIndex: fuzzerIndex,
+			DiscardCount:   int(discardCount.Load()),
+		})
+	}
+
 	// retry
 	isRetry := req.GetRetryTaskID() > 0
 	// pause
@@ -480,6 +496,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					}
 					var httpTPLmatchersResult bool
 					var hitColor []string
+					var discard bool
 					for mergedParams := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS(), false) {
 						existedParams := make(map[string]string) // 传入的参数
 						if mergedParams != nil {
@@ -498,17 +515,25 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						for _, kv := range extractorResults { // 合并
 							matcherParams[kv.GetKey()] = kv.GetValue()
 						}
-						httpTPLmatchersResult, hitColor, respModel.Discard = MatchColor(httpTplMatcher,
+						httpTPLmatchersResult, hitColor, discard = MatchColor(httpTplMatcher,
 							&httptpl.RespForMatch{
 								RawPacket: respModel.ResponseRaw,
 								Duration:  float64(respModel.DurationMs),
 							},
 							matcherParams)
+						if discard {
+							break
+						}
 						if httpTPLmatchersResult {
 							respModel.MatchedByMatcher = true
 							respModel.HitColor = strings.Join(hitColor, "|")
 							break
 						}
+					}
+					if discard {
+						discardCount.Add(1)
+						doFuzzerServerPush()
+						continue
 					}
 					respModel.TaskId = int64(historyID)
 					feedbackResponse(respModel, true)
@@ -718,6 +743,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_WithPayloads(true),
 			mutate.WithPoolOpt_RandomSession(true),
 			mutate.WithPoolOpt_UseConnPool(!req.GetDisableUseConnPool()),
+			mutate.WithPoolOpt_SaveHTTPFlow(false),
 			//mutate.WithPoolOpt_ConnPool(true),
 		}
 
@@ -897,23 +923,17 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					log.Warnf("match color and append httpflow tags cost too much time, can someone investigate it? cost: %v", du)
 				}
 
-				if httpTPLmatchersResult {
-					appendHttpflowTagsByHiddenIndexExStart := time.Now()
-					err := yakit.AppendHTTPFlowTagsByHiddenIndexEx(lowhttpResponse.HiddenIndex, hitColor...)
-					if time.Now().Sub(appendHttpflowTagsByHiddenIndexExStart).Seconds() > 1 {
-						log.Error("yakit.AppendHTTPFlowTagsByHiddenIndexEx cost too much time, can someone investigate it?")
+				if discard {
+					discardCount.Add(1)
+					doFuzzerServerPush()
+					continue
+				} else if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
+					saveLowhttpResponse := result.LowhttpResponse
+					if httpTPLmatchersResult {
+						saveLowhttpResponse.Tags = append(saveLowhttpResponse.Tags, hitColor...)
 					}
-					if err != nil {
-						log.Errorf("append http flow tags failed: %s", err)
-					}
+					yakit.SaveLowHTTPFlow(saveLowhttpResponse, false)
 				}
-				//httpTPLmatchersResult, err = ins.Execute(&httptpl.RespForMatch{
-				//	RawPacket: result.ResponseRaw,
-				//	Duration:  lowhttpResponse.GetDurationFloat(),
-				//}, matcherParams)
-				//if finalError != nil {
-				//	log.Errorf("httptpl.YakMatcher execute failed: %s", err)
-				//}
 			}
 
 			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
@@ -1070,12 +1090,19 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							RawPacket: redirectRes.RawPacket,
 							Duration:  redirectRes.GetDurationFloat(),
 						}, matcherParams)
-						if redirectMatchersResult {
-							err := yakit.AppendHTTPFlowTagsByHiddenIndexEx(redirectRes.HiddenIndex, redirectHitColor...)
-							if err != nil {
-								log.Errorf("append http flow tags failed: %s", err)
+
+						if !redirectDiscard {
+							discardCount.Add(1)
+							doFuzzerServerPush()
+							continue
+						} else if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
+							saveLowhttpRedirectResponse := redirectRes
+							if redirectMatchersResult {
+								saveLowhttpRedirectResponse.Tags = append(saveLowhttpRedirectResponse.Tags, hitColor...)
 							}
+							yakit.SaveLowHTTPFlow(saveLowhttpRedirectResponse, false)
 						}
+
 					}
 					redirectRsp := &ypb.FuzzerResponse{
 						Url:                   utils.EscapeInvalidUTF8Byte([]byte(redirectRes.Url)),
@@ -1171,7 +1198,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 			if err != nil {
 				log.Errorf("send to client failed: %s", err)
-				continue
 			}
 		}
 		return nil
