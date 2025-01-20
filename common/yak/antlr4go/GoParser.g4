@@ -390,9 +390,9 @@ parameterDecl
 expression
     : primaryExpr
     | unary_op = (PLUS | MINUS | EXCLAMATION | CARET | STAR | AMPERSAND | RECEIVE) eos* expression
-    | expression eos* mul_op = (STAR | DIV | MOD | LSHIFT | RSHIFT | AMPERSAND | BIT_CLEAR) eos* expression
-    | expression eos* add_op = (PLUS | MINUS | OR | CARET) eos* expression
-    | expression eos* rel_op = (
+    | expression mul_op = (STAR | DIV | MOD | LSHIFT | RSHIFT | AMPERSAND | BIT_CLEAR) eos* expression
+    | expression  add_op = (PLUS | MINUS | OR | CARET) eos* expression
+    | expression  rel_op = (
         EQUALS
         | NOT_EQUALS
         | LESS
@@ -400,8 +400,8 @@ expression
         | GREATER
         | GREATER_OR_EQUALS
     ) eos* expression
-    | expression eos* LOGICAL_AND eos* expression
-    | expression eos* LOGICAL_OR eos* expression
+    | expression LOGICAL_AND eos* expression
+    | expression  LOGICAL_OR eos* expression
     ;
 
 primaryExpr

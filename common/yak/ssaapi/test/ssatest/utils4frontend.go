@@ -3,6 +3,7 @@ package ssatest
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -120,7 +121,18 @@ func CheckPrintlnValue(code string, want []string, t *testing.T) {
 	})
 }
 
-func CheckPrintf(t *testing.T, tc TestCase) {
+func CheckPrintlnValueContain(code string, want []string, t *testing.T) {
+	CheckPrintf(t, TestCase{
+		Code: code,
+		Want: want,
+	}, true)
+}
+
+func CheckPrintf(t *testing.T, tc TestCase, contains ...bool) {
+	contain := false
+	if len(contains) > 0 {
+		contain = contains[0]
+	}
 	tc.Check = func(prog *ssaapi.Program, want []string) {
 		println := prog.Ref("println").ShowWithSource()
 		// test.Equal(1, len(println), "println should only 1")
@@ -142,8 +154,23 @@ func CheckPrintf(t *testing.T, tc TestCase) {
 			sort.Strings(a)
 			sort.Strings(b)
 
-			// Compare the sorted slices
-			require.Equal(t, a, b)
+			if contain {
+				for _, containSubStr := range want {
+					match := false
+					// should contain at least one
+					for _, g := range got {
+						if strings.Contains(g, containSubStr) {
+							match = true
+						}
+					}
+					if !match {
+						t.Errorf("want[%s] not found in got[%v]", want, got)
+					}
+				}
+			} else {
+				// Compare the sorted slices
+				require.Equal(t, a, b)
+			}
 		}
 
 		equalSlices(want, got)
