@@ -185,7 +185,6 @@ func NewVersioned[T versionedValue](globalIndex int, name string, local bool, sc
 		variables: make(map[string]VersionedIF[T]),
 		kind:      NormalVariable,
 	}
-	ret.variableMemory.variables[name] = ret
 	ret.captureVariable = ret
 	return ret
 }

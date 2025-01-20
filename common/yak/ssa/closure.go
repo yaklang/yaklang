@@ -57,6 +57,10 @@ func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
 		if !ok {
 			return
 		}
+		// todo: 各个语言的处理不一样，需要统一
+		// if _, isPointer := ToPointerType(para.GetType()); !isPointer {
+		// 	return
+		// }
 
 		sideEffect := &FunctionSideEffect{
 			Name:                 variable.GetName(),
@@ -143,10 +147,15 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			bindScope = bindVariable.GetScope()
 			if o := bindVariable.object; o != nil {
 				if p, ok := ToParameter(o); ok && p.IsFreeValue {
-					if p.GetDefault() != nil {
+					if defaul := p.GetDefault(); defaul != nil {
 						// 对于member而言default为外部object
-						bindVariable = p.GetDefault().GetLastVariable()
-						bindScope = bindVariable.GetScope()
+						// bindVariable = defaul.GetLastVariable()
+						// if vam := defaul.GetVariableMemory(); vam != nil {
+						// 	if variable, ok := vam.GetVariableByName(o.GetName()); ok {
+						// 		bindVariable = variable.(*Variable)
+						// 	}
+						// }
+						// bindScope = bindVariable.GetScope()
 
 						findName = fmt.Sprintf("#%d.%s", bindVariable.GetId(), se.Variable.key.String())
 						if member := bindScope.ReadVariable(findName); member != nil {

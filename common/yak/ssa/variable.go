@@ -38,6 +38,7 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 		DefRange:  nil,
 		UseRange:  map[memedit.RangeIf]struct{}{},
 	}
+	ret.GetVariableMemory().SetVariable(ret)
 	return ret
 }
 

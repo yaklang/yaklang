@@ -152,7 +152,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			c #-> as $c
 	`, map[string][]string{
 			"b": {"20"},
-			"c": {"1", "10"},
+			"c": {"1"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 
@@ -183,7 +183,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			b #-> as $b
 			c #-> as $c
 	`, map[string][]string{
-			"b": {"2", "20"},
+			"b": {"2"},
 			"c": {"10"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
@@ -215,7 +215,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			b #-> as $b
 			c #-> as $c
 	`, map[string][]string{
-			"b": {"2", "20"},
+			"b": {"2"},
 			"c": {"10"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})

@@ -177,13 +177,13 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 						if i < len(objt.Keys) {
 							return objt.Keys[i]
 						} else {
+							b.NewError(ssa.Error, TAG, "Object parameter error")
 							return b.EmitConstInst("")
 						}
 					},
 					func(i int) ssa.Value {
 						return typeHandler(objt.FieldTypes[i], kvs[i].kv)
 					})
-				b.AssignVariable(b.CreateLocalVariable(""), obj)
 			}
 
 			partInit := func() {
@@ -199,7 +199,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 						}
 						return b.GetDefaultValue(objt.FieldTypes[i])
 					})
-				b.AssignVariable(b.CreateLocalVariable(""), obj)
 			}
 
 			if len(kvs) == 0 {
@@ -209,21 +208,10 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 
 			if kvs[0].value != nil {
 				if m, ok := kvs[0].value.(*ssa.Make); ok {
-					if m.GetVariableMemory().GetKind() == ssautil.AddressVariable {
+					if vam := m.GetVariableMemory(); vam != nil && vam.GetKind() == ssautil.AddressVariable {
 						return kvs[0].value
 					} else {
-						var mkeys, mmembers []ssa.Value
-						for k, m := range m.GetAllMember() {
-							mkeys = append(mkeys, k)
-							mmembers = append(mmembers, m)
-						}
-						newObject := b.InterfaceAddFieldBuild(len(mkeys),
-							func(i int) ssa.Value {
-								return mkeys[i]
-							},
-							func(i int) ssa.Value {
-								return mmembers[i]
-							})
+						newObject := b.CopyValue(m)
 						return newObject
 					}
 				}
@@ -240,9 +228,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 						if _, ok := obj.GetAllMember()[objt.GetKeybyName(kv.key.String())]; ok {
 							continue
 						}
-						newObject := typeHandler(a, kv.kv)
+						object := typeHandler(a, kv.kv)
 						variable := b.CreateMemberCallVariable(obj, b.EmitConstInst(kv.key.String()))
-						b.AssignVariable(variable, newObject)
+						b.AssignVariable(variable, object)
 					}
 				}
 			}
@@ -335,6 +323,8 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			bp.AddMethod(n, f)
 		}
 		rvalue.SetType(typ)
+		leftv := b.CreateVariable(bp.Name)
+		b.AssignVariable(leftv, rvalue)
 	}
 
 	return rvalue
@@ -495,7 +485,7 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) ssa.Type {
 	if strings.HasPrefix(text, "*") {
 		if p := stmt.PointerType(); p != nil {
 			if t := p.(*gol.PointerTypeContext).Type_(); t != nil {
-				return b.buildType(t.(*gol.Type_Context))
+				return ssa.NewPointerType(b.buildType(t.(*gol.Type_Context)))
 			}
 		}
 	}

@@ -192,25 +192,18 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	// if not freeValue, or not `a = a`(just create FreeValue)
 	_, exist := b.captureFreeValue[name]
 	if !variable.GetLocal() && (exist || b.SupportClosure) {
-		var getOriginVariable func(name string, value Value)
-		getOriginVariable = func(name string, value Value) {
-			if parentValue, ok := b.getParentFunctionVariable(name); ok &&
-				GetFristLocalVariableFromScopeAndParent(scope, name) == nil {
-				parentValue.AddMask(value)
-				v := parentValue.GetVariable(name)
-				b.AddSideEffect(v, value)
-				para := b.BuildFreeValue(name)
-				para.SetDefault(parentValue)
-				para.SetType(parentValue.GetType())
-				parentValue.AddOccultation(para)
-				// } else if p, ok := value.(*ParameterMember); ok {
-				// 	if object, ok := b.getParentFunctionVariable(p.MemberCallObjectName); ok {
-				// 		objName := fmt.Sprintf("#%d.%s", object.GetId(), p.MemberCallKey.String())
-				// 		getOriginVariable(objName, value)
-				// 	}
-			}
+
+		name := variable.GetName()
+		if parentValue, ok := b.getParentFunctionVariable(name); ok &&
+			GetFristLocalVariableFromScopeAndParent(scope, name) == nil {
+			parentValue.AddMask(value)
+			v := parentValue.GetVariable(name)
+			b.AddSideEffect(v, value)
+			para := b.BuildFreeValue(name)
+			para.SetDefault(parentValue)
+			para.SetType(parentValue.GetType())
+			parentValue.AddOccultation(para)
 		}
-		getOriginVariable(variable.GetName(), value)
 	}
 	if val, ok := b.RefParameter[variable.GetName()]; ok {
 		b.AddForceSideEffect(variable.GetName(), value, val.Index)
