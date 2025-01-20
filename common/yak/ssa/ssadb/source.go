@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"path"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -72,10 +71,10 @@ func SaveFile(filename, content string, programName string, folderPaths []string
 	// append program name with folder path as full path
 	fullPathParts := []string{programName}
 	fullPathParts = append(fullPathParts, folderPaths...)
-	fullPath := path.Join(fullPathParts...)
+	fullPath := irSourceJoin(fullPathParts...)
 	// calc file hash
-	folderPath := path.Join(folderPaths...)
-	fileUrl := path.Join(folderPath, filename)
+	folderPath := irSourceJoin(folderPaths...)
+	fileUrl := irSourceJoin(folderPath, filename)
 	editor := memedit.NewMemEditorWithFileUrl(content, fileUrl)
 	hash := editor.GetIrSourceHash(programName)
 
@@ -101,7 +100,7 @@ func SaveFolder(folderName string, folderPaths []string) error {
 		return utils.Errorf("folder path is empty")
 	}
 	programName := folderPaths[0]
-	folderPath := path.Join(folderPaths...)
+	folderPath := irSourceJoin(folderPaths...)
 
 	irSource := &IrSource{
 		ProgramName:    programName,
@@ -155,7 +154,7 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 		code = source.QuotedCode
 	}
 	//_, folder, _ := strings.Cut(source.FolderPath, source.ProgramName)
-	_, fileUrl := splitProjectPath(path.Join(source.FolderPath, source.FileName))
+	_, fileUrl := splitProjectPath(irSourceJoin(source.FolderPath, source.FileName))
 	editor := memedit.NewMemEditorWithFileUrl(code, fileUrl)
 	editor.SetUrl(fileUrl)
 	return editor, nil
