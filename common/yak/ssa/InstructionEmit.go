@@ -391,8 +391,29 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 	return ci
 }
 
-func (f *FunctionBuilder) CopyConstInst(i *ConstInst) *ConstInst {
-	return f.EmitConstInst(i.value)
+func (f *FunctionBuilder) CopyValue(v Value) Value {
+	switch i := v.(type) {
+	case *ConstInst:
+		return f.EmitConstInst(i.value)
+	case *Make:
+		var mkeys, mmembers []Value
+		for k, m := range i.GetAllMember() {
+			mkeys = append(mkeys, k)
+			mmembers = append(mmembers, m)
+		}
+		newObject := f.InterfaceAddFieldBuild(len(mkeys),
+			func(i int) Value {
+				return mkeys[i]
+			},
+			func(i int) Value {
+				return mmembers[i]
+			})
+		newObject.SetVerboseName(i.verboseName)
+		newObject.SetType(v.GetType())
+		return newObject
+	}
+
+	return v
 }
 
 func (f *FunctionBuilder) EmitTypeCast(v Value, typ Type) *TypeCast {

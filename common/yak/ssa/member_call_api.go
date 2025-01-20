@@ -29,9 +29,9 @@ func (b *FunctionBuilder) ReadMemberCallValueByScope(object, key Value, scope Sc
 				program.SetOffsetVariable(ret, b.CurrentRange)
 			}
 		}
-		if ret.Value != nil {
+		if ret.GetValue() != nil {
 			// has value, just return
-			return ret.Value
+			return ret.GetValue()
 		}
 	}
 

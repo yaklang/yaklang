@@ -206,7 +206,7 @@ func TestStmt_spin(t *testing.T) {
 		}
 		println(str[0])
 	}
-		`, []string{"phi(#18[0])[2,1]"}, t)
+		`, []string{"phi(#29[0])[2,1]"}, t)
 	})
 
 	t.Run("for Spin array add assign", func(t *testing.T) {
@@ -220,7 +220,7 @@ func TestStmt_spin(t *testing.T) {
 		}
 		println(str[0])
 	}
-		`, []string{"phi(#18[0])[add(2, 3),1]"}, t)
+		`, []string{"phi(#29[0])[add(2, 3),1]"}, t)
 	})
 
 	t.Run("for Spin secondary array add assign", func(t *testing.T) {
@@ -237,7 +237,7 @@ func TestStmt_spin(t *testing.T) {
 		}
 		println(array2D[2][2])
 	}
-		`, []string{"phi(#58[2])[add(1, 5),9]"}, t)
+		`, []string{"phi(#77[2])[add(1, 5),9]"}, t)
 	})
 
 	t.Run("for Spin map assign", func(t *testing.T) {
@@ -250,7 +250,7 @@ func TestStmt_spin(t *testing.T) {
 		}
 		println(mp["a"])
 	}
-		`, []string{"phi(#21.a)[2,1]"}, t)
+		`, []string{"phi(#29.a)[2,1]"}, t)
 	})
 
 	t.Run("for Spin map add assign", func(t *testing.T) {
@@ -263,7 +263,7 @@ func TestStmt_spin(t *testing.T) {
 		}
 		println(mp["a"])
 	}
-		`, []string{"phi(#21.a)[add(2, 3),1]"}, t)
+		`, []string{"phi(#29.a)[add(2, 3),1]"}, t)
 	})
 
 	t.Run("for Spin secondary map add assign", func(t *testing.T) {
@@ -302,7 +302,7 @@ func TestStmt_spin(t *testing.T) {
 		}
 		println(str.a)
 	}
-		`, []string{"phi(#29.a)[2,1]"}, t)
+		`, []string{"phi(#37.a)[2,1]"}, t)
 	})
 
 	t.Run("for Spin struct add assign", func(t *testing.T) {
@@ -322,7 +322,7 @@ func TestStmt_spin(t *testing.T) {
 		}
 		println(str.a)
 	}
-		`, []string{"phi(#29.a)[add(2, 3),1]"}, t)
+		`, []string{"phi(#37.a)[add(2, 3),1]"}, t)
 	})
 
 	t.Run("for Spin closu assign", func(t *testing.T) {
