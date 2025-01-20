@@ -374,7 +374,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	defer func() {
 		feedbackWg.Wait()
 	}()
+	feedbackLock := new(sync.Mutex)
 	feedbackResponse := func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
+		feedbackLock.Lock()
+		defer feedbackLock.Unlock()
 		startTime := time.Now()
 		defer func() {
 			duration := time.Now().Sub(startTime)
@@ -927,13 +930,15 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					discardCount.Add(1)
 					doFuzzerServerPush()
 					continue
-				} else if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
-					saveLowhttpResponse := result.LowhttpResponse
+				} else {
 					if httpTPLmatchersResult {
-						saveLowhttpResponse.Tags = append(saveLowhttpResponse.Tags, hitColor...)
+						result.LowhttpResponse.Tags = append(result.LowhttpResponse.Tags, hitColor...)
 					}
-					yakit.SaveLowHTTPFlow(saveLowhttpResponse, false)
 				}
+			}
+
+			if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
+				yakit.SaveLowHTTPFlow(result.LowhttpResponse, false)
 			}
 
 			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
@@ -1096,14 +1101,17 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							doFuzzerServerPush()
 							continue
 						} else if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
-							saveLowhttpRedirectResponse := redirectRes
 							if redirectMatchersResult {
-								saveLowhttpRedirectResponse.Tags = append(saveLowhttpRedirectResponse.Tags, hitColor...)
+								redirectRes.Tags = append(redirectRes.Tags, hitColor...)
 							}
-							yakit.SaveLowHTTPFlow(saveLowhttpRedirectResponse, false)
 						}
 
 					}
+
+					if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
+						yakit.SaveLowHTTPFlow(redirectRes, false)
+					}
+
 					redirectRsp := &ypb.FuzzerResponse{
 						Url:                   utils.EscapeInvalidUTF8Byte([]byte(redirectRes.Url)),
 						Method:                utils.EscapeInvalidUTF8Byte([]byte(method)),
