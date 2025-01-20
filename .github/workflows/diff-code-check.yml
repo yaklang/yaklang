@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Cache YakLang Project
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
         uses: actions/cache@v3
         id: cache-project
         with:
