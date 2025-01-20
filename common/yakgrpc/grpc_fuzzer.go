@@ -280,6 +280,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	}
 
 	// server push info
+	engineDropPacket := req.GetEngineDropPacket()
+
 	discardCount := new(atomic.Int64)
 	fuzzerIndex := req.GetFuzzerTabIndex()
 	doFuzzerServerPush := func() {
@@ -524,16 +526,14 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 								Duration:  float64(respModel.DurationMs),
 							},
 							matcherParams)
-						if discard {
-							break
-						}
 						if httpTPLmatchersResult {
 							respModel.MatchedByMatcher = true
 							respModel.HitColor = strings.Join(hitColor, "|")
+							respModel.Discard = discard
 							break
 						}
 					}
-					if discard {
+					if discard && engineDropPacket {
 						discardCount.Add(1)
 						doFuzzerServerPush()
 						continue
@@ -926,7 +926,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					log.Warnf("match color and append httpflow tags cost too much time, can someone investigate it? cost: %v", du)
 				}
 
-				if discard {
+				if discard && engineDropPacket {
 					discardCount.Add(1)
 					doFuzzerServerPush()
 					continue
@@ -1096,11 +1096,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							Duration:  redirectRes.GetDurationFloat(),
 						}, matcherParams)
 
-						if !redirectDiscard {
+						if redirectDiscard && engineDropPacket {
 							discardCount.Add(1)
 							doFuzzerServerPush()
 							continue
-						} else if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
+						} else {
 							if redirectMatchersResult {
 								redirectRes.Tags = append(redirectRes.Tags, hitColor...)
 							}
