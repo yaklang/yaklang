@@ -69,38 +69,71 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 	}, 10)
 	require.NoError(t, err)
 
-	matcher := &ypb.HTTPResponseMatcher{
-		MatcherType: "word",
-		Scope:       "raw",
-		Condition:   "and",
-		Group:       []string{"123"},
-		ExprType:    "nuclei-dsl",
-	}
+	t.Run("re_matcher", func(t *testing.T) {
+		matcher := &ypb.HTTPResponseMatcher{
+			MatcherType: "word",
+			Scope:       "raw",
+			Condition:   "and",
+			Group:       []string{"123"},
+			ExprType:    "nuclei-dsl",
+		}
 
-	matcherStream, err := client.HTTPFuzzer(context.Background(),
-		&ypb.FuzzerRequest{
-			Matchers:           []*ypb.HTTPResponseMatcher{matcher},
-			HistoryWebFuzzerId: int32(taskID),
-			ReMatch:            true,
-		})
+		matcherStream, err := client.HTTPFuzzer(context.Background(),
+			&ypb.FuzzerRequest{
+				Matchers:           []*ypb.HTTPResponseMatcher{matcher},
+				HistoryWebFuzzerId: int32(taskID),
+				ReMatch:            true,
+			})
 
-	if err != nil {
-		panic(err)
-	}
-	var matcherCheckCount int
-	for i := 0; i < 10; i++ {
-		resp, err := matcherStream.Recv()
 		if err != nil {
-			break
+			panic(err)
 		}
-		spew.Dump(resp)
-		if resp.MatchedByMatcher {
-			matcherCheckCount++
+		var matcherCheckCount int
+		for i := 0; i < 10; i++ {
+			resp, err := matcherStream.Recv()
+			if err != nil {
+				break
+			}
+			spew.Dump(resp)
+			if resp.MatchedByMatcher {
+				matcherCheckCount++
+			}
 		}
-	}
-	if matcherCheckCount != 9 {
-		t.Fatalf("matcher check failed: need [%v] got [%v]", 9, matcherCheckCount)
-	}
+		if matcherCheckCount != 9 {
+			t.Fatalf("matcher check failed: need [%v] got [%v]", 9, matcherCheckCount)
+		}
+	})
+
+	t.Run("re_matcher_with_discard", func(t *testing.T) {
+		matcher := &ypb.HTTPResponseMatcher{
+			MatcherType: "word",
+			Scope:       "raw",
+			Condition:   "and",
+			Group:       []string{"123"},
+			ExprType:    "nuclei-dsl",
+			Action:      Action_Discard,
+		}
+
+		matcherStream, err := client.HTTPFuzzer(context.Background(),
+			&ypb.FuzzerRequest{
+				Matchers:           []*ypb.HTTPResponseMatcher{matcher},
+				HistoryWebFuzzerId: int32(taskID),
+				ReMatch:            true,
+			})
+
+		require.NoError(t, err)
+		count := 0
+		for {
+			resp, err := matcherStream.Recv()
+			if err != nil {
+				break
+			}
+			spew.Dump(resp)
+			count++
+		}
+		require.Equal(t, 1, count, "feedback count is not 1")
+
+	})
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
@@ -424,21 +457,24 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 			Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
 		})
 		require.NoError(t, err)
-		var retainCount, discardCount int
+		var retainCount int
+		var runtimeID string
 		for {
 			resp, err := stream.Recv()
 			if err != nil {
 				break
 			}
-			if resp.Discard {
-				discardCount++
-			} else {
-				require.Equal(t, "red", resp.HitColor, "retain color is not red")
-				retainCount++
+			if resp.RuntimeID != "" {
+				runtimeID = resp.RuntimeID
 			}
+			require.Equal(t, "red", resp.HitColor, "retain color is not red")
+			retainCount++
 		}
 		require.Equal(t, 6, retainCount, "retain count is not 6")
-		require.Equal(t, 5, discardCount, "other count is not 5")
+		_, err = QueryHTTPFlows(ctx, client, &ypb.QueryHTTPFlowRequest{ // check db save
+			RuntimeId: runtimeID,
+		}, 6)
+		require.NoError(t, err)
 
 	})
 
@@ -479,21 +515,23 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 			Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
 		})
 		require.NoError(t, err)
-		var discardCount, retainCount int
+		var retainCount int
+		var runtimeID string
 		for {
 			resp, err := stream.Recv()
 			if err != nil {
 				break
 			}
-			if resp.Discard {
-				require.Equal(t, "red", resp.HitColor, "discard return color is not red")
-				discardCount++
-			} else {
-				require.Equal(t, "blue", resp.HitColor, "not discard return color is not blue")
-				retainCount++
+			if resp.RuntimeID != "" {
+				runtimeID = resp.RuntimeID
 			}
+			require.Equal(t, "blue", resp.HitColor, "not discard return color is not blue")
+			retainCount++
 		}
-		require.Equal(t, 6, discardCount, "discard count is not 6")
 		require.Equal(t, 5, retainCount, "other count is not 5")
+		_, err = QueryHTTPFlows(ctx, client, &ypb.QueryHTTPFlowRequest{ // check db save
+			RuntimeId: runtimeID,
+		}, 5)
+		require.NoError(t, err)
 	})
 }
