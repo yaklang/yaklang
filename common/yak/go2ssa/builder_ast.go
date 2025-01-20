@@ -276,8 +276,8 @@ func (b *astbuilder) handleImportPackage() {
 
 		if importp, _ := b.GetImportPackageUser(id); importp != nil {
 			for n, g := range importp.ExportValue {
-				ex.Member = append(ex.Member, g)
-				ex.MemberMap[n] = g
+				ex.Member = append(ex.Member, g.GetId())
+				ex.MemberMap[n] = g.GetId()
 			}
 		}
 
@@ -648,6 +648,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		}
 
 		for i, p := range fun.Params {
+			p := fun.GetValueById(p)
 			p.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
@@ -769,6 +770,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		}
 
 		for i, p := range fun.Params {
+			p := fun.GetValueById(p)
 			p.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
@@ -2027,6 +2029,7 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 		}
 
 		for i, p := range fun.Params {
+			p := fun.GetValueById(p)
 			p.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true

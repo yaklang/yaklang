@@ -3,6 +3,7 @@ package ssadb
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -69,8 +70,6 @@ type IrCode struct {
 	Users Int64Slice `json:"users" gorm:"type:text"`
 	// Phi Chains Relation
 	Occulatation Int64Slice `json:"phis" gorm:"type:text"`
-	// this is user is call and method is this IR self
-	CalledBy Int64Slice `json:"is_called_by" gorm:"type:text"`
 
 	// OOP Supporting
 	IsObject       bool
@@ -104,12 +103,12 @@ func emptyIrCode() *IrCode {
 	return &IrCode{}
 }
 
-func RequireIrCode(DB *gorm.DB, program string) (uint, *IrCode) {
+func RequireIrCode(DB *gorm.DB, program string) (int64, *IrCode) {
 	db := DB.Model(&IrCode{})
 	ircode := emptyIrCode()
 	ircode.ProgramName = program
 	db.Create(ircode)
-	return ircode.ID, ircode
+	return int64(ircode.ID), ircode
 }
 
 func GetIrCodeById(db *gorm.DB, id int64) *IrCode {

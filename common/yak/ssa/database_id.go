@@ -2,6 +2,8 @@ package ssa
 
 import (
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func (p *Program) DeleteInstruction(inst Instruction) {
@@ -29,7 +31,39 @@ func (p *Program) GetInstructionById(id int64) Instruction {
 	if p == nil {
 		return nil
 	}
-	return p.Cache.GetInstruction(id)
+	return GetEx[Instruction](p.Cache, id)
+}
+
+func GetEx[T Instruction](c *Cache, id int64) T {
+	var zero T
+	if c == nil {
+		return zero
+	}
+	slice := GetExs[T](c, id)
+	if len(slice) == 0 {
+		return zero
+	}
+	return slice[0]
+}
+
+func GetExs[T Instruction](c *Cache, ids ...int64) []T {
+	if c == nil {
+		return nil
+	}
+	ret := make([]T, 0)
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		inst := c.GetInstruction(id)
+		v, ok := inst.(T)
+		if !ok {
+			log.Errorf("BUG::: %v err: %d", inst, id)
+			continue
+		}
+		ret = append(ret, v)
+	}
+	return ret
 }
 
 func (p *Program) AddConstInstruction(instruction Instruction) {

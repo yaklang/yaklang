@@ -39,7 +39,7 @@ func TestRange_normol(t *testing.T) {
 		}
 		got := []string{}
 		for _, target := range targets {
-			ca, ok := ssa.ToConst(target.GetSSAValue())
+			ca, ok := ssa.ToConstInst(target.GetSSAValue())
 			if !ok {
 				continue
 			}

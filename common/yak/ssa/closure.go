@@ -140,7 +140,7 @@ func handleSideEffect(c *Call, funcTyp *FunctionType) {
 			if !ok {
 				continue
 			}
-			variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
+			variable = builder.CreateMemberCallVariable(obj, c.GetValueById(se.MemberCallKey))
 			if se.BindVariable != nil {
 				variable.SetCaptured(se.BindVariable)
 			}
@@ -152,7 +152,7 @@ func handleSideEffect(c *Call, funcTyp *FunctionType) {
 			sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
 			builder.AssignVariable(variable, sideEffect)
 			sideEffect.SetVerboseName(se.VerboseName)
-			c.SideEffectValue[se.VerboseName] = sideEffect
+			c.SideEffectValue[se.VerboseName] = sideEffect.GetId()
 		}
 	}
 }
@@ -212,7 +212,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				continue
 			}
 			// is object
-			variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
+			variable = builder.CreateMemberCallVariable(obj, c.GetValueById(se.MemberCallKey))
 			if se.BindVariable != nil {
 				variable.SetCaptured(se.BindVariable)
 			}
@@ -235,7 +235,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
 				builder.AssignVariable(variable, sideEffect)
 				sideEffect.SetVerboseName(se.VerboseName)
-				c.SideEffectValue[se.VerboseName] = sideEffect
+				c.SideEffectValue[se.VerboseName] = sideEffect.GetId()
 			}
 
 			SetCapturedSideEffect := func() {
@@ -331,14 +331,15 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 }
 
 func (f *FunctionBuilder) SwitchFreevalueInSideEffectFromScope(name string, se *SideEffect, scope ScopeIF) *SideEffect {
-	vs := make([]Value, 0)
+	vs := make(Values, 0)
 	if scope == nil {
 		return se
 	}
-	if phi, ok := ToPhi(se.Value); ok {
-		for i, e := range phi.Edge {
-			vs = append(vs, e)
-			if p, ok := ToParameter(e); ok && p.IsFreeValue {
+	if phi, ok := ToPhi(f.GetValueById(se.Value)); ok {
+		for i, id := range phi.Edge {
+			edgeValue := f.GetValueById(id)
+			vs = append(vs, edgeValue)
+			if p, ok := ToParameter(edgeValue); ok && p.IsFreeValue {
 				if value := scope.ReadValue(name); value != nil {
 					vs[i] = value
 				}
@@ -347,10 +348,10 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffectFromScope(name string, se *
 		phit := &Phi{
 			anValue:            phi.anValue,
 			CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
-			Edge:               vs,
+			Edge:               vs.GetIds(),
 		}
 
-		sideEffect := f.EmitSideEffect(name, se.CallSite.(*Call), phit)
+		sideEffect := f.EmitSideEffect(name, f.GetValueById(se.CallSite).(*Call), phit)
 		return sideEffect
 	}
 	return se

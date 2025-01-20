@@ -1,10 +1,12 @@
 package ssa
 
 import (
-	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
+
+	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -17,6 +19,16 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
+var progPool = utils.NewSafeMap[*Program]()
+
+func GetProgramFromPool(name string) (*Program, bool) {
+	return progPool.Get(name)
+}
+
+// func DeleteProgramFromPool(names string) {
+// 	progPool.Delete(names)
+// }
+
 type ProjectConfigType int
 
 const (
@@ -25,7 +37,7 @@ const (
 	PROJECT_CONFIG_PROPERTIES
 )
 
-func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
+func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string, ttl ...time.Duration) *Program {
 	prog := &Program{
 		Name:                    ProgramName,
 		ProgramKind:             kind,
@@ -33,7 +45,6 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
-		Cache:                   NewDBCache(ProgramName, enableDatabase),
 		astMap:                  make(map[string]struct{}),
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
@@ -54,6 +65,8 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 	}
 	if kind == Application {
 		prog.Application = prog
+		prog.Cache = NewDBCache(prog, enableDatabase, ttl...)
+		progPool.Set(ProgramName, prog)
 	}
 	prog.EnableDatabase = enableDatabase
 	prog.Loader = ssautil.NewPackageLoader(
@@ -215,10 +228,11 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 	var handFunc func(*Function)
 	handFunc = func(f *Function) {
 		handler(f)
-		for _, s := range f.ChildFuncs {
-			f, ok := ToFunction(s)
+		for _, id := range f.ChildFuncs {
+			child := f.GetValueById(id)
+			f, ok := ToFunction(child)
 			if !ok {
-				log.Warnf("function %s is not a ssa.Function", s.GetName())
+				log.Warnf("function %s is not a ssa.Function", child.GetName())
 				continue
 			}
 			handFunc(f)
@@ -269,6 +283,7 @@ func (prog *Program) Finish() {
 		// save instruction
 		prog.Cache.SaveToDatabase()
 	}
+	progPool.Delete(prog.GetProgramName())
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
