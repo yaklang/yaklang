@@ -291,6 +291,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		})
 	}
 
+	throttle := utils.NewThrottle(1)
+	doFuzzerServerPushThrottle := func() {
+		throttle(doFuzzerServerPush)
+	}
+	defer doFuzzerServerPush()
+
 	// retry
 	isRetry := req.GetRetryTaskID() > 0
 	// pause
@@ -535,7 +541,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					}
 					if discard && engineDropPacket {
 						discardCount.Add(1)
-						doFuzzerServerPush()
+						doFuzzerServerPushThrottle()
 						continue
 					}
 					respModel.TaskId = int64(historyID)
@@ -928,7 +934,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 				if discard && engineDropPacket {
 					discardCount.Add(1)
-					doFuzzerServerPush()
+					doFuzzerServerPushThrottle()
 					continue
 				} else {
 					if httpTPLmatchersResult {
@@ -1098,7 +1104,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 						if redirectDiscard && engineDropPacket {
 							discardCount.Add(1)
-							doFuzzerServerPush()
+							doFuzzerServerPushThrottle()
 							continue
 						} else {
 							if redirectMatchersResult {
