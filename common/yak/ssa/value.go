@@ -151,12 +151,27 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	// log.Infof("AssignVariable: %v, %v typ %s", variable.GetName(), value.GetName(), value.GetType())
 	name := variable.GetName()
-	_ = name
+	scope := b.CurrentBlock.ScopeTable
+
 	if utils.IsNil(value) {
 		log.Infof("assign nil value to variable: %v, it will not work on ssa ir format", name)
 		return
 	}
-	scope := b.CurrentBlock.ScopeTable
+
+	if variable.GetKind() == DereferenceVariable {
+		variable.HandleDereferenceVariable(value)
+	} else if variable.GetKind() == PointerVariable {
+		variable.HandlePointerVariable(value)
+	}
+
+	if p, ok := ToPointerType(value.GetType()); ok {
+		if p.GetPointerKind() == PointerVariable {
+			variable.HandlePointerVariable(value)
+		} else if p.GetPointerKind() == DereferenceVariable {
+			variable.HandleDereferenceVariable(value)
+		}
+	}
+
 	scope.AssignVariable(variable, value)
 
 	if value.GetName() == variable.GetName() {
@@ -214,6 +229,9 @@ func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) 
 	if variable := b.getCurrentScopeVariable(name); variable != nil {
 		if value := variable.GetValue(); value != nil {
 			if _, ok := ToConst(value); ok {
+				return variable
+			}
+			if un, ok := ToUnOp(value); ok && un.Op == OpAddress {
 				return variable
 			}
 			if _, ok := value.(*SideEffect); ok {
