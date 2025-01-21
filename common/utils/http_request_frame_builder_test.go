@@ -213,7 +213,7 @@ abcdefg`,
 			input: `
 :method: GET
 
-!@#$%^&*()_+\n\r\t`,
+!@#$%^&*()_+` + "\n\r\t",
 			wantBody:    "!@#$%^&*()_+\n\r\t",
 			wantErr:     false,
 			description: "请求体包含特殊字符",

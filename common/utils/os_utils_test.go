@@ -18,7 +18,7 @@ func TestIsPortAvailable(t *testing.T) {
 		t.FailNow()
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%v", port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%v", port))
 	if err != nil {
 		t.Logf("listen failed: %s", err)
 		t.FailNow()
