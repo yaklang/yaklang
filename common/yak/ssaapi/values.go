@@ -705,7 +705,7 @@ func (v *Value) GetCalledBy() Values {
 			if !ok {
 				continue
 			}
-			if call == nil && call.Method == nil {
+			if call == nil || call.Method == nil {
 				continue
 			}
 			if call.Method.GetId() == nodeId {

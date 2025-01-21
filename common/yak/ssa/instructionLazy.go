@@ -1,8 +1,6 @@
 package ssa
 
 import (
-	"fmt"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -12,7 +10,7 @@ import (
 
 func init() {
 	ssautil.RegisterLazyInstructionBuilder(func(id int64) (ssautil.SSAValue, error) {
-		return NewLazyInstruction(id)
+		return NewLazyValue(id)
 	})
 }
 
@@ -28,6 +26,7 @@ type LazyInstruction struct {
 	ir          *ssadb.IrCode
 	programName string
 	cache       *Cache
+	prog        *Program
 	Modify      bool
 }
 
@@ -36,6 +35,28 @@ var (
 	_ Value       = (*LazyInstruction)(nil)
 	_ User        = (*LazyInstruction)(nil)
 )
+
+func NewLazyValue(id int64) (Value, error) {
+	inst, err := NewLazyEx(id, ToValue)
+	if err != nil {
+		return nil, err
+	}
+	return inst, nil
+}
+
+func NewLazyEx[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, error) {
+	var zero T
+	lz, err := NewLazyInstruction(id)
+	if err != nil {
+		return zero, err
+	}
+
+	inst, ok := Cover(lz)
+	if !ok {
+		return zero, utils.Errorf("BUG: lazyInstruction cover failed")
+	}
+	return inst, nil
+}
 
 func NewInstructionFromLazy[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, error) {
 	var zero T
@@ -51,46 +72,43 @@ func NewInstructionFromLazy[T Instruction](id int64, Cover func(Instruction) (T,
 	return inst, nil
 }
 
-// NewLazyInstruction : create a new lazy instruction, only create in cache
-func NewLazyInstruction(id int64) (Value, error) {
+// // NewLazyInstruction : create a new lazy instruction, only create in cache
+func NewLazyInstruction(id int64) (Instruction, error) {
 	ir := ssadb.GetIrCodeById(ssadb.GetDB(), id)
-	return NewLazyInstructionFromIrCode(ir)
+	if ir == nil {
+		return nil, utils.Error("IrCode is nil")
+	}
+	prog, ok := GetProgramFromPool(ir.ProgramName)
+	if !ok {
+		log.Errorf("program not found: %s", ir.ProgramName)
+		return nil, utils.Errorf("program not found: %s", ir.ProgramName)
+	}
+	return NewLazyInstructionFromIrCode(ir, prog)
 }
 
-func NewLazyInstructionFromIrCode(ir *ssadb.IrCode) (Value, error) {
+func NewLazyInstructionFromIrCode(ir *ssadb.IrCode, prog *Program, ignoreCache ...bool) (Instruction, error) {
 	if ir == nil {
-		return nil, utils.Error("ircode is nil")
+		return nil, utils.Error("IrCode is nil")
 	}
-	cache := GetCacheFromPool(ir.ProgramName)
-	return newLazyInstruction(int64(ir.ID), ir, cache)
-}
-
-func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) (Value, error) {
-	if ret, ok := cache.InstructionCache.Get(id); ok {
-		value, ok := ToValue(ret.inst)
-		if !ok {
-			log.Warnf("BUG: cache return not a value")
-			return nil, utils.Errorf("BUG: LazyInstruction cache return not a value\n")
-		}
-		return value, nil
+	if prog == nil {
+		return nil, utils.Errorf("BUG: program is nil: %s", ir.ProgramName)
 	}
-	if ir == nil {
-		ir = ssadb.GetIrCodeById(ssadb.GetDB(), id)
-		if ir == nil {
-			return nil, utils.Errorf("ircode [" + fmt.Sprint(id) + "]not found")
+	if len(ignoreCache) == 0 || !ignoreCache[0] {
+		if inst := prog.Cache.GetInstruction(ir.GetIdInt64()); !utils.IsNil(inst) {
+			return inst, nil
 		}
+	}
+	if ir == nil || ir.ID == 0 {
+		log.Infof("ircode is nil or id is 0")
 	}
 	lz := &LazyInstruction{
-		id:          id,
+		id:          ir.GetIdInt64(),
 		ir:          ir,
 		variable:    make(map[string]*Variable),
 		programName: ir.ProgramName,
+		cache:       prog.Cache,
+		prog:        prog,
 	}
-	lz.cache = cache
-	lz.cache.InstructionCache.Set(lz.id, instructionIrCode{
-		inst:   lz,
-		irCode: lz.ir,
-	})
 	return lz, nil
 }
 
@@ -125,6 +143,11 @@ func (lz *LazyInstruction) IsBlock(name string) bool {
 
 // create real-instruction from lazy-instruction
 func (lz *LazyInstruction) check() {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("panic: %v", err)
+		}
+	}()
 	if lz.Instruction == nil {
 		inst := CreateInstruction(Opcode(lz.GetOpcode()))
 		if inst == nil {
@@ -132,9 +155,9 @@ func (lz *LazyInstruction) check() {
 			return
 		}
 		lz.Instruction = inst
-		// set range for instruction
 		lz.GetRange()
-		lz.cache.IrCodeToInstruction(lz.Instruction, lz.ir)
+		// set range for instruction
+		lz.cache.IrCodeToInstruction(inst, lz.ir)
 	}
 	if lz.Value == nil {
 		if value, ok := ToValue(lz.Instruction); ok {

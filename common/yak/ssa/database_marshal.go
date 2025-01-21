@@ -309,7 +309,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 }
 
 func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
-	newLazyInstruction := func(input any) Value {
+	unmarshalInstruction := func(input any) Instruction {
 		var id int64
 		switch result := input.(type) {
 		case int64:
@@ -336,12 +336,18 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		}
 		return lz
 	}
+	unmarshalValue := func(p any) Value {
+		lazyIns := unmarshalInstruction(p)
+		if value, ok := ToValue(lazyIns); ok {
+			return value
+		}
+		return nil
+	}
 	unmarshalValues := func(p any) []Value {
 		vs := make([]Value, 0)
 		for _, id := range utils.InterfaceToSliceInterface(p) {
-			lazyIns := newLazyInstruction(id)
-			if lazyIns != nil {
-				vs = append(vs, lazyIns)
+			if value := unmarshalValue(id); value != nil {
+				vs = append(vs, value)
 			}
 		}
 		return vs
@@ -351,7 +357,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		switch ret := p.(type) {
 		case []any:
 			for _, id := range ret {
-				vs = append(vs, newLazyInstruction(id))
+				vs = append(vs, unmarshalInstruction(id))
 			}
 
 		default:
@@ -363,7 +369,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		switch ret := p.(type) {
 		case map[string]any:
 			for k, id := range ret {
-				vs[k] = newLazyInstruction(id)
+				vs[k] = unmarshalValue(id)
 			}
 		default:
 		}
@@ -375,8 +381,8 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		switch ret := p.(type) {
 		case map[string]any:
 			for _, id := range ret {
-				value := newLazyInstruction(id)
-				vs[value.GetLastVariable()] = newLazyInstruction(id)
+				value := unmarshalValue(id)
+				vs[value.GetLastVariable()] = value
 			}
 		default:
 		}
@@ -422,16 +428,16 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	params := ir.GetExtraInfo()
 	switch ret := inst.(type) {
 	case *Assert:
-		ret.Cond = newLazyInstruction(params["assert_condition_id"])
+		ret.Cond = unmarshalValue(params["assert_condition_id"])
 		if msg, ok := params["assert_message_id"]; ok {
-			ret.MsgValue = newLazyInstruction(msg)
+			ret.MsgValue = unmarshalValue(msg)
 		}
 		ret.Msg = params["assert_message_string"].(string)
 	case *BasicBlock:
 		ret.Preds = unmarshalValues(params["block_preds"])
 		ret.Succs = unmarshalValues(params["block_succs"])
 		if cond, ok := params["block_condition"]; ok {
-			ret.Condition = newLazyInstruction(cond)
+			ret.Condition = unmarshalValue(cond)
 		}
 		ret.setReachable = codec.Atob(fmt.Sprint(params["block_set_reachable"]))
 		ret.canBeReached = codec.Atoi(fmt.Sprint(params["block_can_be_reached"]))
@@ -444,13 +450,13 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *BinOp:
 		ret.Op = BinaryOpcode(params["binop_op"].(string))
 		if x, ok := params["binop_x"]; ok {
-			ret.X = newLazyInstruction(x)
+			ret.X = unmarshalValue(x)
 		}
 		if y, ok := params["binop_y"]; ok {
-			ret.Y = newLazyInstruction(y)
+			ret.Y = unmarshalValue(y)
 		}
 	case *Call:
-		ret.Method = newLazyInstruction(params["call_method"])
+		ret.Method = unmarshalValue(params["call_method"])
 		ret.Args = unmarshalValues(params["call_args"])
 		ret.ArgMember = unmarshalValues(params["call_arg_member"])
 		ret.Binding = unmarshalMapValues(params["call_binding"])
@@ -460,11 +466,11 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.IsEllipsis = toBool(params["call_ellipsis"])
 	case *Next:
 		ret.InNext = toBool(params["next_in_next"])
-		ret.Iter = newLazyInstruction(params["next_iter"])
+		ret.Iter = unmarshalValue(params["next_iter"])
 	case *Parameter:
 		ret.IsFreeValue = params["formalParam_is_freevalue"].(bool)
 		if defaultValue, ok := params["formalParam_default"]; ok {
-			ret.SetDefault(newLazyInstruction(defaultValue))
+			ret.SetDefault(unmarshalValue(defaultValue))
 		}
 		ret.FormalParameterIndex = int(params["formalParam_index"].(float64))
 	case *ParameterMember:
@@ -473,26 +479,26 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.MemberCallObjectIndex = int(params["member_call_index"].(float64))
 		ret.MemberCallObjectName = params["member_call_name"].(string)
 		if key, ok := params["member_call_key"]; ok {
-			ret.MemberCallKey = newLazyInstruction(key)
+			ret.MemberCallKey = unmarshalValue(key)
 		}
 	case *Phi:
 		ret.Edge = unmarshalValues(params["phi_edges"])
 		if cfgEntry, ok := params["cfg_entry"]; ok {
-			ret.CFGEntryBasicBlock = newLazyInstruction(cfgEntry)
+			ret.CFGEntryBasicBlock = unmarshalValue(cfgEntry)
 		}
 	case *Return:
 		ret.Results = unmarshalValues(params["return_results"])
 	case *SideEffect:
-		ret.CallSite = newLazyInstruction(params["sideEffect_call"])
-		ret.Value = newLazyInstruction(params["sideEffect_value"])
+		ret.CallSite = unmarshalValue(params["sideEffect_call"])
+		ret.Value = unmarshalValue(params["sideEffect_value"])
 	case *UnOp:
 		ret.Op = UnaryOpcode(params["unop_op"].(string))
-		ret.X = newLazyInstruction(params["unop_x"])
+		ret.X = unmarshalValue(params["unop_x"])
 	case *Undefined:
 		ret.Kind = UndefinedKind(params["undefined_kind"].(float64))
 	case *Jump:
 		if to, ok := params["jump_to"]; ok {
-			ret.To = newLazyInstruction(to)
+			ret.To = unmarshalValue(to)
 		}
 	case *ConstInst:
 		i := params["const_value"]
@@ -511,29 +517,29 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		}
 	case *If:
 		if cond, ok := params["if_cond"]; ok {
-			ret.Cond = newLazyInstruction(cond)
+			ret.Cond = unmarshalValue(cond)
 		}
 		if trueBlock, ok := params["if_true"]; ok {
-			ret.True = newLazyInstruction(trueBlock)
+			ret.True = unmarshalValue(trueBlock)
 		}
 		if falseBlock, ok := params["if_false"]; ok {
-			ret.False = newLazyInstruction(falseBlock)
+			ret.False = unmarshalValue(falseBlock)
 		}
 	case *Make:
 		if low, ok := params["make_low"]; ok {
-			ret.low = newLazyInstruction(low)
+			ret.low = unmarshalValue(low)
 		}
 		if high, ok := params["make_high"]; ok {
-			ret.high = newLazyInstruction(high)
+			ret.high = unmarshalValue(high)
 		}
 		if step, ok := params["make_step"]; ok {
-			ret.step = newLazyInstruction(step)
+			ret.step = unmarshalValue(step)
 		}
 		if l, ok := params["make_len"]; ok {
-			ret.Len = newLazyInstruction(l)
+			ret.Len = unmarshalValue(l)
 		}
 		if c, ok := params["make_cap"]; ok {
-			ret.Cap = newLazyInstruction(c)
+			ret.Cap = unmarshalValue(c)
 		}
 	case *Function:
 		ret.Params = unmarshalValues(params["params"])
@@ -550,33 +556,33 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 				// name / verbose_name / modified / forcecreate
 				ins.Name = utils.MapGetString(extra, "name")
 				ins.VerboseName = utils.MapGetString(extra, "verbose_name")
-				ins.Modify = newLazyInstruction(extra["modify"])
+				ins.Modify = unmarshalValue(extra["modify"])
 				ins.forceCreate = utils.MapGetBool(extra, "forceCreate")
 				ins.ObjectName = utils.MapGetString(extra, "object_name")
 				ins.MemberCallKind = ParameterMemberCallKind(utils.MapGetInt(extra, "member_call_kind"))
 				ins.MemberCallObjectIndex = utils.MapGetInt(extra, "member_call_object_index")
 				ins.MemberCallObjectName = utils.MapGetString(extra, "member_call_name")
 				if extra["member_call_key"] != nil {
-					ins.MemberCallKey = newLazyInstruction(extra["member_call_key"])
+					ins.MemberCallKey = unmarshalValue(extra["member_call_key"])
 				}
 				se = append(se, ins)
 			})
 			ret.SideEffects = se
 		}
 		if parent, ok := params["parent"]; ok {
-			ret.parent = newLazyInstruction(parent)
+			ret.parent = unmarshalValue(parent)
 		}
 		ret.ChildFuncs = unmarshalValues(params["child_funcs"])
 		ret.Return = unmarshalValues(params["return"])
 		ret.Blocks = unmarshalInstructions(params["blocks"])
 		if enter, ok := params["enter_block"]; ok {
-			ret.EnterBlock = newLazyInstruction(enter)
+			ret.EnterBlock = unmarshalValue(enter)
 		}
 		if exit, ok := params["exit_block"]; ok {
-			ret.ExitBlock = newLazyInstruction(exit)
+			ret.ExitBlock = unmarshalValue(exit)
 		}
 		if deferBlock, ok := params["defer_block"]; ok {
-			ret.DeferBlock = newLazyInstruction(deferBlock)
+			ret.DeferBlock = unmarshalValue(deferBlock)
 		}
 
 		if hasEllipsis, ok := params["has_ellipsis"].(bool); ok {
@@ -585,6 +591,6 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *ExternLib:
 
 	default:
-		log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())
+		// log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())
 	}
 }
