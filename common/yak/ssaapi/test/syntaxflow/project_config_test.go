@@ -83,7 +83,7 @@ func TestParsePropertiesFile(t *testing.T) {
 		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 			prog := programs[0]
 			rule := `
-__projectConfig__./management.endpoints.web.exposure.include/ as $include;
+__projectConfig__."management.endpoints.web.exposure.include" as $include;
 `
 			vals, err := prog.SyntaxFlowWithError(rule)
 			require.NoError(t, err)
@@ -145,8 +145,8 @@ myapp:
 		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 			prog := programs[0]
 			vals, err := prog.SyntaxFlowWithError(`
-__projectConfig__./spring.datasource.username/ as $username;
-__projectConfig__./myapp.welcome-message/ as $welcome
+__projectConfig__."spring.datasource.username" as $username;
+__projectConfig__."myapp.welcome-message" as $welcome
 `)
 			require.NoError(t, err)
 			userName := vals.GetValues("username")
