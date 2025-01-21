@@ -166,7 +166,7 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 	reqPacket = lowhttp.ReplaceHTTPPacketFirstLine(reqPacket, fmt.Sprintf("%s %s %s", req.Method, urlIns.RequestURI(), strings.ToUpper(req.HTTPVersion)))
 
 	// build request headers
-	var ReqHeaders map[string]string
+	ReqHeaders := make(map[string]string)
 	lo.ForEach(req.Headers, func(kv *HARKVPair, _ int) {
 		name, value := kv.Name, kv.Value
 		if isRequestHTTP2 {
@@ -191,14 +191,16 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 
 	// build request post data
 	postData := req.PostData
-	if postData.Text != "" {
-		reqPacket = lowhttp.ReplaceHTTPPacketBody(reqPacket, []byte(postData.Text), false)
-	} else if len(postData.Params) > 0 {
-		postParams := lowhttp.NewQueryParams(lowhttp.WithDisableAutoEncode(true))
-		for _, kv := range postData.Params {
-			postParams.Add(kv.Name, kv.Value)
+	if postData != nil {
+		if postData.Text != "" {
+			reqPacket = lowhttp.ReplaceHTTPPacketBody(reqPacket, []byte(postData.Text), false)
+		} else if len(postData.Params) > 0 {
+			postParams := lowhttp.NewQueryParams(lowhttp.WithDisableAutoEncode(true))
+			for _, kv := range postData.Params {
+				postParams.Add(kv.Name, kv.Value)
+			}
+			reqPacket = lowhttp.ReplaceHTTPPacketBody(reqPacket, []byte(postParams.Encode()), false)
 		}
-		reqPacket = lowhttp.ReplaceHTTPPacketBody(reqPacket, []byte(postParams.Encode()), false)
 	}
 
 	//---------------- build response
@@ -211,7 +213,7 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 	isResponseHTTP2 := strings.Contains(strings.ToLower(resp.HTTPVersion), "http/2")
 
 	// build response headers
-	var RespHeaders map[string]string
+	RespHeaders := make(map[string]string)
 	lo.ForEach(resp.Headers, func(kv *HARKVPair, _ int) {
 		name, value := kv.Name, kv.Value
 		if isResponseHTTP2 {
@@ -219,10 +221,10 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 		}
 		RespHeaders[name] = value
 	})
-	reqPacket = lowhttp.ReplaceAllHTTPPacketHeaders(reqPacket, RespHeaders)
+	respPacket = lowhttp.ReplaceAllHTTPPacketHeaders(respPacket, RespHeaders)
 
 	// build response content
-	if resp.Content.Text != "" {
+	if resp.Content != nil && resp.Content.Text != "" {
 		respPacket = lowhttp.ReplaceHTTPPacketBody(respPacket, []byte(resp.Content.Text), false)
 	}
 
