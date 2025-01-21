@@ -89,6 +89,46 @@ func Test_Pointer_normal(t *testing.T) {
 		`, []string{"3", "3", "3", "4"}, t)
 	})
 
+	t.Run("same const reused by multiple variableMemories", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type A struct {
+			a int 
+		}
+
+		func main() {
+			var n1 = 1
+			var str = A{a: n1}
+
+			p := &n1
+			*p = 2
+
+			println(str.a)	// 1
+			println(n1)		// 2
+		}
+
+		`, []string{"1", "2"}, t)
+
+		test.CheckPrintlnValue(`package main
+
+		type A struct {
+			a *int 
+		}
+
+		func main() {
+			var n1 = 1
+			var str = A{a: &n1}
+
+			p := &n1
+			*p = 2
+
+			println(str.a)	// 2
+			println(n1)		// 2
+		}
+
+		`, []string{"2", "2"}, t)
+	})
+
 	// todo
 	t.Run("basic muti pointer", func(t *testing.T) {
 		t.Skip()
