@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -18,7 +19,10 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/adapters/gonet"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv6"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/ports"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/urfave/cli"
@@ -105,6 +109,108 @@ func main() {
 				// nat 转换的情况如下：
 				//    10.1.1.1 -> 10.2.2.2 -> en0 (192.168.0.134) -> 8.8.8.8
 				//
+				return nil
+			},
+		},
+		{
+			Name: "synscan",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "host",
+					Value: "47.52.100.1/24",
+				},
+				cli.StringFlag{
+					Name:  "port",
+					Value: "22,80,443",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				handler, err := rwendpoint.NewPcapReadWriteCloser("en0", 1600)
+				if err != nil {
+					log.Errorf("Failed to create PcapReadWriteCloserEndpoint: %v", err)
+					return err
+				}
+				defer handler.Close()
+
+				ep, err := rwendpoint.NewReadWriteCloserEndpoint(handler, 1600, 0)
+				if err != nil {
+					log.Errorf("Failed to create ReadWriteCloserEndpoint: %v", err)
+					return err
+				}
+				defer ep.Close()
+
+				s, err := netstack.NewDefaultStack(
+					handler.GetIP4Address().String(),
+					handler.GetGatewayIP4Address().String(),
+					ep,
+				)
+				if err != nil {
+					log.Errorf("Failed to create default network stack: %v", err)
+					return err
+				}
+
+				finished := new(int64)
+				addFinished := func() {
+					atomic.AddInt64(finished, 1)
+				}
+
+				count := new(int64)
+				addTask := func() {
+					atomic.AddInt64(count, 1)
+				}
+				go func() {
+					for {
+						// log.Infof("count: %v", atomic.LoadInt64(count))
+						time.Sleep(1 * time.Second)
+					}
+				}()
+
+				swg := utils.NewSizedWaitGroup(10000)
+				for _, host := range utils.ParseStringToHosts(c.String("host")) {
+					for _, port := range utils.ParseStringToPorts(c.String("port")) {
+						host := host
+						port := port
+						swg.Add(1)
+						addTask()
+						lport, tcpErr := s.PortManager.PickEphemeralPort(s.SecureRNG(), func(p uint16) (bool, tcpip.Error) {
+							return true, nil
+						})
+						if tcpErr != nil {
+							log.Errorf("Failed to pick ephemeral port: %v", err)
+						}
+
+						go func() {
+							defer swg.Done()
+							defer func() {
+								s.ReleasePort(ports.Reservation{
+									Networks:  []tcpip.NetworkProtocolNumber{ipv4.ProtocolNumber, ipv6.ProtocolNumber},
+									Transport: tcp.ProtocolNumber,
+									Addr:      tcpip.AddrFrom4(netip.MustParseAddr(host).As4()),
+									Port:      uint16(lport),
+								})
+							}()
+
+							conn, err := gonet.DialTCPWithBind(utils.TimeoutContextSeconds(5), s, tcpip.FullAddress{
+								Port: uint16(lport),
+								NIC:  1,
+								Addr: tcpip.AddrFrom4(netip.MustParseAddr(handler.GetIP4Address().String()).As4()),
+							}, tcpip.FullAddress{
+								Port: uint16(port),
+								NIC:  1,
+								Addr: tcpip.AddrFrom4(netip.MustParseAddr(host).As4()),
+							}, ipv4.ProtocolNumber)
+							if err != nil {
+								// log.Infof("Remote Port %v CLOSE", utils.HostPort(host, port))
+								return
+							}
+							log.Infof("Remote Port %23s OPEN from: %v", utils.HostPort(host, port), conn.LocalAddr().String())
+							addFinished()
+							conn.Close()
+						}()
+					}
+				}
+				swg.Wait()
+				log.Infof("finished: %v", atomic.LoadInt64(finished))
 				return nil
 			},
 		},
