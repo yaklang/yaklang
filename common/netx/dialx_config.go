@@ -12,6 +12,40 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+type DialXTraceInfo struct {
+	// dial 耗时 (包括重试
+	TotalTime time.Duration
+	// tcp dial time
+	TCPtime time.Duration
+	// tls 握手耗时
+	TLSHandshakeTime time.Duration
+}
+
+func NewDialXTraceInfo() *DialXTraceInfo {
+	return &DialXTraceInfo{}
+}
+
+func (d *DialXTraceInfo) SetTLSHandshakeDuration(t time.Duration) {
+	if d == nil {
+		return
+	}
+	d.TLSHandshakeTime = t
+}
+
+func (d *DialXTraceInfo) SetTotalDuration(t time.Duration) {
+	if d == nil {
+		return
+	}
+	d.TotalTime = t
+}
+
+func (d *DialXTraceInfo) SetTCPDuration(t time.Duration) {
+	if d == nil {
+		return
+	}
+	d.TCPtime = t
+}
+
 type dialXConfig struct {
 	Timeout           time.Duration
 	ForceDisableProxy bool
@@ -55,6 +89,8 @@ type dialXConfig struct {
 	LocalAddr *net.UDPAddr
 
 	JustListen bool // just listen udp , not connect .
+
+	TraceInfo *DialXTraceInfo
 }
 
 type DialXOption func(c *dialXConfig)
@@ -69,6 +105,12 @@ func SetDefaultDialXConfig(opt ...DialXOption) {
 	defer defaultDialXOptionsMutex.Unlock()
 
 	defaultDialXOptions = opt
+}
+
+func DialX_WithDialTraceInfo(traceInfo *DialXTraceInfo) DialXOption {
+	return func(c *dialXConfig) {
+		c.TraceInfo = traceInfo
+	}
 }
 
 func DialX_WithDisableProxy(b bool) DialXOption {
