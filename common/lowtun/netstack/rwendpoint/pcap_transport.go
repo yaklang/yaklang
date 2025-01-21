@@ -23,6 +23,22 @@ type PcapReadWriteCloser struct {
 	gatewayHardwareAddr net.HardwareAddr
 }
 
+func (p *PcapReadWriteCloser) GetIP4Address() netip.Addr {
+	return p.ip4address
+}
+
+func (p *PcapReadWriteCloser) GetGatewayIP4Address() netip.Addr {
+	return p.gatewayIp4address
+}
+
+func (p *PcapReadWriteCloser) GetDeviceHardwareAddr() net.HardwareAddr {
+	return p.deviceHardwareAddr
+}
+
+func (p *PcapReadWriteCloser) GetGatewayHardwareAddr() net.HardwareAddr {
+	return p.gatewayHardwareAddr
+}
+
 func NewPcapReadWriteCloser(device string, snaplen int32) (*PcapReadWriteCloser, error) {
 	handle, err := pcap.OpenLive(device, snaplen, true, pcap.BlockForever)
 	if err != nil {
