@@ -626,3 +626,124 @@ func Test_SideEffect_MutiReturn(t *testing.T) {
 		`, []string{"side-effect(2, a)"}, t)
 	})
 }
+
+func Test_SideEffect_Object(t *testing.T) {
+	t.Run("side-effect value", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			a int
+			b int
+		}
+
+		func main(){
+			o := &T{a: 1, b: 2}
+			f1 := func() {
+				o.a = 2
+			}
+			f1()
+			println(o.a)
+		}
+		`, []string{"side-effect(2, o.a)"}, t)
+	})
+
+	t.Run("side-effect pointer", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			a int
+			b int
+		}
+
+		func main(){
+			o1 := T{a: 1, b: 2}
+			o2 := o1
+			f1 := func() {
+				o1.a = 2
+			}
+			f1()
+			println(o1.a)
+			println(o2.a)
+		}
+		`, []string{"side-effect(2, o1.a)", "1"}, t)
+
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			a int
+			b int
+		}
+
+		func main(){
+			o1 := T{a: 1, b: 2}
+			o2 := &o1
+			f1 := func() {
+				o1.a = 2
+			}
+			f1()
+			println(o1.a)
+			println(o2.a)
+		}
+		`, []string{"side-effect(2, o1.a)", "side-effect(2, o1.a)"}, t)
+	})
+
+	t.Run("side-effect value without init", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			a int
+			b int
+		}
+
+		func main(){
+			o := &T{}
+			f1 := func() {
+				o.a = 2
+			}
+
+			f1()
+			println(o.a)
+		}
+		`, []string{"side-effect(2, o.a)"}, t)
+	})
+
+	t.Run("side-effect object", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			a int
+			b int
+		}
+
+		func main(){
+			o := &T{a: 1, b: 2}
+			f1 := func() {
+				o = &T{a: 3, b: 4}
+			}
+			f1()
+			println(o.a)
+		}
+		`, []string{"3"}, t)
+	})
+
+	t.Run("side-effect object if", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			a int
+			b int
+		}
+
+		func main(){
+			o := &T{a: 1, b: 2}
+			f1 := func() {
+				if true {
+					o = &T{a: 3, b: 4}
+				}
+			}
+			f1()
+			println(o.a)
+		}
+		`, []string{"Undefined-o.a(valid)"}, t)
+	})
+}

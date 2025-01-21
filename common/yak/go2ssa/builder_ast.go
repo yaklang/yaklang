@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 // entry point
@@ -437,6 +438,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 			}
 			for _, value := range rightList {
 				rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
+				rightv = b.CopyValue(rightv)
 				rightvl = append(rightvl, rightv)
 			}
 			b.AssignList(leftvl, rightvl)
@@ -500,7 +502,8 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 
 	if leftlen == rightlen {
 		for i, _ := range leftVariables {
-			b.AssignVariable(leftVariables[i], rightVariables[i])
+			right := rightVariables[i]
+			b.AssignVariable(leftVariables[i], right)
 		}
 	} else if rightlen == 1 { /* 大概率是函数调用 */
 		inter := rightVariables[0]
@@ -786,7 +789,11 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		if recove := fun.Receiver(); recove != nil {
 			ssatyp := b.buildReceiver(recove.(*gol.ReceiverContext))
 			for _, t := range ssatyp {
-				if it, ok := ssa.ToObjectType(t); ok {
+				if it, ok := ssa.ToPointerType(t); ok {
+					if it, ok := ssa.ToObjectType(it.GetOrigin()); ok {
+						it.AddMethod(methodName, newFunc)
+					}
+				} else if it, ok := ssa.ToObjectType(t); ok {
 					it.AddMethod(methodName, newFunc)
 				}
 			}
@@ -868,6 +875,11 @@ func (b *astbuilder) buildReceiverDecl(para *gol.ParameterDeclContext) ssa.Type 
 		if typeType != nil {
 			for _, p := range pList {
 				p.SetType(typeType)
+				if _, ok := ssa.ToPointerType(typeType); ok {
+					if vam := p.GetVariableMemory(); vam != nil {
+						vam.SetKind(ssautil.AddressVariable)
+					}
+				}
 			}
 		}
 	}
@@ -1076,12 +1088,16 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, syntaxBlocks ...bool) {
 	}
 
 	handleGlobal := func() {
-		if global := b.GetProgram().GlobalScope; global != nil && !b.SetGlobal {
+		var checkGlobal func(ssa.Value)
+		checkGlobal = func(value ssa.Value) {
 			b.SetGlobal = true
-			for i, m := range global.GetAllMember() {
+			for i, m := range value.GetAllMember() {
 				variable := b.CreateLocalVariable(i.String())
 				b.AssignVariable(variable, m)
 			}
+		}
+		if global := b.GetProgram().GlobalScope; global != nil && !b.SetGlobal {
+			checkGlobal(global)
 		}
 	}
 
@@ -1826,6 +1842,7 @@ func (b *astbuilder) buildShortVarDecl(stmt *gol.ShortVarDeclContext) []ssa.Valu
 	}
 	for _, value := range rightList {
 		rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
+		rightv = b.CopyValue(rightv)
 		rightvl = append(rightvl, rightv)
 	}
 

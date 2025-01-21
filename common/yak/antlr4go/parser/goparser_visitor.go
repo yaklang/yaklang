@@ -316,6 +316,9 @@ type GoParserVisitor interface {
 	// Visit a parse tree produced by GoParser#arguments.
 	VisitArguments(ctx *ArgumentsContext) interface{}
 
+	// Visit a parse tree produced by GoParser#starExpr.
+	VisitStarExpr(ctx *StarExprContext) interface{}
+
 	// Visit a parse tree produced by GoParser#methodExpr.
 	VisitMethodExpr(ctx *MethodExprContext) interface{}
 

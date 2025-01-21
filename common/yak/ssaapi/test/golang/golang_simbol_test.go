@@ -18,7 +18,7 @@ func Test_Express(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 		a #-> as $target
 		`, map[string][]string{
-			"target": {"1", "2"},
+			"target": {"3"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }

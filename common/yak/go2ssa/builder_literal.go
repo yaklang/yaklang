@@ -8,6 +8,7 @@ import (
 
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 func (b *astbuilder) buildBoolLiteral(name string) ssa.Value {
@@ -176,6 +177,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 						if i < len(objt.Keys) {
 							return objt.Keys[i]
 						} else {
+							b.NewError(ssa.Error, TAG, "Object parameter error")
 							return b.EmitConstInst("")
 						}
 					},
@@ -205,21 +207,13 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			}
 
 			if kvs[0].value != nil {
-				// todo: 只有指针才会复用object，目前默认非指针
 				if m, ok := kvs[0].value.(*ssa.Make); ok {
-					var mkeys, mmembers []ssa.Value
-					for k, m := range m.GetAllMember() {
-						mkeys = append(mkeys, k)
-						mmembers = append(mmembers, m)
+					if vam := m.GetVariableMemory(); vam != nil && vam.GetKind() == ssautil.AddressVariable {
+						return kvs[0].value
+					} else {
+						newObject := b.CopyValue(m)
+						return newObject
 					}
-					newObject := b.InterfaceAddFieldBuild(len(mkeys),
-						func(i int) ssa.Value {
-							return mkeys[i]
-						},
-						func(i int) ssa.Value {
-							return mmembers[i]
-						})
-					return newObject
 				}
 
 				return kvs[0].value
@@ -231,9 +225,12 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				partInit()
 				for _, kv := range kvs {
 					if a, ok := objt.AnonymousField[kv.key.String()]; ok {
-						newObject := typeHandler(a, kv.kv)
+						if _, ok := obj.GetAllMember()[objt.GetKeybyName(kv.key.String())]; ok {
+							continue
+						}
+						object := typeHandler(a, kv.kv)
 						variable := b.CreateMemberCallVariable(obj, b.EmitConstInst(kv.key.String()))
-						b.AssignVariable(variable, newObject)
+						b.AssignVariable(variable, object)
 					}
 				}
 			}
@@ -281,6 +278,16 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					return b.EmitConstInst(i)
 				})
 		case ssa.NumberTypeKind, ssa.StringTypeKind, ssa.BooleanTypeKind:
+			if kvs[0].value == nil {
+				return nil
+			}
+			if cons, ok := kvs[0].value.(*ssa.ConstInst); ok {
+				if vam := cons.GetVariableMemory(); vam != nil && vam.GetKind() == ssautil.AddressVariable {
+					return cons
+				}
+
+				return b.CopyValue(cons)
+			}
 			return kvs[0].value
 		default:
 			if kvs[0].value != nil {
@@ -316,6 +323,8 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			bp.AddMethod(n, f)
 		}
 		rvalue.SetType(typ)
+		leftv := b.CreateVariable(bp.Name)
+		b.AssignVariable(leftv, rvalue)
 	}
 
 	return rvalue
@@ -476,7 +485,7 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) ssa.Type {
 	if strings.HasPrefix(text, "*") {
 		if p := stmt.PointerType(); p != nil {
 			if t := p.(*gol.PointerTypeContext).Type_(); t != nil {
-				return b.buildType(t.(*gol.Type_Context))
+				return ssa.NewPointerType(b.buildType(t.(*gol.Type_Context)))
 			}
 		}
 	}
@@ -651,6 +660,7 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 	defer recoverRange()
 
 	var ssatyp ssa.Type = nil
+	var key ssa.Value
 	if typ := stmt.Type_(); typ != nil {
 		ssatyp = b.buildType(typ.(*gol.Type_Context))
 	}
@@ -672,12 +682,14 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			}
 			if p, ok := parent.(*ssa.ObjectType); ok {
 				structTyp.AnonymousField[typ.TypeName().GetText()] = p
-				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), p)
+				key = b.EmitConstInst(typ.TypeName().GetText())
 			} else if a, ok := parent.(*ssa.AliasType); ok {
-				structTyp.AddField(b.EmitConstInst(a.Name), a.GetType())
+				key = b.EmitConstInst(a.Name)
 			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
-				structTyp.AddField(b.EmitConstInst(ba.GetName()), ba)
+				key = b.EmitConstInst(ba.GetName())
 			}
+
+			structTyp.AddField(key, parent)
 		}
 	}
 }
