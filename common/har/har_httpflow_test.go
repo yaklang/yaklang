@@ -11,7 +11,94 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
+
+func TestHAR2HTTPFlow(t *testing.T) {
+	wantRspBody := "Hello World"
+	entry := HAREntry{
+		Request: &HARRequest{
+			Method:      "GET",
+			URL:         "https://example.com",
+			HTTPVersion: "http/2.0",
+			Headers: []*HARKVPair{
+				{
+					Name:  ":authority",
+					Value: "example.com",
+				},
+				{
+					Name:  ":method",
+					Value: "GET",
+				},
+				{
+					Name:  ":path",
+					Value: "/",
+				},
+				{
+					Name:  ":scheme",
+					Value: "https",
+				},
+				{
+					Name:  "user-agent",
+					Value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+				},
+			},
+			HeadersSize: -1,
+			BodySize:    0,
+		},
+		Response: &HARResponse{
+			StatusCode:  200,
+			StatusText:  "OK",
+			HTTPVersion: "http/2.0",
+			HeadersSize: -1,
+			Headers: []*HARKVPair{
+				{
+					Name:  "content-length",
+					Value: strconv.Itoa(len(wantRspBody)),
+				},
+				{
+					Name:  "content-type",
+					Value: "text/html",
+				},
+				{
+					Name:  "vary",
+					Value: "Accept-Encoding",
+				},
+			},
+			Content: &HARHTTPContent{
+				Size:     len(wantRspBody),
+				MimeType: "text/html",
+				Text:     wantRspBody,
+			},
+			BodySize: -1,
+		},
+	}
+	flow, err := HarEntry2HTTPFlow(&entry)
+	require.NoError(t, err)
+	require.Equal(t, "GET", flow.Method)
+	require.Equal(t, int64(200), flow.StatusCode)
+	require.Equal(t, "https://example.com", flow.Url)
+	// check request
+	req, err := strconv.Unquote(flow.Request)
+	require.NoError(t, err)
+	reqBytes := []byte(req)
+	_, _, version := lowhttp.GetHTTPPacketFirstLine(reqBytes)
+	require.Equal(t, "HTTP/2.0", version)
+	require.Equal(t, "example.com", lowhttp.GetHTTPPacketHeader(reqBytes, "Host"))
+	require.Equal(t, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", lowhttp.GetHTTPPacketHeader(reqBytes, "User-Agent"))
+	// check response
+	rsp, err := strconv.Unquote(flow.Response)
+	require.NoError(t, err)
+	rspBytes := []byte(rsp)
+	respVersion, statusCode, statusMessage := lowhttp.GetHTTPPacketFirstLine(rspBytes)
+	require.Equal(t, "HTTP/2.0", respVersion)
+	require.Equal(t, "200", statusCode)
+	require.Equal(t, "OK", statusMessage)
+	require.Equal(t, strconv.Itoa(len(wantRspBody)), lowhttp.GetHTTPPacketHeader(rspBytes, "Content-Length"))
+	require.Equal(t, "text/html", lowhttp.GetHTTPPacketHeader(rspBytes, "Content-Type"))
+	require.Equal(t, "Accept-Encoding", lowhttp.GetHTTPPacketHeader(rspBytes, "Vary"))
+	require.Equal(t, wantRspBody, string(lowhttp.GetHTTPPacketBody(rspBytes)))
+}
 
 func TestHTTPFlow2HAR(t *testing.T) {
 	// generate a random data
