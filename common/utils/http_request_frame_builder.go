@@ -267,6 +267,10 @@ HEADER_READER:
 					pda.Pop()
 					pda.Push(__FRAME_PARSE_HEADER_STATUS_HEADER_DIVIDER)
 					goto RETRY
+				} else if b == '\n' {
+					pda.Pop()
+					pda.Push(__FRAME_PARSE_HEADER_STATUS_HEADER_END)
+					goto RETRY
 				}
 				currentHeaderKey.WriteString(string(b))
 			}
@@ -298,5 +302,20 @@ HEADER_READER:
 			return nil, nil, nil, Error("BUG: invalid status")
 		}
 	}
-	return fakeHeader, headers, nil, nil
+
+	if headerKey := currentHeaderKey.String(); len(headerKey) > 0 {
+		headerValue := currentHeaderValue.String()
+		if strings.HasPrefix(headerKey, ":") {
+			fakeHeader = append(fakeHeader, [2]string{headerKey, headerValue})
+		} else {
+			headers = append(headers, [2]string{headerKey, headerValue})
+		}
+	}
+
+	buf, err := io.ReadAll(br)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return fakeHeader, headers, bytes.NewReader(buf), nil
 }
