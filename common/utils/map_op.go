@@ -3,11 +3,12 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -348,6 +349,19 @@ func MapGetBool(m map[string]interface{}, key string) bool {
 	return MapGetBoolOr(m, key, false)
 }
 
+func getInt64(r any) int64 {
+	switch ret := r.(type) {
+	case float64:
+		return int64(ret)
+	case int64:
+		return ret
+	case int:
+		return int64(ret)
+	default:
+		return codec.Atoi64(fmt.Sprint(r))
+	}
+
+}
 func MapGetInt64Or(m map[string]interface{}, key string, value int64) int64 {
 	if m == nil {
 		return value
@@ -355,16 +369,56 @@ func MapGetInt64Or(m map[string]interface{}, key string, value int64) int64 {
 
 	r, ok := m[key]
 	if ok {
-		v, typeOk := r.(int64)
-		if typeOk {
-			return v
-		}
+		return getInt64(r)
 	}
 	return value
 }
 
 func MapGetInt64(m map[string]interface{}, key string) int64 {
 	return MapGetInt64Or(m, key, 0)
+}
+
+func MapGetInt64Slice(m map[string]any, key string) []int64 {
+	return MapGetInt64SliceOr(m, key, []int64{})
+}
+
+func MapGetInt64SliceOr(m map[string]any, key string, value []int64) []int64 {
+	if m == nil {
+		return value
+	}
+
+	if r, ok := m[key]; ok {
+		if ret, typeOk := r.([]interface{}); typeOk {
+			result := []int64{}
+			for _, i := range ret {
+				result = append(result, getInt64(i))
+			}
+			return result
+		}
+	}
+	return value
+}
+
+func MapGetStringInt64Map(m map[string]interface{}, key string) map[string]int64 {
+	return MapGetStringInt64MapOr(m, key, map[string]int64{})
+}
+
+func MapGetStringInt64MapOr(m map[string]interface{}, key string, value map[string]int64) map[string]int64 {
+	if m == nil {
+		return value
+	}
+
+	r, ok := m[key]
+	if ok {
+		result := map[string]int64{}
+		if ret, typeOk := r.(map[string]interface{}); typeOk {
+			for k, v := range ret {
+				result[k] = getInt64(v)
+			}
+		}
+		return result
+	}
+	return value
 }
 
 func InterfaceToGeneralMap(params interface{}) (finalResult map[string]interface{}) {

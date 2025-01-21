@@ -17,17 +17,14 @@ func NewTypeCheck(config) Analyzer {
 
 // Analyze(config, *ssa.Program)
 func (t *TypeCheck) Run(prog *ssa.Program) {
-	check := func(inst ssa.Instruction) {
-		t.CheckOnInstruction(inst)
-	}
 
 	analyzeOnFunction := func(f *ssa.Function) {
-		for _, bRaw := range f.Blocks {
-			b, ok := ssa.ToBasicBlock(bRaw)
-			if !ok {
-				log.Errorf("TypeCheck: %s is not a basic block", bRaw.GetName())
-				continue
-			}
+		check := func(instId int64) {
+			inst := f.GetValueById(instId)
+			t.CheckOnInstruction(inst)
+		}
+		for _, blockID := range f.Blocks {
+			b := f.GetBasicBlockByID(blockID)
 
 			for _, phi := range b.Phis {
 				check(phi)
@@ -123,7 +120,7 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 
 		objTyp := inst.GetObject().GetType()
 		key := inst.GetKey()
-		if ssa.IsConst(key) {
+		if ssa.IsConstInst(key) {
 			want := ssa.TryGetSimilarityKey(ssa.GetAllKey(objTyp), key.String())
 			if want != "" {
 				inst.NewError(
@@ -141,7 +138,8 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 }
 
 func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
-	funcTyp, ok := c.Method.GetType().(*ssa.FunctionType)
+	method := c.GetValueById(c.Method)
+	funcTyp, ok := method.GetType().(*ssa.FunctionType)
 	isMethod := false
 	if !ok {
 		return
@@ -149,10 +147,13 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 	// check argument number
 	func() {
 		wantParaLen := len(funcTyp.Parameter)
-		var gotPara ssa.Types = lo.Map(c.Args, func(arg ssa.Value, _ int) ssa.Type { return arg.GetType() })
+		var gotPara ssa.Types = lo.Map(c.Args, func(argId int64, _ int) ssa.Type {
+			arg := c.GetValueById(argId)
+			return arg.GetType()
+		})
 		gotParaLen := len(c.Args)
 		funName := ""
-		if f, ok := c.Method.(*ssa.Function); ok {
+		if f, ok := ssa.ToFunction(method); ok {
 			funName = f.GetName()
 		} else if funcTyp.Name != "" {
 			funName = funcTyp.Name
@@ -182,7 +183,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 				)
 				return
 			}
-			log.Errorf("TypeCheckCall: %s, %s", c.Method.GetVerboseName(),
+			log.Errorf("TypeCheckCall: %s, %s", method.GetVerboseName(),
 				"gotParaLen == funcTyp.ParameterLen but no enough argument")
 		}
 		checkParamType := func(i int, got, want ssa.Type) {
@@ -247,7 +248,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			if hasError {
 				hasError := true
 				for key := range c.GetAllMember() {
-					if c, ok := ssa.ToConst(key); ok {
+					if c, ok := ssa.ToConstInst(key); ok {
 						if c.IsNumber() {
 							if int(c.Number()) == len(objType.FieldTypes)-1 {
 								hasError = false

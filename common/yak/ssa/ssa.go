@@ -71,6 +71,16 @@ type Instruction interface {
 	// IsFromDB means this instruction is loaded from db
 	IsFromDB() bool
 	SetIsFromDB(bool)
+
+	// use program cache
+	GetInstructionById(id int64) Instruction
+	GetValueById(id int64) Value
+	GetUsersByID(id int64) User
+	GetValuesByIDs([]int64) Values
+	GetUsersByIDs([]int64) Users
+
+	// string
+	String() string
 }
 
 type (
@@ -80,8 +90,6 @@ type (
 
 // data-flow
 type Node interface {
-	// string
-	String() string
 
 	// for graph
 	HasUsers() bool
@@ -144,6 +152,10 @@ type Value interface {
 	Occultation
 	AddUser(User)
 	RemoveUser(User)
+
+	// for save
+	save(*ssadb.IrCode)
+	load(*ssadb.IrCode)
 }
 
 type Occultation interface {
@@ -304,32 +316,32 @@ type Function struct {
 	Type *FunctionType
 
 	// just function parameter
-	Params      []Value
+	Params      []int64 // parameter
 	ParamLength int
 	// for closure function
-	FreeValues map[*Variable]Value // store the captured variable form parent-function, just contain name, and type is Parameter
+	FreeValues map[*Variable]int64 // parameter-freevalue  // store the captured variable form parent-function, just contain name, and type is Parameter
 	// parameter member call
 	// ParameterMembers []*ParameterMember
-	ParameterMembers []Value
+	ParameterMembers []int64 // parameter member
 	// function side effects
 	SideEffects       []*FunctionSideEffect
 	SideEffectsReturn []map[*Variable]*FunctionSideEffect
 
 	// closure function double link. parentFunc <-> childFuncs
-	parent     Value   // parent function;  can be nil if there is no parent function
-	ChildFuncs []Value // child function within this function
+	parent     int64   // function     // parent function;  can be nil if there is no parent function
+	ChildFuncs []int64 // function  // child function within this function
 
-	Return []Value
+	Return []int64 // return
 
 	// BasicBlock list
-	Blocks []Instruction
+	Blocks []int64
 	// First and End block
-	EnterBlock Instruction
-	ExitBlock  Instruction
+	EnterBlock int64
+	ExitBlock  int64
 	// For Defer  semantic
 	// this block will always execute when the function exits,
 	// regardless of whether the function returns normally or exits due to a panic.
-	DeferBlock Instruction
+	DeferBlock int64
 
 	// ssa error
 	errComment ErrorComment
@@ -368,8 +380,8 @@ func (f *Function) GetMethodName() string {
 func (f *Function) FirstBlockInstruction() []Instruction {
 	if len(f.Blocks) > 0 {
 		firstBlock := f.Blocks[0]
-		if block, ok := ToBasicBlock(firstBlock); ok {
-			return block.Insts
+		if block := f.GetBasicBlockByID(firstBlock); block != nil {
+			return f.GetInstructionsByIDs(block.Insts)
 		} else {
 			log.Warnf("function %s first block is not a basic block", f.GetName())
 		}
@@ -382,24 +394,31 @@ var (
 	_ Value = (*Function)(nil)
 )
 
+type BasicBlockReachableKind int
+
+const (
+	BasicBlockUnknown     BasicBlockReachableKind = 0
+	BasicBlockReachable                           = 1
+	BasicBlockUnReachable                         = -1
+)
+
 // implement Value
 type BasicBlock struct {
-	anValue
+	anValue `json:"-"`
 
 	Index int
 	// BasicBlock graph
-	Preds, Succs []Value
+	Preds, Succs []int64 // basic block
 
 	/*
 		if Condition == true: this block reach
 	*/
-	setReachable bool
-	canBeReached int
-	Condition    Value
+	canBeReached BasicBlockReachableKind
+	Condition    int64 // value
 
 	// instruction list
-	Insts []Instruction
-	Phis  []Value
+	Insts []int64 // instruction
+	Phis  []int64 // phi
 
 	// error catch
 	Handler *ErrorHandler
@@ -410,11 +429,10 @@ type BasicBlock struct {
 }
 
 func (b *BasicBlock) SetReachable(boolean bool) {
-	b.setReachable = true
 	if boolean {
-		b.canBeReached = 1
+		b.canBeReached = BasicBlockReachable
 	} else {
-		b.canBeReached = -1
+		b.canBeReached = BasicBlockUnReachable
 	}
 }
 
@@ -422,10 +440,11 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 	if len(b.Insts) <= 0 {
 		return nil, false
 	}
-	jmp, err := lo.Last(b.Insts)
-	if err != nil {
+	jmpId, err := lo.Last(b.Insts)
+	if jmpId <= 0 || err != nil {
 		return nil, false
 	}
+	jmp := b.GetInstructionById(jmpId)
 
 	_, ok := jmp.(*LazyInstruction)
 	if ok {
@@ -434,21 +453,23 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 
 	switch ret := jmp.(type) {
 	case *Jump:
-		if ret.To == nil {
+		if ret.To <= 0 {
 			log.Warnf("Jump To is nil: %T", ret)
 			return nil, false
 		}
+		to := b.GetInstructionById(ret.To)
 
-		toBlock, ok := ToBasicBlock(ret.To)
+		toBlock, ok := ToBasicBlock(to)
 		if !ok {
 			log.Warnf("Jump To is not *BasicBlock: %T", ret.To)
 			return nil, false
 		}
 
-		last, err := lo.Last(toBlock.Insts)
-		if err != nil {
+		lastId, err := lo.Last(toBlock.Insts)
+		if lastId <= 0 || err != nil {
 			return nil, false
 		}
+		last := b.GetInstructionById(lastId)
 		// fetch essential instructions via jump
 		// if else(elif) condition
 		// for loop condition
@@ -470,14 +491,12 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 		case *Switch:
 			log.Warn("Swtich Statement (Condition/Label value should contains jmp) WARNING")
 			return lo.Map(ret.Label, func(label SwitchLabel, i int) Instruction {
-				var result Instruction = label.Value
+				var result Instruction = b.GetValueById(label.Value)
 				return result
 			}), true
 		case *Loop:
 			log.Warn("Loop Statement (Condition/Label value should contains jmp) WARNING")
-			return []Instruction{
-				ret.Cond,
-			}, true
+			return []Instruction{b.GetValueById(ret.Cond)}, true
 		default:
 			log.Warnf("unsupoorted CFG Entry Instruction: %T", ret)
 		}
@@ -506,9 +525,9 @@ var (
 type Phi struct {
 	anValue
 
-	CFGEntryBasicBlock Value
+	CFGEntryBasicBlock int64
 
-	Edge []Value // edge[i] from phi.Block.Preds[i]
+	Edge []int64 // value  // edge[i] from phi.Block.Preds[i]
 	//	what instruction create this control-flow merge?
 	// branch *Instruction // loop or if :
 }
@@ -531,8 +550,8 @@ type ExternLib struct {
 	table   map[string]any
 	builder *FunctionBuilder
 
-	MemberMap map[string]Value
-	Member    []Value
+	MemberMap map[string]int64 // value
+	Member    []int64          // value
 }
 
 var (
@@ -558,13 +577,13 @@ type parameterMemberInner struct {
 	MemberCallKind        ParameterMemberCallKind
 	MemberCallObjectIndex int    // for Parameter
 	MemberCallObjectName  string // for FreeValue
-	MemberCallKey         Value
+	MemberCallKey         int64  // value
 }
 
 func newParameterMember(obj *Parameter, key Value) *parameterMemberInner {
 	new := &parameterMemberInner{
 		ObjectName:    obj.GetName(),
-		MemberCallKey: key,
+		MemberCallKey: key.GetId(),
 	}
 
 	if obj.IsFreeValue {
@@ -578,6 +597,8 @@ func newParameterMember(obj *Parameter, key Value) *parameterMemberInner {
 }
 
 func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
+
+	var id int64
 	switch p.MemberCallKind {
 	case NoMemberCall:
 		return
@@ -585,20 +606,23 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 		if p.MemberCallObjectIndex >= len(c.Args) {
 			return
 		}
-		return c.Args[p.MemberCallObjectIndex], true
+		ok = true
+		id = c.Args[p.MemberCallObjectIndex]
+		// return c.Args[p.MemberCallObjectIndex], true
 	case FreeValueMemberCall:
-		obj, ok = c.Binding[p.MemberCallObjectName]
-		return obj, ok
+		id, ok = c.Binding[p.MemberCallObjectName]
 	case CallMemberCall:
 		return c, true
 	case SideEffectMemberCall:
-		value, ok := c.SideEffectValue[p.MemberCallObjectName]
-		return value, ok
+		id, ok = c.SideEffectValue[p.MemberCallObjectName]
 	case ParameterCall:
 		if p.MemberCallObjectIndex >= len(c.Args) {
 			return
 		}
-		return c.Args[p.MemberCallObjectIndex], true
+		id, ok = c.Args[p.MemberCallObjectIndex], true
+	}
+	if id > 0 {
+		obj = c.GetValueById(id)
 	}
 	return
 }
@@ -620,26 +644,26 @@ type Parameter struct {
 
 	// for FreeValue
 	IsFreeValue  bool
-	defaultValue Value
+	defaultValue int64 // value
 
 	// Parameter Index
 	FormalParameterIndex int
 }
 
 func (p *Parameter) ReplaceValue(v Value, to Value) {
-	if p.defaultValue == v {
-		p.defaultValue = to
+	if p.defaultValue == v.GetId() {
+		p.defaultValue = to.GetId()
 	}
 }
 func (p *Parameter) GetDefault() Value {
-	return p.defaultValue
+	return p.GetValueById(p.defaultValue)
 }
 
 func (p *Parameter) SetDefault(v Value) {
 	if p == nil {
 		return
 	}
-	p.defaultValue = v
+	p.defaultValue = v.GetId()
 	//增加一个ud关系绑定
 	v.AddPointer(p)
 	v.AddUser(p)
@@ -662,8 +686,8 @@ type ConstInst struct {
 	*Const
 	anValue
 	Unary      int
-	isIdentify bool // field key
-	Origin     User
+	isIdentify bool  // field key
+	Origin     int64 // user
 }
 
 // ConstInst cont set Type
@@ -725,7 +749,7 @@ var (
 type BinOp struct {
 	anValue
 	Op   BinaryOpcode
-	X, Y Value
+	X, Y int64
 }
 
 var (
@@ -739,7 +763,7 @@ type UnOp struct {
 	anValue
 
 	Op UnaryOpcode
-	X  Value
+	X  int64
 }
 
 var (
@@ -758,10 +782,10 @@ type Call struct {
 	anValue
 
 	// for call function
-	Method    Value
-	Args      []Value
-	Binding   map[string]Value
-	ArgMember []Value
+	Method    int64
+	Args      []int64
+	Binding   map[string]int64
+	ArgMember []int64
 
 	// go function
 	Async  bool
@@ -772,7 +796,7 @@ type Call struct {
 	// ~ drop error
 	IsDropError     bool
 	IsEllipsis      bool
-	SideEffectValue map[string]Value
+	SideEffectValue map[string]int64
 }
 
 var (
@@ -785,8 +809,8 @@ var (
 // ----------- SideEffect
 type SideEffect struct {
 	anValue
-	CallSite Value // call instruction
-	Value    Value // modify to this value
+	CallSite int64 // call instruction
+	Value    int64 // modify to this value
 }
 
 func (p *SideEffect) IsSideEffect() bool {
@@ -805,7 +829,7 @@ var (
 // function.
 type Return struct {
 	anValue
-	Results []Value
+	Results []int64
 }
 
 var (
@@ -822,12 +846,12 @@ type Make struct {
 	anValue
 
 	// when slice
-	low, high, step Value
+	low, high, step int64
 
-	parentI Value // parent interface
+	parentI int64 // parent interface
 
 	// when slice or map
-	Len, Cap Value
+	Len, Cap int64
 }
 
 var (
@@ -840,7 +864,7 @@ var (
 // ------------- Next
 type Next struct {
 	anValue
-	Iter   Value
+	Iter   int64
 	InNext bool // "in" grammar
 }
 
@@ -857,9 +881,9 @@ var (
 type Assert struct {
 	anInstruction
 
-	Cond     Value
+	Cond     int64
 	Msg      string
-	MsgValue Value
+	MsgValue int64
 }
 
 var (
@@ -873,7 +897,7 @@ var (
 type TypeCast struct {
 	anValue
 
-	Value Value
+	Value int64
 }
 
 var (
@@ -899,8 +923,8 @@ var (
 // ------------- ErrorHandler
 type ErrorHandler struct {
 	anInstruction
-	catchs           []*BasicBlock
-	try, final, done *BasicBlock
+	catchs           []int64
+	try, final, done int64
 }
 
 var _ Instruction = (*ErrorHandler)(nil)
@@ -908,7 +932,7 @@ var _ Instruction = (*ErrorHandler)(nil)
 // -------------- PANIC
 type Panic struct {
 	anValue
-	Info Value
+	Info int64
 }
 
 var (
@@ -938,7 +962,7 @@ var (
 // the block containing Jump instruction only have one successor block
 type Jump struct {
 	anInstruction
-	To Value
+	To int64 // value
 }
 
 var _ Instruction = (*Jump)(nil)
@@ -950,9 +974,9 @@ var _ Instruction = (*Jump)(nil)
 type If struct {
 	anInstruction
 
-	Cond  Value
-	True  Value
-	False Value
+	Cond  int64
+	True  int64
+	False int64
 }
 
 func (i *If) GetSiblings() []*If {
@@ -969,11 +993,11 @@ func (i *If) getSiblings(m map[int64]struct{}) []*If {
 	}
 
 	var ifs []*If
-	if i.False == nil {
+	if i.False <= 0 {
 		return nil
 	}
 
-	falseBlock, ok := ToBasicBlock(i.False)
+	falseBlock, ok := ToBasicBlock(i.GetValueById(i.False))
 	if !ok || len(falseBlock.Insts) == 0 {
 		return nil
 	}
@@ -998,10 +1022,10 @@ var (
 type Loop struct {
 	anInstruction
 
-	Body, Exit *BasicBlock
+	Body, Exit int64 // basic block
 
-	Init, Cond, Step Value
-	Key              Value
+	Init, Cond, Step int64
+	Key              int64
 }
 
 var (
@@ -1012,21 +1036,21 @@ var (
 
 // ----------- Switch
 type SwitchLabel struct {
-	Value Value
-	Dest  *BasicBlock
+	Value int64
+	Dest  int64 // basic block
 }
 
 func NewSwitchLabel(v Value, dest *BasicBlock) SwitchLabel {
 	return SwitchLabel{
-		Value: v,
-		Dest:  dest,
+		Value: v.GetId(),
+		Dest:  dest.GetId(),
 	}
 }
 
 type Switch struct {
 	anInstruction
 
-	Cond         Value
+	Cond         int64
 	DefaultBlock *BasicBlock
 
 	Label []SwitchLabel

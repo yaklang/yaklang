@@ -1,8 +1,14 @@
 package ssa
 
 // for DataFlowNode cover
-func ToNode(a any) (Node, bool)         { u, ok := a.(Node); return u, ok }
-func ToValue(n any) (Value, bool)       { v, ok := n.(Value); return v, ok }
+func ToNode(a any) (Node, bool) { u, ok := a.(Node); return u, ok }
+func ToValue(n Instruction) (Value, bool) {
+	if lz, isLz := ToLazyInstruction(n); isLz {
+		return ToValue(lz.Self())
+	}
+	v, ok := n.(Value)
+	return v, ok
+}
 func ToUser(n Instruction) (User, bool) { u, ok := n.(User); return u, ok }
 
 func ToFunction(n Instruction) (*Function, bool) {
@@ -39,10 +45,10 @@ func ToFreeValue(n Node) (*Parameter, bool) {
 func ToLazyInstruction(n any) (*LazyInstruction, bool) { u, ok := n.(*LazyInstruction); return u, ok }
 
 // value
-func IsConst(v Instruction) bool { _, ok := ToConst(v); return ok }
-func ToConst(v Instruction) (*ConstInst, bool) {
+func IsConstInst(v Instruction) bool { _, ok := ToConstInst(v); return ok }
+func ToConstInst(v Instruction) (*ConstInst, bool) {
 	if lz, isLZ := ToLazyInstruction(v); isLZ {
-		return ToConst(lz.Self())
+		return ToConstInst(lz.Self())
 	}
 	c, ok := v.(*ConstInst)
 	return c, ok
@@ -130,7 +136,7 @@ func ToMake(v Instruction) (*Make, bool) {
 
 // type cover
 
-func ToObjectType(t Type) (*ObjectType, bool)             { o, ok := t.(*ObjectType); return o, ok }
-func ToFunctionType(t Type) (*FunctionType, bool)         { f, ok := t.(*FunctionType); return f, ok }
-func ToBasicType(t Type) (*BasicType, bool)               { b, ok := t.(*BasicType); return b, ok }
+func ToObjectType(t Type) (*ObjectType, bool)        { o, ok := t.(*ObjectType); return o, ok }
+func ToFunctionType(t Type) (*FunctionType, bool)    { f, ok := t.(*FunctionType); return f, ok }
+func ToBasicType(t Type) (*BasicType, bool)          { b, ok := t.(*BasicType); return b, ok }
 func ToClassBluePrintType(t Type) (*Blueprint, bool) { c, ok := t.(*Blueprint); return c, ok }

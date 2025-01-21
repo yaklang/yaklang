@@ -9,19 +9,15 @@ import (
 func (f *Function) GetDeferBlock() *BasicBlock {
 	newDefer := func() *BasicBlock {
 		block := f.NewBasicBlockNotAddBlocks("defer")
-		f.DeferBlock = block
+		f.DeferBlock = block.GetId()
 		// TODO: this Scope should be child Scope of other scope in function
 		block.SetScope(NewScope(f, f.GetProgram().GetProgramName()))
 		return block
 	}
-	if f.DeferBlock == nil {
+	if f.DeferBlock <= 0 {
 		return newDefer()
 	}
-	block, ok := f.DeferBlock.(*BasicBlock)
-	if !ok {
-		log.Warnf("defer block is not a basic block")
-		return newDefer()
-	}
+	block := f.GetBasicBlockByID(f.DeferBlock)
 	return block
 }
 
@@ -42,15 +38,16 @@ func (f *Function) NewBasicBlockNotAddUnSealed(name string) *BasicBlock {
 func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bool) *BasicBlock {
 	b := &BasicBlock{
 		anValue: NewValue(),
-		Preds:   make([]Value, 0),
-		Succs:   make([]Value, 0),
-		Insts:   make([]Instruction, 0),
-		Phis:    make([]Value, 0),
+		Preds:   make([]int64, 0),
+		Succs:   make([]int64, 0),
+		Insts:   make([]int64, 0),
+		Phis:    make([]int64, 0),
 		Handler: nil,
 		finish:  false,
 	}
 	b.SetName(name)
 	b.SetFunc(f)
+	b.GetProgram().SetVirtualRegister(b)
 	b.SetBlock(b)
 	if !nodAddToBlocks {
 		addToBlocks(b)
@@ -78,8 +75,7 @@ func addToBlocks(block *BasicBlock) {
 	block.SetName(name)
 
 	block.Index = index
-	f.Blocks = append(f.Blocks, block)
-	block.GetProgram().SetVirtualRegister(block)
+	f.Blocks = append(f.Blocks, block.GetId())
 }
 
 func (b *BasicBlock) SetScope(s ScopeIF) {
@@ -89,39 +85,33 @@ func (b *BasicBlock) SetScope(s ScopeIF) {
 	b.ScopeTable = s
 }
 
-/*
-	if condition is true  :  1 reach
-	if condition is false : -1 unreachable
-	if condition need calc: 0  unknown
-*/
-
-func (b *BasicBlock) Reachable() int {
-	if b.setReachable {
+func (b *BasicBlock) Reachable() BasicBlockReachableKind {
+	if b.canBeReached != BasicBlockUnknown {
 		return b.canBeReached
 	}
 
-	if b.Condition == nil {
-		return 0
+	if b.Condition > 0 {
+		return BasicBlockUnknown
 	}
 
-	if c, ok := b.Condition.(*ConstInst); ok {
+	if c, ok := ToConstInst(b.GetInstructionById(b.Condition)); ok {
 		if c.IsBoolean() {
 			if c.Boolean() {
-				return 1
+				return BasicBlockReachable
 			} else {
-				return -1
+				return BasicBlockUnReachable
 			}
 		}
 	}
 
-	return 0
+	return BasicBlockUnknown
 }
 
 func (b *BasicBlock) AddSucc(succ *BasicBlock) {
-	b.Succs = append(b.Succs, succ)
-	succ.Preds = append(succ.Preds, b)
+	b.Succs = append(b.Succs, succ.GetId())
+	succ.Preds = append(succ.Preds, b.GetId())
 }
 
 func (b *BasicBlock) LastInst() Instruction {
-	return b.Insts[len(b.Insts)-1]
+	return b.GetInstructionById(b.Insts[len(b.Insts)-1])
 }

@@ -3,16 +3,17 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -1029,14 +1030,14 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 	if !ok {
 		return suggestions
 	}
-	funcTyp, ok := ssa.ToFunctionType(call.Method.GetType())
+	funcTyp, ok := ssa.ToFunctionType(call.GetValueById(call.Method).GetType())
 	if !ok {
 		return suggestions
 	}
 	// find index of call.Args
 	index := -1
 	for i, arg := range call.Args {
-		if arg == ssaapi.GetBareNode(v) {
+		if arg == v.GetId() {
 			index = i
 		}
 	}
@@ -1239,6 +1240,7 @@ func fuzztagCompletion(fuzztagCode string, hotPatchCode string) []*ypb.Suggestio
 			mainFunc, ok := prog.Program.Funcs.Get("main")
 			if ok {
 				for _, childFunc := range mainFunc.ChildFuncs {
+					childFunc := mainFunc.GetValueById(childFunc)
 					if utils.StringArrayContains(hotPatchBlacklist, childFunc.GetName()) {
 						continue
 					}

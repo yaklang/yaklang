@@ -109,6 +109,7 @@ func (v *Value) GetAllCallActualParams() (sfvm.ValueOperator, error) {
 	})
 	if f, ok := ssa.ToFunction(v.node); ok {
 		for _, para := range f.Params {
+			para := f.GetValueById(para)
 			vs = append(vs, v.NewValue(para))
 		}
 	}
@@ -134,13 +135,15 @@ func (v *Value) GetCallActualParams(i int) (sfvm.ValueOperator, error) {
 	v.GetCalledBy().ForEach(func(c *Value) {
 		if c, ok := ssa.ToCall(c.node); ok {
 			if len(c.Args) > i {
-				add(c.Args[i])
+				arg := c.GetValueById(c.Args[i])
+				add(arg)
 			}
 		}
 	})
 	if f, ok := ssa.ToFunction(v.node); ok {
 		if len(f.Params) > i {
-			add(f.Params[i])
+			param := f.GetValueById(f.Params[i])
+			add(param)
 		}
 	}
 	return rets, nil
