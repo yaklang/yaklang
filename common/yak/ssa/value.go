@@ -173,6 +173,9 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		}
 	}
 
+	if pv, ok := ToPointerValue(value); ok { // PointerValue只传递信息，不参与赋值
+		value = pv.GetOriginValue()
+	}
 	scope.AssignVariable(variable, value)
 
 	if value.GetName() == variable.GetName() {
@@ -232,6 +235,9 @@ func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) 
 	if variable := b.getCurrentScopeVariable(name); variable != nil {
 		if value := variable.GetValue(); value != nil {
 			if _, ok := ToConst(value); ok {
+				return variable
+			}
+			if _, ok := ToMake(value); ok {
 				return variable
 			}
 			if un, ok := ToUnOp(value); ok && un.Op == OpAddress {

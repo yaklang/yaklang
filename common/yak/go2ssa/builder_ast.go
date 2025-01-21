@@ -438,6 +438,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 			}
 			for _, value := range rightList {
 				rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
+				rightv = b.CopyValue(rightv)
 				rightvl = append(rightvl, rightv)
 			}
 			b.AssignList(leftvl, rightvl)
@@ -502,11 +503,6 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 	if leftlen == rightlen {
 		for i, _ := range leftVariables {
 			right := rightVariables[i]
-			if vam := right.GetVariableMemory(); vam != nil && vam.GetKind() == ssautil.AddressVariable {
-
-			} else {
-				right = b.CopyValue(right)
-			}
 			b.AssignVariable(leftVariables[i], right)
 		}
 	} else if rightlen == 1 { /* 大概率是函数调用 */
@@ -1846,6 +1842,7 @@ func (b *astbuilder) buildShortVarDecl(stmt *gol.ShortVarDeclContext) []ssa.Valu
 	}
 	for _, value := range rightList {
 		rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
+		rightv = b.CopyValue(rightv)
 		rightvl = append(rightvl, rightv)
 	}
 

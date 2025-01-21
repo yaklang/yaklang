@@ -286,7 +286,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					return cons
 				}
 
-				return b.CopyConstInst(cons)
+				return b.CopyValue(cons)
 			}
 			return kvs[0].value
 		default:

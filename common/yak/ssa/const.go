@@ -74,6 +74,14 @@ func NewConst(i any) *ConstInst {
 	return ci
 }
 
+func NewPointerValue(va *Variable) *PointerValue {
+	p := &PointerValue{
+		anValue: NewValue(),
+		origin:  va,
+	}
+	return p
+}
+
 func newConstCreate(i any) *Const {
 	// build new const
 	typ := GetType(i)

@@ -161,7 +161,6 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 						if member := bindScope.ReadVariable(findName); member != nil {
 							bindVariable = member.(*Variable)
 						} else {
-							// todo
 						}
 					}
 				}
@@ -246,14 +245,6 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			}
 
 			CheckSideEffect := func(find *Variable) {
-				// Check := func(scope ScopeIF) {
-				// 	if bindScope.IsSameOrSubScope(scope) {
-				// 		AddSideEffect()
-				// 	} else {
-				// 		SetCapturedSideEffect()
-				// 	}
-				// }
-
 				if bindVariable == nil || find.GetCaptured() == bindVariable.GetCaptured() {
 					AddSideEffect()
 				} else {
@@ -283,6 +274,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				return ret
 			}
 
+			// todo: 只有指针类型的Parameter才会生成side-effect
 			if _, ok := se.Modify.(*Parameter); ok {
 				AddSideEffect()
 				continue

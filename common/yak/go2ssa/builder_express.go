@@ -18,7 +18,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 
 	getValue := func(single getSingleExpr, i int) ssa.Value {
 		if s := single.Expression(i); s != nil {
-			rightv, _ := b.buildExpression(s.(*gol.ExpressionContext), IslValue)
+			rightv, _ := b.buildExpression(s.(*gol.ExpressionContext), false)
 			return rightv
 		} else {
 			b.NewError(ssa.Error, TAG, "can't get expression")
@@ -27,7 +27,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 	}
 	getVariable := func(single getSingleExpr, i int) *ssa.Variable {
 		if s := single.Expression(i); s != nil {
-			_, leftv := b.buildExpression(s.(*gol.ExpressionContext), IslValue)
+			_, leftv := b.buildExpression(s.(*gol.ExpressionContext), true)
 			return leftv
 		} else {
 			b.NewError(ssa.Error, TAG, "can't get expression")
@@ -64,28 +64,28 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 				ssaop = ssa.OpChan
 			case "*":
 				//ssaop = ssa.OpDereference
-				if variable := op1.GetLastVariable(); variable != nil {
+				if variable := getVariable(exp, 0); variable != nil {
 					variable.SetKind(ssautil.DereferenceVariable)
+					if variable.GetValue() == nil {
+						b.AssignVariable(variable, op1)
+					}
+					return b.EmitPointerValue(variable), nil
 				}
 				return op1, nil
 			case "&":
 				//ssaop = ssa.OpAddress
-				if variable := op1.GetLastVariable(); variable != nil {
+				if variable := getVariable(exp, 0); variable != nil {
 					variable.SetKind(ssautil.AddressVariable)
+					if variable.GetValue() == nil {
+						b.AssignVariable(variable, op1)
+					}
+					return b.EmitPointerValue(variable), nil
 				}
 				return op1, nil
 			default:
 				b.NewError(ssa.Error, TAG, UnaryOperatorNotSupport(op.GetText()))
 			}
 
-			// if ssaop == ssa.OpDereference {
-			// 	op1.SetType(ssa.NewPointerType(op1.GetType(), ssautil.DereferenceVariable))
-			// 	return op1, nil
-			// }
-			// if ssaop == ssa.OpAddress {
-			// 	op1.SetType(ssa.NewPointerType(op1.GetType(), ssautil.PointerVariable))
-			// 	return op1, nil
-			// }
 			return b.EmitUnOp(ssaop, op1), nil
 		}
 
@@ -227,9 +227,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 	if IslValue {
 		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
-		if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
-			rv = un.X
-		}
+		// if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+		// 	rv = un.X
+		// }
 
 		if ret := exp.Index(); ret != nil {
 			index := b.buildIndexExpression(ret.(*gol.IndexContext))
@@ -241,9 +241,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			test := id.GetText()
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
-				if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
-					rv = un.X
-				}
+				// if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+				// 	rv = un.X
+				// }
 				if key := typ.GetKeybyName(test); key != nil {
 					leftv = b.CreateMemberCallVariable(rv, key)
 				} else {
@@ -294,9 +294,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
-				if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
-					rv = un.X
-				}
+				// if un, ok := rv.(*ssa.UnOp); ok && un.Op == ssa.OpAddress {
+				// 	rv = un.X
+				// }
 				if key := typ.GetKeybyName(test); key != nil {
 					if se, ok := rv.(*ssa.SideEffect); ok {
 						scope := se.Value.GetBlock().ScopeTable

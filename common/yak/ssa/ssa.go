@@ -657,6 +657,30 @@ var (
 )
 
 // ================================= Normal Value
+// ----------- Pointer
+type PointerValue struct {
+	anValue
+	origin *Variable
+}
+
+// PointerValue set Type
+func (c *PointerValue) GetType() Type   { return c.anValue.GetType() }
+func (c *PointerValue) SetType(ts Type) { c.anValue.SetType(ts) }
+
+func (c *PointerValue) GetOriginValue() Value {
+	return c.origin.GetValue()
+}
+
+func (c *PointerValue) GetVariableMemory() *ssautil.VariableMemory[Value] {
+	variable := c.origin
+	return variable.GetVariableMemory()
+}
+
+var (
+	_ Node        = (*PointerValue)(nil)
+	_ Value       = (*PointerValue)(nil)
+	_ Instruction = (*PointerValue)(nil)
+)
 
 // ----------- Const
 // ConstInst also have block pointer, which block set this const to variable

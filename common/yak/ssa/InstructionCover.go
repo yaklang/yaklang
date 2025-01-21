@@ -48,6 +48,15 @@ func ToConst(v Instruction) (*ConstInst, bool) {
 	return c, ok
 }
 
+func IsPointerValue(v Instruction) bool { _, ok := ToPointerValue(v); return ok }
+func ToPointerValue(v Instruction) (*PointerValue, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToPointerValue(lz.Self())
+	}
+	c, ok := v.(*PointerValue)
+	return c, ok
+}
+
 func ToPhi(v Instruction) (*Phi, bool) {
 	if lz, isLZ := ToLazyInstruction(v); isLZ {
 		return ToPhi(lz.Self())

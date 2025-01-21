@@ -391,6 +391,12 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 	return ci
 }
 
+func (f *FunctionBuilder) EmitPointerValue(va *Variable) *PointerValue {
+	p := NewPointerValue(va)
+	f.emit(p)
+	return p
+}
+
 func (f *FunctionBuilder) CopyValue(v Value) Value {
 	switch i := v.(type) {
 	case *ConstInst:

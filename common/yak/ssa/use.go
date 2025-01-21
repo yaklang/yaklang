@@ -121,6 +121,10 @@ func (p *Parameter) GetValues() Values { return nil }
 func (p *ParameterMember) HasValues() bool   { return false }
 func (p *ParameterMember) GetValues() Values { return nil }
 
+// ----------- Pointer
+func (p *PointerValue) HasValues() bool   { return false }
+func (p *PointerValue) GetValues() Values { return nil }
+
 // ----------- ConstInst
 func (c *ConstInst) HasValues() bool {
 	return c.Origin != nil

@@ -60,36 +60,32 @@ func Test_Pointer_normal(t *testing.T) {
 		`, []string{"3", "3", "3", "4"}, t)
 	})
 
-	t.Run("structure pointer (including implicit object creation)", func(t *testing.T) {
+	t.Run("same const of variableMemories", func(t *testing.T) {
 
 		test.CheckPrintlnValue(`package main
 
-		type T struct {
-			n *int
-		}
-
 		func main(){
 			var a, b int
+			var p, o *int
+
 			a = 1
-			b = 2
+			b = a
+			p = &a
+			o = &b
 
-			s  := T{n: &a}
-			sp := &T{n: &a}
+			a = 2
+			b = 3
 
-			*s.n = 3
-			println(*s.n)  // 3
-			println(*sp.n)	// 3
-
-			sp.n = &b
-			*sp.n = 4
-			println(*s.n) // 3
-			println(*sp.n) // 4
+			println(*o) // 3
+			println(*p) // 2
+			println(a)	// 2
+			println(b)	// 3
 		}
 			
-		`, []string{"3", "3", "3", "4"}, t)
+		`, []string{"3", "2", "2", "3"}, t)
 	})
 
-	t.Run("same const reused by multiple variableMemories", func(t *testing.T) {
+	t.Run("struct pointer (member)", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
 		type A struct {
@@ -127,6 +123,35 @@ func Test_Pointer_normal(t *testing.T) {
 		}
 
 		`, []string{"2", "2"}, t)
+	})
+
+	t.Run("struct pointer (anonymous object creation)", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			n *int
+		}
+
+		func main(){
+			var a, b int
+			a = 1
+			b = 2
+
+			s  := T{n: &a}
+			sp := &T{n: &a}
+
+			*s.n = 3
+			println(*s.n)  // 3
+			println(*sp.n)	// 3
+
+			sp.n = &b
+			*sp.n = 4
+			println(*s.n) // 3
+			println(*sp.n) // 4
+		}
+			
+		`, []string{"3", "3", "3", "4"}, t)
 	})
 
 	// todo
