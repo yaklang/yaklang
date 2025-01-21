@@ -293,12 +293,14 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			if kvs[0].value == nil {
 				return nil
 			}
-			cons := kvs[0].value.(*ssa.ConstInst)
-			if vam := cons.GetVariableMemory(); vam != nil && vam.GetKind() == ssautil.AddressVariable {
-				return cons
-			}
+			if cons, ok := kvs[0].value.(*ssa.ConstInst); ok {
+				if vam := cons.GetVariableMemory(); vam != nil && vam.GetKind() == ssautil.AddressVariable {
+					return cons
+				}
 
-			return b.CopyConstInst(cons)
+				return b.CopyConstInst(cons)
+			}
+			return kvs[0].value
 		default:
 			if kvs[0].value != nil {
 				return kvs[0].value
