@@ -1,10 +1,12 @@
 package ssa
 
 import (
-	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
+
+	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -17,7 +19,25 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
+var progPool = utils.NewSafeMap[*Program]()
+
+func GetProgramFromPool(name string) (*Program, bool) {
+	if prog, ok := progPool.Get(name); ok {
+		return prog, true
+	}
+	if prog, err := GetProgram(name, Application); err == nil {
+		progPool.Set(name, prog)
+		return prog, true
+	} else {
+		return nil, false
+	}
+}
+
+func NewProgram(
+	ProgramName string, enableDatabase bool, kind ProgramKind,
+	fs fi.FileSystem, programPath string,
+	ttl ...time.Duration,
+) *Program {
 	prog := &Program{
 		Name:                    ProgramName,
 		ProgramKind:             kind,
@@ -25,7 +45,6 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
-		Cache:                   NewDBCache(ProgramName, enableDatabase),
 		astMap:                  make(map[string]struct{}),
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
@@ -46,6 +65,8 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 	}
 	if kind == Application {
 		prog.Application = prog
+		prog.Cache = NewDBCache(prog, enableDatabase, ttl...)
+		progPool.Set(ProgramName, prog)
 	}
 	prog.EnableDatabase = enableDatabase
 	prog.Loader = ssautil.NewPackageLoader(
@@ -261,6 +282,7 @@ func (prog *Program) Finish() {
 		// save instruction
 		prog.Cache.SaveToDatabase()
 	}
+	progPool.Delete(prog.GetProgramName())
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {

@@ -2,9 +2,10 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -15,7 +16,7 @@ import (
 
 func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	programName := c.ProgramName
-	application := ssa.NewProgram(programName, c.ProgramName != "", ssa.Application, filesystem, c.programPath)
+	application := ssa.NewProgram(programName, c.ProgramName != "", ssa.Application, filesystem, c.programPath, c.cacheTTL...)
 	application.Language = string(c.language)
 
 	application.ProcessInfof = func(s string, v ...any) {

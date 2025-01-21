@@ -54,6 +54,7 @@ type config struct {
 	process ProcessFunc
 
 	// for build
+	cacheTTL                []time.Duration
 	externLib               map[string]map[string]any
 	externValue             map[string]any
 	defineFunc              map[string]any
@@ -83,6 +84,7 @@ func defaultConfig(opts ...Option) (*config, error) {
 		fs:                         filesys.NewLocalFs(),
 		programPath:                ".",
 		entryFile:                  make([]string, 0),
+		cacheTTL:                   make([]time.Duration, 0),
 		externLib:                  make(map[string]map[string]any),
 		externValue:                make(map[string]any),
 		defineFunc:                 make(map[string]any),
@@ -138,6 +140,13 @@ func (c *config) Processf(process float64, format string, arg ...any) {
 		c.process(msg, process)
 	} else {
 		log.Infof(msg)
+	}
+}
+
+func WithCacheTTL(ttl time.Duration) Option {
+	return func(c *config) error {
+		c.cacheTTL = append(c.cacheTTL, ttl)
+		return nil
 	}
 }
 
