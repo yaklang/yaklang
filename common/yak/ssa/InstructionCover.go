@@ -1,8 +1,14 @@
 package ssa
 
 // for DataFlowNode cover
-func ToNode(a any) (Node, bool)         { u, ok := a.(Node); return u, ok }
-func ToValue(n any) (Value, bool)       { v, ok := n.(Value); return v, ok }
+func ToNode(a any) (Node, bool) { u, ok := a.(Node); return u, ok }
+func ToValue(n Instruction) (Value, bool) {
+	if lz, isLZ := ToLazyInstruction(n); isLZ {
+		return ToValue(lz.Self())
+	}
+	v, ok := n.(Value)
+	return v, ok
+}
 func ToUser(n Instruction) (User, bool) { u, ok := n.(User); return u, ok }
 
 func ToFunction(n Instruction) (*Function, bool) {
@@ -130,7 +136,7 @@ func ToMake(v Instruction) (*Make, bool) {
 
 // type cover
 
-func ToObjectType(t Type) (*ObjectType, bool)             { o, ok := t.(*ObjectType); return o, ok }
-func ToFunctionType(t Type) (*FunctionType, bool)         { f, ok := t.(*FunctionType); return f, ok }
-func ToBasicType(t Type) (*BasicType, bool)               { b, ok := t.(*BasicType); return b, ok }
+func ToObjectType(t Type) (*ObjectType, bool)        { o, ok := t.(*ObjectType); return o, ok }
+func ToFunctionType(t Type) (*FunctionType, bool)    { f, ok := t.(*FunctionType); return f, ok }
+func ToBasicType(t Type) (*BasicType, bool)          { b, ok := t.(*BasicType); return b, ok }
 func ToClassBluePrintType(t Type) (*Blueprint, bool) { c, ok := t.(*Blueprint); return c, ok }

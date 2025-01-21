@@ -34,7 +34,7 @@ func matchInstructionsEx(
 		var insts []Instruction
 		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), ctx, compareMode, matchMode, name)
 		for ir := range ch {
-			inst, err := NewLazyInstructionFromIrCode(ir)
+			inst, err := NewLazyInstructionFromIrCode(ir, prog)
 			if err != nil {
 				log.Errorf("NewLazyInstructionFromIrCode failed: %v", err)
 				continue
@@ -64,7 +64,7 @@ func matchInstructionsEx(
 			compareMode, matchMode, name,
 		)
 		for ir := range ch {
-			inst, err := NewLazyInstructionFromIrCode(ir)
+			inst, err := NewLazyInstructionFromIrCode(ir, prog)
 			if err != nil {
 				log.Errorf("NewLazyInstructionFromIrCode failed: %v", err)
 				continue
