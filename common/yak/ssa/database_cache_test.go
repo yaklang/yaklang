@@ -50,11 +50,12 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 	require.NotNil(t, inst2)
 	require.Equal(t, inst2.GetId(), instID)
 	require.Equal(t, inst2.GetOpcode(), SSAOpcodeBinOp)
+	// this inst2 is load form db, is lazyInstruction
 
 	// // replace value
 	ReplaceAllValue(undefineA, undefineC) // a -> c
 	// // a + b => c + b
-	require.Equal(t, LineDisasm(inst2), "add(Undefined-c, Undefined-b)")
+	require.Equal(t, LineDisasm(binInst), "add(Undefined-c, Undefined-b)")
 
 	// wait instruction save to db
 	time.Sleep(ttl * 2)

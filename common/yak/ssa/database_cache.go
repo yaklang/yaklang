@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"reflect"
 	"strings"
 	"time"
 
@@ -108,6 +109,48 @@ func (c *Cache) HaveDatabaseBackend() bool {
 
 // =============================================== Instruction =======================================================
 
+func (c *Cache) Refresh(insts any) {
+	if c.InstructionCache.IsClose() {
+		return
+	}
+	if utils.IsNil(insts) {
+		return
+	}
+	refresh := func(inst Instruction) {
+		id := inst.GetId()
+		if id <= 0 {
+			c.SetInstruction(inst)
+			return
+		}
+		if item, ok := c.InstructionCache.GetPure(id); ok {
+			if item.inst != inst {
+				if item.inst.IsLazy() {
+					item.inst = inst
+					c.InstructionCache.Set(id, item)
+				}
+			}
+		} else {
+			c.InstructionCache.Set(id, &instructionCachePair{
+				inst:   inst,
+				irCode: ssadb.GetIrCodeById(ssadb.GetDB(), id),
+			})
+		}
+	}
+	t := reflect.TypeOf(insts).Kind()
+	if t == reflect.Array || t == reflect.Slice {
+		len := reflect.ValueOf(insts).Len()
+		for i := 0; i < len; i++ {
+			if ins, ok := reflect.ValueOf(insts).Index(i).Interface().(Instruction); ok {
+				refresh(ins)
+			}
+		}
+	} else {
+		if ins, ok := insts.(Instruction); ok {
+			refresh(ins)
+		}
+	}
+}
+
 // SetInstruction : set instruction to cache.
 func (c *Cache) SetInstruction(inst Instruction) {
 	if inst.GetId() == -1 {
@@ -119,11 +162,7 @@ func (c *Cache) SetInstruction(inst Instruction) {
 			irCode: irCode,
 		})
 	} else {
-		id := inst.GetId()
-		// this cache will auto load from database
-		pair, ok := c.InstructionCache.Get(id)
-		_ = pair
-		_ = ok
+		c.Refresh(inst)
 	}
 }
 

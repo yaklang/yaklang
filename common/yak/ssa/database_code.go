@@ -36,7 +36,7 @@ func (c *Cache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode) Instruct
 }
 
 func fitRange(c *ssadb.IrCode, rangeIns memedit.RangeIf) {
-	if rangeIns == nil || utils.IsNil(rangeIns) || utils.IsNil(rangeIns.GetEditor()) {
+	if utils.IsNil(rangeIns) || utils.IsNil(rangeIns.GetEditor()) {
 		log.Warnf("(BUG or in DEBUG MODE) Range not found for %s", c.Name)
 		return
 	}
