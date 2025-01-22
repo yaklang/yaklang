@@ -1,6 +1,7 @@
 package syntaxflow
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -108,8 +109,9 @@ public class FileUtils extends org.apache.commons.io.FileUtils
 }
 	`
 
-	t.Run("test", func(t *testing.T) {
-		rule := `
+	t.Run("test file read", func(t *testing.T) {
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			rule := `
 File() as $fileInstance 
 $fileInstance -{
 	include: <<<CODE
@@ -117,10 +119,14 @@ $fileInstance -{
 CODE
 }-> as $fileReadInstance 
 		`
+			vals, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			file := vals.GetValues("fileInstance")
+			require.Contains(t, file.String(), `Undefined-File(Undefined-File,Parameter-filePath)`)
+			fileRead := vals.GetValues("fileReadInstance")
+			require.Contains(t, fileRead.String(), `Undefined-fis.read`)
 
-		want := map[string][]string{}
-		ssatest.CheckSyntaxFlow(t, code, rule, want,
-			ssaapi.WithRawLanguage("java"),
-		)
+			return nil
+		}, ssaapi.WithRawLanguage("java"))
 	})
 }
