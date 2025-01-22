@@ -551,6 +551,10 @@ type UDPConn struct {
 	wq *waiter.Queue
 }
 
+func (c *UDPConn) GetEndpoint() tcpip.Endpoint {
+	return c.ep
+}
+
 // NewUDPConn creates a new UDPConn.
 func NewUDPConn(wq *waiter.Queue, ep tcpip.Endpoint) *UDPConn {
 	c := &UDPConn{

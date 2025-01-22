@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -14,8 +15,10 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/rwendpoint"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 
 	"github.com/davecgh/go-spew/spew"
+	gvisorDHCP "github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/dhcp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/adapters/gonet"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
@@ -52,46 +55,6 @@ func init() {
 	})
 }
 
-type RWTun interface {
-	Read([][]byte, []int, int) (int, error)
-	Write([][]byte, int) (int, error)
-}
-
-func TUNCopy(prompt string, w, r RWTun, mtu int, offset int) {
-	buf := make([][]byte, 1)
-	buf[0] = make([]byte, mtu)
-	sizes := make([]int, 1)
-
-	for {
-		n, err := r.Read(buf, sizes, offset)
-		if err != nil {
-			log.Errorf("Error reading from TUN: %v", err)
-			continue
-		}
-
-		if n > 0 {
-			packet := buf[0][:sizes[0]]
-			if len(packet) > 16 {
-				packet = packet[16:]
-			}
-			version := packet[0] >> 4
-
-			switch version {
-			case 4:
-				log.Infof("%v: IPv4 packet, len: %v", prompt, len(packet))
-			case 6:
-				log.Infof("%v: IPv6 packet", prompt)
-				// spew.Dump(packet)
-			default:
-				log.Warnf("Unknown IP version: %d", version)
-			}
-			newBuf := make([][]byte, 1)
-			newBuf[0] = packet
-			w.Write(buf, 16)
-		}
-	}
-}
-
 func main() {
 	app := cli.NewApp()
 
@@ -113,6 +76,65 @@ func main() {
 			},
 		},
 		{
+			Name: "sdhcp",
+			Action: func(c *cli.Context) error {
+				return nil
+			},
+		},
+		{
+			Name: "dhcp",
+			Flags: []cli.Flag{
+				cli.StringFlag{Name: "iface", Value: ""},
+			},
+			Action: func(c *cli.Context) error {
+				var iname string = c.String("iface")
+				if iname == "" {
+					ifaceDefault, _, _, err := netutil.GetPublicRoute()
+					if err != nil {
+						log.Errorf("failed to get public route: %v", err)
+						return err
+					}
+					iname = ifaceDefault.Name
+				}
+				rwc, ep, err := rwendpoint.NewPcapReadWriteCloserEndpointEx(iname, 1600)
+				if err != nil {
+					log.Errorf("failed to create pcap read write closer endpoint: %v", err)
+					return err
+				}
+				defer rwc.Close()
+				defer ep.Close()
+
+				stack, err := netstack.NewDefaultStack(
+					"", "",
+					ep,
+				)
+				if err != nil {
+					log.Errorf("failed to create default stack: %v", err)
+					return err
+				}
+				for k, v := range stack.NICInfo() {
+					_ = v
+					log.Infof("nic: %v", k)
+				}
+				stack.IsSubnetBroadcast(1, ipv4.ProtocolNumber, tcpip.AddrFromSlice([]byte{255, 255, 255, 255}))
+
+				// 解析 MAC 地址
+				mac, err := net.ParseMAC("72:72:f1:d2:6f:66")
+				if err != nil {
+					log.Fatalf("Failed to parse MAC address: %v", err)
+				}
+
+				client := gvisorDHCP.NewClient(stack, 1, tcpip.LinkAddress(mac), 5*time.Second, 5*time.Second, 5*time.Second, func(ctx context.Context, lost, acquired tcpip.AddressWithPrefix, cfg gvisorDHCP.Config) {
+
+				})
+				log.Info("start to run gvisor dhcp client")
+				result := client.Run(context.Background())
+				spew.Dump(result)
+				stack.Wait()
+				return nil
+			},
+		},
+		{
 			Name: "synscan",
 			Flags: []cli.Flag{
 				cli.StringFlag{
@@ -123,9 +145,19 @@ func main() {
 					Name:  "port",
 					Value: "22,80,443",
 				},
+				cli.StringFlag{
+					Name:  "iface",
+					Value: "",
+				},
 			},
 			Action: func(c *cli.Context) error {
-				handler, err := rwendpoint.NewPcapReadWriteCloser("en0", 1600)
+				iface, preferred, getaway, err := netutil.GetPublicRoute()
+				if err != nil {
+					return utils.Errorf("failed to get public route: %v", err)
+				}
+
+				_, _ = preferred, getaway
+				handler, err := rwendpoint.NewPcapReadWriteCloser(iface.Name, 1600)
 				if err != nil {
 					log.Errorf("Failed to create PcapReadWriteCloserEndpoint: %v", err)
 					return err
@@ -172,15 +204,17 @@ func main() {
 						port := port
 						swg.Add(1)
 						addTask()
-						lport, tcpErr := s.PortManager.PickEphemeralPort(s.SecureRNG(), func(p uint16) (bool, tcpip.Error) {
-							return true, nil
-						})
-						if tcpErr != nil {
-							log.Errorf("Failed to pick ephemeral port: %v", err)
-						}
 
 						go func() {
 							defer swg.Done()
+
+							lport, tcpErr := s.PortManager.PickEphemeralPort(s.SecureRNG(), func(p uint16) (bool, tcpip.Error) {
+								return true, nil
+							})
+							if tcpErr != nil {
+								log.Errorf("Failed to pick ephemeral port: %v", err)
+							}
+
 							defer func() {
 								s.ReleasePort(ports.Reservation{
 									Networks:  []tcpip.NetworkProtocolNumber{ipv4.ProtocolNumber, ipv6.ProtocolNumber},
@@ -190,22 +224,53 @@ func main() {
 								})
 							}()
 
-							conn, err := gonet.DialTCPWithBind(utils.TimeoutContextSeconds(5), s, tcpip.FullAddress{
-								Port: uint16(lport),
-								NIC:  1,
-								Addr: tcpip.AddrFrom4(netip.MustParseAddr(handler.GetIP4Address().String()).As4()),
-							}, tcpip.FullAddress{
-								Port: uint16(port),
-								NIC:  1,
-								Addr: tcpip.AddrFrom4(netip.MustParseAddr(host).As4()),
-							}, ipv4.ProtocolNumber)
-							if err != nil {
-								// log.Infof("Remote Port %v CLOSE", utils.HostPort(host, port))
-								return
+							ctx, cancel := context.WithCancelCause(utils.TimeoutContextSeconds(5))
+							defer cancel(nil)
+
+							isOpen := utils.NewAtomicBool()
+
+							wg := new(sync.WaitGroup)
+							for _idx := 0; _idx < 3; _idx++ {
+								select {
+								case <-ctx.Done():
+									log.Infof("context done")
+									return
+								case <-time.After(1 * time.Second):
+									wg.Add(1)
+									go func() {
+										defer wg.Done()
+										conn, err := gonet.DialTCPWithBind(ctx, s, tcpip.FullAddress{
+											Port: uint16(lport),
+											NIC:  1,
+											Addr: tcpip.AddrFrom4(netip.MustParseAddr(handler.GetIP4Address().String()).As4()),
+										}, tcpip.FullAddress{
+											Port: uint16(port),
+											NIC:  1,
+											Addr: tcpip.AddrFrom4(netip.MustParseAddr(host).As4()),
+										}, ipv4.ProtocolNumber)
+										defer func() {
+											if conn != nil {
+												conn.Close()
+											}
+
+										}()
+										if err != nil {
+											// log.Infof("Remote Port %v CLOSE", utils.HostPort(host, port))
+											return
+										}
+										cancel(nil)
+										select {
+										case <-ctx.Done():
+										default:
+											isOpen.Set()
+											log.Infof("Remote Port %23s OPEN from: %v", utils.HostPort(host, port), conn.LocalAddr().String())
+
+										}
+									}()
+								}
 							}
-							log.Infof("Remote Port %23s OPEN from: %v", utils.HostPort(host, port), conn.LocalAddr().String())
+							wg.Wait()
 							addFinished()
-							conn.Close()
 						}()
 					}
 				}
