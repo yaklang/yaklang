@@ -5,81 +5,16 @@ programName := cli.String("programName",
     cli.setRequired(true),
     cli.setVerboseName("项目名")
 )
-// languages = cli.StringSlice("language",
-//     cli.setMultipleSelect(false),
-//     cli.setSelectOption("Java", "java"),
-//     cli.setSelectOption("PHP", "php"),
-//     cli.setSelectOption("Yaklang", "yak"),
-//     // cli.setSelectOption("JavaScript", "js"),
-//     cli.setSelectOption("Golang", "go"),
-//     cli.setRequired(true)
-// )
-
-compile_require_options = cli.Json("compile_require_options", cli.setVerboseName("编译选项"),
-    cli.setJsonSchema(<<<JSON
-    {
-        "type": "object",
-        "properties": {
-            "language": {
-                "title": "语言",
-                "type": "string",
-                "enum": [
-                    "php",
-                    "java",
-                    "js",
-                    "go",
-                    "yak"
-                ],
-                "default": "java"
-            },
-            "excludeFile": {
-                "title": "文件排除",
-                "type": "string"
-            }
-        },
-        "required": ["language"],
-        "allOf": [
-            {
-                "if": {
-                    "properties": {
-                        "language": {
-                            "const": "php"
-                        }
-                    }
-                },
-                "then": {
-                    "properties": {
-                        "excludeFile": {
-                            "type": "string",
-                            "default": "**/vendor/**"
-                        }
-                    }
-                }
-            },
-            {
-                "if": {
-                    "properties": {
-                        "language": {
-                            "const": "java"
-                        }
-                    }
-                },
-                "then": {
-                    "properties": {
-                        "excludeFile": {
-                            "type": "string",
-                            "default": "**/class/**,**/target/**"
-
-                        }
-                    }
-                }
-            }
-        ]
-    }
-JSON,cli.setUISchema(
-    cli.uiGlobalFieldPosition(cli.uiPosHorizontal)
+languages = cli.StringSlice("language",
+    cli.setMultipleSelect(false),
+    cli.setSelectOption("Java", "java"),
+    cli.setSelectOption("PHP", "php"),
+    cli.setSelectOption("Yaklang", "yak"),
+    // cli.setSelectOption("JavaScript", "js"),
+    cli.setSelectOption("Golang", "go"),
+    cli.setRequired(true)
 )
-),cli.setRequired(true))
+excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**"))
 
 info = cli.Json("info",
     cli.setVerboseName("项目信息"),
@@ -406,11 +341,10 @@ cli.check()
 //    dbPath = dbPaths[0]
 //}
 
-language:=""
-exclude_file:=""
-
-language = compile_require_options["language"]
-exclude_file = compile_require_options["excludeFile"]
+language :=""
+if languages.Len()>0{
+    language = languages[0]
+}
 
 
 opts = [
@@ -428,7 +362,7 @@ opts = [
     ssa.withContext(context.Background()),
     ssa.withConfigInfo(info),
     ssa.withPeepholeSize(peepholeSize),
-    ssa.withDefaultExcludeFunc(str.Split(exclude_file, ","))~,
+    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ","))~,
 ]
 if len(entry) != 0{
     opts = append(opts, ssa.withEntryFile(entry...))
