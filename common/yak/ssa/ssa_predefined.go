@@ -409,8 +409,13 @@ func (a *anValue) GetVariable(name string) *Variable {
 	if ret, ok := a.variables.Get(name); ok {
 		return ret
 	} else {
-		return nil
+		if a.IsFromDB() {
+			v := GetVariableFromDB(a.GetId(), name)
+			a.AddVariable(v)
+			return v
+		}
 	}
+	return nil
 }
 
 func (a *anValue) GetLastVariable() *Variable {
