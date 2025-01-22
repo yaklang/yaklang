@@ -2,39 +2,39 @@ yakit.AutoInitYakit()
 
 target = cli.String("target", cli.setRequired(true))
 languages = cli.StringSlice(
-    "language", 
-    cli.setMultipleSelect(false), 
-    cli.setSelectOption("Java", "java"), 
-    cli.setSelectOption("PHP", "php"), 
-    cli.setSelectOption("Yaklang", "yak"), 
-    cli.setSelectOption("Golang", "go"), 
+    "language",
+    cli.setMultipleSelect(false),
+    cli.setSelectOption("Java", "java"),
+    cli.setSelectOption("PHP", "php"),
+    cli.setSelectOption("Yaklang", "yak"),
+    cli.setSelectOption("Golang", "go"),
 )
 
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
-// timeout = cli.Int("timeout", cli.setDefault(3))
 timeout = 3
 
 peepholeSizes := cli.StringSlice(
-    "peephole", 
-    cli.setHelp("将项目切分为多个小项目，以提高编译速度。精度随数字增高。"), 
-    cli.setVerboseName("项目分片"), 
-    cli.setSelectOption("关闭，精度IV", "0"), 
-    cli.setSelectOption("慢速，精度III", "40"), 
-    cli.setSelectOption("中速，精度II", "10"), 
-    cli.setSelectOption("快速，精度I", "1"), 
+    "peephole",
+    cli.setHelp("将项目切分为多个小项目，以提高编译速度。精度随数字增高。"),
+    cli.setVerboseName("项目分片"),
+    cli.setSelectOption("关闭，精度IV", "0"),
+    cli.setSelectOption("慢速，精度III", "40"),
+    cli.setSelectOption("中速，精度II", "10"),
+    cli.setSelectOption("快速，精度I", "1"),
 )
 
 programName := cli.String("programName", cli.setVerboseName("项目名"), cli.setCliGroup("information"))
 description := cli.Text("description", cli.setVerboseName("项目描述"), cli.setCliGroup("information"))
+excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**"))
 
 // {{ compile option
 entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))
 strictMode = cli.Bool(
-    "StrictMode", 
-    cli.setVerboseName("严格模式"), 
-    cli.setHelp("如果取消严格模式将会忽略编译错误的文件。将可能导致编译结果缺失部分文件。"), 
-    cli.setCliGroup("compile"), 
-    cli.setDefault(false), 
+    "StrictMode",
+    cli.setVerboseName("严格模式"),
+    cli.setHelp("如果取消严格模式将会忽略编译错误的文件。将可能导致编译结果缺失部分文件。"),
+    cli.setCliGroup("compile"),
+    cli.setDefault(false),
 )
 reCompile := cli.Bool("re-compile", cli.setVerboseName("是否重新编译"), cli.setCliGroup("compile"), cli.setDefault(true))
 
@@ -50,23 +50,26 @@ javaFiles = ["web.xml", "pom.xml", "application.properties", "struts.xml", "appl
 var countMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0}
 
 params = {
-    "program_name": "", 
-    "language": "", 
+    "program_name": "",
+    "language": "",
     "info": {
-        "kind": "", 
-        "local_file": "", 
-        "url": "", 
+        "kind": "",
+        "local_file": "",
+        "url": "",
         "proxy": {"proxy": false, "url": ""}
-    }, 
-    "description": "", 
+    },
+    "description": "",
     "file_count": 0,
     "error": {
-        "kind": "", 
+        "kind": "",
         "msg": ""
     }
 }
 func setLanguage(language) {
-    params.language = language
+    if params.language == ""{
+        params.language = language
+    }
+    return
 }
 
 // check cli parameter
@@ -84,7 +87,7 @@ peepholeSize = 0
 if len(peepholeSizes) > 0 {
     i, err = atoi(peepholeSizes[0])
     if err == nil {
-        peepholeSize = i 
+        peepholeSize = i
     }
 }
 
@@ -111,7 +114,7 @@ func newFileNotFoundExcption(err) {
 }
 func newLanguageNeedSelectException(err) {
     if  params.error.kind!= "" {
-        return 
+        return
     }
     params.error.kind = "languageNeedSelectException"
     params.error.msg = err
@@ -135,7 +138,7 @@ func AutoParseLanguage() {
             maxinfo.value = value
         }
     }
-    
+
     if maxinfo.value != 0 {
         setLanguage(maxinfo.key)
     } else {
@@ -143,7 +146,7 @@ func AutoParseLanguage() {
     }
 }
 func generateDesc() {
-    params.description = f`desc: ${description} 
+    params.description = f`desc: ${description}
 compile from [${params.info.kind}]${params.info.url}${params.info.local_file}
     `
 }
@@ -153,20 +156,20 @@ func getZipinfo(basePath) {
     if params.language != "" {
         return
     }
-    
+
     zip.Recursive(
-        basePath, 
+        basePath,
         (dir, path, info) => {
             if !info.IsDir() {
                 params.file_count++
             }
-            
+
             ext = file.GetExt(path).Lower().TrimLeft(".")
             countinfo = countMap[ext]
             if countinfo != nil {
                 countMap[ext] = countinfo + 1
             }
-            
+
             if params.language == "" {
                 if info.IsDir() {
                     if info.Name().Lower() in javaDir {
@@ -176,28 +179,24 @@ func getZipinfo(basePath) {
                     if info.Name().Lower() in javaFiles {
                         setLanguage(ssa.Java)
                     }
-                    
-// if info.Name().Lower() in jsFiles{
-//     setLanguage( ssa.Javascript)
-// }
                     if info.Name().Lower() in phpFiles {
                         setLanguage(ssa.PHP)
                     }
                 }
             }
-        }, 
+        },
     )
 }
 
 func getLocalInfo(localFile) {
     if !file.IsExisted(localFile) {
         newFileNotFoundExcption(sprintf(
-            "not found this file in local,check path: %s", 
-            localFile, 
+            "not found this file in local,check path: %s",
+            localFile,
         ))
         return
     }
-    
+
     ext := file.GetExt(localFile).Lower()
     switch ext {
     case ".jar", ".war":
@@ -216,20 +215,18 @@ func getLocalInfo(localFile) {
             newFileTypeException(sprint("文件存在，但仅支持jar、war、zip压缩格式。"))
             return
         }
-        
+
         params.info.local_file = localFile
         filesys.Recursive(
-            localFile, 
+            localFile,
             filesys.onDirStat(func(path, info) {
                 if params.language == "" {
                     switch  {
                     case info.Name().Lower() in javaDir:
                         setLanguage(ssa.Java)
-                        // case info.Name().Lower() in jsDir:
-                        //     setLanguage( ssa.Javascript)
                     }
                 }
-            }), 
+            }),
             filesys.onFileStat(func(path, info) {
                 params.file_count++
                 ext = file.GetExt(path).Lower().TrimLeft(".")
@@ -237,18 +234,16 @@ func getLocalInfo(localFile) {
                 if countinfo != nil {
                     countMap[ext] = countinfo + 1
                 }
-                
+
                 if params.language == "" {
                     switch  {
                     case info.Name().Lower() in javaFiles:
                         setLanguage(ssa.Java)
                     case info.Name().Lower() in phpFiles:
                         setLanguage(ssa.PHP)
-                        // case info.Name().Lower() in jsFiles:
-                        //     setLanguage(ssa.Javascript)
                     }
                 }
-            }), 
+            }),
         )
         generateFileName("local", localFile)
     }
@@ -261,11 +256,11 @@ func getHttpInfo(target) {
     } else {
         httpUrl = target[8:]
     }
-    
+
     if !target.HasSuffix("/") {
         target += "/"
     }
-    
+
     gitUrl = target + "info/refs?service=git-upload-pack"
     rsp, req, err = poc.Get(gitUrl, poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
     if err == nil && rsp.GetStatusCode() == 200 {
@@ -273,7 +268,7 @@ func getHttpInfo(target) {
         params.info.url = target
         generateFileName("git", httpUrl)
     }
-    
+
     if err != nil || rsp.GetStatusCode() != 200 {
         res, req, err2 = poc.Get(origin, poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
         if err2 != nil || res.GetStatusCode() != 200 {
@@ -286,7 +281,7 @@ func getHttpInfo(target) {
             }
             return
         }
-        
+
         if str.MatchAllOfSubString(res.GetContentType(), "jar") {
             params.info.kind = "jar"
             params.info.url = target
@@ -307,7 +302,6 @@ if target.HasPrefix("git://") {
     params.info.kind = "git"
     params.info.url = target
     generateFileName("git", gitUrl)
-    // setLanguage( "")
     if params.language == "" {
         newLanguageNeedSelectException("git 无法自动检测项目的语言，请手动指定语言。")
     }
@@ -335,10 +329,21 @@ generateDesc()
 programName = sprint(params.program_name)
 language = sprint(params.language)
 
-opts = [ssa.withProgramName(programName), ssa.withProcess((msg, process) => {
+opts = [
+    ssa.withProgramName(programName),
+    ssa.withProcess((msg, process) => {
     yakit.SetProgressEx("complile", process)
     yakit.Info("%s: %f", msg, process)
-}), ssa.withLanguage(language), ssa.withReCompile(reCompile), ssa.withStrictMode(strictMode), ssa.withDescription(params.description), ssa.withSaveToProfile(true), ssa.withContext(context.Background()), ssa.withConfigInfo(params.info), ssa.withPeepholeSize(peepholeSize)]
+  }),
+    ssa.withLanguage(language),
+    ssa.withReCompile(reCompile),
+    ssa.withStrictMode(strictMode),
+    ssa.withDescription(params.description),
+    ssa.withSaveToProfile(true),
+    ssa.withContext(context.Background()),
+    ssa.withConfigInfo(params.info),
+    ssa.withPeepholeSize(peepholeSize),
+    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ","))~]
 if len(entry) != 0 {
     opts = append(opts, ssa.withEntryFile(entry...))
 }
