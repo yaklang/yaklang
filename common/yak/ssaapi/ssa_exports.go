@@ -100,7 +100,8 @@ func defaultConfig(opts ...Option) (*config, error) {
 	}
 	return c, nil
 }
-func defaultExcludeFileFunc(patterns []string) (func(string, string) bool, error) {
+
+func DefaultExcludeFunc(patterns []string) (Option, error) {
 	var compile []glob.Glob
 	for _, pattern := range patterns {
 		g, err := glob.Compile(pattern)
@@ -109,18 +110,22 @@ func defaultExcludeFileFunc(patterns []string) (func(string, string) bool, error
 		}
 		compile = append(compile, g)
 	}
-	return func(dir string, path string) bool {
-		for _, g := range compile {
-			if match := g.Match(dir); match {
-				return true
+	return func(c *config) error {
+		c.excludeFile = func(dir string, path string) bool {
+			for _, g := range compile {
+				if match := g.Match(dir); match {
+					return true
+				}
+				if match := g.Match(path); match {
+					return true
+				}
 			}
-			if match := g.Match(path); match {
-				return true
-			}
+			return false
 		}
-		return false
+		return nil
 	}, nil
 }
+
 func (c *config) CalcHash() string {
 	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.language, c.ignoreSyntaxErr, c.externInfo)
 }
@@ -484,7 +489,7 @@ var Exports = map[string]any{
 	"withContext":            WithContext,
 	"withPeepholeSize":       WithPeepholeSize,
 	"withExcludeFile":        WithExcludeFile,
-	"withDefaultExcludeFunc": defaultExcludeFileFunc,
+	"withDefaultExcludeFunc": DefaultExcludeFunc,
 
 	// language:
 	"Javascript": JS,

@@ -50,7 +50,8 @@ compile_require_options = cli.Json("compile_require_options", cli.setVerboseName
                 "then": {
                     "properties": {
                         "excludeFile": {
-                            "default": "vendor/**"
+                            "type": "string",
+                            "default": "**/vendor/**"
                         }
                     }
                 }
@@ -66,7 +67,9 @@ compile_require_options = cli.Json("compile_require_options", cli.setVerboseName
                 "then": {
                     "properties": {
                         "excludeFile": {
-                            "default": "class/**,target/**"
+                            "type": "string",
+                            "default": "**/class/**,**/target/**"
+
                         }
                     }
                 }
@@ -405,17 +408,11 @@ cli.check()
 
 language:=""
 exclude_file:=""
-lan,ok = compile_require_options["language"]
-if ok{
-    language = lan
-}
-exclude,ok = compile_require_options["excludeFile"]
-if ok{
-    exclude_file = exclude
-}
+
+language = compile_require_options["language"]
+exclude_file = compile_require_options["excludeFile"]
 
 
-excludeFunc =  ssa.withDefaultExcludeFunc(str.Split(exclude_file, ","))~
 opts = [
     ssa.withProgramName(programName),
     ssa.withProcess((msg , process )=>{
@@ -431,7 +428,7 @@ opts = [
     ssa.withContext(context.Background()),
     ssa.withConfigInfo(info),
     ssa.withPeepholeSize(peepholeSize),
-    ssa.withExcludeFile(excludeFunc),
+    ssa.withDefaultExcludeFunc(str.Split(exclude_file, ","))~,
 ]
 if len(entry) != 0{
     opts = append(opts, ssa.withEntryFile(entry...))
