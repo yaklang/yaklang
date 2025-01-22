@@ -36,6 +36,10 @@ func GetSFIncludeCache() *utils.Cache[sfvm.ValueOperator] {
 	return includeCache
 }
 
+func DeleteIncludeCache() {
+	includeCache.DeleteAll()
+}
+
 var includeCache = createIncludeCache()
 
 func createIncludeCache() *utils.Cache[sfvm.ValueOperator] {
