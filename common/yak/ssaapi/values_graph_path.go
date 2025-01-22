@@ -8,7 +8,7 @@ import (
 func (v *Value) GetDataflowPath(end ...*Value) []Values {
 	var paths []Values
 	effectPath := v.GetEffectOnPath(end...)
-	dependPath := v.GetEffectOnPath(end...)
+	dependPath := v.GetDependOnPath(end...)
 	addPath := func(effect, depend Values) {
 		path := make(Values, 0, len(effect)+len(depend)+1)
 		path = append(path, effect...)
