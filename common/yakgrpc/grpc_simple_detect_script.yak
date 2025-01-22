@@ -635,10 +635,14 @@ func cveBaselineCheck(result) {
                 if cpe.Version not in versionList {
                     versionList = append(versionList, cpe.Version)
                     for res = range cve.QueryEx(cve.product(cpe.Product, cpe.Version)) {
+                        description :=res.DescriptionMainZh
+                        if description== ""{
+                            description = res.DescriptionMain
+                        }
                         titleStr = sprintf("%s: - %s", res.CVE, res.TitleZh)
                         risk.NewRisk(target, risk.title(titleStr), risk.type("cve-baseline"), risk.typeVerbose("CVE基线检查"),
                                 risk.parameter(parameter), risk.potential(true), risk.level(res.Severity),
-                                risk.description(res.DescriptionMainZh), risk.solution(res.Solution), risk.cve(res.CVE))
+                                risk.description(description), risk.solution(res.Solution), risk.cve(res.CVE))
                     }
                 }
             }
