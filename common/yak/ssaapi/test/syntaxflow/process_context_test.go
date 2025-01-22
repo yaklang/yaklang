@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-const code = `
+const xxeTestCode = `
 @RestController(value = "/xxe")
 public class XXEController {
 
@@ -83,7 +83,7 @@ func Test_Process(t *testing.T) {
 	}
 
 	t.Run("test normal ", func(t *testing.T) {
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		ssatest.Check(t, xxeTestCode, func(prog *ssaapi.Program) error {
 			check(prog, `
 			DocumentBuilderFactory.newInstance().*Builder().parse(* as $param)
 			`)
@@ -92,7 +92,7 @@ func Test_Process(t *testing.T) {
 	})
 
 	t.Run("test loop filter", func(t *testing.T) {
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		ssatest.Check(t, xxeTestCode, func(prog *ssaapi.Program) error {
 			check(prog, `
 	DocumentBuilderFactory.newInstance()?{!((.setFeature) || (.setXIncludeAware) || (.setExpandEntityReferences))} as $entry;
 	$entry.*Builder().parse(* #-> as $param);
@@ -106,7 +106,7 @@ func Test_Process(t *testing.T) {
 
 func Test_Context(t *testing.T) {
 	t.Run("test context", func(t *testing.T) {
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		ssatest.Check(t, xxeTestCode, func(prog *ssaapi.Program) error {
 			ctx, cancel := context.WithCancel(context.Background())
 			process := 0.0
 			_, err := prog.SyntaxFlowWithError(`

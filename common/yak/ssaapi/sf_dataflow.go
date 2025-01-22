@@ -172,7 +172,6 @@ func dataFlowFilter(
 			paths := v.GetDataflowPath(endValues...)
 			pathNum := len(paths)
 			for _, path := range paths {
-				path := Values(path)
 				matchedConfigs := recursiveConfig.compileAndRun(path)
 				if _, ok := matchedConfigs[sf.RecursiveConfig_Exclude]; ok {
 					pathNum -= 1
@@ -190,7 +189,6 @@ func dataFlowFilter(
 			dataPaths := v.GetDataflowPath()
 			var excludeFlag = 0
 			for _, dataPath := range dataPaths {
-				dataPath := Values(dataPath)
 				matchedConfigs := recursiveConfig.compileAndRun(dataPath)
 
 				if _, ok := matchedConfigs[sf.RecursiveConfig_Include]; ok {
