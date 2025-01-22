@@ -1054,38 +1054,11 @@ func YieldHTTPUrl(db *gorm.DB, ctx context.Context) chan *HTTPFlowUrl {
 }
 
 func YieldHTTPFlows(db *gorm.DB, ctx context.Context) chan *schema.HTTPFlow {
-	outC := make(chan *schema.HTTPFlow)
-	go func() {
-		defer close(outC)
+	return YieldHTTPFlowsEx(db, ctx, nil)
+}
 
-		page := 1
-		for {
-			var items []*schema.HTTPFlow
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+func YieldHTTPFlowsEx(db *gorm.DB, ctx context.Context, countCallback func(int)) chan *schema.HTTPFlow {
+	return bizhelper.YieldModel[*schema.HTTPFlow](ctx, db, bizhelper.WithYieldModel_CountCallback(countCallback))
 }
 
 const (
