@@ -2,7 +2,6 @@ package har
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"os"
 	"path"
@@ -11,15 +10,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/embed"
 )
 
-//go:embed testdata/example.com.har
-var testHARBytes []byte
-
 func TestImportHTTPArchive(t *testing.T) {
-	buf := bytes.NewBuffer(testHARBytes)
+	buf, _ := embed.TestAsset("testdata/example.com.har")
+	r := bytes.NewBuffer(buf)
 	count := 0
-	ImportHTTPArchiveStream(buf, func(entry *HAREntry) error {
+	ImportHTTPArchiveStream(r, func(entry *HAREntry) error {
 		count++
 		req, rsp := entry.Request, entry.Response
 		require.Equal(t, "GET", req.Method)
@@ -106,8 +104,9 @@ func TestExportHTTPArchive(t *testing.T) {
 }
 
 func TestSmokeImportAndExport(t *testing.T) {
+	buf, _ := embed.TestAsset("testdata/example.com.har")
 	dir := t.TempDir()
-	har, err := ImportHTTPArchive(bytes.NewBuffer(testHARBytes))
+	har, err := ImportHTTPArchive(bytes.NewBuffer(buf))
 	require.NoError(t, err)
 	p := path.Join(dir, fmt.Sprintf("%s.har", uuid.NewString()))
 	fh, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR, 0644)

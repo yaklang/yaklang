@@ -10,6 +10,17 @@ import (
 //go:embed data dataex
 var FS embed.FS
 
+//go:embed testdata
+var TestFS embed.FS
+
+func TestAsset(name string) ([]byte, error) {
+	buf, err := TestFS.ReadFile(name)
+	if strings.HasSuffix(name, ".gz") || strings.HasSuffix(name, ".gzip") {
+		buf, err = utils.GzipDeCompress(buf)
+	}
+	return buf, err
+}
+
 func Asset(name string) ([]byte, error) {
 	buf, err := FS.ReadFile(name)
 	if strings.HasSuffix(name, ".gz") || strings.HasSuffix(name, ".gzip") {
