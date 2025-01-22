@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/netip"
 	"os"
@@ -21,11 +22,10 @@ import (
 	gvisorDHCP "github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/dhcp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/adapters/gonet"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv6"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/ports"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/urfave/cli"
@@ -151,18 +151,28 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				iface, preferred, getaway, err := netutil.GetPublicRoute()
-				if err != nil {
-					return utils.Errorf("failed to get public route: %v", err)
-				}
 
-				_, _ = preferred, getaway
-				handler, err := rwendpoint.NewPcapReadWriteCloser(iface.Name, 1600)
+				ifaceName := c.String("iface")
+				if ifaceName == "" {
+					iface, preferred, getaway, err := netutil.GetPublicRoute()
+					if err != nil {
+						return utils.Errorf("failed to get public route: %v", err)
+					}
+					_, _ = preferred, getaway
+					ifaceName = iface.Name
+				}
+				log.Infof("using iface: %v", ifaceName)
+				handler, err := rwendpoint.NewPcapReadWriteCloser(ifaceName, 1600)
 				if err != nil {
 					log.Errorf("Failed to create PcapReadWriteCloserEndpoint: %v", err)
 					return err
 				}
 				defer handler.Close()
+
+				localAddressStr := handler.GetIP4Address()
+				log.Infof("local address: %v", localAddressStr)
+				gatewayAddressStr := handler.GetGatewayIP4Address()
+				log.Infof("gateway address: %v", gatewayAddressStr)
 
 				ep, err := rwendpoint.NewReadWriteCloserEndpoint(handler, 1600, 0)
 				if err != nil {
@@ -191,8 +201,13 @@ func main() {
 					atomic.AddInt64(count, 1)
 				}
 				go func() {
+					var lastCount int64
 					for {
-						// log.Infof("count: %v", atomic.LoadInt64(count))
+						currentCount := atomic.LoadInt64(count)
+						if currentCount != lastCount {
+							log.Infof("count: %v", currentCount)
+							lastCount = currentCount
+						}
 						time.Sleep(1 * time.Second)
 					}
 				}()
@@ -204,72 +219,39 @@ func main() {
 						port := port
 						swg.Add(1)
 						addTask()
-
 						go func() {
+							time.Sleep(time.Duration(rand.Intn(2000)) * time.Millisecond)
+							ctx := utils.TimeoutContextSeconds(5)
 							defer swg.Done()
 
 							lport, tcpErr := s.PortManager.PickEphemeralPort(s.SecureRNG(), func(p uint16) (bool, tcpip.Error) {
 								return true, nil
 							})
 							if tcpErr != nil {
-								log.Errorf("Failed to pick ephemeral port: %v", err)
+								log.Errorf("failed to pick ephemeral port: %v", tcpErr)
 							}
-
 							defer func() {
-								s.ReleasePort(ports.Reservation{
-									Networks:  []tcpip.NetworkProtocolNumber{ipv4.ProtocolNumber, ipv6.ProtocolNumber},
-									Transport: tcp.ProtocolNumber,
-									Addr:      tcpip.AddrFrom4(netip.MustParseAddr(host).As4()),
+								s.PortManager.ReleasePort(ports.Reservation{
+									Networks:  []tcpip.NetworkProtocolNumber{tcpip.NetworkProtocolNumber(ipv4.ProtocolNumber)},
+									Transport: header.TCPProtocolNumber,
 									Port:      uint16(lport),
 								})
 							}()
 
-							ctx, cancel := context.WithCancelCause(utils.TimeoutContextSeconds(5))
-							defer cancel(nil)
-
-							isOpen := utils.NewAtomicBool()
-
-							wg := new(sync.WaitGroup)
-							for _idx := 0; _idx < 3; _idx++ {
-								select {
-								case <-ctx.Done():
-									log.Infof("context done")
-									return
-								case <-time.After(1 * time.Second):
-									wg.Add(1)
-									go func() {
-										defer wg.Done()
-										conn, err := gonet.DialTCPWithBind(ctx, s, tcpip.FullAddress{
-											Port: uint16(lport),
-											NIC:  1,
-											Addr: tcpip.AddrFrom4(netip.MustParseAddr(handler.GetIP4Address().String()).As4()),
-										}, tcpip.FullAddress{
-											Port: uint16(port),
-											NIC:  1,
-											Addr: tcpip.AddrFrom4(netip.MustParseAddr(host).As4()),
-										}, ipv4.ProtocolNumber)
-										defer func() {
-											if conn != nil {
-												conn.Close()
-											}
-
-										}()
-										if err != nil {
-											// log.Infof("Remote Port %v CLOSE", utils.HostPort(host, port))
-											return
-										}
-										cancel(nil)
-										select {
-										case <-ctx.Done():
-										default:
-											isOpen.Set()
-											log.Infof("Remote Port %23s OPEN from: %v", utils.HostPort(host, port), conn.LocalAddr().String())
-
-										}
-									}()
-								}
+							conn, err := gonet.DialTCPWithBind(ctx, s, tcpip.FullAddress{
+								Port: uint16(lport),
+								NIC:  1,
+								Addr: tcpip.AddrFrom4(netip.MustParseAddr(handler.GetIP4Address().String()).As4()),
+							}, tcpip.FullAddress{
+								Port: uint16(port),
+								NIC:  1,
+								Addr: tcpip.AddrFrom4(netip.MustParseAddr(host).As4()),
+							}, ipv4.ProtocolNumber)
+							if err != nil {
+								return
 							}
-							wg.Wait()
+							defer conn.Close()
+							log.Infof("%4s: Remote Port %23s OPEN from: localhost:%v", fmt.Sprint(atomic.LoadInt64(finished)), utils.HostPort(host, port), lport)
 							addFinished()
 						}()
 					}
