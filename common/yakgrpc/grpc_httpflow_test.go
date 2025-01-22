@@ -3,11 +3,13 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,7 +17,9 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 
+	"github.com/yaklang/yaklang/common/har"
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/samber/lo"
@@ -789,6 +793,183 @@ Host: www.example.com
 			}
 		}
 	})
+}
+
+func generateTestHTTPFlowData(db *gorm.DB, num int, url string) (string, []int64) {
+	token := utils.RandStringBytes(16)
+	ids := make([]int64, 0, num)
+	host, port, _ := utils.ParseStringToHostPort(url)
+	for i := 0; i < num; i++ {
+
+		flow, _ := yakit.CreateHTTPFlow(
+			yakit.CreateHTTPFlowWithURL(url),
+			yakit.CreateHTTPFlowWithRequestRaw([]byte(
+				fmt.Sprintf(
+					"GET / HTTP/1.1\r\nHost: %s:%d\r\n\r\n%s",
+					host, port,
+					utils.RandStringBytes(16),
+				),
+			),
+			),
+			yakit.CreateHTTPFlowWithResponseRaw([]byte("HTTP/1.1 200 OK\r\nContent-Length: 16\r\n\r\n"+token)),
+		)
+		err := yakit.InsertHTTPFlow(db, flow)
+		if err == nil {
+			ids = append(ids, int64(flow.ID))
+		}
+	}
+	return token, ids
+}
+
+func TestGRPCMUSTPASS_Export_And_ImportHAR(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx := utils.TimeoutContextSeconds(10)
+
+	wantCount := 16
+	wantURL := "http://example.com/"
+	db := consts.GetGormProjectDatabase()
+	token, ids := generateTestHTTPFlowData(db, wantCount, wantURL)
+
+	t.Cleanup(func() {
+		yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{
+			Id: ids,
+		})
+	})
+
+	// export
+	fn := filepath.Join(t.TempDir(), "test.har")
+	stream, err := client.ExportHTTPFlowStream(ctx, &ypb.ExportHTTPFlowStreamRequest{
+		Filter: &ypb.QueryHTTPFlowRequest{
+			Keyword: token,
+		},
+		ExportType: "har",
+		TargetPath: fn,
+	})
+	progress := 0.0
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		progress = msg.Percent
+	}
+
+	// check export
+	require.Equal(t, 1.0, progress)
+	count := 0
+	fh, err := os.Open(fn)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		fh.Close()
+	})
+	har.ImportHTTPArchiveStream(fh, func(h *har.HAREntry) error {
+		count++
+		require.NotNil(t, h.Request)
+		require.Equal(t, wantURL, h.Request.URL)
+		require.NotNil(t, h.Request.PostData)
+		require.Greater(t, len(h.Request.PostData.Text), 0)
+		require.NotNil(t, h.Response)
+		require.NotNil(t, h.Response.Content)
+		require.Equal(t, token, h.Response.Content.Text)
+		return nil
+	})
+	require.Equal(t, wantCount, count)
+
+	// delete before import
+	err = yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{
+		Id: ids,
+	})
+	require.NoError(t, err)
+
+	// import
+	importStream, err := client.ImportHTTPFlowStream(ctx, &ypb.ImportHTTPFlowStreamRequest{
+		InputPath: fn,
+	})
+	require.NoError(t, err)
+	progress = 0.0
+	for {
+		msg, err := importStream.Recv()
+		if err != nil {
+			log.Error(err)
+			break
+		}
+		progress = msg.Percent
+	}
+	// check import
+	require.Equal(t, 1.0, progress)
+	_, flows, err := yakit.QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+		Keyword: token,
+	})
+	require.NoError(t, err)
+	for _, flow := range flows {
+		require.Equal(t, wantURL, flow.Url)
+		require.NotEmpty(t, flow.Request)
+		require.Contains(t, flow.Response, token)
+	}
+	require.Equal(t, wantCount, len(flows))
+}
+
+func TestGRPCMUSTPASS_Export_CSV(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	wantCount := 16
+	wantURL := "http://example.com/"
+	db := consts.GetGormProjectDatabase()
+	fieldNames := []string{"method", "url", "request", "response"}
+	token, ids := generateTestHTTPFlowData(db, wantCount, wantURL)
+
+	t.Cleanup(func() {
+		yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{
+			Id: ids,
+		})
+	})
+	fn := filepath.Join(t.TempDir(), "test.csv")
+	require.NoError(t, err)
+
+	stream, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
+		FieldName: fieldNames,
+		Filter: &ypb.QueryHTTPFlowRequest{
+			Keyword: token,
+		},
+		ExportType: "csv",
+		TargetPath: fn,
+	})
+	require.NoError(t, err)
+	progress := 0.0
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		progress = msg.Percent
+	}
+
+	// check export
+	require.Equal(t, 1.0, progress)
+
+	fh, err := os.Open(fn)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		fh.Close()
+	})
+	reader := csv.NewReader(fh)
+	gotFieldNames, err := reader.Read()
+	require.NoError(t, err)
+	// export will add a "id" field
+	fieldNames = append([]string{"id"}, fieldNames...)
+	require.ElementsMatch(t, fieldNames, gotFieldNames)
+	records, err := reader.ReadAll()
+	require.NoError(t, err)
+	require.Len(t, records, wantCount)
+	for _, record := range records {
+		require.NotEmpty(t, record[0])        // id
+		require.Equal(t, "GET", record[1])    // method
+		require.Equal(t, wantURL, record[2])  // url
+		require.NotEmpty(t, record[3])        // request
+		require.Contains(t, record[4], token) // response
+	}
 }
 
 func TestGetHTTPPacketBody(t *testing.T) {
