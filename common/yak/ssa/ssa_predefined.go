@@ -262,6 +262,7 @@ func (n *anValue) SetObject(v Value) {
 }
 
 func (n *anValue) GetObject() Value {
+	n.RefreshToCache(n.object)
 	return n.object
 }
 
@@ -270,6 +271,7 @@ func (n *anValue) SetKey(k Value) {
 }
 
 func (n *anValue) GetKey() Value {
+	n.RefreshToCache(n.key)
 	return n.key
 }
 
@@ -292,6 +294,7 @@ func (n *anValue) GetMember(key Value) (Value, bool) {
 	if !ok {
 		return nil, false
 	}
+	n.RefreshToCache(ret)
 	return ret, true
 }
 
@@ -329,14 +332,19 @@ func (n *anValue) GetAllMember() map[Value]Value {
 }
 
 func (n *anValue) ForEachMember(fn func(Value, Value) bool) {
-	n.member.ForEach(fn)
+	n.member.ForEach(func(i, v Value) bool {
+		return fn(i, v)
+	})
 }
 
 func (n *anValue) String() string { return "" }
 
 // has/get user and value
-func (n *anValue) HasUsers() bool  { return len(n.userList) != 0 }
-func (n *anValue) GetUsers() Users { return n.userList }
+func (n *anValue) HasUsers() bool { return len(n.userList) != 0 }
+func (n *anValue) GetUsers() Users {
+	n.RefreshToCache(n.userList)
+	return n.userList
+}
 
 // for Value
 func (n *anValue) AddUser(u User) {
@@ -471,4 +479,14 @@ func (i *anValue) FlatOccultation() []Value {
 	handler(i)
 
 	return ret
+}
+
+// TODO: use this for point in struct, like user/value
+// in next pr i will remove this and user/value just save ID not point
+func (i anValue) RefreshToCache(item any) {
+	if i.GetProgram() == nil || i.GetProgram().Cache == nil {
+		return
+	}
+	cache := i.GetProgram().Cache
+	cache.Refresh(item)
 }

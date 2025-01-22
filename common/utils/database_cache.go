@@ -2,6 +2,7 @@ package utils
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -38,6 +39,7 @@ type DataBaseCacheWithKey[K comparable, T any] struct {
 	saveDatabase     SaveDatabase[K, T]
 	loadFromDatabase LoadFromDatabase[K, T]
 	wait             *sync.WaitGroup
+	close            atomic.Bool
 }
 
 /*
@@ -58,6 +60,7 @@ func NewDatabaseCacheWithKey[K comparable, T any](
 		saveDatabase:     save,
 		loadFromDatabase: load,
 		wait:             &sync.WaitGroup{},
+		close:            atomic.Bool{},
 	}
 	cache.SetExpirationCallback(func(_ string, key K, reason EvictionReason) {
 		log.Debugf("expire key: %v", key)
@@ -80,11 +83,15 @@ func GetDatabaseCacheStatus[K comparable, T any](c *DataBaseCacheWithKey[K, T], 
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Set(key K, memValue T) {
+	if c.close.Load() {
+		log.Errorf("BUG:: cache is closed,  con't set value with key: %v", key)
+		return
+	}
 	if item, ok := c.data.Get(key); ok {
 		_ = item
 		// already exist
-		log.Errorf("BUG:: already exist in cache, key: %v", key)
-		return
+		log.Debugf("BUG:: already exist in cache, key: %v", key)
+		// return
 	}
 	c.notifyCache.Set(InterfaceToString(key), key)
 	c.data.Set(key, databaseCacheItem[K, T]{
@@ -94,7 +101,7 @@ func (c *DataBaseCacheWithKey[K, T]) Set(key K, memValue T) {
 	})
 }
 
-func (c *DataBaseCacheWithKey[K, T]) Get(key K) (T, bool) {
+func (c *DataBaseCacheWithKey[K, T]) GetPure(key K) (T, bool) {
 	// get from cache
 	if item, ok := c.data.Get(key); ok {
 		if item.status == DatabaseCacheItemSave {
@@ -103,6 +110,14 @@ func (c *DataBaseCacheWithKey[K, T]) Get(key K) (T, bool) {
 		}
 		// return memory data
 		return item.memoryItem, true
+	}
+	var zero T
+	return zero, false
+}
+
+func (c *DataBaseCacheWithKey[K, T]) Get(key K) (T, bool) {
+	if item, ok := c.GetPure(key); ok {
+		return item, true
 	}
 
 	// no in cache, load from database
@@ -159,14 +174,14 @@ func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
 	save_success := c.saveDatabase(item.key, item.memoryItem, reason) // wait this
 
 	// check status
-	item, ok = c.data.Get(key)
+	item2, ok := c.data.Get(key)
 	if !ok {
 		// no this item
 		log.Errorf("BUG:: no this item in cache, key: %v", key)
 		return
 	}
 	if save_success {
-		switch item.status {
+		switch item2.status {
 		case DatabaseCacheItemSave:
 			// normal save to database and no one care, just delete this item
 			// c.notifyCache deleted this item already
@@ -176,7 +191,7 @@ func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
 			recoverData()
 		case DatabaseCacheItemNormal:
 			// not run here !
-			log.Errorf("BUG:: after save item status is Normal, key: %v", key)
+			log.Debugf("BUG:: after save item status is Normal, key: %v", key)
 		}
 	} else {
 		recoverData()
@@ -191,10 +206,15 @@ func (c *DataBaseCacheWithKey[K, T]) Count() int {
 	return c.data.Count()
 }
 
+func (c *DataBaseCacheWithKey[K, T]) IsClose() bool {
+	return c.close.Load()
+}
 func (c *DataBaseCacheWithKey[K, T]) Close() {
 	// todo: save all item
 	// return c.data.Close()
+	c.close.Store(true)
 	c.notifyCache.Close()
+	c.close.Store(false)
 }
 
 func (c *DataBaseCacheWithKey[K, T]) ForEach(f func(K, T) bool) {
