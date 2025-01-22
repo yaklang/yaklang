@@ -1,9 +1,10 @@
 package bizhelper
 
 import (
+	"math"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"math"
 )
 
 type Param struct {
@@ -50,7 +51,7 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	var offset int
 
 	db = utils.GormTransactionReturnDb(db, func(tx *gorm.DB) {
-		if tx.Model(result).Count(&count); tx.Error != nil {
+		if tx.Count(&count); tx.Error != nil {
 			return
 		}
 		if p.Limit == -1 {
