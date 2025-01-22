@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"errors"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -41,6 +40,7 @@ func (c *config) parseProject() (Programs, error) {
 	if c.reCompile {
 		ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
 		ssadb.DeleteSSAProgram(c.ProgramName)
+		DeleteIncludeCache()
 	}
 	if c.databasePath != "" {
 		consts.SetSSADataBasePath(c.databasePath)
