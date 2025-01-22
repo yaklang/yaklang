@@ -14,12 +14,17 @@ type Log struct {
 }
 
 type Entries struct {
-	Entries        []*HAREntry
-	entriesChannel <-chan *HAREntry // use this first if exist
+	Entries              []*HAREntry
+	entriesChannel       <-chan *HAREntry // use this first if exist
+	marshalEntryCallback func(*HAREntry)
 }
 
 func (e *Entries) SetEntriesChannel(ch <-chan *HAREntry) {
 	e.entriesChannel = ch
+}
+
+func (e *Entries) SetMarshalEntryCallback(fn func(*HAREntry)) {
+	e.marshalEntryCallback = fn
 }
 
 type Creator struct {

@@ -22,7 +22,7 @@ var (
 )
 
 func Match(path []json.Token, target []json.Token) bool {
-	if len(path) < len(target) {
+	if len(path) != len(target) {
 		return false
 	}
 	for i, v := range target {

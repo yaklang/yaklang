@@ -51,6 +51,9 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar12(out *jwriter.Write
 			} else {
 				(*entry).MarshalEasyJSON(out)
 			}
+			if in.marshalEntryCallback != nil {
+				in.marshalEntryCallback(entry)
+			}
 		}
 		out.RawByte(']')
 	}

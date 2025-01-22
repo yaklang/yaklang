@@ -14,10 +14,25 @@ func ImportHTTPArchive(r io.Reader) (*HTTPArchive, error) {
 	err := easyjson.UnmarshalFromReader(r, &har)
 	return &har, err
 }
+func CountHTTPArchiveEntries(r io.Reader) (int, error) {
+	count := 0
+	dec := json.NewDecoder(r)
+	err := jsonstream.Iterate(dec, func(path []json.Token) error {
+		if !jsonstream.Match(path, []json.Token{"log", "entries", "*"}) {
+			return nil
+		}
+		count++
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
 
 func ImportHTTPArchiveStream(r io.Reader, callback func(*HAREntry) error) error {
 	dec := json.NewDecoder(r)
-	jsonstream.Iterate(dec, func(path []json.Token) error {
+	err := jsonstream.Iterate(dec, func(path []json.Token) error {
 		if !jsonstream.Match(path, []json.Token{"log", "entries", "*"}) {
 			return nil
 		}
@@ -30,6 +45,9 @@ func ImportHTTPArchiveStream(r io.Reader, callback func(*HAREntry) error) error 
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
