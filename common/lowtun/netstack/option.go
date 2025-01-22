@@ -27,7 +27,7 @@ func NewDefaultStack(networkIfaceIP string, networkIfaceGateway string, endpoint
 			icmp.NewProtocol4,
 			icmp.NewProtocol6,
 		},
-		HandleLocal: true,
+		HandleLocal: false,
 	})
 	err := WithDefault()(s)
 	if err != nil {
@@ -59,7 +59,7 @@ func NewDefaultStack(networkIfaceIP string, networkIfaceGateway string, endpoint
 		// packets), we need to enable spoofing.
 		//
 		// Ref: https://github.com/google/gvisor/commit/8c0701462a84ff77e602f1626aec49479c308127
-		WithSpoofing(nic, true),
+		WithSpoofing(nic, false),
 
 		// basic all-subnet route table
 		WithRouteTable(nic),
