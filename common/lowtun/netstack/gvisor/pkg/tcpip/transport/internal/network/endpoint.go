@@ -19,6 +19,7 @@ package network
 import (
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/atomicbitops"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/buffer"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/sync"
@@ -541,6 +542,7 @@ func (e *Endpoint) AcquireContextForWrite(opts tcpip.WriteOptions) (WriteContext
 	}
 
 	if !e.ops.GetBroadcast() && route.IsOutboundBroadcast() {
+		log.Infof("broadcast disabled, route.IsOutboundBroadcast() is %v, e.ops.GetBroadcast() is %v", route.IsOutboundBroadcast(), e.ops.GetBroadcast())
 		route.Release()
 		return WriteContext{}, &tcpip.ErrBroadcastDisabled{}
 	}

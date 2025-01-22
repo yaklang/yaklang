@@ -27,7 +27,7 @@ func NewDefaultStack(networkIfaceIP string, networkIfaceGateway string, endpoint
 			icmp.NewProtocol4,
 			icmp.NewProtocol6,
 		},
-		HandleLocal: false,
+		HandleLocal: true,
 	})
 	err := WithDefault()(s)
 	if err != nil {
