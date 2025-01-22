@@ -655,18 +655,8 @@ func (lz *LazyInstruction) GetVariable(n string) *Variable {
 		return v
 	}
 	{
-		v := NewVariable(0, n, false, nil).(*Variable)
+		v := GetVariableFromDB(lz.id, n)
 		v.Assign(lz)
-		offset := ssadb.GetOffsetByVariable(n, lz.id)
-		for _, o := range offset {
-			editor, start, end, err := o.GetStartAndEndPositions()
-			if err != nil {
-				log.Errorf("GetStartAndEndPositions failed: %v", err)
-				continue
-			}
-			rng := editor.GetRangeByPosition(start, end)
-			v.AddRange(rng, true)
-		}
 		lz.variable[n] = v
 		return v
 	}
