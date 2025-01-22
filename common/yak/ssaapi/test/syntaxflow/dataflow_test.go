@@ -2,6 +2,7 @@ package syntaxflow
 
 import (
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -9,7 +10,9 @@ import (
 )
 
 func TestDataflowReal1(t *testing.T) {
-	code := `
+
+	t.Run("test file read", func(t *testing.T) {
+		code := `
 package com.ruoyi.common.utils.file;
 
 import java.io.File;
@@ -23,11 +26,7 @@ import java.nio.charset.StandardCharsets;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-/**
- * 文件处理工具类
- * 
- * @author ruoyi
- */
+
 public class FileUtils extends org.apache.commons.io.FileUtils
 {
     public static String FILENAME_PATTERN = "[a-zA-Z0-9_\\-\\|\\.\\u4e00-\\u9fa5]+";
@@ -87,29 +86,10 @@ public class FileUtils extends org.apache.commons.io.FileUtils
             }
         }
     }
-
-    /**
-     * 删除文件
-     * 
-     * @param filePath 文件
-     * @return
-     */
-    public static boolean deleteFile(String filePath)
-    {
-        boolean flag = false;
-        File file = new File(filePath);
-        // 路径为文件且不为空则进行删除
-        if (file.isFile() && file.exists())
-        {
-            file.delete();
-            flag = true;
-        }
-        return flag;
-    }
+   
 }
 	`
 
-	t.Run("test file read", func(t *testing.T) {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			rule := `
 File() as $fileInstance 
@@ -128,5 +108,44 @@ CODE
 
 			return nil
 		}, ssaapi.WithRawLanguage("java"))
+	})
+
+	t.Run("test ddos real", func(t *testing.T) {
+		code := `
+package org.example.Dos;
+
+import java.io.*;
+import java.net.Socket;
+
+public class DOSDemo {
+    public static void readSocketData(Socket socket) throws IOException {
+        BufferedReader reader = new BufferedReader(
+                new InputStreamReader(socket.getInputStream())
+        );
+        String line;
+        // 限制单行的最大长度
+        final int MAX_LINE_LENGTH = 1024; // 最大行长度为1024个字符
+        while ((line = reader.readLine()) != null) {
+            processLine(line);
+        }
+    }
+}
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			rule := `
+.getInputStream()?{<typeName>?{have: 'java.net.Socket' || 'java.new.ServerSocket'}} as $source;
+BufferedReader().readLine()?{!.length}?{<typeName>?{have:'java.io'}}  as $sink;
+$sink#{
+    include:<<<CODE
+    <self> & $source
+CODE
+}-> as $vul;
+`
+			vals, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			source := vals.GetValues("vul")
+			require.Contains(t, source.String(), `Parameter-socket`)
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
 	})
 }

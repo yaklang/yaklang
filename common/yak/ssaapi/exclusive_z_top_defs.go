@@ -264,10 +264,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		var vals Values
 		getParameter := func() Values {
 			fun := i.GetFunction()
+			if fun == nil {
+				return Values{i}
+			}
+			fun.AppendEffectOn(i)
 			switch inst.MemberCallKind {
 			case ssa.ParameterMemberCall:
 				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
-					return para.getTopDefs(actx, opt...)
+					return para.AppendEffectOn(fun).getTopDefs(actx, opt...)
 				}
 			case ssa.FreeValueMemberCall:
 				if fv := fun.GetFreeValue(inst.MemberCallObjectName); fv != nil {
