@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"sync"
 	"time"
 
 	"github.com/gopacket/gopacket"
@@ -14,13 +15,15 @@ import (
 )
 
 type PcapReadWriteCloser struct {
-	handle *pcap.Handle
-	mtu    int
+	handle     *pcap.Handle
+	writeMutex sync.Mutex
+	mtu        int
 
 	ip4address          netip.Addr
 	gatewayIp4address   netip.Addr
 	deviceHardwareAddr  net.HardwareAddr
 	gatewayHardwareAddr net.HardwareAddr
+	packetChan          chan gopacket.Packet
 }
 
 func (p *PcapReadWriteCloser) GetIP4Address() netip.Addr {
@@ -200,30 +203,46 @@ ARPLOOP:
 		handle.Close()
 		return nil, fmt.Errorf("failed to reset BPF filter: %v", err)
 	}
+	p.packetChan = packetChan
 	log.Infof("Reset BPF filter to capture all traffic")
-
 	return p, nil
 }
 
 func (p *PcapReadWriteCloser) Read(packet []byte) (n int, err error) {
-	data, _, err := p.handle.ReadPacketData()
-	if err != nil {
-		return 0, err
+	if p.packetChan == nil {
+		return 0, fmt.Errorf("packetChan is nil")
 	}
-
+	pkt, ok := <-p.packetChan
+	if !ok {
+		return 0, fmt.Errorf("packetChan is closed")
+	}
+	data := pkt.Data()
 	rawLayer := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
 	if rawLayer != nil {
+		ethernetLayer := rawLayer.Layer(layers.LayerTypeEthernet)
+		if _, ok := ethernetLayer.(*layers.Ethernet); ok {
+			data = data[14:]
+		}
+
 		netLayer := rawLayer.NetworkLayer()
 		if netLayer != nil {
-			data = netLayer.LayerContents()
-			if udpLayer := rawLayer.Layer(layers.LayerTypeUDP); udpLayer != nil {
-				udp, ok := udpLayer.(*layers.UDP)
-				if ok {
-					// 检查是否是 DHCP 端口
-					if udp.SrcPort == 67 || udp.DstPort == 67 || // DHCP 服务器端口
-						udp.SrcPort == 68 || udp.DstPort == 68 { // DHCP 客户端端口
-						//log.Infof("发现 DHCP 数据包: %s", rawLayer.String())
+			tcpLayer := rawLayer.Layer(layers.LayerTypeTCP)
+			if tcpLayer != nil {
+				if tcp, ok := tcpLayer.(*layers.TCP); ok {
+					if tcp.RST {
+						// networkLayer, ok := netLayer.(*layers.IPv4)
+						// if ok && networkLayer.DstIP.Equal(net.ParseIP("47.52.100.44")) {
+						// 	log.Infof("skip tcp rst packet from: %v:%s <- %v:%s", networkLayer.NetworkFlow().Src(), tcp.SrcPort, networkLayer.NetworkFlow().Dst(), tcp.DstPort)
+						// }
+						return 0, nil
 					}
+
+					// if tcp.SYN && tcp.ACK {
+					// 	networkLayer, ok := netLayer.(*layers.IPv4)
+					// 	if ok && networkLayer.SrcIP.Equal(net.ParseIP("47.52.100.84")) {
+					// 		log.Infof("recv tcp syn-ack packet from: %v:%s <- %v:%s", networkLayer.NetworkFlow().Src(), tcp.SrcPort, networkLayer.NetworkFlow().Dst(), tcp.DstPort)
+					// 	}
+					// }
 				}
 			}
 		}
@@ -234,12 +253,29 @@ func (p *PcapReadWriteCloser) Read(packet []byte) (n int, err error) {
 		return n, nil
 	}
 	return len(data), nil
+
 }
 
 func (p *PcapReadWriteCloser) Write(packet []byte) (n int, err error) {
+	p.writeMutex.Lock()
+	defer p.writeMutex.Unlock()
+
 	if len(packet) > p.mtu {
 		// Truncate packet to MTU size
 		packet = packet[:p.mtu]
+	}
+
+	// 解析数据包
+	rawLayer := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default)
+	if rawLayer != nil {
+		tcpLayer := rawLayer.Layer(layers.LayerTypeTCP)
+		if tcpLayer != nil {
+			if tcp, ok := tcpLayer.(*layers.TCP); ok {
+				if tcp.RST {
+					return len(packet), nil
+				}
+			}
+		}
 	}
 
 	// Check if this is a network layer packet that needs ethernet header

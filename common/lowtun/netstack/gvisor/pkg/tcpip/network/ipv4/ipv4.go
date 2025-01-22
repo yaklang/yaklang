@@ -17,10 +17,11 @@ package ipv4
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"math"
 	"reflect"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/atomicbitops"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/buffer"
@@ -827,6 +828,7 @@ func (e *endpoint) forwardUnicastPacket(pkt *stack.PacketBuffer) ip.ForwardingEr
 // HandlePacket is called by the link layer when new ipv4 packets arrive for
 // this endpoint.
 func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
+
 	stats := e.stats.ip
 
 	stats.PacketsReceived.Increment()
@@ -838,6 +840,7 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 
 	hView, ok := e.protocol.parseAndValidate(pkt)
 	if !ok {
+		log.Infof("MalformedPacketsReceived: %v", pkt.NetworkHeader())
 		stats.MalformedPacketsReceived.Increment()
 		return
 	}
@@ -1795,13 +1798,15 @@ func (p *protocol) isSubnetLocalBroadcastAddress(addr tcpip.Address) bool {
 func (p *protocol) parseAndValidate(pkt *stack.PacketBuffer) (*buffer.View, bool) {
 	transProtoNum, hasTransportHdr, ok := p.Parse(pkt)
 	if !ok {
+		log.Infof("MalformedPacketsReceived cannot parse transproto: %v", pkt.NetworkHeader())
 		return nil, false
 	}
 
 	h := header.IPv4(pkt.NetworkHeader().Slice())
 	// Do not include the link header's size when calculating the size of the IP
 	// packet.
-	if !h.IsValid(pkt.Size() - len(pkt.LinkHeader().Slice())) {
+	if l := pkt.Size() - len(pkt.LinkHeader().Slice()); !h.IsValid(l) {
+		log.Infof("MalformedPacketsReceived cannot verify size: pkt.Size() - len(pkt.LinkHeader().Slice()): %v", l)
 		return nil, false
 	}
 
