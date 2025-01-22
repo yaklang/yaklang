@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
@@ -136,7 +137,12 @@ $entryFunc(*?{opcode: param && !have: this} as $source);
 
 	t.Run("db", func(t *testing.T) {
 		ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
-		_, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
+		_, err := ssaapi.ParseProjectWithFS(
+			filesys.NewEmbedFS(sourceCodeSample),
+			ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY),
+			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithCacheTTL(500*time.Millisecond), //	trigger  cache save/refresh/load
+		)
 		if err != nil {
 			t.Fatalf("compile failed: %v", err)
 		}
