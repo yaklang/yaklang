@@ -211,9 +211,22 @@ func (p *PcapReadWriteCloser) Read(packet []byte) (n int, err error) {
 		return 0, err
 	}
 
-	// Skip ethernet header (14 bytes)
-	if len(data) > 14 {
-		data = data[14:]
+	rawLayer := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
+	if rawLayer != nil {
+		netLayer := rawLayer.NetworkLayer()
+		if netLayer != nil {
+			data = netLayer.LayerContents()
+			if udpLayer := rawLayer.Layer(layers.LayerTypeUDP); udpLayer != nil {
+				udp, ok := udpLayer.(*layers.UDP)
+				if ok {
+					// 检查是否是 DHCP 端口
+					if udp.SrcPort == 67 || udp.DstPort == 67 || // DHCP 服务器端口
+						udp.SrcPort == 68 || udp.DstPort == 68 { // DHCP 客户端端口
+						//log.Infof("发现 DHCP 数据包: %s", rawLayer.String())
+					}
+				}
+			}
+		}
 	}
 
 	n = copy(packet, data)
@@ -280,13 +293,13 @@ func (p *PcapReadWriteCloser) Write(packet []byte) (n int, err error) {
 			}
 			packet = buf.Bytes()
 		}
+		err = p.handle.WritePacketData(packet)
+		if err != nil {
+			return 0, err
+		}
+		return len(packet), nil
 	}
-
-	err = p.handle.WritePacketData(packet)
-	if err != nil {
-		return 0, err
-	}
-	return len(packet), nil
+	return 0, fmt.Errorf("unsupported packet type")
 }
 
 func (p *PcapReadWriteCloser) Close() error {
@@ -300,4 +313,16 @@ func NewPcapReadWriteCloserEndpoint(device string, snaplen int32) (*ReadWriteEnd
 		return nil, err
 	}
 	return NewReadWriteCloserEndpoint(rwc, uint32(rwc.mtu), 0)
+}
+
+func NewPcapReadWriteCloserEndpointEx(device string, snaplen int32) (*PcapReadWriteCloser, *ReadWriteEndpoint, error) {
+	rwc, err := NewPcapReadWriteCloser(device, snaplen)
+	if err != nil {
+		return nil, nil, err
+	}
+	ep, err := NewReadWriteCloserEndpoint(rwc, uint32(rwc.mtu), 0)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rwc, ep, nil
 }
