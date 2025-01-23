@@ -144,9 +144,49 @@ const (
 	NativeCall_Java_UnEscape_Output = "javaUnescapeOutput"
 
 	NativeCall_Foeach_Func_Inst = "foreach_function_inst"
+
+	NativeCall_GetFilename = "getFilename"
 )
 
 func init() {
+	registerNativeCall(NativeCall_GetFilename, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var rs []sfvm.ValueOperator
+
+		program, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		prog := program.Program
+		fileHash := make(map[string]string, len(prog.FileList))
+		for name, hash := range prog.FileList {
+			fileHash[hash] = name
+		}
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Program:
+				return nil
+			case *Value:
+				vr := ret.node.GetRange()
+				if vr == nil {
+					log.Errorf("node range is nil")
+					return nil
+				}
+				editor := vr.GetEditor()
+				if editor == nil {
+					log.Errorf("node editor is nil")
+				}
+				md5 := editor.SourceCodeMd5()
+				filename, exist := fileHash[md5]
+				if exist {
+					rs = append(rs, program.NewValue(ssa.NewConst(filename)))
+				} else {
+					log.Errorf("program filelist not found this file")
+				}
+			}
+			return nil
+		})
+		return true, sfvm.NewValues(rs), nil
+	}))
 	//<foreach_function_inst(hook=`xxx` as $result)> as $result
 	registerNativeCall(NativeCall_Foeach_Func_Inst, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
