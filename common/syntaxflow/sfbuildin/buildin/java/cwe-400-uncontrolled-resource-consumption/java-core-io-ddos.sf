@@ -1,0 +1,83 @@
+desc(
+    title:"Check Java Core IO Denial of Service Vulnerability",
+    title_zh:"检测Java IO库拒绝服务漏洞",
+    type:vuln,
+    desc:<<<TEXT
+    该规则用于检测Java IO库中可能存在的拒绝服务漏洞。IO库中的一些方法如果输入的是不受信任的数据并且没有长度限制、超时限制等机制，可能导致资源被无限制使用，从而导致拒绝服务漏洞。因此，建议在使用IO库时，对输入数据进行验证和限制，以防止拒绝服务漏洞的发生。
+TEXT,
+)
+
+<include("java-net-socket-read")> as $source
+<include("java-servlet-param")> as $source
+<include("java-spring-param")> as $source
+check $source
+
+// BufferedReader使用readLine读取数据，并且没有使用length方法读取长度以进行限制
+BufferedReader().readLine()?{<typeName>?{have:'java.io'} && !(.length())}  as $sink;
+$sink#{
+    include:<<<INCLUDE
+    <self> & $source
+INCLUDE
+}-> as $vul;
+alert $vul for {
+    message: "发现Java的java.io库可能存在ddos漏洞",
+    level: low,
+    type: vuln,
+    risk: ddos,
+}
+
+desc(
+    lang:java,
+    alert_num:1,
+    "file://demo.java":<<<TEXT
+    package org.example.Dos;
+    import java.io.*;
+    import java.net.Socket;
+
+    public class DOSDemo {
+        public static void readSocketData(Socket socket) throws IOException {
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(socket.getInputStream())
+            );
+            String line;
+            while ((line = reader.readLine()) != null) {
+                processLine(line);
+            }
+        }
+        private static void processLine(String line) {
+            // 业务逻辑处理
+        }
+    }
+TEXT
+)
+
+desc(
+    lang:java,
+    "safefile://demo.java":<<<TEXT
+    package org.example.Dos;
+    import java.io.*;
+    import java.net.Socket;
+
+    public class SecurityDOSDemo {
+        public static void readSocketData(Socket socket) throws IOException {
+                BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(socket.getInputStream())
+                );
+                // 限制单行的最大长度
+                String line;
+                final int MAX_LINE_LENGTH = 1024; // 最大行长度为1024个字符
+                while ((line = reader.readLine()) != null) {
+                    if (line.length() > MAX_LINE_LENGTH) {
+                        break;
+                    }
+                    processLine(line);
+                }
+            }
+        private static void processLine(String line) {
+            // 业务逻辑处理
+        }
+    }
+TEXT
+)
+
+
