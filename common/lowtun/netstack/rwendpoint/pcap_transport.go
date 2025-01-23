@@ -244,6 +244,20 @@ func (p *PcapReadWriteCloser) Read(packet []byte) (n int, err error) {
 					// 	}
 					// }
 				}
+			} else if dhcpv4 := rawLayer.Layer(layers.LayerTypeDHCPv4); dhcpv4 != nil {
+				if dhcp, ok := dhcpv4.(*layers.DHCPv4); ok {
+					if dhcp.Operation == layers.DHCPOpReply {
+						if len(dhcp.Options) > 0 {
+							for _, opt := range dhcp.Options {
+								if opt.Type == layers.DHCPOptMessageType && len(opt.Data) > 0 {
+									if opt.Data[0] == byte(layers.DHCPMsgTypeOffer) {
+										log.Infof("收到DHCP Offer消息: 服务器IP=%v, 提供IP=%v", dhcp.NextServerIP, dhcp.YourClientIP)
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	}
