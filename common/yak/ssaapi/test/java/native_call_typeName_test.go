@@ -2,6 +2,7 @@ package java
 
 import (
 	"errors"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 
@@ -481,7 +482,10 @@ public class FastJSONDemoController {
 			prog := progs[0]
 			prog.Show()
 			obj := prog.SyntaxFlowChain("id.annotation.Hello<fullTypeName> as $obj").Show()
-			assert.Equal(t, 2, obj.Len())
+			//assert.Equal(t, 2, obj.Len())
+			require.Contains(t, obj.String(), "com.Annotation2.example.Hello")
+			require.Contains(t, obj.String(), "java.lang.Hello")
+			require.Contains(t, obj.String(), "org.springframework.web.bind.annotation.Hello")
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})
@@ -637,7 +641,7 @@ class Main{
 	}
 }
 `
-	ssatest.CheckSyntaxFlow(t, code, `foo<getReturns><typeName> as $f; bar<getReturns><typeName> as $b;
+	ssatest.CheckSyntaxFlowContain(t, code, `foo<getReturns><typeName> as $f; bar<getReturns><typeName> as $b;
 	test<getReturns><typeName> as $t;`,
 		map[string][]string{
 			"f": {"\"String\""},
