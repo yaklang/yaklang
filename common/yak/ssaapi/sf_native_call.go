@@ -148,9 +148,27 @@ const (
 	NativeCall_GetUsers = "getUsers"
 
 	NativeCall_GetActualParams = "getActualParams"
+
+	NativeCall_GetActualParamLen = "getActualParamLen"
 )
 
 func init() {
+	registerNativeCall(NativeCall_GetActualParamLen, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		vs, err := v.GetAllCallActualParams()
+		if err != nil {
+			return false, nil, err
+		}
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		var count int
+		vs.Recursive(func(operator sfvm.ValueOperator) error {
+			count++
+			return nil
+		})
+		return true, sfvm.NewValues([]sfvm.ValueOperator{prog.NewValue(ssa.NewConst(count))}), nil
+	}), nc_desc("获取实际参数长度"))
 	registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		result, err := v.GetAllCallActualParams()
 		if err != nil {
