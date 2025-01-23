@@ -1,12 +1,10 @@
 package har
 
 import (
-	"encoding/json"
 	"io"
 
 	"github.com/mailru/easyjson"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/jsonstream"
 )
 
 func ImportHTTPArchive(r io.Reader) (*HTTPArchive, error) {
@@ -16,39 +14,29 @@ func ImportHTTPArchive(r io.Reader) (*HTTPArchive, error) {
 }
 func CountHTTPArchiveEntries(r io.Reader) (int, error) {
 	count := 0
-	dec := json.NewDecoder(r)
-	err := jsonstream.Iterate(dec, func(path []json.Token) error {
-		if !jsonstream.Match(path, []json.Token{"log", "entries", "*"}) {
-			return nil
-		}
-		count++
-		return nil
-	})
-	if err != nil {
-		return 0, err
+	har := &HTTPArchive{
+		Log: &Log{
+			Entries: &Entries{
+				unmarshalEntryCallback: func(h *HAREntry) error {
+					count++
+					return nil
+				},
+			},
+		},
 	}
-	return count, nil
+	err := easyjson.UnmarshalFromReader(r, har)
+	return count, err
 }
 
 func ImportHTTPArchiveStream(r io.Reader, callback func(*HAREntry) error) error {
-	dec := json.NewDecoder(r)
-	err := jsonstream.Iterate(dec, func(path []json.Token) error {
-		if !jsonstream.Match(path, []json.Token{"log", "entries", "*"}) {
-			return nil
-		}
-		var entry HAREntry
-		if err := dec.Decode(&entry); err != nil {
-			return err
-		}
-		if callback != nil {
-			return callback(&entry)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
+	har := &HTTPArchive{
+		Log: &Log{
+			Entries: &Entries{
+				unmarshalEntryCallback: callback,
+			},
+		},
 	}
-	return nil
+	return easyjson.UnmarshalFromReader(r, har)
 }
 
 func ExportHTTPArchiveStream(w io.Writer, har *HTTPArchive) error {

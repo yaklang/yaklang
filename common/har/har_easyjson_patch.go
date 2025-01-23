@@ -21,6 +21,12 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar12(in *jlexer.Lexer, 
 		} else {
 			v2 = new(HAREntry)
 			(*v2).UnmarshalEasyJSON(in)
+			if out.unmarshalEntryCallback != nil {
+				err := out.unmarshalEntryCallback(v2)
+				if err != nil {
+					in.AddError(err)
+				}
+			}
 		}
 		out.Entries = append(out.Entries, v2)
 		in.WantComma()
