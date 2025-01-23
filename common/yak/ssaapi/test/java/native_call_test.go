@@ -1,6 +1,7 @@
 package java
 
 import (
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"strconv"
 	"strings"
 	"testing"
@@ -446,4 +447,20 @@ func TestNativeCall_Java_RegexpForMybatisAnnotation(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+func TestNativeCall(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("a.java", `package main;
+public class A{
+}
+`)
+	fs.AddFile("b.java", `package main2;
+public class B{}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `A as $output
+$output<getFilename> as $sink
+`, map[string][]string{
+		"sink": {"a.java"},
+	}, true, ssaapi.WithLanguage(ssaapi.JAVA))
 }
