@@ -29,8 +29,10 @@ type Builder interface {
 type initHanlderFunc func(*FunctionBuilder)
 
 type PreHandlerInit struct {
-	InitHandlerOnce sync.Once
-	initHandlerFunc []initHanlderFunc
+	InitHandlerOnce       sync.Once
+	initHandlerFunc       []initHanlderFunc
+	beforeInitHandlerFunc []initHanlderFunc
+	languageConfigOpts    []languageConfigOpt
 }
 
 func (d *PreHandlerInit) AfterPreHandlerProject(builder *FunctionBuilder) {
@@ -44,12 +46,25 @@ func NewPreHandlerInit(fs ...initHanlderFunc) *PreHandlerInit {
 	}
 }
 
+func (d *PreHandlerInit) WithLanguageConfigOpts(opts ...languageConfigOpt) *PreHandlerInit {
+	d.languageConfigOpts = opts
+	return d
+}
+func (d *PreHandlerInit) WithPreInitHandler(fs ...initHanlderFunc) *PreHandlerInit {
+	d.beforeInitHandlerFunc = fs
+	return d
+}
+
 var ProjectConfigVariable = "__projectConfig__"
 
 func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
 	d.InitHandlerOnce.Do(func() {
 		// build the global dependency scope
 		b.SetEmptyRange()
+		b.SetLanguageConfig(d.languageConfigOpts...)
+		for _, handlerFunc := range d.beforeInitHandlerFunc {
+			handlerFunc(b)
+		}
 		variable := b.CreateVariable("__dependency__")
 		container := b.EmitEmptyContainer()
 		b.AssignVariable(variable, container)
@@ -57,10 +72,8 @@ func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
 		configVariable := b.CreateVariable(ProjectConfigVariable)
 		configContainer := b.EmitEmptyContainer()
 		b.AssignVariable(configVariable, configContainer)
-
 		// run the init handler functions
 		for _, f := range d.initHandlerFunc {
-			// xx
 			f(b)
 		}
 	})

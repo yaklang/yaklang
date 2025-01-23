@@ -22,16 +22,12 @@ var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler),
+		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(
+			ssa.LanguageConfigIsBinding,
+			ssa.LanguageConfigIsSupportClass,
+			ssa.LanguageConfigIsSupportClassStaticModifier,
+		),
 	}
-}
-
-func initHandler(fb *ssa.FunctionBuilder) {
-	fb.SetLanguageConfig(
-		ssa.LanguageConfigIsBinding,
-		ssa.LanguageConfigIsSupportClass,
-		ssa.LanguageConfigIsSupportClassStaticModifier,
-	)
 }
 
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
