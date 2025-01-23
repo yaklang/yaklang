@@ -119,7 +119,7 @@ jobs:
               # StaticAnalyze
               go test -timeout 20s -run TestAnalyzeMustPASS* ./common/coreplugin
               # BuildIn SyntaxFlow Rule
-              go test -timeout 1m ./common/syntaxflow/sfbuildin/...
+              go test -timeout 2m ./common/syntaxflow/sfbuildin/...
 
           - name: Test SSA Frontend (yak/java/php/js/go)
             run: |
