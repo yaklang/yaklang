@@ -26,14 +26,11 @@ var Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler),
+		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(ssa.LanguageConfigIsBinding),
 	}
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
-	fb.SetLanguageConfig(
-		ssa.LanguageConfigIsBinding,
-	)
 	container := fb.EmitEmptyContainer()
 	fb.GetProgram().GlobalScope = container
 }

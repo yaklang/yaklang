@@ -20,12 +20,8 @@ var Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler),
+		PreHandlerInit: ssa.NewPreHandlerInit(),
 	}
-}
-
-func initHandler(fb *ssa.FunctionBuilder) {
-	fb.SetLanguageConfig()
 }
 
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {

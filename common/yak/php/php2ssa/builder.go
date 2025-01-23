@@ -32,17 +32,16 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 }
 func (s *SSABuild) Create() ssa.Builder {
 	return &SSABuild{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler),
+		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
+			ssa.LanguageConfigIsBinding,
+			ssa.LanguageConfigTryBuildValue,
+			ssa.LanguageConfigIsSupportClass,
+			ssa.LanguageConfigIsSupportClassStaticModifier,
+		),
 	}
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
-	fb.SetLanguageConfig(
-		ssa.LanguageConfigIsBinding,
-		ssa.LanguageConfigTryBuildValue,
-		ssa.LanguageConfigIsSupportClass,
-		ssa.LanguageConfigIsSupportClassStaticModifier,
-	)
 	fb.SetEmptyRange()
 	container := fb.EmitEmptyContainer()
 	fb.AssignVariable(fb.CreateVariable("global-container"), container)
