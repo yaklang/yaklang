@@ -834,6 +834,7 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 	stats.PacketsReceived.Increment()
 
 	if !e.isEnabled() {
+		log.Infof("IPv4 endpoint is disabled, dropping packet")
 		stats.DisabledPacketsReceived.Increment()
 		return
 	}
@@ -865,6 +866,7 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 		if e.protocol.stack.HandleLocal() {
 			addressEndpoint := e.AcquireAssignedAddress(header.IPv4(pkt.NetworkHeader().Slice()).SourceAddress(), e.nic.Promiscuous(), stack.CanBePrimaryEndpoint, true /* readOnly */)
 			if addressEndpoint != nil {
+				log.Infof("invalid source adress received dropped addressEndpoint: %v", addressEndpoint)
 				// The source address is one of our own, so we never should have gotten
 				// a packet like this unless HandleLocal is false or our NIC is the
 				// loopback interface.
@@ -877,6 +879,7 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 		inNicName := e.protocol.stack.FindNICNameFromID(e.nic.ID())
 		if ok := e.protocol.stack.IPTables().CheckPrerouting(pkt, e, inNicName); !ok {
 			// iptables is telling us to drop the packet.
+			log.Infof("iptables is telling us to drop the packet. nicName: %v", e.nic.Name())
 			stats.IPTablesPreroutingDropped.Increment()
 			return
 		}
@@ -1166,6 +1169,10 @@ func (e *endpoint) handleValidatedPacket(h header.IPv4, pkt *stack.PacketBuffer,
 			stats.ip.InvalidDestinationAddressesReceived.Increment()
 		}
 		return
+		// } else if dstAddr == header.IPv4Broadcast {
+		// 	log.Infof("handleValidatedPacket Broadcast, srcAddr: %v, dstAddr: %v", srcAddr, dstAddr)
+		// 	e.deliverPacketLocally(h, pkt, inNICName)
+		// 	return
 	}
 
 	// Before we do any processing, check if the packet was received as some
@@ -1176,8 +1183,12 @@ func (e *endpoint) handleValidatedPacket(h header.IPv4, pkt *stack.PacketBuffer,
 	if addressEndpoint := e.AcquireAssignedAddress(dstAddr, e.nic.Promiscuous(), stack.CanBePrimaryEndpoint, true /* readOnly */); addressEndpoint != nil {
 		subnet := addressEndpoint.AddressWithPrefix().Subnet()
 		pkt.NetworkPacketInfo.LocalAddressBroadcast = subnet.IsBroadcast(dstAddr) || dstAddr == header.IPv4Broadcast
+		// if pkt.NetworkPacketInfo.LocalAddressBroadcast {
+		// 	log.Infof("handleValidatedPacket, pkt.NetworkPacketInfo.LocalAddressBroadcast: %v", pkt.NetworkPacketInfo.LocalAddressBroadcast)
+		// }
 		e.deliverPacketLocally(h, pkt, inNICName)
 	} else if e.Forwarding() {
+		// log.Infof("e.Forwarding() -> e.handleForwardingError(e.forwardUnicastPacket(pkt)), srcAddr: %v, dstAddr: %v", srcAddr, dstAddr)
 		e.handleForwardingError(e.forwardUnicastPacket(pkt))
 	} else {
 		stats.ip.InvalidDestinationAddressesReceived.Increment()
@@ -1232,6 +1243,7 @@ func (e *endpoint) deliverPacketLocally(h header.IPv4, pkt *stack.PacketBuffer, 
 	// this machine and will not be forwarded.
 	if ok := e.protocol.stack.IPTables().CheckInput(pkt, inNICName); !ok {
 		// iptables is telling us to drop the packet.
+		// log.Infof("iptables is telling us to drop the packet")
 		stats.ip.IPTablesInputDropped.Increment()
 		return
 	}
@@ -1240,6 +1252,7 @@ func (e *endpoint) deliverPacketLocally(h header.IPv4, pkt *stack.PacketBuffer, 
 		if pkt.Data().Size()+len(pkt.TransportHeader().Slice()) == 0 {
 			// Drop the packet as it's marked as a fragment but has
 			// no payload.
+			// log.Infof("handleValidatedPacket, pkt.Data().Size(): %v, len(pkt.TransportHeader().Slice()): %v", pkt.Data().Size(), len(pkt.TransportHeader().Slice()))
 			stats.ip.MalformedPacketsReceived.Increment()
 			stats.ip.MalformedFragmentsReceived.Increment()
 			return
@@ -1249,6 +1262,7 @@ func (e *endpoint) deliverPacketLocally(h header.IPv4, pkt *stack.PacketBuffer, 
 			// or we could be assembling errant packets. However we do not change the
 			// options as that could lead to double processing later.
 			if _, _, optProblem := e.processIPOptions(pkt, opts, &optionUsageVerify{}); optProblem != nil {
+				// log.Infof("e.processIPOptions, optProblem: %v", optProblem)
 				if optProblem.NeedICMP {
 					_ = e.protocol.returnError(&icmpReasonParamProblem{
 						pointer: optProblem.Pointer,
@@ -1270,6 +1284,7 @@ func (e *endpoint) deliverPacketLocally(h header.IPv4, pkt *stack.PacketBuffer, 
 		if int(start)+pkt.Data().Size() > header.IPv4MaximumPayloadSize {
 			stats.ip.MalformedPacketsReceived.Increment()
 			stats.ip.MalformedFragmentsReceived.Increment()
+			// log.Infof("handleValidatedPacket, MalformedFragmentsReceived")
 			return
 		}
 
@@ -1290,11 +1305,13 @@ func (e *endpoint) deliverPacketLocally(h header.IPv4, pkt *stack.PacketBuffer, 
 			pkt,
 		)
 		if err != nil {
+			// log.Infof("e.protocol.fragmentation.Process, err: %v", err)
 			stats.ip.MalformedPacketsReceived.Increment()
 			stats.ip.MalformedFragmentsReceived.Increment()
 			return
 		}
 		if !ready {
+			// log.Infof("e.protocol.fragmentation.Process, !ready")
 			return
 		}
 		defer resPkt.DecRef()
@@ -1309,6 +1326,7 @@ func (e *endpoint) deliverPacketLocally(h header.IPv4, pkt *stack.PacketBuffer, 
 		e.protocol.parseTransport(pkt, tcpip.TransportProtocolNumber(transProtoNum))
 
 		// Now that the packet is reassembled, it can be sent to raw sockets.
+		// log.Infof("start to handle transport protocol: %v", h.TransportProtocol())
 		e.dispatcher.DeliverRawPacket(h.TransportProtocol(), pkt)
 	}
 	stats.ip.PacketsDelivered.Increment()

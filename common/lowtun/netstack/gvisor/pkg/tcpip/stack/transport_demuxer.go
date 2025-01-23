@@ -82,6 +82,23 @@ func (eps *transportEndpoints) iterEndpointsLocked(id TransportEndpointID, yield
 		}
 	}
 
+	// Try to find a match with only the local port and broadcast address.
+	if id.LocalAddress == header.IPv4Broadcast {
+		// log.Infof("localAddress: %v:%v remoteAddress: %v:%v", id.LocalAddress, id.LocalPort, id.RemoteAddress, id.RemotePort)
+		for epId, ep := range eps.endpoints {
+			if epId.LocalPort == id.LocalPort {
+				if !yield(ep) {
+					return
+				}
+			}
+		}
+	}
+	// if ep, ok := eps.endpoints[nid]; ok {
+	// 	if !yield(ep) {
+	// 		return
+	// 	}
+	// }
+
 	// Try to find a match with the id minus the local address.
 	nid := id
 
@@ -109,6 +126,7 @@ func (eps *transportEndpoints) iterEndpointsLocked(id TransportEndpointID, yield
 			return
 		}
 	}
+
 }
 
 // findAllEndpointsLocked returns all endpointsByNIC in eps that match id, in

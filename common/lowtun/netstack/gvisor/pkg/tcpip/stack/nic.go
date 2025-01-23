@@ -865,6 +865,11 @@ func (n *nic) DeliverTransportPacket(protocol tcpip.TransportProtocolNumber, pkt
 		RemotePort:    srcPort,
 		RemoteAddress: src,
 	}
+
+	// if dst == header.IPv4Broadcast {
+	// 	log.Infof("DeliverTransportPacket, id: %v", id)
+	// }
+
 	if n.stack.demux.deliverPacket(protocol, pkt, id) {
 		return TransportPacketHandled
 	}
