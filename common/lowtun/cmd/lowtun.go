@@ -119,12 +119,12 @@ func main() {
 				stack.IsSubnetBroadcast(1, ipv4.ProtocolNumber, tcpip.AddrFromSlice([]byte{255, 255, 255, 255}))
 
 				// 解析 MAC 地址
-				mac, err := net.ParseMAC("72:72:f1:d2:6f:66")
-				if err != nil {
-					log.Fatalf("Failed to parse MAC address: %v", err)
-				}
+				// mac, err := net.ParseMAC("72:72:f1:d2:6f:66")
+				// if err != nil {
+				// 	log.Fatalf("Failed to parse MAC address: %v", err)
+				// }
 
-				client := gvisorDHCP.NewClient(stack, 1, tcpip.LinkAddress(mac), 5*time.Second, 5*time.Second, 5*time.Second, func(ctx context.Context, lost, acquired tcpip.AddressWithPrefix, cfg gvisorDHCP.Config) {
+				client := gvisorDHCP.NewClient(stack, 1, 5*time.Second, 5*time.Second, 5*time.Second, func(ctx context.Context, lost, acquired tcpip.AddressWithPrefix, cfg gvisorDHCP.Config) {
 
 				})
 				log.Info("start to run gvisor dhcp client")

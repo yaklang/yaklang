@@ -20,7 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/checksum"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/packet"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/udp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/waiter"
 )
 
@@ -168,7 +168,6 @@ type Info struct {
 func NewClient(
 	s *stack.Stack,
 	nicid tcpip.NICID,
-	linkAddr tcpip.LinkAddress,
 	acquisition,
 	backoff,
 	retransmission time.Duration,
@@ -194,7 +193,6 @@ func NewClient(
 	c.stats.PacketDiscardStats.Init()
 	c.storeInfo(&Info{
 		NICID:          nicid,
-		LinkAddr:       linkAddr,
 		Acquisition:    acquisition,
 		Retransmission: retransmission,
 		Backoff:        backoff,
@@ -658,15 +656,17 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 	//
 	// This prevents us from receiving packets that arrive on interfaces different
 	// from the interface the client is performing DHCP on.
-	ep := packet.NewEndpoint(c.stack, true /* cooked */, 0 /* netProto */, &c.wq)
-	//if err != nil {
-	//	return Config{}, fmt.Errorf("packet.NewEndpoint(_, true, 0, _): %s", err)
-	//}
+	netProto := udp.NewProtocol(c.stack)
+	ep, err := netProto.NewEndpoint(header.IPv4ProtocolNumber, &c.wq)
+	if err != nil {
+		return Config{}, fmt.Errorf("udp.NewProtocol.NewEndpoint: %s", err)
+	}
 	defer ep.Close()
 
 	recvOn := tcpip.FullAddress{
 		NIC:  info.NICID,
-		Port: uint16(header.IPv4ProtocolNumber),
+		Port: ClientPort,
+		Addr: tcpip.Address(tcpip.AddrFrom4([4]byte{0, 0, 0, 0})),
 	}
 	if err := ep.Bind(recvOn); err != nil {
 		return Config{}, fmt.Errorf("ep.Bind(%+v): %s", recvOn, err)
@@ -697,10 +697,12 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 			6,  // domain name server
 		}},
 	}
+	log.Infof("DHCP : server address: %v", info.Config.ServerAddress.String())
 	requestedAddr := info.Acquired
 	if info.State == initSelecting {
 		discOpts := append(options{
 			{optDHCPMsgType, []byte{byte(dhcpDISCOVER)}},
+			// {optDHCPServer, []byte(info.Config.ServerAddress.AsSlice())},
 		}, commonOpts...)
 		if requestedAddr.Address.Len() != 0 {
 			discOpts = append(discOpts, option{optReqIPAddr, []byte(requestedAddr.Address.AsSlice())})
@@ -714,7 +716,7 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 				info,
 				discOpts,
 				writeTo,
-				false, /* broadcast */
+				true,  /* broadcast */
 				false, /* ciaddr */
 			); err != nil {
 				c.stats.SendDiscoverErrors.Increment()
@@ -810,7 +812,7 @@ retransmitRequest:
 			info,
 			reqOpts,
 			writeTo,
-			false,                       /* broadcast */
+			true,                        /* broadcast */
 			info.State != initSelecting, /* ciaddr */
 		); err != nil {
 			c.stats.SendRequestErrors.Increment()
@@ -892,7 +894,13 @@ retransmitRequest:
 
 				// Now that we've successfully acquired the address, update the client state.
 				info.Acquired = requestedAddr
-				log.Infof(tag, "%s: got %s from %s with leaseLength=%s", nicName, result.typ, result.source, cfg.LeaseLength)
+				log.Infof(tag+" "+
+					"%s: got %s from %s with leaseLength=%s",
+					nicName,
+					result.typ,
+					result.source,
+					cfg.LeaseLength,
+				)
 				return cfg, nil
 			case dhcpNAK:
 				c.stats.RecvNaks.Increment()
@@ -997,34 +1005,34 @@ func (c *Client) send(
 	})
 	ip.SetChecksum(^ip.CalculateChecksum())
 
-	var linkAddress tcpip.LinkAddress
-	{
-		ch := make(chan stack.LinkResolutionResult, 1)
-		err := c.stack.GetLinkAddress(info.NICID, writeTo.Addr, info.Assigned.Address, header.IPv4ProtocolNumber, func(result stack.LinkResolutionResult) {
-			ch <- result
-		})
-		switch err.(type) {
-		case nil:
-			result := <-ch
-			linkAddress = result.LinkAddress
-			err = result.Err
-		case *tcpip.ErrWouldBlock:
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("client address resolution: %w", ctx.Err())
-			case result := <-ch:
-				linkAddress = result.LinkAddress
-				err = result.Err
-			}
-		}
-		if err != nil {
-			return fmt.Errorf("failed to resolve link address: %s", err)
-		}
-	}
+	// var linkAddress tcpip.LinkAddress
+	// {
+	// 	ch := make(chan stack.LinkResolutionResult, 1)
+	// 	err := c.stack.GetLinkAddress(info.NICID, writeTo.Addr, info.Assigned.Address, header.IPv4ProtocolNumber, func(result stack.LinkResolutionResult) {
+	// 		ch <- result
+	// 	})
+	// 	switch err.(type) {
+	// 	case nil:
+	// 		result := <-ch
+	// 		linkAddress = result.LinkAddress
+	// 		err = result.Err
+	// 	case *tcpip.ErrWouldBlock:
+	// 		select {
+	// 		case <-ctx.Done():
+	// 			return fmt.Errorf("client address resolution: %w", ctx.Err())
+	// 		case result := <-ch:
+	// 			linkAddress = result.LinkAddress
+	// 			err = result.Err
+	// 		}
+	// 	}
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to resolve link address: %s", err)
+	// 	}
+	// }
 
 	if err := c.stack.WritePacketToRemote(
 		writeTo.NIC,
-		linkAddress,
+		"",
 		header.IPv4ProtocolNumber,
 		bufferv2.MakeWithData(bytes),
 	); err != nil {
@@ -1055,7 +1063,7 @@ func (c *Client) recv(
 			NeedRemoteAddr:     true,
 			NeedLinkPacketInfo: true,
 		})
-		senderAddr := tcpip.LinkAddress(res.RemoteAddr.Addr.AsSlice())
+		// senderAddr := tcpip.LinkAddress(res.RemoteAddr.Addr.AsSlice())
 		if _, ok := err.(*tcpip.ErrWouldBlock); ok {
 			select {
 			case <-read:
@@ -1070,116 +1078,118 @@ func (c *Client) recv(
 			return recvResult{}, false, fmt.Errorf("read: %s", err)
 		}
 
-		if res.LinkPacketInfo.Protocol != header.IPv4ProtocolNumber {
-			panic(fmt.Sprintf("received packet with non-IPv4 network protocol number: %d", header.IPv4ProtocolNumber))
-		}
+		// if res.LinkPacketInfo.Protocol != header.IPv4ProtocolNumber {
+		// 	panic(fmt.Sprintf("received packet with non-IPv4 network protocol number: %d", header.IPv4ProtocolNumber))
+		// }
+		// log.Infof("recv result: %+v", res)
 
-		switch res.LinkPacketInfo.PktType {
-		case tcpip.PacketHost, tcpip.PacketBroadcast:
-		default:
-			c.stats.PacketDiscardStats.InvalidPacketType.Increment(uint64(res.LinkPacketInfo.PktType))
-			//_ = syslog.DebugTf(
-			//	tag,
-			//		"PacketDiscardStats.InvalidPacketType[%d]++",
-			//		res.LinkPacketInfo.PktType,
-			//)
-			continue
-		}
+		// switch res.LinkPacketInfo.PktType {
+		// case tcpip.PacketHost, tcpip.PacketBroadcast:
+		// default:
+		// 	c.stats.PacketDiscardStats.InvalidPacketType.Increment(uint64(res.LinkPacketInfo.PktType))
+		// 	//_ = syslog.DebugTf(
+		// 	//	tag,
+		// 	//		"PacketDiscardStats.InvalidPacketType[%d]++",
+		// 	//		res.LinkPacketInfo.PktType,
+		// 	//)
+		// 	continue
+		// }
 
 		v := b.Bytes()
-		ip := header.IPv4(v)
-		if !ip.IsValid(len(v)) {
-			//_ = syslog.WarnTf(
-			//	tag,
-			//	"%s: received malformed IP frame from %s; discarding %d bytes",
-			//	nicName,
-			//	senderAddr,
-			//	len(v),
-			//)
-			continue
-		}
-		if !ip.IsChecksumValid() {
-			//_ = syslog.WarnTf(
-			//	tag,
-			//	"%s: received damaged IP frame from %s; discarding %d bytes",
-			//	nicName,
-			//	senderAddr,
-			//	len(v),
-			//)
-			continue
-		}
-		if ip.More() || ip.FragmentOffset() != 0 {
-			//_ = syslog.WarnTf(
-			//	tag,
-			//	"%s: received fragmented IP frame from %s; discarding %d bytes",
-			//	nicName,
-			//	senderAddr,
-			//	len(v),
-			//)
-			continue
-		}
-		if ip.TransportProtocol() != header.UDPProtocolNumber {
-			c.stats.PacketDiscardStats.InvalidTransProto.Increment(uint64(ip.TransportProtocol()))
-			//_ = syslog.DebugTf(
-			//	tag,
-			//	"PacketDiscardStats.InvalidTransProto[%d]++",
-			//	ip.TransportProtocol(),
-			//)
-			continue
-		}
-		udp := header.UDP(ip.Payload())
-		if len(udp) < header.UDPMinimumSize {
-			//_ = syslog.WarnTf(
-			//	tag,
-			//		"%s: discarding malformed UDP frame (%s@%s -> %s) with length (%d) < minimum UDP size (%d)",
-			//		nicName,
-			//		ip.SourceAddress(),
-			//		senderAddr,
-			//		ip.DestinationAddress(),
-			//		len(udp),
-			//		header.UDPMinimumSize,
-			//)
-			continue
-		}
-		if udp.DestinationPort() != ClientPort {
-			c.stats.PacketDiscardStats.InvalidPort.Increment(uint64(udp.DestinationPort()))
-			////_ = syslog.DebugTf(
-			//	tag,
-			//	"PacketDiscardStats.InvalidPort[%d]++",
-			//	udp.DestinationPort(),
-			//)
-			continue
-		}
-		if udp.Length() > uint16(len(udp)) {
-			//_ = syslog.WarnTf(
-			//	tag,
-			//	"%s: discarding malformed UDP frame (%s@%s -> %s) with length (%d) < the header-specified length (%d)",
-			//	nicName,
-			//	ip.SourceAddress(),
-			//	senderAddr,
-			//	ip.DestinationAddress(),
-			//	len(udp),
-			//	udp.Length(),
-			//)
-			continue
-		}
-		payload := udp.Payload()
-		if xsum := udp.Checksum(); xsum != 0 {
-			if !udp.IsChecksumValid(ip.SourceAddress(), ip.DestinationAddress(), checksum.Checksum(payload, 0)) {
-				//_ = syslog.WarnTf(
-				//	tag,
-				//	"%s: received damaged UDP frame (%s@%s -> %s); discarding %d bytes",
-				//	nicName,
-				//	ip.SourceAddress(),
-				//	senderAddr,
-				//	ip.DestinationAddress(),
-				//	len(udp),
-				//)
-				continue
-			}
-		}
+		// spew.Dump(v)
+		// ip := header.IPv4(v)
+		// if !ip.IsValid(len(v)) {
+		// 	//_ = syslog.WarnTf(
+		// 	//	tag,
+		// 	//	"%s: received malformed IP frame from %s; discarding %d bytes",
+		// 	//	nicName,
+		// 	//	senderAddr,
+		// 	//	len(v),
+		// 	//)
+		// 	continue
+		// }
+		// if !ip.IsChecksumValid() {
+		// 	//_ = syslog.WarnTf(
+		// 	//	tag,
+		// 	//	"%s: received damaged IP frame from %s; discarding %d bytes",
+		// 	//	nicName,
+		// 	//	senderAddr,
+		// 	//	len(v),
+		// 	//)
+		// 	continue
+		// }
+		// if ip.More() || ip.FragmentOffset() != 0 {
+		// 	//_ = syslog.WarnTf(
+		// 	//	tag,
+		// 	//	"%s: received fragmented IP frame from %s; discarding %d bytes",
+		// 	//	nicName,
+		// 	//	senderAddr,
+		// 	//	len(v),
+		// 	//)
+		// 	continue
+		// }
+		// if ip.TransportProtocol() != header.UDPProtocolNumber {
+		// 	c.stats.PacketDiscardStats.InvalidTransProto.Increment(uint64(ip.TransportProtocol()))
+		// 	//_ = syslog.DebugTf(
+		// 	//	tag,
+		// 	//	"PacketDiscardStats.InvalidTransProto[%d]++",
+		// 	//	ip.TransportProtocol(),
+		// 	//)
+		// 	continue
+		// }
+		// udp := header.UDP(ip.Payload())
+		// if len(udp) < header.UDPMinimumSize {
+		// 	//_ = syslog.WarnTf(
+		// 	//	tag,
+		// 	//		"%s: discarding malformed UDP frame (%s@%s -> %s) with length (%d) < minimum UDP size (%d)",
+		// 	//		nicName,
+		// 	//		ip.SourceAddress(),
+		// 	//		senderAddr,
+		// 	//		ip.DestinationAddress(),
+		// 	//		len(udp),
+		// 	//		header.UDPMinimumSize,
+		// 	//)
+		// 	continue
+		// }
+		// if udp.DestinationPort() != ClientPort {
+		// 	c.stats.PacketDiscardStats.InvalidPort.Increment(uint64(udp.DestinationPort()))
+		// 	////_ = syslog.DebugTf(
+		// 	//	tag,
+		// 	//	"PacketDiscardStats.InvalidPort[%d]++",
+		// 	//	udp.DestinationPort(),
+		// 	//)
+		// 	continue
+		// }
+		// if udp.Length() > uint16(len(udp)) {
+		// 	//_ = syslog.WarnTf(
+		// 	//	tag,
+		// 	//	"%s: discarding malformed UDP frame (%s@%s -> %s) with length (%d) < the header-specified length (%d)",
+		// 	//	nicName,
+		// 	//	ip.SourceAddress(),
+		// 	//	senderAddr,
+		// 	//	ip.DestinationAddress(),
+		// 	//	len(udp),
+		// 	//	udp.Length(),
+		// 	//)
+		// 	continue
+		// }
+		// payload := udp.Payload()
+		// if xsum := udp.Checksum(); xsum != 0 {
+		// 	if !udp.IsChecksumValid(ip.SourceAddress(), ip.DestinationAddress(), checksum.Checksum(payload, 0)) {
+		// 		//_ = syslog.WarnTf(
+		// 		//	tag,
+		// 		//	"%s: received damaged UDP frame (%s@%s -> %s); discarding %d bytes",
+		// 		//	nicName,
+		// 		//	ip.SourceAddress(),
+		// 		//	senderAddr,
+		// 		//	ip.DestinationAddress(),
+		// 		//	len(udp),
+		// 		//)
+		// 		continue
+		// 	}
+		// }
 
-		h := hdr(payload)
+		h := hdr(v)
 		if !h.isValid() {
 			return recvResult{}, false, fmt.Errorf("invalid hdr: %x", h)
 		}
@@ -1189,17 +1199,6 @@ func (c *Client) recv(
 		}
 
 		if !bytes.Equal(h.xidbytes(), c.xid[:]) {
-			log.Infof(
-				tag+" "+
-					"%s: received UDP frame (%s@%s -> %s) whose xid (%x) != the client's xid (%x); discarding %d bytes",
-				nicName,
-				ip.SourceAddress(),
-				senderAddr,
-				ip.DestinationAddress(),
-				h.xidbytes(),
-				c.xid[:],
-				len(udp),
-			)
 			continue
 		}
 
@@ -1215,7 +1214,7 @@ func (c *Client) recv(
 			}
 
 			return recvResult{
-				source:  ip.SourceAddress(),
+				source:  res.RemoteAddr.Addr,
 				yiaddr:  tcpip.AddrFromSlice(h.yiaddr()),
 				options: opts,
 				typ:     typ,
