@@ -144,9 +144,36 @@ const (
 	NativeCall_Java_UnEscape_Output = "javaUnescapeOutput"
 
 	NativeCall_Foeach_Func_Inst = "foreach_function_inst"
+
+	NativeCall_GetUsers = "getUsers"
+
+	NativeCall_GetActualParams = "getActualParams"
 )
 
 func init() {
+	registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		result, err := v.GetAllCallActualParams()
+		if err != nil {
+			return false, nil, err
+		}
+		return true, result, nil
+	}), nc_desc("获取实际参数"))
+	registerNativeCall(NativeCall_GetUsers, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				result = append(result, ret.GetUsers())
+			case *Values:
+				result = append(result, ret.GetUsers())
+			}
+			return nil
+		})
+		if len(result) > 0 {
+			return true, sfvm.NewValues(result), nil
+		}
+		return false, nil, nil
+	}), nc_desc("获取值的Users"))
 	//<foreach_function_inst(hook=`xxx` as $result)> as $result
 	registerNativeCall(NativeCall_Foeach_Func_Inst, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
@@ -445,11 +472,20 @@ func init() {
 	registerNativeCall(NativeCall_OpCodes, nc_func(nativeCallOpCodes))
 	registerNativeCall(NativeCall_Slice, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		start := params.GetInt(0, "start")
+		index := params.GetInt(0, "index")
+
+		if index == -1 && start == -1 {
+			return false, nil, utils.Errorf("start or index is required")
+		}
 		idx := 0
 		var vals []sfvm.ValueOperator
 		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
-			if idx >= start {
+			if idx >= start && start != -1 {
 				vals = append(vals, operator)
+			}
+			if idx == index && index != -1 {
+				vals = append(vals, operator)
+				return utils.Error("abort")
 			}
 			idx++
 			return nil
@@ -536,16 +572,19 @@ func init() {
 		NativeCall_TypeName,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
-			v.Recursive(func(operator sfvm.ValueOperator) error {
+			err := v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
 					return nil
 				}
-				t := val.GetType()
-				fts := t.t.GetFullTypeNames()
+				typ := val.GetType()
+				if typ == nil || typ.t == nil {
+					return utils.Errorf("native call type name failed: the value have %s no type", val.String())
+				}
+				fts := typ.t.GetFullTypeNames()
 				var results []string
 				if len(fts) == 0 {
-					results = append(results, t.String())
+					results = append(results, typ.String())
 				} else {
 					for _, ft := range fts {
 						//remove versioin name
@@ -572,6 +611,9 @@ func init() {
 				}
 				return nil
 			})
+			if err != nil {
+				return false, nil, err
+			}
 			if len(vals) > 0 {
 				return true, sfvm.NewValues(vals), nil
 			}
@@ -587,15 +629,18 @@ func init() {
 		NativeCall_FullTypeName,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
-			v.Recursive(func(operator sfvm.ValueOperator) error {
+			err := v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
 					return nil
 				}
-				t := val.GetType()
-				fts := t.t.GetFullTypeNames()
+				typ := val.GetType()
+				if typ == nil || typ.t == nil {
+					return utils.Errorf("native call type name failed: the value have %s no type", val.String())
+				}
+				fts := typ.t.GetFullTypeNames()
 				if len(fts) == 0 {
-					results := val.NewValue(ssa.NewConst(t.String()))
+					results := val.NewValue(ssa.NewConst(typ.String()))
 					vals = append(vals, results)
 				} else {
 					for _, ft := range fts {
@@ -608,6 +653,9 @@ func init() {
 
 				return nil
 			})
+			if err != nil {
+				return false, nil, err
+			}
 			if len(vals) > 0 {
 				return true, sfvm.NewValues(vals), nil
 			}
