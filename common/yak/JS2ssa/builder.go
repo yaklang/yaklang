@@ -21,14 +21,8 @@ var Builder ssa.Builder = &SSABuild{}
 
 func (s *SSABuild) Create() ssa.Builder {
 	return &SSABuild{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler),
+		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(ssa.LanguageConfigIsBinding),
 	}
-}
-
-func initHandler(fb *ssa.FunctionBuilder) {
-	fb.SetLanguageConfig(
-		ssa.LanguageConfigIsBinding,
-	)
 }
 
 func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
