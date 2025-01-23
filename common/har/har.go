@@ -14,9 +14,10 @@ type Log struct {
 }
 
 type Entries struct {
-	Entries              []*HAREntry
-	entriesChannel       <-chan *HAREntry // use this first if exist
-	marshalEntryCallback func(*HAREntry)
+	Entries                []*HAREntry
+	entriesChannel         <-chan *HAREntry // use this first if exist
+	marshalEntryCallback   func(*HAREntry)
+	unmarshalEntryCallback func(*HAREntry) error
 }
 
 func (e *Entries) SetEntriesChannel(ch <-chan *HAREntry) {
