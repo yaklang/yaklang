@@ -224,7 +224,7 @@ func (c *Client) Stats() *Stats {
 // The function periodically searches for a new IP address.
 func (c *Client) Run(ctx context.Context) (rtn tcpip.AddressWithPrefix) {
 	info := c.Info()
-	log.Infof(tag+" Starting DHCP client with info: %v", info)
+	//log.Infof(tag+" Starting DHCP client with info: %v", info)
 
 	nicName := c.stack.FindNICNameFromID(info.NICID)
 	log.Infof(tag+" Found NIC name: %s for ID: %d", nicName, info.NICID)

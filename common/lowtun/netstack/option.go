@@ -2,7 +2,11 @@ package netstack
 
 import (
 	"fmt"
+	"net"
 	"net/netip"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/arp"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
@@ -15,11 +19,12 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func NewDefaultStack(networkIfaceIP string, networkIfaceGateway string, endpoint stack.LinkEndpoint, opts ...Option) (*stack.Stack, error) {
+func NewDefaultStack(ipAddr string, macAddress string, networkIfaceGateway string, endpoint stack.LinkEndpoint, opts ...Option) (*stack.Stack, error) {
 	s := stack.New(stack.Options{
 		NetworkProtocols: []stack.NetworkProtocolFactory{
 			ipv4.NewProtocol,
 			ipv6.NewProtocol,
+			arp.NewProtocol,
 		},
 		TransportProtocols: []stack.TransportProtocolFactory{
 			tcp.NewProtocol,
@@ -66,8 +71,8 @@ func NewDefaultStack(networkIfaceIP string, networkIfaceGateway string, endpoint
 		WithMulticastGroups(nic, nil),
 	)
 
-	if networkIfaceIP != "" {
-		opts = append(opts, WithMainNICIP(nic, netip.MustParseAddr(networkIfaceIP)))
+	if ipAddr != "" {
+		opts = append(opts, WithMainNICIP(nic, tcpip.AddrFromSlice(netip.MustParseAddr(ipAddr).AsSlice()), net.HardwareAddr{}))
 	}
 
 	if networkIfaceGateway != "" {
@@ -440,13 +445,19 @@ func WithRouteTable(nicID tcpip.NICID) Option {
 	}
 }
 
-func WithMainNICIP(nicID tcpip.NICID, ip netip.Addr) Option {
+func WithMainNICIP(nicID tcpip.NICID, ip tcpip.Address, mac net.HardwareAddr) Option {
 	return func(s *stack.Stack) error {
 		s.AddProtocolAddress(nicID, tcpip.ProtocolAddress{
-			Protocol:          header.IPv4ProtocolNumber,
-			AddressWithPrefix: tcpip.AddrFromSlice(ip.AsSlice()).WithPrefix(),
+			Protocol: header.IPv4ProtocolNumber,
+			AddressWithPrefix: tcpip.AddressWithPrefix{
+				Address:   tcpip.AddrFromSlice(ip.AsSlice()),
+				PrefixLen: 24,
+			},
 		}, stack.AddressProperties{})
-		s.SetNICAddress(nicID, tcpip.LinkAddress(ip.String()))
+		tcpErr := s.SetNICAddress(nicID, tcpip.LinkAddress(mac))
+		if tcpErr != nil {
+			log.Errorf("set nic address failed: %v", tcpErr)
+		}
 		return nil
 	}
 }
