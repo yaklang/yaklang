@@ -2,6 +2,7 @@ package rwendpoint
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"net"
 	"net/netip"
 	"sync"
@@ -277,6 +278,8 @@ func (p *PcapReadWriteCloser) Write(packet []byte) (n int, err error) {
 	p.writeMutex.Lock()
 	defer p.writeMutex.Unlock()
 
+	origin := packet
+
 	if len(packet) > p.mtu {
 		// Truncate packet to MTU size
 		packet = packet[:p.mtu]
@@ -323,34 +326,39 @@ func (p *PcapReadWriteCloser) Write(packet []byte) (n int, err error) {
 					}
 				}
 			}
+		}
+		// Create ethernet header
+		eth := &layers.Ethernet{
+			SrcMAC:       p.deviceHardwareAddr,
+			DstMAC:       p.gatewayHardwareAddr,
+			EthernetType: layers.EthernetTypeIPv4,
+		}
+		if len(origin) == 28 {
+			eth.EthernetType = layers.EthernetTypeARP
+		}
+		if version == 6 {
+			eth.EthernetType = layers.EthernetTypeIPv6
+		}
 
-			// Create ethernet header
-			eth := &layers.Ethernet{
-				SrcMAC:       p.deviceHardwareAddr,
-				DstMAC:       p.gatewayHardwareAddr,
-				EthernetType: layers.EthernetTypeIPv4,
-			}
-			if version == 6 {
-				eth.EthernetType = layers.EthernetTypeIPv6
-			}
-
-			// Serialize ethernet header
-			buf := gopacket.NewSerializeBuffer()
-			opts := gopacket.SerializeOptions{}
-			err := gopacket.SerializeLayers(buf, opts,
-				eth,
-				gopacket.Payload(packet),
-			)
-			if err != nil {
-				return 0, err
-			}
-			packet = buf.Bytes()
+		// Serialize ethernet header
+		buf := gopacket.NewSerializeBuffer()
+		opts := gopacket.SerializeOptions{}
+		err := gopacket.SerializeLayers(buf, opts,
+			eth,
+			gopacket.Payload(packet),
+		)
+		if err != nil {
+			return 0, err
+		}
+		packet = buf.Bytes()
+		if len(origin) == 28 {
+			spew.Dump(packet)
 		}
 		err = p.handle.WritePacketData(packet)
 		if err != nil {
 			return 0, err
 		}
-		return len(packet), nil
+		return len(origin), nil
 	}
 	return 0, fmt.Errorf("unsupported packet type")
 }
