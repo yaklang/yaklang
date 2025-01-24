@@ -4,9 +4,7 @@ package ssa
 func ToNode(a any) (Node, bool) { u, ok := a.(Node); return u, ok }
 func ToValue(n Instruction) (Value, bool) {
 	if lz, isLZ := ToLazyInstruction(n); isLZ {
-		if _, ok := ToValue(lz.Self()); ok {
-			return lz, true
-		}
+		return ToValue(lz.Self())
 	}
 	v, ok := n.(Value)
 	return v, ok

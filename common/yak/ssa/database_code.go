@@ -127,6 +127,10 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 			log.Errorf("BUG: set CurrentBlock[%d]: %v", ir.CurrentBlock, err)
 		}
 	}
+	editor, start, end, err := ir.GetStartAndEndPositions()
+	if err == nil {
+		inst.SetRange(editor.GetRangeByPosition(start, end))
+	}
 
 	inst.SetExtern(ir.IsExternal)
 }
