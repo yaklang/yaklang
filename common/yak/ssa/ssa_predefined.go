@@ -340,11 +340,8 @@ func (n *anValue) ForEachMember(fn func(Value, Value) bool) {
 func (n *anValue) String() string { return "" }
 
 // has/get user and value
-func (n *anValue) HasUsers() bool { return len(n.userList) != 0 }
-func (n *anValue) GetUsers() Users {
-	n.RefreshToCache(n.userList)
-	return n.userList
-}
+func (n *anValue) HasUsers() bool  { return len(n.userList) != 0 }
+func (n *anValue) GetUsers() Users { return n.userList }
 
 // for Value
 func (n *anValue) AddUser(u User) {
@@ -486,9 +483,16 @@ func (i *anValue) FlatOccultation() []Value {
 	return ret
 }
 
+func (i anValue) HasValues() bool   { return false }
+func (i anValue) GetValues() Values { return nil }
+
 // TODO: use this for point in struct, like user/value
 // in next pr i will remove this and user/value just save ID not point
-func (i anValue) RefreshToCache(item any) {
+func (i *anValue) RefreshToCache(item any) {
+	RefreshToCache(i, item)
+}
+
+func RefreshToCache(i Value, item any) {
 	if i.GetProgram() == nil || i.GetProgram().Cache == nil {
 		return
 	}

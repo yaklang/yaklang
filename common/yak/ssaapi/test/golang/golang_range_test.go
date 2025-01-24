@@ -8,8 +8,20 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"gotest.tools/v3/assert"
 )
+
+func check[T ssa.Instruction](t *testing.T, gots ssaapi.Values, want []string, Cover func(ssa.Instruction) (T, bool)) {
+	gotString := make([]string, 0, len(gots))
+	for _, got := range gots {
+		t, ok := Cover(got.GetSSAValue())
+		if ok {
+			gotString = append(gotString, t.GetRange().String())
+		}
+	}
+	slices.Sort(want)
+	slices.Sort(gotString)
+	require.Equal(t, want, gotString)
+}
 
 func TestRange_normol(t *testing.T) {
 	code := `package main
@@ -37,17 +49,7 @@ func TestRange_normol(t *testing.T) {
 			"4:10 - 4:14: true",
 			"8:10 - 8:15: false",
 		}
-		got := []string{}
-		for _, target := range targets {
-			ca, ok := ssa.ToConst(target.GetSSAValue())
-			if !ok {
-				continue
-			}
-			got = append(got, ca.GetRange().String())
-		}
-		slices.Sort(want)
-		slices.Sort(got)
-		require.Equal(t, want, got)
+		check(t, targets, want, ssa.ToConst)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.GO))
 
@@ -71,31 +73,27 @@ func main(){
 	println(b)
 }
 `
-	ssatest.CheckWithName("funtion-range", t, code, func(prog *ssaapi.Program) error {
-		target := prog.SyntaxFlow("test as $target1").GetValues("target1")
-		target2 := prog.SyntaxFlow("test2 as $target2").GetValues("target2")
-		a := target[0].GetSSAValue()
-		b := target2[0].GetSSAValue()
-		if ca, ok := ssa.ToFunction(a); ok {
-			ra := ca.GetRange()
-			assert.Equal(t, 3, ra.GetStart().GetLine())
-			assert.Equal(t, 1, ra.GetStart().GetColumn())
-			assert.Equal(t, 5, ra.GetEnd().GetLine())
-			assert.Equal(t, 2, ra.GetEnd().GetColumn())
-		}
-		if cb, ok := ssa.ToFunction(b); ok {
-			rb := cb.GetRange()
-			assert.Equal(t, 7, rb.GetStart().GetLine())
-			assert.Equal(t, 1, rb.GetStart().GetColumn())
-			assert.Equal(t, 9, rb.GetEnd().GetLine())
-			assert.Equal(t, 2, rb.GetEnd().GetColumn())
-		}
 
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	t.Run("check target1 ", func(t *testing.T) {
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			target := prog.SyntaxFlow("test as $target1").GetValues("target1")
+			check(t, target, []string{
+				"3:1 - 5:2: func test() bool{\n\treturn true\n}",
+			}, ssa.ToFunction)
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
 
+	t.Run("check target2 ", func(t *testing.T) {
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			target2 := prog.SyntaxFlow("test2 as $target2").GetValues("target2")
+			check(t, target2, []string{
+				"7:1 - 9:2: func test2() bool{\n\treturn false\n}",
+			}, ssa.ToFunction)
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
 }
-
 func TestRange_import(t *testing.T) {
 	code := `package test
 
@@ -136,26 +134,19 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 `
-	ssatest.CheckWithName("import-range", t, code, func(prog *ssaapi.Program) error {
-		ent := prog.SyntaxFlow("ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $target;").GetValues("target")
-		fmt := prog.SyntaxFlow("fmt?{<fullTypeName>?{have: 'fmt'}} as $target;").GetValues("target")
-		a := ent[0].GetSSAValue()
-		b := fmt[0].GetSSAValue()
-		if ca, ok := ssa.ToExternLib(a); ok {
-			ra := ca.GetRange()
-			assert.Equal(t, 9, ra.GetStart().GetLine())
-			assert.Equal(t, 2, ra.GetStart().GetColumn())
-			assert.Equal(t, 9, ra.GetEnd().GetLine())
-			assert.Equal(t, 16, ra.GetEnd().GetColumn())
-		}
-		if cb, ok := ssa.ToExternLib(b); ok {
-			rb := cb.GetRange()
-			assert.Equal(t, 5, rb.GetStart().GetLine())
-			assert.Equal(t, 2, rb.GetStart().GetColumn())
-			assert.Equal(t, 5, rb.GetEnd().GetLine())
-			assert.Equal(t, 7, rb.GetEnd().GetColumn())
-		}
 
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	t.Run("test ent", func(t *testing.T) {
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			ent := prog.SyntaxFlow("ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $target;").GetValues("target")
+			check(t, ent, []string{"9:2 - 9:16: \"entgo.io/ent\""}, ssa.ToExternLib)
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+	t.Run("test ent", func(t *testing.T) {
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			fmt := prog.SyntaxFlow("fmt?{<fullTypeName>?{have: 'fmt'}} as $target;").GetValues("target")
+			check(t, fmt, []string{"5:2 - 5:7: \"fmt\""}, ssa.ToExternLib)
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
 }
