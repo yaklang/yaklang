@@ -18,7 +18,7 @@ import (
 
 var (
 	//go:embed templates/**
-	templateFS embed.FS
+	TemplateFS embed.FS
 
 	LangToTemplateMap     = make(map[string][]string)
 	TemplateToFilenameMap = make(map[string]string)
@@ -26,13 +26,13 @@ var (
 )
 
 func init() {
-	entries, _ := templateFS.ReadDir("templates")
+	entries, _ := TemplateFS.ReadDir("templates")
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		_, lang := path.Split(entry.Name())
-		templateEntries, err := templateFS.ReadDir(path.Join("templates", lang))
+		templateEntries, err := TemplateFS.ReadDir(path.Join("templates", lang))
 		if err == nil {
 			LangToTemplateMap[lang] = lo.FilterMap(templateEntries, func(entry fs.DirEntry, _ int) (string, bool) {
 				if entry.IsDir() {
@@ -162,7 +162,7 @@ func (s *SyntaxFlowWebServer) registerTemplateRoute() {
 			writeErrorJson(w, NewInvalidTemplateError(fullID))
 			return
 		}
-		content, err := templateFS.ReadFile(path.Join("templates", lang, filename))
+		content, err := TemplateFS.ReadFile(path.Join("templates", lang, filename))
 		if err != nil {
 			writeErrorJson(w, utils.JoinErrors(err, NewReadFileError()))
 			return
