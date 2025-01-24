@@ -136,6 +136,7 @@ jobs:
               go test -timeout 30s ./common/yak/antlr4go/...
 
           - name: Test SyntaxFlow Web Server
+            run:  |
               go test -timeout 20s ./common/sfweb/...
 
           - name: Test lowhttp / DNSX
