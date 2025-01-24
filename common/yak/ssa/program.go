@@ -62,6 +62,7 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 	programPath, _, _ := strings.Cut(fullPath, endPath)
 	subProg := NewProgram(name, prog.EnableDatabase, kind, fs, programPath)
 	subProg.Application = prog.Application
+	subProg.config = prog.config
 
 	subProg.Loader.AddIncludePath(prog.Loader.GetIncludeFiles()...)
 	subProg.Language = prog.Language

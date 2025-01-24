@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"fmt"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -290,6 +289,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return Values{}
 			}
 			var actualParam ssa.Value
+			if inst.MemberCallKind == ssa.MoreParameterMember {
+				value, exist := calledInstance.MarkParameterMember[inst.GetVerboseName()]
+				if !exist {
+					log.Errorf("not found this parameterMember")
+					return Values{}
+				}
+				return i.NewTopDefValue(value).getTopDefs(actx, opt...)
+			}
 			if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
 				return getParameter()
 			}
@@ -336,15 +343,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if len(isInners) > 0 {
 				isInner = isInners[0]
 			}
-
 			calledInstance, ok := ssa.ToCall(called.node)
 			if !ok {
 				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
 			}
 
+			_, isParameterMember := ssa.ToParameterMember(calledInstance.Method)
+			_, isParameter := ssa.ToParameter(calledInstance.Method)
 			thisFunc := i.GetFunction()
-			if !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) {
+			if !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) && !(isParameterMember || isParameter) {
 				log.Errorf("call stack function %s(%d) not same with Parameter function %s(%d)",
 					calledInstance.Method.GetName(), calledInstance.Method.GetId(),
 					thisFunc.GetName(), thisFunc.GetId(),

@@ -15,6 +15,9 @@ func (b *FunctionBuilder) SetLanguageConfig(opt ...languageConfigOpt) {
 func LanguageConfigIsBinding(config *LanguageConfig) {
 	config.isBindLanguage = true
 }
+func LanguageConfigIsWeak(config *LanguageConfig) {
+	config.isWeakLanguage = true
+}
 
 func LanguageConfigTryBuildValue(config *LanguageConfig) {
 	config.isTryBuildValue = true
@@ -70,6 +73,9 @@ type LanguageConfig struct {
 	// Support obtaining static members and static method, even if the class is not instantiated.
 	isSupportClass               bool
 	isSupportClassStaticModifier bool
+
+	//weakLanguage we need more detail for it!
+	isWeakLanguage bool
 }
 
 func NewLanguageConfig() *LanguageConfig {
@@ -78,6 +84,7 @@ func NewLanguageConfig() *LanguageConfig {
 		isTryBuildValue:              false,
 		isSupportClass:               false,
 		isSupportClassStaticModifier: false,
+		isWeakLanguage:               false,
 	}
 }
 
