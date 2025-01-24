@@ -15,7 +15,8 @@ import (
 )
 
 type NetStackVirtualMachine struct {
-	stack *stack.Stack
+	stack  *stack.Stack
+	config *Config
 }
 
 func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) {
@@ -120,4 +121,15 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 
 	vm.stack = stackIns
 	return vm, nil
+}
+
+func (vm *NetStackVirtualMachine) GetStack() *stack.Stack {
+	return vm.stack
+}
+
+func (vm *NetStackVirtualMachine) StartDHCP(callback func(ip net.IP)) error {
+	if vm.config.DHCPDisabled {
+		return utils.Errorf("dhcp is disabled")
+	}
+	return nil
 }
