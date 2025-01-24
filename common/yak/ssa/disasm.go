@@ -243,6 +243,8 @@ func (p *ParameterMember) String() string {
 		return fmt.Sprintf("parameter[%d].%s", p.MemberCallObjectIndex, p.MemberCallKey)
 	case FreeValueMemberCall:
 		return fmt.Sprintf("freeValue-%s.%s", p.MemberCallObjectName, p.MemberCallKey)
+	case MoreParameterMember:
+		return fmt.Sprintf("parameterMember[%s].%s", p.MemberCallObjectName, p.MemberCallKey)
 	}
 	return ""
 }

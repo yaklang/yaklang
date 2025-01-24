@@ -183,6 +183,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["call_unpack"] = ret.Unpack
 		params["call_drop_error"] = ret.IsDropError
 		params["call_ellipsis"] = ret.IsEllipsis
+		params["mark_parameter_member"] = fetchIds(ret.MarkParameterMember)
 	case *ErrorHandler:
 		// try-catch-finally-done
 		if ret.try != nil {
@@ -464,6 +465,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.Unpack = toBool(params["call_unpack"])
 		ret.IsDropError = toBool(params["call_drop_error"])
 		ret.IsEllipsis = toBool(params["call_ellipsis"])
+		ret.MarkParameterMember = unmarshalMapValues(params["mark_parameter_member"])
 	case *Next:
 		ret.InNext = toBool(params["next_in_next"])
 		ret.Iter = unmarshalValue(params["next_iter"])
