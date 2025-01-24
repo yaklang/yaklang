@@ -155,9 +155,9 @@ func (lz *LazyInstruction) check() {
 			return
 		}
 		lz.Instruction = inst
-		lz.GetRange()
-		// set range for instruction
 		lz.cache.IrCodeToInstruction(inst, lz.ir)
+		// set range for instruction
+		lz.GetRange()
 	}
 	if lz.Value == nil {
 		if value, ok := ToValue(lz.Instruction); ok {
