@@ -140,14 +140,21 @@ func (e *ReadWriteEndpoint) dispatchLoop(ctx context.Context) {
 			continue
 		}
 
+		pktRaw := data[offset : n+offset]
 		pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
-			Payload: buffer.MakeWithData(data[offset : n+offset]),
+			Payload: buffer.MakeWithData(pktRaw),
 		})
-		switch header.IPVersion(data[offset:]) {
+
+		switch ret := header.IPVersion(data[offset:]); ret {
 		case header.IPv4Version:
 			e.InjectInbound(header.IPv4ProtocolNumber, pkt)
 		case header.IPv6Version:
 			e.InjectInbound(header.IPv6ProtocolNumber, pkt)
+		default:
+			arpPacket := header.ARP(pktRaw)
+			if arpPacket.IsValid() {
+				e.InjectInbound(header.ARPProtocolNumber, pkt)
+			}
 		}
 		pkt.DecRef()
 	}
@@ -180,4 +187,8 @@ func (e *ReadWriteEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 		return &tcpip.ErrInvalidEndpointState{}
 	}
 	return nil
+}
+
+func (e *ReadWriteEndpoint) Capabilities() stack.LinkEndpointCapabilities {
+	return stack.CapabilityResolutionRequired
 }
