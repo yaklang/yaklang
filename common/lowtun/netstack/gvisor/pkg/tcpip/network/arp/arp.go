@@ -171,7 +171,6 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 
 	switch h.Op() {
 	case header.ARPRequest:
-		log.Info("recv arp request")
 		stats.requestsReceived.Increment()
 		localAddr := tcpip.AddrFrom4Slice(h.ProtocolAddressTarget())
 
