@@ -168,6 +168,9 @@ func (e *ReadWriteEndpoint) outboundLoop(ctx context.Context) {
 		if pkt == nil {
 			break
 		}
+		if !e.IsAttached() {
+			continue
+		}
 		e.writePacket(pkt)
 	}
 }
