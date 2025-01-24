@@ -1132,6 +1132,9 @@ type FunctionType struct {
 	AnnotationFunc    []func(Value)
 	fullTypeName      []string
 	isAnyFunctionType bool
+
+	//moreParameterMember
+	MarkParameterMember []*ParameterMember
 }
 
 var _ Type = (*FunctionType)(nil)
@@ -1160,6 +1163,9 @@ func (f *FunctionType) SetFullTypeNames(names []string) {
 		return
 	}
 	f.fullTypeName = names
+}
+func (s *FunctionType) SetMarkParameterMember(member []*ParameterMember) {
+	s.MarkParameterMember = member
 }
 
 func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }

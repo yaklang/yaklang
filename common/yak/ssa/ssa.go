@@ -346,12 +346,16 @@ type Function struct {
 	// runtime function return type
 	currentReturnType Type
 	// static CallBack
+
+	MarkMoreParamMember []*ParameterMember
 }
 
 func (f *Function) SetCurrentReturnType(t Type) {
 	f.currentReturnType = t
 }
-
+func (f *Function) AddMarkParameterMember(member *ParameterMember) {
+	f.MarkMoreParamMember = append(f.MarkMoreParamMember, member)
+}
 func (f *Function) GetCurrentReturnType() Type {
 	return f.currentReturnType
 }
@@ -551,6 +555,8 @@ const (
 	SideEffectMemberCall
 
 	ParameterCall
+
+	MoreParameterMember
 )
 
 type parameterMemberInner struct {
@@ -559,6 +565,9 @@ type parameterMemberInner struct {
 	MemberCallObjectIndex int    // for Parameter
 	MemberCallObjectName  string // for FreeValue
 	MemberCallKey         Value
+
+	//more parameterMember
+	MemberCallObject *ParameterMember
 }
 
 func newParameterMember(obj *Parameter, key Value) *parameterMemberInner {
@@ -576,8 +585,17 @@ func newParameterMember(obj *Parameter, key Value) *parameterMemberInner {
 	}
 	return new
 }
+func newMoreParameterMember(member *ParameterMember, key Value) *parameterMemberInner {
+	p := &parameterMemberInner{
+		MemberCallKey:        key,
+		MemberCallKind:       MoreParameterMember,
+		MemberCallObjectName: member.GetName(),
+		MemberCallObject:     member,
+	}
+	return p
+}
 
-func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
+func (p *parameterMemberInner) Get(c *Call, builder *FunctionBuilder) (obj Value, ok bool) {
 	switch p.MemberCallKind {
 	case NoMemberCall:
 		return
@@ -586,6 +604,12 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 			return
 		}
 		return c.Args[p.MemberCallObjectIndex], true
+	case MoreParameterMember:
+		if member, flag := p.MemberCallObject.Get(c, builder); flag {
+			value := builder.ReadMemberCallValue(member, p.MemberCallObject.MemberCallKey)
+			m := builder.ReadMemberCallValue(value, p.MemberCallKey)
+			return m, flag
+		}
 	case FreeValueMemberCall:
 		obj, ok = c.Binding[p.MemberCallObjectName]
 		return obj, ok
@@ -605,7 +629,9 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 
 type ParameterMember struct {
 	anValue
+
 	FormalParameterIndex int
+
 	*parameterMemberInner
 }
 
@@ -763,6 +789,7 @@ type Call struct {
 	Binding   map[string]Value
 	ArgMember []Value
 
+	Member map[string]Value
 	// go function
 	Async  bool
 	Unpack bool
@@ -773,6 +800,8 @@ type Call struct {
 	IsDropError     bool
 	IsEllipsis      bool
 	SideEffectValue map[string]Value
+
+	MarkParameterMember map[string]Value
 }
 
 var (

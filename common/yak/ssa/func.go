@@ -122,6 +122,13 @@ func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Va
 	f.AssignVariable(variable, paraMember)
 	return paraMember
 }
+func (f *FunctionBuilder) NewMoreParameterMember(name string, member *ParameterMember, key Value) *ParameterMember {
+	paraMember := NewMoreParamMember(name, f, member, key)
+	variable := f.CreateVariable(name)
+	f.AssignVariable(variable, paraMember)
+	f.MarkMoreParamMember = append(f.MarkMoreParamMember, paraMember)
+	return paraMember
+}
 
 func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) {
 	f.Params = append(f.Params, p)

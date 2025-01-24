@@ -120,6 +120,7 @@ class test {
 		ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{"param": {"1"}}, false, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 	t.Run("import class2", func(t *testing.T) {
+		//todo: the case need default ???
 		fs := filesys.NewVirtualFs()
 		fs.AddFile("a.java", `
 package com.example.demo1;
@@ -140,7 +141,7 @@ class B{
 `)
 		ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* as $sink)`,
 			map[string][]string{
-				"sink": {"1"},
+				"sink": {"ParameterMember-parameterMember"},
 			},
 			true,
 			ssaapi.WithLanguage(ssaapi.JAVA))

@@ -18,15 +18,16 @@ func NewCall(target Value, args []Value, binding map[string]Value, block *BasicB
 	}
 
 	c := &Call{
-		anValue:         NewValue(),
-		Method:          target,
-		Args:            args,
-		Binding:         binding,
-		Async:           false,
-		Unpack:          false,
-		IsDropError:     false,
-		IsEllipsis:      false,
-		SideEffectValue: map[string]Value{},
+		anValue:             NewValue(),
+		Method:              target,
+		Args:                args,
+		Binding:             binding,
+		Async:               false,
+		Unpack:              false,
+		IsDropError:         false,
+		IsEllipsis:          false,
+		SideEffectValue:     map[string]Value{},
+		MarkParameterMember: make(map[string]Value),
 	}
 	return c
 }
@@ -46,6 +47,7 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	c.handlerObjectMethod()
 	c.handlerReturnType()
 	c.handleCalleeFunction()
+	c.handleMoreParameterMember()
 	return c
 }
 
@@ -219,9 +221,32 @@ func (c *Call) handlerReturnType() {
 	} else {
 		c.SetType(funcTyp.ReturnType)
 	}
-
 	// handler free value
 	c.HandleFreeValue(funcTyp.FreeValue)
+}
+func (c *Call) handleMoreParameterMember() {
+	fun := c.GetFunc()
+	builder := fun.builder
+	typ := c.Method.GetType()
+	functionType, ok := ToFunctionType(typ)
+	if !ok {
+		log.Errorf("method type not function Type")
+		return
+	}
+	for _, member := range functionType.MarkParameterMember {
+		val, ok := member.Get(c, builder)
+		if !ok {
+			log.Errorf("[BUG]: parameter member get fail")
+			continue
+		}
+		//copy ud
+		for _, user := range member.GetUsers() {
+			val.AddUser(user)
+		}
+
+		//绑定多级实参
+		c.MarkParameterMember[member.verboseName] = val
+	}
 }
 
 // handler if method, set object for first argument
@@ -255,7 +280,7 @@ func (c *Call) handleCalleeFunction() {
 
 				objectName := p.ObjectName
 				key := p.MemberCallKey
-				object, ok := p.Get(c)
+				object, ok := p.Get(c, builder)
 				if !ok {
 					continue
 				}
@@ -296,6 +321,9 @@ func (c *Call) handleCalleeFunction() {
 				}
 				val = builder.ReadMemberCallValue(object, key)
 				val.AddUser(c)
+				for _, i := range p.GetUsers() {
+					val.AddUser(i)
+				}
 				c.ArgMember = append(c.ArgMember, val)
 			}
 			break
