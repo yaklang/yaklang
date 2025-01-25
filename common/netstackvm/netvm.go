@@ -2,8 +2,12 @@ package netstackvm
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
 	"net"
+	"sync"
+
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/dhcp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
@@ -22,8 +26,20 @@ type NetStackVirtualMachine struct {
 
 	mainNICID tcpip.NICID
 
+	// dhcp only have one client
 	dhcpStarted *utils.AtomicBool
 	dhcpClient  *dhcp.Client
+
+	// arp only have one client too
+	arpServiceStarted    *utils.AtomicBool
+	arpPersistentMap     *sync.Map
+	arpPersistentMutex   sync.Mutex
+	arpPersistentTrigger *utils.AtomicBool
+
+	mainNICLinkAddress net.HardwareAddr
+	mainNICIPv4Address net.IP
+	mainNICIPv4Netmask *net.IPNet
+	mainNICIPv4Gateway net.IP
 }
 
 func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) {
@@ -135,11 +151,24 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 		}
 	}
 
+	if !config.DisableForwarding {
+		if err := stackIns.SetForwardingDefaultAndAllNICs(header.IPv4ProtocolNumber, true); err != nil {
+			return nil, utils.Errorf("set forwarding: %s", err)
+		}
+		if err := stackIns.SetForwardingDefaultAndAllNICs(header.IPv6ProtocolNumber, true); err != nil {
+			return nil, utils.Errorf("set forwarding: %s", err)
+		}
+	}
+
 	vm.stack = stackIns
 	vm.dhcpStarted = utils.NewAtomicBool()
 	vm.mainNICID = mainNicID
 	vm.config = config
-
+	vm.mainNICLinkAddress = config.MainNICLinkAddress
+	vm.arpServiceStarted = utils.NewAtomicBool()
+	vm.arpPersistentMap = new(sync.Map)
+	vm.arpPersistentMutex = sync.Mutex{}
+	vm.arpPersistentTrigger = utils.NewAtomicBool()
 	go func() {
 		for {
 			stackIns.Stats()

@@ -710,6 +710,7 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 
 	retransmitDiscover:
 		for i := uint(0); ; i++ {
+			log.Infof(tag+" %s: Sending dhcpDISCOVER", nicName)
 			if err := c.send(
 				ctx,
 				nicName,
@@ -725,6 +726,7 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 			c.stats.SendDiscovers.Increment()
 
 			// Receive a DHCPOFFER message from a responding DHCP server.
+			log.Info("DHCP: Waiting for dhcpOFFER")
 			retransmit := c.retransTimeout(c.exponentialBackoff(i))
 			for {
 				result, retransmit, err := c.recv(ctx, nicName, ep, ch, retransmit)
@@ -734,10 +736,12 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 					} else {
 						c.stats.RecvOfferErrors.Increment()
 					}
+					log.Infof("DHCP: Error receiving dhcpOFFER: %v", err)
 					return Config{}, fmt.Errorf("recv %s: %w", dhcpOFFER, err)
 				}
 				if retransmit {
 					c.stats.RecvOfferTimeout.Increment()
+					log.Infof(tag, "%s: recv timeout waiting for %s; retransmitting %s", nicName, dhcpOFFER, dhcpDISCOVER)
 					continue retransmitDiscover
 				}
 

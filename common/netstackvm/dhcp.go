@@ -9,14 +9,17 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 )
 
-func (vm *NetStackVirtualMachine) StartDHCP(callback func(ip net.IP)) error {
+func (vm *NetStackVirtualMachine) StartDHCP() error {
 	if vm.dhcpStarted.IsSet() {
 		log.Warn("dhcp client already started, do not start again")
 		return nil
 	}
 	vm.dhcpStarted.Set()
 
-	log.Info("start to create dhcp client")
+	log.Infof("start to create dhcp client nic: %v, acq timeout: %v, acq interval: %v, retry interval: %v",
+		vm.MainNICID(),
+		vm.config.DHCPAcquireTimeout, vm.config.DHCPAcquireInterval, vm.config.DHCPAcquireRetryInterval,
+	)
 	vm.dhcpClient = dhcp.NewClient(
 		vm.stack, vm.MainNICID(),
 		vm.config.DHCPAcquireTimeout,
@@ -28,7 +31,32 @@ func (vm *NetStackVirtualMachine) StartDHCP(callback func(ip net.IP)) error {
 				log.Errorf("failed to parse cidr: %v", err)
 				return
 			}
-			log.Infof("dhcp client acquired ip: %v, net: %v", preferIp.String(), perferNet.String())
+			var getawey net.IP
+			if !cfg.ServerAddress.Unspecified() {
+				getawey = net.ParseIP(cfg.ServerAddress.String())
+			}
+			log.Infof("dhcp client acquired ip: %v, net: %v getaway: %v", preferIp.String(), perferNet.String(), getawey)
+
+			err = vm.SetMainNICv4(preferIp, perferNet, getawey)
+			if err != nil {
+				log.Errorf("set nic ip failed: %v", err)
+				return
+			}
+			log.Infof("finish to set nic ip: %v", preferIp.String())
+
+			log.Infof("start to set default route")
+			err = vm.SetDefaultRoute(getawey)
+			if err != nil {
+				log.Errorf("set default route failed: %v", err)
+				return
+			}
+
+			vm.arpPersistentMap.Store(preferIp.String(), struct{}{})
+			// start to announcement arp localIP macAddr
+			if err := vm.StartAnnounceARP(); err != nil {
+				log.Errorf("start to announce arp failed: %v", err)
+				return
+			}
 		},
 	)
 

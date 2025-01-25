@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/netstackvm"
@@ -46,11 +47,13 @@ func main() {
 		vm, err := netstackvm.NewNetStackVirtualMachine(
 			netstackvm.WithPcapDevice("en0"),
 			netstackvm.WithPcapPromisc(true),
+			netstackvm.WithMainNICLinkAddress(`f0:2f:4b:09:df:59`),
 		)
 		if err != nil {
 			return err
 		}
-		vm.StartDHCP(nil)
+		vm.StartDHCP()
+		time.Sleep(10 * time.Second)
 		vm.Wait()
 		return nil
 	}
