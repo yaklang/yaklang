@@ -11,15 +11,16 @@ import (
 )
 
 func (vm *NetStackVirtualMachine) SetDefaultRoute(gateway net.IP) error {
+	log.Infof("start to set default route to getaway: %v", gateway)
 	vm.stack.SetRouteTable([]tcpip.Route{
 		{
 			Destination: header.IPv4EmptySubnet,
-			Gateway:     tcpip.AddrFromSlice(gateway),
+			Gateway:     tcpip.AddrFrom4([4]byte(gateway.To4())),
 			NIC:         vm.MainNICID(),
 		},
 		{
 			Destination: header.IPv6EmptySubnet,
-			Gateway:     tcpip.AddrFromSlice(gateway),
+			Gateway:     tcpip.AddrFrom4([4]byte(gateway.To4())),
 			NIC:         vm.MainNICID(),
 		},
 	})
@@ -77,7 +78,7 @@ func (vm *NetStackVirtualMachine) SetMainNICv4(ipAddr net.IP, netmask *net.IPNet
 	tcpErr := vm.stack.AddProtocolAddress(vm.MainNICID(), tcpip.ProtocolAddress{
 		Protocol: header.IPv4ProtocolNumber,
 		AddressWithPrefix: tcpip.AddressWithPrefix{
-			Address:   tcpip.AddrFromSlice(ipAddr.To4()),
+			Address:   tcpip.AddrFrom4([4]byte(ipAddr.To4())),
 			PrefixLen: ones,
 		},
 	}, stack.AddressProperties{})

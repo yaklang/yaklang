@@ -150,6 +150,7 @@ func (*endpoint) WriteHeaderIncludedPacket(*stack.Route, *stack.PacketBuffer) tc
 }
 
 func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
+	// spew.Dump(pkt)
 	stats := e.stats.arp
 	stats.packetsReceived.Increment()
 
@@ -181,7 +182,7 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 
 		remoteAddr := tcpip.AddrFrom4Slice(h.ProtocolAddressSender())
 		remoteLinkAddr := tcpip.LinkAddress(h.HardwareAddressSender())
-		log.Infof("start to handle ARPRequest: v4, question: %v from remote: %v, remotelink: %v", h.ProtocolAddressTarget(), remoteAddr, remoteLinkAddr)
+		log.Debugf("start to handle ARPRequest: v4, question: %v from remote: %v, remotelink: %v", h.ProtocolAddressTarget(), remoteAddr, remoteLinkAddr)
 		switch err := e.nic.HandleNeighborProbe(header.IPv4ProtocolNumber, remoteAddr, remoteLinkAddr); err.(type) {
 		case nil:
 		case *tcpip.ErrNotSupported:
@@ -213,7 +214,7 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 			panic(fmt.Sprintf("copied %d bytes, expected %d bytes", n, header.IPv4AddressSize))
 		}
 
-		log.Infof("start to send ARPReply: v4, local: %v, locallink: %v, remote: %v, remotelink: %v", localAddr, e.nic.LinkAddress(), remoteAddr, remoteLinkAddr)
+		log.Debugf("start to send ARPReply: v4, local: %v, locallink: %v, remote: %v, remotelink: %v", localAddr, e.nic.LinkAddress(), remoteAddr, remoteLinkAddr)
 		// As per RFC 826, under Packet Reception:
 		//   Swap hardware and protocol fields, putting the local hardware and
 		//   protocol addresses in the sender fields.

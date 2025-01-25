@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -15,30 +16,31 @@ import (
 )
 
 func (m *NetStackVirtualMachine) persistentARPAnnouncement() error {
-	m.arpPersistentMutex.Lock()
-	defer m.arpPersistentMutex.Unlock()
-
+	var addrs []string
 	m.arpPersistentMap.Range(func(key, value any) bool {
-		select {
-		case <-m.config.ctx.Done():
-			return false
-		default:
-		}
-
-		ipAddrString := key.(string)
-		ipAddr := net.ParseIP(ipAddrString)
-		if ipAddr == nil {
-			log.Errorf("failed to parse ip in persistentARPAnnouncement: %v", ipAddrString)
-			return true
-		}
-		err := m.sendARPAnnouncement(m.config.ctx, tcpip.AddrFrom4([4]byte(ipAddr.To4())))
-		if err != nil {
-			log.Errorf("failed to send arp announcement: %v", err)
-		} else {
-			log.Infof("send arp announcement success: %v", ipAddr)
-		}
+		addrs = append(addrs, key.(string))
 		return true
 	})
+
+	wg := sync.WaitGroup{}
+	for _, addr := range addrs {
+		ipAddr := net.ParseIP(addr)
+		if ipAddr == nil {
+			log.Errorf("failed to parse ip in persistentARPAnnouncement: %v", addr)
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := m.sendARPAnnouncement(m.config.ctx, tcpip.AddrFrom4([4]byte(ipAddr.To4())))
+			if err != nil {
+				log.Errorf("failed to send arp announcement: %v", err)
+			} else {
+				log.Infof("send arp announcement success: %v", ipAddr)
+			}
+		}()
+	}
+	wg.Wait()
 	return nil
 }
 
@@ -82,27 +84,28 @@ func (vm *NetStackVirtualMachine) sendARPAnnouncement(ctx context.Context, ipAdd
 	}
 	log.Infof("send arp announcement: %v", ipAddr)
 	pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
-		Payload: buffer.MakeWithData(arpHdr),
+		Payload: buffer.MakeWithData([]byte(string(arpHdr))),
 	})
 	nicIns.WritePacketToRemote(tcpip.LinkAddress(header.EthernetBroadcastAddress), pkt)
+	pkt.DecRef() // 修复第一个包的内存泄漏
 
 	// 可选：发送多次以提高可靠性
 	fastInterval := vm.config.ARPAnnouncementFastInterval
 	if fastInterval <= 0 {
 		fastInterval = time.Second * 1
 	}
+	timer := time.NewTicker(fastInterval)
+	defer timer.Stop()
 	for i := 0; i < vm.config.ARPAnnouncementFastTimes; i++ {
 		select {
 		case <-ctx.Done():
 			return nil
-		default:
-			log.Infof("send arp announcement: %v, interval: %v", ipAddr, fastInterval)
+		case <-timer.C:
 			pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
-				Payload: buffer.MakeWithData(arpHdr),
+				Payload: buffer.MakeWithData([]byte(string(arpHdr))),
 			})
 			nicIns.WritePacketToRemote(tcpip.LinkAddress(header.EthernetBroadcastAddress), pkt)
 			pkt.DecRef()
-			time.Sleep(fastInterval)
 		}
 	}
 
@@ -123,19 +126,19 @@ func (m *NetStackVirtualMachine) StartAnnounceARP() error {
 		if err != nil {
 			log.Errorf("failed to persistentARPAnnouncement: %v", err)
 		}
-		//for {
-		//	select {
-		//	case <-m.config.ctx.Done():
-		//		return
-		//	case <-time.After(m.config.ARPAnnouncementSlowInterval):
-		//		m.persistentARPAnnouncement()
-		//	case <-time.After(time.Second):
-		//		if m.arpPersistentTrigger.IsSet() {
-		//			m.arpPersistentTrigger.UnSet()
-		//			m.persistentARPAnnouncement()
-		//		}
-		//	}
-		//}
+		for {
+			select {
+			case <-m.config.ctx.Done():
+				return
+			case <-time.After(m.config.ARPAnnouncementSlowInterval):
+				m.persistentARPAnnouncement()
+			case <-time.After(time.Second):
+				if m.arpPersistentTrigger.IsSet() {
+					m.arpPersistentTrigger.UnSet()
+					m.persistentARPAnnouncement()
+				}
+			}
+		}
 	}()
 
 	return nil

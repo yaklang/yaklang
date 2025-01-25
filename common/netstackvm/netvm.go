@@ -84,6 +84,10 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 
 	stackIns := stack.New(stackOpt)
 
+	if configStackErr := loadStackOptions(config, stackIns); configStackErr != nil {
+		return nil, utils.Errorf("load stack options: %s", configStackErr)
+	}
+
 	if string(config.MainNICLinkAddress) == "" {
 		err := WithRandomMainNICLinkAddress()(config)
 		if err != nil {
@@ -169,11 +173,6 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 	vm.arpPersistentMap = new(sync.Map)
 	vm.arpPersistentMutex = sync.Mutex{}
 	vm.arpPersistentTrigger = utils.NewAtomicBool()
-	go func() {
-		for {
-			stackIns.Stats()
-		}
-	}()
 	return vm, nil
 }
 
