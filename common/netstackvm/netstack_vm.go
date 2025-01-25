@@ -2,8 +2,10 @@ package netstackvm
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/log"
 	"net"
 
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/dhcp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/arp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
@@ -17,10 +19,15 @@ import (
 type NetStackVirtualMachine struct {
 	stack  *stack.Stack
 	config *Config
+
+	mainNICID tcpip.NICID
+
+	dhcpStarted *utils.AtomicBool
+	dhcpClient  *dhcp.Client
 }
 
 func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) {
-	config := NewConfig()
+	config := NewDefaultConfig()
 	for _, opt := range opts {
 		if err := opt(config); err != nil {
 			return nil, err
@@ -60,7 +67,16 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 	stackOpt.HandleLocal = config.HandleLocal
 
 	stackIns := stack.New(stackOpt)
-	pcapEp, err := NewPCAPEndpoint(config.ctx, stackIns, config.pcapPromisc, config.pcapDevice)
+
+	if string(config.MainNICLinkAddress) == "" {
+		err := WithRandomMainNICLinkAddress()(config)
+		if err != nil {
+			return nil, utils.Errorf("failed with random main nic link address: %s", err)
+		}
+	}
+
+	log.Infof("start to create pcap endpoint default mac: %v", config.MainNICLinkAddress.String())
+	pcapEp, err := NewPCAPEndpoint(config.ctx, stackIns, config.pcapPromisc, config.pcapDevice, config.MainNICLinkAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +136,15 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 	}
 
 	vm.stack = stackIns
+	vm.dhcpStarted = utils.NewAtomicBool()
+	vm.mainNICID = mainNicID
+	vm.config = config
+
+	go func() {
+		for {
+			stackIns.Stats()
+		}
+	}()
 	return vm, nil
 }
 
@@ -127,9 +152,10 @@ func (vm *NetStackVirtualMachine) GetStack() *stack.Stack {
 	return vm.stack
 }
 
-func (vm *NetStackVirtualMachine) StartDHCP(callback func(ip net.IP)) error {
-	if vm.config.DHCPDisabled {
-		return utils.Errorf("dhcp is disabled")
-	}
-	return nil
+func (vm *NetStackVirtualMachine) MainNICID() tcpip.NICID {
+	return vm.mainNICID
+}
+
+func (vm *NetStackVirtualMachine) Wait() {
+	vm.stack.Wait()
 }

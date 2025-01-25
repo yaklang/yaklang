@@ -5,11 +5,12 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
+	"time"
 
+	gvisorDHCP "github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/dhcp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
-	"golang.org/x/time/rate"
-
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -62,14 +63,6 @@ const (
 	tcpDefaultReceiveBufferSize = tcp.DefaultReceiveBufferSize
 )
 
-func NewConfig() *Config {
-	return &Config{
-		DHCPDisabled:             false,
-		ARPDisabled:              false,
-		OnTCPConnectionRequested: nil,
-	}
-}
-
 type Option func(*Config) error
 
 type Config struct {
@@ -91,6 +84,12 @@ type Config struct {
 	DisallowPacketEndpointWrite bool
 	EnableLinkLayer             bool
 	OnTCPConnectionRequested    func(*tcpip.FullAddress, *tcpip.FullAddress)
+
+	//dhcp config
+	DHCPAcquireTimeout       time.Duration
+	DHCPAcquireInterval      time.Duration
+	DHCPAcquireRetryInterval time.Duration
+	DHCPAcquireCallback      func(ctx context.Context, lost, acquired tcpip.AddressWithPrefix, cfg gvisorDHCP.Config)
 
 	// nic options
 	MainNICIPv4Address        string
@@ -150,6 +149,9 @@ func NewDefaultConfig() *Config {
 		TCPModerateReceiveBuffer:    tcpModerateReceiveBufferEnabled,
 		TCPSACKEnabled:              tcpSACKEnabled,
 		TCPRACKLossDetection:        tcpRecovery,
+		DHCPAcquireTimeout:          time.Second * 5,
+		DHCPAcquireInterval:         time.Second * 2,
+		DHCPAcquireRetryInterval:    time.Second * 2,
 	}
 }
 

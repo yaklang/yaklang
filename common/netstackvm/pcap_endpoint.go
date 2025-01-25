@@ -3,6 +3,8 @@ package netstackvm
 import (
 	"context"
 	"fmt"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 	"io"
 	"net"
 	"sync"
@@ -39,9 +41,14 @@ type PCAPEndpoint struct {
 	pcapPacketHandleOnce sync.Once
 	pcapPacket           chan gopacket.Packet
 	mtu                  int
+
+	// ethernet cache n arp cache
+	ipToMac *sync.Map
 }
 
-func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, device string) (*PCAPEndpoint, error) {
+const defaultOutQueueLen = 1 << 10
+
+func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, device string, macAddr net.HardwareAddr) (*PCAPEndpoint, error) {
 	pcapName, err := pcaputil.IfaceNameToPcapIfaceName(device)
 	if err != nil {
 		return nil, err
@@ -59,6 +66,7 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, d
 
 	ctx, cancel := context.WithCancel(ctx)
 	pcapEp := &PCAPEndpoint{
+		Endpoint:             channel.New(defaultOutQueueLen, uint32(mtu), tcpip.LinkAddress(string(macAddr))),
 		stack:                stackIns,
 		handle:               handle,
 		mtu:                  mtu,
@@ -68,6 +76,7 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, d
 		ctx:                  ctx,
 		cancel:               cancel,
 		wg:                   new(sync.WaitGroup),
+		ipToMac:              new(sync.Map),
 	}
 	packetChan := gopacket.NewPacketSource(handle, handle.LinkType()).Packets()
 
@@ -165,23 +174,53 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 			continue
 		}
 
-		pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
-			Payload: buffer.MakeWithData(data[:n]),
-		})
-		defer pkt.DecRef()
-
-		packet := gopacket.NewPacket(data, layers.LinkTypeEthernet, gopacket.DecodeOptions{
+		dataWithLink := data[:n]
+		packet := gopacket.NewPacket(dataWithLink, layers.LinkTypeEthernet, gopacket.DecodeOptions{
 			NoCopy: true,
 			Lazy:   true,
 		})
+
 		networklayer := packet.NetworkLayer()
 		if networklayer == nil {
-			log.Errorf("failed to get network layer")
 			continue
 		}
 
+		linkLayer := packet.LinkLayer()
+		offset := 0
+		var srcMac net.HardwareAddr
+		var dstMac net.HardwareAddr
+		if linkLayer != nil {
+			offset = len(linkLayer.LayerContents())
+			switch ret := linkLayer.(type) {
+			case *layers.Ethernet:
+				srcMac = ret.SrcMAC
+				dstMac = ret.DstMAC
+				_ = dstMac
+			}
+		}
+
+		//if dhcp4 := packet.Layer(layers.LayerTypeDHCPv4); dhcp4 != nil {
+		//	if dhcp4ins, ok := dhcp4.(*layers.DHCPv4); ok {
+		//	}
+		//}
+
+		networkPayloads := data[offset:n]
+		pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
+			Payload: buffer.MakeWithData(networkPayloads),
+		})
 		switch networklayer.LayerType() {
 		case layers.LayerTypeIPv4:
+			var srcIp net.IP
+			var dstIp net.IP
+			if v4header, err := ipv4.ParseHeader(networkPayloads); err == nil {
+				srcIp = v4header.Src
+				dstIp = v4header.Dst
+				_ = dstIp
+			}
+			if !srcIp.IsUnspecified() {
+				log.Infof("remember ip to mac: %s -> %s", srcIp.String(), srcMac.String())
+				p.ipToMac.Store(srcIp.String(), srcMac)
+			}
 			p.InjectInbound(header.IPv4ProtocolNumber, pkt)
 		case layers.LayerTypeIPv6:
 			p.InjectInbound(header.IPv6ProtocolNumber, pkt)
@@ -212,7 +251,51 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 	buf := pkt.ToBuffer()
 	defer buf.Release()
 
-	if _, err := p.Write(buf.Flatten()); err != nil {
+	payloads := buf.Flatten()
+
+	getDefaultEthernetByDest := func(nextLayers layers.EthernetType, dst string) *layers.Ethernet {
+		var dstMac net.HardwareAddr
+		if dst == "" {
+			dstMac = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+		} else {
+			macAddr, existed := p.ipToMac.Load(dst)
+			if existed {
+				dstMac = macAddr.(net.HardwareAddr)
+			} else {
+				dstMac = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+			}
+		}
+		return &layers.Ethernet{
+			SrcMAC:       net.HardwareAddr(p.LinkAddress()),
+			DstMAC:       dstMac,
+			EthernetType: nextLayers,
+		}
+	}
+
+	var eth *layers.Ethernet
+	if v4header, err := ipv4.ParseHeader(payloads); err == nil {
+		eth = getDefaultEthernetByDest(layers.EthernetTypeIPv4, v4header.Dst.String())
+	} else if v6header, err := ipv6.ParseHeader(payloads); err == nil {
+		eth = getDefaultEthernetByDest(layers.EthernetTypeIPv6, v6header.Dst.String())
+	} else if arpHeader := header.ARP(payloads); arpHeader != nil && arpHeader.IsValid() {
+		eth = getDefaultEthernetByDest(layers.EthernetTypeARP, "")
+	}
+
+	if eth != nil {
+		buf := gopacket.NewSerializeBuffer()
+		opts := gopacket.SerializeOptions{
+			FixLengths:       true,
+			ComputeChecksums: true,
+		}
+		err := gopacket.SerializeLayers(buf, opts, eth, gopacket.Payload(payloads))
+		if err != nil {
+			log.Warnf("failed to serialize layers: %s", err)
+			return &tcpip.ErrInvalidEndpointState{}
+		}
+		payloads = buf.Bytes()
+	}
+
+	if _, err := p.Write(payloads); err != nil {
 		return &tcpip.ErrInvalidEndpointState{}
 	}
 	return nil
