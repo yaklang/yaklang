@@ -24,6 +24,8 @@ type NetStackVirtualMachine struct {
 	stack  *stack.Stack
 	config *Config
 
+	driver *PCAPEndpoint
+
 	mainNICID tcpip.NICID
 
 	// dhcp only have one client
@@ -173,6 +175,7 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 	vm.arpPersistentMap = new(sync.Map)
 	vm.arpPersistentMutex = sync.Mutex{}
 	vm.arpPersistentTrigger = utils.NewAtomicBool()
+	vm.driver = pcapEp
 	return vm, nil
 }
 
