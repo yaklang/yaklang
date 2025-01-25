@@ -3,12 +3,6 @@ package netstackvm
 import (
 	"context"
 	"fmt"
-	"golang.org/x/net/ipv4"
-	"golang.org/x/net/ipv6"
-	"io"
-	"net"
-	"sync"
-
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/pcap"
@@ -19,6 +13,12 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/link/channel"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
+	"io"
+	"net"
+	"sync"
+	"sync/atomic"
 )
 
 type pcapEpIf interface {
@@ -64,37 +64,21 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, d
 	}
 	mtu := iface.MTU
 
+	_ = handle.SetBPFFilter("")
 	ctx, cancel := context.WithCancel(ctx)
 	pcapEp := &PCAPEndpoint{
-		Endpoint:             channel.New(defaultOutQueueLen, uint32(mtu), tcpip.LinkAddress(string(macAddr))),
+		Endpoint:             channel.New(defaultOutQueueLen*100, uint32(mtu), tcpip.LinkAddress(string(macAddr))),
 		stack:                stackIns,
 		handle:               handle,
 		mtu:                  mtu,
 		writeMutex:           new(sync.Mutex),
 		pcapPacketHandleOnce: sync.Once{},
-		pcapPacket:           make(chan gopacket.Packet, 1024),
+		pcapPacket:           gopacket.NewPacketSource(handle, handle.LinkType()).Packets(),
 		ctx:                  ctx,
 		cancel:               cancel,
 		wg:                   new(sync.WaitGroup),
 		ipToMac:              new(sync.Map),
 	}
-	packetChan := gopacket.NewPacketSource(handle, handle.LinkType()).Packets()
-
-	pcapEp.pcapPacketHandleOnce.Do(func() {
-		go func() {
-			defer func() {
-				if err := recover(); err != nil {
-					log.Errorf("failed to handle pcap packet: %s", err)
-				}
-			}()
-			defer func() {
-				close(pcapEp.pcapPacket)
-			}()
-			for packet := range packetChan {
-				pcapEp.pcapPacket <- packet
-			}
-		}()
-	})
 	return pcapEp, nil
 }
 
@@ -102,16 +86,22 @@ func (p *PCAPEndpoint) Read(packet []byte) (n int, err error) {
 	if p.pcapPacket == nil {
 		return 0, fmt.Errorf("pcapPacket is nil")
 	}
-	pkt, ok := <-p.pcapPacket
-	if !ok {
+	select {
+	case <-p.ctx.Done():
 		return 0, fmt.Errorf("pcapPacket is closed")
+	case pkt, ok := <-p.pcapPacket:
+		if !ok {
+			log.Infof("pcapPacket is closed")
+			return 0, fmt.Errorf("pcapPacket is closed")
+		}
+		n := copy(packet, pkt.Data())
+		return n, nil
 	}
-	return copy(packet, pkt.Data()), nil
 }
 
 func (p *PCAPEndpoint) Write(packet []byte) (n int, err error) {
-	p.writeMutex.Lock()
-	defer p.writeMutex.Unlock()
+	//p.writeMutex.Lock()
+	//defer p.writeMutex.Unlock()
 	err = p.handle.WritePacketData(packet)
 	if err != nil {
 		return 0, err
@@ -127,10 +117,12 @@ func (p *PCAPEndpoint) Close() {
 func (p *PCAPEndpoint) Attach(dispatcher stack.NetworkDispatcher) {
 	p.Endpoint.Attach(dispatcher)
 	p.attachOnce.Do(func() {
+		log.Info("start to attach pcap endpoint outbound loop and inboundloop")
 		p.ctx, p.cancel = context.WithCancel(p.ctx)
 		p.wg.Add(2)
 		go func() {
 			defer func() {
+				log.Infof("cancel outbound loop")
 				p.cancel()
 				p.wg.Done()
 			}()
@@ -138,6 +130,7 @@ func (p *PCAPEndpoint) Attach(dispatcher stack.NetworkDispatcher) {
 		}()
 		go func() {
 			defer func() {
+				log.Infof("cancel inbound loop")
 				p.cancel()
 				p.wg.Done()
 			}()
@@ -152,6 +145,10 @@ func (p *PCAPEndpoint) Wait() {
 
 func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 	mtu := p.mtu
+
+	defer func() {
+		log.Info("inboundLoop exit")
+	}()
 
 	for {
 		select {
@@ -169,21 +166,18 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 		if n == 0 || n > mtu {
 			continue
 		}
+		addInboundPacket()
 
 		if !p.IsAttached() {
 			continue
 		}
 
 		dataWithLink := data[:n]
+
 		packet := gopacket.NewPacket(dataWithLink, layers.LinkTypeEthernet, gopacket.DecodeOptions{
 			NoCopy: true,
 			Lazy:   true,
 		})
-
-		networklayer := packet.NetworkLayer()
-		if networklayer == nil {
-			continue
-		}
 
 		linkLayer := packet.LinkLayer()
 		offset := 0
@@ -198,46 +192,76 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 				_ = dstMac
 			}
 		}
-
-		//if dhcp4 := packet.Layer(layers.LayerTypeDHCPv4); dhcp4 != nil {
-		//	if dhcp4ins, ok := dhcp4.(*layers.DHCPv4); ok {
-		//	}
-		//}
-
 		networkPayloads := data[offset:n]
+
 		pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
 			Payload: buffer.MakeWithData(networkPayloads),
 		})
-		switch networklayer.LayerType() {
-		case layers.LayerTypeIPv4:
-			var srcIp net.IP
-			var dstIp net.IP
-			if v4header, err := ipv4.ParseHeader(networkPayloads); err == nil {
-				srcIp = v4header.Src
-				dstIp = v4header.Dst
-				_ = dstIp
+		defer func() {
+			pkt.DecRef()
+		}()
+
+		networklayer := packet.NetworkLayer()
+		if networklayer == nil {
+			// arp
+			arpLayer := packet.Layer(layers.LayerTypeARP)
+			if arpLayer != nil {
+				arpPacket, ok := arpLayer.(*layers.ARP)
+				if !ok {
+					continue
+				}
+				_ = arpPacket
+				p.InjectInbound(header.ARPProtocolNumber, pkt)
+			} else {
+				log.Infof("recv non network layer packet: \n%s", packet.Dump())
 			}
-			if !srcIp.IsUnspecified() {
-				//log.Infof("remember ip to mac: %s -> %s", srcIp.String(), srcMac.String())
-				p.ipToMac.Store(srcIp.String(), srcMac)
+		} else {
+			switch networklayer.LayerType() {
+			case layers.LayerTypeIPv4:
+				var srcIp net.IP
+				var dstIp net.IP
+				if v4header, err := ipv4.ParseHeader(networkPayloads); err == nil {
+					srcIp = v4header.Src
+					dstIp = v4header.Dst
+					_ = dstIp
+				}
+				if !srcIp.IsUnspecified() {
+					//log.Infof("remember ip to mac: %s -> %s", srcIp.String(), srcMac.String())
+					p.ipToMac.Store(srcIp.String(), srcMac)
+				}
+				p.InjectInbound(header.IPv4ProtocolNumber, pkt)
+			case layers.LayerTypeIPv6:
+				p.InjectInbound(header.IPv6ProtocolNumber, pkt)
+			case layers.LayerTypeARP:
+				p.InjectInbound(header.ARPProtocolNumber, pkt)
+			default:
+				log.Errorf("unknown network layer type: %s", networklayer.LayerType())
 			}
-			p.InjectInbound(header.IPv4ProtocolNumber, pkt)
-		case layers.LayerTypeIPv6:
-			p.InjectInbound(header.IPv6ProtocolNumber, pkt)
-		case layers.LayerTypeARP:
-			p.InjectInbound(header.ARPProtocolNumber, pkt)
-		default:
-			log.Errorf("unknown network layer type: %s", networklayer.LayerType())
 		}
 	}
+}
+
+var inboundPacket = new(int64)
+var outboundPacket = new(int64)
+
+func addInboundPacket() {
+	atomic.AddInt64(inboundPacket, 1)
+	//log.Infof("inbound packet: %d", atomic.LoadInt64(inboundPacket))
+}
+
+func addOutboundPacket() {
+	atomic.AddInt64(outboundPacket, 1)
+	//log.Infof("outbound packet: %d", atomic.LoadInt64(outboundPacket))
 }
 
 func (p *PCAPEndpoint) outboundLoop(ctx context.Context) {
 	for {
 		pkt := p.ReadContext(ctx)
 		if pkt == nil {
+			log.Infof("outboundLoop exit")
 			break
 		}
+		addOutboundPacket()
 		if !p.IsAttached() {
 			continue
 		}

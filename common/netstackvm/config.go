@@ -4,6 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv6"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"net"
 	"time"
 
@@ -108,8 +111,6 @@ type Config struct {
 	// tcp options
 	// DefaultTTL specifies the default TTL used by stack
 	DefaultTTL uint8
-	// Forwarding enables packet forwarding between NICs
-	Forwarding bool
 	// ICMPBurst is the number of ICMP messages that can be sent in a single burst
 	ICMPBurst int
 	// ICMPLimit is the maximum number of ICMP messages permitted by rate limiter
@@ -138,10 +139,66 @@ type Config struct {
 	TCPRACKLossDetection tcpip.TCPRecovery
 }
 
+func loadStackOptions(config *Config, stackIns *stack.Stack) error {
+	if config.DefaultTTL > 0 {
+		opt := tcpip.DefaultTTLOption(config.DefaultTTL)
+		if err := stackIns.SetNetworkProtocolOption(ipv4.ProtocolNumber, &opt); err != nil {
+			return fmt.Errorf("set ipv4 default TTL: %s", err)
+		}
+		if err := stackIns.SetNetworkProtocolOption(ipv6.ProtocolNumber, &opt); err != nil {
+			return fmt.Errorf("set ipv6 default TTL: %s", err)
+		}
+	}
+
+	if config.ICMPBurst > 0 {
+		stackIns.SetICMPBurst(config.ICMPBurst)
+	}
+	if config.ICMPLimit > 0 {
+		stackIns.SetICMPLimit(config.ICMPLimit)
+	}
+
+	if config.TCPSendBufferSizeMin > 0 && config.TCPSendBufferSizeMax > 0 && config.TCPSendBufferSizeDefault > 0 {
+		sndOpt := tcpip.TCPSendBufferSizeRangeOption{Min: config.TCPSendBufferSizeMin, Default: config.TCPSendBufferSizeDefault, Max: config.TCPSendBufferSizeMax}
+		if err := stackIns.SetTransportProtocolOption(tcp.ProtocolNumber, &sndOpt); err != nil {
+			return fmt.Errorf("set TCP send buffer size range: %s", err)
+		}
+	}
+
+	if config.TCPReceiveBufferSizeMin > 0 && config.TCPReceiveBufferSizeMax > 0 && config.TCPReceiveBufferSizeDefault > 0 {
+		rcvOpt := tcpip.TCPReceiveBufferSizeRangeOption{Min: config.TCPReceiveBufferSizeMin, Default: config.TCPReceiveBufferSizeDefault, Max: config.TCPReceiveBufferSizeMax}
+		if err := stackIns.SetTransportProtocolOption(tcp.ProtocolNumber, &rcvOpt); err != nil {
+			return fmt.Errorf("set TCP receive buffer size range: %s", err)
+		}
+	}
+
+	opt := tcpip.TCPDelayEnabled(config.TCPDelayEnabled)
+	if err := stackIns.SetTransportProtocolOption(tcp.ProtocolNumber, &opt); err != nil {
+		return fmt.Errorf("set TCP delay: %s", err)
+	}
+
+	copt := tcpip.CongestionControlOption(config.TCPCongestionControl)
+	if err := stackIns.SetTransportProtocolOption(tcp.ProtocolNumber, &copt); err != nil {
+		return fmt.Errorf("set TCP congestion control algorithm: %s", err)
+	}
+
+	mopt := tcpip.TCPModerateReceiveBufferOption(config.TCPModerateReceiveBuffer)
+	if err := stackIns.SetTransportProtocolOption(tcp.ProtocolNumber, &mopt); err != nil {
+		return fmt.Errorf("set TCP moderate receive buffer: %s", err)
+	}
+
+	if config.TCPSACKEnabled {
+		opt := tcpip.TCPSACKEnabled(true)
+		if err := stackIns.SetTransportProtocolOption(tcp.ProtocolNumber, &opt); err != nil {
+			return fmt.Errorf("set TCP SACK: %s", err)
+		}
+	}
+
+	return nil
+}
+
 func NewDefaultConfig() *Config {
 	return &Config{
 		DefaultTTL:                  defaultTimeToLive,
-		Forwarding:                  ipForwardingEnabled,
 		ICMPBurst:                   icmpBurst,
 		ICMPLimit:                   icmpLimit,
 		TCPSendBufferSizeMin:        tcpMinBufferSize,
@@ -159,8 +216,9 @@ func NewDefaultConfig() *Config {
 		DHCPAcquireInterval:         time.Second * 2,
 		DHCPAcquireRetryInterval:    time.Second * 2,
 		ARPAnnouncementFastInterval: time.Second * 1,
-		ARPAnnouncementFastTimes:    10,
+		ARPAnnouncementFastTimes:    2,
 		ARPAnnouncementSlowInterval: 30 * time.Second,
+		pcapPromisc:                 true,
 	}
 }
 

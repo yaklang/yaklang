@@ -2,6 +2,7 @@ package netstackvm
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
 	"net"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -62,7 +63,9 @@ func (vm *NetStackVirtualMachine) StartDHCP() error {
 
 	log.Info("start to run dhcp client")
 	go func() {
-		vm.dhcpClient.Run(vm.config.ctx)
+		results := vm.dhcpClient.Run(vm.config.ctx)
+		_ = results
+		spew.Dump(results)
 	}()
 	return nil
 }
