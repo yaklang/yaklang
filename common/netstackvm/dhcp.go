@@ -3,11 +3,11 @@ package netstackvm
 import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
-	"net"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/dhcp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
+	"net"
+	"time"
 )
 
 func (vm *NetStackVirtualMachine) StartDHCP() error {
@@ -38,6 +38,7 @@ func (vm *NetStackVirtualMachine) StartDHCP() error {
 			}
 			log.Infof("dhcp client acquired ip: %v, net: %v getaway: %v", preferIp.String(), perferNet.String(), getawey)
 
+			vm.driver.SetGatewayIP(getawey)
 			err = vm.SetMainNICv4(preferIp, perferNet, getawey)
 			if err != nil {
 				log.Errorf("set nic ip failed: %v", err)
@@ -68,4 +69,21 @@ func (vm *NetStackVirtualMachine) StartDHCP() error {
 		spew.Dump(results)
 	}()
 	return nil
+}
+
+func (t *NetStackVirtualMachine) WaitDHCPFinished(ctx context.Context) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if t.GetMainNICIPv4Address() != nil && t.GetMainNICIPv4Gateway() != nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.config.ctx.Done():
+			return t.config.ctx.Err()
+		case <-ticker.C:
+		}
+	}
 }
