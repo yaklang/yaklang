@@ -1,6 +1,7 @@
 package netstackvm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/gopacket/gopacket"
@@ -13,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/link/channel"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 	"io"
@@ -30,6 +32,10 @@ var _ pcapEpIf = (*PCAPEndpoint)(nil)
 
 type PCAPEndpoint struct {
 	*channel.Endpoint
+
+	getawayFound    *utils.AtomicBool
+	getawayHardware net.HardwareAddr
+	getawayIP       net.IP
 
 	ctx                  context.Context
 	cancel               context.CancelFunc
@@ -78,8 +84,26 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, d
 		cancel:               cancel,
 		wg:                   new(sync.WaitGroup),
 		ipToMac:              new(sync.Map),
+		getawayFound:         utils.NewAtomicBool(),
 	}
 	return pcapEp, nil
+}
+
+func (p *PCAPEndpoint) SetGatewayHardwareAddr(hwAddr net.HardwareAddr) {
+	p.getawayHardware = hwAddr
+	p.getawayFound.Set()
+}
+
+func (p *PCAPEndpoint) SetGatewayIP(g net.IP) {
+	p.getawayIP = g
+	if p.getawayHardware == nil {
+		macaddr, ok := p.ipToMac.Load(g.String())
+		if ok {
+			log.Infof("auto set gateway hardware addr: %s -> %s", g.String(), macaddr.(net.HardwareAddr).String())
+			p.getawayHardware, _ = macaddr.(net.HardwareAddr)
+		}
+	}
+	p.getawayFound.Set()
 }
 
 func (p *PCAPEndpoint) Read(packet []byte) (n int, err error) {
@@ -210,7 +234,9 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 				if !ok {
 					continue
 				}
-				_ = arpPacket
+				if ok && len(arpPacket.SourceHwAddress) == 6 && !bytes.Equal(arpPacket.SourceHwAddress, []byte{0, 0, 0, 0, 0, 0}) && !bytes.Equal(arpPacket.SourceHwAddress, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}) {
+					p.ipToMac.Store(net.IP(arpPacket.SourceProtAddress).String(), arpPacket.SourceHwAddress)
+				}
 				p.InjectInbound(header.ARPProtocolNumber, pkt)
 			} else {
 				log.Infof("recv non network layer packet: \n%s", packet.Dump())
@@ -226,14 +252,14 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 					_ = dstIp
 				}
 				if !srcIp.IsUnspecified() {
-					//log.Infof("remember ip to mac: %s -> %s", srcIp.String(), srcMac.String())
-					p.ipToMac.Store(srcIp.String(), srcMac)
+					if len(srcMac) == 6 && !bytes.Equal(srcMac, []byte{0, 0, 0, 0, 0, 0}) && !bytes.Equal(srcMac, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}) {
+						//log.Infof("remember ip to mac: %s -> %s", srcIp.String(), srcMac.String())
+						p.ipToMac.Store(srcIp.String(), srcMac)
+					}
 				}
 				p.InjectInbound(header.IPv4ProtocolNumber, pkt)
 			case layers.LayerTypeIPv6:
 				p.InjectInbound(header.IPv6ProtocolNumber, pkt)
-			case layers.LayerTypeARP:
-				p.InjectInbound(header.ARPProtocolNumber, pkt)
 			default:
 				log.Errorf("unknown network layer type: %s", networklayer.LayerType())
 			}
@@ -269,6 +295,13 @@ func (p *PCAPEndpoint) outboundLoop(ctx context.Context) {
 	}
 }
 
+func (p *PCAPEndpoint) fallbackDefaultMac() net.HardwareAddr {
+	if p.getawayFound.IsSet() {
+		return p.getawayHardware
+	}
+	return net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+}
+
 func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 	defer pkt.DecRef()
 
@@ -280,13 +313,13 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 	getDefaultEthernetByDest := func(nextLayers layers.EthernetType, dst string) *layers.Ethernet {
 		var dstMac net.HardwareAddr
 		if dst == "" {
-			dstMac = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+			dstMac = p.fallbackDefaultMac()
 		} else {
 			macAddr, existed := p.ipToMac.Load(dst)
 			if existed {
 				dstMac = macAddr.(net.HardwareAddr)
 			} else {
-				dstMac = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+				dstMac = p.fallbackDefaultMac()
 			}
 		}
 		return &layers.Ethernet{
