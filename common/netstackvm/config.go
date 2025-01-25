@@ -84,12 +84,18 @@ type Config struct {
 	DisallowPacketEndpointWrite bool
 	EnableLinkLayer             bool
 	OnTCPConnectionRequested    func(*tcpip.FullAddress, *tcpip.FullAddress)
+	DisableForwarding           bool
 
 	//dhcp config
 	DHCPAcquireTimeout       time.Duration
 	DHCPAcquireInterval      time.Duration
 	DHCPAcquireRetryInterval time.Duration
 	DHCPAcquireCallback      func(ctx context.Context, lost, acquired tcpip.AddressWithPrefix, cfg gvisorDHCP.Config)
+
+	//arp config
+	ARPAnnouncementFastInterval time.Duration
+	ARPAnnouncementFastTimes    int
+	ARPAnnouncementSlowInterval time.Duration
 
 	// nic options
 	MainNICIPv4Address        string
@@ -152,6 +158,9 @@ func NewDefaultConfig() *Config {
 		DHCPAcquireTimeout:          time.Second * 5,
 		DHCPAcquireInterval:         time.Second * 2,
 		DHCPAcquireRetryInterval:    time.Second * 2,
+		ARPAnnouncementFastInterval: time.Second * 1,
+		ARPAnnouncementFastTimes:    10,
+		ARPAnnouncementSlowInterval: 30 * time.Second,
 	}
 }
 
@@ -285,6 +294,12 @@ func WithTCPDisabled(disabled bool) Option {
 func WithUDPDisabled(disabled bool) Option {
 	return func(c *Config) error {
 		c.UDPDisabled = disabled
+		return nil
+	}
+}
+
+func WithDisableForwarding(v bool) Option {
+	return func(s *Config) error {
 		return nil
 	}
 }

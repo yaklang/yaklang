@@ -218,7 +218,7 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 				_ = dstIp
 			}
 			if !srcIp.IsUnspecified() {
-				log.Infof("remember ip to mac: %s -> %s", srcIp.String(), srcMac.String())
+				//log.Infof("remember ip to mac: %s -> %s", srcIp.String(), srcMac.String())
 				p.ipToMac.Store(srcIp.String(), srcMac)
 			}
 			p.InjectInbound(header.IPv4ProtocolNumber, pkt)
@@ -273,12 +273,23 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 	}
 
 	var eth *layers.Ethernet
-	if v4header, err := ipv4.ParseHeader(payloads); err == nil {
-		eth = getDefaultEthernetByDest(layers.EthernetTypeIPv4, v4header.Dst.String())
-	} else if v6header, err := ipv6.ParseHeader(payloads); err == nil {
-		eth = getDefaultEthernetByDest(layers.EthernetTypeIPv6, v6header.Dst.String())
-	} else if arpHeader := header.ARP(payloads); arpHeader != nil && arpHeader.IsValid() {
-		eth = getDefaultEthernetByDest(layers.EthernetTypeARP, "")
+	switch ret := header.IPVersion(payloads); ret {
+	case header.IPv4Version:
+		if v4header, err := ipv4.ParseHeader(payloads); err == nil {
+			eth = getDefaultEthernetByDest(layers.EthernetTypeIPv4, v4header.Dst.String())
+		} else {
+			log.Errorf("failed to parse ipv4 header: %s", err)
+		}
+	case header.IPv6Version:
+		if v6header, err := ipv6.ParseHeader(payloads); err == nil {
+			eth = getDefaultEthernetByDest(layers.EthernetTypeIPv6, v6header.Dst.String())
+		} else {
+			log.Errorf("failed to parse ipv6 header: %s", err)
+		}
+	default:
+		if arpHeader := header.ARP(payloads); arpHeader != nil && arpHeader.IsValid() {
+			eth = getDefaultEthernetByDest(layers.EthernetTypeARP, "")
+		}
 	}
 
 	if eth != nil {
@@ -294,7 +305,6 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 		}
 		payloads = buf.Bytes()
 	}
-
 	if _, err := p.Write(payloads); err != nil {
 		return &tcpip.ErrInvalidEndpointState{}
 	}

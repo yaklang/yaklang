@@ -2,7 +2,6 @@ package rwendpoint
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"net"
 	"net/netip"
 	"sync"
@@ -351,9 +350,6 @@ func (p *PcapReadWriteCloser) Write(packet []byte) (n int, err error) {
 			return 0, err
 		}
 		packet = buf.Bytes()
-		if len(origin) == 28 {
-			spew.Dump(packet)
-		}
 		err = p.handle.WritePacketData(packet)
 		if err != nil {
 			return 0, err
