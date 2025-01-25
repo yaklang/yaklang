@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"os/signal"
 	"strings"
@@ -46,15 +48,44 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 		vm, err := netstackvm.NewNetStackVirtualMachine(
 			netstackvm.WithPcapDevice("en0"),
-			netstackvm.WithPcapPromisc(true),
 			netstackvm.WithMainNICLinkAddress(`f0:2f:4b:09:df:59`),
 		)
 		if err != nil {
 			return err
 		}
-		vm.StartDHCP()
-		time.Sleep(10 * time.Second)
-		vm.Wait()
+		if err := vm.StartDHCP(); err != nil {
+			log.Warnf("Start DHCP failed: %v", err)
+		}
+		_ = vm
+		log.Info("dial tcp in 5s")
+		time.Sleep(5 * time.Second)
+		log.Info("开始循环连接测试")
+		var totalTime time.Duration
+		count := 0
+		for {
+			now := time.Now()
+			conn, err := vm.DialTCP(10*time.Second, "2.19.126.156:80")
+			if err != nil {
+				log.Errorf("连接失败: %v", err)
+				continue
+			}
+			_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"))
+			if err != nil {
+				log.Errorf("请求发送失败: %v", err)
+				conn.Close()
+				continue
+			}
+			results := utils.StableReaderEx(conn, 5*time.Second, 1024)
+			elapsed := time.Since(now)
+			totalTime += elapsed
+			count++
+
+			log.Infof("本次请求耗时: %v, 响应长度: %v", elapsed, len(results))
+			log.Infof("平均耗时: %v", totalTime/time.Duration(count))
+
+			conn.Close()
+			time.Sleep(1 * time.Second) // 每次请求间隔1秒
+		}
 		return nil
 	}
 
