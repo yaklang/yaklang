@@ -46,6 +46,8 @@ var DHCPCommand = cli.Command{
 		defer ep.Close()
 
 		macAddr := rwc.GetDeviceHardwareAddr()
+
+		//macAddr, _ = net.ParseMAC("71:71:71:71:71:71")
 		ipAddr := rwc.GetIP4Address()
 		getawayAddr := rwc.GetGatewayIP4Address()
 		stackInstance, err := netstack.NewDefaultStack(
