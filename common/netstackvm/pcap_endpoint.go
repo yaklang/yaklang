@@ -99,7 +99,7 @@ func (p *PCAPEndpoint) SetGatewayIP(g net.IP) {
 	if p.getawayHardware == nil {
 		macaddr, ok := p.ipToMac.Load(g.String())
 		if ok {
-			log.Infof("auto set gateway hardware addr: %s -> %s", g.String(), macaddr.(net.HardwareAddr).String())
+			// log.Infof("auto set gateway hardware addr: %s -> %s", g.String(), macaddr.(net.HardwareAddr).String())
 			p.getawayHardware, _ = macaddr.(net.HardwareAddr)
 		}
 	}
@@ -310,17 +310,21 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 
 	payloads := buf.Flatten()
 
-	getDefaultEthernetByDest := func(nextLayers layers.EthernetType, dst string) *layers.Ethernet {
+	getDefaultEthernetByDest := func(nextLayers layers.EthernetType, dst string, broadcast bool) *layers.Ethernet {
 		var dstMac net.HardwareAddr
-		if dst == "" {
-			dstMac = p.fallbackDefaultMac()
-		} else {
-			macAddr, existed := p.ipToMac.Load(dst)
-			if existed {
-				dstMac = macAddr.(net.HardwareAddr)
-			} else {
+		if !broadcast {
+			if dst == "" {
 				dstMac = p.fallbackDefaultMac()
+			} else {
+				macAddr, existed := p.ipToMac.Load(dst)
+				if existed {
+					dstMac = macAddr.(net.HardwareAddr)
+				} else {
+					dstMac = p.fallbackDefaultMac()
+				}
 			}
+		} else {
+			dstMac = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 		}
 		return &layers.Ethernet{
 			SrcMAC:       net.HardwareAddr(p.LinkAddress()),
@@ -333,19 +337,19 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 	switch ret := header.IPVersion(payloads); ret {
 	case header.IPv4Version:
 		if v4header, err := ipv4.ParseHeader(payloads); err == nil {
-			eth = getDefaultEthernetByDest(layers.EthernetTypeIPv4, v4header.Dst.String())
+			eth = getDefaultEthernetByDest(layers.EthernetTypeIPv4, v4header.Dst.String(), false)
 		} else {
 			log.Errorf("failed to parse ipv4 header: %s", err)
 		}
 	case header.IPv6Version:
 		if v6header, err := ipv6.ParseHeader(payloads); err == nil {
-			eth = getDefaultEthernetByDest(layers.EthernetTypeIPv6, v6header.Dst.String())
+			eth = getDefaultEthernetByDest(layers.EthernetTypeIPv6, v6header.Dst.String(), false)
 		} else {
 			log.Errorf("failed to parse ipv6 header: %s", err)
 		}
 	default:
 		if arpHeader := header.ARP(payloads); arpHeader != nil && arpHeader.IsValid() {
-			eth = getDefaultEthernetByDest(layers.EthernetTypeARP, "")
+			eth = getDefaultEthernetByDest(layers.EthernetTypeARP, "", true)
 		}
 	}
 

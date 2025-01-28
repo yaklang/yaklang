@@ -86,6 +86,16 @@ func (vm *NetStackVirtualMachine) SetMainNICv4(ipAddr net.IP, netmask *net.IPNet
 		return utils.Errorf("failed to add protocol address: %v", tcpErr)
 	}
 
+	if addGwErr := vm.stack.AddProtocolAddress(vm.MainNICID(), tcpip.ProtocolAddress{
+		Protocol: header.IPv4ProtocolNumber,
+		AddressWithPrefix: tcpip.AddressWithPrefix{
+			Address:   tcpip.AddrFrom4([4]byte(getaway.To4())),
+			PrefixLen: ones,
+		},
+	}, stack.AddressProperties{}); addGwErr != nil {
+		return utils.Errorf("failed to add protocol address (gateway): %v", addGwErr)
+	}
+
 	vm.mainNICIPv4Address = ipAddr
 	vm.mainNICIPv4Netmask = netmask
 	vm.mainNICIPv4Gateway = getaway

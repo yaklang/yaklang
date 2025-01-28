@@ -49,7 +49,7 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 		vm, err := netstackvm.NewNetStackVirtualMachine(
 			netstackvm.WithPcapDevice("en0"),
-			netstackvm.WithMainNICLinkAddress(`f0:2f:4b:09:df:59`),
+			netstackvm.WithMainNICLinkAddress(`f0:2f:4b:09:df:44`),
 		)
 		if err != nil {
 			return err
