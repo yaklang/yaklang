@@ -55,9 +55,10 @@ type AcquiredFunc func(ctx context.Context, lost, acquired tcpip.AddressWithPref
 
 // Client is a DHCP client.
 type Client struct {
-	stack           *stack.Stack
-	networkEndpoint stack.NetworkEndpoint
-	xid             xid
+	overrideLinkAddr tcpip.LinkAddress
+	stack            *stack.Stack
+	networkEndpoint  stack.NetworkEndpoint
+	xid              xid
 
 	// info holds the Client's state as type Info.
 	info atomic.Value
@@ -198,6 +199,10 @@ func NewClient(
 		Backoff:        backoff,
 	})
 	return c
+}
+
+func (c *Client) SetOverrideLinkAddr(addr tcpip.LinkAddress) {
+	c.overrideLinkAddr = addr
 }
 
 // Info returns a copy of the synchronized state of the Info.
@@ -430,7 +435,7 @@ func (c *Client) Run(ctx context.Context) (rtn tcpip.AddressWithPrefix) {
 									Addr: header.IPv4Broadcast,
 									Port: ServerPort,
 								},
-								false, /* broadcast */
+								true,  /* broadcast */
 								false, /* ciaddr */
 							); err != nil {
 								log.Infof(tag+" %s: Failed to send DECLINE: %v", nicName, err)
@@ -953,7 +958,13 @@ func (c *Client) send(
 		}
 	}
 
-	chaddr := info.LinkAddr
+	var chaddr tcpip.LinkAddress
+	if c.overrideLinkAddr == "" {
+		chaddr = info.LinkAddr
+	} else {
+		chaddr = tcpip.LinkAddress(c.overrideLinkAddr)
+	}
+
 	if n, l := copy(dhcpPayload.chaddr(), chaddr), len(chaddr); n != l {
 		log.Warn(fmt.Sprintf("failed to copy chaddr bytes, want=%d got=%d", l, n))
 	}
