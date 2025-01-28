@@ -62,6 +62,7 @@ func (vm *NetStackVirtualMachine) StartDHCP() error {
 		},
 	)
 
+	vm.dhcpClient.SetOverrideLinkAddr(tcpip.LinkAddress(vm.GetMainNICLinkAddress()))
 	log.Info("start to run dhcp client")
 	go func() {
 		results := vm.dhcpClient.Run(vm.config.ctx)
