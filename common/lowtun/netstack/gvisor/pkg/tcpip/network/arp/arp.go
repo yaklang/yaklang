@@ -177,7 +177,7 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 	switch h.Op() {
 	case header.ARPRequest:
 		if net.IP(h.ProtocolAddressSender()).String() == net.IP(h.ProtocolAddressTarget()).String() {
-			log.Infof("start to handle gratuitous ARPRequest: v4, question: %v from remote: %v, remotelink: %v", net.IP(h.ProtocolAddressTarget()).String(), net.IP(h.ProtocolAddressSender()).String(), net.HardwareAddr(h.HardwareAddressSender()).String())
+			log.Debugf("start to handle gratuitous ARPRequest: v4, question: %v from remote: %v, remotelink: %v", net.IP(h.ProtocolAddressTarget()).String(), net.IP(h.ProtocolAddressSender()).String(), net.HardwareAddr(h.HardwareAddressSender()).String())
 			e.nic.HandleNeighborConfirmation(header.IPv4ProtocolNumber, tcpip.AddrFrom4([4]byte(net.IP(h.ProtocolAddressSender()).To4())), tcpip.LinkAddress(h.HardwareAddressSender()), stack.ReachabilityConfirmationFlags{
 				Solicited: true,
 				IsRouter:  false,
@@ -195,7 +195,7 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 
 		remoteAddr := tcpip.AddrFrom4Slice(h.ProtocolAddressSender())
 		remoteLinkAddr := tcpip.LinkAddress(h.HardwareAddressSender())
-		log.Infof("start to handle ARPRequest: v4, question: %v from remote: %v, remotelink: %v", net.IP(h.ProtocolAddressTarget()).String(), remoteAddr.String(), net.HardwareAddr(remoteLinkAddr).String())
+		log.Debugf("start to handle ARPRequest: v4, question: %v from remote: %v, remotelink: %v", net.IP(h.ProtocolAddressTarget()).String(), remoteAddr.String(), net.HardwareAddr(remoteLinkAddr).String())
 
 		switch err := e.nic.HandleNeighborProbe(header.IPv4ProtocolNumber, remoteAddr, remoteLinkAddr); err.(type) {
 		case nil:

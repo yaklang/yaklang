@@ -60,7 +60,8 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, d
 	if err != nil {
 		return nil, err
 	}
-	handle, err := pcap.OpenLive(pcapName, 1600, promisc, pcap.BlockForever)
+
+	handle, err := pcap.OpenLive(pcapName, 1600, true, pcap.BlockForever)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +244,7 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 					ipString := net.IP(arpPacket.SourceProtAddress).String()
 					_, ok := p.ipToMac.Load(ipString)
 					if !ok {
-						log.Infof("remember ip to mac: %s -> %s", ipString, net.HardwareAddr(arpPacket.SourceHwAddress).String())
+						//log.Infof("remember ip to mac: %s -> %s", ipString, net.HardwareAddr(arpPacket.SourceHwAddress).String())
 						p.ipToMac.Store(ipString, arpPacket.SourceHwAddress)
 					}
 				}
