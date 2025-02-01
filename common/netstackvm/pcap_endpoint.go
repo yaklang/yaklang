@@ -33,9 +33,10 @@ var _ pcapEpIf = (*PCAPEndpoint)(nil)
 type PCAPEndpoint struct {
 	*channel.Endpoint
 
-	getawayFound    *utils.AtomicBool
-	getawayHardware net.HardwareAddr
-	getawayIP       net.IP
+	overrideSrcHardwareAddr net.HardwareAddr
+	getawayFound            *utils.AtomicBool
+	getawayHardware         net.HardwareAddr
+	getawayIP               net.IP
 
 	ctx                  context.Context
 	cancel               context.CancelFunc
@@ -70,7 +71,7 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, d
 	}
 	mtu := iface.MTU
 
-	_ = handle.SetBPFFilter("")
+	//_ = handle.SetBPFFilter("dst mac " + macAddr.String())
 	ctx, cancel := context.WithCancel(ctx)
 	pcapEp := &PCAPEndpoint{
 		Endpoint:             channel.New(defaultOutQueueLen*100, uint32(mtu), tcpip.LinkAddress(string(macAddr))),
@@ -87,6 +88,10 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, d
 		getawayFound:         utils.NewAtomicBool(),
 	}
 	return pcapEp, nil
+}
+
+func (p *PCAPEndpoint) SetOverrideSrcHardwareAddr(hwAddr net.HardwareAddr) {
+	p.overrideSrcHardwareAddr = hwAddr
 }
 
 func (p *PCAPEndpoint) SetGatewayHardwareAddr(hwAddr net.HardwareAddr) {
@@ -235,7 +240,12 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 					continue
 				}
 				if ok && len(arpPacket.SourceHwAddress) == 6 && !bytes.Equal(arpPacket.SourceHwAddress, []byte{0, 0, 0, 0, 0, 0}) && !bytes.Equal(arpPacket.SourceHwAddress, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}) {
-					p.ipToMac.Store(net.IP(arpPacket.SourceProtAddress).String(), arpPacket.SourceHwAddress)
+					ipString := net.IP(arpPacket.SourceProtAddress).String()
+					_, ok := p.ipToMac.Load(ipString)
+					if !ok {
+						log.Infof("remember ip to mac: %s -> %s", ipString, net.HardwareAddr(arpPacket.SourceHwAddress).String())
+						p.ipToMac.Store(ipString, arpPacket.SourceHwAddress)
+					}
 				}
 				p.InjectInbound(header.ARPProtocolNumber, pkt)
 			} else {
@@ -333,6 +343,7 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 		}
 	}
 
+	isArp := false
 	var eth *layers.Ethernet
 	switch ret := header.IPVersion(payloads); ret {
 	case header.IPv4Version:
@@ -349,7 +360,11 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 		}
 	default:
 		if arpHeader := header.ARP(payloads); arpHeader != nil && arpHeader.IsValid() {
+			if net.IP(arpHeader.ProtocolAddressSender()).String() == p.getawayIP.String() {
+				return nil
+			}
 			eth = getDefaultEthernetByDest(layers.EthernetTypeARP, "", true)
+			isArp = true
 		}
 	}
 
@@ -359,6 +374,14 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 			FixLengths:       true,
 			ComputeChecksums: true,
 		}
+		if p.overrideSrcHardwareAddr != nil {
+			eth.SrcMAC = p.overrideSrcHardwareAddr
+		}
+
+		_ = isArp
+		//if isArp {
+		//	log.Infof("s")
+		//}
 		err := gopacket.SerializeLayers(buf, opts, eth, gopacket.Payload(payloads))
 		if err != nil {
 			log.Warnf("failed to serialize layers: %s", err)

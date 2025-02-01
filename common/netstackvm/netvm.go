@@ -2,6 +2,7 @@ package netstackvm
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/icmp"
 	"net"
 	"sync"
 
@@ -82,6 +83,11 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, tcp.NewProtocol)
 	}
 
+	if !config.ICMPDisabled {
+		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, icmp.NewProtocol4)
+		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, icmp.NewProtocol6)
+	}
+
 	stackOpt.HandleLocal = config.HandleLocal
 
 	stackIns := stack.New(stackOpt)
@@ -101,6 +107,9 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 	pcapEp, err := NewPCAPEndpoint(config.ctx, stackIns, config.pcapPromisc, config.pcapDevice, config.MainNICLinkAddress)
 	if err != nil {
 		return nil, err
+	}
+	if config.OverrideLinkLayerSrcHardware != nil {
+		pcapEp.SetOverrideSrcHardwareAddr(config.OverrideLinkLayerSrcHardware)
 	}
 
 	mainNicID := stackIns.NextNICID()

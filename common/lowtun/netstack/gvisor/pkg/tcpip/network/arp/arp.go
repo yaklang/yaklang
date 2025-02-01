@@ -18,7 +18,9 @@
 package arp
 
 import (
+	"bytes"
 	"fmt"
+	"net"
 	"reflect"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -46,6 +48,8 @@ var _ ip.DADProtocol = (*endpoint)(nil)
 // facility provided by the stack to deliver packets to a layer above
 // the link-layer is via stack.NetworkEndpoint.HandlePacket.
 var _ stack.NetworkEndpoint = (*endpoint)(nil)
+
+var invalidMacHardwareAddr = []byte{0, 0, 0, 0, 0, 0}
 
 // +stateify savable
 type endpoint struct {
@@ -172,6 +176,15 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 
 	switch h.Op() {
 	case header.ARPRequest:
+		if net.IP(h.ProtocolAddressSender()).String() == net.IP(h.ProtocolAddressTarget()).String() {
+			log.Infof("start to handle gratuitous ARPRequest: v4, question: %v from remote: %v, remotelink: %v", net.IP(h.ProtocolAddressTarget()).String(), net.IP(h.ProtocolAddressSender()).String(), net.HardwareAddr(h.HardwareAddressSender()).String())
+			e.nic.HandleNeighborConfirmation(header.IPv4ProtocolNumber, tcpip.AddrFrom4([4]byte(net.IP(h.ProtocolAddressSender()).To4())), tcpip.LinkAddress(h.HardwareAddressSender()), stack.ReachabilityConfirmationFlags{
+				Solicited: true,
+				IsRouter:  false,
+			})
+			return
+		}
+
 		stats.requestsReceived.Increment()
 		localAddr := tcpip.AddrFrom4Slice(h.ProtocolAddressTarget())
 
@@ -182,7 +195,8 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 
 		remoteAddr := tcpip.AddrFrom4Slice(h.ProtocolAddressSender())
 		remoteLinkAddr := tcpip.LinkAddress(h.HardwareAddressSender())
-		log.Debugf("start to handle ARPRequest: v4, question: %v from remote: %v, remotelink: %v", h.ProtocolAddressTarget(), remoteAddr, remoteLinkAddr)
+		log.Infof("start to handle ARPRequest: v4, question: %v from remote: %v, remotelink: %v", net.IP(h.ProtocolAddressTarget()).String(), remoteAddr.String(), net.HardwareAddr(remoteLinkAddr).String())
+
 		switch err := e.nic.HandleNeighborProbe(header.IPv4ProtocolNumber, remoteAddr, remoteLinkAddr); err.(type) {
 		case nil:
 		case *tcpip.ErrNotSupported:
@@ -191,7 +205,6 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 		default:
 			panic(fmt.Sprintf("unexpected error when informing NIC of neighbor probe message: %s", err))
 		}
-
 		respPkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
 			ReserveHeaderBytes: int(e.nic.MaxHeaderLength()) + header.ARPSize,
 		})
@@ -212,6 +225,12 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 		}
 		if n := copy(packet.ProtocolAddressTarget(), h.ProtocolAddressSender()); n != header.IPv4AddressSize {
 			panic(fmt.Sprintf("copied %d bytes, expected %d bytes", n, header.IPv4AddressSize))
+		}
+
+		if bytes.Equal(invalidMacHardwareAddr, packet.HardwareAddressTarget()) {
+			if n := copy(packet.HardwareAddressTarget(), header.EthernetBroadcastAddress); n != header.EthernetAddressSize {
+				panic(fmt.Sprintf("copied %d bytes, expected %d bytes", n, header.EthernetAddressSize))
+			}
 		}
 
 		log.Debugf("start to send ARPReply: v4, local: %v, locallink: %v, remote: %v, remotelink: %v", localAddr, e.nic.LinkAddress(), remoteAddr, remoteLinkAddr)
@@ -254,6 +273,18 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 			panic(fmt.Sprintf("unexpected error when informing NIC of neighbor confirmation message: %s", err))
 		}
 	}
+}
+
+func (e *endpoint) SetRouter(number tcpip.NetworkProtocolNumber, addr tcpip.Address, linkAddr tcpip.LinkAddress) tcpip.Error {
+	return e.nic.HandleNeighborConfirmation(number, addr, linkAddr, stack.ReachabilityConfirmationFlags{
+		Solicited: true,
+		Override:  true,
+		IsRouter:  true,
+	})
+}
+
+func (e *endpoint) HandleNeighborConfirmation(number tcpip.NetworkProtocolNumber, addr tcpip.Address, linkAddr tcpip.LinkAddress, flags stack.ReachabilityConfirmationFlags) tcpip.Error {
+	return e.nic.HandleNeighborConfirmation(number, addr, linkAddr, flags)
 }
 
 // Stats implements stack.NetworkEndpoint.
@@ -353,6 +384,12 @@ func (e *endpoint) sendARPRequest(localAddr, targetAddr tcpip.Address, remoteLin
 		panic(fmt.Sprintf("copied %d bytes, expected %d bytes", n, header.IPv4AddressSize))
 	}
 
+	if bytes.Equal(invalidMacHardwareAddr, h.HardwareAddressTarget()) {
+		if n := copy(h.HardwareAddressTarget(), header.EthernetBroadcastAddress); n != header.EthernetAddressSize {
+			panic(fmt.Sprintf("copied %d bytes, expected %d bytes", n, header.EthernetAddressSize))
+		}
+	}
+
 	stats := e.stats.arp
 	if err := e.nic.WritePacketToRemote(remoteLinkAddr, pkt); err != nil {
 		stats.outgoingRequestsDropped.Increment()
@@ -417,3 +454,9 @@ func NewProtocolWithOptions(opts Options) stack.NetworkProtocolFactory {
 func NewProtocol(s *stack.Stack) stack.NetworkProtocol {
 	return NewProtocolWithOptions(Options{})(s)
 }
+
+type RouteSetter interface {
+	SetRouter(number tcpip.NetworkProtocolNumber, addr tcpip.Address, linkAddr tcpip.LinkAddress) tcpip.Error
+}
+
+var _ RouteSetter = (*endpoint)(nil)

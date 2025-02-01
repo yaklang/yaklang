@@ -746,7 +746,7 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 				}
 				if retransmit {
 					c.stats.RecvOfferTimeout.Increment()
-					log.Infof(tag, "%s: recv timeout waiting for %s; retransmitting %s", nicName, dhcpOFFER, dhcpDISCOVER)
+					log.Infof(tag+" %s: recv timeout waiting for %s; retransmitting %s", nicName, dhcpOFFER, dhcpDISCOVER)
 					continue retransmitDiscover
 				}
 

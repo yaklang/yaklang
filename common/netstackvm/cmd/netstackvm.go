@@ -49,7 +49,9 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 		vm, err := netstackvm.NewNetStackVirtualMachine(
 			netstackvm.WithPcapDevice("en0"),
-			netstackvm.WithMainNICLinkAddress(`f0:2f:4b:09:df:44`),
+			netstackvm.WithMainNICLinkAddress(`f0:2f:4b:11:11:11`),
+			netstackvm.WithPcapPromisc(true),
+			//netstackvm.WithOverrideLinkLayerSrcHardware(`f0:2f:4b:09:df:59`),
 		)
 		if err != nil {
 			return err
@@ -67,12 +69,12 @@ func main() {
 		count := 0
 		for {
 			now := time.Now()
-			conn, err := vm.DialTCP(10*time.Second, "110.242.68.66:80")
+			conn, err := vm.DialTCP(100*time.Second, "23.192.228.150:80")
 			if err != nil {
 				log.Errorf("连接失败: %v", err)
 				continue
 			}
-			_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"))
+			_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n"))
 			if err != nil {
 				log.Errorf("请求发送失败: %v", err)
 				conn.Close()

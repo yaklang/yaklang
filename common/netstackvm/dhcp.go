@@ -6,6 +6,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/dhcp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
+	"github.com/yaklang/yaklang/common/utils/arptable"
 	"net"
 	"time"
 )
@@ -37,6 +39,41 @@ func (vm *NetStackVirtualMachine) StartDHCP() error {
 				getawey = net.ParseIP(cfg.ServerAddress.String())
 			}
 			log.Infof("dhcp client acquired ip: %v, net: %v getaway: %v", preferIp.String(), perferNet.String(), getawey)
+
+			if macAddr, err := arptable.SearchHardware(getawey.String()); err == nil {
+				tcpErr := vm.stack.AddStaticNeighbor(
+					vm.MainNICID(),
+					header.IPv4ProtocolNumber,
+					tcpip.AddrFrom4([4]byte(getawey.To4())),
+					tcpip.LinkAddress(string(macAddr)),
+				)
+				if tcpErr != nil {
+					log.Errorf("add static neighbor failed: %v", tcpErr)
+				}
+			}
+
+			//if nicIns, nicErr := vm.stack.GetNICByID(vm.MainNICID()); nicErr != nil {
+			//	log.Errorf("failed to get nic by id: %v", nicErr)
+			//	return
+			//} else {
+			//	for k, v := range arptable.Table() {
+			//		log.Infof("arp table: %v -> %v", k, v)
+			//		mac, err := net.ParseMAC(v)
+			//		if err != nil {
+			//			continue
+			//		}
+			//		nicIns.HandleNeighborConfirmation(
+			//			header.IPv4ProtocolNumber,
+			//			tcpip.AddrFrom4([4]byte(net.ParseIP(k).To4())),
+			//			tcpip.LinkAddress(string(mac)),
+			//			stack.ReachabilityConfirmationFlags{
+			//				Solicited: true,
+			//				Override:  true,
+			//				IsRouter:  k == getawey.String(),
+			//			},
+			//		)
+			//	}
+			//}
 
 			vm.driver.SetGatewayIP(getawey)
 			err = vm.SetMainNICv4(preferIp, perferNet, getawey)
