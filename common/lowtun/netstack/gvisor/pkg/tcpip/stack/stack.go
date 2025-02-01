@@ -1605,6 +1605,9 @@ func (s *Stack) FindRoute(id tcpip.NICID, localAddr, remoteAddr tcpip.Address, n
 	}
 
 	if needRoute {
+		//if localAddr.String() != "0.0.0.0" || localAddr.String() != "255.255.255.255" {
+		//	log.Info("FindRoute: needRoute, localAddr: " + localAddr.String() + " remoteAddr: " + remoteAddr.String())
+		//}
 		// TODO(https://gvisor.dev/issues/8105): This should be ErrNetworkUnreachable.
 		return nil, &tcpip.ErrHostUnreachable{}
 	}

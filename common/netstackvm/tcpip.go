@@ -17,11 +17,13 @@ func (vm *NetStackVirtualMachine) SetDefaultRoute(gateway net.IP) error {
 			Destination: header.IPv4EmptySubnet,
 			Gateway:     tcpip.AddrFrom4([4]byte(gateway.To4())),
 			NIC:         vm.MainNICID(),
+			MTU:         1500,
 		},
 		{
 			Destination: header.IPv6EmptySubnet,
 			Gateway:     tcpip.AddrFrom4([4]byte(gateway.To4())),
 			NIC:         vm.MainNICID(),
+			MTU:         1500,
 		},
 	})
 	return nil

@@ -66,7 +66,7 @@ func (vm *NetStackVirtualMachine) sendARPAnnouncement(ctx context.Context, ipAdd
 	copy(arpHdr.ProtocolAddressSender(), ipAddr.AsSlice())
 
 	// 设置目标地址（在 Gratuitous ARP 中，协议地址与源相同）
-	copy(arpHdr.HardwareAddressTarget(), header.EthernetBroadcastAddress)
+	// copy(arpHdr.HardwareAddressTarget(), header.EthernetBroadcastAddress)
 	copy(arpHdr.ProtocolAddressTarget(), ipAddr.AsSlice())
 
 	//// 创建以太网头
