@@ -120,7 +120,7 @@ func main() {
 				gatewayAddressStr := handler.GetGatewayIP4Address()
 				log.Infof("gateway address: %v", gatewayAddressStr)
 
-				ep, err := rwendpoint.NewReadWriteCloserEndpoint(handler, 1600, 0)
+				ep, err := rwendpoint.NewReadWriteCloserEndpoint(handler, 1500, 0)
 				if err != nil {
 					log.Errorf("Failed to create ReadWriteCloserEndpoint: %v", err)
 					return err
