@@ -64,14 +64,16 @@ func main() {
 			log.Errorf("Wait DHCP finished failed: %v", err)
 			return utils.Errorf("Wait DHCP finished failed: %v", err)
 		}
-		log.Info("开始循环连接测试")
+		ipAddr := "23.192.228.150"
+		log.Info("开始循环连接测试:" + ipAddr)
+		log.Infof("bpf: %v", `(eth.addr != cc:e0:da:26:66:f2 && arp) || dhcp || ip.addr == 23.192.228.150`)
 		var totalTime time.Duration
 		count := 0
 		for {
 			now := time.Now()
-			conn, err := vm.DialTCP(100*time.Second, "23.192.228.150:80")
+			conn, err := vm.DialTCP(10*time.Second, ipAddr+":80")
 			if err != nil {
-				log.Errorf("连接失败: %v", err)
+				log.Errorf("连接 %v 失败: %v", ipAddr, err)
 				continue
 			}
 			_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n"))
