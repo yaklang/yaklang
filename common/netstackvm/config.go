@@ -89,8 +89,6 @@ type Config struct {
 	OnTCPConnectionRequested    func(*tcpip.FullAddress, *tcpip.FullAddress)
 	DisableForwarding           bool
 
-	OverrideLinkLayerSrcHardware net.HardwareAddr
-
 	//dhcp config
 	DHCPAcquireTimeout       time.Duration
 	DHCPAcquireInterval      time.Duration
@@ -241,17 +239,6 @@ func WithRandomMainNICLinkAddress() Option {
 		rand.Read(mac)
 		mac[0] = (mac[0] | 2) & 0xfe // Set local bit, ensure unicast
 		c.MainNICLinkAddress = net.HardwareAddr(mac)
-		return nil
-	}
-}
-
-func WithOverrideLinkLayerSrcHardware(addr string) Option {
-	return func(config *Config) error {
-		addrIns, err := net.ParseMAC(addr)
-		if err != nil {
-			return err
-		}
-		config.OverrideLinkLayerSrcHardware = addrIns
 		return nil
 	}
 }
