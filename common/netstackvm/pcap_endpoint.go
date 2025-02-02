@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/pcap"
@@ -33,11 +34,10 @@ var _ pcapEpIf = (*PCAPEndpoint)(nil)
 type PCAPEndpoint struct {
 	*channel.Endpoint
 
-	overrideSrcHardwareAddr net.HardwareAddr
-	getawayFound            *utils.AtomicBool
-	getawayHardware         net.HardwareAddr
-	getawayIP               net.IP
-
+	netBridge            *pcapBridge
+	getawayFound         *utils.AtomicBool
+	getawayHardware      net.HardwareAddr
+	getawayIP            net.IP
 	ctx                  context.Context
 	cancel               context.CancelFunc
 	attachOnce           sync.Once
@@ -72,9 +72,14 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, d
 	}
 	mtu := iface.MTU
 
+	internalMacAddr := macAddr
+	externalMacAddr := iface.HardwareAddr
+	bridge := &pcapBridge{internal: internalMacAddr, external: externalMacAddr}
+
 	//_ = handle.SetBPFFilter("dst mac " + macAddr.String())
 	ctx, cancel := context.WithCancel(ctx)
 	pcapEp := &PCAPEndpoint{
+		netBridge:            bridge,
 		Endpoint:             channel.New(defaultOutQueueLen*100, uint32(mtu), tcpip.LinkAddress(string(macAddr))),
 		stack:                stackIns,
 		handle:               handle,
@@ -89,10 +94,6 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, d
 		getawayFound:         utils.NewAtomicBool(),
 	}
 	return pcapEp, nil
-}
-
-func (p *PCAPEndpoint) SetOverrideSrcHardwareAddr(hwAddr net.HardwareAddr) {
-	p.overrideSrcHardwareAddr = hwAddr
 }
 
 func (p *PCAPEndpoint) SetGatewayHardwareAddr(hwAddr net.HardwareAddr) {
@@ -180,6 +181,7 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 		log.Info("inboundLoop exit")
 	}()
 
+	log.Infof("start to execute inbound loop with mtu: %v", mtu)
 	for {
 		select {
 		case <-ctx.Done():
@@ -204,10 +206,7 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 
 		dataWithLink := data[:n]
 
-		packet := gopacket.NewPacket(dataWithLink, layers.LinkTypeEthernet, gopacket.DecodeOptions{
-			NoCopy: true,
-			Lazy:   true,
-		})
+		packet := gopacket.NewPacket(dataWithLink, layers.LinkTypeEthernet, gopacket.DecodeOptions{})
 
 		linkLayer := packet.LinkLayer()
 		offset := 0
@@ -215,10 +214,11 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 		var dstMac net.HardwareAddr
 		if linkLayer != nil {
 			offset = len(linkLayer.LayerContents())
-			switch ret := linkLayer.(type) {
+			switch eth := linkLayer.(type) {
 			case *layers.Ethernet:
-				srcMac = ret.SrcMAC
-				dstMac = ret.DstMAC
+				eth = p.netBridge.handleInbound(eth)
+				srcMac = eth.SrcMAC
+				dstMac = eth.DstMAC
 				_ = dstMac
 			}
 		}
@@ -250,7 +250,7 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 				}
 				p.InjectInbound(header.ARPProtocolNumber, pkt)
 			} else {
-				log.Infof("recv non network layer packet: \n%s", packet.Dump())
+				log.Infof("recv non network layer packet: \n%s", spew.Sdump(dataWithLink))
 			}
 		} else {
 			switch networklayer.LayerType() {
@@ -364,31 +364,46 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 			if net.IP(arpHeader.ProtocolAddressSender()).String() == p.getawayIP.String() {
 				return nil
 			}
-			eth = getDefaultEthernetByDest(layers.EthernetTypeARP, "", true)
+			arpHeader = p.netBridge.handleOutboundARP(arpHeader)
+			payloads = arpHeader
+			if arpHeader.Op() == header.ARPReply {
+				eth = &layers.Ethernet{
+					SrcMAC:       net.HardwareAddr(p.LinkAddress()),
+					DstMAC:       net.HardwareAddr(arpHeader.HardwareAddressTarget()),
+					EthernetType: layers.EthernetTypeARP,
+				}
+			} else {
+				eth = getDefaultEthernetByDest(layers.EthernetTypeARP, "", true)
+			}
 			isArp = true
 		}
 	}
 
 	if eth != nil {
+		eth = p.netBridge.handleOutbound(eth)
+	}
+
+	if eth != nil && !isArp {
 		buf := gopacket.NewSerializeBuffer()
 		opts := gopacket.SerializeOptions{
 			FixLengths:       true,
 			ComputeChecksums: true,
 		}
-		if p.overrideSrcHardwareAddr != nil {
-			eth.SrcMAC = p.overrideSrcHardwareAddr
-		}
-
-		_ = isArp
-		//if isArp {
-		//	log.Infof("s")
-		//}
 		err := gopacket.SerializeLayers(buf, opts, eth, gopacket.Payload(payloads))
 		if err != nil {
 			log.Warnf("failed to serialize layers: %s", err)
 			return &tcpip.ErrInvalidEndpointState{}
 		}
 		payloads = buf.Bytes()
+	} else {
+		ethBytes := make([]byte, 0, 14)
+		ethBytes = append(ethBytes, eth.DstMAC...)
+		ethBytes = append(ethBytes, eth.SrcMAC...)
+		ethBytes = append(ethBytes, 0x08, 0x06)
+		newPayloads := make([]byte, 0, len(payloads)+14)
+		newPayloads = append(newPayloads, ethBytes...)
+		newPayloads = append(newPayloads, payloads...)
+		payloads = newPayloads
 	}
 	if _, err := p.Write(payloads); err != nil {
 		return &tcpip.ErrInvalidEndpointState{}

@@ -108,9 +108,6 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 	if err != nil {
 		return nil, err
 	}
-	if config.OverrideLinkLayerSrcHardware != nil {
-		pcapEp.SetOverrideSrcHardwareAddr(config.OverrideLinkLayerSrcHardware)
-	}
 
 	mainNicID := stackIns.NextNICID()
 	tcpErr := stackIns.CreateNICWithOptions(mainNicID, pcapEp, stack.NICOptions{
