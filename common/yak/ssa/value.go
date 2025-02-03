@@ -3,6 +3,7 @@ package ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 // --------------- Read
@@ -84,9 +85,9 @@ func (b *FunctionBuilder) readValueEx(
 				program.SetOffsetVariable(ret, b.CurrentRange)
 			}
 		}
-		if ret.Value != nil {
+		if ret.GetVariableMemory().Value != nil {
 			// has value, just return
-			return ret.Value
+			return ret.GetVariableMemory().Value
 		}
 	}
 
@@ -151,12 +152,27 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	// log.Infof("AssignVariable: %v, %v typ %s", variable.GetName(), value.GetName(), value.GetType())
 	name := variable.GetName()
-	_ = name
+	scope := b.CurrentBlock.ScopeTable
+
 	if utils.IsNil(value) {
 		log.Infof("assign nil value to variable: %v, it will not work on ssa ir format", name)
 		return
 	}
-	scope := b.CurrentBlock.ScopeTable
+
+	if variable.GetKind() == ssautil.DereferenceVariable {
+		variable.HandleDereferenceVariable(value)
+		// } else if variable.GetKind() == ssautil.AddressVariable {
+		// 	variable.HandleAddressVariable(value)
+	}
+
+	if variableMemory := value.GetVariableMemory(); variableMemory != nil {
+		if variableMemory.GetKind() == ssautil.DereferenceVariable {
+			variable.HandleDereferenceVariable(value)
+		} else if variableMemory.GetKind() == ssautil.AddressVariable {
+			variable.HandleAddressVariable(value)
+		}
+	}
+
 	scope.AssignVariable(variable, value)
 
 	if value.GetName() == variable.GetName() {
@@ -214,6 +230,9 @@ func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) 
 	if variable := b.getCurrentScopeVariable(name); variable != nil {
 		if value := variable.GetValue(); value != nil {
 			if _, ok := ToConst(value); ok {
+				return variable
+			}
+			if un, ok := ToUnOp(value); ok && un.Op == OpAddress {
 				return variable
 			}
 			if _, ok := value.(*SideEffect); ok {
@@ -338,7 +357,7 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 	parentScope := b.parentScope
 	for parentScope != nil {
 		if parentVariable := ReadVariableFromScopeAndParent(parentScope.scope, name); parentVariable != nil {
-			return parentVariable.Value, true
+			return parentVariable.GetVariableMemory().Value, true
 		}
 		parentScope = parentScope.next
 	}

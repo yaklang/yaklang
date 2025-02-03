@@ -49,11 +49,13 @@ func IsCompareOpcode(i BinaryOpcode) bool {
 type UnaryOpcode string
 
 const (
-	OpNot        = `not`
-	OpPlus       = `plus`
-	OpNeg        = `neg`
-	OpChan       = `chan`
-	OpBitwiseNot = `bitwise-not`
+	OpNot         = `not`
+	OpPlus        = `plus`
+	OpNeg         = `neg`
+	OpChan        = `chan`
+	OpBitwiseNot  = `bitwise-not`
+	OpDereference = `dereference-operator`
+	OpAddress     = `address-of-operator`
 )
 
 func HandlerBinOp(b *BinOp) (ret Value) {
@@ -198,7 +200,7 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 		}
 	case OpAdd:
 		if x.IsFloat() && y.IsFloat() {
-		    return NewConst(x.Float() + y.Float())
+			return NewConst(x.Float() + y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() + y.Number())
@@ -208,24 +210,24 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 		}
 	case OpSub:
 		if x.IsFloat() && y.IsFloat() {
-		    return NewConst(x.Float() - y.Float())
+			return NewConst(x.Float() - y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() - y.Number())
 		}
 	case OpMul:
 		if x.IsFloat() && y.IsFloat() {
-		    return NewConst(x.Float() * y.Float())
+			return NewConst(x.Float() * y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() * y.Number())
 		}
 	case OpDiv:
 		if x.IsFloat() && y.IsFloat() {
-		    if x.Float() == 0 || y.Float() == 0 {
-		        return NewConst(0)
+			if x.Float() == 0 || y.Float() == 0 {
+				return NewConst(0)
 			}
-		    return NewConst(x.Float() / y.Float())
+			return NewConst(x.Float() / y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			if x.Number() == 0 || y.Number() == 0 {
