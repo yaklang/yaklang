@@ -58,6 +58,71 @@ func main() {
 		{
 			Name:  "synscan",
 			Usage: "synscan <ip>",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "iface",
+					Usage: "指定物理网卡名称",
+				},
+				cli.StringFlag{
+					Name:  "ports,p",
+					Usage: "specify target ports to scan",
+					Value: "22,80",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				ifaceName := c.String("iface")
+				if ifaceName == "" {
+					route, gateway, srcIP, err := netutil.GetPublicRoute()
+					if err != nil {
+						return err
+					}
+					ifaceName = route.Name
+					_ = gateway
+					_ = srcIP
+				}
+				vm, err := netstackvm.NewNetStackVirtualMachine(
+					netstackvm.WithPcapDevice(ifaceName),
+				)
+				if err != nil {
+					return err
+				}
+
+				err = vm.InheritPcapInterfaceIP()
+				if err != nil {
+					return err
+				}
+
+				swg := utils.NewSizedWaitGroup(2000)
+
+				ports := utils.ParseStringToPorts(c.String("ports"))
+				if len(ports) == 0 {
+					ports = []int{80, 22, 443, 3306, 3389}
+				}
+				log.Infof("start to scan ports: %v", ports)
+				hostsRaw := strings.Join(c.Args(), ",")
+				log.Infof("start to scan hosts: %v", hostsRaw)
+				hosts := utils.ParseStringToHosts(hostsRaw)
+				for _, host := range hosts {
+					for _, port := range ports {
+						host := host
+						port := port
+						swg.Add()
+						go func() {
+							defer swg.Done()
+							addr := utils.HostPort(host, port)
+							conn, err := vm.DialTCP(5*time.Second, addr)
+							if err != nil {
+								// log.Infof("CLOSE: %v, REASON: %v", addr, err)
+								return
+							}
+							log.Infof("OPEN: %v", addr)
+							conn.Close()
+						}()
+					}
+				}
+				swg.Wait()
+				return nil
+			},
 		},
 	}
 

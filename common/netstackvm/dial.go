@@ -1,6 +1,7 @@
 package netstackvm
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/adapters/gonet"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
@@ -12,6 +13,11 @@ import (
 )
 
 func (vm *NetStackVirtualMachine) DialTCP(timeout time.Duration, hostport string) (net.Conn, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("panic: %v", err)
+		}
+	}()
 	host, port, err := utils.ParseStringToHostPort(hostport)
 	if err != nil {
 		return nil, err

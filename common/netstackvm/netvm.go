@@ -2,9 +2,10 @@ package netstackvm
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/icmp"
 	"net"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/icmp"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 
@@ -22,6 +23,9 @@ import (
 )
 
 type NetStackVirtualMachine struct {
+	systemIface *net.Interface
+	mtu         int
+
 	stack  *stack.Stack
 	config *Config
 
@@ -51,6 +55,12 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 		if err := opt(config); err != nil {
 			return nil, err
 		}
+	}
+	// 获取网络接口
+	iface, err := net.InterfaceByName(config.pcapDevice)
+	if err != nil {
+		log.Debugf("failed to get interface %s: %v", config.pcapDevice, err)
+		return nil, utils.Errorf("failed to get interface %s: %v", config.pcapDevice, err)
 	}
 
 	if config.ctx == nil {
@@ -103,11 +113,16 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 		}
 	}
 
+	mtu := iface.MTU
+
 	log.Infof("start to create pcap endpoint default mac: %v", config.MainNICLinkAddress.String())
-	pcapEp, err := NewPCAPEndpoint(config.ctx, stackIns, config.pcapPromisc, config.pcapDevice, config.MainNICLinkAddress)
+	pcapEp, err := NewPCAPEndpoint(config.ctx, stackIns, config.pcapDevice, config.MainNICLinkAddress, config.pcapPromisc)
 	if err != nil {
 		return nil, err
 	}
+
+	pcapEp.SetPCAPOutboundFilter(config.pcapOutboundFilter)
+	pcapEp.SetPCAPInboundFilter(config.pcapInboundFilter)
 
 	mainNicID := stackIns.NextNICID()
 	tcpErr := stackIns.CreateNICWithOptions(mainNicID, pcapEp, stack.NICOptions{
@@ -182,7 +197,17 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 	vm.arpPersistentMutex = sync.Mutex{}
 	vm.arpPersistentTrigger = utils.NewAtomicBool()
 	vm.driver = pcapEp
+	vm.mtu = mtu
+	vm.systemIface = iface
 	return vm, nil
+}
+
+func (vm *NetStackVirtualMachine) GetMTU() int {
+	return vm.mtu
+}
+
+func (vm *NetStackVirtualMachine) GetSystemInterface() *net.Interface {
+	return vm.systemIface
 }
 
 func (vm *NetStackVirtualMachine) GetStack() *stack.Stack {
