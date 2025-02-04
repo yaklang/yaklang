@@ -3,14 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
+	"math/rand"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/netstackvm"
@@ -42,16 +45,47 @@ func main() {
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name: "",
+			Name:  "iface",
+			Usage: "指定物理网卡名称",
+		},
+		cli.StringFlag{
+			Name:  "vmac",
+			Usage: "指定虚拟机MAC地址",
+		},
+	}
+
+	app.Commands = []cli.Command{
+		{
+			Name:  "synscan",
+			Usage: "synscan <ip>",
 		},
 	}
 
 	app.Action = func(c *cli.Context) error {
+		ifaceName := c.String("iface")
+		if c.String("iface") == "" {
+			route, gateway, srcIP, err := netutil.GetPublicRoute()
+			if err != nil {
+				return err
+			}
+			_ = gateway
+			_ = srcIP
+			ifaceName = route.Name
+		}
+
+		if ifaceName == "" {
+			return utils.Errorf("no network interface specified")
+		}
+
+		vmac := c.String("vmac")
+		if vmac == "" {
+			vmac = fmt.Sprintf("f0:2f:4b:ff:%02x:%02x", rand.Intn(255), rand.Intn(255))
+			log.Info("no vmac specified, use random mac")
+		}
+
 		vm, err := netstackvm.NewNetStackVirtualMachine(
-			netstackvm.WithPcapDevice("en0"),
-			netstackvm.WithMainNICLinkAddress(`f0:2f:4b:11:11:11`),
-			netstackvm.WithPcapPromisc(true),
-			//netstackvm.WithOverrideLinkLayerSrcHardware(`f0:2f:4b:09:df:59`),
+			netstackvm.WithPcapDevice(ifaceName),
+			netstackvm.WithMainNICLinkAddress(vmac),
 		)
 		if err != nil {
 			return err

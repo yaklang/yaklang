@@ -3,51 +3,37 @@ package netstackvm
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
-	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/buffer"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/link/channel"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
-	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"io"
 	"net"
 	"sync"
-	"sync/atomic"
 )
-
-type pcapEpIf interface {
-	io.ReadWriter
-	Close()
-}
-
-var _ pcapEpIf = (*PCAPEndpoint)(nil)
 
 type PCAPEndpoint struct {
 	*channel.Endpoint
 
-	netBridge            *pcapBridge
-	getawayFound         *utils.AtomicBool
-	getawayHardware      net.HardwareAddr
-	getawayIP            net.IP
-	ctx                  context.Context
-	cancel               context.CancelFunc
-	attachOnce           sync.Once
-	wg                   *sync.WaitGroup
-	stack                *stack.Stack
-	handle               *pcap.Handle
-	writeMutex           *sync.Mutex
-	pcapPacketHandleOnce sync.Once
-	pcapPacket           chan gopacket.Packet
-	mtu                  int
+	adaptor         *pcapAdaptor
+	netBridge       *pcapBridge
+	getawayFound    *utils.AtomicBool
+	getawayHardware net.HardwareAddr
+	getawayIP       net.IP
+	ctx             context.Context
+	cancel          context.CancelFunc
+	attachOnce      sync.Once
+	wg              *sync.WaitGroup
+	stack           *stack.Stack
+	writeMutex      *sync.Mutex
+	mtu             int
 
 	// ethernet cache n arp cache
 	ipToMac *sync.Map
@@ -56,14 +42,9 @@ type PCAPEndpoint struct {
 const defaultOutQueueLen = 1 << 10
 
 func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, device string, macAddr net.HardwareAddr) (*PCAPEndpoint, error) {
-	pcapName, err := pcaputil.IfaceNameToPcapIfaceName(device)
+	adaptor, err := NewPCAPAdaptor(device, promisc)
 	if err != nil {
-		return nil, err
-	}
-
-	handle, err := pcap.OpenLive(pcapName, 1600, true, pcap.BlockForever)
-	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("create pcap adaptor failed: %v", err)
 	}
 
 	iface, err := net.InterfaceByName(device)
@@ -79,19 +60,18 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, d
 	//_ = handle.SetBPFFilter("dst mac " + macAddr.String())
 	ctx, cancel := context.WithCancel(ctx)
 	pcapEp := &PCAPEndpoint{
-		netBridge:            bridge,
-		Endpoint:             channel.New(defaultOutQueueLen*100, uint32(mtu), tcpip.LinkAddress(string(macAddr))),
-		stack:                stackIns,
-		handle:               handle,
-		mtu:                  mtu,
-		writeMutex:           new(sync.Mutex),
-		pcapPacketHandleOnce: sync.Once{},
-		pcapPacket:           gopacket.NewPacketSource(handle, handle.LinkType()).Packets(),
-		ctx:                  ctx,
-		cancel:               cancel,
-		wg:                   new(sync.WaitGroup),
-		ipToMac:              new(sync.Map),
-		getawayFound:         utils.NewAtomicBool(),
+		//handle:               handle,
+
+		adaptor:      adaptor,
+		netBridge:    bridge,
+		Endpoint:     channel.New(defaultOutQueueLen*100, uint32(mtu), tcpip.LinkAddress(string(macAddr))),
+		stack:        stackIns,
+		mtu:          mtu,
+		ctx:          ctx,
+		cancel:       cancel,
+		wg:           new(sync.WaitGroup),
+		ipToMac:      new(sync.Map),
+		getawayFound: utils.NewAtomicBool(),
 	}
 	return pcapEp, nil
 }
@@ -113,36 +93,9 @@ func (p *PCAPEndpoint) SetGatewayIP(g net.IP) {
 	p.getawayFound.Set()
 }
 
-func (p *PCAPEndpoint) Read(packet []byte) (n int, err error) {
-	if p.pcapPacket == nil {
-		return 0, fmt.Errorf("pcapPacket is nil")
-	}
-	select {
-	case <-p.ctx.Done():
-		return 0, fmt.Errorf("pcapPacket is closed")
-	case pkt, ok := <-p.pcapPacket:
-		if !ok {
-			log.Infof("pcapPacket is closed")
-			return 0, fmt.Errorf("pcapPacket is closed")
-		}
-		n := copy(packet, pkt.Data())
-		return n, nil
-	}
-}
-
-func (p *PCAPEndpoint) Write(packet []byte) (n int, err error) {
-	//p.writeMutex.Lock()
-	//defer p.writeMutex.Unlock()
-	err = p.handle.WritePacketData(packet)
-	if err != nil {
-		return 0, err
-	}
-	return len(packet), nil
-}
-
 func (p *PCAPEndpoint) Close() {
 	p.cancel()
-	p.handle.Close()
+	p.adaptor.Close()
 }
 
 func (p *PCAPEndpoint) Attach(dispatcher stack.NetworkDispatcher) {
@@ -177,37 +130,34 @@ func (p *PCAPEndpoint) Wait() {
 func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 	mtu := p.mtu
 
+	packetChan := p.adaptor.PacketSource()
+	if packetChan == nil {
+		log.Errorf("failed to get packet source: nil packet source")
+		return
+	}
+
 	defer func() {
 		log.Info("inboundLoop exit")
 	}()
 
 	log.Infof("start to execute inbound loop with mtu: %v", mtu)
+	var packet gopacket.Packet
+	var ok bool
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case packet, ok = <-packetChan:
+			if !ok {
+				log.Errorf("failed to get packet from packet source: %v", ok)
+				return
+			}
 		}
 
-		data := make([]byte, mtu)
-		n, err := p.Read(data)
-		if err != nil {
-			log.Errorf("failed to read from pcap: %s", err)
-			return
-		}
-		if n == 0 || n > mtu {
-			continue
-		}
-		addInboundPacket()
-
+		data := packet.Data()
 		if !p.IsAttached() {
 			continue
 		}
-
-		dataWithLink := data[:n]
-
-		packet := gopacket.NewPacket(dataWithLink, layers.LinkTypeEthernet, gopacket.DecodeOptions{})
-
 		linkLayer := packet.LinkLayer()
 		offset := 0
 		var srcMac net.HardwareAddr
@@ -222,7 +172,7 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 				_ = dstMac
 			}
 		}
-		networkPayloads := data[offset:n]
+		networkPayloads := data[offset:]
 
 		pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
 			Payload: buffer.MakeWithData(networkPayloads),
@@ -250,7 +200,7 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 				}
 				p.InjectInbound(header.ARPProtocolNumber, pkt)
 			} else {
-				log.Infof("recv non network layer packet: \n%s", spew.Sdump(dataWithLink))
+				log.Infof("recv non network layer packet: \n%s", spew.Sdump(data))
 			}
 		} else {
 			switch networklayer.LayerType() {
@@ -278,19 +228,6 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 	}
 }
 
-var inboundPacket = new(int64)
-var outboundPacket = new(int64)
-
-func addInboundPacket() {
-	atomic.AddInt64(inboundPacket, 1)
-	//log.Infof("inbound packet: %d", atomic.LoadInt64(inboundPacket))
-}
-
-func addOutboundPacket() {
-	atomic.AddInt64(outboundPacket, 1)
-	//log.Infof("outbound packet: %d", atomic.LoadInt64(outboundPacket))
-}
-
 func (p *PCAPEndpoint) outboundLoop(ctx context.Context) {
 	for {
 		pkt := p.ReadContext(ctx)
@@ -298,7 +235,6 @@ func (p *PCAPEndpoint) outboundLoop(ctx context.Context) {
 			log.Infof("outboundLoop exit")
 			break
 		}
-		addOutboundPacket()
 		if !p.IsAttached() {
 			continue
 		}
@@ -405,7 +341,7 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 		newPayloads = append(newPayloads, payloads...)
 		payloads = newPayloads
 	}
-	if _, err := p.Write(payloads); err != nil {
+	if err := p.adaptor.WritePacketData(payloads); err != nil {
 		return &tcpip.ErrInvalidEndpointState{}
 	}
 	return nil
