@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/gopacket/gopacket"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv6"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
@@ -72,8 +73,10 @@ type Config struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	pcapPromisc bool
-	pcapDevice  string
+	pcapPromisc        bool
+	pcapDevice         string
+	pcapInboundFilter  func(packet gopacket.Packet) bool
+	pcapOutboundFilter func(packet gopacket.Packet) bool
 
 	// stack options
 	IPv4Disabled                bool
@@ -219,6 +222,20 @@ func NewDefaultConfig() *Config {
 		ARPAnnouncementFastTimes:    2,
 		ARPAnnouncementSlowInterval: 30 * time.Second,
 		pcapPromisc:                 true,
+	}
+}
+
+func WithPCAPInboundFilter(filter func(packet gopacket.Packet) bool) Option {
+	return func(c *Config) error {
+		c.pcapInboundFilter = filter
+		return nil
+	}
+}
+
+func WithPCAPOutboundFilter(filter func(packet gopacket.Packet) bool) Option {
+	return func(c *Config) error {
+		c.pcapOutboundFilter = filter
+		return nil
 	}
 }
 

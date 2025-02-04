@@ -22,6 +22,9 @@ import (
 type PCAPEndpoint struct {
 	*channel.Endpoint
 
+	inboundFilter  func(packet gopacket.Packet) bool
+	outboundFilter func(packet gopacket.Packet) bool
+
 	adaptor         *pcapAdaptor
 	netBridge       *pcapBridge
 	getawayFound    *utils.AtomicBool
@@ -41,7 +44,15 @@ type PCAPEndpoint struct {
 
 const defaultOutQueueLen = 1 << 10
 
-func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, promisc bool, device string, macAddr net.HardwareAddr) (*PCAPEndpoint, error) {
+func (p *PCAPEndpoint) SetPCAPInboundFilter(filter func(packet gopacket.Packet) bool) {
+	p.inboundFilter = filter
+}
+
+func (p *PCAPEndpoint) SetPCAPOutboundFilter(filter func(packet gopacket.Packet) bool) {
+	p.outboundFilter = filter
+}
+
+func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, macAddr net.HardwareAddr, promisc bool) (*PCAPEndpoint, error) {
 	adaptor, err := NewPCAPAdaptor(device, promisc)
 	if err != nil {
 		return nil, utils.Errorf("create pcap adaptor failed: %v", err)
@@ -153,11 +164,15 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 				return
 			}
 		}
-
-		data := packet.Data()
 		if !p.IsAttached() {
 			continue
 		}
+
+		if p.inboundFilter != nil && !p.inboundFilter(packet) {
+			continue
+		}
+
+		data := packet.Data()
 		linkLayer := packet.LinkLayer()
 		offset := 0
 		var srcMac net.HardwareAddr
@@ -238,7 +253,10 @@ func (p *PCAPEndpoint) outboundLoop(ctx context.Context) {
 		if !p.IsAttached() {
 			continue
 		}
-		p.writePacket(pkt)
+		err := p.writePacket(pkt)
+		if err != nil {
+			log.Errorf("failed to write packet (PCAPEndpoint): %v", err)
+		}
 	}
 }
 
@@ -249,7 +267,7 @@ func (p *PCAPEndpoint) fallbackDefaultMac() net.HardwareAddr {
 	return net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 }
 
-func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
+func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) error {
 	defer pkt.DecRef()
 
 	buf := pkt.ToBuffer()
@@ -287,19 +305,16 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 		if v4header, err := ipv4.ParseHeader(payloads); err == nil {
 			eth = getDefaultEthernetByDest(layers.EthernetTypeIPv4, v4header.Dst.String(), false)
 		} else {
-			log.Errorf("failed to parse ipv4 header: %s", err)
+			return utils.Errorf("failed to parse ipv4 header: %v", err)
 		}
 	case header.IPv6Version:
 		if v6header, err := ipv6.ParseHeader(payloads); err == nil {
 			eth = getDefaultEthernetByDest(layers.EthernetTypeIPv6, v6header.Dst.String(), false)
 		} else {
-			log.Errorf("failed to parse ipv6 header: %s", err)
+			return utils.Errorf("failed to parse ipv6 header: %v", err)
 		}
 	default:
 		if arpHeader := header.ARP(payloads); arpHeader != nil && arpHeader.IsValid() {
-			if net.IP(arpHeader.ProtocolAddressSender()).String() == p.getawayIP.String() {
-				return nil
-			}
 			arpHeader = p.netBridge.handleOutboundARP(arpHeader)
 			payloads = arpHeader
 			if arpHeader.Op() == header.ARPReply {
@@ -319,30 +334,39 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) tcpip.Error {
 		eth = p.netBridge.handleOutbound(eth)
 	}
 
-	if eth != nil && !isArp {
-		buf := gopacket.NewSerializeBuffer()
-		opts := gopacket.SerializeOptions{
-			FixLengths:       true,
-			ComputeChecksums: true,
+	if eth != nil {
+		if !isArp {
+			buf := gopacket.NewSerializeBuffer()
+			opts := gopacket.SerializeOptions{
+				FixLengths:       true,
+				ComputeChecksums: true,
+			}
+			err := gopacket.SerializeLayers(buf, opts, eth, gopacket.Payload(payloads))
+			if err != nil {
+				return utils.Errorf("failed to serialize layers: %v", err)
+			}
+			payloads = buf.Bytes()
+		} else {
+			ethBytes := make([]byte, 0, 14)
+			ethBytes = append(ethBytes, eth.DstMAC...)
+			ethBytes = append(ethBytes, eth.SrcMAC...)
+			ethBytes = append(ethBytes, 0x08, 0x06)
+			newPayloads := make([]byte, 0, len(payloads)+14)
+			newPayloads = append(newPayloads, ethBytes...)
+			newPayloads = append(newPayloads, payloads...)
+			payloads = newPayloads
 		}
-		err := gopacket.SerializeLayers(buf, opts, eth, gopacket.Payload(payloads))
-		if err != nil {
-			log.Warnf("failed to serialize layers: %s", err)
-			return &tcpip.ErrInvalidEndpointState{}
-		}
-		payloads = buf.Bytes()
-	} else {
-		ethBytes := make([]byte, 0, 14)
-		ethBytes = append(ethBytes, eth.DstMAC...)
-		ethBytes = append(ethBytes, eth.SrcMAC...)
-		ethBytes = append(ethBytes, 0x08, 0x06)
-		newPayloads := make([]byte, 0, len(payloads)+14)
-		newPayloads = append(newPayloads, ethBytes...)
-		newPayloads = append(newPayloads, payloads...)
-		payloads = newPayloads
 	}
+
+	if p.outboundFilter != nil && eth != nil {
+		packet := gopacket.NewPacket(payloads, layers.LayerTypeEthernet, gopacket.Default)
+		if !p.outboundFilter(packet) {
+			return nil
+		}
+	}
+
 	if err := p.adaptor.WritePacketData(payloads); err != nil {
-		return &tcpip.ErrInvalidEndpointState{}
+		return utils.Errorf("adaptor.WritePacketData in PCAPEndpoint failed: %v", err)
 	}
 	return nil
 }

@@ -52,29 +52,6 @@ func (vm *NetStackVirtualMachine) StartDHCP() error {
 				}
 			}
 
-			//if nicIns, nicErr := vm.stack.GetNICByID(vm.MainNICID()); nicErr != nil {
-			//	log.Errorf("failed to get nic by id: %v", nicErr)
-			//	return
-			//} else {
-			//	for k, v := range arptable.Table() {
-			//		log.Infof("arp table: %v -> %v", k, v)
-			//		mac, err := net.ParseMAC(v)
-			//		if err != nil {
-			//			continue
-			//		}
-			//		nicIns.HandleNeighborConfirmation(
-			//			header.IPv4ProtocolNumber,
-			//			tcpip.AddrFrom4([4]byte(net.ParseIP(k).To4())),
-			//			tcpip.LinkAddress(string(mac)),
-			//			stack.ReachabilityConfirmationFlags{
-			//				Solicited: true,
-			//				Override:  true,
-			//				IsRouter:  k == getawey.String(),
-			//			},
-			//		)
-			//	}
-			//}
-
 			vm.driver.SetGatewayIP(getawey)
 			err = vm.SetMainNICv4(preferIp, perferNet, getawey)
 			if err != nil {
