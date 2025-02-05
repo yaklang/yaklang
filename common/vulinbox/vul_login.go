@@ -103,6 +103,11 @@ func (s *VulinServer) registerLoginRoute() {
 		},
 		{
 			DefaultQuery: "",
+			Path:         "/register",
+			Handler:      s.RegisterUserHandler,
+		},
+		{
+			DefaultQuery: "",
 			Path:         "/login/profile",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				authToken := request.Header.Get("Authorization")
