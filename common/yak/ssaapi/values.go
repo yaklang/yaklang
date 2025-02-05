@@ -21,8 +21,9 @@ type Value struct {
 	node ssa.Value
 	// cache
 	disasmLine string
-	users      Values
-	operands   Values
+
+	users    Values
+	operands Values
 
 	// for debug
 	syntaxFlowName []string
@@ -85,6 +86,13 @@ func ValueCompare(v1raw, v2raw *Value) bool {
 		res = res || same(v1, v2Ref) || same(v2Ref, v1)
 	}
 	return res
+}
+
+func (v *Value) Hash() (string, bool) {
+	if v.IsNil() {
+		return "", false
+	}
+	return utils.CalcSha256(v.GetId()), true
 }
 
 func (v *Value) GetProgramName() string {
@@ -809,6 +817,23 @@ func (v *Value) AnalyzeDepth() int {
 }
 
 type Values []*Value
+
+func (value Values) Hash() (string, bool) {
+	var retIds []int64
+	haveNil := false
+	value.ForEach(func(value *Value) {
+		id := value.GetId()
+		if id == -1 {
+			haveNil = true
+			return
+		}
+		retIds = append(retIds, value.GetId())
+	})
+	if haveNil {
+		return "", false
+	}
+	return utils.CalcSha256(retIds), true
+}
 
 func (value Values) Ref(name string) Values {
 	ret := make(Values, 0, len(value))

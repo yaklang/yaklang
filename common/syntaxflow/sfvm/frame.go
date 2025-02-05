@@ -186,6 +186,12 @@ func (s *SFFrame) Flush() {
 	s.idx = 0
 }
 
+func (f *SFFrame) SetInputValues() {
+	if vals := f.config.inputValues; vals != nil {
+		f.GetSymbolTable().Set("input", vals)
+	}
+}
+
 func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, ValueOperator] {
 	return s.result.SymbolTable
 }
@@ -229,6 +235,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 
 	// clear
 	s.Flush()
+	s.SetInputValues()
 
 	defer func() {
 		if err := recover(); err != nil {
