@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strconv"
 	"sync/atomic"
@@ -23,6 +24,8 @@ type IrSource struct {
 	// file content
 	QuotedCode string `json:"quoted_code" gorm:"type:text"`
 	IsBigFile  bool   `json:"is_big_file"` // if set this flag, the source code is too big, QuotedCode contain this file path
+
+	IsFolder bool `json:"is_folder"`
 }
 
 func GetIrSourceByPath(path string) ([]*IrSource, error) {
@@ -85,6 +88,7 @@ func SaveFile(filename, content string, programName string, folderPaths []string
 		FileName:       filename,
 		FolderPath:     fullPath,
 		IsBigFile:      false,
+		IsFolder:       false,
 	}
 	irSource.save()
 	return irSource.SourceCodeHash
@@ -109,6 +113,7 @@ func SaveFolder(folderName string, folderPaths []string) error {
 		FileName:       folderName,
 		FolderPath:     folderPath,
 		IsBigFile:      false,
+		IsFolder:       true,
 	}
 	irSource.save()
 	return nil
@@ -158,4 +163,32 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 	editor := memedit.NewMemEditorWithFileUrl(code, fileUrl)
 	editor.SetUrl(fileUrl)
 	return editor, nil
+}
+
+// FuzzySearchIrSource path is glob
+func FuzzySearchIrSource(programName, path string, folder bool) ([]*IrSource, error) {
+	db := GetDB().Debug()
+	var irSources []*IrSource
+	db = db.Where("program_name = ?", programName)
+	db = bizhelper.FuzzQueryLike(db, "folder_path", path)
+	if folder {
+		db = bizhelper.QueryByBool(db, "is_folder", true)
+	}
+	result := db.Find(&irSources)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return irSources, nil
+}
+
+func FuzzSearchIrSourceByContent(progName, content string) ([]*IrSource, error) {
+	db := GetDB()
+	var irSources []*IrSource
+	db = db.Where("program_name = ?", progName)
+	db = bizhelper.FuzzQueryLike(db, "quoted_code", content)
+	result := db.Find(&irSources)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return irSources, nil
 }
