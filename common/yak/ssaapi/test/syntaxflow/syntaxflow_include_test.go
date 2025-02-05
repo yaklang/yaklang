@@ -14,7 +14,7 @@ var sflib string
 
 func TestSFLib(t *testing.T) {
 	const ruleName = "fetch-abc-calling"
-	_,err := sfdb.ImportRuleWithoutValid(ruleName, `
+	_, err := sfdb.ImportRuleWithoutValid(ruleName, `
 desc(lib: "abc");
 abc() as $output;
 alert $output
@@ -42,7 +42,7 @@ dump(e)
 	})
 }
 
-func TestFS_RuleUPdate(t *testing.T) {
+func TestFS_RuleUpdate(t *testing.T) {
 	name := "yak-a.sf"
 	content := `
 	desc(lib: "a")

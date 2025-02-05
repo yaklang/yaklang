@@ -14,8 +14,9 @@ import (
 
 type queryConfig struct {
 	// input
-	program *Program
-	value   sfvm.ValueOperator // use this
+	program         *Program
+	value           sfvm.ValueOperator // use this
+	haveInputValues bool
 	//  rule
 	ruleContent string
 	ruleName    string
@@ -116,6 +117,10 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		}
 		process(float64(handler)/float64(total), s)
 	}))
+
+	if config.haveInputValues {
+		config.opts = append(config.opts, sfvm.WithInputValues(value))
+	}
 	// runtime
 	res, err := frame.Feed(value, config.opts...)
 	if err != nil {
@@ -153,6 +158,13 @@ func QueryWithProgram(program *Program) QueryOption {
 func QueryWithPrograms(programs Programs) QueryOption {
 	return func(c *queryConfig) {
 		c.value = sfvm.NewValues(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator { return p }))
+	}
+}
+
+func QueryWithInputValue(value sfvm.ValueOperator) QueryOption {
+	return func(c *queryConfig) {
+		c.value = value
+		c.haveInputValues = true
 	}
 }
 
