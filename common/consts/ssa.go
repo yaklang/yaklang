@@ -1,6 +1,8 @@
 package consts
 
 import (
+	"fmt"
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,6 +103,15 @@ func GetSSADataBasePath() string {
 		return GetSSADataBasePathDefault()
 	}
 	return YAK_SSA_PROJECT_DB_PATH
+}
+
+func GetTempSSADataBase() (*gorm.DB, error) {
+	db, err := createAndConfigDatabase(filepath.Join(GetDefaultYakitBaseTempDir(), fmt.Sprintf("temp-yakssa-%s.db", uuid.NewString())), SQLiteExtend)
+	if err != nil {
+		return nil, err
+	}
+	schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
+	return db, nil
 }
 
 func initSSADatabase() {
