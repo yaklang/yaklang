@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/lowtun/netstack"
+	"io"
 	"math/rand"
-	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -59,7 +60,48 @@ func main() {
 	app.Commands = []cli.Command{
 		{
 			Name: "tun",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name: "iface",
+				},
+				cli.StringFlag{
+					Name:  "target",
+					Value: "baidu.com,example.com",
+				},
+			},
 			Action: func(c *cli.Context) error {
+				domains := utils.ParseStringToHosts(c.String("target"))
+				fixedDomains := make([]string, len(domains), len(domains)*2)
+				for _, domain := range domains {
+					fixedDomains = append(fixedDomains, domain)
+					if utils.IsIPv4(domain) {
+						continue
+					}
+					fixedDomains = append(fixedDomains, "www."+domain)
+				}
+				if len(fixedDomains) <= 0 {
+					return utils.Errorf("no route target specified")
+				}
+
+				ifaceName := c.String("iface")
+				if ifaceName == "" {
+					route, gateway, srcIP, err := netutil.GetPublicRoute()
+					if err != nil {
+						return err
+					}
+					ifaceName = route.Name
+					_ = gateway
+					_ = srcIP
+				}
+				userStack, err := netstackvm.NewNetStackVirtualMachine(netstackvm.WithPcapDevice(ifaceName))
+				if err != nil {
+					return utils.Errorf("create netstack virtual machine failed: %v", err)
+				}
+				if err := userStack.StartDHCP(); err != nil {
+					log.Errorf("start dhcp failed: %v", err)
+					return err
+				}
+
 				s, err := netstackvm.NewTunVirtualMachine(context.Background())
 				if err != nil {
 					return err
@@ -68,30 +110,47 @@ func main() {
 
 				log.Infof("start to create tunnel: %v", s.GetTunnelName())
 				if err := s.SetHijackTCPHandler(func(conn netstack.TCPConn) {
-					log.Infof("hijack tcp connection: %v, close it", conn.RemoteAddr())
-					conn.Close()
+					defer func() {
+						conn.Close()
+					}()
+					id := conn.ID()
+					addr := utils.HostPort(id.LocalAddress.String(), id.LocalPort)
+					hijackedConn, err := userStack.DialTCP(10*time.Second, addr)
+					if err != nil {
+						log.Errorf("dial tcp failed: %v", err)
+						return
+					}
+					wg := sync.WaitGroup{}
+					wg.Add(2)
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+
+					hijackedConn = ctxio.NewConn(ctx, hijackedConn)
+					go func() {
+						defer func() {
+							wg.Done()
+							cancel()
+						}()
+						_, _ = io.Copy(hijackedConn, conn)
+					}()
+					go func() {
+						defer func() {
+							wg.Done()
+							cancel()
+						}()
+						_, _ = io.Copy(conn, hijackedConn)
+					}()
+					wg.Wait()
 				}); err != nil {
 					return err
 				}
-				if err := s.HijackDomain("baidu.com"); err != nil {
-					log.Errorf("hijack domain failed: %v", err)
-				}
-				if err := s.HijackDomain("www.baidu.com"); err != nil {
-					log.Errorf("hijack domain failed: %v", err)
-				}
-				if err := s.HijackDomain("www.baidu.com"); err != nil {
-					log.Errorf("hijack domain failed: %v", err)
-				}
-				go func() {
-					for {
-						time.Sleep(time.Second)
-						_, err := net.Dial("tcp", "www.baidu.com:80")
-						if err != nil {
-							log.Errorf("dial www.baidu.com failed: %v", err)
-							return
-						}
+
+				for _, target := range fixedDomains {
+					log.Infof("start to hijack domain: %v", target)
+					if err := s.HijackDomain(target); err != nil {
+						log.Errorf("hijack domain failed: %v", err)
 					}
-				}()
+				}
 				select {}
 			},
 		},
