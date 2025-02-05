@@ -22,6 +22,68 @@ var loginPage []byte
 //go:embed html/vul_user_profile.html
 var profilePage []byte
 
+func (s *VulinServer) RegisterUserHandler(writer http.ResponseWriter, request *http.Request) {
+	if request.Method == http.MethodGet {
+		// 返回登录页面
+		writer.Header().Set("Content-Type", "text/html")
+		writer.Write(registerPage)
+		return
+	} else if request.Method == http.MethodPost {
+		// 解析请求体中的 JSON 数据
+		user := &VulinUser{
+			Role: "user",
+		}
+		err := json.NewDecoder(request.Body).Decode(user)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		remake := strings.ToLower(user.Remake)
+		filterRemake := strings.ReplaceAll(remake, "<", "")
+		filterRemake = strings.ReplaceAll(filterRemake, ">", "")
+		filterRemake = strings.ReplaceAll(filterRemake, "script", "")
+		user.Remake = filterRemake
+
+		// 在这里执行用户注册逻辑，将用户信息存储到数据库
+		err = s.database.CreateUser(user)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		// 假设验证通过，返回登录成功消息
+		responseData, err := json.Marshal(user)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		response := struct {
+			Id      uint   `json:"id"`
+			Success bool   `json:"success"`
+			Message string `json:"message"`
+			Data    string `json:"data"`
+		}{
+			Id:      user.ID,
+			Success: true,
+			Message: "Register successful",
+			Data:    string(responseData),
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(writer).Encode(response)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		writer.WriteHeader(http.StatusOK)
+		return
+	}
+}
+
 func (s *VulinServer) registerUserRoute() {
 	var router = s.router
 	logicGroup := router.PathPrefix("/logic").Name("逻辑场景").Subrouter()
@@ -107,67 +169,7 @@ func (s *VulinServer) registerUserRoute() {
 		{
 			DefaultQuery: "",
 			Path:         "/user/register",
-			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				if request.Method == http.MethodGet {
-					// 返回登录页面
-					writer.Header().Set("Content-Type", "text/html")
-					writer.Write(registerPage)
-					return
-				} else if request.Method == http.MethodPost {
-					// 解析请求体中的 JSON 数据
-					user := &VulinUser{
-						Role: "user",
-					}
-					err := json.NewDecoder(request.Body).Decode(user)
-					if err != nil {
-						writer.Write([]byte(err.Error()))
-						writer.WriteHeader(http.StatusBadRequest)
-						return
-					}
-
-					remake := strings.ToLower(user.Remake)
-					filterRemake := strings.ReplaceAll(remake, "<", "")
-					filterRemake = strings.ReplaceAll(filterRemake, ">", "")
-					filterRemake = strings.ReplaceAll(filterRemake, "script", "")
-					user.Remake = filterRemake
-
-					// 在这里执行用户注册逻辑，将用户信息存储到数据库
-					err = s.database.CreateUser(user)
-					if err != nil {
-						writer.Write([]byte(err.Error()))
-						writer.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-
-					// 假设验证通过，返回登录成功消息
-					responseData, err := json.Marshal(user)
-					if err != nil {
-						writer.Write([]byte(err.Error()))
-						writer.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					response := struct {
-						Id      uint   `json:"id"`
-						Success bool   `json:"success"`
-						Message string `json:"message"`
-						Data    string `json:"data"`
-					}{
-						Id:      user.ID,
-						Success: true,
-						Message: "Register successful",
-						Data:    string(responseData),
-					}
-					writer.Header().Set("Content-Type", "application/json")
-					err = json.NewEncoder(writer).Encode(response)
-					if err != nil {
-						writer.Write([]byte(err.Error()))
-						writer.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					writer.WriteHeader(http.StatusOK)
-					return
-				}
-			},
+			Handler:      s.RegisterUserHandler,
 		},
 		{
 			DefaultQuery: "",
