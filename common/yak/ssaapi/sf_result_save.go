@@ -70,7 +70,7 @@ func (r *SyntaxFlowResult) Save(kind schema.SyntaxflowResultKind, TaskIDs ...str
 		errs = utils.JoinErrors(errs, err)
 	}
 	result.RiskCount = uint64(len(r.riskMap))
-	result.RiskHashs = lo.MapValues(r.riskMap, func(risk *schema.Risk, name string) string {
+	result.RiskHashs = lo.MapValues(r.riskMap, func(risk *schema.SSARisk, name string) string {
 		return risk.Hash
 	})
 	if err := ssadb.SaveResult(result); err != nil {

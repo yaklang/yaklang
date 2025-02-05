@@ -253,10 +253,14 @@ func TestRuleRisk(t *testing.T) {
 
 	taskID := uuid.NewString()
 	resultID, err := res.Save(schema.SFResultKindDebug, taskID)
-	defer ssadb.DeleteResultByID(resultID)
-	defer yakit.DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
-		RuntimeId: taskID,
+
+	t.Cleanup(func() {
+		defer ssadb.DeleteResultByID(resultID)
+		defer yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskID},
+		})
 	})
+
 	require.NoError(t, err)
 
 	// check result
@@ -265,15 +269,15 @@ func TestRuleRisk(t *testing.T) {
 	require.Equal(t, resultDB.RiskCount, uint64(1))
 
 	// check risk
-	_, risks, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
-		RuntimeId: taskID,
-	})
+	_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+		RuntimeID: []string{taskID},
+	}, nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(risks))
 	require.Equal(t, resultDB.RiskCount, uint64(len(risks)))
 	risk := risks[0]
 	require.Contains(t, risk.Details, "target is not const")
 	require.Equal(t, "sqli", risk.RiskType)
-	require.Equal(t, "warning", risk.Severity)
+	require.Equal(t, schema.SyntaxFlowSeverity("middle"), risk.Severity)
 	require.Equal(t, "check print variable", risk.Title)
 }
