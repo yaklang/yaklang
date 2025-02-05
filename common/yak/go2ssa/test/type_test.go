@@ -19,7 +19,7 @@ func TestType_Template(t *testing.T) {
 			println(item)
 		}
 
-		`, []string{"Undefined-item(valid)"}, t)
+		`, []string{"ParameterMember-parameterMember[#22.items].0"}, t)
 	})
 
 	t.Run("template function", func(t *testing.T) {
