@@ -250,6 +250,18 @@ func TestSFURl(t *testing.T) {
 			require.Equal(t, target1.VerboseName, "alert information")
 			require.Equal(t, target1.ResourceType, "variable")
 			require.Equal(t, target1.VerboseType, "alert")
+		})
+	})
+
+	t.Run("check syntaxflow value with alert", func(t *testing.T) {
+		CheckSSAURL(t, local, progID, "/target1", `
+		target2(* #-> as $a) 
+		target1() as $target1
+		alert $target1 for "alert information"
+		`, func(res []*ypb.YakURLResource) {
+			spew.Dump(res)
+			target1 := res[0]
+			require.Equal(t, target1.ResourceType, "value")
 			matchRisk := false
 			for _, extra := range target1.Extra {
 				if extra.Key == "risk_hash" && extra.Value != "" {
@@ -347,7 +359,7 @@ func TestSFURl(t *testing.T) {
 						}
 						graphInfoMap[info.NodeID] = info
 
-						check(info.CodeRange.URL)
+						check(info.CodeRange.GetPath())
 					}
 				}
 				if extra.Key == "graph_line" {
@@ -446,26 +458,26 @@ func TestSFURl_golang(t *testing.T) {
 			for _, extra := range res[0].Extra {
 				if extra.Key == "code_range" {
 					log.Infof("code_range: %v", extra.Value)
-					var codeRange yakurl.CodeRange
+					var codeRange ssaapi.CodeRange
 					if err := json.Unmarshal([]byte(extra.Value), &codeRange); err != nil {
 						t.Error(err)
 					}
 
-					check(codeRange.URL)
-					graphInfoMap[0] = codeRange.URL
+					check(codeRange.GetPath())
+					graphInfoMap[0] = codeRange.GetPath()
 				}
 			}
 
 			for _, extra := range res[1].Extra {
 				if extra.Key == "code_range" {
 					log.Infof("code_range: %v", extra.Value)
-					var codeRange yakurl.CodeRange
+					var codeRange ssaapi.CodeRange
 					if err := json.Unmarshal([]byte(extra.Value), &codeRange); err != nil {
 						t.Error(err)
 					}
 
-					check(codeRange.URL)
-					graphInfoMap[1] = codeRange.URL
+					check(codeRange.GetPath())
+					graphInfoMap[1] = codeRange.GetPath()
 				}
 			}
 
