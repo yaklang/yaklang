@@ -866,7 +866,7 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 		if e.protocol.stack.HandleLocal() {
 			addressEndpoint := e.AcquireAssignedAddress(header.IPv4(pkt.NetworkHeader().Slice()).SourceAddress(), e.nic.Promiscuous(), stack.CanBePrimaryEndpoint, true /* readOnly */)
 			if addressEndpoint != nil {
-				log.Infof("invalid source adress received dropped addressEndpoint: %v", addressEndpoint)
+				log.Infof("invalid source address received dropped addressEndpoint: %v", addressEndpoint.AddressWithPrefix())
 				// The source address is one of our own, so we never should have gotten
 				// a packet like this unless HandleLocal is false or our NIC is the
 				// loopback interface.

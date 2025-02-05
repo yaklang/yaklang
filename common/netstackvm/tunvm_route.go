@@ -1,13 +1,17 @@
 package netstackvm
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"net"
+	"os/exec"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
-	"os/exec"
-	"time"
 )
 
 func (vm *TunVirtualMachine) HijackDomain(domain string) error {
@@ -55,9 +59,25 @@ func (vm *TunVirtualMachine) HijackIPNet(ipNet *net.IPNet) error {
 		return utils.Errorf("tunnel name not set")
 	}
 
-	err := exec.CommandContext(ctx, "route", "add", "-net", ipNet.String(), "-interface", name).Run()
+	ones, _ := ipNet.Mask.Size()
+	ipNetStr := fmt.Sprintf("%s/%d", ipNet.IP.String(), ones)
+	log.Infof("route add -net %s -interface %s", ipNetStr, name)
+	cmder := exec.CommandContext(ctx, "route", "add", "-net", ipNetStr, "-interface", name)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmder.Stdout = &stdout
+	cmder.Stderr = &stderr
+	err := cmder.Run()
 	if err != nil {
+		log.Errorf("route add failed: %v\nmsg: %s", err, string(stderr.Bytes()))
 		return utils.Errorf("route add failed: %v", err)
+	}
+	if raw := strings.TrimSpace(stdout.String()); len(raw) > 0 {
+		log.Infof("route add success: %s", raw)
+	}
+	if raw := strings.TrimSpace(stderr.String()); len(raw) > 0 {
+		log.Warnf("route add failed: %s", raw)
+		return utils.Errorf("route add failed: %s", raw)
 	}
 	return nil
 }

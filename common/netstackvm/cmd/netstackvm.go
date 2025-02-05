@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/lowtun/netstack"
 	"math/rand"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -81,6 +82,16 @@ func main() {
 				if err := s.HijackDomain("www.baidu.com"); err != nil {
 					log.Errorf("hijack domain failed: %v", err)
 				}
+				go func() {
+					for {
+						time.Sleep(time.Second)
+						_, err := net.Dial("tcp", "www.baidu.com:80")
+						if err != nil {
+							log.Errorf("dial www.baidu.com failed: %v", err)
+							return
+						}
+					}
+				}()
 				select {}
 			},
 		},
