@@ -1514,7 +1514,8 @@ func (s *Stack) FindRoute(id tcpip.NICID, localAddr, remoteAddr tcpip.Address, n
 		defer s.routeMu.RUnlock()
 
 		for route := s.routeTable.Front(); route != nil; route = route.Next() {
-			if remoteAddr.BitLen() != 0 && !route.Destination.Contains(remoteAddr) {
+			bitLen := remoteAddr.BitLen()
+			if bitLen != 0 && !route.Destination.Contains(remoteAddr) {
 				continue
 			}
 
@@ -1550,7 +1551,9 @@ func (s *Stack) FindRoute(id tcpip.NICID, localAddr, remoteAddr tcpip.Address, n
 			// there is no reason to prefer routes that let us use a local address
 			// when routing forwarded (as opposed to locally-generated) traffic.
 			locallyGenerated := (id != 0 || localAddr != tcpip.Address{})
-			if onlyGlobalAddresses && chosenRoute.Equal(tcpip.Route{}) && isNICForwarding(nic, netProto) {
+			forwarding := isNICForwarding(nic, netProto)
+			emptyRoute := chosenRoute.Equal(tcpip.Route{})
+			if onlyGlobalAddresses && emptyRoute && forwarding {
 				if locallyGenerated {
 					chosenRoute = *route
 					continue
