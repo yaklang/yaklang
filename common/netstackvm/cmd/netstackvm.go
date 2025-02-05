@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/lowtun/netstack"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -55,6 +56,34 @@ func main() {
 	}
 
 	app.Commands = []cli.Command{
+		{
+			Name: "tun",
+			Action: func(c *cli.Context) error {
+				s, err := netstackvm.NewTunVirtualMachine(context.Background())
+				if err != nil {
+					return err
+				}
+				defer s.Close()
+
+				log.Infof("start to create tunnel: %v", s.GetTunnelName())
+				if err := s.SetHijackTCPHandler(func(conn netstack.TCPConn) {
+					log.Infof("hijack tcp connection: %v, close it", conn.RemoteAddr())
+					conn.Close()
+				}); err != nil {
+					return err
+				}
+				if err := s.HijackDomain("baidu.com"); err != nil {
+					log.Errorf("hijack domain failed: %v", err)
+				}
+				if err := s.HijackDomain("www.baidu.com"); err != nil {
+					log.Errorf("hijack domain failed: %v", err)
+				}
+				if err := s.HijackDomain("www.baidu.com"); err != nil {
+					log.Errorf("hijack domain failed: %v", err)
+				}
+				select {}
+			},
+		},
 		{
 			Name:  "synscan",
 			Usage: "synscan <ip>",
