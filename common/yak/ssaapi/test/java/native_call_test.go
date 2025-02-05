@@ -1,6 +1,7 @@
 package java
 
 import (
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"strconv"
 	"strings"
@@ -463,4 +464,14 @@ $output<getFilename> as $sink
 `, map[string][]string{
 		"sink": {"a.java"},
 	}, true, ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckWithFS(fs, t, func(programs ssaapi.Programs) error {
+		result, err := programs.SyntaxFlowWithError(`
+A as $output
+$output<getFilename> as $sink
+alert $output
+`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		_ = result
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
