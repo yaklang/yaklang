@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -12,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -338,7 +339,7 @@ func (s *Server) QueryRisk(ctx context.Context, req *ypb.QueryRiskRequest) (*ypb
 func (s *Server) DeleteRisk(ctx context.Context, req *ypb.DeleteRiskRequest) (*ypb.Empty, error) {
 	if req.GetDeleteRepetition() {
 		if req.GetFilter() != nil && req.GetId() > 0 {
-			rdb, _ := yakit.FilterByQueryRisks(s.GetProjectDatabase(), req.GetFilter())
+			rdb := yakit.FilterByQueryRisks(s.GetProjectDatabase(), req.GetFilter())
 			if rdb != nil {
 				if db := rdb.Unscoped().Where("id <> ?", req.GetId()).Delete(&schema.Risk{}); db.Error != nil {
 					return nil, utils.Errorf("delete error: %s", db.Error)
@@ -362,7 +363,7 @@ func (s *Server) DeleteRisk(ctx context.Context, req *ypb.DeleteRiskRequest) (*y
 	}
 
 	if req.GetFilter() != nil {
-		rdb, _ := yakit.FilterByQueryRisks(s.GetProjectDatabase(), req.GetFilter())
+		rdb := yakit.FilterByQueryRisks(s.GetProjectDatabase(), req.GetFilter())
 		if rdb != nil {
 			if db := rdb.Unscoped().Delete(&schema.Risk{}); db.Error != nil {
 				return nil, utils.Errorf("delete error: %s", db.Error)
@@ -628,18 +629,19 @@ func NewRiskGRPCModel(p *schema.Risk) *ypb.NewRisk {
 }
 
 func (s *Server) NewRiskRead(ctx context.Context, req *ypb.NewRiskReadRequest) (*ypb.Empty, error) {
-	if len(req.GetIds()) > 0 {
-		for _, v := range funk.ChunkInt64s(req.Ids, 100) {
-			err := yakit.NewRiskReadRequest(s.GetProjectDatabase(), v)
-			if err != nil {
-				log.Errorf("NewRiskRead error: %v", err)
-			}
+	var filter *ypb.QueryRisksRequest
+	if req.GetFilter() != nil {
+		filter = req.GetFilter() // use filter, good
+	} else if len(req.GetIds()) > 0 {
+		filter = &ypb.QueryRisksRequest{ // just use id, this is older frontend
+			Ids: req.GetIds(),
 		}
 	} else {
-		err := yakit.NewRiskReadRequest(s.GetProjectDatabase(), []int64{})
-		if err != nil {
-			return nil, utils.Errorf("NewRiskRead error: %v", err)
-		}
+		filter = nil // nil is all risk mark as read
+	}
+	err := yakit.NewRiskReadRequest(s.GetProjectDatabase(), filter)
+	if err != nil {
+		return nil, err
 	}
 	return &ypb.Empty{}, nil
 }
