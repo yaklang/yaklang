@@ -2,6 +2,9 @@ package syntaxflow
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -172,5 +175,69 @@ func Test_Include_HitCache(t *testing.T) {
 	})
 	_, exist := ssaapi.GetSFIncludeCache().Get(utils.CalcSha256(ruleName, programName))
 	require.True(t, exist)
+}
 
+func TestSF_NativeCall_Include_Input_Value(t *testing.T) {
+	code := `a1 = 1
+	a2 ="hello world"
+	b = 2`
+	t.Run("test include have input param ", func(t *testing.T) {
+		name := uuid.NewString()
+		libName := uuid.NewString()
+		content := fmt.Sprintf(`
+		desc(lib: "%s");
+		$input?{have:'hello world'} as $output;
+		alert $output;
+		`, libName)
+
+		sfdb.ImportRuleWithoutValid(name, content, true)
+		defer sfdb.DeleteRuleByRuleName(name)
+
+		sfRule := fmt.Sprintf(`
+		a* as $check;	
+		$check<include('%s')> as $target`, libName)
+
+		ssatest.CheckSyntaxFlow(t, code, sfRule, map[string][]string{
+			"check":  {"1", "\"hello world\""},
+			"target": {"\"hello world\""},
+		})
+	})
+
+	t.Run("test cache hit", func(t *testing.T) {
+		name := uuid.NewString()
+		libName := uuid.NewString()
+		content := fmt.Sprintf(`
+		desc(lib: "%s");
+		$input?{have:'hello world'} as $output;
+		alert $output;
+		`, libName)
+
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("a.yak", code)
+
+		sfdb.ImportRuleWithoutValid(name, content, true)
+		defer sfdb.DeleteRuleByRuleName(name)
+
+		sfRule := fmt.Sprintf(`
+		a* as $check;	
+		$check<include('%s')> as $target`, libName)
+
+		programName := uuid.NewString()
+		prog, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(consts.Yak))
+		defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+		require.NoError(t, err)
+		prog.SyntaxFlowWithError(sfRule)
+		cache := ssaapi.GetSFIncludeCache()
+		require.Greater(t, cache.Count(), 0)
+
+		haveResult := false
+		cache.ForEach(func(s string, vo sfvm.ValueOperator) {
+			t.Logf("key: %s, value: %v", s, vo)
+			if strings.Contains(vo.String(), "hello world") {
+				haveResult = true
+			}
+		})
+		require.True(t, haveResult)
+	})
 }
