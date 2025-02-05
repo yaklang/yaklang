@@ -160,7 +160,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 	local, err := NewLocalClient(true)
 	require.NoError(t, err)
 
-	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	stream, err := local.DuplexConnection(ctx)
 	require.NoError(t, err)
 
@@ -170,12 +170,14 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
 		check_syntaxflow_result := false
-
+		check_ssa_risk := false
 		for {
 			res, err := stream.Recv()
 			log.Info(res)
+			if err == context.Canceled {
+				break
+			}
 			log.Info(err)
 			if err != nil {
 				break
@@ -188,11 +190,17 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 				require.Equal(t, tmp["task_id"], taskID1)
 				check_syntaxflow_result = true
 			}
-			if check_syntaxflow_result {
+			if res.MessageType == schema.ServerPushType_SSARisk {
+				var tmp map[string]string
+				err = json.Unmarshal(res.GetData(), &tmp)
+				require.NoError(t, err)
+				require.Equal(t, tmp["task_id"], taskID1)
+				check_ssa_risk = true
+			}
+			if check_syntaxflow_result && check_ssa_risk {
 				break
 			}
 		}
-		require.True(t, check_syntaxflow_result)
 	}()
 
 	{
@@ -207,20 +215,21 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 		res := prog.SyntaxFlow(`println(* as $para); alert $para`)
 		resultID1, err := res.Save(schema.SFResultKindDebug, taskID1)
 		defer ssadb.DeleteResultByID(resultID1)
-		defer yakit.DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
-			RuntimeId: taskID1,
+		defer yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskID1},
 		})
 		require.NoError(t, err)
 
 		// check have risk
-		_, risks, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
-			RuntimeId: taskID1,
-		})
+		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskID1},
+		}, nil)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(risks))
 		require.Equal(t, taskID1, risks[0].RuntimeId)
 		_ = resultID1
 	}
+	cancel()
 	wg.Wait()
 
 }

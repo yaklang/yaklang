@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"os"
 	"time"
 
@@ -81,6 +82,10 @@ func (s *Server) GetProjectDatabase() *gorm.DB {
 		return s.projectDatabase
 	}
 	return consts.GetGormProjectDatabase()
+}
+
+func (s *Server) GetSSADatabase() *gorm.DB {
+	return ssadb.GetDB()
 }
 
 func NewServer(opts ...ServerOpts) (*Server, error) {

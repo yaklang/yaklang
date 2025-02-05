@@ -109,10 +109,7 @@ func DeleteRiskByID(db *gorm.DB, ids ...int64) error {
 }
 
 func DeleteRisk(db *gorm.DB, request *ypb.QueryRisksRequest) error {
-	filterDb, err := FilterByQueryRisks(db, request)
-	if err != nil {
-		return err
-	}
+	filterDb := FilterByQueryRisks(db, request)
 	if db := filterDb.Unscoped().Delete(&schema.Risk{}); db.Error != nil {
 		return db.Error
 	}
@@ -130,7 +127,7 @@ func FixRiskType(db *gorm.DB) {
 	// 修复 nuclei 漏洞保存格式
 }
 
-func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB, _ error) {
+func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) *gorm.DB {
 	db = db.Model(&schema.Risk{})
 	if runtimeId := params.GetRuntimeId(); runtimeId != "" {
 		db = db.Where("runtime_id = ?", runtimeId)
@@ -165,7 +162,7 @@ func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB,
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.GetIds())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", params.GetSSAProgramNames())
 	// db = bizhelper.ExactQueryString(db, "reverse_token", params.GetToken())
-	return db, nil
+	return db
 }
 
 func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginator, []*schema.Risk, error) {
@@ -193,11 +190,7 @@ func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginato
 		db = db.Where("id < ?", params.GetUntilId())
 	}
 
-	var err error
-	db, err = FilterByQueryRisks(db, params)
-	if err != nil {
-		return nil, nil, err
-	}
+	db = FilterByQueryRisks(db, params)
 	var ret []*schema.Risk
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
@@ -416,10 +409,10 @@ func QueryNewRisk(db *gorm.DB, req *ypb.QueryNewRiskRequest, newRisk bool, isRea
 	return paging, ret, nil
 }
 
-func NewRiskReadRequest(db *gorm.DB, Ids []int64) error {
+func NewRiskReadRequest(db *gorm.DB, filter *ypb.QueryRisksRequest) error {
 	db = db.Model(&schema.Risk{})
-	if len(Ids) > 0 {
-		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", Ids)
+	if filter != nil {
+		db = FilterByQueryRisks(db, filter)
 	} else {
 		db = db.Where("created_at <= ?", time.Unix(time.Now().Unix(), 0))
 	}
