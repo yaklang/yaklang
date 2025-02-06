@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil/netroute"
 	"github.com/yaklang/yaklang/common/utils/netutil/routewrapper"
+	"golang.org/x/sync/singleflight"
 	"net"
 	"os/exec"
 	"runtime"
@@ -18,30 +19,75 @@ import (
 	"time"
 )
 
+type interfaceIPCacheS struct {
+	iface net.Interface
+}
+
+var (
+	// 创建缓存实例
+	interfaceIPCache = utils.NewTTLCache[*interfaceIPCacheS](1 * time.Minute)
+	sfGroup          = &singleflight.Group{}
+)
+
+func init() {
+	interfaceIPCache.SetExpirationCallback(func(key string, value *interfaceIPCacheS) {
+		log.Debugf("interfaceIPCache %s is expired", key)
+	})
+}
+
 func FindInterfaceByIP(ip string) (net.Interface, error) {
 	ipOriginIns := net.ParseIP(ip)
-	ifs, err := net.Interfaces()
+	if ipOriginIns == nil {
+		return net.Interface{}, utils.Errorf("invalid IP: %v", ip)
+	}
+	ipStr := ipOriginIns.String()
+
+	// 尝试从缓存获取
+	if cached, ok := interfaceIPCache.Get(ipStr); ok {
+		return cached.iface, nil
+	}
+
+	// 使用 singleflight 处理并发请求
+	v, err, _ := sfGroup.Do(ipStr, func() (interface{}, error) {
+		// 再次检查缓存（防止在等待过程中其他协程已经完成了查找）
+		if cached, ok := interfaceIPCache.Get(ipStr); ok {
+			return cached.iface, nil
+		}
+
+		// 实际的查找逻辑
+		ifs, err := net.Interfaces()
+		if err != nil {
+			return net.Interface{}, err
+		}
+
+		for _, i := range ifs {
+			addrs, err := i.Addrs()
+			if err != nil {
+				continue
+			}
+
+			for _, addr := range addrs {
+				ipIns, _, err := net.ParseCIDR(addr.String())
+				if err != nil {
+					continue
+				}
+				if ipIns.String() == ipStr {
+					log.Debugf("found interface by ip: %v", ip)
+					interfaceIPCache.Set(ipStr, &interfaceIPCacheS{
+						iface: i,
+					})
+					return i, nil
+				}
+			}
+		}
+		return net.Interface{}, utils.Errorf("cannot fetch net.Interface{} by: %v", ip)
+	})
+
 	if err != nil {
 		return net.Interface{}, err
 	}
 
-	for _, i := range ifs {
-		addrs, err := i.Addrs()
-		if err != nil {
-			continue
-		}
-
-		for _, addr := range addrs {
-			ipIns, _, err := net.ParseCIDR(addr.String())
-			if err != nil {
-				continue
-			}
-			if ipIns.String() == ipOriginIns.String() {
-				return i, nil
-			}
-		}
-	}
-	return net.Interface{}, utils.Errorf("cannot fetch net.Interface{} by: %v", ip)
+	return v.(net.Interface), nil
 }
 
 func IsPrivateIPString(target string) bool {

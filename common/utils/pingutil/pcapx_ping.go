@@ -2,6 +2,7 @@ package pingutil
 
 import (
 	"context"
+	"fmt"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -103,13 +104,14 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 			firstIP = srcIp.To16().String()
 		}
 	}
-	macAddress, _ := arpx.Arp(iface.Name, ip)
+
+	ctx, cancel := context.WithTimeout(parentCtx, config.timeout)
+	defer cancel()
+	macAddress, _ := arpx.ArpWithContext(ctx, iface.Name, ip)
 
 	isAlive := utils.NewBool(false)
 	ttl := 0
 
-	ctx, cancel := context.WithTimeout(parentCtx, config.timeout)
-	defer cancel()
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
@@ -123,92 +125,105 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 			pcaputil.WithContext(ctx),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 				go func() {
-					baseN := 1
-					for i := 0; i < 3; i++ {
+					defer func() {
+						if err := recover(); err != nil {
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
+					}()
+					retryCount := config.RetryCount
+					if retryCount == 0 {
+						retryCount = 2
+					}
+					retryInterval := config.RetryInterval
+					if retryInterval == 0 {
+						retryInterval = 60 * time.Millisecond
+					}
+
+					// time.Ticker 控制发包间隔
+					ticker := time.NewTicker(retryInterval)
+					defer ticker.Stop()
+
+					for i := 0; i < retryCount; i++ {
 						if isAlive.IsSet() {
 							return
 						}
-						packetOpts := []any{
-							pcapx.WithLoopback(isLoopBack),
-							pcapx.WithIPv4_DstIP(ip),
-							pcapx.WithIPv4_SrcIP(firstIP),
-							pcapx.WithIPv4_NoOptions(),
-							pcapx.WithICMP_Type(layers.ICMPv4TypeEchoRequest, nil),
-							pcapx.WithICMP_Id(baseN),
-							pcapx.WithICMP_Sequence(i),
-							pcapx.WithPayload(icmpPayload),
+
+						// 4. 发包错误处理优化
+						if err := sendICMPPacket(handle, ip, firstIP, isLoopBack, macAddress, iface, i); err != nil {
+							log.Debugf("send icmp packet failed: %s", err)
+							continue
 						}
-						if macAddress != nil {
-							packetOpts = append(packetOpts, pcapx.WithEthernet_DstMac(macAddress), pcapx.WithEthernet_SrcMac(iface.HardwareAddr))
-						}
-						packet, err := pcapx.PacketBuilder(packetOpts...)
-						if err != nil {
-							log.Errorf("build icmp packet failed: %s", err)
-							break
-						}
-						err = handle.WritePacketData(packet)
-						if err != nil {
-							log.Errorf("write icmp packet failed: %s", err)
-							return
-						}
-						time.Sleep(time.Millisecond * 600)
+
+						<-ticker.C
 					}
 				}()
 			}),
-			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-				defer func() {
-					if err := recover(); err != nil {
-						utils.PrintCurrentGoroutineRuntimeStack()
-					}
-				}()
-
-				if isAlive.IsSet() {
-					return
-				}
-
-				if !pcaputil.IsICMP(packet) {
-					return
-				}
-
-				ip4raw := packet.Layer(layers.LayerTypeIPv4)
-				if ip4, ok := ip4raw.(*layers.IPv4); ok {
-					icmpV4 := packet.Layer(layers.LayerTypeICMPv4)
-					if l, ok := icmpV4.(*layers.ICMPv4); ok {
-						ty := l.TypeCode.Type()
-						if ty == layers.ICMPv4TypeEchoReply {
-							if ip4.SrcIP.String() == ip {
-								isAlive.SetTo(true)
-								ttl = int(ip4.TTL)
-								cancel()
-							}
-							log.Debugf("%v is alive", ip4.SrcIP.String())
-							return
-						} else if ty == layers.ICMPv4TypeEchoRequest {
-							return
-						}
-					}
-				}
-			}),
+			pcaputil.WithEveryPacket(handleICMPPacket(ip, isAlive, &ttl, cancel)),
 		)
 		if err != nil {
 			log.Warnf("sniff failed: %s", err)
 		}
 	}()
 
-	<-ctx.Done()
+	resultChan := make(chan *PingResult, 1)
+	go func() {
+		<-ctx.Done()
+		if isAlive.IsSet() {
+			resultChan <- &PingResult{IP: target, Ok: true, RTT: int64(ttl)}
+		} else {
+			resultChan <- &PingResult{IP: target, Ok: false, Reason: "timeout"}
+		}
+	}()
 
-	if isAlive.IsSet() {
-		return &PingResult{
-			IP:  target,
-			Ok:  true,
-			RTT: int64(ttl),
-		}, nil
-	} else {
-		return &PingResult{
-			IP:     target,
-			Ok:     false,
-			RTT:    0,
-			Reason: "timeout",
-		}, nil
+	return <-resultChan, nil
+}
+
+// 发包
+func sendICMPPacket(handle *pcaputil.PcapHandleWrapper, ip, firstIP string, isLoopBack bool, macAddress net.HardwareAddr, iface *net.Interface, seq int) error {
+	packetOpts := []any{
+		pcapx.WithLoopback(isLoopBack),
+		pcapx.WithIPv4_DstIP(ip),
+		pcapx.WithIPv4_SrcIP(firstIP),
+		pcapx.WithIPv4_NoOptions(),
+		pcapx.WithICMP_Type(layers.ICMPv4TypeEchoRequest, nil),
+		pcapx.WithICMP_Id(1),
+		pcapx.WithICMP_Sequence(seq),
+		pcapx.WithPayload(icmpPayload),
+	}
+
+	if macAddress != nil {
+		packetOpts = append(packetOpts,
+			pcapx.WithEthernet_DstMac(macAddress),
+			pcapx.WithEthernet_SrcMac(iface.HardwareAddr))
+	}
+
+	packet, err := pcapx.PacketBuilder(packetOpts...)
+	if err != nil {
+		return fmt.Errorf("build packet: %w", err)
+	}
+
+	return handle.WritePacketData(packet)
+}
+
+// 包处理
+func handleICMPPacket(targetIP string, isAlive *utils.AtomicBool, ttl *int, cancel context.CancelFunc) func(packet gopacket.Packet) {
+	return func(packet gopacket.Packet) {
+		if isAlive.IsSet() || !pcaputil.IsICMP(packet) {
+			return
+		}
+
+		ip4Layer := packet.Layer(layers.LayerTypeIPv4)
+		icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
+
+		if ip4, ok := ip4Layer.(*layers.IPv4); ok {
+			if l, ok := icmpLayer.(*layers.ICMPv4); ok &&
+				l.TypeCode.Type() == layers.ICMPv4TypeEchoReply &&
+				ip4.SrcIP.String() == targetIP {
+				isAlive.SetTo(true)
+				*ttl = int(ip4.TTL)
+				cancel()
+				log.Debugf("%v is alive", ip4.SrcIP.String())
+			}
+		}
 	}
 }

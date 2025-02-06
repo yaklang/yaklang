@@ -7,7 +7,7 @@ import (
 )
 
 type PingConfig struct {
-	Ctx 		  context.Context
+	Ctx            context.Context
 	defaultTcpPort string
 	timeout        time.Duration
 	proxies        []string
@@ -16,11 +16,13 @@ type PingConfig struct {
 	pingNativeHandler func(ip string, timeout time.Duration) *PingResult
 	tcpDialHandler    func(ctx context.Context, addr string, proxies ...string) (net.Conn, error)
 	forceTcpPing      bool
+	RetryCount        int           // 发包重试次数
+	RetryInterval     time.Duration // 发包间隔
 }
 
 func NewPingConfig() *PingConfig {
 	return &PingConfig{
-		Ctx :           context.Background(),
+		Ctx:            context.Background(),
 		timeout:        5 * time.Second,
 		defaultTcpPort: "22,80,443",
 	}

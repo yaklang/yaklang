@@ -66,16 +66,14 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 		pcaputil.WithContext(ctx),
 		pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 			go func() {
+				defer func() {
+					if err := recover(); err != nil {
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
 				for p := range targetList.Hosts() {
 					p := p
-
 					senderSwg.Add(1)
-					//err := senderSwg.Add(1)
-					//if err != nil {
-					//	continue
-					//}
-					// log.Infof("start to build arp packet for %s", p)
-
 					go func() {
 						defer func() {
 							senderSwg.Done()
@@ -108,7 +106,7 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 							}
 
 							if i != count-1 {
-								time.Sleep(500 * time.Millisecond)
+								time.Sleep(250 * time.Millisecond)
 							}
 						}
 
