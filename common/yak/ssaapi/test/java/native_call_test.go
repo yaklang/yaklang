@@ -1,8 +1,11 @@
 package java
 
 import (
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"strconv"
 	"strings"
 	"testing"
@@ -474,4 +477,22 @@ alert $output
 		_ = result
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestNativeCall_GetFileFullName(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("/src/main/java/abc.java", `package main;`)
+	fs.AddFile("/src/main/java/bcd.java", `package main2;`)
+	programID := uuid.NewString()
+	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
+	require.NoError(t, err)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	}()
+	result, err := prog.SyntaxFlowWithError(`<getFullFileName(filename="*/a*")> as $sink`, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithSave(schema.SFResultKindFile))
+	require.NoError(t, err)
+	id := result.GetResultID()
+	dbResult, err := ssaapi.LoadResultByID(id)
+	require.NoError(t, err)
+	require.True(t, dbResult.GetValues("sink").Len() != 0)
 }
