@@ -67,6 +67,9 @@ func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 
 func nativeCallSourceCode(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 	context := params.GetInt("context")
+	if context == -1 {
+		context = 0
+	}
 	var vals []sfvm.ValueOperator
 	prog, err := fetchProgram(v)
 	if err != nil {

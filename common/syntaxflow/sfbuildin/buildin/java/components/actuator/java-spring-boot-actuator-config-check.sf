@@ -1,0 +1,114 @@
+desc(
+    title:"Check Java Spring Boot Actuator Config",
+    title_zh:"检查Java Spring Boot Actuator配置",
+    type:config,
+    desc:<<<TEXT
+Java Spring Boot Actuator是Spring Boot的一个子项目，它提供了一组监控和管理生产环境的工具。该规则检查Java Spring Boot Actuator配置是否存在安全风险。
+TEXT,
+    solution:<<<TEXT
+1. 禁用`management.security.enabled`和`endpoints.health.sensitive`属性，以防止敏感信息泄露。
+2. 禁止Spring Security默认放行actuator端点。
+TEXT,
+)
+
+__projectConfig__."management.security.enabled"?{have:'false'} as $weak;
+__projectConfig__."endpoints.health.sensitive"?{have:'false'} as $weak;
+check $weak then "Java Spring Boot Actuator配置存在安全风险"
+
+alert $weak for{
+    message:"Java Spring Boot Actuator配置存在安全风险",
+    risk:'info-exposure',
+    level:'low',
+}
+
+WebSecurity?{<typeName>?{have:'org.springframework.security.config.annotation.web.builders.WebSecurity'}} as $webSecurity;
+$webSecurity...ignoring().antMatchers(* #-> *?{opcode:const} as $allow)
+
+HttpSecurity?{<typeName>?{have:'org.springframework.security.config.annotation.web.builders.HttpSecurity'}} as $httpSecurity;
+$httpSecurity...permitAll(* ?{have:'antMatchers'} as $match)
+$match<getCaller>(* #-> *?{opcode:const} as $allow)
+$allow?{have:'actuator'} as $sink;
+
+alert $sink for{
+    message:"Java Spring Boot Actuator配置存在安全风险,并且Spring Security默认允许所有请求访问Actuator端点。",
+    risk:'info-exposure',
+    level:'mid',
+}
+
+desc{
+    lang:java,
+    alert_num:3,
+    "file://application.properties":<<<TEXT
+spring.application.name=springsecuritydemo
+management.security.enabled=false
+endpoints.health.sensitive=false
+TEXT,
+    "file://springSecurity.java":<<<TEXT
+package org.example.springsecuritydemo;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+
+@Configuration
+@EnableWebSecurity
+public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+                .authorizeRequests()
+                .antMatchers("/actuator/**").permitAll() // 不安全：放行所有 Actuator 端点
+                .anyRequest().authenticated() // 其他请求需要认证
+                .and()
+                .httpBasic(); // 使用 HTTP Basic 认证
+    }
+}
+TEXT,
+}
+
+desc{
+    lang:java,
+    alert_num:3,
+    "file://application.yml":<<<TEXT
+    spring:
+      application:
+        name: springsecuritydemo
+    management:
+      security:
+        enabled: false
+    endpoints:
+      health:
+        sensitive: false
+TEXT,
+    "file://springSecurity.java":<<<TEXT
+package org.example.springsecuritydemo;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.WebSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+
+@Configuration
+@EnableWebSecurity
+public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    public void configure(WebSecurity web) throws Exception {
+        web
+            .ignoring()
+            .antMatchers("/actuator/**"); // Ignore Actuator endpoints for security checks
+    }
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .authorizeRequests()
+                .anyRequest().authenticated() // Any other request must be authenticated
+            .and()
+            .httpBasic(); // Use HTTP Basic authentication
+    }
+}
+TEXT,
+}

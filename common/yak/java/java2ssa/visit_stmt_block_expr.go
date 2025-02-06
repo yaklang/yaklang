@@ -772,12 +772,12 @@ func (y *builder) VisitBlockOrState(raw javaparser.IBlockOrStateContext) {
 	}
 }
 
-func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
+func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 	if y.IsBlockFinish() {
-		return nil
+		return
 	}
 	if y == nil || raw == nil || y.IsStop() {
-		return nil
+		return
 	}
 
 	recoverRange := y.SetRange(raw)
@@ -786,7 +786,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 
 	switch ret := raw.(type) {
 	case *javaparser.BlockLabelStatementContext:
-		return y.VisitBlock(ret.Block())
+		y.VisitBlock(ret.Block())
 	case *javaparser.AssertStatementContext:
 		// 处理断言语句
 		getExpr := func(i int) ssa.Value {
@@ -805,11 +805,10 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		if lenExprs > 1 {
 			msgV = getExpr(1)
 		}
-		return y.EmitAssert(cond, msgV, exprs[0].GetText())
+		y.EmitAssert(cond, msgV, exprs[0].GetText())
 	case *javaparser.IfStatementContext:
 		// 处理 if 语句
 		y.VisitIfStmt(ret.Ifstmt())
-		return nil
 	case *javaparser.ForStatementContext:
 		//处理 for 语句
 		if ret.ForControl() != nil {
@@ -822,7 +821,6 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 			})
 			loop.Finish()
 		}
-		return nil
 	case *javaparser.WhileStatementContext:
 		// 处理 while 语句
 		loop := y.CreateLoopBuilder()
@@ -832,10 +830,8 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 			expr := parExpr.Expression()
 			loop.SetCondition(func() ssa.Value {
 				condition := y.VisitExpression(expr)
-				if condition == nil {
+				if utils.IsNil(condition) {
 					condition = y.EmitConstInst(true)
-				} else {
-					condition = y.VisitExpression(expr)
 				}
 				return condition
 			})
@@ -846,7 +842,6 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 			}
 		})
 		loop.Finish()
-		return nil
 	case *javaparser.DoWhileStatementContext:
 		// 处理 do while 语句
 		loop := y.CreateLoopBuilder()
@@ -870,93 +865,90 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		})
 
 		loop.Finish()
-		return nil
 	case *javaparser.TryStatementContext:
 		// 处理 try 语句
-		if ret.TRY() != nil {
-			tryBuilder := y.BuildTry()
-
-			tryBuilder.BuildTryBlock(func() {
-				if ret := ret.Block(); ret != nil {
-					y.VisitBlock(ret)
+		if ret.TRY() == nil {
+			return
+		}
+		tryBuilder := y.BuildTry()
+		tryBuilder.BuildTryBlock(func() {
+			if block := ret.Block(); block != nil {
+				y.VisitBlock(block)
+			}
+		})
+		for _, catch := range ret.AllCatchClause() {
+			catchClause := catch.(*javaparser.CatchClauseContext)
+			tryBuilder.BuildErrorCatch(func() string {
+				return catchClause.Identifier().GetText()
+			}, func() {
+				if block := catchClause.Block(); block != nil {
+					y.VisitBlock(block)
 				}
 			})
-			for _, catch := range ret.AllCatchClause() {
-				catchClause := catch.(*javaparser.CatchClauseContext)
-				tryBuilder.BuildErrorCatch(func() string {
-					return catchClause.Identifier().GetText()
-				}, func() {
-					if block := catchClause.Block(); block != nil {
-						y.VisitBlock(block)
-					}
-				})
-			}
-			if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
-				tryBuilder.BuildFinally(func() {
-					y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
-				})
-			}
-			tryBuilder.Finish()
 		}
-		return nil
+		if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
+			tryBuilder.BuildFinally(func() {
+				final := finallyBlock.(*javaparser.FinallyBlockContext)
+				y.VisitBlock(final.Block())
+			})
+		}
+		tryBuilder.Finish()
 	case *javaparser.TryWithResourcesStatementContext:
 		// 处理 try with resources 语句
-		if ret.TRY() != nil {
-			tryBuilder := y.BuildTry()
-			var shouldClosedValue []ssa.Value
-			tryBuilder.BuildTryBlock(func() {
-				if r := ret.ResourceSpecification(); r != nil {
-					shouldClosedValue = y.VisitResourceSpecification(r)
-				}
-				if b := ret.Block(); ret != nil {
-					y.VisitBlock(b)
+		if ret.TRY() == nil {
+			return
+		}
+		tryBuilder := y.BuildTry()
+		var shouldClosedValue []ssa.Value
+		tryBuilder.BuildTryBlock(func() {
+			if r := ret.ResourceSpecification(); r != nil {
+				shouldClosedValue = y.VisitResourceSpecification(r)
+			}
+			if b := ret.Block(); ret != nil {
+				y.VisitBlock(b)
+			}
+		})
+		for _, catch := range ret.AllCatchClause() {
+			catchClause := catch.(*javaparser.CatchClauseContext)
+			tryBuilder.BuildErrorCatch(func() string {
+				return catchClause.Identifier().GetText()
+			}, func() {
+				if block := catchClause.Block(); block != nil {
+					y.VisitBlock(block)
 				}
 			})
-			for _, catch := range ret.AllCatchClause() {
-				catchClause := catch.(*javaparser.CatchClauseContext)
-				tryBuilder.BuildErrorCatch(func() string {
-					return catchClause.Identifier().GetText()
-				}, func() {
-					if block := catchClause.Block(); block != nil {
-						y.VisitBlock(block)
-					}
-				})
-			}
-			if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
-				tryBuilder.BuildFinally(func() {
-					y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
-					key := y.EmitConstInst("close")
-					if shouldClosedValue != nil {
-						for _, value := range shouldClosedValue {
-							y.ReadMemberCallValue(value, key)
-						}
-					}
-				})
-			} else {
-				tryBuilder.BuildFinally(func() {
-					key := y.EmitConstInst("close")
-					if shouldClosedValue != nil {
-						for _, value := range shouldClosedValue {
-							y.ReadMemberCallMethod(value, key)
-						}
-					}
-				})
-			}
-			tryBuilder.Finish()
 		}
-
-		return nil
+		if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
+			tryBuilder.BuildFinally(func() {
+				y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
+				key := y.EmitConstInst("close")
+				if shouldClosedValue != nil {
+					for _, value := range shouldClosedValue {
+						y.ReadMemberCallValue(value, key)
+					}
+				}
+			})
+		} else {
+			tryBuilder.BuildFinally(func() {
+				key := y.EmitConstInst("close")
+				if shouldClosedValue != nil {
+					for _, value := range shouldClosedValue {
+						y.ReadMemberCallMethod(value, key)
+					}
+				}
+			})
+		}
+		tryBuilder.Finish()
 	case *javaparser.PureSwitchStatementContext:
 		y.VisitSwitchStatement(ret.SwitchStatement())
 	case *javaparser.SynchronizedStatementContext:
 		// 处理 synchronized 语句
-		return nil
 	case *javaparser.ReturnStatementContext:
 		// 处理 return 语句
 		if ret.Expression() != nil {
 			value := y.VisitExpression(ret.Expression())
 			if utils.IsNil(value) {
-				return nil
+				return
 			}
 			if funcTyp := y.GetCurrentReturnType(); funcTyp != nil {
 				value.SetType(funcTyp)
@@ -966,41 +958,32 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		} else {
 			y.EmitReturn(nil)
 		}
-		return nil
 	case *javaparser.ThrowStatementContext:
 		// 处理 throw 语句
-		return nil
 	case *javaparser.BreakStatementContext:
 		// 处理 break 语句
 		// todo break使用标签
 		if !y.Break() {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.UnexpectedBreakStmt())
 		}
-		return nil
 	case *javaparser.ContinueStatementContext:
 		// 处理 continue 语句
 		// todo continue使用标签
 		if !y.Continue() {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.UnexpectedContinueStmt())
 		}
-		return nil
 	case *javaparser.YieldStatementContext:
 		// 处理 yield 语句
-		return y.VisitExpression(ret.Expression())
+		y.VisitExpression(ret.Expression())
 	case *javaparser.ExpressionStatementContext:
 		// 处理表达式语句
-		return y.VisitExpression(ret.Expression())
+		y.VisitExpression(ret.Expression())
 	case *javaparser.SwitchArrowExpressionContext:
 		// 处理 switch 箭头语句
 		_ = y.VisitSwitchExpression(ret.SwitchExpression(), false)
-		return nil
 	case *javaparser.IdentifierLabelStatementContext:
 		// 处理标识符标签语句
-		return nil
-	default:
-		return nil
 	}
-	return nil
 }
 
 func (y *builder) VisitLocalTypeDeclaration(raw javaparser.ILocalTypeDeclarationContext) interface{} {
@@ -1202,7 +1185,6 @@ func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBu
 		return nil
 	}
 
-	var cond javaparser.IExpressionContext
 	loop := y.CreateLoopBuilder()
 	if i.EnhancedForControl() != nil {
 		//处理增强for循环形式(for each)
@@ -1230,10 +1212,6 @@ func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBu
 		if first := i.ForInit(); first != nil {
 			loop.SetFirst(func() []ssa.Value { return y.VisitForInit(first) })
 		}
-		// 设置第二个参数
-		if expr := i.Expression(); expr != nil {
-			cond = expr
-		}
 		// 设置第三个参数
 		if third := i.GetForUpdate(); third != nil {
 			loop.SetThird(func() []ssa.Value { return y.VisitExpressionList(third) })
@@ -1241,13 +1219,10 @@ func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBu
 	}
 	// 设置循环条件
 	loop.SetCondition(func() ssa.Value {
-		var condition ssa.Value
-		if cond == nil {
-			condition = y.EmitConstInst(true)
-		} else {
-			condition = y.VisitExpression(cond)
+		if i.Expression() == nil {
+			return y.EmitConstInst(true)
 		}
-		return condition
+		return y.VisitExpression(i.Expression())
 	})
 	return loop
 }

@@ -37,6 +37,7 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		allImportPkgSlice: make([][]string, 0),
 		selfPkgPath:       make([]string, 0),
 	}
+	build.initImport()
 	build.VisitCompilationUnit(ast)
 	return nil
 }
@@ -119,4 +120,8 @@ func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
 	b.LoadFunctionBuilder(s.Store)
+}
+
+func (b *builder) initImport() {
+	b.allImportPkgSlice = append(b.allImportPkgSlice, []string{"java", "lang", "*"})
 }

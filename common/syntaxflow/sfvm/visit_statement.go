@@ -106,6 +106,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 				y.rule.CVE = value
 			case "risk_type", "risk":
 				y.rule.RiskType = value
+			case "solution", "fix":
+				y.rule.Solution = value
 			default:
 				if strings.Contains(keyLower, "://") {
 					urlIns, _ := url.Parse(keyLower)

@@ -1,0 +1,77 @@
+desc(
+    title:'Check Java Script Injection Vulnerability in Java Dynamic Code Evaluation',
+    title_zh:'检测Java动态代码执行中的脚本注入漏洞',
+    type:vuln,
+    desc:<<<TEXT
+该规则用于检测Java中动态代码执行中的脚本注入漏洞。在Java中，动态代码执行是指在运行时动态加载、编译和执行代码的过程。如果动态代码执行的输入未经过滤，可能会导致脚本注入漏洞，攻击者可以通过构造恶意代码注入到应用程序中，从而导致应用程序受到攻击。
+TEXT,
+)
+
+<include('java-servlet-param')> as $source;
+<include('java-spring-param')> as $source;
+<include('java-js-sink')> as $sink;
+
+$sink#{
+    include:<<<INCLUDE
+<self>&$source
+INCLUDE,
+}-> as $mid;
+
+alert $mid for {
+    message: "Find Java Dynamic Code Evaluation Script Injection Vulnerability",
+    level: mid,
+    risk:'rce-code',
+}
+
+desc(
+    lang:java,
+    alert_num:1,
+    "file://DynamicCodeEvaluation.java":<<<TEXT
+    package org.example;
+    import javax.script.ScriptEngineManager;
+    import javax.script.ScriptEngine;
+    import javax.servlet.http.HttpServletRequest;
+
+    public class CalculatorServlet {
+        public Object executeOperation(HttpServletRequest request) {
+            ScriptEngineManager scriptEngineManager = new ScriptEngineManager();
+            ScriptEngine scriptEngine = scriptEngineManager.getEngineByExtension("js");
+            String userOps = request.getParameter("operation");
+            return scriptEngine.eval(userOps);
+        }
+    }
+TEXT
+)
+
+desc(
+    lang:java,
+    alert_num:1,
+    "file://DynamicCodeEvaluation.java":<<<TEXT
+    package org.example;
+    import javax.script.Compilable;
+    import javax.script.CompiledScript;
+    import javax.script.ScriptEngine;
+    import javax.script.ScriptEngineManager;
+    import org.springframework.web.bind.annotation.PostMapping;
+    import org.springframework.web.bind.annotation.RequestBody;
+    import org.springframework.web.bind.annotation.RestController;
+
+    @RestController
+    public class ScriptInjectionController {
+
+        @PostMapping("/executeScript")
+        public String executeScript(@RequestBody String userScript) {
+            ScriptEngineManager manager = new ScriptEngineManager();
+            ScriptEngine engine = manager.getEngineByName("JavaScript");
+            Compilable compilable = (Compilable) engine;
+
+            try {
+                CompiledScript script = compilable.compile(userScript);
+                return "Script executed successfully: " + script.eval();
+            } catch (Exception e) {
+                return "Error executing script: " + e.getMessage();
+            }
+        }
+    }
+TEXT
+)

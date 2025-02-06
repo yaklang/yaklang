@@ -1,0 +1,57 @@
+desc(
+    title:'Check Javax Sql Rowset Unchecked Return Value',
+    title_zh:'检测Javax Sql Rowset未检查返回值的API',
+    type:security,
+    desc:<<<TEXT
+Java的javax.sql.rowset.RowSet接口中的某些方法会返回一个值，但是调用者没有检查这个返回值。这可能导致一些潜在的安全风险，例如资源泄露、内存泄露、数据泄露等。因此，建议在调用这些方法时，检查返回值并根据需要进行处理。
+TEXT,
+)
+
+/(supportsCrossJoin|supportsFullJoin|supportsInnerJoin|supportsLeftOuterJoin|supportsRightOuterJoin|getShowDeleted|getEscapeProcessing|isReadOnly|getAutoCommit|supportsUpdatableView|is*)/<getCall> as $toCheck;
+$toCheck?{<typeName>?{have:'javax.sql.rowset'}}?{!<getUsers>} as $weak;
+alert $weak for{
+    message:"发现Java javax.sql.rowset库未检查返回值的API",
+    risk:'api-abuse',
+    level:info,
+}
+
+desc{
+    lang:java,
+    alert_num:10,
+    "file://demo.java":<<<TEXT
+package org.example;
+
+import javax.sql.rowset.*;
+
+public class SqlDemo {
+    public static void main(String[] args) {
+        //demo1
+        try{
+            JoinRowSet joinRowSet = JoinRowSetImpl.create();
+            joinRowSet.supportsCrossJoin();
+            joinRowSet.supportsFullJoin();
+            joinRowSet.supportsInnerJoin();
+            joinRowSet.supportsLeftOuterJoin();
+            joinRowSet.supportsRightOuterJoin();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        //demo2
+        try {
+            CachedRowSet cachedRowSet = new CachedRowSetImpl();
+            cachedRowSet.setUrl("jdbc:mysql://localhost:3306/mydatabase");
+            cachedRowSet.setUsername("root");
+            cachedRowSet.setPassword("password");
+            cachedRowSet.setCommand("SELECT * FROM users");
+            cachedRowSet.execute();
+            boolean showDeleted = cachedRowSet.getShowDeleted();
+            cachedRowSet.getEscapeProcessing();
+            cachedRowSet.isReadOnly();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+TEXT
+}

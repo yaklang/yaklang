@@ -46,7 +46,7 @@ func (n *NativeCallActualParams) GetString(index any, extra ...any) string {
 
 func (n *NativeCallActualParams) GetInt(index any, extra ...any) int {
 	if n == nil {
-		return 0
+		return -1
 	}
 	raw, ok := n.m[codec.AnyToString(index)]
 	if ok {
@@ -59,7 +59,7 @@ func (n *NativeCallActualParams) GetInt(index any, extra ...any) int {
 			return codec.Atoi(codec.AnyToString(raw))
 		}
 	}
-	return 0
+	return -1
 }
 
 type NativeCallFunc func(v ValueOperator, frame *SFFrame, params *NativeCallActualParams) (bool, ValueOperator, error)

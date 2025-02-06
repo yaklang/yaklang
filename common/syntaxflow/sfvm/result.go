@@ -258,6 +258,7 @@ func (s *SFFrameResult) GetDescription() string {
 			"type":     string(s.rule.Purpose),
 			"level":    string(s.rule.Severity),
 			"lang":     s.rule.Language,
+			"solution": s.rule.Solution,
 		}
 		return codec.AnyToString(info)
 	}

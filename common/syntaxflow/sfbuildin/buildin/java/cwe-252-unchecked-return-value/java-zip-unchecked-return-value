@@ -1,0 +1,74 @@
+desc(
+    title:'Check Java Zip Unchecked Return Value',
+    title_zh:'检测Java Zip未检查返回值的API',
+    type:security,
+    desc:<<<TEXT
+检测java.util.zip.ZipFile和org.apache.commons.compress.archivers.zip.ZipFile的一些接口会返回值，如果调用者没有检查这个返回值，可能会导致一些潜在的安全风险，例如资源泄露、内存泄露、数据泄露等。因此，建议在调用这些方法时，检查返回值并根据需要进行处理。
+TEXT,
+)
+
+.getInputStream() as $toCheck;
+$toCheck?{<typeName>?{have:'java.util.zip.ZipFile' }}?{!<getUsers>} as $weak1;
+alert $weak1 for{
+    message:"发现Java java.util.zip.ZipFile未检查返回值的API",
+    risk:'api-abuse',
+    level:info,
+}
+
+$toCheck?{<typeName>?{have:'org.apache.commons.compress.archivers.zip.ZipFile'}}?{!<getUsers>} as $weak2;
+alert $weak2 for{
+    message:"发现Java org.apache.commons.compress.archivers.zip.ZipFile未检查返回值的API",
+    risk:'api-abuse',
+    level:low,
+}
+
+desc{
+    lang:'java',
+    alert_num:1,
+    'file://demo.java':<<<TEXT
+package org.example;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.io.InputStream;
+import java.io.IOException;
+
+public class ZipFileExample {
+    public static void main(String[] args) {
+        String zipFilePath = "example.zip";
+        try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+            java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            ZipEntry entry = entries.nextElement();
+            try (InputStream entryInputStream = zipFile.getInputStream(entry)) {
+                // ...
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+TEXT
+}
+
+desc{
+    lang:'java',
+    alert_num:1,
+    'file://demo2.java':<<<TEXT
+import java.io.InputStream;
+import java.io.IOException;
+
+public class ApacheCommonsZipFileExample {
+    public static void main(String[] args) {
+        String zipFilePath = "example.zip"; // 假设你有一个名为 example.zip 的文件
+        try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+
+            try (InputStream entryInputStream = zipFile.getInputStream(entry)) {
+                // ...
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+TEXT
+}
+
