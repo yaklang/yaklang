@@ -181,22 +181,22 @@ func TestSF_NativeCall_Include_Input_Value(t *testing.T) {
 	code := `a1 = 1
 	a2 ="hello world"
 	b = 2`
-	t.Run("test include have input param ", func(t *testing.T) {
-		name := uuid.NewString()
-		libName := uuid.NewString()
-		content := fmt.Sprintf(`
+
+	name := uuid.NewString()
+	libName := uuid.NewString()
+	content := fmt.Sprintf(`
 		desc(lib: "%s");
 		$input?{have:'hello world'} as $output;
 		alert $output;
 		`, libName)
 
-		sfdb.ImportRuleWithoutValid(name, content, true)
-		defer sfdb.DeleteRuleByRuleName(name)
+	sfdb.ImportRuleWithoutValid(name, content, true)
+	defer sfdb.DeleteRuleByRuleName(name)
 
+	t.Run("test include have input param ", func(t *testing.T) {
 		sfRule := fmt.Sprintf(`
 		a* as $check;	
 		$check<include('%s')> as $target`, libName)
-
 		ssatest.CheckSyntaxFlow(t, code, sfRule, map[string][]string{
 			"check":  {"1", "\"hello world\""},
 			"target": {"\"hello world\""},
@@ -204,14 +204,6 @@ func TestSF_NativeCall_Include_Input_Value(t *testing.T) {
 	})
 
 	t.Run("test cache hit", func(t *testing.T) {
-		name := uuid.NewString()
-		libName := uuid.NewString()
-		content := fmt.Sprintf(`
-		desc(lib: "%s");
-		$input?{have:'hello world'} as $output;
-		alert $output;
-		`, libName)
-
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("a.yak", code)
 
@@ -239,5 +231,26 @@ func TestSF_NativeCall_Include_Input_Value(t *testing.T) {
 			}
 		})
 		require.True(t, haveResult)
+	})
+
+	t.Run("input value  should not affect program ", func(t *testing.T) {
+		name2 := uuid.NewString()
+		libName2 := uuid.NewString()
+		content2 := fmt.Sprintf(`
+		desc(lib: "%s");
+		b as $output;
+		alert $output;
+		`, libName2)
+
+		sfdb.ImportRuleWithoutValid(name2, content2, true)
+		defer sfdb.DeleteRuleByRuleName(name2)
+
+		sfRule := fmt.Sprintf(`
+		a* as $check;	
+		$check<include('%s')> as $target`, libName2)
+		ssatest.CheckSyntaxFlow(t, code, sfRule, map[string][]string{
+			"check":  {"1", "\"hello world\""},
+			"target": {"2"},
+		})
 	})
 }
