@@ -58,14 +58,16 @@ func (p *Program) GetType(name string) *Type {
 	return NewType(typ)
 }
 
-func (p *Program) Hash() string {
+func (p *Program) Hash() (string, bool) {
 	if p.ssaProgram != nil {
 		// Use the name and created_at to generate the hash,
 		// So that the hash will be changed when the program is recompiled.
 		hash := utils.CalcSha256(p.ssaProgram.Name, p.ssaProgram.CreatedAt.String())
-		return hash
+		return hash, true
+	} else if p.Program.Name != "" {
+		return utils.CalcSha256(p.Program.Name), true
 	} else {
-		return utils.CalcSha256(p.Program.Name)
+		return "", false
 	}
 }
 

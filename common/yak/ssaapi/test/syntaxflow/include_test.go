@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -246,7 +245,7 @@ func Test_Include_HitCache(t *testing.T) {
 	cache.ForEach(func(s string, vo sfvm.ValueOperator) {
 		t.Logf("key: %s, value: %v", s, vo)
 	})
-	_, exist := ssaapi.GetSFIncludeCache().Get(utils.CalcSha256(ruleName, programName))
+	_, _, exist := ssaapi.GetIncludeCacheValue(prog[0], ruleName, nil)
 	require.True(t, exist)
 }
 
@@ -339,13 +338,12 @@ func TestSF_Include_Cache_For_Recompile(t *testing.T) {
 	ruleName := "java-servlet-param"
 	prog1.SyntaxFlowWithError(fmt.Sprintf(`<include('%s')>`, ruleName))
 
-	hash1, _, ok1 := ssaapi.GetIncludeCacheValue(prog1[0], ruleName, nil)
-	require.True(t, ok1)
+	hash1, _, shouldCache := ssaapi.GetIncludeCacheValue(prog1[0], ruleName, nil)
+	require.True(t, shouldCache)
 
 	// recompile
 	progFromDB, err := ssaapi.FromDatabase(programName)
 	require.NoError(t, err)
-	hash2, _, ok2 := ssaapi.GetIncludeCacheValue(progFromDB, ruleName, nil)
-	require.False(t, ok2)
+	hash2, _, _ := ssaapi.GetIncludeCacheValue(progFromDB, ruleName, nil)
 	require.NotEqual(t, hash1, hash2)
 }
