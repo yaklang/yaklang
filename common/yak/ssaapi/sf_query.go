@@ -14,9 +14,8 @@ import (
 
 type queryConfig struct {
 	// input
-	program         *Program
-	value           sfvm.ValueOperator // use this
-	haveInputValues bool
+	program *Program
+	value   sfvm.ValueOperator // use this
 	//  rule
 	ruleContent string
 	ruleName    string
@@ -118,9 +117,6 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		process(float64(handler)/float64(total), s)
 	}))
 
-	if config.haveInputValues {
-		config.opts = append(config.opts, sfvm.WithInputValues(value))
-	}
 	// runtime
 	res, err := frame.Feed(value, config.opts...)
 	if err != nil {
@@ -158,13 +154,6 @@ func QueryWithProgram(program *Program) QueryOption {
 func QueryWithPrograms(programs Programs) QueryOption {
 	return func(c *queryConfig) {
 		c.value = sfvm.NewValues(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator { return p }))
-	}
-}
-
-func QueryWithInputValue(value sfvm.ValueOperator) QueryOption {
-	return func(c *queryConfig) {
-		c.value = value
-		c.haveInputValues = true
 	}
 }
 
@@ -222,6 +211,14 @@ func QueryWithInitVar(result *omap.OrderedMap[string, sfvm.ValueOperator]) Query
 	}
 }
 
+func QueryWithCreateInitVar(varName string, value sfvm.ValueOperator) QueryOption {
+	return func(c *queryConfig) {
+		result := omap.NewOrderedMap(map[string]sfvm.ValueOperator{})
+		result.Set(varName, value)
+		c.opts = append(c.opts, sfvm.WithInitialContextVars(result))
+	}
+}
+
 func QueryWithContext(ctx context.Context) QueryOption {
 	return func(c *queryConfig) {
 		c.ctx = ctx
@@ -232,12 +229,6 @@ func QueryWithContext(ctx context.Context) QueryOption {
 func QueryWithProcessCallback(cb func(float64, string)) QueryOption {
 	return func(c *queryConfig) {
 		c.processCallback = cb
-	}
-}
-
-func QueryWithInitialContextVars(o *omap.OrderedMap[string, sfvm.ValueOperator]) QueryOption {
-	return func(c *queryConfig) {
-		c.opts = append(c.opts, sfvm.WithInitialContextVars(o))
 	}
 }
 

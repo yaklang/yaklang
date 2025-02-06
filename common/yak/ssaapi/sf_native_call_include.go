@@ -116,10 +116,10 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	}
 	config := frame.GetConfig()
 	result, err := QuerySyntaxflow(
-		QueryWithProgram(parent),
-		QueryWithInputValue(queryValue),
-		QueryWithRule(rule),
 		QueryWithSFConfig(config),
+		QueryWithProgram(parent),
+		QueryWithCreateInitVar("input", queryValue),
+		QueryWithRule(rule),
 	)
 	if err != nil {
 		return false, nil, err
