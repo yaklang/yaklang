@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -153,7 +154,12 @@ func QueryWithProgram(program *Program) QueryOption {
 
 func QueryWithPrograms(programs Programs) QueryOption {
 	return func(c *queryConfig) {
-		c.value = sfvm.NewValues(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator { return p }))
+		c.value = sfvm.NewValues(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator {
+			return p
+		}))
+		c.program, _ = lo.Find(programs, func(item *Program) bool {
+			return item.GetProgramKind() == ssa.Application
+		})
 	}
 }
 
