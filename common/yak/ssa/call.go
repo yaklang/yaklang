@@ -219,7 +219,6 @@ func (c *Call) handlerReturnType() {
 	} else {
 		c.SetType(funcTyp.ReturnType)
 	}
-
 	// handler free value
 	c.HandleFreeValue(funcTyp.FreeValue)
 }
@@ -296,6 +295,9 @@ func (c *Call) handleCalleeFunction() {
 				}
 				val = builder.ReadMemberCallValue(object, key)
 				val.AddUser(c)
+				for _, i := range p.GetUsers() {
+					val.AddUser(i)
+				}
 				c.ArgMember = append(c.ArgMember, val)
 			}
 			break

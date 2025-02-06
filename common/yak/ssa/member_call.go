@@ -1,6 +1,8 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 // get field value
 func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Value {
@@ -141,8 +143,6 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 			fun.SetObject(object)
 			un := writeUndefind()
 			memberHandler(res.typ, un)
-			// un := writeUndefind()
-			// memberHandler(res.typ, un)
 			return un
 		}
 	}
@@ -151,8 +151,17 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 			return member
 		}
 		member := b.NewParameterMember(name, para, key)
+
 		memberHandler(res.typ, member)
 		return member
+	}
+	config := b.prog.config
+	if member, ok := ToParameterMember(object); ok {
+		if !wantFunction || config.isWeakLanguage {
+			parameterMember := b.NewMoreParameterMember(name, member, key)
+			memberHandler(res.typ, parameterMember)
+			return parameterMember
+		}
 	}
 	if ret := b.getStaticFieldValue(object, key, wantFunction); ret != nil {
 		return ret

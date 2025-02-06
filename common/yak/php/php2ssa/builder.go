@@ -33,6 +33,7 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 func (s *SSABuild) Create() ssa.Builder {
 	return &SSABuild{
 		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
+			ssa.LanguageConfigIsWeak,
 			ssa.LanguageConfigIsBinding,
 			ssa.LanguageConfigTryBuildValue,
 			ssa.LanguageConfigIsSupportClass,

@@ -208,6 +208,23 @@ func NewParamMember(variable string, builder *FunctionBuilder, obj *Parameter, k
 	p.GetProgram().SetVirtualRegister(p)
 	return p
 }
+func NewMoreParamMember(variable string, builder *FunctionBuilder, member *ParameterMember, key Value) *ParameterMember {
+	p := &ParameterMember{
+		anValue:              NewValue(),
+		parameterMemberInner: newMoreParameterMember(member, key),
+	}
+	p.SetName(variable)
+	p.SetFunc(builder.Function)
+	block, ok := ToBasicBlock(builder.EnterBlock)
+	if ok {
+		p.SetBlock(block)
+	} else {
+		log.Warnf("NewParamMember block cannot convert to BasicBlock: %v", builder.EnterBlock)
+	}
+	p.SetRange(builder.CurrentRange)
+	p.GetProgram().SetVirtualRegister(p)
+	return p
+}
 
 func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 	s := &SideEffect{
