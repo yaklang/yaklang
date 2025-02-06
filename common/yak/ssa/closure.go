@@ -136,7 +136,7 @@ func handleSideEffect(c *Call, funcTyp *FunctionType) {
 			}
 		} else {
 			// is object
-			obj, ok := se.Get(c, builder)
+			obj, ok := se.Get(c)
 			if !ok {
 				continue
 			}
@@ -192,7 +192,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				variable.SetCaptured(se.BindVariable)
 			}
 		case ParameterCall:
-			val, exists := se.Get(c, builder)
+			val, exists := se.Get(c)
 			if !exists || utils.IsNil(val) {
 				continue
 			}
@@ -207,7 +207,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			se.BindVariable = val.GetLastVariable()
 			variable = builder.CreateVariable(se.Name)
 		default:
-			obj, ok := se.Get(c, builder)
+			obj, ok := se.Get(c)
 			if !ok {
 				continue
 			}

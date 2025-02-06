@@ -50,12 +50,12 @@ class A{
 	}
 }
 function func_A($a){
-	$b = $a->b(1);
+	$b = $a->b($_POST[1]);
 }
 
 $a = new A();
 func_A($a);
 `
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"_POST"})
 	})
 }
