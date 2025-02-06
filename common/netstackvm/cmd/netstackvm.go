@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/lowtun/netstack"
 	"io"
 	"math/rand"
 	"os"
@@ -13,6 +11,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
+	"github.com/yaklang/yaklang/common/lowtun/netstack"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -270,6 +271,13 @@ func main() {
 		log.Infof("bpf: %v", `(eth.addr != cc:e0:da:26:66:f2 && arp) || dhcp || ip.addr == 23.192.228.150`)
 		var totalTime time.Duration
 		count := 0
+
+		go func() {
+			time.Sleep(10 * time.Second)
+			log.Infof("开始禁用 %v", ipAddr)
+			vm.DisallowTCP(ipAddr)
+		}()
+
 		for {
 			now := time.Now()
 			conn, err := vm.DialTCP(10*time.Second, ipAddr+":80")
@@ -280,7 +288,7 @@ func main() {
 			_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n"))
 			if err != nil {
 				log.Errorf("请求发送失败: %v", err)
-				conn.Close()
+				// conn.Close()
 				continue
 			}
 			results := utils.StableReaderEx(conn, 3*time.Second, 1024)
@@ -290,7 +298,7 @@ func main() {
 
 			log.Infof("本次请求耗时: %v, 响应长度: %v", elapsed, len(results))
 			log.Infof("平均耗时: %v", totalTime/time.Duration(count))
-			conn.Close()
+			// conn.Close()
 			time.Sleep(500 * time.Millisecond)
 		}
 		return nil
