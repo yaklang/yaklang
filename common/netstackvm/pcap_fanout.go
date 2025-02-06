@@ -106,6 +106,7 @@ func (p *pcapFanOut) background(notify chan error) error {
 	// Main packet processing loop
 	lastLogTime := make(map[string]int64)
 	droppedPackets := make(map[string]int64)
+
 	for {
 		select {
 		case packet, ok := <-pcapChan:
@@ -115,9 +116,12 @@ func (p *pcapFanOut) background(notify chan error) error {
 			}
 			// Distribute packet to all consumers
 			p.m.Lock()
+
 			for id, ch := range p.chans {
+				copied := packet.Data()
+				copiedPacket := gopacket.NewPacket(copied, packet.LinkLayer().LayerType(), gopacket.Default)
 				select {
-				case ch <- packet:
+				case ch <- copiedPacket:
 				default:
 					now := utils.TimestampMs()
 					droppedPackets[id]++
@@ -152,7 +156,7 @@ func (p *pcapFanOut) CreatePCAPAdaptor() (*pcapAdaptor, error) {
 		go func() {
 			defer func() {
 				if err := recover(); err != nil {
-					log.Errorf("pcap fanout panic: %v", err)
+					log.Errorf("pcap fanout panic: %v", utils.ErrorStack(err))
 				}
 			}()
 			_ = p.background(notify)
