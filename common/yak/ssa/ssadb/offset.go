@@ -15,9 +15,9 @@ type IrOffset struct {
 	StartOffset int64  `json:"start_offset" gorm:"index"`
 	EndOffset   int64  `json:"end_offset" gorm:"index"`
 	//variable
-	VariableName string `json:"variable_name"` // this id set when have variable
+	VariableName string `json:"variable_name" gorm:"index"` // this id set when have variable
 	// value
-	ValueID int64 `json:"value_id"` // this id will set
+	ValueID int64 `json:"value_id" gorm:"index"` // this id will set
 }
 
 func CreateOffset(rng memedit.RangeIf, projectName string) *IrOffset {
