@@ -20,6 +20,8 @@ type Builder interface {
 	// create a new builder
 	Create() Builder
 
+	GetCodeFileExt() string
+
 	Build(string, bool, *FunctionBuilder) error
 	FilterFile(string) bool
 	GetLanguage() consts.Language

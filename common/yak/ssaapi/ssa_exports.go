@@ -128,8 +128,8 @@ func DefaultExcludeFunc(patterns []string) (Option, error) {
 	}, nil
 }
 
-func (c *config) CalcHash() string {
-	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.language, c.ignoreSyntaxErr, c.externInfo)
+func (c *config) CalcHash(content string) string {
+	return utils.CalcSha1(content, c.language, c.ignoreSyntaxErr, c.externInfo)
 }
 
 type Option func(*config) error
@@ -441,26 +441,41 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	hash := ""
 	if input != nil {
 		raw, err := io.ReadAll(input)
 		if err != nil {
 			log.Warnf("read input error: %v", err)
+			return nil, err
 		}
-		config.originEditor = memedit.NewMemEditor(string(raw))
+		vf := filesys.NewVirtualFs()
+		var name string
+		if config.SelectedLanguageBuilder != nil {
+			name = fmt.Sprintf("%s.%s", simpleFileName, config.SelectedLanguageBuilder.GetCodeFileExt())
+		} else {
+			name = simpleFileName
+		}
+		vf.AddFile(name, string(raw))
+		WithFileSystem(vf)(config)
+		hash = config.CalcHash(string(raw))
 	}
 
-	hash := config.CalcHash()
 	if config.EnableCache {
 		if prog, ok := ttlSSAParseCache.Get(hash); ok {
 			return prog, nil
 		}
 	}
 
-	ret, err := config.parseFile()
-	if err == nil && config.EnableCache {
-		ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
+	rets, err := config.parseProject()
+	if err == nil && len(rets) > 0 {
+		ret := rets[0]
+		if config.EnableCache {
+			ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
+		}
+		return ret, nil
 	}
-	return ret, err
+	return nil, err
 }
 
 func (p *Program) Feed(code io.Reader) error {

@@ -41,6 +41,8 @@ var AllLanguageBuilders = []ssa.Builder{
 	go2ssa.Builder,
 }
 
+const simpleFileName = "$$File$$Input"
+
 func (c *config) isStop() bool {
 	if c == nil || c.ctx == nil {
 		return false
