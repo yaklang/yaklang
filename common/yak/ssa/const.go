@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sync"
 )
 
@@ -60,6 +61,11 @@ func NewConstWithUnary(i any, un int) *ConstInst {
 	return c
 }
 
+func NewConstWithRange(i any, rangeIf memedit.RangeIf) *ConstInst {
+	c := NewConst(i)
+	c.SetRange(rangeIf)
+	return c
+}
 func NewConst(i any) *ConstInst {
 	c := newConstByMap(i)
 	if c == nil {

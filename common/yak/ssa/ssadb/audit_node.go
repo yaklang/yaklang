@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"context"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -29,7 +28,14 @@ type AuditNode struct {
 	// is entry node
 	IsEntryNode bool `json:"is_entry_node"`
 	// value
-	IRCodeID    int64  `json:"ir_code_id"`
+	IRCodeID int64 `json:"ir_code_id"`
+
+	// if IrCodeId is -1, TmpCode  will be used
+	TmpValue         string `json:"tmp_code"`
+	TmpValueFileHash string `json:"tmp_value_file_hash"`
+	TmpStartOffset   int    `json:"tmp_start_offset"`
+	TmpEndOffset     int    `json:"tmp_end_offset"`
+
 	VerboseName string `json:"verbose_name"`
 }
 

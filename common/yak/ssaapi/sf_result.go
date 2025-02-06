@@ -47,6 +47,13 @@ func CreateResultFromQuery(res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret.rule = res.GetRule()
 	return ret
 }
+func CreateResultWithProg(prog *Program, res *sfvm.SFFrameResult) *SyntaxFlowResult {
+	ret := createEmptyResult()
+	ret.program = prog
+	ret.memResult = res
+	ret.rule = res.GetRule()
+	return ret
+}
 
 func (r *SyntaxFlowResult) GetSFResult() *sfvm.SFFrameResult {
 	if r == nil {

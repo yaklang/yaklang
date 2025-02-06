@@ -2,7 +2,9 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/java/template2java"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -144,9 +146,110 @@ const (
 	NativeCall_Java_UnEscape_Output = "javaUnescapeOutput"
 
 	NativeCall_Foeach_Func_Inst = "foreach_function_inst"
+
+	NativeCall_GetFilenameByContent = "FilenameByContent"
+
+	NativeCall_GetFullFileName = "getFullFileName"
 )
 
 func init() {
+
+	/*
+		// NativeCall_GetFullFileName is used to get the full file name, the input is a file name. eg.
+		// <getFullFileName(filename="xxx")>
+	*/
+	registerNativeCall(NativeCall_GetFullFileName, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var rs []sfvm.ValueOperator
+		fileMap := make(map[string]struct{})
+		fname := params.GetString("filename")
+		if fname == "" {
+			return false, nil, utils.Errorf("filename is empty")
+		}
+		program, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		p := program.Program
+		if p == nil {
+			return false, nil, utils.Errorf("program is nil")
+		}
+		matchFilename := func(f func(filename string) bool) {
+			for name, _ := range p.FileList {
+				if f(name) {
+					_, ok := fileMap[name]
+					if !ok {
+						memeditor := &memedit.MemEditor{}
+						fileMap[name] = struct{}{}
+						if program.enableDatabase {
+							memeditor, err = ssadb.GetEditorByFileName(path.Join("/", program.GetProgramName(), name))
+							if err != nil {
+								log.Errorf("get ir source from hash failed: %v", err)
+								continue
+							}
+						} else {
+							editor, b := program.Program.GetEditor(name)
+							if b {
+								memeditor = editor
+							} else {
+								log.Errorf("get editor failed")
+								continue
+							}
+						}
+						rs = append(rs, program.NewValue(ssa.NewConstWithRange(name, memeditor.GetFullRange())))
+					}
+				}
+			}
+		}
+		compile, err := glob.Compile(fname)
+		if err == nil {
+			matchFilename(func(filename string) bool {
+				return compile.Match(filename)
+			})
+		}
+		r, err := regexp.Compile(fname)
+		if err == nil {
+			matchFilename(func(filename string) bool {
+				return r.MatchString(filename)
+			})
+		}
+		matchFilename(func(filename string) bool {
+			return strings.ToLower(filename) == strings.ToLower(fname)
+		})
+		return true, sfvm.NewValues(rs), nil
+	}))
+	registerNativeCall(NativeCall_GetFilenameByContent, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var rs []sfvm.ValueOperator
+
+		program, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		prog := program.Program
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Program:
+				return nil
+			case *Value:
+				vr := ret.node.GetRange()
+				if vr == nil {
+					log.Errorf("node range is nil")
+					return nil
+				}
+				editor := vr.GetEditor()
+				if editor == nil {
+					log.Errorf("node editor is nil")
+				}
+				_, exist := prog.FileList[editor.GetFilename()]
+				if exist {
+					rs = append(rs, program.NewValue(ssa.NewConstWithRange(editor.GetFilename(), editor.GetFullRange())))
+				} else {
+					log.Errorf("program filelist not found this file")
+				}
+			}
+			return nil
+		})
+		return true, sfvm.NewValues(rs), nil
+	}))
 	//<foreach_function_inst(hook=`xxx` as $result)> as $result
 	registerNativeCall(NativeCall_Foeach_Func_Inst, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
@@ -595,12 +698,12 @@ func init() {
 				t := val.GetType()
 				fts := t.t.GetFullTypeNames()
 				if len(fts) == 0 {
-					results := val.NewValue(ssa.NewConst(t.String()))
+					results := val.NewValue(ssa.NewConstWithRange(t.String(), val.GetRange()))
 					vals = append(vals, results)
 				} else {
 					for _, ft := range fts {
 						ft = yakunquote.TryUnquote(ft)
-						results := val.NewValue(ssa.NewConst(ft))
+						results := val.NewValue(ssa.NewConstWithRange(ft, val.GetRange()))
 						results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
 						vals = append(vals, results)
 					}

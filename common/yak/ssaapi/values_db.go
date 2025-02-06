@@ -4,6 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -83,6 +84,23 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 		AuditNodeStatus: s.AuditNodeStatus,
 		IsEntryNode:     ValueCompare(value, s.entryValue),
 		IRCodeID:        value.GetId(),
+		TmpStartOffset:  -1,
+		TmpEndOffset:    -1,
+	}
+	if value.GetId() == -1 {
+		R := value.GetRange()
+		an.TmpValue = yakunquote.TryUnquote(value.String())
+		if R != nil {
+			editor := R.GetEditor()
+			if editor == nil {
+				log.Errorf("%v: CreateOffset: rng or editor is nil", value.GetVerboseName())
+				return an, nil
+			}
+			hash := editor.GetIrSourceHash(value.GetProgramName())
+			an.TmpValueFileHash = hash
+			an.TmpStartOffset = R.GetStartOffset()
+			an.TmpEndOffset = R.GetEndOffset()
+		}
 	}
 	if ret := s.db.Save(an).Error; ret != nil {
 		return nil, utils.Wrap(ret, "save AuditNode")
