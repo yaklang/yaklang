@@ -48,6 +48,7 @@ func (b *astbuilder) build(ast *yak.ProgramContext) {
 	if stmt, ok := ast.StatementList().(*yak.StatementListContext); ok {
 		b.buildStatementList(stmt)
 	}
+	b.Finish()
 }
 
 // statement list
