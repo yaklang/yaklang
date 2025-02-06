@@ -3,6 +3,9 @@ package netstackvm
 import (
 	"bytes"
 	"context"
+	"net"
+	"sync"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -12,16 +15,17 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/link/channel"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"net"
-	"sync"
 )
 
 type PCAPEndpoint struct {
 	*channel.Endpoint
 
+	tcpKillMutex   sync.RWMutex
+	tcpKillMap     map[string]struct{}
 	inboundFilter  func(packet gopacket.Packet) bool
 	outboundFilter func(packet gopacket.Packet) bool
 
@@ -72,7 +76,7 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, 
 	ctx, cancel := context.WithCancel(ctx)
 	pcapEp := &PCAPEndpoint{
 		//handle:               handle,
-
+		tcpKillMap:   make(map[string]struct{}),
 		adaptor:      adaptor,
 		netBridge:    bridge,
 		Endpoint:     channel.New(defaultOutQueueLen*100, uint32(mtu), tcpip.LinkAddress(string(macAddr))),
@@ -85,6 +89,101 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, 
 		getawayFound: utils.NewAtomicBool(),
 	}
 	return pcapEp, nil
+}
+
+func (p *PCAPEndpoint) DisallowTCP(addr string) {
+	hashes := p.generateKillTCPHash(addr, "")
+	p.tcpKillMutex.Lock()
+	defer p.tcpKillMutex.Unlock()
+	for _, hash := range hashes {
+		p.tcpKillMap[hash] = struct{}{}
+	}
+}
+
+func (p *PCAPEndpoint) AllowTCP(addr string) {
+	hashes := p.generateKillTCPHash(addr, "")
+	p.tcpKillMutex.Lock()
+	defer p.tcpKillMutex.Unlock()
+	for _, hash := range hashes {
+		delete(p.tcpKillMap, hash)
+	}
+}
+
+func (p *PCAPEndpoint) DisallowTCPWithSrc(addr string, src string) {
+	hashes := p.generateKillTCPHash(addr, src)
+	p.tcpKillMutex.Lock()
+	defer p.tcpKillMutex.Unlock()
+	for _, hash := range hashes {
+		p.tcpKillMap[hash] = struct{}{}
+	}
+}
+
+func (p *PCAPEndpoint) AllowTCPWithSrc(addr string, src string) {
+	hashes := p.generateKillTCPHash(addr, src)
+	p.tcpKillMutex.Lock()
+	defer p.tcpKillMutex.Unlock()
+	for _, hash := range hashes {
+		delete(p.tcpKillMap, hash)
+	}
+}
+
+func (p *PCAPEndpoint) generateKillTCPHash(to, from string) []string {
+	var fromHosts []string
+	var toHosts []string
+
+	if from != "" {
+		fromHost, fromPort, _ := utils.ParseStringToHostPort(from)
+		if fromPort <= 0 {
+			fromHost = from
+		}
+		fromIp := net.ParseIP(fromHost)
+		if fromIp != nil {
+			fromHosts = append(fromHosts, fromIp.String())
+		} else {
+			ips := netx.LookupAll(fromHost)
+			for _, ip := range ips {
+				fromHosts = append(fromHosts, ip)
+			}
+		}
+	}
+
+	toHost, toPort, _ := utils.ParseStringToHostPort(to)
+	if toPort <= 0 {
+		toHost = to
+	}
+
+	toIp := net.ParseIP(toHost)
+	if toIp != nil {
+		toHosts = append(toHosts, toIp.String())
+	} else {
+		ips := netx.LookupAll(toHost)
+		for _, ip := range ips {
+			toHosts = append(toHosts, ip)
+		}
+	}
+
+	var newAddrs []string
+	for _, toAddr := range toHosts {
+		target := toAddr
+		if toPort > 0 {
+			target = utils.HostPort(toAddr, toPort)
+		}
+
+		if len(fromHosts) > 0 {
+			for _, fromAddr := range fromHosts {
+				src := fromAddr
+				if toPort > 0 {
+					src = utils.HostPort(fromAddr, toPort)
+				}
+				newAddr := utils.CalcSha256(target, src)
+				newAddrs = append(newAddrs, newAddr)
+			}
+		} else {
+			newAddr := utils.CalcSha256(target)
+			newAddrs = append(newAddrs, newAddr)
+		}
+	}
+	return newAddrs
 }
 
 func (p *PCAPEndpoint) SetGatewayHardwareAddr(hwAddr net.HardwareAddr) {
@@ -164,7 +263,12 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 				return
 			}
 		}
+
 		if !p.IsAttached() {
+			continue
+		}
+
+		if dropped, _ := p.generateRSTFromPacket(packet); dropped {
 			continue
 		}
 
