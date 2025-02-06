@@ -35,6 +35,16 @@ func (driver *PCAPEndpoint) generateRSTFromPacket(pkt gopacket.Packet) (bool, er
 		return false, errors.New("tcp layer not found")
 	}
 
+	// 如果是 RST 包，不需要再生成 RST
+	if tcpLayer.RST {
+		return false, nil
+	}
+
+	// 如果是 FIN 包，不需要生成 RST
+	if tcpLayer.FIN {
+		return false, nil
+	}
+
 	networkLayerRaw := pkt.Layer(layers.LayerTypeIPv4)
 	if networkLayerRaw == nil {
 		return false, errors.New("ip layer not found")
@@ -54,6 +64,15 @@ func (driver *PCAPEndpoint) generateRSTFromPacket(pkt gopacket.Packet) (bool, er
 		hashes[h] = struct{}{}
 	}
 	for _, h := range driver.generateKillTCPHash(utils.HostPort(dstIP, dstPort), "") {
+		hashes[h] = struct{}{}
+	}
+	for _, h := range driver.generateKillTCPHash(utils.HostPort(srcIP, srcPort), "") {
+		hashes[h] = struct{}{}
+	}
+	for _, h := range driver.generateKillTCPHash(dstIP, "") {
+		hashes[h] = struct{}{}
+	}
+	for _, h := range driver.generateKillTCPHash(srcIP, "") {
 		hashes[h] = struct{}{}
 	}
 

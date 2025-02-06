@@ -157,9 +157,7 @@ func (p *PCAPEndpoint) generateKillTCPHash(to, from string) []string {
 		toHosts = append(toHosts, toIp.String())
 	} else {
 		ips := netx.LookupAll(toHost)
-		for _, ip := range ips {
-			toHosts = append(toHosts, ip)
-		}
+		toHosts = append(toHosts, ips...)
 	}
 
 	var newAddrs []string
