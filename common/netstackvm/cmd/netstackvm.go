@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/lowtun/netstack"
 	"io"
 	"math/rand"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -97,6 +97,16 @@ func main() {
 				if err != nil {
 					return utils.Errorf("create netstack virtual machine failed: %v", err)
 				}
+
+				//conflictNativeStack, err := netstackvm.NewNetStackVirtualMachine(netstackvm.WithPcapDevice(ifaceName))
+				//if err != nil {
+				//	return utils.Errorf("create conflict netstack virtual machine failed: %v", err)
+				//}
+				//if err := conflictNativeStack.InheritPcapInterfaceIP(); err != nil {
+				//	return utils.Errorf("inherit pcap interface ip failed: %v", err)
+				//}
+				//_ = conflictNativeStack
+
 				if err := userStack.StartDHCP(); err != nil {
 					log.Errorf("start dhcp failed: %v", err)
 					return err
@@ -108,13 +118,14 @@ func main() {
 				}
 				defer s.Close()
 
-				log.Infof("start to create tunnel: %v", s.GetTunnelName())
-				if err := s.SetHijackTCPHandler(func(conn netstack.TCPConn) {
+				lis := s.GetListener()
+
+				handler := func(conn net.Conn) {
 					defer func() {
 						conn.Close()
 					}()
-					id := conn.ID()
-					addr := utils.HostPort(id.LocalAddress.String(), id.LocalPort)
+					addr := conn.LocalAddr().String()
+					log.Infof("hijack connection: %v", addr)
 					hijackedConn, err := userStack.DialTCP(10*time.Second, addr)
 					if err != nil {
 						log.Errorf("dial tcp failed: %v", err)
@@ -141,8 +152,6 @@ func main() {
 						_, _ = io.Copy(conn, hijackedConn)
 					}()
 					wg.Wait()
-				}); err != nil {
-					return err
 				}
 
 				for _, target := range fixedDomains {
@@ -150,6 +159,16 @@ func main() {
 					if err := s.HijackDomain(target); err != nil {
 						log.Errorf("hijack domain failed: %v", err)
 					}
+				}
+
+				for {
+					conn, err := lis.Accept()
+					if err != nil {
+						return err
+					}
+					go func() {
+						handler(conn)
+					}()
 				}
 				select {}
 			},
