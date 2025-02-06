@@ -58,6 +58,17 @@ func (p *Program) GetType(name string) *Type {
 	return NewType(typ)
 }
 
+func (p *Program) Hash() string {
+	if p.ssaProgram != nil {
+		// Use the name and created_at to generate the hash,
+		// So that the hash will be changed when the program is recompiled.
+		hash := utils.CalcSha256(p.ssaProgram.Name, p.ssaProgram.CreatedAt.String())
+		return hash
+	} else {
+		return utils.CalcSha256(p.Program.Name)
+	}
+}
+
 func NewProgram(prog *ssa.Program, config *config) *Program {
 	p := &Program{
 		Program:           prog,
