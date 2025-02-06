@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sort"
 	"time"
 
@@ -216,6 +217,28 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 	if err != nil {
 		log.Errorf("NewValueFromDB: audit node not found: %d", nodeID)
 		return nil
+	}
+	// if auditNode is -1,check it.
+	if auditNode.IRCodeID == -1 {
+		var offset memedit.RangeIf
+		var memEditor *memedit.MemEditor
+		if auditNode.TmpValueFileHash == "" {
+			memEditor = memedit.NewMemEditor(auditNode.TmpValue)
+		} else {
+			memEditor, err = ssadb.GetIrSourceFromHash(auditNode.TmpValueFileHash)
+			if err != nil {
+				log.Errorf("NewValueFromDB: get ir source from hash failed: %v", err)
+				return nil
+			}
+		}
+		if auditNode.TmpStartOffset == -1 || auditNode.TmpEndOffset == -1 {
+			offset = memEditor.GetRangeOffset(0, memEditor.CodeLength())
+		} else {
+			offset = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
+		}
+		val := p.NewValue(ssa.NewConstWithRange(auditNode.TmpValue, offset))
+		val.auditNode = auditNode
+		return val
 	}
 	val, err := p.GetValueById(auditNode.IRCodeID)
 	if err != nil {
