@@ -67,8 +67,8 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		return false, nil, utils.Error("no rule name found")
 	}
 
-	hash, ret, ok := GetIncludeCacheValue(parent, ruleName, inputs)
-	if ok {
+	hash, ret, shouldCache := GetIncludeCacheValue(parent, ruleName, inputs)
+	if ret != nil {
 		return true, ret, nil
 	}
 
@@ -101,13 +101,15 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	}
 	if len(vals) > 0 {
 		value = ValuesToSFValueList(vals)
-		includeCache.Set(hash, value)
+		if shouldCache {
+			includeCache.Set(hash, value)
+		}
 		return true, value, nil
 	}
 	return false, nil, utils.Error("no value found")
 }
 
-func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (string, sfvm.ValueOperator, bool) {
+func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (hash string, value sfvm.ValueOperator, shouldCache bool) {
 	getRetFromCache := func(hash string) sfvm.ValueOperator {
 		if ret, ok := includeCache.Get(hash); ok {
 			return ret
@@ -116,23 +118,24 @@ func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values)
 		}
 	}
 
-	if program.GetProgramName() != "" {
-		hash := program.Hash()
-		shouldCache := true
-		if !inputValues.IsEmpty() {
-			if hash2, ok := inputValues.Hash(); ok {
-				hash = utils.CalcSha256(hash, hash2)
+	if programHash, ok := program.Hash(); ok {
+		// Use program hash and rule name to generate a unique hash
+		hash = utils.CalcSha256(programHash + ruleName)
+		shouldCache = true
+		if inputValues != nil && !inputValues.IsEmpty() {
+			if valueHash, ok := inputValues.Hash(); ok {
+				hash = utils.CalcSha256(hash, valueHash)
 			} else {
 				// if input param values not empty but have temp value,
 				// then the result should not be cached
 				shouldCache = false
 			}
 		}
-		if ret := getRetFromCache(hash); ret != nil && shouldCache {
-			return hash, ret, true
-		} else {
-			return hash, nil, false
+		if !shouldCache {
+			return
 		}
+		value = getRetFromCache(hash)
+		return
 	}
-	return "", nil, false
+	return
 }
