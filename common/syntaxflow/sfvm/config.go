@@ -19,7 +19,6 @@ func NewConfig(opts ...Option) *Config {
 type ResultCapturedCallback func(name string, results ValueOperator) error
 
 type Config struct {
-	inputValues               ValueOperator
 	debug                     bool
 	StrictMatch               bool
 	FailFast                  bool
@@ -44,12 +43,6 @@ func WithInitialContextVars(o *omap.OrderedMap[string, ValueOperator]) Option {
 func WithProcessCallback(p func(int, string)) Option {
 	return func(config *Config) {
 		config.processCallback = p
-	}
-}
-
-func WithInputValues(vals ValueOperator) Option {
-	return func(config *Config) {
-		config.inputValues = vals
 	}
 }
 

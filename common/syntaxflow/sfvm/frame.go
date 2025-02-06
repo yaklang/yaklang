@@ -186,12 +186,6 @@ func (s *SFFrame) Flush() {
 	s.idx = 0
 }
 
-func (f *SFFrame) SetInputValues() {
-	if vals := f.config.inputValues; vals != nil {
-		f.GetSymbolTable().Set("input", vals)
-	}
-}
-
 func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, ValueOperator] {
 	return s.result.SymbolTable
 }
@@ -201,7 +195,7 @@ func (s *SFFrame) GetSymbol(sfi *SFI) (ValueOperator, bool) {
 	}
 	switch sfi.OpCode {
 	// variable +/-/&& can read from context
-	case OpMergeRef, OpRemoveRef, OpIntersectionRef:
+	case OpMergeRef, OpRemoveRef, OpIntersectionRef, OpNewRef:
 		if initVars := s.config.initialContextVars; initVars != nil {
 			return initVars.Get(sfi.UnaryStr)
 		}
@@ -227,7 +221,7 @@ func (s *SFFrame) WithPredecessorContext(label string) AnalysisContextOption {
 	}
 }
 
-func (s *SFFrame) exec(input ValueOperator) (ret error) {
+func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 	s.predCounter = 0
 	defer func() {
 		s.predCounter = 0
@@ -235,7 +229,6 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 
 	// clear
 	s.Flush()
-	s.SetInputValues()
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -286,7 +279,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		case OpCheckStackTop:
 			if s.stack.Len() == 0 {
 				s.debugSubLog(">> stack top is nil (push input)")
-				s.stack.Push(input)
+				s.stack.Push(feedValue)
 			}
 		case OpEnterStatement:
 			s.statementStack.Push(&errorSkipContext{
