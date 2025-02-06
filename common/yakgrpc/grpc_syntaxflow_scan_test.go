@@ -135,6 +135,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 					require.Greater(t, len(res.Results), 0)
 					require.Equal(t, res.Results[0].Kind, string(schema.SFResultKindScan))
 				}
+				break
 			}
 		}
 		require.True(t, matchTaskID)
@@ -377,6 +378,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Group(t *testing.T) {
 					require.Greater(t, len(res.Results), 0)
 					require.Equal(t, res.Results[0].Kind, string(schema.SFResultKindScan))
 				}
+				break
 			}
 		}
 		require.True(t, matchTaskID)

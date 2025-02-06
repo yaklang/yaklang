@@ -3,6 +3,7 @@ package yaklib
 import (
 	"context"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -81,7 +82,7 @@ func queryRiskEx(keyword string, opts ...yakit.RiskParamsOpt) chan *schema.Risk 
 	queryParams.Network = risk.IP
 	queryParams.Tags = risk.Tags
 	queryParams.Search = keyword
-	db, _ = yakit.FilterByQueryRisks(db, queryParams)
+	db = yakit.FilterByQueryRisks(db, queryParams)
 	return yakit.YieldRisks(db, context.Background())
 }
 

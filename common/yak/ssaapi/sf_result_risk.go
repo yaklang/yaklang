@@ -1,7 +1,11 @@
 package ssaapi
 
 import (
+	"encoding/json"
 	"fmt"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
@@ -12,90 +16,177 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) {
-	alertInfo, ok := r.GetAlertInfo(variable)
-	if !ok {
-		log.Infof("no alert msg for %s; skip", variable)
-		return
+type CodeRange struct {
+	URL            string `json:"url"`
+	StartLine      int64  `json:"start_line"`
+	StartColumn    int64  `json:"start_column"`
+	EndLine        int64  `json:"end_line"`
+	EndColumn      int64  `json:"end_column"`
+	SourceCodeLine int64  `json:"source_code_line"`
+}
+
+func (c *CodeRange) GetPath() string {
+	urlIns := utils.ParseStringToUrl(c.URL)
+	return urlIns.Path
+}
+
+func (c *CodeRange) JsonString() string {
+	jsonString, err := json.Marshal(c)
+	if err != nil {
+		return ""
+	}
+	return string(jsonString)
+}
+
+const CodeContextLine = 3
+
+const SSADBProto = "ssadb://"
+
+func CoverCodeRange(programName string, codeSourceProto string, r memedit.RangeIf) (*CodeRange, string) {
+	// url := ""
+	source := ""
+	ret := &CodeRange{
+		URL:            "",
+		StartLine:      0,
+		StartColumn:    0,
+		EndLine:        0,
+		EndColumn:      0,
+		SourceCodeLine: 0,
+	}
+	if r == nil {
+		return ret, source
 	}
 
-	rule := r.rule
-	// risk := yakit.CreateRisk("",
-	opts := []yakit.RiskParamsOpt{
-		yakit.WithRiskParam_RuntimeId(result.TaskID),
-		yakit.WithRiskParam_FromScript(rule.RuleName),
-		yakit.WithRiskParam_Title(rule.Title),
-		yakit.WithRiskParam_TitleVerbose(rule.TitleZh),
-		yakit.WithRiskParam_Description(rule.Description),
-		yakit.WithRiskParam_Severity(string(rule.Severity)),
-		yakit.WithRiskParam_CVE(rule.CVE),
-		yakit.WithRiskParam_RiskType(string(rule.RiskType)),
+	if editor := r.GetEditor(); editor != nil {
+		// if codeSourceProto is empty, url is pure path
+		ret.URL = fmt.Sprintf("%s/%s/%s", codeSourceProto, programName, editor.GetFilename())
+		source = editor.GetTextFromRangeContext(r, CodeContextLine)
+	}
+	if start := r.GetStart(); start != nil {
+		ret.StartLine = int64(start.GetLine())
+		ret.StartColumn = int64(start.GetColumn())
+	}
+	if end := r.GetEnd(); end != nil {
+		ret.EndLine = int64(end.GetLine())
+		ret.EndColumn = int64(end.GetColumn())
+	}
+	if start := ret.StartLine - CodeContextLine - 1; start > 0 {
+		ret.SourceCodeLine = start
+	}
+	return ret, source
+}
+
+func buildSSARisk(
+	result *SyntaxFlowResult,
+	variable string, index int,
+	resultID uint64, runtimeId string,
+) *schema.SSARisk {
+	progName := result.GetProgramName()
+	if progName == "" {
+		return nil
+	}
+	var value *Value
+	if vs := result.GetValues(variable); len(vs) <= index {
+		return nil
+	} else {
+		value = vs[index]
+	}
+	riskCodeRange, CodeFragment := CoverCodeRange(progName, SSADBProto, value.GetRange())
+	rule := result.rule
+	newSSARisk := &schema.SSARisk{
+		CodeSourceUrl: riskCodeRange.URL,
+		CodeRange:     riskCodeRange.JsonString(),
+		CodeFragment:  CodeFragment,
+		Title:         rule.Title,
+		TitleVerbose:  rule.TitleZh,
+		Description:   rule.Description,
+		RiskType:      rule.RiskType,
+		Severity:      rule.Severity,
+		CVE:           rule.CVE,
+
+		FromRule:    rule.RuleName,
+		RuntimeId:   runtimeId,
+		IsPotential: false,
+		ProgramName: progName,
+		// result
+		ResultID: resultID,
+		Variable: variable,
+		Index:    int64(index),
+
+		FunctionName: value.GetFunction().GetName(),
+		Line:         riskCodeRange.StartLine,
 	}
 
 	// modify info by alertMsg
+	alertInfo, _ := result.GetAlertInfo(variable)
 	if alertInfo.OnlyMsg {
 		if alertInfo.Msg != "" {
-			opts = append(opts, yakit.WithRiskParam_Details(alertInfo.Msg))
+			newSSARisk.Details = alertInfo.Msg
 		}
 	} else {
 		// cover info from alertMsg
 		if alertInfo.Severity != "" {
-			opts = append(opts, yakit.WithRiskParam_Severity(string(alertInfo.Severity)))
+			newSSARisk.Severity = alertInfo.Severity
 		}
 		if alertInfo.CVE != "" {
-			opts = append(opts, yakit.WithRiskParam_CVE(alertInfo.CVE))
+			newSSARisk.CVE = alertInfo.CVE
 		}
 		if alertInfo.RiskType != "" {
-			opts = append(opts, yakit.WithRiskParam_RiskType(string(alertInfo.RiskType)))
+			newSSARisk.RiskType = alertInfo.RiskType
 		}
 		if alertInfo.Title != "" {
-			opts = append(opts, yakit.WithRiskParam_Title(alertInfo.Title))
+			newSSARisk.Title = alertInfo.Title
 		}
 		if alertInfo.Description != "" {
-			opts = append(opts, yakit.WithRiskParam_TitleVerbose(alertInfo.TitleZh))
+			newSSARisk.TitleVerbose = alertInfo.TitleZh
 		}
 		if alertInfo.Solution != "" {
-			opts = append(opts, yakit.WithRiskParam_Solution(alertInfo.Solution))
+			newSSARisk.Solution = alertInfo.Solution
 		}
 		if alertInfo.Msg != "" {
-			opts = append(opts, yakit.WithRiskParam_Details(map[string]string{
-				"message": alertInfo.Msg,
-			}))
+			newSSARisk.Details = alertInfo.Msg
 		}
 	}
-
-	fileUrl := fmt.Sprintf("syntaxflow://%s/%s?result_id=%d", result.ProgramName, variable, result.ID)
-	risk := yakit.CreateRisk("", opts...) // this url not use in argument, because it is not a real url
-	risk.Url = fileUrl
-	risk.ResultID = result.ID
-	risk.Variable = variable
-	risk.ProgramName = result.ProgramName
-	if err := yakit.SaveRisk(risk); err != nil {
-		log.Errorf("save risk failed: %s", err)
-		return
-	}
-	r.riskMap[variable] = risk
+	return newSSARisk
 }
 
-func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.Risk {
+func ssaRiskName(variable string, index int) string {
+	return fmt.Sprintf("%s-%d", variable, index)
+}
+
+func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) {
+	_, ok := r.GetAlertInfo(variable)
+	if !ok {
+		log.Infof("no alert msg for %s; skip", variable)
+		return
+	}
+	for i := range r.GetValues(variable) {
+		ssaRisk := buildSSARisk(r, variable, i, uint64(result.ID), result.TaskID)
+		if ssaRisk == nil {
+			continue
+		}
+		err := yakit.CreateSSARisk(consts.GetGormDefaultSSADataBase(), ssaRisk)
+		if err != nil {
+			log.Errorf("save risk failed: %s", err)
+		}
+		r.riskMap[ssaRiskName(variable, i)] = ssaRisk
+	}
+}
+
+func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.SSARisk {
 	if r == nil {
 		return nil
 	}
 
 	// load risk from database
 	if r.dbResult != nil && len(r.riskMap) != len(r.dbResult.RiskHashs) {
-		for name, hash := range r.dbResult.RiskHashs {
-			risk, err := yakit.GetRiskByHash(consts.GetGormProjectDatabase(), hash)
-			if err != nil {
-				log.Errorf("get risk by hash failed: %s", err)
-				continue
-			}
-			r.riskMap[name] = risk
+		for name := range r.dbResult.RiskHashs {
+			r.getRisk(name)
 		}
 	}
 	// transform to grpc model
 	if len(r.riskGRPCCache) != len(r.riskMap) {
-		r.riskGRPCCache = lo.MapToSlice(r.riskMap, func(name string, risk *schema.Risk) *ypb.Risk {
+		r.riskGRPCCache = lo.MapToSlice(r.riskMap, func(name string, risk *schema.SSARisk) *ypb.SSARisk {
 			return risk.ToGRPCModel()
 		})
 	}
@@ -103,7 +194,30 @@ func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.Risk {
 	return r.riskGRPCCache
 }
 
-func (r *SyntaxFlowResult) GetRisk(name string) *schema.Risk {
+func (r *SyntaxFlowResult) GetRiskByValue(variable string, i int) *schema.SSARisk {
+	if r == nil {
+		return nil
+	}
+	return r.getRisk(ssaRiskName(variable, i))
+}
+
+func (r *SyntaxFlowResult) GetRiskHash(variable string, i int) string {
+	name := ssaRiskName(variable, i)
+	if r == nil {
+		return ""
+	}
+	if r, ok := r.riskMap[name]; ok {
+		return r.Hash
+	}
+	if r.dbResult != nil {
+		if hash, ok := r.dbResult.RiskHashs[name]; ok {
+			return hash
+		}
+	}
+	return ""
+}
+
+func (r *SyntaxFlowResult) getRisk(name string) *schema.SSARisk {
 	if r == nil {
 		return nil
 	}
@@ -113,7 +227,7 @@ func (r *SyntaxFlowResult) GetRisk(name string) *schema.Risk {
 	// from db
 	if r.dbResult != nil {
 		if hash, ok := r.dbResult.RiskHashs[name]; ok {
-			risk, err := yakit.GetRiskByHash(consts.GetGormProjectDatabase(), hash)
+			risk, err := yakit.GetSSARiskByHash(ssadb.GetDB(), hash)
 			if err != nil {
 				log.Errorf("get risk by hash failed: %s", err)
 				return nil

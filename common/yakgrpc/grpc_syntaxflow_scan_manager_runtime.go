@@ -123,10 +123,10 @@ func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	}
 	// m.riskQuery
 	m.stream.Send(&ypb.SyntaxFlowScanResponse{
-		TaskID: m.taskID,
-		Status: m.status,
-		Result: res.GetGRPCModelResult(),
-		Risks:  res.GetGRPCModelRisk(),
+		TaskID:   m.taskID,
+		Status:   m.status,
+		Result:   res.GetGRPCModelResult(),
+		SSARisks: res.GetGRPCModelRisk(),
 	})
 }
 
