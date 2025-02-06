@@ -289,14 +289,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return Values{}
 			}
 			var actualParam ssa.Value
-			if inst.MemberCallKind == ssa.MoreParameterMember {
-				value, exist := calledInstance.MarkParameterMember[inst.GetVerboseName()]
-				if !exist {
-					log.Errorf("not found this parameterMember")
-					return Values{}
-				}
-				return i.NewTopDefValue(value).getTopDefs(actx, opt...)
-			}
 			if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
 				return getParameter()
 			}

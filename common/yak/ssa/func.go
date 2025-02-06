@@ -126,7 +126,8 @@ func (f *FunctionBuilder) NewMoreParameterMember(name string, member *ParameterM
 	paraMember := NewMoreParamMember(name, f, member, key)
 	variable := f.CreateVariable(name)
 	f.AssignVariable(variable, paraMember)
-	f.MarkMoreParamMember = append(f.MarkMoreParamMember, paraMember)
+	f.ParameterMembers = append(f.ParameterMembers, paraMember)
+	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
 	return paraMember
 }
 

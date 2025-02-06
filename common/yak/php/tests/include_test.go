@@ -206,6 +206,3 @@ $user->Show();
 `
 	ssatest.CheckSyntaxFlow(t, code, `exit(* #-> * as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
 }
-func TestCode3(t *testing.T) {
-
-}
