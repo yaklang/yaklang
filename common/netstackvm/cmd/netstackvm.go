@@ -191,6 +191,9 @@ func main() {
 					return err
 				}
 
+				log.Info("start to set filter for synscan, improve synscan performance")
+				vm.SetFilterForSynScan()
+
 				swg := utils.NewSizedWaitGroup(2000)
 
 				ports := utils.ParseStringToPorts(c.String("ports"))
