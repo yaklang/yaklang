@@ -52,7 +52,9 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 		opt = append(opt, languageOption)
 	}
 	opt = append(opt, ssaapi.WithExternValue(tc.ExternValue))
-	opt = append(opt, static_analyzer.GetPluginSSAOpt(string(language))...)
+	if language == "yak" {
+		opt = append(opt, static_analyzer.GetPluginSSAOpt(string(language))...)
+	}
 	opt = append(opt, tc.Option...)
 	prog, err := ssaapi.Parse(tc.Code, opt...)
 	require.Nil(t, err, "parse error")

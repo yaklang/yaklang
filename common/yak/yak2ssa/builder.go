@@ -16,7 +16,11 @@ type SSABuilder struct {
 	*ssa.PreHandlerInit
 }
 
-var Builder = &SSABuilder{}
+func (s *SSABuilder) GetCodeFileExt() string {
+	return "yak"
+}
+
+var Builder ssa.Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{

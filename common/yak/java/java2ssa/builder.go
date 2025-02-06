@@ -23,6 +23,10 @@ type SSABuilder struct {
 
 var Builder ssa.Builder = &SSABuilder{}
 
+func (*SSABuilder) GetCodeFileExt() string {
+	return "java"
+}
+
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	b.GetProgram().VirtualImport = true
 	ast, err := Frontend(src, force)

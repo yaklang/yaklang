@@ -26,6 +26,10 @@ type SSABuild struct {
 
 var Builder ssa.Builder = &SSABuild{}
 
+func (*SSABuild) GetCodeFileExt() string {
+	return "php"
+}
+
 func (*SSABuild) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".php" || extension == ".lock"

@@ -22,7 +22,11 @@ type SSABuilder struct {
 	*ssa.PreHandlerInit
 }
 
-var Builder = &SSABuilder{}
+var Builder ssa.Builder = &SSABuilder{}
+
+func (*SSABuilder) GetCodeFileExt() string {
+	return "go"
+}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{

@@ -59,8 +59,9 @@ func ReducerCompile(base string, opts ...Option) error {
 			}
 			if c.stopAtCompileError {
 				cancel()
+				return err
 			}
-			return err
+			return nil
 		}
 		for _, result := range results {
 			visited.Insert(result)
@@ -69,14 +70,18 @@ func ReducerCompile(base string, opts ...Option) error {
 	}
 
 	for _, entryFile := range c.entryFiles {
-		path := c.fs.Join(base, entryFile)
-		info, err := c.fs.Stat(path)
-		if err != nil {
-			return utils.Wrapf(err, "find entryfile failed: %v", path)
-		}
-		_ = info
-		if err := handler(path); err != nil {
-			return err
+		for _, base := range []string{"", base} {
+			path := c.fs.Join(base, entryFile)
+			log.Infof("entry file: %v", path)
+			info, err := c.fs.Stat(path)
+			if err != nil {
+				utils.Errorf("find entryfile failed: %v", path)
+				continue
+			}
+			_ = info
+			if err := handler(path); err != nil {
+				return err
+			}
 		}
 	}
 

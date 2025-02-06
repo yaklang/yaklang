@@ -25,6 +25,10 @@ func (s *SSABuild) Create() ssa.Builder {
 	}
 }
 
+func (*SSABuild) GetCodeFileExt() string {
+	return "js"
+}
+
 func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {

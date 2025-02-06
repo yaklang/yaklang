@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gobwas/glob"
 	"io"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gobwas/glob"
 
 	"github.com/yaklang/yaklang/common/consts"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
 
 type ProcessFunc func(msg string, process float64)
@@ -128,8 +130,8 @@ func DefaultExcludeFunc(patterns []string) (Option, error) {
 	}, nil
 }
 
-func (c *config) CalcHash() string {
-	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.language, c.ignoreSyntaxErr, c.externInfo)
+func (c *config) CalcHash(content string) string {
+	return utils.CalcSha1(content, c.language, c.ignoreSyntaxErr, c.externInfo)
 }
 
 type Option func(*config) error
@@ -441,26 +443,43 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if config.SelectedLanguageBuilder == nil {
+		config.LanguageBuilder = LanguageBuilders[Yak]
+		log.Infof("use default language [%s] for empty path", Yak)
+	} else {
+		config.LanguageBuilder = config.SelectedLanguageBuilder
+	}
+	hash := ""
 	if input != nil {
 		raw, err := io.ReadAll(input)
 		if err != nil {
 			log.Warnf("read input error: %v", err)
+			return nil, err
 		}
-		config.originEditor = memedit.NewMemEditor(string(raw))
+		vf := filesys.NewVirtualFs()
+		name := SimpleFilePath(config.LanguageBuilder)
+		vf.AddFile(name, string(raw))
+		WithFileSystem(vf)(config)
+		hash = config.CalcHash(string(raw))
 	}
 
-	hash := config.CalcHash()
 	if config.EnableCache {
 		if prog, ok := ttlSSAParseCache.Get(hash); ok {
 			return prog, nil
 		}
 	}
 
-	ret, err := config.parseFile()
-	if err == nil && config.EnableCache {
-		ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
+	rets, err := config.parseProject()
+	if err == nil && len(rets) > 0 {
+		ret := rets[0]
+		ssa4analyze.RunAnalyzer(ret.Program)
+		if config.EnableCache {
+			ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
+		}
+		return ret, nil
 	}
-	return ret, err
+	return nil, err
 }
 
 func (p *Program) Feed(code io.Reader) error {

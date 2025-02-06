@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -39,6 +41,16 @@ var AllLanguageBuilders = []ssa.Builder{
 	yak2ssa.Builder,
 	js2ssa.Builder,
 	go2ssa.Builder,
+}
+
+const simpleFileName = "$$File$$Input"
+
+func SimpleFilePath(language ssa.Builder) string {
+	if language != nil {
+		return fmt.Sprintf("%s.%s", simpleFileName, language.GetCodeFileExt())
+	} else {
+		return simpleFileName
+	}
 }
 
 func (c *config) isStop() bool {
