@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sort"
 	"testing"
 
@@ -190,44 +191,33 @@ func TestProgramRelation(t *testing.T) {
 		assert.Nilf(t, irProg, "b should be deleted")
 	}
 }
+
 func TestAuditResult(t *testing.T) {
 	code := `package main; func main() { a := 1; print(a) }`
 	programName := uuid.NewString()
+	taskId := uuid.NewString()
 	prog, err := ssaapi.Parse(code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.GO))
 	require.NoError(t, err)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	}()
-	value := prog.NewValue(ssa.NewConst("print"))
+	editor := memedit.NewMemEditor(code)
+	value := prog.NewValue(ssa.NewConstWithRange("print", editor.GetFullRange()))
 	result := sfvm.NewSFResult(&schema.SyntaxFlowRule{}, &sfvm.Config{})
-	result.SymbolTable.Set("a", value)
-	value.AppendEffectOn(prog.NewValue(ssa.NewConst("tt")))
+	result.SymbolTable.Set("print", value)
 	query := ssaapi.CreateResultWithProg(prog, result)
-	resultId, err := query.Save(schema.SFResultKindFile, "test")
+	resultId, err := query.Save(schema.SFResultKindSearch, taskId)
 	require.NoError(t, err)
 	dbResult, err := ssaapi.LoadResultByID(resultId)
 	require.NoError(t, err)
-	values := dbResult.GetValues("a")
+	values := dbResult.GetValues("print")
+	require.True(t, len(values) != 0)
 	values.Recursive(func(operator sfvm.ValueOperator) error {
 		switch ret := operator.(type) {
 		case *ssaapi.Value:
 			require.True(t, ret.GetId() == -1)
 			require.True(t, ret.GetRange() != nil)
-
-			//todo:
-			//require.True(t, ret.GetRange().GetStartOffset() == strings.Index(code, "print"))
-			//require.True(t, ret.GetRange().GetEndOffset() == strings.Index(code, "print")+len("print"))
-		}
-		return nil
-	})
-	ttValue := dbResult.GetValues("tt")
-	ttValue.Recursive(func(operator sfvm.ValueOperator) error {
-		switch ret := operator.(type) {
-		case *ssaapi.Value:
-			require.True(t, ret.GetId() == -1)
-			require.True(t, ret.GetRange() != nil)
-			require.True(t, ret.GetRange().GetStartOffset() == 0)
-			require.True(t, ret.GetRange().GetEndOffset() == len(code))
+			require.True(t, ret.GetRange().String() == editor.GetFullRange().String())
 		}
 		return nil
 	})

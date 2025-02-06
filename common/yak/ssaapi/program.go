@@ -220,23 +220,21 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 	}
 	// if auditNode is -1,check it.
 	if auditNode.IRCodeID == -1 {
-		var offset memedit.RangeIf
+		var rangeIf memedit.RangeIf
 		var memEditor *memedit.MemEditor
-		if auditNode.TmpValueFileHash == "" {
-			memEditor = memedit.NewMemEditor(auditNode.TmpValue)
-		} else {
+		if auditNode.TmpValueFileHash != "" {
 			memEditor, err = ssadb.GetIrSourceFromHash(auditNode.TmpValueFileHash)
 			if err != nil {
 				log.Errorf("NewValueFromDB: get ir source from hash failed: %v", err)
 				return nil
 			}
+			if auditNode.TmpStartOffset == -1 || auditNode.TmpEndOffset == -1 {
+				rangeIf = memEditor.GetRangeOffset(0, memEditor.CodeLength())
+			} else {
+				rangeIf = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
+			}
 		}
-		if auditNode.TmpStartOffset == -1 || auditNode.TmpEndOffset == -1 {
-			offset = memEditor.GetRangeOffset(0, memEditor.CodeLength())
-		} else {
-			offset = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
-		}
-		val := p.NewValue(ssa.NewConstWithRange(auditNode.TmpValue, offset))
+		val := p.NewValue(ssa.NewConstWithRange(auditNode.TmpValue, rangeIf))
 		val.auditNode = auditNode
 		return val
 	}

@@ -2,7 +2,9 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/java/template2java"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -158,6 +160,7 @@ func init() {
 	*/
 	registerNativeCall(NativeCall_GetFullFileName, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var rs []sfvm.ValueOperator
+		fileMap := make(map[string]struct{})
 		fname := params.GetString("filename")
 		if fname == "" {
 			return false, nil, utils.Errorf("filename is empty")
@@ -170,14 +173,30 @@ func init() {
 		if p == nil {
 			return false, nil, utils.Errorf("program is nil")
 		}
-		fileHash := make(map[string]string, len(p.FileList))
-		for name, hash := range p.FileList {
-			fileHash[hash] = name
-		}
 		matchFilename := func(f func(filename string) bool) {
-			for _, name := range fileHash {
+			for name, _ := range p.FileList {
 				if f(name) {
-					rs = append(rs, program.NewValue(ssa.NewConst(name)))
+					_, ok := fileMap[name]
+					if !ok {
+						memeditor := &memedit.MemEditor{}
+						fileMap[name] = struct{}{}
+						if program.enableDatabase {
+							memeditor, err = ssadb.GetEditorByFileName(path.Join("/", program.GetProgramName(), name))
+							if err != nil {
+								log.Errorf("get ir source from hash failed: %v", err)
+								continue
+							}
+						} else {
+							editor, b := program.Program.GetEditor(name)
+							if b {
+								memeditor = editor
+							} else {
+								log.Errorf("get editor failed")
+								continue
+							}
+						}
+						rs = append(rs, program.NewValue(ssa.NewConstWithRange(name, memeditor.GetFullRange())))
+					}
 				}
 			}
 		}
@@ -186,14 +205,12 @@ func init() {
 			matchFilename(func(filename string) bool {
 				return compile.Match(filename)
 			})
-			return true, sfvm.NewValues(rs), nil
 		}
 		r, err := regexp.Compile(fname)
 		if err == nil {
 			matchFilename(func(filename string) bool {
 				return r.MatchString(filename)
 			})
-			return true, sfvm.NewValues(rs), nil
 		}
 		matchFilename(func(filename string) bool {
 			return strings.ToLower(filename) == strings.ToLower(fname)
@@ -208,10 +225,6 @@ func init() {
 			return false, nil, err
 		}
 		prog := program.Program
-		fileHash := make(map[string]string, len(prog.FileList))
-		for name, hash := range prog.FileList {
-			fileHash[hash] = name
-		}
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Program:
@@ -226,10 +239,9 @@ func init() {
 				if editor == nil {
 					log.Errorf("node editor is nil")
 				}
-				md5 := editor.SourceCodeMd5()
-				filename, exist := fileHash[md5]
+				_, exist := prog.FileList[editor.GetFilename()]
 				if exist {
-					rs = append(rs, program.NewValue(ssa.NewConst(filename)))
+					rs = append(rs, program.NewValue(ssa.NewConstWithRange(editor.GetFilename(), editor.GetFullRange())))
 				} else {
 					log.Errorf("program filelist not found this file")
 				}

@@ -463,18 +463,30 @@ public class A{
 public class B{}
 `)
 	ssatest.CheckSyntaxFlowWithFS(t, fs, `A as $output
-$output<getFilename> as $sink
+$output<FilenameByContent> as $sink
 `, map[string][]string{
 		"sink": {"a.java"},
 	}, true, ssaapi.WithLanguage(ssaapi.JAVA))
 	ssatest.CheckWithFS(fs, t, func(programs ssaapi.Programs) error {
 		result, err := programs.SyntaxFlowWithError(`
 A as $output
-$output<getFilename> as $sink
+$output<FilenameByContent> as $sink
 alert $output
 `, ssaapi.QueryWithEnableDebug())
 		require.NoError(t, err)
 		_ = result
+
+		values := result.GetValues("sink").Show()
+		values.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *ssaapi.Value:
+				require.True(t, ret.GetRange() != nil && ret.GetRange().GetEditor() != nil)
+				editor := ret.GetRange().GetEditor()
+				require.True(t, editor.GetFilename() == "a.java")
+				require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
+			}
+			return nil
+		})
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
@@ -489,10 +501,22 @@ func TestNativeCall_GetFileFullName(t *testing.T) {
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)
 	}()
-	result, err := prog.SyntaxFlowWithError(`<getFullFileName(filename="*/a*")> as $sink`, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithSave(schema.SFResultKindFile))
+	result, err := prog.SyntaxFlowWithError(`<getFullFileName(filename="*/a*")> as $sink`, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithSave(schema.SFResultKindSearch))
 	require.NoError(t, err)
 	id := result.GetResultID()
 	dbResult, err := ssaapi.LoadResultByID(id)
 	require.NoError(t, err)
-	require.True(t, dbResult.GetValues("sink").Len() != 0)
+	values := dbResult.GetValues("sink")
+	require.True(t, !values.IsEmpty())
+	values.Recursive(func(operator sfvm.ValueOperator) error {
+		switch ret := operator.(type) {
+		case *ssaapi.Value:
+			require.True(t, ret.GetRange() != nil)
+			require.True(t, ret.GetRange().GetEditor() != nil)
+			editor := ret.GetRange().GetEditor()
+			require.True(t, editor.GetFilename() == "src/main/java/abc.java")
+			require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
+		}
+		return nil
+	})
 }

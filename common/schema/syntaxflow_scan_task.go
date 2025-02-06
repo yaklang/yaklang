@@ -19,10 +19,10 @@ const SYNTAXFLOWSCAN_PROGRAM_SPLIT = ","
 type SyntaxflowResultKind string
 
 const (
-	SFResultKindDebug SyntaxflowResultKind = "debug" // 新建插件 调试
-	SFResultKindScan  SyntaxflowResultKind = "scan"  // 代码扫描 自动执行
-	SFResultKindQuery SyntaxflowResultKind = "query" // 代码审计 手动执行
-	SFResultKindFile  SyntaxflowResultKind = "file"  //	文件名搜索
+	SFResultKindDebug  SyntaxflowResultKind = "debug"  // 新建插件 调试
+	SFResultKindScan   SyntaxflowResultKind = "scan"   // 代码扫描 自动执行
+	SFResultKindQuery  SyntaxflowResultKind = "query"  // 代码审计 手动执行
+	SFResultKindSearch SyntaxflowResultKind = "search" // 文件名搜索
 )
 
 type SyntaxFlowScanTask struct {

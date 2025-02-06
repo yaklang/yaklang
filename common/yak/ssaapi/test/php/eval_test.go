@@ -46,7 +46,7 @@ println("1");
 `)
 	ssatest.CheckSyntaxFlowWithFS(t, fs, `
 println(* as $param)
-$param<getFilename> as $output`, map[string][]string{
-		"output": {"b.php"},
+$param<FilenameByContent> as $output`, map[string][]string{
+		"output": {`"b.php"`},
 	}, false, ssaapi.WithLanguage(ssaapi.PHP))
 }
