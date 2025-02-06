@@ -145,11 +145,62 @@ const (
 
 	NativeCall_Foeach_Func_Inst = "foreach_function_inst"
 
-	NativeCall_GetFilename = "getFilename"
+	NativeCall_GetFilenameByContent = "FilenameByContent"
+
+	NativeCall_GetFullFileName = "getFullFileName"
 )
 
 func init() {
-	registerNativeCall(NativeCall_GetFilename, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+
+	/*
+		// NativeCall_GetFullFileName is used to get the full file name, the input is a file name. eg.
+		// <getFullFileName(filename="xxx")>
+	*/
+	registerNativeCall(NativeCall_GetFullFileName, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var rs []sfvm.ValueOperator
+		fname := params.GetString("filename")
+		if fname == "" {
+			return false, nil, utils.Errorf("filename is empty")
+		}
+		program, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		p := program.Program
+		if p == nil {
+			return false, nil, utils.Errorf("program is nil")
+		}
+		fileHash := make(map[string]string, len(p.FileList))
+		for name, hash := range p.FileList {
+			fileHash[hash] = name
+		}
+		matchFilename := func(f func(filename string) bool) {
+			for _, name := range fileHash {
+				if f(name) {
+					rs = append(rs, program.NewValue(ssa.NewConst(name)))
+				}
+			}
+		}
+		compile, err := glob.Compile(fname)
+		if err == nil {
+			matchFilename(func(filename string) bool {
+				return compile.Match(filename)
+			})
+			return true, sfvm.NewValues(rs), nil
+		}
+		r, err := regexp.Compile(fname)
+		if err == nil {
+			matchFilename(func(filename string) bool {
+				return r.MatchString(filename)
+			})
+			return true, sfvm.NewValues(rs), nil
+		}
+		matchFilename(func(filename string) bool {
+			return strings.ToLower(filename) == strings.ToLower(fname)
+		})
+		return true, sfvm.NewValues(rs), nil
+	}))
+	registerNativeCall(NativeCall_GetFilenameByContent, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var rs []sfvm.ValueOperator
 
 		program, err := fetchProgram(v)
@@ -635,12 +686,12 @@ func init() {
 				t := val.GetType()
 				fts := t.t.GetFullTypeNames()
 				if len(fts) == 0 {
-					results := val.NewValue(ssa.NewConst(t.String()))
+					results := val.NewValue(ssa.NewConstWithRange(t.String(), val.GetRange()))
 					vals = append(vals, results)
 				} else {
 					for _, ft := range fts {
 						ft = yakunquote.TryUnquote(ft)
-						results := val.NewValue(ssa.NewConst(ft))
+						results := val.NewValue(ssa.NewConstWithRange(ft, val.GetRange()))
 						results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
 						vals = append(vals, results)
 					}

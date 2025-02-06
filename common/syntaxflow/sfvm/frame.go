@@ -1193,7 +1193,12 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		s.debugSubLog("<< push: %v", ret)
 		s.stack.Push(ret)
-	case OpFileFilterJsonPath:
+	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath:
+		opcode2strMap := map[SFVMOpCode]string{
+			OpFileFilterJsonPath: "jsonpath",
+			OpFileFilterReg:      "regexp",
+			OpFileFilterXpath:    "xpath",
+		}
 		s.debugSubLog(">> pop")
 		value := s.stack.Pop()
 		if value == nil {
@@ -1206,51 +1211,12 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		paramList := i.Values
 		paramMap := i.FileFilterMethodItem
-		res, err := value.FileFilter(name, "jsonpath", paramMap, paramList)
+		strOpcode := opcode2strMap[i.OpCode]
+		res, err := value.FileFilter(name, strOpcode, paramMap, paramList)
 		if err != nil {
 			return utils.Errorf("file filter failed: %v", err)
 		}
 		s.stack.Push(res)
-	case OpFileFilterXpath:
-		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
-			return utils.Wrap(CriticalError, "native call failed: stack top is empty")
-		}
-		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
-		name := i.UnaryStr
-		if name == "" {
-			return utils.Errorf("file filter failed: file name is empty")
-		}
-		paramList := i.Values
-		paramMap := i.FileFilterMethodItem
-		res, err := value.FileFilter(name, "xpath", paramMap, paramList)
-		if err != nil {
-			return utils.Errorf("file filter failed: %v", err)
-		}
-		s.stack.Push(res)
-		_ = paramList
-		_ = paramMap
-	case OpFileFilterReg:
-		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
-			return utils.Wrap(CriticalError, "native call failed: stack top is empty")
-		}
-		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
-		name := i.UnaryStr
-		if name == "" {
-			return utils.Errorf("file filter failed: file name is empty")
-		}
-		paramList := i.Values
-		paramMap := i.FileFilterMethodItem
-		res, err := value.FileFilter(name, "regexp", paramMap, paramList)
-		if err != nil {
-			return utils.Errorf("file filter failed: %v", err)
-		}
-		s.stack.Push(res)
-		// _ = paramList
-		// _ = paramMap
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		return utils.Wrap(CriticalError, msg)
