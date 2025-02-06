@@ -8,14 +8,13 @@ desc(
 TEXT
 )
 
-<include('php-param')> as $input1;
-<include('php-global-variable')> as $input2;
-$input1 + $input2 as $input;
+<include('php-param')> as $source;
+<include('php-global-variable')> as $source;
 <include('php-filter-function')> as $filter;
 extract(* as $output);
 
 $output #{
-    until: `* & $input`,
+    until: `* & $source`,
 }-> as $root;
 
 $root?{!<dataflow(<<<CODE
