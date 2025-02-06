@@ -211,7 +211,6 @@ func (f *Function) Finish() {
 	funType.ParameterMember = lo.FilterMap(f.ParameterMembers, func(i Value, _ int) (*ParameterMember, bool) {
 		return ToParameterMember(i)
 	})
-	funType.MarkParameterMember = f.MarkMoreParamMember
 	result := make(map[*Variable]*Parameter)
 	for n, p := range f.FreeValues {
 		if param, ok := ToParameter(p); ok {
