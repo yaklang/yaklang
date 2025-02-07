@@ -3,13 +3,17 @@ package ssa
 // for DataFlowNode cover
 func ToNode(a any) (Node, bool) { u, ok := a.(Node); return u, ok }
 func ToValue(n Instruction) (Value, bool) {
-	if lz, isLZ := ToLazyInstruction(n); isLZ {
-		return ToValue(lz.Self())
+	if IsValueInstruction(n) {
+		return n.(Value), true
 	}
-	v, ok := n.(Value)
-	return v, ok
+	return nil, false
 }
-func ToUser(n Instruction) (User, bool) { u, ok := n.(User); return u, ok }
+func ToUser(n Instruction) (User, bool) {
+	if IsUserInstruction(n) {
+		return n.(User), true
+	}
+	return nil, false
+}
 
 func ToFunction(n Instruction) (*Function, bool) {
 	if lz, isLZ := ToLazyInstruction(n); isLZ {
