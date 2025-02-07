@@ -10,11 +10,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
-	"github.com/yaklang/yaklang/embed"
+	"github.com/yaklang/yaklang/embed/testdata"
 )
 
 func TestImportHTTPArchive(t *testing.T) {
-	buf, _ := embed.TestAsset("testdata/example.com.har")
+	buf, _ := testdata.Asset("data/example.com.har")
 	r := bytes.NewBuffer(buf)
 	count := 0
 	ImportHTTPArchiveStream(r, func(entry *HAREntry) error {
@@ -104,7 +104,7 @@ func TestExportHTTPArchive(t *testing.T) {
 }
 
 func TestSmokeImportAndExport(t *testing.T) {
-	buf, _ := embed.TestAsset("testdata/example.com.har")
+	buf, _ := testdata.Asset("data/example.com.har")
 	dir := t.TempDir()
 	har, err := ImportHTTPArchive(bytes.NewBuffer(buf))
 	require.NoError(t, err)
