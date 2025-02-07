@@ -3,13 +3,14 @@ package javaclassparser
 import (
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
-	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"io"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
+	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
@@ -862,9 +863,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
 			continue
 		}
-		if name != "lexerOptionsSpec" {
-			continue
-		}
+		// if name != "getMainColor" {
+		// 	continue
+		// }
 		res, err := c.DumpMethod(name, descriptor)
 		if err != nil {
 			return nil, fmt.Errorf("dump method %s failed, %w", name, err)

@@ -3,15 +3,16 @@ package core
 import (
 	"encoding/binary"
 	"fmt"
+	"reflect"
+	"sort"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"reflect"
-	"sort"
-	"strings"
 )
 
 func GetTypeSize(typ types.JavaType) int {
@@ -354,6 +355,7 @@ func GetRealValue(value values.JavaValue) values.JavaValue {
 	return value
 }
 func DumpNodesToDotExp(code *Node) string {
+	return ""
 	var visitor func(node *Node, visited map[*Node]bool, sb *strings.Builder)
 	visitor = func(node *Node, visited map[*Node]bool, sb *strings.Builder) {
 		if node == nil {

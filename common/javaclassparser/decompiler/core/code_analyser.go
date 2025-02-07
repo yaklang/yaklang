@@ -3,6 +3,9 @@ package core
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
@@ -13,8 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"golang.org/x/exp/slices"
-	"sort"
-	"strings"
 )
 
 type BootstrapMethod struct {
