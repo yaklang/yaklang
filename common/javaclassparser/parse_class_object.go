@@ -145,6 +145,7 @@ func (this *ClassObject) SetClassName(name string) error {
 	return nil
 }
 
+
 // SetSourceFileName 设置文件名
 func (this *ClassObject) SetSourceFileName(name string) error {
 	if !strings.HasSuffix(name, ".java") {

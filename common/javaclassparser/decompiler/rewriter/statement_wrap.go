@@ -3,6 +3,9 @@ package rewriter
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
@@ -14,8 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	"sort"
-	"strings"
 )
 
 type RewriteManager struct {
@@ -56,6 +57,14 @@ func (s *RewriteManager) NewLoopLabel() string {
 }
 
 func (s *RewriteManager) MergeIf() {
+	for{
+	if !s.mergeIf(){
+		break
+	}
+
+	}
+}
+func (s *RewriteManager) mergeIf() bool {
 	ifNodes := utils2.NodeFilter(WalkNodeToList(s.RootNode), func(node *core.Node) bool {
 		_, ok := node.Statement.(*statements.ConditionStatement)
 		return ok
@@ -64,8 +73,10 @@ func (s *RewriteManager) MergeIf() {
 	sort.Slice(ifNodes, func(i, j int) bool {
 		return ifNodes[i].Id > ifNodes[j].Id
 	})
+	result := false
 	delNodesSet := utils.NewSet[*core.Node]()
 	for _, node := range ifNodes {
+		utils2.DumpNodesToDotExp(s.RootNode)
 		if delNodesSet.Has(node) {
 			continue
 		}
@@ -79,6 +90,7 @@ func (s *RewriteManager) MergeIf() {
 
 		for _, n := range node.Source {
 			mergeCondition := func(parentNode, childNode *core.Node) {
+				result = true
 				if parentNode.TrueNode() != childNode { // or logic
 					if parentNode.TrueNode() == childNode.TrueNode() { // same direction
 						ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
@@ -151,13 +163,15 @@ func (s *RewriteManager) MergeIf() {
 					continue
 				}
 				s.DominatorMap = GenerateDominatorTree(s.RootNode)
-				CalcEnd(s.DominatorMap, parentNode)
-				if len(childNode.Next) == 1 {
-					childNode.MergeNode = childNode.Next[0]
-				} else {
-					CalcEnd(s.DominatorMap, childNode)
-				}
-				if parentNode.MergeNode != nil && parentNode.MergeNode == childNode.MergeNode {
+				// CalcEnd(s.DominatorMap, parentNode)
+				// if len(childNode.Next) == 1 {
+				// 	childNode.MergeNode = childNode.Next[0]
+				// } else {
+				// 	CalcEnd(s.DominatorMap, childNode)
+				// }
+				sourceSet := utils.NewSet[*core.Node]()
+				sourceSet.AddList(childNode.Source)
+				if sourceSet.Len() == 1 &&  CheckCanBeMerge(parentNode,childNode){
 					if len(childNode.Next) == 1 {
 						childNode.Next = append(childNode.Next, childNode.Next[0])
 					}
@@ -169,6 +183,35 @@ func (s *RewriteManager) MergeIf() {
 			}
 		}
 	}
+	return result
+}
+func CheckCanBeMerge(ifNode1,ifNode2 *core.Node) bool{
+	// 检查是否一方是另一方的子节点
+	var node1, node2 *core.Node
+	if slices.Contains(ifNode1.Next, ifNode2) {
+		node1 = ifNode1
+		node2 = ifNode2
+	} else if slices.Contains(ifNode2.Next, ifNode1) {
+		node1 = ifNode2 
+		node2 = ifNode1
+	} else {
+		return false
+	}
+
+	// 获取父节点的另一个子节点
+	var otherChild *core.Node
+	for _, next := range node1.Next {
+		if next != node2 {
+			otherChild = next
+			break
+		}
+	}
+	if otherChild == nil {
+		return false
+	}
+
+	// 检查另一个子节点的父节点是否为node2
+	return slices.Contains(node2.Next, otherChild)
 }
 func (s *RewriteManager) SetId(id int) {
 	s.currentNodeId = id

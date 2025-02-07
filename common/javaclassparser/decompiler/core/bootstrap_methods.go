@@ -2,10 +2,11 @@ package core
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
-	"strings"
 )
 
 type BuildinBootstrapMethod func(d *Decompiler, sim StackSimulation, typ types.JavaType, args ...values.JavaValue) (values.JavaValue, error)
@@ -50,7 +51,12 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 		return func(d *Decompiler, sim StackSimulation, typ types.JavaType, args2 ...values.JavaValue) (values.JavaValue, error) {
 			classMember := args1[1].(*values.JavaClassMember)
 			if classMember.Name != d.FunctionContext.ClassName {
-				return nil, fmt.Errorf("call external lamada: %s.%s", classMember.Name, classMember.Member)
+				return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+					return d.FunctionContext.ShortTypeName(classMember.Name)+"::"+classMember.Member
+				},func() types.JavaType {
+					return typ
+				}),nil
+				// return nil, fmt.Errorf("call external lamada: %s.%s", classMember.Name, classMember.Member)
 			}
 			methodStr, err := d.DumpClassLambdaMethod(classMember.Member, classMember.Description, sim.GetVarId())
 			if err != nil {
