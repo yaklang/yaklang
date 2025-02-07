@@ -2,6 +2,7 @@ package go2ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -249,6 +250,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 					rightv = b.ReadMemberCallValue(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {
+						/*
+						 a.A.b
+						*/
 						if test == n {
 							rightv = b.ReadMemberCallValueByName(rv, n)
 							if rightv == nil {
@@ -257,14 +261,13 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 							break
 						} else {
 							rvt := rv
-							if key := a.GetKeybyName(test); key != nil {
+							if key := a.GetKeybyName(test); !utils.IsNil(key) {
 								rvt = b.ReadMemberCallValueByName(rv, n)
 								if rvt == nil {
 									rvt = b.ReadMemberCallValue(rv, key)
-									//b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
+									rightv = rvt
+									break
 								}
-							} else {
-								// rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(n))
 							}
 							handleObjectType(rvt, a)
 						}

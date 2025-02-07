@@ -625,7 +625,7 @@ func TestType_interface(t *testing.T) {
 		}
 
 		`, []string{"Undefined-b1.Get(valid)(make(struct {map[string]number}),\"a\") member[make(map[string]number)]",
-			"Undefined-b2.Get(valid)(make(struct {[]number}),\"2\") member[make([]number)]"}, t)
+			"Undefined-b2.Get(valid)(make(struct {[]number}),\"2\") member[make([]number),Undefined-.arr.int(num)(valid)]"}, t)
 	})
 }
 

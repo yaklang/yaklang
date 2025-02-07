@@ -8,6 +8,26 @@ import (
 )
 
 func Test_Struct(t *testing.T) {
+	t.Run("anymous struct", func(t *testing.T) {
+		code := `package main
+	type A struct {
+		t int
+	}
+	type B struct {
+		A
+	}
+	func (a *B) getA() int {
+			return a.t
+	}
+	func main() {
+		b := B{A: A{t: 2}}
+		a2:=b.getA()
+	}
+`
+		ssatest.CheckSyntaxFlow(t, code, `a2 #-> * as $param`, map[string][]string{
+			"param": {"2"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
 	t.Run("struct function inheritance", func(t *testing.T) {
 		code := `package main
 
