@@ -248,6 +248,11 @@ var SSACompilerCommands = []*cli.Command{
 				Usage: `in default, you can see program that compiled by ssa-cli in Yakit Frontend.
 					you can use --no-frontend to disable this function`,
 			},
+			cli.StringSliceFlag{
+				Name: "exclude-file",
+				Usage: `exclude default file,only support glob mode. eg.
+						targets/*, vendor/*`,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			if ret, err := log.ParseLevel(c.String("log")); err == nil {
@@ -275,7 +280,16 @@ var SSACompilerCommands = []*cli.Command{
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
 			saveProfile := !c.Bool("no-frontend")
+			excludeFile := c.StringSlice("exclude-file")
 
+			var excludeCompile []glob.Glob
+			for _, s := range excludeFile {
+				compile, err := glob.Compile(s)
+				if err != nil {
+					return err
+				}
+				excludeCompile = append(excludeCompile, compile)
+			}
 			// check program name duplicate
 			if prog, err := ssadb.GetProgram(programName, string(ssa.Application)); prog != nil && err == nil {
 				if !reCompile {
@@ -327,6 +341,15 @@ var SSACompilerCommands = []*cli.Command{
 			opt = append(opt, ssaapi.WithRawLanguage(input_language))
 			opt = append(opt, ssaapi.WithReCompile(reCompile))
 			opt = append(opt, ssaapi.WithSaveToProfile(saveProfile))
+			opt = append(opt, ssaapi.WithExcludeFile(func(path, filename string) bool {
+				for _, g := range excludeCompile {
+					if g.Match(filename) {
+						return true
+					}
+				}
+				return false
+			}))
+
 			if entry != "" {
 				log.Infof("start to use entry file: %v", entry)
 				opt = append(opt, ssaapi.WithFileSystemEntry(entry))
