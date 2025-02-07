@@ -2,11 +2,8 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -36,7 +33,7 @@ func (s *Server) CreateSyntaxFlowRuleEx(ctx context.Context, req *ypb.CreateSynt
 	}
 
 	input := req.GetSyntaxFlowInput()
-	rule, err := ParseSyntaxFlowInput(input)
+	rule, err := yakit.ParseSyntaxFlowInput(input)
 	if err != nil {
 		return nil, err
 	}
@@ -98,19 +95,4 @@ func (s *Server) DeleteSyntaxFlowRule(ctx context.Context, req *ypb.DeleteSyntax
 	count, err := yakit.DeleteSyntaxFlowNonBuildInRule(s.GetProfileDatabase(), req)
 	msg.EffectRows = count
 	return msg, err
-}
-
-func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlowRule, error) {
-	language, err := sfdb.CheckSyntaxFlowLanguage(ruleInput.Language)
-	if err != nil {
-		return nil, err
-	}
-	rule, _ := sfdb.CheckSyntaxFlowRuleContent(ruleInput.Content)
-	rule.Language = string(language)
-	rule.RuleName = ruleInput.RuleName
-	rule.Tag = strings.Join(ruleInput.Tags, "|")
-	rule.Title = ruleInput.RuleName
-	//rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
-	rule.Description = ruleInput.Description
-	return rule, nil
 }

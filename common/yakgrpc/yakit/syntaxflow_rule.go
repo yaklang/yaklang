@@ -135,16 +135,25 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	if rule.RuleName == "" {
 		return nil, utils.Errorf("update syntaxFlow rule failed: rule name is empty")
 	}
-
+	if rule.Content == "" {
+		return nil, utils.Errorf("update syntaxFlow rule failed: rule content is empty")
+	}
+	dbRule, err2 := ParseSyntaxFlowInput(rule)
+	if err2 != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err2)
+	}
 	updateRule, err := sfdb.QueryRuleByName(consts.GetGormProfileDatabase(), rule.GetRuleName())
 	if err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
-
 	updateRule.Language = rule.GetLanguage()
 	updateRule.Content = rule.GetContent()
 	updateRule.Tag = strings.Join(rule.GetTags(), ",")
 	updateRule.Description = rule.GetDescription()
+	updateRule.AlertDesc = dbRule.AlertDesc
+	updateRule.TitleZh = dbRule.TitleZh
+	updateRule.OpCodes = dbRule.OpCodes
+	updateRule.Hash = dbRule.CalcHash()
 	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
 	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
@@ -170,4 +179,19 @@ func QuerySameGroupByRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema
 		return rules[0].Groups, nil
 	}
 	return sfdb.GetIntersectionGroup(consts.GetGormProfileDatabase(), groups), nil
+}
+
+func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlowRule, error) {
+	language, err := sfdb.CheckSyntaxFlowLanguage(ruleInput.Language)
+	if err != nil {
+		return nil, err
+	}
+	rule, _ := sfdb.CheckSyntaxFlowRuleContent(ruleInput.Content)
+	rule.Language = string(language)
+	rule.RuleName = ruleInput.RuleName
+	rule.Tag = strings.Join(ruleInput.Tags, "|")
+	rule.Title = ruleInput.RuleName
+	//rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
+	rule.Description = ruleInput.Description
+	return rule, nil
 }
