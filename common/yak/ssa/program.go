@@ -255,7 +255,7 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 	})
 }
 
-func (prog *Program) Finish() {
+func (prog *Program) Finish(cb ...func()) {
 	// only run once and not wait
 	if prog.finished {
 		return
@@ -281,7 +281,7 @@ func (prog *Program) Finish() {
 			updateToDatabase(prog)
 		}
 		// save instruction
-		prog.Cache.SaveToDatabase()
+		prog.Cache.SaveToDatabase(cb...)
 	}
 	progPool.Delete(prog.GetProgramName())
 }
