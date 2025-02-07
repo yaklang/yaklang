@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -112,6 +113,22 @@ func (r *SyntaxFlowResult) GetValues(name string) Values {
 		return vs
 	}
 	return nil
+}
+
+func (r *SyntaxFlowResult) GetValue(name string, index int64) (*Value, error) {
+	if r == nil {
+		return nil, utils.Errorf("result is nil")
+	}
+
+	vs := r.GetValues(name)
+	if len(vs) == 0 {
+		return nil, utils.Errorf("value not found")
+	}
+	if len(vs) > int(index) {
+		return vs[index], nil
+	} else {
+		return nil, utils.Errorf("index out of range")
+	}
 }
 
 // Alert value

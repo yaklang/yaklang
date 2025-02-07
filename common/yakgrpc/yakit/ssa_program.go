@@ -70,7 +70,7 @@ func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
 		programNames = append(programNames, prog.Name)
 	}
 	// delete risk create by this program
-	DeleteRiskByProgram(consts.GetGormProjectDatabase(), programNames)
+	DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: programNames})
 	// DeleteRisk()
 	return len(programs), result.Error
 }
@@ -124,8 +124,8 @@ func Prog2GRPC(prog *schema.SSAProgram) *ypb.SSAProgram {
 			Critical int64
 			Warning  int64
 		}
-		projectDB := consts.GetGormProjectDatabase()
-		if err := projectDB.Model(&schema.Risk{}).Where("program_name=?", prog.Name).Select(`
+		projectDB := ssadb.GetDB()
+		if err := projectDB.Model(&schema.SSARisk{}).Where("program_name=?", prog.Name).Select(`
 		sum(case when severity='critical' then 1 else 0 end) as critical,
 		sum(case when severity='high' then 1 else 0 end) as high,
 		sum(case when severity='warning' then 1 else 0 end) as warning,
