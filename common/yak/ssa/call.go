@@ -293,7 +293,9 @@ func (c *Call) handleCalleeFunction() {
 						}
 					}
 				}
-				val = builder.ReadMemberCallValue(object, key)
+				if utils.IsNil(val) {
+					val = builder.ReadMemberCallValue(object, key)
+				}
 				val.AddUser(c)
 				for _, i := range p.GetUsers() {
 					val.AddUser(i)
