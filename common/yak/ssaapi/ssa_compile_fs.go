@@ -36,17 +36,16 @@ func (c *config) parseProjectWithFS(
 		ssadb.SaveFolder(prog.Name, []string{"/"})
 	}
 
-	totalProcess := 0
-	handledProcess := 0
+	process := 0.0
 	prog.ProcessInfof = func(s string, v ...any) {
 		processCallback(
-			float64(handledProcess)/float64(totalProcess),
+			process,
 			s, v...,
 		)
 	}
 
-	preHandlerSize := 0
-	parseSize := 0
+	preHandlerTotal := 0
+	handlerTotal := 0
 
 	prog.ProcessInfof("parse project in fs: %v, path: %v", filesystem, c.info)
 	prog.ProcessInfof("calculate total size of project")
@@ -70,10 +69,10 @@ func (c *config) parseProjectWithFS(
 				return nil
 			}
 			if c.checkLanguage(path) == nil {
-				parseSize++
+				handlerTotal++
 			}
 			if c.checkLanguagePreHandler(path) == nil {
-				preHandlerSize++
+				preHandlerTotal++
 			}
 			return nil
 		}),
@@ -84,13 +83,17 @@ func (c *config) parseProjectWithFS(
 	if c.isStop() {
 		return nil, ErrContextCancel
 	}
-	if (parseSize + preHandlerSize) == 0 {
+	if (handlerTotal + preHandlerTotal) == 0 {
 		return nil, ErrNoFoundCompiledFile
 	}
-	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerSize, parseSize)
-	totalProcess = parseSize + preHandlerSize
+	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerTotal, handlerTotal)
 
-	// pre handler
+	// pre handler  0-40%
+	preHandlerNum := 0
+	preHandlerProcess := func() {
+		preHandlerNum++
+		process = 0 + (float64(preHandlerNum)/float64(preHandlerTotal))*0.4
+	}
 	prog.SetPreHandler(true)
 	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
 	filesys.Recursive(programPath,
@@ -121,7 +124,7 @@ func (c *config) parseProjectWithFS(
 			if err := c.checkLanguagePreHandler(path); err != nil {
 				return nil
 			}
-			handledProcess++
+			preHandlerProcess()
 			if language := c.LanguageBuilder; language != nil {
 				language.InitHandler(builder)
 				language.PreHandlerProject(filesystem, builder, path)
@@ -136,10 +139,15 @@ func (c *config) parseProjectWithFS(
 		language.AfterPreHandlerProject(builder)
 	}
 	prog.ProcessInfof("pre-handler parse project finish")
-	handledProcess = preHandlerSize // finish pre-handler 50%
 
-	// parse project
+	process = 0.4 // 40%
+	// parse project 40%-90%
 	prog.ProcessInfof("parse project start")
+	handlerNum := 0
+	handlerProcess := func() {
+		handlerNum++
+		process = 0.4 + (float64(handlerNum)/float64(handlerTotal))*0.5
+	}
 	prog.SetPreHandler(false)
 	err = ssareducer.ReducerCompile(
 		programPath, // base
@@ -170,7 +178,7 @@ func (c *config) parseProjectWithFS(
 				log.Warnf("parse file %s error: %v", path, err)
 				return nil, nil
 			}
-			handledProcess++
+			handlerProcess()
 
 			// build
 			if err := prog.Build(path, memedit.NewMemEditor(raw), builder); err != nil {
@@ -190,8 +198,16 @@ func (c *config) parseProjectWithFS(
 	if c.isStop() {
 		return nil, ErrContextCancel
 	}
-	handledProcess = preHandlerSize + parseSize
-	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, prog.Cache.CountInstruction()) // %99
-	prog.Finish()
+	process = 0.9 // %90
+	instructionSaveTotal := prog.Cache.CountInstruction()
+	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, instructionSaveTotal) // %90
+	instructionSaveNum := 0
+	prog.Finish(func() {
+		instructionSaveNum++
+		process = 0.9 + (float64(instructionSaveNum)/float64(instructionSaveTotal))*0.1
+		if int(process*1000)%10 == 0 { // is 91.0%/92.0%/....
+			prog.ProcessInfof("Saving instructions: %d complete(total %d)", instructionSaveNum, instructionSaveTotal)
+		}
+	})
 	return NewProgram(prog, c), nil
 }

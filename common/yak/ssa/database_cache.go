@@ -37,6 +37,8 @@ type Cache struct {
 	MemberCache     map[string][]Instruction
 	Class2InstIndex map[string][]Instruction
 	constCache      []Instruction
+
+	afterSaveNotify func()
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
@@ -271,13 +273,19 @@ func (c *Cache) saveInstruction(instIr *instructionCachePair) bool {
 		log.Errorf("Save irCode error: %v", err)
 	}
 	syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Since(start)))
+	if c.afterSaveNotify != nil {
+		c.afterSaveNotify()
+	}
 
 	return true
 }
 
-func (c *Cache) SaveToDatabase() {
+func (c *Cache) SaveToDatabase(cb ...func()) {
 	if !c.HaveDatabaseBackend() {
 		return
+	}
+	if len(cb) > 0 {
+		c.afterSaveNotify = cb[0]
 	}
 	c.InstructionCache.Close()
 }

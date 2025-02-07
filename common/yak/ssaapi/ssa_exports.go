@@ -139,7 +139,7 @@ func (c *config) Processf(process float64, format string, arg ...any) {
 	if c.process != nil {
 		c.process(msg, process)
 	} else {
-		log.Infof(msg)
+		log.Info(msg, process)
 	}
 }
 
