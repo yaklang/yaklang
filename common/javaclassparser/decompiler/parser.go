@@ -26,7 +26,9 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 
 	statementManager := rewriter.NewRootStatementManager(decompiler.RootNode)
 	statementManager.SetId(decompiler.CurrentId)
+	core.DumpNodesToDotExp(decompiler.RootNode)
 	statementManager.MergeIf()
+	core.DumpNodesToDotExp(decompiler.RootNode)
 	allNodes := []*core.Node{}
 	core.WalkGraph[*core.Node](decompiler.RootNode, func(node *core.Node) ([]*core.Node, error) {
 		allNodes = append(allNodes, node)

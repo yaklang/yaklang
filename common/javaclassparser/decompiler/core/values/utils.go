@@ -45,3 +45,9 @@ func SimplifyConditionValue(condition JavaValue) JavaValue {
 	}
 	return resVal
 }
+func UnpackSoltValue(value JavaValue) JavaValue {
+	if ref, ok := value.(*SlotValue); ok {
+		return UnpackSoltValue(ref.GetValue())
+	}
+	return value
+}

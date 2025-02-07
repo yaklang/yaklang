@@ -2,14 +2,15 @@ package javaclassparser
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 func TestParseSingleClass(t *testing.T) {
@@ -44,7 +45,7 @@ func TestParseClass(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if path != "/Users/z3/Downloads/error-jdsc 3/decompile-err-0891f02d99bd27aa6e82c8dd.class" {
+		if path != "/Users/z3/Downloads/error-jdsc 3/decompile-err-042240ff10b9ca0b895360a9.class" {
 			return nil
 		}
 		source, err := cf.Dump()
@@ -54,7 +55,7 @@ func TestParseClass(t *testing.T) {
 			println(path)
 		}
 		_ = source
-		//fmt.Println(source)
+		// fmt.Println(source)
 		return nil
 	})
 	if err != nil {

@@ -2,9 +2,10 @@ package values
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
-	"strings"
 )
 
 type NewExpression struct {
@@ -114,13 +115,15 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 		expectClassType, ok1 := argType.RawType().(*types.JavaClass)
 		atcClassType, ok2 := arg.Type().RawType().(*types.JavaClass)
 		if ok1 && ok2 && expectClassType.Name != atcClassType.Name {
-			argStr := arg.String(funcCtx)
-			argTypeStr := argType.String(funcCtx)
-			arg = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-				return fmt.Sprintf("(%s)(%s)", argTypeStr, argStr)
-			}, func() types.JavaType {
-				return argType
-			})
+			if expectClassType.Name != "java.lang.Object" {
+				argStr := arg.String(funcCtx)
+				argTypeStr := argType.String(funcCtx)
+				arg = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+					return fmt.Sprintf("(%s)(%s)", argTypeStr, argStr)
+				}, func() types.JavaType {
+					return argType
+				})
+			}
 		}
 		paramStrs = append(paramStrs, arg.String(funcCtx))
 	}
@@ -137,7 +140,8 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 			return fmt.Sprintf("%s(%s)", f.FunctionName, strings.Join(paramStrs, ","))
 		}
 	}
-	switch f.Object.(type) {
+	obj := UnpackSoltValue(f.Object)
+	switch obj.(type) {
 	case *JavaExpression, *TernaryExpression, *SlotValue:
 		return fmt.Sprintf("(%s).%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
 	default:
