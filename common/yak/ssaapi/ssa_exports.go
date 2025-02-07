@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gobwas/glob"
 	"io"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gobwas/glob"
 
 	"github.com/yaklang/yaklang/common/consts"
 
@@ -139,7 +140,7 @@ func (c *config) Processf(process float64, format string, arg ...any) {
 	if c.process != nil {
 		c.process(msg, process)
 	} else {
-		log.Infof(msg)
+		log.Info(msg, process)
 	}
 }
 
