@@ -66,7 +66,7 @@ func (a *SyntaxFlowAction) querySF(programName, code string) (*ssaapi.SyntaxFlow
 	return res, nil
 }
 
-func (a *SyntaxFlowAction) getResult(programName, code string, resultID uint, kind schema.SyntaxflowResultKind) (*ssaapi.SyntaxFlowResult, uint, error) {
+func (a *SyntaxFlowAction) getResult(programName, code string, resultID uint) (*ssaapi.SyntaxFlowResult, uint, error) {
 	// get result
 	if resultID != 0 {
 		if res, ok := a.ResultIDCache.Get(resultID); ok {
@@ -84,13 +84,13 @@ func (a *SyntaxFlowAction) getResult(programName, code string, resultID uint, ki
 	}
 
 	// query sf get memory result
-	syntaxFlowCode := code
+	syntaxFlowCode := string(code)
 	result, err := a.querySF(programName, syntaxFlowCode)
 	if err != nil {
 		return nil, 0, utils.Errorf("query syntaxflow failed: %v", err)
 	}
 	// save result to db
-	resultID, err = result.Save(kind)
+	resultID, err = result.Save(schema.SFResultKindQuery)
 	if err != nil {
 		return nil, 0, utils.Errorf("save result failed: %v", err)
 	}
@@ -141,7 +141,7 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 	// Parse variable and index from path
 	path := u.Path
 	variable := ""
-	index := int64(-1)
+	var index int64 = -1
 	if path != "" {
 		parts := strings.Split(path, "/")
 		if len(parts) > 1 {
@@ -155,14 +155,10 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 			}
 		}
 	}
-	resultType := schema.SFResultKindQuery
-	switch query["result_type"] {
-	case string(schema.SFResultKindSearch):
-		resultType = schema.SFResultKindQuery
-	}
+
 	// get program
 	programName := u.GetLocation()
-	result, resultID, err := a.getResult(programName, string(params.GetBody()), resultID, resultType)
+	result, resultID, err := a.getResult(programName, string(params.GetBody()), resultID)
 	if err != nil {
 		return nil, err
 	}
