@@ -54,6 +54,7 @@ func updateRuleByNames(client ypb.YakClient, names []string, des string) error {
 				RuleName:    name,
 				Language:    "php",
 				Description: des,
+				Content:     `println as $output`,
 			},
 		}
 		_, err := client.UpdateSyntaxFlowRule(context.Background(), req)
@@ -197,6 +198,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
 				RuleName:   ruleName,
 				Language:   "java",
+				Content:    `println as $output`,
 				GroupNames: []string{group1},
 			},
 		})
@@ -204,7 +206,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		_, err = client.UpdateSyntaxFlowRule(context.Background(), &ypb.UpdateSyntaxFlowRuleRequest{
 			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
 				RuleName:   ruleName,
+				Language:   "java",
 				GroupNames: []string{group2},
+				Content:    `println as $output`,
 			},
 		})
 		require.NoError(t, err)
