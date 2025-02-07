@@ -603,6 +603,14 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 		}
 		return c.Args[p.MemberCallObjectIndex], true
 	case MoreParameterMember:
+		/*todo:
+		enable closure and readValue have error.
+		beacuse create parameter in head scope.the seem error.
+		need more test to case
+		*/
+		if p.MemberCallObjectIndex >= len(c.ArgMember) {
+			return nil, false
+		}
 		return c.ArgMember[p.MemberCallObjectIndex], true
 	case FreeValueMemberCall:
 		obj, ok = c.Binding[p.MemberCallObjectName]
