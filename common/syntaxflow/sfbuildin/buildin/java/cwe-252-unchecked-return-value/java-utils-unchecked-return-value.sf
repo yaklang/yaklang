@@ -1,0 +1,31 @@
+desc(
+    title:'Check Java Util Unchecked Return Value',
+    title_zh:'检测Java Util库未检查返回值的API',
+    type:security,
+    desc:<<<TEXT
+Java的java.util库中某些方法会返回一个值，但是调用者没有检查这个返回值。这可能导致一些潜在的安全风险，例如资源泄露、内存泄露、数据泄露等。因此，建议在调用这些方法时，检查返回值并根据需要进行处理。
+TEXT
+)
+
+.tryLock()?{<typeName>?{have:'java.util.concurrent.locks'}}?{!<getUsers>} as $weak;
+alert $weak for{
+    message:"发现Java java.util.concurrent.locks库的Lock.tryLock未检查返回值的API",
+    risk:'api-abuse',
+    level:info,
+}
+
+desc{
+    lang:java,
+    alert_num:1,
+    "file://demo.java":<<<TEXT
+package org.example;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+public class CustomHostnameVerifier   {
+    public static void main(String[] args) {
+        Lock lock = new ReentrantLock();
+        lock.tryLock();
+    }
+}
+TEXT
+}

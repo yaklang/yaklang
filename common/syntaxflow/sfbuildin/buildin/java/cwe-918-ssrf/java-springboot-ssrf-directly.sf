@@ -1,27 +1,23 @@
 desc(
     title: "Find Java SpringBoot SSRF Vuln Directly",
     type: vuln,
-    level: mid,
-    risk: ssrf,
     desc: <<<TEXT
 服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序向不受信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证和过滤，攻击者可以利用该漏洞访问内部资源或发起对其他系统的恶意请求。这可能导致敏感数据泄露、服务拒绝攻击或进一步的内网渗透。
 TEXT
 )
-
 <include('java-spring-param')> as $source;
 <include("java-http-sink")> as $sink;
 
-$source -{
-    until: `* & $sink as $result`,
-}->;
+$sink #{
+    include: `<self> & $source`,
+    exclude: `<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
+}->as  $result;
 
-$result & $sink as $output;
-
-$result<dataflow(<<<CODE
-*<show>?{!opcode: call} as $__next__;
-CODE)> as $directly;
-
-alert $directly;
+alert $result for {
+    message: "发现Java SpringBoot SSRF漏洞",
+    risk: ssrf,
+    level: mid,
+}
 
 desc(
 lang: java,
