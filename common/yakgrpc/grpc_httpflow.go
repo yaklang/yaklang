@@ -3,15 +3,19 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/har"
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/mutate"
 
@@ -790,4 +794,174 @@ func (s *Server) QueryHTTPFlowsProcessNames(ctx context.Context, req *ypb.QueryH
 	return &ypb.QueryHTTPFlowsProcessNamesResponse{
 		ProcessNames: processNames,
 	}, nil
+}
+
+func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stream ypb.Yak_ExportHTTPFlowStreamServer) error {
+	exportType := req.GetExportType()
+	if exportType != "csv" && exportType != "har" {
+		return utils.Error("unsupported export type")
+	}
+
+	count, total := 0.0, 0.0
+	totalCallback := func(i int) {
+		total = float64(i)
+	}
+	filter := req.GetFilter()
+	fieldNames := req.GetFieldName()
+	// csv extra handle fieldNames
+	if exportType == "csv" {
+		if !lo.Contains(fieldNames, "id") {
+			fieldNames = append([]string{"id"}, fieldNames...)
+		}
+		// overwrite Select Field, fix payloads
+		for i, field := range fieldNames {
+			if field != "payloads" {
+				continue
+			}
+			filter.WithPayload = true
+			fieldNames[i] = "payload"
+		}
+	}
+
+	queryDB := yakit.BuildHTTPFlowQuery(s.GetProjectDatabase(), filter)
+	fh, err := os.OpenFile(req.GetTargetPath(), os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return utils.Wrap(err, "open file error")
+	}
+	defer fh.Close()
+
+	switch exportType {
+	case "csv":
+		if len(fieldNames) == 0 {
+			return utils.Error("field name is empty")
+		}
+		queryDB = queryDB.Select(fieldNames)
+
+		w := csv.NewWriter(fh)
+		defer w.Flush()
+		w.Write(fieldNames)
+		flowCh, err := bizhelper.YieldModelToMapEx(stream.Context(), queryDB, totalCallback)
+		if err != nil {
+			return err
+		}
+		for flowMap := range flowCh {
+			row := make([]string, len(fieldNames))
+			for i, field := range fieldNames {
+				v, ok := flowMap[field]
+				if !ok {
+					continue
+				}
+				row[i] = utils.InterfaceToString(v)
+			}
+			if err := w.Write(row); err != nil {
+				return utils.Wrap(err, "write csv error")
+			}
+			count++
+			percent := 0.0
+			if total == 0 {
+				percent = count / (count + 1)
+			} else {
+				percent = count / total
+			}
+			stream.Send(&ypb.ExportHTTPFlowStreamResponse{
+				Percent: percent,
+			})
+		}
+	case "har":
+		flowCh := yakit.YieldHTTPFlowsEx(queryDB, stream.Context(), totalCallback)
+		// to har entry
+		entryCh := make(chan *har.HAREntry, 8)
+		go func() {
+			for flow := range flowCh {
+				entry, err := har.HTTPFlow2HarEntry(flow)
+				if err != nil {
+					log.Errorf("HTTPFlow2HarEntry failed: %s", err)
+				} else {
+					entryCh <- entry
+				}
+			}
+			close(entryCh)
+		}()
+
+		entryCallback := func(e *har.HAREntry) {
+			count++
+			percent := 0.0
+			if total == 0 {
+				percent = count / (count + 1)
+			} else {
+				percent = count / float64(total)
+			}
+			stream.Send(&ypb.ExportHTTPFlowStreamResponse{
+				Percent: percent,
+			})
+		}
+
+		entries := &har.Entries{}
+		entries.SetEntriesChannel(entryCh)
+		entries.SetMarshalEntryCallback(entryCallback)
+		httpArchive := &har.HTTPArchive{
+			Log: &har.Log{
+				Version: "1.2",
+				Creator: &har.Creator{
+					Name:    "Yaklang",
+					Version: consts.GetYakVersion(),
+				},
+				Entries: entries,
+			},
+		}
+		return har.ExportHTTPArchiveStream(fh, httpArchive)
+	}
+
+	return nil
+}
+
+func (s *Server) ImportHTTPFlowStream(req *ypb.ImportHTTPFlowStreamRequest, stream ypb.Yak_ImportHTTPFlowStreamServer) error {
+	count, total := 0.0, 0.0
+
+	inputPath := req.GetInputPath()
+	if inputPath == "" {
+		return utils.Error("input path is empty")
+	}
+	typ := strings.TrimPrefix(filepath.Ext(inputPath), ".")
+	if typ != "har" {
+		return utils.Errorf("unsupported file type: %s", typ)
+	}
+
+	fh, err := os.OpenFile(inputPath, os.O_RDWR, 0o644)
+	if err != nil {
+		return utils.Wrap(err, "open file error")
+	}
+	defer fh.Close()
+
+	// count total entries
+	totalInt, err := har.CountHTTPArchiveEntries(fh)
+	if err != nil {
+		return err
+	}
+	total = float64(totalInt)
+	fh.Seek(0, 0)
+	return utils.GormTransaction(s.GetProjectDatabase(), func(tx *gorm.DB) error {
+		return har.ImportHTTPArchiveStream(fh, func(e *har.HAREntry) error {
+			flow, err := har.HarEntry2HTTPFlow(e)
+			if err != nil {
+				return err
+			}
+			flow.ID = 0
+			flow.Hash = flow.CalcHash()
+			err = yakit.SaveHTTPFlow(tx, flow)
+			if err != nil {
+				return err
+			}
+			count++
+			percent := 0.0
+			if total == 0 {
+				percent = count / (count + 1)
+			} else {
+				percent = count / float64(total)
+			}
+			return stream.Send(&ypb.ImportHTTPFlowStreamResponse{
+				Percent: percent,
+			})
+		})
+	})
 }

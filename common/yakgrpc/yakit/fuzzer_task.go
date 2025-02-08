@@ -3,9 +3,10 @@ package yakit
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/consts"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -31,6 +32,7 @@ func QueryFirst50WebFuzzerTask(db *gorm.DB) []*ypb.HistoryHTTPFuzzerTask {
 }
 
 func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExParams) (*bizhelper.Paginator, []*schema.WebFuzzerTask, error) {
+	db = db.Model(&schema.WebFuzzerTask{})
 	oldDB := db
 
 	var keywords []string

@@ -15,6 +15,13 @@ func yakitColor(i string) string {
 	return COLORPREFIX + i
 }
 
+var (
+	HTTPFlow_SourceType_MITM    = "mitm"
+	HTTPFlow_SourceType_SCAN    = "scan"
+	HTTPFlow_SourceType_CRAWLER = "basic-crawler"
+	HTTPFlow_SourceType_HAR     = "har"
+)
+
 type HTTPFlow struct {
 	gorm.Model
 
