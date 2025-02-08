@@ -13,6 +13,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
+var DefaultInputVar = "input"
+
 type queryConfig struct {
 	// input
 	program *Program
@@ -217,10 +219,10 @@ func QueryWithInitVar(result *omap.OrderedMap[string, sfvm.ValueOperator]) Query
 	}
 }
 
-func QueryWithCreateInitVar(varName string, value sfvm.ValueOperator) QueryOption {
+func QueryWithInitInputVar(value sfvm.ValueOperator) QueryOption {
 	return func(c *queryConfig) {
 		result := omap.NewOrderedMap(map[string]sfvm.ValueOperator{})
-		result.Set(varName, value)
+		result.Set(DefaultInputVar, value)
 		c.opts = append(c.opts, sfvm.WithInitialContextVars(result))
 	}
 }
