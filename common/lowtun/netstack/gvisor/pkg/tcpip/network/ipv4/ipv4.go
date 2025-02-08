@@ -841,7 +841,7 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 
 	hView, ok := e.protocol.parseAndValidate(pkt)
 	if !ok {
-		log.Infof("MalformedPacketsReceived: %v", pkt.NetworkHeader())
+		// log.Infof("MalformedPacketsReceived: %v", pkt.NetworkHeader())
 		stats.MalformedPacketsReceived.Increment()
 		return
 	}
