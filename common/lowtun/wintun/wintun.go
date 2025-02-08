@@ -31,7 +31,7 @@ type Adapter struct {
 }
 
 var (
-	modwintun                         = newLazyDLL("wintun.dll", setupLogger)
+	modwintun                         = newLazyAutoReleaseDLL("wintun.dll", GetWintunDLLData(), setupLogger)
 	procWintunCreateAdapter           = modwintun.NewProc("WintunCreateAdapter")
 	procWintunOpenAdapter             = modwintun.NewProc("WintunOpenAdapter")
 	procWintunCloseAdapter            = modwintun.NewProc("WintunCloseAdapter")
