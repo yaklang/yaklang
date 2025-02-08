@@ -2,7 +2,6 @@ package netstackvm
 
 import (
 	"errors"
-
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -25,6 +24,23 @@ func (vm *NetStackVirtualMachine) AllowTCPWithSrc(destinationAddr string, srcAdd
 	vm.driver.AllowTCPWithSrc(destinationAddr, srcAddr)
 }
 
+func (driver *PCAPEndpoint) sendRSTPacket(eth *layers.Ethernet, ip *layers.IPv4, rst *layers.TCP) (bool, error) {
+	buf := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{
+		ComputeChecksums: true,
+		FixLengths:       true,
+	}
+	rst.SetNetworkLayerForChecksum(ip)
+	if err := gopacket.SerializeLayers(buf, opts, eth, ip, rst); err != nil {
+		log.Errorf("序列化 RST 数据包失败: %v", err)
+		return false, err
+	}
+	if err := driver.adaptor.WritePacketData(buf.Bytes()); err != nil {
+		log.Errorf("发送 RST 数据包失败: %v", err)
+		return false, err
+	}
+	return true, nil
+}
 func (driver *PCAPEndpoint) generateRSTFromPacket(pkt gopacket.Packet) (bool, error) {
 	tcpLayerRaw := pkt.Layer(layers.LayerTypeTCP)
 	if tcpLayerRaw == nil {
@@ -122,27 +138,31 @@ func (driver *PCAPEndpoint) generateRSTFromPacket(pkt gopacket.Packet) (bool, er
 		DstMAC:       eth.SrcMAC,
 		EthernetType: eth.EthernetType,
 	}
-
-	// 序列化数据包
-	buf := gopacket.NewSerializeBuffer()
-	opts := gopacket.SerializeOptions{
-		ComputeChecksums: true,
-		FixLengths:       true,
-	}
-
-	// 计算 TCP 校验和
-	rst.SetNetworkLayerForChecksum(ip)
-
-	if err := gopacket.SerializeLayers(buf, opts, newEth, ip, rst); err != nil {
-		log.Errorf("序列化 RST 数据包失败: %v", err)
+	if _, err := driver.sendRSTPacket(newEth, ip, rst); err != nil {
 		return false, err
 	}
-
-	// 发送 RST 数据包
-	if err := driver.adaptor.WritePacketData(buf.Bytes()); err != nil {
-		log.Errorf("发送 RST 数据包失败: %v", err)
+	_, err := driver.sendRSTPacket(&layers.Ethernet{
+		SrcMAC:       eth.SrcMAC,
+		DstMAC:       eth.DstMAC,
+		EthernetType: eth.EthernetType,
+	}, &layers.IPv4{
+		Version:  4,
+		TTL:      64,
+		SrcIP:    networkLayer.SrcIP,
+		DstIP:    networkLayer.DstIP,
+		Protocol: layers.IPProtocolTCP,
+	}, &layers.TCP{
+		SrcPort: tcpLayer.SrcPort,
+		DstPort: tcpLayer.DstPort,
+		Seq:     tcpLayer.Seq,
+		Ack:     tcpLayer.Ack,
+		RST:     true,
+		Window:  0,
+		Urgent:  0,
+		Options: []layers.TCPOption{},
+	})
+	if err != nil {
 		return false, err
 	}
-
 	return true, nil
 }
