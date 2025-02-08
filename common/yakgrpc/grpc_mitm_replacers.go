@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/samber/lo"
 
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 
@@ -122,7 +123,7 @@ func (m *MITMReplaceRule) matchByPacketInfo(info *yakit.PacketInfo) ([]*yakit.Ma
 	if !info.IsRequest && !m.EnableForResponse {
 		return nil, nil // match nothing
 	}
-	var items []*yakit.MatchInfo
+	var items []*yakit.MatchMetaInfo
 	var enableURI, enableHeader, enableBody, enableEntire bool
 	enableURI = m.EnableForURI
 	enableHeader = m.EnableForHeader
@@ -140,20 +141,28 @@ func (m *MITMReplaceRule) matchByPacketInfo(info *yakit.PacketInfo) ([]*yakit.Ma
 		enableBody = false
 	}
 	if enableURI {
-		items = append(items, &yakit.MatchInfo{
-			[]byte(info.RequestURI), len(info.Method) + 1,
+		items = append(items, &yakit.MatchMetaInfo{
+			Raw:    []byte(info.RequestURI),
+			Offset: len(info.Method) + 1,
 		})
 	}
 	if enableHeader {
-		items = append(items, &yakit.MatchInfo{
-			[]byte(info.HeaderRaw), 0,
+		items = append(items, &yakit.MatchMetaInfo{
+			Raw:    []byte(info.HeaderRaw),
+			Offset: 0,
 		})
 	}
 	if enableBody {
-		items = append(items, &yakit.MatchInfo{info.BodyRaw, len(info.HeaderRaw)})
+		items = append(items, &yakit.MatchMetaInfo{
+			Raw:    info.BodyRaw,
+			Offset: len(info.HeaderRaw),
+		})
 	}
 	if enableEntire {
-		items = append(items, &yakit.MatchInfo{info.Raw, 0})
+		items = append(items, &yakit.MatchMetaInfo{
+			Raw:    info.Raw,
+			Offset: 0,
+		})
 	}
 	var res []*yakit.MatchResult
 	for _, item := range items {
@@ -165,11 +174,24 @@ func (m *MITMReplaceRule) matchByPacketInfo(info *yakit.PacketInfo) ([]*yakit.Ma
 			continue
 		}
 		var ret string
+
 		for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
 			if match.GroupCount() > 1 {
-				extractGroup := match.GroupByNumber(1)
-				if extractGroup != nil {
-					ret = extractGroup.String()
+				// backoff compatible
+				if len(m.GetRegexpGroups()) == 0 {
+					extractGroup := match.GroupByNumber(1)
+					if extractGroup != nil {
+						ret = extractGroup.String()
+					}
+				} else {
+					var groups []string
+					for _, i := range m.GetRegexpGroups() {
+						group := match.GroupByNumber(int(i))
+						if group != nil {
+							groups = append(groups, group.String())
+						}
+					}
+					ret = strings.Join(groups, ", ")
 				}
 			} else {
 				ret = match.String()
@@ -180,7 +202,8 @@ func (m *MITMReplaceRule) matchByPacketInfo(info *yakit.PacketInfo) ([]*yakit.Ma
 			res = append(res, &yakit.MatchResult{
 				Match:          match,
 				IsMatchRequest: info.IsRequest,
-				MatchInfo:      item,
+				MatchResult:    ret,
+				MetaInfo:       item,
 			})
 		}
 	}
@@ -687,26 +710,10 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 		tagNames = append(tagNames, rule.ExtraTag...) // merge tag name
 
 		for _, match := range matchResults {
-			ret := ""
-
-			if match.GroupCount() > 1 {
-				extractGroup := match.GroupByNumber(1)
-				if extractGroup != nil {
-					ret = extractGroup.String()
-				}
-			} else {
-				ret = match.String()
-			}
-
-			if ret == "" {
-				continue
-			}
-
 			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
 				flow.HiddenIndex,
 				rule.VerboseName,
 				match,
-				ret,
 				rule.String(),
 			))
 		}
