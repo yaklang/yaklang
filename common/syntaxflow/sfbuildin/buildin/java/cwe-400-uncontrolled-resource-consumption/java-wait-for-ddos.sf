@@ -1,0 +1,148 @@
+desc(
+    title:"Check Java Process WaitFor DDOS",
+    title_zh:"检测Java waitFor方法可能导致的DDOS漏洞",
+    type:vuln,
+    desc:<<<TEXT
+    该规则用于检测Java代码中使用Process.waitFor方法可能导致的DDOS漏洞。在Java中，Process.waitFor方法会导致当前线程阻塞，直到子进程终止。如果子进程不终止，当前线程将一直阻塞，导致资源耗尽，从而可能导致DDOS攻击。因此，建议在调用Process.waitFor方法时，设置超时时间或使用其他方式避免DDOS漏洞。
+TEXT,
+)
+
+// 查找没有设置超时时间Process.waitFor方法的Process.
+.waitFor?{!(<getActualParams><slice(start=1)>)}(* as $process,)
+check $process;
+// 检测Process是否调用destroy或者destroyForcibly主动销毁进程
+$process-{
+    exclude:`<self>.destroy*`,
+}-> as $result
+
+alert $result for {
+    message: "发现Java的Process.waitFor方法可能导致DDOS漏洞",
+    level: mid,
+    type: vuln,
+    risk: ddos,
+}
+
+desc(
+    lang:java,
+    alert_num:1,
+    "file://demo.java":<<<TEXT
+package org.example.Dos;
+import javax.servlet.http.*;
+import javax.servlet.annotation.*;
+import java.io.IOException;
+
+@WebServlet("/execute")
+public class UnsafeProcessServlet extends HttpServlet {
+
+    // 漏洞点：直接执行用户输入的命令，且未设置超时
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String command = req.getParameter("cmd"); // 用户输入的命令（高危操作！）
+        if (command == null || command.isEmpty()) {
+            resp.getWriter().write("Command parameter 'cmd' is required.");
+            return;
+        }
+
+        try {
+            Process process = Runtime.getRuntime().exec(command);
+            int exitCode = process.waitFor(); // 阻塞直到命令执行完成（可能永久挂起！）
+            resp.getWriter().write("Command exited with code: " + exitCode);
+        } catch (InterruptedException e) {
+            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Command interrupted.");
+        } finally {
+            // 未强制终止残留进程（风险残留）
+        }
+    }
+}
+TEXT
+)
+
+desc(
+    lang:java,
+    "safefile://demo.java":<<<TEXT
+       package org.example.Dos;
+
+       import javax.servlet.http.*;
+       import javax.servlet.annotation.*;
+       import java.io.IOException;
+       import java.util.concurrent.TimeUnit;
+       import java.util.concurrent.TimeoutException;
+
+       @WebServlet("/execute-safe")
+       public class SafeProcessServlet extends HttpServlet {
+
+           @Override
+           protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+               String command = req.getParameter("cmd");
+               if (command == null || command.isEmpty()) {
+                   resp.getWriter().write("Command parameter 'cmd' is required.");
+                   return;
+               }
+
+               Process process = null;
+               try {
+                   process = Runtime.getRuntime().exec(command);
+
+                   // 修复点：设置超时（例如 10 秒）
+                   boolean finished = process.waitFor(10, TimeUnit.SECONDS);
+                   if (!finished) {
+                       process.destroyForcibly(); // 强制终止进程
+                       throw new TimeoutException("Command execution timed out.");
+                   }
+
+                   int exitCode = process.exitValue();
+                   resp.getWriter().write("Command exited with code: " + exitCode);
+               } catch (InterruptedException | TimeoutException e) {
+                   resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error: " + e.getMessage());
+               } finally {
+                   if (process != null && process.isAlive()) {
+                       process.destroyForcibly(); // 确保进程终止
+                   }
+               }
+           }
+       }
+TEXT
+)
+
+desc(
+    lang:java,
+    "safefile://demo.java":<<<TEXT
+      package org.example.Dos;
+
+      import javax.servlet.http.*;
+      import javax.servlet.annotation.*;
+      import java.io.IOException;
+      import java.util.concurrent.TimeUnit;
+      import java.util.concurrent.TimeoutException;
+
+      @WebServlet("/execute-safe")
+      public class SafeProcessServlet2 extends HttpServlet {
+
+          @Override
+          protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+              String command = req.getParameter("cmd"); // 用户输入的命令（高危操作！）
+              if (command == null || command.isEmpty()) {
+                  resp.getWriter().write("Command parameter 'cmd' is required.");
+                  return;
+              }
+
+              Process process = null;
+              try {
+                  process = Runtime.getRuntime().exec(command);
+                  int exitCode = process.waitFor();
+                  process.destroyForcibly();
+
+                  resp.getWriter().write("Command exited with code: " + exitCode);
+              } catch (InterruptedException e) {
+                  resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Command interrupted.");
+              } finally {
+                  if (process != null) {
+                      process.destroyForcibly(); // 确保进程终止
+                  }
+              }
+          }
+      }
+TEXT
+)
+
+

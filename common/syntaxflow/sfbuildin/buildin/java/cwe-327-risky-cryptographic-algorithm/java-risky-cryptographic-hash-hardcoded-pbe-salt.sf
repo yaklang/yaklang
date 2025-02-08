@@ -1,0 +1,125 @@
+desc(
+    title: "Find Java Risky Cryptographic Hash Hardcoded PBE Salt",
+    title_zh: "查找 Java 哈希算法使用硬编码的PBE盐值",
+    type: security,
+    level: low,
+    risk:'risky_crypt',
+    desc: <<<TEXT
+    该审计规则旨在识别 Java 代码中使用硬编码的PBE盐值的情况。PBE（Password-Based Encryption）是一种基于密码的加密算法，用于加密和解密数据。在使用PBE算法时，盐值（Salt）是一个随机的字节序列，用于增加密码的复杂性和安全性。硬编码的PBE盐值可能会导致密码加密的不安全性，因为攻击者可以通过分析代码来获取盐值，从而破解加密密码。建议开发者使用随机生成的盐值来增强密码的安全性。
+TEXT
+)
+
+// AlgorithmParameterSpec paramSpec = new PBEParameterSpec(SALT, ITERATION_COUNT);
+PBEParameterSpec?{<typeName>?{have:'javax.crypto.spec.PBEParameterSpec'}}(,* as $salt,);
+// Make元素全部为const那么就认为可能存在硬编码
+$salt?{!(.*#{exclude:`* ?{opcode:const}`}->)} as $toCheck;
+// salt没有被如random.nextBytes(salt)这样的函数修正过
+$toCheck?{!<getCall>?{have:/(?i)(random|next)/}} as $risk
+
+alert $risk for{
+    message:"发现Java代码中使用硬编码的PBE盐值",
+}
+
+desc{
+    lang:java,
+    alert_num:1,
+    'file://unsafe.java': <<<EOF
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.PBEParameterSpec;
+import java.security.spec.AlgorithmParameterSpec;
+
+public class HardcodedSaltExample {
+
+    // 硬编码的盐值
+    private static final byte[] SALT = {
+        (byte) 0x43, (byte) 0x76, (byte) 0x95, (byte) 0xc7,
+        (byte) 0x5b, (byte) 0xd7, (byte) 0x45, (byte) 0x17
+    };
+
+    // 硬编码的迭代次数
+    private static final int ITERATION_COUNT = 1000;
+
+    public static void main(String[] args) throws Exception {
+        // 假设的密码
+        char[] password = "secretPassword".toCharArray();
+
+        // 创建PBEKeySpec
+        PBEKeySpec keySpec = new PBEKeySpec(password);
+
+        // 获取SecretKeyFactory实例
+        SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBEWithMD5AndDES");
+
+        // 生成SecretKey
+        SecretKey key = keyFactory.generateSecret(keySpec);
+
+        // 创建PBEParameterSpec
+        AlgorithmParameterSpec paramSpec = new PBEParameterSpec(SALT, ITERATION_COUNT);
+
+        // 获取Cipher实例
+        Cipher cipher = Cipher.getInstance("PBEWithMD5AndDES");
+
+        // 初始化Cipher为加密模式
+        cipher.init(Cipher.ENCRYPT_MODE, key, paramSpec);
+
+        // 加密数据
+        byte[] encryptedData = cipher.doFinal("Hello, World!".getBytes());
+
+        // 输出加密后的数据
+        System.out.println("Encrypted Data: " + new String(encryptedData));
+    }
+}
+EOF
+}
+
+desc{
+    lang:java,
+    'safefile://safe.java': <<<EOF
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.PBEParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.SecureRandom;
+import java.security.spec.AlgorithmParameterSpec;
+import java.util.Base64;
+
+public class SecureEncryptionExample {
+
+    private static final int SALT_LENGTH = 8;
+    private static final int ITERATION_COUNT = 65536;
+    private static final int KEY_LENGTH = 256;
+
+    public static void main(String[] args) throws Exception {
+        char[] password = "secretPassword".toCharArray();
+
+        // 生成随机盐
+        byte[] salt = new byte[SALT_LENGTH];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(salt);
+
+        // 使用PBKDF2密钥派生函数
+        PBEKeySpec keySpec = new PBEKeySpec(password, salt, ITERATION_COUNT, KEY_LENGTH);
+        SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        byte[] keyBytes = keyFactory.generateSecret(keySpec).getEncoded();
+        SecretKey key = new SecretKeySpec(keyBytes, "AES");
+
+        // 初始化加密参数
+        AlgorithmParameterSpec paramSpec = new PBEParameterSpec(salt, ITERATION_COUNT);
+
+        // 使用AES加密算法
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, key, paramSpec);
+
+        byte[] encryptedData = cipher.doFinal("Hello, World!".getBytes());
+
+        // 输出加密数据和盐（用于解密）
+        System.out.println("Encrypted Data: " + Base64.getEncoder().encodeToString(encryptedData));
+        System.out.println("Salt: " + Base64.getEncoder().encodeToString(salt));
+    }
+}
+EOF
+}

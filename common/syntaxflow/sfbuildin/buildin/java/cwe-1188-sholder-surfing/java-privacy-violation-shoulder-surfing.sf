@@ -1,0 +1,125 @@
+desc(
+    title:"Check Java Privacy Violation - Shoulder Surfing",
+    title_zh:"检查Java隐私泄露 - 肩窥",
+    type:security,
+    risk:'info-exposure',
+    level:low,
+    desc:<<<TEXT
+    该规则用于检测Java代码中是否含有“肩窥”问题，“肩窥”是一种安全威胁，指的是攻击者通过观察用户的屏幕或键盘输入来获取敏感信息，例如密码。
+TEXT
+)
+
+// new PasswordCallback("Password: ", true)
+PasswordCallback?{<typeName>?{have:'javax.security.auth.callback.PasswordCallback'}}(,,* as $toCheck);
+$toCheck #{
+    include:`* ?{opcode:const && have:'true'} `
+}-> as $risk;
+alert $risk for{
+    message:"发现Java代码中PasswordCallback方法存在隐私泄露的风险"
+}
+
+desc(
+    lang:'java',
+    alert_num:1,
+    "file://unsafe.java":<<<TEXT
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import java.io.Console;
+import java.io.IOException;
+
+public class InsecurePasswordInput {
+
+    public static void main(String[] args) {
+        // 创建一个CallbackHandler，用于处理密码输入
+        CallbackHandler callbackHandler = new CallbackHandler() {
+            @Override
+            public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+                for (Callback callback : callbacks) {
+                    if (callback instanceof PasswordCallback) {
+                        PasswordCallback pc = (PasswordCallback) callback;
+                        // 设置提示信息，但没有禁用回显
+                        pc.setPrompt("Please enter your password: ");
+                        // 注意：这里没有调用setEcho(false)，导致密码可能会被回显
+                        // 获取控制台
+                        Console console = System.console();
+                        if (console != null) {
+                            // 读取密码，由于没有禁用回显，密码可能会显示在屏幕上
+                            char[] password = console.readPassword();
+                            // 设置密码
+                            pc.setPassword(password);
+                        } else {
+                            throw new IOException("Cannot access console");
+                        }
+                    } else {
+                        throw new UnsupportedCallbackException(callback, "Unsupported callback");
+                    }
+                }
+            }
+        };
+
+        // 模拟一个认证过程，需要用户输入密码
+        try {
+            callbackHandler.handle(new Callback[]{new PasswordCallback("Password: ", true)});
+            // 注意：这里PasswordCallback的构造函数中的echo参数被设置为true，增加了安全风险
+            System.out.println("Password entered successfully.");
+        } catch (IOException | UnsupportedCallbackException e) {
+            e.printStackTrace();
+        }
+    }
+}
+TEXT
+)
+
+desc(
+    lang:'java',
+    "safefile://safe.java":<<<TEXT
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import java.io.Console;
+import java.io.IOException;
+
+public class SecurePasswordInput {
+
+    public static void main(String[] args) {
+        // 创建一个CallbackHandler，用于处理密码输入
+        CallbackHandler callbackHandler = new CallbackHandler() {
+            @Override
+            public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+                for (Callback callback : callbacks) {
+                    if (callback instanceof PasswordCallback) {
+                        PasswordCallback pc = (PasswordCallback) callback;
+                        // 设置提示信息，并禁用回显
+                        pc.setPrompt("Please enter your password: ");
+                        pc.setEcho(false);
+                        // 获取控制台
+                        Console console = System.console();
+                        if (console != null) {
+                            // 读取密码，不会在屏幕上显示
+                            char[] password = console.readPassword();
+                            // 设置密码
+                            pc.setPassword(password);
+                        } else {
+                            throw new IOException("Cannot access console");
+                        }
+                    } else {
+                        throw new UnsupportedCallbackException(callback, "Unsupported callback");
+                    }
+                }
+            }
+        };
+
+        // 模拟一个认证过程，需要用户输入密码
+        try {
+            callbackHandler.handle(new Callback[]{new PasswordCallback("Password: ", false)});
+            System.out.println("Password entered successfully.");
+        } catch (IOException | UnsupportedCallbackException e) {
+            e.printStackTrace();
+        }
+    }
+}
+TEXT
+)
