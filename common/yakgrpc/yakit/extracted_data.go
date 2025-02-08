@@ -2,10 +2,11 @@ package yakit
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/dlclark/regexp2"
 	"github.com/jinzhu/gorm"
@@ -28,14 +29,15 @@ type PacketInfo struct {
 	BodyRaw       []byte
 	Raw           []byte
 }
-type MatchInfo struct {
+type MatchMetaInfo struct {
 	Raw    []byte
 	Offset int
 }
 type MatchResult struct {
 	*regexp2.Match
 	IsMatchRequest bool
-	MatchInfo      *MatchInfo
+	MatchResult    string
+	MetaInfo       *MatchMetaInfo
 }
 
 func CreateOrUpdateExtractedData(db *gorm.DB, mainId int64, i interface{}) error {
@@ -152,7 +154,7 @@ func CountExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) (float64, 
 	return count, nil
 }
 
-func ExtractedDataFromHTTPFlow(hiddenIndex string, ruleName string, matchResult *MatchResult, data string, regexpStr ...string) *schema.ExtractedData {
+func ExtractedDataFromHTTPFlow(hiddenIndex string, ruleName string, res *MatchResult, regexpStr ...string) *schema.ExtractedData {
 	var r string
 	if len(regexpStr) > 0 {
 		r = strings.Join(regexpStr, ", ")
@@ -163,10 +165,10 @@ func ExtractedDataFromHTTPFlow(hiddenIndex string, ruleName string, matchResult 
 		TraceId:        hiddenIndex,
 		Regexp:         r,
 		RuleVerbose:    ruleName,
-		Data:           data,
-		DataIndex:      matchResult.Index + matchResult.MatchInfo.Offset,
-		Length:         matchResult.Length,
-		IsMatchRequest: matchResult.IsMatchRequest,
+		Data:           res.MatchResult,
+		DataIndex:      res.Index + res.MetaInfo.Offset,
+		Length:         res.Length,
+		IsMatchRequest: res.IsMatchRequest,
 	}
 	return extractData
 }
