@@ -347,14 +347,10 @@ type Function struct {
 	currentReturnType Type
 	// static CallBack
 
-	MarkMoreParamMember []*ParameterMember
 }
 
 func (f *Function) SetCurrentReturnType(t Type) {
 	f.currentReturnType = t
-}
-func (f *Function) AddMarkParameterMember(member *ParameterMember) {
-	f.MarkMoreParamMember = append(f.MarkMoreParamMember, member)
 }
 func (f *Function) GetCurrentReturnType() Type {
 	return f.currentReturnType

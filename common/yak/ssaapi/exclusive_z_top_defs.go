@@ -341,10 +341,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return Values{}
 			}
 
-			_, isParameterMember := ssa.ToParameterMember(calledInstance.Method)
-			_, isParameter := ssa.ToParameter(calledInstance.Method)
+			//_, isParameterMember := ssa.ToParameterMember(calledInstance.Method)
+			//_, isParameter := ssa.ToParameter(calledInstance.Method)
 			thisFunc := i.GetFunction()
-			if !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) && !(isParameterMember || isParameter) {
+			if !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) {
 				log.Errorf("call stack function %s(%d) not same with Parameter function %s(%d)",
 					calledInstance.Method.GetName(), calledInstance.Method.GetId(),
 					thisFunc.GetName(), thisFunc.GetId(),

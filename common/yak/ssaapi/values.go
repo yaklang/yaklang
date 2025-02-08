@@ -708,9 +708,6 @@ func (v *Value) GetCalledBy() Values {
 			if call == nil && call.Method == nil {
 				continue
 			}
-			if _, flag := ssa.ToParameterMember(call.Method); flag {
-				vs = append(vs, v.NewValue(call))
-			}
 
 			if call.Method.GetId() == nodeId {
 				vs = append(vs, v.NewValue(call))
