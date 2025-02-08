@@ -40,6 +40,77 @@
     </nav>
 </header>
 
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">代码提交</h3>
+                </div>
+                <div class="card-body">
+                    <form>
+                        <div class="mb-3">
+                            <label for="codeTitle" class="form-label">代码标题</label>
+                            <input type="text" class="form-control" id="codeTitle" placeholder="请输入代码标题">
+                        </div>
+                        <div class="mb-3">
+                            <label for="codeDescription" class="form-label">代码描述</label>
+                            <textarea class="form-control" id="codeDescription" rows="3" placeholder="请描述代码的用途和功能"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="codeContent" class="form-label">代码内容</label>
+                            <textarea class="form-control" id="codeContent" rows="10" placeholder="请输入代码内容" 
+                                style="font-family: monospace; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;"></textarea>
+                        </div>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-secondary" onclick="submitToAI()">AI 描述代码信息</button>
+                            <script>
+                                function submitToAI() {
+                                    const data = {
+                                        title: document.getElementById('codeTitle').value,
+                                        description: document.getElementById('codeDescription').value,
+                                        code: document.getElementById('codeContent').value
+                                    };
+
+                                    fetch('/_/ai-analyze', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify(data)
+                                    })
+                                    .then(response => response.json())
+                                    .then(result => {
+                                        document.getElementById('codeDescription').value = result.description;
+                                        document.getElementById('submitBtn').disabled = false;
+                                    })
+                                    .catch(error => {
+                                        alert('提交失败: ' + error);
+                                    });
+                                }
+                            </script>
+                            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>提交</button>
+                        </div>
+                        <script>
+                            function validateForm() {
+                                const title = document.getElementById('codeTitle').value;
+                                const desc = document.getElementById('codeDescription').value;
+                                const code = document.getElementById('codeContent').value;
+                                
+                                if(title && desc && code) {
+                                    document.getElementById('submitBtn').disabled = false;
+                                    alert('内容已填写完整,可以提交了!');
+                                } else {
+                                    alert('请确保所有字段都已填写!');
+                                }
+                            }
+                        </script>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 
 <!-- 引入 Bootstrap JavaScript -->
