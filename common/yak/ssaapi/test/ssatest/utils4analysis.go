@@ -614,7 +614,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 		}
 
 		// in db
-		result2, err := p.SyntaxFlowRule(rule)
+		result2, err := p.SyntaxFlowRule(rule, ssaapi.QueryWithInitInputVar(p[0]))
 		if err != nil {
 			return utils.Errorf("syntax flow rule failed: %v", err)
 		}
@@ -639,14 +639,14 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 	if vfs != nil && l != "" {
 		log.Infof("safe filesystem start")
 		CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-			result, err := programs.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithEnableDebug())
+			result, err := programs.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(programs[0]))
 			if err != nil {
 				return utils.Errorf("syntax flow content failed: %v", err)
 			}
 			if err := check(result); err != nil {
 				return utils.Errorf("check content failed: %v", err)
 			}
-			result2, err := programs.SyntaxFlowRule(rule, ssaapi.QueryWithEnableDebug())
+			result2, err := programs.SyntaxFlowRule(rule, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(programs[0]))
 			if err != nil {
 				return utils.Errorf("syntax flow rule failed: %v", err)
 			}
