@@ -761,7 +761,7 @@ func init() {
 				}
 				fts := typ.t.GetFullTypeNames()
 				if len(fts) == 0 {
-					results := val.NewValue(ssa.NewConstWithRange(t.String(), val.GetRange()))
+					results := val.NewValue(ssa.NewConstWithRange(typ.String(), val.GetRange()))
 					vals = append(vals, results)
 				} else {
 					for _, ft := range fts {
