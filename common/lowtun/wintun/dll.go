@@ -9,6 +9,8 @@ package wintun
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -18,6 +20,10 @@ import (
 
 func newLazyDLL(name string, onLoad func(d *lazyDLL)) *lazyDLL {
 	return &lazyDLL{Name: name, onLoad: onLoad}
+}
+
+func newLazyAutoReleaseDLL(name string, data []byte, onLoad func(d *lazyDLL)) *lazyDLL {
+	return &lazyDLL{Name: name, autoReleaseData: data, onLoad: onLoad}
 }
 
 func (d *lazyDLL) NewProc(name string) *lazyProc {
@@ -63,10 +69,11 @@ func (p *lazyProc) Addr() uintptr {
 }
 
 type lazyDLL struct {
-	Name   string
-	mu     sync.Mutex
-	module windows.Handle
-	onLoad func(d *lazyDLL)
+	Name            string
+	autoReleaseData []byte
+	mu              sync.Mutex
+	module          windows.Handle
+	onLoad          func(d *lazyDLL)
 }
 
 func (d *lazyDLL) Load() error {
@@ -85,7 +92,24 @@ func (d *lazyDLL) Load() error {
 	)
 	module, err := windows.LoadLibraryEx(d.Name, 0, LOAD_LIBRARY_SEARCH_APPLICATION_DIR|LOAD_LIBRARY_SEARCH_SYSTEM32)
 	if err != nil {
-		return fmt.Errorf("Unable to load library: %w", err)
+		if len(d.autoReleaseData) > 0 {
+			exePath, err := os.Executable()
+			if err != nil {
+				return fmt.Errorf("Unable to get executable path: %w", err)
+			}
+			dllPath := filepath.Join(filepath.Dir(exePath), d.Name)
+			err = os.WriteFile(dllPath, d.autoReleaseData, 0600)
+			if err != nil {
+				return fmt.Errorf("Unable to write %s on %s: %w", d.Name, filepath.Dir(exePath), err)
+			}
+
+			module, err = windows.LoadLibraryEx(dllPath, 0, LOAD_LIBRARY_SEARCH_APPLICATION_DIR|LOAD_LIBRARY_SEARCH_SYSTEM32)
+			if err != nil {
+				return fmt.Errorf("Unable to load library from temporary file: %w", err)
+			}
+		} else {
+			return fmt.Errorf("Unable to load library: %w", err)
+		}
 	}
 
 	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&d.module)), unsafe.Pointer(module))
