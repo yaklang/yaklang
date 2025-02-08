@@ -114,6 +114,9 @@ func (s *VulinServer) init() {
 	// agent ws connector
 	s.registerWSAgent()
 
+	// ai knowledge base practice
+	s.registerAIKBPractice()
+
 	// 通用型
 	s.registerSQLinj()
 	s.registerXSS()
