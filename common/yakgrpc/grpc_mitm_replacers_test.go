@@ -967,3 +967,35 @@ Cookie: %s
 	require.NotContains(t, string(res), extraCookieKey)
 	require.NotContains(t, string(res), extraCookieValue)
 }
+
+func TestGRPCMUSTPASS_HookColorWithRegexpGroup(t *testing.T) {
+	replacer := NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:              `(a)(b)(c)`,
+		NoReplace:         true,
+		Result:            ``,
+		Color:             "",
+		EnableForResponse: true,
+		EnableForHeader:   true,
+		EnableForBody:     true,
+		Index:             0,
+		ExtraTag:          nil,
+		Disabled:          false,
+		VerboseName:       "",
+		RegexpGroups:      []int64{1, 2, 3},
+	})
+	responseBytes := []byte(`HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Tue, 10 Oct 2023 07:28:15 GMT
+Content-Length: 23
+
+abc`)
+	req, err := http.NewRequest("GET", "https://www.baidu.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	extractedData := replacer.hookColor([]byte(""), responseBytes, req, &schema.HTTPFlow{})
+	require.Len(t, extractedData, 1)
+	require.Equal(t, "a, b, c", extractedData[0].Data)
+}
