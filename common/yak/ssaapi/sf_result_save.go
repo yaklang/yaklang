@@ -106,7 +106,8 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 			result.UnValueVariable = append(result.UnValueVariable, name)
 			return
 		}
-		if msg, ok := r.GetAlertMsg(name); ok {
+		//非search才存入到risk数据库中
+		if msg, ok := r.GetAlertMsg(name); ok && result.Kind != schema.SFResultKindSearch {
 			opts = append(opts, OptionSaveValue_ResultAlert(msg))
 			r.SaveRisk(name, result)
 		}

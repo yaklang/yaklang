@@ -45,6 +45,10 @@ func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
 	resultID3, err := res.Save(schema.SFResultKindQuery, taskID2)
 	require.NoError(t, err)
 
+	taskID3 := uuid.NewString()
+	_, err = res.Save(schema.SFResultKindSearch, taskID3)
+	require.NoError(t, err)
+
 	t.Run("test query result by taskID", func(t *testing.T) {
 		// taskID1 (resultID1)
 		rsp, err := local.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
@@ -150,6 +154,17 @@ func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
 		require.Equal(t, 1, len(rsp.GetResults()))
 		require.Equal(t, string(schema.SFResultKindDebug), rsp.GetResults()[0].GetKind())
 
+	})
+
+	//
+	t.Run("test exclude search kind", func(t *testing.T) {
+		result, err2 := local.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
+			Pagination: &ypb.Paging{},
+		})
+		require.NoError(t, err2)
+		for _, flowResult := range result.Results {
+			require.True(t, flowResult.Kind != string(schema.SFResultKindSearch))
+		}
 	})
 
 }
