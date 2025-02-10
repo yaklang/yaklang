@@ -451,12 +451,7 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 			return nil, err
 		}
 		vf := filesys.NewVirtualFs()
-		var name string
-		if config.SelectedLanguageBuilder != nil {
-			name = fmt.Sprintf("%s.%s", simpleFileName, config.SelectedLanguageBuilder.GetCodeFileExt())
-		} else {
-			name = simpleFileName
-		}
+		name := SimpleFilePath(config.SelectedLanguageBuilder)
 		vf.AddFile(name, string(raw))
 		WithFileSystem(vf)(config)
 		hash = config.CalcHash(string(raw))
