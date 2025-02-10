@@ -39,6 +39,8 @@ var Exports = map[string]any{
 	"withSave": func() ssaapi.QueryOption {
 		return ssaapi.QueryWithSave(schema.SFResultKindQuery)
 	},
-
+	"withSearch": func() ssaapi.QueryOption {
+		return ssaapi.QueryWithSave(schema.SFResultKindSearch)
+	},
 	"QuerySyntaxFlowRules": QuerySyntaxFlowRules,
 }
