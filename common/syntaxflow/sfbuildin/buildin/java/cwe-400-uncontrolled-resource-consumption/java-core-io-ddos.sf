@@ -14,11 +14,11 @@ check $source
 
 // BufferedReader使用readLine读取数据，并且没有使用length方法读取长度以进行限制
 BufferedReader().readLine()?{<typeName>?{have:'java.io'} && !(.length())}  as $sink;
-$sink#{
+$sink?{* #{
     include:<<<INCLUDE
     <self> & $source
 INCLUDE
-}-> as $vul;
+}->} as $vul;
 alert $vul for {
     message: "发现Java的java.io库可能存在ddos漏洞",
     level: low,

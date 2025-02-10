@@ -11,9 +11,9 @@ TEXT,
 .waitFor?{!(<getActualParams><slice(start=1)>)}(* as $process,)
 check $process;
 // 检测Process是否调用destroy或者destroyForcibly主动销毁进程
-$process-{
+$process?{*-{
     exclude:`<self>.destroy*`,
-}-> as $result
+}->} as $result
 
 alert $result for {
     message: "发现Java的Process.waitFor方法可能导致DDOS漏洞",
