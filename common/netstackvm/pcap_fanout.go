@@ -59,7 +59,7 @@ func NewPCAPAdaptor(ifaceName string, promisc bool) (*pcapAdaptor, error) {
 func newPCAPFanOuter(device string, promic bool) (*pcapFanOut, error) {
 	name, err := pcaputil.IfaceNameToPcapIfaceName(device)
 	if err != nil {
-		return nil, utils.Errorf("failed to get pcap interface name (%v): %v", err)
+		return nil, utils.Errorf("failed to get pcap interface name (%v): %v", device, err)
 	}
 
 	// Open pcap handle with large snaplen to avoid truncation

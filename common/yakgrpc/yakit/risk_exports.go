@@ -36,6 +36,9 @@ type (
 
 var (
 	riskTypeVerboses = []*riskType{
+		{Types: []string{"ddos"}, Verbose: "拒绝服务攻击"},
+		{Types: []string{"code-quality"}, Verbose: "代码质量"},
+		{Types: []string{"api-abuse"}, Verbose: "API滥用"},
 		{Types: []string{"variable_coverage"}, Verbose: "变量覆盖"},
 		{Types: []string{"include", "file-include"}, Verbose: "文件包含"},
 		{Types: []string{"sca"}, Verbose: "使用不安全的依赖"},

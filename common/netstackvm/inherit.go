@@ -4,8 +4,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/arptable"
 	"net"
 
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
@@ -80,34 +78,6 @@ func (vm *NetStackVirtualMachine) GetOSNetStackIPv6() (net.IP, net.IP, net.IPMas
 }
 
 func (vm *NetStackVirtualMachine) InheritPcapInterfaceIP() error {
-	vm.driver.SetPCAPInboundFilter(func(packet gopacket.Packet) bool {
-		tcpLayerRaw := packet.Layer(layers.LayerTypeTCP)
-		if tcpLayerRaw == nil {
-			return false
-		}
-		tcpLayer, ok := tcpLayerRaw.(*layers.TCP)
-		if !ok {
-			return false
-		}
-		if tcpLayer.ACK && tcpLayer.SYN {
-			return true
-		}
-		return false
-	})
-	vm.driver.SetPCAPOutboundFilter(func(packet gopacket.Packet) bool {
-		tcpLayerRaw := packet.Layer(layers.LayerTypeTCP)
-		if tcpLayerRaw == nil {
-			return false
-		}
-		tcpLayer, ok := tcpLayerRaw.(*layers.TCP)
-		if !ok {
-			return false
-		}
-		if tcpLayer.SYN {
-			return true
-		}
-		return false
-	})
 	ipv4, gateway4, mask4 := vm.GetOSNetStackIPv4()
 	vm.driver.SetGatewayIP(gateway4)
 	err := vm.SetMainNICv4(ipv4, &net.IPNet{

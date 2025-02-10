@@ -36,10 +36,6 @@ func GetSFIncludeCache() *utils.Cache[sfvm.ValueOperator] {
 	return includeCache
 }
 
-func DeleteIncludeCache() {
-	includeCache.DeleteAll()
-}
-
 var includeCache = createIncludeCache()
 
 func createIncludeCache() *utils.Cache[sfvm.ValueOperator] {
@@ -47,42 +43,33 @@ func createIncludeCache() *utils.Cache[sfvm.ValueOperator] {
 }
 
 func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.ValueOperator, err error) {
-	var parent *Program
+	parent, err := fetchProgram(v)
+	if err != nil {
+		return false, nil, err
+	}
+
+	var inputs Values
 	v.Recursive(func(operator sfvm.ValueOperator) error {
-		switch ret := operator.(type) {
-		case *Value:
-			parent = ret.ParentProgram
-			return utils.Error("abort")
-		case *Program:
-			parent = ret
+		val, ok := operator.(*Value)
+		if ok {
+			inputs = append(inputs, val)
 		}
 		return nil
 	})
-	if parent == nil {
-		return false, nil, utils.Error("no parent program found")
-	}
+
 	var ruleName string
 	if ret := params.GetString("name", "rule", "rulename"); ret != "" {
 		ruleName = ret
 	} else if ret := params.GetString("0"); ret != "" {
 		ruleName = ret
 	}
-
 	if ruleName == "" {
 		return false, nil, utils.Error("no rule name found")
 	}
 
-	if programName := parent.GetProgramName(); includeCache != nil && programName != "" {
-		hash := utils.CalcSha256(ruleName, programName)
-		if ret, ok := includeCache.Get(hash); ok {
-			return true, ret, nil
-		}
-		defer func() {
-			if !success || value == nil || err != nil {
-				return
-			}
-			includeCache.Set(hash, value)
-		}()
+	hash, ret, shouldCache := GetIncludeCacheValue(parent, ruleName, inputs)
+	if ret != nil {
+		return true, ret, nil
 	}
 
 	rule, err := sfdb.GetLibrary(ruleName)
@@ -91,11 +78,18 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		return false, nil, err
 	}
 
+	var queryValue sfvm.ValueOperator
+	queryValue = inputs
+	if inputs.IsEmpty() {
+		queryValue = parent
+	}
+
 	config := frame.GetConfig()
 	result, err := QuerySyntaxflow(
-		QueryWithProgram(parent),
-		QueryWithRule(rule),
 		QueryWithSFConfig(config),
+		QueryWithProgram(parent),
+		QueryWithInitInputVar(queryValue),
+		QueryWithRule(rule),
 	)
 	if err != nil {
 		return false, nil, err
@@ -106,7 +100,42 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		vals = append(vals, vs...)
 	}
 	if len(vals) > 0 {
-		return true, ValuesToSFValueList(vals), nil
+		value = ValuesToSFValueList(vals)
+		if shouldCache {
+			includeCache.Set(hash, value)
+		}
+		return true, value, nil
 	}
 	return false, nil, utils.Error("no value found")
+}
+
+func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (hash string, value sfvm.ValueOperator, shouldCache bool) {
+	getRetFromCache := func(hash string) sfvm.ValueOperator {
+		if ret, ok := includeCache.Get(hash); ok {
+			return ret
+		} else {
+			return nil
+		}
+	}
+
+	if programHash, ok := program.Hash(); ok {
+		// Use program hash and rule name to generate a unique hash
+		hash = utils.CalcSha256(programHash + ruleName)
+		shouldCache = true
+		if inputValues != nil && !inputValues.IsEmpty() {
+			if valueHash, ok := inputValues.Hash(); ok {
+				hash = utils.CalcSha256(hash, valueHash)
+			} else {
+				// if input param values not empty but have temp value,
+				// then the result should not be cached
+				shouldCache = false
+			}
+		}
+		if !shouldCache {
+			return
+		}
+		value = getRetFromCache(hash)
+		return
+	}
+	return
 }

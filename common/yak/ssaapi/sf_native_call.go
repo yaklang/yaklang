@@ -2,7 +2,9 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/java/template2java"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -144,9 +146,155 @@ const (
 	NativeCall_Java_UnEscape_Output = "javaUnescapeOutput"
 
 	NativeCall_Foeach_Func_Inst = "foreach_function_inst"
+
+	NativeCall_GetFilenameByContent = "FilenameByContent"
+
+	NativeCall_GetFullFileName = "getFullFileName"
+
+	NativeCall_GetUsers = "getUsers"
+
+	NativeCall_GetActualParams = "getActualParams"
+
+	NativeCall_GetActualParamLen = "getActualParamLen"
 )
 
 func init() {
+	registerNativeCall(NativeCall_GetActualParamLen, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		vs, err := v.GetAllCallActualParams()
+		if err != nil {
+			return false, nil, err
+		}
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		var count int
+		vs.Recursive(func(operator sfvm.ValueOperator) error {
+			count++
+			return nil
+		})
+		return true, sfvm.NewValues([]sfvm.ValueOperator{prog.NewValue(ssa.NewConst(count))}), nil
+	}), nc_desc("获取实际参数长度"))
+	registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		result, err := v.GetAllCallActualParams()
+		if err != nil {
+			return false, nil, err
+		}
+		return true, result, nil
+	}), nc_desc("获取实际参数"))
+	registerNativeCall(NativeCall_GetUsers, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				result = append(result, ret.GetUsers())
+			case *Values:
+				result = append(result, ret.GetUsers())
+			}
+			return nil
+		})
+		if len(result) > 0 {
+			return true, sfvm.NewValues(result), nil
+		}
+		return false, nil, nil
+	}), nc_desc("获取值的Users"))
+
+	/*
+		// NativeCall_GetFullFileName is used to get the full file name, the input is a file name. eg.
+		// <getFullFileName(filename="xxx")>
+	*/
+	registerNativeCall(NativeCall_GetFullFileName, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var rs []sfvm.ValueOperator
+		fileMap := make(map[string]struct{})
+		fname := params.GetString("filename")
+		if fname == "" {
+			return false, nil, utils.Errorf("filename is empty")
+		}
+		program, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		p := program.Program
+		if p == nil {
+			return false, nil, utils.Errorf("program is nil")
+		}
+		matchFilename := func(f func(filename string) bool) {
+			for name, _ := range p.FileList {
+				if f(name) {
+					_, ok := fileMap[name]
+					if !ok {
+						memeditor := &memedit.MemEditor{}
+						fileMap[name] = struct{}{}
+						if program.enableDatabase {
+							memeditor, err = ssadb.GetEditorByFileName(path.Join("/", program.GetProgramName(), name))
+							if err != nil {
+								log.Errorf("get ir source from hash failed: %v", err)
+								continue
+							}
+						} else {
+							editor, b := program.Program.GetEditor(name)
+							if b {
+								memeditor = editor
+							} else {
+								log.Errorf("get editor failed")
+								continue
+							}
+						}
+						rs = append(rs, program.NewValue(ssa.NewConstWithRange(name, memeditor.GetFullRange())))
+					}
+				}
+			}
+		}
+		compile, err := glob.Compile(fname)
+		if err == nil {
+			matchFilename(func(filename string) bool {
+				return compile.Match(filename)
+			})
+		}
+		r, err := regexp.Compile(fname)
+		if err == nil {
+			matchFilename(func(filename string) bool {
+				return r.MatchString(filename)
+			})
+		}
+		matchFilename(func(filename string) bool {
+			return strings.ToLower(filename) == strings.ToLower(fname)
+		})
+		return true, sfvm.NewValues(rs), nil
+	}))
+	registerNativeCall(NativeCall_GetFilenameByContent, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var rs []sfvm.ValueOperator
+
+		program, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		prog := program.Program
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Program:
+				return nil
+			case *Value:
+				vr := ret.node.GetRange()
+				if vr == nil {
+					log.Errorf("node range is nil")
+					return nil
+				}
+				editor := vr.GetEditor()
+				if editor == nil {
+					log.Errorf("node editor is nil")
+				}
+				_, exist := prog.FileList[editor.GetFilename()]
+				if exist {
+					rs = append(rs, program.NewValue(ssa.NewConstWithRange(editor.GetFilename(), editor.GetFullRange())))
+				} else {
+					log.Errorf("program filelist not found this file")
+				}
+			}
+			return nil
+		})
+		return true, sfvm.NewValues(rs), nil
+	}))
 	//<foreach_function_inst(hook=`xxx` as $result)> as $result
 	registerNativeCall(NativeCall_Foeach_Func_Inst, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
@@ -445,11 +593,20 @@ func init() {
 	registerNativeCall(NativeCall_OpCodes, nc_func(nativeCallOpCodes))
 	registerNativeCall(NativeCall_Slice, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		start := params.GetInt(0, "start")
+		index := params.GetInt(0, "index")
+
+		if index == -1 && start == -1 {
+			return false, nil, utils.Errorf("start or index is required")
+		}
 		idx := 0
 		var vals []sfvm.ValueOperator
 		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
-			if idx >= start {
+			if idx >= start && start != -1 {
 				vals = append(vals, operator)
+			}
+			if idx == index && index != -1 {
+				vals = append(vals, operator)
+				return utils.Error("abort")
 			}
 			idx++
 			return nil
@@ -536,16 +693,19 @@ func init() {
 		NativeCall_TypeName,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
-			v.Recursive(func(operator sfvm.ValueOperator) error {
+			err := v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
 					return nil
 				}
-				t := val.GetType()
-				fts := t.t.GetFullTypeNames()
+				typ := val.GetType()
+				if typ == nil || typ.t == nil {
+					return utils.Errorf("native call type name failed: the value have %s no type", val.String())
+				}
+				fts := typ.t.GetFullTypeNames()
 				var results []string
 				if len(fts) == 0 {
-					results = append(results, t.String())
+					results = append(results, typ.String())
 				} else {
 					for _, ft := range fts {
 						//remove versioin name
@@ -572,6 +732,9 @@ func init() {
 				}
 				return nil
 			})
+			if err != nil {
+				return false, nil, err
+			}
 			if len(vals) > 0 {
 				return true, sfvm.NewValues(vals), nil
 			}
@@ -587,20 +750,23 @@ func init() {
 		NativeCall_FullTypeName,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
-			v.Recursive(func(operator sfvm.ValueOperator) error {
+			err := v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
 					return nil
 				}
-				t := val.GetType()
-				fts := t.t.GetFullTypeNames()
+				typ := val.GetType()
+				if typ == nil || typ.t == nil {
+					return utils.Errorf("native call type name failed: the value have %s no type", val.String())
+				}
+				fts := typ.t.GetFullTypeNames()
 				if len(fts) == 0 {
-					results := val.NewValue(ssa.NewConst(t.String()))
+					results := val.NewValue(ssa.NewConstWithRange(typ.String(), val.GetRange()))
 					vals = append(vals, results)
 				} else {
 					for _, ft := range fts {
 						ft = yakunquote.TryUnquote(ft)
-						results := val.NewValue(ssa.NewConst(ft))
+						results := val.NewValue(ssa.NewConstWithRange(ft, val.GetRange()))
 						results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
 						vals = append(vals, results)
 					}
@@ -608,6 +774,9 @@ func init() {
 
 				return nil
 			})
+			if err != nil {
+				return false, nil, err
+			}
 			if len(vals) > 0 {
 				return true, sfvm.NewValues(vals), nil
 			}

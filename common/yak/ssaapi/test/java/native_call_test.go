@@ -1,6 +1,12 @@
 package java
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"strconv"
 	"strings"
 	"testing"
@@ -446,4 +452,148 @@ func TestNativeCall_Java_RegexpForMybatisAnnotation(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+func TestNativeCall(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("a.java", `package main;
+public class A{
+}
+`)
+	fs.AddFile("b.java", `package main2;
+public class B{}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `A as $output
+$output<FilenameByContent> as $sink
+`, map[string][]string{
+		"sink": {"a.java"},
+	}, true, ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckWithFS(fs, t, func(programs ssaapi.Programs) error {
+		result, err := programs.SyntaxFlowWithError(`
+A as $output
+$output<FilenameByContent> as $sink
+alert $output
+`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		_ = result
+
+		values := result.GetValues("sink").Show()
+		values.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *ssaapi.Value:
+				require.True(t, ret.GetRange() != nil && ret.GetRange().GetEditor() != nil)
+				editor := ret.GetRange().GetEditor()
+				require.True(t, editor.GetFilename() == "a.java")
+				require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
+			}
+			return nil
+		})
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestNativeCall_GetFileFullName(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("/src/main/java/abc.java", `package main;`)
+	fs.AddFile("/src/main/java/bcd.java", `package main2;`)
+	programID := uuid.NewString()
+	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
+	require.NoError(t, err)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	}()
+	result, err := prog.SyntaxFlowWithError(`<getFullFileName(filename="*/a*")> as $sink`, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithSave(schema.SFResultKindSearch))
+	require.NoError(t, err)
+	id := result.GetResultID()
+	dbResult, err := ssaapi.LoadResultByID(id)
+	require.NoError(t, err)
+	values := dbResult.GetValues("sink")
+	require.True(t, !values.IsEmpty())
+	values.Recursive(func(operator sfvm.ValueOperator) error {
+		switch ret := operator.(type) {
+		case *ssaapi.Value:
+			require.True(t, ret.GetRange() != nil)
+			require.True(t, ret.GetRange().GetEditor() != nil)
+			editor := ret.GetRange().GetEditor()
+			require.True(t, editor.GetFilename() == "src/main/java/abc.java")
+			require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
+		}
+		return nil
+	})
+}
+
+func TestNativeCall_GetActualParams(t *testing.T) {
+	code := `
+package org.example.ImproperPasswd;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DatabaseConnection {
+    /**
+     * 漏洞点：明文传递 null 作为密码
+     */
+    public Connection connect() throws SQLException {
+        String url = "jdbc:mysql://localhost:3306/mydb";
+        String user = "root";
+        // 触发规则：密码参数显式设置为 null
+        Connection conn = DriverManager.getConnection(url, user, null);
+        return conn;
+    }
+
+    public static void main(String[] args) {
+        DatabaseConnection db = new DatabaseConnection();
+        try {
+            Connection conn = db.connect();
+            System.out.println("Connected to database.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+`
+
+	ssatest.CheckSyntaxFlowContain(t, code,
+		`DriverManager.getConnection<getActualParams> as $params`,
+		map[string][]string{
+			"params": {"root", "mydb", "DriverManager", "nil"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+func TestNativeCall_GetActualParamLen(t *testing.T) {
+	code := `
+package org.example.ImproperPasswd;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DatabaseConnection {
+    /**
+     * 漏洞点：明文传递 null 作为密码
+     */
+    public Connection connect() throws SQLException {
+        String url = "jdbc:mysql://localhost:3306/mydb";
+        String user = "root";
+        // 触发规则：密码参数显式设置为 null
+        Connection conn = DriverManager.getConnection(url, user, null);
+        return conn;
+    }
+
+    public static void main(String[] args) {
+        DatabaseConnection db = new DatabaseConnection();
+        try {
+            Connection conn = db.connect();
+            System.out.println("Connected to database.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+`
+
+	ssatest.CheckSyntaxFlow(t, code,
+		`DriverManager.getConnection<getActualParamLen> as $len`,
+		map[string][]string{
+			"len": {"4"},
+		}, ssaapi.WithLanguage(consts.JAVA))
 }

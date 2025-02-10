@@ -77,8 +77,13 @@
 
         // 返回登录按钮点击事件处理程序
         loginButton.addEventListener('click', function () {
-            // 跳转回登录页面
-            window.location.href = '/logic/user/login';
+            const params = new URLSearchParams(window.location.search)
+            let ref = params.get('reference')
+            if (ref === "" || ref == null) {
+                window.location.href = '/logic/user/login';
+            }else {
+                window.location.href = ref;
+            }
         });
     </script>
 </body>

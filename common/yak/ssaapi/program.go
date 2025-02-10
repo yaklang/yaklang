@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sort"
 	"time"
 
@@ -56,6 +57,19 @@ func (p *Program) GetType(name string) *Type {
 		return nil
 	}
 	return NewType(typ)
+}
+
+func (p *Program) Hash() (string, bool) {
+	if p.ssaProgram != nil {
+		// Use the name and created_at to generate the hash,
+		// So that the hash will be changed when the program is recompiled.
+		hash := utils.CalcSha256(p.ssaProgram.Name, p.ssaProgram.CreatedAt.String())
+		return hash, true
+	} else if p.Program.Name != "" {
+		return utils.CalcSha256(p.Program.Name), true
+	} else {
+		return "", false
+	}
 }
 
 func NewProgram(prog *ssa.Program, config *config) *Program {
@@ -203,6 +217,26 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 	if err != nil {
 		log.Errorf("NewValueFromDB: audit node not found: %d", nodeID)
 		return nil
+	}
+	// if auditNode is -1,check it.
+	if auditNode.IRCodeID == -1 {
+		var rangeIf memedit.RangeIf
+		var memEditor *memedit.MemEditor
+		if auditNode.TmpValueFileHash != "" {
+			memEditor, err = ssadb.GetIrSourceFromHash(auditNode.TmpValueFileHash)
+			if err != nil {
+				log.Errorf("NewValueFromDB: get ir source from hash failed: %v", err)
+				return nil
+			}
+			if auditNode.TmpStartOffset == -1 || auditNode.TmpEndOffset == -1 {
+				rangeIf = memEditor.GetRangeOffset(0, memEditor.CodeLength())
+			} else {
+				rangeIf = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
+			}
+		}
+		val := p.NewValue(ssa.NewConstWithRange(auditNode.TmpValue, rangeIf))
+		val.auditNode = auditNode
+		return val
 	}
 	val, err := p.GetValueById(auditNode.IRCodeID)
 	if err != nil {

@@ -1,6 +1,7 @@
 package php
 
 import (
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -33,4 +34,19 @@ func TestCodeFromDb(t *testing.T) {
 		rule.Show()
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.PHP))
+}
+
+func TestNativeCallFilename(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("a.php", `<?php
+	phpinfo();
+`)
+	fs.AddFile("b.php", `<?php
+println("1");
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `
+println(* as $param)
+$param<FilenameByContent> as $output`, map[string][]string{
+		"output": {`"b.php"`},
+	}, false, ssaapi.WithLanguage(ssaapi.PHP))
 }

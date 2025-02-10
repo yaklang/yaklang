@@ -22,11 +22,17 @@
                     <label for="password" class="form-label">密码</label>
                     <input type="password" class="form-control" id="password" name="password" required>
                 </div>
-                <button type="submit" class="btn btn-primary w-100">提交</button>
+                <div class="d-flex gap-2"> <!-- 使用 flex 布局 -->
+                    <button type="submit" class="btn btn-primary flex-grow-1">提交</button>
+                    <button type="button" class="btn btn-success flex-grow-1" onclick="redirectToRegister()">注册</button>
+                </div>
             </form>
         </div>
     </div>
     <script>
+        function redirectToRegister() {
+            window.location.href = './register?reference=./login';
+        }
         const token = localStorage.getItem('VULINBOX_JWT');
         if (token) {
             fetch('/jwt/login/profile', {
@@ -72,7 +78,10 @@
             <label for="password" class="form-label">密码</label>
             <input type="password" class="form-control" id="password" name="password" required>
         </div>
-        <button type="submit" class="btn btn-primary w-100">提交</button>
+        <div class="d-flex gap-2"> <!-- 使用 flex 布局 -->
+            <button type="submit" class="btn btn-primary flex-grow-1">提交</button>
+            <button type="button" class="btn btn-success flex-grow-1" onclick="redirectToRegister()">注册</button>
+        </div>
     </form>
 </div>
             `

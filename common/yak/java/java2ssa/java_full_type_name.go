@@ -93,7 +93,6 @@ func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type 
 	} else {
 		return y.AddFullTypeNameForAllImport(typName, typ)
 	}
-
 }
 
 func (y *builder) MergeFullTypeNameForType(allTypName []string, typ ssa.Type) ssa.Type {

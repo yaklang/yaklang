@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"testing"
 
 	"github.com/google/uuid"
@@ -51,6 +54,7 @@ func updateRuleByNames(client ypb.YakClient, names []string, des string) error {
 				RuleName:    name,
 				Language:    "php",
 				Description: des,
+				Content:     `println as $output`,
 			},
 		}
 		_, err := client.UpdateSyntaxFlowRule(context.Background(), req)
@@ -194,6 +198,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
 				RuleName:   ruleName,
 				Language:   "java",
+				Content:    `println as $output`,
 				GroupNames: []string{group1},
 			},
 		})
@@ -201,7 +206,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		_, err = client.UpdateSyntaxFlowRule(context.Background(), &ypb.UpdateSyntaxFlowRuleRequest{
 			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
 				RuleName:   ruleName,
+				Language:   "java",
 				GroupNames: []string{group2},
+				Content:    `println as $output`,
 			},
 		})
 		require.NoError(t, err)
@@ -435,4 +442,67 @@ func TestGRPCMUSTPASS_DeleteSyntaxFlow_With_Group(t *testing.T) {
 	afterDelete, err := queryRulesByName(client, []string{ruleName})
 	require.NoError(t, err)
 	require.Equal(t, 0, len(afterDelete))
+}
+
+func TestGrpcMUSTPASS_UpdateSyntaxFlow(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ruleName := uuid.NewString()
+	Content := `desc(
+	lang: java
+)
+	println as $output
+`
+	req := &ypb.CreateSyntaxFlowRuleRequest{
+		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+			Language: "java",
+			RuleName: ruleName,
+			Content:  Content,
+		},
+	}
+	_, err = client.CreateSyntaxFlowRule(context.Background(), req)
+	defer func() {
+		_, err2 := yakit.DeleteSyntaxFlowRule(consts.GetGormProfileDatabase(), &ypb.DeleteSyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: []string{ruleName},
+			},
+		})
+		require.NoError(t, err2)
+	}()
+	require.NoError(t, err)
+	updateRuleContent := `
+desc(
+	title_zh: "1",
+	lang: java
+)
+println as $output;
+alert $output
+`
+	Updaterule, _ := sfdb.CheckSyntaxFlowRuleContent(updateRuleContent)
+	Updaterule.RuleName = ruleName
+	_, err = client.UpdateSyntaxFlowRule(context.Background(), &ypb.UpdateSyntaxFlowRuleRequest{
+		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+			Language: "java",
+			RuleName: ruleName,
+			Content:  updateRuleContent,
+		},
+	})
+	require.NoError(t, err)
+	_, rules, err := yakit.QuerySyntaxFlowRule(consts.GetGormProfileDatabase(), &ypb.QuerySyntaxFlowRuleRequest{
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			RuleNames: []string{ruleName},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, len(rules) == 1)
+
+	for _, rule := range rules {
+		require.Equal(t, rule.RuleName, Updaterule.RuleName)
+		require.Equal(t, rule.Tag, Updaterule.Tag)
+		require.Equal(t, rule.OpCodes, Updaterule.OpCodes)
+		require.Equal(t, rule.Content, updateRuleContent)
+		require.Equal(t, rule.TitleZh, Updaterule.TitleZh)
+		require.Equal(t, rule.AlertDesc, Updaterule.AlertDesc)
+		require.Equal(t, rule.Hash, Updaterule.CalcHash())
+	}
 }

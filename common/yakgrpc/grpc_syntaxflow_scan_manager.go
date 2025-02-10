@@ -211,7 +211,7 @@ func (m *SyntaxFlowScanManager) initByConfig(stream ypb.Yak_SyntaxFlowScanServer
 		ruleCh := make(chan *schema.SyntaxFlowRule)
 		go func() {
 			defer close(ruleCh)
-			if rule, err := ParseSyntaxFlowInput(input); err != nil {
+			if rule, err := yakit.ParseSyntaxFlowInput(input); err != nil {
 				m.client.YakitError("compile rule failed: %s", err)
 			} else {
 				ruleCh <- rule

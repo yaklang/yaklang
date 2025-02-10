@@ -604,7 +604,8 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 	}
 	log.Infof("unsafe filesystem start")
 	CheckWithFS(vfs, t, func(p ssaapi.Programs) error {
-		result, err := p.SyntaxFlowWithError(rule.Content)
+		// Use the program as the init input var,so that the lib rule which have `$input` can be tested.
+		result, err := p.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithInitInputVar(p[0]))
 		if err != nil {
 			return utils.Errorf("syntax flow content failed: %v", err)
 		}
@@ -671,7 +672,7 @@ func EvaluateVerifyFilesystem(i string, t require.TestingT) error {
 
 	var errs error
 	CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-		result, err := programs.SyntaxFlowWithError(i, ssaapi.QueryWithEnableDebug(false))
+		result, err := programs.SyntaxFlowWithError(i, ssaapi.QueryWithEnableDebug(false), ssaapi.QueryWithInitInputVar(programs[0]))
 		if err != nil {
 			errs = utils.JoinErrors(errs, err)
 			return err
@@ -688,7 +689,7 @@ func EvaluateVerifyFilesystem(i string, t require.TestingT) error {
 	l, vfs, _ = frame.ExtractNegativeFilesystemAndLanguage()
 	if vfs != nil && l != "" {
 		CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-			result, err := programs.SyntaxFlowWithError(i, ssaapi.QueryWithEnableDebug(false))
+			result, err := programs.SyntaxFlowWithError(i, ssaapi.QueryWithEnableDebug(false), ssaapi.QueryWithInitInputVar(programs[0]))
 			if err != nil {
 				if errors.Is(err, sfvm.CriticalError) {
 					errs = utils.JoinErrors(errs, err)

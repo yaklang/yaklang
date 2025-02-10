@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,6 +12,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
+
+var DefaultInputVar = "input"
 
 type queryConfig struct {
 	// input
@@ -116,6 +119,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		}
 		process(float64(handler)/float64(total), s)
 	}))
+
 	// runtime
 	res, err := frame.Feed(value, config.opts...)
 	if err != nil {
@@ -152,7 +156,12 @@ func QueryWithProgram(program *Program) QueryOption {
 
 func QueryWithPrograms(programs Programs) QueryOption {
 	return func(c *queryConfig) {
-		c.value = sfvm.NewValues(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator { return p }))
+		c.value = sfvm.NewValues(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator {
+			return p
+		}))
+		c.program, _ = lo.Find(programs, func(item *Program) bool {
+			return item.GetProgramKind() == ssa.Application
+		})
 	}
 }
 
@@ -210,6 +219,14 @@ func QueryWithInitVar(result *omap.OrderedMap[string, sfvm.ValueOperator]) Query
 	}
 }
 
+func QueryWithInitInputVar(value sfvm.ValueOperator) QueryOption {
+	return func(c *queryConfig) {
+		result := omap.NewOrderedMap(map[string]sfvm.ValueOperator{})
+		result.Set(DefaultInputVar, value)
+		c.opts = append(c.opts, sfvm.WithInitialContextVars(result))
+	}
+}
+
 func QueryWithContext(ctx context.Context) QueryOption {
 	return func(c *queryConfig) {
 		c.ctx = ctx
@@ -220,12 +237,6 @@ func QueryWithContext(ctx context.Context) QueryOption {
 func QueryWithProcessCallback(cb func(float64, string)) QueryOption {
 	return func(c *queryConfig) {
 		c.processCallback = cb
-	}
-}
-
-func QueryWithInitialContextVars(o *omap.OrderedMap[string, sfvm.ValueOperator]) QueryOption {
-	return func(c *queryConfig) {
-		c.opts = append(c.opts, sfvm.WithInitialContextVars(o))
 	}
 }
 
