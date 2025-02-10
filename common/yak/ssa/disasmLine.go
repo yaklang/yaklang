@@ -222,7 +222,14 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 			),
 		)
 	case *LazyInstruction:
-		return lineDisasm(v.Self(), liner)
+		switch liner.(type) {
+		case *NameDisasmLiner:
+			return v.ir.ReadableNameShort
+		case *FullDisasmLiner:
+			return v.ir.ReadableName
+		default:
+			return ""
+		}
 	default:
 		return ""
 	}
