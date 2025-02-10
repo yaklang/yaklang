@@ -8,28 +8,28 @@ import (
 )
 
 func YieldModel[T any](ctx context.Context, db *gorm.DB, sizes ...int) chan T {
+	var t T
+	db = db.Table(db.NewScope(t).TableName())
+
 	size := 1024
 	if len(sizes) > 0 {
 		size = sizes[0]
 	}
+	db = db.Debug()
 	outC := make(chan T)
 
 	go func() {
 		defer close(outC)
 
-		page := 1
-		var items []T
+		paginator := NewFastPaginator(db, size)
 		for {
-			if _, b := NewPagination(&Param{
-				DB:    db,
-				Page:  page,
-				Limit: size,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
+			var items []T
+			if err, ok := paginator.Next(&items); !ok {
+				break
+			} else if err != nil {
+				log.Errorf("paging failed: %s", err)
+				break
 			}
-
-			page++
 
 			for _, d := range items {
 				select {
@@ -37,10 +37,6 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, sizes ...int) chan T {
 					return
 				case outC <- d:
 				}
-			}
-
-			if len(items) < size {
-				return
 			}
 		}
 	}()
