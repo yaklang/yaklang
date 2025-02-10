@@ -52,7 +52,6 @@ func SimpleFilePath(language ssa.Builder) string {
 		return simpleFileName
 	}
 }
-
 func (c *config) isStop() bool {
 	if c == nil || c.ctx == nil {
 		return false
