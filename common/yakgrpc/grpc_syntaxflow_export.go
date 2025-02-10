@@ -75,6 +75,7 @@ func (s *Server) ExportSyntaxFlows(req *ypb.ExportSyntaxFlowsRequest, stream ypb
 
 		return name, w
 	}))
+	opts = append(opts, bizhelper.WithExportIndexField(`"syntax_flow_rules".id`))
 	err := bizhelper.ExportTableZip[*schema.SyntaxFlowRule](stream.Context(), ruleDB, req.GetTargetPath(), opts...)
 	if err != nil {
 		return utils.Wrap(err, "export syntax flow rules failed")
