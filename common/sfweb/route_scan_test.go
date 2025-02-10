@@ -49,7 +49,11 @@ func writeJSON(wc *lowhttp.WebsocketClient, data any) error {
 
 func TestScan(t *testing.T) {
 	t.Parallel()
+	scanContent(t, "java", scanFileContent)
 
+}
+
+func scanContent(t *testing.T, lang, content string) {
 	progress := 0.0
 	var risks []*sfweb.SyntaxFlowScanRisk
 
@@ -75,8 +79,8 @@ func TestScan(t *testing.T) {
 	require.NoError(t, err)
 	now := time.Now()
 	err = writeJSON(wc, &sfweb.SyntaxFlowScanRequest{
-		Content:        scanFileContent,
-		Lang:           `java`,
+		Content:        content,
+		Lang:           lang,
 		ControlMessage: `start`,
 	})
 	require.NoError(t, err)
