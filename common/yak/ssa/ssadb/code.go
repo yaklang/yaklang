@@ -33,11 +33,12 @@ type IrCode struct {
 	OpcodeOperator string `json:"opcode_operator"`
 
 	// basic info
-	Name             string `json:"name"`
-	VerboseName      string `json:"verbose_name"`
-	ShortVerboseName string `json:"short_verbose_name"`
-	String           string `json:"string" gorm:"type:text"`
-
+	Name              string `json:"name"`
+	VerboseName       string `json:"verbose_name"`
+	ShortVerboseName  string `json:"short_verbose_name"`
+	String            string `json:"string" gorm:"type:text"`
+	ReadableName      string `json:"readable_name"`
+	ReadableNameShort string `json:"readable_name_short"`
 	// any IrCode in one block inner one  function
 	CurrentBlock    int64 `json:"current_block"`
 	CurrentFunction int64 `json:"current_function"`
