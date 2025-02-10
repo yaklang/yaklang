@@ -7,21 +7,41 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-func YieldModel[T any](ctx context.Context, db *gorm.DB, sizes ...int) chan T {
+type YieldModelConfig struct {
+	Size       int
+	IndexField string
+}
+
+func NewYieldModelConfig() *YieldModelConfig {
+	return &YieldModelConfig{
+		Size:       1024,
+		IndexField: "id",
+	}
+}
+
+type YieldModelOpts func(*YieldModelConfig)
+
+func WithYieldModel_IndexField(selectField string) YieldModelOpts {
+	return func(c *YieldModelConfig) {
+		c.IndexField = selectField
+	}
+}
+
+func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts) chan T {
 	var t T
 	db = db.Table(db.NewScope(t).TableName())
 
-	size := 1024
-	if len(sizes) > 0 {
-		size = sizes[0]
+	cfg := NewYieldModelConfig()
+	for _, opt := range opts {
+		opt(cfg)
 	}
-	db = db.Debug()
+
 	outC := make(chan T)
 
 	go func() {
 		defer close(outC)
 
-		paginator := NewFastPaginator(db, size)
+		paginator := NewFastPaginator(db, cfg.Size, WithFastPaginator_IndexField(cfg.IndexField))
 		for {
 			var items []T
 			if err, ok := paginator.Next(&items); !ok {

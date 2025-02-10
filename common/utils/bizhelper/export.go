@@ -38,13 +38,20 @@ type ExportConfig struct {
 	AfterWriteHandler func(name string, b []byte, metadata MetaData)
 	MetaData          MetaData
 	Password          string // Password for encrypted file
+	IndexField        string // for yield model
 }
 
 func NewExportConfig(filepath string) *ExportConfig {
-	return &ExportConfig{FilePath: filepath}
+	return &ExportConfig{FilePath: filepath, IndexField: "id"}
 }
 
 type ExportOption func(*ExportConfig)
+
+func WithExportIndexField(field string) ExportOption {
+	return func(config *ExportConfig) {
+		config.IndexField = field
+	}
+}
 
 func WithExportPassword(password string) ExportOption {
 	return func(config *ExportConfig) {
@@ -331,7 +338,7 @@ func ExportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 			w.Close()
 		}()
 
-		ch := YieldModel[T](ctx, db)
+		ch := YieldModel[T](ctx, db, WithYieldModel_IndexField(config.IndexField))
 		for d := range ch {
 			v := reflect.ValueOf(d)
 			if v.Kind() == reflect.Pointer {
