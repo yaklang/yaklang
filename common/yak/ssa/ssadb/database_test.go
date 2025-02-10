@@ -2,11 +2,13 @@ package ssadb_test
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sort"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
@@ -194,20 +196,38 @@ func TestProgramRelation(t *testing.T) {
 
 func TestAuditResult(t *testing.T) {
 	code := `package main; func main() { a := 1; print(a) }`
+	filePath := "a.go"
+	vf := filesys.NewVirtualFs()
+	vf.AddFile(filePath, code)
+
 	programName := uuid.NewString()
 	taskId := uuid.NewString()
-	prog, err := ssaapi.Parse(code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.GO))
+	// get prog
+	_, err := ssaapi.ParseProject(
+		ssaapi.WithProgramName(programName),
+		ssaapi.WithLanguage(ssaapi.GO),
+		ssaapi.WithFileSystem(vf),
+	)
 	require.NoError(t, err)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	}()
+	prog, err := ssaapi.FromDatabase(programName)
+	require.NoError(t, err)
+
+	// create template value
 	editor := memedit.NewMemEditor(code)
+	editor.SetUrl(filePath)
 	value := prog.NewValue(ssa.NewConstWithRange("print", editor.GetFullRange()))
+
+	// save result
 	result := sfvm.NewSFResult(&schema.SyntaxFlowRule{}, &sfvm.Config{})
 	result.SymbolTable.Set("print", value)
 	query := ssaapi.CreateResultWithProg(prog, result)
 	resultId, err := query.Save(schema.SFResultKindSearch, taskId)
 	require.NoError(t, err)
+
+	// load result and check template value
 	dbResult, err := ssaapi.LoadResultByID(resultId)
 	require.NoError(t, err)
 	values := dbResult.GetValues("print")

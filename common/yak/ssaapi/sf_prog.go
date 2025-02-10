@@ -2,9 +2,10 @@ package ssaapi
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/antchfx/xpath"
 	"github.com/gobwas/glob"
@@ -144,18 +145,14 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 		log.Infof("file filter support with database")
 	}
 	var res []sfvm.ValueOperator
-	addRes := func(str string, rangeIf memedit.RangeIf) {
-		val := ssa.NewConstWithRange(str, rangeIf)
-		res = append(res, p.NewValue(val))
-	}
-	getRange := func(content, match string) memedit.RangeIf {
+	addRes := func(str, content string) {
 		// get range of match string
 		start := strings.Index(content, match)
-		if start == -1 {
-			return nil
-		}
 		editor := memedit.NewMemEditor(content)
-		return editor.GetRangeOffset(start, start+len(match))
+		editor.SetUrl(path)
+		rangeIf := editor.GetRangeOffset(start, start+len(match))
+		val := ssa.NewConstWithRange(str, rangeIf)
+		res = append(res, p.NewValue(val))
 	}
 	matchFile := false
 	handler := func(data string) {
@@ -174,7 +171,7 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 				// match[0] contain "url=", match[1] not contain
 				for _, match := range matches {
 					if len(match) > 1 {
-						addRes(match[1], getRange(data, match[1]))
+						addRes(match[1], data)
 					}
 				}
 			case "xpath":
@@ -196,11 +193,11 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 						nav := t.Current().(*htmlquery.NodeNavigator)
 						node := nav.Current()
 						str := htmlquery.InnerText(node)
-						addRes(str, getRange(data, str))
+						addRes(str, data)
 					}
 				default:
 					str := codec.AnyToString(t)
-					addRes(str, getRange(data, str))
+					addRes(str, data)
 				}
 			case "json": // json path
 			}
