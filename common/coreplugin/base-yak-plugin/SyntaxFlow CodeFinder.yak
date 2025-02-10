@@ -1,0 +1,129 @@
+yakit.AutoInitYakit()
+
+fuzzSearch = cli.Bool("fuzz",cli.setHelp("是否进行模糊搜索，默认开启"),cli.setRequired(true),cli.setDefault(true))
+kind = cli.StringSlice("kind",
+    cli.setSelectOption("all", "all"),
+    cli.setSelectOption("symbol","symbol"),
+    cli.setSelectOption("function", "function"),
+    cli.setSelectOption("call", "call"),
+    cli.setSelectOption("file", "file"),
+    cli.setSelectOption("const", "const"),
+    cli.setRequired(true)
+)
+rule = cli.String("rule", cli.setHelp(`输入的内容，输入的内容将会进行正则校验，比如：
+    a(                  将会被补充成一个Call
+`),cli.setRequired(true))
+progName = cli.String(
+    "progName",
+    cli.setHelp("输入当前的项目名，将从数据库进行索引"),
+    cli.setRequired(true)
+    )
+
+cli.check()
+
+syntaxflowTemplate={
+    "executeSf": "",
+    "syntaxflowTemplate": `%s as $variable
+alert $variable
+`,
+    "kind": kind,
+    "render": (i)=>{
+        return <<<TEXT
+%s as $result
+alert $result
+TEXT %i
+    },
+    "execute": (name,rule)=>{
+        prog = ssa.NewProgramFromDB(name)~
+        result = prog.SyntaxFlowWithError(rule,syntaxflow.withContext(context.Background()), syntaxflow.withProcess((f, s)=>{
+        yakit.SetProgress(f)
+        yakit.Info("%s",s)
+    }), syntaxflow.withSearch(),
+        syntaxflow.withExecDebug(true)
+    )~
+        result.Show()
+        yakit_output(result.GetResultID())
+    }
+}
+if len(kind)>0{
+    syntaxflowTemplate.kind = kind[0]
+}
+func matchCallMethodName(content){
+    compile = re.Compile(`(\b[a-zA-Z_]\w*)\(`)~
+    matchPart = compile.FindAllStringSubmatch(content, -1)
+    if matchPart.Len()==0{
+        yakit.Error("syntaxFlowTemplate is call,but not match this methodName")
+        return
+    }
+    matchInfo = matchPart[0]
+    if matchInfo.Len()<2{
+        yakit.Error("syntaxflowTemplate is call,but match part is: %s",matchInfo)
+        return
+    }
+    methodName = matchInfo[1]
+    return methodName
+}
+
+//处理fuzz并且组合成最终的syntax语句
+func generateRule(content){
+    sfRule:=""
+    switch syntaxflowTemplate.kind{
+        case "file":
+            sfRule = content
+        case "call":
+            sfRule = sprintf(`%s()`, content)
+        case "symbol":
+            sfRule = sprintf(`%s`, content)
+        case "function":
+            sfRule = sprintf("%s?{opcode: function}", content)
+        case "const":
+            sfRule = sprintf(`g<<<CODE
+%s
+CODE`, content)
+    }
+    return sfRule
+}
+func processFuzz(content){
+    switch syntaxflowTemplate.kind{
+        case "file":
+        content = sprintf("*%s*", content)
+            fileTemplate = sprintf(`<getFullFileName(filename="%s")> as $result1
+<getFullFileName(filename="%s")> as $result2
+<getFullFileName(filename="%s")> as $result3
+<getFullFileName(filename="%s")> as $result4
+$result1+$result2+$result3+$result4`, str.PathJoin("*",content,"*"),str.PathJoin("*",content),str.PathJoin(content,"*"),content)
+                return fileTemplate
+        case "call","symbol","const":
+            if fuzzSearch{
+                return sprintf("*%s*",content)
+            }else{
+                return sprintf("%s", content)
+            }
+    }
+}
+func processContent(content){
+    content = str.TrimSpace(content)
+    // call
+    if re.Match(`(\b[a-zA-Z_]\w*)\(`, content){
+        syntaxflowTemplate.kind = "call"
+        return matchCallMethodName(content)
+    }
+    //file
+    if re.Match(`[/|\\]`, content){
+        syntaxflowTemplate.kind ="file"
+    }
+    return content
+}
+
+for i in [processContent,processFuzz,generateRule]{
+    rule = i(rule)
+}
+if rule == ""{
+    yakit.Error("rule content is null.check it")
+    return
+}
+
+syntaxflowTemplate.executeSf = syntaxflowTemplate.render(rule)
+syntaxflowTemplate.execute(progName, syntaxflowTemplate.executeSf)
+
+
