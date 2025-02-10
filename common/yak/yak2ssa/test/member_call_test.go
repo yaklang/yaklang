@@ -307,8 +307,10 @@ func Test_CallMember_Cfg(t *testing.T) {
 			result, err := prog.SyntaxFlowWithError(`println(* #-> * as $param)`)
 			require.NoError(t, err)
 			values := result.GetValues("param")
-			fmt.Println(values.String())
-			require.Contains(t, values.String(), "1")
+			require.Equal(t, 1, len(values))
+			value := values[0]
+			fmt.Println(value.String())
+			require.Contains(t, value.String(), "1")
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.Yak))
 	})

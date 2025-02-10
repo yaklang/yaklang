@@ -109,9 +109,9 @@ func CheckWithName(
 	{
 		opt = append(opt, ssaapi.WithProgramName(programID))
 		prog, err := ssaapi.Parse(code, opt...)
-		defer func() {
-			ssadb.DeleteProgram(ssadb.GetDB(), programID)
-		}()
+		// defer func() {
+		// 	ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		// }()
 		require.Nil(t, err)
 		// prog.Show()
 

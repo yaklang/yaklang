@@ -165,7 +165,7 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 				return err
 			}
 		}
-		return nil
+		return lastErr
 	}
 
 	base := raw

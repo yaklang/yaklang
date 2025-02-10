@@ -280,10 +280,7 @@ func (prog *Program) Finish() {
 		if prog.EnableDatabase { // save program
 			updateToDatabase(prog)
 		}
-		// save instruction
-		prog.Cache.SaveToDatabase()
 	}
-	progPool.Delete(prog.GetProgramName())
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
