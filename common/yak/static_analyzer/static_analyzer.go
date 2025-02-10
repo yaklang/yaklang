@@ -127,7 +127,7 @@ func checkRules(plugin string, prog *ssaapi.Program, kind StaticAnalyzeKind) *re
 
 func SSAParse(code, scriptType string, o ...ssaapi.Option) (*ssaapi.Program, error) {
 	opt := GetPluginSSAOpt(scriptType)
-	opt = append(opt, ssaapi.WithEnableCache())
+	opt = append(opt, ssaapi.WithEnableCache(), ssaapi.WithLanguage(ssaapi.Yak))
 	opt = append(opt, o...)
 	return ssaapi.Parse(code, opt...)
 }
