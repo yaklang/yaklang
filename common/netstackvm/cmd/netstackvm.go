@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+
 	"io"
 	"math/rand"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -12,15 +14,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/lowtun/netstack"
-
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-
-	"github.com/urfave/cli"
-	"github.com/yaklang/yaklang/common/netstackvm"
 )
 
 var (
@@ -46,17 +46,6 @@ func init() {
 
 func main() {
 	app := cli.NewApp()
-
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "iface",
-			Usage: "指定物理网卡名称",
-		},
-		cli.StringFlag{
-			Name:  "vmac",
-			Usage: "指定虚拟机MAC地址",
-		},
-	}
 
 	app.Commands = []cli.Command{
 		{
@@ -98,6 +87,16 @@ func main() {
 				if err != nil {
 					return utils.Errorf("create netstack virtual machine failed: %v", err)
 				}
+
+				//conflictNativeStack, err := netstackvm.NewNetStackVirtualMachine(netstackvm.WithPcapDevice(ifaceName))
+				//if err != nil {
+				//	return utils.Errorf("create conflict netstack virtual machine failed: %v", err)
+				//}
+				//if err := conflictNativeStack.InheritPcapInterfaceIP(); err != nil {
+				//	return utils.Errorf("inherit pcap interface ip failed: %v", err)
+				//}
+				//_ = conflictNativeStack
+
 				if err := userStack.StartDHCP(); err != nil {
 					log.Errorf("start dhcp failed: %v", err)
 					return err
@@ -109,13 +108,14 @@ func main() {
 				}
 				defer s.Close()
 
-				log.Infof("start to create tunnel: %v", s.GetTunnelName())
-				if err := s.SetHijackTCPHandler(func(conn netstack.TCPConn) {
+				lis := s.GetListener()
+
+				handler := func(conn net.Conn) {
 					defer func() {
 						conn.Close()
 					}()
-					id := conn.ID()
-					addr := utils.HostPort(id.LocalAddress.String(), id.LocalPort)
+					addr := conn.LocalAddr().String()
+					log.Infof("hijack connection: %v", addr)
 					hijackedConn, err := userStack.DialTCP(10*time.Second, addr)
 					if err != nil {
 						log.Errorf("dial tcp failed: %v", err)
@@ -142,8 +142,6 @@ func main() {
 						_, _ = io.Copy(conn, hijackedConn)
 					}()
 					wg.Wait()
-				}); err != nil {
-					return err
 				}
 
 				for _, target := range fixedDomains {
@@ -151,6 +149,16 @@ func main() {
 					if err := s.HijackDomain(target); err != nil {
 						log.Errorf("hijack domain failed: %v", err)
 					}
+				}
+
+				for {
+					conn, err := lis.Accept()
+					if err != nil {
+						return err
+					}
+					go func() {
+						handler(conn)
+					}()
 				}
 				select {}
 			},
@@ -229,6 +237,21 @@ func main() {
 		},
 	}
 
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "iface",
+			Usage: "指定物理网卡名称",
+		},
+		cli.StringFlag{
+			Name:  "vmac",
+			Usage: "指定虚拟机MAC地址",
+			Value: "cc:e0:11:11:11:11",
+		},
+		cli.StringFlag{
+			Name:  "test-addr",
+			Value: "192.168.3.134:2324",
+		},
+	}
 	app.Action = func(c *cli.Context) error {
 		ifaceName := c.String("iface")
 		if c.String("iface") == "" {
@@ -266,7 +289,12 @@ func main() {
 			log.Errorf("Wait DHCP finished failed: %v", err)
 			return utils.Errorf("Wait DHCP finished failed: %v", err)
 		}
-		ipAddr := "23.192.228.150"
+		ipAddr := c.String("test-addr")
+		if ipAddr == "" {
+			randIp := mutate.QuickMutateSimple(`{{ri(1,255)}}.{{ri(1,255)}}.{{ri(1,255)}}.{{ri(1,255)}}:{{ri(100,61111)}}`)
+			ipAddr = randIp[0]
+			log.Infof("no test address specified, use random address: %v", ipAddr)
+		}
 		log.Info("开始循环连接测试:" + ipAddr)
 		log.Infof("bpf: %v", `(eth.addr != cc:e0:da:26:66:f2 && arp) || dhcp || ip.addr == 23.192.228.150`)
 		var totalTime time.Duration
@@ -280,7 +308,7 @@ func main() {
 
 		for {
 			now := time.Now()
-			conn, err := vm.DialTCP(10*time.Second, ipAddr+":80")
+			conn, err := vm.DialTCP(10*time.Second, ipAddr)
 			if err != nil {
 				log.Errorf("连接 %v 失败: %v", ipAddr, err)
 				continue
