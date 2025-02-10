@@ -1,6 +1,7 @@
 package ssadb_test
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -8,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
@@ -200,45 +200,76 @@ func TestAuditResult(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile(filePath, code)
 
-	programName := uuid.NewString()
-	taskId := uuid.NewString()
-	// get prog
-	_, err := ssaapi.ParseProject(
-		ssaapi.WithProgramName(programName),
-		ssaapi.WithLanguage(ssaapi.GO),
-		ssaapi.WithFileSystem(vf),
-	)
-	require.NoError(t, err)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), programName)
-	}()
-	prog, err := ssaapi.FromDatabase(programName)
-	require.NoError(t, err)
+	check := func(t *testing.T, progName string) {
+		// create template value
+		prog, err := ssaapi.FromDatabase(progName)
+		require.NoError(t, err)
 
-	// create template value
-	editor := memedit.NewMemEditor(code)
-	editor.SetUrl(filePath)
-	value := prog.NewValue(ssa.NewConstWithRange("print", editor.GetFullRange()))
+		match, value, err := prog.ExactMatch(context.Background(), ssadb.NameMatch, "print")
+		require.True(t, match)
+		require.NoError(t, err)
 
-	// save result
-	result := sfvm.NewSFResult(&schema.SyntaxFlowRule{}, &sfvm.Config{})
-	result.SymbolTable.Set("print", value)
-	query := ssaapi.CreateResultWithProg(prog, result)
-	resultId, err := query.Save(schema.SFResultKindSearch, taskId)
-	require.NoError(t, err)
+		vals := make([]*ssaapi.Value, 0)
+		value.Recursive(func(operator sfvm.ValueOperator) error {
+			val, ok := operator.(*ssaapi.Value)
+			if !ok {
+				return nil
+			}
 
-	// load result and check template value
-	dbResult, err := ssaapi.LoadResultByID(resultId)
-	require.NoError(t, err)
-	values := dbResult.GetValues("print")
-	require.True(t, len(values) != 0)
-	values.Recursive(func(operator sfvm.ValueOperator) error {
-		switch ret := operator.(type) {
-		case *ssaapi.Value:
-			require.True(t, ret.GetId() == -1)
-			require.True(t, ret.GetRange() != nil)
-			require.True(t, ret.GetRange().String() == editor.GetFullRange().String())
-		}
-		return nil
+			results := val.NewValue(ssa.NewConstWithRange(val.String(), val.GetRange()))
+			vals = append(vals, results)
+			return nil
+		})
+
+		// save result
+		result := sfvm.NewSFResult(&schema.SyntaxFlowRule{}, &sfvm.Config{})
+		result.SymbolTable.Set("print", ssaapi.ValuesToSFValueList(vals))
+		query := ssaapi.CreateResultWithProg(prog, result)
+		resultId, err := query.Save(schema.SFResultKindSearch)
+		require.NoError(t, err)
+
+		// load result and check template value
+		dbResult, err := ssaapi.LoadResultByID(resultId)
+		require.NoError(t, err)
+		values := dbResult.GetValues("print")
+		require.True(t, len(values) != 0)
+		values.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *ssaapi.Value:
+				spew.Dump(map[string]any{
+					"id":  ret.GetId(),
+					"rng": ret.GetRange().String(),
+				})
+				require.True(t, ret.GetId() == -1)
+				require.True(t, ret.GetRange() != nil)
+				require.True(t, ret.GetRange().String() == "1:37 - 1:42: print")
+			}
+
+			return nil
+		})
+	}
+
+	t.Run("test file system", func(t *testing.T) {
+		programName := uuid.NewString()
+		_, err := ssaapi.ParseProject(
+			ssaapi.WithFileSystem(vf),
+			ssaapi.WithProgramName(programName),
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+		require.NoError(t, err)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programName)
+		}()
+		check(t, programName)
+	})
+
+	t.Run("test source code", func(t *testing.T) {
+		programName := uuid.NewString()
+		_, err := ssaapi.Parse(code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.GO))
+		require.NoError(t, err)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programName)
+		}()
+		check(t, programName)
 	})
 }

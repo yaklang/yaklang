@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -138,7 +137,7 @@ func (irSource *IrSource) save() error {
 
 // GetIrSourceFromHash fetch editor from cache by hash(md5)
 func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
-	log.Errorf("load ir source by %s", hash)
+	// log.Errorf("load ir source by %s", hash)
 	db := GetDB()
 	result, ok := irSourceCache.Get(hash)
 	if ok {
