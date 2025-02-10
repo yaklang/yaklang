@@ -1,0 +1,33 @@
+desc(
+    title:"Check Message Exposure Through PrintStackTrace",
+    title_zh:"检查通过PrintStackTrace泄露信息",
+    type:security,
+    desc:<<<TEXT
+在Java中，PrintStackTrace是一个用于打印异常堆栈信息的方法。在生产环境中，如果异常信息中包含敏感信息，通过PrintStackTrace打印异常堆栈信息可能会导致敏感信息泄露。因此，应该避免在生产环境中使用PrintStackTrace打印异常堆栈信息。
+TEXT
+)
+
+.printStackTrace() as $sink
+check $sink then "发现PrintStackTrace打印异常堆栈信息"
+alert $sink{
+    message:"通过PrintStackTrace泄露信息",
+    severity:low,
+    risk:"info-exposure"
+}
+
+desc(
+    lang:java,
+    alert_num:1,
+    'file://unsafe.java':<<<UNSAFE
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+   @ExceptionHandler(MyException.class)
+    public Result error(MyException e){
+        log.error(e.getMessage());
+        e.printStackTrace();
+        return Result.error().code(e.getCode()).message(e.getMsg());
+    }
+}
+UNSAFE,
+)

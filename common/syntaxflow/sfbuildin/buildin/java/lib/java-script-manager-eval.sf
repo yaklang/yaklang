@@ -5,10 +5,13 @@ desc(
     lib: "java-js-sink",
 )
 
-ScriptEngineManager().getEngineByName() as $engine;
+/(getEngineByName|getEngineByExtension|getEngineByMimeType)/<getCall> as $toCheck;
+$toCheck?{<typeName>?{have:'javax.script'}} as $engine;
 check $engine;
-$engine.eval(*<slice(start=1)> as $params);
-$engine.put(*<slice(start=1)> as $params);
+
+$engine.eval(,* as $params);
+$engine.put(,* as $params);
+$engine.compile(,* as $params);
 check $params;
 $params as $output;
 alert $output;
@@ -16,6 +19,7 @@ alert $output;
 
 desc(
     lang: java,
+    alert_num:1,
     "file://basic.java": <<<SCRIPT
 import javax.script.*;
 
@@ -39,6 +43,27 @@ public class JavaScriptExample {
         System.out.println(result); // 输出：8
     }
 }
-
 SCRIPT
 )
+
+desc(
+    lang: java,
+    alert_num:1,
+    "file://basic.java": <<<SCRIPT
+package org.example;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptEngine;
+import javax.script.ScriptException;
+import javax.servlet.http.HttpServletRequest;
+
+public class CalculatorServlet {
+    public Object executeOperation(HttpServletRequest request) throws ScriptException {
+        ScriptEngineManager scriptEngineManager = new ScriptEngineManager();
+        ScriptEngine scriptEngine = scriptEngineManager.getEngineByExtension("js");
+        String userOps = request.getParameter("operation");
+        return scriptEngine.eval(userOps);
+    }
+}
+SCRIPT
+)
+
