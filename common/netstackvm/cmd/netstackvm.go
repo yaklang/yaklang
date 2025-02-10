@@ -338,7 +338,7 @@ func main() {
 			log.Errorf("Wait DHCP finished failed: %v", err)
 			return utils.Errorf("Wait DHCP finished failed: %v", err)
 		}
-		ipAddr := "23.192.228.150"
+		ipAddr := "192.168.3.114"
 		log.Info("开始循环连接测试:" + ipAddr)
 		log.Infof("bpf: %v", `(eth.addr != cc:e0:da:26:66:f2 && arp) || dhcp || ip.addr == 23.192.228.150`)
 		var totalTime time.Duration
