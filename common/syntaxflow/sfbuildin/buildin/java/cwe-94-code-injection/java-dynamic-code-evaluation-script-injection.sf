@@ -11,11 +11,11 @@ TEXT,
 <include('java-spring-param')> as $source;
 <include('java-js-sink')> as $sink;
 
-$sink#{
+$sink?{* #{
     include:<<<INCLUDE
 <self>&$source
 INCLUDE,
-}-> as $mid;
+}->} as $mid;
 
 alert $mid for {
     message: "Find Java Dynamic Code Evaluation Script Injection Vulnerability",
