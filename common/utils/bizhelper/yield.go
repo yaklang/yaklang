@@ -7,29 +7,49 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-func YieldModel[T any](ctx context.Context, db *gorm.DB, sizes ...int) chan T {
-	size := 1024
-	if len(sizes) > 0 {
-		size = sizes[0]
+type YieldModelConfig struct {
+	Size       int
+	IndexField string
+}
+
+func NewYieldModelConfig() *YieldModelConfig {
+	return &YieldModelConfig{
+		Size:       1024,
+		IndexField: "id",
 	}
+}
+
+type YieldModelOpts func(*YieldModelConfig)
+
+func WithYieldModel_IndexField(selectField string) YieldModelOpts {
+	return func(c *YieldModelConfig) {
+		c.IndexField = selectField
+	}
+}
+
+func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts) chan T {
+	var t T
+	db = db.Table(db.NewScope(t).TableName())
+
+	cfg := NewYieldModelConfig()
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	outC := make(chan T)
 
 	go func() {
 		defer close(outC)
 
-		page := 1
-		var items []T
+		paginator := NewFastPaginator(db, cfg.Size, WithFastPaginator_IndexField(cfg.IndexField))
 		for {
-			if _, b := NewPagination(&Param{
-				DB:    db,
-				Page:  page,
-				Limit: size,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
+			var items []T
+			if err, ok := paginator.Next(&items); !ok {
+				break
+			} else if err != nil {
+				log.Errorf("paging failed: %s", err)
+				break
 			}
-
-			page++
 
 			for _, d := range items {
 				select {
@@ -37,10 +57,6 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, sizes ...int) chan T {
 					return
 				case outC <- d:
 				}
-			}
-
-			if len(items) < size {
-				return
 			}
 		}
 	}()

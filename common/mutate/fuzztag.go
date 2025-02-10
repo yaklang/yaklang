@@ -729,7 +729,7 @@ func init() {
 				}
 			}
 
-			ch := bizhelper.YieldModel[*schema.Payload](ctx, db.Table("payloads").Select("content, is_file").Order("hit_count desc"))
+			ch := bizhelper.YieldModel[*schema.Payload](ctx, db.Select("content, is_file").Order("hit_count desc"))
 
 			f := filter.NewBigFilter()
 			defer f.Close()
