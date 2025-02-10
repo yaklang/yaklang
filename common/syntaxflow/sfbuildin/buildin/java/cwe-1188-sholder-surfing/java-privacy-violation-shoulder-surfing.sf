@@ -11,9 +11,9 @@ TEXT
 
 // new PasswordCallback("Password: ", true)
 PasswordCallback?{<typeName>?{have:'javax.security.auth.callback.PasswordCallback'}}(,,* as $toCheck);
-$toCheck #{
+$toCheck ?{* #{
     include:`* ?{opcode:const && have:'true'} `
-}-> as $risk;
+}->} as $risk;
 alert $risk for{
     message:"发现Java代码中PasswordCallback方法存在隐私泄露的风险"
 }
