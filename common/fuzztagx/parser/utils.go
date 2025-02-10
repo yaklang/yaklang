@@ -1,8 +1,9 @@
 package parser
 
 import (
-	"golang.org/x/exp/maps"
 	"strings"
+
+	"golang.org/x/exp/maps"
 )
 
 type trieNode struct {
@@ -94,16 +95,18 @@ type Escaper struct {
 func (e *Escaper) Escape(s string) string {
 	keys := maps.Keys(e.escapeChars)
 	poses := IndexAllSubstrings(s, keys...)
-	res := ""
+	var builder strings.Builder
+	builder.Grow(len(s) * 2)
 	pre := 0
 	for _, pos := range poses {
 		key := keys[pos[0]]
-		res += s[pre:pos[1]]
-		res += (e.escapeSymbol + key)
+		builder.WriteString(s[pre:pos[1]])
+		builder.WriteString(e.escapeSymbol)
+		builder.WriteString(key)
 		pre = pos[1] + len(key)
 	}
-	res += s[pre:]
-	return res
+	builder.WriteString(s[pre:])
+	return builder.String()
 }
 func (e *Escaper) Unescape(s string) (string, error) {
 	// 构建trie树
