@@ -3,8 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/mutate"
+
 	"io"
 	"math/rand"
 	"net"
@@ -15,14 +14,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yaklang/yaklang/common/lowtun/netstack"
-
+	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-
-	"github.com/urfave/cli"
-	"github.com/yaklang/yaklang/common/netstackvm"
 )
 
 var (
@@ -251,7 +249,7 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "test-addr",
-			Value: "192.168.0.134:2324",
+			Value: "192.168.3.134:2324",
 		},
 	}
 	app.Action = func(c *cli.Context) error {
