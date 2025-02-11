@@ -314,7 +314,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
-				call2fun := fun.GetCalledBy()
+				call2fun := fun.GetCalledBy(make(map[int64]struct{}))
 				call2fun.AppendEffectOn(fun)
 				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call)
@@ -340,18 +340,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
 			}
-
-			//_, isParameterMember := ssa.ToParameterMember(calledInstance.Method)
-			//_, isParameter := ssa.ToParameter(calledInstance.Method)
-			thisFunc := i.GetFunction()
-			if !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) {
-				log.Errorf("call stack function %s(%d) not same with Parameter function %s(%d)",
-					calledInstance.Method.GetName(), calledInstance.Method.GetId(),
-					thisFunc.GetName(), thisFunc.GetId(),
-				)
-				return Values{}
-			}
-
 			var actualParam ssa.Value
 			if inst.IsFreeValue {
 				// free value
@@ -397,7 +385,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// if not found in call stack, then find in called-by
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
-				call2fun := fun.GetCalledBy()
+				call2fun := fun.GetCalledBy(make(map[int64]struct{}))
 				call2fun.AppendEffectOn(fun)
 				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call, true)

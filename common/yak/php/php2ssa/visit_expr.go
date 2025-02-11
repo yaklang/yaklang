@@ -431,7 +431,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		return y.ReadValue(id)
 
 	case *phpparser.ShortQualifiedNameExpressionContext:
-		// 因为涉及到函数，先peek 如果没有读取到说明是一个常量 （define定义的常量会出现问题）
+		// 因为涉及到函数，先peek如果没有读取到说明是一个常量 （define定义的常量会出现问题）
 		var unquote string
 		_unquote, err := yakunquote.Unquote(ret.Identifier().GetText())
 		if err != nil {
@@ -441,6 +441,25 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		}
 		valName := y.VisitIdentifier(ret.Identifier())
 		if !y.isFunction {
+			readConst, ok := y.ReadConst(unquote)
+			if ok {
+				return readConst
+			}
+		}
+		if value := y.PeekValue(valName); !utils.IsNil(value) {
+			if function, b := ssa.ToFunction(value); b {
+				function.Build()
+			}
+			if printType, b := ssa.ToClassBluePrintType(value.GetType()); b {
+				printType.Build()
+			}
+			return value
+		}
+		if funcx := y.GetFunc(valName, ""); !utils.IsNil(funcx) {
+			return funcx
+		}
+		if !y.isFunction {
+
 			if s, ok := y.ReadConst(unquote); ok {
 				return s
 			}
