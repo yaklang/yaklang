@@ -44,10 +44,6 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return extension == ".go" || extension == ".mod"
 }
 
-func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
-}
-
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {

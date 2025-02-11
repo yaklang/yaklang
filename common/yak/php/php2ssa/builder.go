@@ -105,11 +105,6 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 	return nil
 }
 
-func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().VirtualImport = true
-	builder.GetProgram().GetApplication().Build("", editor, builder)
-}
-
 func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := FrondEnd(src, force)
 	if err != nil {

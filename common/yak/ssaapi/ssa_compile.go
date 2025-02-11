@@ -64,19 +64,6 @@ func (c *config) isStop() bool {
 	}
 }
 
-func (c *config) parseFile() (ret *Program, err error) {
-	if c.databasePath != "" {
-		consts.SetSSADataBasePath(c.databasePath)
-	}
-	prog, err := c.parseSimple(c.originEditor)
-	if err != nil {
-		return nil, err
-	}
-	prog.Finish()
-	c.SaveProfile()
-	return NewProgram(prog, c), nil
-}
-
 func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")
 	if err := prog.Build("", code, builder); err != nil {
@@ -85,41 +72,6 @@ func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
 	builder.Finish()
 	ssa4analyze.RunAnalyzer(prog)
 	return nil
-}
-
-func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			ret = nil
-			err = utils.Errorf("parse error with panic : %v", r)
-			log.Errorf("parse error with panic : %v", err)
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
-	// path is empty, use language or YakLang as default
-	if c.SelectedLanguageBuilder == nil {
-		c.LanguageBuilder = LanguageBuilders[Yak]
-		log.Infof("use default language [%s] for empty path", Yak)
-	} else {
-		c.LanguageBuilder = c.SelectedLanguageBuilder
-	}
-	c.LanguageBuilder = c.LanguageBuilder.Create()
-	prog, builder, err := c.init(c.fs)
-	prog.SetPreHandler(true)
-	c.LanguageBuilder.InitHandler(builder)
-	// builder.SetRangeInit(r)
-	if err != nil {
-		return nil, err
-	}
-	c.LanguageBuilder.PreHandlerFile(r, builder)
-	// parse code
-	prog.SetPreHandler(false)
-	if err := prog.Build("", r, builder); err != nil {
-		return nil, err
-	}
-	builder.Finish()
-	ssa4analyze.RunAnalyzer(prog)
-	return prog, nil
 }
 
 var SkippedError = ssareducer.SkippedError
