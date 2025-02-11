@@ -10,6 +10,7 @@ import (
 
 func FilterSyntaxFlowResult(rawDB *gorm.DB, filter *ypb.SyntaxFlowResultFilter) *gorm.DB {
 	db := rawDB.Model(&ssadb.AuditResult{})
+	db = bizhelper.ExactQueryExcludeArrayOr(db, "kind", []any{string(schema.SFResultKindSearch)})
 	if filter == nil {
 		return db
 	}
@@ -25,7 +26,6 @@ func FilterSyntaxFlowResult(rawDB *gorm.DB, filter *ypb.SyntaxFlowResultFilter) 
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramNames())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_severity", filter.GetSeverity())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "kind", filter.GetKind())
-	db = bizhelper.ExactQueryExcludeArrayOr(db, "kind", []any{string(schema.SFResultKindSearch)})
 
 	if filter.GetAfterID() > 0 {
 		db = db.Where("id > ?", filter.GetAfterID())
