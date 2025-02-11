@@ -5,7 +5,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func (pkg *Program) GetBluePrint(name string) *Blueprint {
@@ -39,11 +38,7 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...C
 		recoverRange := b.SetRange(tokenizer[0])
 		defer recoverRange()
 	}
-	prog := b.prog
 	blueprint := NewBlueprint(name)
-	if prog.Blueprint == nil {
-		prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
-	}
 	blueprint.GeneralUndefined = func(s string) *Undefined {
 		return b.EmitUndefined(s)
 	}
@@ -62,15 +57,12 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...C
 		log.Errorf("CreateBluePrintWithPkgName.InitializeWithContainer error: %s", err)
 	}
 
-	if prog.VirtualImport {
-		//generate default fullTypeName
-		packagename := b.GetProgram().PkgName
-		if packagename == "" {
-			packagename = "main"
-		}
-		defaultFullTypename := fmt.Sprintf("%s.%s", packagename, name)
-		blueprint.AddFullTypeName(defaultFullTypename)
+	//generate default fullTypeName
+	var defaultFullTypename = name
+	if prog := b.GetProgram(); prog.ProgramKind != Application {
+		defaultFullTypename = fmt.Sprintf("%s.%s", prog.PkgName, name)
 	}
+	blueprint.AddFullTypeName(defaultFullTypename)
 	return blueprint
 }
 

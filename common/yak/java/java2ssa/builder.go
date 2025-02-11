@@ -28,7 +28,6 @@ func (*SSABuilder) GetCodeFileExt() string {
 }
 
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	b.GetProgram().VirtualImport = true
 	ast, err := Frontend(src, force)
 	if err != nil {
 		return err
