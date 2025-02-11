@@ -382,8 +382,8 @@ func (y *SyntaxFlowVisitor) VisitNumberLiteral(raw sf.INumberLiteralContext) int
 	return -1
 }
 
-func (y *SyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(raw sf.IStringLiteralWithoutStarGroupContext) []func() (string, int) {
-	var result []func() (string, int)
+func (y *SyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(raw sf.IStringLiteralWithoutStarGroupContext) []func() (string, ConditionFilterMode) {
+	var result []func() (string, ConditionFilterMode)
 	if y == nil || raw == nil {
 		return result
 	}
@@ -395,7 +395,7 @@ func (y *SyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(raw sf.IStringLit
 
 	for _, s := range i.AllStringLiteralWithoutStar() {
 		star := s.(*sf.StringLiteralWithoutStarContext)
-		result = append(result, func() (string, int) {
+		result = append(result, func() (string, ConditionFilterMode) {
 			var (
 				mode = ExactConditionFilter
 				text = star.GetText()
