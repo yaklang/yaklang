@@ -1762,6 +1762,29 @@ func ExtractPostParams(raw []byte) (map[string]string, error) {
 	return params, err
 }
 
+// ua 是一个请求选项参数，用于改变请求报文，添加 User-Agent 请求头中的值
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.ua("Mozilla/5.0")) // 向 pie.dev 发起请求，添加User-Agent请求头，其值为Mozilla/5.0
+// ```
+func WithUserAgent(ua string) PocConfigOption {
+	return WithReplaceHttpPacketHeader("User-Agent", ua)
+}
+
+// cookie 是一个请求选项参数，用于改变请求报文，添加 Cookie 请求头中的值
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.cookie("a=b; c=d")) // 向 pie.dev 发起请求，添加Cookie请求头，其值为a=b; c=d
+// poc.Get("https://pie.dev/get", poc.cookie("a", "b")) // 向 pie.dev 发起请求，添加Cookie请求头，其值为a=b
+// ```
+func WithCookieFull(c string, values ...any) PocConfigOption {
+	if len(values) > 0 {
+		valueStrings := utils.InterfaceToStringSlice(values)
+		return WithReplaceHttpPacketCookie(c, strings.Join(valueStrings, ","))
+	}
+	return WithReplaceHttpPacketHeader("Cookie", c)
+}
+
 var PoCExports = map[string]interface{}{
 	"HTTP":          HTTP,
 	"HTTPEx":        HTTPEx,
@@ -1787,6 +1810,7 @@ var PoCExports = map[string]interface{}{
 	"retryMaxWaitTime":     WithRetryMaxWaitTime,
 	"redirectTimes":        WithRedirectTimes,
 	"noRedirect":           WithNoRedirect,
+	"noredirect":           WithNoRedirect,
 	"jsRedirect":           WithJSRedirect,
 	"redirectHandler":      WithRedirectHandler,
 	"https":                WithForceHTTPS,
@@ -1813,12 +1837,23 @@ var PoCExports = map[string]interface{}{
 	"username":             WithUsername,
 	"password":             WithPassword,
 	"randomJA3":            WithRandomJA3,
-	"json":                 WithJSON,
-	"body":                 WithBody,
-	"query":                WithQuery,
-	"postData":             WithPostData,
-	"postParams":           WithPostParams,
 
+	"json":       WithJSON,
+	"body":       WithBody,
+	"query":      WithQuery,
+	"postData":   WithPostData,
+	"postParams": WithPostParams,
+	"postparams": WithPostParams,
+	"header":     WithAppendHeader,
+	"ua":         WithUserAgent,
+	"useragent":  WithUserAgent,
+	"fakeua":     WithReplaceHttpPacketRandomUserAgent,
+	"uarand":     WithReplaceHttpPacketRandomUserAgent,
+	"runtimeID":  WithRuntimeId,
+	"fromPlugin": WithFromPlugin,
+	"cookie":     WithCookieFull,
+
+	// full options
 	"replaceFirstLine":                   WithReplaceHttpPacketFirstLine,
 	"replaceMethod":                      WithReplaceHttpPacketMethod,
 	"replaceHeader":                      WithReplaceHttpPacketHeader,
