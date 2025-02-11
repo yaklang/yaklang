@@ -153,19 +153,47 @@ func (v *SyntaxFlowVisitor) EmitCompareOpcode(i []string) {
 	})
 }
 
-const (
-	CompareStringAnyMode = iota << 1
-	CompareStringHaveMode
+type CompareStringMode int
 
-	ExactConditionFilter
+const (
+	CompareStringAnyMode CompareStringMode = iota
+	CompareStringHaveMode
+)
+
+func ValidCompareString(mode int) CompareStringMode {
+	switch mode {
+	case 0:
+		return CompareStringAnyMode
+	case 1:
+		return CompareStringHaveMode
+	}
+	return -1
+}
+
+type ConditionFilterMode int
+
+const (
+	ExactConditionFilter ConditionFilterMode = iota
 	RegexpConditionFilter
 	GlobalConditionFilter
 )
 
-func (v *SyntaxFlowVisitor) EmitCompareString(i []func() (string, int), compareMode int) {
+func ValidConditionFilter(mode int) ConditionFilterMode {
+	switch mode {
+	case 0:
+		return ExactConditionFilter
+	case 1:
+		return RegexpConditionFilter
+	case 2:
+		return GlobalConditionFilter
+	}
+	return -1
+}
+
+func (v *SyntaxFlowVisitor) EmitCompareString(i []func() (string, ConditionFilterMode), compareMode CompareStringMode) {
 	s := &SFI{
 		OpCode:   OpCompareString,
-		UnaryInt: compareMode,
+		UnaryInt: int(compareMode),
 	}
 	s.Values = make([]string, len(i))
 	s.MultiOperator = make([]int, len(i))
@@ -186,10 +214,10 @@ func (v *SyntaxFlowVisitor) EmitCompareString(i []func() (string, int), compareM
 			return item
 		}
 	}
-	lo.ForEach(i, func(item func() (string, int), index int) {
+	lo.ForEach(i, func(item func() (string, ConditionFilterMode), index int) {
 		s2, i2 := item()
 		s.Values[index] = handler(s2)
-		s.MultiOperator[index] = i2
+		s.MultiOperator[index] = int(i2)
 	})
 	v.codes = append(v.codes, s)
 

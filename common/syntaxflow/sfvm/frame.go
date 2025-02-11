@@ -911,7 +911,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if values == nil {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		mode := i.UnaryInt
+		mode := ValidCompareString(i.UnaryInt)
 		if mode != CompareStringAnyMode && mode != CompareStringHaveMode {
 			return utils.Wrapf(CriticalError, "compare string failed: invalid mode %v", mode)
 		}
@@ -926,7 +926,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 				return false
 			}
 			condition, exit := conditionCache[codec.Md5(str)]
-			conditionMode := i.MultiOperator[index]
+			conditionMode := ValidConditionFilter(i.MultiOperator[index])
 			switch conditionMode {
 			case GlobalConditionFilter:
 				var global glob.Glob
