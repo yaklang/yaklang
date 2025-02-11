@@ -697,43 +697,69 @@ func (v *Value) IsCalled() bool {
 	})) > 0
 }
 
-// GetCalledBy desc all of 'Users' is Call
-func (v *Value) GetCalledBy() Values {
+func (v *Value) GetCalledBy(tmp map[int64]struct{}) Values {
 	if v.IsNil() {
 		return nil
 	}
 	vs := make(Values, 0)
-	addCall := func(node ssa.Value) {
-		if node == nil {
+	_, ok := tmp[v.GetId()]
+	if ok {
+		return vs
+	}
+	tmp[v.GetId()] = struct{}{}
+	check := func(call *ssa.Call, id int64) {
+		if call == nil && call.Method == nil {
 			return
 		}
+		if call.Method.GetId() == id {
+			vs = append(vs, v.NewValue(call))
+			return
+		}
+		function, ok := ssa.ToFunction(call.Method)
+		if !ok {
+			reference := call.Method.GetReference()
+			if refFunction, b := ssa.ToFunction(reference); b {
+				function = refFunction
+			} else {
+				return
+			}
+		}
+		for index, value := range call.ArgMember {
+			if len(function.ParameterMembers) <= index {
+				break
+			}
+			if value.GetId() == id {
+				vs = append(vs, v.NewValue(function.ParameterMembers[index]).GetCalledBy(tmp)...)
+			}
+		}
+		for index, arg := range call.Args {
+			if len(function.Params) <= index {
+				break
+			}
+			if arg.GetId() == id {
+				vs = append(vs, v.NewValue(function.Params[index]).GetCalledBy(tmp)...)
+			}
+		}
+	}
+	addCall := func(node ssa.Value) {
 		nodeId := node.GetId()
 		for _, user := range node.GetUsers() {
 			call, ok := ssa.ToCall(user)
 			if !ok {
 				continue
 			}
-			if call == nil || call.Method == nil {
-				continue
-			}
-
-			if call.Method.GetId() == nodeId {
-				vs = append(vs, v.NewValue(call))
-			}
+			check(call, nodeId)
 		}
 	}
-
 	handler := func(node ssa.Value) {
 		if node == nil {
 			return
 		}
-		// self
 		addCall(node)
 		for _, pointer := range node.GetPointer() {
 			addCall(pointer)
 		}
 	}
-	// handler self
 	handler(v.node)
 	if v.IsFunction() {
 		// function's reference, like parent-class same name function

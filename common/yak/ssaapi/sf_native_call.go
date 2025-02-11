@@ -352,7 +352,7 @@ func init() {
 					vals = append(vals, value.GetCallArgs())
 				}
 			} else {
-				call2fun := value.GetCalledBy()
+				call2fun := value.GetCalledBy(make(map[int64]struct{}))
 				call2fun.ForEach(func(call *Value) {
 					if checkUnEscape(call) {
 						res = append(res, call.GetCallArgs())
