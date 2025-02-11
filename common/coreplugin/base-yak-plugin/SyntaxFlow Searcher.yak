@@ -145,4 +145,4 @@ result = prog.SyntaxFlowWithError(
     syntaxflow.withSearch(),
 )~
 result.Show()
-yakit_output(result.GetResultID())
+yakit.Output(result.GetResultID())
