@@ -252,7 +252,7 @@ func (p *Protocol) handleRequest(ctx context.Context, request *transport.BaseJSO
 			if p.FallbackRequestHandler != nil {
 				return p.FallbackRequestHandler(ctx, req)
 			}
-			println("no handler for method and no default handler:", req.Method)
+			logger.Errorf("[mcp protocol] no handler for method and no default handler: %s", req.Method)
 			return nil, fmt.Errorf("method not found: %s", req.Method)
 		}
 	}
@@ -273,14 +273,14 @@ func (p *Protocol) handleRequest(ctx context.Context, request *transport.BaseJSO
 
 		result, err := handler(ctx, request, RequestHandlerExtra{Context: ctx})
 		if err != nil {
-			println("error:", err.Error())
+			logger.Error(err.Error())
 			p.sendErrorResponse(request.Id, err)
 			return
 		}
 
 		jsonResult, err := json.Marshal(result)
 		if err != nil {
-			println("error:", err.Error())
+			logger.Error(err.Error())
 			p.sendErrorResponse(request.Id, fmt.Errorf("failed to marshal result: %w", err))
 			return
 		}
@@ -291,7 +291,7 @@ func (p *Protocol) handleRequest(ctx context.Context, request *transport.BaseJSO
 		}
 
 		if err := p.transport.Send(ctx, transport.NewBaseMessageResponse(response)); err != nil {
-			println("error:", err.Error())
+			logger.Error(err.Error())
 			p.handleError(fmt.Errorf("failed to send response: %w", err))
 		}
 	}()
