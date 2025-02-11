@@ -667,6 +667,21 @@ func printf(format string, a ...any) (n int, err error) {
 // println("hello yak")
 // ```
 func println(a ...any) (n int, err error) {
+	var results = make([]any, len(a))
+	for i, v := range a {
+		switch val := v.(type) {
+		case []byte:
+			results[i] = string(val)
+		case uint8:
+			if val >= 32 && val <= 126 {
+				results[i] = fmt.Sprintf("'%c'", val)
+			} else {
+				results[i] = fmt.Sprintf("'\\x%02x'", val)
+			}
+		default:
+			results[i] = val
+		}
+	}
 	return fmt.Println(a...)
 }
 
