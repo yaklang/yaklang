@@ -1,15 +1,14 @@
 package http
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/mcp/transport"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
 // HTTPClientTransport implements a client-side HTTP transport for MCP
@@ -59,28 +58,15 @@ func (t *HTTPClientTransport) Send(ctx context.Context, message *transport.BaseJ
 	}
 
 	url := fmt.Sprintf("%s%s", t.baseURL, t.endpoint)
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	for key, value := range t.headers {
-		req.Header.Set(key, value)
-	}
 
-	resp, err := t.client.Do(req)
+	rsp, _, err := poc.DoPOST(url, poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"), poc.WithBody(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("server returned error: %s (status: %d)", string(body), resp.StatusCode)
+	body := rsp.GetBody()
+	if statusCode := rsp.GetStatusCode(); statusCode != http.StatusOK {
+		return fmt.Errorf("server returned error: %s (status: %d)", string(body), statusCode)
 	}
 
 	if len(body) > 0 {
