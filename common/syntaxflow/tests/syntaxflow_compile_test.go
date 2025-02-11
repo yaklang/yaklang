@@ -81,26 +81,20 @@ a*?{.b} as $a
 	require.NoError(t, err)
 	require.NotEqual(t, rule.OpCodes, "")
 
-	// check frame
-	vm := sfvm.NewSyntaxFlowVirtualMachine()
-	frame, err := vm.Load(rule)
-	require.NoError(t, err)
-	require.Greater(t, len(frame.Codes), 0)
-
-	prog, err := ssaapi.Parse(code)
+	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.Yak))
+	prog.Show()
 	require.NoError(t, err)
 
-	t.Run("test frame feed", func(t *testing.T) {
-		res, err := frame.Feed(prog)
+	t.Run("test use rule code", func(t *testing.T) {
+		res, err := prog.SyntaxFlowWithError(syntaxflowRule, ssaapi.QueryWithEnableDebug())
 		require.NoError(t, err)
-		vs, ok := res.SymbolTable.Get("a")
+		vs := res.GetValues("a")
 		log.Infof(vs.String())
-		require.True(t, ok)
 		require.Contains(t, vs.String(), "make")
 		require.NotContains(t, vs.String(), "3")
 	})
 
-	t.Run("test SyntaxFlowRule", func(t *testing.T) {
+	t.Run("test SyntaxFlowRule, use rule struct", func(t *testing.T) {
 		res, err := prog.SyntaxFlowRule(rule)
 		require.NoError(t, err)
 		vs := res.GetValues("a")
@@ -109,7 +103,7 @@ a*?{.b} as $a
 		require.NotContains(t, vs.String(), "3")
 	})
 
-	t.Run("test SyntaxFlowRuleName", func(t *testing.T) {
+	t.Run("test SyntaxFlowRuleName, use rule name ", func(t *testing.T) {
 		res, err := prog.SyntaxFlowRuleName(rulename)
 		require.NoError(t, err)
 		vs := res.GetValues("a")
