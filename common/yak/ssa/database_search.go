@@ -28,7 +28,7 @@ func matchInstructionsEx(
 	prog *Program,
 	compareMode, matchMode int,
 	name string,
-) []Instruction {
+) (res []Instruction) {
 	// all application in database, just use sql
 	if prog.EnableDatabase {
 		var insts []Instruction
@@ -45,7 +45,7 @@ func matchInstructionsEx(
 		return insts
 	}
 
-	res := make([]Instruction, 0)
+	res = make([]Instruction, 0)
 	tmp := make(map[int64]struct{})
 	addRes := func(insts ...Instruction) {
 		for _, inst := range insts {
@@ -74,16 +74,25 @@ func matchInstructionsEx(
 		addRes(insts...)
 	} else {
 		// from cache
-		check := func(s string) bool {
-			switch compareMode {
-			case ssadb.ExactCompare:
-				return s == name
-			case ssadb.GlobCompare:
-				return glob.MustCompile(name).Match(s)
-			case ssadb.RegexpCompare:
-				return regexp.MustCompile(name).MatchString(s)
+		var check func(string) bool
+		// check := func(s string) bool {
+		switch compareMode {
+		case ssadb.ExactCompare:
+			check = func(s string) bool { return s == name }
+		case ssadb.GlobCompare:
+			matcher, err := glob.Compile(name)
+			if err != nil {
+				return
 			}
-			return false
+			check = func(s string) bool { return matcher.Match(s) }
+		case ssadb.RegexpCompare:
+			matcher, err := regexp.Compile(name)
+			if err != nil {
+				return
+			}
+			check = func(s string) bool { return matcher.MatchString(s) }
+		default:
+			return
 		}
 		addRes(prog.Cache._getByVariableEx(matchMode, check)...)
 	}
