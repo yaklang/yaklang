@@ -36,10 +36,6 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return !slices.Contains(fileList, extension)
 }
 
-func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
-}
-
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.FunctionBuilder, path string) error {
 	prog := fb.GetProgram()
 	if prog == nil {
