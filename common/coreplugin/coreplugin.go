@@ -276,8 +276,14 @@ func init() {
 			withPluginHelp("代码扫描默认规则探测，根据传入的url来提供代码扫描的默认参数"),
 			withPluginAuthors("Q16G"),
 			withPluginEnableGenerateParam(true))
+		registerBuildInPlugin("yak", "SyntaxFlow Searcher",
+			withPluginHelp(`代码审计项目管理中，支持文件名、函数名、变量名、常量等搜索`),
+			withPluginAuthors("Q16G"),
+			withPluginEnableGenerateParam(true),
+		)
 		return nil
 	})
+
 }
 
 // only use for test
