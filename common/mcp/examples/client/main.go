@@ -1,15 +1,15 @@
 package main
 
 import (
-	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"context"
 
@@ -32,8 +32,7 @@ func main() {
 
 	go func() {
 		log.Info("cmd.Start() to start server")
-		if raw, err := cmd.CombinedOutput(); err != nil {
-			fmt.Println(string(raw))
+		if err := cmd.Start(); err != nil {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()

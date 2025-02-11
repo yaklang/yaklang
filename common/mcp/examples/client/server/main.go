@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	mcp "github.com/yaklang/yaklang/common/mcp"
 	"github.com/yaklang/yaklang/common/mcp/transport/stdio"
