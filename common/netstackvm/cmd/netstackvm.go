@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
 	"io"
 	"math/rand"
 	"os"
@@ -224,6 +225,77 @@ func main() {
 					}
 				}
 				swg.Wait()
+				return nil
+			},
+		},
+
+		{
+			Name:  "pingscan",
+			Usage: "pingscan <ip>",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "iface",
+					Usage: "指定物理网卡名称",
+				},
+				cli.Int64Flag{
+					Name:  "retry,r",
+					Usage: "number of retry times",
+					Value: 0,
+				},
+				cli.Int64Flag{
+					Name:  "concurrent,c",
+					Usage: "packing frequency (per second)",
+					Value: 128,
+				},
+				cli.Int64Flag{
+					Name:  "timeout,t",
+					Usage: "ping timeout (second).",
+					Value: 4,
+				},
+			},
+			Action: func(c *cli.Context) error {
+				ifaceName := c.String("iface")
+				if ifaceName == "" {
+					route, gateway, srcIP, err := netutil.GetPublicRoute()
+					if err != nil {
+						return err
+					}
+					ifaceName = route.Name
+					_ = gateway
+					_ = srcIP
+				}
+				vm, err := netstackvm.NewNetStackVirtualMachine(
+					netstackvm.WithPcapDevice(ifaceName),
+				)
+				if err != nil {
+					return err
+				}
+
+				if err := vm.StartDHCP(); err != nil {
+					log.Errorf("StartDHCP failed: %v", err)
+					return utils.Errorf("StartDHCP failed: %v", err)
+				}
+
+				if err := vm.WaitDHCPFinished(context.Background()); err != nil {
+					log.Errorf("Wait DHCP finished failed: %v", err)
+					return utils.Errorf("Wait DHCP finished failed: %v", err)
+				}
+
+				target := strings.Join(c.Args(), ",")
+				res, err := icmp.NewClient(vm.GetStack()).PingScan(context.Background(), target)
+				if err != nil {
+					log.Errorf("PingScan start failed: %v", err)
+					return utils.Errorf("PingScan start failed: %v", err)
+				}
+				count := 0
+				for r := range res {
+					if r == nil {
+						continue
+					}
+					fmt.Printf("ping alive: [%s]\n", r.Address)
+					count++
+				}
+				fmt.Printf("total alive: %d\n", count)
 				return nil
 			},
 		},

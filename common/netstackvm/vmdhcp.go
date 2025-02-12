@@ -67,6 +67,12 @@ func (vm *NetStackVirtualMachine) StartDHCP() error {
 				return
 			}
 
+			err = vm.AppendMainNicIPV4NeighborRoute()
+			if err != nil {
+				log.Errorf("set main nic neighbor route failed: %v", err)
+				return
+			}
+
 			vm.arpPersistentMap.Store(preferIp.String(), struct{}{})
 			// start to announcement arp localIP macAddr
 			if err := vm.StartAnnounceARP(); err != nil {
