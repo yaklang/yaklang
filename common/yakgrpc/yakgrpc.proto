@@ -1726,6 +1726,7 @@ message QueryMITMRuleExtractedDataRequest {
   string HTTPFlowHash = 2;
   string HTTPFlowHiddenIndex = 3;
   ExtractedDataFilter Filter = 4;
+  bool OnlyName = 5;
 }
 
 message ExtractedDataFilter {
@@ -2121,15 +2122,15 @@ message YaklangLanguageSuggestionRequest {
   string YakScriptCode = 3;
   // }
 
-  Range Range = 4; // selected range 
-  string ModelID = 5; // monaco model id 
+  Range Range = 4; // selected range
+  string ModelID = 5; // monaco model id
 
   // {
-  // from database : support getReference 
-  // if set this progranName will use this from database 
+  // from database : support getReference
+  // if set this progranName will use this from database
   string ProgramName = 6;
   string FileName = 7;
-  // } 
+  // }
 }
 
 
@@ -3109,7 +3110,7 @@ message QueryRisksRequest {
 
   string RuntimeId = 15;
 
-  // ssa program 
+  // ssa program
   repeated string SSAProgramNames = 16;
 }
 
@@ -3158,7 +3159,7 @@ message NewRisk {
 message NewRiskReadRequest {
   int64 AfterId = 1;
   repeated int64 Ids = 2;
-  QueryRisksRequest Filter = 3; 
+  QueryRisksRequest Filter = 3;
 }
 
 message UploadRiskToOnlineRequest {
@@ -4780,7 +4781,7 @@ message QueryHTTPFlowRequest {
 
   repeated string IncludeHash = 41;
   repeated string HiddenIndex = 42;
-  
+
   repeated string ProcessName = 43;
   repeated string ExcludeKeywords = 44;
   string KeywordType = 45; // <empty> = all/response/request
@@ -4799,7 +4800,7 @@ message ExportHTTPFlowsRequest {
 }
 
 message QueryHTTPFlowsProcessNamesResponse {
-    repeated string ProcessNames = 1;
+  repeated string ProcessNames = 1;
 }
 
 message DeleteHTTPFlowRequest {
@@ -5314,7 +5315,7 @@ message ExecParamItem {
   string Value = 2;
 }
 message ExecRequest {
-  // 执行优先级为：ScriptPath > Script > ScriptId 
+  // 执行优先级为：ScriptPath > Script > ScriptId
   repeated ExecParamItem Params = 1;
   string Script = 2;
   string ScriptId = 3;
@@ -5687,8 +5688,8 @@ message SSAProgramFilter{
 
 
 message QuerySSAProgramRequest{
-  Paging Paging = 1; // abort 
-  Paging Pagination = 2; 
+  Paging Paging = 1; // abort
+  Paging Pagination = 2;
   SSAProgramFilter Filter = 3;
 }
 
@@ -5702,7 +5703,7 @@ message DeleteSSAProgramRequest{
 }
 
 message QuerySSAProgramResponse{
-  Paging Paging = 1; // abort 
+  Paging Paging = 1; // abort
   Paging Pagination = 5;
   repeated SSAProgram Programs = 2; // abort
   repeated SSAProgram Data = 4;
@@ -5714,7 +5715,7 @@ message CreateSyntaxFlowRuleRequest{
 }
 
 message CreateSyntaxFlowRuleResponse {
-  DbOperateMessage Message = 1; 
+  DbOperateMessage Message = 1;
   SyntaxFlowRule Rule = 2;
 }
 
@@ -5723,7 +5724,7 @@ message UpdateSyntaxFlowRuleRequest{
 }
 
 message UpdateSyntaxFlowRuleResponse{
-  DbOperateMessage Message = 1; 
+  DbOperateMessage Message = 1;
   SyntaxFlowRule Rule = 2;
 }
 
@@ -5771,10 +5772,10 @@ message UpdateSyntaxFlowRuleGroupRequest {
 }
 
 message UpdateSyntaxFlowRuleAndGroupRequest{
-   SyntaxFlowRuleFilter Filter = 1;
-   repeated string AddGroups= 2;
-   repeated string RemoveGroups = 3;
-   bool All = 4; // abort
+  SyntaxFlowRuleFilter Filter = 1;
+  repeated string AddGroups= 2;
+  repeated string RemoveGroups = 3;
+  bool All = 4; // abort
 }
 
 message QuerySyntaxFlowSameGroupRequest{
@@ -5798,10 +5799,10 @@ message SyntaxFlowScanRequest{
   // 恢复扫描任务
   string ResumeTaskId = 5;         // 恢复任务ID
 
-  // 其他参数 
+  // 其他参数
   bool IgnoreLanguage = 4; // 是否忽略语言 默认为false 将会只运行和当前项目语言一致的规则，最后运行的规则可能会比当前选中的规则少一些。
 
-  // for new rule scan task 
+  // for new rule scan task
   SyntaxFlowRuleInput RuleInput = 6; // 用于新建规则时的调试功能
 }
 
@@ -5816,7 +5817,7 @@ message SyntaxFlowScanTaskFilter{
   repeated string TaskIds = 3;
   int64 FromId = 4;
   int64  UntilId = 5;
-  string Keyword = 6; // fuzz search program-name 
+  string Keyword = 6; // fuzz search program-name
   repeated string Kind = 7; // "debug" | "scan";
 }
 
@@ -5827,26 +5828,26 @@ message QuerySyntaxFlowScanTaskResponse{
 }
 
 message SyntaxFlowScanTask {
-    uint64 Id = 1;
-    int64 CreatedAt = 2;
-    int64 UpdatedAt = 3;
+  uint64 Id = 1;
+  int64 CreatedAt = 2;
+  int64 UpdatedAt = 3;
 
-    string TaskId = 4;
-    repeated string Programs = 5;
-    int64 RuleCount = 6;
-    string Status = 7; // executing / paused / done / error
-    string Reason = 8;
-    // query execute
-    int64 FailedQuery= 9;
-    int64 SkipQuery=10;
-    int64 SuccessQuery = 11;
-    // risk
-    int64 RiskCount =12;
-    // query process
-    int64 TotalQuery =13;
+  string TaskId = 4;
+  repeated string Programs = 5;
+  int64 RuleCount = 6;
+  string Status = 7; // executing / paused / done / error
+  string Reason = 8;
+  // query execute
+  int64 FailedQuery= 9;
+  int64 SkipQuery=10;
+  int64 SuccessQuery = 11;
+  // risk
+  int64 RiskCount =12;
+  // query process
+  int64 TotalQuery =13;
 
-    SyntaxFlowScanRequest Config = 14;
-    string Kind =  15; // "debug" | "scan"
+  SyntaxFlowScanRequest Config = 14;
+  string Kind =  15; // "debug" | "scan"
 }
 
 message DeleteSyntaxFlowScanTaskRequest{
@@ -5861,7 +5862,7 @@ message SyntaxFlowScanResponse{
 
   ExecResult ExecResult = 3;
 
-  // result 
+  // result
   SyntaxFlowResult Result = 4;
   repeated Risk risks = 5;
   repeated SSARisk SSARisks = 6;
@@ -5904,7 +5905,7 @@ message SyntaxFlowResult {
   uint64 ResultID = 1;
   string TaskID = 2;
 
-  // rule info 
+  // rule info
   string RuleName = 3;
   string Title = 4;
   string TitleZh = 5;
@@ -5912,11 +5913,11 @@ message SyntaxFlowResult {
   string Severity = 7; //  "info", "low", "middle", "critical", "high"
   string Purpose = 8;
 
-  // target info 
+  // target info
   string ProgramName = 9;
   string Language = 10;
 
-  // runtime info 
+  // runtime info
   uint64 RiskCount = 11;
 
   string RuleContent = 12;
@@ -6025,7 +6026,7 @@ message SSARisk {
   string FunctionName = 26;
   int64 Line = 27;
 
-  // other mesg 
+  // other mesg
   string Solution = 28;
   string Description = 29 ;
 }
@@ -6098,53 +6099,53 @@ message SyntaxflowsProgress {
 
 // hot-patch template
 message HotPatchTemplate {
-    string Name = 1;
-    string Content = 2;
-    string Type = 3; // fuzzer/mitm
+  string Name = 1;
+  string Content = 2;
+  string Type = 3; // fuzzer/mitm
 }
 
 message HotPatchTemplateRequest {
-    repeated int64 Id = 1;
-    repeated string Name = 2;
-    repeated string ContentKeyword = 3;
-    string Type = 4; // fuzzer/mitm
+  repeated int64 Id = 1;
+  repeated string Name = 2;
+  repeated string ContentKeyword = 3;
+  string Type = 4; // fuzzer/mitm
 }
 
 message UpdateHotPatchTemplateRequest {
-    HotPatchTemplateRequest Condition = 1;
-    HotPatchTemplate Data = 2;
+  HotPatchTemplateRequest Condition = 1;
+  HotPatchTemplate Data = 2;
 }
 
 message DeleteHotPatchTemplateRequest {
-    HotPatchTemplateRequest Condition = 1;
-    bool All = 2;
+  HotPatchTemplateRequest Condition = 1;
+  bool All = 2;
 }
 
 message CreateHotPatchTemplateResponse {
-    DbOperateMessage Message = 1;
+  DbOperateMessage Message = 1;
 }
 
 message DeleteHotPatchTemplateResponse {
-    DbOperateMessage Message = 1;
+  DbOperateMessage Message = 1;
 }
 
 message UpdateHotPatchTemplateResponse {
-    DbOperateMessage Message = 1;
+  DbOperateMessage Message = 1;
 }
 
 message QueryHotPatchTemplateResponse {
-    DbOperateMessage Message = 1;
-    repeated HotPatchTemplate Data = 2;
+  DbOperateMessage Message = 1;
+  repeated HotPatchTemplate Data = 2;
 }
 
 message QueryHotPatchTemplateListRequest {
-    string Type = 1; // fuzzer/mitm
+  string Type = 1; // fuzzer/mitm
 }
 
 message QueryHotPatchTemplateListResponse {
-    Paging Pagination = 1;
-    repeated string Name = 2;
-    int64 Total = 3;
+  Paging Pagination = 1;
+  repeated string Name = 2;
+  int64 Total = 3;
 }
 
 message GroupTableColumnRequest {
