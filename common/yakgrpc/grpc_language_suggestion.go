@@ -3,16 +3,17 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -1066,7 +1067,7 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 func fixCompletionBeforeParen(suggestions []*ypb.SuggestionDescription, prog *ssaapi.Program, rng memedit.RangeIf, v *ssaapi.Value) []*ypb.SuggestionDescription {
 	// fix completion, for text before paren, we should complete function name instead of function signature
 	// e.g. callable(app()) -> callable(append()), not callable(append(a, vals...)())
-	editor, ok := prog.Program.GetEditor("")
+	editor, ok := prog.Program.GetInputFileEditor()
 	if !ok {
 		return suggestions
 	}
