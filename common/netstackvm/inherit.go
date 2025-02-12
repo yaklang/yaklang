@@ -1,6 +1,7 @@
 package netstackvm
 
 import (
+	"encoding/hex"
 	"github.com/yaklang/yaklang/common/utils/arptable"
 	"net"
 
@@ -95,6 +96,62 @@ func (vm *NetStackVirtualMachine) InheritPcapInterfaceIP() error {
 	if err != nil {
 		return err
 	}
+	if macAddr, err := arptable.SearchHardware(gateway4.String()); err == nil {
+		vm.driver.SetGatewayHardwareAddr(macAddr)
+		tcpErr := vm.stack.AddStaticNeighbor(
+			vm.MainNICID(),
+			header.IPv4ProtocolNumber,
+			tcpip.AddrFrom4([4]byte(gateway4.To4())),
+			tcpip.LinkAddress(string(macAddr)),
+		)
+		if tcpErr != nil {
+			log.Errorf("add static neighbor failed: %v", tcpErr)
+		}
+	}
+	return nil
+}
+
+func (vm *NetStackVirtualMachine) InheritPcapInterfaceRoute() error {
+	ipv4, gateway4, mask4 := vm.GetOSNetStackIPv4()
+	vm.driver.SetGatewayIP(gateway4)
+	err := vm.SetMainNICv4(ipv4, &net.IPNet{
+		IP:   ipv4,
+		Mask: mask4,
+	}, gateway4)
+	if err != nil {
+		return err
+	}
+
+	networkSegment := make([]byte, 4)
+	for i := 0; i < len(ipv4); i++ {
+		networkSegment[i] = ipv4[i] & mask4[i]
+	}
+
+	mask4Byte, _ := hex.DecodeString(mask4.String())
+	neigh, err := tcpip.NewSubnet(tcpip.AddrFrom4([4]byte(networkSegment)), tcpip.MaskFrom(string(mask4Byte)))
+	if err != nil {
+		return err
+	}
+	vm.stack.SetRouteTable([]tcpip.Route{
+		{
+			Destination: neigh,
+			NIC:         vm.MainNICID(),
+			MTU:         uint32(vm.mtu),
+		},
+		{
+			Destination: header.IPv4EmptySubnet,
+			Gateway:     tcpip.AddrFrom4([4]byte(gateway4.To4())),
+			NIC:         vm.MainNICID(),
+			MTU:         uint32(vm.mtu),
+		},
+		{
+			Destination: header.IPv6EmptySubnet,
+			Gateway:     tcpip.AddrFrom4([4]byte(gateway4.To4())),
+			NIC:         vm.MainNICID(),
+			MTU:         uint32(vm.mtu),
+		},
+	})
+
 	if macAddr, err := arptable.SearchHardware(gateway4.String()); err == nil {
 		vm.driver.SetGatewayHardwareAddr(macAddr)
 		tcpErr := vm.stack.AddStaticNeighbor(
