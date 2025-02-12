@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -931,10 +930,6 @@ func (s *Server) ImportHTTPFlowStream(req *ypb.ImportHTTPFlowStreamRequest, stre
 	inputPath := req.GetInputPath()
 	if inputPath == "" {
 		return utils.Error("input path is empty")
-	}
-	typ := strings.TrimPrefix(filepath.Ext(inputPath), ".")
-	if typ != "har" {
-		return utils.Errorf("unsupported file type: %s", typ)
 	}
 
 	fh, err := os.OpenFile(inputPath, os.O_RDWR, 0o644)
