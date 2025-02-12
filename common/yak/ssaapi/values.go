@@ -2,12 +2,12 @@ package ssaapi
 
 import (
 	"fmt"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -33,6 +33,21 @@ type Value struct {
 	DescInfo     map[string]string
 	// value from database
 	auditNode *ssadb.AuditNode
+}
+
+func (v *Value) CompareString(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+	if v == nil || items == nil {
+		return nil, []bool{false}
+	}
+	text := yakunquote.TryUnquote(v.String())
+	return nil, []bool{items.CompareString(text)}
+}
+
+func (v *Value) CompareOpcode(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+	if v == nil || items == nil {
+		return nil, []bool{false}
+	}
+	return nil, []bool{items.CompareOpcode(v.GetOpcode(), v.GetBinaryOperator())}
 }
 
 type PredecessorValue struct {
@@ -818,6 +833,26 @@ func (v *Value) AnalyzeDepth() int {
 }
 
 type Values []*Value
+
+func (v Values) CompareString(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+	var res []bool
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		_, result := operator.CompareString(items)
+		res = append(res, result...)
+		return nil
+	})
+	return nil, res
+}
+
+func (v Values) CompareOpcode(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+	var res []bool
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		_, result := operator.CompareOpcode(items)
+		res = append(res, result...)
+		return nil
+	})
+	return nil, res
+}
 
 func (value Values) Hash() (string, bool) {
 	var retIds []int64

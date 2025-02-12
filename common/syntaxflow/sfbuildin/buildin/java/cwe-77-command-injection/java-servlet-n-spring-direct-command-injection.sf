@@ -1,6 +1,6 @@
 desc(
     title: "Servlet & Springframework Paremeter Directly Passed into Command Injection Sink",
-    title: 'Servlet & Springframewor 基础参数直接命令注入',
+    title: 'Servlet & Springframework 基础参数直接命令注入',
     type: vuln,
     risk:rce,
     desc: <<<TEXT

@@ -23,6 +23,10 @@ func MatchInstructionByRegexp(ctx context.Context, prog *Program, mod int, r str
 	return matchInstructionsEx(ctx, prog, ssadb.RegexpCompare, mod, r)
 }
 
+func MatchInstructionByOpcode(ctx context.Context, prog *Program, mod int, r string) []Instruction {
+	return matchInstructionsEx(ctx, prog, ssadb.OpcodeCompare, mod, r)
+}
+
 func matchInstructionsEx(
 	ctx context.Context,
 	prog *Program,
@@ -32,7 +36,7 @@ func matchInstructionsEx(
 	// all application in database, just use sql
 	if prog.EnableDatabase {
 		var insts []Instruction
-		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), ctx, compareMode, matchMode, name)
+		ch := ssadb.SearchIrCode(ssadb.GetDBInProgram(prog.Name), ctx, compareMode, matchMode, name)
 		for ir := range ch {
 			inst, err := NewLazyInstructionFromIrCode(ir, prog)
 			if err != nil {
@@ -58,7 +62,7 @@ func matchInstructionsEx(
 	if prog.EnableDatabase {
 		// from database
 		var insts []Instruction
-		ch := ssadb.SearchVariable(
+		ch := ssadb.SearchIrCode(
 			ssadb.GetDB().Where("program_name = ?", prog.Name),
 			ctx,
 			compareMode, matchMode, name,

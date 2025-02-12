@@ -32,6 +32,16 @@ type ValueList struct {
 	Values []ValueOperator
 }
 
+func (v *ValueList) CompareString(items *CompareItems) (ValueOperator, []bool) {
+	var res []bool
+	v.Recursive(func(operator ValueOperator) error {
+		_, result := operator.CompareString(items)
+		res = append(res, result...)
+		return nil
+	})
+	return nil, res
+}
+
 func (v *ValueList) AppendPredecessor(value ValueOperator, opts ...AnalysisContextOption) error {
 	return v.Recursive(func(operator ValueOperator) error {
 		return operator.AppendPredecessor(value, opts...)

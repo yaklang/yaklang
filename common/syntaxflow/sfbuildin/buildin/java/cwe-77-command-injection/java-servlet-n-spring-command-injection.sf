@@ -1,0 +1,11 @@
+desc(
+    title: 'Check Servlet & Springframework Basic Parameter Command Injection',
+    title_zh: 'Servlet & Springframework 基础参数命令注入',
+    type: vuln,
+)
+
+include('java-servlet-param') as $source;
+include('java-spring-param') as $source;
+
+
+

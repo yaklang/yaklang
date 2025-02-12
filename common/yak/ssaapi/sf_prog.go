@@ -20,6 +20,32 @@ import (
 
 var _ sfvm.ValueOperator = &Program{}
 
+func (p *Program) CompareOpcode(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+	v := items.MatchComparedValues(p)
+	if v.IsEmpty() {
+		return nil, []bool{false}
+	}
+	var res []bool
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		res = append(res, true)
+		return nil
+	})
+	return v, res
+}
+
+func (p *Program) CompareString(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+	v := items.MatchComparedValues(p)
+	if v.IsEmpty() {
+		return nil, []bool{false}
+	}
+	var res []bool
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		res = append(res, true)
+		return nil
+	})
+	return v, res
+}
+
 func (p *Program) String() string {
 	return p.Program.GetProgramName()
 }

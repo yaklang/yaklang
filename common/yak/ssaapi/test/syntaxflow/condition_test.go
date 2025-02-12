@@ -233,3 +233,19 @@ $target?{have: anc*,/[0-9]+$/} as $output
 		})
 	})
 }
+
+func Test_Condition_Filter_Start_With_Program(t *testing.T) {
+	t.Run("test CompareStringHaveMode", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		a1 = "abc"
+		a2 = ss
+		a3 = func() {}
+		`,
+			`
+			*?{opcode:const && have: 'a'} as $target1
+			`,
+			map[string][]string{
+				"target1": {"abc"},
+			})
+	})
+}
