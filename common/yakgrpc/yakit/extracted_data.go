@@ -91,7 +91,14 @@ func FilterExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) *gorm.DB 
 	db = bizhelper.ExactQueryStringArrayOr(db, "rule_verbose", filter.GetRuleVerbose())
 	return db
 }
-
+func QueryExtractedDataOnlyName(db *gorm.DB) ([]*schema.ExtractedData, error) {
+	var result []*schema.ExtractedData
+	db = db.Select("rule_verbose,trace_id").Find(&result)
+	if db.Error != nil {
+		return nil, utils.Errorf("select rule_verbose fail: %s", db.Error)
+	}
+	return result, nil
+}
 func QueryExtractedDataPagination(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest) (*bizhelper.Paginator, []*schema.ExtractedData, error) {
 	db = db.Model(&schema.ExtractedData{})
 	filter := req.GetFilter()
@@ -108,6 +115,15 @@ func QueryExtractedDataPagination(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDa
 	}
 
 	db = FilterExtractedData(db, filter)
+	if req.OnlyName {
+		result, err := QueryExtractedDataOnlyName(db)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &bizhelper.Paginator{
+			TotalRecord: len(result),
+		}, result, nil
+	}
 	params := req.GetPagination()
 	if params == nil {
 		params = &ypb.Paging{
@@ -117,7 +133,6 @@ func QueryExtractedDataPagination(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDa
 			Order:   "desc",
 		}
 	}
-
 	db = bizhelper.QueryOrder(db, params.OrderBy, params.Order)
 	var ret []*schema.ExtractedData
 	paging, db := bizhelper.Paging(db, int(params.GetPage()), int(params.GetLimit()), &ret)
