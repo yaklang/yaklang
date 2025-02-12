@@ -351,6 +351,9 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 			c.NewError(Error, SSATAG, BindingNotFoundInCall(fv.GetName()))
 		}
 
+		/*
+			在call的时候，从call scope中读取freeValue，然后绑定ud关系
+		*/
 		value := builder.PeekValue(fv.GetName())
 		if fv.GetDefault() == nil && value != nil {
 			bindAndHandler(fv.GetName(), value)
