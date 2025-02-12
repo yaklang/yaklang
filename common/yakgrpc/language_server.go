@@ -132,7 +132,7 @@ func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) 
 			prog, err = static_analyzer.SSAParse(trimCode, scriptType)
 			if err == nil {
 				// reset ssaRange and editor
-				newEditor, ok := prog.Program.GetEditor("")
+				newEditor, ok := prog.Program.GetInputFileEditor()
 				if !ok {
 					newEditor = memedit.NewMemEditor(trimCode)
 				}

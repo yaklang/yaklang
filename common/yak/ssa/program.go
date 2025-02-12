@@ -316,6 +316,13 @@ func (prog *Program) GetFrontValueByOffset(searchOffset int) (offset int, value 
 	return offset, value
 }
 
+func (p *Program) GetInputFileEditor() (*memedit.MemEditor, bool) {
+	if p.editorMap.Len() == 1 {
+		return p.editorMap.Get(p.editorMap.Keys()[0])
+	}
+	return nil, false
+}
+
 func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 	return p.editorMap.Get(url)
 }
