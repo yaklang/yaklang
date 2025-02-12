@@ -822,6 +822,7 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 			fieldNames[i] = "payload"
 		}
 	}
+	filter.Full = true
 
 	queryDB := yakit.BuildHTTPFlowQuery(s.GetProjectDatabase(), filter)
 	fh, err := os.OpenFile(req.GetTargetPath(), os.O_CREATE|os.O_RDWR, 0o644)
@@ -869,22 +870,7 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 		}
 	case "har":
 		flowCh := yakit.YieldHTTPFlowsEx(queryDB, stream.Context(), totalCallback)
-		// to har entry
-		entryCh := make(chan *har.HAREntry, 8)
-		go func() {
-			for flow := range flowCh {
-				entry, err := har.HTTPFlow2HarEntry(flow)
-				if err != nil {
-					log.Errorf("HTTPFlow2HarEntry failed: %s", err)
-				} else {
-					entryCh <- entry
-				}
-			}
-			close(entryCh)
-		}()
-
-		entryCallback := func(e *har.HAREntry) {
-			count++
+		sendPercent := func() {
 			percent := 0.0
 			if total == 0 {
 				percent = count / (count + 1)
@@ -894,6 +880,30 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 			stream.Send(&ypb.ExportHTTPFlowStreamResponse{
 				Percent: percent,
 			})
+		}
+		// to har entry
+		entryCh := make(chan *har.HAREntry, 8)
+		go func() {
+			for flow := range flowCh {
+				entry, err := har.HTTPFlow2HarEntry(flow)
+				if err != nil {
+					log.Errorf("HTTPFlow2HarEntry failed: %s", err)
+					stream.Send(&ypb.ExportHTTPFlowStreamResponse{
+						Verbose: err.Error(),
+					})
+
+					count++
+					sendPercent()
+				} else {
+					entryCh <- entry
+				}
+			}
+			close(entryCh)
+		}()
+
+		entryCallback := func(e *har.HAREntry) {
+			count++
+			sendPercent()
 		}
 
 		entries := &har.Entries{}
