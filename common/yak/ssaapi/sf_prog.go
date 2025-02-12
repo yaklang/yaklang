@@ -21,6 +21,47 @@ import (
 
 var _ sfvm.ValueOperator = &Program{}
 
+func (p *Program) OpcodeMatch(ctx context.Context, s string) (bool, sfvm.ValueOperator, error) {
+	var values Values = lo.FilterMap(
+		ssa.MatchInstructionByOpcode(ctx, p.Program, s),
+		func(i ssa.Instruction, _ int) (*Value, bool) {
+			if v, ok := i.(ssa.Value); ok {
+				return p.NewValue(v), true
+			} else {
+				return nil, false
+			}
+		},
+	)
+	return len(values) > 0, values, nil
+}
+
+func (p *Program) CompareOpcode(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+	v := items.MatchComparedValues(p)
+	if v.IsEmpty() {
+		return nil, []bool{false}
+	}
+	var res []bool
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		_, exist := operator.CompareOpcode(items)
+		res = append(res, exist...)
+		return nil
+	})
+	return v, res
+}
+
+func (p *Program) CompareString(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+	v := items.MatchComparedValues(p)
+	if v.IsEmpty() {
+		return nil, []bool{false}
+	}
+	var res []bool
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		res = append(res, true)
+		return nil
+	})
+	return v, res
+}
+
 func (p *Program) String() string {
 	return p.Program.GetProgramName()
 }
