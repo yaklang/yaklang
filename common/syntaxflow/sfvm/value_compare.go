@@ -173,7 +173,7 @@ func (c *CompareItems) matchStringValue(value ValueOperator) ValueOperator {
 		for _, item := range c.Items {
 			v := item.matchStringValue(context, value)
 			if v == nil {
-				return nil
+				continue
 			}
 			v.Recursive(func(vo ValueOperator) error {
 				if ret, ok := vo.(ssa.GetIdIF); ok {
@@ -222,7 +222,7 @@ func (c *CompareItems) matchOpcodeValue(value ValueOperator) ValueOperator {
 	for _, item := range c.Items {
 		v := item.matchOpcodeValue(value, context)
 		if v == nil {
-			return nil
+			continue
 		}
 		v.Recursive(func(vo ValueOperator) error {
 			if ret, ok := vo.(ssa.GetIdIF); ok {

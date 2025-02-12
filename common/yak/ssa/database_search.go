@@ -2,11 +2,10 @@ package ssa
 
 import (
 	"context"
-	"regexp"
-
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"regexp"
 )
 
 func MatchInstructionByExact(ctx context.Context, prog *Program, mod int, e string) []Instruction {
@@ -46,10 +45,11 @@ func matchInstructionByOpcode(ctx context.Context, prog *Program, opcodeName str
 	checkOpcode := func(op Opcode) bool {
 		return SSAOpcode2Name[op] == opcodeName
 	}
-	for _, instruction := range prog.Cache.constCache {
-		value, b := ToValue(instruction)
+	for _, cache := range prog.Cache.InstructionCache.GetAll() {
+		inst := cache.inst
+		value, b := ToValue(cache.inst)
 		if b && checkOpcode(value.GetOpcode()) {
-			insts = append(insts, instruction)
+			insts = append(insts, inst)
 		}
 	}
 	return insts
