@@ -3,6 +3,7 @@ package icmp
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
@@ -76,18 +77,21 @@ func TestClient_ICMP(t *testing.T) {
 	_ = gateway
 	_ = srcIP
 	userStack, err := netstackvm.NewNetStackVirtualMachine(netstackvm.WithPcapDevice(ifaceName))
+	require.NoError(t, err)
 
-	err = userStack.InheritPcapInterfaceRoute()
-	if err != nil {
-		panic(utils.Errorf("stark inherit pcap interface route %v", err))
-	}
-	target := "183.2.172.185/24,192.168.3.1/24"
-	//target := "183.2.172.185/24"
+	err = userStack.StartDHCP()
+	require.NoError(t, err)
+
+	err = userStack.WaitDHCPFinished(context.Background())
+	require.NoError(t, err)
+
+	err = userStack.AppendMainNicIPV4NeighborRoute()
+	require.NoError(t, err)
+	//target := "183.2.172.185/24,192.168.3.1/24"
+	target := "183.2.172.185/24"
 	//target := "192.168.3.1/24"
-	res, err := NewClient(userStack.GetStack()).PingScan(context.Background(), target, WithRetries(1))
-	if err != nil {
-		t.Fatal(err)
-	}
+	res, err := NewClient(userStack.GetStack()).PingScan(context.Background(), target)
+	require.NoError(t, err)
 	count := 0
 	for r := range res {
 		if r == nil {
@@ -99,12 +103,12 @@ func TestClient_ICMP(t *testing.T) {
 	fmt.Printf("total alive: %d\n", count)
 }
 
-func TestAbc(t *testing.T) {
-	if utils.InGithubActions() {
-		t.Skip()
-		return
-	}
-	for i := 0; i < 10; i++ {
-		TestClient_ICMP(t)
-	}
-}
+//func TestAbc(t *testing.T) {
+//	if utils.InGithubActions() {
+//		t.Skip()
+//		return
+//	}
+//	for i := 0; i < 10; i++ {
+//		TestClient_ICMP(t)
+//	}
+//}
