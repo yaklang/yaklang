@@ -111,16 +111,9 @@ func (vm *NetStackVirtualMachine) InheritPcapInterfaceIP() error {
 	return nil
 }
 
-func (vm *NetStackVirtualMachine) InheritPcapInterfaceRoute() error {
-	ipv4, gateway4, mask4 := vm.GetOSNetStackIPv4()
-	vm.driver.SetGatewayIP(gateway4)
-	err := vm.SetMainNICv4(ipv4, &net.IPNet{
-		IP:   ipv4,
-		Mask: mask4,
-	}, gateway4)
-	if err != nil {
-		return err
-	}
+func (vm *NetStackVirtualMachine) AppendMainNicIPV4NeighborRoute() error {
+	mask4 := vm.GetMainNICIPv4Netmask().Mask
+	ipv4 := vm.GetMainNICIPv4Address().To4()
 
 	networkSegment := make([]byte, 4)
 	for i := 0; i < len(ipv4); i++ {
@@ -132,37 +125,12 @@ func (vm *NetStackVirtualMachine) InheritPcapInterfaceRoute() error {
 	if err != nil {
 		return err
 	}
-	vm.stack.SetRouteTable([]tcpip.Route{
-		{
+	vm.stack.AddRoute(
+		tcpip.Route{
 			Destination: neigh,
 			NIC:         vm.MainNICID(),
 			MTU:         uint32(vm.mtu),
 		},
-		{
-			Destination: header.IPv4EmptySubnet,
-			Gateway:     tcpip.AddrFrom4([4]byte(gateway4.To4())),
-			NIC:         vm.MainNICID(),
-			MTU:         uint32(vm.mtu),
-		},
-		{
-			Destination: header.IPv6EmptySubnet,
-			Gateway:     tcpip.AddrFrom4([4]byte(gateway4.To4())),
-			NIC:         vm.MainNICID(),
-			MTU:         uint32(vm.mtu),
-		},
-	})
-
-	if macAddr, err := arptable.SearchHardware(gateway4.String()); err == nil {
-		vm.driver.SetGatewayHardwareAddr(macAddr)
-		tcpErr := vm.stack.AddStaticNeighbor(
-			vm.MainNICID(),
-			header.IPv4ProtocolNumber,
-			tcpip.AddrFrom4([4]byte(gateway4.To4())),
-			tcpip.LinkAddress(string(macAddr)),
-		)
-		if tcpErr != nil {
-			log.Errorf("add static neighbor failed: %v", tcpErr)
-		}
-	}
+	)
 	return nil
 }

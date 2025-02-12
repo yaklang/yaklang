@@ -31,9 +31,9 @@ type PCAPEndpoint struct {
 
 	adaptor         *pcapAdaptor
 	netBridge       *pcapBridge
-	getawayFound    *utils.AtomicBool
-	getawayHardware net.HardwareAddr
-	getawayIP       net.IP
+	gatewayFound    *utils.AtomicBool
+	gatewayHardware net.HardwareAddr
+	gatewayIP       net.IP
 	ctx             context.Context
 	cancel          context.CancelFunc
 	attachOnce      sync.Once
@@ -86,7 +86,7 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, 
 		cancel:       cancel,
 		wg:           new(sync.WaitGroup),
 		ipToMac:      new(sync.Map),
-		getawayFound: utils.NewAtomicBool(),
+		gatewayFound: utils.NewAtomicBool(),
 	}
 	return pcapEp, nil
 }
@@ -185,20 +185,20 @@ func (p *PCAPEndpoint) generateKillTCPHash(to, from string) []string {
 }
 
 func (p *PCAPEndpoint) SetGatewayHardwareAddr(hwAddr net.HardwareAddr) {
-	p.getawayHardware = hwAddr
-	p.getawayFound.Set()
+	p.gatewayHardware = hwAddr
+	p.gatewayFound.Set()
 }
 
 func (p *PCAPEndpoint) SetGatewayIP(g net.IP) {
-	p.getawayIP = g
-	if p.getawayHardware == nil {
+	p.gatewayIP = g
+	if p.gatewayHardware == nil {
 		macaddr, ok := p.ipToMac.Load(g.String())
 		if ok {
 			// log.Infof("auto set gateway hardware addr: %s -> %s", g.String(), macaddr.(net.HardwareAddr).String())
-			p.getawayHardware, _ = macaddr.(net.HardwareAddr)
+			p.gatewayHardware, _ = macaddr.(net.HardwareAddr)
 		}
 	}
-	p.getawayFound.Set()
+	p.gatewayFound.Set()
 }
 
 func (p *PCAPEndpoint) Close() {
@@ -363,8 +363,8 @@ func (p *PCAPEndpoint) outboundLoop(ctx context.Context) {
 }
 
 func (p *PCAPEndpoint) fallbackDefaultMac() net.HardwareAddr {
-	if p.getawayFound.IsSet() {
-		return p.getawayHardware
+	if p.gatewayFound.IsSet() {
+		return p.gatewayHardware
 	}
 	return net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 }
