@@ -37,7 +37,7 @@ func (p *Program) OpcodeMatch(ctx context.Context, s string) (bool, sfvm.ValueOp
 
 func (p *Program) CompareOpcode(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
 	v := items.MatchComparedValues(p)
-	if v.IsEmpty() {
+	if v == nil || v.IsEmpty() {
 		return nil, []bool{false}
 	}
 	var res []bool
@@ -51,7 +51,7 @@ func (p *Program) CompareOpcode(items *sfvm.CompareItems) (sfvm.ValueOperator, [
 
 func (p *Program) CompareString(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
 	v := items.MatchComparedValues(p)
-	if v.IsEmpty() {
+	if v == nil || v.IsEmpty() {
 		return nil, []bool{false}
 	}
 	var res []bool
