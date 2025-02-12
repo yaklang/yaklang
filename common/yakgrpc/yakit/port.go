@@ -2,8 +2,9 @@ package yakit
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -163,6 +164,7 @@ end as fingerprint`)
 }
 
 func FilterPort(db *gorm.DB, params *ypb.QueryPortsRequest) *gorm.DB {
+	db = db.Model(&schema.Port{})
 	db = bizhelper.QueryBySpecificPorts(db, "port", params.GetPorts())
 	//db = bizhelper.QueryBySpecificAddress(db, "ip_integer", params.GetHosts())
 	db = bizhelper.FuzzQueryLike(db, "host", params.GetHosts())
@@ -231,38 +233,8 @@ func YieldSimplePorts(db *gorm.DB, ctx context.Context) chan *SimplePort {
 }
 
 func YieldPorts(db *gorm.DB, ctx context.Context) chan *schema.Port {
-	outC := make(chan *schema.Port)
-	go func() {
-		defer close(outC)
-
-		var page = 1
-		for {
-			var items []*schema.Port
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	db = db.Model(schema.Port{})
+	return bizhelper.YieldModel[*schema.Port](ctx, db)
 }
 
 /*func FilterByQueryPorts(db *gorm.DB, params *ypb.QueryPortsRequest) (_ *gorm.DB, _ error) {
