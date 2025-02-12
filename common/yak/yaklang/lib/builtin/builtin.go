@@ -682,7 +682,7 @@ func println(a ...any) (n int, err error) {
 			results[i] = val
 		}
 	}
-	return fmt.Println(a...)
+	return fmt.Println(results...)
 }
 
 // sprint 使用默认格式进行格式化并返回字符串
