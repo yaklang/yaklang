@@ -314,7 +314,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
-				call2fun := fun.GetCalledBy(make(map[int64]struct{}))
+				call2fun := fun.GetCalledBy()
 				call2fun.AppendEffectOn(fun)
 				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call)
@@ -385,7 +385,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// if not found in call stack, then find in called-by
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
-				call2fun := fun.GetCalledBy(make(map[int64]struct{}))
+				call2fun := fun.GetCalledBy()
 				call2fun.AppendEffectOn(fun)
 				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call, true)

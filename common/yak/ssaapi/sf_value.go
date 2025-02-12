@@ -104,7 +104,7 @@ func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 
 func (v *Value) GetAllCallActualParams() (sfvm.ValueOperator, error) {
 	vs := make(Values, 0)
-	v.GetCalledBy(make(map[int64]struct{})).ForEach(func(c *Value) {
+	v.GetCalledBy().ForEach(func(c *Value) {
 		vs = append(vs, c.GetCallArgs()...)
 	})
 	if f, ok := ssa.ToFunction(v.node); ok {
@@ -131,7 +131,7 @@ func (v *Value) GetCallActualParams(i int) (sfvm.ValueOperator, error) {
 		))
 		rets = append(rets, ret)
 	}
-	v.GetCalledBy(make(map[int64]struct{})).ForEach(func(c *Value) {
+	v.GetCalledBy().ForEach(func(c *Value) {
 		if c, ok := ssa.ToCall(c.node); ok {
 			if len(c.Args) > i {
 				add(c.Args[i])
@@ -147,8 +147,7 @@ func (v *Value) GetCallActualParams(i int) (sfvm.ValueOperator, error) {
 }
 
 func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
-	// return v.GetCalledBy(), nil
-	ret := v.GetCalledBy(make(map[int64]struct{}))
+	ret := v.GetCalledBy()
 	ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
 	return ret, nil
 }

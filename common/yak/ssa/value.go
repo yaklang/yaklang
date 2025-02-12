@@ -89,8 +89,18 @@ func (b *FunctionBuilder) readValueEx(
 			return ret.Value
 		}
 	}
-
-	if enableClosureFreeValue {
+	isClosure := func() bool {
+		if enableClosureFreeValue {
+			return true
+		}
+		_, ok := b.captureFreeValue[name]
+		if ok {
+			return true
+		}
+		return false
+	}
+	enableReadParent := isClosure()
+	if enableReadParent {
 		if parentValue, ok := b.getParentFunctionVariable(name); ok {
 			// the ret variable should be FreeValue
 			para := b.BuildFreeValue(name)
@@ -119,7 +129,7 @@ func (b *FunctionBuilder) readValueEx(
 		return ret
 	}
 
-	if enableClosureFreeValue && create {
+	if enableReadParent && create {
 		if b.parentScope != nil {
 			return b.BuildFreeValue(name)
 		}
