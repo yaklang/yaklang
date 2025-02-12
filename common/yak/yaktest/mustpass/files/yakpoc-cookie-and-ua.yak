@@ -1,0 +1,42 @@
+port = os.GetRandomAvailableTCPPort()
+assert port > 0
+uaChecked := false
+
+uaRand = str.RandStr(10)
+cookieKey = str.RandStr(10)
+cookieValue = str.RandStr(10)
+cookieCheck1 = false
+cookieFull = str.RandStr(10) + "; a=1"
+cookieCheck2 = false
+
+go func {
+    httpserver.Serve(
+        "127.0.0.1",
+        port,
+        httpserver.handler((w, r) => {
+            ua = r.Header.Get("User-Agent")
+            if ua == uaRand {
+                uaChecked = true
+            }
+
+            c = r.Header.Get("Cookie")
+            println(c)
+
+            if string(c).Contains(cookieKey + "=" + cookieValue) {
+                cookieCheck1 = true
+            }
+
+
+            if string(c).Contains(cookieFull) {
+                cookieCheck2 = true
+            }
+        }),
+    )
+}
+
+
+poc.Get("http://127.0.0.1:" + sprint(port), poc.ua(uaRand), poc.cookie(cookieKey, cookieValue))
+assert uaChecked
+assert cookieCheck1
+poc.Get("http://127.0.0.1:" + sprint(port), poc.cookie(cookieFull))
+assert cookieCheck2
