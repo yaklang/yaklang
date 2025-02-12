@@ -9,11 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
@@ -880,122 +877,52 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if values == nil {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		res := make([]bool, 0, ValuesLen(values))
-		_ = values.Recursive(func(vo ValueOperator) error {
-			for _, element := range i.Values {
-				code := vo.GetOpcode()
-				if element == code {
-					res = append(res, true)
-					return nil
-				} else if results := BinOpRegexp.FindStringSubmatch(element); len(results) > 2 {
-					if code == results[1] {
-						// vo.GetOpcode()
-						switch ret := ssa.BinaryOpcode(vo.GetBinaryOperator()); ret {
-						case ssa.OpAdd:
-							if results[2] == "+" {
-								res = append(res, true)
-								return nil
-							}
-						}
-					}
-				}
+		items := NewCompareOpcodeItems(s.GetContext())
+		for _, opcode := range i.Values {
+			items.AddOpcodeCompareItem(opcode)
+		}
+		newVal, condition := values.CompareOpcode(items)
+		if newVal != nil && !newVal.IsEmpty() {
+			dup := s.stack.Pop()
+			if dup == nil {
+				return utils.Wrapf(CriticalError, "compare opcode failed: stack top is empty")
 			}
-
-			res = append(res, false)
-			return nil
-		})
-		s.conditionStack.Push(res)
+			s.debugSubLog("Remove duplicate :%v")
+			s.debugSubLog(">> push: %v", newVal.String())
+			s.stack.Push(newVal)
+		}
+		s.conditionStack.Push(condition)
 	case OpCompareString:
 		s.debugSubLog(">> pop")
 		values := s.stack.Pop()
 		if values == nil {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
+
 		mode := ValidCompareString(i.UnaryInt)
-		if mode != CompareStringAnyMode && mode != CompareStringHaveMode {
+		if mode == -1 {
 			return utils.Wrapf(CriticalError, "compare string failed: invalid mode %v", mode)
 		}
-		res := make([]bool, 0, ValuesLen(values))
-		var (
-			conditionCache = make(map[string]any)
-		)
 
-		matchFunc := func(index int, str, raw string) bool {
-			if len(i.MultiOperator) <= index {
-				log.Errorf("sfi values or mutiOperator out size %v", index)
-				return false
-			}
-			condition, exit := conditionCache[codec.Md5(str)]
-			conditionMode := ValidConditionFilter(i.MultiOperator[index])
-			switch conditionMode {
-			case GlobalConditionFilter:
-				var global glob.Glob
-				if exit {
-					if _global, ok := condition.(glob.Glob); ok {
-						global = _global
-					}
-				}
-				if global == nil {
-					compile, err := glob.Compile(str)
-					if err != nil {
-						log.Errorf("global compile fail: %s", err)
-						return false
-					}
-					conditionCache[codec.Md5(str)] = compile
-					global = compile
-				}
-				return global.Match(raw)
-			case RegexpConditionFilter:
-				var regexpCondition *regexp.Regexp
-				if exit {
-					if r, ok := condition.(*regexp.Regexp); ok {
-						regexpCondition = r
-					}
-				}
-				if regexpCondition == nil {
-					compile, err := regexp.Compile(str)
-					if err != nil {
-						log.Errorf("regexp compile fail: %s", err)
-						return false
-					}
-					conditionCache[codec.Md5(str)] = compile
-					regexpCondition = compile
-				}
-				result := regexpCondition.MatchString(raw)
-				return result
-			case ExactConditionFilter:
-				result := strings.Contains(raw, str)
-				return result
-			default:
-				return false
-			}
-
+		items := NewCompareStringItems(mode, s.GetContext())
+		if len(i.Values) != len(i.MultiOperator) {
+			s.conditionStack.Push([]bool{false})
+			return utils.Wrapf(CriticalError, "sfi values or mutiOperator out size %v", len(i.Values))
 		}
-		_ = values.Recursive(func(vo ValueOperator) error {
-			raw := vo.String()
-			if mode == CompareStringAnyMode {
-				match := false
-				for index, v := range i.Values {
-					if matchFunc(index, v, yakunquote.TryUnquote(raw)) {
-						match = true
-						break
-					}
-				}
-				res = append(res, match)
+		for index, v := range i.Values {
+			items.AddStringCompareItem(v, ValidConditionFilter(i.MultiOperator[index]))
+		}
+		newVal, condition := values.CompareString(items)
+		if newVal != nil && !newVal.IsEmpty() {
+			dup := s.stack.Pop()
+			if dup == nil {
+				return utils.Wrapf(CriticalError, "compare string failed: stack top is empty")
 			}
-			if mode == CompareStringHaveMode {
-				match := true
-				for index, v := range i.Values {
-					if !matchFunc(index, v, yakunquote.TryUnquote(raw)) {
-						match = false
-						break
-					}
-				}
-				res = append(res, match)
-			}
-			return nil
-		})
-		s.conditionStack.Push(res)
+			s.debugSubLog("Remove duplicate :%v")
+			s.debugSubLog(">> push: %v", newVal.String())
+			s.stack.Push(newVal)
+		}
+		s.conditionStack.Push(condition)
 	case OpVersionIn:
 		value := s.stack.Peek()
 		if value == nil {
