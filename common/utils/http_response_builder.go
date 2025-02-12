@@ -171,12 +171,14 @@ HandleExpect100Continue:
 			ret(lowerKey, valStr)
 		}
 
+		alreadySet := false
 		switch lowerKey {
 		case "content-length":
 			useContentLength = true
 			contentLengthInt = codec.Atoi(strings.TrimSpace(valStr))
 			if contentLengthInt != 0 {
 				header.Set(keyStr, valStr)
+				alreadySet = true
 				rsp.ContentLength = int64(contentLengthInt)
 			}
 		case "transfer-encoding":
@@ -194,7 +196,7 @@ HandleExpect100Continue:
 			hasEntityHeader = true
 		}
 		// add header
-		if keyStr == "" {
+		if keyStr == "" || alreadySet {
 			continue
 		}
 		header[keyStr] = append(header[keyStr], valStr)
