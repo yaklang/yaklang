@@ -152,12 +152,19 @@ type PingResult struct {
 //
 
 type ScanConfig struct {
-	Timeout    time.Duration // default 4s
-	Retries    int
-	Concurrent int
+	PingTimeout time.Duration // time out just for ping, default 4s
+	Timeout     time.Duration // one target timeout, include link address resolve. default pingTimeout + 4s
+	RetryTimes  int
+	Concurrent  int
 }
 
 type ScanConfigOpt func(*ScanConfig)
+
+func WithPingTimeout(timeout time.Duration) ScanConfigOpt {
+	return func(c *ScanConfig) {
+		c.PingTimeout = timeout
+	}
+}
 
 func WithTimeout(timeout time.Duration) ScanConfigOpt {
 	return func(c *ScanConfig) {
@@ -165,9 +172,9 @@ func WithTimeout(timeout time.Duration) ScanConfigOpt {
 	}
 }
 
-func WithRetries(retries int) ScanConfigOpt {
+func WithRetryTimes(times int) ScanConfigOpt {
 	return func(c *ScanConfig) {
-		c.Retries = retries
+		c.RetryTimes = times
 	}
 }
 
@@ -179,19 +186,23 @@ func WithConcurrent(concurrent int) ScanConfigOpt {
 
 func (c *Client) PingScan(ctx context.Context, target string, opts ...ScanConfigOpt) (chan *PingResult, error) {
 	config := &ScanConfig{
-		Timeout:    4 * time.Second,
-		Retries:    0,
-		Concurrent: 128,
+		PingTimeout: 4 * time.Second,
+		RetryTimes:  0,
+		Concurrent:  128,
 	}
 	for _, opt := range opts {
 		opt(config)
+	}
+
+	if config.Timeout == 0 {
+		config.Timeout = config.PingTimeout + time.Second*4
 	}
 
 	res := make(chan *PingResult, 100)
 	go func() {
 		defer close(res)
 		targetList := utils.ParseStringToHosts(target)
-		pingLimiter := rate.NewLimiter(128, 1)
+		pingLimiter := rate.NewLimiter(rate.Limit(config.Concurrent), 1)
 		wg := new(sync.WaitGroup)
 		for _, t := range targetList {
 			waitErr := pingLimiter.Wait(ctx)
@@ -202,9 +213,9 @@ func (c *Client) PingScan(ctx context.Context, target string, opts ...ScanConfig
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for i := 0; i <= config.Retries; i++ {
-					subctx, _ := context.WithTimeout(ctx, config.Timeout+time.Second*4)
-					v4, err := c.PingV4(subctx, t, config.Timeout)
+				for i := 0; i <= config.RetryTimes; i++ {
+					subCtx, _ := context.WithTimeout(ctx, config.Timeout)
+					v4, err := c.PingV4(subCtx, t, config.PingTimeout)
 					if err != nil {
 						//log.Errorf("ping %s fail: %v", t, err)
 						continue
@@ -258,6 +269,8 @@ func (c *Client) PingV4(ctx context.Context, target string, timeout time.Duratio
 		return nil, utils.Errorf("endpoint write echo request fail: %v", err)
 	}
 
+	writeCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	// register read able event
 	readWE, read := waiter.NewChannelEntry(waiter.EventIn)
 	c.wq.EventRegister(&readWE)
@@ -267,7 +280,7 @@ func (c *Client) PingV4(ctx context.Context, target string, timeout time.Duratio
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-time.After(timeout):
+		case <-writeCtx.Done():
 			return nil, utils.Errorf("ping %s timeout", target)
 		case <-read:
 			res, err := ep.Read(&b, tcpip.ReadOptions{

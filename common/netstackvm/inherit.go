@@ -96,6 +96,11 @@ func (vm *NetStackVirtualMachine) InheritPcapInterfaceIP() error {
 	if err != nil {
 		return err
 	}
+
+	err = vm.AppendMainNicIPV4NeighborRoute()
+	if err != nil {
+		return err
+	}
 	if macAddr, err := arptable.SearchHardware(gateway4.String()); err == nil {
 		vm.driver.SetGatewayHardwareAddr(macAddr)
 		tcpErr := vm.stack.AddStaticNeighbor(
