@@ -1,9 +1,12 @@
 package har
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -106,38 +109,68 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 		StatusText: http.StatusText(int(flow.StatusCode)),
 	}
 
-	respRaw, err := strconv.Unquote(flow.Response)
+	var r io.Reader
+	if flow.Response != "" {
+		respRaw, err := strconv.Unquote(flow.Response)
+		if err != nil {
+			return nil, err
+		}
+		r = bytes.NewBufferString(respRaw)
+	} else {
+		f, err := os.Open(flow.TooLargeResponseHeaderFile)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		f2, err := os.Open(flow.TooLargeResponseBodyFile)
+		if err != nil {
+			return nil, err
+		}
+		defer f2.Close()
+
+		r = io.MultiReader(f, f2)
+	}
+
+	resp, err := utils.ReadHTTPResponseFromBufioReader(r, nil)
 	if err != nil {
 		return nil, err
 	}
-	respByte := []byte(respRaw)
 
 	// get http version
-	response.HTTPVersion, _, _ = lowhttp.GetHTTPPacketFirstLine(respByte)
+	response.HTTPVersion = resp.Proto
 	isResponseHTTP2 := strings.Contains(strings.ToLower(response.HTTPVersion), "http/2")
 
 	// get headers
-	var responseHeaders []*HARKVPair
-	for key, values := range lowhttp.GetHTTPPacketHeadersFull(respByte) {
+	var (
+		responseHeaders     []*HARKVPair
+		ResponseContentType string
+	)
+	for key, headers := range resp.Header {
 		if isResponseHTTP2 {
 			key = strings.ToLower(key)
 		}
-		for _, value := range values {
+		if strings.ToLower(key) == "content-type" {
+			ResponseContentType = headers[0]
+		}
+		for _, header := range headers {
 			responseHeaders = append(responseHeaders, &HARKVPair{
 				Name:  key,
-				Value: value,
+				Value: header,
 			})
 		}
 	}
 	response.Headers = responseHeaders
 	response.HeadersSize = len(responseHeaders)
 
-	body := lowhttp.GetHTTPPacketBody(respByte)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
 
 	// get content
 	response.Content = &HARHTTPContent{
 		Size:     len(body),
-		MimeType: lowhttp.GetHTTPPacketContentType(respByte),
+		MimeType: ResponseContentType,
 		Text:     string(body),
 	}
 	response.BodySize = len(body)
