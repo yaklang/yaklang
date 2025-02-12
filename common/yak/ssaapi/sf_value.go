@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 
 	"github.com/samber/lo"
@@ -85,6 +86,26 @@ func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
 	return value != nil, value, nil
+}
+
+func (v *Value) CompareString(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+	if v == nil || items == nil {
+		return nil, []bool{false}
+	}
+	text := yakunquote.TryUnquote(v.String())
+	return nil, []bool{items.CompareString(text)}
+}
+
+func (v *Value) CompareOpcode(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+	if v == nil || items == nil {
+		return nil, []bool{false}
+	}
+	return nil, []bool{items.CompareOpcode(v.GetOpcode(), v.GetBinaryOperator())}
+}
+
+func (v *Value) OpcodeMatch(ctx context.Context, op string) (bool, sfvm.ValueOperator, error) {
+	newVal := _SearchValuesByOpcode(Values{v}, op, sfvm.WithAnalysisContext_Label("search-opcode:"+op))
+	return newVal != nil, newVal, nil
 }
 
 func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {

@@ -1,6 +1,7 @@
 package syntaxflow
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -231,5 +232,144 @@ $target?{have: anc*,/[0-9]+$/} as $output
 `, map[string][]string{
 			"output": {`"anc123"`},
 		})
+	})
+}
+
+func Test_Condition_Filter_Start_With_Program(t *testing.T) {
+	t.Run("test CompareString-Have Regex", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		asd = 1
+		asdd = 2
+		`,
+			`
+			*?{ have: /^asd$/  } as $target1
+			`,
+			map[string][]string{
+				"target1": {"1"},
+			})
+	})
+	t.Run("test CompareString-Have Global", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		asd = 1
+		asdd = 2
+		`,
+			`
+			*?{ have: a* } as $target1
+			`,
+			map[string][]string{
+				"target1": {"1", "2"},
+			})
+	})
+	t.Run("test CompareString-Have with opcode", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		a1 = "abc"
+		a2 = ss
+		a3 = func() {}
+		`,
+			`
+			*?{ have: 'a' && opcode:const } as $target1
+			`,
+			map[string][]string{
+				"target1": {"\"abc\""},
+			})
+	})
+
+	t.Run("test CompareString-Have mutli exact", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		aa = 1
+		aacc = 2
+		cc = 3
+		`,
+			`
+			*?{have:'aa','cc'} as $target1
+			`,
+			map[string][]string{
+				"target1": {"2"},
+			})
+	})
+
+	t.Run("test CompareString-Have Any 1 ", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		aa = 1
+		aacc = 2
+		cc = 3
+		`,
+			`
+			*?{any:'aa','cc'} as $target1
+			`,
+			map[string][]string{
+				"target1": {"1", "2", "3"},
+			})
+	})
+
+	t.Run("test CompareString-Have Any 2", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		exist = 1
+		www = 2
+		`,
+			`
+			*?{any:'notExist','exist'} as $target1
+			`,
+			map[string][]string{
+				"target1": {"1"},
+			})
+	})
+
+	t.Run("test CompareOpcode 1", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		a1=11
+		a2=undefined
+		a3=func(){}
+		`,
+			`
+			*?{opcode:const} as $target1
+			`,
+			map[string][]string{
+				"target1": {"11"},
+			})
+	})
+
+	t.Run("test CompareOpcode 1", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		a1 = 11
+		b2 = 22
+		a2 = undefined
+		a3 = func(){}
+		`,
+			`
+			*?{opcode:const && have:'11'} as $target1
+			`,
+			map[string][]string{
+				"target1": {"11"},
+			})
+	})
+
+	t.Run("test CompareOpcode 2", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, `    public class demo {
+        public static void main(String[] args) {
+            String str = "hello";
+            if (str.contains("he")) {
+                System.out.println("ok");
+            }
+        }
+    }`, `*?{opcode:call && have:"contain"} as $output;
+alert $output;`, map[string][]string{
+			"output": {"contain"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("test muti filter", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		a1 = 11
+		b2 = 22
+		a2 = undefined
+		a3 = func(){}
+		`,
+			`
+			*?{opcode:const && *?{have:'11'}} as $target1
+			`,
+			map[string][]string{
+				"target1": {"11"},
+			})
 	})
 }
