@@ -153,6 +153,13 @@ func (v *SyntaxFlowVisitor) EmitCompareOpcode(i []string) {
 	})
 }
 
+type CompareMode int
+
+const (
+	CompareModeString CompareMode = iota
+	CompareModeOpcode
+)
+
 type CompareStringMode int
 
 const (
