@@ -990,4 +990,5 @@ class ChildClass extends ParentClass {
 			`Undefined-.Method(valid)("parent")`,
 		}, t)
 	})
+
 }

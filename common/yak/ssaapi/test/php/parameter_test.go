@@ -6,8 +6,9 @@ import (
 	"testing"
 )
 
-func TestParameter(t *testing.T) {
-	code := `<?php
+func TestParamCall(t *testing.T) {
+	t.Run("parameterCall is called", func(t *testing.T) {
+		code := `<?php
 	function bBB($a){
 	   echo($a);
 	}
@@ -16,12 +17,12 @@ func TestParameter(t *testing.T) {
 	}
 	A(bBB);
 	`
-	ssatest.CheckSyntaxFlow(t, code, `echo(* #-> * as $param)`, map[string][]string{
-		"param": {"1"},
-	}, ssaapi.WithLanguage(ssaapi.PHP))
-}
-func TestParameterMember(t *testing.T) {
-	code := `<?php
+		ssatest.CheckSyntaxFlow(t, code, `echo(* #-> * as $param)`, map[string][]string{
+			"param": {"1"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("parameterMember is called", func(t *testing.T) {
+		code := `<?php
 	class A{
 		public function b($a){
 			println($a);
@@ -33,7 +34,160 @@ func TestParameterMember(t *testing.T) {
 	$a = new A();
 	bBB($a);
 	`
-	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
-		"param": {"1"},
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
+			"param": {"1"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test parameterMember call and parameter", func(t *testing.T) {
+		code := `<?php
+
+
+class B{
+    public function b($f){
+        println($f);
+    }
+}
+
+class A{
+    public $field_b;
+    public function run($c){
+        $c->field_b->b(1);
+    }
+}
+
+$a = new A();
+$a->field_b = new B();
+
+$b = new A();
+$b->run($a);
+`
+		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
+			"param": {"1"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test freeValue call", func(t *testing.T) {
+		code := `<?php
+
+function test($a){
+    println($a);
+}
+function A($a){
+    $a(1);
+}
+
+$a = test;
+$b = function()use(&$a){
+    A($a);
+};
+$b();
+`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+	})
+
+	t.Run("test sideEffect call parameter", func(t *testing.T) {
+		code := `<?php
+
+function test1($c){
+	println($c);
+}
+function test($c){
+	println($c);
+}
+function A($f,$v){
+    $f($v);
+}
+
+$a = test1;
+$b = function()use(&$a){
+	$a = test;
+};
+if($c){
+	//$a = test
+	$b();
+	A($a,1);
+}else{
+	//$a = test1
+	A($a,2);
+}
+`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1", "2"})
+	})
+
+	//todo: fix member call
+
+	//	t.Run("big test for more parameterMember", func(t *testing.T) {
+	//		code := `<?php
+	//
+	//
+	///*
+	//topdef:
+	//    $a        GetFunc
+	//    FunctionA GetCallBy
+	//
+	// */
+	//class A{
+	//    public $c;
+	//    public function FunctionA($a){
+	//        println($a->c);
+	//    }
+	//}
+	//function C($c){
+	//    $c->FunctionA($c);
+	//}
+	//$a = new A();
+	//$a->c = 2;
+	//C($a);
+	//`
+	//		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
+	//	})
+	t.Run("big test for parameter and feeevalue", func(t *testing.T) {
+		code := `<?php
+
+/*
+topdef:
+    param $a
+    getFunc test
+    getCallBy():
+        FuncA()
+        foreach ArgsMember
+        parameterMember
+    getCallBy():
+    
+*/
+
+class A{
+    public function test($a){
+        println($a);    
+    }
+}
+function FuncA($a){
+    $a->test(1);
+}
+
+$a = new A();
+$b = function()use(&$a){
+    FuncA($a);
+};
+$b();
+`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+	})
+	//	/*
+	//		todo： 动态语言的情况，会在call中进行修复
+	//	*/
+	//	t.Run("test const sideEffect call", func(t *testing.T) {
+	//		code := `<?php
+	//
+	//function a($a){
+	//    println($a);
+	//}
+	//
+	//$b = "c";
+	//$c = function()use(&$b){
+	//	$b = "a";
+	//};
+	//$c();
+	//$b(1);`
+	//		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{})
+	//	})
 }

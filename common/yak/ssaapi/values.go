@@ -697,7 +697,13 @@ func (v *Value) IsCalled() bool {
 	})) > 0
 }
 
-func (v *Value) GetCalledBy(tmp map[int64]struct{}) Values {
+func (v *Value) GetCalledBy() Values {
+	if v.IsNil() {
+		return nil
+	}
+	return v.getCallByEx(make(map[int64]struct{}))
+}
+func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 	if v.IsNil() {
 		return nil
 	}
@@ -729,7 +735,8 @@ func (v *Value) GetCalledBy(tmp map[int64]struct{}) Values {
 				break
 			}
 			if value.GetId() == id {
-				vs = append(vs, v.NewValue(function.ParameterMembers[index]).GetCalledBy(tmp)...)
+				vs = append(vs, v.NewValue(function.ParameterMembers[index]).getCallByEx(tmp)...)
+				return
 			}
 		}
 		for index, arg := range call.Args {
@@ -737,9 +744,25 @@ func (v *Value) GetCalledBy(tmp map[int64]struct{}) Values {
 				break
 			}
 			if arg.GetId() == id {
-				vs = append(vs, v.NewValue(function.Params[index]).GetCalledBy(tmp)...)
+				vs = append(vs, v.NewValue(function.Params[index]).getCallByEx(tmp)...)
+				return
 			}
 		}
+		searchBindVariable := func(name string) {
+			for _, value := range function.FreeValues {
+				if value.GetName() == name {
+					vs = append(vs, v.NewValue(value).getCallByEx(tmp)...)
+					return
+				}
+			}
+		}
+		for name, value := range call.Binding {
+			if value.GetId() == id {
+				searchBindVariable(name)
+				return
+			}
+		}
+
 	}
 	addCall := func(node ssa.Value) {
 		nodeId := node.GetId()

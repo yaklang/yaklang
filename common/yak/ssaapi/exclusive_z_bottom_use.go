@@ -179,7 +179,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			// var results Values
 			results := make(Values, 0)
 			if f := ins.GetFunc(); f != nil {
-				v.NewBottomUseValue(f).GetCalledBy(make(map[int64]struct{})).ForEach(func(value *Value) {
+				v.NewBottomUseValue(f).GetCalledBy().ForEach(func(value *Value) {
 					dep := value.AppendDependOn(v)
 					if !actx.haveTheCrossProcess(dep) {
 						actx.setCauseValue(dep)
