@@ -493,6 +493,7 @@ func (*endpoint) Disconnect() tcpip.Error {
 }
 
 // Connect connects the endpoint to its peer. Specifying a NIC is optional.
+// icmp connect will start resolving the route to the destination.
 func (e *endpoint) Connect(addr tcpip.FullAddress) tcpip.Error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -516,7 +517,10 @@ func (e *endpoint) Connect(addr tcpip.FullAddress) tcpip.Error {
 	e.rcvReady = true
 	e.rcvMu.Unlock()
 
-	return nil
+	e.net.ResolvedRoute(func(_ stack.ResolvedFieldsResult) {
+		e.waiterQueue.Notify(waiter.WritableEvents)
+	})
+	return &tcpip.ErrConnectStarted{}
 }
 
 // ConnectEndpoint is not supported.

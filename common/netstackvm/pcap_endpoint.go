@@ -312,7 +312,7 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 					_, ok := p.ipToMac.Load(ipString)
 					if !ok {
 						//log.Infof("remember ip to mac: %s -> %s", ipString, net.HardwareAddr(arpPacket.SourceHwAddress).String())
-						p.ipToMac.Store(ipString, arpPacket.SourceHwAddress)
+						p.ipToMac.Store(ipString, net.HardwareAddr(arpPacket.SourceHwAddress))
 					}
 				}
 				p.InjectInbound(header.ARPProtocolNumber, pkt)
