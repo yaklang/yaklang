@@ -91,6 +91,21 @@ func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.
 	return newValue
 }
 
+func _SearchValuesByOpcode(values Values, opcode string, opt ...sfvm.AnalysisContextOption) Values {
+	var newValue Values
+	if values.IsEmpty() {
+		return newValue
+	}
+
+	for _, value := range values {
+		if value.GetOpcode() == opcode {
+			value.AppendPredecessor(value, opt...)
+			newValue = append(newValue, value)
+		}
+	}
+	return newValue
+}
+
 func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
 	var rets Values
 	for _, v := range vs {
