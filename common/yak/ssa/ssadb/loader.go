@@ -93,6 +93,7 @@ const (
 	ExactCompare int = iota
 	GlobCompare
 	RegexpCompare
+	OpcodeCompare
 )
 
 func SearchVariable(db *gorm.DB, ctx context.Context, compareMode, matchMod int, value string) chan *IrCode {
@@ -146,6 +147,11 @@ func RegexpSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value strin
 		db = db.Where("variable_name REGEXP ? OR class_name REGEXP ? OR field_name REGEXP ?", value, value, value)
 	}
 	return yieldIrIndex(db, ctx)
+}
+
+func SearchIrCodeByOpcode(db *gorm.DB, opcode string, ctx context.Context) chan *IrCode {
+	db = db.Model(&IrCode{}).Where("opcode_name = ?", opcode)
+	return yieldIrCodes(db, ctx)
 }
 
 func GetVariableByValue(valueID int64) []*IrIndex {
