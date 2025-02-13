@@ -162,9 +162,9 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 			if v.GetType().GetTypeKind() == AnyTypeKind {
 				continue
 			}
-			if _, ok := ToParameter(v); ok {
-				continue
-			}
+			//if _, ok := ToParameter(v); ok {
+			//	continue
+			//}
 			if _, ok := typeMerge[v.GetType()]; ok {
 				continue
 			}
