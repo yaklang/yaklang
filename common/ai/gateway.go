@@ -2,6 +2,8 @@ package ai
 
 import (
 	"errors"
+	"github.com/yaklang/yaklang/common/ai/deepseek"
+	"github.com/yaklang/yaklang/common/ai/siliconflow"
 	"io"
 
 	"github.com/samber/lo"
@@ -32,6 +34,12 @@ func init() {
 	})
 	aispec.Register("comate", func() aispec.AIClient {
 		return &comate.Client{}
+	})
+	aispec.Register("deepseek", func() aispec.AIClient {
+		return &deepseek.GetawayClient{}
+	})
+	aispec.Register("siliconflow", func() aispec.AIClient {
+		return &siliconflow.GetawayClient{}
 	})
 }
 

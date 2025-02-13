@@ -177,6 +177,14 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			verbose = "Tongyi"
 			extTag["model"] = "default:qwen-turbo"
 			extTag["domain"] = "default:dashscope.aliyuncs.com"
+		case "deepseek":
+			verbose = "DeepSeek"
+			extTag["model"] = "default:deepseek-chat"
+			extTag["domain"] = "default:api.deepseek.com"
+		case "siliconflow":
+			verbose = "SiliconFlow"
+			extTag["model"] = "default:deepseek-ai/DeepSeek-V3"
+			extTag["domain"] = "default:api.siliconflow.cn"
 		}
 		aiOptions, err := utils.ParseAppTagToOptions(&aispec.AIConfig{}, extTag)
 		if err != nil {
