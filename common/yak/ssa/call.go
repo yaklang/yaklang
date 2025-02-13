@@ -40,13 +40,37 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-
 	f.emit(c)
 	c.handlerGeneric()
 	c.handlerObjectMethod()
 	c.handlerReturnType()
 	c.handleCalleeFunction()
+	c.handleWeakLanguageCall()
 	return c
+}
+func (c *Call) handleWeakLanguageCall() {
+	method := c.Method
+	/*
+		handle weakLanguage call
+	*/
+	builder := c.GetFunc().builder
+	weakLanguage := builder.IsWeakLanguage()
+	check := func() {
+		// get function from prog method
+		if IsConst(method) {
+			if newMethod := builder.GetFunc(method.String(), ""); utils.IsNil(newMethod) {
+				log.Errorf("weakLanguage call %s not found", method.String())
+				return
+			} else {
+				Point(newMethod, method)
+			}
+		}
+	}
+	if weakLanguage {
+		if !method.IsExtern() && method.GetOpcode() != SSAOpcodeFunction {
+			check()
+		}
+	}
 }
 
 func (c *Call) handlerGeneric() {
