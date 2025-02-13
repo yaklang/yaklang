@@ -506,6 +506,18 @@ func InterfaceToBoolean(i any) bool {
 	}
 }
 
+func InterfaceToFloat64(i any) float64 {
+	if i == nil {
+		return 0
+	}
+	switch ret := i.(type) {
+	case float64:
+		return ret
+	default:
+		return float64(InterfaceToInt(i))
+	}
+}
+
 func InterfaceToInt(i any) int {
 	if i == nil {
 		return 0
