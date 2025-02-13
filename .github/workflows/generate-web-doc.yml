@@ -40,7 +40,7 @@ jobs:
 
     - name: Copy docs
       run: |
-        cp -rf web_doc/* websize/docs/api
+        cp -rf web_doc/* websize/api-manual/api
 
     - name: Add tag and Push
       continue-on-error: true
