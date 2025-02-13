@@ -22,51 +22,97 @@ desc(
     lang:'java',
     alert_num:1,
     "file://unsafe.java":<<<TEXT
+package net.jradius.security.auth;
+import java.io.IOException;
+import java.util.Map;
+import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
-import java.io.Console;
-import java.io.IOException;
+import javax.security.auth.login.CredentialExpiredException;
+import javax.security.auth.login.LoginException;
+import javax.security.auth.spi.LoginModule;
 
-public class InsecurePasswordInput {
-
-    public static void main(String[] args) {
-        // 创建一个CallbackHandler，用于处理密码输入
-        CallbackHandler callbackHandler = new CallbackHandler() {
-            @Override
-            public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
-                for (Callback callback : callbacks) {
-                    if (callback instanceof PasswordCallback) {
-                        PasswordCallback pc = (PasswordCallback) callback;
-                        // 设置提示信息，但没有禁用回显
-                        pc.setPrompt("Please enter your password: ");
-                        // 注意：这里没有调用setEcho(false)，导致密码可能会被回显
-                        // 获取控制台
-                        Console console = System.console();
-                        if (console != null) {
-                            // 读取密码，由于没有禁用回显，密码可能会显示在屏幕上
-                            char[] password = console.readPassword();
-                            // 设置密码
-                            pc.setPassword(password);
-                        } else {
-                            throw new IOException("Cannot access console");
-                        }
-                    } else {
-                        throw new UnsupportedCallbackException(callback, "Unsupported callback");
-                    }
-                }
-            }
-        };
-
-        // 模拟一个认证过程，需要用户输入密码
-        try {
-            callbackHandler.handle(new Callback[]{new PasswordCallback("Password: ", true)});
-            // 注意：这里PasswordCallback的构造函数中的echo参数被设置为true，增加了安全风险
-            System.out.println("Password entered successfully.");
-        } catch (IOException | UnsupportedCallbackException e) {
-            e.printStackTrace();
+import net.jradius.client.RadiusClient;
+import net.jradius.log.RadiusLog;
+import net.jradius.packet.AccessAccept;
+import net.jradius.packet.AccessRequest;
+import net.jradius.packet.RadiusResponse;
+import net.jradius.packet.attribute.AttributeFactory;
+import net.jradius.packet.attribute.AttributeList;
+import net.jradius.security.JRadiusPrincipal;
+public class JRadiusModule implements LoginModule
+{
+    public boolean login() throws LoginException
+    {
+        if (callbackHandler == null)
+        {
+            throw new LoginException("No CallbackHandler for this JRadius LoginModule.");
         }
+
+        if (radiusClient == null)
+        {
+            try {
+				radiusClient = new RadiusClient();
+			} catch (Exception e) {
+				throw new LoginException();
+			}
+        }
+
+        NameCallback nameCallback = new NameCallback("User Name: ");
+        PasswordCallback passwordCallback = new PasswordCallback("Password: ", true);
+        JRadiusCallback radiusCallback = new JRadiusCallback(radiusClient);
+
+        Callback[] callbacks = new Callback[3];
+        callbacks[0] = nameCallback;
+        callbacks[1] = passwordCallback;
+        callbacks[2] = radiusCallback;
+
+        try
+        {
+            callbackHandler.handle(callbacks);
+        }
+        catch (IOException ioex)
+        {
+            throw new LoginException(ioex.getMessage());
+        }
+        catch (UnsupportedCallbackException uscbex)
+        {
+            StringBuffer sb = new StringBuffer("Error: Callback ");
+            sb.append(uscbex.getCallback().toString());
+            sb.append(" not supported.");
+            throw new LoginException(sb.toString());
+        }
+
+        userName = nameCallback.getName();
+        String password = new String(passwordCallback.getPassword());
+
+        try
+        {
+            AccessRequest request = new AccessRequest(radiusClient, radiusCallback.getAuthAttributes());
+            request.addAttribute(AttributeFactory.newAttribute("User-Name", userName, "="));
+            request.addAttribute(AttributeFactory.newAttribute("User-Password", password, "="));
+            if (debug)
+            {
+                RadiusLog.debug("Sending:\n" + request.toString());
+            }
+            RadiusResponse reply = radiusClient.authenticate(request, radiusCallback.getRadiusAuthenticator(), retries);
+            if (reply == null) throw new LoginException("no reply from remote RADIUS server");
+            if (debug)
+            {
+                RadiusLog.debug("Received:\n" + reply.toString());
+            }
+            if (!(reply instanceof AccessAccept)) throw new CredentialExpiredException("authentication failed");
+        }
+        catch (Exception ioex)
+        {
+            throw new LoginException(ioex.getMessage());
+        }
+
+        authenticated = true;
+        return true;
     }
 }
 TEXT
@@ -75,50 +121,97 @@ TEXT
 desc(
     lang:'java',
     "safefile://safe.java":<<<TEXT
+package net.jradius.security.auth;
+import java.io.IOException;
+import java.util.Map;
+import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
-import java.io.Console;
-import java.io.IOException;
+import javax.security.auth.login.CredentialExpiredException;
+import javax.security.auth.login.LoginException;
+import javax.security.auth.spi.LoginModule;
 
-public class SecurePasswordInput {
-
-    public static void main(String[] args) {
-        // 创建一个CallbackHandler，用于处理密码输入
-        CallbackHandler callbackHandler = new CallbackHandler() {
-            @Override
-            public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
-                for (Callback callback : callbacks) {
-                    if (callback instanceof PasswordCallback) {
-                        PasswordCallback pc = (PasswordCallback) callback;
-                        // 设置提示信息，并禁用回显
-                        pc.setPrompt("Please enter your password: ");
-                        pc.setEcho(false);
-                        // 获取控制台
-                        Console console = System.console();
-                        if (console != null) {
-                            // 读取密码，不会在屏幕上显示
-                            char[] password = console.readPassword();
-                            // 设置密码
-                            pc.setPassword(password);
-                        } else {
-                            throw new IOException("Cannot access console");
-                        }
-                    } else {
-                        throw new UnsupportedCallbackException(callback, "Unsupported callback");
-                    }
-                }
-            }
-        };
-
-        // 模拟一个认证过程，需要用户输入密码
-        try {
-            callbackHandler.handle(new Callback[]{new PasswordCallback("Password: ", false)});
-            System.out.println("Password entered successfully.");
-        } catch (IOException | UnsupportedCallbackException e) {
-            e.printStackTrace();
+import net.jradius.client.RadiusClient;
+import net.jradius.log.RadiusLog;
+import net.jradius.packet.AccessAccept;
+import net.jradius.packet.AccessRequest;
+import net.jradius.packet.RadiusResponse;
+import net.jradius.packet.attribute.AttributeFactory;
+import net.jradius.packet.attribute.AttributeList;
+import net.jradius.security.JRadiusPrincipal;
+public class JRadiusModule implements LoginModule
+{
+    public boolean login() throws LoginException
+    {
+        if (callbackHandler == null)
+        {
+            throw new LoginException("No CallbackHandler for this JRadius LoginModule.");
         }
+
+        if (radiusClient == null)
+        {
+            try {
+				radiusClient = new RadiusClient();
+			} catch (Exception e) {
+				throw new LoginException();
+			}
+        }
+
+        NameCallback nameCallback = new NameCallback("User Name: ");
+        PasswordCallback passwordCallback = new PasswordCallback("Password: ", false);
+        JRadiusCallback radiusCallback = new JRadiusCallback(radiusClient);
+
+        Callback[] callbacks = new Callback[3];
+        callbacks[0] = nameCallback;
+        callbacks[1] = passwordCallback;
+        callbacks[2] = radiusCallback;
+
+        try
+        {
+            callbackHandler.handle(callbacks);
+        }
+        catch (IOException ioex)
+        {
+            throw new LoginException(ioex.getMessage());
+        }
+        catch (UnsupportedCallbackException uscbex)
+        {
+            StringBuffer sb = new StringBuffer("Error: Callback ");
+            sb.append(uscbex.getCallback().toString());
+            sb.append(" not supported.");
+            throw new LoginException(sb.toString());
+        }
+
+        userName = nameCallback.getName();
+        String password = new String(passwordCallback.getPassword());
+
+        try
+        {
+            AccessRequest request = new AccessRequest(radiusClient, radiusCallback.getAuthAttributes());
+            request.addAttribute(AttributeFactory.newAttribute("User-Name", userName, "="));
+            request.addAttribute(AttributeFactory.newAttribute("User-Password", password, "="));
+            if (debug)
+            {
+                RadiusLog.debug("Sending:\n" + request.toString());
+            }
+            RadiusResponse reply = radiusClient.authenticate(request, radiusCallback.getRadiusAuthenticator(), retries);
+            if (reply == null) throw new LoginException("no reply from remote RADIUS server");
+            if (debug)
+            {
+                RadiusLog.debug("Received:\n" + reply.toString());
+            }
+            if (!(reply instanceof AccessAccept)) throw new CredentialExpiredException("authentication failed");
+        }
+        catch (Exception ioex)
+        {
+            throw new LoginException(ioex.getMessage());
+        }
+
+        authenticated = true;
+        return true;
     }
 }
 TEXT
