@@ -1,6 +1,6 @@
 desc(
-    title: "Servlet & Springframework Paremeter Directly Passed into Command Injection Sink",
-    title: 'Servlet & Springframewor 基础参数直接命令注入',
+    title: "Servlet & Springframework Paremeter Passed into Command Injection Sink",
+    title: 'Servlet & Springframework 基础参数命令注入',
     type: vuln,
     risk:rce,
     desc: <<<TEXT
@@ -18,11 +18,21 @@ check $sink;
 $sink #{
     include:`<self> & $source`,
     exclude:`<self>?{opcode:call}?{!<self> & $source}`
+}->as $high;
+
+alert $high for{
+    message: "发现Java代码中存在命令注入漏洞，并且数据流中间没有进行任何过滤。",
+    level: high,
+};
+
+$sink #{
+    include:`<self> & $source`,
 }->as $result;
 
-alert $result for{
-    message: "Find direct command injection vulnerability for java",
-    level: high,
+$result - $high -> as $mid;
+alert $mid for{
+    message: "发现Java代码中可能存在命令注入漏洞。",
+    level: mid,
 };
 
 desc(
@@ -83,7 +93,7 @@ EOF
 
 desc(
 language: java,
-alert_min:1,
+alert_high:1,
 'file://directly.java':<<<EOF
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -125,5 +135,66 @@ public class CommandExecutionApplication {
 
     }
 }
+EOF
+)
+
+desc(
+    lang:java,
+    alert_mid:1,
+    "file://complexDemo1.java":<<<EOF
+    package com.example;
+
+    public class CmdObject {
+        private String cmd1;
+        private String cmd2;
+
+        public void setCmd(String s) {
+            this.cmd1 = s;
+        }
+
+        public void setCmd2(String s) {
+            this.cmd2 = s;
+        }
+
+        public String getCmd() {
+            return this.cmd1;
+        }
+
+        public String getCmd2() {
+            return this.cmd2;
+        }
+    }
+    @RestController()
+    public class AstTaintCase001 {
+    @PostMapping(value = "Cross_Class_Command_Injection-1")
+          public Map<String, Object> CrossClassTest1(@RequestParam String cmd) {
+              Map<String, Object> modelMap = new HashMap<>();
+              try {
+                  CmdObject simpleBean = new CmdObject();
+                  simpleBean.setCmd(cmd);
+                  simpleBean.setCmd2("cd /");
+                  Runtime.getRuntime().exec(simpleBean.getCmd());
+                  modelMap.put("status", "success");
+              } catch (Exception e) {
+                  modelMap.put("status", "error");
+              }
+              return modelMap;
+          }
+
+       @PostMapping(value = "Cross_Class_Command_Injection-2")
+             public Map<String, Object> CrossClassTest2(@RequestParam String cmd) {
+                 Map<String, Object> modelMap = new HashMap<>();
+                 try {
+                     CmdObject simpleBean = new CmdObject();
+                     simpleBean.setCmd(cmd);
+                     simpleBean.setCmd2("cd /");
+                     Runtime.getRuntime().exec(simpleBean.getCmd2());
+                     modelMap.put("status", "success");
+                 } catch (Exception e) {
+                     modelMap.put("status", "error");
+                 }
+                 return modelMap;
+             }
+    }
 EOF
 )
