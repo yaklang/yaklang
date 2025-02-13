@@ -82,7 +82,7 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 	an := &ssadb.AuditNode{
 		AuditNodeStatus: s.AuditNodeStatus,
-		IsEntryNode:     ValueCompare(value, s.entryValue),
+		IsEntryNode:     value == s.entryValue,
 		IRCodeID:        value.GetId(),
 		TmpStartOffset:  -1,
 		TmpEndOffset:    -1,
