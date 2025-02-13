@@ -20,6 +20,7 @@ import (
 
 type Language string
 
+const EmbedSfBuildInRuleKey = "e18179b8cbbea727589cd210c8204306"
 const (
 	Yak     Language = "yak"
 	JS      Language = "js"

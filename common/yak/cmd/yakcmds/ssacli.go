@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"io"
 	"io/fs"
 	"os"
@@ -551,7 +552,7 @@ var SSACompilerCommands = []*cli.Command{
 	},
 	{
 		Name:    "syntaxflow-save",
-		Aliases: []string{"save-syntaxflow", "ssf", "sfs"},
+		Aliases: []string{"save-syntaxflow", "ssf", "sfs", "sync-rule"},
 		Usage:   "save SyntaxFlow rule to database",
 		Flags: []cli.Flag{
 			cli.StringFlag{
@@ -563,58 +564,59 @@ var SSACompilerCommands = []*cli.Command{
 			},
 		},
 		Action: func(c *cli.Context) error {
-			count := 0
-			err := filesys.Recursive(c.String("filesystem"), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-				count++
-				if count > 50 {
-					return utils.Error("too many files")
-				}
-				// size > 2M will be ignored
-				if info.Size() > 2*1024*1024 {
-					return utils.Errorf("file %v size too large", s)
-				}
-				return nil
-			}))
-			if err != nil {
-				return utils.Wrap(err, "read mvp file system failed")
-			}
-
-			memfs := filesys.NewVirtualFs()
-			local := filesys.NewLocalFs()
-			err = filesys.Recursive(c.String("filesystem"), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-				raw, err := local.ReadFile(s)
+			if c.String("filesystem") == "" {
+				return sfbuildin.SyncEmbedRule()
+			} else {
+				count := 0
+				err := filesys.Recursive(c.String("filesystem"), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					count++
+					if count > 50 {
+						return utils.Error("too many files")
+					}
+					// size > 2M will be ignored
+					if info.Size() > 2*1024*1024 {
+						return utils.Errorf("file %v size too large", s)
+					}
+					return nil
+				}))
 				if err != nil {
+					return utils.Wrap(err, "read mvp file system failed")
+				}
+
+				memfs := filesys.NewVirtualFs()
+				local := filesys.NewLocalFs()
+				err = filesys.Recursive(c.String("filesystem"), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					raw, err := local.ReadFile(s)
+					if err != nil {
+						return nil
+					}
+					memfs.AddFile(s, string(raw))
+					return nil
+				}))
+				if err != nil {
+					return err
+				}
+
+				contentRaw, _ := local.ReadFile(c.String("rule"))
+				if len(contentRaw) > 0 {
+					err = sfdb.ImportValidRule(memfs, c.String("rule"), string(contentRaw))
+					if err != nil {
+						log.Warnf("import rule failed: %v", err)
+					}
 					return nil
 				}
-				memfs.AddFile(s, string(raw))
-				return nil
-			}))
-			if err != nil {
-				return err
-			}
 
-			contentRaw, _ := local.ReadFile(c.String("rule"))
-			if len(contentRaw) > 0 {
-				err = sfdb.ImportValidRule(memfs, c.String("rule"), string(contentRaw))
-				if err != nil {
-					log.Warnf("import rule failed: %v", err)
-				}
-				return nil
-			}
-
-			entrys, err := utils.ReadDir(c.String("rule"))
-			if err != nil {
-				return err
-			}
-			for _, entry := range entrys {
-				contentRaw, _ := local.ReadFile(entry.Path)
-				if len(contentRaw) <= 0 {
-					continue
-				}
-				err = sfdb.ImportValidRule(memfs, entry.Path, string(contentRaw))
-				if err != nil {
-					log.Warnf("import rule failed: %v", err)
-					continue
+				entrys, _ := utils.ReadDir(c.String("rule"))
+				for _, entry := range entrys {
+					contentRaw, _ := local.ReadFile(entry.Path)
+					if len(contentRaw) <= 0 {
+						continue
+					}
+					err = sfdb.ImportValidRule(memfs, entry.Path, string(contentRaw))
+					if err != nil {
+						log.Warnf("import rule failed: %v", err)
+						continue
+					}
 				}
 			}
 			return nil
