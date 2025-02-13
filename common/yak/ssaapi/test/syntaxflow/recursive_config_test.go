@@ -229,6 +229,16 @@ UNTIL,
 
 func TestSF_NativeCall_DataFlow_DFS(t *testing.T) {
 	code := `
+
+/*
+getCmd()
+function-getCmd -> return(binaryOpAdd)
+filter(param1) 
+function_filter	-> return(binaryOpAdd)
+parameter2 --> getFunction
+actx pop call
+...
+*/
 getCmd = (param1) => {
 	return filter(param1) + "-al"
 }
@@ -259,7 +269,7 @@ end:'end',
 )>as $result;
 			`,
 			map[string][]string{
-				"start":  {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
+				"start":  {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Undefined-c1"},
 				"result": {"\"-l\"", "\"ls\"", "Undefined-c1"},
 				"end":    {"phi(cmd)[\"ls-l\",Function-getCmd() binding[Function-filter]]"},
 			})
@@ -278,7 +288,7 @@ end:'end',
 )>as $result;
 			`,
 			map[string][]string{
-				"start":  {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
+				"start":  {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Undefined-c1"},
 				"result": {"\"-al\"", "\"-l\"", "\"ls\"", "Parameter-param1", "Undefined-c1"},
 				"end":    {"phi(cmd)[\"ls-l\",Function-getCmd() binding[Function-filter]]"},
 			})
@@ -297,8 +307,8 @@ end:'end',
 )>as $result;
 			`,
 			map[string][]string{
-				"start":  {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Parameter-param2", "Undefined-c1"},
-				"result": {"\"-t\"", "Parameter-param2"},
+				"start":  {"\"-al\"", "\"-l\"", "\"-t\"", "\"ls\"", "Parameter-param1", "Undefined-c1"},
+				"result": {"\"-t\"", "Parameter-param1"},
 				"end":    {"Function-getCmd"},
 			})
 	})
