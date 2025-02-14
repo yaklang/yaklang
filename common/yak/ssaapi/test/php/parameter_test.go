@@ -114,45 +114,47 @@ if($c){
 	})
 
 	//todo: fix member call
-
-	//	t.Run("big test for more parameterMember", func(t *testing.T) {
-	//		code := `<?php
-	//
-	//
+	//t.Run("big test for more parameterMember", func(t *testing.T) {
+	//	code := `<?php
 	///*
-	//topdef:
-	//    $a        GetFunc
-	//    FunctionA GetCallBy
 	//
-	// */
+	//*/
 	//class A{
-	//    public $c;
-	//    public function FunctionA($a){
-	//        println($a->c);
-	//    }
+	//   public $c;
+	//   public function FunctionA($a){
+	//       println($a->c);
+	//   }
 	//}
 	//function C($c){
-	//    $c->FunctionA($c);
+	//   $c->FunctionA($c);
 	//}
 	//$a = new A();
 	//$a->c = 2;
 	//C($a);
 	//`
-	//		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
-	//	})
+	//	ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
+	//})
 	t.Run("big test for parameter and feeevalue", func(t *testing.T) {
 		code := `<?php
 
 /*
-topdef:
-    param $a
-    getFunc test
-    getCallBy():
-        FuncA()
-        foreach ArgsMember
-        parameterMember
-    getCallBy():
-    
+	function_test:
+		call println($a)
+	function_A:
+		parameterMember: [$a->test]
+			call $a->test(1) argsMembers[]
+	anymousFunc:
+        fv: [$a]
+        parameterMember: [$a->test]
+        call FuncA($a) Bind[$a] ArgsMember[$a->test]
+
+	topDef:
+		println(* #-> * as $param)
+	
+		param($a) -> getFunc test
+		test      -> getCallBy() -> foreach ArgsMember -> $a->test ->parameterMember anymousFunc 
+		$a->test  -> getCallBy() -> foreach ArgsMember -> $a->test ->parameterMember FuncA
+		inst
 */
 
 class A{
