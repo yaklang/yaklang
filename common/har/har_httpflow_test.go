@@ -16,6 +16,7 @@ import (
 
 func TestHAR2HTTPFlow(t *testing.T) {
 	wantRspBody := "Hello World"
+	randTag := utils.RandStringBytes(16)
 	entry := HAREntry{
 		Request: &HARRequest{
 			Method:      "GET",
@@ -72,6 +73,10 @@ func TestHAR2HTTPFlow(t *testing.T) {
 			},
 			BodySize: -1,
 		},
+		MetaData: &HTTPFlowMetaData{
+			SourceType: "har",
+			Tags:       randTag,
+		},
 	}
 	flow, err := HarEntry2HTTPFlow(&entry)
 	require.NoError(t, err)
@@ -98,6 +103,9 @@ func TestHAR2HTTPFlow(t *testing.T) {
 	require.Equal(t, "text/html", lowhttp.GetHTTPPacketHeader(rspBytes, "Content-Type"))
 	require.Equal(t, "Accept-Encoding", lowhttp.GetHTTPPacketHeader(rspBytes, "Vary"))
 	require.Equal(t, wantRspBody, string(lowhttp.GetHTTPPacketBody(rspBytes)))
+	// check metadata
+	require.Equal(t, "har", flow.SourceType)
+	require.Equal(t, randTag, flow.Tags)
 }
 
 func TestHTTPFlow2HAR(t *testing.T) {
@@ -135,7 +143,7 @@ func TestHTTPFlow2HAR(t *testing.T) {
 			Value: utils.RandStringBytes(16),
 		}
 	}
-	responseHeaderString := strings.Join(lo.Map(headers, func(item *HARKVPair, _ int) string {
+	responseHeaderString := strings.Join(lo.Map(responseHeaders, func(item *HARKVPair, _ int) string {
 		return fmt.Sprintf("%s: %s", item.Name, item.Value)
 	}), "\n")
 
@@ -152,6 +160,8 @@ Content-Length: %d
 
 %s`, len(responseBody), responseHeaderString, responseBody)
 	response = strconv.Quote(response)
+	sourceType := "har"
+	randTag := utils.RandStringBytes(16)
 	// build flow
 	flow := &schema.HTTPFlow{
 		Request:    request,
@@ -160,6 +170,9 @@ Content-Length: %d
 		Url:        url,
 		BodyLength: int64(len(requestBody)),
 		StatusCode: 200,
+		// metadata
+		SourceType: sourceType,
+		Tags:       randTag,
 	}
 
 	// convert flow to har entry
@@ -169,7 +182,6 @@ Content-Length: %d
 	require.NoError(t, err)
 	gotRequest := entry.Request
 	gotResponse := entry.Response
-	_ = gotResponse
 	require.Equal(t, "POST", gotRequest.Method)
 	require.Equal(t, url, gotRequest.URL)
 	require.Equal(t, "HTTP/2", gotRequest.HTTPVersion)
@@ -233,7 +245,11 @@ Content-Length: %d
 	sort.Slice(gotResponse.Headers, func(i, j int) bool {
 		return gotResponse.Headers[i].Name < gotResponse.Headers[j].Name
 	})
-	require.Equal(t, headers, gotRequest.Headers)
+	require.Equal(t, responseHeaders, gotResponse.Headers)
 	require.Equal(t, len(responseBody), gotResponse.BodySize)
 	require.Equal(t, responseBody, gotResponse.Content.Text)
+
+	// check metadata
+	require.Equal(t, sourceType, flow.SourceType)
+	require.Equal(t, randTag, flow.Tags)
 }

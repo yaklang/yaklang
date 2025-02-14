@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/samber/lo"
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/har"
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -803,6 +805,7 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 
 	count, total := 0.0, 0.0
 	totalCallback := func(i int) {
+		fmt.Println("!!!!", i)
 		total = float64(i)
 	}
 	filter := req.GetFilter()
@@ -824,7 +827,7 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 	filter.Full = true
 
 	queryDB := yakit.BuildHTTPFlowQuery(s.GetProjectDatabase(), filter)
-	fh, err := os.OpenFile(req.GetTargetPath(), os.O_CREATE|os.O_RDWR, 0o644)
+	fh, err := os.OpenFile(req.GetTargetPath(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o644)
 	if err != nil {
 		return utils.Wrap(err, "open file error")
 	}
@@ -952,6 +955,7 @@ func (s *Server) ImportHTTPFlowStream(req *ypb.ImportHTTPFlowStreamRequest, stre
 				return err
 			}
 			flow.ID = 0
+			flow.HiddenIndex = ksuid.New().String()
 			flow.Hash = flow.CalcHash()
 			err = yakit.SaveHTTPFlow(tx, flow)
 			if err != nil {

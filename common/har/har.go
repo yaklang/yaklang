@@ -1,6 +1,9 @@
 package har
 
-import "time"
+import (
+	sql "database/sql"
+	"time"
+)
 
 type HTTPArchive struct {
 	Log *Log `json:"log"`
@@ -45,9 +48,10 @@ type PageTimings struct {
 	OnLoad        float64 `json:"onLoad"`
 }
 type HAREntry struct {
-	Request         *HARRequest  `json:"request"`
-	Response        *HARResponse `json:"response"`
-	ServerIPAddress string       `json:"serverIPAddress"`
+	Request         *HARRequest       `json:"request"`
+	Response        *HARResponse      `json:"response"`
+	ServerIPAddress string            `json:"serverIPAddress"`
+	MetaData        *HTTPFlowMetaData `json:"metaData,omitempty"`
 }
 
 type HARKVPair struct {
@@ -112,4 +116,23 @@ type Timings struct {
 	WorkerReady              int     `json:"_workerReady"`
 	WorkerFetchStart         int     `json:"_workerFetchStart"`
 	WorkerRespondWithSettled int     `json:"_workerRespondWithSettled"`
+}
+
+type HTTPFlowMetaData struct {
+	NoFixContentLength bool           `json:"no_fix_content_length" json:"no_fix_content_length,omitempty"`
+	IsHTTPS            bool           `json:"is_https,omitempty"`
+	Path               string         `json:"path,omitempty"`
+	SourceType         string         `json:"source_type,omitempty"`
+	Duration           int64          `json:"duration,omitempty"`
+	GetParamsTotal     int            `json:"get_params_total,omitempty"`
+	PostParamsTotal    int            `json:"post_params_total,omitempty"`
+	CookieParamsTotal  int            `json:"cookie_params_total,omitempty"`
+	IPAddress          string         `json:"ip_address,omitempty"`
+	IPInteger          int            `json:"ip_integer,omitempty"`
+	Tags               string         `json:"tags,omitempty"` // 用来打标！
+	Payload            string         `json:"payload,omitempty"`
+	IsWebsocket        bool           `json:"is_websocket,omitempty"`
+	FromPlugin         string         `json:"from_plugin,omitempty"`
+	ProcessName        sql.NullString `json:"process_name,omitempty"`
+	UploadOnline       bool           `json:"upload_online,omitempty"`
 }
