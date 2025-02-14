@@ -141,7 +141,7 @@ $sink#{
 CODE
 }-> as $vul;
 `
-			vals, err := prog.SyntaxFlowWithError(rule)
+			vals, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug())
 			require.NoError(t, err)
 			source := vals.GetValues("vul")
 			require.Contains(t, source.String(), `Parameter-socket`)
