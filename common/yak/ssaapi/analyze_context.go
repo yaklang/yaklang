@@ -217,14 +217,6 @@ func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
 	if !g.theObjectShouldBeVisited(obj, key, member) {
 		return utils.Errorf("This make object(%d) key(%d) member(%d) valueVisited, skip", obj.GetId(), key.GetId(), member.GetId())
 	}
-	if g._objectStack.HaveLastStackValue() {
-		last := g._objectStack.LastStackValue()
-		if ValueCompare(last.object, obj) &&
-			ValueCompare(last.key, key) &&
-			ValueCompare(last.member, member) {
-			return utils.Errorf("BUG: This object-key recursive.")
-		}
-	}
 	g._objectStack.Push(objectItem{
 		object: obj,
 		key:    key,
