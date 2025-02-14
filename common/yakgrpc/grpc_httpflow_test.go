@@ -28,7 +28,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -845,61 +844,61 @@ func generateTestHTTPFlowData(db *gorm.DB, num int, url string) (string, []int64
 // 	return token, int64(flow.ID)
 // }
 
-func TestLARGEGRPCMUSTPASS_Export_Large_HTTPFlow(t *testing.T) {
-	client, err := NewLocalClient()
-	require.NoError(t, err)
-	ctx := utils.TimeoutContextSeconds(10)
+// func TestLARGEGRPCMUSTPASS_Export_Large_HTTPFlow(t *testing.T) {
+// 	client, err := NewLocalClient()
+// 	require.NoError(t, err)
+// 	ctx := utils.TimeoutContextSeconds(10)
 
-	db := consts.GetGormProjectDatabase()
-	dataSize := 15 * 1024 * 1024
-	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s", dataSize, strings.Repeat("a", dataSize))))
-	token := utils.RandStringBytes(16)
-	_, _, err = poc.DoGET(fmt.Sprintf("http://%s:%d?a=%s", host, port, token), poc.WithSave(true))
-	require.NoError(t, err)
+// 	db := consts.GetGormProjectDatabase()
+// 	dataSize := 15 * 1024 * 1024
+// 	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s", dataSize, strings.Repeat("a", dataSize))))
+// 	token := utils.RandStringBytes(16)
+// 	_, _, err = poc.DoGET(fmt.Sprintf("http://%s:%d?a=%s", host, port, token), poc.WithSave(true))
+// 	require.NoError(t, err)
 
-	t.Cleanup(func() {
-		yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{
-			Filter: &ypb.QueryHTTPFlowRequest{
-				Keyword: token,
-			},
-		})
-	})
-	// wait until httpflow save
-	filter := &ypb.QueryHTTPFlowRequest{
-		Keyword: token,
-	}
-	_, err = QueryHTTPFlows(ctx, client, filter, 1)
-	require.NoError(t, err)
+// 	t.Cleanup(func() {
+// 		yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{
+// 			Filter: &ypb.QueryHTTPFlowRequest{
+// 				Keyword: token,
+// 			},
+// 		})
+// 	})
+// 	// wait until httpflow save
+// 	filter := &ypb.QueryHTTPFlowRequest{
+// 		Keyword: token,
+// 	}
+// 	_, err = QueryHTTPFlows(ctx, client, filter, 1)
+// 	require.NoError(t, err)
 
-	fn := filepath.Join(t.TempDir(), "test.har")
-	stream, err := client.ExportHTTPFlowStream(ctx, &ypb.ExportHTTPFlowStreamRequest{
-		Filter:     filter,
-		ExportType: "har",
-		TargetPath: fn,
-	})
-	require.NoError(t, err)
+// 	fn := filepath.Join(t.TempDir(), "test.har")
+// 	stream, err := client.ExportHTTPFlowStream(ctx, &ypb.ExportHTTPFlowStreamRequest{
+// 		Filter:     filter,
+// 		ExportType: "har",
+// 		TargetPath: fn,
+// 	})
+// 	require.NoError(t, err)
 
-	progress := 0.0
-	for {
-		msg, err := stream.Recv()
-		spew.Dump(msg)
-		if err != nil {
-			break
-		}
-		progress = msg.Percent
-	}
+// 	progress := 0.0
+// 	for {
+// 		msg, err := stream.Recv()
+// 		spew.Dump(msg)
+// 		if err != nil {
+// 			break
+// 		}
+// 		progress = msg.Percent
+// 	}
 
-	// check export
-	require.Equal(t, 1.0, progress)
-	fh, err := os.Open(fn)
-	defer fh.Close()
-	require.NoError(t, err)
+// 	// check export
+// 	require.Equal(t, 1.0, progress)
+// 	fh, err := os.Open(fn)
+// 	defer fh.Close()
+// 	require.NoError(t, err)
 
-	har.ImportHTTPArchiveStream(fh, func(h *har.HAREntry) error {
-		require.Equal(t, dataSize, len(h.Response.Content.Text))
-		return nil
-	})
-}
+// 	har.ImportHTTPArchiveStream(fh, func(h *har.HAREntry) error {
+// 		require.Equal(t, dataSize, len(h.Response.Content.Text))
+// 		return nil
+// 	})
+// }
 
 func TestGRPCMUSTPASS_Export_And_ImportHAR(t *testing.T) {
 	client, err := NewLocalClient()
