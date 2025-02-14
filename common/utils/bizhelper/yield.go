@@ -36,7 +36,6 @@ func WithYieldModel_CountCallback(countCallback func(int)) YieldModelOpts {
 }
 
 func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts) chan T {
-	first := true
 	var t T
 	db = db.Table(db.NewScope(t).TableName())
 
@@ -51,6 +50,9 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 		defer close(outC)
 
 		paginator := NewFastPaginator(db, cfg.Size, WithFastPaginator_IndexField(cfg.IndexField))
+		if cfg.CountCallback != nil {
+			cfg.CountCallback(paginator.totalRecord)
+		}
 		for {
 			var items []T
 			if err, ok := paginator.Next(&items); !ok {
@@ -58,10 +60,6 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 			} else if err != nil {
 				log.Errorf("paging failed: %s", err)
 				break
-			}
-			if first && cfg.CountCallback != nil {
-				first = false
-				cfg.CountCallback(len(paginator.ids))
 			}
 
 			for _, d := range items {
@@ -92,19 +90,22 @@ func YieldModelToMapEx(ctx context.Context, db *gorm.DB, countCallback func(int)
 	if err != nil {
 		return nil, err
 	}
+
 	cols, err := rows.Columns()
 	if err != nil {
+		rows.Close()
 		return nil, err
 	}
 	colTypes, err := rows.ColumnTypes()
 	if err != nil {
+		rows.Close()
 		return nil, err
 	}
 	outC := make(chan map[string]any)
 	go func() {
 		defer func() {
-			rows.Close()
 			close(outC)
+			rows.Close()
 		}()
 		for rows.Next() {
 			select {
