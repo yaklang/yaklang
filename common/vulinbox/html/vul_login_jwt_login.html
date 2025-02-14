@@ -13,7 +13,7 @@
     <div id="authcheck" class="row justify-content-center mt-5">
         <div class="col-md-4">
             <h2 class="text-center mb-4">登录</h2>
-            <form action="/jwt/login" method="POST">
+            <form method="POST">
                 <div class="mb-3">
                     <label for="username" class="form-label">用户名</label>
                     <input type="text" class="form-control" id="username" name="username" required>
@@ -30,12 +30,16 @@
         </div>
     </div>
     <script>
+        function logout() {
+            localStorage.removeItem('VULINBOX_JWT');
+            window.location.reload();
+        }
         function redirectToRegister() {
             window.location.href = './register?reference=./login';
         }
         const token = localStorage.getItem('VULINBOX_JWT');
         if (token) {
-            fetch('/jwt/login/profile', {
+            fetch('{{params(profileUrl)}}', {
                 method: 'GET',
                 headers: {
                     'Authorization': 'Bearer ' + token,
@@ -49,7 +53,24 @@
                     // 处理个人资料数据
                     const profileData = data[0];
                     const profileContainer = document.createElement('div');
-                    profileContainer.innerHTML = `
+                    if (data.flag){
+                        profileContainer.innerHTML = `
+    <div class="card">
+        <div class="card-body">
+            <h1 class="card-title">Win!</h1>
+        </div>
+    </div>
+    <div class="d-grid mt-3">
+    <button
+        class="btn btn-danger"
+        onclick="logout()"
+    >
+        退出登录
+    </button>
+</div>
+`;
+                    }else{
+                        profileContainer.innerHTML = `
     <div class="card">
         <div class="card-body">
             <h3 class="card-title">个人资料</h3>
@@ -60,7 +81,16 @@
             <p class="card-text">创建时间：${profileData.created_at}</p>
         </div>
     </div>
+    <div class="d-grid mt-3">
+    <button
+        class="btn btn-danger"
+        onclick="logout()"
+    >
+        退出登录
+    </button>
+</div>
 `;
+                    }
                     document.getElementById("authcheck").appendChild(profileContainer);
                 })
                 .catch(error => {
@@ -69,7 +99,7 @@
         } else {
             document.getElementById("authcheck").innerHTML = `<div class="col-md-4">
     <h2 class="text-center mb-4">登录</h2>
-    <form action="/jwt/login" method="POST">
+    <form method="POST">
         <div class="mb-3">
             <label for="username" class="form-label">用户名</label>
             <input type="text" class="form-control" id="username" name="username" required>
@@ -84,6 +114,9 @@
         </div>
     </form>
 </div>
+<div class="text-center" style="padding-top: 50px;">
+            <strong>游戏目标：</strong>为用户信息添加flag字段<br>
+        </div>
             `
         }
     </script>
