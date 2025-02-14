@@ -49,26 +49,50 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	return c
 }
 func (c *Call) handleWeakLanguageCall() {
-	method := c.Method
+	callMethod := c.Method
 	/*
 		handle weakLanguage call
 	*/
 	builder := c.GetFunc().builder
+	var check func(Value)
 	weakLanguage := builder.IsWeakLanguage()
-	check := func() {
-		// get function from prog method
-		if IsConst(method) {
+	tmp := make(map[int64]struct{})
+	PointFunc := func(fun Value, method Value) {
+		Point(fun, method)
+	}
+	check = func(method Value) {
+		_, exist := tmp[method.GetId()]
+		if exist {
+			return
+		}
+		tmp[method.GetId()] = struct{}{}
+		switch ret := method.(type) {
+		case *ConstInst:
+			/*
+				from <string> to getFunc
+			*/
 			if newMethod := builder.GetFunc(method.String(), ""); utils.IsNil(newMethod) {
 				log.Errorf("weakLanguage call %s not found", method.String())
 				return
 			} else {
-				Point(newMethod, method)
+				PointFunc(newMethod, callMethod)
 			}
+		case *SideEffect:
+			/*
+				from value to getFunc
+			*/
+			check(ret.Value)
+		case *Phi:
+			for _, value := range ret.GetValues() {
+				check(value)
+			}
+		case *Function:
+			PointFunc(ret, callMethod)
 		}
 	}
 	if weakLanguage {
-		if !method.IsExtern() && method.GetOpcode() != SSAOpcodeFunction {
-			check()
+		if !callMethod.IsExtern() && callMethod.GetOpcode() != SSAOpcodeFunction {
+			check(callMethod)
 		}
 	}
 }
