@@ -13,6 +13,9 @@ func NodeDeduplication(nodes []*core.Node) []*core.Node {
 }
 
 func IsEndNode(node *core.Node) bool {
+	if node == nil {
+		return false
+	}
 	if v, ok := node.Statement.(*statements.MiddleStatement); ok {
 		return v.Flag == "end"
 	}

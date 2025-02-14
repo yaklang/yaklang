@@ -12,6 +12,7 @@ type NewExpression struct {
 	types.JavaType
 	Length          []JavaValue
 	ArgumentsGetter func() string
+	Initializer     []JavaValue
 }
 
 func NewNewArrayExpression(typ types.JavaType, length ...JavaValue) *NewExpression {
@@ -34,6 +35,13 @@ func (n *NewExpression) String(funcCtx *class_context.ClassContext) string {
 		s := fmt.Sprintf("new %s", n.ElementType().String(funcCtx))
 		for _, l := range n.Length {
 			s += fmt.Sprintf("[%v]", l.(JavaValue).String(funcCtx))
+		}
+		if len(n.Initializer) != 0 {
+			vsStr := []string{}
+			for _, v := range n.Initializer {
+				vsStr = append(vsStr, v.String(funcCtx))
+			}
+			s += fmt.Sprintf("{%s}", strings.Join(vsStr, ","))
 		}
 		return s
 	}

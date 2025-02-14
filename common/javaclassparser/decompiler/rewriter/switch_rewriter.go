@@ -1,6 +1,11 @@
 package rewriter
 
 import (
+	"math"
+	"slices"
+	"sort"
+
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
@@ -8,12 +13,11 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"math"
-	"slices"
-	"sort"
 )
 
 func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
+	// manager.DominatorMap = GenerateDominatorTree(manager.RootNode)
+	// manager.DumpDominatorTree()
 	middleStatement := node.Statement.(*statements.MiddleStatement)
 	switchData := middleStatement.Data.([]any)
 	caseToIndexMap := switchData[0].(*omap.OrderedMap[int, int])
@@ -26,6 +30,33 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	sort.Ints(keyMap)
 	keyMap = append(keyMap[1:], -1)
 	startNodes := caseMap.Values()
+	// var mergeNodes []*core.Node
+	// for _, startNode := range startNodes {
+	// 	core.WalkGraph[*core.Node](startNode, func(n *core.Node) ([]*core.Node, error) {
+	// 		// 检查是否所有前驱节点都在当前路径上
+	// 		allSourcesInPath := true
+	// 		for _, source := range n.Source {
+	// 			inPath := false
+	// 			core.WalkGraph[*core.Node](startNode, func(pathNode *core.Node) ([]*core.Node, error) {
+	// 				if pathNode == source {
+	// 					inPath = true
+	// 					return nil, nil
+	// 				}
+	// 				return pathNode.Next, nil
+	// 			})
+	// 			if !inPath {
+	// 				allSourcesInPath = false
+	// 				break
+	// 			}
+	// 		}
+
+	// 		if allSourcesInPath && len(n.Source) > 1 {
+	// 			mergeNodes = append(mergeNodes, n)
+	// 			return nil, nil
+	// 		}
+	// 		return n.Next, nil
+	// 	})
+	// }
 	endNodes := utils.NodeFilter(manager.DominatorMap[node], func(node *core.Node) bool {
 		if v, ok := node.Statement.(*statements.MiddleStatement); ok && (v.Flag == "end" || v.Flag == "start") {
 			return false
@@ -53,14 +84,12 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	if mergeNode == nil {
 		mergeNode = caseMap.GetMust(-1)
 	}
-	core.DumpNodesToDotExp(manager.RootNode)
 	node.MergeNode = mergeNode
 	return nil
 }
 func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 	SwitchRewriter1(manager, node)
 	//switchNode := node
-	core.DumpNodesToDotExp(manager.RootNode)
 	middleStatement := node.Statement.(*statements.MiddleStatement)
 	switchData := middleStatement.Data.([]any)
 	caseToIndexMap := switchData[0].(*omap.OrderedMap[int, int])
@@ -119,6 +148,8 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 	})
 	nodeToVals = newNodeToVals
 	sort.Ints(keyMap)
+	var endNodes []*core.Node
+	var bodyNodes []*core.Node
 	for _, v := range keyMap {
 		startNode := caseMap.GetMust(v)
 		caseItem := statements.NewCaseItem(v, nil)
@@ -127,14 +158,19 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 			continue
 		}
 		caseItem.IsDefault = v == math.MaxInt
+		if caseItem.IsDefault {
+			switchNode.RemoveNext(startNode)
+		}
 		//var terminalIsEndNode bool
-		var sts []statements.Statement
+		var sts []*core.Node
 		err := core.WalkGraph(startNode, func(node *core.Node) ([]*core.Node, error) {
-			sts = append(sts, node.Statement)
+			sts = append(sts, node)
 			var next []*core.Node
 			for _, n := range node.Next {
 				if slices.Contains(manager.DominatorMap[node], n) {
 					next = append(next, n)
+				} else {
+					endNodes = append(endNodes, n)
 				}
 			}
 			return next, nil
@@ -142,13 +178,25 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 		if err != nil {
 			return err
 		}
-		caseItem.Body = sts
+		caseItem.Body = lo.Map[*core.Node](sts, func(item *core.Node, index int) statements.Statement {
+			return item.Statement
+		})
+		bodyNodes = append(bodyNodes, sts...)
 		caseItems = append(caseItems, caseItem)
 	}
 	switchStatement.Cases = caseItems
 	sort.Slice(caseItems, func(i, j int) bool {
 		return caseItems[i].IntValue < caseItems[j].IntValue
 	})
-	utils.DumpNodesToDotExp(manager.RootNode)
+	endNodes = utils.NodeFilter(endNodes, func(node *core.Node) bool {
+		if slices.Contains(bodyNodes, node) {
+			return false
+		}
+		return !IsEndNode(node)
+	})
+	for _, node := range NodeDeduplication(endNodes) {
+		switchNode.AddNext(node)
+	}
+
 	return nil
 }

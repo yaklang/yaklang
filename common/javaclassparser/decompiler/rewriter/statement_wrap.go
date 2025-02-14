@@ -57,10 +57,10 @@ func (s *RewriteManager) NewLoopLabel() string {
 }
 
 func (s *RewriteManager) MergeIf() {
-	for{
-	if !s.mergeIf(){
-		break
-	}
+	for {
+		if !s.mergeIf() {
+			break
+		}
 
 	}
 }
@@ -76,7 +76,6 @@ func (s *RewriteManager) mergeIf() bool {
 	result := false
 	delNodesSet := utils.NewSet[*core.Node]()
 	for _, node := range ifNodes {
-		utils2.DumpNodesToDotExp(s.RootNode)
 		if delNodesSet.Has(node) {
 			continue
 		}
@@ -171,7 +170,7 @@ func (s *RewriteManager) mergeIf() bool {
 				// }
 				sourceSet := utils.NewSet[*core.Node]()
 				sourceSet.AddList(childNode.Source)
-				if sourceSet.Len() == 1 &&  CheckCanBeMerge(parentNode,childNode){
+				if sourceSet.Len() == 1 && CheckCanBeMerge(parentNode, childNode) {
 					if len(childNode.Next) == 1 {
 						childNode.Next = append(childNode.Next, childNode.Next[0])
 					}
@@ -185,14 +184,14 @@ func (s *RewriteManager) mergeIf() bool {
 	}
 	return result
 }
-func CheckCanBeMerge(ifNode1,ifNode2 *core.Node) bool{
+func CheckCanBeMerge(ifNode1, ifNode2 *core.Node) bool {
 	// 检查是否一方是另一方的子节点
 	var node1, node2 *core.Node
 	if slices.Contains(ifNode1.Next, ifNode2) {
 		node1 = ifNode1
 		node2 = ifNode2
 	} else if slices.Contains(ifNode2.Next, ifNode1) {
-		node1 = ifNode2 
+		node1 = ifNode2
 		node2 = ifNode1
 	} else {
 		return false
@@ -574,7 +573,6 @@ func (s *RewriteManager) Rewrite() error {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 	}
 	order := s.TopologicalSortReverse(keyNodes)
-	utils2.DumpNodesToDotExp(s.RootNode)
 	loopJmpRewriterRecoed := map[*core.Node]struct{}{}
 	for i := 0; i < len(order); i++ {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
@@ -587,12 +585,10 @@ func (s *RewriteManager) Rewrite() error {
 					if _, ok := loopJmpRewriterRecoed[n]; ok {
 						break
 					}
-					utils2.DumpNodesToDotExp(s.RootNode)
 					err := LoopJmpRewriter(s, n)
 					if err != nil {
 						return err
 					}
-					utils2.DumpNodesToDotExp(s.RootNode)
 					loopJmpRewriterRecoed[n] = struct{}{}
 					s.DominatorMap = GenerateDominatorTree(s.RootNode)
 					break
@@ -632,9 +628,9 @@ func (s *RewriteManager) DumpDominatorTree() {
 	}
 	for node, dom := range s.DominatorMap {
 		for _, n := range dom {
-			sb.WriteString(fmt.Sprintf("\"%d%s\" -> \"%d%s\"\n", n.Id, toString(n), node.Id, toString(node)))
+			sb.WriteString(fmt.Sprintf("\"%d%s\" -> \"%d%s\"\n", node.Id, toString(node), n.Id, toString(n)))
 		}
 	}
 	sb.WriteString("}\n")
-	// println(sb.String())
+	println(sb.String())
 }

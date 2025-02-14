@@ -12,7 +12,6 @@ import (
 type rewriterFunc func(statementManager *RewriteManager, node *core.Node) error
 
 func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
-	core.DumpNodesToDotExp(manager.RootNode)
 	err := CalcEnd(manager.DominatorMap, ifNode)
 	if err != nil {
 		return err
@@ -103,13 +102,24 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 	condition := originNodeStatement.(*statements.ConditionStatement).Condition
 	ifStatement.Condition = condition
 	ifBodyNodes := []*core.Node{}
+	copyIfBody := false
+	if IsEndNode(ifNode.MergeNode) && len(trueNode.Source) > 1 && len(falseNode.Source) > 1 {
+		copyIfBody = true
+		trueNode.RemoveSource(ifStatementNode)
+	}
 	if trueNode != nil {
-		ifBody, err := getBody(trueNode)
-		if err != nil {
-			return err
+		if copyIfBody {
+			sts := WalkNodeToList(trueNode)
+			ifStatement.IfBody = core.NodesToStatements(sts)
+			ifBodyNodes = append(ifBodyNodes, sts...)
+		} else {
+			ifBody, err := getBody(trueNode)
+			if err != nil {
+				return err
+			}
+			ifStatement.IfBody = core.NodesToStatements(ifBody)
+			ifBodyNodes = append(ifBodyNodes, ifBody...)
 		}
-		ifStatement.IfBody = core.NodesToStatements(ifBody)
-		ifBodyNodes = append(ifBodyNodes, ifBody...)
 	}
 	if falseNode != nil {
 		elseBody, err := getBody(falseNode)
@@ -132,14 +142,14 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 	return nil
 }
 
-func CalcEnd1(domTree map[*core.Node][]*core.Node,ifNode *core.Node) error {
+func CalcEnd1(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
 	trueNode := ifNode.TrueNode()
 	falseNode := ifNode.FalseNode()
-	
+
 	// 获取从trueNode出发可以到达的所有节点和路径
 	trueNodeSet := utils.NewSet[*core.Node]()
 	trueNodePaths := make(map[*core.Node][][]*core.Node)
-	trueNodePaths[trueNode] = [][]*core.Node{{trueNode,trueNode}}
+	trueNodePaths[trueNode] = [][]*core.Node{{trueNode, trueNode}}
 	core.WalkGraph[*core.Node](trueNode, func(node *core.Node) ([]*core.Node, error) {
 		next := []*core.Node{}
 		for _, n := range node.Next {
@@ -163,7 +173,7 @@ func CalcEnd1(domTree map[*core.Node][]*core.Node,ifNode *core.Node) error {
 	// 获取从falseNode出发可以到达的所有节点和路径
 	falseNodeSet := utils.NewSet[*core.Node]()
 	falseNodePaths := make(map[*core.Node][][]*core.Node)
-	falseNodePaths[falseNode] = [][]*core.Node{{falseNode,falseNode}}
+	falseNodePaths[falseNode] = [][]*core.Node{{falseNode, falseNode}}
 	core.WalkGraph[*core.Node](falseNode, func(node *core.Node) ([]*core.Node, error) {
 		next := []*core.Node{}
 		for _, n := range node.Next {
@@ -196,7 +206,7 @@ func CalcEnd1(domTree map[*core.Node][]*core.Node,ifNode *core.Node) error {
 			}
 		}
 	}
-ifNode.MergeNode = mergeNode
+	ifNode.MergeNode = mergeNode
 	return nil
 }
 func __CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
@@ -254,7 +264,7 @@ func __CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
 					current = nil
 				}
 			}
-			
+
 			// 更新最短路径的汇聚点
 			if minDepth == -1 || depth < minDepth {
 				minDepth = depth

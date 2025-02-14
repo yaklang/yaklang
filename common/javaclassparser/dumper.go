@@ -863,7 +863,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
 			continue
 		}
-		// if name != "getMainColor" {
+		// if name != "inflater" {
 		// 	continue
 		// }
 		res, err := c.DumpMethod(name, descriptor)
