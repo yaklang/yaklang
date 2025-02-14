@@ -1,11 +1,13 @@
 package ssadb
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -21,6 +23,8 @@ func (t *IrType) CalcHash() string {
 	return utils.CalcSha1(t.Kind, t.String, t.ExtraInformation)
 }
 
+var saveTypeMutex sync.Mutex
+
 func SaveType(kind int, str string, extra string) int {
 	start := time.Now()
 	defer func() {
@@ -28,22 +32,26 @@ func SaveType(kind int, str string, extra string) int {
 	}()
 
 	irType := IrType{
-
 		Kind:             kind,
 		String:           str,
 		ExtraInformation: extra,
 	}
 	irType.Hash = irType.CalcHash()
+	saveType(&irType)
+	return int(irType.ID)
+}
+
+func saveType(irType *IrType) error {
+	saveTypeMutex.Lock()
+	defer saveTypeMutex.Unlock()
 
 	db := GetDB()
-	utils.GormTransaction(db, func(tx *gorm.DB) error {
-		err := tx.Where("hash = ?", irType.Hash).FirstOrCreate(&irType).Error
-		if err != nil {
-			log.Errorf("ssa type FirstOrCreate err: %v", err)
-		}
+	err := db.Where("hash = ?", irType.Hash).FirstOrCreate(&irType).Error
+	if err != nil {
+		log.Errorf("ssa type FirstOrCreate err: %v", err)
 		return err
-	})
-	return int(irType.ID)
+	}
+	return nil
 }
 
 func GetType(id int) (int, string, string, error) {
