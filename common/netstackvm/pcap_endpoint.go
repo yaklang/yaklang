@@ -63,11 +63,6 @@ func (p *PCAPEndpoint) SetLoopback(b bool) {
 }
 
 func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, macAddr net.HardwareAddr, promisc bool) (*PCAPEndpoint, error) {
-	adaptor, err := NewPCAPAdaptor(device, promisc)
-	if err != nil {
-		return nil, utils.Errorf("create pcap adaptor failed: %v", err)
-	}
-
 	iface, err := net.InterfaceByName(device)
 	if err != nil {
 		return nil, err
@@ -77,6 +72,11 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, 
 	internalMacAddr := macAddr
 	externalMacAddr := iface.HardwareAddr
 	bridge := &pcapBridge{internal: internalMacAddr, external: externalMacAddr}
+
+	adaptor, err := NewPCAPAdaptor(device, int32(mtu), promisc)
+	if err != nil {
+		return nil, utils.Errorf("create pcap adaptor failed: %v", err)
+	}
 
 	//_ = handle.SetBPFFilter("dst mac " + macAddr.String())
 	ctx, cancel := context.WithCancel(ctx)
