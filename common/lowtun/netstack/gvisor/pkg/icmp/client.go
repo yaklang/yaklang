@@ -3,7 +3,6 @@ package icmp
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/sync"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
@@ -16,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/time/rate"
 	"math/rand/v2"
-	"net"
+	"net/netip"
 	"sync/atomic"
 	"time"
 )
@@ -54,102 +53,13 @@ func (c *Client) newICMPv4EchoRequest() header.ICMPv4 {
 	return icmpPacket
 }
 
-func MustParse4(addr string) tcpip.Address {
-	ip := net.ParseIP(addr).To4()
-	if ip == nil {
-		panic(fmt.Sprintf("Parse4 expects IPv4 addresses, but was passed %q", addr))
-	}
-	return tcpip.AddrFrom4Slice(ip)
-}
-
 type PingResult struct {
 	MessageType header.ICMPv4Type
 	MessageCode header.ICMPv4Code
 	MessageID   uint16
 	Address     tcpip.Address
+	TTL         uint8
 }
-
-//func (c *Client) FastPing(ctx context.Context, target chan string) (chan *PingResult, error) {
-//	we, read := waiter.NewChannelEntry(waiter.EventIn)
-//	c.wq.EventRegister(&we)
-//	ep, err := icmp.NewProtocol4(c.stack).NewEndpoint(ipv4.ProtocolNumber, &c.wq)
-//	if err != nil {
-//		return nil, utils.Errorf("icmp new endpoint fail: %v", err)
-//	}
-//
-//	hasPingTargetMap := new(sync.Map)
-//	resChan := make(chan *PingResult, 100)
-//	subCtx, cancel := context.WithCancel(ctx)
-//	_ = cancel
-//	go func() {
-//		defer close(resChan)
-//		defer c.wq.EventUnregister(&we)
-//		var b bytes.Buffer
-//		for {
-//			select {
-//			case <-read:
-//			case <-subCtx.Done():
-//				return
-//			}
-//			for {
-//				b.Reset()
-//				res, err := ep.Read(&b, tcpip.ReadOptions{
-//					NeedRemoteAddr: true,
-//				})
-//				if err != nil {
-//					if _, ok := err.(*tcpip.ErrWouldBlock); ok {
-//						break
-//					}
-//					log.Errorf("icmp read fail: %v", err)
-//					return
-//				}
-//				v := b.Bytes()
-//				icmpV4Packet := header.ICMPv4(v)
-//				if icmpV4Packet.Type() == header.ICMPv4Echo {
-//					continue
-//				}
-//				if _, ok := hasPingTargetMap.LoadAndDelete(res.RemoteAddr.Addr.String()); ok {
-//					resChan <- &PingResult{
-//						MessageType: icmpV4Packet.Type(),
-//						MessageCode: icmpV4Packet.Code(),
-//						MessageID:   icmpV4Packet.Ident(),
-//						Address:     res.RemoteAddr.Addr,
-//					}
-//				}
-//			}
-//		}
-//	}()
-//
-//	go func() {
-//		defer cancel()
-//		pingLimiter := rate.NewLimiter(64, 1)
-//		for t := range target {
-//			waitErr := pingLimiter.Wait(subCtx)
-//			if waitErr != nil {
-//				log.Errorf("ping limiter wait fail: %v", waitErr)
-//				return
-//			}
-//			echoRequest := c.newICMPv4EchoRequest()
-//			var r bytes.Reader
-//			r.Reset(echoRequest)
-//			if MustParse4(t).As4()[3] == 255 {
-//				continue
-//			}
-//			_, err := ep.Write(&r, tcpip.WriteOptions{
-//				To: &tcpip.FullAddress{Addr: MustParse4(t)},
-//			})
-//			if err != nil {
-//				log.Errorf("endpoint write echo request fail: %v", err)
-//				continue
-//			}
-//			hasPingTargetMap.Store(t, struct{}{})
-//		}
-//		<-time.After(2 * time.Second)
-//	}()
-//
-//	return resChan, nil
-//}
-//
 
 type ScanConfig struct {
 	PingTimeout time.Duration // time out just for ping, default 4s
@@ -236,9 +146,13 @@ func (c *Client) PingV4(ctx context.Context, target string, timeout time.Duratio
 		target = netx.LookupFirst(target)
 	}
 
-	remoteAddr := tcpip.FullAddress{Addr: MustParse4(target)}
-
-	ep, err := icmp.NewProtocol4(c.stack).NewEndpoint(ipv4.ProtocolNumber, &c.wq)
+	ipv4Ins, parseErr := netip.ParseAddr(target)
+	if parseErr != nil {
+		return nil, utils.Errorf("parse addr fail: %v", parseErr)
+	}
+	remoteAddr := tcpip.FullAddress{Addr: tcpip.AddrFrom4(ipv4Ins.As4())}
+	e := new(waiter.Queue)
+	ep, err := icmp.NewProtocol4(c.stack).NewEndpoint(ipv4.ProtocolNumber, e)
 	if err != nil {
 		return nil, utils.Errorf("icmp new endpoint fail: %v", err)
 	}
@@ -246,8 +160,8 @@ func (c *Client) PingV4(ctx context.Context, target string, timeout time.Duratio
 
 	// register write able event
 	writeWE, write := waiter.NewChannelEntry(waiter.WritableEvents)
-	c.wq.EventRegister(&writeWE)
-	defer c.wq.EventUnregister(&writeWE)
+	e.EventRegister(&writeWE)
+	defer e.EventUnregister(&writeWE)
 
 	err = ep.Connect(remoteAddr)
 	if _, ok := err.(*tcpip.ErrConnectStarted); ok {
@@ -273,8 +187,8 @@ func (c *Client) PingV4(ctx context.Context, target string, timeout time.Duratio
 	defer cancel()
 	// register read able event
 	readWE, read := waiter.NewChannelEntry(waiter.EventIn)
-	c.wq.EventRegister(&readWE)
-	defer c.wq.EventUnregister(&readWE)
+	e.EventRegister(&readWE)
+	defer e.EventUnregister(&readWE)
 
 	for {
 		select {
@@ -297,11 +211,16 @@ func (c *Client) PingV4(ctx context.Context, target string, timeout time.Duratio
 			if icmpV4Packet.Type() == header.ICMPv4Echo {
 				return nil, utils.Errorf("icmp type is echo")
 			}
+			ttl := uint8(0)
+			if res.ControlMessages.HasTTL {
+				ttl = res.ControlMessages.TTL
+			}
 			return &PingResult{
 				MessageType: icmpV4Packet.Type(),
 				MessageCode: icmpV4Packet.Code(),
 				MessageID:   icmpV4Packet.Ident(),
 				Address:     res.RemoteAddr.Addr,
+				TTL:         ttl,
 			}, nil
 		}
 	}
