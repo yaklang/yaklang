@@ -707,6 +707,10 @@ func (e *Endpoint) ConnectAndThen(addr tcpip.FullAddress, f func(netProto tcpip.
 	return nil
 }
 
+func (e *Endpoint) ResolvedRoute(afterResolve func(stack.ResolvedFieldsResult)) tcpip.Error {
+	return e.connectedRoute.ResolvedFields(afterResolve)
+}
+
 // Shutdown shutsdown the endpoint.
 func (e *Endpoint) Shutdown() tcpip.Error {
 	e.mu.Lock()

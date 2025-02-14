@@ -16,6 +16,7 @@ package icmp
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"time"
 
@@ -493,6 +494,7 @@ func (*endpoint) Disconnect() tcpip.Error {
 }
 
 // Connect connects the endpoint to its peer. Specifying a NIC is optional.
+// icmp connect will start resolving the route to the destination.
 func (e *endpoint) Connect(addr tcpip.FullAddress) tcpip.Error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -515,8 +517,14 @@ func (e *endpoint) Connect(addr tcpip.FullAddress) tcpip.Error {
 	e.rcvMu.Lock()
 	e.rcvReady = true
 	e.rcvMu.Unlock()
-
-	return nil
+	e.net.ResolvedRoute(func(info stack.ResolvedFieldsResult) {
+		if info.Err != nil {
+			log.Error("icmp connect failed: ResolvedRoute failed: ", info.Err)
+			return
+		}
+		e.waiterQueue.Notify(waiter.WritableEvents)
+	})
+	return &tcpip.ErrConnectStarted{}
 }
 
 // ConnectEndpoint is not supported.

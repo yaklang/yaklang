@@ -2,10 +2,12 @@ package netstackvm
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/arp"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/icmp"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/udp"
 	"net"
 	"sync"
-
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/icmp"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 
@@ -13,12 +15,9 @@ import (
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/dhcp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/arp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv6"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/udp"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -66,44 +65,13 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 	if config.ctx == nil {
 		config.ctx, config.cancel = context.WithCancel(context.Background())
 	}
-
 	vm := &NetStackVirtualMachine{}
-
-	stackOpt := stack.Options{}
-
-	if !config.DisallowPacketEndpointWrite {
-		stackOpt.AllowPacketEndpointWrite = true
-	}
-
-	if !config.IPv4Disabled {
-		stackOpt.NetworkProtocols = append(stackOpt.NetworkProtocols, ipv4.NewProtocol)
-	}
-	if !config.IPv6Disabled {
-		stackOpt.NetworkProtocols = append(stackOpt.NetworkProtocols, ipv6.NewProtocol)
-	}
-	if !config.ARPDisabled {
-		stackOpt.NetworkProtocols = append(stackOpt.NetworkProtocols, arp.NewProtocol)
-	}
-
-	// dhcp is beyond udp, ignore it in stack opt
-	if !config.UDPDisabled {
-		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, udp.NewProtocol)
-	}
-	if !config.TCPDisabled {
-		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, tcp.NewProtocol)
-	}
-
-	if !config.ICMPDisabled {
-		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, icmp.NewProtocol4)
-		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, icmp.NewProtocol6)
-	}
-
-	stackOpt.HandleLocal = config.HandleLocal
-
-	stackIns := stack.New(stackOpt)
-
-	if configStackErr := loadStackOptions(config, stackIns); configStackErr != nil {
-		return nil, utils.Errorf("load stack options: %s", configStackErr)
+	stackIns := config.stack
+	if stackIns == nil {
+		stackIns, err = NewNetStackFromConfig(config)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if string(config.MainNICLinkAddress) == "" {
@@ -179,10 +147,10 @@ func NewNetStackVirtualMachine(opts ...Option) (*NetStackVirtualMachine, error) 
 	}
 
 	if !config.DisableForwarding {
-		if err := stackIns.SetForwardingDefaultAndAllNICs(header.IPv4ProtocolNumber, true); err != nil {
+		if _, err := stackIns.SetNICForwarding(mainNicID, header.IPv4ProtocolNumber, true); err != nil {
 			return nil, utils.Errorf("set forwarding: %s", err)
 		}
-		if err := stackIns.SetForwardingDefaultAndAllNICs(header.IPv6ProtocolNumber, true); err != nil {
+		if _, err := stackIns.SetNICForwarding(mainNicID, header.IPv6ProtocolNumber, true); err != nil {
 			return nil, utils.Errorf("set forwarding: %s", err)
 		}
 	}
@@ -220,4 +188,41 @@ func (vm *NetStackVirtualMachine) MainNICID() tcpip.NICID {
 
 func (vm *NetStackVirtualMachine) Wait() {
 	vm.stack.Wait()
+}
+
+func NewNetStackFromConfig(c *Config) (*stack.Stack, error) {
+	stackOpt := stack.Options{}
+
+	if !c.DisallowPacketEndpointWrite {
+		stackOpt.AllowPacketEndpointWrite = true
+	}
+
+	if !c.IPv4Disabled {
+		stackOpt.NetworkProtocols = append(stackOpt.NetworkProtocols, ipv4.NewProtocol)
+	}
+	if !c.IPv6Disabled {
+		stackOpt.NetworkProtocols = append(stackOpt.NetworkProtocols, ipv6.NewProtocol)
+	}
+	if !c.ARPDisabled {
+		stackOpt.NetworkProtocols = append(stackOpt.NetworkProtocols, arp.NewProtocol)
+	}
+
+	// dhcp is beyond udp, ignore it in stack opt
+	if !c.UDPDisabled {
+		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, udp.NewProtocol)
+	}
+	if !c.TCPDisabled {
+		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, tcp.NewProtocol)
+	}
+
+	if !c.ICMPDisabled {
+		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, icmp.NewProtocol4)
+		stackOpt.TransportProtocols = append(stackOpt.TransportProtocols, icmp.NewProtocol6)
+	}
+	stackOpt.HandleLocal = c.HandleLocal
+	stackIns := stack.New(stackOpt)
+	if configStackErr := loadStackOptions(c, stackIns); configStackErr != nil {
+		return nil, utils.Errorf("load stack options: %s", configStackErr)
+	}
+	return stackIns, nil
 }

@@ -10,6 +10,23 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func (vm *NetStackVirtualMachine) AddDefaultRoute(gateway net.IP) error {
+	log.Infof("start to set default route to getaway: %v", gateway)
+	vm.stack.AddRoute(tcpip.Route{
+		Destination: header.IPv4EmptySubnet,
+		Gateway:     tcpip.AddrFrom4([4]byte(gateway.To4())),
+		NIC:         vm.MainNICID(),
+		MTU:         uint32(vm.mtu),
+	})
+	vm.stack.AddRoute(tcpip.Route{
+		Destination: header.IPv6EmptySubnet,
+		Gateway:     tcpip.AddrFrom4([4]byte(gateway.To4())),
+		NIC:         vm.MainNICID(),
+		MTU:         uint32(vm.mtu),
+	})
+	return nil
+}
+
 func (vm *NetStackVirtualMachine) SetDefaultRoute(gateway net.IP) error {
 	log.Infof("start to set default route to getaway: %v", gateway)
 	vm.stack.SetRouteTable([]tcpip.Route{

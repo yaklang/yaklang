@@ -61,9 +61,15 @@ func (vm *NetStackVirtualMachine) StartDHCP() error {
 			log.Infof("finish to set nic ip: %v", preferIp.String())
 
 			log.Infof("start to set default route")
-			err = vm.SetDefaultRoute(getawey)
+			err = vm.AddDefaultRoute(getawey)
 			if err != nil {
 				log.Errorf("set default route failed: %v", err)
+				return
+			}
+
+			err = vm.InheritPcapInterfaceNeighborRoute()
+			if err != nil {
+				log.Errorf("set main nic neighbor route failed: %v", err)
 				return
 			}
 
