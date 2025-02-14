@@ -3,9 +3,9 @@ name: Release Vulinbox(OSS Release)
 on:
   pull_request:
     paths:
-      - 'common/vulinbox/**'
-      - 'common/vulinboxrunner/**'
-      - '.github/workflows/release-vulinbox.yml'
+      - "common/vulinbox/**"
+      - "common/vulinboxrunner/**"
+      - ".github/workflows/release-vulinbox.yml"
 
 jobs:
   build_and_release:
@@ -23,8 +23,8 @@ jobs:
         id: fetchtag
         with:
           source: ${{ github.ref }}
-          find: 'refs/tags/'
-          replace: ''
+          find: "refs/tags/"
+          replace: ""
       - name: Print RELEASE_VERSION
         run: |
           echo "github actions's env VERSION: ${{ steps.fetchtag.outputs.value }}"
@@ -75,14 +75,12 @@ jobs:
           name: vulinbox_windows_amd64.exe
           path: ./vulinbox_windows_amd64.exe
 
-
       - name: Upload Artifacts MacOS
         uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
           name: vulinbox_darwin_amd64
           path: ./vulinbox_darwin_amd64
-
 
       - name: Upload Artifacts Linux
         uses: actions/upload-artifact@v4
@@ -94,7 +92,7 @@ jobs:
   download_artifacts_and_release:
     needs:
       - build_and_release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -103,8 +101,8 @@ jobs:
         id: fetchtag_release
         with:
           source: ${{ github.ref }}
-          find: 'refs/tags/v'
-          replace: ''
+          find: "refs/tags/v"
+          replace: ""
       # 获取 latest 之前的 tag
       - name: Get previous version
         run: |
