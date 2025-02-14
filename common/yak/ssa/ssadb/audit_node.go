@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -56,6 +57,7 @@ func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error
 	if err != nil {
 		return nil, err
 	}
+	defer row.Close()
 
 	for row.Next() {
 		var item ResultVariable
