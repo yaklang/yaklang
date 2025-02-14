@@ -115,44 +115,47 @@ if($c){
 
 	//todo: fix member call
 
-	//	t.Run("big test for more parameterMember", func(t *testing.T) {
-	//		code := `<?php
-	//
-	//
-	///*
-	//topdef:
-	//    $a        GetFunc
-	//    FunctionA GetCallBy
-	//
-	// */
-	//class A{
-	//    public $c;
-	//    public function FunctionA($a){
-	//        println($a->c);
-	//    }
-	//}
-	//function C($c){
-	//    $c->FunctionA($c);
-	//}
-	//$a = new A();
-	//$a->c = 2;
-	//C($a);
-	//`
-	//		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
-	//	})
+	t.Run("big test for more parameterMember", func(t *testing.T) {
+		code := `<?php
+	/*
+
+	*/
+	class A{
+	   public $c;
+	   public function FunctionA($a){
+	       println($a->c);
+	   }
+	}
+	function C($c){
+	   $c->FunctionA($c);
+	}
+	$a = new A();
+	$a->c = 2;
+	C($a);
+	`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
+	})
 	t.Run("big test for parameter and feeevalue", func(t *testing.T) {
 		code := `<?php
 
 /*
-topdef:
-    param $a
-    getFunc test
-    getCallBy():
-        FuncA()
-        foreach ArgsMember
-        parameterMember
-    getCallBy():
-    
+	function_test:
+		call println($a)
+	function_A:
+		parameterMember: [$a->test]
+			call $a->test(1) argsMembers[]
+	anymousFunc:
+        fv: [$a]
+        parameterMember: [$a->test]
+        call FuncA($a) Bind[$a] ArgsMember[$a->test]
+
+	topDef:
+		println(* #-> * as $param)
+	
+		param($a) -> getFunc test
+		test      -> getCallBy() -> foreach ArgsMember -> $a->test ->parameterMember anymousFunc 
+		$a->test  -> getCallBy() -> foreach ArgsMember -> $a->test ->parameterMember FuncA
+		inst
 */
 
 class A{
@@ -172,22 +175,4 @@ $b();
 `
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
 	})
-	//	/*
-	//		todo： 动态语言的情况，会在call中进行修复
-	//	*/
-	//	t.Run("test const sideEffect call", func(t *testing.T) {
-	//		code := `<?php
-	//
-	//function a($a){
-	//    println($a);
-	//}
-	//
-	//$b = "c";
-	//$c = function()use(&$b){
-	//	$b = "a";
-	//};
-	//$c();
-	//$b(1);`
-	//		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{})
-	//	})
 }
