@@ -6,7 +6,7 @@ import (
 	"github.com/samber/lo"
 )
 
-func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar12(in *jlexer.Lexer, out *Entries) {
+func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar13(in *jlexer.Lexer, out *Entries) {
 	in.Delim('[')
 	if !in.IsDelim(']') {
 		out.Entries = make([]*HAREntry, 0, 8)
@@ -34,7 +34,7 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar12(in *jlexer.Lexer, 
 	in.Delim(']')
 }
 
-func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar12(out *jwriter.Writer, in Entries) {
+func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar13(out *jwriter.Writer, in Entries) {
 	first := true
 	_ = first
 	if in.Entries == nil && in.entriesChannel == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
