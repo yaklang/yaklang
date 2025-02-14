@@ -864,12 +864,16 @@ func TestLARGEGRPCMUSTPASS_Export_Large_HTTPFlow(t *testing.T) {
 			},
 		})
 	})
+	// wait until httpflow save
+	filter := &ypb.QueryHTTPFlowRequest{
+		Keyword: token,
+	}
+	_, err = QueryHTTPFlows(ctx, client, filter, 1)
+	require.NoError(t, err)
 
 	fn := filepath.Join(t.TempDir(), "test.har")
 	stream, err := client.ExportHTTPFlowStream(ctx, &ypb.ExportHTTPFlowStreamRequest{
-		Filter: &ypb.QueryHTTPFlowRequest{
-			Keyword: token,
-		},
+		Filter:     filter,
 		ExportType: "har",
 		TargetPath: fn,
 	})

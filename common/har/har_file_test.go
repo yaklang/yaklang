@@ -28,7 +28,9 @@ func TestImportHTTPArchive(t *testing.T) {
 		require.Equal(t, "", rsp.StatusText)
 		require.Equal(t, "http/2.0", rsp.HTTPVersion)
 		require.Len(t, rsp.Headers, 9)
-
+		// metadata
+		require.Equal(t, "har", entry.MetaData.SourceType)
+		require.Equal(t, "example", entry.MetaData.Tags)
 		return nil
 	})
 	require.Equal(t, 1, count, "should have 1 entry")
@@ -69,6 +71,10 @@ func TestExportHTTPArchive(t *testing.T) {
 				BodySize:    0,
 			},
 			Response: &HARResponse{},
+			MetaData: &HTTPFlowMetaData{
+				SourceType: "har",
+				Tags:       "example",
+			},
 		}
 		close(ch)
 	}()
@@ -101,6 +107,11 @@ func TestExportHTTPArchive(t *testing.T) {
 	require.True(t, resultHeaders.Exists())
 	headers := resultHeaders.Array()
 	require.Len(t, headers, 5)
+	// metadata
+	metaData := entries[0].Get("metaData")
+	require.True(t, metaData.Exists())
+	require.Equal(t, "har", metaData.Get("source_type").String())
+	require.Equal(t, "example", metaData.Get("tags").String())
 }
 
 func TestSmokeImportAndExport(t *testing.T) {

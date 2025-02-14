@@ -25,49 +25,49 @@ var (
 type HTTPFlow struct {
 	gorm.Model
 
-	HiddenIndex        string `gorm:"index"`
-	NoFixContentLength bool   `json:"no_fix_content_length"`
-	Hash               string `gorm:"unique_index"`
-	IsHTTPS            bool
-	Url                string `gorm:"index"`
-	Path               string
-	Method             string
-	BodyLength         int64
-	ContentType        string
-	StatusCode         int64
-	SourceType         string
-	Request            string
-	Response           string
-	Duration           int64
-	GetParamsTotal     int
-	PostParamsTotal    int
-	CookieParamsTotal  int
-	IPAddress          string
-	RemoteAddr         string
-	IPInteger          int
-	Tags               string // 用来打标！
-	Payload            string
+	HiddenIndex        string `gorm:"index" json:"hidden_index,omitempty"`
+	NoFixContentLength bool   `json:"no_fix_content_length" json:"no_fix_content_length,omitempty"`
+	Hash               string `gorm:"unique_index" json:"unique_index,omitempty"`
+	IsHTTPS            bool   `json:"is_https,omitempty"`
+	Url                string `gorm:"index" json:"url,omitempty"`
+	Path               string `json:"path,omitempty"`
+	Method             string `json:"method,omitempty"`
+	BodyLength         int64  `json:"body_length,omitempty"`
+	ContentType        string `json:"content_type,omitempty"`
+	StatusCode         int64  `json:"status_code,omitempty"`
+	SourceType         string `json:"source_type,omitempty"`
+	Request            string `json:"request,omitempty"`
+	Response           string `json:"response,omitempty"`
+	Duration           int64  `json:"duration,omitempty"`
+	GetParamsTotal     int    `json:"get_params_total,omitempty"`
+	PostParamsTotal    int    `json:"post_params_total,omitempty"`
+	CookieParamsTotal  int    `json:"cookie_params_total,omitempty"`
+	IPAddress          string `json:"ip_address,omitempty"`
+	RemoteAddr         string `json:"remote_addr,omitempty"`
+	IPInteger          int    `json:"ip_integer,omitempty"`
+	Tags               string `json:"tags,omitempty"` // 用来打标！
+	Payload            string `json:"payload,omitempty"`
 
 	// Websocket 相关字段
-	IsWebsocket bool
+	IsWebsocket bool `json:"is_websocket,omitempty"`
 	// 用来计算 websocket hash, 每次连接都不一样，一般来说，内部对象 req 指针足够了
-	WebsocketHash string
+	WebsocketHash string `json:"websocket_hash,omitempty"`
 
-	RuntimeId   string
-	FromPlugin  string
-	ProcessName sql.NullString
+	RuntimeId   string         `json:"runtime_id,omitempty"`
+	FromPlugin  string         `json:"from_plugin,omitempty"`
+	ProcessName sql.NullString `json:"process_name,omitempty"`
 
 	// friendly for gorm build instance, not for store
 	// 这两个字段不参与数据库存储，但是在序列化的时候，会被覆盖
 	// 主要用来标记用户的 Request 和 Response 是否超大
-	IsRequestOversize  bool `gorm:"-"`
-	IsResponseOversize bool `gorm:"-"`
+	IsRequestOversize  bool `gorm:"-" json:"is_request_oversize,omitempty"`
+	IsResponseOversize bool `gorm:"-" json:"is_response_oversize,omitempty"`
 
-	IsTooLargeResponse         bool
-	TooLargeResponseHeaderFile string
-	TooLargeResponseBodyFile   string
+	IsTooLargeResponse         bool   `json:"is_too_large_response,omitempty"`
+	TooLargeResponseHeaderFile string `json:"too_large_response_header_file,omitempty"`
+	TooLargeResponseBodyFile   string `json:"too_large_response_body_file,omitempty"`
 	// 同步到企业端
-	UploadOnline bool `json:"upload_online"`
+	UploadOnline bool `json:"upload_online,omitempty"`
 }
 
 func (f *HTTPFlow) GetRequest() string {

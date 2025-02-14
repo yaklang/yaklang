@@ -175,10 +175,29 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	}
 	response.BodySize = len(body)
 
+	// clear and save httpflow metadata
 	entry := &HAREntry{
 		Request:         request,
 		Response:        response,
 		ServerIPAddress: flow.RemoteAddr,
+		MetaData: &HTTPFlowMetaData{
+			NoFixContentLength: flow.NoFixContentLength,
+			IsHTTPS:            flow.IsHTTPS,
+			Path:               flow.Path,
+			SourceType:         flow.SourceType,
+			Duration:           flow.Duration,
+			GetParamsTotal:     flow.GetParamsTotal,
+			PostParamsTotal:    flow.PostParamsTotal,
+			CookieParamsTotal:  flow.CookieParamsTotal,
+			IPAddress:          flow.IPAddress,
+			IPInteger:          flow.IPInteger,
+			Tags:               flow.Tags,
+			Payload:            flow.Payload,
+			IsWebsocket:        flow.IsWebsocket,
+			FromPlugin:         flow.FromPlugin,
+			ProcessName:        flow.ProcessName,
+			UploadOnline:       flow.UploadOnline,
+		},
 	}
 
 	return entry, nil
@@ -261,7 +280,8 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 		respPacket = lowhttp.ReplaceHTTPPacketBody(respPacket, []byte(resp.Content.Text), false)
 	}
 
-	return &schema.HTTPFlow{
+	metadata := entry.MetaData
+	flow := &schema.HTTPFlow{
 		Method:      req.Method,
 		Url:         req.URL,
 		StatusCode:  int64(resp.StatusCode),
@@ -270,6 +290,24 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 		RemoteAddr:  entry.ServerIPAddress,
 		BodyLength:  int64(resp.Content.Size),
 		ContentType: resp.Content.MimeType,
-		SourceType:  schema.HTTPFlow_SourceType_HAR,
-	}, nil
+	}
+	if metadata != nil {
+		flow.NoFixContentLength = metadata.NoFixContentLength
+		flow.IsHTTPS = metadata.IsHTTPS
+		flow.Path = metadata.Path
+		flow.SourceType = metadata.SourceType
+		flow.Duration = metadata.Duration
+		flow.GetParamsTotal = metadata.GetParamsTotal
+		flow.PostParamsTotal = metadata.PostParamsTotal
+		flow.CookieParamsTotal = metadata.CookieParamsTotal
+		flow.IPAddress = metadata.IPAddress
+		flow.IPInteger = metadata.IPInteger
+		flow.Tags = metadata.Tags
+		flow.Payload = metadata.Payload
+		flow.IsWebsocket = metadata.IsWebsocket
+		flow.FromPlugin = metadata.FromPlugin
+		flow.ProcessName = metadata.ProcessName
+		flow.UploadOnline = metadata.UploadOnline
+	}
+	return flow, nil
 }
