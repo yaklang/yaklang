@@ -52,10 +52,10 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 			classMember := args1[1].(*values.JavaClassMember)
 			if classMember.Name != d.FunctionContext.ClassName {
 				return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-					return d.FunctionContext.ShortTypeName(classMember.Name)+"::"+classMember.Member
-				},func() types.JavaType {
+					return d.FunctionContext.ShortTypeName(classMember.Name) + "::" + classMember.Member
+				}, func() types.JavaType {
 					return typ
-				}),nil
+				}), nil
 				// return nil, fmt.Errorf("call external lamada: %s.%s", classMember.Name, classMember.Member)
 			}
 			methodStr, err := d.DumpClassLambdaMethod(classMember.Member, classMember.Description, sim.GetVarId())
@@ -78,4 +78,8 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 			}), nil
 		}
 	},
+}
+
+func init() {
+	buildinBootstrapMethods["java.lang.invoke.LambdaMetafactory.altMetafactory"] = buildinBootstrapMethods["java.lang.invoke.LambdaMetafactory.metafactory"]
 }

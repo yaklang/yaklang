@@ -4,42 +4,43 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"reflect"
+
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"reflect"
 )
 
 const (
-	CfgIsTerminal     = "isTerminal"
-	CfgIsList         = "list"
-	CfgIsTempRoot     = "temp root"
-	CfgLength         = "length"
-	CfgUnit           = "unit"
-	CfgType           = "type"
-	CfgGetResult      = "get result"
-	CfgRawResult      = "raw result"
-	CfgRootMap        = "rootNodeMap"
-	CfgEndian         = "endian"
-	CfgOperator       = "operator"
-	CfgInList         = "inList"
-	CfgParent         = "parent"
-	CfgDel            = "del"
-	CfgDelimiter      = "delimiter"
-	CfgImport         = "import"
-	CfgNodeResult     = "node result"
-	CfgLastNode       = "last node"
-	CfgElementIndex   = "element index"
-	CfgExceptionPlan  = "exception-plan"
-	CtxGenReaders     = "readers in generator"
-	CfgIsRefType      = "is ref type"
-	CfgRefType        = "ref-type"
+	CfgIsTerminal          = "isTerminal"
+	CfgIsList              = "list"
+	CfgIsTempRoot          = "temp root"
+	CfgLength              = "length"
+	CfgUnit                = "unit"
+	CfgType                = "type"
+	CfgGetResult           = "get result"
+	CfgRawResult           = "raw result"
+	CfgRootMap             = "rootNodeMap"
+	CfgEndian              = "endian"
+	CfgOperator            = "operator"
+	CfgInList              = "inList"
+	CfgParent              = "parent"
+	CfgDel                 = "del"
+	CfgDelimiter           = "delimiter"
+	CfgImport              = "import"
+	CfgNodeResult          = "node result"
+	CfgLastNode            = "last node"
+	CfgElementIndex        = "element index"
+	CfgExceptionPlan       = "exception-plan"
+	CtxGenReaders          = "readers in generator"
+	CfgIsRefType           = "is ref type"
+	CfgRefType             = "ref-type"
 	CfgLengthFromField     = "length-from-field"
 	CfgLengthForStartField = "length-for-start-field"
 	CfgLengthForField      = "length-for-field"
 	CfgStopValue           = "stop-value"
-	CfgLengthCacheMap = "length-cache-map"
+	CfgLengthCacheMap      = "length-cache-map"
 )
 
 var baseType = []string{"int", "uint", "int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "string", "bool", "raw"}
@@ -125,9 +126,6 @@ func (d *DefParser) OnRoot(node *base.Node) error {
 	return nil
 }
 func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
-	if node.Name == "Body" {
-		println()
-	}
 	if node.Cfg.Has(CfgRefType) {
 		typeNode, err := ParseRefNode(node)
 		if err != nil {

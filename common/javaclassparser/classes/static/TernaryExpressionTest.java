@@ -8,7 +8,7 @@ public class TernaryExpressionTest {
 	}
 	void main() {
 		int var1 = 1;
-		System.out.println(((var1) == (2)) ? ((this).getVar()) : (((var1) == (1)) ? (1) : (2)));
+		System.out.println(((var1) == (2)) ? (this.getVar()) : (((var1) == (1)) ? (1) : (2)));
 		String var2 = "s";
 		String var4 = (((var2) == (null)) ? (var2 = "a") : (var2 = "b")).toString();
 	}
