@@ -16,6 +16,7 @@ package icmp
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"time"
 
@@ -516,8 +517,11 @@ func (e *endpoint) Connect(addr tcpip.FullAddress) tcpip.Error {
 	e.rcvMu.Lock()
 	e.rcvReady = true
 	e.rcvMu.Unlock()
-
-	e.net.ResolvedRoute(func(_ stack.ResolvedFieldsResult) {
+	e.net.ResolvedRoute(func(info stack.ResolvedFieldsResult) {
+		if info.Err != nil {
+			log.Error("icmp connect failed: ResolvedRoute failed: ", info.Err)
+			return
+		}
 		e.waiterQueue.Notify(waiter.WritableEvents)
 	})
 	return &tcpip.ErrConnectStarted{}

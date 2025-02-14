@@ -2,12 +2,12 @@ package netstackvm
 
 import (
 	"encoding/hex"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/utils/arptable"
 	"net"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 )
 
 func (vm *NetStackVirtualMachine) GetOSNetStackIPv4() (net.IP, net.IP, net.IPMask) {
@@ -78,6 +78,7 @@ func (vm *NetStackVirtualMachine) GetOSNetStackIPv6() (net.IP, net.IP, net.IPMas
 	return nil, nil, nil
 }
 
+// InheritPcapInterfaceIP inherits the IP address of the pcap interface, set default mac address for driver(pcap endpoint)
 func (vm *NetStackVirtualMachine) InheritPcapInterfaceIP() error {
 	ipv4, gateway4, mask4 := vm.GetOSNetStackIPv4()
 	vm.driver.SetGatewayIP(gateway4)
@@ -88,25 +89,12 @@ func (vm *NetStackVirtualMachine) InheritPcapInterfaceIP() error {
 	if err != nil {
 		return err
 	}
-	vm.stack.AddStaticNeighbor(
-		vm.MainNICID(),
-		header.IPv4ProtocolNumber,
-		tcpip.AddrFrom4([4]byte(ipv4)), "")
-	err = vm.SetDefaultRoute(gateway4)
-	if err != nil {
-		return err
-	}
-
-	err = vm.AppendMainNicIPV4NeighborRoute()
-	if err != nil {
-		return err
-	}
-	if macAddr, err := arptable.SearchHardware(gateway4.String()); err == nil {
+	if macAddr, err := arptable.SearchHardware(vm.mainNICIPv4Gateway.String()); err == nil {
 		vm.driver.SetGatewayHardwareAddr(macAddr)
 		tcpErr := vm.stack.AddStaticNeighbor(
 			vm.MainNICID(),
 			header.IPv4ProtocolNumber,
-			tcpip.AddrFrom4([4]byte(gateway4.To4())),
+			tcpip.AddrFrom4([4]byte(vm.mainNICIPv4Gateway.To4())),
 			tcpip.LinkAddress(string(macAddr)),
 		)
 		if tcpErr != nil {
@@ -116,7 +104,8 @@ func (vm *NetStackVirtualMachine) InheritPcapInterfaceIP() error {
 	return nil
 }
 
-func (vm *NetStackVirtualMachine) AppendMainNicIPV4NeighborRoute() error {
+// GetPcapInterfaceNeighborRoute returns the route of the pcap interface, should call after set main nic ip
+func (vm *NetStackVirtualMachine) GetPcapInterfaceNeighborRoute() (tcpip.Route, error) {
 	mask4 := vm.GetMainNICIPv4Netmask().Mask
 	ipv4 := vm.GetMainNICIPv4Address().To4()
 
@@ -128,14 +117,44 @@ func (vm *NetStackVirtualMachine) AppendMainNicIPV4NeighborRoute() error {
 	mask4Byte, _ := hex.DecodeString(mask4.String())
 	neigh, err := tcpip.NewSubnet(tcpip.AddrFrom4([4]byte(networkSegment)), tcpip.MaskFrom(string(mask4Byte)))
 	if err != nil {
+		return tcpip.Route{}, err
+	}
+
+	return tcpip.Route{
+		Destination: neigh,
+		NIC:         vm.MainNICID(),
+		MTU:         uint32(vm.mtu),
+	}, nil
+}
+
+// InheritPcapInterfaceNeighborRoute inherits the route of the pcap interface
+func (vm *NetStackVirtualMachine) InheritPcapInterfaceNeighborRoute() error {
+	route, err := vm.GetPcapInterfaceNeighborRoute()
+	if err != nil {
 		return err
 	}
-	vm.stack.AddRoute(
-		tcpip.Route{
-			Destination: neigh,
-			NIC:         vm.MainNICID(),
-			MTU:         uint32(vm.mtu),
-		},
-	)
+	vm.stack.AddRoute(route)
 	return nil
+}
+
+// InheritPcapInterfaceConfig inherits the IP address and route of the pcap interface( will set default route, netx hop is gateway)
+func (vm *NetStackVirtualMachine) InheritPcapInterfaceConfig() error {
+	err := vm.InheritPcapInterfaceIP()
+	if err != nil {
+		return err
+	}
+	vm.stack.AddStaticNeighbor(
+		vm.MainNICID(),
+		header.IPv4ProtocolNumber,
+		tcpip.AddrFrom4([4]byte(vm.GetMainNICIPv4Address())), "")
+	gateway4 := vm.GetMainNICIPv4Gateway()
+	err = vm.SetDefaultRoute(gateway4)
+	if err != nil {
+		return err
+	}
+	err = vm.InheritPcapInterfaceNeighborRoute()
+	if err != nil {
+		return err
+	}
+	return err
 }

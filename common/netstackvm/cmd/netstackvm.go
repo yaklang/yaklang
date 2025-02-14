@@ -188,7 +188,7 @@ func main() {
 					return err
 				}
 
-				err = vm.InheritPcapInterfaceIP()
+				err = vm.InheritPcapInterfaceConfig()
 				if err != nil {
 					return err
 				}
