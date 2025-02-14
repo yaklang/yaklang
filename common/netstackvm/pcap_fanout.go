@@ -63,7 +63,7 @@ func newPCAPFanOuter(device string, promic bool) (*pcapFanOut, error) {
 	}
 
 	// Open pcap handle with large snaplen to avoid truncation
-	handle, err := pcap.OpenLive(name, 1600, promic, pcap.BlockForever)
+	handle, err := pcap.OpenLive(name, 0, promic, pcap.BlockForever) // no snaplen limit
 	if err != nil {
 		return nil, utils.Errorf("failed to open pcap handle: %v", err)
 	}
