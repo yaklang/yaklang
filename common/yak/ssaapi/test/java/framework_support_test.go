@@ -97,8 +97,7 @@ public class GreetingController {
 </body>
 </html>
 `)
-		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-			prog := programs[0]
+		ssatest.CheckWithFS(vf, t, func(prog ssaapi.Programs) error {
 			prog.Show()
 
 			rule := `
@@ -111,9 +110,10 @@ UNTIL
 }-> as $model
 $model.addAttribute(,* as $res)
 `
-			vals, err := prog.SyntaxFlowWithError(rule)
+			vals, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug())
 			require.NoError(t, err)
 			res := vals.GetValues("res")
+			vals.Show()
 			require.NotNil(t, res)
 			return nil
 		})
