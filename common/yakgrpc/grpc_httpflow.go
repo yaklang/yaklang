@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path"
@@ -805,7 +804,6 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 
 	count, total := 0.0, 0.0
 	totalCallback := func(i int) {
-		fmt.Println("!!!!", i)
 		total = float64(i)
 	}
 	filter := req.GetFilter()

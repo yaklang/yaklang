@@ -8,12 +8,13 @@ import (
 )
 
 type FastPaginator struct {
-	db     *gorm.DB
-	ids    []int
-	size   int
-	offset int
-	page   int
-	cfg    *FastPaginatorConfig
+	db          *gorm.DB
+	ids         []int
+	totalRecord int
+	size        int
+	offset      int
+	page        int
+	cfg         *FastPaginatorConfig
 	// p   Paginator
 }
 
@@ -68,6 +69,7 @@ func NewFastPaginator(db *gorm.DB, size int, opts ...FastPaginatorOpts) *FastPag
 	paginator.cfg = cfg
 	paginator.db = db
 	paginator.ids = ids
+	paginator.totalRecord = len(ids)
 	paginator.offset = 0
 	paginator.page = 0
 	paginator.size = size
