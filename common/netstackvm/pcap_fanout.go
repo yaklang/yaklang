@@ -33,7 +33,7 @@ var (
 
 // NewPCAPAdaptor creates a new pcap adaptor for the given interface.
 // It reuses existing adaptors if one already exists for the interface.
-func NewPCAPAdaptor(ifaceName string, promisc bool) (*pcapAdaptor, error) {
+func NewPCAPAdaptor(ifaceName string, mtu int32, promisc bool) (*pcapAdaptor, error) {
 	// Generate unique hash for this interface configuration
 	hash := utils.CalcSha256(ifaceName, promisc, _salt)
 
@@ -47,7 +47,7 @@ func NewPCAPAdaptor(ifaceName string, promisc bool) (*pcapAdaptor, error) {
 	}
 
 	// Create new fanout instance if none exists
-	ins, err := newPCAPFanOuter(ifaceName, promisc)
+	ins, err := newPCAPFanOuter(ifaceName, mtu, promisc)
 	if err != nil {
 		return nil, utils.Errorf("create pcap fanout failed: %v", err)
 	}
@@ -56,14 +56,14 @@ func NewPCAPAdaptor(ifaceName string, promisc bool) (*pcapAdaptor, error) {
 }
 
 // newPCAPFanOuter creates a new pcapFanOut instance for packet capture
-func newPCAPFanOuter(device string, promic bool) (*pcapFanOut, error) {
+func newPCAPFanOuter(device string, mtu int32, promic bool) (*pcapFanOut, error) {
 	name, err := pcaputil.IfaceNameToPcapIfaceName(device)
 	if err != nil {
 		return nil, utils.Errorf("failed to get pcap interface name (%v): %v", device, err)
 	}
 
 	// Open pcap handle with large snaplen to avoid truncation
-	handle, err := pcap.OpenLive(name, 0, promic, pcap.BlockForever) // no snaplen limit
+	handle, err := pcap.OpenLive(name, mtu, promic, pcap.BlockForever) // no snaplen limit
 	if err != nil {
 		return nil, utils.Errorf("failed to open pcap handle: %v", err)
 	}
