@@ -78,6 +78,14 @@ var (
 //	return "", utils.Errorf("cannot find loopback device")
 //}
 
+func GetPublicRouteIfaceName() (string, error) {
+	route, _, _, err := GetPublicRoute()
+	if err != nil {
+		return "", err
+	}
+	return route.Name, nil
+}
+
 func GetPublicRoute() (*net.Interface, net.IP, net.IP, error) {
 	iface, gw, ip, err := Route(5*time.Second, "8.8.8.8")
 	if err != nil {
