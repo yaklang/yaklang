@@ -3,6 +3,10 @@ package pingutil
 import (
 	"context"
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -12,12 +16,56 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"net"
-	"sync"
-	"time"
 )
 
 var icmpPayload = []byte("f\xc8\x14A\x00\n\xebs\b\t\n\v\f\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !\"#$%&'()*+,-./01234567")
+
+var (
+	// 使用 TTLCache 缓存网卡地址信息，设置 1 分钟过期
+	ifaceAddrCache = utils.NewTTLCacheWithKey[string, []*net.IPNet](1 * time.Minute)
+)
+
+func getIfaceAddrs(iface net.Interface) []*net.IPNet {
+	// 尝试从缓存获取
+	if addrs, ok := ifaceAddrCache.Get(iface.Name); ok {
+		return addrs
+	}
+
+	// 缓存未命中，获取地址
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil
+	}
+
+	// 转换并保存到缓存
+	var ipNets []*net.IPNet
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok {
+			ipNets = append(ipNets, ipnet)
+		}
+	}
+
+	ifaceAddrCache.Set(iface.Name, ipNets)
+	return ipNets
+}
+
+func isInSameSubnet(iface net.Interface, target string) bool {
+	targetIP := net.ParseIP(target)
+	if targetIP == nil {
+		return false
+	}
+
+	// 使用缓存的地址信息
+	for _, ipnet := range getIfaceAddrs(iface) {
+		// 确保 IP 版本匹配（IPv4 或 IPv6）
+		if targetIP.To4() != nil && ipnet.IP.To4() != nil {
+			return ipnet.Contains(targetIP)
+		} else if targetIP.To4() == nil && ipnet.IP.To4() == nil {
+			return ipnet.Contains(targetIP)
+		}
+	}
+	return false
+}
 
 func PingAuto2(target string, config *PingConfig) *PingResult {
 	result, err := PcapxPing(target, config)
@@ -104,10 +152,17 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 			firstIP = srcIp.To16().String()
 		}
 	}
+	var macAddress net.HardwareAddr
+
+	if isInSameSubnet(*iface, ip) {
+		macAddress, _ = arpx.ArpWithContext(parentCtx, iface.Name, ip)
+	} else {
+		// PacketBuilder 中会自己尝试构建 Ethernet 层
+		macAddress = nil
+	}
 
 	ctx, cancel := context.WithTimeout(parentCtx, config.timeout)
 	defer cancel()
-	macAddress, _ := arpx.ArpWithContext(ctx, iface.Name, ip)
 
 	isAlive := utils.NewBool(false)
 	ttl := 0
@@ -208,6 +263,12 @@ func sendICMPPacket(handle *pcaputil.PcapHandleWrapper, ip, firstIP string, isLo
 // 包处理
 func handleICMPPacket(targetIP string, isAlive *utils.AtomicBool, ttl *int, cancel context.CancelFunc) func(packet gopacket.Packet) {
 	return func(packet gopacket.Packet) {
+		defer func() {
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
+
 		if isAlive.IsSet() || !pcaputil.IsICMP(packet) {
 			return
 		}
@@ -216,8 +277,7 @@ func handleICMPPacket(targetIP string, isAlive *utils.AtomicBool, ttl *int, canc
 		icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 
 		if ip4, ok := ip4Layer.(*layers.IPv4); ok {
-			if l, ok := icmpLayer.(*layers.ICMPv4); ok &&
-				l.TypeCode.Type() == layers.ICMPv4TypeEchoReply &&
+			if l, ok := icmpLayer.(*layers.ICMPv4); ok && l.TypeCode.Type() == layers.ICMPv4TypeEchoReply &&
 				ip4.SrcIP.String() == targetIP {
 				isAlive.SetTo(true)
 				*ttl = int(ip4.TTL)

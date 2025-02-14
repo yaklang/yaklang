@@ -26,14 +26,6 @@ func (c *cache) Search(ip string) string {
 	c.RLock()
 	defer c.RUnlock()
 
-	mac, ok := c.table[ip]
-
-	if !ok {
-		c.RUnlock()
-		c.Refresh()
-		c.RLock()
-		mac = c.table[ip]
-	}
-
-	return mac
+	// 简单地返回结果，不做自动刷新
+	return c.table[ip]
 }

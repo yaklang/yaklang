@@ -106,7 +106,7 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 							}
 
 							if i != count-1 {
-								time.Sleep(250 * time.Millisecond)
+								time.Sleep(100 * time.Millisecond)
 							}
 						}
 

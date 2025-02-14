@@ -41,8 +41,11 @@ func ArpWithContext(ctx context.Context, ifaceName string, target string) (net.H
 			return hw, nil
 		}
 	}
-
+	start := time.Now()
 	hw, _ := arptable.SearchHardware(target)
+	elapsed := time.Since(start)
+	log.Debugf("arp search hardware for %s cost: %s", target, elapsed)
+
 	if hw != nil && hw.String() != "" {
 		arpTableTTLCache.Set(target, hw)
 		return hw, nil

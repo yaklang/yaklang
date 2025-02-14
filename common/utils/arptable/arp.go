@@ -1,10 +1,11 @@
 package arptable
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type ArpTable map[string]string
@@ -14,6 +15,7 @@ var (
 	arpCache = &cache{
 		table: make(ArpTable),
 	}
+	sfGroup = &singleflight.Group{}
 )
 
 func init() {
@@ -57,9 +59,21 @@ func Search(ip string) string {
 }
 
 func SearchHardware(ip string) (net.HardwareAddr, error) {
-	result := Search(ip)
-	if result != "" {
+	v, err, _ := sfGroup.Do(ip, func() (interface{}, error) {
+		result := Search(ip)
+		if result == "" {
+			// 异步刷新 ARP 表
+			go func() {
+				CacheUpdate()
+			}()
+			return nil, fmt.Errorf("arp search table failed for IP: %s", ip)
+		}
+
 		return net.ParseMAC(result)
+	})
+
+	if err != nil {
+		return nil, err
 	}
-	return nil, errors.New(fmt.Sprintf("arpx search table failed: %s", ip))
+	return v.(net.HardwareAddr), nil
 }
