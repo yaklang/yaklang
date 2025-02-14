@@ -73,6 +73,8 @@ type Config struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	stack *stack.Stack
+
 	pcapPromisc        bool
 	pcapDevice         string
 	pcapInboundFilter  func(packet gopacket.Packet) bool
@@ -222,6 +224,13 @@ func NewDefaultConfig() *Config {
 		ARPAnnouncementFastTimes:    2,
 		ARPAnnouncementSlowInterval: 30 * time.Second,
 		pcapPromisc:                 true,
+	}
+}
+
+func WithNetStack(netStack *stack.Stack) Option {
+	return func(c *Config) error {
+		c.stack = netStack
+		return nil
 	}
 }
 
