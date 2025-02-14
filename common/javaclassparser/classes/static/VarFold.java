@@ -1,5 +1,7 @@
 package org.benf.cfr.reader;
 
+import java.util.List;
+
 public class VarFold {
 	public VarFold() {
 	}
@@ -27,5 +29,9 @@ public class VarFold {
 	}
 	void newExpression() {
 		String var1 = new String("");
+	}
+	void typeCase() {
+		Integer var1 = Integer.valueOf(1);
+		List var2 = (var1 instanceof Object) ? ((List)(var1)) : (var1.getClass());
 	}
 }

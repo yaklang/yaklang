@@ -9,7 +9,6 @@ import (
 )
 
 func DumpNodesToDotExp(code *core.Node) string {
-	return ""
 	var visitor func(node *core.Node, visited map[*core.Node]bool, sb *strings.Builder)
 	visitor = func(node *core.Node, visited map[*core.Node]bool, sb *strings.Builder) {
 		if node == nil {

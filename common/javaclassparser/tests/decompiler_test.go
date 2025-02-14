@@ -18,35 +18,35 @@ func TestDecompiler(t *testing.T) {
 	testCase := []struct {
 		name string
 	}{
-		// {"LongTest"},
-		// {"LogicalOperationMini"},
-		// {"SelfOp"},
-		// {"ContinuousAssign"},
-		// {"TryCatch1"},
-		// {"VarFold"},
-		// {"SuperTest"},
-		// {"FinalTest"},
-		// {
-		// 	"SynchronizedTest",
-		// },
-		// {
-		// 	"LambdaTest",
-		// },
-		// {
-		// 	"IfTest",
-		// },
-		// {
-		// 	"InterfaceTest",
-		// },
-		// {
-		// 	"TryCatch",
-		// },
-		// {
-		// 	name: "LogicalOperation",
-		// },
-		// {
-		// 	name: "TernaryExpressionTest",
-		// },
+		{"LongTest"},
+		{"LogicalOperationMini"},
+		{"SelfOp"},
+		{"ContinuousAssign"},
+		{"TryCatch1"},
+		{"VarFold"},
+		{"SuperTest"},
+		{"FinalTest"},
+		{
+			"SynchronizedTest",
+		},
+		{
+			"LambdaTest",
+		},
+		{
+			"IfTest",
+		},
+		{
+			"InterfaceTest",
+		},
+		{
+			"TryCatch",
+		},
+		{
+			name: "LogicalOperation",
+		},
+		{
+			name: "TernaryExpressionTest",
+		},
 		{
 			name: "SwitchTest",
 		},

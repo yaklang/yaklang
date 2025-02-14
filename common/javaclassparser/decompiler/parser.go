@@ -1,12 +1,13 @@
 package decompiler
 
 import (
+	"slices"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/rewriter"
 	"github.com/yaklang/yaklang/common/utils"
-	"slices"
 )
 
 func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, err error) {
@@ -26,9 +27,7 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 
 	statementManager := rewriter.NewRootStatementManager(decompiler.RootNode)
 	statementManager.SetId(decompiler.CurrentId)
-	core.DumpNodesToDotExp(decompiler.RootNode)
 	statementManager.MergeIf()
-	core.DumpNodesToDotExp(decompiler.RootNode)
 	allNodes := []*core.Node{}
 	core.WalkGraph[*core.Node](decompiler.RootNode, func(node *core.Node) ([]*core.Node, error) {
 		allNodes = append(allNodes, node)
@@ -56,7 +55,6 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	if err != nil {
 		return nil, err
 	}
-	core.DumpNodesToDotExp(decompiler.RootNode)
 	sts, err := statementManager.ToStatements(func(node *core.Node) bool {
 		return true
 	})

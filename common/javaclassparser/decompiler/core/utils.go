@@ -355,7 +355,6 @@ func GetRealValue(value values.JavaValue) values.JavaValue {
 	return value
 }
 func DumpNodesToDotExp(code *Node) string {
-	return ""
 	var visitor func(node *Node, visited map[*Node]bool, sb *strings.Builder)
 	visitor = func(node *Node, visited map[*Node]bool, sb *strings.Builder) {
 		if node == nil {

@@ -45,9 +45,9 @@ func TestParseClass(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if path != "/Users/z3/Downloads/error-jdsc 3/decompile-err-042240ff10b9ca0b895360a9.class" {
-			return nil
-		}
+		// if path != "/Users/z3/Downloads/error-jdsc 3/decompile-err-068afc96a4cd68e35eeb99e2.class" {
+		// 	return nil
+		// }
 		source, err := cf.Dump()
 
 		if err != nil {

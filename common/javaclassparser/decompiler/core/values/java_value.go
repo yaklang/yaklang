@@ -2,14 +2,15 @@ package values
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strconv"
-	"strings"
 )
 
 type JavaRef struct {

@@ -1,6 +1,9 @@
 package decompiler
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
@@ -12,8 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"strings"
-	"testing"
 )
 
 func TestSwitch(t *testing.T) {
@@ -56,7 +57,6 @@ func TestSwitch(t *testing.T) {
 	case3.AddNext(defaultNode)
 	defaultNode.AddNext(endNode)
 	//rewriter.GenerateDominatorTree(switchNode)
-	println(utils.DumpNodesToDotExp(start))
 
 	statementManager := rewriter.NewRootStatementManager(start)
 	statementManager.SetId(id)
