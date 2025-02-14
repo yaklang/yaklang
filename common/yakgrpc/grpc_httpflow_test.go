@@ -882,6 +882,7 @@ func TestLARGEGRPCMUSTPASS_Export_Large_HTTPFlow(t *testing.T) {
 	progress := 0.0
 	for {
 		msg, err := stream.Recv()
+		spew.Dump(msg)
 		if err != nil {
 			break
 		}
