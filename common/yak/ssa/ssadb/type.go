@@ -1,11 +1,11 @@
 package ssadb
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"sync/atomic"
 	"time"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -36,12 +36,23 @@ func SaveType(kind int, str string, extra string) int {
 	irType.Hash = irType.CalcHash()
 
 	db := GetDB()
+	/*
+		todo: check it why db locked. this is tmp resolve
+	*/
 	utils.GormTransaction(db, func(tx *gorm.DB) error {
+		count := 0
+	retry:
 		err := tx.Where("hash = ?", irType.Hash).FirstOrCreate(&irType).Error
 		if err != nil {
-			log.Errorf("ssa type FirstOrCreate err: %v", err)
+			if count < 5 {
+				count++
+				goto retry
+			} else {
+				log.Errorf("ssa type FirstOrCreate err: %v", err)
+				return err
+			}
 		}
-		return err
+		return nil
 	})
 	return int(irType.ID)
 }
