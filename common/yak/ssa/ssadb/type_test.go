@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSaveType(t *testing.T) {
@@ -21,10 +21,10 @@ func TestSaveType(t *testing.T) {
 
 	// Retrieve the type
 	retrievedKind, retrievedStr, retrievedExtra, err := GetType(id)
-	assert.NoError(t, err)
-	assert.Equal(t, kind, retrievedKind)
-	assert.Equal(t, str, retrievedStr)
-	assert.Equal(t, extra, retrievedExtra)
+	require.NoError(t, err)
+	require.Equal(t, kind, retrievedKind)
+	require.Equal(t, str, retrievedStr)
+	require.Equal(t, extra, retrievedExtra)
 }
 
 func TestSaveTypeReuse(t *testing.T) {
@@ -41,14 +41,14 @@ func TestSaveTypeReuse(t *testing.T) {
 	id2 := SaveType(kind, str, extra)
 
 	// Ensure the IDs are the same, indicating reuse
-	assert.Equal(t, id1, id2)
+	require.Equal(t, id1, id2)
 
 	// Retrieve the type
 	retrievedKind, retrievedStr, retrievedExtra, err := GetType(id1)
-	assert.NoError(t, err)
-	assert.Equal(t, kind, retrievedKind)
-	assert.Equal(t, str, retrievedStr)
-	assert.Equal(t, extra, retrievedExtra)
+	require.NoError(t, err)
+	require.Equal(t, kind, retrievedKind)
+	require.Equal(t, str, retrievedStr)
+	require.Equal(t, extra, retrievedExtra)
 }
 
 func TestSaveTypeConcurrent(t *testing.T) {
@@ -76,12 +76,12 @@ func TestSaveTypeConcurrent(t *testing.T) {
 	// defer DeleteType(id1) // Clear data after test
 
 	// Ensure the IDs are the same, indicating reuse
-	assert.Equal(t, id1, id2)
+	require.Equal(t, id1, id2)
 
 	// Retrieve the type
 	retrievedKind, retrievedStr, retrievedExtra, err := GetType(id1)
-	assert.NoError(t, err)
-	assert.Equal(t, kind, retrievedKind)
-	assert.Equal(t, str, retrievedStr)
-	assert.Equal(t, extra, retrievedExtra)
+	require.NoError(t, err)
+	require.Equal(t, kind, retrievedKind)
+	require.Equal(t, str, retrievedStr)
+	require.Equal(t, extra, retrievedExtra)
 }
