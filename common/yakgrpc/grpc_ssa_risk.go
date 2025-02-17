@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Server) QuerySSARisks(ctx context.Context, req *ypb.QuerySSARisksRequest) (*ypb.QuerySSARisksResponse, error) {
-	p, risks, err := yakit.QuerySSARisk(s.GetSSADatabase(), req.GetFilter(), req.GetPagination())
+	p, risks, err := yakit.QuerySSARisk(s.GetSSADatabase().Debug(), req.GetFilter(), req.GetPagination())
 	if err != nil {
 		return nil, err
 	}
@@ -71,4 +71,37 @@ func (s *Server) NewSSARiskRead(ctx context.Context, req *ypb.NewSSARiskReadRequ
 		return nil, err
 	}
 	return &ypb.NewSSARiskReadResponse{}, nil
+}
+
+func (s *Server) QueryNewSSARisks(ctx context.Context, req *ypb.QueryNewSSARisksRequest) (*ypb.QueryNewSSARiskResponse, error) {
+	// query new ssa-risk
+	p, data, err := yakit.QuerySSARisk(s.GetSSADatabase().Debug(), &ypb.SSARisksFilter{
+		IsRead: -1, // unread
+	}, &ypb.Paging{
+		Limit:   -1,
+		OrderBy: "id",
+		Order:   "desc",
+		AfterId: req.GetAfterID(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	total, _ := yakit.QuerySSARiskCount(s.GetSSADatabase(), nil)
+	totalUnread := p.TotalRecord // paging not effect p.TotalRecord, so we don't need to query again
+
+	// yakit.SSARiskColumnGroupCount()
+	return &ypb.QueryNewSSARiskResponse{
+		// new ssa-risk unread  data
+		Data: lo.Map(data, func(risk *schema.SSARisk, _ int) *ypb.SSARisk {
+			return risk.ToGRPCModel()
+		}),
+		// new ssa-risk unread count
+		NewRiskTotal: int64(len(data)),
+
+		// total ssa-risk
+		Total:  int64(total),
+		Unread: int64(totalUnread),
+	}, nil
+
 }
