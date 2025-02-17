@@ -15,8 +15,8 @@ func (b *FunctionBuilder) SetLanguageConfig(opt ...languageConfigOpt) {
 func LanguageConfigIsBinding(config *LanguageConfig) {
 	config.isBindLanguage = true
 }
-func LanguageConfigIsWeak(config *LanguageConfig) {
-	config.isWeakLanguage = true
+func LanguageConfigSupportConstMethod(config *LanguageConfig) {
+	config.isSupportConstMethod = true
 }
 
 func LanguageConfigTryBuildValue(config *LanguageConfig) {
@@ -74,8 +74,8 @@ type LanguageConfig struct {
 	isSupportClass               bool
 	isSupportClassStaticModifier bool
 
-	//weakLanguage we need more detail for it!
-	isWeakLanguage bool
+	//script Language need to handle call method
+	isSupportConstMethod bool
 }
 
 func NewLanguageConfig() *LanguageConfig {
@@ -84,7 +84,7 @@ func NewLanguageConfig() *LanguageConfig {
 		isTryBuildValue:              false,
 		isSupportClass:               false,
 		isSupportClassStaticModifier: false,
-		isWeakLanguage:               false,
+		isSupportConstMethod:         false,
 	}
 }
 

@@ -45,17 +45,19 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	c.handlerObjectMethod()
 	c.handlerReturnType()
 	c.handleCalleeFunction()
-	c.handleWeakLanguageCall()
+	c.handleMethod()
 	return c
 }
-func (c *Call) handleWeakLanguageCall() {
+
+// handleMethod handle method for call,this call have more type,need handle this type
+func (c *Call) handleMethod() {
 	callMethod := c.Method
 	/*
 		handle weakLanguage call
 	*/
 	builder := c.GetFunc().builder
 	var check func(Value)
-	weakLanguage := builder.IsWeakLanguage()
+	weakLanguage := builder.IsSupportConstMethod()
 	tmp := make(map[int64]struct{})
 	PointFunc := func(fun Value, method Value) {
 		Point(fun, method)
@@ -71,11 +73,13 @@ func (c *Call) handleWeakLanguageCall() {
 			/*
 				from <string> to getFunc
 			*/
-			if newMethod := builder.GetFunc(method.String(), ""); utils.IsNil(newMethod) {
-				log.Errorf("weakLanguage call %s not found", method.String())
-				return
-			} else {
-				PointFunc(newMethod, callMethod)
+			if weakLanguage {
+				if newMethod := builder.GetFunc(method.String(), ""); utils.IsNil(newMethod) {
+					log.Errorf("weakLanguage call %s not found", method.String())
+					return
+				} else {
+					PointFunc(newMethod, callMethod)
+				}
 			}
 		case *SideEffect:
 			/*
@@ -90,10 +94,8 @@ func (c *Call) handleWeakLanguageCall() {
 			PointFunc(ret, callMethod)
 		}
 	}
-	if weakLanguage {
-		if !callMethod.IsExtern() && callMethod.GetOpcode() != SSAOpcodeFunction {
-			check(callMethod)
-		}
+	if !callMethod.IsExtern() && callMethod.GetOpcode() != SSAOpcodeFunction {
+		check(callMethod)
 	}
 }
 
