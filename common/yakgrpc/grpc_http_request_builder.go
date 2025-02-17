@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"net/url"
+	"strings"
+	"sync"
+
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"google.golang.org/grpc"
-	"net/url"
-	"strings"
-	"sync"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -30,6 +32,10 @@ var debugScriptCode string
 func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPluginServer) error {
 	input := req.GetInput()
 	pluginType := req.GetPluginType()
+	if !lo.Contains([]string{"yak", "codec", "mitm", "nuclei", "port-scan"}, pluginType) {
+		return utils.Errorf("unsupported plugin type: %#v", pluginType)
+	}
+
 	if pluginType != "yak" && input == "" && req.GetHTTPRequestTemplate() == nil {
 		return utils.Error("input / input packet is empty")
 	}
