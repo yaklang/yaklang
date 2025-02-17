@@ -103,11 +103,11 @@ func NewMCPServer() *MCPServer {
 		),
 		mcp.WithNumber("duration",
 			mcp.Description("Duration of the operation in seconds"),
-			mcp.DefaultNumber(10),
+			mcp.Default(10),
 		),
 		mcp.WithNumber("steps",
 			mcp.Description("Number of steps in the operation"),
-			mcp.DefaultNumber(5),
+			mcp.Default(5),
 		),
 	), s.handleLongRunningOperationTool)
 

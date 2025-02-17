@@ -125,6 +125,14 @@ func Description(desc string) PropertyOption {
 	}
 }
 
+// Default sets the default value for a property.
+// This value will be used if the property is not explicitly provided.
+func Default(desc any) PropertyOption {
+	return func(schema map[string]any) {
+		schema["default"] = desc
+	}
+}
+
 // Required marks a property as required in the tool's input schema.
 // Required properties must be provided when using the tool.
 func Required() PropertyOption {
@@ -145,17 +153,9 @@ func Title(title string) PropertyOption {
 // String Property Options
 //
 
-// DefaultString sets the default value for a string property.
-// This value will be used if the property is not explicitly provided.
-func DefaultString(value string) PropertyOption {
-	return func(schema map[string]any) {
-		schema["default"] = value
-	}
-}
-
 // Enum specifies a list of allowed values for a string property.
 // The property value must be one of the specified enum values.
-func Enum(values ...string) PropertyOption {
+func Enum(values ...any) PropertyOption {
 	return func(schema map[string]any) {
 		schema["enum"] = values
 	}
@@ -189,14 +189,6 @@ func Pattern(pattern string) PropertyOption {
 // Number Property Options
 //
 
-// DefaultNumber sets the default value for a number property.
-// This value will be used if the property is not explicitly provided.
-func DefaultNumber(value float64) PropertyOption {
-	return func(schema map[string]any) {
-		schema["default"] = value
-	}
-}
-
 // Max sets the maximum value for a number property.
 // The number value must not exceed this maximum.
 func Max(max float64) PropertyOption {
@@ -222,24 +214,12 @@ func MultipleOf(value float64) PropertyOption {
 }
 
 //
-// Boolean Property Options
-//
-
-// DefaultBool sets the default value for a boolean property.
-// This value will be used if the property is not explicitly provided.
-func DefaultBool(value bool) PropertyOption {
-	return func(schema map[string]any) {
-		schema["default"] = value
-	}
-}
-
-//
 // Property Type Helpers
 //
 
-// WithBoolean adds a boolean property to the tool schema.
+// WithBool adds a boolean property to the tool schema.
 // It accepts property options to configure the boolean property's behavior and constraints.
-func WithBoolean(name string, opts ...PropertyOption) ToolOption {
+func WithBool(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "boolean",
 	}
@@ -283,6 +263,15 @@ func WithArray(name string, itemType string, opts ...PropertyOption) ToolOption 
 			"type": itemType,
 		},
 	}
+	return WithRaw(name, schema, opts...)
+}
+
+func WithStruct(name string, opts []PropertyOption, itemsOpt ...ToolOption) ToolOption {
+	schema := map[string]any{
+		"type": "object",
+	}
+	temp := NewTool("", itemsOpt...)
+	schema["properties"] = temp.InputSchema.Properties
 	return WithRaw(name, schema, opts...)
 }
 
