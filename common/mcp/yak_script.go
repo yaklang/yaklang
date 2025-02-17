@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,8 +33,12 @@ func (s *MCPServer) registerYakScriptTool() {
 		mcp.WithStringArray("tag",
 			mcp.Description("Filter by script tags"),
 		),
-		mcp.WithStringArray("group",
-			mcp.Description("Filter by script groups"),
+		mcp.WithStruct("group",
+			[]mcp.PropertyOption{mcp.Description("Filter scripts by group settings")},
+			mcp.WithBool("UnSetGroup",
+				mcp.Description("if true, filter scripts without these groups")),
+			mcp.WithStringArray("Group",
+				mcp.Description("Group names to filter")),
 		),
 		mcp.WithString("userName",
 			mcp.Description("Filter scripts by author username"),
@@ -61,6 +64,39 @@ func (s *MCPServer) registerYakScriptTool() {
 		mcp.WithKVPairs("execParams",
 			mcp.Description(`Parameters for the yak script, check script content for the required parameters.Please check the use of all cli libraries, for example: cli.Int("a") means that there is a parameter with key "a" and type int`)),
 	), s.handleExecYakScriptTool)
+
+	s.server.AddTool(mcp.NewTool("create_yak_script_group",
+		mcp.WithDescription("Create a new Yak script group"),
+		mcp.WithString("GroupName",
+			mcp.Description("Group name"),
+		),
+	), s.handleCreateYakScriptGroup)
+
+	s.server.AddTool(mcp.NewTool("query_yak_script_group",
+		mcp.WithDescription("Query Yak script group info"),
+		mcp.WithBool("All",
+			mcp.Description("Fetch all groups"),
+			mcp.Default(false),
+		),
+		mcp.WithString("PageId",
+			mcp.Description("Page identifier for pagination"),
+		),
+		mcp.WithBool("IsPocBuiltIn",
+			mcp.Description("Filter built-in POC groups"),
+			mcp.Default(false),
+		),
+		mcp.WithStringArray("ExcludeType",
+			mcp.Description("Exclude specific script types"),
+		),
+		mcp.WithNumber("IsMITMParamPlugins",
+			mcp.Description(`Filter MITM parameter plugins:
+        0 - No filter
+        1 - Only plugins with MITM parameters
+        2 - Plugins without MITM params OR port-scan type`),
+			mcp.Default(0),
+			mcp.Enum(0, 1, 2),
+		),
+	), s.handleQueryYakScriptGroup)
 }
 
 func (s *MCPServer) handleExecYakScriptTool(
@@ -134,20 +170,37 @@ func (s *MCPServer) handleQueryYakScriptTool(
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to query yak script")
 	}
-	rspBytes, err := json.Marshal(rsp.Data)
+	return NewCommonCallToolResult(rsp.Data)
+}
+
+func (s *MCPServer) handleCreateYakScriptGroup(
+	ctx context.Context,
+	request mcp.CallToolRequest,
+) (*mcp.CallToolResult, error) {
+	var req ypb.SetGroupRequest
+	err := mapstructure.Decode(request.Params.Arguments, &req)
 	if err != nil {
-		return nil, utils.Wrap(err, "failed to marshal response")
+		return nil, utils.Wrap(err, "invalid argument")
 	}
-	return &mcp.CallToolResult{
-		Content: []any{
-			mcp.TextContent{
-				Type: "text",
-				Text: "Result:",
-			},
-			mcp.TextContent{
-				Type: "text",
-				Text: string(rspBytes),
-			},
-		},
-	}, nil
+	_, err = s.grpcClient.SetGroup(ctx, &req)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to query yak script group info")
+	}
+	return NewCommonCallToolResult("create success")
+}
+
+func (s *MCPServer) handleQueryYakScriptGroup(
+	ctx context.Context,
+	request mcp.CallToolRequest,
+) (*mcp.CallToolResult, error) {
+	var req ypb.QueryYakScriptGroupRequest
+	err := mapstructure.Decode(request.Params.Arguments, &req)
+	if err != nil {
+		return nil, utils.Wrap(err, "invalid argument")
+	}
+	rsp, err := s.grpcClient.QueryYakScriptGroup(ctx, &req)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to query yak script group info")
+	}
+	return NewCommonCallToolResult(rsp.Group)
 }
