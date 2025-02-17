@@ -240,79 +240,28 @@ func DefaultBool(value bool) PropertyOption {
 // WithBoolean adds a boolean property to the tool schema.
 // It accepts property options to configure the boolean property's behavior and constraints.
 func WithBoolean(name string, opts ...PropertyOption) ToolOption {
-	return func(t *Tool) {
-		schema := map[string]any{
-			"type": "boolean",
-		}
-
-		for _, opt := range opts {
-			opt(schema)
-		}
-
-		// Remove required from property schema and add to InputSchema.required
-		if required, ok := schema["required"].(bool); ok && required {
-			delete(schema, "required")
-			if t.InputSchema.Required == nil {
-				t.InputSchema.Required = []string{name}
-			} else {
-				t.InputSchema.Required = append(t.InputSchema.Required, name)
-			}
-		}
-
-		t.InputSchema.Properties[name] = schema
+	schema := map[string]any{
+		"type": "boolean",
 	}
+	return WithRaw(name, schema, opts...)
 }
 
 // WithNumber adds a number property to the tool schema.
 // It accepts property options to configure the number property's behavior and constraints.
 func WithNumber(name string, opts ...PropertyOption) ToolOption {
-	return func(t *Tool) {
-		schema := map[string]any{
-			"type": "number",
-		}
-
-		for _, opt := range opts {
-			opt(schema)
-		}
-
-		// Remove required from property schema and add to InputSchema.required
-		if required, ok := schema["required"].(bool); ok && required {
-			delete(schema, "required")
-			if t.InputSchema.Required == nil {
-				t.InputSchema.Required = []string{name}
-			} else {
-				t.InputSchema.Required = append(t.InputSchema.Required, name)
-			}
-		}
-
-		t.InputSchema.Properties[name] = schema
+	schema := map[string]any{
+		"type": "number",
 	}
+	return WithRaw(name, schema, opts...)
 }
 
 // WithString adds a string property to the tool schema.
 // It accepts property options to configure the string property's behavior and constraints.
 func WithString(name string, opts ...PropertyOption) ToolOption {
-	return func(t *Tool) {
-		schema := map[string]any{
-			"type": "string",
-		}
-
-		for _, opt := range opts {
-			opt(schema)
-		}
-
-		// Remove required from property schema and add to InputSchema.required
-		if required, ok := schema["required"].(bool); ok && required {
-			delete(schema, "required")
-			if t.InputSchema.Required == nil {
-				t.InputSchema.Required = []string{name}
-			} else {
-				t.InputSchema.Required = append(t.InputSchema.Required, name)
-			}
-		}
-
-		t.InputSchema.Properties[name] = schema
+	schema := map[string]any{
+		"type": "string",
 	}
+	return WithRaw(name, schema, opts...)
 }
 
 // WithStringArray adds a string array property to the tool schema.
@@ -328,83 +277,65 @@ func WithNumberArray(name string, opts ...PropertyOption) ToolOption {
 }
 
 func WithArray(name string, itemType string, opts ...PropertyOption) ToolOption {
-	return func(t *Tool) {
-		schema := map[string]any{
-			"type": "array",
-			"items": map[string]any{
-				"type": itemType,
-			},
-		}
-
-		for _, opt := range opts {
-			opt(schema)
-		}
-
-		// Remove required from property schema and add to InputSchema.required
-		if required, ok := schema["required"].(bool); ok && required {
-			delete(schema, "required")
-			if t.InputSchema.Required == nil {
-				t.InputSchema.Required = []string{name}
-			} else {
-				t.InputSchema.Required = append(t.InputSchema.Required, name)
-			}
-		}
-
-		t.InputSchema.Properties[name] = schema
+	schema := map[string]any{
+		"type": "array",
+		"items": map[string]any{
+			"type": itemType,
+		},
 	}
+	return WithRaw(name, schema, opts...)
 }
 
 func WithPaging(name string, opts ...PropertyOption) ToolOption {
-	return func(t *Tool) {
-		schema := map[string]any{
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"page": map[string]any{
+				"type": "number",
+			},
+			"limit": map[string]any{
+				"type": "number",
+			},
+			"order": map[string]any{
+				"type": "string",
+			},
+			"orderby": map[string]any{
+				"type": "string",
+			},
+		},
+	}
+	return WithRaw(name, schema, opts...)
+}
+
+func WithKVPairs(name string, opts ...PropertyOption) ToolOption {
+	schema := map[string]any{
+		"type": "array",
+		"items": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"page": map[string]any{
-					"type": "number",
-				},
-				"limit": map[string]any{
-					"type": "number",
-				},
-				"order": map[string]any{
+				"key": map[string]any{
 					"type": "string",
 				},
-				"orderby": map[string]any{
+				"value": map[string]any{
 					"type": "string",
 				},
 			},
-		}
-
-		for _, opt := range opts {
-			opt(schema)
-		}
-
-		// Remove required from property schema and add to InputSchema.required
-		if required, ok := schema["required"].(bool); ok && required {
-			delete(schema, "required")
-			if t.InputSchema.Required == nil {
-				t.InputSchema.Required = []string{name}
-			} else {
-				t.InputSchema.Required = append(t.InputSchema.Required, name)
-			}
-		}
-
-		t.InputSchema.Properties[name] = schema
+		},
 	}
+	return WithRaw(name, schema, opts...)
 }
 
 // WithRaw adds a custom object property to the tool schema.
 // It accepts property options to configure the object property's behavior and constraints.
 func WithRaw(name string, object map[string]any, opts ...PropertyOption) ToolOption {
 	return func(t *Tool) {
-		schema := object
-
 		for _, opt := range opts {
-			opt(schema)
+			opt(object)
 		}
 
 		// Remove required from property schema and add to InputSchema.required
-		if required, ok := schema["required"].(bool); ok && required {
-			delete(schema, "required")
+		if required, ok := object["required"].(bool); ok && required {
+			delete(object, "required")
 			if t.InputSchema.Required == nil {
 				t.InputSchema.Required = []string{name}
 			} else {
@@ -412,6 +343,6 @@ func WithRaw(name string, object map[string]any, opts ...PropertyOption) ToolOpt
 			}
 		}
 
-		t.InputSchema.Properties[name] = schema
+		t.InputSchema.Properties[name] = object
 	}
 }
