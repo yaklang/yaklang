@@ -17,7 +17,6 @@ writed by Zhiwei Yan, 2020 Oct
 
 package sm4
 
-import "C"
 import (
 	"errors"
 	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
