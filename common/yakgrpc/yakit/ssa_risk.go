@@ -209,6 +209,14 @@ func NewSSARiskReadRequest(db *gorm.DB, filter *ypb.SSARisksFilter) error {
 	return nil
 }
 
+func QuerySSARiskCount(DB *gorm.DB, filter *ypb.SSARisksFilter) (int, error) {
+	db := DB.Model(&schema.SSARisk{})
+	db = FilterSSARisk(db, filter)
+	var count int
+	db = db.Count(&count)
+	return count, db.Error
+}
+
 func YieldSSARisk(db *gorm.DB, ctx context.Context) chan *schema.SSARisk {
 	return bizhelper.YieldModel[*schema.SSARisk](ctx, db, bizhelper.WithYieldModel_PageSize(100))
 }
