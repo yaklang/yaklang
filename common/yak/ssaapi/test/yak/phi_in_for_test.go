@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -156,4 +157,31 @@ func TestPhiInCFG_If_Without_ElseStatement(t *testing.T) {
 		}
 		return nil
 	})
+}
+func TestPhiMethod(t *testing.T) {
+	code := `func a(){
+    return "a"
+}
+func b(){
+    return "b"
+}
+c = 1
+var call
+if(c){
+    call = a
+}else{
+    call = b
+}
+result = call()
+println(result)`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		result, err := prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		param := result.GetValues("param")
+		require.True(t, param.Len() == 3)
+		require.Contains(t, param.String(), "a")
+		require.Contains(t, param.String(), "b")
+		require.Contains(t, param.String(), "1")
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.Yak))
 }
