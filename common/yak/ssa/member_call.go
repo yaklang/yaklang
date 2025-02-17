@@ -157,7 +157,7 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 	}
 	config := b.prog.config
 	if member, ok := ToParameterMember(object); ok {
-		if !wantFunction || config.isWeakLanguage {
+		if !wantFunction || config.isSupportConstMethod {
 			parameterMember := b.NewMoreParameterMember(name, member, key)
 			memberHandler(res.typ, parameterMember)
 			return parameterMember
