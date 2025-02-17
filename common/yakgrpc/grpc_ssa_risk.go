@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -76,6 +77,41 @@ func (s *Server) NewSSARiskRead(ctx context.Context, req *ypb.NewSSARiskReadRequ
 		return nil, err
 	}
 	return &ypb.NewSSARiskReadResponse{}, nil
+}
+
+func (s *Server) QueryNewSSARisks(ctx context.Context, req *ypb.QueryNewSSARisksRequest) (*ypb.QueryNewSSARisksResponse, error) {
+	db := s.GetSSADatabase().Where("id > ?", req.GetAfterID())
+	// query new ssa-risk
+	p, data, err := yakit.QuerySSARisk(db, &ypb.SSARisksFilter{
+		IsRead: -1, // unread
+	}, &ypb.Paging{
+		Limit:   5,
+		OrderBy: "id",
+		Order:   "desc",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	total, _ := yakit.QuerySSARiskCount(s.GetSSADatabase(), nil)
+	totalUnread, _ := yakit.QuerySSARiskCount(s.GetSSADatabase(), &ypb.SSARisksFilter{
+		IsRead: -1, // unread
+	})
+
+	// yakit.SSARiskColumnGroupCount()
+	return &ypb.QueryNewSSARisksResponse{
+		// new ssa-risk unread  data
+		Data: lo.Map(data, func(risk *schema.SSARisk, _ int) *ypb.SSARisk {
+			return risk.ToGRPCModel()
+		}),
+		// new ssa-risk unread count
+		NewRiskTotal: int64(p.TotalRecord),
+
+		// total ssa-risk
+		Total:  int64(total),
+		Unread: int64(totalUnread),
+	}, nil
+
 }
 
 func (s *Server) SSARiskFeedbackToOnline(ctx context.Context, req *ypb.SSARiskFeedbackToOnlineRequest) (*ypb.Empty, error) {
