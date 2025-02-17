@@ -93,7 +93,7 @@ var pop3Auth = &DefaultServiceAuthInfo{
 		target := fixToTarget(i.Target, 110)
 		res := i.Result()
 		ok, err := POP3Auth(target, i.Username, i.Password, true)
-		if err != nil {
+		if err != nil && errors.Is(err, dialError) {
 			res.Finished = true
 			return res
 		}

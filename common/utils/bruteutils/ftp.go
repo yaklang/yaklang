@@ -1,6 +1,7 @@
 package bruteutils
 
 import (
+	"errors"
 	"github.com/jlaffaye/ftp"
 )
 
@@ -45,7 +46,7 @@ var ftpAuth = &DefaultServiceAuthInfo{
 		result := i.Result()
 
 		ok, err := FTPAuth(i.Target, "anonymous", "anonymous")
-		if err != nil {
+		if err != nil && errors.Is(err, dialError) {
 			result.Finished = true
 			return result
 		}
@@ -56,7 +57,7 @@ var ftpAuth = &DefaultServiceAuthInfo{
 		i.Target = appendDefaultPort(i.Target, 21)
 		result := i.Result()
 		ok, err := FTPAuth(i.Target, i.Username, i.Password)
-		if err != nil {
+		if err != nil && errors.Is(err, dialError) {
 			result.Finished = true
 			return result
 		}
