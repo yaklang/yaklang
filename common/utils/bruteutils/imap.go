@@ -85,7 +85,7 @@ var imapAuth = &DefaultServiceAuthInfo{
 		target := fixToTarget(i.Target, 143)
 		res := i.Result()
 		ok, err := IMAPAuth(target, i.Username, i.Password, true)
-		if err != nil {
+		if err != nil && errors.Is(err, dialError) {
 			res.Finished = true
 			return res
 		}

@@ -1,6 +1,7 @@
 package bruteutils
 
 import (
+	"errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/smb"
@@ -83,7 +84,7 @@ func smbBrutePass(i *BruteItem) (*BruteItemResult, error) {
 	session, err := smb.NewSession(rdb, false)
 	res := i.Result()
 
-	if err != nil {
+	if err != nil && errors.Is(err, dialError) {
 		res.Finished = true
 		return res, err
 	}

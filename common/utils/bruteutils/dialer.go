@@ -3,6 +3,7 @@ package bruteutils
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"time"
 
@@ -22,7 +23,7 @@ func (d *NetXDialer) Dial(network, address string) (net.Conn, error) {
 func (d *NetXDialer) DialTCPContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	conn, err := netx.DialContext(ctx, addr)
 	if err != nil {
-		return nil, err
+		return nil, utils.Wrap(dialError, err.Error())
 	}
 	return conn, nil
 }
