@@ -15,7 +15,6 @@ import (
 type Client struct {
 	stack *stack.Stack
 	ep    stack.LinkAddressResolverCapture
-	wq    waiter.Queue
 }
 
 func NewClient(
