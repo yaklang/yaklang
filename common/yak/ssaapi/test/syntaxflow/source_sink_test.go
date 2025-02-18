@@ -1,6 +1,7 @@
 package syntaxflow
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -53,7 +54,24 @@ system(* #-> * as $target)`,
 		(phi, add, bash)
 	and then exclude rule will exclude "bash" in result
 	*/
+	// TODO :缺少边 bash --effectOn--> phi(cmd)
 	t.Run("simple exclude", func(t *testing.T) {
+		ssatest.Check(t, `
+		f = (para) => {
+			cmd := "bash" 
+			if para == "ls" {
+				cmd += para
+			}
+			system(cmd)
+		}
+		`, func(prog *ssaapi.Program) error {
+			prog.SyntaxFlowChain(`system(* #{
+	exclude: <<<EXCLUDE
+		* ?{opcode:add}
+EXCLUDE
+}-> * as $target)`).ShowDot()
+			return nil
+		})
 		ssatest.CheckSyntaxFlow(t, `
 		f = (para) => {
 			cmd := "bash" 
@@ -67,10 +85,11 @@ system(* #-> * as $target)`,
 	exclude: <<<EXCLUDE
 		* ?{opcode:add}
 EXCLUDE
-}-> * as $target)`,
+}->  as $target)`,
 			map[string][]string{
 				"target": {
 					// `"bash"`,
+					`Parameter-para`,
 					`"ls"`,
 				},
 			},
