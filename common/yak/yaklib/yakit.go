@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -13,6 +11,9 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
 	uuid "github.com/google/uuid"
 	"github.com/tidwall/gjson"
@@ -378,9 +379,8 @@ func MarshalYakitOutput(t interface{}) (string, string) {
 	case *YakitStatusCard:
 		return "feature-status-card-data", string(raw)
 	case *ypb.ExecResult:
-		execRes := t.(*ypb.ExecResult)
-		if execRes.IsMessage {
-			contentResult := gjson.Parse(string(execRes.Message)).Get("content")
+		if ret.IsMessage {
+			contentResult := gjson.Parse(string(ret.Message)).Get("content")
 			level := contentResult.Get("level").String()
 			data := contentResult.Get("data").String()
 			return level, data

@@ -45,10 +45,12 @@ require (
 	github.com/go-pg/pg/v10 v10.9.1
 	github.com/go-rod/rod v0.112.9
 	github.com/go-sql-driver/mysql v1.5.0
+	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/gobwas/glob v0.2.3
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/protobuf v1.5.3
 	github.com/golang/snappy v0.0.4
+	github.com/google/btree v1.0.0
 	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-dap v0.10.0
 	github.com/google/pprof v0.0.0-20230926050212-f7f687d19a98

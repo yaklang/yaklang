@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 func ChatBase(url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error), streamHandler func(io.Reader)) (string, error) {
@@ -22,7 +23,7 @@ func ChatBase(url string, model string, msg string, fs []Function, opt func() ([
 	if err != nil {
 		return "", utils.Errorf("build config failed: %v", err)
 	}
-	msgIns := NewChatMessage(model, []ChatDetail{NewUserChatDetail(msg)})
+	msgIns := NewChatMessage(model, []ChatDetail{NewUserChatDetail(msg)}, fs...)
 
 	handleStream := streamHandler != nil
 	if handleStream {

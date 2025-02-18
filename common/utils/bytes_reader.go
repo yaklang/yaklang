@@ -184,11 +184,7 @@ func ReadUntilStableEx(reader io.Reader, noTimeout bool, conn net.Conn, timeout 
 		ctx, cancel = context.WithTimeout(context.Background(), timeout)
 	}
 	defer cancel()
-
-	stopWord := make(map[byte]struct{})
-	for _, stop := range sep {
-		stopWord[stop] = struct{}{}
-	}
+	stopStep := 0
 
 	wrapperTimeout := func(originReader io.Reader) io.Reader {
 		if noTimeout {
@@ -238,10 +234,14 @@ func ReadUntilStableEx(reader io.Reader, noTimeout bool, conn net.Conn, timeout 
 			return nil, Error("i/o timeout")
 		default:
 		}
-		if n == 1 {
-			_, isStop := stopWord[buf[0]]
-			if isStop {
-				return result.Bytes(), nil
+		if n == 1 && stopStep < len(sep) {
+			if buf[0] == sep[stopStep] {
+				stopStep++
+				if stopStep == len(sep) {
+					return result.Bytes(), nil
+				}
+			} else {
+				stopStep = 0
 			}
 		}
 	}

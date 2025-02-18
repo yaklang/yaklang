@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/domainextractor"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -63,6 +64,50 @@ func getCacheHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) *ypb.HTTPFlow {
 		return v
 	}
 	return nil
+}
+
+func FromHTTPFlowGRPCModel(f *ypb.HTTPFlow) (*schema.HTTPFlow, error) {
+	if f == nil {
+		return nil, fmt.Errorf("input HTTPFlow is nil")
+	}
+
+	flow := &schema.HTTPFlow{
+		Model: gorm.Model{
+			ID:        uint(f.Id),
+			CreatedAt: time.Unix(f.CreatedAt, 0),
+			UpdatedAt: time.Unix(f.UpdatedAt, 0),
+		},
+		HiddenIndex:                f.HiddenIndex,
+		NoFixContentLength:         f.NoFixContentLength,
+		Hash:                       f.Hash,
+		IsHTTPS:                    f.IsHTTPS,
+		Url:                        f.Url,
+		Path:                       f.Path,
+		Method:                     f.Method,
+		BodyLength:                 f.BodyLength,
+		ContentType:                f.ContentType,
+		StatusCode:                 f.StatusCode,
+		SourceType:                 f.SourceType,
+		Duration:                   f.DurationMs * int64(time.Millisecond),
+		GetParamsTotal:             int(f.GetParamsTotal),
+		PostParamsTotal:            int(f.PostParamsTotal),
+		CookieParamsTotal:          int(f.CookieParamsTotal),
+		IPAddress:                  f.IPAddress,
+		RemoteAddr:                 f.HostPort,
+		Tags:                       f.Tags,
+		Payload:                    strings.Join(f.Payloads, ","),
+		IsWebsocket:                f.IsWebsocket,
+		WebsocketHash:              f.WebsocketHash,
+		FromPlugin:                 f.FromPlugin,
+		IsTooLargeResponse:         f.IsTooLargeResponse,
+		TooLargeResponseBodyFile:   string(f.TooLargeResponseBodyFile),
+		TooLargeResponseHeaderFile: string(f.TooLargeResponseHeaderFile),
+	}
+
+	flow.Response = strconv.Quote(string(f.Response))
+	flow.Request = strconv.Quote(string(f.Request))
+
+	return flow, nil
 }
 
 func ToHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
