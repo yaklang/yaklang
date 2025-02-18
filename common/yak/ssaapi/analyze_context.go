@@ -40,7 +40,7 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	// cross process
 	a._valueStack.Push(v)
-	recoverCrossProcess := a.pushCrossProcess()
+	recoverCrossProcess := a.tryCrossProcess()
 	recoverStack = func() {
 		recoverCrossProcess()
 		a._valueStack.Pop()
@@ -71,11 +71,12 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	return
 }
 
-func (a *AnalyzeContext) pushCrossProcess() func() {
+func (a *AnalyzeContext) tryCrossProcess() func() {
 	defer func() {
 		a._causeValue = nil
 	}()
 
+	var recoverCrossProcess func()
 	if a._valueStack.Len() > 1 {
 		currentValue := a._valueStack.Peek()
 		lastValue := a._valueStack.PeekN(1)
@@ -87,10 +88,21 @@ func (a *AnalyzeContext) pushCrossProcess() func() {
 				a.crossProcess.deleteCurrentCauseValue(a._causeValue)
 			}
 			hash := a.calcCrossProcessHash(lastValue, currentValue)
-			return a.crossProcess.pushCrossProcess(hash, a._causeValue)
+			recoverCrossProcess = a.crossProcess.Cross(hash, a._causeValue)
 		}
 	}
-	return func() {}
+
+	recoverWithinProcess := a.crossProcess.nextNode()
+	return func() {
+		// recover cross process
+		if recoverCrossProcess != nil {
+			recoverCrossProcess()
+		}
+		// recover within process
+		if recoverWithinProcess != nil {
+			recoverWithinProcess()
+		}
+	}
 }
 
 // needCrossProcess If the SSA-ID of the function from-value and to-value is different,

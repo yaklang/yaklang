@@ -12,8 +12,8 @@ const emptyStackHash = "__EmptyStack__"
 // 包括用于防止递归的valueVisited和objectVisited
 // 以及导致此次跨过程的causeValue
 type processStackInfo struct {
-	valueVisited  map[int64]struct{}
-	objectVisited map[string]struct{}
+	valueVisited  *omap.OrderedMap[int64, struct{}]
+	objectVisited *omap.OrderedMap[string, struct{}]
 	causeValue    *Value
 }
 
@@ -34,18 +34,19 @@ func newCrossProcessTable() *crossProcess {
 	// init cross process stack status
 	c.crossProcessStack.Push(emptyStackHash)
 	c.crossProcessMap.Set(emptyStackHash, newProcessInfo(nil))
+
 	return c
 }
 
 func newProcessInfo(causeValue *Value) *processStackInfo {
 	return &processStackInfo{
-		valueVisited:  make(map[int64]struct{}),
-		objectVisited: make(map[string]struct{}),
+		valueVisited:  omap.NewOrderedMap(map[int64]struct{}{}),
+		objectVisited: omap.NewOrderedMap(map[string]struct{}{}),
 		causeValue:    causeValue,
 	}
 }
 
-func (c *crossProcess) pushCrossProcess(hash string, causeValue *Value) func() {
+func (c *crossProcess) Cross(hash string, causeValue *Value) func() {
 	if hash == "" {
 		return func() {}
 	}
@@ -67,7 +68,7 @@ func (c *crossProcess) deleteCurrentCauseValue(causeValue *Value) {
 	hash := c.crossProcessStack.Peek()
 	info, ok := c.crossProcessMap.Get(hash)
 	if ok {
-		delete(info.valueVisited, causeValue.GetId())
+		info.valueVisited.Delete(causeValue.GetId())
 	}
 }
 
@@ -85,13 +86,12 @@ func (c *crossProcess) valueShould(v *Value) bool {
 	if !ok {
 		return false
 	}
-	if _, ok := info.valueVisited[v.GetId()]; !ok {
-		info.valueVisited[v.GetId()] = struct{}{}
+	if _, ok = info.valueVisited.Get(v.GetId()); !ok {
+		info.valueVisited.Set(v.GetId(), struct{}{})
 		return true
 	}
 	return false
 }
-
 func (c *crossProcess) objectShould(object, key, member *Value) bool {
 	info, ok := c.getCurrentProcessInfo()
 	if !ok {
@@ -101,9 +101,22 @@ func (c *crossProcess) objectShould(object, key, member *Value) bool {
 		return false
 	}
 	hash := utils.CalcSha1(object.GetId(), member.GetId(), key.GetId())
-	if _, ok := info.objectVisited[hash]; !ok {
-		info.objectVisited[hash] = struct{}{}
+	if _, ok = info.objectVisited.Get(hash); !ok {
+		info.objectVisited.Set(hash, struct{}{})
 		return true
 	}
 	return false
+}
+
+func (c *crossProcess) nextNode() func() {
+	info, ok := c.getCurrentProcessInfo()
+	if !ok {
+		return func() {}
+	}
+	valueBackUp := info.valueVisited
+	objectBackUp := info.objectVisited
+	return func() {
+		info.valueVisited = valueBackUp.Copy()
+		info.objectVisited = objectBackUp.Copy()
+	}
 }
