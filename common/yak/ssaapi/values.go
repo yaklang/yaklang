@@ -785,8 +785,12 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 	}
 	handler(v.node)
 	if v.IsFunction() {
-		// function's reference, like parent-class same name function
-		// this function over-write parent-class function
+		/*
+			function's reference, like parent-class same name function
+			this function over-write parent-class function
+
+			weakLanguagePoint use this eg: $a()
+		*/
 		handler(v.node.GetReference())
 	}
 	return vs

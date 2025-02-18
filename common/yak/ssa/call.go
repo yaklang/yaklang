@@ -40,13 +40,63 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-
 	f.emit(c)
 	c.handlerGeneric()
 	c.handlerObjectMethod()
 	c.handlerReturnType()
 	c.handleCalleeFunction()
+	c.handleMethod()
 	return c
+}
+
+// handleMethod handle method for call,this call have more type,need handle this type
+func (c *Call) handleMethod() {
+	callMethod := c.Method
+	/*
+		handle weakLanguage call
+	*/
+	builder := c.GetFunc().builder
+	var check func(Value)
+	weakLanguage := builder.IsSupportConstMethod()
+	tmp := make(map[int64]struct{})
+	PointFunc := func(fun Value, method Value) {
+		Point(fun, method)
+	}
+	check = func(method Value) {
+		_, exist := tmp[method.GetId()]
+		if exist {
+			return
+		}
+		tmp[method.GetId()] = struct{}{}
+		switch ret := method.(type) {
+		case *ConstInst:
+			/*
+				from <string> to getFunc
+			*/
+			if weakLanguage {
+				if newMethod := builder.GetFunc(method.String(), ""); utils.IsNil(newMethod) {
+					log.Errorf("weakLanguage call %s not found", method.String())
+					return
+				} else {
+					PointFunc(newMethod, callMethod)
+				}
+			}
+		case *SideEffect:
+			/*
+				from value to getFunc
+			*/
+			check(ret.Value)
+		case *Phi:
+			for _, value := range ret.GetValues() {
+				check(value)
+			}
+		case *Function:
+			PointFunc(ret, callMethod)
+		}
+	}
+	if !callMethod.IsExtern() && callMethod.GetOpcode() != SSAOpcodeFunction {
+		check(callMethod)
+	}
 }
 
 func (c *Call) handlerGeneric() {

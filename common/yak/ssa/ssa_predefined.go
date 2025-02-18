@@ -146,7 +146,9 @@ func (a *anInstruction) SetProgram(prog *Program) {
 func (a *anInstruction) SetIsAnnotation(b bool) {
 	a.isAnnotation = b
 }
-
+func (v *anInstruction) IsSupportConstMethod() bool {
+	return v.prog.config.isSupportConstMethod
+}
 func (a *anInstruction) IsAnnotation() bool {
 	return a.isAnnotation
 }
