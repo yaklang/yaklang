@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -547,6 +549,17 @@ var SSACompilerCommands = []*cli.Command{
 				return err
 			}
 			return nil
+		},
+	},
+	{
+		Name:  "sync-rule",
+		Usage: "sync rule from embed to database",
+		Action: func(c *cli.Context) error {
+			start := time.Now()
+			err := sfbuildin.SyncEmbedRule()
+			duration := time.Now().Sub(start)
+			log.Infof("sync rule from embed to database success, cost %v", duration)
+			return err
 		},
 	},
 	{
