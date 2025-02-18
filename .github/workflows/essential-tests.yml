@@ -110,7 +110,10 @@ jobs:
               # SSA
               go test -timeout 20s ./common/yak/ssa/...
               # SSAAPI
-              go test -timeout 6m ./common/yak/ssaapi/... 
+              go test -timeout 1m ./common/yak/ssaapi
+              go test -timeout 1m ./common/yak/ssaapi/ssareducer
+              go test -timeout 1m ./common/yak/ssaapi/test/ssatest
+
 
           - name: Test StaticAnalyze / BuildIn SyntaxFlow Rule
             run: |
@@ -120,22 +123,35 @@ jobs:
               go test -timeout 20s -run TestAnalyzeMustPASS* ./common/coreplugin
               # BuildIn SyntaxFlow Rule
               go test -timeout 2m ./common/syntaxflow/sfbuildin/...
+              go test -timeout 1m ./common/yak/ssaapi/test/syntaxflow
 
-          - name: Test SSA Frontend (yak/java/php/js/go)
+          - name: Test SSA Frontend Yak  / JavaScript
             run: |
               # yak ssa
               go test -timeout 20s ./common/yak/yak2ssa/test/...
-              # Test Java Syntax
-              go test -timeout 60s ./common/yak/java/...
-              # Test php syntax
-              go test -timeout 60s ./common/yak/php/...
-              # Test js syntax
+              go test -timeout 1m ./common/yak/ssaapi/test/yak
+              # Test js
               go test -timeout 60s ./common/yak/JS2ssa/...
-              # Test go syntax
+              go test -timeout 1m ./common/yak/ssaapi/test/javascript
+
+          - name: Test SSA Frontend Java 
+            run: |
+              go test -timeout 2m ./common/yak/java/...
+              go test -timeout 3m ./common/yak/ssaapi/test/java
+
+          - name: Test SSA Frontend PHP
+            run: |
+              go test -timeout 60s ./common/yak/php/...
+              go test -timeout 2m ./common/yak/ssaapi/test/php
+
+          - name: Test SSA Frontend Golang 
+            run: |
               go test -timeout 30s ./common/yak/go2ssa/...
               go test -timeout 30s ./common/yak/antlr4go/...
+              go test -timeout 2m ./common/yak/ssaapi/test/golang
 
           - name: Test SyntaxFlow Web Server
+            run: |
               go test -timeout 20s ./common/sfweb/...
 
           - name: Test lowhttp / DNSX
@@ -170,10 +186,10 @@ jobs:
             run: go test -timeout 5m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc/...
 
           - name: Test gRPC(LARGE)MUSTPASS
-            run: go test -timeout 2m -run TestLARGEGRPCMUSTPASS ./common/yakgrpc/...
+            run: go test -timeout 2m -run TestLARGEGRPCMUSTPASS* ./common/yakgrpc/...
 
           - name: Test gRPC Other
-            run: go test -timeout 6m -skip "^(TestGRPCMUSTPASS_HTTP_|TestGRPCMUSTPASS_MITM_|TestGRPCMUSTPASS_HTTPFuzzer|TestGRPCMUSTPASS_LANGUAGE|TestGRPCMUSTPASS_COMMON|TestLARGEGRPCMUSTPASS|TestGRPCMUSTPASS_SyntaxFlow)" ./common/yakgrpc/...
+            run: go test -v -timeout 6m -skip "^(TestGRPCMUSTPASS_HTTP_*|TestGRPCMUSTPASS_MITM_*|TestGRPCMUSTPASS_HTTPFuzzer*|TestGRPCMUSTPASS_LANGUAGE*|TestGRPCMUSTPASS_COMMON*|TestLARGEGRPCMUSTPASS*|TestGRPCMUSTPASS_SyntaxFlow*)" ./common/yakgrpc/...
 
           - name: Test Vulinbox SQL Injection
             run: go test -timeout 5m -run TestGRPCMUSTPASS_SQL ./common/coreplugin
