@@ -40,9 +40,7 @@ func (c *CodeRange) JsonString() string {
 
 const CodeContextLine = 3
 
-const SSADBProto = "ssadb://"
-
-func CoverCodeRange(programName string, codeSourceProto string, r memedit.RangeIf) (*CodeRange, string) {
+func CoverCodeRange(programName string, r memedit.RangeIf) (*CodeRange, string) {
 	// url := ""
 	source := ""
 	ret := &CodeRange{
@@ -59,7 +57,7 @@ func CoverCodeRange(programName string, codeSourceProto string, r memedit.RangeI
 
 	if editor := r.GetEditor(); editor != nil {
 		// if codeSourceProto is empty, url is pure path
-		ret.URL = fmt.Sprintf("%s/%s/%s", codeSourceProto, programName, editor.GetFilename())
+		ret.URL = fmt.Sprintf("/%s/%s", programName, editor.GetFilename())
 		source = editor.GetTextFromRangeContext(r, CodeContextLine)
 	}
 	if start := r.GetStart(); start != nil {
@@ -91,7 +89,7 @@ func buildSSARisk(
 	} else {
 		value = vs[index]
 	}
-	riskCodeRange, CodeFragment := CoverCodeRange(progName, SSADBProto, value.GetRange())
+	riskCodeRange, CodeFragment := CoverCodeRange(progName, value.GetRange())
 	rule := result.rule
 	newSSARisk := &schema.SSARisk{
 		CodeSourceUrl: riskCodeRange.URL,
