@@ -158,6 +158,8 @@ func (s *MCPServer) handleExecYakScriptTool(
 	if err != nil {
 		return nil, utils.Wrap(err, "invalid argument")
 	}
+	progressToken := request.Params.Meta.ProgressToken
+
 	stream, err := s.grpcClient.DebugPlugin(ctx, &req)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to query yak script")
@@ -199,6 +201,10 @@ func (s *MCPServer) handleExecYakScriptTool(
 		results = append(results, mcp.TextContent{
 			Type: "text",
 			Text: content,
+		})
+		s.server.SendNotificationToClient("exec_yak_script/info", map[string]any{
+			"content":       content,
+			"progressToken": progressToken,
 		})
 	}
 
