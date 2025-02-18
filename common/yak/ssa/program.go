@@ -96,7 +96,6 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 	subProg.externBuildValueHandler = prog.externBuildValueHandler
 	subProg.ExternInstance = prog.ExternInstance
 	subProg.ExternLib = prog.ExternLib
-	subProg.VirtualImport = prog.VirtualImport
 	subProg.ExportType = make(map[string]Type)
 	subProg.ExportValue = make(map[string]Value)
 
@@ -128,6 +127,9 @@ func (prog *Program) GetOrCreateLibrary(name string) (*Program, error) {
 	library, _ := prog.GetLibrary(name)
 	if library != nil {
 		return library, nil
+	}
+	if !prog.getLanguageConfig().isSupportVirtualImport {
+		return nil, utils.Errorf("not found library [%s] and not support virtual import", name)
 	}
 	lib, err := prog.GenerateVirtualLib(name)
 	if err != nil {
@@ -312,6 +314,13 @@ func (prog *Program) GetFrontValueByOffset(searchOffset int) (offset int, value 
 		value = item.GetValue()
 	}
 	return offset, value
+}
+
+func (p *Program) GetInputFileEditor() (*memedit.MemEditor, bool) {
+	if p.editorMap.Len() == 1 {
+		return p.editorMap.Get(p.editorMap.Keys()[0])
+	}
+	return nil, false
 }
 
 func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {

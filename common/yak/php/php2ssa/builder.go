@@ -26,6 +26,10 @@ type SSABuild struct {
 
 var Builder ssa.Builder = &SSABuild{}
 
+func (*SSABuild) GetCodeFileExt() string {
+	return "php"
+}
+
 func (*SSABuild) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".php" || extension == ".lock"
@@ -33,6 +37,7 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 func (s *SSABuild) Create() ssa.Builder {
 	return &SSABuild{
 		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
+			ssa.LanguageSupportVirtualImport,
 			ssa.LanguageConfigIsWeak,
 			ssa.LanguageConfigIsBinding,
 			ssa.LanguageConfigTryBuildValue,
@@ -99,11 +104,6 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 		prog.Build(path, memedit.NewMemEditor(string(file)), builder)
 	}
 	return nil
-}
-
-func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().VirtualImport = true
-	builder.GetProgram().GetApplication().Build("", editor, builder)
 }
 
 func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {

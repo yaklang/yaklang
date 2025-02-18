@@ -22,11 +22,18 @@ type SSABuilder struct {
 	*ssa.PreHandlerInit
 }
 
-var Builder = &SSABuilder{}
+var Builder ssa.Builder = &SSABuilder{}
+
+func (*SSABuilder) GetCodeFileExt() string {
+	return "go"
+}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(ssa.LanguageConfigIsBinding),
+		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
+			ssa.LanguageConfigIsBinding,
+			ssa.LanguageSupportVirtualImport,
+		),
 	}
 }
 
@@ -38,10 +45,6 @@ func initHandler(fb *ssa.FunctionBuilder) {
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".go" || extension == ".mod"
-}
-
-func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
 }
 
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {

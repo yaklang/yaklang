@@ -5,20 +5,20 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 type PreHandlerAnalyzer interface {
 	InitHandler(builder *FunctionBuilder)
 	FilterPreHandlerFile(string) bool
 	PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error
-	PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder)
 	AfterPreHandlerProject(builder *FunctionBuilder)
 }
 
 type Builder interface {
 	// create a new builder
 	Create() Builder
+
+	GetCodeFileExt() string
 
 	Build(string, bool, *FunctionBuilder) error
 	FilterFile(string) bool
@@ -77,9 +77,6 @@ func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
 			f(b)
 		}
 	})
-}
-
-func (d *PreHandlerInit) PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder) {
 }
 
 func (d *PreHandlerInit) FilterPreHandlerFile(string) bool {

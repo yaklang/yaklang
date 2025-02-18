@@ -42,7 +42,6 @@ func fitRange(c *ssadb.IrCode, rangeIns memedit.RangeIf) {
 	}
 	editor := rangeIns.GetEditor()
 	c.SourceCodeHash = editor.GetIrSourceHash(c.ProgramName)
-	// start, end := rangeIns.GetOffsetRange()
 	c.SourceCodeStartOffset = int64(rangeIns.GetStartOffset())
 	c.SourceCodeEndOffset = int64(rangeIns.GetEndOffset())
 }

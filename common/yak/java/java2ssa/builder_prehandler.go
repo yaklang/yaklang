@@ -26,6 +26,7 @@ func (s *SSABuilder) Create() ssa.Builder {
 			ssa.LanguageConfigIsBinding,
 			ssa.LanguageConfigIsSupportClass,
 			ssa.LanguageConfigIsSupportClassStaticModifier,
+			ssa.LanguageSupportVirtualImport,
 		),
 	}
 }
@@ -34,10 +35,6 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	fileList := []string{".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc", ".php", ".go"}
 	return !slices.Contains(fileList, extension)
-}
-
-func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
 }
 
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.FunctionBuilder, path string) error {

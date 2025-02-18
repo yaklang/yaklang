@@ -101,6 +101,11 @@ func GetPluginSSAOpt(plugin string) []ssaapi.Option {
 	if pluginType != plugin_type.PluginTypeYak {
 		ret = append(ret, plugin_type.GetPluginSSAOpt(pluginType)...)
 	}
+	ret = append(ret,
+		ssaapi.WithEnableCache(),
+		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithStrictMode(true),
+	)
 	return ret
 }
 
@@ -127,7 +132,6 @@ func checkRules(plugin string, prog *ssaapi.Program, kind StaticAnalyzeKind) *re
 
 func SSAParse(code, scriptType string, o ...ssaapi.Option) (*ssaapi.Program, error) {
 	opt := GetPluginSSAOpt(scriptType)
-	opt = append(opt, ssaapi.WithEnableCache())
 	opt = append(opt, o...)
 	return ssaapi.Parse(code, opt...)
 }
