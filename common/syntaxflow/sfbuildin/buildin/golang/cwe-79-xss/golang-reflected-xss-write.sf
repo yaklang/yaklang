@@ -1,5 +1,5 @@
 desc(
-    title: "golang Reflected XSS",
+    title: "golang Reflected XSS(write)",
     type: audit,
     severity: high,
     desc: <<<TEXT
