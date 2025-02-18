@@ -385,9 +385,9 @@ func coverNodeInfos(graph *ssaapi.ValueGraph, programName string) []*NodeInfo {
 
 func Value2Response(programName string, value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
 	vg := ssaapi.NewValueGraph(value)
-	nodeID := vg.Value2Node[value.GetId()]
+	nodeID := vg.Value2Node[value]
 	nodeInfos := coverNodeInfos(vg, programName)
-	graphLines := vg.DeepFirstGraph(value.GetId())
+	graphLines := vg.DeepFirstGraphPrev(value)
 
 	var buf bytes.Buffer
 	vg.GenerateDOT(&buf)
