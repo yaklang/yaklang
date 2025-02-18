@@ -89,27 +89,25 @@ func matchInstructionsByVariable(
 	}
 
 	// from cache
-	check := func(s string) bool {
-		// from cache
-		var check func(string) bool
-		// check := func(s string) bool {
-		switch compareMode {
-		case ssadb.ExactCompare:
-			check = func(s string) bool { return s == name }
-		case ssadb.GlobCompare:
-			matcher, err := glob.Compile(name)
-			if err != nil {
-				return
-			}
-			check = func(s string) bool { return matcher.Match(s) }
-		case ssadb.RegexpCompare:
-			matcher, err := regexp.Compile(name)
-			if err != nil {
-				return
-			}
-			check = func(s string) bool { return matcher.MatchString(s) }
-		default:
+	var check func(string) bool
+	// check := func(s string) bool {
+	switch compareMode {
+	case ssadb.ExactCompare:
+		check = func(s string) bool { return s == name }
+	case ssadb.GlobCompare:
+		matcher, err := glob.Compile(name)
+		if err != nil {
 			return
+		}
+		check = func(s string) bool { return matcher.Match(s) }
+	case ssadb.RegexpCompare:
+		matcher, err := regexp.Compile(name)
+		if err != nil {
+			return
+		}
+		check = func(s string) bool { return matcher.MatchString(s) }
+	default:
+		return
 	}
 	addRes(prog.Cache._getByVariableEx(matchMode, check)...)
 	return res
