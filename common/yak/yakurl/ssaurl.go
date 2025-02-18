@@ -227,7 +227,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 			if v == nil {
 				continue
 			}
-			codeRange, source := ssaapi.CoverCodeRange(programName, "", v.GetRange())
+			codeRange, source := ssaapi.CoverCodeRange(programName, v.GetRange())
 			extraData := []extra{
 				{"index", index},
 				{"code_range", codeRange},
@@ -371,7 +371,7 @@ type NodeInfo struct {
 func coverNodeInfos(graph *ssaapi.ValueGraph, programName string) []*NodeInfo {
 	res := make([]*NodeInfo, 0, len(graph.Node2Value))
 	for id, node := range graph.Node2Value {
-		codeRange, source := ssaapi.CoverCodeRange(programName, "", node.GetRange())
+		codeRange, source := ssaapi.CoverCodeRange(programName, node.GetRange())
 		ret := &NodeInfo{
 			NodeID:     dot.NodeName(id),
 			IRCode:     node.String(),
