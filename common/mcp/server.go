@@ -29,6 +29,7 @@ func NewMCPServer() *MCPServer {
 	}
 
 	s.registerYakScriptTool()
+	s.registerHTTPFlowTool()
 
 	s.server.AddNotificationHandler("notification", s.handleNotification)
 	return s

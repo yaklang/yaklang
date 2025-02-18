@@ -3,7 +3,8 @@ package javaclassparser
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/mitchellh/mapstructure"
+
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
