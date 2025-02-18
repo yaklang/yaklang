@@ -17,6 +17,7 @@ package stack
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"io"
 	"time"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/buffer"
@@ -1429,3 +1430,22 @@ type GSOEndpoint interface {
 // GVisorGSOMaxSize is a maximum allowed size of a software GSO segment.
 // This isn't a hard limit, because it is never set into packet headers.
 const GVisorGSOMaxSize = 1 << 16
+
+type NetworkCapture interface {
+	// StartCapture start captures network packet.
+	StartCapture()
+
+	// StopCapture stop captures network packet.
+	StopCapture()
+
+	// GetCaptureWaitQueue get the wait queue for capture.
+	GetCaptureWaitQueue() *waiter.Queue
+
+	// ReadPacket read packet from capture list.
+	ReadPacket(dst io.Writer) tcpip.Error
+}
+
+type LinkAddressResolverCapture interface {
+	NetworkCapture
+	LinkAddressResolver
+}

@@ -20,10 +20,13 @@ package arp
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/waiter"
+	"io"
 	"net"
 	"reflect"
-
-	"github.com/yaklang/yaklang/common/log"
+	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/atomicbitops"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/sync"
@@ -66,6 +69,15 @@ type endpoint struct {
 
 	// +checklocks:mu
 	dad ip.DAD
+
+	// arp recv list
+	rcvMu   sync.Mutex `state:"nosave"`
+	rcvList *arpPacketList
+
+	// capture state
+	capture atomic.Bool
+
+	waiterQueue *waiter.Queue
 }
 
 // CheckDuplicateAddress implements stack.DuplicateAddressDetector.
@@ -172,6 +184,22 @@ func (e *endpoint) HandlePacket(pkt *stack.PacketBuffer) {
 	if !h.IsValid() {
 		stats.malformedPacketsReceived.Increment()
 		return
+	}
+
+	if e.capture.Load() {
+		// Drop the packet if our buffer is currently full.
+		senderMac := h.HardwareAddressSender()
+		// Push new packet into receive list and increment the buffer size.
+		pktBuf := pkt.ToBuffer()
+		packet := &arpPacket{
+			senderMac:  tcpip.LinkAddress(senderMac),
+			data:       stack.NewPacketBuffer(stack.PacketBufferOptions{Payload: pktBuf}),
+			receivedAt: time.Now(),
+		}
+		e.rcvMu.Lock()
+		e.rcvList.PushBack(packet)
+		e.rcvMu.Unlock()
+		e.waiterQueue.Notify(waiter.EventIn)
 	}
 
 	switch h.Op() {
@@ -309,8 +337,12 @@ func (*protocol) ParseAddresses([]byte) (src, dst tcpip.Address) {
 
 func (p *protocol) NewEndpoint(nic stack.NetworkInterface, _ stack.TransportDispatcher) stack.NetworkEndpoint {
 	e := &endpoint{
-		protocol: p,
-		nic:      nic,
+		protocol:    p,
+		nic:         nic,
+		rcvMu:       sync.Mutex{},
+		rcvList:     new(arpPacketList),
+		waiterQueue: &waiter.Queue{},
+		capture:     atomic.Bool{},
 	}
 
 	e.mu.Lock()
@@ -408,6 +440,43 @@ func (*endpoint) ResolveStaticAddress(addr tcpip.Address) (tcpip.LinkAddress, bo
 		return header.EthernetAddressFromMulticastIPv4Address(addr), true
 	}
 	return tcpip.LinkAddress([]byte(nil)), false
+}
+
+func (e *endpoint) StartCapture() {
+	e.capture.Store(true)
+}
+
+func (e *endpoint) StopCapture() {
+	e.capture.Store(false)
+	e.rcvMu.Lock()
+	defer e.rcvMu.Unlock()
+	e.rcvList.tail = nil
+	e.rcvList.head = nil
+}
+
+func (e *endpoint) GetCaptureWaitQueue() *waiter.Queue {
+	return e.waiterQueue
+}
+
+func (e *endpoint) ReadPacket(dst io.Writer) tcpip.Error {
+	e.rcvMu.Lock()
+
+	if e.rcvList.Empty() {
+		var err tcpip.Error = &tcpip.ErrWouldBlock{}
+		e.rcvMu.Unlock()
+		return err
+	}
+
+	p := e.rcvList.Front()
+	e.rcvList.Remove(p)
+	defer p.data.DecRef()
+	e.rcvMu.Unlock()
+
+	n, err := p.data.Data().ReadTo(dst, false)
+	if n == 0 && err != nil {
+		return &tcpip.ErrBadBuffer{}
+	}
+	return nil
 }
 
 // SetOption implements stack.NetworkProtocol.SetOption.
