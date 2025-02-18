@@ -175,11 +175,11 @@ $b();
 	//	/*
 	//		todo： 动态语言的情况，会在call中进行修复
 	//	*/
-	//	t.Run("test const sideEffect call", func(t *testing.T) {
-	//		code := `<?php
+	//t.Run("test const sideEffect call", func(t *testing.T) {
+	//	code := `<?php
 	//
 	//function a($a){
-	//    println($a);
+	//   println($a);
 	//}
 	//
 	//$b = "c";
@@ -188,6 +188,31 @@ $b();
 	//};
 	//$c();
 	//$b(1);`
-	//		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{})
-	//	})
+	//	ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{})
+	//})
+	t.Run("test blueprint parameterMember", func(t *testing.T) {
+		code := `
+/*
+println(* #-> * as $param)
+topDef:
+	$a->c parameterMember
+*/
+<?php
+ class A{
+    public $c;
+    public function FunctionA($a){
+        println($a->c);
+    }
+ }
+ function C($c){
+    $c->FunctionA($c); //undefined argsMember
+ }
+ $a = new A(); //call -> return -> make -> 
+ $a->c = 2;
+ C($a);
+ // parameterMemberCall/MoreParameterMemberCall`
+		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
+			"param": {"2"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }
