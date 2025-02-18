@@ -1,9 +1,6 @@
 package ssaapi_test
 
 import (
-	"testing"
-	"time"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -11,14 +8,16 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"strings"
+	"testing"
+	"time"
 )
 
 func TestGraph(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-		package com.example.apackage; 
+		package com.example.apackage;
 		import com.example.bpackage.sub.B;
 		class A {
 			public static void main(String[] args) {
@@ -32,7 +31,7 @@ func TestGraph(t *testing.T) {
 		`)
 
 	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
-		package com.example.bpackage.sub; 
+		package com.example.bpackage.sub;
 		class B {
 			public  int get() {
 				return 	 1;
@@ -54,13 +53,10 @@ func TestGraph(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, prog)
 
+	// TODO：hook会产生随机结果
 	query := `
-		target* as $target 
-		$target (* #{
-			hook: <<<HOOK
-				* as $a 
-HOOK
-		}-> as $para_top_def)
+		target* as $target
+		$target (* #-> as $para_top_def)
 		` // , "`*  as $a`"
 
 	require.Len(t, prog, 1)
@@ -90,7 +86,7 @@ HOOK
 		log.Infof("memory graph time: %v", since)
 		log.Infof("memory graph time: %d", since)
 		log.Infof("dot graph: \n%v", dotStr)
-		memPath = graph.DeepFirstGraph(value.GetId())
+		memPath = graph.DeepFirstGraphPrev(value)
 		// memTime = since
 	}
 
@@ -108,13 +104,13 @@ HOOK
 		log.Infof("db graph time: %v", since)
 		log.Infof("db graph time: %d", since)
 		log.Infof("dot graph from db: \n%v", dotStrDB)
-		dbPath = graphDB.DeepFirstGraph(value.GetId())
+		dbPath = graphDB.DeepFirstGraphPrev(value)
 		// dbTime = since
 	}
 	log.Infof("memory path: %v", memPath)
 	log.Infof("db path: %v", dbPath)
 
-	require.Equal(t, len(memPath), 2)
+	require.Equal(t, 2, len(memPath))
 	require.Equal(t, len(memPath), len(dbPath))
 }
 
@@ -123,28 +119,28 @@ func TestGraph2(t *testing.T) {
 public interface RemoteLogService
 {
 	@PostMapping("/operlog")
-    public R<Boolean> saveLog(@RequestBody SysOperLog sysOperLog, @RequestHeader(SecurityConstants.FROM_SOURCE) String source) throws Exception;
+   public R<Boolean> saveLog(@RequestBody SysOperLog sysOperLog, @RequestHeader(SecurityConstants.FROM_SOURCE) String source) throws Exception;
 
 	@Override
-    public T deserialize1() throws SerializationException
-    {
-        return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
-    }
+   public T deserialize1() throws SerializationException
+   {
+       return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
+   }
 	@Override
-    public T deserialize2() throws SerializationException
-    {
-        return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
-    }
+   public T deserialize2() throws SerializationException
+   {
+       return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
+   }
 	@Override
-    public T deserialize3() throws SerializationException
-    {
-        return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
-    }
+   public T deserialize3() throws SerializationException
+   {
+       return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
+   }
 	@Override
-    public T deserialize4() throws SerializationException
-    {
-        return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
-    }
+   public T deserialize4() throws SerializationException
+   {
+       return JSON.parseObject(str, clazz, AUTO_TYPE_FILTER);
+   }
 }
 	`
 
@@ -164,7 +160,7 @@ public interface RemoteLogService
 	require.Greater(t, len(entrys), 0)
 	entry := entrys[0]
 	graph := ssaapi.NewValueGraph(entry)
-	path := graph.DeepFirstGraph(entry.GetId())
+	path := graph.DeepFirstGraphPrev(entry)
 	log.Infof("path: %v", path)
 	memDot := entry.DotGraph()
 	log.Infof("dot: \n%v", memDot)
@@ -179,10 +175,34 @@ public interface RemoteLogService
 	require.Greater(t, len(entrysDB), 0)
 	entryDB := entrysDB[0]
 	graphDB := ssaapi.NewValueGraph(entryDB)
-	pathDB := graphDB.DeepFirstGraph(entry.GetId())
+	pathDB := graphDB.DeepFirstGraphPrev(entryDB)
 	require.Equal(t, len(pathDB), 1)
 
 	log.Infof("path from db: %v", pathDB)
 	dbDot := entryDB.DotGraph()
 	log.Infof("dot from db: \n%v", dbDot)
+}
+
+func Test_Values_Graph_Dot(t *testing.T) {
+	t.Run("test dfs 1", func(t *testing.T) {
+		progName := uuid.NewString()
+		prog, err := ssaapi.Parse(``, ssaapi.WithProgramName(progName))
+		require.NoError(t, err)
+		value1 := CreateValue(prog, 1)
+		value2 := CreateValue(prog, 2)
+		value3_1 := CreateValue(prog, 3)
+		value3_2 := CreateValue(prog, 3)
+		value4 := CreateValue(prog, 4)
+		value1.AppendDependOn(value2)
+		value2.AppendDependOn(value3_1)
+		value1.AppendDependOn(value3_2)
+		value3_2.AppendDependOn(value4)
+
+		graph := ssaapi.NewValueGraph(value1)
+		graph.ShowDot()
+
+		result := graph.DeepFirstGraphNext(value1)
+		require.Equal(t, 2, len(result))
+		require.Equal(t, strings.Count(graph.Dot(), "t3: 3"), 2)
+	})
 }
