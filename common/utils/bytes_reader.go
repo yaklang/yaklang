@@ -234,7 +234,7 @@ func ReadUntilStableEx(reader io.Reader, noTimeout bool, conn net.Conn, timeout 
 			return nil, Error("i/o timeout")
 		default:
 		}
-		if n == 1 {
+		if n == 1 && stopStep < len(sep) {
 			if buf[0] == sep[stopStep] {
 				stopStep++
 				if stopStep == len(sep) {
