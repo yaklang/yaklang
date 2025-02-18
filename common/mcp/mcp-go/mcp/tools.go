@@ -275,7 +275,7 @@ func WithStruct(name string, opts []PropertyOption, itemsOpt ...ToolOption) Tool
 	return WithRaw(name, schema, opts...)
 }
 
-func WithPaging(name string, opts ...PropertyOption) ToolOption {
+func WithPaging(name string, fieldNames []string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -287,6 +287,7 @@ func WithPaging(name string, opts ...PropertyOption) ToolOption {
 			},
 			"order": map[string]any{
 				"type": "string",
+				"enum": fieldNames,
 			},
 			"orderby": map[string]any{
 				"type": "string",

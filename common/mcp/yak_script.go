@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/utils"
@@ -15,9 +15,11 @@ import (
 
 var filterYakScriptToolOptions = []mcp.ToolOption{
 	mcp.WithPaging("pagination",
-		mcp.Description(`Pagination settings for the query, field: id,created_at,updated_at,deleted_at,script_name,type,content,level,params,help,author,tags,ignored,from_local,local_path,is_history,force_interactive,from_store,is_general_module,general_module_verbose,general_module_key,from_git,is_batch_script,is_external,enable_plugin_selector,plugin_selector_types,online_id,online_script_name,online_contributors,online_is_private,user_id,uuid,head_img,online_base_url,base_online_id,online_official,online_group,is_core_plugin,risk_type,risk_detail,risk_annotation,collaborator_info,plugin_env_key`)),
+		[]string{"id", "created_at", "updated_at", "deleted_at", "script_name", "type", "content", "level", "params", "help", "author", "tags", "ignored", "from_local", "local_path", "is_history", "force_interactive", "from_store", "is_general_module", "general_module_verbose", "general_module_key", "from_git", "is_batch_script", "is_external", "enable_plugin_selector", "plugin_selector_types", "online_id", "online_script_name", "online_contributors", "online_is_private", "user_id", "uuid", "head_img", "online_base_url", "base_online_id", "online_official", "online_group", "is_core_plugin", "risk_type", "risk_detail", "risk_annotation", "collaborator_info", "plugin_env_key"},
+		mcp.Description(`Pagination settings for the query`)),
 	mcp.WithString("type",
 		mcp.Description("Script type filter"),
+		mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan"),
 	),
 	mcp.WithString("keyword",
 		mcp.Description("Keyword search in script content/name"),
@@ -51,7 +53,7 @@ func (s *MCPServer) registerYakScriptTool() {
 		append([]mcp.ToolOption{
 			mcp.WithDescription("Query Yak scripts with flexible filters"),
 		}, filterYakScriptToolOptions...)...,
-	), s.handleQueryYakScriptTool)
+	), s.handleQueryYakScript)
 
 	s.server.AddTool(mcp.NewTool("exec_yak_script",
 		mcp.WithDescription("execute yak script by raw code or yak script name"),
@@ -68,7 +70,7 @@ func (s *MCPServer) registerYakScriptTool() {
 		),
 		mcp.WithKVPairs("execParams",
 			mcp.Description(`Parameters for the yak script, check script content for the required parameters.Please check the use of all cli libraries, for example: cli.Int("a") means that there is a parameter with key "a" and type int`)),
-	), s.handleExecYakScriptTool)
+	), s.handleExecYakScript)
 
 	s.server.AddTool(mcp.NewTool("create_yak_script_group",
 		mcp.WithDescription("Create a new Yak script group"),
@@ -149,7 +151,7 @@ func (s *MCPServer) registerYakScriptTool() {
 	), s.handleDeleteYakScriptGroup)
 }
 
-func (s *MCPServer) handleExecYakScriptTool(
+func (s *MCPServer) handleExecYakScript(
 	ctx context.Context,
 	request mcp.CallToolRequest,
 ) (*mcp.CallToolResult, error) {
@@ -213,7 +215,7 @@ func (s *MCPServer) handleExecYakScriptTool(
 	}, nil
 }
 
-func (s *MCPServer) handleQueryYakScriptTool(
+func (s *MCPServer) handleQueryYakScript(
 	ctx context.Context,
 	request mcp.CallToolRequest,
 ) (*mcp.CallToolResult, error) {
