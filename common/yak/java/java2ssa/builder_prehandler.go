@@ -1,6 +1,7 @@
 package java2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/javaclassparser"
 	"path/filepath"
 	"strings"
 
@@ -82,12 +83,23 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 	}
 
 	switch strings.ToLower(fileSystem.Ext(path)) {
-	case ".java", ".class":
+	case ".java":
 		raw, err := fileSystem.ReadFile(path)
 		if err != nil {
 			return err
 		}
 		prog.Build(path, memedit.NewMemEditor(string(raw)), fb)
+	case ".class":
+		raw, err := fileSystem.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		if _, ok := fileSystem.(*javaclassparser.FS); ok {
+			prog.Build(path, memedit.NewMemEditor(string(raw)), fb)
+		} else {
+			saveExtraFile(path, raw)
+		}
 	case ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
 		return nil
 	case ".jsp":
