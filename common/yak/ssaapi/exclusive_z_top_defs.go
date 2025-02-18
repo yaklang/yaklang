@@ -86,7 +86,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	if !actx.theValueShouldBeVisited(i) {
 		return Values{}
 	}
-	{
+	checkObject := func() Values {
 		obj, key, member := actx.getCurrentObject()
 		_ = obj
 		_ = key
@@ -97,8 +97,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return m.getTopDefs(actx, opt...)
 			}
 		}
+		return nil
 	}
-
+	vals := checkObject()
+	if vals != nil {
+		return vals
+	}
 	getMemberCall := func(apiValue *Value, value ssa.Value, actx *AnalyzeContext) Values {
 		if value.HasValues() {
 			return i.visitedDefs(actx, opt...)
@@ -270,10 +274,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			switch inst.MemberCallKind {
 			case ssa.ParameterMemberCall:
 				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
+					actx.pushObject(para, i.NewValue(inst.MemberCallKey), i.NewValue(ssa.NewConst("")))
 					return para.AppendEffectOn(fun).getTopDefs(actx, opt...)
 				}
 			case ssa.FreeValueMemberCall:
 				if fv := fun.GetFreeValue(inst.MemberCallObjectName); fv != nil {
+					actx.pushObject(fv, i.NewValue(inst.MemberCallKey), i.NewValue(ssa.NewConst("")))
 					return fv.getTopDefs(actx, opt...)
 				}
 			}
