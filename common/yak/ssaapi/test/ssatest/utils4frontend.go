@@ -2,8 +2,6 @@ package ssatest
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -133,49 +131,16 @@ func CheckPrintf(t *testing.T, tc TestCase, contains ...bool) {
 	if len(contains) > 0 {
 		contain = contains[0]
 	}
-	tc.Check = func(prog *ssaapi.Program, want []string) {
-		println := prog.Ref("println").ShowWithSource()
-		// test.Equal(1, len(println), "println should only 1")
-		got := lo.Map(
-			println.GetUsers().ShowWithSource().Flat(func(v *ssaapi.Value) ssaapi.Values {
-				return ssaapi.Values{v.GetOperand(1)}
-			}),
-			func(v *ssaapi.Value, _ int) string {
-				return v.String()
-			},
-		)
-		// sort.Strings(got)
-		log.Info("got :", got)
-		// sort.Strings(want)
-		log.Info("want :", want)
+	Check(t, tc.Code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`println(* as $param)`)
+		require.NoError(t, err)
+		res.Show()
 
-		equalSlices := func(a, b []string) {
-			// Sort both slices
-			sort.Strings(a)
-			sort.Strings(b)
-
-			if contain {
-				for _, containSubStr := range want {
-					match := false
-					// should contain at least one
-					for _, g := range got {
-						if strings.Contains(g, containSubStr) {
-							match = true
-						}
-					}
-					if !match {
-						t.Errorf("want[%s] not found in got[%v]", want, got)
-					}
-				}
-			} else {
-				// Compare the sorted slices
-				require.Equal(t, a, b)
-			}
-		}
-
-		equalSlices(want, got)
-	}
-	CheckTestCase(t, tc)
+		CompareResult(t, contain, res, map[string][]string{
+			"param": tc.Want,
+		})
+		return nil
+	})
 }
 
 func CheckParse(t *testing.T, code string, opt ...ssaapi.Option) {
