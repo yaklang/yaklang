@@ -286,7 +286,7 @@ type LibInstance struct {
 	LibName      string
 	InstanceName string
 	Type         string
-	ValueStr     string
+	ValueStr     string `json:"value,omitempty"`
 }
 
 func (i *LibInstance) String() string {
@@ -318,13 +318,13 @@ func (l *ScriptLib) String() string {
 type Field struct {
 	Name    string
 	Type    string
-	RefType reflect.Type
+	RefType reflect.Type `json:"-"`
 }
 
 type FuncDecl struct {
 	LibName    string
 	MethodName string
-	Document   string
+	Document   string `json:"document,omitempty"`
 	Decl       string
 
 	Params  []*Field

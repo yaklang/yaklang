@@ -33,3 +33,51 @@ func GetDefaultDocumentHelper() *yakdoc.DocumentHelper {
 	})
 	return defaultDocumentHelper
 }
+
+func GetDocumentFunctions(libName string) map[string]*yakdoc.FuncDecl {
+	helper := GetDefaultDocumentHelper()
+	if libName == "" {
+		return helper.Functions
+	}
+	lib, ok := helper.Libs[libName]
+	if !ok {
+		return nil
+	}
+	return lib.Functions
+}
+
+func GetDocumentInstances(libName string) map[string]*yakdoc.LibInstance {
+	helper := GetDefaultDocumentHelper()
+	if libName == "" {
+		return helper.Instances
+	}
+	lib, ok := helper.Libs[libName]
+	if !ok {
+		return nil
+	}
+	return lib.Instances
+}
+
+func GetDocumentFunction(libName, funcName string) *yakdoc.FuncDecl {
+	helper := GetDefaultDocumentHelper()
+	if libName == "" {
+		return helper.Functions[funcName]
+	}
+	lib, ok := helper.Libs[libName]
+	if !ok {
+		return nil
+	}
+	return lib.Functions[funcName]
+}
+
+func GetDocumentInstance(libName, instanceName string) *yakdoc.LibInstance {
+	helper := GetDefaultDocumentHelper()
+	if libName == "" {
+		return helper.Instances[instanceName]
+	}
+	lib, ok := helper.Libs[libName]
+	if !ok {
+		return nil
+	}
+	return lib.Instances[instanceName]
+}
