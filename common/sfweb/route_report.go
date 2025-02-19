@@ -27,7 +27,7 @@ func init() {
 	falsePositiveIssueTemplate, err = template.New("false_positive_body").Funcs(template.FuncMap{
 		"CodeBlock": CodeBlock,
 		"Details":   Details,
-		"Escape":    html.EscapeString,
+		"Escape":    func(s schema.SyntaxFlowSeverity) string { return html.EscapeString(string(s)) },
 	}).Parse(`## 规则
 ### 规则名称
 {{Details .Rule.Title .Rule.TitleZh }}
@@ -37,7 +37,7 @@ func init() {
 {{Details .Risk.Title .Risk.TitleVerbose }}
 
 ### 风险类型
-{{Details .Risk.RiskType .Risk.RiskTypeVerbose }}
+{{Details .Risk.RiskType .Risk.RiskType }}
 
 ### 风险等级
 <p>{{.Risk.Severity | Escape }}</p>
@@ -69,7 +69,7 @@ func init() {
 
 type ReportFalsePositiveTemplateData struct {
 	Rule    *schema.SyntaxFlowRule
-	Risk    *schema.Risk
+	Risk    *schema.SSARisk
 	Content string
 	Lang    string
 }
@@ -159,12 +159,12 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 			return
 		}
 
-		risk, err := yakit.GetRiskByHash(consts.GetGormProjectDatabase(), req.RiskHash)
+		risk, err := yakit.GetSSARiskByHash(consts.GetGormDefaultSSADataBase(), req.RiskHash)
 		if err != nil {
 			writeErrorJson(w, utils.Wrap(err, "get risk error"))
 			return
 		}
-		ruleName := risk.FromYakScript
+		ruleName := risk.FromRule
 		rule, err := sfdb.GetRulePure(ruleName)
 		if err != nil {
 			writeErrorJson(w, utils.Wrap(err, "get rule error"))
