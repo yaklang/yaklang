@@ -54,7 +54,7 @@ func TestMCPClient(t *testing.T) {
 
 	request := mcp.CallToolRequest{}
 	data := `{
-  "code": "a = cli.Int(\"a\", cli.setRequired(true))\nb = cli.Int(\"b\", cli.setRequired(true))\ncli.check()\nyakit.Output(string(a+b))",
+  "code": "a = 1; b= ",
   "execParams": [
     {"key": "a", "value": "1"},
     {"key": "b", "value": "2"}
