@@ -8,6 +8,26 @@ import (
 	"github.com/yaklang/yaklang/common/utils/graph"
 )
 
+type EdgeType string
+
+const (
+	EdgeTypeDependOn    = "depend_on"
+	EdgeTypeEffectOn    = "effect_on"
+	EdgeTypePredecessor = "predecessor"
+)
+
+func ValidEdgeType(edge string) EdgeType {
+	switch edge {
+	case "depend_on":
+		return EdgeTypeDependOn
+	case "effect_on":
+		return EdgeTypeEffectOn
+	case "predecessor":
+		return EdgeTypePredecessor
+	}
+	return ""
+}
+
 type ValueGraph struct {
 	*dot.Graph
 
@@ -27,7 +47,7 @@ func NewValueGraph(v ...*Value) *ValueGraph {
 		Node2Value:     make(map[int]*Value),
 	}
 
-	builder := graph.NewGraphBuilder[int, *Value](
+	builder := graph.NewDFSGraphBuilder[int, *Value](
 		g.getNodeIdByValue,
 		g.getNeighbors,
 		g.handleEdge,
@@ -50,71 +70,66 @@ func (g *ValueGraph) ShowDot() {
 	fmt.Println(buf.String())
 }
 
-func (g *ValueGraph) getNodeIdByValue(value *Value) int {
+func (g *ValueGraph) getNodeIdByValue(value *Value) (int, error) {
 	log.Infof("create node %d: %v, %p", value.GetId(), value.GetVerboseName(), value)
-	// get node id, if existed, no need to create
-
 	nodeId, ok := g.Value2Node[value]
 	if !ok {
-		// value.getVerboseName can be same in some different value,
-		// so if value not exist, just create, don't use `GetOrCreateNode`
 		nodeId = g.AddNode(value.GetVerboseName())
 		g.Value2Node[value] = nodeId
 	}
-	// marshal
-	// add node2Value, just use bare ssa.value
 	if _, ok := g.Node2Value[nodeId]; !ok {
 		g.Node2Value[nodeId] = value
 	}
-	return nodeId
+	return nodeId, nil
 }
 
 func (g *ValueGraph) getValueByNodeId(node int) *Value {
 	return g.Node2Value[node]
 }
 
-func (g *ValueGraph) getNeighbors(node int) []graph.NeighborWithEdgeType[*Value] {
+func (g *ValueGraph) getNeighbors(node int) []*graph.NeighborWithEdgeType[*Value] {
 	value := g.getValueByNodeId(node)
 	if value == nil {
 		return nil
 	}
 
-	var res []graph.NeighborWithEdgeType[*Value]
+	var res []*graph.NeighborWithEdgeType[*Value]
 	for _, v := range value.GetDependOn() {
-		res = append(res, graph.NewNeighbor(v, "depend_on"))
+		res = append(res, graph.NewNeighbor(v, EdgeTypeDependOn))
 	}
 	for _, v := range value.GetEffectOn() {
-		res = append(res, graph.NewNeighbor(v, "effect_on"))
+		res = append(res, graph.NewNeighbor(v, EdgeTypeEffectOn))
 	}
 	for _, predecessor := range value.GetPredecessors() {
 		if predecessor.Node == nil {
 			continue
 		}
-		neighbor := graph.NewNeighbor(predecessor.Node, "predecessor")
+		neighbor := graph.NewNeighbor(predecessor.Node, EdgeTypePredecessor)
 		neighbor.AddExtraMsg("label", predecessor.Info.Label)
 		neighbor.AddExtraMsg("step", predecessor.Info.Step)
+		res = append(res, neighbor)
 	}
 	return res
 }
 
 func (g *ValueGraph) handleEdge(fromNode int, toNode int, edgeType string, extraMsg map[string]any) {
-	switch edgeType {
-	case "depend_on":
+	switch ValidEdgeType(edgeType) {
+	case EdgeTypeDependOn:
 		g.AddEdge(fromNode, toNode, "")
-	case "effect_on":
+	case EdgeTypeEffectOn:
 		g.AddEdge(toNode, fromNode, "")
-	case "predecessor":
-		edges := g.GetEdges(fromNode, toNode)
+	case EdgeTypePredecessor:
+		edges := g.GetEdges(toNode, fromNode)
 		var (
-			label, edgeLabel string
-			step             int64
+			edgeLabel string
+			step      int64
 		)
 		if extraMsg != nil {
-			label = extraMsg["label"].(string)
-			step = extraMsg["step"].(int64)
+			edgeLabel = extraMsg["label"].(string)
+			step = int64(extraMsg["step"].(int))
 		}
 		if step > 0 {
-			edgeLabel = fmt.Sprintf(`step[%v]: %v`, step, label)
+			edgeLabel = fmt.Sprintf(`step[%v]: %v`, step, edgeLabel)
 		}
 		if len(edges) > 0 {
 			for _, edge := range edges {

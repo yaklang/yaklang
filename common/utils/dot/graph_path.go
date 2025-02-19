@@ -9,7 +9,7 @@ func GraphPathPrev(g *Graph, nodeId int) [][]string {
 			return node.Prevs()
 		},
 		func(i int) string { // get value
-			return g.GetLabelByID(i)
+			return NodeName(i)
 		},
 	)
 }
@@ -21,7 +21,7 @@ func GraphPathNext(g *Graph, nodeId int) [][]string {
 			return node.Nexts()
 		},
 		func(i int) string { // get value
-			return g.GetLabelByID(i)
+			return NodeName(i)
 		},
 	)
 }

@@ -4,16 +4,18 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/graph"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 type saveValueCtx struct {
-	db      *gorm.DB
-	visited map[*Value]struct{}
+	db          *gorm.DB
+	valueToNode map[*Value]*ssadb.AuditNode
 	ssadb.AuditNodeStatus
 
-	entryValue *Value
+	nodeToValue map[uint]*Value
+	entryValue  *Value
 }
 
 type SaveValueOption func(c *saveValueCtx)
@@ -66,9 +68,10 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 		return utils.Error("db is nil")
 	}
 	ctx := &saveValueCtx{
-		db:         db,
-		visited:    make(map[*Value]struct{}),
-		entryValue: value,
+		db:          db,
+		valueToNode: map[*Value]*ssadb.AuditNode{},
+		entryValue:  value,
+		nodeToValue: map[uint]*Value{},
 	}
 	for _, o := range opts {
 		o(ctx)
@@ -76,10 +79,22 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 	if ctx.ProgramName == "" {
 		return utils.Error("program info is empty")
 	}
-	return ctx.recursiveSaveValue(value, nil)
+	builder := graph.NewDFSGraphBuilder[*ssadb.AuditNode, *Value](
+		ctx.SaveNode,
+		ctx.getNeighbors,
+		ctx.SaveEdge,
+	)
+	builder.BuildGraph(value)
+	return nil
 }
 
 func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
+	if value == nil {
+		return nil, utils.Error("value is nil")
+	}
+	if an, ok := s.valueToNode[value]; ok {
+		return an, nil
+	}
 	an := &ssadb.AuditNode{
 		AuditNodeStatus: s.AuditNodeStatus,
 		IsEntryNode:     value == s.entryValue,
@@ -105,72 +120,63 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 	if ret := s.db.Save(an).Error; ret != nil {
 		return nil, utils.Wrap(ret, "save AuditNode")
 	}
+	s.valueToNode[value] = an
+	if s.nodeToValue[an.ID] == nil {
+		s.nodeToValue[an.ID] = value
+	}
 	return an, nil
 }
 
-func (s *saveValueCtx) recursiveSaveValue(value *Value, callback func(next *ssadb.AuditNode) error) error {
-	if s == nil {
-		return utils.Error("saveValueCtx is nil")
-	}
-
+func (s *saveValueCtx) getNeighbors(node *ssadb.AuditNode) []*graph.NeighborWithEdgeType[*Value] {
+	value := s.nodeToValue[node.ID]
 	if value == nil {
 		return nil
 	}
 
-	if _, ok := s.visited[value]; ok {
-		return nil
-	}
-	s.visited[value] = struct{}{}
-
-	an, err := s.SaveNode(value)
-	if err != nil {
-		return err
-	}
-
-	if callback != nil {
-		if err := callback(an); err != nil {
-			log.Errorf("callback failed: %v", err)
-		}
-	}
-
+	var res []*graph.NeighborWithEdgeType[*Value]
 	for _, i := range value.DependOn {
-		if err := s.recursiveSaveValue(i, func(next *ssadb.AuditNode) error {
-			edge := an.CreateDependsOnEdge(s.ProgramName, next.ID)
-			if ret := s.db.Save(edge).Error; ret != nil {
-				return utils.Wrap(ret, "save AuditEdge")
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
+		res = append(res, graph.NewNeighbor(i, EdgeTypeDependOn))
 	}
 	for _, i := range value.EffectOn {
-		if err := s.recursiveSaveValue(i, func(next *ssadb.AuditNode) error {
-			edge := an.CreateEffectsOnEdge(s.ProgramName, next.ID)
-			if ret := s.db.Save(edge).Error; ret != nil {
-				return utils.Wrap(ret, "save AuditEdge")
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
+		res = append(res, graph.NewNeighbor(i, EdgeTypeEffectOn))
 	}
 	for _, pred := range value.Predecessors {
-		if err := s.recursiveSaveValue(pred.Node, func(next *ssadb.AuditNode) error {
-			var step int64
-			var label string
-			if info := pred.Info; info != nil {
-				step = int64(info.Step)
-				label = info.Label
-			}
-			edge := an.CreatePredecessorEdge(s.ProgramName, next.ID, step, label)
-			if ret := s.db.Save(edge).Error; ret != nil {
-				return utils.Wrap(ret, "save AuditEdge")
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
+		neighbor := graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
+		neighbor.AddExtraMsg("label", pred.Info.Label)
+		neighbor.AddExtraMsg("step", int64(pred.Info.Step))
+		res = append(res, neighbor)
 	}
-	return nil
+	return res
+}
+
+func (s *saveValueCtx) SaveEdge(from *ssadb.AuditNode, to *ssadb.AuditNode, edgeType string, extraMsg map[string]interface{}) {
+	if from == nil || to == nil {
+		return
+	}
+	switch ValidEdgeType(edgeType) {
+	case EdgeTypeDependOn:
+		edge := from.CreateDependsOnEdge(s.ProgramName, to.ID)
+		if err := s.db.Save(edge).Error; err != nil {
+			log.Errorf("save AuditEdge failed: %v", err)
+		}
+	case EdgeTypeEffectOn:
+		edge := from.CreateEffectsOnEdge(s.ProgramName, to.ID)
+		if err := s.db.Save(edge).Error; err != nil {
+			log.Errorf("save AuditEdge failed: %v", err)
+		}
+	case EdgeTypePredecessor:
+		var (
+			label string
+			step  int64
+		)
+		if extraMsg != nil {
+			label = extraMsg["label"].(string)
+			step = extraMsg["step"].(int64)
+		}
+		edge := from.CreatePredecessorEdge(s.ProgramName, to.ID, step, label)
+		if err := s.db.Save(edge).Error; err != nil {
+			log.Errorf("save AuditEdge failed: %v", err)
+		}
+
+	}
 }
