@@ -56,6 +56,7 @@ var ProfileTables = []interface{}{
 	&SSAProgram{},
 	//general rule
 	&GeneralRule{},
+	&GeneralRuleGroup{},
 	//syntaxFlow rule
 	&SyntaxFlowRule{},
 	&SyntaxFlowGroup{},

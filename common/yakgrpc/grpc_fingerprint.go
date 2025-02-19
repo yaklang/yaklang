@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/samber/lo"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -63,9 +64,9 @@ func (s *Server) UpdateFingerprint(ctx context.Context, req *ypb.UpdateFingerpri
 	rule := req.GetRule()
 	if req.GetId() > 0 {
 		rule.Id = req.GetId()
-		effectCount, err = yakit.UpdateGeneralRule(s.GetProfileDatabase(), schema.NewFingerprintFromGRPCModel(rule))
+		effectCount, err = yakit.UpdateGeneralRule(s.GetProfileDatabase(), schema.GRPCGeneralRuleToSchemaGeneralRule(rule))
 	} else if req.GetRuleName() != "" {
-		effectCount, err = yakit.UpdateGeneralRuleByRuleName(s.GetProfileDatabase(), req.GetRuleName(), schema.NewFingerprintFromGRPCModel(rule))
+		effectCount, err = yakit.UpdateGeneralRuleByRuleName(s.GetProfileDatabase(), req.GetRuleName(), schema.GRPCGeneralRuleToSchemaGeneralRule(rule))
 	} else {
 		return nil, utils.Errorf("id or rule_name must be set at least one")
 	}
@@ -90,7 +91,7 @@ func (s *Server) CreateFingerprint(ctx context.Context, req *ypb.CreateFingerpri
 	if rule == nil {
 		return nil, utils.Errorf("rule is nil")
 	}
-	err := yakit.CreateGeneralRule(s.GetProfileDatabase(), schema.NewFingerprintFromGRPCModel(rule))
+	err := yakit.CreateGeneralRule(s.GetProfileDatabase(), schema.GRPCGeneralRuleToSchemaGeneralRule(rule))
 	if err != nil {
 		return nil, err
 	}
@@ -112,5 +113,57 @@ func (s *Server) RecoverBuiltinFingerprint(ctx context.Context, _ *ypb.Empty) (*
 		TableName:    "general_rule",
 		Operation:    "recover_builtin",
 		ExtraMessage: "recover builtin general rule success",
+	}, nil
+}
+
+func (s *Server) CreateFingerprintGroup(ctx context.Context, req *ypb.FingerprintGroup) (*ypb.DbOperateMessage, error) {
+	db := s.GetProfileDatabase()
+	err := yakit.CreateGeneralRuleGroup(db, schema.GRPCFingerprintGroupToSchemaGeneralRuleGroup(req))
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.DbOperateMessage{
+		TableName:  "general_rule_group",
+		Operation:  "create",
+		EffectRows: 1,
+	}, nil
+}
+
+func (s *Server) GetAllFingerprintGroup(ctx context.Context, req *ypb.Empty) (*ypb.FingerprintGroups, error) {
+	db := s.GetProfileDatabase()
+	group, err := yakit.GetAllGeneralRuleGroup(db)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.FingerprintGroups{
+		Data: lo.Map(group, func(g *schema.GeneralRuleGroup, _ int) *ypb.FingerprintGroup {
+			return g.ToGRPCModel()
+		}),
+	}, nil
+}
+
+func (s *Server) RenameFingerprintGroup(ctx context.Context, req *ypb.RenameFingerprintGroupRequest) (*ypb.DbOperateMessage, error) {
+	db := s.GetProfileDatabase()
+	err := yakit.RenameGeneralRuleGroupName(db, req.GetGroupName(), req.GetNewGroupName())
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.DbOperateMessage{
+		TableName:  "general_rule_group",
+		Operation:  "update",
+		EffectRows: 1,
+	}, nil
+}
+
+func (s *Server) DeleteFingerprintGroup(ctx context.Context, req *ypb.DeleteFingerprintGroupRequest) (*ypb.DbOperateMessage, error) {
+	db := s.GetProfileDatabase()
+	effectRow, err := yakit.DeleteGeneralRuleGroupByName(db, req.GetGroupNames())
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.DbOperateMessage{
+		TableName:  "general_rule_group",
+		Operation:  "delete",
+		EffectRows: effectRow,
 	}, nil
 }
