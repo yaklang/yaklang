@@ -160,7 +160,11 @@ func (s *MCPServer) handleExecYakScript(
 	if err != nil {
 		return nil, utils.Wrap(err, "invalid argument")
 	}
-	progressToken := request.Params.Meta.ProgressToken
+	var progressToken mcp.ProgressToken
+	meta := request.Params.Meta
+	if meta != nil {
+		progressToken = meta.ProgressToken
+	}
 
 	stream, err := s.grpcClient.DebugPlugin(ctx, &req)
 	if err != nil {
