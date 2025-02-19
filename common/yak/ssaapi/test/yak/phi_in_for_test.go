@@ -173,15 +173,58 @@ if(c){
     call = b
 }
 result = call()
-println(result)`
+println(result)
+`
 	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 		result, err := prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
 		require.NoError(t, err)
 		param := result.GetValues("param")
+		param.Show()
 		require.True(t, param.Len() == 3)
 		require.Contains(t, param.String(), "a")
 		require.Contains(t, param.String(), "b")
 		require.Contains(t, param.String(), "1")
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.Yak))
+}
+func TestMethodCall(t *testing.T) {
+	//	t.Run("test phi method call", func(t *testing.T) {
+	//		code := `
+	//func FuncA(b){
+	//	//println(b)
+	//}
+	//func FuncC(b){
+	//	//println(b)
+	//}
+	//var a = bada
+	//if(c){
+	// a =cada
+	//}
+	//println(a)
+	//a(1)
+	//`
+	//		ssatest.CheckPrintlnValue(code, []string{}, t)
+	//		//		ssatest.CheckSyntaxFlow(t, code, `FuncA() as $functionA
+	//		//FuncC() as $functionC
+	//		//`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.Yak))
+	//	})
+	t.Run("sideEffect get callBy", func(t *testing.T) {
+		code := `
+func FuncA(a){
+    println(a)
+}
+func FuncC(c){
+    println(c)
+}
+var a = FuncA
+
+func d(){
+    a = FuncC
+}
+d()
+a(1)`
+		ssatest.CheckSyntaxFlow(t, code, `FuncC() as $functionC`, map[string][]string{
+			"functionC": {"side-effect(FreeValue-FuncC, a)(1)"},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
 }
