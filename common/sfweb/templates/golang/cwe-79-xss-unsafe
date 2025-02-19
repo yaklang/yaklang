@@ -17,7 +17,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		Name string
 	}{
-		Name: r.FormValue("name"), // 从用户输入获取 name 参数
+		Name: template.HTML(r.FormValue("name")), // 从用户输入获取 name 参数
 	}
 
 	tmpl.Execute(w, data) // 自动对输出进行转义
