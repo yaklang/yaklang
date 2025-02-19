@@ -1,5 +1,7 @@
 package mcp
 
+import "fmt"
+
 // ListToolsRequest is sent from the client to request a list of tools the
 // server has.
 type ListToolsRequest struct {
@@ -113,6 +115,14 @@ func WithDescription(description string) ToolOption {
 	}
 }
 
+// WithRequireTool adds a ATTENTION description to the Tool.
+// require tool description means prerequisites for running this tool
+func WithRequireTool(tool string) ToolOption {
+	return func(t *Tool) {
+		t.Description += fmt.Sprintf("<ATTENTION> before call this tool, please call %s tool first </ATTENTION>", tool)
+	}
+}
+
 //
 // Common Property Options
 //
@@ -122,6 +132,19 @@ func WithDescription(description string) ToolOption {
 func Description(desc string) PropertyOption {
 	return func(schema map[string]any) {
 		schema["description"] = desc
+	}
+}
+
+// RequireTool adds a ATTENTION description to a property in the JSON Schema.
+// require tool description means prerequisites for running this tool
+func RequireTool(tool string) PropertyOption {
+	return func(schema map[string]any) {
+		requireToolMessage := fmt.Sprintf("<ATTENTION> before call this tool, please call %s tool first </ATTENTION>", tool)
+		if i, ok := schema["description"]; ok {
+			schema["description"] = fmt.Sprintf("%s %s", i, requireToolMessage)
+		} else {
+			schema["description"] = requireToolMessage
+		}
 	}
 }
 
@@ -247,22 +270,35 @@ func WithString(name string, opts ...PropertyOption) ToolOption {
 // WithStringArray adds a string array property to the tool schema.
 // It accepts property options to configure the string-array property's behavior and constraints.
 func WithStringArray(name string, opts ...PropertyOption) ToolOption {
-	return WithArray(name, "string", opts...)
+	return WithSimpleArray(name, "string", opts...)
 }
 
 // WithNumberArray adds a number array property to the tool schema.
 // It accepts property options to configure the number-array property's behavior and constraints.
 func WithNumberArray(name string, opts ...PropertyOption) ToolOption {
-	return WithArray(name, "number", opts...)
+	return WithSimpleArray(name, "number", opts...)
 }
 
-func WithArray(name string, itemType string, opts ...PropertyOption) ToolOption {
+func WithSimpleArray(name string, itemType string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "array",
 		"items": map[string]any{
 			"type": itemType,
 		},
 	}
+	return WithRaw(name, schema, opts...)
+}
+
+func WithStructArray(name string, opts []PropertyOption, itemsOpt ...ToolOption) ToolOption {
+	items := map[string]any{
+		"type": "object",
+	}
+	schema := map[string]any{
+		"type":  "array",
+		"items": items,
+	}
+	temp := NewTool("", itemsOpt...)
+	items["properties"] = temp.InputSchema.Properties
 	return WithRaw(name, schema, opts...)
 }
 
