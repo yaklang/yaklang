@@ -16,35 +16,37 @@ func TestGraph_Builder(t *testing.T) {
 		dotGraph.MakeDirected()
 		dotGraph.GraphAttribute("rankdir", "BT")
 
+		// 创建节点的唯一标识->节点
 		keyToNode := make(map[int]string)
+		// 节点->节点唯一标识
 		NodeToKey := make(map[string]int)
 
 		// 使用 GraphBuilder 构建图
-		builder := graph.NewGraphBuilder[int, string](
-			func(node string) int {
+		builder := graph.NewDFSGraphBuilder[int, string](
+			func(node string) (int, error) {
 				if nodeId, ok := NodeToKey[node]; ok {
-					return nodeId
+					return nodeId, nil
 				}
 				nodeId := dotGraph.AddNode(node)
 				NodeToKey[node] = nodeId
 				keyToNode[nodeId] = node
 
-				return nodeId
+				return nodeId, nil
 			},
-			func(nodeKey int) []graph.NeighborWithEdgeType[string] {
+			func(nodeKey int) []*graph.NeighborWithEdgeType[string] {
 				if node, ok := keyToNode[nodeKey]; ok {
 					switch node {
 					case "n1":
-						return []graph.NeighborWithEdgeType[string]{
+						return []*graph.NeighborWithEdgeType[string]{
 							{Node: "n2", EdgeType: "depends_on"},
 							{Node: "n4", EdgeType: "depends_on"},
 						}
 					case "n2":
-						return []graph.NeighborWithEdgeType[string]{
+						return []*graph.NeighborWithEdgeType[string]{
 							{Node: "n3", EdgeType: "depends_on"},
 						}
 					case "n4":
-						return []graph.NeighborWithEdgeType[string]{
+						return []*graph.NeighborWithEdgeType[string]{
 							{Node: "n3", EdgeType: "depends_on"},
 						}
 					}
@@ -83,9 +85,14 @@ func TestGraph_Builder(t *testing.T) {
 		require.True(t, dotGraph.HasEdge(n2, n3), "Edge (n4 -> n3) should exist")
 
 		// 验证路径逻辑
+		getNodeName := func(node string) string {
+			nodeId := NodeToKey[node]
+			return dot.NodeName(nodeId)
+		}
+
 		pathN1ToN3 := dot.GraphPathPrev(dotGraph, n3.ID())
 		require.Equal(t, len(pathN1ToN3), 2, "Path from n1 to n3 should have exactly one path")
-		require.Contains(t, pathN1ToN3, []string{"n3", "n2", "n1"}, "Path from n3 to n1 should match expected sequence")
-		require.Contains(t, pathN1ToN3, []string{"n3", "n4", "n1"}, "Path from n3 to n1 should match expected sequence")
+		require.Contains(t, pathN1ToN3, []string{getNodeName("n3"), getNodeName("n2"), getNodeName("n1")}, "Path from n3 to n1 should match expected sequence")
+		require.Contains(t, pathN1ToN3, []string{getNodeName("n3"), getNodeName("n4"), getNodeName("n1")}, "Path from n3 to n1 should match expected sequence")
 	})
 }
