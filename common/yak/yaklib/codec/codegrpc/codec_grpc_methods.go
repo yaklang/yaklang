@@ -17,7 +17,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
+	"github.com/samber/lo"
 	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 
 	"github.com/yaklang/yaklang/common/gmsm/sm4"
@@ -48,7 +50,7 @@ var codecDoc []byte
 
 var (
 	CodecLibs    *yakdoc.ScriptLib
-	CodecLibsDoc []*ypb.CodecMethod // 记录函数的数据，参数类型等，用于前端生成样式
+	CodecLibsDoc = make(map[string]*ypb.CodecMethod) // 记录函数的数据，参数类型等，用于前端生成样式
 )
 
 type outputType = string
@@ -78,7 +80,7 @@ func init() {
 			continue
 		}
 		CodecMethod.CodecMethod = funcName
-		CodecLibsDoc = append(CodecLibsDoc, &CodecMethod)
+		CodecLibsDoc[funcName] = &CodecMethod
 	}
 
 	mutate.AddFuzzTagToGlobal(&mutate.FuzzTagDescription{
@@ -108,6 +110,35 @@ func init() {
 		TagNameVerbose:      "调用codec模块保存的codec flow",
 		ArgumentDescription: "{{string_split(name:codecflow名)}}{{string(abc:输入)}}",
 	})
+}
+
+var (
+	getCodecLibsDocMethodsMu     sync.Mutex
+	codecLibsDocMethods          []*ypb.CodecMethod
+	getCodecLibsDocMethodNamesMu sync.Mutex
+	codecLibsDocMethodNames      []string
+)
+
+func GetCodecLibsDocMethods() []*ypb.CodecMethod {
+	if codecLibsDocMethods == nil {
+		getCodecLibsDocMethodsMu.Lock()
+		defer getCodecLibsDocMethodsMu.Unlock()
+
+		codecLibsDocMethods = lo.Values(CodecLibsDoc)
+	}
+
+	return codecLibsDocMethods
+}
+
+func GetCodecLibsDocMethodNames() []string {
+	if codecLibsDocMethodNames == nil {
+		getCodecLibsDocMethodsMu.Lock()
+		defer getCodecLibsDocMethodsMu.Unlock()
+
+		codecLibsDocMethodNames = lo.Keys(CodecLibsDoc)
+	}
+
+	return codecLibsDocMethodNames
 }
 
 type CodecExecFlow struct {
