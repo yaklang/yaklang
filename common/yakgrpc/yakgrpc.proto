@@ -538,6 +538,9 @@ service Yak {
   rpc DownloadOnlinePluginByPluginName(DownloadOnlinePluginByScriptNamesRequest) returns (DownloadOnlinePluginByScriptNamesResponse);
   rpc DownloadOnlinePluginByUUID(DownloadOnlinePluginByUUIDRequest) returns (YakScript);
 
+  rpc QueryOnlinePlugins(QueryOnlinePluginsRequest) returns(QueryOnlinePluginsResponse);
+
+
   // 新的扫描模式
   rpc ExecPacketScan(ExecPacketScanRequest) returns (stream ExecResult);
 
@@ -2306,6 +2309,13 @@ message DownloadOnlinePluginsRequest {
   repeated int64 Status = 11;
   repeated string UUID = 12;
   repeated string ScriptName = 13;
+  repeated string ExcludeTypes = 14;
+  string FieldKeywords = 15;
+}
+
+message QueryPluginGroup {
+  bool UnSetGroup = 1;
+  repeated string Group = 2;
 }
 
 message DownloadOnlinePluginByScriptNamesRequest {
@@ -2326,6 +2336,42 @@ message DownloadOnlinePluginByScriptName {
 message DownloadOnlinePluginByUUIDRequest {
   string UUID = 1;
   string Token = 2;
+}
+
+message QueryOnlinePluginsRequest {
+  Paging Pagination = 1;
+  DownloadOnlinePluginsRequest Data = 2;
+}
+
+message QueryOnlinePluginsResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated OnlinePlugin Data = 3;
+}
+
+message OnlinePlugin {
+  int64 Id = 1;
+  int64 UpdatedAt = 2;
+  int64 CreatedAt = 3;
+  string Content = 4;
+  string Type = 5;
+  repeated YakScriptParam Params = 6;
+  bool IsPrivate = 7;
+  string ScriptName = 8;
+  string Help = 9;
+  string Author = 10;
+  string Tags = 11;
+  bool EnablePluginSelector = 12;
+  string PluginSelectorTypes = 13;
+  string UUID = 14;
+  string HeadImg = 15;
+  bool Official = 16;
+  string Group = 17;
+  bool IsCorePlugin = 18;
+  // 协作者
+  repeated Collaborator CollaboratorInfo = 19;
+  repeated YakRiskInfo RiskInfo = 20;
+  repeated string PluginEnvKey = 21;
 }
 
 message OnlineProfile {

@@ -43,21 +43,25 @@ type QueryOnlinePluginRequest struct {
 }
 
 type DownloadOnlinePluginRequest struct {
-	Token      string   `json:"token"`
-	IsPrivate  []bool   `json:"is_private"`
-	Keywords   string   `json:"keywords"`
-	PluginType []string `json:"plugin_type"`
-	Tags       []string `json:"tags"`
-	UserName   string   `json:"user_name"`
-	UserId     int64    `json:"user_id"`
-	TimeSearch string   `json:"time_search"`
-	Group      []string `json:"group"`
-	ListType   string   `json:"listType"`
-	Page       int      `json:"page"`
-	Limit      int      `json:"limit"`
-	UUID       []string `json:"uuid"`
-	Status     []int64  `json:"status"`
-	ScriptName []string `json:"script_name"`
+	Token         string               `json:"token"`
+	IsPrivate     []bool               `json:"is_private"`
+	Keywords      string               `json:"keywords"`
+	PluginType    []string             `json:"plugin_type"`
+	Tags          []string             `json:"tags"`
+	UserName      string               `json:"user_name"`
+	UserId        int64                `json:"user_id"`
+	TimeSearch    string               `json:"time_search"`
+	ListType      string               `json:"listType"`
+	Page          int                  `json:"page"`
+	Limit         int                  `json:"limit"`
+	UUID          []string             `json:"uuid"`
+	Status        []int64              `json:"status"`
+	ScriptName    []string             `json:"script_name"`
+	OrderBy       string               `json:"order_by"`
+	Order         string               `json:"order"`
+	ExcludeTypes  []string             `json:"excludePluginTypes"`
+	FieldKeywords string               `json:"fieldKeywords"`
+	QueryGroup    ypb.QueryPluginGroup `json:"pluginGroup"`
 }
 
 type OnlineClient struct {
@@ -125,6 +129,7 @@ type OnlineRiskDetail struct {
 type OnlinePlugin struct {
 	Id                   int64                     `json:"id"`
 	UpdatedAt            int64                     `json:"updated_at"`
+	CreatedAt            int64                     `json:"created_at"`
 	Type                 string                    `json:"type"`
 	ScriptName           string                    `json:"script_name"`
 	Content              string                    `json:"content"`
@@ -690,8 +695,11 @@ func (s *OnlineClient) downloadNewOnlinePlugins(
 		UserName:   userName,
 		ScriptName: scriptName,
 		TimeSearch: timeSearch,
-		Group:      group,
 		ListType:   listType,
+		QueryGroup: ypb.QueryPluginGroup{
+			UnSetGroup: false,
+			Group:      group,
+		},
 	})
 	if err != nil {
 		return nil, nil, utils.Errorf("marshal params failed: %s", err)
@@ -828,4 +836,121 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 	}
 
 	return nil
+}
+
+func (s *OnlineClient) QueryPlugins(req *ypb.QueryOnlinePluginsRequest) ([]*OnlinePlugin, *OnlinePaging, error) {
+	urlIns, err := url.Parse(s.genUrl("/api/query/plugins"))
+	if err != nil {
+		return nil, nil, utils.Errorf("parse url-instance failed: %s", err)
+	}
+
+	raw, err := json.Marshal(DownloadOnlinePluginRequest{
+		Keywords:      req.Data.Keywords,
+		PluginType:    req.Data.PluginType,
+		Tags:          req.Data.Tags,
+		UserName:      req.Data.UserName,
+		UUID:          req.Data.UUID,
+		ScriptName:    req.Data.ScriptName,
+		ExcludeTypes:  req.Data.ExcludeTypes,
+		FieldKeywords: req.Data.FieldKeywords,
+		OrderBy:       req.Pagination.OrderBy,
+		Order:         req.Pagination.Order,
+		Page:          int(req.Pagination.Page),
+		Limit:         int(req.Pagination.Limit),
+		QueryGroup: ypb.QueryPluginGroup{
+			UnSetGroup: false,
+			Group:      req.Data.Group,
+		},
+	})
+	if err != nil {
+		return nil, nil, utils.Errorf("marshal params failed: %s", err)
+	}
+	rsp, err := s.client.Post(urlIns.String(), "application/json", bytes.NewBuffer(raw))
+	if err != nil {
+		return nil, nil, utils.Errorf("HTTP Post %v failed: %v params:%s", urlIns.String(), err, string(raw))
+	}
+	rawResponse, err := ioutil.ReadAll(rsp.Body)
+	if err != nil {
+		return nil, nil, utils.Errorf("read body failed: %s", err)
+	}
+	type PluginDownloadResponse struct {
+		Data     []*OnlinePlugin `json:"data"`
+		Pagemeta *OnlinePaging   `json:"pagemeta"`
+	}
+	type OnlineErr struct {
+		Form   string `json:"form"`
+		Reason string `json:"reason"`
+		Ok     bool   `json:"ok"`
+	}
+	var _container PluginDownloadResponse
+	var ret OnlineErr
+	err = json.Unmarshal(rawResponse, &_container)
+	if err != nil {
+		return nil, nil, utils.Errorf("unmarshal plugin response failed: %s", err.Error())
+	}
+	err = json.Unmarshal(rawResponse, &ret)
+	if ret.Reason != "" {
+		return nil, nil, utils.Errorf("unmarshal plugin response failed: %s", ret.Reason)
+	}
+	return _container.Data, _container.Pagemeta, nil
+}
+
+func ToGRPCModel(s *OnlinePlugin) *ypb.OnlinePlugin {
+	var params []*ypb.YakScriptParam
+	for _, paramInstance := range s.Params {
+		params = append(params, &ypb.YakScriptParam{
+			Field:        paramInstance.Field,
+			DefaultValue: paramInstance.DefaultValue,
+			TypeVerbose:  paramInstance.TypeVerbose,
+			FieldVerbose: paramInstance.FieldVerbose,
+			Help:         paramInstance.Help,
+			Required:     paramInstance.Required,
+			Group:        paramInstance.Group,
+			ExtraSetting: paramInstance.ExtraSetting,
+			MethodType:   paramInstance.MethodType,
+		})
+	}
+	var riskInfo []*ypb.YakRiskInfo
+	for _, riskDetailInstance := range s.RiskInfo {
+		riskInfo = append(riskInfo, &ypb.YakRiskInfo{
+			Level:       riskDetailInstance.Level,
+			TypeVerbose: riskDetailInstance.TypeVerbose,
+			CVE:         riskDetailInstance.CVE,
+			Description: riskDetailInstance.Description,
+			Solution:    riskDetailInstance.Solution,
+		})
+	}
+
+	var collaboratorInfo []*ypb.Collaborator
+	for _, collaborator := range s.CollaboratorInfo {
+		collaboratorInfo = append(collaboratorInfo, &ypb.Collaborator{
+			HeadImg:  collaborator.HeadImg,
+			UserName: collaborator.UserName,
+		})
+	}
+	script := &ypb.OnlinePlugin{
+		Id:                   s.Id,
+		Content:              s.Content,
+		Type:                 s.Type,
+		Params:               params,
+		IsPrivate:            s.IsPrivate,
+		ScriptName:           s.ScriptName,
+		Help:                 s.Help,
+		Author:               s.Author,
+		Tags:                 s.Tags,
+		EnablePluginSelector: s.EnablePluginSelector,
+		PluginSelectorTypes:  s.PluginSelectorTypes,
+		UUID:                 s.UUID,
+		HeadImg:              s.HeadImg,
+		Official:             s.Official,
+		Group:                s.Group,
+		IsCorePlugin:         s.IsCorePlugin,
+		CollaboratorInfo:     collaboratorInfo,
+		RiskInfo:             riskInfo,
+		PluginEnvKey:         s.PluginEnvKey,
+		UpdatedAt:            s.UpdatedAt,
+		CreatedAt:            s.CreatedAt,
+	}
+
+	return script
 }
