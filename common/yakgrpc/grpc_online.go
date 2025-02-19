@@ -435,3 +435,42 @@ func (s *Server) DownloadOnlinePluginByUUID(ctx context.Context, req *ypb.Downlo
 	}
 	return res.ToGRPCModel(), nil
 }
+
+func (s *Server) QueryOnlinePlugins(ctx context.Context, req *ypb.QueryOnlinePluginsRequest) (*ypb.QueryOnlinePluginsResponse, error) {
+	err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl())
+	if err != nil {
+		return nil, utils.Errorf("Query failed: %s", err.Error())
+	}
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	if req.Pagination == nil {
+		req.Pagination = &ypb.Paging{
+			Page:    1,
+			Limit:   20,
+			OrderBy: "updated_at",
+			Order:   "desc",
+		}
+	}
+	if req.Data == nil {
+		req.Data = &ypb.DownloadOnlinePluginsRequest{}
+	}
+	plugins, paging, err := client.QueryPlugins(req)
+
+	if plugins == nil {
+		return nil, utils.Error("BUG: Query stream error: empty")
+	}
+	rsp := &ypb.QueryOnlinePluginsResponse{
+		Pagination: &ypb.Paging{
+			Page:    req.Pagination.Page,
+			Limit:   req.Pagination.Limit,
+			OrderBy: req.Pagination.OrderBy,
+			Order:   req.Pagination.Order,
+		},
+	}
+
+	for _, res := range plugins {
+		rsp.Total = int64(paging.Total)
+		rsp.Data = append(rsp.Data, yaklib.ToGRPCModel(res))
+	}
+
+	return rsp, nil
+}
