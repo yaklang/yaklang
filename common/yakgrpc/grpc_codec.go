@@ -1072,7 +1072,7 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (resp 
 }
 
 func (s *Server) GetAllCodecMethods(ctx context.Context, in *ypb.Empty) (*ypb.CodecMethods, error) {
-	return &ypb.CodecMethods{Methods: codegrpc.CodecLibsDoc}, nil
+	return &ypb.CodecMethods{Methods: codegrpc.GetCodecLibsDocMethods()}, nil
 }
 
 func (s *Server) SaveCodecFlow(ctx context.Context, req *ypb.CustomizeCodecFlow) (*ypb.Empty, error) {
