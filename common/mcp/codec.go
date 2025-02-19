@@ -160,7 +160,7 @@ func (s *MCPServer) handleRenderFuzztag(
 	}
 	rsp, err := s.grpcClient.StringFuzzer(ctx, &req)
 	if err != nil {
-		return nil, utils.Wrap(err, "failed to query HTTPFlows")
+		return nil, utils.Wrap(err, "failed to render fuzztag")
 	}
 	results := make([]string, 0, len(rsp.Results))
 	for _, result := range rsp.Results {
