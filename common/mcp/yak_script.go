@@ -213,6 +213,12 @@ func (s *MCPServer) handleExecYakScript(
 			"progressToken": progressToken,
 		})
 	}
+	if len(results) == 0 {
+		results = append(results, mcp.TextContent{
+			Type: "text",
+			Text: "[System] Script execution completed with no output",
+		})
+	}
 
 	return &mcp.CallToolResult{
 		Content: results,
