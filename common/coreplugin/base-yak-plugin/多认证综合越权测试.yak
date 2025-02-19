@@ -181,7 +181,7 @@ handleReq = (https, reqBytes, baseResponse, handleTag) => {
     )
 }
 
-mirrorHTTPFlow = (https, url, req, rsp, body) => {
+mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
     replaceResults = []
     emptyResults = []
     originReq = req
