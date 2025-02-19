@@ -2,5 +2,5 @@
 // nolint: golint
 package consts
 
-const ExistedCorePluginEmbedFSHash string = "dcb8844980e78f48fd5649f56b025d877bb16bb71972609d86c880b13834d5fa"
+const ExistedCorePluginEmbedFSHash string = "cfdebaea3eddcdc80d45bbe1519924e746335f371ae9bc8c5027e7fb9b516a37"
 const ExistedSyntaxFlowEmbedFSHash string = "7453526cb9539e1fabf2776a0d185326827c0be72d0fa034c5720d95de467e45"
