@@ -90,8 +90,6 @@ func (c *Call) handleMethod() {
 			for _, value := range ret.GetValues() {
 				check(value)
 			}
-		case *Function:
-			PointFunc(ret, callMethod)
 		}
 	}
 	if !callMethod.IsExtern() && callMethod.GetOpcode() != SSAOpcodeFunction {
