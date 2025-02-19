@@ -55,6 +55,7 @@ var ProfileTables = []interface{}{
 	&CodecFlow{},
 	//general rule
 	&GeneralRule{},
+	&GeneralRuleGroup{},
 	//syntaxFlow rule
 	&SyntaxFlowRule{},
 	&SyntaxFlowGroup{},
