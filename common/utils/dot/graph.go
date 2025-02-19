@@ -133,6 +133,13 @@ func (g *Graph) GetNodeByID(id int) *node {
 	return g.registeredNodes[id]
 }
 
+func (g *Graph) GetLabelByID(id int) string {
+	if node, ok := g.registeredNodes[id]; ok {
+		return node.label
+	}
+	return ""
+}
+
 // NodeExisted returns the id of the node with the given label if it
 func (g *Graph) NodeExisted(label string) (int, bool) {
 	for _, node := range g.nodes {
@@ -261,6 +268,24 @@ func (g *Graph) DefaultEdgeAttribute(name, value string) {
 // GraphAttribute sets an attribute for the graph
 func (g *Graph) GraphAttribute(name, value string) {
 	g.graphAttributes.set(name, value)
+}
+
+func (g *Graph) FindNode(name string) *node {
+	for _, node := range g.nodes {
+		if node.label == name {
+			return node
+		}
+	}
+	return nil
+}
+
+func (g *Graph) HasEdge(n1, n2 *node) bool {
+	for _, edge := range g.edges {
+		if edge.from == n1 && edge.to == n2 {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *Graph) generateDot(indent int, w io.Writer) int {
