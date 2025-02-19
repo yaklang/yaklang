@@ -111,6 +111,14 @@ func ToUndefined(v Instruction) (*Undefined, bool) {
 	return p, ok
 }
 
+func ToPointer(v Instruction) (*Pointer, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToPointer(lz.Self())
+	}
+	p, ok := v.(*Pointer)
+	return p, ok
+}
+
 func ToBinOp(v Instruction) (*BinOp, bool) {
 	if lz, isLZ := ToLazyInstruction(v); isLZ {
 		return ToBinOp(lz.Self())
@@ -157,4 +165,5 @@ func ToAliasType(t Type) (*AliasType, bool)          { a, ok := t.(*AliasType); 
 func ToFunctionType(t Type) (*FunctionType, bool)    { f, ok := t.(*FunctionType); return f, ok }
 func ToBasicType(t Type) (*BasicType, bool)          { b, ok := t.(*BasicType); return b, ok }
 func ToClassBluePrintType(t Type) (*Blueprint, bool) { c, ok := t.(*Blueprint); return c, ok }
-func ToPointerType(t Type) (*PointerType, bool)      { p, ok := t.(*PointerType); return p, ok }
+
+// func ToPointerType(t Type) (*PointerType, bool)      { p, ok := t.(*PointerType); return p, ok }

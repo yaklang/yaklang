@@ -7,6 +7,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
+type VariableKind int
+
+const (
+	NormalVariable VariableKind = iota
+	PointerVariable
+)
+
 type Variable struct {
 	*ssautil.Versioned[Value]
 	DefRange memedit.RangeIf
@@ -16,6 +23,14 @@ type Variable struct {
 	object      Value
 	key         Value
 	verboseName string
+
+	kind VariableKind
+
+	/* 已弃用
+	// directVariable   *Variable            // A pointer has only one direct reference
+	// indirectVariable map[string]*Variable // may be multiple indirect references
+	// hideVariable     map[string]*Variable // which variables are referenced
+	*/
 }
 
 var _ ssautil.VersionedIF[Value] = (*Variable)(nil)
@@ -26,6 +41,7 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 		DefRange:  nil,
 		UseRange:  map[memedit.RangeIf]struct{}{},
 	}
+	ret.GetVariableMemory().SetVariable(ret)
 	return ret
 }
 
@@ -56,6 +72,7 @@ func (variable *Variable) Assign(value Value) error {
 	}
 
 	value.AddVariable(variable)
+	value.SetVariableMemory(variable.GetVariableMemory())
 	if variable.IsMemberCall() {
 		// setMemberVerboseName(value)
 		value.SetVerboseName(getMemberVerboseName(variable.object, variable.key))
@@ -120,6 +137,57 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 	for rangePos := range v.UseRange {
 		value.GetFunc().NewErrorWithPos(kind, tag, rangePos, msg)
 	}
+}
+
+func (v *Variable) GetKind() VariableKind {
+	return v.kind
+}
+
+func (v *Variable) SetKind(kind VariableKind) {
+	v.kind = kind
+}
+
+// func (v *Variable) AddPointVariable(p Value) {
+// 	if len(p.GetAllVariables()) == 0 {
+// 		return
+// 	}
+// 	last := p.GetLastVariable()
+// 	v.directVariable = last
+// 	for _, va := range p.GetAllVariables() { // 遍历所有引用过last的指针
+// 		for _, h := range va.hideVariable {
+// 			v.indirectVariable[h.GetName()] = h
+// 			h.indirectVariable[v.GetName()] = v
+// 		}
+// 	}
+
+// 	last.hideVariable[v.GetName()] = v
+// }
+
+// func (v *Variable) RemovePointVariable(p Value) {
+// 	for _, i := range v.GetIndirectVariable() {
+// 		for _, j := range i.GetIndirectVariable() {
+// 			if j == v {
+// 				delete(i.GetIndirectVariable(), v.GetName())
+// 			}
+// 		}
+// 	}
+// 	v.ClearIndirectVariable()
+// }
+
+// func (v *Variable) GetDirectVariable() *Variable {
+// 	return v.directVariable
+// }
+
+// func (v *Variable) GetIndirectVariable() map[string]*Variable {
+// 	return v.indirectVariable
+// }
+
+// func (v *Variable) ClearIndirectVariable() {
+// 	v.indirectVariable = make(map[string]*Variable)
+// }
+
+func (v *Variable) HandlePointerVariable(variableMemory *ssautil.VariableMemory[Value]) {
+	v.GetVariableMemory().InsertNext(variableMemory)
 }
 
 func ReadVariableFromScope(scope ScopeIF, name string) *Variable {

@@ -87,11 +87,12 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	// }
 
 	// check is method
-	if method := GetMethod(value.GetType(), key.String()); !utils.IsNil(method) {
+	valueType := value.GetType()
+	if method := GetMethod(valueType, key.String()); !utils.IsNil(method) {
 		ret.typ = method.GetType()
 		return
 	}
-	if blueprint, b := ToClassBluePrintType(value.GetType()); b {
+	if blueprint, b := ToClassBluePrintType(valueType); b {
 		if method := blueprint.GetStaticMethod(key.String()); !utils.IsNil(method) {
 			ret.typ = method.GetType()
 			return
@@ -103,11 +104,11 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		}
 		return ret
 	}
-	switch value.GetType().GetTypeKind() {
+	switch valueType.GetTypeKind() {
 	case ObjectTypeKind:
-		typ, ok := ToObjectType(value.GetType())
+		typ, ok := ToObjectType(valueType)
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", value.GetType())
+			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", typ)
 			break
 		}
 		if fieldTyp := typ.GetField(key); fieldTyp != nil {
@@ -118,9 +119,9 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		}
 		return
 	case StructTypeKind: // string
-		typ, ok := ToObjectType(value.GetType())
+		typ, ok := ToObjectType(valueType)
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", value.GetType())
+			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", typ)
 			break
 		}
 		if TypeCompare(BasicTypes[StringTypeKind], key.GetType()) {
@@ -134,9 +135,9 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			// type check error
 		}
 	case TupleTypeKind:
-		typ, ok := ToObjectType(value.GetType())
+		typ, ok := ToObjectType(valueType)
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is TupleTypeKind but is not a ObjectType", value.GetType())
+			log.Errorf("checkCanMemberCall: %v is TupleTypeKind but is not a ObjectType", typ)
 			break
 		}
 		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
@@ -146,9 +147,9 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			}
 		}
 	case MapTypeKind: // string / number
-		typ, ok := ToObjectType(value.GetType())
+		typ, ok := ToObjectType(valueType)
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is MapTypeKind but is not a ObjectType", value.GetType())
+			log.Errorf("checkCanMemberCall: %v is MapTypeKind but is not a ObjectType", typ)
 			break
 		}
 		if TypeCompare(typ.KeyTyp, key.GetType()) {
@@ -164,9 +165,9 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			// type check error
 		}
 	case SliceTypeKind:
-		typ, ok := ToObjectType(value.GetType())
+		typ, ok := ToObjectType(valueType)
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is SliceTypeKind but is not a ObjectType", value.GetType())
+			log.Errorf("checkCanMemberCall: %v is SliceTypeKind but is not a ObjectType", typ)
 			break
 		}
 		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
@@ -192,7 +193,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		ret.typ = CreateAnyType()
 		return
 	case ClassBluePrintTypeKind:
-		class := value.GetType().(*Blueprint)
+		class := valueType.(*Blueprint)
 		if member := class.GetStaticMember(key.String()); !utils.IsNil(member) {
 			ret.typ = member.GetType()
 			return

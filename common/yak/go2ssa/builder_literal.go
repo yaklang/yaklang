@@ -167,12 +167,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				func(i int) ssa.Value {
 					return typeHandler(objt.FieldType, kvs[i].kv)
 				})
-		case ssa.PointerTypeKind:
-			pt := typ.(*ssa.PointerType)
-			if kvs[0].value != nil {
-				return kvs[0].value.(*ssa.UnOp).X
-			}
-			return typeHandler(pt.GetOrigin(), kvs)
 		case ssa.StructTypeKind:
 			objt := typ.(*ssa.ObjectType)
 
@@ -188,6 +182,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					func(i int) ssa.Value {
 						return typeHandler(objt.FieldTypes[i], kvs[i].kv)
 					})
+				b.AssignVariable(b.CreateLocalVariable(""), obj)
 			}
 
 			partInit := func() {
@@ -203,6 +198,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 						}
 						return b.GetDefaultValue(objt.FieldTypes[i])
 					})
+				b.AssignVariable(b.CreateLocalVariable(""), obj)
 			}
 
 			if len(kvs) == 0 {
@@ -211,9 +207,14 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			}
 
 			if kvs[0].value != nil {
-				// todo: 只有指针才会复用object，目前默认非指针
-				if m, ok := kvs[0].value.(*ssa.Make); ok {
+				if p, ok := ssa.ToPointer(kvs[0].value); ok {
+					if origin := p.GetOrigin(); origin != nil {
+						originValue := origin.GetValue()
+						return originValue
+					}
+				} else if m, ok := ssa.ToMake(kvs[0].value); ok {
 					var mkeys, mmembers []ssa.Value
+
 					for k, m := range m.GetAllMember() {
 						mkeys = append(mkeys, k)
 						mmembers = append(mmembers, m)
@@ -293,6 +294,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					return b.EmitConstInst(i)
 				})
 		case ssa.NumberTypeKind, ssa.StringTypeKind, ssa.BooleanTypeKind:
+			if kvs[0].value == nil {
+				return nil
+			}
 			return kvs[0].value
 		default:
 			if kvs[0].value != nil {
@@ -691,11 +695,8 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
 				key = b.EmitConstInst(ba.GetName())
 			}
-			if typ.STAR() != nil {
-				structTyp.AddField(key, ssa.NewPointerType(parent))
-			} else {
-				structTyp.AddField(key, parent)
-			}
+
+			structTyp.AddField(key, parent)
 		}
 	}
 }

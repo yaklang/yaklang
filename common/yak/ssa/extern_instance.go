@@ -82,7 +82,7 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 	name := getExternLibMemberCall(extern, key)
 	// read from scope, if assign to this library-value, return this value
 	if ret := ReadVariableFromScopeAndParent(b.CurrentBlock.ScopeTable, name); !utils.IsNil(ret) {
-		return ret.Value
+		return ret.GetVariableMemory().GetValue()
 	}
 	// try build field
 	if ret := extern.BuildField(key.String()); ret != nil {

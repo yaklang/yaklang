@@ -35,6 +35,7 @@ const (
 	SSAOpcodeTypeValue
 	SSAOpcodeUnOp
 	SSAOpcodeUndefined
+	SSAOpcodePointer
 	SSAOpcodeFunction
 )
 
@@ -65,6 +66,7 @@ var SSAOpcode2Name = map[Opcode]string{
 	SSAOpcodeTypeValue:       "TypeValue",
 	SSAOpcodeUnOp:            "UnOp",
 	SSAOpcodeUndefined:       "Undefined",
+	SSAOpcodePointer:         "Pointer",
 	SSAOpcodeFunction:        "Function",
 }
 
@@ -134,6 +136,7 @@ func (i *ExternLib) GetOpcode() Opcode    { return SSAOpcodeExternLib }
 func (i *Phi) GetOpcode() Opcode          { return SSAOpcodePhi }
 func (i *ConstInst) GetOpcode() Opcode    { return SSAOpcodeConstInst }
 func (i *Undefined) GetOpcode() Opcode    { return SSAOpcodeUndefined }
+func (i *Pointer) GetOpcode() Opcode      { return SSAOpcodePointer }
 func (i *BinOp) GetOpcode() Opcode        { return SSAOpcodeBinOp }
 func (i *UnOp) GetOpcode() Opcode         { return SSAOpcodeUnOp }
 func (i *Call) GetOpcode() Opcode         { return SSAOpcodeCall }

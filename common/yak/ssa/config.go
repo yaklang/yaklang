@@ -4,11 +4,23 @@ import "github.com/yaklang/yaklang/common/log"
 
 type languageConfigOpt func(*LanguageConfig)
 
+type Config struct {
+	*LanguageConfig
+	pointerAssign bool
+}
+
+func NewConfig() *Config {
+	return &Config{
+		LanguageConfig: NewLanguageConfig(),
+		pointerAssign:  false,
+	}
+}
+
 func (b *FunctionBuilder) SetLanguageConfig(opt ...languageConfigOpt) {
-	newConfig := NewLanguageConfig()
+	newConfig := NewConfig()
 	b.GetProgram().Application.config = newConfig
 	for _, o := range opt {
-		o(newConfig)
+		o(newConfig.LanguageConfig)
 	}
 }
 
@@ -65,6 +77,24 @@ func (b *FunctionBuilder) isSupportClassStaticModifier() bool {
 		return false
 	}
 	return config.isSupportClassStaticModifier
+}
+
+func (b *FunctionBuilder) SetPointerAssignConfig(bo bool) {
+	config := b.GetProgram().Application.config
+	if config == nil {
+		log.Errorf("[BUG]SupportClassStaticModifier config is not init")
+		return
+	}
+	config.pointerAssign = bo
+}
+
+func (b *FunctionBuilder) GetPointerAssignConfig() bool {
+	config := b.GetProgram().Application.config
+	if config == nil {
+		log.Errorf("[BUG]SupportClassStaticModifier config is not init")
+		return false
+	}
+	return config.pointerAssign
 }
 
 type LanguageConfig struct {
