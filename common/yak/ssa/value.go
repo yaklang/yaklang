@@ -84,9 +84,9 @@ func (b *FunctionBuilder) readValueEx(
 				program.SetOffsetVariable(ret, b.CurrentRange)
 			}
 		}
-		if ret.Value != nil {
+		if v := ret.GetVariableMemory().GetValue(); v != nil {
 			// has value, just return
-			return ret.Value
+			return v
 		}
 	}
 	isClosure := func() bool {
@@ -168,19 +168,9 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		return
 	}
 
-	if value.GetOpcode() == SSAOpcodeUnOp {
-		if un := value.(*UnOp); un.Op == OpAddress {
-			un.X.SetVerboseName(name)
-			un.AddOccultation(un.X)
-		}
-	}
-
-	if v := variable.GetValue(); v != nil && v.GetOpcode() == SSAOpcodeUnOp {
-		if un := v.(*UnOp); un.Op == OpAddress {
-			for _, o := range un.GetOccultation() {
-				scope.AssignVariable(o.GetLastVariable(), value)
-			}
-		}
+	if pointer, ok := ToPointer(value); ok {
+		variable.SetKind(PointerVariable)
+		variable.HandlePointerVariable(pointer.GetOrigin())
 	}
 
 	scope.AssignVariable(variable, value)
@@ -237,9 +227,15 @@ func (b *FunctionBuilder) CreateVariableForce(name string, pos ...CanStartStopTo
 }
 
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
-	if variable := b.getCurrentScopeVariable(name); variable != nil {
+	if variable := b.getVariableFromCurrentScope(name); variable != nil {
 		if value := variable.GetValue(); value != nil {
-			if _, ok := ToParameter(value); !ok {
+			if _, ok := ToConst(value); ok {
+				return variable
+			}
+			if _, ok := ToPointer(value); ok {
+				return variable
+			}
+			if _, ok := value.(*SideEffect); ok {
 				return variable
 			}
 		}
@@ -248,8 +244,14 @@ func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) 
 }
 
 func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...CanStartStopToken) *Variable {
-	scope := b.CurrentBlock.ScopeTable
+	if b.GetPointerAssignConfig() {
+		// 用于指针初始化，不需要创建新的variable
+		if variable := b.getVariableFromReachableScope(name); variable != nil {
+			return variable
+		}
+	}
 
+	scope := b.CurrentBlock.ScopeTable
 	ret := scope.CreateVariable(name, isLocal)
 	variable := ret.(*Variable)
 
@@ -361,17 +363,26 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 	parentScope := b.parentScope
 	for parentScope != nil {
 		if parentVariable := ReadVariableFromScopeAndParent(parentScope.scope, name); parentVariable != nil {
-			return parentVariable.Value, true
+			return parentVariable.GetVariableMemory().GetValue(), true
 		}
 		parentScope = parentScope.next
 	}
 	return nil, false
 }
 
-func (b *FunctionBuilder) getCurrentScopeVariable(name string) *Variable {
+func (b *FunctionBuilder) getVariableFromCurrentScope(name string) *Variable {
 	scope := b.CurrentBlock.ScopeTable
 	if variable := ReadVariableFromScope(scope, name); variable != nil {
 		return variable
+	}
+	return nil
+}
+
+func (b *FunctionBuilder) getVariableFromReachableScope(name string) *Variable {
+	for scope := b.CurrentBlock.ScopeTable; scope != nil; scope = scope.GetParent() {
+		if variable := ReadVariableFromScope(scope, name); variable != nil {
+			return variable
+		}
 	}
 	return nil
 }

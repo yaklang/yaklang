@@ -374,6 +374,15 @@ func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 	return f.EmitConstInst(nil)
 }
 
+func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
+	if f.CurrentBlock.finish {
+		return nil
+	}
+	pointer := NewPointer(o)
+	f.emit(pointer)
+	return pointer
+}
+
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 	ci := f.EmitConstInst(i)
 	ci.Unary = un
@@ -390,6 +399,10 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 	f.GetProgram().AddConstInstruction(ci)
 	return ci
 }
+
+// func (f *FunctionBuilder) CopyConstInst(i *ConstInst) *ConstInst {
+// 	return f.EmitConstInst(i.value)
+// }
 
 func (f *FunctionBuilder) EmitTypeCast(v Value, typ Type) *TypeCast {
 	if f.CurrentBlock.finish {
