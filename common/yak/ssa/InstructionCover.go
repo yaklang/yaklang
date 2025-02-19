@@ -129,6 +129,13 @@ func ToCall(v Instruction) (*Call, bool) {
 	p, ok := v.(*Call)
 	return p, ok
 }
+func ToSideEffect(instruction Instruction) (*SideEffect, bool) {
+	if lz, isLZ := ToLazyInstruction(instruction); isLZ {
+		return ToSideEffect(lz.Self())
+	}
+	p, ok := instruction.(*SideEffect)
+	return p, ok
+}
 
 func ToMake(v Instruction) (*Make, bool) {
 	if lz, isLZ := ToLazyInstruction(v); isLZ {

@@ -113,27 +113,26 @@ if($c){
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1", "2"})
 	})
 
-	//todo: fix member call
-	//t.Run("big test for more parameterMember", func(t *testing.T) {
-	//	code := `<?php
-	///*
-	//
-	//*/
-	//class A{
-	//   public $c;
-	//   public function FunctionA($a){
-	//       println($a->c);
-	//   }
-	//}
-	//function C($c){
-	//   $c->FunctionA($c);
-	//}
-	//$a = new A();
-	//$a->c = 2;
-	//C($a);
-	//`
-	//	ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
-	//})
+	t.Run("big test for more parameterMember", func(t *testing.T) {
+		code := `<?php
+	/*
+	
+	*/
+	class A{
+	 public $c;
+	 public function FunctionA($a){
+	     println($a->c);
+	 }
+	}
+	function C($c){
+	 $c->FunctionA($c);
+	}
+	$a = new A();
+	$a->c = 2;
+	C($a);
+	`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
+	})
 	t.Run("big test for parameter and feeevalue", func(t *testing.T) {
 		code := `<?php
 
@@ -174,24 +173,21 @@ $b();
 `
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
 	})
-	//	/*
-	//		todo： 动态语言的情况，会在call中进行修复
-	//	*/
-	//t.Run("test const sideEffect call", func(t *testing.T) {
-	//	code := `<?php
-	//
-	//function a($a){
-	//   println($a);
-	//}
-	//
-	//$b = "c";
-	//$c = function()use(&$b){
-	//	$b = "a";
-	//};
-	//$c();
-	//$b(1);`
-	//	ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{})
-	//})
+	t.Run("test const sideEffect call", func(t *testing.T) {
+		code := `<?php
+	
+	function a($a){
+	  println($a);
+	}
+	
+	$b = "c";
+	$c = function()use(&$b){
+		$b = "a";
+	};
+	$c();
+	$b(1);`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+	})
 	t.Run("test blueprint parameterMember", func(t *testing.T) {
 		code := `
 /*

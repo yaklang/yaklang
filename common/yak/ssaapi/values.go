@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -713,65 +714,87 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 		return vs
 	}
 	tmp[v.GetId()] = struct{}{}
-	check := func(call *ssa.Call, id int64) {
-		if call == nil && call.Method == nil {
-			return
-		}
-		if call.Method.GetId() == id {
-			vs = append(vs, v.NewValue(call))
-			return
-		}
-		function, ok := ssa.ToFunction(call.Method)
-		if !ok {
-			reference := call.Method.GetReference()
-			if refFunction, b := ssa.ToFunction(reference); b {
-				function = refFunction
-			} else {
+	check := func(val ssa.Value, id int64) {
+		switch ret := val.(type) {
+		case *ssa.Phi, *ssa.SideEffect:
+			vs = append(vs, v.NewValue(ret).getCallByEx(tmp)...)
+		case *ssa.Call:
+			call := ret
+			if call == nil && call.Method == nil {
 				return
 			}
-		}
-		for index, value := range call.ArgMember {
-			if len(function.ParameterMembers) <= index {
-				break
-			}
-			if value.GetId() == id {
-				vs = append(vs, v.NewValue(function.ParameterMembers[index]).getCallByEx(tmp)...)
+			if call.Method.GetId() == id {
+				vs = append(vs, v.NewValue(call))
 				return
 			}
-		}
-		for index, arg := range call.Args {
-			if len(function.Params) <= index {
-				break
-			}
-			if arg.GetId() == id {
-				vs = append(vs, v.NewValue(function.Params[index]).getCallByEx(tmp)...)
-				return
-			}
-		}
-		searchBindVariable := func(name string) {
-			for _, value := range function.FreeValues {
-				if value.GetName() == name {
-					vs = append(vs, v.NewValue(value).getCallByEx(tmp)...)
+			function, ok := ssa.ToFunction(call.Method)
+			if !ok {
+				reference := call.Method.GetReference()
+				if refFunction, b := ssa.ToFunction(reference); b {
+					function = refFunction
+				} else {
 					return
 				}
 			}
-		}
-		for name, value := range call.Binding {
-			if value.GetId() == id {
-				searchBindVariable(name)
-				return
+			for index, value := range call.ArgMember {
+				if len(function.ParameterMembers) <= index {
+					break
+				}
+				if value.GetId() == id {
+					vs = append(vs, v.NewValue(function.ParameterMembers[index]).getCallByEx(tmp)...)
+					return
+				}
 			}
+			for index, arg := range call.Args {
+				if len(function.Params) <= index {
+					break
+				}
+				if arg.GetId() == id {
+					vs = append(vs, v.NewValue(function.Params[index]).getCallByEx(tmp)...)
+					return
+				}
+			}
+			searchBindVariable := func(name string) {
+				for _, value := range function.FreeValues {
+					if value.GetName() == name {
+						vs = append(vs, v.NewValue(value).getCallByEx(tmp)...)
+						return
+					}
+				}
+			}
+			for name, value := range call.Binding {
+				if value.GetId() == id {
+					searchBindVariable(name)
+					return
+				}
+			}
+		default:
+			log.Errorf("unknown type %T", ret)
 		}
-
+	}
+	checkUser := func(user ssa.User) (ssa.Value, bool) {
+		call, isCall := ssa.ToCall(user)
+		if isCall {
+			return call, true
+		}
+		phi, isPhi := ssa.ToPhi(user)
+		if isPhi {
+			return phi, true
+		}
+		effect, isSideEffect := ssa.ToSideEffect(user)
+		if isSideEffect {
+			return effect, true
+		}
+		return nil, false
 	}
 	addCall := func(node ssa.Value) {
 		nodeId := node.GetId()
 		for _, user := range node.GetUsers() {
-			call, ok := ssa.ToCall(user)
+			value, ok := checkUser(user)
 			if !ok {
 				continue
 			}
-			check(call, nodeId)
+			check(value, nodeId)
 		}
 	}
 	handler := func(node ssa.Value) {
