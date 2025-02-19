@@ -133,13 +133,6 @@ func (g *Graph) GetNodeByID(id int) *node {
 	return g.registeredNodes[id]
 }
 
-func (g *Graph) GetLabelByID(id int) string {
-	if node, ok := g.registeredNodes[id]; ok {
-		return node.label
-	}
-	return ""
-}
-
 // NodeExisted returns the id of the node with the given label if it
 func (g *Graph) NodeExisted(label string) (int, bool) {
 	for _, node := range g.nodes {

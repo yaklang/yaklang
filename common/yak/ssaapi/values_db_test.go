@@ -112,7 +112,7 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 
 			var edge3_4 []*ssadb.AuditEdge
 			db.Model(&ssadb.AuditEdge{}).Where("program_name = ? AND from_node IN (?) AND to_node IN (?) ", progName, node3, node4).Find(&edge3_4)
-			require.Equal(t, 4, len(edge3_4))
+			require.Equal(t, 5, len(edge3_4))
 			for _, e := range edge3_4 {
 				edge3a = append(edge3b, e.FromNode)
 				fmt.Printf("edge3_4: fromNode:%v,toNode:%v,edgeType:%v\n", e.FromNode, e.ToNode, e.EdgeType)
@@ -120,7 +120,7 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 
 			var edge3_2 []*ssadb.AuditEdge
 			db.Model(&ssadb.AuditEdge{}).Where("program_name = ? AND from_node IN (?) AND to_node in (?) ", progName, node2, node3).Find(&edge3_2)
-			require.Equal(t, 4, len(edge3_2))
+			require.Equal(t, 5, len(edge3_2))
 			for _, e := range edge3_2 {
 				edge3b = append(edge3b, e.FromNode)
 				fmt.Printf("edge3_2: fromNode:%v,toNode:%v,edgeType:%v\n", e.FromNode, e.ToNode, e.EdgeType)

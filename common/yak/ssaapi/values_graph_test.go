@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -184,7 +185,7 @@ public interface RemoteLogService
 }
 
 func Test_Values_Graph_Dot(t *testing.T) {
-	t.Run("test dfs 1", func(t *testing.T) {
+	t.Run("test dfs simple", func(t *testing.T) {
 		progName := uuid.NewString()
 		prog, err := ssaapi.Parse(``, ssaapi.WithProgramName(progName))
 		require.NoError(t, err)
@@ -204,5 +205,29 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		result := graph.DeepFirstGraphNext(value1)
 		require.Equal(t, 2, len(result))
 		require.Equal(t, strings.Count(graph.Dot(), "t3: 3"), 2)
+	})
+
+	t.Run("test dfs with predecessor", func(t *testing.T) {
+		progName := uuid.NewString()
+		prog, err := ssaapi.Parse(``, ssaapi.WithProgramName(progName))
+		require.NoError(t, err)
+		value1 := CreateValue(prog, 1)
+		value2 := CreateValue(prog, 2)
+		value3 := CreateValue(prog, 3)
+		value4 := CreateValue(prog, 4)
+
+		value1.AppendDependOn(value2)
+		value2.AppendDependOn(value3)
+		value3.AppendDependOn(value4)
+
+		value1.AppendPredecessor(value2, sfvm.WithAnalysisContext_Label("Test1"), sfvm.WithAnalysisContext_Step(1))
+		value1.AppendPredecessor(value3, sfvm.WithAnalysisContext_Label("Test2"), sfvm.WithAnalysisContext_Step(2))
+		value3.AppendPredecessor(value4, sfvm.WithAnalysisContext_Label("Test3"), sfvm.WithAnalysisContext_Step(-1))
+		graph := ssaapi.NewValueGraph(value1)
+		graph.ShowDot()
+
+		require.Contains(t, graph.Dot(), "step[1]: Test1")
+		require.Contains(t, graph.Dot(), "step[2]: Test2")
+		require.Contains(t, graph.Dot(), "Test3")
 	})
 }
