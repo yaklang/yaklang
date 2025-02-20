@@ -49,6 +49,19 @@ var filterYakScriptToolOptions = []mcp.ToolOption{
 }
 
 func (s *MCPServer) registerYakScriptTool() {
+	s.server.AddTool(mcp.NewTool("static_analyze_yak_script",
+		mcp.WithDescription("Static analysis yak script for syntax error and other issues"),
+		mcp.WithString("code",
+			mcp.Description("The yak script content to be analyzed"),
+			mcp.Required(),
+		),
+		mcp.WithString("pluginType",
+			mcp.Description("The type of the yak script"),
+			mcp.Required(),
+			mcp.Enum("yak", "mitm", "port_scan", "codec", "syntaxflow"),
+		),
+	), s.handleStaticAnalyzeYakScript)
+
 	s.server.AddTool(mcp.NewTool("query_yak_script",
 		append([]mcp.ToolOption{
 			mcp.WithDescription("Query Yak scripts with flexible filters"),
@@ -149,6 +162,23 @@ func (s *MCPServer) registerYakScriptTool() {
 			mcp.Required(),
 		),
 	), s.handleDeleteYakScriptGroup)
+}
+
+func (s *MCPServer) handleStaticAnalyzeYakScript(
+	ctx context.Context,
+	request mcp.CallToolRequest,
+) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+	req := ypb.StaticAnalyzeErrorRequest{
+		Code:       []byte(utils.MapGetString(args, "code")),
+		PluginType: utils.MapGetString(args, "pluginType"),
+	}
+
+	rsp, err := s.grpcClient.StaticAnalyzeError(ctx, &req)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to static analyze yak script")
+	}
+	return NewCommonCallToolResult(rsp.Result)
 }
 
 func (s *MCPServer) handleExecYakScript(
