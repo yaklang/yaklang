@@ -299,6 +299,7 @@ func WithStructArray(name string, opts []PropertyOption, itemsOpt ...ToolOption)
 	}
 	temp := NewTool("", itemsOpt...)
 	items["properties"] = temp.InputSchema.Properties
+	items["required"] = temp.InputSchema.Required
 	return WithRaw(name, schema, opts...)
 }
 
@@ -308,6 +309,43 @@ func WithStruct(name string, opts []PropertyOption, itemsOpt ...ToolOption) Tool
 	}
 	temp := NewTool("", itemsOpt...)
 	schema["properties"] = temp.InputSchema.Properties
+	schema["required"] = temp.InputSchema.Required
+	return WithRaw(name, schema, opts...)
+}
+
+// WithOneOf
+func WithOneOf(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
+	schema := map[string]any{
+		"type": "object",
+	}
+	oneOfArray := make([]any, 0, len(itemsOpt))
+	for _, itemOpt := range itemsOpt {
+		temp := NewTool("", itemOpt...)
+		m := map[string]any{
+			"properties": temp.InputSchema.Properties,
+			"required":   temp.InputSchema.Required,
+		}
+		oneOfArray = append(oneOfArray, m)
+	}
+	schema["oneOf"] = oneOfArray
+	return WithRaw(name, schema, opts...)
+}
+
+// WithAnyOf
+func WithAnyOf(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
+	schema := map[string]any{
+		"type": "object",
+	}
+	anyOfArray := make([]any, 0, len(itemsOpt))
+	for _, itemOpt := range itemsOpt {
+		temp := NewTool("", itemOpt...)
+		m := map[string]any{
+			"properties": temp.InputSchema.Properties,
+			"required":   temp.InputSchema.Required,
+		}
+		anyOfArray = append(anyOfArray, m)
+	}
+	schema["anyOf"] = anyOfArray
 	return WithRaw(name, schema, opts...)
 }
 

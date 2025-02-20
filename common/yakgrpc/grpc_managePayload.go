@@ -198,7 +198,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 
 	if payload, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
 		if !isNew {
-			return utils.Wrapf(err, "check group[%s]", group)
+			return utils.Wrapf(err, "update group[%s] error", group)
 		}
 	} else if payload != nil {
 		if isNew {
@@ -318,7 +318,7 @@ func (s Server) SaveLargePayloadToFileStream(req *ypb.SavePayloadRequest, stream
 
 	if payload, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
 		if !isNew {
-			return utils.Wrapf(err, "check group[%s]", group)
+			return utils.Wrapf(err, "update group[%s] error", group)
 		}
 	} else if payload != nil {
 		if isNew {

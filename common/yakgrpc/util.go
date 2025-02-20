@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
 	"github.com/segmentio/ksuid"
 	log "github.com/yaklang/yaklang/common/log"
@@ -179,6 +180,25 @@ var (
 	ciClientOnce        sync.Once
 )
 
+type Client struct {
+	ypb.YakClient
+	server *Server
+}
+
+func (c *Client) GetProfileDatabase() *gorm.DB {
+	if c.server == nil {
+		return nil
+	}
+	return c.server.profileDatabase
+}
+
+func (c *Client) GetProjectDatabase() *gorm.DB {
+	if c.server == nil {
+		return nil
+	}
+	return c.server.projectDatabase
+}
+
 func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
 	local := false
 	if len(locals) > 0 {
@@ -191,14 +211,6 @@ func NewLocalClientWithTempDatabase(t *testing.T) (ypb.YakClient, error) {
 	var port int
 	var addr string
 	netx.UnsetProxyFromEnv()
-
-	dialServer := func(addr string) (ypb.YakClient, error) {
-		conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(100*1024*1045),
-			grpc.MaxCallRecvMsgSize(100*1024*1045),
-		))
-		return ypb.NewYakClient(conn), err
-	}
 
 	port = utils.GetRandomAvailableTCPPort()
 	addr = utils.HostPort("127.0.0.1", port)
@@ -233,7 +245,15 @@ func NewLocalClientWithTempDatabase(t *testing.T) (ypb.YakClient, error) {
 		}
 	}()
 	time.Sleep(1 * time.Second)
-	return dialServer(addr)
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(100*1024*1045),
+		grpc.MaxCallRecvMsgSize(100*1024*1045),
+	))
+	client := &Client{
+		YakClient: ypb.NewYakClient(conn),
+		server:    s,
+	}
+	return client, err
 }
 
 func newLocalClientEx(local bool) (ypb.YakClient, error) {
@@ -241,12 +261,15 @@ func newLocalClientEx(local bool) (ypb.YakClient, error) {
 	var addr string
 	netx.UnsetProxyFromEnv()
 
-	dialServer := func(addr string) (ypb.YakClient, error) {
+	dialServer := func(addr string, server *Server) (ypb.YakClient, error) {
 		conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(100*1024*1045),
 			grpc.MaxCallRecvMsgSize(100*1024*1045),
 		))
-		return ypb.NewYakClient(conn), err
+		return &Client{
+			YakClient: ypb.NewYakClient(conn),
+			server:    server,
+		}, err
 	}
 
 	if local || !utils.InGithubActions() {
@@ -290,7 +313,7 @@ func newLocalClientEx(local bool) (ypb.YakClient, error) {
 				}
 			}()
 			time.Sleep(1 * time.Second)
-			localClient, finalErr = dialServer(addr)
+			localClient, finalErr = dialServer(addr, s)
 		})
 		if finalErr != nil {
 			return nil, finalErr
@@ -300,7 +323,7 @@ func newLocalClientEx(local bool) (ypb.YakClient, error) {
 		addr = utils.HostPort("127.0.0.1", 8087)
 		var finalErr error
 		ciClientOnce.Do(func() {
-			ciClient, finalErr = dialServer(addr)
+			ciClient, finalErr = dialServer(addr, nil)
 		})
 		return ciClient, finalErr
 	}
