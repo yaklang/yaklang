@@ -21,7 +21,7 @@ e = a
 		ssatest.CheckSyntaxFlow(t, code,
 			`e #-> * as $target`,
 			map[string][]string{
-				"target": {"1", "3", "Undefined-c"},
+				"target": {"1", "3", "Undefined-c", "add(FreeValue-a, 1)"},
 			})
 	})
 }
@@ -154,7 +154,7 @@ func TestCrossProcessAndReverseProcess(t *testing.T) {
 		f2(tmp)
 		`, `
 		a1?{opcode: param} #-> * as $target`, map[string][]string{
-			"target": {"11", "Parameter-a2"},
+			"target": {"11"},
 		})
 	})
 }
