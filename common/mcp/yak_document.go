@@ -6,6 +6,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
 )
 
@@ -16,7 +17,7 @@ func (s *MCPServer) registerYakDocumentTool() {
 	), s.handleYakDocAllLibraryNames)
 	s.server.AddTool(mcp.NewTool("yakdoc_library_details",
 		mcp.WithDescription("YakDocument: Get the standard library details, include function names and variable names"),
-		mcp.WithString("library",
+		mcp.WithStringArray("library",
 			mcp.Description("The library name, if empty, will return global function names and variable names"),
 		),
 	), s.handleYakDocLibraryDetails)
@@ -27,7 +28,7 @@ func (s *MCPServer) registerYakDocumentTool() {
 		mcp.WithString("library",
 			mcp.Description("The library name, empty means global function"),
 		),
-		mcp.WithString("function",
+		mcp.WithStringArray("function",
 			mcp.Description("The function name"),
 			mcp.Required(),
 		),
@@ -39,7 +40,7 @@ func (s *MCPServer) registerYakDocumentTool() {
 		mcp.WithString("library",
 			mcp.Description("The library name, empty means global function"),
 		),
-		mcp.WithString("variable",
+		mcp.WithStringArray("variable",
 			mcp.Description("The variable name"),
 			mcp.Required(),
 		),
@@ -60,10 +61,14 @@ func (s *MCPServer) handleYakDocLibraryDetails(
 	request mcp.CallToolRequest,
 ) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
-	libName := utils.MapGetString(args, "library")
-	results := map[string]any{
-		"functions": lo.Keys(doc.GetDocumentFunctions(libName)),
-		"variables": lo.Keys(doc.GetDocumentInstances(libName)),
+	libNames := utils.MapGetStringSlice(args, "library")
+	results := make(map[string]map[string]any, len(libNames))
+	for _, name := range libNames {
+		result := make(map[string]any, 2)
+		result["functions"] = lo.Keys(doc.GetDocumentFunctions(name))
+		result["variables"] = lo.Keys(doc.GetDocumentInstances(name))
+
+		results[name] = result
 	}
 	return NewCommonCallToolResult(results)
 }
@@ -74,19 +79,23 @@ func (s *MCPServer) handleYakDocFunctionDetails(
 ) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	libName := utils.MapGetString(args, "library")
-	funcName := utils.MapGetString(args, "function")
-	if funcName == "" {
+	funcNames := utils.MapGetStringSlice(args, "function")
+	if len(funcNames) == 0 {
 		return nil, utils.Error("missing argument: function")
 	}
 
-	f := doc.GetDocumentFunction(libName, funcName)
-	if f == nil {
-		if libName == "" {
-			libName = "GLOBAL"
+	results := make(map[string]*yakdoc.FuncDecl, len(funcNames))
+	for _, funcName := range funcNames {
+		f := doc.GetDocumentFunction(libName, funcName)
+		if f == nil {
+			if libName == "" {
+				libName = "GLOBAL"
+			}
+			return nil, utils.Errorf("function[%s.%s] not found", libName, funcName)
 		}
-		return nil, utils.Errorf("function[%s.%s] not found", libName, funcName)
+		results[funcName] = f
 	}
-	return NewCommonCallToolResult(f)
+	return NewCommonCallToolResult(results)
 }
 
 func (s *MCPServer) handleYakDocVariableDetails(
@@ -95,17 +104,21 @@ func (s *MCPServer) handleYakDocVariableDetails(
 ) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	libName := utils.MapGetString(args, "library")
-	varName := utils.MapGetString(args, "variable")
-	if varName == "" {
+	varNames := utils.MapGetStringSlice(args, "variable")
+	if len(varNames) == 0 {
 		return nil, utils.Error("missing argument: variable")
 	}
 
-	i := doc.GetDocumentInstance(libName, varName)
-	if i == nil {
-		if libName == "" {
-			libName = "GLOBAL"
+	results := make(map[string]*yakdoc.LibInstance, len(varNames))
+	for _, varName := range varNames {
+		i := doc.GetDocumentInstance(libName, varName)
+		if i == nil {
+			if libName == "" {
+				libName = "GLOBAL"
+			}
+			return nil, utils.Errorf("variable[%s.%s] not found", libName, varName)
 		}
-		return nil, utils.Errorf("variable[%s.%s] not found", libName, varName)
+		results[varName] = i
 	}
-	return NewCommonCallToolResult(i)
+	return NewCommonCallToolResult(results)
 }
