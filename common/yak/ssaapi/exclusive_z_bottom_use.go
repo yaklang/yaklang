@@ -75,22 +75,17 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		return v.getBottomUses(actx, opt...)
 	}
 
-	reachDepthLimit, recoverStack := actx.check(v)
+	shouldExit, recoverStack := actx.check(v)
 	defer recoverStack()
-
-	if reachDepthLimit {
+	if shouldExit {
 		return Values{v}
 	}
+
 	v.SetDepth(actx.depth)
 	err := actx.hook(v)
 	if err != nil {
 		return Values{v}
 	}
-
-	if !actx.theValueShouldBeVisited(v) {
-		return Values{v}
-	}
-
 	switch ins := v.node.(type) {
 	case *ssa.Phi:
 		return v.visitUserFallback(actx, opt...)
@@ -109,7 +104,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		if ValueCompare(funcValue, actx.Self) {
 			return v.visitUserFallback(actx, opt...)
 		}
-		if actx.haveTheCrossProcess(funcValue) {
+		if actx.haveCrossProcess(funcValue) {
 			return v.visitUserFallback(actx, opt...)
 		} else {
 			actx.setCauseValue(v)
@@ -181,7 +176,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if f := ins.GetFunc(); f != nil {
 				v.NewBottomUseValue(f).GetCalledBy().ForEach(func(value *Value) {
 					dep := value.AppendDependOn(v)
-					if !actx.haveTheCrossProcess(dep) {
+					if !actx.haveCrossProcess(dep) {
 						actx.setCauseValue(dep)
 					}
 					results = append(results, dep.getBottomUses(actx, opt...)...)
