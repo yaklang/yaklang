@@ -72,7 +72,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return i.getTopDefs(actx, opt...)
 	}
-
 	shouldExit, recoverStack := actx.check(i)
 	defer recoverStack()
 	if shouldExit {
