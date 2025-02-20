@@ -146,6 +146,7 @@ func (lz *LazyInstruction) check() {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 	if lz.Instruction == nil {
@@ -401,28 +402,38 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 		if err != nil {
 			switch ret := lz.Self().(type) {
 			case *BasicBlock:
-				if len(ret.Insts) > 0 {
-					startRng := ret.Insts[0].GetRange()
-					endRng := ret.Insts[len(ret.Insts)-1].GetRange()
-					fallbackRange := memedit.NewRange(startRng.GetStart(), endRng.GetEnd())
-					fallbackRange.SetEditor(startRng.GetEditor())
-					lz.Instruction.SetRange(fallbackRange)
-					return fallbackRange
-				}
-
 				// check if block has no instruction
 				var startRng memedit.RangeIf
-				for _, start := range ret.Preds {
-					if rng := start.GetRange(); rng != nil {
-						startRng = rng
-						break
+				if len(ret.Insts) > 0 {
+					for _, start := range ret.Insts {
+						if rng := start.GetRange(); rng != nil {
+							startRng = rng
+							break
+						}
+					}
+				} else {
+					for _, start := range ret.Preds {
+						if rng := start.GetRange(); rng != nil {
+							startRng = rng
+							break
+						}
 					}
 				}
+
 				var endRng memedit.RangeIf
-				for _, end := range ret.Succs {
-					if rng := end.GetRange(); rng != nil {
-						endRng = rng
-						break
+				if len(ret.Insts) > 0 {
+					for _, end := range ret.Insts {
+						if rng := end.GetRange(); rng != nil {
+							endRng = rng
+							break
+						}
+					}
+				} else {
+					for _, end := range ret.Succs {
+						if rng := end.GetRange(); rng != nil {
+							endRng = rng
+							break
+						}
 					}
 				}
 				if startRng != nil && endRng != nil {
