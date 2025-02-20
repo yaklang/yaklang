@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -47,6 +48,7 @@ func (s *MCPServer) registerCodecTool() {
 		mcp.WithDescription("Get codec method details, include codec name, description and params. Should be use with exec_codec tool"),
 		mcp.WithStringArray("method",
 			mcp.Description("Name of codec method"),
+			mcp.Enum(codegrpc.GetCodecLibsDocMethodNames()),
 			mcp.Required(),
 		),
 	), s.handleCodecMethodDetails)
@@ -81,13 +83,28 @@ func (s *MCPServer) handleExecCodec(
 	var req ypb.CodecRequestFlow
 	err := mapstructure.Decode(request.Params.Arguments, &req)
 	if err != nil {
-		return nil, utils.Wrap(err, "invalid argument")
+		methodDetails := lo.SliceToMap(req.WorkFlow, func(flow *ypb.CodecWork) (string, string) {
+			doc, err := getCodecMethodDetail(flow.CodecType)
+			if err != nil {
+				return flow.CodecType, err.Error()
+			}
+			return flow.CodecType, doc
+		})
+		detailBytes, marshalErr := json.Marshal(methodDetails)
+		if marshalErr != nil {
+			return nil, utils.Wrap(err, "invalid argument")
+		} else {
+			return nil, fmt.Errorf("invalid argument: %v\nhere are method details:\n%s", err, string(detailBytes))
+		}
 	}
 	rsp, err := s.grpcClient.NewCodec(ctx, &req)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to exec codec")
 	}
-	return NewCommonCallToolResult(rsp)
+	result := make(map[string]any, 2)
+	result["text"] = rsp.Result
+	result["base64_text"] = rsp.RawResult
+	return NewCommonCallToolResult(result)
 }
 
 func getCodecMethodDetail(methodName string) (string, error) {
@@ -119,7 +136,10 @@ func (s *MCPServer) handleCodecMethodDetails(
 	}
 	methods := utils.InterfaceToStringSlice(iMethods)
 	results := lo.SliceToMap(methods, func(methodName string) (string, string) {
-		doc, _ := getCodecMethodDetail(methodName)
+		doc, err := getCodecMethodDetail(methodName)
+		if err != nil {
+			return methodName, err.Error()
+		}
 		return methodName, doc
 	})
 	return NewCommonCallToolResult(results)
