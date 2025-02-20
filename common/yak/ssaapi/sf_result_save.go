@@ -9,16 +9,29 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func LoadResultByHash(programName, ruleContent string, kind schema.SyntaxflowResultKind) (*SyntaxFlowResult, error) {
+	result := ssadb.GetResultByHash(programName, ruleContent, kind)
+	if result == nil {
+		return nil, utils.Error("result not found")
+	}
+	return loadResult(result)
+}
+
 func LoadResultByID(resultID uint) (*SyntaxFlowResult, error) {
-	res := createEmptyResult()
 	result, err := ssadb.GetResultByID(resultID)
 	if err != nil {
 		return nil, err
 	}
+	return loadResult(result)
+}
+
+func loadResult(result *ssadb.AuditResult) (*SyntaxFlowResult, error) {
+	res := createEmptyResult()
 	res.dbResult = result
 	var rule *schema.SyntaxFlowRule
 	if result.RuleName != "" {
 		// load rule from db
+		var err error
 		rule, err = sfdb.GetRulePure(result.RuleName)
 		if err != nil {
 			return nil, utils.Errorf("load rule %s error: %v", result.RuleName, err)

@@ -1,0 +1,76 @@
+package ssaapi_test
+
+import (
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+)
+
+func TestSFSave(t *testing.T) {
+	progName := uuid.NewString()
+	code := `
+println(123)
+	`
+	prog, err := ssaapi.Parse(code,
+		ssaapi.WithLanguage(consts.Yak),
+		ssaapi.WithProgramName(progName),
+	)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progName)
+	}()
+	require.NoError(t, err)
+
+	// query first
+	rule := `println( * as $a)`
+	res, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithSave(schema.SFResultKindDebug))
+	require.NoError(t, err)
+	resId := res.GetResultID()
+	// check
+
+	auditResult, err := ssadb.GetResultByID(resId)
+	require.NoError(t, err)
+	require.Equal(t, progName, auditResult.ProgramName)
+	require.Equal(t, rule, auditResult.RuleContent)
+	require.Equal(t, schema.SFResultKindDebug, auditResult.Kind)
+}
+
+func TestSFQueryWithCache(t *testing.T) {
+	progName := uuid.NewString()
+	code := `
+println(123)
+	`
+	prog, err := ssaapi.Parse(code,
+		ssaapi.WithLanguage(consts.Yak),
+		ssaapi.WithProgramName(progName),
+	)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progName)
+	}()
+	require.NoError(t, err)
+
+	// query first
+	rule := `println( * as $a)`
+	res, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithSave(schema.SFResultKindDebug))
+	require.NoError(t, err)
+	res1Id := res.GetResultID()
+
+	// query second, run query and get other id
+	res2, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithSave(schema.SFResultKindDebug))
+	require.NoError(t, err)
+	res2Id := res2.GetResultID()
+
+	require.NotEqual(t, res1Id, res2Id)
+
+	// query third, use cache get second id
+	res3, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithSave(schema.SFResultKindDebug), ssaapi.QueryWithUseCache())
+	require.NoError(t, err)
+	res3Id := res3.GetResultID()
+
+	require.Equal(t, res1Id, res3Id)
+
+}

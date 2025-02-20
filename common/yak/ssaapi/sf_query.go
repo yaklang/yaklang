@@ -17,6 +17,8 @@ import (
 var DefaultInputVar = "input"
 
 type queryConfig struct {
+	// check if exist in database just use this
+	useCache bool
 	// input
 	program *Program
 	value   sfvm.ValueOperator // use this
@@ -105,6 +107,28 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		return nil, utils.Errorf("SyntaxflowQuery: value is nil")
 	}
 
+	// set cache and have programName and kind
+	if config.useCache && (config.program != nil && config.kind != "") {
+		ruleContent := ""
+		if config.ruleContent != "" {
+			ruleContent = config.ruleContent
+		} else if config.rule != nil {
+			ruleContent = config.rule.Content
+		} else if config.ruleName != "" {
+			rule, err := sfdb.GetRule(config.ruleName)
+			if err != nil {
+				return nil, utils.Errorf("SyntaxflowQuery: load rule %s from db error: %v", config.ruleName, err)
+			}
+			config.rule = rule
+			ruleContent = rule.Content
+		} else {
+			return nil, utils.Errorf("SyntaxflowQuery: rule is nil")
+		}
+		if ret, err := LoadResultByHash(config.program.GetProgramName(), ruleContent, config.kind); err == nil && ret != nil {
+			return ret, nil
+		}
+	}
+
 	process(0, "load or compile syntaxflow rule ")
 	// get runtime frame
 	frame, err := config.GetFrame()
@@ -169,6 +193,7 @@ func QueryWithPrograms(programs Programs) QueryOption {
 func QueryWithValue(value sfvm.ValueOperator) QueryOption {
 	return func(c *queryConfig) {
 		c.value = value
+		c.program, _ = fetchProgram(value)
 	}
 }
 
@@ -244,6 +269,16 @@ func QueryWithProcessCallback(cb func(float64, string)) QueryOption {
 func QueryWithFailFast(b ...bool) QueryOption {
 	return func(c *queryConfig) {
 		c.opts = append(c.opts, sfvm.WithFailFast(b...))
+	}
+}
+
+func QueryWithUseCache(b ...bool) QueryOption {
+	return func(c *queryConfig) {
+		if len(b) > 0 {
+			c.useCache = b[0]
+		} else {
+			c.useCache = true
+		}
 	}
 }
 

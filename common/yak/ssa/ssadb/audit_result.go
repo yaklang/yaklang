@@ -25,15 +25,15 @@ type AuditResult struct {
 	RulePurpose  string `json:"purpose"`
 	RuleSeverity string `json:"rule_severity"`
 	RuleDesc     string `json:"rule_desc"`
-	RuleContent  string `json:"rule_content" gorm:"type:text"`
+	RuleContent  string `json:"rule_content" gorm:"type:text;index"`
 
 	AlertDesc schema.MapEx[string, *schema.SyntaxFlowDescInfo] `gorm:"type:text"`
 
 	// Program
-	ProgramName string `json:"program_name"`
+	ProgramName string `json:"program_name" gorm:"index"`
 	Language    string `json:"language"`
 
-	Kind schema.SyntaxflowResultKind `json:"kind"` // debug / scan / query
+	Kind schema.SyntaxflowResultKind `json:"kind" gorm:"index"` // debug / scan / query / search
 
 	RiskCount uint64                       `json:"risk_count"`
 	RiskHashs schema.MapEx[string, string] `json:"risk_hashs" gorm:"type:text"`
@@ -49,6 +49,14 @@ func GetResultByID(resultID uint) (*AuditResult, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+func GetResultByHash(programName, rule string, kind schema.SyntaxflowResultKind) *AuditResult {
+	var result AuditResult
+	if err := GetDB().Where("program_name = ? AND rule_content = ? AND kind = ?", programName, rule, kind).First(&result).Error; err != nil {
+		return nil
+	}
+	return &result
 }
 
 func DeleteResultByTaskID(taskId string) error {
