@@ -980,6 +980,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
 				DisableRenderStyles:        len(body) > 1024*1024*2,
 				RuntimeID:                  runtimeID,
+				IsAutoFixContentType:       lowhttpResponse.FixContentType,
 			}
 
 			redirectPacket := result.LowhttpResponse.RedirectRawPackets

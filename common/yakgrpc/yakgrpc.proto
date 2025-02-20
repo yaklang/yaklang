@@ -4107,7 +4107,7 @@ message YakScript {
   repeated Collaborator CollaboratorInfo = 35;
   repeated YakRiskInfo RiskInfo = 36;
   bool IsUpdate = 37;
-  repeated string PluginEnvKey =38;
+  repeated string PluginEnvKey = 38;
 }
 
 message Collaborator {
@@ -4738,6 +4738,7 @@ message FuzzerResponse {
 
   string RuntimeID = 53;
   bool Discard = 54;
+  bool IsAutoFixContentType = 55;
 }
 
 message RedirectHTTPFlow {
@@ -5730,17 +5731,17 @@ message SSAProgramInput {
 }
 
 message SSAProgramFilter{
-  repeated string ProgramNames =  1;
-  repeated string Languages =  2;
-  repeated int64 Ids =  3;
+  repeated string ProgramNames = 1;
+  repeated string Languages = 2;
+  repeated int64 Ids = 3;
 
   // update range
   int64 BeforeUpdatedAt = 5;
   int64 AfterUpdatedAt = 6;
   // fuzz search
-  string Keyword =  7 ;
+  string Keyword = 7 ;
   // id range
-  int64 AfterID =  8;
+  int64 AfterID = 8;
   int64 BeforeID = 9;
 }
 
@@ -5807,7 +5808,7 @@ message SyntaxFlowRuleGroupFilter {
 message SyntaxFlowGroup{
   string GroupName = 1;
   int32  Count = 2;
-  bool  IsBuildIn =3;
+  bool  IsBuildIn = 3;
 }
 
 message QuerySyntaxFlowRuleGroupRequest{
@@ -5831,7 +5832,7 @@ message UpdateSyntaxFlowRuleGroupRequest {
 
 message UpdateSyntaxFlowRuleAndGroupRequest{
   SyntaxFlowRuleFilter Filter = 1;
-  repeated string AddGroups= 2;
+  repeated string AddGroups = 2;
   repeated string RemoveGroups = 3;
   bool All = 4; // abort
 }
@@ -5896,16 +5897,16 @@ message SyntaxFlowScanTask {
   string Status = 7; // executing / paused / done / error
   string Reason = 8;
   // query execute
-  int64 FailedQuery= 9;
-  int64 SkipQuery=10;
+  int64 FailedQuery = 9;
+  int64 SkipQuery = 10;
   int64 SuccessQuery = 11;
   // risk
-  int64 RiskCount =12;
+  int64 RiskCount = 12;
   // query process
-  int64 TotalQuery =13;
+  int64 TotalQuery = 13;
 
   SyntaxFlowScanRequest Config = 14;
-  string Kind =  15; // "debug" | "scan"
+  string Kind = 15; // "debug" | "scan"
 }
 
 message DeleteSyntaxFlowScanTaskRequest{
@@ -5979,7 +5980,7 @@ message SyntaxFlowResult {
   uint64 RiskCount = 11;
 
   string RuleContent = 12;
-  string Kind =  13; // "query" | "debug" | "scan"
+  string Kind = 13; // "query" | "debug" | "scan"
 }
 
 message DeleteSyntaxFlowResultRequest{
@@ -6078,7 +6079,7 @@ message SSARisk {
   bool IsRead = 23;
 
   uint64 ResultID = 22;
-  string Variable  = 24;
+  string Variable = 24;
   int64 Index = 25;
 
   string FunctionName = 26;
@@ -6226,22 +6227,22 @@ message DownloadHotPatchTemplateRequest {
   string Type = 2; // fuzzer/mitm
 }
 message ExportHTTPFlowStreamRequest {
-    QueryHTTPFlowRequest Filter = 1;
-    repeated string FieldName = 2;
-    string ExportType = 3; // csv/har
-    string TargetPath = 4;
+  QueryHTTPFlowRequest Filter = 1;
+  repeated string FieldName = 2;
+  string ExportType = 3; // csv/har
+  string TargetPath = 4;
 }
 
 message ExportHTTPFlowStreamResponse {
-    double Percent = 1;
-    string Verbose = 2; 
+  double Percent = 1;
+  string Verbose = 2;
 }
 
 message ImportHTTPFlowStreamRequest {
-    string InputPath = 1;
+  string InputPath = 1;
 }
 
 message ImportHTTPFlowStreamResponse {
-    double Percent = 1;
-    string Verbose = 2; 
+  double Percent = 1;
+  string Verbose = 2;
 }
