@@ -36,6 +36,7 @@ var Exports = map[string]any{
 	"withExecDebug":  ssaapi.QueryWithEnableDebug,
 	"withProcess":    ssaapi.QueryWithProcessCallback,
 	"withContext":    ssaapi.QueryWithContext,
+	"withCache":      ssaapi.QueryWithUseCache,
 	"withSave": func() ssaapi.QueryOption {
 		return ssaapi.QueryWithSave(schema.SFResultKindQuery)
 	},
