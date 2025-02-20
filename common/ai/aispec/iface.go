@@ -22,8 +22,30 @@ type Configurable interface {
 	CheckValid() error
 }
 
+type StructuredData struct {
+	Id             string
+	Event          string
+	DataRaw        []byte
+	OutputText     string
+	FinishedReason string
+	ThoughtText    string
+	UsageStats     []UsageStatsInfo
+}
+
+type UsageStatsInfo struct {
+	Model       string
+	InputToken  int
+	OutputToken int
+}
+
+type StructuredStreamer interface {
+	SupportedStructuredStream() bool
+	StructuredStream(string, ...Function) (chan *StructuredData, error)
+}
+
 type AIClient interface {
 	Chatter
 	FunctionCaller
 	Configurable
+	StructuredStreamer
 }

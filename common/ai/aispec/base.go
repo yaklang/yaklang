@@ -117,6 +117,46 @@ func ExtractFromResult(result string, fields map[string]any) (map[string]any, er
 	return nil, utils.Errorf("cannot extractjson: \n%v\n", string(result))
 }
 
+func GenerateJSONPrompt(msg string, fields map[string]any) string {
+	// 按字母序排列字段
+	keys := make([]string, 0, len(fields))
+	for k := range fields {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var fieldsDesc strings.Builder
+	for i, k := range keys {
+		fieldsDesc.WriteString(fmt.Sprintf("%d. 字段名：%#v, 含义：%#v;\n", i+1, k, fields[k]))
+	}
+
+	return `# 指令
+你是一个专业的数据处理助手，请严格按以下要求处理输入内容：
+
+## 处理步骤
+1. 直接提取或总结所需数据
+2. 必须使用JSON格式输出
+3. 不要包含推理过程
+4. 不要添加额外解释
+
+## 输入内容
+` + strconv.Quote(msg) + `
+
+## 字段定义
+` + fieldsDesc.String() + `
+
+## 输出要求
+- 使用严格JSON格式（无Markdown代码块）
+- 确保类型正确：
+* 数值类型：不要加引号
+* 字符串类型：必须加双引号
+* 空值返回null
+- 示例格式：
+{"field1":123,"field2":"text","field3":null}
+
+请直接输出处理后的JSON：`
+}
+
 func ChatBasedExtractData(url string, model string, msg string, fields map[string]any, opt func() ([]poc.PocConfigOption, error), streamHandler func(io.Reader)) (map[string]any, error) {
 	if len(fields) <= 0 {
 		return nil, utils.Error("no fields config for extract")
@@ -126,38 +166,7 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 		fields = make(map[string]any)
 		fields["raw_data"] = "相关数据"
 	}
-
-	var buf = bytes.NewBufferString("")
-	var keys []string
-	for k := range fields {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for i := 0; i < len(keys); i++ {
-		buf.WriteString(fmt.Sprintf("%v. 字段名：%#v, 含义：%#v;\n",
-			i+1, keys[i], fields[keys[i]]))
-	}
-
-	var text = `
-# 背景
-
-你是一个专业人员，并且在完成数据精炼和提取任务，尽量省略推理过程，直接提取或总结数据，输出尽量保持 JSON 格式，不要提供脚本
-
-# 数据源是
-
-` + strconv.Quote(msg) + "\n" +
-		"\n" +
-		`
-# 数据源格式要求如下：
-
-如要提取一系列字段，请提取内容，输出成JSON格式，对JSON对象需求的字段列表为: 
-
-` + buf.String()
-	msg = text + "\n\n# 注意：尽量不要输出非JSON的东西 尽量少提出意见"
-
-	if streamHandler != nil {
-		// fmt.Println(text)
-	}
+	msg = GenerateJSONPrompt(msg, fields)
 	result, err := ChatBase(url, model, msg, nil, opt, streamHandler)
 	if err != nil {
 		log.Errorf("chatbase error: %s", err)
