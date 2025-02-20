@@ -85,6 +85,7 @@ func (c *processAnalysisManager) valueShould(v *Value) (bool, func()) {
 	if _, ok = intra.valueVisited.Get(v.GetId()); !ok {
 		intra.valueVisited.Set(v.GetId(), struct{}{})
 		return true, func() {
+			log.Infof("recover intra process value: %v", v.String())
 			intra.valueVisited.Delete(v.GetId())
 		}
 	}
