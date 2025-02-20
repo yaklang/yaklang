@@ -136,16 +136,14 @@ func CheckPrintf(t *testing.T, tc TestCase, contains ...bool) {
 		contain = contains[0]
 	}
 	tc.Check = func(prog *ssaapi.Program, want []string) {
-		println := prog.Ref("println").ShowWithSource()
-		// test.Equal(1, len(println), "println should only 1")
-		got := lo.Map(
-			println.GetUsers().ShowWithSource().Flat(func(v *ssaapi.Value) ssaapi.Values {
-				return ssaapi.Values{v.GetOperand(1)}
-			}),
-			func(v *ssaapi.Value, _ int) string {
-				return v.String()
-			},
-		)
+		arg := prog.Ref("println").ShowWithSource().GetUsers().ShowWithSource().Filter(func(v *ssaapi.Value) bool {
+			return v.IsCall()
+		}).ShowWithSource().Flat(func(v *ssaapi.Value) ssaapi.Values {
+			return v.GetCallArgs()
+		}).ShowWithSource()
+
+		got := lo.Map(arg, func(v *ssaapi.Value, _ int) string { return v.String() })
+
 		// sort.Strings(got)
 		log.Info("got :", got)
 		// sort.Strings(want)
@@ -176,6 +174,11 @@ func CheckPrintf(t *testing.T, tc TestCase, contains ...bool) {
 		}
 
 		equalSlices(want, got)
+		// res, err := prog.SyntaxFlowWithError(`println(* as $a)`)
+		// require.NoError(t, err)
+		// CompareResult(t, contain, res, map[string][]string{
+		// 	"a": want,
+		// })
 	}
 	CheckTestCase(t, tc)
 }

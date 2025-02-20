@@ -137,7 +137,7 @@ world`+"`"+`)
 			println(ch2)
 		}
 			
-		`, []string{"Function-make(typeValue(chan number))", "Function-make(typeValue(chan string))"}, t)
+		`, []string{"Undefined-make(typeValue(chan number))", "Undefined-make(typeValue(chan string))"}, t)
 	})
 
 	t.Run("struct", func(t *testing.T) {

@@ -722,7 +722,7 @@ func TestFuntion_normol(t *testing.T) {
 		func main(){
 			mapt := make(map[string]string)
 			println(mapt)
-		}`, []string{"Function-make(typeValue(map[string]string))"}, t)
+		}`, []string{"Undefined-make(typeValue(map[string]string))"}, t)
 	})
 
 	t.Run("memcall", func(t *testing.T) {
