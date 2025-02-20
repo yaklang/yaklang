@@ -17,20 +17,19 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func sendSSAURL(t *testing.T, local ypb.YakClient, resultID int, programName string) []*ypb.YakURLResource {
+func sendSSAURL(t *testing.T, local ypb.YakClient, resultID int, programName, kind string) []*ypb.YakURLResource {
 	url := &ypb.RequestYakURLParams{
 		Method: "GET",
 		Url: &ypb.YakURL{
 			Schema:   "syntaxflow",
 			Location: programName,
-			Path:     "/result",
+			Path:     fmt.Sprintf("/%s", kind),
 			Query: []*ypb.KVPair{
 				{
 					// get from database
@@ -116,7 +115,8 @@ func NewSfSearch(fs filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.Op
 		_, err := ssaapi.ParseProject(opt...)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			ssadb.DeleteProgram(ssadb.GetDB(), progName)
+			log.Infof("delete program: %v", progName)
+			// ssadb.DeleteProgram(ssadb.GetDB(), progName)
 		})
 	}
 	_, err = ssaapi.FromDatabase(progName)
@@ -138,7 +138,7 @@ func NewSfSearch(fs filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.Op
 	}
 }
 
-func (s *sfSearch) runSearch(kind, input string, fuzz bool) int {
+func (s *sfSearch) RunSearch(kind, input string, fuzz bool) int {
 	stream, err := s.local.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
 		Code:       s.code,
 		PluginType: "yak",
@@ -190,9 +190,8 @@ func (s *sfSearch) runSearch(kind, input string, fuzz bool) int {
 	return resultId
 }
 
-func (s *sfSearch) check(t *testing.T, kind, input string, fuzz bool, want map[string]string) {
-	resultId := s.runSearch(kind, input, fuzz)
-	rets := sendSSAURL(t, s.local, resultId, s.progName)
+func (s *sfSearch) Check(t *testing.T, kind string, resultId int, want map[string]string) {
+	rets := sendSSAURL(t, s.local, resultId, s.progName, kind)
 	spew.Dump(rets)
 
 	got := lo.SliceToMap(rets, func(ret *ypb.YakURLResource) (string, string) {
@@ -213,7 +212,12 @@ func (s *sfSearch) check(t *testing.T, kind, input string, fuzz bool, want map[s
 	}
 }
 
-func TestSsaSearch(t *testing.T) {
+func (s *sfSearch) SearchAndCheck(t *testing.T, kind, input string, fuzz bool, want map[string]string) {
+	resultId := s.RunSearch(kind, input, fuzz)
+	s.Check(t, kind, resultId, want)
+}
+
+func TestSSASearch(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	code1 := `<?php
 $b = "funcA(";
@@ -232,7 +236,7 @@ funcA(222);
 	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaapi.PHP))
 
 	t.Run("check all funcA", func(t *testing.T) {
-		s.check(t, "all", "funcA", false, map[string]string{
+		s.SearchAndCheck(t, "all", "funcA", false, map[string]string{
 			"Function-funcA":           "function funcA(){}",
 			"Undefined-funcA":          "funcA",
 			`"funcA("`:                 "funcA(",
@@ -243,20 +247,20 @@ funcA(222);
 	})
 
 	t.Run("check symbol funcA", func(t *testing.T) {
-		s.check(t, "symbol", "funcA", false, map[string]string{
+		s.SearchAndCheck(t, "symbol", "funcA", false, map[string]string{
 			"Function-funcA":  "function funcA(){}",
 			"Undefined-funcA": "funcA",
 		})
 	})
 
 	t.Run("check function funcA", func(t *testing.T) {
-		s.check(t, "function", "funcA", false, map[string]string{
+		s.SearchAndCheck(t, "function", "funcA", false, map[string]string{
 			"Function-funcA": "function funcA(){}",
 		})
 	})
 
 	t.Run("check function funcA with fuzz", func(t *testing.T) {
-		s.check(t, "function", "funcA", true, map[string]string{
+		s.SearchAndCheck(t, "function", "funcA", true, map[string]string{
 			"Function-funcA":         "function funcA(){}",
 			"Function-funcAxxxx":     "function funcAxxxx() {}",
 			"Function-yyyyfuncAxxxx": "function yyyyfuncAxxxx() {}",
@@ -264,21 +268,81 @@ funcA(222);
 	})
 
 	t.Run("check call funcA", func(t *testing.T) {
-		s.check(t, "call", "funcA", false, map[string]string{
+		s.SearchAndCheck(t, "call", "funcA", false, map[string]string{
 			"Function-funcA(111)":  "funcA(111)",
 			"Undefined-funcA(222)": "funcA(222)",
 		})
 	})
 
 	t.Run("check file funcA", func(t *testing.T) {
-		s.check(t, "file", "funcA", false, map[string]string{
+		s.SearchAndCheck(t, "file", "funcA", false, map[string]string{
 			`"var/www/html/funcA.php"`: code3,
 		})
 	})
 
 	t.Run("check const funcA", func(t *testing.T) {
-		s.check(t, "const", "funcA", false, map[string]string{
+		s.SearchAndCheck(t, "const", "funcA", false, map[string]string{
 			`"funcA("`: "funcA(",
 		})
+	})
+}
+
+func TestSSASearch_Reuse(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	code1 := `<?php
+$b = "funcA(";
+function funcA(){}
+funcA(111);
+
+function funcAxxxx() {}
+function yyyyfuncAxxxx() {}
+`
+	fs.AddFile("/var/www/html/1.php", code1)
+	code3 := `<?php
+funcA(222);
+`
+	fs.AddFile("/var/www/html/funcA.php", code3)
+
+	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaapi.PHP))
+
+	// search
+	_ = s
+	result := s.RunSearch("all", "funcA", true)
+
+	// check all
+	s.Check(t, "all", result, map[string]string{
+		"Function-funcA":           "function funcA(){}",
+		"Undefined-funcA":          "funcA",
+		`"funcA("`:                 "funcA(",
+		"Function-funcA(111)":      "funcA(111)",
+		"Undefined-funcA(222)":     "funcA(222)",
+		`"var/www/html/funcA.php"`: code3,
+	})
+
+	// check file
+	s.Check(t, "file", result, map[string]string{
+		`"var/www/html/funcA.php"`: code3,
+	})
+
+	// check function
+	s.Check(t, "function", result, map[string]string{
+		"Function-funcA": "function funcA(){}",
+	})
+
+	// check symbol
+	s.Check(t, "symbol", result, map[string]string{
+		"Function-funcA":  "function funcA(){}",
+		"Undefined-funcA": "funcA",
+	})
+
+	// check call
+	s.Check(t, "call", result, map[string]string{
+		"Function-funcA(111)":  "funcA(111)",
+		"Undefined-funcA(222)": "funcA(222)",
+	})
+
+	// check const
+	s.Check(t, "const", result, map[string]string{
+		`"funcA("`: "funcA(",
 	})
 }

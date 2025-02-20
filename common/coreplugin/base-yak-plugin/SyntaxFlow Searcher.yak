@@ -1,15 +1,16 @@
 yakit.AutoInitYakit()
 
 fuzzSearch = cli.Bool("fuzz", cli.setHelp("是否进行模糊搜索，默认开启"), cli.setRequired(true), cli.setDefault(true))
-kind = cli.StringSlice(
+kinds = cli.StringSlice(
     "kind",
-    cli.setSelectOption("all", "all"),
-    cli.setSelectOption("symbol", "symbol"),
-    cli.setSelectOption("function", "function"),
-    cli.setSelectOption("call", "call"),
-    cli.setSelectOption("file", "file"),
-    cli.setSelectOption("const", "const"),
+    cli.setSelectOption("全部", "all"),
+    cli.setSelectOption("符号", "symbol"),
+    cli.setSelectOption("函数", "function"),
+    cli.setSelectOption("函数调用", "call"),
+    cli.setSelectOption("文件", "file"),
+    cli.setSelectOption("常量", "const"),
     cli.setRequired(true),
+    cli.setDefault("all")
 )
 rule = cli.String(
     "rule",
@@ -23,14 +24,9 @@ progName = cli.String("progName", cli.setHelp("输入当前的项目名，将从
 
 cli.check()
 
-syntaxFlowInfo = {"kind": "symbol", "render": (i) => {
-    return <<<TEXT
-%s as $result
-
-TEXT % i
-}}
-if len(kind) > 0 {
-    syntaxFlowInfo.kind = kind[0]
+kind = "all"
+if len(kinds) > 0 {
+    kind = kinds[0]
 }
 
 
@@ -56,24 +52,26 @@ func matchCallMethodName(content) {
     methodName = matchInfo[1]
     return methodName
 }
-
-func generateRule(kind, content) {
-    sfRule := ""
-    switch kind {
-    case "file", "symbol":
-        sfRule = sprintf("%s", content)
-    case "call":
-        sfRule = sprintf("%s()", content)
-    case "function":
-        sfRule = sprintf("%s?{opcode: function}", content)
-    case "const":
-        sfRule = sprintf(`g<<<CODE
-%s
-CODE`, content)
+func processContent(content) {
+    content = str.TrimSpace(content)
+    // call
+    if kind == "const" {
+        return content
     }
 
-    return sfRule
+
+    if re.Match(`(\b[a-zA-Z_]\w*)\(`, content) {
+        kind = "call"
+        return matchCallMethodName(content)
+    }
+
+//file
+    if re.Match(`[/|\\]`, content) {
+        kind = "file"
+    }
+    return content
 }
+
 
 func normalProcess(content) {
     if fuzzSearch {
@@ -83,51 +81,55 @@ func normalProcess(content) {
     }
 }
 func fileProcess(content) {
-    return sprintf(`<getFullFileName(filename="**%s**")>`, content)
-}
-func processContent(content) {
-    content = str.TrimSpace(content)
-    // call
-    if syntaxFlowInfo.kind == "const" {
+    if fuzzSearch {
+        return sprintf("**%s**", content)
+    } else {
         return content
     }
-
-
-    if re.Match(`(\b[a-zA-Z_]\w*)\(`, content) {
-        syntaxFlowInfo.kind = "call"
-        return matchCallMethodName(content)
-    }
-
-
-
-
-//file
-    if re.Match(`[/|\\]`, content) {
-        syntaxFlowInfo.kind = "file"
-    }
-
-
-    return content
 }
-templateMap = map[string]any{"const": normalProcess, "file": fileProcess, "function": normalProcess, "call": normalProcess, "symbol": normalProcess}
+
+
+templateMap = map[string]any{
+    "const": (i) => {
+        i = normalProcess(i)
+        return sprintf(`g<<<CODE
+%s
+CODE as $const`, i)
+    }, 
+    "file": (i) =>{
+        i = fileProcess(i)
+        return sprintf(`<getFullFileName(filename="%s")> as $file`, i)
+    }, 
+    "function": (i) => {
+        i = normalProcess(i)
+        return sprintf(`%s?{opcode: function} as $function`, i)
+    }, 
+    "call": (i) => {
+        i = normalProcess(i)
+        return sprintf(`%s() as $call`, i)
+    }, 
+    "symbol": (i) => {
+        i = normalProcess(i)
+        return sprintf(`%s as $symbol`, i)
+    },
+}
+
 
 rule = processContent(rule)
-if syntaxFlowInfo.kind != "all" {
-    f = templateMap[syntaxFlowInfo.kind]
+if kind != "all" {
+    f = templateMap[kind]
     if f == nil {
         yakit.Error("get template render fail")
         return
     }
     rule = f(rule)
-    rule = syntaxFlowInfo.render(generateRule(syntaxFlowInfo.kind, rule))
 } else {
     targetRule := ""
     for k, f := range templateMap {
         tmprule = f(rule)
-        tmprule = syntaxFlowInfo.render(generateRule(k, tmprule))
-        targetRule += tmprule
+        targetRule += tmprule + "\n"
     }
-
+    targetRule += "$const + $file + $function + $call + $symbol as $all"
     rule = targetRule
 }
 
@@ -143,6 +145,7 @@ result = prog.SyntaxFlowWithError(
         yakit.Info("%s", s)
     }),
     syntaxflow.withSearch(),
+    syntaxflow.withCache(),
 )~
 result.Show()
 yakit.Output(result.GetResultID())
