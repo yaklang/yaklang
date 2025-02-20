@@ -1,6 +1,8 @@
 package lowhttp
 
 import (
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
 )
@@ -73,4 +75,19 @@ Content-Type: image/png
 			tt.wantRes(t, res)
 		})
 	}
+}
+
+func TestCheckLowHttpAutoFixFlag(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Disposition: attachment; filename="example.pdf"
+
+%PDF-1.4
+%âãÏÓ
+%%EOF
+`))
+
+	rsp, err := HTTP(WithHost(host), WithPort(port))
+	require.NoError(t, err)
+	require.True(t, rsp.FixContentType)
 }

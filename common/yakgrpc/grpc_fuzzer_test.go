@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"net/http"
+	"net/http/httputil"
 	"sort"
 	"strings"
 	"testing"
@@ -1552,4 +1553,36 @@ Host: %s:%d
 		}
 	})
 
+}
+
+func TestWebFuzzerAutoFixHeaderFlag(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Disposition: attachment; filename="example.pdf"
+
+%PDF-1.4
+%âãÏÓ
+%%EOF`))
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", host, port), nil)
+	require.NoError(t, err)
+	dumpRequest, err := httputil.DumpRequest(req, false)
+	require.NoError(t, err)
+	fuzzer, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		RequestRaw: dumpRequest,
+	})
+	require.NoError(t, err)
+	flag := false
+	for {
+		recv, err := fuzzer.Recv()
+		if err != nil {
+			break
+		}
+		if recv.IsAutoFixContentType {
+			flag = true
+			break
+		}
+	}
+	require.True(t, flag)
 }
