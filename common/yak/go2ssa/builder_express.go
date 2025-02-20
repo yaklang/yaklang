@@ -2,6 +2,7 @@ package go2ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils"
 
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
@@ -204,6 +205,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 						rv = b.ReadMemberCallValueByName(rv, n)
 						if rv == nil {
 							b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
+							return
 						}
 						if key := a.GetKeybyName(test); key != nil {
 							handleObjectType(rv, a)
