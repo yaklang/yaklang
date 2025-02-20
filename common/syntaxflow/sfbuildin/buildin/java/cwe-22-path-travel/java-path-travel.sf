@@ -30,7 +30,7 @@ $sink #{
     include:`<self> & $source`,
 }->as $result;
 
-$result - $high -> as $low;
+$result - $high as $low;
 alert $low for {
     message: "Java代码中可能存在路径穿越漏洞。",
     type: vuln,
