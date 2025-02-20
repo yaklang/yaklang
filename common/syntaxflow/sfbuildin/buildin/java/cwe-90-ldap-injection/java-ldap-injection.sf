@@ -15,13 +15,24 @@ InitialDirContext()?{<typeName>?{have:'javax.naming'}}.search(*?{<typeName>?{hav
 check $sink;
 
 $sink #{
-    include:`<self> & $source`,
-    exclude:`<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`
+    include:`* & $source`,
+    exclude:`*?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
+    exclude:`*?{opcode:phi}`,
 }->as $high;
 
 alert $high for {
-    message: "Find LDAP direct injection vulnerability",
+    message: "发现Java代码中存在LDAP注入漏洞，并且数据流中间没有进行任何过滤。",
     level: high,
+};
+
+$sink #{
+    include:`<self> & $source`,
+}->as $result;
+
+$result - $high -> as $low;
+alert $low for {
+    message: "发现Java代码中可能存在LDAP注入漏洞。",
+    level: low,
 };
 
 desc(

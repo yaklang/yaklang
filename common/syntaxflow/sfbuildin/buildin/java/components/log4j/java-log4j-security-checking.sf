@@ -26,13 +26,24 @@ $sinkFunc?{<typeName>?{have:'org.apache.logging.log4j'}}(* as $sink) ;
 check $sink;
 
 $sink #{
-    include:`<self> & $source`,
-    exclude:`<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
+    include:`* & $source`,
+    exclude:`* ?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
 }->as $high;
 
 alert $high for {
-    message: "Find Log4j direct jndi injection vulnerability",
+    message: "发现Java代码中存在Log4j远程代码执行漏洞，并且数据流中间没有进行任何过滤。",
     level: high,
+    risk: "rce",
+};
+
+$sink #{
+    include:`<self> & $source`,
+}->as $result;
+
+$result - $high -> as $low;
+alert $low for {
+    message: "发现Java代码中可能存在Log4j远程代码执行漏洞。",
+    level: low,
     risk: "rce",
 };
 

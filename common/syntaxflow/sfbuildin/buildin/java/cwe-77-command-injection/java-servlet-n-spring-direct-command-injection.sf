@@ -29,10 +29,10 @@ $sink #{
     include:`<self> & $source`,
 }->as $result;
 
-$result - $high -> as $mid;
+$result - $high -> as $low;
 alert $mid for{
     message: "发现Java代码中可能存在命令注入漏洞。",
-    level: mid,
+    level: low,
 };
 
 desc(
@@ -140,7 +140,7 @@ EOF
 
 desc(
     lang:java,
-    alert_mid:1,
+    alert_num:1,
     "file://complexDemo1.java":<<<EOF
     package com.example;
 
