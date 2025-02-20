@@ -1,0 +1,59 @@
+desc(
+    title: "check file read function",
+    type: audit,
+    level: info,
+    lib: 'golang-file-read-ioutil',
+    desc: <<<TEXT
+在Go语言中，`io/ioutil` 包提供了便捷的文件读写功能。然而，`ioutil.ReadAll` 和 `ioutil.ReadFile` 函数在读取大文件时可能会导致内存占用过高，因为它们会将整个文件内容一次性加载到内存中。这可能会导致性能问题，尤其是在处理大型文件时。此外，随着Go语言的演进，`io/ioutil` 包中的部分功能已被标记为废弃，推荐使用 `os` 和 `io` 包中的相应功能来代替，如 `os.ReadFile` 和使用 `io.ReadFull` 与 `io.Reader` 接口来处理文件读取。
+TEXT
+)
+
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
+$entry.ReadAll <getCall> <getMembers> as $output
+$entry.ReadFile <getCall> <getMembers> as $output
+
+$entry.ReadAll(* #-> as $output) 
+$entry.ReadFile(* #-> as $output)
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://fileread.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+)
+
+func main() {
+	// 要写入的文件名
+	fileName := "example.txt"
+
+	// 写入数据到文件
+	data := []byte("Hello, Go Programming!\nThis is a simple file I/O example.")
+	err := ioutil.WriteFile(fileName, data, 0644) // 0644 是文件权限
+	if err != nil {
+		log.Fatalf("Error writing to file: %s", err)
+		return
+	}
+	fmt.Println("Data written to file successfully.")
+
+	// 读取文件内容
+	content, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		log.Fatalf("Error reading from file: %s", err)
+		return
+	}
+
+	// 打印文件内容
+	fmt.Println("File content:")
+	fmt.Println(string(content))
+}
+
+PARAM
+)

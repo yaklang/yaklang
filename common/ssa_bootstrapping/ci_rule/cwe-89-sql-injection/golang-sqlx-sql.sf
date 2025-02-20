@@ -1,0 +1,72 @@
+desc(
+    title: "golang SQL Injection(sqlx)",
+    type: audit,
+    severity: high,
+    desc: <<<TEXT
+SQL注入漏洞允许攻击者通过操纵应用程序的SQL查询来执行任意SQL代码。在Go语言中使用sqlx库时，如果直接将用户输入拼接到SQL查询字符串中，而没有进行适当的输入验证或参数化查询，就可能导致SQL注入漏洞。这会使攻击者能够绕过正常的认证和授权机制，访问、修改或删除数据库中的敏感数据。
+TEXT
+)
+
+<include('golang-database-sqlx')> as $sink;
+$sink.Select(, * #-> as $param);
+$param?{have: 'Parameter'} as $high;
+
+alert $high for {
+    title: 'SQL Injection detected',
+    title_zh: '检测到SQL注入',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"net/http"
+
+	"github.com/jmoiron/sqlx"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	// 连接到数据库
+	dsn := "user:password@tcp(localhost:3306)/dbname"
+	db, err := sqlx.Connect("mysql", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 不安全的查询
+	var users []User
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	err = db.Select(&users, query)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+UNSAFE
+)

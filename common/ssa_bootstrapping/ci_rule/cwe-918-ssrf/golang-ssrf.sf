@@ -1,0 +1,66 @@
+desc(
+    title: "golang SSRF",
+    type: audit,
+    severity: high,
+    desc: <<<TEXT
+服务器端请求伪造（Server-Side Request Forgery, SSRF）漏洞允许攻击者诱导服务器对内部或外部网络地址发起请求。在Go语言应用中，如果应用从用户输入中读取URL并直接发起HTTP请求，而没有对URL进行充分的验证和过滤，就可能导致SSRF漏洞。攻击者可以利用此漏洞绕过防火墙、扫描内网、攻击内网其他应用或进行端口扫描等，从而获取敏感信息或进一步控制服务器。
+TEXT
+)
+
+<include('golang-http-sink')> as $output;
+$output.URL.Query().Get() #-> as $sink;
+$sink?{have: 'Parameter'} as $high
+
+alert $high for {
+    title: 'SSRF detected',
+    title_zh: '检测到SSRF',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	// 从查询参数获取 URL
+	url := r.URL.Query().Get("url")
+
+	// 发送请求
+	resp, err := http.Get(url)
+	if err != nil {
+		http.Error(w, "Error fetching URL", http.StatusBadRequest)
+		return
+	}
+	defer resp.Body.Close()
+
+	// 读取响应
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Error reading response", http.StatusInternalServerError)
+		return
+	}
+
+	// 返回响应内容
+	w.Write(body)
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+	fmt.Println("Server is running on :8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		fmt.Println("Failed to start server:", err)
+		os.Exit(1)
+	}
+}
+UNSAFE
+)

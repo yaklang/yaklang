@@ -1,0 +1,75 @@
+desc(
+    title: "check file database function",
+    type: audit,
+    level: info,
+    lib: 'golang-database-gorm',
+    desc: <<<TEXT
+此规则旨在审计使用GORM（Go Object-Relational Mapping）库进行数据库操作的文件。GORM是一个流行的Go语言ORM库，它简化了数据库操作，包括连接数据库、迁移模式、CRUD（创建、读取、更新、删除）操作等。通过审计这些操作，可以确保数据库交互代码的正确性和安全性，例如检查是否存在SQL注入风险、连接管理是否得当、错误处理是否完善等。这有助于维护数据库的完整性和应用程序的稳定性。
+TEXT
+)
+
+gorm?{<fullTypeName>?{have: 'gorm.io/gorm'}} as $entry;
+$entry.Open <getCall> as $db;
+$db <getMembers> as $output;
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://database.go': <<<PARAM
+package main
+
+import (
+    "gorm.io/driver/sqlite"
+    "gorm.io/gorm"
+    "log"
+)
+
+// User 定义用户模型
+type User struct {
+    ID   uint    // 主键
+    Name string  // 用户名
+    Age  int     // 年龄
+}
+
+func main() {
+    // 连接到 SQLite 数据库
+    db, err := gorm.Open(sqlite.Open("example.db"), &gorm.Config{})
+    if err != nil {
+        log.Fatal("failed to connect database:", err)
+    }
+
+    // 自动迁移，创建表
+    err = db.AutoMigrate(&User{})
+    if err != nil {
+        log.Fatal("failed to migrate:", err)
+    }
+
+    // 插入用户数据
+    user1 := User{Name: "Alice", Age: 30}
+    user2 := User{Name: "Bob", Age: 25}
+
+    db.Create(&user1)
+    db.Create(&user2)
+
+    // 查询所有用户
+    var users []User
+    db.Find(&users)
+
+    // 打印用户信息
+    log.Println("Users:")
+    for _, user := range users {
+        log.Printf("ID: %d, Name: %s, Age: %d\n", user.ID, user.Name, user.Age)
+    }
+
+    // 更新用户信息
+    db.Model(&user1).Update("Age", 31)
+
+    // 删除用户
+    db.Delete(&user2)
+}
+
+
+PARAM
+)
