@@ -45,16 +45,6 @@ system(* #-> * as $target)`,
 		)
 	})
 
-	/*FIXME: this is a bug,
-	should contain bash,
-	bash have two dataflow path:
-		1. phi -> bash
-		2. phi -> add -> bash
-	but in v.GetDataFlowPath(), bash get all path:
-		(phi, add, bash)
-	and then exclude rule will exclude "bash" in result
-	*/
-	// TODO :缺少边 bash --effectOn--> phi(cmd)
 	t.Run("simple exclude", func(t *testing.T) {
 		ssatest.Check(t, `
 		f = (para) => {
@@ -88,7 +78,7 @@ EXCLUDE
 }->  as $target)`,
 			map[string][]string{
 				"target": {
-					// `"bash"`,
+					`"bash"`,
 					`Parameter-para`,
 					`"ls"`,
 				},

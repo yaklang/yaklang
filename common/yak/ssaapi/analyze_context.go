@@ -8,9 +8,10 @@ import (
 )
 
 type objectItem struct {
-	object *Value
-	key    *Value
-	member *Value
+	object       *Value
+	key          *Value
+	member       *Value
+	recoverIntra func()
 }
 
 type AnalyzeContext struct {
@@ -20,33 +21,48 @@ type AnalyzeContext struct {
 	depth                       int
 	haveBeenReachedDepthLimited bool
 	// cross process
-	crossProcess *crossProcess
-	_valueStack  utils.Stack[*Value]
-	_causeValue  *Value
+	analysisManager *processAnalysisManager
+	_valueStack     utils.Stack[*Value]
+	_causeValue     *Value
 	//object
 	_objectStack *utils.Stack[objectItem]
 }
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	actx := &AnalyzeContext{
-		crossProcess: newCrossProcessTable(),
-		_objectStack: utils.NewStack[objectItem](),
-		config:       NewOperations(opt...),
-		depth:        -1,
+		analysisManager: newAnalysisManager(),
+		_objectStack:    utils.NewStack[objectItem](),
+		config:          NewOperations(opt...),
+		depth:           -1,
 	}
 	return actx
 }
 
-func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
-	// cross process
+func (a *AnalyzeContext) pushValue(v *Value) {
 	a._valueStack.Push(v)
-	recoverCrossProcess := a.tryCrossProcess()
+}
+
+func (a *AnalyzeContext) popValue() *Value {
+	return a._valueStack.Pop()
+}
+
+func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
+	a.pushValue(v)
+	// 跨过程分析
+	recoverCrossProcess := a.crossProcess()
+	// 过程内分析
+	needVisited, recoverIntraProcess := a.theValueShouldBeVisited(v)
 	recoverStack = func() {
+		a.popValue()
 		recoverCrossProcess()
-		a._valueStack.Pop()
+		recoverIntraProcess()
 	}
-	// depth limited check
+	if !needVisited {
+		return true, recoverStack
+	}
+
 	needExit = true
+	// depth limited check
 	if a.haveBeenReachedDepthLimited {
 		log.Warnf("reached depth limit,stop it")
 		return
@@ -71,12 +87,11 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	return
 }
 
-func (a *AnalyzeContext) tryCrossProcess() func() {
+func (a *AnalyzeContext) crossProcess() func() {
 	defer func() {
 		a._causeValue = nil
 	}()
 
-	var recoverCrossProcess func()
 	if a._valueStack.Len() > 1 {
 		currentValue := a._valueStack.Peek()
 		lastValue := a._valueStack.PeekN(1)
@@ -85,24 +100,13 @@ func (a *AnalyzeContext) tryCrossProcess() func() {
 			// remove the causeValue in current process stack info from the visited table.
 			// Because causeValue is the information of the next layer's process stack info.
 			if a._causeValue != nil {
-				a.crossProcess.deleteCurrentCauseValue(a._causeValue)
+				a.analysisManager.deleteCurrentCauseValue(a._causeValue)
 			}
 			hash := a.calcCrossProcessHash(lastValue, currentValue)
-			recoverCrossProcess = a.crossProcess.Cross(hash, a._causeValue)
+			return a.analysisManager.CrossProcess(hash, a._causeValue)
 		}
 	}
-
-	recoverWithinProcess := a.crossProcess.nextNode()
-	return func() {
-		// recover cross process
-		if recoverCrossProcess != nil {
-			recoverCrossProcess()
-		}
-		// recover within process
-		if recoverWithinProcess != nil {
-			recoverWithinProcess()
-		}
-	}
+	return func() {}
 }
 
 // needCrossProcess If the SSA-ID of the function from-value and to-value is different,
@@ -137,40 +141,40 @@ func (a *AnalyzeContext) hook(i *Value) error {
 }
 
 func (a *AnalyzeContext) getRecursiveCounter() int64 {
-	return atomic.LoadInt64(&a.crossProcess._recursiveCounter)
+	return atomic.LoadInt64(&a.analysisManager._recursiveCounter)
 }
 
 func (a *AnalyzeContext) enterRecursive() {
-	atomic.AddInt64(&a.crossProcess._recursiveCounter, 1)
+	atomic.AddInt64(&a.analysisManager._recursiveCounter, 1)
 }
 
-func (a *AnalyzeContext) haveTheCrossProcess(next *Value) bool {
+func (a *AnalyzeContext) haveCrossProcess(next *Value) bool {
 	if a._valueStack.Len() == 0 {
 		return false
 	}
 	lastValue := a._valueStack.Peek()
 	hash := a.calcCrossProcessHash(lastValue, next)
-	return a.crossProcess.crossProcessMap.Have(hash)
+	return a.analysisManager.crossProcessMap.Have(hash)
 }
 
 func (a *AnalyzeContext) getLastCauseValue() *Value {
-	cp := a.crossProcess
+	cp := a.analysisManager
 	if cp.crossProcessStack.Len() <= 0 {
 		return nil
 	}
-	info, ok := cp.getCurrentProcessInfo()
+	current, ok := cp.getCurrentIntraProcess()
 	if !ok {
 		return nil
 	}
-	return info.causeValue
+	return current.causeValue
 }
 
-func (a *AnalyzeContext) theValueShouldBeVisited(i *Value) bool {
-	return a.crossProcess.valueShould(i)
+func (a *AnalyzeContext) theValueShouldBeVisited(i *Value) (bool, func()) {
+	return a.analysisManager.valueShould(i)
 }
 
-func (a *AnalyzeContext) theObjectShouldBeVisited(object, key, member *Value) bool {
-	return a.crossProcess.objectShould(object, key, member)
+func (a *AnalyzeContext) theObjectShouldBeVisited(object, key, member *Value) (bool, func()) {
+	return a.analysisManager.objectShould(object, key, member)
 }
 
 func (a *AnalyzeContext) calcCrossProcessHash(from *Value, to *Value) string {
@@ -214,13 +218,15 @@ func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
 	if !obj.IsObject() {
 		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.node)
 	}
-	if !g.theObjectShouldBeVisited(obj, key, member) {
+	shouldVisited, recoverIntra := g.theObjectShouldBeVisited(obj, key, member)
+	if !shouldVisited {
 		return utils.Errorf("This make object(%d) key(%d) member(%d) valueVisited, skip", obj.GetId(), key.GetId(), member.GetId())
 	}
 	g._objectStack.Push(objectItem{
-		object: obj,
-		key:    key,
-		member: member,
+		object:       obj,
+		key:          key,
+		member:       member,
+		recoverIntra: recoverIntra,
 	})
 	return nil
 }
@@ -230,6 +236,7 @@ func (g *AnalyzeContext) popObject() (*Value, *Value, *Value) {
 		return nil, nil, nil
 	}
 	item := g._objectStack.Pop()
+	item.recoverIntra()
 	return item.object, item.key, item.member
 }
 

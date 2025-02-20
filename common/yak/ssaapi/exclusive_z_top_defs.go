@@ -73,9 +73,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		return i.getTopDefs(actx, opt...)
 	}
 
-	reachDepthLimit, recoverStack := actx.check(i)
+	shouldExit, recoverStack := actx.check(i)
 	defer recoverStack()
-	if reachDepthLimit {
+	if shouldExit {
 		return Values{i}
 	}
 	err := actx.hook(i)
@@ -83,9 +83,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		return Values{i}
 	}
 
-	if !actx.theValueShouldBeVisited(i) {
-		return Values{}
-	}
 	checkObject := func() Values {
 		obj, key, member := actx.getCurrentObject()
 		_ = obj
