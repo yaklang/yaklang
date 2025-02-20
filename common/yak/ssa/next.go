@@ -10,6 +10,10 @@ func newNextType(iterType Type, isIn bool) Type {
 	typ := NewStructType()
 	typ.AddField(NextOk, BasicTypes[BooleanTypeKind])
 
+	if a, ok := iterType.(*AliasType); ok {
+		iterType = a.elem
+	}
+
 	switch iterType.GetTypeKind() {
 	case SliceTypeKind:
 		it := iterType.(*ObjectType)
