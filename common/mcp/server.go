@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/yakgrpc"
@@ -14,6 +15,8 @@ type MCPServer struct {
 	server     *server.MCPServer
 	sseServer  *server.SSEServer
 	grpcClient ypb.YakClient
+	profileDB  *gorm.DB
+	projectDB  *gorm.DB
 
 	sseMu sync.Mutex
 }
@@ -32,6 +35,7 @@ func NewMCPServer() *MCPServer {
 	s.registerHTTPFlowTool()
 	s.registerCodecTool()
 	s.registerYakDocumentTool()
+	s.registerPayloadTool()
 
 	s.server.AddNotificationHandler("notification", s.handleNotification)
 	return s
