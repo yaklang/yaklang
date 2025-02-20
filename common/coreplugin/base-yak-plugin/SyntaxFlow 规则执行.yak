@@ -26,6 +26,7 @@ res, err := prog.SyntaxFlowWithError(ruleContext,
         yakit.Info("%s",s)
     }), 
     syntaxflow.withSave(), 
+    syntaxflow.withCache(),
 )
 
 if err != nil {
