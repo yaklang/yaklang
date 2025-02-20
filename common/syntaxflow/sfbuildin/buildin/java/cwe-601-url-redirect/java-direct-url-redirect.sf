@@ -1,6 +1,6 @@
 desc(
-    title: "Check Java Direct URL Redirect Vulnerability",
-    title_zh: "检测Java直接URL重定向漏洞",
+    title: "Check Java URL Redirect Vulnerability",
+    title_zh: "检测Java URL重定向漏洞",
     type:vuln,
     risk_type:"url-redirect",
     desc:<<<TEXT
@@ -19,14 +19,22 @@ RedirectView?{<typeName>?{have:'org.springframework.web.servlet.view'}}(,* as $s
 check $sink;
 
 $sink #{
-    include:`<self> & $source`,
-    exclude:`<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`
+    include:`* & $source`,
+    exclude:`*?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
+    exclude:`*?{opcode:phi}`,
 }->as $result;
 
 alert $result for {
     message: "Find direct URL redirect vulnerability for java",
     type: vuln,
     level: high,
+};
+
+$source - $result -> as $low;
+alert $low for {
+    message: "Find possible URL redirect vulnerability for java",
+    type: vuln,
+    level: low,
 };
 
 desc(

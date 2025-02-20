@@ -29,11 +29,12 @@ alert $high for {
 $sink #{
     include:`<self> & $source`,
 }->as $result;
-$result - $high -> as $mid;
-alert $mid for {
+
+$result - $high -> as $low;
+alert $low for {
     message: "Java代码中可能存在路径穿越漏洞。",
     type: vuln,
-    level: mid,
+    level: low,
 };
 
 desc(
@@ -124,7 +125,7 @@ EOF
 )
 
 desc(
-    alert_mid:1,
+    alert_low:1,
     "file://complex1.java": <<<EOF
     package com.ruoyi.web.controller.common;
 
