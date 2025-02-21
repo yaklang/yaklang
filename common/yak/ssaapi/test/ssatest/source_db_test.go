@@ -81,3 +81,17 @@ func TestSourceWithInclude_PHP(t *testing.T) {
 	include 'b.php';`)
 	checkSource(vf, t)
 }
+
+func TestMarshalInstruction(t *testing.T) {
+	t.Run("type cast", func(t *testing.T) {
+		code := `
+		<?php
+		$a = (int) 1;
+		println($a);
+		`
+		CheckSyntaxFlow(t, code, `println(* as $para); $para #-> as $top`, map[string][]string{
+			"para": {"castType(number, 1)"},
+			"top":  {"1"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+}

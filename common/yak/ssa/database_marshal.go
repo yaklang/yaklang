@@ -286,9 +286,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		}
 		params["switch_label"] = fetchIds(ret.Label)
 	case *TypeCast:
-		if ret.Value != nil {
-			params["typecast_value"] = ret.Value.GetId()
-		}
+		params["typecast_value"] = ret.Value.GetId()
 	case *TypeValue:
 		// nothing to do
 	case *UnOp:
@@ -591,6 +589,9 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			ret.hasEllipsis = hasEllipsis
 		}
 	case *ExternLib:
+
+	case *TypeCast:
+		ret.Value = unmarshalValue(params["typecast_value"])
 
 	default:
 		// log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())
