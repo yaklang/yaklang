@@ -1,15 +1,15 @@
 name: Diff-Code-Check
 on:
   workflow_run:
-    workflows: ["Essential Tests"]
+    workflows: [ "Essential Tests" ]
     types:
       - completed
 jobs:
   setup:
     runs-on: ubuntu-20.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Cache YakLang Project
-        if: ${{ github.event.workflow_run.conclusion == 'success' }}
         uses: actions/cache@v3
         id: cache-project
         with:
