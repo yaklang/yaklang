@@ -6,7 +6,7 @@ import (
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"time"
@@ -85,11 +85,11 @@ func QueryNSEx(client *dns.Client, ctx context.Context, target string, servers [
 }
 
 func QueryIPAll(target string, timeout time.Duration, dnsServers []string) []string {
-	return netx.LookupAll(target, netx.WithTimeout(timeout), netx.WithDNSServers(dnsServers...))
+	return dns_lookup.LookupAll(target, dns_lookup.WithTimeout(timeout), dns_lookup.WithDNSServers(dnsServers...))
 }
 
 func QueryIP(target string, timeout time.Duration, dnsServers []string) string {
-	return netx.LookupFirst(target, netx.WithTimeout(timeout), netx.WithDNSServers(dnsServers...))
+	return dns_lookup.LookupFirst(target, dns_lookup.WithTimeout(timeout), dns_lookup.WithDNSServers(dnsServers...))
 }
 
 func QueryTxt(target string, timeout time.Duration, nameServers []string) []string {

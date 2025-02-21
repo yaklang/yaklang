@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"io"
 	"net"
 	"net/http"
@@ -223,6 +224,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		maxContentLength     = option.MaxContentLength
 		randomJA3FingerPrint = option.RandomJA3FingerPrint
 		clientHelloSpec      = option.ClientHelloSpec
+		useNetStackVM        = option.UseNetStackVM
+		netStackVM           = option.NetStackVM
 	)
 	if reqIns == nil {
 		// create new request instance for httpctx
@@ -565,20 +568,25 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	dialTraceInfo := netx.NewDialXTraceInfo()
 	dialopts = append(
 		dialopts,
+		netx.DialX_WithUseNetStackVM(useNetStackVM),
 		netx.DialX_WithTimeoutRetry(maxRetryTimes),
 		netx.DialX_WithTimeoutRetryWaitRange(
 			retryWaitTime,
 			retryMaxWaitTime,
 		),
 		netx.DialX_WithDNSOptions(
-			netx.WithDNSOnFinished(func() {
+			dns_lookup.WithDNSOnFinished(func() {
 				dnsEnd = time.Now()
 			}),
-			netx.WithDNSServers(dnsServers...),
-			netx.WithTemporaryHosts(dnsHosts),
+			dns_lookup.WithDNSServers(dnsServers...),
+			dns_lookup.WithTemporaryHosts(dnsHosts),
 		),
 		netx.DialX_WithDialTraceInfo(dialTraceInfo),
 	)
+
+	if netStackVM != nil {
+		dialopts = append(dialopts, netx.DialX_WithNetStackVM(netStackVM))
+	}
 
 	if option.OverrideEnableSystemProxyFromEnv {
 		dialopts = append(dialopts, netx.DialX_WithEnableSystemProxyFromEnv(option.EnableSystemProxyFromEnv))

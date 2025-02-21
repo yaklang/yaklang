@@ -1,4 +1,4 @@
-package netx
+package dns_lookup
 
 import (
 	"context"

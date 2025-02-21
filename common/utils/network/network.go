@@ -1,11 +1,11 @@
 package network
 
 import (
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -32,7 +32,7 @@ func ParseStringToCClassHosts(targets string) string {
 			target = append(target, r)
 			continue
 		}
-		ip := netx.LookupFirst(r, netx.WithTimeout(5*time.Second))
+		ip := dns_lookup.LookupFirst(r, dns_lookup.WithTimeout(5*time.Second))
 		if ip != "" && utils.IsIPv4(ip) {
 			netStr, err := utils.IPv4ToCClassNetwork(ip)
 			if err != nil {

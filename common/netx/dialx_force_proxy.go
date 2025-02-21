@@ -17,7 +17,7 @@ import (
 var ErrorProxyAuthFailed = utils.Error("invalid proxy username or password")
 
 func DialTCPTimeoutForceProxy(timeout time.Duration, target string, proxy string) (net.Conn, error) {
-	return connectForceProxy(nil, target, proxy, timeout)
+	return connectForceProxy(nil, target, proxy, &dialXConfig{Timeout: timeout})
 }
 
 func UnsetProxyFromEnv() {
@@ -34,7 +34,7 @@ func UnsetProxyFromEnv() {
 
 func DialContext(ctx context.Context, target string, proxies ...string) (net.Conn, error) {
 	if proxies := utils.StringArrayFilterEmpty(proxies); len(proxies) <= 0 {
-		return DialContextWithoutProxy(ctx, "tcp", target)
+		return DialContextWithoutProxy(ctx, target)
 	} else {
 		for _, proxy := range proxies {
 			conn, err := getConnForceProxyContext(ctx, target, proxy)
@@ -48,86 +48,75 @@ func DialContext(ctx context.Context, target string, proxies ...string) (net.Con
 	}
 }
 
-func getConnForceProxy(target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
-	return connectForceProxy(context.Background(), target, proxy, connectTimeout)
+func getConnForceProxy(target string, proxy string, config *dialXConfig) (net.Conn, error) {
+	return connectForceProxy(context.Background(), target, proxy, config)
 }
 
 func getConnForceProxyContext(ctx context.Context, target, proxy string) (net.Conn, error) {
-	return connectForceProxy(ctx, target, proxy, 10*time.Second)
+	return connectForceProxy(ctx, target, proxy, &dialXConfig{
+		Timeout: 10 * time.Second,
+	})
 }
 
-func connectForceProxy(ctx context.Context, target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
-	// use dialx
-	// remember disallow proxy!!!
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	ctx, _ = context.WithTimeout(ctx, connectTimeout)
-
-	host, port, _ := utils.ParseStringToHostPort(proxy)
-	if host == "" || port <= 0 {
-		return nil, utils.Errorf("proxy need host:port... at least[%v]", proxy)
-	}
-
-	proxyAddr := utils.HostPort(host, port)
-	username, password := parseProxyCredential(proxy)
-	credential := fmt.Sprintf("%s:%s", username, password)
-
-	switch true {
-	case utils.IHasPrefix(proxy, "https://"):
-		return httpProxyDial(ctx, proxyAddr, username, credential, proxy, target, true)
-	case utils.IHasPrefix(proxy, "socks://"):
-		fallthrough
-	case utils.IHasPrefix(proxy, "socks5://"):
-		fallthrough
-	case utils.IHasPrefix(proxy, "s5://"):
-		conn, err := DialSocksProxy(ctx, SOCKS5, proxyAddr, username, password)("tcp", target)
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
-	case utils.IHasPrefix(proxy, "s4://") || utils.IHasPrefix(proxy, "socks4://"):
-		conn, err := DialSocksProxy(ctx, SOCKS4, proxyAddr, username, password)("tcp", target)
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
-	case utils.IHasPrefix(proxy, "s4a://") || utils.IHasPrefix(proxy, "socks4a://"):
-		conn, err := DialSocksProxy(ctx, SOCKS4A, proxyAddr, username, password)("tcp", target)
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
-	case utils.IHasPrefix(proxy, "http://"):
-		fallthrough
-	default:
-		return httpProxyDial(ctx, proxyAddr, username, credential, proxy, target, false)
-	}
+type ProxyCredential struct {
+	username  string
+	password  string
+	proxyAddr string
+	schema    string
+	proxyUrl  string
+	dialCfg   *dialXConfig
 }
 
-func httpProxyDial(ctx context.Context, proxyAddr string, username string, credential string, proxy string, target string, https bool) (net.Conn, error) {
-	httpsString := "https"
-	if !https {
-		httpsString = "http"
-	}
+func (c *ProxyCredential) dialProxyTCP(ctx context.Context, target string) (net.Conn, error) {
 	ddl, ok := ctx.Deadline()
 	timeout := 15 * time.Second
 	if ok {
 		timeout = ddl.Sub(time.Now())
 	}
-	conn, err := DialX(
-		proxyAddr,
+	return DialX(
+		target,
 		DialX_WithDisableProxy(true),
-		DialX_WithTLS(https),
+		DialX_WithTLS(c.schema == "https"),
 		DialX_WithTimeout(timeout),
+		DialX_WithUseNetStackVM(c.dialCfg.UseNetStackVM),
+		DialX_WithNetStackVM(c.dialCfg.NetStackVm),
 	)
+}
+
+func (c *ProxyCredential) getCredentialString() string {
+	return fmt.Sprintf("%s:%s", c.username, c.password)
+}
+
+func (c *ProxyCredential) proxyDial(ctx context.Context, target string) (net.Conn, error) {
+	switch strings.ToLower(c.schema) {
+	case "socks", "socks5", "s5":
+		return c.socksProxyDial(ctx, target, SOCKS5)
+	case "s4a":
+		return c.socksProxyDial(ctx, target, SOCKS4A)
+	case "s4", "socks4":
+		return c.socksProxyDial(ctx, target, SOCKS4)
+	default:
+		return c.httpProxyDial(ctx, target)
+	}
+}
+
+func (c *ProxyCredential) httpProxyDial(ctx context.Context, target string) (net.Conn, error) {
+	if target == "" {
+		target = "/"
+	}
+	schema := c.schema
+	if schema == "" {
+		schema = "http"
+	}
+	ddl, _ := ctx.Deadline()
+	conn, err := c.dialProxyTCP(ctx, c.proxyAddr)
 	if err != nil {
 		return nil, err
 	}
 	conn.SetDeadline(ddl)
-	if username != "" {
+	if c.username != "" {
 		// 有密码
-		_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, credential))
+		_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, c.getCredentialString()))
 	} else {
 		// 无密码
 		_, err = conn.Write(generateHTTPProxyConnect(target))
@@ -135,22 +124,58 @@ func httpProxyDial(ctx context.Context, proxyAddr string, username string, crede
 	if err = isHTTPConnectWork(conn); err == nil {
 		conn.SetDeadline(time.Time{}) // 置空取消 deadline
 		return conn, nil
+	} else {
+		conn.Close()
+		return nil, utils.Wrapf(err, "connect proxy(%s) [%s] failed", schema, c.proxyUrl)
 	}
-	conn.Close()
-	if err != nil {
-		return nil, utils.Wrapf(err, "connect proxy(%s) [%s] failed", httpsString, proxy)
-	}
-	return nil, utils.Errorf("connect proxy(%s) [%s] failed", httpsString, proxy)
 }
 
-func parseProxyCredential(proxyURL string) (string, string) {
+// DialSocksProxy returns the dial function to be used in http.Transport object.
+// Argument socksType should be one of SOCKS4, SOCKS4A and SOCKS5.
+// Argument proxy should be in this format "127.0.0.1:1080".
+func (c *ProxyCredential) socksProxyDial(ctx context.Context, target string, socksType int) (net.Conn, error) {
+	cfg := &config{Context: ctx, Proto: socksType, Host: c.proxyAddr, ProxyDialer: c.dialProxyTCP}
+	if c.username != "" {
+		cfg.Auth = &auth{c.username, c.password}
+	}
+	return cfg.dialFunc()(target)
+}
+
+func connectForceProxy(ctx context.Context, target string, proxy string, config *dialXConfig) (net.Conn, error) {
+	// use dialx
+	// remember disallow proxy!!!
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, _ = context.WithTimeout(ctx, config.Timeout)
+
+	host, port, _ := utils.ParseStringToHostPort(proxy)
+	if host == "" || port <= 0 {
+		return nil, utils.Errorf("proxy need host:port... at least[%v]", proxy)
+	}
+	credential, err := newProxyCredential(proxy, config)
+	if err != nil {
+		return nil, err
+	}
+
+	return credential.proxyDial(ctx, target)
+}
+
+func newProxyCredential(proxyURL string, cfg *dialXConfig) (*ProxyCredential, error) {
 	urlIns, err := url.Parse(proxyURL)
 	if err != nil {
-		return "", ""
+		return nil, utils.Errorf("parse proxy url failed: %v", err)
 	}
 	username := urlIns.User.Username()
 	password, _ := urlIns.User.Password()
-	return username, password
+	return &ProxyCredential{
+		username:  username,
+		password:  password,
+		proxyAddr: urlIns.Host,
+		schema:    strings.ToLower(urlIns.Scheme),
+		proxyUrl:  proxyURL,
+		dialCfg:   cfg,
+	}, nil
 }
 
 func isHTTPConnectWork(c net.Conn) error {
@@ -216,38 +241,9 @@ func ProxyCheck(proxy string, connectTimeout time.Duration) (net.Conn, error) { 
 		return nil, utils.Errorf("proxy need host:port... at least[%v]", proxy)
 	}
 
-	proxyAddr := utils.HostPort(host, port)
-	username, password := parseProxyCredential(proxy)
-	credential := fmt.Sprintf("%s:%s", username, password)
-
-	switch true {
-	case utils.IHasPrefix(proxy, "https://"):
-		return httpProxyDial(ctx, proxyAddr, username, credential, proxy, "/", true)
-	case utils.IHasPrefix(proxy, "socks://"):
-		fallthrough
-	case utils.IHasPrefix(proxy, "socks5://"):
-		fallthrough
-	case utils.IHasPrefix(proxy, "s5://"):
-		conn, err := dialSocksProxyCheckConfig(ctx, SOCKS5, proxyAddr, connectTimeout, username, password).dialSocks5("")
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
-	case utils.IHasPrefix(proxy, "s4://") || utils.IHasPrefix(proxy, "socks4://"):
-		conn, err := dialSocksProxyCheckConfig(ctx, SOCKS4, proxyAddr, connectTimeout, username, password).dialSocks4("")
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
-	case utils.IHasPrefix(proxy, "s4a://") || utils.IHasPrefix(proxy, "socks4a://"):
-		conn, err := dialSocksProxyCheckConfig(ctx, SOCKS4A, proxyAddr, connectTimeout, username, password).dialSocks4("")
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
-	case utils.IHasPrefix(proxy, "http://"):
-		fallthrough
-	default:
-		return httpProxyDial(ctx, proxyAddr, username, credential, proxy, "/", false)
+	credential, err := newProxyCredential(proxy, &dialXConfig{Timeout: connectTimeout})
+	if err != nil {
+		return nil, err
 	}
+	return credential.proxyDial(ctx, "")
 }

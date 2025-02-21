@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"io"
 	"net/http"
 	"os"
@@ -28,7 +29,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -230,7 +230,7 @@ func TestGRPCMUSTPASS_COMMON_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 		t.Fatal(err)
 	}
 	check := false
-	for _, i := range netx.NewDefaultReliableDNSConfig().SpecificDNSServers {
+	for _, i := range dns_lookup.NewDefaultReliableDNSConfig().SpecificDNSServers {
 		if !check {
 			if i == "127.0.0.1" {
 				check = true
@@ -242,7 +242,7 @@ func TestGRPCMUSTPASS_COMMON_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 	}
 	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	check = false
-	for _, i := range netx.NewDefaultReliableDNSConfig().SpecificDNSServers {
+	for _, i := range dns_lookup.NewDefaultReliableDNSConfig().SpecificDNSServers {
 		if !check {
 			if i == "127.0.0.1" {
 				check = true

@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net/url"
 	"strings"
 	"sync"
@@ -116,7 +117,7 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 
 			var lines []string
 			for _, dnsServer := range req.GetDNSServers() {
-				ips := netx.LookupAll(domain, netx.WithTimeout(timeout), netx.WithDNSServers(dnsServer))
+				ips := dns_lookup.LookupAll(domain, dns_lookup.WithTimeout(timeout), dns_lookup.WithDNSServers(dnsServer))
 				for _, i := range ips {
 					if utils.IsIPv4(i) {
 						lines = append(lines, fmt.Sprintf("%v =>    [A]: %v", dnsServer, i))
@@ -132,7 +133,7 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 				continue
 			}
 			for _, dnsServer := range systemDNS {
-				ips := netx.LookupAll(domain, netx.WithTimeout(timeout), netx.WithDNSServers(dnsServer))
+				ips := dns_lookup.LookupAll(domain, dns_lookup.WithTimeout(timeout), dns_lookup.WithDNSServers(dnsServer))
 				for _, i := range ips {
 					if utils.IsIPv4(i) {
 						lines = append(lines, fmt.Sprintf("SYSTEM: %v =>    [A]: %v", dnsServer, i))
@@ -293,24 +294,24 @@ func (s *Server) DiagnoseNetworkDNS(req *ypb.DiagnoseNetworkDNSRequest, server y
 	info(`start to check system dns resolver, fallbackTCP: false, fallbackDoH: false`)
 
 	var err error
-	err = netx.LookupCallback(domain, callback,
-		netx.WithDNSDisableSystemResolver(false),
-		netx.WithDNSFallbackTCP(false), netx.WithDNSPreferTCP(false),
-		netx.WithDNSFallbackDoH(false), netx.WithDNSPreferDoH(false),
-		netx.WithDNSNoCache(true),
+	err = dns_lookup.LookupCallback(domain, callback,
+		dns_lookup.WithDNSDisableSystemResolver(false),
+		dns_lookup.WithDNSFallbackTCP(false), dns_lookup.WithDNSPreferTCP(false),
+		dns_lookup.WithDNSFallbackDoH(false), dns_lookup.WithDNSPreferDoH(false),
+		dns_lookup.WithDNSNoCache(true),
 	)
 	if err != nil {
 		log.Errorf("yakdns.Lookup Failed: %s", err)
 	}
 
-	config := netx.NewDefaultReliableDNSConfig()
+	config := dns_lookup.NewDefaultReliableDNSConfig()
 	if len(config.SpecificDNSServers) > 0 {
 		info("start to check default dns servers: " + strings.Join(config.SpecificDNSServers, ", "))
-		err = netx.LookupCallback(domain, callback,
-			netx.WithDNSDisableSystemResolver(true),
-			netx.WithDNSFallbackTCP(false), netx.WithDNSPreferTCP(false),
-			netx.WithDNSFallbackDoH(false), netx.WithDNSPreferDoH(false),
-			netx.WithDNSNoCache(true),
+		err = dns_lookup.LookupCallback(domain, callback,
+			dns_lookup.WithDNSDisableSystemResolver(true),
+			dns_lookup.WithDNSFallbackTCP(false), dns_lookup.WithDNSPreferTCP(false),
+			dns_lookup.WithDNSFallbackDoH(false), dns_lookup.WithDNSPreferDoH(false),
+			dns_lookup.WithDNSNoCache(true),
 		)
 		if err != nil {
 			log.Errorf("yakdns.Lookup Failed: %s", err)
@@ -321,11 +322,11 @@ func (s *Server) DiagnoseNetworkDNS(req *ypb.DiagnoseNetworkDNSRequest, server y
 
 	if len(config.SpecificDoH) > 0 {
 		info("start to check prefer doh dns servers: " + strings.Join(config.SpecificDoH, ", "))
-		err = netx.LookupCallback(domain, callback,
-			netx.WithDNSDisableSystemResolver(true),
-			netx.WithDNSFallbackTCP(false), netx.WithDNSPreferTCP(false),
-			netx.WithDNSServers(), netx.WithDNSNoCache(true),
-			netx.WithDNSFallbackDoH(false), netx.WithDNSPreferDoH(true),
+		err = dns_lookup.LookupCallback(domain, callback,
+			dns_lookup.WithDNSDisableSystemResolver(true),
+			dns_lookup.WithDNSFallbackTCP(false), dns_lookup.WithDNSPreferTCP(false),
+			dns_lookup.WithDNSServers(), dns_lookup.WithDNSNoCache(true),
+			dns_lookup.WithDNSFallbackDoH(false), dns_lookup.WithDNSPreferDoH(true),
 		)
 		if err != nil {
 			log.Errorf("yakdns.Lookup Failed: %s", err)
