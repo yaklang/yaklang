@@ -93,6 +93,10 @@ type PocConfig struct {
 
 	ClientHelloSpec *utls.ClientHelloSpec
 	RandomJA3       bool
+
+	GmTLS       bool
+	GmTLSOnly   bool
+	GmTLSPrefer bool
 }
 
 func (c *PocConfig) IsHTTPS() bool {
@@ -207,6 +211,15 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 
 	if c.RandomJA3 {
 		opts = append(opts, lowhttp.WithRandomJA3FingerPrint(c.RandomJA3))
+	}
+	if c.GmTLSOnly {
+		opts = append(opts, lowhttp.WithGmTLSOnly(c.GmTLSOnly))
+	}
+	if c.GmTLS {
+		opts = append(opts, lowhttp.WithGmTLS(c.GmTLS))
+	}
+	if c.GmTLSPrefer {
+		opts = append(opts, lowhttp.WithGmTLSPrefer(c.GmTLSPrefer))
 	}
 	return opts
 }
@@ -1785,6 +1798,24 @@ func WithCookieFull(c string, values ...any) PocConfigOption {
 	return WithReplaceHttpPacketHeader("Cookie", c)
 }
 
+func WithGmTls() PocConfigOption {
+	return func(c *PocConfig) {
+		c.GmTLS = true
+	}
+}
+
+func WithGmTlsOnly() PocConfigOption {
+	return func(c *PocConfig) {
+		c.GmTLSOnly = true
+	}
+}
+
+func WithGmTLSPrefer() PocConfigOption {
+	return func(c *PocConfig) {
+		c.GmTLSPrefer = true
+	}
+}
+
 var PoCExports = map[string]interface{}{
 	"HTTP":          HTTP,
 	"HTTPEx":        HTTPEx,
@@ -1837,6 +1868,9 @@ var PoCExports = map[string]interface{}{
 	"username":             WithUsername,
 	"password":             WithPassword,
 	"randomJA3":            WithRandomJA3,
+	"gmTls":                WithGmTls,
+	"gmTlsOnly":            WithGmTlsOnly,
+	"gmTLSPrefer":          WithGmTLSPrefer,
 
 	"json":       WithJSON,
 	"body":       WithBody,
