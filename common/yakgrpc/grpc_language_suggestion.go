@@ -3,16 +3,17 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -433,11 +434,10 @@ func _getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc 
 	if utils.IsNil(bareTyp) {
 		return
 	}
-
 	switch bareTyp.GetTypeKind() {
 	case ssa.SliceTypeKind:
 		// []byte / [] 内置方法
-		rTyp, ok := bareTyp.(*ssa.ObjectType)
+		rTyp, ok := ssa.ToObjectType(bareTyp)
 		if !ok {
 			break
 		}
