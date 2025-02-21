@@ -1,7 +1,6 @@
 package sfvm
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -22,7 +21,6 @@ func validSSAOpcode(raw string) ssa.Opcode {
 	case "function", "func", "def":
 		return ssa.SSAOpcodeFunction
 	default:
-		log.Errorf("unknown opcode: %s", raw)
 		return -1
 	}
 }
@@ -30,22 +28,49 @@ func validSSAOpcode(raw string) ssa.Opcode {
 func validSSABinOpcode(raw string) string {
 	text := yakunquote.TryUnquote(raw)
 	switch text {
-	case "add":
+	case "add", "+":
 		return ssa.OpAdd
-	case "sub":
+	case "sub", "-":
 		return ssa.OpSub
-	case "mul":
+	case "mul", "*":
 		return ssa.OpMul
-	case "div":
+	case "div", "/":
 		return ssa.OpDiv
-	case "mod":
+	case "mod", "%":
 		return ssa.OpMod
-	case "gt":
+	case "gt", ">":
 		return ssa.OpGt
-	case "lt":
+	case "lt", "<":
 		return ssa.OpLt
+	case "gteq", ">=":
+		return ssa.OpGtEq
+	case "lteq", "<=":
+		return ssa.OpLtEq
+	case "neq", "!=":
+		return ssa.OpNotEq
+	case "eq", "==":
+		return ssa.OpEq
+	case "and", "&&":
+		return ssa.OpLogicAnd
+	case "or", "||":
+		return ssa.OpLogicOr
+	case "xor", "^":
+		return ssa.OpXor
+	case "shl", "<<":
+		return ssa.OpShl
+	case "shr", ">>":
+		return ssa.OpShr
+	case "not", "!":
+		return ssa.OpNot
+	case "plus", "++":
+		return ssa.OpPlus
+	case "neg", "--":
+		return ssa.OpNeg
+	case "bitwise-not", "~":
+		return ssa.OpBitwiseNot
+	case "pow", "**=":
+		return ssa.OpPow
 	default:
-		log.Errorf("unknown opcode: %s", raw)
 		return ""
 	}
 }

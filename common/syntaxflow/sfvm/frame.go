@@ -887,8 +887,10 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			}
 			binOp := validSSABinOpcode(v)
 			if binOp != "" {
-				comparator.AddBinOpcode(binOp)
+				comparator.AddBinOrUnaryOpcode(binOp)
+				continue
 			}
+			log.Infof("invalid opcode: %v", v)
 		}
 
 		newVal, condition := values.CompareOpcode(comparator)
