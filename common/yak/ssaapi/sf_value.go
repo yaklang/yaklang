@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"golang.org/x/exp/slices"
 	"regexp"
 
 	"github.com/samber/lo"
@@ -51,7 +52,11 @@ func (v *Value) GetUnaryOperator() string {
 		return ""
 	}
 	if sa.GetOpcode() == ssa.SSAOpcodeUnOp {
-
+		unOp, ok := ssa.ToUnOp(sa)
+		if !ok {
+			return ""
+		}
+		return string(unOp.Op)
 	}
 	return ""
 }
@@ -103,10 +108,11 @@ func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOper
 	checkOp := func(opcode ssa.Opcode) bool {
 		return v.getOpcode() == opcode
 	}
-	checkBinOp := func(binOp string) bool {
-		return v.GetBinaryOperator() == binOp
+	checkBinOrUnaryOp := func(binOp string) bool {
+		ops := []string{v.GetBinaryOperator(), v.GetUnaryOperator()}
+		return slices.Contains(ops, binOp)
 	}
-	return nil, []bool{comparator.AllSatisfy(checkOp, checkBinOp)}
+	return nil, []bool{comparator.AllSatisfy(checkOp, checkBinOrUnaryOp)}
 }
 
 func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
