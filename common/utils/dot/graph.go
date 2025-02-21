@@ -263,6 +263,24 @@ func (g *Graph) GraphAttribute(name, value string) {
 	g.graphAttributes.set(name, value)
 }
 
+func (g *Graph) FindNode(name string) *node {
+	for _, node := range g.nodes {
+		if node.label == name {
+			return node
+		}
+	}
+	return nil
+}
+
+func (g *Graph) HasEdge(n1, n2 *node) bool {
+	for _, edge := range g.edges {
+		if edge.from == n1 && edge.to == n2 {
+			return true
+		}
+	}
+	return false
+}
+
 func (g *Graph) generateDot(indent int, w io.Writer) int {
 	if g.IsSubGraph() {
 		fmt.Fprintf(g.drawIndent(w, indent), "subgraph cluster_%v ", g.idGetter())
