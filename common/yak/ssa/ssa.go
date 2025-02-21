@@ -144,6 +144,8 @@ type Value interface {
 	Occultation
 	AddUser(User)
 	RemoveUser(User)
+	GetVariableMemory() *ssautil.VariableMemory[Value]
+	SetVariableMemory(*ssautil.VariableMemory[Value])
 }
 
 type Occultation interface {
@@ -289,7 +291,7 @@ type Program struct {
 	// Template Language
 	Template map[string]tl.TemplateGeneratedInfo
 
-	config *LanguageConfig
+	config *Config
 }
 
 // implement Value
@@ -744,6 +746,21 @@ var (
 	_ Value       = (*Undefined)(nil)
 	_ Instruction = (*Undefined)(nil)
 )
+
+// ----------- Pointer
+type Pointer struct {
+	anValue
+	origin *ssautil.VariableMemory[Value]
+}
+
+var (
+	_ Node        = (*Pointer)(nil)
+	_ Value       = (*Pointer)(nil)
+	_ Instruction = (*Pointer)(nil)
+)
+
+func (p *Pointer) IsPointer() bool                           { return true }
+func (p *Pointer) GetOrigin() *ssautil.VariableMemory[Value] { return p.origin }
 
 // ----------- BinOp
 type BinOp struct {

@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
 
@@ -229,7 +230,8 @@ type anValue struct {
 	key    Value
 	member *omap.OrderedMap[Value, Value] // map[Value]Value
 
-	variables *omap.OrderedMap[string, *Variable] // map[string]*Variable
+	variables      *omap.OrderedMap[string, *Variable] // map[string]*Variable
+	variableMemory *ssautil.VariableMemory[Value]
 
 	// mask is a map, key is variable name, value is variable value
 	// it record the variable is masked by closure function or some scope changed
@@ -354,6 +356,14 @@ func (n *anValue) AddUser(u User) {
 
 func (n *anValue) RemoveUser(u User) {
 	n.userList = utils.RemoveSliceItem(n.userList, u)
+}
+
+func (n *anValue) GetVariableMemory() *ssautil.VariableMemory[Value] {
+	return n.variableMemory
+}
+
+func (n *anValue) SetVariableMemory(variableMemory *ssautil.VariableMemory[Value]) {
+	n.variableMemory = variableMemory
 }
 
 // for Value : type

@@ -43,6 +43,15 @@ func NewUndefined(name string) *Undefined {
 	return u
 }
 
+func NewPointer(o *Variable) *Pointer {
+	variableMemory := o.GetVariableMemory()
+	p := &Pointer{
+		anValue: NewValue(),
+		origin:  variableMemory,
+	}
+	return p
+}
+
 func NewBinOp(op BinaryOpcode, x, y Value) *BinOp {
 	b := &BinOp{
 		anValue: NewValue(),

@@ -182,6 +182,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					func(i int) ssa.Value {
 						return typeHandler(objt.FieldTypes[i], kvs[i].kv)
 					})
+				b.AssignVariable(b.CreateLocalVariable(""), obj)
 			}
 
 			partInit := func() {
@@ -197,6 +198,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 						}
 						return b.GetDefaultValue(objt.FieldTypes[i])
 					})
+				b.AssignVariable(b.CreateLocalVariable(""), obj)
 			}
 
 			if len(kvs) == 0 {
@@ -205,9 +207,14 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			}
 
 			if kvs[0].value != nil {
-				// todo: 只有指针才会复用object，目前默认非指针
-				if m, ok := kvs[0].value.(*ssa.Make); ok {
+				if p, ok := ssa.ToPointer(kvs[0].value); ok {
+					if origin := p.GetOrigin(); origin != nil {
+						originValue := origin.GetValue()
+						return originValue
+					}
+				} else if m, ok := ssa.ToMake(kvs[0].value); ok {
 					var mkeys, mmembers []ssa.Value
+
 					for k, m := range m.GetAllMember() {
 						mkeys = append(mkeys, k)
 						mmembers = append(mmembers, m)
@@ -231,6 +238,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				partInit()
 				for _, kv := range kvs {
 					if a, ok := objt.AnonymousField[kv.key.String()]; ok {
+						if _, ok := obj.GetAllMember()[objt.GetKeybyName(kv.key.String())]; ok {
+							continue
+						}
 						newObject := typeHandler(a, kv.kv)
 						variable := b.CreateMemberCallVariable(obj, b.EmitConstInst(kv.key.String()))
 						b.AssignVariable(variable, newObject)
@@ -281,6 +291,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					return b.EmitConstInst(i)
 				})
 		case ssa.NumberTypeKind, ssa.StringTypeKind, ssa.BooleanTypeKind:
+			if kvs[0].value == nil {
+				return nil
+			}
 			return kvs[0].value
 		default:
 			if kvs[0].value != nil {
@@ -651,6 +664,7 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 	defer recoverRange()
 
 	var ssatyp ssa.Type = nil
+	var key ssa.Value
 	if typ := stmt.Type_(); typ != nil {
 		ssatyp = b.buildType(typ.(*gol.Type_Context))
 	}
@@ -672,12 +686,14 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			}
 			if p, ok := parent.(*ssa.ObjectType); ok {
 				structTyp.AnonymousField[typ.TypeName().GetText()] = p
-				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), p)
+				key = b.EmitConstInst(typ.TypeName().GetText())
 			} else if a, ok := parent.(*ssa.AliasType); ok {
-				structTyp.AddField(b.EmitConstInst(a.Name), a.GetType())
+				key = b.EmitConstInst(a.Name)
 			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
-				structTyp.AddField(b.EmitConstInst(ba.GetName()), ba)
+				key = b.EmitConstInst(ba.GetName())
 			}
+
+			structTyp.AddField(key, parent)
 		}
 	}
 }
