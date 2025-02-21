@@ -261,7 +261,7 @@ func ParseJA3ToClientHelloSpec(str string) (*tls.ClientHelloSpec, error) {
 func GetTransportByClientHelloSpec(spec *tls.ClientHelloSpec) *http.Transport {
 	return &http.Transport{
 		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			conn, err := netx.DialContextWithoutProxy(ctx, network, addr)
+			conn, err := netx.DialContextWithoutProxy(ctx, addr)
 			if err != nil {
 				println("Error creating connection #123", err)
 				return nil, err

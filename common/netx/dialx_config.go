@@ -3,6 +3,8 @@ package netx
 import (
 	"crypto/tls"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/netstackvm"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net"
 	"sync"
 	"time"
@@ -76,7 +78,7 @@ type dialXConfig struct {
 	TimeoutRetryMinWait time.Duration
 	TimeoutRetryMaxWait time.Duration
 
-	DNSOpts []DNSOption
+	DNSOpts []dns_lookup.DNSOption
 
 	Debug bool
 
@@ -91,6 +93,9 @@ type dialXConfig struct {
 	JustListen bool // just listen udp , not connect .
 
 	TraceInfo *DialXTraceInfo
+
+	UseNetStackVM bool
+	NetStackVm    *netstackvm.NetStackVirtualMachine
 }
 
 type DialXOption func(c *dialXConfig)
@@ -145,7 +150,7 @@ func DialX_WithTimeoutRetry(max int) DialXOption {
 	}
 }
 
-func DialX_WithDNSOptions(opt ...DNSOption) DialXOption {
+func DialX_WithDNSOptions(opt ...dns_lookup.DNSOption) DialXOption {
 	return func(c *dialXConfig) {
 		c.DNSOpts = opt
 	}
@@ -291,6 +296,19 @@ func DialX_WithLocalAddr(addr *net.UDPAddr) DialXOption {
 func DialX_WithUdpJustListen(b bool) DialXOption {
 	return func(c *dialXConfig) {
 		c.JustListen = b
+	}
+}
+
+func DialX_WithNetStackVM(stack *netstackvm.NetStackVirtualMachine) DialXOption {
+	return func(c *dialXConfig) {
+		c.UseNetStackVM = true
+		c.NetStackVm = stack
+	}
+}
+
+func DialX_WithUseNetStackVM(b bool) DialXOption {
+	return func(c *dialXConfig) {
+		c.UseNetStackVM = b
 	}
 }
 

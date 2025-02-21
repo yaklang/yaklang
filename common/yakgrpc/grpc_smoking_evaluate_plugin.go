@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"math/rand"
 	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
@@ -168,8 +168,8 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	defer pluginTestingServer.ClearRequestsHistory()
 	host, port := pluginTestingServer.Host, pluginTestingServer.Port
 	testDomain := utils.RandStringBytes(60) + ".com"
-	netx.AddHost(testDomain, host)
-	defer netx.DeleteHost(testDomain)
+	dns_lookup.AddHost(testDomain, host)
+	defer dns_lookup.DeleteHost(testDomain)
 	target := fmt.Sprintf("http://%s:%d", testDomain, port)
 	var results []*ypb.SmokingEvaluateResult
 	pushSuggestion := func(item string, suggestion string, R *ypb.Range, severity string, i ...[]byte) {

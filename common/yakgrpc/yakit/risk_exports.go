@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net/url"
 	"os"
 	"strconv"
@@ -22,7 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -476,7 +476,7 @@ func _createRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
 			r.IP = r.Host
 			r.IPInteger, _ = utils.IPv4ToUint64(r.Host)
 		} else {
-			r.IP = netx.LookupFirst(r.Host, netx.WithTimeout(3*time.Second))
+			r.IP = dns_lookup.LookupFirst(r.Host, dns_lookup.WithTimeout(3*time.Second))
 		}
 	}
 

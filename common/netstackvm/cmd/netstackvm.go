@@ -68,7 +68,7 @@ func main() {
 				},
 				cli.StringFlag{
 					Name:  "target",
-					Value: "baidu.com,example.com",
+					Value: "baidu.com",
 				},
 			},
 			Action: func(c *cli.Context) error {
@@ -103,6 +103,10 @@ func main() {
 					log.Errorf("start dhcp failed: %v", err)
 					return err
 				}
+				if err := userStack.WaitDHCPFinished(utils.TimeoutContextSeconds(5)); err != nil {
+					log.Errorf("wait dhcp finished fail: %v", err)
+					return err
+				}
 
 				s, err := netstackvm.NewTunVirtualMachine(context.Background())
 				if err != nil {
@@ -112,9 +116,6 @@ func main() {
 
 				log.Infof("start to create tunnel: %v", s.GetTunnelName())
 				if err := s.SetHijackTCPHandler(func(conn netstack.TCPConn) {
-					defer func() {
-						conn.Close()
-					}()
 					id := conn.ID()
 					addr := utils.HostPort(id.LocalAddress.String(), id.LocalPort)
 					hijackedConn, err := userStack.DialTCP(10*time.Second, addr)
@@ -122,27 +123,29 @@ func main() {
 						log.Errorf("dial tcp failed: %v", err)
 						return
 					}
-					wg := sync.WaitGroup{}
-					wg.Add(2)
 					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
 
 					hijackedConn = ctxio.NewConn(ctx, hijackedConn)
 					go func() {
 						defer func() {
-							wg.Done()
 							cancel()
 						}()
 						_, _ = io.Copy(hijackedConn, conn)
 					}()
 					go func() {
 						defer func() {
-							wg.Done()
 							cancel()
 						}()
 						_, _ = io.Copy(conn, hijackedConn)
 					}()
-					wg.Wait()
+
+					go func() {
+						select {
+						case <-ctx.Done():
+							conn.Close()
+						}
+					}()
+
 				}); err != nil {
 					return err
 				}
