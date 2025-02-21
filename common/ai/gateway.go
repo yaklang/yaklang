@@ -2,9 +2,12 @@ package ai
 
 import (
 	"errors"
+	"io"
+	"time"
+
+	"github.com/yaklang/yaklang/common/ai/dashscopebase"
 	"github.com/yaklang/yaklang/common/ai/deepseek"
 	"github.com/yaklang/yaklang/common/ai/siliconflow"
-	"io"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -40,6 +43,9 @@ func init() {
 	})
 	aispec.Register("siliconflow", func() aispec.AIClient {
 		return &siliconflow.GetawayClient{}
+	})
+	aispec.Register("yaklang-writer", func() aispec.AIClient {
+		return dashscopebase.CreateDashScopeGateway("a51e9af5a60f40c983dac6ed50dba15b")
 	})
 }
 
@@ -223,6 +229,37 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	return responseRsp, nil
 }
 
+func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec.StructuredData, error) {
+	config := aispec.NewDefaultAIConfig(opts...)
+	var selectedGateway aispec.AIClient
+	tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
+		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
+		if err := gateway.CheckValid(); err != nil {
+			log.Warnf("check valid by %s failed: %s", typ, err)
+			return false
+		}
+
+		if gateway.SupportedStructuredStream() {
+			selectedGateway = gateway
+		}
+		return true
+	})
+	if selectedGateway == nil {
+		return nil, errors.New("not found valid ai agent")
+	}
+
+	for i := 0; i < config.FunctionCallRetryTimes; i++ {
+		ch, err := selectedGateway.StructuredStream(input)
+		if err != nil {
+			log.Warnf("structured stream by %s failed: %s, retry times: %d", config.Type, err, i)
+			time.Sleep(time.Second * time.Duration(i+1))
+			continue
+		}
+		return ch, nil
+	}
+	return nil, errors.New("not found valid ai agent or retry times is over")
+}
+
 func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp map[string]any
@@ -261,6 +298,7 @@ var Exports = map[string]any{
 
 	"Chat":         Chat,
 	"FunctionCall": FunctionCall,
+	"Stream":       StructuredStream,
 
 	"timeout":            aispec.WithTimeout,
 	"proxy":              aispec.WithProxy,
