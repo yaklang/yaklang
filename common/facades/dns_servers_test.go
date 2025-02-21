@@ -2,7 +2,7 @@ package facades
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math/rand"
@@ -41,32 +41,32 @@ func TestDNSServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := netx.LookupFirst(
+	result := dns_lookup.LookupFirst(
 		baseDomain,
-		netx.WithDNSDisableSystemResolver(true),
-		netx.WithDNSServers(addr),
+		dns_lookup.WithDNSDisableSystemResolver(true),
+		dns_lookup.WithDNSServers(addr),
 	)
 	assert.Equal(t, result, randIp)
 
-	result = netx.LookupFirst(
+	result = dns_lookup.LookupFirst(
 		token+"."+baseDomain,
-		netx.WithDNSDisableSystemResolver(true),
-		netx.WithDNSServers(addr),
+		dns_lookup.WithDNSDisableSystemResolver(true),
+		dns_lookup.WithDNSServers(addr),
 	)
 	assert.Equal(t, result, randIp)
 
-	result = netx.LookupFirst(
+	result = dns_lookup.LookupFirst(
 		token+"."+strings.ToLower(utils.RandStringBytes(10))+".bb.com",
-		netx.WithDNSDisableSystemResolver(true),
-		netx.WithDNSServers(addr),
+		dns_lookup.WithDNSDisableSystemResolver(true),
+		dns_lookup.WithDNSServers(addr),
 	)
 	assert.Equal(t, result, randIp)
 
 	anyDomainToken := strings.ToLower(utils.RandStringBytes(10))
-	result = netx.LookupFirst(
+	result = dns_lookup.LookupFirst(
 		anyDomainToken+"."+checkSuffix,
-		netx.WithDNSDisableSystemResolver(true),
-		netx.WithDNSServers(addr),
+		dns_lookup.WithDNSDisableSystemResolver(true),
+		dns_lookup.WithDNSServers(addr),
 	)
 	assert.Equal(t, result, randIp)
 	assert.Equal(t, checkToken, anyDomainToken)

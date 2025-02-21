@@ -265,6 +265,39 @@ func mitmMaxContentLength(i int) MitmConfigOpt {
 	}
 }
 
+// Start 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
+// 如果没有指定 CA 证书和私钥，那么将使用内置的证书和私钥
+// Example:
+// ```
+// mitm.Start(8080, mitm.host("127.0.0.1"), mitm.callback(func(isHttps, urlStr, req, rsp) { http.dump(req); http.dump(rsp)  })) // 启动一个中间人代理服务器，并将请求和响应打印到标准输出
+// ```
+func buildTunMITM(
+	opts ...MitmConfigOpt,
+) (*crep.MITMServer, error) {
+	config := &mitmConfig{
+		ctx:                context.Background(),
+		host:               "",
+		callback:           nil,
+		mitmCert:           nil,
+		mitmPkey:           nil,
+		useDefaultMitmCert: true,
+		maxContentLength:   10 * 1000 * 1000,
+	}
+
+	for _, opt := range opts {
+		opt(config)
+	}
+	server, err := initMitmServer("", config)
+	if err != nil {
+		return nil, utils.Errorf("create mitm server failed: %s", err)
+	}
+	err = server.TunInit(config.ctx)
+	if err != nil {
+		return nil, err
+	}
+	return server, nil
+}
+
 // Bridge 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，第二个参数是下游代理服务器地址，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
 // Bridge 与 Start 类似，但略有不同，Bridge可以指定下游代理服务器地址，同时默认会在接收到请求和响应时打印到标准输出
 // 如果没有指定 CA 证书和私钥，那么将使用内置的证书和私钥
@@ -290,6 +323,19 @@ func startBridge(
 	for _, opt := range opts {
 		opt(config)
 	}
+	server, err := initMitmServer(downstreamProxy, config)
+	if err != nil {
+		return utils.Errorf("create mitm server failed: %s", err)
+	}
+	err = server.Serve(config.ctx, utils.HostPort(config.host, port))
+	if err != nil {
+		log.Errorf("server mitm failed: %s", err)
+		return err
+	}
+	return nil
+}
+
+func initMitmServer(downstreamProxy string, config *mitmConfig) (*crep.MITMServer, error) {
 
 	if config.host == "" {
 		config.host = "127.0.0.1"
@@ -297,7 +343,7 @@ func startBridge(
 
 	if config.mitmPkey == nil || config.mitmCert == nil {
 		if !config.useDefaultMitmCert {
-			return utils.Errorf("empty root CA, please use tls to generate or use mitm.useDefaultCA(true) to allow buildin ca.")
+			return nil, utils.Errorf("empty root CA, please use tls to generate or use mitm.useDefaultCA(true) to allow buildin ca.")
 		}
 		log.Infof("mitm proxy use the default cert and key")
 	}
@@ -310,7 +356,7 @@ func startBridge(
 		config.ctx = context.Background()
 	}
 
-	server, err := crep.NewMITMServer(
+	return crep.NewMITMServer(
 		crep.MITM_SetGM(config.gmtls),
 		crep.MITM_SetGMPrefer(config.gmtlsPrefer),
 		crep.MITM_SetGMOnly(config.gmtlsOnly),
@@ -493,13 +539,4 @@ func startBridge(
 			return after
 		}),
 	)
-	if err != nil {
-		return utils.Errorf("create mitm server failed: %s", err)
-	}
-	err = server.Serve(config.ctx, utils.HostPort(config.host, port))
-	if err != nil {
-		log.Errorf("server mitm failed: %s", err)
-		return err
-	}
-	return nil
 }

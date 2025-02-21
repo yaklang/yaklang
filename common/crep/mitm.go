@@ -271,6 +271,8 @@ type MITMServer struct {
 
 	// random JA3 fingerprint
 	randomJA3 bool
+
+	tunMode bool
 }
 
 func (m *MITMServer) GetMaxContentLength() int {
@@ -295,17 +297,43 @@ func (m *MITMServer) GetCaCert() []byte {
 	return m.caCert
 }
 
+func (m *MITMServer) TunInit(ctx context.Context) error {
+	m.tunMode = true
+	m.proxy.SetTunMode(true)
+	return m.proxy.TunInit(ctx)
+}
+
+func (m *MITMServer) TunStart(ctx context.Context) error {
+	if err := m.initConfig(); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	m.setHijackHandler(ctx)
+	err := m.proxy.TunStart(ctx)
+	if err != nil {
+		return utils.Errorf("serve proxy server failed: %s", err)
+	}
+	return nil
+}
+
+func (m *MITMServer) AddHijackTarget(target string) error {
+	if !m.tunMode {
+		return utils.Errorf("tun mode not enabled")
+	}
+	return m.proxy.AddHijackTarget(target)
+}
+
 func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	return m.ServeWithListenedCallback(ctx, addr, func() {
 		log.Info("mitm server started")
 	})
 }
 
-func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string, callback func()) error {
+func (m *MITMServer) initConfig() error {
 	if m.mitmConfig == nil {
 		return utils.Errorf("mitm config empty")
 	}
-
 	// m.proxy.SetDownstreamProxy(m.proxyUrl)
 	m.proxy.SetH2(m.http2)
 	if m.proxyAuth != nil {
@@ -341,7 +369,13 @@ func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string,
 	m.proxy.SetFindProcessName(m.findProcessName)
 
 	m.proxy.SetMITM(m.mitmConfig)
+	return nil
+}
 
+func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string, callback func()) error {
+	if err := m.initConfig(); err != nil {
+		return err
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	m.setHijackHandler(ctx)

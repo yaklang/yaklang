@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"time"
@@ -23,7 +23,7 @@ func (d *dnslogCNBroker) Require(timeout time.Duration, proxy ...string) (domain
 		r = samples[0]
 	}
 
-	netx.LookupFirst(`dnslog.cn`, netx.WithTimeout(5*time.Second))
+	dns_lookup.LookupFirst(`dnslog.cn`, dns_lookup.WithTimeout(5*time.Second))
 	packet := []byte(`GET /getdomain.php?t=0.06596369931824886 HTTP/1.1
 Host: dnslog.cn
 Accept: */*

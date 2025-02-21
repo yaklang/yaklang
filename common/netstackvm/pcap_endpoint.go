@@ -3,6 +3,7 @@ package netstackvm
 import (
 	"bytes"
 	"context"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"golang.org/x/net/ipv6"
 	"net"
 	"sync"
@@ -16,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/link/channel"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/ipv4"
 )
@@ -67,7 +67,7 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, 
 	if err != nil {
 		return nil, err
 	}
-	mtu := iface.MTU
+	mtu := iface.MTU + 100
 
 	internalMacAddr := macAddr
 	externalMacAddr := iface.HardwareAddr
@@ -147,7 +147,7 @@ func (p *PCAPEndpoint) generateKillTCPHash(to, from string) []string {
 		if fromIp != nil {
 			fromHosts = append(fromHosts, fromIp.String())
 		} else {
-			ips := netx.LookupAll(fromHost)
+			ips := dns_lookup.LookupAll(fromHost)
 			for _, ip := range ips {
 				fromHosts = append(fromHosts, ip)
 			}
@@ -163,7 +163,7 @@ func (p *PCAPEndpoint) generateKillTCPHash(to, from string) []string {
 	if toIp != nil {
 		toHosts = append(toHosts, toIp.String())
 	} else {
-		ips := netx.LookupAll(toHost)
+		ips := dns_lookup.LookupAll(toHost)
 		toHosts = append(toHosts, ips...)
 	}
 

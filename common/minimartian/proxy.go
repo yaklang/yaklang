@@ -19,6 +19,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"io"
 	"net"
 	"net/http"
@@ -89,6 +90,9 @@ type Proxy struct {
 	h2Cache sync.Map
 
 	forceDisableKeepAlive bool
+
+	tunMode bool
+	tunVM   *netstackvm.TunVirtualMachine
 }
 
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
@@ -214,6 +218,10 @@ func (p *Proxy) SetFindProcessName(b bool) {
 	p.findProcessName = b
 }
 
+func (p *Proxy) SetTunMode(b bool) {
+	p.tunMode = b
+}
+
 // Close sets the proxy to the closing state so it stops receiving new connections,
 // finishes processing any inflight requests, and closes existing connections without
 // reading anymore requests from them.
@@ -255,4 +263,11 @@ func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
 	}
 
 	p.resmod = resmod
+}
+
+func (p *Proxy) AddHijackTarget(target string) error {
+	if !p.tunMode {
+		return utils.Errorf("tun mode is not enabled")
+	}
+	return p.tunVM.HijackDomain(target)
 }

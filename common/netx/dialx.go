@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netstackvm"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net"
 	"sync/atomic"
 	"time"
@@ -90,7 +92,7 @@ RETRY:
 		config.Proxy = append(config.Proxy, FixProxy(GetProxyFromEnv()))
 	}
 
-	DnsConfig := NewDefaultReliableDNSConfig()
+	DnsConfig := dns_lookup.NewDefaultReliableDNSConfig()
 	for _, o := range config.DNSOpts {
 		o(DnsConfig)
 	}
@@ -117,7 +119,7 @@ RETRY:
 		ip := host
 		if net.ParseIP(utils.FixForParseIP(host)) == nil {
 			// not valid ip
-			ip = LookupFirst(host, config.DNSOpts...)
+			ip = dns_lookup.LookupFirst(host, config.DNSOpts...)
 		}
 		if ip == "" {
 			return nil, utils.Errorf("cannot resolve %v", target)
@@ -129,7 +131,19 @@ RETRY:
 				return nil, utils.Errorf("disallow address %v by config(check your yakit system/network config)", ip)
 			}
 		}
-		conn, err = net.DialTimeout("tcp", utils.HostPort(ip, port), config.Timeout)
+
+		if config.UseNetStackVM {
+			vm := config.NetStackVm
+			if vm == nil {
+				vm, err = netstackvm.GetDefaultNetStackVirtualMachine()
+				if err != nil {
+					return nil, utils.Errorf("get default netstack vm failed: %v", err)
+				}
+			}
+			conn, err = vm.DialTCP(config.Timeout, utils.HostPort(ip, port))
+		} else {
+			conn, err = net.DialTimeout("tcp", utils.HostPort(ip, port), config.Timeout)
+		}
 		if err != nil {
 			if config.Debug {
 				log.Errorf("dial %s failed: %v", target, err)
@@ -153,7 +167,7 @@ RETRY:
 
 	var errs error
 	for _, proxy := range config.Proxy {
-		conn, err := getConnForceProxy(target, proxy, config.Timeout)
+		conn, err := getConnForceProxy(target, proxy, config)
 		if err != nil {
 			log.Errorf("proxy conn failed: %s", err)
 			if !shouldRetryError {
@@ -317,7 +331,7 @@ func dialPlainUdpConn(target string, config *dialXConfig) (udpConn *net.UDPConn,
 	ipIns := net.ParseIP(host)
 	if ipIns == nil {
 		// not valid ip
-		host = LookupFirst(host, config.DNSOpts...)
+		host = dns_lookup.LookupFirst(host, config.DNSOpts...)
 		if ipIns = net.ParseIP(host); ipIns == nil {
 			return nil, nil, utils.Errorf("cannot resolve %v", target)
 		}
