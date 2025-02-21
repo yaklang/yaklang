@@ -60,16 +60,29 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOp
 
 	switch comparator.MatchMode {
 	case sfvm.MatchHave:
+		set := sfvm.NewValueSet()
 		for i, condition := range comparator.Conditions {
-			if i > 0 {
-				// TODO:OR条件匹配value
+			matched := matchValue(condition)
+			if matched == nil {
 				continue
 			}
-			matched := matchValue(condition)
-			if matched != nil {
-				res = append(res, matched)
+			otherSet := sfvm.NewValueSet()
+			matched.Recursive(func(vo sfvm.ValueOperator) error {
+				if ret, ok := vo.(ssa.GetIdIF); ok {
+					id := ret.GetId()
+					if i == 0 {
+						set.Add(id, vo)
+					} else {
+						otherSet.Add(id, vo)
+					}
+				}
+				return nil
+			})
+			if i != 0 {
+				set = set.And(otherSet)
 			}
 		}
+		res = set.List()
 	case sfvm.MatchHaveAny:
 		for _, condition := range comparator.Conditions {
 			matched := matchValue(condition)
