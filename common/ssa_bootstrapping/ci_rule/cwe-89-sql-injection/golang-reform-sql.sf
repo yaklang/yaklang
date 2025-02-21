@@ -1,0 +1,77 @@
+desc(
+    title: "golang SQL Injection(Reform)",
+    type: audit,
+    severity: high,
+    desc: <<<TEXT
+SQL注入漏洞允许攻击者通过输入恶意的SQL代码来操纵后端数据库。在本规则中，我们关注的是在使用Reform库进行数据库操作时，由于未对输入进行适当的参数化处理或转义，导致的SQL注入风险。这种不安全的查询方式可能允许攻击者绕过正常的身份验证流程，执行任意SQL命令，访问或修改敏感数据，甚至可能导致数据库崩溃。为了防止SQL注入，建议使用参数化查询或ORM（对象关系映射）库提供的查询构建方法，确保所有用户输入都被正确处理，无法被解释为SQL代码的一部分。
+TEXT
+)
+
+<include('golang-database-reform')> as $sink;
+$sink.Select(,* #-> as $param)
+$param?{have: 'Parameter'} as $high
+
+alert $high for {
+    title: 'SQL Injection detected',
+    title_zh: '检测到SQL注入',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/hedonist/reform"
+	_ "github.com/lib/pq" // 使用 PostgreSQL 驱动
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	// 连接到数据库
+	db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// 创建 Reform 实例
+	reformDB := reform.NewDB(db, reform.Postgres)
+
+	// 不安全的查询
+	var users []User
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	_, err = reformDB.Select(&users, query)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+UNSAFE
+)

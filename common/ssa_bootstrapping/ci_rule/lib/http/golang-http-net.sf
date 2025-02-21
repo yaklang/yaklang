@@ -1,0 +1,69 @@
+desc(
+    title: "Find Executing Request",
+    type: audit,
+    level: low,
+    lib: "golang-http-net",
+    desc: <<<TEXT
+此规则旨在审计Golang应用程序中是否正确处理HTTP请求。通过检查`net/http`包的使用情况，该规则能够识别出处理HTTP请求的代码段。不当处理HTTP请求可能会导致安全漏洞，如敏感信息泄露、请求伪造等。建议开发者仔细审查HTTP请求的处理逻辑，确保对请求参数和请求体进行充分的验证和清理，以防止潜在的安全风险。
+TEXT
+)
+
+http?{<fullTypeName>?{have: 'net/http'}} as $entry;
+$entry.HandleFunc(, * as $handle);
+$handle( * as $output);
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://http_net.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "net/http"
+)
+
+func main() {
+    http.HandleFunc("/get", handleGet)
+    http.HandleFunc("/post", handlePost)
+
+    fmt.Println("Server is running on http://localhost:8080")
+    http.ListenAndServe(":8080", nil)
+}
+
+// 处理 GET 请求
+func handleGet(w http.ResponseWriter, r *http.Request) {
+    // 读取查询参数
+    name := r.URL.Query().Get("name") // 例如 /get?name=John
+    response := fmt.Sprintf("Hello, %s!", name)
+    
+    // 返回响应
+    w.Write([]byte(response))
+}
+
+// 处理 POST 请求
+func handlePost(w http.ResponseWriter, r *http.Request) {
+    // 确保请求方法是 POST
+    if r.Method != http.MethodPost {
+        http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+        return
+    }
+
+    // 读取请求体
+    body, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+        return
+    }
+    defer r.Body.Close() // 确保在函数结束时关闭请求体
+
+    // 返回请求体内容
+    response := fmt.Sprintf("Received: %s", body)
+    w.Write([]byte(response))
+}
+
+PARAM
+)

@@ -1,0 +1,71 @@
+desc(
+    title: "check file database function",
+    type: audit,
+    level: info,
+    lib: 'golang-database-pop',
+    desc: <<<TEXT
+此规则旨在审计使用`github.com/gobuffalo/pop`库的Go语言项目中数据库操作的安全性。`pop`库是一个流行的Go ORM（对象关系映射）库，用于在Go应用程序中方便地管理数据库操作。此审计规则会检查项目中是否正确、安全地使用了数据库连接和操作功能。不当的数据库操作可能会导致SQL注入、数据泄露等安全风险，因此建议开发者遵循最佳实践，确保数据库操作的安全性。
+TEXT
+)
+
+pop?{<fullTypeName>?{have: 'github.com/gobuffalo/pop'}} as $entry;
+$entry.Connect <getCall> as $db;
+$db <getMembers> as $output;
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://database.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "github.com/gobuffalo/pop"
+    "log"
+    "os"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func main() {
+    // 连接到 SQLite 数据库
+    db, err := pop.Connect("development")
+    if err != nil {
+        log.Fatal("Could not connect to the database:", err)
+    }
+
+    // 执行迁移
+    err = db.Migrate("create_users_table")
+    if err != nil {
+        log.Fatal("Could not migrate the database:", err)
+    }
+
+    // 插入用户数据
+    user := &User{Name: "Alice", Age: 30}
+    err = db.Create(user)
+    if err != nil {
+        log.Fatal("Could not create user:", err)
+    }
+
+    // 查询用户数据
+    var users []User
+    err = db.All(&users)
+    if err != nil {
+        log.Fatal("Could not retrieve users:", err)
+    }
+
+    // 打印用户信息
+    fmt.Println("Users:")
+    for _, u := range users {
+        fmt.Printf("ID: %d, Name: %s, Age: %d\n", u.ID, u.Name, u.Age)
+    }
+}
+
+PARAM
+)

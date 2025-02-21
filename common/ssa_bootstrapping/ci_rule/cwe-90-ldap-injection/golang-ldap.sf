@@ -1,0 +1,73 @@
+desc(
+    title: "golang LDAP Injection",
+    type: audit,
+    severity: high,
+    desc: <<<TEXT
+LDAP注入攻击是一种攻击者通过操纵LDAP（轻量目录访问协议）查询来访问或操纵敏感数据的攻击方式。在Go语言应用程序中，如果LDAP查询的构造不当，特别是当查询中包含未经过滤或未转义的输入时，攻击者可能会利用这一漏洞执行恶意LDAP查询，获取未授权的访问权限或敏感信息。这种漏洞通常出现在用户认证、授权或数据检索功能中。为了防止LDAP注入攻击，建议对所有的LDAP查询输入进行严格的验证和过滤，或使用参数化查询。
+TEXT
+)
+
+ldap?{<fullTypeName>?{have: 'gopkg.in/ldap.v2'}} as $entry;
+ldap?{<fullTypeName>?{have: 'github.com/nmcclain/ldap'}} as $entry;
+ldap?{<fullTypeName>?{have: 'github.com/go-ldap/ldap'}} as $entry;
+$entry.Dial <getCall> as $db;
+$db <getMembers> as $sink;
+$sink.Search( * #-> as $param)
+$param?{have: 'Parameter'} as $high
+
+alert $high for {
+    title: 'LDAP Injection detected',
+    title_zh: '检测到LDAP注入',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"fmt"
+	"log"
+
+	ldap "gopkg.in/ldap.v2"
+)
+
+func authenticate(username, password string) bool {
+	l, err := ldap.Dial("tcp", "ldap.example.com:389")
+	if err != nil {
+		log.Fatalf("Failed to connect to LDAP server: %s", err)
+	}
+	defer l.Close()
+
+	// 绑定到 LDAP 服务器
+	err = l.Bind("cn=admin,dc=example,dc=com", password)
+	if err != nil {
+		log.Fatalf("Failed to bind: %s", err)
+	}
+
+	// LDAP 查询构造
+	searchRequest := ldap.NewSearchRequest(
+		"ou=users,dc=example,dc=com",
+		ldap.ScopeWholeSubtree,
+		ldap.NeverDerefAliases,
+		0, 0, false,
+		fmt.Sprintf("(uid=%s)", username), // 潜在的注入点
+		[]string{"dn"},
+		nil,
+	)
+
+	// 执行查询
+	_, err = l.Search(searchRequest)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 这里省略了密码验证的具体实现
+	return true
+}
+
+UNSAFE
+)

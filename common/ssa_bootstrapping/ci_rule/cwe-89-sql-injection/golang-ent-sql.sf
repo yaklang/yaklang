@@ -1,0 +1,76 @@
+desc(
+    title: "golang SQL Injection(ent)",
+    type: audit,
+    severity: high,
+    desc: <<<TEXT
+SQL注入漏洞允许攻击者通过向SQL查询注入恶意SQL代码，从而操控后端数据库。在使用`entgo.io/ent`框架时，如果未正确构建查询条件，而是直接将用户输入拼接到SQL查询中，将会导致SQL注入漏洞。攻击者可以利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，严重危害应用程序的数据安全。
+TEXT
+)
+
+ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $entry;
+$entry.Open() <getMembers> as $client;
+$client.User.Query().Where(* #-> as $param);
+$param?{have: 'Parameter'} as $high;
+
+alert $high for {
+    title: 'SQL Injection detected',
+    title_zh: '检测到SQL注入',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package test
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+
+	"entgo.io/ent"
+	_ "github.com/go-sql-driver/mysql"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	// 连接到数据库
+	client, err := ent.Open("mysql", "user:password@tcp(localhost:3306)/dbname")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	// 不安全的查询
+	input := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	ctx := context.Background()
+
+	users, err := client.User.Query().Where(user.Name(input)).All(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+UNSAFE
+)
