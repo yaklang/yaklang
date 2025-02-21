@@ -634,3 +634,14 @@ Host: %v
 	})
 
 }
+
+func TestLowhttpNetStack(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/1.1
+Host: %v 
+
+`, "www.google.com"))), WithHttps(true), WithUseNetStackVM(true), WithProxy("http://192.168.3.212:7890"))
+		require.NoError(t, err)
+		spew.Dump(rsp)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
@@ -688,7 +689,7 @@ func init() {
 			return nasl_type.NewNaslArray([]interface{}{ctx.Host})
 		},
 		"get_host_name_source": func(ctx *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error) {
-			return netx.LookupFirst(params.GetParamByName("hostname", "").String()), nil
+			return dns_lookup.LookupFirst(params.GetParamByName("hostname", "").String()), nil
 		},
 		"resolve_host_name": func(ctx *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `resolve_host_name` is not implement"))

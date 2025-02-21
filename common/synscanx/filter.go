@@ -1,7 +1,7 @@
 package synscanx
 
 import (
-	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"strconv"
@@ -52,7 +52,7 @@ func (s *Scannerx) GetNonExcludedHosts(targets string) []string {
 
 	for _, host := range utils.ParseStringToHosts(targets) {
 		if !utils.IsIPv4(host) && !utils.IsIPv6(host) {
-			for _, _host := range netx.LookupAll(host, netx.WithTimeout(3*time.Second)) {
+			for _, _host := range dns_lookup.LookupAll(host, dns_lookup.WithTimeout(3*time.Second)) {
 				if s.excludedHost(_host) {
 					continue
 				}

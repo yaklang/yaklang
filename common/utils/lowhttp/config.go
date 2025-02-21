@@ -3,6 +3,7 @@ package lowhttp
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"mime/multipart"
@@ -94,6 +95,9 @@ type LowhttpExecConfig struct {
 
 	BeforeCount *int64
 	AfterCount  *int64
+
+	UseNetStackVM bool
+	NetStackVM    *netstackvm.NetStackVirtualMachine
 }
 
 type LowhttpResponse struct {
@@ -696,5 +700,17 @@ func WithRandomJA3FingerPrint(b bool) LowhttpOpt {
 func WithClientHelloSpec(spec *utls.ClientHelloSpec) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.ClientHelloSpec = spec
+	}
+}
+
+func WithUseNetStackVM(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.UseNetStackVM = b
+	}
+}
+
+func WithNetStackVM(vm *netstackvm.NetStackVirtualMachine) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.NetStackVM = vm
 	}
 }

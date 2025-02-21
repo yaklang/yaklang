@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net"
 	"os"
 	"sync"
@@ -12,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/hybridscan"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
@@ -576,7 +576,7 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 		log.Debugf("start to submit synscan for %s ports: %v", target, ports)
 		hostsFilter.Add(target)
 		if !utils.IsIPv4(target) {
-			hostsFilter.Add(netx.LookupAll(target, netx.WithTimeout(5*time.Second))...)
+			hostsFilter.Add(dns_lookup.LookupAll(target, dns_lookup.WithTimeout(5*time.Second))...)
 		}
 
 		hostRaw, portRaw, _ := utils.ParseStringToHostPort(target)
@@ -584,7 +584,7 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 			portsFilter.Add(fmt.Sprint(portRaw))
 			hostsFilter.Add(hostRaw)
 			if !utils.IsIPv4(target) {
-				hostsFilter.Add(netx.LookupAll(target, netx.WithTimeout(5*time.Second))...)
+				hostsFilter.Add(dns_lookup.LookupAll(target, dns_lookup.WithTimeout(5*time.Second))...)
 			}
 			_ = scanCenter.SubmitOpenPortScanTask(hostRaw, fmt.Sprint(portRaw), true, true)
 		}

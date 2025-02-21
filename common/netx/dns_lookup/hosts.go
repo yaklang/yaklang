@@ -1,4 +1,4 @@
-package netx
+package dns_lookup
 
 import (
 	"github.com/yaklang/yaklang/common/log"
