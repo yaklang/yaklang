@@ -36,7 +36,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 	"github.com/saintfish/chardet"
 )
 
@@ -980,7 +980,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
 				DisableRenderStyles:        len(body) > 1024*1024*2,
 				RuntimeID:                  runtimeID,
-				IsAutoFixContentType:       lowhttpResponse.FixContentType,
+				IsAutoFixContentType:       lowhttpResponse.IsFixContentType,
+				OriginalContentType:        lowhttpResponse.OriginContentType,
+				FixContentType:             lowhttpResponse.FixContentType,
+				IsSetContentTypeOptions:    lowhttpResponse.IsSetContentTypeOptions,
 			}
 
 			redirectPacket := result.LowhttpResponse.RedirectRawPackets

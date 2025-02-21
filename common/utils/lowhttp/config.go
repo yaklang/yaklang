@@ -117,7 +117,6 @@ type LowhttpResponse struct {
 
 	// if TooLarge, the database will drop some response data
 	TooLarge         bool
-	FixContentType   bool
 	TooLargeLimit    int64
 	ResponseBodySize int64
 
@@ -130,6 +129,11 @@ type LowhttpResponse struct {
 
 	// custom tags
 	Tags []string
+
+	IsFixContentType        bool
+	OriginContentType       string
+	FixContentType          string
+	IsSetContentTypeOptions bool
 
 	postParts []*multipart.Part
 }
