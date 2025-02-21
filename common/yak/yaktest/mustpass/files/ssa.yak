@@ -1,0 +1,5 @@
+
+//  static analyze YaklangScriptChecking
+res = ssa.YaklangScriptChecking("print(a)", "yak")
+assert len(res) == 1
+

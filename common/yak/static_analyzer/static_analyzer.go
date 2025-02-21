@@ -24,6 +24,14 @@ const (
 	Score
 )
 
+func YaklangScriptChecking(code, pluginType string) []*result.StaticAnalyzeResult {
+	return StaticAnalyze(code, pluginType, Analyze)
+}
+
+func init() {
+	ssaapi.RegisterExport("YaklangScriptChecking", YaklangScriptChecking)
+}
+
 // plugin type : "yak" "mitm" "port-scan" "codec" "syntaxflow"
 
 func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.StaticAnalyzeResult {
