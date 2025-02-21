@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gobwas/glob"
 	"io"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gobwas/glob"
 
 	"github.com/yaklang/yaklang/common/consts"
 
@@ -476,6 +477,25 @@ func (p *Program) Feed(code io.Reader) error {
 	return p.config.feed(p.Program, memedit.NewMemEditor(string(raw)))
 }
 
+/*
+YaklangScriptChecking is a function that checks the syntax of a Yaklang script.
+
+Input: code string, pluginType: `"yak" "mitm" "port-scan" "codec" "syntaxflow"`
+
+Return: []*result.StaticAnalyzeResult
+*/
+func YaklangScriptChecking(code string, pluginType string) []any {
+	log.Warn("YaklangScriptChecking is not implemented! Please contact developers to fix it.")
+	return nil
+}
+
+func RegisterExport(name string, value any) {
+	if _, ok := Exports[name]; !ok {
+		log.Warnf("ssa Export [%s] create by Register but no default implement", name)
+	}
+	Exports[name] = value
+}
+
 var Exports = map[string]any{
 	"Parse":              Parse,
 	"ParseLocalProject":  ParseProjectFromPath,
@@ -505,4 +525,7 @@ var Exports = map[string]any{
 	"Yak":        Yak,
 	"PHP":        PHP,
 	"Java":       JAVA,
+
+	/// static analyze
+	"YaklangScriptChecking": YaklangScriptChecking,
 }
