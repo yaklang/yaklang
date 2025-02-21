@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -215,7 +216,17 @@ func (s *MCPServer) handleExecYakScript(
 			continue
 		}
 
-		content := handleExecMessage(exec)
+		content := string(exec.Message)
+		// handle complex message
+		msgContent := gjson.GetBytes(exec.Message, "content")
+		level := msgContent.Get("level").String()
+		switch level {
+		case "feature-status-card-data":
+			continue
+		case "info", "json":
+			// use content directly
+			content = msgContent.Get("data").String()
+		}
 		if content == "" {
 			continue
 		}

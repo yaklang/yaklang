@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/samber/lo"
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -154,18 +155,47 @@ func (s *MCPServer) handlePortScan(
 			continue
 		}
 
-		content := handleExecMessage(exec)
+		content := string(exec.Message)
+		// handle complex message
+		msgContent := gjson.GetBytes(exec.Message, "content")
+		level := msgContent.Get("level").String()
+		switch level {
+		case "feature-status-card-data":
+			continue
+		case "info", "json":
+			// use content directly
+			content = msgContent.Get("data").String()
+		}
+
+		isResult := gjson.GetBytes(exec.Message, "isOpen").Exists()
+		if isResult {
+			content = "[Result] " + content
+		}
+
 		if content == "" {
 			continue
 		}
-		results = append(results, mcp.TextContent{
-			Type: "text",
-			Text: content,
-		})
-		s.server.SendNotificationToClient("port_scan/info", map[string]any{
-			"content":       content,
-			"progressToken": progressToken,
-		})
+		typ := gjson.GetBytes(exec.Message, "type").String()
+
+		if typ == "progress" {
+			s.server.SendNotificationToClient("port_scan/progress", map[string]any{
+				"progressToken": progressToken,
+				"title":         msgContent.Get("id").String(),
+				"progress":      msgContent.Get("progress").Float(),
+			})
+		} else {
+			s.server.SendNotificationToClient("port_scan/info", map[string]any{
+				"progressToken": progressToken,
+				"content":       content,
+			})
+		}
+
+		if typ != "progress" {
+			results = append(results, mcp.TextContent{
+				Type: "text",
+				Text: content,
+			})
+		}
 	}
 	if len(results) == 0 {
 		results = append(results, mcp.TextContent{
