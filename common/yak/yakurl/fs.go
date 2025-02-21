@@ -388,16 +388,20 @@ func (f *fileSystemAction) FormatPath(params *ypb.RequestYakURLParams) (string, 
 		absPath           string
 		dirname, filename string
 	)
+	path, err := codec.PathUnescape(u.GetPath())
+	if err != nil {
+		path = u.GetPath()
+	}
 
-	if fs.IsAbs(u.GetPath()) {
-		dirname, filename = fs.PathSplit(u.GetPath())
-		absPath = u.GetPath()
+	if fs.IsAbs(path) {
+		dirname, filename = fs.PathSplit(path)
+		absPath = path
 	} else {
 		wd, err := fs.Getwd()
 		if err != nil {
 			return "", "", "", utils.Wrap(err, "cannot get current working directory")
 		}
-		absPath = fs.Join(wd, u.GetPath())
+		absPath = fs.Join(wd, path)
 		dirname, filename = fs.PathSplit(absPath)
 	}
 	if params.GetUrl() != nil {
