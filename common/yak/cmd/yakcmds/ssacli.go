@@ -5,14 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gobwas/glob"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -373,9 +374,25 @@ var SSACompilerCommands = []*cli.Command{
 				log.Warnf("no-override flag is set, will not delete existed program: %v", programName)
 			}
 
-			proj, err := ssaapi.ParseProjectFromPath(target, opt...)
-			if err != nil {
-				return utils.Errorf("parse project [%v] failed: %v", target, err)
+			var proj ssaapi.Programs
+			zipfs, err := filesys.NewZipFSFromLocal(target)
+			if err == nil {
+				proj, err = ssaapi.ParseProjectWithFS(zipfs, ssaapi.WithRawLanguage(input_language), ssaapi.WithExcludeFile(func(path, filename string) bool {
+					for _, g := range excludeCompile {
+						if g.Match(target) {
+							return true
+						}
+					}
+					return false
+				}))
+				if err != nil {
+					return utils.Errorf("parse project [%v] failed: %v", target, err)
+				}
+			} else {
+				proj, err = ssaapi.ParseProjectFromPath(target, opt...)
+				if err != nil {
+					return utils.Errorf("parse project [%v] failed: %v", target, err)
+				}
 			}
 
 			log.Infof("finished compiling..., results: %v", len(proj))

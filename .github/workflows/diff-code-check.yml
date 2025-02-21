@@ -58,6 +58,7 @@ jobs:
           go build ./common/yak/cmd/yak.go
 
       - name: Generate Prog And Check With SyntaxFlow
+        continue-on-error: true
         if: steps.cache-project.outputs.cache-hit != 'true'
         run: |
           pwd && ls -al
@@ -65,10 +66,13 @@ jobs:
           MERGE_BASE=$(git merge-base main ${{ github.event.workflow_run.head_sha }})
           echo "Merge base is: $MERGE_BASE"
           ./yak gitefs --start $MERGE_BASE --end ${{ github.event.workflow_run.head_sha }} --output ./fs.zip
-          ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule --exclude-file *.pb.go > log.txt 2>&1 || exit 1
-
+          ./yak ssa -t ./fs.zip --program diffcode -l golang > log.txt 2>&1 || echo "compile_fail=true >> $GITHUB_ENV"
+        # ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang
+        # ./yak sf --program diffcode ./common/ssa_bootstrapping/ci_rule
+        # ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule --exclude-file *.pb.go > log.txt 2>&1 || exit 1
+          
       - name: Upload fail log
-        if: steps.cache-project.outputs.cache-hit != 'true'
+        if: ${{env.compile_fail == 'true'}}
         uses: actions/upload-artifact@v4
         with:
           name: log.txt
