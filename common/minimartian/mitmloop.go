@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"io"
 	"net"
 	"net/http"
@@ -41,6 +42,509 @@ const (
 	S5_CONNECT_ADDR = "S5ConnectAddr"
 	AUTH_FINISH     = "authFinish"
 )
+
+func (p *Proxy) TunInit(ctx context.Context) error {
+	s, err := netstackvm.NewTunVirtualMachine(ctx)
+	if err != nil {
+		return err
+	}
+	p.tunVM = s
+	return nil
+}
+
+func (p *Proxy) TunStart(ctx context.Context) error {
+	s := p.tunVM
+	if s == nil {
+		return utils.Errorf("tun vm is nil")
+	}
+	l, err := s.ListenTCP()
+	if err != nil {
+		return err
+	}
+	p.tunVM = s
+
+	var currentConnCount int64 = 0
+	// 设置缓存并清除
+	connsCached := new(sync.Map)
+	cacheConns := func(uid string, c net.Conn) {
+		connsCached.Store(uid, c)
+		atomic.AddInt64(&currentConnCount, 1)
+		log.Debugf("record connection from cache: %v=>%v, current count: %v", c.LocalAddr(), c.RemoteAddr(), currentConnCount)
+	}
+	removeConns := func(uid string, c net.Conn) {
+		connsCached.Delete(uid)
+		atomic.AddInt64(&currentConnCount, -1)
+		if c == nil {
+			log.Debugf("remove connection table from cache: %v=>%v, current coon: %v", c.LocalAddr(), c.RemoteAddr(), currentConnCount)
+		}
+	}
+
+	statusContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() {
+		var lastCurrentConnCount int64
+		for {
+			select {
+			case <-statusContext.Done():
+				return
+			default:
+				if currentConnCount > 0 && lastCurrentConnCount != currentConnCount {
+					log.Infof("mitm frontend active connections count: %v", currentConnCount)
+					lastCurrentConnCount = currentConnCount
+				}
+				time.Sleep(3 * time.Second)
+			}
+		}
+	}()
+
+	go func() {
+		defer func() {
+			count := 0
+			connsCached.Range(func(key, value interface{}) bool {
+				count++
+				connIns, ok := value.(net.Conn)
+				if ok && connIns != nil {
+					log.Infof("closing remote addr: %s", connIns.RemoteAddr())
+					connIns.Close()
+				}
+				return true
+			})
+			if count > 0 {
+				log.Debugf("CONNECTION UNBALANCED: %v", count)
+				log.Debugf("CONNECTION UNBALANCED: %v", count)
+				log.Debugf("CONNECTION UNBALANCED: %v", count)
+				log.Debugf("CONNECTION UNBALANCED: %v", count)
+			}
+		}()
+		for {
+			select {
+			case <-ctx.Done():
+				log.Info("closing martian proxying...")
+				s.Close()
+				return
+			default:
+				if p.Closing() {
+					s.Close()
+					return
+				}
+				time.Sleep(500 * time.Millisecond)
+			}
+		}
+	}()
+
+	var delay time.Duration
+	for {
+		if p.Closing() {
+			return nil
+		}
+
+		conn, err := l.Accept()
+		if err != nil {
+			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+				if delay == 0 {
+					delay = 5 * time.Millisecond
+				} else {
+					delay *= 2
+				}
+				if max := time.Second; delay > max {
+					delay = max
+				}
+
+				log.Debugf("mitm: temporary error on accept: %v", err)
+				time.Sleep(delay)
+				continue
+			}
+			log.Errorf("mitm: failed to accept: %v", err)
+			return err
+		}
+		if conn == nil {
+			continue
+		}
+
+		// generate ksuid
+		uid := ksuid.New().String()
+
+		nosigpipe.IgnoreSIGPIPE(conn)
+		select {
+		case <-ctx.Done():
+			conn.Close()
+			log.Info("closing martian proxying...")
+			s.Close()
+			return nil
+		default:
+			cacheConns(uid, conn)
+		}
+		delay = 0
+
+		log.Debugf("mitm: accepted connection from %s", conn.RemoteAddr())
+		go func(uidStr string, originConn net.Conn) {
+			subCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			defer func() {
+				//if err := recover(); err != nil {
+				//	log.Errorf("handle mitm proxy loop failed: %s", err)
+				//	utils.PrintCurrentGoroutineRuntimeStack()
+				//}
+				if originConn != nil {
+					originConn.Close()
+				}
+			}()
+			var handledConnection net.Conn
+			var firstByte byte
+			handledConnection, _, firstByte, err = IsSocks5HandleShake(originConn)
+			if err != nil {
+				removeConns(uidStr, originConn)
+				log.Errorf("check socks5 handle shake failed: %s", err)
+				return
+			}
+			isTls := firstByte == 0x16
+			defer func() {
+				removeConns(uidStr, handledConnection)
+			}()
+			p.handleTunLoop(isTls, handledConnection, subCtx)
+		}(uid, conn)
+	}
+}
+
+func (p *Proxy) handleTunLoop(isTLSConn bool, conn net.Conn, rootCtx context.Context) {
+	if conn == nil {
+		return
+	}
+	p.connsMu.Lock()
+	p.conns.Add(1)
+	p.connsMu.Unlock()
+	defer p.conns.Done()
+	defer func() {
+		if conn != nil {
+			conn.Close()
+		}
+	}()
+	if p.Closing() {
+		return
+	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("handle proxy loop failed: %s", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
+	brw := bufio.NewReadWriter(bufio.NewReader(ctxio.NewReader(rootCtx, conn)), bufio.NewWriter(ctxio.NewWriter(rootCtx, conn)))
+	s, err := newSession(conn, brw)
+	if err != nil {
+		log.Errorf("mitm: failed to create session: %v", err)
+		return
+	}
+
+	ctx, err := withSession(s)
+	if err != nil {
+		log.Errorf("mitm: failed to create context: %v", err)
+		return
+	}
+	targetHost, targetPort, _ := utils.ParseStringToHostPort(conn.LocalAddr().String())
+	if err != nil {
+		log.Errorf("mitm: failed to parse addr: %v", err)
+		return
+	}
+
+	s.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, targetHost)
+	s.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, strconv.Itoa(targetPort))
+	/* TLS */
+	if isTLSConn {
+		s.MarkSecure()
+		s.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, true)
+		var serverUseH2 bool
+		if p.http2 {
+			// does remote server use h2?
+			var proxyStr string
+			if p.proxyURL != nil {
+				proxyStr = p.proxyURL.String()
+			}
+
+			// Check the cache first.
+			cacheKey := utils.HostPort(targetHost, targetPort)
+			if cached, ok := p.h2Cache.Load(cacheKey); ok {
+				log.Infof("use cached h2 %v", cacheKey)
+				serverUseH2 = cached.(bool)
+			} else {
+				// TODO: should connect every connection?
+				netConn, _ := netx.DialX(
+					cacheKey,
+					netx.DialX_WithTimeout(10*time.Second),
+					netx.DialX_WithProxy(proxyStr),
+					netx.DialX_WithForceProxy(proxyStr != ""),
+					netx.DialX_WithTLSNextProto("h2"),
+					netx.DialX_WithTLS(true),
+					netx.DialX_WithUseNetStackVM(true),
+				)
+				if netConn != nil {
+					switch ret := netConn.(type) {
+					case *tls.Conn:
+						if ret.ConnectionState().NegotiatedProtocol == "h2" {
+							serverUseH2 = true
+						}
+					case *gmtls.Conn:
+						if ret.ConnectionState().NegotiatedProtocol == "h2" {
+							serverUseH2 = true
+						}
+					}
+					netConn.Close()
+				}
+				// Store the result in the cache.
+				p.h2Cache.Store(cacheKey, serverUseH2)
+			}
+		}
+		conn = tls.Server(conn, p.mitm.TLSForHost(targetHost, p.http2 && serverUseH2))
+		if tlsConn, ok := conn.(*tls.Conn); ok && tlsConn != nil {
+			err := tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
+			if err != nil {
+				log.Errorf("mitm recv tls conn from client, but handshake error: %v", err)
+				return
+			}
+			if tlsConn.ConnectionState().NegotiatedProtocol == "h2" {
+				err := p.proxyH2(p.closing, tlsConn, nil, ctx)
+				if err != nil {
+					log.Errorf("mitm proxy h2 failed: %v", err)
+				}
+				return
+			}
+			brw.Writer.Reset(tlsConn)
+			brw.Reader.Reset(tlsConn)
+			conn = tlsConn
+		}
+	}
+
+	timerInterval := time.Second * 10
+	var timer *time.Timer
+	for {
+		conn.SetDeadline(time.Time{})
+		log.Debugf("waiting conn: %v", conn.RemoteAddr())
+		err := p.handleTun(ctx, timer, conn, brw)
+		if timer == nil {
+			timer = time.AfterFunc(timerInterval, func() {
+				conn.Close()
+			})
+		} else {
+			timer.Reset(timerInterval)
+		}
+
+		if err != nil {
+			if isCloseable(err) {
+				log.Debugf("closing conn(%v): %v", err, conn.RemoteAddr())
+				return
+			} else {
+				log.Infof("continue read conn: %v with err: %v", conn.RemoteAddr(), err)
+			}
+		}
+	}
+}
+
+func (p *Proxy) handleTun(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufio.ReadWriter) error {
+	log.Debugf("mitm: waiting for request: %v", conn.RemoteAddr())
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("handle proxy request panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
+	var req *http.Request
+	reqc := make(chan *http.Request, 1)
+	errc := make(chan error, 1)
+	go func() {
+		r, err := utils.ReadHTTPRequestFromBufioReaderOnFirstLine(brw.Reader, func(s string) {
+			if timer != nil {
+				timer.Stop()
+			}
+		})
+		if err != nil {
+			errc <- err
+			return
+		}
+
+		if p.forceDisableKeepAlive && r != nil {
+			r.Close = true
+		}
+		if timer != nil {
+			timer.Stop()
+		}
+		reqc <- r
+	}()
+	select {
+	case err := <-errc:
+		if isCloseable(err) {
+			log.Debugf("mitm: connection closed prematurely: %v", err)
+			conn.Close()
+		} else {
+			log.Errorf("mitm: failed to read request: %v", err)
+		}
+		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
+		return errClose
+	case req = <-reqc:
+	case <-p.closing:
+		return errClose
+	}
+	defer req.Body.Close()
+
+	// set process name
+	if p.findProcessName {
+		_, name, err := process.FindProcessNameByConn(conn)
+		if err != nil {
+			log.Errorf("mitm: conn[%s->%s] failed to get process name: %v", conn.LocalAddr(), conn.RemoteAddr(), err)
+		} else {
+			httpctx.SetProcessName(req, name)
+		}
+	}
+
+	session := ctx.Session()
+	ctx, err := withSession(session)
+	if err != nil {
+		log.Errorf("mitm: failed to build new context: %v", err)
+		return err
+	}
+
+	httpctx.SetMITMFrontendReadWriter(req, brw)
+
+	link(req, ctx, p)
+	defer unlink(req, p)
+
+	// set plugin context
+	httpctx.SetPluginContext(req, consts.NewPluginContext())
+	var isHttps bool
+	if tconn, ok := conn.(*tls.Conn); ok {
+		session.MarkSecure()
+
+		cs := tconn.ConnectionState()
+		req.TLS = &cs
+		req.URL.Scheme = "https"
+		isHttps = true
+		httpctx.SetRequestHTTPS(req, true)
+	}
+
+	if session.IsSecure() {
+		log.Debugf("mitm: forcing HTTPS inside secure session")
+		req.URL.Scheme = "https"
+	}
+
+	host := ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
+	port := ctx.GetSessionIntValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
+	if (isHttps && port != 443) || (!isHttps && port != 80) {
+		host = utils.HostPort(host, port)
+	}
+
+	if host == "" {
+		conn.Close()
+		return utils.Errorf("mitm: no host (and not connect to) in request: \n%v\n\n", string(httpctx.GetBareRequestBytes(req)))
+	}
+
+	if req.URL.Host == "" {
+		req.URL.Host = host
+	}
+	if req.Host == "" {
+		req.Host = host
+	}
+
+	if ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_ViaConnect) {
+		httpctx.SetRequestViaCONNECT(req, true)
+	}
+
+	if err := p.reqmod.ModifyRequest(req); err != nil {
+		log.Errorf("mitm: error modifying request: %v", err)
+		proxyutil.Warning(req.Header, err)
+	}
+	if session.Hijacked() {
+		log.Debugf("mitm: connection hijacked by request modifier")
+		return nil
+	}
+
+	res, err := p.doHTTPRequest(ctx, req)
+	if (err != nil && err != io.EOF) || res == nil {
+		if strings.Contains(err.Error(), "no such host") {
+			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG, true)
+			res = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp(fmt.Sprintf("Unknown host: %s", req.Host))), req)
+		} else {
+			log.Debugf("mitm: failed to round trip: %v", err)
+			res = proxyutil.NewResponse(502, nil, req)
+			proxyutil.Warning(res.Header, err)
+		}
+	}
+	defer func() {
+		if res == nil {
+			return
+		}
+		if res.Body == nil {
+			return
+		}
+		res.Body.Close()
+	}()
+
+	if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
+		err := p.resmod.ModifyResponse(res)
+		if err != nil {
+			if errors.Is(err, IsDroppedError) {
+				res = proxyutil.NewResponseFromOldResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("响应被用户丢弃")), req, res)
+			} else {
+				log.Errorf("mitm: error modifying response: %v", err)
+				proxyutil.Warning(res.Header, err)
+			}
+		}
+	}
+
+	if session.Hijacked() {
+		log.Debugf("mitm: connection hijacked by response modifier")
+		return nil
+	}
+
+	var closing error
+	if req.Close || res.Close || p.Closing() || p.forceDisableKeepAlive {
+		log.Debugf("mitm: received close request: %v", req.RemoteAddr)
+		res.Close = true
+		closing = errClose
+	}
+
+	if httpctx.GetMITMSkipFrontendFeedback(req) {
+		// skip frontend feedback
+		// if met this case, means that "response" is handled.
+		err = brw.Flush()
+		if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				closing = errClose
+			} else if strings.Contains(err.Error(), `write: broken pipe`) {
+				closing = errClose
+			}
+			return closing
+		}
+		return nil
+	}
+
+	var responseBytes []byte
+	responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
+	_ = responseBytes
+	if err != nil {
+		log.Errorf("handle ordinary request: got error while writing response back to client: %v", err)
+	}
+
+	// Handle proxy getting stuck when upstream stops responding midway
+	// see https://github.com/google/martian/pull/349
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		closing = errClose
+	}
+
+	err = brw.Flush()
+	if err != nil {
+		log.Errorf("handle ordinary request: got error while flushing response back to client: %v", err)
+	}
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		closing = errClose
+	}
+	if p.forceDisableKeepAlive { // if http force close ,  just use only once
+		conn.Close()
+	}
+
+	return closing
+}
 
 // Serve accepts connections from the listener and handles the requests.
 func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {

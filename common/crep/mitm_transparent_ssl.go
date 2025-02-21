@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"io"
 	"io/ioutil"
 	"net"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -145,7 +145,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 		log.Infof("start to handle dns items for %v", host)
 		cachedTarget, ok := m.dnsCache.Load(host)
 		if !ok {
-			target := netx.LookupFirst(host, netx.WithTimeout(timeout), netx.WithDNSServers(m.DNSServers...))
+			target := dns_lookup.LookupFirst(host, dns_lookup.WithTimeout(timeout), dns_lookup.WithDNSServers(m.DNSServers...))
 			if target == "" {
 				// httpConn.Write(fallbackHttpFrame)
 				return utils.Errorf("cannot query dns host[%s]", host)
