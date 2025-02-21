@@ -563,20 +563,27 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 	name := typedef.IDENTIFIER().GetText()
 	ssatyp := b.buildType(typedef.Type_().(*gol.Type_Context))
 
-	switch ssatyp.GetTypeKind() {
-	case ssa.StructTypeKind:
-		ssatyp.(*ssa.ObjectType).VerboseName = name
-		b.AddStruct(name, ssatyp)
-		bp := b.CreateBlueprintAndSetConstruct(name)
-		_ = bp
-	case ssa.InterfaceTypeKind:
-		b.AddStruct(name, ssatyp)
-		bp := b.CreateBlueprintAndSetConstruct(name)
-		_ = bp
-	default:
-		aliast := ssa.NewAliasType(name, ssatyp.PkgPathString(), ssatyp)
-		b.AddAlias(name, aliast)
+	var handleType func(ssa.Type)
+	handleType = func(ssatyp ssa.Type) {
+		switch ssatyp.GetTypeKind() {
+		case ssa.StructTypeKind:
+			ssatyp.(*ssa.ObjectType).VerboseName = name
+			b.AddStruct(name, ssatyp)
+			bp := b.CreateBlueprintAndSetConstruct(name)
+			_ = bp
+		case ssa.InterfaceTypeKind:
+			b.AddStruct(name, ssatyp)
+			bp := b.CreateBlueprintAndSetConstruct(name)
+			_ = bp
+		case ssa.AliasTypeKind:
+			aliast := ssatyp.(*ssa.AliasType)
+			handleType(aliast.GetType())
+		default:
+			aliast := ssa.NewAliasType(name, ssatyp.PkgPathString(), ssatyp)
+			b.AddAlias(name, aliast)
+		}
 	}
+	handleType(ssatyp)
 }
 
 func (b *astbuilder) buildTypeParameters(typ *gol.TypeParametersContext) func() {
