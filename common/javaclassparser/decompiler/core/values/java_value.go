@@ -23,6 +23,16 @@ type JavaRef struct {
 	typ         types.JavaType
 }
 
+// ReplaceVar implements JavaValue.
+func (j *JavaRef) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	if j.Id == oldId {
+		j.Id = newId
+	}
+	if j.StackVar != nil {
+		j.StackVar.ReplaceVar(oldId, newId)
+	}
+}
+
 func (j *JavaRef) Type() types.JavaType {
 	return j.typ
 }
@@ -55,6 +65,11 @@ type JavaArray struct {
 	JavaType types.JavaType
 }
 
+// ReplaceVar implements JavaValue.
+func (j *JavaArray) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	j.Length.ReplaceVar(oldId, newId)
+}
+
 func (j *JavaArray) Type() types.JavaType {
 	return j.JavaType
 }
@@ -74,6 +89,10 @@ func NewJavaArray(class *types.JavaClass, length JavaValue) *JavaArray {
 type JavaLiteral struct {
 	JavaType types.JavaType
 	Data     any
+}
+
+// ReplaceVar implements JavaValue.
+func (j *JavaLiteral) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
 }
 
 func (j *JavaLiteral) Type() types.JavaType {
@@ -133,6 +152,16 @@ type JavaClassValue struct {
 	types.JavaType
 }
 
+// ReplaceVar implements JavaValue.
+func (j *JavaClassValue) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+}
+
+// String implements JavaValue.
+// Subtle: this method shadows the method (JavaType).String of JavaClassValue.JavaType.
+func (j *JavaClassValue) String(funcCtx *class_context.ClassContext) string {
+	return j.JavaType.String(funcCtx)
+}
+
 func (j *JavaClassValue) Type() types.JavaType {
 	return j.JavaType
 }
@@ -147,6 +176,10 @@ type JavaClassMember struct {
 	Member      string
 	Description string
 	JavaType    types.JavaType
+}
+
+// ReplaceVar implements JavaValue.
+func (j *JavaClassMember) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
 }
 
 func (j *JavaClassMember) Type() types.JavaType {
@@ -176,6 +209,11 @@ type RefMember struct {
 	JavaType types.JavaType
 }
 
+// ReplaceVar implements JavaValue.
+func (j *RefMember) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	j.Object.ReplaceVar(oldId, newId)
+}
+
 func (j *RefMember) Type() types.JavaType {
 	return j.JavaType
 }
@@ -202,6 +240,12 @@ func NewRefMember(object JavaValue, member string, typ types.JavaType) *RefMembe
 type JavaArrayMember struct {
 	Object JavaValue
 	Index  JavaValue
+}
+
+// ReplaceVar implements JavaValue.
+func (j *JavaArrayMember) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	j.Object.ReplaceVar(oldId, newId)
+	j.Index.ReplaceVar(oldId, newId)
 }
 
 func (j *JavaArrayMember) Type() types.JavaType {
@@ -239,6 +283,10 @@ func (j *RefMember) String(funcCtx *class_context.ClassContext) string {
 type javaNull struct {
 }
 
+// ReplaceVar implements JavaValue.
+func (j javaNull) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+}
+
 func (j javaNull) Type() types.JavaType {
 	return types.NewJavaPrimer(types.JavaVoid)
 }
@@ -257,6 +305,13 @@ type TernaryExpression struct {
 	ConditionFromOp int
 	TrueValue       JavaValue
 	FalseValue      JavaValue
+}
+
+// ReplaceVar implements JavaValue.
+func (j *TernaryExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	j.Condition.ReplaceVar(oldId, newId)
+	j.TrueValue.ReplaceVar(oldId, newId)
+	j.FalseValue.ReplaceVar(oldId, newId)
 }
 
 func (j *TernaryExpression) Type() types.JavaType {
@@ -288,6 +343,11 @@ func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {
 type SlotValue struct {
 	val     JavaValue
 	TmpType types.JavaType
+}
+
+// ReplaceVar implements JavaValue.
+func (s *SlotValue) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	s.val.ReplaceVar(oldId, newId)
 }
 
 func (s *SlotValue) Type() types.JavaType {

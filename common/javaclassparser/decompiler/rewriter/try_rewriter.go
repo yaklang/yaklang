@@ -1,12 +1,13 @@
 package rewriter
 
 import (
+	"slices"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/utils"
-	"slices"
 )
 
 func TryRewriter(manager *RewriteManager, node *core.Node) error {

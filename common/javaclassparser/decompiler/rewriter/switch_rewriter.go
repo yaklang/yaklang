@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	utils3 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
@@ -22,8 +23,12 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	switchData := middleStatement.Data.([]any)
 	caseToIndexMap := switchData[0].(*omap.OrderedMap[int, int])
 	caseMap := omap.NewEmptyOrderedMap[int, *core.Node]()
+	nexts := slices.Clone(node.Next)
+	sort.Slice(nexts, func(i, j int) bool {
+		return true
+	})
 	caseToIndexMap.ForEach(func(k int, v int) bool {
-		caseMap.Set(k, node.Next[v])
+		caseMap.Set(k, nexts[v])
 		return true
 	})
 	keyMap := caseMap.Keys()
@@ -76,6 +81,7 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 		for _, source := range allSources {
 			breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 				return "break"
+			}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 			}))
 			source.AddNext(breakNode)
 		}
@@ -88,14 +94,19 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	return nil
 }
 func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
+	startSwitchNode := node
 	SwitchRewriter1(manager, node)
 	//switchNode := node
 	middleStatement := node.Statement.(*statements.MiddleStatement)
 	switchData := middleStatement.Data.([]any)
 	caseToIndexMap := switchData[0].(*omap.OrderedMap[int, int])
 	caseMap := omap.NewEmptyOrderedMap[int, *core.Node]()
+	nexts := slices.Clone(node.Next)
+	sort.Slice(nexts, func(i, j int) bool {
+		return true
+	})
 	caseToIndexMap.ForEach(func(k int, v int) bool {
-		caseMap.Set(k, node.Next[v])
+		caseMap.Set(k, nexts[v])
 		return true
 	})
 	data := switchData[1].(values.JavaValue)
@@ -164,6 +175,11 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 		//var terminalIsEndNode bool
 		var sts []*core.Node
 		err := core.WalkGraph(startNode, func(node *core.Node) ([]*core.Node, error) {
+			if node == startNode {
+				if !slices.Contains(manager.DominatorMap[startSwitchNode], node) {
+					return nil, nil
+				}
+			}
 			sts = append(sts, node)
 			var next []*core.Node
 			for _, n := range node.Next {

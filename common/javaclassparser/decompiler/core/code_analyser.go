@@ -48,6 +48,7 @@ type Decompiler struct {
 	BootstrapMethods              []*BootstrapMethod
 	DumpClassLambdaMethod         func(name, desc string, id *utils2.VariableId) (string, error)
 	CurrentId                     int
+	BodyStartId                   int
 	BaseVarId                     *utils2.VariableId
 	Params                        []values.JavaValue
 	ifNodeConditionCallback       map[*OpCode]func(value values.JavaValue)
@@ -181,7 +182,12 @@ func (d *Decompiler) ScanJmp() error {
 						LinkOpcode(pre, d.opCodes[gotoOp])
 						pre.IsTryCatchParent = true
 						pre.TryNode = opcode
-						pre.CatchNode = append(pre.CatchNode, d.opCodes[gotoOp])
+						pre.CatchNode = append(pre.CatchNode, &CatchNode{
+							ExceptionTypeIndex: entry.CatchType,
+							StartIndex:         entry.StartPc,
+							EndIndex:           entry.EndPc,
+							OpCode:             d.opCodes[gotoOp],
+						})
 					}
 				}
 			}
@@ -927,6 +933,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		if !d.FunctionContext.IsStatic {
 			runtimeSim.GetVar(0).IsThis = true
 		}
+		d.BodyStartId = len(params)
 	}
 	isIfNode := func(code *OpCode) bool {
 		switch code.Instr.OpCode {
@@ -951,19 +958,25 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			mergeNodeToIfNode[mergeNode] = append(mergeNodeToIfNode[mergeNode], opcode)
 		}
 	}
-	nodeToVarTable := map[*OpCode][]any{}
-	getVarTable := func(code *OpCode) (map[int]*values.JavaRef, *utils2.VariableId) {
-		if vt, ok := nodeToVarTable[code]; ok {
-			return vt[0].(map[int]*values.JavaRef), vt[1].(*utils2.VariableId)
+	nodeToVarScope := map[*OpCode]*Scope{}
+	getVarScope := func(code *OpCode) *Scope {
+		if vt, ok := nodeToVarScope[code]; ok {
+			return vt
 		}
 		panic("not found var table")
-		//return nil, utils2.NewVariableId(&d.BaseVarId)
 	}
-	setVarTable := func(code *OpCode, vt map[int]*values.JavaRef, id *utils2.VariableId) {
-		nodeToVarTable[code] = []any{vt, id}
+	setVarScope := func(code *OpCode, scope *Scope) {
+		nodeToVarScope[code] = scope
 	}
 	ifNodeToConditionCallback := map[*OpCode]func(values.JavaValue){}
+	var preRuntimeStackSimulation *StackSimulationImpl
+	varTable := map[int]*values.JavaRef{}
 	err := WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
+		if IsSwitchOpcode(code.Instr.OpCode) {
+			sort.Slice(code.Target, func(i, j int) bool {
+				return true
+			})
+		}
 		var runtimeStackSimulation *StackSimulationImpl
 		if len(code.Source) == 0 {
 			if code.Instr.OpCode == OP_START {
@@ -972,18 +985,22 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				if varId == nil {
 					varId = utils2.NewRootVariableId()
 				}
-				runtimeStackSimulation = NewStackSimulation(emptySim, map[int]*values.JavaRef{}, varId)
+				runtimeStackSimulation = NewStackSimulation(emptySim, varTable, varId)
 				initMethodVar(runtimeStackSimulation)
 			} else {
 				return nil, fmt.Errorf("opcode %d has no source", code.Id)
 			}
 		} else if len(code.Source) == 1 {
-			entry := code.Source[0].StackEntry
-			if entry == nil {
-				return nil, fmt.Errorf("not found simuation stack for opcode %d", code.Source[0].Id)
+			if IsSwitchOpcode(code.Source[0].Instr.OpCode) {
+				runtimeStackSimulation = preRuntimeStackSimulation
+			} else {
+				entry := code.Source[0].StackEntry
+				if entry == nil {
+					return nil, fmt.Errorf("not found simuation stack for opcode %d", code.Source[0].Id)
+				}
+				scope := getVarScope(code.Source[0])
+				runtimeStackSimulation = NewStackSimulation(entry, scope.VarTable, scope.VarId)
 			}
-			varTable, id := getVarTable(code.Source[0])
-			runtimeStackSimulation = NewStackSimulation(entry, varTable, id)
 		} else if len(code.Source) > 0 {
 			//ifNodes := mergeNodeToIfNode[code]
 			//for _, opCode := range code.Source {
@@ -1045,8 +1062,8 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			size := -1
 			for _, validSource := range validSources {
 				stackEntry := validSource.StackEntry
-				varTable, id := getVarTable(validSource)
-				stackSize := NewStackSimulation(stackEntry, varTable, id).Size()
+				scope := getVarScope(validSource)
+				stackSize := NewStackSimulation(stackEntry, scope.VarTable, scope.VarId).Size()
 				//if stackSize > 1 {
 				//	return nil, fmt.Errorf("invalid stack size %d for opcode %d", stackSize, code.Id)
 				//}
@@ -1082,8 +1099,8 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 					if ifNode.StackEntry == nil {
 						continue
 					}
-					varTable, id := getVarTable(ifNode)
-					stackSize := NewStackSimulation(ifNode.StackEntry, varTable, id).Size()
+					scope := getVarScope(ifNode)
+					stackSize := NewStackSimulation(ifNode.StackEntry, scope.VarTable, scope.VarId).Size()
 					if ifSize == -1 {
 						ifSize = stackSize
 					} else {
@@ -1098,10 +1115,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			}
 			if isIfMergeNode {
 				validSource := validSources[0]
-				varTable, id := getVarTable(validSource)
-				preSim := NewStackSimulation(validSource.StackEntry, varTable, id)
+				scope := getVarScope(validSource)
+				preSim := NewStackSimulation(validSource.StackEntry, scope.VarTable, scope.VarId)
 				preSim.Pop()
-				runtimeStackSimulation = NewStackSimulation(preSim.stackEntry, varTable, id)
+				runtimeStackSimulation = NewStackSimulation(preSim.stackEntry, scope.VarTable, scope.VarId)
 				slotVal := values.NewSlotValue(nil, validSource.StackEntry.value.Type())
 				runtimeStackSimulation.Push(slotVal)
 				ternaryExpMergeNodeSlot[code] = slotVal
@@ -1109,14 +1126,14 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				mergeToIfNode[code] = append(mergeToIfNode[code], ifNodes...)
 			} else {
 				validSource := validSources[0]
-				varTable, id := getVarTable(validSource)
-				runtimeStackSimulation = NewStackSimulation(validSource.StackEntry, varTable, id)
+				scope := getVarScope(validSource)
+				runtimeStackSimulation = NewStackSimulation(validSource.StackEntry, scope.VarTable, scope.VarId)
 			}
 		} else {
 			for _, opCode := range code.Source {
 				if opCode.StackEntry != nil {
-					varTable, id := getVarTable(opCode)
-					runtimeStackSimulation = NewStackSimulation(opCode.StackEntry, varTable, id)
+					scope := getVarScope(opCode)
+					runtimeStackSimulation = NewStackSimulation(opCode.StackEntry, scope.VarTable, scope.VarId)
 					break
 				}
 			}
@@ -1146,12 +1163,17 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			exceptionValue.Flag = "exception"
 			runtimeStackSimulation.Push(exceptionValue)
 		}
+		runtimeStackSimulation.varTable = varTable
 		err := d.calcOpcodeStackInfo(sim, code)
 		if err != nil {
 			return nil, err
 		}
 		code.StackEntry = runtimeStackSimulation.stackEntry
-		setVarTable(code, runtimeStackSimulation.varTable, runtimeStackSimulation.currentVarId)
+		scope := NewScope()
+		scope.VarId = runtimeStackSimulation.currentVarId
+		scope.VarTable = varTable
+		setVarScope(code, scope)
+		preRuntimeStackSimulation = runtimeStackSimulation
 		return code.Target, nil
 	})
 	if err != nil {
@@ -1359,7 +1381,7 @@ func (d *Decompiler) ParseStatement() error {
 			node.IsTryCatch = true
 			node.TryNodeId = tryCatchOpcode.TryNode.Id
 			for _, code := range tryCatchOpcode.CatchNode {
-				node.CatchNodeId = append(node.CatchNodeId, code.Id)
+				node.CatchNodeInfo = append(node.CatchNodeInfo, code)
 			}
 			tryCatchOpcode = nil
 		}
@@ -1444,15 +1466,24 @@ func (d *Decompiler) ParseStatement() error {
 					}
 				}()
 				if skip {
-					for _, argument := range append(funcCallValue.Arguments, funcCallValue.Object) {
-						val := values.UnpackSoltValue(argument)
-						if v, ok := val.(*values.JavaRef); ok {
-							attr := d.delRefUserAttr[v.VarUid]
-							attr[0]++
-							d.delRefUserAttr[v.VarUid] = attr
-						}
-					}
+					// for _, argument := range append(funcCallValue.Arguments, funcCallValue.Object) {
+					// 	val := values.UnpackSoltValue(argument)
+					// 	println(val.String(funcCtx))
+					// 	println(funcCallValue.String(funcCtx))
+					// 	if v, ok := val.(*values.JavaRef); ok {
+					// 		attr := d.delRefUserAttr[v.VarUid]
+					// 		attr[0]++
+					// 		d.delRefUserAttr[v.VarUid] = attr
+					// 	}
+					// }
 					val := UnpackSoltValue(funcCallValue.Object)
+					// println(val.String(funcCtx))
+					// println(funcCallValue.String(funcCtx))
+					if v, ok := val.(*values.JavaRef); ok {
+						attr := d.delRefUserAttr[v.VarUid]
+						attr[0]++
+						d.delRefUserAttr[v.VarUid] = attr
+					}
 					if val, ok := val.(*values.JavaRef); ok {
 						assignNode := refToNewExpressionAssignNode[val.Id]
 						if assignNode != nil {
@@ -1465,6 +1496,8 @@ func (d *Decompiler) ParseStatement() error {
 							}
 							appendNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 								return assignSt.String(funcCtx)
+							}, func(oldId *utils2.VariableId, newId *utils2.VariableId) {
+								assignSt.ReplaceVar(oldId, newId)
 							}))
 						}
 					}
@@ -1558,6 +1591,8 @@ func (d *Decompiler) ParseStatement() error {
 			val := opcode.stackConsumed[0]
 			appendNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 				return fmt.Sprintf("throw %v", val.String(funcCtx))
+			}, func(oldId *utils2.VariableId, newId *utils2.VariableId) {
+				val.ReplaceVar(oldId, newId)
 			}))
 		case OP_IRETURN:
 			v := opcode.stackConsumed[0]
@@ -1922,41 +1957,66 @@ func (d *Decompiler) ParseStatement() error {
 	err = WalkGraph[*Node](d.RootNode, func(node *Node) ([]*Node, error) {
 		if node.IsTryCatch {
 			tryNodeId := getStatementNextIdByOpcodeId(node.TryNodeId)
-			catchNodeIds := funk.Map(node.CatchNodeId, func(id int) int {
-				return getStatementNextIdByOpcodeId(id)
-			}).([]int)
 			tryNodes := NodeFilter(node.Next, func(n *Node) bool {
 				return n.Id == tryNodeId
-			})
-			catchNodes := NodeFilter(node.Next, func(n *Node) bool {
-				return slices.Contains(catchNodeIds, n.Id)
 			})
 			if len(tryNodes) == 0 {
 				return nil, errors.New("not found try body")
 			}
-			if len(catchNodes) == 0 {
-				return nil, errors.New("not found catch body")
-			}
 			tryStartNode := tryNodes[0]
-			tryNode := NewNode(statements.NewMiddleStatement(statements.MiddleTryStart, nil))
-			tryNode.Id = statementsIndex
-			statementsIndex++
-			node.RemoveNext(tryNode)
-			node.AddNext(tryNode)
-			tryNode.AddNext(tryStartNode)
-			for _, catchNode := range catchNodes {
-				tryNode.AddNext(catchNode)
-				node.RemoveNext(catchNode)
+			catchInfos := slices.Clone(node.CatchNodeInfo)
+			// group by endIndex
+			catchNodeMap := map[int][]*Node{}
+			for _, catchInfo := range catchInfos {
+				catchNodeMap[int(catchInfo.EndIndex)] = NodeFilter(node.Next, func(n *Node) bool {
+					return n.Id == getStatementNextIdByOpcodeId(catchInfo.OpCode.Id)
+				})
 			}
-			source := funk.Filter(tryStartNode.Source, func(item *Node) bool {
-				return item != tryNode
-			}).([]*Node)
-			for _, n := range source {
-				tryStartNode.RemoveSource(n)
+			endIndexes := []int{}
+			for endIndex := range catchNodeMap {
+				endIndexes = append(endIndexes, endIndex)
 			}
-			for _, n := range source {
-				tryNode.AddSource(n)
+			sort.Slice(endIndexes, func(i, j int) bool {
+				return endIndexes[i] < endIndexes[j]
+			})
+			// build try node
+			currentTryNode := tryStartNode
+			for _, endIndex := range endIndexes {
+				catchNodes := catchNodeMap[endIndex]
+				tryNode := NewNode(statements.NewMiddleStatement(statements.MiddleTryStart, nil))
+				tryNode.Id = statementsIndex
+				for _, n := range currentTryNode.Source {
+					currentTryNode.RemoveSource(n)
+					tryNode.AddSource(n)
+				}
+				tryNode.AddNext(currentTryNode)
+				statementsIndex++
+				for _, catchNode := range catchNodes {
+					tryNode.AddNext(catchNode)
+					node.RemoveNext(catchNode)
+				}
+				node.AddNext(tryNode)
+				currentTryNode = tryNode
 			}
+			// tryNode := NewNode(statements.NewMiddleStatement(statements.MiddleTryStart, nil))
+			// tryNode.Id = statementsIndex
+			// statementsIndex++
+			// node.RemoveNext(tryNode)
+			// node.AddNext(tryNode)
+			// tryNode.AddNext(tryStartNode)
+			// for _, catchNode := range catchNodes {
+			// 	tryNode.AddNext(catchNode)
+			// 	node.RemoveNext(catchNode)
+			// }
+			// source := funk.Filter(tryStartNode.Source, func(item *Node) bool {
+			// 	return item != tryNode
+			// }).([]*Node)
+			// for _, n := range source {
+			// 	tryStartNode.RemoveSource(n)
+			// }
+			// for _, n := range source {
+			// 	tryNode.AddSource(n)
+			// }
 		}
 		return node.Next, nil
 	})

@@ -2,12 +2,20 @@ package values
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 )
 
 type JavaCompare struct {
 	JavaValue1, JavaValue2 JavaValue
+}
+
+// ReplaceVar implements JavaValue.
+func (j *JavaCompare) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	j.JavaValue1.ReplaceVar(oldId, newId)
+	j.JavaValue2.ReplaceVar(oldId, newId)
 }
 
 func (j *JavaCompare) Type() types.JavaType {

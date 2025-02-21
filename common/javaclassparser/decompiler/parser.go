@@ -51,19 +51,22 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 			}
 		}
 	}
+
 	err = statementManager.Rewrite()
 	if err != nil {
 		return nil, err
 	}
-	sts, err := statementManager.ToStatements(func(node *core.Node) bool {
+	nodes, err := statementManager.ToStatements(func(node *core.Node) bool {
 		return true
 	})
-	sts = funk.Filter(sts, func(item *core.Node) bool {
+	nodes = funk.Filter(nodes, func(item *core.Node) bool {
 		_, ok := item.Statement.(*statements.StackAssignStatement)
 		return !ok
 	}).([]*core.Node)
 	if err != nil {
 		return nil, err
 	}
-	return core.NodesToStatements(sts), nil
+	sts := core.NodesToStatements(nodes)
+	rewriter.RewriteVar(&sts, decompiler.BodyStartId)
+	return sts, nil
 }
