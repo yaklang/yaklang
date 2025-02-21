@@ -4,6 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"io"
+	"sync"
+	"time"
+
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -11,15 +15,18 @@ import (
 	"github.com/yaklang/yaklang/common/twofa"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"io"
-	"sync"
-	"time"
 )
 
 type Client struct {
 	config *aispec.AIConfig
+}
 
-	targetUrl string
+func (c *Client) SupportedStructuredStream() bool {
+	return false
+}
+
+func (c *Client) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+	return nil, utils.Error("unsupported method")
 }
 
 var (
@@ -155,8 +162,9 @@ func (c *Client) ChatStream(s string) (io.Reader, error) {
 }
 
 func (c *Client) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {
-	result, err := c.Chat(data + desc)
-	if err != nil {
+	prompt := aispec.GenerateJSONPrompt(data+"\n"+desc, fields)
+	result, err := c.Chat(prompt)
+	if err != nil && result == "" {
 		return nil, err
 	}
 	return aispec.ExtractFromResult(result, fields)

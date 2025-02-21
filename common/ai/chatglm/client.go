@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
@@ -14,6 +16,16 @@ type GLMClient struct {
 
 	targetUrl string
 }
+
+func (g *GLMClient) SupportedStructuredStream() bool {
+	return false
+}
+
+func (g *GLMClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+	return nil, utils.Error("unsupported method")
+}
+
+var _ aispec.AIClient = (*GLMClient)(nil)
 
 func (g *GLMClient) ChatStream(msg string) (io.Reader, error) {
 	return aispec.ChatWithStream(g.targetUrl, g.config.Model, msg, g.config.HTTPErrorHandler, g.BuildHTTPOptions)

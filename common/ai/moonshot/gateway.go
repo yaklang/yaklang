@@ -14,6 +14,16 @@ type GatewayClient struct {
 	targetUrl string
 }
 
+var _ aispec.AIClient = (*GatewayClient)(nil)
+
+func (g *GatewayClient) SupportedStructuredStream() bool {
+	return false
+}
+
+func (g *GatewayClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+	return nil, errors.New("unsupported method")
+}
+
 func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.BuildHTTPOptions)
 }

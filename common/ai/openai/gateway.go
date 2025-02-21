@@ -14,6 +14,16 @@ type GetawayClient struct {
 	targetUrl string
 }
 
+func (g *GetawayClient) SupportedStructuredStream() bool {
+	return false
+}
+
+func (g *GetawayClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+	return nil, errors.New("unsupported method")
+}
+
+var _ aispec.AIClient = (*GetawayClient)(nil)
+
 func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, error) {
 	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler)
 }

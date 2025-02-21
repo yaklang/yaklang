@@ -40,6 +40,16 @@ type GetawayClient struct {
 	functionCallHandle func(msg string) (map[string]any, error)
 }
 
+func (g *GetawayClient) SupportedStructuredStream() bool {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (g *GetawayClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (g *GetawayClient) CheckValid() error {
 	if g.valid {
 		return nil
