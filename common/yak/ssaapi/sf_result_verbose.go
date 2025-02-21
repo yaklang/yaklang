@@ -238,10 +238,10 @@ func (r *SyntaxFlowResult) Dump(showCode bool) string {
 				line("ID: %v", val.GetId())
 				if rg := val.GetRange(); rg != nil {
 					if editor := rg.GetEditor(); editor != nil {
-						line("Filename: %v", editor.GetFormatedUrl())
+						path := fmt.Sprintf("ssadb:///%s/%s", r.GetProgramName(), editor.GetFilename())
+						line("Filename: %v", path)
 					}
 				}
-				// line("Filename: %v", val.GetRange().GetEditor().GetFormatedUrl())
 				if strings.Contains(rule.Title, "SCA:") {
 					line("Reason: SCA: 根据依赖版本检查漏洞")
 				} else {
