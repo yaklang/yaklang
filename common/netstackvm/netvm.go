@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/icmp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/udp"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 	"net"
 	"sync"
 
@@ -20,6 +21,33 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+var DefaultNetStackVirtualMachine *NetStackVirtualMachine
+
+func GetDefaultNetStackVirtualMachine() (*NetStackVirtualMachine, error) {
+	if DefaultNetStackVirtualMachine == nil {
+		route, _, _, err := netutil.GetPublicRoute()
+		if err != nil {
+			return nil, utils.Errorf("get public route failed: %v", err)
+		}
+		userStack, err := NewNetStackVirtualMachine(WithPcapDevice(route.Name))
+		if err != nil {
+			return nil, utils.Errorf("create netstack virtual machine failed: %v", err)
+		}
+		//if err := userStack.StartDHCP(); err != nil {
+		//	return nil, utils.Errorf("start dhcp failed: %v", err)
+		//}
+		//if err := userStack.WaitDHCPFinished(utils.TimeoutContextSeconds(5)); err != nil {
+		//	return nil, utils.Errorf("wait dhcp finished fail: %v", err)
+		//}
+		err = userStack.InheritPcapInterfaceConfig()
+		if err != nil {
+			return nil, utils.Errorf("inherit pcap interface config failed: %v", err)
+		}
+		DefaultNetStackVirtualMachine = userStack
+	}
+	return DefaultNetStackVirtualMachine, nil
+}
 
 type NetStackVirtualMachine struct {
 	systemIface *net.Interface

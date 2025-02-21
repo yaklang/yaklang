@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"os/exec"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -26,7 +25,7 @@ import (
 )
 
 // TUN_MTU is the default MTU for TUN device. 1420 is wg default MTU, use it for compatibility.
-const TUN_MTU = 1420
+const TUN_MTU = 3200
 
 const UTUNINDEXSTART = 410
 
@@ -109,15 +108,15 @@ func NewTunVirtualMachine(ctx context.Context) (*TunVirtualMachine, error) {
 	ip2Str := net.ParseIP(utils.Uint32ToIPv4(ip2).String())
 	log.Infof("Tunnel IP: %s -> %s", ip1Str, ip2Str)
 
-	ifconfigTimeout, ifConfigTimeoutCancel := context.WithTimeout(ctx, 10*time.Second)
-	defer ifConfigTimeoutCancel()
-	cmd := exec.CommandContext(ifconfigTimeout, "ifconfig", utunName, ip1Str.String(), ip2Str.String(), "up")
-	raw, err := cmd.CombinedOutput()
-	if err != nil {
-		cancel()
-		log.Infof("ifconfig failed: %v\nmsg: %s", err, string(raw))
-		return nil, utils.Errorf("ifconfig failed: %v", err)
-	}
+	//ifconfigTimeout, ifConfigTimeoutCancel := context.WithTimeout(ctx, 10*time.Second)
+	//defer ifConfigTimeoutCancel()
+	//cmd := exec.CommandContext(ifconfigTimeout, "ifconfig", utunName, ip1Str.String(), ip2Str.String(), "up")
+	//raw, err := cmd.CombinedOutput()
+	//if err != nil {
+	//	cancel()
+	//	log.Infof("ifconfig failed: %v\nmsg: %s", err, string(raw))
+	//	return nil, utils.Errorf("ifconfig failed: %v", err)
+	//}
 
 	log.Infof("Initializing network stack")
 	s := stack.New(stack.Options{
@@ -218,6 +217,7 @@ func (t *TunVirtualMachine) SetHijackTCPHandler(handle func(conn netstack.TCPCon
 			TCPConn: gonet.NewTCPConn(&wq, ep),
 			id:      id,
 		}
+		conn.ID()
 		handle(conn)
 	})
 	t.stack.SetTransportProtocolHandler(header.TCPProtocolNumber, tcpForwarder.HandlePacket)
@@ -231,4 +231,14 @@ func (t *TunVirtualMachine) Close() error {
 
 func (t *TunVirtualMachine) GetTunnelName() string {
 	return t.tunnelName
+}
+
+func (t *TunVirtualMachine) ListenTCP() (*TunVmTCPListener, error) {
+	listener := &TunVmTCPListener{
+		vm: t,
+		ch: make(chan netstack.TCPConn, 1000),
+	}
+	return listener, t.SetHijackTCPHandler(func(conn netstack.TCPConn) {
+		listener.ch <- conn
+	})
 }
