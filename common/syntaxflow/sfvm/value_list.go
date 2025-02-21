@@ -32,36 +32,20 @@ type ValueList struct {
 	Values []ValueOperator
 }
 
-func (v *ValueList) OpcodeMatch(ctx context.Context, s string) (bool, ValueOperator, error) {
-	var res []ValueOperator
-	for _, value := range v.Values {
-		match, next, err := value.OpcodeMatch(ctx, s)
-		if err != nil {
-			return false, nil, err
-		}
-		if match {
-			if next != nil {
-				res = append(res, next)
-			}
-		}
-	}
-	return len(res) > 0, NewValues(res), nil
-}
-
-func (v *ValueList) CompareOpcode(items *CompareItems) (ValueOperator, []bool) {
+func (v *ValueList) CompareOpcode(comparator *OpcodeComparator) (ValueOperator, []bool) {
 	var res []bool
 	v.Recursive(func(operator ValueOperator) error {
-		_, result := operator.CompareOpcode(items)
+		_, result := operator.CompareOpcode(comparator)
 		res = append(res, result...)
 		return nil
 	})
 	return nil, res
 }
 
-func (v *ValueList) CompareString(items *CompareItems) (ValueOperator, []bool) {
+func (v *ValueList) CompareString(comparator *StringComparator) (ValueOperator, []bool) {
 	var res []bool
 	v.Recursive(func(operator ValueOperator) error {
-		_, result := operator.CompareString(items)
+		_, result := operator.CompareString(comparator)
 		res = append(res, result...)
 		return nil
 	})

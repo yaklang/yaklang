@@ -14,25 +14,20 @@ import (
 
 var _ sfvm.ValueOperator = new(Values)
 
-func (v Values) OpcodeMatch(ctx context.Context, opcode string) (bool, sfvm.ValueOperator, error) {
-	newVals := _SearchValuesByOpcode(v, opcode, sfvm.WithAnalysisContext_Label("search-opcode:"+opcode))
-	return len(newVals) > 0, newVals, nil
-}
-
-func (v Values) CompareString(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+func (v Values) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
 	var res []bool
 	v.Recursive(func(operator sfvm.ValueOperator) error {
-		_, result := operator.CompareString(items)
+		_, result := operator.CompareString(comparator)
 		res = append(res, result...)
 		return nil
 	})
 	return nil, res
 }
 
-func (v Values) CompareOpcode(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+func (v Values) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
 	var res []bool
 	v.Recursive(func(operator sfvm.ValueOperator) error {
-		_, result := operator.CompareOpcode(items)
+		_, result := operator.CompareOpcode(comparator)
 		res = append(res, result...)
 		return nil
 	})

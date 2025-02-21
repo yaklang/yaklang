@@ -1,50 +1,51 @@
 package sfvm
 
 import (
-	"regexp"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-var BinOpRegexp = regexp.MustCompile(`(?i)([A-Za-z_-]+)\[([\w\S+=*/]{1,3})]`)
-
-type ValueSet struct {
-	m map[int64]ValueOperator
-}
-
-func NewValueSet() *ValueSet {
-	return &ValueSet{
-		m: make(map[int64]ValueOperator),
+func validSSAOpcode(raw string) ssa.Opcode {
+	text := yakunquote.TryUnquote(raw)
+	switch text {
+	case "call":
+		return ssa.SSAOpcodeCall
+	case "phi":
+		return ssa.SSAOpcodePhi
+	case "const", "constant":
+		return ssa.SSAOpcodeConstInst
+	case "param", "formal_param":
+		return ssa.SSAOpcodeParameter
+	case "return":
+		return ssa.SSAOpcodeReturn
+	case "function", "func", "def":
+		return ssa.SSAOpcodeFunction
+	default:
+		log.Errorf("unknown opcode: %s", raw)
+		return -1
 	}
 }
 
-func (v *ValueSet) Add(id int64, value ValueOperator) {
-	if v.m == nil {
-		v.m = make(map[int64]ValueOperator)
+func validSSABinOpcode(raw string) string {
+	text := yakunquote.TryUnquote(raw)
+	switch text {
+	case "add":
+		return ssa.OpAdd
+	case "sub":
+		return ssa.OpSub
+	case "mul":
+		return ssa.OpMul
+	case "div":
+		return ssa.OpDiv
+	case "mod":
+		return ssa.OpMod
+	case "gt":
+		return ssa.OpGt
+	case "lt":
+		return ssa.OpLt
+	default:
+		log.Errorf("unknown opcode: %s", raw)
+		return ""
 	}
-	v.m[id] = value
-}
-
-func (v *ValueSet) Has(id int64) bool {
-	_, ok := v.m[id]
-	return ok
-}
-
-func (v *ValueSet) List() []ValueOperator {
-	var res []ValueOperator
-	for _, v := range v.m {
-		res = append(res, v)
-	}
-	return res
-}
-
-func (v *ValueSet) And(other *ValueSet) *ValueSet {
-	if v == nil || other == nil {
-		return nil
-	}
-	res := NewValueSet()
-	for id, vo := range v.m {
-		if other.Has(id) {
-			res.Add(id, vo)
-		}
-	}
-	return res
 }

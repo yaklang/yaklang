@@ -160,19 +160,19 @@ const (
 	CompareModeOpcode
 )
 
-type CompareStringMode int
+type StringMatchMode int
 
 const (
-	CompareStringAnyMode CompareStringMode = iota
-	CompareStringHaveMode
+	MatchHaveAny StringMatchMode = iota
+	MatchHave
 )
 
-func ValidCompareString(mode int) CompareStringMode {
+func ValidStringMatchMode(mode int) StringMatchMode {
 	switch mode {
 	case 0:
-		return CompareStringAnyMode
+		return MatchHaveAny
 	case 1:
-		return CompareStringHaveMode
+		return MatchHave
 	}
 	return -1
 }
@@ -197,7 +197,7 @@ func ValidConditionFilter(mode int) ConditionFilterMode {
 	return -1
 }
 
-func (v *SyntaxFlowVisitor) EmitCompareString(i []func() (string, ConditionFilterMode), compareMode CompareStringMode) {
+func (v *SyntaxFlowVisitor) EmitCompareString(i []func() (string, ConditionFilterMode), compareMode StringMatchMode) {
 	s := &SFI{
 		OpCode:   OpCompareString,
 		UnaryInt: int(compareMode),

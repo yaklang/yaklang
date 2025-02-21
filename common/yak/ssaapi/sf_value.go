@@ -88,24 +88,25 @@ func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm
 	return value != nil, value, nil
 }
 
-func (v *Value) CompareString(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
+func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
 	if v == nil || items == nil {
 		return nil, []bool{false}
 	}
 	text := yakunquote.TryUnquote(v.String())
-	return nil, []bool{items.CompareString(text)}
+	return nil, []bool{items.Matches(text)}
 }
 
-func (v *Value) CompareOpcode(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
-	if v == nil || items == nil {
+func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
+	if v == nil || comparator == nil {
 		return nil, []bool{false}
 	}
-	return nil, []bool{items.CompareOpcode(v.GetOpcode(), v.GetBinaryOperator())}
-}
-
-func (v *Value) OpcodeMatch(ctx context.Context, op string) (bool, sfvm.ValueOperator, error) {
-	newVal := _SearchValuesByOpcode(Values{v}, op, sfvm.WithAnalysisContext_Label("search-opcode:"+op))
-	return newVal != nil, newVal, nil
+	checkOp := func(opcode ssa.Opcode) bool {
+		return v.getOpcode() == opcode
+	}
+	checkBinOp := func(binOp string) bool {
+		return v.GetBinaryOperator() == binOp
+	}
+	return nil, []bool{comparator.AllSatisfy(checkOp, checkBinOp)}
 }
 
 func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {

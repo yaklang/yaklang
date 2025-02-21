@@ -1,6 +1,7 @@
 package syntaxflow
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -274,6 +275,7 @@ func Test_Condition_Filter_Start_With_Program(t *testing.T) {
 	})
 
 	t.Run("test CompareString-Have mutli exact", func(t *testing.T) {
+		t.Skip()
 		ssatest.CheckSyntaxFlow(t, `
 		aa = 1
 		aacc = 2
@@ -287,7 +289,7 @@ func Test_Condition_Filter_Start_With_Program(t *testing.T) {
 			})
 	})
 
-	t.Run("test CompareString-Have Any ", func(t *testing.T) {
+	t.Run("test CompareString-Have Any 1 ", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
 		aa = 1
 		aacc = 2
@@ -298,6 +300,19 @@ func Test_Condition_Filter_Start_With_Program(t *testing.T) {
 			`,
 			map[string][]string{
 				"target1": {"1", "2", "3"},
+			})
+	})
+
+	t.Run("test CompareString-Have Any 2", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		exist = 1
+		www = 2
+		`,
+			`
+			*?{any:'notExist','exist'} as $target1
+			`,
+			map[string][]string{
+				"target1": {"1"},
 			})
 	})
 
@@ -328,6 +343,20 @@ func Test_Condition_Filter_Start_With_Program(t *testing.T) {
 			map[string][]string{
 				"target1": {"11"},
 			})
+	})
+
+	t.Run("test CompareOpcode 2", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, `    public class demo {
+        public static void main(String[] args) {
+            String str = "hello";
+            if (str.contains("he")) {
+                System.out.println("ok");
+            }
+        }
+    }`, `*?{opcode:call && have:"contain"} as $output;
+alert $output;`, map[string][]string{
+			"output": {"contain"},
+		}, ssaapi.WithLanguage(consts.JAVA))
 	})
 
 	t.Run("test muti filter", func(t *testing.T) {

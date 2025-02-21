@@ -120,7 +120,6 @@ type ValueOperator interface {
 	GlobMatch(context.Context, int, string) (bool, ValueOperator, error)
 	// RegexpMatch for OpPushSearchRegexp
 	RegexpMatch(context.Context, int, string) (bool, ValueOperator, error)
-	OpcodeMatch(context.Context, string) (bool, ValueOperator, error)
 
 	// GetCallActualParams for OpGetCallArgs
 	GetCalled() (ValueOperator, error)
@@ -147,6 +146,6 @@ type ValueOperator interface {
 	// fileFilter
 	FileFilter(string, string, map[string]string, []string) (ValueOperator, error)
 
-	CompareString(*CompareItems) (ValueOperator, []bool)
-	CompareOpcode(*CompareItems) (ValueOperator, []bool)
+	CompareString(*StringComparator) (ValueOperator, []bool)
+	CompareOpcode(*OpcodeComparator) (ValueOperator, []bool)
 }

@@ -6,12 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
-
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/ssa"
-
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 )
 
@@ -210,41 +206,17 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		opcodes := i.AllOpcodesCondition()
 		ops := make([]string, 0, len(opcodes))
 		for _, opcode := range opcodes {
-			text := yakunquote.TryUnquote(opcode.GetText())
-			switch text {
-			case "add":
-				text = "+"
-			case "sub":
-				text = "-"
-			}
-			switch text {
-			case "call":
-				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeCall])
-			case "phi":
-				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodePhi])
-			case "const", "constant":
-				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeConstInst])
-			case "param", "formal_param":
-				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeParameter])
-			case "return":
-				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeReturn])
-			case "function", "func", "def":
-				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeFunction])
-			case "+", "-", "*", "/", "%":
-				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeBinOp]+"["+text+"]")
-			default:
-				log.Errorf("unknown opcode: %s", opcode.GetText())
-			}
+			ops = append(ops, opcode.GetText())
 		}
 		y.EmitCompareOpcode(ops)
 	case *sf.StringContainAnyConditionContext:
 		y.EmitDuplicate()
 		res := y.VisitStringLiteralWithoutStarGroup(i.StringLiteralWithoutStarGroup())
-		y.EmitCompareString(res, CompareStringAnyMode)
+		y.EmitCompareString(res, MatchHaveAny)
 	case *sf.StringContainHaveConditionContext:
 		y.EmitDuplicate()
 		res := y.VisitStringLiteralWithoutStarGroup(i.StringLiteralWithoutStarGroup())
-		y.EmitCompareString(res, CompareStringHaveMode)
+		y.EmitCompareString(res, MatchHave)
 	case *sf.FilterExpressionCompareContext:
 		if i.NumberLiteral() != nil {
 			n := y.VisitNumberLiteral(i.NumberLiteral())
