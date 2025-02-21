@@ -89,5 +89,5 @@ Content-Disposition: attachment; filename="example.pdf"
 
 	rsp, err := HTTP(WithHost(host), WithPort(port))
 	require.NoError(t, err)
-	require.True(t, rsp.FixContentType)
+	require.True(t, rsp.IsFixContentType)
 }
