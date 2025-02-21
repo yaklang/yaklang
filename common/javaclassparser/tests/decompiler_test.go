@@ -130,6 +130,9 @@ func TestSyntax(t *testing.T) {
 		{
 			"VarArgs",
 		},
+		{
+			"SwitchScopeTest",
+		},
 	}
 	for _, testItem := range testCase {
 		t.Run(testItem.name, func(t *testing.T) {
@@ -151,6 +154,7 @@ func TestSyntax(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			println(source)
 			assert.Equal(t, string(sourceCode), source)
 		})
 	}

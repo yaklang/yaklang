@@ -11,7 +11,7 @@ public class LambdaTest {
 	}
 	void main() {
 		new ArrayList().forEach((Object var4) -> {
-			int var5 = 1;
+			int var1 = 1;
 		});
 		int var1 = 1;
 		ArrayList var2 = new ArrayList();

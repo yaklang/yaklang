@@ -5,6 +5,6 @@ public class ContinuousAssign {
 	}
 	void main() {
 		int var1 = 2;
-		int var3 = var1 = 1;
+		int var2 = var1 = 1;
 	}
 }

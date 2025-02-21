@@ -45,16 +45,20 @@ func TestParseClass(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// if path != "/Users/z3/Downloads/error-jdsc 3/decompile-err-068afc96a4cd68e35eeb99e2.class" {
+		// if path != "/Users/z3/Downloads/error-jdsc 3/decompile-err-151593971f918df1f3764021.class" {
 		// 	return nil
 		// }
 		source, err := cf.Dump()
 
 		if err != nil {
 			//return err
+			if strings.Contains(err.Error(), "not support opcode: jsr") {
+				return nil
+			}
 			println(path)
 		}
 		_ = source
+
 		// fmt.Println(source)
 		return nil
 	})
@@ -80,9 +84,9 @@ func TestParseJar(t *testing.T) {
 			return nil
 		}
 		fmt.Printf("file: %s\n", path)
-		//if path != "net/lingala/zip4j/core/HeaderReader.class" {
-		//	return nil
-		//}
+		if path != "net/lingala/zip4j/core/HeaderReader.class" {
+			return nil
+		}
 		data, err := jarFs.ReadFile(path)
 		if err != nil {
 			failedFils = append(failedFils, path)

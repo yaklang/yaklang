@@ -2,12 +2,14 @@ package utils
 
 import (
 	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 type VariableId struct {
+	Name     string
 	parent   *VariableId
 	children []*VariableId
 }
@@ -22,6 +24,9 @@ func NewRootVariableId() *VariableId {
 func (v *VariableId) Id() int {
 	return v._id(utils.NewSet[*VariableId]()) - 1
 }
+func (v *VariableId) SetName(name string) {
+	v.Name = name
+}
 func (v *VariableId) _id(set *utils.Set[*VariableId]) int {
 	if set.Has(v) {
 		log.Errorf("cycle detected in variable id")
@@ -34,6 +39,9 @@ func (v *VariableId) _id(set *utils.Set[*VariableId]) int {
 	return v.parent._id(set) + 1
 }
 func (v *VariableId) String() string {
+	if v.Name != "" {
+		return v.Name
+	}
 	return fmt.Sprintf("var%d", v.Id())
 }
 

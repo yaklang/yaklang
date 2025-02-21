@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 )
 
@@ -13,6 +14,16 @@ type NewExpression struct {
 	Length          []JavaValue
 	ArgumentsGetter func() string
 	Initializer     []JavaValue
+}
+
+// ReplaceVar implements JavaValue.
+func (n *NewExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	for _, length := range n.Length {
+		length.ReplaceVar(oldId, newId)
+	}
+	for _, initializer := range n.Initializer {
+		initializer.ReplaceVar(oldId, newId)
+	}
 }
 
 func NewNewArrayExpression(typ types.JavaType, length ...JavaValue) *NewExpression {
@@ -56,6 +67,13 @@ type JavaExpression struct {
 	Values []JavaValue
 	Op     string
 	Typ    types.JavaType
+}
+
+// ReplaceVar implements JavaValue.
+func (j *JavaExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	for _, value := range j.Values {
+		value.ReplaceVar(oldId, newId)
+	}
 }
 
 func (j *JavaExpression) Type() types.JavaType {
@@ -104,6 +122,13 @@ type FunctionCallExpression struct {
 	ClassName    string
 	Arguments    []JavaValue
 	FuncType     *types.JavaFuncType
+}
+
+// ReplaceVar implements JavaValue.
+func (f *FunctionCallExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	for _, arg := range f.Arguments {
+		arg.ReplaceVar(oldId, newId)
+	}
 }
 
 func (f *FunctionCallExpression) Type() types.JavaType {

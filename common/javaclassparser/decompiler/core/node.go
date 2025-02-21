@@ -1,9 +1,10 @@
 package core
 
 import (
+	"slices"
+
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/utils"
-	"slices"
 )
 
 type Node struct {
@@ -23,7 +24,7 @@ type Node struct {
 	IsIf                bool
 	IsTryCatch          bool
 	TryNodeId           int
-	CatchNodeId         []int
+	CatchNodeInfo       []*CatchNode
 	IsDoWhile           bool
 	BodyNodeStart       *Node
 	GetLoopEndNode      func() *Node

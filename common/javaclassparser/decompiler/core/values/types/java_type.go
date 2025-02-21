@@ -2,8 +2,10 @@ package types
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 )
 
 type JavaFuncType struct {
@@ -56,6 +58,10 @@ func NewJavaArrayType(typ JavaType) JavaType {
 type JavaClass struct {
 	Name string
 	JavaType
+}
+
+// ReplaceVar implements values.JavaValue.
+func (j *JavaClass) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
 }
 
 func (j *JavaClass) IsJavaType() {
