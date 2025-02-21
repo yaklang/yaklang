@@ -10,12 +10,10 @@ import (
 )
 
 type saveValueCtx struct {
-	db          *gorm.DB
-	valueToNode map[*Value]*ssadb.AuditNode
+	db *gorm.DB
 	ssadb.AuditNodeStatus
 
-	nodeToValue map[uint]*Value
-	entryValue  *Value
+	entryValue *Value
 }
 
 type SaveValueOption func(c *saveValueCtx)
@@ -68,10 +66,8 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 		return utils.Error("db is nil")
 	}
 	ctx := &saveValueCtx{
-		db:          db,
-		valueToNode: map[*Value]*ssadb.AuditNode{},
-		entryValue:  value,
-		nodeToValue: map[uint]*Value{},
+		db:         db,
+		entryValue: value,
 	}
 	for _, o := range opts {
 		o(ctx)
@@ -79,21 +75,18 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 	if ctx.ProgramName == "" {
 		return utils.Error("program info is empty")
 	}
-	builder := graph.NewDFSGraphBuilder[*ssadb.AuditNode, *Value](
+	err := graph.BuildGraphWithDFS[*ssadb.AuditNode, *Value](
+		value,
 		ctx.SaveNode,
 		ctx.getNeighbors,
 		ctx.SaveEdge,
 	)
-	builder.BuildGraph(value)
-	return nil
+	return err
 }
 
 func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 	if value == nil {
 		return nil, utils.Error("value is nil")
-	}
-	if an, ok := s.valueToNode[value]; ok {
-		return an, nil
 	}
 	an := &ssadb.AuditNode{
 		AuditNodeStatus: s.AuditNodeStatus,
@@ -120,20 +113,15 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 	if ret := s.db.Save(an).Error; ret != nil {
 		return nil, utils.Wrap(ret, "save AuditNode")
 	}
-	s.valueToNode[value] = an
-	if s.nodeToValue[an.ID] == nil {
-		s.nodeToValue[an.ID] = value
-	}
 	return an, nil
 }
 
-func (s *saveValueCtx) getNeighbors(node *ssadb.AuditNode) []*graph.NeighborWithEdgeType[*Value] {
-	value := s.nodeToValue[node.ID]
+func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	if value == nil {
 		return nil
 	}
 
-	var res []*graph.NeighborWithEdgeType[*Value]
+	var res []*graph.Neighbor[*Value]
 	for _, i := range value.DependOn {
 		res = append(res, graph.NewNeighbor(i, EdgeTypeDependOn))
 	}
