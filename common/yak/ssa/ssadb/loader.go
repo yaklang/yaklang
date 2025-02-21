@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"context"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -149,8 +148,8 @@ func RegexpSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value strin
 	return yieldIrIndex(db, ctx)
 }
 
-func SearchIrCodeByOpcode(db *gorm.DB, opcode string, ctx context.Context) chan *IrCode {
-	db = db.Model(&IrCode{}).Where("opcode_name = ?", opcode)
+func SearchIrCodeByOpcodes(db *gorm.DB, ctx context.Context, opcodes ...int) chan *IrCode {
+	db = db.Model(&IrCode{}).Where("opcode in (?)", opcodes)
 	return yieldIrCodes(db, ctx)
 }
 

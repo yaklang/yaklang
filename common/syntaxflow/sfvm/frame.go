@@ -877,11 +877,21 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if values == nil {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		items := NewCompareOpcodeItems(s.GetContext())
-		for _, opcode := range i.Values {
-			items.AddOpcodeCompareItem(opcode)
+
+		comparator := NewOpcodeComparator(s.GetContext())
+		for _, v := range i.Values {
+			op := validSSAOpcode(v)
+			if op != -1 {
+				comparator.AddOpcode(op)
+				continue
+			}
+			binOp := validSSABinOpcode(v)
+			if binOp != "" {
+				comparator.AddBinOpcode(binOp)
+			}
 		}
-		newVal, condition := values.CompareOpcode(items)
+
+		newVal, condition := values.CompareOpcode(comparator)
 		if newVal != nil && !newVal.IsEmpty() {
 			dup := s.stack.Pop()
 			if dup == nil {
@@ -899,20 +909,20 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 
-		mode := ValidCompareString(i.UnaryInt)
+		mode := ValidStringMatchMode(i.UnaryInt)
 		if mode == -1 {
 			return utils.Wrapf(CriticalError, "compare string failed: invalid mode %v", mode)
 		}
 
-		items := NewCompareStringItems(mode, s.GetContext())
+		comparator := NewStringComparator(mode, s.GetContext())
 		if len(i.Values) != len(i.MultiOperator) {
 			s.conditionStack.Push([]bool{false})
 			return utils.Wrapf(CriticalError, "sfi values or mutiOperator out size %v", len(i.Values))
 		}
 		for index, v := range i.Values {
-			items.AddStringCompareItem(v, ValidConditionFilter(i.MultiOperator[index]))
+			comparator.AddCondition(v, ValidConditionFilter(i.MultiOperator[index]))
 		}
-		newVal, condition := values.CompareString(items)
+		newVal, condition := values.CompareString(comparator)
 		if newVal != nil && !newVal.IsEmpty() {
 			dup := s.stack.Pop()
 			if dup == nil {

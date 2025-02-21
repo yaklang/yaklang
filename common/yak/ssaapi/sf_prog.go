@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -21,45 +22,68 @@ import (
 
 var _ sfvm.ValueOperator = &Program{}
 
-func (p *Program) OpcodeMatch(ctx context.Context, s string) (bool, sfvm.ValueOperator, error) {
-	var values Values = lo.FilterMap(
-		ssa.MatchInstructionByOpcode(ctx, p.Program, s),
+func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
+	var boolRes []bool
+	ctx := opcodeItems.Context
+	var res Values = lo.FilterMap(
+		ssa.MatchInstructionByOpcodes(ctx, p.Program, opcodeItems.Opcodes...),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
+				boolRes = append(boolRes, true)
 				return p.NewValue(v), true
 			} else {
 				return nil, false
 			}
 		},
 	)
-	return len(values) > 0, values, nil
+	return res, boolRes
 }
 
-func (p *Program) CompareOpcode(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
-	v := items.MatchComparedValues(p)
-	if v == nil || v.IsEmpty() {
-		return nil, []bool{false}
-	}
-	var res []bool
-	v.Recursive(func(operator sfvm.ValueOperator) error {
-		_, exist := operator.CompareOpcode(items)
-		res = append(res, exist...)
-		return nil
-	})
-	return v, res
-}
+func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
+	var res []sfvm.ValueOperator
+	var boolRes []bool
+	ctx := comparator.Context
 
-func (p *Program) CompareString(items *sfvm.CompareItems) (sfvm.ValueOperator, []bool) {
-	v := items.MatchComparedValues(p)
-	if v == nil || v.IsEmpty() {
-		return nil, []bool{false}
+	matchValue := func(condition *sfvm.StringCondition) sfvm.ValueOperator {
+		var v sfvm.ValueOperator
+		switch condition.FilterMode {
+		case sfvm.GlobalConditionFilter:
+			_, v, _ = p.GlobMatch(ctx, ssadb.NameMatch, condition.Pattern)
+		case sfvm.RegexpConditionFilter:
+			_, v, _ = p.RegexpMatch(ctx, ssadb.NameMatch, condition.Pattern)
+		case sfvm.ExactConditionFilter:
+			_, v, _ = p.RegexpMatch(ctx, ssadb.NameMatch, fmt.Sprintf(".*%s.*", condition.Pattern))
+		}
+		return v
+		return nil
 	}
-	var res []bool
-	v.Recursive(func(operator sfvm.ValueOperator) error {
-		res = append(res, true)
+
+	switch comparator.MatchMode {
+	case sfvm.MatchHave:
+		for i, condition := range comparator.Conditions {
+			if i > 0 {
+				// TODO:OR条件匹配value
+				continue
+			}
+			matched := matchValue(condition)
+			if matched != nil {
+				res = append(res, matched)
+			}
+		}
+	case sfvm.MatchHaveAny:
+		for _, condition := range comparator.Conditions {
+			matched := matchValue(condition)
+			if matched != nil {
+				res = append(res, matched)
+			}
+		}
+	}
+	result := sfvm.NewValues(res)
+	result.Recursive(func(operator sfvm.ValueOperator) error {
+		boolRes = append(boolRes, true)
 		return nil
 	})
-	return v, res
+	return result, boolRes
 }
 
 func (p *Program) String() string {
