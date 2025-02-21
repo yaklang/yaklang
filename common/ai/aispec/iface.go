@@ -25,11 +25,8 @@ type Configurable interface {
 type StructuredData struct {
 	Id             string
 	Event          string
+	DataSourceType string
 	DataRaw        []byte
-	OutputText     string
-	FinishedReason string
-	ThoughtText    string
-	UsageStats     []UsageStatsInfo
 }
 
 type UsageStatsInfo struct {
