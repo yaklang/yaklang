@@ -16,39 +16,28 @@ func TestGraph_Builder(t *testing.T) {
 		dotGraph.MakeDirected()
 		dotGraph.GraphAttribute("rankdir", "BT")
 
-		// 创建节点的唯一标识->节点
-		keyToNode := make(map[int]string)
-		// 节点->节点唯一标识
-		NodeToKey := make(map[string]int)
-
+		var NodeToKey = make(map[string]int)
 		// 使用 GraphBuilder 构建图
 		builder := graph.NewDFSGraphBuilder[int, string](
 			func(node string) (int, error) {
-				if nodeId, ok := NodeToKey[node]; ok {
-					return nodeId, nil
-				}
 				nodeId := dotGraph.AddNode(node)
 				NodeToKey[node] = nodeId
-				keyToNode[nodeId] = node
-
 				return nodeId, nil
 			},
-			func(nodeKey int) []*graph.NeighborWithEdgeType[string] {
-				if node, ok := keyToNode[nodeKey]; ok {
-					switch node {
-					case "n1":
-						return []*graph.NeighborWithEdgeType[string]{
-							{Node: "n2", EdgeType: "depends_on"},
-							{Node: "n4", EdgeType: "depends_on"},
-						}
-					case "n2":
-						return []*graph.NeighborWithEdgeType[string]{
-							{Node: "n3", EdgeType: "depends_on"},
-						}
-					case "n4":
-						return []*graph.NeighborWithEdgeType[string]{
-							{Node: "n3", EdgeType: "depends_on"},
-						}
+			func(node string) []*graph.Neighbor[string] {
+				switch node {
+				case "n1":
+					return []*graph.Neighbor[string]{
+						{Node: "n2", EdgeType: "depends_on"},
+						{Node: "n4", EdgeType: "depends_on"},
+					}
+				case "n2":
+					return []*graph.Neighbor[string]{
+						{Node: "n3", EdgeType: "depends_on"},
+					}
+				case "n4":
+					return []*graph.Neighbor[string]{
+						{Node: "n3", EdgeType: "depends_on"},
 					}
 				}
 				return nil

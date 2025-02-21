@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/graph"
 )
@@ -46,14 +45,13 @@ func NewValueGraph(v ...*Value) *ValueGraph {
 		marshaledValue: make(map[int]struct{}),
 		Node2Value:     make(map[int]*Value),
 	}
-
-	builder := graph.NewDFSGraphBuilder[int, *Value](
-		g.getNodeIdByValue,
-		g.getNeighbors,
-		g.handleEdge,
-	)
 	for _, value := range v {
-		builder.BuildGraph(value)
+		graph.BuildGraphWithDFS[int, *Value](
+			value,
+			g.createNode,
+			g.getNeighbors,
+			g.handleEdge,
+		)
 	}
 	return g
 }
@@ -70,30 +68,19 @@ func (g *ValueGraph) ShowDot() {
 	fmt.Println(buf.String())
 }
 
-func (g *ValueGraph) getNodeIdByValue(value *Value) (int, error) {
-	log.Infof("create node %d: %v, %p", value.GetId(), value.GetVerboseName(), value)
-	nodeId, ok := g.Value2Node[value]
-	if !ok {
-		nodeId = g.AddNode(value.GetVerboseName())
-		g.Value2Node[value] = nodeId
-	}
-	if _, ok := g.Node2Value[nodeId]; !ok {
-		g.Node2Value[nodeId] = value
-	}
+func (g *ValueGraph) createNode(value *Value) (int, error) {
+	nodeId := g.AddNode(value.GetVerboseName())
+	g.Node2Value[nodeId] = value
+	g.Value2Node[value] = nodeId
 	return nodeId, nil
 }
 
-func (g *ValueGraph) getValueByNodeId(node int) *Value {
-	return g.Node2Value[node]
-}
-
-func (g *ValueGraph) getNeighbors(node int) []*graph.NeighborWithEdgeType[*Value] {
-	value := g.getValueByNodeId(node)
+func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	if value == nil {
 		return nil
 	}
 
-	var res []*graph.NeighborWithEdgeType[*Value]
+	var res []*graph.Neighbor[*Value]
 	for _, v := range value.GetDependOn() {
 		res = append(res, graph.NewNeighbor(v, EdgeTypeDependOn))
 	}
