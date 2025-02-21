@@ -354,6 +354,9 @@ func GetRealValue(value values.JavaValue) values.JavaValue {
 	}
 	return value
 }
+func IsSwitchOpcode(opcode int) bool {
+	return opcode == OP_TABLESWITCH || opcode == OP_LOOKUPSWITCH
+}
 func DumpNodesToDotExp(code *Node) string {
 	var visitor func(node *Node, visited map[*Node]bool, sb *strings.Builder)
 	visitor = func(node *Node, visited map[*Node]bool, sb *strings.Builder) {

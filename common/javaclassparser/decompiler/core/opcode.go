@@ -17,7 +17,7 @@ type OpCode struct {
 	GetStackChange   func()
 	IsTryCatchParent bool
 	TryNode          *OpCode
-	CatchNode        []*OpCode
+	CatchNode        []*CatchNode
 	//StackSimulation                *StackSimulationImpl
 	StackEntry                     *StackItem
 	Ref                            *values.JavaRef
@@ -36,4 +36,10 @@ type OpCode struct {
 	Info                           any
 	IsCustom                       bool
 	conditionOpId                  int
+}
+type CatchNode struct {
+	ExceptionTypeIndex uint16
+	StartIndex         uint16
+	EndIndex           uint16
+	OpCode            *OpCode
 }

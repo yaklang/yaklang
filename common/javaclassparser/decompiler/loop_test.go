@@ -1,18 +1,20 @@
 package decompiler
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	utils3 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/rewriter"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"testing"
 )
 
 type graphBuilder struct {
@@ -27,6 +29,7 @@ func newGraphBuilder() *graphBuilder {
 func (g *graphBuilder) NewNode(name string) *core.Node {
 	node := core.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 		return name
+	}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 	}))
 	node.Id = g.id
 	g.id++
@@ -192,6 +195,7 @@ func TestNestedLoop(t *testing.T) {
 	newCommonNode := func(name string) *core.Node {
 		node := core.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 			return name
+		}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 		}))
 		node.Id = id
 		id++
@@ -274,6 +278,7 @@ func TestBreakInLoop(t *testing.T) {
 	newCommonNode := func(name string) *core.Node {
 		node := core.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 			return name
+		}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 		}))
 		node.Id = id
 		id++

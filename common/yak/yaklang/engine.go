@@ -1,9 +1,10 @@
 package yaklang
 
 import (
+	"os"
+
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
-	"os"
 )
 
 var yaklangLibs map[string]interface{}

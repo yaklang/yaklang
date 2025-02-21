@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	utils3 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
@@ -61,6 +62,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 			if next == circleNode {
 				continueNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 					return "continue"
+				}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 				}))
 				continueNode.IsJmp = true
 				node.RemoveNext(next)
@@ -73,6 +75,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 				if node != circleNode {
 					breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 						return "break"
+					}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 					}))
 					breakNode.HideNext = next
 					breakNode.IsJmp = true
@@ -84,6 +87,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 				}
 				breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 					return "break"
+				}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 				}))
 				breakNode.HideNext = next
 				breakNode.IsJmp = true
@@ -100,6 +104,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 						}
 						breakNode.Statement = statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 							return "continue " + loopNode.Label
+						}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 						})
 					}
 					//} else {
@@ -116,6 +121,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 							}
 							breakNode.Statement = statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 								return "break " + loopNode.Label
+							}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 							})
 							//ok = true
 							break
@@ -134,6 +140,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 			if loopEnd != nil && (next == loopEnd && node != circleNode) {
 				breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 					return "break"
+				}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 				}))
 				node.RemoveNext(next)
 				node.AddNext(breakNode)
@@ -155,9 +162,11 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 						}
 						breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 							return "break"
+						}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 						}))
 						breakNode.Statement = statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 							return "continue " + loopNode.Label
+						}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 						})
 						breakNode.IsJmp = true
 						node.RemoveNext(next)
@@ -182,9 +191,11 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 							}
 							breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 								return "break"
+							}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 							}))
 							breakNode.Statement = statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 								return "break " + loopNode.Label
+							}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 							})
 							breakNode.IsJmp = true
 							node.RemoveNext(next)

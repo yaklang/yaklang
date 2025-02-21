@@ -2,16 +2,24 @@ package statements
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
+
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
-	"strings"
 )
 
 type ConditionStatement struct {
 	Condition values.JavaValue
 	Neg       bool
 	Callback  func(values.JavaValue)
+}
+
+// ReplaceVar implements Statement.
+func (r *ConditionStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	r.Condition.ReplaceVar(oldId, newId)
 }
 
 func (r *ConditionStatement) String(funcCtx *class_context.ClassContext) string {
@@ -67,6 +75,13 @@ type ReturnStatement struct {
 	JavaValue values.JavaValue
 }
 
+// ReplaceVar implements Statement.
+func (r *ReturnStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	if r.JavaValue != nil {
+		r.JavaValue.ReplaceVar(oldId, newId)
+	}
+}
+
 func (r *ReturnStatement) String(funcCtx *class_context.ClassContext) string {
 	if r.JavaValue == nil {
 		return "return"
@@ -81,25 +96,14 @@ func NewReturnStatement(value values.JavaValue) *ReturnStatement {
 	}
 }
 
-type DeclareStatement struct {
-	Id       int
-	JavaType types.JavaType
-}
-
-func (a *DeclareStatement) String(funcCtx *class_context.ClassContext) string {
-	return fmt.Sprintf("%s var%d", a.JavaType.String(funcCtx), a.Id)
-}
-
-func NewDeclareStatement(id int, typ types.JavaType) *DeclareStatement {
-	return &DeclareStatement{
-		Id:       id,
-		JavaType: typ,
-	}
-}
-
 type StackAssignStatement struct {
 	Id        int
 	JavaValue *values.JavaRef
+}
+
+// ReplaceVar implements Statement.
+func (a *StackAssignStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	a.JavaValue.ReplaceVar(oldId, newId)
 }
 
 func (a *StackAssignStatement) String(funcCtx *class_context.ClassContext) string {
@@ -116,10 +120,23 @@ type AssignStatement struct {
 	LeftValue   values.JavaValue
 	ArrayMember *values.JavaArrayMember
 	JavaValue   values.JavaValue
+	IsDeclare   bool
 	IsFirst     bool
 }
 
+// ReplaceVar implements Statement.
+func (a *AssignStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	a.LeftValue.ReplaceVar(oldId, newId)
+	if a.ArrayMember != nil {
+		a.ArrayMember.ReplaceVar(oldId, newId)
+	}
+	a.JavaValue.ReplaceVar(oldId, newId)
+}
+
 func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
+	if a.IsDeclare {
+		return fmt.Sprintf("%s %s", a.LeftValue.Type().String(funcCtx), a.LeftValue.String(funcCtx))
+	}
 	if a.ArrayMember != nil {
 		return fmt.Sprintf("%s = %s", a.ArrayMember.String(funcCtx), a.JavaValue.String(funcCtx))
 	}
@@ -132,11 +149,20 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 }
 
 type ForStatement struct {
-	InitVar             Statement
-	Condition           *ConditionStatement
-	EndExp              Statement
-	SubStatements       []Statement
-	SubStatementsDumper func(subStatement Statement) string
+	InitVar       Statement
+	Condition     *ConditionStatement
+	EndExp        Statement
+	SubStatements []Statement
+}
+
+// ReplaceVar implements Statement.
+func (f *ForStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	f.InitVar.ReplaceVar(oldId, newId)
+	f.Condition.ReplaceVar(oldId, newId)
+	f.EndExp.ReplaceVar(oldId, newId)
+	for _, st := range f.SubStatements {
+		st.ReplaceVar(oldId, newId)
+	}
 }
 
 func NewForStatement(subStatements []Statement) *ForStatement {
@@ -154,11 +180,7 @@ func (f *ForStatement) String(funcCtx *class_context.ClassContext) string {
 	datas = append(datas, f.EndExp.String(funcCtx))
 	statementStr := []string{}
 	for _, statement := range f.SubStatements {
-		if f.SubStatementsDumper != nil {
-			statementStr = append(statementStr, f.SubStatementsDumper(statement))
-		} else {
-			statementStr = append(statementStr, statement.String(funcCtx))
-		}
+		statementStr = append(statementStr, statement.String(funcCtx))
 	}
 	s := fmt.Sprintf("for(%s; %s; %s) {\n%s\n}", datas[0], datas[1], datas[2], strings.Join(statementStr, "\n"))
 	return s
@@ -171,6 +193,12 @@ func NewArrayMemberAssignStatement(m *values.JavaArrayMember, value values.JavaV
 	}
 }
 
+func NewDeclareStatement(leftVal values.JavaValue) *AssignStatement {
+	return &AssignStatement{
+		LeftValue: leftVal,
+		IsDeclare: true,
+	}
+}
 func NewAssignStatement(leftVal, value values.JavaValue, isFirst bool) *AssignStatement {
 	if value == nil || leftVal == nil || value.Type() == nil || leftVal.Type() == nil {
 		value.Type()
@@ -189,6 +217,16 @@ type IfStatement struct {
 	Condition values.JavaValue
 	IfBody    []Statement
 	ElseBody  []Statement
+}
+
+func (g *IfStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	g.Condition.ReplaceVar(oldId, newId)
+	for _, st := range g.IfBody {
+		st.ReplaceVar(oldId, newId)
+	}
+	for _, st := range g.ElseBody {
+		st.ReplaceVar(oldId, newId)
+	}
 }
 
 func (g *IfStatement) String(funcCtx *class_context.ClassContext) string {
@@ -217,6 +255,10 @@ type GOTOStatement struct {
 	ToStatement int
 }
 
+// ReplaceVar implements Statement.
+func (g *GOTOStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+}
+
 func (g *GOTOStatement) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("goto: %d", g.ToStatement)
 }
@@ -226,6 +268,11 @@ func NewGOTOStatement() *GOTOStatement {
 
 type NewStatement struct {
 	Class *types.JavaClass
+}
+
+// ReplaceVar implements Statement.
+func (a *NewStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	a.Class.ReplaceVar(oldId, newId)
 }
 
 func (a *NewStatement) String(funcCtx *class_context.ClassContext) string {
@@ -240,6 +287,11 @@ func NewNewStatement(class *types.JavaClass) *NewStatement {
 
 type ExpressionStatement struct {
 	Expression values.JavaValue
+}
+
+// ReplaceVar implements Statement.
+func (a *ExpressionStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	a.Expression.ReplaceVar(oldId, newId)
 }
 
 func (a *ExpressionStatement) String(funcCtx *class_context.ClassContext) string {
@@ -268,6 +320,16 @@ func NewCaseItem(v int, body []Statement) *CaseItem {
 type SwitchStatement struct {
 	Value values.JavaValue
 	Cases []*CaseItem
+}
+
+// ReplaceVar implements Statement.
+func (a *SwitchStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	a.Value.ReplaceVar(oldId, newId)
+	for _, c := range a.Cases {
+		for _, st := range c.Body {
+			st.ReplaceVar(oldId, newId)
+		}
+	}
 }
 
 func (a *SwitchStatement) String(funcCtx *class_context.ClassContext) string {
@@ -299,6 +361,10 @@ type MiddleStatement struct {
 	Flag string
 }
 
+// ReplaceVar implements Statement.
+func (a *MiddleStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+}
+
 func (a *MiddleStatement) String(funcCtx *class_context.ClassContext) string {
 	return a.Flag
 }
@@ -313,6 +379,14 @@ func NewMiddleStatement(flag string, d any) *MiddleStatement {
 type SynchronizedStatement struct {
 	Argument values.JavaValue
 	Body     []Statement
+}
+
+// ReplaceVar implements Statement.
+func (s *SynchronizedStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	s.Argument.ReplaceVar(oldId, newId)
+	for _, st := range s.Body {
+		st.ReplaceVar(oldId, newId)
+	}
 }
 
 func NewSynchronizedStatement(val values.JavaValue, body []Statement) *SynchronizedStatement {

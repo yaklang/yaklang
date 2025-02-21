@@ -21,6 +21,7 @@ import (
 
 type RewriteManager struct {
 	currentNodeId    int
+	startVarId       int
 	RootNode         *core.Node
 	PreNode          *core.Node
 	CircleEntryPoint []*core.Node
@@ -211,6 +212,9 @@ func CheckCanBeMerge(ifNode1, ifNode2 *core.Node) bool {
 
 	// 检查另一个子节点的父节点是否为node2
 	return slices.Contains(node2.Next, otherChild)
+}
+func (s *RewriteManager) SetStartVarId(id int) {
+	s.startVarId = id
 }
 func (s *RewriteManager) SetId(id int) {
 	s.currentNodeId = id

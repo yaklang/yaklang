@@ -1,13 +1,14 @@
 package yaktest
 
 import (
-	"github.com/yaklang/yaklang/common/javaclassparser"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func TestParseClass(t *testing.T) {
@@ -26,19 +27,20 @@ func TestParseClass(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if path != "/Users/z3/Downloads/error-jdsc 3/decompile-err-02da3de4136c76a40f1b48fc.class" {
-			return nil
-		}
+		// if path != "/Users/z3/Downloads/error-jdsc 3/decompile-err-0891f02d99bd27aa6e82c8dd.class" {
+		// 	return nil
+		// }
 		source, err := cf.Dump()
 
 		if err != nil {
 			//return err
 			println(path)
-
+			return nil
 		}
 		_ = source
 		_, err = ssaapi.Parse(source, ssaapi.WithLanguage(ssaapi.JAVA))
 		if err != nil {
+			os.WriteFile("/Users/z3/Downloads/error.java", []byte(source), 0644)
 			println(path)
 		}
 		//fmt.Println(source)

@@ -4,8 +4,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
-	"golang.org/x/exp/maps"
 )
 
 type StackItem struct {
@@ -102,11 +100,12 @@ func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values
 		s.varTable[slot] = newRef
 		return newRef, true
 	}
-	types.MergeTypes(ref.Type(), val.Type())
-	newRef := *ref
-	newRef.Id = newRef.Id.Horizontal()
-	newRef.Val = val
-	return &newRef, false
+	return ref, false
+	// types.MergeTypes(ref.Type(), val.Type())
+	// newRef := *ref
+	// newRef.Id = newRef.Id.Horizontal()
+	// newRef.Val = val
+	// return &newRef, false
 }
 
 func NewEmptyStackEntry() *StackItem {
@@ -115,10 +114,10 @@ func NewEmptyStackEntry() *StackItem {
 func NewStackSimulation(entry *StackItem, varTable map[int]*values.JavaRef, generator *utils.VariableId) *StackSimulationImpl {
 	sim := &StackSimulationImpl{
 		stackEntry:   entry,
-		varTable:     map[int]*values.JavaRef{},
+		varTable:     varTable,
 		currentVarId: generator,
 	}
-	maps.Copy(sim.varTable, varTable)
+	// maps.Copy(sim.varTable, varTable)
 	return sim
 }
 
