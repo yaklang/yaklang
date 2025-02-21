@@ -275,7 +275,6 @@ func Test_Condition_Filter_Start_With_Program(t *testing.T) {
 	})
 
 	t.Run("test CompareString-Have mutli exact", func(t *testing.T) {
-		t.Skip()
 		ssatest.CheckSyntaxFlow(t, `
 		aa = 1
 		aacc = 2
