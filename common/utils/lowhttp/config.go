@@ -130,6 +130,11 @@ type LowhttpResponse struct {
 	// custom tags
 	Tags []string
 
+	IsFixContentType        bool
+	OriginContentType       string
+	FixContentType          string
+	IsSetContentTypeOptions bool
+
 	postParts []*multipart.Part
 }
 

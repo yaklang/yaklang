@@ -1018,13 +1018,27 @@ STATUSCODERETRY:
 		2. PIPELINE(multi response)
 	*/
 	if !noFixContentLength && !isMultiResponses {
-		// fix
 		// return responseRaw.Bytes(), nil
+		header := GetHTTPPacketHeader(rawBytes, "Content-Type")
+		response.OriginContentType = header
+		ContentTypeOptions := GetHTTPPacketHeader(rawBytes, "X-Content-Type-Options")
+		response.IsSetContentTypeOptions = ContentTypeOptions != ""
+		headerHash := codec.Md5(header)
+		/*
+			todo: need split fix http response, fix content-type need as option
+		*/
 		rspRaw, _, err := FixHTTPResponse(rawBytes)
 		if err != nil {
 			log.Errorf("fix http response failed: %s", err)
 			response.RawPacket = rawBytes
+			response.IsFixContentType = false
 			return response, nil
+		}
+		fixHeader := GetHTTPPacketHeader(rspRaw, "Content-Type")
+		md5 := codec.Md5(fixHeader)
+		response.IsFixContentType = headerHash != md5
+		if response.IsFixContentType {
+			response.FixContentType = fixHeader
 		}
 		response.RawPacket = rspRaw
 		return response, nil
