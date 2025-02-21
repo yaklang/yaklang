@@ -87,14 +87,13 @@ func (c *StringCondition) Matches(target string) bool {
 }
 
 type OpcodeComparator struct {
-	Context   context.Context
-	Opcodes   []ssa.Opcode
-	BinOpcode []string
+	Context        context.Context
+	Opcodes        []ssa.Opcode
+	BinAndUnarayOp []string
 }
 
-type OpcodeCheck func(opcode ssa.Opcode) bool
-
-type BinOpcodeCheck func(opcode string) bool
+type CheckOpcode func(opcode ssa.Opcode) bool
+type CheckBinOrUnaryOpcode func(opcode string) bool
 
 func NewOpcodeComparator(ctx context.Context) *OpcodeComparator {
 	return &OpcodeComparator{
@@ -110,14 +109,14 @@ func (c *OpcodeComparator) AddOpcode(opcode ssa.Opcode) {
 	c.Opcodes = append(c.Opcodes, opcode)
 }
 
-func (c *OpcodeComparator) AddBinOpcode(binOp string) {
+func (c *OpcodeComparator) AddBinOrUnaryOpcode(op string) {
 	if c == nil {
 		return
 	}
-	c.BinOpcode = append(c.BinOpcode, binOp)
+	c.BinAndUnarayOp = append(c.BinAndUnarayOp, op)
 }
 
-func (c *OpcodeComparator) AllSatisfy(opcodeCheck OpcodeCheck, binOpCheck BinOpcodeCheck) bool {
+func (c *OpcodeComparator) AllSatisfy(opcodeCheck CheckOpcode, check CheckBinOrUnaryOpcode) bool {
 	if c == nil {
 		return false
 	}
@@ -126,8 +125,8 @@ func (c *OpcodeComparator) AllSatisfy(opcodeCheck OpcodeCheck, binOpCheck BinOpc
 			return true
 		}
 	}
-	for _, binOpcode := range c.BinOpcode {
-		if binOpCheck(binOpcode) {
+	for _, opcode := range c.BinAndUnarayOp {
+		if check(opcode) {
 			return true
 		}
 	}
