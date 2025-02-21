@@ -14,6 +14,26 @@ import (
 
 var _ sfvm.ValueOperator = new(Values)
 
+func (v Values) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
+	var res []bool
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		_, result := operator.CompareString(comparator)
+		res = append(res, result...)
+		return nil
+	})
+	return nil, res
+}
+
+func (v Values) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
+	var res []bool
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		_, result := operator.CompareOpcode(comparator)
+		res = append(res, result...)
+		return nil
+	})
+	return nil, res
+}
+
 func (p Values) GetOpcode() string {
 	return ssa.SSAOpcode2Name[ssa.SSAOpcodeUnKnow]
 }

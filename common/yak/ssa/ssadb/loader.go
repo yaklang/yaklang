@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"context"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -93,6 +92,7 @@ const (
 	ExactCompare int = iota
 	GlobCompare
 	RegexpCompare
+	OpcodeCompare
 )
 
 func SearchVariable(db *gorm.DB, ctx context.Context, compareMode, matchMod int, value string) chan *IrCode {
@@ -146,6 +146,11 @@ func RegexpSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value strin
 		db = db.Where("variable_name REGEXP ? OR class_name REGEXP ? OR field_name REGEXP ?", value, value, value)
 	}
 	return yieldIrIndex(db, ctx)
+}
+
+func SearchIrCodeByOpcodes(db *gorm.DB, ctx context.Context, opcodes ...int) chan *IrCode {
+	db = db.Model(&IrCode{}).Where("opcode in (?)", opcodes)
+	return yieldIrCodes(db, ctx)
 }
 
 func GetVariableByValue(valueID int64) []*IrIndex {

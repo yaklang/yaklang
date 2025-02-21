@@ -145,4 +145,7 @@ type ValueOperator interface {
 
 	// fileFilter
 	FileFilter(string, string, map[string]string, []string) (ValueOperator, error)
+
+	CompareString(*StringComparator) (ValueOperator, []bool)
+	CompareOpcode(*OpcodeComparator) (ValueOperator, []bool)
 }
