@@ -1559,6 +1559,7 @@ func TestWebFuzzerAutoFixHeaderFlag(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
 Content-Disposition: attachment; filename="example.pdf"
+X-Content-Type-Options: nosniff
 
 %PDF-1.4
 %âãÏÓ
@@ -1574,15 +1575,26 @@ Content-Disposition: attachment; filename="example.pdf"
 	})
 	require.NoError(t, err)
 	flag := false
+	var (
+		originContentType       string
+		fixedContentType        string
+		isSetContentTypeOptions bool
+	)
 	for {
 		recv, err := fuzzer.Recv()
 		if err != nil {
 			break
 		}
 		if recv.IsAutoFixContentType {
+			originContentType = recv.OriginalContentType
+			fixedContentType = recv.FixContentType
+			isSetContentTypeOptions = recv.IsSetContentTypeOptions
 			flag = true
 			break
 		}
 	}
 	require.True(t, flag)
+	require.True(t, "text/html" == originContentType)
+	require.True(t, "application/pdf" == fixedContentType)
+	require.True(t, isSetContentTypeOptions)
 }
