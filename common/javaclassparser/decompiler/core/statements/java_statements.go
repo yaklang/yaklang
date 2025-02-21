@@ -126,11 +126,15 @@ type AssignStatement struct {
 
 // ReplaceVar implements Statement.
 func (a *AssignStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
-	a.LeftValue.ReplaceVar(oldId, newId)
+	if a.LeftValue != nil {
+		a.LeftValue.ReplaceVar(oldId, newId)
+	}
 	if a.ArrayMember != nil {
 		a.ArrayMember.ReplaceVar(oldId, newId)
 	}
-	a.JavaValue.ReplaceVar(oldId, newId)
+	if a.JavaValue != nil {
+		a.JavaValue.ReplaceVar(oldId, newId)
+	}
 }
 
 func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
