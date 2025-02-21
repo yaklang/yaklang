@@ -2,11 +2,12 @@ package ssa
 
 import (
 	"context"
-	"regexp"
-
 	"github.com/gobwas/glob"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"golang.org/x/exp/slices"
+	"regexp"
 )
 
 func MatchInstructionByExact(ctx context.Context, prog *Program, mod int, e string) []Instruction {
@@ -23,15 +24,18 @@ func MatchInstructionByRegexp(ctx context.Context, prog *Program, mod int, r str
 	return matchInstructionsByVariable(ctx, prog, ssadb.RegexpCompare, mod, r)
 }
 
-func MatchInstructionByOpcode(ctx context.Context, prog *Program, opcode string) []Instruction {
-	return matchInstructionByOpcode(ctx, prog, opcode)
+func MatchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Opcode) []Instruction {
+	return matchInstructionByOpcodes(ctx, prog, opcodes...)
 }
 
-func matchInstructionByOpcode(ctx context.Context, prog *Program, opcodeName string) []Instruction {
+func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Opcode) []Instruction {
 	var insts []Instruction
-
 	if prog.EnableDatabase {
-		ch := ssadb.SearchIrCodeByOpcode(ssadb.GetDBInProgram(prog.Name), opcodeName, ctx)
+		ch := ssadb.SearchIrCodeByOpcodes(ssadb.GetDBInProgram(prog.Name), ctx,
+			lo.Map(opcodes, func(opcode Opcode, index int) int {
+				return int(opcode)
+			})...,
+		)
 		for ir := range ch {
 			inst, err := NewLazyInstructionFromIrCode(ir, prog)
 			if err != nil {
@@ -43,13 +47,11 @@ func matchInstructionByOpcode(ctx context.Context, prog *Program, opcodeName str
 		return insts
 	}
 
-	checkOpcode := func(op Opcode) bool {
-		return SSAOpcode2Name[op] == opcodeName
-	}
-	for _, instruction := range prog.Cache.constCache {
-		value, b := ToValue(instruction)
-		if b && checkOpcode(value.GetOpcode()) {
-			insts = append(insts, instruction)
+	for _, cache := range prog.Cache.InstructionCache.GetAll() {
+		inst := cache.inst
+		value, b := ToValue(cache.inst)
+		if b && slices.Contains(opcodes, value.GetOpcode()) {
+			insts = append(insts, inst)
 		}
 	}
 	return insts
@@ -89,27 +91,25 @@ func matchInstructionsByVariable(
 	}
 
 	// from cache
-	check := func(s string) bool {
-		// from cache
-		var check func(string) bool
-		// check := func(s string) bool {
-		switch compareMode {
-		case ssadb.ExactCompare:
-			check = func(s string) bool { return s == name }
-		case ssadb.GlobCompare:
-			matcher, err := glob.Compile(name)
-			if err != nil {
-				return
-			}
-			check = func(s string) bool { return matcher.Match(s) }
-		case ssadb.RegexpCompare:
-			matcher, err := regexp.Compile(name)
-			if err != nil {
-				return
-			}
-			check = func(s string) bool { return matcher.MatchString(s) }
-		default:
+	var check func(string) bool
+	// check := func(s string) bool {
+	switch compareMode {
+	case ssadb.ExactCompare:
+		check = func(s string) bool { return s == name }
+	case ssadb.GlobCompare:
+		matcher, err := glob.Compile(name)
+		if err != nil {
 			return
+		}
+		check = func(s string) bool { return matcher.Match(s) }
+	case ssadb.RegexpCompare:
+		matcher, err := regexp.Compile(name)
+		if err != nil {
+			return
+		}
+		check = func(s string) bool { return matcher.MatchString(s) }
+	default:
+		return
 	}
 	addRes(prog.Cache._getByVariableEx(matchMode, check)...)
 	return res
