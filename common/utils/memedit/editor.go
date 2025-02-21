@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -63,26 +62,6 @@ func (ve *MemEditor) SetUrl(url string) {
 // GetIrSourceHash 使用程序名称、路径和源代码计算哈希值
 func (ve *MemEditor) GetIrSourceHash(programName string) string {
 	return codec.Md5(programName + ve.GetFilename() + ve.GetSourceCode())
-}
-
-func (ve *MemEditor) GetFormatedUrl() string {
-	u := ve.fileUrl
-	if strings.HasPrefix(u, "file://") {
-		return u
-	}
-
-	if filepath.IsAbs(ve.fileUrl) {
-		return "file://" + ve.fileUrl
-	}
-
-	raw, err := filepath.Abs(ve.fileUrl)
-	if err != nil {
-		if strings.HasPrefix(ve.fileUrl, "./") {
-			return ve.fileUrl
-		}
-		return "./" + ve.fileUrl
-	}
-	return "file://" + raw
 }
 
 func (ve *MemEditor) GetFilename() string {
