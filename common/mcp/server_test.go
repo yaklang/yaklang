@@ -54,14 +54,10 @@ func TestMCPClient(t *testing.T) {
 
 	request := mcp.CallToolRequest{}
 	data := `{
-  "code": "a = 1; b= ",
-  "execParams": [
-    {"key": "a", "value": "1"},
-    {"key": "b", "value": "2"}
-  ],
-  "pluginType": "yak"
+  "targets": ["asd","qwe"],
+  "ports": [80,443]
 }`
-	request.Params.Name = "exec_yak_script"
+	request.Params.Name = "port_scan"
 	err = json.Unmarshal([]byte(data), &request.Params.Arguments)
 	require.NoError(t, err)
 
