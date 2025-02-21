@@ -34,16 +34,16 @@ func GetDefaultNetStackVirtualMachine() (*NetStackVirtualMachine, error) {
 		if err != nil {
 			return nil, utils.Errorf("create netstack virtual machine failed: %v", err)
 		}
-		//if err := userStack.StartDHCP(); err != nil {
-		//	return nil, utils.Errorf("start dhcp failed: %v", err)
-		//}
-		//if err := userStack.WaitDHCPFinished(utils.TimeoutContextSeconds(5)); err != nil {
-		//	return nil, utils.Errorf("wait dhcp finished fail: %v", err)
-		//}
-		err = userStack.InheritPcapInterfaceConfig()
-		if err != nil {
-			return nil, utils.Errorf("inherit pcap interface config failed: %v", err)
+		if err := userStack.StartDHCP(); err != nil {
+			return nil, utils.Errorf("start dhcp failed: %v", err)
 		}
+		if err := userStack.WaitDHCPFinished(utils.TimeoutContextSeconds(5)); err != nil {
+			return nil, utils.Errorf("wait dhcp finished fail: %v", err)
+		}
+		//err = userStack.InheritPcapInterfaceConfig()
+		//if err != nil {
+		//	return nil, utils.Errorf("inherit pcap interface config failed: %v", err)
+		//}
 		DefaultNetStackVirtualMachine = userStack
 	}
 	return DefaultNetStackVirtualMachine, nil
