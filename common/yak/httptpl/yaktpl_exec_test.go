@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"io"
 	"net/http"
 	"net/url"
@@ -17,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -1602,7 +1602,7 @@ func TestMockTest_OOB(t *testing.T) {
 			t.Fatal(err)
 			return
 		}
-		netx.LookupFirst(urlIns.Host, netx.WithTimeout(time.Second), netx.WithDNSServers(dnsserver), netx.WithDNSDisableSystemResolver(true))
+		dns_lookup.LookupFirst(urlIns.Host, dns_lookup.WithTimeout(time.Second), dns_lookup.WithDNSServers(dnsserver), dns_lookup.WithDNSDisableSystemResolver(true))
 	})
 	tmp := `id: CVE-2017-9506
 

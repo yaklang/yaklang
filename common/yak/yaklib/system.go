@@ -1,11 +1,11 @@
 package yaklib
 
 import (
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net"
 	"os"
 	"runtime"
 
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/privileged"
@@ -70,7 +70,7 @@ var SystemExports = map[string]interface{}{
 // os.LookupHost("www.yaklang.com")
 // ```
 func lookupHost(i string) []string {
-	return netx.LookupAll(i)
+	return dns_lookup.LookupAll(i)
 }
 
 // LookupIP 通过DNS服务器，根据域名查找IP
@@ -79,7 +79,7 @@ func lookupHost(i string) []string {
 // os.LookupIP("www.yaklang.com")
 // ```
 func lookupIP(i string) []string {
-	return netx.LookupAll(i)
+	return dns_lookup.LookupAll(i)
 }
 
 // IsTCPPortOpen 检查TCP端口是否开放
@@ -447,7 +447,7 @@ func Chown(name string, uid, gid int) error {
 // os.GetDefaultDNSServers()
 // ```
 func GetDefaultDNSServers() []string {
-	return netx.NewDefaultReliableDNSConfig().SpecificDNSServers
+	return dns_lookup.NewDefaultReliableDNSConfig().SpecificDNSServers
 }
 
 // WaitConnect 等待一个地址的端口开放或指导超时时间，如果超时则返回错误，这通常用于等待并确保一个服务启动

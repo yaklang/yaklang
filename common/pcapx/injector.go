@@ -5,7 +5,7 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/pcap"
-	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -114,7 +114,7 @@ func ParseSrcNDstAddress(src, dst string) (net.IP, net.IP, uint16, uint16, error
 			wg.Done()
 		}()
 		if !utils.IsIPv4(srcHost) && utils.IsValidDomain(srcHost) {
-			targetIP := netx.LookupFirst(srcHost, netx.WithTimeout(3*time.Second))
+			targetIP := dns_lookup.LookupFirst(srcHost, dns_lookup.WithTimeout(3*time.Second))
 
 			if targetIP != "" {
 				srcIP = net.ParseIP(targetIP)
@@ -132,7 +132,7 @@ func ParseSrcNDstAddress(src, dst string) (net.IP, net.IP, uint16, uint16, error
 			wg.Done()
 		}()
 		if !utils.IsIPv4(dstHost) && utils.IsValidDomain(dstHost) {
-			targetIP := netx.LookupFirst(dstHost, netx.WithTimeout(5*time.Second))
+			targetIP := dns_lookup.LookupFirst(dstHost, dns_lookup.WithTimeout(5*time.Second))
 			if targetIP != "" {
 				dstIP = net.ParseIP(targetIP)
 			}
