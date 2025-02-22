@@ -13,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -22,17 +21,35 @@ import (
 
 const WIN_DEV_LOOP = "\\Device\\NPF_Loopback"
 
+type interfaceMatchResult struct {
+	matches bool
+}
+
+var interfaceMatchCache = utils.NewTTLCache[*interfaceMatchResult](1 * time.Minute)
+
+func init() {
+	// 设置过期回调
+	interfaceMatchCache.SetExpirationCallback(func(key string, value *interfaceMatchResult) {
+		log.Debugf("interfaceMatchCache %s is expired", key)
+	})
+}
+
 func PcapInterfaceEqNetInterface(piface pcap.Interface, iface *net.Interface) bool {
+	cacheKey := fmt.Sprintf("%s__%s", piface.Name, iface.Name)
+
+	if cached, ok := interfaceMatchCache.Get(cacheKey); ok {
+		return cached.matches
+	}
+
+	// 处理 Windows Loopback 特殊情况
 	// 如果 windows \Device\NPF_Loopback 网卡没 IP address，比如 npcap-1.60版本的，安装后默认没 IP address
-	// 同时安装完成后需要重启电脑，不然会报错\Device\NPF_Loopback: driver error: not enough memory to allocate the kernel buffer
-	// Mock IP addresses
+	// 会报错 \Device\NPF_Loopback: driver error: not enough memory to allocate the kernel buffer
+	// 直接 Mock IP address
 	if piface.Name == WIN_DEV_LOOP && len(piface.Addresses) == 0 {
-		piface.Addresses = append(piface.Addresses, pcap.InterfaceAddress{
-			IP: net.IPv4(127, 0, 0, 1),
-		})
-		piface.Addresses = append(piface.Addresses, pcap.InterfaceAddress{
-			IP: net.IPv6loopback,
-		})
+		piface.Addresses = []pcap.InterfaceAddress{
+			{IP: net.IPv4(127, 0, 0, 1)},
+			{IP: net.IPv6loopback},
+		}
 	}
 
 	addrs, err := iface.Addrs()
@@ -41,29 +58,31 @@ func PcapInterfaceEqNetInterface(piface pcap.Interface, iface *net.Interface) bo
 		return false
 	}
 
-	var pIfaceAddrs []string
-	var ifaceAddrs []string
-
+	// 比较逻辑
+	pIfaceAddrs := make(map[string]struct{}, len(piface.Addresses))
 	for _, addr := range piface.Addresses {
-		pIfaceAddrs = append(pIfaceAddrs, addr.IP.String())
+		pIfaceAddrs[addr.IP.String()] = struct{}{}
 	}
 
+	matches := 0
 	for _, addr := range addrs {
 		ipValue, _, err := net.ParseCIDR(addr.String())
 		if err != nil {
 			continue
 		}
-		ifaceAddrs = append(ifaceAddrs, ipValue.String())
+		if _, ok := pIfaceAddrs[ipValue.String()]; ok {
+			matches++
+		}
 	}
 
-	if pIfaceAddrs == nil || ifaceAddrs == nil {
-		log.Debugf("no iIfaceAddrs[pcap:%v] or ifaceAddrs[net:%v]", piface.Name, iface.Name)
-		return false
-	}
+	result := matches > 0 && matches == len(pIfaceAddrs)
 
-	sort.Strings(pIfaceAddrs)
-	sort.Strings(ifaceAddrs)
-	return utils.CalcSha1(strings.Join(pIfaceAddrs, "|")) == utils.CalcSha1(strings.Join(ifaceAddrs, "|"))
+	// 缓存结果
+	interfaceMatchCache.Set(cacheKey, &interfaceMatchResult{
+		matches: result,
+	})
+
+	return result
 }
 
 type ConvertIfaceNameError struct {
@@ -82,6 +101,35 @@ func NewConvertIfaceNameError(name string) *ConvertIfaceNameError {
 
 var cachedFindAllDevs = utils.CacheFunc(60, pcap.FindAllDevs)
 
+// 创建接口缓存
+var interfaceByNameCache = utils.NewTTLCache[*net.Interface](1 * time.Minute)
+
+func init() {
+	interfaceByNameCache.SetExpirationCallback(func(key string, value *net.Interface) {
+		log.Debugf("interfaceByNameCache %s is expired", key)
+	})
+}
+
+// 封装 InterfaceByName 的缓存版本
+func getCachedInterfaceByName(name string) (*net.Interface, error) {
+	// 尝试从缓存获取
+	if iface, ok := interfaceByNameCache.Get(name); ok {
+		//log.Infof("fetch iface %s from cache", name)
+		return iface, nil
+	}
+
+	// 缓存未命中，获取接口信息
+	iface, err := net.InterfaceByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	// 更新缓存
+	interfaceByNameCache.Set(name, iface)
+
+	return iface, nil
+}
+
 func IfaceNameToPcapIfaceName(name string) (string, error) {
 	devs, err := cachedFindAllDevs()
 	if err != nil {
@@ -94,7 +142,7 @@ func IfaceNameToPcapIfaceName(name string) (string, error) {
 		}
 	}
 
-	iface, err := net.InterfaceByName(name)
+	iface, err := getCachedInterfaceByName(name)
 	if err != nil {
 		return "", utils.Errorf("fetch net.Interface failed: %s", err)
 	}
@@ -135,7 +183,7 @@ func PcapIfaceNameToNetInterface(ifaceName string) (*net.Interface, error) {
 					return &iface, nil
 				}
 			} else {
-				iface, err := net.InterfaceByName(dev.Name)
+				iface, err := getCachedInterfaceByName(dev.Name)
 				if err != nil {
 					return nil, utils.Errorf("fetch net.Interface failed: %s", err)
 				}
@@ -298,7 +346,6 @@ func WrapPcapHandle(handle *pcap.Handle, isloop ...bool) *PcapHandleWrapper {
 		isLoopback: isLoopback,
 	}
 }
-
 func (w *PcapHandleWrapper) IsLoopback() bool {
 	return w.isLoopback
 }
