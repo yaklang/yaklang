@@ -35,7 +35,11 @@ jobs:
 
       - name: Get Yak binary Latest
         run: |
-          wget https://aliyun-oss.yaklang.com/yak/1.3.9-beta3/yak_linux_amd64
+          BIN_VERSION="${{ inputs.update_version}}"
+          if [ -z "$BIN_VERSION" ]; then
+            BIN_VERSION="latest"
+          fi 
+          wget https://aliyun-oss.yaklang.com/yak/$BIN_VERSION/yak_linux_amd64
           pwd && ls -lh && chmod +x ./yak_linux_amd64
           ./yak_linux_amd64 version
 
@@ -43,7 +47,7 @@ jobs:
         run: |
           VERSION_INPUT="${{ inputs.update_version}}"
           if [ -z "$VERSION_INPUT" ]; then
-            VERSION_INPUT="1.3.9-beta3"
+            VERSION_INPUT="dev"
           fi 
           echo "YAK_TAG=$VERSION_INPUT" >> $GITHUB_ENV 
 
