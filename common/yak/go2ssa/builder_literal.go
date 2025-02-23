@@ -246,6 +246,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				func(i int) ssa.Value {
 					return b.EmitConstInst(i)
 				})
+		case ssa.AliasTypeKind:
+			alias := typ.(*ssa.AliasType)
+			obj = typeHandler(alias.GetType(), kvs)
 		case ssa.AnyTypeKind: // 对于未知类型，这里选择根据LiteralValue的特征来推测其类型
 			var typt ssa.Type
 
@@ -842,6 +845,9 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 		return b.EmitConstInst(false)
 	case ssa.FunctionTypeKind:
 		return b.EmitUndefined("func")
+	case ssa.AliasTypeKind:
+		alias, _ := ssa.ToAliasType(ityp)
+		return b.GetDefaultValue(alias.GetType())
 	default:
 		return b.EmitConstInst(0)
 	}
