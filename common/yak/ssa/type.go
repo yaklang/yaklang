@@ -104,6 +104,13 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 	t1kind := t1.GetTypeKind()
 	t2kind := t2.GetTypeKind()
 
+	if t1kind == AliasTypeKind {
+		t1kind = t1.(*AliasType).GetType().GetTypeKind()
+	}
+	if t2kind == AliasTypeKind {
+		t2kind = t2.(*AliasType).GetType().GetTypeKind()
+	}
+
 	if t1kind == AnyTypeKind || t2kind == AnyTypeKind {
 		return true
 	}
@@ -253,6 +260,9 @@ func GetAllKey(t Type) []string {
 	}
 	ret := make([]string, 0)
 	switch t.GetTypeKind() {
+	case AliasTypeKind:
+		a, _ := ToAliasType(t)
+		ret = append(ret, GetAllKey(a.GetType())...)
 	case FunctionTypeKind:
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, StructTypeKind:
 		ot, _ := ToObjectType(t)
@@ -367,6 +377,7 @@ const (
 	NullTypeKind      //
 	AnyTypeKind       // any type
 	ChanTypeKind
+	AliasTypeKind
 	ErrorTypeKind
 
 	ObjectTypeKind
@@ -705,7 +716,7 @@ func (a *AliasType) RawString() string {
 }
 
 func (a *AliasType) GetTypeKind() TypeKind {
-	return a.elem.GetTypeKind()
+	return AliasTypeKind
 }
 
 func (a *AliasType) GetType() Type {
@@ -1353,6 +1364,9 @@ func isGenericType(t Type) bool {
 func GetGenericTypeFromType(t Type) []Type {
 	typs := make([]Type, 0)
 	switch t.GetTypeKind() {
+	case AliasTypeKind:
+		alias, _ := ToAliasType(t)
+		typs = append(typs, GetGenericTypeFromType(alias.GetType())...)
 	case OrTypeKind:
 		for _, typ := range t.(*OrType).types {
 			typs = append(typs, GetGenericTypeFromType(typ)...)
@@ -1454,6 +1468,13 @@ func CloneType(t Type) (Type, bool) {
 			clonedTypes = append(clonedTypes, typ)
 		}
 		return NewOrType(clonedTypes...), true
+	case AliasTypeKind:
+		alias := t.(*AliasType)
+		clonedElem, ok := CloneType(alias.GetType())
+		if !ok {
+			return nil, false
+		}
+		return NewAliasType(alias.Name, alias.PkgPathString(), clonedElem), true
 	}
 	return nil, false
 }
