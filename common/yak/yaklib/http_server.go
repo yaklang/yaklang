@@ -197,11 +197,17 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 			for globRoute, handler := range config.localFileSystemHandler {
 				pathStr := request.URL.Path
 				if matched, _ := filepath.Match(globRoute, pathStr); matched {
+					if globRoute != "" {
+						handler = http.StripPrefix(globRoute, handler)
+					}
 					handler.ServeHTTP(writer, request)
 					return
 				} else {
 					hasPrefix := strings.HasPrefix(pathStr, globRoute)
 					if hasPrefix {
+						if globRoute != "" {
+							handler = http.StripPrefix(globRoute, handler)
+						}
 						handler.ServeHTTP(writer, request)
 						return
 					}
