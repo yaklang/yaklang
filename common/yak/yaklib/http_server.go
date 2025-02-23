@@ -3,9 +3,12 @@ package yaklib
 import (
 	"context"
 	"crypto/tls"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"net"
 	"net/http"
+	"path/filepath"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -13,11 +16,13 @@ import (
 )
 
 var HttpServeExports = map[string]interface{}{
-	"Serve":                _httpServe,
-	"tlsCertAndKey":        _httpServerOptCaAndKey,
-	"context":              _httpServerOptContext,
-	"handler":              _httpServerOptCallback,
-	"LocalFileSystemServe": _localFileSystemServe,
+	"Serve":                  _httpServe,
+	"tlsCertAndKey":          _httpServerOptCaAndKey,
+	"context":                _httpServerOptContext,
+	"handler":                _httpServerOptCallback,
+	"routeHandler":           _httpServerOptRouteHandler,
+	"localFileSystemHandler": _httpServerOptLocalFileSystemHandler,
+	"LocalFileSystemServe":   _localFileSystemServe,
 }
 
 var (
@@ -29,10 +34,45 @@ var (
 type _httpServerConfig struct {
 	tlsConfig *tls.Config
 	ctx       context.Context
-	callback  http.HandlerFunc
+
+	localFileSystemHandler map[string]http.Handler
+	routeHandler           map[string]http.HandlerFunc
+	callback               http.HandlerFunc
 }
 
 type HttpServerConfigOpt func(c *_httpServerConfig)
+
+func _httpServerOptLocalFileSystemHandler(prefix, dir string) HttpServerConfigOpt {
+	return func(c *_httpServerConfig) {
+		if c.localFileSystemHandler == nil {
+			c.localFileSystemHandler = make(map[string]http.Handler)
+		}
+		c.localFileSystemHandler[prefix] = http.FileServer(http.Dir(dir))
+	}
+}
+
+// routeHandler 用于设置 HTTP 服务器的路由处理函数，第一个参数为路由路径，第二个参数为处理函数
+// 此函数会根据路由路径自动添加前缀 "/"
+// Example:
+// ```
+//
+//	err = httpserver.Serve("127.0.0.1", 8888, httpserver.routeHandler("/", func(w http.ResponseWriter, r *http.Request) {
+//		w.Write([]byte("Hello world"))
+//	}))
+//
+// ```
+func _httpServerOptRouteHandler(route string, handler http.HandlerFunc) HttpServerConfigOpt {
+	return func(c *_httpServerConfig) {
+		if c.routeHandler == nil {
+			c.routeHandler = make(map[string]http.HandlerFunc)
+		}
+		if strings.HasPrefix(route, "/") {
+			c.routeHandler[route] = handler
+		} else {
+			c.routeHandler["/"+route] = handler
+		}
+	}
+}
 
 func BuildGmTlsConfig(crt, key interface{}, cas ...interface{}) *gmtls.Config {
 	crtRaw := utils.StringAsFileParams(crt)
@@ -153,6 +193,37 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 	}()
 
 	return http.Serve(lis, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if config.localFileSystemHandler != nil {
+			for globRoute, handler := range config.localFileSystemHandler {
+				pathStr := request.URL.Path
+				if matched, _ := filepath.Match(globRoute, pathStr); matched {
+					handler.ServeHTTP(writer, request)
+					return
+				} else {
+					hasPrefix := strings.HasPrefix(pathStr, globRoute)
+					if hasPrefix {
+						handler.ServeHTTP(writer, request)
+						return
+					}
+				}
+			}
+		}
+
+		if config.routeHandler != nil {
+			for route, handler := range config.routeHandler {
+				if route == request.URL.Path {
+					handler.ServeHTTP(writer, request)
+					return
+				} else if strings.HasPrefix(request.URL.Path, route) {
+					handler.ServeHTTP(writer, request)
+					return
+				} else if utils.MatchAnyOfGlob(request.URL.Path, route) {
+					handler.ServeHTTP(writer, request)
+					return
+				}
+			}
+		}
+
 		if config.callback == nil {
 			_, _ = writer.Write([]byte("not implemented yak http server handler"))
 			writer.WriteHeader(200)
