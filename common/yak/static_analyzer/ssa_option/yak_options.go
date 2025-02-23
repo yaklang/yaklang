@@ -82,224 +82,233 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 		}
 	)
 
-	switch t.GetTypeKind() {
-	case ssa.MapTypeKind:
-		ot, _ := ssa.ToObjectType(t)
-		fieldTyp := ot.FieldType
-		keyTyp := ot.KeyTyp
-		name += "map." + s
-		switch s {
-		case "Keys":
-			ret = append(ret, SliceTyp(keyTyp))
-		case "Values":
-			ret = append(ret, SliceTyp(fieldTyp))
-		case "Entries", "Item":
-			// TODO: handle this return type: the map[T]U return [][1:T, 2:U]
-			ret = append(ret, SliceTyp(AnyTyp))
-		case "ForEach":
-			arg = append(arg, HandlerFunc([]ssa.Type{keyTyp, fieldTyp}, []ssa.Type{}, false))
-		case "Set":
-			IsModifySelf = true
-			arg = append(arg, keyTyp, fieldTyp)
-			// TODO: this return value always True
-			ret = append(ret, BoolTyp)
-		case "Remove", "Delete":
-			IsModifySelf = true
-			arg = append(arg, keyTyp)
-		case "Has", "IsExisted":
-			arg = append(arg, keyTyp)
-			ret = append(ret, BoolTyp)
-		case "Length", "Len":
-			ret = append(ret, NumberTyp)
-		default:
-			name = ""
-		}
-	case ssa.SliceTypeKind:
-		ot, _ := ssa.ToObjectType(t)
-		fieldTyp := ot.FieldType
-		name = "slice." + s
-		switch s {
-		case "Append", "Push":
-			IsModifySelf = true
-			IsVariadic = true
-			arg = append(arg, fieldTyp)
-			ret = append(ret, ot)
-		case "Pop":
-			IsVariadic = true
-			IsModifySelf = true
-			arg = append(arg, NumberTyp)
-			ret = append(ret, fieldTyp)
-		case "Extend", "Merge":
-			IsModifySelf = true
-			arg = append(arg, ot)
-			ret = append(ret, ot)
-		case "Length", "Len":
-			ret = append(ret, NumberTyp)
-		case "Capability", "Cap":
-			ret = append(ret, NumberTyp)
-		case "StringSlice":
-			ret = append(ret, SliceTyp(StrTyp))
-		case "GeneralSlice":
-			ret = append(ret, SliceTyp(AnyTyp))
-		case "Shift":
-			IsModifySelf = true
-			ret = append(ret, fieldTyp)
-		case "Unshift":
-			IsModifySelf = true
-			arg = append(arg, fieldTyp)
-			ret = append(ret, ot)
-		case "Map":
-			arg = append(arg, HandlerFunc([]ssa.Type{fieldTyp}, []ssa.Type{AnyTyp}, false))
-			ret = append(ret, SliceTyp(AnyTyp))
-		case "Filter":
-			arg = append(arg, HandlerFunc([]ssa.Type{fieldTyp}, []ssa.Type{BoolTyp}, false))
-			ret = append(ret, ot)
-		case "Insert":
-			IsModifySelf = true
-			arg = append(arg, NumberTyp, fieldTyp)
-			ret = append(ret, ot)
-		case "Remove":
-			IsModifySelf = true
-			arg = append(arg, fieldTyp)
-			ret = append(ret, ot)
-		case "Reverse":
-			IsModifySelf = true
-			ret = append(ret, ot)
-		case "Sort":
-			IsModifySelf = true
-			IsVariadic = true
-			arg = append(arg, BoolTyp)
-			ret = append(ret, ot)
-		case "Clear":
-			IsModifySelf = true
-			ret = append(ret, ot)
-		case "Count":
-			arg = append(arg, fieldTyp)
-			ret = append(ret, NumberTyp)
-		case "Index":
-			arg = append(arg, NumberTyp)
-			ret = append(ret, fieldTyp)
-		default:
-			name = ""
-		}
-	case ssa.StringTypeKind:
-		name += "string." + s
-		switch s {
-		case "First":
-			ret = append(ret, NumberTyp)
-		case "Reverse":
-			ret = append(ret, StrTyp)
-		case "Shuffle":
-			ret = append(ret, StrTyp)
-		case "Fuzz":
-			arg = append(arg, MapTyp(StrTyp, AnyTyp))
-			ret = append(ret, SliceTyp(StrTyp))
-			IsVariadic = true
-		case "Contains":
-			arg = append(arg, StrTyp)
-			ret = append(ret, BoolTyp)
-		case "IContains":
-			arg = append(arg, StrTyp)
-			ret = append(ret, BoolTyp)
-		case "ReplaceN":
-			arg = append(arg, StrTyp, StrTyp, NumberTyp)
-			ret = append(ret, StrTyp)
-		case "ReplaceAll", "Replace":
-			arg = append(arg, StrTyp, StrTyp)
-			ret = append(ret, StrTyp)
-		case "Split":
-			arg = append(arg, StrTyp)
-			ret = append(ret, SliceTyp(StrTyp))
-		case "SplitN":
-			arg = append(arg, StrTyp, NumberTyp)
-			ret = append(ret, SliceTyp(StrTyp))
-		case "Join":
-			arg = append(arg, SliceTyp(AnyTyp))
-			ret = append(ret, StrTyp)
-		case "Trim", "TrimLeft", "TrimRight":
-			arg = append(arg, StrTyp)
-			ret = append(ret, StrTyp)
-			IsVariadic = true
-		case "HasPrefix", "HasSuffix", "StartsWith", "EndsWith":
-			arg = append(arg, StrTyp)
-			ret = append(ret, BoolTyp)
-		case "RemovePrefix", "RemoveSuffix":
-			arg = append(arg, StrTyp)
-			ret = append(ret, StrTyp)
-		case "Zfill", "Rzfill":
-			arg = append(arg, NumberTyp)
-			ret = append(ret, StrTyp)
-		case "Ljust", "Rjust":
-			arg = append(arg, NumberTyp, StrTyp)
-			ret = append(ret, StrTyp)
-			IsVariadic = true
-		case "Count", "Find", "RFind", "IndexOf", "LastIndexOf":
-			arg = append(arg, StrTyp)
-			ret = append(ret, NumberTyp)
-		case "Lower", "Upper", "Title":
-			ret = append(ret, StrTyp)
-		case "IsLower", "IsUpper", "IsTitle", "IsAlpha", "IsDigit", "IsAlnum", "IsPrintable":
-			ret = append(ret, BoolTyp)
-		default:
-			name = ""
-		}
-	case ssa.BytesTypeKind:
-		name = "bytes." + s
-		switch s {
-		case "First":
-			ret = append(ret, NumberTyp)
-		case "Reverse", "Shuffle":
-			ret = append(ret, BytesTyp)
-		case "Fuzz":
-			arg = append(arg, MapTyp(StrTyp, AnyTyp))
-			ret = append(ret, SliceTyp(StrTyp))
-			IsVariadic = true
-		case "Contains", "IContains":
-			arg = append(arg, BytesTyp)
-			ret = append(ret, BoolTyp)
-		case "ReplaceN":
-			arg = append(arg, BytesTyp, BytesTyp, NumberTyp)
-			ret = append(ret, BytesTyp)
-		case "ReplaceAll", "Replace":
-			arg = append(arg, BytesTyp, BytesTyp)
-			ret = append(ret, BytesTyp)
-		case "Split":
-			arg = append(arg, BytesTyp)
-			ret = append(ret, SliceTyp(BytesTyp))
-		case "SplitN":
-			arg = append(arg, BytesTyp, NumberTyp)
-			ret = append(ret, SliceTyp(BytesTyp))
-		case "Join":
-			arg = append(arg, AnyTyp)
-			ret = append(ret, BytesTyp)
-		case "Trim", "TrimLeft", "TrimRight":
-			IsVariadic = true
-			arg = append(arg, BytesTyp)
-			ret = append(ret, BytesTyp)
-		case "HasPrefix", "HasSuffix", "StartsWith", "EndsWith":
-			arg = append(arg, BytesTyp)
-			ret = append(ret, BoolTyp)
-		case "RemovePrefix", "RemoveSuffix":
-			arg = append(arg, BytesTyp)
-			ret = append(ret, BytesTyp)
-		case "Zfill", "Rzfill":
-			arg = append(arg, NumberTyp)
-			ret = append(ret, BytesTyp)
-		case "Ljust", "Rjust":
-			IsVariadic = true
-			arg = append(arg, NumberTyp, BytesTyp)
-			ret = append(ret, BytesTyp)
-		case "Count", "Find", "Rfind", "IndexOf", "LastIndexOf":
-			arg = append(arg, BytesTyp)
-			ret = append(ret, NumberTyp)
-		case "Lower", "Upper", "Title":
-			ret = append(ret, BytesTyp)
-		case "IsLower", "IsUpper", "IsTitle", "IsAlpha", "IsDigit", "IsAlnum", "IsPrintable":
-			ret = append(ret, BoolTyp)
-		default:
-			name = ""
+	var handleType func(ssa.Type)
+	handleType = func(t ssa.Type) {
+		switch t.GetTypeKind() {
+		case ssa.AliasTypeKind:
+			alias, _ := ssa.ToAliasType(t)
+			handleType(alias.GetType())
+		case ssa.MapTypeKind:
+			ot, _ := ssa.ToObjectType(t)
+			fieldTyp := ot.FieldType
+			keyTyp := ot.KeyTyp
+			name += "map." + s
+			switch s {
+			case "Keys":
+				ret = append(ret, SliceTyp(keyTyp))
+			case "Values":
+				ret = append(ret, SliceTyp(fieldTyp))
+			case "Entries", "Item":
+				// TODO: handle this return type: the map[T]U return [][1:T, 2:U]
+				ret = append(ret, SliceTyp(AnyTyp))
+			case "ForEach":
+				arg = append(arg, HandlerFunc([]ssa.Type{keyTyp, fieldTyp}, []ssa.Type{}, false))
+			case "Set":
+				IsModifySelf = true
+				arg = append(arg, keyTyp, fieldTyp)
+				// TODO: this return value always True
+				ret = append(ret, BoolTyp)
+			case "Remove", "Delete":
+				IsModifySelf = true
+				arg = append(arg, keyTyp)
+			case "Has", "IsExisted":
+				arg = append(arg, keyTyp)
+				ret = append(ret, BoolTyp)
+			case "Length", "Len":
+				ret = append(ret, NumberTyp)
+			default:
+				name = ""
+			}
+		case ssa.SliceTypeKind:
+			ot, _ := ssa.ToObjectType(t)
+			fieldTyp := ot.FieldType
+			name = "slice." + s
+			switch s {
+			case "Append", "Push":
+				IsModifySelf = true
+				IsVariadic = true
+				arg = append(arg, fieldTyp)
+				ret = append(ret, ot)
+			case "Pop":
+				IsVariadic = true
+				IsModifySelf = true
+				arg = append(arg, NumberTyp)
+				ret = append(ret, fieldTyp)
+			case "Extend", "Merge":
+				IsModifySelf = true
+				arg = append(arg, ot)
+				ret = append(ret, ot)
+			case "Length", "Len":
+				ret = append(ret, NumberTyp)
+			case "Capability", "Cap":
+				ret = append(ret, NumberTyp)
+			case "StringSlice":
+				ret = append(ret, SliceTyp(StrTyp))
+			case "GeneralSlice":
+				ret = append(ret, SliceTyp(AnyTyp))
+			case "Shift":
+				IsModifySelf = true
+				ret = append(ret, fieldTyp)
+			case "Unshift":
+				IsModifySelf = true
+				arg = append(arg, fieldTyp)
+				ret = append(ret, ot)
+			case "Map":
+				arg = append(arg, HandlerFunc([]ssa.Type{fieldTyp}, []ssa.Type{AnyTyp}, false))
+				ret = append(ret, SliceTyp(AnyTyp))
+			case "Filter":
+				arg = append(arg, HandlerFunc([]ssa.Type{fieldTyp}, []ssa.Type{BoolTyp}, false))
+				ret = append(ret, ot)
+			case "Insert":
+				IsModifySelf = true
+				arg = append(arg, NumberTyp, fieldTyp)
+				ret = append(ret, ot)
+			case "Remove":
+				IsModifySelf = true
+				arg = append(arg, fieldTyp)
+				ret = append(ret, ot)
+			case "Reverse":
+				IsModifySelf = true
+				ret = append(ret, ot)
+			case "Sort":
+				IsModifySelf = true
+				IsVariadic = true
+				arg = append(arg, BoolTyp)
+				ret = append(ret, ot)
+			case "Clear":
+				IsModifySelf = true
+				ret = append(ret, ot)
+			case "Count":
+				arg = append(arg, fieldTyp)
+				ret = append(ret, NumberTyp)
+			case "Index":
+				arg = append(arg, NumberTyp)
+				ret = append(ret, fieldTyp)
+			default:
+				name = ""
+			}
+		case ssa.StringTypeKind:
+			name += "string." + s
+			switch s {
+			case "First":
+				ret = append(ret, NumberTyp)
+			case "Reverse":
+				ret = append(ret, StrTyp)
+			case "Shuffle":
+				ret = append(ret, StrTyp)
+			case "Fuzz":
+				arg = append(arg, MapTyp(StrTyp, AnyTyp))
+				ret = append(ret, SliceTyp(StrTyp))
+				IsVariadic = true
+			case "Contains":
+				arg = append(arg, StrTyp)
+				ret = append(ret, BoolTyp)
+			case "IContains":
+				arg = append(arg, StrTyp)
+				ret = append(ret, BoolTyp)
+			case "ReplaceN":
+				arg = append(arg, StrTyp, StrTyp, NumberTyp)
+				ret = append(ret, StrTyp)
+			case "ReplaceAll", "Replace":
+				arg = append(arg, StrTyp, StrTyp)
+				ret = append(ret, StrTyp)
+			case "Split":
+				arg = append(arg, StrTyp)
+				ret = append(ret, SliceTyp(StrTyp))
+			case "SplitN":
+				arg = append(arg, StrTyp, NumberTyp)
+				ret = append(ret, SliceTyp(StrTyp))
+			case "Join":
+				arg = append(arg, SliceTyp(AnyTyp))
+				ret = append(ret, StrTyp)
+			case "Trim", "TrimLeft", "TrimRight":
+				arg = append(arg, StrTyp)
+				ret = append(ret, StrTyp)
+				IsVariadic = true
+			case "HasPrefix", "HasSuffix", "StartsWith", "EndsWith":
+				arg = append(arg, StrTyp)
+				ret = append(ret, BoolTyp)
+			case "RemovePrefix", "RemoveSuffix":
+				arg = append(arg, StrTyp)
+				ret = append(ret, StrTyp)
+			case "Zfill", "Rzfill":
+				arg = append(arg, NumberTyp)
+				ret = append(ret, StrTyp)
+			case "Ljust", "Rjust":
+				arg = append(arg, NumberTyp, StrTyp)
+				ret = append(ret, StrTyp)
+				IsVariadic = true
+			case "Count", "Find", "RFind", "IndexOf", "LastIndexOf":
+				arg = append(arg, StrTyp)
+				ret = append(ret, NumberTyp)
+			case "Lower", "Upper", "Title":
+				ret = append(ret, StrTyp)
+			case "IsLower", "IsUpper", "IsTitle", "IsAlpha", "IsDigit", "IsAlnum", "IsPrintable":
+				ret = append(ret, BoolTyp)
+			default:
+				name = ""
+			}
+		case ssa.BytesTypeKind:
+			name = "bytes." + s
+			switch s {
+			case "First":
+				ret = append(ret, NumberTyp)
+			case "Reverse", "Shuffle":
+				ret = append(ret, BytesTyp)
+			case "Fuzz":
+				arg = append(arg, MapTyp(StrTyp, AnyTyp))
+				ret = append(ret, SliceTyp(StrTyp))
+				IsVariadic = true
+			case "Contains", "IContains":
+				arg = append(arg, BytesTyp)
+				ret = append(ret, BoolTyp)
+			case "ReplaceN":
+				arg = append(arg, BytesTyp, BytesTyp, NumberTyp)
+				ret = append(ret, BytesTyp)
+			case "ReplaceAll", "Replace":
+				arg = append(arg, BytesTyp, BytesTyp)
+				ret = append(ret, BytesTyp)
+			case "Split":
+				arg = append(arg, BytesTyp)
+				ret = append(ret, SliceTyp(BytesTyp))
+			case "SplitN":
+				arg = append(arg, BytesTyp, NumberTyp)
+				ret = append(ret, SliceTyp(BytesTyp))
+			case "Join":
+				arg = append(arg, AnyTyp)
+				ret = append(ret, BytesTyp)
+			case "Trim", "TrimLeft", "TrimRight":
+				IsVariadic = true
+				arg = append(arg, BytesTyp)
+				ret = append(ret, BytesTyp)
+			case "HasPrefix", "HasSuffix", "StartsWith", "EndsWith":
+				arg = append(arg, BytesTyp)
+				ret = append(ret, BoolTyp)
+			case "RemovePrefix", "RemoveSuffix":
+				arg = append(arg, BytesTyp)
+				ret = append(ret, BytesTyp)
+			case "Zfill", "Rzfill":
+				arg = append(arg, NumberTyp)
+				ret = append(ret, BytesTyp)
+			case "Ljust", "Rjust":
+				IsVariadic = true
+				arg = append(arg, NumberTyp, BytesTyp)
+				ret = append(ret, BytesTyp)
+			case "Count", "Find", "Rfind", "IndexOf", "LastIndexOf":
+				arg = append(arg, BytesTyp)
+				ret = append(ret, NumberTyp)
+			case "Lower", "Upper", "Title":
+				ret = append(ret, BytesTyp)
+			case "IsLower", "IsUpper", "IsTitle", "IsAlpha", "IsDigit", "IsAlnum", "IsPrintable":
+				ret = append(ret, BoolTyp)
+			default:
+				name = ""
+			}
 		}
 	}
+
+	handleType(t)
+
 	if name != "" {
 		funcType := ssa.NewFunctionTypeDefine(name, arg, ret, IsVariadic)
 		funcType.SetModifySelf(IsModifySelf)
@@ -311,6 +320,9 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 
 func (b *Builder) GetMethodNames(t ssa.Type) []string {
 	switch t.GetTypeKind() {
+	case ssa.AliasTypeKind:
+		alias, _ := ssa.ToAliasType(t)
+		return b.GetMethodNames(alias.GetType())
 	case ssa.SliceTypeKind:
 		return []string{
 			"Append", "Push", "Pop", "Extend", "Merge", "Length", "Len", "Capability", "Cap", "StringSlice", "GeneralSlice", "Shift", "Unshift", "Map", "Filter", "Insert", "Remove", "Reverse", "Sort", "Clear", "Count", "Index",

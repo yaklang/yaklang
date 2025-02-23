@@ -12,7 +12,7 @@ func newNextType(iterType Type, isIn bool) Type {
 
 	switch iterType.GetTypeKind() {
 	case SliceTypeKind:
-		it := iterType.(*ObjectType)
+		it, _ := ToObjectType(iterType)
 		if isIn {
 			typ.AddField(NextKey, it.FieldType)
 			typ.AddField(NextField, BasicTypes[NullTypeKind])
@@ -21,7 +21,7 @@ func newNextType(iterType Type, isIn bool) Type {
 			typ.AddField(NextField, it.FieldType)
 		}
 	case MapTypeKind:
-		it := iterType.(*ObjectType)
+		it, _ := ToObjectType(iterType)
 		typ.AddField(NextKey, it.KeyTyp)
 		typ.AddField(NextField, it.FieldType)
 	case ChanTypeKind:
