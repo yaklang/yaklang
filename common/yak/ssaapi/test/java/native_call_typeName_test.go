@@ -666,3 +666,37 @@ class Main{
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+
+func Test_Class_Declare_Type_Name(t *testing.T) {
+	code := `
+package com.mycompany.myapp;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import java.util.List;
+
+@Mapper
+public interface UserMapper {
+
+    User getUser(@Param("id") Long id);
+
+    void insertUser(User user);
+
+    void updateUser(User user);
+
+    void deleteUser(@Param("id") Long id);
+
+    List<User> getAllUsers(); 
+}
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		vals, err := prog.SyntaxFlowWithError(`UserMapper_declare<typeName> as $res`)
+		require.NoError(t, err)
+		res := vals.GetValues("res")
+		res.Show()
+		require.Contains(t, res.String(), "UserMapper")
+		require.Contains(t, res.String(), "com.mycompany.myapp.UserMapper")
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+}
