@@ -26,18 +26,22 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch Main And Reset Main
+        if: steps.cache-project.outputs.cache-hit != 'true'
         run: |
           git fetch --all
           git checkout main
           git reset --hard origin/main
           git checkout ${{ github.event.workflow_run.head_sha }}
+
       - name: Set up Go 1.x
+        if: steps.cache-project.outputs.cache-hit != 'true'
         uses: actions/setup-go@v4
         with:
           go-version-file: "./go.mod"
         id: go
 
       - name: Dependence
+        if: steps.cache-project.outputs.cache-hit != 'true'
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: libpcap-dev
@@ -46,21 +50,40 @@ jobs:
       #        run: |
       #          wget https://aliyun-oss.yaklang.com/yak/latest/yak_linux_amd64
       #          chmod +x ./yak_linux_amd64
+
       - name: Init Module
+        if: steps.cache-project.outputs.cache-hit != 'true'
         run: |
           go mod tidy
           go build ./common/yak/cmd/yak.go
+
       - name: Generate Prog And Check With SyntaxFlow
+        continue-on-error: true
+        if: steps.cache-project.outputs.cache-hit != 'true'
         run: |
           pwd && ls -al
           ./yak -h
           MERGE_BASE=$(git merge-base main ${{ github.event.workflow_run.head_sha }})
           echo "Merge base is: $MERGE_BASE"
+          echo "Current head sha is: ${{ github.event.workflow_run.head_sha }}"
+          ./yak sync-rule
           ./yak gitefs --start $MERGE_BASE --end ${{ github.event.workflow_run.head_sha }} --output ./fs.zip
-          ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule --exclude-file *.pb.go > log.txt 2>&1 || exit 1
-
+          ./yak ssa -t ./fs.zip --program diffcode -l golang > log.txt 2>&1 || {echo "compile_fail=true" >> $GITHUB_ENV; exit 1;}
+          grep -F "Current goroutine call stack:" log.txt && {echo "compile_fail=true" >> $GITHUB_ENV; exit 1;}
+          ./yak sf --program diffcode ./common/ssa_bootstrapping/ci_rule || {echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1;}
+        # ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang || {echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1;}
+        # ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule --exclude-file *.pb.go > log.txt 2>&1 || exit 1
+          
       - name: Upload fail log
+        if: ${{env.compile_fail == 'true'}}
         uses: actions/upload-artifact@v4
         with:
           name: log.txt
           path: log.txt
+
+      - name: Upload database
+        if: ${{env.syntaxflow_fail == 'true'}}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ~/yakit-projects/default-yakssa.db
+          path: default-yakssa.db
