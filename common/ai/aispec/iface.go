@@ -27,6 +27,20 @@ type StructuredData struct {
 	Event          string
 	DataSourceType string
 	DataRaw        []byte
+
+	IsParsed   bool
+	IsResponse bool
+	// parsed from node
+	OutputNodeName     string
+	OutputNodeStatus   string
+	OutputNodeId       string
+	OutputNodeType     string
+	OutputNodeExecTime string
+	OutputText         string
+	OutputReason       string
+
+	HaveUsage  bool
+	ModelUsage []UsageStatsInfo
 }
 
 type UsageStatsInfo struct {
