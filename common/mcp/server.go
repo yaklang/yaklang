@@ -37,6 +37,7 @@ func NewMCPServer() *MCPServer {
 	s.registerYakDocumentTool()
 	s.registerPayloadTool()
 	s.registerPortScanTool()
+	s.registerCVETool()
 
 	s.server.AddNotificationHandler("notification", s.handleNotification)
 	return s
