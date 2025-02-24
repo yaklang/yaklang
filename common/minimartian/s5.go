@@ -70,29 +70,6 @@ const (
 	replySuccess = 0x00
 )
 
-func IsSocks5HandleShake(conn net.Conn) (fConn net.Conn, _ bool, _ byte, _ error) {
-	peekable := utils.NewPeekableNetConn(conn)
-
-	defer func() {
-		if err := recover(); err != nil {
-			log.Infof("peekable failed: %s", err)
-			fConn = peekable
-		}
-	}()
-
-	raw, err := peekable.Peek(2)
-	if err != nil {
-		if err == io.EOF {
-			return peekable, false, 0, nil
-		}
-		return nil, false, 0, utils.Errorf("peek failed: %s", err)
-	}
-	if len(raw) != 2 {
-		return nil, false, 0, utils.Errorf("check s5 failed: %v", raw)
-	}
-	return peekable, raw[0] == socks5Version && raw[1] > 0, raw[0], nil
-}
-
 func (c *S5Config) Handshake(conn net.Conn) error {
 	conn.SetReadDeadline(time.Now().Add(c.HandshakeTimeout))
 	defer conn.SetReadDeadline(time.Time{})
@@ -712,4 +689,27 @@ func (c *S5Config) ConnectionFallback(src, proxiedConn net.Conn) error {
 func (c *S5Config) HijackSource(src, proxiedConn net.Conn) (net.Conn, net.Conn, bool, error) {
 	// martian s5 is no need to hijack
 	return src, proxiedConn, true, nil
+}
+
+func (c *S5Config) ServerConnect(conn net.Conn) (string, int, error) {
+	err := c.Handshake(conn)
+	if err != nil {
+		return "", 0, err
+	}
+	req, err := c.HandleS5RequestHeader(conn)
+	if err != nil {
+		return "", 0, err
+	}
+	if req.Cmd != commandConnect {
+		return "", 0, err
+	}
+	host, port, err := utils.ParseStringToHostPort(conn.LocalAddr().String())
+	if err != nil {
+		return "", 0, err
+	}
+	_, err = conn.Write(NewReply(net.ParseIP(host), port))
+	if err != nil {
+		return "", 0, err
+	}
+	return req.GetDstHost(), req.GetDstPort(), nil
 }
