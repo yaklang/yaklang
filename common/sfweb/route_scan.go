@@ -143,7 +143,9 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 		if err := stream.Send(&ypb.SyntaxFlowScanRequest{
 			ProgramName: []string{programName},
 			ControlMode: req.ControlMessage,
-			Filter:      &ypb.SyntaxFlowRuleFilter{},
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				Language: []string{req.Lang},
+			},
 		}); err != nil {
 			WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
 				Error: fmt.Sprintf("start syntaxflow scan failed: %v", err),
