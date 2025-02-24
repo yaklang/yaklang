@@ -11,10 +11,11 @@ import (
 type XMLConfig struct {
 	onStartElement func(xml.StartElement)
 	onEndElement   func(xml.EndElement)
-	onCharData     func(xml.CharData)
+	onCharData     func(xml.CharData, int64)
 	onComment      func(xml.Comment)
 	onProcInst     func(xml.ProcInst)
 	onDirective    func(xml.Directive) bool
+	currentOffset  int64
 }
 
 type XMLConfigHandler func(*XMLConfig)
@@ -31,7 +32,7 @@ func WithEndElementHandler(handler func(xml.EndElement)) XMLConfigHandler {
 	}
 }
 
-func WithCharDataHandler(handler func(xml.CharData)) XMLConfigHandler {
+func WithCharDataHandler(handler func(xml.CharData, int64)) XMLConfigHandler {
 	return func(c *XMLConfig) {
 		c.onCharData = handler
 	}
@@ -73,7 +74,6 @@ func Handle(value string, opts ...XMLConfigHandler) {
 			}
 			break
 		}
-
 		if !doctype {
 			switch se := t.(type) {
 			case xml.Directive:
@@ -101,7 +101,7 @@ func Handle(value string, opts ...XMLConfigHandler) {
 			}
 		case xml.CharData:
 			if c.onCharData != nil {
-				c.onCharData(se)
+				c.onCharData(se, c.currentOffset)
 			}
 		case xml.Comment:
 			if c.onComment != nil {
@@ -114,5 +114,6 @@ func Handle(value string, opts ...XMLConfigHandler) {
 		default:
 			log.Infof("unknown: %T", se)
 		}
+		c.currentOffset = decoder.InputOffset()
 	}
 }
