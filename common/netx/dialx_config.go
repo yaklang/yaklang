@@ -96,6 +96,8 @@ type dialXConfig struct {
 
 	UseNetStackVM bool
 	NetStackVm    *netstackvm.NetStackVirtualMachine
+
+	Dialer func(duration time.Duration, target string) (net.Conn,error)
 }
 
 type DialXOption func(c *dialXConfig)
@@ -299,16 +301,9 @@ func DialX_WithUdpJustListen(b bool) DialXOption {
 	}
 }
 
-func DialX_WithNetStackVM(stack *netstackvm.NetStackVirtualMachine) DialXOption {
+func DialX_WithDialer(dialer func(duration time.Duration, target string) (net.Conn,error)) DialXOption {
 	return func(c *dialXConfig) {
-		c.UseNetStackVM = true
-		c.NetStackVm = stack
-	}
-}
-
-func DialX_WithUseNetStackVM(b bool) DialXOption {
-	return func(c *dialXConfig) {
-		c.UseNetStackVM = b
+		c.Dialer = dialer
 	}
 }
 
