@@ -193,14 +193,11 @@ func (s *SFFrame) GetSymbol(sfi *SFI) (ValueOperator, bool) {
 	if val, b := s.result.SymbolTable.Get(sfi.UnaryStr); b {
 		return val, b
 	}
-	switch sfi.OpCode {
-	// variable +/-/&& can read from context
-	case OpMergeRef, OpRemoveRef, OpIntersectionRef, OpNewRef:
-		if initVars := s.config.initialContextVars; initVars != nil {
-			return initVars.Get(sfi.UnaryStr)
-		}
+	if initVars := s.config.initialContextVars; initVars != nil {
+		return initVars.Get(sfi.UnaryStr)
+	} else {
+		return NewEmptyValues(), true
 	}
-	return nil, false
 }
 func (s *SFFrame) GetSymbolByName(name string) (ValueOperator, bool) {
 	return s.result.SymbolTable.Get(name)
