@@ -224,8 +224,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		maxContentLength     = option.MaxContentLength
 		randomJA3FingerPrint = option.RandomJA3FingerPrint
 		clientHelloSpec      = option.ClientHelloSpec
-		useNetStackVM        = option.UseNetStackVM
-		netStackVM           = option.NetStackVM
+		dialer               = option.Dialer
 	)
 	if reqIns == nil {
 		// create new request instance for httpctx
@@ -568,7 +567,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	dialTraceInfo := netx.NewDialXTraceInfo()
 	dialopts = append(
 		dialopts,
-		netx.DialX_WithUseNetStackVM(useNetStackVM),
 		netx.DialX_WithTimeoutRetry(maxRetryTimes),
 		netx.DialX_WithTimeoutRetryWaitRange(
 			retryWaitTime,
@@ -584,8 +582,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		netx.DialX_WithDialTraceInfo(dialTraceInfo),
 	)
 
-	if netStackVM != nil {
-		dialopts = append(dialopts, netx.DialX_WithNetStackVM(netStackVM))
+	if dialer != nil {
+		dialopts = append(dialopts, netx.DialX_WithDialer(dialer))
 	}
 
 	if option.OverrideEnableSystemProxyFromEnv {

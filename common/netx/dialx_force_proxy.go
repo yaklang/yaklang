@@ -78,8 +78,7 @@ func (c *ProxyCredential) dialProxyTCP(ctx context.Context, target string) (net.
 		DialX_WithDisableProxy(true),
 		DialX_WithTLS(c.schema == "https"),
 		DialX_WithTimeout(timeout),
-		DialX_WithUseNetStackVM(c.dialCfg.UseNetStackVM),
-		DialX_WithNetStackVM(c.dialCfg.NetStackVm),
+		DialX_WithDialer(c.dialCfg.Dialer),
 	)
 }
 

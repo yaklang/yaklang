@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net"
 	"sync/atomic"
@@ -132,15 +131,8 @@ RETRY:
 			}
 		}
 
-		if config.UseNetStackVM {
-			vm := config.NetStackVm
-			if vm == nil {
-				vm, err = netstackvm.GetDefaultNetStackVirtualMachine()
-				if err != nil {
-					return nil, utils.Errorf("get default netstack vm failed: %v", err)
-				}
-			}
-			conn, err = vm.DialTCP(config.Timeout, utils.HostPort(ip, port))
+		if config.Dialer != nil {
+			conn, err = config.Dialer(config.Timeout, utils.HostPort(ip, port))
 		} else {
 			conn, err = net.DialTimeout("tcp", utils.HostPort(ip, port), config.Timeout)
 		}

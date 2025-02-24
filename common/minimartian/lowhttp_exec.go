@@ -81,8 +81,8 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		lowhttp.WithMaxContentLength(MaxContentLength),
 	)
 
-	if p.tunMode {
-		opts = append(opts, lowhttp.WithUseNetStackVM(true))
+	if p.dial != nil {
+		opts = append(opts,lowhttp.WithDialer(p.dial))
 	}
 
 	//if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
