@@ -296,9 +296,9 @@ var Exports = map[string]any{
 	"ChatGLM":  ChatGLM,
 	"Moonshot": Moonshot,
 
-	"Chat":         Chat,
-	"FunctionCall": FunctionCall,
-	"Stream":       StructuredStream,
+	"Chat":             Chat,
+	"FunctionCall":     FunctionCall,
+	"StructuredStream": StructuredStream,
 
 	"timeout":            aispec.WithTimeout,
 	"proxy":              aispec.WithProxy,

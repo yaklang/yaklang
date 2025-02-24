@@ -483,14 +483,17 @@ var StringsExport = map[string]interface{}{
 	"Unquote":        strconv.Unquote,
 
 	// 特有的
-	"RandStr":                utils.RandStringBytes,
-	"Random":                 randomUpperAndLower,
+	"RandStr":             utils.RandStringBytes,
+	"Random":              randomUpperAndLower,
+	"RandomUpperAndLower": randomUpperAndLower,
+	"RandSecret":          utils.RandSecret,
+
+	// 其他
 	"f":                      _sfmt,
 	"SplitAndTrim":           utils.PrettifyListFromStringSplited,
 	"StringSliceContains":    utils.StringSliceContain,
 	"StringSliceContainsAll": utils.StringSliceContainsAll,
 	"RemoveRepeat":           utils.RemoveRepeatStringSlice,
-	"RandSecret":             utils.RandSecret,
 	"IsStrongPassword":       utils.IsStrongPassword,
 	"ExtractStrContext":      utils.ExtractStrContextByKeyword,
 
@@ -511,6 +514,9 @@ var StringsExport = map[string]interface{}{
 	"ExtractRootDomain":                 extractRootDomain,
 	"ExtractJson":                       extractValidJson,
 	"ExtractJsonWithRaw":                extractJsonEx,
+	"ExtractURLFromHTTPRequestRaw":      lowhttp.ExtractURLFromHTTPRequestRaw,
+	"ExtractURLFromHTTPRequest":         lowhttp.ExtractURLFromHTTPRequest,
+	"ExtractTitle":                      extractTitle,
 	"LowerAndTrimSpace":                 utils.StringLowerAndTrimSpace,
 	"HostPort":                          utils.HostPort,
 	"ParseStringToHTTPRequest":          lowhttp.ParseStringToHttpRequest,
@@ -521,9 +527,6 @@ var StringsExport = map[string]interface{}{
 	"FixHTTPResponse":                   lowhttp.FixHTTPResponse,
 	"ExtractBodyFromHTTPResponseRaw":    lowhttp.ExtractBodyFromHTTPResponseRaw,
 	"FixHTTPRequest":                    lowhttp.FixHTTPRequest,
-	"ExtractURLFromHTTPRequestRaw":      lowhttp.ExtractURLFromHTTPRequestRaw,
-	"ExtractURLFromHTTPRequest":         lowhttp.ExtractURLFromHTTPRequest,
-	"ExtractTitle":                      extractTitle,
 	"SplitHTTPHeadersAndBodyFromPacket": lowhttp.SplitHTTPHeadersAndBodyFromPacket,
 	"MergeUrlFromHTTPRequest":           lowhttp.MergeUrlFromHTTPRequest,
 	"ReplaceHTTPPacketBody":             lowhttp.ReplaceHTTPPacketBody,
