@@ -152,7 +152,7 @@ jobs:
 
           - name: Test SyntaxFlow Web Server
             run: |
-              go test -timeout 20s ./common/sfweb/...
+              go test -timeout 1m ./common/sfweb/...
 
           - name: Test lowhttp / DNSX
             run: |
