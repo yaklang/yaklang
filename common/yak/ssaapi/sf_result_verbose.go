@@ -18,6 +18,13 @@ func (r *SyntaxFlowResult) GetAlertValue(name string) Values {
 	return r.GetValues(name)
 }
 
+func (r *SyntaxFlowResult) IsLib() bool {
+	if _, ok := r.memResult.Description.GetMap()["lib"]; ok {
+		return true
+	}
+	return false
+}
+
 func (r *SyntaxFlowResult) GetAlertValues() *omap.OrderedMap[string, Values] {
 	if r == nil {
 		return omap.NewOrderedMap(make(map[string]Values))
