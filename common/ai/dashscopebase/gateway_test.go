@@ -1,11 +1,11 @@
 package dashscopebase
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -25,6 +25,11 @@ func TestDashScopeGateway(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := range c {
-		log.Infof("%v id:%v event:%v data: %v", i.DataSourceType, i.Id, i.Event, string(utils.ShrinkString(i.DataRaw, 160)))
+		if i.OutputReason != "" {
+			fmt.Println(i.OutputReason)
+		}
+		if i.OutputText != "" {
+			fmt.Println(i.OutputText)
+		}
 	}
 }
