@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/xml2"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -20,52 +21,117 @@ type mybatisXMLMapper struct {
 	FullClassName string
 	ClassName     string
 	Namespace     string
+	frame         *sfvm.SFFrame
+	prog          *Program
 	entityStack   *utils.Stack[*mybatisXMLQuery]
 }
 
-func newMybatisXMLMapper() *mybatisXMLMapper {
+func newMybatisXMLMapper(prog *Program, frame *sfvm.SFFrame) *mybatisXMLMapper {
 	return &mybatisXMLMapper{
+		prog:        prog,
+		frame:       frame,
 		entityStack: utils.NewStack[*mybatisXMLQuery](),
 	}
 }
 
 type mybatisXMLQuery struct {
-	mapper         *mybatisXMLMapper
-	Id             string
-	CheckParamName []string
+	mapper      *mybatisXMLMapper
+	Id          string
+	CheckParams []*checkParam
+}
+
+type checkParam struct {
+	name string
+	rng  memedit.RangeIf
 }
 
 func newMybatisXMLQuery(mapper *mybatisXMLMapper, id string) *mybatisXMLQuery {
 	return &mybatisXMLQuery{
-		mapper:         mapper,
-		Id:             id,
-		CheckParamName: make([]string, 0),
+		mapper:      mapper,
+		Id:          id,
+		CheckParams: make([]*checkParam, 0),
 	}
 }
 
-func (m *mybatisXMLQuery) SyntaxFlowFirst(token string) string {
-	if m.mapper == nil {
-		return ""
+func (m *mybatisXMLQuery) AddCheckParam(name string, rng memedit.RangeIf) {
+	m.CheckParams = append(m.CheckParams, &checkParam{
+		name: name,
+		rng:  rng,
+	})
+}
+
+func (m *mybatisXMLQuery) Check() []sfvm.ValueOperator {
+	var res []sfvm.ValueOperator
+
+	for _, param := range m.CheckParams {
+		res = append(res, m.SyntaxFlowFirst(param.name, param.rng))
+		res = append(res, m.SyntaxFlowFinal(param.rng))
 	}
+	return res
+}
+
+func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng memedit.RangeIf) sfvm.ValueOperator {
+	if m.mapper == nil {
+		return nil
+	}
+
+	token := utils.RandStringBytes(16)
+	token = "_a" + token
 	var builder strings.Builder
 	builder.WriteString(m.mapper.ClassName)
 	builder.WriteString(".")
 	builder.WriteString(m.Id)
-	builder.WriteString("(*?{!have: this && opcode: param && any: " + strings.Join(m.CheckParamName, ",") + " } as $_" + token + ")")
-	return builder.String()
+	builder.WriteString("(*?{!have: this && opcode: param && have: \"" + name + "\" } as $" + token + ")")
+	return m.runRuleAndFixRng(token, builder.String(), rng)
 }
 
-func (m *mybatisXMLQuery) SyntaxFlowFinal(token string) string {
+func (m *mybatisXMLQuery) SyntaxFlowFinal(rng memedit.RangeIf) sfvm.ValueOperator {
 	if m.mapper == nil {
-		return ""
+		return nil
 	}
+
+	token := utils.RandStringBytes(16)
+	token = "a" + token
 	var builder strings.Builder
 	builder.WriteString(m.mapper.ClassName)
 	builder.WriteString(".")
 	builder.WriteString(m.Id)
-	builder.WriteString("(*?{!have: this && opcode: param } as $_" + token + ")")
+	builder.WriteString("(*?{!have: this && opcode: param } as $" + token + ")")
+	return m.runRuleAndFixRng(token, builder.String(), rng)
+}
 
-	return builder.String()
+func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng memedit.RangeIf) sfvm.ValueOperator {
+	if m == nil || m.mapper == nil {
+		return nil
+	}
+	prog := m.mapper.prog
+	frame := m.mapper.frame
+	if prog == nil || frame == nil {
+		return nil
+	}
+
+	val := prog.NewValue(ssa.NewConst(rule))
+	_, _, err := nativeCallEval(val, frame, nil)
+	if err != nil {
+		log.Warnf("mybatis-${...}: fetch query: %v, error: %v", rule, err)
+	}
+	results, ok := frame.GetSymbolTable().Get(token)
+	defer func() {
+		frame.GetSymbolTable().Delete(token)
+	}()
+	if !ok {
+		return nil
+	}
+
+	editor := rng.GetEditor()
+	if editor == nil {
+		return results
+	}
+	fileName := ssa.NewConst(editor.GetFilename())
+	fileName.SetRange(rng)
+	fileVal := prog.NewValue(fileName)
+	results.AppendPredecessor(fileVal, frame.WithPredecessorContext("mybatis-${...}"))
+	return results
 }
 
 var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -74,23 +140,31 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 		return false, nil, err
 	}
 
-	var vals []sfvm.ValueOperator
+	var res []sfvm.ValueOperator
 
+	offset := 0
 	for name, content := range prog.Program.ExtraFile {
 		log.Debugf("start to handling: %v len: %v", name, len(content))
+		if !strings.HasSuffix(name, ".xml") {
+			continue
+		}
+		var editor *memedit.MemEditor
 		if len(content) <= 128 {
 			hash := content
-			editor, _ := ssadb.GetIrSourceFromHash(hash)
+			editor, _ = ssadb.GetIrSourceFromHash(hash)
 			if editor != nil {
 				content = editor.GetSourceCode()
 			}
+		} else {
+			editor = memedit.NewMemEditorWithFileUrl(content, name)
 		}
 
 		mapperStack := utils.NewStack[*mybatisXMLMapper]()
-		mapper := newMybatisXMLMapper()
+		mapper := newMybatisXMLMapper(prog, frame)
 		mapperStack.Push(mapper)
 
 		onDirective := xml2.WithDirectiveHandler(func(directive xml.Directive) bool {
+			offset += len(directive)
 			if utils.MatchAnyOfSubString(string(directive), "dtd/mybatis-", "mybatis.org") {
 				return true
 			}
@@ -98,7 +172,7 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 		})
 		onStartElement := xml2.WithStartElementHandler(func(element xml.StartElement) {
 			if element.Name.Local == "mapper" {
-				mapperStack.Push(newMybatisXMLMapper())
+				mapperStack.Push(newMybatisXMLMapper(prog, frame))
 				mapper := mapperStack.Peek()
 				for _, attr := range element.Attr {
 					if attr.Name.Local == "namespace" {
@@ -151,7 +225,7 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 			}
 			i.entityStack.Pop()
 		})
-		onCharData := xml2.WithCharDataHandler(func(data xml.CharData) {
+		onCharData := xml2.WithCharDataHandler(func(data xml.CharData, offset int64) {
 			i := mapperStack.Peek()
 			if utils.IsNil(i) {
 				return
@@ -160,40 +234,21 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 			if query == nil {
 				return
 			}
-			for _, groups := range mybatisVarExtractor.FindAllStringSubmatch(string(data), -1) {
-				variableName := groups[1]
-				query.CheckParamName = append(query.CheckParamName, variableName)
+			for _, match := range mybatisVarExtractor.FindAllStringSubmatchIndex(string(data), -1) {
+				start, end := match[2], match[3]
+				variableName := string(data[start:end])
+				rng := editor.GetRangeByPosition(
+					editor.GetPositionByOffset(start+int(offset)),
+					editor.GetPositionByOffset(end+int(offset)),
+				)
+				query.AddCheckParam(variableName, rng)
 			}
-			if len(query.CheckParamName) > 0 {
-				token := utils.RandStringBytes(16)
-				token = "a" + token
-				for _, sf := range []string{
-					query.SyntaxFlowFirst(token), query.SyntaxFlowFinal(token),
-				} {
-					if sf == "" {
-						continue
-					}
-					val := prog.NewValue(ssa.NewConst(sf))
-
-					_ = val.AppendPredecessor(v, frame.WithPredecessorContext("mybatis-${...}"))
-					log.Infof("mybatis-${...}: fetch query: %v", sf)
-					_, _, err := nativeCallEval(val, frame, nil)
-					if err != nil {
-						log.Warnf("mybatis-${...}: fetch query: %v, error: %v", sf, err)
-					}
-					results, ok := frame.GetSymbolTable().Get("_" + token)
-					if !ok {
-						continue
-					}
-					results.Recursive(func(operator sfvm.ValueOperator) error {
-						vals = append(vals, operator)
-						return nil
-					})
-				}
-				frame.GetSymbolTable().Delete("_" + token)
-			}
+			res = append(res, query.Check()...)
 		})
 		xml2.Handle(content, onDirective, onStartElement, onEndElement, onCharData)
 	}
-	return true, sfvm.NewValues(vals), nil
+	if len(res) > 0 {
+		return true, sfvm.NewValues(res), nil
+	}
+	return false, nil, nil
 }
