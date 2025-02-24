@@ -18,7 +18,7 @@ var filterYakScriptToolOptions = []mcp.ToolOption{
 		[]string{"id", "created_at", "updated_at", "deleted_at", "script_name", "type", "content", "level", "params", "help", "author", "tags", "ignored", "from_local", "local_path", "is_history", "force_interactive", "from_store", "is_general_module", "general_module_verbose", "general_module_key", "from_git", "is_batch_script", "is_external", "enable_plugin_selector", "plugin_selector_types", "online_id", "online_script_name", "online_contributors", "online_is_private", "user_id", "uuid", "head_img", "online_base_url", "base_online_id", "online_official", "online_group", "is_core_plugin", "risk_type", "risk_detail", "risk_annotation", "collaborator_info", "plugin_env_key"},
 		mcp.Description(`Pagination settings for the query`)),
 	mcp.WithString("type",
-		mcp.Description("Script type filter"),
+		mcp.Description("Script type"),
 		mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan"),
 	),
 	mcp.WithString("keyword",
@@ -45,6 +45,33 @@ var filterYakScriptToolOptions = []mcp.ToolOption{
 	),
 	mcp.WithStringArray("excludeTypes",
 		mcp.Description("Exclude these script types"),
+	),
+}
+
+var filterOnlinePluginToolOptions = []mcp.ToolOption{
+	mcp.WithString("keywords",
+		mcp.Description("Keywords to search for in plugins, search in name, description, tags and content"),
+	),
+	mcp.WithStringArray("scriptName"),
+	mcp.WithStringArray("pluginType",
+		mcp.Description("Script type"),
+		mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan"),
+	),
+	mcp.WithStringArray("tags",
+		mcp.Description("Tags associated with the scripts"),
+	),
+	mcp.WithString("userName",
+		mcp.Description("Username of the script creator"),
+	),
+	mcp.WithStringArray("excludeTypes",
+		mcp.Description("Script types to exclude from the query"),
+		mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan"),
+	),
+	mcp.WithString("group",
+		mcp.Description("Script Group"),
+	),
+	mcp.WithString("uuid",
+		mcp.Description("UUID of the script"),
 	),
 }
 
@@ -162,6 +189,28 @@ func (s *MCPServer) registerYakScriptTool() {
 			mcp.Required(),
 		),
 	), s.handleDeleteYakScriptGroup)
+
+	// online
+	s.server.AddTool(mcp.NewTool("query_online_plugins",
+		mcp.WithDescription("Queries online plugins based on the provided filters"),
+		mcp.WithPaging("pagination",
+			[]string{"created_at", "updated_at", "id"},
+			mcp.Description("Pagination settings for the query"),
+		),
+		mcp.WithStruct("data",
+			[]mcp.PropertyOption{
+				mcp.Description("Filters"),
+				mcp.Required(),
+			},
+			filterOnlinePluginToolOptions...,
+		),
+	), s.handleQueryOnlinePlugins)
+
+	s.server.AddTool(mcp.NewTool("download_online_plugins",
+		append([]mcp.ToolOption{
+			mcp.WithDescription("Download online plugins to local based on the provided filters"),
+		}, filterOnlinePluginToolOptions...)...,
+	), s.handleDownloadOnlinePlugins)
 }
 
 func (s *MCPServer) handleStaticAnalyzeYakScript(
@@ -246,9 +295,7 @@ func (s *MCPServer) handleExecYakScript(
 		})
 	}
 
-	return &mcp.CallToolResult{
-		Content: results,
-	}, nil
+	return NewCommonCallToolResult(results)
 }
 
 func (s *MCPServer) handleQueryYakScript(
@@ -361,4 +408,78 @@ func (s *MCPServer) handleDeleteYakScriptGroup(
 		return nil, utils.Wrap(err, "failed to delete yak script group")
 	}
 	return NewCommonCallToolResult("delete group success")
+}
+
+func (s *MCPServer) handleQueryOnlinePlugins(
+	ctx context.Context,
+	request mcp.CallToolRequest,
+) (*mcp.CallToolResult, error) {
+	var req ypb.QueryOnlinePluginsRequest
+	err := mapstructure.Decode(request.Params.Arguments, &req)
+	if err != nil {
+		return nil, utils.Wrap(err, "invalid argument")
+	}
+	rsp, err := s.grpcClient.QueryOnlinePlugins(ctx, &req)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to query online plugins")
+	}
+	return NewCommonCallToolResult(rsp.Data)
+}
+
+func (s *MCPServer) handleDownloadOnlinePlugins(
+	ctx context.Context,
+	request mcp.CallToolRequest,
+) (*mcp.CallToolResult, error) {
+	var req ypb.DownloadOnlinePluginsRequest
+	err := mapstructure.Decode(request.Params.Arguments, &req)
+	if err != nil {
+		return nil, utils.Wrap(err, "invalid argument")
+	}
+	var progressToken mcp.ProgressToken
+	meta := request.Params.Meta
+	if meta != nil {
+		progressToken = meta.ProgressToken
+	}
+
+	stream, err := s.grpcClient.DownloadOnlinePlugins(ctx, &req)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to download online plugins")
+	}
+	results := make([]any, 0, 4)
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				results = append(results, mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf("error: %v", err),
+				})
+			}
+			break
+		}
+		if msg.Log != "" {
+			results = append(results, mcp.TextContent{
+				Type: "text",
+				Text: msg.Log,
+			})
+			s.server.SendNotificationToClient("download_online_plugins/info", map[string]any{
+				"content":       msg.Log,
+				"progressToken": progressToken,
+				"progress":      msg.Progress,
+			})
+		} else if msg.Progress > 0 {
+			s.server.SendNotificationToClient("download_online_plugins/progress", map[string]any{
+				"progressToken": progressToken,
+				"progress":      msg.Progress,
+			})
+		}
+	}
+	if len(results) == 0 {
+		results = append(results, mcp.TextContent{
+			Type: "text",
+			Text: "[System] Download online plugins completed with no output",
+		})
+	}
+
+	return NewCommonCallToolResult(results)
 }
