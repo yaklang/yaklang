@@ -164,6 +164,7 @@ func (d *rspFeeder) GetNewData(structued *aispec.StructuredData, input []byte) (
 								structued.OutputReason = fmt.Sprint(resultReason)
 							}
 						}
+						structued.IsParsed = true
 					}
 				}
 			}
