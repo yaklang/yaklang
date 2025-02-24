@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -51,6 +52,10 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...C
 	blueprintContainer := b.EmitEmptyContainer()
 	blueprintContainer.SetName(name)
 	blueprintContainer.SetVerboseName(name)
+	typ := blueprintContainer.GetType()
+	typ.SetFullTypeNames([]string{strings.Join([]string{prog.PkgName, name}, ".")})
+	blueprintContainer.SetType(typ)
+
 	// search this blueprint-declare can use ${blueprint-name} or ${blueprint-name}_declare
 	variableName := fmt.Sprintf("%s_declare", name)
 	var1 := b.CreateVariable(variableName, tokenizer...)
