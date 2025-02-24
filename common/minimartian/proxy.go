@@ -15,7 +15,6 @@
 package minimartian
 
 import (
-	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -58,7 +57,7 @@ func isCloseable(err error) bool {
 
 // Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
 type Proxy struct {
-	dial            func(context.Context, string, string) (net.Conn, error)
+	dial            func(time.Duration, string) (net.Conn, error)
 	timeout         time.Duration
 	mitm            *mitm.Config
 	proxyURL        *url.URL

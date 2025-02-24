@@ -19,3 +19,12 @@ func (t *TunVmTCPListener) Accept() (netstack.TCPConn, error) {
 		return nil, utils.Error("tun vm tcp listener closed")
 	}
 }
+
+func (t *TunVmTCPListener) Close() error {
+	err := t.vm.Close()
+	if err != nil {
+		return err
+	}
+	close(t.ch)
+	return nil
+}
