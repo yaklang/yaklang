@@ -279,6 +279,25 @@ func WithRedirectHandler(i func(isHttps bool, req, rsp []byte) bool) PocConfigOp
 	}
 }
 
+// redirect 是一个请求选项参数，用于设置旧风格的 redirectHandler 函数，如果设置了该选项，则会在重定向时调用该函数，如果该函数返回 true，则会继续重定向，否则不会重定向。其第一个参数为当前的请求，第二个参数为既往的多个请求
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.redirect(func(current, vias) {
+// return true
+// })) // 向 example.com 发起请求，使用自定义 redirectHandler 函数，如果该函数返回 true，则会继续重定向，否则不会重定向
+// ```
+func WithRedirect(i func(current *http.Request, vias []*http.Request) bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.RedirectHandler = func(isHttps bool, req, rsp []byte) bool {
+			reqInstance, err := lowhttp.ParseBytesToHttpRequest(req)
+			if err != nil {
+				return i(reqInstance, []*http.Request{reqInstance})
+			}
+			return i(reqInstance, []*http.Request{reqInstance})
+		}
+	}
+}
+
 // stream 是一个请求选项参数，可以设置一个回调函数，如果 body 读取了，将会复制一份给这个流，在这个流中处理 body 是不会影响最终结果的，一般用于处理较长的 chunk 数据
 func WithBodyStreamReaderHandler(i func(r []byte, closer io.ReadCloser)) PocConfigOption {
 	return func(c *PocConfig) {
@@ -1843,6 +1862,7 @@ var PoCExports = map[string]interface{}{
 	"noRedirect":           WithNoRedirect,
 	"noredirect":           WithNoRedirect,
 	"jsRedirect":           WithJSRedirect,
+	"redirect":             WithRedirectHandler,
 	"redirectHandler":      WithRedirectHandler,
 	"https":                WithForceHTTPS,
 	"http2":                WithForceHTTP2,

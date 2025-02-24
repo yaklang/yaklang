@@ -1,0 +1,71 @@
+baseDir = os.TempDir()
+staticBase = file.Join(baseDir, "static-test")
+
+
+file.MkdirAll(staticBase)
+file.Save(file.Join(staticBase, "/a.txt"), "testA")
+file.MkdirAll(file.Join(staticBase, "b"))
+file.Save(file.Join(staticBase, "b", "bbb"), "testBBB")
+
+
+port = os.GetRandomAvailableTCPPort()
+host = "127.0.0.1"
+go func{
+    httpserver.Serve(host /*type: string*/, port /*type: int*/, 
+        httpserver.localFileSystemHandler("/static/", staticBase),
+        httpserver.routeHandler("/api/v1/echo", (w, req) => {
+            log.Info("start to call /api/v1/echo")
+            body = io.ReadAll(req.Body)~
+            w.Write(body)
+        }),
+        httpserver.handler((w, req) => {
+            w.Write("fallback, any static and route not matched, use this")
+        })
+    )
+}
+os.WaitConnect(str.HostPort(host, port), 4)
+rsp, req, err = poc.Get("http://" + str.HostPort(host /*type: string*/, port) + "/static/a.txt")
+die(err)
+println(rsp.RawPacket)
+/*
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Content-Type: text/plain; charset=utf-8
+Last-Modified: Sun, 23 Feb 2025 03:54:55 GMT
+Date: Sun, 23 Feb 2025 03:54:55 GMT
+Content-Length: 5
+
+testA
+*/
+assert rsp.GetBody() == "testA"
+
+rsp, req, err = poc.Get("http://" + str.HostPort(host /*type: string*/, port) + "/static/b/bbb")
+die(err)
+println(rsp.RawPacket)
+
+assert string(rsp.GetBody()) == "testBBB"
+/*
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Content-Type: text/plain; charset=utf-8
+Last-Modified: Sun, 23 Feb 2025 03:54:55 GMT
+Date: Sun, 23 Feb 2025 03:54:55 GMT
+Content-Length: 7
+
+testBBB
+*/
+
+randomStr = randstr(10)
+rsp, req, err = poc.Get("http://" + str.HostPort(host /*type: string*/, port) + "/api/v1/echo", poc.postData(randomStr))
+_ = err
+println(rsp.RawPacket)
+/*
+HTTP/1.1 200 OK
+Date: Sun, 23 Feb 2025 03:58:52 GMT
+Content-Type: text/plain; charset=utf-8
+Content-Length: 10
+
+ksJkYUmfoq
+*/
+
+assert string(rsp.GetBody()) == randomStr
