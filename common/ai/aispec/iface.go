@@ -43,6 +43,17 @@ type StructuredData struct {
 	ModelUsage []UsageStatsInfo
 }
 
+func (s *StructuredData) Copy() *StructuredData {
+	return &StructuredData{
+		Id:             s.Id,
+		Event:          s.Event,
+		DataSourceType: s.DataSourceType,
+		DataRaw:        s.DataRaw,
+		HaveUsage:      s.HaveUsage,
+		ModelUsage:     s.ModelUsage,
+	}
+}
+
 type UsageStatsInfo struct {
 	Model       string
 	InputToken  int

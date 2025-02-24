@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
+
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
@@ -81,96 +83,109 @@ func (d *DashScopeGateway) ExtractData(data string, desc string, fields map[stri
 }
 
 type rspFeeder struct {
+	visited sync.Map
 }
 
-func (d *rspFeeder) GetNewData(structued *aispec.StructuredData, input []byte) (*aispec.StructuredData, error) {
-	// {"output":{"thoughts":[{"response":"{\"nodeName\":\"开始\",\"nodeType\":\"Start\",\"nodeStatus\":\"success\",\"nodeId\":\"Start_bYxoRU\",\"nodeExecTime\":\"0ms\"}"},{"response":"{\"nodeName\":\"prerag\",\"nodeResult\":\"{\\\"result\\\":\\\"\\\"}\",\"nodeType\":\"LLM\",\"nodeStatus\":\"success\",\"nodeId\":\"LLM_j4AP\",\"nodeExecTime\":\"2638ms\"}"},{"response":"{\"nodeName\":\"yaklang-rag\",\"nodeResult\":\"{\\\"result\\\":\\\"\\\"}\",\"nodeType\":\"Retrieval\",\"nodeStatus\":\"success\",\"nodeId\":\"Retrieval_hK8d\",\"nodeExecTime\":\"765ms\"}"},{"response":"{\"nodeName\":\"code-generator\",\"nodeResult\":\"{\\\"result\\\":\\\"\\\",\\\"reasoningContent\\\":\\\"好的，用户想要在Y\\\"}\",\"nodeType\":\"LLM\",\"nodeStatus\":\"executing\",\"nodeId\":\"LLM_pBed\"}"}],"session_id":"3daa9655f7614515a08cda59d26ccaa7","finish_reason":"null"},"usage":{"models":[{"input_tokens":809,"output_tokens":49,"model_id":"qwen-max"},{"input_tokens":1464,"output_tokens":8,"model_id":"deepseek-r1"}]},"request_id":"db3c29e3-c696-9de3-903b-3886f87b4404"}
-	var data = make(map[string]any)
-	err := json.Unmarshal(input, &data)
-	if err != nil {
-		return nil, err
-	}
+func (d *rspFeeder) GetNewData(structued *aispec.StructuredData, input []byte) chan *aispec.StructuredData {
+	var resultChan = make(chan *aispec.StructuredData, 1000)
+	go func() {
+		defer close(resultChan)
+		// {"output":{"thoughts":[{"response":"{\"nodeName\":\"开始\",\"nodeType\":\"Start\",\"nodeStatus\":\"success\",\"nodeId\":\"Start_bYxoRU\",\"nodeExecTime\":\"0ms\"}"},{"response":"{\"nodeName\":\"prerag\",\"nodeResult\":\"{\\\"result\\\":\\\"\\\"}\",\"nodeType\":\"LLM\",\"nodeStatus\":\"success\",\"nodeId\":\"LLM_j4AP\",\"nodeExecTime\":\"2638ms\"}"},{"response":"{\"nodeName\":\"yaklang-rag\",\"nodeResult\":\"{\\\"result\\\":\\\"\\\"}\",\"nodeType\":\"Retrieval\",\"nodeStatus\":\"success\",\"nodeId\":\"Retrieval_hK8d\",\"nodeExecTime\":\"765ms\"}"},{"response":"{\"nodeName\":\"code-generator\",\"nodeResult\":\"{\\\"result\\\":\\\"\\\",\\\"reasoningContent\\\":\\\"好的，用户想要在Y\\\"}\",\"nodeType\":\"LLM\",\"nodeStatus\":\"executing\",\"nodeId\":\"LLM_pBed\"}"}],"session_id":"3daa9655f7614515a08cda59d26ccaa7","finish_reason":"null"},"usage":{"models":[{"input_tokens":809,"output_tokens":49,"model_id":"qwen-max"},{"input_tokens":1464,"output_tokens":8,"model_id":"deepseek-r1"}]},"request_id":"db3c29e3-c696-9de3-903b-3886f87b4404"}
+		var data = make(map[string]any)
+		err := json.Unmarshal(input, &data)
+		if err != nil {
+			return
+		}
 
-	if usageRaw, ok := data["usage"]; ok {
-		if usage, ok := usageRaw.(map[string]any); ok {
-			if models, ok := usage["models"]; ok {
-				// "usage":{"models":[{"input_tokens":809,"output_tokens":49,"model_id":"qwen-max"},{"input_tokens":1464,"output_tokens":8,"model_id":"deepseek-r1"}]}
-				modelList, ok := models.([]any)
-				if !ok {
-					return structued, nil
-				}
-				for _, i := range modelList {
-					structued.HaveUsage = true
-					if model, ok := i.(map[string]any); ok {
-						if modelId, ok := model["model_id"]; ok {
-							inputTokens := 0
-							outputTokens := 0
-							if inputTokensRaw, ok := model["input_tokens"]; ok {
-								inputTokens = int(inputTokensRaw.(float64))
+		if usageRaw, ok := data["usage"]; ok {
+			if usage, ok := usageRaw.(map[string]any); ok {
+				if models, ok := usage["models"]; ok {
+					// "usage":{"models":[{"input_tokens":809,"output_tokens":49,"model_id":"qwen-max"},{"input_tokens":1464,"output_tokens":8,"model_id":"deepseek-r1"}]}
+					modelList, ok := models.([]any)
+					if !ok {
+						return
+					}
+					for _, i := range modelList {
+						structued.HaveUsage = true
+						if model, ok := i.(map[string]any); ok {
+							if modelId, ok := model["model_id"]; ok {
+								inputTokens := 0
+								outputTokens := 0
+								if inputTokensRaw, ok := model["input_tokens"]; ok {
+									inputTokens = int(inputTokensRaw.(float64))
+								}
+								if outputTokensRaw, ok := model["output_tokens"]; ok {
+									outputTokens = int(outputTokensRaw.(float64))
+								}
+								structued.ModelUsage = append(structued.ModelUsage, aispec.UsageStatsInfo{
+									Model:       modelId.(string),
+									InputToken:  inputTokens,
+									OutputToken: outputTokens,
+								})
 							}
-							if outputTokensRaw, ok := model["output_tokens"]; ok {
-								outputTokens = int(outputTokensRaw.(float64))
-							}
-							structued.ModelUsage = append(structued.ModelUsage, aispec.UsageStatsInfo{
-								Model:       modelId.(string),
-								InputToken:  inputTokens,
-								OutputToken: outputTokens,
-							})
 						}
 					}
 				}
 			}
 		}
-	}
 
-	if outputRaw, ok := data["output"]; ok {
-		if output, ok := outputRaw.(map[string]any); ok {
-			if thoughts, ok := output["thoughts"]; ok {
-				thoughtList, ok := thoughts.([]any)
-				if !ok {
-					structued.IsParsed = false
-					return structued, nil
-				}
-				if len(thoughtList) <= 0 {
-					return structued, nil
-				}
-				i := thoughtList[len(thoughtList)-1]
-				if thought, ok := i.(map[string]any); ok {
-					if responseRaw, ok := thought["response"]; ok {
-						var response = make(map[string]any)
-						err := json.Unmarshal([]byte(responseRaw.(string)), &response)
-						if err != nil {
-							return structued, nil
-						}
-						// "{\"nodeName\":\"开始\",\"nodeType\":\"Start\",\"nodeStatus\":\"success\",\"nodeId\":\"Start_bYxoRU\",\"nodeExecTime\":\"0ms\"}"
-						structued.OutputNodeId = fmt.Sprint(response["nodeId"])
-						structued.OutputNodeName = fmt.Sprint(response["nodeName"])
-						structued.OutputNodeType = fmt.Sprint(response["nodeType"])
-						structued.OutputNodeStatus = fmt.Sprint(response["nodeStatus"])
-						if response["nodeExecTime"] != nil {
-							structued.OutputNodeExecTime = fmt.Sprint(response["nodeExecTime"])
-						}
-						nodeResult, ok := response["nodeResult"]
-						if ok {
-							var result = make(map[string]any)
-							err = json.Unmarshal([]byte(nodeResult.(string)), &result)
-							if err != nil {
-								return nil, err
+		if outputRaw, ok := data["output"]; ok {
+			if output, ok := outputRaw.(map[string]any); ok {
+				if thoughts, ok := output["thoughts"]; ok {
+					thoughtList, ok := thoughts.([]any)
+					if !ok {
+						structued.IsParsed = false
+						return
+					}
+					if len(thoughtList) <= 0 {
+						return
+					}
+					for _, i := range thoughtList {
+						if thought, ok := i.(map[string]any); ok {
+							if responseRaw, ok := thought["response"]; ok {
+								var response = make(map[string]any)
+								responseStr := fmt.Sprint(responseRaw)
+								hash := utils.CalcSha256(responseStr)
+								if _, ok := d.visited.Load(hash); ok {
+									continue
+								}
+								d.visited.Store(hash, structued)
+								err := json.Unmarshal([]byte(responseStr), &response)
+								if err != nil {
+									return
+								}
+
+								newStructued := structued.Copy()
+
+								// "{\"nodeName\":\"开始\",\"nodeType\":\"Start\",\"nodeStatus\":\"success\",\"nodeId\":\"Start_bYxoRU\",\"nodeExecTime\":\"0ms\"}"
+								newStructued.OutputNodeId = fmt.Sprint(response["nodeId"])
+								newStructued.OutputNodeName = fmt.Sprint(response["nodeName"])
+								newStructued.OutputNodeType = fmt.Sprint(response["nodeType"])
+								newStructued.OutputNodeStatus = fmt.Sprint(response["nodeStatus"])
+								if response["nodeExecTime"] != nil {
+									newStructued.OutputNodeExecTime = fmt.Sprint(response["nodeExecTime"])
+								}
+								nodeResult, ok := response["nodeResult"]
+								if ok {
+									var result = make(map[string]any)
+									_ = json.Unmarshal([]byte(nodeResult.(string)), &result)
+									if resultText, ok := result["result"]; ok {
+										newStructued.OutputText = fmt.Sprint(resultText)
+									}
+									if resultReason, ok := result["reasoningContent"]; ok {
+										newStructued.OutputReason = fmt.Sprint(resultReason)
+									}
+								}
+								newStructued.IsParsed = true
+								resultChan <- newStructued
 							}
-							if resultText, ok := result["result"]; ok {
-								structued.OutputText = fmt.Sprint(resultText)
-							}
-							if resultReason, ok := result["reasoningContent"]; ok {
-								structued.OutputReason = fmt.Sprint(resultReason)
-							}
 						}
-						structued.IsParsed = true
 					}
 				}
 			}
 		}
-	}
-	return structued, nil
+	}()
+	return resultChan
 }
 
 func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
@@ -219,7 +234,19 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 						if strings.HasPrefix(line, "data:") {
 							structured.DataRaw = bytes.TrimSpace([]byte(line[5:]))
 							inputs := []byte(line[5:])
-							_, _ = feeder.GetNewData(structured, inputs)
+							ch := feeder.GetNewData(structured, inputs)
+							if ch != nil {
+								for data := range ch {
+									objChannel <- data
+									count++
+								}
+								return
+							} else {
+								if len(structured.DataRaw) > 0 {
+									objChannel <- structured
+									count++
+								}
+							}
 						} else if strings.HasPrefix(line, "id:") {
 							structured.Id = strings.TrimSpace(line[3:])
 						} else if strings.HasPrefix(line, "event:") {
@@ -250,11 +277,6 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 						}
 						handleLine(result)
 					}
-					if string(structured.DataRaw) == "" {
-						continue
-					}
-					objChannel <- structured
-					count++
 				}
 			}),
 		)
