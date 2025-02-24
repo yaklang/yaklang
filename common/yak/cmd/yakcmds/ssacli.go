@@ -5,14 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gobwas/glob"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -373,9 +374,18 @@ var SSACompilerCommands = []*cli.Command{
 				log.Warnf("no-override flag is set, will not delete existed program: %v", programName)
 			}
 
-			proj, err := ssaapi.ParseProjectFromPath(target, opt...)
-			if err != nil {
-				return utils.Errorf("parse project [%v] failed: %v", target, err)
+			var proj ssaapi.Programs
+			zipfs, err := filesys.NewZipFSFromLocal(target)
+			if err == nil {
+				proj, err = ssaapi.ParseProjectWithFS(zipfs, opt...)
+				if err != nil {
+					return utils.Errorf("parse project [%v] failed: %v", target, err)
+				}
+			} else {
+				proj, err = ssaapi.ParseProjectFromPath(target, opt...)
+				if err != nil {
+					return utils.Errorf("parse project [%v] failed: %v", target, err)
+				}
 			}
 
 			log.Infof("finished compiling..., results: %v", len(proj))
@@ -755,7 +765,6 @@ var SSACompilerCommands = []*cli.Command{
 			}
 
 			var dirChecking []string
-
 			handleBySyntaxFlowContent := func(syntaxFlow string) error {
 				err := SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
 				if err != nil {
@@ -772,6 +781,26 @@ var SSACompilerCommands = []*cli.Command{
 					return utils.Wrapf(err, "read %v failed", filename)
 				}
 				return handleBySyntaxFlowContent(string(raw))
+			}
+
+			var ruleError error
+			addError := func(err error, ruleName string) {
+				if ruleError == nil {
+					ruleError = fmt.Errorf("execute syntaxRule[%s] fail,reason: %s", ruleName, err)
+				} else {
+					ruleError = fmt.Errorf("%w\n,execute syntaxRule[%s] fail,reason: %s", ruleError, ruleName, err)
+				}
+			}
+
+			sarifCallback = func(result *ssaapi.SyntaxFlowResult) {
+				if result.IsLib() {
+					return
+				}
+				values := result.GetAlertValues()
+				if values.Len() != 0 {
+					addError(errors.New("alert number is not null"), result.Name())
+					result.Show()
+				}
 			}
 
 			var errs []error
@@ -855,23 +884,31 @@ var SSACompilerCommands = []*cli.Command{
 				}
 				return utils.Errorf("many error happened: \n%v", buf.String())
 			}
+
+			if ruleError != nil {
+				return ruleError
+			}
+
 			return nil
 		},
 	},
 }
 
+// SyntaxFlowQuery 函数用于执行语法流查询
 func SyntaxFlowQuery(
-	programName string,
-	syntaxFlow string,
-	dbDebug, sfDebug, showDot, withCode bool,
-	callbacks ...func(*ssaapi.SyntaxFlowResult),
+	programName string, // 程序名称
+	syntaxFlow string, // 语法流
+	dbDebug, sfDebug, showDot, withCode bool, // 是否开启数据库调试、语法流调试、显示dot、显示代码
+	callbacks ...func(*ssaapi.SyntaxFlowResult), // 回调函数
 ) error {
+	// 捕获panic
 	defer func() {
 		if err := recover(); err != nil {
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 
+	// 检查程序名称是否为空
 	if programName == "" {
 		return utils.Error("program name is required when using syntax flow query language")
 	}
