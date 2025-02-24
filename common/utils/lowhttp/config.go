@@ -3,10 +3,10 @@ package lowhttp
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"reflect"
 	"strings"
@@ -96,8 +96,7 @@ type LowhttpExecConfig struct {
 	BeforeCount *int64
 	AfterCount  *int64
 
-	UseNetStackVM bool
-	NetStackVM    *netstackvm.NetStackVirtualMachine
+	Dialer func(duration time.Duration, addr string) (net.Conn, error)
 }
 
 type LowhttpResponse struct {
@@ -703,14 +702,8 @@ func WithClientHelloSpec(spec *utls.ClientHelloSpec) LowhttpOpt {
 	}
 }
 
-func WithUseNetStackVM(b bool) LowhttpOpt {
+func WithDialer(dialer func(duration time.Duration, addr string) (net.Conn, error)) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.UseNetStackVM = b
-	}
-}
-
-func WithNetStackVM(vm *netstackvm.NetStackVirtualMachine) LowhttpOpt {
-	return func(o *LowhttpExecConfig) {
-		o.NetStackVM = vm
+		o.Dialer = dialer
 	}
 }
