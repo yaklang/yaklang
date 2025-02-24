@@ -16,6 +16,58 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+var filterPortsToolOptions = []mcp.ToolOption{
+	mcp.WithStruct("pagination",
+		[]mcp.PropertyOption{
+			mcp.Description("Pagination settings for the query"),
+			mcp.Required(),
+		},
+	),
+	mcp.WithString("hosts",
+		mcp.Description("(fuzzy search)Filter by host names or IP addresses"),
+	),
+	mcp.WithStringArray("ports",
+		mcp.Description("Filter by ports, allow ranges (e.g. 5-10)"),
+	),
+	mcp.WithString("service",
+		mcp.Description("(fuzzy search)Filter by service fingerprint, e.g. https"),
+	),
+	mcp.WithString("state",
+		mcp.Description("Filter by port state"),
+		mcp.Enum("open", "closed", "unknown"),
+	),
+	mcp.WithString("title",
+		mcp.Description("(fuzzy search)Filter by HTML title of the service"),
+	),
+	mcp.WithBool("all",
+		mcp.Description("Query all data, ignoring pagination"),
+	),
+	mcp.WithString("keywords",
+		mcp.Description("(fuzzy search)Filter by keywords in the service data"),
+	),
+	mcp.WithBool("titleEffective",
+		mcp.Description("Filter by whether the title is effective, not 404 or empty"),
+	),
+	mcp.WithString("proto",
+		mcp.Description("Filter by protocol, e.g., tcp, udp"),
+		mcp.Enum("tcp", "udp"),
+		mcp.Default("tcp"),
+		mcp.Required(),
+	),
+	mcp.WithNumber("beforeUpdatedAt",
+		mcp.Description("Filter by records updated before this timestamp"),
+	),
+	mcp.WithNumber("afterUpdatedAt",
+		mcp.Description("Filter by records updated after this timestamp"),
+	),
+	mcp.WithNumber("afterId",
+		mcp.Description("Filter by records with ID greater than this value"),
+	),
+	mcp.WithNumber("beforeId",
+		mcp.Description("Filter by records with ID less than this value"),
+	),
+}
+
 func (s *MCPServer) registerPortScanTool() {
 	s.server.AddTool(mcp.NewTool("port_scan",
 		mcp.WithDescription("Scan ports on targets"),
@@ -98,6 +150,34 @@ func (s *MCPServer) registerPortScanTool() {
 			mcp.Description("Enable brute force when specific ports are detected with corresponding fingerprints"),
 		),
 	), s.handlePortScan)
+
+	s.server.AddTool(mcp.NewTool("query_ports",
+		append([]mcp.ToolOption{
+			mcp.WithDescription("Query ports based with flexible filters"),
+		},
+			filterPortsToolOptions...)...,
+	), s.handleQueryPort)
+
+	s.server.AddTool(mcp.NewTool("delete_ports",
+		mcp.WithDescription("Delete ports based with flexible filters"),
+		mcp.WithNumberArray("id",
+			mcp.Description("ID of the port to delete")),
+		mcp.WithBool("all",
+			mcp.Description("Delete all ports")),
+		mcp.WithStruct("filter", nil, filterPortsToolOptions...),
+	), s.handleDeletePort)
+}
+func arrayToStringHook(from reflect.Type, to reflect.Type, v any) (any, error) {
+	if to.Kind() == reflect.String {
+		if from.Kind() == reflect.Slice {
+			slice := utils.InterfaceToSliceInterface(v)
+			stringSlice := lo.Map(slice, func(item any, _ int) string {
+				return utils.InterfaceToString(item)
+			})
+			return strings.Join(stringSlice, ","), nil
+		}
+	}
+	return v, nil
 }
 
 func (s *MCPServer) handlePortScan(
@@ -105,20 +185,8 @@ func (s *MCPServer) handlePortScan(
 	request mcp.CallToolRequest,
 ) (*mcp.CallToolResult, error) {
 	var req ypb.PortScanRequest
-	ArrayToStringHook := func(from reflect.Type, to reflect.Type, v any) (any, error) {
-		if to.Kind() == reflect.String {
-			if from.Kind() == reflect.Slice {
-				slice := utils.InterfaceToSliceInterface(v)
-				stringSlice := lo.Map(slice, func(item any, _ int) string {
-					return utils.InterfaceToString(item)
-				})
-				return strings.Join(stringSlice, ","), nil
-			}
-		}
-		return v, nil
-	}
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		DecodeHook: ArrayToStringHook,
+		DecodeHook: arrayToStringHook,
 		Result:     &req,
 	})
 	if err != nil {
@@ -207,4 +275,50 @@ func (s *MCPServer) handlePortScan(
 	return &mcp.CallToolResult{
 		Content: results,
 	}, nil
+}
+
+func (s *MCPServer) handleQueryPort(
+	ctx context.Context,
+	request mcp.CallToolRequest,
+) (*mcp.CallToolResult, error) {
+	var req ypb.QueryPortsRequest
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: arrayToStringHook,
+		Result:     &req,
+	})
+	if err != nil {
+		return nil, utils.Wrap(err, "BUG: new map structure decoder error")
+	}
+	err = decoder.Decode(request.Params.Arguments)
+	if err != nil {
+		return nil, utils.Wrap(err, "invalid argument")
+	}
+	rsp, err := s.grpcClient.QueryPorts(ctx, &req)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to query ports")
+	}
+	return NewCommonCallToolResult(rsp.Data)
+}
+
+func (s *MCPServer) handleDeletePort(
+	ctx context.Context,
+	request mcp.CallToolRequest,
+) (*mcp.CallToolResult, error) {
+	var req ypb.DeletePortsRequest
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: arrayToStringHook,
+		Result:     &req,
+	})
+	if err != nil {
+		return nil, utils.Wrap(err, "BUG: new map structure decoder error")
+	}
+	err = decoder.Decode(request.Params.Arguments)
+	if err != nil {
+		return nil, utils.Wrap(err, "invalid argument")
+	}
+	_, err = s.grpcClient.DeletePorts(ctx, &req)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to delete ports")
+	}
+	return NewCommonCallToolResult("delete port(s) success")
 }
