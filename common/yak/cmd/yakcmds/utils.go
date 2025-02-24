@@ -510,7 +510,7 @@ var UtilsCommands = []*cli.Command{
 			cli.IntFlag{Name: "times,t", Usage: "retry times", Value: 5},
 		},
 		Action: func(c *cli.Context) error {
-			client, err := oss.New(c.String("endpoint"), c.String("ak"), c.String("sk"))
+			client, err := oss.New(c.String("endpoint"), c.String("ak"), c.String("sk"), oss.EnableCRC(true))
 			if err != nil {
 				return err
 			}
