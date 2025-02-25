@@ -340,7 +340,7 @@ type ListResourcesRequest struct {
 // from the client.
 type ListResourcesResult struct {
 	PaginatedResult
-	Resources []Resource `json:"resources"`
+	Resources []*Resource `json:"resources"`
 }
 
 // ListResourceTemplatesRequest is sent from the client to request a list of
@@ -353,7 +353,7 @@ type ListResourceTemplatesRequest struct {
 // resources/templates/list request from the client.
 type ListResourceTemplatesResult struct {
 	PaginatedResult
-	ResourceTemplates []ResourceTemplate `json:"resourceTemplates"`
+	ResourceTemplates []*ResourceTemplate `json:"resourceTemplates"`
 }
 
 // ReadResourceRequest is sent from the client to the server, to read a

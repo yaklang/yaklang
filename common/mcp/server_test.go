@@ -16,7 +16,7 @@ import (
 )
 
 func TestMCPServerEx(t *testing.T) {
-	s := NewMCPServer()
+	s, _ := NewMCPServer()
 
 	if err := s.ServeSSE(":18083", "http://localhost:18083"); err != nil {
 		panic(err)
@@ -28,7 +28,7 @@ func TestMCPClient(t *testing.T) {
 
 	port := utils.GetRandomAvailableTCPPort()
 	go func() {
-		s := NewMCPServer()
+		s, _ := NewMCPServer()
 
 		if err := s.ServeSSE(fmt.Sprintf(":%d", port), fmt.Sprintf("http://localhost:%d", port)); err != nil {
 			panic(err)
@@ -57,15 +57,17 @@ func TestMCPClient(t *testing.T) {
 
 	request := mcp.CallToolRequest{}
 	data := `{
-  "targets": ["183.2.172.22"],
-  "ports": [80, 443],
-  "mode": "all",
-  "proto": ["tcp"],
-  "active": true,
-  "fingerprintMode": "all",
-  "saveToDB": true
+  "targets": {
+    "input": ["http://127.0.0.1:8787/xss/echo?name=admin"]
+  },
+  "plugin": {
+    "filter": {
+      "keyword": "基础 XSS"
+    }
+  },
+  "concurrent": 20
 }`
-	request.Params.Name = "port_scan"
+	request.Params.Name = "hybrid_scan"
 	err = json.Unmarshal([]byte(data), &request.Params.Arguments)
 	require.NoError(t, err)
 	c.OnNotification(func(notification mcp.JSONRPCNotification) {
