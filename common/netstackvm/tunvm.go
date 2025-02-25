@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -41,6 +42,10 @@ type TunVirtualMachine struct {
 	mainNicID tcpip.NICID
 
 	tcpHijacked *utils.AtomicBool
+
+	// hijackedTCPHandler
+	hijackedMutex   sync.RWMutex
+	hijackedHandler func(conn netstack.TCPConn)
 }
 
 func NewTunVirtualMachine(ctx context.Context) (*TunVirtualMachine, error) {
@@ -178,11 +183,8 @@ func NewTunVirtualMachine(ctx context.Context) (*TunVirtualMachine, error) {
 		stack:        s,
 		mainNicID:    mainNICId,
 	}
-	return tvm, nil
-}
 
-func (t *TunVirtualMachine) SetHijackTCPHandler(handle func(conn netstack.TCPConn)) error {
-	tcpForwarder := tcp.NewForwarder(t.stack, defaultWndSize, maxConnAttempts, func(r *tcp.ForwarderRequest) {
+	tcpForwarder := tcp.NewForwarder(tvm.stack, defaultWndSize, maxConnAttempts, func(r *tcp.ForwarderRequest) {
 		var (
 			wq  waiter.Queue
 			ep  tcpip.Endpoint
@@ -210,18 +212,22 @@ func (t *TunVirtualMachine) SetHijackTCPHandler(handle func(conn netstack.TCPCon
 		defer r.Complete(false)
 
 		log.Infof("start to set socket options: %s:%d->%s:%d", id.RemoteAddress, id.RemotePort, id.LocalAddress, id.LocalPort)
-		err = setSocketOptions(t.stack, ep)
+		err = setSocketOptions(tvm.stack, ep)
 
 		log.Infof("start to create tcp connection instance for userland: %s:%d->%s:%d", id.RemoteAddress, id.RemotePort, id.LocalAddress, id.LocalPort)
 		conn := &tcpConn{
 			TCPConn: gonet.NewTCPConn(&wq, ep),
 			id:      id,
 		}
-		conn.ID()
-		handle(conn)
+
+		tvm.hijackedMutex.RLock()
+		defer tvm.hijackedMutex.RUnlock()
+		if tvm.hijackedHandler != nil {
+			tvm.hijackedHandler(conn)
+		}
 	})
-	t.stack.SetTransportProtocolHandler(header.TCPProtocolNumber, tcpForwarder.HandlePacket)
-	return nil
+	tvm.stack.SetTransportProtocolHandler(header.TCPProtocolNumber, tcpForwarder.HandlePacket)
+	return tvm, nil
 }
 
 func (t *TunVirtualMachine) Close() error {
@@ -241,4 +247,15 @@ func (t *TunVirtualMachine) ListenTCP() (*TunVmTCPListener, error) {
 	return listener, t.SetHijackTCPHandler(func(conn netstack.TCPConn) {
 		listener.ch <- conn
 	})
+}
+
+func (t *TunVirtualMachine) SetHijackTCPHandler(handle func(conn netstack.TCPConn)) error {
+	t.hijackedMutex.Lock()
+	defer t.hijackedMutex.Unlock()
+
+	if t.hijackedHandler != nil {
+		return utils.Error("hijackedHandler already set")
+	}
+	t.hijackedHandler = handle
+	return nil
 }
