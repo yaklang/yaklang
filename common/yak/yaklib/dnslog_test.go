@@ -1,11 +1,11 @@
 package yaklib_test
 
 import (
-	"github.com/yaklang/yaklang/common/netx"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )

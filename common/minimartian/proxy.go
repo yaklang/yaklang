@@ -18,7 +18,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netstackvm"
 	"io"
 	"net"
 	"net/http"
@@ -57,7 +56,7 @@ func isCloseable(err error) bool {
 
 // Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
 type Proxy struct {
-	dial            func(time.Duration, string) (net.Conn, error)
+	dialer          func(time.Duration, string) (net.Conn, error)
 	timeout         time.Duration
 	mitm            *mitm.Config
 	proxyURL        *url.URL
@@ -91,7 +90,6 @@ type Proxy struct {
 	forceDisableKeepAlive bool
 
 	tunMode bool
-	tunVM   *netstackvm.TunVirtualMachine
 }
 
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
@@ -141,6 +139,11 @@ func NewProxy() *Proxy {
 		ctxCache:         utils.NewTTLCache[*Context](5 * time.Minute),
 	}
 	return proxy
+}
+
+// SetDialer sets the proxy dialer
+func (p *Proxy) SetDialer(dialer func(time.Duration, string) (net.Conn, error)) {
+	p.dialer = dialer
 }
 
 // SetTimeout sets the request timeout of the proxy.
@@ -262,11 +265,4 @@ func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
 	}
 
 	p.resmod = resmod
-}
-
-func (p *Proxy) AddHijackTarget(target string) error {
-	if !p.tunMode {
-		return utils.Errorf("tun mode is not enabled")
-	}
-	return p.tunVM.HijackDomain(target)
 }

@@ -1,11 +1,11 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"os"
 	"runtime"
 
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/privileged"

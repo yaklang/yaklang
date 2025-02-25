@@ -229,6 +229,7 @@ type MITMServer struct {
 	gmOnly                bool
 	forceDisableKeepAlive bool
 	findProcessName       bool
+	dialer                func(timeout time.Duration, addr string) (net.Conn, error)
 
 	clientCerts []*ClientCertificationPair
 
@@ -297,33 +298,6 @@ func (m *MITMServer) GetCaCert() []byte {
 	return m.caCert
 }
 
-func (m *MITMServer) TunInit(ctx context.Context) error {
-	m.tunMode = true
-	m.proxy.SetTunMode(true)
-	return m.proxy.TunInit(ctx)
-}
-
-func (m *MITMServer) TunStart(ctx context.Context) error {
-	if err := m.initConfig(); err != nil {
-		return err
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	m.setHijackHandler(ctx)
-	err := m.proxy.TunStart(ctx)
-	if err != nil {
-		return utils.Errorf("serve proxy server failed: %s", err)
-	}
-	return nil
-}
-
-func (m *MITMServer) AddHijackTarget(target string) error {
-	if !m.tunMode {
-		return utils.Errorf("tun mode not enabled")
-	}
-	return m.proxy.AddHijackTarget(target)
-}
-
 func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	return m.ServeWithListenedCallback(ctx, addr, func() {
 		log.Info("mitm server started")
@@ -367,19 +341,13 @@ func (m *MITMServer) initConfig() error {
 	m.proxy.SetGMOnly(m.gmOnly)
 	m.proxy.SetHTTPForceClose(m.forceDisableKeepAlive)
 	m.proxy.SetFindProcessName(m.findProcessName)
+	m.proxy.SetDialer(m.dialer)
 
 	m.proxy.SetMITM(m.mitmConfig)
 	return nil
 }
 
 func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string, callback func()) error {
-	if err := m.initConfig(); err != nil {
-		return err
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	m.setHijackHandler(ctx)
-
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return utils.Errorf("listen port: %v failed: %s", addr, err)
@@ -389,7 +357,6 @@ func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string,
 	if callback != nil {
 		callback()
 	}
-
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -397,12 +364,19 @@ func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string,
 		}
 	}()
 
-	log.Infof("start to server mitm server: tcp://%v", addr)
-	err = m.proxy.Serve(lis, ctx)
+	return m.ServerListener(ctx, lis)
+}
+func (m *MITMServer) ServerListener(ctx context.Context, lis net.Listener) error {
+	if err := m.initConfig(); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	m.setHijackHandler(ctx)
+	err := m.proxy.Serve(lis, ctx)
 	if err != nil {
 		return utils.Errorf("serve proxy server failed: %s", err)
 	}
-
 	return nil
 }
 
