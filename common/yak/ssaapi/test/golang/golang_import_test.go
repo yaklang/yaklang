@@ -83,8 +83,8 @@ func TestImport_function(t *testing.T) {
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"1", "2"},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
+		"a": {"1", "2", "3"},
+	}, false, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
 

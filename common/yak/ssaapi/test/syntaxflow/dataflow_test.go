@@ -1,9 +1,10 @@
 package syntaxflow
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -147,5 +148,29 @@ CODE
 			require.Contains(t, source.String(), `Parameter-socket`)
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+}
+
+func TestDataflowTest(t *testing.T) {
+	code := `
+	a = {} 
+
+	source := a.b()
+	{
+		b = source + 1 
+		b = c(b)
+		f1(b)
+	}
+	`
+
+	ssatest.CheckSyntaxFlow(t, code, `
+a.b() as $source 
+f1(* as $sink)
+$sink #-> as $vul1
+$sink<dataflow(<<<CODE
+    * ?{opcode: const} as $value1
+CODE)> 
+    `, map[string][]string{
+		"value1": {"1"},
 	})
 }

@@ -32,14 +32,14 @@ func ValidSyntaxFlowRule(s *schema.SyntaxFlowRule) error {
 	return nil
 }
 
-func GetSFIncludeCache() *utils.Cache[sfvm.ValueOperator] {
+func GetSFIncludeCache() *utils.Cache[Values] {
 	return includeCache
 }
 
 var includeCache = createIncludeCache()
 
-func createIncludeCache() *utils.Cache[sfvm.ValueOperator] {
-	return utils.NewTTLCache[sfvm.ValueOperator]()
+func createIncludeCache() *utils.Cache[Values] {
+	return utils.NewTTLCache[Values]()
 }
 
 func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.ValueOperator, err error) {
@@ -94,25 +94,36 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	if err != nil {
 		return false, nil, err
 	}
-	var vals Values
+	var gotValues Values
 	for _, name := range result.GetAlertVariables() {
 		vs := result.GetValues(name)
-		vals = append(vals, vs...)
+		gotValues = append(gotValues, vs...)
 	}
-	if len(vals) > 0 {
-		value = ValuesToSFValueList(vals)
-		if shouldCache {
-			includeCache.Set(hash, value)
-		}
-		return true, value, nil
+	if len(gotValues) == 0 {
+		return false, nil, utils.Errorf("no value found")
 	}
-	return false, nil, utils.Error("no value found")
+	if shouldCache {
+		includeCache.Set(hash, gotValues)
+	}
+	val := CreateIncludeValue(gotValues)
+	return true, val, nil
+}
+
+func CreateIncludeValue(vs Values) sfvm.ValueOperator {
+	// value := ValuesToSFValueList(vals)
+	var list []sfvm.ValueOperator
+	for _, got := range vs {
+		val := got.NewValue(got.node)
+		val.AppendPredecessor(got, sfvm.WithAnalysisContext_Label("include"))
+		list = append(list, val)
+	}
+	return sfvm.NewValues(list)
 }
 
 func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (hash string, value sfvm.ValueOperator, shouldCache bool) {
 	getRetFromCache := func(hash string) sfvm.ValueOperator {
 		if ret, ok := includeCache.Get(hash); ok {
-			return ret
+			return CreateIncludeValue(ret)
 		} else {
 			return nil
 		}
