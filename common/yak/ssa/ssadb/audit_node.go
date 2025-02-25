@@ -13,13 +13,14 @@ type AuditNodeStatus struct {
 	TaskId string `json:"task_id" gorm:"index"`
 	// syntaxflow result
 	ResultId       uint   `json:"result_id" gorm:"index"`
-	ResultVariable string `json:"result_variable"` // syntaxflow result variable name
+	ResultVariable string `json:"result_variable" gorm:"index"` // syntaxflow result variable name
+	ResultIndex    uint   `json:"result_index" gorm:"index"`
 	ResultAlertMsg string `json:"result_alert_msg"`
 	// rule  info
 	RuleName  string `json:"rule_name" gorm:"index"`
 	RuleTitle string `json:"rule_title"`
 	// program info
-	ProgramName string `json:"program_name"`
+	ProgramName string `json:"program_name" gorm:"index"`
 }
 
 type AuditNode struct {
@@ -27,7 +28,7 @@ type AuditNode struct {
 
 	AuditNodeStatus
 	// is entry node
-	IsEntryNode bool `json:"is_entry_node"`
+	IsEntryNode bool `json:"is_entry_node" gorm:"index"`
 	// value
 	IRCodeID int64 `json:"ir_code_id"`
 
@@ -83,12 +84,22 @@ func GetResultValueByVariable(db *gorm.DB, resultID uint, resultVariable string)
 	return items, nil
 }
 
+func GetResultNodeByVariableIndex(db *gorm.DB, resultID uint, resultVariable string, resultIndex uint) (uint, error) {
+	var node AuditNode
+	if err := db.Model(&AuditNode{}).
+		Where("result_id = ? and result_variable = ? and result_index = ? and is_entry_node = true ",
+			resultID, resultVariable, resultIndex).First(&node).Error; err != nil {
+		return 0, err
+	}
+	return uint(node.ID), nil
+}
+
 func GetResultNodeByVariable(db *gorm.DB, resultID uint, resultVariable string) ([]uint, error) {
 	// db = db.Debug()
 	// get andit node by result_id, unique by result_variable, and get number of result_variable
 	var items []uint
-	if err := db.Model(&AuditNode{}).
-		Where("result_id = ? and result_variable = ? and is_entry_node = ?", resultID, resultVariable, true).
+	if err := db.Model(&AuditNode{}).Order("result_index").
+		Where("result_id = ? and result_variable = ? and is_entry_node = true", resultID, resultVariable).
 		Pluck("id", &items).Error; err != nil {
 		return nil, err
 	}
