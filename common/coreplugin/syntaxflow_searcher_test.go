@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -17,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -287,7 +289,7 @@ funcA(222);
 	})
 }
 
-func TestSSASearch_Reuse(t *testing.T) {
+func TestSSASearch_OnceSearch_MultipleQueryKind(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	code1 := `<?php
 $b = "funcA(";
@@ -344,5 +346,74 @@ funcA(222);
 	// check const
 	s.Check(t, "const", result, map[string]string{
 		`"funcA("`: "funcA(",
+	})
+}
+
+func TestSSASearch_MultipleSearch_HitCache(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	code1 := `<?php
+$b = "funcA(";
+function funcA(){}
+funcA(111);
+
+function funcAxxxx() {}
+function yyyyfuncAxxxx() {}
+`
+	fs.AddFile("/var/www/html/1.php", code1)
+	code3 := `<?php
+funcA(222);
+`
+	fs.AddFile("/var/www/html/funcA.php", code3)
+
+	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaapi.PHP))
+
+	// search
+	result := s.RunSearch("all", "funcA", true)
+	log.Infof("result: %v", result)
+
+	t.Run("check database cache ", func(t *testing.T) {
+		// check database cache
+		key := fmt.Sprint([]any{s.progName, "all", "funcA"})
+		log.Infof("key: %s", key)
+		res, err := s.local.GetKey(context.Background(), &ypb.GetKeyRequest{
+			Key: key,
+		})
+		require.NoError(t, err)
+		got := res.GetValue()
+		log.Infof("got: %v", got)
+		gotResult, err := strconv.Atoi(got)
+		require.NoError(t, err)
+		require.Equal(t, result, gotResult)
+	})
+
+	t.Run("check search again", func(t *testing.T) {
+		// search again
+		resultGot := s.RunSearch("all", "funcA", true)
+		require.Equal(t, result, resultGot)
+	})
+
+	t.Run("check search again with different kind: should same id", func(t *testing.T) {
+		// search
+		// other kind can get "all" kind cache
+		resultGot := s.RunSearch("file", "funcA", true)
+		require.Equal(t, result, resultGot)
+	})
+
+	t.Run("all kind con't got other kind", func(t *testing.T) {
+		str := strings.ReplaceAll(uuid.NewString(), "-", "")
+		resultWant := s.RunSearch("file", str, true)
+		resultGot := s.RunSearch("all", str, true)
+		require.NotEqual(t, resultWant, resultGot)
+	})
+
+	t.Run("negative: delete result but still in cache", func(t *testing.T) {
+		str := strings.ReplaceAll(uuid.NewString(), "-", "")
+		// search
+		result1 := s.RunSearch("all", str, true)
+		log.Infof("result: %v", result1)
+		ssadb.DeleteResultByID(uint(result1))
+		// search again
+		resultGot := s.RunSearch("all", str, true)
+		require.NotEqual(t, result1, resultGot)
 	})
 }

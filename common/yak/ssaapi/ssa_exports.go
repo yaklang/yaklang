@@ -528,4 +528,7 @@ var Exports = map[string]any{
 
 	/// static analyze
 	"YaklangScriptChecking": YaklangScriptChecking,
+
+	// result
+	"NewResultFromDB": LoadResultByID,
 }

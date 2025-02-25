@@ -125,6 +125,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 			return nil, utils.Errorf("SyntaxflowQuery: rule is nil")
 		}
 		if ret, err := LoadResultByHash(config.program.GetProgramName(), ruleContent, config.kind); err == nil && ret != nil {
+			process(1, "get result from database cache")
 			return ret, nil
 		}
 	}

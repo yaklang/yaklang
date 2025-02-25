@@ -36,6 +36,12 @@ func OptionSaveValue_ResultVariable(variable string) SaveValueOption {
 	}
 }
 
+func OptionSaveValue_ResultIndex(index uint) SaveValueOption {
+	return func(c *saveValueCtx) {
+		c.ResultIndex = index
+	}
+}
+
 func OptionSaveValue_ResultAlert(alertMsg string) SaveValueOption {
 	return func(c *saveValueCtx) {
 		c.ResultAlertMsg = alertMsg
@@ -75,6 +81,7 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 	if ctx.ProgramName == "" {
 		return utils.Error("program info is empty")
 	}
+	log.Infof("SaveValue: %v: %v", ctx, value)
 	err := graph.BuildGraphWithDFS[*ssadb.AuditNode, *Value](
 		value,
 		ctx.SaveNode,

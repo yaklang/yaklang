@@ -109,11 +109,11 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 		OptionSaveValue_RuleName(result.RuleName),
 		OptionSaveValue_RuleTitle(result.RuleTitle),
 		// program
-		// program
 		OptionSaveValue_ProgramName(result.ProgramName),
 	}
 	saveVariable := func(name string, values Values) {
 		opts := append(opts, OptionSaveValue_ResultVariable(name))
+
 		// save un value variable
 		if len(values) == 0 {
 			result.UnValueVariable = append(result.UnValueVariable, name)
@@ -125,7 +125,8 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 			r.SaveRisk(name, result)
 		}
 		// save variable that has value
-		for _, v := range values {
+		for index, v := range values {
+			opts = append(opts, OptionSaveValue_ResultIndex(uint(index)))
 			e := SaveValue(v, opts...)
 			err = utils.JoinErrors(err, e)
 		}
