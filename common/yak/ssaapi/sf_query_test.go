@@ -66,11 +66,32 @@ println(123)
 
 	require.NotEqual(t, res1Id, res2Id)
 
-	// query third, use cache get second id
-	res3, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithSave(schema.SFResultKindDebug), ssaapi.QueryWithUseCache())
-	require.NoError(t, err)
-	res3Id := res3.GetResultID()
+	t.Run("test query with cache ", func(t *testing.T) {
+		// query third, use cache get second id
+		res3, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithSave(schema.SFResultKindDebug), ssaapi.QueryWithUseCache())
+		require.NoError(t, err)
+		res3Id := res3.GetResultID()
 
-	require.Equal(t, res1Id, res3Id)
+		require.Equal(t, res1Id, res3Id)
+	})
 
+	t.Run("test query with cache and process", func(t *testing.T) {
+
+		process := float64(0.0)
+		res3, err := prog.SyntaxFlowWithError(rule,
+			ssaapi.QueryWithSave(schema.SFResultKindDebug),
+			ssaapi.QueryWithUseCache(),
+			ssaapi.QueryWithProcessCallback(func(f float64, s string) {
+				if process < f {
+					process = f
+				}
+			}),
+		)
+		require.NoError(t, err)
+		res3Id := res3.GetResultID()
+
+		require.Equal(t, res1Id, res3Id)
+
+		require.Equal(t, float64(1.0), process)
+	})
 }
