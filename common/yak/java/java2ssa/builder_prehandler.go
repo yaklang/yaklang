@@ -82,7 +82,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 	}
 
 	switch strings.ToLower(fileSystem.Ext(path)) {
-	case ".java", ".class":
+	case ".java":
 		raw, err := fileSystem.ReadFile(path)
 		if err != nil {
 			return err
