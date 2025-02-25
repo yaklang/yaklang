@@ -67,10 +67,16 @@ func (g *GetawayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 			"Authorization": "Bearer " + g.config.APIKey,
 		}),
 	}
-	opts = append(opts, poc.WithTimeout(g.config.Timeout))
 	if g.config.Proxy != "" {
 		opts = append(opts, poc.WithProxy(g.config.Proxy))
 	}
+	if g.config.Context != nil {
+		opts = append(opts, poc.WithContext(g.config.Context))
+	}
+	if g.config.Timeout > 0 {
+		opts = append(opts, poc.WithConnectTimeout(g.config.Timeout))
+	}
+	opts = append(opts, poc.WithTimeout(600))
 	return opts, nil
 }
 
