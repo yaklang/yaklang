@@ -2,6 +2,7 @@ package dashscopebase
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -201,85 +202,90 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 		}()
 		count := 0
 		feeder := &rspFeeder{}
-		rsp, req, err := poc.DoPOST(
-			d.endpointUrl,
-			poc.WithConnectTimeout(15),
-			poc.WithTimeout(600),
-			poc.WithReplaceHttpPacketHeader("Authorization", `Bearer `+d.dashscopeAPIKey),
-			poc.WithReplaceHttpPacketHeader("X-DashScope-SSE", "enable"),
-			poc.WithJSON(
-				map[string]any{
-					"input": map[string]any{
-						"prompt": s,
-					},
-					"parameters": map[string]any{
-						"stream":             false,
-						"incremental_output": true,
-						"has_thoughts":       true,
-						// "flow_stream_mode":   "agent_format",
-					},
-					"debug": map[string]any{},
+		opts, _ := d.BuildHTTPOptions()
+		opts = append(opts, poc.WithTimeout(600))
+		opts = append(opts, poc.WithReplaceHttpPacketHeader("Authorization", `Bearer `+d.dashscopeAPIKey))
+		opts = append(opts, poc.WithReplaceHttpPacketHeader("X-DashScope-SSE", "enable"))
+		opts = append(opts, poc.WithJSON(
+			map[string]any{
+				"input": map[string]any{
+					"prompt": s,
 				},
-			),
-			poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-				chunked := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"))) == "chunked"
-				if chunked {
-					log.Infof("SSE Chunked for: %v", d.endpointUrl)
+				"parameters": map[string]any{
+					"stream":             false,
+					"incremental_output": true,
+					"has_thoughts":       true,
+					// "flow_stream_mode":   "agent_format",
+				},
+				"debug": map[string]any{},
+			},
+		))
+		opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
+			chunked := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"))) == "chunked"
+			if chunked {
+				log.Infof("SSE Chunked for: %v", d.endpointUrl)
+			}
+			for {
+				structured := &aispec.StructuredData{
+					DataSourceType: "dashscope",
+				}
+				handleLine := func(line string) {
+					if strings.HasPrefix(line, "data:") {
+						structured.DataRaw = bytes.TrimSpace([]byte(line[5:]))
+						inputs := []byte(line[5:])
+						ch := feeder.GetNewData(structured, inputs)
+						if ch != nil {
+							for data := range ch {
+								objChannel <- data
+								count++
+							}
+							return
+						} else {
+							if len(structured.DataRaw) > 0 {
+								objChannel <- structured
+								count++
+							}
+						}
+					} else if strings.HasPrefix(line, "id:") {
+						structured.Id = strings.TrimSpace(line[3:])
+					} else if strings.HasPrefix(line, "event:") {
+						structured.Event = strings.TrimSpace(line[6:])
+					}
 				}
 				for {
-					structured := &aispec.StructuredData{
-						DataSourceType: "dashscope",
+					resultBytes, err := utils.ReadLine(closer)
+					if err != nil {
+						log.Warnf("failed to read line in %v: %v", d.endpointUrl, err)
+						return
 					}
-					handleLine := func(line string) {
-						if strings.HasPrefix(line, "data:") {
-							structured.DataRaw = bytes.TrimSpace([]byte(line[5:]))
-							inputs := []byte(line[5:])
-							ch := feeder.GetNewData(structured, inputs)
-							if ch != nil {
-								for data := range ch {
-									objChannel <- data
-									count++
-								}
-								return
-							} else {
-								if len(structured.DataRaw) > 0 {
-									objChannel <- structured
-									count++
-								}
-							}
-						} else if strings.HasPrefix(line, "id:") {
-							structured.Id = strings.TrimSpace(line[3:])
-						} else if strings.HasPrefix(line, "event:") {
-							structured.Event = strings.TrimSpace(line[6:])
-						}
-					}
-					for {
-						resultBytes, err := utils.ReadLine(closer)
-						if err != nil {
-							log.Warnf("failed to read line in %v: %v", d.endpointUrl, err)
+					if d.config.Context != nil {
+						select {
+						case <-d.config.Context.Done():
 							return
+						default:
 						}
-						result := string(resultBytes)
-						size, _ := strconv.ParseInt(result, 16, 64)
-						if chunked {
-							if size > 0 {
-								var buf = make([]byte, size)
-								io.ReadFull(closer, buf)
-								for _, line := range utils.ParseStringToLines(string(buf)) {
-									handleLine(line)
-								}
-							}
-							_, _ = utils.ReadLine(closer)
-							break
-						}
-						if strings.TrimSpace(result) == "" {
-							break
-						}
-						handleLine(result)
 					}
+					result := string(resultBytes)
+					size, _ := strconv.ParseInt(result, 16, 64)
+					if chunked {
+						if size > 0 {
+							var buf = make([]byte, size)
+							io.ReadFull(closer, buf)
+							for _, line := range utils.ParseStringToLines(string(buf)) {
+								handleLine(line)
+							}
+						}
+						_, _ = utils.ReadLine(closer)
+						break
+					}
+					if strings.TrimSpace(result) == "" {
+						break
+					}
+					handleLine(result)
 				}
-			}),
-		)
+			}
+		}))
+		rsp, req, err := poc.DoPOST(d.endpointUrl, opts...)
 		if count <= 2 {
 			if rsp != nil && rsp.RawPacket != nil && len(rsp.RawPacket) > 0 {
 				log.Infof(" request: \n%v", string(rsp.RawRequest))
@@ -324,7 +330,15 @@ func (d *DashScopeGateway) LoadOption(opt ...aispec.AIConfigOption) {
 }
 
 func (d *DashScopeGateway) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
-	return nil, nil
+	var opts []poc.PocConfigOption
+	if d.config.Context == nil {
+		d.config.Context = context.Background()
+		opts = append(opts, poc.WithContext(d.config.Context))
+	}
+	if d.config.Timeout > 0 {
+		opts = append(opts, poc.WithConnectTimeout(d.config.Timeout))
+	}
+	return opts, nil
 }
 
 func (d *DashScopeGateway) CheckValid() error {

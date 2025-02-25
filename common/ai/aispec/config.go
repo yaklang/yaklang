@@ -1,6 +1,7 @@
 package aispec
 
 import (
+	"context"
 	"io"
 	"os"
 	"time"
@@ -24,6 +25,7 @@ type AIConfig struct {
 	Proxy         string `app:"name:proxy,verbose:代理地址,id:5"`
 	StreamHandler func(io.Reader)
 	Type          string
+	Context       context.Context
 
 	FunctionCallRetryTimes int
 
@@ -46,6 +48,12 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 }
 
 type AIConfigOption func(*AIConfig)
+
+func WithContext(ctx context.Context) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Context = ctx
+	}
+}
 
 func WithBaseURL(baseURL string) AIConfigOption {
 	return func(c *AIConfig) {

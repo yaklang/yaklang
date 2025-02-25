@@ -111,7 +111,9 @@ func (c *Client) question(i string) (io.Reader, error) {
 			u, poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 			poc.WithReplaceHttpPacketHeader("x-access-token", token),
 			poc.WithReplaceHttpPacketBody(raw, false),
-			poc.WithTimeout(60),
+			poc.WithContext(c.config.Context),
+			poc.WithConnectTimeout(c.config.Timeout),
+			poc.WithTimeout(600),
 			poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
 				scanner := bufio.NewScanner(closer)
 				scanner.Split(bufio.ScanLines)
