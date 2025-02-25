@@ -344,7 +344,7 @@ func CheckSyntaxFlowWithSFOption(t *testing.T, code string, sf string, wants map
 func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaapi.Option, sfOpt []ssaapi.QueryOption) {
 	Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
-		sfOpt = append(sfOpt, ssaapi.QueryWithEnableDebug(true))
+		sfOpt = append(sfOpt, ssaapi.QueryWithEnableDebug(false))
 		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
 		require.Nil(t, err)
 		require.NotNil(t, results)
@@ -355,9 +355,13 @@ func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants
 
 func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult, wants map[string][]string) {
 	results.Show()
-	for k, want := range wants {
-		gotVs := results.GetValues(k)
-		require.Greater(t, len(gotVs), 0, "key[%s] not found", k)
+	for name, want := range wants {
+		gotVs := results.GetValues(name)
+		if contain {
+			require.GreaterOrEqual(t, len(gotVs), len(want), "key[%s] not found", name)
+		} else {
+			require.Equal(t, len(gotVs), len(want), "key[%s] not found", name)
+		}
 		got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
 		sort.Strings(got)
 		sort.Strings(want)

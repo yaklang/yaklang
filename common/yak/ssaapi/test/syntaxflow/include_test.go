@@ -3,14 +3,14 @@ package syntaxflow
 import (
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -242,7 +242,7 @@ func Test_Include_HitCache(t *testing.T) {
 
 	cache := ssaapi.GetSFIncludeCache()
 	require.Greater(t, cache.Count(), 0)
-	cache.ForEach(func(s string, vo sfvm.ValueOperator) {
+	cache.ForEach(func(s string, vo ssaapi.Values) {
 		t.Logf("key: %s, value: %v", s, vo)
 	})
 	_, _, exist := ssaapi.GetIncludeCacheValue(prog[0], ruleName, nil)
@@ -296,7 +296,7 @@ func TestSF_NativeCall_Include_Input_Value(t *testing.T) {
 		require.Greater(t, cache.Count(), 0)
 
 		haveResult := false
-		cache.ForEach(func(s string, vo sfvm.ValueOperator) {
+		cache.ForEach(func(s string, vo ssaapi.Values) {
 			t.Logf("key: %s, value: %v", s, vo)
 			if strings.Contains(vo.String(), "hello world") {
 				haveResult = true
@@ -346,4 +346,85 @@ func TestSF_Include_Cache_For_Recompile(t *testing.T) {
 	require.NoError(t, err)
 	hash2, _, _ := ssaapi.GetIncludeCacheValue(progFromDB, ruleName, nil)
 	require.NotEqual(t, hash1, hash2)
+}
+func Test_Include_WithGraph(t *testing.T) {
+
+	t.Run("test graph path inner include", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		sfdb.ImportRuleWithoutValid(ruleName, fmt.Sprintf(`
+		desc(lib: "%s")
+		sink -{until:"*?{opcode:phi}"}-> as $target
+		alert $target
+		`, ruleName), false)
+		defer sfdb.DeleteRuleByRuleName(ruleName)
+
+		code := `
+		a = 1
+		if condition{
+			a = sink
+		}
+		
+		b = 2 
+		if condition {
+			b = source
+		}
+		a(b)
+		`
+
+		rule := fmt.Sprintf(`
+		<include("%s")> as $sink
+		$sink --> as $user
+		$user #{include:"*?{opcode: const}"}->  as $top
+		`, ruleName)
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"top": {"1", "2"},
+		})
+	})
+
+	t.Run("test graph path should not cross through include", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		sfdb.ImportRuleWithoutValid(ruleName, fmt.Sprintf(`
+		desc(lib: "%s");
+		f*(* as $sink)
+		alert $sink
+		`, ruleName), false)
+		defer sfdb.DeleteRuleByRuleName(ruleName)
+
+		code := `
+		a = {} 
+
+		source := a.b()
+		{
+			b = source + 1 
+			b = c(b)
+			f1(b)
+		}
+		`
+
+		rule := fmt.Sprintf(`
+<include("%s")> as $sink 
+$sink #{include:<<<CODE
+	*?{opcode: const} as $value1
+CODE}-> 
+
+// sink1 contain top-def dataflow 
+$sink<dataflow(<<<CODE
+	*?{opcode: const} as $value2 
+CODE)> 
+
+
+// this value should not contain other top-def dataflow 
+<include("%s")> as $sink2 
+$sink2<dataflow(<<<CODE
+	*?{opcode:const} as $value3
+CODE)> as $top3
+		`, ruleName, ruleName)
+
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"value1": {"1"},
+			"value2": {"1"},
+			"value3": {},
+		})
+	})
+
 }
