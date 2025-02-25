@@ -32,8 +32,9 @@ func (t *TunSpoofingListener) Close() error {
 }
 
 func (t *TunSpoofingListener) Addr() net.Addr {
-	return &net.IPAddr{
-		IP: net.IPv4(127, 0, 0, 1),
+	return &net.TCPAddr{
+		IP:   net.IPv4(127, 0, 0, 1),
+		Port: 0,
 	}
 }
 

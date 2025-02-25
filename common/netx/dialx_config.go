@@ -3,7 +3,6 @@ package netx
 import (
 	"crypto/tls"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/netstackvm"
 	"net"
 	"sync"
 	"time"
@@ -92,9 +91,6 @@ type dialXConfig struct {
 	JustListen bool // just listen udp , not connect .
 
 	TraceInfo *DialXTraceInfo
-
-	UseNetStackVM bool
-	NetStackVm    *netstackvm.NetStackVirtualMachine
 
 	Dialer func(duration time.Duration, target string) (net.Conn, error)
 }

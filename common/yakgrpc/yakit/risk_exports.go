@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx"
 	"net/url"
 	"os"
 	"strconv"
@@ -23,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 )
 

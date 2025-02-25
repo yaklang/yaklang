@@ -105,23 +105,25 @@ func (p *Proxy) startConnLog(statusContext context.Context) (func(string, net.Co
 func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 	defer l.Close()
 	s5config := NewSocks5Config()
-	host, port, err := utils.ParseStringToHostPort(l.Addr().String())
-	if err != nil {
-		return err
-	}
-	if host == "0.0.0.0" || host == `[::]` {
-		host = "127.0.0.1"
-	}
-	s5config.DownstreamHTTPProxy = "http://" + utils.HostPort(host, port)
-	s5config.ProxyPassword = p.proxyPassword
-	s5config.ProxyUsername = p.proxyUsername
-	if s5config.ProxyPassword != "" || s5config.ProxyUsername != "" {
-		urlIns, err := url.Parse(s5config.DownstreamHTTPProxy)
+	if !p.tunMode {
+		host, port, err := utils.ParseStringToHostPort(l.Addr().String())
 		if err != nil {
-			return utils.Errorf("parse s5 downstream url failed, err: %v", err)
+			return err
 		}
-		urlIns.User = url.UserPassword(s5config.ProxyUsername, s5config.ProxyPassword)
-		s5config.DownstreamHTTPProxy = urlIns.String()
+		if host == "0.0.0.0" || host == `[::]` {
+			host = "127.0.0.1"
+		}
+		s5config.DownstreamHTTPProxy = "http://" + utils.HostPort(host, port)
+		s5config.ProxyPassword = p.proxyPassword
+		s5config.ProxyUsername = p.proxyUsername
+		if s5config.ProxyPassword != "" || s5config.ProxyUsername != "" {
+			urlIns, err := url.Parse(s5config.DownstreamHTTPProxy)
+			if err != nil {
+				return utils.Errorf("parse s5 downstream url failed, err: %v", err)
+			}
+			urlIns.User = url.UserPassword(s5config.ProxyUsername, s5config.ProxyPassword)
+			s5config.DownstreamHTTPProxy = urlIns.String()
+		}
 	}
 	statusContext, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -195,11 +197,13 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 				return
 			}
 			isTls := firstByte == 0x16
-
-			var dstHost string
-			var dstPort int
-			if isS5 {
-				dstHost, dstPort, err = s5config.ServerConnect(handledConnection)
+			proxyContext, err := CreateProxyHandleContext(subCtx, handledConnection)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			if !p.tunMode && isS5 {
+				dstHost, dstPort, err := s5config.ServerConnect(handledConnection)
 				if err != nil {
 					log.Errorf("server s5 connect failed: %s", err)
 					return
@@ -209,14 +213,11 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					log.Errorf("check tls handle shake failed: %s", err)
 					return
 				}
-			}
-
-			proxyContext, err := CreateProxyHandleContext(subCtx, handledConnection)
-			if err != nil {
-				log.Error(err)
-				return
-			}
-			if isS5 {
+				proxyContext, err = CreateProxyHandleContext(subCtx, handledConnection)
+				if err != nil {
+					log.Error(err)
+					return
+				}
 				sessionBindConnectTo(proxyContext.Session(), PROTO_S5, dstHost, dstPort)
 			}
 			p.handleLoop(isTls, handledConnection, proxyContext)
@@ -299,7 +300,7 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 					netx.DialX_WithForceProxy(proxyStr != ""),
 					netx.DialX_WithTLSNextProto("h2"),
 					netx.DialX_WithTLS(true),
-					netx.DialX_WithDialer(p.dial),
+					netx.DialX_WithDialer(p.dialer),
 				)
 				if netConn != nil {
 					switch ret := netConn.(type) {
@@ -470,7 +471,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 					netx.DialX_WithForceProxy(proxyStr != ""),
 					netx.DialX_WithTLSNextProto("h2"),
 					netx.DialX_WithTLS(true),
-					netx.DialX_WithDialer(p.dial),
+					netx.DialX_WithDialer(p.dialer),
 				)
 				if netConn != nil {
 					switch ret := netConn.(type) {

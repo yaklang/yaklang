@@ -3,7 +3,9 @@ package yaklib
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
@@ -58,6 +60,8 @@ type mitmConfig struct {
 	gmtls              bool
 	gmtlsPrefer        bool
 	gmtlsOnly          bool
+	dialer             func(timeout time.Duration, target string) (net.Conn, error)
+	tunMode            bool
 
 	// 是否开启透明劫持
 	isTransparent            bool
@@ -181,6 +185,8 @@ func mitmConfigHijackHTTPRequest(h func(isHttps bool, u string, req []byte, modi
 	}
 }
 
+var MITMConfigHijackHTTPResponse = mitmConfigHijackHTTPResponse
+
 // hijackHTTPResponse 是一个选项函数，用于指定中间人代理服务器的响应劫持函数，当接收到响应后，会调用该回调函数
 // 通过调用该回调函数的第四个参数，可以修改响应内容，通过调用该回调函数的第五个参数，可以丢弃响应
 // Example:
@@ -265,13 +271,26 @@ func mitmMaxContentLength(i int) MitmConfigOpt {
 	}
 }
 
-// Start 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
-// 如果没有指定 CA 证书和私钥，那么将使用内置的证书和私钥
-// Example:
-// ```
-// mitm.Start(8080, mitm.host("127.0.0.1"), mitm.callback(func(isHttps, urlStr, req, rsp) { http.dump(req); http.dump(rsp)  })) // 启动一个中间人代理服务器，并将请求和响应打印到标准输出
-// ```
-func buildTunMITM(
+var MITMConfigTunMode = mitmConfigTunMode
+
+// set tunmode ,not process proxy proto
+func mitmConfigTunMode(b bool) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.tunMode = b
+	}
+}
+
+var MITMConfigDialer = mitmConfigDialer
+
+// setDialer for proxy
+func mitmConfigDialer(dialer func(timeout time.Duration, target string) (net.Conn, error)) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.dialer = dialer
+	}
+}
+
+// NewMITMServer just new mitm server
+func NewMITMServer(
 	opts ...MitmConfigOpt,
 ) (*crep.MITMServer, error) {
 	config := &mitmConfig{
@@ -290,10 +309,6 @@ func buildTunMITM(
 	server, err := initMitmServer("", config)
 	if err != nil {
 		return nil, utils.Errorf("create mitm server failed: %s", err)
-	}
-	err = server.TunInit(config.ctx)
-	if err != nil {
-		return nil, err
 	}
 	return server, nil
 }
@@ -357,6 +372,8 @@ func initMitmServer(downstreamProxy string, config *mitmConfig) (*crep.MITMServe
 	}
 
 	return crep.NewMITMServer(
+		crep.MITM_SetDialer(config.dialer),
+		crep.MITM_SetTunMode(config.tunMode),
 		crep.MITM_SetGM(config.gmtls),
 		crep.MITM_SetGMPrefer(config.gmtlsPrefer),
 		crep.MITM_SetGMOnly(config.gmtlsOnly),

@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"sync"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/finscan"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 )
