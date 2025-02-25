@@ -2,7 +2,10 @@ package mcp
 
 import (
 	"encoding/json"
+	"reflect"
+	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -31,4 +34,17 @@ func NewCommonCallToolResult(data any) (*mcp.CallToolResult, error) {
 			},
 		},
 	}, nil
+}
+
+func arrayToStringHook(from reflect.Type, to reflect.Type, v any) (any, error) {
+	if to.Kind() == reflect.String {
+		if from.Kind() == reflect.Slice {
+			slice := utils.InterfaceToSliceInterface(v)
+			stringSlice := lo.Map(slice, func(item any, _ int) string {
+				return utils.InterfaceToString(item)
+			})
+			return strings.Join(stringSlice, ","), nil
+		}
+	}
+	return v, nil
 }

@@ -1,10 +1,23 @@
 package main
 
-import "github.com/yaklang/yaklang/common/mcp"
+import (
+	"os"
+
+	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/mcp"
+)
 
 func main() {
-	s := mcp.NewMCPServer()
-	if err := s.ServeStdio(); err != nil {
+	mcpCommand := mcp.MCPCommand
+	app := &cli.App{
+		Name:     mcpCommand.Name,
+		HelpName: mcpCommand.Name,
+		Usage:    mcpCommand.Usage,
+		Writer:   os.Stdout,
+		Flags:    mcpCommand.Flags,
+		Action:   mcpCommand.Action,
+	}
+	if err := app.Run(os.Args); err != nil {
 		panic(err)
 	}
 }

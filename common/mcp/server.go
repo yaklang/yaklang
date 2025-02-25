@@ -21,26 +21,27 @@ type MCPServer struct {
 	sseMu sync.Mutex
 }
 
-func NewMCPServer() *MCPServer {
+func NewMCPServer(opts ...McpServerOption) (*MCPServer, error) {
 	s := &MCPServer{
 		server: server.NewMCPServer(
 			"Yaklang MCP Server",
-			"0.0.1",
+			"0.0.2",
 			server.WithResourceCapabilities(true, true),
 			server.WithPromptCapabilities(true),
 		),
 	}
-
-	s.registerYakScriptTool()
-	s.registerHTTPFlowTool()
-	s.registerCodecTool()
-	s.registerYakDocumentTool()
-	s.registerPayloadTool()
-	s.registerPortScanTool()
-	s.registerCVETool()
+	// tools and resources
+	cfg := NewMCPServerConfig()
+	for _, opt := range opts {
+		err := opt(cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+	cfg.ApplyConfig(s)
 
 	s.server.AddNotificationHandler("notification", s.handleNotification)
-	return s
+	return s, nil
 }
 
 func (s *MCPServer) ServeSSE(addr, baseURL string) (err error) {
