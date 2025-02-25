@@ -229,6 +229,7 @@ type MITMServer struct {
 	gmOnly                bool
 	forceDisableKeepAlive bool
 	findProcessName       bool
+	dialer                func(timeout time.Duration, addr string) (net.Conn, error)
 
 	clientCerts []*ClientCertificationPair
 
@@ -271,6 +272,8 @@ type MITMServer struct {
 
 	// random JA3 fingerprint
 	randomJA3 bool
+
+	tunMode bool
 }
 
 func (m *MITMServer) GetMaxContentLength() int {
@@ -301,11 +304,10 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	})
 }
 
-func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string, callback func()) error {
+func (m *MITMServer) initConfig() error {
 	if m.mitmConfig == nil {
 		return utils.Errorf("mitm config empty")
 	}
-
 	// m.proxy.SetDownstreamProxy(m.proxyUrl)
 	m.proxy.SetH2(m.http2)
 	if m.proxyAuth != nil {
@@ -339,13 +341,13 @@ func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string,
 	m.proxy.SetGMOnly(m.gmOnly)
 	m.proxy.SetHTTPForceClose(m.forceDisableKeepAlive)
 	m.proxy.SetFindProcessName(m.findProcessName)
+	m.proxy.SetDialer(m.dialer)
 
 	m.proxy.SetMITM(m.mitmConfig)
+	return nil
+}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	m.setHijackHandler(ctx)
-
+func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string, callback func()) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return utils.Errorf("listen port: %v failed: %s", addr, err)
@@ -355,7 +357,6 @@ func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string,
 	if callback != nil {
 		callback()
 	}
-
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -363,12 +364,19 @@ func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string,
 		}
 	}()
 
-	log.Infof("start to server mitm server: tcp://%v", addr)
-	err = m.proxy.Serve(lis, ctx)
+	return m.ServerListener(ctx, lis)
+}
+func (m *MITMServer) ServerListener(ctx context.Context, lis net.Listener) error {
+	if err := m.initConfig(); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	m.setHijackHandler(ctx)
+	err := m.proxy.Serve(lis, ctx)
 	if err != nil {
 		return utils.Errorf("serve proxy server failed: %s", err)
 	}
-
 	return nil
 }
 

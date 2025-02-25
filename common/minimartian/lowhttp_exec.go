@@ -81,6 +81,10 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		lowhttp.WithMaxContentLength(MaxContentLength),
 	)
 
+	if p.dialer != nil {
+		opts = append(opts, lowhttp.WithDialer(p.dialer))
+	}
+
 	//if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
 	//	portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
 	//	if !portValid {

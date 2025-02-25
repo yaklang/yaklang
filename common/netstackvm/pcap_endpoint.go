@@ -3,6 +3,7 @@ package netstackvm
 import (
 	"bytes"
 	"context"
+	"github.com/yaklang/yaklang/common/netx"
 	"golang.org/x/net/ipv6"
 	"net"
 	"sync"
@@ -16,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/link/channel"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/ipv4"
 )
@@ -67,7 +67,7 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, 
 	if err != nil {
 		return nil, err
 	}
-	mtu := iface.MTU
+	mtu := iface.MTU + 100
 
 	internalMacAddr := macAddr
 	externalMacAddr := iface.HardwareAddr

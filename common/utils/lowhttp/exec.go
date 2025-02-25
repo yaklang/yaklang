@@ -223,6 +223,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		maxContentLength     = option.MaxContentLength
 		randomJA3FingerPrint = option.RandomJA3FingerPrint
 		clientHelloSpec      = option.ClientHelloSpec
+		dialer               = option.Dialer
 	)
 	if reqIns == nil {
 		// create new request instance for httpctx
@@ -579,6 +580,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		),
 		netx.DialX_WithDialTraceInfo(dialTraceInfo),
 	)
+
+	if dialer != nil {
+		dialopts = append(dialopts, netx.DialX_WithDialer(dialer))
+	}
 
 	if option.OverrideEnableSystemProxyFromEnv {
 		dialopts = append(dialopts, netx.DialX_WithEnableSystemProxyFromEnv(option.EnableSystemProxyFromEnv))

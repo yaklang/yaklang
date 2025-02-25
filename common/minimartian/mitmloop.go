@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,7 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/process"
 
 	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/nosigpipe"
@@ -35,36 +33,7 @@ import (
 
 var IsDroppedError = utils.Error("dropped")
 
-const (
-	S5_CONNECT_HOST = "S5ConnectHost"
-	S5_CONNECT_PORT = "S5ConnectPort"
-	S5_CONNECT_ADDR = "S5ConnectAddr"
-	AUTH_FINISH     = "authFinish"
-)
-
-// Serve accepts connections from the listener and handles the requests.
-func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
-	defer l.Close()
-	s5config := NewSocks5Config()
-	host, port, err := utils.ParseStringToHostPort(l.Addr().String())
-	if err != nil {
-		return err
-	}
-	if host == "0.0.0.0" || host == `[::]` {
-		host = "127.0.0.1"
-	}
-	s5config.DownstreamHTTPProxy = "http://" + utils.HostPort(host, port)
-	s5config.ProxyPassword = p.proxyPassword
-	s5config.ProxyUsername = p.proxyUsername
-	if s5config.ProxyPassword != "" || s5config.ProxyUsername != "" {
-		urlIns, err := url.Parse(s5config.DownstreamHTTPProxy)
-		if err != nil {
-			return utils.Errorf("parse s5 downstream url failed, err: %v", err)
-		}
-		urlIns.User = url.UserPassword(s5config.ProxyUsername, s5config.ProxyPassword)
-		s5config.DownstreamHTTPProxy = urlIns.String()
-	}
-
+func (p *Proxy) startConnLog(statusContext context.Context) (func(string, net.Conn), func(string, net.Conn)) {
 	var currentConnCount int64 = 0
 	// 设置缓存并清除
 	connsCached := new(sync.Map)
@@ -80,9 +49,6 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 			log.Debugf("remove connection table from cache: %v=>%v, current coon: %v", c.LocalAddr(), c.RemoteAddr(), currentConnCount)
 		}
 	}
-
-	statusContext, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	go func() {
 		var lastCurrentConnCount int64
@@ -121,25 +87,54 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 		}()
 		for {
 			select {
-			case <-ctx.Done():
+			case <-statusContext.Done():
 				log.Info("closing martian proxying...")
-				l.Close()
 				return
 			default:
 				if p.Closing() {
-					l.Close()
 					return
 				}
 				time.Sleep(500 * time.Millisecond)
 			}
 		}
 	}()
+	return cacheConns, removeConns
+}
+
+// Serve accepts connections from the listener and handles the requests.
+func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
+	defer l.Close()
+	s5config := NewSocks5Config()
+	if !p.tunMode {
+		host, port, err := utils.ParseStringToHostPort(l.Addr().String())
+		if err != nil {
+			return err
+		}
+		if host == "0.0.0.0" || host == `[::]` {
+			host = "127.0.0.1"
+		}
+		s5config.DownstreamHTTPProxy = "http://" + utils.HostPort(host, port)
+		s5config.ProxyPassword = p.proxyPassword
+		s5config.ProxyUsername = p.proxyUsername
+		if s5config.ProxyPassword != "" || s5config.ProxyUsername != "" {
+			urlIns, err := url.Parse(s5config.DownstreamHTTPProxy)
+			if err != nil {
+				return utils.Errorf("parse s5 downstream url failed, err: %v", err)
+			}
+			urlIns.User = url.UserPassword(s5config.ProxyUsername, s5config.ProxyPassword)
+			s5config.DownstreamHTTPProxy = urlIns.String()
+		}
+	}
+	statusContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	cacheConns, removeConns := p.startConnLog(statusContext)
 
 	var delay time.Duration
 
 	log.Infof("(mitm) ready for recv connection from: %v", l.Addr().String())
 	for {
 		if p.Closing() {
+			l.Close()
 			return nil
 		}
 
@@ -194,83 +189,40 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					originConn.Close()
 				}
 			}()
-			var isS5 bool
-			var handledConnection net.Conn
-			var firstByte byte
-			handledConnection, isS5, firstByte, err = IsSocks5HandleShake(originConn)
+			defer removeConns(uidStr, originConn)
+
+			handledConnection, isS5, firstByte, err := IsSocks5HandleShake(originConn)
 			if err != nil {
-				removeConns(uidStr, originConn)
 				log.Errorf("check socks5 handle shake failed: %s", err)
 				return
 			}
 			isTls := firstByte == 0x16
-
-			defer func() {
-				removeConns(uidStr, handledConnection)
-			}()
-
-			if isS5 {
-				err := s5config.Handshake(handledConnection)
+			proxyContext, err := CreateProxyHandleContext(subCtx, handledConnection)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			if !p.tunMode && isS5 {
+				dstHost, dstPort, err := s5config.ServerConnect(handledConnection)
 				if err != nil {
-					log.Errorf("socks5 Handshake failed: %s", err)
+					log.Errorf("server s5 connect failed: %s", err)
 					return
 				}
-				req, err := s5config.HandleS5RequestHeader(handledConnection)
-				if err != nil {
-					log.Errorf("socks5 handle request failed: %s", err)
-					return
-				}
-				if req.Cmd != commandConnect {
-					log.Errorf("mitm socks5 proxy error : mitm not support command %s", req.Cmd)
-					return
-				}
-				host, port, err := utils.ParseStringToHostPort(handledConnection.LocalAddr().String())
-				if err != nil {
-					log.Errorf("socks5 server parse host port failed: %v", err)
-					return
-				}
-				_, err = handledConnection.Write(NewReply(net.ParseIP(host), port))
-				if err != nil {
-					log.Errorf("socks5 server reply failed: %v", err)
-					return
-				}
-				dstPort := req.GetDstPort()
-				dstHost := req.GetDstHost()
-				subCtx = context.WithValue(subCtx, S5_CONNECT_ADDR, utils.HostPort(dstHost, dstPort))
-				subCtx = context.WithValue(subCtx, S5_CONNECT_HOST, dstHost)
-				subCtx = context.WithValue(subCtx, S5_CONNECT_PORT, strconv.Itoa(dstPort))
 				handledConnection, isTls, err = IsTlsHandleShake(handledConnection)
 				if err != nil {
 					log.Errorf("check tls handle shake failed: %s", err)
 					return
 				}
+				proxyContext, err = CreateProxyHandleContext(subCtx, handledConnection)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				sessionBindConnectTo(proxyContext.Session(), PROTO_S5, dstHost, dstPort)
 			}
-			p.handleLoop(isTls, handledConnection, subCtx)
+			p.handleLoop(isTls, handledConnection, proxyContext)
 		}(uid, conn)
 	}
-}
-
-func IsTlsHandleShake(conn net.Conn) (fConn net.Conn, _ bool, _ error) {
-	peekable := utils.NewPeekableNetConn(conn)
-
-	defer func() {
-		if err := recover(); err != nil {
-			log.Infof("peekable failed: %s", err)
-			fConn = peekable
-		}
-	}()
-
-	raw, err := peekable.Peek(2)
-	if err != nil {
-		if err == io.EOF {
-			return peekable, false, nil
-		}
-		return nil, false, utils.Errorf("peek failed: %s", err)
-	}
-	if len(raw) != 2 {
-		return nil, false, utils.Errorf("check s5 failed: %v", raw)
-	}
-	return peekable, raw[0] == 0x16, nil
 }
 
 var cachedTLSConfig *tls.Config
@@ -294,23 +246,24 @@ func (p *Proxy) defaultTLSConfig() *tls.Config {
 	return cachedTLSConfig
 }
 
-func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Context) {
+func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 	if conn == nil {
 		return
 	}
 
 	p.connsMu.Lock()
+	if p.Closing() { // protect closing,avoid add after close
+		return
+	}
 	p.conns.Add(1)
 	p.connsMu.Unlock()
+
 	defer p.conns.Done()
 	defer func() {
 		if conn != nil {
 			conn.Close()
 		}
 	}()
-	if p.Closing() {
-		return
-	}
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -318,33 +271,8 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-
-	brw := bufio.NewReadWriter(bufio.NewReader(ctxio.NewReader(rootCtx, conn)), bufio.NewWriter(ctxio.NewWriter(rootCtx, conn)))
-	s, err := newSession(conn, brw)
-	if err != nil {
-		log.Errorf("mitm: failed to create session: %v", err)
-		return
-	}
-
-	ctx, err := withSession(s)
-	if err != nil {
-		log.Errorf("mitm: failed to create context: %v", err)
-		return
-	}
-
-	s.Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "http")
-	// s5 proxy needs to have higher priority than http proxy
-	if s5ProxyAddr, ok := rootCtx.Value(S5_CONNECT_ADDR).(string); ok && s5ProxyAddr != "" {
-		s.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, s5ProxyAddr)
-		if s5ProxyHost, ok := rootCtx.Value(S5_CONNECT_HOST).(string); ok && s5ProxyHost != "" {
-			s.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, rootCtx.Value(S5_CONNECT_HOST).(string))
-		}
-		if s5ProxyPort, ok := rootCtx.Value(S5_CONNECT_PORT).(string); ok && s5ProxyPort != "" {
-			s.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, rootCtx.Value(S5_CONNECT_PORT).(string))
-		}
-		s.Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "socks5")
-		s.Set(AUTH_FINISH, true)
-	}
+	s := ctx.Session()
+	brw := s.brw
 
 	/* TLS */
 	if isTLSConn {
@@ -372,6 +300,7 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 					netx.DialX_WithForceProxy(proxyStr != ""),
 					netx.DialX_WithTLSNextProto("h2"),
 					netx.DialX_WithTLS(true),
+					netx.DialX_WithDialer(p.dialer),
 				)
 				if netConn != nil {
 					switch ret := netConn.(type) {
@@ -438,15 +367,6 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 	}
 }
 
-func (p *Proxy) setHTTPCtxConnectTo(req *http.Request) (string, error) {
-	connectedTo, err := utils.GetConnectedToHostPortFromHTTPRequest(req)
-	if err != nil {
-		return "", utils.Wrap(err, "mitm: invalid host")
-	}
-
-	return connectedTo, nil
-}
-
 // handleConnectionTunnel handles a CONNECT request.
 func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, conn net.Conn, ctx *Context, session *Session, brw *bufio.ReadWriter, connectedTo string) error {
 	var err error
@@ -455,9 +375,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 	// set session ctx, session > httpctx
 	parsedConnectedToPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 	parsedConnectedToHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
-	session.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
-	session.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
-	session.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
+	sessionBindConnectTo(session, PROTO_HTTP, parsedConnectedToHost, parsedConnectedToPort)
 	session.Set(httpctx.REQUEST_CONTEXT_KEY_ViaConnect, true)
 
 	if err := p.reqmod.ModifyRequest(req); err != nil {
@@ -553,6 +471,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 					netx.DialX_WithForceProxy(proxyStr != ""),
 					netx.DialX_WithTLSNextProto("h2"),
 					netx.DialX_WithTLS(true),
+					netx.DialX_WithDialer(p.dialer),
 				)
 				if netConn != nil {
 					switch ret := netConn.(type) {
@@ -598,7 +517,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 	// -> Client Connection <- is plain HTTP connection
 	// Prepend the previously read data to be read again.
 	brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
-	return p.handle(ctx, timer, conn, brw)
+	return p.handle(ctx, timer, conn, brw) // should read next request from client
 }
 
 func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufio.ReadWriter) error {
@@ -673,11 +592,17 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	// set plugin context
 	httpctx.SetPluginContext(req, consts.NewPluginContext())
 
-	// auth
-	proxyProtocol := ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol)
-	authFinish := ctx.GetSessionBoolValue(AUTH_FINISH)
-	needAuth := p.proxyUsername != "" || p.proxyPassword != ""
-	httpctx.SetRequestProxyProtocol(req, proxyProtocol)
+	if p.tunMode { // tunnel mode
+		return p.handleRequest(conn, req, ctx)
+	}
+	return p.handleProxyAuth(conn, req, timer, ctx) // mitm mode should process proxy proto
+}
+
+// handleProxyAuth handles proxy authentication.
+func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Timer, ctx *Context) error {
+	session := ctx.Session()
+	brw := session.brw
+	needAuth := (p.proxyUsername != "" || p.proxyPassword != "") && !ctx.GetSessionBoolValue(AUTH_FINISH)
 
 	var isHttps bool
 	if tconn, ok := conn.(*tls.Conn); ok {
@@ -700,6 +625,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	if host == "" {
 		host = req.URL.Host
 	}
+
 	if host == "" {
 		host = ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 		port := ctx.GetSessionIntValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
@@ -724,57 +650,61 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 		httpctx.SetRequestViaCONNECT(req, true)
 	}
 
-	if proxyProtocol == "http" { // if proxy is http ,need handle proxy request connect(1.1) or 1.0
-		if needAuth && !authFinish {
-			// 开启认证
-			failed := func(reason string) error {
-				res := proxyutil.NewResponse(407, http.NoBody, req)
-				res.Status = "407 Authentication Required"
-				res.Header.Set("Proxy-Authenticate", "Basic realm=\"yakit proxy\", charset=\"UTF-8\"")
-				e := fmt.Errorf("reason: %v", reason)
-				proxyutil.Warning(res.Header, e)
-				_, err := utils.DumpHTTPResponse(res, true, brw)
-				if err != nil {
-					// never happen
-					err = errors.Join(err, e)
-					log.Errorf("got error while writing failed response back to client: %v", err)
-				}
-				brw.Flush()
-				conn.Close()
-				return e
+	if needAuth {
+		// 开启认证
+		failed := func(reason string) error {
+			res := proxyutil.NewResponse(407, http.NoBody, req)
+			res.Status = "407 Authentication Required"
+			res.Header.Set("Proxy-Authenticate", "Basic realm=\"yakit proxy\", charset=\"UTF-8\"")
+			e := fmt.Errorf("reason: %v", reason)
+			proxyutil.Warning(res.Header, e)
+			_, err := utils.DumpHTTPResponse(res, true, brw)
+			if err != nil {
+				// never happen
+				err = errors.Join(err, e)
+				log.Errorf("got error while writing failed response back to client: %v", err)
 			}
-			if req.Header.Get("Proxy-Authorization") == "" {
-				return failed("empty Proxy-Authorization Header")
-			}
-
-			proxyAuth := req.Header.Get("Proxy-Authorization")
-			originProxyAuth := proxyAuth
-			if proxyAuth != "" {
-				proxyAuth = strings.Replace(proxyAuth, "Basic ", "", -1)
-				proxyAuth, err := base64.StdEncoding.DecodeString(proxyAuth)
-				if err != nil {
-					return failed("decode Proxy-Authorization[" + originProxyAuth + "] Header failed")
-				}
-				user, pass := lowhttp.SplitHTTPHeader(string(proxyAuth))
-				if !(user == p.proxyUsername && pass == p.proxyPassword) {
-					// 认证失败
-					return failed("username/password is not valid!")
-				}
-				session.Set(AUTH_FINISH, true)
-			} else {
-				return failed("empty Proxy-Authorization Header")
-			}
-		}
-		connectedTo, err := p.setHTTPCtxConnectTo(req)
-		if err != nil {
+			brw.Flush()
 			conn.Close()
-			return err
+			return e
 		}
-		if req.Method == "CONNECT" { // handle connect request
-			return p.handleConnectionTunnel(req, timer, conn, ctx, session, brw, connectedTo)
+		if req.Header.Get("Proxy-Authorization") == "" {
+			return failed("empty Proxy-Authorization Header")
+		}
+
+		proxyAuth := req.Header.Get("Proxy-Authorization")
+		originProxyAuth := proxyAuth
+		if proxyAuth != "" {
+			proxyAuth = strings.Replace(proxyAuth, "Basic ", "", -1)
+			proxyAuth, err := base64.StdEncoding.DecodeString(proxyAuth)
+			if err != nil {
+				return failed("decode Proxy-Authorization[" + originProxyAuth + "] Header failed")
+			}
+			user, pass := lowhttp.SplitHTTPHeader(string(proxyAuth))
+			if !(user == p.proxyUsername && pass == p.proxyPassword) {
+				// 认证失败
+				return failed("username/password is not valid!")
+			}
+			session.Set(AUTH_FINISH, true)
+		} else {
+			return failed("empty Proxy-Authorization Header")
 		}
 	}
+	connectedTo, err := p.setHTTPCtxConnectTo(req)
+	if err != nil {
+		conn.Close()
+		return err
+	}
+	if req.Method == "CONNECT" { // handle connect request
+		return p.handleConnectionTunnel(req, timer, conn, ctx, session, brw, connectedTo)
+	}
+	return p.handleRequest(conn, req, ctx)
+}
 
+// handleRequest handles an ordinary HTTP request.
+func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) error {
+	session := ctx.Session()
+	brw := session.brw
 	if err := p.reqmod.ModifyRequest(req); err != nil {
 		log.Errorf("mitm: error modifying request: %v", err)
 		proxyutil.Warning(req.Header, err)
@@ -869,84 +799,4 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	}
 
 	return closing
-}
-
-// A peekedConn subverts the net.Conn.Read implementation, primarily so that
-// sniffed bytes can be transparently prepended.
-type peekedConn struct {
-	net.Conn
-	r io.Reader
-}
-
-// Read allows control over the embedded net.Conn's read data. By using an
-// io.MultiReader one can read from a conn, and then replace what they read, to
-// be read again.
-func (c *peekedConn) Read(buf []byte) (int, error) { return c.r.Read(buf) }
-
-// connectResponse fix previous 200 CONNECT response with content-length issue
-func (p *Proxy) connectResponse(req *http.Request) *http.Response {
-	// "Connection Established" is the standard status for connect request. ref-link https://github.com/google/martian/issues/306
-	// Content-Length  should not be set, otherwise awvs will not work ref-link https://github.com/chaitin/xray/issues/627
-	resp := proxyutil.NewResponse(200, nil, req)
-	resp.Header.Del("Content-Type")
-	resp.Close = false
-	resp.Status = fmt.Sprintf("%d %s", 200, "Connection established")
-	resp.Proto = "HTTP/1.0"
-	resp.ProtoMajor = 1
-	resp.ProtoMinor = 0
-	resp.ContentLength = -1
-	return resp
-}
-
-func (p *Proxy) handshakeWithTarget(req *http.Request) (net.Conn, error) {
-	var rawConn net.Conn
-	var err error
-	var proxyUrl string
-	gmConfig := &gmtls.Config{
-		InsecureSkipVerify: true,
-		GMSupport:          &gmtls.GMSupport{},
-		ServerName:         utils.ExtractHost(req.URL.Host),
-	}
-
-	if p.proxyURL != nil {
-		proxyUrl = p.proxyURL.String()
-	}
-	vanillaTLS := func() {
-		rawConn, err = netx.DialTLSTimeout(time.Second*10, req.URL.Host, &gmtls.Config{
-			InsecureSkipVerify: true,
-			NextProtos:         []string{"h2", "http/1.1"},
-			ServerName:         utils.ExtractHost(req.URL.Host),
-		}, proxyUrl)
-	}
-	gmTLS := func() {
-		rawConn, err = netx.DialTLSTimeout(time.Second*10, req.URL.Host, gmConfig, proxyUrl)
-	}
-	var taskGroup []func()
-
-	// when not enable gmTLS
-	if !p.gmTLS {
-		taskGroup = append(taskGroup, vanillaTLS)
-	} else {
-		// when enable gmTLS add another func
-		if !p.gmTLSOnly {
-			taskGroup = append(taskGroup, vanillaTLS)
-		}
-		taskGroup = append(taskGroup, gmTLS)
-	}
-
-	// handle gmPrefer option
-	// we get at least one option in taskGroup
-	if p.gmTLS && p.gmPrefer && !p.gmTLSOnly {
-		taskGroup[0], taskGroup[1] = taskGroup[1], taskGroup[0] // vanilla TLS always be the first
-	}
-
-	for _, task := range taskGroup {
-		task()
-		if len(taskGroup) > 1 && err != nil {
-			continue
-		} else {
-			break
-		}
-	}
-	return rawConn, err
 }

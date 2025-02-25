@@ -1,11 +1,11 @@
 package network
 
 import (
+	"github.com/yaklang/yaklang/common/netx"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 )
 

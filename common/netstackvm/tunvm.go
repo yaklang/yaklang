@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"os/exec"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -26,7 +26,7 @@ import (
 )
 
 // TUN_MTU is the default MTU for TUN device. 1420 is wg default MTU, use it for compatibility.
-const TUN_MTU = 1420
+const TUN_MTU = 3200
 
 const UTUNINDEXSTART = 410
 
@@ -42,6 +42,10 @@ type TunVirtualMachine struct {
 	mainNicID tcpip.NICID
 
 	tcpHijacked *utils.AtomicBool
+
+	// hijackedTCPHandler
+	hijackedMutex   sync.RWMutex
+	hijackedHandler func(conn netstack.TCPConn)
 }
 
 func NewTunVirtualMachine(ctx context.Context) (*TunVirtualMachine, error) {
@@ -109,15 +113,15 @@ func NewTunVirtualMachine(ctx context.Context) (*TunVirtualMachine, error) {
 	ip2Str := net.ParseIP(utils.Uint32ToIPv4(ip2).String())
 	log.Infof("Tunnel IP: %s -> %s", ip1Str, ip2Str)
 
-	ifconfigTimeout, ifConfigTimeoutCancel := context.WithTimeout(ctx, 10*time.Second)
-	defer ifConfigTimeoutCancel()
-	cmd := exec.CommandContext(ifconfigTimeout, "ifconfig", utunName, ip1Str.String(), ip2Str.String(), "up")
-	raw, err := cmd.CombinedOutput()
-	if err != nil {
-		cancel()
-		log.Infof("ifconfig failed: %v\nmsg: %s", err, string(raw))
-		return nil, utils.Errorf("ifconfig failed: %v", err)
-	}
+	//ifconfigTimeout, ifConfigTimeoutCancel := context.WithTimeout(ctx, 10*time.Second)
+	//defer ifConfigTimeoutCancel()
+	//cmd := exec.CommandContext(ifconfigTimeout, "ifconfig", utunName, ip1Str.String(), ip2Str.String(), "up")
+	//raw, err := cmd.CombinedOutput()
+	//if err != nil {
+	//	cancel()
+	//	log.Infof("ifconfig failed: %v\nmsg: %s", err, string(raw))
+	//	return nil, utils.Errorf("ifconfig failed: %v", err)
+	//}
 
 	log.Infof("Initializing network stack")
 	s := stack.New(stack.Options{
@@ -179,11 +183,8 @@ func NewTunVirtualMachine(ctx context.Context) (*TunVirtualMachine, error) {
 		stack:        s,
 		mainNicID:    mainNICId,
 	}
-	return tvm, nil
-}
 
-func (t *TunVirtualMachine) SetHijackTCPHandler(handle func(conn netstack.TCPConn)) error {
-	tcpForwarder := tcp.NewForwarder(t.stack, defaultWndSize, maxConnAttempts, func(r *tcp.ForwarderRequest) {
+	tcpForwarder := tcp.NewForwarder(tvm.stack, defaultWndSize, maxConnAttempts, func(r *tcp.ForwarderRequest) {
 		var (
 			wq  waiter.Queue
 			ep  tcpip.Endpoint
@@ -211,17 +212,22 @@ func (t *TunVirtualMachine) SetHijackTCPHandler(handle func(conn netstack.TCPCon
 		defer r.Complete(false)
 
 		log.Infof("start to set socket options: %s:%d->%s:%d", id.RemoteAddress, id.RemotePort, id.LocalAddress, id.LocalPort)
-		err = setSocketOptions(t.stack, ep)
+		err = setSocketOptions(tvm.stack, ep)
 
 		log.Infof("start to create tcp connection instance for userland: %s:%d->%s:%d", id.RemoteAddress, id.RemotePort, id.LocalAddress, id.LocalPort)
 		conn := &tcpConn{
 			TCPConn: gonet.NewTCPConn(&wq, ep),
 			id:      id,
 		}
-		handle(conn)
+
+		tvm.hijackedMutex.RLock()
+		defer tvm.hijackedMutex.RUnlock()
+		if tvm.hijackedHandler != nil {
+			tvm.hijackedHandler(conn)
+		}
 	})
-	t.stack.SetTransportProtocolHandler(header.TCPProtocolNumber, tcpForwarder.HandlePacket)
-	return nil
+	tvm.stack.SetTransportProtocolHandler(header.TCPProtocolNumber, tcpForwarder.HandlePacket)
+	return tvm, nil
 }
 
 func (t *TunVirtualMachine) Close() error {
@@ -231,4 +237,25 @@ func (t *TunVirtualMachine) Close() error {
 
 func (t *TunVirtualMachine) GetTunnelName() string {
 	return t.tunnelName
+}
+
+func (t *TunVirtualMachine) ListenTCP() (*TunVmTCPListener, error) {
+	listener := &TunVmTCPListener{
+		vm: t,
+		ch: make(chan netstack.TCPConn, 1000),
+	}
+	return listener, t.SetHijackTCPHandler(func(conn netstack.TCPConn) {
+		listener.ch <- conn
+	})
+}
+
+func (t *TunVirtualMachine) SetHijackTCPHandler(handle func(conn netstack.TCPConn)) error {
+	t.hijackedMutex.Lock()
+	defer t.hijackedMutex.Unlock()
+
+	if t.hijackedHandler != nil {
+		return utils.Error("hijackedHandler already set")
+	}
+	t.hijackedHandler = handle
+	return nil
 }

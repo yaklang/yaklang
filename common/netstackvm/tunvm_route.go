@@ -4,24 +4,26 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"os/exec"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (vm *TunVirtualMachine) HijackDomain(domain string) error {
+func (t *TunVirtualMachine) HijackDomain(domain string) error {
 	if utils.IsIPv4(domain) {
-		return vm.HijackIP(domain)
+		return t.HijackIP(domain)
 	} else if _, ipnet, err := net.ParseCIDR(domain); err == nil && ipnet != nil {
-		return vm.HijackIPNet(ipnet)
+		return t.HijackIPNet(ipnet)
 	} else {
 		for _, ip := range netx.LookupAll(domain) {
-			if err := vm.HijackIP(ip); err != nil {
+			if err := t.HijackIP(ip); err != nil {
 				log.Errorf("hijack ip %s failed: %v", ip, err)
 			}
 		}
@@ -29,7 +31,7 @@ func (vm *TunVirtualMachine) HijackDomain(domain string) error {
 	}
 }
 
-func (vm *TunVirtualMachine) HijackIP(ip string) error {
+func (t *TunVirtualMachine) HijackIP(ip string) error {
 	var ipNet *net.IPNet
 	var err error
 	if utils.IsIPv4(ip) {
@@ -47,22 +49,31 @@ func (vm *TunVirtualMachine) HijackIP(ip string) error {
 	if ipNet == nil {
 		return utils.Errorf("invalid ip: %s", ip)
 	}
-	return vm.HijackIPNet(ipNet)
+	return t.HijackIPNet(ipNet)
 }
 
-func (vm *TunVirtualMachine) HijackIPNet(ipNet *net.IPNet) error {
-	ctx, cancel := context.WithTimeout(vm.ctx, 5*time.Second)
+func (t *TunVirtualMachine) HijackIPNet(ipNet *net.IPNet) error {
+	ctx, cancel := context.WithTimeout(t.ctx, 5*time.Second)
 	defer cancel()
 
-	name := vm.GetTunnelName()
+	name := t.GetTunnelName()
 	if name == "" {
 		return utils.Errorf("tunnel name not set")
 	}
 
-	ones, _ := ipNet.Mask.Size()
-	ipNetStr := fmt.Sprintf("%s/%d", ipNet.IP.String(), ones)
-	log.Infof("route add -net %s -interface %s", ipNetStr, name)
-	cmder := exec.CommandContext(ctx, "route", "add", "-net", ipNetStr, "-interface", name)
+	var cmder *exec.Cmd
+	if runtime.GOOS == "windows" {
+		iface, err := net.InterfaceByName(name)
+		if err != nil {
+			return utils.Errorf("tun interface not found: %v", err)
+		}
+		cmder = exec.CommandContext(ctx, "route", "ADD", ipNet.IP.String(), "MASK", MaskToIPString(ipNet.Mask), ipNet.IP.String(), "IF", strconv.Itoa(iface.Index))
+	} else {
+		ones, _ := ipNet.Mask.Size()
+		ipNetStr := fmt.Sprintf("%s/%d", ipNet.IP.String(), ones)
+		cmder = exec.CommandContext(ctx, "route", "add", "-net", ipNetStr, "-interface", name)
+	}
+
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmder.Stdout = &stdout
@@ -80,4 +91,8 @@ func (vm *TunVirtualMachine) HijackIPNet(ipNet *net.IPNet) error {
 		return utils.Errorf("route add failed: %s", raw)
 	}
 	return nil
+}
+
+func MaskToIPString(mask net.IPMask) string {
+	return net.IP(mask).String()
 }

@@ -30,7 +30,7 @@ func DialTimeoutWithoutProxy(timeout time.Duration, network, addr string) (net.C
 }
 
 // DialContextWithoutProxy dials a connection with a context.
-func DialContextWithoutProxy(ctx context.Context, network, addr string) (net.Conn, error) {
+func DialContextWithoutProxy(ctx context.Context, addr string) (net.Conn, error) {
 	var timeout = 30 * time.Second
 	ddl, ok := ctx.Deadline()
 	if ok {

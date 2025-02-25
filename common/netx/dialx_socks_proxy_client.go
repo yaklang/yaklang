@@ -91,12 +91,13 @@ const (
 
 type (
 	config struct {
-		Context context.Context
-		Proto   int
-		Host    string
-		Auth    *auth
-		Timeout time.Duration
-		Check   bool
+		Context     context.Context
+		Proto       int
+		Host        string
+		Auth        *auth
+		Timeout     time.Duration
+		Check       bool
+		ProxyDialer func(ctx context.Context, target string) (net.Conn, error)
 	}
 	auth struct {
 		Username string
@@ -146,11 +147,10 @@ func parse(proxyURI string) (*config, error) {
 
 func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
 RECON:
-	proxy := cfg.Host
 	ctx := cfg.Context
 
 	// dial TCP
-	conn, err := DialContextWithoutProxy(ctx, "tcp", proxy)
+	conn, err := cfg.ProxyDialer(ctx, cfg.Host)
 	if err != nil {
 		return nil, err
 	}
@@ -258,16 +258,16 @@ RECON:
 	return conn, nil
 }
 
-// DialSocksProxy returns the dial function to be used in http.Transport object.
-// Argument socksType should be one of SOCKS4, SOCKS4A and SOCKS5.
-// Argument proxy should be in this format "127.0.0.1:1080".
-func DialSocksProxy(ctx context.Context, socksType int, proxy string, username string, password string) func(string, string) (net.Conn, error) {
-	cfg := &config{Context: ctx, Proto: socksType, Host: proxy}
-	if username != "" {
-		cfg.Auth = &auth{username, password}
-	}
-	return cfg.dialFunc()
-}
+//// DialSocksProxy returns the dial function to be used in http.Transport object.
+//// Argument socksType should be one of SOCKS4, SOCKS4A and SOCKS5.
+//// Argument proxy should be in this format "127.0.0.1:1080".
+//func DialSocksProxy(ctx context.Context, socksType int, proxy string, username string, password string) func(string, string) (net.Conn, error) {
+//	cfg := &config{Context: ctx, Proto: socksType, Host: proxy}
+//	if username != "" {
+//		cfg.Auth = &auth{username, password}
+//	}
+//	return cfg.dialFunc()
+//}
 
 func dialSocksProxyCheckConfig(ctx context.Context, socksType int, proxy string, timeout time.Duration, username string, password string) *config {
 	cfg := &config{Context: ctx, Proto: socksType, Host: proxy, Check: true, Timeout: timeout}
@@ -277,34 +277,28 @@ func dialSocksProxyCheckConfig(ctx context.Context, socksType int, proxy string,
 	return cfg
 }
 
-func (c *config) dialFunc() func(string, string) (net.Conn, error) {
+func (c *config) dialFunc() func(string) (net.Conn, error) {
 	switch c.Proto {
 	case SOCKS5:
-		return func(_, targetAddr string) (conn net.Conn, err error) {
-			return c.dialSocks5(targetAddr)
-		}
+		return c.dialSocks5
 	case SOCKS4, SOCKS4A:
-		return func(_, targetAddr string) (conn net.Conn, err error) {
-			return c.dialSocks4(targetAddr)
-		}
+		return c.dialSocks4
 	}
 	return dialError(fmt.Errorf("unknown SOCKS protocol %v", c.Proto))
 }
 
-func dialError(err error) func(string, string) (net.Conn, error) {
-	return func(_, _ string) (net.Conn, error) {
+func dialError(err error) func(string) (net.Conn, error) {
+	return func(_ string) (net.Conn, error) {
 		return nil, err
 	}
 }
 
 func (cfg *config) dialSocks4(targetAddr string) (_ net.Conn, err error) {
 	socksType := cfg.Proto
-	proxy := cfg.Host
 	ctx := cfg.Context
 
 	// dial TCP
-
-	conn, err := DialContextWithoutProxy(ctx, "tcp", proxy)
+	conn, err := cfg.ProxyDialer(ctx, cfg.Host)
 	if err != nil {
 		return nil, err
 	}

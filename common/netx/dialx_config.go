@@ -91,6 +91,8 @@ type dialXConfig struct {
 	JustListen bool // just listen udp , not connect .
 
 	TraceInfo *DialXTraceInfo
+
+	Dialer func(duration time.Duration, target string) (net.Conn, error)
 }
 
 type DialXOption func(c *dialXConfig)
@@ -291,6 +293,12 @@ func DialX_WithLocalAddr(addr *net.UDPAddr) DialXOption {
 func DialX_WithUdpJustListen(b bool) DialXOption {
 	return func(c *dialXConfig) {
 		c.JustListen = b
+	}
+}
+
+func DialX_WithDialer(dialer func(duration time.Duration, target string) (net.Conn, error)) DialXOption {
+	return func(c *dialXConfig) {
+		c.Dialer = dialer
 	}
 }
 

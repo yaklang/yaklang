@@ -15,7 +15,6 @@
 package minimartian
 
 import (
-	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -57,7 +56,7 @@ func isCloseable(err error) bool {
 
 // Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
 type Proxy struct {
-	dial            func(context.Context, string, string) (net.Conn, error)
+	dialer          func(time.Duration, string) (net.Conn, error)
 	timeout         time.Duration
 	mitm            *mitm.Config
 	proxyURL        *url.URL
@@ -89,6 +88,8 @@ type Proxy struct {
 	h2Cache sync.Map
 
 	forceDisableKeepAlive bool
+
+	tunMode bool
 }
 
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
@@ -138,6 +139,11 @@ func NewProxy() *Proxy {
 		ctxCache:         utils.NewTTLCache[*Context](5 * time.Minute),
 	}
 	return proxy
+}
+
+// SetDialer sets the proxy dialer
+func (p *Proxy) SetDialer(dialer func(time.Duration, string) (net.Conn, error)) {
+	p.dialer = dialer
 }
 
 // SetTimeout sets the request timeout of the proxy.
@@ -212,6 +218,10 @@ func (p *Proxy) SetLowhttpConfig(config []lowhttp.LowhttpOpt) {
 
 func (p *Proxy) SetFindProcessName(b bool) {
 	p.findProcessName = b
+}
+
+func (p *Proxy) SetTunMode(b bool) {
+	p.tunMode = b
 }
 
 // Close sets the proxy to the closing state so it stops receiving new connections,

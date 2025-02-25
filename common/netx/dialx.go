@@ -129,7 +129,12 @@ RETRY:
 				return nil, utils.Errorf("disallow address %v by config(check your yakit system/network config)", ip)
 			}
 		}
-		conn, err = net.DialTimeout("tcp", utils.HostPort(ip, port), config.Timeout)
+
+		if config.Dialer != nil {
+			conn, err = config.Dialer(config.Timeout, utils.HostPort(ip, port))
+		} else {
+			conn, err = net.DialTimeout("tcp", utils.HostPort(ip, port), config.Timeout)
+		}
 		if err != nil {
 			if config.Debug {
 				log.Errorf("dial %s failed: %v", target, err)
@@ -153,7 +158,7 @@ RETRY:
 
 	var errs error
 	for _, proxy := range config.Proxy {
-		conn, err := getConnForceProxy(target, proxy, config.Timeout)
+		conn, err := getConnForceProxy(target, proxy, config)
 		if err != nil {
 			log.Errorf("proxy conn failed: %s", err)
 			if !shouldRetryError {

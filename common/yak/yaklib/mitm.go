@@ -3,7 +3,9 @@ package yaklib
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
@@ -58,6 +60,8 @@ type mitmConfig struct {
 	gmtls              bool
 	gmtlsPrefer        bool
 	gmtlsOnly          bool
+	dialer             func(timeout time.Duration, target string) (net.Conn, error)
+	tunMode            bool
 
 	// 是否开启透明劫持
 	isTransparent            bool
@@ -181,6 +185,8 @@ func mitmConfigHijackHTTPRequest(h func(isHttps bool, u string, req []byte, modi
 	}
 }
 
+var MITMConfigHijackHTTPResponse = mitmConfigHijackHTTPResponse
+
 // hijackHTTPResponse 是一个选项函数，用于指定中间人代理服务器的响应劫持函数，当接收到响应后，会调用该回调函数
 // 通过调用该回调函数的第四个参数，可以修改响应内容，通过调用该回调函数的第五个参数，可以丢弃响应
 // Example:
@@ -265,6 +271,48 @@ func mitmMaxContentLength(i int) MitmConfigOpt {
 	}
 }
 
+var MITMConfigTunMode = mitmConfigTunMode
+
+// set tunmode ,not process proxy proto
+func mitmConfigTunMode(b bool) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.tunMode = b
+	}
+}
+
+var MITMConfigDialer = mitmConfigDialer
+
+// setDialer for proxy
+func mitmConfigDialer(dialer func(timeout time.Duration, target string) (net.Conn, error)) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.dialer = dialer
+	}
+}
+
+// NewMITMServer just new mitm server
+func NewMITMServer(
+	opts ...MitmConfigOpt,
+) (*crep.MITMServer, error) {
+	config := &mitmConfig{
+		ctx:                context.Background(),
+		host:               "",
+		callback:           nil,
+		mitmCert:           nil,
+		mitmPkey:           nil,
+		useDefaultMitmCert: true,
+		maxContentLength:   10 * 1000 * 1000,
+	}
+
+	for _, opt := range opts {
+		opt(config)
+	}
+	server, err := initMitmServer("", config)
+	if err != nil {
+		return nil, utils.Errorf("create mitm server failed: %s", err)
+	}
+	return server, nil
+}
+
 // Bridge 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，第二个参数是下游代理服务器地址，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
 // Bridge 与 Start 类似，但略有不同，Bridge可以指定下游代理服务器地址，同时默认会在接收到请求和响应时打印到标准输出
 // 如果没有指定 CA 证书和私钥，那么将使用内置的证书和私钥
@@ -290,6 +338,19 @@ func startBridge(
 	for _, opt := range opts {
 		opt(config)
 	}
+	server, err := initMitmServer(downstreamProxy, config)
+	if err != nil {
+		return utils.Errorf("create mitm server failed: %s", err)
+	}
+	err = server.Serve(config.ctx, utils.HostPort(config.host, port))
+	if err != nil {
+		log.Errorf("server mitm failed: %s", err)
+		return err
+	}
+	return nil
+}
+
+func initMitmServer(downstreamProxy string, config *mitmConfig) (*crep.MITMServer, error) {
 
 	if config.host == "" {
 		config.host = "127.0.0.1"
@@ -297,7 +358,7 @@ func startBridge(
 
 	if config.mitmPkey == nil || config.mitmCert == nil {
 		if !config.useDefaultMitmCert {
-			return utils.Errorf("empty root CA, please use tls to generate or use mitm.useDefaultCA(true) to allow buildin ca.")
+			return nil, utils.Errorf("empty root CA, please use tls to generate or use mitm.useDefaultCA(true) to allow buildin ca.")
 		}
 		log.Infof("mitm proxy use the default cert and key")
 	}
@@ -310,7 +371,9 @@ func startBridge(
 		config.ctx = context.Background()
 	}
 
-	server, err := crep.NewMITMServer(
+	return crep.NewMITMServer(
+		crep.MITM_SetDialer(config.dialer),
+		crep.MITM_SetTunMode(config.tunMode),
 		crep.MITM_SetGM(config.gmtls),
 		crep.MITM_SetGMPrefer(config.gmtlsPrefer),
 		crep.MITM_SetGMOnly(config.gmtlsOnly),
@@ -493,13 +556,4 @@ func startBridge(
 			return after
 		}),
 	)
-	if err != nil {
-		return utils.Errorf("create mitm server failed: %s", err)
-	}
-	err = server.Serve(config.ctx, utils.HostPort(config.host, port))
-	if err != nil {
-		log.Errorf("server mitm failed: %s", err)
-		return err
-	}
-	return nil
 }

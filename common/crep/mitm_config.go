@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -553,6 +554,20 @@ func MITM_SetWebsocketRequestMirrorRaw(f func(req []byte)) MITMConfig {
 func MITM_SetWebsocketResponseMirrorRaw(f func(req []byte)) MITMConfig {
 	return func(server *MITMServer) error {
 		server.websocketResponseMirror = f
+		return nil
+	}
+}
+
+func MITM_SetTunMode(b bool) MITMConfig {
+	return func(server *MITMServer) error {
+		server.tunMode = b
+		return nil
+	}
+}
+
+func MITM_SetDialer(dialer func(duration time.Duration, target string) (net.Conn, error)) MITMConfig {
+	return func(server *MITMServer) error {
+		server.dialer = dialer
 		return nil
 	}
 }
