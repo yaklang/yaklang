@@ -3,7 +3,6 @@ package vulinbox
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
