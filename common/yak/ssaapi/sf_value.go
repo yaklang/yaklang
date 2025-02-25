@@ -3,6 +3,8 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"golang.org/x/exp/slices"
 	"regexp"
 
 	"github.com/samber/lo"
@@ -50,7 +52,11 @@ func (v *Value) GetUnaryOperator() string {
 		return ""
 	}
 	if sa.GetOpcode() == ssa.SSAOpcodeUnOp {
-
+		unOp, ok := ssa.ToUnOp(sa)
+		if !ok {
+			return ""
+		}
+		return string(unOp.Op)
 	}
 	return ""
 }
@@ -85,6 +91,28 @@ func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
 	return value != nil, value, nil
+}
+
+func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
+	if v == nil || items == nil {
+		return nil, []bool{false}
+	}
+	text := yakunquote.TryUnquote(v.String())
+	return nil, []bool{items.Matches(text)}
+}
+
+func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
+	if v == nil || comparator == nil {
+		return nil, []bool{false}
+	}
+	checkOp := func(opcode ssa.Opcode) bool {
+		return v.getOpcode() == opcode
+	}
+	checkBinOrUnaryOp := func(binOp string) bool {
+		ops := []string{v.GetBinaryOperator(), v.GetUnaryOperator()}
+		return slices.Contains(ops, binOp)
+	}
+	return nil, []bool{comparator.AllSatisfy(checkOp, checkBinOrUnaryOp)}
 }
 
 func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
