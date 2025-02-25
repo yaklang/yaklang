@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"io"
 	"path/filepath"
 	"strings"
@@ -194,7 +196,14 @@ func WithFileSystem(fs fi.FileSystem) Option {
 		if fs == nil {
 			return utils.Errorf("need set filesystem")
 		}
-		c.fs = fs
+
+		var ops []filesys.UnifiedFsOption
+		ops = append(ops, filesys.WithUnifiedFsSeparator(ssadb.IrSourceFsSeparators))
+		// fix for java class parser
+		if _, ok := fs.(*javaclassparser.FS); ok {
+			ops = append(ops, filesys.WithUnifiedFsExtMap(".class", ".java"))
+		}
+		c.fs = filesys.NewUnifiedFS(fs, ops...)
 		return nil
 	}
 }
