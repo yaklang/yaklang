@@ -2,8 +2,8 @@ name: Essential Tests
 
 on:
   pull_request:
-    branches: [ main ]
-    types: [ opened, synchronize, reopened ]
+    branches: [main]
+    types: [opened, synchronize, reopened]
     paths:
       - "common/**"
       - ".github/workflows/essential-tests.yml"
@@ -72,6 +72,7 @@ jobs:
               go test -timeout 20s -run TestQueryCVEWithFixName ./common/cve
               go test -timeout 20s ./common/sca/...
               go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/yak/yaklib
+              go test -timeout 20s -run TestMUSTPASS_Common ./common/yak/yaklib
               go test -timeout 1m -run TestMUSTPASS_Fp ./common/yak/yaklib/tools
               go test -timeout 30s ./common/openapi/...
               go test -timeout 10s ./common/utils/dot/... ./common/utils/filesys/...
@@ -114,7 +115,6 @@ jobs:
               go test -timeout 1m ./common/yak/ssaapi/ssareducer
               go test -timeout 1m ./common/yak/ssaapi/test/ssatest
 
-
           - name: Test StaticAnalyze / BuildIn SyntaxFlow Rule
             run: |
               # SSA plugin rule/option
@@ -134,7 +134,7 @@ jobs:
               go test -timeout 60s ./common/yak/JS2ssa/...
               go test -timeout 1m ./common/yak/ssaapi/test/javascript
 
-          - name: Test SSA Frontend Java 
+          - name: Test SSA Frontend Java
             run: |
               go test -timeout 2m ./common/yak/java/...
               go test -timeout 3m ./common/yak/ssaapi/test/java
@@ -144,7 +144,7 @@ jobs:
               go test -timeout 60s ./common/yak/php/...
               go test -timeout 2m ./common/yak/ssaapi/test/php
 
-          - name: Test SSA Frontend Golang 
+          - name: Test SSA Frontend Golang
             run: |
               go test -timeout 30s ./common/yak/go2ssa/...
               go test -timeout 30s ./common/yak/antlr4go/...

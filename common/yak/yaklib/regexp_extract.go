@@ -1,6 +1,7 @@
 package yaklib
 
 import (
+	"net/url"
 	"regexp"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -95,8 +96,40 @@ func RegexpMatchHostPort(i interface{}) []string {
 // ```
 func RegexpMatchPathParam(i interface{}) []string {
 	var res []string
-	for _, group := range RE_PATHPARAM.FindAllStringSubmatch(utils.InterfaceToString(i), -1) {
-		res = append(res, group[0])
+	var allIndexs [][]int
+	inputData := utils.InterfaceToBytes(i)
+	urlIndexs := RE_URL.FindAllSubmatchIndex(inputData, -1)
+	pathIndexs := RE_PATHPARAM.FindAllSubmatchIndex(inputData, -1)
+	allIndexs = append(allIndexs, urlIndexs...)
+	// 如果pathIndex的范围和urlIndex的范围重叠，则不添加到allIndexs中, 否则添加到allIndexs中
+	for _, pathIndex := range pathIndexs {
+		inUrlMatch := false
+		for _, urlIndex := range urlIndexs {
+			if pathIndex[0] >= urlIndex[0] && pathIndex[1] <= urlIndex[1] {
+				inUrlMatch = true
+				break
+			}
+		}
+		if !inUrlMatch {
+			allIndexs = append(allIndexs, pathIndex)
+		}
+	}
+
+	for _, index := range allIndexs {
+		submatch := string(inputData[index[0]:index[1]])
+		u, err := url.Parse(submatch)
+		if err != nil {
+			continue
+		}
+		p := u.RawPath
+		if p == "" {
+			p = u.Path
+		}
+		query := "?" + u.RawQuery
+		if u.ForceQuery {
+			query = "?"
+		}
+		res = append(res, p+query)
 	}
 	return res
 }
