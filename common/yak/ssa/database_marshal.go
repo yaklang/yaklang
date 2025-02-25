@@ -13,6 +13,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 func fetchIds(origin any) any {
@@ -280,6 +281,8 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		if ret.CFGEntryBasicBlock != nil {
 			params["cfg_entry"] = ret.CFGEntryBasicBlock.GetId()
 		}
+	case *Pointer:
+		params["pointer_origin"] = ret.GetOrigin().GetValue()
 	case *Return:
 		params["return_results"] = marshalValues(ret.Results)
 	case *SideEffect:
@@ -344,6 +347,13 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		lazyIns := unmarshalInstruction(p)
 		if value, ok := ToValue(lazyIns); ok {
 			return value
+		}
+		return nil
+	}
+	unmarshalVariableMemory := func(p any) *ssautil.VariableMemory[Value] {
+		lazyIns := unmarshalInstruction(p)
+		if value, ok := ToValue(lazyIns); ok {
+			return value.GetVariableMemory()
 		}
 		return nil
 	}
@@ -491,6 +501,8 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		if cfgEntry, ok := params["cfg_entry"]; ok {
 			ret.CFGEntryBasicBlock = unmarshalValue(cfgEntry)
 		}
+	case *Pointer:
+		ret.origin = unmarshalVariableMemory(params["pointer_origin"])
 	case *Return:
 		ret.Results = unmarshalValues(params["return_results"])
 	case *SideEffect:

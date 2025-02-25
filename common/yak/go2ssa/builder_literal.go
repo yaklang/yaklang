@@ -694,9 +694,16 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 				key = b.EmitConstInst(a.Name)
 			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
 				key = b.EmitConstInst(ba.GetName())
+			} else if bp, ok := parent.(*ssa.Blueprint); ok {
+				key = b.EmitConstInst(bp.Name)
 			}
 
-			structTyp.AddField(key, parent)
+			if key != nil {
+				structTyp.AddField(key, parent)
+			} else {
+				b.NewError(ssa.Warn, TAG, MakeUnknownTypeInStruct())
+			}
+
 		}
 	}
 }

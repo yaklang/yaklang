@@ -220,7 +220,7 @@ func (u *Undefined) String() string {
 	return fmt.Sprintf("%s = undefined-%s", getStr(u), u.GetName())
 }
 
-// ----------- pointer
+// ----------- Pointer
 func (p *Pointer) String() string {
 	return p.GetOrigin().GetValue().String()
 }

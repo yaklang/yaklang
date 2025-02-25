@@ -151,7 +151,7 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 		}
 		return fmt.Sprintf("%s-%s", SSAOpcode2Name[v.GetOpcode()], v.GetVerboseName())
 	case *Pointer:
-		return fmt.Sprintf("%s-&(%s)", SSAOpcode2Name[v.GetOpcode()], v.String())
+		return fmt.Sprintf("%s-&(%s)", SSAOpcode2Name[v.GetOpcode()], v.GetOrigin().GetValue().String())
 	case *Phi:
 		liner.SetName(v, v.GetVerboseName())
 		ret = fmt.Sprintf("phi(%s)[%s]", v.GetVerboseName(), DisasmValues(v.Edge))
