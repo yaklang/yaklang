@@ -188,8 +188,10 @@ func dataFlowFilter(
 		for _, v := range vs {
 			dataPaths := v.GetDataflowPath()
 			var excludeFlag = 0
-			for _, dataPath := range dataPaths {
+			log.Infof("dataPaths: %v", v)
+			for i, dataPath := range dataPaths {
 				matchedConfigs := recursiveConfig.compileAndRun(dataPath)
+				log.Infof("\n %d/%d : dataPath: %v\nres:%v", i, len(dataPaths), dataPath, matchedConfigs)
 
 				if _, ok := matchedConfigs[sf.RecursiveConfig_Include]; ok {
 					ret = append(ret, v)
