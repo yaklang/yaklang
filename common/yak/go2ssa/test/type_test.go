@@ -629,6 +629,104 @@ func TestType_interface(t *testing.T) {
 	})
 }
 
+func TestType_pointer(t *testing.T) {
+	t.Run("basic pointer", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			var a int = 1
+			var b string = "hello"
+
+			var ap *int = &a
+			var bp *string = &b
+
+			*ap = 2
+			*bp = "world"
+
+			println(a)
+			println(b)
+
+			println(*ap)
+			println(*bp)
+		}
+			
+		`, []string{"2", "\"world\"", "2", "\"world\""}, t)
+	})
+
+	t.Run("slice array pointer", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			var s1 string = "hello"
+			var s2 string = "world"
+			var str []*string = []*string{&s1, &s2}
+
+			println(*str[0])
+			println(*str[1])
+
+			str[0] = &s2
+
+			println(*str[0])
+			println(*str[1])
+		}
+			
+		`, []string{"\"hello\"", "\"world\"", "\"world\"", "\"world\""}, t)
+	})
+
+	t.Run("map pointer", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			var n1 int = 1
+			var n2 int = 2
+			var mp map[string]*int = make(map[string]*int)
+			mp["a"] = &n1
+			mp["b"] = &n2
+
+			println(*mp["a"])
+			println(*mp["b"])
+
+			mp["a"] = &n2
+
+			println(*mp["a"])
+			println(*mp["b"])
+		}
+			
+		`, []string{"1", "2", "2", "2"}, t)
+	})
+
+	t.Run("object pointer", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+		type T struct {
+			a *int
+			b *int
+		}
+
+		func main(){
+			var a, b int
+			a = 1
+			b = 2
+
+			o1 := T{a: &a, b: &b}
+			o2 := T{a: &a, b: &b}
+
+			*o1.a = 3
+			*o2.b = 4
+			println(*o1.a)
+			println(*o1.b)
+			println(*o2.a)
+			println(*o2.b)
+		}
+			
+		`, []string{"3", "4", "3", "4"}, t)
+	})
+}
+
 func TestType_alias(t *testing.T) {
 	t.Run("alias type", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main

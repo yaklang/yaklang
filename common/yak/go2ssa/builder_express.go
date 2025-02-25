@@ -13,29 +13,46 @@ type getSingleExpr interface {
 	Expression(i int) gol.IExpressionContext
 }
 
-func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) (ssa.Value, *ssa.Variable) {
+func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	getValue := func(single getSingleExpr, i int) ssa.Value {
 		if s := single.Expression(i); s != nil {
-			rightv, _ := b.buildExpression(s.(*gol.ExpressionContext), IslValue)
+			rightv, _ := b.buildExpression(s.(*gol.ExpressionContext), false)
 			return rightv
 		} else {
 			b.NewError(ssa.Error, TAG, "can't get expression")
 			return b.EmitConstInst(0)
 		}
 	}
+	getVariable := func(single getSingleExpr, i int) *ssa.Variable {
+		if s := single.Expression(i); s != nil {
+			b.SetPointerAssignConfig(true)
+			_, leftv := b.buildExpression(s.(*gol.ExpressionContext), true)
+			b.SetPointerAssignConfig(false)
+			return leftv
+		} else {
+			b.NewError(ssa.Error, TAG, "can't get expression")
+			return b.CreateVariable("")
+		}
+	}
 
 	// fmt.Printf("exp = %v\n", exp.GetText())
 
 	if ret := exp.PrimaryExpr(); ret != nil {
-		return b.buildPrimaryExpression(ret.(*gol.PrimaryExprContext), IslValue)
+		return b.buildPrimaryExpression(ret.(*gol.PrimaryExprContext), islValue)
 	}
 
-	if !IslValue { // right
+	if !islValue { // right
 		if op := exp.GetUnary_op(); op != nil {
 			var ssaop ssa.UnaryOpcode
+
+			op1 := getValue(exp, 0)
+			if op1 == nil {
+				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+				return b.EmitConstInst(0), b.CreateVariable("")
+			}
 
 			switch op.GetText() {
 			case "+":
@@ -49,21 +66,40 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 			case "<-":
 				ssaop = ssa.OpChan
 			case "*":
-				ssaop = ""
+				//ssaop = ssa.OpDereference
+				var value ssa.Value
+				if op1Variable := getVariable(exp, 0); op1Variable != nil {
+					if op1Variable.GetKind() != ssa.PointerVariable {
+						b.NewError(ssa.Warn, TAG, "Non-pointers cannot be dereferenced")
+						return op1, nil
+					}
+					if value = op1Variable.GetValue(); value == nil {
+						b.NewError(ssa.Warn, TAG, "The pointer is not initialized")
+						return op1, nil
+					}
+
+					if next := op1Variable.GetVariableMemory().GetNext(); next != nil {
+						if variable := next.GetVariable(); variable != nil {
+							return variable.GetValue(), nil
+						}
+					}
+				}
+				return op1, nil
 			case "&":
-				ssaop = ""
+				//ssaop = ssa.OpAddress
+				if op1Variable := getVariable(exp, 0); op1Variable != nil {
+					rightv := b.EmitConstPointer(op1Variable)
+					if op1Variable.GetVariableMemory().GetPrev() == nil {
+						leftv := b.CreateVariable("&" + op1Variable.GetName())
+						b.AssignVariable(leftv, rightv)
+					}
+					return rightv, nil
+				}
+				return op1, nil
 			default:
 				b.NewError(ssa.Error, TAG, UnaryOperatorNotSupport(op.GetText()))
 			}
 
-			op1 := getValue(exp, 0)
-			if op1 == nil {
-				b.NewError(ssa.Error, TAG, NeedTwoExpression())
-				return b.EmitConstInst(0), b.CreateVariable("")
-			}
-			if ssaop == "" {
-				return op1, nil
-			}
 			return b.EmitUnOp(ssaop, op1), nil
 		}
 
@@ -161,31 +197,62 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 			return b.EmitBinOp(ssaop, op1, op2), nil
 		}
 	} else { // left
+		if op := exp.GetUnary_op(); op != nil {
+			var op1Variable *ssa.Variable
 
+			switch op.GetText() {
+			case "*":
+				op1Variable = getVariable(exp, 0)
+				if op1Variable.GetKind() != ssa.PointerVariable {
+					b.NewError(ssa.Warn, TAG, "Non-pointers cannot be dereferenced")
+				} else if value := op1Variable.GetValue(); value == nil {
+					b.NewError(ssa.Warn, TAG, "The pointer is not initialized")
+				}
+
+				if next := op1Variable.GetVariableMemory().GetNext(); next != nil {
+					if variable := next.GetVariable(); variable != nil {
+						op1Variable = variable.(*ssa.Variable)
+					} else {
+						// memeryPhi解引用会进入这里
+						newVariable := b.CreateVariable("*" + op1Variable.GetName())
+						op1Variable.GetVariableMemory().InsertNext(newVariable.GetVariableMemory())
+						op1Variable = newVariable
+					}
+				}
+			default:
+				op1Variable = b.CreateVariable("")
+				b.NewError(ssa.Error, TAG, UnaryOperatorNotSupport(op.GetText()))
+			}
+
+			return nil, op1Variable
+		}
 	}
 
 	return b.EmitConstInst(0), b.CreateVariable("")
 }
 
-func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValue bool) (ssa.Value, *ssa.Variable) {
+func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, islValue bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	if ret := exp.Operand(); ret != nil {
-		return b.buildOperandExpression(ret.(*gol.OperandContext), IslValue)
+		return b.buildOperandExpression(ret.(*gol.OperandContext), islValue)
 	}
 	if ret := exp.MethodExpr(); ret != nil {
-		return b.buildMethodExpression(ret.(*gol.MethodExprContext), IslValue)
+		return b.buildMethodExpression(ret.(*gol.MethodExprContext), islValue)
 	}
+	// if ret := exp.StarExpr(); ret != nil {
+	// 	return b.buildStarExpression(ret.(*gol.StarExprContext), IslValue)
+	// }
 	if ret := exp.Conversion(); ret != nil {
-		return b.buildConversion(ret.(*gol.ConversionContext), IslValue)
+		return b.buildConversion(ret.(*gol.ConversionContext), islValue)
 	}
 
 	var leftv *ssa.Variable = nil
 	var rightv ssa.Value = nil
 	var handleObjectType func(ssa.Value, *ssa.ObjectType)
 
-	if IslValue {
+	if islValue {
 		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
 
 		if ret := exp.Index(); ret != nil {
@@ -194,6 +261,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 		}
 
 		if ret := exp.DOT(); ret != nil {
+			if p, ok := ssa.ToPointer(rv); ok {
+				rv = p.GetOrigin().GetValue()
+			}
 			id := exp.IDENTIFIER()
 			test := id.GetText()
 
@@ -240,6 +310,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 		}
 
 		if ret := exp.DOT(); ret != nil {
+			if p, ok := ssa.ToPointer(rv); ok {
+				rv = p.GetOrigin().GetValue()
+			}
 			id := exp.IDENTIFIER()
 			test := id.GetText()
 
@@ -279,10 +352,13 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 			if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 				handleObjectType(rv, typ)
-			} else if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), test); ok {
-				rightv = value
 			}
 
+			if rightv == nil {
+				if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), test); ok {
+					rightv = value
+				}
+			}
 			if rightv == nil {
 				rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(test))
 				rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
@@ -299,6 +375,27 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 	}
 	return rightv, leftv
 }
+
+// func (b *astbuilder) buildStarExpression(exp *gol.StarExprContext, IslValue bool) (ssa.Value, *ssa.Variable) {
+// 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+// 	defer recoverRange()
+
+// 	if ret := exp.Expression(); ret != nil {
+// 		rightv, leftv := b.buildExpression(ret.(*gol.ExpressionContext), IslValue)
+// 		// if leftv != nil {
+// 		// 	leftv.SetKind(ssautil.DereferenceVariable)
+// 		// }
+// 		// if rightv != nil {
+// 		// 	if un, ok := rightv.(*ssa.UnOp); ok {
+// 		// 		rightv = un.X
+// 		// 	}
+// 		// }
+// 		return rightv, leftv
+// 	}
+
+// 	b.NewError(ssa.Error, TAG, Unreachable())
+// 	return b.EmitConstInst(0), b.CreateVariable("")
+// }
 
 func (b *astbuilder) buildMethodExpression(exp *gol.MethodExprContext, IslValue bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
@@ -405,13 +502,13 @@ func (b *astbuilder) buildExpressionStmt(stmt *gol.ExpressionStmtContext) []ssa.
 	return []ssa.Value{rightv}
 }
 
-func (b *astbuilder) buildOperandExpression(exp *gol.OperandContext, IslValue bool) (ssa.Value, *ssa.Variable) {
+func (b *astbuilder) buildOperandExpression(exp *gol.OperandContext, islValue bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
 	var rightv ssa.Value
 	var leftv *ssa.Variable
 
-	if !IslValue { // right
+	if !islValue { // right
 		if literal := exp.Literal(); literal != nil {
 			rightv = b.buildLiteral(literal.(*gol.LiteralContext))
 		}
