@@ -7,10 +7,12 @@ on:
     paths:
       - "common/sfweb/**"
       - ".github/workflows/auto-build-sfweb.yml"
+      - ".github/workflows/reuse-build-sfweb.yml"
 
 jobs:
   build:
     uses: ./.github/workflows/reuse-build-sfweb.yml
     with:
       os: linux-amd64
+      update: true
     secrets: inherit
