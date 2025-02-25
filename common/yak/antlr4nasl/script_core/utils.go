@@ -1,7 +1,7 @@
 package script_core
 
 import (
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"time"
@@ -27,7 +27,7 @@ func Ping(ctx *ExecContext) {
 	if utils.IsIPv4(target) || utils.IsIPv6(target) {
 		ok = pingutil.PingAuto(target, pingutil.WithDefaultTcpPort(tcpPingPort), pingutil.WithTimeout(timeout), pingutil.WithProxies(proxies...)).Ok
 	} else {
-		result := dns_lookup.LookupFirst(target, dns_lookup.WithTimeout(dnsTimeout))
+		result := netx.LookupFirst(target, netx.WithTimeout(dnsTimeout))
 		if result != "" && (utils.IsIPv4(result) || utils.IsIPv6(result)) {
 			ok = pingutil.PingAuto(result, pingutil.WithDefaultTcpPort(tcpPingPort), pingutil.WithTimeout(timeout), pingutil.WithProxies(proxies...)).Ok
 		}

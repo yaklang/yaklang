@@ -1,7 +1,7 @@
 package yaklib_test
 
 import (
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -23,7 +23,7 @@ func TestNewCustomDNSLog(t *testing.T) {
 		t.FailNow()
 		return
 	}
-	dns_lookup.LookupFirst(domain)
+	netx.LookupFirst(domain)
 
 	tokens, err := cd.CheckDNSLogByToken()
 	if err != nil {

@@ -3,7 +3,7 @@ package vulinbox
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -533,9 +533,9 @@ func check(s string) bool {
 	if host == "" || port == "" {
 		return false
 	}
-	dns := dns_lookup.LookupFirst(host,
-		dns_lookup.WithDNSNoCache(true),
-		dns_lookup.WithDNSDisableSystemResolver(true),
+	dns := netx.LookupFirst(host,
+		netx.WithDNSNoCache(true),
+		netx.WithDNSDisableSystemResolver(true),
 	)
 	// dns := dnsLookup(host)
 

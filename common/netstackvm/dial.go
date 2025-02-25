@@ -5,7 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/adapters/gonet"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"net/netip"
@@ -23,7 +23,7 @@ func (vm *NetStackVirtualMachine) DialTCP(timeout time.Duration, hostport string
 		return nil, err
 	}
 	if !utils.IsIPv4(host) {
-		host = dns_lookup.LookupFirst(host)
+		host = netx.LookupFirst(host)
 	}
 
 	target := tcpip.FullAddress{

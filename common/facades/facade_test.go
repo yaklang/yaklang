@@ -3,7 +3,7 @@ package facades
 import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"net"
@@ -96,7 +96,7 @@ func TestLookupAll(t *testing.T) {
 
 	type args struct {
 		host string
-		opt  []dns_lookup.DNSOption
+		opt  []netx.DNSOption
 	}
 	fakeDnsServer := MockDNSServerDefault("abc.com", func(record string, domain string) string {
 		return "9.9.9.9"
@@ -113,10 +113,10 @@ func TestLookupAll(t *testing.T) {
 			name: "set hosts 不会缓存 10.10.10.10(case A)",
 			args: args{
 				host: "abc.com",
-				opt: []dns_lookup.DNSOption{
-					dns_lookup.WithTemporaryHosts(map[string]string{"abc.com": "10.10.10.10"}),
-					dns_lookup.WithDNSServers(fakeDnsServer),
-					dns_lookup.WithDNSDisableSystemResolver(true),
+				opt: []netx.DNSOption{
+					netx.WithTemporaryHosts(map[string]string{"abc.com": "10.10.10.10"}),
+					netx.WithDNSServers(fakeDnsServer),
+					netx.WithDNSDisableSystemResolver(true),
 				},
 			},
 			wantMethod: "hosts",
@@ -126,9 +126,9 @@ func TestLookupAll(t *testing.T) {
 			name: "cancel hosts 没有缓存所以结果是 fake 的ip，本次会进行缓存(case A)",
 			args: args{
 				host: "abc.com",
-				opt: []dns_lookup.DNSOption{
-					dns_lookup.WithDNSServers(fakeDnsServer),
-					dns_lookup.WithDNSDisableSystemResolver(true),
+				opt: []netx.DNSOption{
+					netx.WithDNSServers(fakeDnsServer),
+					netx.WithDNSDisableSystemResolver(true),
 				},
 			},
 			wantMethod: "yakdns.udp",
@@ -139,9 +139,9 @@ func TestLookupAll(t *testing.T) {
 			name: "test hosts cache (case A)",
 			args: args{
 				host: "abc.com",
-				opt: []dns_lookup.DNSOption{
-					dns_lookup.WithDNSServers(fakeDnsServer),
-					dns_lookup.WithDNSDisableSystemResolver(true),
+				opt: []netx.DNSOption{
+					netx.WithDNSServers(fakeDnsServer),
+					netx.WithDNSDisableSystemResolver(true),
 				},
 			},
 			wantMethod: "cache",
@@ -151,10 +151,10 @@ func TestLookupAll(t *testing.T) {
 			name: "设置 hosts 与 host 不相同会缓存 9.9.9.9 (case A)",
 			args: args{
 				host: "abc.com",
-				opt: []dns_lookup.DNSOption{
-					dns_lookup.WithTemporaryHosts(map[string]string{"bcd.com": "10.10.10.10"}),
-					dns_lookup.WithDNSServers(fakeDnsServer),
-					dns_lookup.WithDNSDisableSystemResolver(true),
+				opt: []netx.DNSOption{
+					netx.WithTemporaryHosts(map[string]string{"bcd.com": "10.10.10.10"}),
+					netx.WithDNSServers(fakeDnsServer),
+					netx.WithDNSDisableSystemResolver(true),
 				},
 			},
 			wantMethod: "cache",
@@ -165,7 +165,7 @@ func TestLookupAll(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建当前测试用例的副本
 			currentTest := tt
-			dnsOptions := append(currentTest.args.opt, dns_lookup.WithDNSCallback(func(dnsType, domain, ip, fromServer, method string) {
+			dnsOptions := append(currentTest.args.opt, netx.WithDNSCallback(func(dnsType, domain, ip, fromServer, method string) {
 				currentTest.callback = callbackInfo{
 					dnsType:    dnsType,
 					domain:     domain,
@@ -175,7 +175,7 @@ func TestLookupAll(t *testing.T) {
 				}
 			}))
 
-			if got := dns_lookup.LookupAll(currentTest.args.host, dnsOptions...); !reflect.DeepEqual(got, currentTest.want) {
+			if got := netx.LookupAll(currentTest.args.host, dnsOptions...); !reflect.DeepEqual(got, currentTest.want) {
 				t.Errorf("LookupAll() = %v, want %v", got, currentTest.want)
 			}
 			// 验证回调信息

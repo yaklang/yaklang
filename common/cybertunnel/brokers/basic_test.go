@@ -2,7 +2,7 @@ package dnslogbrokers
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"testing"
 )
@@ -14,7 +14,7 @@ func TestDIGPM1(t *testing.T) {
 		panic(err)
 	}
 	spew.Dump(domain, token)
-	dns_lookup.LookupFirst(domain, dns_lookup.WithTimeout(utils.FloatSecondDuration(3)))
+	netx.LookupFirst(domain, netx.WithTimeout(utils.FloatSecondDuration(3)))
 	a, err := defaultDigPm1433.GetResult(token, utils.FloatSecondDuration(5))
 	if err != nil {
 		panic(err)
@@ -29,7 +29,7 @@ func TestDIGPM2(t *testing.T) {
 		panic(err)
 	}
 	spew.Dump(domain, token)
-	dns_lookup.LookupFirst(domain, dns_lookup.WithTimeout(utils.FloatSecondDuration(3)))
+	netx.LookupFirst(domain, netx.WithTimeout(utils.FloatSecondDuration(3)))
 	a, err := defaultDigPMBYPASS.GetResult(token, utils.FloatSecondDuration(5))
 	if err != nil {
 		panic(err)
@@ -44,7 +44,7 @@ func TestDNSLOGCN(t *testing.T) {
 		panic(err)
 	}
 	spew.Dump(domain, token)
-	dns_lookup.LookupFirst(domain, dns_lookup.WithTimeout(utils.FloatSecondDuration(3)))
+	netx.LookupFirst(domain, netx.WithTimeout(utils.FloatSecondDuration(3)))
 	a, err := defaultDNSLogCN.GetResult(token, utils.FloatSecondDuration(5))
 	if err != nil {
 		panic(err)
