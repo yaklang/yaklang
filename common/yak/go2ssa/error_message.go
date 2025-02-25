@@ -75,6 +75,10 @@ func MakeUnknownType() string {
 	return "make unknown type"
 }
 
+func MakeUnknownTypeInStruct() string {
+	return "make unknown type in struct"
+}
+
 func InvalidChanType(typ string) string {
 	return fmt.Sprintf("iteration (variable of type %s) permits only one right variable", typ)
 }

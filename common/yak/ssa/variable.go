@@ -71,6 +71,25 @@ func (variable *Variable) Assign(value Value) error {
 		prog.SetOffsetValue(value, value.GetRange())
 	}
 
+	// ToDo: 需要兼容loop中emptyphi的替换
+	var variableMemorys []*ssautil.VariableMemory[Value]
+	if pointer, ok := ToPointer(value); ok {
+		variable.SetKind(PointerVariable)
+		variableMemorys = append(variableMemorys, pointer.GetOrigin())
+		variable.HandlePointerVariable(variableMemorys)
+	} else if phi, ok := ToPhi(value); ok {
+		for _, e := range phi.Edge {
+			if pointer, ok := ToPointer(e); ok {
+				variableMemorys = append(variableMemorys, pointer.GetOrigin())
+			}
+		}
+		if len(variableMemorys) > 0 {
+			variable.SetKind(PointerVariable)
+			variable.SetPhiVariable(true)
+			variable.HandlePointerVariable(variableMemorys)
+		}
+	}
+
 	value.AddVariable(variable)
 	value.SetVariableMemory(variable.GetVariableMemory())
 	if variable.IsMemberCall() {
@@ -147,6 +166,14 @@ func (v *Variable) SetKind(kind VariableKind) {
 	v.kind = kind
 }
 
+func (v *Variable) IsPhiVariable() bool {
+	return v.GetVariableMemory().IsPhiMemery()
+}
+
+func (v *Variable) SetPhiVariable(b bool) {
+	v.GetVariableMemory().SetPhiMemery(b)
+}
+
 // func (v *Variable) AddPointVariable(p Value) {
 // 	if len(p.GetAllVariables()) == 0 {
 // 		return
@@ -186,8 +213,15 @@ func (v *Variable) SetKind(kind VariableKind) {
 // 	v.indirectVariable = make(map[string]*Variable)
 // }
 
-func (v *Variable) HandlePointerVariable(variableMemory *ssautil.VariableMemory[Value]) {
-	v.GetVariableMemory().InsertNext(variableMemory)
+func (v *Variable) HandlePointerVariable(variableMemorys []*ssautil.VariableMemory[Value]) {
+	variableMemory := v.GetVariableMemory()
+	if variableMemory.IsPhiMemery() {
+		v := &ssautil.VariableMemory[Value]{}
+		variableMemory.SetEdge(variableMemorys)
+		variableMemory.InsertNext(v)
+	} else {
+		variableMemory.InsertNext(variableMemorys[0])
+	}
 }
 
 func ReadVariableFromScope(scope ScopeIF, name string) *Variable {

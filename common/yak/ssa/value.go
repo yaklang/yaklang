@@ -168,9 +168,19 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		return
 	}
 
-	if pointer, ok := ToPointer(value); ok {
-		variable.SetKind(PointerVariable)
-		variable.HandlePointerVariable(pointer.GetOrigin())
+	if preVariableMemory := variable.GetVariableMemory().GetPrev(); preVariableMemory != nil {
+		if preVariableMemory.IsPhiMemery() {
+			for _, e := range preVariableMemory.GetEdges() {
+				if phi, ok := ToPhi(e.GetValue()); ok {
+					phi.Edge = append(phi.Edge, value)
+					b.AssignVariable(e.GetVariable().(*Variable), phi)
+				} else {
+					var vs []Value = []Value{e.GetValue(), value}
+					newPhi := b.EmitPhi(e.GetVariable().GetName(), vs)
+					b.AssignVariable(e.GetVariable().(*Variable), newPhi)
+				}
+			}
+		}
 	}
 
 	scope.AssignVariable(variable, value)

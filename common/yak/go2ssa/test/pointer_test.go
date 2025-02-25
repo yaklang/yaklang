@@ -178,6 +178,27 @@ func Test_Pointer_normal(t *testing.T) {
 
 		`, []string{"2", "2"}, t)
 	})
+
+	t.Run("alias pointer", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+		func add(a, b *int) int{
+			return *a + *b
+		}
+
+		func main(){
+			a := 1
+			b := 2
+
+			c := add(&a, &b)
+			println(a)
+			println(b)
+			println(c)
+		}
+			
+		`, []string{"1", "2", "Function-add(Pointer-&(1),Pointer-&(2))"}, t)
+	})
 }
 
 func Test_Pointer_muti(t *testing.T) {
@@ -224,10 +245,7 @@ func Test_Pointer_muti(t *testing.T) {
 }
 
 func Test_Pointer_cfg(t *testing.T) {
-	// todo: 指针需要支持phi
 	t.Run("pointer cfg if", func(t *testing.T) {
-		t.Skip()
-
 		test.CheckPrintlnValue(`package main
 
 		func main(){
@@ -249,8 +267,79 @@ func Test_Pointer_cfg(t *testing.T) {
 			
 		`, []string{"3", "phi(a)[1,3]", "phi(b)[2,3]"}, t)
 	})
+
+	t.Run("pointer cfg switch", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			var a int = 1
+			var b int = 2
+			var p *int
+		
+			switch a {
+			case 1:
+				p = &a
+			case 2:
+				p = &b
+			}
+			*p = 3
+
+			println(*p) // 3
+			println(a)	// phi(a)[1,3]
+			println(b)	// phi(b)[2,3]
+		}
+			
+		`, []string{"3", "phi(a)[1,3]", "phi(b)[2,3]"}, t)
+	})
+
+	t.Run("pointer cfg for", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			var a int = 1
+			var b int = 2
+			var p *int
+
+			for p = &a; ; {
+				p = &b
+			}
+			*p = 3
+
+			println(*p) // 3
+			println(a)	// phi(a)[1,3]
+			println(b)	// phi(b)[2,3]
+		}
+			
+		`, []string{"3", "phi(a)[1,3]", "phi(b)[2,3]"}, t)
+	})
 }
 
 func Test_Pointer_sideEffect(t *testing.T) {
+	// todo
+	t.Run("pointer side-effect", func(t *testing.T) {
+		t.Skip()
+		test.CheckPrintlnValue(`package main
 
+		func main(){
+			var a int = 1
+			var b int = 2
+			var p *int = &a
+
+			f := func() {
+				p = &b
+			}
+
+			*p = 3
+			println(a) // 3
+			println(b) // 2
+
+			f()
+
+			*p = 4
+			println(a) // 3
+			println(b) // 4
+		}
+			
+		`, []string{"3", "2", "3", "4"}, t)
+	})
 }

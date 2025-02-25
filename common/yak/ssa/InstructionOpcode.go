@@ -160,7 +160,7 @@ func IsControlInstruction(i Instruction) bool {
 }
 
 func IsValueInstruction(i Instruction) bool {
-	return slices.Index([]Opcode{SSAOpcodePanic, SSAOpcodeBasicBlock, SSAOpcodeBinOp, SSAOpcodeCall, SSAOpcodeExternLib, SSAOpcodeFunction, SSAOpcodeConstInst, SSAOpcodeMake, SSAOpcodeNext, SSAOpcodeParameter, SSAOpcodeFreeValue, SSAOpcodeParameterMember, SSAOpcodePhi, SSAOpcodeRecover, SSAOpcodeReturn, SSAOpcodeSideEffect, SSAOpcodeTypeCast, SSAOpcodeTypeValue, SSAOpcodeUnOp, SSAOpcodeUndefined}, i.GetOpcode()) != -1
+	return slices.Index([]Opcode{SSAOpcodePanic, SSAOpcodeBasicBlock, SSAOpcodeBinOp, SSAOpcodeCall, SSAOpcodeExternLib, SSAOpcodeFunction, SSAOpcodeConstInst, SSAOpcodeMake, SSAOpcodeNext, SSAOpcodeParameter, SSAOpcodeFreeValue, SSAOpcodeParameterMember, SSAOpcodePhi, SSAOpcodeRecover, SSAOpcodeReturn, SSAOpcodeSideEffect, SSAOpcodeTypeCast, SSAOpcodeTypeValue, SSAOpcodeUnOp, SSAOpcodeUndefined, SSAOpcodePointer}, i.GetOpcode()) != -1
 }
 
 func IsUserInstruction(i Instruction) bool {

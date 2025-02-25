@@ -77,23 +77,23 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 						b.NewError(ssa.Warn, TAG, "The pointer is not initialized")
 						return op1, nil
 					}
-					if pointer, ok := ssa.ToPointer(value); ok {
-						if o := pointer.GetOrigin(); o != nil {
-							return o.GetValue(), nil
-						} else {
-							b.NewError(ssa.Warn, TAG, "Pointer does not have an origin entry")
-							return op1, nil
+
+					if next := op1Variable.GetVariableMemory().GetNext(); next != nil {
+						if variable := next.GetVariable(); variable != nil {
+							return variable.GetValue(), nil
 						}
-					} else {
-						b.NewError(ssa.Warn, TAG, "The value is not Pointer")
-						return op1, nil
 					}
 				}
 				return op1, nil
 			case "&":
 				//ssaop = ssa.OpAddress
 				if op1Variable := getVariable(exp, 0); op1Variable != nil {
-					return b.EmitConstPointer(op1Variable), nil
+					rightv := b.EmitConstPointer(op1Variable)
+					if op1Variable.GetVariableMemory().GetPrev() == nil {
+						leftv := b.CreateVariable("&" + op1Variable.GetName())
+						b.AssignVariable(leftv, rightv)
+					}
+					return rightv, nil
 				}
 				return op1, nil
 			default:
@@ -207,12 +207,16 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 					b.NewError(ssa.Warn, TAG, "Non-pointers cannot be dereferenced")
 				} else if value := op1Variable.GetValue(); value == nil {
 					b.NewError(ssa.Warn, TAG, "The pointer is not initialized")
-				} else if _, ok := ssa.ToPointer(value); !ok {
-					b.NewError(ssa.Warn, TAG, "Pointer does not have an origin entry")
 				}
+
 				if next := op1Variable.GetVariableMemory().GetNext(); next != nil {
 					if variable := next.GetVariable(); variable != nil {
 						op1Variable = variable.(*ssa.Variable)
+					} else {
+						// memeryPhi解引用会进入这里
+						newVariable := b.CreateVariable("*" + op1Variable.GetName())
+						op1Variable.GetVariableMemory().InsertNext(newVariable.GetVariableMemory())
+						op1Variable = newVariable
 					}
 				}
 			default:
