@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"encoding/json"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -29,8 +28,13 @@ func SaveTypeToDB(typ Type) int {
 		param["kind"] = t.Kind
 		param["fullTypeName"] = t.GetFullTypeNames()
 	case *Blueprint:
+		var parentBlueprintIds []int
 		param["name"] = t.Name
 		param["fullTypeName"] = t.GetFullTypeNames()
+		for _, blueprint := range t.ParentBlueprints {
+			parentBlueprintIds = append(parentBlueprintIds, SaveTypeToDB(blueprint))
+		}
+		param["parentBlueprints"] = parentBlueprintIds
 	default:
 		param["fullTypeName"] = t.GetFullTypeNames()
 	}
@@ -103,9 +107,17 @@ func GetTypeFromDB(id int) Type {
 		typ := &Blueprint{}
 		typ.Name = getParamStr("name")
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
+		blueprints, ok := params["parentBlueprints"].([]interface{})
+		if ok {
+			for _, typeId := range blueprints {
+				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(utils.InterfaceToInt(typeId)))
+				if isBlueprint {
+					typ.ParentBlueprints = append(typ.ParentBlueprints, blueprint)
+				}
+			}
+		}
 		return typ
 	default:
-
 	}
 
 	return nil

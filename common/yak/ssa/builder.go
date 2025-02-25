@@ -159,6 +159,7 @@ func (b *FunctionBuilder) NewFunc(name string) *Function {
 	f.SetRange(b.CurrentRange)
 	f.SetFunc(b.Function)
 	f.SetBlock(b.CurrentBlock)
+	f.SetCurrentBlueprint(b.CurrentBlueprint)
 	return f
 }
 

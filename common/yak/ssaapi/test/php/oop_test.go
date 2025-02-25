@@ -202,6 +202,21 @@ class B{
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
+func TestBlueprintNativeCall(t *testing.T) {
+	code := `<?php
+class B extends Think{}
+class A extends B{
+	public function a($c){
+		echo $c;
+	}
+}
+`
+	ssatest.CheckSyntaxFlow(t, code, `a<getCurrentBlueprint><fullTypeName> as $sink`,
+		map[string][]string{
+			"sink": {`"main.A"`, `"main.B"`, `"main.Think"`},
+		},
+		ssaapi.WithLanguage(ssaapi.PHP))
+}
 
 func Test_MethodName_in_Syntaxflow(t *testing.T) {
 	t.Run("syntaxflow method name", func(t *testing.T) {

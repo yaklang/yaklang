@@ -157,9 +157,41 @@ const (
 	NativeCall_GetActualParams = "getActualParams"
 
 	NativeCall_GetActualParamLen = "getActualParamLen"
+
+	//getCurrentBlueprint is used to get the current blueprint. only function can use it
+	NativeCall_GetCurrentBlueprint = "getCurrentBlueprint"
 )
 
 func init() {
+	registerNativeCall(NativeCall_GetCurrentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				function, isFunction := ssa.ToFunction(ret.node)
+				if !isFunction {
+					return nil
+				}
+				blueprint := function.CurrentBlueprint
+				if blueprint == nil {
+					return nil
+				}
+				val := ssa.NewConst(blueprint.Name)
+				val.SetIsFromDB(true)
+				val.SetType(blueprint)
+				result = append(result, prog.NewValue(val))
+			default:
+				return nil
+			}
+			return nil
+		})
+		return true, sfvm.NewValues(result), nil
+	}))
+
 	registerNativeCall(NativeCall_GetActualParamLen, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		vs, err := v.GetAllCallActualParams()
 		if err != nil {
