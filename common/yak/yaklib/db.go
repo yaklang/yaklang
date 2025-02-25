@@ -137,6 +137,9 @@ var DatabaseExports = map[string]interface{}{
 	"SetKey": func(k, v interface{}) error {
 		return yakit.SetKey(consts.GetGormProfileDatabase(), k, v)
 	},
+	"SetKeyWithTTL": func(k, v any, ttl int) error {
+		return yakit.SetKeyWithTTL(consts.GetGormProfileDatabase(), k, v, ttl)
+	},
 	"GetKey": func(k interface{}) string {
 		return yakit.GetKey(consts.GetGormProfileDatabase(), k)
 	},
