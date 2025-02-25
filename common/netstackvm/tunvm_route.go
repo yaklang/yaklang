@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"os/exec"
 	"runtime"
@@ -16,14 +16,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (vm *TunVirtualMachine) HijackDomain(domain string) error {
+func (t *TunVirtualMachine) HijackDomain(domain string) error {
 	if utils.IsIPv4(domain) {
-		return vm.HijackIP(domain)
+		return t.HijackIP(domain)
 	} else if _, ipnet, err := net.ParseCIDR(domain); err == nil && ipnet != nil {
-		return vm.HijackIPNet(ipnet)
+		return t.HijackIPNet(ipnet)
 	} else {
-		for _, ip := range dns_lookup.LookupAll(domain) {
-			if err := vm.HijackIP(ip); err != nil {
+		for _, ip := range netx.LookupAll(domain) {
+			if err := t.HijackIP(ip); err != nil {
 				log.Errorf("hijack ip %s failed: %v", ip, err)
 			}
 		}
@@ -31,7 +31,7 @@ func (vm *TunVirtualMachine) HijackDomain(domain string) error {
 	}
 }
 
-func (vm *TunVirtualMachine) HijackIP(ip string) error {
+func (t *TunVirtualMachine) HijackIP(ip string) error {
 	var ipNet *net.IPNet
 	var err error
 	if utils.IsIPv4(ip) {
@@ -49,14 +49,14 @@ func (vm *TunVirtualMachine) HijackIP(ip string) error {
 	if ipNet == nil {
 		return utils.Errorf("invalid ip: %s", ip)
 	}
-	return vm.HijackIPNet(ipNet)
+	return t.HijackIPNet(ipNet)
 }
 
-func (vm *TunVirtualMachine) HijackIPNet(ipNet *net.IPNet) error {
-	ctx, cancel := context.WithTimeout(vm.ctx, 5*time.Second)
+func (t *TunVirtualMachine) HijackIPNet(ipNet *net.IPNet) error {
+	ctx, cancel := context.WithTimeout(t.ctx, 5*time.Second)
 	defer cancel()
 
-	name := vm.GetTunnelName()
+	name := t.GetTunnelName()
 	if name == "" {
 		return utils.Errorf("tunnel name not set")
 	}
