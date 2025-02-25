@@ -275,7 +275,7 @@ func NewToolResultResource(
 
 // NewListResourcesResult creates a new ListResourcesResult
 func NewListResourcesResult(
-	resources []Resource,
+	resources []*Resource,
 	nextCursor Cursor,
 ) *ListResourcesResult {
 	return &ListResourcesResult{
@@ -288,7 +288,7 @@ func NewListResourcesResult(
 
 // NewListResourceTemplatesResult creates a new ListResourceTemplatesResult
 func NewListResourceTemplatesResult(
-	templates []ResourceTemplate,
+	templates []*ResourceTemplate,
 	nextCursor Cursor,
 ) *ListResourceTemplatesResult {
 	return &ListResourceTemplatesResult{
@@ -336,7 +336,7 @@ func NewGetPromptResult(
 }
 
 // NewListToolsResult creates a new ListToolsResult
-func NewListToolsResult(tools []Tool, nextCursor Cursor) *ListToolsResult {
+func NewListToolsResult(tools []*Tool, nextCursor Cursor) *ListToolsResult {
 	return &ListToolsResult{
 		PaginatedResult: PaginatedResult{
 			NextCursor: nextCursor,

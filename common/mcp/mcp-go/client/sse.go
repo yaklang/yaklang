@@ -46,8 +46,15 @@ func NewSSEMCPClient(baseURL string) (*SSEMCPClient, error) {
 	}
 
 	return &SSEMCPClient{
-		baseURL:      parsedURL,
-		httpClient:   &http.Client{},
+		baseURL: parsedURL,
+		httpClient: &http.Client{
+			Transport: &http.Transport{
+				ResponseHeaderTimeout: 60 * time.Minute,
+				IdleConnTimeout:       60 * time.Minute,
+				TLSHandshakeTimeout:   10 * time.Second,
+			},
+			Timeout: 60 * time.Minute,
+		},
 		responses:    make(map[int64]chan RPCResponse),
 		done:         make(chan struct{}),
 		endpointChan: make(chan struct{}),
@@ -89,7 +96,7 @@ func (c *SSEMCPClient) Start(ctx context.Context) error {
 		// Endpoint received, proceed
 	case <-ctx.Done():
 		return fmt.Errorf("context cancelled while waiting for endpoint")
-	case <-time.After(30 * time.Second): // Add a timeout
+	case <-time.After(60 * time.Minute): // Add a timeout
 		return fmt.Errorf("timeout waiting for endpoint")
 	}
 

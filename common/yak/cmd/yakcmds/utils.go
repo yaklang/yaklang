@@ -655,40 +655,7 @@ var UtilsCommands = []*cli.Command{
 	},
 
 	// mcp
-	{
-		Name:  "mcp",
-		Usage: "Start a mcp server for providing mcp service",
-		Flags: []cli.Flag{
-			cli.StringFlag{Name: "transport", Usage: "transport protocol, e.g. sse/stdio", Value: "stdio"},
-			cli.StringFlag{Name: "host", Usage: "if transport is sse, listen host", Value: "localhost"},
-			cli.IntFlag{Name: "port", Usage: "if transport is sse, listen port"},
-		},
-		Action: func(c *cli.Context) error {
-			var err error
-			transport := c.String("transport")
-			host := c.String("host")
-			port := c.Int("port")
-
-			server := mcp.NewMCPServer()
-			switch transport {
-			case "stdio":
-				log.SetLevel(log.FatalLevel)
-				err = server.ServeStdio()
-			case "sse":
-				if port == 0 {
-					port = utils.GetRandomAvailableTCPPort()
-				}
-				err = server.ServeSSE(fmt.Sprintf(":%d", port), fmt.Sprintf("http://%s:%d", host, port))
-			default:
-				return utils.Errorf("invalid transport: %v", transport)
-			}
-			if err != nil {
-				return err
-			}
-
-			return nil
-		},
-	},
+	mcp.MCPCommand,
 }
 
 var DistributionCommands = []*cli.Command{

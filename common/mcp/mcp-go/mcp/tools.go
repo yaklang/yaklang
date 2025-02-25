@@ -12,7 +12,7 @@ type ListToolsRequest struct {
 // client.
 type ListToolsResult struct {
 	PaginatedResult
-	Tools []Tool `json:"tools"`
+	Tools []*Tool `json:"tools"`
 }
 
 // CallToolResult is the server's response to a tool call.
@@ -90,7 +90,7 @@ type PropertyOption func(map[string]any)
 // NewTool creates a new Tool with the given name and options.
 // The tool will have an object-type input schema with configurable properties.
 // Options are applied in order, allowing for flexible tool configuration.
-func NewTool(name string, opts ...ToolOption) Tool {
+func NewTool(name string, opts ...ToolOption) *Tool {
 	tool := Tool{
 		Name: name,
 		InputSchema: ToolInputSchema{
@@ -104,7 +104,7 @@ func NewTool(name string, opts ...ToolOption) Tool {
 		opt(&tool)
 	}
 
-	return tool
+	return &tool
 }
 
 // WithDescription adds a description to the Tool.

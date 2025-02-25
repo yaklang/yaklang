@@ -9,6 +9,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -115,36 +116,36 @@ var filterHTTPFlowToolOptions = []mcp.ToolOption{
 	),
 }
 
-func (s *MCPServer) registerHTTPFlowTool() {
-	s.server.AddTool(mcp.NewTool("query_http_flow",
-		append([]mcp.ToolOption{
-			mcp.WithDescription("Query HTTP flow data with flexible filters"),
-		}, filterYakScriptToolOptions...)...,
-	), s.handleQueryHTTPFlows)
-
-	s.server.AddTool(mcp.NewTool(string("set_tag_for_http_flow"),
-		mcp.WithDescription("Sets tags for an HTTP flow"),
-		mcp.WithNumber("id",
-			mcp.Description("The ID of the HTTP flow, maybe use query_http_flow to get the ID of the flow to be tagged"),
-			mcp.Required(),
-		),
-		mcp.WithStringArray("tags",
-			mcp.Description("The tags to be set for the HTTP flow"),
-			mcp.Required(),
-		),
-	), s.handleSetTagForHTTPFlow)
-
-	s.server.AddTool(mcp.NewTool(string("delete_http_flow"),
-		mcp.WithDescription("Delete HTTP flow with flexible filters"),
-		mcp.WithBool("deleteAll",
-			mcp.Description("Delete all flows")),
-		mcp.WithStruct("filter",
-			[]mcp.PropertyOption{
-				mcp.Description("Filter that same with query_http_flow arguments"),
-			},
-			filterHTTPFlowToolOptions...,
-		),
-	), s.handleDeleteHTTPFlows)
+func init() {
+	AddGlobalToolSet("httpflow",
+		WithTool(mcp.NewTool("query_http_flow",
+			append([]mcp.ToolOption{
+				mcp.WithDescription("Query HTTP flow data with flexible filters"),
+			}, filterYakScriptToolOptions...)...,
+		), handleQueryHTTPFlows),
+		WithTool(mcp.NewTool(string("set_tag_for_http_flow"),
+			mcp.WithDescription("Sets tags for an HTTP flow"),
+			mcp.WithNumber("id",
+				mcp.Description("The ID of the HTTP flow, maybe use query_http_flow to get the ID of the flow to be tagged"),
+				mcp.Required(),
+			),
+			mcp.WithStringArray("tags",
+				mcp.Description("The tags to be set for the HTTP flow"),
+				mcp.Required(),
+			),
+		), handleSetTagForHTTPFlow),
+		WithTool(mcp.NewTool(string("delete_http_flow"),
+			mcp.WithDescription("Delete HTTP flow with flexible filters"),
+			mcp.WithBool("deleteAll",
+				mcp.Description("Delete all flows")),
+			mcp.WithStruct("filter",
+				[]mcp.PropertyOption{
+					mcp.Description("Filter that same with query_http_flow arguments"),
+				},
+				filterHTTPFlowToolOptions...,
+			),
+		), handleDeleteHTTPFlows),
+	)
 }
 
 func ypbHTTPFlowToFriendlyHTTPFlow(f *ypb.HTTPFlow) *schema.HTTPFlow {
@@ -185,57 +186,63 @@ func ypbHTTPFlowToFriendlyHTTPFlow(f *ypb.HTTPFlow) *schema.HTTPFlow {
 	return flow
 }
 
-func (s *MCPServer) handleQueryHTTPFlows(
-	ctx context.Context,
-	request mcp.CallToolRequest,
-) (*mcp.CallToolResult, error) {
-	var req ypb.QueryHTTPFlowRequest
-	err := mapstructure.Decode(request.Params.Arguments, &req)
-	if err != nil {
-		return nil, utils.Wrap(err, "invalid argument")
-	}
-	rsp, err := s.grpcClient.QueryHTTPFlows(ctx, &req)
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to query HTTPFlows")
-	}
-	results := make([]*schema.HTTPFlow, 0, len(rsp.Data))
-	for _, flow := range rsp.Data {
-		if flow == nil {
-			continue
+func handleQueryHTTPFlows(s *MCPServer) server.ToolHandlerFunc {
+	return func(
+		ctx context.Context,
+		request mcp.CallToolRequest,
+	) (*mcp.CallToolResult, error) {
+		var req ypb.QueryHTTPFlowRequest
+		err := mapstructure.Decode(request.Params.Arguments, &req)
+		if err != nil {
+			return nil, utils.Wrap(err, "invalid argument")
 		}
-		results = append(results, ypbHTTPFlowToFriendlyHTTPFlow(flow))
+		rsp, err := s.grpcClient.QueryHTTPFlows(ctx, &req)
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to query HTTPFlows")
+		}
+		results := make([]*schema.HTTPFlow, 0, len(rsp.Data))
+		for _, flow := range rsp.Data {
+			if flow == nil {
+				continue
+			}
+			results = append(results, ypbHTTPFlowToFriendlyHTTPFlow(flow))
+		}
+		return NewCommonCallToolResult(results)
 	}
-	return NewCommonCallToolResult(results)
 }
 
-func (s *MCPServer) handleSetTagForHTTPFlow(
-	ctx context.Context,
-	request mcp.CallToolRequest,
-) (*mcp.CallToolResult, error) {
-	var req ypb.SetTagForHTTPFlowRequest
-	err := mapstructure.Decode(request.Params.Arguments, &req)
-	if err != nil {
-		return nil, utils.Wrap(err, "invalid argument")
+func handleSetTagForHTTPFlow(s *MCPServer) server.ToolHandlerFunc {
+	return func(
+		ctx context.Context,
+		request mcp.CallToolRequest,
+	) (*mcp.CallToolResult, error) {
+		var req ypb.SetTagForHTTPFlowRequest
+		err := mapstructure.Decode(request.Params.Arguments, &req)
+		if err != nil {
+			return nil, utils.Wrap(err, "invalid argument")
+		}
+		_, err = s.grpcClient.SetTagForHTTPFlow(ctx, &req)
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to set tag for httpflow(s)")
+		}
+		return NewCommonCallToolResult("set tag for httpflow(s) success")
 	}
-	_, err = s.grpcClient.SetTagForHTTPFlow(ctx, &req)
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to set tag for httpflow(s)")
-	}
-	return NewCommonCallToolResult("set tag for httpflow(s) success")
 }
 
-func (s *MCPServer) handleDeleteHTTPFlows(
-	ctx context.Context,
-	request mcp.CallToolRequest,
-) (*mcp.CallToolResult, error) {
-	var req ypb.DeleteHTTPFlowRequest
-	err := mapstructure.Decode(request.Params.Arguments, &req)
-	if err != nil {
-		return nil, utils.Wrap(err, "invalid argument")
+func handleDeleteHTTPFlows(s *MCPServer) server.ToolHandlerFunc {
+	return func(
+		ctx context.Context,
+		request mcp.CallToolRequest,
+	) (*mcp.CallToolResult, error) {
+		var req ypb.DeleteHTTPFlowRequest
+		err := mapstructure.Decode(request.Params.Arguments, &req)
+		if err != nil {
+			return nil, utils.Wrap(err, "invalid argument")
+		}
+		_, err = s.grpcClient.DeleteHTTPFlows(ctx, &req)
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to delete httpflow(s)")
+		}
+		return NewCommonCallToolResult("delete httpflow(s) success")
 	}
-	_, err = s.grpcClient.DeleteHTTPFlows(ctx, &req)
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to delete httpflow(s)")
-	}
-	return NewCommonCallToolResult("delete httpflow(s) success")
 }

@@ -7,7 +7,7 @@ type ResourceOption func(*Resource)
 // NewResource creates a new Resource with the given URI, name and options.
 // The resource will be configured based on the provided options.
 // Options are applied in order, allowing for flexible resource configuration.
-func NewResource(uri string, name string, opts ...ResourceOption) Resource {
+func NewResource(uri string, name string, opts ...ResourceOption) *Resource {
 	resource := Resource{
 		URI:  uri,
 		Name: name,
@@ -17,7 +17,7 @@ func NewResource(uri string, name string, opts ...ResourceOption) Resource {
 		opt(&resource)
 	}
 
-	return resource
+	return &resource
 }
 
 // WithResourceDescription adds a description to the Resource.
@@ -58,7 +58,7 @@ type ResourceTemplateOption func(*ResourceTemplate)
 // NewResourceTemplate creates a new ResourceTemplate with the given URI template, name and options.
 // The template will be configured based on the provided options.
 // Options are applied in order, allowing for flexible template configuration.
-func NewResourceTemplate(uriTemplate string, name string, opts ...ResourceTemplateOption) ResourceTemplate {
+func NewResourceTemplate(uriTemplate string, name string, opts ...ResourceTemplateOption) *ResourceTemplate {
 	template := ResourceTemplate{
 		URITemplate: uriTemplate,
 		Name:        name,
@@ -68,7 +68,7 @@ func NewResourceTemplate(uriTemplate string, name string, opts ...ResourceTempla
 		opt(&template)
 	}
 
-	return template
+	return &template
 }
 
 // WithTemplateDescription adds a description to the ResourceTemplate.

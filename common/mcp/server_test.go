@@ -9,13 +9,14 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/client"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestMCPServerEx(t *testing.T) {
-	s := NewMCPServer()
+	s, _ := NewMCPServer()
 
 	if err := s.ServeSSE(":18083", "http://localhost:18083"); err != nil {
 		panic(err)
@@ -23,9 +24,11 @@ func TestMCPServerEx(t *testing.T) {
 }
 
 func TestMCPClient(t *testing.T) {
+	log.SetLevel(log.FatalLevel)
+
 	port := utils.GetRandomAvailableTCPPort()
 	go func() {
-		s := NewMCPServer()
+		s, _ := NewMCPServer()
 
 		if err := s.ServeSSE(fmt.Sprintf(":%d", port), fmt.Sprintf("http://localhost:%d", port)); err != nil {
 			panic(err)
@@ -38,7 +41,7 @@ func TestMCPClient(t *testing.T) {
 
 	defer c.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer cancel()
 
 	err = c.Start(ctx)
@@ -54,23 +57,45 @@ func TestMCPClient(t *testing.T) {
 
 	request := mcp.CallToolRequest{}
 	data := `{
-  "targets": ["asd","qwe"],
-  "ports": [80,443]
+  "targets": {
+    "input": ["http://127.0.0.1:8787/xss/echo?name=admin"]
+  },
+  "plugin": {
+    "filter": {
+      "keyword": "基础 XSS"
+    }
+  },
+  "concurrent": 20
 }`
-	request.Params.Name = "port_scan"
+	request.Params.Name = "hybrid_scan"
 	err = json.Unmarshal([]byte(data), &request.Params.Arguments)
 	require.NoError(t, err)
+	c.OnNotification(func(notification mcp.JSONRPCNotification) {
+		fmt.Println("Call notification:", notification)
+	})
 
 	result, err := c.CallTool(context.Background(), request)
 	require.NoError(t, err)
 	for _, r := range result.Content {
 		switch result := r.(type) {
 		case mcp.TextContent:
-			fmt.Println(result.Text)
+			fmt.Println("CallResult:", result.Text)
 		case mcp.ImageContent:
-			fmt.Println("image:\n" + result.Data)
+			fmt.Println("CallResult: image:\n" + result.Data)
 		default:
-			spew.Dump(result)
+			m, ok := result.(map[string]any)
+			if ok {
+				typ := utils.MapGetString(m, "type")
+				if typ == "text" {
+					fmt.Println("CallResult:", utils.MapGetString(m, "text"))
+				} else if typ == "image" {
+					fmt.Println("CallResult: image:\n" + utils.MapGetString(m, "data"))
+				} else {
+					spew.Dump(result)
+				}
+			} else {
+				spew.Dump(result)
+			}
 		}
 	}
 }

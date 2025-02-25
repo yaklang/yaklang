@@ -424,7 +424,7 @@ func TestMCPServer_HandleUndefinedHandlers(t *testing.T) {
 	)
 
 	// Add a test tool to enable tool capabilities
-	server.AddTool(mcp.Tool{
+	server.AddTool(&mcp.Tool{
 		Name:        "test-tool",
 		Description: "Test tool",
 		InputSchema: mcp.ToolInputSchema{
@@ -566,7 +566,7 @@ func createTestServer() *MCPServer {
 	)
 
 	server.AddResource(
-		mcp.Resource{
+		&mcp.Resource{
 			URI:  "resource://testresource",
 			Name: "My Resource",
 		},
@@ -584,7 +584,7 @@ func createTestServer() *MCPServer {
 	)
 
 	server.AddTool(
-		mcp.Tool{
+		&mcp.Tool{
 			Name:        "test-tool",
 			Description: "Test tool",
 		},

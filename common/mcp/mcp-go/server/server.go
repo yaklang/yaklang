@@ -12,14 +12,14 @@ import (
 
 // resourceEntry holds both a resource and its handler
 type resourceEntry struct {
-	resource mcp.Resource
+	resource *mcp.Resource
 	handler  ResourceHandlerFunc
 }
 
 // resourceTemplateEntry holds both a template and its handler
 type resourceTemplateEntry struct {
-	template mcp.ResourceTemplate
-	handler  ResourceTemplateHandlerFunc
+	template *mcp.ResourceTemplate
+	handler  ResourceHandlerFunc
 }
 
 // ServerOption is a function that configures an MCPServer.
@@ -27,9 +27,6 @@ type ServerOption func(*MCPServer)
 
 // ResourceHandlerFunc is a function that returns resource contents.
 type ResourceHandlerFunc func(ctx context.Context, request mcp.ReadResourceRequest) ([]interface{}, error)
-
-// ResourceTemplateHandlerFunc is a function that returns a resource template.
-type ResourceTemplateHandlerFunc func(ctx context.Context, request mcp.ReadResourceRequest) ([]interface{}, error)
 
 // PromptHandlerFunc handles prompt requests with given arguments.
 type PromptHandlerFunc func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error)
@@ -61,7 +58,7 @@ type MCPServer struct {
 	resourceTemplates    map[string]resourceTemplateEntry
 	prompts              map[string]mcp.Prompt
 	promptHandlers       map[string]PromptHandlerFunc
-	tools                map[string]mcp.Tool
+	tools                map[string]*mcp.Tool
 	toolHandlers         map[string]ToolHandlerFunc
 	notificationHandlers map[string]NotificationHandlerFunc
 	capabilities         serverCapabilities
@@ -174,7 +171,7 @@ func NewMCPServer(
 		resourceTemplates:    make(map[string]resourceTemplateEntry),
 		prompts:              make(map[string]mcp.Prompt),
 		promptHandlers:       make(map[string]PromptHandlerFunc),
-		tools:                make(map[string]mcp.Tool),
+		tools:                make(map[string]*mcp.Tool),
 		toolHandlers:         make(map[string]ToolHandlerFunc),
 		name:                 name,
 		version:              version,
@@ -384,7 +381,7 @@ func (s *MCPServer) HandleMessage(
 
 // AddResource registers a new resource and its handler
 func (s *MCPServer) AddResource(
-	resource mcp.Resource,
+	resource *mcp.Resource,
 	handler ResourceHandlerFunc,
 ) {
 	if s.capabilities.resources == nil {
@@ -398,8 +395,8 @@ func (s *MCPServer) AddResource(
 
 // AddResourceTemplate registers a new resource template and its handler
 func (s *MCPServer) AddResourceTemplate(
-	template mcp.ResourceTemplate,
-	handler ResourceTemplateHandlerFunc,
+	template *mcp.ResourceTemplate,
+	handler ResourceHandlerFunc,
 ) {
 	if s.capabilities.resources == nil {
 		panic("Resource capabilities not enabled")
@@ -420,7 +417,7 @@ func (s *MCPServer) AddPrompt(prompt mcp.Prompt, handler PromptHandlerFunc) {
 }
 
 // AddTool registers a new tool and its handler
-func (s *MCPServer) AddTool(tool mcp.Tool, handler ToolHandlerFunc) {
+func (s *MCPServer) AddTool(tool *mcp.Tool, handler ToolHandlerFunc) {
 	s.tools[tool.Name] = tool
 	s.toolHandlers[tool.Name] = handler
 
@@ -497,7 +494,7 @@ func (s *MCPServer) handleListResources(
 	id interface{},
 	request mcp.ListResourcesRequest,
 ) mcp.JSONRPCMessage {
-	resources := make([]mcp.Resource, 0, len(s.resources))
+	resources := make([]*mcp.Resource, 0, len(s.resources))
 	for _, entry := range s.resources {
 		resources = append(resources, entry.resource)
 	}
@@ -516,7 +513,7 @@ func (s *MCPServer) handleListResourceTemplates(
 	id interface{},
 	request mcp.ListResourceTemplatesRequest,
 ) mcp.JSONRPCMessage {
-	templates := make([]mcp.ResourceTemplate, 0, len(s.resourceTemplates))
+	templates := make([]*mcp.ResourceTemplate, 0, len(s.resourceTemplates))
 	for _, entry := range s.resourceTemplates {
 		templates = append(templates, entry.template)
 	}
@@ -628,7 +625,7 @@ func (s *MCPServer) handleListTools(
 	id interface{},
 	request mcp.ListToolsRequest,
 ) mcp.JSONRPCMessage {
-	tools := make([]mcp.Tool, 0, len(s.tools))
+	tools := make([]*mcp.Tool, 0, len(s.tools))
 	for name := range s.tools {
 		tools = append(tools, s.tools[name])
 	}
