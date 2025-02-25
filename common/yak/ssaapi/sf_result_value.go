@@ -83,6 +83,24 @@ func (r *SyntaxFlowResult) GetAllValuesChain() Values {
 	return results
 }
 
+func (r *SyntaxFlowResult) GetValueCount(name string) int {
+	if r == nil {
+		return 0
+	}
+
+	if r.variable == nil {
+		r.GetAllVariable()
+	}
+	if v, ok := r.variable.Get(name); ok {
+		if ret, ok := v.(int); ok {
+			return ret
+		}
+	} else if name == "_" {
+		return r.GetUnNameValues().Len()
+	}
+	return 0
+}
+
 // ======================================== Single Value ========================================
 
 // Normal value
@@ -115,20 +133,32 @@ func (r *SyntaxFlowResult) GetValues(name string) Values {
 	return nil
 }
 
-func (r *SyntaxFlowResult) GetValue(name string, index int64) (*Value, error) {
+func (r *SyntaxFlowResult) GetValue(name string, index int) (*Value, error) {
 	if r == nil {
 		return nil, utils.Errorf("result is nil")
 	}
 
-	vs := r.GetValues(name)
-	if len(vs) == 0 {
-		return nil, utils.Errorf("value not found")
+	if name == "_" {
+		return r.GetUnNameValues()[index], nil
 	}
-	if len(vs) > int(index) {
-		return vs[index], nil
-	} else {
-		return nil, utils.Errorf("index out of range")
+
+	if r.memResult != nil {
+		vs := r.GetValues(name)
+		if len(vs) > int(index) {
+			return vs[index], nil
+		} else {
+			return nil, utils.Errorf("index out of range")
+		}
 	}
+
+	if r.dbResult != nil {
+		id, err := ssadb.GetResultNodeByVariableIndex(ssadb.GetDB(), r.GetResultID(), name, uint(index))
+		if err != nil {
+			return nil, err
+		}
+		return r.program.NewValueFromAuditNode(id), nil
+	}
+	return nil, utils.Errorf("value not found")
 }
 
 // Alert value
