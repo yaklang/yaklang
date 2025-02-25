@@ -120,3 +120,4 @@ str.Trim("test_test", "test")  // 实际效果：移除所有 t/e/s 字符
 
 // 误区3：期待多次修剪
 str.Trim("[[value]]", "[]")  // 单次操作即可，输出 "value"
+```
