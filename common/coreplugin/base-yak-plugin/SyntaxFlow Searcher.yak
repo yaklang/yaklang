@@ -2,22 +2,22 @@ yakit.AutoInitYakit()
 
 fuzzSearch = cli.Bool("fuzz", cli.setHelp("是否进行模糊搜索，默认开启"), cli.setRequired(true), cli.setDefault(true))
 kinds = cli.StringSlice(
-    "kind",
-    cli.setSelectOption("全部", "all"),
-    cli.setSelectOption("符号", "symbol"),
-    cli.setSelectOption("函数", "function"),
-    cli.setSelectOption("函数调用", "call"),
-    cli.setSelectOption("文件", "file"),
-    cli.setSelectOption("常量", "const"),
-    cli.setRequired(true),
-    cli.setDefault("all")
+    "kind", 
+    cli.setSelectOption("全部", "all"), 
+    cli.setSelectOption("符号", "symbol"), 
+    cli.setSelectOption("函数", "function"), 
+    cli.setSelectOption("函数调用", "call"), 
+    cli.setSelectOption("文件", "file"), 
+    cli.setSelectOption("常量", "const"), 
+    cli.setRequired(true), 
+    cli.setDefault("all"), 
 )
-rule = cli.String(
-    "rule",
+input = cli.String(
+    "rule", 
     cli.setHelp(`输入的内容，输入的内容将会进行正则校验，比如：
     a(                  将会被补充成一个Call
-`),
-    cli.setRequired(true),
+`), 
+    cli.setRequired(true), 
 )
 
 progName = cli.String("progName", cli.setHelp("输入当前的项目名，将从数据库进行索引"), cli.setRequired(true))
@@ -30,6 +30,48 @@ if len(kinds) > 0 {
 }
 
 
+var resultID = ""
+// check cache
+func getCache(k) {
+    key := sprint([progName, k, input])
+    value := db.GetKey(key)
+    if value == "" {
+        // skip cache
+        return "" 
+    }
+    resID := parseInt(value)
+    // check  result id is valid
+    res, err := ssa.NewResultFromDB(resID)
+    if err == nil {
+        log.info("cache resultId is valid, use it. with-key:%s" , key)
+        return resID
+    } else {
+        log.info("cache resultId error, skip.")
+        return ""
+    }
+}
+resultID := getCache("all")
+if resultID != "" {
+    yakit.SetProgress(1)
+    yakit.Output(resultID)
+}
+
+
+resultID = getCache(kind)
+if resultID != "" {
+    yakit.SetProgress(1)
+    yakit.Output(resultID)
+}
+
+
+defer func {
+    key := sprint([progName, kind, input])
+    // 10 day cache 
+    db.SetKeyWithTTL(key, resultID, 10 * 24 * 60 * 60)
+}
+
+// define process handler
+
 func matchCallMethodName(content) {
     compile = re.Compile(`(\b[a-zA-Z_]\w*)\(`)~
     matchPart = compile.FindAllStringSubmatch(content, -1)
@@ -37,17 +79,16 @@ func matchCallMethodName(content) {
         yakit.Error("syntaxFlowTemplate is call,but not match this methodName")
         return
     }
-
+    
 
     matchInfo = matchPart[0]
     if matchInfo.Len() < 2 {
         yakit.Error(
-            "syntaxflowTemplate is call,but match part is: %s",
-            matchInfo,
+            "syntaxflowTemplate is call,but match part is: %s", 
+            matchInfo, 
         )
         return
     }
-
 
     methodName = matchInfo[1]
     return methodName
@@ -58,7 +99,7 @@ func processContent(content) {
     if kind == "const" {
         return content
     }
-
+    
 
     if re.Match(`(\b[a-zA-Z_]\w*)\(`, content) {
         kind = "call"
@@ -71,7 +112,6 @@ func processContent(content) {
     }
     return content
 }
-
 
 func normalProcess(content) {
     if fuzzSearch {
@@ -88,34 +128,30 @@ func fileProcess(content) {
     }
 }
 
-
-templateMap = map[string]any{
-    "const": (i) => {
-        i = normalProcess(i)
-        return sprintf(`g<<<CODE
+templateMap = map[string]any{"const": (i) => {
+    i = normalProcess(i)
+    return sprintf(`g<<<CODE
 %s
 CODE as $const`, i)
-    }, 
-    "file": (i) =>{
-        i = fileProcess(i)
-        return sprintf(`<getFullFileName(filename="%s")> as $file`, i)
-    }, 
-    "function": (i) => {
-        i = normalProcess(i)
-        return sprintf(`%s?{opcode: function} as $function`, i)
-    }, 
-    "call": (i) => {
-        i = normalProcess(i)
-        return sprintf(`%s() as $call`, i)
-    }, 
-    "symbol": (i) => {
-        i = normalProcess(i)
-        return sprintf(`%s as $symbol`, i)
-    },
-}
+}, "file": (i) => {
+    i = fileProcess(i)
+    return sprintf(
+        `<getFullFileName(filename="%s")> as $file`, 
+        i, 
+    )
+}, "function": (i) => {
+    i = normalProcess(i)
+    return sprintf(`%s?{opcode: function} as $function`, i)
+}, "call": (i) => {
+    i = normalProcess(i)
+    return sprintf(`%s() as $call`, i)
+}, "symbol": (i) => {
+    i = normalProcess(i)
+    return sprintf(`%s as $symbol`, i)
+}}
 
-
-rule = processContent(rule)
+// process
+rule = processContent(input)
 if kind != "all" {
     f = templateMap[kind]
     if f == nil {
@@ -138,14 +174,15 @@ log.info("execute rule: %s", rule)
 log.info("progName: %s", progName)
 prog = ssa.NewProgramFromDB(progName)~
 result = prog.SyntaxFlowWithError(
-    rule,
-    syntaxflow.withContext(context.Background()),
+    rule, 
+    syntaxflow.withContext(context.Background()), 
     syntaxflow.withProcess((f, s) => {
         yakit.SetProgress(f)
         yakit.Info("%s", s)
-    }),
-    syntaxflow.withSearch(),
-    syntaxflow.withCache(),
+    }), 
+    syntaxflow.withSearch(), 
+    syntaxflow.withCache(), 
 )~
 result.Show()
-yakit.Output(result.GetResultID())
+resultID = result.GetResultID()
+yakit.Output(resultID)
