@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
@@ -40,7 +40,7 @@ func TestDNSLogServer(t *testing.T) {
 
 		if !check1 {
 			if strings.Contains(rsp.GetDomain(), token1) {
-				dns_lookup.LookupFirst(rsp.GetDomain(), dns_lookup.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)))
+				netx.LookupFirst(rsp.GetDomain(), netx.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)))
 				dnslogResult, err := client.QueryExistedDNSLog(context.Background(), &tpb.QueryExistedDNSLogParams{
 					Token: rsp.GetToken(),
 					Mode:  "",
@@ -55,7 +55,7 @@ func TestDNSLogServer(t *testing.T) {
 
 		if !check2 {
 			if strings.Contains(rsp.GetDomain(), token2) {
-				dns_lookup.LookupFirst(rsp.GetDomain(), dns_lookup.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)))
+				netx.LookupFirst(rsp.GetDomain(), netx.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)))
 				dnslogResult, err := client.QueryExistedDNSLog(context.Background(), &tpb.QueryExistedDNSLogParams{
 					Token: rsp.GetToken(),
 				})
@@ -69,7 +69,7 @@ func TestDNSLogServer(t *testing.T) {
 
 		if !check3 {
 			if strings.Contains(rsp.GetDomain(), token3) {
-				dns_lookup.LookupFirst(rsp.GetDomain(), dns_lookup.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)))
+				netx.LookupFirst(rsp.GetDomain(), netx.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)))
 				dnslogResult, err := client.QueryExistedDNSLog(context.Background(), &tpb.QueryExistedDNSLogParams{
 					Token: rsp.GetToken(),
 				})

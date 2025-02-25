@@ -6,7 +6,6 @@ import (
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/pcapx/arpx"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
@@ -72,7 +71,7 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 		if host == "" {
 			host = target
 		}
-		ip = dns_lookup.LookupFirst(host, dns_lookup.WithTimeout(config.timeout), dns_lookup.WithDNSServers(config.proxies...))
+		ip = netx.LookupFirst(host, netx.WithTimeout(config.timeout), netx.WithDNSServers(config.proxies...))
 		if ip == "" {
 			return nil, utils.Errorf("lookup %s failed", host)
 		}

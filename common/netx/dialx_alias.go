@@ -2,13 +2,12 @@ package netx
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net"
 	"time"
 )
 
 // NewDialContextFunc is a function that can be used to dial a connection.
-func NewDialContextFunc(timeout time.Duration, opts ...dns_lookup.DNSOption) func(ctx context.Context, network string, addr string) (net.Conn, error) {
+func NewDialContextFunc(timeout time.Duration, opts ...DNSOption) func(ctx context.Context, network string, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network string, addr string) (net.Conn, error) {
 		ddl, ok := ctx.Deadline()
 		if ok {
@@ -47,7 +46,7 @@ func DialContextWithoutProxy(ctx context.Context, addr string) (net.Conn, error)
 	)
 }
 
-func NewDialGMTLSContextFunc(enableGM bool, preferGMTLS bool, onlyGMTLS bool, timeout time.Duration, opts ...dns_lookup.DNSOption) func(ctx context.Context, network string, addr string) (net.Conn, error) {
+func NewDialGMTLSContextFunc(enableGM bool, preferGMTLS bool, onlyGMTLS bool, timeout time.Duration, opts ...DNSOption) func(ctx context.Context, network string, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network string, addr string) (net.Conn, error) {
 		ddl, ok := ctx.Deadline()
 		if ok {

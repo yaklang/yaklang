@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"io"
 	"net"
@@ -298,7 +297,7 @@ func (c *S5Config) HandleBind(conn net.Conn, req *S5Request) error {
 	bindPort := utils.GetRandomAvailableTCPPort()
 	targetHost, targetPort := string(req.DstHost), binary.BigEndian.Uint16(req.DstPort)
 	if !utils.IsIPv4(targetHost) && !utils.IsIPv6(targetHost) {
-		targetHost = dns_lookup.LookupFirst(targetHost, dns_lookup.WithTimeout(3*time.Second))
+		targetHost = netx.LookupFirst(targetHost, netx.WithTimeout(3*time.Second))
 		if targetHost == "" {
 			return errors.Errorf("cannot found domain[%s]'s ip address", target)
 		}

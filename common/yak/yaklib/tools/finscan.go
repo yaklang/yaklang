@@ -3,7 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"sync"
 	"time"
@@ -280,7 +280,7 @@ func _finscanDo(targetChan chan string, ports string, config *_yakFinPortScanCon
 			// 默认的整体 target 一定要包含进去
 			hostsFilter.Add(target)
 			if !utils.IsIPv4(target) {
-				hostsFilter.Add(dns_lookup.LookupAll(target, dns_lookup.WithTimeout(5*time.Second))...)
+				hostsFilter.Add(netx.LookupAll(target, netx.WithTimeout(5*time.Second))...)
 			}
 
 			hostRaw, portRaw, _ := utils.ParseStringToHostPort(target)
@@ -289,7 +289,7 @@ func _finscanDo(targetChan chan string, ports string, config *_yakFinPortScanCon
 				portsFilter.Add(fmt.Sprint(portRaw))
 				hostsFilter.Add(hostRaw)
 				if !utils.IsIPv4(hostRaw) {
-					hostsFilter.Add(dns_lookup.LookupAll(hostRaw, dns_lookup.WithTimeout(5*time.Second))...)
+					hostsFilter.Add(netx.LookupAll(hostRaw, netx.WithTimeout(5*time.Second))...)
 				}
 				_ = scanner.RandomScan(hostRaw, fmt.Sprint(portRaw), true)
 			}

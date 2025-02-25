@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
@@ -100,7 +100,7 @@ func NewTracerouteConfig(opts ...TracerouteConfigOption) *TracerouteConfig {
 		var readTimeOut = config.ReadTimeOut
 		var localAddr = config.LocalAddr
 		var udpPort = config.UdpPort
-		ip := dns_lookup.LookupFirst(host)
+		ip := netx.LookupFirst(host)
 		dstIp := net.ParseIP(ip)
 		switch protocol {
 		case "udp":
@@ -210,7 +210,7 @@ func Traceroute(host string, opts ...TracerouteConfigOption) (chan *TracerouteRe
 	var retryTimes = config.RetryTimes
 	var udpPort = config.UdpPort
 	var firstTTL = config.FirstTTL
-	ip := dns_lookup.LookupFirst(host)
+	ip := netx.LookupFirst(host)
 	rsp := make(chan *TracerouteResponse, 0)
 	go func() {
 		defer func() {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"strconv"
 	"sync"
 	"time"
@@ -361,7 +360,7 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		MinTlsVersion:     tls.VersionSSL30,
 		MaxContentLength:  1024 * 1024 * 10,
 	}
-	config := dns_lookup.NewBackupInitilizedReliableDNSConfig()
+	config := netx.NewBackupInitilizedReliableDNSConfig()
 	defaultConfig.CustomDoHServers = config.SpecificDoH
 	defaultConfig.CustomDNSServers = config.SpecificDNSServers
 	defaultConfig.DNSFallbackDoH = config.FallbackDoH
@@ -397,13 +396,13 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 		consts.SetGlobalCallerCallPluginTimeout(float64(c.GetCallPluginTimeout()))
 	}
 
-	dns_lookup.SetDefaultDNSOptions(
-		dns_lookup.WithDNSFallbackDoH(c.DNSFallbackDoH),
-		dns_lookup.WithDNSFallbackTCP(c.DNSFallbackTCP),
-		dns_lookup.WithDNSDisableSystemResolver(c.DisableSystemDNS),
-		dns_lookup.WithDNSSpecificDoH(c.CustomDoHServers...),
-		dns_lookup.WithDNSServers(c.CustomDNSServers...),
-		dns_lookup.WithDNSDisabledDomain(c.GetDisallowDomain()...),
+	netx.SetDefaultDNSOptions(
+		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
+		netx.WithDNSFallbackTCP(c.DNSFallbackTCP),
+		netx.WithDNSDisableSystemResolver(c.DisableSystemDNS),
+		netx.WithDNSSpecificDoH(c.CustomDoHServers...),
+		netx.WithDNSServers(c.CustomDNSServers...),
+		netx.WithDNSDisabledDomain(c.GetDisallowDomain()...),
 	)
 
 	netx.SetDefaultDialXConfig(

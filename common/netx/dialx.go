@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net"
 	"sync/atomic"
 	"time"
@@ -91,7 +90,7 @@ RETRY:
 		config.Proxy = append(config.Proxy, FixProxy(GetProxyFromEnv()))
 	}
 
-	DnsConfig := dns_lookup.NewDefaultReliableDNSConfig()
+	DnsConfig := NewDefaultReliableDNSConfig()
 	for _, o := range config.DNSOpts {
 		o(DnsConfig)
 	}
@@ -118,7 +117,7 @@ RETRY:
 		ip := host
 		if net.ParseIP(utils.FixForParseIP(host)) == nil {
 			// not valid ip
-			ip = dns_lookup.LookupFirst(host, config.DNSOpts...)
+			ip = LookupFirst(host, config.DNSOpts...)
 		}
 		if ip == "" {
 			return nil, utils.Errorf("cannot resolve %v", target)
@@ -323,7 +322,7 @@ func dialPlainUdpConn(target string, config *dialXConfig) (udpConn *net.UDPConn,
 	ipIns := net.ParseIP(host)
 	if ipIns == nil {
 		// not valid ip
-		host = dns_lookup.LookupFirst(host, config.DNSOpts...)
+		host = LookupFirst(host, config.DNSOpts...)
 		if ipIns = net.ParseIP(host); ipIns == nil {
 			return nil, nil, utils.Errorf("cannot resolve %v", target)
 		}

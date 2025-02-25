@@ -3,7 +3,6 @@ package netx
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/utils"
 	"os/exec"
 	"regexp"
@@ -78,7 +77,7 @@ func SetSystemProxy(s SystemProxySetting) error {
 		}
 		if !utils.IsIPv4(host) && !utils.IsIPv6(host) {
 
-			if addr := dns_lookup.LookupFirst(host, dns_lookup.WithTimeout(5*time.Second)); addr == "" {
+			if addr := LookupFirst(host, WithTimeout(5*time.Second)); addr == "" {
 				return utils.Errorf("cannot set proxy for %s for (DNSFailed)", s.DefaultServer)
 			}
 		}

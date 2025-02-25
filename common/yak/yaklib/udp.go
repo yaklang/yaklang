@@ -3,7 +3,6 @@ package yaklib
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"math/rand"
@@ -148,7 +147,7 @@ func (t *udpConnection) SendTo(i interface{}, target string) error {
 	}
 
 	if !utils.IsIPv4(host) {
-		host = dns_lookup.LookupFirst(host, dns_lookup.WithTimeout(t.GetTimeout()))
+		host = netx.LookupFirst(host, netx.WithTimeout(t.GetTimeout()))
 		if host == "" {
 			return utils.Errorf("cannot found ip by %v", host)
 		}

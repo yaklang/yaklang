@@ -3,7 +3,7 @@ package tools
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/network"
@@ -223,7 +223,7 @@ func _ping(target string, opts ...PingConfigOpt) *pingutil.PingResult {
 		}
 		return _ping(result, opts...)
 	} else {
-		result := dns_lookup.LookupFirst(target, dns_lookup.WithTimeout(config.dnsTimeout), dns_lookup.WithDNSServers(config.dnsServers...))
+		result := netx.LookupFirst(target, netx.WithTimeout(config.dnsTimeout), netx.WithDNSServers(config.dnsServers...))
 		if result != "" && (utils.IsIPv4(result) || utils.IsIPv6(result)) {
 			return pingutil.PingAuto(result,
 				pingutil.WithPingContext(config.Ctx),
