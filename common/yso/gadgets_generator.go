@@ -3,9 +3,10 @@ package yso
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yserx"
-	"strings"
 )
 
 type GadgetInfo struct {
@@ -856,12 +857,27 @@ func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 	return GenerateGadget(string(GadgetSimplePrincipalCollection))
 }
 
-// GetAllGadget 获取所有的支持的Gadget
+// GetAllGadget 获取所有支持的Java反序列化Gadget。
+// 这个函数会遍历所有已配置的Gadget，并为每个Gadget创建对应的生成函数。
+// 对于支持模板实现的Gadget，会创建一个接受GenClassOptionFun参数的函数；
+// 对于不支持模板实现的Gadget，会创建一个接受命令字符串参数的函数。
+// 返回：包含所有Gadget生成函数的接口切片。
 // Example:
 // ```
-// dump(yso.GetAllGadget())
+// allGadgets := yso.GetAllGadget()
+//
+//	for _, gadget := range allGadgets {
+//	    switch g := gadget.(type) {
+//	    case func(...GenClassOptionFun) (*JavaObject, error):
+//	        // 处理模板实现的Gadget
+//	        obj, err := g(yso.useRuntimeExecEvilClass("whoami"))
+//	    case func(string) (*JavaObject, error):
+//	        // 处理命令执行类型的Gadget
+//	        obj, err := g("whoami")
+//	    }
+//	}
+//
 // ```
-
 func GetAllGadget() []interface{} {
 	var allGadget []any
 	for name, cfg := range YsoConfigInstance.Gadgets {
