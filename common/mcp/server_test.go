@@ -57,17 +57,12 @@ func TestMCPClient(t *testing.T) {
 
 	request := mcp.CallToolRequest{}
 	data := `{
-  "targets": {
-    "input": ["http://127.0.0.1:8787/xss/echo?name=admin"]
-  },
-  "plugin": {
-    "filter": {
-      "keyword": "基础 XSS"
-    }
-  },
-  "concurrent": 20
+"program": "Bash -i",
+"shellType": "bash",
+"ip": "127.0.0.1",
+"port": 10000
 }`
-	request.Params.Name = "hybrid_scan"
+	request.Params.Name = "generate_reverse_shell_command"
 	err = json.Unmarshal([]byte(data), &request.Params.Arguments)
 	require.NoError(t, err)
 	c.OnNotification(func(notification mcp.JSONRPCNotification) {

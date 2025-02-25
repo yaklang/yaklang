@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/embed"
-	"strings"
 )
 
 func (s *Server) GetReverseShellProgramList(ctx context.Context, req *ypb.GetReverseShellProgramListRequest) (*ypb.GetReverseShellProgramListResponse, error) {
@@ -93,7 +94,7 @@ func (s *Server) GenerateReverseShellCommand(ctx context.Context, req *ypb.Gener
 		result = codec.DoubleEncodeUrl(result)
 	case "Base64":
 		result = codec.EncodeBase64(result)
-	case "None":
+	case "None", "":
 
 	default:
 		return nil, fmt.Errorf("invalid encode type: %v", encode)
