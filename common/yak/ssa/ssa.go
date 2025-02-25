@@ -345,8 +345,9 @@ type Function struct {
 	isGeneric bool
 	// runtime function return type
 	currentReturnType Type
-	// static CallBack
 
+	//if blueprint method,we need record.
+	CurrentBlueprint *Blueprint
 }
 
 func (f *Function) SetCurrentReturnType(t Type) {
