@@ -275,6 +275,10 @@
                             return;
                         }
 
+                        // 添加 loading 状态到提交按钮
+                        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 分析中...';
+                        submitBtn.disabled = true;
+
                         // 重置当前上下文ID
                         updateContextId(null);
                         
@@ -286,10 +290,6 @@
                         resultArea.style.display = 'block';
                         textContent.innerHTML = '<div class="result-item">正在分析中...</div>';
                         reasonContent.innerHTML = '<div class="reason-item">初始化中...</div>';
-
-                        // 禁用提交按钮，显示取消按钮
-                        submitBtn.disabled = true;
-                        cancelBtn.style.display = 'inline-block';
 
                         // 用于存储按 node_id 分组的输出
                         const nodeOutputs = new Map();
@@ -397,7 +397,8 @@
                         } catch (error) {
                             textContent.innerHTML += `<div class="result-item text-danger">错误: ${error.message}</div>`;
                         } finally {
-                            // 恢复按钮状态
+                            // 恢复提交按钮状态
+                            submitBtn.innerHTML = 'AI 样本生成';
                             submitBtn.disabled = false;
                             cancelBtn.style.display = 'none';
                             
@@ -655,15 +656,20 @@
                     
                     // 修改 submitData 函数，增加对单个节点的处理
                     async function submitData(dataSource, content) {
+                        const uploadButtons = document.querySelectorAll('.btn-outline-primary');
                         try {
+                            // 禁用所有上传按钮并显示 loading 状态
+                            uploadButtons.forEach(btn => {
+                                btn.disabled = true;
+                                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 上传中...';
+                            });
+
                             const collectKey = document.getElementById('collectKey').value;
                             
-                            // 如果是单个节点上传，检查是否需要特殊处理
                             let finalContent = content;
                             if (dataSource.startsWith('END_') || dataSource === 'LLM_pBed') {
-                                finalContent = content; // 直接使用内容
+                                finalContent = content;
                             } else {
-                                // 对于其他节点，可以选择是否要特殊处理
                                 finalContent = content;
                             }
                             
@@ -688,6 +694,12 @@
                         } catch (error) {
                             console.error('提交数据失败:', error);
                             showResultModal('提交错误', { error: error.message });
+                        } finally {
+                            // 恢复所有上传按钮状态
+                            uploadButtons.forEach(btn => {
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="bi bi-upload"></i> 上传此节点';
+                            });
                         }
                     }
                     
