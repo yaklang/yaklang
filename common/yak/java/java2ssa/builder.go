@@ -44,7 +44,7 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 
 func (*SSABuilder) FilterFile(path string) bool {
 	ext := filepath.Ext(path)
-	return ext == ".java" || ext == ".class"
+	return ext == ".java"
 }
 
 func (*SSABuilder) GetLanguage() consts.Language {
