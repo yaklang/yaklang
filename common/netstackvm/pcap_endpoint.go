@@ -3,7 +3,7 @@ package netstackvm
 import (
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"golang.org/x/net/ipv6"
 	"net"
 	"sync"
@@ -147,7 +147,7 @@ func (p *PCAPEndpoint) generateKillTCPHash(to, from string) []string {
 		if fromIp != nil {
 			fromHosts = append(fromHosts, fromIp.String())
 		} else {
-			ips := dns_lookup.LookupAll(fromHost)
+			ips := netx.LookupAll(fromHost)
 			for _, ip := range ips {
 				fromHosts = append(fromHosts, ip)
 			}
@@ -163,7 +163,7 @@ func (p *PCAPEndpoint) generateKillTCPHash(to, from string) []string {
 	if toIp != nil {
 		toHosts = append(toHosts, toIp.String())
 	} else {
-		ips := dns_lookup.LookupAll(toHost)
+		ips := netx.LookupAll(toHost)
 		toHosts = append(toHosts, ips...)
 	}
 

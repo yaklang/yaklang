@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"net/url"
 	"os"
 	"strconv"
@@ -476,7 +476,7 @@ func _createRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
 			r.IP = r.Host
 			r.IPInteger, _ = utils.IPv4ToUint64(r.Host)
 		} else {
-			r.IP = dns_lookup.LookupFirst(r.Host, dns_lookup.WithTimeout(3*time.Second))
+			r.IP = netx.LookupFirst(r.Host, netx.WithTimeout(3*time.Second))
 		}
 	}
 

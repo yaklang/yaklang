@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
@@ -248,7 +248,7 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 				}
 				if !utils.IsIPv4(host) && !utils.IsIPv6(host) {
 					log.Infof("Resolving %s", host)
-					host = dns_lookup.LookupFirst(host, dns_lookup.WithTimeout(3*time.Second))
+					host = netx.LookupFirst(host, netx.WithTimeout(3*time.Second))
 				}
 
 				if s.excludedHost(host) {

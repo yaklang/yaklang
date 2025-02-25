@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"io"
 	"net"
 	"net/http"
@@ -573,11 +572,11 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			retryMaxWaitTime,
 		),
 		netx.DialX_WithDNSOptions(
-			dns_lookup.WithDNSOnFinished(func() {
+			netx.WithDNSOnFinished(func() {
 				dnsEnd = time.Now()
 			}),
-			dns_lookup.WithDNSServers(dnsServers...),
-			dns_lookup.WithTemporaryHosts(dnsHosts),
+			netx.WithDNSServers(dnsServers...),
+			netx.WithTemporaryHosts(dnsHosts),
 		),
 		netx.DialX_WithDialTraceInfo(dialTraceInfo),
 	)

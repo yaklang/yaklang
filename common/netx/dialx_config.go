@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/netstackvm"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net"
 	"sync"
 	"time"
@@ -78,7 +77,7 @@ type dialXConfig struct {
 	TimeoutRetryMinWait time.Duration
 	TimeoutRetryMaxWait time.Duration
 
-	DNSOpts []dns_lookup.DNSOption
+	DNSOpts []DNSOption
 
 	Debug bool
 
@@ -97,7 +96,7 @@ type dialXConfig struct {
 	UseNetStackVM bool
 	NetStackVm    *netstackvm.NetStackVirtualMachine
 
-	Dialer func(duration time.Duration, target string) (net.Conn,error)
+	Dialer func(duration time.Duration, target string) (net.Conn, error)
 }
 
 type DialXOption func(c *dialXConfig)
@@ -152,7 +151,7 @@ func DialX_WithTimeoutRetry(max int) DialXOption {
 	}
 }
 
-func DialX_WithDNSOptions(opt ...dns_lookup.DNSOption) DialXOption {
+func DialX_WithDNSOptions(opt ...DNSOption) DialXOption {
 	return func(c *dialXConfig) {
 		c.DNSOpts = opt
 	}
@@ -301,7 +300,7 @@ func DialX_WithUdpJustListen(b bool) DialXOption {
 	}
 }
 
-func DialX_WithDialer(dialer func(duration time.Duration, target string) (net.Conn,error)) DialXOption {
+func DialX_WithDialer(dialer func(duration time.Duration, target string) (net.Conn, error)) DialXOption {
 	return func(c *dialXConfig) {
 		c.Dialer = dialer
 	}

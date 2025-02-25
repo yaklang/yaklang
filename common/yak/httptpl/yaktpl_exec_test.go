@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"net/http"
 	"net/url"
@@ -1602,7 +1602,7 @@ func TestMockTest_OOB(t *testing.T) {
 			t.Fatal(err)
 			return
 		}
-		dns_lookup.LookupFirst(urlIns.Host, dns_lookup.WithTimeout(time.Second), dns_lookup.WithDNSServers(dnsserver), dns_lookup.WithDNSDisableSystemResolver(true))
+		netx.LookupFirst(urlIns.Host, netx.WithTimeout(time.Second), netx.WithDNSServers(dnsserver), netx.WithDNSDisableSystemResolver(true))
 	})
 	tmp := `id: CVE-2017-9506
 

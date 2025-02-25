@@ -2,7 +2,6 @@ package fp
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"net"
 
 	"github.com/jinzhu/copier"
@@ -75,7 +74,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	ip := net.ParseIP(utils2.FixForParseIP(host))
 	if ip == nil {
 		log.Debugf("found host:%s is a domain, resolve it to ip", host)
-		ipStr := dns_lookup.LookupFirst(host, dns_lookup.WithTimeout(config.ProbeTimeout))
+		ipStr := netx.LookupFirst(host, netx.WithTimeout(config.ProbeTimeout))
 		if ipStr == "" {
 			dataErr := errors.Errorf("resolve %s failed: %s", host, "no available ip")
 			result.Reason = dataErr.Error()

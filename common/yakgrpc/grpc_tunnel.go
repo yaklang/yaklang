@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -30,7 +30,7 @@ func (s *Server) VerifyTunnelServerDomain(ctx context.Context, p *ypb.VerifyTunn
 	if err != nil {
 		return nil, err
 	}
-	ipFirst := dns_lookup.LookupFirst(p.Domain, dns_lookup.WithTimeout(5*time.Second), dns_lookup.WithDNSServers(ip.String()))
+	ipFirst := netx.LookupFirst(p.Domain, netx.WithTimeout(5*time.Second), netx.WithDNSServers(ip.String()))
 	var reason []string
 	if ip.String() != ipFirst {
 		reason = append(reason, fmt.Sprintf(
@@ -39,7 +39,7 @@ func (s *Server) VerifyTunnelServerDomain(ctx context.Context, p *ypb.VerifyTunn
 		))
 	}
 
-	ipFirst = dns_lookup.LookupFirst(p.Domain, dns_lookup.WithTimeout(5*time.Second))
+	ipFirst = netx.LookupFirst(p.Domain, netx.WithTimeout(5*time.Second))
 	if ip.String() != ipFirst {
 		reason = append(reason, fmt.Sprintf(
 			"dns A for [%v] is %v, tunnel server external ip: %s (ns:default)",

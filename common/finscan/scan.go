@@ -2,7 +2,7 @@ package finscan
 
 import (
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/pcapx/arpx"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
@@ -86,7 +86,7 @@ func (s *Scanner) scanPublic(publicHosts []string, ports []int, random bool) err
 			}
 			go func() {
 				defer swg.Done()
-				ip := dns_lookup.LookupFirst(dstTarget)
+				ip := netx.LookupFirst(dstTarget)
 				if ip != "" {
 					if dstIp := net.ParseIP(ip); dstIp != nil {
 						layers, loopback, err := s.createTCPWithDstMac(dstIp, i.port, nil)

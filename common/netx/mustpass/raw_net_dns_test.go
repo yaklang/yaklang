@@ -4,7 +4,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"strings"
@@ -22,9 +22,9 @@ func TestBASIC_SPECIFIC_DNS_2(t *testing.T) {
 
 	time.Sleep(time.Second)
 	var start = time.Now()
-	var result = dns_lookup.LookupFirst(domain+":80",
-		dns_lookup.WithDNSDisableSystemResolver(true),
-		dns_lookup.WithDNSServers(addr), dns_lookup.WithDNSFallbackTCP(false))
+	var result = netx.LookupFirst(domain+":80",
+		netx.WithDNSDisableSystemResolver(true),
+		netx.WithDNSServers(addr), netx.WithDNSFallbackTCP(false))
 	log.Infof("LookupFirst %s cost %s", domain, time.Since(start))
 	if time.Now().Sub(start).Milliseconds() > 300 {
 		t.Errorf("LookupFirst %s cost %s", domain, time.Since(start))
@@ -36,10 +36,10 @@ func TestBASIC_SPECIFIC_DNS_2(t *testing.T) {
 	}
 	spew.Dump(result)
 
-	if dns_lookup.LookupFirst("1.2.3.4") != "1.2.3.4" {
+	if netx.LookupFirst("1.2.3.4") != "1.2.3.4" {
 		t.Fatal("LookupFirst ip failed")
 	}
-	if dns_lookup.LookupFirst("1.2.3.4:443") != "1.2.3.4" {
+	if netx.LookupFirst("1.2.3.4:443") != "1.2.3.4" {
 		t.Fatal("LookupFirst ip failed")
 	}
 }
@@ -54,9 +54,9 @@ func TestBASIC_SPECIFIC_DNS(t *testing.T) {
 
 	time.Sleep(time.Second)
 	var start = time.Now()
-	var result = dns_lookup.LookupFirst(domain,
-		dns_lookup.WithDNSDisableSystemResolver(true),
-		dns_lookup.WithDNSServers(addr), dns_lookup.WithDNSFallbackTCP(false))
+	var result = netx.LookupFirst(domain,
+		netx.WithDNSDisableSystemResolver(true),
+		netx.WithDNSServers(addr), netx.WithDNSFallbackTCP(false))
 	log.Infof("LookupFirst %s cost %s", domain, time.Since(start))
 	if time.Now().Sub(start).Milliseconds() > 300 {
 		t.Errorf("LookupFirst %s cost %s", domain, time.Since(start))
@@ -80,10 +80,10 @@ func TestBASIC_SPECIFIC_TCP_FALLBACK_DNS(t *testing.T) {
 
 	time.Sleep(time.Second)
 	var start = time.Now()
-	var result = dns_lookup.LookupFirst(domain,
-		dns_lookup.WithDNSDisableSystemResolver(true),
-		dns_lookup.WithDNSServers(addr), dns_lookup.WithDNSFallbackTCP(true),
-		dns_lookup.WithDNSPreferTCP(true),
+	var result = netx.LookupFirst(domain,
+		netx.WithDNSDisableSystemResolver(true),
+		netx.WithDNSServers(addr), netx.WithDNSFallbackTCP(true),
+		netx.WithDNSPreferTCP(true),
 	)
 	log.Infof("LookupFirst %s cost %s", domain, time.Since(start))
 	if time.Now().Sub(start).Milliseconds() > 300 {
@@ -104,11 +104,11 @@ func TestNotExisted_OnlyDoH(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	token := utils.RandStringBytes(20)
 	_ = token
-	var a = dns_lookup.LookupFirst(
+	var a = netx.LookupFirst(
 		strings.ToLower(token)+".com",
-		dns_lookup.WithDNSPreferDoH(true),
-		dns_lookup.WithDNSDisableSystemResolver(true),
-		dns_lookup.WithDNSSpecificDoH("http://"+utils.HostPort(host, port)+"/dns-query"),
+		netx.WithDNSPreferDoH(true),
+		netx.WithDNSDisableSystemResolver(true),
+		netx.WithDNSSpecificDoH("http://"+utils.HostPort(host, port)+"/dns-query"),
 	)
 	if a != "1.2.3.4" {
 		t.Errorf("DoH Failed")

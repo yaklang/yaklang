@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/icmp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/waiter"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/time/rate"
 	"math/rand/v2"
@@ -143,7 +143,7 @@ func (c *Client) PingScan(ctx context.Context, target string, opts ...ScanConfig
 
 func (c *Client) PingV4(ctx context.Context, target string, timeout time.Duration) (*PingResult, error) {
 	if !utils.IsIPv4(target) {
-		target = dns_lookup.LookupFirst(target)
+		target = netx.LookupFirst(target)
 	}
 
 	ipv4Ins, parseErr := netip.ParseAddr(target)

@@ -3,7 +3,7 @@ package yaklib
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
+	"github.com/yaklang/yaklang/common/netx"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -209,7 +209,7 @@ func queryCustomScript() {
 var DNSLogExports = map[string]interface{}{
 	"NewCustomDNSLog":   NewCustomDNSLog,
 	"QueryCustomScript": queryCustomScript,
-	"LookupFirst":       dns_lookup.LookupFirst,
+	"LookupFirst":       netx.LookupFirst,
 	"random":            randomDNSLogPlatforms,
 	"mode":              setMode,
 	"local":             setLocal,

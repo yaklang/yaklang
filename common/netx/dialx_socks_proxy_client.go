@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx/dns_lookup"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"net/url"
@@ -58,7 +57,7 @@ func (c *config) readAll(conn net.Conn) (resp []byte, err error) {
 }
 
 func lookupIPv4(host string) (net.IP, error) {
-	ipStr := dns_lookup.LookupFirst(host)
+	ipStr := LookupFirst(host)
 	if ipStr == "" {
 		return nil, fmt.Errorf("host not found: %s", host)
 	}
