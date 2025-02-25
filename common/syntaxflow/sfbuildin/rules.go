@@ -2,6 +2,9 @@ package sfbuildin
 
 import (
 	"embed"
+	"io/fs"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -9,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"io/fs"
-	"strings"
 )
 
 //go:embed buildin/***
@@ -72,20 +73,11 @@ func SyncEmbedRule() error {
 }
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-		/*
-		 is dev and not in github actions
-		*/
-		if consts.IsDevMode() && !utils.InGithubActions() {
-			log.Infof("current mode is dev, skip sync embed rule")
+		if yakit.Get(consts.EmbedSfBuildInRuleKey) == consts.ExistedSyntaxFlowEmbedFSHash {
+			log.Infof("already sync embed rule")
 			return nil
-		} else {
-			// if not dev mode, check embed rule hash
-			if yakit.Get(consts.EmbedSfBuildInRuleKey) == consts.ExistedSyntaxFlowEmbedFSHash {
-				log.Infof("already sync embed rule")
-				return nil
-			}
-			return SyncEmbedRule()
 		}
+		return SyncEmbedRule()
 	})
 
 }
