@@ -66,7 +66,7 @@ func TestHandle(t *testing.T) {
 		stack.Push(d)
 	}), WithEndElementHandler(func(element xml.EndElement) {
 		stack.Pop()
-	}), WithCharDataHandler(func(data xml.CharData) {
+	}), WithCharDataHandler(func(data xml.CharData, offset int64) {
 		top := stack.Peek()
 		top.Text = append(top.Text, data)
 	}), WithDirectiveHandler(func(directive xml.Directive) bool {
