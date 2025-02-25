@@ -182,6 +182,8 @@ Get SyntaxFlowAction
 		body: syntaxflow code // if set this will query result with this syntaxflow code
 		query:
 			result_id	string  // if set this, will get result from database
+		page:
+			start from
 	Response:
 		1. "syntaxflow://program_id/" :
 			* ResourceType: (message / variable) +  result_id
@@ -211,9 +213,14 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 	result := query.Result
 	programName := query.programName
 	url := params.GetUrl()
+	// page start from 1
+	if params.Page <= 1 {
+		params.Page = 1
+	}
 
 	var resources []*ypb.YakURLResource
 
+	finish := true
 	switch {
 	case variable == "":
 		// "syntaxflow://program_id/"
@@ -222,9 +229,19 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 	case index == -1:
 		// "syntaxflow://program_id/variable_name"
 		// response: variable values
-		values := result.GetValues(variable)
-		for index, v := range values {
-			if v == nil {
+		valueLen := result.GetValueCount(variable)
+		finish = false
+		if params.PageSize <= 0 {
+			params.PageSize = int64(valueLen)
+		}
+		for i := 0; i < int(params.PageSize); i++ {
+			index := int(params.Page-1)*int(params.PageSize) + i
+			if valueLen <= int(index) {
+				finish = true
+				break
+			}
+			v, err := result.GetValue(variable, index)
+			if v == nil || err != nil {
 				continue
 			}
 			codeRange, source := ssaapi.CoverCodeRange(programName, v.GetRange())
@@ -233,7 +250,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 				{"code_range", codeRange},
 				{"source", source}}
 			// result.risk
-			if hash := result.GetRiskHash(variable, index); hash != "" {
+			if hash := result.GetRiskHash(variable, int(index)); hash != "" {
 				extraData = append(extraData, extra{"risk_hash", hash})
 			}
 
@@ -241,6 +258,10 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 			res.ResourceType = "value"
 			res.ResourceName = v.String()
 			resources = append(resources, res)
+		}
+
+		if params.Page*params.PageSize >= int64(valueLen) {
+			finish = true
 		}
 	default:
 		// "syntaxflow://program_id/variable_name/index"
@@ -256,7 +277,8 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 	}
 
 	// result_id
-	if query.ResultID != 0 {
+	if finish && query.ResultID != 0 {
+		// when have resultId, this item mark the end.
 		res := createNewRes(url, 0, []extra{})
 		res.ResourceType = "result_id"
 		res.VerboseType = "result_id"
@@ -265,8 +287,8 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 	}
 	// res.CheckParams
 	return &ypb.RequestYakURLResponse{
-		Page:      1,
-		PageSize:  100,
+		Page:      params.Page,
+		PageSize:  params.PageSize,
 		Total:     int64(len(resources)),
 		Resources: resources,
 	}, nil
