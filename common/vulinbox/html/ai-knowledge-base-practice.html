@@ -441,18 +441,41 @@
                                 
                                 const finalResultContent = document.getElementById('final-result-content');
                                 
-                                // 添加自动上传勾选框
-                                const autoUploadDiv = document.createElement('div');
-                                autoUploadDiv.className = 'form-check mb-3';
-                                autoUploadDiv.innerHTML = `
-                                    <input class="form-check-input" type="checkbox" id="autoUploadCheck">
-                                    <label class="form-check-label" for="autoUploadCheck">
-                                        自动上传分析结果
-                                    </label>
-                                `;
-                                finalResultContent.appendChild(autoUploadDiv);
+                                // 筛选数据
+                                let selectedData = null;
+                                let dataSource = '';
                                 
-                                // 创建更友好的结果展示
+                                // 优先检查 End_DrQn7F 节点
+                                if (result['End_DrQn7F']) {
+                                    selectedData = result['End_DrQn7F'];
+                                    dataSource = 'End_DrQn7F';
+                                } 
+                                // 其次检查 LLM_pBed 节点
+                                else if (result['LLM_pBed']) {
+                                    selectedData = result['LLM_pBed'];
+                                    dataSource = 'LLM_pBed';
+                                }
+                                // 最后检查其他 END_ 开头的节点
+                                else {
+                                    const endNodes = {};
+                                    for (const [key, value] of Object.entries(result)) {
+                                        if (key.startsWith('END_')) {
+                                            endNodes[key] = value;
+                                        }
+                                    }
+                                    
+                                    if (Object.keys(endNodes).length > 0) {
+                                        selectedData = Object.values(endNodes).join('\n\n');
+                                        dataSource = 'END_';
+                                    }
+                                }
+                                
+                                if (!selectedData) {
+                                    showResultModal('无可用数据', { error: '未找到 End_DrQn7F、LLM_pBed 或 END_ 开头的节点数据' });
+                                    return;
+                                }
+                                
+                                // 直接开始创建结果展示
                                 for (const [key, value] of Object.entries(result)) {
                                     const sectionDiv = document.createElement('div');
                                     sectionDiv.className = 'result-section mb-3';
@@ -580,74 +603,80 @@
                             let selectedData = null;
                             let dataSource = '';
                             
-                            // 首先尝试获取 END_ 开头的节点
-                            const endNodes = {};
-                            for (const [key, value] of Object.entries(result)) {
-                                if (key.startsWith('END_')) {
-                                    endNodes[key] = value;
-                                }
-                            }
-                            
-                            if (Object.keys(endNodes).length > 0) {
-                                selectedData = Object.values(endNodes).join('\n\n');
-                                dataSource = 'END_';
-                            } else if (result['LLM_pBed']) {
-                                // 如果没有 END_ 节点，使用 LLM_pBed
+                            // 优先检查 End_DrQn7F 节点
+                            if (result['End_DrQn7F']) {
+                                selectedData = result['End_DrQn7F'];
+                                dataSource = 'End_DrQn7F';
+                            } 
+                            // 其次检查 LLM_pBed 节点
+                            else if (result['LLM_pBed']) {
                                 selectedData = result['LLM_pBed'];
                                 dataSource = 'LLM_pBed';
                             }
+                            // 最后检查其他 END_ 开头的节点
+                            else {
+                                const endNodes = {};
+                                for (const [key, value] of Object.entries(result)) {
+                                    if (key.startsWith('END_')) {
+                                        endNodes[key] = value;
+                                    }
+                                }
+                                
+                                if (Object.keys(endNodes).length > 0) {
+                                    selectedData = Object.values(endNodes).join('\n\n');
+                                    dataSource = 'END_';
+                                }
+                            }
                             
                             if (!selectedData) {
-                                showResultModal('无可用数据', { error: '未找到 END_ 开头或 LLM_pBed 节点的数据' });
+                                showResultModal('无可用数据', { error: '未找到 End_DrQn7F、LLM_pBed 或 END_ 开头的节点数据' });
                                 return;
                             }
                             
-                            // 检查是否需要自动上传
-                            const autoUploadCheck = document.getElementById('autoUploadCheck');
-                            if (!autoUploadCheck.checked) {
-                                // 显示确认对话框
-                                const modalDiv = document.createElement('div');
-                                modalDiv.innerHTML = `
-                                    <div class="modal fade" tabindex="-1">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">确认上传</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <p>已找到${dataSource}数据，是否上传？</p>
-                                                    <div class="alert alert-info">
-                                                        提示：您可以勾选"自动上传分析结果"来跳过此确认步骤。
-                                                    </div>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                                                    <button type="button" class="btn btn-primary" id="confirmUploadBtn">确认上传</button>
-                                                </div>
+                            // 显示确认对话框
+                            const modalDiv = document.createElement('div');
+                            modalDiv.innerHTML = `
+                                <div class="modal fade" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">确认上传</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p>已找到${dataSource}数据，是否上传？</p>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                                <button type="button" class="btn btn-primary" id="confirmUploadBtn">确认上传</button>
                                             </div>
                                         </div>
                                     </div>
-                                `;
+                                </div>
+                            `;
+                            
+                            document.body.appendChild(modalDiv);
+                            
+                            const modal = new bootstrap.Modal(modalDiv.querySelector('.modal'));
+                            modal.show();
+                            
+                            // 使用事件监听器处理确认上传
+                            const confirmBtn = document.getElementById('confirmUploadBtn');
+                            confirmBtn.addEventListener('click', async () => {
+                                // 添加 loading 状态
+                                confirmBtn.disabled = true;
+                                confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 上传中...';
                                 
-                                document.body.appendChild(modalDiv);
-                                
-                                const modal = new bootstrap.Modal(modalDiv.querySelector('.modal'));
-                                modal.show();
-                                
-                                // 使用事件监听器处理确认上传
-                                document.getElementById('confirmUploadBtn').addEventListener('click', async () => {
+                                try {
                                     await submitData(dataSource, selectedData);
+                                } finally {
                                     modal.hide();
-                                });
-                                
-                                modalDiv.addEventListener('hidden.bs.modal', () => {
-                                    document.body.removeChild(modalDiv);
-                                });
-                            } else {
-                                // 自动上传
-                                await submitData(dataSource, selectedData);
-                            }
+                                }
+                            });
+                            
+                            modalDiv.addEventListener('hidden.bs.modal', () => {
+                                document.body.removeChild(modalDiv);
+                            });
                         } catch (error) {
                             console.error('处理数据失败:', error);
                             showResultModal('处理错误', { error: error.message });
