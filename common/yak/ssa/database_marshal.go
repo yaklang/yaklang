@@ -98,6 +98,11 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		for k, v := range ret.FreeValues {
 			freeValues[k.GetId()] = v.GetId()
 		}
+		params["current_blueprint"] = -1
+		if ret.CurrentBlueprint != nil {
+			typid := SaveTypeToDB(ret.CurrentBlueprint)
+			params["current_blueprint"] = typid
+		}
 		params["is_method"] = ret.isMethod
 		params["method_name"] = ret.methodName
 		params["free_values"] = freeValues
@@ -548,6 +553,15 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.methodName = toString(params["method_name"])
 		ret.FreeValues = unmarshalMapVariables(params["free_values"])
 		ret.ParameterMembers = unmarshalValues(params["parameter_members"])
+
+		currentBlueprint := toInt(params["current_blueprint"])
+		if currentBlueprint != -1 {
+			typ := GetTypeFromDB(currentBlueprint)
+			blueprint, ok := ToClassBluePrintType(typ)
+			if ok {
+				ret.CurrentBlueprint = blueprint
+			}
+		}
 		if ses := params["side_effect"]; ses != nil && funk.IsIteratee(ses) {
 			var se []*FunctionSideEffect
 			funk.ForEach(params["side_effect"], func(a any) {
