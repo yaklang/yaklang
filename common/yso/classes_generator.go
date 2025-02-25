@@ -1,11 +1,12 @@
 package yso
 
 import (
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strconv"
 )
 
 type ClassPayload struct {
@@ -17,6 +18,20 @@ type ClassPayload struct {
 func GenerateClassWithType(typ ClassType, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	return GenerateClass(append(options, SetClassType(typ))...)
 }
+
+// GenerateClass 根据提供的配置选项生成一个Java类对象。
+// 这个函数是生成各种类型Java类对象的核心函数，它可以处理原始字节码类型和预定义的类模板。
+// 对于原始字节码类型(ClassRaw)，它直接解析提供的模板；对于其他类型，它从YsoConfigInstance中加载相应的类模板并应用参数。
+// options：一组GenClassOptionFun函数，用于配置生成的类对象的各种属性。
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// Example:
+// ```
+// // 使用原始字节码生成类对象
+// classObj, err := yso.GenerateClass(yso.SetClassBytes(bytecode))
+//
+// // 使用预定义模板生成类对象
+// classObj, err := yso.GenerateClass(yso.SetClassType(ClassRuntimeExec), yso.SetExecCommand("whoami"))
+// ```
 func GenerateClass(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(options...)
 	if config.ClassType == ClassRaw {
@@ -97,11 +112,24 @@ func NewClassConfig(options ...GenClassOptionFun) *ClassGenConfig {
 	return obj
 }
 
+// SetClassType 设置要生成的类类型
+// t: 类类型
+// Example:
+// ```
+// classObj,_ = yso.GenerateClass(yso.useTemplate("RuntimeExec"))
+// ```
 func SetClassType(t ClassType) GenClassOptionFun {
 	return func(config *ClassGenConfig) {
 		config.ClassType = t
 	}
 }
+
+// SetCustomTemplate 设置自定义的类模板字节码
+// customBytes: 自定义模板的字节码
+// Example:
+// ```
+// classObj,_ = yso.GenerateClass(yso.SetCustomTemplate(templateBytes))
+// ```
 func SetCustomTemplate(customBytes []byte) GenClassOptionFun {
 	return func(config *ClassGenConfig) {
 		config.CustomTemplate = customBytes
@@ -118,6 +146,13 @@ func (cf *ClassGenConfig) GetParam(name ClassParamType) (string, bool) {
 
 type GenClassOptionFun func(config *ClassGenConfig)
 
+// SetClassParam 设置类生成时的参数
+// k: 参数名
+// v: 参数值
+// Example:
+// ```
+// classObj,_ = yso.GenerateClass(yso.useClassParam("command","whoami"))
+// ```
 func SetClassParam(k, v string) GenClassOptionFun {
 	return func(config *ClassGenConfig) {
 		config.SetParam(ClassParamType(k), v)
