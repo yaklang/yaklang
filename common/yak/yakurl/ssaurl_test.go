@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -163,7 +164,7 @@ func checkVariable(t *testing.T, res []*ypb.YakURLResource, want []string) {
 	require.Equal(t, want, got)
 }
 
-func TestSFURl(t *testing.T) {
+func TestSFURL(t *testing.T) {
 	local, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		t.Error(err)
@@ -383,7 +384,7 @@ func TestSFURl(t *testing.T) {
 	})
 }
 
-func TestSFURl_golang(t *testing.T) {
+func TestSFURL_golang(t *testing.T) {
 	local, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		t.Error(err)
@@ -483,5 +484,141 @@ func TestSFURl_golang(t *testing.T) {
 
 		})
 		require.NotEqual(t, graphInfoMap[0], graphInfoMap[1], "The two strings should not be equal")
+	})
+}
+
+func TestSSAURLPagination(t *testing.T) {
+
+	local, err := yakgrpc.NewLocalClient()
+	if err != nil {
+		t.Error(err)
+	}
+	_ = local
+
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
+		package com.example.apackage; 
+		import com.example.bpackage.sub.B;
+		class A {
+			public static void main(String[] args) {
+				print(1);
+				print(2);
+				print(3);
+				print(4);
+				print(5);
+				print(6);
+			}
+		}
+		`)
+
+	progID := uuid.NewString()
+	prog, err := ssaapi.ParseProjectWithFS(vf,
+		ssaapi.WithLanguage(consts.JAVA),
+		ssaapi.WithProgramPath("example"),
+		ssaapi.WithProgramName(progID),
+	)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progID)
+	}()
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+
+	res, err := prog.SyntaxFlowWithError(`print( * as  $para)`, ssaapi.QueryWithSave(schema.SFResultKindDebug))
+	res.Show()
+	require.NoError(t, err)
+	resultID := res.GetResultID()
+	require.NotEqual(t, 0, resultID)
+
+	query := func(page, pageSize int64, path string) ([]string, bool) {
+		// send memory query
+		url := &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema:   "syntaxflow",
+				Location: progID,
+				Path:     path,
+				Query: []*ypb.KVPair{
+					{
+						// get from database
+						Key:   "result_id",
+						Value: codec.AnyToString(resultID),
+					},
+				},
+			},
+			Page:     page,
+			PageSize: pageSize,
+		}
+		res, err := local.RequestYakURL(context.Background(), url)
+		require.NoError(t, err)
+		t.Log("checkHandler in database query ")
+		spew.Dump(res)
+		finish := false
+		ret := make([]string, 0, len(res.Resources))
+		for _, res := range res.Resources {
+			if res.ResourceType == "value" {
+				ret = append(ret, res.ResourceName)
+			}
+
+			if res.ResourceType == "result_id" {
+				finish = true
+			}
+
+		}
+		return ret, finish
+	}
+
+	t.Run("test lign pagination", func(t *testing.T) {
+		total := make([]string, 0, 6)
+
+		path := "/para"
+		res, finish := query(1, 2, path)
+		total = append(total, res...)
+		require.Equal(t, false, finish)
+
+		res, finish = query(2, 2, path)
+		total = append(total, res...)
+		require.Equal(t, false, finish)
+
+		res, finish = query(3, 2, path)
+		total = append(total, res...)
+		require.Equal(t, true, finish)
+
+		sort.Strings(total)
+		require.Equal(t, []string{"1", "2", "3", "4", "5", "6"}, total)
+	})
+
+	t.Run("test not align pagination", func(t *testing.T) {
+		total := make([]string, 0, 6)
+
+		path := "/para"
+		res, finish := query(1, 4, path)
+		total = append(total, res...)
+		require.Equal(t, false, finish)
+
+		res, finish = query(2, 4, path)
+		total = append(total, res...)
+		require.Equal(t, true, finish)
+
+		sort.Strings(total)
+		require.Equal(t, []string{"1", "2", "3", "4", "5", "6"}, total)
+	})
+
+	t.Run("test _ ", func(t *testing.T) {
+
+		// check "_"
+		total := make([]string, 0, 6)
+
+		path := "/_"
+		res, finish := query(1, 4, path)
+		total = append(total, res...)
+		require.Equal(t, false, finish)
+
+		res, finish = query(2, 4, path)
+		total = append(total, res...)
+		require.Equal(t, true, finish)
+
+		sort.Strings(total)
+		require.Equal(t, []string{"Undefined-print(1)", "Undefined-print(2)", "Undefined-print(3)", "Undefined-print(4)", "Undefined-print(5)", "Undefined-print(6)"}, total)
+
 	})
 }
