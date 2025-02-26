@@ -29,7 +29,7 @@ var savePayloadToolOptions = []mcp.ToolOption{
 	mcp.WithBool("saveAsFile",
 		mcp.Description("Whether to save the payload as a file"),
 	),
-	mcp.WithOneOf("source", []mcp.PropertyOption{
+	mcp.WithOneOfStruct("source", []mcp.PropertyOption{
 		mcp.Description("source from content or file"),
 		mcp.Required(),
 	}, []mcp.ToolOption{
