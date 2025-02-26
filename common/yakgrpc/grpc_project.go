@@ -7,9 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/gmsm/sm4"
-	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,6 +14,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/gmsm/sm4"
+	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
@@ -59,7 +60,7 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 			return &ypb.Empty{}, nil
 		}
 		// 不是默认数据库 不需要生成文件
-		if CheckDefault(proj.ProjectName, proj.Type, proj.FolderID, proj.ChildFolderID) == nil {
+		if !CheckDefault(proj.ProjectName, proj.Type, proj.FolderID, proj.ChildFolderID) {
 			old, err := os.Open(proj.DatabasePath)
 			if err != nil {
 				return nil, utils.Errorf("can't open local database: %s", err)
@@ -141,7 +142,7 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 		ChildFolderID: req.ChildFolderId,
 	}
 
-	if isHandleProject && CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) != nil {
+	if isHandleProject && CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) {
 		return nil, utils.Errorf("cannot use this builtin name: %s", yakit.INIT_DATABASE_RECORD_NAME)
 	}
 
@@ -188,7 +189,7 @@ func (s *Server) UpdateProject(ctx context.Context, req *ypb.NewProjectRequest) 
 		FolderID:      req.FolderId,
 		ChildFolderID: req.ChildFolderId,
 	}
-	if isHandleProject && CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) != nil {
+	if isHandleProject && CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) {
 		return nil, utils.Errorf("cannot use this builtin name: %s", yakit.INIT_DATABASE_RECORD_NAME)
 	}
 	oldPro, err := yakit.GetProjectByID(s.GetProfileDatabase(), req.GetId())
@@ -215,7 +216,7 @@ func (s *Server) IsProjectNameValid(ctx context.Context, req *ypb.IsProjectNameV
 	if req.GetType() == "" {
 		return nil, utils.Error("type is empty")
 	}
-	if CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) != nil {
+	if CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) {
 		return nil, utils.Error("[default] cannot be user's db name")
 	}
 	proj, _ := yakit.GetProject(consts.GetGormProfileDatabase(), req)
@@ -545,11 +546,11 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 	return nil
 }
 
-func CheckDefault(ProjectName, Type string, FolderId, ChildFolderId int64) error {
+func CheckDefault(ProjectName, Type string, FolderId, ChildFolderId int64) bool {
 	if ProjectName == yakit.INIT_DATABASE_RECORD_NAME && Type == yakit.TypeProject && FolderId == 0 && ChildFolderId == 0 {
-		return utils.Error("[default] cannot be deleted")
+		return true
 	}
-	return nil
+	return false
 }
 
 func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectRequest) (*ypb.Empty, error) {
@@ -563,18 +564,18 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 	if projects == nil {
 		return nil, utils.Error("project is not exist")
 	}
-	proj, err := yakit.GetDefaultProject(s.GetProfileDatabase())
+	defaultProject, err := yakit.GetDefaultProject(s.GetProfileDatabase())
 	if err != nil {
 		return nil, utils.Errorf("open project database failed: %s", err)
 	}
-	err = yakit.SetCurrentProjectById(s.GetProfileDatabase(), int64(proj.ID))
+	err = yakit.SetCurrentProjectById(s.GetProfileDatabase(), int64(defaultProject.ID))
 	if err != nil {
 		return nil, utils.Errorf("open project database failed: %s", err)
 	}
 
 	// delete selected projects
 	for k := range projects {
-		if CheckDefault(k.ProjectName, k.Type, k.FolderID, k.ChildFolderID) != nil {
+		if CheckDefault(k.ProjectName, k.Type, k.FolderID, k.ChildFolderID) {
 			log.Info("[default] cannot be deleted")
 			break
 		}
@@ -593,13 +594,13 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 	}
 
 	// set current project
-	defaultDB, err := consts.CreateProjectDatabase(proj.DatabasePath)
+	defaultDB, err := consts.CreateProjectDatabase(defaultProject.DatabasePath)
 	if err != nil {
 		return &ypb.Empty{}, utils.Errorf("open default project database failed: %s", err)
 	}
 
-	log.Infof("Set default project db by grpc: %s", proj.DatabasePath)
-	consts.SetDefaultYakitProjectDatabaseName(proj.DatabasePath)
+	log.Infof("Set default project db by grpc: %s", defaultProject.DatabasePath)
+	consts.SetDefaultYakitProjectDatabaseName(defaultProject.DatabasePath)
 	consts.SetGormProjectDatabase(defaultDB)
 	return &ypb.Empty{}, nil
 }
