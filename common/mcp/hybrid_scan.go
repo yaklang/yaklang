@@ -74,7 +74,7 @@ func handleHybridScan(s *MCPServer) server.ToolHandlerFunc {
 	) (*mcp.CallToolResult, error) {
 		var req ypb.HybridScanRequest
 		decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			DecodeHook: arrayToStringHook,
+			DecodeHook: decodeHook,
 			Result:     &req,
 		})
 		if err != nil {

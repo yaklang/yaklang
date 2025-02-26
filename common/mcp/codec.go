@@ -33,7 +33,7 @@ func init() {
 	AddGlobalToolSet("codec",
 		// fuzztag
 		WithTool(mcp.NewTool("render_fuzztag",
-			mcp.WithDescription("Render fuzztag(a DSL for web fuzzer). e.g. {{int(1-10)}} will be render as [1,2,3,4,5,6,7,8,9,10]"),
+			mcp.WithDescription("Render fuzztag(a DSL for http fuzzer). e.g. {{int(1-10)}} will be render as [1,2,3,4,5,6,7,8,9,10]"),
 			mcp.WithString("template",
 				mcp.Description("Input fuzztag"),
 				mcp.Required(),
