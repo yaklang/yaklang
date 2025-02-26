@@ -103,5 +103,15 @@ jobs:
         if: ${{env.syntaxflow_fail == 'true'}}
         uses: actions/upload-artifact@v4
         with:
-          name: ~/yakit-projects/default-yakssa.db
-          path: default-yakssa.db
+          name: default-yakssa.db
+          path: /home/runner/yakit-projects/default-yakssa.db
+
+      - name: Fail
+        run: |
+          if [ "${{ env.syntaxflow_fail }}" == "true" ]; then
+            exit 1
+          elif [ "${{ env.compile_fail }}" == "true" ]; then
+            exit 1
+          else
+            echo "Success"
+          fi
