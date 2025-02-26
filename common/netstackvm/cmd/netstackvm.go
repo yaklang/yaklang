@@ -95,7 +95,7 @@ func main() {
 					_ = gateway
 					_ = srcIP
 				}
-				userStack, err := netstackvm.NewNetStackVirtualMachine(netstackvm.WithPcapDevice(ifaceName))
+				userStack, err := netstackvm.NewNetStackVirtualMachineEntry(netstackvm.WithPcapDevice(ifaceName))
 				if err != nil {
 					return utils.Errorf("create netstack virtual machine failed: %v", err)
 				}
@@ -184,7 +184,7 @@ func main() {
 					_ = gateway
 					_ = srcIP
 				}
-				vm, err := netstackvm.NewNetStackVirtualMachine(
+				vm, err := netstackvm.NewNetStackVirtualMachineEntry(
 					netstackvm.WithPcapDevice(ifaceName),
 				)
 				if err != nil {
@@ -267,7 +267,7 @@ func main() {
 					_ = gateway
 					_ = srcIP
 				}
-				vm, err := netstackvm.NewNetStackVirtualMachine(
+				vm, err := netstackvm.NewNetStackVirtualMachineEntry(
 					netstackvm.WithPcapDevice(ifaceName),
 				)
 				if err != nil {
@@ -326,7 +326,7 @@ func main() {
 			log.Info("no vmac specified, use random mac")
 		}
 
-		vm, err := netstackvm.NewNetStackVirtualMachine(
+		vm, err := netstackvm.NewNetStackVirtualMachineEntry(
 			netstackvm.WithPcapDevice(ifaceName),
 			netstackvm.WithMainNICLinkAddress(vmac),
 		)
