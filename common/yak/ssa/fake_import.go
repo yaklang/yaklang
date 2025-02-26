@@ -10,6 +10,16 @@ func (p *Program) GenerateVirtualLib(packagePath string) (*Program, error) {
 	return lib, err
 }
 
+func fakeGetValue(lib *Program, name string) Value {
+	builder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(VirtualFunctionName))
+	value := builder.ReadValue(name)
+	return value
+}
+func fakeGetType(lib *Program, name string, token ...CanStartStopToken) Type {
+	builder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(VirtualFunctionName))
+	blueprint := builder.CreateBlueprint(name, token...)
+	return blueprint
+}
 func fakeImportValue(lib *Program, name string) Value {
 	builder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(VirtualFunctionName))
 	if value, ok := lib.ExportValue[name]; !ok && lib.VirtualImport {
