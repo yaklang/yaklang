@@ -4,11 +4,30 @@ on:
     workflows: [ "Essential Tests" ]
     types:
       - completed
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+    paths:
+      - ".github/workflows/diff-code-check.yml"
+      - "common/ssa_bootstrapping/ci_rule/**"
+      - "common/syntaxflow/sfbuildin/buildin/golang/**"
 jobs:
   setup:
     runs-on: ubuntu-20.04
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'pull_request') }}
     steps:
+      - name: Init HEAD_SHA
+        run: | 
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            echo "HEAD_SHA=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          else
+            echo "Unsupported event: ${{ github.event_name }}"
+            exit 1
+          fi
+          echo "Current head sha is: ${{ env.HEAD_SHA }}"
+
       - name: Cache YakLang Project
         uses: actions/cache@v3
         id: cache-project
@@ -16,13 +35,13 @@ jobs:
           path: |
             ~/yakit-projects
             ${{ github.workspace }}
-          key: go-${{ github.event.workflow_run.head_sha }}
+          key: go-${{ env.HEAD_SHA }}
 
       - name: Check out code into the Go module directory
         if: steps.cache-project.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ env.HEAD_SHA }}
           fetch-depth: 0
 
       - name: Fetch Main And Reset Main
@@ -31,7 +50,7 @@ jobs:
           git fetch --all
           git checkout main
           git reset --hard origin/main
-          git checkout ${{ github.event.workflow_run.head_sha }}
+          git checkout ${{ env.HEAD_SHA }}
 
       - name: Set up Go 1.x
         if: steps.cache-project.outputs.cache-hit != 'true'
@@ -63,15 +82,14 @@ jobs:
         run: |
           pwd && ls -al
           ./yak -h
-          MERGE_BASE=$(git merge-base main ${{ github.event.workflow_run.head_sha }})
+          MERGE_BASE=$(git merge-base main ${{ env.HEAD_SHA }})
           echo "Merge base is: $MERGE_BASE"
-          echo "Current head sha is: ${{ github.event.workflow_run.head_sha }}"
           ./yak sync-rule
-          ./yak gitefs --start $MERGE_BASE --end ${{ github.event.workflow_run.head_sha }} --output ./fs.zip
+          ./yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip
           ./yak ssa -t ./fs.zip --program diffcode -l golang > log.txt 2>&1 || { echo "compile_fail=true" >> $GITHUB_ENV; exit 1; }
           grep -F "Current goroutine call stack:" log.txt && { echo "compile_fail=true" >> $GITHUB_ENV; exit 1; }
           ./yak sf --program diffcode ./common/ssa_bootstrapping/ci_rule || { echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1; }
-          ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang || {echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1;}
+          ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang || { echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1; }
         # ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule --exclude-file *.pb.go > log.txt 2>&1 || exit 1
           
       - name: Upload fail log
