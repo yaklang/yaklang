@@ -68,10 +68,10 @@ jobs:
           echo "Current head sha is: ${{ github.event.workflow_run.head_sha }}"
           ./yak sync-rule
           ./yak gitefs --start $MERGE_BASE --end ${{ github.event.workflow_run.head_sha }} --output ./fs.zip
-          ./yak ssa -t ./fs.zip --program diffcode -l golang > log.txt 2>&1 || {echo "compile_fail=true" >> $GITHUB_ENV; exit 1;}
-          grep -F "Current goroutine call stack:" log.txt && {echo "compile_fail=true" >> $GITHUB_ENV; exit 1;}
-          ./yak sf --program diffcode ./common/ssa_bootstrapping/ci_rule || {echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1;}
-        # ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang || {echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1;}
+          ./yak ssa -t ./fs.zip --program diffcode -l golang > log.txt 2>&1 || { echo "compile_fail=true" >> $GITHUB_ENV; exit 1; }
+          grep -F "Current goroutine call stack:" log.txt && { echo "compile_fail=true" >> $GITHUB_ENV; exit 1; }
+          ./yak sf --program diffcode ./common/ssa_bootstrapping/ci_rule || { echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1; }
+          ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang || {echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1;}
         # ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule --exclude-file *.pb.go > log.txt 2>&1 || exit 1
           
       - name: Upload fail log
