@@ -57,12 +57,12 @@ func TestMCPClient(t *testing.T) {
 
 	request := mcp.CallToolRequest{}
 	data := `{
-"program": "Bash -i",
-"shellType": "bash",
-"ip": "127.0.0.1",
-"port": 10000
+  "request": "GET /get?a={{int(1-10)}} HTTP/1.1\r\nHost: pie.dev\r\n\r\n",
+  "concurrent": 1,
+  "fuzzTagMode": "standard",
+  "isHttps": true
 }`
-	request.Params.Name = "generate_reverse_shell_command"
+	request.Params.Name = "http_fuzzer"
 	err = json.Unmarshal([]byte(data), &request.Params.Arguments)
 	require.NoError(t, err)
 	c.OnNotification(func(notification mcp.JSONRPCNotification) {
