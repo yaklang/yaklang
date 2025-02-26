@@ -2,18 +2,19 @@ package ssa
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"strings"
 )
 
-func (pkg *Program) GetBluePrint(name string) *Blueprint {
+// GetBluePrint will get the blueprint by name. if not found and virtualImport enable,
+// it will try to create blueprint by name
+func (pkg *Program) GetBluePrint(name string, token ...CanStartStopToken) *Blueprint {
 	if pkg == nil {
 		return nil
 	}
-	return pkg.GetClassBlueprintEx(name, "")
+	return pkg.GetClassBlueprintEx(name, "", token...)
 }
 
 func (b *FunctionBuilder) GetBluePrint(name string) *Blueprint {
@@ -80,7 +81,14 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...C
 }
 
 func (b *FunctionBuilder) CreateBlueprint(name string, tokenizer ...CanStartStopToken) *Blueprint {
-	return b.CreateBlueprintWithPkgName(name, tokenizer...)
+	blueprint := b.CreateBlueprintWithPkgName(name, tokenizer...)
+	blueprint.SetKind(BlueprintClass)
+	return blueprint
+}
+func (b *FunctionBuilder) CreateInterface(name string, tokenizer ...CanStartStopToken) *Blueprint {
+	blueprint := b.CreateBlueprint(name)
+	blueprint.SetKind(BlueprintInterface)
+	return blueprint
 }
 
 func (b *FunctionBuilder) CreateBlueprintAndSetConstruct(typName string, libName ...string) *Blueprint {

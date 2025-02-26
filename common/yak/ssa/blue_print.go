@@ -37,8 +37,9 @@ const (
 	BlueprintNone BlueprintKind = iota
 	BlueprintClass
 	BlueprintInterface
-	BlueprintEnum
-	BlueprintStruct
+
+	//BlueprintObject for object, like new Blueprint
+	BlueprintObject
 )
 
 type BlueprintRelationKind string

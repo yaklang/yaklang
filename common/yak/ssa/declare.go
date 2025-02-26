@@ -13,7 +13,6 @@ func (prog *Program) getTypeEx(name, pkg string) Type {
 		}
 		return nil, false
 	}
-
 	if typ, ok := readDeclareWithImport[Type](
 		prog, pkg, name,
 		prog.ReadImportTypeWithPkg,
@@ -25,7 +24,7 @@ func (prog *Program) getTypeEx(name, pkg string) Type {
 	return nil
 }
 
-func (p *Program) GetClassBlueprintEx(name string, pkg string) *Blueprint {
+func (p *Program) GetClassBlueprintEx(name string, pkg string, token ...CanStartStopToken) *Blueprint {
 	if p == nil {
 		return nil
 	}
@@ -52,6 +51,13 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string) *Blueprint {
 				c.Build()
 			}
 			return c
+		}
+	}
+	if p.VirtualImport {
+		fakeType := fakeGetType(p, name, token...)
+		blueprint, ok := ToClassBluePrintType(fakeType)
+		if ok {
+			return blueprint
 		}
 	}
 	return nil
