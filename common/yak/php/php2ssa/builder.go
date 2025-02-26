@@ -63,6 +63,7 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 		log.Errorf("program is nil")
 		return nil
 	}
+	prog.VirtualImport = true
 	if prog.ExtraFile == nil {
 		prog.ExtraFile = make(map[string]string)
 	}
