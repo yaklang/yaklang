@@ -313,8 +313,8 @@ func WithStruct(name string, opts []PropertyOption, itemsOpt ...ToolOption) Tool
 	return WithRaw(name, schema, opts...)
 }
 
-// WithOneOf
-func WithOneOf(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
+// WithOneOfStruct
+func WithOneOfStruct(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
 	schema := map[string]any{
 		"type": "object",
 	}
@@ -331,8 +331,8 @@ func WithOneOf(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) Too
 	return WithRaw(name, schema, opts...)
 }
 
-// WithAnyOf
-func WithAnyOf(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
+// WithAnyOfStruct
+func WithAnyOfStruct(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
 	schema := map[string]any{
 		"type": "object",
 	}

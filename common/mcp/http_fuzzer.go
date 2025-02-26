@@ -113,7 +113,7 @@ func handleHTTPFuzzer(s *MCPServer) server.ToolHandlerFunc {
 		}
 		stream, err := s.grpcClient.HTTPFuzzer(ctx, &req)
 		if err != nil {
-			return nil, utils.Wrap(err, "failed to render fuzztag")
+			return nil, utils.Wrap(err, "failed to start http fuzzer")
 		}
 		req.DisableHotPatch = true
 
