@@ -513,6 +513,8 @@ func InterfaceToFloat64(i any) float64 {
 	switch ret := i.(type) {
 	case float64:
 		return ret
+	case float32:
+		return float64(ret)
 	default:
 		return float64(InterfaceToInt(i))
 	}

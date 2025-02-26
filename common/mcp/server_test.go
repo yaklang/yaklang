@@ -57,12 +57,28 @@ func TestMCPClient(t *testing.T) {
 
 	request := mcp.CallToolRequest{}
 	data := `{
-  "request": "GET /get?a={{int(1-10)}} HTTP/1.1\r\nHost: pie.dev\r\n\r\n",
-  "concurrent": 1,
-  "fuzzTagMode": "standard",
-  "isHttps": true
+    "type": "mysql",
+    "target": {
+        "targets": [
+            "127.0.0.1:3306"
+        ]
+    },
+    "concurrent": 20,
+    "user-dict": {
+        "usernames": [
+            "root"
+        ]
+    },
+    "pass-dict": {
+        "passwords": [
+            "root",
+            "123456"
+        ]
+    },
+	"replaceDefaultUsernameDict": true,
+	"replaceDefaultPasswordDict": true
 }`
-	request.Params.Name = "http_fuzzer"
+	request.Params.Name = "brute"
 	err = json.Unmarshal([]byte(data), &request.Params.Arguments)
 	require.NoError(t, err)
 	c.OnNotification(func(notification mcp.JSONRPCNotification) {

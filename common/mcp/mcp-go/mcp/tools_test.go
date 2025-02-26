@@ -11,7 +11,7 @@ import (
 func TestWithOneOf(t *testing.T) {
 	tool := NewTool("tool",
 		WithString("test"),
-		WithOneOf("option",
+		WithOneOfStruct("option",
 			[]PropertyOption{
 				Description("an option"),
 			},
@@ -33,7 +33,7 @@ func TestWithOneOf(t *testing.T) {
 func TestWithAnyOf(t *testing.T) {
 	tool := NewTool("tool",
 		WithString("test"),
-		WithAnyOf("option",
+		WithAnyOfStruct("option",
 			[]PropertyOption{
 				Description("an option"),
 			},
