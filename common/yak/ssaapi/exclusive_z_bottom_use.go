@@ -106,8 +106,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 		if actx.haveCrossProcess(funcValue) {
 			return v.visitUserFallback(actx, opt...)
-		} else {
-			actx.setCauseValue(v)
 		}
 		//try to find formal param index from call
 		//v is calling instruction
@@ -176,9 +174,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if f := ins.GetFunc(); f != nil {
 				v.NewBottomUseValue(f).GetCalledBy().ForEach(func(value *Value) {
 					dep := value.AppendDependOn(v)
-					if !actx.haveCrossProcess(dep) {
-						actx.setCauseValue(dep)
-					}
 					results = append(results, dep.getBottomUses(actx, opt...)...)
 				})
 			}
@@ -203,7 +198,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			}
 		}
 
-		currentCallValue := actx.getLastCauseValue()
+		currentCallValue := actx.getLastCauseCall(BottomUseAnalysis)
 		if currentCallValue == nil {
 			return fallback()
 		}
