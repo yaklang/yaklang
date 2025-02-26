@@ -171,13 +171,9 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	}
 
 	var (
-		parents         []string
-		extendName      string
-		implNames       []string
-		implExtendNames []string
-		blueprint       *ssa.Blueprint
+		blueprint *ssa.Blueprint
 	)
-	tokenMap := make(map[string]ssa.CanStartStopToken)
+	var handlefunc []func(b *builder)
 
 	if i.ClassEntryType() != nil {
 		switch strings.ToLower(i.ClassEntryType().GetText()) {
@@ -199,18 +195,37 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 				y.CurrentBlueprint = nil
 			}()
 			y.GetProgram().SetExportType(name, blueprint)
-
 			if i.Extends() != nil {
-				extendName = i.QualifiedStaticTypeRef().GetText()
-				parents = append(parents, extendName)
-				tokenMap[extendName] = i.QualifiedStaticTypeRef()
+				handlefunc = append(handlefunc, func(b *builder) {
+					b.SetRange(i.QualifiedStaticTypeRef())
+					extendBlueprint := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
+					blueprint.AddParentBlueprint(extendBlueprint)
+					blueprint.AddSuperBlueprint(extendBlueprint)
+					blueprint.SetKind(ssa.BlueprintClass)
+				})
 			}
 			if i.Implements() != nil {
-				for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
-					implNames = append(implNames, impl.GetText())
-					tokenMap[impl.GetText()] = impl
-					parents = append(parents, impl.GetText())
-				}
+				handlefunc = append(handlefunc, func(b *builder) {
+					for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
+						ref := impl.(*phpparser.QualifiedStaticTypeRefContext)
+						pkgName, namespaceName := b.VisitQualifiedNamespaceName(ref.QualifiedNamespaceName())
+						app := b.GetProgram().GetApplication()
+						var iface *ssa.Blueprint
+						if len(pkgName) <= 1 {
+							iface = b.GetBluePrint(namespaceName)
+							if iface == nil {
+								iface = b.CreateBlueprint(namespaceName)
+							}
+						} else {
+							iface = b.GetBluePrint(namespaceName)
+							if iface == nil {
+								iface = app.GetClassBlueprintEx(namespaceName, strings.Join(pkgName, "."))
+							}
+						}
+						iface.SetKind(ssa.BlueprintInterface)
+						blueprint.AddInterfaceBlueprint(iface)
+					}
+				})
 			}
 		}
 	} else if i.Interface() != nil {
@@ -224,9 +239,25 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		if i.Extends() != nil {
 			if i.InterfaceList() != nil {
 				for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
-					implExtendNames = append(implExtendNames, impl.GetText())
-					tokenMap[impl.GetText()] = impl
-					parents = append(parents, impl.GetText())
+					handlefunc = append(handlefunc, func(b *builder) {
+						ref := impl.(*phpparser.QualifiedStaticTypeRefContext)
+						pkgName, namespaceName := y.VisitQualifiedNamespaceName(ref.QualifiedNamespaceName())
+						app := b.GetProgram().GetApplication()
+						var iface *ssa.Blueprint
+						if len(pkgName) <= 1 {
+							iface = b.GetBluePrint(namespaceName)
+							if iface == nil {
+								iface = b.CreateBlueprint(namespaceName)
+							}
+						} else {
+							iface = b.GetBluePrint(namespaceName)
+							if iface == nil {
+								iface = app.GetClassBlueprintEx(namespaceName, strings.Join(pkgName, "."))
+							}
+						}
+						iface.SetKind(ssa.BlueprintInterface)
+						blueprint.AddInterfaceBlueprint(iface)
+					})
 				}
 			}
 		}
@@ -239,40 +270,8 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	blueprint.AddLazyBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
-		for _, parent := range parents {
-			bp := y.GetBluePrint(parent)
-			if bp == nil {
-				bp = y.CreateBlueprint(parent, tokenMap[parent])
-			}
-			bp.SetKind(ssa.BlueprintInterface)
-			blueprint.AddParentBlueprint(bp)
-			for _, s := range bp.GetFullTypeNames() {
-				blueprint.AddFullTypeName(s)
-			}
-		}
-		for _, impl := range implNames {
-			bp := y.GetBluePrint(impl)
-			if bp == nil {
-				bp = y.CreateBlueprint(impl, tokenMap[impl])
-			}
-			bp.SetKind(ssa.BlueprintInterface)
-			blueprint.AddInterfaceBlueprint(bp)
-		}
-		if extendName != "" {
-			bp := y.GetBluePrint(extendName)
-			if bp == nil {
-				bp = y.CreateBlueprint(extendName, tokenMap[extendName])
-			}
-			bp.SetKind(ssa.BlueprintClass)
-			blueprint.AddSuperBlueprint(bp)
-		}
-		for _, impl := range implExtendNames {
-			bp := y.GetBluePrint(impl)
-			if bp == nil {
-				bp = y.CreateBlueprint(impl, tokenMap[impl])
-			}
-			bp.SetKind(ssa.BlueprintInterface)
-			blueprint.AddSuperBlueprint(bp)
+		for _, f := range handlefunc {
+			f(y)
 		}
 	})
 	for _, statement := range i.AllClassStatement() {

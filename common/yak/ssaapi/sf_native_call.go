@@ -160,9 +160,78 @@ const (
 
 	//getCurrentBlueprint is used to get the current blueprint. only function can use it
 	NativeCall_GetCurrentBlueprint = "getCurrentBlueprint"
+
+	NativeCall_ExtendsBy = "extendsBy"
+
+	NativeCall_Getblurpint = "getBluePrint"
 )
 
 func init() {
+	registerNativeCall(NativeCall_Getblurpint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				_, isBlueprint := ssa.ToClassBluePrintType(ret.node.GetType())
+				if isBlueprint {
+					result = append(result, ret)
+				}
+			default:
+				return nil
+			}
+			return nil
+		})
+		return true, sfvm.NewValues(result), nil
+	}))
+	registerNativeCall(NativeCall_ExtendsBy, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		/*
+		*a<extendsBy($b)> 判断a是否继承自b
+		 */
+		var result []sfvm.ValueOperator
+		var extends []*ssa.Blueprint
+		name := params.GetString(0)
+		val, ok := frame.GetSymbolByName(name)
+		if !ok {
+			return false, nil, utils.Errorf("can't find symbol %s", name)
+		}
+		val.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				typ, isBlueprint := ssa.ToClassBluePrintType(ret.node.GetType())
+				if isBlueprint {
+					extends = append(extends, typ)
+				}
+			default:
+				return nil
+			}
+			return nil
+		})
+		check := func(p ssa.Type) bool {
+			typ, isBlueprint := ssa.ToClassBluePrintType(p)
+			if isBlueprint {
+				return false
+			}
+			for _, extend := range extends {
+				if typ.CheckExtendBy(extend) {
+					return true
+				}
+			}
+			return false
+		}
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				node := ret.node
+				if check(node.GetType()) {
+					result = append(result, ret)
+				}
+			default:
+				return nil
+			}
+			return nil
+		})
+		return true, sfvm.NewValues(result), nil
+	}))
 	registerNativeCall(NativeCall_GetCurrentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
 		prog, err := fetchProgram(v)
@@ -180,7 +249,7 @@ func init() {
 				if blueprint == nil {
 					return nil
 				}
-				val := ssa.NewConst(blueprint.Name)
+				val := ssa.NewConstWithRange(blueprint.Name, function.GetRange())
 				val.SetIsFromDB(true)
 				val.SetType(blueprint)
 				result = append(result, prog.NewValue(val))

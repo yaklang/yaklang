@@ -77,15 +77,19 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		if parent == nil {
 			parent = y.EmitConstInst(text)
 		}
-		cls := y.MarkedThisClassBlueprint.GetSuperBlueprint()
-		if cls != nil {
-			parent.SetType(cls)
+		currentBlueprint := y.Function.GetCurrentBlueprint()
+		if currentBlueprint != nil {
+			parentBlueprint := currentBlueprint.GetSuperBlueprint()
+			if parentBlueprint != nil {
+				parent.SetType(parentBlueprint)
+				key := y.VisitMemberCallKey(ret.MemberCallKey())
+				if y.isFunction {
+					return y.ReadMemberCallMethod(parent, key)
+				}
+				return y.ReadMemberCallValue(parent, key)
+			}
 		}
-		key := y.VisitMemberCallKey(ret.MemberCallKey())
-		if y.isFunction {
-			return y.ReadMemberCallMethod(parent, key)
-		}
-		return y.ReadMemberCallValue(parent, key)
+		return y.EmitUndefined("parent")
 	case *phpparser.MemberCallExpressionContext:
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitMemberCallKey(ret.MemberCallKey())
