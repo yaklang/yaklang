@@ -67,6 +67,9 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 func (f *Function) SetCurrentBlueprint(blueprint *Blueprint) {
 	f.CurrentBlueprint = blueprint
 }
+func (f *Function) GetCurrentBlueprint() *Blueprint {
+	return f.CurrentBlueprint
+}
 func (f *Function) GetType() Type {
 	if f.Type != nil {
 		return f.Type

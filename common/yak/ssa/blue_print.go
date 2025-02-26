@@ -1,8 +1,6 @@
 package ssa
 
 import (
-	"strings"
-
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -113,9 +111,6 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 	if parent == nil || c == nil {
 		return
 	}
-	if parent == nil {
-		return
-	}
 
 	c.setBlueprintRelation(parent, relation)
 	if relation == BlueprintRelationParents {
@@ -166,11 +161,12 @@ func (c *Blueprint) GetInterfaceBlueprint() []*Blueprint {
 	return c.InterfaceBlueprints
 }
 
-func (c *Blueprint) CheckExtendBy(kls string) bool {
-	for _, class := range c.ParentBlueprints {
-		if strings.EqualFold(class.Name, kls) {
+func (c *Blueprint) CheckExtendBy(parentBlueprint *Blueprint) bool {
+	for _, blueprint := range c.SuperBlueprints {
+		if blueprint == parentBlueprint {
 			return true
 		}
+		return blueprint.CheckExtendBy(parentBlueprint)
 	}
 	return false
 }
