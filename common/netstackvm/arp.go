@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (m *NetStackVirtualMachine) persistentARPAnnouncement() error {
+func (m *NetStackVirtualMachineEntry) persistentARPAnnouncement() error {
 	var addrs []string
 	m.arpPersistentMap.Range(func(key, value any) bool {
 		addrs = append(addrs, key.(string))
@@ -44,7 +44,7 @@ func (m *NetStackVirtualMachine) persistentARPAnnouncement() error {
 	return nil
 }
 
-func (vm *NetStackVirtualMachine) sendARPAnnouncement(ctx context.Context, ipAddr tcpip.Address) error {
+func (vm *NetStackVirtualMachineEntry) sendARPAnnouncement(ctx context.Context, ipAddr tcpip.Address) error {
 	nicID := vm.MainNICID()
 	s := vm.stack
 	// 获取网卡信息
@@ -112,7 +112,7 @@ func (vm *NetStackVirtualMachine) sendARPAnnouncement(ctx context.Context, ipAdd
 	return nil
 }
 
-func (m *NetStackVirtualMachine) StartAnnounceARP() error {
+func (m *NetStackVirtualMachineEntry) StartAnnounceARP() error {
 	if m.config.ARPDisabled {
 		return utils.Error("arp is disabled")
 	}

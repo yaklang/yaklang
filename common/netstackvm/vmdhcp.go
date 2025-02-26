@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func (vm *NetStackVirtualMachine) StartDHCP() error {
+func (vm *NetStackVirtualMachineEntry) StartDHCP() error {
 	if vm.dhcpStarted.IsSet() {
 		log.Warn("dhcp client already started, do not start again")
 		return nil
@@ -72,6 +72,7 @@ func (vm *NetStackVirtualMachine) StartDHCP() error {
 				log.Errorf("set main nic neighbor route failed: %v", err)
 				return
 			}
+			vm.dhcpSuccess.Set()
 
 			vm.arpPersistentMap.Store(preferIp.String(), struct{}{})
 			// start to announcement arp localIP macAddr
@@ -92,7 +93,7 @@ func (vm *NetStackVirtualMachine) StartDHCP() error {
 	return nil
 }
 
-func (t *NetStackVirtualMachine) WaitDHCPFinished(ctx context.Context) error {
+func (t *NetStackVirtualMachineEntry) WaitDHCPFinished(ctx context.Context) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	for {
