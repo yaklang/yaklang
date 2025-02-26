@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -36,14 +37,22 @@ func NewCommonCallToolResult(data any) (*mcp.CallToolResult, error) {
 	}, nil
 }
 
-func arrayToStringHook(from reflect.Type, to reflect.Type, v any) (any, error) {
+func decodeHook(from reflect.Type, to reflect.Type, v any) (any, error) {
 	if to.Kind() == reflect.String {
 		if from.Kind() == reflect.Slice {
 			slice := utils.InterfaceToSliceInterface(v)
 			stringSlice := lo.Map(slice, func(item any, _ int) string {
 				return utils.InterfaceToString(item)
 			})
-			return strings.Join(stringSlice, ","), nil
+			return strings.Join(stringSlice, "\n"), nil
+		}
+	} else if to.Kind() == reflect.Slice && to.Elem().Kind() == reflect.Uint8 {
+		if from.Kind() == reflect.Slice {
+			slice := utils.InterfaceToSliceInterface(v)
+			bytesSlice := lo.Map(slice, func(item any, _ int) []byte {
+				return utils.InterfaceToBytes(item)
+			})
+			return bytes.Join(bytesSlice, []byte("\n")), nil
 		}
 	}
 	return v, nil

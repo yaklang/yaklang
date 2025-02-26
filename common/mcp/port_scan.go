@@ -175,7 +175,7 @@ func handlePortScan(s *MCPServer) server.ToolHandlerFunc {
 	) (*mcp.CallToolResult, error) {
 		var req ypb.PortScanRequest
 		decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			DecodeHook: arrayToStringHook,
+			DecodeHook: decodeHook,
 			Result:     &req,
 		})
 		if err != nil {
@@ -274,7 +274,7 @@ func handleQueryPort(s *MCPServer) server.ToolHandlerFunc {
 	) (*mcp.CallToolResult, error) {
 		var req ypb.QueryPortsRequest
 		decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			DecodeHook: arrayToStringHook,
+			DecodeHook: decodeHook,
 			Result:     &req,
 		})
 		if err != nil {
@@ -299,7 +299,7 @@ func handleDeletePort(s *MCPServer) server.ToolHandlerFunc {
 	) (*mcp.CallToolResult, error) {
 		var req ypb.DeletePortsRequest
 		decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			DecodeHook: arrayToStringHook,
+			DecodeHook: decodeHook,
 			Result:     &req,
 		})
 		if err != nil {
