@@ -152,8 +152,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		case isFunc && !fun.IsExtern():
 			callee := i.NewTopDefValue(fun)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
-			// The call will result in crossing the function boundary
-			actx.setCauseValue(i)
 			// inherit return index
 			val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
 			if ok {
@@ -313,7 +311,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return Values{traced}
 			}
 		}
-		called := actx.getLastCauseValue()
+		called := actx.getLastCauseCall(TopDefAnalysis)
 		if called != nil {
 			calledByValue := getCalledByValue(called)
 			vals = append(vals, calledByValue...)
@@ -378,7 +376,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		var vals Values
 		// Retrieve the case value. And it is required that the value must be a Call.
-		called := actx.getLastCauseValue()
+		called := actx.getLastCauseCall(TopDefAnalysis)
 		if called != nil {
 			if !called.IsCall() {
 				log.Infof("parent function is not called by any other function, skip (%T)", called)
@@ -387,7 +385,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			calledByValue := getCalledByValue(called)
 			vals = append(vals, calledByValue...)
 		}
-
 		// if not found in call stack, then find in called-by
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
@@ -411,9 +408,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	case *ssa.SideEffect:
 		callIns := inst.CallSite
 		if callIns != nil {
-			call := i.NewTopDefValue(callIns)
 			v := i.NewTopDefValue(inst.Value)
-			actx.setCauseValue(call)
 			return v.getTopDefs(actx, opt...)
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
