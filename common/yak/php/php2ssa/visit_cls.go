@@ -89,18 +89,6 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 			}
 		}
 	}
-	//if i.Interface() != nil {
-	//	blueprint.SetKind(ssa.BlueprintInterface)
-	//	if i.Extends() != nil {
-	//		if i.InterfaceList() != nil {
-	//			for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
-	//				extendImpls = append(extendImpls, impl.GetText())
-	//				tokenMap[impl.GetText()] = impl
-	//				parents = append(parents, impl.GetText())
-	//			}
-	//		}
-	//	}
-	//}
 	for _, parent := range parents {
 		bp := y.GetBluePrint(parent)
 		if bp == nil {
@@ -840,15 +828,13 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 		log.Errorf("create library fail: %s", err)
 	} else if library != nil {
 		if !blueprint {
-			if value, ok := library.ExportValue[identifier]; ok {
-				return value
-			}
+			value := library.GetExportValue(identifier)
+			return value
 		} else {
-			if t, ok := library.ExportType[identifier]; ok {
-				undefined := y.EmitUndefined(identifier)
-				undefined.SetType(t)
-				return undefined
-			}
+			fullTypeBluePrint := library.GetBluePrint(identifier, raw)
+			undefined := y.EmitUndefined(identifier)
+			undefined.SetType(fullTypeBluePrint)
+			return undefined
 		}
 	}
 	undefined := y.EmitUndefined(identifier)
