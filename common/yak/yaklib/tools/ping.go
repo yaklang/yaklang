@@ -17,6 +17,7 @@ type _pingConfig struct {
 	Ctx                context.Context
 	RuntimeId          string
 	dnsTimeout         time.Duration
+	linkResolveTimeout time.Duration
 	timeout            time.Duration
 	dnsServers         []string
 	scanCClass         bool
@@ -83,6 +84,12 @@ func _pingConfigOpt_withDNSTimeout(i float64) PingConfigOpt {
 func _pingConfigOpt_withTimeout(i float64) PingConfigOpt {
 	return func(config *_pingConfig) {
 		config.timeout = utils.FloatSecondDuration(i)
+	}
+}
+
+func _pingConfigOpt_LinkResolveTimeout(i float64) PingConfigOpt {
+	return func(config *_pingConfig) {
+		config.linkResolveTimeout = utils.FloatSecondDuration(i)
 	}
 }
 
@@ -202,13 +209,16 @@ func _ping(target string, opts ...PingConfigOpt) *pingutil.PingResult {
 		r(config)
 	}
 
+	pingOpts := []pingutil.PingConfigOpt{
+		pingutil.WithPingContext(config.Ctx),
+		pingutil.WithDefaultTcpPort(config.tcpPingPort),
+		pingutil.WithTimeout(config.timeout),
+		pingutil.WithProxies(config.proxies...),
+		pingutil.WithLinkResolveTimeout(config.linkResolveTimeout),
+	}
+
 	if utils.IsIPv4(target) || utils.IsIPv6(target) {
-		return pingutil.PingAuto(target,
-			pingutil.WithPingContext(config.Ctx),
-			pingutil.WithDefaultTcpPort(config.tcpPingPort),
-			pingutil.WithTimeout(config.timeout),
-			pingutil.WithProxies(config.proxies...),
-		)
+		return pingutil.PingAuto(target, pingOpts...)
 	} else if strings.HasPrefix(
 		target, "https://") || strings.HasPrefix(
 		target, "http://") {
@@ -225,12 +235,7 @@ func _ping(target string, opts ...PingConfigOpt) *pingutil.PingResult {
 	} else {
 		result := netx.LookupFirst(target, netx.WithTimeout(config.dnsTimeout), netx.WithDNSServers(config.dnsServers...))
 		if result != "" && (utils.IsIPv4(result) || utils.IsIPv6(result)) {
-			return pingutil.PingAuto(result,
-				pingutil.WithPingContext(config.Ctx),
-				pingutil.WithDefaultTcpPort(config.tcpPingPort),
-				pingutil.WithTimeout(config.timeout),
-				pingutil.WithProxies(config.proxies...),
-			)
+			return pingutil.PingAuto(target, pingOpts...)
 		}
 		return &pingutil.PingResult{
 			IP:     target,
