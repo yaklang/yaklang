@@ -1,0 +1,28 @@
+// 定义文件路径
+filePath := file.Join(os.TempDir(), randstr(10) + ".txt")
+
+
+// 打开文件（如果文件不存在则创建）
+f := file.Open(filePath)~
+defer f.Close()  // 确保文件最终会被关闭
+
+// 写入内容到文件
+f.WriteLine("Hello, Yaklang!")
+f.WriteLine("This is a test file.")
+
+// 将文件指针移动到文件开头，以便读取
+f.Seek(0, 0)
+
+// 按行读取文件内容
+lines := f.ReadLines()
+println("File content:")
+assertedLine = ""
+for line in lines {
+    println(line)
+    line = str.TrimSpace(line)
+    if line == "" {
+        continue
+    }
+    assertedLine = line
+}
+assert assertedLine == `This is a test file.`
