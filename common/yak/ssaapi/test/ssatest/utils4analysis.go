@@ -535,14 +535,15 @@ func checkResult(frame *sfvm.SFFrame, rule *schema.SyntaxFlowRule, result *ssaap
 
 	for _, name := range result.GetAlertVariables() {
 		alertCount += len(result.GetValues(name))
+		count := len(result.GetValues(name))
 		if info, b := result.GetAlertInfo(name); b {
 			switch info.Severity {
 			case "mid", "m", "middle":
-				alert_mid++
+				alert_mid += count
 			case "high", "h":
-				alert_high++
+				alert_high += count
 			case "info", "low":
-				alert_info++
+				alert_info += count
 			}
 		}
 	}
