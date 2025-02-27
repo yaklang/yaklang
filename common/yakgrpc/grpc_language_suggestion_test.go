@@ -3,10 +3,11 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
@@ -253,6 +254,20 @@ prog.`, &ypb.Range{
 			EndLine:     3,
 			EndColumn:   7,
 		}, []string{"Program", "Ref"})
+	})
+
+	t.Run("extern alias type completion", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionContains(t, `
+dur = time.ParseDuration("100ms")~
+dur.`, &ypb.Range{
+			Code:        "dur.",
+			StartLine:   3,
+			StartColumn: 1,
+			EndLine:     3,
+			EndColumn:   5,
+		}, []string{"Abs", "Hours", "Minutes"})
 	})
 
 	t.Run("anonymous field struct completion", func(t *testing.T) {
