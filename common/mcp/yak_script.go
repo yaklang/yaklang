@@ -7,7 +7,6 @@ import (
 	"io"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"
@@ -193,8 +192,8 @@ func init() {
 		), handleDeleteYakScriptGroup),
 
 		// online
-		WithTool(mcp.NewTool("query_online_plugins",
-			mcp.WithDescription("Queries online plugins based on the provided filters"),
+		WithTool(mcp.NewTool("query_online_yak_script",
+			mcp.WithDescription("Queries online yak scripts based on the provided filters"),
 			mcp.WithPaging("pagination",
 				[]string{"created_at", "updated_at", "id"},
 				mcp.Description("Pagination settings for the query"),
@@ -208,9 +207,9 @@ func init() {
 			),
 		), handleQueryOnlinePlugins),
 
-		WithTool(mcp.NewTool("download_online_plugins",
+		WithTool(mcp.NewTool("download_online_yak_script",
 			append([]mcp.ToolOption{
-				mcp.WithDescription("Download online plugins to local based on the provided filters"),
+				mcp.WithDescription("Download online yak scripts to local based on the provided filters"),
 			}, filterOnlinePluginToolOptions...)...,
 		), handleDownloadOnlinePlugins),
 	)
@@ -273,16 +272,7 @@ func handleExecYakScript(s *MCPServer) server.ToolHandlerFunc {
 			}
 
 			content := string(exec.Message)
-			// handle complex message
-			msgContent := gjson.GetBytes(exec.Message, "content")
-			level := msgContent.Get("level").String()
-			switch level {
-			case "feature-status-card-data":
-				continue
-			case "info", "json":
-				// use content directly
-				content = msgContent.Get("data").String()
-			}
+			content = handleExecMessage(content)
 			if content == "" {
 				continue
 			}
@@ -302,7 +292,7 @@ func handleExecYakScript(s *MCPServer) server.ToolHandlerFunc {
 			})
 		}
 
-		return NewCommonCallToolResult((results))
+		return NewCommonCallToolResult(results)
 	}
 }
 

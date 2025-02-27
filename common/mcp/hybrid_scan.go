@@ -141,16 +141,9 @@ func handleHybridScan(s *MCPServer) server.ToolHandlerFunc {
 				continue
 			}
 			content := string(exec.Message)
-			// handle complex message
+			content = handleExecMessage(content)
 			msgContent := gjson.GetBytes(exec.Message, "content")
 			level := msgContent.Get("level").String()
-			switch level {
-			case "feature-status-card-data":
-				continue
-			case "info", "json", "json-risk":
-				// use content directly
-				content = msgContent.Get("data").String()
-			}
 			if content == "" {
 				continue
 			}

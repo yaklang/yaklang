@@ -13,7 +13,12 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/client"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
+
+func init() {
+	yakit.CallPostInitDatabase()
+}
 
 func TestMCPServerEx(t *testing.T) {
 	s, _ := NewMCPServer()
@@ -57,28 +62,9 @@ func TestMCPClient(t *testing.T) {
 
 	request := mcp.CallToolRequest{}
 	data := `{
-    "type": "mysql",
-    "target": {
-        "targets": [
-            "127.0.0.1:3306"
-        ]
-    },
-    "concurrent": 20,
-    "user-dict": {
-        "usernames": [
-            "root"
-        ]
-    },
-    "pass-dict": {
-        "passwords": [
-            "root",
-            "123456"
-        ]
-    },
-	"replaceDefaultUsernameDict": true,
-	"replaceDefaultPasswordDict": true
+  "target": "www.example.com" 
 }`
-	request.Params.Name = "brute"
+	request.Params.Name = "subdomain_collection"
 	err = json.Unmarshal([]byte(data), &request.Params.Arguments)
 	require.NoError(t, err)
 	c.OnNotification(func(notification mcp.JSONRPCNotification) {

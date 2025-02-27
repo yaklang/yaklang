@@ -213,16 +213,8 @@ func handlePortScan(s *MCPServer) server.ToolHandlerFunc {
 			}
 
 			content := string(exec.Message)
-			// handle complex message
+			content = handleExecMessage(content)
 			msgContent := gjson.GetBytes(exec.Message, "content")
-			level := msgContent.Get("level").String()
-			switch level {
-			case "feature-status-card-data":
-				continue
-			case "info", "json":
-				// use content directly
-				content = msgContent.Get("data").String()
-			}
 
 			isResult := gjson.GetBytes(exec.Message, "isOpen").Exists()
 			if isResult {

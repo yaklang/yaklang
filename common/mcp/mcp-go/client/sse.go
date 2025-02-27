@@ -15,7 +15,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // SSEMCPClient implements the MCPClient interface using Server-Sent Events (SSE).
@@ -108,11 +110,22 @@ func (c *SSEMCPClient) Start(ctx context.Context) error {
 func (c *SSEMCPClient) readSSE(reader io.ReadCloser) {
 	defer reader.Close()
 
-	scanner := bufio.NewScanner(reader)
-	var event, data string
+	var (
+		content []byte
+		err     error
+	)
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	bufReader := bufio.NewReader(reader)
+	var event, data string
+	for {
+		content, err = utils.BufioReadLine(bufReader)
+		if err != nil {
+			if err == io.EOF || errors.Is(err, io.ErrUnexpectedEOF) {
+				err = nil
+				break
+			}
+		}
+		line := string(content)
 
 		if line == "" {
 			// Empty line means end of event
@@ -129,14 +142,15 @@ func (c *SSEMCPClient) readSSE(reader io.ReadCloser) {
 		} else if strings.HasPrefix(line, "data:") {
 			data = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 		}
+
 	}
 
-	if err := scanner.Err(); err != nil {
+	if err != nil {
 		select {
 		case <-c.done:
 			return
 		default:
-			fmt.Printf("SSE stream error: %v\n", err)
+			log.Errorf("SSE stream error: %v\n", err)
 		}
 	}
 }
