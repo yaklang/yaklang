@@ -142,6 +142,19 @@ func (y *_yakFile) GetOsFile() *os.File {
 	return y.file
 }
 
+// Seek 移动文件指针，返回新的偏移量和错误
+func (y *_yakFile) Seek(offset int64, whence int) (int64, error) {
+	return y.file.Seek(offset, whence)
+}
+
+func (y *_yakFile) Truncated(size int64) error {
+	return y.file.Truncate(size)
+}
+
+func (y *_yakFile) Sync() error {
+	return y.file.Sync()
+}
+
 func (y *_yakFile) Name() string {
 	return y.file.Name()
 }
