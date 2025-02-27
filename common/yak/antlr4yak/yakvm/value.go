@@ -825,19 +825,35 @@ func (v *Value) Float64() float64 {
 	if v.IsInt64() {
 		return float64(v.Int64())
 	}
+	refV := reflect.ValueOf(v.Value)
+	if refV.Kind() == reflect.Float32 || refV.Kind() == reflect.Float64 {
+		return refV.Float()
+	}
+
 	return float64(0)
 }
 
 func (v *Value) IsInt64() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
 	switch v.Value.(type) {
 	case int, int64, int8, int16, int32,
 		uint, uint8, uint16, uint32, uint64:
 		return true
+	default:
+		kind := reflect.TypeOf(v.Value).Kind()
+		if kind >= reflect.Int && kind <= reflect.Uint64 {
+			return true
+		}
 	}
 	return false
 }
 
 func (v *Value) IsInt64EX() (int64, bool) {
+	if v == nil || v.Value == nil {
+		return 0, false
+	}
 	switch ret := v.Value.(type) {
 	case int:
 		return int64(ret), true
@@ -860,24 +876,34 @@ func (v *Value) IsInt64EX() (int64, bool) {
 	case uint64:
 		log.Errorf("uint64 to int64 overflow, value: %d", ret)
 		return int64(ret), true
+	default:
+		refV := reflect.ValueOf(v.Value)
+		if refV.Kind() >= reflect.Int && refV.Kind() <= reflect.Uint64 {
+			return refV.Int(), true
+		}
 	}
 	return 0, false
 }
 
 func (v *Value) IsInt() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
 	switch v.Value.(type) {
 	case int, int64, int8, int16, int32,
 		uint, uint8, uint16, uint32, uint64:
 		return true
+	default:
+		kind := reflect.TypeOf(v.Value).Kind()
+		if kind >= reflect.Int && kind <= reflect.Uint64 {
+			return true
+		}
 	}
 	return false
 }
 
 func (v *Value) Int() int {
-	if v == nil {
-		return 0
-	}
-	if v.Value == nil {
+	if v == nil || v.Value == nil {
 		return 0
 	}
 	switch ret := v.Value.(type) {
@@ -901,11 +927,20 @@ func (v *Value) Int() int {
 		return int(ret)
 	case uint64:
 		return int(ret)
+	default:
+		refV := reflect.ValueOf(v.Value)
+		if refV.Kind() >= reflect.Int && refV.Kind() <= reflect.Uint64 {
+			return int(refV.Int())
+		}
 	}
+
 	return 0
 }
 
 func (v *Value) Int64() int64 {
+	if v == nil || v.Value == nil {
+		return 0
+	}
 	switch ret := v.Value.(type) {
 	case int:
 		return int64(ret)
@@ -927,6 +962,11 @@ func (v *Value) Int64() int64 {
 		return int64(ret)
 	case uint64:
 		return int64(ret)
+	default:
+		refV := reflect.ValueOf(v.Value)
+		if refV.Kind() >= reflect.Int && refV.Kind() <= reflect.Uint64 {
+			return refV.Int()
+		}
 	}
 	return 0
 }

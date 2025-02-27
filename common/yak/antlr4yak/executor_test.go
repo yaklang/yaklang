@@ -121,6 +121,10 @@ func init() {
 		return &struct{ A uint16 }{A: 1}, map[string]uint16{"a": 1}, []uint16{1, 2, 3}
 	})
 	Import("NewSizedWaitGroup", utils2.NewSizedWaitGroup)
+	Import("dur", func(i string) time.Duration {
+		dur, _ := time.ParseDuration(i)
+		return dur
+	})
 }
 
 func TestRangeString(t *testing.T) {
@@ -4261,6 +4265,14 @@ func TestUnicode(t *testing.T) {
 	code := `
 assert "\xE4\xBD\xA0\xE5\xA5\xBD" == "你好"
 assert "\u4F60\u597D" == "你好"
+`
+	_marshallerTest(code)
+	_formattest(code)
+}
+
+func TestAliasTypeOp(t *testing.T) {
+	code := `
+assert dur("100ms") < dur("200ms")
 `
 	_marshallerTest(code)
 	_formattest(code)
