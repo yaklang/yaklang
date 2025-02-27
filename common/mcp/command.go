@@ -8,11 +8,12 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 var MCPCommandUsage = `Start a mcp server for providing mcp service.
 
-Available ToolSets: codec, cve, httpflow, hybrid_scan, payload, port_scan, yak_document, yak_script, reverse_shell, http_fuzzer, brute
+Available ToolSets: codec, cve, httpflow, hybrid_scan, payload, port_scan, yak_document, yak_script, reverse_shell, http_fuzzer, brute, subdomain, crawler
 
 Available ResourceSets: codec`
 
@@ -29,6 +30,8 @@ var MCPCommand = &cli.Command{
 		cli.StringFlag{Name: "dr,disable-resource", Usage: "disable resource sets, split by ,"},
 	},
 	Action: func(c *cli.Context) error {
+		yakit.CallPostInitDatabase()
+
 		var err error
 		transport := c.String("transport")
 		host := c.String("host")
