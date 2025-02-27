@@ -3,6 +3,7 @@ package filesys
 import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -63,8 +64,12 @@ func TestUnifiedFs_File_Operate(t *testing.T) {
 	uf := NewUnifiedFS(lf, WithUnifiedFsSeparator('$'))
 	unifiedPath := "a$b$c.txt"
 	t.Run("TestUnifiedFS_OpenFile", func(t *testing.T) {
-		_, err := uf.OpenFile(unifiedPath, os.O_RDONLY, 0644)
+		info, err := uf.OpenFile(unifiedPath, os.O_RDONLY, 0644)
 		require.NoError(t, err)
+		fi, err := info.Stat()
+		require.NoError(t, err)
+		require.Equal(t, int64(len(content)), fi.Size())
+		require.Equal(t, "c.txt", fi.Name())
 	})
 
 	t.Run("TestUnifiedFS_Exists", func(t *testing.T) {
@@ -96,11 +101,6 @@ func TestUnifiedFs_ClassToJavaExtMap(t *testing.T) {
 		lf,
 		WithUnifiedFsExtMap(".class", ".java"),
 	)
-
-	t.Run("TestUnifiedFS_ConvertToRealPath", func(t *testing.T) {
-		require.Equal(t, uf.convertToRealPathWithOp("test.class", ReadOperation), "test.java")
-		require.Equal(t, uf.convertToRealPathWithOp("test.java", WriteOperation), "test.class")
-	})
 
 	t.Run("TestWriteClassFile", func(t *testing.T) {
 		unifiedPath := "Example.java"
@@ -177,4 +177,83 @@ func TestUnifiedFs_ClassToJavaExtMap(t *testing.T) {
 		ret := uf.Ext("aaa.java")
 		require.Equal(t, ".java", ret)
 	})
+
+	t.Run("TestVirtualExtNoAffected", func(t *testing.T) {
+		unifiedPath := "testAAA.java"
+		uf.WriteFile(unifiedPath, []byte("test content"), 0644)
+		dir, err := uf.ReadDir(".")
+		require.NoError(t, err)
+		check := false
+		for _, entry := range dir {
+			if entry.Name() == "testAAA.java" {
+				check = true
+			}
+		}
+		require.True(t, check)
+	})
+	t.Run("Test state", func(t *testing.T) {
+		test1 := "test1.java"
+		uf.WriteFile(test1, []byte("test1"), 0644)
+
+		info, err := uf.Stat(test1)
+		require.NoError(t, err)
+		require.Equal(t, "test1.java", info.Name())
+	})
+	t.Run("test open", func(t *testing.T) {
+		test2 := "test2.java"
+		uf.WriteFile(test2, []byte("test2"), 0644)
+
+		info, err := uf.Open(test2)
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		fi, err := info.Stat()
+		require.NoError(t, err)
+		require.Equal(t, "test2.java", fi.Name())
+	})
+
+	t.Run("test openfile ", func(t *testing.T) {
+		test3 := "test3.java"
+		uf.WriteFile(test3, []byte("test3"), 0644)
+
+		info, err := uf.OpenFile(test3, os.O_RDONLY, 0644)
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		fi, err := info.Stat()
+		require.NoError(t, err)
+		require.Equal(t, "test3.java", fi.Name())
+	})
+}
+
+func TestUnifiedFs_Recursive(t *testing.T) {
+	vf := NewVirtualFs()
+	vf.AddFile("a/b/c.class", "c content")
+	vf.AddFile("a/d.class", "d content")
+	vf.AddFile("a/e.java", "e content")
+
+	tmp := NewUnifiedFS(vf,
+		WithUnifiedFsExtMap(".class", ".java"),
+	)
+	uf := NewUnifiedFS(tmp,
+		WithUnifiedFsSeparator('$'),
+	)
+
+	var path []string
+	var infoName []string
+	var content []string
+	Recursive(".", WithFileSystem(uf), WithFileStat(func(s string, info fs.FileInfo) error {
+		t.Log("path is", s)
+		path = append(path, s)
+		t.Log("infoName is", info.Name())
+		infoName = append(infoName, info.Name())
+		data, err := uf.ReadFile(s)
+		require.NoError(t, err)
+		content = append(content, string(data))
+		return nil
+	}))
+	expectedPath := []string{"a$b$c.java", "a$d.java"}
+	expectedName := []string{"c.java", "d.java"}
+	expectedContent := []string{"c content", "d content"}
+	require.Equal(t, expectedPath, path)
+	require.Equal(t, expectedName, infoName)
+	require.Equal(t, expectedContent, content)
 }
