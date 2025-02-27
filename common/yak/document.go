@@ -459,13 +459,6 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]any) *yakdoc.DocumentHelpe
 				fieldTypeAndMethod := item.Value.(*EmbedFieldTypeAndMethod)
 				fieldType, method := fieldTypeAndMethod.FieldType, fieldTypeAndMethod.Method
 				structFieldType := fieldType
-				// 如果是指针类型，那么需要获取其指向的类型，如果不是结构体类型，那么就不需要处理
-				if fieldType.Kind() == reflect.Ptr {
-					structFieldType = fieldType.Elem()
-					if structFieldType.Kind() != reflect.Struct {
-						continue
-					}
-				}
 
 				var (
 					err      error

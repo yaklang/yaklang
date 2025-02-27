@@ -102,6 +102,8 @@ func CheckDocumentHelper(t *testing.T, helper *yakdoc.DocumentHelper) {
 	checkStructMethods("github.com/yaklang/yaklang/common/yak/yaklib.WaitGroupProxy", "Wait")
 	// alias builtin struct
 	checkStructMethods("net.IP", "Equal")
+	// alias type
+	checkStructMethods("time.Duration", "Abs", "Hours", "String")
 	// check auto-generated file struct method params
 	checkStructMethodParams("time.Time", "Unix", func(decl *yakdoc.FuncDecl) {
 		require.Len(t, decl.Params, 0)
