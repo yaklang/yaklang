@@ -18,7 +18,7 @@ import (
 var ruleFS embed.FS
 
 func SyncEmbedRule() error {
-	log.Infof("start sync embed rule")
+	// log.Infof("start sync embed rule")
 	sfdb.DeleteBuildInRule()
 	defer func() {
 		hash, _ := SyntaxFlowRuleHash()
@@ -74,7 +74,7 @@ func SyncEmbedRule() error {
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 		if yakit.Get(consts.EmbedSfBuildInRuleKey) == consts.ExistedSyntaxFlowEmbedFSHash {
-			log.Infof("already sync embed rule")
+			// log.Infof("already sync embed rule")
 			return nil
 		}
 		return SyncEmbedRule()
