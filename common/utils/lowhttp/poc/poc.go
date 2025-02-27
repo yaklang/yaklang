@@ -1862,7 +1862,7 @@ var PoCExports = map[string]interface{}{
 	"noRedirect":           WithNoRedirect,
 	"noredirect":           WithNoRedirect,
 	"jsRedirect":           WithJSRedirect,
-	"redirect":             WithRedirectHandler,
+	"redirect":             WithRedirect,
 	"redirectHandler":      WithRedirectHandler,
 	"https":                WithForceHTTPS,
 	"http2":                WithForceHTTP2,
