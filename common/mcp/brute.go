@@ -7,7 +7,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"
@@ -169,16 +168,7 @@ func handleBrute(s *MCPServer) server.ToolHandlerFunc {
 				})
 				continue
 			}
-			// handle complex message
-			msgContent := gjson.GetBytes(exec.Message, "content")
-			level := msgContent.Get("level").String()
-			switch level {
-			case "feature-status-card-data", "feature-table-data", "json-feature":
-				continue
-			case "info", "json", "json-risk":
-				// use content directly
-				content = msgContent.Get("data").String()
-			}
+			content = handleExecMessage(content)
 
 			results = append(results, mcp.TextContent{
 				Type: "text",
