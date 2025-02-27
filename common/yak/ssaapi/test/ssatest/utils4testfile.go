@@ -31,6 +31,14 @@ func GetJarFile() (string, error) {
 	return jarPath, nil
 }
 
+func GetJarContent() ([]byte, error) {
+	jar, err := JavaTestFile.ReadFile("testfile/test.jar")
+	if err != nil {
+		return []byte{}, err
+	}
+	return jar, nil
+}
+
 func GetZipFile() (string, error) {
 	// write java zip file to template directory
 	dir := os.TempDir()
