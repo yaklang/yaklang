@@ -87,7 +87,10 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
 		}
-		return javaclassparser.NewJarFS(zipfs), nil
+		fs := filesys.NewUnifiedFS(javaclassparser.NewJarFS(zipfs),
+			filesys.WithUnifiedFsExtMap(".class", ".java"),
+		)
+		return fs, nil
 	case "git":
 		return gitFs(&info, c.Processf)
 	case "svn":

@@ -10,7 +10,10 @@ import (
 
 type UnifiedFSConfig struct {
 	Separator rune
-	ExtMap    map[string]string
+	// 从外部文件系统读取或写入文件名称的时候，需要将文件名后缀转换为真实后缀
+	inputExtMap map[string]string // VirtualExt -> RealExt
+	// 文件系统输出文件名称的时候，需要将文件名后缀转换为虚拟后缀
+	outputExtMap map[string]string // RealExt -> VirtualExt
 }
 
 type UnifiedFS struct {
@@ -24,7 +27,9 @@ func NewUnifiedFS(fs fi.FileSystem, opts ...UnifiedFsOption) *UnifiedFS {
 	u := &UnifiedFS{
 		fs: fs,
 		config: &UnifiedFSConfig{
-			ExtMap: make(map[string]string),
+			Separator:    filepath.Separator,
+			inputExtMap:  make(map[string]string),
+			outputExtMap: make(map[string]string),
 		},
 	}
 	for _, opt := range opts {
@@ -39,24 +44,18 @@ func WithUnifiedFsSeparator(sep rune) func(config *UnifiedFSConfig) {
 	}
 }
 
-func WithUnifiedFsExtMap(extBefore, extAfter string) func(config *UnifiedFSConfig) {
+func WithUnifiedFsExtMap(extReal, extVirtual string) func(config *UnifiedFSConfig) {
 	return func(config *UnifiedFSConfig) {
-		if config.ExtMap == nil {
-			config.ExtMap = make(map[string]string)
+		if config.inputExtMap == nil {
+			config.inputExtMap = make(map[string]string)
 		}
-		config.ExtMap[extBefore] = extAfter
-		if _, exists := config.ExtMap[extAfter]; !exists {
-			config.ExtMap[extAfter] = extBefore
+		if config.outputExtMap == nil {
+			config.outputExtMap = make(map[string]string)
 		}
+		config.inputExtMap[extVirtual] = extReal
+		config.outputExtMap[extReal] = extVirtual
 	}
 }
-
-type OperationType int
-
-const (
-	ReadOperation OperationType = iota
-	WriteOperation
-)
 
 func (u *UnifiedFS) GetSeparators() rune {
 	return u.config.Separator
@@ -84,7 +83,7 @@ func (u *UnifiedFS) Ext(name string) string {
 }
 
 func (u *UnifiedFS) Exists(name string) (bool, error) {
-	realPath := u.convertToRealPathWithOp(name, ReadOperation)
+	realPath := u.convertToRealPath(name)
 	_, err := u.Open(realPath)
 	return err == nil, err
 }
@@ -96,22 +95,22 @@ func (u *UnifiedFS) IsAbs(name string) bool {
 func (u *UnifiedFS) Getwd() (string, error) { return ".", nil }
 
 func (u *UnifiedFS) Stat(name string) (fs.FileInfo, error) {
-	realPath := u.convertToRealPathWithOp(name, ReadOperation)
+	realPath := u.convertToRealPath(name)
 	return u.fs.Stat(realPath)
 }
 
 func (u *UnifiedFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
-	realPath := u.convertToRealPathWithOp(name, ReadOperation)
+	realPath := u.convertToRealPath(name)
 	return u.fs.OpenFile(realPath, flag, perm)
 }
 
 func (u *UnifiedFS) Open(name string) (fs.File, error) {
-	realPath := u.convertToRealPathWithOp(name, ReadOperation)
+	realPath := u.convertToRealPath(name)
 	return u.fs.Open(realPath)
 }
 
 func (u *UnifiedFS) ReadFile(name string) ([]byte, error) {
-	realPath := u.convertToRealPathWithOp(name, ReadOperation)
+	realPath := u.convertToRealPath(name)
 	return u.fs.ReadFile(realPath)
 }
 
@@ -120,28 +119,28 @@ func (u *UnifiedFS) ExtraInfo(s string) map[string]any {
 }
 
 func (u *UnifiedFS) Rename(old string, new string) error {
-	oldPath := u.convertToRealPathWithOp(old, WriteOperation)
-	newPath := u.convertToRealPathWithOp(new, WriteOperation)
+	oldPath := u.convertToRealPath(old)
+	newPath := u.convertToRealPath(new)
 	return u.fs.Rename(oldPath, newPath)
 }
 
 func (u *UnifiedFS) WriteFile(name string, data []byte, perm os.FileMode) error {
-	realPath := u.convertToRealPathWithOp(name, WriteOperation)
+	realPath := u.convertToRealPath(name)
 	return u.fs.WriteFile(realPath, data, perm)
 }
 
 func (u *UnifiedFS) Delete(name string) error {
-	realPath := u.convertToRealPathWithOp(name, WriteOperation)
+	realPath := u.convertToRealPath(name)
 	return u.fs.Delete(realPath)
 }
 
 func (u *UnifiedFS) MkdirAll(name string, perm os.FileMode) error {
-	realPath := u.convertToRealPathWithOp(name, WriteOperation)
+	realPath := u.convertToRealPath(name)
 	return u.fs.MkdirAll(realPath, perm)
 }
 
 func (u *UnifiedFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	realPath := u.convertToRealPathWithOp(name, ReadOperation)
+	realPath := u.convertToRealPath(name)
 
 	// 获取原始目录条目
 	entries, err := u.fs.ReadDir(realPath)
@@ -165,7 +164,7 @@ func (u *UnifiedFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return unifiedEntries, nil
 }
 
-func (u *UnifiedFS) convertToRealPathWithOp(name string, op OperationType) string {
+func (u *UnifiedFS) convertToRealPath(name string) string {
 	pathComponents := strings.Split(name, string(u.config.Separator))
 	realPath := u.fs.Join(pathComponents...)
 
@@ -173,16 +172,8 @@ func (u *UnifiedFS) convertToRealPathWithOp(name string, op OperationType) strin
 	if ext == "" {
 		return realPath
 	}
-
-	switch op {
-	case ReadOperation:
-		if mappedExt, ok := u.config.ExtMap[ext]; ok {
-			realPath = strings.TrimSuffix(realPath, ext) + mappedExt
-		}
-	case WriteOperation:
-		if originalExt, ok := u.config.ExtMap[ext]; ok {
-			realPath = strings.TrimSuffix(realPath, ext) + originalExt
-		}
+	if virtualExt, ok := u.config.inputExtMap[ext]; ok {
+		realPath = strings.TrimSuffix(realPath, ext) + virtualExt
 	}
 	return realPath
 }
@@ -202,7 +193,7 @@ func (e *UnifiedDirEntry) Name() string {
 		return base
 	}
 	// 查找反向映射
-	if originalExt, ok := e.u.config.ExtMap[ext]; ok {
+	if originalExt, ok := e.u.config.outputExtMap[ext]; ok {
 		return strings.TrimSuffix(base, ext) + originalExt
 	}
 	return base
