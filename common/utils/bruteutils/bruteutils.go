@@ -250,7 +250,6 @@ func (b *BruteUtil) run(ctx context.Context) error {
 
 func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Context) error {
 	currCtx, cancel := context.WithCancel(parentCtx)
-	defer cancel()
 	defer func() {
 		go func() {
 			select {
@@ -258,6 +257,7 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 				b.RemoteProcessingByTarget(target)
 			}
 		}()
+		cancel()
 	}()
 
 	process, err := b.GetProcessingByTarget(target)
@@ -316,6 +316,10 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 		i := i
 		go func(item *BruteItem) {
 			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("brute target[%s] failed with panic: %v", target, err)
+				}
+
 				process.Swg.Done()
 				atomic.AddInt32(&process.count, 1)
 			}()
