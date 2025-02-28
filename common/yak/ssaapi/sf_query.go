@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
 
@@ -45,6 +46,7 @@ type queryConfig struct {
 
 	// process
 	processCallback func(float64, string)
+	useInfo         bool
 }
 
 func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
@@ -133,6 +135,12 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	process(0, "load or compile syntaxflow rule ")
 	// get runtime frame
 	frame, err := config.GetFrame()
+	if config.useInfo {
+		frame.SetDebugInfoCall(func(s string) {
+			fmt.Print(s)
+			frame.GetResult().AppendDebugInfo(s)
+		})
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +180,12 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 }
 
 type QueryOption func(*queryConfig)
+
+func QueryWithDebugInfo() QueryOption {
+	return func(c *queryConfig) {
+		c.useInfo = true
+	}
+}
 
 func QueryWithProgram(program *Program) QueryOption {
 	return func(c *queryConfig) {
