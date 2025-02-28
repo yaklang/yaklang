@@ -28,6 +28,9 @@ func TestFixMacos(t *testing.T) {
 	lookupBpf()
 	require.NoError(t, Fix())
 	lookupBpf()
+	require.True(t, IsPrivilegedForNetRaw())
 	require.NoError(t, Withdraw())
 	lookupBpf()
+	require.False(t, IsPrivilegedForNetRaw())
+
 }
