@@ -10,7 +10,7 @@ const (
 	GTE  = ">="
 	GT   = ">"
 	NE   = "!="
-	Not   = "!"
+	Not  = "!"
 	LTE  = "<="
 	SUB  = "-"
 	REM  = "%"
@@ -26,3 +26,7 @@ const (
 	LOGICAL_AND = "&&"
 	LOGICAL_OR  = "||"
 )
+
+func IsLogicalOperator(op string) bool {
+	return op == LOGICAL_AND || op == LOGICAL_OR || op == "&" || op == "|" || op == "^" || op == "!"
+}

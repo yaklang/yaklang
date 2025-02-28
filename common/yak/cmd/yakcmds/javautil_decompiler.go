@@ -143,6 +143,10 @@ var JavaDecompilerSelfChecking = &cli.Command{
 					return nil
 				}
 
+				if strings.Contains(filepath.Base(s), "package-info.class") {
+					return nil
+				}
+
 				raw, err := zfs.ReadFile(s)
 				if err != nil {
 					if c.Bool("verbose") {

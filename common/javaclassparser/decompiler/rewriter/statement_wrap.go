@@ -106,11 +106,7 @@ func (s *RewriteManager) mergeIf() bool {
 					} else {
 						ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
 						ifStat2 := childNode.Statement.(*statements.ConditionStatement)
-						ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-							return fmt.Sprintf("!%s", ifStat2.Condition.String(funcCtx))
-						}, func() types.JavaType {
-							return types.NewJavaPrimer(types.JavaBoolean)
-						}), "||", types.NewJavaPrimer(types.JavaBoolean))
+						ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, values.NewUnaryExpression(ifStat2.Condition, "!", types.NewJavaPrimer(types.JavaBoolean)), "||", types.NewJavaPrimer(types.JavaBoolean))
 						trueNode := parentNode.TrueNode()
 						parentNode.RemoveAllNext()
 						childTrueNode := childNode.TrueNode()
@@ -134,11 +130,7 @@ func (s *RewriteManager) mergeIf() bool {
 					} else {
 						ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
 						ifStat2 := childNode.Statement.(*statements.ConditionStatement)
-						ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-							return fmt.Sprintf("!%s", ifStat2.Condition.String(funcCtx))
-						}, func() types.JavaType {
-							return types.NewJavaPrimer(types.JavaBoolean)
-						}), "&&", types.NewJavaPrimer(types.JavaBoolean))
+						ifStat1.Condition = values.NewBinaryExpression(ifStat1.Condition, values.NewUnaryExpression(ifStat2.Condition, "!", types.NewJavaPrimer(types.JavaBoolean)), "&&", types.NewJavaPrimer(types.JavaBoolean))
 						falseNode := parentNode.FalseNode()
 						parentNode.RemoveAllNext()
 						childFalseNode := childNode.FalseNode()

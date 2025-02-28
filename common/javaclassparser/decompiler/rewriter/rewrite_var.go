@@ -11,8 +11,11 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 )
 
-func RewriteVar(sts *[]statements.Statement, startVarId int) {
+func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.JavaRef) {
 	scope := NewScope(startVarId, sts)
+	for _, v := range params {
+		scope.assignedMap[v.VarUid] = v.Id
+	}
 	rewriteVar(scope)
 	var checkUndefinedVar func(scope *Scope, parentAssigned map[*utils.VariableId]struct{})
 	undefined := make(map[values.JavaValue]int)
@@ -41,6 +44,9 @@ func RewriteVar(sts *[]statements.Statement, startVarId int) {
 		}
 	}
 	assigned := make(map[*utils.VariableId]struct{})
+	for _, v := range params {
+		assigned[v.Id] = struct{}{}
+	}
 	checkUndefinedVar(scope, assigned)
 	//for key, _ := range undefined {
 	//	sts := varAssignMap[key.(*values.JavaRef).Id]
