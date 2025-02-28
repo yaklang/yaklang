@@ -76,18 +76,12 @@ func CoverCodeRange(programName string, r memedit.RangeIf) (*CodeRange, string) 
 
 func buildSSARisk(
 	result *SyntaxFlowResult,
-	variable string, index int,
+	variable string, index int, value *Value,
 	resultID uint64, runtimeId string,
 ) *schema.SSARisk {
 	progName := result.GetProgramName()
 	if progName == "" {
 		return nil
-	}
-	var value *Value
-	if vs := result.GetValues(variable); len(vs) <= index {
-		return nil
-	} else {
-		value = vs[index]
 	}
 	riskCodeRange, CodeFragment := CoverCodeRange(progName, value.GetRange())
 	rule := result.rule
@@ -152,23 +146,20 @@ func ssaRiskName(variable string, index int) string {
 	return fmt.Sprintf("%s-%d", variable, index)
 }
 
-func (r *SyntaxFlowResult) SaveRisk(variable string, result *ssadb.AuditResult) {
+func (r *SyntaxFlowResult) SaveRisk(variable string, index int, value *Value, result *ssadb.AuditResult) {
 	_, ok := r.GetAlertInfo(variable)
 	if !ok {
-		log.Infof("no alert msg for %s; skip", variable)
 		return
 	}
-	for i := range r.GetValues(variable) {
-		ssaRisk := buildSSARisk(r, variable, i, uint64(result.ID), result.TaskID)
-		if ssaRisk == nil {
-			continue
-		}
-		err := yakit.CreateSSARisk(consts.GetGormDefaultSSADataBase(), ssaRisk)
-		if err != nil {
-			log.Errorf("save risk failed: %s", err)
-		}
-		r.riskMap[ssaRiskName(variable, i)] = ssaRisk
+	ssaRisk := buildSSARisk(r, variable, index, value, uint64(result.ID), result.TaskID)
+	if ssaRisk == nil {
+		return
 	}
+	err := yakit.CreateSSARisk(consts.GetGormDefaultSSADataBase(), ssaRisk)
+	if err != nil {
+		log.Errorf("save risk failed: %s", err)
+	}
+	r.riskMap[ssaRiskName(variable, index)] = ssaRisk
 }
 
 func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.SSARisk {
