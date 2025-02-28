@@ -3,6 +3,7 @@ package test
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -822,6 +823,34 @@ func TestMethod_normol(t *testing.T) {
 	}
 
 		`, []string{"side-effect(Parameter-id, u.Id)", "side-effect(Parameter-name, u.Name)"}, t)
+	})
+
+	code := `package main
+
+	type T struct {
+		
+	}
+
+	func (t *T) F() int {
+		return 1
+	}
+
+	func main() {
+		t := &T{}
+		a := t.F()
+		b := T_F()
+		
+		println(b)
+	}`
+
+	t.Run("method check name", func(t *testing.T) {
+		test.CheckSyntaxFlow(t, code, `
+			a #-> as $a
+			b #-> as $b
+	`, map[string][]string{
+			"a": {"1"},
+			"b": {"Undefined-T_F"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }
 
