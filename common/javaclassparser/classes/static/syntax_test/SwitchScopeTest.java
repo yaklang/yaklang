@@ -1,8 +1,6 @@
 package org.benf.cfr.reader;
 
 public class SwitchScopeTest {
-	public SwitchScopeTest() {
-	}
 	void main() {
 		int var1 = 1;
 		switch (var1){

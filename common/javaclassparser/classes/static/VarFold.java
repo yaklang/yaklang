@@ -3,8 +3,6 @@ package org.benf.cfr.reader;
 import java.util.List;
 
 public class VarFold {
-	public VarFold() {
-	}
 	void common() {
 		System.out.println(1);
 	}

@@ -1,8 +1,6 @@
 package org.benf.cfr.reader;
 
 public class TryCatch {
-	public TryCatch() {
-	}
 	void main() {
 		int var1 = 1;
 		try{
