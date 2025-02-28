@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/pcapfix"
 	"math/rand"
 	"net"
 )
@@ -418,6 +419,8 @@ var (
 		"InjectTCP":          InjectTCPIP,
 		"InjectHTTPRequest":  InjectHTTPRequest,
 		"InjectChaosTraffic": InjectChaosTraffic,
+		"FixPermission":      pcapfix.Fix,
+		"WithdrawPermission": pcapfix.Withdraw,
 	}
 )
 
