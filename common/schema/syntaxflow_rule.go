@@ -187,6 +187,7 @@ type SyntaxFlowRule struct {
 	AllowIncluded bool
 	IncludedName  string
 	OpCodes       string
+	DeBugInfo     string
 
 	Groups []*SyntaxFlowGroup `gorm:"many2many:syntax_flow_rule_and_group;"`
 
