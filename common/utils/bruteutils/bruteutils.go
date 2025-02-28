@@ -332,13 +332,34 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 			}
 
 			// 执行爆破函数
-			result := b.callback(item)
+			var result *BruteItemResult
+
+			func() {
+				defer func() {
+					if err := recover(); err != nil {
+						result = item.Result()
+						result.Ok = false
+						result.ExtraInfo = []byte(fmt.Sprintf("brute item failed: %s\nstack:\n%v", err, utils.ErrorStack(err)))
+					}
+				}()
+				retResult := b.callback(item)
+				if retResult != nil {
+					result = retResult
+				}
+			}()
 			if result == nil {
 				return
 			}
 
 			if b.resultCallback != nil {
-				b.resultCallback(result)
+				func() {
+					defer func() {
+						if err := recover(); err != nil {
+							log.Errorf("resultCallback panic: %v\nstack:\n%v", err, utils.ErrorStack(err))
+						}
+					}()
+					b.resultCallback(result)
+				}()
 			}
 
 			// 是否遇到了爆破成功的情况？
