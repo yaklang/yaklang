@@ -1,17 +1,33 @@
 package pcapfix
 
 import (
+	"fmt"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
+	"os/exec"
+	"runtime"
 	"testing"
 )
 
 func TestFix(t *testing.T) {
-	//lookupBpf := func() {
-	//	output, err := exec.Command("sh", "-c", "ls -al /dev/bpf*").Output()
-	//	require.NoError(t, err)
-	//	fmt.Println(string(output))
-	//}
-	//
-	//lookupBpf()
 	Fix()
-	//lookupBpf()
+}
+
+func TestFixMacos(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("Skip in Github Actions")
+	}
+	if runtime.GOOS != "darwin" {
+		t.Skip("Skip on non-darwin")
+	}
+	lookupBpf := func() {
+		output, err := exec.Command("sh", "-c", "ls -al /dev/bpf*").Output()
+		require.NoError(t, err)
+		fmt.Println(string(output))
+	}
+	lookupBpf()
+	require.NoError(t, Fix())
+	lookupBpf()
+	require.NoError(t, Withdraw())
+	lookupBpf()
 }
