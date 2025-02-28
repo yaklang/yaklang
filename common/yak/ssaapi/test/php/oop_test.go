@@ -1,6 +1,8 @@
 package php
 
 import (
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -203,7 +205,8 @@ class B{
 	})
 }
 func TestBlueprintNativeCall(t *testing.T) {
-	code := `<?php
+	t.Run("test getCurrentBlueprint", func(t *testing.T) {
+		code := `<?php
 class B extends Think{}
 class A extends B{
 	public function a($c){
@@ -211,11 +214,87 @@ class A extends B{
 	}
 }
 `
-	ssatest.CheckSyntaxFlow(t, code, `a<getCurrentBlueprint><fullTypeName> as $sink`,
-		map[string][]string{
-			"sink": {`"main.A"`, `"main.B"`, `"main.Think"`},
-		},
-		ssaapi.WithLanguage(ssaapi.PHP))
+		ssatest.CheckSyntaxFlow(t, code, `a<getCurrentBlueprint><fullTypeName> as $sink`,
+			map[string][]string{
+				"sink": {`"main.A"`, `"main.B"`, `"main.Think"`},
+			},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test getCurrent blueprint with fs", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("/var/www/html/1.php", `<?php
+class A{
+	public function a(){}
+}
+`)
+		fs.AddFile("/var/www/html/2.php", `<?php
+include("1.php");
+class C extends A{
+	public function b(){}
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `b<getCurrentBlueprint><fullTypeName> as $output`,
+			map[string][]string{
+				"output": {`"main.A"`, `"main.C"`},
+			},
+			true,
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("getFunc getCurrentBlueprint", func(t *testing.T) {
+		code := `<?php
+class B extends Think{}
+class A extends B{
+	public function a($c){
+		$c = "aa";
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `e"aa" as $source
+$source<getFunc><getCurrentBlueprint> as $output
+$output<fullTypeName> as $sink
+`, map[string][]string{
+			"sink": {`"main.Think"`, `"main.A"`, `"main.B"`},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test currentBlueprint with fs", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("/var/www/html/1.php", `<?php
+namespace app\common\controller;
+
+use app\BaseController;
+use think\facade\Cookie;
+class Base extends BaseController
+{}
+`)
+		fs.AddFile("/var/www/html/2.php", `<?php
+namespace app\common\controller;
+class Backend extends \app\common\controller\Base{
+	public function aa(){}
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `aa<getCurrentBlueprint><fullTypeName> as $output`, map[string][]string{}, true, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+}
+func TestStaticBlueprint(t *testing.T) {
+	code := `<?php
+$path = $_GET["path"];
+$file = $_FILES["file"];
+$savename = \think\facade\Filesystem::disk('public')->putFile($path, $file);
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		result, err := prog.SyntaxFlowWithError(`Filesystem as $obj
+.disk as $method
+.putFile(* #-> as $param)
+`, ssaapi.QueryWithEnableDebug())
+		if err != nil {
+			return err
+		}
+		result.Show()
+		require.NotEqual(t, result.GetValues("obj").Len(), 0)
+		require.NotEqual(t, result.GetValues("method").Len(), 0)
+		require.NotEqual(t, result.GetValues("param").Len(), 0)
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
 
 func Test_MethodName_in_Syntaxflow(t *testing.T) {
