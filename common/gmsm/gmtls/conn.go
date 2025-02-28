@@ -1369,6 +1369,16 @@ func (c *Conn) handshakeContext(ctx context.Context) (ret error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Warnf("handshake context panic: %v", err)
+			// 添加更多调试信息
+			if c.vers != 0 {
+				log.Debugf("TLS Version: 0x%04x", c.vers)
+			}
+			if c.clientProtocol != "" {
+				log.Debugf("Negotiated Protocol: %s", c.clientProtocol)
+			}
+			if c.cipherSuite != 0 {
+				log.Debugf("Cipher Suite: 0x%04x", c.cipherSuite)
+			}
 			ret = fmt.Errorf("handshake context panic: %v", err)
 		}
 	}()
