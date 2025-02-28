@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"sort"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -43,16 +45,48 @@ func createEmptyResult() *SyntaxFlowResult {
 
 func CreateResultFromQuery(res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret := createEmptyResult()
-	ret.memResult = res
+	ret.setMemoryResult(res)
 	ret.rule = res.GetRule()
 	return ret
 }
 func CreateResultWithProg(prog *Program, res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret := createEmptyResult()
 	ret.program = prog
-	ret.memResult = res
+	ret.setMemoryResult(res)
 	ret.rule = res.GetRule()
 	return ret
+}
+
+func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
+	r.memResult = res
+	res.SymbolTable.Map(func(s string, vo sfvm.ValueOperator) (string, sfvm.ValueOperator, error) {
+		values := SyntaxFlowVariableToValues(vo)
+		sort.Slice(values, func(i, j int) bool {
+			// sort by file
+			valueI := values[i]
+			valueJ := values[j]
+			rangeI := valueI.GetRange()
+			rangeJ := valueJ.GetRange()
+			if rangeI == nil || rangeI.GetEditor() == nil {
+				return false // i < j
+			}
+			if rangeJ == nil || rangeJ.GetEditor() == nil {
+				return true // i > j
+			}
+			fileI := rangeI.GetEditor().GetFilename()
+			fileJ := rangeJ.GetEditor().GetFilename()
+			if fileI != fileJ {
+				return fileI > fileJ // i > j
+			}
+			offsetI := rangeI.GetStartOffset()
+			offsetJ := rangeJ.GetStartOffset()
+			if offsetI != offsetJ {
+				return offsetI > offsetJ // i > j
+			}
+			return i > j // all same just by index
+		})
+		return s, values, nil
+	})
 }
 
 func (r *SyntaxFlowResult) GetSFResult() *sfvm.SFFrameResult {
