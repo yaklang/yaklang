@@ -1,0 +1,65 @@
+desc(
+    title: " Open Redirect Vulnerability",
+    title_zh: "开放重定向漏洞，可能会导致用户进入恶意链接，从而实现钓鱼攻击",
+    level: "low",
+    risk: "open-redirect",
+    type: "audit",
+    desc: <<<TEXT
+开放重定向漏洞（CWE-601）允许攻击者构造恶意URL诱导用户访问钓鱼网站。当应用程序未对header()函数中的重定向目标进行严格验证时，攻击者可通过篡改URL参数（如redirect_to）将用户导向恶意域名。
+TEXT
+)
+
+
+<include('php-param')> as $params
+<include('php-tp-all-extern-variable-param-source')> as $params
+<include('php-filter-function')> as $filter
+
+header(* as $sink)
+
+$sink #{
+    include: `<self> & $params`,
+    exclude: `<self>?{opcode: call}`
+}-> as $high
+
+alert $high for{
+   title: "Unvalidated Redirect Vulnerability",
+   title_zh: "检测到用户输入($source)直接传递给header()函数且未经过任何过滤函数调用",
+   type: "vuln",
+   level: "high"
+}
+
+$sink #{
+    include: `<self> & $params`,
+    include: `<self>?{opcode: call && !<self><getCaller> & $filter}`
+}-> as $mid
+
+alert $mid for{
+   title: "Insufficient Redirect Validation",
+   title_zh: "检测到存在过滤函数($filter)但未完全验证目标域名的合法性",
+   type: "mid",
+   level: "mid"
+}
+
+
+$sink #{
+    include: `<self> & $params`,
+    include: `<self>?{opcode: call && <self><getCaller> & $filter}`
+}-> as $low
+
+alert $low for{
+   title: "Potential Redirect Validation Bypass",
+   title_zh: "检测到已使用过滤函数但存在验证逻辑缺陷的潜在绕过风险",
+   type: "low",
+   level: "low"
+}
+
+desc(
+    lang: "php",
+    alert_min: 1,
+    alert_high: 1,
+    'file:///unsafe.php': <<<TEXT
+<?php
+    $url = $_GET["url"];
+    header("Location: ".$url);
+TEXT
+)

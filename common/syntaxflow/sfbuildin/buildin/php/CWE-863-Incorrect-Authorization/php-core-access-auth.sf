@@ -1,0 +1,58 @@
+desc(
+title: "Insecure File Operation",
+title_zh: "未经验证的文件操作风险",
+risk: "file-operation",
+desc: <<<TEXT
+    检测未经验证的用户输入直接用于文件操作系统函数,可能导致任意文件读取、写入、删除等风险,建议对用户输入进行严格过滤或验证,避免直接传递给文件操作系统函数.
+TEXT
+)
+/copy|(sym)?link|rename/ as $function
+
+<include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
+
+$function(* as $source)
+
+$source #{
+    include: `<self> & $params`,
+    exclude: `*?{opcode: call}`,
+}-> as $high_risk
+
+alert $high_risk for {
+   title: "Direct File Operation Without Validation",
+   title_zh: "未经验证的文件操作高危漏洞",
+   level: "high",
+}
+
+$source #{
+    include: `<self> & $params`,
+    exclude: `*?{opcode: call && !*?{<self><getCaller> & $filter}}`,
+}-> as $mid_risk
+
+alert $mid_risk for {
+   title: "Insufficient Parameter Filtering",
+   title_zh: "参数过滤不完整风险",
+   level: "mid",
+}
+
+$source #{
+    include: `<self> & $params`,
+    include: `*?{opcode: call && <self><getCaller> & $filter}`,
+}-> as $low_risk
+
+alert $low_risk for {
+   title: "Potential Access Control Bypass",
+   title_zh: "潜在访问控制绕过风险",
+   level: "low",
+}
+
+desc(
+    lang: "php",
+    alert_min: 1,
+    "file:///unsafe.php": <<<TEXT
+<?php
+    $origin = $_GET["origin"];
+    $destination = $_GET["destination"];
+    copy($origin,$destination);
+TEXT
+)

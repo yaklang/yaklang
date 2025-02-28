@@ -1,0 +1,75 @@
+desc(
+    title: "mysql inject",
+    type: audit,
+    level: low,
+    risk: "sqli-inject",
+    desc: <<<TEXT
+SQL注入（SQL Injection，简称SQLI）是一种代码注入技术，攻击者通过在应用程序的输入栏中恶意插入或“注入”SQL命令，干扰正常的数据库查询执行。这种攻击可导致数据泄露、数据篡改、拒绝服务等严重后果。审计此规则旨在识别和防范在PHP代码中未经过滤或不当过滤直接拼接SQL查询的情况，从而降低应用程序遭受SQL注入攻击的风险。
+TEXT
+)
+
+/^pg_(exec|(send_)?(execute|query(_params)?))$/ as $pgFunction;
+
+<include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
+<include('php-filter-function')> as $filter;
+pg_escape_string as $filter;
+
+$pgFunction(* as $source)
+$source #{
+    include: `<self> & $params`,
+    exclude: `*?{opcode: call}`,
+}-> as $high_risk
+
+alert $high_risk for {
+    title: 'Unvalidated PostgreSQL Parameter Injection',
+    title_zh: 'PostgreSQL未验证参数注入风险',
+    level: 'high',
+}
+$source #{
+    include: `<self> & $params`,
+    exclude: `*?{opcode: call && !<self><getCaller> & $filter}`,
+}-> as $mid_risk
+
+alert $mid_risk for {
+    title: 'Insufficient PostgreSQL Parameter Filtering',
+    title_zh: 'PostgreSQL参数过滤不充分',
+    level: 'mid',
+}
+
+$source #{
+    include: `<self> & $params`,
+    include: `*?{opcode: call && <self><getCaller> & $filter}`,
+}-> as $low_risk
+
+alert $low_risk for {
+    title: 'Potential PostgreSQL Access Control Bypass',
+    title_zh: 'PostgreSQL访问控制潜在绕过风险',
+    level: 'low',
+}
+
+desc(
+    lang: 'php',
+    alert_min: 3,
+    alert_high: 1,
+    'file:///high.php': <<<CODE
+<?php
+    $username = $_COOKIE['user'];
+    $conn = pg_connect("host=localhost dbname=test");
+    $result = pg_query($conn, "SELECT * FROM users WHERE login = '$username'");
+CODE,
+    'file:///mid.php': <<<CODE
+<?php
+    function pseudo_filter($input) {
+        return str_replace("'", "''", $input); // 仅处理单引号
+    }
+    $email = pseudo_filter($_POST['email']);
+    $res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123"); // 中危漏洞[2]
+CODE,
+    'file:///low.php': <<<CODE
+<?php
+    $filtered_id = pg_escape_string($_GET['id']);
+    $query = pg_prepare($conn, "g   et_user", "SELECT * FROM profiles WHERE user_id = $1");
+    $result = pg_execute($conn, "get_user", array($filtered_id));
+CODE
+)

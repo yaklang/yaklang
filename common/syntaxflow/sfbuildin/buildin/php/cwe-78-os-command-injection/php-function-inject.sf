@@ -1,0 +1,77 @@
+desc(
+    title: "Potential code execution risk",
+    title_zh: "可能存在代码执行风险",
+    risk: "code-execution",
+    desc: <<<TEXT
+    检测到代码中直接使用 eval、create_function、assert 等函数，若参数来源于未经验证的外部输入，可能导致代码执行风险。修复方法包括验证输入、过滤输出、禁用危险函数等。
+TEXT
+)
+/^create_function|eval|assert$/ as $evalFunction;
+
+check $evalFunction;
+alert $evalFunction for{
+    title: "Detected dangerous function, possible code execution risk",
+    title_zh: "检测到危险函数，可能存在代码执行风险",
+    level: "low",
+}
+<include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
+<include('php-filter-function')> as $filter;
+$evalFunction(* as $source)
+
+$source #{
+    include: `<self> & $params`,
+    exclude: `*?{opcode: call}`,
+}-> as $high_risk
+
+alert $high_risk for {
+    title: 'Unvalidated parameter injection',
+    title_zh: '未验证参数注入风险',
+    level: 'high',
+}
+
+$source #{
+    include: `<self> & $params`,
+    exclude: `*?{opcode: call && !<self><getCaller> & $filter}`,
+}-> as $mid_risk
+
+alert $mid_risk for {
+    title: 'Insufficient parameter filtering',
+    title_zh: '参数过滤不充分，可能存在代码执行风险',
+    level: 'mid',
+}
+
+$source #{
+    include: `<self> & $params`,
+    include: `*?{opcode: call && <self><getCaller> & $filter}`,
+}-> as $low_risk
+
+alert $low_risk for {
+    title: 'Potential code execution risk',
+    title_zh: '潜在代码执行风险',
+    level: 'low',
+}
+desc(
+    lang: "php",
+    alert_min: 4,
+    alert_high: 3,
+    alert_low: 1,
+    "file:///eval.php": <<<TEXT
+<?php
+eval($_GET["code"]);
+TEXT,
+    "file:///createFunction.php": <<<TEXT
+<?php
+    $func = create_function('$a', $_COOKIE['func_body']);
+    $func(1);
+TEXT,
+    "file:///assert.php": <<<TEXT
+<?php
+    assert($_GET['code']);
+TEXT,
+    "file:///eval_low.php": <<<TEXT
+<?php
+    $input = addslashes($_GET['cmd']);
+    eval("echo $input;");
+TEXT
+)

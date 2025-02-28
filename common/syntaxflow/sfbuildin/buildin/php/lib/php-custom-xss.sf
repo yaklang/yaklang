@@ -7,7 +7,7 @@ desc(
 TEXT
 )
 
-/^(echo|print|print_r|exit|die|sprint|var_dump|var_export)$/ as $output
+/^(echo|print|print_r|exit|die|sprint|var_dump|var_export|show_source|highlight_file)$/ as $output
 
 alert $output
 

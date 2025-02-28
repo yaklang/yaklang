@@ -1,0 +1,86 @@
+desc(
+    title: "FTP Parameter Validation Risk",
+    title_zh: "FTP参数验证风险",
+    level: "low",
+    risk: "unsafe-ftp-parameter-validation",
+    desc: <<<TEXT
+    当文件操作函数（如copy/rename/symlink）未验证用户输入时，攻击者可通过构造恶意路径实现文件覆盖/删除或路径穿越攻击
+TEXT
+)
+
+/^ftp_(chdir|delete|fput|mkdir|nb_fput|rmdir|size|chmod|fget)$/ as $function
+/^ftp_(append|get|nb_fget|nb_get|nb_put|put|rename)$/ as $function
+ftp_alloc as $function
+ftp_login as $function
+
+
+<include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
+<include('php-filter-function')> as $filter;
+
+$function(* as $source)
+
+$source #{
+    include: `<self> & $params`,
+    exclude: `*?{opcode: call}`,
+}-> as $high_risk
+
+alert $high_risk for {
+    title: 'Unvalidated FTP Parameter Injection',
+    title_zh: 'FTP未验证参数注入风险',
+    level: 'high',
+}
+
+$source #{
+    include: `<self> & $params`,
+    exclude: `*?{opcode: call && !<self><getCaller> & $filter}`,
+}-> as $mid_risk
+
+alert $mid_risk for {
+    title: 'Insufficient FTP Parameter Filtering',
+    title_zh: 'FTP参数过滤不充分',
+    level: 'mid',
+}
+$source #{
+    include: `<self> & $params`,
+    include: `*?{opcode: call && <self><getCaller> & $filter}`,
+}-> as $low_risk
+
+alert $low_risk for {
+    title: 'Potential FTP Access Control Bypass',
+    title_zh: 'FTP访问控制潜在绕过风险',
+    level: 'low',
+}
+
+desc(
+    lang: "php",
+    alert_min: 3,
+    alert_high: 1,
+    alert_low: 2,
+    "file:///unsafe.php": <<<TEXT
+<?php
+// 高风险案例（直接使用未过滤参数）
+function deleteFile() {
+    $file = $_GET['file']; // 直接接收用户输入
+    ftp_delete($ftp_conn, $file); // 触发高风险告警
+}
+
+// 中风险案例（过滤不充分）
+function uploadFile() {
+    $path = $_POST['path'];
+    $filtered = str_replace('../', '', $path); // 简单过滤
+    ftp_fput($ftp_conn, $filtered, $fp); // 触发中风险告警（可绕过）
+}
+
+// 低风险案例（存在潜在绕过）
+function createDir() {
+    $dir = sanitizeInput($_GET['dir']);
+    ftp_mkdir($ftp_conn, $dir); // 触发低风险告警（需审计过滤逻辑）
+}
+
+function sanitizeInput($input) {
+    return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
+}
+?>
+TEXT
+)

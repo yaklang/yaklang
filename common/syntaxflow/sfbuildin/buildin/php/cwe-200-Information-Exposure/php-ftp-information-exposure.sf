@@ -1,0 +1,51 @@
+desc(
+   title: "FTP Information Exposure",
+   title_zh: "FTP信息泄露风险",
+   risk: "information-exposure",
+   level: "low",
+   desc: <<<TEXT
+检测可能通过FTP相关函数泄露服务器敏感信息，包括：
+    1. 目录结构暴露（ftp_nlist/ftp_rawlist）
+    2. 当前工作路径泄露（ftp_pwd）
+    3. 服务器系统类型识别（ftp_systype）
+    可能被攻击者用于信息收集阶段，辅助后续攻击
+TEXT
+)
+
+/^ftp_nlist|ftp_pwd|ftp_rawlist|ftp_systype$/ as $output
+
+<include("php-xss-method")> as $method
+
+$method(* as $source)
+
+$source #{
+   include: `<self> & $output`,
+}-> as $ftp_exposure;
+
+alert $ftp_exposure for{
+   title: "FTP Server Exposure Detected",
+   title_zh: "检测到FTP服务信息泄露风险"
+   level: "low",
+}
+
+desc(
+   lang: "php",
+   alert_min: "3",
+   "file:///unsafe.php": <<<TEXT
+<?php
+    // 不安全FTP操作示例
+    $conn = ftp_connect('ftp.example.com');
+    ftp_login($conn, 'user', 'pass');
+
+    // 风险点1：获取并输出当前工作目录
+    echo "Current dir: " . ftp_pwd($conn);
+
+    // 风险点2：列出服务器文件列表
+    $files = ftp_nlist($conn, ".");
+    print_r($files);
+
+    // 风险点3：获取服务器类型
+    echo "System type: " . ftp_systype($conn);
+?>
+TEXT
+)
