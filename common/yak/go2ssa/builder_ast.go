@@ -1,7 +1,6 @@
 package go2ssa
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -749,7 +748,8 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		methodName = Name.GetText()
 		if recove := fun.Receiver(); recove != nil {
 			ssatypName = b.getReceiver(recove.(*gol.ReceiverContext))
-			funcName = fmt.Sprintf("%s_%s", ssatypName[0], methodName)
+			//funcName = fmt.Sprintf("%s_%s", ssatypName[0], methodName)
+			funcName = methodName
 		}
 	}
 
