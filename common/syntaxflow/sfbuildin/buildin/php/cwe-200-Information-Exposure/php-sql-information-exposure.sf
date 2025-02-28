@@ -1,0 +1,49 @@
+desc(
+   title: "php information exposure",
+   title_zh: "PHP信息泄露风险",
+   risk: "sql-information-exposure",
+   desc: <<<TEXT
+    检测可能暴露敏感信息的PHP函数调用，包括：
+        1. MySQL相关：错误信息(mysql_error)、数据库元数据(mysql_get_host_info)、会话信息等
+        2. PostgreSQL相关：错误日志(pg_last_error)、数据库配置(pg_version)等
+TEXT
+)
+
+/^mysql_error|mysql_[db_name|field_[name|flag|type|table]|get_[client|host|server]_info|info|status|session_id|get[_current_user|cwd]]$/ as $mysql_information;
+/^pg_[last_error|result_error(_field)?]$/ as $pg_information;
+/^pg_[dbname|field_name|field_table|host|last_notice|meta_data|options|port|tty|version]$/ as $pg_information;
+
+$pg_information + $mysql_information as $information;
+<include("php-xss-method")> as $method
+
+$method(* as $param)
+
+$param #{
+    include: `<self> & $information`,
+}-> as $mysqli_exposure;
+
+alert $mysqli_exposure for{
+   title: "MySQL Information Exposure",
+   title_zh: "MySQL数据库信息泄露风险"
+   level: "low",
+}
+
+$param #{
+    include: `<self> & $information`,
+}-> as $pg_exposure;
+
+alert $pg_exposure for{
+   title: "PostgreSQL Information Exposure",
+   title_zh: "PostgreSQL数据库信息泄露风险"
+   level: "low",
+}
+desc(
+    lang: "php",
+    alert_low: 1,
+    'file:///high.php': <<<UNSAFE
+<?php
+    $host_info = mysql_get_host_info();
+    echo "数据库主机信息：" . $host_info;
+?>
+UNSAFE
+)

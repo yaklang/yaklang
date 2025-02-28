@@ -11,10 +11,15 @@ TEXT
 ldap_search(*<slice(start=1)> as $query);
 ldap_list(*<slice(start=1)> as $query);
 ldap_read(*<slice(start=1)> as $query)
+ldap_add(*<slice(start=2)> as $query)
+ldap_delete(*<slice(start=1)> as $query)
+/ldap_mod_(add|del|replace)/(*<slice(start=2)> as $query)
 ldap_compare(,* as $query);
 
 <include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
 <include('php-filter-function')> as $filter;
+
 $query #{
     until: `* & $params`,
 }-> as $root;
@@ -81,7 +86,7 @@ CODE,
 
 
 'safefile:///save.php':<<<CODE
-// no php-param
+<?php
 $escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
 $dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
 $is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
