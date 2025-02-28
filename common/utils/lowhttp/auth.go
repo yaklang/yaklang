@@ -29,19 +29,19 @@ type DigestAuthentication struct {
 	// DigestAuthentication的相关属性
 	Username string
 	Password string
+	AuthInfo string
 }
 
 func (da *DigestAuthentication) Authenticate(conn net.Conn, config *LowhttpExecConfig) ([]byte, error) {
 	method, uri, _ := GetHTTPPacketFirstLine(config.Packet)
 	body := GetHTTPPacketBody(config.Packet)
-	authInfo := GetHTTPPacketHeader(config.Packet, "WWW-Authenticate")
 	url := GetHTTPPacketHeader(config.Packet, "Host") + uri
 	if config.Https {
 		url += "https://"
 	} else {
 		url += "http://"
 	}
-	_, ah, err := GetDigestAuthorizationFromRequestEx(method, url, string(body), authInfo, da.Username, da.Password, true)
+	_, ah, err := GetDigestAuthorizationFromRequestEx(method, url, string(body), da.AuthInfo, da.Username, da.Password, true)
 	if err != nil {
 		return nil, utils.Wrap(err, "get digest authorization failed")
 	}
@@ -126,7 +126,7 @@ func GetAuth(authHeader string, username string, password string) Authentication
 	case "basic":
 		return &BasicAuthentication{username, password}
 	case "digest":
-		return &DigestAuthentication{username, password}
+		return &DigestAuthentication{username, password, authHeader}
 	}
 	return nil
 }
