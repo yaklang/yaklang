@@ -1,8 +1,6 @@
 package org.benf.cfr.reader;
 
 public class TernaryExpressionTest {
-	public TernaryExpressionTest() {
-	}
 	int getVar() {
 		return 1;
 	}

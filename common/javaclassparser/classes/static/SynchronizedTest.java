@@ -1,8 +1,6 @@
 package org.benf.cfr.reader;
 
 public class SynchronizedTest {
-	public SynchronizedTest() {
-	}
 	void main() {
 		String var1 = "1";
 		String var2 = var1;

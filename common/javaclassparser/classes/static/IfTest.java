@@ -1,8 +1,6 @@
 package org.benf.cfr.reader;
 
 public class IfTest {
-	public IfTest() {
-	}
 	void main() {
 		int var1 = 1;
 		if ((var1) > (1)){
@@ -13,12 +11,12 @@ public class IfTest {
 		if ((var1) > (1)){
 			var1 = 2;
 		}
-		if (((var1) <= (1)) && (!(var1) > (0))){
+		if (((var1) <= (1)) && ((var1) <= (0))){
 
 		}else{
 			var1 = 2;
 		}
-		if (((var1) <= (1)) && (!(var1) > (0))){
+		if (((var1) <= (1)) && ((var1) <= (0))){
 			var1 = 3;
 		}else{
 			var1 = 2;
