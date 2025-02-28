@@ -28,6 +28,19 @@ type SFFrameResult struct {
 	SymbolTable      *omap.OrderedMap[string, ValueOperator]
 	UnNameValue      []ValueOperator
 	AlertSymbolTable map[string]ValueOperator
+	debugInfo        string
+}
+
+func (c *SFFrameResult) GetDebugInfo() string {
+	return c.debugInfo
+}
+
+func (c *SFFrameResult) SetDebugInfo(s string) {
+	c.debugInfo = s
+}
+
+func (c *SFFrameResult) AppendDebugInfo(s string) {
+	c.debugInfo += s
 }
 
 func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
