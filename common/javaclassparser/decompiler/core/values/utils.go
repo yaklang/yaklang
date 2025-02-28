@@ -1,26 +1,37 @@
 package values
 
-import "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
+import (
+	"fmt"
 
-func GetNotOp(op string) string {
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
+)
+
+func GetNotOpWithError(op string) (string, error) {
 	switch op {
 	case "==":
-		return "!="
+		return "!=", nil
 	case "!=":
-		return "=="
+		return "==", nil
 	case "<":
-		return ">="
+		return ">=", nil
 	case ">=":
-		return "<"
+		return "<", nil
 	case ">":
-		return "<="
+		return "<=", nil
 	case "<=":
-		return ">"
+		return ">", nil
 	default:
-		return "[not support op " + op + "]"
+		return "", fmt.Errorf("[not support op %s]", op)
 	}
 }
 
+func GetNotOp(op string) string {
+	res, err := GetNotOpWithError(op)
+	if err != nil {
+		return err.Error()
+	}
+	return res
+}
 func SimplifyConditionValue(condition JavaValue) JavaValue {
 	resVal := condition
 	if val, ok := resVal.(*JavaExpression); ok {
@@ -38,7 +49,10 @@ func SimplifyConditionValue(condition JavaValue) JavaValue {
 				if v1.Op == Not {
 					return v1.Values[0]
 				} else {
-					resVal = NewBinaryExpression(v1.Values[0], v1.Values[1], GetNotOp(v1.Op), types.NewJavaPrimer(types.JavaBoolean))
+					reverseOp, err := GetNotOpWithError(v1.Op)
+					if err == nil {
+						resVal = NewBinaryExpression(v1.Values[0], v1.Values[1], reverseOp, types.NewJavaPrimer(types.JavaBoolean))
+					}
 				}
 			}
 		}

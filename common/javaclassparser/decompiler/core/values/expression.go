@@ -101,6 +101,9 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 }
 
 func NewUnaryExpression(value1 JavaValue, op string, typ types.JavaType) *JavaExpression {
+	if IsLogicalOperator(op) {
+		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+	}
 	return &JavaExpression{
 		Values: []JavaValue{value1},
 		Op:     op,
@@ -108,6 +111,10 @@ func NewUnaryExpression(value1 JavaValue, op string, typ types.JavaType) *JavaEx
 	}
 }
 func NewBinaryExpression(value1, value2 JavaValue, op string, typ types.JavaType) *JavaExpression {
+	if IsLogicalOperator(op) {
+		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+		value2.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+	}
 	return &JavaExpression{
 		Values: []JavaValue{value1, value2},
 		Op:     op,

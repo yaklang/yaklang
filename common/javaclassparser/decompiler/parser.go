@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/rewriter"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -67,6 +68,12 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 		return nil, err
 	}
 	sts := core.NodesToStatements(nodes)
-	rewriter.RewriteVar(&sts, decompiler.BodyStartId)
+	params := []*values.JavaRef{}
+	for _, v := range decompiler.Params {
+		if ref, ok := v.(*values.JavaRef); ok {
+			params = append(params, ref)
+		}
+	}
+	rewriter.RewriteVar(&sts, decompiler.BodyStartId, params)
 	return sts, nil
 }
