@@ -1,14 +1,14 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"strings"
-	"testing"
 )
 
 func TestNativeCall_MybatisSupport(t *testing.T) {
@@ -158,17 +158,20 @@ public interface UserMapper {
 `)
 		ssatest.CheckWithFS(f, t, func(programs ssaapi.Programs) error {
 			prog := programs[0]
-			vals, err := prog.SyntaxFlowWithError(`<mybatisSink> as $params`)
+			res, err := prog.SyntaxFlowWithError(`<mybatisSink> as $params`)
 			require.NoError(t, err)
-			params := vals.GetValues("params")
+			res.Show()
+			params := res.GetValues("params")
 
 			check := false
 			params.Recursive(func(vo sfvm.ValueOperator) error {
 				if v, ok := vo.(*ssaapi.Value); ok {
 					for _, p := range v.Predecessors {
-						p.Node.ShowWithRange()
-						str := p.Node.StringWithSourceCode()
-						if strings.Contains(str, `"sqlmap.xml"`) && strings.Contains(str, "id") {
+						// p.Node.ShowWithRange()
+						rng := p.Node.GetRange()
+						// str := p.Node.StringWithSourceCode()
+						// log.Infof("str: %s", str)
+						if editor := rng.GetEditor(); editor != nil && editor.GetFilename() == "sqlmap.xml" {
 							check = true
 						}
 					}
