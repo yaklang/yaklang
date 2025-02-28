@@ -14,6 +14,7 @@ TEXT
 $read + $write + $unlink as $source
 
 <include('php-param')> as $params
+<include('php-tp-all-extern-variable-param-source')> as $params
 <include('php-filter-function')> as $filter
 
 $source(* as $param)

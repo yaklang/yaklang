@@ -1,0 +1,41 @@
+desc(
+    title: "Unsafe Error Handling and Information Exposure",
+    title_zh: "不安全的错误处理与信息泄露风险",
+    risk: "information-exposure",
+    desc: <<<TEXT
+    检查查了php中常见的错误处理函数的使用，如果这些函数的返回结果直接被输出可能导致敏感信息泄露，如错误详情、调试数据等。修复方法包括验证输入、过滤输出、禁用调试函数等，可能导致敏感信息泄露，如错误详情、调试数据等。修复方法包括验证输入、过滤输出、禁用调试函数等。
+TEXT
+)
+
+/preg_last_error|preg_last_error_msg/ as $info_function
+/error_get_last|debug_backtrace/ as $info_function
+/^apd_[callstack|dump_persistent_resources|dump_regular_resources|get_active_symbols]$/ as $info_function
+
+<include("php-xss-method")> as $method
+$method(* as $source)
+
+$source #{
+    include: `<self> & $info_function`,
+}-> as $risk
+
+alert $risk for{
+    title: "Unsafe Error Handling and Information Exposure",
+    title_zh: "不安全的错误处理与信息泄露风险",
+    level: "low",
+}
+desc(
+    lang: 'php',
+    alert_min: 2,
+    alert_low: 2,
+    'file:///unsafe.php': <<<CODE
+<?php
+    $error = error_get_last();
+    echo $_GET['debug_mode'] ? $error['message'] : '';
+CODE,
+    'file:///unsafe2.php': <<<CODE
+<?php
+    $trace = debug_backtrace();
+    $filtered = strip_tags($trace[0]['file']);
+    var_dump($filtered);
+CODE
+)
