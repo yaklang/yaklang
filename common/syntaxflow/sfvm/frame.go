@@ -470,6 +470,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 					}
 					return nil
 				})
+				results.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 				next = append(next, results)
 				if have {
 					return true
@@ -483,7 +484,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", results.String())
-		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
 	case OpRecursiveSearchGlob:
