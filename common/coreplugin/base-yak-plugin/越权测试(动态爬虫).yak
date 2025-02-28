@@ -1,0 +1,707 @@
+//输入待测凭证测试越权
+yakit.AutoInitYakit()
+
+targetUrl = cli.String("targetUrl", cli.setHelp("爬虫目标url"),cli.setVerboseName("目标"),cli.setRequired(true))
+wsAddress = cli.String("wsAddress", cli.setHelp("chrome headless运行时的ws地址"),cli.setVerboseName("浏览器ws地址"),cli.setCliGroup("浏览器"))
+exePath = cli.String("exePath", cli.setHelp("chrome浏览器可执行程序的路径"),cli.setVerboseName("浏览器执行程序路径"),cli.setCliGroup("浏览器"))
+proxy = cli.String("proxy", cli.setHelp("代理地址"),cli.setVerboseName("代理地址"),cli.setCliGroup("浏览器"))
+proxyUsername = cli.String("proxyUsername", cli.setHelp("代理用户名"),cli.setVerboseName("代理用户名"),cli.setCliGroup("浏览器"))
+proxyPassword = cli.String("proxyPassword", cli.setHelp("代理密码"),cli.setVerboseName("代理密码"),cli.setCliGroup("浏览器"))
+pageTimeout = cli.Int("pageTimeout", cli.setDefault(30),cli.setHelp("单页面爬虫的最大操作时间，单位秒"),cli.setVerboseName("单页面超时时间"),cli.setCliGroup("爬虫参数"))
+fullTimeout = cli.Int("fullTimeout", cli.setDefault(1800),cli.setHelp("整个爬虫运行的超时时间 单位秒"),cli.setVerboseName("全局超时时间"),cli.setCliGroup("爬虫参数"))
+formFill = cli.String("formFill", cli.setDefault("username:admin;password:admin"),cli.setHelp("key和value用英文冒号隔开，不同组数据用英文分号隔开"),cli.setVerboseName("表单填写"),cli.setCliGroup("爬虫参数"))
+fileUpload = cli.String("fileUpload", cli.setDefault("default:/opt/defaultFile.txt;"),cli.setHelp("key（关键词）和value（文件路径）用英文冒号隔开，不同组数据用英文分号隔开\nkey为default时value为默认上传文件路径"),cli.setVerboseName("文件输入"),cli.setCliGroup("爬虫参数"))
+header = cli.String("header", cli.setHelp("header名和header值用英文冒号隔开，不同组数据用英文分号隔开"),cli.setCliGroup("爬虫参数"))
+cookie = cli.String("cookie", cli.setHelp("cookie名和cookie值用英文冒号隔开，不同组数据用英文分号隔开"),cli.setCliGroup("爬虫参数"))
+scanRange = cli.StringSlice("scanRange", cli.setMultipleSelect(false),cli.setSelectOption("AllDomainScan", "AllDomainScan"),cli.setSelectOption("SubMenuScan", "SubMenuScan"),cli.setVerboseName("扫描范围"),cli.setCliGroup("爬虫参数"),cli.setDefault("AllDomainScan"))
+scanRepeat = cli.StringSlice("scanRepeat", cli.setMultipleSelect(false),cli.setSelectOption("ExtremeRepeatLevel", "ExtremeRepeatLevel"),cli.setSelectOption("HighRepeatLevel", "HighRepeatLevel"),cli.setSelectOption("MediumRepeatLevel", "MediumRepeatLevel"),cli.setSelectOption("LowRepeatLevel", "LowRepeatLevel"),cli.setSelectOption("UnLimitRepeat", "UnLimitRepeat"),cli.setVerboseName("url去重级别"),cli.setCliGroup("爬虫参数"),cli.setDefault("LowRepeatLevel"))
+maxUrl = cli.Int("maxUrl", cli.setVerboseName("最大url数量"),cli.setCliGroup("爬虫参数"),cli.setDefault(0))
+maxDepth = cli.Int("maxDepth", cli.setVerboseName("最大爬虫深度"),cli.setCliGroup("爬虫参数"),cli.setDefault(0))
+ignoreQuery = cli.String("ignoreQuery", cli.setHelp("url去重检测时忽略的query-name 以英文逗号隔开"),cli.setVerboseName("忽略参数名"),cli.setCliGroup("爬虫参数"))
+extraWaitLoad = cli.Int("extraWaitLoad", cli.setHelp("页面加载的额外等待时间 单位毫秒"),cli.setVerboseName("额外等待时间"),cli.setCliGroup("爬虫参数"),cli.setDefault(0))
+
+blacklist = cli.String("blacklist", cli.setHelp("url黑名单，以英文逗号隔开"),cli.setVerboseName("url黑名单"),cli.setCliGroup("爬虫参数"))
+whitelist = cli.String("whitelist", cli.setHelp("url白名单，以英文逗号隔开"),cli.setVerboseName("url白名单"),cli.setCliGroup("爬虫参数"))
+sensitiveWords = cli.String("sensitiveWords", cli.setHelp("当设置敏感词时，对应待操作元素innerHTml中存在该词汇则不会进行操作\n不同词之间用英文逗号隔开"),cli.setVerboseName("敏感词"),cli.setCliGroup("爬虫参数"))
+leakless = cli.StringSlice("leakless", cli.setMultipleSelect(false),cli.setSelectOption("default", "default"),cli.setSelectOption("true", "true"),cli.setSelectOption("false", "false"),cli.setHelp("浏览器自动进程关闭进行在windows下会报病毒 默认在windows下会关闭\n当关闭时 如果强制关闭爬虫进程时chrome.exe会存在后台 过多时需要手动进行关闭"),cli.setVerboseName("浏览器进程自动关闭"),cli.setCliGroup("其他参数"),cli.setDefault("default"))
+concurrent = cli.Int("concurrent", cli.setDefault(3),cli.setVerboseName("浏览器同时打开页面数量"),cli.setCliGroup("爬虫参数"))
+
+rawHeaders=""
+rawCookie=""
+rawCredential_type=cli.StringSlice("rawCredential_type", cli.setMultipleSelect(false),cli.setSelectOption("cookie", "cookie"),cli.setSelectOption("header", "header"),cli.setVerboseName("原始凭证类型"),cli.setRequired(true),cli.setDefault("cookie"))
+rawCredential=cli.Text("rawCredential", cli.setVerboseName("原始凭证"),cli.setRequired(true),cli.setDefault("Cookie: PHPSESSID=ej13mf9l774n8uiapf27c6sn2k"))
+fuzzCredential_type=cli.StringSlice("fuzzCredential_type", cli.setMultipleSelect(false),cli.setSelectOption("cookie", "cookie"),cli.setSelectOption("header", "header"),cli.setVerboseName("待测凭证类型"),cli.setDefault("cookie"),cli.setRequired(true))
+fuzzCredential=cli.Text("fuzzCredential", cli.setVerboseName("待测凭证"),cli.setRequired(true),cli.setDefault("Cookie: PHPSESSID=qwer;test=111"))
+
+path_list=cli.LineDict("path_list",cli.setDefault("address\nedit\nid\ninfo\nlist\nmember\nmem\nprofile\nselect\nservice\nuser\nupdate"),cli.setVerboseName("url白名单"),cli.setHelp("可自定义其他需要测试越权的路径关键字"),cli.setCliGroup("插件额外参数"))
+black_path_list=cli.LineDict("black_path_list",cli.setDefault("infoleak\njarheads\nlogin\nlogout\nsqli_id\ntruman\nwide"),cli.setVerboseName("url黑名单"),cli.setHelp("自定义黑名单，不会对黑名单中的路径关键字进行越权检测"),cli.setCliGroup("插件额外参数"))
+over_permission_flag_list=cli.LineDict("over_permission_flag_list",cli.setVerboseName("响应关键字字典"),cli.setHelp("如果确定响应中含有某个关键字（且该关键字不在html/css/js标签及属性中），一定存在越权可额外配置"),cli.setCliGroup("插件额外参数"))
+sim_value=cli.Float("sim_value", cli.setDefault("0.9"),cli.setVerboseName("相似度阈值"),cli.setCliGroup("插件额外参数"),cli.setHelp("大于等于该阈值告警"))
+recognition_patten=cli.StringSlice("recognition_patten", cli.setVerboseName("识别模式"),cli.setMultipleSelect(false),cli.setSelectOption("字典模式", "1"),cli.setSelectOption("机器学习模式", "2"),cli.setSelectOption("字典模式优先-机器学习辅助", "3"),cli.setSelectOption("字典模式-机器学习并行", "4"),cli.setSelectOption("机器学习优先-字典模式辅助", "5"),cli.setDefault("1"),cli.setHelp("检测识别模式"),cli.setCliGroup("插件额外参数"))
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setSelectOption("定时", "定时"),cli.setSelectOption("周期", "周期"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//定时任务延时开始时间
+timed_task_start_time=cli.String("timed_task_start_time", cli.setDefault("2024-09-01 10:00:00"),cli.setVerboseName("定时任务开始时间"),cli.setHelp("定时任务开始时间，严格按照模板值填写: 2024-09-01 10:00:00 表示北京时间24年9月1号上午10点"),cli.setCliGroup("插件额外参数"))
+//周期任务间隔时间
+periodic_tasks_interval_time=cli.Int("periodic_tasks_interval_time", cli.setVerboseName("周期任务间隔时间"),cli.setHelp("周期任务间隔时间，单位s"),cli.setCliGroup("插件额外参数"))
+cli.check()
+
+
+//mitm 插件源码
+plugin=`
+//开始替换内容标志fuzzCredential_type
+//待替换内容，勿动！
+fuzzCredential_type=cli.StringSlice("fuzzCredential_type", cli.setMultipleSelect(false),cli.setSelectOption("cookie", "cookie"),cli.setSelectOption("header", "header"),cli.setVerboseName("待测凭证类型"),cli.setRequired(true))
+//结束替换内容标志fuzzCredential_type
+
+//开始替换内容标志fuzzCredential
+//待替换内容，勿动！
+fuzzCredential=cli.Text("fuzzCredential", cli.setVerboseName("待测凭证"),cli.setRequired(true))
+//结束替换内容标志fuzzCredential
+
+//替换凭证逻辑
+fuzz_credential_dic={}
+fuzz_credential_list=fuzzCredential.Split("\n")
+for sub_fuzz_credential in fuzz_credential_list{
+    // 查找真实value,匹配第一个':',后索引加2,步过空格
+    fuzzCredential_key_index=sub_fuzz_credential.Find(":")
+    fuzzCredential_value_index=sub_fuzz_credential.Find(":")+2
+    fuzz_credential_dic[sub_fuzz_credential[:fuzzCredential_key_index]]={"position":fuzzCredential_type[0],"value":sub_fuzz_credential[fuzzCredential_value_index:]}
+}
+
+
+//可自定义其他需要测试越权的路径关键字
+//开始替换内容标志path_list
+//待替换内容，勿动！
+path_list=cli.LineDict("path_list",cli.setDefault("address\nedit\nid\ninfo\nlist\nmember\nmem\nprofile\nselect\nservice\nuser\nupdate"),cli.setVerboseName("url白名单"),cli.setHelp("可自定义其他需要测试越权的路径关键字"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志path_list
+
+// 自定义黑名单，不会对黑名单中的路径关键字进行越权检测
+//开始替换内容标志black_path_list
+//待替换内容，勿动！
+black_path_list=cli.LineDict("black_path_list",cli.setDefault("infoleak\njarheads\nlogin\nlogout\nsqli_id\ntruman\nwide"),cli.setVerboseName("url黑名单"),cli.setHelp("自定义黑名单，不会对黑名单中的路径关键字进行越权检测"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志black_path_list
+
+
+// 如果确定响应中含有某个关键字（且该关键字不在html/css/js标签及属性中），一定存在越权可额外配置
+//开始替换内容标志over_permission_flag_list
+//待替换内容，勿动！
+over_permission_flag_list=cli.LineDict("over_permission_flag_list",cli.setVerboseName("响应关键字字典"),cli.setHelp("如果确定响应中含有某个关键字（且该关键字不在html/css/js标签及属性中），一定存在越权可额外配置"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志over_permission_flag_list
+
+//开始替换内容标志sim_value
+//待替换内容，勿动！
+sim_value=cli.Float("sim_value", cli.setDefault("0.9"),cli.setVerboseName("相似度阈值"),cli.setCliGroup("插件额外参数"),cli.setHelp("大于等于该阈值告警"))
+//结束替换内容标志sim_value
+
+//开始替换内容标志recognition_patten
+//待替换内容，勿动！
+recognition_patten=cli.StringSlice("recognition_patten", cli.setVerboseName("识别模式"),cli.setMultipleSelect(false),cli.setSelectOption("字典模式", "1"),cli.setSelectOption("机器学习模式", "2"),cli.setSelectOption("字典模式优先-机器学习辅助", "3"),cli.setSelectOption("字典模式-机器学习并行", "4"),cli.setSelectOption("机器学习优先-字典模式辅助", "5"),cli.setDefault("1"),cli.setHelp("检测识别模式"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志recognition_patten
+
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setSelectOption("定时", "定时"),cli.setSelectOption("周期", "周期"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志task_type
+
+
+
+cli.check()
+//用于告警的去重，记录所有告警的检测（根据url(包括参数值)+string(body)进行hash去重）
+risk_output_dic={}
+
+//用于触发检测的去重，已经告警的url（不含参数）不会进行检测（根据url(不包括参数值)进行hash去重）
+detect_output_dic={}
+
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+// 定义用于打印的 base_info 变量
+base_info_script_name="凭证越权检测"
+base_info_task_creater=""
+base_info_task_type=task_type[0]
+base_info_detect_mode="动态爬虫"
+base_info_task_mode=recognition_patten_dic[recognition_patten[0]]
+base_info_login=""
+base_info_crediential=""
+base_info_user_define_header=""
+base_info_start_time=time.Now().String()
+base_info_end_time=""
+
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+flow_total=-1
+bad_rsp_list=[
+    "<title>Login</title>",
+    "no_login",
+    "请登录",
+    "(?i)Unauthorized",
+    "系统异常",
+    "未授权"
+]
+
+
+bad_end_str_list=[
+".jpg", ".png", ".gif", ".css", ".js", ".pdf", ".mp3", ".mp4", ".avi", ".map", ".svg", ".ico", ".woff", ".woff2", ".ttf"
+]
+
+
+description="越权漏洞发生在应用程序未正确验证用户身份或角色时。攻击者可以通过修改或伪造身份验证令牌或会话标识符，冒充其他用户的身份并访问其他用户的数据或执行特权操作"
+solution="1.身份验证和授权：确保在访问敏感信息之前进行适当的身份验证和授权检查。在服务器端验证用户的身份，确保只有合法用户才能查看对应的个人信息。\n2.会话管理：使用安全的会话管理机制，例如使用随机生成的会话标识符，并将其与用户身份关联。在每个请求中，验证会话标识符以确保用户的身份和权限。\n3.输入验证和过滤：对于用户提供的输入，包括用户ID，进行严格的验证和过滤。确保只有合法的用户ID才能被接受和处理。\n4.访问控制列表（ACL）：在服务器端实施访问控制列表，限制用户只能访问自己的个人信息。ACL可以基于用户ID进行配置，只允许用户访问与其ID匹配的信息。\n5.基于角色的访问控制（RBAC）：使用基于角色的访问控制模型，确保只有特定角色的用户才能查看个人信息。将访问权限与用户角色关联，并限制非授权用户的访问。\n6.安全审计和监测：定期审计和监测接口的使用情况，检查是否存在越权访问行为。记录访问日志，并设置警报机制以及异常行为的检测。\n7.安全开发实践：采用安全的开发实践，包括输入验证、输出编码、安全配置等，以减少安全漏洞的风险。\n8.漏洞管理：定期进行安全评估和漏洞扫描，及时修复已知的安全漏洞，并确保接口的安全性得到持续改进和维护。"
+
+
+mitm_risk_output=func(url,req,rsp,vul_type,vul_name,vul_severity,param,payload,payload_success_flag,pocname){
+    // 考虑去重策略 即时/定时 任务去重（因为任务本身也只跑一次），周期任务不去重
+    if task_type[0]=="即时" || task_type[0]=="定时" {
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行告警
+            return
+        }else{
+            risk_output_dic[url_body_hash]=1
+        }
+
+        //记录到检测去重字典中,借助库函数，拼接root_url和path
+        detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+        detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+        if err!=nil{
+            die(err)
+        }
+        detect_path=detect_url_Instance.Path
+        detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测，后续 mirrorFilteredHTTPFlow 不再进行检测
+        }else{
+            //记录到检测去重字典中
+            detect_output_dic[detect_url_path_hash]=1
+        }
+    }
+    risk.NewRisk(
+        url,
+        risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+        risk.type(vul_type),
+        risk.severity(vul_severity),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.parameter(param),
+        risk.payload(payload),
+        risk.description(description),
+        risk.solution(solution),
+        risk.details({
+            "location":url,
+            "pocname":pocname,
+            "payload_success_flag":payload_success_flag,
+            "recognition_patten":recognition_patten_dic[recognition_patten[0]]
+        })
+        )
+}
+
+
+compare_fuzz_rsp=func(http_rsp,http_fuzz_rsp){
+    if http_rsp.StatusCode!=http_fuzz_rsp.StatusCode{
+        yakit_output(f"原始请求响应状态码 ${http_rsp.StatusCode} 不同于模拟 fuzz 重放后的响应状态码 ${http_fuzz_rsp.StatusCode} ，跳过后续检测")
+        return false
+    }
+    // dump(http_rsp.Header["Content-Type"][0])
+    // dump(http_csrf_rsp.Header["Content-Type"][0])
+    if http_rsp.Header["Content-Type"]!=nil && http_fuzz_rsp.Header["Content-Type"]!=nil {
+        http_rsp_content_type=http_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+        http_fuzz_rsp_content_type=http_fuzz_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+
+        // 针对text/html自动拼接charset=utf-8的处理
+        if "text/html" in http_rsp_content_type && "text/html" in http_fuzz_rsp_content_type{
+            return true
+        }
+        if http_rsp_content_type!=http_fuzz_rsp_content_type{
+            yakit_output(f"原始请求响应 Content-Type ${http_rsp_content_type} 不同于模拟 fuzz 重放后的响应Content-Type ${http_fuzz_rsp_content_type} ，跳过后续检测")
+            return false
+        }
+    }elif http_rsp.Header["Content-Type"]==nil && http_fuzz_rsp.Header["Content-Type"]==nil {
+
+    }else{
+        yakit_output(f"原始请求响应 Content-Type 不同于模拟 fuzz 重放后的响应Content-Type ，跳过后续检测")
+        return false
+    }
+    return true
+}
+
+
+pre_check=func(http_req,http_rsp){
+
+    // 通过相似度检测的插件，可以先排除一部分无关流量
+    rsp=http.dump(http_rsp)~
+
+    if http_req.Method!="GET" && http_req.Method!="POST" {
+        return false
+    }
+
+    if str.MatchAnyOfSubString(http_req.URL.Path, bad_end_str_list...) {
+        return false
+    }
+
+    if str.MatchAnyOfRegexp(http_rsp.StatusCode, ["40\\d","50\\d"]...){
+        return false
+    }
+
+    if str.MatchAnyOfRegexp(rsp, bad_rsp_list...){
+        return false
+    }
+
+    return true
+}
+
+
+gen_fuzz_freq=func(freq){
+    param=""
+    payload=""
+    for fuzz_name in fuzz_credential_dic{
+        fuzz_position=fuzz_credential_dic[fuzz_name]["position"]
+        fuzz_value=fuzz_credential_dic[fuzz_name]["value"]
+        param=param+fuzz_name+"|"
+        payload=payload+fuzz_value+"|"
+        switch fuzz_position{
+            case "cookie":
+                freq=freq.FuzzCookieRaw(fuzz_value)
+            case "header":
+                freq=freq.FuzzHTTPHeader(fuzz_name, fuzz_value)
+            case "get":
+                freq=freq.FuzzGetParams(fuzz_name,fuzz_value)
+            case "post":
+                freq=freq.FuzzPostParams(fuzz_name,fuzz_value)
+            case "json":
+                freq=freq.FuzzPostJsonParams(fuzz_name,fuzz_value)
+        }
+
+    }
+    return freq,param[0:-1],payload[0:-1]
+}
+
+
+not_bad_result_check=func(result){
+    http_result=poc.ParseBytesToHTTPResponse(result.ResponseRaw)~
+    if "Set-Cookie" in http_result.Header{
+        yakit_output("在响应包中检测到 Set-Cookie 字段，跳过后续检测")
+        return false
+    }
+    // 检测响应中是否含有登录失败/登录界面等误报标识，出现表示凭证未通过鉴权
+    if str.MatchAnyOfRegexp(result.ResponseRaw, bad_rsp_list...){
+        return false
+    }
+    return true
+}
+
+
+over_permission=func(freq,http_rsp,rsp){
+    risk_output=false
+    payload_success_flag=nil
+    rsp_header,rsp_body=poc.Split(rsp)
+
+    //生成freq并取得fuzz后的结果
+    freq,param,payload=gen_fuzz_freq(freq)
+    result=freq.ExecFirst(httpool.redirectTimes(0))~
+    result_rsp_header,result_rsp_body=poc.Split(result.ResponseRaw)
+    http_result=poc.ParseBytesToHTTPResponse(result.ResponseRaw)~
+
+    // 先比较状态码/content-type/bad_res等字段，减少误报
+    if compare_fuzz_rsp(http_rsp, http_result) && not_bad_result_check(result){
+
+    }else{
+        return
+    }
+
+    // over_permission_flag_list优先级较高
+    if len(over_permission_flag_list)!=0 && str.MatchAnyOfSubString(result_rsp_body, over_permission_flag_list...){
+        yakit_output(f"替换访问凭证后的页面检测到 响应关键字")
+        risk_output=true
+        for over_permission_flag in over_permission_flag_list{
+            if str.MatchAnyOfSubString(result_rsp_body, over_permission_flag){
+                payload_success_flag=over_permission_flag
+                break
+            }
+        }
+    }
+
+    // 当over_permission_flag_list已经测试漏洞存在时，跳过相似度检测
+    if risk_output!=true{
+        sim_res=nil
+        //替换凭证前后页面为空 此时相似度检测为 0 的漏报处理
+        if rsp_body==result_rsp_body{
+            sim_res=1
+        }else{
+            sim_res=str.CalcSimilarity(rsp_body,result_rsp_body)~
+        }
+        yakit_output(f"计算替换访问凭证前后的页面响应相似度为 ${sim_res}")
+        if sim_res>sim_value{
+            risk_output=true
+            payload_success_flag=f"相似度检测=${sim_res}"
+        }
+    }
+    if risk_output{
+        if payload=="" || payload=="|" || "||" in payload{
+            mitm_risk_output(result.url, result.RequestRaw, result.ResponseRaw, "逻辑漏洞", "未授权", "high",param, payload, payload_success_flag, "mitm_over_permission_check")
+        }else{
+        mitm_risk_output(result.url, result.RequestRaw, result.ResponseRaw, "逻辑漏洞", "越权", "high",param, payload, payload_success_flag, "mitm_over_permission_check")
+        }
+    }
+}
+
+
+credential_output=func(){
+    for key in fuzz_credential_dic{
+        yakit_output(f"设置 ${fuzz_credential_dic[key]['position']} 处访问凭证 ${key} 值为 ${fuzz_credential_dic[key]['value']}")
+    }
+}
+
+
+
+# mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+    // 手动对爬虫预检测流量进行过滤
+    // if flow_total==-1{
+    //     flow_total=flow_total+1
+    //     return
+    // }
+
+    detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+    detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+    if err!=nil{
+        yakit_output("url 解析错误，脚本即将退出")
+        die(err)
+    }
+    detect_path=detect_url_Instance.Path
+    detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+    // 考虑去重策略 即时/定时 任务去重（因为任务本身也只跑一次），周期任务不去重
+    if task_type[0]=="即时" || task_type[0]=="定时"{
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测并告警，不再进行检测
+            yakit_output("detect_output_dic 去重")
+            return
+        }
+
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行检测
+            return
+        }
+    }
+
+    http_req = poc.ParseBytesToHTTPRequest(req)~
+    http_rsp=poc.ParseBytesToHTTPResponse(rsp)~
+    freq=fuzz.HTTPRequest(req,fuzz.https(isHttps))~
+    //credential_output()
+    if !pre_check(http_req,http_rsp){
+        return
+    }
+
+    // 在path_list且不在黑名单路径会进行检测
+    if str.MatchAnyOfSubString(http_req.URL.Path,path_list... ) && !str.MatchAnyOfRegexp(http_req.URL.Path, black_path_list...){
+        yakit_output(f"匹配到预设置的路径标识，开始对 ${url} 进行越权检测...")
+    }else{
+        yakit_output(f"未在 ${url} 中检测到预设置的路径标识，插件即将退出")
+        return
+    }
+    over_permission(freq, http_rsp, rsp)
+    yakit_output(f"${url} 越权检测完毕")
+}`
+
+// 第一步 处理被动流量插件，替换参数
+//(1)替换待测凭证字典
+
+re_rule_template=`//开始替换内容标志%s
+//待替换内容，勿动！
+(.*?)
+//结束替换内容标志%s`
+
+// 该方法只适用于cli参数返回为 (适配param_object参数类型 []string /float64 /string 可自定义扩展替换类型)
+replace_plugin_handle=func(plugin,replace_param_name,param_object){
+    re_rule=re_rule_template % [replace_param_name,replace_param_name]
+    if typeof(param_object)==string && param_object!=nil{
+        param_object_str=param_object
+        yakit.Info(f`设置 ${replace_param_name} 参数为 "${param_object_str}"`)
+        plugin=re.ReplaceAll(plugin, re_rule /*type: string*/, f`${replace_param_name}="${param_object_str}"`)
+    }
+
+    if typeof(param_object)==float64 && param_object!=nil{
+        param_object_str=param_object
+        yakit.Info(f`设置 ${replace_param_name} 参数为 "${param_object_str}"`)
+        plugin=re.ReplaceAll(plugin, re_rule /*type: string*/, f`${replace_param_name}=${param_object_str}`)
+    }
+
+    if typeof(param_object)==[]string && param_object!=nil{
+        param_object_str=`","`.Join(param_object)
+        yakit.Info(f`设置 ${replace_param_name} 参数为 "${param_object_str}"`)
+        plugin=re.ReplaceAll(plugin, re_rule /*type: string*/, f`${replace_param_name}=["${param_object_str}"]`)
+    }
+
+    return plugin
+}
+
+plugin=replace_plugin_handle(plugin, "fuzzCredential",fuzzCredential)
+plugin=replace_plugin_handle(plugin, "fuzzCredential_type",fuzzCredential_type)
+plugin=replace_plugin_handle(plugin, "path_list",path_list)
+plugin=replace_plugin_handle(plugin, "black_path_list",black_path_list)
+plugin=replace_plugin_handle(plugin, "over_permission_flag_list",over_permission_flag_list)
+plugin=replace_plugin_handle(plugin, "sim_value",sim_value)
+plugin=replace_plugin_handle(plugin, "recognition_patten",recognition_patten)
+plugin=replace_plugin_handle(plugin, "task_type",task_type)
+// dump(plugin)
+
+manager, err = hook.NewMixPluginCaller()
+startMitm = func(port){
+    println("创建manager")
+    if err != nil {
+        println("build mix plugin caller failed: %s", err)
+        die(err)
+    }
+
+    manager.LoadPluginByName(context.Background(), uuid(), nil, plugin)
+
+    println("启动mitm")
+    mitm.Start(port, mitm.callback(
+        func(isHttps,url,req,rsp){
+            req,err = http.dump(req)
+            if err!= nil{
+                yakit.Info(err.Error())
+                return
+            }
+            rsp,err = http.dump(rsp)
+            if err!= nil{
+                yakit.Info(err.Error())
+                return
+            }
+            body,err = str.ExtractBodyFromHTTPResponseRaw(rsp)
+            if err!= nil{
+                yakit.Info(err.Error())
+                return
+            }
+
+            defer func{
+                err = recover()
+                if err != nil {
+                    yakit.Info("handle result met error: %s", err)
+                }
+            }
+            try {
+                println("调用插件")
+                manager.MirrorHTTPFlowEx(false,isHttps,url,req,rsp,body)
+            } catch err {
+                yakit.Info(err.Error())
+            }
+        },
+    ))
+}
+
+// 第二步 启动被动流量服务
+randomPort = randn(10000, 60000)
+go startMitm(randomPort)
+sleep(5)
+proxy = "http://127.0.0.1:" + f`${randomPort}`
+
+func stringToDict(tempStr) {
+    result = make(map[string]string, 0)
+    items = tempStr.Split(";")
+    for _, item := range items {
+        if item.Contains(":") {
+            kv := item.Split(":")
+            result[kv[0]] = kv[1]
+        }
+    }
+    return result
+}
+
+host = ""
+if targetUrl.Contains("://") {
+    host = targetUrl.Split("://")[1]
+} else {
+    host = targetUrl
+}
+host = host.Split("/")[0]
+
+scanRangeMap = {
+    "AllDomainScan": crawlerx.AllDomainScan,
+    "SubMenuScan": crawlerx.SubMenuScan,
+}
+
+scanRepeatMap = {
+    "UnLimitRepeat": crawlerx.UnLimitRepeat,
+    "LowRepeatLevel": crawlerx.LowRepeatLevel,
+    "MediumRepeatLevel": crawlerx.MediumRepeatLevel,
+    "HighRepeatLevel": crawlerx.HighRepeatLevel,
+    "ExtremeRepeatLevel": crawlerx.ExtremeRepeatLevel,
+}
+
+browserInfo = {
+    "ws_address":"",
+    // "ws_address":"ws://192.168.0.68:7317",
+    "exe_path":"",
+    "proxy_address":"",
+    "proxy_username":"",
+    "proxy_password":"",
+}
+if wsAddress != "" {
+    browserInfo["ws_address"] = wsAddress
+}
+if exePath != "" {
+    browserInfo["exe_path"] = exePath
+}
+if proxy != "" {
+    browserInfo["proxy_address"] = proxy
+    if proxyUsername != "" {
+        browserInfo["proxy_username"] = proxyUsername
+        browserInfo["proxy_password"] = proxyPassword
+    }
+}
+browserInfoOpt = crawlerx.browserInfo(json.dumps(browserInfo))
+
+pageTimeoutOpt = crawlerx.pageTimeout(pageTimeout)
+
+fullTimeoutOpt = crawlerx.fullTimeout(fullTimeout)
+
+concurrentOpt = crawlerx.concurrent(concurrent)
+
+opts = [
+    browserInfoOpt,
+    pageTimeoutOpt,
+    fullTimeoutOpt,
+    concurrentOpt,
+    crawlerx.sourceType("plugin"),
+    crawlerx.fromPlugin("headless_crawlerx"),
+    crawlerx.saveToDB(true),
+    crawlerx.urlCheck(false)
+]
+
+if formFill != "" {
+    formFillInfo = stringToDict(formFill)
+    formFillOpt = crawlerx.formFill(formFillInfo)
+    opts = append(opts, formFillOpt)
+}
+
+if fileUpload != "" {
+    fileUploadInfo = stringToDict(fileUpload)
+    fileUploadOpt = crawlerx.fileInput(fileUploadInfo)
+    opts = append(opts, fileUploadOpt)
+}
+
+if header != "" {
+    headerInfo = stringToDict(header)
+    headerOpt = crawlerx.headers(headerInfo)
+    opts = append(opts, headerOpt)
+}
+
+if rawCredential_type[0]=="cookie"{
+    rawCookie=rawCredential
+
+}elif rawCredential_type[0]=="header"{
+    rawHeaders=rawCredential
+
+}
+
+if rawHeaders != "" {
+    opts = append(opts, crawlerx.rawHeaders(rawHeaders))
+}
+
+if rawCookie != "" {
+    opts = append(opts, crawlerx.rawCookie(host, rawCookie))
+}
+
+if cookie != "" {
+    cookieInfo = stringToDict(cookie)
+    cookieOpt = crawlerx.cookies(host, cookieInfo)
+    opts = append(opts, cookieOpt)
+}
+
+scanRangeStr = scanRange[0]
+if scanRangeStr != "" {
+    scanRangeItem = scanRangeMap[scanRangeStr]
+    scanRangeOpt = crawlerx.scanRangeLevel(scanRangeItem)
+    opts = append(opts, scanRangeOpt)
+}
+
+scanRepeatStr = scanRepeat[0]
+if scanRepeatStr != "" {
+    scanRepeatItem = scanRepeatMap[scanRepeatStr]
+    scanRepeatOpt = crawlerx.scanRepeatLevel(scanRepeatItem)
+    opts = append(opts, scanRepeatOpt)
+}
+
+if maxUrl != 0 {
+    opts = append(opts, crawlerx.maxUrl(maxUrl))
+}
+
+if maxDepth != 0 {
+    opts = append(opts, crawlerx.maxDepth(maxDepth))
+}
+
+if extraWaitLoad != 0 {
+    opts = append(opts, crawlerx.extraWaitLoadTime(extraWaitLoad))
+}
+
+if ignoreQuery != "" {
+    opts = append(opts, crawlerx.ignoreQueryName(ignoreQuery.Split(",")...))
+}
+
+if blacklist != "" {
+    opts = append(opts, crawlerx.blacklist(blacklist.Split(",")...))
+}
+
+if whitelist != "" {
+    opts = append(opts, crawlerx.whitelist(whitelist.Split(",")...))
+}
+
+if sensitiveWords != "" {
+    opts = append(opts, crawlerx.sensitiveWords(sensitiveWords.Split(",")))
+}
+
+leaklessStr = leakless[0]
+if leaklessStr != "" {
+    opts = append(opts, crawlerx.leakless(leaklessStr))
+}
+
+//todo适配周期/定时任务，对爬虫进行控制
+
+if task_type[0]=="即时"{
+    ch = crawlerx.StartCrawler(targetUrl, opts...)~
+    for item = range ch{
+        yakit.Info(item.Method() + " " + item.Url())
+    }
+}elif task_type[0]=="定时"{
+    // 使用延时函数
+    // 返回 UTC 时间
+    timed_task_start_time_obj=time.Parse("2006-01-02 15:04:05", timed_task_start_time /*type: string*/)~
+    // 计算到 CST 间隔，差值8小时
+    sleep_time=time.Since(timed_task_start_time_obj).Seconds()+3600*8
+    if sleep_time>0 {
+        yakit.Info(f"定时任务时间不合法")
+    }else{
+        yakit.Info(f"定时任务将于 ${timed_task_start_time} 开始执行，请耐心等待")
+        sleep(math.Abs(sleep_time))
+        ch = crawlerx.StartCrawler(targetUrl, opts...)~
+        for item = range ch{
+            yakit.Info(item.Method() + " " + item.Url())
+        }
+    }
+}elif task_type[0]=="周期"{
+    // 使用延时函数 避免无休止执行 先执行10次
+    for i in 10 {
+        yakit.Info(f"开始第 ${i+1} 次周期任务")
+        ch = crawlerx.StartCrawler(targetUrl, opts...)~
+        for item = range ch{
+            yakit.Info(item.Method() + " " + item.Url())
+        }
+        sleep(periodic_tasks_interval_time)
+    }
+}

@@ -1,0 +1,234 @@
+phone_list=cli.LineDict("phone_list",cli.setVerboseName("请求包手机号标识"), cli.setDefault("phone\nmoblie\nmobile"),cli.setCliGroup("插件额外参数"))
+verification_code_list=cli.LineDict("verification_code_list",cli.setVerboseName("响应包验证码标识"), cli.setDefault("check\ncode\ndata\nidentifying\nkey\nmessage\nmsg\nsms\nverification\nverify\nyanzhengma\nyzm\n验证码"),cli.setCliGroup("插件额外参数"))
+
+//开始替换内容标志recognition_patten
+//待替换内容，勿动！
+recognition_patten=cli.StringSlice("recognition_patten", cli.setVerboseName("识别模式"),cli.setMultipleSelect(false),cli.setSelectOption("字典模式", "1"),cli.setSelectOption("机器学习模式", "2"),cli.setSelectOption("字典模式优先-机器学习辅助", "3"),cli.setSelectOption("字典模式-机器学习并行", "4"),cli.setSelectOption("机器学习优先-字典模式辅助", "5"),cli.setDefault("1"),cli.setHelp("检测识别模式"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志recognition_patten
+
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志task_type
+
+cli.check()
+
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+
+// 定义用于打印的 base_info 变量
+base_info_script_name="漏洞名"
+base_info_task_creater=""
+base_info_task_type=task_type[0]
+base_info_detect_mode="mitm"
+base_info_task_mode=recognition_patten_dic[recognition_patten[0]]
+base_info_login=""
+base_info_crediential=""
+base_info_user_define_header=""
+base_info_start_time=time.Now().String()
+base_info_end_time=""
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+// 为code额外设置的误报情况
+bad_code_list = ["ad", "bad", "city", "country", "err", "fail", "nation", "return", "rsp", "status", "state", "success"]
+
+tips_list = ["查收", "短信", "接收", "验证码"]
+
+bad_end_str_list=[
+".jpg", ".png", ".gif", ".css", ".js", ".pdf", ".mp3", ".mp4", ".avi", ".map", ".svg", ".ico", ".woff", ".woff2", ".ttf"
+]
+
+code_re_rule = `(?:\b|\D)(\d{4}|\d{6})(?:\b|\D)`
+risk_output_dic,detect_output_dic,flow_total={},{},-1
+
+description=`手机验证码回显漏洞是指验证码在发送过程中，验证码信息以明文形式存在于返回的数据包中，或者虽然加密但加密方式不够安全，使得攻击者有可能通过观察或拦截这些数据包，从而获取到验证码内容。这种漏洞可能导致未授权访问、账户被劫持等安全问题。手机验证码回显漏洞的危害有账户安全威胁：攻击者获取验证码后，可以冒充用户进行登录、交易等操作，从而窃取用户信息、资金等敏感数据。服务滥用：攻击者可以利用验证码进行恶意注册、刷单等行为，对服务平台造成不必要的负担和资源浪费。`
+solution=`1.不在响应中返回验证码：最简单的解决方案是在响应包中不包含验证码信息。一旦验证码被提交验证，就不要再将验证码信息返回给客户端。
+2.监控和日志记录：监控系统中的验证码使用情况，记录验证码生成、发送和验证的操作，及时发现异常情况。`
+
+// RFC 规范http响应头 假设不会存在验证码
+http_response_headers_list = [
+    "Access-Control-Allow-Origin",
+    "Cache-Control",
+    "Content-Length",
+    "Content-Type",
+    "Date",
+    "ETag",
+    "Expires",
+    "Last-Modified",
+    "Location",
+    "Pragma",
+    "P3P",
+    "Server",
+    "Vary",
+    "X-Powered-By",
+]
+
+res_output = func(url, req, rsp, verification_code) {
+
+    // 计算url和string后的body md5进行去重
+    if task_type[0]=="即时" || task_type[0]=="定时" {
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行告警
+            return
+        }else{
+            //记录到告警去重字典中
+            risk_output_dic[url_body_hash]=1
+        }
+
+        //记录到检测去重字典中,借助库函数，拼接root_url和path
+        detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+        detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+        if err!=nil{
+            die(err)
+        }
+        detect_path=detect_url_Instance.Path
+        detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测，后续 mirrorFilteredHTTPFlow 不再进行检测
+        }else{
+            //记录到检测去重字典中
+            detect_output_dic[detect_url_path_hash]=1
+        }
+    }
+    risk.NewRisk(
+        url,
+        risk.severity("middle"),
+        risk.title(f"检测到 ${url} 响应包中存在验证码"),
+        risk.type("other"),
+        risk.typeVerbose("验证码回显"),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.details({"payload_success_flag": verification_code,"location":url,"recognition_patten" : recognition_patten_dic[recognition_patten[0]]}),
+        risk.solution(solution),
+        risk.description(description)
+    )
+}
+
+
+base_check_func=func(name,value){
+    return str.MatchAnyOfSubString(name, verification_code_list...) && !str.MatchAnyOfSubString(name, bad_code_list...) && str.MatchAnyOfRegexp(value, code_re_rule)
+}
+
+pre_check=func(req,rsp){
+    http_req = poc.ParseBytesToHTTPRequest(req)~
+
+    if http_req.Method!="GET" && http_req.Method!="POST" {
+        return false
+    }
+
+    if str.MatchAnyOfSubString(http_req.URL.Path, bad_end_str_list...) {
+        return false
+    }
+
+    http_rsp=poc.ParseBytesToHTTPResponse(rsp)~
+
+    if str.MatchAnyOfRegexp(http_rsp.StatusCode, ["40\\d","50\\d"]...){
+        return false
+    }
+
+    return true
+}
+
+
+# mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
+mirrorFilteredHTTPFlow = func(isHttps /* bool */, url /* string */, req /* []byte */, rsp /* []byte */, body /* []byte */) {
+
+
+    // 手动对爬虫预检测流量进行过滤，yakit加载mitm插件时，建议注释，动态爬虫形式调用无需注释（当爬虫启用crawlerx.check()需要注释）
+    // if flow_total==-1{
+    //     flow_total=flow_total+1
+    //     return
+    // }
+
+    detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+    detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+    if err!=nil{
+        yakit_output("url 解析错误，脚本即将退出")
+        die(err)
+    }
+
+    detect_path=detect_url_Instance.Path
+    detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+    // 考虑去重策略 即时/定时 任务去重（因为任务本身也只跑一次），周期任务不去重
+    if task_type[0]=="即时" || task_type[0]=="定时"{
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测并告警，不再进行检测
+            yakit_output("detect_output_dic 去重")
+            return
+        }
+
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行检测
+            yakit_output("risk_output_dic 去重")
+            return
+        }
+    }
+
+
+    if !pre_check(req,rsp){
+        return
+    }
+    // 检测响应报文，检测响应 header（正则匹配）/body（json格式解析利用json.loads解析参数，html格式正则匹配）
+    http_req,http_rsp = poc.ParseBytesToHTTPRequest(req)~,poc.ParseBytesToHTTPResponse(rsp)~
+    req_header, req_body = poc.Split(req)
+    http_rsp_header = http_rsp.Header
+    http_rsp_content_length = int(http_rsp_header["Content-Length"][0])
+
+
+    // 当请求URL或body中含有手机号标识时，才进行响应包验证码的判断
+    if str.MatchAnyOfSubString(http_req.URL.RawQuery, phone_list...) || str.MatchAnyOfSubString(req_body, phone_list...){
+        yakit_output(f"检测到 ${url} 请求中含有手机号标识，开始验证码回显检测")
+    }else{
+        return
+    }
+
+    // 检测header
+    for header_key in http_rsp_header{
+        if str.MatchAnyOfSubString(header_key, http_response_headers_list...){
+            continue
+        }
+        for sub_value in http_rsp_header[header_key]{
+            if base_check_func(sub_value,sub_value){
+                res_output(url, req, rsp, re.FindSubmatchAll(sub_value, code_re_rule /*type: string*/)[0][1])
+                yakit_output(f"完成对 ${url} 验证码回显检测")
+                return
+            }
+        }
+    }
+
+    // 检测body
+    if json.loads(body)!={} {
+    // 检测json body
+        json_rsp_body=json.loads(body)
+        for key in json_rsp_body{
+            // 遍历所有键值，查找 是"非误报"的验证码标识，且值为合法验证码格式
+            if base_check_func(key,json_rsp_body[key]){
+                res_output(url, req, rsp, re.FindSubmatchAll(json_rsp_body[key], code_re_rule /*type: string*/)[0][1])
+                yakit_output(f"完成对 ${url} 验证码回显检测")
+                return
+            }
+        }
+    }elif http_rsp_content_length<50 && str.MatchAnyOfSubString(body, tips_list...) && str.MatchAnyOfRegexp(body, code_re_rule){
+        res_output(url, req, rsp, re.FindSubmatchAll(body, code_re_rule /*type: string*/)[0][1])
+        yakit_output(f"完成对 ${url} 验证码回显检测")
+        return
+    }
+    yakit_output(f"完成对 ${url} 验证码回显检测")
+}

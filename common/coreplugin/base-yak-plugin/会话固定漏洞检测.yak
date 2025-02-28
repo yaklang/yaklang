@@ -1,0 +1,276 @@
+// 检测原理
+// 当且仅当原始报文携带 cookie 且登录成功的响应报文的set-cookie包含原始cookie，才进行告警
+
+bad_end_str_list=[
+".jpg", ".png", ".gif", ".css", ".js", ".pdf", ".mp3", ".mp4", ".avi", ".map", ".svg", ".ico", ".woff", ".woff2", ".ttf"
+]
+
+risk_output_dic={}
+detect_output_dic={}
+flow_total=-1
+
+// 可以严格按照正则匹配
+// cookie_flag_list=[
+//     "PHPSESSID", "PHPSESSIONID", "JSESSIONID", "SESSION", "SESSID", "SESSIONID", "ASPSESSIONID", "CFTOKEN", "CFID", "MSCSSID", "JWSESSIONID"
+// ]
+
+
+
+login_fail_list=[
+    `(登录(失败|错误))`,
+    `(((用户)|(账户)|(账号)).*?((未[被在]{0,1}(系统[中]{0,1}){0,1}注册)|(不存在)))`,
+    `((错误|无效|有误|失效|不正确)的(用户名(或|和|)密码|验证码))|((用户名(或|和|)密码|验证码)(错误|无效|有误|失效|不正确))`,
+    `(?i)(error|fail|invalid)`
+]
+
+set_cookie_check=func(req,rsp,url){
+
+    has_set_cookie=false
+    http_rsp=poc.ParseBytesToHTTPResponse(rsp)~
+
+    for key in http_rsp.Header{
+        if key.Lower()=="set-cookie"{
+            has_set_cookie=true
+            break
+        }
+    }
+
+    http_req=poc.ParseBytesToHTTPRequest(req)~
+    RawCookie=http_req.Header["Cookie"][0]
+
+    // 响应报文 不含 set-cookie ，表明原始cookie可使用，告警
+    if !has_set_cookie{
+        mitm_risk_output(url,req,rsp,"其他漏洞（会话管理类）","会话固定","middle",RawCookie,"","mitm_session_fixation_check")
+        return true
+    }
+
+
+    // 当检测到set cookie字段时候，需要满足未对原始cookie进行修改
+
+    for set_cookie in http_rsp.Header["Set-Cookie"]{
+        if str.MatchAnyOfSubString(set_cookie, RawCookie){
+            mitm_risk_output(url,req,rsp,"其他漏洞（会话管理类）","会话固定","middle",RawCookie,set_cookie,"mitm_session_fixation_check")
+            return true
+        }
+    }
+
+    return false
+}
+
+
+
+pre_check=func(req,rsp){
+    http_req = poc.ParseBytesToHTTPRequest(req)~
+
+    if http_req.Method!="GET" && http_req.Method!="POST" {
+        return false
+    }
+
+    if str.MatchAnyOfSubString(http_req.URL.Path, bad_end_str_list...) {
+        return false
+    }
+
+    http_rsp=poc.ParseBytesToHTTPResponse(rsp)~
+
+    if str.MatchAnyOfRegexp(http_rsp.StatusCode, ["40\\d","50\\d"]...){
+        return false
+    }
+
+    // http_rsp_header,http_rsp_body=poc.Split(rsp)
+    // // 启用非json形式的检查
+    // if not_json_check{
+    //     return true
+    // }
+
+    // http_rsp_json_body=json.loads(string(http_rsp_body))
+    // if http_rsp_json_body == {} {
+    //     return false
+    // }
+
+    return true
+}
+
+
+white_path_list=cli.LineDict("white_path_list", cli.setDefault("access\naccount\nadmit\nadmission\nauth\nconnect\ncredential\ndenglu\nenroll\nenter\nentry\nidenti\njoin\nlogin\nlogon\nportal\nsecure\nsession\nsignin\nstart\nvalidate\nverification\nverify"),cli.setCliGroup("插件额外参数"),cli.setVerboseName("登录 url 标识"))
+white_param_list=cli.LineDict("white_param_list", cli.setDefault("access\naccount\nauth\ncredential\nidenti\nkey\nmail\nname\npass\nphone\nsecret\nuser\nverification"),cli.setCliGroup("插件额外参数"),cli.setVerboseName("账号参数标识"))
+session_flag_list=cli.LineDict("session_flag_list",cli.setDefault("CFID\nCFTOKEN\nMSCSSID\nSESSID\nSESSION"),cli.setCliGroup("插件额外参数"),cli.setVerboseName("会话标识"))
+//开始替换内容标志recognition_patten
+//待替换内容，勿动！
+recognition_patten=cli.StringSlice("recognition_patten", cli.setVerboseName("识别模式"),cli.setMultipleSelect(false),cli.setSelectOption("字典模式", "1"),cli.setSelectOption("机器学习模式", "2"),cli.setSelectOption("字典模式优先-机器学习辅助", "3"),cli.setSelectOption("字典模式-机器学习并行", "4"),cli.setSelectOption("机器学习优先-字典模式辅助", "5"),cli.setDefault("1"),cli.setHelp("检测识别模式"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志recognition_patten
+
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志task_type
+
+cli.check()
+
+
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+base_info_script_name = "会话固定漏洞检测"
+base_info_task_creater=json.loads(db.GetKey("httpSetting"))["user_name"]
+base_info_task_type=task_type[0]
+base_info_detect_mode="mitm"
+base_info_task_mode=recognition_patten_dic[recognition_patten[0]]
+base_info_login=""
+base_info_crediential=""
+base_info_user_define_header=""
+base_info_start_time=time.Now().String()
+base_info_end_time=""
+
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+
+mitm_risk_output=func(url,req,rsp,vul_type,vul_name,vul_severity,payload,payload_success_flag,pocname){
+
+    // 计算url和string后的body md5进行去重
+    if task_type[0]=="即时" || task_type[0]=="定时" {
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行告警
+            return
+        }else{
+            //记录到告警去重字典中
+            risk_output_dic[url_body_hash]=1
+        }
+
+        //记录到检测去重字典中,借助库函数，拼接root_url和path
+        detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+        detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+        if err!=nil{
+            die(err)
+        }
+        detect_path=detect_url_Instance.Path
+        detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测，后续 mirrorFilteredHTTPFlow 不再进行检测
+        }else{
+            //记录到检测去重字典中
+            detect_output_dic[detect_url_path_hash]=1
+        }
+    }
+
+    risk.NewRisk(
+        url,
+        risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+        risk.type(vul_type),
+        risk.severity(vul_severity),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.payload(payload),
+        risk.description("会话固定漏洞（Session Fixation）是一种网络攻击，攻击者通过将会话ID（Session ID）预先设置为攻击者已知的值，然后诱骗受害者在攻击者控制的会话中进行身份验证，导致攻击者可以冒用受害者的身份，进行未经授权的操作。"),
+        risk.solution("防范会话固定漏洞的措施包括在用户成功登录后立即重新生成会话ID，以确保新会话ID不受攻击者的控制。此外，服务器应在每次重要操作或权限提升时重新验证会话ID的有效性，限制会话ID的生命周期，并通过HTTPS加密传输会话ID，以防止其在网络上传输时被窃取。这些措施可以有效降低会话固定攻击的风险。"),
+        risk.details({
+            "location":url,
+            "pocname":pocname,
+            "payload_success_flag":payload_success_flag,
+            "recognition_patten":recognition_patten_dic[recognition_patten[0]]
+        })
+        )
+}
+
+
+
+# mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+    // 手动对爬虫预检测流量进行过滤，yakit加载mitm插件时，建议注释，动态爬虫形式调用无需注释（当爬虫启用crawlerx.check()需要注释）
+    // if flow_total==-1{
+    //     flow_total=flow_total+1
+    //     return
+    // }
+
+    detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+    detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+    if err!=nil{
+        yakit_output("url 解析错误，脚本即将退出")
+        die(err)
+    }
+
+    detect_path=detect_url_Instance.Path
+    detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+    // 考虑去重策略 即时/定时 任务去重（因为任务本身也只跑一次），周期任务不去重
+    if task_type[0]=="即时" || task_type[0]=="定时"{
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测并告警，不再进行检测
+            yakit_output("detect_output_dic 去重")
+            return
+        }
+
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行检测
+            yakit_output("risk_output_dic 去重")
+            return
+        }
+    }
+
+
+    if !pre_check(req, rsp){
+        return
+    }
+
+    // todo url path 白名单
+    http_req = str.ParseBytesToHTTPRequest(req)~
+    if !str.MatchAnyOfSubString(http_req.URL.Path, white_path_list...){
+        return
+    }
+
+    // todo 非cookie参数 白名单
+    freq=fuzz.HTTPRequest(req, fuzz.https(isHttps))~
+    params,param_flag=freq.GetCommonParams(),false
+    for param in params{
+        if param.Position().StartsWith("Cookie"){
+            continue
+        }
+        if str.MatchAnyOfSubString(param.Name(), white_param_list...){
+            param_flag=true
+            break
+        }
+    }
+    if !param_flag{
+        yakit_output(f"未在 ${url} 中检测到预设置的登录业务标识")
+        return
+    }
+    yakit_output(f"在 ${url} 中检测到预设置的登录业务标识")
+
+    has_session,http_req=false,poc.ParseBytesToHTTPRequest(req)~
+    for key in http_req.Header{
+        //字段名为cookie且含有session id等标识
+        if key.Lower()=="cookie" && str.MatchAnyOfSubString(http_req.Header[key],session_flag_list...){
+            has_session=true
+            break
+        }
+    }
+    if !has_session{
+        yakit_output("原始 mitm 登录业务不含会话标识字段，插件即将退出")
+        return
+    }
+
+    if str.MatchAnyOfRegexp(rsp, login_fail_list...){
+        yakit_output("原始 mitm 登录业务失败，插件即将退出")
+        return
+    }
+    yakit_output(f"开始检测 ${url} 中是否存在 会话固定 漏洞")
+    set_cookie_check(req,rsp,url)
+
+    yakit_output(f"完成对 ${url} 进行会话固定漏洞检测")
+
+}

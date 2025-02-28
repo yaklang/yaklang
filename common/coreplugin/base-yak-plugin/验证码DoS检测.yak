@@ -1,0 +1,270 @@
+
+// mitm参数输入 动态爬虫调用mitm插件时候，使用正则字符串替换 plugin 源码进行传参，需要给参数注释进行正则匹配
+
+//开始替换内容标志width_param_list
+//待替换内容，勿动！
+width_param_list=cli.LineDict("width_param_list",cli.setDefault("captchaWidth\nimgW\nimgWidth\nw\nwidth\nwidthPixels\nwSize"),cli.setVerboseName("图片宽度参数"),cli.setRequired(true))
+//结束替换内容标志width_param_list
+
+//开始替换内容标志height_param_list
+//待替换内容，勿动！
+height_param_list=cli.LineDict("height_param_list",cli.setDefault("captchaHeight\nimgH\nimgHeight\nh\nheight\nheightPixels\nhSize"),cli.setVerboseName("图片高度参数"),cli.setRequired(true))
+//结束替换内容标志height_param_list
+
+//开始替换内容标志font_param_list
+//待替换内容，勿动！
+font_param_list=cli.LineDict("font_param_list",cli.setDefault("font_size\nsize"),cli.setVerboseName("字体大小参数"),cli.setRequired(true))
+//结束替换内容标志font_param_list
+
+//开始替换内容标志diff_percent
+//待替换内容，勿动！
+diff_percent=cli.Float("diff_percent",cli.setDefault(0.3),cli.setVerboseName("响应差值阈值"),cli.setHelp("大于等于该值则告警"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志diff_percent
+
+//开始替换内容标志length_list
+//待替换内容，勿动！
+length_list=cli.StringSlice("length_list",cli.setDefault("1,10,100,1000,10000"),cli.setMultipleSelect(true),cli.setVerboseName("参数 fuzz 范围"),cli.setHelp("对图片、字体参数的 fuzz 范围"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志length_list
+
+//开始替换内容标志img_type_list
+//待替换内容，勿动！
+img_type_list=cli.StringSlice("img_type_list",cli.setDefault("image"),cli.setMultipleSelect(true),cli.setVerboseName("响应 Content-Type 类型"),cli.setHelp("只对响应报文中 Content-Type 以该参数开头的报文进行检测"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志img_type_list
+
+//开始替换内容标志param_codec_type
+//待替换内容，勿动！
+param_codec_type=cli.StringSlice("param_codec_type",cli.setDefault("1"),cli.setVerboseName("参数codec模式"),cli.setHelp("只对请求报文参数生效，按照自定义的codec脚本对可 fuzz 参数进行测试"),cli.setSelectOption("不检测编码", "1"),cli.setSelectOption("检测Url编码", "2"),cli.setSelectOption("检测Base64编码", "3"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志param_codec_type
+
+//开始替换内容标志recognition_patten
+//待替换内容，勿动！
+recognition_patten=cli.StringSlice("recognition_patten", cli.setVerboseName("识别模式"),cli.setMultipleSelect(false),cli.setSelectOption("字典模式", "1"),cli.setSelectOption("机器学习模式", "2"),cli.setSelectOption("字典模式优先-机器学习辅助", "3"),cli.setSelectOption("字典模式-机器学习并行", "4"),cli.setSelectOption("机器学习优先-字典模式辅助", "5"),cli.setDefault("1"),cli.setHelp("检测识别模式"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志recognition_patten
+
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志task_type
+
+
+// 定义全局变量
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+param_codec_dic={
+    "1":"不检测编码",
+    "2":"Url编码",
+    "3":"Base64编码",
+}
+
+
+
+
+// 定义用于打印的 base_info 变量
+base_info_script_name="验证码 DoS 检测"
+base_info_task_creater=""
+base_info_task_type=task_type[0]
+base_info_detect_mode="mitm"
+base_info_task_mode=recognition_patten_dic[recognition_patten[0]]
+base_info_login=""
+base_info_crediential=""
+base_info_user_define_header=""
+base_info_start_time=time.Now().String()
+base_info_end_time=""
+
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+
+cli.check()
+
+
+solution="1.实现验证码频率限制：限制每个用户请求验证码的频率，防止攻击者发送大量恶意请求。可以设置每个用户在一定时间内只能请求验证码的次数。\n2.监控异常请求：实施安全审计和监控机制，监视系统中的异常请求模式。及时检测到异常行为并采取相应措施来应对。\n3.定期更新验证码生成算法：定期更新验证码生成算法，确保验证码的安全性和抗攻击能力。"
+
+description="验证码 DoS（拒绝服务）漏洞是一种安全漏洞，攻击者利用该漏洞可以通过恶意请求使验证码系统不可用或性能严重下降。这种攻击可能导致系统无法正常响应合法用户的请求，从而影响系统的可用性。"
+
+risk_output_dic={}
+detect_output_dic={}
+flow_total=-1
+
+
+
+invokeCodec = (name,arg)=>{
+    if name=="不检测编码"{
+        return arg
+    }
+    plugin = db.GetYakitPluginByName(name)~
+    if plugin.Type!="codec"{
+        return ""
+    }
+    code = plugin.Content
+    file.TempFileName()
+    name, err = file.TempFileName()
+    if err != nil{
+        return ""
+    }
+    defer os.Remove(name)
+    file.Save(name, code)
+    hanlde = import(name, "handle")~
+    return hanlde(arg)
+}
+
+
+gen_dos_fuzz_freq=func(freq,length_value){
+    freq_finall,param,payload=freq,"",invokeCodec(param_codec_dic[param_codec_type[0]],length_value)
+    // 不获取报文中的参数，而是对设置的参数列表强制fuzz，无需检测原始参数编码类型
+
+    for width_param in width_param_list{
+        freq_finall=freq_finall.FuzzGetParams(width_param, payload).FuzzPostParams(width_param,payload )
+        param=param+"|"+width_param
+    }
+
+    for height_param in height_param_list{
+        freq_finall=freq_finall.FuzzGetParams(height_param, payload).FuzzPostParams(height_param,payload )
+        param=param+"|"+height_param
+    }
+
+    for font_param in font_param_list{
+        freq_finall=freq_finall.FuzzGetParams(font_param,payload).FuzzPostParams(font_param,payload )
+        param=param+"|"+font_param
+    }
+
+    return freq_finall,param[1:]
+}
+
+
+dos_check=func(freq_finall,raw_content_length){
+
+    // dos 可能时间增加，设置等待30s
+    result=freq_finall.ExecFirst(fuzz.WithTimeOut(30))~
+    fuzz_http_rsp_header=str.ParseBytesToHTTPResponse(result.ResponseRaw)~
+    // 检测响应时间会有误报 考虑检测响应content-length ,默认 fuzz 后的报文长度和原始长度差值大于原始长度的 30% 时，便认为存在漏洞
+    fuzz_content_length=int(fuzz_http_rsp_header.Header["Content-Length"][0])
+    diff_value=fuzz_content_length-raw_content_length
+    if diff_value>0 && (diff_value*1.0/raw_content_length)>=diff_percent{
+        yakit_output(f"检测到 fuzz 后的响应差值大于预设值的阈值 ${diff_percent}")
+        return true,result,fuzz_content_length
+    }
+    return false,result,fuzz_content_length
+}
+
+
+mitm_risk_output=func(url,req,rsp,vul_type,vul_name,vul_severity,param,payload,payload_success_flag,pocname){
+    // 考虑去重策略 即时/定时 任务去重（因为任务本身也只跑一次），周期任务不去重
+    if task_type[0]=="即时" || task_type[0]=="定时" {
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行告警
+            return
+        }else{
+            //记录到告警去重字典中
+            risk_output_dic[url_body_hash]=1
+        }
+
+        //记录到检测去重字典中,借助库函数，拼接root_url和path
+        detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+        detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+        if err!=nil{
+            die(err)
+        }
+        detect_path=detect_url_Instance.Path
+        detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测，后续 mirrorFilteredHTTPFlow 不再进行检测
+        }else{
+            //记录到检测去重字典中
+            detect_output_dic[detect_url_path_hash]=1
+        }
+    }
+
+    risk.NewRisk(
+        url,
+        risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+        risk.type(vul_type),
+        risk.severity(vul_severity),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.payload(payload),
+        risk.solution(solution),
+        risk.description(description),
+        risk.parameter(param),
+        risk.details({
+            "location":url,
+            "pocname":pocname,
+            "payload_success_flag":f"Content-Length: ${payload_success_flag}",
+            "recognition_patten":recognition_patten_dic[recognition_patten[0]]
+        })
+        )
+}
+
+
+# mirrorHTTPFlow 会镜像所有的流量到这里，包括 .js / .css / .jpg 这类一般会被劫持程序过滤的请求
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+    // 手动对爬虫预检测流量进行过滤，yakit加载mitm插件时，建议注释，动态爬虫形式调用无需注释（当爬虫启用crawlerx.check()需要注释）
+    // if flow_total==-1{
+    //     flow_total=flow_total+1
+    //     return
+    // }
+
+    detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+    detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+    if err!=nil{
+        yakit_output("url 解析错误，脚本即将退出")
+        die(err)
+    }
+
+    detect_path=detect_url_Instance.Path
+    detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+    // 考虑去重策略 即时/定时 任务去重（因为任务本身也只跑一次），周期任务不去重
+    if task_type[0]=="即时" || task_type[0]=="定时"{
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测并告警，不再进行检测
+            yakit_output("detect_output_dic 去重")
+            return
+        }
+
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行检测
+            yakit_output("risk_output_dic 去重")
+            return
+        }
+    }
+
+    //过滤出图片类型的响应
+    http_rsp=str.ParseBytesToHTTPResponse(rsp)~
+    if ("Content-Type" in http_rsp.Header) && (str.MatchAnyOfSubString(http_rsp.Header["Content-Type"], img_type_list...)) {
+        yakit_output(f"检测到响应报文为图片类型，开始尝试对 ${url} 进行验证码 DoS 检测")
+    }else{
+        return
+    }
+
+    //生成freq
+    raw_content_length,freq=int(http_rsp.Header["Content-Length"][0]),fuzz.HTTPRequest(req,fuzz.https(isHttps))~
+    // 有参数场景下 容易 fuzz 无必要参数，考虑后续补充参数字典形式优化 pass
+    // 无参数场景下 直接 fuzz 参数 只考虑 get/post 两种形式 ，且参数字典也可覆盖有参数场景
+    for length_value in length_list{
+        freq_finall,param=gen_dos_fuzz_freq(freq, length_value)
+        dos_check_res,result,payload_success_flag=dos_check(freq_finall,raw_content_length)
+        if dos_check_res{
+            mitm_risk_output(result.Url, result.RequestRaw, result.ResponseRaw, "逻辑漏洞", "验证码DoS", "middle", param, invokeCodec(param_codec_dic[param_codec_type[0]],length_value), payload_success_flag, "mitm_verification_code_DoS_check")
+            yakit_output(f"检测到 ${url} 中存在验证码 DoS 漏洞!")
+            break
+        }
+    }
+    yakit_output(f"完成对 ${url} 的验证码 DoS 检测")
+}

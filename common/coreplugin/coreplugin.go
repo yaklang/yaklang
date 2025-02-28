@@ -281,6 +281,103 @@ func init() {
 			withPluginAuthors("Q16G"),
 			withPluginEnableGenerateParam(true),
 		)
+		registerBuildInPlugin("yak", "验证码DoS(动态爬虫)",
+			withPluginHelp("验证码DoS(动态爬虫)"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "被动未授权服务检测",
+			withPluginHelp("第一次访问网站时，检测常见未授权服务"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+		registerBuildInPlugin("mitm", "JWT伪造检测",
+			withPluginHelp("尝试伪造admin身份的JWT，根据响应相似度进行检测"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+		registerBuildInPlugin("mitm", "验证码回显绕过检测",
+			withPluginHelp("验证码回显检测，对响应报文检测是否存在验证码"),
+			withPluginAuthors("学不会二进制不改名"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "验证码DoS检测",
+			withPluginHelp("验证码大小可控对服务端DoS"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "Cookie欺骗检测",
+			withPluginHelp("Cookie凭据验证较弱，可构造恶意Cookie绕过登录验证"),
+			withPluginAuthors("学不会二进制不改名"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "凭证未授权检测重构版本",
+			withPluginHelp("SRC_COOKIE/TOKEN未授权检测重构版本，适用于主体访问客体场景下，主体未授权。自动对可能鉴权的请求头（Cookie/Token/Authoritarian等）及get/post/json位置处的鉴权参数字典测试"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("yak", "未授权测试(动态爬虫)",
+			withPluginHelp("无头浏览器模拟点击爬虫"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "常见信息泄露检测",
+			withPluginHelp("常见 CMS 信息泄露/目录穿越/路径穿越/文件读取，通过被动流量进行 payload fuzz"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("yak", "遍历测试(动态爬虫)",
+			withPluginHelp("无头浏览器模拟点击爬虫"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("yak", "越权测试(动态爬虫)",
+			withPluginHelp("无头浏览器模拟点击爬虫"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "敏感信息遍历检测",
+			withPluginHelp("SRC_敏感信息遍历检测，适用于主体访问客体场景下，当前主体可遍历客体标识，访问多个客体对象"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "会话固定漏洞检测",
+			withPluginHelp("SRC_会话固定漏洞检测"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "注销功能有效性检测",
+			withPluginHelp("通过原始凭证和随机凭证，相似度检测注销功能是否有效"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "验证码可复用检测",
+			withPluginHelp("SRC_验证码可复用检测，适用于登录场景下检测，仅支持插件仓库子页面下调用"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "验证码可绕过检测",
+			withPluginHelp("删除表单中的验证码参数，尝试绕过后端检测，检测逻辑依赖于比对正确验证码响应包和删除验证码响应包的相似度比较"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "js中接口未授权",
+			withPluginHelp("匹配并提取js中的接口，尝试拼接访问，当返回内容为json格式且长度大于100时告警"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "凭证越权检测",
+			withPluginHelp("SRC_COOKIE/TOKEN越权检测，适用于主体访问客体场景下，主体凭证替换导致的越权"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "SRC_CSRF检测",
+			withPluginHelp("SRC_CSRF检测"),
+			withPluginAuthors("汤鲜味美砂锅面🍜"),
+			withPluginEnableGenerateParam(true))
+
+		registerBuildInPlugin("mitm", "验证码爆破",
+			withPluginHelp("检测数字型验证码是否可以爆破，配置四位数/六位数爆破以及六位数万能密码"),
+			withPluginAuthors("迹"),
+			withPluginEnableGenerateParam(true))
 		return nil
 	})
 

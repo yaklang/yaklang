@@ -1,0 +1,872 @@
+pure_digital_rule="^\\d+$"
+string_rule="^[ -~]{1,}$"
+path_digital_rule="/(\\d+)(/|$)"
+pure_digital_rule_list=[pure_digital_rule]
+string_rule_list=[string_rule]
+// 如果确认请求中参数值为bad param时，响应不含敏感信息，可额外设置此项以提高检测准确率
+fuzz_bad_param_value=""
+
+flow_total=-1
+m=sync.NewMutex()
+
+description="用户敏感信息遍历漏洞发生在应用程序中，当应用程序没有正确验证和限制用户对其他用户信息的访问时。攻击者可以通过构造恶意请求来遍历用户信息，获取其他用户的敏感数据，如个人资料、私密消息、账户凭证等"
+solution="1.授权和访问控制：实施严格的访问控制机制，确保用户只能访问其自己的信息。验证用户的身份，并限制其仅能访问其授权范围内的数据。\n2.输入验证和过滤：对于用户输入的参数，进行严格的输入验证和过滤。确保只允许合法的输入，并阻止特殊字符或路径分隔符的使用。\n3.强制访问控制：在应用程序中实施强制访问控制机制，确保用户只能通过授权的接口或功能访问其信息。禁止直接访问其他用户的敏感数据。\n4.加密和敏感数据保护：对于存储在数据库或其他存储介质中的敏感用户数据，采用适当的加密方法进行保护。确保数据在存储和传输过程中都是加密的。\n5.安全的会话管理：实施安全的会话管理机制，包括使用安全的会话标识符、会话过期时间、会话令牌等。确保每个用户只能访问其自己的会话数据。\n6.错误处理和信息泄露：在应用程序中实施合适的错误处理机制，避免向用户泄露敏感信息。确保错误消息不包含敏感数据，同时提供有限的错误信息以防止攻击者利用。\n7.安全开发实践：采用安全的开发实践，包括安全编码、代码审查、安全测试等，以及及时修复已知的漏洞和安全问题。\n8.持续监测和漏洞扫描：定期进行安全漏洞扫描和监测，及时发现和修复越权用户信息遍历漏洞及其他安全漏洞。"
+
+
+
+//mitm插件需自定义手动修改参数，yak插件无需修改源码
+
+
+//开始替换内容标志concurrency
+//待替换内容，勿动！
+concurrency=cli.Int("concurrency",cli.setDefault(10),cli.setVerboseName("并发线程数"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志concurrency
+wg=sync.NewSizedWaitGroup(concurrency)
+
+//开始替换内容标志digital_param_list
+//待替换内容，勿动！
+digital_param_list=cli.LineDict("digital_param_list",cli.setHelp("参数值为数字类型的参数名"), cli.setVerboseName("数字型参数名"),cli.setCliGroup("插件额外参数"),cli.setDefault("account\nid\nmode\nno\nnum\nnumber\npage\nuser_code"))
+//结束替换内容标志digital_param_list
+
+
+//开始替换内容标志string_param_list
+//待替换内容，勿动！
+string_param_list=cli.LineDict("string_param_list",cli.setHelp("参数值为字符串类型的参数名"), cli.setVerboseName("字符串型参数名"),cli.setCliGroup("插件额外参数"),cli.setDefault("name"))
+//结束替换内容标志string_param_list
+
+
+//开始替换内容标志digital_dic_content
+//待替换内容，勿动！
+digital_dic_content=cli.LineDict("digital_dic_content", cli.setVerboseName("数字型fuzz字典"),cli.setHelp("字典内容按行隔开"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志digital_dic_content
+
+//开始替换内容标志string_dic_content
+//待替换内容，勿动！
+string_dic_content=cli.LineDict("string_dic_content", cli.setVerboseName("字符串型fuzz字典"),cli.setHelp("字典内容按行隔开"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志string_dic_content
+
+
+//开始替换内容标志not_json_check
+//待替换内容，勿动！
+not_json_check=cli.Bool("not_json_check",cli.setVerboseName("检测非json格式响应"),cli.setDefault(false),cli.setHelp("检测非json格式响应为true时，务必额外配置非json响应关键字"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志not_json_check
+
+//开始替换内容标志not_json_rsp_keyword_dic
+//待替换内容，勿动！
+not_json_rsp_keyword_dic=cli.LineDict("not_json_rsp_keyword_dic", cli.setVerboseName("非json响应关键字字典"),cli.setDefault("姓名\n性别\n手机\n住址\n邮箱"),cli.setHelp("字典内容按行隔开"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志not_json_rsp_keyword_dic
+
+//开始替换内容标志json_rsp_keyword_dic
+//待替换内容，勿动！
+json_rsp_keyword_dic=cli.LineDict("json_rsp_keyword_dic", cli.setVerboseName("json响应关键字字典"),cli.setDefault("account\nadd\narticle\nbank\nbusiness\nbirth\ncard\ncity\ncompany\ncontent\ndriver\neducation\nemail\nemployee\ngender\nid\nlicense\nmarital\nmedical\nmobile\nname\nnumber\noccupation\norder\norganization\nowner\npass\nphone\npostal\npwd\nrecord\nsfz\ntax_number\ntitle\ntransaction\n姓名\n性别\n手机\n住址\n邮箱"),cli.setHelp("字典内容按行隔开"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志json_rsp_keyword_dic
+
+//开始替换内容标志sensitive_rsp_dic_content
+//待替换内容，勿动！
+sensitive_rsp_dic_content=cli.LineDict("sensitive_rsp_dic_content", cli.setVerboseName("响应内容字典"),cli.setHelp("字典内容按行隔开"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志sensitive_rsp_dic_content
+
+
+//开始替换内容标志recognition_patten
+//待替换内容，勿动！
+recognition_patten=cli.StringSlice("recognition_patten", cli.setVerboseName("识别模式"),cli.setMultipleSelect(false),cli.setSelectOption("字典模式", "1"),cli.setSelectOption("机器学习模式", "2"),cli.setSelectOption("字典模式优先-机器学习辅助", "3"),cli.setSelectOption("字典模式-机器学习并行", "4"),cli.setSelectOption("机器学习优先-字典模式辅助", "5"),cli.setDefault("1"),cli.setHelp("检测识别模式"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志recognition_patten
+
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志task_type
+
+//开始替换内容标志param_codec_type_decode
+//待替换内容，勿动！
+param_codec_type_decode=cli.StringSlice("param_codec_type_decode",cli.setDefault("不编码"),cli.setVerboseName("参数codec模式-解码"),cli.setHelp("用于参数识别阶段，对参数进行解码。默认不编码，其余方式结合自定义 codec 插件实现"),cli.setSelectOption("不编码", "不编码"),cli.setSelectOption("Url", "Url解码"),cli.setSelectOption("Base64", "Base64解码"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志param_codec_type_decode
+
+
+//开始替换内容标志param_codec_type_encode
+//待替换内容，勿动！
+param_codec_type_encode=cli.StringSlice("param_codec_type_encode",cli.setDefault("不编码"),cli.setVerboseName("参数codec模式-编码"),cli.setHelp("用于参数测试阶段，对参数进行编码。默认不编码，其余方式结合自定义 codec 插件实现"),cli.setSelectOption("不编码", "不编码"),cli.setSelectOption("Url", "Url编码"),cli.setSelectOption("Base64", "Base64编码"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志param_codec_type_encode
+
+
+
+// 定义全局变量
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+
+cli.check()
+
+
+// 定义用于打印的 base_info 变量
+base_info_script_name="敏感信息遍历检测"
+base_info_task_creater=""
+base_info_task_type="即时"
+base_info_detect_mode="mitm"
+base_info_task_mode=recognition_patten_dic[recognition_patten[0]]
+base_info_login=""
+base_info_crediential=""
+base_info_user_define_header=""
+base_info_start_time=time.Now().String()
+base_info_end_time=""
+
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+
+fuzz_bad_flag=[
+    "参数错误",
+    "参数异常",
+    "数据不存在",
+    "(?i)not found",
+    "(?i)Unauthorized",
+    "(?i)(param|method).*?(error|invalid|miss|not present)",
+    "\\u53c2\\u6570\\u9519\\u8bef",
+    "系统异常",
+    "未授权",
+    "code\": {0,}[45]0[\\d]",
+    "(?i)((error|invaild|miss(ing){0,1}).*?(method|param))",
+    "(?i)(data\"[ \\t]{0,}:[ \\t]{0,}\"{0,1}(null|none|\\[[ \\t]{0,}\\]))",
+    "password incorrect"
+]
+
+bad_json_len1_rule=[
+    "-1",
+    "0",
+]
+
+bad_json_len4_rule=[
+    "none",
+    "0000",
+    "null",
+]
+
+bad_json_len6_rule=[
+    "000000",
+    "成功",
+    "失败"
+]
+
+name_list=[
+    "admin",
+    "test",
+    "system",
+    "lili",
+    "kobe"
+]
+
+//用于告警的去重，记录所有告警的检测（根据url(包括参数值)+string(body)进行hash去重）
+risk_output_dic={
+
+}
+
+//用于触发检测的去重，已经告警的url（不含参数）不会进行检测（根据url(不包括参数值)进行hash去重）
+detect_output_dic={
+
+}
+
+
+
+bad_end_str_list=[
+".jpg", ".png", ".gif", ".css", ".js", ".pdf", ".mp3", ".mp4", ".avi", ".map", ".svg", ".ico", ".woff", ".woff2", ".ttf"
+]
+
+
+gen_new_dic=func(codec_type_encode,old_dic){
+    if codec_type_encode=="不编码"{
+        return old_dic
+    }
+    new_dic=[]
+    for i in len(old_dic){
+        new_dic.Append(invokeCodec(codec_type_encode,old_dic[i]))
+    }
+    return new_dic
+}
+
+
+invokeCodec = (name,arg)=>{
+    if name=="不编码"{
+        return arg
+    }
+    plugin = db.GetYakitPluginByName(name)~
+    if plugin.Type!="codec"{
+        return ""
+    }
+    code = plugin.Content
+    name, err = file.TempFileName()
+    if err != nil{
+        return ""
+    }
+    defer os.Remove(name)
+    file.Save(name, code)
+    hanlde = import(name, "handle")~
+    return hanlde(arg)
+}
+
+
+
+pre_check=func(req,rsp){
+    http_req = poc.ParseBytesToHTTPRequest(req)~
+
+    if http_req.Method!="GET" && http_req.Method!="POST" {
+        return false
+    }
+
+    if str.MatchAnyOfSubString(http_req.URL.Path, bad_end_str_list...) {
+        return false
+    }
+
+    http_rsp=poc.ParseBytesToHTTPResponse(rsp)~
+
+    if str.MatchAnyOfRegexp(http_rsp.StatusCode, ["40\\d","50\\d"]...){
+        return false
+    }
+
+    http_rsp_header,http_rsp_body=poc.Split(rsp)
+    // 启用非json形式的检查
+    if not_json_check{
+        return true
+    }
+
+    http_rsp_json_body=json.loads(string(http_rsp_body))
+    if http_rsp_json_body == {} {
+        return false
+    }
+
+    return true
+}
+
+
+get_param_matched_rule=func(param){
+    // 当参数名和参数值同时符合规则时才会fuzz，参数名通过字符串包含关系匹配(忽略大小写)，参数值通过正则匹配(get_raw_value_by_param 会尝试对base64 参数进行识别和解码，传入的param.OriginValue()为原始值)
+    // get_raw_value_by_param 里面结合 codec 插件进行识别
+
+    if str.MatchAnyOfSubString(param.Name(), digital_param_list...) && str.MatchAnyOfRegexp(get_raw_value_by_param(param.GetFirstValue(),param.OriginValue(),param.Position()), pure_digital_rule){
+        yakit_output(f"${param.Position()} 处参数 ${param.Name()} 解析为 ${get_raw_value_by_param(param.GetFirstValue(),param.OriginValue(),param.Position())}")
+        return pure_digital_rule
+    }
+
+    if str.MatchAnyOfSubString(param.Name(), string_param_list...) && str.MatchAnyOfRegexp(get_raw_value_by_param(param.GetFirstValue(),param.OriginValue(),param.Position()), string_rule){
+        yakit_output(f"${param.Position()} 处参数 ${param.Name()} 解析为 ${get_raw_value_by_param(param.GetFirstValue(),param.OriginValue(),param.Position())}")
+        return string_rule
+    }
+    return ""
+}
+
+
+get_payload_by_param=func(param_value,param_position,param_originvalue){
+    //主要用于告警打印的payload生成
+    //通过param获取payload, base64编码的参数获取编码之后的payload
+    // if str.MatchAnyOfSubString(param_position, "base64"){
+    //     // res=""
+    //     // for sub_value in param_value{
+    //     //     res=res+chr(sub_value)
+    //     // }
+    //     //此时的 res 为 base64 解码字符串
+    //     base64_res=codec.EncodeBase64(param_value)~
+    //     return base64_res
+    // }
+    return param_originvalue
+}
+
+get_raw_value_by_param=func(param_value,param_originvalue,param_position){
+    //主要用于校验原始参数规则
+    //获取原始参数值，用作参数规则的校验及后续fuzz逻辑的选择
+    //通过param获取param_value, base64编码的参数获取编码之前的原始参数值
+    // if str.MatchAnyOfSubString(param_position, "base64"){
+    //     res=""
+    //     for sub_value in param_value{
+    //         res=res+chr(sub_value)
+    //     }
+    //     //此时的 res 为 base64 解码字符串
+    //     return res
+    // }
+
+    // param_value 为传入的 param.GetFirstValue()，自动base64/url解码
+    // param_value 为传入的 param.OriginValue()，需要结合 codec 插件实现解码
+    return invokeCodec(param_codec_type_decode[0], param_originvalue)
+}
+
+
+get_payload_success_flag=func(result_body,flag_list){
+    for flag in flag_list{
+        if str.MatchAnyOfSubString(result_body, flag){
+            return flag
+        }
+    }
+}
+
+//检测json格式响应报文中是否含有敏感信息，若含有，返回(true,敏感信息字段名,敏感信息字段值)，否则返回(false,nil,nil)
+get_payload_success_flag_in_json_rsp=func(result_body,flag_list,raw_rsp_sensitive_info,raw_rsp_sensitive_info_type){
+    // 通过将响应body和模板请求头进行拼接，构造新的http req，借助fuzz req中获取json参数的方法，对多层嵌套json进行处理
+    packet="POST / HTTP/1.1\nContent-Type: application/json\nHost: test\n\n"
+    packet_=packet+string(result_body)
+    freq=fuzz.HTTPRequest(packet_)~
+    params=freq.GetCommonParams()
+
+    // 先遍历全部参数，尝试找到触发告警证据，未找到的话再进行二次遍历
+    for param in params{
+        // if param.Name()=="data1"{
+        //     dump(param.Value()[0])
+        // }
+
+        if param.Name()!=raw_rsp_sensitive_info{
+            continue
+        }
+        // 对param.Value()返回结果进行过滤
+        // 过滤空值null(json规范),[],""
+        string_param_value=string(param.GetFirstValue())
+        if len(string_param_value)<=0{
+            // println(param.Name()+"为null")
+        // 过滤值为字典的情况，GetCommonParams()能够继续取得字典内部的键名
+        }elif string_param_value.StartsWith("map["){
+            // println(param.Name()+"为null")
+        // 依次过滤1/4/6位表示空值意义的字符串
+        }elif len(string_param_value)==1 && str.MatchAnyOfSubString(string_param_value, bad_json_len1_rule...){
+            // println(param.Name()+"为表示空值意义的1位字符串")
+        }elif len(string_param_value)==4 && str.MatchAnyOfSubString(string_param_value, bad_json_len4_rule...){
+            // println(param.Name()+"为表示空值意义的4位字符串")
+        }elif len(string_param_value)==6 && str.MatchAnyOfSubString(string_param_value, bad_json_len6_rule...){
+            // println(param.Name()+"为表示空值意义的6位字符串")
+        }elif raw_rsp_sensitive_info_type=="json_rsp_keyword_dic" && raw_rsp_sensitive_info!="" && param.Name()==raw_rsp_sensitive_info{
+            //触发检测条件为json_rsp_keyword_dic且参数名完全一致
+            return true,param.Name(),param.GetFirstValue()
+        }
+    }
+
+    for param in params{
+        // if param.Name()=="data1"{
+        //     dump(param.Value()[0])
+        // }
+        // 对param.Value()返回结果进行过滤
+        // 过滤空值null(json规范),[],""
+        string_param_value=string(param.GetFirstValue())
+        if len(string_param_value)<=0{
+            // println(param.Name()+"为null")
+        // 过滤值为字典的情况，GetCommonParams()能够继续取得字典内部的键名
+        }elif string_param_value.StartsWith("map["){
+            // println(param.Name()+"为null")
+        // 依次过滤1/4/6位表示空值意义的字符串
+        }elif len(string_param_value)==1 && str.MatchAnyOfSubString(string_param_value, bad_json_len1_rule...){
+            // println(param.Name()+"为表示空值意义的1位字符串")
+        }elif len(string_param_value)==4 && str.MatchAnyOfSubString(string_param_value, bad_json_len4_rule...){
+            // println(param.Name()+"为表示空值意义的4位字符串")
+        }elif len(string_param_value)==6 && str.MatchAnyOfSubString(string_param_value, bad_json_len6_rule...){
+            // println(param.Name()+"为表示空值意义的6位字符串")
+        }elif str.MatchAnyOfSubString(param.Name(), flag_list...){
+            // println(param.Name(),param.Value(),len(param.Value()[0]))
+            return true,param.Name(),param.GetFirstValue()
+        }
+    }
+    return false,nil,nil
+}
+
+// param_value 为originvalue
+fuzz_result_check=func(result,raw_rsp,fuzz_bad_result,param_name,param_value,param_position,raw_rsp_sensitive_info,raw_rsp_sensitive_info_type,fuzz_result_flag){
+
+    // 检测响应请求行状态码
+    // 检测响应请求头
+    // 检测响应请求体
+        // 检测响应是否含有bad flag
+        // 再检测响应内容是否含有敏感字符 因为每个响应内容不一致，无法通过相似度判断
+    wg.Add()
+    go fn{
+        defer wg.Done()
+        m.Lock()
+        defer m.Unlock()
+        if fuzz_result_flag["success_num"]>=10{
+            return
+        }
+        http_raw_rsp,http_fuzz_rsp=poc.ParseBytesToHTTPResponse(raw_rsp)~,poc.ParseBytesToHTTPResponse(result.ResponseRaw)~
+        payload_success_flag,payload,flag_in_json_rsp=nil,nil,nil
+        result_header,result_body=poc.Split(result.ResponseRaw)
+        // yakit_output("开始检测相似度")
+        if fuzz_bad_result!=nil{
+            //与bad result的相似度检测 只检测相似度
+            bad_result_header,bad_result_body=poc.Split(fuzz_bad_result.ResponseRaw)
+            if str.CalcTextMaxSubStrStability(result_body,bad_result_body)[0]>0.999{
+                // yakit_output("bad res 相似度过高")
+                return
+            }
+        }
+        // 该函数检测了请求行 请求头
+        if !compare_fuzz_rsp(http_raw_rsp,http_fuzz_rsp){
+            // yakit_output("检测请求行 请求头")
+            return
+        }
+        // 请求体
+        if str.MatchAnyOfRegexp(result_body, fuzz_bad_flag...){
+            // yakit_output("请求体检测到bad flag")
+            return
+        }
+
+        //用户输入的响应关键字sensitive_rsp_dic_content，优先级最为靠前！
+        // 当匹配到sensitive_rsp_dic_content时候，可能是触发检测的raw_rsp_sensitive_info，也可能是sensitive_rsp_dic_content中其他内容，优先以raw_rsp_sensitive_info进行证据展示，否则通过get_payload_success_flag进行证据展示
+        if len(sensitive_rsp_dic_content)!=0 && str.MatchAnyOfSubString(result_body, sensitive_rsp_dic_content...) {
+            if param_name!="url_path"{
+                freq_=fuzz.HTTPRequest(result.RequestRaw)~
+                if param_codec_type_encode[0]!="不编码"{
+                    freq_.DisableAutoEncode(true)
+                }
+                params_=freq_.GetCommonParams()
+                for param_ in params_ {
+                    if !param_.Position().StartsWith("cookie") && param_.Name()==param_name && param_.OriginValue()!=param_value && param_.Position()==param_position {
+                        // payload=f"${param_.Value()[0]}"
+                        payload=get_payload_by_param(param_.GetFirstValue(),param_.Position(),param_.OriginValue())
+                        if raw_rsp_sensitive_info_type=="sensitive_rsp_dic_content" && str.MatchAnyOfSubString(result_body, raw_rsp_sensitive_info){
+                            payload_success_flag=raw_rsp_sensitive_info
+                        }else{
+                            payload_success_flag=get_payload_success_flag(result_body,sensitive_rsp_dic_content)
+                        }
+                        mitm_risk_output(result.Url,result.RequestRaw,result.ResponseRaw,"逻辑漏洞","敏感信息遍历","high",param_name,f"${payload}",payload_success_flag,"mitm_sensitive_info_traversal")
+                        fuzz_result_flag["success_num"]=fuzz_result_flag["success_num"]+1
+                        break
+                    }
+                }
+            }else{
+                http_req_=poc.ParseBytesToHTTPRequest(result.RequestRaw)~
+                raw_path_=http_req_.URL.Path
+                payload=re.FindSubmatchAll(raw_path_, path_digital_rule)[0][1]
+                if payload!=param_value{
+                    // yakit_output(payload)
+                    if raw_rsp_sensitive_info_type=="sensitive_rsp_dic_content" && str.MatchAnyOfSubString(result_body, raw_rsp_sensitive_info){
+                        payload_success_flag=raw_rsp_sensitive_info
+                    }else{
+                        payload_success_flag=get_payload_success_flag(result_body,sensitive_rsp_dic_content)
+                    }
+                    mitm_risk_output(result.Url,result.RequestRaw,result.ResponseRaw,"逻辑漏洞","敏感信息遍历","high",param_name,raw_path_,payload_success_flag,"mitm_sensitive_info_traversal")
+                    fuzz_result_flag["success_num"]=fuzz_result_flag["success_num"]+1
+                }
+            }
+            return
+        }
+
+        //not_json_check优先级较为靠前，且默认一定会检测json响应，共分为2种场景考虑
+        //case1 设置检测非json响应时，响应为非json数据，只进行not_json_rsp_keyword_dic关键字匹配，如果检测到此类关键字，优先以raw_rsp_sensitive_info进行证据展示，否则通过get_payload_success_flag进行证据展示
+        if not_json_check && json.loads(string(result_body))=={}{
+            // yakit_output("")
+
+            if str.MatchAnyOfSubString(result_body, not_json_rsp_keyword_dic...){
+                if param_name!="url_path"{
+                    freq_=fuzz.HTTPRequest(result.RequestRaw)~
+                    if param_codec_type_encode[0]!="不编码"{
+                        freq_.DisableAutoEncode(true)
+                    }
+                    params_=freq_.GetCommonParams()
+                    for param_ in params_ {
+                        if !param_.Position().StartsWith("cookie") && param_.Name()==param_name && param_.OriginValue()!=param_value && param_.Position()==param_position {
+                            // payload=f"${param_.Value()[0]}"
+                            payload=get_payload_by_param(param_.GetFirstValue(),param_.Position(),param_.OriginValue())
+                            if raw_rsp_sensitive_info_type=="not_json_rsp_keyword_dic" && str.MatchAnyOfSubString(result_body, raw_rsp_sensitive_info){
+                                payload_success_flag=raw_rsp_sensitive_info
+                            }else{
+                                payload_success_flag=get_payload_success_flag(result_body,not_json_rsp_keyword_dic)
+                            }
+                            mitm_risk_output(result.Url,result.RequestRaw,result.ResponseRaw,"逻辑漏洞","敏感信息遍历","high",param_name,f"${payload}",payload_success_flag,"mitm_sensitive_info_traversal")
+                            fuzz_result_flag["success_num"]=fuzz_result_flag["success_num"]+1
+                            break
+                        }
+                    }
+                }else{
+                    http_req_=poc.ParseBytesToHTTPRequest(result.RequestRaw)~
+                    raw_path_=http_req_.URL.Path
+                    payload=re.FindSubmatchAll(raw_path_, path_digital_rule)[0][1]
+                    if payload!=param_value{
+                        // yakit_output(payload)
+                        if raw_rsp_sensitive_info_type=="not_json_rsp_keyword_dic" && str.MatchAnyOfSubString(result_body, raw_rsp_sensitive_info){
+                            payload_success_flag=raw_rsp_sensitive_info
+                        }else{
+                            payload_success_flag=get_payload_success_flag(result_body,not_json_rsp_keyword_dic)
+                        }
+                        mitm_risk_output(result.Url,result.RequestRaw,result.ResponseRaw,"逻辑漏洞","敏感信息遍历","high",param_name,raw_path_,payload_success_flag,"mitm_sensitive_info_traversal")
+                        fuzz_result_flag["success_num"]=fuzz_result_flag["success_num"]+1
+                    }
+                }
+                return
+            }
+        }
+        //case2 设置检测非json响应/不检测非json响应，响应为json数据，只进行json_rsp_keyword_dic关键字匹配，如果检测到此类关键字，通过get_payload_success_flag_in_json_rsp进证据展示，会额外展示匹配到的敏感信息内容，（get_payload_success_flag_in_json_rsp依旧优先查找raw_rsp_sensitive_info作为证据展示）
+        if json.loads(string(result_body))!={}{
+            flag_in_json_rsp=nil
+            flag_in_json_rsp,payload_success_flag,payload_success_flag_sensitive_data=get_payload_success_flag_in_json_rsp(result_body,json_rsp_keyword_dic,raw_rsp_sensitive_info,raw_rsp_sensitive_info_type)
+
+            if flag_in_json_rsp {
+                // 需要额外排除原始参数值
+                if param_name!="url_path"{
+                    freq_=fuzz.HTTPRequest(result.RequestRaw)~
+                    if param_codec_type_encode[0]!="不编码"{
+                        freq_.DisableAutoEncode(true)
+                    }
+                    params_=freq_.GetCommonParams()
+                    for param_ in params_ {
+                        if param_.Position()!="cookie" && param_.Name()==param_name && param_.OriginValue()!=param_value && param_.Position()==param_position {
+                            // payload=f"${param_.Value()[0]}"
+                            payload=get_payload_by_param(param_.GetFirstValue(),param_.Position(),param_.OriginValue())
+                            mitm_risk_output(result.Url,result.RequestRaw,result.ResponseRaw,"逻辑漏洞","敏感信息遍历","high",param_name,f"${payload}",f"\"${payload_success_flag}\":\"${payload_success_flag_sensitive_data}\"","mitm_sensitive_info_traversal")
+                            fuzz_result_flag["success_num"]=fuzz_result_flag["success_num"]+1
+                            break
+                        }
+                    }
+                }else{
+                    http_req_=poc.ParseBytesToHTTPRequest(result.RequestRaw)~
+                    raw_path_=http_req_.URL.Path
+                    payload=re.FindSubmatchAll(raw_path_, path_digital_rule)[0][1]
+                    if payload!=param_value{
+                        mitm_risk_output(result.Url,result.RequestRaw,result.ResponseRaw,"逻辑漏洞","敏感信息遍历","high",param_name,raw_path_,f"\"${payload_success_flag}\":\"${payload_success_flag_sensitive_data}\"","mitm_sensitive_info_traversal")
+                        fuzz_result_flag["success_num"]=fuzz_result_flag["success_num"]+1
+                    }
+                }
+                return
+            }
+        }
+    }
+}
+
+
+mitm_risk_output=func(url,req,rsp,vul_type,vul_name,vul_severity,param,payload,payload_success_flag,pocname){
+
+    // 计算url和string后的body md5进行去重
+    if task_type[0]=="即时" || task_type[0]=="定时" {
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行告警
+            return
+        }else{
+            //记录到告警去重字典中
+            risk_output_dic[url_body_hash]=1
+        }
+
+        //记录到检测去重字典中,借助库函数，拼接root_url和path
+        detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+        detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+        if err!=nil{
+            die(err)
+        }
+        detect_path=detect_url_Instance.Path
+        detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测，后续 mirrorFilteredHTTPFlow 不再进行检测
+        }else{
+            //记录到检测去重字典中
+            detect_output_dic[detect_url_path_hash]=1
+        }
+    }
+
+    risk.NewRisk(
+        url,
+        risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+        risk.type(vul_type),
+        risk.severity(vul_severity),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.payload(payload),
+        risk.solution(solution),
+        risk.description(description),
+        risk.parameter(param),
+        risk.details({
+            "location":url,
+            "pocname":pocname,
+            "payload_success_flag":payload_success_flag,
+            "recognition_patten":recognition_patten_dic[recognition_patten[0]]
+        })
+        )
+}
+
+
+compare_fuzz_rsp=func(http_rsp,http_fuzz_rsp){
+    if http_rsp.StatusCode!=http_fuzz_rsp.StatusCode{
+        yakit_output(f"原始请求响应状态码 ${http_rsp.StatusCode} 不同于模拟 fuzz 重放后的响应状态码 ${http_fuzz_rsp.StatusCode} ，跳过后续检测")
+        return false
+    }
+    // dump(http_rsp.Header["Content-Type"][0])
+    // dump(http_fuzz_rsp.Header["Content-Type"][0])
+
+    if http_rsp.Header["Content-Type"]!=nil && http_fuzz_rsp.Header["Content-Type"]!=nil {
+        http_rsp_content_type=http_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+        http_fuzz_rsp_content_type=http_fuzz_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+
+        // 针对text/html自动拼接charset=utf-8的处理
+        if "text/html" in http_rsp_content_type && "text/html" in http_fuzz_rsp_content_type{
+            return true
+        }
+        if http_rsp_content_type!=http_fuzz_rsp_content_type{
+            yakit_output(f"原始请求响应 Content-Type ${http_rsp_content_type} 不同于模拟 fuzz 重放后的响应Content-Type ${http_fuzz_rsp_content_type} ，跳过后续检测")
+            return false
+        }
+    }elif http_rsp.Header["Content-Type"]==nil && http_fuzz_rsp.Header["Content-Type"]==nil {
+
+    }else{
+        yakit_output(f"原始请求响应 Content-Type 不同于模拟 fuzz 重放后的响应Content-Type ，跳过后续检测")
+        return false
+    }
+    return true
+}
+
+
+url_path_fuzz=func(freq,raw_path,rsp,raw_rsp_sensitive_info,raw_rsp_sensitive_info_type){
+
+    path_digital,end_str=re.FindSubmatchAll(raw_path, path_digital_rule)[0][1],re.FindSubmatchAll(raw_path, path_digital_rule)[0][2]
+    param_len=len(path_digital)
+    fuzz_bad_result,result=nil,nil
+    fuzz_tag1,fuzz_tag2,path_fuzz_tag1,path_fuzz_tag2,fuzz_tag1_max_fuzz_value=nil,nil,nil,nil,nil
+
+    if param_len>=4{
+        fuzz_tag1_max_fuzz_value=1000
+        fuzz_tag2_min_fuzz_value=int(path_digital)-500
+        fuzz_tag2_max_fuzz_value=int(path_digital)+500
+        fuzz_tag2=f"{{int(${fuzz_tag2_min_fuzz_value}-${fuzz_tag2_max_fuzz_value}|${param_len})}}"
+    }else{
+        fuzz_tag1_max_fuzz_value=int(fuzz.Strings(f"{{repeatstr(9|${param_len})}}")[0])
+    }
+
+    fuzz_tag1=f"{{int(0-${fuzz_tag1_max_fuzz_value}|${param_len})}}"
+    yakit_output(f"数字路径: fuzz_tag1 为 \"${fuzz_tag1}\",fuzz_tag2 为 \"${fuzz_tag2}\"")
+
+    // 数字路径需要在fuzz_tag基础上额外生成path_fuzz_tag
+    if fuzz_tag2!=nil{
+        path_fuzz_tag2=re.ReplaceAll(raw_path, path_digital_rule, "/"+fuzz_tag2+end_str)
+    }
+    path_fuzz_tag1=re.ReplaceAll(raw_path, path_digital_rule, "/"+fuzz_tag1+end_str)
+
+    if path_fuzz_tag2!=nil{
+        // result=freq.FuzzPath(f"{{array(${path_fuzz_tag1}|${path_fuzz_tag2})}}").Exec(httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.proxy("http://127.0.0.1:8080"))~
+        result=freq.FuzzPath(f"{{array(${path_fuzz_tag1}|${path_fuzz_tag2})}}").Exec(httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.size(concurrency))~
+    }else{
+        // result=freq.FuzzPath(f"{{array(${path_fuzz_tag1})}}").Exec(httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.proxy("http://127.0.0.1:8080"))~
+        result=freq.FuzzPath(f"{{array(${path_fuzz_tag1})}}").Exec(httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.size(concurrency))~
+    }
+    fuzz_result_flag={"success_num":0}
+    for sub_result in result{
+        //最多告警10次
+        fuzz_result_check(sub_result,rsp,fuzz_bad_result,"url_path",path_digital,"url_path",raw_rsp_sensitive_info,raw_rsp_sensitive_info_type,fuzz_result_flag)
+    }
+}
+
+
+
+
+
+param_handle=func(params){
+    //返回FuzzHTTPRequestParam类型和matched_rule构成的列表
+    cookie_params_list=[]
+    not_cookie_params_list=[]
+    for param in params{
+        if param.Position().StartsWith("cookie"){
+            cookie_params_list.Append(param)
+            continue
+        }
+        // 根据codec type 提取参数
+        matched_rule=get_param_matched_rule(param)
+        if matched_rule==""{
+            yakit_output(f"${param.Position()} 处参数 ${param.Name()} 未匹配到预期规则")
+            continue
+        }
+        yakit_output(f"${param.Position()} 处参数 ${param.Name()} 匹配到预期规则 \"${matched_rule}\"")
+        not_cookie_params_list.Append([param,matched_rule])
+    }
+    return cookie_params_list,not_cookie_params_list
+}
+
+
+
+not_cookie_param_fuzz=func(param,rule,rsp,raw_rsp_sensitive_info,raw_rsp_sensitive_info_type){
+    fuzz_bad_result,result,fuzz_tag1,fuzz_tag2,fuzz_tag1_max_fuzz_value=nil,nil,nil,nil,nil
+    if fuzz_bad_param_value!=""{
+        fuzz_bad_result=param.Fuzz(fuzz_bad_param_value).ExecFirst(httpool.redirectTimes(0),httpool.perRequestTimeout(10))~
+    }
+
+    //排除原始参数 交叉去重
+    // 当用户输入对应规则的fuzz字典时，只按照字典进行fuzz
+    if (rule in pure_digital_rule_list) && digital_dic_content!=nil{
+        yakit_output(f"按照外部数字型字典 fuzz ${param.Position()} 处参数 ${param.Name()}")
+        result=param.Fuzz(gen_new_dic(param_codec_type_encode[0],digital_dic_content)...).Exec(httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.size(concurrency))~
+        yakit_output(f"${param.Position()} 处参数 ${param.Name()} fuzz 完成，开始检测响应中是否含有敏感信息")
+    }elif rule in pure_digital_rule_list {
+        yakit_output(f"按照内置数字型逻辑 fuzz ${param.Position()} 处参数 ${param.Name()}")
+        // 4位以下参数全部遍历
+        // 4位及以上最大遍历到1000值，尝试原始参数基础上-500 或 +500
+        // param_len=len(param.Value()[0])
+        raw_value_by_param=get_raw_value_by_param(param.GetFirstValue(),param.OriginValue(),param.Position())
+        param_len=len(string(raw_value_by_param))
+        if param_len>=4{
+            fuzz_tag1_max_fuzz_value=1000
+            fuzz_tag2_min_fuzz_value=int(raw_value_by_param)-500
+            fuzz_tag2_max_fuzz_value=int(raw_value_by_param)+500
+            fuzz_tag2=f"{{int(${fuzz_tag2_min_fuzz_value}-${fuzz_tag2_max_fuzz_value}|${param_len})}}"
+        }else{
+            fuzz_tag1_max_fuzz_value=int(fuzz.Strings(f"{{repeatstr(9|${param_len})}}")[0])
+        }
+        fuzz_tag1=f"{{int(0-${fuzz_tag1_max_fuzz_value}|${param_len})}}"
+        yakit_output(f"参数 ${param.Name()}: fuzz_tag1 为 \"${fuzz_tag1}\",fuzz_tag2 为 \"${fuzz_tag2}\"")
+        if fuzz_tag2!=nil{
+            // result=param.Fuzz(f"{{array(${fuzz_tag1}|${fuzz_tag2})}}").Exec(httpool.https(isHttps),httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.proxy("http://127.0.0.1:8080"))~
+            fuzz_tag_dic=fuzz.Strings(f"{{array(${fuzz_tag1}|${fuzz_tag2})}}")
+            result=param.Fuzz(gen_new_dic(param_codec_type_encode[0],fuzz_tag_dic)...).Exec(httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.size(concurrency))~
+        }else{
+            // result=param.Fuzz(f"{{array(${fuzz_tag1})}}").Exec(httpool.https(isHttps),httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.proxy("http://127.0.0.1:8080"))~
+            fuzz_tag_dic=fuzz.Strings(f"{{array(${fuzz_tag1})}}")
+            result=param.Fuzz(gen_new_dic(param_codec_type_encode[0],fuzz_tag_dic)...).Exec(httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.size(concurrency))~
+        }
+        yakit_output(f"${param.Position()} 处参数 ${param.Name()} fuzz 完成，开始检测响应中是否含有敏感信息")
+    }
+
+
+    if (rule in string_rule_list) && string_dic_content!=nil{
+
+        yakit_output(f"按照外部字符串型字典 fuzz ${param.Position()} 处参数 ${param.Name()}")
+        // yakit_output(string_dic_content)
+        // dump(string_dic_content)
+        result=param.Fuzz(gen_new_dic(param_codec_type_encode[0],string_dic_content)...).Exec(httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.size(concurrency))~
+        yakit_output(f"${param.Position()} 处参数 ${param.Name()} fuzz 完成，开始检测响应中是否含有敏感信息")
+    }elif rule in string_rule_list{
+        yakit_output(f"按照内置字符串型逻辑 fuzz ${param.Position()} 处参数 ${param.Name()}")
+        result=param.Fuzz(gen_new_dic(param_codec_type_encode[0],name_list)...).Exec(httpool.redirectTimes(0),httpool.perRequestTimeout(10),httpool.size(concurrency))~
+        yakit_output(f"${param.Position()} 处参数 ${param.Name()} fuzz 完成，开始检测响应中是否含有敏感信息")
+    }
+    // 使用锁对 success_num 的值进行限制，即使遍历100条数据，最高告警10次
+    fuzz_result_flag={"success_num":0}
+    for sub_result in result{
+        //最多告警10次
+        fuzz_result_check(sub_result,rsp,fuzz_bad_result,param.Name(),param.OriginValue(),param.Position(),raw_rsp_sensitive_info,raw_rsp_sensitive_info_type,fuzz_result_flag)
+    }
+}
+
+raw_rsp_sensitive_info_check=func(url,result_body){
+
+    // 当检测到fuzz_bad_flag时，直接返回false
+    if str.MatchAnyOfRegexp(result_body,fuzz_bad_flag...){
+        return false,nil,nil
+    }
+
+    //用户输入的响应关键字sensitive_rsp_dic_content，优先级最为靠前！并且返回敏感信息关键字
+    if len(sensitive_rsp_dic_content)!=0 && str.MatchAnyOfSubString(result_body, sensitive_rsp_dic_content...){
+        payload_success_flag=get_payload_success_flag(result_body, sensitive_rsp_dic_content)
+        yakit_output(f"在原始 ${url} 响应中检测到 响应内容字典 中定义的敏感信息 \"${payload_success_flag}\"")
+        return true,get_payload_success_flag(result_body, sensitive_rsp_dic_content),"sensitive_rsp_dic_content"
+    }
+
+
+    //not_json_check优先级较为靠前，且默认一定会检测json响应，共分为2种场景考虑
+    //case1 设置检测非json响应时，响应为非json数据，只进行not_json_rsp_keyword_dic关键字匹配，并且返回敏感信息关键字
+    if not_json_check && json.loads(string(result_body))=={}{
+        if str.MatchAnyOfSubString(result_body, not_json_rsp_keyword_dic...) {
+            payload_success_flag=get_payload_success_flag(result_body, not_json_rsp_keyword_dic)
+            yakit_output(f"在原始 ${url} 响应中检测到非 json 格式的敏感信息 \"${payload_success_flag}\"")
+            return true,payload_success_flag,"not_json_rsp_keyword_dic"
+        }
+        return false,nil,nil
+    }
+
+    //case2 设置检测非json响应/不检测非json响应，响应为json数据，只进行json_rsp_keyword_dic关键字匹配，并且返回敏感信息的关键字
+    if json.loads(string(result_body))!={}{
+        flag_in_json_rsp,payload_success_flag,payload_success_flag_sensitive_data=get_payload_success_flag_in_json_rsp(result_body,json_rsp_keyword_dic,"","")
+        if flag_in_json_rsp {
+            yakit_output(f"在原始 ${url} 响应中检测到 json 格式的敏感信息 \"${payload_success_flag}\":\"${payload_success_flag_sensitive_data}\"")
+            return true,payload_success_flag,"json_rsp_keyword_dic"
+        }
+        return false,nil,nil
+    }
+
+    return false,nil,nil
+}
+
+
+# mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+    // 手动对爬虫预检测流量进行过滤，yakit加载mitm插件时，建议注释，动态爬虫形式调用无需注释（当爬虫启用crawlerx.check()需要注释）
+    // if flow_total==-1{
+    //     flow_total=flow_total+1
+    //     return
+    // }
+
+    detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+    detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+    if err!=nil{
+        yakit_output("url 解析错误，脚本即将退出")
+        die(err)
+    }
+
+    detect_path=detect_url_Instance.Path
+    detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+    // 考虑去重策略 即时/定时 任务去重（因为任务本身也只跑一次），周期任务不去重
+    if task_type[0]=="即时" || task_type[0]=="定时"{
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测并告警，不再进行检测
+            yakit_output("detect_output_dic 去重")
+            return
+        }
+
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行检测
+            yakit_output("risk_output_dic 去重")
+            return
+        }
+    }
+
+
+    //开始检测
+    freq,has_fuzz,cookie_params_list,not_cookie_params_list=fuzz.HTTPRequest(req, fuzz.https(isHttps))~,false,[],[]
+    if param_codec_type_encode[0]!="不编码"{
+        freq.DisableAutoEncode(true)
+    }
+
+    params=freq.GetCommonParams()
+    if !pre_check(req, rsp){
+        return
+    }
+
+    // 首先检测原始响应是否含有敏感信息，并提取敏感信息关键字
+    raw_rsp_sensitive_info_check_res,raw_rsp_sensitive_info,raw_rsp_sensitive_info_type=raw_rsp_sensitive_info_check(url,string(body))
+    if !raw_rsp_sensitive_info_check_res{
+        // yakit_output(f"未在 ${url} 检出敏感信息")
+        return
+    }
+
+    // 参数提取及fuzz分类
+    // 1.提取req中非cookie参数，识别是否为身份标识参数（数字型id/字符串型name），按照对应类别去fuzz
+    // 2.提取url中数字型参数，按照对应类别去fuzz
+    // 3.提取req中cookie参数，暂未找到合适测试场景
+    yakit_output(f"开始尝试从 ${url} 中获取可 fuzz 参数")
+    cookie_params_list,not_cookie_params_list=param_handle(params)
+    // 确认是否含有可fuzz参数
+    if len(not_cookie_params_list)>0{
+        for param,rule in not_cookie_params_list{
+            yakit_output(f"开始处理 ${param.Position()} 处 ${param.Name()} 参数，尝试敏感信息遍历检测")
+            not_cookie_param_fuzz(param,rule,rsp,raw_rsp_sensitive_info,raw_rsp_sensitive_info_type)
+            wg.Wait()
+            has_fuzz=true
+            yakit_output(f"${param.Position()} 处 ${param.Name()} 参数处理完成")
+        }
+    }
+
+
+    if has_fuzz!=true {
+        yakit_output(f"在 ${url} 参数中没有找到可 fuzz 参数，尝试数字路径进行fuzz")
+        http_req=poc.ParseBytesToHTTPRequest(req)~
+        raw_path=http_req.URL.Path
+        if len(re.FindSubmatchAll(raw_path, path_digital_rule))!=1{
+            yakit_output(f"匹配到 ${url} 数字路径个数不为1，跳过后续检测")
+            return
+        }
+        yakit_output(f"开始处理数字路径")
+        url_path_fuzz(freq,raw_path,rsp,raw_rsp_sensitive_info,raw_rsp_sensitive_info_type)
+        wg.Wait()
+        yakit_output(f"数字路径处理完成")
+    }
+    yakit_output(f"${url} 中\"参数/数字路径\"敏感信息遍历检测完成")
+}

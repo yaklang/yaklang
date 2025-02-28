@@ -1,0 +1,188 @@
+list = cli.LineDict(
+    "list",
+    cli.setDefault("admin\nmessage\npasswd\npassword\npwd\nrole\nuser"),
+    cli.setVerboseName("敏感标识"),
+    cli.setRequired(true)
+)
+
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+recognition_patten = cli.StringSlice(
+    "recognition_patten",
+    cli.setVerboseName("识别模式"),
+    cli.setMultipleSelect(false),
+    cli.setSelectOption("字典模式", "1"),
+    cli.setSelectOption("机器学习模式", "2"),
+    cli.setSelectOption("字典模式优先-机器学习辅助", "3"),
+    cli.setSelectOption("字典模式-机器学习并行", "4"),
+    cli.setSelectOption("机器学习优先-字典模式辅助", "5"),
+    cli.setDefault("1"),cli.setHelp("检测识别模式"),
+    cli.setCliGroup("插件额外参数")
+)
+cli.check()
+
+base_info_script_name = "Cookie欺骗检测"
+base_info_task_creater = ""
+base_info_task_type = task_type[0]
+base_info_detect_mode = "mitm"
+base_info_task_mode = recognition_patten_dic[recognition_patten[0]]
+base_info_login = ""
+base_info_crediential = ""
+base_info_user_define_header = ""
+base_info_start_time = time.Now().String()
+base_info_end_time = ""
+
+solution="为了防范Cookie伪造漏洞，网站应该采取一系列安全措施。首先，网站应该对Cookie进行严格的验证和加密存储，确保只有合法的用户可以读取和修改自己的Cookie信息。其次，使用HTTP only的Cookie可以进一步增加安全性，防止JavaScript等客户端代码获取到Cookie信息。此外，对于重要的操作和敏感数据，网站还应该采用额外的身份验证机制，以确保操作的合法性"
+description="Cookie伪造漏洞是一种网络安全威胁，它允许攻击者伪装成合法用户，利用虚假的Cookie信息来访问和操纵目标网站的用户数据。这种漏洞的产生通常是由于网站没有严格验证或加密存储Cookie，或者使用了不安全的Cookie标志，使得攻击者可以通过各种手段获取并篡改Cookie信息，一旦攻击者成功伪造了Cookie，他们就可以执行一系列恶意操作，如登录受害者的账户、窃取敏感信息、修改用户设置或执行其他未经授权的操作。这种攻击往往会给受害者带来严重的损失，包括个人信息泄露、财产损失等"
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+
+risk_output_dic = {}
+detect_output_dic = {}
+
+
+
+mitm_risk_output=func(url,req,rsp,vul_type,vul_name,vul_severity,param,payload,payload_success_flag,pocname){
+    // 考虑去重策略 即时/定时 任务去重（因为任务本身也只跑一次），周期任务不去重
+    if task_type[0]=="即时" || task_type[0]=="定时" {
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行告警
+            return
+        }else{
+            //记录到告警去重字典中
+            risk_output_dic[url_body_hash]=1
+        }
+
+        //记录到检测去重字典中,借助库函数，拼接root_url和path
+        detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+        detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+        if err!=nil{
+            die(err)
+        }
+        detect_path=detect_url_Instance.Path
+        detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测，后续 mirrorFilteredHTTPFlow 不再进行检测
+        }else{
+            //记录到检测去重字典中
+            detect_output_dic[detect_url_path_hash]=1
+        }
+    }
+
+    risk.NewRisk(
+        url,
+        risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+        risk.type(vul_type),
+        risk.severity(vul_severity),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.payload(payload),
+        risk.solution(solution),
+        risk.description(description),
+        risk.parameter(param),
+        risk.details({
+            "location":url,
+            "pocname":pocname,
+            "payload_success_flag":payload_success_flag,
+            "recognition_patten":recognition_patten_dic[recognition_patten[0]]
+        })
+        )
+}
+
+
+check = func(resource, list, req, rsp, url, method) {
+    freq=fuzz.HTTPRequest(req)~
+    for param in freq.GetCookieParams(){
+        if str.MatchAnyOfSubString(param.GetFirstValue(), list...){
+            mitm_risk_output(url, req, rsp, "logic", "Cookie欺骗", "middle", param.Name(), param.GetFirstValue(), "", "mitm_cookie_spoofing_check")
+            return
+        }
+    }
+
+    // stu = 0
+    // t = ""
+    // Cookie = ""
+    // try {
+    //     matchCookie, errCookie := re.Compile("Cookie: (.*)")
+    //     if errCookie != nil {
+    //         return
+    //     }
+    //     if matchCookie {
+    //         Cookie = matchCookie.FindAllStringSubmatch(string(resource), -1)[0][1]
+    //         if Cookie {
+    //             yakit.Info(Cookie)
+    //             for l in list {
+    //                 if l in string(Cookie) {
+    //                     stu = 1
+    //                     yakit.Info("发现凭据中存在敏感信息，可能存在凭据欺骗漏洞")
+    //                     // 如果敏感Cookie以json格式出现就按照json来处理
+    //                     if `{` in string(Cookie) && `}` in string(Cookie) {
+    //                         matchjson, err := re.Compile("({.*})")
+    //                         if err != nil {
+    //                             yakit.Info("error")
+    //                         }
+    //                         jon = json.loads(matchjson.FindAllStringSubmatch(string(Cookie), -1)[0][1])
+    //                         t = string(json.dumps(jon))
+    //                         if jon[l] {
+    //                             yakit.Info(l + ": " + jon[l])
+    //                         }
+
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     if stu == 1 {
+    //         c, err = codec.DecodeUrl(Cookie)
+    //         if err != nil {
+    //             return
+    //         }
+    //         show(c, req, rsp, url, method)
+    //     }
+    // } catch {
+    //     return
+    // }
+}
+
+# mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+    yakit_output(f"开始对 ${url} 的请求和响应 Cookie 进行是否可伪造检测")
+
+    http_req, http_req_err = poc.ParseBytesToHTTPRequest(req)
+    http_rsp, http_rsp_err = poc.ParseBytesToHTTPResponse(rsp)
+    req_header_, req_body = poc.Split(req)
+    rsp_header_, rsp_body = poc.Split(rsp)
+    http_req_method = http_req.Method
+    http_rsp_header = http_rsp.Header
+
+    if http_req_err != nil {
+        die(http_req_err)
+    }
+    if http_rsp_err != nil {
+        die(http_rsp_err)
+    }
+
+    check(req_header_, list, req, rsp, url, "请求体")
+    // check(rsp_header_, list, req, rsp, url, "响应体")  响应中的 cookie 会自动被浏览器设置到请求中，无需对响应进行检测
+
+    yakit_output(f"完成对 ${url} 的请求和响应 Cookie 进行是否可伪造检测")
+}

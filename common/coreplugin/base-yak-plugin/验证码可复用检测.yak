@@ -1,0 +1,256 @@
+// 仅支持插件仓库子页面下调用 单次调用，无需考虑去重
+// 使用错误的账号和密码进行爆破，检测响应中是否存在验证码失效等字段
+// mitm劫持下验证码可能会被后端刷新，动态爬虫无法输入正确的验证码，且可能爬虫会刷新验证码
+
+description="验证码复用漏洞是指在应用程序中使用验证码（如短信验证码、邮箱验证码）进行身份验证时，验证码可以被多次使用或者在一段时间内多次验证。这种漏洞可能导致恶意用户或攻击者利用同一验证码多次验证身份，从而爆破账号和密码，实施未经授权的操作或者攻击。"
+solution="解决验证码复用漏洞的关键在于确保每个验证码只能使用一次，或者在一段时间内只能使用一次。以下是一些常见的解决方案：\n1.一次性使用：确保每个验证码只能被验证一次，验证后立即失效。一旦验证码被使用，即使攻击者获取到该验证码，也无法再次使用。\n2.短期有效性：限制验证码的有效期，确保验证码只能在一定时间内使用。一旦过了有效期，验证码应自动失效，无法再被验证。\n3.绑定用户信息：将验证码与特定用户或特定操作绑定，确保验证码只能用于特定用户或特定操作的验证，防止验证码被用于其他目的。\n4.监控和限制验证次数：监控验证码的验证次数，如果发现同一验证码被多次验证，立即采取措施，例如暂时禁止该验证码的验证。\n5.加强安全性措施：采用多因素身份验证、设备识别、IP 地址验证等安全措施，提高身份验证的安全性，减少验证码复用漏洞的风险。 "
+detect_output_dic={}
+risk_output_dic={}
+
+
+
+bad_end_str_list=[
+".jpg", ".png", ".gif", ".css", ".js", ".pdf", ".mp3", ".mp4", ".avi", ".map", ".svg", ".ico", ".woff", ".woff2", ".ttf"
+]
+
+
+// verification_code_list=cli.LineDict("verification_code_list", cli.setDefault("check\ncode\ndata\nidentifying\nkey\nmessage\nmsg\nsms\nverification\nverify\nyanzhengma\nyzm\n验证码"),cli.setRequired(true),cli.setVerboseName("验证码参数"),cli.setHelp("会检测请求包中是否含有验证码参数"))
+username=cli.String("username", cli.setDefault("username"),cli.setRequired(true),cli.setVerboseName("用户名参数"),cli.setHelp("会检测请求包中是否含有用户名参数，严格匹配"))
+password=cli.String("password", cli.setDefault("password"),cli.setRequired(true),cli.setVerboseName("用户密码参数"),cli.setHelp("会检测请求包中是否含有用户密码参数，严格匹配"))
+verification_code=cli.String("verification_code", cli.setDefault("code"),cli.setRequired(true),cli.setVerboseName("验证码参数"),cli.setHelp("会检测请求包中是否含有验证码参数，严格匹配"))
+sim_value=cli.Float("sim_value", cli.setDefault("0.9"),cli.setVerboseName("相似度阈值"),cli.setCliGroup("插件额外参数"),cli.setHelp("大于等于该阈值告警"))
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志task_type
+
+
+
+recognition_patten = cli.StringSlice(
+    "recognition_patten",
+    cli.setVerboseName("识别模式"),
+    cli.setMultipleSelect(false),
+    cli.setSelectOption("字典模式", "1"),
+    cli.setSelectOption("机器学习模式", "2"),
+    cli.setSelectOption("字典模式优先-机器学习辅助", "3"),
+    cli.setSelectOption("字典模式-机器学习并行", "4"),
+    cli.setSelectOption("机器学习优先-字典模式辅助", "5"),
+    cli.setDefault("1"),cli.setHelp("检测识别模式"),
+    cli.setCliGroup("插件额外参数")
+)
+cli.check()
+
+
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+
+
+base_info_script_name = "验证码可复用检测"
+base_info_task_creater = ""
+base_info_task_type = "即时"
+base_info_detect_mode = "mitm"
+base_info_task_mode = recognition_patten_dic[recognition_patten[0]]
+base_info_login = ""
+base_info_crediential = ""
+base_info_user_define_header = ""
+base_info_start_time = time.Now().String()
+base_info_end_time = ""
+
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+
+
+// 验证码不正确的正则
+verification_code_fail_list=[
+    `(验证码(.*?)(错误|有误|失效|无效|不正确))|((错误|有误|失效|无效|不正确)的验证码)`,
+    `(?i)(captcha (incorrect|error|invalid))|((incorrect|error|invalid) captcha)`
+]
+
+
+
+pre_check=func(req,rsp){
+    http_req = poc.ParseBytesToHTTPRequest(req)~
+
+    if http_req.Method!="GET" && http_req.Method!="POST" {
+        return false
+    }
+
+    if str.MatchAnyOfSubString(http_req.URL.Path, bad_end_str_list...) {
+        return false
+    }
+
+    http_rsp=poc.ParseBytesToHTTPResponse(rsp)~
+
+    if str.MatchAnyOfRegexp(http_rsp.StatusCode, ["40\\d","50\\d"]...){
+        return false
+    }
+
+    // http_rsp_header,http_rsp_body=poc.Split(rsp)
+    // // 启用非json形式的检查
+    // if not_json_check{
+    //     return true
+    // }
+
+    // http_rsp_json_body=json.loads(string(http_rsp_body))
+    // if http_rsp_json_body == {} {
+    //     return false
+    // }
+
+    return true
+}
+
+
+compare_fuzz_rsp=func(http_rsp,http_fuzz_rsp){
+    if http_rsp.StatusCode!=http_fuzz_rsp.StatusCode{
+        yakit_output(f"原始请求响应状态码 ${http_rsp.StatusCode} 不同于模拟 fuzz 重放后的响应状态码 ${http_fuzz_rsp.StatusCode} ，跳过后续检测")
+        return false
+    }
+    // dump(http_rsp.Header["Content-Type"][0])
+    // dump(http_fuzz_rsp.Header["Content-Type"][0])
+
+    if http_rsp.Header["Content-Type"]!=nil && http_fuzz_rsp.Header["Content-Type"]!=nil {
+        http_rsp_content_type=http_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+        http_fuzz_rsp_content_type=http_fuzz_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+
+        // 针对text/html自动拼接charset=utf-8的处理
+        if "text/html" in http_rsp_content_type && "text/html" in http_fuzz_rsp_content_type{
+            return true
+        }
+        if http_rsp_content_type!=http_fuzz_rsp_content_type{
+            yakit_output(f"原始请求响应 Content-Type ${http_rsp_content_type} 不同于模拟 fuzz 重放后的响应Content-Type ${http_fuzz_rsp_content_type} ，跳过后续检测")
+            return false
+        }
+    }elif http_rsp.Header["Content-Type"]==nil && http_fuzz_rsp.Header["Content-Type"]==nil {
+
+    }else{
+        yakit_output(f"原始请求响应 Content-Type 不同于模拟 fuzz 重放后的响应Content-Type ，跳过后续检测")
+        return false
+    }
+    return true
+}
+
+
+
+mitm_risk_output=func(url,req,rsp,vul_type,vul_name,vul_severity,param,payload,payload_success_flag,pocname){
+    risk.NewRisk(
+        url,
+        risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+        risk.type(vul_type),
+        risk.severity(vul_severity),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.parameter(param),
+        risk.payload(payload),
+        risk.solution(solution),
+        risk.description(description),
+        risk.details({
+            "location":url,
+            "pocname":pocname,
+            "payload_success_flag":payload_success_flag,
+            "recognition_patten":recognition_patten_dic[recognition_patten[0]]
+        })
+        )
+}
+
+
+# mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+    //首先确保是验证码业务 只检测参数
+    //原始响应如何过滤 验证码正确无误
+    //检测重放后的响应和原始响应相似度 相似度检测 >0.9 且 不含关键字
+
+    detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+    detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+    if err!=nil{
+        yakit_output("url 解析错误，脚本即将退出")
+        die(err)
+    }
+    detect_path=detect_url_Instance.Path
+    detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+    if detect_url_path_hash in detect_output_dic{
+        //该条流已经检测并告警，不再进行检测
+        yakit_output("detect_output_dic 去重")
+        return
+    }
+    // 计算url和string后的body md5进行去重
+    header_md5_check,body_md5_check=poc.Split(req)
+    url_body_hash=codec.Md5(url+string(body_md5_check))
+    if url_body_hash in risk_output_dic{
+        //该条流已经告警输出，不再进行检测
+        yakit_output("risk_output_dic 去重")
+        return
+    }
+
+    username_flag,password_flag,verification_code_flag=false,false,false
+    if !pre_check(req, rsp){
+        return
+    }
+
+    freq=fuzz.HTTPRequest(req, fuzz.https(isHttps))~
+
+    // 判断是否为输入含有验证码的登录报文
+    params,password_param,verification_code_param,payload=freq.GetCommonParams(),nil,nil,nil
+    for param in params{
+        if !param.Position().StartsWith("cookie") && param.Name()==username{
+            username_flag=true
+            continue
+        }
+        if !param.Position().StartsWith("cookie") && param.Name()==password{
+            password_flag,password_param=true,param
+            continue
+        }
+        if !param.Position().StartsWith("cookie") && param.Name()==verification_code{
+            verification_code_flag,verification_code_param,payload=true,param.Name(),param.GetFirstValue()
+            continue
+        }
+    }
+
+    if username_flag && password_flag && verification_code_flag{
+        // 报文满足fuzz 要求
+        yakit_output(f"开始对 ${url} 进行验证码可复用检测")
+    }else{
+        yakit_output(f"在 ${url} 中未检测到输入参数 ,插件即将退出")
+        return
+    }
+
+    // 黑名单 检测mitm流量 验证码是否正确
+    if str.MatchAnyOfRegexp(rsp, verification_code_fail_list...){
+        yakit_output("原始验证码不正确，请核实后重新输入")
+        return
+    }
+
+    //生成随机的密码，模拟爆破，测试验证码是否依旧可以使用
+    rand_password=str.RandStr(len(password_param.GetFirstValue()))
+    result=password_param.Fuzz(rand_password).ExecFirst(httpool.noRedirect(true))~
+
+
+    http_rsp,http_fuzz_rsp =poc.ParseBytesToHTTPResponse(rsp)~,poc.ParseBytesToHTTPResponse(result.ResponseRaw)~
+    if !compare_fuzz_rsp(http_rsp,http_fuzz_rsp){
+        return false
+    }
+
+    fuzz_rsp_header,fuzz_rsp_body=poc.Split(result.ResponseRaw)
+    sim_res=str.CalcSimilarity(body,fuzz_rsp_body)
+    yakit_output(f"计算 验证码复用 重放前后的页面响应相似度为 ${sim_res}")
+
+    // 相似度和黑名单关键字检测
+    if sim_res>sim_value && !str.MatchAnyOfRegexp(result.ResponseRaw, verification_code_fail_list...){
+        yakit_output(f"检测到 ${url} 中可能存在 验证码复用 漏洞")
+        mitm_risk_output(url, string(result.RequestRaw), string(result.ResponseRaw), "逻辑漏洞", "验证码复用", "middle", verification_code_param,payload, "", "mitm_verification_code_reuse_check")
+        return
+    }
+    yakit_output(f"${url} 检测完成，不存在 验证码复用 漏洞")
+
+}

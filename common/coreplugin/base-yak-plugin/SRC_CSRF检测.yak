@@ -1,0 +1,243 @@
+// Access-Control-Allow-Headers: 允许的头部信息，包括 Authorization
+
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+recognition_patten = cli.StringSlice(
+    "recognition_patten",
+    cli.setVerboseName("识别模式"),
+    cli.setMultipleSelect(false),
+    cli.setSelectOption("字典模式", "1"),
+    cli.setSelectOption("机器学习模式", "2"),
+    cli.setSelectOption("字典模式优先-机器学习辅助", "3"),
+    cli.setSelectOption("字典模式-机器学习并行", "4"),
+    cli.setSelectOption("机器学习优先-字典模式辅助", "5"),
+    cli.setDefault("1"),cli.setHelp("检测识别模式"),
+    cli.setCliGroup("插件额外参数")
+)
+cli.check()
+
+base_info_script_name = "SRC_CSRF检测"
+base_info_task_creater = ""
+base_info_task_type = "即时"
+base_info_detect_mode = "mitm"
+base_info_task_mode = recognition_patten_dic[recognition_patten[0]]
+base_info_login = ""
+base_info_crediential = ""
+base_info_user_define_header = ""
+base_info_start_time = time.Now().String()
+base_info_end_time = ""
+
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+// 可加上针对refer的优化 绕过等
+token_blacklist=[
+    "token",
+    "csrf",
+    "xsrf",
+    "tkn",
+    "auth",
+
+]
+
+
+
+
+// 新参数列表为老参数列表+token参数列表
+param_blacklist=[
+    "搜索",
+    "search",
+    "登录",
+    "login",
+    "注册",
+    "register",
+    "查询",
+]
+
+param_whitelist=[
+    "submit",
+    "change",
+    "update",
+    "add",
+    "delete",
+    "edit",
+]
+
+pre_check=func(http_req,http_rsp){
+
+    // 通过相似度检测的插件，可以先排除一部分无关流量
+
+    if http_req.Method!="GET" && http_req.Method!="POST" {
+        return false
+    }
+
+    if str.MatchAnyOfSubString(http_req.URL.Path, [`.js`,`.css`,`.map`]...) {
+        return false
+    }
+
+    if str.MatchAnyOfRegexp(http_rsp.StatusCode, [`40\d`,`50\d`]...){
+        return false
+    }
+
+    return true
+}
+
+
+
+
+header_check=func(req,url){
+    http_req=poc.ParseBytesToHTTPRequest(req)~
+    http_req_header=http_req.Header
+    for key in http_req_header {
+        if str.MatchAnyOfSubString(key, token_blacklist...){
+            yakit_output(f"在 ${url}  header 中检测到 token 关键字，停止后续 CSRF 检测")
+            return false
+        }
+    }
+    return true
+}
+
+
+
+param_check=func(freq,url){
+    params=freq.GetCommonParams()
+    common_params_list=[]
+    param_blacklist=param_blacklist+token_blacklist
+    yakit_output(f"尝试在 ${url} 中匹配预设置的 '业务操作' 关键字")
+    for param in params{
+        if param.Position()=="cookie"{
+            continue
+        }
+        // 只要含有一个黑名单参数，就return false ，否则遍历所有参数列表来查找白名单参数
+        if str.MatchAnyOfSubString(param.Name(), param_blacklist...) || str.MatchAnyOfSubString(param.Value()[0], param_blacklist...){
+            yakit_output(f"在 ${url} 中匹配到预设置的黑名单参数，停止后续 CSRF 检测")
+            return false
+        }
+        if str.MatchAnyOfSubString(param.Name(), param_whitelist...){
+            common_params_list.Append(param)
+        }
+    }
+    if len(common_params_list)==0{
+        yakit_output(f"未在 ${url} 中匹配预设置的 '业务操作' 关键字，停止后续 CSRF 检测")
+        return false
+    }
+    return true
+}
+
+
+mitm_risk_output=func(url,req,rsp,vul_type,vul_name,vul_severity,payload,payload_success_flag,pocname){
+    risk.NewRisk(
+        url,
+        risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+        risk.type(vul_type),
+        risk.severity(vul_severity),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.payload(payload),
+        risk.description("CSRF漏洞（跨站请求伪造，Cross-Site Request Forgery）是一种网络攻击方式，攻击者通过诱导已登录用户点击恶意链接或访问恶意网站，利用用户的身份凭证在不知情的情况下向受信任的网站发送伪造请求。这些伪造的请求会以用户的身份执行敏感操作，如更改账户设置、提交表单或进行交易，因为服务器无法区分是用户主动发出的请求还是由攻击者伪造的请求。这种漏洞通常利用了用户已登录状态下的身份凭据，导致攻击者能够绕过身份验证机制并执行未授权操作"),
+        risk.solution("修复CSRF漏洞的方案包括在每个关键请求中加入不可预测的CSRF令牌（Token），确保每次请求都包含一个唯一且随机生成的令牌，只有服务器生成并验证通过的请求才能被执行。此外，使用双重提交Cookie、验证Referer头信息、限制请求的来源以及在敏感操作前要求重新输入密码等措施，也能有效降低CSRF攻击的风险。通过这些方法，可以确保只有经过验证的合法请求才能成功执行"),
+        risk.details({
+            "location":url,
+            "pocname":pocname,
+            "payload_success_flag":payload_success_flag
+        })
+        )
+}
+
+
+compare_csrf_rsp=func(http_rsp,http_csrf_rsp){
+
+
+    if http_rsp.StatusCode!=http_csrf_rsp.StatusCode{
+        dump(1111)
+        yakit_output(f"原始请求响应状态码 ${http_rsp.StatusCode} 不同于模拟 CSRF 重放后的响应状态码 ${http_csrf_rsp.StatusCode} ，跳过后续检测")
+        return false
+    }
+    // dump(http_rsp.Header["Content-Type"][0])
+    // dump(http_csrf_rsp.Header["Content-Type"][0])
+
+    if http_rsp.Header["Content-Type"]!=nil && http_csrf_rsp.Header["Content-Type"]!=nil {
+        http_rsp_content_type=http_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+        http_csrf_rsp_content_type=http_csrf_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+
+        if http_rsp_content_type!=http_csrf_rsp_content_type{
+            yakit_output(f`原始请求响应 Content-Type ${http_rsp_content_type} 不同于模拟 CSRF 重放后的响应Content-Type ${http_csrf_rsp_content_type} ，跳过后续检测`)
+            return false
+        }
+    }elif http_rsp.Header["Content-Type"]==nil && http_csrf_rsp.Header["Content-Type"]==nil {
+
+
+    }else{
+        yakit_output(f`原始请求响应 Content-Type 不同于模拟 CSRF 重放后的响应Content-Type ，跳过后续检测`)
+        return false
+    }
+
+    return true
+
+
+
+}
+
+
+# mirrorHTTPFlow 会镜像所有的流量到这里，包括 .js / .css / .jpg 这类一般会被劫持程序过滤的请求
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+}
+
+# mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    yakit_output(f"开始检测 ${url} 是否存在 CSRF 漏洞")
+    http_req = poc.ParseBytesToHTTPRequest(req)~
+    http_rsp =poc.ParseBytesToHTTPResponse(rsp)~
+    if !pre_check(http_req,http_rsp){
+        return
+    }
+
+    freq=fuzz.HTTPRequest(req, fuzz.https(isHttps))~
+
+    if !header_check(req,url) || !param_check(freq,url){
+        return
+    }
+    yakit_output("模拟 CSRF 重放请求")
+
+
+    // 尝试重发（不302），因为mitm劫持的流量即为302 再比较相似度 ，
+
+    csrf_rsp,csrf_req,err=poc.HTTP(req, poc.https(isHttps /*type: bool*/),poc.noRedirect(true))
+    if err!=nil{
+        yakit_output("模拟 CSRF 重放失败")
+        return
+    }
+
+    // 先比较状态码/content-type等字段，减少误报
+    http_csrf_rsp=poc.ParseBytesToHTTPResponse(csrf_rsp)~
+
+    if !compare_csrf_rsp(http_rsp, http_csrf_rsp) {
+        return false
+
+    }
+    rsp_header,rsp_body=poc.Split(rsp)
+    csrf_rsp_header,csrf_rsp_body=poc.Split(csrf_rsp)
+    sim_res=str.CalcTextMaxSubStrStability(string(rsp_body),string(csrf_rsp_body))~
+    dump(sim_res)
+    yakit_output(f"计算替换模拟 CSRF 重放前后的页面响应相似度为 ${sim_res}")
+
+    if sim_res>0.999{
+        yakit_output(f"检测到 ${url} 中可能存在 CSRF 漏洞")
+        mitm_risk_output(url, string(csrf_req), string(csrf_rsp), "CSRF", "CSRF", "middle", "", "", "mitm_csrf_check")
+        return
+    }
+    yakit_output(f"${url} 检测完成，不存在 CSRF 漏洞")
+}
+
+

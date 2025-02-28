@@ -1,0 +1,278 @@
+bad_end_str_list=[
+".jpg", ".png", ".gif", ".css", ".js", ".pdf", ".mp3", ".mp4", ".avi", ".map", ".svg", ".ico", ".woff", ".woff2", ".ttf"
+]
+
+description="注销功能无效的漏洞是指在应用程序或网站中存在的问题，导致用户在注销账户或退出登录后，仍然可以继续访问受保护的资源或功能。这种漏洞可能会给攻击者机会利用用户的会话或凭证，继续访问用户账户或敏感信息，从而造成安全风险。"
+solution="以下是一些防止注销功能无效漏洞的解决方案：\n1.正确管理会话：确保应用程序正确管理用户会话，及时使会话失效，避免用户注销后仍然可以继续访问资源。\n2.清除认证信息：在用户注销或退出登录时，及时清除用户的认证信息、会话凭证和Cookie，避免被攻击者利用。\n3.强制重新认证：用户注销后，强制要求用户重新进行身份验证，以确保用户身份得到正确确认。\n4.前后端同步：确保前端和后端状态同步，用户注销操作应该及时同步到后端，避免出现状态不一致的情况。\n5.安全审计和测试：定期进行安全审计和漏洞测试，发现并修复应用程序中存在的会话管理问题，确保用户注销功能的有效性。"
+
+// todo 此处可根据业务场景，自定义为需要鉴权的路径
+auth_type=cli.StringSlice("auth_type", cli.setDefault("cookie"),cli.setSelectOption("cookie", "cookie"),cli.setSelectOption("header","header"),cli.setVerboseName("鉴权类型"),cli.setRequired(true),cli.setHelp("鉴权类型，cookie或header"))
+need_auth_path=cli.String("need_auth_path", cli.setDefault("portal.php"),cli.setVerboseName("鉴权路径"),cli.setRequired(true),cli.setHelp("注销后访问的路径，该路径需要严格鉴权"))
+header_name=cli.String("header_name", cli.setDefault("Authorization"),cli.setVerboseName("鉴权字段名"),cli.setHelp("鉴权字段名，设置鉴权类型为header时，需要配置此选项"),cli.setCliGroup("插件额外参数"))
+logout_path_list=cli.LineDict("logout_path_list", cli.setVerboseName("注销路径"),cli.setCliGroup("插件额外参数"),cli.setDefault("abandon\ncease\nclose\ndisconnect\ndisengage\nend\nexit\nleave\nlogout\nlogoff\nquit\nretreat\nsiginout\nterminate\nwithdraw\n"))
+sim_value=cli.Float("sim_value", cli.setDefault("0.2"),cli.setVerboseName("相似度阈值"),cli.setCliGroup("插件额外参数"),cli.setHelp("小于等于该阈值告警"))
+// 假设生成的随机凭证无法通过鉴权path的鉴权，那么
+// 随机凭证与原始凭证比对 相似度>阈值 不存在漏洞
+// 随机凭证与原始凭证比对 相似度<等于阈值 存在漏洞
+//开始替换内容标志recognition_patten
+//待替换内容，勿动！
+recognition_patten=cli.StringSlice("recognition_patten", cli.setVerboseName("识别模式"),cli.setMultipleSelect(false),cli.setSelectOption("字典模式", "1"),cli.setSelectOption("机器学习模式", "2"),cli.setSelectOption("字典模式优先-机器学习辅助", "3"),cli.setSelectOption("字典模式-机器学习并行", "4"),cli.setSelectOption("机器学习优先-字典模式辅助", "5"),cli.setDefault("1"),cli.setHelp("检测识别模式"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志recognition_patten
+
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志task_type
+
+cli.check()
+auth_type=auth_type[0]
+
+risk_output_dic={}
+detect_output_dic={}
+flow_total=-1
+
+
+// 定义全局变量
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+
+bad_rsp_list=[
+    `<title>Login</title>`,
+    `no_login`,
+    `请登录`
+]
+
+
+// 定义用于打印的 base_info 变量
+base_info_script_name="注销功能有效性"
+base_info_task_creater=""
+base_info_task_type=task_type[0]
+base_info_detect_mode="mitm"
+base_info_task_mode=recognition_patten_dic[recognition_patten[0]]
+base_info_login=""
+base_info_crediential=""
+base_info_user_define_header=""
+base_info_start_time=time.Now().String()
+base_info_end_time=""
+
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+
+
+pre_check=func(req,rsp){
+    http_req = poc.ParseBytesToHTTPRequest(req)~
+
+    if http_req.Method!="GET" && http_req.Method!="POST" {
+        return false
+    }
+
+    if str.MatchAnyOfSubString(http_req.URL.Path, bad_end_str_list...) {
+        return false
+    }
+
+    http_rsp=poc.ParseBytesToHTTPResponse(rsp)~
+
+    if str.MatchAnyOfRegexp(http_rsp.StatusCode, ["40\\d","50\\d"]...){
+        return false
+    }
+
+    // http_rsp_header,http_rsp_body=poc.Split(rsp)
+    // // 启用非json形式的检查
+    // if not_json_check{
+    //     return true
+    // }
+
+    // http_rsp_json_body=json.loads(string(http_rsp_body))
+    // if http_rsp_json_body == {} {
+    //     return false
+    // }
+
+    return true
+}
+
+
+compare_fuzz_rsp=func(http_rsp,http_fuzz_rsp){
+    if http_rsp.StatusCode!=http_fuzz_rsp.StatusCode{
+        yakit_output(f"原始请求响应状态码 ${http_rsp.StatusCode} 不同于模拟 fuzz 重放后的响应状态码 ${http_fuzz_rsp.StatusCode} ，跳过后续检测")
+        return false
+    }
+    // dump(http_rsp.Header["Content-Type"][0])
+    // dump(http_fuzz_rsp.Header["Content-Type"][0])
+
+    if http_rsp.Header["Content-Type"]!=nil && http_fuzz_rsp.Header["Content-Type"]!=nil {
+        http_rsp_content_type=http_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+        http_fuzz_rsp_content_type=http_fuzz_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+
+        // 针对text/html自动拼接charset=utf-8的处理
+        if "text/html" in http_rsp_content_type && "text/html" in http_fuzz_rsp_content_type{
+            return true
+        }
+        if http_rsp_content_type!=http_fuzz_rsp_content_type{
+            yakit_output(f"原始请求响应 Content-Type ${http_rsp_content_type} 不同于模拟 fuzz 重放后的响应Content-Type ${http_fuzz_rsp_content_type} ，跳过后续检测")
+            return false
+        }
+    }elif http_rsp.Header["Content-Type"]==nil && http_fuzz_rsp.Header["Content-Type"]==nil {
+
+    }else{
+        yakit_output(f"原始请求响应 Content-Type 不同于模拟 fuzz 重放后的响应Content-Type ，跳过后续检测")
+        return false
+    }
+    return true
+}
+
+
+
+
+
+mitm_risk_output=func(url,req,rsp,vul_type,vul_name,vul_severity,param,payload,payload_success_flag,pocname){
+    // 计算url和string后的body md5进行去重
+    if task_type[0]=="即时" || task_type[0]=="定时" {
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行告警
+            return
+        }else{
+            //记录到告警去重字典中
+            risk_output_dic[url_body_hash]=1
+        }
+
+        //记录到检测去重字典中,借助库函数，拼接root_url和path
+        detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+        detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+        if err!=nil{
+            die(err)
+        }
+        detect_path=detect_url_Instance.Path
+        detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测，后续 mirrorFilteredHTTPFlow 不再进行检测
+        }else{
+            //记录到检测去重字典中
+            detect_output_dic[detect_url_path_hash]=1
+        }
+    }
+
+    risk.NewRisk(
+        url,
+        risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+        risk.type(vul_type),
+        risk.severity(vul_severity),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.parameter(param),
+        risk.payload(payload),
+        risk.solution(solution),
+        risk.description(description),
+        risk.details({
+            "location":url,
+            "pocname":pocname,
+            "payload_success_flag":payload_success_flag,
+            "recognition_patten":recognition_patten_dic[recognition_patten[0]]
+        })
+        )
+}
+
+
+# mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+
+    // 手动对爬虫预检测流量进行过滤，yakit加载mitm插件时，建议注释，动态爬虫形式调用无需注释（当爬虫启用crawlerx.check()需要注释）
+    // if flow_total==-1{
+    //     flow_total=flow_total+1
+    //     return
+    // }
+
+    detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+    detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+    if err!=nil{
+        yakit_output("url 解析错误，脚本即将退出")
+        die(err)
+    }
+
+    detect_path=detect_url_Instance.Path
+    detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+    // 考虑去重策略 即时/定时 任务去重（因为任务本身也只跑一次），周期任务不去重
+    if task_type[0]=="即时" || task_type[0]=="定时"{
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测并告警，不再进行检测
+            yakit_output("detect_output_dic 去重")
+            return
+        }
+
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行检测
+            yakit_output("risk_output_dic 去重")
+            return
+        }
+    }
+
+
+    if !pre_check(req, rsp){
+        return
+    }
+    // url path 白名单
+    http_req,freq = str.ParseBytesToHTTPRequest(req)~,fuzz.HTTPRequest(req,fuzz.https(isHttps))~
+    if str.MatchAnyOfSubString(http_req.URL.Path, logout_path_list...){
+        yakit_output(f"在 ${url} 中找到注销路径标识，开始注销功能有效性检测")
+    }else{
+        return
+    }
+
+    yakit_output(f"${url} 预设置的鉴权路径为 ${need_auth_path}")
+    // 保持原有登录凭证不变，去访问需要鉴权路径，最高3次重定向
+    raw_result,fuzz_result,test_payload,auth_param,payload=freq.FuzzPath(need_auth_path).ExecFirst(httpool.redirectTimes(10))~,nil,"test_auth_payload",nil,nil
+    // fuzz 不合法的登录凭证，去访问需要鉴权路径
+    switch auth_type {
+        case "cookie":
+            auth_param,payload="Cookie",freq.GetHeader("Cookie")
+            fuzz_result=freq.FuzzPath(need_auth_path).FuzzCookieRaw(test_payload).ExecFirst(httpool.redirectTimes(10))~
+        case "header":
+            auth_param,payload=header_name,freq.GetHeader(header_name)
+            fuzz_result=freq.FuzzPath(need_auth_path).FuzzHTTPHeader(auth_param, test_payload).ExecFirst(httpool.redirectTimes(10))~
+    }
+
+    http_raw_result_rsp,http_fuzz_result_rsp =poc.ParseBytesToHTTPResponse(raw_result.ResponseRaw)~,poc.ParseBytesToHTTPResponse(fuzz_result.ResponseRaw)~
+
+    // 检测响应中是否含有登录失败/登录界面等误报标识
+    if str.MatchAnyOfRegexp(raw_result.ResponseRaw, bad_rsp_list...){
+
+        return
+    }
+
+    // 先比较状态码/content-type等字段，减少误报  返回为false 表示二者（原始凭证/虚假凭证）响应头比较存在区别，原始凭证依然在注销后生效，可能存在漏洞(此处和其他 compare_fuzz_rsp存在区别)，返回为true的话继续比较相似度，
+    // 检测响应中是否含有登录失败/登录界面等误报标识，虚假凭证返回登录失败/登录界面等表示，而原始凭证未返回，表明原始凭证依然在注销后生效，可能存在漏洞
+    if !compare_fuzz_rsp(http_raw_result_rsp, http_fuzz_result_rsp) || str.MatchAnyOfRegexp(fuzz_result.ResponseRaw, bad_rsp_list...){
+        mitm_risk_output(raw_result.Url, string(raw_result.RequestRaw), string(raw_result.ResponseRaw), "其他漏洞（会话管理类）", "注销功能无效", "middle", auth_param,payload, "", "mitm_logout_validity_check")
+        return
+    }
+
+
+    raw_result_rsp_header,raw_result_rsp_body=poc.Split(raw_result.ResponseRaw)
+    fuzz_result_rsp_header,fuzz_result_rsp_body=poc.Split(fuzz_result.ResponseRaw)
+    sim_res=str.CalcTextMaxSubStrStability(string(raw_result_rsp_body),string(fuzz_result_rsp_body))~
+    yakit_output(f"计算重放前后的页面响应相似度为 ${sim_res}")
+
+    if sim_res<=sim_value{
+        yakit_output(f"检测到 ${url} 中可能存在 注销功能无效 漏洞")
+        mitm_risk_output(raw_result.Url, string(raw_result.RequestRaw), string(raw_result.ResponseRaw), "其他漏洞（会话管理类）", "注销功能无效", "middle", auth_param,payload, "", "mitm_logout_validity_check")
+        return
+    }
+    yakit_output(f"${url} 检测完成，不存在 注销功能无效 漏洞")
+}
