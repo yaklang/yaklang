@@ -152,7 +152,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			c #-> as $c
 	`, map[string][]string{
 			"b": {"20"},
-			"c": {"1", "10"},
+			"c": {"1"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 
@@ -183,7 +183,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			b #-> as $b
 			c #-> as $c
 	`, map[string][]string{
-			"b": {"2", "20"},
+			"b": {"2"},
 			"c": {"10"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
@@ -215,7 +215,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			b #-> as $b
 			c #-> as $c
 	`, map[string][]string{
-			"b": {"2", "20"},
+			"b": {"2"},
 			"c": {"10"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
@@ -426,7 +426,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 
-	t.Run("object", func(t *testing.T) {
+	t.Run("object member", func(t *testing.T) {
 		code := `package main
 
 	import "fmt"
@@ -451,7 +451,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 
-	t.Run("object nesting", func(t *testing.T) {
+	t.Run("object member nesting", func(t *testing.T) {
 		code := `package main
 
 	import "fmt"
@@ -480,6 +480,35 @@ func Test_SideEffect_Capture(t *testing.T) {
 		`, map[string][]string{
 			"b": {"2"},
 			"c": {"3"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	t.Run("object", func(t *testing.T) {
+		code := `package main
+
+	import "fmt"
+
+	type T struct {
+		a int
+		b int
+	}
+
+	func main(){
+		o := &T{a: 1, b: 2}
+		f1 := func() {
+			o = &T{a: 3, b: 4}
+		}
+		o1 := o.a
+		f1()
+		o2 := o.a
+	}
+		`
+		ssatest.CheckSyntaxFlow(t, code, `
+			o1 #-> as $o1
+			o2 #-> as $o2
+		`, map[string][]string{
+			"o1": {"1"},
+			"o2": {"3"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 

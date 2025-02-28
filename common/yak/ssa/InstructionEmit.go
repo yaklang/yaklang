@@ -580,3 +580,26 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 
 	return se
 }
+
+func (f *FunctionBuilder) CopyValue(v Value) Value {
+	ret := v
+	switch v := v.(type) {
+	case *ConstInst:
+		ret = f.EmitConstInst(v.value)
+	case *Make:
+		var keys []Value
+		var members []Value
+		for key, member := range v.GetAllMember() {
+			keys = append(keys, key)
+			members = append(members, member)
+		}
+		ret = f.InterfaceAddFieldBuild(len(keys),
+			func(i int) Value {
+				return keys[i]
+			},
+			func(i int) Value {
+				return members[i]
+			})
+	}
+	return ret
+}
