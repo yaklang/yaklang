@@ -1833,6 +1833,9 @@ func (b *astbuilder) buildShortVarDecl(stmt *gol.ShortVarDeclContext) []ssa.Valu
 	}
 	for _, value := range rightList {
 		rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
+		if rightv.GetLastVariable() != nil {
+			rightv = b.CopyValue(rightv)
+		}
 		rightvl = append(rightvl, rightv)
 	}
 
