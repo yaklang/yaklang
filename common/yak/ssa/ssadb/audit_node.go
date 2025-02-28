@@ -98,7 +98,7 @@ func GetResultNodeByVariable(db *gorm.DB, resultID uint, resultVariable string) 
 	// db = db.Debug()
 	// get andit node by result_id, unique by result_variable, and get number of result_variable
 	var items []uint
-	if err := db.Model(&AuditNode{}).Order("result_index").
+	if err := db.Model(&AuditNode{}).Order("result_index ASC, id ASC").
 		Where("result_id = ? and result_variable = ? and is_entry_node = true", resultID, resultVariable).
 		Pluck("id", &items).Error; err != nil {
 		return nil, err

@@ -142,23 +142,21 @@ func (r *SyntaxFlowResult) GetValue(name string, index int) (*Value, error) {
 		return r.GetUnNameValues()[index], nil
 	}
 
-	if r.memResult != nil {
-		vs := r.GetValues(name)
-		if len(vs) > int(index) {
-			return vs[index], nil
-		} else {
-			return nil, utils.Errorf("index out of range")
+	if r.dbResult != nil {
+		// for new DB data  have index
+		id, err := ssadb.GetResultNodeByVariableIndex(ssadb.GetDB(), r.GetResultID(), name, uint(index))
+		if err == nil {
+			return r.program.NewValueFromAuditNode(id), nil
 		}
 	}
 
-	if r.dbResult != nil {
-		id, err := ssadb.GetResultNodeByVariableIndex(ssadb.GetDB(), r.GetResultID(), name, uint(index))
-		if err != nil {
-			return nil, err
-		}
-		return r.program.NewValueFromAuditNode(id), nil
+	// the old DB data and memory data can get by this
+	vs := r.GetValues(name)
+	if len(vs) > int(index) {
+		return vs[index], nil
+	} else {
+		return nil, utils.Errorf("index out of range")
 	}
-	return nil, utils.Errorf("value not found")
 }
 
 // Alert value
