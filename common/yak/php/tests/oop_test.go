@@ -922,6 +922,22 @@ class ChildClass extends ParentClass {
 			"\"Parent\"",
 		}, t)
 	})
+	t.Run("more extends", func(t *testing.T) {
+		code := `<?php
+
+class A{
+    public static $a = 1;
+}
+class B extends A{
+}
+
+class C extends B{
+    public function AA(){
+        println(parent::$a);
+    }
+}`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+	})
 
 	t.Run("test super class's static field", func(t *testing.T) {
 		code := `
