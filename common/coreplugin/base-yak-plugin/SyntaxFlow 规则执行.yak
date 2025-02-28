@@ -10,6 +10,8 @@ ruleContext := cli.Text("ruleContext",
     cli.setRequired(true),
 )
 
+useCache := cli.Bool("useCache", cli.setDefault("false"))
+
 cli.check()
 
 
@@ -18,16 +20,18 @@ if err !=nil{
     yakit.Error("load program %s from db err: %s",ProgramName, err)
     return 
 }
-
-res, err := prog.SyntaxFlowWithError(ruleContext, 
+opt = [
     syntaxflow.withContext(context.Background()), 
     syntaxflow.withProcess((f, s)=>{
         yakit.SetProgress(f)
         yakit.Info("%s",s)
     }), 
     syntaxflow.withSave(), 
-    syntaxflow.withCache(),
-)
+]
+if useCache {
+    opt.Append(syntaxflow.withCache())
+}
+res, err := prog.SyntaxFlowWithError(ruleContext, opt...)
 
 if err != nil {
     yakit.Error("exec syntaxflow rule:%s", err)
