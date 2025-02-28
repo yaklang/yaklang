@@ -315,6 +315,7 @@ func initYaklangLib() {
 
 	// twofa
 	yaklang.Import("twofa", twofa.Exports)
+	yaklang.Import("mfa", twofa.Exports)
 
 	// 处理 yakit 库的一些函数名
 	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
