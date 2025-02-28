@@ -4,8 +4,6 @@ import java.io.File;
 import java.io.FileInputStream;
 
 public class TryCatch1 {
-	public TryCatch1() {
-	}
 	public static void main(String[] var0) {
 		System.out.println(2);
 		try{

@@ -3,8 +3,6 @@ package org.benf.cfr.reader;
 import java.util.HashMap;
 
 public class LongTest {
-	public LongTest() {
-	}
 	void main() {
 		HashMap var1 = new HashMap();
 		var1.merge(Long.valueOf(1),Long.valueOf(10),Long::sum);
