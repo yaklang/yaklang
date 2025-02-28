@@ -122,10 +122,10 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 		//非search才存入到risk数据库中
 		if msg, ok := r.GetAlertMsg(name); ok && result.Kind != schema.SFResultKindSearch {
 			opts = append(opts, OptionSaveValue_ResultAlert(msg))
-			r.SaveRisk(name, result)
 		}
 		// save variable that has value
 		for index, v := range values {
+			r.SaveRisk(name, index, v, result)
 			opts = append(opts, OptionSaveValue_ResultIndex(uint(index)))
 			e := SaveValue(v, opts...)
 			err = utils.JoinErrors(err, e)
