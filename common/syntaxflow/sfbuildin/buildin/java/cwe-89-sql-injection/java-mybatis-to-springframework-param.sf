@@ -13,7 +13,7 @@ TEXT
 
 // <mybatisSink><getFunc> as $params;
 // $top -{
-//     hook: `*?{opcode: call}<getCaller> as $name`
+//     hook: `*?{opcode: call}<getCallee> as $name`
 // }->
 // $name<getObject><typeName>?{!have: '.'} as $cls;
 // $name<name>?{!have: '.'} as $methodName;

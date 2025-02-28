@@ -12,7 +12,7 @@ __dependency__.*alibaba*fastjson.version as $ver;
 $ver in (,1.2.83) as $vulnerable;
 check $vulnerable;
 
-FastJsonHttpMessageConverter()?{<getCall><getCaller><name>?{have: '.add'}} as $config;
+FastJsonHttpMessageConverter()?{<getCall><getCallee><name>?{have: '.add'}} as $config;
 alert $config for {
     message_zh: "FastJson 配置类中使用了 FastJsonHttpMessageConverter",
     message: "FastJson configuration class uses FastJsonHttpMessageConverter"

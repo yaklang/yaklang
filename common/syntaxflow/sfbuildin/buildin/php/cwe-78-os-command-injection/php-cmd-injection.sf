@@ -28,7 +28,7 @@ alert $high for{
 
 $sink#{
     include: `<self> & $params`,
-    exclude: `<self>?{opcode: call && <self><getCaller> & $filter}`
+    exclude: `<self>?{opcode: call && <self><getCallee> & $filter}`
 }-> as $middle
 
 alert $middle for{
@@ -39,7 +39,7 @@ alert $middle for{
 
 $sink #{
 include: `<self> & $params`,
-include: `<self>?{opcode: call && <self><getCaller> & $filter}`
+include: `<self>?{opcode: call && <self><getCallee> & $filter}`
        }-> as $low
 alert $low for{
     title_zh: '检测到命令执行，但是经过函数过滤',

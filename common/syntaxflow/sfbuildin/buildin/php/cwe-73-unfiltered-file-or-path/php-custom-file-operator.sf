@@ -31,7 +31,7 @@ alert $high for{
 
 $param #{
     include: `<self>& $params`,
-    include: `*?{opcode: call && !<self><getCaller> & $filter}`
+    include: `*?{opcode: call && !<self><getCallee> & $filter}`
 }-> as $middle
 
 alert $middle for{
@@ -43,7 +43,7 @@ alert $middle for{
 
 $param #{
     include: `<self> & $params`,
-    include: `*?{opcode: call && <self><getCaller> & $filter}`
+    include: `*?{opcode: call && <self><getCallee> & $filter}`
 }-> as $low
 
 alert $low for{

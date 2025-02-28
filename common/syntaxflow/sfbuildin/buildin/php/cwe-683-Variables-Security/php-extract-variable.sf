@@ -18,7 +18,7 @@ $output #{
 }-> as $root;
 
 $root?{!<dataflow(<<<CODE
-*?{opcode: call && <self><getCaller> & $filter} as $__next__
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
 CODE)>} as $result
 
 alert $result for {
@@ -29,7 +29,7 @@ alert $result for {
 }
 
 $root?{<dataflow(<<<CODE
-*?{opcode: call && !<self><getCaller> & $filter} as $__next__
+*?{opcode: call && !<self><getCallee> & $filter} as $__next__
 CODE)>} as $middle
 
 
@@ -41,7 +41,7 @@ alert $middle for {
 }
 
 $root?{<dataflow(<<<CODE
-*?{opcode: call && <self><getCaller> & $filter} as $__next__
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
 CODE)>} as $low
 
 alert $low for {

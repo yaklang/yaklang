@@ -20,7 +20,7 @@ $sink#{
     <self> & $source
 UNTIL,
     exclude:<<<EXCLUDE
-    <self><getCaller> & $filter
+    <self><getCallee> & $filter
 EXCLUDE
 }-> as $mid;
 alert $mid for {

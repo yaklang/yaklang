@@ -8,7 +8,7 @@ XML External Entity (XXE) 漏洞允许攻击者利用应用程序解析 XML 输�
 TEXT
 )
 
-LIBXML_NOENT<getCall><getCaller>?{<getObject><name>?{have: DOMDocument} && <name>?{have: load} } as $vuln;
+LIBXML_NOENT<getCall><getCallee>?{<getObject><name>?{have: DOMDocument} && <name>?{have: load} } as $vuln;
 check $vuln;
 alert $vuln;
 

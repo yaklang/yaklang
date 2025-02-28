@@ -1,15 +1,16 @@
 package java
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/stretchr/testify/assert"
 
@@ -163,7 +164,7 @@ func TestNativeCall_GetCall_Then_GetFunc(t *testing.T) {
 	ssatest.Check(t, NativeCallTest,
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
-yourMethod()<getCaller> as $sink; 
+yourMethod()<getCallee> as $sink; 
 `, ssaapi.QueryWithEnableDebug(true))
 			sink := results.GetValues("sink")
 			sink.Show()
@@ -181,11 +182,11 @@ yourMethod()<getCaller> as $sink;
 	)
 }
 
-func TestNativeCall_GetCaller(t *testing.T) {
+func TestNativeCall_getCallee(t *testing.T) {
 	ssatest.Check(t, NativeCallTest,
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
-aArgs <getCall> <getCaller> as $sink; 
+aArgs <getCall> <getCallee> as $sink; 
 `, ssaapi.QueryWithEnableDebug(true))
 			sink := results.GetValues("sink").Show()
 			if sink.Len() != 1 {
@@ -266,7 +267,7 @@ funcA = () => {
 
 func TestNativeCall_Java_FuncName(t *testing.T) {
 	ssatest.Check(t, NativeCallTest, func(prog *ssaapi.Program) error {
-		sinks := prog.SyntaxFlowChain(`aArgs<getCall><getCaller><name> as $sink`).Show()
+		sinks := prog.SyntaxFlowChain(`aArgs<getCall><getCallee><name> as $sink`).Show()
 		haveFuncName := false
 		for _, v := range sinks {
 			if strings.Contains(v.String(), "yourMethod") {
@@ -281,7 +282,7 @@ func TestNativeCall_Java_FuncName(t *testing.T) {
 func TestNativeCall_Java_Eval(t *testing.T) {
 	ssatest.Check(t, NativeCallTest, func(prog *ssaapi.Program) error {
 		sinks := prog.SyntaxFlowChain(`
-<eval('aArgs<getCall><getCaller><name> as $sink')>
+<eval('aArgs<getCall><getCallee><name> as $sink')>
 `).Show()
 		haveFuncName := false
 		for _, v := range sinks {
@@ -297,7 +298,7 @@ func TestNativeCall_Java_Eval(t *testing.T) {
 func TestNativeCall_Java_Eval_Show(t *testing.T) {
 	ssatest.Check(t, NativeCallTest, func(prog *ssaapi.Program) error {
 		sinks := prog.SyntaxFlowChain(`
-<eval('aArgs<getCall><getCaller><show><name> as $sink')>
+<eval('aArgs<getCall><getCallee><show><name> as $sink')>
 `).Show()
 		haveFuncName := false
 		for _, v := range sinks {
@@ -313,7 +314,7 @@ func TestNativeCall_Java_Eval_Show(t *testing.T) {
 func TestNativeCall_Java_FuzztagNEval(t *testing.T) {
 	ssatest.Check(t, NativeCallTest, func(prog *ssaapi.Program) error {
 		sinks := prog.SyntaxFlowChain(`
-<fuzztag("<getCaller>")> as $accccc;
+<fuzztag("<getCallee>")> as $accccc;
 <fuzztag('aArgs<getCall>{{accccc}}<name> as $sink')> as $code;
 <eval($code)><show>
 check $sink;
@@ -332,7 +333,7 @@ check $sink;
 func TestNativeCall_Java_FuzztagThenEval_Basic(t *testing.T) {
 	ssatest.Check(t, NativeCallTest, func(prog *ssaapi.Program) error {
 		sinks := prog.SyntaxFlowChain(`
-<fuzztag("<getCaller>")> as $accccc;
+<fuzztag("<getCallee>")> as $accccc;
 <fuzztag('aArgs<getCall>{{accccc}}<name> as $sink')> as $code;
 <eval($code)><show>
 check $sink;

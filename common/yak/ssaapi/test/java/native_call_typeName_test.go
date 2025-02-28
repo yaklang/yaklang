@@ -2,9 +2,10 @@ package java
 
 import (
 	"errors"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -87,7 +88,7 @@ public class FastJSONDemoController {
 		obj = prog.SyntaxFlowChain(`parse*?{<getObject><fullTypeName>?{have: 'alibaba.fastjson'} } as $obj`, ssaapi.QueryWithEnableDebug()).Show(true)
 		assert.NotNil(t, obj)
 
-		obj = prog.SyntaxFlowChain(`ok()?{<getCaller><getObject><fullTypeName>?{have: 'org.springframework.'} } as $obj`, ssaapi.QueryWithEnableDebug()).Show(true)
+		obj = prog.SyntaxFlowChain(`ok()?{<getCallee><getObject><fullTypeName>?{have: 'org.springframework.'} } as $obj`, ssaapi.QueryWithEnableDebug()).Show(true)
 		assert.NotNil(t, obj)
 
 		typeName := prog.SyntaxFlowChain(`anyJSON<typeName>?{have:'JSON'} as $id;`, ssaapi.QueryWithEnableDebug()).Show()
