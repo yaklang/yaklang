@@ -1,6 +1,8 @@
 package bruteutils
 
 import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -19,7 +21,16 @@ type DefaultServiceAuthInfo struct {
 }
 
 func (d *DefaultServiceAuthInfo) GetBruteHandler() BruteCallback {
-	return func(item *BruteItem) *BruteItemResult {
+	return func(item *BruteItem) (finalResult *BruteItemResult) {
+		defer func() {
+			if err := recover(); err != nil {
+				result := item.Result()
+				result.Ok = false
+				result.ExtraInfo = []byte(fmt.Sprintf("brute item failed: %s\nstack:\n%v", err, utils.ErrorStack(err)))
+				finalResult = result
+			}
+		}()
+
 		if strings.Contains(item.Password, "{{params(user)}}") {
 			passwords, _ := mutate.QuickMutate(item.Password, consts.GetGormProfileDatabase(), mutate.MutateWithExtraParams(map[string][]string{
 				"user": {item.Username},
