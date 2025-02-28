@@ -2,12 +2,13 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/yak/java/template2java"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/java/template2java"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -726,7 +727,7 @@ func init() {
 				}
 				results = utils.RemoveRepeatStringSlice(results)
 				for _, result := range results {
-					v := val.NewValue(ssa.NewConst(result))
+					v := val.NewValue(ssa.NewConstWithRange(result, val.GetRange()))
 					v.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
 					vals = append(vals, v)
 				}

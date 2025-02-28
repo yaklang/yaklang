@@ -27,7 +27,7 @@ var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *s
 			return nil
 		}
 
-		results := val.NewValue(ssa.NewConst(val.String()))
+		results := val.NewValue(ssa.NewConstWithRange(val.String(), val.GetRange()))
 		results.AppendPredecessor(val, frame.WithPredecessorContext("string"))
 		vals = append(vals, results)
 		return nil
@@ -47,7 +47,7 @@ var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 		}
 		if val.IsConstInst() {
 			ss := codec.AnyToString(val.GetConstValue())
-			results := val.NewValue(ssa.NewConst(strings.ToLower(ss)))
+			results := val.NewValue(ssa.NewConstWithRange(strings.ToLower(ss), val.GetRange()))
 			results.AppendPredecessor(val, frame.WithPredecessorContext("str-lower"))
 			vals = append(vals, results)
 			return nil
@@ -69,7 +69,7 @@ var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 		}
 		if val.IsConstInst() {
 			ss := codec.AnyToString(val.GetConstValue())
-			results := val.NewValue(ssa.NewConst(strings.ToUpper(ss)))
+			results := val.NewValue(ssa.NewConstWithRange(strings.ToUpper(ss), val.GetRange()))
 			results.AppendPredecessor(val, frame.WithPredecessorContext("str-upper"))
 			vals = append(vals, results)
 			return nil

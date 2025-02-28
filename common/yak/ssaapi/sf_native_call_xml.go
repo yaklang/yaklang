@@ -2,6 +2,9 @@ package ssaapi
 
 import (
 	"encoding/xml"
+	"regexp"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -9,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/xml2"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"regexp"
-	"strings"
 )
 
 var (
@@ -127,8 +128,7 @@ func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng memedi
 	if editor == nil {
 		return results
 	}
-	fileName := ssa.NewConst(editor.GetFilename())
-	fileName.SetRange(rng)
+	fileName := ssa.NewConstWithRange(rng.GetText(), rng)
 	fileVal := prog.NewValue(fileName)
 	results.AppendPredecessor(fileVal, frame.WithPredecessorContext("mybatis-${...}"))
 	return results
