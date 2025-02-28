@@ -8,7 +8,7 @@ desc(
 TEXT
 )
 
-/^(file_get_contents|file|readfile|fgetss|fgets|fread)$/ as $output
+/^(file_get_contents|file|readfile|fgetss|fgets|fread|fgetc|stream_get_line|fscanf)$/ as $output
 
 alert $output
 

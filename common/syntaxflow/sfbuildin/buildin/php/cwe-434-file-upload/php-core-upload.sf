@@ -1,0 +1,16 @@
+desc(
+    title: "",
+    title_zh: "",
+    desc: <<<CODE
+
+CODE
+)
+<include('php-filter-function')> as $filter
+
+<include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
+<include('php-file-write')> as $functions
+
+move_uploaded_file(* as $source)
+.move?{<getFunction><getCurrentBlueprint><fullTypeName>?{have: "Controller"}} as $source
+.putFile<getObject>

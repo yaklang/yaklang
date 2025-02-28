@@ -8,23 +8,34 @@ desc(
 TEXT
 )
 
-input() as $param
-$param as $output
-check $output
+input() as $sink
+I() as $sink
+./param|request|server|cookie|get|post|only|except|file/ as $function
+$function?{<getObject>?{opcode: call && any: "Request"}} as $sink
+$function?{<getObject>?{any: "Request","request"}} as $sink
+$sink?{<getFunc><getCurrentBlueprint><fullTypeName>?{have: "Controller"}}  as $output
 alert $output
 
 desc(
     lang: php,
-    alert_min: '3',
+    alert_min: '10',
     'file://param.php': <<<PARAM
 <?php
-    input('get.name','','htmlspecialchars'); // 获取get变量 并用htmlspecialchars函数过滤
-    input('username','','strip_tags'); // 获取param变量 并用strip_tags函数过滤
-    input('post.name','','org\Filter::safeHtml'); // 获取post变量 并用org\Filter类的safeHtml方法过滤
-    input('get.id/d');
-    input('post.name/s');
-    input('post.ids/a');
-    input('get.');
-    input('name');
+    class A extends BaseController{
+        public function index(){
+            $id = $this->request->param('id');
+            $name = $this->request->param('name');
+            $age = $this->request->param('age');
+            input('get.name','','htmlspecialchars'); // 获取get变量 并用htmlspecialchars函数过滤
+            input('username','','strip_tags'); // 获取param变量 并用strip_tags函数过滤
+            input('post.name','','org\Filter::safeHtml'); // 获取post变量 并用org\Filter类的safeHtml方法过滤
+            input('get.id/d');
+            input('post.name/s');
+            input('post.ids/a');
+            input('get.');
+            input('name');
+            Request::instance()->param("name");
+    }
+    }
 PARAM
 )

@@ -1,0 +1,90 @@
+desc(
+    title: "Server-Side Request Forgery (SSRF)",
+    title_zh: "SSRF漏洞，旨在获取内部服务信息或数据, 通过未经过滤的URL参数，攻击者可以探测内部服务或获取敏感数据",
+    risk: "ssrf",
+    desc: <<<TEXT
+检测到网络请求函数（curl_setopt/fsockopen/file_get_contents等）的参数未经过充分过滤验证。当参数包含未经验证的用户输入时，可能引发SSRF攻击导致内部服务探测或数据泄露。建议对URL参数进行协议白名单校验和域名限制。
+TEXT
+)
+
+/^curl_init|curl_setopt|curl_exec|curl_close|fsockopen|file_get_contents$/ as $curlFunction;
+
+check $curlFunction;
+alert $curlFunction for{
+    title: "",
+    title_zh: "",
+    level: "low",
+}
+
+/$curl_setopt|fsockopen|file_get_contents^/as $ssrfFunction
+
+<include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
+
+$ssrfFunction #{
+    include: `<self> & $params`,
+    exclude: `*?{opcode: call}`,
+}-> as $high_risk
+
+alert $high_risk for {
+       title: 'Unvalidated SSRF Parameter Injection',
+       title_zh: 'SSRF未验证参数注入风险',
+       level: 'high',
+}
+
+$ssrfFunction #{
+    include: `<self> & $params`,
+    exclude: `*?{opcode: call && !<self><getCaller> & $filter}`,
+}-> as $mid_risk
+
+alert $mid_risk for {
+    title: 'Insufficient SSRF Parameter Filtering',
+    title_zh: 'SSRF参数过滤不充分',
+    level: 'mid',
+}
+
+$ssrfFunction #{
+    include: `<self> & $params`,
+    include: `*?{opcode: call && <self><getCaller> & $filter}`,
+}-> as $low_risk
+
+alert $low_risk for {
+    title: 'Potential SSRF Access Control Bypass',
+    title_zh: 'SSRF访问控制潜在绕过风险',
+    level: 'low',
+}
+
+desc(
+    lang: "php",
+    alert_min: 2,
+    "file:///curl.php": <<<TEXT
+<?php
+function curl($url){
+    $ch = curl_init();
+    curl_setopt($ch,CURLOPT_URL,$url);
+    #curl_setopt($ch,CUPLOPT_HEADER,1);
+    curl_exec($ch);
+    curl_close($ch);
+}
+$url = $_GET['url'];
+curl($url);
+?>
+TEXT
+   "file:///fsockopen.php": <<<TEXT
+   <?php
+   $host=$_GET['url'];
+   $fp = fsockopen("$host", 80, $errno, $errstr, 30);
+   if (!$fp) {
+       echo "$errstr ($errno)<br />\n";
+   } else {
+       $out = "GET / HTTP/1.1\r\n";
+       $out .= "Host: $host\r\n";
+       $out .= "Connection: Close\r\n\r\n";
+       fwrite($fp, $out);
+       while (!feof($fp)) {
+           echo fgets($fp, 128);
+       }
+       fclose($fp);
+   }?>
+TEXT
+)
