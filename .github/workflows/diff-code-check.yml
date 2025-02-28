@@ -88,8 +88,8 @@ jobs:
           ./yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip
           ./yak ssa -t ./fs.zip --program diffcode -l golang > log.txt 2>&1 || { echo "compile_fail=true" >> $GITHUB_ENV; exit 1; }
           grep -F "Current goroutine call stack:" log.txt && { echo "compile_fail=true" >> $GITHUB_ENV; exit 1; }
-          ./yak sf --program diffcode ./common/ssa_bootstrapping/ci_rule || { echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1; }
-          ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang || { echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1; }
+          ./yak sf --program diffcode ./common/ssa_bootstrapping/ci_rule --output debug.txt || { echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1; }
+          ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang --output debug.txt || { echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1; }
         # ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule --exclude-file *.pb.go > log.txt 2>&1 || exit 1
           
       - name: Upload fail log
@@ -99,6 +99,13 @@ jobs:
           name: log.txt
           path: log.txt
 
+      - name: Upload debug log
+        if: ${{env.compile_fail == 'true'}}
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug.txt
+          path: debug.txt
+
       - name: Upload database
         if: ${{env.syntaxflow_fail == 'true'}}
         uses: actions/upload-artifact@v4
@@ -106,9 +113,10 @@ jobs:
           name: default-yakssa.db
           path: /home/runner/yakit-projects/default-yakssa.db
 
-      - name: Fail
+      - name: Workflows Fail
         run: |
           if [ "${{ env.syntaxflow_fail }}" == "true" ]; then
+            cat debug.txt
             exit 1
           elif [ "${{ env.compile_fail }}" == "true" ]; then
             exit 1
