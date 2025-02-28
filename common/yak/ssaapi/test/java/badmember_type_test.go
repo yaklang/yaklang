@@ -37,7 +37,7 @@ public class FastJSONDemoController {
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
 		prog.Show()
-		results := prog.SyntaxFlowChain(`.getParameter()?{<getCaller><getObject><fullTypeName>?{have: servlet} && <getFunc><getObject>.annotation.*Mapping} as $dynamicParams`, ssaapi.QueryWithEnableDebug(true))
+		results := prog.SyntaxFlowChain(`.getParameter()?{<getCallee><getObject><fullTypeName>?{have: servlet} && <getFunc><getObject>.annotation.*Mapping} as $dynamicParams`, ssaapi.QueryWithEnableDebug(true))
 		assert.Equal(t, 1, len(results))
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))

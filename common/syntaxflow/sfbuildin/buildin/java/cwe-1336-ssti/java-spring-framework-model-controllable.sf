@@ -20,7 +20,7 @@ $returns #{
     until: `* & $param as $source`,
 }->;
 $source<dataflow(exclude=<<<CODE
-*<show>?{opcode: call && <getCaller><name>?{!have: "ModelAndView"}}
+*<show>?{opcode: call && <getCallee><name>?{!have: "ModelAndView"}}
 CODE)> as $filteredSource
 <delete(param)>
 alert $filteredSource for {

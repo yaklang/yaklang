@@ -16,13 +16,13 @@ HttpOptions as $methods;
 HttpHead as $methods;
 HttpTrace as $methods;
 
-$methods?{<getCall>?{<getCall><getCaller><getObject>?{.execute}}}(,* as $output);
+$methods?{<getCall>?{<getCall><getCallee><getObject>?{.execute}}}(,* as $output);
 <delete(methods)>
 
-BasicHttpRequest?{<getCall>?{<getCall><getCaller><getObject>?{.execute}}}(,,* as $output);
+BasicHttpRequest?{<getCall>?{<getCall><getCallee><getObject>?{.execute}}}(,,* as $output);
 
 
-// $obj?{<getCall><getCaller><getObject>?{.execute}} as $rightObj;
+// $obj?{<getCall><getCallee><getObject>?{.execute}} as $rightObj;
 
 <delete(obj)>
 alert $output;

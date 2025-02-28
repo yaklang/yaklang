@@ -1,11 +1,12 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestChainMemberCall(t *testing.T) {
@@ -27,10 +28,10 @@ until: <<<UNTIL
 UNTIL
 }->);
 $vuln<dataflow(<<<CODE
-*?{opcode:call}<getCaller>?{<name>?{have:'concat'}}(,* as $a) as $concatA ;
+*?{opcode:call}<getCallee>?{<name>?{have:'concat'}}(,* as $a) as $concatA ;
 CODE)>
-$concatA<getCall><getCaller>(,* as $b) as $concatB;
-$concatB<getCall><getCaller>(,* as $c);
+$concatA<getCall><getCallee>(,* as $b) as $concatB;
+$concatB<getCall><getCallee>(,* as $c);
 $a + $b + $c as $info;
 $concatA + $concatB as $concat;
 check $concat; check $info; $info<show>

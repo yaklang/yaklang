@@ -19,7 +19,7 @@ $query #{
     until: `* & $params`,
 }-> as $root;
 $root?{!<dataflow(<<<CODE
-*?{opcode: call && <getCaller><name>?{have: ldap_escape}} as $__next__;
+*?{opcode: call && <getCallee><name>?{have: ldap_escape}} as $__next__;
 CODE)>} as $result;
 alert $result for {
     title: 'php ldap direct injection without filter',

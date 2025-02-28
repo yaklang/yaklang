@@ -12,7 +12,7 @@ TEXT
 check $params;
 $params?{opcode: const && <string>?{any: disposition,Disposition} } as $flag;
 check $flag;
-$flag<getCall><getCaller> as $sink;
+$flag<getCall><getCallee> as $sink;
 check $sink;
 alert $sink for "Config Download filename Position";
 

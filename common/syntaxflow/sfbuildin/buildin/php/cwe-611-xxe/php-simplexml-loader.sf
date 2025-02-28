@@ -8,7 +8,7 @@ desc(
 TEXT
 )
 
-LIBXML_NOENT <getCall> <getCaller> <name> ?{have: simplexml_load_string} as $vuln;
+LIBXML_NOENT <getCall> <getCallee> <name> ?{have: simplexml_load_string} as $vuln;
 check $vuln;
 alert $vuln;
 

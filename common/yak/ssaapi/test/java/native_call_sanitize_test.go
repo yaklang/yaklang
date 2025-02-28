@@ -1,10 +1,11 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestSanitizeNameFetching(t *testing.T) {
@@ -39,7 +40,7 @@ CODE,
 }->;
 $source<show>
 $source<dataflow(<<<CODE
-*?{opcode: call && <getCaller><name><show><isSanitizeName>} as $__next__
+*?{opcode: call && <getCallee><name><show><isSanitizeName>} as $__next__
 CODE)> as $haveCall;
 alert $haveCall;
 `)
