@@ -888,8 +888,11 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		if err != nil {
 			return nil, fmt.Errorf("dump method %s failed, %w", name, err)
 		}
+		accessFlagsVerbose, _ := getMethodAccessFlagsVerbose(method.AccessFlags)
 		if strings.TrimSpace(res.bodyCode) == "" {
-			continue
+			if !slices.Contains(accessFlagsVerbose, "abstract") && !slices.Contains(accessFlagsVerbose, "annotation") && !slices.Contains(accessFlagsVerbose, "interface") && !slices.Contains(accessFlagsVerbose, "enum") {
+				continue
+			}
 		}
 		result = append(result, res)
 	}
