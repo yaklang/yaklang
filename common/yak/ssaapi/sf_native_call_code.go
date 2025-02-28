@@ -89,7 +89,7 @@ func nativeCallSourceCode(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfv
 		if text == "" {
 			return nil
 		}
-		result := prog.NewValue(ssa.NewConst(text))
+		result := prog.NewValue(ssa.NewConstWithRange(text, r))
 		result.AppendPredecessor(val, frame.WithPredecessorContext("source-code"))
 		vals = append(vals, result)
 		return nil
