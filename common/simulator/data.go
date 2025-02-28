@@ -13,14 +13,14 @@ var ElementProperty = []string{
 var ElementKeyword = append(ElementAttribute, ElementProperty...)
 
 var usernameKeyword = []string{
-	"username", "admin", "account",
+	"username", "admin", "account", "uname",
 	"用户名", "账户名", "账号",
 	"telephone", "email",
 	"手机", "电话", "邮箱",
 }
 
 var simpleUsernameKeyword = []string{
-	"user", "admin", "tele", "email", "account",
+	"user", "admin", "tele", "email", "account", "uname",
 	"用户", "账户", "账号", "手机", "电话", "邮箱",
 }
 
