@@ -391,7 +391,7 @@ var SSACompilerCommands = []*cli.Command{
 			log.Infof("finished compiling..., results: %v", len(proj))
 			if syntaxFlow != "" {
 				log.Warn("Deprecated: syntax flow query language will be removed in ssa sub-command, please use `ssa-query(in short: sf/syntaxFlow)` instead")
-				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
+				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, false, withCode)
 			}
 			return nil
 		},
@@ -701,6 +701,7 @@ var SSACompilerCommands = []*cli.Command{
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
 			filename := c.String("output")
+			debugInfo := false
 
 			// set database
 			if databaseDialect != "" {
@@ -766,12 +767,12 @@ var SSACompilerCommands = []*cli.Command{
 			}()
 
 			if syntaxFlow != "" {
-				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
+				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, debugInfo, sarifCallback)
 			}
 
 			var dirChecking []string
 			handleBySyntaxFlowContent := func(syntaxFlow string) error {
-				err := SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
+				err := SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, debugInfo, sarifCallback)
 				if err != nil {
 					return err
 				}
@@ -791,6 +792,7 @@ var SSACompilerCommands = []*cli.Command{
 			var file *os.File
 			if filename != "" {
 				var err error
+				debugInfo = true
 				file, err = os.OpenFile("debug.txt", os.O_WRONLY|os.O_CREATE, 0644)
 				if err != nil {
 					log.Warnf("create file failed: %v", err)
@@ -801,14 +803,13 @@ var SSACompilerCommands = []*cli.Command{
 			var ruleError error
 			addError := func(err error, result *ssaapi.SyntaxFlowResult) {
 				ruleName := result.Name()
-				debugInfo := result.GetRule().DeBugInfo
 				if ruleError == nil {
 					ruleError = fmt.Errorf("Fail syntaxRule name: [%s], Reason: %s\n", ruleName, err)
 				} else {
 					ruleError = fmt.Errorf("%w\nFail syntaxRule name: [%s], Reason: %s\n", ruleError, ruleName, err)
 				}
 				if file != nil {
-					io.WriteString(file, fmt.Errorf("Fail syntaxRule name: [%s], Reason: %s\n", ruleName, err).Error()+debugInfo)
+					io.WriteString(file, fmt.Errorf("Fail syntaxRule name: [%s], Reason: %s\n", ruleName, err).Error()+result.GetSFResult().GetDebugInfo())
 				}
 			}
 
@@ -921,7 +922,7 @@ var SSACompilerCommands = []*cli.Command{
 func SyntaxFlowQuery(
 	programName string, // 程序名称
 	syntaxFlow string, // 语法流
-	dbDebug, sfDebug, showDot, withCode bool, // 是否开启数据库调试、语法流调试、显示dot、显示代码
+	dbDebug, sfDebug, showDot, withCode, debugInfo bool, // 是否开启数据库调试、语法流调试、显示dot、显示代码
 	callbacks ...func(*ssaapi.SyntaxFlowResult), // 回调函数
 ) error {
 	// 捕获panic
@@ -946,6 +947,9 @@ func SyntaxFlowQuery(
 	opt := make([]ssaapi.QueryOption, 0)
 	if sfDebug {
 		opt = append(opt, ssaapi.QueryWithEnableDebug())
+	}
+	if debugInfo {
+		opt = append(opt, ssaapi.QueryWithDebugInfo())
 	}
 	var execError error
 	result, err := prog.SyntaxFlowWithError(syntaxFlow, opt...)
