@@ -35,9 +35,9 @@ const (
 	// NativeCall_GetCall is used to get the call of a value, generally used to get the call of an opcode
 	NativeCall_GetCall = "getCall"
 
-	// NativeCall_GetCaller is used to get the caller of a value
+	// NativeCall_GetCallee is used to get the caller of a value
 	// find the caller instruction which contains the value
-	NativeCall_GetCaller = "getCaller"
+	NativeCall_GetCallee = "getCallee"
 
 	// NativeCall_SearchFunc is used to search the call of a value, generally used to search the call of a function
 	// if the input is a call already, check the 'call' 's method(function) 's other call(search mode)
@@ -128,7 +128,7 @@ const (
 	// NativeCall_DataFlow is used to get data flow
 	// if u want to fetch dataflow, call <dataflow...> after --> or #->
 	// use it like: $data<dataflow(<<<CODE
-	// *?{opcode: call && <getCaller><name>?{name} }
+	// *?{opcode: call && <getCallee><name>?{name} }
 	// CODE)>
 	NativeCall_DataFlow = "dataflow"
 
@@ -853,7 +853,7 @@ func init() {
 	)
 
 	registerNativeCall(
-		NativeCall_GetCaller,
+		NativeCall_GetCallee,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
@@ -865,7 +865,7 @@ func init() {
 				if val.IsCall() {
 					call := val.GetCallee()
 					if call != nil {
-						call.AppendPredecessor(val, frame.WithPredecessorContext("getCaller"))
+						call.AppendPredecessor(val, frame.WithPredecessorContext("getCallee"))
 						vals = append(vals, call)
 					}
 				}

@@ -16,7 +16,7 @@ check $params;
 
 // support StringBuilder
 // from `strBuilder.toString()` to `strBuilder.append($appendParams)` 
-$params<getCaller>?{<name>?{have:toString}}<getObject>.append(, * as $appendParams)
+$params<getCallee>?{<name>?{have:toString}}<getObject>.append(, * as $appendParams)
 
 $params<getFunc>(* as $limited)
 

@@ -13,7 +13,7 @@ PatchMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
 OptionsMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
 HeadMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
 TraceMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
-$methods?{<getCall>?{<getCall><getCaller><getObject>?{.executeMethod}}}(,* as $output);
+$methods?{<getCall>?{<getCall><getCallee><getObject>?{.executeMethod}}}(,* as $output);
 <delete(methods)>
 alert $output;
 

@@ -28,7 +28,7 @@ alert $high for {
 
 $query #{
     include: `<self> & $params`,
-    include: `<self>?{opcode: call && !<self><getCaller> & $filter}`
+    include: `<self>?{opcode: call && !<self><getCallee> & $filter}`
 }-> as $middle
 
 alert $middle for {
@@ -41,7 +41,7 @@ alert $middle for {
 
 $query #{
     include: `<self> & $params`,
-    include: `<self>?{opcode: call && <self><getCaller> & $filter}`
+    include: `<self>?{opcode: call && <self><getCallee> & $filter}`
 }-> as $low
 
 alert $low for {

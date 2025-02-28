@@ -30,7 +30,7 @@ alert $withoutCall for {
 $haveCall<dataflow(<<<CODE
 * - $haveCall as $other;
 $other?{opcode: call && !opcode: param} as $calls;
-$calls?{<getCaller><name><isSanitizeName>} as $__next__;
+$calls?{<getCallee><name><isSanitizeName>} as $__next__;
 <delete(call)>
 <delete(other)>
 CODE)> as $filteredSink;

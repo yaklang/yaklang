@@ -22,7 +22,7 @@ alert $high for {
 }
 $sink #{
     include: `<self> & $params`,
-    include: `<self>?{opcode: call && !<self><getCaller> & $filter}`
+    include: `<self>?{opcode: call && !<self><getCallee> & $filter}`
 }-> as $mid
 
 alert $mid for {
@@ -33,7 +33,7 @@ alert $mid for {
 }
 $sink #{
     include: `<self> & $params`,
-    include: `<self>?{opcode: call && <self><getCaller> & $filter}`
+    include: `<self>?{opcode: call && <self><getCallee> & $filter}`
 }-> as $low
 
 alert $low for {

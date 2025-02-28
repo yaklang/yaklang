@@ -13,7 +13,7 @@ g"select*" as $sqlConst;
 // 检测 SQL 字符串被传入到了某一个执行函数中，执行函数符合常见的 SQL 执行命名规范
 $sqlConst -{
     until: <<<CODE
-*?{opcode: call && <getCaller><name>?{have: /(?i)(query)|(execut)|(insert)|(native)|(update)/}<show>}<var(sink)> as $__next__;
+*?{opcode: call && <getCallee><name>?{have: /(?i)(query)|(execut)|(insert)|(native)|(update)/}<show>}<var(sink)> as $__next__;
 CODE
 }->;
 check $sink;
