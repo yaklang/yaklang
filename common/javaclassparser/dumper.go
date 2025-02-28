@@ -280,10 +280,22 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 		if err != nil {
 			return nil, err
 		}
-		fieldTypeStr := fieldType.String(c.FuncCtx)
-		c.FuncCtx.Import(fieldTypeStr)
-		lastPacket := c.FuncCtx.ShortTypeName(fieldTypeStr)
 
+		lastPacket := ""
+		if fieldType.IsArray() {
+			javaTyp := fieldType.RawType().(*types.JavaArrayType)
+			fieldTypeStr := javaTyp.JavaType.String(c.FuncCtx)
+			c.FuncCtx.Import(fieldTypeStr)
+			shortName := c.FuncCtx.ShortTypeName(fieldTypeStr)
+			originalType := javaTyp.JavaType
+			javaTyp.JavaType = types.NewJavaClass(shortName)
+			lastPacket = javaTyp.JavaType.String(c.FuncCtx)
+			javaTyp.JavaType = originalType
+		} else {
+			fieldTypeStr := fieldType.String(c.FuncCtx)
+			c.FuncCtx.Import(fieldTypeStr)
+			lastPacket = c.FuncCtx.ShortTypeName(fieldTypeStr)
+		}
 		valueLiteral := ""
 		for _, attr := range field.Attributes {
 			switch ret := attr.(type) {
@@ -643,6 +655,13 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 								c.fieldDefaultValue[v.Member] = ret.JavaValue.String(funcCtx)
 							}
 						}
+					} else if v, ok := ret.LeftValue.(*values.JavaClassMember); ok {
+						if funcCtx.FunctionName == "<cinit>" || v.Name == funcCtx.ClassName {
+							if _, ok := finalFieldMap[v.Member]; ok {
+								foundFieldInit = true
+								c.fieldDefaultValue[v.Member] = ret.JavaValue.String(funcCtx)
+							}
+						}
 					}
 					if !foundFieldInit {
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
@@ -662,7 +681,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					}
 					haveCatch := len(ret.CatchBodies) > 0
 					if !haveCatch {
-						statementStr += "catch(Exception e) { throw e }"
+						statementStr += "catch(Exception e) { throw e; }"
 					}
 				case *statements.WhileStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
@@ -758,7 +777,6 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		}
 		paramsNewStr = strings.Join(paramList, ", ")
 	}
-
 	if isLambda {
 		res := fmt.Sprintf("(%s) -> {%s", paramsNewStr, code)
 		res += strings.Repeat("\t", c.TabNumber()) + "}"
@@ -863,12 +881,15 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
 			continue
 		}
-		// if name != "scope" {
+		// if name != "isSymlink" {
 		// 	continue
 		// }
 		res, err := c.DumpMethod(name, descriptor)
 		if err != nil {
 			return nil, fmt.Errorf("dump method %s failed, %w", name, err)
+		}
+		if strings.TrimSpace(res.bodyCode) == "" {
+			continue
 		}
 		result = append(result, res)
 	}
