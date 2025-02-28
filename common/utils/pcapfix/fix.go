@@ -1,10 +1,12 @@
 package pcapfix
 
 import (
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/permutil"
+	"github.com/yaklang/yaklang/common/utils/privileged"
 	"os"
 	"os/exec"
 	"os/user"
@@ -57,9 +59,9 @@ func Fix() error {
 			cmd := `dscl . create /Groups/access_bpf gid 101 &&` +
 				` chgrp access_bpf /dev/bpf* && chmod g+rw /dev/bpf* &&` +
 				` dscl . append /Groups/access_bpf GroupMembership ` + strconv.Quote(u.Username)
-			err := permutil.Sudo(cmd, permutil.WithVerbose("create access_bpf(101) for fix pcap permission for user"))
+			output, err := privileged.NewExecutor("fix pcap").Execute(context.Background(), cmd, privileged.WithDescription("create access_bpf(101) for fix pcap permission for user"))
 			if err != nil {
-				return err
+				return utils.Errorf("cannot create group access_bpf: %s ,output: %s", err, output)
 			}
 			return nil
 		}
@@ -95,9 +97,9 @@ func Fix() error {
 			//  check groupmember: dscacheutil -q group -a name access_bpf
 			appendUserToGroupCmd := "dscl . append /Groups/access_bpf GroupMembership " + strconv.Quote(u.Username) + " && chmod g+rw /dev/bpf*"
 			_ = appendUserToGroupCmd
-			err := permutil.Sudo(appendUserToGroupCmd, permutil.WithVerbose(fmt.Sprintf("add group(access_bpf) for %v", strconv.Quote(u.Username))))
+			output, err := privileged.NewExecutor("fix pcap").Execute(context.Background(), appendUserToGroupCmd, privileged.WithDescription(fmt.Sprintf("add group(access_bpf) for %v", strconv.Quote(u.Username))))
 			if err != nil {
-				return err
+				return utils.Errorf("cannot add group access_bpf: %s ,output: %s", err, output)
 			}
 			return nil
 		}

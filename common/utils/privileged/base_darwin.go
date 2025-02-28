@@ -1,6 +1,7 @@
 package privileged
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -20,16 +21,21 @@ type Executor struct {
 func NewExecutor(appName string) *Executor {
 	return &Executor{
 		AppName:       appName,
-		DefaultPrompt: "此操作需要管理员权限",
+		DefaultPrompt: "this operation requires administrator privileges",
 	}
 }
 
-func (p *Executor) Execute(opts ExecuteOptions) ([]byte, error) {
-	if opts.Title == "" {
-		opts.Title = p.AppName
+func (p *Executor) Execute(ctx context.Context, cmd string, opts ...ExecuteOption) ([]byte, error) {
+	config := DefaultExecuteConfig()
+	for _, opt := range opts {
+		opt(config)
 	}
-	if opts.Prompt == "" {
-		opts.Prompt = p.DefaultPrompt
+
+	if config.Title == "" {
+		config.Title = p.AppName
+	}
+	if config.Prompt == "" {
+		config.Prompt = p.DefaultPrompt
 	}
 
 	script := fmt.Sprintf(`
@@ -91,10 +97,10 @@ tell application "System Events"
 	else
 		error "用户取消操作"
 	end if
-end tell`, hex.EncodeToString([]byte(opts.Title)), hex.EncodeToString([]byte(opts.Description)), hex.EncodeToString([]byte(opts.Command)), hex.EncodeToString([]byte(opts.Prompt)))
+end tell`, hex.EncodeToString([]byte(config.Title)), hex.EncodeToString([]byte(config.Description)), hex.EncodeToString([]byte(cmd)), hex.EncodeToString([]byte(config.Prompt)))
 
-	cmd := exec.Command("osascript", "-e", script)
-	output, err := cmd.CombinedOutput()
+	cmder := exec.CommandContext(ctx, "osascript", "-e", script)
+	output, err := cmder.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("privileged execution failed: %v, output: %s", err, output)
 	}
