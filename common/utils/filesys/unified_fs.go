@@ -1,10 +1,10 @@
 package filesys
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -83,9 +83,8 @@ func (u *UnifiedFS) Ext(name string) string {
 }
 
 func (u *UnifiedFS) Exists(name string) (bool, error) {
-	realPath := u.convertToRealPath(name)
-	_, err := u.Open(realPath)
-	return err == nil, err
+	realPath, _ := u.convertToRealPath(name)
+	return u.fs.Exists(realPath)
 }
 
 func (u *UnifiedFS) IsAbs(name string) bool {
@@ -95,45 +94,45 @@ func (u *UnifiedFS) IsAbs(name string) bool {
 func (u *UnifiedFS) Getwd() (string, error) { return ".", nil }
 
 func (u *UnifiedFS) Stat(name string) (fs.FileInfo, error) {
-	realPath := u.convertToRealPath(name)
+	realPath, _ := u.convertToRealPath(name)
 	info, err := u.fs.Stat(realPath)
 	if err != nil {
 		return nil, err
 	}
-	_, realName := u.PathSplit(name)
+	_, virtualName := u.PathSplit(name)
 	return &UnifiedFileInfo{
 		FileInfo: info,
-		name:     realName,
+		name:     virtualName,
 	}, nil
 }
 func (u *UnifiedFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
-	realPath := u.convertToRealPath(name)
+	realPath, _ := u.convertToRealPath(name)
 	file, err := u.fs.OpenFile(realPath, flag, perm)
 	if err != nil {
 		return nil, err
 	}
+	_, virtualName := u.PathSplit(name)
 	return &UnifiedFile{
-		File:     file,
-		u:        u,
-		realPath: realPath,
+		File: file,
+		name: virtualName,
 	}, nil
 }
 
 func (u *UnifiedFS) Open(name string) (fs.File, error) {
-	realPath := u.convertToRealPath(name)
+	realPath, _ := u.convertToRealPath(name)
 	file, err := u.fs.Open(realPath)
 	if err != nil {
 		return nil, err
 	}
+	_, virtualName := u.PathSplit(name)
 	return &UnifiedFile{
-		File:     file,
-		u:        u,
-		realPath: realPath,
+		File: file,
+		name: virtualName,
 	}, nil
 }
 
 func (u *UnifiedFS) ReadFile(name string) ([]byte, error) {
-	realPath := u.convertToRealPath(name)
+	realPath, _ := u.convertToRealPath(name)
 	return u.fs.ReadFile(realPath)
 }
 
@@ -142,84 +141,88 @@ func (u *UnifiedFS) ExtraInfo(s string) map[string]any {
 }
 
 func (u *UnifiedFS) Rename(old string, new string) error {
-	oldPath := u.convertToRealPath(old)
-	newPath := u.convertToRealPath(new)
+	oldPath, err := u.convertToRealPath(old)
+	if err != nil {
+		return err
+	}
+	newPath, err := u.convertToRealPath(new)
+	if err != nil {
+		return err
+	}
 	return u.fs.Rename(oldPath, newPath)
 }
 
 func (u *UnifiedFS) WriteFile(name string, data []byte, perm os.FileMode) error {
-	realPath := u.convertToRealPath(name)
+	realPath, _ := u.convertToRealPath(name)
 	return u.fs.WriteFile(realPath, data, perm)
 }
 
 func (u *UnifiedFS) Delete(name string) error {
-	realPath := u.convertToRealPath(name)
+	realPath, _ := u.convertToRealPath(name)
 	return u.fs.Delete(realPath)
 }
 
 func (u *UnifiedFS) MkdirAll(name string, perm os.FileMode) error {
-	realPath := u.convertToRealPath(name)
+	realPath, _ := u.convertToRealPath(name)
 	return u.fs.MkdirAll(realPath, perm)
 }
 
 func (u *UnifiedFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	realPath := u.convertToRealPath(name)
-
-	// 获取原始目录条目
+	realPath, _ := u.convertToRealPath(name)
 	entries, err := u.fs.ReadDir(realPath)
 	if err != nil {
 		return nil, err
 	}
-
-	// 转换每个条目
 	unifiedEntries := make([]fs.DirEntry, 0, len(entries))
 	for _, entry := range entries {
-		// 构造完整真实路径
-		fullRealPath := u.fs.Join(realPath, entry.Name())
-
+		entry.Name()
 		unifiedEntries = append(unifiedEntries, &UnifiedDirEntry{
 			DirEntry: entry,
-			u:        u,
-			realPath: fullRealPath,
+			name:     u.convertToVirtualPath(entry.Name()),
 		})
 	}
-
 	return unifiedEntries, nil
 }
 
-func (u *UnifiedFS) convertToRealPath(name string) string {
-	pathComponents := strings.Split(name, string(u.config.Separator))
-	realPath := u.fs.Join(pathComponents...)
+func (u *UnifiedFS) convertToRealPath(name string) (string, error) {
+	allPath := strings.Split(name, string(u.GetSeparators()))
+	realPath := u.fs.Join(allPath...)
+	// 真实的文件系统存在 realFileName.VirtualExt
+	exist, err := u.fs.Exists(realPath)
+	if err == nil && exist {
+		return realPath, utils.Error("convert virtual ext to real ext failed, file already exists")
+	}
 
-	ext := filepath.Ext(realPath)
+	ext := u.fs.Ext(realPath)
 	if ext == "" {
-		return realPath
+		return realPath, nil
 	}
-	if virtualExt, ok := u.config.inputExtMap[ext]; ok {
-		realPath = strings.TrimSuffix(realPath, ext) + virtualExt
+	if realExt, ok := u.config.inputExtMap[ext]; ok {
+		realPath = strings.TrimSuffix(realPath, ext) + realExt
 	}
-	return realPath
+	return realPath, nil
+}
+
+func (u *UnifiedFS) convertToVirtualPath(name string) string {
+	allPath := strings.Split(name, string(u.fs.GetSeparators()))
+	virtualPath := u.Join(allPath...)
+	ext := u.Ext(virtualPath)
+	if ext == "" {
+		return virtualPath
+	}
+	if virtualExt, ok := u.config.outputExtMap[ext]; ok {
+		virtualPath = strings.TrimSuffix(virtualPath, ext) + virtualExt
+	}
+	return virtualPath
 }
 
 type UnifiedDirEntry struct {
 	fs.DirEntry
-	u        *UnifiedFS
-	realPath string
+	name string
 }
 
 func (e *UnifiedDirEntry) Name() string {
-	// 应用反向转换规则（存储名 → 虚拟名）
-	base := e.DirEntry.Name()
-	ext := getExtension(base)
-	// 如果是目录则直接返回
-	if e.IsDir() {
-		return base
-	}
-	// 查找反向映射
-	if originalExt, ok := e.u.config.outputExtMap[ext]; ok {
-		return strings.TrimSuffix(base, ext) + originalExt
-	}
-	return base
+	return e.name
 }
 
 func (e *UnifiedDirEntry) Info() (fs.FileInfo, error) {
@@ -242,26 +245,13 @@ func (i *UnifiedFileInfo) Name() string {
 	return i.name
 }
 
-// UnifiedFile 是一个包装器，用于在 fs.File 上应用虚拟路径映射
 type UnifiedFile struct {
 	fs.File
-	u        *UnifiedFS
-	realPath string
+	name string
 }
 
 func (f *UnifiedFile) Name() string {
-	// 获取原始文件名
-	base := filepath.Base(f.realPath)
-	ext := getExtension(base)
-	if ext == "" {
-		return base
-	}
-
-	// 查找反向映射规则
-	if virtualExt, ok := f.u.config.outputExtMap[ext]; ok {
-		return strings.TrimSuffix(base, ext) + virtualExt
-	}
-	return base
+	return f.name
 }
 
 func (f *UnifiedFile) Stat() (fs.FileInfo, error) {
