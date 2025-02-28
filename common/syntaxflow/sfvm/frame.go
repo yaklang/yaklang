@@ -1203,16 +1203,17 @@ func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 }
 
 func (s *SFFrame) debugLog(i string, item ...any) {
-	if !s.config.debug {
-		return
-	}
-
+	rule := s.GetRule()
 	filterStackLen := s.statementStack.Len()
 
 	prefix := strings.Repeat(" ", filterStackLen)
 	prefix = "sf" + fmt.Sprintf("%4d", s.idx) + "| " + prefix
 	for _, line := range strings.Split(fmt.Sprintf(i, item...), "\n") {
-		fmt.Print(prefix + line + "\n")
+		str := fmt.Sprint(prefix + line + "\n")
+		if s.config.debug {
+			fmt.Print(str)
+		}
+		rule.DeBugInfo += str
 	}
 }
 

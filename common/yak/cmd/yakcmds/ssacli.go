@@ -683,6 +683,10 @@ var SSACompilerCommands = []*cli.Command{
 			cli.StringFlag{
 				Name: "sarif,sarif-export,o", Usage: "export SARIF format to files",
 			},
+			cli.StringFlag{
+				Name:  "output",
+				Usage: "output filename",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			if ret, err := log.ParseLevel(c.String("log")); err == nil {
@@ -696,6 +700,7 @@ var SSACompilerCommands = []*cli.Command{
 			syntaxFlow := c.String("syntaxflow")
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
+			filename := c.String("output")
 
 			// set database
 			if databaseDialect != "" {
@@ -783,12 +788,27 @@ var SSACompilerCommands = []*cli.Command{
 				return handleBySyntaxFlowContent(string(raw))
 			}
 
+			var file *os.File
+			if filename != "" {
+				var err error
+				file, err = os.OpenFile("debug.txt", os.O_WRONLY|os.O_CREATE, 0644)
+				if err != nil {
+					log.Warnf("create file failed: %v", err)
+				}
+				defer file.Close()
+			}
+
 			var ruleError error
-			addError := func(err error, ruleName string) {
+			addError := func(err error, result *ssaapi.SyntaxFlowResult) {
+				ruleName := result.Name()
+				debugInfo := result.GetRule().DeBugInfo
 				if ruleError == nil {
-					ruleError = fmt.Errorf("execute syntaxRule[%s] fail,reason: %s", ruleName, err)
+					ruleError = fmt.Errorf("Fail syntaxRule name: [%s], Reason: %s\n", ruleName, err)
 				} else {
-					ruleError = fmt.Errorf("%w\n,execute syntaxRule[%s] fail,reason: %s", ruleError, ruleName, err)
+					ruleError = fmt.Errorf("%w\nFail syntaxRule name: [%s], Reason: %s\n", ruleError, ruleName, err)
+				}
+				if file != nil {
+					io.WriteString(file, fmt.Errorf("Fail syntaxRule name: [%s], Reason: %s\n", ruleName, err).Error()+debugInfo)
 				}
 			}
 
@@ -798,8 +818,11 @@ var SSACompilerCommands = []*cli.Command{
 				}
 				values := result.GetAlertValues()
 				if values.Len() != 0 {
-					addError(errors.New("alert number is not null"), result.Name())
 					result.Show()
+					if file != nil {
+						io.WriteString(file, result.String()+"\n")
+					}
+					addError(errors.New("alert number is not null"), result)
 				}
 			}
 
