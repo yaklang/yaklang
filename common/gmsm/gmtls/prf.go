@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"hash"
 
+	circlPki "github.com/cloudflare/circl/pki"
 	"github.com/yaklang/yaklang/common/gmsm/sm3"
 )
 
@@ -214,8 +215,14 @@ func lookupTLSHash(signatureAlgorithm SignatureScheme) (crypto.Hash, error) {
 		return crypto.SHA384, nil
 	case PKCS1WithSHA512, PSSWithSHA512, ECDSAWithP521AndSHA512:
 		return crypto.SHA512, nil
+	case Ed25519:
+		return directSigning, nil
 	default:
-		return 0, fmt.Errorf("tls: unsupported signature algorithm: %#04x", signatureAlgorithm)
+		scheme := circlPki.SchemeByTLSID(uint(signatureAlgorithm))
+		if scheme == nil {
+			return 0, fmt.Errorf("tls: unsupported signature algorithm: %#04x", signatureAlgorithm)
+		}
+		return 0, nil
 	}
 }
 func newFinishedHash(version uint16, cipherSuite *cipherSuite) finishedHash {
