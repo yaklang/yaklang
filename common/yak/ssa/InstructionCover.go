@@ -63,6 +63,7 @@ func ToConst(v Instruction) (*ConstInst, bool) {
 	return c, ok
 }
 
+func IsPhi(v Instruction) bool { _, ok := ToPhi(v); return ok }
 func ToPhi(v Instruction) (*Phi, bool) {
 	if lz, isLZ := ToLazyInstruction(v); isLZ {
 		return ToPhi(lz.Self())

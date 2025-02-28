@@ -16,7 +16,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 
 	// replace object member-call
 	if v.IsObject() {
-		for index, member := range v.GetAllMember() {
+		replace := func(index, member Value) {
 			// replace this member object to to
 			key := member.GetKey()
 			// remove this member from v
@@ -65,6 +65,18 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			if !member.IsObject() {
 				ret[name] = memberT
 			}
+		}
+		// call value需要优先替换
+		callMap := make(map[Value]Value)
+		for index, member := range v.GetAllMember() {
+			if _, ok := ToCall(member); ok {
+				callMap[index] = member
+				continue
+			}
+			replace(index, member)
+		}
+		for index, member := range callMap {
+			replace(index, member)
 		}
 	}
 

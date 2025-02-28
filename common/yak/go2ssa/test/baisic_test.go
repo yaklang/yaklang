@@ -393,7 +393,7 @@ func TestStmt_spin(t *testing.T) {
 		`, []string{"3", "phi(a)[2,3]", "phi(a)[1,phi(a)[2,3]]"}, t)
 	})
 
-	// todo 等待pr:https://github.com/yaklang/yaklang/pull/2277
+	// todo
 	t.Run("for Spin side-effect", func(t *testing.T) {
 		t.Skip()
 		test.CheckPrintlnValue(`package A
@@ -417,7 +417,7 @@ func main() {
 		`, []string{"side-effect(2, a)"}, t)
 	})
 
-	// todo 等待pr:https://github.com/yaklang/yaklang/pull/2277
+	// todo
 	t.Run("for Spin side-effect and function assignment", func(t *testing.T) {
 		t.Skip()
 		test.CheckPrintlnValue(`package A
@@ -440,6 +440,32 @@ func main() {
 	}
 }
 		`, []string{"side-effect(1, a)"}, t)
+	})
+
+	t.Run("for Spin memberCall", func(t *testing.T) {
+		test.CheckPrintlnValueContain(`package A
+
+		type T struct {
+		    a, b int
+		}
+
+		func (t* T)add() int {
+			return t.a + t.b
+		}
+
+		func main() {
+			t := &T{1, 2}
+
+		    for i := 0; i < 10; i++ {
+		        t.a = t.add()
+				t.b = t.add()
+		    }
+
+			println(t.a)
+			println(t.b)
+		}
+		`, []string{"[1,Undefined-t.add(valid)(make(struct {number,number})) member[1,2]]",
+			"[2,Undefined-t.add(valid)(make(struct {number,number})) member[1,2]]"}, t)
 	})
 }
 
