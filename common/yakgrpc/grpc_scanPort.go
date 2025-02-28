@@ -38,8 +38,8 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 		return utils.Errorf("create temp target file failed: %s", err)
 	}
 	raw, _ := ioutil.ReadFile(req.GetTargetsFile())
-	targetsLineFromFile := utils.PrettifyListFromStringSplited(string(raw), "\n")
-	targetsLine := utils.PrettifyListFromStringSplited(req.GetTargets(), "\n")
+	targetsLineFromFile := utils.PrettifyListFromStringSplitEx(string(raw), "\n", ",")
+	targetsLine := utils.PrettifyListFromStringSplitEx(req.GetTargets(), "\n", ",")
 	targets := append(targetsLine, targetsLineFromFile...)
 
 	// validation
