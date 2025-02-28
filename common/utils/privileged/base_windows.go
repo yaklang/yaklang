@@ -1,6 +1,7 @@
 package privileged
 
 import (
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
@@ -22,4 +23,21 @@ func isPrivileged() bool {
 		os.RemoveAll(f)
 	}()
 	return true
+}
+
+type Executor struct {
+	AppName       string
+	AppIcon       string
+	DefaultPrompt string
+}
+
+func NewExecutor(appName string) *Executor {
+	return &Executor{
+		AppName:       appName,
+		DefaultPrompt: "this operation requires administrator privileges",
+	}
+}
+
+func (p *Executor) Execute(ctx context.Context, cmd string, opts ...ExecuteOption) ([]byte, error) {
+	return nil, utils.Error("not implemented")
 }
