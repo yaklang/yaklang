@@ -50,6 +50,8 @@ func VerifyUTCCode(secret string, code any) bool {
 }
 
 var Exports = map[string]any{
+	"TOTPCode":      GetUTCCode,
+	"TOTPVerify":    VerifyUTCCode,
 	"GetUTCCode":    GetUTCCode,
 	"VerifyUTCCode": VerifyUTCCode,
 

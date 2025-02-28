@@ -3,9 +3,12 @@ package aispec
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
+	"github.com/samber/lo"
 	"io"
 	"net/http/httputil"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -27,32 +30,65 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 		if te := lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"); utils.IContains(te, "chunked") {
 			chunked = true
 		}
-		var ioReader io.Reader = utils.NewTrimLeftReader(closer)
+
+		var reader io.Reader = closer
+		// reader = io.TeeReader(reader, os.Stdout)
+		var ioReader io.Reader = utils.NewTrimLeftReader(reader)
 		if chunked {
 			ioReader = httputil.NewChunkedReader(ioReader)
 		}
 		lineReader := bufio.NewReader(ioReader)
+		haveReason := false
+		onceStartReason := sync.Once{}
+		onceEndReason := sync.Once{}
+
 		for {
 			line, err := utils.BufioReadLine(lineReader)
 			if err != nil {
 				if err != io.EOF {
-					log.Warnf("failed to read line: %v", err)
+					log.Warnf("failed to read line [%#v]: %v", line, err)
 				}
 				return
+			}
+			if string(line) == "" {
+				continue
 			}
 			lineStr := string(line)
 			jsonIdentifiers := jsonextractor.ExtractStandardJSON(lineStr)
 			for _, j := range jsonIdentifiers {
 				results := jsonpath.Find(j, `$..choices[*].delta.content`)
+				reasonContent := jsonpath.Find(j, `$..choices[*].delta.reasoning_content`)
+
 				wordList := utils.InterfaceToSliceInterface(results)
 				if len(wordList) <= 0 {
 					log.Debugf("cannot identifier delta content, try to fetch arguments for: %v", j)
 					wordList = utils.InterfaceToSliceInterface(jsonpath.Find(j, `$..choices[*].delta.tool_calls[*].function.arguments`))
 				}
+				reasonStrs := lo.Map(utils.InterfaceToSliceInterface(reasonContent), func(reason any, idx int) string {
+					return fmt.Sprint(reason)
+				})
+				reasonDelta := strings.Join(reasonStrs, "")
+
 				handled := false
+				if reasonDelta != "" {
+					handled = true
+					onceStartReason.Do(func() {
+						pw.Write([]byte("<think>\n"))
+						haveReason = true
+					})
+					pw.Write([]byte(reasonDelta))
+				}
+
 				for _, raw := range wordList {
 					handled = true
 					data := codec.AnyToBytes(raw)
+					if len(data) > 0 {
+						onceEndReason.Do(func() {
+							if haveReason {
+								pw.Write([]byte("\n</think>\n\n"))
+							}
+						})
+					}
 					pw.Write(data)
 				}
 				if !handled {
