@@ -23,11 +23,11 @@ var MCPCommand = &cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{Name: "transport", Usage: "transport protocol, e.g. sse/stdio", Value: "stdio"},
 		cli.StringFlag{Name: "host", Usage: "if transport is sse, listen host", Value: "localhost"},
-		cli.IntFlag{Name: "port", Usage: "if transport is sse, listen port"},
-		cli.StringFlag{Name: "t,tool", Usage: "enable tool sets, split by ,"},
-		cli.StringFlag{Name: "dt,disable-tool", Usage: "disable tool sets, split by ,"},
-		cli.StringFlag{Name: "r,resource", Usage: "enable resource sets, split by ,"},
-		cli.StringFlag{Name: "dr,disable-resource", Usage: "disable resource sets, split by ,"},
+		cli.IntFlag{Name: "port", Usage: "if transport is sse, listen port", Value: 11432},
+		cli.StringFlag{Name: "t,tool", Usage: "enable tool sets, split by ','"},
+		cli.StringFlag{Name: "dt,disable-tool", Usage: "disable tool sets, split by ','"},
+		cli.StringFlag{Name: "r,resource", Usage: "enable resource sets, split by ','"},
+		cli.StringFlag{Name: "dr,disable-resource", Usage: "disable resource sets, split by ','"},
 	},
 	Action: func(c *cli.Context) error {
 		yakit.CallPostInitDatabase()
@@ -81,7 +81,10 @@ var MCPCommand = &cli.Command{
 			if port == 0 {
 				port = utils.GetRandomAvailableTCPPort()
 			}
-			err = s.ServeSSE(fmt.Sprintf(":%d", port), fmt.Sprintf("http://%s:%d", host, port))
+			hostPort := utils.HostPort(host, port)
+			urlStr := fmt.Sprintf("http://%s", hostPort)
+			log.Infof("start to listen reverse(mcp) on: %s", urlStr)
+			err = s.ServeSSE(hostPort, urlStr)
 		default:
 			return utils.Errorf("invalid transport: %v", transport)
 		}
