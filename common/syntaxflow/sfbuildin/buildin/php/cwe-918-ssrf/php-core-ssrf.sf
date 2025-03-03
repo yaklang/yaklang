@@ -34,7 +34,7 @@ alert $high_risk for {
 
 $ssrfFunction #{
     include: `<self> & $params`,
-    exclude: `*?{opcode: call && !<self><getCaller> & $filter}`,
+    exclude: `*?{opcode: call && !<self><getCallee> & $filter}`,
 }-> as $mid_risk
 
 alert $mid_risk for {
@@ -45,7 +45,7 @@ alert $mid_risk for {
 
 $ssrfFunction #{
     include: `<self> & $params`,
-    include: `*?{opcode: call && <self><getCaller> & $filter}`,
+    include: `*?{opcode: call && <self><getCallee> & $filter}`,
 }-> as $low_risk
 
 alert $low_risk for {
