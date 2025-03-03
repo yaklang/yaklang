@@ -53,13 +53,13 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string, token ...CanStart
 			return c
 		}
 	}
-	if p.VirtualImport {
-		fakeType := fakeGetType(p, name, token...)
-		blueprint, ok := ToClassBluePrintType(fakeType)
-		if ok {
-			return blueprint
-		}
-	}
+	//if p.IsVirtualImport() {
+	//	fakeType := fakeGetType(p, name, token...)
+	//	blueprint, ok := ToClassBluePrintType(fakeType)
+	//	if ok {
+	//		return blueprint
+	//	}
+	//}
 	return nil
 
 }

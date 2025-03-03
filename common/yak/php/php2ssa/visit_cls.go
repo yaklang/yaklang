@@ -113,8 +113,6 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, blueprint)
 	}
-	//todo: 可能会有问题
-	// bluePrint.Build()
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(blueprint)
 	args := []ssa.Value{obj}
@@ -189,7 +187,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 					extendBlueprint := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
 					blueprint.AddParentBlueprint(extendBlueprint)
 					blueprint.AddSuperBlueprint(extendBlueprint)
-					blueprint.SetKind(ssa.BlueprintClass)
 				})
 			}
 			if i.Implements() != nil {
@@ -202,16 +199,23 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 						if len(pkgName) <= 1 {
 							iface = b.GetBluePrint(namespaceName)
 							if iface == nil {
-								iface = b.CreateBlueprint(namespaceName)
+								iface = b.CreateBlueprint(namespaceName, ref)
 							}
 						} else {
 							iface = b.GetBluePrint(namespaceName)
 							if iface == nil {
 								iface = app.GetClassBlueprintEx(namespaceName, strings.Join(pkgName, "."))
 							}
+							library, err := app.GetOrCreateLibrary(namespaceName)
+							if err != nil {
+								return
+							}
+							b.FakeGetBlueprint(library, namespaceName, ref)
 						}
 						iface.SetKind(ssa.BlueprintInterface)
+						//todo： 待优化，优化到blueprint中
 						blueprint.AddInterfaceBlueprint(iface)
+						blueprint.AddParentBlueprint(iface)
 					}
 				})
 			}
@@ -235,15 +239,23 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 						if len(pkgName) <= 1 {
 							iface = b.GetBluePrint(namespaceName)
 							if iface == nil {
-								iface = b.CreateBlueprint(namespaceName)
+								iface = b.CreateInterface(namespaceName, ref.QualifiedNamespaceName())
 							}
 						} else {
 							iface = b.GetBluePrint(namespaceName)
 							if iface == nil {
 								iface = app.GetClassBlueprintEx(namespaceName, strings.Join(pkgName, "."))
 							}
+
+							library, err := app.GetOrCreateLibrary(namespaceName)
+							if err != nil {
+								return
+							}
+							b.FakeGetBlueprint(library, namespaceName, ref.QualifiedNamespaceName())
 						}
 						iface.SetKind(ssa.BlueprintInterface)
+						blueprint.AddSuperBlueprint(iface)
+						blueprint.AddParentBlueprint(iface)
 						blueprint.AddInterfaceBlueprint(iface)
 					})
 				}
@@ -805,7 +817,7 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 	return y.EmitUndefined(raw.GetText())
 }
 
-func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualifiedNamespaceExprContext, blueprint bool) ssa.Value {
+func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualifiedNamespaceExprContext, wantBlueprint bool) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -815,6 +827,19 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 	i, _ := raw.(*phpparser.FullyQualifiedNamespaceExprContext)
 	if i == nil {
 		return nil
+	}
+	if !wantBlueprint {
+		_func := y.GetFunc(i.GetText(), "")
+		if _func != nil {
+			return _func
+		}
+	} else {
+		bluePrint := y.GetBluePrint(i.GetText())
+		if bluePrint != nil {
+			inst := y.EmitConstInst(bluePrint.Name)
+			inst.SetType(bluePrint)
+			return inst
+		}
 	}
 	var pkgPath []string
 	for j := 0; j < len(i.AllIdentifier())-1; j++ {
@@ -827,20 +852,25 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 	if err != nil {
 		log.Errorf("create library fail: %s", err)
 	} else if library != nil {
-		if !blueprint {
+		if !wantBlueprint {
 			value := library.GetExportValue(identifier)
-			return value
+			if !utils.IsNil(value) {
+				return value
+			}
 		} else {
 			fullTypeBluePrint := library.GetBluePrint(identifier, raw)
-			undefined := y.EmitUndefined(identifier)
-			undefined.SetType(fullTypeBluePrint)
-			return undefined
+			if !utils.IsNil(fullTypeBluePrint) {
+				undefined := y.EmitUndefined(identifier)
+				undefined.SetType(fullTypeBluePrint)
+				return undefined
+			}
 		}
 	}
 	undefined := y.EmitUndefined(identifier)
-	if blueprint {
+	if wantBlueprint {
 		bluePrint := y.CreateBlueprint(identifier)
 		bluePrint.SetFullTypeNames(pkgPath)
+		undefined.SetType(bluePrint)
 		return undefined
 	} else {
 		return undefined

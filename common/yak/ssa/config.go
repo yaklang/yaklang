@@ -26,6 +26,12 @@ func LanguageConfigTryBuildValue(config *LanguageConfig) {
 func LanguageConfigIsSupportClass(config *LanguageConfig) {
 	config.isSupportClass = true
 }
+func LanguageConfigVirtualImport(config *LanguageConfig) {
+	config.VirtualImport = true
+}
+func LanguageConfigVirtualGet(config *LanguageConfig) {
+	config.VirtualGetter = true
+}
 
 func LanguageConfigIsSupportClassStaticModifier(config *LanguageConfig) {
 	config.isSupportClassStaticModifier = true
@@ -76,6 +82,9 @@ type LanguageConfig struct {
 
 	//script Language need to handle call method
 	isSupportConstMethod bool
+
+	VirtualImport bool
+	VirtualGetter bool
 }
 
 func NewLanguageConfig() *LanguageConfig {
@@ -90,6 +99,12 @@ func NewLanguageConfig() *LanguageConfig {
 
 func (c *LanguageConfig) SetBindLanguage(b bool) {
 	c.isBindLanguage = b
+}
+func (c *LanguageConfig) SetVirtualImport(b bool) {
+	c.VirtualImport = b
+}
+func (c *LanguageConfig) SetVirtualGet(b bool) {
+	c.VirtualGetter = b
 }
 
 func (c *LanguageConfig) SetTryBuildValue(b bool) {

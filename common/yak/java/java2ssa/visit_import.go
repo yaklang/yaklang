@@ -50,7 +50,7 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 		} else {
 			for i := len(pkgNames) - 1; i > 0; i-- {
 				className = strings.Join(pkgNames[i:], ".")
-				if lib, _ := y.GetProgram().GetLibrary(strings.Join(pkgNames[:i], ".")); lib != nil {
+				if lib, _ := y.GetProgram().GetOrCreateLibrary(strings.Join(pkgNames[:i], ".")); lib != nil {
 					prog = lib
 					break
 				}
