@@ -104,7 +104,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		if ValueCompare(funcValue, actx.Self) {
 			return v.visitUserFallback(actx, opt...)
 		}
-		if actx.haveCrossProcess(funcValue) {
+		if actx.existCrossProcess(funcValue) {
 			return v.visitUserFallback(actx, opt...)
 		}
 		//try to find formal param index from call

@@ -52,16 +52,17 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 //   - needExit: A boolean indicating whether the analysis should exit early.
 //   - recoverStack: A function to restore the state of the analysis stack if needed.
 func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
-	a.pushNode(v)
+	defer func() {
+		a.needRollBack = false
+	}()
 	// 跨过程分析
-	exit, recoverCrossProcess := a.tryCrossProcess()
+	exit, recoverCrossProcess := a.tryCrossProcess(v)
 	if exit {
 		return true, recoverCrossProcess
 	}
 	// 过程内分析
 	needVisited, recoverIntraProcess := a.valueShould(v)
 	recoverStack = func() {
-		a.popNode()
 		recoverCrossProcess()
 		recoverIntraProcess()
 	}

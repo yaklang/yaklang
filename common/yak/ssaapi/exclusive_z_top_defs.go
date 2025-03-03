@@ -313,6 +313,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		called := actx.getLastCauseCall(TopDefAnalysis)
 		if called != nil {
+			actx.setRollBack()
 			calledByValue := getCalledByValue(called)
 			vals = append(vals, calledByValue...)
 		}
@@ -378,10 +379,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// Retrieve the case value. And it is required that the value must be a Call.
 		called := actx.getLastCauseCall(TopDefAnalysis)
 		if called != nil {
-			if !called.IsCall() {
-				log.Infof("parent function is not called by any other function, skip (%T)", called)
-				return Values{i}
-			}
+			actx.setRollBack()
 			calledByValue := getCalledByValue(called)
 			vals = append(vals, calledByValue...)
 		}
