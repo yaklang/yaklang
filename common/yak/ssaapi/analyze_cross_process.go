@@ -10,8 +10,8 @@ import (
 const emptyStackHash = "__EmptyStack__"
 
 type intraProcess struct {
-	valueVisited  *omap.OrderedMap[int64, struct{}]
-	objectVisited *omap.OrderedMap[string, struct{}]
+	valueVisited  *omap.OrderedMap[int64, struct{}]  // valueId->struct{}
+	objectVisited *omap.OrderedMap[string, struct{}] // object hash -> struct{}
 }
 
 type processAnalysisManager struct {
@@ -23,6 +23,8 @@ type processAnalysisManager struct {
 	nodeStack *utils.Stack[*Value]
 	// The value that leads to cross process occurrence
 	causeStack *utils.Stack[*Value]
+	// needRollBack is a flag that indicates whether the current analysis needs to be rolled back.
+	needRollBack bool
 }
 
 func newAnalysisManager() *processAnalysisManager {
@@ -45,58 +47,73 @@ func newIntraProcess() *intraProcess {
 	}
 }
 
+func (p *processAnalysisManager) setRollBack() {
+	p.needRollBack = true
+}
+
 // tryCrossProcess determines if a cross-process action is needed.
 // Returns:
 //   - shouldExit: true if a cross-process is required, false otherwise.
 //   - recoverCrossProcess: A function to recover the cross-process state if needed.
-func (c *processAnalysisManager) tryCrossProcess() (shouldExit bool, recoverCrossProcess func()) {
-	current, last, err := c.getCurrentAndLastNode()
-	if err != nil {
+func (c *processAnalysisManager) tryCrossProcess(v *Value) (shouldExit bool, recoverCrossProcess func()) {
+	if !c.needCrossProcess(v) {
 		return false, func() {}
 	}
-	if !c.needCrossProcess(last, current) {
-		return false, func() {}
-	}
-
-	intra := newIntraProcess()
-	hash := c.calcCrossProcessHash(last, current)
-	if c.crossProcessMap.Have(hash) {
+	if c.existCrossProcess(v) {
 		return true, func() {}
 	}
+	if c.needRollBack {
+		return false, c.rollbackCrossProcess()
+	}
+	intra := newIntraProcess()
+	hash := c.calcCrossProcessHash(v)
 	c.crossProcessStack.Push(hash)
 	c.crossProcessMap.Set(hash, intra)
-	c.causeStack.Push(last)
+	//log.Infof("----> cross process")
+	c.pushCause(c.peekNode())
 	return false, func() {
 		// Recover Cross Process
 		c.causeStack.Pop()
 		hash = c.crossProcessStack.Pop()
 		c.crossProcessMap.Delete(hash)
+		//log.Infof("<----- recover cross process")
 	}
 }
 
-// needCrossProcess determines whether a cross-process transition is required by comparing
-// the functions of two values (from and to). If either value or its associated node is nil,
-// it returns false. Otherwise, it checks if the IDs of the functions associated with the
-// two values are different, indicating a need for a cross-process transition.
-func (c *processAnalysisManager) needCrossProcess(from *Value, to *Value) bool {
-	if utils.IsNil(from) || utils.IsNil(from.node) || utils.IsNil(to) || utils.IsNil(to.node) {
+func (c *processAnalysisManager) rollbackCrossProcess() func() {
+	cause := c.popCause()
+	node := c.popNode()
+	hash := c.crossProcessStack.Pop()
+	//log.Infof("====> rollback")
+	var intra *intraProcess
+	if hash != "" && hash != emptyStackHash {
+		intra, _ = c.crossProcessMap.Get(hash)
+		c.crossProcessMap.Delete(hash)
+	}
+	return func() {
+		//log.Infof("<==== recover rollback")
+		c.pushNode(node)
+		c.pushCause(cause)
+		if intra != nil {
+			c.crossProcessStack.Push(hash)
+			c.crossProcessMap.Set(hash, intra)
+		}
+	}
+}
+
+func (c *processAnalysisManager) needCrossProcess(v *Value) bool {
+	last := c.nodeStack.Peek()
+	if utils.IsNil(last) {
 		return false
 	}
-	return from.GetFunction().GetId() != to.GetFunction().GetId()
+	return needCrossProcess(last, v)
 }
 
-// haveCrossProcess determines if the next analysis of the given value will involve a cross-process analysis.
-// This function is typically used in scenarios where it's necessary to know whether the subsequent analysis
-// (e.g., top-def or bottom-use) for the current value will require a cross-process transition.
-// Returns:
-//   - bool: true if the next analysis is a cross-process analysis, false otherwise.
-func (c *processAnalysisManager) haveCrossProcess(current *Value) bool {
+func (c *processAnalysisManager) existCrossProcess(current *Value) bool {
 	if c.nodeStack.Len() == 0 || utils.IsNil(current) || utils.IsNil(current.node) {
 		return false
 	}
-
-	last := c.nodeStack.Peek()
-	hash := c.calcCrossProcessHash(last, current)
+	hash := c.calcCrossProcessHash(current)
 	return c.crossProcessMap.Have(hash)
 }
 
@@ -120,8 +137,10 @@ func (c *processAnalysisManager) valueShould(v *Value) (bool, func()) {
 		return false, func() {}
 	}
 	if _, ok = intra.valueVisited.Get(v.GetId()); !ok {
+		c.pushNode(v)
 		intra.valueVisited.Set(v.GetId(), struct{}{})
 		return true, func() {
+			c.popNode()
 			intra.valueVisited.Delete(v.GetId())
 		}
 	}
@@ -146,6 +165,46 @@ func (c *processAnalysisManager) objectShould(object, key, member *Value) (bool,
 	return false, func() {}
 }
 
+func (c *processAnalysisManager) getLastCauseCall(typ AnalysisType) (result *Value) {
+	value := c.peekCause()
+	if value == nil {
+		return nil
+	}
+	switch ret := value.node.(type) {
+	case *ssa.Call:
+		result = value
+	case *ssa.SideEffect:
+		if typ == TopDefAnalysis {
+			result = value.NewTopDefValue(ret.CallSite)
+		} else if typ == BottomUseAnalysis {
+			result = value.NewBottomUseValue(ret.CallSite)
+		}
+	}
+	return result
+}
+
+func (c *processAnalysisManager) calcCrossProcessHash(v *Value) string {
+	if c == nil || c.nodeStack == nil {
+		return ""
+	}
+	if c.nodeStack.Len() < 1 {
+		return ""
+	}
+	last := c.nodeStack.Peek()
+	return calcCrossProcessHash(last, v)
+}
+
+// needCrossProcess determines whether a cross-process transition is required by comparing
+// the functions of two values (from and to). If either value or its associated node is nil,
+// it returns false. Otherwise, it checks if the IDs of the functions associated with the
+// two values are different, indicating a need for a cross-process transition.
+func needCrossProcess(from *Value, to *Value) bool {
+	if utils.IsNil(from) || utils.IsNil(from.node) || utils.IsNil(to) || utils.IsNil(to.node) {
+		return false
+	}
+	return from.GetFunction().GetId() != to.GetFunction().GetId()
+}
+
 func (c *processAnalysisManager) pushNode(value *Value) {
 	c.nodeStack.Push(value)
 }
@@ -154,58 +213,33 @@ func (c *processAnalysisManager) popNode() *Value {
 	return c.nodeStack.Pop()
 }
 
-func (c *processAnalysisManager) getCurrentAndLastNode() (current *Value, last *Value, err error) {
-	if c == nil || c.nodeStack == nil {
-		return nil, nil, utils.Errorf("BUG: nodeStack is nil")
-	}
-	if c.nodeStack.Len() < 2 {
-		return nil, nil, utils.Errorf("BUG: nodeStack length is less than 2")
-	}
-	current = c.nodeStack.Peek()
-	last = c.nodeStack.PeekN(1)
-	if utils.IsNil(current) || utils.IsNil(current.node) || utils.IsNil(last) || utils.IsNil(last.node) {
-		return nil, nil, utils.Errorf("BUG: current or last node is nil")
-	}
-	return current, last, nil
+func (c *processAnalysisManager) popCause() *Value {
+	return c.causeStack.Pop()
 }
 
-func (c *processAnalysisManager) getLastCauseCall(typ AnalysisType) *Value {
-	value := c.causeStack.Pop()
-	if value == nil {
-		return nil
-	}
-	switch ret := value.node.(type) {
-	case *ssa.Call:
-		return value
-	case *ssa.SideEffect:
-		if typ == TopDefAnalysis {
-			return value.NewTopDefValue(ret.CallSite)
-		} else if typ == BottomUseAnalysis {
-			return value.NewBottomUseValue(ret.CallSite)
-		}
-	}
-	return nil
+func (c *processAnalysisManager) peekNode() *Value {
+	return c.nodeStack.Peek()
 }
 
-func (c *processAnalysisManager) calcCrossProcessHash(from *Value, to *Value) string {
+func (c *processAnalysisManager) peekCause() *Value {
+	return c.causeStack.Peek()
+}
+
+func (c *processAnalysisManager) pushCause(v *Value) {
+	c.causeStack.Push(v)
+}
+
+func calcCrossProcessHash(from *Value, to *Value) string {
 	var (
 		fromFuncId, toFuncId int64
 		fromId, toId         int64
 	)
-	//getObjectHash := func(v *Value) string {
-	//	if v == nil || v.node == nil || !v.IsCall() {
-	//		return ""
-	//	}
-	//	obj, key, member := a.getCurrentObject()
-	//	return utils.CalcSha1(obj.GetId(), key.GetId(), member.GetId())
-	//}
 	if from == nil || from.node == nil {
 		fromFuncId = -1
 		fromId = -1
 	} else {
 		fromId = from.GetId()
 		fromFuncId = from.GetFunction().GetId()
-		//objectHash = getObjectHash(from)
 	}
 	if to == nil || to.node == nil {
 		toFuncId = -1
@@ -214,7 +248,6 @@ func (c *processAnalysisManager) calcCrossProcessHash(from *Value, to *Value) st
 		toFuncId = to.GetFunction().GetId()
 		toId = to.GetId()
 	}
-	// TODO感觉可以不用fromId和toId
 	hash := utils.CalcSha1(fromFuncId, toFuncId, fromId, toId)
 	return hash
 }
