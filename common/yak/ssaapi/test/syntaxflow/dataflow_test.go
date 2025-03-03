@@ -134,8 +134,8 @@ public class DOSDemo {
 `
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			rule := `
-.getInputStream()?{<typeName>?{have: 'java.net.Socket' || 'java.new.ServerSocket'}} as $source;
-BufferedReader().readLine()?{!.length}?{<typeName>?{have:'java.io'}}  as $sink;
+.getInputStream()?{<fullTypeName>?{have: 'java.net.Socket' || 'java.new.ServerSocket'}} as $source;
+BufferedReader().readLine()?{!.length}?{<fullTypeName>?{have:'java.io'}}  as $sink;
 $sink#{
     include:<<<CODE
     <self> & $source
