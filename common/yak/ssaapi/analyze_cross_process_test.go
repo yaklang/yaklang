@@ -6,8 +6,7 @@ import (
 )
 
 func Test_CrossProcess(t *testing.T) {
-	// TODO：跨过程应该也是深度优先的一张图，而不是使用边做哈希的一张表
-	t.Run("Test_CrossProcess_Analysis: mutli cross-process edge", func(t *testing.T) {
+	t.Run("avoid recursive mechanism should not be triggered ", func(t *testing.T) {
 		code := `
 	func A(num){
 		return num
@@ -39,8 +38,55 @@ INCLUDE
 		})
 	})
 
-	t.Run("Test_CrossProcess_Analysis: test topdef param", func(t *testing.T) {
-		t.Skip()
+	t.Run("intra and cross process avoid recursive mechanism should not be triggered ", func(t *testing.T) {
+		code := `
+	f1 = (a1)=>{
+		return a1
+	}
+	
+	f0 = (a0) =>{
+		value = f1(a0)
+		if c{
+			value = f1(a0)+1
+		}	
+		return value
+	}
+	print(f0(11))
+		`
+		ssatest.CheckSyntaxFlow(t, code, `print(* #-> as $res)`, map[string][]string{
+			"res": {"1", "11", "FreeValue-c"},
+		})
+	})
+
+	t.Run("avoid recursive mechanism should be triggered ", func(t *testing.T) {
+		code := `
+f4 = (a4) => {
+    return a4;
+}
+
+f3 = (a3) => {
+    return f4(a3) ;
+}
+
+f2 = (a2) => {
+    return f3(a2) ;
+}
+
+f1 = (a1) => {
+    resultB = f2(a1);
+    resultC = f3(a1);
+    return resultB + resultC;
+}
+
+result = f1(10);
+`
+
+		ssatest.CheckSyntaxFlowContain(t, code, `a4?{opcode:param} --> as $ret`, map[string][]string{
+			"ret": {"Function-f1(10)"},
+		})
+	})
+
+	t.Run("rollback process", func(t *testing.T) {
 		code := `
 f1 = (a1) => {
 	return a1
@@ -60,15 +106,14 @@ b = f2(8)
 
 	})
 
-	t.Run("Test_CrossProcess_Analysis: topdef param 2", func(t *testing.T) {
-		t.Skip()
+	t.Run("multiple  rollback process ", func(t *testing.T) {
 		code := `
 f0 = (a0) =>{
 	return a0
 }
 
 f1 = (a1) => {
-	return f0(a1)
+	return f0(a1) 
 }
 f2 = (a2) =>{
 	return f1(a2)
@@ -82,8 +127,23 @@ b = f2(8)
 			"target1": {"7"},
 			"target2": {"8"},
 		})
-
 	})
+
+	t.Run("rollback and cross process", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		f1 = (a1)  => {
+  			return a1
+		}
+		f2 = (a2) => {
+			return f1(a2)
+		}
+		f1(f2(11))
+		`, `
+		a2?{opcode: param} #-> * as $target`, map[string][]string{
+			"target": {"11"},
+		})
+	})
+
 }
 
 func Test_IntraProcess(t *testing.T) {
