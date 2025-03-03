@@ -47,6 +47,9 @@ func init() {
 	aispec.Register("yaklang-writer", func() aispec.AIClient {
 		return dashscopebase.CreateDashScopeGateway("a51e9af5a60f40c983dac6ed50dba15b")
 	})
+	aispec.Register("yaklang-rag", func() aispec.AIClient {
+		return dashscopebase.CreateDashScopeGateway("e3acc5f1c8ea4995aeac7618bc543ad5")
+	})
 }
 
 type Gateway struct {
