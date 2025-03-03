@@ -14,6 +14,9 @@ func ToValue(n Instruction) (Value, bool) {
 	return nil, false
 }
 func ToUser(n Instruction) (User, bool) {
+	if utils.IsNil(n) {
+		return nil, false
+	}
 	if IsUserInstruction(n) {
 		return n.(User), true
 	}
@@ -21,6 +24,9 @@ func ToUser(n Instruction) (User, bool) {
 }
 
 func ToFunction(n Instruction) (*Function, bool) {
+	if utils.IsNil(n) {
+		return nil, false
+	}
 	if lz, isLZ := ToLazyInstruction(n); isLZ {
 		return ToFunction(lz.Self())
 	}

@@ -122,7 +122,7 @@ func (lz *LazyInstruction) SetIsFromDB(isFromDB bool) {
 }
 
 func (lz *LazyInstruction) Self() Instruction {
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		lz.check()
 	}
 	if lz.Value != nil {
@@ -132,10 +132,10 @@ func (lz *LazyInstruction) Self() Instruction {
 }
 
 func (lz *LazyInstruction) IsBlock(name string) bool {
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		lz.check()
 	}
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return false
 	}
 	return lz.Value.IsBlock(name)
@@ -149,7 +149,7 @@ func (lz *LazyInstruction) check() {
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		inst := CreateInstruction(Opcode(lz.GetOpcode()))
 		if inst == nil {
 			log.Infof("unknown opcode: %d: %s", lz.GetOpcode(), lz.ir.OpcodeName)
@@ -160,12 +160,12 @@ func (lz *LazyInstruction) check() {
 		// set range for instruction
 		lz.GetRange()
 	}
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		if value, ok := ToValue(lz.Instruction); ok {
 			lz.Value = value
 		}
 	}
-	if lz.User == nil {
+	if utils.IsNil(lz.User) {
 		if user, ok := ToUser(lz.Instruction); ok {
 			lz.User = user
 		}
@@ -173,7 +173,7 @@ func (lz *LazyInstruction) check() {
 }
 
 func (lz *LazyInstruction) ShouldSave() bool {
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return false
 	}
 
@@ -185,7 +185,7 @@ func (lz *LazyInstruction) GetId() int64 { return lz.id }
 
 // just use IrCode
 func (lz *LazyInstruction) GetName() string {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return ""
 	}
@@ -193,7 +193,7 @@ func (lz *LazyInstruction) GetName() string {
 }
 
 func (lz *LazyInstruction) GetVerboseName() string {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return ""
 	}
@@ -201,7 +201,7 @@ func (lz *LazyInstruction) GetVerboseName() string {
 }
 
 func (lz *LazyInstruction) GetShortVerboseName() string {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return ""
 	}
@@ -209,7 +209,7 @@ func (lz *LazyInstruction) GetShortVerboseName() string {
 }
 
 func (lz *LazyInstruction) IsExtern() bool {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
@@ -217,7 +217,7 @@ func (lz *LazyInstruction) IsExtern() bool {
 }
 
 func (lz *LazyInstruction) GetOpcode() Opcode {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return SSAOpcodeUnKnow
 	}
@@ -225,7 +225,7 @@ func (lz *LazyInstruction) GetOpcode() Opcode {
 }
 
 func (lz *LazyInstruction) String() string {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return ""
 	}
@@ -233,7 +233,7 @@ func (lz *LazyInstruction) String() string {
 }
 
 func (lz *LazyInstruction) HasUsers() bool {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
@@ -241,7 +241,7 @@ func (lz *LazyInstruction) HasUsers() bool {
 }
 
 func (lz *LazyInstruction) HasValues() bool {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
@@ -249,7 +249,7 @@ func (lz *LazyInstruction) HasValues() bool {
 }
 
 func (lz *LazyInstruction) IsMember() bool {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
@@ -257,7 +257,7 @@ func (lz *LazyInstruction) IsMember() bool {
 }
 
 func (lz *LazyInstruction) IsObject() bool {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
@@ -265,7 +265,7 @@ func (lz *LazyInstruction) IsObject() bool {
 }
 
 func (lz *LazyInstruction) IsUndefined() bool {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
@@ -273,7 +273,7 @@ func (lz *LazyInstruction) IsUndefined() bool {
 }
 
 func (lz *LazyInstruction) IsParameter() bool {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
@@ -281,7 +281,7 @@ func (lz *LazyInstruction) IsParameter() bool {
 }
 
 func (lz *LazyInstruction) IsSideEffect() bool {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
@@ -289,7 +289,7 @@ func (lz *LazyInstruction) IsSideEffect() bool {
 }
 
 func (lz *LazyInstruction) IsPhi() bool {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
@@ -297,7 +297,7 @@ func (lz *LazyInstruction) IsPhi() bool {
 }
 
 func (lz *LazyInstruction) GetProgramName() string {
-	if lz.ir == nil {
+	if utils.IsNil(lz.ir) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return ""
 	}
@@ -306,7 +306,7 @@ func (lz *LazyInstruction) GetProgramName() string {
 
 func (lz *LazyInstruction) GetFunc() *Function {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return nil
 	}
 	return lz.Instruction.GetFunc()
@@ -314,7 +314,7 @@ func (lz *LazyInstruction) GetFunc() *Function {
 
 func (lz *LazyInstruction) SetFunc(f *Function) {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return
 	}
 	lz.Instruction.SetFunc(f)
@@ -322,7 +322,7 @@ func (lz *LazyInstruction) SetFunc(f *Function) {
 
 func (lz *LazyInstruction) GetBlock() *BasicBlock {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return nil
 	}
 	return lz.Instruction.GetBlock()
@@ -330,7 +330,7 @@ func (lz *LazyInstruction) GetBlock() *BasicBlock {
 
 func (lz *LazyInstruction) SetBlock(b *BasicBlock) {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return
 	}
 	lz.Instruction.SetBlock(b)
@@ -338,7 +338,7 @@ func (lz *LazyInstruction) SetBlock(b *BasicBlock) {
 
 func (lz *LazyInstruction) GetProgram() *Program {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return nil
 	}
 	return lz.Instruction.GetProgram()
@@ -346,7 +346,7 @@ func (lz *LazyInstruction) GetProgram() *Program {
 
 func (lz *LazyInstruction) SetProgram(p *Program) {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return
 	}
 	lz.Instruction.SetProgram(p)
@@ -354,7 +354,7 @@ func (lz *LazyInstruction) SetProgram(p *Program) {
 
 func (lz *LazyInstruction) SetName(name string) {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return
 	}
 	lz.Instruction.SetName(name)
@@ -362,7 +362,7 @@ func (lz *LazyInstruction) SetName(name string) {
 
 func (lz *LazyInstruction) SetVerboseName(name string) {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return
 	}
 	lz.Instruction.SetVerboseName(name)
@@ -370,7 +370,7 @@ func (lz *LazyInstruction) SetVerboseName(name string) {
 
 func (lz *LazyInstruction) SetIsAnnotation(b bool) {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return
 	}
 	lz.Instruction.SetIsAnnotation(b)
@@ -378,7 +378,7 @@ func (lz *LazyInstruction) SetIsAnnotation(b bool) {
 
 func (lz *LazyInstruction) IsAnnotation() bool {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return false
 	}
 	return lz.Instruction.IsAnnotation()
@@ -386,7 +386,7 @@ func (lz *LazyInstruction) IsAnnotation() bool {
 
 func (lz *LazyInstruction) SetId(id int64) {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return
 	}
 	lz.Instruction.SetId(id)
@@ -394,7 +394,7 @@ func (lz *LazyInstruction) SetId(id int64) {
 
 func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return nil
 	}
 	if lz.Instruction.GetRange() == nil {
@@ -466,7 +466,7 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 
 func (lz *LazyInstruction) SetRange(r memedit.RangeIf) {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return
 	}
 	lz.Instruction.SetRange(r)
@@ -474,7 +474,7 @@ func (lz *LazyInstruction) SetRange(r memedit.RangeIf) {
 
 func (lz *LazyInstruction) GetSourceCode() string {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return ""
 	}
 	r := lz.Instruction.GetRange()
@@ -486,7 +486,7 @@ func (lz *LazyInstruction) GetSourceCode() string {
 
 func (lz *LazyInstruction) GetSourceCodeContext(n int) string {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return ""
 	}
 	r := lz.Instruction.GetRange()
@@ -498,7 +498,7 @@ func (lz *LazyInstruction) GetSourceCodeContext(n int) string {
 
 func (lz *LazyInstruction) SetExtern(extern bool) {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return
 	}
 	lz.Instruction.SetExtern(extern)
@@ -506,7 +506,7 @@ func (lz *LazyInstruction) SetExtern(extern bool) {
 
 func (lz *LazyInstruction) SelfDelete() {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return
 	}
 	lz.Instruction.SelfDelete()
@@ -514,7 +514,7 @@ func (lz *LazyInstruction) SelfDelete() {
 
 func (lz *LazyInstruction) IsCFGEnterBlock() ([]Instruction, bool) {
 	lz.check()
-	if lz.Instruction == nil {
+	if utils.IsNil(lz.Instruction) {
 		return nil, false
 	}
 	return lz.Instruction.IsCFGEnterBlock()
@@ -522,7 +522,7 @@ func (lz *LazyInstruction) IsCFGEnterBlock() ([]Instruction, bool) {
 
 func (lz *LazyInstruction) AddMask(v Value) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.AddMask(v)
@@ -530,7 +530,7 @@ func (lz *LazyInstruction) AddMask(v Value) {
 
 func (lz *LazyInstruction) AddMember(v1 Value, v2 Value) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.AddMember(v1, v2)
@@ -538,7 +538,7 @@ func (lz *LazyInstruction) AddMember(v1 Value, v2 Value) {
 
 func (lz *LazyInstruction) AddVariable(v *Variable) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.AddVariable(v)
@@ -546,7 +546,7 @@ func (lz *LazyInstruction) AddVariable(v *Variable) {
 
 func (lz *LazyInstruction) DeleteMember(v Value) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.DeleteMember(v)
@@ -554,7 +554,7 @@ func (lz *LazyInstruction) DeleteMember(v Value) {
 
 func (lz *LazyInstruction) ForEachMember(fn func(Value, Value) bool) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.ForEachMember(fn)
@@ -562,7 +562,7 @@ func (lz *LazyInstruction) ForEachMember(fn func(Value, Value) bool) {
 
 func (lz *LazyInstruction) GetAllMember() map[Value]Value {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetAllMember()
@@ -570,7 +570,7 @@ func (lz *LazyInstruction) GetAllMember() map[Value]Value {
 
 func (lz *LazyInstruction) GetAllVariables() map[string]*Variable {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetAllVariables()
@@ -578,7 +578,7 @@ func (lz *LazyInstruction) GetAllVariables() map[string]*Variable {
 
 func (lz *LazyInstruction) GetIndexMember(i int) (Value, bool) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil, false
 	}
 	return lz.Value.GetIndexMember(i)
@@ -586,7 +586,7 @@ func (lz *LazyInstruction) GetIndexMember(i int) (Value, bool) {
 
 func (lz *LazyInstruction) GetKey() Value {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetKey()
@@ -594,7 +594,7 @@ func (lz *LazyInstruction) GetKey() Value {
 
 func (lz *LazyInstruction) GetLastVariable() *Variable {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetLastVariable()
@@ -602,7 +602,7 @@ func (lz *LazyInstruction) GetLastVariable() *Variable {
 
 func (lz *LazyInstruction) GetMask() []Value {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetMask()
@@ -610,7 +610,7 @@ func (lz *LazyInstruction) GetMask() []Value {
 
 func (lz *LazyInstruction) GetMember(v Value) (Value, bool) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil, false
 	}
 	return lz.Value.GetMember(v)
@@ -618,7 +618,7 @@ func (lz *LazyInstruction) GetMember(v Value) (Value, bool) {
 
 func (lz *LazyInstruction) GetObject() Value {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetObject()
@@ -626,7 +626,7 @@ func (lz *LazyInstruction) GetObject() Value {
 
 func (lz *LazyInstruction) GetStringMember(n string) (Value, bool) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil, false
 	}
 	return lz.Value.GetStringMember(n)
@@ -634,7 +634,7 @@ func (lz *LazyInstruction) GetStringMember(n string) (Value, bool) {
 
 func (lz *LazyInstruction) GetType() Type {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		log.Errorf("[BUG]: lazyInstruction value is nil,get type fail: %d", lz.id)
 		return nil
 	}
@@ -643,7 +643,7 @@ func (lz *LazyInstruction) GetType() Type {
 
 func (lz *LazyInstruction) GetUsers() Users {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetUsers()
@@ -651,7 +651,7 @@ func (lz *LazyInstruction) GetUsers() Users {
 
 func (lz *LazyInstruction) GetValues() Values {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetValues()
@@ -659,7 +659,7 @@ func (lz *LazyInstruction) GetValues() Values {
 
 func (lz *LazyInstruction) GetVariable(n string) *Variable {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	if v, ok := lz.variable[n]; ok {
@@ -676,7 +676,7 @@ func (lz *LazyInstruction) GetVariable(n string) *Variable {
 
 func (lz *LazyInstruction) Masked() bool {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return false
 	}
 	return lz.Value.Masked()
@@ -684,7 +684,7 @@ func (lz *LazyInstruction) Masked() bool {
 
 func (lz *LazyInstruction) NewError(e ErrorKind, t ErrorTag, msg string) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.NewError(e, t, msg)
@@ -692,7 +692,7 @@ func (lz *LazyInstruction) NewError(e ErrorKind, t ErrorTag, msg string) {
 
 func (lz *LazyInstruction) SetKey(v Value) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.SetKey(v)
@@ -700,7 +700,7 @@ func (lz *LazyInstruction) SetKey(v Value) {
 
 func (lz *LazyInstruction) SetObject(v Value) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.SetObject(v)
@@ -708,7 +708,7 @@ func (lz *LazyInstruction) SetObject(v Value) {
 
 func (lz *LazyInstruction) SetType(t Type) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.SetType(t)
@@ -724,7 +724,7 @@ func (lz *LazyInstruction) ReplaceValue(v1, v2 Value) {
 
 func (lz *LazyInstruction) GetPointer() Values {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetPointer()
@@ -732,14 +732,14 @@ func (lz *LazyInstruction) GetPointer() Values {
 
 func (lz *LazyInstruction) AddPointer(v Value) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.AddPointer(v)
 }
 func (lz *LazyInstruction) GetReference() Value {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetReference()
@@ -747,7 +747,7 @@ func (lz *LazyInstruction) GetReference() Value {
 
 func (lz *LazyInstruction) SetReference(v Value) {
 	lz.check()
-	if lz.Value == nil {
+	if utils.IsNil(lz.Value) {
 		return
 	}
 	lz.Value.SetReference(v)
