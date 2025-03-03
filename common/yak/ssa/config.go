@@ -63,7 +63,14 @@ func (b *FunctionBuilder) isSupportClass() bool {
 	}
 	return config.isSupportClass
 }
-
+func (b *FunctionBuilder) IsVirtualImport() bool {
+	config := b.GetProgram().Application.config
+	if config == nil {
+		log.Errorf("[BUG]SupportClass config is not init")
+		return false
+	}
+	return config.VirtualImport
+}
 func (b *FunctionBuilder) isSupportClassStaticModifier() bool {
 	config := b.GetProgram().Application.config
 	if config == nil {
