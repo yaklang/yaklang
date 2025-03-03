@@ -113,10 +113,6 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 func (prog *Program) IsVirtualImport() bool {
 	return prog.config.VirtualImport
 }
-func (prog *Program) IsVirtualGet() bool {
-	return prog.config.VirtualGetter
-}
-
 func (prog *Program) GetSubProgram(name string, path ...string) *Program {
 	child, ok := prog.UpStream.Get(name)
 	if !ok {

@@ -794,49 +794,49 @@ func init() {
 	registerNativeCall(
 		NativeCall_TypeName,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+			/*
+				java.io.File #-> File
+			*/
 			var vals []sfvm.ValueOperator
-			err := v.Recursive(func(operator sfvm.ValueOperator) error {
-				val, ok := operator.(*Value)
-				if !ok {
-					return nil
+			var tmpMap = make(map[string]struct{})
+			addVals := func(val *Value, typ string) {
+				_, ok := tmpMap[typ]
+				if ok {
+					return
 				}
-				typ := val.GetType()
-				if typ == nil || typ.t == nil {
-					return utils.Errorf("native call type name failed: the value have %s no type", val.String())
-				}
-				fts := typ.t.GetFullTypeNames()
-				var results []string
-				if len(fts) == 0 {
-					results = append(results, typ.String())
-				} else {
-					for _, ft := range fts {
-						//remove versioin name
-						ft = yakunquote.TryUnquote(ft)
-						index := strings.Index(ft, ":")
-						if index != -1 {
-							ft = ft[:index]
-							results = append(results, ft)
-						}
-
-						// get type name
-						lastIndex := strings.LastIndex(ft, ".")
-						if lastIndex != -1 && len(ft) > lastIndex+1 {
-							results = append(results, ft[lastIndex+1:])
-						}
-						results = append(results, ft)
+				tmpMap[typ] = struct{}{}
+				vx := val.NewValue(ssa.NewConstWithRange(typ, val.GetRange()))
+				vx.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+				vals = append(vals, vx)
+			}
+			v.Recursive(func(operator sfvm.ValueOperator) error {
+				switch val := operator.(type) {
+				case *Value:
+					typ := val.GetType()
+					if typ == nil || typ.t == nil {
+						return utils.Errorf("native call type name failed: the value have %s no type", val.String())
 					}
-				}
-				results = utils.RemoveRepeatStringSlice(results)
-				for _, result := range results {
-					v := val.NewValue(ssa.NewConstWithRange(result, val.GetRange()))
-					v.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-					vals = append(vals, v)
+					fts := typ.t.GetFullTypeNames()
+					if len(fts) == 0 {
+						addVals(val, typ.String())
+					} else {
+						for _, ft := range fts {
+							ft = yakunquote.TryUnquote(ft)
+							index := strings.Index(ft, ":")
+							if index != -1 {
+								ft = ft[:index]
+								addVals(val, ft)
+							}
+							lastIndex := strings.LastIndex(ft, ".")
+							if lastIndex != -1 && len(ft) > lastIndex+1 {
+								addVals(val, ft[lastIndex+1:])
+							}
+							addVals(val, ft)
+						}
+					}
 				}
 				return nil
 			})
-			if err != nil {
-				return false, nil, err
-			}
 			if len(vals) > 0 {
 				return true, sfvm.NewValues(vals), nil
 			}
@@ -852,6 +852,20 @@ func init() {
 		NativeCall_FullTypeName,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
+			var tmpMap = make(map[string]struct{})
+			addVals := func(val *Value, typ string, rangeIf memedit.RangeIf) {
+				if typ == "" {
+					return
+				}
+				_, exist := tmpMap[typ]
+				if exist {
+					return
+				}
+				tmpMap[typ] = struct{}{}
+				results := val.NewValue(ssa.NewConstWithRange(typ, rangeIf))
+				results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
+				vals = append(vals, results)
+			}
 			err := v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
@@ -863,14 +877,11 @@ func init() {
 				}
 				fts := typ.t.GetFullTypeNames()
 				if len(fts) == 0 {
-					results := val.NewValue(ssa.NewConstWithRange(typ.String(), val.GetRange()))
-					vals = append(vals, results)
+					addVals(val, typ.String(), val.GetRange())
 				} else {
 					for _, ft := range fts {
 						ft = yakunquote.TryUnquote(ft)
-						results := val.NewValue(ssa.NewConstWithRange(ft, val.GetRange()))
-						results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
-						vals = append(vals, results)
+						addVals(val, ft, val.GetRange())
 					}
 				}
 
