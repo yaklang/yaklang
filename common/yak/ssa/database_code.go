@@ -12,6 +12,9 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 	if ir.ID != uint(inst.GetId()) {
 		return utils.Errorf("marshal instruction id not match")
 	}
+	if inst.GetId() == -1 {
+		log.Errorf("insts is -1")
+	}
 
 	instruction2IrCode(inst, ir)
 	value2IrCode(inst, ir)

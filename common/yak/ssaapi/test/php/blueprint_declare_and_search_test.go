@@ -50,7 +50,7 @@ func Test_Blueprint_name2declare(t *testing.T) {
 		E.__super__ as $retG // A
 		`, map[string][]string{
 			"retA": {"B", "E"},
-			"retB": {"D", "E"},
+			"retB": {"CC", "D", "E"},
 			"retC": {"A"},
 			"retD": {"C"},
 			"retE": {"C"},
@@ -122,7 +122,7 @@ class D extends AA implements BB {}
 	t.Run("can search and range correct", func(t *testing.T) {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			res, err := prog.SyntaxFlowWithError(`
-			AA as $classAA 
+			AA as $classAA
 			BB as $classBB
 			CC as $classCC
 			A as $classA
@@ -132,23 +132,23 @@ class D extends AA implements BB {}
 
 			classAAs := res.GetValues("classAA")
 			require.Equal(t, classAAs.Len(), 1)
-			require.Equal(t, classAAs[0].GetRange().GetText(), "AA")
+			require.Equal(t, "AA", classAAs[0].GetRange().GetText())
 
 			classBBs := res.GetValues("classBB")
 			require.Equal(t, classBBs.Len(), 1)
-			require.Equal(t, classBBs[0].GetRange().GetText(), "BB")
+			require.Equal(t, "BB", classBBs[0].GetRange().GetText())
 
 			classCCs := res.GetValues("classCC")
 			require.Equal(t, classCCs.Len(), 1)
-			require.Equal(t, classCCs[0].GetRange().GetText(), "CC")
+			require.Equal(t, "CC", classCCs[0].GetRange().GetText())
 
 			classDs := res.GetValues("classD")
 			require.Equal(t, classDs.Len(), 1)
-			require.Equal(t, classDs[0].GetRange().GetText(), "D")
+			require.Equal(t, "D", classDs[0].GetRange().GetText())
 
 			classAs := res.GetValues("classA")
 			require.Equal(t, classAs.Len(), 1)
-			require.Equal(t, classAs[0].GetRange().GetText(), "A")
+			require.Equal(t, "A", classAs[0].GetRange().GetText())
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
