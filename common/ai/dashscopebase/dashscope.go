@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http/httputil"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -98,6 +98,7 @@ func (d *rspFeeder) GetNewData(structued *aispec.StructuredData, input []byte) c
 			return
 		}
 
+		usages := make(map[string]aispec.UsageStatsInfo)
 		if usageRaw, ok := data["usage"]; ok {
 			if usage, ok := usageRaw.(map[string]any); ok {
 				if models, ok := usage["models"]; ok {
@@ -118,11 +119,12 @@ func (d *rspFeeder) GetNewData(structued *aispec.StructuredData, input []byte) c
 								if outputTokensRaw, ok := model["output_tokens"]; ok {
 									outputTokens = int(outputTokensRaw.(float64))
 								}
-								structued.ModelUsage = append(structued.ModelUsage, aispec.UsageStatsInfo{
+								usageInstance := aispec.UsageStatsInfo{
 									Model:       modelId.(string),
 									InputToken:  inputTokens,
 									OutputToken: outputTokens,
-								})
+								}
+								usages[fmt.Sprint(modelId)] = usageInstance
 							}
 						}
 					}
@@ -178,6 +180,9 @@ func (d *rspFeeder) GetNewData(structued *aispec.StructuredData, input []byte) c
 									}
 								}
 								newStructued.IsParsed = true
+								for _, usage := range usages {
+									newStructued.ModelUsage = append(newStructued.ModelUsage, usage)
+								}
 								resultChan <- newStructued
 							}
 						}
@@ -220,11 +225,14 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 				"debug": map[string]any{},
 			},
 		))
-		opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
+		opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, rawCloser io.ReadCloser) {
 			chunked := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"))) == "chunked"
+			var bodyReader io.Reader = rawCloser
 			if chunked {
 				log.Infof("SSE Chunked for: %v", d.endpointUrl)
+				bodyReader = httputil.NewChunkedReader(rawCloser)
 			}
+
 			for {
 				structured := &aispec.StructuredData{
 					DataSourceType: "dashscope",
@@ -253,34 +261,14 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 					}
 				}
 				for {
-					resultBytes, err := utils.ReadLine(closer)
-					if err != nil {
-						log.Warnf("failed to read line in %v: %v", d.endpointUrl, err)
+					resultBytes, err := utils.ReadLine(bodyReader)
+					if err != nil && len(resultBytes) <= 0 {
+						if err != io.EOF {
+							log.Warnf("failed to read line in %v: %v", d.endpointUrl, err)
+						}
 						return
 					}
-					if d.config.Context != nil {
-						select {
-						case <-d.config.Context.Done():
-							return
-						default:
-						}
-					}
 					result := string(resultBytes)
-					size, _ := strconv.ParseInt(result, 16, 64)
-					if chunked {
-						if size > 0 {
-							var buf = make([]byte, size)
-							io.ReadFull(closer, buf)
-							for _, line := range utils.ParseStringToLines(string(buf)) {
-								handleLine(line)
-							}
-						}
-						_, _ = utils.ReadLine(closer)
-						break
-					}
-					if strings.TrimSpace(result) == "" {
-						break
-					}
 					handleLine(result)
 				}
 			}
