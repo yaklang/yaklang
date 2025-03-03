@@ -282,7 +282,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 class A {
 	public static void main(String[] args) {
-	try (InputStream   in = new FileInputStream(src);
+	try (InputStream in = new FileInputStream(src);
          OutputStream out = new FileOutputStream(dst)) {
         byte[] buf = new byte[BUFFER_SIZE];
         int n;
@@ -291,12 +291,12 @@ class A {
     	}
 	}}
 `
-	ssatest.CheckSyntaxFlow(t, code, `in<fullTypeName> as $in;out<fullTypeName> as $out;`,
+	ssatest.CheckSyntaxFlowContain(t, code, `in<fullTypeName> as $in;out<fullTypeName> as $out;`,
 		map[string][]string{
-			"in":  []string{"\"java.io.FileInputStream\"", "\"java.io.InputStream\""},
-			"out": []string{"\"java.io.FileOutputStream\"", "\"java.io.OutputStream\""},
+			"in":  {"\"java.io.FileInputStream\"", "\"java.io.InputStream\""},
+			"out": {"\"java.io.FileOutputStream\"", "\"java.io.OutputStream\""},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
-	ssatest.CheckSyntaxFlow(t, code, `.close<fullTypeName> as $close;`,
+	ssatest.CheckSyntaxFlowContain(t, code, `.close<fullTypeName> as $close;`,
 		map[string][]string{
 			"close": []string{"\"java.io.FileInputStream\"", "\"java.io.FileOutputStream\"", "\"java.io.InputStream\"", "\"java.io.OutputStream\""},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))

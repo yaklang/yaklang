@@ -1,6 +1,7 @@
 package java2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -36,7 +37,7 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 
 		for _, extendName := range extendNames {
 			bp := y.GetBluePrint(extendName)
-			if bp == nil {
+			if utils.IsNil(bp) {
 				bp = y.CreateBlueprint(extendName, tokenMap[extendName])
 				y.AddFullTypeNameForAllImport(extendName, bp)
 			}

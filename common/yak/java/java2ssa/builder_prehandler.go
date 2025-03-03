@@ -26,6 +26,7 @@ func (s *SSABuilder) Create() ssa.Builder {
 			ssa.LanguageConfigIsBinding,
 			ssa.LanguageConfigIsSupportClass,
 			ssa.LanguageConfigIsSupportClassStaticModifier,
+			ssa.LanguageConfigVirtualImport,
 		),
 	}
 }
