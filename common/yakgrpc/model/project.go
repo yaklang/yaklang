@@ -11,19 +11,20 @@ import (
 )
 
 const (
-	TypeFile = "file" // same as common/yakgrpc/yakit/projects.go
+	TypeFile    = "file"    // same as common/yakgrpc/yakit/projects.go
+	TypeProject = "project" // same as common/yakgrpc/yakit/projects.go
 )
 
 func ToProjectGRPCModel(p *schema.Project, db *gorm.DB) *ypb.ProjectDescription {
 	var folderName, childFolderName string
 	if p.FolderID > 0 {
-		folder, _ := GetProjectById(db, p.FolderID, TypeFile)
+		folder, _ := GetProjectById(db, p.FolderID)
 		if folder != nil {
 			folderName = folder.ProjectName
 		}
 	}
 	if p.ChildFolderID > 0 {
-		childFolder, _ := GetProjectById(db, p.ChildFolderID, TypeFile)
+		childFolder, _ := GetProjectById(db, p.ChildFolderID)
 		if childFolder != nil {
 			childFolderName = childFolder.ProjectName
 		}
@@ -51,14 +52,9 @@ func ToProjectGRPCModel(p *schema.Project, db *gorm.DB) *ypb.ProjectDescription 
 	}
 }
 
-func GetProjectById(db *gorm.DB, id int64, Type string) (*schema.Project, error) {
+func GetProjectById(db *gorm.DB, id int64) (*schema.Project, error) {
 	var req schema.Project
 	db = db.Model(&schema.Project{}).Where("id = ?", id)
-	if Type == TypeFile {
-		db = db.Where("type = ?", Type)
-	} else {
-		db = db.Where("type IS NULL or type = ?", Type)
-	}
 	db = db.First(&req)
 	if db.Error != nil {
 		return nil, utils.Errorf("get Project failed: %s", db.Error)

@@ -331,7 +331,7 @@ func TestProgram_ListAndDelete(t *testing.T) {
 	}()
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
-	consts.SetSSADataBasePath(dbPath)
+	consts.SetSSAProjectDatabasePath(dbPath)
 	programID3 := uuid.NewString()
 	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID3), ssaapi.WithSaveToProfile())
 	defer func() {

@@ -6,8 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-
-
 // Project 描述一个 Yakit 项目
 // 一般项目数据都是应该用 ProjectDatabase 作为连接的
 // 但是项目本身的元数据应该存在 ProfileDatabase 中
@@ -27,8 +25,8 @@ type Project struct {
 
 type BackProject struct {
 	Project
-	FolderName      string
-	ChildFolderName string
+	FolderName      string `json:"folder_name"`
+	ChildFolderName string `json:"child_folder_name"`
 }
 
 func (p *BackProject) BackGRPCModel() *ypb.ProjectDescription {

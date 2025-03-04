@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -73,7 +74,7 @@ func init() {
 				filterDb := FilterYakScript(db, &ypb.QueryYakScriptRequest{
 					Keyword: keywords,
 				})
-				yakScripts := YieldYakScripts(filterDb, context.Background())
+				yakScripts := bizhelper.YieldModel[*schema.YakScript](context.Background(), filterDb)
 				for yakScript := range yakScripts {
 					res, err := GetYakScriptByName(consts.GetGormProfileDatabase(), yakScript.ScriptName)
 					if err != nil {

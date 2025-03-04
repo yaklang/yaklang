@@ -46,10 +46,15 @@ func CreateProfileDatabase(path string) (*gorm.DB, error) {
 	return db, nil
 }
 
-func SetGormProjectDatabase(d *gorm.DB) {
+func SetGormProjectDatabase(path string) error {
+	d, err := CreateProjectDatabase(path)
+	if err != nil {
+		return err
+	}
 	projectDataBase = d
 	schema.AutoMigrate(d, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	schema.SetGormProjectDatabase(d)
+	return nil
 }
 
 func GetGormProfileDatabase() *gorm.DB {
@@ -105,6 +110,13 @@ func initYakitDatabase() {
 		}
 		schema.SetGormProjectDatabase(projectDataBase)
 		schema.SetGormProfileDatabase(profileDatabase)
+
+		/* 创建SSA数据库 */
+		ssaProjectDatabaseName := GetSSADataBasePathDefault(baseDir)
+		ssaDatabase, err = CreateSSAProjectDatabase(ssaProjectDatabaseName)
+		if err != nil {
+			log.Errorf("init ssa-db[%v] failed: %s", ssaProjectDatabaseName, err)
+		}
 	})
 }
 
