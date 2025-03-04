@@ -220,12 +220,10 @@ func DeleteRiskByTarget(db *gorm.DB, target string) error {
 
 func YieldRisksByIds(db *gorm.DB, ctx context.Context, ids []int) chan *schema.Risk {
 	db = bizhelper.ExactQueryIntArrayOr(db, "id", ids)
-	outC := bizhelper.YieldModel[*schema.Risk](ctx, db)
-	return outC
+	return bizhelper.YieldModel[*schema.Risk](ctx, db)
 }
 
 func YieldRisksByTarget(db *gorm.DB, ctx context.Context, target string) chan *schema.Risk {
-	outC := make(chan *schema.Risk)
 	db = db.Model(&schema.Risk{})
 	host, port, _ := utils.ParseStringToHostPort(target)
 	if port > 0 {
@@ -237,151 +235,25 @@ func YieldRisksByTarget(db *gorm.DB, ctx context.Context, target string) chan *s
 		db = db.Where("(ip = ?) OR (url LIKE ?) OR (host LIKE ?) OR (host = ?)", target, target, target, target)
 	}
 
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.Risk
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*schema.Risk](ctx, db)
 }
 
 func YieldRisksByRuntimeId(db *gorm.DB, ctx context.Context, runtimeId string) chan *schema.Risk {
-	outC := make(chan *schema.Risk)
 	db = db.Model(&schema.Risk{})
 	db = db.Where("runtime_id = ?", runtimeId)
-
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.Risk
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*schema.Risk](ctx, db)
 }
 
 func YieldRisksByCreateAt(db *gorm.DB, ctx context.Context, timestamp int64) chan *schema.Risk {
-	outC := make(chan *schema.Risk)
 	db = db.Model(&schema.Risk{})
 	db = bizhelper.QueryDateTimeAfterTimestampOr(db, "created_at", timestamp)
-
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.Risk
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*schema.Risk](ctx, db)
 }
 
 func YieldRisksByScriptName(db *gorm.DB, ctx context.Context, scriptName string) chan *schema.Risk {
-	outC := make(chan *schema.Risk)
 	db = db.Model(&schema.Risk{})
 	db = db.Where("from_yak_script = ?", scriptName)
-
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.Risk
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*schema.Risk](ctx, db)
 }
 
 func QueryNewRisk(db *gorm.DB, req *ypb.QueryNewRiskRequest, newRisk bool, isRead bool) (*bizhelper.Paginator, []*schema.Risk, error) {
@@ -424,39 +296,7 @@ func NewRiskReadRequest(db *gorm.DB, filter *ypb.QueryRisksRequest) error {
 }
 
 func YieldRisks(db *gorm.DB, ctx context.Context) chan *schema.Risk {
-	outC := make(chan *schema.Risk)
-	db = db.Model(&schema.Risk{})
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.Risk
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 15,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 15 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*schema.Risk](ctx, db, bizhelper.WithYieldModel_PageSize(15))
 }
 
 func UploadRiskToOnline(db *gorm.DB, hash []string) error {
