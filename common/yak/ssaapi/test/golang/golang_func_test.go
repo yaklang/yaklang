@@ -185,6 +185,31 @@ func Test_Closure(t *testing.T) {
 	})
 }
 
+func Test_MethodName_in_Syntaxflow(t *testing.T) {
+	t.Run("syntaxflow method name", func(t *testing.T) {
+		code := `package main
+
+type T struct {
+    
+}
+
+func (t *T) List() int {
+    
+}
+		`
+		ssatest.CheckSyntaxFlow(t, code,
+			`   
+			List as $a
+    		T_List as $b
+	`,
+			map[string][]string{
+				"a": {"Function-List"},
+			},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+}
+
 func Test_Method_lazybuild(t *testing.T) {
 
 	t.Run("normal", func(t *testing.T) {

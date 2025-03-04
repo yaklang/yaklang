@@ -202,3 +202,22 @@ class B{
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
+
+func Test_MethodName_in_Syntaxflow(t *testing.T) {
+	t.Run("syntaxflow method name", func(t *testing.T) {
+		code := `<?php
+
+class A{
+    public function F(){
+        return 1;
+    }
+}`
+		ssatest.CheckSyntaxFlow(t, code, `
+			F as $a
+			A_F as $b
+		
+		`, map[string][]string{
+			"a": []string{"Function-A.F", "Undefined-A.F(valid)"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+}

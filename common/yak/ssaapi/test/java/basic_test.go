@@ -55,3 +55,32 @@ func Test_Class_Member(t *testing.T) {
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
+
+func Test_MethodName_in_Syntaxflow(t *testing.T) {
+	t.Run("syntaxflow method name", func(t *testing.T) {
+		test(t, &TestCase{
+			Code: `
+class A {
+	int a; 
+	public static void F() {
+		println(a);
+	}
+}
+
+public class Main {
+    public static void main(String[] args) {
+
+    }
+}
+		`,
+			SF: `
+				F as $a
+				A_F as $b
+			`,
+			Contain: true,
+			Expect: map[string][]string{
+				"a": {"Function-A.F"},
+			},
+		})
+	})
+}
