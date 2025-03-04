@@ -12,6 +12,7 @@ desc(
 <include('java-image-io-read-url')> as $output;
 <include('java-net-url-connect')> as $output;
 <include('java-spring-rest-template-use')> as $output;
+<include('java-okhttpclient-request-execute'> as $output;
 alert $output;
 
 desc(
