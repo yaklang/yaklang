@@ -30,7 +30,7 @@ alert $result for {
     level: high,
 };
 
-$source - $result -> as $low;
+$result - $high  as $low;
 alert $low for {
     message: "Find possible URL redirect vulnerability for java",
     type: vuln,
