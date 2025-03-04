@@ -782,7 +782,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	}
 
 	if funcName != "" {
-		variable := b.CreateLocalVariable(funcName)
+		variable := b.CreateLocalVariable(methodName)
 		b.AssignVariable(variable, newFunc)
 	}
 
