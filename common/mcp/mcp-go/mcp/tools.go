@@ -249,6 +249,15 @@ func WithBool(name string, opts ...PropertyOption) ToolOption {
 	return WithRaw(name, schema, opts...)
 }
 
+// WithInteger adds a integer property to the tool schema.
+// It accepts property options to configure the integer property's behavior and constraints.
+func WithInteger(name string, opts ...PropertyOption) ToolOption {
+	schema := map[string]any{
+		"type": "integer",
+	}
+	return WithRaw(name, schema, opts...)
+}
+
 // WithNumber adds a number property to the tool schema.
 // It accepts property options to configure the number property's behavior and constraints.
 func WithNumber(name string, opts ...PropertyOption) ToolOption {
