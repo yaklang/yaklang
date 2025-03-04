@@ -3,9 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"os"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/yaklang/yaklang/common/schema"
 
