@@ -35,6 +35,12 @@ func WithYieldModel_CountCallback(countCallback func(int)) YieldModelOpts {
 	}
 }
 
+func WithYieldModel_PageSize(size int) YieldModelOpts {
+	return func(c *YieldModelConfig) {
+		c.Size = size
+	}
+}
+
 func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts) chan T {
 	var t T
 	db = db.Table(db.NewScope(t).TableName())

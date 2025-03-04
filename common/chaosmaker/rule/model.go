@@ -3,7 +3,6 @@ package rule
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"os"
 	"regexp"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai"
@@ -390,38 +391,7 @@ func DeleteSuricataRuleByID(db *gorm.DB, id int64) error {
 }
 
 func YieldRules(db *gorm.DB, ctx context.Context) chan *Storage {
-	outC := make(chan *Storage)
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*Storage
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*Storage](ctx, db, bizhelper.WithYieldModel_PageSize(1000))
 }
 
 func ExportRulesToFile(db *gorm.DB, fileName string) error {

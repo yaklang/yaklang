@@ -213,28 +213,5 @@ func YieldAuditNodeByRuleName(DB *gorm.DB, ruleName string) chan *AuditNode {
 
 func yieldAuditNode(DB *gorm.DB, ctx context.Context) chan *AuditNode {
 	db := DB.Model(&AuditNode{}).Where("is_entry_node = true")
-	outC := make(chan *AuditNode)
-	go func() {
-		defer close(outC)
-
-		paginator := bizhelper.NewFastPaginator(db, 100)
-		for {
-			var items []*AuditNode
-			if err, ok := paginator.Next(&items); !ok {
-				break
-			} else if err != nil {
-				log.Errorf("paging failed: %s", err)
-				continue
-			}
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*AuditNode](ctx, db)
 }

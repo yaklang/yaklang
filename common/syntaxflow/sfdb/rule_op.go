@@ -294,32 +294,9 @@ func GetRulePure(ruleName string) (*schema.SyntaxFlowRule, error) {
 func GetAllRules() ([]*schema.SyntaxFlowRule, error) {
 	db := consts.GetGormProfileDatabase()
 	db = db.Where("allow_included = false")
-	outC := make(chan *schema.SyntaxFlowRule)
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.SyntaxFlowRule
-			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				outC <- d
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
 
 	var rules []*schema.SyntaxFlowRule
-	for r := range outC {
+	for r := range YieldSyntaxFlowRules(db, context.Background()) {
 		rules = append(rules, r)
 	}
 	if len(rules) == 0 {
@@ -331,32 +308,9 @@ func GetAllRules() ([]*schema.SyntaxFlowRule, error) {
 func GetRules(ruleNameGlob string) ([]*schema.SyntaxFlowRule, error) {
 	db := consts.GetGormProfileDatabase()
 	db = db.Where("(rule_name like ?) and (allow_included = false)", "%"+fmt.Sprint(ruleNameGlob)+"%")
-	outC := make(chan *schema.SyntaxFlowRule)
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.SyntaxFlowRule
-			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				outC <- d
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
 
 	var rules []*schema.SyntaxFlowRule
-	for r := range outC {
+	for r := range YieldSyntaxFlowRules(db, context.Background()) {
 		rules = append(rules, r)
 	}
 	if len(rules) == 0 {
@@ -366,34 +320,7 @@ func GetRules(ruleNameGlob string) ([]*schema.SyntaxFlowRule, error) {
 }
 
 func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
-	outC := make(chan *schema.SyntaxFlowRule)
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.SyntaxFlowRule
-			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*schema.SyntaxFlowRule](ctx, db, bizhelper.WithYieldModel_IndexField("syntax_flow_rules.id"))
 }
 
 func YieldSyntaxFlowRulesWithoutLib(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
