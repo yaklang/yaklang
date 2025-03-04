@@ -1,5 +1,5 @@
 desc(
-    title: "golang LDAP Injection",
+    title: "golang LDAP injection",
     type: audit,
     severity: high,
     desc: <<<TEXT
@@ -7,11 +7,8 @@ LDAP注入攻击是一种攻击者通过操纵LDAP（轻量目录访问协议）
 TEXT
 )
 
-ldap?{<fullTypeName>?{have: 'gopkg.in/ldap.v2'}} as $entry;
-ldap?{<fullTypeName>?{have: 'github.com/nmcclain/ldap'}} as $entry;
-ldap?{<fullTypeName>?{have: 'github.com/go-ldap/ldap'}} as $entry;
-$entry.Dial <getCall> as $db;
-$db <getMembers> as $sink;
+<include('golang-ldap-sink')> as $sink;
+
 $sink.Search( * #-> as $param)
 $param?{have: 'Parameter'} as $high
 

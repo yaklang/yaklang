@@ -1,0 +1,108 @@
+desc(
+    title: "golang SQL information exposure",
+    type: audit,
+    severity: low,
+    desc: <<<TEXT
+检测可能通过SQL相关函数泄露服务器敏感信息，包括：
+    1. 目录结构暴露
+    2. 当前工作路径泄露
+    3. 服务器系统类型识别
+    可能被攻击者用于信息收集阶段，辅助后续攻击
+TEXT
+)
+
+<include('golang-database-sink')> as $sink;
+
+*.Scan() --> as $target;
+$target #{until: `* & $sink`}-> as $low;
+
+alert $low for {
+    title: 'FTP Information Exposure',
+    title_zh: '检测到SQL信息泄露',
+    type: 'vuln',
+    level: 'low',
+}
+
+desc(
+    lang: golang,
+    alert_low: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+    "database/sql"
+    "fmt"
+    _ "github.com/lib/pq"
+    "strings"
+)
+
+func main() {
+    // 连接到 PostgreSQL 数据库
+    connStr := "user=username dbname=mydb sslmode=disable"
+    db, err := sql.Open("postgres", connStr)
+    if err != nil {
+        fmt.Println("Failed to connect to database:", err)
+        return
+    }
+    defer db.Close()
+
+    // 列出表（防止目录结构暴露）
+    listTables(db)
+
+    // 获取当前数据库（防止路径泄露）
+    getCurrentDatabase(db)
+
+    // 获取服务器版本（防止系统类型识别）
+    getServerVersion(db)
+}
+
+func listTables(db *sql.DB) {
+    rows, err := db.Query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name NOT LIKE 'pg_%'")
+    if err != nil {
+        fmt.Println("Failed to list tables:", err)
+        return
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var tableName string
+        if err := rows.Scan(&tableName); err != nil {
+            fmt.Println("Failed to scan table name:", err)
+            return
+        }
+        fmt.Println("Table:", tableName)
+    }
+}
+
+func getCurrentDatabase(db *sql.DB) {
+    var dbName string
+    err := db.QueryRow("SELECT current_database()").Scan(&dbName)
+    if err != nil {
+        fmt.Println("Failed to get current database:", err)
+        return
+    }
+
+    if dbName == "sensitive_db" {
+        fmt.Println("Current database: [REDACTED]")
+    } else {
+        fmt.Println("Current database:", dbName)
+    }
+}
+
+func getServerVersion(db *sql.DB) {
+    var version string
+    err := db.QueryRow("SELECT version()").Scan(&version)
+    if err != nil {
+        fmt.Println("Failed to get server version:", err)
+        return
+    }
+
+    if strings.Contains(version, "PostgreSQL") || strings.Contains(version, "MySQL") {
+        fmt.Println("Server version: [REDACTED]")
+    } else {
+        fmt.Println("Server version:", version)
+    }
+}
+
+UNSAFE
+)

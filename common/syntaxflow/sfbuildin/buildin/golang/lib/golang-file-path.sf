@@ -8,7 +8,11 @@ desc(
 TEXT
 )
 
-filepath?{<fullTypeName>?{have: 'path/filepath'}} as $output
+filepath?{<fullTypeName>?{have: 'path/filepath'}} as $entry
+
+$entry.Join(* #-> as $output)
+$entry.Dir(* #-> as $output)
+$entry.Match(* #-> as $output)
 
 alert $output
 

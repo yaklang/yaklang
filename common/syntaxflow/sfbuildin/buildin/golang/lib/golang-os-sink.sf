@@ -1,0 +1,66 @@
+desc(
+    title: "check audit the usage of the os package",
+    type: audit,
+    level: info,
+    lib: 'golang-os-sink',
+    desc: <<<TEXT
+此规则旨在审计Go语言代码中`os`包的使用情况。
+TEXT
+)
+
+os?{<fullTypeName>?{have: 'os'}} as $entry
+$entry.Create(* #-> as $output) 
+$entry.Open(* #-> as $output) 
+$entry.Remove(* #-> as $output) 
+$entry.RemoveAll(* #-> as $output) 
+$entry.Mkdir(* #-> as $output) 
+$entry.MkdirAll(* #-> as $output) 
+$entry.ReadDir(* #-> as $output) 
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://os.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
+)
+
+func main() {
+    http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+		file, handler, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// 验证文件路径
+		safePath := filepath.Join("/var/www/uploads", filepath.Base(handler.Filename))
+		if !strings.HasPrefix(safePath, "/var/www/uploads") {
+			http.Error(w, "Invalid file path", http.StatusBadRequest)
+			return
+		}
+
+		// 保存文件
+		dst, err := os.Create(safePath)
+		if err != nil {
+			http.Error(w, "Error creating the file", http.StatusInternalServerError)
+			return
+		}
+		defer dst.Close()
+
+		io.Copy(dst, file)
+		fmt.Fprintf(w, "File uploaded successfully")
+	})
+}
+
+PARAM
+)
