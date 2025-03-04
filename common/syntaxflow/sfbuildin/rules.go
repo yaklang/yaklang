@@ -20,10 +20,7 @@ var ruleFS embed.FS
 func SyncEmbedRule() error {
 	// log.Infof("start sync embed rule")
 	sfdb.DeleteBuildInRule()
-	defer func() {
-		hash, _ := SyntaxFlowRuleHash()
-		yakit.Set(consts.EmbedSfBuildInRuleKey, hash)
-	}()
+
 	fsInstance := filesys.NewEmbedFS(ruleFS)
 	err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		dirName, name := fsInstance.PathSplit(s)
@@ -77,6 +74,7 @@ func init() {
 			// log.Infof("already sync embed rule")
 			return nil
 		}
+		defer yakit.Set(consts.EmbedSfBuildInRuleKey, consts.ExistedSyntaxFlowEmbedFSHash)
 		return SyncEmbedRule()
 	})
 
