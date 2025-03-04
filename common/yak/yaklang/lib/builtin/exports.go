@@ -34,7 +34,6 @@ var YaklangBaseLib = map[string]interface{}{
 	"fprint":    fprint,
 	"fprintf":   fprintf,
 	"fprintln":  fprintln,
-	"set":       Set,
 	"make":      Make,
 	"close":     CloseChan,
 
