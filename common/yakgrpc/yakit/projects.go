@@ -2,7 +2,11 @@ package yakit
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
@@ -19,8 +23,9 @@ const (
 	INIT_DATABASE_RECORD_NAME = "[default]"
 	FolderID                  = 0
 	ChildFolderID             = 0
-	TypeProject               = "project"
-	TypeFile                  = "file"
+	TypeProject               = "project"     // yakit front
+	TypeSSAProject            = "ssa_project" // sast front
+	TypeFile                  = "file"        // folder
 	TEMPORARY_PROJECT_NAME    = "[temporary]"
 	MIGRATE_DATABASE_KEY      = "__migrate_database__"
 )
@@ -28,12 +33,10 @@ const (
 func InitializingProjectDatabase() error {
 	profileDB := consts.GetGormProfileDatabase()
 	profileDB.Model(&schema.Project{}).RemoveIndex("uix_projects_project_name")
-	defaultProj, _ := GetDefaultProject(profileDB)
 
 	defaultYakitPath := consts.GetDefaultYakitBaseDir()
 	log.Debugf("Yakit base directory: %s", defaultYakitPath)
 	homeYakitPath := filepath.Join(utils.GetHomeDirDefault("."), "yakit-projects")
-	defaultDBPath := consts.GetDefaultYakitProjectDatabase(defaultYakitPath)
 	// 需要迁移所有yakit-projects/projects
 	if defaultYakitPath != homeYakitPath && GetKey(profileDB, MIGRATE_DATABASE_KEY) == "" {
 		log.Debugf("migrate project database path from %s to %s", homeYakitPath, defaultYakitPath)
@@ -51,24 +54,36 @@ func InitializingProjectDatabase() error {
 		}
 	}
 
-	// 迁移默认数据库
-	if defaultProj == nil || defaultProj.DatabasePath != defaultDBPath {
-		if defaultProj != nil {
-			log.Debugf("migrate default database path from %s to %s", defaultProj.DatabasePath, defaultDBPath)
+	updateProject := func(typ string, path string) {
+		project, _ := GetDefaultProject(profileDB, typ)
+		if project == nil || project.DatabasePath != path {
+			if project != nil {
+				log.Debugf("migrate default database path from %s to %s", project.DatabasePath, path)
+			}
+			projectData := &schema.Project{
+				ProjectName:   INIT_DATABASE_RECORD_NAME,
+				Description:   "默认数据库(~/yakit-projects/***.db): Default Database!",
+				DatabasePath:  path,
+				FolderID:      FolderID,
+				ChildFolderID: ChildFolderID,
+				Type:          typ,
+			}
+			err := CreateOrUpdateProject(profileDB, INIT_DATABASE_RECORD_NAME, FolderID, ChildFolderID, typ, projectData)
+			if err != nil {
+				log.Errorf("create default database file failed: %s", err)
+			}
 		}
-		projectData := &schema.Project{
-			ProjectName:   INIT_DATABASE_RECORD_NAME,
-			Description:   "默认数据库(~/yakit-projects/***.db): Default Database!",
-			DatabasePath:  defaultDBPath,
-			FolderID:      FolderID,
-			ChildFolderID: ChildFolderID,
-			Type:          TypeProject,
-		}
-		err := CreateOrUpdateProject(profileDB, INIT_DATABASE_RECORD_NAME, FolderID, ChildFolderID, TypeProject, projectData)
-		if err != nil {
-			log.Errorf("create default database file failed: %s", err)
-		}
+
 	}
+
+	// 迁移默认数据库
+	// yakit frontend
+	defaultProjectPath := consts.GetDefaultYakitProjectDatabase(defaultYakitPath)
+	updateProject(TypeProject, defaultProjectPath)
+	// sast frontend
+	defaultSSAProjectPath := consts.GetSSADataBasePathDefault(defaultYakitPath)
+	updateProject(TypeSSAProject, defaultSSAProjectPath)
+
 	return nil
 }
 
@@ -79,15 +94,80 @@ func init() {
 	})
 }
 
+func filterType(db *gorm.DB, typ string) *gorm.DB {
+	switch typ {
+	case TypeProject: // yakit front
+		db = db.Where("type IS NULL or type = ?", TypeProject)
+	case TypeSSAProject: // sast front
+		db = db.Where("type = ?", TypeSSAProject)
+	case TypeFile: // folder
+		db = db.Where("type = ?", TypeFile)
+	}
+	return db
+}
+
+func filterFrontendType(db *gorm.DB, typ string) *gorm.DB {
+	switch typ {
+	case TypeProject, "": // yakit front
+		db = db.Where("type != ?", TypeSSAProject)
+	case TypeSSAProject: // sast front
+		db = db.Where("type != ?", TypeProject)
+	}
+	return db
+}
+
+var projectNameRe = regexp.MustCompile(`(?i)[_a-z0-9\p{Han}][-_0-9a-z \p{Han}]*`)
+
+func projectNameToFileName(s string) string {
+	s = strings.ReplaceAll(s, "-", "_")
+	return strings.Join(projectNameRe.FindAllString(s, -1), "_")
+}
+
+func CheckInvalidProjectName(name string) error {
+	if !projectNameRe.MatchString(name) {
+		return utils.Errorf("name invalid, should match pattern: %v", projectNameRe.String())
+	}
+	return nil
+}
+
+func GetExportFile(projectName, suffix string) string {
+	outputFile := filepath.Join(consts.GetDefaultYakitProjectsDir(),
+		"project-"+projectNameToFileName(projectName)+".yakitproject"+suffix)
+	return outputFile
+}
+
+func CreateProjectFile(name, Type string) (string, error) {
+	switch Type {
+	case TypeProject:
+		databaseName := fmt.Sprintf("yakit-project-%v-%v.sqlite3.db", projectNameToFileName(name), time.Now().Unix())
+		pathName := filepath.Join(consts.GetDefaultYakitProjectsDir(), databaseName)
+		projectDatabase, err := consts.CreateProjectDatabase(pathName)
+		if err != nil {
+			return "", utils.Errorf("create project database failed: %s", err)
+		}
+		defer projectDatabase.Close()
+
+		return pathName, nil
+	case TypeSSAProject:
+		databaseName := fmt.Sprintf("ssa-project-%v-%v.sqlite3.db", projectNameToFileName(name), time.Now().Unix())
+		pathName := filepath.Join(consts.GetDefaultSSAProjectDir(), databaseName)
+		ssaProjectDatabase, err := consts.CreateSSAProjectDatabase(pathName)
+		if err != nil {
+			return "", utils.Errorf("create ssa project database failed: %s", err)
+		}
+		defer ssaProjectDatabase.Close()
+		return pathName, nil
+	case TypeFile:
+		return "", nil
+	}
+	return "", utils.Errorf("BUG: unknown project type: %v", Type)
+}
+
 func CreateOrUpdateProject(db *gorm.DB, name string, folderID, childFolderID int64, Type string, i interface{}) error {
 	db = db.Model(&schema.Project{})
 
 	db = db.Where("project_name = ? and (folder_id = ? or folder_id IS NULL) and (child_folder_id = ? or child_folder_id IS NULL )", name, folderID, childFolderID)
-	if Type == TypeFile {
-		db = db.Where("type = ?", Type)
-	} else {
-		db = db.Where("type IS NULL or type = ?", Type)
-	}
+	db = filterType(db, Type)
 	db = db.Assign(i).FirstOrCreate(&schema.Project{})
 	if db.Error != nil {
 		return utils.Errorf("create/update Project failed: %s", db.Error)
@@ -164,12 +244,8 @@ func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Pagin
 			db = db.Where("child_folder_id IS NULL or child_folder_id = false")
 		}
 	}
-	switch params.Type {
-	case TypeFile:
-		db = db.Where("type = ?", params.Type)
-	case TypeProject:
-		db = db.Where("type IS NULL or type = ?", params.Type)
-	}
+	db = filterType(db, params.Type)
+	db = filterFrontendType(db, params.FrontendType)
 	db = db.Where(" NOT (project_name = ? AND folder_id = false AND child_folder_id = false AND type = 'project' )", TEMPORARY_PROJECT_NAME)
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 	db = db.Unscoped()
@@ -182,16 +258,18 @@ func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Pagin
 	return paging, ret, nil
 }
 
-func GetCurrentProject(db *gorm.DB) (*schema.Project, error) {
+func GetCurrentProject(db *gorm.DB, Type string) (*schema.Project, error) {
 	var proj schema.Project
-	if db1 := db.Model(&schema.Project{}).Where("is_current_project = true").First(&proj); db1.Error != nil {
+	db = db.Model(&schema.Project{})
+	db = filterType(db, Type)
+	if db1 := db.Where("is_current_project = true").First(&proj); db1.Error != nil {
 		var defaultProj schema.Project
-		if db2 := db.Model(&schema.Project{}).Where("project_name = ?", INIT_DATABASE_RECORD_NAME).First(&defaultProj); db2.Error != nil {
+		if db2 := db.Where("project_name = ?", INIT_DATABASE_RECORD_NAME).First(&defaultProj); db2.Error != nil {
 			return nil, utils.Errorf("cannot found current project or default database: %s", db2.Error)
 		}
 
-		db.Model(&schema.Project{}).Where("true").Update(map[string]interface{}{"is_current_project": false})
-		db.Model(&schema.Project{}).Where("project_name = ?", INIT_DATABASE_RECORD_NAME).Update(map[string]interface{}{
+		db.Where("true").Update(map[string]interface{}{"is_current_project": false})
+		db.Where("project_name = ?", INIT_DATABASE_RECORD_NAME).Update(map[string]interface{}{
 			"is_current_project": true,
 		})
 
@@ -223,11 +301,7 @@ func GetProject(db *gorm.DB, params *ypb.IsProjectNameValidRequest) (*schema.Pro
 	db = db.Model(&schema.Project{}).Where("project_name = ? ", params.ProjectName)
 	db = db.Where("folder_id = ? or folder_id IS NULL", params.FolderId)
 	db = db.Where("child_folder_id = ? or child_folder_id IS NULL", params.ChildFolderId)
-	if params.Type == TypeFile {
-		db = db.Where("type = ?", params.Type)
-	} else {
-		db = db.Where("type IS NULL or type = ?", params.Type)
-	}
+	db = filterType(db, params.Type)
 	db = db.First(&req)
 	if db.Error != nil {
 		return nil, utils.Errorf("get Project failed: %s", db.Error)
@@ -249,7 +323,8 @@ func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Pag
 		}
 	}
 	params := req.Pagination
-	db = db.Where("type IS NULL or type = ? ", TypeProject)
+	db = filterType(db, req.FrontendType)
+	db = filterFrontendType(db, req.FrontendType)
 	db = db.Where(" NOT (project_name = ? AND folder_id = false AND child_folder_id = false AND type = 'project' )", TEMPORARY_PROJECT_NAME)
 	var ret []*schema.Project
 	paging, db := bizhelper.Paging(db, int(params.Page), int(params.Limit), &ret)
@@ -293,12 +368,13 @@ func DeleteProjectById(db *gorm.DB, id int64) error {
 	return nil
 }
 
-func GetDefaultProject(db *gorm.DB) (*schema.Project, error) {
+func GetDefaultProject(db *gorm.DB, typ string) (*schema.Project, error) {
 	var req schema.Project
 	db = db.Model(&schema.Project{})
 	db = db.Where("folder_id = ? or folder_id IS NULL", 0)
 	db = db.Where("child_folder_id = ? or child_folder_id IS NULL", 0)
-	db = db.Where("type IS NULL or type = ?", TypeProject).Where("project_name = ?", INIT_DATABASE_RECORD_NAME)
+	db = filterType(db, typ)
+	db = db.Where("project_name = ?", INIT_DATABASE_RECORD_NAME)
 	db = db.First(&req)
 	if db.Error != nil {
 		return nil, utils.Errorf("get Project failed: %s", db.Error)
@@ -308,32 +384,25 @@ func GetDefaultProject(db *gorm.DB) (*schema.Project, error) {
 }
 
 func GetProjectDetail(db *gorm.DB, id int64) (*schema.BackProject, error) {
-	//var req schema.BackProject
-	var req schema.Project
-	db = db.Model(&schema.Project{})
+	var req schema.BackProject
+	db = db.Table("projects")
 	db = db.Select("projects.*, F.project_name as folder_name, C.project_name as child_folder_name")
-	db = db.Where("projects.id = ? and (projects.type = ? or projects.type IS NULL)", id, TypeProject)
+	db = db.Where("projects.id = ? and (projects.type != ?)", id, TypeFile)
 	db = db.Joins("left join projects F on projects.folder_id = F.id ")
 	db = db.Joins("left join projects C on projects.child_folder_id = C.id ")
-	db = db.First(&req)
+	db = db.Scan(&req)
 	if db.Error != nil {
 		return nil, utils.Errorf("get Project failed: %s", db.Error)
 	}
 
-	return &schema.BackProject{
-		Project: req,
-	}, nil
+	return &req, nil
 }
 
 func GetProjectByWhere(db *gorm.DB, name string, folderID, childFolderID int64, Type string, id int64) (*schema.Project, error) {
 	var req schema.Project
 	db = db.Model(&schema.Project{})
 	db = db.Where("project_name = ? and (folder_id = ? or folder_id IS NULL) and (child_folder_id = ? or child_folder_id IS NULL )", name, folderID, childFolderID)
-	if Type == TypeFile {
-		db = db.Where("type = ?", Type)
-	} else {
-		db = db.Where("type IS NULL or type = ?", Type)
-	}
+	db = filterType(db, Type)
 	if id > 0 {
 		db = db.Where("id <> ?", id)
 	}
@@ -367,12 +436,13 @@ func UpdateProjectDatabasePath(db *gorm.DB, id int64, databasePath string) error
 	return nil
 }
 
-func GetTemporaryProject(db *gorm.DB) (*schema.Project, error) {
+func GetTemporaryProject(db *gorm.DB, Type string) (*schema.Project, error) {
 	var req schema.Project
 	db = db.Model(&schema.Project{})
 	db = db.Where("folder_id = ? or folder_id IS NULL", 0)
 	db = db.Where("child_folder_id = ? or child_folder_id IS NULL", 0)
-	db = db.Where("type IS NULL or type = ?", TypeProject).Where("project_name = ?", TEMPORARY_PROJECT_NAME)
+	db = filterType(db, Type)
+	db = db.Where("project_name = ?", TEMPORARY_PROJECT_NAME)
 	db = db.First(&req)
 	if db.Error != nil {
 		return nil, utils.Errorf("get temporary Project failed: %s", db.Error)

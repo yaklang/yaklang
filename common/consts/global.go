@@ -1,11 +1,12 @@
 package consts
 
 import (
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 
 	"go.uber.org/atomic"
 
@@ -248,6 +249,14 @@ func GetDefaultBaseHomeDir() string {
 
 func GetDefaultYakitPayloadsDir() string {
 	pt := filepath.Join(GetDefaultYakitBaseDir(), "payloads")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
+
+func GetDefaultSSAProjectDir() string {
+	pt := filepath.Join(GetDefaultYakitBaseDir(), "ssa-projects")
 	if !utils.IsDir(pt) {
 		os.MkdirAll(pt, 0o777)
 	}

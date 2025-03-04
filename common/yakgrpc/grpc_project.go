@@ -10,8 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,7 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 
-	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -41,49 +38,78 @@ var currentProjectMutex = new(sync.Mutex)
 func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProjectRequest) (*ypb.Empty, error) {
 	currentProjectMutex.Lock()
 	defer currentProjectMutex.Unlock()
-	if req.GetId() > 0 {
-		db := s.GetProfileDatabase()
-		proj, err := model.GetProjectById(db, req.GetId(), yakit.TypeProject)
-		if err != nil {
-			err := yakit.InitializingProjectDatabase()
-			if err != nil {
-				log.Errorf("init db failed: %s", err)
-			}
-			return &ypb.Empty{}, nil
-		}
-		err = yakit.SetCurrentProjectById(db, req.GetId())
-		if err != nil {
-			err := yakit.InitializingProjectDatabase()
-			if err != nil {
-				log.Errorf("init db failed: %s", err)
-			}
-			return &ypb.Empty{}, nil
-		}
-		// 不是默认数据库 不需要生成文件
-		if !CheckDefault(proj.ProjectName, proj.Type, proj.FolderID, proj.ChildFolderID) {
-			old, err := os.Open(proj.DatabasePath)
-			if err != nil {
-				return nil, utils.Errorf("can't open local database: %s", err)
-			}
-			old.Close()
-		}
-
-		projectDatabase, err := gorm.Open(consts.SQLite, proj.DatabasePath)
-		if err != nil {
-			return nil, utils.Errorf("open project database failed: %s", err)
-		}
-		log.Infof("Set project db by grpc: %s", proj.DatabasePath)
-		consts.SetDefaultYakitProjectDatabaseName(proj.DatabasePath)
-		consts.SetGormProjectDatabase(projectDatabase)
-		return &ypb.Empty{}, nil
-	} else {
+	if req.GetId() <= 0 {
 		// 传入CurrentProject id为空，默认关闭当前的currentProject数据库
 		consts.GetGormProjectDatabase().Close()
+		return nil, utils.Errorf("params is empty")
 	}
-	return nil, utils.Errorf("params is empty")
+	if req.Type == "" { // empty is older front-end default,
+		req.Type = yakit.TypeProject
+	}
+
+	db := s.GetProfileDatabase()
+	proj, err := model.GetProjectById(db, req.GetId())
+	if err != nil {
+		err := yakit.InitializingProjectDatabase()
+		if err != nil {
+			log.Errorf("init db failed: %s", err)
+		}
+		return &ypb.Empty{}, nil
+	}
+	if proj.Type != req.GetType() {
+		return nil, utils.Errorf("type not match %s vs want[%s]", proj.Type, req.GetType())
+	}
+
+	err = yakit.SetCurrentProjectById(db, req.GetId())
+	if err != nil {
+		err := yakit.InitializingProjectDatabase()
+		if err != nil {
+			log.Errorf("init db failed: %s", err)
+		}
+		return &ypb.Empty{}, nil
+	}
+	// 不是默认数据库 不需要生成文件
+	if !CheckDefault(proj.ProjectName, proj.Type, proj.FolderID, proj.ChildFolderID) {
+		old, err := os.Open(proj.DatabasePath)
+		if err != nil {
+			return nil, utils.Errorf("can't open local database: %s", err)
+		}
+		old.Close()
+	}
+
+	path := proj.DatabasePath
+	log.Infof("Set project db by grpc: %s", path)
+	switch req.GetType() {
+	case yakit.TypeProject:
+		consts.SetDefaultYakitProjectDatabaseName(path)
+		consts.SetGormProjectDatabase(path)
+	case yakit.TypeSSAProject:
+		consts.SetSSAProjectDatabasePath(path)
+		consts.SetGormSSAProjectDatabaseByPath(path)
+	}
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) GetCurrentProject(ctx context.Context, _ *ypb.Empty) (*ypb.ProjectDescription, error) {
+	return s.GetCurrentProjectEx(ctx, &ypb.GetCurrentProjectExRequest{Type: yakit.TypeProject})
+}
+
+func (s *Server) GetCurrentProjectEx(ctx context.Context, req *ypb.GetCurrentProjectExRequest) (*ypb.ProjectDescription, error) {
+	currentProjectMutex.Lock()
+	defer currentProjectMutex.Unlock()
+
+	db := s.GetProfileDatabase()
+	proj, err := yakit.GetCurrentProject(db, req.GetType())
+	if err != nil {
+		return nil, utils.Errorf("cannot fetch current project")
+	}
+	return model.ToProjectGRPCModel(proj, consts.GetGormProfileDatabase()), nil
 }
 
 func (s *Server) GetProjects(ctx context.Context, req *ypb.GetProjectsRequest) (*ypb.GetProjectsResponse, error) {
+	if req.FrontendType == "" {
+		req.FrontendType = yakit.TypeProject
+	}
 	paging, data, err := yakit.QueryProject(s.GetProfileDatabase(), req)
 	if err != nil {
 		return nil, err
@@ -100,13 +126,6 @@ func (s *Server) GetProjects(ctx context.Context, req *ypb.GetProjectsRequest) (
 	}, nil
 }
 
-var projectNameRe = regexp.MustCompile(`(?i)[_a-z0-9\p{Han}][-_0-9a-z \p{Han}]*`)
-
-func projectNameToFileName(s string) string {
-	s = strings.ReplaceAll(s, "-", "_")
-	return strings.Join(projectNameRe.FindAllString(s, -1), "_")
-}
-
 var encryptProjectMagic = []byte{0xff, 0xff, 0xff, 0xff}
 
 func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*ypb.NewProjectResponse, error) {
@@ -114,25 +133,28 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 		return nil, utils.Errorf("type is empty")
 	}
 	name := req.GetProjectName() // maybe project or folder name
-	if !projectNameRe.MatchString(name) {
-		return nil, utils.Errorf("name invalid, should match pattern: %v", projectNameRe.String())
+	if err := yakit.CheckInvalidProjectName(name); err != nil {
+		return nil, err
 	}
-	var pathName string
-	isHandleProject := req.Type == yakit.TypeProject
 
+	// check this name exist
 	pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.GetFolderId(), req.GetChildFolderId(), req.GetType(), req.GetId())
 	if pro != nil {
 		return nil, utils.Errorf("Project or directory name can not be duplicated in the same directory")
 	}
 
-	if isHandleProject { // project
-		databaseName := fmt.Sprintf("yakit-project-%v-%v.sqlite3.db", projectNameToFileName(name), time.Now().Unix())
-		pathName = filepath.Join(consts.GetDefaultYakitProjectsDir(), databaseName)
-		if ok, _ := utils.PathExists(pathName); ok {
-			return nil, utils.Errorf("BUG: file already exist: %v", pathName)
-		}
+	// check is default project
+	if CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) {
+		return nil, utils.Errorf("cannot use this builtin name: %s", yakit.INIT_DATABASE_RECORD_NAME)
 	}
 
+	// create project database
+	pathName, err := yakit.CreateProjectFile(name, req.GetType())
+	if err != nil {
+		return nil, utils.Errorf("create project file failed: %v", err)
+	}
+
+	// create project in profile database
 	projectData := &schema.Project{
 		ProjectName:   req.GetProjectName(),
 		Description:   req.GetDescription(),
@@ -142,22 +164,11 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 		ChildFolderID: req.ChildFolderId,
 	}
 
-	if isHandleProject && CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) {
-		return nil, utils.Errorf("cannot use this builtin name: %s", yakit.INIT_DATABASE_RECORD_NAME)
-	}
-
 	// create
 	// insert database row
 	db := s.GetProfileDatabase()
 	if db = db.Create(&projectData); db.Error != nil {
 		return nil, db.Error
-	}
-	if isHandleProject {
-		projectDatabase, err := consts.CreateProjectDatabase(pathName)
-		if err != nil {
-			return nil, utils.Errorf("create project database failed: %s", err)
-		}
-		defer projectDatabase.Close()
 	}
 
 	return &ypb.NewProjectResponse{Id: int64(projectData.ID), ProjectName: req.GetProjectName()}, nil
@@ -168,28 +179,17 @@ func (s *Server) UpdateProject(ctx context.Context, req *ypb.NewProjectRequest) 
 		return nil, utils.Errorf("type is empty")
 	}
 	name := req.GetProjectName() // maybe project or folder name
-	if !projectNameRe.MatchString(name) {
-		return nil, utils.Errorf("name invalid, should match pattern: %v", projectNameRe.String())
+	if err := yakit.CheckInvalidProjectName(name); err != nil {
+		return nil, err
 	}
-	var pathName string
-	isHandleProject := req.Type == yakit.TypeProject
-	pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.GetFolderId(), req.GetChildFolderId(), req.GetType(), req.GetId())
-	if pro != nil {
-		return nil, utils.Errorf("not found this project")
+
+	// create file
+	pathName, err := yakit.CreateProjectFile(name, req.GetType())
+	if err != nil {
+		return nil, utils.Errorf("create project file failed: %v", err)
 	}
-	if isHandleProject { // project
-		databaseName := fmt.Sprintf("yakit-project-%v-%v.sqlite3.db", projectNameToFileName(name), time.Now().Unix())
-		pathName = filepath.Join(consts.GetDefaultYakitProjectsDir(), databaseName)
-	}
-	projectData := &schema.Project{
-		ProjectName:   req.GetProjectName(),
-		Description:   req.GetDescription(),
-		DatabasePath:  pathName,
-		Type:          req.Type,
-		FolderID:      req.FolderId,
-		ChildFolderID: req.ChildFolderId,
-	}
-	if isHandleProject && CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) {
+
+	if CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) {
 		return nil, utils.Errorf("cannot use this builtin name: %s", yakit.INIT_DATABASE_RECORD_NAME)
 	}
 	oldPro, err := yakit.GetProjectByID(s.GetProfileDatabase(), req.GetId())
@@ -197,19 +197,28 @@ func (s *Server) UpdateProject(ctx context.Context, req *ypb.NewProjectRequest) 
 		return nil, utils.Errorf("update row not exist: %v", err)
 	}
 
-	if isHandleProject && oldPro.DatabasePath != pathName { // only project should rename file, folder is virtual
+	// if type=file old.databasePath = pathName = ""
+	if oldPro.DatabasePath != pathName {
 		err = os.Rename(oldPro.DatabasePath, pathName)
 		if err != nil {
 			return nil, errors.Errorf("rename %s to %s error: %v", oldPro.DatabasePath, pathName, err)
 		}
 	}
 
-	err = yakit.UpdateProject(s.GetProfileDatabase(), req.GetId(), *projectData)
+	projectData := schema.Project{
+		ProjectName:   req.GetProjectName(),
+		Description:   req.GetDescription(),
+		DatabasePath:  pathName,
+		Type:          req.Type,
+		FolderID:      req.FolderId,
+		ChildFolderID: req.ChildFolderId,
+	}
+	err = yakit.UpdateProject(s.GetProfileDatabase(), req.GetId(), projectData)
 	if err != nil {
 		return nil, utils.Errorf("update project failed!")
 	}
 
-	return &ypb.NewProjectResponse{Id: int64(projectData.ID), ProjectName: req.GetProjectName()}, nil
+	return &ypb.NewProjectResponse{Id: int64(req.GetId()), ProjectName: req.GetProjectName()}, nil
 }
 
 func (s *Server) IsProjectNameValid(ctx context.Context, req *ypb.IsProjectNameValidRequest) (*ypb.Empty, error) {
@@ -224,23 +233,11 @@ func (s *Server) IsProjectNameValid(ctx context.Context, req *ypb.IsProjectNameV
 		return nil, utils.Errorf("project name: %s is existed", req.GetProjectName())
 	}
 
-	if !projectNameRe.MatchString(req.GetProjectName()) {
-		return nil, utils.Errorf("validate project by name failed! name should match %v", projectNameRe.String())
+	if err := yakit.CheckInvalidProjectName(req.GetProjectName()); err != nil {
+		return nil, err
 	}
 
 	return &ypb.Empty{}, nil
-}
-
-func (s *Server) GetCurrentProject(ctx context.Context, _ *ypb.Empty) (*ypb.ProjectDescription, error) {
-	currentProjectMutex.Lock()
-	defer currentProjectMutex.Unlock()
-
-	db := s.GetProfileDatabase()
-	proj, err := yakit.GetCurrentProject(db)
-	if err != nil {
-		return nil, utils.Errorf("cannot fetch current project")
-	}
-	return model.ToProjectGRPCModel(proj, consts.GetGormProfileDatabase()), nil
 }
 
 func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_ExportProjectServer) error {
@@ -259,7 +256,7 @@ func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_Exp
 		feedProgress("导出失败-"+"数据库不存在："+path, 0.9)
 		return utils.Errorf("cannot found database file in: %s", path)
 	}*/
-	proj, err := model.GetProjectById(s.GetProfileDatabase(), req.GetId(), yakit.TypeProject)
+	proj, err := model.GetProjectById(s.GetProfileDatabase(), req.GetId())
 	if err != nil {
 		feedProgress("导出失败-"+"数据库不存在：", 0.9)
 		return utils.Errorf("cannot found database file in: %s", err.Error())
@@ -283,10 +280,7 @@ func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_Exp
 	if req.GetPassword() != "" {
 		suffix = ".enc"
 	}
-	outputFile = filepath.Join(consts.GetDefaultYakitProjectsDir(),
-		"project-"+projectNameToFileName(
-			model.ToProjectGRPCModel(proj, consts.GetGormProfileDatabase()).GetProjectName(),
-		)+".yakitproject"+suffix)
+	outputFile = yakit.GetExportFile(proj.ProjectName, suffix)
 	outFp, err := os.OpenFile(outputFile, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
 		feedProgress("打开输出文件失败！", 0.5)
@@ -377,6 +371,9 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 			Percent:    progress,
 			Verbose:    utils.EscapeInvalidUTF8Byte([]byte(verbose)), // avoid invalid utf8 byte for grpc
 		})
+	}
+	if req.GetType() == "" {
+		req.Type = yakit.TypeProject // default project
 	}
 
 	feedProgress("开始导入项目: "+req.GetLocalProjectName(), 0.1)
@@ -510,18 +507,22 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 		projectName = "_default_"
 	}
 
-	_, err = s.IsProjectNameValid(stream.Context(), &ypb.IsProjectNameValidRequest{ProjectName: projectName, Type: yakit.TypeProject})
+	_, err = s.IsProjectNameValid(stream.Context(), &ypb.IsProjectNameValidRequest{ProjectName: projectName, Type: req.GetType()})
 	if err != nil {
 		projectName = projectName + fmt.Sprintf("_%v", utils.RandStringBytes(6))
-		_, err := s.IsProjectNameValid(stream.Context(), &ypb.IsProjectNameValidRequest{ProjectName: projectName, Type: yakit.TypeProject})
+		_, err := s.IsProjectNameValid(stream.Context(), &ypb.IsProjectNameValidRequest{ProjectName: projectName, Type: req.GetType()})
 		if err != nil {
 			feedProgress("创建新的项目失败："+projectName+"："+err.Error(), 0.9)
 			return utils.Errorf("cannot valid project name: %s", err)
 		}
 	}
 	feedProgress("创建新的项目："+projectName, 0.6)
-	databaseName := fmt.Sprintf("yakit-%v-%v.sqlite3.db", projectNameToFileName(projectName), time.Now().Unix())
-	fileName := filepath.Join(consts.GetDefaultYakitProjectsDir(), databaseName)
+
+	fileName, err := yakit.CreateProjectFile(projectName, req.GetType())
+	if err != nil {
+		feedProgress("创建新数据库失败："+err.Error(), 0.9)
+		return err
+	}
 	err = os.Rename(tempFp.Name(), fileName)
 	if err != nil {
 		feedProgress("创建新数据库失败："+err.Error(), 0.9)
@@ -537,7 +538,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 		ChildFolderID: req.GetChildFolderId(),
 		Type:          "project",
 	}
-	err = yakit.CreateOrUpdateProject(s.GetProfileDatabase(), projectName, req.FolderId, req.ChildFolderId, "project", proj)
+	err = yakit.CreateOrUpdateProject(s.GetProfileDatabase(), projectName, req.FolderId, req.ChildFolderId, req.GetType(), proj)
 	if err != nil {
 		feedProgress("创建项目数据失败："+err.Error(), 0.9)
 		return err
@@ -547,7 +548,9 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 }
 
 func CheckDefault(ProjectName, Type string, FolderId, ChildFolderId int64) bool {
-	if ProjectName == yakit.INIT_DATABASE_RECORD_NAME && Type == yakit.TypeProject && FolderId == 0 && ChildFolderId == 0 {
+	if ProjectName == yakit.INIT_DATABASE_RECORD_NAME && //  default name
+		(Type == yakit.TypeProject || Type == yakit.TypeSSAProject) && // yakit/sast project
+		FolderId == 0 && ChildFolderId == 0 { // no parent/child folder
 		return true
 	}
 	return false
@@ -558,20 +561,23 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 		return &ypb.Empty{}, utils.Error("invalid id")
 	}
 
+	//  get delete target programs
 	db := s.GetProfileDatabase()
 	db = db.Where(" id = ? or folder_id = ? or child_folder_id = ? ", req.GetId(), req.GetId(), req.GetId())
 	projects := yakit.YieldProject(db, ctx)
 	if projects == nil {
 		return nil, utils.Error("project is not exist")
 	}
-	defaultProject, err := yakit.GetDefaultProject(s.GetProfileDatabase())
+
+	// close current program
+	consts.GetGormProjectDatabase().Close()
+
+	// set default to current
+	defaultProg, err := s.GetDefaultProjectEx(ctx, &ypb.GetDefaultProjectExRequest{Type: req.GetType()})
 	if err != nil {
-		return nil, utils.Errorf("open project database failed: %s", err)
+		return nil, utils.Errorf("get default project err: %v", err)
 	}
-	err = yakit.SetCurrentProjectById(s.GetProfileDatabase(), int64(defaultProject.ID))
-	if err != nil {
-		return nil, utils.Errorf("open project database failed: %s", err)
-	}
+	s.SetCurrentProject(ctx, &ypb.SetCurrentProjectRequest{Id: defaultProg.Id, Type: req.GetType()})
 
 	// delete selected projects
 	for k := range projects {
@@ -580,7 +586,6 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 			break
 		}
 		if req.IsDeleteLocal {
-			consts.GetGormProjectDatabase().Close()
 			err := consts.DeleteDatabaseFile(k.DatabasePath)
 			if err != nil {
 				log.Errorf("delete local database error: %v", err)
@@ -593,24 +598,18 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 		}
 	}
 
-	// set current project
-	defaultDB, err := consts.CreateProjectDatabase(defaultProject.DatabasePath)
-	if err != nil {
-		return &ypb.Empty{}, utils.Errorf("open default project database failed: %s", err)
-	}
-
-	log.Infof("Set default project db by grpc: %s", defaultProject.DatabasePath)
-	consts.SetDefaultYakitProjectDatabaseName(defaultProject.DatabasePath)
-	consts.SetGormProjectDatabase(defaultDB)
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) GetDefaultProject(ctx context.Context, req *ypb.Empty) (*ypb.ProjectDescription, error) {
-	proj, err := yakit.GetDefaultProject(s.GetProfileDatabase())
+func (s *Server) GetDefaultProjectEx(ctx context.Context, req *ypb.GetDefaultProjectExRequest) (*ypb.ProjectDescription, error) {
+	proj, err := yakit.GetDefaultProject(s.GetProfileDatabase(), req.GetType())
 	if err != nil {
 		return nil, utils.Errorf("cannot fetch default project")
 	}
 	return model.ToProjectGRPCModel(proj, consts.GetGormProfileDatabase()), nil
+}
+func (s *Server) GetDefaultProject(ctx context.Context, req *ypb.Empty) (*ypb.ProjectDescription, error) {
+	return s.GetDefaultProjectEx(ctx, &ypb.GetDefaultProjectExRequest{Type: yakit.TypeProject})
 }
 
 func (s *Server) QueryProjectDetail(ctx context.Context, req *ypb.QueryProjectDetailRequest) (*ypb.ProjectDescription, error) {
@@ -625,10 +624,13 @@ func (s *Server) QueryProjectDetail(ctx context.Context, req *ypb.QueryProjectDe
 	return proj, nil
 }
 
-func (s *Server) GetTemporaryProject(ctx context.Context, req *ypb.Empty) (*ypb.ProjectDescription, error) {
-	proj, err := yakit.GetTemporaryProject(s.GetProfileDatabase())
+func (s *Server) GetTemporaryProjectEx(ctx context.Context, req *ypb.GetTemporaryProjectExRequest) (*ypb.ProjectDescription, error) {
+	proj, err := yakit.GetTemporaryProject(s.GetProfileDatabase(), req.GetType())
 	if err != nil {
 		return nil, utils.Errorf("cannot fetch temporary project")
 	}
 	return model.ToProjectGRPCModel(proj, consts.GetGormProfileDatabase()), nil
+}
+func (s *Server) GetTemporaryProject(ctx context.Context, req *ypb.Empty) (*ypb.ProjectDescription, error) {
+	return s.GetTemporaryProjectEx(ctx, &ypb.GetTemporaryProjectExRequest{Type: yakit.TypeProject})
 }

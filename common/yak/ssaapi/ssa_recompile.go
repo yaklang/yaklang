@@ -13,7 +13,7 @@ func (c *config) SaveProfile() {
 		prog := &schema.SSAProgram{
 			Name:          c.ProgramName,
 			Description:   c.ProgramDescription,
-			DBPath:        consts.GetSSADataBasePath(),
+			DBPath:        consts.GetSSADataBasePathDefault(consts.GetDefaultYakitBaseDir()),
 			Language:      string(c.language),
 			EngineVersion: consts.GetYakVersion(),
 			ConfigInput:   c.info,

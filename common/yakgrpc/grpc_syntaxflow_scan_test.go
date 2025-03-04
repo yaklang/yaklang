@@ -204,7 +204,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel(t *testing.T) {
 	require.Equal(t, task.Status, "done")
 }
 
-func TestGRPCMUSTPASS_Syntaxflow_Scan_Cancel_Multiple(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel_Multiple(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
