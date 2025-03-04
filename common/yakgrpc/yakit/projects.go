@@ -2,9 +2,10 @@ package yakit
 
 import (
 	"context"
+	"path/filepath"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
-	"path/filepath"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -262,38 +263,7 @@ func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Pag
 var GetProjectById = model.GetProjectById
 
 func YieldProject(db *gorm.DB, ctx context.Context) chan *schema.Project {
-	outC := make(chan *schema.Project)
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.Project
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*schema.Project](ctx, db)
 }
 
 func SetCurrentProjectById(db *gorm.DB, id int64) error {

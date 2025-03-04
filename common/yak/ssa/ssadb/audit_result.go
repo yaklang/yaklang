@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -83,32 +82,8 @@ func SaveResult(result *AuditResult) error {
 	return GetDB().Save(result).Error
 }
 
-func YieldAuditResults(DB *gorm.DB, ctx context.Context) chan *AuditResult {
-	db := DB.Model(&AuditResult{})
-
-	outC := make(chan *AuditResult)
-
-	go func() {
-		paginator := bizhelper.NewFastPaginator(db, 100)
-		for {
-			var items []*AuditResult
-			if err, ok := paginator.Next(&items); !ok {
-				break
-			} else if err != nil {
-				log.Errorf("paging failed: %s", err)
-				continue
-			}
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-		}
-	}()
-	return outC
+func YieldAuditResults(db *gorm.DB, ctx context.Context) chan *AuditResult {
+	return bizhelper.YieldModel[*AuditResult](ctx, db)
 }
 
 func (r *AuditResult) ToGRPCModel() *ypb.SyntaxFlowResult {
