@@ -10,6 +10,7 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -240,6 +241,13 @@ func (g *Group) FeedHTTPResponseBytes(rsp []byte) {
 	})
 }
 
+func (g *Group) FeedHTTPFlowBytesWithTrafficFlow(flow *pcaputil.TrafficFlow, req, rsp []byte) {
+	g.feedHTTPFlow(&HttpFlow{
+		TrafficFlow: flow,
+		Rsp:         rsp,
+		Req:         req,
+	})
+}
 func (g *Group) FeedHTTPFlowBytes(req, rsp []byte) {
 	g.feedHTTPFlow(&HttpFlow{
 		Rsp: rsp,

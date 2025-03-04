@@ -2,6 +2,9 @@ package yakcmds
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/gopacket/gopacket"
 	"github.com/urfave/cli"
 	"github.com/yaklang/pcap"
@@ -14,8 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"net/http"
-	"strings"
 )
 
 var pcapCommand = cli.Command{
@@ -160,7 +161,7 @@ var pcapCommand = cli.Command{
 				}
 				reqBytes, _ := utils.DumpHTTPRequest(req, true)
 				rspBytes, _ := utils.DumpHTTPResponse(rsp, true)
-				group.FeedHTTPFlowBytes(reqBytes, rspBytes)
+				group.FeedHTTPFlowBytesWithTrafficFlow(flow, reqBytes, rspBytes)
 			}),
 		)
 		return pcaputil.Start(opts...)
