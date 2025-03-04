@@ -16,8 +16,8 @@ func CheckAndSwitchDB(name string) *schema.SSAProgram {
 	if prog == nil {
 		return nil
 	}
-	if prog.DBPath != consts.GetSSADataBasePath() {
-		consts.SetSSADataBasePath(prog.DBPath)
+	if prog.DBPath != consts.GetSSADataBasePathDefault(consts.GetDefaultYakitBaseDir()) {
+		consts.SetSSAProjectDatabasePath(prog.DBPath)
 	}
 	return prog
 }

@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"encoding/json"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"

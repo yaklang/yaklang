@@ -2,12 +2,10 @@ package consts
 
 import (
 	"fmt"
-	"github.com/google/uuid"
-	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -15,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 type Language string
@@ -51,63 +48,43 @@ func ValidateLanguage(language string) (Language, error) {
 }
 
 var (
-	YAK_SSA_PROJECT_DB_PATH = ""
+	YAK_SSA_PROJECT_DB_PATH = "default-yakssa.db"
 	ssaDatabase             *gorm.DB
-	initSSADatabaseOnce     *sync.Once
 )
 
-func init() {
-	resetSSADB()
+const (
+	YAK_SSA_PROJECT_DB_DEFAULT = "default-yakssa.db"
+)
 
-	// use env to config ssa database
-	dialect := os.Getenv("YAK_SSA_DATABASE_DIALECT") // dialect
-	url := os.Getenv("YAK_SSA_DATABASE_URL")         // url
-	if dialect != "" && url != "" {
-		db, err := gorm.Open(dialect, url)
-		if err != nil {
-			log.Errorf("create ssa database err: %v", err)
-		} else {
-			ssaDatabase = db
-			log.Infof("init ssa database:[%s]%s", dialect, url)
-		}
+func GetSSADataBasePathDefault(base string) string {
+	if filepath.IsAbs(YAK_SSA_PROJECT_DB_PATH) {
+		return YAK_SSA_PROJECT_DB_PATH
 	}
+	return filepath.Join(base, YAK_SSA_PROJECT_DB_PATH)
 }
 
-func resetSSADB() {
-	if ssaDatabase != nil {
-		ssaDatabase.Close()
-		ssaDatabase = nil
+func SetGormSSAProjectDatabaseByPath(path string) error {
+	db, err := CreateSSAProjectDatabase(path)
+	if err != nil {
+		return err
 	}
-	initSSADatabaseOnce = new(sync.Once)
-}
-
-func GetSSADataBasePathDefault() string {
-	filename := "default-yakssa.db"
-	return filepath.Join(GetDefaultYakitBaseDir(), filename)
-}
-
-func SetSSADB(db *gorm.DB) {
 	ssaDatabase = db
-	initSSADatabaseOnce = new(sync.Once)
+	return nil
 }
 
-func SetSSADataBasePath(path string) {
+func SetGormSSAProjectDatabaseByDB(db *gorm.DB) {
+	ssaDatabase = db
+}
+
+func SetSSAProjectDatabasePath(path string) {
 	if path == "" {
 		return
 	}
 	YAK_SSA_PROJECT_DB_PATH = path
-	resetSSADB()
 }
 
-func GetSSADataBasePath() string {
-	if YAK_SSA_PROJECT_DB_PATH == "" {
-		return GetSSADataBasePathDefault()
-	}
-	return YAK_SSA_PROJECT_DB_PATH
-}
-
-func GetTempSSADataBase() (*gorm.DB, error) {
-	db, err := createAndConfigDatabase(filepath.Join(GetDefaultYakitBaseTempDir(), fmt.Sprintf("temp-yakssa-%s.db", uuid.NewString())), SQLiteExtend)
+func CreateSSAProjectDatabase(path string) (*gorm.DB, error) {
+	db, err := createAndConfigDatabase(path, SQLiteExtend)
 	if err != nil {
 		return nil, err
 	}
@@ -115,22 +92,12 @@ func GetTempSSADataBase() (*gorm.DB, error) {
 	return db, nil
 }
 
-func initSSADatabase() {
-	initSSADatabaseOnce.Do(func() {
-		// use default sqlite database
-		if ssaDatabase == nil {
-			if db, err := createAndConfigDatabase(GetSSADataBasePath(), SQLiteExtend); err != nil {
-				log.Errorf("create ssa database err: %v", err)
-			} else {
-				ssaDatabase = db
-				log.Infof("init ssa database: %s", GetSSADataBasePath())
-			}
-		}
-		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SSA_DATABASE)
-	})
+func GetTempSSADataBase() (*gorm.DB, error) {
+	path := filepath.Join(GetDefaultYakitBaseTempDir(), fmt.Sprintf("temp-yakssa-%s.db", uuid.NewString()))
+	return CreateSSAProjectDatabase(path)
 }
 
 func GetGormDefaultSSADataBase() *gorm.DB {
-	initSSADatabase()
+	initYakitDatabase()
 	return ssaDatabase
 }
