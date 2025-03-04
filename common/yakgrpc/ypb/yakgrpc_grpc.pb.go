@@ -322,6 +322,7 @@ const (
 	Yak_PromotePermissionForUserPcap_FullMethodName               = "/ypb.Yak/PromotePermissionForUserPcap"
 	Yak_SetCurrentProject_FullMethodName                          = "/ypb.Yak/SetCurrentProject"
 	Yak_GetCurrentProject_FullMethodName                          = "/ypb.Yak/GetCurrentProject"
+	Yak_GetCurrentProjectEx_FullMethodName                        = "/ypb.Yak/GetCurrentProjectEx"
 	Yak_GetProjects_FullMethodName                                = "/ypb.Yak/GetProjects"
 	Yak_NewProject_FullMethodName                                 = "/ypb.Yak/NewProject"
 	Yak_UpdateProject_FullMethodName                              = "/ypb.Yak/UpdateProject"
@@ -329,8 +330,10 @@ const (
 	Yak_RemoveProject_FullMethodName                              = "/ypb.Yak/RemoveProject"
 	Yak_DeleteProject_FullMethodName                              = "/ypb.Yak/DeleteProject"
 	Yak_GetDefaultProject_FullMethodName                          = "/ypb.Yak/GetDefaultProject"
+	Yak_GetDefaultProjectEx_FullMethodName                        = "/ypb.Yak/GetDefaultProjectEx"
 	Yak_QueryProjectDetail_FullMethodName                         = "/ypb.Yak/QueryProjectDetail"
 	Yak_GetTemporaryProject_FullMethodName                        = "/ypb.Yak/GetTemporaryProject"
+	Yak_GetTemporaryProjectEx_FullMethodName                      = "/ypb.Yak/GetTemporaryProjectEx"
 	Yak_ExportProject_FullMethodName                              = "/ypb.Yak/ExportProject"
 	Yak_ImportProject_FullMethodName                              = "/ypb.Yak/ImportProject"
 	Yak_MigrateLegacyDatabase_FullMethodName                      = "/ypb.Yak/MigrateLegacyDatabase"
@@ -847,6 +850,7 @@ type YakClient interface {
 	// 操作项目的相关接口，通过设置 ProjectDatabase
 	SetCurrentProject(ctx context.Context, in *SetCurrentProjectRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetCurrentProject(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ProjectDescription, error)
+	GetCurrentProjectEx(ctx context.Context, in *GetCurrentProjectExRequest, opts ...grpc.CallOption) (*ProjectDescription, error)
 	GetProjects(ctx context.Context, in *GetProjectsRequest, opts ...grpc.CallOption) (*GetProjectsResponse, error)
 	NewProject(ctx context.Context, in *NewProjectRequest, opts ...grpc.CallOption) (*NewProjectResponse, error)
 	UpdateProject(ctx context.Context, in *NewProjectRequest, opts ...grpc.CallOption) (*NewProjectResponse, error)
@@ -854,8 +858,10 @@ type YakClient interface {
 	RemoveProject(ctx context.Context, in *RemoveProjectRequest, opts ...grpc.CallOption) (*Empty, error)
 	DeleteProject(ctx context.Context, in *DeleteProjectRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetDefaultProject(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ProjectDescription, error)
+	GetDefaultProjectEx(ctx context.Context, in *GetDefaultProjectExRequest, opts ...grpc.CallOption) (*ProjectDescription, error)
 	QueryProjectDetail(ctx context.Context, in *QueryProjectDetailRequest, opts ...grpc.CallOption) (*ProjectDescription, error)
 	GetTemporaryProject(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ProjectDescription, error)
+	GetTemporaryProjectEx(ctx context.Context, in *GetTemporaryProjectExRequest, opts ...grpc.CallOption) (*ProjectDescription, error)
 	// 导入导出项目，带密码，带进度
 	ExportProject(ctx context.Context, in *ExportProjectRequest, opts ...grpc.CallOption) (Yak_ExportProjectClient, error)
 	ImportProject(ctx context.Context, in *ImportProjectRequest, opts ...grpc.CallOption) (Yak_ImportProjectClient, error)
@@ -4829,6 +4835,15 @@ func (c *yakClient) GetCurrentProject(ctx context.Context, in *Empty, opts ...gr
 	return out, nil
 }
 
+func (c *yakClient) GetCurrentProjectEx(ctx context.Context, in *GetCurrentProjectExRequest, opts ...grpc.CallOption) (*ProjectDescription, error) {
+	out := new(ProjectDescription)
+	err := c.cc.Invoke(ctx, Yak_GetCurrentProjectEx_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetProjects(ctx context.Context, in *GetProjectsRequest, opts ...grpc.CallOption) (*GetProjectsResponse, error) {
 	out := new(GetProjectsResponse)
 	err := c.cc.Invoke(ctx, Yak_GetProjects_FullMethodName, in, out, opts...)
@@ -4892,6 +4907,15 @@ func (c *yakClient) GetDefaultProject(ctx context.Context, in *Empty, opts ...gr
 	return out, nil
 }
 
+func (c *yakClient) GetDefaultProjectEx(ctx context.Context, in *GetDefaultProjectExRequest, opts ...grpc.CallOption) (*ProjectDescription, error) {
+	out := new(ProjectDescription)
+	err := c.cc.Invoke(ctx, Yak_GetDefaultProjectEx_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) QueryProjectDetail(ctx context.Context, in *QueryProjectDetailRequest, opts ...grpc.CallOption) (*ProjectDescription, error) {
 	out := new(ProjectDescription)
 	err := c.cc.Invoke(ctx, Yak_QueryProjectDetail_FullMethodName, in, out, opts...)
@@ -4904,6 +4928,15 @@ func (c *yakClient) QueryProjectDetail(ctx context.Context, in *QueryProjectDeta
 func (c *yakClient) GetTemporaryProject(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ProjectDescription, error) {
 	out := new(ProjectDescription)
 	err := c.cc.Invoke(ctx, Yak_GetTemporaryProject_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetTemporaryProjectEx(ctx context.Context, in *GetTemporaryProjectExRequest, opts ...grpc.CallOption) (*ProjectDescription, error) {
+	out := new(ProjectDescription)
+	err := c.cc.Invoke(ctx, Yak_GetTemporaryProjectEx_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7017,6 +7050,7 @@ type YakServer interface {
 	// 操作项目的相关接口，通过设置 ProjectDatabase
 	SetCurrentProject(context.Context, *SetCurrentProjectRequest) (*Empty, error)
 	GetCurrentProject(context.Context, *Empty) (*ProjectDescription, error)
+	GetCurrentProjectEx(context.Context, *GetCurrentProjectExRequest) (*ProjectDescription, error)
 	GetProjects(context.Context, *GetProjectsRequest) (*GetProjectsResponse, error)
 	NewProject(context.Context, *NewProjectRequest) (*NewProjectResponse, error)
 	UpdateProject(context.Context, *NewProjectRequest) (*NewProjectResponse, error)
@@ -7024,8 +7058,10 @@ type YakServer interface {
 	RemoveProject(context.Context, *RemoveProjectRequest) (*Empty, error)
 	DeleteProject(context.Context, *DeleteProjectRequest) (*Empty, error)
 	GetDefaultProject(context.Context, *Empty) (*ProjectDescription, error)
+	GetDefaultProjectEx(context.Context, *GetDefaultProjectExRequest) (*ProjectDescription, error)
 	QueryProjectDetail(context.Context, *QueryProjectDetailRequest) (*ProjectDescription, error)
 	GetTemporaryProject(context.Context, *Empty) (*ProjectDescription, error)
+	GetTemporaryProjectEx(context.Context, *GetTemporaryProjectExRequest) (*ProjectDescription, error)
 	// 导入导出项目，带密码，带进度
 	ExportProject(*ExportProjectRequest, Yak_ExportProjectServer) error
 	ImportProject(*ImportProjectRequest, Yak_ImportProjectServer) error
@@ -8104,6 +8140,9 @@ func (UnimplementedYakServer) SetCurrentProject(context.Context, *SetCurrentProj
 func (UnimplementedYakServer) GetCurrentProject(context.Context, *Empty) (*ProjectDescription, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCurrentProject not implemented")
 }
+func (UnimplementedYakServer) GetCurrentProjectEx(context.Context, *GetCurrentProjectExRequest) (*ProjectDescription, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCurrentProjectEx not implemented")
+}
 func (UnimplementedYakServer) GetProjects(context.Context, *GetProjectsRequest) (*GetProjectsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProjects not implemented")
 }
@@ -8125,11 +8164,17 @@ func (UnimplementedYakServer) DeleteProject(context.Context, *DeleteProjectReque
 func (UnimplementedYakServer) GetDefaultProject(context.Context, *Empty) (*ProjectDescription, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDefaultProject not implemented")
 }
+func (UnimplementedYakServer) GetDefaultProjectEx(context.Context, *GetDefaultProjectExRequest) (*ProjectDescription, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDefaultProjectEx not implemented")
+}
 func (UnimplementedYakServer) QueryProjectDetail(context.Context, *QueryProjectDetailRequest) (*ProjectDescription, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryProjectDetail not implemented")
 }
 func (UnimplementedYakServer) GetTemporaryProject(context.Context, *Empty) (*ProjectDescription, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTemporaryProject not implemented")
+}
+func (UnimplementedYakServer) GetTemporaryProjectEx(context.Context, *GetTemporaryProjectExRequest) (*ProjectDescription, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTemporaryProjectEx not implemented")
 }
 func (UnimplementedYakServer) ExportProject(*ExportProjectRequest, Yak_ExportProjectServer) error {
 	return status.Errorf(codes.Unimplemented, "method ExportProject not implemented")
@@ -14140,6 +14185,24 @@ func _Yak_GetCurrentProject_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetCurrentProjectEx_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCurrentProjectExRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetCurrentProjectEx(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetCurrentProjectEx_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetCurrentProjectEx(ctx, req.(*GetCurrentProjectExRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetProjects_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetProjectsRequest)
 	if err := dec(in); err != nil {
@@ -14266,6 +14329,24 @@ func _Yak_GetDefaultProject_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetDefaultProjectEx_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDefaultProjectExRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetDefaultProjectEx(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetDefaultProjectEx_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetDefaultProjectEx(ctx, req.(*GetDefaultProjectExRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_QueryProjectDetail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryProjectDetailRequest)
 	if err := dec(in); err != nil {
@@ -14298,6 +14379,24 @@ func _Yak_GetTemporaryProject_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).GetTemporaryProject(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetTemporaryProjectEx_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTemporaryProjectExRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetTemporaryProjectEx(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetTemporaryProjectEx_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetTemporaryProjectEx(ctx, req.(*GetTemporaryProjectExRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -17631,6 +17730,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_GetCurrentProject_Handler,
 		},
 		{
+			MethodName: "GetCurrentProjectEx",
+			Handler:    _Yak_GetCurrentProjectEx_Handler,
+		},
+		{
 			MethodName: "GetProjects",
 			Handler:    _Yak_GetProjects_Handler,
 		},
@@ -17659,12 +17762,20 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_GetDefaultProject_Handler,
 		},
 		{
+			MethodName: "GetDefaultProjectEx",
+			Handler:    _Yak_GetDefaultProjectEx_Handler,
+		},
+		{
 			MethodName: "QueryProjectDetail",
 			Handler:    _Yak_QueryProjectDetail_Handler,
 		},
 		{
 			MethodName: "GetTemporaryProject",
 			Handler:    _Yak_GetTemporaryProject_Handler,
+		},
+		{
+			MethodName: "GetTemporaryProjectEx",
+			Handler:    _Yak_GetTemporaryProjectEx_Handler,
 		},
 		{
 			MethodName: "MigrateLegacyDatabase",

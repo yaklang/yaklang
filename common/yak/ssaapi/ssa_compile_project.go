@@ -42,7 +42,7 @@ func (c *config) parseProject() (Programs, error) {
 		ssadb.DeleteSSAProgram(c.ProgramName)
 	}
 	if c.databasePath != "" {
-		consts.SetSSADataBasePath(c.databasePath)
+		consts.SetSSAProjectDatabasePath(c.databasePath)
 	}
 
 	if c.peepholeSize != 0 {

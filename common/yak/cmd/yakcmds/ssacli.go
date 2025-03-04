@@ -164,7 +164,7 @@ var SSACompilerCommands = []*cli.Command{
 				}
 
 				log.Infof("switch to db:%s", dbPath)
-				consts.SetSSADataBasePath(dbPath)
+				consts.SetSSAProjectDatabasePath(dbPath)
 				progs := ssadb.AllPrograms(ssadb.GetDB())
 				if len(progs) == 0 {
 					log.Errorf("no program found in database: %v", dbPath)
@@ -323,7 +323,7 @@ var SSACompilerCommands = []*cli.Command{
 				if err != nil {
 					return utils.Errorf("open database failed: %v", err)
 				}
-				consts.SetSSADB(db)
+				consts.SetGormSSAProjectDB(db)
 			}
 			// if not set dialect, use existed db
 			if databaseDialect == "" && databaseFileRaw != "" {
@@ -707,14 +707,14 @@ var SSACompilerCommands = []*cli.Command{
 				if err != nil {
 					return utils.Errorf("open database failed: %v", err)
 				}
-				consts.SetSSADB(db)
+				consts.SetGormSSAProjectDB(db)
 			} else if databaseFileRaw != "" {
 				// set database path
 				if utils.GetFirstExistedFile(databaseFileRaw) == "" {
 					// no compile ,database not existed
 					return utils.Errorf("database file not found: %v use default database", databaseFileRaw)
 				}
-				consts.SetSSADataBasePath(databaseFileRaw)
+				consts.SetSSAProjectDatabasePath(databaseFileRaw)
 			}
 
 			sarifFile := c.String("sarif")

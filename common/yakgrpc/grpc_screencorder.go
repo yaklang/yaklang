@@ -3,11 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -99,7 +100,7 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 	}
 	_ = info
 
-	proj, err := yakit.GetCurrentProject(consts.GetGormProfileDatabase())
+	proj, err := yakit.GetCurrentProject(consts.GetGormProfileDatabase(), yakit.TypeProject)
 	if err != nil {
 		return utils.Errorf("cannot bind screen recorder to proj: %v", err)
 	}

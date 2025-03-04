@@ -51,6 +51,7 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	var offset int
 
 	db = utils.GormTransactionReturnDb(db, func(tx *gorm.DB) {
+		tx = tx.Debug()
 		if tx.Count(&count); tx.Error != nil {
 			return
 		}
