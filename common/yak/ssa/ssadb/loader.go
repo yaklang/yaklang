@@ -2,8 +2,8 @@ package ssadb
 
 import (
 	"context"
+
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/glob"
 )
@@ -13,69 +13,34 @@ func YieldIrCodesProgramName(rawDB *gorm.DB, ctx context.Context, program string
 	return yieldIrCodes(db, ctx)
 }
 func yieldIrCodes(DB *gorm.DB, ctx context.Context) chan *IrCode {
-	db := DB.Model(&IrCode{})
-	outC := make(chan *IrCode)
-	go func() {
-		defer close(outC)
-
-		paginator := bizhelper.NewFastPaginator(db, 100)
-		// var page = 1
-		for {
-			var items []*IrCode
-			if err, ok := paginator.Next(&items); !ok {
-				break
-			} else if err != nil {
-				log.Errorf("paging failed: %s", err)
-				continue
-			}
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*IrCode](ctx, DB)
 }
 
 func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan *IrCode {
 	db := DB.Model(&IrIndex{})
 	outC := make(chan *IrCode)
+	filter := make(map[int64]struct{})
 	go func() {
 		defer close(outC)
-
-		filter := make(map[int64]struct{})
-
-		paginator := bizhelper.NewFastPaginator(db, 100)
-
-		for {
-			var items []*IrIndex
-			if err, ok := paginator.Next(&items); !ok {
+		for index := range bizhelper.YieldModel[*IrIndex](ctx, db) {
+			if index == nil {
 				break
-			} else if err != nil {
-				log.Errorf("paging failed: %s", err)
+			}
+			// skip duplicate
+			if _, ok := filter[index.ValueID]; ok {
 				continue
 			}
+			filter[index.ValueID] = struct{}{}
 
-			for _, d := range items {
-				id := d.ValueID
-				if _, ok := filter[id]; ok {
-					continue
-				}
-				filter[id] = struct{}{}
-
-				// get ir code
-				code := GetIrCodeById(GetDB(), id)
-
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- code:
-				}
+			// get ir code
+			code := GetIrCodeById(GetDB(), index.ValueID)
+			select {
+			case <-ctx.Done():
+				return
+			case outC <- code:
 			}
 		}
+
 	}()
 	return outC
 }

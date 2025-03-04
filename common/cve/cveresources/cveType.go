@@ -3,14 +3,15 @@ package cveresources
 import (
 	"context"
 	"encoding/json"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type CVE struct {
@@ -358,39 +359,7 @@ func CreateOrUpdateCVE(db *gorm.DB, id string, cve *CVE) error {
 }
 
 func YieldCVEs(db *gorm.DB, ctx context.Context) chan *CVE {
-	limit := 500
-	outC := make(chan *CVE, 5000)
-	go func() {
-		defer close(outC)
-
-		var page = 1
-		for {
-			var items []*CVE
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: limit,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < limit {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*CVE](ctx, db, bizhelper.WithYieldModel_PageSize(500))
 }
 
 func GetCVE(db *gorm.DB, id string) (*CVE, error) {

@@ -222,9 +222,7 @@ func YieldWebFuzzerResponseByTaskIDs(db *gorm.DB, ctx context.Context, taskIDs [
 	if len(oks) > 0 {
 		db = db.Where("ok = ?", oks[0])
 	}
-	outC := make(chan *schema.WebFuzzerResponse)
-	yieldWebFuzzerResponsesToChan(outC, db, ctx)
-	return outC
+	return yieldWebFuzzerResponsesToChan(db, ctx)
 }
 
 func SaveWebFuzzerResponse(db *gorm.DB, taskId int, hiddenIndex string, rsp *ypb.FuzzerResponse) {
@@ -272,40 +270,9 @@ func CountWebFuzzerResponses(db *gorm.DB, id int) (int, error) {
 
 func YieldWebFuzzerResponses(db *gorm.DB, ctx context.Context, id int) chan *schema.WebFuzzerResponse {
 	db = db.Model(&schema.WebFuzzerResponse{}).Where("web_fuzzer_task_id = ?", id)
-	outC := make(chan *schema.WebFuzzerResponse)
-	yieldWebFuzzerResponsesToChan(outC, db, ctx)
-	return outC
+	return yieldWebFuzzerResponsesToChan(db, ctx)
 }
 
-func yieldWebFuzzerResponsesToChan(outC chan *schema.WebFuzzerResponse, db *gorm.DB, ctx context.Context) {
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.WebFuzzerResponse
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
+func yieldWebFuzzerResponsesToChan(db *gorm.DB, ctx context.Context) chan *schema.WebFuzzerResponse {
+	return bizhelper.YieldModel[*schema.WebFuzzerResponse](ctx, db)
 }
