@@ -5,11 +5,12 @@ desc(
     lib: "java-okhttpclient-request-execute",
 )
 
-Request?{<fullTypeName>?{have: 'okhttp3.'}}.Builder()...url(,* as $output);
+Request.Builder()?{<fullTypeName>?{have: 'okhttp.'}}...url(,* as $output);
 alert $output;
 
 desc(
 lang: java,
+alert_num:1,
 'file://a.java': <<<CODE
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -28,6 +29,29 @@ public class OkHttpClientExample {
             e.printStackTrace();
         }
     }
+}
+CODE,
+)
+
+desc(
+lang: java,
+alert_num:1,
+'file://a.java': <<<CODE
+public class OkHttpClientExample {
+    @RequestMapping(value = "/three")
+        public String Three(@RequestParam(value = "url") String imageUrl) {
+            try {
+                URL url = new URL(imageUrl);
+                OkHttpClient client = new OkHttpClient();
+                com.squareup.okhttp.Request request = new com.squareup.okhttp.Request.Builder().get().url(url).build();
+                Call call = client.newCall(request);
+                Response response = call.execute();
+                return response.toString();
+            } catch (IOException var1) {
+                System.out.println(var1);
+                return "Hello";
+            }
+        }
 }
 CODE,
 )
