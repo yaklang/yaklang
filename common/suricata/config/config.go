@@ -2,12 +2,14 @@ package config
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	yaml "github.com/yaklang/yaklang/common/openapi/openapiyaml"
-	"golang.org/x/exp/maps"
+	"math/big"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	yaml "github.com/yaklang/yaklang/common/openapi/openapiyaml"
+	"golang.org/x/exp/maps"
 )
 
 const DefaultConfigYaml = `
@@ -85,7 +87,7 @@ func (c *Config) MatchVar(varName string, s any) bool {
 	case string:
 		ip := net.ParseIP(ret)
 		if ip != nil {
-			return val.hasNumber(ipToUint32(ip))
+			return val.hasNumberBigInt(ipToBigInt(ip))
 		}
 		return false
 	case int:
@@ -111,10 +113,34 @@ func NewConfig() *Config {
 	return cfg
 }
 
-func ipToUint32(ipIns net.IP) uint32 {
-	ip := ipIns.To4()
-	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
+func ipToBigInt(ipIns net.IP) *big.Int {
+	// 确保IP地址是正确的格式
+	if ip4 := ipIns.To4(); ip4 != nil {
+		// IPv4
+		result := new(big.Int)
+		return result.SetBytes(ip4)
+	} else {
+		// IPv6
+		ip6 := ipIns.To16()
+		if ip6 == nil {
+			return big.NewInt(0)
+		}
+		result := new(big.Int)
+		return result.SetBytes(ip6)
+	}
 }
+
+// 为了保持向后兼容，保留原有函数
+func ipToUint32(ipIns net.IP) uint32 {
+	result := ipToBigInt(ipIns)
+	// 如果是IPv6地址，取最后32位
+	if result.BitLen() > 32 {
+		mask := new(big.Int).SetUint64(0xFFFFFFFF)
+		result.And(result, mask)
+	}
+	return uint32(result.Uint64())
+}
+
 func (c *Config) addVarWithVarGetter(varType string, name string, v any, getter func(typ, name string) error) error {
 	req := func(name string) error {
 		err := getter(varType, name)
@@ -146,8 +172,8 @@ func (c *Config) addVarWithVarGetter(varType string, name string, v any, getter 
 			}
 			ret = strings.TrimSpace(ret)
 			if v := net.ParseIP(ret); v != nil {
-				n := ipToUint32(v)
-				return newScope(uint32(n), uint32(n)), true, nil
+				n := ipToBigInt(v)
+				return newScopeBigInt(n, n), true, nil
 			}
 			_, ipNet, err := net.ParseCIDR(ret)
 			if err == nil {
@@ -157,7 +183,7 @@ func (c *Config) addVarWithVarGetter(varType string, name string, v any, getter 
 				for i := range ipNet.Mask {
 					endIP[i] |= ^ipNet.Mask[i]
 				}
-				return newScope(ipToUint32(startIP), ipToUint32(endIP)), true, nil
+				return newScopeBigInt(ipToBigInt(startIP), ipToBigInt(endIP)), true, nil
 			}
 			if strings.HasPrefix(ret, "$") {
 				refVarName := ret[1:]
