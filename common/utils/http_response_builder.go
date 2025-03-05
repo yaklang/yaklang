@@ -329,9 +329,24 @@ type flusher interface {
 	Flush() error
 }
 
+type flusher2 interface {
+	Flush()
+}
+
+type flusher3 interface {
+	Flush() (int, error)
+}
+
 func FlushWriter(writer io.Writer) {
 	if f, ok := writer.(flusher); ok {
 		err := f.Flush()
+		if err != nil {
+			log.Warnf("flush writer failed: %s", err)
+		}
+	} else if f, ok := writer.(flusher2); ok {
+		f.Flush()
+	} else if f, ok := writer.(flusher3); ok {
+		_, err := f.Flush()
 		if err != nil {
 			log.Warnf("flush writer failed: %s", err)
 		}
