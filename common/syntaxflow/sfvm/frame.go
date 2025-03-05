@@ -63,6 +63,10 @@ func (s *SFFrame) GetRule() *schema.SyntaxFlowRule {
 	return s.rule
 }
 
+func (s *SFFrame) GetResult() *SFFrameResult {
+	return s.result
+}
+
 func (s *SFFrame) GetContext() context.Context {
 	if s == nil || s.config == nil {
 		return context.Background()

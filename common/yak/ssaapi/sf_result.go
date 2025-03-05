@@ -177,3 +177,7 @@ func (r *SyntaxFlowResult) GetProgramName() string {
 	}
 	return ""
 }
+
+func (r *SyntaxFlowResult) GetRule() *schema.SyntaxFlowRule {
+	return r.rule
+}
