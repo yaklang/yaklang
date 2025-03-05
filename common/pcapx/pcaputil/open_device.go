@@ -104,6 +104,10 @@ func IfaceNameToPcapIfaceName(name string) (string, error) {
 			return dev.Name, nil
 		}
 	}
+	if runtime.GOOS == "windows" {
+		return deviceNameToPcapGuidWindows(name)
+	}
+
 	return "", NewConvertIfaceNameError(name)
 }
 
