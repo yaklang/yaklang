@@ -47,6 +47,13 @@ alert $low for {
     type: 'audit',
     level: 'low'
 };
+include() as $info
+alert $info for{
+    title: "File contains were detected, but no vulnerabilities were detected. Please pay attention",
+    title_zh: "检测到文件包含，但是未检测到漏洞，请注意关注",
+    type: 'audit',
+    level: 'info'
+}
 
 desc(
     lang: php,

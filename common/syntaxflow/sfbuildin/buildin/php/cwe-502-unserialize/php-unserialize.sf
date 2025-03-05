@@ -44,6 +44,13 @@ alert $low for {
     type: 'low',
     level: 'low'
 }
+unserialize() as $info
+alert $info for{
+    title: "php deserialization function detected, but no vulnerability detected, please check manually",
+    title_zh: "检测到php反序列化函数，但是未检测到漏洞，请手动检查",
+    type: "info",
+    level: "info"
+}
 desc(
     lang: php,
     alert_min: 3,
