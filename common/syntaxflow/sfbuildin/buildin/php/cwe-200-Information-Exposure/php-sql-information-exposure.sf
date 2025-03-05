@@ -1,6 +1,7 @@
 desc(
    title: "php information exposure",
    title_zh: "PHP信息泄露风险",
+   type: vul,
    risk: "sql-information-exposure",
    desc: <<<TEXT
     检测可能暴露敏感信息的PHP函数调用，包括：

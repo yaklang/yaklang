@@ -20,7 +20,10 @@ var (
 func init() {
 	var err error
 	port := utils.GetRandomAvailableTCPPort()
-	serverUrl, err = sfweb.NewSyntaxFlowWebServer(context.Background(), sfweb.WithHost("127.0.0.1"), sfweb.WithPort(port), sfweb.WithHttps(false), sfweb.WithDebug(true), sfweb.WithChatGLMAPIKey(os.Getenv(sfweb.CHAT_GLM_API_KEY)))
+	serverUrl, err = sfweb.NewSyntaxFlowWebServer(
+		context.Background(),
+		sfweb.WithHost("127.0.0.1"),
+		sfweb.WithPort(port), sfweb.WithHttps(false), sfweb.WithDebug(true), sfweb.WithChatGLMAPIKey(os.Getenv(sfweb.CHAT_GLM_API_KEY)))
 	if err != nil {
 		panic(err)
 	}
