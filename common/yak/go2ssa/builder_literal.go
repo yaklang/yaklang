@@ -116,7 +116,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					kvs = b.buildLiteralValue(s, false)
 				}
 			case *ssa.AliasType: // 处理golang库
-				// TODO
 				typ = typ.(*ssa.AliasType).GetType()
 				kvs = b.buildLiteralValue(s, true)
 			default:
@@ -315,6 +314,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 		}
 
 		bp := b.CreateBlueprint(o.VerboseName)
+		// b.AssignVariable(b.CreateVariable(o.VerboseName), rvalue)
 		for n, f := range typ.GetMethod() {
 			bp.AddMethod(n, f)
 		}
