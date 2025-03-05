@@ -22,7 +22,7 @@ func TestClient_ICMP(t *testing.T) {
 	ifaceName := route.Name
 	_ = gateway
 	_ = srcIP
-	userStack, err := netstackvm.NewNetStackVirtualMachine(netstackvm.WithPcapDevice(ifaceName))
+	userStack, err := netstackvm.NewNetStackVirtualMachineEntry(netstackvm.WithPcapDevice(ifaceName))
 	require.NoError(t, err)
 
 	err = userStack.StartDHCP()

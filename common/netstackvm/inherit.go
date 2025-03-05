@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 )
 
-func (vm *NetStackVirtualMachine) GetOSNetStackIPv4() (net.IP, net.IP, net.IPMask) {
+func (vm *NetStackVirtualMachineEntry) GetOSNetStackIPv4() (net.IP, net.IP, net.IPMask) {
 	iface := vm.GetSystemInterface()
 	addrs, err := iface.Addrs()
 	if err != nil {
@@ -40,7 +40,7 @@ func (vm *NetStackVirtualMachine) GetOSNetStackIPv4() (net.IP, net.IP, net.IPMas
 	return nil, nil, nil
 }
 
-func (vm *NetStackVirtualMachine) GetOSNetStackIPv6() (net.IP, net.IP, net.IPMask) {
+func (vm *NetStackVirtualMachineEntry) GetOSNetStackIPv6() (net.IP, net.IP, net.IPMask) {
 	// 获取接口地址列表
 	addrs, err := vm.GetSystemInterface().Addrs()
 	if err != nil {
@@ -79,7 +79,7 @@ func (vm *NetStackVirtualMachine) GetOSNetStackIPv6() (net.IP, net.IP, net.IPMas
 }
 
 // InheritPcapInterfaceIP inherits the IP address of the pcap interface, set default mac address for driver(pcap endpoint)
-func (vm *NetStackVirtualMachine) InheritPcapInterfaceIP() error {
+func (vm *NetStackVirtualMachineEntry) InheritPcapInterfaceIP() error {
 	ipv4, gateway4, mask4 := vm.GetOSNetStackIPv4()
 	vm.driver.SetGatewayIP(gateway4)
 	err := vm.SetMainNICv4(ipv4, &net.IPNet{
@@ -105,7 +105,7 @@ func (vm *NetStackVirtualMachine) InheritPcapInterfaceIP() error {
 }
 
 // GetPcapInterfaceNeighborRoute returns the route of the pcap interface, should call after set main nic ip
-func (vm *NetStackVirtualMachine) GetPcapInterfaceNeighborRoute() (tcpip.Route, error) {
+func (vm *NetStackVirtualMachineEntry) GetPcapInterfaceNeighborRoute() (tcpip.Route, error) {
 	mask4 := vm.GetMainNICIPv4Netmask().Mask
 	ipv4 := vm.GetMainNICIPv4Address().To4()
 
@@ -128,7 +128,7 @@ func (vm *NetStackVirtualMachine) GetPcapInterfaceNeighborRoute() (tcpip.Route, 
 }
 
 // InheritPcapInterfaceNeighborRoute inherits the route of the pcap interface
-func (vm *NetStackVirtualMachine) InheritPcapInterfaceNeighborRoute() error {
+func (vm *NetStackVirtualMachineEntry) InheritPcapInterfaceNeighborRoute() error {
 	route, err := vm.GetPcapInterfaceNeighborRoute()
 	if err != nil {
 		return err
@@ -138,7 +138,7 @@ func (vm *NetStackVirtualMachine) InheritPcapInterfaceNeighborRoute() error {
 }
 
 // InheritPcapInterfaceConfig inherits the IP address and route of the pcap interface( will set default route, netx hop is gateway)
-func (vm *NetStackVirtualMachine) InheritPcapInterfaceConfig() error {
+func (vm *NetStackVirtualMachineEntry) InheritPcapInterfaceConfig() error {
 	err := vm.InheritPcapInterfaceIP()
 	if err != nil {
 		return err

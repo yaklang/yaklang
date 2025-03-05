@@ -8,19 +8,19 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (vm *NetStackVirtualMachine) DisallowTCP(destinationAddr string) {
+func (vm *NetStackVirtualMachineEntry) DisallowTCP(destinationAddr string) {
 	vm.driver.DisallowTCP(destinationAddr)
 }
 
-func (vm *NetStackVirtualMachine) AllowTCP(destinationAddr string) {
+func (vm *NetStackVirtualMachineEntry) AllowTCP(destinationAddr string) {
 	vm.driver.AllowTCP(destinationAddr)
 }
 
-func (vm *NetStackVirtualMachine) DisallowTCPWithSrc(destinationAddr string, srcAddr string) {
+func (vm *NetStackVirtualMachineEntry) DisallowTCPWithSrc(destinationAddr string, srcAddr string) {
 	vm.driver.DisallowTCPWithSrc(destinationAddr, srcAddr)
 }
 
-func (vm *NetStackVirtualMachine) AllowTCPWithSrc(destinationAddr string, srcAddr string) {
+func (vm *NetStackVirtualMachineEntry) AllowTCPWithSrc(destinationAddr string, srcAddr string) {
 	vm.driver.AllowTCPWithSrc(destinationAddr, srcAddr)
 }
 

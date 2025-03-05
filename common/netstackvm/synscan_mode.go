@@ -5,7 +5,7 @@ import (
 	"github.com/gopacket/gopacket/layers"
 )
 
-func (vm *NetStackVirtualMachine) SetFilterForSynScan() {
+func (vm *NetStackVirtualMachineEntry) SetFilterForSynScan() {
 	vm.driver.SetPCAPInboundFilter(func(packet gopacket.Packet) bool {
 		tcpLayerRaw := packet.Layer(layers.LayerTypeTCP)
 		if tcpLayerRaw == nil {

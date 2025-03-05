@@ -7,10 +7,11 @@ import (
 )
 
 type PingConfig struct {
-	Ctx 		  context.Context
-	defaultTcpPort string
-	timeout        time.Duration
-	proxies        []string
+	Ctx                       context.Context
+	defaultTcpPort            string
+	timeout                   time.Duration
+	linkAddressResolveTimeout time.Duration
+	proxies                   []string
 
 	// for test
 	pingNativeHandler func(ip string, timeout time.Duration) *PingResult
@@ -20,9 +21,10 @@ type PingConfig struct {
 
 func NewPingConfig() *PingConfig {
 	return &PingConfig{
-		Ctx :           context.Background(),
-		timeout:        5 * time.Second,
-		defaultTcpPort: "22,80,443",
+		Ctx:                       context.Background(),
+		timeout:                   5 * time.Second,
+		defaultTcpPort:            "22,80,443",
+		linkAddressResolveTimeout: 2 * time.Second,
 	}
 }
 
@@ -55,6 +57,12 @@ func WithTcpDialHandler(f func(ctx context.Context, addr string, proxies ...stri
 func WithTimeout(timeout time.Duration) PingConfigOpt {
 	return func(cfg *PingConfig) {
 		cfg.timeout = timeout
+	}
+}
+
+func WithLinkResolveTimeout(timeout time.Duration) PingConfigOpt {
+	return func(cfg *PingConfig) {
+		cfg.linkAddressResolveTimeout = timeout
 	}
 }
 

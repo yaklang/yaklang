@@ -2,7 +2,10 @@ package pingutil
 
 import (
 	"context"
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
@@ -53,11 +56,12 @@ func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 		if config.pingNativeHandler != nil {
 			return config.pingNativeHandler(ip, timeout)
 		} else {
-			result, err := PcapxPing(ip, config)
+			subCtx, _ := context.WithTimeout(parentCtx, timeout)
+			result, err := NetstackPing(subCtx, ip, config.linkAddressResolveTimeout)
 			if result != nil {
 				return result
 			}
-			log.Errorf("pcapx ping fail %v", err)
+			log.Errorf("netstack ping fail %v", err)
 		}
 	}
 
@@ -185,4 +189,28 @@ func PingNativeBase(ip string, cxt context.Context, timeout time.Duration) *Ping
 
 func PingNative(ip string, timeout time.Duration) *PingResult {
 	return PingNativeBase(ip, context.Background(), timeout)
+}
+
+func NetstackPing(ctx context.Context, ip string, timeout time.Duration) (*PingResult, error) {
+	if client := netstackvm.GetDefaultICMPClient(); client != nil {
+		res, err := client.Ping(ctx, ip, timeout)
+		if err != nil {
+			return nil, err
+		}
+		return CreatePingResult(res), nil
+	}
+	return nil, fmt.Errorf("netstack icmp client is not available")
+}
+
+func CreatePingResult(result *icmp.Result) *PingResult {
+	res := &PingResult{
+		IP:  result.Address.String(),
+		Ok:  result.Ok,
+		RTT: result.RTT.Milliseconds(),
+	}
+
+	if !result.Ok {
+		res.Reason = fmt.Sprintf("recv icmp type %d , code %d", result.MessageType, result.MessageCode)
+	}
+	return res
 }

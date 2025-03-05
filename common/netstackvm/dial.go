@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func (vm *NetStackVirtualMachine) DialTCP(timeout time.Duration, hostport string) (net.Conn, error) {
+func (vm *NetStackVirtualMachineEntry) DialTCP(timeout time.Duration, hostport string) (net.Conn, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic: %v", err)
@@ -24,6 +24,15 @@ func (vm *NetStackVirtualMachine) DialTCP(timeout time.Duration, hostport string
 	}
 	if !utils.IsIPv4(host) {
 		host = netx.LookupFirst(host)
+	}
+
+	if !vm.dhcpSuccess.IsSet() {
+		return net.DialTCP("tcp", &net.TCPAddr{
+			IP: vm.mainNICIPv4Address,
+		}, &net.TCPAddr{
+			IP:   net.ParseIP(host),
+			Port: port,
+		})
 	}
 
 	target := tcpip.FullAddress{

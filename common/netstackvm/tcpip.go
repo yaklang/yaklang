@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (vm *NetStackVirtualMachine) AddDefaultRoute(gateway net.IP) error {
+func (vm *NetStackVirtualMachineEntry) AddDefaultRoute(gateway net.IP) error {
 	log.Infof("start to set default route to getaway: %v", gateway)
 	vm.stack.AddRoute(tcpip.Route{
 		Destination: header.IPv4EmptySubnet,
@@ -27,7 +27,7 @@ func (vm *NetStackVirtualMachine) AddDefaultRoute(gateway net.IP) error {
 	return nil
 }
 
-func (vm *NetStackVirtualMachine) SetDefaultRoute(gateway net.IP) error {
+func (vm *NetStackVirtualMachineEntry) SetDefaultRoute(gateway net.IP) error {
 	log.Infof("start to set default route to getaway: %v", gateway)
 	vm.stack.SetRouteTable([]tcpip.Route{
 		{
@@ -46,23 +46,23 @@ func (vm *NetStackVirtualMachine) SetDefaultRoute(gateway net.IP) error {
 	return nil
 }
 
-func (vm *NetStackVirtualMachine) GetMainNICIPv4Address() net.IP {
+func (vm *NetStackVirtualMachineEntry) GetMainNICIPv4Address() net.IP {
 	return vm.mainNICIPv4Address
 }
 
-func (vm *NetStackVirtualMachine) GetMainNICIPv4Netmask() *net.IPNet {
+func (vm *NetStackVirtualMachineEntry) GetMainNICIPv4Netmask() *net.IPNet {
 	return vm.mainNICIPv4Netmask
 }
 
-func (vm *NetStackVirtualMachine) GetMainNICIPv4Gateway() net.IP {
+func (vm *NetStackVirtualMachineEntry) GetMainNICIPv4Gateway() net.IP {
 	return vm.mainNICIPv4Gateway
 }
 
-func (vm *NetStackVirtualMachine) GetMainNICLinkAddress() net.HardwareAddr {
+func (vm *NetStackVirtualMachineEntry) GetMainNICLinkAddress() net.HardwareAddr {
 	return vm.mainNICLinkAddress
 }
 
-func (vm *NetStackVirtualMachine) SetMainNICv4(ipAddr net.IP, netmask *net.IPNet, getaway net.IP) error {
+func (vm *NetStackVirtualMachineEntry) SetMainNICv4(ipAddr net.IP, netmask *net.IPNet, getaway net.IP) error {
 	if vm.mainNICID == 0 {
 		return utils.Error("main nic id not set")
 	}
