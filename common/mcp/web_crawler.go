@@ -83,7 +83,7 @@ func handleWebCrawler(s *MCPServer) server.ToolHandlerFunc {
 		ctx context.Context,
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
-		return s.commonExecYakScript(ctx,
+		return s.downloadAndExecYakScript(ctx,
 			"web_crawler",
 			"基础爬虫",
 			"eb77ddbc-e703-4e95-b59f-41b3b172ce3d",
