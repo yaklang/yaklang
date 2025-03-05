@@ -30,7 +30,7 @@ $sink #{
 }->as $result;
 
 $result - $high as $low;
-alert $mid for{
+alert $low for{
     message: "发现Java代码中可能存在命令注入漏洞。",
     level: low,
 };
@@ -140,7 +140,7 @@ EOF
 
 desc(
     lang:java,
-    alert_num:1,
+    alert_low:1,
     "file://complexDemo1.java":<<<EOF
     package com.example;
 
