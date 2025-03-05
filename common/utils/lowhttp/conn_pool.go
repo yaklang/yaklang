@@ -31,14 +31,14 @@ var (
 )
 
 var (
-	DefaultLowHttpConnPool = NewHttpConnPool(context.Background())
+	DefaultLowHttpConnPool = NewHttpConnPool(context.Background(), 100, 2)
 	errServerClosedIdle    = errors.New("conn pool: server closed idle connection")
 )
 
-func NewHttpConnPool(ctx context.Context) *LowHttpConnPool {
+func NewHttpConnPool(ctx context.Context, idleCount int, perHostCount int) *LowHttpConnPool {
 	return &LowHttpConnPool{
-		maxIdleConn:        100,
-		maxIdleConnPerHost: 2,
+		maxIdleConn:        idleCount,
+		maxIdleConnPerHost: perHostCount,
 		connCount:          0,
 		idleConnTimeout:    90 * time.Second,
 		idleConnMap:        make(map[string][]*persistConn),

@@ -588,6 +588,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		timeoutSeconds = 10
 	}
 
+	dialTimeoutSeconds := req.GetDialTimeoutSeconds()
+	if dialTimeoutSeconds <= 0 {
+		dialTimeoutSeconds = 5
+	}
+
 	task, err := yakit.SaveWebFuzzerTask(s.GetProjectDatabase(), req, 0, false, "executing...")
 	if err != nil {
 		return utils.Errorf("save to web fuzzer to database failed: %s", err)
@@ -720,6 +725,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_FuzzParams(mergedParams),
 			mutate.WithPoolOpt_ExtraFuzzOptions(extraOpt...),
 			mutate.WithPoolOpt_Timeout(timeoutSeconds),
+			mutate.WithPoolOpt_DialTimeout(dialTimeoutSeconds),
 			mutate.WithPoolOpt_Proxy(proxies...),
 			mutate.WithPoolOpt_BatchTarget(batchTarget),
 			mutate.WithPoolOpt_SizedWaitGroup(fuzzerRequestSwg),
@@ -757,7 +763,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 
 		if !req.GetDisableUseConnPool() {
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ConnPool(lowhttp.NewHttpConnPool(stream.Context())))
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ConnPool(lowhttp.NewHttpConnPool(stream.Context(), int(concurrent*50), int(concurrent))))
 		}
 
 		if !req.GetDisableHotPatch() {
