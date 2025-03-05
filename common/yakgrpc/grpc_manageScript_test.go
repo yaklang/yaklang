@@ -427,7 +427,7 @@ func TestYakScriptDelete(t *testing.T) {
 
 	t.Run("con't delete core plugin", func(t *testing.T) {
 		id1 := create(false)
-		id2 := create(true) // this is core plugin and can't be deleted
+		id2 := create(true)
 		delete(id1, id2)
 		_, err := query(id1)
 		require.Error(t, err)
@@ -436,4 +436,95 @@ func TestYakScriptDelete(t *testing.T) {
 		require.NotNil(t, script2)
 	})
 
+}
+
+func TestYakScriptSkipUpdate(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	type TestCase struct {
+		script *schema.YakScript
+	}
+
+	createScript := func(scripts ...*TestCase) {
+		for _, script := range scripts {
+			err := yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, script.script)
+			require.NoError(t, err)
+		}
+	}
+
+	deleteScript := func(scripts ...*TestCase) {
+		for _, script := range scripts {
+			require.NoError(t, yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), script.script.ScriptName))
+		}
+	}
+
+	querySkipUpdate := func(scriptName string) bool {
+		resp, err := client.QueryYakScriptSkipUpdate(context.Background(), &ypb.QueryYakScriptRequest{
+			IncludedScriptNames: []string{scriptName},
+		})
+		require.NoError(t, err)
+		return resp.SkipUpdate
+	}
+
+	setSkipUpdate := func(scriptName string, skipUpdate bool) {
+		req := &ypb.SetYakScriptSkipUpdateRequest{
+			Field:      &ypb.QueryYakScriptRequest{IncludedScriptNames: []string{scriptName}},
+			SkipUpdate: skipUpdate,
+		}
+		_, err := client.SetYakScriptSkipUpdate(context.Background(), req)
+		require.NoError(t, err)
+	}
+
+	testcases := []*TestCase{
+		{
+			script: &schema.YakScript{
+				ScriptName: "fileKeywords-test-script-1",
+				Type:       "yak",
+				Content:    "yakit.AutoInitYakit()\n\n# Input your code!\n\n// 测试",
+			},
+		},
+		{
+			script: &schema.YakScript{
+				ScriptName: "fileKeywords-script-2",
+				Type:       "yak",
+				Content:    "yakit.AutoInitYakit()\n\n# Input your code!\n\n// fileKeywords-测试-2",
+			},
+		},
+		{
+			script: &schema.YakScript{
+				ScriptName: "fileKeywords-test-3",
+				Type:       "yak",
+				Content:    "yakit.AutoInitYakit()\n\n# Input your code!\n\n// -fileKeywords-script-3",
+			},
+		},
+	}
+
+	createScript(testcases...)
+	defer deleteScript(testcases...)
+
+	t.Run("test query skip update by name", func(t *testing.T) {
+		for _, tc := range testcases {
+			skipUpdate := querySkipUpdate(tc.script.ScriptName)
+			require.False(t, skipUpdate)
+		}
+	})
+
+	t.Run("test set skip update by name", func(t *testing.T) {
+		for _, tc := range testcases {
+			setSkipUpdate(tc.script.ScriptName, true)
+			skipUpdate := querySkipUpdate(tc.script.ScriptName)
+			require.True(t, skipUpdate)
+		}
+	})
+
+	t.Run("test unset skip update by name", func(t *testing.T) {
+		for _, tc := range testcases {
+			setSkipUpdate(tc.script.ScriptName, true)
+			require.True(t, querySkipUpdate(tc.script.ScriptName))
+
+			setSkipUpdate(tc.script.ScriptName, false)
+			require.False(t, querySkipUpdate(tc.script.ScriptName))
+		}
+	})
 }

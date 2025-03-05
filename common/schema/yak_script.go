@@ -80,6 +80,8 @@ type YakScript struct {
 	CollaboratorInfo string `json:"collaborator_info"`
 
 	PluginEnvKey string `json:"plugin_env_key"`
+
+	SkipUpdate bool `json:"skip_update"`
 }
 
 func (s *YakScript) BeforeSave() error {
@@ -219,6 +221,7 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		RiskInfo:             riskDetail,
 		IsCorePlugin:         s.IsCorePlugin,
 		PluginEnvKey:         pluginEnvKey,
+		SkipUpdate:           s.SkipUpdate,
 	}
 	/*if s.Type == "mitm" {
 		script.Params = mitmPluginDefaultPlugins

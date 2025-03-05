@@ -3,10 +3,9 @@ package yakit
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 	"sync"
-
-	"github.com/yaklang/yaklang/common/schema"
 
 	"gopkg.in/yaml.v2"
 
@@ -554,8 +553,44 @@ func DeleteYakScriptByNameOrUUID(db *gorm.DB, name, uuid string) error {
 
 	if db := db.Model(&schema.YakScript{}).Where(
 		"script_name = ? or uuid = ?", name, uuid,
-	).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
+	).Where("skip_update = false").Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
+	return nil
+}
+
+func CreateOrSkipUpdateYakScriptByName(db *gorm.DB, scriptName string, i interface{}) error {
+	db = db.Model(&schema.YakScript{})
+
+	// 锁住更新步骤，太快容易整体被锁
+	yakScriptOpLock.Lock()
+	if db := db.Where("script_name = ?", scriptName).Where("skip_update = false").Assign(i).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
+		yakScriptOpLock.Unlock()
+		return utils.Errorf("create/update YakScript failed: %s", db.Error)
+	}
+	yakScriptOpLock.Unlock()
+
+	switch ret := i.(type) {
+	case *schema.YakScript:
+		return UpdateGeneralModuleFromByYakScriptName(db, scriptName, ret.IsGeneralModule)
+	case schema.YakScript:
+		return UpdateGeneralModuleFromByYakScriptName(db, scriptName, ret.IsGeneralModule)
+	}
+
+	return nil
+}
+
+func UpdateYakScriptSkipUpdate(db *gorm.DB, params *ypb.SetYakScriptSkipUpdateRequest) error {
+	yakScriptOpLock.Lock()
+	defer yakScriptOpLock.Unlock()
+	db = db.Model(&schema.YakScript{})
+	if params.Field != nil {
+		db = FilterYakScript(db, params.Field)
+	}
+	db = db.UpdateColumn("skip_update", params.SkipUpdate)
+	if db.Error != nil {
+		return utils.Errorf("UpdateYakScriptSkipUpdate failed: %v", db.Error)
+	}
+
 	return nil
 }

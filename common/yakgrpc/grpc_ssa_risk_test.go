@@ -2,6 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/bytedance/mockey"
+	"github.com/jinzhu/gorm"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"testing"
 
 	"github.com/google/uuid"
@@ -151,4 +157,71 @@ func TestSSARisk_MarkRead(t *testing.T) {
 		require.NoError(t, err)
 		check(data, false)
 	}
+}
+
+func TestSSARiskFeedbackToOnline(t *testing.T) {
+	taskID := uuid.NewString()
+
+	defer func() {
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskID},
+		})
+	}()
+	createRisk := func(filePath, serverity, risk_type string) {
+		yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+			CodeSourceUrl: filePath,
+			Severity:      schema.ValidSeverityType(serverity),
+			RiskType:      risk_type,
+			RuntimeId:     taskID,
+		})
+	}
+	createRisk("ssadb://prog1/1", "high", "risk1")
+	createRisk("ssadb://prog1/1", "low", "risk2")
+
+	checkCount := func(items chan *schema.SSARisk, expectedCount int) {
+		var results []*schema.SSARisk
+		for item := range items {
+			results = append(results, item)
+		}
+		fmt.Printf("Results: %+v\n", len(results))
+
+		require.Len(t, results, expectedCount)
+	}
+
+	{
+		data := yakit.YieldSSARisk(ssadb.GetDB(), context.Background())
+		checkCount(data, 2)
+	}
+
+	mockey.PatchConvey("Test SSARiskFeedbackToOnline", t, func() {
+		token := "valid_token"
+		req := &ypb.SSARiskFeedbackToOnlineRequest{
+			Token:  token,
+			Filter: &ypb.SSARisksFilter{},
+		}
+
+		mockey.Mock(yakit.FilterSSARisk).To(func(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
+			return db
+		}).Build()
+
+		mockey.Mock((*yaklib.OnlineClient).UploadToOnline).To(func(ctx context.Context, token string, raw []byte, urlStr string) error {
+			assert.Equal(t, token, "valid_token")
+
+			var reqBody yaklib.QueryUploadRiskOnlineRequest
+			err := json.Unmarshal(raw, &reqBody)
+			assert.NoError(t, err)
+			assert.NotNil(t, reqBody)
+			return nil
+		}).Build()
+
+		server := &TestServerWrapper{
+			onlineClient: yaklib.OnlineClient{},
+		}
+
+		resp, err := server.SSARiskFeedbackToOnline(context.Background(), req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+	})
+
 }
