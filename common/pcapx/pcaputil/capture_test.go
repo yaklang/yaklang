@@ -1,9 +1,13 @@
 package pcaputil
 
 import (
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/utils"
+	"net"
 	"testing"
 	"time"
 )
@@ -80,4 +84,29 @@ func TestBackgroundHandler(t *testing.T) {
 	if count1-count < 10 {
 		t.Fatal("count1-count < 10")
 	}
+}
+
+func TestWindowsToPcapGuid(t *testing.T) {
+	if utils.InGithubActions() {
+		t.SkipNow()
+	}
+	interfaces, err := net.Interfaces()
+	require.NoError(t, err)
+	for _, nic := range interfaces {
+
+		fmt.Println(nic.Name)
+		pcapName, err := deviceNameToPcapGuidWindows(nic.Name)
+		//require.NoError(t, err)
+		fmt.Println(err)
+		fmt.Println(pcapName)
+	}
+	//
+	fmt.Println("--------------------------------")
+
+	pcapics, err := pcap.FindAllDevs()
+	require.NoError(t, err)
+	for _, pcapic := range pcapics {
+		fmt.Println(pcapic.Name)
+	}
+
 }
