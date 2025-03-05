@@ -1,0 +1,67 @@
+desc(
+    title: "check ldap server",
+    type: audit,
+    level: info,
+    lib: 'golang-ldap-sink',
+    desc: <<<TEXT
+此规则旨在审计代码中是否使用了`path/filepath`库的相关功能，尽管`path/filepath`库本身通常不直接涉及文件写操作，但它用于处理文件路径，这在文件操作中是一个关键步骤。不当的文件路径处理可能导致安全问题，如路径遍历漏洞，攻击者可能利用此类漏洞访问或修改服务器上的敏感文件。
+TEXT
+)
+
+ldap?{<fullTypeName>?{have: 'gopkg.in/ldap.v2'}} as $entry;
+ldap?{<fullTypeName>?{have: 'github.com/nmcclain/ldap'}} as $entry;
+ldap?{<fullTypeName>?{have: 'github.com/go-ldap/ldap'}} as $entry;
+$entry.Dial <getCall> as $db;
+$db <getMembers> as $output;
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://ldap.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"log"
+
+	ldap "gopkg.in/ldap.v2"
+)
+
+func authenticate(username, password string) bool {
+	l, err := ldap.Dial("tcp", "ldap.example.com:389")
+	if err != nil {
+		log.Fatalf("Failed to connect to LDAP server: %s", err)
+	}
+	defer l.Close()
+
+	// 绑定到 LDAP 服务器
+	err = l.Bind("cn=admin,dc=example,dc=com", password)
+	if err != nil {
+		log.Fatalf("Failed to bind: %s", err)
+	}
+
+	// LDAP 查询构造
+	searchRequest := ldap.NewSearchRequest(
+		"ou=users,dc=example,dc=com",
+		ldap.ScopeWholeSubtree,
+		ldap.NeverDerefAliases,
+		0, 0, false,
+		fmt.Sprintf("(uid=%s)", username), // 潜在的注入点
+		[]string{"dn"},
+		nil,
+	)
+
+	// 执行查询
+	_, err = l.Search(searchRequest)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 这里省略了密码验证的具体实现
+	return true
+}
+
+PARAM
+)

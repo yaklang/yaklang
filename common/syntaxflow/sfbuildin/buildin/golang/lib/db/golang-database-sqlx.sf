@@ -1,0 +1,89 @@
+desc(
+    title: "check file database function",
+    type: audit,
+    level: info,
+    lib: 'golang-database-sqlx',
+    desc: <<<TEXT
+此审计规则旨在检查代码中是否正确使用了 `github.com/jmoiron/sqlx` 库进行数据库操作。`sqlx` 是一个强大的 Go 语言库，它在标准库 `database/sql` 的基础上提供了更多功能，如更便捷的查询、命名参数支持等。此审计主要关注代码中是否安全、合理地使用了数据库连接、查询、更新和删除等操作，以确保应用程序的数据安全性和稳定性。不当的数据库操作可能导致 SQL 注入、数据泄露等安全问题。
+TEXT
+)
+
+sqlx?{<fullTypeName>?{have: 'github.com/jmoiron/sqlx'}} as $entry;
+$entry.Connect <getCall> as $db;
+$entry.Open <getCall> as $db;
+$db <getMembers> as $output;
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://database.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "log"
+
+    "github.com/jmoiron/sqlx"
+    _ "modernc.org/sqlite"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func main() {
+    // 连接到 SQLite 数据库
+    db, err := sqlx.Open("sqlite", "example.db")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    // 创建用户表
+    schema := `CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        age INTEGER
+    );`
+    db.MustExec(schema)
+
+    // 插入用户数据
+    user := User{Name: "Alice", Age: 30}
+    _, err = db.NamedExec(`INSERT INTO users (name, age) VALUES (:name, :age)`, &user)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 查询用户数据
+    var users []User
+    err = db.Select(&users, "SELECT * FROM users")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 打印用户信息
+    fmt.Println("Users:")
+    for _, u := range users {
+        fmt.Printf("ID: %d, Name: %s, Age: %d\n", u.ID, u.Name, u.Age)
+    }
+
+    // 更新用户信息
+    user.Age = 31
+    _, err = db.NamedExec(`UPDATE users SET age = :age WHERE name = :name`, user)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 删除用户
+    _, err = db.Exec(`DELETE FROM users WHERE name = ?`, user.Name)
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+
+PARAM
+)
