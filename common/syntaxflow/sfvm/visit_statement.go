@@ -65,6 +65,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 		return nil
 	}
 
+	extraDesc := NewExtraDesc()
+	haveDesc := false
 	for _, item := range i.DescriptionItems().(*sf.DescriptionItemsContext).AllDescriptionItem() {
 		ret, ok := item.(*sf.DescriptionItemContext)
 		if !ok || ret.Comment() != nil { // skip comment
@@ -109,6 +111,7 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 			case "solution", "fix":
 				y.rule.Solution = value
 			default:
+				haveDesc = true
 				if strings.Contains(keyLower, "://") {
 					urlIns, _ := url.Parse(keyLower)
 					if urlIns != nil {
@@ -116,23 +119,25 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 						case "file", "fs", "filesystem":
 							if strings.HasPrefix(keyLower, ret+"://") {
 								filename := strings.TrimPrefix(keyLower, ret+"://")
-								y.verifyFilesystem[filename] = value
+								extraDesc.verifyFilesystem[filename] = value
 								continue
 							}
 						case "safe-file", "safefile", "safe-fs", "safefs", "safe-filesystem", "safefilesystem", "negative-file", "negativefs", "nfs":
 							if strings.HasPrefix(keyLower, ret+"://") {
 								filename := strings.TrimPrefix(keyLower, ret+"://")
-								y.negativeFilesystem[filename] = value
+								extraDesc.negativeFilesystem[filename] = value
 								continue
 							}
 						}
 					}
 				}
-				y.rawDesc[key] = value
+				extraDesc.rawDesc[key] = value
 			}
 		}
+		if haveDesc {
+			y.verifyFsInfo = append(y.verifyFsInfo, extraDesc)
+		}
 		y.EmitAddDescription(key, value)
-
 	}
 
 	return nil

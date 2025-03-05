@@ -12,11 +12,23 @@ import (
 )
 
 type SyntaxFlowVisitor struct {
-	rule               *schema.SyntaxFlowRule
+	rule         *schema.SyntaxFlowRule
+	verifyFsInfo []*VerifyFsInfo
+	codes        OpCodes
+}
+
+type VerifyFsInfo struct {
 	rawDesc            map[string]string
 	verifyFilesystem   map[string]string
 	negativeFilesystem map[string]string
-	codes              OpCodes
+}
+
+func NewExtraDesc() *VerifyFsInfo {
+	return &VerifyFsInfo{
+		rawDesc:            make(map[string]string),
+		verifyFilesystem:   make(map[string]string),
+		negativeFilesystem: make(map[string]string),
+	}
 }
 
 func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
@@ -24,9 +36,7 @@ func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
 		rule: &schema.SyntaxFlowRule{
 			AlertDesc: make(schema.MapEx[string, *schema.SyntaxFlowDescInfo]),
 		},
-		verifyFilesystem:   make(map[string]string),
-		negativeFilesystem: make(map[string]string),
-		rawDesc:            make(map[string]string),
+		verifyFsInfo: make([]*VerifyFsInfo, 0),
 	}
 	return sfv
 }
