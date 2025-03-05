@@ -57,12 +57,6 @@ type SFFrame struct {
 	toLeft bool
 
 	predCounter int
-
-	DebugInfoCall func(string)
-}
-
-func (c *SFFrame) SetDebugInfoCall(call func(string)) {
-	c.DebugInfoCall = call
 }
 
 func (s *SFFrame) GetRule() *schema.SyntaxFlowRule {
@@ -122,9 +116,6 @@ func newSfFrameEx(vars *omap.OrderedMap[string, ValueOperator], text string, cod
 		VerifyFs:   make(map[string]string),
 		NegativeFs: make(map[string]string),
 		ExtraDesc:  make(map[string]string),
-		DebugInfoCall: func(s string) {
-			fmt.Print(s)
-		},
 	}
 }
 
@@ -1201,12 +1192,16 @@ func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 }
 
 func (s *SFFrame) debugLog(i string, item ...any) {
+	if !s.config.debug {
+		return
+	}
+
 	filterStackLen := s.statementStack.Len()
 
 	prefix := strings.Repeat(" ", filterStackLen)
 	prefix = "sf" + fmt.Sprintf("%4d", s.idx) + "| " + prefix
 	for _, line := range strings.Split(fmt.Sprintf(i, item...), "\n") {
-		s.DebugInfoCall(prefix + line + "\n")
+		fmt.Print(prefix + line + "\n")
 	}
 }
 

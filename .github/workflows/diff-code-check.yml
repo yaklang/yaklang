@@ -77,7 +77,6 @@ jobs:
           go build ./common/yak/cmd/yak.go
 
       - name: Generate Prog And Check With SyntaxFlow
-        continue-on-error: true
         if: steps.cache-project.outputs.cache-hit != 'true'
         run: |
           pwd && ls -al
@@ -86,40 +85,34 @@ jobs:
           echo "Merge base is: $MERGE_BASE"
           ./yak sync-rule
           ./yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip
-          ./yak ssa -t ./fs.zip --program diffcode -l golang > log.txt 2>&1 || { echo "compile_fail=true" >> $GITHUB_ENV; exit 1; }
-          grep -F "Current goroutine call stack:" log.txt && { echo "compile_fail=true" >> $GITHUB_ENV; exit 1; }
-          ./yak sf --program diffcode ./common/ssa_bootstrapping/ci_rule --output debug.txt || { echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1; }
-          ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang --output debug.txt || { echo "syntaxflow_fail=true" >> $GITHUB_ENV; exit 1; }
+          ./yak ssa -t ./fs.zip --program diffcode -l golang > log.txt 2>&1 || exit 1; 
+          grep -F "Current goroutine call stack:" log.txt && exit 1;
+          ./yak sf --program diffcode ./common/ssa_bootstrapping/ci_rule --output risk.json || exit 1;
+          ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang --output risk.json || exit 1;
         # ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule --exclude-file *.pb.go > log.txt 2>&1 || exit 1
           
       - name: Upload fail log
-        if: ${{env.compile_fail == 'true'}}
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: log.txt
           path: log.txt
 
-      - name: Upload debug log
-        if: ${{env.compile_fail == 'true'}}
+      - name: Upload risk log
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: debug.txt
-          path: debug.txt
+          name: risk.json
+          path: risk.json
 
       - name: Upload database
-        if: ${{env.syntaxflow_fail == 'true'}}
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: default-yakssa.db
           path: /home/runner/yakit-projects/default-yakssa.db
 
       - name: Workflows Fail
+        if: failure()
         run: |
-          if [ "${{ env.syntaxflow_fail }}" == "true" ]; then
-            cat debug.txt
-            exit 1
-          elif [ "${{ env.compile_fail }}" == "true" ]; then
-            exit 1
-          else
-            echo "Success"
-          fi
+          jq . risk.json

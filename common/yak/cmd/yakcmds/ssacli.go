@@ -3,6 +3,7 @@ package yakcmds
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -701,7 +704,7 @@ var SSACompilerCommands = []*cli.Command{
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
 			filename := c.String("output")
-			debugInfo := false
+			saverisk := false
 
 			// set database
 			if databaseDialect != "" {
@@ -766,13 +769,24 @@ var SSACompilerCommands = []*cli.Command{
 				}
 			}()
 
+			var file *os.File
+			if filename != "" {
+				var err error
+				saverisk = true
+				file, err = os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0644)
+				if err != nil {
+					log.Warnf("create file failed: %v", err)
+				}
+				defer file.Close()
+			}
+
 			if syntaxFlow != "" {
-				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, debugInfo, sarifCallback)
+				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, saverisk, sarifCallback)
 			}
 
 			var dirChecking []string
 			handleBySyntaxFlowContent := func(syntaxFlow string) error {
-				err := SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, debugInfo, sarifCallback)
+				err := SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, saverisk, sarifCallback)
 				if err != nil {
 					return err
 				}
@@ -789,27 +803,24 @@ var SSACompilerCommands = []*cli.Command{
 				return handleBySyntaxFlowContent(string(raw))
 			}
 
-			var file *os.File
-			if filename != "" {
-				var err error
-				debugInfo = true
-				file, err = os.OpenFile("debug.txt", os.O_WRONLY|os.O_CREATE, 0644)
-				if err != nil {
-					log.Warnf("create file failed: %v", err)
-				}
-				defer file.Close()
-			}
-
 			var ruleError error
 			addError := func(err error, result *ssaapi.SyntaxFlowResult) {
 				ruleName := result.Name()
+				programName := result.GetProgramName()
+				_, risks, _ := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName}}, nil)
 				if ruleError == nil {
 					ruleError = fmt.Errorf("Fail syntaxRule name: [%s], Reason: %s\n", ruleName, err)
 				} else {
 					ruleError = fmt.Errorf("%w\nFail syntaxRule name: [%s], Reason: %s\n", ruleError, ruleName, err)
 				}
 				if file != nil {
-					io.WriteString(file, fmt.Errorf("Fail syntaxRule name: [%s], Reason: %s\n", ruleName, err).Error()+result.GetSFResult().GetDebugInfo())
+					for _, r := range risks {
+						if r.Severity == "output" {
+							continue
+						}
+						data, _ := json.Marshal(r)
+						file.WriteString(string(data))
+					}
 				}
 			}
 
@@ -820,9 +831,6 @@ var SSACompilerCommands = []*cli.Command{
 				values := result.GetAlertValues()
 				if values.Len() != 0 {
 					result.Show()
-					if file != nil {
-						io.WriteString(file, result.String()+"\n")
-					}
 					addError(errors.New("alert number is not null"), result)
 				}
 			}
@@ -922,7 +930,7 @@ var SSACompilerCommands = []*cli.Command{
 func SyntaxFlowQuery(
 	programName string, // 程序名称
 	syntaxFlow string, // 语法流
-	dbDebug, sfDebug, showDot, withCode, debugInfo bool, // 是否开启数据库调试、语法流调试、显示dot、显示代码
+	dbDebug, sfDebug, showDot, withCode, saverisk bool, // 是否开启数据库调试、语法流调试、显示dot、显示代码、保存risk信息
 	callbacks ...func(*ssaapi.SyntaxFlowResult), // 回调函数
 ) error {
 	// 捕获panic
@@ -948,9 +956,6 @@ func SyntaxFlowQuery(
 	if sfDebug {
 		opt = append(opt, ssaapi.QueryWithEnableDebug())
 	}
-	if debugInfo {
-		opt = append(opt, ssaapi.QueryWithDebugInfo())
-	}
 	var execError error
 	result, err := prog.SyntaxFlowWithError(syntaxFlow, opt...)
 	if err != nil {
@@ -964,6 +969,9 @@ func SyntaxFlowQuery(
 		return execError
 	}
 
+	if saverisk {
+		result.Save(schema.SFResultKindDebug)
+	}
 	if result != nil {
 		for _, c := range callbacks {
 			c(result)
