@@ -55,12 +55,6 @@ type SFFrame struct {
 	toLeft bool
 
 	predCounter int
-
-	DebugInfoCall func(string)
-}
-
-func (c *SFFrame) SetDebugInfoCall(call func(string)) {
-	c.DebugInfoCall = call
 }
 
 type VerifyFileSystem struct {
@@ -1213,12 +1207,16 @@ func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 }
 
 func (s *SFFrame) debugLog(i string, item ...any) {
+	if !s.config.debug {
+		return
+	}
+
 	filterStackLen := s.statementStack.Len()
 
 	prefix := strings.Repeat(" ", filterStackLen)
 	prefix = "sf" + fmt.Sprintf("%4d", s.idx) + "| " + prefix
 	for _, line := range strings.Split(fmt.Sprintf(i, item...), "\n") {
-		s.DebugInfoCall(prefix + line + "\n")
+		fmt.Print(prefix + line + "\n")
 	}
 }
 
