@@ -16,10 +16,10 @@ import (
 )
 
 var currentCPS atomic.Int64
-var lastCPS int64
+var lastCPS atomic.Int64
 
 func GetDialxCPS() int64 {
-	return (lastCPS + currentCPS.Load()) / 2
+	return lastCPS.Load()
 }
 
 func init() {
@@ -28,7 +28,7 @@ func init() {
 		for {
 			select {
 			case <-rpsTick.C:
-				lastCPS = currentCPS.Load()
+				lastCPS.Store(currentCPS.Load())
 				currentCPS.Store(0)
 			}
 		}

@@ -386,6 +386,7 @@ func _httpPool_SetFollowJSRedirect(i bool) HttpPoolConfigOption {
 func _httpPool_SetSize(i int) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.Size = i
+		config.SizedWaitGroupInstance = utils.NewSizedWaitGroup(i)
 	}
 }
 
@@ -568,7 +569,6 @@ type HttpResult struct {
 
 func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 	base := &httpPoolConfig{
-		Size:               50,
 		PerRequestTimeout:  10 * time.Second,
 		IsHttps:            false,
 		IsGmTLS:            false,
@@ -671,6 +671,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 			config.Size = 50
 		}
 
+		if config.SizedWaitGroupInstance == nil {
+			config.SizedWaitGroupInstance = utils.NewSizedWaitGroup(config.Size)
+		}
+
 		results := make(chan *HttpResult, 20480)
 		go func() {
 			defer close(results)
@@ -687,13 +691,12 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 				requestCounter         *int64 = new(int64)
 				requestFeedbackCounter *int64 = new(int64)
 				debugCounter           *int64 = new(int64)
-				swg                           = utils.NewSizedWaitGroup(config.Size)
 
 				beforeCount *int64 = new(int64)
 				afterCount  *int64 = new(int64)
 
 				// extern swg for overall concurrency  control
-				externSwg = config.SizedWaitGroupInstance
+				swg = config.SizedWaitGroupInstance
 			)
 
 			requestCounterAdd := func() {
@@ -722,9 +725,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 
 				execRequestInstance := func(targetRequest []byte) {
 					swg.Add()
-					if externSwg != nil {
-						externSwg.Add()
-					}
 					requestCounterAdd()
 
 					go func() {
@@ -733,9 +733,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								delayer.Wait()
 							}
 							swg.Done()
-							if externSwg != nil {
-								externSwg.Done()
-							}
 						}()
 
 						var finalResult *HttpResult
