@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"net/http"
 	"reflect"
 	"strings"
@@ -28,6 +29,7 @@ type httpPoolConfig struct {
 	Size                         int
 	SizedWaitGroupInstance       *utils.SizedWaitGroup
 	PerRequestTimeout            time.Duration
+	DialTimeout                  time.Duration
 	IsHttps                      bool
 	IsGmTLS                      bool
 	Host                         string
@@ -408,6 +410,12 @@ func _httpPool_PerRequestTimeout(f float64) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_DialTimeout(f float64) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.DialTimeout = utils.FloatSecondDuration(f)
+	}
+}
+
 func _httpPool_noFixContentLength(f bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.NoFixContentLength = f
@@ -675,9 +683,11 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 			config.SizedWaitGroupInstance = utils.NewSizedWaitGroup(config.Size)
 		}
 
-		results := make(chan *HttpResult, 20480)
+		results := make(chan *HttpResult, 2048)
+		cache := chanx.NewUnlimitedChanEx[*HttpResult](config.Ctx, make(chan *HttpResult, 2048), results, 2048)
+
 		go func() {
-			defer close(results)
+			defer close(cache.In)
 			defer func() {
 				if e := recover(); e != nil {
 					log.Error(e)
@@ -766,7 +776,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 									}
 								}
 							}
-							results <- finalResult
+							cache.In <- finalResult
 							requestFeedbackCounterAdd()
 						}()
 
@@ -835,6 +845,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithHost(host), lowhttp.WithPort(port),
 							lowhttp.WithPacketBytes(targetRequest),
 							lowhttp.WithTimeout(config.PerRequestTimeout),
+							lowhttp.WithConnectTimeout(config.DialTimeout),
 							lowhttp.WithRedirectTimes(redictTimes),
 							lowhttp.WithJsRedirect(config.FollowJSRedirect),
 							lowhttp.WithContext(config.Ctx),
@@ -1135,6 +1146,7 @@ var (
 	WithPoolOpt_FromPlugin                 = _httpPool_fromPlugin
 	WithPoolOpt_SNI                        = _httpPool_sni
 	WithPoolOpt_Timeout                    = _httpPool_PerRequestTimeout
+	WithPoolOpt_DialTimeout                = _httpPool_DialTimeout
 	WithPoolOpt_Concurrent                 = _httpPool_SetSize
 	WithPoolOpt_SizedWaitGroup             = _httpPool_SetSizedWaitGroup
 	WithPoolOpt_Addr                       = _httpPool_Host
