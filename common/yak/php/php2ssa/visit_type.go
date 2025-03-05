@@ -172,5 +172,5 @@ func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticType
 		}
 	}
 	log.Warnf("classBlue print not found: %s", raw.GetText())
-	return y.CreateBlueprint(yakunquote.TryUnquote(raw.GetText()))
+	return y.CreateBlueprint(yakunquote.TryUnquote(raw.GetText()), raw)
 }

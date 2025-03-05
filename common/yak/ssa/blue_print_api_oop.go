@@ -2,18 +2,19 @@ package ssa
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"strings"
 )
 
-func (pkg *Program) GetBluePrint(name string) *Blueprint {
+// GetBluePrint will get the blueprint by name. if not found and virtualImport enable,
+// it will try to create blueprint by name
+func (pkg *Program) GetBluePrint(name string, token ...CanStartStopToken) *Blueprint {
 	if pkg == nil {
 		return nil
 	}
-	return pkg.GetClassBlueprintEx(name, "")
+	return pkg.GetClassBlueprintEx(name, "", token...)
 }
 
 func (b *FunctionBuilder) GetBluePrint(name string) *Blueprint {
@@ -67,7 +68,7 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...C
 		log.Errorf("CreateBluePrintWithPkgName.InitializeWithContainer error: %s", err)
 	}
 
-	if prog.VirtualImport {
+	if b.IsVirtualImport() {
 		//generate default fullTypeName
 		packagename := b.GetProgram().PkgName
 		if packagename == "" {
@@ -80,7 +81,14 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...C
 }
 
 func (b *FunctionBuilder) CreateBlueprint(name string, tokenizer ...CanStartStopToken) *Blueprint {
-	return b.CreateBlueprintWithPkgName(name, tokenizer...)
+	blueprint := b.CreateBlueprintWithPkgName(name, tokenizer...)
+	blueprint.SetKind(BlueprintClass)
+	return blueprint
+}
+func (b *FunctionBuilder) CreateInterface(name string, tokenizer ...CanStartStopToken) *Blueprint {
+	blueprint := b.CreateBlueprint(name, tokenizer...)
+	blueprint.SetKind(BlueprintInterface)
+	return blueprint
 }
 
 func (b *FunctionBuilder) CreateBlueprintAndSetConstruct(typName string, libName ...string) *Blueprint {
@@ -141,7 +149,7 @@ func (b *FunctionBuilder) PushBlueprint(bp *Blueprint) {
 	prog.BlueprintStack.Push(bp)
 }
 
-func (b *FunctionBuilder) PeekBlueprint() *Blueprint {
+func (b *FunctionBuilder) PeekInnerBlueprint() *Blueprint {
 	prog := b.GetProgram()
 	if prog == nil {
 		return nil
@@ -163,7 +171,7 @@ func (b *FunctionBuilder) PopBlueprint() *Blueprint {
 	return prog.BlueprintStack.Pop()
 }
 
-func (b *FunctionBuilder) PeekNBlueprint(n int) *Blueprint {
+func (b *FunctionBuilder) PeekNInnerBlueprint(n int) *Blueprint {
 	prog := b.GetProgram()
 	if prog == nil {
 		return nil
@@ -172,4 +180,10 @@ func (b *FunctionBuilder) PeekNBlueprint(n int) *Blueprint {
 		return nil
 	}
 	return prog.BlueprintStack.PeekN(n)
+}
+
+func (b *FunctionBuilder) FakeGetBlueprint(lib *Program, name string, token ...CanStartStopToken) *Blueprint {
+	blueprintType := fakeGetType(lib, name, token...)
+	blueprint, _ := ToClassBluePrintType(blueprintType)
+	return blueprint
 }

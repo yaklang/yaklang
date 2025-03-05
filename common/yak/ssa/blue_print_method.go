@@ -75,13 +75,17 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 			_name := fmt.Sprintf("%s-constructor", c.Name)
 			constructor := c.GeneralUndefined(_name)
 			_method = constructor
-			_method.SetType(NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true))
+			functionType := NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true)
+			functionType.SetFullTypeNames(c.GetFullTypeNames())
+			_method.SetType(functionType)
 			c.RegisterMagicMethod(Constructor, _method)
 		case Destructor:
 			_name := fmt.Sprintf("%s-destructor", c.Name)
 			destructor := c.GeneralUndefined(_name)
 			_method = destructor
-			_method.SetType(NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true))
+			functionType := NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true)
+			functionType.SetFullTypeNames(c.GetFullTypeNames())
+			_method.SetType(functionType)
 			c.RegisterMagicMethod(Destructor, _method)
 		default:
 			return nil

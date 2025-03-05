@@ -157,9 +157,110 @@ const (
 	NativeCall_GetActualParams = "getActualParams"
 
 	NativeCall_GetActualParamLen = "getActualParamLen"
+
+	//getCurrentBlueprint is used to get the current blueprint. only function can use it
+	NativeCall_GetCurrentBlueprint = "getCurrentBlueprint"
+
+	NativeCall_ExtendsBy = "extendsBy"
+
+	NativeCall_Getblurpint = "getBluePrint"
 )
 
 func init() {
+	registerNativeCall(NativeCall_Getblurpint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				_, isBlueprint := ssa.ToClassBluePrintType(ret.node.GetType())
+				if isBlueprint {
+					result = append(result, ret)
+				}
+			default:
+				return nil
+			}
+			return nil
+		})
+		return true, sfvm.NewValues(result), nil
+	}))
+	registerNativeCall(NativeCall_ExtendsBy, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		/*
+		*a<extendsBy($b)> 判断a是否继承自b
+		 */
+		var result []sfvm.ValueOperator
+		var extends []*ssa.Blueprint
+		name := params.GetString(0)
+		val, ok := frame.GetSymbolByName(name)
+		if !ok {
+			return false, nil, utils.Errorf("can't find symbol %s", name)
+		}
+		val.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				typ, isBlueprint := ssa.ToClassBluePrintType(ret.node.GetType())
+				if isBlueprint {
+					extends = append(extends, typ)
+				}
+			default:
+				return nil
+			}
+			return nil
+		})
+		check := func(p ssa.Type) bool {
+			typ, isBlueprint := ssa.ToClassBluePrintType(p)
+			if isBlueprint {
+				return false
+			}
+			for _, extend := range extends {
+				if typ.CheckExtendBy(extend) {
+					return true
+				}
+			}
+			return false
+		}
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				node := ret.node
+				if check(node.GetType()) {
+					result = append(result, ret)
+				}
+			default:
+				return nil
+			}
+			return nil
+		})
+		return true, sfvm.NewValues(result), nil
+	}))
+	registerNativeCall(NativeCall_GetCurrentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				function, isFunction := ssa.ToFunction(ret.node)
+				if !isFunction {
+					return nil
+				}
+				blueprint := function.GetCurrentBlueprint()
+				if blueprint == nil {
+					return nil
+				}
+				val := ssa.NewConstWithRange(blueprint.Name, function.GetRange())
+				val.SetIsFromDB(true)
+				val.SetType(blueprint)
+				result = append(result, prog.NewValue(val))
+			default:
+				return nil
+			}
+			return nil
+		})
+		return true, sfvm.NewValues(result), nil
+	}))
+
 	registerNativeCall(NativeCall_GetActualParamLen, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		vs, err := v.GetAllCallActualParams()
 		if err != nil {
@@ -693,49 +794,49 @@ func init() {
 	registerNativeCall(
 		NativeCall_TypeName,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+			/*
+				java.io.File #-> File
+			*/
 			var vals []sfvm.ValueOperator
-			err := v.Recursive(func(operator sfvm.ValueOperator) error {
-				val, ok := operator.(*Value)
-				if !ok {
-					return nil
+			var tmpMap = make(map[string]struct{})
+			addVals := func(val *Value, typ string) {
+				_, ok := tmpMap[typ]
+				if ok {
+					return
 				}
-				typ := val.GetType()
-				if typ == nil || typ.t == nil {
-					return utils.Errorf("native call type name failed: the value have %s no type", val.String())
-				}
-				fts := typ.t.GetFullTypeNames()
-				var results []string
-				if len(fts) == 0 {
-					results = append(results, typ.String())
-				} else {
-					for _, ft := range fts {
-						//remove versioin name
-						ft = yakunquote.TryUnquote(ft)
-						index := strings.Index(ft, ":")
-						if index != -1 {
-							ft = ft[:index]
-							results = append(results, ft)
-						}
-
-						// get type name
-						lastIndex := strings.LastIndex(ft, ".")
-						if lastIndex != -1 && len(ft) > lastIndex+1 {
-							results = append(results, ft[lastIndex+1:])
-						}
-						results = append(results, ft)
+				tmpMap[typ] = struct{}{}
+				vx := val.NewValue(ssa.NewConstWithRange(typ, val.GetRange()))
+				vx.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+				vals = append(vals, vx)
+			}
+			v.Recursive(func(operator sfvm.ValueOperator) error {
+				switch val := operator.(type) {
+				case *Value:
+					typ := val.GetType()
+					if typ == nil || typ.t == nil {
+						return utils.Errorf("native call type name failed: the value have %s no type", val.String())
 					}
-				}
-				results = utils.RemoveRepeatStringSlice(results)
-				for _, result := range results {
-					v := val.NewValue(ssa.NewConstWithRange(result, val.GetRange()))
-					v.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-					vals = append(vals, v)
+					fts := typ.t.GetFullTypeNames()
+					if len(fts) == 0 {
+						addVals(val, typ.String())
+					} else {
+						for _, ft := range fts {
+							ft = yakunquote.TryUnquote(ft)
+							index := strings.Index(ft, ":")
+							if index != -1 {
+								ft = ft[:index]
+								addVals(val, ft)
+							}
+							lastIndex := strings.LastIndex(ft, ".")
+							if lastIndex != -1 && len(ft) > lastIndex+1 {
+								addVals(val, ft[lastIndex+1:])
+							}
+							addVals(val, ft)
+						}
+					}
 				}
 				return nil
 			})
-			if err != nil {
-				return false, nil, err
-			}
 			if len(vals) > 0 {
 				return true, sfvm.NewValues(vals), nil
 			}
@@ -751,6 +852,20 @@ func init() {
 		NativeCall_FullTypeName,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
+			var tmpMap = make(map[string]struct{})
+			addVals := func(val *Value, typ string, rangeIf memedit.RangeIf) {
+				if typ == "" {
+					return
+				}
+				_, exist := tmpMap[typ]
+				if exist {
+					return
+				}
+				tmpMap[typ] = struct{}{}
+				results := val.NewValue(ssa.NewConstWithRange(typ, rangeIf))
+				results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
+				vals = append(vals, results)
+			}
 			err := v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
@@ -762,14 +877,11 @@ func init() {
 				}
 				fts := typ.t.GetFullTypeNames()
 				if len(fts) == 0 {
-					results := val.NewValue(ssa.NewConstWithRange(typ.String(), val.GetRange()))
-					vals = append(vals, results)
+					addVals(val, typ.String(), val.GetRange())
 				} else {
 					for _, ft := range fts {
 						ft = yakunquote.TryUnquote(ft)
-						results := val.NewValue(ssa.NewConstWithRange(ft, val.GetRange()))
-						results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
-						vals = append(vals, results)
+						addVals(val, ft, val.GetRange())
 					}
 				}
 

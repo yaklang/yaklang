@@ -203,7 +203,6 @@ type Program struct {
 	ProgramKind     ProgramKind // is library or application
 	Language        string
 	magicMethodName []string
-	VirtualImport   bool
 	// from pom.xml file
 	SCAPackages []*dxtypes.Package
 
@@ -345,8 +344,9 @@ type Function struct {
 	isGeneric bool
 	// runtime function return type
 	currentReturnType Type
-	// static CallBack
 
+	//if blueprint method,we need record.
+	currentBlueprint *Blueprint
 }
 
 func (f *Function) SetCurrentReturnType(t Type) {

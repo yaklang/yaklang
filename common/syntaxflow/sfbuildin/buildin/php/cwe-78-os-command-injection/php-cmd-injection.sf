@@ -10,6 +10,7 @@ TEXT
 )
 <include('php-os-exec')>(* as $sink);
 <include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
 <include('php-filter-function')> as $filter;
 
 check $sink;

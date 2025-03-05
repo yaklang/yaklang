@@ -96,7 +96,6 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 	subProg.externBuildValueHandler = prog.externBuildValueHandler
 	subProg.ExternInstance = prog.ExternInstance
 	subProg.ExternLib = prog.ExternLib
-	subProg.VirtualImport = prog.VirtualImport
 	subProg.ExportType = make(map[string]Type)
 	subProg.ExportValue = make(map[string]Value)
 
@@ -111,7 +110,9 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 	subProg.fixImportCallback = make([]func(), 0)
 	return subProg
 }
-
+func (prog *Program) IsVirtualImport() bool {
+	return prog.config.VirtualImport
+}
 func (prog *Program) GetSubProgram(name string, path ...string) *Program {
 	child, ok := prog.UpStream.Get(name)
 	if !ok {

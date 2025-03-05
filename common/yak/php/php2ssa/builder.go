@@ -38,6 +38,7 @@ func (s *SSABuild) Create() ssa.Builder {
 			ssa.LanguageConfigTryBuildValue,
 			ssa.LanguageConfigIsSupportClass,
 			ssa.LanguageConfigIsSupportClassStaticModifier,
+			ssa.LanguageConfigVirtualImport,
 		),
 	}
 }
@@ -102,7 +103,6 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 }
 
 func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().VirtualImport = true
 	builder.GetProgram().GetApplication().Build("", editor, builder)
 }
 

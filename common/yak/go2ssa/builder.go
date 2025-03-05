@@ -26,7 +26,10 @@ var Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(ssa.LanguageConfigIsBinding),
+		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
+			ssa.LanguageConfigIsBinding,
+			ssa.LanguageConfigVirtualImport,
+		),
 	}
 }
 
