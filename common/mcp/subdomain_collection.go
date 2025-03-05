@@ -35,7 +35,7 @@ func handleSubdomainCollection(s *MCPServer) server.ToolHandlerFunc {
 		ctx context.Context,
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
-		return s.commonExecYakScript(ctx,
+		return s.downloadAndExecYakScript(ctx,
 			"subdomain_collection",
 			"子域名收集",
 			"8cc4491d-5b77-43ea-b6ea-3f78b99b73e2",

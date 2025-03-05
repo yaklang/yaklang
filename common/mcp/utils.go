@@ -84,7 +84,7 @@ func handleExecMessage(content string) string {
 	return content
 }
 
-func (s *MCPServer) commonExecYakScript(ctx context.Context, taskName, scriptName, scriptUUID string, request mcp.CallToolRequest, handler func(ypb.Yak_DebugPluginClient, string) (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error) {
+func (s *MCPServer) downloadAndExecYakScript(ctx context.Context, taskName, scriptName, scriptUUID string, request mcp.CallToolRequest, handler func(ypb.Yak_DebugPluginClient, string) (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error) {
 	var script *ypb.YakScript
 
 	rsp, err := s.grpcClient.QueryYakScript(ctx, &ypb.QueryYakScriptRequest{
