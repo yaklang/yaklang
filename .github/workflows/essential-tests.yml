@@ -232,6 +232,8 @@ jobs:
             run: |
               # cli
               go test --timeout 1m ./common/utils/cli
+              # mcp
+              go test --timeout 1m ./common/mcp/convert
               # doc
               go test --timeout 1m  ./common/yak/yakdoc/...
           - name: Test BinParser
