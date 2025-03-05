@@ -225,6 +225,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		clientHelloSpec      = option.ClientHelloSpec
 		dialer               = option.Dialer
 	)
+	connectTimeout = 2 * time.Second
 	if reqIns == nil {
 		// create new request instance for httpctx
 		reqIns, _ = utils.ReadHTTPRequestFromBytes(requestPacket)
