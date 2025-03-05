@@ -3,11 +3,36 @@ package ai
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestDashscope_Search(t *testing.T) {
+	if utils.InGithubActions() {
+		return
+	}
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fail()
+	}
+	keyPath := filepath.Join(dir, `yakit-projects/yaklang-bailian-apikey.txt`)
+	keyContent, _ := os.ReadFile(keyPath)
+	ch, err := StructuredStream("web fuzzer 用法", aispec.WithType("yaklang-com-search"), aispec.WithAPIKey(string(keyContent)))
+	if err != nil {
+		t.Fail()
+	}
+	for data := range ch {
+		if strings.HasPrefix(data.OutputNodeId, "End_") {
+			println(data.OutputText)
+		}
+	}
+}
 
 func TestAutoUpdateAiList(t *testing.T) {
 	cfg := yakit.GetNetworkConfig()
@@ -15,7 +40,7 @@ func TestAutoUpdateAiList(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() {           // restore the original value
+	defer func() { // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
@@ -51,6 +76,16 @@ func TestAutoUpdateAiList(t *testing.T) {
 
 type TestGateway struct {
 	config *aispec.AIConfig
+}
+
+func (t *TestGateway) SupportedStructuredStream() bool {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *TestGateway) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (t *TestGateway) Chat(s string, function ...aispec.Function) (string, error) {
@@ -94,7 +129,7 @@ func TestClientStreamExtInfo(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() {           // restore the original value
+	defer func() { // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
