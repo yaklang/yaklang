@@ -100,15 +100,18 @@ func DownloadOnlineAuthProxy(baseUrl string) error {
 }
 
 type OnlinePluginParam struct {
-	Field        string `json:"field"`
-	DefaultValue string `json:"default_value"`
-	TypeVerbose  string `json:"type_verbose"`
-	FieldVerbose string `json:"field_verbose"`
-	Help         string `json:"help"`
-	Required     bool   `json:"required"`
-	Group        string `json:"group"`
-	ExtraSetting string `json:"extra_setting"`
-	MethodType   string `json:"method_type"`
+	Field                    string `json:"field"`
+	DefaultValue             string `json:"default_value"`
+	TypeVerbose              string `json:"type_verbose"`
+	FieldVerbose             string `json:"field_verbose"`
+	Help                     string `json:"help"`
+	Required                 bool   `json:"required"`
+	Group                    string `json:"group"`
+	ExtraSetting             string `json:"extra_setting"`
+	MethodType               string `json:"method_type"`
+	JsonSchema               string `json:"json_schema"`
+	SuggestionDataExpression string `json:"suggestion_data_expression"`
+	UISchema                 string `json:"ui_schema"`
 }
 
 type OnlinePaging struct {
@@ -408,15 +411,18 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 		var params []*ypb.YakScriptParam
 		for _, paramInstance := range i.Params {
 			params = append(params, &ypb.YakScriptParam{
-				Field:        paramInstance.Field,
-				DefaultValue: paramInstance.DefaultValue,
-				TypeVerbose:  paramInstance.TypeVerbose,
-				FieldVerbose: paramInstance.FieldVerbose,
-				Help:         paramInstance.Help,
-				Required:     paramInstance.Required,
-				Group:        paramInstance.Group,
-				ExtraSetting: paramInstance.ExtraSetting,
-				MethodType:   paramInstance.MethodType,
+				Field:                    paramInstance.Field,
+				DefaultValue:             paramInstance.DefaultValue,
+				TypeVerbose:              paramInstance.TypeVerbose,
+				FieldVerbose:             paramInstance.FieldVerbose,
+				Help:                     paramInstance.Help,
+				Required:                 paramInstance.Required,
+				Group:                    paramInstance.Group,
+				ExtraSetting:             paramInstance.ExtraSetting,
+				MethodType:               paramInstance.MethodType,
+				JsonSchema:               paramInstance.JsonSchema,
+				SuggestionDataExpression: paramInstance.SuggestionDataExpression,
+				UISchema:                 paramInstance.UISchema,
 			})
 		}
 		raw, _ := json.Marshal(params)
@@ -526,7 +532,7 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 	}
 
 	if len(scripts) == 1 {
-		err := yakit.CreateOrUpdateYakScriptByName(db, scripts[0].ScriptName, scripts[0])
+		err := yakit.CreateOrSkipUpdateYakScriptByName(db, scripts[0].ScriptName, scripts[0])
 		if err != nil {
 			log.Errorf("save [%s] to local failed: %s", scripts[0].ScriptName, err)
 			return err
@@ -534,7 +540,7 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 	}
 
 	for _, i := range scripts {
-		err := yakit.CreateOrUpdateYakScriptByName(db, i.ScriptName, i)
+		err := yakit.CreateOrSkipUpdateYakScriptByName(db, i.ScriptName, i)
 		if err != nil {
 			log.Errorf("save [%s] to local failed: %s", i.ScriptName, err)
 		}
@@ -777,15 +783,18 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 	_ = json.Unmarshal([]byte(r), &yakScriptParams)
 	for _, v := range yakScriptParams {
 		paramsJson = append(paramsJson, &OnlinePluginParam{
-			Field:        v.Field,
-			DefaultValue: v.DefaultValue,
-			TypeVerbose:  v.TypeVerbose,
-			FieldVerbose: v.FieldVerbose,
-			Help:         v.Help,
-			Required:     v.Required,
-			Group:        v.Group,
-			ExtraSetting: v.ExtraSetting,
-			MethodType:   v.MethodType,
+			Field:                    v.Field,
+			DefaultValue:             v.DefaultValue,
+			TypeVerbose:              v.TypeVerbose,
+			FieldVerbose:             v.FieldVerbose,
+			Help:                     v.Help,
+			Required:                 v.Required,
+			Group:                    v.Group,
+			ExtraSetting:             v.ExtraSetting,
+			MethodType:               v.MethodType,
+			JsonSchema:               v.JsonSchema,
+			SuggestionDataExpression: v.SuggestionDataExpression,
+			UISchema:                 v.UISchema,
 		})
 	}
 	tagsJson := strings.Split(tags, ",")

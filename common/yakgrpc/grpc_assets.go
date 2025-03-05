@@ -672,8 +672,15 @@ func (s *Server) UploadRiskToOnline(ctx context.Context, req *ypb.UploadRiskToOn
 		if err != nil {
 			continue
 		}
+		raw, err := json.Marshal(yaklib.QueryUploadRiskOnlineRequest{
+			req.ProjectName,
+			content,
+		})
+		if err != nil {
+			continue
+		}
 		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-		err = client.UploadRiskToOnlineWithToken(ctx, req, content)
+		err = client.UploadToOnline(ctx, req.Token, raw, "api/risk/upload")
 		if err != nil {
 			log.Errorf("uploadRiskToOnline failed: %s", err)
 			return &ypb.Empty{}, nil
@@ -1008,4 +1015,34 @@ func AvailableRiskIP(db *gorm.DB) ([]*ypb.FieldGroup, error) {
 	}
 
 	return riskIP, nil
+}
+
+func (s *Server) RiskFeedbackToOnline(ctx context.Context, req *ypb.UploadRiskToOnlineRequest) (*ypb.Empty, error) {
+	if req.Token == "" || req.Hash == nil {
+		return nil, utils.Errorf("params empty")
+	}
+	db := s.GetProjectDatabase()
+	db = bizhelper.ExactQueryStringArrayOr(db, "hash", req.Hash)
+	data := yakit.YieldRisks(db, context.Background())
+	for k := range data {
+		content, err := json.Marshal(k)
+		if err != nil {
+			continue
+		}
+		raw, err := json.Marshal(yaklib.QueryUploadRiskOnlineRequest{
+			"",
+			content,
+		})
+		if err != nil {
+			continue
+		}
+		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+		err = client.UploadToOnline(ctx, req.Token, raw, "api/risk/feed/back")
+		if err != nil {
+			log.Errorf("uploadRiskToOnline failed: %s", err)
+			return &ypb.Empty{}, nil
+		}
+	}
+
+	return &ypb.Empty{}, nil
 }

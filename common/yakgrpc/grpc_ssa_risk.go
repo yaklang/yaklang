@@ -2,6 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
@@ -71,4 +76,32 @@ func (s *Server) NewSSARiskRead(ctx context.Context, req *ypb.NewSSARiskReadRequ
 		return nil, err
 	}
 	return &ypb.NewSSARiskReadResponse{}, nil
+}
+
+func (s *Server) SSARiskFeedbackToOnline(ctx context.Context, req *ypb.SSARiskFeedbackToOnlineRequest) (*ypb.Empty, error) {
+	if req.Token == "" {
+		return nil, utils.Errorf("params empty")
+	}
+	db := s.GetSSADatabase()
+	db = yakit.FilterSSARisk(db, req.Filter)
+	data := yakit.YieldSSARisk(db, context.Background())
+	for k := range data {
+		content, err := json.Marshal(k)
+		if err != nil {
+			continue
+		}
+		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+
+		raw, err := json.Marshal(yaklib.QueryUploadRiskOnlineRequest{
+			"",
+			content,
+		})
+		err = client.UploadToOnline(ctx, req.Token, raw, "api/ssa/risk/feed/back")
+		if err != nil {
+			log.Errorf("uploadRiskToOnline failed: %s", err)
+			return &ypb.Empty{}, nil
+		}
+	}
+
+	return &ypb.Empty{}, nil
 }

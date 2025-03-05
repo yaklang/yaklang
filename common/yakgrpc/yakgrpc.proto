@@ -187,6 +187,8 @@ service Yak {
   rpc ExportLocalYakScriptStream(ExportLocalYakScriptRequest) returns (stream ExportYakScriptLocalResponse);
 
   rpc ImportYakScript(ImportYakScriptRequest) returns (stream ImportYakScriptResult);
+  rpc SetYakScriptSkipUpdate(SetYakScriptSkipUpdateRequest) returns (Empty);
+  rpc QueryYakScriptSkipUpdate(QueryYakScriptRequest) returns (QueryYakScriptSkipUpdateResponse);
 
   // YakScript Group
   rpc QueryYakScriptGroup(QueryYakScriptGroupRequest) returns (QueryYakScriptGroupResponse);
@@ -434,11 +436,13 @@ service Yak {
   rpc QueryAvailableTarget(Empty) returns (Fields);
   rpc QueryNewRisk(QueryNewRiskRequest) returns (QueryNewRiskResponse);
   rpc NewRiskRead(NewRiskReadRequest) returns (Empty);
+  // 风险漏洞自动同步
   rpc UploadRiskToOnline(UploadRiskToOnlineRequest) returns (Empty);
   rpc SetTagForRisk(SetTagForRiskRequest) returns (Empty);
   rpc QueryRiskTags(Empty) returns (QueryRiskTagsResponse);
   rpc RiskFieldGroup(Empty) returns (RiskFieldGroupResponse);
-
+  // 误报反馈
+  rpc RiskFeedbackToOnline(UploadRiskToOnlineRequest) returns (Empty);
 
   // Report
   rpc QueryReports(QueryReportsRequest) returns(QueryReportsResponse);
@@ -754,6 +758,8 @@ service Yak {
   rpc UpdateSSARiskTags(UpdateSSARiskTagsRequest)returns(DbOperateMessage);
   rpc GetSSARiskFieldGroup(Empty) returns (SSARiskFieldGroupResponse);
   rpc NewSSARiskRead(NewSSARiskReadRequest) returns (NewSSARiskReadResponse);
+
+  rpc SSARiskFeedbackToOnline(SSARiskFeedbackToOnlineRequest) returns (Empty);
 
   rpc GetAllPluginEnv(Empty) returns (PluginEnvData);
   rpc QueryPluginEnv(QueryPluginEnvRequest) returns (PluginEnvData);
@@ -3215,6 +3221,7 @@ message NewRiskReadRequest {
 message UploadRiskToOnlineRequest {
   string Token = 1;
   string ProjectName = 2;
+  repeated string Hash = 3;
 }
 
 message SetTagForRiskRequest {
@@ -4108,6 +4115,7 @@ message YakScript {
   repeated YakRiskInfo RiskInfo = 36;
   bool IsUpdate = 37;
   repeated string PluginEnvKey = 38;
+  bool SkipUpdate = 39;
 }
 
 message Collaborator {
@@ -4191,6 +4199,15 @@ message ImportYakScriptResult {
   double Progress = 1;
   string Message = 2;
   string MessageType = 3;
+}
+
+message SetYakScriptSkipUpdateRequest{
+  bool SkipUpdate = 1;
+  QueryYakScriptRequest Field = 2;
+}
+
+message QueryYakScriptSkipUpdateResponse {
+  bool SkipUpdate = 1;
 }
 
 message QueryYakScriptGroupRequest {
@@ -6141,6 +6158,11 @@ message NewSSARiskReadRequest {
   SSARisksFilter Filter = 1;
 }
 message NewSSARiskReadResponse {
+}
+
+message SSARiskFeedbackToOnlineRequest {
+  string Token = 1;
+  SSARisksFilter Filter = 2;
 }
 
 message ExportSyntaxFlowsRequest {

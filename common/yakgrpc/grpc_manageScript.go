@@ -1177,3 +1177,30 @@ func (s *Server) ExportLocalYakScriptStream(req *ypb.ExportLocalYakScriptRequest
 
 	return nil
 }
+
+func (s *Server) SetYakScriptSkipUpdate(ctx context.Context, req *ypb.SetYakScriptSkipUpdateRequest) (*ypb.Empty, error) {
+	err := yakit.UpdateYakScriptSkipUpdate(s.GetProfileDatabase(), req)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) QueryYakScriptSkipUpdate(ctx context.Context, req *ypb.QueryYakScriptRequest) (*ypb.QueryYakScriptSkipUpdateResponse, error) {
+	var (
+		total      int
+		skipUpdate = true
+	)
+	db := s.GetProfileDatabase().Model(&schema.YakScript{})
+	db = yakit.FilterYakScript(db, req)
+	db = db.Where("skip_update = false").Count(&total)
+	if db.Error != nil {
+		return nil, db.Error
+	}
+	if total > 0 {
+		skipUpdate = false
+	}
+	return &ypb.QueryYakScriptSkipUpdateResponse{
+		SkipUpdate: skipUpdate,
+	}, nil
+}
