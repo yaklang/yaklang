@@ -1,8 +1,8 @@
 package pcapx
 
 import (
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -129,4 +129,15 @@ func CopyTCP(t *layers.TCP) *layers.TCP {
 		}),
 		Padding: utils.CopyBytes(t.Padding),
 	}
+}
+func seriGopkt(layers ...gopacket.SerializableLayer) ([]byte, error) {
+	buffer := gopacket.NewSerializeBuffer()
+	err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}, layers...)
+	if err != nil {
+		return nil, errors.Wrap(err, "serialize gopacket error")
+	}
+	return buffer.Bytes(), nil
 }

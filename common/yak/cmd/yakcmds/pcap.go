@@ -2,7 +2,6 @@ package yakcmds
 
 import (
 	"fmt"
-	"github.com/google/gopacket"
 	"net/http"
 	"strings"
 
