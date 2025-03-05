@@ -287,6 +287,12 @@ funcA(222);
 			`"funcA("`: "funcA(",
 		})
 	})
+
+	t.Run("check auto select to call", func(t *testing.T) {
+		s.SearchAndCheck(t, "all", "funcA(111)", false, map[string]string{
+			"Function-funcA(111)": "funcA(111)",
+		})
+	})
 }
 
 func TestSSASearch_OnceSearch_MultipleQueryKind(t *testing.T) {
@@ -347,6 +353,7 @@ funcA(222);
 	s.Check(t, "const", result, map[string]string{
 		`"funcA("`: "funcA(",
 	})
+
 }
 
 func TestSSASearch_MultipleSearch_HitCache(t *testing.T) {
@@ -416,4 +423,5 @@ funcA(222);
 		resultGot := s.RunSearch("all", str, true)
 		require.NotEqual(t, result1, resultGot)
 	})
+
 }

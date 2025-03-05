@@ -24,11 +24,11 @@ progName = cli.String("progName", cli.setHelp("输入当前的项目名，将从
 
 cli.check()
 
-kind = "all"
+kind_input = "all"
 if len(kinds) > 0 {
-    kind = kinds[0]
+    kind_input = kinds[0]
 }
-
+kind = kind_input
 
 var resultID = ""
 // check cache
@@ -165,8 +165,13 @@ if kind != "all" {
         tmprule = f(rule)
         targetRule += tmprule + "\n"
     }
-    targetRule += "$const + $file + $function + $call + $symbol as $all"
     rule = targetRule
+}
+
+// set output, because kind will modify by processContent, like: () set to call 
+// so use kind_input, if kind_input is all, will output all kind
+if kind_input == "all" {
+    rule += "$const + $file + $function + $call + $symbol as $all"
 }
 
 
