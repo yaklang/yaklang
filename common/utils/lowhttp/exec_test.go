@@ -634,3 +634,16 @@ Host: %v
 	})
 
 }
+
+func TestLowhttpH2Downgrade(t *testing.T) {
+	httpsHost, httpsPort := utils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Length: 1\r\n\r\na"))
+	t.Run("http2 Downgrade http1", func(t *testing.T) {
+		_, err := HTTPWithoutRedirect(WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/2
+Host: %v 
+
+`, utils.HostPort(httpsHost, httpsPort)))), WithHttps(true))
+		require.NoError(t, err)
+	})
+
+}
