@@ -328,6 +328,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		requestURI = uri
 		if strings.HasPrefix(proto, "HTTP/2") || forceHttp2 {
 			enableHttp2 = true
+			withConnPool = true
 		} else if strings.HasPrefix(proto, "HTTP/3") || forceHttp3 {
 			enableHttp3 = true
 		}
@@ -614,7 +615,7 @@ RECONNECT:
 		httpctx.SetBareResponseBytes(reqIns, responsePacket)
 		response.RawPacket = responsePacket
 		return response, nil
-	} else if withConnPool || enableHttp2 {
+	} else if withConnPool {
 		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
 	} else {
 		conn, err = netx.DialX(originAddr, dialopts...)
@@ -678,41 +679,42 @@ RECONNECT:
 			enableHttp2 = false
 			method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
 			requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
-		}
-		h2Conn := pc.alt
-		if h2Conn == nil {
-			return nil, utils.Error("conn h2 Processor is nil")
-		}
+		} else {
+			h2Conn := pc.alt
+			if h2Conn == nil {
+				return nil, utils.Error("conn h2 Processor is nil")
+			}
 
-		h2Stream, err := h2Conn.newStream(reqIns, requestPacket)
-		if err != nil {
-			if err == CreateStreamAfterGoAwayErr {
-				goto RECONNECT
-			} else {
-				return nil, err
+			h2Stream, err := h2Conn.newStream(reqIns, requestPacket)
+			if err != nil {
+				if err == CreateStreamAfterGoAwayErr {
+					goto RECONNECT
+				} else {
+					return nil, err
+				}
 			}
-		}
 
-		currentRPS.Add(1)
-		if err := h2Stream.doRequest(); err != nil {
-			if h2Stream.ID == 1 { // first stream
-				return nil, err
-			} else {
-				goto RECONNECT
+			currentRPS.Add(1)
+			if err := h2Stream.doRequest(); err != nil {
+				if h2Stream.ID == 1 { // first stream
+					return nil, err
+				} else {
+					goto RECONNECT
+				}
 			}
-		}
-		resp, responsePacket, err := h2Stream.waitResponse(timeout)
-		_ = resp
-		if err != nil {
-			if conn.(*persistConn).shouldRetryRequest(err) {
-				goto RECONNECT
-			} else {
-				return nil, err
+			resp, responsePacket, err := h2Stream.waitResponse(timeout)
+			_ = resp
+			if err != nil {
+				if conn.(*persistConn).shouldRetryRequest(err) {
+					goto RECONNECT
+				} else {
+					return nil, err
+				}
 			}
+			httpctx.SetBareResponseBytes(reqIns, responsePacket)
+			response.RawPacket = responsePacket
+			return response, nil
 		}
-		httpctx.SetBareResponseBytes(reqIns, responsePacket)
-		response.RawPacket = responsePacket
-		return response, nil
 	}
 
 	var multiResponses []*http.Response
