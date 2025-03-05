@@ -99,8 +99,8 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 			freeValues[k.GetId()] = v.GetId()
 		}
 		params["current_blueprint"] = -1
-		if ret.CurrentBlueprint != nil {
-			typid := SaveTypeToDB(ret.CurrentBlueprint)
+		if ret.currentBlueprint != nil {
+			typid := SaveTypeToDB(ret.currentBlueprint)
 			params["current_blueprint"] = typid
 		}
 		params["is_method"] = ret.isMethod
@@ -559,7 +559,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			typ := GetTypeFromDB(currentBlueprint)
 			blueprint, ok := ToClassBluePrintType(typ)
 			if ok {
-				ret.CurrentBlueprint = blueprint
+				ret.currentBlueprint = blueprint
 			}
 		}
 		if ses := params["side_effect"]; ses != nil && funk.IsIteratee(ses) {

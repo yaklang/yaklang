@@ -175,10 +175,8 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			}
 			blueprint.SetKind(ssa.BlueprintClass)
 			y.MarkedThisClassBlueprint = blueprint
-			y.CurrentBlueprint = blueprint
 			defer func() {
 				y.MarkedThisClassBlueprint = nil
-				y.CurrentBlueprint = nil
 			}()
 			y.GetProgram().SetExportType(name, blueprint)
 			if i.Extends() != nil {

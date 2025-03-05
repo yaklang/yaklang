@@ -79,3 +79,14 @@ class A {
 		ssatest.CheckSyntaxFlow(t, code, `in<fullTypeName> as $output`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
+func TestNativeCallBlueprint(t *testing.T) {
+	code := `package main;
+public class OuterClass {
+    public static void main(String[] args) {
+    }
+}
+`
+	ssatest.CheckSyntaxFlow(t, code, `main<getCurrentBlueprint><fullTypeName> as $sink`, map[string][]string{
+		"sink": {`"main.OuterClass"`},
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}

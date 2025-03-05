@@ -2,6 +2,7 @@ desc(
    title: "FTP Information Exposure",
    title_zh: "FTP信息泄露风险",
    risk: "information-exposure",
+   type: vul,
    level: "low",
    desc: <<<TEXT
 检测可能通过FTP相关函数泄露服务器敏感信息，包括：

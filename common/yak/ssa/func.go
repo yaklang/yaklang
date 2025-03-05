@@ -65,10 +65,10 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 }
 
 func (f *Function) SetCurrentBlueprint(blueprint *Blueprint) {
-	f.CurrentBlueprint = blueprint
+	f.currentBlueprint = blueprint
 }
 func (f *Function) GetCurrentBlueprint() *Blueprint {
-	return f.CurrentBlueprint
+	return f.currentBlueprint
 }
 func (f *Function) GetType() Type {
 	if f.Type != nil {

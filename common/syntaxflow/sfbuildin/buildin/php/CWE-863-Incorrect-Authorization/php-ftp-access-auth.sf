@@ -2,6 +2,7 @@ desc(
     title: "FTP Parameter Validation Risk",
     title_zh: "FTP参数验证风险",
     level: "low",
+    type: vul,
     risk: "unsafe-ftp-parameter-validation",
     desc: <<<TEXT
     当文件操作函数（如copy/rename/symlink）未验证用户输入时，攻击者可通过构造恶意路径实现文件覆盖/删除或路径穿越攻击

@@ -245,7 +245,7 @@ func init() {
 				if !isFunction {
 					return nil
 				}
-				blueprint := function.CurrentBlueprint
+				blueprint := function.GetCurrentBlueprint()
 				if blueprint == nil {
 					return nil
 				}

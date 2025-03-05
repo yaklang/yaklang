@@ -346,7 +346,7 @@ type Function struct {
 	currentReturnType Type
 
 	//if blueprint method,we need record.
-	CurrentBlueprint *Blueprint
+	currentBlueprint *Blueprint
 }
 
 func (f *Function) SetCurrentReturnType(t Type) {

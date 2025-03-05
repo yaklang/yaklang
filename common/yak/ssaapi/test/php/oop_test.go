@@ -272,7 +272,9 @@ class Backend extends \app\common\controller\Base{
 	public function aa(){}
 }
 `)
-		ssatest.CheckSyntaxFlowWithFS(t, fs, `aa<getCurrentBlueprint><fullTypeName> as $output`, map[string][]string{}, true, ssaapi.WithLanguage(ssaapi.PHP))
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `aa<getCurrentBlueprint><fullTypeName> as $output`, map[string][]string{
+			"output": {"app.BaseController"},
+		}, true, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
 func TestStaticBlueprint(t *testing.T) {
