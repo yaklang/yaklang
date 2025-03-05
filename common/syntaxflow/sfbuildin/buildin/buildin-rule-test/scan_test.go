@@ -26,15 +26,16 @@ func TestVerifiedRule(t *testing.T) {
 		if err != nil {
 			t.Fatalf("compile rule %s error: %s", rule.RuleName, err)
 		}
-		if len(f.VerifyFs) > 0 || len(f.NegativeFs) > 0 {
-			t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
-				t.Log("Start to verify: " + rule.RuleName)
-				err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t)
-				if err != nil {
-					t.Fatal(err)
-				}
-			})
+		if len(f.VerifyFsInfo) == 0 {
+			continue
 		}
+		t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
+			t.Log("Start to verify: " + rule.RuleName)
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
@@ -43,7 +44,6 @@ func TestVerify_DEBUG(t *testing.T) {
 		t.SkipNow()
 		return
 	}
-
 	yakit.InitialDatabase()
 	ruleName := "java-path-travel-directly.sf"
 
@@ -56,7 +56,7 @@ func TestVerify_DEBUG(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(f.VerifyFs) > 0 || len(f.NegativeFs) > 0 {
+	if len(f.VerifyFsInfo) != 0 {
 		t.Run(rule.RuleName, func(t *testing.T) {
 			t.Log("Start to verify: " + rule.RuleName)
 			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t)
