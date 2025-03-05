@@ -2,13 +2,14 @@ package cveresources
 
 import (
 	"context"
+	"strconv"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 type CWE struct {
@@ -95,38 +96,7 @@ func (c *CWE) BeforeSave() error {
 	return nil
 }
 func YieldCWEs(db *gorm.DB, ctx context.Context) chan *CWE {
-	outC := make(chan *CWE)
-	go func() {
-		defer close(outC)
-
-		var page = 1
-		for {
-			var items []*CWE
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*CWE](ctx, db, bizhelper.WithYieldModel_PageSize(1000))
 }
 
 func GetCWEById(db *gorm.DB, id int) (*CWE, error) {

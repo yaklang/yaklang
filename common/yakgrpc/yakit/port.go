@@ -198,38 +198,7 @@ type SimplePort struct {
 }
 
 func YieldSimplePorts(db *gorm.DB, ctx context.Context) chan *SimplePort {
-	outC := make(chan *SimplePort)
-	go func() {
-		defer close(outC)
-
-		var page = 1
-		for {
-			var items []*SimplePort
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*SimplePort](ctx, db)
 }
 
 func YieldPorts(db *gorm.DB, ctx context.Context) chan *schema.Port {

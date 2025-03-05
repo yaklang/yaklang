@@ -2,14 +2,14 @@ package yakit
 
 import (
 	"context"
+	"sort"
+	"strings"
+
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sort"
-	"strings"
 )
 
 func CreateOrUpdateDomain(db *gorm.DB, hash string, i interface{}) error {
@@ -106,36 +106,5 @@ func QueryDomain(db *gorm.DB, params *ypb.QueryDomainsRequest) (*bizhelper.Pagin
 }
 
 func YieldDomains(db *gorm.DB, ctx context.Context) chan *schema.Domain {
-	outC := make(chan *schema.Domain)
-	go func() {
-		defer close(outC)
-
-		var page = 1
-		for {
-			var items []*schema.Domain
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*schema.Domain](ctx, db)
 }

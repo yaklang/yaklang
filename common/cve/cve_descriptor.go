@@ -216,36 +216,5 @@ func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIClient) error {
 }
 
 func YieldCVEDescriptions(db *gorm.DB, ctx context.Context) chan *CVEDescription {
-	outC := make(chan *CVEDescription)
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*CVEDescription
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*CVEDescription](ctx, db)
 }

@@ -276,38 +276,7 @@ func TidyGeneralStorage(db *gorm.DB) {
 }
 
 func YieldGeneralStorages(db *gorm.DB, ctx context.Context) chan *schema.GeneralStorage {
-	outC := make(chan *schema.GeneralStorage)
-	go func() {
-		defer close(outC)
-
-		page := 1
-		for {
-			var items []*schema.GeneralStorage
-			if _, b := bizhelper.NewPagination(&bizhelper.Param{
-				DB:    db,
-				Page:  page,
-				Limit: 1000,
-			}, &items); b.Error != nil {
-				log.Errorf("paging failed: %s", b.Error)
-				return
-			}
-
-			page++
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-
-			if len(items) < 1000 {
-				return
-			}
-		}
-	}()
-	return outC
+	return bizhelper.YieldModel[*schema.GeneralStorage](ctx, db)
 }
 
 func GetNetworkConfig() *ypb.GlobalNetworkConfig {
