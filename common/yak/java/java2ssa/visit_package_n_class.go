@@ -160,6 +160,10 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	})
 
 	container := blueprint.Container()
+	y.MarkedThisClassBlueprint = blueprint
+	defer func() {
+		y.MarkedThisClassBlueprint = nil
+	}()
 	y.VisitClassBody(i.ClassBody(), blueprint)
 	return container
 }
