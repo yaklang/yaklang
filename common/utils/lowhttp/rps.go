@@ -6,10 +6,10 @@ import (
 )
 
 var currentRPS atomic.Int64
-var lastRPS int64
+var lastRPS atomic.Int64
 
 func GetLowhttpRPS() int64 {
-	return (lastRPS + currentRPS.Load()) / 2
+	return lastRPS.Load()
 }
 
 func init() {
@@ -18,7 +18,7 @@ func init() {
 		for {
 			select {
 			case <-rpsTicker.C:
-				lastRPS = currentRPS.Load()
+				lastRPS.Store(currentRPS.Load())
 				currentRPS.Store(0)
 			}
 		}
