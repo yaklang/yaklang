@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net"
@@ -395,11 +396,15 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 	if key.https && key.scheme == H2 {
 		switch conn := newConn.(type) {
 		case *tls.Conn:
-			if conn.ConnectionState().NegotiatedProtocol == H1 {
+			if conn.ConnectionState().NegotiatedProtocol != H2 {
 				key.scheme = H1
 			}
 		case *utls.UConn:
-			if conn.ConnectionState().NegotiatedProtocol == H1 {
+			if conn.ConnectionState().NegotiatedProtocol != H2 {
+				key.scheme = H1
+			}
+		case *gmtls.Conn:
+			if conn.ConnectionState().NegotiatedProtocol != H2 {
 				key.scheme = H1
 			}
 		}
