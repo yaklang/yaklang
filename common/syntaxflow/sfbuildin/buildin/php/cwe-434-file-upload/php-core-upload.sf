@@ -14,7 +14,7 @@ _FILES.* as $params
 _FILES as $params
 
 move_uploaded_file(* as $source)
-./move|putFile/?{<getFunction><getCurrentBlueprint><fullTypeName>?{have: "Controller"}} as $source
+./move|putFile/?{<getFunc><getCurrentBlueprint><fullTypeName>?{have: "Controller"}} as $source
 
 $source #{
     include: `* & $params`,
