@@ -34,9 +34,7 @@ type SFFrame struct {
 	config *Config
 	rule   *schema.SyntaxFlowRule
 
-	VerifyFs   map[string]string
-	NegativeFs map[string]string
-	ExtraDesc  map[string]string
+	VerifyFsInfo []*VerifyFsInfo
 
 	// install meta info and result info
 	result *SFFrameResult
@@ -59,6 +57,41 @@ type SFFrame struct {
 	predCounter int
 }
 
+type VerifyFileSystem struct {
+	vfs       filesys_interface.FileSystem
+	checkInfo map[string]string
+}
+
+func (v *VerifyFileSystem) GetVirtualFs() filesys_interface.FileSystem {
+	return v.vfs
+}
+
+func (v *VerifyFileSystem) GetExtraInfo(key string, backup ...string) string {
+	result, ok := v.checkInfo[key]
+	if ok {
+		return result
+	}
+	for _, b := range backup {
+		result, ok := v.checkInfo[b]
+		if ok {
+			return result
+		}
+	}
+	return ""
+}
+
+func (v *VerifyFileSystem) GetExtraInfoInt(key string, backup ...string) int {
+	result := v.GetExtraInfo(key, backup...)
+	if result == "" {
+		return 0
+	}
+	val, err := strconv.Atoi(result)
+	if err != nil {
+		return 0
+	}
+	return val
+}
+
 func (s *SFFrame) GetRule() *schema.SyntaxFlowRule {
 	return s.rule
 }
@@ -68,32 +101,6 @@ func (s *SFFrame) GetContext() context.Context {
 		return context.Background()
 	}
 	return s.config.GetContext()
-}
-
-func (s *SFFrame) GetExtraInfo(key string, backup ...string) string {
-	result, ok := s.ExtraDesc[key]
-	if ok {
-		return result
-	}
-	for _, b := range backup {
-		result, ok := s.ExtraDesc[b]
-		if ok {
-			return result
-		}
-	}
-	return ""
-}
-
-func (s *SFFrame) GetExtraInfoInt(key string, backup ...string) int {
-	result := s.GetExtraInfo(key, backup...)
-	if result == "" {
-		return 0
-	}
-	val, err := strconv.Atoi(result)
-	if err != nil {
-		return 0
-	}
-	return val
 }
 
 func newSfFrameEx(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI, rule *schema.SyntaxFlowRule, config *Config) *SFFrame {
@@ -106,12 +113,10 @@ func newSfFrameEx(vars *omap.OrderedMap[string, ValueOperator], text string, cod
 	}
 
 	return &SFFrame{
-		Text:       text,
-		Codes:      codes,
-		rule:       rule,
-		VerifyFs:   make(map[string]string),
-		NegativeFs: make(map[string]string),
-		ExtraDesc:  make(map[string]string),
+		Text:         text,
+		Codes:        codes,
+		rule:         rule,
+		VerifyFsInfo: make([]*VerifyFsInfo, 0),
 	}
 }
 
@@ -119,56 +124,66 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 	return newSfFrameEx(vars, text, codes, nil, nil)
 }
 
-func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() (consts.Language, filesys_interface.FileSystem, error) {
+func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() (consts.Language, []*VerifyFileSystem, error) {
 	val, err := consts.ValidateLanguage(s.rule.Language)
 	if err != nil {
 		log.Warnf("validate language failed: %s", err)
 	}
-	if s.VerifyFs == nil || len(s.VerifyFs) <= 0 {
-		return "", nil, utils.Wrap(err, "validator verify failed")
-	}
-
-	vfs := filesys.NewVirtualFs()
-	for name, content := range s.VerifyFs {
-		if val == "" {
-			lidx := strings.LastIndex(name, ".")
-			if lidx > 0 {
-				val, _ = consts.ValidateLanguage(name[lidx+1:])
-			}
+	var result []*VerifyFileSystem
+	for _, desc := range s.VerifyFsInfo {
+		if len(desc.verifyFilesystem) == 0 {
+			continue
 		}
-		vfs.AddFile(name, content)
+		verify := &VerifyFileSystem{}
+		vfs := filesys.NewVirtualFs()
+		for name, content := range desc.verifyFilesystem {
+			if val == "" {
+				lidx := strings.LastIndex(name, ".")
+				if lidx > 0 {
+					val, _ = consts.ValidateLanguage(name[lidx+1:])
+				}
+			}
+			vfs.AddFile(name, content)
+		}
+		verify.vfs = vfs
+		verify.checkInfo = desc.rawDesc
+		result = append(result, verify)
 	}
-
 	if val == "" {
-		return "", nil, utils.Wrap(err, "validator language not found")
+		return val, result, utils.Wrap(err, "validator language not found")
 	}
-	return val, vfs, nil
+	return val, result, nil
 }
 
-func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() (consts.Language, filesys_interface.FileSystem, error) {
+func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() (consts.Language, []*VerifyFileSystem, error) {
 	val, err := consts.ValidateLanguage(s.rule.Language)
 	if err != nil {
 		log.Warnf("validate language failed: %s", err)
 	}
-	if s.NegativeFs == nil || len(s.NegativeFs) <= 0 {
-		return "", nil, utils.Wrap(err, "validator verify failed")
-	}
-
-	vfs := filesys.NewVirtualFs()
-	for name, content := range s.NegativeFs {
-		if val == "" {
-			lidx := strings.LastIndex(name, ".")
-			if lidx > 0 {
-				val, _ = consts.ValidateLanguage(name[lidx+1:])
-			}
+	var result []*VerifyFileSystem
+	for _, desc := range s.VerifyFsInfo {
+		if len(desc.negativeFilesystem) == 0 {
+			continue
 		}
-		vfs.AddFile(name, content)
+		verify := &VerifyFileSystem{}
+		vfs := filesys.NewVirtualFs()
+		for name, content := range desc.negativeFilesystem {
+			if val == "" {
+				lidx := strings.LastIndex(name, ".")
+				if lidx > 0 {
+					val, _ = consts.ValidateLanguage(name[lidx+1:])
+				}
+			}
+			vfs.AddFile(name, content)
+		}
+		verify.vfs = vfs
+		verify.checkInfo = desc.rawDesc
+		result = append(result, verify)
 	}
-
 	if val == "" {
-		return "", nil, utils.Wrap(err, "validator language not found")
+		return val, result, utils.Wrap(err, "validator language not found")
 	}
-	return val, vfs, nil
+	return val, result, nil
 }
 
 func (s *SFFrame) Flush() {

@@ -115,13 +115,9 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	result.rule.OpCodes = result.codes.ToString()
 	frame = result.CreateFrame(s.vars)
 	frame.config = s.config
-	if len(result.verifyFilesystem) > 0 {
-		frame.VerifyFs = result.verifyFilesystem
+	if len(result.verifyFsInfo) > 0 {
+		frame.VerifyFsInfo = result.verifyFsInfo
 	}
-	if len(result.negativeFilesystem) > 0 {
-		frame.NegativeFs = result.negativeFilesystem
-	}
-	frame.ExtraDesc = result.rawDesc
 	frame.rule = result.rule
 	frame.vm = s
 
