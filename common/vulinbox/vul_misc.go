@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -37,6 +40,31 @@ func (s *VulinServer) registerMiscResponse() {
 	r := router.PathPrefix("/misc/response").Name("一些精心构造的畸形/异常/测试响应").Subrouter()
 	addRouteWithVulInfo(r, &VulInfo{
 		Handler: expect100handle, Title: "100-Continue", Path: "/expect100",
+	})
+	addRouteWithVulInfo(r, &VulInfo{
+		Handler: func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			start := time.Now()
+			for {
+				writer.Write([]byte("Hello Long-Time Chunked now is " + time.Now().Format("2006-01-02 15:04:05") + "\n"))
+				utils.FlushWriter(writer)
+				time.Sleep(time.Second * 1)
+				if time.Since(start) > time.Second*60 {
+					break
+				}
+			}
+		},
+		Title: "Long-Time Chunked 测试",
+		Path:  "/long-time-chunked",
+	})
+	addRouteWithVulInfo(r, &VulInfo{
+		Handler: func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+			writer.Header().Set("X-Info", `This is a test for too large body(50MB) chunked, if u see this but no body, it's save`)
+			writer.Write([]byte(strings.Repeat("a", 1024*1024*50))) // 50MB
+		},
+		Title: "TooLarge Body Chunked 测试",
+		Path:  "/too-large-body-chunked",
 	})
 	addRouteWithVulInfo(r, &VulInfo{
 		Handler: func(writer http.ResponseWriter, request *http.Request) {
