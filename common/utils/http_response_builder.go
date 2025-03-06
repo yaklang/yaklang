@@ -337,6 +337,25 @@ type flusher3 interface {
 	Flush() (int, error)
 }
 
+type AutoFlushWriter struct {
+	w io.Writer
+}
+
+func (w *AutoFlushWriter) Write(data []byte) (int, error) {
+	n, err := w.w.Write(data)
+	if err != nil {
+		return n, err
+	}
+	FlushWriter(w.w)
+	return n, nil
+}
+
+func WriterAutoFlush(writer io.Writer) *AutoFlushWriter {
+	return &AutoFlushWriter{
+		w: writer,
+	}
+}
+
 func FlushWriter(writer io.Writer) {
 	if f, ok := writer.(flusher); ok {
 		err := f.Flush()

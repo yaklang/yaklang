@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
@@ -142,13 +143,13 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 
 		// set if chunked or content-length is too large
 		httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
-			writerCloser := utils.NewTriggerWriter(uint64(MaxContentLength), func(buffer io.ReadCloser) {
+			writerCloser := utils.NewTriggerWriterEx(uint64(MaxContentLength), time.Second*10, func(buffer io.ReadCloser) {
 				httpctx.SetResponseTooLarge(req, true)
 				httpctx.SetMITMSkipFrontendFeedback(req, true)
 				bwr.Write(headerBytes)
 				utils.FlushWriter(bwr)
 				go func() {
-					_, err := utils.IOCopy(bwr, buffer, nil)
+					_, err := utils.IOCopy(utils.WriterAutoFlush(bwr), buffer, nil)
 					utils.FlushWriter(bwr)
 					if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 						log.Errorf("io.Copy error: %s", err)
