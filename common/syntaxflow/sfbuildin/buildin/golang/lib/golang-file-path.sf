@@ -1,5 +1,5 @@
 desc(
-    title: "check file write function",
+    title: "check file path",
     type: audit,
     level: info,
     lib: 'golang-file-path',
@@ -8,7 +8,11 @@ desc(
 TEXT
 )
 
-filepath?{<fullTypeName>?{have: 'path/filepath'}} as $output
+filepath?{<fullTypeName>?{have: 'path/filepath'}} as $entry
+
+$entry.Join(* #-> as $output)
+$entry.Dir(* #-> as $output)
+$entry.Match(* #-> as $output)
 
 alert $output
 

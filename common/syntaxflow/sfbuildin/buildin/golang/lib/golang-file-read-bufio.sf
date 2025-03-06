@@ -1,5 +1,5 @@
 desc(
-    title: "check file read function",
+    title: "check file read function(bufio)",
     type: audit,
     level: info,
     lib: 'golang-file-read-bufio',
@@ -10,7 +10,7 @@ TEXT
 
 bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
 $entry.NewReader <getCall> as $reader;
-$reader.ReadString <getCall> <getMembers> as $output;
+$reader.ReadString().* as $output;
 
 $reader.ReadString(* #-> as $output); 
 
