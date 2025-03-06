@@ -1,5 +1,5 @@
 desc(
-    title: "check file read function",
+    title: "check file read function(ioutil)",
     type: audit,
     level: info,
     lib: 'golang-file-read-ioutil',
@@ -9,8 +9,8 @@ TEXT
 )
 
 ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
-$entry.ReadAll <getCall> <getMembers> as $output
-$entry.ReadFile <getCall> <getMembers> as $output
+$entry.ReadAll().* as $output
+$entry.ReadFile().* as $output
 
 $entry.ReadAll(* #-> as $output) 
 $entry.ReadFile(* #-> as $output)

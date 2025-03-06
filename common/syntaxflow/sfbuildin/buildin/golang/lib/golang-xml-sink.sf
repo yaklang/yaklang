@@ -1,0 +1,60 @@
+desc(
+    title: "check audit xml input and parsing",
+    type: audit,
+    level: info,
+    lib: 'golang-xml-sink',
+    desc: <<<TEXT
+此规则旨在审计Go语言代码中`xml`包的使用情况。
+TEXT
+)
+
+xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry
+$entry.NewDecoder() as $output
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://xml.go': <<<PARAM
+package main
+
+import (
+    "encoding/xml"
+    "fmt"
+    "os"
+)
+
+type Person struct {
+    Name string `xml:"name"`
+    Age  int    `xml:"age"`
+}
+
+func main() {
+    // 模拟恶意 XML 输入
+    xmlData := `<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<person>
+    <name>&xxe;</name>
+    <age>30</age>
+</person>`
+
+    var person Person
+    decoder := xml.NewDecoder(strings.NewReader(xmlData))
+
+    // 禁用外部实体解析
+    decoder.Strict = false
+    decoder.Entity = xml.HTMLEntity
+
+    err := decoder.Decode(&person)
+    if err != nil {
+        fmt.Println("Error unmarshalling XML:", err)
+        return
+    }
+
+    fmt.Println("Name:", person.Name)
+    fmt.Println("Age:", person.Age)
+}
+
+PARAM
+)

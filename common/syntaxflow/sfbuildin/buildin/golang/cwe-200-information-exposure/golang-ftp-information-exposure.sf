@@ -1,0 +1,119 @@
+desc(
+    title: "golang FTP information exposure",
+    type: audit,
+    severity: low,
+    desc: <<<TEXT
+检测可能通过FTP相关函数泄露服务器敏感信息，包括：
+    1. 目录结构暴露
+    2. 当前工作路径泄露
+    3. 服务器系统类型识别
+    可能被攻击者用于信息收集阶段，辅助后续攻击
+TEXT
+)
+
+<include('golang-ftp-sink')> as $sink;
+
+*.List() --> as $target;
+*.CurrentDir() --> as $target;
+*.SystemType() --> as $target;
+$target #{until: `* & $sink`}-> as $low;
+
+alert $low for {
+    title: 'FTP Information Exposure',
+    title_zh: '检测到FTP信息泄露',
+    type: 'vuln',
+    level: 'low',
+}
+
+desc(
+    lang: golang,
+    alert_low: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+    "fmt"
+    "github.com/jlaffaye/ftp"
+    "strings"
+    "time"
+)
+
+func main() {
+    // 连接到 FTP 服务器
+    conn, err := ftp.Dial("ftp.example.com:21", ftp.DialWithTimeout(5*time.Second))
+    if err != nil {
+        fmt.Println("Failed to connect:", err)
+        return
+    }
+    defer conn.Quit()
+
+    // 登录
+    err = conn.Login("username", "password")
+    if err != nil {
+        fmt.Println("Failed to login:", err)
+        return
+    }
+    defer conn.Logout()
+
+    // 列出文件（防止目录结构暴露）
+    listFiles(conn, "/var/www/uploads")
+
+    // 获取当前目录（防止路径泄露）
+    getCurrentDir(conn)
+
+    // 获取系统类型（防止系统类型识别）
+    getSystemType(conn)
+}
+
+func listFiles(conn *ftp.ServerConn, dir string) {
+    allowedDir := "/var/www/uploads"
+    if !strings.HasPrefix(dir, allowedDir) {
+        fmt.Println("Access denied: directory not allowed")
+        return
+    }
+
+    entries, err := conn.List(dir)
+    if err != nil {
+        fmt.Println("Failed to list files:", err)
+        return
+    }
+
+    for _, entry := range entries {
+        if !strings.HasPrefix(entry.Name, ".") {
+            fmt.Println(entry.Name)
+        }
+    }
+}
+
+func getCurrentDir(conn *ftp.ServerConn) {
+    dir, err := conn.CurrentDir()
+    if err != nil {
+        fmt.Println("Failed to get current directory:", err)
+        return
+    }
+
+    allowedDir := "/var/www/uploads"
+    if !strings.HasPrefix(dir, allowedDir) {
+        fmt.Println("Access denied: directory not allowed")
+        return
+    }
+
+    fmt.Println("Current directory:", dir)
+}
+
+func getSystemType(conn *ftp.ServerConn) {
+    systemType, err := conn.SystemType()
+    if err != nil {
+        fmt.Println("Failed to get system type:", err)
+        return
+    }
+
+    if strings.Contains(systemType, "UNIX") || strings.Contains(systemType, "Windows") {
+        fmt.Println("System type: [REDACTED]")
+    } else {
+        fmt.Println("System type:", systemType)
+    }
+}
+
+UNSAFE
+)
