@@ -701,3 +701,31 @@ public interface UserMapper {
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
+
+func TestJava_Creator_MethodCallTypeName(t *testing.T) {
+	t.Run("test new method call type name", func(t *testing.T) {
+		code := `import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
+public class OkHttpClientExample {
+    public static void main(String[] args) {
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url("https://api.github.com/users/github")
+                .build();
+        try {
+            // 执行请求
+            Response response = client.newCall(request).execute();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}`
+		ssatest.CheckSyntaxFlowContain(t, code, `Request.Builder()<typeName> as $result1;
+Request.Builder().url()<typeName> as $result2`, map[string][]string{
+			"result1": {"okhttp3.Request"},
+			"result2": {"okhttp3.Request"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+}
