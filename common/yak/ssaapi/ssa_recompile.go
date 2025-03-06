@@ -2,24 +2,26 @@ package ssaapi
 
 import (
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 // save to Profile SSAProgram
-func (c *config) SaveProfile() {
-	if c.toProfile {
-		prog := &schema.SSAProgram{
-			Name:          c.ProgramName,
-			Description:   c.ProgramDescription,
-			DBPath:        consts.GetSSADataBasePathDefault(consts.GetDefaultYakitBaseDir()),
-			Language:      string(c.language),
-			EngineVersion: consts.GetYakVersion(),
-			ConfigInput:   c.info,
-			PeepholeSize:  c.peepholeSize,
+func (c *config) SaveConfig() {
+	if c.enableDatabase {
+		irProg, err := ssadb.GetProgram(c.ProgramName, ssa.Application)
+		if err != nil {
+			log.Errorf("irProg is nil, save config failed: %v", err)
+			return
 		}
-		ssadb.SaveSSAProgram(prog)
+		irProg.Description = c.ProgramDescription
+		irProg.Language = string(c.language)
+		irProg.EngineVersion = consts.GetYakVersion()
+		irProg.ConfigInput = c.info
+		irProg.PeepholeSize = c.peepholeSize
+		ssadb.UpdateProgram(irProg)
 	}
 }
 
@@ -28,13 +30,12 @@ func (prog *Program) Recompile(opts ...Option) error {
 	// get file system
 	hasFS := false
 	// recompile from info
-	if prog.ssaProgram != nil {
-		if prog.ssaProgram.ConfigInput != "" {
-			configInfo := prog.ssaProgram.ConfigInput
+	if prog.irProgram != nil {
+		if configInfo := prog.irProgram.ConfigInput; configInfo != "" {
 			opts = append(opts, WithConfigInfoRaw(configInfo))
 			hasFS = true
 		}
-		opts = append(opts, WithPeepholeSize(prog.ssaProgram.PeepholeSize))
+		opts = append(opts, WithPeepholeSize(prog.irProgram.PeepholeSize))
 	}
 	//TODO: recompile from database
 
@@ -47,7 +48,6 @@ func (prog *Program) Recompile(opts ...Option) error {
 	// append other options
 	opts = append(opts, WithProgramName(prog.Program.Name))
 	opts = append(opts, WithRawLanguage(prog.GetLanguage()))
-	opts = append(opts, WithSaveToProfile())
 	opts = append(opts, WithReCompile(true))
 
 	// parse

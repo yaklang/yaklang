@@ -181,11 +181,9 @@ type User interface {
 
 type Build func(string, *memedit.MemEditor, *FunctionBuilder) error
 
-type ProgramKind string
-
 const (
-	Application ProgramKind = "application"
-	Library                 = "library"
+	Application = ssadb.Application
+	Library     = ssadb.Library
 )
 
 type FunctionName string
@@ -200,7 +198,7 @@ type Program struct {
 	// package list
 	Name            string
 	Version         string
-	ProgramKind     ProgramKind // is library or application
+	ProgramKind     ssadb.ProgramKind // is library or application
 	Language        string
 	magicMethodName []string
 	// from pom.xml file

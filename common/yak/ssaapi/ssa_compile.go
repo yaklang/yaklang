@@ -66,7 +66,7 @@ func (c *config) parseFile() (ret *Program, err error) {
 		prog.UpdateToDatabase()
 	}
 	prog.Cache.SaveToDatabase()
-	c.SaveProfile()
+	c.SaveConfig()
 	return NewProgram(prog, c), nil
 }
 
