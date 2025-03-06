@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,6 +14,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
+
+var (
+	escapeRegexp = regexp.MustCompile(`[%_\[\]^\\]`)
 )
 
 type Range struct {
@@ -157,11 +162,11 @@ func FuzzQueryArrayStringOrLike(db *gorm.DB, field string, s []string) *gorm.DB 
 	for index, sub := range s {
 		raw[index] = sub
 	}
-	return FuzzQueryArrayOrLike(db, field, raw)
+	return FuzzQueryArrayOrLike(db, field, raw, false)
 }
 
 // FuzzQueryArrayOrLike
-func FuzzQueryArrayOrLike(db *gorm.DB, field string, s []interface{}) *gorm.DB {
+func FuzzQueryArrayOrLike(db *gorm.DB, field string, s []interface{}, escape bool) *gorm.DB {
 	if len(s) <= 0 {
 		return db
 	}
@@ -172,9 +177,19 @@ func FuzzQueryArrayOrLike(db *gorm.DB, field string, s []interface{}) *gorm.DB {
 	)
 
 	for _, sub := range s {
-		pattern := fmt.Sprintf("%%%v%%", sub)           // 将 'sub' 转换为类似于 '%sub%' 的形式
-		pattern = strings.ReplaceAll(pattern, "*", "%") // 将 '*' 替换为 SQL 通配符 '%'
-		querys = append(querys, fmt.Sprintf("( %v LIKE ? )", field))
+		pattern := fmt.Sprintf("%v", sub) // 将 'sub' 转换为类似于 '%sub%' 的形式
+		if escape {
+			pattern = escapeRegexp.ReplaceAllString(pattern, `\$0`) // 转义特殊字符
+		} else {
+			pattern = strings.ReplaceAll(pattern, "*", "%") // 将 '*' 替换为 SQL 通配符 '%'
+		}
+		pattern = fmt.Sprintf("%%%s%%", pattern)
+		if escape {
+			querys = append(querys, fmt.Sprintf(`( %v LIKE ? ESCAPE '\' )`, field))
+		} else {
+			querys = append(querys, fmt.Sprintf("( %v LIKE ? )", field))
+		}
+
 		items = append(items, pattern)
 	}
 
@@ -259,7 +274,7 @@ func FuzzQueryStringArrayOrLike(db *gorm.DB, field string, s []string) *gorm.DB 
 	for index, sub := range s {
 		raw[index] = sub
 	}
-	return FuzzQueryArrayOrLike(db, field, raw)
+	return FuzzQueryArrayOrLike(db, field, raw, false)
 }
 
 func FuzzQueryStringArrayOrLikeExclude(db *gorm.DB, field string, s []string) *gorm.DB {
