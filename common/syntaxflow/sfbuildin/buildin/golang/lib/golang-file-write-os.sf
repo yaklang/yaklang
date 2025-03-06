@@ -1,0 +1,58 @@
+desc(
+    title: "check file write function(os)",
+    type: audit,
+    level: info,
+    lib: 'golang-file-write-os',
+    desc: <<<TEXT
+此规则用于审计Go语言项目中文件写入功能的安全性。
+TEXT
+)
+
+os?{<fullTypeName>?{have: 'os'}} as $os
+$os.WriteFile(* #-> as $param)
+$param?{!have: 'Parameter'} as $output;
+
+alert $output
+
+desc(
+    lang: golang,
+    alert_min: 1,
+    'file://filewrite.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
+)
+
+func writeFile(w http.ResponseWriter, r *http.Request) {
+    filePath := r.URL.Query().Get("file")
+    content := r.URL.Query().Get("content")
+
+    // 解析并验证文件路径
+    safePath, err := safeJoin("/var/www/uploads", filePath)
+    if err != nil {
+        fmt.Fprintf(w, "Invalid file path")
+        return
+    }
+
+    // 写入文件内容
+    err = os.WriteFile(safePath, []byte(content), 0644)
+    if err != nil {
+        fmt.Fprintf(w, "Error: %v", err)
+        return
+    }
+
+    fmt.Fprintf(w, "File written successfully")
+}
+
+func main() {
+    http.HandleFunc("/write", writeFile)
+    http.ListenAndServe(":8080", nil)
+}
+
+PARAM
+)

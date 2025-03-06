@@ -1,0 +1,66 @@
+desc(
+    title: "golang file upload check",
+    type: audit,
+    level: low,
+    desc: <<<TEXT
+此审计规则旨在验证用户输入，及传入的文件路径没有经过过滤与授权，攻击者可通过构造恶意路径实现文件覆盖/删除或路径穿越攻击。
+TEXT
+)
+
+<include('golang-os-sink')> as $sink;
+
+strings.HasPrefix as $path;
+$sink #{until: `* & $path`}-> as $low;
+
+alert $low for {
+    title: 'filedelele missing permission check',
+    title_zh: '检测到文件路径未授权',
+    type: 'vuln',
+    level: 'low',
+}
+
+desc(
+    lang: golang,
+    alert_low: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
+)
+
+func main() {
+    http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+		file, handler, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// 验证文件路径
+		safePath := filepath.Join("/var/www/uploads", filepath.Base(handler.Filename))
+		if !strings.HasPrefix(safePath, "/var/www/uploads") {
+			http.Error(w, "Invalid file path", http.StatusBadRequest)
+			return
+		}
+
+		// 保存文件
+		dst, err := os.Create(safePath)
+		if err != nil {
+			http.Error(w, "Error creating the file", http.StatusInternalServerError)
+			return
+		}
+		defer dst.Close()
+
+		io.Copy(dst, file)
+		fmt.Fprintf(w, "File uploaded successfully")
+	})
+}
+
+UNSAFE
+)
