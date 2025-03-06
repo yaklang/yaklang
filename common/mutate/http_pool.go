@@ -5,14 +5,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"net/http"
 	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
@@ -1094,7 +1095,11 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 					opts = append(opts, config.ExtraFuzzOption...)
 					_, err := FuzzTagExec(string(reqRaw), opts...)
 					if err != nil {
-						log.Errorf("fuzz with callback failed: %s", err)
+						finalResult := &HttpResult{
+							Error: utils.Errorf("fuzz tag exec failed: %s", err),
+						}
+						results <- finalResult
+						return
 					}
 				} else {
 					submitTask(reqRaw)
