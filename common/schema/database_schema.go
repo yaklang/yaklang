@@ -53,7 +53,6 @@ var ProfileTables = []interface{}{
 	&WebFuzzerLabel{},
 	&PluginGroup{},
 	&CodecFlow{},
-	&SSAProgram{},
 	//general rule
 	&GeneralRule{},
 	//syntaxFlow rule

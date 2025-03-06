@@ -38,8 +38,7 @@ func ParseProject(opts ...Option) (Programs, error) {
 
 func (c *config) parseProject() (Programs, error) {
 	if c.reCompile {
-		ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
-		ssadb.DeleteSSAProgram(c.ProgramName)
+		ssadb.DeleteProgramCode(ssadb.GetDB(), c.ProgramName)
 	}
 	if c.databasePath != "" {
 		consts.SetSSAProjectDatabasePath(c.databasePath)
@@ -50,7 +49,7 @@ func (c *config) parseProject() (Programs, error) {
 		if progs, err := c.peephole(); err != nil {
 			return nil, err
 		} else {
-			c.SaveProfile()
+			c.SaveConfig()
 			c.Processf(1, "programs finish")
 			return progs, nil
 		}
@@ -61,7 +60,7 @@ func (c *config) parseProject() (Programs, error) {
 		}); err != nil {
 			return nil, err
 		} else {
-			c.SaveProfile()
+			c.SaveConfig()
 			c.Processf(1, "program %s finish", prog.GetProgramName())
 			return Programs{prog}, nil
 		}

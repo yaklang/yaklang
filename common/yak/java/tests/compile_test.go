@@ -110,7 +110,7 @@ public class A {
 	// compare program-application with database
 	if err := comparePackage(&ssadb.IrProgram{
 		ProgramName: programId,
-		ProgramKind: string(ssa.Application),
+		ProgramKind: (ssa.Application),
 		UpStream:    []string{pkgName},
 		DownStream:  []string{},
 	}); err != nil {
@@ -119,7 +119,7 @@ public class A {
 	// compare package-library with database
 	if err := comparePackage(&ssadb.IrProgram{
 		ProgramName: pkgName,
-		ProgramKind: string(ssa.Library),
+		ProgramKind: (ssa.Library),
 		UpStream:    []string{},
 		DownStream:  []string{programId},
 	}); err != nil {
@@ -233,7 +233,7 @@ func TestCompileProgram_ReUseLibrary(t *testing.T) {
 	}
 	if err := comparePackage(&ssadb.IrProgram{
 		ProgramName: pkgName,
-		ProgramKind: string(ssa.Library),
+		ProgramKind: (ssa.Library),
 		UpStream:    []string{},
 		DownStream:  []string{programID1},
 	}); err != nil {
@@ -253,7 +253,7 @@ func TestCompileProgram_ReUseLibrary(t *testing.T) {
 	// check ir-package re-use
 	if err := comparePackage(&ssadb.IrProgram{
 		ProgramName: pkgName,
-		ProgramKind: string(ssa.Library),
+		ProgramKind: (ssa.Library),
 		UpStream:    []string{},
 		DownStream:  []string{programID1, programID2},
 	}); err != nil {
@@ -278,7 +278,7 @@ func TestCompileProgram_ReUseLibrary(t *testing.T) {
 	ssadb.DeleteProgram(ssadb.GetDB(), programID1)
 	if err := comparePackage(&ssadb.IrProgram{
 		ProgramName: pkgName,
-		ProgramKind: string(ssa.Library),
+		ProgramKind: (ssa.Library),
 		UpStream:    []string{},
 		DownStream:  []string{programID2},
 	}); err != nil {

@@ -16,6 +16,7 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
@@ -34,7 +35,7 @@ func GetProgramFromPool(name string) (*Program, bool) {
 }
 
 func NewProgram(
-	ProgramName string, enableDatabase bool, kind ProgramKind,
+	ProgramName string, enableDatabase bool, kind ssadb.ProgramKind,
 	fs fi.FileSystem, programPath string,
 	ttl ...time.Duration,
 ) *Program {
@@ -76,7 +77,7 @@ func NewProgram(
 	)
 	return prog
 }
-func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...string) *Program {
+func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path ...string) *Program {
 	fs := prog.Loader.GetFilesysFileSystem()
 	fullPath := prog.GetCurrentEditor().GetFilename()
 	endPath := fs.Join(path...)

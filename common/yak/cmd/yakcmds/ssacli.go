@@ -49,15 +49,10 @@ var SSACompilerCommands = []*cli.Command{
 						log.Infof("Start to delete program: %v", name)
 						ssadb.DeleteProgram(ssadb.GetDB(), name)
 					}
-					for _, name := range ssadb.GetProfileSSAProgram() {
-						log.Infof("Start to delete profile database program: %v", name)
-						_ = ssadb.DeleteSSAProgram(name)
-					}
 					break
 				}
 				log.Infof("Start to delete program: %v", name)
 				ssadb.DeleteProgram(ssadb.GetDB(), name)
-				_ = ssadb.DeleteSSAProgram(name)
 			}
 		},
 	},
@@ -146,45 +141,6 @@ var SSACompilerCommands = []*cli.Command{
 			}
 			if ruleError != nil {
 				return ruleError
-			}
-			return nil
-		},
-	},
-	{
-		Name:  "ssa-import",
-		Usage: "Import SSA IR From SSA Database",
-		Action: func(c *cli.Context) error {
-			for _, dbPath := range c.Args() {
-				if dbPath == "" &&
-					utils.GetFirstExistedFile(dbPath) == "" {
-					// no compile ,database not existed
-					log.Errorf("database file not found: %v", dbPath)
-					continue
-				}
-
-				log.Infof("switch to db:%s", dbPath)
-				consts.SetSSAProjectDatabasePath(dbPath)
-				progs := ssadb.AllPrograms(ssadb.GetDB())
-				if len(progs) == 0 {
-					log.Errorf("no program found in database: %v", dbPath)
-					continue
-				}
-				for _, prog := range progs {
-					log.Infof("improt program : %v [%s]", prog.ProgramName, prog.Language)
-					ssaProg := &schema.SSAProgram{
-						Name:          prog.ProgramName,
-						Description:   "",
-						DBPath:        dbPath,
-						Language:      prog.Language,
-						EngineVersion: consts.GetYakVersion(),
-						ConfigInput:   "",
-						PeepholeSize:  0,
-					}
-					if err := ssadb.SaveSSAProgram(ssaProg); err != nil {
-						log.Errorf("save ssa program failed: %v", err)
-						continue
-					}
-				}
 			}
 			return nil
 		},
@@ -281,7 +237,6 @@ var SSACompilerCommands = []*cli.Command{
 			sfDebug := c.Bool("syntaxflow-debug")
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
-			saveProfile := !c.Bool("no-frontend")
 			excludeFile := c.StringSlice("exclude-file")
 
 			var excludeCompile []glob.Glob
@@ -293,19 +248,10 @@ var SSACompilerCommands = []*cli.Command{
 				excludeCompile = append(excludeCompile, compile)
 			}
 			// check program name duplicate
-			if prog, err := ssadb.GetProgram(programName, string(ssa.Application)); prog != nil && err == nil {
+			if prog, err := ssadb.GetProgram(programName, ssa.Application); prog != nil && err == nil {
 				if !reCompile {
 					return utils.Errorf(
 						"program name %v existed in this database, please use `re-compile` flag to re-compile or change program name",
-						programName,
-					)
-				}
-			}
-
-			if saveProfile && slices.Contains(ssadb.GetProfileSSAProgram(), programName) {
-				if !reCompile {
-					return utils.Errorf(
-						"program name %v existed in other database, please use `re-compile` flag to re-compile or change program name",
 						programName,
 					)
 				}
@@ -351,7 +297,6 @@ var SSACompilerCommands = []*cli.Command{
 			log.Infof("start to compile file: %v ", target)
 			opt = append(opt, ssaapi.WithRawLanguage(input_language))
 			opt = append(opt, ssaapi.WithReCompile(reCompile))
-			opt = append(opt, ssaapi.WithSaveToProfile(saveProfile))
 			opt = append(opt, ssaapi.WithExcludeFile(func(path, filename string) bool {
 				for _, g := range excludeCompile {
 					if g.Match(filename) {

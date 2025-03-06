@@ -330,7 +330,7 @@ func TestSF_NativeCall_Include_Input_Value(t *testing.T) {
 func TestSF_Include_Cache_For_Recompile(t *testing.T) {
 	programName := uuid.NewString()
 	vfs := createTestVFS()
-	prog1, err := ssaapi.ParseProjectWithFS(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithSaveToProfile(true))
+	prog1, err := ssaapi.ParseProjectWithFS(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.JAVA))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	require.NoError(t, err)
 	require.NotNil(t, prog1)

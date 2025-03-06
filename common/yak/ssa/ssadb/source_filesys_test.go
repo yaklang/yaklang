@@ -3,6 +3,7 @@ package ssadb_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -21,9 +21,6 @@ import (
 )
 
 func TestSourceFilesysLocal(t *testing.T) {
-	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.apackage")
-	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.bpackage.sub")
-
 	dir := fmt.Sprintf("%s/ssa_source_test", os.TempDir())
 	os.Mkdir(dir, os.ModePerm)
 	defer os.RemoveAll(dir)
@@ -77,11 +74,9 @@ func TestSourceFilesysLocal(t *testing.T) {
 	_, err = ssaapi.ParseProjectFromPath(dir,
 		ssaapi.WithLanguage(ssaapi.JAVA),
 		ssaapi.WithProgramName(programID),
-		ssaapi.WithSaveToProfile(),
 	)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)
-		ssadb.DeleteSSAProgram(programID)
 	}()
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 	dirs := make([]string, 0)
@@ -206,11 +201,9 @@ func TestSourceFilesys(t *testing.T) {
 	_, err := ssaapi.ParseProjectWithFS(vf,
 		ssaapi.WithLanguage(ssaapi.JAVA),
 		ssaapi.WithProgramName(programID),
-		ssaapi.WithSaveToProfile(),
 	)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)
-		ssadb.DeleteSSAProgram(programID)
 	}()
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 	dir := make([]string, 0)
@@ -268,10 +261,6 @@ func TestSourceFilesys(t *testing.T) {
 }
 
 func TestProgram_ListAndDelete(t *testing.T) {
-
-	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.apackage")
-	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.bpackage.sub")
-
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
 	package com.example.apackage; 
@@ -303,41 +292,23 @@ func TestProgram_ListAndDelete(t *testing.T) {
 		default-ssa.db:
 			programID1
 			programID2
-		tmp/ssa.db:
-			programID3
 	*/
-	dir := fmt.Sprintf("%s/ssa_source_test", os.TempDir())
-	os.Mkdir(dir, os.ModePerm)
-	defer os.RemoveAll(dir)
-	log.Infof("dir: %v", dir)
-	dbPath := fmt.Sprintf("%s/%s", dir, "ssa.db")
 
 	var err error
 	programID1 := uuid.NewString()
-	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID1), ssaapi.WithSaveToProfile())
+	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID1))
 	defer func() {
-		ssadb.CheckAndSwitchDB(programID1)
+
+		// ssadb.CheckAndSwitchDB(programID1)
 		ssadb.DeleteProgram(ssadb.GetDB(), programID1)
-		ssadb.DeleteSSAProgram(programID1)
+
 	}()
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
 	programID2 := uuid.NewString()
-	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID2), ssaapi.WithSaveToProfile())
+	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID2))
 	defer func() {
-		ssadb.CheckAndSwitchDB(programID2)
 		ssadb.DeleteProgram(ssadb.GetDB(), programID2)
-		ssadb.DeleteSSAProgram(programID2)
-	}()
-	assert.NoErrorf(t, err, "parse project error: %v", err)
-
-	consts.SetSSAProjectDatabasePath(dbPath)
-	programID3 := uuid.NewString()
-	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID3), ssaapi.WithSaveToProfile())
-	defer func() {
-		ssadb.CheckAndSwitchDB(programID3)
-		ssadb.DeleteProgram(ssadb.GetDB(), programID3)
-		ssadb.DeleteSSAProgram(programID3)
 	}()
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
@@ -359,7 +330,6 @@ func TestProgram_ListAndDelete(t *testing.T) {
 		)
 		assert.Contains(t, dir, programID1)
 		assert.Contains(t, dir, programID2)
-		assert.Contains(t, dir, programID3)
 	})
 
 	local, err := yakgrpc.NewLocalClient()
@@ -384,7 +354,6 @@ func TestProgram_ListAndDelete(t *testing.T) {
 		match := map[string]bool{
 			fmt.Sprintf("/%s", programID1): false,
 			fmt.Sprintf("/%s", programID2): false,
-			fmt.Sprintf("/%s", programID3): false,
 		}
 		for _, res := range res.Resources {
 			if _, ok := match[res.Path]; ok {
@@ -444,57 +413,155 @@ func TestProgram_ListAndDelete(t *testing.T) {
 	})
 
 }
+func getDir(local ypb.YakClient, t *testing.T, path string) []string {
+	res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+		Method: "GET",
+		Url: &ypb.YakURL{
+			Schema: "ssadb",
+			Path:   path,
+			Query: []*ypb.KVPair{
+				{
+					Key:   "op",
+					Value: "list",
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	files := make([]string, 0, len(res.Resources))
+	for _, info := range res.Resources {
+		files = append(files, info.Path)
+	}
+	return files
+}
+func TestSourceFilesystem_YakURL(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	codea := `
+	package com.example.apackage; 
+	import com.example.bpackage.sub.B;
+	class A {
+		public static void main(String[] args) {
+			B b = new B();
+			// for test 1: A->B
+			target1(b.get());
+			// for test 2: B->A
+			b.show(1);
+		}
+	}
+	`
+	codeb := `
+	package com.example.bpackage.sub; 
+	class B {
+		public  int get() {
+			return 	 1;
+		}
+		public void show(int a) {
+			target2(a);
+		}
+	}
+	`
+	vf.AddFile("example/src/main/java/com/example/apackage/a.java", codea)
+	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", codeb)
+
+	programID := uuid.NewString()
+	_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	}()
+	assert.NoErrorf(t, err, "parse project error: %v", err)
+
+	local, err := yakgrpc.NewLocalClient()
+	assert.NoError(t, err)
+
+	getDir := func(path string) []string {
+		return getDir(local, t, path)
+	}
+	_ = getDir
+
+	readFile := func(path string) string {
+		stream, err := local.ReadFile(context.Background(), &ypb.ReadFileRequest{
+			FilePath:   path,
+			BufSize:    0,
+			FileSystem: "ssadb",
+		})
+		require.NoError(t, err)
+		buf := make([]byte, 0, 1024)
+		require.NoError(t, err)
+		for {
+			res, err := stream.Recv()
+			if err != nil {
+				require.ErrorIs(t, err, io.EOF, "unexpected error: %v", err)
+				break
+			}
+			buf = append(buf, res.Data...)
+		}
+		return string(buf)
+	}
+	_ = readFile
+
+	targetProgramPath := fmt.Sprintf("/%s", programID)
+	t.Run("test source file system root path", func(t *testing.T) {
+		progList := getDir("/")
+		require.Contains(t, progList, targetProgramPath)
+	})
+
+	t.Run("test source file system program path", func(t *testing.T) {
+		file := getDir(targetProgramPath)
+		require.Equal(t, 1, len(file))
+		target := fmt.Sprintf("%s/example", targetProgramPath)
+		require.Contains(t, file, target)
+
+		file = getDir(target)
+		require.Equal(t, 1, len(file))
+		target = fmt.Sprintf("%s/example/src", targetProgramPath)
+		require.Contains(t, file, target)
+
+	})
+
+	// t.Run("test source file deep path ", func(t *testing.T) {
+	// 	file := getDir(fmt.Sprintf("%s/example/src/main/java/com/example/", targetProgramPath))
+	// 	require.Contains(t, file, fmt.Sprintf("%s/example/src/main/java/com/example/apackage", targetProgramPath))
+	// 	require.Contains(t, file, fmt.Sprintf("%s/example/src/main/java/com/example/bpackage", targetProgramPath))
+	// })
+
+	t.Run("test read file ", func(t *testing.T) {
+		data := readFile(fmt.Sprintf("%s/example/src/main/java/com/example/apackage/a.java", targetProgramPath))
+		require.Equal(t, codea, data)
+
+		datab := readFile(fmt.Sprintf("%s/example/src/main/java/com/example/bpackage/sub/b.java", targetProgramPath))
+		require.Equal(t, codeb, datab)
+	})
+}
 
 func TestProgram_NewProgram(t *testing.T) {
 	local, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err)
 	get := func() []string {
-		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssadb",
-				Path:   "/",
-				Query: []*ypb.KVPair{
-					{
-						Key:   "op",
-						Value: "list",
-					},
-				},
-			},
-		})
-		require.NoError(t, err)
-		progs := make([]string, 0, len(res.Resources))
-		for _, info := range res.Resources {
-			progs = append(progs, info.Path)
-		}
-		return progs
+		return getDir(local, t, "/")
 	}
+
 	{
 		progName := uuid.NewString()
-		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
+		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName))
 		require.NoError(t, err)
-		defer ssadb.DeleteSSAProgram(progName)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	}
 	{
 		progName := uuid.NewString()
-		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
+		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName))
 		require.NoError(t, err)
-		defer ssadb.DeleteSSAProgram(progName)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	}
 	{
 		progName := uuid.NewString()
-		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
+		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName))
 		require.NoError(t, err)
-		defer ssadb.DeleteSSAProgram(progName)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	}
 	{
 		progName := uuid.NewString()
-		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
+		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName))
 		require.NoError(t, err)
-		defer ssadb.DeleteSSAProgram(progName)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	}
 
@@ -503,10 +570,9 @@ func TestProgram_NewProgram(t *testing.T) {
 		log.Infof("progs: %v", progs)
 
 		progName := uuid.NewString()
-		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName), ssaapi.WithSaveToProfile())
+		_, err := ssaapi.Parse(`println("a")`, ssaapi.WithProgramName(progName))
 		require.NoError(t, err)
 		log.Infof("progName: %v", progName)
-		defer ssadb.DeleteSSAProgram(progName)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 
 		newProgs := get()
@@ -533,11 +599,11 @@ func TestIrSourceFS_File_URL(t *testing.T) {
 			path := "path_" + uuid.NewString()
 			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName), content)
 
-			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID), ssaapi.WithSaveToProfile())
+			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				ssadb.DeleteProgram(ssadb.GetDB(), programID)
-				ssadb.DeleteSSAProgram(programID)
+
 			})
 			fullPath := fmt.Sprintf("/%s/%s", programID, path)
 			irSource, err := ssadb.GetIrSourceByPathAndName(fullPath, fileName)
@@ -565,11 +631,11 @@ func TestIrSourceFS_File_URL(t *testing.T) {
 			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName1), content)
 			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName2), content)
 
-			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID), ssaapi.WithSaveToProfile())
+			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				ssadb.DeleteProgram(ssadb.GetDB(), programID)
-				ssadb.DeleteSSAProgram(programID)
+
 			})
 			fullPath := fmt.Sprintf("/%s/%s", programID, path)
 			irSources, err := ssadb.GetIrSourceByPath(fullPath)
