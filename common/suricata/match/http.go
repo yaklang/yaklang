@@ -3,14 +3,15 @@ package match
 import (
 	"bufio"
 	"bytes"
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
@@ -50,9 +51,9 @@ func (h *HttpFlow) createRequestPacket() []gopacket.Packet {
 	// 如果 TrafficFlow 不为空，优先使用其中的网络信息
 	if h.TrafficFlow != nil {
 		h.Src = h.TrafficFlow.ClientConn.LocalIP().String()
-		h.Dst = h.TrafficFlow.ServerConn.RemoteIP().String()
+		h.Dst = h.TrafficFlow.ClientConn.RemoteIP().String()
 		h.SrcPort = h.TrafficFlow.ClientConn.LocalPort()
-		h.DstPort = h.TrafficFlow.ServerConn.RemotePort()
+		h.DstPort = h.TrafficFlow.ClientConn.RemotePort()
 	}
 
 	if len(h.Req) > 0 {

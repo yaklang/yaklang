@@ -95,7 +95,11 @@ func (g *Group) SetLoader(loader SuricataRuleLoaderType) {
 }
 
 func (g *Group) LoadRule(r *rule.Rule) {
-	matcher := New(r)
+	matcher, err := CompileRule(r)
+	if err != nil {
+		log.Errorf("compile rule failed: %v", err)
+		return
+	}
 	switch r.Protocol {
 	case "http":
 		g.HTTPMatcher = append(g.HTTPMatcher, &sync.Pool{New: func() any {

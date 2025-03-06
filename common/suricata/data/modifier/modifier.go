@@ -55,6 +55,22 @@ const (
 	// ICMP
 	ICMPV4HDR
 	ICMPV6HDR
+
+	// TLS
+	TLSCertSubject
+	TLSCertIssuer
+	TLSCertSerial
+	TLSCertFingerprint
+	TLSSNI
+	TLSRandom
+	TLSRandomTime
+	TLSRandomBytes
+
+	// JA3
+	JA3Hash
+	JA3String
+	JA3SHash
+	JA3SString
 )
 
 var HTTP_REQ_ONLY = []Modifier{
