@@ -2,13 +2,13 @@ package ssaapi
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sort"
 	"time"
 
+	"github.com/yaklang/yaklang/common/utils/memedit"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -18,8 +18,8 @@ import (
 type Program struct {
 	// TODO: one program may have multiple program,
 	// 	 	 only one Application and multiple Library
-	Program    *ssa.Program
-	ssaProgram *schema.SSAProgram
+	Program   *ssa.Program
+	irProgram *ssadb.IrProgram
 	// DBCache *ssa.Cache
 	config *config
 
@@ -43,7 +43,7 @@ func (p *Program) GetProgramName() string {
 	return p.Program.Name
 }
 
-func (p *Program) GetProgramKind() ssa.ProgramKind {
+func (p *Program) GetProgramKind() ssadb.ProgramKind {
 	return p.Program.ProgramKind
 }
 
@@ -60,10 +60,10 @@ func (p *Program) GetType(name string) *Type {
 }
 
 func (p *Program) Hash() (string, bool) {
-	if p.ssaProgram != nil {
+	if p.irProgram != nil {
 		// Use the name and created_at to generate the hash,
 		// So that the hash will be changed when the program is recompiled.
-		hash := utils.CalcSha256(p.ssaProgram.Name, p.ssaProgram.CreatedAt.String())
+		hash := utils.CalcSha256(p.irProgram.ProgramName, p.irProgram.UpdatedAt.String())
 		return hash, true
 	} else if p.Program.Name != "" {
 		return utils.CalcSha256(p.Program.Name), true
@@ -76,7 +76,7 @@ func NewProgram(prog *ssa.Program, config *config) *Program {
 	p := &Program{
 		Program:           prog,
 		config:            config,
-		enableDatabase:    config.ProgramName != "",
+		enableDatabase:    config.enableDatabase,
 		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
 	}
 

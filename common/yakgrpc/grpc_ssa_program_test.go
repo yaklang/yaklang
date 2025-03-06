@@ -33,13 +33,12 @@ func TestGRPCMUSTPASS_SyntaxFlow_SSAPrograms_Query(t *testing.T) {
 
 	prog, err := ssaapi.Parse(`print("a")`,
 		ssaapi.WithProgramName(name),
-		ssaapi.WithSaveToProfile(true),
 		ssaapi.WithLanguage(ssaapi.Yak),
 		ssaapi.WithProgramDescription(desc),
 	)
 	_ = prog
 	defer func() {
-		ssadb.DeleteSSAProgram(name)
+
 		ssadb.DeleteProgram(ssadb.GetDB(), name)
 	}()
 	require.NoError(t, err)
@@ -107,12 +106,11 @@ func TestGRPCMUSTPASS_SyntaxFlow_Program_Delete_WithKeyword(t *testing.T) {
 
 	_, err = ssaapi.Parse(`print("a")`,
 		ssaapi.WithProgramName(name),
-		ssaapi.WithSaveToProfile(true),
 		ssaapi.WithLanguage(ssaapi.Yak),
 		ssaapi.WithProgramDescription(desc),
 	)
 	defer func() {
-		ssadb.DeleteSSAProgram(name)
+
 		ssadb.DeleteProgram(ssadb.GetDB(), name)
 	}()
 	require.NoError(t, err)
@@ -147,12 +145,11 @@ func TestGRPCMUSTPASS_SyntaxFlow_Program_Update(t *testing.T) {
 
 	_, err = ssaapi.Parse(`print("a")`,
 		ssaapi.WithProgramName(name),
-		ssaapi.WithSaveToProfile(true),
 		ssaapi.WithLanguage(ssaapi.Yak),
 		ssaapi.WithProgramDescription(desc),
 	)
 	defer func() {
-		ssadb.DeleteSSAProgram(name)
+
 		ssadb.DeleteProgram(ssadb.GetDB(), name)
 	}()
 	require.NoError(t, err)

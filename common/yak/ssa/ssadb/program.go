@@ -5,11 +5,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+type ProgramKind string
+
+const (
+	Application ProgramKind = "application"
+	Library                 = "library"
+)
+
 type IrProgram struct {
 	gorm.Model
 
 	ProgramName string `json:"program_name" gorm:"unique_index"`
-	Version     string `json:"package_version" gorm:"index"`
+	Description string `json:"description" gorm:"type:text"`
+
+	Version       string `json:"package_version" gorm:"index"`
+	EngineVersion string `json:"engine_version" gorm:"type:varchar(255)"`
 
 	// Language: yak, java, php, js, etc
 	// if the program contains many language,
@@ -18,7 +28,7 @@ type IrProgram struct {
 	Language string `json:"language" gorm:"index"`
 
 	// application / library
-	ProgramKind string `json:"program_kind" gorm:"index"`
+	ProgramKind ProgramKind `json:"program_kind" gorm:"index"`
 
 	// up-stream program is the program that this program depends on
 	UpStream StringSlice `json:"up_stream_programs" gorm:"type:text"`
@@ -30,9 +40,13 @@ type IrProgram struct {
 
 	// program extra file: *.properties, *.xml, *.json, etc
 	ExtraFile StringMap `json:"extra_file" gorm:"type:text"`
+
+	// compile argument
+	ConfigInput  string `json:"config_input" gorm:"type:text"`
+	PeepholeSize int    `json:"peephole_size"`
 }
 
-func CreateProgram(name, kind, version string) *IrProgram {
+func CreateProgram(name, version string, kind ProgramKind) *IrProgram {
 	db := GetDB().Model(&IrProgram{})
 	out := &IrProgram{
 		ProgramName: name,
@@ -58,7 +72,7 @@ func GetLibrary(name, version string) (*IrProgram, error) {
 	return &p, nil
 }
 
-func GetProgram(name, kind string) (*IrProgram, error) {
+func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {
 	var p IrProgram
 	db := GetDB().Model(&IrProgram{})
 	if name == "" {
@@ -87,7 +101,12 @@ func GetDBInProgram(program string) *gorm.DB {
 }
 
 func DeleteProgram(db *gorm.DB, program string) {
-	deleteProgramDBOnly(db, program)
+	db.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
+	deleteProgramCodeOnly(db, program)
+}
+
+func DeleteProgramCode(db *gorm.DB, program string) {
+	deleteProgramCodeOnly(db, program)
 }
 
 func AllProgramNames(db *gorm.DB) []string {
@@ -97,8 +116,7 @@ func AllProgramNames(db *gorm.DB) []string {
 }
 
 func AllPrograms(db *gorm.DB) []*IrProgram {
-	db = db.Debug()
 	var prorams []*IrProgram
-	db.Model(&IrProgram{}).Find(&prorams)
+	db.Model(&IrProgram{}).Order("created_at DESC").Find(&prorams)
 	return prorams
 }

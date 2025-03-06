@@ -26,11 +26,10 @@ func TestJarRecompile(t *testing.T) {
 			"local_file": jarPath,
 		}),
 		ssaapi.WithProgramName(progName),
-		ssaapi.WithSaveToProfile(),
 	)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), progName)
-		ssadb.DeleteSSAProgram(progName)
+
 	}()
 	require.NoErrorf(t, err, "error: %v", err)
 	require.NotNil(t, res)
@@ -49,10 +48,11 @@ func TestJarRecompile(t *testing.T) {
 	log.Infof("file list: %v", fileList)
 
 	// check info in ssa-program
-	ssaprog := ssadb.CheckAndSwitchDB(progName)
-	require.NotNil(t, ssaprog)
-	log.Infof("config input: %v", ssaprog)
-	require.True(t, len(ssaprog.ConfigInput) > 0)
+	prog, err := ssadb.GetProgram(progName, ssadb.Application)
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+	log.Infof("config input: %v", prog)
+	require.True(t, len(prog.ConfigInput) > 0)
 
 	// load from database
 	progFromDB, err := ssaapi.FromDatabase(progName)

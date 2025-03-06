@@ -339,7 +339,6 @@ opts = [
     ssa.withReCompile(reCompile),
     ssa.withStrictMode(strictMode),
     ssa.withDescription(params.description),
-    ssa.withSaveToProfile(true),
     ssa.withContext(context.Background()),
     ssa.withConfigInfo(params.info),
     ssa.withPeepholeSize(peepholeSize),

@@ -78,11 +78,9 @@ func checkFilelist(t *testing.T, language string, info map[string]any) {
 		ssaapi.WithRawLanguage(language),
 		ssaapi.WithConfigInfo(info),
 		ssaapi.WithProgramName(progName),
-		ssaapi.WithSaveToProfile(),
 	)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), progName)
-		ssadb.DeleteSSAProgram(progName)
 	}()
 	require.NoErrorf(t, err, "error: %v", err)
 	require.NotNil(t, res)
@@ -100,10 +98,11 @@ func checkFilelist(t *testing.T, language string, info map[string]any) {
 	log.Infof("file list: %v", fileList)
 
 	// in ssa-program
-	ssaprog := ssadb.CheckAndSwitchDB(progName)
-	require.NotNil(t, ssaprog)
-	log.Infof("config input: %v", ssaprog)
-	require.True(t, len(ssaprog.ConfigInput) > 0)
+	prog, err := ssadb.GetProgram(progName, ssadb.Application)
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+	log.Infof("config input: %v", prog)
+	require.True(t, len(prog.ConfigInput) > 0)
 
 	progDB, err := ssaapi.FromDatabase(progName)
 	require.NoError(t, err)

@@ -3,13 +3,12 @@ package yakgrpc
 import (
 	"context"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) QuerySSAPrograms(ctx context.Context, req *ypb.QuerySSAProgramRequest) (*ypb.QuerySSAProgramResponse, error) {
-	pagine, programs, err := yakit.QuerySSAProgram(consts.GetGormProfileDatabase(), req)
+	pagine, programs, err := yakit.QuerySSAProgram(s.GetSSADatabase(), req)
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +23,7 @@ func (s *Server) QuerySSAPrograms(ctx context.Context, req *ypb.QuerySSAProgramR
 }
 
 func (s *Server) UpdateSSAProgram(ctx context.Context, req *ypb.UpdateSSAProgramRequest) (*ypb.DbOperateMessage, error) {
-	count, err := yakit.UpdateSSAProgram(consts.GetGormProfileDatabase(), req.GetProgramInput())
+	count, err := yakit.UpdateSSAProgram(s.GetSSADatabase(), req.GetProgramInput())
 	return &ypb.DbOperateMessage{
 		TableName:    "ssa_programs",
 		Operation:    "update",
@@ -37,9 +36,9 @@ func (s *Server) DeleteSSAPrograms(ctx context.Context, req *ypb.DeleteSSAProgra
 	var count int
 	var err error
 	if req.DeleteAll {
-		count, err = yakit.DeleteSSAProgram(s.GetProfileDatabase(), nil)
+		count, err = yakit.DeleteSSAProgram(s.GetSSADatabase(), nil)
 	} else if req.GetFilter() != nil {
-		count, err = yakit.DeleteSSAProgram(consts.GetGormProfileDatabase(), req.GetFilter())
+		count, err = yakit.DeleteSSAProgram(s.GetSSADatabase(), req.GetFilter())
 	}
 	if err != nil {
 		return nil, err

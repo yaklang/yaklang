@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -37,7 +36,6 @@ func (a *SyntaxFlowAction) getProgram(name string) (*ssaapi.Program, error) {
 		return prog, nil
 	}
 
-	ssadb.CheckAndSwitchDB(name)
 	prog, err := ssaapi.FromDatabase(name)
 	if err != nil {
 		return nil, utils.Wrapf(err, "get program %s", name)

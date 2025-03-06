@@ -13,25 +13,18 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func init() {
-	RegisterPostInitDatabaseFunction(func() error {
-		go SSAProgramExistClear(consts.GetGormProfileDatabase())
-		return nil
-	})
-}
-
 func FilterSSAProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
-	db = db.Model(&schema.SSAProgram{})
+	db = db.Model(&ssadb.IrProgram{})
 	if filter == nil {
 		return db
 	}
 
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "name", filter.GetProgramNames())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramNames())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguages())
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetIds())
 
 	if word := filter.GetKeyword(); word != "" {
-		db = bizhelper.FuzzSearchEx(db, []string{"name", "description"}, word, false)
+		db = bizhelper.FuzzSearchEx(db, []string{"program_name", "description"}, word, false)
 	}
 	if filter.GetAfterID() > 0 {
 		db = db.Where("id > ?", filter.GetAfterID())
@@ -52,22 +45,22 @@ func FilterSSAProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
 // when filter == nil delete all program
 func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
 	// db is profile database
-	db := DB.Model(&schema.SSAProgram{})
+	db := DB.Model(&ssadb.IrProgram{})
 	db = FilterSSAProgram(db, filter)
 	// get all program
-	var programs []*schema.SSAProgram
-	queryResult := db.Model(&schema.SSAProgram{}).Select("name").Find(&programs)
+	var programs []*ssadb.IrProgram
+	queryResult := db.Model(&ssadb.IrProgram{}).Select("program_name").Find(&programs)
 	if queryResult.Error != nil {
 		log.Errorf("query ssa program fail: %s", queryResult.Error)
 	}
 	// delete schema program
-	result := db.Unscoped().Delete(&schema.SSAProgram{})
+	result := db.Unscoped().Delete(&ssadb.IrProgram{})
 
 	// delete ssadb program
 	programNames := make([]string, 0, len(programs))
 	for _, prog := range programs {
-		ssadb.DeleteProgram(ssadb.GetDB(), prog.Name)
-		programNames = append(programNames, prog.Name)
+		ssadb.DeleteProgram(ssadb.GetDB(), prog.ProgramName)
+		programNames = append(programNames, prog.ProgramName)
 	}
 	// delete risk create by this program
 	DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: programNames})
@@ -76,7 +69,7 @@ func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
 }
 
 func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator, []*ypb.SSAProgram, error) {
-	var programs []*schema.SSAProgram
+	var programs []*ssadb.IrProgram
 	p := request.Pagination
 	if p == nil {
 		p = &ypb.Paging{
@@ -99,21 +92,22 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 	return paging, progGRPCs, nil
 }
 
-func Prog2GRPC(prog *schema.SSAProgram) *ypb.SSAProgram {
+func Prog2GRPC(prog *ssadb.IrProgram) *ypb.SSAProgram {
 	ret := &ypb.SSAProgram{
 		Id: uint32(prog.ID),
 		// basic info
 		CreateAt:      prog.CreatedAt.Unix(),
 		UpdateAt:      prog.UpdatedAt.Unix(),
-		Name:          prog.Name,
+		Name:          prog.ProgramName,
 		Description:   prog.Description,
 		Language:      prog.Language,
 		EngineVersion: prog.EngineVersion,
-		Dbpath:        prog.DBPath,
+		Dbpath:        consts.GetSSADataBasePathDefault(consts.GetDefaultYakitBaseDir()),
 	}
 	// recompile
 	NeedReCompile := func() bool {
-		return prog.EngineVersion != consts.GetYakVersion()
+		return false
+		// return prog.EngineVersion != consts.GetYakVersion()
 	}
 	ret.Recompile = NeedReCompile()
 	// risk info
@@ -125,7 +119,7 @@ func Prog2GRPC(prog *schema.SSAProgram) *ypb.SSAProgram {
 			Warning  int64
 		}
 		projectDB := ssadb.GetDB()
-		if err := projectDB.Model(&schema.SSARisk{}).Where("program_name=?", prog.Name).Select(`
+		if err := projectDB.Model(&schema.SSARisk{}).Where("program_name=?", prog.ProgramName).Select(`
 		sum(case when severity='critical' then 1 else 0 end) as critical,
 		sum(case when severity='high' then 1 else 0 end) as high,
 		sum(case when severity='warning' then 1 else 0 end) as warning,
@@ -146,31 +140,7 @@ func UpdateSSAProgram(DB *gorm.DB, input *ypb.SSAProgramInput) (int64, error) {
 	if input == nil {
 		return 0, utils.Errorf("input is nil ")
 	}
-	db := DB.Model(&schema.SSAProgram{})
-	db = db.Where("name = ?", input.GetName()).Update("description", input.Description)
+	db := DB.Model(&ssadb.IrProgram{})
+	db = db.Where("program_name = ?", input.GetName()).Update("description", input.Description)
 	return db.RowsAffected, db.Error
-}
-
-func SSAProgramExistClear(DB *gorm.DB) {
-	var programs []*schema.SSAProgram
-	if DB = DB.Model(&schema.SSAProgram{}).Find(&programs); DB.Error != nil {
-		log.Errorf("query ssa program fail: %s", DB.Error)
-		return
-	}
-
-	var invalidPrograms []string
-	for _, prog := range programs {
-		if ok, _ := utils.PathExists(prog.DBPath); !ok {
-			invalidPrograms = append(invalidPrograms, prog.Name)
-		}
-	}
-	if len(invalidPrograms) > 0 {
-		log.Infof("delete invalid ssa program: %v", invalidPrograms)
-		_, err := DeleteSSAProgram(DB, &ypb.SSAProgramFilter{
-			ProgramNames: invalidPrograms,
-		})
-		if err != nil {
-			log.Errorf("delete invalid ssa program fail: %s", err)
-		}
-	}
 }

@@ -38,7 +38,7 @@ func Test_CompileError(t *testing.T) {
 		_ = prog
 		require.Less(t, finalProcess, 1.0)
 
-		irProg, err := ssadb.GetProgram(progName, string(ssa.Application))
+		irProg, err := ssadb.GetProgram(progName, ssa.Application)
 		require.Nil(t, irProg)
 		require.Error(t, err)
 		require.True(t, gorm.IsRecordNotFoundError(err))
