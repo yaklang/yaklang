@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -76,8 +77,8 @@ func (fs *irSourceFS) Stat(path string) (fs.FileInfo, error) {
 func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	if path == "/" {
 		ret := make([]fs.DirEntry, 0)
-		for _, porgram := range AllSSAPrograms() {
-			ret = append(ret, filesys.NewVirtualFileInfo(porgram.Name, 0, true))
+		for _, porgram := range AllPrograms(GetDB()) {
+			ret = append(ret, filesys.NewVirtualFileInfo(porgram.ProgramName, 0, true))
 		}
 		return ret, nil
 	}
@@ -118,11 +119,11 @@ func (f *irSourceFS) ExtraInfo(path string) map[string]any {
 	if !isProgram {
 		return m
 	}
-	if prog := GetSSAProgram(programName); prog != nil {
+	if prog, err := GetProgram(programName, Application); prog != nil && err == nil {
 		m["programName"] = programName
 		m["CreateAt"] = prog.CreatedAt.Unix()
 		m["Language"] = prog.Language
-		m["Path"] = prog.DBPath
+		m["Path"] = consts.GetSSADataBasePathDefault(consts.GetDefaultYakitBaseDir())
 		m["Description"] = prog.Description
 	}
 	return m
@@ -137,13 +138,12 @@ func (f *irSourceFS) Delete(path string) error {
 		return utils.Errorf("path [%v] is not a program root path, can't delete", path)
 	}
 	// switch db path
-	if prog := CheckAndSwitchDB(programName); prog == nil {
-		return utils.Errorf("program [%v] not exist", programName)
-	}
+	// if prog := CheckAndSwitchDB(programName); prog == nil {
+	// 	return utils.Errorf("program [%v] not exist", programName)
+	// }
 	delete(f.virtual, programName)
 	// delete program
 	DeleteProgram(GetDB(), programName)
-	DeleteSSAProgram(programName)
 	return nil
 }
 
@@ -227,7 +227,6 @@ func loadIrSourceFS(path, progName string, isDir bool, fs *irSourceFS, vf *files
 	// 	return
 	// }
 
-	CheckAndSwitchDB(progName)
 	if isDir {
 		addDir(path)
 		return

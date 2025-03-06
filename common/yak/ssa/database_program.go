@@ -12,9 +12,9 @@ func GetLibrary(program, version string) (*Program, error) {
 		return nil, utils.Errorf("program %s have err: %v", program, err)
 	}
 }
-func GetProgram(program string, kind ProgramKind) (*Program, error) {
+func GetProgram(program string, kind ssadb.ProgramKind) (*Program, error) {
 	// rebuild in database
-	if p, err := ssadb.GetProgram(program, string(kind)); err == nil {
+	if p, err := ssadb.GetProgram(program, kind); err == nil {
 		return NewProgramFromDB(p), nil
 	} else {
 		return nil, utils.Errorf("program %s have err: %v", program, err)
@@ -22,7 +22,7 @@ func GetProgram(program string, kind ProgramKind) (*Program, error) {
 }
 
 func NewProgramFromDB(p *ssadb.IrProgram) *Program {
-	prog := NewProgram(p.ProgramName, true, ProgramKind(p.ProgramKind), nil, "")
+	prog := NewProgram(p.ProgramName, true, p.ProgramKind, nil, "")
 	prog.irProgram = p
 	prog.Language = p.Language
 	prog.FileList = p.FileList
@@ -34,14 +34,21 @@ func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 func (prog *Program) UpdateToDatabase() {
 	ir := prog.irProgram
 	if ir == nil {
-		ir = ssadb.CreateProgram(prog.Name, string(prog.ProgramKind), prog.Version)
+		ir = ssadb.CreateProgram(prog.Name, prog.Version, prog.ProgramKind)
 		prog.irProgram = ir
 	}
 	ir.Language = prog.Language
-	ir.ProgramKind = string(prog.ProgramKind)
+	ir.ProgramKind = prog.ProgramKind
 	ir.ProgramName = prog.Name
 	ir.Version = prog.Version
 	ir.FileList = prog.FileList
 	ir.ExtraFile = prog.ExtraFile
 	ssadb.UpdateProgram(ir)
+}
+
+func (p *Program) GetIrProgram() *ssadb.IrProgram {
+	if p == nil || p.irProgram == nil {
+		return nil
+	}
+	return p.irProgram
 }

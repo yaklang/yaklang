@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"io"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/gobwas/glob"
 
@@ -26,6 +27,7 @@ import (
 type ProcessFunc func(msg string, process float64)
 
 type config struct {
+	enableDatabase bool
 	// program
 	ProgramName        string
 	ProgramDescription string
@@ -69,7 +71,6 @@ type config struct {
 	// other build options
 	DatabaseProgramCacheHitter func(any)
 	EnableCache                bool
-	toProfile                  bool
 	// for hash
 	externInfo string
 	// process ctx
@@ -90,7 +91,6 @@ func defaultConfig(opts ...Option) (*config, error) {
 		externLib:                  make(map[string]map[string]any),
 		externValue:                make(map[string]any),
 		defineFunc:                 make(map[string]any),
-		toProfile:                  false,
 		DatabaseProgramCacheHitter: func(any) {},
 		excludeFile: func(path, filename string) bool {
 			return false
@@ -379,6 +379,7 @@ func WithDatabasePath(path string) Option {
 func WithProgramName(name string) Option {
 	return func(c *config) error {
 		c.ProgramName = name
+		c.enableDatabase = true
 		return nil
 	}
 }
@@ -386,17 +387,6 @@ func WithProgramName(name string) Option {
 func WithDatabaseProgramCacheHitter(h func(i any)) Option {
 	return func(c *config) error {
 		c.DatabaseProgramCacheHitter = h
-		return nil
-	}
-}
-
-func WithSaveToProfile(b ...bool) Option {
-	return func(c *config) error {
-		if len(b) > 0 {
-			c.toProfile = b[0]
-		} else {
-			c.toProfile = true
-		}
 		return nil
 	}
 }
@@ -520,7 +510,6 @@ var Exports = map[string]any{
 	"withEntryFile":          WithFileSystemEntry,
 	"withReCompile":          WithReCompile,
 	"withStrictMode":         WithStrictMode,
-	"withSaveToProfile":      WithSaveToProfile,
 	"withContext":            WithContext,
 	"withPeepholeSize":       WithPeepholeSize,
 	"withExcludeFile":        WithExcludeFile,
