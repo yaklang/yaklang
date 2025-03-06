@@ -176,6 +176,9 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 		}
 		count++
 	}
+	if err := generator.Error; err != nil {
+		return nil, err
+	}
 	return res, nil
 }
 
