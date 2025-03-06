@@ -130,11 +130,7 @@ var SSACompilerCommands = []*cli.Command{
 			}
 			var ruleError error
 			addError := func(err error, ruleName string) {
-				if ruleError == nil {
-					ruleError = fmt.Errorf("execute syntaxRule[%s] fail,reason: %s", ruleName, err)
-				} else {
-					ruleError = fmt.Errorf("%w\n,execute syntaxRule[%s] fail,reason: %s", ruleError, ruleName, err)
-				}
+				ruleError = utils.JoinErrors(ruleError, fmt.Errorf("execute syntaxRule[%s] fail,reason: %s", ruleName, err))
 			}
 			for _, sfrule := range sfrules {
 				result, err := programs.SyntaxFlowRule(sfrule, ssaapi.QueryWithEnableDebug(true))
@@ -394,7 +390,7 @@ var SSACompilerCommands = []*cli.Command{
 			log.Infof("finished compiling..., results: %v", len(proj))
 			if syntaxFlow != "" {
 				log.Warn("Deprecated: syntax flow query language will be removed in ssa sub-command, please use `ssa-query(in short: sf/syntaxFlow)` instead")
-				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, false, withCode)
+				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
 			}
 			return nil
 		},
@@ -648,6 +644,74 @@ var SSACompilerCommands = []*cli.Command{
 	},
 	SSACompilerSyntaxFlowCommand,
 	{
+		Name:    "ssa-risk",
+		Aliases: []string{"ssa-risk", "sr"},
+		Usage:   "output risk information from the database",
+		Flags: []cli.Flag{
+			cli.StringFlag{Name: "log", Usage: "log level"},
+			cli.StringFlag{
+				Name:  "program,p",
+				Usage: `program name to save in database`,
+			},
+			cli.StringFlag{
+				Name:  "output,o",
+				Usage: `output file path`,
+			},
+			cli.BoolFlag{
+				Name:  "json,js",
+				Usage: `specify output format`,
+			},
+		},
+		Action: func(c *cli.Context) error {
+			programName := c.String("program")
+			output := c.String("output")
+			level := schema.ValidSeverityType(c.String("log"))
+			//isjson := c.Bool("json")
+			isjson := true
+
+			_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName}}, nil)
+			if err != nil {
+				return err
+			}
+
+			var file *os.File
+			if output != "" {
+				var err error
+				file, err = os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+				if err != nil {
+					return err
+				}
+				defer file.Close()
+			}
+
+			var ret []*schema.SSARisk
+			if isjson {
+				for _, r := range risks {
+					if level == schema.SFR_SEVERITY_INFO {
+						ret = append(ret, r)
+					} else {
+						switch schema.ValidSeverityType(r.Severity) {
+						case level:
+							ret = append(ret, r)
+						}
+					}
+				}
+			}
+
+			if len(ret) == 0 {
+				return nil
+			}
+			data, _ := json.Marshal(ret)
+			if file != nil {
+				file.WriteString(string(data))
+			} else {
+				log.Infof(string(data))
+			}
+
+			return nil
+		},
+	},
+	{
 		Name:    "ssa-query",
 		Aliases: []string{"sf", "syntaxFlow"},
 		Usage:   "Use SyntaxFlow query SSA OpCodes from database",
@@ -686,9 +750,8 @@ var SSACompilerCommands = []*cli.Command{
 			cli.StringFlag{
 				Name: "sarif,sarif-export,o", Usage: "export SARIF format to files",
 			},
-			cli.StringFlag{
-				Name:  "output",
-				Usage: "output filename",
+			cli.BoolFlag{
+				Name: "save,s", Usage: "save the risk to the database",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -703,8 +766,7 @@ var SSACompilerCommands = []*cli.Command{
 			syntaxFlow := c.String("syntaxflow")
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
-			filename := c.String("output")
-			saverisk := false
+			saverisk := c.Bool("save")
 
 			// set database
 			if databaseDialect != "" {
@@ -769,24 +831,13 @@ var SSACompilerCommands = []*cli.Command{
 				}
 			}()
 
-			var file *os.File
-			if filename != "" {
-				var err error
-				saverisk = true
-				file, err = os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0644)
-				if err != nil {
-					log.Warnf("create file failed: %v", err)
-				}
-				defer file.Close()
-			}
-
 			if syntaxFlow != "" {
-				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, saverisk, sarifCallback)
+				return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
 			}
 
 			var dirChecking []string
 			handleBySyntaxFlowContent := func(syntaxFlow string) error {
-				err := SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, saverisk, sarifCallback)
+				err := SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
 				if err != nil {
 					return err
 				}
@@ -803,27 +854,6 @@ var SSACompilerCommands = []*cli.Command{
 				return handleBySyntaxFlowContent(string(raw))
 			}
 
-			var ruleError error
-			addError := func(err error, result *ssaapi.SyntaxFlowResult) {
-				ruleName := result.Name()
-				programName := result.GetProgramName()
-				_, risks, _ := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName}}, nil)
-				if ruleError == nil {
-					ruleError = fmt.Errorf("Fail syntaxRule name: [%s], Reason: %s\n", ruleName, err)
-				} else {
-					ruleError = fmt.Errorf("%w\nFail syntaxRule name: [%s], Reason: %s\n", ruleError, ruleName, err)
-				}
-				if file != nil {
-					for _, r := range risks {
-						if r.Severity == "output" {
-							continue
-						}
-						data, _ := json.Marshal(r)
-						file.WriteString(string(data))
-					}
-				}
-			}
-
 			sarifCallback = func(result *ssaapi.SyntaxFlowResult) {
 				if result.IsLib() {
 					return
@@ -831,7 +861,9 @@ var SSACompilerCommands = []*cli.Command{
 				values := result.GetAlertValues()
 				if values.Len() != 0 {
 					result.Show()
-					addError(errors.New("alert number is not null"), result)
+					if saverisk {
+						result.Save(schema.SFResultKindQuery)
+					}
 				}
 			}
 
@@ -917,10 +949,6 @@ var SSACompilerCommands = []*cli.Command{
 				return utils.Errorf("many error happened: \n%v", buf.String())
 			}
 
-			if ruleError != nil {
-				return ruleError
-			}
-
 			return nil
 		},
 	},
@@ -930,7 +958,7 @@ var SSACompilerCommands = []*cli.Command{
 func SyntaxFlowQuery(
 	programName string, // 程序名称
 	syntaxFlow string, // 语法流
-	dbDebug, sfDebug, showDot, withCode, saverisk bool, // 是否开启数据库调试、语法流调试、显示dot、显示代码、保存risk信息
+	dbDebug, sfDebug, showDot, withCode bool, // 是否开启数据库调试、语法流调试、显示dot、显示代码
 	callbacks ...func(*ssaapi.SyntaxFlowResult), // 回调函数
 ) error {
 	// 捕获panic
@@ -969,9 +997,6 @@ func SyntaxFlowQuery(
 		return execError
 	}
 
-	if saverisk {
-		result.Save(schema.SFResultKindDebug)
-	}
 	if result != nil {
 		for _, c := range callbacks {
 			c(result)
