@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/yaklang/yaklang/common/vulinbox"
 	"net/http"
 	"strings"
 	"sync"
@@ -1999,4 +2000,60 @@ Host: %s:%d
 
 	})
 
+}
+
+func TestGRPCMUSTPASS_MITM_Longtime_chunk(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+
+	vulinboxTarget, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
+	require.NoError(t, err)
+
+	addr := strings.Trim(vulinboxTarget, "http://")
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host:        mitmHost,
+			Port:        uint32(mitmPort),
+			EnableGMTLS: true,
+			PreferGMTLS: true,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+
+		conn, err := netx.DialX(addr, netx.DialX_WithProxy(proxy))
+		require.NoError(t, err)
+		defer conn.Close()
+		defer cancel()
+
+		_, err = conn.Write(lowhttp.FixHTTPRequest([]byte(fmt.Sprintf(`GET /misc/response/long-time-chunked HTTP/1.1
+Host: %s
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate
+Content-length: 0
+
+`, addr))))
+		require.NoError(t, err)
+
+		buffer := make([]byte, 128)
+		conn.SetReadDeadline(time.Now().Add(time.Second * 15)) // check start forwarding
+		_, err = conn.Read(buffer)
+		require.NoError(t, err)
+		fmt.Println("read buffer---------------------")
+		spew.Dump(buffer)
+
+		for i := 0; i < 10; i++ { // check is forwarding stable?
+			buffer := make([]byte, 128)
+			conn.SetReadDeadline(time.Now().Add(time.Second * 2))
+			_, err = conn.Read(buffer)
+			require.NoError(t, err)
+			fmt.Println("read buffer---------------------")
+			spew.Dump(buffer)
+		}
+
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+	})
 }
