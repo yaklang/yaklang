@@ -691,6 +691,8 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 		if argument := i.Arguments(); argument != nil {
 			args = y.VisitArguments(i.Arguments())
 			c := y.EmitCall(y.NewCall(methodCall, args))
+			cTyp := y.MergeFullTypeNameForType(methodCall.GetType().GetFullTypeNames(), c.GetType())
+			c.SetType(cTyp)
 			y.HookMemberCallMethod(object, memberKey, args...)
 			return c
 		}
@@ -1657,8 +1659,9 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 			arguments := y.VisitClassCreatorRest(ret, className)
 			args = append(args, arguments...)
 			call := y.EmitCall(y.NewCall(defaultClassFullback, args))
-			newCallTyp = y.AddFullTypeNameFromMap(className, call.GetType())
 
+			newCallTyp = y.AddFullTypeNameFromMap(className, call.GetType())
+			newCallTyp = y.MergeFullTypeNameForType(defaultClassFullback.GetType().GetFullTypeNames(), newCallTyp)
 			call.SetType(newCallTyp)
 			return obj, call
 		}
