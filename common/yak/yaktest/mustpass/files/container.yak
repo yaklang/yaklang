@@ -1,0 +1,210 @@
+println("===== 容器库测试开始 =====")
+
+// ===== 测试 Set 创建函数 =====
+println("\n测试 NewSet 和 NewUnsafeSet")
+s1 = container.NewSet("1", "2") 
+println("s1:", s1.ToSlice())
+
+s2 = container.NewUnsafeSet("1", "2")
+println("s2:", s2.ToSlice())
+
+// ===== 测试基本操作 =====
+println("\n测试 Add 方法")
+s = container.NewSet()
+assert s.Add("1") == true
+assert s.Add("1") == false  // 添加已存在元素返回false
+println("Add测试通过")
+
+println("\n测试 Append 方法")
+s = container.NewSet()
+assert s.Append("1", "2", "3") == 3
+assert s.Append("1", "4") == 1  // 只有一个新元素添加成功
+println("Append测试通过")
+
+println("\n测试 Len/Cardinality 方法")
+s = container.NewSet("1", "2")
+assert s.Len() == 2
+assert s.Cardinality() == 2
+println("Len/Cardinality测试通过")
+
+println("\n测试 Clear 方法")
+s = container.NewSet("1", "2")
+s.Clear()
+assert s.Len() == 0
+println("Clear测试通过")
+
+println("\n测试 Clone 方法")
+s = container.NewSet("1", "2")
+s2 = s.Clone()
+assert s2.Equal(s)
+println("Clone测试通过")
+
+println("\n测试 Contains 方法")
+s = container.NewSet("1", "2")
+assert s.Contains("1", "2") == true
+assert s.Contains("3") == false
+println("Contains测试通过")
+
+println("\n测试 ContainsAny 方法")
+s = container.NewSet("1", "2")
+assert s.ContainsAny("2", "3") == true
+assert s.ContainsAny("1") == true
+assert s.ContainsAny("3", "4") == false
+println("ContainsAny测试通过")
+
+println("\n测试 ContainsOne 方法")
+s = container.NewSet("1", "2")
+assert s.ContainsOne("1") == true
+assert s.ContainsOne("3") == false
+println("ContainsOne测试通过")
+
+println("\n测试 Difference 方法")
+s = container.NewSet("1", "2")
+s2 = container.NewSet("2", "3")
+s3 = s.Difference(s2)
+println("差集结果:", s3.ToSlice())
+assert s3.ContainsOne("1") == true
+assert s3.Len() == 1
+println("Difference测试通过")
+
+println("\n测试 Each 方法")
+s = container.NewSet("1", "2")
+count = 0
+s.Each(func(val) {
+  println("元素:", val)
+  count += 1
+  return true
+})
+assert count == 2,count
+println("Each测试通过")
+
+println("\n测试 Equal 方法")
+s = container.NewSet("1", "2")
+s2 = container.NewSet("2", "1")
+s3 = container.NewSet("1", "2", "3")
+assert s.Equal(s2) == true
+assert s.Equal(s3) == false
+println("Equal测试通过")
+
+println("\n测试 IsEmpty 方法")
+s = container.NewSet()
+assert s.IsEmpty() == true
+s2 = container.NewSet("1")
+assert s2.IsEmpty() == false
+println("IsEmpty测试通过")
+
+println("\n测试 Iter/Iterator 方法")
+s = container.NewSet("1", "2")
+count = 0
+for val = range s.Iter() {
+  println("Iter元素:", val)
+  count += 1
+}
+assert count == 2
+
+count = 0
+for val = range s.Iterator() {
+  println("Iterator元素:", val)
+  count += 1
+}
+assert count == 2
+println("Iter/Iterator测试通过")
+
+println("\n测试 Intersect 方法")
+s = container.NewSet("1", "2")
+s2 = container.NewSet("2", "3")
+s3 = s.Intersect(s2)
+println("交集结果:", s3.ToSlice())
+assert s3.ContainsOne("2") == true
+assert s3.Len() == 1
+println("Intersect测试通过")
+
+println("\n测试 IsProperSubset 方法")
+s = container.NewSet("1", "2")
+s2 = container.NewSet("1", "2", "3")
+assert s.IsProperSubset(s2) == true
+assert s.IsProperSubset(s) == false
+println("IsProperSubset测试通过")
+
+println("\n测试 IsProperSuperset 方法")
+s = container.NewSet("1", "2")
+s2 = container.NewSet("1", "2", "3")
+assert s.IsProperSuperset(s2) == false
+assert s.IsProperSuperset(s) == false
+assert s2.IsProperSuperset(s) == true
+println("IsProperSuperset测试通过")
+
+println("\n测试 IsSubset 方法")
+s = container.NewSet("1", "2")
+s2 = container.NewSet("1", "2", "3")
+s3 = container.NewSet("2", "3")
+assert s.IsSubset(s2) == true
+assert s.IsSubset(s) == true
+assert s.IsSubset(s3) == false
+println("IsSubset测试通过")
+
+println("\n测试 IsSuperset 方法")
+s = container.NewSet("1", "2")
+s2 = container.NewSet("1", "2", "3")
+assert s.IsSuperset(s2) == false
+assert s.IsSuperset(s) == true
+assert s2.IsSuperset(s) == true
+println("IsSuperset测试通过")
+
+println("\n测试 Union 方法")
+s = container.NewSet("1", "2")
+s2 = container.NewSet("2", "3")
+s3 = s.Union(s2)
+println("并集结果:", s3.ToSlice())
+assert s3.Len() == 3
+assert s3.Contains("1", "2", "3") == true
+println("Union测试通过")
+
+println("\n测试 SymmetricDifference 方法")
+s = container.NewSet("1", "2")
+s2 = container.NewSet("2", "3")
+s3 = s.SymmetricDifference(s2)
+println("对称差集结果:", s3.ToSlice())
+assert s3.Len() == 2
+assert s3.Contains("1", "3") == true
+println("SymmetricDifference测试通过")
+
+println("\n测试 Pop 方法")
+s = container.NewSet("1", "2")
+initialLen = s.Len()
+v, ok = s.Pop()
+assert ok == true
+assert s.Len() == initialLen - 1
+println("弹出元素:", v)
+println("Pop测试通过")
+
+println("\n测试 Remove 方法")
+s = container.NewSet("1", "2")
+s.Remove("1")
+assert s.Len() == 1
+assert s.ContainsOne("1") == false
+println("Remove测试通过")
+
+println("\n测试 RemoveAll 方法")
+s = container.NewSet("1", "2", "3")
+s.RemoveAll("1", "2")
+assert s.Len() == 1
+assert s.ContainsOne("3") == true
+println("RemoveAll测试通过")
+
+println("\n测试 ToSlice 方法")
+s = container.NewSet("1", "2")
+slice = s.ToSlice()
+println("转换为切片:", slice)
+assert len(slice) == 2
+println("ToSlice测试通过")
+
+println("\n===== 链表操作测试 =====")
+l = container.NewLinkedList()
+l.PushBack("第一个元素")
+l.PushBack("第二个元素")
+assert l.Len() == 2
+front = l.Front()
+println("链表首元素:", front.Value)
+
+println("\n===== 容器库测试结束 =====")
