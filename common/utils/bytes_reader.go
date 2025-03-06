@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"io/ioutil"
 	"net"
@@ -488,10 +489,10 @@ type TriggerWriter struct {
 	r    io.ReadCloser
 	w    io.WriteCloser
 	once *sync.Once
-	h    func(buffer io.ReadCloser)
+	h    func(buffer io.ReadCloser, triggerEvent string)
 }
 
-func NewTriggerWriter(trigger uint64, h func(buffer io.ReadCloser)) *TriggerWriter {
+func NewTriggerWriter(trigger uint64, h func(buffer io.ReadCloser, triggerEvent string)) *TriggerWriter {
 	r, w := NewBufPipe(nil)
 	return &TriggerWriter{
 		sizeTrigger: trigger,
@@ -502,7 +503,7 @@ func NewTriggerWriter(trigger uint64, h func(buffer io.ReadCloser)) *TriggerWrit
 	}
 }
 
-func NewTriggerWriterEx(sizeTrigger uint64, timeTrigger time.Duration, h func(buffer io.ReadCloser)) *TriggerWriter {
+func NewTriggerWriterEx(sizeTrigger uint64, timeTrigger time.Duration, h func(buffer io.ReadCloser, triggerEvent string)) *TriggerWriter {
 	r, w := NewBufPipe(nil)
 	return &TriggerWriter{
 		sizeTrigger:         sizeTrigger,
@@ -525,12 +526,12 @@ func (f *TriggerWriter) Write(p []byte) (n int, err error) {
 	select {
 	case <-f.timeTrigger.C:
 		f.once.Do(func() {
-			f.h(f.r)
+			f.h(f.r, httpctx.REQUEST_CONTEXT_KEY_ResponseTooSlow)
 		})
 	default:
 		if f.sizeTrigger > 0 && atomic.AddUint64(&f.bytesCount, uint64(len(p))) > f.sizeTrigger {
 			f.once.Do(func() {
-				f.h(f.r)
+				f.h(f.r, httpctx.REQUEST_CONTEXT_KEY_ResponseTooLarge)
 			})
 		}
 	}

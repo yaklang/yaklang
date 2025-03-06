@@ -63,6 +63,7 @@ type HTTPFlow struct {
 	IsRequestOversize  bool `gorm:"-" json:"is_request_oversize,omitempty"`
 	IsResponseOversize bool `gorm:"-" json:"is_response_oversize,omitempty"`
 
+	IsReadTooSlowResponse      bool   `json:"is_read_too_slow_response,omitempty"`
 	IsTooLargeResponse         bool   `json:"is_too_large_response,omitempty"`
 	TooLargeResponseHeaderFile string `json:"too_large_response_header_file,omitempty"`
 	TooLargeResponseBodyFile   string `json:"too_large_response_body_file,omitempty"`

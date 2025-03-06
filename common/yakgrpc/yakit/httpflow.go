@@ -342,6 +342,9 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 			flow.TooLargeResponseBodyFile = httpctx.GetResponseTooLargeBodyFile(reqIns)
 			flow.BodyLength = httpctx.GetResponseTooLargeSize(reqIns)
 		}
+		if httpctx.GetResponseReadTooSlow(reqIns) {
+			flow.IsReadTooSlowResponse = true
+		}
 	} else {
 		fReq, _ = mutate.NewFuzzHTTPRequest(reqRaw)
 	}
@@ -943,6 +946,7 @@ get_params_total, post_params_total, cookie_params_total,
 ip_address, remote_addr, ip_integer,
 tags, is_websocket, websocket_hash, runtime_id, from_plugin,
 process_name,
+is_read_too_slow_response,
 
 -- request is larger than 200K, return empty string
 LENGTH(request) > 204800 as is_request_oversize,
