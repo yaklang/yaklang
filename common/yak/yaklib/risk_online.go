@@ -25,7 +25,7 @@ func (s *OnlineClient) UploadToOnline(ctx context.Context,
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
 	)
 	if err != nil {
-		return utils.Wrapf(err, "OpenAI Chat failed: http error")
+		return utils.Wrapf(err, "UploadToOnline failed: http error")
 	}
 	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 	var responseData map[string]interface{}
