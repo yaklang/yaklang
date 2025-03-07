@@ -2,14 +2,15 @@ package rule
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
 	"github.com/yaklang/yaklang/common/utils"
-	"strconv"
-	"strings"
 )
 
 // Rule is a suricata rule
@@ -69,8 +70,8 @@ func (r *Rule) AIDecoration(opts ...openai.ConfigOption) {
 
 把结果放在 json 中, json 的 key 为 result, 以方便我提取，翻译过程中尽量使用网络安全术语，注重可读性，不要太晦涩。注意，我有一些翻译偏好，希望能遵守：
 
-Hash 是一个专有名词，不要翻译；“可能” 使用 “潜在” 代替；按习惯来说你认为是产品名或专有名字可以不翻译;糟糕/恶劣声誉等词汇，使用 “恶意黑名单” 代替；
-Poor Reputation 翻译为“恶意”。Observed 翻译为 “检测到”。 “CINS Active”是专有名词 
+Hash 是一个专有名词，不要翻译；"可能" 使用 "潜在" 代替；按习惯来说你认为是产品名或专有名字可以不翻译;糟糕/恶劣声誉等词汇，使用 "恶意黑名单" 代替；
+Poor Reputation 翻译为"恶意"。Observed 翻译为 "检测到"。 "CINS Active"是专有名词 
 
 `)
 		if err != nil {
@@ -111,6 +112,9 @@ type ContentRuleConfig struct {
 
 	/* ICMP */
 	IcmpConfig *ICMPLayerRule
+
+	/* TLS */
+	TLSConfig *TLSRule
 
 	/* Payload Match */
 	ContentRules []*ContentRule

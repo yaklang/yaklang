@@ -2,6 +2,8 @@ package match
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -9,16 +11,28 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/rule"
-	"sync"
 )
 
 type Matcher struct {
 	matcher *matchContext
 }
 
-func New(r *rule.Rule) *Matcher {
+func CompileRule(r *rule.Rule) (*Matcher, error) {
+	ctx, err := compile(r)
+	if err != nil {
+		return nil, err
+	}
 	return &Matcher{
-		matcher: compile(r),
+		matcher: ctx,
+	}, nil
+}
+func New(r *rule.Rule) *Matcher {
+	ctx, err := compile(r)
+	if err != nil {
+		log.Error(err)
+	}
+	return &Matcher{
+		matcher: ctx,
 	}
 }
 
@@ -47,7 +61,11 @@ func (m *Matcher) MatchPackage(pk gopacket.Packet) bool {
 		return false
 	}
 
-	return m.matcher.Match(pk)
+	err, ok := m.matcher.Match(pk)
+	if err != nil {
+		return false
+	}
+	return ok
 }
 
 type matchHandler func(*matchContext) error
@@ -142,7 +160,7 @@ func (c *matchContext) Tidy() {
 	c.prevModifier = modifier.Default
 }
 
-func compile(r *rule.Rule) *matchContext {
+func compile(r *rule.Rule) (*matchContext, error) {
 	c := &matchContext{
 		Value:  make(map[string]any),
 		Rule:   r,
@@ -151,23 +169,34 @@ func compile(r *rule.Rule) *matchContext {
 	}
 
 	if err := matchMutex(c); err != nil {
-		log.Errorf("match mutex failed: %s", err.Error())
+		return c, fmt.Errorf("match mutex failed: %s", err.Error())
 	}
 
-	return c
+	return c, nil
 }
 
-func (c *matchContext) Match(pk gopacket.Packet) bool {
+func (c *matchContext) match() (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("match flow failed: %v", e)
+		}
+	}()
+	err = c.Next()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (c *matchContext) Match(pk gopacket.Packet) (error, bool) {
 	c.lock.Lock()
 	c.Tidy()
 	defer c.lock.Unlock()
 	c.PK = pk
-	err := c.Next()
+	err := c.match()
 	if err != nil {
-		log.Errorf("match flow failed: %s", err.Error())
-		return false
+		return fmt.Errorf("match failed: %v", err), false
 	}
-	return !c.rejected
+	return nil, !c.rejected
 }
 
 func matchMutex(c *matchContext) error {
@@ -195,6 +224,11 @@ func matchMutex(c *matchContext) error {
 		c.Attach(ipMatcher, icmpParser)
 		attachFastPattern(c)
 		c.Attach(icmpCfgMatch)
+		attachPayloadMatcher(c)
+	case protocol.TLS:
+		c.Attach(ipMatcher, portMatcher, tlsParser)
+		attachFastPattern(c)
+		// c.Attach(tlsMatcher)
 		attachPayloadMatcher(c)
 	default:
 		return fmt.Errorf("unsupported protocol: %s", c.Rule.Protocol)

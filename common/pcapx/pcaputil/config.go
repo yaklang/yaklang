@@ -294,6 +294,11 @@ func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Respons
 					}()
 					go func() {
 						defer flow.httpflowWg.Done()
+						defer func() {
+							if err := recover(); err != nil {
+								log.Errorf("http flow panic with: %v", err)
+							}
+						}()
 						reader := bufio.NewReader(responseConn.reader)
 						for {
 							rsp, err := utils.ReadHTTPResponseFromBufioReader(reader, nil)
