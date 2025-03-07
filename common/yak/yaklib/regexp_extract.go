@@ -125,7 +125,10 @@ func RegexpMatchPathParam(i interface{}) []string {
 		if p == "" {
 			p = u.Path
 		}
-		query := "?" + u.RawQuery
+		var query string
+		if u.RawQuery != "" {
+			query = "?" + u.RawQuery
+		}
 		if u.ForceQuery {
 			query = "?"
 		}
