@@ -484,7 +484,7 @@ type TriggerWriter struct {
 
 	timeTriggerDuration time.Duration
 	timeTrigger         *time.Timer
-	writeTimeOnce       *sync.Once
+	writeFirstOnce      *sync.Once
 
 	r    io.ReadCloser
 	w    io.WriteCloser
@@ -497,9 +497,9 @@ func NewTriggerWriter(trigger uint64, h func(buffer io.ReadCloser, triggerEvent 
 	return &TriggerWriter{
 		sizeTrigger: trigger,
 		w:           w, r: r,
-		once:          new(sync.Once),
-		writeTimeOnce: new(sync.Once),
-		h:             h,
+		once:           new(sync.Once),
+		writeFirstOnce: new(sync.Once),
+		h:              h,
 	}
 }
 
@@ -509,9 +509,9 @@ func NewTriggerWriterEx(sizeTrigger uint64, timeTrigger time.Duration, h func(bu
 		sizeTrigger:         sizeTrigger,
 		timeTriggerDuration: timeTrigger,
 		w:                   w, r: r,
-		once:          new(sync.Once),
-		writeTimeOnce: new(sync.Once),
-		h:             h,
+		once:           new(sync.Once),
+		writeFirstOnce: new(sync.Once),
+		h:              h,
 	}
 }
 
@@ -519,9 +519,17 @@ func (f *TriggerWriter) GetCount() int64 {
 	return int64(atomic.LoadUint64(&f.bytesCount))
 }
 
+func (f *TriggerWriter) initTimeTrigger() {
+	f.timeTrigger = time.NewTimer(f.timeTriggerDuration)
+	if f.timeTriggerDuration <= 0 {
+		f.timeTrigger.Stop()
+	}
+}
+
 func (f *TriggerWriter) Write(p []byte) (n int, err error) {
-	f.writeTimeOnce.Do(func() {
-		f.timeTrigger = time.NewTimer(f.timeTriggerDuration)
+	byteCount := atomic.AddUint64(&f.bytesCount, uint64(len(p)))
+	f.writeFirstOnce.Do(func() {
+		f.initTimeTrigger()
 	})
 	select {
 	case <-f.timeTrigger.C:
@@ -529,7 +537,7 @@ func (f *TriggerWriter) Write(p []byte) (n int, err error) {
 			f.h(f.r, httpctx.REQUEST_CONTEXT_KEY_ResponseTooSlow)
 		})
 	default:
-		if f.sizeTrigger > 0 && atomic.AddUint64(&f.bytesCount, uint64(len(p))) > f.sizeTrigger {
+		if f.sizeTrigger > 0 && byteCount > f.sizeTrigger {
 			f.once.Do(func() {
 				f.h(f.r, httpctx.REQUEST_CONTEXT_KEY_ResponseTooLarge)
 			})
