@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -18,6 +19,11 @@ type YakError struct {
 	typ            any
 	*stack
 }
+
+var (
+	AbortError    = errors.New("abort")
+	SanitizeError = errors.New("sanitize")
+)
 
 func Error(i interface{}) error {
 	switch t := i.(type) {

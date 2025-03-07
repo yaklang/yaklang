@@ -48,7 +48,8 @@ func DataFlowWithSFConfig(
 			addHandler(sf.RecursiveConfig_Include, item.Value)
 		case sf.RecursiveConfig_Hook:
 			configItems = append(configItems, item)
-
+		case sf.RecursiveConfig_Sanitize:
+			configItems = append(configItems, item)
 		case sf.RecursiveConfig_Exclude:
 			addHandler(sf.RecursiveConfig_Exclude, item.Value)
 		case sf.RecursiveConfig_Include:
@@ -61,7 +62,10 @@ func DataFlowWithSFConfig(
 		options = append(options, WithHookEveryNode(func(value *Value) error {
 			matchedConfigs := recursiveConfig.compileAndRun(value)
 			if _, ok := matchedConfigs[sf.RecursiveConfig_Until]; ok {
-				return utils.Error("abort")
+				return utils.AbortError
+			}
+			if _, ok := matchedConfigs[sf.RecursiveConfig_Sanitize]; ok {
+				return utils.SanitizeError
 			}
 			return nil
 		}))

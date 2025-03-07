@@ -23,7 +23,8 @@ const (
 	// RecursiveConfig_Until 会沿着数据流匹配每个Value，知道匹配到符合配置项的Value的时候，数据流停止流动。
 	RecursiveConfig_Until = "until"
 	// RecursiveConfig_Hook 会对匹配到的每个Value执行配置项的sfRule，但是不会影响最终结果，其数据流会持续流动。
-	RecursiveConfig_Hook = "hook"
+	RecursiveConfig_Hook     = "hook"
+	RecursiveConfig_Sanitize = "sanitize"
 	// un-used now
 	RecursiveConfig_Filter = "filter"
 )
@@ -44,6 +45,8 @@ func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
 		return RecursiveConfig_Hook
 	case "include":
 		return RecursiveConfig_Include
+	case "sanitize":
+		return RecursiveConfig_Sanitize
 	default:
 		log.Warnf("unknown recursive config key: %s", i)
 	}

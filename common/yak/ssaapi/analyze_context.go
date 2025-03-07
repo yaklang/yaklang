@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"errors"
 	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -113,7 +114,7 @@ func (a *AnalyzeContext) hook(i *Value) error {
 	if len(a.config.HookEveryNode) > 0 {
 		for _, hook := range a.config.HookEveryNode {
 			if err := hook(i); err != nil {
-				if err.Error() != "abort" {
+				if !errors.Is(err, utils.SanitizeError) && !errors.Is(err, utils.AbortError) {
 					log.Errorf("hook-every-node error: %v", err)
 				}
 				return err

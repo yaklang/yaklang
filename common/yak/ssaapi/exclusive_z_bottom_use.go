@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"errors"
+	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 
 	"github.com/samber/lo"
@@ -84,7 +86,11 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	v.SetDepth(actx.depth)
 	err := actx.hook(v)
 	if err != nil {
-		return Values{v}
+		if errors.Is(err, utils.SanitizeError) {
+			return Values{}
+		} else {
+			return Values{v}
+		}
 	}
 	switch ins := v.node.(type) {
 	case *ssa.Phi:

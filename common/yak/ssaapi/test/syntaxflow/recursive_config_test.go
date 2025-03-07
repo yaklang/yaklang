@@ -1,6 +1,8 @@
 package syntaxflow
 
 import (
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -312,4 +314,68 @@ end:'end',
 				"end":    {"Function-getCmd"},
 			})
 	})
+}
+
+func TestDataFlow_Sanitize(t *testing.T) {
+	t.Run("test sanitize1", func(t *testing.T) {
+		code := `
+a=1;
+b=2;
+if isEmpty(a){
+	return 
+}
+if isValid(b){
+	return 
+}
+print(a,b)
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			rule := `
+isEmpty() as $filter
+isValid() as $filter2
+print(* #{
+sanitize:<<<TEXT
+	*?{<getCondition> & $filter || <getCondition> & $filter2}
+TEXT
+}->as $result)`
+			vals, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			result := vals.GetValues("result")
+			require.Equal(t, 0, result.Len())
+			return nil
+		})
+	})
+
+	t.Run("test get condition 4", func(t *testing.T) {
+		code := `
+a=1;
+b=2;
+if isEmpty(a){
+	return 
+}
+if isValid(b){
+	return 
+}
+print(a,b)
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			rule := `
+isEmpty() as $filter
+print(* #{
+sanitize:<<<TEXT
+	*?{<getCondition> & $filter}
+TEXT
+}->as $result)`
+			vals, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			result := vals.GetValues("result")
+			result.Show()
+			result.ShowDot()
+			require.NotContains(t, result.DotGraph(), "isEmpty")
+			return nil
+		})
+	})
+
 }

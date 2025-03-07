@@ -598,3 +598,48 @@ public class DatabaseConnection {
 			"len": {"4"},
 		}, ssaapi.WithLanguage(consts.JAVA))
 }
+
+func TestNativeCall_GetCondition(t *testing.T) {
+	t.Run("test get condition1", func(t *testing.T) {
+		code := `
+a=1;
+if isValid(a){
+	return 
+}
+print(a)
+`
+		ssatest.CheckSyntaxFlow(t, code, `print(*<getCondition> as $cond)`, map[string][]string{
+			"cond": {"Undefined-isValid(1)"},
+		})
+	})
+
+	t.Run("test get condition2", func(t *testing.T) {
+		code := `
+a=1;
+b=2;
+if isEmpty(a){
+	a=11
+}
+if isValid(b){
+	b=22
+}
+print(a,b)
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			rule := `
+isValid() as $filter
+print(* #{
+exclude:<<<EXCLUDE
+	*?{<getCondition> & $filter}
+EXCLUDE
+}->as $cond)`
+			vals, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			cond := vals.GetValues("cond")
+			cond.Show()
+			return nil
+		})
+	})
+
+}

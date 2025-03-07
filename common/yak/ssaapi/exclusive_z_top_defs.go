@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/samber/lo"
@@ -83,7 +84,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	}
 	err := actx.hook(i)
 	if err != nil {
-		return Values{i}
+		if errors.Is(err, utils.SanitizeError) {
+			return Values{}
+		} else {
+			return Values{i}
+		}
 	}
 
 	checkObject := func() Values {
