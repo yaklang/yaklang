@@ -181,11 +181,10 @@ func WithStrictMode(b bool) Option {
 
 func WithLocalFs(path string) Option {
 	return func(c *config) error {
-		c.fs = filesys.NewRelLocalFs(path)
-		c.info = config_info{
-			Kind:      "local",
-			LocalFile: path,
-		}.String()
+		WithConfigInfo(map[string]any{
+			"kind":       "local",
+			"local_file": path,
+		})(c)
 		return nil
 	}
 }
@@ -195,7 +194,7 @@ func WithFileSystem(fs fi.FileSystem) Option {
 		if fs == nil {
 			return utils.Errorf("need set filesystem")
 		}
-		c.fs = filesys.NewUnifiedFS(fs, filesys.WithUnifiedFsSeparator(ssadb.IrSourceFsSeparators))
+		c.fs = getUnifiedSeparatorFs(fs)
 		return nil
 	}
 }
@@ -207,7 +206,7 @@ func WithConfigInfoRaw(info string) Option {
 		if err != nil {
 			return err
 		}
-		c.fs = fs
+		WithFileSystem(fs)(c)
 		return nil
 	}
 }
@@ -418,6 +417,12 @@ func WithContext(ctx context.Context) Option {
 		c.ctx = ctx
 		return nil
 	}
+}
+
+func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
+	return filesys.NewUnifiedFS(fs,
+		filesys.WithUnifiedFsSeparator(ssadb.IrSourceFsSeparators),
+	)
 }
 
 var ttlSSAParseCache = createCache(10 * time.Second)
