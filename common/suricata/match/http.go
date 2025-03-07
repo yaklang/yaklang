@@ -14,9 +14,10 @@ import (
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
-	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
 type HttpFlow struct {
@@ -49,9 +50,24 @@ func (h *HttpFlow) createRequestPacket() []gopacket.Packet {
 	// 如果 TrafficFlow 不为空，优先使用其中的网络信息
 	if h.TrafficFlow != nil {
 		h.Src = h.TrafficFlow.ClientConn.LocalIP().String()
-		h.Dst = h.TrafficFlow.ServerConn.RemoteIP().String()
+		h.Dst = h.TrafficFlow.ClientConn.RemoteIP().String()
 		h.SrcPort = h.TrafficFlow.ClientConn.LocalPort()
-		h.DstPort = h.TrafficFlow.ServerConn.RemotePort()
+		h.DstPort = h.TrafficFlow.ClientConn.RemotePort()
+	}
+	if h.Src == "" {
+		h.Src = utils.GetLocalIPAddress()
+	}
+
+	if h.Dst == "" {
+		h.Dst = utils.GetRandomIPAddress()
+	}
+
+	if h.DstPort <= 0 {
+		h.DstPort = 80
+	}
+
+	if h.SrcPort <= 0 {
+		h.SrcPort = 10000 + rand.Intn(30000)
 	}
 
 	if len(h.Req) > 0 {
