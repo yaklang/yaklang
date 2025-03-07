@@ -2,14 +2,15 @@ package rule
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/data/numrange"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
 	"github.com/yaklang/yaklang/common/utils"
-	"strconv"
-	"strings"
 )
 
 func modifierMapping(str string) modifier.Modifier {
@@ -76,6 +77,16 @@ func modifierMapping(str string) modifier.Modifier {
 		return modifier.IPv6HDR
 	case "tcp.hdr", "tcp_hdr":
 		return modifier.TCPHDR
+	case "ja3.hash":
+		return modifier.JA3Hash
+	case "ja3s.hash":
+		return modifier.JA3SHash
+	case "ja3.string":
+		return modifier.JA3String
+	case "ja3s.string":
+		return modifier.JA3SString
+	case "tls.cert_subject":
+		return modifier.TLSCertSubject
 	}
 	return modifier.Default
 }
