@@ -44,7 +44,7 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 	}
 	var domain string
 	// 查找dnslog
-	re, err := regexp.Compile(`(\w+\.)+((dnslog\.cn)|(ceye\.io)|(vcap\.me)|(vcap\.io)|(xip\.io)|(burpcollaborator\.net)|(dgrh3\.cn)|(gobygo\.net)|(127\.0\.0\.1:\d+))`)
+	re, err := regexp.Compile(`(\w+\.)+((dnslog\.cn)|(ceye\.io)|(vcap\.me)|(vcap\.io)|(xip\.io)|(burpcollaborator\.net)|(dgrh3\.cn)|(gobygo\.net))|(127\.0\.0\.1:\d+)`)
 	if err != nil {
 		return nil, err
 	}
