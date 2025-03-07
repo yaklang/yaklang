@@ -256,7 +256,7 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 	})
 }
 
-func (prog *Program) Finish(cb ...func()) {
+func (prog *Program) Finish() {
 	// only run once and not wait
 	if prog.finished {
 		return
@@ -275,15 +275,6 @@ func (prog *Program) Finish(cb ...func()) {
 		v.Finish()
 		return true
 	})
-
-	// only application need save and wait
-	if prog.ProgramKind == Application {
-		if prog.EnableDatabase { // save program
-			updateToDatabase(prog)
-		}
-		// save instruction
-		prog.Cache.SaveToDatabase(cb...)
-	}
 	progPool.Delete(prog.GetProgramName())
 }
 
