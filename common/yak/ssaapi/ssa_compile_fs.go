@@ -199,15 +199,22 @@ func (c *config) parseProjectWithFS(
 		return nil, ErrContextCancel
 	}
 	process = 0.9 // %90
-	instructionSaveTotal := prog.Cache.CountInstruction()
-	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, instructionSaveTotal) // %90
-	instructionSaveNum := 0
-	prog.Finish(func() {
-		instructionSaveNum++
-		process = 0.9 + (float64(instructionSaveNum)/float64(instructionSaveTotal))*0.1
-		if int(process*1000)%10 == 0 { // is 91.0%/92.0%/....
-			prog.ProcessInfof("Saving instructions: %d complete(total %d)", instructionSaveNum, instructionSaveTotal)
+	prog.Finish()
+	if prog.EnableDatabase { // save program
+		prog.UpdateToDatabase()
+	}
+	total := prog.Cache.CountInstruction()
+	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
+	index := 0
+	prevProcess := 0.9
+	prog.Cache.SaveToDatabase(func() {
+		index++
+		process = 0.9 + (float64(index)/float64(total))*0.1
+		if (process - prevProcess) > 0.01 { // is 91.0%/92.0%/....
+			prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
+			prevProcess = process
 		}
 	})
+	_ = prevProcess
 	return NewProgram(prog, c), nil
 }

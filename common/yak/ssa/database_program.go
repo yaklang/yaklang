@@ -31,7 +31,7 @@ func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 	return prog
 }
 
-func updateToDatabase(prog *Program) {
+func (prog *Program) UpdateToDatabase() {
 	ir := prog.irProgram
 	if ir == nil {
 		ir = ssadb.CreateProgram(prog.Name, string(prog.ProgramKind), prog.Version)

@@ -76,6 +76,10 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 	require.Equal(t, LineDisasm(inst3), "add(Undefined-c, Undefined-b)")
 
 	prog.Finish()
+	if prog.EnableDatabase { // save program
+		prog.UpdateToDatabase()
+	}
+	prog.Cache.SaveToDatabase()
 
 	{
 		// check database
@@ -121,6 +125,11 @@ func TestCache_with_lazyBuilder(t *testing.T) {
 
 	// finish
 	prog.Finish()
+	if prog.EnableDatabase { // save program
+		prog.UpdateToDatabase()
+	}
+	prog.Cache.SaveToDatabase()
+
 	require.Greater(t, undefineId, int64(0))
 	require.True(t, builded)
 	{
