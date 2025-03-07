@@ -2,6 +2,9 @@ package pcapx
 
 import (
 	"fmt"
+	"math/rand"
+	"net"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -9,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/pcapfix"
-	"math/rand"
-	"net"
 )
 
 type ChaosTraffic struct {
@@ -421,6 +422,11 @@ var (
 		"InjectChaosTraffic": InjectChaosTraffic,
 		"FixPermission":      pcapfix.Fix,
 		"WithdrawPermission": pcapfix.Withdraw,
+		"withIface":          WithIface,
+		"withLocalAddress":   WithLocalAddress,
+		"withRemoteAddress":  WithRemoteAddress,
+		"withToServer":       WithToServer,
+		"withToClient":       WithToClient,
 	}
 )
 
