@@ -6,6 +6,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBase64Padding(t *testing.T) {
+	i := `MQ`
+	result := AutoDecode(i)
+	require.Len(t, result, 1, "base64 decode failed")
+}
+
 func TestHTTPChunkedDecode(t *testing.T) {
 	text := "hellowasdfnasdjkfaskdklasdfkaskodfpoasdfpoasdofpasdfasdfaa"
 	afterChunked := string(HTTPChunkedEncode([]byte(text)))

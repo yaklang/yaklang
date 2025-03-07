@@ -172,6 +172,22 @@ func DecodeBase64Url(i interface{}) ([]byte, error) {
 	return DecodeBase64(org)
 }
 
+func Base32Padding(i string) string {
+	padding := 8 - len(i)%8
+	if padding <= 0 || padding == 8 {
+		return i
+	}
+	return i + strings.Repeat("=", padding)
+}
+
+func Base64Padding(i string) string {
+	padding := 4 - len(i)%4
+	if padding <= 0 || padding == 4 {
+		return i
+	}
+	return i + strings.Repeat("=", padding)
+}
+
 func DecodeBase64(i string) ([]byte, error) {
 	i = strings.TrimSpace(i)
 	if strings.Index(i, "%") >= 0 {

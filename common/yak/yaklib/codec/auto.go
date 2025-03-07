@@ -161,6 +161,7 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		return yakunquote.UnquoteInner(rawStr, 0)
 	}
 	base32Detect := func(rawStr string) bool {
+		rawStr = Base32Padding(rawStr)
 		matched := base32Regexp.MatchString(rawStr)
 		if !matched {
 			return false
@@ -176,6 +177,7 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		return true
 	}
 	base64Detect := func(rawStr string) bool {
+		rawStr = Base64Padding(rawStr)
 		matched := govalidator.IsBase64(rawStr)
 		if !matched {
 			return false
