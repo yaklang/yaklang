@@ -163,10 +163,37 @@ const (
 
 	NativeCall_ExtendsBy = "extendsBy"
 
-	NativeCall_Getblurpint = "getBluePrint"
+	NativeCall_Getblurpint  = "getBluePrint"
+	NativeCall_getCondition = "getCondition"
 )
 
 func init() {
+	registerNativeCall(NativeCall_getCondition, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			if ret, ok := operator.(*Value); ok {
+				phi, ok := ssa.ToPhi(ret.node)
+				if !ok {
+					return nil
+				}
+				conditions := phi.GetControlFlowConditions()
+				for _, condition := range conditions {
+					condValue := prog.NewValue(condition)
+					condValue.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("get condition"))
+					result = append(result, condValue)
+				}
+			}
+			return nil
+		})
+		if len(result) > 0 {
+			return true, sfvm.NewValues(result), nil
+		}
+		return false, nil, nil
+	}), nc_desc("获取条件"))
 	registerNativeCall(NativeCall_Getblurpint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
 		v.Recursive(func(operator sfvm.ValueOperator) error {
