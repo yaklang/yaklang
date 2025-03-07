@@ -44,7 +44,7 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 	}
 	var domain string
 	// 查找dnslog
-	re, err := regexp.Compile(`127\.0\.0\.1\:\d+`)
+	re, err := regexp.Compile(`(\w+\.)+((dnslog\.cn)|(ceye\.io)|(vcap\.me)|(vcap\.io)|(xip\.io)|(burpcollaborator\.net)|(dgrh3\.cn)|(gobygo\.net)|(127\.0\.0\.1:\d+))`)
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +386,7 @@ func (s *VulinServer) registerFastjson() {
             auth = {"user":name,"password":password};
             $.ajax({
                 type:"get",
-                url:"/fastjson/json-in-query",
+                url:"/fastjson/jackson-in-query",
                 data:{"auth":JSON.stringify(auth),"action":"login"},
                 success: function (data ,textStatus, jqXHR)
                 {
@@ -431,7 +431,7 @@ func (s *VulinServer) registerFastjson() {
             auth = {"user":name,"password":password};
             $.ajax({
                 type:"post",
-                url:"/fastjson/json-in-form",
+                url:"/fastjson/unstable-network",
                 data:{"auth":JSON.stringify(auth),"action":"login"},
 				dataType: "json",
                 success: function (data ,textStatus, jqXHR)
@@ -463,7 +463,7 @@ func (s *VulinServer) registerFastjson() {
             auth = {"user":name,"password":password};
             $.ajax({
                 type:"get",
-                url:"/fastjson/json-in-query",
+                url:"/fastjson/get-in-query-intranet",
                 data:{"auth":JSON.stringify(auth),"action":"login"},
                 success: function (data ,textStatus, jqXHR)
                 {
