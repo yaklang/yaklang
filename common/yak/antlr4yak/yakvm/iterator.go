@@ -1,13 +1,16 @@
 package yakvm
 
 import (
+	"container/list"
 	"context"
 	"fmt"
 	"reflect"
 	"sort"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
+	"github.com/yaklang/yaklang/common/yak/yaklib/container"
 )
 
 type IteratorType int
@@ -182,7 +185,7 @@ type ChannelIterator struct {
 	p   reflect.Value
 }
 
-func newChannelIterator(i interface{}, ctx context.Context) *ChannelIterator {
+func newChannelIterator(ctx context.Context, i interface{}) *ChannelIterator {
 	p := reflect.ValueOf(i)
 	kind := p.Kind()
 	if kind != reflect.Chan {
@@ -251,14 +254,95 @@ func (i *RepeatIterator) Next() (data []interface{}, hadEnd bool) {
 	return
 }
 
-func NewIterator(i interface{}, v *Frame) (IteratorInterface, error) {
+type SetIterator struct {
+	BaseIterator
+
+	iter *mapset.Iterator[any]
+}
+
+func newSetIterator(s mapset.Set[any]) *SetIterator {
+	setLen := s.Cardinality()
+	if setLen == 0 {
+		return nil
+	}
+
+	return &SetIterator{
+		BaseIterator: BaseIterator{
+			Current: 0,
+			N:       setLen,
+			typ:     SliceIteratorType,
+		},
+		iter: s.Iterator(),
+	}
+}
+
+func (i *SetIterator) Next() (data []interface{}, hadEnd bool) {
+	var current int
+	current, hadEnd = i.nextStep()
+	if hadEnd {
+		data = []interface{}{nil, nil}
+	} else {
+		v, ok := <-i.iter.C
+		if !ok {
+			data = []interface{}{nil, nil}
+		} else {
+			data = []interface{}{current, v}
+		}
+	}
+	return
+}
+
+type LinkedListIterator struct {
+	BaseIterator
+
+	list    *list.List
+	element *list.Element
+}
+
+func newLinkedListIterator(l *list.List) *LinkedListIterator {
+	return &LinkedListIterator{
+		BaseIterator: BaseIterator{
+			Current: 0,
+			N:       2,
+			typ:     SliceIteratorType,
+		},
+		list: l,
+	}
+}
+
+func (i *LinkedListIterator) Next() (data []interface{}, hadEnd bool) {
+	current, hadEnd := i.nextStep()
+	var ele *list.Element
+	if i.element == nil {
+		i.element = i.list.Front()
+	} else {
+		i.element = i.element.Next()
+	}
+	ele = i.element
+	if ele != nil {
+		i.N++
+		data = []interface{}{current, ele.Value}
+	} else {
+		i.N = i.Current
+		hadEnd = true
+		data = []interface{}{nil, nil}
+	}
+	return
+}
+
+func NewIterator(ctx context.Context, i interface{}) (IteratorInterface, error) {
 	if i == nil {
 		return nil, nil
 	}
 
 	// OrderedMap iterator
-	if orderedMap, ok := i.(*orderedmap.OrderedMap); ok {
-		return newOrderedMapIterator(orderedMap), nil
+	switch iter := i.(type) {
+	case *orderedmap.OrderedMap:
+		return newOrderedMapIterator(iter), nil
+	case *container.Set:
+		return newSetIterator(iter.Set), nil
+	case *list.List:
+		return newLinkedListIterator(iter), nil
 	}
 
 	kind := reflect.TypeOf(i).Kind()
@@ -275,7 +359,7 @@ func NewIterator(i interface{}, v *Frame) (IteratorInterface, error) {
 	case reflect.Map:
 		return newMapIterator(i), nil
 	case reflect.Chan:
-		return newChannelIterator(i, v.ctx), nil
+		return newChannelIterator(ctx, i), nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return newRepeatIterator(reflect.ValueOf(i).Int()), nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:

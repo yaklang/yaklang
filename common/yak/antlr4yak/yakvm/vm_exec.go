@@ -514,8 +514,6 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			Value:       v.popArgN(c.Unary),
 		})
 	case OpRangeNext:
-		var jmp bool
-
 		iterator := v.iteratorStack.Peek().(IteratorInterface)
 		if iterator == nil {
 			panic("iterator is nil")
@@ -534,6 +532,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 
 		if c.Unary > 1 && typ == ChannelIteratorType {
 			panic(fmt.Sprintf("range over channel allow only one iteration variable"))
+		}
+
+		if hadEnd {
+			v.setCodeIndex(c.Op1.Int())
+			return
 		}
 
 		min := c.Unary
@@ -545,22 +548,13 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			values[i] = NewAutoValue(data[i])
 		}
 
-		if typ == ChannelIteratorType && hadEnd {
-			jmp = true
-			v.setCodeIndex(c.Op1.Int())
-		}
-
-		if !jmp {
-			v.push(&Value{
-				TypeVerbose: "__opcode_list__",
-				Value:       values,
-			})
-			v.nextCode()
-		}
+		v.push(&Value{
+			TypeVerbose: "__opcode_list__",
+			Value:       values,
+		})
+		v.nextCode()
 		return
 	case OpInNext:
-		var jmp bool
-
 		iterator := v.iteratorStack.Peek().(IteratorInterface)
 		if iterator == nil {
 			panic("iterator is nil")
@@ -579,6 +573,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 
 		if c.Unary > 1 && typ == ChannelIteratorType {
 			panic(fmt.Sprintf("range over channel allow only one iteration variable"))
+		}
+
+		if hadEnd {
+			v.setCodeIndex(c.Op1.Int())
+			return
 		}
 
 		// 对sliceIterator做处理，第一个索引应该抛弃
@@ -613,23 +612,16 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			values[i] = NewAutoValue(data[i])
 		}
 
-		if hadEnd && typ == ChannelIteratorType {
-			jmp = true
-			v.setCodeIndex(c.Op1.Int())
-		}
-
-		if !jmp {
-			v.push(&Value{
-				TypeVerbose: "__opcode_list__",
-				Value:       values,
-			})
-			v.nextCode()
-		}
+		v.push(&Value{
+			TypeVerbose: "__opcode_list__",
+			Value:       values,
+		})
+		v.nextCode()
 
 		return
 	case OpEnterFR:
 		op := v.peek()
-		iterator, err := NewIterator(op.Value, v)
+		iterator, err := NewIterator(v.ctx, op.Value)
 		if err != nil {
 			panic(fmt.Sprintf("%#v is not rangeable", op.TypeVerbose))
 		} else if rv := reflect.ValueOf(iterator); !rv.IsValid() || rv.IsNil() {
