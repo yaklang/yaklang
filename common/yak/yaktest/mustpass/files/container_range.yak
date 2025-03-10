@@ -1,0 +1,30 @@
+// set无序
+s = container.NewSet("q", "w", "e")
+count = 0
+m = {}
+for i, v = range s {
+    count++
+    m[v] = true
+}
+assert count == 3
+assert m["q"] == true
+assert m["w"] == true
+assert m["e"] == true
+
+l = container.NewLinkedList()
+count = 0
+l.PushBack("q")
+l.PushBack("w")
+l.PushBack("e")
+for i, v = range l {
+    count++
+    if count == 1 {
+        assert v == "q"
+    } else if count == 2 {
+        assert v == "w"
+    } else if count == 3 {
+        assert v == "e"
+    }
+}
+
+assert count == 3, count 
