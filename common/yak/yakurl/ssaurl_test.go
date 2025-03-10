@@ -622,3 +622,133 @@ func TestSSAURLPagination(t *testing.T) {
 
 	})
 }
+
+func TestHaveRange(t *testing.T) {
+	local, err := yakgrpc.NewLocalClient()
+	if err != nil {
+		t.Error(err)
+	}
+	_ = local
+
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
+		package com.example.apackage; 
+		import com.example.bpackage.sub.B;
+		class A {
+			public static void main(String[] args) {
+				B b = new B();
+				// for test 1: A->B
+				target1(b.get());
+				// for test 2: B->A
+				b.show(1);
+
+				Map<String, String> map = new HashMap<>();
+				map.put("domain", domain);
+			}
+		}
+		`)
+
+	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
+		package com.example.bpackage.sub; 
+		class B {
+			public  int get() {
+				return 	 1;
+			}
+			public void show(int a) {
+				target2(a);
+			}
+		}
+		`)
+	progID := uuid.NewString()
+	prog, err := ssaapi.ParseProjectWithFS(vf,
+		ssaapi.WithLanguage(consts.JAVA),
+		ssaapi.WithProgramPath("example"),
+		ssaapi.WithProgramName(progID),
+	)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progID)
+	}()
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+
+	result, err := prog.SyntaxFlowWithError(`__dependency__ as $main`, ssaapi.QueryWithSave(schema.SFResultKindDebug))
+	require.NoError(t, err)
+	resId := result.GetResultID()
+	require.Greater(t, resId, uint(0))
+
+	// check  this value all empty
+	{
+		url := &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema:   "syntaxflow",
+				Location: progID,
+				Path:     "/main",
+				Query: []*ypb.KVPair{
+					{
+						// get from database
+						Key:   "result_id",
+						Value: codec.AnyToString(resId),
+					},
+				},
+			},
+		}
+		res, err := local.RequestYakURL(context.Background(), url)
+		require.NoError(t, err)
+		t.Log("checkHandler in database query ")
+		spew.Dump(res)
+
+		emptyRange := true
+		for _, item := range res.Resources {
+			if item.ResourceType == "value" {
+				for _, extra := range item.Extra {
+					if extra.Key == "code_range" {
+						var rng map[string]any
+						t.Log(extra.Value)
+						err := json.Unmarshal([]byte(extra.Value), &rng)
+						require.NoError(t, err)
+						if rng["url"] != "" {
+							emptyRange = false
+						}
+					}
+				}
+			}
+		}
+		require.True(t, emptyRange)
+	}
+	// check  no value return
+	{
+		url := &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema:   "syntaxflow",
+				Location: progID,
+				Path:     "/main",
+				Query: []*ypb.KVPair{
+					{
+						// get from database
+						Key:   "result_id",
+						Value: codec.AnyToString(resId),
+					},
+					{
+						Key:   "have_range",
+						Value: "true",
+					},
+				},
+			},
+		}
+		res, err := local.RequestYakURL(context.Background(), url)
+		require.NoError(t, err)
+		t.Log("checkHandler in database query ")
+		spew.Dump(res)
+		require.Equal(t, len(res.Resources), 1) // just result id item
+
+		haveValue := false
+		for _, item := range res.Resources {
+			if item.ResourceType == "value" {
+				haveValue = true
+			}
+		}
+		require.False(t, haveValue)
+	}
+}

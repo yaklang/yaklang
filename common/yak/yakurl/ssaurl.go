@@ -101,6 +101,9 @@ type QuerySyntaxFlow struct {
 	variable string
 	index    int64
 
+	// option
+	haveRange bool
+
 	// extra info
 	programName string
 	ResultID    uint
@@ -116,6 +119,11 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 	query := make(map[string]string)
 	for _, v := range u.GetQuery() {
 		query[v.GetKey()] = v.GetValue()
+	}
+
+	haveRange := false
+	if have_range, ok := query["have_range"]; ok {
+		haveRange = have_range == "true"
 	}
 
 	// get resultID from query
@@ -163,6 +171,8 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 		variable: variable,
 		index:    index,
 
+		haveRange: haveRange,
+
 		ResultID:    resultID,
 		programName: programName,
 
@@ -180,6 +190,7 @@ Get SyntaxFlowAction
 		body: syntaxflow code // if set this will query result with this syntaxflow code
 		query:
 			result_id	string  // if set this, will get result from database
+			have_range  bool    // if set this, will just return value contain code range
 		page:
 			start from
 	Response:
@@ -243,11 +254,13 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 				continue
 			}
 			codeRange, source := ssaapi.CoverCodeRange(programName, v.GetRange())
+			if query.haveRange && codeRange.URL == "" {
+				continue
+			}
 			extraData := []extra{
 				{"index", index},
 				{"code_range", codeRange},
 				{"source", source}}
-			// result.risk
 			if hash := result.GetRiskHash(variable, int(index)); hash != "" {
 				extraData = append(extraData, extra{"risk_hash", hash})
 			}
