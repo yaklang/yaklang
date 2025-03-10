@@ -123,6 +123,11 @@ func (o *OrderedMapEx[K, V]) Get(key K) (V, bool) {
 	return val, exists
 }
 
+func (o *OrderedMapEx[K, V]) GetExact(key K) V {
+	val := o.values[key]
+	return val
+}
+
 func (o *OrderedMapEx[K, V]) Set(key K, value V) {
 	_, exists := o.values[key]
 	if !exists {
