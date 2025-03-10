@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 )
 
 var (
@@ -137,16 +138,16 @@ func init() {
 	WeakJWTTokenKeys = utils.RemoveRepeatedWithStringSlice(WeakJWTTokenKeys)
 }
 
-func NewJWTHelper(alg string) (*jwt.Token, error) {
+func NewJWTHelper(alg string) (*Token, error) {
 	if alg == "" || alg == "none" || alg == "None" {
-		return jwt.New(&AuthHackJWTSigningNone{}), nil
+		return NewTokenFromJwtToken(jwt.New(&AuthHackJWTSigningNone{})), nil
 	}
 
 	algIns, ok := algsToAlgsInstance[alg]
 	if !ok {
 		return nil, utils.Errorf("not supported alg: %v in %v", alg, AvailableJWTTokensAlgs())
 	}
-	return jwt.New(algIns), nil
+	return NewTokenFromJwtToken(jwt.New(algIns)), nil
 }
 
 func AvailableJWTTokensAlgs() []string {
@@ -157,37 +158,46 @@ func AvailableJWTTokensAlgs() []string {
 	return res
 }
 
-func JwtGenerate(alg string, claims map[string]interface{}, typ string, key []byte) (string, error) {
+func JwtGenerate(alg string, claims any, typ string, key []byte) (string, error) {
 	return JwtGenerateEx(alg, nil, claims, typ, key)
 }
 
-func JwtGenerateEx(alg string, header map[string]interface{}, claims map[string]interface{}, typ string, key []byte) (string, error) {
+func JwtGenerateEx(alg string, header, claims any, typ string, key []byte) (string, error) {
 	token, err := NewJWTHelper(alg)
 	if err != nil {
 		return "", err
 	}
-	token.Claims = jwt.MapClaims(claims)
-	if typ == "" {
-		token.Header["typ"] = "JWT"
-	} else {
-		token.Header["typ"] = typ
-	}
 
-	if header != nil && len(header) > 0 {
-		for k, v := range header {
-			token.Header[k] = v
+	// headers
+	if typ == "" {
+		token.Header.Set("typ", "JWT")
+	} else {
+		token.Header.Set("typ", typ)
+	}
+	// claims
+	switch claims := claims.(type) {
+	case *orderedmap.OrderedMap:
+		token.Claims = NewOMapClaimsFromOrderedMap(claims)
+	default:
+		newClaims := NewOMapClaims()
+		claimMap := utils.InterfaceToMapInterface(claims)
+		for k, v := range claimMap {
+			newClaims.Set(k, v)
 		}
+		token.Claims = newClaims
 	}
 
 	return token.SignedString(key)
 }
 
-func JwtParse(tokenStr string, keys ...string) (*jwt.Token, []byte, error) {
+func JwtParse(tokenStr string, keys ...string) (*Token, []byte, error) {
 	var jwtErr *jwt.ValidationError
+	claims := NewOMapClaims()
 
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+	rawToken, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 		return nil, nil
 	})
+	token := NewTokenFromJwtToken(rawToken)
 	if err != nil {
 		if !errors.As(err, &jwtErr) {
 			return nil, nil, utils.Wrap(err, "Unexpected error")
@@ -195,8 +205,8 @@ func JwtParse(tokenStr string, keys ...string) (*jwt.Token, []byte, error) {
 		if jwtErr.Errors == jwt.ValidationErrorMalformed {
 			return nil, nil, utils.Errorf("malformed token: %v", err)
 		} else if jwtErr.Errors == jwt.ValidationErrorUnverifiable {
-			if token != nil && len(token.Header) > 0 {
-				alg := strings.ToLower(fmt.Sprint(token.Header["alg"]))
+			if token != nil && token.Header.Len() > 0 {
+				alg := strings.ToLower(fmt.Sprint(token.Header.GetExact("alg")))
 				if alg == "none" {
 					return token, nil, nil
 				}
@@ -207,9 +217,10 @@ func JwtParse(tokenStr string, keys ...string) (*jwt.Token, []byte, error) {
 
 	for _, i := range keys {
 		key := []byte(i)
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		rawToken, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 			return []byte(i), nil
 		})
+		token := NewTokenFromJwtToken(rawToken)
 		if err != nil {
 			if !errors.As(err, &jwtErr) {
 				return nil, nil, utils.Wrap(err, "Unexpected error")
@@ -239,7 +250,7 @@ func JwtParse(tokenStr string, keys ...string) (*jwt.Token, []byte, error) {
 			}
 		}
 
-		if len(token.Header) <= 0 {
+		if token.Header.Len() <= 0 {
 			continue
 		}
 
@@ -258,7 +269,7 @@ func JwtChangeAlgToNone(token string) (string, error) {
 	if err != nil && !errors.Is(err, ErrKeyNotFound) {
 		return "", utils.Errorf("invalid token: %v", token)
 	}
-	newToken := jwt.New(&AuthHackJWTSigningNone{})
+	newToken := NewTokenFromJwtToken(jwt.New(&AuthHackJWTSigningNone{}))
 	newToken.Header = t.Header
 	newToken.Claims = t.Claims
 	return newToken.SignedString(nil)

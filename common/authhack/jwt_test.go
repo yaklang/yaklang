@@ -189,6 +189,18 @@ func TestJwt(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, token)
 		require.Equal(t, password, string(key))
-		require.Equal(t, m["test"], token.Claims.(jwt.MapClaims)["test"])
+		require.Equal(t, m["test"], token.Claims.(*OMapClaims).GetExact("test"))
 	})
+}
+
+func TestJwtClaimsOrder(t *testing.T) {
+	testJWT := `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwibW12IjoidHR2IiwienhjIjoicXdlIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.brgCnaG_Aj19IgPTeWdxZN5LZ5lzgrqBMcJmELoCjPQ`
+
+	for i := 0; i < 100; i++ {
+		token, _, err := JwtParse(testJWT)
+		require.ErrorIs(t, err, ErrKeyNotFound)
+		signed, err := token.SignedString([]byte("a-string-secret-at-least-256-bits-long"))
+		require.NoError(t, err)
+		require.Equal(t, testJWT, signed)
+	}
 }
