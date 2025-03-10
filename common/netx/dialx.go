@@ -152,7 +152,7 @@ RETRY:
 					addTimeoutRetry()
 					goto RETRY
 				}
-				if strings.Contains(opError.Error(), "actively refused") {
+				if strings.Contains(opError.Error(), "refused") {
 					time.Sleep(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1)))
 					addRefuseErrorRetry()
 					goto RETRY
