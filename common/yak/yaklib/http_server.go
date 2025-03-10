@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/gobwas/glob"
 	"github.com/yaklang/fastgocaptcha"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -41,7 +43,34 @@ type _httpServerConfig struct {
 	routeHandler           map[string]http.HandlerFunc
 	callback               http.HandlerFunc
 
+	// _globHandler 用于存储 glob 路由处理器, is auto managed
+	_globCacheMutex sync.RWMutex
+	_globHandler    map[string]glob.Glob
+
 	captchaManager *fastgocaptcha.FastGoCaptcha
+}
+
+func (c *_httpServerConfig) addGlobHandler(route string) {
+	c._globCacheMutex.Lock()
+	defer c._globCacheMutex.Unlock()
+
+	if c._globHandler == nil {
+		c._globHandler = make(map[string]glob.Glob)
+	}
+	var err error
+	c._globHandler[route], err = glob.Compile(route, rune('/'))
+	if err != nil {
+		log.Errorf("compile glob failed: %s", err)
+		return
+	}
+}
+
+func (c *_httpServerConfig) getGlobHandler(route string) (glob.Glob, bool) {
+	c._globCacheMutex.RLock()
+	defer c._globCacheMutex.RUnlock()
+
+	handler, ok := c._globHandler[route]
+	return handler, ok
 }
 
 type HttpServerConfigOpt func(c *_httpServerConfig)
@@ -70,33 +99,55 @@ func _httpServerOptRouteHandler(route string, handler http.HandlerFunc) HttpServ
 		if c.routeHandler == nil {
 			c.routeHandler = make(map[string]http.HandlerFunc)
 		}
+		log.Infof("add route handler: %s", route)
 		if strings.HasPrefix(route, "/") {
+			c.addGlobHandler(route)
 			c.routeHandler[route] = handler
 		} else {
+			c.addGlobHandler("/" + route)
 			c.routeHandler["/"+route] = handler
 		}
 	}
 }
 
+// captchaRouteHandler 用于设置 HTTP 服务器的验证码处理函数，第一个参数为路由路径，第二个参数为超时时间，第三个参数为处理函数
+// 此函数会根据路由路径自动添加前缀 "/"
+// Example:
+// ```
+//
+//	err = httpserver.Serve("127.0.0.1", 8888, httpserver.captchaRouteHandler("/captcha", 30, func(w http.ResponseWriter, r *http.Request) {
+//		w.Write([]byte("Hello world"))
+//	}))
+//
+// ```
 func _httpServerOptCaptchaRoute(route string, timeoutSeconds float64, handler http.HandlerFunc) HttpServerConfigOpt {
 	return func(c *_httpServerConfig) {
 		if c.captchaManager == nil {
 			var err error
+			log.Info("start to init fastgocaptcha")
 			c.captchaManager, err = fastgocaptcha.NewFastGoCaptcha()
 			if err != nil {
 				log.Errorf("new fastgocaptcha failed: %s", err)
 				return
 			}
+			c.captchaManager.SetErrorf(log.Errorf)
+			c.captchaManager.SetInfof(log.Infof)
+			c.captchaManager.SetWarningf(log.Warnf)
+			_httpServerOptRouteHandler("/fastgocaptcha/", func(w http.ResponseWriter, r *http.Request) {
+				c.captchaManager.Middleware(nil).ServeHTTP(w, r)
+			})(c)
 		}
 		timeout := time.Second * time.Duration(timeoutSeconds)
 		if timeoutSeconds <= 0 {
 			log.Warnf("timeoutSeconds is less than 0, use default 30 seconds")
 			timeout = 30 * time.Second
 		}
+		log.Infof("add protect matcher with timeout: %s, timeout: %s", route, timeout)
 		c.captchaManager.AddProtectMatcherWithTimeout(route, timeout)
 		_httpServerOptRouteHandler(route, func(w http.ResponseWriter, r *http.Request) {
+			log.Infof("captcha middleware hit: %s", route)
 			c.captchaManager.Middleware(handler).ServeHTTP(w, r)
-		})
+		})(c)
 	}
 }
 
@@ -171,6 +222,11 @@ func _httpServerOptCallback(cb func(rsp http.ResponseWriter, req *http.Request))
 	}
 }
 
+// localFileSystemHandler 用于设置 HTTP 服务器的本地文件系统处理函数，第一个参数为访问路径前缀，第二个参数为本地文件系统路径
+// Example:
+// ```
+// err = httpserver.Serve("127.0.0.1", 8888, httpserver.localFileSystemHandler("/static", "/var/www/static"))
+// ```
 func _localFileSystemHandler(prefix, dir string) http.Handler {
 	if prefix != "" {
 		return http.StripPrefix(prefix, http.FileServer(http.Dir(dir)))
@@ -244,14 +300,19 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 		if config.routeHandler != nil {
 			for route, handler := range config.routeHandler {
 				if route == request.URL.Path {
+					log.Infof("route handler hit exactly: %s", route)
 					handler.ServeHTTP(writer, request)
 					return
 				} else if strings.HasPrefix(request.URL.Path, route) {
+					log.Infof("route handler hit prefix: %s", route)
 					handler.ServeHTTP(writer, request)
 					return
-				} else if utils.MatchAnyOfGlob(request.URL.Path, route) {
-					handler.ServeHTTP(writer, request)
-					return
+				} else if globHandler, ok := config.getGlobHandler(route); ok {
+					log.Infof("route handler hit glob: %s", route)
+					if globHandler.Match(request.URL.Path) {
+						handler.ServeHTTP(writer, request)
+						return
+					}
 				}
 			}
 		}
