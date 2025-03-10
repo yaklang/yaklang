@@ -1,0 +1,1 @@
+go run ./common/yak/cmd/yak.go grpc --profile-db sast-profile-rule.db --project-db default-sast.db
