@@ -56,6 +56,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yak/yaklib/container"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yserx"
@@ -318,7 +319,7 @@ func initYaklangLib() {
 	yaklang.Import("mfa", twofa.Exports)
 
 	// set
-	yaklang.Import("container", yaklib.ContainerExports)
+	yaklang.Import("container", container.ContainerExports)
 
 	// 处理 yakit 库的一些函数名
 	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {

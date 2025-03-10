@@ -1,4 +1,4 @@
-package yaklib
+package container
 
 import (
 	"container/list"
