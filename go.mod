@@ -1,6 +1,6 @@
 module github.com/yaklang/yaklang
 
-go 1.22.0
+go 1.22.8
 
 replace github.com/yaklang/yaklang v0.0.0 => ./
 
@@ -56,7 +56,7 @@ require (
 	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-dap v0.10.0
 	github.com/google/pprof v0.0.0-20230926050212-f7f687d19a98
-	github.com/google/uuid v1.5.0
+	github.com/google/uuid v1.6.0
 	github.com/gopacket/gopacket v1.3.1
 	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/websocket v1.4.2
@@ -218,8 +218,11 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.3.0 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
+	github.com/wenlng/go-captcha-assets v1.0.5 // indirect
+	github.com/wenlng/go-captcha/v2 v2.0.3 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
+	github.com/yaklang/fastgocaptcha v1.0.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/ysmood/fetchup v0.2.2 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
@@ -232,7 +235,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.22.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff // indirect
-	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d // indirect
+	golang.org/x/image v0.16.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect

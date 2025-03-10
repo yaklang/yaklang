@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/yaklang/fastgocaptcha"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
@@ -23,6 +24,7 @@ var HttpServeExports = map[string]interface{}{
 	"routeHandler":           _httpServerOptRouteHandler,
 	"localFileSystemHandler": _httpServerOptLocalFileSystemHandler,
 	"LocalFileSystemServe":   _localFileSystemServe,
+	"captchaRouteHandler":    _httpServerOptCaptchaRoute,
 }
 
 var (
@@ -38,6 +40,8 @@ type _httpServerConfig struct {
 	localFileSystemHandler map[string]http.Handler
 	routeHandler           map[string]http.HandlerFunc
 	callback               http.HandlerFunc
+
+	captchaManager *fastgocaptcha.FastGoCaptcha
 }
 
 type HttpServerConfigOpt func(c *_httpServerConfig)
@@ -71,6 +75,28 @@ func _httpServerOptRouteHandler(route string, handler http.HandlerFunc) HttpServ
 		} else {
 			c.routeHandler["/"+route] = handler
 		}
+	}
+}
+
+func _httpServerOptCaptchaRoute(route string, timeoutSeconds float64, handler http.HandlerFunc) HttpServerConfigOpt {
+	return func(c *_httpServerConfig) {
+		if c.captchaManager == nil {
+			var err error
+			c.captchaManager, err = fastgocaptcha.NewFastGoCaptcha()
+			if err != nil {
+				log.Errorf("new fastgocaptcha failed: %s", err)
+				return
+			}
+		}
+		timeout := time.Second * time.Duration(timeoutSeconds)
+		if timeoutSeconds <= 0 {
+			log.Warnf("timeoutSeconds is less than 0, use default 30 seconds")
+			timeout = 30 * time.Second
+		}
+		c.captchaManager.AddProtectMatcherWithTimeout(route, timeout)
+		_httpServerOptRouteHandler(route, func(w http.ResponseWriter, r *http.Request) {
+			c.captchaManager.Middleware(handler).ServeHTTP(w, r)
+		})
 	}
 }
 
@@ -231,10 +257,16 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 		}
 
 		if config.callback == nil {
-			_, _ = writer.Write([]byte("not implemented yak http server handler"))
-			writer.WriteHeader(200)
+			writer.WriteHeader(404)
 		} else {
-			config.callback(writer, request)
+			if config.captchaManager == nil {
+				config.callback(writer, request)
+				return
+			}
+
+			config.captchaManager.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				config.callback(w, r)
+			})).ServeHTTP(writer, request)
 		}
 	}))
 }
