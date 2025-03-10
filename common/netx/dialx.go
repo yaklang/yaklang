@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -51,17 +52,20 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.
 		}
 	}()
 
-	var timeoutRetryMax int64 = 1
+	var retryMax int64 = 3
 	if config.EnableTimeoutRetry {
-		timeoutRetryMax = config.TimeoutRetryMax
-	} else {
-		timeoutRetryMax = 0
+		retryMax = config.TimeoutRetryMax
 	}
 
 	// do first as zero
 	var timeoutRetryCount int64 = -1
-	addRetry := func() int64 {
-		return atomic.AddInt64(&timeoutRetryCount, 1)
+	addTimeoutRetry := func() {
+		atomic.AddInt64(&timeoutRetryCount, 1)
+	}
+
+	var refuseErrorRetryCount int64 = -1
+	addRefuseErrorRetry := func() {
+		atomic.AddInt64(&refuseErrorRetryCount, 1)
 	}
 
 	minWait, maxWait := config.TimeoutRetryMinWait, config.TimeoutRetryMaxWait
@@ -72,9 +76,9 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.
 	var lastError error
 	shouldRetryError := false
 RETRY:
-	if ret := addRetry(); ret > timeoutRetryMax {
-		if timeoutRetryMax > 0 {
-			return nil, fmt.Errorf("timeout retry(%v) > max(%v)", ret, timeoutRetryMax)
+	if timeoutRetryCount > retryMax || refuseErrorRetryCount > retryMax {
+		if retryMax > 0 {
+			return nil, fmt.Errorf("timeout retry(%v) or refuse retry(%v) > max(%v)", timeoutRetryCount, refuseErrorRetryCount, retryMax)
 		}
 		if lastError != nil {
 			return nil, lastError
@@ -143,11 +147,14 @@ RETRY:
 			var opError *net.OpError
 			switch {
 			case errors.As(err, &opError):
-				if opError.Timeout() {
-					if config.Debug {
-						log.Infof("dial %s timeout, retrying", target)
-					}
-					utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1))
+				if opError.Timeout() && config.EnableTimeoutRetry {
+					time.Sleep(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1)))
+					addTimeoutRetry()
+					goto RETRY
+				}
+				if strings.Contains(opError.Error(), "actively refused") {
+					time.Sleep(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1)))
+					addRefuseErrorRetry()
 					goto RETRY
 				}
 			}
