@@ -25,6 +25,9 @@ var SSAProjectTables = []any{
 	&schema.SSARisk{},
 
 	&schema.SyntaxFlowScanTask{},
+
+	// report
+	&schema.ReportRecord{},
 }
 
 func init() {

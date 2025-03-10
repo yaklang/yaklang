@@ -540,8 +540,17 @@ func (s *Server) DeleteHistoryHTTPFuzzerTask(ctx context.Context, d *ypb.DeleteH
 	return &ypb.Empty{}, nil
 }
 
+func (s *Server) GetProjectDBWithType(typ string) *gorm.DB {
+	if typ == yakit.TypeSSAProject {
+		return s.GetSSADatabase()
+	}
+	return s.GetProjectDatabase()
+}
+
 func (s *Server) QueryReports(ctx context.Context, d *ypb.QueryReportsRequest) (*ypb.QueryReportsResponse, error) {
-	p, res, err := yakit.QueryReportRecord(s.GetProjectDatabase(), d)
+	// projectDB :=
+	projectDB := s.GetProjectDBWithType(d.Type)
+	p, res, err := yakit.QueryReportRecord(projectDB, d)
 	if err != nil {
 		return nil, err
 	}
@@ -557,9 +566,10 @@ func (s *Server) QueryReports(ctx context.Context, d *ypb.QueryReportsRequest) (
 }
 
 func (s *Server) QueryReport(ctx context.Context, d *ypb.QueryReportRequest) (*ypb.Report, error) {
-	r, err := yakit.GetReportRecord(s.GetProjectDatabase(), d.GetId())
+	projectDB := s.GetProjectDBWithType(d.Type)
+	r, err := yakit.GetReportRecord(projectDB, d.GetId())
 	if err != nil {
-		f, err := yakit.GetReportRecordByHash(s.GetProjectDatabase(), d.GetHash())
+		f, err := yakit.GetReportRecordByHash(projectDB, d.GetHash())
 		if err != nil {
 			return nil, err
 		}
@@ -569,21 +579,22 @@ func (s *Server) QueryReport(ctx context.Context, d *ypb.QueryReportRequest) (*y
 }
 
 func (s *Server) DeleteReport(ctx context.Context, d *ypb.DeleteReportRequest) (*ypb.Empty, error) {
-	_ = yakit.DeleteReportRecordByID(s.GetProjectDatabase(), d.GetId())
-	_ = yakit.DeleteReportRecordByHash(s.GetProjectDatabase(), d.GetHash())
+	projectDB := s.GetProjectDBWithType(d.Type)
+	_ = yakit.DeleteReportRecordByID(projectDB, d.GetId())
+	_ = yakit.DeleteReportRecordByHash(projectDB, d.GetHash())
 	if d.GetDeleteAll() {
-		if db := s.GetProjectDatabase().Model(&schema.ReportRecord{}).Where("true").Unscoped().Delete(&schema.ReportRecord{}); db.Error != nil {
+		if db := projectDB.Model(&schema.ReportRecord{}).Where("true").Unscoped().Delete(&schema.ReportRecord{}); db.Error != nil {
 			return nil, db.Error
 		}
 	}
 	if d.GetFilter() != nil {
-		if db := yakit.FilterReportRecord(s.GetProjectDatabase().Model(&schema.ReportRecord{}), d.GetFilter()).Unscoped().Delete(&schema.ReportRecord{}); db.Error != nil {
+		if db := yakit.FilterReportRecord(projectDB.Model(&schema.ReportRecord{}), d.GetFilter()).Unscoped().Delete(&schema.ReportRecord{}); db.Error != nil {
 			log.Errorf("error: %s", db.Error)
 		}
 	}
 	if len(d.GetIDs()) > 0 {
 		for _, i := range d.GetIDs() {
-			yakit.DeleteReportRecordByID(s.GetProjectDatabase(), i)
+			yakit.DeleteReportRecordByID(projectDB, i)
 		}
 	}
 	return &ypb.Empty{}, nil
