@@ -1,4 +1,4 @@
-package netstackvm
+package netstackvm_test
 
 import (
 	"context"
@@ -6,12 +6,13 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"testing"
 	"time"
 )
 
 func TestNewSystemNetStackVM(t *testing.T) {
-	m, err := NewSystemNetStackVM()
+	m, err := netstackvm.NewSystemNetStackVM()
 	if err != nil {
 		t.Errorf("NewSystemNetStackVM() failed: %v", err)
 	}
@@ -31,7 +32,7 @@ func TestNewSystemNetStackVM(t *testing.T) {
 }
 
 func TestNewSystemNetStackVMTCP(t *testing.T) {
-	m, err := NewSystemNetStackVM()
+	m, err := netstackvm.NewSystemNetStackVM()
 	if err != nil {
 		t.Errorf("NewSystemNetStackVM() failed: %v", err)
 	}

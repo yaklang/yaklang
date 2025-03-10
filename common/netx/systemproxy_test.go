@@ -21,9 +21,9 @@ func TestSet(t *testing.T) {
 	}
 }
 
-func TestSet2(t *testing.T) {
-	Set(SystemProxySetting{
-		Enabled:       false,
-		DefaultServer: "http://127.0.0.1:7890",
-	})
-}
+//func TestSet2(t *testing.T) {
+//	Set(SystemProxySetting{
+//		Enabled:       false,
+//		DefaultServer: "http://127.0.0.1:7890",
+//	})
+//}

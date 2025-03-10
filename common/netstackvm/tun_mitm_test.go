@@ -1,16 +1,17 @@
-package netstackvm
+package netstackvm_test
 
 import (
 	"bytes"
 	"context"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"testing"
 )
 
 func TestMitmTun(t *testing.T) {
-	vm, err := GetDefaultNetStackVirtualMachine()
+	vm, err := netstackvm.GetDefaultNetStackVirtualMachine()
 	require.NoError(t, err)
 	server, err := yaklib.NewMITMServer(
 		yaklib.MITMConfigDialer(vm.DialTCP),
@@ -20,7 +21,7 @@ func TestMitmTun(t *testing.T) {
 	)
 	require.NoError(t, err)
 	ctx := context.Background()
-	tundev, err := NewTunVirtualMachine(ctx)
+	tundev, err := netstackvm.NewTunVirtualMachine(ctx)
 	require.NoError(t, err)
 	defer tundev.Close()
 
