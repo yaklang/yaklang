@@ -25,7 +25,11 @@ func FilterNote(db *gorm.DB, filter *ypb.NoteFilter) *gorm.DB {
 	db = db.Model(_note)
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", filter.Id)
 	db = bizhelper.ExactQueryStringArrayOr(db, "title", filter.Title)
-	db = bizhelper.FuzzQueryStringArrayOr(db, "content", filter.ContentKeyword)
+	keyword := lo.Map(filter.GetKeyword(), func(item string, _ int) any {
+		return item
+	})
+	db = bizhelper.FuzzQueryArrayOrLike(db, "content", keyword, true)
+	db = bizhelper.FuzzQueryArrayOrLike(db, "title", keyword, true)
 	return db
 }
 
