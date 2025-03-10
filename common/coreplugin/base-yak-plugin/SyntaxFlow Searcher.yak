@@ -24,6 +24,8 @@ progName = cli.String("progName", cli.setHelp("输入当前的项目名，将从
 
 cli.check()
 
+yakit.SetProgress(0)
+
 kind_input = "all"
 if len(kinds) > 0 {
     kind_input = kinds[0]
@@ -54,6 +56,7 @@ resultID := getCache("all")
 if resultID != "" {
     yakit.SetProgress(1)
     yakit.Output(resultID)
+    return 
 }
 
 
@@ -61,6 +64,7 @@ resultID = getCache(kind)
 if resultID != "" {
     yakit.SetProgress(1)
     yakit.Output(resultID)
+    return 
 }
 
 
