@@ -40,7 +40,7 @@ public class DemoServlet extends HttpServlet {
 			prog := programs[0]
 			prog.Show()
 			rule := `
-print?{<typeName>?{have:'javax.servlet.http.HttpServletRequest'}}(* #-> as $out);
+print?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}}(* #-> as $out);
 request?{opcode:param  && <typeName>?{have:'javax.servlet.http.HttpServlet'}} as $source;
 		$out #{
 until:<<<UNTIL
@@ -101,7 +101,7 @@ public class GreetingController {
 			prog.Show()
 
 			rule := `
-print?{<typeName>?{have:'javax.servlet.http.HttpServletRequest'}}(* #-> as $out);
+print?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}}(* #-> as $out);
 model?{opcode:param  && <typeName>?{have:'org.springframework.ui.Model'}} as $source;
 		$out #{
 until:<<<UNTIL

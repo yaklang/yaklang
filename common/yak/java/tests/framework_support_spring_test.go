@@ -50,7 +50,7 @@ public class GreetingController {
 			prog.Show()
 
 			rule := `
-print()?{<typeName>?{have:'javax.servlet.http.HttpServletRequest'}} as $sink;
+print()?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}} as $sink;
 `
 			vals, err := prog.SyntaxFlowWithError(rule)
 			require.NoError(t, err)
