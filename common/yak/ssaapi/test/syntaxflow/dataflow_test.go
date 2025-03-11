@@ -11,7 +11,6 @@ import (
 )
 
 func TestDataflowReal1(t *testing.T) {
-
 	t.Run("test file read", func(t *testing.T) {
 		code := `
 package com.ruoyi.common.utils.file;
@@ -103,8 +102,10 @@ CODE
 			vals, err := prog.SyntaxFlowWithError(rule)
 			require.NoError(t, err)
 			file := vals.GetValues("fileInstance")
+			file.Show()
 			require.Contains(t, file.String(), `Undefined-File(Undefined-File,Parameter-filePath)`)
 			fileRead := vals.GetValues("fileReadInstance")
+			fileRead.Show()
 			require.Contains(t, fileRead.String(), `Undefined-fis.read`)
 
 			return nil

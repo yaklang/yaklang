@@ -1,11 +1,8 @@
 package ssaapi
 
 import (
-	"sort"
-
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -26,29 +23,29 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
+
+	object, _, _ := actx.getCurrentObject()
+	if v.IsObject() && utils.IsNil(object) || object.GetId() != v.GetId() {
+		v.GetAllMember().ForEach(func(value *Value) {
+			vals = append(vals, value.AppendDependOn(v).getBottomUses(actx, opt...)...)
+		})
+	}
+	if v.IsMember() {
+		obj := v.GetObject()
+		key := v.GetKey()
+		if err := actx.pushObject(obj, key, v); err != nil {
+			log.Errorf("BUG: (visitUserFallback) pushObject failed: %v", err)
+		} else {
+			vals = append(vals, obj.AppendDependOn(v).getBottomUses(actx, opt...)...)
+			actx.popObject()
+		}
+	}
 	v.GetUsers().ForEach(func(value *Value) {
 		if ret := value.AppendDependOn(v).getBottomUses(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
 	})
-
-	// member.IsUndefined()
-	undefineMember := false
-	if un, ok := ssa.ToUndefined(v.node); ok {
-		if un.Kind == ssa.UndefinedMemberInValid || un.Kind == ssa.UndefinedMemberValid {
-			undefineMember = true
-		}
-	}
-	if v.IsMember() && !undefineMember {
-		obj := v.GetObject()
-		if err := actx.pushObject(obj, v.GetKey(), v); err != nil {
-			log.Errorf("%v", err)
-			return v.visitedDefs(actx, opt...)
-		}
-		vals = append(vals, obj.getBottomUses(actx, opt...)...)
-		actx.popObject()
-	}
-	if len(vals) <= 0 {
+	if vals.Len() <= 0 {
 		return Values{v}
 	}
 	return vals
@@ -65,7 +62,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	defer func() {
 		actx.depth--
 	}()
-
 	if ins, ok := ssa.ToLazyInstruction(v.node); ok {
 		v.node, ok = ins.Self().(ssa.Value)
 		if !ok {
@@ -74,183 +70,193 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 		return v.getBottomUses(actx, opt...)
 	}
-
 	shouldExit, recoverStack := actx.check(v)
 	defer recoverStack()
 	if shouldExit {
 		return Values{v}
 	}
-
 	v.SetDepth(actx.depth)
 	err := actx.hook(v)
 	if err != nil {
 		return Values{v}
 	}
-	switch ins := v.node.(type) {
-	case *ssa.Phi:
-		return v.visitUserFallback(actx, opt...)
+	switch inst := v.node.(type) {
 	case *ssa.Call:
-		if ins.Method == nil {
-			// log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
+		method := inst.Method
+		if method == nil {
+			log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", inst.Method.String())
 			return v.visitUserFallback(actx, opt...)
 		}
-		// enter function via call
-		f, ok := ssa.ToFunction(ins.Method)
-		if !ok {
-			//log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
+		actx.pushCall(inst)
+		//分析的当前值相同，说明进来就是当前值
+		if ValueCompare(v, actx.Self) {
+			log.Infof("value analysis: (call instruction) caller is self")
 			return v.visitUserFallback(actx, opt...)
 		}
-		funcValue := v.NewBottomUseValue(f)
-		if ValueCompare(funcValue, actx.Self) {
-			return v.visitUserFallback(actx, opt...)
-		}
-		if actx.existCrossProcess(funcValue) {
-			return v.visitUserFallback(actx, opt...)
-		}
-		//try to find formal param index from call
-		//v is calling instruction
-		//funcValue is the function
-		getCalledFormalParams := func(f *ssa.Function) Values {
-			existed := map[int64]struct{}{}
-			v.DependOn.ForEach(func(value *Value) {
-				existed[value.GetId()] = struct{}{}
-			})
-
-			var formalParamsIndex = make([]int, 0, len(ins.Args))
-			for argIndex, targetIndex := range ins.Args {
-				if _, ok := existed[targetIndex.GetId()]; ok {
-					formalParamsIndex = append(formalParamsIndex, argIndex)
-				}
-			}
-			var params = omap.NewOrderedMap(map[int64]ssa.Value{})
-			lo.ForEach(f.Params, func(param ssa.Value, index int) {
-				for _, i := range formalParamsIndex {
-					if index == i {
-						params.Set(param.GetId(), param)
+		existed := map[int64]struct{}{}
+		var vals Values
+		checkVal := func(args []ssa.Value, get func(index int, arg ssa.Value) (*Value, bool), handle func(value *Value)) {
+			for index, arg := range args {
+				value, ok := get(index, arg)
+				if ok {
+					if !utils.IsNil(value) {
+						handle(value)
 					}
 				}
+			}
+		}
+		v.DependOn.ForEach(func(value *Value) {
+			existed[value.GetId()] = struct{}{}
+		})
+		fun, isFunc := ssa.ToFunction(method)
+		if !isFunc && method.GetReference() != nil {
+			fun, isFunc = ssa.ToFunction(method.GetReference())
+		}
+		if isFunc {
+			checkVal(inst.Args, func(index int, arg ssa.Value) (*Value, bool) {
+				if index >= len(fun.Params) {
+					return nil, false
+				}
+				_, ok := existed[arg.GetId()]
+				if !ok {
+					return nil, false
+				}
+				value := fun.Params[index]
+				return v.NewBottomUseValue(value), true
+			}, func(value *Value) {
+				vals = append(vals, value)
 			})
-			if lo.Max(formalParamsIndex) >= len(f.Params) && len(f.Params) > 0 {
-				last, _ := lo.Last(f.Params)
-				if last != nil {
-					params.Set(last.GetId(), last)
+			checkVal(inst.ArgMember, func(index int, arg ssa.Value) (*Value, bool) {
+				if index >= len(fun.ParameterMembers) {
+					return nil, false
 				}
-			}
-
-			var formalParams Values
-			if params.Len() > 0 {
-				for _, formalParam := range params.Values() {
-					formalParams = append(formalParams, funcValue.NewBottomUseValue(formalParam))
+				_, ok := existed[arg.GetId()]
+				if !ok {
+					return nil, false
 				}
-				return formalParams
+				value := fun.ParameterMembers[index]
+				return v.NewBottomUseValue(value), true
+			}, func(value *Value) {
+				vals = append(vals, value)
+			})
+			var result Values
+			for _, val := range vals {
+				actx.setCauseValue(v)
+				result = append(result, val.getBottomUses(actx, opt...)...)
 			}
+			if result.Len() == 0 {
+				result = append(result, v.visitUserFallback(actx, opt...)...)
+			}
+			return result
+		}
+		var backTrackSearch func(ssa.Value, int) *Value
+		backTrackSearch = func(method ssa.Value, callIndex int) *Value {
+			_, isparam := ssa.ToParameter(method)
+			_, isParameterMember := ssa.ToParameterMember(method)
+			if !(isParameterMember || isparam) {
+				return v.NewValue(method)
+			}
+			methodId := method.GetId()
+			call := actx.peekCall(callIndex)
+			if utils.IsNil(call) {
+				return v.NewValue(method)
+			}
+			function := call.Method
+			toFunction, isFunction := ssa.ToFunction(function)
+			if !isFunction {
+				return v.NewValue(method)
+			}
+			var val *Value
+			checkVal(toFunction.Params, func(index int, arg ssa.Value) (*Value, bool) {
+				if index >= len(call.Args) {
+					return nil, false
+				}
+				if arg.GetId() == methodId {
+					return v.NewValue(call.Args[index]), true
+				}
+				return nil, false
+			}, func(value *Value) {
+				val = value
+			})
+			checkVal(toFunction.ParameterMembers, func(index int, arg ssa.Value) (*Value, bool) {
+				if index >= len(call.ArgMember) {
+					return nil, false
+				}
+				if arg.GetId() == methodId {
+					return v.NewValue(call.ArgMember[index]), true
+				}
+				return nil, false
+			}, func(value *Value) {
+				val = value
+			})
+			if val == nil {
+				return v.NewValue(method)
+			}
+			return backTrackSearch(val.node, callIndex+1)
+		}
+		search := backTrackSearch(method, 1)
+		if search.GetId() == method.GetId() {
+			return v.visitUserFallback(actx, opt...)
+		}
+		//todo： copy？
+		s := &ssa.Call{
+			Method:          search.node,
+			Args:            inst.Args,
+			Binding:         inst.Binding,
+			ArgMember:       inst.ArgMember,
+			Async:           inst.Async,
+			Unpack:          inst.Unpack,
+			IsDropError:     inst.IsDropError,
+			IsEllipsis:      inst.IsEllipsis,
+			SideEffectValue: inst.SideEffectValue,
+		}
+		for _, user := range v.node.GetUsers() {
+			s.AddUser(user)
+		}
+		value := v.NewBottomUseValue(s)
+		value.DependOn = append(value.DependOn, v.DependOn...)
+		return value.getBottomUses(actx, opt...)
+	case *ssa.Return:
+		var vals Values
+		function := inst.GetFunc()
+		if function == nil {
+			log.Errorf("BUG: (return instruction 's function is nil)")
+			log.Errorf("BUG: (return instruction 's function is nil)")
+			log.Errorf("BUG: (return instruction 's function is nil)")
+			log.Errorf("BUG: (return instruction 's function is nil)")
 			return nil
 		}
-		formalParams := getCalledFormalParams(f)
-		if formalParams != nil {
-			var vals Values
-			formalParams.ForEach(func(actualParam *Value) {
-				rets := actualParam.getBottomUses(actx, opt...)
-				vals = append(vals, rets...)
+		call := actx.getLastCauseValue()
+		if call == nil {
+			called := v.NewBottomUseValue(function).GetCalledBy()
+			called.ForEach(func(value *Value) {
+				vals = append(vals, value.getBottomUses(actx, opt...)...)
 			})
-			if len(vals) > 0 {
-				return vals
-			}
-		}
-
-		// no formal parameters found!
-		// enter return
-		var vals Values
-		for _, retStmt := range f.Return {
-			retVals := funcValue.NewBottomUseValue(retStmt).getBottomUses(actx, opt...)
-			vals = append(vals, retVals...)
-		}
-		return vals
-	case *ssa.Return:
-		// enter function via return
-		fallback := func() Values {
-			// var results Values
-			results := make(Values, 0)
-			if f := ins.GetFunc(); f != nil {
-				v.NewBottomUseValue(f).GetCalledBy().ForEach(func(value *Value) {
-					dep := value.AppendDependOn(v)
-					results = append(results, dep.getBottomUses(actx, opt...)...)
-				})
-			}
-			if len(results) > 0 {
-				return results
-			}
-			for _, result := range ins.Results {
-				results = append(results, v.NewBottomUseValue(result))
-			}
-			return results
-		}
-		// if actx.IsInPositiveStack() {
-		existed := make(map[int64]struct{})
-		v.DependOn.ForEach(func(value *Value) {
-			existedId := value.GetId()
-			existed[existedId] = struct{}{}
-		})
-		var indexes = make(map[int]struct{})
-		for idx, ret := range ins.Results {
-			if _, ok := existed[ret.GetId()]; ok {
-				indexes[idx] = struct{}{}
-			}
-		}
-
-		currentCallValue := actx.getLastCauseCall(BottomUseAnalysis)
-		if currentCallValue == nil {
-			return fallback()
-		}
-		call, ok := ssa.ToCall(currentCallValue.node)
-		if !ok {
-			log.Warnf("BUG: (call's fun is not clean!) call stack's value is not call: %v", currentCallValue.String())
-			return fallback()
-		}
-		fun, ok := ssa.ToFunction(call.Method)
-		if !ok {
-			log.Warnf("BUG: (call's fun is not clean!) unknown function: %v", v.String())
-			return fallback()
-		}
-		_ = fun //TODO: fun can tell u, which return value is the target
-
-		var vals Values
-		if !call.IsObject() || len(indexes) <= 0 {
-			currentCallValue.GetUsers().ForEach(func(user *Value) {
-				if ret := user.AppendDependOn(currentCallValue).getBottomUses(actx); len(ret) > 0 {
-					vals = append(vals, ret...)
-				}
-			})
-
-			if len(vals) > 0 {
-				return vals
-			}
-			return v.NewBottomUseValue(call).getBottomUses(actx, opt...)
-		}
-
-		// handle indexed return to call return
-		orderedIndex := lo.Keys(indexes)
-		sort.Ints(orderedIndex)
-		for _, idx := range orderedIndex {
-			indexedReturn, ok := call.GetIndexMember(idx)
-			if !ok {
-				continue
-			}
-
-			returnReceiver := v.NewBottomUseValue(indexedReturn)
-			actx.pushObject(currentCallValue, returnReceiver.GetKey(), returnReceiver)
-			if newVals := returnReceiver.getBottomUses(actx); len(newVals) > 0 {
-				vals = append(vals, newVals...)
-			}
-			actx.popObject()
-		}
-		if len(vals) > 0 {
 			return vals
 		}
-		return v.NewBottomUseValue(call).getBottomUses(actx, opt...)
-		// }
-	case *ssa.Function:
+		exists := make(map[int64]struct{})
+		v.DependOn.ForEach(func(value *Value) {
+			exists[value.GetId()] = struct{}{}
+		})
 
+		getReturnIndex := -1
+		for index, result := range inst.Results {
+			if _, ok := exists[result.GetId()]; ok {
+				getReturnIndex = index
+			}
+		}
+		if getReturnIndex != -1 {
+			member := call.GetMember(v.NewValue(ssa.NewConst(getReturnIndex)))
+			if member == nil {
+				log.Errorf("BUG: (return instruction 's member is nil),check it")
+			} else {
+				vals = append(vals, member.AppendDependOn(v).getBottomUses(actx, opt...)...)
+			}
+		}
+		if vals.Len() == 0 {
+			vals = append(vals, v.NewBottomUseValue(call.node).getBottomUses(actx, opt...)...)
+		}
+		return vals
 	}
 	return v.visitUserFallback(actx, opt...)
 }

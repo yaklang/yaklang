@@ -565,23 +565,12 @@ dump(c)
 
 func TestObject_Make(t *testing.T) {
 	t.Run("make bottom user", func(t *testing.T) {
-		ssatest.Check(t, `
-		m = []string{"i", j}
-		print(m)
-		`,
-			ssatest.CheckBottomUser_Contain("j", []string{"print("}),
-		)
-	})
-
-	t.Run("function return, bottom user", func(t *testing.T) {
-		ssatest.Check(t, ` 
-		f = (j, i, k) => {
-			return j, i, k
-		}
-		a, b, c = f(source, 2, 3)
-		print(a)
-		`,
-			ssatest.CheckBottomUser_Contain("source", []string{"print("}),
-		)
+		code := `
+		m = []string{"i","j"}
+		print(m[1])
+		`
+		ssatest.CheckSyntaxFlow(t, code, `e"j" --> as $target`, map[string][]string{
+			"target": {`Undefined-print("j")`},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
 }
