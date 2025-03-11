@@ -490,7 +490,7 @@ staticClass
     : fullyQualifiedNamespaceExpr    
     | identifier  
     | string 
-    | variable  
+    | flexiVariable
     ;
 
 memberCallKey
