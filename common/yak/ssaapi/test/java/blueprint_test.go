@@ -90,3 +90,20 @@ public class OuterClass {
 		"sink": {`"main.OuterClass"`},
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+func TestBlueprintBottomUse(t *testing.T) {
+	t.Run("test new creator", func(t *testing.T) {
+		code := `package main;
+class A{
+	public void main(){
+		String ip = request.getParameter("ip");
+		String[] cmd = new String[]{"ping", "-c", "2", ip};
+		Runtime rt = Runtime.getRuntime();
+        Process proc = rt.exec(cmd);
+	}
+}`
+		ssatest.CheckSyntaxFlowContain(t, code,
+			`request.getParameter() --> as $res`, map[string][]string{
+				"res": {"rt.exec"},
+			}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+}

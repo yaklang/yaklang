@@ -21,14 +21,9 @@ handler = (request, response) => {
 }
 register("/route1", handler)
 `
-	ssatest.CheckSyntaxFlow(t, code,
-		//TODO:
-		// `req*.GetParams() -{utilCall: System}-> * as $target`,
-		// `os.System(*) -{util: request}-> * as $target`,
-		`req*.GetParams() --> * as $target`,
-		map[string][]string{
-			"target": {`ParameterMember-parameter[0].GetParams("cmd")`},
-		})
+	ssatest.CheckSyntaxFlowContain(t, code, `req*.GetParams() --> * as $target`, map[string][]string{
+		"target": {"ParameterMember-parameter[1].Write(ParameterMember-freeValue-os"},
+	}, ssaapi.WithLanguage(ssaapi.Yak))
 }
 
 func TestSearchAndFind(t *testing.T) {
