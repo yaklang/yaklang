@@ -1,11 +1,14 @@
 package mustpass
 
 import (
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -114,4 +117,22 @@ func TestNotExisted_OnlyDoH(t *testing.T) {
 		t.Errorf("DoH Failed")
 		t.FailNow()
 	}
+}
+
+func TestDialRfuseRetry(t *testing.T) {
+	port := utils.GetRandomAvailableTCPPort()
+	go func() {
+		time.AfterFunc(1*time.Second, func() {
+			listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+			require.NoError(t, err)
+			for {
+				_, err := listener.Accept()
+				require.NoError(t, err)
+			}
+		})
+	}()
+	conn, err := netx.DialX(fmt.Sprintf("127.0.0.1:%d", port), netx.DialX_WithTimeoutRetryWaitRange(2*time.Second, 5*time.Second))
+	spew.Dump(conn)
+	fmt.Println(err)
+	require.NoError(t, err)
 }

@@ -68,6 +68,35 @@ func (m *NetStackVirtualMachine) DialTCP(timeout time.Duration, target string) (
 	return entry.DialTCP(timeout, utils.HostPort(host, port))
 }
 
+func (m *NetStackVirtualMachine) ListenTCP(addr string) (net.Listener, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("panic: %v", err)
+		}
+	}()
+	host, port, err := utils.ParseStringToHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	if !utils.IsIPv4(host) {
+		host = netx.LookupFirst(host)
+	}
+
+	r, routeErr := m.stack.FindRoute(0, tcpip.Address{}, tcpip.AddrFrom4(netip.MustParseAddr(host).As4()), header.IPv4ProtocolNumber, false)
+	if routeErr != nil {
+		return nil, utils.Errorf("failed to find route: %v", routeErr)
+	}
+	defer r.Release()
+
+	dialEntryID := r.NICID()
+
+	entry, ok := m.GetEntry(dialEntryID)
+	if !ok {
+		return nil, utils.Errorf("failed to find vm: %d", dialEntryID)
+	}
+	return entry.ListenTCP(utils.HostPort(host, port))
+}
+
 func NewSystemNetStackVM(opts ...Option) (*NetStackVirtualMachine, error) {
 	m := &NetStackVirtualMachine{
 		entries: make(map[tcpip.NICID]*NetStackVirtualMachineEntry),
