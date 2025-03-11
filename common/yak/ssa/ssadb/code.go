@@ -3,6 +3,7 @@ package ssadb
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -114,11 +115,29 @@ func RequireIrCode(DB *gorm.DB, program string) (int64, *IrCode) {
 	return int64(ircode.ID), ircode
 }
 
+var irCodeCache = utils.NewCacheExWithKey[int64, *IrCode](utils.WithCacheTTL(time.Hour * 1))
+
 func GetIrCodeById(db *gorm.DB, id int64) *IrCode {
 	if id == -1 {
 		return nil
 	}
-	return db.Model(&IrCode{}).Where("id = ?", id).First(&IrCode{}).Value.(*IrCode)
+	// check cache
+	if ret, ok := irCodeCache.Get(id); ok && ret != nil {
+		return ret
+	}
+	ir := db.Model(&IrCode{}).Where("id = ?", id).First(&IrCode{}).Value.(*IrCode)
+	// save to cache
+	if ir != nil {
+		irCodeCache.Set(ir.GetIdInt64(), ir)
+	}
+	return ir
+}
+
+func (ir *IrCode) Save(db *gorm.DB) error {
+	if ir != nil {
+		irCodeCache.Set(ir.GetIdInt64(), ir)
+	}
+	return db.Save(ir).Error
 }
 
 func GetIrByVariable(db *gorm.DB, program, name string) []*IrCode {
