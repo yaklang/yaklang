@@ -94,6 +94,8 @@ func SearchNoteContent(db *gorm.DB, keyword string, paging *ypb.Paging) (*bizhel
 		lineStart := strings.LastIndexByte(note.Content[:index], '\n')
 		if lineStart == -1 {
 			lineStart = 0
+		} else {
+			lineStart++
 		}
 		lineEnd := strings.IndexByte(note.Content[index:], '\n')
 		if lineEnd == -1 {
@@ -105,7 +107,7 @@ func SearchNoteContent(db *gorm.DB, keyword string, paging *ypb.Paging) (*bizhel
 			Note:        note.ToGRPCModel(),
 			Index:       uint64(index),
 			Length:      uint64(len(keyword)),
-			LineContent: note.Content[lineStart+1 : lineEnd],
+			LineContent: note.Content[lineStart:lineEnd],
 		}, true
 	})
 
