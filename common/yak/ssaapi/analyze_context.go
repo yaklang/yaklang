@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type objectItem struct {
@@ -31,7 +32,10 @@ type AnalyzeContext struct {
 	// cross process manager
 	*processAnalysisManager
 	//object
-	objectStack *utils.Stack[objectItem]
+	_objectStack *utils.Stack[objectItem]
+
+	callStack *utils.Stack[*ssa.Call]
+
 	// Use for recursive depth limit
 	recursiveCounter int64
 }
@@ -39,11 +43,21 @@ type AnalyzeContext struct {
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	actx := &AnalyzeContext{
 		processAnalysisManager: newAnalysisManager(),
-		objectStack:            utils.NewStack[objectItem](),
+		_objectStack:           utils.NewStack[objectItem](),
 		config:                 NewOperations(opt...),
 		depth:                  -1,
+		callStack:              utils.NewStack[*ssa.Call](),
 	}
 	return actx
+}
+func (a *AnalyzeContext) pushCall(call *ssa.Call) {
+	a.callStack.Push(call)
+}
+func (a *AnalyzeContext) popCall() *ssa.Call {
+	return a.callStack.Pop()
+}
+func (a *AnalyzeContext) peekCall(index int) *ssa.Call {
+	return a.callStack.PeekN(index)
 }
 
 // check determines whether to switch the analysis stack based on cross-process and intra-process analysis.
@@ -61,6 +75,7 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 		return true, recoverCrossProcess
 	}
 	// 过程内分析
+
 	needVisited, recoverIntraProcess := a.valueShould(v)
 	recoverStack = func() {
 		recoverCrossProcess()
@@ -143,7 +158,7 @@ func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
 	if !shouldVisited {
 		return utils.Errorf("This make object(%d) key(%d) member(%d) valueVisited, skip", obj.GetId(), key.GetId(), member.GetId())
 	}
-	g.objectStack.Push(objectItem{
+	g._objectStack.Push(objectItem{
 		object:       obj,
 		key:          key,
 		member:       member,
@@ -153,19 +168,19 @@ func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
 }
 
 func (g *AnalyzeContext) popObject() (*Value, *Value, *Value) {
-	if g.objectStack.Len() <= 0 {
+	if g._objectStack.Len() <= 0 {
 		return nil, nil, nil
 	}
-	item := g.objectStack.Pop()
+	item := g._objectStack.Pop()
 	item.recoverIntra()
 	return item.object, item.key, item.member
 }
 
 func (g *AnalyzeContext) getCurrentObject() (*Value, *Value, *Value) {
-	if g.objectStack.Len() <= 0 {
+	if g._objectStack.Len() <= 0 {
 		return nil, nil, nil
 	}
-	item := g.objectStack.Peek()
+	item := g._objectStack.Peek()
 	return item.object, item.key, item.member
 }
 
