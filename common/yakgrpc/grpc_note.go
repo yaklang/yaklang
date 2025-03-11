@@ -148,8 +148,17 @@ func (s *Server) ExportNote(req *ypb.ExportNoteRequest, stream ypb.Yak_ExportNot
 	zipWriter := zip.NewWriter(zipFile)
 	defer zipWriter.Close()
 
+	titleMap := make(map[string]int)
+
 	for note := range ch {
 		fileName := fmt.Sprintf("%s.md", note.Title)
+		if i, ok := titleMap[fileName]; ok {
+			titleMap[fileName] = i + 1
+			fileName = fmt.Sprintf("%s(%d).md", note.Title, i+1)
+		} else {
+			titleMap[fileName] = 0
+		}
+
 		writer, err := zipWriter.Create(fileName)
 		if err != nil {
 			return fmt.Errorf("failed to create file in zip: %v", err)
