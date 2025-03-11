@@ -9,6 +9,9 @@ type OperationConfig struct {
 	// Hook
 	HookEveryNode        []func(*Value) error
 	AllowIgnoreCallStack bool
+
+	//用来记录上一次的值
+	lastValue *Value
 }
 
 type OperationOption func(*OperationConfig)
@@ -16,6 +19,12 @@ type OperationOption func(*OperationConfig)
 func WithMaxDepth(maxDepth int) OperationOption {
 	return func(operationConfig *OperationConfig) {
 		operationConfig.MaxDepth = maxDepth
+	}
+}
+
+func WithLastValue(value *Value) OperationOption {
+	return func(operationConfig *OperationConfig) {
+		operationConfig.lastValue = value
 	}
 }
 
