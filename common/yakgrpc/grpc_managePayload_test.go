@@ -860,4 +860,22 @@ func TestPayload(t *testing.T) {
 		// group2 should be empty
 		comparePayloadByGroupFolder(local, group2, "", "", t)
 	})
+
+	t.Run("Trim-Left", func(t *testing.T) {
+		want := "  xxx\n xxx\nxxx\n"
+		group1, group2 := uuid.NewString(), uuid.NewString()
+		// database
+		save2database(local, t, group1, "", want)
+		defer deleteGroup(local, t, group1) // delete group
+		rsp := queryFromDatabase(local, t, group1, "")
+		got := _getPayloadFromYpbPayloads(rsp.Data)
+		comparePayload(got, want, t)
+		// file
+		save2file(local, t, group2, "", want)
+		defer deleteGroup(local, t, group2) // delete group
+
+		rsp2 := queryFromFile(local, t, group2, "")
+		got = string(rsp2.Data)
+		comparePayload(got, want, t)
+	})
 }
