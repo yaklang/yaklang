@@ -88,6 +88,10 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return &fileSystemAction{
 			fs: ssadb.NewIrSourceFs(),
 		}
+	case "ssarisk":
+		return &riskTreeAction{
+			register: make(map[string]int),
+		}
 	default:
 		return nil
 	}

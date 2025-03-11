@@ -55,6 +55,82 @@ func GetSSARiskByHash(db *gorm.DB, hash string) (*schema.SSARisk, error) {
 	return &r, nil
 }
 
+func GetSSARiskByFuncName(db *gorm.DB, programName, path, funcName string) ([]*schema.SSARisk, error) {
+	var r []*schema.SSARisk
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	path = "/" + programName + path
+
+	if db := db.Model(&schema.SSARisk{}).
+		Where("program_name = ?", programName).
+		Where("code_source_url LIKE ?", path+"%").
+		Where("function_name = ?", funcName).Find(&r); db.Error != nil {
+		return nil, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+	return r, nil
+}
+
+func GetSSARiskByPath(db *gorm.DB, programName, path string) ([]*schema.SSARisk, error) {
+	var r []*schema.SSARisk
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	path = "/" + programName + path
+
+	if db := db.Model(&schema.SSARisk{}).
+		Where("program_name = ?", programName).
+		Where("code_source_url LIKE ?", path+"%").Find(&r); db.Error != nil {
+		return nil, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+	return r, nil
+}
+
+func GetSSARiskByProgram(db *gorm.DB, programName string) ([]*schema.SSARisk, error) {
+	var r []*schema.SSARisk
+	if db := db.Model(&schema.SSARisk{}).
+		Where("program_name = ?", programName).Find(&r); db.Error != nil {
+		return nil, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+	return r, nil
+}
+func GetSSARisk(db *gorm.DB, programName, path, funcName string) ([]*schema.SSARisk, error) {
+	var r []*schema.SSARisk
+	var err error
+	if funcName != "" {
+		r, err = GetSSARiskByFuncName(db, programName, path, funcName)
+		if err != nil {
+			return nil, err
+		}
+	} else if path != "" {
+		r, err = GetSSARiskByPath(db, programName, path)
+		if err != nil {
+			return nil, err
+		}
+	} else if programName != "" {
+		r, err = GetSSARiskByProgram(db, programName)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if db := db.Model(&schema.SSARisk{}).Find(&r); db.Error != nil {
+			return nil, utils.Errorf("get Risk failed: %s", db.Error)
+		}
+	}
+
+	return r, nil
+}
+
+func GetCount(db *gorm.DB, source, funcName string) (int, error) {
+	var c int
+	if db := db.Model(&schema.SSARisk{}).Where("code_source_url = ?", source).Where("function_name = ?", funcName).Count(&c); db.Error != nil {
+		return -1, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+	return c, nil
+}
+
 func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetID())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramName())
