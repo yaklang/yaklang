@@ -103,8 +103,7 @@ func _jsonDumps(raw interface{}, opts ...JsonOpt) string {
 // ```
 func _jsonLoad(raw interface{}, opts ...JsonOpt) interface{} {
 	// opts 中暂时没有load的选项，所以这里暂时不处理
-	var i interface{}
-	defaultValue := orderedmap.New()
+	i := orderedmap.New()
 
 	str := utils.InterfaceToString(raw)
 	str = strings.TrimSpace(str)
@@ -133,7 +132,7 @@ func _jsonLoad(raw interface{}, opts ...JsonOpt) interface{} {
 			}
 		}
 		log.Error(err)
-		return defaultValue
+		return i
 	}
 	return i
 }
