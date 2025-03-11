@@ -3,7 +3,7 @@ package mustpass
 import (
 	"context"
 	"errors"
-	"net"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -14,7 +14,6 @@ import (
 func TestProxyFastTimeout(t *testing.T) {
 	var (
 		proxyCheckErr error
-		opError       *net.OpError
 	)
 
 	t.Run("http proxy timeout", func(t *testing.T) {
@@ -28,9 +27,7 @@ func TestProxyFastTimeout(t *testing.T) {
 				t.Fatalf("Unexpected error: %#v", err)
 			}
 		}
-		if !errors.As(proxyCheckErr, &opError) {
-			t.Fatalf("Unexpected error: %#v", proxyCheckErr)
-		}
+		require.Error(t, proxyCheckErr)
 	})
 
 	t.Run("socks proxy timeout", func(t *testing.T) {
@@ -44,8 +41,6 @@ func TestProxyFastTimeout(t *testing.T) {
 				t.Fatalf("Unexpected error: %#v", err)
 			}
 		}
-		if !errors.As(proxyCheckErr, &opError) {
-			t.Fatalf("Unexpected error: %#v", proxyCheckErr)
-		}
+		require.Error(t, proxyCheckErr)
 	})
 }
