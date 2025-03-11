@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type objectItem struct {
@@ -26,6 +27,10 @@ type AnalyzeContext struct {
 	_causeValue     *Value
 	//object
 	_objectStack *utils.Stack[objectItem]
+
+	callStack *utils.Stack[*ssa.Call]
+
+	//记录topDef中完整的分析过程
 }
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
@@ -34,8 +39,24 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 		_objectStack:    utils.NewStack[objectItem](),
 		config:          NewOperations(opt...),
 		depth:           -1,
+		callStack:       utils.NewStack[*ssa.Call](),
 	}
 	return actx
+}
+func (a *AnalyzeContext) pushCall(call *ssa.Call) {
+	a.callStack.Push(call)
+}
+func (a *AnalyzeContext) foreachCallStack() {
+
+}
+func (a *AnalyzeContext) getPreviousValue() *Value {
+	return a._valueStack.PeekN(1)
+}
+func (a *AnalyzeContext) popCall() *ssa.Call {
+	return a.callStack.Pop()
+}
+func (a *AnalyzeContext) peekCall(index int) *ssa.Call {
+	return a.callStack.PeekN(index)
 }
 
 func (a *AnalyzeContext) pushValue(v *Value) {
@@ -52,6 +73,7 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	recoverCrossProcess := a.crossProcess()
 	// 过程内分析
 	needVisited, recoverIntraProcess := a.theValueShouldBeVisited(v)
+
 	recoverStack = func() {
 		a.popValue()
 		recoverCrossProcess()
@@ -146,6 +168,19 @@ func (a *AnalyzeContext) getRecursiveCounter() int64 {
 
 func (a *AnalyzeContext) enterRecursive() {
 	atomic.AddInt64(&a.analysisManager._recursiveCounter, 1)
+}
+func (a *AnalyzeContext) ForeachValueStack(f func(value *Value) bool) {
+	flag := false
+	for i := 0; i < a._valueStack.Len(); i++ {
+		if i == 0 {
+			flag = f(a._valueStack.Peek())
+		} else {
+			flag = f(a._valueStack.PeekN(i))
+		}
+		if !flag {
+			return
+		}
+	}
 }
 
 func (a *AnalyzeContext) haveCrossProcess(next *Value) bool {
