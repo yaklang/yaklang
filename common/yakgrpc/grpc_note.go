@@ -49,7 +49,7 @@ func (s *Server) DeleteNote(ctx context.Context, req *ypb.DeleteNoteRequest) (*y
 }
 
 func (s *Server) QueryNote(ctx context.Context, req *ypb.QueryNoteRequest) (*ypb.QueryNoteResponse, error) {
-	_, data, err := yakit.QueryNote(s.GetProjectDatabase(), req.GetFilter(), req.GetPagination())
+	pag, data, err := yakit.QueryNote(s.GetProjectDatabase(), req.GetFilter(), req.GetPagination())
 	if err != nil {
 		return nil, err
 	}
@@ -59,17 +59,19 @@ func (s *Server) QueryNote(ctx context.Context, req *ypb.QueryNoteRequest) (*ypb
 		Data: lo.Map(data, func(i *schema.Note, _ int) *ypb.Note {
 			return i.ToGRPCModel()
 		}),
+		Total: int64(pag.TotalRecord),
 	}, nil
 }
 
 func (s *Server) SearchNoteContent(ctx context.Context, req *ypb.SearchNoteContentRequest) (*ypb.SearchNoteContentResponse, error) {
-	_, data, err := yakit.SearchNoteContent(s.GetProjectDatabase(), req.GetKeyword(), req.GetPagination())
+	pag, data, err := yakit.SearchNoteContent(s.GetProjectDatabase(), req.GetKeyword(), req.GetPagination())
 	if err != nil {
 		return nil, err
 	}
 	return &ypb.SearchNoteContentResponse{
 		Pagination: req.GetPagination(),
 		Data:       data,
+		Total:      int64(pag.TotalRecord),
 	}, nil
 }
 
