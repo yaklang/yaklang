@@ -227,6 +227,9 @@ func TestBottomUse_Func(t *testing.T) {
 b = (i, j) => i
 c = b(a,2)
 e = c + 3
+/*
+a --> b(a,2) --> i ---> return --> binaryOp 
+*/
 `)
 	if err != nil {
 		t.Fatal(err)
@@ -256,6 +259,7 @@ c,d,e = a(f,2,3);
 		t.Fatal(err)
 	}
 	prog.Show()
+	//4个
 	vals := prog.Ref("f").GetBottomUses()
 	if len(vals) != 1 {
 		t.Fatal("bottom use failed")
@@ -281,8 +285,8 @@ c,d,e = a(f,2,3);
 	}
 	prog.Show()
 	vals := prog.Ref("f").GetBottomUses()
+	vals.Show()
 	if len(vals) != 2 {
 		t.Fatal("bottom use failed")
 	}
-	vals.Show()
 }
