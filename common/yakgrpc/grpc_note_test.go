@@ -1,9 +1,12 @@
 package yakgrpc
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -160,4 +163,72 @@ func TestImportAndExportNote(t *testing.T) {
 		return note.Title
 	})
 	require.ElementsMatch(t, titles, gotTitles)
+}
+
+func TestExportNoteWithSameTitle(t *testing.T) {
+	ctx := utils.TimeoutContextSeconds(2)
+	// create
+	title, content := uuid.NewString(), uuid.NewString()
+	err := createNote(ctx, title, content)
+	require.NoError(t, err)
+	err = createNote(ctx, title, content)
+	require.NoError(t, err)
+	err = createNote(ctx, title, content)
+	require.NoError(t, err)
+
+	// export
+	p := filepath.Join(t.TempDir(), "notes.zip")
+	exportStream, err := defaultClient.ExportNote(ctx, &ypb.ExportNoteRequest{
+		Filter: &ypb.NoteFilter{
+			Title: []string{title},
+		},
+		TargetPath: p,
+	})
+	for {
+		_, err := exportStream.Recv()
+		if err != nil {
+			require.ErrorIs(t, err, io.EOF)
+			break
+		}
+	}
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		err := deleteNote(ctx, title)
+		require.NoError(t, err)
+	})
+
+	zipFile, err := os.Open(p)
+	require.NoError(t, err)
+	defer zipFile.Close()
+
+	stat, err := zipFile.Stat()
+	require.NoError(t, err)
+	zipReader, err := zip.NewReader(zipFile, stat.Size())
+	require.NoError(t, err)
+	checkFileMap := make(map[string]struct{}, 3)
+	for _, file := range zipReader.File {
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		rc, err := file.Open()
+		require.NoError(t, err)
+		defer rc.Close()
+
+		fileContent, err := io.ReadAll(rc)
+		require.NoError(t, err)
+		require.Equal(t, content, string(fileContent))
+
+		fn := path.Base(file.Name)
+		fn = strings.TrimSuffix(fn, path.Ext(fn))
+		checkFileMap[fn] = struct{}{}
+	}
+
+	require.Len(t, checkFileMap, 3)
+	_, ok := checkFileMap[title]
+	require.True(t, ok)
+	_, ok = checkFileMap[fmt.Sprintf("%s(1)", title)]
+	require.True(t, ok)
+	_, ok = checkFileMap[fmt.Sprintf("%s(2)", title)]
+	require.True(t, ok)
 }
