@@ -96,6 +96,10 @@ qwer%szxcv`, uuid.NewString(), uuid.NewString(), searchContent)
 	require.Equal(t, fmt.Sprintf("qwer%szxcv", searchContent), strings.TrimSpace(searchResp.Data[0].LineContent))
 	require.Equal(t, index, int(searchResp.Data[0].Index))
 	require.Equal(t, len(searchContent), int(searchResp.Data[0].Length))
+	// negative saerch
+	searchResp, err = searchNoteContent(ctx, uuid.NewString())
+	require.NoError(t, err)
+	require.Len(t, searchResp.Data, 0)
 }
 
 func TestImportAndExportNote(t *testing.T) {
