@@ -804,7 +804,7 @@ service Yak {
   rpc ImportHTTPFlowStream(ImportHTTPFlowStreamRequest) returns(stream ImportHTTPFlowStreamResponse);
   
   // Note
-  rpc CreateNote(CreateNoteRequest) returns (DbOperateMessage);
+  rpc CreateNote(CreateNoteRequest) returns (CreateNoteResponse);
   rpc UpdateNote(UpdateNoteRequest) returns (DbOperateMessage);
   rpc DeleteNote(DeleteNoteRequest) returns (DbOperateMessage);
   rpc QueryNote(QueryNoteRequest) returns (QueryNoteResponse);
@@ -6350,6 +6350,11 @@ message CreateNoteRequest {
   string Content = 2;
 }
 
+message CreateNoteResponse {
+  DbOperateMessage Message = 1;
+  int64 NoteId = 2;
+}
+
 message UpdateNoteRequest {
   NoteFilter Filter = 1;
   bool UpdateTitle = 2;
@@ -6391,6 +6396,7 @@ message ImportNoteRequest {
 message ImportNoteResponse {
   double Percent = 1;
   string Verbose = 2;
+  int64 NoteId = 3;
 }
 
 message ExportNoteRequest {

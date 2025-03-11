@@ -1046,7 +1046,7 @@ type YakClient interface {
 	ExportHTTPFlowStream(ctx context.Context, in *ExportHTTPFlowStreamRequest, opts ...grpc.CallOption) (Yak_ExportHTTPFlowStreamClient, error)
 	ImportHTTPFlowStream(ctx context.Context, in *ImportHTTPFlowStreamRequest, opts ...grpc.CallOption) (Yak_ImportHTTPFlowStreamClient, error)
 	// Note
-	CreateNote(ctx context.Context, in *CreateNoteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	CreateNote(ctx context.Context, in *CreateNoteRequest, opts ...grpc.CallOption) (*CreateNoteResponse, error)
 	UpdateNote(ctx context.Context, in *UpdateNoteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteNote(ctx context.Context, in *DeleteNoteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QueryNote(ctx context.Context, in *QueryNoteRequest, opts ...grpc.CallOption) (*QueryNoteResponse, error)
@@ -6723,8 +6723,8 @@ func (x *yakImportHTTPFlowStreamClient) Recv() (*ImportHTTPFlowStreamResponse, e
 	return m, nil
 }
 
-func (c *yakClient) CreateNote(ctx context.Context, in *CreateNoteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
-	out := new(DbOperateMessage)
+func (c *yakClient) CreateNote(ctx context.Context, in *CreateNoteRequest, opts ...grpc.CallOption) (*CreateNoteResponse, error) {
+	out := new(CreateNoteResponse)
 	err := c.cc.Invoke(ctx, Yak_CreateNote_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -7405,7 +7405,7 @@ type YakServer interface {
 	ExportHTTPFlowStream(*ExportHTTPFlowStreamRequest, Yak_ExportHTTPFlowStreamServer) error
 	ImportHTTPFlowStream(*ImportHTTPFlowStreamRequest, Yak_ImportHTTPFlowStreamServer) error
 	// Note
-	CreateNote(context.Context, *CreateNoteRequest) (*DbOperateMessage, error)
+	CreateNote(context.Context, *CreateNoteRequest) (*CreateNoteResponse, error)
 	UpdateNote(context.Context, *UpdateNoteRequest) (*DbOperateMessage, error)
 	DeleteNote(context.Context, *DeleteNoteRequest) (*DbOperateMessage, error)
 	QueryNote(context.Context, *QueryNoteRequest) (*QueryNoteResponse, error)
@@ -8742,7 +8742,7 @@ func (UnimplementedYakServer) ExportHTTPFlowStream(*ExportHTTPFlowStreamRequest,
 func (UnimplementedYakServer) ImportHTTPFlowStream(*ImportHTTPFlowStreamRequest, Yak_ImportHTTPFlowStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method ImportHTTPFlowStream not implemented")
 }
-func (UnimplementedYakServer) CreateNote(context.Context, *CreateNoteRequest) (*DbOperateMessage, error) {
+func (UnimplementedYakServer) CreateNote(context.Context, *CreateNoteRequest) (*CreateNoteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateNote not implemented")
 }
 func (UnimplementedYakServer) UpdateNote(context.Context, *UpdateNoteRequest) (*DbOperateMessage, error) {
