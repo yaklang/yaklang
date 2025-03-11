@@ -51,7 +51,7 @@ else {
 			prog.Show()
 
 			rule := `
-			out?{<typeName>?{have:'javax.servlet'}}.print*(* as $out);
+			out?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}}.print*(* as $out);
 			check $out;
 			$out?{have:'eval' &&  have:'script'} as $sink;
 			
@@ -120,7 +120,7 @@ else {
 			prog.Show()
 
 			rule := `
-			out?{<typeName>?{have:'javax.servlet'}}.print*(* as $out);
+			out?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}}.print*(* as $out);
 			check $out;
 			$out?{opcode:add}?{have:'<' && have:'='} as $sink;
 			request.getParameter() as $source;

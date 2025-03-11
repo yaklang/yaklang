@@ -1,0 +1,148 @@
+desc(
+    title: "Check Java Servlet XSS Vulnerability",
+    title_zh: "检测Java Servlet XSS漏洞",
+    type:vuln,
+    level: mid,
+    desc: <<<TEXT
+    该规则检测Java Servlet中的XSS漏洞，当Servlet中使用了未转义的用户输入输出到响应中时，可能导致XSS漏洞。
+TEXT
+)
+
+<include('java-servlet-param')> as $source;
+<include('java-escape-method')> as $filter
+
+response?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}}.getWriter() as $out;
+$out.print(,* as $sink);
+$out.println(,* as $sink);
+$out.write(,* as $sink);
+.append?{<typeName()>?{have:'javax.servlet.http.HttpServletResponse'}}(,* as $sink)
+check $sink;
+
+$sink#{
+    include:` * & $source`,
+    exclude:` *<getCallee> & $filter`
+}-> as $mid;
+alert $mid for {
+    message: "发现Java Servlet的XSS漏洞，并且数据流没有使用任何转义方法。",
+    type: vuln,
+    level: mid,
+    risk:xss,
+};
+
+$sink#{
+    include:`* & $source`,
+}-> as $all;
+$all - $mid as $low;
+
+alert $low for {
+    message: "发现Java Servlet的XSS漏洞,并且数据流中使用了转义方法。",
+    type: vuln,
+    level: low,
+    risk:xss,
+};
+
+desc(
+    lang: java,
+    alert_low:1,
+    'file://demo.jsp':<<<EOF
+  <%@ page language="java" contentType="text/html; charset=ISO-8859-1"
+           pageEncoding="ISO-8859-1"%>
+  <%@ page import="com.sectooladdict.encoders.HtmlEncoder" %>
+  <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+  <html>
+  <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+      <title>JavaScript Injection in DOM XSS Sink eval()</title>
+  </head>
+  <body>
+  <%
+      if (request.getParameter("userinput") == null) {
+  %>
+  Enter your input:<br><br>
+  <form name="frmInput" id="frmInput" action="Case36-InjectionDirectlyInToDomXssSinkEval.jsp" method="GET">
+      <input type="text" name="userinput" id="userinput"><br>
+      <input type=submit value="submit">
+  </form>
+  <%
+      }
+      else {
+          try {
+              String userinput = request.getParameter("userinput");
+              userinput = HtmlEncoder.htmlEncodeAngleBracketsAndQuotes(userinput);
+              out.println("<script>\neval(\"" + userinput + "\");</script>");
+              out.flush();
+          } catch (Exception e) {
+              out.println("Exception details: " + e);
+          }
+      } //end of if/else block
+  %>
+  </body>
+  </html>
+EOF
+)
+
+desc(
+    lang: java,
+    alert_mid:1,
+    'file://demo.java':<<<EOF
+  package com.example;
+
+  import java.io.IOException;
+  import java.io.PrintWriter;
+  import javax.servlet.http.HttpServlet;
+  import javax.servlet.http.HttpServletRequest;
+  import javax.servlet.http.HttpServletResponse;
+
+  // 存在 XSS 漏洞的 Servlet
+  public class VulnerableServlet extends HttpServlet {
+
+      @Override
+      protected void doGet(HttpServletRequest request, HttpServletResponse response)
+              throws IOException {
+          response.setContentType("text/html");
+          PrintWriter out = response.getWriter();
+
+          String name = request.getParameter("name");
+
+          out.append("<html><body>")
+             .append("<h1>Welcome, ")
+             .append(name) // 漏洞点：未转义用户输入
+             .append("!</h1>")
+             .append("</body></html>");
+      }
+  }
+EOF
+)
+
+desc(
+    lang: java,
+    'safefile://safe.jsp':<<<EOF
+  package dao;
+  import java.rmi.MarshalledObject;
+  import java.sql.Connection;
+  import java.sql.PreparedStatement;
+  import java.sql.ResultSet;
+  import java.sql.SQLException;
+  public class LoginDao {
+      Connection conn = DBHelper.getConn();
+      PreparedStatement pstm = null;
+      ResultSet rs = null;
+      public boolean sqlInjectLog(String username, String password) {
+          String sql = "select * from user where username=\'" + username + "\' and password=\'" + password + "\'";
+          System.out.println("正在被尝试注入的 SQL 语句:" + sql);
+          try {
+              pstm = conn.prepareStatement(sql);
+              rs = pstm.executeQuery();
+              if (rs.next()) {
+                  return true;
+              } else {
+                  return false;
+              }
+          } catch (SQLException e) {
+              e.printStackTrace();
+          }
+          return false;
+      }
+  }
+EOF
+)

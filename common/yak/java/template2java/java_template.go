@@ -109,7 +109,7 @@ func (t *JavaTemplate) generateTemplate() {
 	t.builder.WriteString("public class " + t.className + " {\r\n")
 	t.classDeclLine = len(strings.Split(t.builder.String(), "\r\n")) - 1
 	t.builder.WriteString("public void _JavaTemplateService(" + "HttpServletRequest request, HttpServletResponse response" + ") {\r\n")
-	t.builder.WriteString("\tout = request.getOut(); \r\n")
+	t.builder.WriteString("\tout = response.getWriter(); \r\n")
 }
 
 func tryUnquote(text string) string {
