@@ -833,7 +833,7 @@ func phpparserParserInit() {
 		1259, 3, 294, 147, 0, 1259, 171, 1, 0, 0, 0, 1260, 1261, 3, 174, 87, 0,
 		1261, 1262, 5, 196, 0, 0, 1262, 1263, 3, 182, 91, 0, 1263, 173, 1, 0, 0,
 		0, 1264, 1269, 3, 166, 83, 0, 1265, 1269, 3, 294, 147, 0, 1266, 1269, 3,
-		258, 129, 0, 1267, 1269, 3, 186, 93, 0, 1268, 1264, 1, 0, 0, 0, 1268, 1265,
+		258, 129, 0, 1267, 1269, 3, 182, 91, 0, 1268, 1264, 1, 0, 0, 0, 1268, 1265,
 		1, 0, 0, 0, 1268, 1266, 1, 0, 0, 0, 1268, 1267, 1, 0, 0, 0, 1269, 175,
 		1, 0, 0, 0, 1270, 1278, 3, 294, 147, 0, 1271, 1278, 3, 258, 129, 0, 1272,
 		1278, 3, 186, 93, 0, 1273, 1274, 5, 220, 0, 0, 1274, 1275, 3, 180, 90,
@@ -18207,10 +18207,10 @@ func (s *StaticClassContext) String_() IStringContext {
 	return t.(IStringContext)
 }
 
-func (s *StaticClassContext) Variable() IVariableContext {
+func (s *StaticClassContext) FlexiVariable() IFlexiVariableContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IVariableContext); ok {
+		if _, ok := ctx.(IFlexiVariableContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -18220,7 +18220,7 @@ func (s *StaticClassContext) Variable() IVariableContext {
 		return nil
 	}
 
-	return t.(IVariableContext)
+	return t.(IFlexiVariableContext)
 }
 
 func (s *StaticClassContext) GetRuleContext() antlr.RuleContext {
@@ -18292,7 +18292,7 @@ func (p *PHPParser) StaticClass() (localctx IStaticClassContext) {
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(1267)
-			p.Variable()
+			p.flexiVariable(0)
 		}
 
 	}
