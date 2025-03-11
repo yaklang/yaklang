@@ -26,7 +26,7 @@ const (
 var frameworks = make(map[string]*JavaFramework)
 
 func init() {
-	registerFrameworkSupport(FrameworkSupportJAVAEE, hookMemberCallMethod(hookJavaEEReturn))
+	registerFrameworkSupport(FrameworkSupportJAVAEE, hookMemberCallMethod(hookJavaEEMemberCallMethod))
 	registerFrameworkSupport(FrameworkSupportSpringBoot, hookReturn(hookSpringBootReturn), hookMemberCallMethod(hookSpringBootMemberCallMethod))
 }
 

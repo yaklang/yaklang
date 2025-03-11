@@ -12,7 +12,7 @@ const (
 	SERVLET_TEMPLATE_PREFIX   = "webapp"
 )
 
-func hookJavaEEReturn(y *builder, obj ssa.Value, key ssa.Value, args ...ssa.Value) {
+func hookJavaEEMemberCallMethod(y *builder, obj ssa.Value, key ssa.Value, args ...ssa.Value) {
 	typ := obj.GetType()
 	if typ == nil || !strings.Contains(strings.Join(typ.GetFullTypeNames(), "."), SERVLET_PATH) {
 		return
@@ -48,7 +48,7 @@ func hookJavaEEReturn(y *builder, obj ssa.Value, key ssa.Value, args ...ssa.Valu
 		jspObj := y.EmitUndefined(t.GetClassName())
 		jspObj.SetType(jspBlueprint)
 		methodCall := y.ReadMemberCallMethod(jspObj, y.EmitConstInst(jspMethod))
-		jspArgs := []ssa.Value{obj, y.EmitConstInstNil()}
+		jspArgs := []ssa.Value{obj, obj}
 		y.EmitCall(y.NewCall(methodCall, jspArgs))
 	}
 }
