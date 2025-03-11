@@ -85,8 +85,10 @@ func TestNote(t *testing.T) {
 	searchContent := uuid.NewString() + `!@#$%^&*()-_[]\` // special characters
 	newContent = fmt.Sprintf(`%s
 %s
-qwer%szxcv`, uuid.NewString(), uuid.NewString(), searchContent)
+qwer%szxcv
+yuio%svbnm`, uuid.NewString(), uuid.NewString(), searchContent, searchContent)
 	index := strings.Index(newContent, searchContent)
+	secondIndex := strings.LastIndex(newContent, searchContent)
 	err = createNote(ctx, newTitle, newContent)
 	t.Cleanup(func() {
 		err := deleteNote(ctx, newTitle)
@@ -95,10 +97,14 @@ qwer%szxcv`, uuid.NewString(), uuid.NewString(), searchContent)
 	require.NoError(t, err)
 	searchResp, err := searchNoteContent(ctx, searchContent)
 	require.NoError(t, err)
-	require.Len(t, searchResp.Data, 1)
+	require.Len(t, searchResp.Data, 2)
 	require.Equal(t, fmt.Sprintf("qwer%szxcv", searchContent), strings.TrimSpace(searchResp.Data[0].LineContent))
 	require.Equal(t, index, int(searchResp.Data[0].Index))
 	require.Equal(t, len(searchContent), int(searchResp.Data[0].Length))
+	require.Equal(t, fmt.Sprintf("yuio%svbnm", searchContent), strings.TrimSpace(searchResp.Data[1].LineContent))
+	require.Equal(t, secondIndex, int(searchResp.Data[1].Index))
+	require.Equal(t, len(searchContent), int(searchResp.Data[1].Length))
+
 	// negative saerch
 	searchResp, err = searchNoteContent(ctx, uuid.NewString())
 	require.NoError(t, err)
