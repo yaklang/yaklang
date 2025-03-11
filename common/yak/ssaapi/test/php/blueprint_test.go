@@ -1,6 +1,7 @@
 package php
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 )
@@ -74,5 +75,23 @@ $classA->a = 2;
 printValue($classA);
 `
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
+	})
+	t.Run("blueprint test", func(t *testing.T) {
+		code := `<?php
+
+class A{
+    public B $a;
+}
+class B{
+    public static function bb($a){
+        println($a);
+    }
+}
+$c = new A();
+$c->a::bb(1);`
+		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`,
+			map[string][]string{
+				"param": {"1"},
+			}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }

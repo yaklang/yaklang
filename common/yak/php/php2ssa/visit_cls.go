@@ -581,9 +581,8 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Bluep
 	var className string
 	if full := i.FullyQualifiedNamespaceExpr(); full != nil {
 		value = y.VisitFullyQualifiedNamespaceExpr(full, true)
-	} else if variable := i.Variable(); variable != nil {
-		name := y.VisitVariable(variable)
-		value = y.ReadValue(name)
+	} else if variable := i.FlexiVariable(); variable != nil {
+		value = y.VisitRightValue(variable)
 	} else if i.String_() != nil {
 		className = i.String_().GetText()
 		if str, err := strconv.Unquote(className); err == nil {

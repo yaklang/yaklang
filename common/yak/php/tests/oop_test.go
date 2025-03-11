@@ -1006,5 +1006,13 @@ class ChildClass extends ParentClass {
 			`Undefined-.Method(valid)("parent")`,
 		}, t)
 	})
-
+	t.Run("blueprint test", func(t *testing.T) {
+		code := `<?php
+$c->a::bb(1);
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }

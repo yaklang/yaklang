@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -113,6 +114,11 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 		return
 	}
 
+	// check loop
+	if parent == c {
+		log.Errorf("BUG!: add parent blueprint error: loop. blueprint name: %v, parent name: %v", c.Name, parent.Name)
+		return
+	}
 	c.setBlueprintRelation(parent, relation)
 	if relation == BlueprintRelationParents {
 		for name, f := range parent.NormalMethod {
