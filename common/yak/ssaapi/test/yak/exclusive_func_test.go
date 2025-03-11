@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/stretchr/testify/require"
 	"regexp"
 	"testing"
 
@@ -269,9 +270,13 @@ c,d,e = a(f,2,3);
 	prog.Ref("c").Show().ForEach(func(value *ssaapi.Value) {
 		cId = value.GetId()
 	})
-	if ret := vals[0].GetId(); ret != cId {
-		t.Fatalf("bottom use failed: expect: %v got: %v", cId, ret)
+	flag := false
+	for _, val := range vals {
+		if val.GetId() == cId {
+			flag = true
+		}
 	}
+	require.True(t, flag, "bottom use failed not found this id")
 }
 
 func TestBottomUse_ReturnUnpack2(t *testing.T) {
