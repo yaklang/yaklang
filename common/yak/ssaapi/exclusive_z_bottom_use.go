@@ -25,19 +25,23 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 	var vals Values
 
 	object, _, _ := actx.getCurrentObject()
-	if v.IsObject() && utils.IsNil(object) || object.GetId() != v.GetId() {
+	if v.IsObject() && (utils.IsNil(object) || object.GetId() != v.GetId()) {
 		v.GetAllMember().ForEach(func(value *Value) {
 			vals = append(vals, value.AppendDependOn(v).getBottomUses(actx, opt...)...)
 		})
 	}
 	if v.IsMember() {
-		obj := v.GetObject()
-		key := v.GetKey()
-		if err := actx.pushObject(obj, key, v); err != nil {
-			log.Errorf("BUG: (visitUserFallback) pushObject failed: %v", err)
-		} else {
-			vals = append(vals, obj.AppendDependOn(v).getBottomUses(actx, opt...)...)
-			actx.popObject()
+		currentObject := v.GetObject()
+		currentKey := v.GetKey()
+		obj, key, _ := actx.getCurrentObject()
+		if utils.IsNil(obj) || (object.GetId() == currentObject.GetId() && key.GetId() != currentKey.GetId()) || (obj.GetId() != currentObject.GetId()) {
+			if err := actx.pushObject(currentObject, currentKey, v); err != nil {
+				log.Errorf("BUG: (visitUserFallback) pushObject failed: %v", err)
+			} else {
+				vals = append(vals, currentObject.AppendDependOn(v).getBottomUses(actx, opt...)...)
+				actx.popObject()
+			}
+			//vals = append(vals, v.AppendDependOn(obj, key, v).getBottomUses(actx, opt...)...)
 		}
 	}
 	v.GetUsers().ForEach(func(value *Value) {
@@ -250,7 +254,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if member == nil {
 				log.Errorf("BUG: (return instruction 's member is nil),check it")
 			} else {
+				actx.pushObject(call, member.GetKey(), member)
 				vals = append(vals, member.AppendDependOn(v).getBottomUses(actx, opt...)...)
+				actx.popObject()
 			}
 		}
 		if vals.Len() == 0 {

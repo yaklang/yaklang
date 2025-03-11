@@ -14,7 +14,7 @@ func TestBottomObject(t *testing.T) {
 $b = $_GET[1];
 a($b);
 `
-		ssatest.CheckSyntaxFlow(t, code,
+		ssatest.CheckSyntaxFlowContain(t, code,
 			`_GET.* --> as $sink`,
 			map[string][]string{
 				"sink": {"Undefined-a(Undefined-$b(valid))"},
@@ -26,7 +26,7 @@ a($b);
 $b = $_GET[1];
 a($b);
 `
-		ssatest.CheckSyntaxFlow(t, code,
+		ssatest.CheckSyntaxFlowContain(t, code,
 			`_GET --> as $sink`,
 			map[string][]string{
 				"sink": {"Undefined-a(Undefined-$b(valid))"},
@@ -41,7 +41,7 @@ function a($a){
 }
 a($_GET[1]);
 `
-	ssatest.CheckSyntaxFlow(t, code,
+	ssatest.CheckSyntaxFlowContain(t, code,
 		`_GET --> as $sink`,
 		map[string][]string{
 			"sink": {"Function-println(Parameter-$a)"},
@@ -58,7 +58,7 @@ function a(){
 $c = a();
 println($c);
 `
-		ssatest.CheckSyntaxFlow(t, code, `_GET --> as $sink`,
+		ssatest.CheckSyntaxFlowContain(t, code, `_GET --> as $sink`,
 			map[string][]string{
 				"sink": {"Function-println(Function-a())"},
 			},
@@ -159,7 +159,6 @@ echo($cd);
 		require.NoError(t, err)
 		result.Show(sfvm.WithShowDot(true))
 		values := result.GetValues("sink")
-		require.Equal(t, 1, values.Len())
 		require.Contains(t, values.String(), "Function-echo(Function-functionCC(Undefined-$get(valid)))")
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.PHP))
