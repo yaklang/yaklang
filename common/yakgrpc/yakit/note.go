@@ -5,7 +5,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -85,31 +84,51 @@ func SearchNoteContent(db *gorm.DB, keyword string, paging *ypb.Paging) (*bizhel
 	db = bizhelper.FuzzQueryArrayOrLike(db, "content", []any{keyword}, true)
 	db = bizhelper.QueryOrder(db, paging.OrderBy, paging.Order)
 	pag, db := bizhelper.Paging(db, int(paging.Page), int(paging.Limit), &notes)
-	ret := lo.FilterMap(notes, func(note *schema.Note, _ int) (*ypb.NoteContent, bool) {
-		index := strings.Index(note.Content, keyword)
-		if index == -1 {
-			log.Errorf("BUG: %s not in %s", keyword, note.Content)
-			return nil, false
+	ret := make([]*ypb.NoteContent, 0, len(notes))
+	for _, note := range notes {
+		content := note.Content
+		contentLength := len(content)
+		startPos := 0
+
+		for {
+			index := strings.Index(content[startPos:], keyword)
+			if index == -1 {
+				break
+			}
+
+			// Adjust index to be relative to the entire string
+			actualIndex := startPos + index
+
+			// Find the beginning of the line
+			lineStart := strings.LastIndexByte(content[:actualIndex], '\n')
+			if lineStart == -1 {
+				lineStart = 0
+			} else {
+				lineStart++
+			}
+
+			// Find the end of the line
+			lineEnd := strings.IndexByte(content[actualIndex:], '\n')
+			if lineEnd == -1 {
+				lineEnd = contentLength
+			} else {
+				lineEnd += actualIndex
+			}
+
+			ret = append(ret, &ypb.NoteContent{
+				Note:        note.ToGRPCModel(),
+				Index:       uint64(actualIndex),
+				Length:      uint64(len(keyword)),
+				LineContent: content[lineStart:lineEnd],
+			})
+
+			// Move the search position forward to find the next occurrence
+			startPos = actualIndex + len(keyword)
+			if startPos >= contentLength {
+				break
+			}
 		}
-		lineStart := strings.LastIndexByte(note.Content[:index], '\n')
-		if lineStart == -1 {
-			lineStart = 0
-		} else {
-			lineStart++
-		}
-		lineEnd := strings.IndexByte(note.Content[index:], '\n')
-		if lineEnd == -1 {
-			lineEnd = len(note.Content)
-		} else {
-			lineEnd += index
-		}
-		return &ypb.NoteContent{
-			Note:        note.ToGRPCModel(),
-			Index:       uint64(index),
-			Length:      uint64(len(keyword)),
-			LineContent: note.Content[lineStart:lineEnd],
-		}, true
-	})
+	}
 
 	return pag, ret, db.Error
 }
