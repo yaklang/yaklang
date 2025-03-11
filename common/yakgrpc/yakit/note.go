@@ -13,12 +13,13 @@ import (
 
 var _note = &schema.Note{}
 
-func CreateNote(db *gorm.DB, title, content string) error {
+func CreateNote(db *gorm.DB, title, content string) (uint, error) {
 	note := &schema.Note{
 		Title:   title,
 		Content: content,
 	}
-	return db.Create(note).Error
+	err := db.Create(note).Error
+	return note.ID, err
 }
 
 func FilterNote(db *gorm.DB, filter *ypb.NoteFilter) *gorm.DB {

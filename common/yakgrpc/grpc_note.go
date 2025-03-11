@@ -16,12 +16,18 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (s *Server) CreateNote(ctx context.Context, req *ypb.CreateNoteRequest) (*ypb.DbOperateMessage, error) {
-	err := yakit.CreateNote(s.GetProjectDatabase(), req.GetTitle(), req.GetContent())
-	return &ypb.DbOperateMessage{
-		TableName: "note",
-		Operation: DbOperationCreate,
-	}, err
+func (s *Server) CreateNote(ctx context.Context, req *ypb.CreateNoteRequest) (*ypb.CreateNoteResponse, error) {
+	id, err := yakit.CreateNote(s.GetProjectDatabase(), req.GetTitle(), req.GetContent())
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.CreateNoteResponse{
+		Message: &ypb.DbOperateMessage{
+			TableName: "note",
+			Operation: DbOperationCreate,
+		},
+		NoteId: int64(id),
+	}, nil
 }
 
 func (s *Server) UpdateNote(ctx context.Context, req *ypb.UpdateNoteRequest) (*ypb.DbOperateMessage, error) {
@@ -107,7 +113,7 @@ func (s *Server) ImportNote(req *ypb.ImportNoteRequest, stream ypb.Yak_ImportNot
 		fn := path.Base(file.Name)
 		fn = strings.TrimSuffix(fn, path.Ext(fn))
 
-		err = yakit.CreateNote(s.GetProjectDatabase(), fn, string(content))
+		id, err := yakit.CreateNote(s.GetProjectDatabase(), fn, string(content))
 		if err != nil {
 			return fmt.Errorf("failed to create note: %v", err)
 		}
@@ -116,6 +122,7 @@ func (s *Server) ImportNote(req *ypb.ImportNoteRequest, stream ypb.Yak_ImportNot
 		stream.Send(&ypb.ImportNoteResponse{
 			Verbose: fmt.Sprintf("Imported note: %s", fn),
 			Percent: count / total,
+			NoteId:  int64(id),
 		})
 	}
 	return nil
