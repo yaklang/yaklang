@@ -50,7 +50,10 @@ func (this *Stack[T]) PeekN(n int) T {
 	for i := 1; i <= n; i++ {
 		p = p.prev
 	}
-
+	if p == nil {
+		var zero T
+		return zero
+	}
 	return p.value
 }
 

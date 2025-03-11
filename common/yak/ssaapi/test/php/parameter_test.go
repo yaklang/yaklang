@@ -214,3 +214,10 @@ topDef:
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
+
+func TestCode(t *testing.T) {
+	code := `<?php
+a(1,2,3,4,5);
+`
+	ssatest.CheckSyntaxFlow(t, code, `a(,* as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+}
