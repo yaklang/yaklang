@@ -24,25 +24,36 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
 
-	object, _, _ := actx.getCurrentObject()
-	if v.IsObject() && (utils.IsNil(object) || object.GetId() != v.GetId()) {
-		v.GetAllMember().ForEach(func(value *Value) {
-			vals = append(vals, value.AppendDependOn(v).getBottomUses(actx, opt...)...)
-		})
-	}
-	if v.IsMember() {
-		currentObject := v.GetObject()
-		currentKey := v.GetKey()
-		needPush := false
-		actx.foreachObjectStack(func(obj *Value, key *Value, value *Value) bool {
-			if currentObject.GetId() == obj.GetId() && key.GetId() == currentKey.GetId() {
-				needPush = true
+	if v.IsObject() {
+		exist := false
+		actx.foreachObjectStack(func(obj *Value, key *Value, val *Value) bool {
+			if obj.GetId() == v.GetId() {
+				exist = true
 				return false
 			}
 			return true
 		})
-		if needPush {
-			actx.pushObject(currentObject, currentKey, v)
+		if !exist {
+			v.GetAllMember().ForEach(func(value *Value) {
+				_ = actx.pushObject(v, value.GetKey(), value)
+				vals = append(vals, value.AppendDependOn(v).getBottomUses(actx, opt...)...)
+				actx.popObject()
+			})
+		}
+	}
+	if v.IsMember() {
+		currentObject := v.GetObject()
+		currentKey := v.GetKey()
+		exist := false
+		actx.foreachObjectStack(func(obj *Value, key *Value, value *Value) bool {
+			if currentObject.GetId() == obj.GetId() && key.GetId() == currentKey.GetId() {
+				exist = true
+				return false
+			}
+			return true
+		})
+		if !exist {
+			_ = actx.pushObject(currentObject, currentKey, v)
 			vals = append(vals, currentObject.AppendDependOn(v).getBottomUses(actx, opt...)...)
 			actx.popObject()
 		}
@@ -257,9 +268,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if member == nil {
 				log.Errorf("BUG: (return instruction 's member is nil),check it")
 			} else {
-				actx.pushObject(call, member.GetKey(), member)
 				vals = append(vals, member.AppendDependOn(v).getBottomUses(actx, opt...)...)
-				actx.popObject()
 			}
 		}
 		if vals.Len() == 0 {

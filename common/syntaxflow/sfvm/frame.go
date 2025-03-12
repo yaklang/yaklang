@@ -915,7 +915,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			if dup == nil {
 				return utils.Wrapf(CriticalError, "compare string failed: stack top is empty")
 			}
-			s.debugSubLog("Remove duplicate :%v")
 			s.debugSubLog(">> push: %v", newVal.String())
 			s.stack.Push(newVal)
 		}
