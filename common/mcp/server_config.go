@@ -1,9 +1,16 @@
 package mcp
 
 import (
+	"io"
 	"maps"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mcp/convert"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
 type MCPServerConfig struct {
@@ -11,6 +18,7 @@ type MCPServerConfig struct {
 	disableTools     map[string]*ToolWithHandler
 	enableResources  map[string]*ResourceWithHandler
 	disableResources map[string]*ResourceWithHandler
+	dynamicScript    []string
 }
 
 func NewMCPServerConfig() *MCPServerConfig {
@@ -46,6 +54,40 @@ func (cfg *MCPServerConfig) ApplyConfig(s *MCPServer) {
 			s.server.AddResource(resource.resource, resource.handler(s))
 		} else if resource.resourceTemplate != nil {
 			s.server.AddResourceTemplate(resource.resourceTemplate, resource.handler(s))
+		}
+	}
+
+	if len(cfg.dynamicScript) > 0 {
+		old := log.GetLevel()
+		log.SetLevel(log.FatalLevel)
+		defer log.SetLevel(old)
+		for _, script := range cfg.dynamicScript {
+			f, err := os.Open(script)
+			if err != nil {
+				log.Errorf("failed to open yak script file: %v", err)
+				continue
+			}
+			contentBytes, err := io.ReadAll(f)
+			if err != nil {
+				log.Errorf("failed to read yak script file: %v", err)
+				continue
+			}
+			defer f.Close()
+
+			toolName := filepath.Base(script)
+			content := string(contentBytes)
+			ext := filepath.Ext(toolName)
+			if ext != "" {
+				toolName = strings.TrimSuffix(toolName, ext)
+			}
+
+			prog, err := static_analyzer.SSAParse(string(content), "yak")
+			if err != nil {
+				log.Errorf("failed to parse yak script: %v", err)
+			}
+
+			tool := convert.ConvertCliParameterToTool(toolName, prog)
+			s.server.AddTool(tool, s.execYakScriptWrapper(toolName, content))
 		}
 	}
 }
@@ -136,6 +178,18 @@ func WithDisableResourceSet(name string) McpServerOption {
 			return utils.Errorf("undefined resource set: %s", name)
 		}
 		maps.Copy(cfg.disableResources, resourceSet.Resources)
+		return nil
+	}
+}
+
+func WithDynamicScript(script []string) McpServerOption {
+	return func(cfg *MCPServerConfig) error {
+		for _, s := range script {
+			if _, err := utils.GetFirstExistedFileE(s); err != nil {
+				return err
+			}
+		}
+		cfg.dynamicScript = script
 		return nil
 	}
 }

@@ -28,6 +28,7 @@ var MCPCommand = &cli.Command{
 		cli.StringFlag{Name: "dt,disable-tool", Usage: "disable tool sets, split by ','"},
 		cli.StringFlag{Name: "r,resource", Usage: "enable resource sets, split by ','"},
 		cli.StringFlag{Name: "dr,disable-resource", Usage: "disable resource sets, split by ','"},
+		cli.StringSliceFlag{Name: "script", Usage: "add the dynamic Yak script as a tool to the MCP server"},
 	},
 	Action: func(c *cli.Context) error {
 		yakit.CallPostInitDatabase()
@@ -37,6 +38,7 @@ var MCPCommand = &cli.Command{
 		host := c.String("host")
 		port := c.Int("port")
 		tool, disableTool := c.String("tool"), c.String("disable-tool")
+		script := c.StringSlice("script")
 		toolSets := lo.FilterMap(strings.Split(tool, ","), func(item string, _ int) (string, bool) {
 			item = strings.TrimSpace(item)
 			return item, item != ""
@@ -67,6 +69,9 @@ var MCPCommand = &cli.Command{
 		}
 		for _, resourceSet := range disableResourceSets {
 			opts = append(opts, WithDisableResourceSet(resourceSet))
+		}
+		if len(script) > 0 {
+			opts = append(opts, WithDynamicScript(script))
 		}
 
 		s, err := NewMCPServer(opts...)
