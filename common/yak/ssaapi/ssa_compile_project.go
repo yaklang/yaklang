@@ -38,12 +38,15 @@ func ParseProject(opts ...Option) (Programs, error) {
 
 func (c *config) parseProject() (Programs, error) {
 	if c.reCompile {
+		c.Processf(0, "recompile project, delete old data...")
 		ssadb.DeleteProgramCode(ssadb.GetDB(), c.ProgramName)
+		c.Processf(0, "recompile project, delete old data finish")
 	}
 	if c.databasePath != "" {
 		consts.SetSSAProjectDatabasePath(c.databasePath)
 	}
 
+	c.Processf(0, "recompile project, start compile")
 	if c.peepholeSize != 0 {
 		// peephole compile
 		if progs, err := c.peephole(); err != nil {
