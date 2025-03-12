@@ -1015,4 +1015,23 @@ $c->a::bb(1);
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	t.Run("test blueprint loop", func(t *testing.T) {
+		code := `<?php
+
+class A extends C{
+
+}
+class B extends A{
+
+}
+class C extends B{
+
+}
+$a = new C();
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }
