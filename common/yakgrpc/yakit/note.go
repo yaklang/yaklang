@@ -28,8 +28,7 @@ func FilterNote(db *gorm.DB, filter *ypb.NoteFilter) *gorm.DB {
 	keyword := lo.Map(filter.GetKeyword(), func(item string, _ int) any {
 		return item
 	})
-	db = bizhelper.FuzzQueryArrayOrLike(db, "content", keyword, true)
-	db = bizhelper.FuzzQueryArrayOrLike(db, "title", keyword, true)
+	db = bizhelper.FuzzQueryOrEx(db, []string{"content", "title"}, keyword, true)
 	return db
 }
 
