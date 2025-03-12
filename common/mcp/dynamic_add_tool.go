@@ -53,7 +53,10 @@ func handleDynamicAddTool(s *MCPServer) server.ToolHandlerFunc {
 		}
 
 		tool := convert.ConvertCliParameterToTool(toolName, prog)
-		tool.Description = description
+		// use script help first
+		if tool.Description == "" {
+			tool.Description = description
+		}
 		s.server.AddTool(tool, s.execYakScriptWrapper(toolName, content))
 
 		return NewCommonCallToolResult(fmt.Sprintf("add tool[%s] success", toolName))
