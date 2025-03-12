@@ -415,6 +415,7 @@ func InjectChaosTraffic(t *ChaosTraffic, opts ...ConfigOption) {
 var (
 	Exports = map[string]interface{}{
 		"GetStatistics":      getStatistics,
+		"GenerateTCPRST":     GenerateTCPRST,
 		"InjectRaw":          InjectRaw,
 		"InjectIP":           InjectTCPIP,
 		"InjectTCP":          InjectTCPIP,
