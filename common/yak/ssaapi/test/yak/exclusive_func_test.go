@@ -260,7 +260,6 @@ c,d,e = a(f,2,3);
 		t.Fatal(err)
 	}
 	prog.Show()
-	//4个
 	vals := prog.Ref("f").GetBottomUses()
 	if len(vals) != 1 {
 		t.Fatal("bottom use failed")

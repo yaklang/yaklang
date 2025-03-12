@@ -159,7 +159,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			})
 			var result Values
 			for _, val := range vals {
-				actx.setCauseValue(v)
 				result = append(result, val.getBottomUses(actx, opt...)...)
 			}
 			if result.Len() == 0 {
@@ -244,7 +243,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			log.Errorf("BUG: (return instruction 's function is nil)")
 			return nil
 		}
-		call := actx.getLastCauseValue()
+		call := actx.getLastCauseCall(BottomUseAnalysis)
 		if call == nil {
 			called := v.NewBottomUseValue(function).GetCalledBy()
 			called.ForEach(func(value *Value) {
@@ -268,7 +267,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if member == nil {
 				log.Errorf("BUG: (return instruction 's member is nil),check it")
 			} else {
+				actx.pushObject(call, member.GetKey(), member)
 				vals = append(vals, member.AppendDependOn(v).getBottomUses(actx, opt...)...)
+				actx.popObject()
 			}
 		}
 		if vals.Len() == 0 {
