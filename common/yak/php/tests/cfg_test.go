@@ -525,6 +525,8 @@ if (in_array($filename, $INCLUDE_ALLOW_LIST)) {
   include $filename;
 }`
 		ssatest.CheckSyntaxFlow(t, code, "include(* #-> * as $param)",
-			map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+			map[string][]string{
+				"param": {"Undefined-_GET"},
+			}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
