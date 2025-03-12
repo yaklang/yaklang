@@ -268,7 +268,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if member == nil {
 				log.Errorf("BUG: (return instruction 's member is nil),check it")
 			} else {
+				actx.pushObject(call, member.GetKey(), member)
 				vals = append(vals, member.AppendDependOn(v).getBottomUses(actx, opt...)...)
+				actx.popObject()
 			}
 		}
 		if vals.Len() == 0 {
