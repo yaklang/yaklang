@@ -121,10 +121,8 @@ type ValueOperator interface {
 	// RegexpMatch for OpPushSearchRegexp
 	RegexpMatch(context.Context, int, string) (bool, ValueOperator, error)
 
-	// GetCallActualParams for OpGetCallArgs
 	GetCalled() (ValueOperator, error)
-	GetCallActualParams(int) (ValueOperator, error)
-	GetAllCallActualParams() (ValueOperator, error)
+	GetCallActualParams(int, bool) (ValueOperator, error)
 	GetFields() (ValueOperator, error)
 
 	// GetTopDef and GetBottomUse is for OpBottomUse

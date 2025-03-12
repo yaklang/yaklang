@@ -55,7 +55,6 @@ const (
 	// handle function call
 	OpGetCall
 	OpGetCallArgs
-	OpGetAllCallArgs
 
 	// use def chain
 	OpGetUsers
@@ -146,6 +145,7 @@ type SFI struct {
 	OpCode               SFVMOpCode             `json:"op_code"`
 	UnaryInt             int                    `json:"unary_int"`
 	UnaryStr             string                 `json:"unary_str"`
+	UnaryBool            bool                   `json:"unary_bool"`
 	Values               []string               `json:"values"`
 	MultiOperator        []int                  `json:"multi_operator"`
 	SyntaxFlowConfig     []*RecursiveConfigItem `json:"syntax_flow_config"`
@@ -207,10 +207,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$regexp", s.UnaryStr, MatchModeString(s.UnaryInt))
 	case OpGetCall:
 		return fmt.Sprintf(verboseLen+" %v", "getCall", s.UnaryStr)
-	case OpGetAllCallArgs:
-		return fmt.Sprintf(verboseLen+" %v", "getAllCallArgs", s.UnaryStr)
 	case OpGetCallArgs:
-		return fmt.Sprintf(verboseLen+" %v", "getCallArgs", s.UnaryInt)
+		return fmt.Sprintf(verboseLen+" %v withOther(%b)", "getCallArgs", s.UnaryInt, s.UnaryBool)
 	case OpGetUsers:
 		return fmt.Sprintf(verboseLen+" %v", "users", s.UnaryStr)
 	case OpGetDefs:

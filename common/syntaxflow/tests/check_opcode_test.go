@@ -154,7 +154,7 @@ func TestOpcode(t *testing.T) {
 		check(t, `a() as $target`, sfvm.OpGetCall)
 	})
 	t.Run("check all argument", func(t *testing.T) {
-		check(t, `a(*  as $target)`, sfvm.OpGetAllCallArgs)
+		check(t, `a(*  as $target)`, sfvm.OpGetCallArgs)
 	})
 	t.Run("check single argument", func(t *testing.T) {
 		check(t, `a(*  as $target, )`, sfvm.OpGetCallArgs)

@@ -316,7 +316,7 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 	switch ret := i.(type) {
 	case *sf.AllParamContext:
 		statement := y.EmitEnterStatement()
-		y.EmitPushAllCallArgs()
+		y.EmitPushCallArgs(0, true) // get all
 		handlerStatement(ret.SingleParam())
 		y.EmitExitStatement(statement)
 	case *sf.EveryParamContext:
@@ -330,13 +330,13 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 				continue
 			}
 			statement := y.EmitEnterStatement()
-			y.EmitPushCallArgs(i)
+			y.EmitPushCallArgs(i, false)
 			handlerStatement(single)
 			y.EmitExitStatement(statement)
 		}
-		if ret.SingleParam() != nil {
+		if ret.SingleParam() != nil { // the last one get continue other value
 			statement := y.EmitEnterStatement()
-			y.EmitPushCallArgs(len(ret.AllActualParamFilter()))
+			y.EmitPushCallArgs(len(ret.AllActualParamFilter()), true)
 			handlerStatement(ret.SingleParam())
 			y.EmitExitStatement(statement)
 		}

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -26,39 +25,52 @@ func TestA(t *testing.T) {
 	code := `
     
 @Path("")
-// context is /api and is set in EmissaryServer.java
-public class Pool {
-    private final Logger logger = LoggerFactory.getLogger(this.getClass());
+// context is emissary
+public class DocumentAction {
 
-    public static final String POOL_ENDPOINT = "api/pool";
-    public static final String POOL_CLUSTER_ENDPOINT = "api/cluster/pool";
+    private static final Logger LOG = LoggerFactory.getLogger(DocumentAction.class);
+
+    public static final String UUID_TOKEN = "token";
+    public static final String SUBMISSION_TOKEN = "SUBMISSION_TOKEN";
 
     @GET
-    @Path("/pool")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response pool() {
-        return Response.ok().entity(this.lookupPool()).build();
+    @Path("/Document.action")
+    @Produces(MediaType.TEXT_HTML)
+    @Template(name = "/document_form")
+    public Map<String, Object> documentForm() {
+        Map<String, Object> map = new HashMap<>();
+        return map;
     }
 
     @GET
-    @Path("/cluster/pool")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response clusterPool() {
-        MapResponseEntity entity = new MapResponseEntity();
+    @Path("/Document.action/{uuid}")
+    @Produces(MediaType.APPLICATION_XML)
+    public Response documentShow(@Context HttpServletRequest request, @PathParam("uuid") String uuid) {
+
         try {
-            // Get our local mobile agents
-            entity.append(this.lookupPool());
-            // Get all of our peers agents
-            EmissaryClient client = new EmissaryClient();
-            for (String peer : lookupPeers()) {
-                String remoteEndPoint = stripPeerString(peer) + "api/pool";
-                MapResponseEntity remoteEntity = client.send(new HttpGet(remoteEndPoint)).getContent(MapResponseEntity.class);
-                entity.append(remoteEntity);
+            final WebSubmissionPlace wsp = (WebSubmissionPlace) Namespace.lookup("WebSubmissionPlace");
+            final List<IBaseDataObject> payload = wsp.take(uuid);
+            if (payload != null) {
+                LOG.debug("Found payloads for token {}", uuid);
+                List<IBaseDataObject> uncheckedPayloadList = (List<IBaseDataObject>) payload;
+                List<IBaseDataObject> payloadList = new ArrayList<IBaseDataObject>();
+                for (Object o : uncheckedPayloadList) {
+                    if (o instanceof IBaseDataObject) {
+                        payloadList.add((IBaseDataObject) o);
+                    }
+                }
+                String xml = PayloadUtil.toXmlString(payloadList);
+                return Response.ok().entity(xml).build();
+            } else {
+                return Response.status(400).entity("<error>uuid " + uuid + " not found</error>").build();
             }
-            return Response.ok().entity(entity).build();
-        } catch (EmissaryException e) {
-            // This should never happen since we already saw if it exists
-            return Response.serverError().entity(e.getMessage()).build();
+        } catch (NamespaceException e) {
+            LOG.error("WebSubmissionPlace error", e);
+            return Response.status(500).entity("<error>" + e.getMessage() + "</error>").build();
+        } catch (Exception e) {
+            LOG.error("Error on {}", uuid, e);
+            return Response.status(500).entity("<error>" + e.getMessage() + "</error>").build();
+
         }
     }
 }
@@ -75,20 +87,10 @@ public class Pool {
 	res, err := prog.SyntaxFlowWithError(`
 Path.__ref__?{opcode: function} as $path_handler
 $path_handler?{.annotation.*?{have:"GET"}} as $ get_path_handler 
-$get_path_handler(* ?{opcode: param} as $format_param)
+$get_path_handler(*  as $format_param1)
+$get_path_handler(,* as $format_param2)
 
-// 查找到后续被build的entity
-Response...entity?{*...build()} as $builded_entity 
-// 获取entity的参数 
-$builded_entity(, * as $target)   
-
-
-$target #{
-    include: "* & $format_param" 
-}-> as $xss 
-
-    `)
+    `, ssaapi.QueryWithEnableDebug())
 	require.NoError(t, err)
-	res.Show(sfvm.WithShowCode())
-
+	res.Show()
 }

@@ -697,7 +697,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if value == nil {
 			return utils.Wrap(CriticalError, "get call args failed: stack top is empty")
 		}
-		results, err := value.GetCallActualParams(i.UnaryInt)
+		results, err := value.GetCallActualParams(i.UnaryInt, i.UnaryBool)
 		if err != nil {
 			err = utils.Errorf("get calling argument failed: %s", err)
 		}
@@ -706,24 +706,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
 
-		// _ = results.AppendPredecessor(value, s.WithPredecessorContext("actual-args["+fmt.Sprint(i.UnaryInt)+"]"))
-		s.stack.Push(results)
-
-	case OpGetAllCallArgs:
-		s.debugSubLog("-- peek")
-		value := s.stack.Peek()
-		if value == nil {
-			return utils.Wrap(CriticalError, "get call args failed: stack top is empty")
-		}
-		results, err := value.GetAllCallActualParams()
-		if err != nil {
-			return utils.Errorf("get calling argument failed: %s", err)
-		}
-		callLen := ValuesLen(results)
-		s.debugSubLog("- get all argument: %v", results.String())
-		s.debugSubLog("<< push arg len: %v", callLen)
-		s.debugSubLog("<< stack grow")
-		// _ = results.AppendPredecessor(value, s.WithPredecessorContext("all-actual-args"))
 		s.stack.Push(results)
 
 	case OpGetUsers:

@@ -357,8 +357,8 @@ func (v *SyntaxFlowVisitor) EmitGetTopDefs(config ...*RecursiveConfigItem) {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetTopDefs, SyntaxFlowConfig: config})
 }
 
-func (v *SyntaxFlowVisitor) EmitPushCallArgs(i int) {
-	v.codes = append(v.codes, &SFI{OpCode: OpGetCallArgs, UnaryInt: i})
+func (v *SyntaxFlowVisitor) EmitPushCallArgs(startIndex int, containOther bool) {
+	v.codes = append(v.codes, &SFI{OpCode: OpGetCallArgs, UnaryInt: startIndex, UnaryBool: containOther})
 }
 
 func (v *SyntaxFlowVisitor) EmitDuplicate() {
@@ -367,10 +367,6 @@ func (v *SyntaxFlowVisitor) EmitDuplicate() {
 
 func (v *SyntaxFlowVisitor) EmitGetCall() {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetCall})
-}
-
-func (v *SyntaxFlowVisitor) EmitPushAllCallArgs() {
-	v.codes = append(v.codes, &SFI{OpCode: OpGetAllCallArgs})
 }
 
 func (v *SyntaxFlowVisitor) Show() {

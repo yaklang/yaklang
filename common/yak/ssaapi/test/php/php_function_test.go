@@ -1,9 +1,10 @@
 package php
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestPhpWeakLanguage(t *testing.T) {
@@ -155,5 +156,48 @@ c() as $functionC
 			"functionB": {`phi($a)[side-effect(phi($a)["A","B"], $a),"c"](1)`},
 			"functionC": {`phi($a)[side-effect(phi($a)["A","B"], $a),"c"](1)`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test", func(t *testing.T) {
+		code := `
+		<?php
+function show($a){
+    echo $a;
+}
+
+function done($a){
+    // do nothing here
+}
+?> 
+
+<?php
+$input = $_GET['input'];
+$method = $_GET['method'];
+$calledMethod = "show";
+if($method == "done"){
+    $calledMethod = "done";
+}
+$calledMethod($input);
+?>
+
+
+<?php 
+$input = $_GET['input'];
+$method = $_GET['method'];
+$calledMethod = "done";
+
+$selectFunction = function ()use($calledMethod){
+    if($method == "done"){
+        $calledMethod = "done";
+    }else {
+        $calledMethod = "show";
+    }
+    return $calledMethod;
+}
+$selectFunction();
+
+$calledMethod($input);
+?>
+`
+		ssatest.CheckSyntaxFlow(t, code, `show`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
