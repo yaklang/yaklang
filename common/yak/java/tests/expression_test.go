@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
@@ -329,5 +331,40 @@ func TestJava_Lambda(t *testing.T) {
 		Calculator Mux =(var number,var times) ->{ println(number * times);};
 		println(Mux);
 `, []string{"mul(Parameter-number, Parameter-times)", "Function-Mux"}, t)
+	})
+}
+
+func TestExpression_Extend(t *testing.T) {
+	t.Run("test unquote string literal", func(t *testing.T) {
+		code := `package org.example;
+
+public class Main {
+    public boolean sqlInjectLog(String username, String password) {
+        String sql = "select * from user where username=\'" + username ;
+        System.out.println("正在被尝试注入的 SQL 语句:" + sql);
+        try {
+            pstm = conn.prepareStatement(sql);
+            rs = pstm.executeQuery();
+            if (rs.next()) {
+                //登陆成功
+                return true;
+            } else {
+                return false;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+}`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			vals, err := prog.SyntaxFlowWithError(`sql #-> as $a`)
+			require.NoError(t, err)
+			ret := vals.GetValues("a")
+			ret.Show()
+			require.Contains(t, ret.String(), "select * from user where username=")
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
 	})
 }
