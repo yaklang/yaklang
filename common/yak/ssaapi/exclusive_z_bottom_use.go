@@ -33,15 +33,18 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 	if v.IsMember() {
 		currentObject := v.GetObject()
 		currentKey := v.GetKey()
-		obj, key, _ := actx.getCurrentObject()
-		if utils.IsNil(obj) || (object.GetId() == currentObject.GetId() && key.GetId() != currentKey.GetId()) || (obj.GetId() != currentObject.GetId()) {
-			if err := actx.pushObject(currentObject, currentKey, v); err != nil {
-				log.Errorf("BUG: (visitUserFallback) pushObject failed: %v", err)
-			} else {
-				vals = append(vals, currentObject.AppendDependOn(v).getBottomUses(actx, opt...)...)
-				actx.popObject()
+		needPush := false
+		actx.foreachObjectStack(func(obj *Value, key *Value, value *Value) bool {
+			if currentObject.GetId() == obj.GetId() && key.GetId() == currentKey.GetId() {
+				needPush = true
+				return false
 			}
-			//vals = append(vals, v.AppendDependOn(obj, key, v).getBottomUses(actx, opt...)...)
+			return true
+		})
+		if needPush {
+			actx.pushObject(currentObject, currentKey, v)
+			vals = append(vals, currentObject.AppendDependOn(v).getBottomUses(actx, opt...)...)
+			actx.popObject()
 		}
 	}
 	v.GetUsers().ForEach(func(value *Value) {
