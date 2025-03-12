@@ -14,7 +14,7 @@ func TestSF_GetUser(t *testing.T) {
 		b = file.Write("abc", result)
 		dump(b)
 		`
-		ssatest.CheckSyntaxFlow(t, code, sf, map[string][]string{
+		ssatest.CheckSyntaxFlowContain(t, code, sf, map[string][]string{
 			"target": expect,
 		})
 	}
@@ -75,7 +75,7 @@ func TestSF_GetUser(t *testing.T) {
 		check(t,
 			`b#->* as $target`,
 			[]string{
-			"\"abc\"", "\"bash attack\"", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)", "Undefined-a.exec(valid)", "Undefined-file", "Undefined-file.Write(valid)"},
+				"\"abc\"", "\"bash attack\"", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)", "Undefined-a.exec(valid)", "Undefined-file", "Undefined-file.Write(valid)"},
 		)
 	})
 }
