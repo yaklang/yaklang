@@ -220,10 +220,10 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	if i == nil {
 		return
 	}
-	_, _, isStatic := y.VisitModifiers(modifiers)
 	if i.ConstructorDeclaration() != nil {
 		y.VisitConstructorDeclaration(i.ConstructorDeclaration(), class)
 	} else if i.FieldDeclaration() != nil {
+		_, _, isStatic := y.VisitModifiers(modifiers)
 		setMember := class.RegisterNormalMember
 		if isStatic {
 			setMember = class.RegisterStaticMember
@@ -259,7 +259,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	} else if ret := i.RecordDeclaration(); ret != nil {
 		log.Infof("todo: java17: %v", ret.GetText())
 	} else if ret := i.MethodDeclaration(); ret != nil {
-		y.VisitMethodDeclaration(ret, class, isStatic, modifiers)
+		y.VisitMethodDeclaration(ret, class, modifiers)
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.GenericConstructorDeclaration(); ret != nil {
 
@@ -561,7 +561,7 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 
 func (y *builder) VisitMethodDeclaration(
 	raw javaparser.IMethodDeclarationContext,
-	class *ssa.Blueprint, isStatic bool,
+	class *ssa.Blueprint,
 	modify javaparser.IModifiersContext,
 ) {
 	if y == nil || raw == nil || y.IsStop() {
@@ -579,7 +579,7 @@ func (y *builder) VisitMethodDeclaration(
 	methodName := key
 	newFunc := y.NewFunc(funcName)
 	newFunc.SetMethodName(methodName)
-	annotationFunc, defCallback, _ := y.VisitModifiers(modify)
+	annotationFunc, defCallback, isStatic := y.VisitModifiers(modify)
 	if isStatic {
 		class.RegisterStaticMethod(key, newFunc)
 	} else {
