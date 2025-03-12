@@ -2,6 +2,7 @@ package java2ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"math"
 	"strconv"
 	"strings"
@@ -48,16 +49,11 @@ func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 			res = y.EmitConstInst(runeChar)
 		}
 	} else if ret := i.STRING_LITERAL(); ret != nil {
-
 		text := ret.GetText()
 		if text == "\"\"" {
 			res = y.EmitConstInst(text)
 		}
-		val, err := strconv.Unquote(text)
-		if err != nil {
-			log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("unquote error %s", err))
-			return y.EmitConstInst(val)
-		}
+		val := yakunquote.TryUnquote(text)
 		res = y.EmitConstInst(val)
 	} else if ret := i.BOOL_LITERAL(); ret != nil {
 		boolLit, err := strconv.ParseBool(ret.GetText())
