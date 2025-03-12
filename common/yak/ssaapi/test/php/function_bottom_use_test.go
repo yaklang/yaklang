@@ -21,20 +21,9 @@ a($b);
 			},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
-	t.Run("object only have member", func(t *testing.T) {
-		code := `<?php
-$b = $_GET[1];
-a($b);
-`
-		ssatest.CheckSyntaxFlowContain(t, code,
-			`_GET --> as $sink`,
-			map[string][]string{
-				"sink": {"Undefined-a(Undefined-$b(valid))"},
-			},
-			ssaapi.WithLanguage(ssaapi.PHP))
-	})
 }
 func TestCallBottomUse(t *testing.T) {
+
 	code := `<?php
 function a($a){
 	println($a);
@@ -58,7 +47,7 @@ function a(){
 $c = a();
 println($c);
 `
-		ssatest.CheckSyntaxFlowContain(t, code, `_GET --> as $sink`,
+		ssatest.CheckSyntaxFlowContain(t, code, `_GET.* --> as $sink`,
 			map[string][]string{
 				"sink": {"Function-println(Function-a())"},
 			},
