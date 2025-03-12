@@ -183,6 +183,14 @@ func (g *AnalyzeContext) getCurrentObject() (*Value, *Value, *Value) {
 	item := g._objectStack.Peek()
 	return item.object, item.key, item.member
 }
+func (g *AnalyzeContext) foreachObjectStack(f func(*Value, *Value, *Value) bool) {
+	for i := 0; i < g._objectStack.Len(); i++ {
+		item := g._objectStack.PeekN(0)
+		if !f(item.object, item.key, item.member) {
+			return
+		}
+	}
+}
 
 func (a *AnalyzeContext) theObjectShouldBeVisited(object, key, member *Value) (bool, func()) {
 	return a.objectShould(object, key, member)
