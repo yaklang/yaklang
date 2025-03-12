@@ -2,10 +2,11 @@ package sfvm
 
 import (
 	"context"
-	"github.com/gobwas/glob"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"regexp"
 	"strings"
+
+	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type StringComparator struct {
@@ -37,21 +38,21 @@ func (c *StringComparator) AddCondition(pattern string, filterMode ConditionFilt
 	})
 }
 
-func (c *StringComparator) Matches(target string) bool {
+func (c *StringComparator) Matches(targets ...string) bool {
 	if c == nil {
 		return false
 	}
 	switch c.MatchMode {
 	case MatchHaveAny:
 		for _, condition := range c.Conditions {
-			if condition.Matches(target) {
+			if condition.Matches(targets) {
 				return true
 			}
 		}
 		return false
 	case MatchHave:
 		for _, condition := range c.Conditions {
-			if !condition.Matches(target) {
+			if !condition.Matches(targets) {
 				return false
 			}
 		}
@@ -60,7 +61,7 @@ func (c *StringComparator) Matches(target string) bool {
 	return false
 }
 
-func (c *StringCondition) Matches(target string) bool {
+func (c *StringCondition) Matches(target []string) bool {
 	if c == nil {
 		return false
 	}
@@ -83,7 +84,12 @@ func (c *StringCondition) Matches(target string) bool {
 	default:
 		return false
 	}
-	return check(target)
+	for _, target := range target {
+		if check(target) {
+			return true
+		}
+	}
+	return false
 }
 
 type OpcodeComparator struct {

@@ -47,6 +47,8 @@ func (a *AnalyzeContext) popValue() *Value {
 }
 
 func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
+	id := v.GetId()
+	_ = id
 	a.pushValue(v)
 	// 跨过程分析
 	recoverCrossProcess := a.crossProcess()

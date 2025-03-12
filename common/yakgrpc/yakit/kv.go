@@ -198,7 +198,7 @@ func SetKeyProcessEnv(db *gorm.DB, key interface{}, processEnv bool) {
 }
 
 func DelKey(db *gorm.DB, key interface{}) {
-	if db := db.Where(`key = ?`, strconv.Quote(utils.InterfaceToString(key))).Unscoped().Delete(&schema.GeneralStorage{}); db.Error != nil {
+	if db := db.Debug().Where(`key = ?`, strconv.Quote(utils.InterfaceToString(key))).Unscoped().Delete(&schema.GeneralStorage{}); db.Error != nil {
 		log.Errorf("del general storage failed: %s", db.Error)
 	}
 }
