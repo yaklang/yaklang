@@ -236,6 +236,8 @@ jobs:
               go test --timeout 1m ./common/mcp/convert
               # doc
               go test --timeout 1m  ./common/yak/yakdoc/...
+              # jwt
+              go test --timeout 1m ./common/authhack/...
           - name: Test BinParser
             run: |
               # binary parser
