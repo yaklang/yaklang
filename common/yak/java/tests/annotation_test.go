@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -49,6 +50,7 @@ public class MyClass {
     }
 }
 class A{
+    @Path("PATHPATH")
     public void AMethod() {
         MyClass c = new MyClass();
         c.myMethod();
@@ -57,9 +59,21 @@ class A{
 `
 
 	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		if prog.SyntaxFlowChain(`*yAnno*`).Len() <= 0 {
-			t.Fatal("annotation is not right parsed")
+		{
+			res, err := prog.SyntaxFlowWithError(`*yAnno*`)
+			require.NoError(t, err)
+			res.Show()
+			require.Greater(t, res.GetValueCount("_"), 0)
 		}
+
+		{
+			res, err := prog.SyntaxFlowWithError(`g"*PATHPATH*"`)
+			require.NoError(t, err)
+			res.Show()
+			require.Equal(t, res.GetValueCount("_"), 1)
+		}
+
 		return nil
+
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
