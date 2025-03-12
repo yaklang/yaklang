@@ -167,6 +167,11 @@ func FuzzQueryArrayStringOrLike(db *gorm.DB, field string, s []string) *gorm.DB 
 
 // FuzzQueryArrayOrLike
 func FuzzQueryArrayOrLike(db *gorm.DB, field string, s []interface{}, escape bool) *gorm.DB {
+	return FuzzQueryOrEx(db, []string{field}, s, escape)
+}
+
+// FuzzQueryArrayOrLike
+func FuzzQueryOrEx(db *gorm.DB, fields []string, s []interface{}, escape bool) *gorm.DB {
 	if len(s) <= 0 {
 		return db
 	}
@@ -176,21 +181,23 @@ func FuzzQueryArrayOrLike(db *gorm.DB, field string, s []interface{}, escape boo
 		items  []interface{}
 	)
 
-	for _, sub := range s {
-		pattern := fmt.Sprintf("%v", sub) // 将 'sub' 转换为类似于 '%sub%' 的形式
-		if escape {
-			pattern = escapeRegexp.ReplaceAllString(pattern, `\$0`) // 转义特殊字符
-		} else {
-			pattern = strings.ReplaceAll(pattern, "*", "%") // 将 '*' 替换为 SQL 通配符 '%'
-		}
-		pattern = fmt.Sprintf("%%%s%%", pattern)
-		if escape {
-			querys = append(querys, fmt.Sprintf(`( %v LIKE ? ESCAPE '\' )`, field))
-		} else {
-			querys = append(querys, fmt.Sprintf("( %v LIKE ? )", field))
-		}
+	for _, field := range fields {
+		for _, sub := range s {
+			pattern := fmt.Sprintf("%v", sub) // 将 'sub' 转换为类似于 '%sub%' 的形式
+			if escape {
+				pattern = escapeRegexp.ReplaceAllString(pattern, `\$0`) // 转义特殊字符
+			} else {
+				pattern = strings.ReplaceAll(pattern, "*", "%") // 将 '*' 替换为 SQL 通配符 '%'
+			}
+			pattern = fmt.Sprintf("%%%s%%", pattern)
+			if escape {
+				querys = append(querys, fmt.Sprintf(`( %v LIKE ? ESCAPE '\' )`, field))
+			} else {
+				querys = append(querys, fmt.Sprintf("( %v LIKE ? )", field))
+			}
 
-		items = append(items, pattern)
+			items = append(items, pattern)
+		}
 	}
 
 	return db.Where(strings.Join(querys, " OR "), items...) //.Debug()
