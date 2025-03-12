@@ -83,10 +83,12 @@ func TestNote(t *testing.T) {
 
 	// search
 	searchContent := uuid.NewString() + `!@#$%^&*()-_[]\` // special characters
+	searchContent1 := fmt.Sprintf("qwer%szxcv", searchContent)
+	searchContent2 := fmt.Sprintf("yuio%svbnm", searchContent)
 	newContent = fmt.Sprintf(`%s
 %s
-qwer%szxcv
-yuio%svbnm`, uuid.NewString(), uuid.NewString(), searchContent, searchContent)
+%[3]s %[3]s
+%s`, uuid.NewString(), uuid.NewString(), searchContent1, searchContent2)
 	index := strings.Index(newContent, searchContent)
 	secondIndex := strings.LastIndex(newContent, searchContent)
 	err = createNote(ctx, newTitle, newContent)
@@ -98,7 +100,7 @@ yuio%svbnm`, uuid.NewString(), uuid.NewString(), searchContent, searchContent)
 	searchResp, err := searchNoteContent(ctx, searchContent)
 	require.NoError(t, err)
 	require.Len(t, searchResp.Data, 2)
-	require.Equal(t, fmt.Sprintf("qwer%szxcv", searchContent), strings.TrimSpace(searchResp.Data[0].LineContent))
+	require.Equal(t, fmt.Sprintf("%[1]s %[1]s", searchContent1, searchContent1), strings.TrimSpace(searchResp.Data[0].LineContent))
 	require.Equal(t, index, int(searchResp.Data[0].Index))
 	require.Equal(t, len(searchContent), int(searchResp.Data[0].Length))
 	require.Equal(t, fmt.Sprintf("yuio%svbnm", searchContent), strings.TrimSpace(searchResp.Data[1].LineContent))
