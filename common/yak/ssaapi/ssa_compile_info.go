@@ -76,7 +76,10 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	if err := json.Unmarshal([]byte(raw), &info); err != nil {
 		return nil, utils.Errorf("error unmarshal info: %v", err)
 	}
-	c.Processf(0, "start parse info: %s", info.Kind)
+	c.Processf(0, "parse info: %s", info.Kind)
+	defer func() {
+		c.Processf(0, "parse info finish")
+	}()
 	switch info.Kind {
 	case "local":
 		return filesys.NewRelLocalFs(info.LocalFile), nil
