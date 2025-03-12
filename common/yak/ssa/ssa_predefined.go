@@ -278,6 +278,9 @@ func (n *anValue) GetKey() Value {
 }
 
 func (n *anValue) IsObject() bool {
+	if n.member == nil {
+		return false
+	}
 	return n.member.Len() != 0
 }
 

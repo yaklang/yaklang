@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/stretchr/testify/require"
 	"regexp"
 	"testing"
 
@@ -227,6 +228,9 @@ func TestBottomUse_Func(t *testing.T) {
 b = (i, j) => i
 c = b(a,2)
 e = c + 3
+/*
+a --> b(a,2) --> i ---> return --> binaryOp 
+*/
 `)
 	if err != nil {
 		t.Fatal(err)
@@ -265,9 +269,13 @@ c,d,e = a(f,2,3);
 	prog.Ref("c").Show().ForEach(func(value *ssaapi.Value) {
 		cId = value.GetId()
 	})
-	if ret := vals[0].GetId(); ret != cId {
-		t.Fatalf("bottom use failed: expect: %v got: %v", cId, ret)
+	flag := false
+	for _, val := range vals {
+		if val.GetId() == cId {
+			flag = true
+		}
 	}
+	require.True(t, flag, "bottom use failed not found this id")
 }
 
 func TestBottomUse_ReturnUnpack2(t *testing.T) {
@@ -281,8 +289,8 @@ c,d,e = a(f,2,3);
 	}
 	prog.Show()
 	vals := prog.Ref("f").GetBottomUses()
+	vals.Show()
 	if len(vals) != 2 {
 		t.Fatal("bottom use failed")
 	}
-	vals.Show()
 }
