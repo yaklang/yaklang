@@ -24,6 +24,7 @@ func TestConvertCliParameterToJsonSchema(t *testing.T) {
 }`
 
 	content := fmt.Sprintf(`
+cli.help("example")
 a = cli.Int("a", cli.setRequired(true))
 b = cli.Bool("b", cli.setHelp("b"), cli.setDefault(true))
 c = cli.String("c", cli.setRequired(true))
@@ -36,6 +37,7 @@ cli.check()
 	prog, err := static_analyzer.SSAParse(content, "yak")
 	require.NoError(t, err)
 	tool := ConvertCliParameterToTool("test", prog)
+	require.Equal(t, "example", tool.Description)
 
 	require.ElementsMatch(t, tool.InputSchema.Required, []string{"a", "c"})
 	checkEx := func(m map[string]any, name string, typ string) map[string]any {

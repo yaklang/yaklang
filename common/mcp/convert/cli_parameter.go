@@ -11,6 +11,7 @@ import (
 
 func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool {
 	properties := make(map[string]any)
+	description := ""
 	requiredProperties := make([]string, 0)
 
 	getConstString := func(v *ssaapi.Value) string {
@@ -124,6 +125,12 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 				return v.IsCall() && v.IsReachable() != -1
 			},
 		).ForEach(func(v *ssaapi.Value) {
+			if funcName == "cli.help" {
+				// skip help function
+				description = getConstString(v.GetOperand(1))
+				return
+			}
+
 			nameValue := v.GetOperand(1)
 			paramName := ""
 			if nameValue.IsConstInst() {
@@ -175,6 +182,7 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 	})
 
 	tool := mcp.NewTool(toolName)
+	tool.Description = description
 	tool.InputSchema.Required = requiredProperties
 	tool.InputSchema.Properties = properties
 	return tool
