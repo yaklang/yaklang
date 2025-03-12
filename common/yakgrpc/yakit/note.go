@@ -123,7 +123,7 @@ func SearchNoteContent(db *gorm.DB, keyword string, paging *ypb.Paging) (*bizhel
 			})
 
 			// Move the search position forward to find the next occurrence
-			startPos = actualIndex + len(keyword)
+			startPos = lineEnd
 			if startPos >= contentLength {
 				break
 			}
