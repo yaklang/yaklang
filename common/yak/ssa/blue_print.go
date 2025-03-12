@@ -113,11 +113,29 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 	if parent == nil || c == nil {
 		return
 	}
-
-	// check loop
-	if parent == c {
-		log.Errorf("BUG!: add parent blueprint error: loop. blueprint name: %v, parent name: %v", c.Name, parent.Name)
-		return
+	if relation == BlueprintRelationParents {
+		isExist := false
+		c.getFieldWithParent(func(bluePrint *Blueprint) bool {
+			if bluePrint == parent {
+				isExist = true
+				return true
+			}
+			return false
+		})
+		if !isExist {
+			parent.getFieldWithParent(func(bluePrint *Blueprint) bool {
+				if bluePrint == c {
+					isExist = true
+					return true
+				}
+				return false
+			})
+		}
+		// check loop
+		if isExist {
+			log.Errorf("BUG!: add parent blueprint error: loop. blueprint name: %v, parent name: %v", c.Name, parent.Name)
+			return
+		}
 	}
 	c.setBlueprintRelation(parent, relation)
 	if relation == BlueprintRelationParents {
