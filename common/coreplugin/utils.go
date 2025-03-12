@@ -21,7 +21,19 @@ type PlugInfo struct {
 }
 
 var initDB = sync.Once{}
+var LoadCorePluginHooks = []func(name string, source string) string{}
 
+func RegisterLoadCorePluginHook(hook func(name string, source string) string) {
+	LoadCorePluginHooks = append(LoadCorePluginHooks, hook)
+}
+
+func GetCorePluginDataWithHook(name string) []byte {
+	codeBytes := GetCorePluginData(name)
+	for _, hook := range LoadCorePluginHooks {
+		codeBytes = []byte(hook(name, string(codeBytes)))
+	}
+	return codeBytes
+}
 func GetCorePluginData(name string) []byte {
 	codeBytes, err := basePlugin.ReadFile(fmt.Sprintf("base-yak-plugin/%v.yak", name))
 	if err != nil {

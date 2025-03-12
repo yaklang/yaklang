@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"io"
 	"io/ioutil"
 	"net"
@@ -35,6 +36,18 @@ const (
 	DbOperationQuery          = "query"
 	DbOperationCreateOrUpdate = "create_or_update"
 )
+
+var CallHookMap = sync.Map{}
+
+func callHook(name string) any {
+	v, ok := CallHookMap.Load(name)
+	if ok {
+		if f, ok := v.(func() any); ok {
+			return f()
+		}
+	}
+	return nil
+}
 
 // OpenPortServerStreamerHelperRWC
 type OpenPortServerStreamerHelperRWC struct {
@@ -275,6 +288,14 @@ func newLocalClientEx(local bool) (ypb.YakClient, error) {
 	if local || !utils.InGithubActions() {
 		var finalErr error
 		initLocalClientOnce.Do(func() {
+			yaklang.Import("test", map[string]any{
+				"callhook": func(name string) any {
+					if callHook != nil {
+						return callHook(name)
+					}
+					panic("callHook is nil")
+				},
+			})
 			port = utils.GetRandomAvailableTCPPort()
 			addr = utils.HostPort("127.0.0.1", port)
 			grpcTrans := grpc.NewServer(
