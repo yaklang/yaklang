@@ -155,10 +155,16 @@ func (c *Cache) Refresh(insts any) {
 
 // SetInstruction : set instruction to cache.
 func (c *Cache) SetInstruction(inst Instruction) {
-	if inst.GetId() == -1 {
+	id := inst.GetId()
+	_ = id
+	if inst.GetId() <= 0 {
 		// new instruction, use new ID
 		id, irCode := c.fetchId()
 		inst.SetId(id)
+		if id <= 0 {
+			log.Errorf("BUG: fetchId return invalid id: %d", id)
+			return
+		}
 		c.InstructionCache.Set(id, &instructionCachePair{
 			inst:   inst,
 			irCode: irCode,
