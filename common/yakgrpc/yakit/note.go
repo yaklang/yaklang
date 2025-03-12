@@ -83,7 +83,13 @@ func SearchNoteContent(db *gorm.DB, keyword string, paging *ypb.Paging) (*bizhel
 	db = bizhelper.FuzzQueryArrayOrLike(db, "content", []any{keyword}, true)
 	db = bizhelper.QueryOrder(db, paging.OrderBy, paging.Order)
 	pag, db := bizhelper.Paging(db, int(paging.Page), int(paging.Limit), &notes)
+
 	ret := make([]*ypb.NoteContent, 0, len(notes))
+
+	if keyword == "" {
+		return pag, ret, nil
+	}
+
 	for _, note := range notes {
 		content := note.Content
 		contentLength := len(content)
