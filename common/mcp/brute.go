@@ -20,7 +20,7 @@ func init() {
 			mcp.WithDescription("Initiates a brute force attack based on the provided parameters"),
 			mcp.WithString("type",
 				mcp.Description("Type of the brute force attack"),
-				mcp.Enum(bruteutils.GetBuildinAvailableBruteType()),
+				mcp.EnumString(bruteutils.GetBuildinAvailableBruteType()...),
 				mcp.Required(),
 			),
 			mcp.WithOneOfStruct("target",
