@@ -142,7 +142,6 @@ BREAKOUT:
 				break BREAKOUT
 			}
 			lineRawLen := int64(len(lineRaw))
-			lineRaw = bytes.TrimSpace(lineRaw)
 			line := string(lineRaw)
 			var hitCount int64 = 0
 			if isCSV {
@@ -203,8 +202,8 @@ func ReadQuotedLinesWithCallBack(data string, handler func(line string, rawLen i
 			break
 		}
 		lineRawLen := int64(len(lineRaw))
-		lineRaw = bytes.TrimSpace(lineRaw)
-		line := strconv.Quote(strings.TrimRightFunc(string(lineRaw), TrimWhitespaceExceptSpace))
+		lineRaw = bytes.TrimRightFunc(lineRaw, TrimWhitespaceExceptSpace)
+		line := strconv.Quote(string(lineRaw))
 		if err := handler(line, lineRawLen); err != nil {
 			return err
 		}

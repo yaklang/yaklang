@@ -69,7 +69,7 @@ func (p *Payload) GetContent() string {
 	if err == nil {
 		content = unquoted
 	}
-	content = strings.TrimSpace(content)
+	content = strings.TrimRightFunc(content, TrimWhitespaceExceptSpace)
 	return content
 }
 
@@ -111,4 +111,15 @@ func NewPayloadFromGRPCModel(p *ypb.Payload) *Payload {
 	}
 	payload.Hash = payload.CalcHash()
 	return payload
+}
+
+func TrimWhitespaceExceptSpace(r rune) bool {
+	if uint32(r) <= '\u00FF' {
+		switch r {
+		case '\t', '\n', '\v', '\f', '\r', 0x85, 0xA0:
+			return true
+		}
+		return false
+	}
+	return false
 }
