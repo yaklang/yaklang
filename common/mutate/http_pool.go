@@ -708,6 +708,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 
 				// extern swg for overall concurrency  control
 				swg = config.SizedWaitGroupInstance
+				wg  = new(sync.WaitGroup)
 			)
 
 			requestCounterAdd := func() {
@@ -736,6 +737,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 
 				execRequestInstance := func(targetRequest []byte) {
 					swg.Add()
+					wg.Add(1)
 					requestCounterAdd()
 
 					go func() {
@@ -744,6 +746,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								delayer.Wait()
 							}
 							swg.Done()
+							wg.Done()
 						}()
 
 						var finalResult *HttpResult
@@ -1098,14 +1101,14 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						finalResult := &HttpResult{
 							Error: utils.Errorf("fuzz tag exec failed: %s", err),
 						}
-						results <- finalResult
+						cache.In <- finalResult
 						return
 					}
 				} else {
 					submitTask(reqRaw)
 				}
 			}
-			swg.Wait()
+			wg.Wait()
 		}()
 		return results, nil
 	case []string:
