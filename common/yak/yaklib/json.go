@@ -40,7 +40,7 @@ var JsonExports = map[string]interface{}{
 func NewJsonConfig() *jsonConfig {
 	return &jsonConfig{
 		prefix: "",
-		indent: "",
+		indent: "  ",
 	}
 }
 
