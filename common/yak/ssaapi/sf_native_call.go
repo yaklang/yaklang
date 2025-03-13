@@ -262,7 +262,7 @@ func init() {
 	}))
 
 	registerNativeCall(NativeCall_GetActualParamLen, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-		vs, err := v.GetAllCallActualParams()
+		vs, err := v.GetCallActualParams(0, true)
 		if err != nil {
 			return false, nil, err
 		}
@@ -278,7 +278,7 @@ func init() {
 		return true, sfvm.NewValues([]sfvm.ValueOperator{prog.NewValue(ssa.NewConst(count))}), nil
 	}), nc_desc("获取实际参数长度"))
 	registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-		result, err := v.GetAllCallActualParams()
+		result, err := v.GetCallActualParams(0, true)
 		if err != nil {
 			return false, nil, err
 		}

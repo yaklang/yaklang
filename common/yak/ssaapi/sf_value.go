@@ -130,45 +130,39 @@ func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 	return v, nil
 }
 
-func (v *Value) GetAllCallActualParams() (sfvm.ValueOperator, error) {
-	vs := make(Values, 0)
-	v.GetCalledBy().ForEach(func(c *Value) {
-		vs = append(vs, c.GetCallArgs()...)
-	})
-	if f, ok := ssa.ToFunction(v.node); ok {
-		for _, para := range f.Params {
-			vs = append(vs, v.NewValue(para))
-		}
-	}
-	for _, value := range vs {
-		if utils.IsNil(value) {
-			continue
-		}
-		value.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("all-actual-args"))
-	}
-
-	return vs, nil
-}
-
-func (v *Value) GetCallActualParams(i int) (sfvm.ValueOperator, error) {
+func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator, error) {
 	rets := make(Values, 0)
-	add := func(value ssa.Value) {
+	addvalue := func(value ssa.Value) {
 		ret := v.NewValue(value)
 		ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label(
-			fmt.Sprintf("actual-args[%d]", i),
+			fmt.Sprintf("actual-args[%d](containRest:%v)", start, contain),
 		))
 		rets = append(rets, ret)
 	}
+	add := func(param []ssa.Value) {
+		if len(param) <= start {
+			return
+		}
+		if contain {
+			for i := start; i < len(param); i++ {
+				value := param[i]
+				addvalue(value)
+			}
+		} else {
+			value := param[start]
+			addvalue(value)
+		}
+	}
 	v.GetCalledBy().ForEach(func(c *Value) {
 		if c, ok := ssa.ToCall(c.node); ok {
-			if len(c.Args) > i {
-				add(c.Args[i])
+			if len(c.Args) > start {
+				add(c.Args)
 			}
 		}
 	})
 	if f, ok := ssa.ToFunction(v.node); ok {
-		if len(f.Params) > i {
-			add(f.Params[i])
+		if len(f.Params) > start {
+			add(f.Params)
 		}
 	}
 	return rets, nil
