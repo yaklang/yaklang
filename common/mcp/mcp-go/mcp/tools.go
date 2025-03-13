@@ -184,6 +184,12 @@ func Enum(values ...any) PropertyOption {
 	}
 }
 
+func EnumString(values ...string) PropertyOption {
+	return func(schema map[string]any) {
+		schema["enum"] = values
+	}
+}
+
 // MaxLength sets the maximum length for a string property.
 // The string value must not exceed this length.
 func MaxLength(max int) PropertyOption {
