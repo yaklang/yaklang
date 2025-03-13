@@ -427,9 +427,6 @@ func init() {
 		unEscapeKey := template2java.JAVA_UNESCAPE_OUTPUT_PRINT
 
 		checkUnEscape := func(value *Value) bool {
-			if !value.IsCall() {
-
-			}
 			t := value.GetType()
 			if t == nil || t.t == nil {
 				return false
@@ -438,7 +435,6 @@ func init() {
 			if len(name) == 0 {
 				return false
 			}
-
 			for _, n := range name {
 				if strings.Contains(n, flag) {
 					return true
@@ -449,18 +445,13 @@ func init() {
 
 		getCalledAndCheck := func(value *Value) []sfvm.ValueOperator {
 			var vals []sfvm.ValueOperator
-			if value.IsCall() {
-				if checkUnEscape(value) {
-					vals = append(vals, value.GetCallArgs())
-				}
-			} else {
-				call2fun := value.GetCalledBy()
-				call2fun.ForEach(func(call *Value) {
-					if checkUnEscape(call) {
-						res = append(res, call.GetCallArgs())
-					}
-				})
+			if !checkUnEscape(value) {
+				return vals
 			}
+			callInst := value.GetCalledBy()
+			callInst.ForEach(func(call *Value) {
+				vals = append(vals, call)
+			})
 			return vals
 		}
 
@@ -468,7 +459,6 @@ func init() {
 		if !match || err != nil {
 			return false, nil, utils.Errorf("no value found")
 		}
-
 		match, printValue, err := outValue.GlobMatch(frame.GetContext(), ssadb.KeyMatch, unEscapeKey)
 		if !match || err != nil {
 			return false, nil, utils.Errorf("no value found")
