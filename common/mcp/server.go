@@ -7,7 +7,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
-	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -50,7 +49,7 @@ func (s *MCPServer) ServeSSE(addr, baseURL string) (err error) {
 	s.sseServer = sseServer
 	s.sseMu.Unlock()
 
-	s.grpcClient, err = yakgrpc.NewLocalClient(true)
+	s.grpcClient, err = NewLocalClient(true)
 	if err != nil {
 		return err
 	}
@@ -58,7 +57,7 @@ func (s *MCPServer) ServeSSE(addr, baseURL string) (err error) {
 }
 
 func (s *MCPServer) ServeStdio() (err error) {
-	s.grpcClient, err = yakgrpc.NewLocalClient(true)
+	s.grpcClient, err = NewLocalClient(true)
 	if err != nil {
 		return err
 	}
