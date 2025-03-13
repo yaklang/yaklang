@@ -26,20 +26,6 @@ func (y *SyntaxFlowVisitor) EmitExitStatement(c *SFI) {
 	})
 }
 
-func (y *SyntaxFlowVisitor) EmitFilterExprEnter() *SFI {
-	code := &SFI{OpCode: OpFilterExprEnter}
-	y.codes = append(y.codes, code)
-	return code
-}
-
-func (y *SyntaxFlowVisitor) EmitFilterExprExit(c *SFI) {
-	idx := len(y.codes)
-	c.UnaryInt = idx
-	y.codes = append(y.codes, &SFI{
-		OpCode:   OpFilterExprExit,
-		UnaryInt: idx,
-	})
-}
 func (y *SyntaxFlowVisitor) EmitNewRef(i string) {
 	y.codes = append(y.codes, &SFI{
 		OpCode:   OpNewRef,

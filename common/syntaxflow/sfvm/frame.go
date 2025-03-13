@@ -47,8 +47,7 @@ type SFFrame struct {
 	iterStack      *utils.Stack[*IterContext]  // for loop
 
 	// when cache err skip  statement/expr
-	statementStack  *utils.Stack[*errorSkipContext]
-	filterExprStack *utils.Stack[*errorSkipContext]
+	errorSkipStack *utils.Stack[*errorSkipContext]
 
 	Text   string
 	Codes  []*SFI
@@ -195,8 +194,7 @@ func (s *SFFrame) Flush() {
 		s.result = NewSFResult(s.rule, s.config) // TODO: This code affects the reentrancy of the function
 	}
 	s.stack = utils.NewStack[ValueOperator]()
-	s.statementStack = utils.NewStack[*errorSkipContext]()
-	s.filterExprStack = utils.NewStack[*errorSkipContext]()
+	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
 	s.iterStack = utils.NewStack[*IterContext]()
 	s.idx = 0
@@ -270,38 +268,22 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 
 		i := s.Codes[s.idx]
 
-		s.debugLog(i.String())
+		s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
 
 		switch i.OpCode {
-		case OpFilterExprEnter:
-			s.filterExprStack.Push(&errorSkipContext{
-				start:      s.idx,
-				end:        i.UnaryInt,
-				stackDepth: s.stack.Len(),
-			})
-		case OpFilterExprExit:
-			checkLen := s.filterExprStack.Pop().stackDepth
-			if s.stack.Len() != checkLen {
-				err := utils.Errorf("filter expr stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
-				log.Errorf("%v", err)
-				if s.config.debug {
-					return err
-				}
-				s.stack.PopN(s.stack.Len() - checkLen)
-			}
 		case OpCheckStackTop:
 			if s.stack.Len() == 0 {
 				s.debugSubLog(">> stack top is nil (push input)")
 				s.stack.Push(feedValue)
 			}
 		case OpEnterStatement:
-			s.statementStack.Push(&errorSkipContext{
+			s.errorSkipStack.Push(&errorSkipContext{
 				start:      s.idx,
 				end:        i.UnaryInt,
 				stackDepth: s.stack.Len(),
 			})
 		case OpExitStatement:
-			checkLen := s.statementStack.Pop().stackDepth
+			checkLen := s.errorSkipStack.Pop().stackDepth
 			if s.stack.Len() != checkLen {
 				err := utils.Errorf("filter statement stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
 				log.Errorf("%v", err)
@@ -350,15 +332,12 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 			}
 		default:
 			if err := s.execStatement(i); err != nil {
+				s.debugSubLog("execStatement error: %v", err)
 				if errors.Is(err, CriticalError) {
 					return err
 				}
 				// go to expression end
-				if result := s.filterExprStack.Peek(); result != nil {
-					s.idx = result.end
-					continue
-				}
-				if result := s.statementStack.Peek(); result != nil {
+				if result := s.errorSkipStack.Peek(); result != nil {
 					s.idx = result.end
 					continue
 				}
@@ -699,10 +678,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		results, err := value.GetCallActualParams(i.UnaryInt, i.UnaryBool)
 		if err != nil {
-			err = utils.Errorf("get calling argument failed: %s", err)
+			return utils.Errorf("get calling argument failed: %s", err)
 		}
 		callLen := ValuesLen(results)
-		s.debugSubLog("- get argument: %v", results.String())
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
 
@@ -1193,9 +1171,8 @@ func (s *SFFrame) debugLog(i string, item ...any) {
 		return
 	}
 
-	filterStackLen := s.statementStack.Len()
-
-	prefix := strings.Repeat(" ", filterStackLen)
+	filterStackLen := s.errorSkipStack.Len()
+	prefix := strings.Repeat("\t", filterStackLen)
 	prefix = "sf" + fmt.Sprintf("%4d", s.idx) + "| " + prefix
 	for _, line := range strings.Split(fmt.Sprintf(i, item...), "\n") {
 		fmt.Print(prefix + line + "\n")

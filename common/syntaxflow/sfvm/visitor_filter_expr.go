@@ -24,9 +24,9 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		return err
 	}
 
-	enter := y.EmitFilterExprEnter()
+	enter := y.EmitEnterStatement()
 	defer func() {
-		y.EmitFilterExprExit(enter)
+		y.EmitExitStatement(enter)
 	}()
 	if raw := i.FilterItemFirst(); raw != nil {
 		y.VisitFilterItemFirst(raw)

@@ -344,7 +344,7 @@ func CheckSyntaxFlowWithSFOption(t *testing.T, code string, sf string, wants map
 func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaapi.Option, sfOpt []ssaapi.QueryOption) {
 	Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
-		sfOpt = append(sfOpt, ssaapi.QueryWithEnableDebug(false))
+		sfOpt = append(sfOpt, ssaapi.QueryWithEnableDebug(true))
 		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
 		require.Nil(t, err)
 		require.NotNil(t, results)
