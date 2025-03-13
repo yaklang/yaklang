@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/dlclark/regexp2"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+)
+
+var (
+	ErrorStop = errors.New("stop")
 )
 
 type MemEditor struct {
@@ -443,58 +447,56 @@ func (ve *MemEditor) IsValidPosition(line, col int) bool {
 func (ve *MemEditor) FindStringRange(feature string, callback func(RangeIf) error) error {
 	startIndex := 0
 	for {
-		index := strings.Index(
-			ve.safeSourceCode.SliceToEnd(startIndex),
-			feature,
-		)
+		featureRunes := []rune(feature)
+		featureLen := len(featureRunes)
+		index := ve.safeSourceCode.SafeSliceToEnd(startIndex).Index(featureRunes)
 		if index == -1 {
 			break // No more matches found
 		}
 
 		absoluteIndex := startIndex + index
 		startPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex)
-		endPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex + len(feature))
+		endPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex + featureLen)
 		err := callback(ve.GetRangeByPosition(startPos, endPos))
 		if err != nil {
 			return err // Return error if callback fails
 		}
 
-		startIndex = absoluteIndex + len(feature) // Move past this feature occurrence
+		startIndex = absoluteIndex + featureLen // Move past this feature occurrence
 	}
 	return nil
 }
 
 func (ve *MemEditor) FindStringRangeIndexFirst(startIndex int, feature string, callback func(RangeIf)) (end int, ok bool) {
-	index := strings.Index(ve.safeSourceCode.SliceToEnd(startIndex), feature)
-	if index == -1 {
-		return startIndex, false
+	var r RangeIf
+	ve.FindStringRange(feature, func(ri RangeIf) error {
+		r = ri
+		ok = true
+		callback(ri)
+		return ErrorStop
+	})
+	if !ok {
+		return -1, false
 	}
-
-	absoluteIndex := startIndex + index
-	startPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex)
-	endPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex + len(feature))
-	callback(ve.GetRangeByPosition(startPos, endPos))
-	return startIndex + len(feature), true
+	return r.GetEndOffset(), true
 }
 
 func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(RangeIf) error) error {
-	pattern, err := regexp.Compile(patternStr)
+	pattern, err := regexp2.Compile(patternStr, regexp2.None)
 	if err != nil {
 		return err // 处理正则表达式编译错误
 	}
-
-	text := ve.safeSourceCode.String()
-	offset := 0 // 维护当前的搜索起点，逐步推进
+	match, err := pattern.FindRunesMatch(ve.safeSourceCode.Runes())
+	if err != nil {
+		return err
+	}
 
 	for {
-		matches := pattern.FindStringIndex(text[offset:])
-		if matches == nil {
-			break // 如果没有找到匹配项，退出循环
+		if match == nil {
+			break
 		}
-
-		// 调整matches的索引，使其相对于整个文本
-		matchStart := offset + matches[0]
-		matchEnd := offset + matches[1]
+		matchStart := match.Index
+		matchEnd := matchStart + match.Length
 
 		startPos, _ := ve.GetPositionByOffsetWithError(matchStart)
 		endPos, _ := ve.GetPositionByOffsetWithError(matchEnd)
@@ -502,8 +504,10 @@ func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(RangeIf) e
 		if err != nil {
 			return err // 如果回调函数出错，提前退出
 		}
-
-		offset = matchEnd // 更新搜索起点，推进到当前找到的匹配项之后
+		match, err = pattern.FindNextMatch(match)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
