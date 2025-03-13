@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -188,7 +187,7 @@ func handleQueryPayload(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		client, ok := s.grpcClient.(*yakgrpc.Client)
+		client, ok := s.grpcClient.(IGetProfileDatabase)
 		if !ok {
 			return nil, utils.Wrap(err, "BUG: local server is nil")
 		}
@@ -394,7 +393,7 @@ func handleUpdateOnePayload(s *MCPServer) server.ToolHandlerFunc {
 		if req.Data == nil {
 			return nil, utils.Error("argument:data is empty")
 		}
-		client, ok := s.grpcClient.(*yakgrpc.Client)
+		client, ok := s.grpcClient.(IGetProfileDatabase)
 		if !ok {
 			return nil, utils.Wrap(err, "BUG: local server is nil")
 		}
@@ -424,7 +423,7 @@ func handleUpdatePayloadFileContent(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		client, ok := s.grpcClient.(*yakgrpc.Client)
+		client, ok := s.grpcClient.(IGetProfileDatabase)
 		if !ok {
 			return nil, utils.Wrap(err, "BUG: local server is nil")
 		}
