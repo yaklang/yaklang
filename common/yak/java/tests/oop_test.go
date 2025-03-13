@@ -11,6 +11,119 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
+func TestJava_Class(t *testing.T) {
+	t.Run("test class value", func(t *testing.T) {
+		code := `
+class A {
+    int a = 0;
+
+	A(int a){
+		this.a = a;
+	}
+}
+
+class B {
+    A A;
+
+	B(A a){
+		this.A = a;
+	}
+}
+
+public class C {
+    public static void main(String[] args) {
+		A a = new A(1);
+        B b = new B(a);
+		b.A.a = 2; 
+		println(a.a); 
+		println(b.A.a);
+		a.a = 3; 
+		println(a.a); 
+		println(b.A.a);
+    }
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			"2", "2", "3", "3",
+		}, t)
+	})
+
+	t.Run("test class muti value", func(t *testing.T) {
+		code := `
+class A {
+    int a = 0;
+
+	A(int a){
+		this.a = a;
+	}
+}
+
+class B {
+    A A;
+
+	B(A a){
+		this.A = a;
+	}
+}
+
+public class C {
+    public static void main(String[] args) {
+ 		A a = new A(1);
+        B b1 = new B(a);
+		B b2 = new B(a);
+
+		b1.A.a = 2; 
+        println(a.a); 
+        println(b1.A.a);
+		println(b2.A.a);
+        a.a = 3; 
+        println(a.a); 
+        println(b1.A.a);
+		println(b2.A.a);
+    }
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			"2", "2", "2", "3", "3", "3",
+		}, t)
+	})
+
+	// todo: phi pointer
+	t.Run("test class if value", func(t *testing.T) {
+		t.Skip()
+		code := `
+class B {
+    A A;
+
+	B(A a){
+		this.A = a;
+	}
+}
+
+public class C {
+    public static void main(String[] args) {
+ 		A a = new A(1);
+        B b = new B(a);
+
+        if (a.a == 2) {
+            B b = new B(a); 
+        }
+
+		b.A.a = 2; 
+        int o1 = a.a; 
+        int o2 = b.A.a;
+        a.a = 3; 
+        int o3 = a.a; 
+        int o4 = b.A.a;
+    }
+}
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			"",
+		}, t)
+	})
+}
+
 func TestJava_Extend_Class(t *testing.T) {
 	t.Run("test extend constant ", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`

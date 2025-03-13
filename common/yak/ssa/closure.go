@@ -206,6 +206,21 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			se.Variable = val.GetLastVariable()
 			se.BindVariable = val.GetLastVariable()
 			variable = builder.CreateVariable(se.Name)
+		case CallMemberCall:
+			obj, ok := se.Get(c)
+			if !ok {
+				continue
+			}
+
+			if p, ok := ToParameter(se.Modify); ok {
+				if p.FormalParameterIndex < len(c.Args) {
+					Point(se.Modify, c.Args[p.FormalParameterIndex])
+				}
+			}
+			variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
+			if se.BindVariable != nil {
+				variable.SetCaptured(se.BindVariable)
+			}
 		default:
 			obj, ok := se.Get(c)
 			if !ok {

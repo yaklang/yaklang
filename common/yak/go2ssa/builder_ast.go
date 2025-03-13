@@ -71,6 +71,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 			init := lib.GetAndCreateFunction(pkgNameCurrent, "@init")
 			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
+			init.SetRange(b.CurrentRange)
 			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "@init")
 
 			if builder != nil {
@@ -124,7 +125,10 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 			if i, ok := s.(*ssa.InterfaceType); ok {
 				store := b.StoreFunctionBuilder()
-				fun, _ := ssa.ToFunction(bp.Constructor)
+				fun, ok := ssa.ToFunction(bp.Constructor)
+				if !ok {
+					continue
+				}
 				fun.AddLazyBuilder(func() {
 					switchHandler := b.SwitchFunctionBuilder(store)
 					defer func() {
