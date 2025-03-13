@@ -143,10 +143,10 @@ func TestOpcode(t *testing.T) {
 
 	// check expr enter
 	t.Run("enter expr with variable", func(t *testing.T) {
-		check(t, `$a.b`, sfvm.OpFilterExprEnter)
+		check(t, `$a.b`, sfvm.OpEnterStatement)
 	})
 	t.Run("enter expr with expr", func(t *testing.T) {
-		check(t, `a.b`, sfvm.OpFilterExprEnter)
+		check(t, `a.b`, sfvm.OpExitStatement)
 	})
 
 	// function call

@@ -124,11 +124,11 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 			panic("BUG: ref filter expr1 is nil")
 		}
 
-		enter := y.EmitFilterExprEnter()
+		enter := y.EmitEnterStatement()
 		for _, filter := range i.AllFilterItem() {
 			y.VisitFilterItem(filter)
 		}
-		y.EmitFilterExprExit(enter)
+		y.EmitExitStatement(enter)
 
 		// collect result for variable or save to '_' variable
 		if up := i.RefVariable(1); up != nil {
