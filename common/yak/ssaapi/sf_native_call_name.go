@@ -6,6 +6,33 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func getValueNames(val *Value) []string {
+	var names = []string{
+		val.GetName(),
+		val.GetVerboseName(),
+		val.ShortString(),
+		val.GetSSAValue().GetVerboseName(),
+		val.GetSSAValue().GetShortVerboseName(),
+	}
+
+	if val.IsMember() {
+		constVal, ok := ssa.ToConst(val.GetKey().GetSSAValue())
+		if ok {
+			names = append(names, constVal.VarString())
+		}
+	}
+
+	if udef, ok := ssa.ToFunction(val.GetSSAValue()); ok {
+		names = append(names, udef.GetShortVerboseName())
+		names = append(names, udef.GetMethodName())
+	}
+	if call, b := ssa.ToCall(val.GetSSAValue()); b {
+		names = append(names, call.Method.GetName())
+		//todo: args?
+	}
+	return names
+}
+
 var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 	var vals []sfvm.ValueOperator
 	v.Recursive(func(operator sfvm.ValueOperator) error {
@@ -13,31 +40,7 @@ var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 		if !ok {
 			return nil
 		}
-
-		var names = []string{
-			val.GetName(),
-			val.GetVerboseName(),
-			val.ShortString(),
-			val.GetSSAValue().GetVerboseName(),
-			val.GetSSAValue().GetShortVerboseName(),
-		}
-
-		if val.IsMember() {
-			constVal, ok := ssa.ToConst(val.GetKey().GetSSAValue())
-			if ok {
-				names = append(names, constVal.VarString())
-			}
-		}
-
-		if udef, ok := ssa.ToFunction(val.GetSSAValue()); ok {
-			names = append(names, udef.GetShortVerboseName())
-			names = append(names, udef.GetMethodName())
-		}
-		if call, b := ssa.ToCall(val.GetSSAValue()); b {
-			names = append(names, call.Method.GetName())
-			//todo: args?
-		}
-
+		names := getValueNames(val)
 		filter := make(map[string]struct{})
 		for _, name := range names {
 			if name == "" {
