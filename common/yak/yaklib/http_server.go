@@ -99,13 +99,21 @@ func _httpServerOptRouteHandler(route string, handler http.HandlerFunc) HttpServ
 		if c.routeHandler == nil {
 			c.routeHandler = make(map[string]http.HandlerFunc)
 		}
-		log.Infof("add route handler: %s", route)
-		if strings.HasPrefix(route, "/") {
-			c.addGlobHandler(route)
-			c.routeHandler[route] = handler
-		} else {
-			c.addGlobHandler("/" + route)
-			c.routeHandler["/"+route] = handler
+
+		var routes = make([]string, 0, 2)
+		routes = append(routes, route)
+		if !strings.HasSuffix(route, "/") {
+			routes = append(routes, route+"/")
+		}
+		for _, routeHandled := range routes {
+			log.Infof("add route handler: %s", routeHandled)
+			if strings.HasPrefix(routeHandled, "/") {
+				c.addGlobHandler(routeHandled)
+				c.routeHandler[routeHandled] = handler
+			} else {
+				c.addGlobHandler("/" + routeHandled)
+				c.routeHandler["/"+routeHandled] = handler
+			}
 		}
 	}
 }
@@ -133,9 +141,15 @@ func _httpServerOptCaptchaRoute(route string, timeoutSeconds float64, handler ht
 			c.captchaManager.SetErrorf(log.Errorf)
 			c.captchaManager.SetInfof(log.Infof)
 			c.captchaManager.SetWarningf(log.Warnf)
-			_httpServerOptRouteHandler("/fastgocaptcha/", func(w http.ResponseWriter, r *http.Request) {
-				c.captchaManager.Middleware(nil).ServeHTTP(w, r)
-			})(c)
+			for _, i := range []string{
+				"/fastgocaptcha/resources/*",
+				"/fastgocaptcha/*",
+				"/fastgocaptcha/session/*",
+			} {
+				_httpServerOptRouteHandler(i, func(w http.ResponseWriter, r *http.Request) {
+					c.captchaManager.Middleware(nil).ServeHTTP(w, r)
+				})(c)
+			}
 		}
 		timeout := time.Second * time.Duration(timeoutSeconds)
 		if timeoutSeconds <= 0 {
@@ -143,7 +157,10 @@ func _httpServerOptCaptchaRoute(route string, timeoutSeconds float64, handler ht
 			timeout = 30 * time.Second
 		}
 		log.Infof("add protect matcher with timeout: %s, timeout: %s", route, timeout)
-		c.captchaManager.AddProtectMatcherWithTimeout(route, timeout)
+		err := c.captchaManager.AddProtectMatcherWithTimeout(route, timeout)
+		if err != nil {
+			log.Errorf("add captcha protect matcher failed: %s", err)
+		}
 		_httpServerOptRouteHandler(route, func(w http.ResponseWriter, r *http.Request) {
 			log.Infof("captcha middleware hit: %s", route)
 			c.captchaManager.Middleware(handler).ServeHTTP(w, r)
@@ -301,10 +318,6 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 			for route, handler := range config.routeHandler {
 				if route == request.URL.Path {
 					log.Infof("route handler hit exactly: %s", route)
-					handler.ServeHTTP(writer, request)
-					return
-				} else if strings.HasPrefix(request.URL.Path, route) {
-					log.Infof("route handler hit prefix: %s", route)
 					handler.ServeHTTP(writer, request)
 					return
 				} else if globHandler, ok := config.getGlobHandler(route); ok {
