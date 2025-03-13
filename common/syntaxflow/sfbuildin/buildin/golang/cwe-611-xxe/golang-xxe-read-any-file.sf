@@ -16,7 +16,7 @@ TEXT
 $sink.Strict?{!have: 'false'} as $high
 
 alert $high for {
-    title: 'filedelele missing permission check',
+    title: 'xxe read any file check',
     title_zh: '检测到文件路径未授权',
     type: 'vuln',
     level: 'high',

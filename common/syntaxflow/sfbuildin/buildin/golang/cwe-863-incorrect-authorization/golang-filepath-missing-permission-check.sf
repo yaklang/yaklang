@@ -11,9 +11,15 @@ desc(
 TEXT
 )
 
+<include('golang-file-path')> as $path;
 <include('golang-os-sink')> as $sink;
 
-$sink?{!have: 'Parameter'} as $low;
+strings.HasPrefix(* #-> as $check);
+$path.Clean(* #-> as $check);
+$path.IsAbs(* #-> as $check);
+
+$sink #{include: `$check`}-> as $safe;
+$sink #{exclude: `$safe`}-> as $low;
 
 alert $low for {
     title: 'filedelele missing permission check',
@@ -35,28 +41,12 @@ import (
 )
 
 func deleteFile(w http.ResponseWriter, r *http.Request) {
-    fileID := r.URL.Query().Get("file_id")
+    filePath := r.URL.Query().Get("file_id")
     user := r.Header.Get("User")
-
-    // 检查用户是否有删除权限
-    if !hasPermission(user, "delete_file") {
-        fmt.Fprintf(w, "Permission denied")
-        return
-    }
-
-    // 获取文件路径（假设 fileID 是文件名）
-    filePath := getFilePathByID(fileID)
 
     // 检查文件是否存在
     if _, err := os.Stat(filePath); os.IsNotExist(err) {
         fmt.Fprintf(w, "File not found")
-        return
-    }
-
-    // 检查文件所有者是否为当前用户
-    fileOwner := getFileOwner(filePath)
-    if fileOwner != user {
-        fmt.Fprintf(w, "Permission denied")
         return
     }
 
@@ -70,24 +60,13 @@ func deleteFile(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "File deleted successfully")
 }
 
-func hasPermission(user string, permission string) bool {
-    // 模拟检查用户权限
-    return user == "user1" && permission == "delete_file"
-}
-
-func getFilePathByID(fileID string) string {
-    // 假设文件存储在 /files 目录下，fileID 是文件名
-    return "/files/" + fileID
-}
-
-func getFileOwner(filePath string) string {
-    // 模拟获取文件所有者（这里假设文件所有者为 user1）
-    return "user1"
-}
-
 func main() {
     http.HandleFunc("/delete", deleteFile)
     http.ListenAndServe(":8080", nil)
 }
-UNSAFE
+UNSAFE,    
+    'safe://main.go': <<<SAFE
+
+
+SAFE
 )

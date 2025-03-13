@@ -11,12 +11,11 @@ desc(
 TEXT
 )
 
-<include('golang-ftp-sink')> as $sink;
+<include('golang-fmt-print')> as $sink;
 
-*.List() --> as $target;
-*.CurrentDir() --> as $target;
-*.SystemType() --> as $target;
-$target #{until: `* & $sink`}-> as $low;
+$sink.List() as $low;
+$sink.CurrentDir() as $low;
+$sink.SystemType() as $low;
 
 alert $low for {
     title: 'FTP Information Exposure',
@@ -55,13 +54,13 @@ func main() {
     }
     defer conn.Logout()
 
-    // 列出文件（防止目录结构暴露）
+    // 列出文件（目录结构暴露）
     listFiles(conn, "/var/www/uploads")
 
-    // 获取当前目录（防止路径泄露）
+    // 获取当前目录（路径泄露）
     getCurrentDir(conn)
 
-    // 获取系统类型（防止系统类型识别）
+    // 获取系统类型（系统类型识别）
     getSystemType(conn)
 }
 

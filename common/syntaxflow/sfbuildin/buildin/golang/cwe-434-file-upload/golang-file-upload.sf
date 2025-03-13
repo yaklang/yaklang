@@ -22,7 +22,7 @@ $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $high;
 
 alert $high for {
-    title: 'filedelele missing permission check',
+    title: 'file upload check',
     title_zh: '检测到文件路径未授权',
     type: 'vuln',
     level: 'high',

@@ -13,7 +13,7 @@ desc(
 TEXT
 )
 
-template?{<fullTypeName>?{have: 'html/template'}} as $template;
+<include('golang-template')> as $template;
 $template.New as $new;
 $new().Parse() -> as $param
 $param.Execute(* as $target) 

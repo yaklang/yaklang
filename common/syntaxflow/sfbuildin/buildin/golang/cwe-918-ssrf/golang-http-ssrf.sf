@@ -1,5 +1,5 @@
 desc(
-    title: "golang SSRF",
+    title: "golang SSRF(http)",
     type: audit,
     severity: high,
     desc: <<<TEXT
