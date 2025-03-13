@@ -1,0 +1,8 @@
+result = json.dumps({"a": 1})
+dump(result)
+assert string(result) == "{\n  \"a\": 1\n}" || string(result) == "{\r\n  \"a\": 1\r\n}"
+
+
+result = json.dumps({"a": 1}, json.withIndent("    "))
+dump(result)
+assert string(result) == "{\n    \"a\": 1\n}" || string(result) == "{\r\n    \"a\": 1\r\n}"
