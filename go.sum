@@ -636,6 +636,10 @@ github.com/yaklang/fastgocaptcha v1.0.0 h1:VKJloXPsj9p4Agnqj+VZ0DlHwtY87sNfH5fIT
 github.com/yaklang/fastgocaptcha v1.0.0/go.mod h1:8JokFE1Wakb8aCY3sRUqdGcm5N1F3O48X3743TPnI20=
 github.com/yaklang/fastgocaptcha v1.0.1 h1:DFEpoL2sRgF061ciRhDYdlmh50GxkL8tIb2nxLSv3o8=
 github.com/yaklang/fastgocaptcha v1.0.1/go.mod h1:8JokFE1Wakb8aCY3sRUqdGcm5N1F3O48X3743TPnI20=
+github.com/yaklang/fastgocaptcha v1.0.3 h1:0kbVe6IvwrkejW83XPcitqS6MVeJZ0hbn+uQEO20Q34=
+github.com/yaklang/fastgocaptcha v1.0.3/go.mod h1:8JokFE1Wakb8aCY3sRUqdGcm5N1F3O48X3743TPnI20=
+github.com/yaklang/fastgocaptcha v1.0.4 h1:oJDeXIKzImOxOcvXnUnf54XHTxBcTXuH2tF/Y8iux5Q=
+github.com/yaklang/fastgocaptcha v1.0.4/go.mod h1:8JokFE1Wakb8aCY3sRUqdGcm5N1F3O48X3743TPnI20=
 github.com/yaklang/pcap v1.0.5 h1:LiatV/vG+1uMzBB+gyNg2rxc5v/yrH4jzk8IsG+iSfE=
 github.com/yaklang/pcap v1.0.5/go.mod h1:JDglFyNaXnntS5KmdIVlhnZBAYFc0oEGPrmJlOI3MDg=
 github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d h1:splanxYIlg+5LfHAM6xpdFEAYOk8iySO56hMFq6uLyA=
