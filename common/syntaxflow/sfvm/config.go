@@ -8,7 +8,8 @@ import (
 
 func NewConfig(opts ...Option) *Config {
 	c := &Config{
-		ctx: context.Background(),
+		ctx:      context.Background(),
+		FailFast: true,
 	}
 	for _, opt := range opts {
 		opt(c)
