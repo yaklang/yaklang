@@ -11,16 +11,16 @@ TEXT
 
 <javaUnescapeOutput> as $sink;
 check $sink then "发现JSP中存在未转义的输出"
-HttpServletRequest?{opcode:param  && <typeName>?{have:'javax.servlet.http.HttpServletRequest'}} as $param;
-$sink #{
-    include: `<self> & $param`
-}-> as $req;
+<include("java-servlet-param")> as $source;
+<include('java-escape-method')> as $filter
 
-$req.getParameter<getCall> as $source;
-$req.getInputStream<getCall> as $source;
-$req.setAttribute(,,* as  $attribute) ;
-$attribute & $source as $res;
-alert $res for {
+$source<getCallee()><getObject()>as $req;
+$sink #{
+    include: `* & $req`,
+    include:`*...setAttribute(,* as $attribute)`,
+    exclude:`* <getCallee> & $filter`
+}-> as $result;
+alert $result for {
     message: "Find Java EE's XSS Vulnerability",
     type: vuln,
     level: high,
@@ -56,3 +56,99 @@ public class XSSVulnerableServlet extends HttpServlet {
 EOF,
 );
 
+
+desc(
+    alert_num:1,
+    lang: "java",
+    'file://web/jsp/messages/seemessages.jsp': <<<EOF
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@page import="java.util.Iterator" %>
+<%@page import="java.util.ArrayList" %>
+<%@page import="entity.Message" %>
+<%@page import="java.util.ArrayList" %>
+<html>
+<head>
+    <title>showmessages</title>
+</head>
+<body>
+<h2>Show Messages</h2>
+<table border=1 cellspacing="0">
+    <tr>
+        <th>留言人姓名</th>
+        <th>留言时间</th>
+        <th>留言标题</th>
+        <th>留言内容</th>
+    </tr>
+    <%
+        ArrayList<Message> all = new ArrayList();
+        all = (ArrayList) session.getAttribute("all_messages");
+        if (all != null) {
+            Iterator it = all.iterator();
+            while (it.hasNext()) {
+                Message ms = (Message) it.next();
+    %>
+    <tr>
+        <td><%= ms.getUsername() %>
+        </td>
+        <td><%= ms.getTime().toString() %>
+        </td>
+        <td><%= ms.getTitle() %>
+        </td>
+        <td><%= ms.getMessage() %>
+        </td>
+    </tr>
+    <%
+            }
+        }
+    %>
+</table>
+</body>
+</html>
+EOF,
+ 'file://web/servlet/ShowMessagesServlet.java': <<<EOF
+ package org.example;
+
+
+ import dao.MessagesDao;
+ import entity.Message;
+
+ import javax.servlet.ServletException;
+ import javax.servlet.annotation.WebServlet;
+ import javax.servlet.http.HttpServlet;
+ import javax.servlet.http.HttpServletRequest;
+ import javax.servlet.http.HttpServletResponse;
+ import javax.servlet.http.HttpSession;
+ import java.io.IOException;
+ import java.util.ArrayList;
+
+ @WebServlet(name = "ShowMessagesServlet")
+ public class ShowMessagesServlet extends HttpServlet {
+     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+         // 解决乱码
+         request.setCharacterEncoding("UTF-8");
+         response.setContentType("text/html;charset=UTF-8");
+
+         // 创建session Dao模型
+         HttpSession session = request.getSession();
+         MessagesDao messagesDao = new MessagesDao();
+
+         //获取留言板表中全部数据 装在list里面，并放到Session中
+         ArrayList<Message> all_messages = messagesDao.getAllMessages();
+         session.setAttribute("all_messages", all_messages);
+
+
+         //get path
+         String servletPath = request.getServletPath();
+
+         if(servletPath.equals("/ShowMessagesServlet")){
+             request.getRequestDispatcher("/jsp/messages/seemessages.jsp").forward(request, response);
+         }else if(servletPath.equals("/ShowMessagesServlet2")){
+             request.getRequestDispatcher("/jsp/messages/seemessages2.jsp").forward(request, response);
+         }
+     }
+     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+         doPost(request,response);
+     }
+ }
+EOF,
+);
