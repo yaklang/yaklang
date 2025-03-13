@@ -125,10 +125,10 @@ func (values Values) RegexpMatch(ctx context.Context, mod int, re string) (bool,
 	return len(newValue) > 0, newValue, nil
 }
 
-func (value Values) GetCallActualParams(index int) (sfvm.ValueOperator, error) {
+func (value Values) GetCallActualParams(index int, contain bool) (sfvm.ValueOperator, error) {
 	var ret Values
 	for _, i := range value {
-		vs, err := i.GetCallActualParams(index)
+		vs, err := i.GetCallActualParams(index, contain)
 		if err != nil {
 			continue
 		}
@@ -139,18 +139,6 @@ func (value Values) GetCallActualParams(index int) (sfvm.ValueOperator, error) {
 	} else {
 		return ret, nil
 	}
-}
-
-func (value Values) GetAllCallActualParams() (sfvm.ValueOperator, error) {
-	var ret Values
-	for _, i := range value {
-		vs, err := i.GetAllCallActualParams()
-		if err != nil {
-			continue
-		}
-		ret = append(ret, vs.(Values)...)
-	}
-	return ret, nil
 }
 
 func (value Values) GetMembersByString(key string) (sfvm.ValueOperator, error) {

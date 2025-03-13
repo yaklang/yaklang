@@ -56,7 +56,13 @@ func TestCallArgument_AsVariable(t *testing.T) {
 	t.Run("test first and second argument ", func(t *testing.T) {
 		check(t, `f(* as $a, * as $b)`, map[string][]string{
 			"a": {"1"},
-			"b": {"2"},
+			"b": {"2", "3"},
+		})
+	})
+
+	t.Run("test second and continue ", func(t *testing.T) {
+		check(t, `f(, * as $b)`, map[string][]string{
+			"b": {"2", "3"},
 		})
 	})
 

@@ -193,10 +193,7 @@ func (p *Program) Remove(...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported remove")
 }
 
-func (p *Program) GetAllCallActualParams() (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ssa.Program is not supported call actual params")
-}
-func (p *Program) GetCallActualParams(int) (sfvm.ValueOperator, error) {
+func (p *Program) GetCallActualParams(int, bool) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported call all actual params")
 }
 

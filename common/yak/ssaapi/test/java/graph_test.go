@@ -33,7 +33,7 @@ check $source then "XXE Attack" else "XXE Safe";
 			"fontcolor", "color",
 			"penwidth=\"3.0\"",
 			"call",
-			"all-actual-args",
+			"actual-args",
 			"search-exact:newInstance",
 			"search-exact:parse",
 			"search-glob:*Builder",
