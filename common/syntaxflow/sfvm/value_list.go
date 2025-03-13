@@ -173,21 +173,10 @@ func (v *ValueList) String() string {
 	return strings.Join(res, "; ")
 }
 
-func (v *ValueList) GetCallActualParams(i int) (ValueOperator, error) {
+func (v *ValueList) GetCallActualParams(i int, b bool) (ValueOperator, error) {
 	var res []ValueOperator
 	for _, v := range v.Values {
-		def, err := v.GetCallActualParams(i)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, def)
-	}
-	return NewValues(res), nil
-}
-func (v *ValueList) GetAllCallActualParams() (ValueOperator, error) {
-	var res []ValueOperator
-	for _, v := range v.Values {
-		def, err := v.GetAllCallActualParams()
+		def, err := v.GetCallActualParams(i, b)
 		if err != nil {
 			return nil, err
 		}
