@@ -6,7 +6,7 @@ import (
 )
 
 func TestFindStringRange(t *testing.T) {
-	editor := NewMemEditor("Hello, world! This is a test string. Welcome to the world of Go.")
+	editor := NewMemEditor("Hello, world! This is a test string. Welcome to the world of Go.你好世界,你好Golang")
 
 	tests := []struct {
 		name     string
@@ -15,6 +15,7 @@ func TestFindStringRange(t *testing.T) {
 		wantErr  bool
 	}{
 		{"Find existing string", "world", []string{"world", "world"}, false},
+		{"Find utf8 string", "你好", []string{"你好", "你好"}, false},
 		{"Find non-existing string", "nonexistent", nil, false},
 		{"Find at the beginning", "Hello", []string{"Hello"}, false},
 		{"Find at the end", "Go.", []string{"Go."}, false},
@@ -88,7 +89,7 @@ func TestFindRegexpRange_Edge(t *testing.T) {
 }
 
 func TestFindRegexpRange(t *testing.T) {
-	editor := NewMemEditor("Hello, world! 123 This is a test string. Welcome to the world of Go 456.")
+	editor := NewMemEditor("Hello, world! 123 This is a test string. Welcome to the world of Go 456.你好世界,你好中国")
 
 	tests := []struct {
 		name     string
@@ -97,6 +98,7 @@ func TestFindRegexpRange(t *testing.T) {
 		wantErr  bool
 	}{
 		{"Find simple regex", `\bworld\b`, []string{"world", "world"}, false},
+		{"Find utf8", `你好`, []string{"你好", "你好"}, false},
 		{"Find digits", `\d+`, []string{"123", "456"}, false},
 		{"Regex no match", `xyz`, nil, false},
 		{"Invalid regex pattern", `[`, nil, true},
