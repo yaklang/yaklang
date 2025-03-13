@@ -117,6 +117,7 @@ func NewNetStackVirtualMachineEntry(opts ...Option) (*NetStackVirtualMachineEntr
 
 	pcapEp.SetPCAPOutboundFilter(config.pcapOutboundFilter)
 	pcapEp.SetPCAPInboundFilter(config.pcapInboundFilter)
+	pcapEp.SetCapabilities(pcapEp.capabilities | config.pcapCapabilities)
 
 	mainNicID := stackIns.NextNICID()
 	tcpErr := stackIns.CreateNICWithOptions(mainNicID, pcapEp, stack.NICOptions{
