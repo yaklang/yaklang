@@ -72,6 +72,12 @@ func TestCallArgument_AsVariable(t *testing.T) {
 			"c": {"3"},
 		})
 	})
+	t.Run("test no function get argument", func(t *testing.T) {
+		check(t, `b(* as $output)`, map[string][]string{})
+	})
+	t.Run("test no index argument", func(t *testing.T) {
+		check(t, `b(,,,,* as $output)`, map[string][]string{})
+	})
 }
 
 func TestCall_SideEffect(t *testing.T) {

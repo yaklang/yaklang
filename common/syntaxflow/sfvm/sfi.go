@@ -125,10 +125,6 @@ const (
 
 	OpCheckStackTop // check the top of stack, if empty, push input into stack
 
-	// OpFilterExprEnter will assert the top of stack, make sure a input
-	OpFilterExprEnter
-	OpFilterExprExit
-
 	OpMergeRef
 	OpRemoveRef
 	OpIntersectionRef
@@ -208,7 +204,7 @@ func (s *SFI) String() string {
 	case OpGetCall:
 		return fmt.Sprintf(verboseLen+" %v", "getCall", s.UnaryStr)
 	case OpGetCallArgs:
-		return fmt.Sprintf(verboseLen+" %v withOther(%b)", "getCallArgs", s.UnaryInt, s.UnaryBool)
+		return fmt.Sprintf(verboseLen+" %v withOther(%v)", "getCallArgs", s.UnaryInt, s.UnaryBool)
 	case OpGetUsers:
 		return fmt.Sprintf(verboseLen+" %v", "users", s.UnaryStr)
 	case OpGetDefs:
@@ -282,10 +278,6 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" iter-latch to: %d", s.UnaryStr, s.Iter.Next)
 	case OpIterNext:
 		return fmt.Sprintf(verboseLen+" start: %v  latch:%v end: %v", "iter-next", s.Iter.Start, s.Iter.Latch, s.Iter.End)
-	case OpFilterExprEnter:
-		return fmt.Sprintf(verboseLen, " \\")
-	case OpFilterExprExit:
-		return fmt.Sprintf(verboseLen, " /")
 	case OpCheckStackTop:
 		return fmt.Sprintf(verboseLen+" %v", "check top", s.UnaryStr)
 	case OpMergeRef:
