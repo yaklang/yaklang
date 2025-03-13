@@ -1,12 +1,11 @@
 package yakit
 
 import (
-	"strings"
-
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -92,47 +91,30 @@ func SearchNoteContent(db *gorm.DB, keyword string, paging *ypb.Paging) (*bizhel
 
 	for _, note := range notes {
 		content := note.Content
-		contentLength := len(content)
-		startPos := 0
+		editor := memedit.NewMemEditor(content)
+		lineMap := make(map[int]struct{})
 
-		for {
-			index := strings.Index(content[startPos:], keyword)
-			if index == -1 {
-				break
+		editor.FindStringRange(keyword, func(ri memedit.RangeIf) error {
+			start := ri.GetStart()
+			startLine := start.GetLine()
+			line, err := editor.GetLine(startLine)
+			if err != nil {
+				line = ri.String()
 			}
-
-			// Adjust index to be relative to the entire string
-			actualIndex := startPos + index
-
-			// Find the beginning of the line
-			lineStart := strings.LastIndexByte(content[:actualIndex], '\n')
-			if lineStart == -1 {
-				lineStart = 0
+			if _, ok := lineMap[startLine]; !ok {
+				lineMap[startLine] = struct{}{}
 			} else {
-				lineStart++
+				return nil
 			}
-
-			// Find the end of the line
-			lineEnd := strings.IndexByte(content[actualIndex:], '\n')
-			if lineEnd == -1 {
-				lineEnd = contentLength
-			} else {
-				lineEnd += actualIndex
-			}
-
 			ret = append(ret, &ypb.NoteContent{
 				Note:        note.ToGRPCModel(),
-				Index:       uint64(actualIndex),
-				Length:      uint64(len(keyword)),
-				LineContent: content[lineStart:lineEnd],
+				Line:        uint64(startLine),
+				Index:       uint64(editor.GetOffsetByPosition(start)),
+				LineContent: line,
 			})
 
-			// Move the search position forward to find the next occurrence
-			startPos = lineEnd
-			if startPos >= contentLength {
-				break
-			}
-		}
+			return nil
+		})
 	}
 
 	return pag, ret, db.Error
