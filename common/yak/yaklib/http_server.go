@@ -317,11 +317,11 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 		if config.routeHandler != nil {
 			for route, handler := range config.routeHandler {
 				if route == request.URL.Path {
-					log.Infof("route handler hit exactly: %s", route)
+					//log.Infof("route handler hit exactly: %s", route)
 					handler.ServeHTTP(writer, request)
 					return
 				} else if globHandler, ok := config.getGlobHandler(route); ok {
-					log.Infof("route handler hit glob: %s", route)
+					//log.Infof("route handler hit glob: %s", route)
 					if globHandler.Match(request.URL.Path) {
 						handler.ServeHTTP(writer, request)
 						return
