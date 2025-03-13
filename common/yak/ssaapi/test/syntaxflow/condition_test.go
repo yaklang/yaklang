@@ -1,8 +1,9 @@
 package syntaxflow
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
@@ -214,23 +215,23 @@ $target?{have: abc} as $output
 b* as $target
 $target?{have: anc,*123} as $output
 `, map[string][]string{
-			"output": []string{`"anc123"`},
+			"output": {`"anc123"`},
 		})
 	})
 	t.Run("test exact and regexp", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 b* as $target
-$target?{have: anc,/[0-9]+$/} as $output
+$target?{have: anc,/[0-9]+anc$/} as $output
 `, map[string][]string{
-			"output": {`"anc123"`},
+			"output": {`"anc1anc"`},
 		}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
 	t.Run("test global and regex", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 b* as $target
-$target?{have: anc*,/[0-9]+$/} as $output
+$target?{have: anc*,/[0-9]+anc$/} as $output
 `, map[string][]string{
-			"output": {`"anc123"`},
+			"output": {`"anc1anc"`},
 		})
 	})
 }
