@@ -3,9 +3,9 @@ package ssaapi
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"golang.org/x/exp/slices"
 	"regexp"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/samber/lo"
 
@@ -13,6 +13,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -97,8 +98,10 @@ func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator,
 	if v == nil || items == nil {
 		return nil, []bool{false}
 	}
-	text := yakunquote.TryUnquote(v.String())
-	return nil, []bool{items.Matches(text)}
+
+	names := getValueNames(v)
+	names = append(names, yakunquote.TryUnquote(v.String()))
+	return nil, []bool{items.Matches(names...)}
 }
 
 func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
