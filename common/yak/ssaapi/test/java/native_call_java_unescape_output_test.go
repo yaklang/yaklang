@@ -77,15 +77,81 @@ $sink #{
 	include:<<<EOF
 <self> & $source
 EOF
-}-> as  $request;
+}-> as $request;
 $request.setAttribute(,,* as $res)
 `
 			vals, err := prog.SyntaxFlowWithError(rule)
 			require.NoError(t, err)
 			require.NotNil(t, vals)
+			vals.Show()
 
 			res := vals.GetValues("res")
 			require.Contains(t, res.String(), "ParameterMember-parameter[1].getParameter(Parameter-request,\"input\")")
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("test unescape out", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("/jsp/messages/seemessages.jsp", `
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@page import="java.util.Iterator" %>
+<%@page import="java.util.ArrayList" %>
+<%@page import="entity.Message" %>
+<%@page import="java.util.ArrayList" %>
+<html>
+<head>
+    <title>showmessages</title>
+</head>
+<body>
+<h2>Show Messages</h2>
+<table border=1 cellspacing="0">
+    <tr>
+        <th>留言人姓名</th>
+        <th>留言时间</th>
+        <th>留言标题</th>
+        <th>留言内容</th>
+    </tr>
+    <%
+        ArrayList<Message> all = new ArrayList();
+        all = (ArrayList) session.getAttribute("all_messages");
+        if (all != null) {
+            Iterator it = all.iterator();
+            while (it.hasNext()) {
+                Message ms = (Message) it.next();
+    %>
+    <tr>
+        <td><%= ms.getUsername() %>
+        </td>
+        <td><%= ms.getTime().toString() %>
+        </td>
+        <td><%= ms.getTitle() %>
+        </td>
+        <td><%= ms.getMessage() %>
+        </td>
+    </tr>
+    <%
+            }
+        }
+    %>
+</table>
+</body>
+</html>
+`)
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			programs.Show()
+			rule := `
+<javaUnescapeOutput> as $sink;
+`
+			result, err := programs.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			res := result.GetValues("sink")
+			res.Show()
+			require.NotNil(t, res)
+			require.Contains(t, res.String(), "getUsername")
+			require.Contains(t, res.String(), "getTitle")
+			require.Contains(t, res.String(), "getMessage")
+			require.Contains(t, res.String(), "toString")
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})
