@@ -564,7 +564,7 @@ func CreateOrSkipUpdateYakScriptByName(db *gorm.DB, scriptName string, i interfa
 
 	// 锁住更新步骤，太快容易整体被锁
 	yakScriptOpLock.Lock()
-	if db := db.Where("script_name = ?", scriptName).Where("skip_update = false").Assign(i).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
+	if db := db.Where("script_name = ?", scriptName).Where("COALESCE(skip_update, false) = false").Assign(i).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
 		yakScriptOpLock.Unlock()
 		return utils.Errorf("create/update YakScript failed: %s", db.Error)
 	}
