@@ -267,6 +267,22 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 		}
 
 		i := s.Codes[s.idx]
+		s.idx++
+
+		// special handler this exist opcode, because this shuold pop then debugLog it
+		if i.OpCode == OpExitStatement {
+			checkLen := s.errorSkipStack.Pop().stackDepth
+			s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
+			if s.stack.Len() != checkLen {
+				err := utils.Errorf("filter statement stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
+				s.debugSubLog("exit statement error:%v", err)
+				if s.config.debug {
+					return err
+				}
+				s.stack.PopN(s.stack.Len() - checkLen)
+			}
+			continue
+		}
 
 		s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
 
@@ -282,16 +298,7 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 				end:        i.UnaryInt,
 				stackDepth: s.stack.Len(),
 			})
-		case OpExitStatement:
-			checkLen := s.errorSkipStack.Pop().stackDepth
-			if s.stack.Len() != checkLen {
-				err := utils.Errorf("filter statement stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
-				log.Errorf("%v", err)
-				if s.config.debug {
-					return err
-				}
-				s.stack.PopN(s.stack.Len() - checkLen)
-			}
+
 		case OpCreateIter:
 			s.debugSubLog(">> peek")
 			vs := s.stack.Peek()
@@ -344,7 +351,6 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 				return err
 			}
 		}
-		s.idx++
 	}
 	return nil
 }
