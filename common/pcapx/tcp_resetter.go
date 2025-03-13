@@ -32,13 +32,16 @@ func buildRST(ether *layers.Ethernet, iplayer gopacket.SerializableLayer, trans 
 
 	// active reset
 	// seq: trans.ack
-	originACK := trans.Ack
-	originSeq := trans.Seq
-	trans.Seq = originACK
+	originACK := trans.Seq
+	originSeq := trans.Ack
+	trans.Seq = originACK + 1
 
 	reverseTrans := CopyTCP(trans)
 	reverseTrans.SrcPort, reverseTrans.DstPort = reverseTrans.DstPort, reverseTrans.SrcPort
-	reverseTrans.Seq = originSeq + 1
+	reverseTrans.Seq = originSeq
+
+	// trans.Seq += 100
+	// reverseTrans.Seq += 100
 	// -------------------------------------------------------------------------------------
 
 	switch ret := iplayer.(type) {

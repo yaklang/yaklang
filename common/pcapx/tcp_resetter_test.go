@@ -1,9 +1,12 @@
 package pcapx
 
 import (
+	"testing"
+
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 func TestTCPReSetter(t *testing.T) {
@@ -14,4 +17,30 @@ func TestTCPReSetter(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, 2, len(results))
+}
+func TestReset(t *testing.T) {
+	tmp := `38d57a2fbe7df84d8991af52080045000028000000004006f378c0a80304c0a803031f99eecf01a4a9f0bf19321d501010006d480000`
+	raw, _ := codec.DecodeHex(tmp)
+	packet := gopacket.NewPacket(raw, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		// default config for packet
+	})
+	ether := packet.LinkLayer()
+	ip := packet.NetworkLayer()
+	tcp := packet.TransportLayer()
+	// layerIp := ip.(*layers.IPv4)
+	// // layerIp.SrcIP = net.ParseIP("192.168.3.3")
+	// // layerIp.DstIP = net.ParseIP("192.168.3.4")
+	// layerTcp := tcp.(*layers.TCP)
+	// layerTcp.Seq = 2
+	// layerTcp.SrcPort = 2080
+	// layerTcp.DstPort = 56969
+	// forged := forgeReset(packet)
+	results, err := buildRST(ether.(*layers.Ethernet), ip.(*layers.IPv4), tcp.(*layers.TCP))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := results[0]
+	packetData := gopacket.NewSerializeBuffer()
+	gopacket.SerializeLayers(packetData, defaultGopacketSerializeOpt, result...)
+	InjectRaw(packetData.Bytes(), WithIface("en0"))
 }
