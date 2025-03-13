@@ -14,11 +14,10 @@ $req -{
   hook: `*.getParameter() as $indirectParam`
 }->;
 .getInputStream?{<getObject><typeName>?{have: *Http*Request*}}() as $getInputStream;
-$directParam + $indirectParam + $getInputStream as $output;
-
-
-
+.getSession?{<getObject><typeName>?{have: *Http*Request*}}() as $getSession;
+$directParam + $indirectParam + $getInputStream +$getSession as $output;
 alert $output;
+
 desc (
   lang: java,
   alert_num:1,
