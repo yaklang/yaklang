@@ -51,7 +51,7 @@ func hookSpringBootReturn(y *builder, value ssa.Value) {
 
 		fbObj.SetType(fBlueprint)
 		methodCall := y.ReadMemberCallMethod(fbObj, y.EmitConstInst(fbMethod))
-		jspArgs := []ssa.Value{y.GetUIModel(), y.EmitConstInstNil()}
+		jspArgs := []ssa.Value{y.GetUIModel(), y.GetUIModel()}
 		y.EmitCall(y.NewCall(methodCall, jspArgs))
 	}
 }
