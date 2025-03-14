@@ -1,5 +1,6 @@
 desc(
     title: 'file operator',
+    title_zh: "恶意文件操作",
     type: vul,
     level: low,
     risk:"path-traversal",

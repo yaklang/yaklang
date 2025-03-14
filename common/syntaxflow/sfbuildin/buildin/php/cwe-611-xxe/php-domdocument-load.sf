@@ -1,5 +1,6 @@
 desc(
     title: "Checking new DOMDocument().load with LIBXML_NOENT (XXE)",
+    title_zh: "xxe漏洞(DOMDocument)",
     type: vuln,
     level: high,
     risk: "xxe",

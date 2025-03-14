@@ -1,6 +1,6 @@
 desc(
     title: "Potential code execution risk",
-    title_zh: "可能存在代码执行风险",
+    title_zh: "代码执行",
     risk: "code-execution",
     type: vul,
     desc: <<<TEXT
