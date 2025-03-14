@@ -461,6 +461,32 @@ func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *h
 	return createHTTPFlowFromHTTP(isHttps, req, rsp, source, url, remoteAddr, opts...)
 }
 
+func UpdateHTTPFlowsTags(db *gorm.DB, flows []*schema.HTTPFlow) error {
+	if len(flows) == 0 {
+		return nil
+	}
+	// 构建CASE WHEN语句和参数
+	query := "UPDATE http_flows SET Tags = CASE id "
+	args := make([]interface{}, 0, len(flows)*2)
+
+	for _, flow := range flows {
+		query += "WHEN ? THEN ? "
+		args = append(args, flow.ID, flow.Tags)
+	}
+
+	query += "ELSE Tags END WHERE id IN (?);"
+	ids := make([]uint, len(flows))
+	for i, flow := range flows {
+		ids[i] = flow.ID
+	}
+	args = append(args, ids)
+	result := db.Exec(query, args...)
+	if err := result.Error; err != nil {
+		return err
+	}
+	return nil
+}
+
 // direct save
 func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) (finErr error) {
 	if i == nil {
@@ -1175,4 +1201,32 @@ func QueryHTTPFlowsProcessNames(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (
 		s := item.String
 		return s, s != "" && item.Valid
 	}), nil
+}
+
+func QueryHTTPFlowsByRegexRequest(db *gorm.DB, ctx context.Context, pattern string, effectiveUrl ...string) chan *schema.HTTPFlow {
+	db = db.Model(&schema.HTTPFlow{})
+	urlPattern := ""
+	if len(effectiveUrl) > 0 {
+		urlPattern = effectiveUrl[0]
+	}
+	if urlPattern == "" {
+		db = db.Where("request REGEXP ?", pattern)
+	} else {
+		db = db.Where("request REGEXP ? AND REGEXP url ?", pattern, urlPattern)
+	}
+	return YieldHTTPFlows(db, ctx)
+}
+
+func QueryHTTPFlowsByRegexResponse(db *gorm.DB, ctx context.Context, pattern string, effectiveUrl ...string) chan *schema.HTTPFlow {
+	db = db.Model(&schema.HTTPFlow{})
+	urlPattern := ""
+	if len(effectiveUrl) > 0 {
+		urlPattern = effectiveUrl[0]
+	}
+	if urlPattern == "" {
+		db = db.Where("response REGEXP ?", pattern)
+	} else {
+		db = db.Where("response REGEXP ? AND REGEXP url ?", pattern, urlPattern)
+	}
+	return YieldHTTPFlows(db, ctx)
 }

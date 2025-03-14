@@ -215,6 +215,10 @@ service Yak {
   rpc HTTPFlowsToOnline(HTTPFlowsToOnlineRequest) returns (Empty);
   rpc QueryHTTPFlowsProcessNames(QueryHTTPFlowRequest) returns (QueryHTTPFlowsProcessNamesResponse);
 
+  // 流量分析器
+  rpc AnalyzeHTTPFlow(AnalyzeHTTPFlowRequest) returns (AnalyzeHTTPFlowResponse);
+  // 查询分析后规则数据
+  rpc QueryAnalyzedHTTPFlowRule(QueryAnalyzedHTTPFlowRuleRequest) returns (QueryAnalyzedHTTPFlowRuleResponse);
   // 从一个 FuzzerRequest 中提取 Url
   rpc ExtractUrl(FuzzerRequest) returns (ExtractedUrl);
 
@@ -4849,6 +4853,31 @@ message HTTPFlowsToOnlineRequest {
   string Token = 1;
   string ProjectName = 2;
   string ProjectDescription = 3;
+}
+
+message AnalyzeHTTPFlowRequest{
+}
+
+message AnalyzeHTTPFlowResponse{
+  string AnalyzeId = 1;
+}
+
+message  QueryAnalyzedHTTPFlowRuleRequest{
+  repeated  string AnalyzeIds = 1;
+  Paging Pagination = 2;
+}
+
+message QueryAnalyzedHTTPFlowRuleResponse{
+  Paging Pagination = 1;
+  repeated HTTPFlowRuleData Data = 2;
+  int64 Total = 3;
+}
+
+// 规则数据
+message HTTPFlowRuleData{
+  repeated int64 HTTPFlowIds =1;
+  string RuleVerboseName = 2;
+  string Rule =3;
 }
 
 message ExportHTTPFlowsRequest {
