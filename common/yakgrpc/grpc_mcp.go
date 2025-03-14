@@ -46,7 +46,7 @@ func (s *Server) StartSSEMCP(req *ypb.StartMCPRequest, stream ypb.Yak_StartSSEMC
 	defer mcpServer.Close()
 
 	stream.Send(&ypb.StartMCPResponse{
-		URL: url,
+		URL: fmt.Sprintf("%s/sse", url),
 	})
 
 	for {
