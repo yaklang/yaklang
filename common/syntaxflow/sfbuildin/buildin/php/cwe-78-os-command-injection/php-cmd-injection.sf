@@ -1,6 +1,6 @@
 desc(
     title: "PHP Filtered Path Command Injection",
-    title_zh: "用户输入被过滤的命令注入代码（需额外检查过滤是否充分）",
+    title_zh: "命令注入",
     type: audit,
     level: mid,
     risk:'rce',

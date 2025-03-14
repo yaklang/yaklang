@@ -1,6 +1,6 @@
 desc(
    title: "FTP Information Exposure",
-   title_zh: "FTP信息泄露风险",
+   title_zh: "FTP信息泄露",
    risk: "information-exposure",
    type: vul,
    level: "low",
