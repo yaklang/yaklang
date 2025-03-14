@@ -9,8 +9,7 @@ TEXT
 )
 
 HttpClientUtils?{<fullTypeName>?{have: 'alibaba.druid'}} as $entry;
-$entry.get(*?{<fullTypeName>?{!have: 'alibaba.druid'}} as $output);
-$entry.post(*?{<fullTypeName>?{!have: 'alibaba.druid'}} as $output);
+$entry./get|post/(,* as $output,);
 alert $output;
 
 desc(
