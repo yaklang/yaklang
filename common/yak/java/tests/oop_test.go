@@ -15,7 +15,7 @@ func TestJava_Class(t *testing.T) {
 	t.Run("test class value", func(t *testing.T) {
 		code := `
 class A {
-    int a = 0;
+	int a = 0;
 
 	A(int a){
 		this.a = a;
@@ -23,7 +23,7 @@ class A {
 }
 
 class B {
-    A A;
+	A A;
 
 	B(A a){
 		this.A = a;
@@ -31,16 +31,16 @@ class B {
 }
 
 public class C {
-    public static void main(String[] args) {
+	public static void main(String[] args) {
 		A a = new A(1);
-        B b = new B(a);
+		B b = new B(a);
 		b.A.a = 2; 
 		println(a.a); 
 		println(b.A.a);
 		a.a = 3; 
 		println(a.a); 
 		println(b.A.a);
-    }
+	}
 }
 `
 		ssatest.CheckPrintlnValue(code, []string{
@@ -51,7 +51,7 @@ public class C {
 	t.Run("test class muti value", func(t *testing.T) {
 		code := `
 class A {
-    int a = 0;
+	int a = 0;
 
 	A(int a){
 		this.a = a;
@@ -59,7 +59,7 @@ class A {
 }
 
 class B {
-    A A;
+	A A;
 
 	B(A a){
 		this.A = a;
@@ -68,17 +68,17 @@ class B {
 
 public class C {
     public static void main(String[] args) {
- 		A a = new A(1);
-        B b1 = new B(a);
+		A a = new A(1);
+		B b1 = new B(a);
 		B b2 = new B(a);
 
 		b1.A.a = 2; 
-        println(a.a); 
-        println(b1.A.a);
+		println(a.a); 
+		println(b1.A.a);
 		println(b2.A.a);
-        a.a = 3; 
-        println(a.a); 
-        println(b1.A.a);
+		a.a = 3; 
+		println(a.a); 
+		println(b1.A.a);
 		println(b2.A.a);
     }
 }
@@ -93,7 +93,7 @@ public class C {
 		t.Skip()
 		code := `
 class B {
-    A A;
+	A A;
 
 	B(A a){
 		this.A = a;
@@ -102,19 +102,19 @@ class B {
 
 public class C {
     public static void main(String[] args) {
- 		A a = new A(1);
-        B b = new B(a);
+		A a = new A(1);
+		B b = new B(a);
 
-        if (a.a == 2) {
-            B b = new B(a); 
-        }
+		if (a.a == 2) {
+			B b = new B(a); 
+		}
 
 		b.A.a = 2; 
-        int o1 = a.a; 
-        int o2 = b.A.a;
-        a.a = 3; 
-        int o3 = a.a; 
-        int o4 = b.A.a;
+		int o1 = a.a; 
+		int o2 = b.A.a;
+		a.a = 3; 
+		int o3 = a.a; 
+		int o4 = b.A.a;
     }
 }
 `
