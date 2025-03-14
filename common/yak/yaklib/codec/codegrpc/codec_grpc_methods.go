@@ -13,6 +13,8 @@ import (
 	_ "embed"
 	"encoding/gob"
 	"encoding/json"
+	"fmt"
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"hash"
 	"regexp"
 	"strconv"
@@ -95,10 +97,35 @@ func init() {
 			if err != nil {
 				return []string{}
 			}
+
+			var workFlow []*ypb.CodecWork
+			err = json.Unmarshal(codecFlow.WorkFlow, &workFlow)
+			if err != nil {
+				log.Errorf("unmarshal codec flow failed: %s", err)
+			}
+
+			getWorkStatus := func(index int) string {
+				return utils.InterfaceToString(jsonpath.Find(codecFlow.WorkFlowUI, fmt.Sprintf("$.rightItems[%d].status", index)))
+			}
+
+			filterWorkFlow := func(allWork []*ypb.CodecWork) (shouldRunWorkFlow []*ypb.CodecWork) {
+				for i, work := range allWork {
+					switch getWorkStatus(i) {
+					case "suspend":
+						return
+					case "shield":
+						continue
+					default:
+						shouldRunWorkFlow = append(shouldRunWorkFlow, work)
+					}
+				}
+				return
+			}
+
 			res, err := CodecFlowExec(&ypb.CodecRequestFlow{
 				Text:       input,
 				Auto:       false,
-				WorkFlow:   codecFlow.ToGRPC().WorkFlow,
+				WorkFlow:   filterWorkFlow(workFlow),
 				InputBytes: nil,
 			})
 			if err != nil {
