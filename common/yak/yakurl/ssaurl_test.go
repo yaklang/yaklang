@@ -279,8 +279,8 @@ func TestSFURL(t *testing.T) {
 		$a?{!(opcode: const)} as $not_const_parameter 
 		$a?{(opcode: const)} as $const_parameter
 
-		check $not_const_parameter then "has not-const parameter" else "no not-const parameter"
 		check $const_parameter then "has const parameter" else "no const parameter"
+		check $not_const_parameter then "has not-const parameter" else "no not-const parameter"
 		`, func(res []*ypb.YakURLResource) {
 			spew.Dump(res)
 			checkVariable(t, res, []string{"a", "const_parameter", "not_const_parameter", "_"})
