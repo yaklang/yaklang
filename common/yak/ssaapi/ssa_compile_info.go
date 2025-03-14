@@ -17,8 +17,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 )
 
-type config_info struct {
-	Kind string `json:"kind"`
+type ConfigInfoKind string
+
+const (
+	Local       ConfigInfoKind = "local"
+	Compression ConfigInfoKind = "compression"
+	Jar         ConfigInfoKind = "jar"
+	Git         ConfigInfoKind = "git"
+	Svn         ConfigInfoKind = "svn"
+)
+
+type ConfigInfo struct {
+	Kind ConfigInfoKind `json:"kind"`
 	// The kind of the parse: "local", "compression"
 
 	/*
@@ -46,8 +56,14 @@ type config_info struct {
 	Branch  string `json:"branch"`
 	GitPath string `json:"path"`
 	Auth    *auth  `json:"ce"`
-	Proxy   *proxy `json:"proxy"`
+	Proxy   *Proxy `json:"proxy"`
 }
+
+func (c ConfigInfo) String() string {
+	b, _ := json.Marshal(c)
+	return string(b)
+}
+
 type auth struct {
 	Kind string `json:"kind"`
 	/*
@@ -64,7 +80,7 @@ type auth struct {
 	KeyPath  string `json:"key_path"`
 }
 
-type proxy struct {
+type Proxy struct {
 	URL      string `json:"url"` // * require
 	User     string `json:"user"`
 	PassWord string `json:"password"`
@@ -74,7 +90,7 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	if raw == "" {
 		return nil, utils.Errorf("info is empty ")
 	}
-	info := config_info{}
+	info := ConfigInfo{}
 	if err := json.Unmarshal([]byte(raw), &info); err != nil {
 		return nil, utils.Errorf("error unmarshal info: %v", err)
 	}
@@ -83,11 +99,11 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 		c.Processf(0, "parse info finish")
 	}()
 	switch info.Kind {
-	case "local":
+	case Local:
 		return filesys.NewRelLocalFs(info.LocalFile), nil
-	case "compression":
+	case Compression:
 		return getZipFile(&info)
-	case "jar":
+	case Jar:
 		zipfs, err := getZipFile(&info)
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
@@ -96,20 +112,15 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 			filesys.WithUnifiedFsExtMap(".class", ".java"),
 		)
 		return fs, nil
-	case "git":
+	case Git:
 		return gitFs(&info, c.Processf)
-	case "svn":
+	case Svn:
 		return svnFs(&info)
 	}
 	return nil, utils.Errorf("unsupported kind: %s", info.Kind)
 }
 
-func (info config_info) String() string {
-	b, _ := json.Marshal(info)
-	return string(b)
-}
-
-func getZipFile(info *config_info) (*filesys.ZipFS, error) {
+func getZipFile(info *ConfigInfo) (*filesys.ZipFS, error) {
 	// use local
 	if info.LocalFile != "" {
 		return filesys.NewZipFSFromLocal(info.LocalFile)
@@ -130,7 +141,7 @@ func getZipFile(info *config_info) (*filesys.ZipFS, error) {
 	return filesys.NewZipFSRaw(bytes.NewReader(resp.GetBody()), int64(len(resp.GetBody())))
 }
 
-func gitFs(info *config_info, process func(float64, string, ...any)) (fi.FileSystem, error) {
+func gitFs(info *ConfigInfo, process func(float64, string, ...any)) (fi.FileSystem, error) {
 	if info.URL == "" {
 		return nil, utils.Errorf("git url is empty ")
 	}
@@ -150,6 +161,7 @@ func gitFs(info *config_info, process func(float64, string, ...any)) (fi.FileSys
 	if opt := parseAuth(info.Auth); opt != nil {
 		opts = append(opts, opt)
 	}
+	opts = append(opts, yakgit.WithHTTPOptions(poc.WithRetryTimes(10)))
 	if err := yakgit.Clone(info.URL, local, opts...); err != nil {
 		return nil, err
 	}
@@ -176,6 +188,6 @@ func parseAuth(auth *auth) yakgit.Option {
 	return nil
 }
 
-func svnFs(info *config_info) (fi.FileSystem, error) {
+func svnFs(info *ConfigInfo) (fi.FileSystem, error) {
 	return nil, utils.Errorf("unimplemented ")
 }

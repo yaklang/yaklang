@@ -206,7 +206,10 @@ func WithConfigInfoRaw(info string) Option {
 		if err != nil {
 			return err
 		}
-		WithFileSystem(fs)(c)
+		err = WithFileSystem(fs)(c)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 }
