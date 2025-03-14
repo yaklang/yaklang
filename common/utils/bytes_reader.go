@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"io/ioutil"
 	"net"
@@ -478,21 +479,39 @@ func ReadLineEx(reader io.Reader) (string, int64, error) {
 }
 
 type TriggerWriter struct {
-	trigger    uint64
-	bytesCount uint64
-	r          io.ReadCloser
-	w          io.WriteCloser
-	once       *sync.Once
-	h          func(buffer io.ReadCloser)
+	sizeTrigger uint64
+	bytesCount  uint64
+
+	timeTriggerDuration time.Duration
+	timeTrigger         *time.Timer
+	writeFirstOnce      *sync.Once
+
+	r    io.ReadCloser
+	w    io.WriteCloser
+	once *sync.Once
+	h    func(buffer io.ReadCloser, triggerEvent string)
 }
 
-func NewTriggerWriter(trigger uint64, h func(buffer io.ReadCloser)) *TriggerWriter {
+func NewTriggerWriter(trigger uint64, h func(buffer io.ReadCloser, triggerEvent string)) *TriggerWriter {
 	r, w := NewBufPipe(nil)
 	return &TriggerWriter{
-		trigger: trigger,
-		w:       w, r: r,
-		once: new(sync.Once),
-		h:    h,
+		sizeTrigger: trigger,
+		w:           w, r: r,
+		once:           new(sync.Once),
+		writeFirstOnce: new(sync.Once),
+		h:              h,
+	}
+}
+
+func NewTriggerWriterEx(sizeTrigger uint64, timeTrigger time.Duration, h func(buffer io.ReadCloser, triggerEvent string)) *TriggerWriter {
+	r, w := NewBufPipe(nil)
+	return &TriggerWriter{
+		sizeTrigger:         sizeTrigger,
+		timeTriggerDuration: timeTrigger,
+		w:                   w, r: r,
+		once:           new(sync.Once),
+		writeFirstOnce: new(sync.Once),
+		h:              h,
 	}
 }
 
@@ -500,11 +519,29 @@ func (f *TriggerWriter) GetCount() int64 {
 	return int64(atomic.LoadUint64(&f.bytesCount))
 }
 
+func (f *TriggerWriter) initTimeTrigger() {
+	f.timeTrigger = time.NewTimer(f.timeTriggerDuration)
+	if f.timeTriggerDuration <= 0 {
+		f.timeTrigger.Stop()
+	}
+}
+
 func (f *TriggerWriter) Write(p []byte) (n int, err error) {
-	if f.trigger > 0 && atomic.AddUint64(&f.bytesCount, uint64(len(p))) > f.trigger {
+	byteCount := atomic.AddUint64(&f.bytesCount, uint64(len(p)))
+	f.writeFirstOnce.Do(func() {
+		f.initTimeTrigger()
+	})
+	select {
+	case <-f.timeTrigger.C:
 		f.once.Do(func() {
-			f.h(f.r)
+			f.h(f.r, httpctx.REQUEST_CONTEXT_KEY_ResponseTooSlow)
 		})
+	default:
+		if f.sizeTrigger > 0 && byteCount > f.sizeTrigger {
+			f.once.Do(func() {
+				f.h(f.r, httpctx.REQUEST_CONTEXT_KEY_ResponseTooLarge)
+			})
+		}
 	}
 	n, err = f.w.Write(p)
 	return

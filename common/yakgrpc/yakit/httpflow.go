@@ -334,10 +334,9 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	// 如果设置了 reqIns，则不会再解析 reqRaw
 	if reqIns != nil {
 		fReq, _ = mutate.NewFuzzHTTPRequest(reqIns)
-
-		// 修复 TooLargeFile
-		if httpctx.GetResponseTooLarge(reqIns) {
-			flow.IsTooLargeResponse = true
+		flow.IsTooLargeResponse = httpctx.GetResponseTooLarge(reqIns)
+		flow.IsReadTooSlowResponse = httpctx.GetResponseReadTooSlow(reqIns)
+		if flow.IsTooLargeResponse || flow.IsReadTooSlowResponse {
 			flow.TooLargeResponseHeaderFile = httpctx.GetResponseTooLargeHeaderFile(reqIns)
 			flow.TooLargeResponseBodyFile = httpctx.GetResponseTooLargeBodyFile(reqIns)
 			flow.BodyLength = httpctx.GetResponseTooLargeSize(reqIns)
@@ -943,6 +942,7 @@ get_params_total, post_params_total, cookie_params_total,
 ip_address, remote_addr, ip_integer,
 tags, is_websocket, websocket_hash, runtime_id, from_plugin,
 process_name,
+is_read_too_slow_response,
 
 -- request is larger than 200K, return empty string
 LENGTH(request) > 204800 as is_request_oversize,

@@ -281,6 +281,7 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseMaxContentLength     = "responseMaxContentLength"
 	REQUEST_CONTEXT_KEY_ResponseTraceInfo            = "responseTraceInfo"
 	REQUEST_CONTEXT_KEY_ResponseTooLarge             = "responseTooLarge"
+	REQUEST_CONTEXT_KEY_ResponseTooSlow              = "responseReadTimeTooSlow"
 	REQUEST_CONTEXT_KEY_RequestTooLarge              = "requestTooLarge"
 	REQUEST_CONTEXT_KEY_ResponseHeaderParsed         = "responseHeaderParsed"
 	REQUEST_CONTEXT_KEY_ResponseContentTypeFiltered  = "ResponseContentTypeFiltered"
@@ -420,6 +421,13 @@ func GetResponseTooLarge(req *http.Request) bool {
 
 func SetResponseTooLarge(req *http.Request, b bool) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooLarge, b)
+}
+func GetResponseReadTooSlow(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooSlow)
+}
+
+func SetResponseReadTooSlow(req *http.Request, b bool) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooSlow, b)
 }
 
 func SetResponseTooLargeSize(req *http.Request, size int64) {

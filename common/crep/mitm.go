@@ -264,6 +264,7 @@ type MITMServer struct {
 	websocketResponseMirror        func(rsp []byte)
 
 	maxContentLength int
+	maxReadWaitTime  time.Duration
 
 	// disable mitm ca cert page
 	enableMITMCACertPage bool
@@ -335,6 +336,8 @@ func (m *MITMServer) initConfig() error {
 	if m.GetMaxContentLength() != 0 && m.GetMaxContentLength() < 10*1024*1024 {
 		m.proxy.SetMaxContentLength(m.GetMaxContentLength())
 	}
+
+	m.proxy.SetMaxReadWaitTime(m.maxReadWaitTime)
 	m.proxy.SetLowhttpConfig(config)
 	m.proxy.SetGMTLS(m.gmtls)
 	m.proxy.SetGMPrefer(m.gmPrefer)
