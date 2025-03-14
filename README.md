@@ -14,9 +14,9 @@
 
 <p align="center">
   <a href="#快速开始">快速开始</a> •
-  <a href="https://yaklang.io/docs/intro">官方文档</a> •
+  <a href="https://yaklang.com/docs/intro">官方文档</a> •
   <a href="https://github.com/yaklang/yaklang/issues">问题反馈</a> •
-  <a href="https://yaklang.io/docs/api/global_buildin_ops/">接口手册</a> •
+  <a href="https://yaklang.com/api-manual/intro">接口手册</a> •
   <a href="#贡献你的代码">贡献代码</a> •
   <a href="#社区 ">加入社区</a> •
   <a href="#项目架构">项目架构</a> 
