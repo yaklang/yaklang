@@ -9,18 +9,12 @@ TEXT
 )
 
 Request?{<fullTypeName>?{have: "client.fluent"}} as $root;
-
-// Get / Post / Put / Delete / Patch / Options / Head / Trace
-$root.Get as $methods
-$root.Post as $methods
-$root.Put as $methods
-$root.Delete as $methods
-$root.Patch as $methods
-$root.Options as $methods
-$root.Head as $methods
-$root.Trace as $methods
-
-$methods?{<getCall>?{<getCall><getCallee><getObject>?{.execute}}}(*?{!<fullTypeName>?{have: "client.fluent"}} as $output);
+$root./Get|Post|Put|Delete|Patch|Options|Head|Trace/ as $methods
+$methods?{*().execute()} as $execMethods;
+$execMethods(, * as $output);
+<delete(root)>
+<delete(methods)>
+<delete(execMethods)>
 alert $output;
 
 desc(
