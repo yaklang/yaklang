@@ -340,6 +340,9 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 		default:
 			if err := s.execStatement(i); err != nil {
 				s.debugSubLog("execStatement error: %v", err)
+				if errors.Is(err, AbortError) {
+					return nil
+				}
 				if errors.Is(err, CriticalError) {
 					return err
 				}
@@ -356,6 +359,7 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 }
 
 var CriticalError = utils.Error("CriticalError(Immediately Abort)")
+var AbortError = utils.Error("AbortError(Normal Abort)")
 
 func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
 	if visited == nil {
@@ -843,10 +847,10 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		if !haveResult {
 			s.debugSubLog("-   error: " + elseStr)
-			if s.config.FailFast {
-				return utils.Wrapf(CriticalError, "check params failed: %v", elseStr)
-			}
 			s.result.Errors = append(s.result.Errors, elseStr)
+			if s.config.FailFast {
+				return utils.Wrapf(AbortError, "check params failed: %v", elseStr)
+			}
 		} else {
 			s.result.CheckParams = append(s.result.CheckParams, i.UnaryStr)
 			if thenStr != "" {

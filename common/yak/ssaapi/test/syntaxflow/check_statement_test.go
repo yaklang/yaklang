@@ -10,6 +10,23 @@ import (
 )
 
 func TestCheckStatement(t *testing.T) {
+
+	t.Run("fast fail as default ", func(t *testing.T) {
+		code := `
+b = 1 
+b2 = 2 
+b3 = 3
+	`
+
+		ssatest.CheckSyntaxFlow(t, code, `
+	a* as $a
+	check $a 
+	b* as $b 
+	`, map[string][]string{
+			"b": {},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+
 	t.Run("simple, positive", func(t *testing.T) {
 		ssatest.Check(t, `
 		f = (i) => {
@@ -40,7 +57,7 @@ func TestCheckStatement(t *testing.T) {
 				bbbb( * as $i )
 				check $i then fine else fail
 				f( * as $b)
-				`, ssaapi.QueryWithEnableDebug())
+				`, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithFailFast(false))
 				assert.NotNil(t, data.GetErrors())
 				log.Infof("err: %v", err)
 				log.Infof("data: %v", data)
@@ -64,7 +81,7 @@ func TestCheckStatement(t *testing.T) {
 				f(* as $b)
 				`,
 					ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithFailFast())
-				assert.NotNil(t, err)
+				assert.Nil(t, err)
 				log.Infof("err: %v", err)
 				log.Infof("data: %v", data)
 				assert.Equal(t, 0, len(data.GetAllValuesChain()))
