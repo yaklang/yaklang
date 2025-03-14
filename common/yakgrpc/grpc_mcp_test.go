@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -28,7 +27,7 @@ func TestStartSSEMCP(t *testing.T) {
 	msg, err := stream.Recv()
 	require.NoError(t, err)
 
-	mcpClient, err := client.NewSSEMCPClient(fmt.Sprintf("%s/sse", msg.GetURL()))
+	mcpClient, err := client.NewSSEMCPClient(msg.GetURL())
 	require.NoError(t, err)
 
 	defer mcpClient.Close()

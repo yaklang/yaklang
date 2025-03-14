@@ -16,7 +16,7 @@ func init() {
 func (s *Server) StartSSEMCP(req *ypb.StartMCPRequest, stream ypb.Yak_StartSSEMCPServer) error {
 	// 创建一个新的gRPC服务来启动MCP，而不是直接调用mcp包
 	// 这样可以避免导入循环
-	hostPort := fmt.Sprintf("localhost:%d", utils.GetRandomAvailableTCPPort())
+	hostPort := fmt.Sprintf("127.0.0.1:%d", utils.GetRandomAvailableTCPPort())
 	url := fmt.Sprintf("http://%s", hostPort)
 	opts := make([]mcp.McpServerOption, 0, len(req.GetTools())+len(req.GetResources())+len(req.GetDisableTools())+len(req.GetDisableResources()))
 	for _, toolSet := range req.GetTools() {
@@ -46,7 +46,7 @@ func (s *Server) StartSSEMCP(req *ypb.StartMCPRequest, stream ypb.Yak_StartSSEMC
 	defer mcpServer.Close()
 
 	stream.Send(&ypb.StartMCPResponse{
-		URL: url,
+		URL: fmt.Sprintf("%s/sse", url),
 	})
 
 	for {
