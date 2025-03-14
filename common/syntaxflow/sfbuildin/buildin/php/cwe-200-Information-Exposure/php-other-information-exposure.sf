@@ -1,6 +1,6 @@
 desc(
     title: "Unsafe Error Handling and Information Exposure",
-    title_zh: "不安全的错误处理与信息泄露风险",
+    title_zh: "信息泄漏",
     type: vul,
     risk: "information-exposure",
     desc: <<<TEXT

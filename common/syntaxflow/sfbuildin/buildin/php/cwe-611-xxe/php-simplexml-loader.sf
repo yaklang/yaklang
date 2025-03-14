@@ -1,5 +1,6 @@
 desc(
     title: "CWE-611 simplexml_load_string checking for XXE (LIBXML_NOENT)",
+    title_zh: "xxe漏洞(simplexml)"
     level: high,
     type: audit,
     risk: "xxe",
