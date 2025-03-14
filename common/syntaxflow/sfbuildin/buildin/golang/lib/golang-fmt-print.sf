@@ -1,0 +1,15 @@
+desc(
+    title: "check audit the usage of the fmt package",
+    type: audit,
+    level: info,
+    lib: 'golang-fmt-print',
+    desc: <<<TEXT
+此规则旨在审计Go语言代码中fmt库的使用情况。
+TEXT
+)
+
+fmt?{<fullTypeName>?{have: 'fmt'}} as $entry
+$entry.Println(* #-> as $output)
+$entry.Printf(* #-> as $output)
+
+alert $output
