@@ -6,8 +6,9 @@ desc(
 )
 
 *.executeMethod(,* as $arg);
-$arg<getCallee()>?{<fullTypeName>?{have: /commons\.httpclient\.methods\.(GetMethod|PostMethod|PutMethod|DeleteMethod|PatchMethod|OptionsMethod|HeadMethod|TraceMethod)/}}(, * as $output);
+$arg<getCallee()>?{<fullTypeName>?{have: /commons\.httpclient\.methods\.(Get|Post|Put|Delete|Patch|Options|Head|Trace)Method/}}(, * as $output);
 <delete(arg)>
+alert $output;
 
 desc(
 lang: java,
