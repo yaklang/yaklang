@@ -326,27 +326,94 @@ func TestGRPCCodecFlowFuzztag(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	flowName := utils.RandStringBytes(10)
-	_, err = client.SaveCodecFlow(utils.TimeoutContextSeconds(1),
-		&ypb.CustomizeCodecFlow{
-			FlowName: flowName,
-			WorkFlow: workFlow,
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data := utils.RandStringBytes(10)
-	expected := codec.EncodeUrlCode(codec.EncodeBase64(data))
+	t.Run("test fuzz tag", func(t *testing.T) {
+		flowName := utils.RandStringBytes(10)
+		_, err = client.SaveCodecFlow(utils.TimeoutContextSeconds(1),
+			&ypb.CustomizeCodecFlow{
+				FlowName: flowName,
+				WorkFlow: workFlow,
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data := utils.RandStringBytes(10)
+		expected := codec.EncodeUrlCode(codec.EncodeBase64(data))
 
-	res, err := mutate.FuzzTagExec("{{codecflow(" + flowName + "|" + data + ")}}")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res) == 0 {
-		t.Fatal("fuzztag exec failed")
-	}
-	require.Equal(t, expected, res[0])
+		res, err := mutate.FuzzTagExec("{{codecflow(" + flowName + "|" + data + ")}}")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res) == 0 {
+			t.Fatal("fuzztag exec failed")
+		}
+		require.Equal(t, expected, res[0])
+	})
+
+	t.Run("test fuzz tag suspend", func(t *testing.T) {
+		flowName := utils.RandStringBytes(10)
+		_, err = client.SaveCodecFlow(utils.TimeoutContextSeconds(1),
+			&ypb.CustomizeCodecFlow{
+				FlowName: flowName,
+				WorkFlow: workFlow,
+				WorkFlowUI: `{
+    "rightItems": [
+        {
+          "status": "suspend" 
+        },
+        {
+        }
+    ]
+}`,
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data := utils.RandStringBytes(10)
+
+		res, err := mutate.FuzzTagExec("{{codecflow(" + flowName + "|" + data + ")}}")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res) == 0 {
+			t.Fatal("fuzztag exec failed")
+		}
+		require.Equal(t, data, res[0])
+	})
+
+	t.Run("test fuzz tag shield", func(t *testing.T) {
+		flowName := utils.RandStringBytes(10)
+		_, err = client.SaveCodecFlow(utils.TimeoutContextSeconds(1),
+			&ypb.CustomizeCodecFlow{
+				FlowName: flowName,
+				WorkFlow: workFlow,
+				WorkFlowUI: `{
+    "rightItems": [
+        {
+          "status": "shield" 
+        },
+        {
+        }
+    ]
+}`,
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data := utils.RandStringBytes(10)
+		expected := codec.EncodeUrlCode(data)
+
+		res, err := mutate.FuzzTagExec("{{codecflow(" + flowName + "|" + data + ")}}")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res) == 0 {
+			t.Fatal("fuzztag exec failed")
+		}
+		require.Equal(t, expected, res[0])
+	})
 }
 
 func TestGRPCCodecFlow(t *testing.T) {
