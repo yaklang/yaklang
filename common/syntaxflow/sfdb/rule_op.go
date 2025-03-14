@@ -290,6 +290,15 @@ func GetRulePure(ruleName string) (*schema.SyntaxFlowRule, error) {
 	}
 	return &rule, nil
 }
+func GetRuleByLanguage(language string) ([]*schema.SyntaxFlowRule, error) {
+	db := consts.GetGormProfileDatabase()
+	var rule []*schema.SyntaxFlowRule
+	result := db.Where("language = ?", language).Where("allow_included = false").Find(&rule)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return rule, nil
+}
 
 func GetRules(ruleNameGlob string) ([]*schema.SyntaxFlowRule, error) {
 	db := consts.GetGormProfileDatabase()
@@ -325,6 +334,13 @@ func QueryRuleByName(db *gorm.DB, ruleName string) (*schema.SyntaxFlowRule, erro
 func QueryRulesByName(db *gorm.DB, ruleNames []string) ([]*schema.SyntaxFlowRule, error) {
 	var rules []*schema.SyntaxFlowRule
 	if err := db.Preload("Groups").Where("rule_name IN (?)", ruleNames).Find(&rules).Error; err != nil {
+		return nil, err
+	}
+	return rules, nil
+}
+func QueryRuleByLanguage(db *gorm.DB, language consts.Language) ([]*schema.SyntaxFlowRule, error) {
+	var rules []*schema.SyntaxFlowRule
+	if err := db.Where("language = ?", language).Find(&rules).Error; err != nil {
 		return nil, err
 	}
 	return rules, nil

@@ -142,9 +142,7 @@ func Test_Multiple_input_git(t *testing.T) {
 		targetPath := path.Join(os.TempDir(), "java-real")
 		os.RemoveAll(targetPath)
 		os.Mkdir(targetPath, 0755)
-
 		err := yakgit.Clone(url, targetPath)
-
 		require.NoError(t, err)
 
 		refFs := filesys.NewRelLocalFs(targetPath)
