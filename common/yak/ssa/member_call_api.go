@@ -35,12 +35,30 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 		return b.TryBuildExternLibValue(extern, key)
 	}
 
+	objectt := object
+	if se, ok := ToSideEffect(object); ok {
+		if ref := se.Value.GetReference(); ref != nil {
+			objectt = ref
+		}
+	}
+
 	// normal member call
-	return b.getFieldValue(object, key, wantFunction)
+	return b.getFieldValue(objectt, key, wantFunction)
 }
 
 // create member call variable
-func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable {
+func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value, isForce ...bool) *Variable {
+	var createVariable func(string) *Variable
+	if len(isForce) > 0 && isForce[0] {
+		createVariable = func(name string) *Variable {
+			return b.CreateVariableForce(name)
+		}
+	} else {
+		createVariable = func(name string) *Variable {
+			return b.CreateVariable(name)
+		}
+	}
+
 	if utils.IsNil(object) || utils.IsNil(key) {
 		log.Errorf("CreateMemberCallVariable: object or key is nil")
 		return nil
@@ -52,21 +70,28 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 	// extern lib
 	if extern, ok := ToExternLib(object); ok {
 		name := getExternLibMemberCall(object, key)
-		ret := b.CreateVariableForce(name)
+		ret := createVariable(name)
 		ret.SetMemberCall(extern, key)
 		return ret
 	}
 
+	objectt := object
+	if se, ok := ToSideEffect(object); ok {
+		if ref := se.Value.GetReference(); ref != nil {
+			objectt = ref
+		}
+	}
+
 	// normal member call
 	// name := b.getFieldName(object, key)
-	res := checkCanMemberCallExist(object, key)
+	res := checkCanMemberCallExist(objectt, key)
 	name := res.name
-	if object.GetOpcode() != SSAOpcodeParameter {
+	if objectt.GetOpcode() != SSAOpcodeParameter {
 		// if member not exist, create undefine member in object position
-		b.checkAndCreatDefaultMember(res, object, key)
+		b.checkAndCreatDefaultMember(res, objectt, key)
 	}
 	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
-	ret := b.CreateVariableForce(name)
-	ret.SetMemberCall(object, key)
+	ret := createVariable(name)
+	ret.SetMemberCall(objectt, key)
 	return ret
 }

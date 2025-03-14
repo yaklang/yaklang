@@ -107,6 +107,8 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return v
 	}
 
+	// fmt.Printf("exp = %s\n", raw.GetText())
+
 	switch ret := raw.(type) {
 	case *javaparser.PrimaryExpressionContext:
 		// 处理主要表达式

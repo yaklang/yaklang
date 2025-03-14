@@ -321,7 +321,7 @@ func CheckSyntaxFlowWithFS(t *testing.T, fs fi.FileSystem, sf string, wants map[
 		// for _, program := range p {
 		// 	program.Show()
 		// }
-		results, err := p.SyntaxFlowWithError(sf, ssaapi.QueryWithEnableDebug())
+		results, err := p.SyntaxFlowWithError(sf, ssaapi.QueryWithEnableDebug(false))
 		require.Nil(t, err)
 		require.NotNil(t, results)
 		CompareResult(t, contain, results, wants)

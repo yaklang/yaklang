@@ -444,9 +444,9 @@ func TestYaklangBasic_CFG_Break(t *testing.T) {
 				continue;
 			}
 		}
-		println(a); // phi[1, 2]
+		println(a); // phi(a)[1,phi(a)[2,1]]
 		`, []string{
-			"phi(a)[2,1]",
+			"phi(a)[1,phi(a)[2,1]]",
 		}, t)
 	})
 
