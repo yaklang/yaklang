@@ -1,5 +1,6 @@
 desc(
     title: "check php Variable coverage",
+    title_zh: "变量覆盖漏洞",
     type: audit,
     level: low,
     risk: 'variable_coverage',
@@ -9,28 +10,26 @@ TEXT
 )
 
 <include('php-param')> as $source;
-<include('php-global-variable')> as $source;
 <include('php-filter-function')> as $filter;
 extract(* as $output);
 
 $output #{
-    until: `* & $source`,
-}-> as $root;
+    include: `* & $source`,
+    exclude: `*?{opcode: call}`
+}-> as $high;
 
-$root?{!<dataflow(<<<CODE
-*?{opcode: call && <self><getCallee> & $filter} as $__next__
-CODE)>} as $result
-
-alert $result for {
+alert $high for {
     title: 'Variable overwriting is detected and there is no filtering',
     title_zh: '检测到变量覆盖，并且没有任何过滤',
     type: 'vuln',
     level: 'high'
 }
 
-$root?{<dataflow(<<<CODE
-*?{opcode: call && !<self><getCallee> & $filter} as $__next__
-CODE)>} as $middle
+$output #{
+    include: `* & $source`,
+    exclude: `*?{opcode:call && ?{}}`
+}->
+
 
 
 alert $middle for {
