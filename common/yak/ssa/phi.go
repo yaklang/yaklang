@@ -100,18 +100,29 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 		}
 
 		// step 2
-		if phi2, ok := ToPhi(latch); ok {
-			if index := slices.Index(phi2.Edge, phiValue); index != -1 {
-				phi2.Edge[index] = header
-				ret[name] = phi2
-				DeleteInst(phiValue)
-				ReplaceAllValue(phiValue, phi2)
-				for name, v := range ReplaceMemberCall(phiValue, phi2) {
-					ret[name] = v
-				}
+		var pass = map[Value]struct{}{}
+		var handle func(Value)
+		handle = func(latch Value) {
+			if _, ok := pass[latch]; ok {
 				return
 			}
+			pass[latch] = struct{}{}
+			if phi2, ok := ToPhi(latch); ok {
+				if index := slices.Index(phi2.Edge, phiValue); index != -1 {
+					phi2.Edge[index] = header
+					ret[name] = phi2
+					DeleteInst(phiValue)
+					ReplaceAllValue(phiValue, phi2)
+					for name, v := range ReplaceMemberCall(phiValue, phi2) {
+						ret[name] = v
+					}
+				}
+				for _, e := range phi2.Edge {
+					handle(e)
+				}
+			}
 		}
+		handle(latch)
 
 		// step 3
 		phi.Edge = append(phi.Edge, header)

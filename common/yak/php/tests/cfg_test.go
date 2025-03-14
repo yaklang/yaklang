@@ -402,7 +402,7 @@ while (1) {
 	}
 }
 println($a);`
-		ssatest.CheckPrintlnValue(code, []string{"phi($a)[3,2]"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"phi($a)[2,phi($a)[3,2]]"}, t)
 	})
 }
 
