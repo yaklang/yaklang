@@ -1,5 +1,6 @@
 desc(
     title: "Check PHP XSS: Directly User OUTPUT",
+    title_zh: "xss漏洞",
     risk:'xss',
     type: vul,
     desc: <<<TEXT

@@ -1,6 +1,6 @@
 desc(
    title: "php information exposure",
-   title_zh: "PHP信息泄露风险",
+   title_zh: "sql信息泄漏",
    type: vul,
    risk: "sql-information-exposure",
    desc: <<<TEXT

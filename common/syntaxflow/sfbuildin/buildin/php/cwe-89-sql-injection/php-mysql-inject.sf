@@ -1,6 +1,6 @@
 desc(
     title: "mysql inject",
-    title_zh: "sql(mysql)注入漏洞检测",
+    title_zh: "sql(mysql)注入漏洞",
     type: audit,
     level: low,
     risk: "sqli-inject",

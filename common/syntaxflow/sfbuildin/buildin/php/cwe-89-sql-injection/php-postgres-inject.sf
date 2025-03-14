@@ -1,6 +1,6 @@
 desc(
     title: "postgres sqlite check",
-    title_zh: "postgres sql注入检测",
+    title_zh: "sql",
     type: audit,
     level: low,
     risk: "sqli-inject",

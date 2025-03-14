@@ -1,5 +1,6 @@
 desc(
     title: "check include vul",
+    title_zh: "文件包含",
     type: audit,
     risk: 'file-include',
     desc: <<<TEXT
