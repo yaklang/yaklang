@@ -1,5 +1,6 @@
 desc(
     title: 'check php function unserialize',
+    title_zh: '反序列化漏洞',
     type: audit,
     level: low,
     risk: "unserialize",

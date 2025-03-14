@@ -1,5 +1,6 @@
 desc(
     title: "LDAP Injection PHP checking",
+    title_zh: "LDAP注入",
     type: vuln,
     severity: mid,
     risk: 'ldap-injection',
