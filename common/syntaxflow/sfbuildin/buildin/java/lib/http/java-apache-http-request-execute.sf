@@ -7,24 +7,10 @@ desc(
 TEXT
 )
 
-HttpGet as $methods;
-HttpPost as $methods;
-HttpPut as $methods;
-HttpDelete as $methods;
-HttpPatch as $methods;
-HttpOptions as $methods;
-HttpHead as $methods;
-HttpTrace as $methods;
-
-$methods?{<getCall>?{<getCall><getCallee><getObject>?{.execute}}}(,* as $output);
-<delete(methods)>
-
-BasicHttpRequest?{<getCall>?{<getCall><getCallee><getObject>?{.execute}}}(,,* as $output);
-
-
-// $obj?{<getCall><getCallee><getObject>?{.execute}} as $rightObj;
-
-<delete(obj)>
+*.execute?{<getObject><fullTypeName>?{have: /org\.apache\.http\.impl\.client\..*Client/}}(, * as $request,);
+$request<getCallee>?{<fullTypeName>?{have: /Http(Get|Post|Put|Delete|Patch|Options|Head|Trace)/}}(,* as $output,);
+$request<getCallee>?{<fullTypeName>?{have: /BasicHttpRequest/}}(,,* as $output,);
+<delete(request)>
 alert $output;
 
 
@@ -75,7 +61,7 @@ TEXT,
 package src.main.b;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;

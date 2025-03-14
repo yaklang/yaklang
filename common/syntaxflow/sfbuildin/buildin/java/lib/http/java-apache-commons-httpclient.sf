@@ -5,16 +5,9 @@ desc(
     lib: "java-apache-commons-httpclient",
 )
 
-GetMethod?{<fullTypeName><show>?{have: 'commons.httpclient'}} as $methods;
-PostMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
-PutMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
-DeleteMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
-PatchMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
-OptionsMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
-HeadMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
-TraceMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
-$methods?{<getCall>?{<getCall><getCallee><getObject>?{.executeMethod}}}(,* as $output);
-<delete(methods)>
+*.executeMethod(,* as $arg);
+$arg<getCallee()>?{<fullTypeName>?{have: /commons\.httpclient\.methods\.(Get|Post|Put|Delete|Patch|Options|Head|Trace)Method/}}(, * as $output);
+<delete(arg)>
 alert $output;
 
 desc(
