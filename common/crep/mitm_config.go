@@ -491,6 +491,13 @@ func MITM_SetMaxContentLength(m int64) MITMConfig {
 	}
 }
 
+func MITM_SetMaxReadWaitTime(m time.Duration) MITMConfig {
+	return func(server *MITMServer) error {
+		server.maxReadWaitTime = m
+		return nil
+	}
+}
+
 func MITM_AppendDNSServers(servers ...string) MITMConfig {
 	return func(server *MITMServer) error {
 		server.DNSServers = utils.RemoveRepeatStringSlice(append(server.DNSServers, servers...))

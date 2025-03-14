@@ -4995,6 +4995,7 @@ message HTTPFlow {
   repeated string RootDomains = 41;
   repeated string JsonObjects = 42;
 
+  bool IsReadTooSlowResponse = 51;
   bool IsTooLargeResponse = 43;
   string TooLargeResponseHeaderFile = 44;
   string TooLargeResponseBodyFile = 45;
@@ -5187,6 +5188,7 @@ message MITMRequest {
 
   // max content-length
   int64 maxContentLength = 55;
+  int64 MaxReadWaitTime = 67;
 
   // 提前为此次flow设置tags
   repeated string Tags = 56;

@@ -83,7 +83,7 @@ func TestReadConnWithTimeout(t *testing.T) {
 
 func TestTrigger(t *testing.T) {
 	var check = false
-	NewTriggerWriter(10, func(buffer io.ReadCloser) {
+	NewTriggerWriter(10, func(buffer io.ReadCloser, _ string) {
 		check = true
 	}).Write([]byte("àf.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)"))
 	if !check {
@@ -91,7 +91,7 @@ func TestTrigger(t *testing.T) {
 	}
 
 	check = true
-	NewTriggerWriter(100000, func(buffer io.ReadCloser) {
+	NewTriggerWriter(100000, func(buffer io.ReadCloser, _ string) {
 		check = false
 	}).Write([]byte("àf.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)"))
 	if !check {

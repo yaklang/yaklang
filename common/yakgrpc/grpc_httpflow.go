@@ -507,6 +507,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 				// IsRequestOversize:          data.IsRequestOversize,
 				// IsResponseOversize:         data.IsResponseOversize,
 				IsTooLargeResponse:         data.IsTooLargeResponse,
+				IsReadTooSlowResponse:      data.IsReadTooSlowResponse,
 				TooLargeResponseHeaderFile: data.TooLargeResponseHeaderFile,
 				TooLargeResponseBodyFile:   data.TooLargeResponseBodyFile,
 			}
@@ -696,6 +697,7 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 		// IsRequestOversize:          httpFlow.IsRequestOversize,
 		// IsResponseOversize:         httpFlow.IsResponseOversize,
 		IsTooLargeResponse:         httpFlow.IsTooLargeResponse,
+		IsReadTooSlowResponse:      httpFlow.IsReadTooSlowResponse,
 		TooLargeResponseHeaderFile: httpFlow.TooLargeResponseHeaderFile,
 		TooLargeResponseBodyFile:   httpFlow.TooLargeResponseBodyFile,
 	}

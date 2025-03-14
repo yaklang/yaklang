@@ -1645,7 +1645,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		crep.MITM_SetFindProcessName(true),
 		crep.MITM_SetDNSServers(dnsServers...),
 		crep.MITM_SetHostMapping(hostMapping),
-		crep.MITM_SetHTTPForceClose(forceDisableKeepAlive))
+		crep.MITM_SetHTTPForceClose(forceDisableKeepAlive),
+		crep.MITM_SetMaxReadWaitTime(time.Duration(firstReq.GetMaxReadWaitTime())*time.Second),
+	)
 
 	// 如果 mitm 启动时进行设置，优先使用mitm中的设置
 	if firstReq.GetMaxContentLength() != 0 && firstReq.GetMaxContentLength() <= 10*1024*1024 {

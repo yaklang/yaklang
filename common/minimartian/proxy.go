@@ -84,6 +84,7 @@ type Proxy struct {
 	lowhttpConfig []lowhttp.LowhttpOpt
 
 	maxContentLength int
+	maxReadWaitTime  time.Duration
 
 	h2Cache sync.Map
 
@@ -158,6 +159,10 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 
 func (p *Proxy) SetMaxContentLength(i int) {
 	p.maxContentLength = i
+}
+
+func (p *Proxy) SetMaxReadWaitTime(t time.Duration) {
+	p.maxReadWaitTime = t
 }
 
 func (p *Proxy) GetMaxContentLength() int {
