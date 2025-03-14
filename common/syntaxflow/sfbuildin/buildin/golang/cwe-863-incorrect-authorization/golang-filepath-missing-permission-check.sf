@@ -3,13 +3,23 @@ desc(
     type: audit,
     level: low,
     desc: <<<TEXT
-此审计规则旨在验证用户输入，及传入的文件路径没有经过过滤与授权，攻击者可通过构造恶意路径实现文件覆盖/删除或路径穿越攻击。
+此审计规则旨在验证用户输入及传入的文件路径是否经过适当的过滤与授权。如果文件路径未经过验证，攻击者可能通过构造恶意路径实现文件覆盖、删除或路径穿越攻击，从而导致安全风险。路径穿越攻击允许攻击者访问或修改应用程序之外的敏感文件，甚至可能导致服务器被完全控制。
+
+文件路径未授权漏洞通常发生在以下场景：
+1. 用户提供的文件名或路径直接拼接到目标路径中，例如 `filePath := "/files/" + fileID`。
+2. 未对文件路径进行严格的验证，导致攻击者可以通过 `../` 等特殊字符实现路径穿越。
 TEXT
 )
 
+<include('golang-file-path')> as $path;
 <include('golang-os-sink')> as $sink;
 
-$sink?{!have: 'Parameter'} as $low;
+strings.HasPrefix(* #-> as $check);
+$path.Clean(* #-> as $check);
+$path.IsAbs(* #-> as $check);
+
+$sink #{include: `$check`}-> as $safe;
+$sink #{exclude: `$safe`}-> as $low;
 
 alert $low for {
     title: 'filedelele missing permission check',
@@ -31,28 +41,12 @@ import (
 )
 
 func deleteFile(w http.ResponseWriter, r *http.Request) {
-    fileID := r.URL.Query().Get("file_id")
+    filePath := r.URL.Query().Get("file_id")
     user := r.Header.Get("User")
-
-    // 检查用户是否有删除权限
-    if !hasPermission(user, "delete_file") {
-        fmt.Fprintf(w, "Permission denied")
-        return
-    }
-
-    // 获取文件路径（假设 fileID 是文件名）
-    filePath := getFilePathByID(fileID)
 
     // 检查文件是否存在
     if _, err := os.Stat(filePath); os.IsNotExist(err) {
         fmt.Fprintf(w, "File not found")
-        return
-    }
-
-    // 检查文件所有者是否为当前用户
-    fileOwner := getFileOwner(filePath)
-    if fileOwner != user {
-        fmt.Fprintf(w, "Permission denied")
         return
     }
 
@@ -66,24 +60,13 @@ func deleteFile(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "File deleted successfully")
 }
 
-func hasPermission(user string, permission string) bool {
-    // 模拟检查用户权限
-    return user == "user1" && permission == "delete_file"
-}
-
-func getFilePathByID(fileID string) string {
-    // 假设文件存储在 /files 目录下，fileID 是文件名
-    return "/files/" + fileID
-}
-
-func getFileOwner(filePath string) string {
-    // 模拟获取文件所有者（这里假设文件所有者为 user1）
-    return "user1"
-}
-
 func main() {
     http.HandleFunc("/delete", deleteFile)
     http.ListenAndServe(":8080", nil)
 }
-UNSAFE
+UNSAFE,    
+    'safe://main.go': <<<SAFE
+
+
+SAFE
 )

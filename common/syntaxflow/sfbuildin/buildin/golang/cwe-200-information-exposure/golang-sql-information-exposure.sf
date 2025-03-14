@@ -13,8 +13,14 @@ TEXT
 
 <include('golang-database-sink')> as $sink;
 
-*.Scan() --> as $target;
-$target #{until: `* & $sink`}-> as $low;
+$sink.QueryRow(* #-> as $param)
+
+$param #{ 
+	include:`*?{opcode:const}?{have:'SELECT current_database()'}`,
+}-> as $low;
+$param #{ 
+	include:`*?{opcode:const}?{have:'SELECT version()'}`,
+}-> as $low;
 
 alert $low for {
     title: 'FTP Information Exposure',

@@ -55,12 +55,13 @@ desc{
     'file://demo2.java':<<<TEXT
 import java.io.InputStream;
 import java.io.IOException;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class ApacheCommonsZipFileExample {
     public static void main(String[] args) {
-        String zipFilePath = "example.zip"; // 假设你有一个名为 example.zip 的文件
+        String zipFilePath = "example.zip";
         try (ZipFile zipFile = new ZipFile(zipFilePath)) {
-
             try (InputStream entryInputStream = zipFile.getInputStream(entry)) {
                 // ...
             }

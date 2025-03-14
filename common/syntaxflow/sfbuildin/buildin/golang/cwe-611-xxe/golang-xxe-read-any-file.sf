@@ -3,7 +3,11 @@ desc(
     type: audit,
     level: high,
     desc: <<<TEXT
-此审计规则旨在验证 XML，攻击者可以通过构造恶意 XML 输入读取服务器上的任意文件（如 /etc/passwd）。
+此审计规则旨在验证 XML 解析过程中是否存在 XXE（XML External Entity）漏洞。XXE 漏洞（CWE-611）允许攻击者通过构造恶意 XML 输入读取服务器上的任意文件（如 `/etc/passwd`），甚至可能导致服务器被完全控制。当应用程序未禁用外部实体解析时，攻击者可以利用外部实体加载恶意文件或执行其他危险操作。
+
+XXE 漏洞通常发生在以下场景：
+1. 应用程序解析用户提供的 XML 数据时，未禁用外部实体解析。
+2. 攻击者通过构造包含外部实体的恶意 XML 文件
 TEXT
 )
 
@@ -12,7 +16,7 @@ TEXT
 $sink.Strict?{!have: 'false'} as $high
 
 alert $high for {
-    title: 'filedelele missing permission check',
+    title: 'xxe read any file check',
     title_zh: '检测到文件路径未授权',
     type: 'vuln',
     level: 'high',
