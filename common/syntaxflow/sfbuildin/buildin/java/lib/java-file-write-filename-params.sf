@@ -24,7 +24,10 @@ FileWriter(, * as $javaIOFileName);
 // java.nio.file.Files
 Files?{<typeName>?{have: 'java.nio'}}.write(,* as $nioParam)
 
+// RandomAccessFile file = new RandomAccessFile("example.txt", "rw");
+RandomAccessFile?{*().write()}(,* as $randomAccessFile,);
 
+$randomAccessFile as $output;
 $javaIOFileParam as $output;
 $printWriterFilenames as $output;
 $javaIOFileStreamName as $output;

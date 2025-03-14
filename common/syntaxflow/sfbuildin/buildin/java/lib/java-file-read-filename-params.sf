@@ -24,7 +24,10 @@ Files?{<typeName>?{have: 'java.nio'}}.newBufferedReader(,* as $nioBufferedReader
 // java.nio.file.Files.newInputStream
 Files?{<typeName>?{have: 'java.nio'}}.newInputStream(,* as $nioInputStream);
 
+// RandomAccessFile file = new RandomAccessFile("example.txt", "r");
+RandomAccessFile?{*().read()}(,* as $randomAccessFile,);
 
+$randomAccessFile as $output;
 $fileReader as $output;
 $fileInputStream as $output;
 $nioFileRead as $output;
