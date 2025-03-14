@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"io"
 	"io/ioutil"
 	"net"
@@ -16,6 +15,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 
 	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
@@ -290,10 +291,7 @@ func newLocalClientEx(local bool) (ypb.YakClient, error) {
 		initLocalClientOnce.Do(func() {
 			yaklang.Import("test", map[string]any{
 				"callhook": func(name string) any {
-					if callHook != nil {
-						return callHook(name)
-					}
-					panic("callHook is nil")
+					return callHook(name)
 				},
 			})
 			port = utils.GetRandomAvailableTCPPort()
