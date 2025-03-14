@@ -100,7 +100,7 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 		}).Build()
 	})
 
-	codeBytes := GetCorePluginData(pluginName)
+	codeBytes := GetCorePluginDataWithHook(pluginName)
 	if codeBytes == nil {
 		t.Errorf("无法从bindata获取: %v", pluginName)
 		return false
