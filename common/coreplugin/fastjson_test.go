@@ -1,15 +1,53 @@
 package coreplugin
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
+
+	record := omap.NewEmptyOrderedMap[string, bool]()
+	yakgrpc.CallHookMap.Store("NewDNSLogDomain", func() any {
+		return func() (domain string, token string, _ error) {
+			token = ksuid.New().String()
+			domain = token + ".dnslog.cn"
+			return domain, token, nil
+		}
+	})
+	yakgrpc.CallHookMap.Store("CheckDNSLogByToken", func() any {
+		return func(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+			if record.Have(token) {
+				return []*tpb.DNSLogEvent{
+					&tpb.DNSLogEvent{
+						Token: token,
+					},
+				}, nil
+			}
+			return nil, errors.New("not found")
+		}
+	})
+	vulinbox.HandleDnsRequest = func(domain string) {
+		token := strings.TrimSuffix(domain, ".dnslog.cn")
+		record.Set(token, true)
+	}
+	RegisterLoadCorePluginHook(func(name string, source string) string {
+		if name == "Fastjson 综合检测" {
+			source = strings.Replace(source, `risk.NewDNSLogDomain`, `test.callhook("NewDNSLogDomain")`, -1)
+			source = strings.Replace(source, `risk.CheckDNSLogByToken`, `test.callhook("CheckDNSLogByToken")`, -1)
+		}
+		return source
+	})
 	client, err := yakgrpc.NewLocalClient(true)
 	if err != nil {
 		panic(err)

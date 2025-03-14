@@ -6,15 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -36,6 +36,8 @@ func generateFastjsonParser(version string) JsonParser {
 	}
 }
 
+var HandleDnsRequest func(domain string)
+
 // 这里模拟fastjson的解析过程
 func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) {
 	// redos
@@ -44,7 +46,7 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 	}
 	var domain string
 	// 查找dnslog
-	re, err := regexp.Compile(`127\.0\.0\.1\:\d+`)
+	re, err := regexp.Compile(`(\w+\.)+((dnslog\.cn)|(ceye\.io)|(vcap\.me)|(vcap\.io)|(xip\.io)|(burpcollaborator\.net)|(dgrh3\.cn)|(\w+\.eu\.org)|(gobygo\.net))|(127\.0\.0\.1:\d+)`)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +62,12 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 		go func() {
 			if domain != magicIntranetHost {
 				log.Infof("dnslog action to: %s", domain)
-				poc.DoGET("http://"+domain, poc.WithContext(ctx))
+				if HandleDnsRequest != nil {
+					HandleDnsRequest(domain)
+				} else {
+					netx.LookupFirst(domain, netx.WithDNSContext(ctx), netx.WithDNSNoCache(false))
+				}
+
 			} else {
 				time.Sleep(2 * time.Second)
 			}
@@ -271,6 +278,7 @@ func (s *VulinServer) registerFastjson() {
                 url:"/fastjson/json-in-body",
                 data:JSON.stringify(auth),
 				dataType: "json",
+				contentType: "application/json",
                 success: function (data ,textStatus, jqXHR)
                 {
                     $("#response").text(JSON.stringify(data));
@@ -386,7 +394,7 @@ func (s *VulinServer) registerFastjson() {
             auth = {"user":name,"password":password};
             $.ajax({
                 type:"get",
-                url:"/fastjson/json-in-query",
+                url:"/fastjson/jackson-in-query",
                 data:{"auth":JSON.stringify(auth),"action":"login"},
                 success: function (data ,textStatus, jqXHR)
                 {
@@ -431,7 +439,7 @@ func (s *VulinServer) registerFastjson() {
             auth = {"user":name,"password":password};
             $.ajax({
                 type:"post",
-                url:"/fastjson/json-in-form",
+                url:"/fastjson/unstable-network",
                 data:{"auth":JSON.stringify(auth),"action":"login"},
 				dataType: "json",
                 success: function (data ,textStatus, jqXHR)
@@ -463,7 +471,7 @@ func (s *VulinServer) registerFastjson() {
             auth = {"user":name,"password":password};
             $.ajax({
                 type:"get",
-                url:"/fastjson/json-in-query",
+                url:"/fastjson/get-in-query-intranet",
                 data:{"auth":JSON.stringify(auth),"action":"login"},
                 success: function (data ,textStatus, jqXHR)
                 {
