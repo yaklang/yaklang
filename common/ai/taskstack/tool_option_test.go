@@ -2,34 +2,43 @@ package taskstack
 
 import (
 	"encoding/json"
+	"io"
 	"reflect"
 	"testing"
 )
+
+// 提供一个测试用的回调函数
+func testCallback(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	return params, nil
+}
 
 // TestNewToolWithOptions 测试使用函数选项模式创建工具
 func TestNewToolWithOptions(t *testing.T) {
 	tests := []struct {
 		name     string
-		builder  func() *Tool
+		builder  func() (*Tool, error)
 		expected *Tool
 	}{
 		{
 			name: "简单工具",
-			builder: func() *Tool {
+			builder: func() (*Tool, error) {
 				return NewTool("simpleTool",
-					WithTool_Description("简单工具描述"))
+					WithTool_Description("简单工具描述"),
+					WithTool_Callback(testCallback))
 			},
 			expected: &Tool{
 				Name:        "simpleTool",
 				Description: "简单工具描述",
 				Params:      []*ToolParam{},
+				Callback:    testCallback,
 			},
 		},
 		{
 			name: "带参数的工具",
-			builder: func() *Tool {
+			builder: func() (*Tool, error) {
 				return NewTool("paramTool",
 					WithTool_Description("带参数的工具"),
+					WithTool_Callback(testCallback),
 					WithTool_Param(
 						NewToolParam("query", "string",
 							WithTool_ParamDescription("查询参数"),
@@ -61,13 +70,15 @@ func TestNewToolWithOptions(t *testing.T) {
 						Default:     10,
 					},
 				},
+				Callback: testCallback,
 			},
 		},
 		{
 			name: "带数组参数的工具",
-			builder: func() *Tool {
+			builder: func() (*Tool, error) {
 				return NewTool("arrayTool",
 					WithTool_Description("带数组参数的工具"),
+					WithTool_Callback(testCallback),
 					WithTool_Param(
 						NewToolParam("items", "array",
 							WithTool_ParamDescription("数组参数"),
@@ -98,13 +109,15 @@ func TestNewToolWithOptions(t *testing.T) {
 						},
 					},
 				},
+				Callback: testCallback,
 			},
 		},
 		{
 			name: "嵌套数组参数工具",
-			builder: func() *Tool {
+			builder: func() (*Tool, error) {
 				return NewTool("nestedArrayTool",
 					WithTool_Description("嵌套数组参数工具"),
+					WithTool_Callback(testCallback),
 					WithTool_Param(
 						NewToolParam("nestedItems", "array",
 							WithTool_ParamDescription("嵌套数组参数"),
@@ -148,13 +161,15 @@ func TestNewToolWithOptions(t *testing.T) {
 						},
 					},
 				},
+				Callback: testCallback,
 			},
 		},
 		{
 			name: "多参数工具",
-			builder: func() *Tool {
+			builder: func() (*Tool, error) {
 				return NewTool("multiParamTool",
 					WithTool_Description("多参数工具"),
+					WithTool_Callback(testCallback),
 					WithTool_Param(
 						NewToolParam("stringParam", "string",
 							WithTool_ParamDescription("字符串参数"),
@@ -200,13 +215,18 @@ func TestNewToolWithOptions(t *testing.T) {
 						Required:    true,
 					},
 				},
+				Callback: testCallback,
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tool := tt.builder()
+			tool, err := tt.builder()
+			if err != nil {
+				t.Errorf("创建工具出错: %v", err)
+				return
+			}
 
 			// 检查工具名称
 			if tool.Name != tt.expected.Name {
@@ -222,6 +242,11 @@ func TestNewToolWithOptions(t *testing.T) {
 			if len(tool.Params) != len(tt.expected.Params) {
 				t.Errorf("Params length = %v, want %v", len(tool.Params), len(tt.expected.Params))
 				return
+			}
+
+			// 检查回调函数是否设置
+			if tool.Callback == nil {
+				t.Errorf("Callback is nil, expected non-nil")
 			}
 
 			// 检查每个参数
@@ -296,6 +321,14 @@ func TestNewToolWithOptions(t *testing.T) {
 	}
 }
 
+// TestMissingCallback 测试缺少回调函数的情况
+func TestMissingCallback(t *testing.T) {
+	_, err := NewTool("noCallbackTool", WithTool_Description("没有回调的工具"))
+	if err == nil {
+		t.Errorf("Expected error for missing callback, got nil")
+	}
+}
+
 // TestToolJSONSchemaGeneration 测试使用函数选项模式创建的工具生成的JSON Schema
 func TestToolJSONSchemaGeneration(t *testing.T) {
 	tests := []struct {
@@ -305,20 +338,28 @@ func TestToolJSONSchemaGeneration(t *testing.T) {
 	}{
 		{
 			name: "简单工具JSON Schema",
-			tool: NewTool("simpleTool",
-				WithTool_Description("简单工具描述")),
+			tool: &Tool{
+				Name:        "simpleTool",
+				Description: "简单工具描述",
+				Callback:    testCallback,
+			},
 			expectedFields: []string{"$schema", "type", "description", "properties", "required"},
 		},
 		{
 			name: "带参数工具JSON Schema",
-			tool: NewTool("paramTool",
-				WithTool_Description("带参数的工具"),
-				WithTool_Param(
-					NewToolParam("query", "string",
-						WithTool_ParamDescription("查询参数"),
-						WithTool_ParamRequired(true),
-					),
-				)),
+			tool: &Tool{
+				Name:        "paramTool",
+				Description: "带参数的工具",
+				Callback:    testCallback,
+				Params: []*ToolParam{
+					{
+						Name:        "query",
+						Type:        "string",
+						Description: "查询参数",
+						Required:    true,
+					},
+				},
+			},
 			expectedFields: []string{"$schema", "type", "description", "properties", "required"},
 		},
 	}
@@ -365,8 +406,9 @@ func TestToolJSONSchemaGeneration(t *testing.T) {
 // TestComplexToolCreation 测试创建复杂工具
 func TestComplexToolCreation(t *testing.T) {
 	// 创建一个复杂工具
-	complexTool := NewTool("complexTool",
+	complexTool, err := NewTool("complexTool",
 		WithTool_Description("复杂工具"),
+		WithTool_Callback(testCallback),
 		WithTool_Param(
 			NewToolParam("simpleParam", "string",
 				WithTool_ParamDescription("简单参数"),
@@ -399,6 +441,11 @@ func TestComplexToolCreation(t *testing.T) {
 			),
 		),
 	)
+
+	if err != nil {
+		t.Errorf("创建复杂工具出错: %v", err)
+		return
+	}
 
 	// 验证基本属性
 	if complexTool.Name != "complexTool" {
