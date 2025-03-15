@@ -5,11 +5,11 @@ import (
 )
 
 func TestPlanRequestUsage(t *testing.T) {
-	// 演示使用WithQuery和WithMetaData辅助函数创建PlanRequest
+	// 演示使用WithPlan_Query和WithPlan_MetaData辅助函数创建PlanRequest
 	request, err := CreatePlanRequest(
 		"编写一个REST API服务",
-		WithMetaData("MetaInfo", "服务需要支持用户认证和数据加密"),
-		WithMetaData("Framework", "Gin框架"),
+		WithPlan_MetaData("MetaInfo", "服务需要支持用户认证和数据加密"),
+		WithPlan_MetaData("Framework", "Gin框架"),
 	)
 
 	if err != nil {
