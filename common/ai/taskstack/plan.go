@@ -4,9 +4,16 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"io"
+	"strings"
 	"text/template"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai"
 )
+
+// AICallback 定义AI调用回调函数类型，输入为提示语字符串，输出为响应reader和错误
+type AICallback func(prompt string) (io.Reader, error)
 
 //go:embed prompts/generate-tasklist.txt
 var generateTaskListPrompt string
@@ -29,8 +36,9 @@ const (
 )
 
 type PlanRequest struct {
-	MetaData map[string]any
-	Query    string
+	MetaData   map[string]any
+	Query      string
+	AICallback AICallback // AI回调函数
 }
 
 type PlanResponse struct {
@@ -145,6 +153,13 @@ func WithUserLevel(level string) PlanOption {
 	}
 }
 
+// WithAICallback 设置AI回调函数
+func WithAICallback(callback AICallback) PlanOption {
+	return func(pr *PlanRequest) {
+		pr.AICallback = callback
+	}
+}
+
 // GeneratePrompt 根据PlanRequest生成prompt
 func (pr *PlanRequest) GeneratePrompt() (string, error) {
 	tmpl, err := template.New("generateTaskList").Parse(generateTaskListPrompt)
@@ -255,10 +270,61 @@ func (pr *PlanRequest) GeneratePrompt() (string, error) {
 	return buf.String(), nil
 }
 
+// Invoke 执行规划请求，调用AI生成任务列表并返回解析后的Task
+func (pr *PlanRequest) Invoke() (*PlanResponse, error) {
+	// 检查回调函数是否设置
+	if pr.AICallback == nil {
+		return nil, fmt.Errorf("未设置AI回调函数")
+	}
+
+	// 生成 Prompt
+	prompt, err := pr.GeneratePrompt()
+	if err != nil {
+		return nil, fmt.Errorf("生成规划 prompt 失败: %v", err)
+	}
+
+	// 调用 AI 回调函数
+	responseReader, err := pr.AICallback(prompt)
+	if err != nil {
+		return nil, fmt.Errorf("调用 AI 服务失败: %v", err)
+	}
+
+	// 读取响应内容
+	responseBytes, err := io.ReadAll(responseReader)
+	if err != nil {
+		return nil, fmt.Errorf("读取 AI 响应失败: %v", err)
+	}
+	response := string(responseBytes)
+
+	// 从响应中提取任务
+	task, err := ExtractTaskFromRawResponse(response)
+	if err != nil {
+		return nil, fmt.Errorf("从 AI 响应中提取任务失败: %v", err)
+	}
+
+	// 将AICallback转换为TaskAICallback并设置给Task
+	taskCallback := TaskAICallback(pr.AICallback)
+	task.SetAICallback(taskCallback)
+
+	return &PlanResponse{
+		RootTask: task,
+	}, nil
+}
+
+// DefaultAICallback 默认的AI回调函数，使用ai.Chat实现
+func DefaultAICallback(prompt string) (io.Reader, error) {
+	response, err := ai.Chat(prompt)
+	if err != nil {
+		return nil, err
+	}
+	return strings.NewReader(response), nil
+}
+
 func CreatePlanRequest(query string, opts ...PlanOption) (*PlanRequest, error) {
 	request := &PlanRequest{
-		MetaData: map[string]any{},
-		Query:    query,
+		MetaData:   map[string]any{},
+		Query:      query,
+		AICallback: DefaultAICallback, // 设置默认的AI回调函数
 	}
 
 	// 添加默认元数据 - 当前时间
