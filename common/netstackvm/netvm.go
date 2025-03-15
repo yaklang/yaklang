@@ -128,7 +128,7 @@ func NewSystemNetStackVM(opts ...Option) (*NetStackVirtualMachine, error) {
 		if nic.Flags&net.FlagRunning == 0 { // just get the running interface
 			continue
 		}
-		vm, err := NewNetStackVirtualMachineEntry(WithPcapDevice(nic.Name), WithNetStack(s))
+		vm, err := NewNetStackVirtualMachineEntry(append(opts, WithPcapDevice(nic.Name), WithNetStack(s))...)
 		if err != nil {
 			log.Errorf("failed to build netStackVM: %v", err)
 			return nil, err

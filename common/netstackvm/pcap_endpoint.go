@@ -45,7 +45,8 @@ type PCAPEndpoint struct {
 	// ethernet cache n arp cache
 	ipToMac *sync.Map
 
-	loopback bool
+	loopback     bool
+	capabilities stack.LinkEndpointCapabilities
 }
 
 const defaultOutQueueLen = 1 << 10
@@ -67,7 +68,10 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, 
 	if err != nil {
 		return nil, err
 	}
-	mtu := iface.MTU + 100
+	mtu := iface.MTU + 200
+	if iface.Flags&net.FlagLoopback != 0 {
+		mtu = 65535 // loopback mtu
+	}
 
 	internalMacAddr := macAddr
 	externalMacAddr := iface.HardwareAddr
@@ -515,8 +519,9 @@ func (p *PCAPEndpoint) encapsulatePayloadLoopback(payloads []byte) ([]byte, gopa
 }
 
 func (p *PCAPEndpoint) Capabilities() stack.LinkEndpointCapabilities {
-	if p.loopback {
-		return stack.CapabilityLoopback
-	}
-	return stack.CapabilityResolutionRequired
+	return p.capabilities
+}
+
+func (p *PCAPEndpoint) SetCapabilities(flag stack.LinkEndpointCapabilities) {
+	p.capabilities = flag
 }

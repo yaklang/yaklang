@@ -79,6 +79,7 @@ type Config struct {
 	pcapDevice         string
 	pcapInboundFilter  func(packet gopacket.Packet) bool
 	pcapOutboundFilter func(packet gopacket.Packet) bool
+	pcapCapabilities   stack.LinkEndpointCapabilities
 
 	// stack options
 	IPv4Disabled                bool
@@ -224,6 +225,7 @@ func NewDefaultConfig() *Config {
 		ARPAnnouncementFastTimes:    2,
 		ARPAnnouncementSlowInterval: 30 * time.Second,
 		pcapPromisc:                 true,
+		pcapCapabilities:            stack.CapabilityResolutionRequired,
 	}
 }
 
@@ -308,6 +310,13 @@ func WithPcapPromisc(promisc bool) Option {
 func WithPcapDevice(device string) Option {
 	return func(c *Config) error {
 		c.pcapDevice = device
+		return nil
+	}
+}
+
+func WithPcapCapabilities(capabilities stack.LinkEndpointCapabilities) Option {
+	return func(c *Config) error {
+		c.pcapCapabilities = capabilities
 		return nil
 	}
 }
