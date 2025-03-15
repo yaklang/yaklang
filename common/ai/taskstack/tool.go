@@ -2,13 +2,19 @@ package taskstack
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 )
+
+// InvokeCallback 定义工具调用回调函数的签名
+type InvokeCallback func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error)
 
 type Tool struct {
 	Name        string
 	Description string
 	Params      []*ToolParam
+	Callback    InvokeCallback // 添加回调函数字段
 }
 
 type ToolParam struct {
@@ -31,7 +37,7 @@ type ToolParamValue struct {
 type ToolOption func(*Tool)
 
 // NewTool 使用函数选项模式创建一个新的Tool实例
-func NewTool(name string, options ...ToolOption) *Tool {
+func NewTool(name string, options ...ToolOption) (*Tool, error) {
 	tool := &Tool{
 		Name:   name,
 		Params: []*ToolParam{},
@@ -42,7 +48,12 @@ func NewTool(name string, options ...ToolOption) *Tool {
 		option(tool)
 	}
 
-	return tool
+	// 检查是否设置了回调函数
+	if tool.Callback == nil {
+		return nil, errors.New("回调函数未设置，请使用 WithTool_Callback 选项设置回调函数")
+	}
+
+	return tool, nil
 }
 
 // WithTool_Description 设置工具的描述信息
@@ -56,6 +67,13 @@ func WithTool_Description(description string) ToolOption {
 func WithTool_Param(param *ToolParam) ToolOption {
 	return func(t *Tool) {
 		t.Params = append(t.Params, param)
+	}
+}
+
+// WithTool_Callback 设置工具的回调函数
+func WithTool_Callback(callback InvokeCallback) ToolOption {
+	return func(t *Tool) {
+		t.Callback = callback
 	}
 }
 
