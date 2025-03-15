@@ -48,21 +48,21 @@ type PlanResponse struct {
 type PlanOption func(*PlanRequest)
 
 // 添加查询选项
-func WithQuery(query string) PlanOption {
+func WithPlan_Query(query string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.Query = query
 	}
 }
 
 // 添加元数据选项
-func WithMetaData(key string, value any) PlanOption {
+func WithPlan_MetaData(key string, value any) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[key] = value
 	}
 }
 
 // 添加当前时间
-func WithCurrentTime() PlanOption {
+func WithPlan_CurrentTime() PlanOption {
 	return func(pr *PlanRequest) {
 		now := time.Now()
 		pr.MetaData[CurrentTimeKey] = now.Format("2006-01-02 15:04:05")
@@ -70,91 +70,91 @@ func WithCurrentTime() PlanOption {
 }
 
 // 添加基本元信息
-func WithMetaInfo(info string) PlanOption {
+func WithPlan_MetaInfo(info string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[MetaInfoKey] = info
 	}
 }
 
 // 添加框架信息
-func WithFramework(framework string) PlanOption {
+func WithPlan_Framework(framework string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[FrameworkKey] = framework
 	}
 }
 
 // 添加编程语言
-func WithLanguage(language string) PlanOption {
+func WithPlan_Language(language string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[LanguageKey] = language
 	}
 }
 
 // 添加环境信息
-func WithEnvironment(env string) PlanOption {
+func WithPlan_Environment(env string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[EnvironmentKey] = env
 	}
 }
 
 // 添加目标平台
-func WithTargetPlatform(platform string) PlanOption {
+func WithPlan_TargetPlatform(platform string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[TargetPlatformKey] = platform
 	}
 }
 
 // 添加API版本
-func WithAPIVersion(version string) PlanOption {
+func WithPlan_APIVersion(version string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[APIVersionKey] = version
 	}
 }
 
 // 添加数据库类型
-func WithDbType(dbType string) PlanOption {
+func WithPlan_DbType(dbType string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[DbTypeKey] = dbType
 	}
 }
 
 // 添加安全级别要求
-func WithSecurityLevel(level string) PlanOption {
+func WithPlan_SecurityLevel(level string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[SecurityLevelKey] = level
 	}
 }
 
 // 添加性能要求
-func WithPerformance(performance string) PlanOption {
+func WithPlan_Performance(performance string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[PerformanceKey] = performance
 	}
 }
 
 // 添加截止日期
-func WithDeadline(deadline string) PlanOption {
+func WithPlan_Deadline(deadline string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[DeadlineKey] = deadline
 	}
 }
 
 // 添加预算
-func WithBudget(budget string) PlanOption {
+func WithPlan_Budget(budget string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[BudgetKey] = budget
 	}
 }
 
 // 添加用户技术水平
-func WithUserLevel(level string) PlanOption {
+func WithPlan_UserLevel(level string) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.MetaData[UserLevelKey] = level
 	}
 }
 
-// WithAICallback 设置AI回调函数
-func WithAICallback(callback AICallback) PlanOption {
+// WithPlan_AICallback 设置AI回调函数
+func WithPlan_AICallback(callback AICallback) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.AICallback = callback
 	}

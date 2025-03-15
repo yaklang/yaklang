@@ -67,10 +67,12 @@ func TestTask_Invoke_NoTools(t *testing.T) {
 		AICallback: mockAICallback,
 	}
 
-	// 执行任务
-	result, err := task.Invoke(nil, map[string]interface{}{
-		"test_key": "test_value",
-	})
+	// 执行任务，使用WithTask_Metadata选项
+	result, err := task.Invoke(
+		WithTask_Metadata(map[string]interface{}{
+			"test_key": "test_value",
+		}),
+	)
 
 	// 验证结果
 	require.NoError(t, err)
@@ -98,14 +100,17 @@ func TestTask_Invoke_WithTools(t *testing.T) {
 	// 创建一个简单的任务
 	task := &Task{
 		Name:       "测试任务",
-		Goal:       "测试Task的Invoke方法（带工具）",
+		Goal:       "测试Task的Invoke方法（使用工具）",
 		AICallback: mockAICallback,
 	}
 
-	// 执行任务
-	result, err := task.Invoke([]*Tool{testTool}, map[string]interface{}{
-		"test_key": "test_value",
-	})
+	// 执行任务，使用WithTask_Tools和WithTask_Metadata选项
+	result, err := task.Invoke(
+		WithTask_Tools([]*Tool{testTool}),
+		WithTask_Metadata(map[string]interface{}{
+			"test_key": "test_value",
+		}),
+	)
 
 	// 验证结果
 	require.NoError(t, err)
@@ -180,29 +185,30 @@ func TestTask_Invoke_WithToolDescription(t *testing.T) {
 }
 
 func TestTask_Invoke_WithSubtasks(t *testing.T) {
-	// 创建一个带子任务的任务
-	task := &Task{
-		Name:       "主任务",
-		Goal:       "测试带子任务的Task Invoke方法",
+	// 创建带子任务的任务
+	parentTask := &Task{
+		Name:       "父任务",
+		Goal:       "测试子任务执行",
 		AICallback: mockAICallback,
 		Subtasks: []Task{
 			{
-				Name:       "子任务1",
-				Goal:       "子任务1的目标",
-				AICallback: mockAICallback,
+				Name: "子任务1",
+				Goal: "子任务1目标",
+				// 子任务会继承父任务的AICallback
 			},
 			{
-				Name:       "子任务2",
-				Goal:       "子任务2的目标",
-				AICallback: mockAICallback,
+				Name: "子任务2",
+				Goal: "子任务2目标",
 			},
 		},
 	}
 
-	// 执行任务
-	result, err := task.Invoke(nil, map[string]interface{}{
-		"test_key": "test_value",
-	})
+	// 执行任务，使用WithTask_Metadata选项
+	result, err := parentTask.Invoke(
+		WithTask_Metadata(map[string]interface{}{
+			"test_key": "test_value",
+		}),
+	)
 
 	// 验证结果
 	require.NoError(t, err)
@@ -217,7 +223,7 @@ func TestTask_NoAICallback(t *testing.T) {
 	}
 
 	// 执行任务，应该返回错误
-	_, err := task.Invoke(nil, map[string]interface{}{})
+	_, err := task.Invoke()
 
 	// 验证错误
 	require.Error(t, err)
@@ -254,7 +260,7 @@ func TestTask_ProgressInfo(t *testing.T) {
 	}
 
 	// 执行任务
-	result, err := task.Invoke(nil, map[string]interface{}{})
+	result, err := task.Invoke()
 
 	// 验证结果
 	require.NoError(t, err)
@@ -436,7 +442,9 @@ func TestTask_DirectAnswer(t *testing.T) {
 	}
 
 	// 执行任务
-	result, err := task.Invoke([]*Tool{testTool1, testTool2}, map[string]interface{}{})
+	result, err := task.Invoke(
+		WithTask_Tools([]*Tool{testTool1, testTool2}),
+	)
 
 	// 验证结果
 	require.NoError(t, err)
