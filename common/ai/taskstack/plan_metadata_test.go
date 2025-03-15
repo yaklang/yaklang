@@ -9,19 +9,19 @@ func TestEnhancedMetadata(t *testing.T) {
 	// 测试使用多种元数据创建PlanRequest
 	request, err := CreatePlanRequest(
 		"创建一个电子商务网站",
-		WithMetaInfo("这是一个综合元信息测试"),
-		WithFramework("Spring Boot"),
-		WithLanguage("Java"),
-		WithEnvironment("AWS"),
-		WithTargetPlatform("Web, iOS, Android"),
-		WithAPIVersion("v2.0"),
-		WithDbType("MySQL"),
-		WithSecurityLevel("高 - 需要支持HTTPS和数据加密"),
-		WithPerformance("支持1000并发用户"),
-		WithDeadline("2023-12-31"),
-		WithBudget("$50,000"),
-		WithUserLevel("高级开发者"),
-		WithMetaData("团队规模", "5人"),
+		WithPlan_MetaInfo("这是一个综合元信息测试"),
+		WithPlan_Framework("Spring Boot"),
+		WithPlan_Language("Java"),
+		WithPlan_Environment("AWS"),
+		WithPlan_TargetPlatform("Web, iOS, Android"),
+		WithPlan_APIVersion("v2.0"),
+		WithPlan_DbType("MySQL"),
+		WithPlan_SecurityLevel("高 - 需要支持HTTPS和数据加密"),
+		WithPlan_Performance("支持1000并发用户"),
+		WithPlan_Deadline("2023-12-31"),
+		WithPlan_Budget("$50,000"),
+		WithPlan_UserLevel("高级开发者"),
+		WithPlan_MetaData("团队规模", "5人"),
 	)
 
 	if err != nil {
@@ -120,7 +120,7 @@ func TestOverrideCurrentTime(t *testing.T) {
 	customTime := "2023-01-01 00:00:00"
 	request, err := CreatePlanRequest(
 		"覆盖当前时间的查询",
-		WithMetaData(CurrentTimeKey, customTime),
+		WithPlan_MetaData(CurrentTimeKey, customTime),
 	)
 	if err != nil {
 		t.Fatalf("创建PlanRequest失败: %v", err)
@@ -152,7 +152,7 @@ func TestWithCurrentTimeFunction(t *testing.T) {
 	// 测试使用WithCurrentTime函数更新当前时间
 	request, err := CreatePlanRequest(
 		"使用WithCurrentTime的查询",
-		WithCurrentTime(), // 显式调用WithCurrentTime会更新时间戳
+		WithPlan_CurrentTime(), // 显式调用WithCurrentTime会更新时间戳
 	)
 	if err != nil {
 		t.Fatalf("创建PlanRequest失败: %v", err)

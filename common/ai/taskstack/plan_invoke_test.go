@@ -33,9 +33,9 @@ func TestPlanRequest_Invoke(t *testing.T) {
 	// 创建 PlanRequest 并设置mock回调
 	request, err := CreatePlanRequest(
 		"帮我计划一次旅游",
-		WithLanguage("Go"),
-		WithMetaInfo("这是一个旅游计划任务"),
-		WithAICallback(func(prompt string) (io.Reader, error) {
+		WithPlan_Language("Go"),
+		WithPlan_MetaInfo("这是一个旅游计划任务"),
+		WithPlan_AICallback(func(prompt string) (io.Reader, error) {
 			// 验证prompt包含期望的内容
 			assert.Contains(t, prompt, "帮我计划一次旅游")
 			assert.Contains(t, prompt, "编程语言: Go")
@@ -93,8 +93,7 @@ func TestPlanRequest_InvokeWithCustomCallback(t *testing.T) {
 	// 创建带有自定义回调的PlanRequest
 	request, err := CreatePlanRequest(
 		"帮我计划一次旅游",
-		WithLanguage("Go"),
-		WithAICallback(customCallback),
+		WithPlan_AICallback(customCallback),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, request)
@@ -202,8 +201,7 @@ func TestPlanRequest_InvokeWithNoiseResponse(t *testing.T) {
 	// 创建带有自定义回调的PlanRequest
 	request, err := CreatePlanRequest(
 		"帮我计划一次旅游",
-		WithLanguage("Go"),
-		WithAICallback(func(prompt string) (io.Reader, error) {
+		WithPlan_AICallback(func(prompt string) (io.Reader, error) {
 			return strings.NewReader(mockNoisyResponse), nil
 		}),
 	)
@@ -286,7 +284,7 @@ func TestPlanRequest_InvokeWithMultipleJSON(t *testing.T) {
 	// 创建带有自定义回调的PlanRequest
 	request, err := CreatePlanRequest(
 		"帮我规划一次复杂的旅行",
-		WithAICallback(func(prompt string) (io.Reader, error) {
+		WithPlan_AICallback(func(prompt string) (io.Reader, error) {
 			return strings.NewReader(mockChaosResponse), nil
 		}),
 	)
@@ -329,7 +327,7 @@ func TestPlanRequest_InvokeWithMalformedResponse(t *testing.T) {
 	// 创建带有自定义回调的PlanRequest
 	request, err := CreatePlanRequest(
 		"帮我计划一次旅游",
-		WithAICallback(func(prompt string) (io.Reader, error) {
+		WithPlan_AICallback(func(prompt string) (io.Reader, error) {
 			return strings.NewReader(mockMalformedResponse), nil
 		}),
 	)
@@ -387,7 +385,7 @@ func TestPlanRequest_InvokeWithMarkdownCodeBlock(t *testing.T) {
 	// 创建带有自定义回调的PlanRequest
 	request, err := CreatePlanRequest(
 		"帮我规划欧洲旅游",
-		WithAICallback(func(prompt string) (io.Reader, error) {
+		WithPlan_AICallback(func(prompt string) (io.Reader, error) {
 			return strings.NewReader(mockMarkdownResponse), nil
 		}),
 	)
