@@ -1,0 +1,39 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["tasks", "query", "@action"],
+    "additionalProperties": false,
+    "properties": {
+        "@action": {
+            "const": "plan",
+            "description": "标识当前操作的具体类型"
+        },
+        "query": {
+            "type": "string",
+            "description": "用户最原始想要执行的目标",
+            "minLength": 1
+        },
+        "tasks": {
+            "type": "array",
+            "description": "用户想要执行的任务拆分后的子任务",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": ["subtask_name", "subtask_goal"],
+                "additionalProperties": false,
+                "properties": {
+                    "subtask_name": {
+                        "type": "string",
+                        "description": "拆分后的子任务名称",
+                        "minLength": 1
+                    },
+                    "subtask_goal": {
+                        "type": "string",
+                        "description": "拆分后的子任务目标，描述任务执行到什么程度才算结束",
+                        "minLength": 1
+                    }
+                }
+            }
+        }
+    }
+}
