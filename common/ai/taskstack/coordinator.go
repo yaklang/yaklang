@@ -86,10 +86,14 @@ func (c *Coordinator) Run() error {
 	for stepIdx, task := range root.Subtasks {
 		log.Infof("step %d: %v", stepIdx, task.Name)
 	}
-
 	if len(root.tools) <= 0 {
 		log.Warnf("coordinator: no tools found")
 	}
+	result, err := root.Invoke()
+	if err != nil {
+		return utils.Errorf("coordinator: invoke root task failed: %v", err)
+	}
+	_ = result
 
 	return utils.Error("not implemented")
 }
