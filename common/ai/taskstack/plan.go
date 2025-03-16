@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"text/template"
 	"time"
@@ -300,8 +301,11 @@ func (pr *PlanRequest) Invoke() (*PlanResponse, error) {
 	}
 
 	// 将AICallback转换为TaskAICallback并设置给Task
-	taskCallback := TaskAICallback(pr.AICallback)
-	task.SetAICallback(taskCallback)
+	if task.AICallback == nil {
+		log.Warnf("task ai callback is not set, inherit from plan request")
+		taskCallback := TaskAICallback(pr.AICallback)
+		task.SetAICallback(taskCallback)
+	}
 
 	return &PlanResponse{
 		RootTask: task,
