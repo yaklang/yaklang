@@ -1,6 +1,7 @@
 package taskstack
 
 import (
+	"io"
 	"strings"
 	"testing"
 )
@@ -22,6 +23,10 @@ func TestEnhancedMetadata(t *testing.T) {
 		WithPlan_Budget("$50,000"),
 		WithPlan_UserLevel("高级开发者"),
 		WithPlan_MetaData("团队规模", "5人"),
+		// 添加一个模拟的AICallback
+		WithPlan_AICallback(func(prompt string) (io.Reader, error) {
+			return strings.NewReader(`{"@action":"plan","query":"创建一个电子商务网站","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`), nil
+		}),
 	)
 
 	if err != nil {
@@ -91,7 +96,13 @@ func TestEnhancedMetadata(t *testing.T) {
 
 func TestDefaultCurrentTime(t *testing.T) {
 	// 测试默认添加当前时间
-	request, err := CreatePlanRequest("简单查询")
+	request, err := CreatePlanRequest(
+		"简单查询",
+		// 添加一个模拟的AICallback
+		WithPlan_AICallback(func(prompt string) (io.Reader, error) {
+			return strings.NewReader(`{"@action":"plan","query":"简单查询","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`), nil
+		}),
+	)
 	if err != nil {
 		t.Fatalf("创建PlanRequest失败: %v", err)
 	}
@@ -121,6 +132,10 @@ func TestOverrideCurrentTime(t *testing.T) {
 	request, err := CreatePlanRequest(
 		"覆盖当前时间的查询",
 		WithPlan_MetaData(CurrentTimeKey, customTime),
+		// 添加一个模拟的AICallback
+		WithPlan_AICallback(func(prompt string) (io.Reader, error) {
+			return strings.NewReader(`{"@action":"plan","query":"覆盖当前时间的查询","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`), nil
+		}),
 	)
 	if err != nil {
 		t.Fatalf("创建PlanRequest失败: %v", err)
@@ -153,6 +168,10 @@ func TestWithCurrentTimeFunction(t *testing.T) {
 	request, err := CreatePlanRequest(
 		"使用WithCurrentTime的查询",
 		WithPlan_CurrentTime(), // 显式调用WithCurrentTime会更新时间戳
+		// 添加一个模拟的AICallback
+		WithPlan_AICallback(func(prompt string) (io.Reader, error) {
+			return strings.NewReader(`{"@action":"plan","query":"使用WithCurrentTime的查询","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`), nil
+		}),
 	)
 	if err != nil {
 		t.Fatalf("创建PlanRequest失败: %v", err)

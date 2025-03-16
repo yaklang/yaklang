@@ -1,6 +1,8 @@
 package taskstack
 
 import (
+	"io"
+	"strings"
 	"testing"
 )
 
@@ -10,6 +12,10 @@ func TestPlanRequestUsage(t *testing.T) {
 		"编写一个REST API服务",
 		WithPlan_MetaData("MetaInfo", "服务需要支持用户认证和数据加密"),
 		WithPlan_MetaData("Framework", "Gin框架"),
+		// 添加一个模拟的AICallback
+		WithPlan_AICallback(func(prompt string) (io.Reader, error) {
+			return strings.NewReader(`{"@action":"plan","query":"编写一个REST API服务","main_task":"创建REST API服务","main_task_goal":"完成一个基于Gin框架的REST API服务","tasks":[{"subtask_name":"设计API接口","subtask_goal":"定义所有API端点和数据结构"}]}`), nil
+		}),
 	)
 
 	if err != nil {
