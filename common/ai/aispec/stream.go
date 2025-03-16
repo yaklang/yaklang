@@ -31,6 +31,10 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 			chunked = true
 		}
 
+		if lowhttp.GetStatusCodeFromResponse(r) > 299 {
+			log.Warnf("response status code: %v", lowhttp.GetStatusCodeFromResponse(r))
+		}
+
 		var reader io.Reader = closer
 		// reader = io.TeeReader(reader, os.Stdout)
 		var ioReader io.Reader = utils.NewTrimLeftReader(reader)
@@ -44,7 +48,7 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 
 		for {
 			line, err := utils.BufioReadLine(lineReader)
-			if err != nil {
+			if err != nil && string(line) == "" {
 				if err != io.EOF {
 					log.Warnf("failed to read line [%#v]: %v", line, err)
 				}
