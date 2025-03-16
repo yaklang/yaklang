@@ -633,7 +633,13 @@ func ReplaceAllHTTPPacketHeaders(packet []byte, headers map[string]string) []byt
 	if _, ok := headers["Host"]; !ok {
 		headers["Host"] = host
 	}
+	buf.WriteString("Host: ")
+	buf.WriteString(strings.ReplaceAll(headers["Host"], "\n", ""))
+	buf.WriteString(CRLF)
+	delete(headers, "Host")
 	for key, value := range headers {
+		value = strings.ReplaceAll(value, "\n", "")
+		key = strings.ReplaceAll(key, "\n", "")
 		buf.WriteString(fmt.Sprintf("%s: %s", key, value))
 		buf.WriteString(CRLF)
 	}

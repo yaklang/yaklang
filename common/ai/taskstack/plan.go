@@ -5,11 +5,8 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
-	"strings"
 	"text/template"
 	"time"
-
-	"github.com/yaklang/yaklang/common/ai"
 )
 
 // AICallback 定义AI调用回调函数类型，输入为提示语字符串，输出为响应reader和错误
@@ -311,20 +308,10 @@ func (pr *PlanRequest) Invoke() (*PlanResponse, error) {
 	}, nil
 }
 
-// DefaultAICallback 默认的AI回调函数，使用ai.Chat实现
-func DefaultAICallback(prompt string) (io.Reader, error) {
-	response, err := ai.Chat(prompt)
-	if err != nil {
-		return nil, err
-	}
-	return strings.NewReader(response), nil
-}
-
 func CreatePlanRequest(query string, opts ...PlanOption) (*PlanRequest, error) {
 	request := &PlanRequest{
-		MetaData:   map[string]any{},
-		Query:      query,
-		AICallback: DefaultAICallback, // 设置默认的AI回调函数
+		MetaData: map[string]any{},
+		Query:    query,
 	}
 
 	// 添加默认元数据 - 当前时间
@@ -333,6 +320,10 @@ func CreatePlanRequest(query string, opts ...PlanOption) (*PlanRequest, error) {
 	// 应用其他选项
 	for _, opt := range opts {
 		opt(request)
+	}
+
+	if request.AICallback == nil {
+		return nil, fmt.Errorf("plan ai callback is not set")
 	}
 
 	return request, nil

@@ -51,7 +51,8 @@ func ChatBase(url string, model string, msg string, fs []Function, opt func() ([
 			}()
 			streamHandler(io.TeeReader(pr, body))
 		}()
-		_, _, err := poc.DoPOST(url, opts...)
+		rsp, _, err := poc.DoPOST(url, opts...)
+		_ = rsp
 		if err != nil {
 			return "", utils.Errorf("request post to %v：%v", url, err)
 		}
