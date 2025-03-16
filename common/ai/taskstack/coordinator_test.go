@@ -49,7 +49,7 @@ func TestNewCoordinator(t *testing.T) {
 	}
 
 	coordinator := NewCoordinator(
-		"帮我规划一个一家三口北京的一日游",
+		"帮我规划一个一家三口北京的一日游，子任务控制三步内",
 		WithPlan_AICallback(aiCallback),
 		WithCoordinator_Tool(GetAllMockTools()...),
 	)
