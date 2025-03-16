@@ -1,17 +1,18 @@
 package taskstack
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
-	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 //go:embed jsonschema/task.json
@@ -23,8 +24,8 @@ var executeTaskPromptTemplate string
 //go:embed prompts/describe-tool.txt
 var describeToolPromptTemplate string
 
-// 用于识别工具操作请求的正则表达式
-var toolActionRegex = regexp.MustCompile(`(?s)\` + "`" + `jsonschema.*?\{.*?"@action"\s*:\s*"([^"]+)".*?"tool"\s*:\s*"([^"]+)".*?\}\s*\` + "`" + ``)
+//go:embed prompts/tool-result.txt
+var toolResultPromptTemplate string
 
 // TaskAICallback 定义Task执行过程中AI调用回调函数类型
 type TaskAICallback func(prompt string) (io.Reader, error)
@@ -77,57 +78,26 @@ func WithTask_Metadata(metadata map[string]interface{}) TaskOption {
 	})
 }
 
-// WithTask_Subtasks 设置Task的子任务
-func WithTask_Subtasks(subtasks []Task) TaskOption {
-	return taskOptionFunc(func(t *Task) {
-		t.Subtasks = subtasks
-
-		// 如果已经设置了AICallback，则为子任务也设置相同的回调
-		if t.AICallback != nil {
-			for i := range t.Subtasks {
-				t.Subtasks[i].SetAICallback(t.AICallback)
-			}
-		}
-	})
-}
-
-// WithTask_ParentTask 设置任务的父任务
-func WithTask_ParentTask(parent *Task) TaskOption {
-	return taskOptionFunc(func(t *Task) {
-		// 从父任务继承回调函数和工具
-		if parent.AICallback != nil {
-			t.SetAICallback(parent.AICallback)
-		}
-
-		if parent.tools != nil && len(parent.tools) > 0 {
-			t.tools = parent.tools
-		}
-
-		// 可以选择性地从父任务继承一些元数据
-		if parent.metadata != nil {
-			if t.metadata == nil {
-				t.metadata = make(map[string]interface{})
-			}
-
-			// 只复制某些特定的元数据，避免覆盖子任务的特定设置
-			for k, v := range parent.metadata {
-				if _, exists := t.metadata[k]; !exists {
-					t.metadata[k] = v
-				}
-			}
-		}
-	})
-}
-
 type Task struct {
 	Name       string
 	Goal       string
-	Subtasks   []Task
+	ParentTask *Task
+	Subtasks   []*Task
 	AICallback TaskAICallback // AI回调函数
 
 	// 新增字段，存储默认工具和元数据
 	tools    []*Tool
 	metadata map[string]interface{}
+
+	executing bool
+	executed  bool
+}
+
+func (t *Task) applyToolsForAllSubtasks() {
+	for _, subtask := range t.Subtasks {
+		subtask.tools = t.tools
+		subtask.applyToolsForAllSubtasks()
+	}
 }
 
 // MarshalJSON 实现自定义的JSON序列化，跳过AICallback字段
@@ -136,9 +106,9 @@ func (t Task) MarshalJSON() ([]byte, error) {
 
 	// 创建一个不包含AICallback的结构体
 	return json.Marshal(struct {
-		Name     string `json:"name"`
-		Goal     string `json:"goal"`
-		Subtasks []Task `json:"subtasks,omitempty"`
+		Name     string  `json:"name"`
+		Goal     string  `json:"goal"`
+		Subtasks []*Task `json:"subtasks,omitempty"`
 	}{
 		Name:     t.Name,
 		Goal:     t.Goal,
@@ -150,9 +120,9 @@ func (t Task) MarshalJSON() ([]byte, error) {
 func (t *Task) UnmarshalJSON(data []byte) error {
 	// 创建一个临时结构体，不包含AICallback
 	aux := struct {
-		Name     string `json:"name"`
-		Goal     string `json:"goal"`
-		Subtasks []Task `json:"subtasks,omitempty"`
+		Name     string  `json:"name"`
+		Goal     string  `json:"goal"`
+		Subtasks []*Task `json:"subtasks,omitempty"`
 	}{}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -217,137 +187,36 @@ func (t *Task) DeepCopy() *Task {
 
 	// 深度复制子任务
 	if len(t.Subtasks) > 0 {
-		copy.Subtasks = make([]Task, len(t.Subtasks))
+		copy.Subtasks = make([]*Task, len(t.Subtasks))
 		for i, subtask := range t.Subtasks {
 			subtaskCopy := subtask.DeepCopy()
-			copy.Subtasks[i] = *subtaskCopy
+			copy.Subtasks[i] = subtaskCopy
 		}
 	}
 
 	return copy
 }
 
-// Invoke 执行当前任务，如果有子任务则依次执行子任务
-// 现在支持通过选项覆盖默认设置
-func (t *Task) Invoke(options ...TaskOption) (string, error) {
-	// 创建一个Task的深度副本，以便应用临时选项
-	taskCopy := t.DeepCopy()
-
-	// 应用临时选项
-	for _, option := range options {
-		option.Apply(taskCopy)
-	}
-
-	if taskCopy.AICallback == nil {
-		return "", errors.New("no AI callback function set")
-	}
-
-	// 使用Task中存储的tools和metadata，如果存在的话
-	tools := taskCopy.tools
-	metadata := make(map[string]interface{})
-
-	// 复制元数据
-	if taskCopy.metadata != nil {
-		for k, v := range taskCopy.metadata {
-			metadata[k] = v
-		}
-	}
-
-	// 如果有子任务，先执行所有子任务
-	if len(taskCopy.Subtasks) > 0 {
-		results := make([]string, 0, len(taskCopy.Subtasks))
-
-		// 计算总任务数（当前任务+所有子任务）
-		totalTasks := 1 + len(taskCopy.Subtasks)
-
-		for i, subtask := range taskCopy.Subtasks {
-			// 更新进度信息
-			progress := TaskProgress{
-				TotalTasks:     totalTasks,
-				CompletedTasks: i,
-				CurrentTask:    subtask.Name,
-				CurrentGoal:    subtask.Goal,
-			}
-
-			// 添加进度信息到metadata
-			metadataCopy := make(map[string]interface{})
-			for k, v := range metadata {
-				metadataCopy[k] = v
-			}
-			metadataCopy["progress"] = progress
-
-			// 为子任务提供父任务的tools和更新的metadata
-			subtaskCopy := subtask
-			if tools != nil {
-				subtaskCopy.tools = tools
-			}
-
-			// 确保子任务继承父任务的AICallback
-			if subtaskCopy.AICallback == nil {
-				subtaskCopy.AICallback = taskCopy.AICallback
-			}
-
-			// 执行子任务
-			result, err := (&subtaskCopy).Invoke(WithTask_Metadata(metadataCopy))
-			if err != nil {
-				return "", fmt.Errorf("error executing subtask '%s': %w", subtask.Name, err)
-			}
-
-			results = append(results, result)
-		}
-
-		// 所有子任务完成后，执行当前任务
-		progress := TaskProgress{
-			TotalTasks:     totalTasks,
-			CompletedTasks: len(taskCopy.Subtasks),
-			CurrentTask:    taskCopy.Name,
-			CurrentGoal:    taskCopy.Goal,
-		}
-
-		// 添加进度信息到metadata
-		metadataCopy := make(map[string]interface{})
-		for k, v := range metadata {
-			metadataCopy[k] = v
-		}
-		metadataCopy["progress"] = progress
-		metadataCopy["subtask_results"] = results
-
-		return taskCopy.executeTask(tools, metadataCopy)
-	}
-
-	// 没有子任务，直接执行当前任务
-	progress := TaskProgress{
-		TotalTasks:     1,
-		CompletedTasks: 0,
-		CurrentTask:    taskCopy.Name,
-		CurrentGoal:    taskCopy.Goal,
-	}
-
-	// 添加进度信息到metadata
-	metadataCopy := make(map[string]interface{})
-	for k, v := range metadata {
-		metadataCopy[k] = v
-	}
-	metadataCopy["progress"] = progress
-
-	return taskCopy.executeTask(tools, metadataCopy)
+type TaskSystemContext struct {
+	Progress    string
+	CurrentTask *Task
 }
 
 // executeTask 实际执行任务并返回结果
-func (t *Task) executeTask(tools []*Tool, metadata map[string]interface{}) (string, error) {
+func (t *Task) executeTask(ctx *TaskSystemContext) (string, error) {
 	// 使用Task的内部字段，如果传入的参数为nil则使用内部字段
-	actualTools := tools
+	actualTools := t.tools
 	if actualTools == nil && t.tools != nil {
 		actualTools = t.tools
 	}
 
-	actualMetadata := metadata
+	actualMetadata := map[string]any{}
 	if actualMetadata == nil && t.metadata != nil {
 		actualMetadata = t.metadata
 	}
 
 	// 生成初始执行任务的prompt
-	prompt, err := t.generateTaskPrompt(actualTools, actualMetadata)
+	prompt, err := t.generateTaskPrompt(actualTools, ctx, actualMetadata)
 	if err != nil {
 		return "", fmt.Errorf("error generating task prompt: %w", err)
 	}
@@ -372,59 +241,123 @@ func (t *Task) executeTask(tools []*Tool, metadata map[string]interface{}) (stri
 
 		response := string(responseBytes)
 		conversationHistory = append(conversationHistory, response)
-
-		// 检查是否有工具操作请求
-		matches := toolActionRegex.FindStringSubmatch(response)
-		if len(matches) > 2 {
-			action := matches[1]
-			toolName := matches[2]
-
-			// 处理不同的操作
-			switch action {
-			case "describe-tool":
-				// 生成工具描述响应
-				toolDescription, err := t.handleDescribeTool(actualTools, toolName)
-				if err != nil {
-					toolDescription = fmt.Sprintf("错误：%s", err.Error())
-				}
-				conversationHistory = append(conversationHistory, toolDescription)
-				currentPrompt = strings.Join(conversationHistory, "\n\n")
+		var toolRequired []string
+		for _, pairs := range jsonextractor.ExtractObjectIndexes(response) {
+			start, end := pairs[0], pairs[1]
+			toolRequiredJSON := response[start:end]
+			var data = make(map[string]any)
+			err := json.Unmarshal([]byte(toolRequiredJSON), &data)
+			if err != nil {
+				log.Errorf("error unmarshal tool required: %v", err)
 				continue
-			default:
-				// 未知操作，继续进行
-				finalResponse = response
-				break
 			}
-		} else {
-			// 没有工具操作请求，将当前响应作为最终响应
-			finalResponse = response
-			break
+			if rawData, ok := data["@action"]; ok && fmt.Sprint(rawData) != "require-tool" {
+				continue
+			}
+			if rawData, ok := data["tool"]; ok && fmt.Sprint(rawData) != "" {
+				toolRequired = append(toolRequired, fmt.Sprint(rawData))
+			}
+		}
+		for _, toolName := range toolRequired {
+			var targetTool *Tool
+			for _, tool := range actualTools {
+				if toolName == tool.Name {
+					targetTool = tool
+					break
+				}
+			}
+			paramsPrompt, err := t.generateRequireToolResponsePrompt(ctx, targetTool, toolName)
+			if err != nil {
+				log.Errorf("error generate require tool response prompt: %v", err)
+				continue
+			}
+			callParams, err := t.AICallback(paramsPrompt)
+			if err != nil {
+				log.Errorf("error calling AI: %v", err)
+				continue
+			}
+			callParamsString, _ := io.ReadAll(callParams)
+			result, err := targetTool.InvokeWithRaw(string(callParamsString))
+			if err != nil {
+				log.Errorf("error invoking tool: %v", err)
+				continue
+			}
+			continuePrompt, err := t.generateToolCallResponsePrompt(result, ctx, targetTool)
+			if err != nil {
+				log.Errorf("error generating tool call response prompt: %v", err)
+				continue
+			}
+			continueResult, err := t.AICallback(continuePrompt)
+			if err != nil {
+				log.Errorf("error calling AI: %v", err)
+				continue
+			}
+			nextResponse, err := io.ReadAll(continueResult)
+			if err != nil {
+				log.Errorf("error reading AI response: %v", err)
+				continue
+			}
+			_ = nextResponse
 		}
 	}
 
 	return finalResponse, nil
 }
 
-// handleDescribeTool 处理描述工具的请求
-func (t *Task) handleDescribeTool(tools []*Tool, toolName string) (string, error) {
-	// 查找请求的工具
-	var targetTool *Tool
-	for _, tool := range tools {
-		if tool.Name == toolName {
-			targetTool = tool
-			break
-		}
-	}
+//go:embed prompts/tool-prompt.txt
+var toolPrompt string
 
+func (t *Task) ToolPrompt() string {
+	if len(t.tools) <= 0 {
+		return ""
+	}
+	var buf bytes.Buffer
+	temp, err := template.New("tool-prompt").Parse(toolPrompt)
+	if err != nil {
+		log.Errorf("error parsing tool prompt template: %v", err)
+		return ""
+	}
+	err = temp.Execute(&buf, map[string]any{
+		"Tools": t.tools,
+	})
+	if err != nil {
+		log.Errorf("error for rendering tool prompt: %v", err)
+		return ""
+	}
+	return buf.String()
+}
+
+func (t *Task) generateToolCallResponsePrompt(result *ToolResult, runtime *TaskSystemContext, targetTool *Tool) (string, error) {
+	templatedata := map[string]any{
+		"Runtime": runtime,
+		"Task":    t,
+		"Tool":    targetTool,
+		"Result":  result,
+	}
+	temp, err := template.New("tool-result").Parse(toolResultPromptTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing tool result template: %w", err)
+	}
+	var promptBuilder strings.Builder
+	err = temp.Execute(&promptBuilder, templatedata)
+	if err != nil {
+		return "", fmt.Errorf("error executing tool result template: %w", err)
+	}
+	return promptBuilder.String(), nil
+}
+
+// handleDescribeTool 处理描述工具的请求
+func (t *Task) generateRequireToolResponsePrompt(runtime *TaskSystemContext, targetTool *Tool, toolName string) (string, error) {
 	if targetTool == nil {
 		return "", fmt.Errorf("找不到名为 '%s' 的工具", toolName)
 	}
 
 	// 生成工具的JSONSchema描述
 	toolJSONSchema := targetTool.ToJSONSchemaString()
-
 	// 创建模板数据
 	templateData := map[string]interface{}{
+		"Runtime":        runtime,
+		"Task":           t,
 		"Tool":           targetTool,
 		"ToolJSONSchema": toolJSONSchema,
 	}
@@ -446,12 +379,13 @@ func (t *Task) handleDescribeTool(tools []*Tool, toolName string) (string, error
 }
 
 // generateTaskPrompt 生成执行任务的prompt
-func (t *Task) generateTaskPrompt(tools []*Tool, metadata map[string]interface{}) (string, error) {
+func (t *Task) generateTaskPrompt(tools []*Tool, systemContext *TaskSystemContext, metadata map[string]interface{}) (string, error) {
 	// 创建模板数据
 	templateData := map[string]interface{}{
 		"Task":     t,
 		"Tools":    tools,
 		"Metadata": metadata,
+		"Runtime":  systemContext,
 	}
 
 	// 解析prompt模板
@@ -468,12 +402,6 @@ func (t *Task) generateTaskPrompt(tools []*Tool, metadata map[string]interface{}
 	}
 
 	return promptBuilder.String(), nil
-}
-
-type Runtime struct {
-	Freeze bool
-	Task   Task
-	Stack  *utils.Stack[Task]
 }
 
 // NewTaskFromJSON 从JSON字符串创建Task
@@ -558,7 +486,7 @@ func extractTaskWithoutOptions(rawResponse string) (*Task, error) {
 			mainTask := &Task{
 				Name:     planObj.MainTask,
 				Goal:     planObj.MainTaskGoal,
-				Subtasks: make([]Task, 0),
+				Subtasks: make([]*Task, 0),
 				metadata: map[string]interface{}{
 					"query": planObj.Query,
 				},
@@ -572,18 +500,22 @@ func extractTaskWithoutOptions(rawResponse string) (*Task, error) {
 				// 如果有多个子任务，使用除第一个外的所有任务作为子任务
 				if len(planObj.Tasks) > 1 {
 					for _, subtask := range planObj.Tasks[1:] {
-						mainTask.Subtasks = append(mainTask.Subtasks, Task{
-							Name: subtask.SubtaskName,
-							Goal: subtask.SubtaskGoal,
+						mainTask.Subtasks = append(mainTask.Subtasks, &Task{
+							Name:       subtask.SubtaskName,
+							Goal:       subtask.SubtaskGoal,
+							ParentTask: mainTask,
+							tools:      mainTask.tools,
 						})
 					}
 				}
 			} else {
 				// 主任务名称存在，将所有任务作为子任务
 				for _, subtask := range planObj.Tasks {
-					mainTask.Subtasks = append(mainTask.Subtasks, Task{
-						Name: subtask.SubtaskName,
-						Goal: subtask.SubtaskGoal,
+					mainTask.Subtasks = append(mainTask.Subtasks, &Task{
+						Name:       subtask.SubtaskName,
+						Goal:       subtask.SubtaskGoal,
+						ParentTask: mainTask,
+						tools:      mainTask.tools,
 					})
 				}
 			}
@@ -615,7 +547,7 @@ func extractTaskWithoutOptions(rawResponse string) (*Task, error) {
 					for _, st := range subtasks {
 						if subtaskMap, ok := st.(map[string]interface{}); ok {
 							if stName, ok := subtaskMap["name"].(string); ok && stName != "" {
-								subtask := Task{
+								subtask := &Task{
 									Name: stName,
 								}
 
@@ -636,179 +568,10 @@ func extractTaskWithoutOptions(rawResponse string) (*Task, error) {
 	return nil, errors.New("no task found")
 }
 
-// Plan 表示一组按顺序执行的任务
-type Plan struct {
-	Name     string
-	Tasks    []*Task
-	tools    []*Tool
-	callback TaskAICallback
-	metadata map[string]interface{}
+func (t *Task) QuoteName() string {
+	return strconv.Quote(t.Name)
 }
 
-// NewPlan 创建一个新的Plan，可以通过选项进行配置
-func NewPlan(name string, options ...TaskOption) *Plan {
-	plan := &Plan{
-		Name:     name,
-		Tasks:    []*Task{},
-		metadata: make(map[string]interface{}),
-	}
-
-	// 应用所有选项到Plan
-	for _, option := range options {
-		applyToPlan(plan, option)
-	}
-
-	return plan
-}
-
-// applyToPlan 将TaskOption应用到Plan
-func applyToPlan(p *Plan, option TaskOption) {
-	// 创建一个临时Task来应用选项
-	tmpTask := &Task{
-		metadata:   p.metadata,
-		tools:      p.tools,
-		AICallback: p.callback,
-	}
-
-	// 应用选项到临时Task
-	option.Apply(tmpTask)
-
-	// 将临时Task的设置同步回Plan
-	p.tools = tmpTask.tools
-	p.callback = tmpTask.AICallback
-	p.metadata = tmpTask.metadata
-}
-
-// AddTask 向Plan添加任务
-func (p *Plan) AddTask(task *Task) {
-	// 确保任务使用Plan的工具和回调
-	if p.callback != nil {
-		task.SetAICallback(p.callback)
-	}
-
-	if p.tools != nil {
-		task.tools = p.tools
-	}
-
-	p.Tasks = append(p.Tasks, task)
-}
-
-// AddTaskWithOptions 创建并添加一个新任务到Plan
-func (p *Plan) AddTaskWithOptions(name, goal string, options ...TaskOption) *Task {
-	// 创建基础任务，继承Plan的设置
-	task := NewTask(name, goal,
-		WithTask_Callback(p.callback),
-		WithTask_Tools(p.tools),
-		WithTask_Metadata(p.metadata),
-	)
-
-	// 应用额外的选项
-	task.ApplyOptions(options...)
-
-	// 添加到Plan
-	p.Tasks = append(p.Tasks, task)
-
-	return task
-}
-
-// ApplyOptions 对Plan应用选项
-func (p *Plan) ApplyOptions(options ...TaskOption) {
-	for _, option := range options {
-		applyToPlan(p, option)
-	}
-
-	// 将Plan的设置应用到所有任务的副本
-	if p.Tasks != nil {
-		for i, task := range p.Tasks {
-			// 创建副本以避免修改原始任务
-			taskCopy := task.DeepCopy()
-
-			// 应用Plan的设置
-			if p.callback != nil {
-				taskCopy.SetAICallback(p.callback)
-			}
-
-			if p.tools != nil {
-				taskCopy.tools = p.tools
-			}
-
-			// 更新任务引用
-			p.Tasks[i] = taskCopy
-		}
-	}
-}
-
-// ExecutePlan 执行整个Plan的所有任务
-func (p *Plan) ExecutePlan(options ...TaskOption) ([]string, error) {
-	// 创建Plan的副本以应用临时选项
-	planCopy := &Plan{
-		Name:     p.Name,
-		callback: p.callback,
-		tools:    p.tools,
-	}
-
-	// 深度复制元数据
-	if p.metadata != nil {
-		planCopy.metadata = make(map[string]interface{})
-		for k, v := range p.metadata {
-			planCopy.metadata[k] = v
-		}
-	} else {
-		planCopy.metadata = make(map[string]interface{})
-	}
-
-	// 深度复制任务列表
-	if len(p.Tasks) > 0 {
-		planCopy.Tasks = make([]*Task, len(p.Tasks))
-		for i, task := range p.Tasks {
-			planCopy.Tasks[i] = task.DeepCopy()
-		}
-	}
-
-	// 应用临时选项
-	planCopy.ApplyOptions(options...)
-
-	// 检查是否设置了回调函数
-	if planCopy.callback == nil {
-		return nil, errors.New("no AI callback function set for plan")
-	}
-
-	results := make([]string, 0, len(planCopy.Tasks))
-
-	// 逐个执行任务
-	for i, task := range planCopy.Tasks {
-		// 更新元数据中的计划执行进度
-		planProgress := map[string]interface{}{
-			"plan_name":         planCopy.Name,
-			"plan_total_tasks":  len(planCopy.Tasks),
-			"plan_current_task": i + 1,
-			"plan_progress":     float64(i) / float64(len(planCopy.Tasks)),
-		}
-
-		// 合并Plan的元数据和任务进度元数据
-		taskMetadata := make(map[string]interface{})
-		for k, v := range planCopy.metadata {
-			taskMetadata[k] = v
-		}
-		for k, v := range planProgress {
-			taskMetadata[k] = v
-		}
-
-		// 为每个任务创建选项，确保使用Plan的tools和callback
-		taskOptions := []TaskOption{
-			WithTask_Callback(planCopy.callback),
-			WithTask_Tools(planCopy.tools),
-			WithTask_Metadata(taskMetadata),
-		}
-
-		// 执行任务
-		result, err := task.Invoke(taskOptions...)
-		if err != nil {
-			return results, fmt.Errorf("error executing task %d (%s): %w", i+1, task.Name, err)
-		}
-
-		results = append(results, result)
-	}
-
-	return results, nil
+func (t *Task) QuoteGoal() string {
+	return strconv.Quote(t.Goal)
 }
