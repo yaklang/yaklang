@@ -3,6 +3,10 @@ package taskstack
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 )
 
@@ -11,6 +15,10 @@ type ToolResult struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`
 	Error   string      `json:"error,omitempty"`
+}
+
+func (t *ToolResult) Dump() string {
+	return spew.Sdump(t)
 }
 
 // ToolInvokeParams 表示工具调用的参数
@@ -41,6 +49,27 @@ func (t *Tool) InvokeWithJSON(jsonStr string) (*ToolResult, error) {
 
 	// 使用参数调用工具
 	return t.InvokeWithParams(params.Params)
+}
+
+func (t *Tool) InvokeWithRaw(raw string) (*ToolResult, error) {
+	for _, params := range jsonextractor.ExtractStandardJSON(raw) {
+		var rawParam = make(map[string]interface{})
+		err := json.Unmarshal([]byte(params), &rawParam)
+		if err != nil {
+			log.Errorf("parse params failed: %v", err)
+			continue
+		}
+		if utils.MapGetString(rawParam, "tool") != t.Name {
+			continue
+		}
+		actionName := utils.MapGetString(rawParam, "@action")
+		if actionName != "" {
+			log.Infof("actionName: %s", actionName)
+		}
+		params := utils.MapGetMapRaw(rawParam, "params")
+		return t.InvokeWithParams(params)
+	}
+	return nil, utils.Errorf("no valid params found: %#v", raw)
 }
 
 // InvokeWithParams 使用参数映射调用工具

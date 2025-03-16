@@ -1,0 +1,19 @@
+你是正在执行一系列任务，并且成功执行了外部工具，获得了结果，以下是上下文
+
+# 任务状态
+
+{{ .Runtime.Progress }}
+
+当前任务：{{ .Task.QuoteName }}
+目标： {{ .Task.QuoteGoal }}
+
+## 工具详情
+
+工具名：{{ .Tool.Name }}
+工具描述：{{ .Tool.Description }}
+
+调用结果：{{ .Result.Dump }}
+
+根据上面的信息，回顾是否可以继续当前任务。如果你觉得还是无法完成任务，可以遵循如下规则，再发起一次工具调用。
+
+{{ .Task.ToolPrompt }}

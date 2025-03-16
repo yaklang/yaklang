@@ -38,7 +38,7 @@ func main() {
 			prompt,
 			aispec.WithDebugStream(true),
 			aispec.WithType("tongyi"),
-			//aispec.WithModel("qwen-max"),
+			aispec.WithModel("qwen-max"),
 			aispec.WithAPIKey(string(apikey)),
 		)
 		if err != nil {
