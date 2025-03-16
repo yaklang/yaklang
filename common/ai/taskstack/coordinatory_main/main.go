@@ -1,20 +1,20 @@
-package taskstack
+package main
 
 import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/taskstack"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"os"
 	"path/filepath"
-	"testing"
 )
 
-func TestNewCoordinator(t *testing.T) {
+func main() {
 	if utils.InGithubActions() {
 		return
 	}
@@ -22,11 +22,11 @@ func TestNewCoordinator(t *testing.T) {
 	keyPath := filepath.Join(consts.GetDefaultYakitBaseDir(), "tongyi-apikey.txt")
 	apikey, err := os.ReadFile(keyPath)
 	if err != nil {
-		t.Error(err)
+		panic(err)
 		return
 	}
 	if string(apikey) == "" {
-		t.Errorf("apikey is empty")
+		panic("apikey is empty")
 		return
 	}
 	consts.InitializeYakitDatabase("", "")
@@ -48,12 +48,12 @@ func TestNewCoordinator(t *testing.T) {
 		return bytes.NewBufferString(result), nil
 	}
 
-	coordinator := NewCoordinator(
+	coordinator := taskstack.NewCoordinator(
 		"帮我规划一个一家三口北京的一日游，子任务控制三步内",
-		WithPlan_AICallback(aiCallback),
-		WithCoordinator_Tool(GetAllMockTools()...),
+		taskstack.WithPlan_AICallback(aiCallback),
+		taskstack.WithCoordinator_Tool(taskstack.GetAllMockTools()...),
 	)
 	if err := coordinator.Run(); err != nil {
-		t.Errorf("Coordinator执行失败: %v", err)
+		panic(err)
 	}
 }

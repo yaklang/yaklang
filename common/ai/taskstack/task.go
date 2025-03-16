@@ -540,39 +540,55 @@ func extractTaskWithoutOptions(rawResponse string) (*Task, error) {
 		start, end := item[0], item[1]
 		taskJSON := rawResponse[start:end]
 
-		// 尝试解析为完整的 task 结构
-		var taskObj struct {
-			Tasks []struct {
+		// 尝试解析为新的 task schema 结构
+		var planObj struct {
+			Action       string `json:"@action"`
+			Query        string `json:"query"`
+			MainTask     string `json:"main_task"`
+			MainTaskGoal string `json:"main_task_goal"`
+			Tasks        []struct {
 				SubtaskName string `json:"subtask_name"`
 				SubtaskGoal string `json:"subtask_goal"`
 			} `json:"tasks"`
 		}
 
-		err := json.Unmarshal([]byte(taskJSON), &taskObj)
-		if err == nil && len(taskObj.Tasks) > 0 {
-			// 找到了合法的任务结构
+		err := json.Unmarshal([]byte(taskJSON), &planObj)
+		if err == nil && planObj.Action == "plan" && len(planObj.Tasks) > 0 {
+			// 创建主任务
 			mainTask := &Task{
-				Name:     taskObj.Tasks[0].SubtaskName,
-				Goal:     taskObj.Tasks[0].SubtaskGoal,
+				Name:     planObj.MainTask,
+				Goal:     planObj.MainTaskGoal,
 				Subtasks: make([]Task, 0),
+				metadata: map[string]interface{}{
+					"query": planObj.Query,
+				},
 			}
 
-			// 如果有多个任务，将后续任务作为子任务
-			if len(taskObj.Tasks) > 1 {
-				for _, subtask := range taskObj.Tasks[1:] {
-					if subtask.SubtaskName != "" {
+			// 如果主任务名称为空，则使用第一个子任务的名称
+			if mainTask.Name == "" {
+				mainTask.Name = planObj.Tasks[0].SubtaskName
+				mainTask.Goal = planObj.Tasks[0].SubtaskGoal
+
+				// 如果有多个子任务，使用除第一个外的所有任务作为子任务
+				if len(planObj.Tasks) > 1 {
+					for _, subtask := range planObj.Tasks[1:] {
 						mainTask.Subtasks = append(mainTask.Subtasks, Task{
 							Name: subtask.SubtaskName,
 							Goal: subtask.SubtaskGoal,
 						})
 					}
 				}
+			} else {
+				// 主任务名称存在，将所有任务作为子任务
+				for _, subtask := range planObj.Tasks {
+					mainTask.Subtasks = append(mainTask.Subtasks, Task{
+						Name: subtask.SubtaskName,
+						Goal: subtask.SubtaskGoal,
+					})
+				}
 			}
 
-			// 检查主任务 Name 是否存在
-			if mainTask.Name != "" {
-				return mainTask, nil
-			}
+			return mainTask, nil
 		}
 
 		// 尝试直接解析为单个 Task 对象
