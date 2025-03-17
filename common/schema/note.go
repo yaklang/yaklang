@@ -18,6 +18,6 @@ func (n *Note) ToGRPCModel() *ypb.Note {
 		Title:    n.Title,
 		Content:  n.Content,
 		CreateAt: n.CreatedAt.Unix(),
-		UpdateAt: n.CreatedAt.Unix(),
+		UpdateAt: n.UpdatedAt.Unix(),
 	}
 }
