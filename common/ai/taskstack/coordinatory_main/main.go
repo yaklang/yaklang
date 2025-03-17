@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/taskstack"
@@ -38,13 +37,12 @@ func main() {
 			prompt,
 			aispec.WithDebugStream(true),
 			aispec.WithType("tongyi"),
-			aispec.WithModel("qwen-max"),
+			aispec.WithModel("deepseek-v3"),
 			aispec.WithAPIKey(string(apikey)),
 		)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(result)
 		return bytes.NewBufferString(result), nil
 	}
 

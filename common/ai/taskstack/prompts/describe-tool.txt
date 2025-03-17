@@ -13,9 +13,9 @@
 工具名称: {{ .Tool.Name }}
 工具描述: {{ .Tool.Description }}
 
-## 工具JSONSchema描述
+## 工具参数用法描述
 ```json
 {{ .ToolJSONSchema }}
 ```
 
-请根据上述JSONSchema描述构造有效的请求来调用此工具。确保包含所有必需参数，并注意参数的类型。
+请根据上述JSONSchema描述构造有效JSON对象来调用此工具。减少比必要的描述和输出。
