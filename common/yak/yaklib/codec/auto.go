@@ -169,6 +169,17 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			},
 		)
 	}
+	fileTypeDetect := func(rawStr string) bool {
+		var err error
+		matchedType, err = filetype.Match([]byte(rawStr))
+		if err != nil || matchedType == types.Unknown {
+			return false
+		}
+		return true
+	}
+	fileTypeDecode := func(rawStr string) (decoded, typ, typVerbose string, err error) {
+		return rawStr, matchedType.Extension, matchedType.MIME.Value, nil
+	}
 	htmlDecode := func(rawStr string) (string, error) {
 		return html.UnescapeString(rawStr), nil
 	}
@@ -199,7 +210,10 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			return false
 		}
 		if !utf8.Valid(decoded) {
-			return false
+			matched, err := filetype.Match([]byte(rawStr))
+			if err != nil || matched == types.Unknown {
+				return false
+			}
 		}
 		base32Bytes = decoded
 		return true
@@ -214,9 +228,12 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		if err != nil {
 			return false
 		}
-		// if !utf8.Valid(decoded) {
-		// 	return false
-		// }
+		if !utf8.Valid(decoded) {
+			matched, err := filetype.Match([]byte(decoded))
+			if err != nil || matched == types.Unknown {
+				return false
+			}
+		}
 		base64Bytes = decoded
 		return true
 	}
@@ -270,17 +287,6 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 	}
 	jwtDecode := func(rawStr string) (string, error) {
 		return jwtBuf.String(), nil
-	}
-	fileTypeDetect := func(rawStr string) bool {
-		var err error
-		matchedType, err = filetype.Match([]byte(rawStr))
-		if err != nil || matchedType == types.Unknown {
-			return false
-		}
-		return true
-	}
-	fileTypeDecode := func(rawStr string) (decoded, typ, typVerbose string, err error) {
-		return rawStr, matchedType.Extension, matchedType.MIME.Value, nil
 	}
 
 	for i := 0; i < 100; i++ {
