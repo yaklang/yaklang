@@ -155,6 +155,12 @@ const (
 
 type AuditEdge struct {
 	gorm.Model
+
+	// task
+	TaskId string `json:"task_id" gorm:"index"`
+	// syntaxflow result
+	ResultId uint `json:"result_id" gorm:"index"`
+
 	// edge
 	FromNode uint `json:"from_node" gorm:"index"`
 	ToNode   uint `json:"to_node" gorm:"index"`
@@ -176,6 +182,8 @@ func (n *AuditNode) CreateDependsOnEdge(progName string, to uint) *AuditEdge {
 		FromNode:    n.ID,
 		ToNode:      to,
 		EdgeType:    EdgeType_DependsOn,
+		TaskId:      n.TaskId,
+		ResultId:    n.ResultId,
 	}
 	return ae
 }
@@ -186,9 +194,12 @@ func (n *AuditNode) CreateEffectsOnEdge(progName string, to uint) *AuditEdge {
 		FromNode:    n.ID,
 		ToNode:      to,
 		EdgeType:    EdgeType_EffectsOn,
+		TaskId:      n.TaskId,
+		ResultId:    n.ResultId,
 	}
 	return ae
 }
+
 func (n *AuditNode) CreatePredecessorEdge(progName string, to uint, step int64, label string) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName:   progName,
@@ -197,6 +208,8 @@ func (n *AuditNode) CreatePredecessorEdge(progName string, to uint, step int64, 
 		EdgeType:      EdgeType_Predecessor,
 		AnalysisStep:  step,
 		AnalysisLabel: label,
+		TaskId:        n.TaskId,
+		ResultId:      n.ResultId,
 	}
 	return ae
 }

@@ -57,7 +57,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 	}
 
 	deleteTask := func(taskId string) {
-		err := ssadb.DeleteResultByTaskID(taskId)
+		_, err := ssadb.DeleteResultByTaskID(taskId)
 		require.NoError(t, err)
 		err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskId)
 		require.NoError(t, err)
