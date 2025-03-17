@@ -58,12 +58,41 @@ func GetResultByHash(programName, rule string, kind schema.SyntaxflowResultKind)
 	return &result
 }
 
-func DeleteResultByTaskID(taskId string) error {
-	return GetDB().Where("task_id = ?", taskId).Unscoped().Delete(&AuditResult{}).Error
+func DeleteResultByTaskID(taskId string) (int64, error) {
+	db := GetDB()
+	db = bizhelper.ExactQueryString(db, "task_id", taskId)
+	return DetleteResultByDB(db)
 }
 
-func DeleteResultByID(resultID uint) error {
-	return GetDB().Where("id = ?", resultID).Unscoped().Delete(&AuditResult{}).Error
+func DetleteResultByDB(db *gorm.DB) (int64, error) {
+	var ids []uint
+	if err := db.Model(&AuditResult{}).Pluck("id", &ids).Error; err != nil {
+		return 0, err
+	}
+	return DeleteResultByID(ids...)
+}
+
+func DeleteResultByID(resultID ...uint) (int64, error) {
+	if len(resultID) == 0 {
+		return 0, nil
+	}
+
+	db := GetDB()
+	// Delete edges using result_id directly
+	{
+		db := bizhelper.ExactQueryUIntArrayOr(db, "result_id", resultID)
+		if err := db.Unscoped().Delete(&AuditEdge{}).Error; err != nil {
+			return 0, err
+		}
+		// Delete nodes
+		if err := db.Unscoped().Delete(&AuditNode{}).Error; err != nil {
+			return 0, err
+		}
+	}
+
+	// Delete results
+	db = db.Unscoped().Where("id IN (?)", resultID).Delete(&AuditResult{})
+	return db.RowsAffected, db.Error
 }
 
 func CreateResult(TaskIDs ...string) *AuditResult {

@@ -438,6 +438,14 @@ func ExactQueryInt64ArrayOr(db *gorm.DB, field string, s []int64) *gorm.DB {
 	return ExactQueryUInt64ArrayOr(db, field, raw)
 }
 
+func ExactQueryUIntArrayOr(db *gorm.DB, field string, s []uint) *gorm.DB {
+	raw := make([]uint64, len(s))
+	for index, sub := range s {
+		raw[index] = uint64(sub)
+	}
+	return ExactQueryUInt64ArrayOr(db, field, raw)
+}
+
 func ExactQueryUInt64ArrayOr(db *gorm.DB, field string, s []uint64) *gorm.DB {
 	if len(s) <= 0 {
 		return db
