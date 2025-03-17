@@ -21,6 +21,18 @@ func checkAutoDecode(t *testing.T, text string, wants []string) {
 	}
 }
 
+func checkAutoDecodeEx(t *testing.T, text string, wants []AutoDecodeResult) {
+	t.Helper()
+	results := AutoDecode(text)
+	require.Lenf(t, results, len(wants), "results[%v] length not match", results)
+
+	for i := range results {
+		require.Equal(t, wants[i].Result, results[i].Result)
+		require.Equal(t, wants[i].Type, results[i].Type)
+		require.Equal(t, wants[i].TypeVerbose, results[i].TypeVerbose)
+	}
+}
+
 func RandStringBytes(n int) string {
 	b := make([]byte, n)
 	for i := range b {
@@ -60,6 +72,16 @@ func TestAutoDecodeOneTime(t *testing.T) {
 	t.Run("no", func(t *testing.T) {
 		checkAutoDecode(t, `hello`, []string{"hello"})
 	})
+	t.Run("file type decode", func(t *testing.T) {
+		checkAutoDecodeEx(t, `GIF89a`, []AutoDecodeResult{
+			{
+				Result:      "GIF89a",
+				Type:        "gif",
+				TypeVerbose: "image/gif",
+			},
+		})
+	})
+
 }
 
 func TestAutoDecodeMultiTimes(t *testing.T) {
@@ -75,7 +97,16 @@ func TestAutoDecodeMultiTimes(t *testing.T) {
 	t.Run("base64-jwt", func(t *testing.T) {
 		checkAutoDecode(t, `ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnpkV0lpT2lJeE1qTTBOVFkzT0Rrd0lpd2libUZ0WlNJNklrcHZhRzRnUkc5bElpd2lhV0YwSWpveE5URTJNak01TURJeWZRLlNmbEt4d1JKU01lS0tGMlFUNGZ3cE1lSmYzNlBPazZ5SlZfYWRRc3N3NWM=`, []string{`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c`, `{"alg":"HS256","typ":"JWT"}.{"sub":"1234567890","name":"John Doe","iat":1516239022}.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c`})
 	})
-
+	t.Run("java class base64 decode", func(t *testing.T) {
+		results := AutoDecode(
+			`rO0ABQ==`,
+		)
+		require.Len(t, results, 2)
+		require.Equal(t, results[0].Type, "Base64 Decode")
+		require.Equal(t, results[0].TypeVerbose, "Base64 解码")
+		require.Equal(t, results[1].Type, "class")
+		require.Equal(t, results[1].TypeVerbose, "application/java-class")
+	})
 }
 
 func TestAutoDecodeRandomString(t *testing.T) {
