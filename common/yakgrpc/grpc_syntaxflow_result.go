@@ -73,8 +73,8 @@ func (s *Server) DeleteSyntaxFlowResult(ctx context.Context, req *ypb.DeleteSynt
 		db = db.Where("risk_count = 0")
 	}
 	// delete
-	db = db.Unscoped().Delete(&ssadb.AuditResult{})
-	if err := db.Error; err != nil {
+	effectRows, err := ssadb.DetleteResultByDB(db)
+	if err != nil {
 		return nil, utils.Errorf("delete failed: %s", err)
 	}
 
@@ -82,7 +82,7 @@ func (s *Server) DeleteSyntaxFlowResult(ctx context.Context, req *ypb.DeleteSynt
 		Message: &ypb.DbOperateMessage{
 			TableName:    "audit_result",
 			Operation:    "delete",
-			EffectRows:   db.RowsAffected,
+			EffectRows:   effectRows,
 			ExtraMessage: "",
 		},
 	}, nil
