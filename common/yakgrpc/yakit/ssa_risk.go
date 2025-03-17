@@ -69,6 +69,7 @@ func GetSSARiskByFuncName(db *gorm.DB, programName, path, funcName string) ([]*s
 		Where("function_name = ?", funcName).Find(&r); db.Error != nil {
 		return nil, utils.Errorf("get Risk failed: %s", db.Error)
 	}
+
 	return r, nil
 }
 
@@ -77,14 +78,13 @@ func GetSSARiskByPath(db *gorm.DB, programName, path string) ([]*schema.SSARisk,
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
-
 	path = "/" + programName + path
-
 	if db := db.Model(&schema.SSARisk{}).
 		Where("program_name = ?", programName).
 		Where("code_source_url LIKE ?", path+"%").Find(&r); db.Error != nil {
 		return nil, utils.Errorf("get Risk failed: %s", db.Error)
 	}
+
 	return r, nil
 }
 
@@ -96,16 +96,37 @@ func GetSSARiskByProgram(db *gorm.DB, programName string) ([]*schema.SSARisk, er
 	}
 	return r, nil
 }
-func GetSSARisk(db *gorm.DB, programName, path, funcName string) ([]*schema.SSARisk, error) {
+func GetSSARiskByRawpath(db *gorm.DB, rawpath string) ([]*schema.SSARisk, error) {
 	var r []*schema.SSARisk
 	var err error
+
+	if len(rawpath) > 0 && rawpath[0] == '/' {
+		rawpath = rawpath[1:]
+	}
+
+	programName := ""
+	pathName := ""
+	funcName := ""
+
+	if firstIndex := strings.Index(rawpath, "/"); firstIndex != -1 {
+		programName = rawpath[:firstIndex]
+		pathName = rawpath[firstIndex:]
+	}
+
+	if strings.Contains(pathName, ".go/") {
+		if lastIndex := strings.LastIndex(pathName, "/"); lastIndex != -1 {
+			funcName = pathName[lastIndex+1:]
+			pathName = pathName[:lastIndex]
+		}
+	}
+
 	if funcName != "" {
-		r, err = GetSSARiskByFuncName(db, programName, path, funcName)
+		r, err = GetSSARiskByFuncName(db, programName, pathName, funcName)
 		if err != nil {
 			return nil, err
 		}
-	} else if path != "" {
-		r, err = GetSSARiskByPath(db, programName, path)
+	} else if pathName != "" {
+		r, err = GetSSARiskByPath(db, programName, pathName)
 		if err != nil {
 			return nil, err
 		}

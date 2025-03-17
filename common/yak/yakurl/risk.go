@@ -3,7 +3,7 @@ package yakurl
 import (
 	"fmt"
 	"net/url"
-	"strings"
+	"path"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -26,22 +26,8 @@ func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 	}
 
 	// _, risks, _ := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{}, nil)
-	path := u.GetPath()
-	programName := u.GetLocation()
-	funcName := ""
-	// funcName := query.Get("function_name")
-
-	if strings.Contains(path, ".go/") {
-		lastIndex := strings.LastIndex(path, "/")
-		if lastIndex == -1 {
-
-		} else {
-			funcName = path[lastIndex+1:]
-			path = path[:lastIndex]
-		}
-	}
-
-	risks, err := yakit.GetSSARisk(ssadb.GetDB(), programName, path, funcName)
+	rawpath := path.Clean(u.GetLocation() + "/" + u.GetPath())
+	risks, err := yakit.GetSSARiskByRawpath(ssadb.GetDB(), rawpath)
 	if err != nil {
 		return nil, err
 	}

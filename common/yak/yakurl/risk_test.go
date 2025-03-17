@@ -2,8 +2,10 @@ package yakurl_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -44,54 +46,60 @@ import (
 				}
 */
 
-func initRiskTest(t *testing.T, programName string) {
+func initRiskTest(t *testing.T, programName string) map[string]int {
 	db := ssadb.GetDB()
 
 	err := yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
-		CodeSourceUrl: "/program/a.go",
+		CodeSourceUrl: fmt.Sprintf("/%s/a.go", programName),
 		FunctionName:  "funcA",
-		Title:         "1",
+		Title:         "test1",
 	})
 	require.NoError(t, err)
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
-		CodeSourceUrl: "/program/b/b.go",
+		CodeSourceUrl: fmt.Sprintf("/%s/b/b.go", programName),
 		FunctionName:  "funcB1",
-		Title:         "2",
+		Title:         "test2",
 	})
 	require.NoError(t, err)
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
-		CodeSourceUrl: "/program/b/b.go",
+		CodeSourceUrl: fmt.Sprintf("/%s/b/b.go", programName),
 		FunctionName:  "funcB2",
-		Title:         "3",
+		Title:         "test3",
 	})
 	require.NoError(t, err)
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
-		CodeSourceUrl: "/program/c.go",
+		CodeSourceUrl: fmt.Sprintf("/%s/c.go", programName),
 		FunctionName:  "funcC",
-		Title:         "4",
+		Title:         "test4",
 	})
 	require.NoError(t, err)
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
-		CodeSourceUrl: "/program/c.go",
+		CodeSourceUrl: fmt.Sprintf("/%s/c.go", programName),
 		FunctionName:  "funcC",
-		Title:         "5",
+		Title:         "test5",
 	})
 	require.NoError(t, err)
+
+	return map[string]int{
+		fmt.Sprintf("/%s/a.go/funcA", programName):    1,
+		fmt.Sprintf("/%s/b/b.go/funcB1", programName): 1,
+		fmt.Sprintf("/%s/b/b.go/funcB2", programName): 1,
+		fmt.Sprintf("/%s/c.go/funcC", programName):    2,
+	}
 }
 
-func TestRisk(t *testing.T) {
-	programName := "program"
-
-	initRiskTest(t, programName)
+func TestRiskAction(t *testing.T) {
+	programName := uuid.NewString()
+	check := initRiskTest(t, programName)
 
 	local, err := yakgrpc.NewLocalClient()
 	if err != nil {
@@ -113,15 +121,7 @@ func TestRisk(t *testing.T) {
 		require.Equal(t, len(res.GetResources()), 4)
 
 		for _, p := range res.GetResources() {
-			if p.Path == "/program/c.go/funcC" {
-				require.Equal(t, p.Extra[0].Value, "2")
-			} else if p.Path == "/program/b/b.go/funcB2" {
-				require.Equal(t, p.Extra[0].Value, "1")
-			} else if p.Path == "/program/b/b.go/funcB1" {
-				require.Equal(t, p.Extra[0].Value, "1")
-			} else if p.Path == "/program/a.go/funcA" {
-				require.Equal(t, p.Extra[0].Value, "1")
-			}
+			require.Equal(t, p.Extra[0].Value, fmt.Sprint(check[p.Path]))
 		}
 	})
 	t.Run("check risk action program", func(t *testing.T) {
@@ -140,15 +140,7 @@ func TestRisk(t *testing.T) {
 		require.Equal(t, len(res.GetResources()), 4)
 
 		for _, p := range res.GetResources() {
-			if p.Path == "/program/c.go/funcC" {
-				require.Equal(t, p.Extra[0].Value, "2")
-			} else if p.Path == "/program/b/b.go/funcB2" {
-				require.Equal(t, p.Extra[0].Value, "1")
-			} else if p.Path == "/program/b/b.go/funcB1" {
-				require.Equal(t, p.Extra[0].Value, "1")
-			} else if p.Path == "/program/a.go/funcA" {
-				require.Equal(t, p.Extra[0].Value, "1")
-			}
+			require.Equal(t, p.Extra[0].Value, fmt.Sprint(check[p.Path]))
 		}
 	})
 	t.Run("check risk action path(dir)", func(t *testing.T) {
@@ -167,11 +159,7 @@ func TestRisk(t *testing.T) {
 		require.Equal(t, len(res.GetResources()), 2)
 
 		for _, p := range res.GetResources() {
-			if p.Path == "/program/b/b.go/funcB2" {
-				require.Equal(t, p.Extra[0].Value, "1")
-			} else if p.Path == "/program/b/b.go/funcB1" {
-				require.Equal(t, p.Extra[0].Value, "1")
-			}
+			require.Equal(t, p.Extra[0].Value, fmt.Sprint(check[p.Path]))
 		}
 	})
 	t.Run("check risk action path(file)", func(t *testing.T) {
@@ -190,9 +178,7 @@ func TestRisk(t *testing.T) {
 		require.Equal(t, len(res.GetResources()), 1)
 
 		for _, p := range res.GetResources() {
-			if p.Path == "/program/c.go/funcC" {
-				require.Equal(t, p.Extra[0].Value, "2")
-			}
+			require.Equal(t, p.Extra[0].Value, fmt.Sprint(check[p.Path]))
 		}
 	})
 	t.Run("check risk action function", func(t *testing.T) {
@@ -217,10 +203,24 @@ func TestRisk(t *testing.T) {
 		require.Equal(t, len(res.GetResources()), 1)
 
 		for _, p := range res.GetResources() {
-			if p.Path == "/program/a.go/funcA" {
-				require.Equal(t, p.Extra[0].Value, "1")
-			}
+			require.Equal(t, p.Extra[0].Value, fmt.Sprint(check[p.Path]))
 		}
+	})
+
+	t.Run("check risk query", func(t *testing.T) {
+		db := ssadb.GetDB()
+
+		risks, err := yakit.GetSSARiskByRawpath(db, fmt.Sprintf("/%s", programName))
+		require.NoError(t, err)
+		require.Equal(t, len(risks), 5)
+
+		risks, err = yakit.GetSSARiskByRawpath(db, fmt.Sprintf("/%s/b/b.go", programName))
+		require.NoError(t, err)
+		require.Equal(t, len(risks), 2)
+
+		risks, err = yakit.GetSSARiskByRawpath(db, fmt.Sprintf("/%s/b/b.go/funcB1", programName))
+		require.NoError(t, err)
+		require.Equal(t, len(risks), 1)
 	})
 
 	t.Cleanup(func() {
