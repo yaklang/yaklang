@@ -1,16 +1,12 @@
 package taskstack
 
 import (
-	"bytes"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strconv"
-	"strings"
-	"text/template"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 )
@@ -79,11 +75,12 @@ func WithTask_Metadata(metadata map[string]interface{}) TaskOption {
 }
 
 type Task struct {
-	Name       string
-	Goal       string
-	ParentTask *Task
-	Subtasks   []*Task
-	AICallback TaskAICallback // AI回调函数
+	Name              string
+	Goal              string
+	ParentTask        *Task
+	Subtasks          []*Task
+	AICallback        TaskAICallback // AI回调函数
+	SummaryAICallback TaskAICallback
 
 	// 新增字段，存储默认工具和元数据
 	tools    []*Tool
@@ -200,208 +197,6 @@ func (t *Task) DeepCopy() *Task {
 type TaskSystemContext struct {
 	Progress    string
 	CurrentTask *Task
-}
-
-// executeTask 实际执行任务并返回结果
-func (t *Task) executeTask(ctx *TaskSystemContext) (string, error) {
-	// 使用Task的内部字段，如果传入的参数为nil则使用内部字段
-	actualTools := t.tools
-	if actualTools == nil && t.tools != nil {
-		actualTools = t.tools
-	}
-
-	actualMetadata := map[string]any{}
-	if actualMetadata == nil && t.metadata != nil {
-		actualMetadata = t.metadata
-	}
-
-	// 生成初始执行任务的prompt
-	prompt, err := t.generateTaskPrompt(actualTools, ctx, actualMetadata)
-	if err != nil {
-		return "", fmt.Errorf("error generating task prompt: %w", err)
-	}
-
-	// 开始交互式执行
-	var finalResponse string
-	currentPrompt := prompt
-	conversationHistory := []string{prompt}
-
-	for {
-		// 调用AI回调函数
-		responseReader, err := t.AICallback(currentPrompt)
-		if err != nil {
-			return "", fmt.Errorf("error calling AI: %w", err)
-		}
-
-		// 读取AI的响应
-		responseBytes, err := io.ReadAll(responseReader)
-		if err != nil {
-			return "", fmt.Errorf("error reading AI response: %w", err)
-		}
-
-		response := string(responseBytes)
-		conversationHistory = append(conversationHistory, response)
-		var toolRequired []string
-		for _, pairs := range jsonextractor.ExtractObjectIndexes(response) {
-			start, end := pairs[0], pairs[1]
-			toolRequiredJSON := response[start:end]
-			var data = make(map[string]any)
-			err := json.Unmarshal([]byte(toolRequiredJSON), &data)
-			if err != nil {
-				log.Errorf("error unmarshal tool required: %v", err)
-				continue
-			}
-			if rawData, ok := data["@action"]; ok && fmt.Sprint(rawData) != "require-tool" {
-				continue
-			}
-			if rawData, ok := data["tool"]; ok && fmt.Sprint(rawData) != "" {
-				toolRequired = append(toolRequired, fmt.Sprint(rawData))
-			}
-		}
-		for _, toolName := range toolRequired {
-			var targetTool *Tool
-			for _, tool := range actualTools {
-				if toolName == tool.Name {
-					targetTool = tool
-					break
-				}
-			}
-			paramsPrompt, err := t.generateRequireToolResponsePrompt(ctx, targetTool, toolName)
-			if err != nil {
-				log.Errorf("error generate require tool response prompt: %v", err)
-				continue
-			}
-			callParams, err := t.AICallback(paramsPrompt)
-			if err != nil {
-				log.Errorf("error calling AI: %v", err)
-				continue
-			}
-			callParamsString, _ := io.ReadAll(callParams)
-			result, err := targetTool.InvokeWithRaw(string(callParamsString))
-			if err != nil {
-				log.Errorf("error invoking tool: %v", err)
-				continue
-			}
-			continuePrompt, err := t.generateToolCallResponsePrompt(result, ctx, targetTool)
-			if err != nil {
-				log.Errorf("error generating tool call response prompt: %v", err)
-				continue
-			}
-			continueResult, err := t.AICallback(continuePrompt)
-			if err != nil {
-				log.Errorf("error calling AI: %v", err)
-				continue
-			}
-			nextResponse, err := io.ReadAll(continueResult)
-			if err != nil {
-				log.Errorf("error reading AI response: %v", err)
-				continue
-			}
-			_ = nextResponse
-		}
-	}
-
-	return finalResponse, nil
-}
-
-//go:embed prompts/tool-prompt.txt
-var toolPrompt string
-
-func (t *Task) ToolPrompt() string {
-	if len(t.tools) <= 0 {
-		return ""
-	}
-	var buf bytes.Buffer
-	temp, err := template.New("tool-prompt").Parse(toolPrompt)
-	if err != nil {
-		log.Errorf("error parsing tool prompt template: %v", err)
-		return ""
-	}
-	err = temp.Execute(&buf, map[string]any{
-		"Tools": t.tools,
-	})
-	if err != nil {
-		log.Errorf("error for rendering tool prompt: %v", err)
-		return ""
-	}
-	return buf.String()
-}
-
-func (t *Task) generateToolCallResponsePrompt(result *ToolResult, runtime *TaskSystemContext, targetTool *Tool) (string, error) {
-	templatedata := map[string]any{
-		"Runtime": runtime,
-		"Task":    t,
-		"Tool":    targetTool,
-		"Result":  result,
-	}
-	temp, err := template.New("tool-result").Parse(toolResultPromptTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error parsing tool result template: %w", err)
-	}
-	var promptBuilder strings.Builder
-	err = temp.Execute(&promptBuilder, templatedata)
-	if err != nil {
-		return "", fmt.Errorf("error executing tool result template: %w", err)
-	}
-	return promptBuilder.String(), nil
-}
-
-// handleDescribeTool 处理描述工具的请求
-func (t *Task) generateRequireToolResponsePrompt(runtime *TaskSystemContext, targetTool *Tool, toolName string) (string, error) {
-	if targetTool == nil {
-		return "", fmt.Errorf("找不到名为 '%s' 的工具", toolName)
-	}
-
-	// 生成工具的JSONSchema描述
-	toolJSONSchema := targetTool.ToJSONSchemaString()
-	// 创建模板数据
-	templateData := map[string]interface{}{
-		"Runtime":        runtime,
-		"Task":           t,
-		"Tool":           targetTool,
-		"ToolJSONSchema": toolJSONSchema,
-	}
-
-	// 解析工具描述模板
-	tmpl, err := template.New("describe-tool").Parse(describeToolPromptTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error parsing tool description template: %w", err)
-	}
-
-	// 渲染模板
-	var promptBuilder strings.Builder
-	err = tmpl.Execute(&promptBuilder, templateData)
-	if err != nil {
-		return "", fmt.Errorf("error executing tool description template: %w", err)
-	}
-
-	return promptBuilder.String(), nil
-}
-
-// generateTaskPrompt 生成执行任务的prompt
-func (t *Task) generateTaskPrompt(tools []*Tool, systemContext *TaskSystemContext, metadata map[string]interface{}) (string, error) {
-	// 创建模板数据
-	templateData := map[string]interface{}{
-		"Task":     t,
-		"Tools":    tools,
-		"Metadata": metadata,
-		"Runtime":  systemContext,
-	}
-
-	// 解析prompt模板
-	tmpl, err := template.New("execute-task").Parse(executeTaskPromptTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error parsing task prompt template: %w", err)
-	}
-
-	// 渲染模板
-	var promptBuilder strings.Builder
-	err = tmpl.Execute(&promptBuilder, templateData)
-	if err != nil {
-		return "", fmt.Errorf("error executing task prompt template: %w", err)
-	}
-
-	return promptBuilder.String(), nil
 }
 
 // NewTaskFromJSON 从JSON字符串创建Task

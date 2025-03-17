@@ -43,6 +43,7 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 		}
 		lineReader := bufio.NewReader(ioReader)
 		haveReason := false
+		reasonFinished := false
 		onceStartReason := sync.Once{}
 		onceEndReason := sync.Once{}
 
@@ -61,17 +62,20 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 			jsonIdentifiers := jsonextractor.ExtractStandardJSON(lineStr)
 			for _, j := range jsonIdentifiers {
 				results := jsonpath.Find(j, `$..choices[*].delta.content`)
-				reasonContent := jsonpath.Find(j, `$..choices[*].delta.reasoning_content`)
+				var reasonDelta string
+				if !reasonFinished {
+					reasonContent := jsonpath.Find(j, `$..choices[*].delta.reasoning_content`)
+					reasonStrs := lo.Map(utils.InterfaceToSliceInterface(reasonContent), func(reason any, idx int) string {
+						return fmt.Sprint(reason)
+					})
+					reasonDelta = strings.Join(reasonStrs, "")
+				}
 
 				wordList := utils.InterfaceToSliceInterface(results)
 				if len(wordList) <= 0 {
 					log.Debugf("cannot identifier delta content, try to fetch arguments for: %v", j)
 					wordList = utils.InterfaceToSliceInterface(jsonpath.Find(j, `$..choices[*].delta.tool_calls[*].function.arguments`))
 				}
-				reasonStrs := lo.Map(utils.InterfaceToSliceInterface(reasonContent), func(reason any, idx int) string {
-					return fmt.Sprint(reason)
-				})
-				reasonDelta := strings.Join(reasonStrs, "")
 
 				handled := false
 				if reasonDelta != "" {
@@ -90,6 +94,7 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 						onceEndReason.Do(func() {
 							if haveReason {
 								pw.Write([]byte("\n</think>\n\n"))
+								reasonFinished = true
 							}
 						})
 					}
