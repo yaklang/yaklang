@@ -3,7 +3,6 @@ package authhack
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -168,31 +167,36 @@ func JwtGenerateEx(alg string, header, claims any, typ string, key []byte) (stri
 	if err != nil {
 		return "", err
 	}
-
-	// headers
-	if typ == "" {
-		token.Header.Set("typ", "JWT")
+	if header != nil {
+		switch h := header.(type) {
+		case *orderedmap.OrderedMap:
+			token.Header = h
+		default:
+			newHeader := orderedmap.New(utils.InterfaceToMapInterface(h))
+			token.Header = newHeader
+		}
 	} else {
-		token.Header.Set("typ", typ)
+		// headers
+		if typ == "" {
+			token.Header.Set("typ", "JWT")
+		} else {
+			token.Header.Set("typ", typ)
+		}
 	}
 	// claims
 	switch claims := claims.(type) {
 	case *orderedmap.OrderedMap:
 		token.Claims = NewOMapClaimsFromOrderedMap(claims)
-    default:
-        newClaims := NewOMapClaims()
-        claimMap := utils.InterfaceToMapInterface(claims)
-        // 同样保持键的顺序
-        keys := make([]string, 0, len(claimMap))
-        for k := range claimMap {
-            keys = append(keys, k)
-        }
-        sort.Strings(keys)
-        for _, k := range keys {
-            newClaims.Set(k, claimMap[k])
-        }
-        token.Claims = newClaims
-    }
+	case *OMapClaims:
+		token.Claims = claims
+	default:
+		newClaims := NewOMapClaims()
+		claimMap := utils.InterfaceToMapInterface(claims)
+		for k, v := range claimMap {
+			newClaims.Set(k, v)
+		}
+		token.Claims = newClaims
+	}
 
 	return token.SignedString(key)
 }

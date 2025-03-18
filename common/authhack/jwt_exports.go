@@ -1,9 +1,5 @@
 package authhack
 
-import (
-	"github.com/yaklang/yaklang/common/utils"
-)
-
 var JWTExports = map[string]interface{}{
 	"ALG_NONE":  "None",
 	"ALG_ES256": "ES256",
@@ -20,17 +16,17 @@ var JWTExports = map[string]interface{}{
 	"ALG_PS512": "PS512",
 
 	"Parse": JwtParse,
-	"JWTGenerate": func(alg string, i map[string]any, key []byte) (string, error) {
+	"JWTGenerate": func(alg string, i any, key []byte) (string, error) {
 		return JwtGenerate(alg, i, "JWT", key)
 	},
-	"JWTGenerateEx": func(alg string, extraHeader, i map[string]any, key []byte) (string, error) {
-		return JwtGenerateEx(alg, utils.InterfaceToMapInterface(extraHeader), utils.InterfaceToMapInterface(i), "JWT", key)
+	"JWTGenerateEx": func(alg string, extraHeader, i any, key []byte) (string, error) {
+		return JwtGenerateEx(alg, extraHeader, i, "JWT", key)
 	},
-	"JWSGenerate": func(alg string, i map[string]any, key []byte) (string, error) {
-		return JwtGenerate(alg, utils.InterfaceToMapInterface(i), "JWS", key)
+	"JWSGenerate": func(alg string, i any, key []byte) (string, error) {
+		return JwtGenerate(alg, i, "JWS", key)
 	},
-	"JWSGenerateEx": func(alg string, extraHeader, i map[string]any, key []byte) (string, error) {
-		return JwtGenerateEx(alg, utils.InterfaceToMapInterface(extraHeader), utils.InterfaceToMapInterface(i), "JWS", key)
+	"JWSGenerateEx": func(alg string, extraHeader, i any, key []byte) (string, error) {
+		return JwtGenerateEx(alg, extraHeader, i, "JWS", key)
 	},
 	"RemoveAlg":         JwtChangeAlgToNone,
 	"AllAlgs":           AvailableJWTTokensAlgs,

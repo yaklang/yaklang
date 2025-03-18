@@ -1,0 +1,8 @@
+testJWT := `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Ind3dy5qc29uLmNuIiwic3ViIjoiZGVtbyIsImlhdCI6MTc0MTQyNDg1NywibmJmIjoxNzQxNDI0ODU3LCJleHAiOjE3NDE1MTEyNTd9.UVr9NEM47qYMMTK62bHDV0thIU63eHX8PH84Q4QDpUQ`
+
+for i := 0; i < 100; i++ {
+    token, _, _ := jwt.Parse(testJWT)
+    encode = jwt.JWTGenerateEx("HS256", token.Header, token.Claims, "json.cn")~
+
+    assert testJWT == encode
+}
