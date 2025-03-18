@@ -281,7 +281,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 				"description": "测试工具",
 				"properties": map[string]interface{}{
 					"@action": map[string]interface{}{
-						"const":       "describe-tool",
+						"const":       "call-tool",
 						"description": "标识当前操作的具体类型",
 					},
 					"tool": map[string]interface{}{
@@ -336,7 +336,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 				"description": "带数组的工具",
 				"properties": map[string]interface{}{
 					"@action": map[string]interface{}{
-						"const":       "describe-tool",
+						"const":       "call-tool",
 						"description": "标识当前操作的具体类型",
 					},
 					"tool": map[string]interface{}{
@@ -377,7 +377,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 				"description": "无参数工具",
 				"properties": map[string]interface{}{
 					"@action": map[string]interface{}{
-						"const":       "describe-tool",
+						"const":       "call-tool",
 						"description": "标识当前操作的具体类型",
 					},
 					"tool": map[string]interface{}{
@@ -407,7 +407,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 				"type":    "object",
 				"properties": map[string]interface{}{
 					"@action": map[string]interface{}{
-						"const":       "describe-tool",
+						"const":       "call-tool",
 						"description": "标识当前操作的具体类型",
 					},
 					"tool": map[string]interface{}{
@@ -476,7 +476,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 				"description": "多种类型参数工具",
 				"properties": map[string]interface{}{
 					"@action": map[string]interface{}{
-						"const":       "describe-tool",
+						"const":       "call-tool",
 						"description": "标识当前操作的具体类型",
 					},
 					"tool": map[string]interface{}{
@@ -538,7 +538,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 				"description": "带有特殊字符的工具名称",
 				"properties": map[string]interface{}{
 					"@action": map[string]interface{}{
-						"const":       "describe-tool",
+						"const":       "call-tool",
 						"description": "标识当前操作的具体类型",
 					},
 					"tool": map[string]interface{}{
@@ -623,8 +623,8 @@ func TestComplexNestedStructures(t *testing.T) {
 		t.Errorf("@action 不是期望的类型")
 		return
 	}
-	if action["const"] != "describe-tool" {
-		t.Errorf("@action const = %v, want 'describe-tool'", action["const"])
+	if action["const"] != "call-tool" {
+		t.Errorf("@action const = %v, want 'call-tool'", action["const"])
 	}
 
 	// 验证tool字段
