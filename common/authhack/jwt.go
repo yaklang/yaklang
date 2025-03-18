@@ -170,19 +170,24 @@ func JwtGenerateEx(alg string, header, claims any, typ string, key []byte) (stri
 	if header != nil {
 		switch h := header.(type) {
 		case *orderedmap.OrderedMap:
-			token.Header = h
+			h.Range(func(key string, value interface{}) {
+                token.Header.Set(key, value)
+            })
 		default:
-			newHeader := orderedmap.New(utils.InterfaceToMapInterface(h))
-			token.Header = newHeader
-		}
-	} else {
-		// headers
-		if typ == "" {
-			token.Header.Set("typ", "JWT")
-		} else {
-			token.Header.Set("typ", typ)
+			headerMap := utils.InterfaceToMapInterface(h)
+            for k, v := range headerMap {
+                token.Header.Set(k, v)
+            }
 		}
 	}
+
+	// headers
+	if typ == "" {
+		token.Header.Set("typ", "JWT")
+	} else {
+		token.Header.Set("typ", typ)
+	}
+
 	// claims
 	switch claims := claims.(type) {
 	case *orderedmap.OrderedMap:
@@ -218,7 +223,7 @@ func JwtParse(tokenStr string, keys ...string) (*Token, []byte, error) {
 		} else if jwtErr.Errors == jwt.ValidationErrorUnverifiable {
 			if token != nil && token.Header.Len() > 0 {
 				alg := strings.ToLower(fmt.Sprint(token.Header.GetExact("alg")))
-				if alg == "none" {
+				if alg == "none" || alg == "<nil>" {
 					return token, nil, nil
 				}
 			}
