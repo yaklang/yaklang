@@ -70,7 +70,7 @@ func (t *Task) generateRequireToolResponsePrompt(runtime *TaskSystemContext, tar
 	}
 
 	// 解析工具描述模板
-	tmpl, err := template.New("describe-tool").Parse(describeToolPromptTemplate)
+	tmpl, err := template.New("call-tool").Parse(describeToolPromptTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing tool description template: %w", err)
 	}

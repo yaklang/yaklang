@@ -44,7 +44,7 @@ func mockAIToolDescriptionCallback(prompt string) (io.Reader, error) {
     "additionalProperties": false,
     "properties": {
         "@action": {
-            "const": "describe-tool",
+            "const": "call-tool",
             "description": "标识当前操作的具体类型"
         },
         "tool": {
