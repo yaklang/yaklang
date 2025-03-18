@@ -7,19 +7,20 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 // 创建一个模拟的AI回调函数，返回固定响应
-func createMockAICallback(response string) TaskAICallback {
-	return func(prompt string) (io.Reader, error) {
+func createMockAICallback(response string) TaskCallback {
+	return func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
 		return strings.NewReader(response), nil
 	}
 }
 
 // 创建一个始终返回错误的AI回调函数
-func createErrorAICallback() TaskAICallback {
-	return func(prompt string) (io.Reader, error) {
+func createErrorAICallback() TaskCallback {
+	return func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
 		return nil, errors.New("模拟AI调用错误")
 	}
 }

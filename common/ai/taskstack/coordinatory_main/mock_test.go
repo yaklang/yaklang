@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"testing"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai"
@@ -15,7 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func main() {
+func TestTaskStack(t *testing.T) {
 	if utils.InGithubActions() {
 		return
 	}
@@ -32,12 +34,12 @@ func main() {
 	log.Infof("apikey for tongyi: %v", string(apikey))
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
 	aiCallback := func(ctx *taskstack.TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
-		log.Infof("start to chat with AI with input: %v", aispec.DetailsToString(details))
+		fmt.Println("-----------Response------------")
 		choices, err := ai.ChatEx(
 			details,
 			aispec.WithDebugStream(true),
-			aispec.WithType("tongyi"),
-			aispec.WithModel("qwq-plus"),
+			aispec.WithType("openai"),
+			aispec.WithModel("Pro/deepseek-ai/DeepSeek-V3"),
 			aispec.WithAPIKey(string(apikey)),
 			aispec.WithDomain("api.siliconflow.cn"),
 		)
@@ -45,11 +47,12 @@ func main() {
 			return nil, err
 		}
 		result := aispec.DetailsToString(lo.Map(choices, func(c aispec.ChatChoice, index int) aispec.ChatDetail { return c.Message }))
+		fmt.Println("-----------Response------------")
 		return bytes.NewBufferString(result), nil
 	}
 
 	coordinator := taskstack.NewCoordinator(
-		"查询北京天气，帮我规划今天一天去一个最推荐的地方旅游，两步规划",
+		"帮我规划一个一家三口北京的一日游，子任务控制三步内",
 		taskstack.WithPlan_AICallback(aiCallback),
 		taskstack.WithCoordinator_Tool(taskstack.GetAllMockTools()...),
 	)

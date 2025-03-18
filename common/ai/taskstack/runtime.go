@@ -3,11 +3,13 @@ package taskstack
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Runtime struct {
@@ -81,7 +83,7 @@ func (r *Runtime) Progress() string {
 	return buf.String()
 }
 
-func (r *Runtime) invokeSubtask(idx int, task *Task) {
+func (r *Runtime) invokeSubtask(idx int, task *Task) (aispec.ChatDetails, error) {
 	r.statusMutex.Lock()
 	if r.RootTask == nil {
 		r.RootTask = task
@@ -97,16 +99,21 @@ func (r *Runtime) invokeSubtask(idx int, task *Task) {
 		r.statusMutex.Unlock()
 	}()
 
+	allDetails := aispec.ChatDetails{}
 	if len(task.Subtasks) > 0 {
 		for idxRaw, subtask := range task.Subtasks {
 			idx := idxRaw + 1
-			r.invokeSubtask(idx, subtask)
+			details, err := r.invokeSubtask(idx, subtask)
+			if err != nil {
+				return nil, err
+			}
+			allDetails = append(allDetails, details...)
 		}
-		return
+		return allDetails, nil
 	}
 
 	progress := r.Progress()
-	task.executeTask(&TaskSystemContext{
+	return task.executeTask(&TaskSystemContext{
 		Progress:    progress,
 		CurrentTask: task,
 	})

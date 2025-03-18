@@ -1,4 +1,4 @@
-你是正在执行一系列任务，并且成功执行了外部工具，获得了结果，以下是上下文
+你正在执行一系列任务，并且成功执行了外部工具，获得了结果，以下是上下文
 
 # 任务状态
 
@@ -14,6 +14,28 @@
 
 调用结果：{{ .Result.Dump }}
 
-根据上面的信息，回顾是否可以继续当前任务。如果你觉得还是无法完成任务，可以遵循如下规则，再发起一次工具调用。
+# 注意
 
-{{ .Task.ToolPrompt }}
+在你执行完任务后，需要生成符合下方Schema的JSON数据实例，禁止返回Schema结构。
+
+```schema
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action"],
+  "properties": {
+    "@action": {
+      "type": "string",
+      "enum": ["require-tool", "finished"],
+      "x-generation-rules": [
+        "当需要申请更多的工具时选require-tool",
+        "流程终止时用finished"
+      ]
+    }
+  },
+  "examples": [
+    {"@action": "require-tool"},
+    {"@action": "finished"}
+  ]
+}
+```
