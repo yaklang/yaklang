@@ -3,11 +3,11 @@ package taskstack
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
+	"reflect"
+
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"reflect"
 )
 
 // ToolResult 表示工具调用的结果
@@ -18,7 +18,8 @@ type ToolResult struct {
 }
 
 func (t *ToolResult) Dump() string {
-	return spew.Sdump(t)
+	bytes, _ := json.Marshal(t)
+	return string(bytes)
 }
 
 // ToolInvokeParams 表示工具调用的参数

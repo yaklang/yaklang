@@ -2,8 +2,9 @@ package aispec
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -207,6 +208,42 @@ func NewToolChatDetailWithID(id, name, content string) ChatDetail {
 		ToolCallID: id,
 		Content:    content,
 	}
+}
+
+func (t *ToolCall) Clone() *ToolCall {
+	if t == nil {
+		return nil
+	}
+	return &ToolCall{
+		ID:       t.ID,
+		Type:     t.Type,
+		Function: t.Function,
+	}
+}
+
+func (f *FunctionCall) Clone() *FunctionCall {
+	if f == nil {
+		return nil
+	}
+	return &FunctionCall{
+		Name:      f.Name,
+		Arguments: f.Arguments,
+	}
+}
+
+func (detail ChatDetail) Clone() ChatDetail {
+	return ChatDetail{
+		Role:         detail.Role,
+		Name:         detail.Name,
+		Content:      detail.Content,
+		ToolCalls:    lo.Map(detail.ToolCalls, func(tool *ToolCall, _ int) *ToolCall { return tool.Clone() }),
+		ToolCallID:   detail.ToolCallID,
+		FunctionCall: detail.FunctionCall.Clone(),
+	}
+}
+
+func (details ChatDetails) Clone() ChatDetails {
+	return lo.Map(details, func(detail ChatDetail, _ int) ChatDetail { return detail.Clone() })
 }
 
 // ChatMessages 返回一个 ChatDetail 切片

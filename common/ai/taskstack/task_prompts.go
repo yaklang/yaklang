@@ -1,38 +1,12 @@
 package taskstack
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 	"text/template"
 
 	_ "embed"
-
-	"github.com/yaklang/yaklang/common/log"
 )
-
-//go:embed prompts/tool-prompt.txt
-var toolPrompt string
-
-func (t *Task) ToolPrompt() string {
-	if len(t.tools) <= 0 {
-		return ""
-	}
-	var buf bytes.Buffer
-	temp, err := template.New("tool-prompt").Parse(toolPrompt)
-	if err != nil {
-		log.Errorf("error parsing tool prompt template: %v", err)
-		return ""
-	}
-	err = temp.Execute(&buf, map[string]any{
-		"Tools": t.tools,
-	})
-	if err != nil {
-		log.Errorf("error for rendering tool prompt: %v", err)
-		return ""
-	}
-	return buf.String()
-}
 
 func (t *Task) generateToolCallResponsePrompt(result *ToolResult, runtime *TaskSystemContext, targetTool *Tool) (string, error) {
 	templatedata := map[string]any{

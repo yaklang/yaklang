@@ -18,4 +18,4 @@
 {{ .ToolJSONSchema }}
 ```
 
-请根据上述JSONSchema描述构造有效JSON对象来调用此工具。减少比必要的描述和输出。
+请根据上述JSONSchema描述构造有效JSON对象来调用此工具。不要输出任何解释或描述。
