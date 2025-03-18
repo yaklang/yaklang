@@ -37,7 +37,7 @@ func main() {
 			prompt,
 			aispec.WithDebugStream(true),
 			aispec.WithType("tongyi"),
-			aispec.WithModel("deepseek-v3"),
+			aispec.WithModel("qwen-max"),
 			aispec.WithAPIKey(string(apikey)),
 		)
 		if err != nil {
@@ -47,7 +47,7 @@ func main() {
 	}
 
 	coordinator := taskstack.NewCoordinator(
-		"帮我规划一个一家三口北京的一日游，子任务控制三步内",
+		"查询北京天气，帮我规划今天一天去一个最推荐的地方旅游，两步规划",
 		taskstack.WithPlan_AICallback(aiCallback),
 		taskstack.WithCoordinator_Tool(taskstack.GetAllMockTools()...),
 	)
