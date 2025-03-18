@@ -4,8 +4,8 @@
 
 {{ .Runtime.Progress }}
 
-当前任务: {{ .Runtime.CurrentTask.QuoteName }}
-目标：{{ .Runtime.CurrentTask.QuoteGoal }}
+当前任务: {{ .Task.QuoteName }}
+目标：{{ .Task.QuoteGoal }}
 
 {{ if .Tools }}## 可用工具
 
