@@ -226,7 +226,7 @@ func (t *Tool) ToJSONSchema() map[string]interface{} {
 
 	// 添加@action字段
 	properties["@action"] = map[string]interface{}{
-		"const":       "call-tool",
+		"const":       "describe-tool",
 		"description": "标识当前操作的具体类型",
 	}
 
