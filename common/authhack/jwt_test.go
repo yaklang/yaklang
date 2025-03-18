@@ -225,4 +225,12 @@ func TestJwtGenerateExOrder(t *testing.T) {
 	if token1 != token2 {
 		t.Errorf("Tokens are different: %s != %s", token1, token2)
 	}
+
+	_, k, err := JwtParse(token1, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(k) != "test" {
+		t.Errorf("Keys are different: %s != %s", k, "test")
+	}
 }
