@@ -235,6 +235,27 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	return responseRsp, nil
 }
 
+func ChatEx(details []aispec.ChatDetail, opts ...aispec.AIConfigOption) (responseChoice []aispec.ChatChoice, err error) {
+	config := aispec.NewDefaultAIConfig(opts...)
+	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
+		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
+		if err := gateway.CheckValid(); err != nil {
+			log.Warnf("check valid by %s failed: %s", typ, err)
+			return false
+		}
+		responseChoice, err = gateway.ChatEx(details)
+		if err != nil {
+			log.Warnf("chat by %s failed: %s", typ, err)
+			return false
+		}
+		return true
+	})
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
 func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec.StructuredData, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var selectedGateway aispec.AIClient

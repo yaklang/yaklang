@@ -8,23 +8,15 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 )
 
-//go:embed jsonschema/task.json
-var taskJsonSchema string
+// TaskCallback 定义Task执行过程中调用回调函数类型
+type TaskCallback func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error)
 
-//go:embed prompts/execute-task.txt
-var executeTaskPromptTemplate string
-
-//go:embed prompts/describe-tool.txt
-var describeToolPromptTemplate string
-
-//go:embed prompts/tool-result.txt
-var toolResultPromptTemplate string
-
-// TaskAICallback 定义Task执行过程中AI调用回调函数类型
-type TaskAICallback func(prompt string) (io.Reader, error)
+// TaskResponseCallback 定义Task执行过程中响应回调函数类型
+type TaskResponseCallback func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (continueThinking bool, prompt string, err error)
 
 // TaskProgress 记录任务执行的进度信息
 type TaskProgress struct {
@@ -55,7 +47,7 @@ func WithTask_Tools(tools []*Tool) TaskOption {
 }
 
 // WithTask_Callback 设置Task的AI回调函数
-func WithTask_Callback(callback TaskAICallback) TaskOption {
+func WithTask_Callback(callback TaskCallback) TaskOption {
 	return taskOptionFunc(func(t *Task) {
 		t.SetAICallback(callback)
 	})
@@ -79,8 +71,9 @@ type Task struct {
 	Goal              string
 	ParentTask        *Task
 	Subtasks          []*Task
-	AICallback        TaskAICallback // AI回调函数
-	SummaryAICallback TaskAICallback
+	AICallback        TaskCallback         // AI回调函数
+	ResponseCallback  TaskResponseCallback // 响应回调函数
+	SummaryAICallback TaskCallback         // 总结回调函数
 
 	// 新增字段，存储默认工具和元数据
 	tools    []*Tool
@@ -133,12 +126,32 @@ func (t *Task) UnmarshalJSON(data []byte) error {
 }
 
 // SetAICallback 设置Task的AI回调函数
-func (t *Task) SetAICallback(callback TaskAICallback) {
+func (t *Task) SetAICallback(callback TaskCallback) {
 	t.AICallback = callback
 
 	// 递归设置子任务的回调函数
 	for i := range t.Subtasks {
 		t.Subtasks[i].SetAICallback(callback)
+	}
+}
+
+// SetResponseAICallback 设置Task的响应回调函数
+func (t *Task) SetResponseAICallback(callback TaskResponseCallback) {
+	t.ResponseCallback = callback
+
+	// 递归设置子任务的回调函数
+	for i := range t.Subtasks {
+		t.Subtasks[i].SetResponseAICallback(callback)
+	}
+}
+
+// SetSummaryAICallback 设置Task的总结回调函数
+func (t *Task) SetSummaryAICallback(callback TaskCallback) {
+	t.SummaryAICallback = callback
+
+	// 递归设置子任务的回调函数
+	for i := range t.Subtasks {
+		t.Subtasks[i].SetSummaryAICallback(callback)
 	}
 }
 
@@ -168,10 +181,12 @@ func (t *Task) ApplyOptions(options ...TaskOption) {
 // DeepCopy 创建Task的深度复制，包括其子任务
 func (t *Task) DeepCopy() *Task {
 	copy := &Task{
-		Name:       t.Name,
-		Goal:       t.Goal,
-		AICallback: t.AICallback,
-		tools:      t.tools, // 工具集和回调函数可以共享引用
+		Name:              t.Name,
+		Goal:              t.Goal,
+		AICallback:        t.AICallback,
+		ResponseCallback:  t.ResponseCallback,
+		SummaryAICallback: t.SummaryAICallback,
+		tools:             t.tools, // 工具集和回调函数可以共享引用
 	}
 
 	// 复制元数据

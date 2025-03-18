@@ -4,14 +4,13 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"text/template"
 	"time"
-)
 
-// AICallback 定义AI调用回调函数类型，输入为提示语字符串，输出为响应reader和错误
-type AICallback func(prompt string) (io.Reader, error)
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/log"
+)
 
 //go:embed prompts/generate-tasklist.txt
 var generateTaskListPrompt string
@@ -36,7 +35,7 @@ const (
 type PlanRequest struct {
 	MetaData   map[string]any
 	Query      string
-	AICallback AICallback // AI回调函数
+	AICallback TaskCallback // AI回调函数
 }
 
 type PlanResponse struct {
@@ -152,7 +151,7 @@ func WithPlan_UserLevel(level string) PlanOption {
 }
 
 // WithPlan_AICallback 设置AI回调函数
-func WithPlan_AICallback(callback AICallback) PlanOption {
+func WithPlan_AICallback(callback TaskCallback) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.AICallback = callback
 	}
@@ -282,7 +281,7 @@ func (pr *PlanRequest) Invoke() (*PlanResponse, error) {
 	}
 
 	// 调用 AI 回调函数
-	responseReader, err := pr.AICallback(prompt)
+	responseReader, err := pr.AICallback(nil, aispec.NewUserChatDetail(prompt))
 	if err != nil {
 		return nil, fmt.Errorf("调用 AI 服务失败: %v", err)
 	}
@@ -303,7 +302,7 @@ func (pr *PlanRequest) Invoke() (*PlanResponse, error) {
 	// 将AICallback转换为TaskAICallback并设置给Task
 	if task.AICallback == nil {
 		log.Warnf("task ai callback is not set, inherit from plan request")
-		taskCallback := TaskAICallback(pr.AICallback)
+		taskCallback := TaskCallback(pr.AICallback)
 		task.SetAICallback(taskCallback)
 	}
 

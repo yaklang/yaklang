@@ -10,26 +10,27 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
 // 模拟的AI回调函数，返回固定的响应
-func mockAICallback(prompt string) (io.Reader, error) {
+func mockAICallback(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
 	// 这里可以记录或打印prompt以检查格式
 	if os.Getenv("DEBUG_TASK_PROMPT") == "true" {
-		fmt.Println("DEBUG_TASK_PROMPT: " + prompt)
+		fmt.Println("DEBUG_TASK_PROMPT: " + aispec.DetailsToString(details))
 	}
 
 	return strings.NewReader("mock response"), nil
 }
 
 // 模拟AI请求工具描述的回调函数
-func mockAIToolDescriptionCallback(prompt string) (io.Reader, error) {
+func mockAIToolDescriptionCallback(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
 	if os.Getenv("DEBUG_TASK_PROMPT") == "true" {
-		fmt.Println("DEBUG_TASK_PROMPT: " + prompt)
+		fmt.Println("DEBUG_TASK_PROMPT: " + aispec.DetailsToString(details))
 	}
 
 	// 检查是否是第一次调用（初始提示）或者是否已经包含了工具描述
-	if strings.Contains(prompt, "JSONSchema描述") {
+	if strings.Contains(aispec.DetailsToString(details), "JSONSchema描述") {
 		// 提示中已经包含了工具描述信息，返回最终响应
 		return strings.NewReader("这是申请工具描述后的最终响应"), nil
 	} else {
@@ -238,7 +239,8 @@ func TestTask_ToolJSONSchema(t *testing.T) {
 
 func TestTask_DirectAnswer(t *testing.T) {
 	// 模拟AI直接回答而不使用工具的情况
-	directAnswerCallback := func(prompt string) (io.Reader, error) {
+	directAnswerCallback := func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
+		prompt := aispec.DetailsToString(details)
 		if os.Getenv("DEBUG_TASK_PROMPT") == "true" {
 			fmt.Println("DEBUG_TASK_PROMPT: " + prompt)
 		}
