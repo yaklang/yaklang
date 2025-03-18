@@ -3,6 +3,7 @@ package authhack
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -178,14 +179,20 @@ func JwtGenerateEx(alg string, header, claims any, typ string, key []byte) (stri
 	switch claims := claims.(type) {
 	case *orderedmap.OrderedMap:
 		token.Claims = NewOMapClaimsFromOrderedMap(claims)
-	default:
-		newClaims := NewOMapClaims()
-		claimMap := utils.InterfaceToMapInterface(claims)
-		for k, v := range claimMap {
-			newClaims.Set(k, v)
-		}
-		token.Claims = newClaims
-	}
+    default:
+        newClaims := NewOMapClaims()
+        claimMap := utils.InterfaceToMapInterface(claims)
+        // 同样保持键的顺序
+        keys := make([]string, 0, len(claimMap))
+        for k := range claimMap {
+            keys = append(keys, k)
+        }
+        sort.Strings(keys)
+        for _, k := range keys {
+            newClaims.Set(k, claimMap[k])
+        }
+        token.Claims = newClaims
+    }
 
 	return token.SignedString(key)
 }
