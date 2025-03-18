@@ -19,14 +19,14 @@ var JWTExports = map[string]interface{}{
 	"JWTGenerate": func(alg string, i any, key []byte) (string, error) {
 		return JwtGenerate(alg, i, "JWT", key)
 	},
-	"JWTGenerateEx": func(alg string, extraHeader, i any, key []byte) (string, error) {
-		return JwtGenerateEx(alg, extraHeader, i, "JWT", key)
+	"JWTGenerateEx": func(alg string, extraHeader, claims any, key []byte) (string, error) {
+		return JwtGenerateEx(alg, extraHeader, claims, "JWT", key)
 	},
-	"JWSGenerate": func(alg string, i any, key []byte) (string, error) {
-		return JwtGenerate(alg, i, "JWS", key)
+	"JWSGenerate": func(alg string, claims any, key []byte) (string, error) {
+		return JwtGenerate(alg, claims, "JWS", key)
 	},
-	"JWSGenerateEx": func(alg string, extraHeader, i any, key []byte) (string, error) {
-		return JwtGenerateEx(alg, extraHeader, i, "JWS", key)
+	"JWSGenerateEx": func(alg string, extraHeader, claims any, key []byte) (string, error) {
+		return JwtGenerateEx(alg, extraHeader, claims, "JWS", key)
 	},
 	"RemoveAlg":         JwtChangeAlgToNone,
 	"AllAlgs":           AvailableJWTTokensAlgs,
