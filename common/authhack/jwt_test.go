@@ -204,3 +204,23 @@ func TestJwtClaimsOrder(t *testing.T) {
 		require.Equal(t, testJWT, signed)
 	}
 }
+
+func TestJwtGenerateExOrder(t *testing.T) {
+	claims := map[string]interface{}{
+		"sub":  "test",
+		"name": "test",
+	}
+
+	// 使用相同的输入参数生成两次
+	token1, err1 := JwtGenerateEx("HS256", nil, claims, "JWT", []byte("test"))
+	token2, err2 := JwtGenerateEx("HS256", nil, claims, "JWT", []byte("test"))
+
+	if err1 != nil || err2 != nil {
+		t.Fatal(err1, err2)
+	}
+
+	// 验证两次生成的 token 是否相同
+	if token1 != token2 {
+		t.Errorf("Tokens are different: %s != %s", token1, token2)
+	}
+}
