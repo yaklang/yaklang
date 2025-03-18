@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"strings"
 	"testing"
 	"time"
@@ -210,10 +211,11 @@ func TestJwtGenerateExOrder(t *testing.T) {
 		"sub":  "test",
 		"name": "test",
 	}
+	c := orderedmap.New(claims)
 
 	// 使用相同的输入参数生成两次
-	token1, err1 := JwtGenerateEx("HS256", nil, claims, "JWT", []byte("test"))
-	token2, err2 := JwtGenerateEx("HS256", nil, claims, "JWT", []byte("test"))
+	token1, err1 := JwtGenerateEx("HS256", nil, c, "JWT", []byte("test"))
+	token2, err2 := JwtGenerateEx("HS256", nil, c, "JWT", []byte("test"))
 
 	if err1 != nil || err2 != nil {
 		t.Fatal(err1, err2)
