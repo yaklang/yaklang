@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/taskstack"
@@ -33,11 +32,30 @@ func TestTaskStack(t *testing.T) {
 	consts.InitializeYakitDatabase("", "")
 	log.Infof("apikey for tongyi: %v", string(apikey))
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
-	aiCallback := func(ctx *taskstack.TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
+	aiCallback := func(req *taskstack.AIRequest) (*taskstack.AIResponse, error) {
+		rsp := taskstack.NewAIResponse()
+		defer rsp.Close()
+
 		fmt.Println("-----------Response------------")
-		choices, err := ai.ChatEx(
-			details,
+		_, err := ai.Chat(
+			req.GetPrompt(),
 			aispec.WithDebugStream(true),
+			aispec.WithReasonStreamHandler(func(c io.Reader) {
+				var buf bytes.Buffer
+				c = io.TeeReader(c, &buf)
+				go func() {
+					io.Copy(os.Stdout, c)
+				}()
+				rsp.EmitReasonStream(&buf)
+			}),
+			aispec.WithStreamHandler(func(c io.Reader) {
+				var buf bytes.Buffer
+				c = io.TeeReader(c, &buf)
+				go func() {
+					io.Copy(os.Stdout, c)
+				}()
+				rsp.EmitOutputStream(&buf)
+			}),
 			aispec.WithType("openai"),
 			aispec.WithModel("Pro/deepseek-ai/DeepSeek-V3"),
 			aispec.WithAPIKey(string(apikey)),
@@ -46,9 +64,7 @@ func TestTaskStack(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		result := aispec.DetailsToString(lo.Map(choices, func(c aispec.ChatChoice, index int) aispec.ChatDetail { return c.Message }))
-		fmt.Println("-----------Response------------")
-		return bytes.NewBufferString(result), nil
+		return rsp, nil
 	}
 
 	coordinator := taskstack.NewCoordinator(
