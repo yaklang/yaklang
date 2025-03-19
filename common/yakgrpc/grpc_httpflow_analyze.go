@@ -112,7 +112,7 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB, analyzeId string) (
 		}
 	}()
 
-	// 热加载和规则匹配进度条比例
+	// 热加载和规则匹配进度条权重
 	ruleProcessPercent := 0.5
 	if !m.haveHotPatch() {
 		ruleProcessPercent = 1
@@ -271,6 +271,7 @@ func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, analyzeId string, proc
 			log.Infof("save analyze result failed: %s", err)
 		}
 		atomic.AddInt64(&m.handledHTTPFlowCount, 1)
+		atomic.AddInt64(&m.matchedHTTPFlowCount, 1)
 		m.notifyResult(analyzed)
 		m.notifyMatchedHTTPFlowNum()
 		m.notifyHandleFlowNum()
