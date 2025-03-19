@@ -27,8 +27,8 @@ alert $high for {
 
 $output #{
     include: `* & $source`,
-    exclude: `*?{opcode:call && ?{}}`
-}->
+    exclude: `*?{opcode:call && !<self><getCallee> & $filter}`
+}-> as $middle
 
 
 
@@ -39,9 +39,11 @@ alert $middle for {
     level: 'mid'
 }
 
-$root?{<dataflow(<<<CODE
-*?{opcode: call && <self><getCallee> & $filter} as $__next__
-CODE)>} as $low
+
+$output#{
+    include: `* & $source`,
+    include: `<self><getCallee> & $filter`
+}-> as $low
 
 alert $low for {
     title: 'Variable coverage detected, but filter function not detected',
