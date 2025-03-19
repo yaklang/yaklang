@@ -3,14 +3,12 @@ package taskstack
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"strings"
-
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"io"
 )
 
 func (t *Task) getToolRequired(response string) []*Tool {
@@ -53,57 +51,48 @@ func (t *Task) getToolResultAction(response string) string {
 	return "unknown"
 }
 
-func (t *Task) callTool(ctx *TaskSystemContext, targetTool *Tool, chatDetails aispec.ChatDetails) (result, action string, err error) {
+func (t *Task) callTool(ctx *TaskSystemContext, targetTool *Tool) (result *ToolResult, action string, err error) {
 	// 生成申请工具详细描述的prompt
 	paramsPrompt, err := t.generateRequireToolResponsePrompt(ctx, targetTool, targetTool.Name)
 	if err != nil {
 		err = utils.Errorf("error generate require tool response prompt: %v", err)
-		return "", "", NewNonRetryableTaskStackError(err)
+		return nil, "", NewNonRetryableTaskStackError(err)
 	}
 	// 调用AI获取工具调用参数
 	req := NewAIRequest(paramsPrompt, WithAIRequest_TaskContext(ctx))
 	callParams, err := t.AICallback(req)
 	if err != nil || callParams == nil {
 		err = utils.Errorf("error calling AI: %v", err)
-		return "", "", NewNonRetryableTaskStackError(err)
+		return nil, "", NewNonRetryableTaskStackError(err)
 	}
 	callParamsString, _ := io.ReadAll(callParams.Reader())
 	// 调用工具
 	toolResult, err := targetTool.InvokeWithRaw(string(callParamsString))
 	if err != nil {
 		err = utils.Errorf("error invoking tool: %v", err)
-		return "", "", NewNonRetryableTaskStackError(err)
+		return nil, "", NewNonRetryableTaskStackError(err)
 	}
 	// 生成调用工具结果的prompt
 	decisionPrompt, err := t.generateToolCallResponsePrompt(toolResult, ctx, targetTool)
 	if err != nil {
 		err = utils.Errorf("error generating tool call response prompt: %v", err)
-		return "", "", NewNonRetryableTaskStackError(err)
+		return nil, "", NewNonRetryableTaskStackError(err)
 	}
 	// 调用AI进行下一步决策
 	req = NewAIRequest(decisionPrompt, WithAIRequest_TaskContext(ctx))
 	continueResult, err := t.AICallback(req)
 	if err != nil {
 		err = utils.Errorf("error calling AI: %v", err)
-		return "", "", NewNonRetryableTaskStackError(err)
+		return nil, "", NewNonRetryableTaskStackError(err)
 	}
 	nextResponse, err := io.ReadAll(continueResult.Reader())
 	if err != nil {
 		err = utils.Errorf("error reading AI response: %v", err)
-		return "", "", NewNonRetryableTaskStackError(err)
+		return nil, "", NewNonRetryableTaskStackError(err)
 	}
 	// 获取下一步决策
 	action = t.getToolResultAction(string(nextResponse))
-
-	// 获取工具调用结果,不包含决策部分
-	index := strings.Index(decisionPrompt, "# 注意")
-	if index != -1 {
-		result = decisionPrompt[:index]
-	} else {
-		result = decisionPrompt
-	}
-	result = strings.TrimSpace(result)
-	return result, action, nil
+	return toolResult, action, nil
 }
 
 // executeTask 实际执行任务并返回结果
@@ -148,6 +137,7 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 		tempChatDetails := chatDetails.Clone()
 		tempChatDetails = append(tempChatDetails, aispec.NewAIChatDetail(response))
 
+	TOOLREQUIRED:
 		for {
 			toolRequired := t.getToolRequired(response)
 			if len(toolRequired) == 0 {
@@ -155,25 +145,22 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 			}
 
 			targetTool := toolRequired[0]
-			result, action, err := t.callTool(ctx, targetTool, tempChatDetails)
+			result, action, err := t.callTool(ctx, targetTool)
 			if err != nil {
+				log.Errorf("error calling tool: %v", err)
 				return nil, err
 			}
+			t.PushToolCallResult(result)
 
-			if action == "unknown" {
-				return nil, fmt.Errorf("unknown action: %s", action)
-			}
-			if action == "finished" {
-				response = result
-				break
-			}
-			if action == "require-tool" {
-				tempChatDetails = append(tempChatDetails,
-					aispec.NewToolChatDetail(targetTool.Name, result),
-					aispec.NewUserChatDetail(__prompt_REQUIRE_MORE_TOOL),
-				)
+			switch action {
+			case "require-more-tool":
+				moreToolPrompt, err := t.generateTaskPrompt(actualTools, ctx, actualMetadata)
+				if err != nil {
+					log.Errorf("error generating task prompt: %v", err)
+					break TOOLREQUIRED
+				}
 
-				req := NewAIRequest(aispec.DetailsToString(tempChatDetails), WithAIRequest_TaskContext(ctx))
+				req := NewAIRequest(moreToolPrompt, WithAIRequest_TaskContext(ctx))
 				responseReader, err := t.AICallback(req)
 				if err != nil {
 					return nil, fmt.Errorf("error calling AI: %w", err)
@@ -183,6 +170,16 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 					return nil, fmt.Errorf("error reading AI response: %w", err)
 				}
 				response = string(responseBytes)
+			case "finished":
+				fallthrough
+			default:
+				callHistory, err := t.generateToolCallResultsPrompt()
+				if err != nil {
+					log.Errorf("error generating tool call results prompt: %v", err)
+					return nil, err
+				}
+				response = callHistory
+				break TOOLREQUIRED
 			}
 		}
 
