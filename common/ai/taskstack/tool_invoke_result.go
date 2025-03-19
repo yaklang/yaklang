@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -12,9 +13,34 @@ import (
 
 // ToolResult 表示工具调用的结果
 type ToolResult struct {
-	Success bool        `json:"success"`
-	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Param       any    `json:"param"`
+	Success     bool   `json:"success"`
+	Data        any    `json:"data,omitempty"`
+	Error       string `json:"error,omitempty"`
+}
+
+func (t *ToolResult) QuoteName() string {
+	return strconv.Quote(t.Name)
+}
+
+func (t *ToolResult) QuoteDescription() string {
+	return strconv.Quote(t.Description)
+}
+
+func (t *ToolResult) QuoteError() string {
+	return strconv.Quote(t.Error)
+}
+
+func (t *ToolResult) QuoteResult() string {
+	raw, _ := json.Marshal(t.Data)
+	return string(raw)
+}
+
+func (t *ToolResult) QuoteParams() string {
+	raw, _ := json.Marshal(t.Param)
+	return string(raw)
 }
 
 func (t *ToolResult) Dump() string {
@@ -35,16 +61,22 @@ func (t *Tool) InvokeWithJSON(jsonStr string) (*ToolResult, error) {
 	var params ToolInvokeParams
 	if err := json.Unmarshal([]byte(jsonStr), &params); err != nil {
 		return &ToolResult{
-			Success: false,
-			Error:   fmt.Sprintf("JSON解析错误: %v", err),
+			Name:        t.Name,
+			Description: t.Description,
+			Param:       params,
+			Success:     false,
+			Error:       fmt.Sprintf("JSON解析错误: %v", err),
 		}, err
 	}
 
 	// 验证工具名称
 	if params.Tool != t.Name {
 		return &ToolResult{
-			Success: false,
-			Error:   fmt.Sprintf("工具名称不匹配: 期望 %s, 实际 %s", t.Name, params.Tool),
+			Name:        t.Name,
+			Description: t.Description,
+			Param:       params,
+			Success:     false,
+			Error:       fmt.Sprintf("工具名称不匹配: 期望 %s, 实际 %s", t.Name, params.Tool),
 		}, fmt.Errorf("工具名称不匹配: 期望 %s, 实际 %s", t.Name, params.Tool)
 	}
 
@@ -68,7 +100,11 @@ func (t *Tool) InvokeWithRaw(raw string) (*ToolResult, error) {
 			log.Infof("actionName: %s", actionName)
 		}
 		params := utils.MapGetMapRaw(rawParam, "params")
-		return t.InvokeWithParams(params)
+		result, err := t.InvokeWithParams(params)
+		if result != nil {
+			result.Param = params
+		}
+		return result, err
 	}
 	return nil, utils.Errorf("no valid params found: %#v", raw)
 }
@@ -79,23 +115,35 @@ func (t *Tool) InvokeWithParams(params map[string]interface{}) (*ToolResult, err
 	valid, validationErrors := t.ValidateParams(params)
 	if !valid {
 		return &ToolResult{
-			Success: false,
-			Error:   fmt.Sprintf("参数验证失败: %v", validationErrors),
+			Name:        t.Name,
+			Description: t.Description,
+			Param:       params,
+			Success:     false,
+			Error:       fmt.Sprintf("参数验证失败: %v", validationErrors),
 		}, fmt.Errorf("参数验证失败: %v", validationErrors)
+	}
+	if _, ok := params["@action"]; ok {
+		delete(params, "@action")
 	}
 
 	// 执行工具并捕获stdout和stderr
 	execResult, err := t.ExecuteToolWithCapture(params)
 	if err != nil {
 		return &ToolResult{
-			Success: false,
-			Error:   fmt.Sprintf("工具执行失败: %v", err),
+			Param:       params,
+			Name:        t.Name,
+			Description: t.Description,
+			Success:     false,
+			Error:       fmt.Sprintf("工具执行失败: %v", err),
 		}, err
 	}
 
 	return &ToolResult{
-		Success: true,
-		Data:    execResult,
+		Name:        t.Name,
+		Description: t.Description,
+		Param:       params,
+		Success:     true,
+		Data:        execResult,
 	}, nil
 }
 

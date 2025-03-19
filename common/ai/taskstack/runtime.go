@@ -3,10 +3,12 @@ package taskstack
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,7 +18,8 @@ type Runtime struct {
 	RootTask *Task
 	Stack    *utils.Stack[*Task]
 
-	statusMutex sync.Mutex
+	statusMutex     sync.Mutex
+	toolCallResults []*ToolResult
 }
 
 func CreateRuntime() *Runtime {
@@ -107,18 +110,54 @@ func (r *Runtime) invokeSubtask(idx int, task *Task) (aispec.ChatDetails, error)
 			if err != nil {
 				return nil, err
 			}
+			r.PushToolCallResults(subtask.ToolCallResults...)
 			allDetails = append(allDetails, details...)
 		}
 		return allDetails, nil
 	}
 
-	progress := r.Progress()
 	return task.executeTask(&TaskSystemContext{
-		Progress:    progress,
+		Runtime:     r,
 		CurrentTask: task,
 	})
 }
 
 func (r *Runtime) Invoke(task *Task) {
 	r.invokeSubtask(1, task)
+}
+
+func (r *Runtime) PushToolCallResults(t ...*ToolResult) {
+	r.statusMutex.Lock()
+	defer r.statusMutex.Unlock()
+
+	r.toolCallResults = append(r.toolCallResults, t...)
+}
+
+func (r *Runtime) PromptForToolCallResultsForLast5() string {
+	r.statusMutex.Lock()
+	defer r.statusMutex.Unlock()
+
+	if len(r.toolCallResults) == 0 {
+		return ""
+	}
+
+	var result = r.toolCallResults
+	if len(result) > 5 {
+		result = result[len(result)-5:]
+	}
+	templatedata := map[string]interface{}{
+		"ToolCallResults": result,
+	}
+	temp, err := template.New("tool-result-history").Parse(toolResultHistoryPromptTemplate)
+	if err != nil {
+		log.Errorf("error parsing tool result history template: %v", err)
+		return ""
+	}
+	var promptBuilder strings.Builder
+	err = temp.Execute(&promptBuilder, templatedata)
+	if err != nil {
+		log.Errorf("error executing tool result history template: %v", err)
+		return ""
+	}
+	return promptBuilder.String()
 }

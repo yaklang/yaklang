@@ -11,9 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-//go:embed prompts/generate-tasklist.txt
-var generateTaskListPrompt string
-
 // 常用元数据键名常量
 const (
 	MetaInfoKey       = "MetaInfo"       // 基本元信息

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -33,6 +34,7 @@ func main() {
 	aiCallback := func(req *taskstack.AIRequest) (*taskstack.AIResponse, error) {
 		rsp := taskstack.NewAIResponse()
 		defer rsp.Close()
+		fmt.Println(req.GetPrompt())
 		_, err := ai.Chat(
 			req.GetPrompt(),
 			aispec.WithStreamHandler(func(c io.Reader) {
@@ -52,7 +54,7 @@ func main() {
 				rsp.EmitReasonStream(&buf)
 			}),
 			aispec.WithType("tongyi"),
-			aispec.WithModel("qwen-max"),
+			aispec.WithModel("qwen-plus"),
 			aispec.WithAPIKey(string(apikey)),
 			// aispec.WithDomain("api.siliconflow.cn"),
 		)
