@@ -873,7 +873,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		db = bizhelper.ExactQueryStringArrayOr(db, "hidden_index", params.GetHiddenIndex())
 	}
 	if len(params.GetAnalyzedIds()) > 0 {
-		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.GetAnalyzedIds())
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "analyzed_http_flow_id", params.GetAnalyzedIds())
 	}
 	if params.AfterBodyLength > 0 {
 		db = db.Where("body_length >= ?", params.AfterBodyLength)
