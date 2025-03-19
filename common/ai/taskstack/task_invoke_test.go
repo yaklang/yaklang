@@ -10,32 +10,37 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // 模拟的AI回调函数，返回固定的响应
-func mockAICallback(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
+func mockAICallback(req *AIRequest) (*AIResponse, error) {
 	// 这里可以记录或打印prompt以检查格式
 	if os.Getenv("DEBUG_TASK_PROMPT") == "true" {
-		fmt.Println("DEBUG_TASK_PROMPT: " + aispec.DetailsToString(details))
+		fmt.Println("DEBUG_TASK_PROMPT: " + req.GetPrompt())
 	}
 
-	return strings.NewReader("mock response"), nil
+	resp := NewAIResponse()
+	defer resp.Close()
+	resp.EmitOutputStream(strings.NewReader("mock response"))
+	return resp, nil
 }
 
 // 模拟AI请求工具描述的回调函数
-func mockAIToolDescriptionCallback(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
+func mockAIToolDescriptionCallback(req *AIRequest) (*AIResponse, error) {
 	if os.Getenv("DEBUG_TASK_PROMPT") == "true" {
-		fmt.Println("DEBUG_TASK_PROMPT: " + aispec.DetailsToString(details))
+		fmt.Println("DEBUG_TASK_PROMPT: " + req.GetPrompt())
 	}
 
+	resp := NewAIResponse()
+	defer resp.Close()
 	// 检查是否是第一次调用（初始提示）或者是否已经包含了工具描述
-	if strings.Contains(aispec.DetailsToString(details), "JSONSchema描述") {
+	if strings.Contains(req.GetPrompt(), "JSONSchema描述") {
 		// 提示中已经包含了工具描述信息，返回最终响应
-		return strings.NewReader("这是申请工具描述后的最终响应"), nil
+		resp.EmitOutputStream(strings.NewReader("这是申请工具描述后的最终响应"))
 	} else {
 		// 第一次调用或没有工具描述，返回一个请求工具描述的响应
-		return strings.NewReader(`我需要了解更多关于test_tool的信息。
+		resp.EmitOutputStream(strings.NewReader(`我需要了解更多关于test_tool的信息。
 
 ` + "```" + `jsonschema help="申请工具详情"
 {
@@ -56,8 +61,9 @@ func mockAIToolDescriptionCallback(ctx *TaskSystemContext, details ...aispec.Cha
 }
 ` + "```" + `
 
-我想申请查看test_tool的详细信息。`), nil
+我想申请查看test_tool的详细信息。`))
 	}
+	return resp, nil
 }
 
 // TestTask_Invoke_NoTools 测试无工具的任务执行
@@ -104,10 +110,15 @@ func TestTask_Invoke_WithToolDescription(t *testing.T) {
 	task := NewTask("test_task", "test goal")
 	task.SetAICallback(mockAICallback)
 
+	// 创建一个简单的 Runtime
+	runtime := &Runtime{
+		Stack: utils.NewStack[*Task](),
+	}
+
 	// 创建一个 TaskSystemContext
 	ctx := &TaskSystemContext{
-		Progress:    "",
 		CurrentTask: task,
+		Runtime:     runtime,
 	}
 
 	// 生成任务提示
@@ -239,8 +250,8 @@ func TestTask_ToolJSONSchema(t *testing.T) {
 
 func TestTask_DirectAnswer(t *testing.T) {
 	// 模拟AI直接回答而不使用工具的情况
-	directAnswerCallback := func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
-		prompt := aispec.DetailsToString(details)
+	directAnswerCallback := func(req *AIRequest) (*AIResponse, error) {
+		prompt := req.GetPrompt()
 		if os.Getenv("DEBUG_TASK_PROMPT") == "true" {
 			fmt.Println("DEBUG_TASK_PROMPT: " + prompt)
 		}
@@ -250,7 +261,10 @@ func TestTask_DirectAnswer(t *testing.T) {
 		assert.Contains(t, prompt, "可以直接给出答案")
 
 		// 返回直接的回答，不请求工具描述
-		return strings.NewReader("我决定直接回答这个任务，不需要使用工具。\n\n这是我的详细回答：...\n\n总结：任务已完成。"), nil
+		resp := NewAIResponse()
+		defer resp.Close()
+		resp.EmitOutputStream(strings.NewReader("我决定直接回答这个任务，不需要使用工具。\n\n这是我的详细回答：...\n\n总结：任务已完成。"))
+		return resp, nil
 	}
 
 	// 创建任务

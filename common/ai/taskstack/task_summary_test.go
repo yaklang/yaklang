@@ -13,9 +13,12 @@ func TestDefaultSummaryAICallback(t *testing.T) {
 	// 创建一个模拟的TaskSystemContext
 	ctx := &TaskSystemContext{
 		CurrentTask: &Task{
-			AICallback: func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
+			AICallback: func(req *AIRequest) (*AIResponse, error) {
 				// 模拟AI回调返回一个简单的总结
-				return bytes.NewReader([]byte("这是一个测试总结")), nil
+				resp := NewAIResponse()
+				defer resp.Close()
+				resp.EmitOutputStream(bytes.NewReader([]byte("这是一个测试总结")))
+				return resp, nil
 			},
 		},
 	}
