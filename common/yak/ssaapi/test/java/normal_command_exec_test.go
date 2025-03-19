@@ -506,7 +506,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0152", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime", "Undefined-cmd", "nil"}, `    /**
+		{"aTaintCase0152", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime", "nil"}, `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
@@ -527,7 +527,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0153", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime", "Undefined-cmd", "nil"}, `    /**
+		{"aTaintCase0153", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime", "nil"}, `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd

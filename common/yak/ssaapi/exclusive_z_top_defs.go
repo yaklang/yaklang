@@ -114,7 +114,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				log.Errorf("%v", err)
 				return i.visitedDefs(actx, opt...)
 			}
-			obj.AppendDependOn(apiValue)
+			// obj.AppendDependOn(apiValue)
+			apiValue.AppendDependOn(obj)
 			ret := obj.getTopDefs(actx, opt...)
 			if !ValueCompare(i, actx.Self) {
 				ret = append(ret, i)
@@ -126,6 +127,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 	switch inst := i.node.(type) {
 	case *ssa.Undefined:
+		if inst.Kind == ssa.UndefinedValueReturn {
+			return Values{}
+		}
 		return getMemberCall(i, inst, actx)
 	case *ssa.ConstInst:
 		return i.visitedDefs(actx, opt...)
