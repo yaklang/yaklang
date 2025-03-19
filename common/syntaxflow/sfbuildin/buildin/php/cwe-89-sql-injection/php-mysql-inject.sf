@@ -22,9 +22,9 @@ $mysqlFunction(* as $source)
 $source #{
     include: `<self> & $params`,
     exclude: `*?{opcode: call}`,
-}-> as $high_risk
+}-> as $high
 
-alert $high_risk for {
+alert $high for {
     title: 'Unvalidated MySQL Parameter Injection',
     title_zh: 'MySQL未验证参数注入风险',
     level: 'high',
@@ -32,9 +32,9 @@ alert $high_risk for {
 $source #{
     include: `<self> & $params`,
     include: `*?{opcode: call && !(<self><getCallee> & $filter)}`,
-}-> as $mid_risk
+}-> as $mid
 
-alert $mid_risk for {
+alert $mid for {
     title: 'Insufficient MySQL Parameter Filtering',
     title_zh: 'MySQL参数过滤不充分',
     level: 'mid',
@@ -43,9 +43,9 @@ alert $mid_risk for {
 $source #{
     include: `<self> & $params`,
     include: `*?{opcode: call && <self><getCallee> & $filter}`,
-}-> as $low_risk
+}-> as $low
 
-alert $low_risk for {
+alert $low for {
     title: 'Potential MySQL Access Control Bypass',
     title_zh: 'MySQL访问控制潜在绕过风险',
     level: 'low',
