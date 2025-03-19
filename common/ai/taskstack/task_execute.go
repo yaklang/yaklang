@@ -61,12 +61,13 @@ func (t *Task) callTool(ctx *TaskSystemContext, targetTool *Tool, chatDetails ai
 		return "", "", NewNonRetryableTaskStackError(err)
 	}
 	// 调用AI获取工具调用参数
-	callParams, err := t.AICallback(ctx, aispec.NewUserChatDetail(paramsPrompt))
+	req := NewAIRequest(paramsPrompt, WithAIRequest_TaskContext(ctx))
+	callParams, err := t.AICallback(req)
 	if err != nil || callParams == nil {
 		err = utils.Errorf("error calling AI: %v", err)
 		return "", "", NewNonRetryableTaskStackError(err)
 	}
-	callParamsString, _ := io.ReadAll(callParams)
+	callParamsString, _ := io.ReadAll(callParams.Reader())
 	// 调用工具
 	toolResult, err := targetTool.InvokeWithRaw(string(callParamsString))
 	if err != nil {
@@ -80,12 +81,13 @@ func (t *Task) callTool(ctx *TaskSystemContext, targetTool *Tool, chatDetails ai
 		return "", "", NewNonRetryableTaskStackError(err)
 	}
 	// 调用AI进行下一步决策
-	continueResult, err := t.AICallback(ctx, aispec.NewUserChatDetail(decisionPrompt))
+	req = NewAIRequest(decisionPrompt, WithAIRequest_TaskContext(ctx))
+	continueResult, err := t.AICallback(req)
 	if err != nil {
 		err = utils.Errorf("error calling AI: %v", err)
 		return "", "", NewNonRetryableTaskStackError(err)
 	}
-	nextResponse, err := io.ReadAll(continueResult)
+	nextResponse, err := io.ReadAll(continueResult.Reader())
 	if err != nil {
 		err = utils.Errorf("error reading AI response: %v", err)
 		return "", "", NewNonRetryableTaskStackError(err)
@@ -129,13 +131,14 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 
 	for {
 		// 调用AI回调函数
-		responseReader, err := t.AICallback(ctx, chatDetails...)
+		req := NewAIRequest(prompt, WithAIRequest_TaskContext(ctx))
+		responseReader, err := t.AICallback(req)
 		if err != nil {
 			return nil, fmt.Errorf("error calling AI: %w", err)
 		}
 
 		// 读取AI的响应
-		responseBytes, err := io.ReadAll(responseReader)
+		responseBytes, err := io.ReadAll(responseReader.Reader())
 		if err != nil {
 			return nil, fmt.Errorf("error reading AI response: %w", err)
 		}
@@ -170,11 +173,12 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 					aispec.NewUserChatDetail(__prompt_REQUIRE_MORE_TOOL),
 				)
 
-				responseReader, err := t.AICallback(ctx, tempChatDetails...)
+				req := NewAIRequest(aispec.DetailsToString(tempChatDetails), WithAIRequest_TaskContext(ctx))
+				responseReader, err := t.AICallback(req)
 				if err != nil {
 					return nil, fmt.Errorf("error calling AI: %w", err)
 				}
-				responseBytes, err := io.ReadAll(responseReader)
+				responseBytes, err := io.ReadAll(responseReader.Reader())
 				if err != nil {
 					return nil, fmt.Errorf("error reading AI response: %w", err)
 				}
@@ -202,15 +206,19 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 	// 处理总结回调
 	summaryCallback := t.SummaryAICallback
 	if summaryCallback == nil {
-		summaryCallback = DefaultSummaryAICallback
+		summaryCallback = t.AICallback
 	}
-
-	summaryReader, err := summaryCallback(ctx, chatDetails...)
+	summaryPromptWellFormed, err := GenerateSummaryPrompt(aispec.DetailsToString(chatDetails))
+	if err != nil {
+		return nil, fmt.Errorf("error generating summary prompt: %w", err)
+	}
+	req := NewAIRequest(summaryPromptWellFormed, WithAIRequest_TaskContext(ctx))
+	summaryReader, err := summaryCallback(req)
 	if err != nil {
 		return nil, fmt.Errorf("error calling summary AI: %w", err)
 	}
 
-	summaryBytes, err := io.ReadAll(summaryReader)
+	summaryBytes, err := io.ReadAll(summaryReader.Reader())
 	if err != nil {
 		return nil, fmt.Errorf("error reading summary: %w", err)
 	}

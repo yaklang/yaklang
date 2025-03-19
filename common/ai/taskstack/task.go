@@ -5,15 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 )
-
-// TaskCallback 定义Task执行过程中调用回调函数类型
-type TaskCallback func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error)
 
 // TaskResponseCallback 定义Task执行过程中响应回调函数类型
 type TaskResponseCallback func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (continueThinking bool, prompt string, err error)
@@ -47,7 +43,7 @@ func WithTask_Tools(tools []*Tool) TaskOption {
 }
 
 // WithTask_Callback 设置Task的AI回调函数
-func WithTask_Callback(callback TaskCallback) TaskOption {
+func WithTask_Callback(callback AICallbackType) TaskOption {
 	return taskOptionFunc(func(t *Task) {
 		t.SetAICallback(callback)
 	})
@@ -71,9 +67,9 @@ type Task struct {
 	Goal              string
 	ParentTask        *Task
 	Subtasks          []*Task
-	AICallback        TaskCallback         // AI回调函数
+	AICallback        AICallbackType       // AI回调函数
 	ResponseCallback  TaskResponseCallback // 响应回调函数
-	SummaryAICallback TaskCallback         // 总结回调函数
+	SummaryAICallback AICallbackType       // 总结回调函数
 
 	// 新增字段，存储默认工具和元数据
 	tools    []*Tool
@@ -126,7 +122,7 @@ func (t *Task) UnmarshalJSON(data []byte) error {
 }
 
 // SetAICallback 设置Task的AI回调函数
-func (t *Task) SetAICallback(callback TaskCallback) {
+func (t *Task) SetAICallback(callback AICallbackType) {
 	t.AICallback = callback
 
 	// 递归设置子任务的回调函数
@@ -146,7 +142,7 @@ func (t *Task) SetResponseAICallback(callback TaskResponseCallback) {
 }
 
 // SetSummaryAICallback 设置Task的总结回调函数
-func (t *Task) SetSummaryAICallback(callback TaskCallback) {
+func (t *Task) SetSummaryAICallback(callback AICallbackType) {
 	t.SummaryAICallback = callback
 
 	// 递归设置子任务的回调函数
