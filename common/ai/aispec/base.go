@@ -16,7 +16,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
-func ChatBase(url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error), streamHandler func(io.Reader)) (string, error) {
+func ChatBase(
+	url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error),
+	streamHandler func(io.Reader), reasonStreamHandler func(reader io.Reader),
+) (string, error) {
 	opts, err := opt()
 	if err != nil {
 		return "", utils.Errorf("build config failed: %v", err)

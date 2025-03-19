@@ -13,11 +13,12 @@ func DefaultSummaryAICallback(ctx *TaskSystemContext, details ...aispec.ChatDeta
 	if err != nil {
 		return nil, err
 	}
-	summaryReader, err := t.AICallback(ctx, aispec.NewUserChatDetail(summaryPrompt))
+	req := NewAIRequest(summaryPrompt, WithAIRequest_TaskContext(ctx))
+	summaryReader, err := t.AICallback(req)
 	if err != nil {
 		return nil, err
 	}
-	summaryBytes, err := io.ReadAll(summaryReader)
+	summaryBytes, err := io.ReadAll(summaryReader.Reader())
 	if err != nil {
 		return nil, err
 	}

@@ -21,11 +21,12 @@ type AIConfig struct {
 	Timeout  float64 // `app:"name:请求超时时长"`
 	Deadline time.Time
 
-	APIKey        string `app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
-	Proxy         string `app:"name:proxy,verbose:代理地址,id:5"`
-	StreamHandler func(io.Reader)
-	Type          string
-	Context       context.Context
+	APIKey              string `app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
+	Proxy               string `app:"name:proxy,verbose:代理地址,id:5"`
+	StreamHandler       func(io.Reader)
+	ReasonStreamHandler func(reader io.Reader)
+	Type                string
+	Context             context.Context
 
 	FunctionCallRetryTimes int
 
@@ -66,6 +67,12 @@ func WithStreamAndConfigHandler(h func(reader io.Reader, cfg *AIConfig)) AIConfi
 		c.StreamHandler = func(reader io.Reader) {
 			h(reader, c)
 		}
+	}
+}
+
+func WithReasonStreamHandler(h func(io.Reader)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.ReasonStreamHandler = h
 	}
 }
 
