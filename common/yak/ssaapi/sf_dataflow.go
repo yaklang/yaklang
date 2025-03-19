@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -12,12 +14,13 @@ import (
 func DataFlowWithSFConfig(
 	sfResult *sf.SFFrameResult,
 	config *sf.Config,
-	dataflowRecursiveFunc func(...OperationOption) Values,
+	value *Value,
+	analysisType AnalysisType,
 	opts ...*sf.RecursiveConfigItem,
-) sf.ValueOperator {
+) Values {
 
 	handlerResult := make([]func(v Values) Values, 0)
-	addHandler := func(key sfvm.RecursiveConfigKey, code string) {
+	addHandler := func(key sf.RecursiveConfigKey, code string) {
 		handlerResult = append(handlerResult, func(v Values) Values {
 			return dataFlowFilter(
 				key, code, v,
@@ -66,11 +69,18 @@ func DataFlowWithSFConfig(
 			return nil
 		}))
 	}
+	var dataflowRecursiveFunc func(options ...OperationOption) Values
+	if analysisType == TopDefAnalysis {
+		dataflowRecursiveFunc = value.GetTopDefs
+	} else if analysisType == BottomUseAnalysis {
+		dataflowRecursiveFunc = value.GetBottomUses
+	}
 
 	result := dataflowRecursiveFunc(options...)
 	for _, handler := range handlerResult {
 		result = handler(result)
 	}
+	result.AppendPredecessor(value, sf.WithAnalysisContext_Label(fmt.Sprintf("dataflow_%s", analysisType)))
 	return result
 }
 
