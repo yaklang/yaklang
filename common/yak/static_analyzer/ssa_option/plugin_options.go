@@ -25,6 +25,7 @@ func MitmGetTypeSSAOpt() []ssaapi.Option {
 	ret = append(ret, ssaapi.WithExternValue(valueTable))
 
 	ret = append(ret, ssaapi.WithDefineFunc(map[string]any{
+		"hijackHTTPFlow":             func(flow *schema.HTTPFlow, extract func(string, *schema.HTTPFlow)) {},
 		"hijackSaveHTTPFlow":         func(flow *schema.HTTPFlow, modify func(*schema.HTTPFlow), drop func()) {},
 		"hijackHTTPResponse":         func(isHttps bool, url string, rsp []byte, forward func([]byte), drop func()) {},
 		"hijackHTTPResponseEx":       func(isHttps bool, url string, req []byte, rsp []byte, forward func([]byte), drop func()) {},
