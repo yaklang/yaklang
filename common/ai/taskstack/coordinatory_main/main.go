@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"path/filepath"
@@ -31,18 +32,27 @@ func main() {
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
 	aiCallback := func(req *taskstack.AIRequest) (*taskstack.AIResponse, error) {
 		rsp := taskstack.NewAIResponse()
+		defer rsp.Close()
 		_, err := ai.Chat(
 			req.GetPrompt(),
 			aispec.WithStreamHandler(func(c io.Reader) {
-				c = io.TeeReader(c, os.Stdout)
-				rsp.EmitOutputStream(c)
+				var buf bytes.Buffer
+				c = io.TeeReader(c, &buf)
+				go func() {
+					io.Copy(os.Stdout, c)
+				}()
+				rsp.EmitOutputStream(&buf)
 			}),
 			aispec.WithReasonStreamHandler(func(c io.Reader) {
-				c = io.TeeReader(c, os.Stdout)
-				rsp.EmitReasonStream(c)
+				var buf bytes.Buffer
+				c = io.TeeReader(c, &buf)
+				go func() {
+					io.Copy(os.Stdout, c)
+				}()
+				rsp.EmitReasonStream(&buf)
 			}),
 			aispec.WithType("tongyi"),
-			aispec.WithModel("qwq-plus"),
+			aispec.WithModel("qwen-max"),
 			aispec.WithAPIKey(string(apikey)),
 			// aispec.WithDomain("api.siliconflow.cn"),
 		)
