@@ -18,7 +18,7 @@ const (
 	DEFAULT                 = "default"
 )
 
-func (y *builder) VisitBlock(raw javaparser.IBlockContext, syntaxBlocks ...bool) interface{} {
+func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -28,20 +28,10 @@ func (y *builder) VisitBlock(raw javaparser.IBlockContext, syntaxBlocks ...bool)
 	if i == nil {
 		return nil
 	}
-	syntaxBlock := false
-	if len(syntaxBlocks) > 0 {
-		syntaxBlock = syntaxBlocks[0]
-	}
-	if syntaxBlock {
-		if ret := i.BlockStatementList(); ret != nil {
-			y.BuildSyntaxBlock(func() {
-				y.VisitBlockStatementList(ret)
-			})
-		}
-	} else {
-		if ret := i.BlockStatementList(); ret != nil {
+	if ret := i.BlockStatementList(); ret != nil {
+		y.BuildSyntaxBlock(func() {
 			y.VisitBlockStatementList(ret)
-		}
+		})
 	}
 
 	return nil
@@ -946,7 +936,8 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 	case *javaparser.PureSwitchStatementContext:
 		y.VisitSwitchStatement(ret.SwitchStatement())
 	case *javaparser.SynchronizedStatementContext:
-		// 处理 synchronized 语句
+		//TODO 处理 synchronized 语句
+		y.VisitBlock(ret.Block())
 	case *javaparser.ReturnStatementContext:
 		// 处理 return 语句
 		if ret.Expression() != nil {

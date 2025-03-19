@@ -2,6 +2,8 @@ package tests
 
 import (
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestJava_LocalType_Declaration(t *testing.T) {
@@ -76,5 +78,32 @@ public class HelloWorld {
 		default : break;
 };
 `, t)
+	})
+}
+
+func TestJavaSyntaxBlock(t *testing.T) {
+	t.Run("test simple block", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+class A{
+	public static void main(String[] args){
+		{
+			int a=2;
+			println(a); // 2 
+		}
+		println(a); //
+	}
+}
+	`, []string{"2", "Undefined-a"}, t)
+	})
+
+	t.Run("test synchronized block", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+	class A{
+		public static void main(String[] args){
+			synchronized(this){
+				println("hello");
+			}
+		}
+	}`, []string{`"hello"`}, t)
 	})
 }
