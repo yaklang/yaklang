@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/graph"
 )
@@ -139,7 +140,10 @@ func (g *ValueGraph) DeepFirstGraphPrev(value *Value) [][]string {
 	if !ok {
 		return nil
 	}
-	return dot.GraphPathPrev(g.Graph, nodeID)
+	return dot.GraphPathPrevWithFilter(g.Graph, nodeID, func(edge *dot.Edge) bool {
+		// only use predecessor edge draw path
+		return edge.Attribute("color") == "red"
+	})
 }
 
 func (g *ValueGraph) DeepFirstGraphNext(value *Value) [][]string {

@@ -202,11 +202,11 @@ func (v *Value) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
 	return v.GetOperands(), nil
 }
 func (v *Value) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return DataFlowWithSFConfig(sfResult, sfConfig, v.GetTopDefs, config...), nil
+	return DataFlowWithSFConfig(sfResult, sfConfig, v, TopDefAnalysis, config...), nil
 }
 
 func (v *Value) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return DataFlowWithSFConfig(sfResult, sfConfig, v.GetBottomUses, config...), nil
+	return DataFlowWithSFConfig(sfResult, sfConfig, v, BottomUseAnalysis, config...), nil
 }
 
 func (v *Value) ListIndex(i int) (sfvm.ValueOperator, error) {

@@ -14,11 +14,11 @@ type objectItem struct {
 	recoverIntra func()
 }
 
-type AnalysisType int
+type AnalysisType string
 
 const (
-	TopDefAnalysis AnalysisType = iota
-	BottomUseAnalysis
+	TopDefAnalysis    AnalysisType = "top_def"
+	BottomUseAnalysis AnalysisType = "bottom_use"
 )
 
 type AnalyzeContext struct {

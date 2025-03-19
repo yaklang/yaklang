@@ -162,11 +162,19 @@ func (value Values) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
 	return value.GetOperands(), nil
 }
 func (value Values) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return DataFlowWithSFConfig(sfResult, sfConfig, value.GetTopDefs, config...), nil
+	var ret Values
+	for _, v := range value {
+		ret = append(ret, DataFlowWithSFConfig(sfResult, sfConfig, v, TopDefAnalysis, config...)...)
+	}
+	return ret, nil
 }
 
 func (value Values) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return DataFlowWithSFConfig(sfResult, sfConfig, value.GetBottomUses, config...), nil
+	var ret Values
+	for _, v := range value {
+		ret = append(ret, DataFlowWithSFConfig(sfResult, sfConfig, v, BottomUseAnalysis, config...)...)
+	}
+	return ret, nil
 }
 
 func (value Values) ListIndex(i int) (sfvm.ValueOperator, error) {
