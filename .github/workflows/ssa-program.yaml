@@ -1,0 +1,67 @@
+name: vuln Program Check
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - ".github/workflows/ssa-program.yaml"
+      - "common/ssa_bootstrapping/sf_buildin_test.go"
+  schedule:
+    - cron: '0 20 * * 5'
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'schedule' }}
+    steps:
+      - name: GET BRANCH HASH
+        run: |
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "HEAD_SHA=${{github.sha}}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          else
+            echo "Unsupported event: ${{ github.event_name }}"
+            exit 1
+          fi
+          echo "Current head sha is: ${{ env.HEAD_SHA }}"
+      - name: Cache YakLang Project
+        uses: actions/cache@v3
+        id: cache-project
+        with:
+          path: |
+            ~/yakit-projects
+            ${{ github.workspace }}
+          key: go-${{ env.HEAD_SHA }}
+
+      - name: Check out code into the Go module directory
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+      - name: Set up Go 1.x
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: "./go.mod"
+        id: goz
+      - name: Dependence
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libpcap-dev
+          version: 1.9.1-3
+      - name: Init Module
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        run: |
+          go mod tidy
+      - name: Run Test
+        run: |
+          pwd && ls -al
+          go run common/yak/cmd/yak.go -version
+          go run common/yak/cmd/yak.go sync-rule
+          go test ./common/ssa_bootstrapping/build_rule_check/...
