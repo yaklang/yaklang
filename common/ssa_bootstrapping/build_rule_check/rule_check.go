@@ -3,6 +3,7 @@ package ssa_bootstrapping
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -26,7 +28,9 @@ const (
 	NotChecked
 )
 
-var ruleCache = utils.NewTTLCache[*schema.SyntaxFlowRule](time.Minute * 10)
+var (
+	ruleCache = utils.NewTTLCache[*schema.SyntaxFlowRule](time.Minute * 10)
+)
 
 type InputRule struct {
 	RuleName    string
@@ -64,39 +68,44 @@ type RiskInfo struct {
 	RiskVariable string
 	TipContent   string
 
+	//可能一行有多个
 	Number int
 }
 
-func (r *RiskInfo) validate(risk *schema.SSARisk) error {
-	var rangeIf ssaapi.CodeRange
-	err := json.Unmarshal([]byte(risk.CodeRange), &rangeIf)
-	if err != nil {
-		return err
+func (r *RiskInfo) check(progName string) error {
+	db := consts.GetGormDefaultSSADataBase().Debug()
+	target := filepath.Join("/", progName, r.FileName)
+	db = yakit.FilterSSARisk(db, &ypb.SSARisksFilter{
+		ProgramName:   []string{progName},
+		Severity:      []string{string(r.Severity)},
+		FromRule:      []string{r.RuleName},
+		CodeSourceUrl: []string{target},
+	})
+	db = bizhelper.ExactQueryString(db, "variable", r.RiskVariable)
+	db = bizhelper.ExactQueryInt64(db, "line", r.Line)
+
+	var risks []*schema.SSARisk
+	if result := db.Find(&risks); result.Error != nil {
+		log.Errorf("find risk error: %v", result.Error)
+		return result.Error
 	}
-	if r.StartLine != rangeIf.StartLine {
-		return utils.Errorf("start line not match: %v != %v", rangeIf.StartLine, r.StartLine)
+	exist := false
+	for _, ssaRisk := range risks {
+		rangeIf := ssaapi.CodeRange{}
+		if err := json.Unmarshal([]byte(ssaRisk.CodeRange), &rangeIf); err != nil {
+			log.Errorf("code range unmarshal fail")
+			continue
+		}
+		if rangeIf.StartLine != r.StartLine || rangeIf.EndLine != r.EndLine || rangeIf.StartColumn != r.StartColumn || rangeIf.EndColumn != r.EndColumn {
+			continue
+		}
+		exist = true
+		break
 	}
-	if r.EndLine != rangeIf.EndLine {
-		return utils.Errorf("end line not match: %v != %v", rangeIf.EndLine, r.EndLine)
+	if !exist {
+		return utils.Errorf("not found match result")
 	}
-	if r.StartColumn != rangeIf.StartColumn {
-		return utils.Errorf("start column not match: %v != %v", rangeIf.StartColumn, r.StartColumn)
-	}
-	if r.EndColumn != rangeIf.EndColumn {
-		return utils.Errorf("end column not match: %v != %v", rangeIf.EndColumn, r.EndColumn)
-	}
-	target := filepath.Join(risk.ProgramName, r.FileName)
-	if target != risk.CodeSourceUrl {
-		return utils.Errorf("code source url not match: %v != %v", risk.CodeSourceUrl, target)
-	}
-	switch r.Kind {
-	case Checked:
-		return nil
-	case NotChecked:
-		return utils.Errorf("not checked rule: %v", r.RuleName)
-	default:
-		return utils.Errorf("unhandled default case")
-	}
+	return nil
 }
 func (s *RuleChecker) getRule() []*schema.SyntaxFlowRule {
 	var rules []*schema.SyntaxFlowRule
@@ -142,6 +151,9 @@ func (s *RuleChecker) run() error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progName)
+	}()
 	if s.ConfigInfo == nil {
 		return utils.Error("config info is nil")
 	}
@@ -191,25 +203,8 @@ func (s *RuleChecker) run() error {
 		}
 	}
 
-	db := consts.GetGormDefaultSSADataBase().Debug()
-	//validate
 	for _, info := range s.RiskInfo {
-		target := filepath.Join(progName, info.FileName)
-		db = yakit.FilterSSARisk(db, &ypb.SSARisksFilter{
-			ProgramName:   []string{progName},
-			Severity:      []string{string(info.Severity)},
-			FromRule:      []string{info.RuleName},
-			CodeSourceUrl: []string{target},
-		})
-		db = bizhelper.ExactQueryString(db, "variable", info.RiskVariable)
-		db = bizhelper.ExactQueryInt64(db, "line", info.Line)
-		var risk = &schema.SSARisk{}
-		if result := db.Find(&risk); result.Error != nil {
-			log.Errorf("find risk error: %v", result.Error)
-			s.errors = append(s.errors, utils.Errorf("find risk error: %v,rule: %s", result.Error, info.RuleName))
-			continue
-		}
-		if err := info.validate(risk); err != nil {
+		if err := info.check(progName); err != nil {
 			s.errors = append(s.errors, utils.Errorf("validate risk error: %v,rule: %s", err, info.RuleName))
 			continue
 		}
@@ -222,4 +217,19 @@ func (s *RuleChecker) run() error {
 		strError = strError + "\n" + err2.Error()
 	}
 	return errors.New(strError)
+}
+
+func startCase(checker []RuleChecker) error {
+	var errResult string
+	startTime := time.Now()
+	for _, ruleChecker := range checker {
+		if err := ruleChecker.run(); err != nil {
+			errResult += fmt.Sprintf("%s\n", err.Error())
+		}
+	}
+	log.Infof("time Duration: %v", time.Now().Sub(startTime).Seconds())
+	if errResult != "" {
+		return fmt.Errorf("error: %s", errResult)
+	}
+	return nil
 }
