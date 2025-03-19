@@ -212,6 +212,24 @@ func (s *SyntaxFlowRule) GetAlertInfo(name string) (*SyntaxFlowDescInfo, bool) {
 	return nil, false
 }
 
+func (s *SyntaxFlowRule) GetInfo() *SyntaxFlowDescInfo {
+	// load info from rule self, and create new syntaxflowdescinfo return
+	info := &SyntaxFlowDescInfo{
+		Title:       s.Title,
+		TitleZh:     s.TitleZh,
+		Description: s.Description,
+		Solution:    s.Solution,
+		Tag:         s.Tag,
+		Severity:    s.Severity,
+		Purpose:     s.Purpose,
+		OnlyMsg:     false,
+		Msg:         "",
+		CVE:         s.CVE,
+		RiskType:    s.RiskType,
+	}
+	return info
+}
+
 func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
 	groupNames := make([]string, 0, len(s.Groups))
 	for _, group := range s.Groups {

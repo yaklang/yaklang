@@ -100,3 +100,8 @@ func (rule *ReportingDescriptor) WithDefaultConfiguration(configuration *Reporti
 	rule.DefaultConfiguration = configuration
 	return rule
 }
+
+func (rule *ReportingDescriptor) WithMessageStrings(messageStrings *MessageStrings) *ReportingDescriptor {
+	rule.MessageStrings = messageStrings
+	return rule
+}
