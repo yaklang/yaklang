@@ -186,7 +186,6 @@ func (s *RuleChecker) run() error {
 		return err
 	}
 	opts = append(opts, excludeOptions)
-	opts = append(opts, ssaapi.WithSaveToProfile(true))
 	_, err = ssaapi.ParseProject(opts...)
 	if err != nil {
 		return err
