@@ -800,7 +800,7 @@ func (s *Server) QueryHTTPFlowsProcessNames(ctx context.Context, req *ypb.QueryH
 
 func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stream ypb.Yak_ExportHTTPFlowStreamServer) error {
 	exportType := req.GetExportType()
-	if exportType != "csv" && exportType != "har" {
+	if exportType != "csv" && exportType != "har" && exportType != "json" {
 		return utils.Error("unsupported export type")
 	}
 
@@ -922,6 +922,25 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 			},
 		}
 		return har.ExportHTTPArchiveStream(fh, httpArchive)
+	case "json":
+		flowCh := yakit.YieldHTTPFlowsEx(queryDB, stream.Context(), totalCallback)
+		sendPercent := func() {
+			percent := 0.0
+			if total == 0 {
+				percent = count / (count + 1)
+			} else {
+				percent = count / float64(total)
+			}
+			stream.Send(&ypb.ExportHTTPFlowStreamResponse{
+				Percent: percent,
+			})
+		}
+		jsonEncoder := json.NewEncoder(fh)
+		for flow := range flowCh {
+			jsonEncoder.Encode(flow)
+			count++
+			sendPercent()
+		}
 	}
 
 	return nil
