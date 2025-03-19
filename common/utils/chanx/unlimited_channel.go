@@ -29,11 +29,11 @@ func (c *UnlimitedChan[T]) SafeFeed(i T) {
 }
 
 func (c *UnlimitedChan[T]) Close() {
-	if c.cancel != nil {
-		c.cancel()
-	}
 	if c.In != nil {
 		close(c.In)
+	}
+	if c.cancel != nil {
+		c.cancel()
 	}
 }
 
