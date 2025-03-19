@@ -37,11 +37,29 @@ func ChatBase(
 	}
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
 
+	var pr, reasonPr io.Reader
+	pr, reasonPr, opts = appendStreamHandlerPoCOptionEx(opts)
+	wg := new(sync.WaitGroup)
+
+	noMerge := false
+	// handle out and reason
+	if reasonStreamHandler != nil {
+		noMerge = true
+		// reason is not empty, not merge output
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Warnf("reasonStreamHandler panic: %v", err)
+				}
+			}()
+			reasonStreamHandler(reasonPr)
+		}()
+	}
+
 	if streamHandler != nil {
-		var pr io.Reader
 		var body = bytes.NewBufferString("")
-		pr, opts = appendStreamHandlerPoCOption(opts)
-		wg := new(sync.WaitGroup)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -50,7 +68,12 @@ func ChatBase(
 					log.Warnf("streamHandler panic: %v", err)
 				}
 			}()
-			streamHandler(io.TeeReader(pr, body))
+			if streamHandler != nil && noMerge {
+				streamHandler(io.TeeReader(pr, body))
+			} else {
+				result := mergeReasonIntoOutputStream(reasonPr, pr)
+				streamHandler(io.TeeReader(result, body))
+			}
 		}()
 		rsp, _, err := poc.DoPOST(url, opts...)
 		_ = rsp
@@ -61,16 +84,20 @@ func ChatBase(
 		return body.String(), nil
 	}
 
-	rsp, _, err := poc.DoPOST(url, opts...)
+	_, _, err = poc.DoPOST(url, opts...)
 	if err != nil {
 		return "", utils.Errorf("request post to %v：%v", url, err)
 	}
-	var compl ChatCompletion
-	err = json.Unmarshal(rsp.GetBody(), &compl)
-	if err != nil || len(compl.Choices) == 0 {
-		return "", utils.Errorf("JSON response (%v) failed：%v", string(rsp.GetBody()), err)
-	}
-	return compl.Choices[0].Message.Content, nil
+
+	reader := mergeReasonIntoOutputStream(reasonPr, pr)
+	bodyRaw, err := io.ReadAll(reader)
+	return string(bodyRaw), nil
+	//var compl ChatCompletion
+	//err = json.Unmarshal(rsp.GetBody(), &compl)
+	//if err != nil || len(compl.Choices) == 0 {
+	//	return "", utils.Errorf("JSON response (%v) failed：%v", string(rsp.GetBody()), err)
+	//}
+	//return compl.Choices[0].Message.Content, nil
 }
 
 func ExtractFromResult(result string, fields map[string]any) (map[string]any, error) {
@@ -169,7 +196,7 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 		fields["raw_data"] = "相关数据"
 	}
 	msg = GenerateJSONPrompt(msg, fields)
-	result, err := ChatBase(url, model, msg, nil, opt, streamHandler)
+	result, err := ChatBase(url, model, msg, nil, opt, streamHandler, nil)
 	if err != nil {
 		log.Errorf("chatbase error: %s", err)
 		return nil, err
