@@ -19,8 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.PocConfigOption) {
-	out, reason, opts := appendStreamHandlerPoCOptionEx(opts)
+func mergeReasonIntoOutputStream(reason io.Reader, out io.Reader) io.Reader {
 	pr, pw := utils.NewBufPipe(nil)
 	go func() {
 		defer pw.Close()
@@ -34,6 +33,12 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 		}
 		io.Copy(pw, out)
 	}()
+	return pr
+}
+
+func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.PocConfigOption) {
+	out, reason, opts := appendStreamHandlerPoCOptionEx(opts)
+	pr := mergeReasonIntoOutputStream(reason, out)
 	return pr, opts
 }
 
