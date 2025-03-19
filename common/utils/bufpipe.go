@@ -132,6 +132,13 @@ func (w *PipeWriter) Write(data []byte) (int, error) {
 	return n, err
 }
 
+// WriteString implements the String Write interface: it writes data to the internal
+// buffer. If the read end is closed with an error, that err is returned as err;
+// otherwise err is ErrClosedPipe.
+func (w *PipeWriter) WriteString(data string) (int, error) {
+	return w.Write([]byte(data))
+}
+
 // Close closes the writer; subsequent reads from the read half of the pipe will
 // return io.EOF once the internal buffer get empty.
 func (w *PipeWriter) Close() error {
