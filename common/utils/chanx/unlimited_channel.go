@@ -2,7 +2,9 @@ package chanx
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/log"
 	"sync/atomic"
+	"time"
 )
 
 // UnlimitedChan is an unbounded chan.
@@ -14,6 +16,25 @@ type UnlimitedChan[T any] struct {
 	In       chan<- T       // channel for write
 	Out      <-chan T       // channel for read
 	buffer   *RingBuffer[T] // buffer
+	ctx      context.Context
+	cancel   context.CancelFunc
+}
+
+func (c *UnlimitedChan[T]) SafeFeed(i T) {
+	select {
+	case c.In <- i:
+	case <-time.After(3 * time.Second):
+		log.Error("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak")
+	}
+}
+
+func (c *UnlimitedChan[T]) Close() {
+	if c.cancel != nil {
+		c.cancel()
+	}
+	if c.In != nil {
+		close(c.In)
+	}
 }
 
 // Len returns len of In plus len of Out plus len of buffer.
@@ -39,7 +60,11 @@ func NewUnlimitedChan[T any](ctx context.Context, initCapacity int) *UnlimitedCh
 }
 
 func NewUnlimitedChanEx[T any](ctx context.Context, in chan T, out chan T, initBufCapacity int) *UnlimitedChan[T] {
-	ch := UnlimitedChan[T]{In: in, Out: out, buffer: NewRingBuffer[T](initBufCapacity)}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	ch := UnlimitedChan[T]{In: in, Out: out, buffer: NewRingBuffer[T](initBufCapacity), ctx: ctx, cancel: cancel}
 	go process(ctx, in, out, &ch)
 	return &ch
 }
@@ -48,7 +73,11 @@ func NewUnlimitedChanEx[T any](ctx context.Context, in chan T, out chan T, initB
 func NewUnlimitedChanSize[T any](ctx context.Context, initInCapacity, initOutCapacity, initBufCapacity int) *UnlimitedChan[T] {
 	in := make(chan T, initInCapacity)
 	out := make(chan T, initOutCapacity)
-	ch := UnlimitedChan[T]{In: in, Out: out, buffer: NewRingBuffer[T](initBufCapacity)}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	ch := UnlimitedChan[T]{In: in, Out: out, buffer: NewRingBuffer[T](initBufCapacity), ctx: ctx, cancel: cancel}
 
 	go process(ctx, in, out, &ch)
 

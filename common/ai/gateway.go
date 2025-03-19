@@ -336,6 +336,7 @@ var Exports = map[string]any{
 	"domain":             aispec.WithDomain,
 	"baseURL":            aispec.WithBaseURL,
 	"onStream":           aispec.WithStreamHandler,
+	"onReasonStream":     aispec.WithReasonStreamHandler,
 	"debugStream":        aispec.WithDebugStream,
 	"type":               aispec.WithType,
 }

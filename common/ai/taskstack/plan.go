@@ -8,7 +8,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -35,7 +34,7 @@ const (
 type PlanRequest struct {
 	MetaData   map[string]any
 	Query      string
-	AICallback TaskCallback // AI回调函数
+	AICallback AICallbackType // AI回调函数
 }
 
 type PlanResponse struct {
@@ -151,7 +150,7 @@ func WithPlan_UserLevel(level string) PlanOption {
 }
 
 // WithPlan_AICallback 设置AI回调函数
-func WithPlan_AICallback(callback TaskCallback) PlanOption {
+func WithPlan_AICallback(callback AICallbackType) PlanOption {
 	return func(pr *PlanRequest) {
 		pr.AICallback = callback
 	}
@@ -281,13 +280,13 @@ func (pr *PlanRequest) Invoke() (*PlanResponse, error) {
 	}
 
 	// 调用 AI 回调函数
-	responseReader, err := pr.AICallback(nil, aispec.NewUserChatDetail(prompt))
+	responseReader, err := pr.AICallback(NewAIRequest(prompt))
 	if err != nil {
 		return nil, fmt.Errorf("调用 AI 服务失败: %v", err)
 	}
 
 	// 读取响应内容
-	responseBytes, err := io.ReadAll(responseReader)
+	responseBytes, err := io.ReadAll(responseReader.Reader())
 	if err != nil {
 		return nil, fmt.Errorf("读取 AI 响应失败: %v", err)
 	}
@@ -302,7 +301,7 @@ func (pr *PlanRequest) Invoke() (*PlanResponse, error) {
 	// 将AICallback转换为TaskAICallback并设置给Task
 	if task.AICallback == nil {
 		log.Warnf("task ai callback is not set, inherit from plan request")
-		taskCallback := TaskCallback(pr.AICallback)
+		taskCallback := pr.AICallback
 		task.SetAICallback(taskCallback)
 	}
 

@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/taskstack"
@@ -31,21 +29,27 @@ func main() {
 	consts.InitializeYakitDatabase("", "")
 	log.Infof("apikey for tongyi: %v", string(apikey))
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
-	aiCallback := func(ctx *taskstack.TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
-		log.Infof("start to chat with AI with input: %v", aispec.DetailsToString(details))
-		choices, err := ai.ChatEx(
-			details,
-			aispec.WithDebugStream(true),
+	aiCallback := func(req *taskstack.AIRequest) (*taskstack.AIResponse, error) {
+		rsp := taskstack.NewAIResponse()
+		_, err := ai.Chat(
+			req.GetPrompt(),
+			aispec.WithStreamHandler(func(c io.Reader) {
+				c = io.TeeReader(c, os.Stdout)
+				rsp.EmitOutputStream(c)
+			}),
+			aispec.WithReasonStreamHandler(func(c io.Reader) {
+				c = io.TeeReader(c, os.Stdout)
+				rsp.EmitReasonStream(c)
+			}),
 			aispec.WithType("tongyi"),
 			aispec.WithModel("qwq-plus"),
 			aispec.WithAPIKey(string(apikey)),
-			aispec.WithDomain("api.siliconflow.cn"),
+			// aispec.WithDomain("api.siliconflow.cn"),
 		)
 		if err != nil {
 			return nil, err
 		}
-		result := aispec.DetailsToString(lo.Map(choices, func(c aispec.ChatChoice, index int) aispec.ChatDetail { return c.Message }))
-		return bytes.NewBufferString(result), nil
+		return rsp, nil
 	}
 
 	coordinator := taskstack.NewCoordinator(
