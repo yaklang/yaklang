@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -16,7 +17,10 @@ func TestDefaultSummaryAICallback(t *testing.T) {
 			AICallback: func(req *AIRequest) (*AIResponse, error) {
 				// 模拟AI回调返回一个简单的总结
 				resp := NewAIResponse()
-				defer resp.Close()
+				defer func() {
+					time.Sleep(100 * time.Millisecond)
+					resp.Close()
+				}()
 				resp.EmitOutputStream(bytes.NewReader([]byte("这是一个测试总结")))
 				return resp, nil
 			},
