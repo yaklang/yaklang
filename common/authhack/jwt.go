@@ -170,14 +170,40 @@ func JwtGenerateEx(alg string, header, claims any, typ string, key []byte) (stri
 	if header != nil {
 		switch h := header.(type) {
 		case *orderedmap.OrderedMap:
-			h.Range(func(key string, value interface{}) {
-                token.Header.Set(key, value)
-            })
+			// 检查是否包含 alg 和 typ
+			hasAlg := h.GetExact("alg") != nil
+			hasTyp := h.GetExact("typ") != nil
+
+			if hasAlg && hasTyp {
+				// 如果都存在，直接使用传入的 header
+				token.Header = h
+			} else {
+				// 否则遍历设置，保留原有的 alg 和 typ
+				h.Range(func(key string, value interface{}) {
+					if (key == "alg" && !hasAlg) || (key == "typ" && !hasTyp) {
+						return
+					}
+					token.Header.Set(key, value)
+				})
+			}
 		default:
 			headerMap := utils.InterfaceToMapInterface(h)
-            for k, v := range headerMap {
-                token.Header.Set(k, v)
-            }
+			// 检查是否包含 alg 和 typ
+			_, hasAlg := headerMap["alg"]
+			_, hasTyp := headerMap["typ"]
+
+			if hasAlg && hasTyp {
+				// 如果都存在，创建新的 OrderedMap
+				token.Header = orderedmap.New(headerMap)
+			} else {
+				// 否则遍历设置，保留原有的 alg 和 typ
+				for k, v := range headerMap {
+					if (k == "alg" && !hasAlg) || (k == "typ" && !hasTyp) {
+						continue
+					}
+					token.Header.Set(k, v)
+				}
+			}
 		}
 	}
 
