@@ -332,26 +332,102 @@ func TestMUSTPASS_AnalyzeHTTPFlow_HotPatch(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
-	stream, err := client.AnalyzeHTTPFlow(context.Background(), &ypb.AnalyzeHTTPFlowRequest{
-		HotPatchCode: `
+	urlToken := uuid.NewString()
+	rspToken := uuid.NewString()
+	color := "Blue"
+	ruleVerboseName := uuid.NewString()
+	tagName := uuid.NewString()
+	hotPatchCode := fmt.Sprintf(`
 	analyzeHTTPFlow = func(flow,extract){
-    if str.Contains(flow.Url, "baidu")  && str.Contains(string(flow.Response),"总书记"){
-        flow.Blue()
-		 extract("热加载",flow)
+    if str.Contains(flow.Url, "%s")  && str.Contains(string(flow.Response),"%s"){
+        flow.%s()
+		flow.AddTag("%s")
+		extract("%s",flow)
     }
-   
 }
-	`,
+	`, urlToken, rspToken, color, tagName, ruleVerboseName)
+
+	flows := []struct {
+		url string
+		req string
+		rsp string
+	}{
+		{"http://www.baidu.com", `POST /post HTTP/1.1`, "HTTP/1.1 200 OK\n\nabc\nabc" + rspToken},
+		{"http://www.abc.com", `GET /get HTTP/1.1`, "HTTP/1.1 200 OK\n\nabc\nabc"},
+		{"http://www.cab.com", `POST /post HTTP/1.1`, fmt.Sprintf("HTTP/1.1 200 OK\n\n%s", rspToken)},
+		{fmt.Sprintf("http://www.bac%s.com", urlToken), `GET /get HTTP/1.1`, "HTTP/1.1 200 OK\n\nabc\nabc"},
+		{fmt.Sprintf("http://www.cab%s.com", urlToken), `POST /post HTTP/1.1 `, "abc"},
+		{fmt.Sprintf("http://www.cab%s.com", urlToken), `POST /post HTTP/1.1`, fmt.Sprintf("HTTP/1.1 200 OK\n\n%s", rspToken)},
+	}
+
+	for _, flow := range flows {
+		err, deleteFlow := createHTTPFlow(flow.url, flow.req, flow.rsp)
+		require.NoError(t, err)
+		defer deleteFlow()
+	}
+
+	stream, err := client.AnalyzeHTTPFlow(context.Background(), &ypb.AnalyzeHTTPFlowRequest{
+		HotPatchCode: hotPatchCode,
 	})
-	require.NoError(t, err)
-	for {
-		rsp, err := stream.Recv()
-		if err != nil {
-			break
+	var (
+		resultId     string
+		finalProcess float64
+		finalMatch   string
+		finalHandled string
+	)
+	{
+		// 测试进度条
+		for {
+			rsp, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			resultId = rsp.ExecResult.GetRuntimeID()
+			result := rsp.GetExecResult().GetMessage()
+			var msg msg
+			json.Unmarshal(result, &msg)
+			if msg.Type == "progress" {
+				finalProcess = msg.Content.Process
+			}
+			if msg.Type == "log" {
+				var contentData contentData
+				json.Unmarshal([]byte(msg.Content.Data), &contentData)
+				if contentData.ID == "符合条件数" {
+					finalMatch = contentData.Data
+				}
+				if contentData.ID == "已处理数/总数" {
+					finalHandled = contentData.Data
+				}
+			}
+
+			ruleData := rsp.GetRuleData()
+			if ruleData != nil {
+				fmt.Println(ruleData)
+			}
 		}
-		result := rsp.GetExecResult().GetMessage()
-		var msg msg
-		json.Unmarshal(result, &msg)
-		fmt.Println(msg)
+		require.Equal(t, float64(1), finalProcess)
+		require.Equal(t, "1", finalMatch)
+		require.Contains(t, finalHandled, "1/")
+	}
+
+	{
+		ruleRsp, err := client.QueryAnalyzedHTTPFlowRule(context.Background(), &ypb.QueryAnalyzedHTTPFlowRuleRequest{
+			Filter: &ypb.AnalyzedHTTPFlowFilter{
+				ResultIds: []string{resultId},
+			},
+		})
+		require.NoError(t, err)
+		fmt.Println(ruleRsp)
+		require.Equal(t, int64(1), ruleRsp.Total)
+		require.Equal(t, 1, len(ruleRsp.Data))
+		queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+			IncludeId: []int64{ruleRsp.Data[0].HTTPFlowId},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(queryFlow.Data))
+		fmt.Println(queryFlow.Data[0])
+		// test color and tag
+		require.Contains(t, queryFlow.Data[0].Tags, tagName)
+		require.Contains(t, queryFlow.Data[0].Tags, schema.COLORPREFIX+strings.ToUpper(color))
 	}
 }
