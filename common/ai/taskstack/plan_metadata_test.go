@@ -1,11 +1,8 @@
 package taskstack
 
 import (
-	"io"
 	"strings"
 	"testing"
-
-	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
 func TestEnhancedMetadata(t *testing.T) {
@@ -26,8 +23,11 @@ func TestEnhancedMetadata(t *testing.T) {
 		WithPlan_UserLevel("高级开发者"),
 		WithPlan_MetaData("团队规模", "5人"),
 		// 添加一个模拟的AICallback
-		WithPlan_AICallback(func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
-			return strings.NewReader(`{"@action":"plan","query":"创建一个电子商务网站","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`), nil
+		WithPlan_AICallback(func(req *AIRequest) (*AIResponse, error) {
+			resp := NewAIResponse()
+			defer resp.Close()
+			resp.EmitOutputStream(strings.NewReader(`{"@action":"plan","query":"创建一个电子商务网站","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`))
+			return resp, nil
 		}),
 	)
 
@@ -101,8 +101,11 @@ func TestDefaultCurrentTime(t *testing.T) {
 	request, err := CreatePlanRequest(
 		"简单查询",
 		// 添加一个模拟的AICallback
-		WithPlan_AICallback(func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
-			return strings.NewReader(`{"@action":"plan","query":"简单查询","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`), nil
+		WithPlan_AICallback(func(req *AIRequest) (*AIResponse, error) {
+			resp := NewAIResponse()
+			defer resp.Close()
+			resp.EmitOutputStream(strings.NewReader(`{"@action":"plan","query":"简单查询","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`))
+			return resp, nil
 		}),
 	)
 	if err != nil {
@@ -135,8 +138,11 @@ func TestOverrideCurrentTime(t *testing.T) {
 		"覆盖当前时间的查询",
 		WithPlan_MetaData(CurrentTimeKey, customTime),
 		// 添加一个模拟的AICallback
-		WithPlan_AICallback(func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
-			return strings.NewReader(`{"@action":"plan","query":"覆盖当前时间的查询","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`), nil
+		WithPlan_AICallback(func(req *AIRequest) (*AIResponse, error) {
+			resp := NewAIResponse()
+			defer resp.Close()
+			resp.EmitOutputStream(strings.NewReader(`{"@action":"plan","query":"覆盖当前时间的查询","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`))
+			return resp, nil
 		}),
 	)
 	if err != nil {
@@ -171,8 +177,11 @@ func TestWithCurrentTimeFunction(t *testing.T) {
 		"使用WithCurrentTime的查询",
 		WithPlan_CurrentTime(), // 显式调用WithCurrentTime会更新时间戳
 		// 添加一个模拟的AICallback
-		WithPlan_AICallback(func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
-			return strings.NewReader(`{"@action":"plan","query":"使用WithCurrentTime的查询","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`), nil
+		WithPlan_AICallback(func(req *AIRequest) (*AIResponse, error) {
+			resp := NewAIResponse()
+			defer resp.Close()
+			resp.EmitOutputStream(strings.NewReader(`{"@action":"plan","query":"使用WithCurrentTime的查询","tasks":[{"subtask_name":"测试子任务","subtask_goal":"测试目标"}]}`))
+			return resp, nil
 		}),
 	)
 	if err != nil {
