@@ -77,6 +77,12 @@ type Task struct {
 
 	executing bool
 	executed  bool
+
+	ToolCallResults []*ToolResult
+}
+
+func (t *Task) PushToolCallResult(i *ToolResult) {
+	t.ToolCallResults = append(t.ToolCallResults, i)
 }
 
 func (t *Task) applyToolsForAllSubtasks() {
@@ -206,8 +212,12 @@ func (t *Task) DeepCopy() *Task {
 }
 
 type TaskSystemContext struct {
-	Progress    string
+	Runtime     *Runtime
 	CurrentTask *Task
+}
+
+func (ctx *TaskSystemContext) Progress() string {
+	return ctx.Runtime.Progress()
 }
 
 // NewTaskFromJSON 从JSON字符串创建Task
