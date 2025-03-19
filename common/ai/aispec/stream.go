@@ -20,11 +20,31 @@ import (
 )
 
 func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.PocConfigOption) {
+	out, reason, opts := appendStreamHandlerPoCOptionEx(opts)
 	pr, pw := utils.NewBufPipe(nil)
+	go func() {
+		defer pw.Close()
+		var firstByte = make([]byte, 1)
+		n, _ := io.ReadFull(reason, firstByte)
+		if n > 0 {
+			pw.WriteString("<think>")
+			pw.Write(firstByte)
+			io.Copy(pw, reason)
+			pw.WriteString("</think>\n")
+		}
+		io.Copy(pw, out)
+	}()
+	return pr, opts
+}
+
+func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.Reader, []poc.PocConfigOption) {
+	outReader, outWriter := utils.NewBufPipe(nil)
+	reasonReader, reasonWriter := utils.NewBufPipe(nil)
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
 		defer func() {
-			pw.Write([]byte{'\n'})
-			defer pw.Close()
+			outWriter.Write([]byte{'\n'})
+			outWriter.Close()
+			reasonWriter.Close()
 		}()
 		var chunked bool
 		if te := lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"); utils.IContains(te, "chunked") {
@@ -61,44 +81,45 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 			lineStr := string(line)
 			jsonIdentifiers := jsonextractor.ExtractStandardJSON(lineStr)
 			for _, j := range jsonIdentifiers {
-				results := jsonpath.Find(j, `$..choices[*].delta.content`)
 				var reasonDelta string
 				if !reasonFinished {
 					reasonContent := jsonpath.Find(j, `$..choices[*].delta.reasoning_content`)
 					reasonStrs := lo.Map(utils.InterfaceToSliceInterface(reasonContent), func(reason any, idx int) string {
+						if utils.IsNil(reason) {
+							return ""
+						}
 						return fmt.Sprint(reason)
 					})
 					reasonDelta = strings.Join(reasonStrs, "")
-				}
-
-				wordList := utils.InterfaceToSliceInterface(results)
-				if len(wordList) <= 0 {
-					log.Debugf("cannot identifier delta content, try to fetch arguments for: %v", j)
-					wordList = utils.InterfaceToSliceInterface(jsonpath.Find(j, `$..choices[*].delta.tool_calls[*].function.arguments`))
 				}
 
 				handled := false
 				if reasonDelta != "" {
 					handled = true
 					onceStartReason.Do(func() {
-						pw.Write([]byte("<think>\n"))
 						haveReason = true
 					})
-					pw.Write([]byte(reasonDelta))
+					reasonWriter.Write([]byte(reasonDelta))
 				}
 
+				results := jsonpath.Find(j, `$..choices[*].delta.content`)
+				wordList := utils.InterfaceToSliceInterface(results)
+				if len(wordList) <= 0 {
+					log.Debugf("cannot identifier delta content, try to fetch arguments for: %v", j)
+					wordList = utils.InterfaceToSliceInterface(jsonpath.Find(j, `$..choices[*].delta.tool_calls[*].function.arguments`))
+				}
 				for _, raw := range wordList {
 					handled = true
 					data := codec.AnyToBytes(raw)
 					if len(data) > 0 {
 						onceEndReason.Do(func() {
 							if haveReason {
-								pw.Write([]byte("\n</think>\n\n"))
 								reasonFinished = true
 							}
+							reasonWriter.Close()
 						})
 					}
-					pw.Write(data)
+					outWriter.Write(data)
 				}
 				if !handled {
 					if ret := codec.AnyToString(jsonpath.Find(j, `$..finish_reason`)); utils.IContains(ret, "stop") {
@@ -112,7 +133,7 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 			}
 		}
 	}))
-	return pr, opts
+	return outReader, reasonReader, opts
 }
 
 func ChatWithStream(url string, model string, msg string, httpErrHandler func(err error), opt func() ([]poc.PocConfigOption, error)) (io.Reader, error) {

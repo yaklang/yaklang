@@ -10,12 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func ChatBase(url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error), streamHandler func(io.Reader)) (string, error) {
@@ -236,68 +234,4 @@ func ChatExBase(url string, model string, details []ChatDetail, function []Funct
 		return nil, utils.Errorf("JSON response (%v) failed：%v", string(rsp.GetBody()), err)
 	}
 	return compl.Choices, nil
-}
-
-func ExtractDataBase(
-	url string, model string, input string,
-	description string, paramRaw map[string]any,
-	opt func() ([]poc.PocConfigOption, error),
-	streamHandler func(io.Reader),
-) (map[string]any, error) {
-	parameters := &Parameters{
-		Type:       "object",
-		Properties: make(map[string]Property),
-		Required:   make([]string, 0),
-	}
-	var requiredName []string
-	for name, v := range paramRaw {
-		parameters.Properties[name] = Property{
-			Type: `string`, Description: codec.AnyToString(v),
-		}
-		requiredName = append(requiredName, name)
-	}
-
-	mainFunction := uuid.New().String()
-	main := Function{
-		Name:        mainFunction,
-		Description: description,
-		Parameters:  *parameters,
-	}
-	if main.Description == "" {
-		main.Description = "extract and summary some useful info"
-	}
-	choice, err := ChatExBase(url, model, []ChatDetail{NewUserChatDetail(input)}, []Function{main}, opt, streamHandler)
-	if err != nil {
-		return nil, err
-	}
-
-	if choice == nil || len(choice) == 0 {
-		return nil, utils.Error("no choice for chat result")
-	}
-	choiceMsg := choice[0].Message.Content
-	if choiceMsg == "" {
-		calls := choice[0].Message.ToolCalls
-		if len(calls) > 0 {
-			choiceMsg = calls[0].Function.Arguments
-		}
-	}
-	if choiceMsg == "" {
-		return nil, utils.Error("no choice message")
-	}
-
-	result := make(map[string]any)
-	err = json.Unmarshal([]byte(choiceMsg), &result)
-	if err != nil {
-		results := jsonextractor.ExtractStandardJSON(choiceMsg)
-		if len(results) > 0 {
-			err = json.Unmarshal([]byte(results[0]), &result)
-			if err != nil {
-				return ChatBasedExtractData(url, model, input, result, opt, streamHandler)
-				//return nil, utils.Errorf("unmarshal choice message[%v] failed: %v", string(choiceMsg), err)
-			}
-			return result, nil
-		}
-		return ChatBasedExtractData(url, model, input, paramRaw, opt, streamHandler)
-	}
-	return result, nil
 }
