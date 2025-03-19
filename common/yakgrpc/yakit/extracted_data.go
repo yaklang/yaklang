@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -91,6 +92,7 @@ func FilterExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) *gorm.DB 
 	}
 	db = bizhelper.ExactQueryStringArrayOr(db, "trace_id", filter.GetTraceID())
 	db = bizhelper.ExactQueryStringArrayOr(db, "rule_verbose", filter.GetRuleVerbose())
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "analyzed_http_flow_id", filter.GetAnalyzedIds())
 	return db
 }
 func QueryExtractedDataOnlyName(db *gorm.DB) ([]*schema.ExtractedData, error) {
@@ -170,6 +172,9 @@ func ExtractedDataFromHTTPFlow(hiddenIndex string, ruleName string, res *MatchRe
 		Length:         res.Length,
 		IsMatchRequest: res.IsMatchRequest,
 	}
+	str := string(res.MetaInfo.Raw)
+	foo := str[res.Index : res.Index+res.Length]
+	fmt.Println(foo)
 	return extractData
 }
 

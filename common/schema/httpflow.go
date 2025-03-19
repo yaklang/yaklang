@@ -68,7 +68,8 @@ type HTTPFlow struct {
 	TooLargeResponseHeaderFile string `json:"too_large_response_header_file,omitempty"`
 	TooLargeResponseBodyFile   string `json:"too_large_response_body_file,omitempty"`
 	// 同步到企业端
-	UploadOnline bool `json:"upload_online,omitempty"`
+	UploadOnline       bool  `json:"upload_online,omitempty"`
+	AnalyzedHTTPFlowId int64 `json:"analyzed_http_flow_id,omitempty"`
 }
 
 func (f *HTTPFlow) GetRequest() string {
