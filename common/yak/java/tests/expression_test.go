@@ -1,11 +1,12 @@
 package tests
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestJava_Simple_Expression(t *testing.T) {
@@ -366,5 +367,101 @@ public class Main {
 			require.Contains(t, ret.String(), "select * from user where username=")
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+}
+
+func TestVisitMethodCallWithObjectRange(t *testing.T) {
+	code := `
+package com.example;
+
+class Parent {
+    public void parentMethod() {}
+}
+
+public class Test extends Parent {
+    public void testMethod() {
+		method();
+
+        obj.method();
+
+        obj.this();
+        
+        obj.super();
+    }
+}
+`
+
+	t.Run("test field range", func(t *testing.T) {
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			values, err := prog.SyntaxFlowWithError(`method as $method`)
+			require.NoError(t, err)
+			method := values.GetValues("method")
+			require.NotEmpty(t, method)
+			methodRange := method[0].GetRange().GetText()
+			require.Equal(t, methodRange, "method",
+				"method should have method name")
+
+			values, err = prog.SyntaxFlowWithError(`obj.method as $objMethod`)
+			require.NoError(t, err)
+			objMethods := values.GetValues("objMethod")
+			require.NotEmpty(t, objMethods)
+			objMethodRange := objMethods[0].GetRange().GetText()
+			require.Equal(t, objMethodRange, "method",
+				"obj.method should have method name")
+
+			values, err = prog.SyntaxFlowWithError(`obj.this as $objThis`)
+			require.NoError(t, err)
+			objThis := values.GetValues("objThis")
+			require.NotEmpty(t, objThis)
+			objThisRange := objThis[0].GetRange().GetText()
+			require.Equal(t, objThisRange, "this",
+				"obj.this should have method name")
+
+			values, err = prog.SyntaxFlowWithError(`obj.super as $objSuper`)
+			require.NoError(t, err)
+			objSuper := values.GetValues("objSuper")
+			require.NotEmpty(t, objSuper)
+			objSuperRange := objSuper[0].GetRange().GetText()
+			require.Equal(t, objSuperRange, "super",
+				"obj.super should have method name")
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("test call range", func(t *testing.T) {
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			values, err := prog.SyntaxFlowWithError(`method() as $methodCall`)
+			require.NoError(t, err)
+			methodCalls := values.GetValues("methodCall")
+			require.NotEmpty(t, methodCalls)
+			methodCallRange := methodCalls[0].GetRange().GetText()
+			require.Equal(t, methodCallRange, "method()",
+				"this.method should have method name")
+
+			values, err = prog.SyntaxFlowWithError(`obj.method() as $objMethodCall`)
+			require.NoError(t, err)
+			methodCalls = values.GetValues("objMethodCall")
+			require.NotEmpty(t, methodCalls)
+			methodCallRange = methodCalls[0].GetRange().GetText()
+			require.Equal(t, methodCallRange, "method()",
+				"obj.method should have method name")
+
+			values, err = prog.SyntaxFlowWithError(`obj.this() as $objThisCall`)
+			require.NoError(t, err)
+			methodCalls = values.GetValues("objThisCall")
+			require.NotEmpty(t, methodCalls)
+			methodCallRange = methodCalls[0].GetRange().GetText()
+			require.Equal(t, methodCallRange, "this()",
+				"obj.this should have method name")
+
+			values, err = prog.SyntaxFlowWithError(`obj.super() as $objSuperCall`)
+			require.NoError(t, err)
+			methodCalls = values.GetValues("objSuperCall")
+			require.NotEmpty(t, methodCalls)
+			methodCallRange = methodCalls[0].GetRange().GetText()
+			require.Equal(t, methodCallRange, "super()",
+				"obj.super should have method name")
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }

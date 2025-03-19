@@ -655,9 +655,13 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 		if ret := i.Identifier(); ret != nil {
 			_, v = y.VisitIdentifier(ret)
 		} else if ret := i.THIS(); ret != nil {
+			recover := y.SetRangeFromTerminalNode(ret)
 			v = y.ReadValue(ret.GetText())
+			recover()
 		} else if ret = i.SUPER(); ret != nil {
+			recover := y.SetRangeFromTerminalNode(ret)
 			v = y.ReadValue(ret.GetText())
+			recover()
 		}
 
 		var args []ssa.Value
@@ -668,17 +672,24 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 		}
 	} else {
 		var memberKey ssa.Value
+		var recover func()
 		if ret := i.Identifier(); ret != nil {
+			recover = y.SetRange(ret)
+			text := ret.GetText()
+			log.Infof("visitMethodCall: %s: range: %s", text, y.CurrentRange.String())
 			memberKey = y.EmitConstInst(ret.GetText())
 		} else if ret := i.THIS(); ret != nil {
-			memberKey = y.EmitConstInst(ret.GetText())
 			// get clazz
-		} else if ret = i.SUPER(); ret != nil {
+			recover = y.SetRangeFromTerminalNode(ret)
 			memberKey = y.EmitConstInst(ret.GetText())
+		} else if ret = i.SUPER(); ret != nil {
 			// get parent class
+			recover = y.SetRangeFromTerminalNode(ret)
+			memberKey = y.EmitConstInst(ret.GetText())
 		}
-
 		methodCall := y.ReadMemberCallMethod(object, memberKey)
+		recover()
+
 		var args []ssa.Value
 		if argument := i.Arguments(); argument != nil {
 			args = y.VisitArguments(i.Arguments())
