@@ -1,15 +1,6 @@
 name: vuln Program Check
 on:
-  pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-      - reopened
-    paths:
-      - ".github/workflows/ssa-program.yaml"
-      - "common/ssa_bootstrapping/sf_buildin_test.go"
+
   schedule:
     - cron: '0 20 * * 5'
 jobs:
