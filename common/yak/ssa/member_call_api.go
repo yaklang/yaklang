@@ -34,9 +34,16 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 	if extern, ok := ToExternLib(object); ok {
 		return b.TryBuildExternLibValue(extern, key)
 	}
+	objectt := object
+	if se, ok := ToSideEffect(objectt); ok {
+		modify := se.Value
+		if ref := modify.GetReference(); ref != nil {
+			objectt = ref
+		}
+	}
 
 	// normal member call
-	return b.getFieldValue(object, key, wantFunction)
+	return b.getFieldValue(objectt, key, wantFunction)
 }
 
 // create member call variable
@@ -56,17 +63,24 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 		ret.SetMemberCall(extern, key)
 		return ret
 	}
+	objectt := object
+	if se, ok := ToSideEffect(objectt); ok {
+		modify := se.Value
+		if ref := modify.GetReference(); ref != nil {
+			objectt = ref
+		}
+	}
 
 	// normal member call
 	// name := b.getFieldName(object, key)
-	res := checkCanMemberCallExist(object, key)
+	res := checkCanMemberCallExist(objectt, key)
 	name := res.name
-	if object.GetOpcode() != SSAOpcodeParameter {
+	if objectt.GetOpcode() != SSAOpcodeParameter {
 		// if member not exist, create undefine member in object position
-		b.checkAndCreatDefaultMember(res, object, key)
+		b.checkAndCreatDefaultMember(res, objectt, key)
 	}
 	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
 	ret := b.CreateVariableForce(name)
-	ret.SetMemberCall(object, key)
+	ret.SetMemberCall(objectt, key)
 	return ret
 }
