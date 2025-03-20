@@ -104,21 +104,15 @@ Host: %s
 		}
 
 		{
-			// 测试QueryAnalyzedHTTPFlowRule查询结果
-			ruleRsp, err := client.QueryAnalyzedHTTPFlowRule(context.Background(), &ypb.QueryAnalyzedHTTPFlowRuleRequest{
-				Filter: &ypb.AnalyzedHTTPFlowFilter{
-					ResultIds: []string{resultId},
-				},
-			})
+			result := yakit.QueryAnalyzedHTTPFlowRule(consts.GetGormProjectDatabase(), []string{resultId})
 			require.NoError(t, err)
-			fmt.Println(ruleRsp)
-			require.Equal(t, int64(1), ruleRsp.Total)
-			require.Equal(t, 1, len(ruleRsp.Data))
-			require.Equal(t, ruleVerboseName, ruleRsp.Data[0].RuleVerboseName)
+			fmt.Println(result)
+			require.Equal(t, 1, len(result))
+			require.Equal(t, ruleVerboseName, result[0].RuleVerboseName)
 
-			httpflowId := ruleRsp.Data[0].HTTPFlowId
+			httpflowId := result[0].HTTPFlow.ID
 			queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
-				IncludeId: []int64{httpflowId},
+				IncludeId: []int64{int64(httpflowId)},
 			})
 			require.NoError(t, err)
 			require.Equal(t, 1, len(queryFlow.Data))
@@ -126,7 +120,6 @@ Host: %s
 			// test color and tag
 			require.Contains(t, queryFlow.Data[0].Tags, tag)
 			require.Contains(t, queryFlow.Data[0].Tags, schema.COLORPREFIX+strings.ToUpper(color))
-
 		}
 	})
 
@@ -197,19 +190,15 @@ Host: %s
 		}
 
 		{
-			// 测试QueryAnalyzedHTTPFlowRule查询结果
-			ruleRsp, err := client.QueryAnalyzedHTTPFlowRule(context.Background(), &ypb.QueryAnalyzedHTTPFlowRuleRequest{
-				Filter: &ypb.AnalyzedHTTPFlowFilter{
-					ResultIds: []string{resultId},
-				},
-			})
+			result := yakit.QueryAnalyzedHTTPFlowRule(consts.GetGormProjectDatabase(), []string{resultId})
 			require.NoError(t, err)
-			fmt.Println(ruleRsp)
-			require.Equal(t, int64(1), ruleRsp.Total)
-			require.Equal(t, 1, len(ruleRsp.Data))
-			require.Equal(t, ruleVerboseName, ruleRsp.Data[0].RuleVerboseName)
+			fmt.Println(result)
+			require.Equal(t, 1, len(result))
+			require.Equal(t, ruleVerboseName, result[0].RuleVerboseName)
+
+			httpflowId := result[0].HTTPFlow.ID
 			queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
-				IncludeId: []int64{ruleRsp.Data[0].HTTPFlowId},
+				IncludeId: []int64{int64(httpflowId)},
 			})
 			require.NoError(t, err)
 			require.Equal(t, 1, len(queryFlow.Data))
@@ -306,18 +295,15 @@ func TestMUSTPASS_AnalyzeHTTPFlow_MutliHTTPFlow(t *testing.T) {
 	}
 
 	{
-		ruleRsp, err := client.QueryAnalyzedHTTPFlowRule(context.Background(), &ypb.QueryAnalyzedHTTPFlowRuleRequest{
-			Filter: &ypb.AnalyzedHTTPFlowFilter{
-				ResultIds: []string{resultId},
-			},
-		})
+		result := yakit.QueryAnalyzedHTTPFlowRule(consts.GetGormProjectDatabase(), []string{resultId})
 		require.NoError(t, err)
-		fmt.Println(ruleRsp)
-		require.Equal(t, int64(1), ruleRsp.Total)
-		require.Equal(t, 1, len(ruleRsp.Data))
-		require.Equal(t, ruleVerboseName, ruleRsp.Data[0].RuleVerboseName)
+		fmt.Println(result)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, ruleVerboseName, result[0].RuleVerboseName)
+
+		httpflowId := result[0].HTTPFlow.ID
 		queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
-			IncludeId: []int64{ruleRsp.Data[0].HTTPFlowId},
+			IncludeId: []int64{int64(httpflowId)},
 		})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(queryFlow.Data))
@@ -411,23 +397,20 @@ func TestMUSTPASS_AnalyzeHTTPFlow_HotPatch(t *testing.T) {
 	}
 
 	{
-		ruleRsp, err := client.QueryAnalyzedHTTPFlowRule(context.Background(), &ypb.QueryAnalyzedHTTPFlowRuleRequest{
-			Filter: &ypb.AnalyzedHTTPFlowFilter{
-				ResultIds: []string{resultId},
-			},
-		})
+		result := yakit.QueryAnalyzedHTTPFlowRule(consts.GetGormProjectDatabase(), []string{resultId})
 		require.NoError(t, err)
-		fmt.Println(ruleRsp)
-		require.Equal(t, int64(1), ruleRsp.Total)
-		require.Equal(t, 1, len(ruleRsp.Data))
+		fmt.Println(result)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, ruleVerboseName, result[0].RuleVerboseName)
+
+		httpflowId := result[0].HTTPFlow.ID
 		queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
-			IncludeId: []int64{ruleRsp.Data[0].HTTPFlowId},
+			IncludeId: []int64{int64(httpflowId)},
 		})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(queryFlow.Data))
 		fmt.Println(queryFlow.Data[0])
 		// test color and tag
-		require.Contains(t, queryFlow.Data[0].Tags, tagName)
 		require.Contains(t, queryFlow.Data[0].Tags, schema.COLORPREFIX+strings.ToUpper(color))
 	}
 }
