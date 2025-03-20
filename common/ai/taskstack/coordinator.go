@@ -3,6 +3,7 @@ package taskstack
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"io"
 )
 
 // CoordinatorOption 定义配置 Coordinator 的选项接口
@@ -18,9 +19,11 @@ type CoordinatorResult struct {
 
 type Coordinator struct {
 	RawUserInput string
-	PlanOption   []PlanOption
-	TaskOption   []TaskOption
-	Tools        []*Tool
+
+	AICallback AICallbackType
+	PlanOption []PlanOption
+	TaskOption []TaskOption
+	Tools      []*Tool
 }
 
 // NewCoordinator 创建一个新的 Coordinator
@@ -61,7 +64,17 @@ func WithCoordinator_Tool(tools ...*Tool) CoordinatorOption {
 	}
 }
 
+func WithCoordinator_AICallback(callback AICallbackType) CoordinatorOption {
+	return func(c *Coordinator) {
+		c.AICallback = callback
+	}
+}
+
 func (c *Coordinator) Run() error {
+	if c.AICallback == nil {
+		return utils.Error("taskstack coordinator run failed: no AICallback found")
+	}
+
 	planReq, err := CreatePlanRequest(c.RawUserInput, c.PlanOption...)
 	if err != nil {
 		return utils.Errorf("coordinator: create PlanRequest failed: %v", err)
@@ -98,5 +111,19 @@ func (c *Coordinator) Run() error {
 	runtime := CreateRuntime()
 	runtime.Invoke(root)
 
-	return utils.Error("not implemented")
+	prompt, err := c.generateReport(runtime)
+	if err != nil {
+		return utils.Error("coordinator: generate report failed")
+	}
+	aiRsp, err := c.AICallback(NewAIRequest(prompt))
+	if err != nil {
+		return utils.Errorf("coordinator: AICallback failed: %v", err)
+	}
+	output, err := io.ReadAll(aiRsp.Reader())
+	if err != nil {
+		return utils.Errorf("coordinator: read AICallback response failed: %v", err)
+	}
+	// todo: callback output
+	_ = output
+	return nil
 }

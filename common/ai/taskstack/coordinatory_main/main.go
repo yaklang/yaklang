@@ -68,6 +68,7 @@ func main() {
 		"查询北京天气，帮我规划今天一天去一个最推荐的地方旅游，两步规划",
 		taskstack.WithPlan_AICallback(aiCallback),
 		taskstack.WithCoordinator_Tool(taskstack.GetAllMockTools()...),
+		taskstack.WithCoordinator_AICallback(aiCallback),
 	)
 	if err := coordinator.Run(); err != nil {
 		panic(err)

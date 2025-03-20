@@ -155,14 +155,14 @@ func WithPlan_AICallback(callback AICallbackType) PlanOption {
 
 // GeneratePrompt 根据PlanRequest生成prompt
 func (pr *PlanRequest) GeneratePrompt() (string, error) {
-	tmpl, err := template.New("generateTaskList").Parse(generateTaskListPrompt)
+	tmpl, err := template.New("generateTaskList").Parse(__prompt_GenerateTaskListPrompt)
 	if err != nil {
 		return "", err
 	}
 
 	// 准备模板数据
 	data := map[string]interface{}{
-		"TaskJsonSchema": taskJsonSchema,
+		"TaskJsonSchema": __prompt_TaskJsonSchema,
 		"Query":          pr.Query,
 		"MetaInfo":       "",
 	}

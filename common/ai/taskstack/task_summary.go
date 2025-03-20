@@ -9,7 +9,7 @@ import (
 
 func DefaultSummaryAICallback(ctx *TaskSystemContext, details ...aispec.ChatDetail) (io.Reader, error) {
 	t := ctx.CurrentTask
-	summaryPrompt, err := GenerateSummaryPrompt(aispec.DetailsToString(details))
+	summaryPrompt, err := GenerateTaskSummaryPrompt(aispec.DetailsToString(details))
 	if err != nil {
 		return nil, err
 	}

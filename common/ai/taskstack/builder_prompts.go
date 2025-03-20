@@ -7,31 +7,34 @@ import (
 )
 
 //go:embed prompts/plan-to-task-list.txt
-var generateTaskListPrompt string
+var __prompt_GenerateTaskListPrompt string
 
 //go:embed jsonschema/task.json
-var taskJsonSchema string
+var __prompt_TaskJsonSchema string
 
-//go:embed prompts/execute-task.txt
-var executeTaskPromptTemplate string
+//go:embed prompts/task-execute.txt
+var __prompt_ExecuteTaskPromptTemplate string
 
 //go:embed prompts/tool-param-schema.txt
-var toolParamSchemaPromptTemplate string
+var __prompt_ToolParamSchemaPromptTemplate string
 
 //go:embed prompts/tool-result-to-decision.txt
-var toolResultToDecisionPromptTemplate string
+var __prompt_ToolResultToDecisionPromptTemplate string
 
 //go:embed prompts/tool-result-history.txt
-var toolResultHistoryPromptTemplate string
+var __prompt_ToolResultHistoryPromptTemplate string
 
-//go:embed prompts/summary.txt
-var __prompt_SUMMARY string
+//go:embed prompts/task-summary.txt
+var __prompt_TaskSummary string
+
+//go:embed prompts/report-finished.txt
+var __prompt_ReportFinished string
 
 var (
-	__prompt_SUMMARY_TEMPLATE = template.Must(template.New("summary").Parse(__prompt_SUMMARY))
+	__prompt_SUMMARY_TEMPLATE = template.Must(template.New("summary").Parse(__prompt_TaskSummary))
 )
 
-func GenerateSummaryPrompt(text string) (string, error) {
+func GenerateTaskSummaryPrompt(text string) (string, error) {
 	var buf bytes.Buffer
 	err := __prompt_SUMMARY_TEMPLATE.Execute(&buf, map[string]string{
 		"Text": text,

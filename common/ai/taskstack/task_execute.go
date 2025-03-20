@@ -3,12 +3,13 @@ package taskstack
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
 func (t *Task) getToolRequired(response string) []*Tool {
@@ -96,7 +97,7 @@ func (t *Task) callTool(ctx *TaskSystemContext, targetTool *Tool) (result *ToolR
 }
 
 // executeTask 实际执行任务并返回结果
-func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
+func (t *Task) executeTask(ctx *TaskSystemContext) error {
 	// 使用Task的内部字段，如果传入的参数为nil则使用内部字段
 	actualTools := t.tools
 	if actualTools == nil && t.tools != nil {
@@ -111,7 +112,7 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 	// 生成初始执行任务的prompt
 	prompt, err := t.generateTaskPrompt(actualTools, ctx, actualMetadata)
 	if err != nil {
-		return nil, fmt.Errorf("error generating task prompt: %w", err)
+		return fmt.Errorf("error generating task prompt: %w", err)
 	}
 
 	chatDetails := aispec.ChatDetails{
@@ -123,13 +124,13 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 		req := NewAIRequest(prompt, WithAIRequest_TaskContext(ctx))
 		responseReader, err := t.AICallback(req)
 		if err != nil {
-			return nil, fmt.Errorf("error calling AI: %w", err)
+			return fmt.Errorf("error calling AI: %w", err)
 		}
 
 		// 读取AI的响应
 		responseBytes, err := io.ReadAll(responseReader.Reader())
 		if err != nil {
-			return nil, fmt.Errorf("error reading AI response: %w", err)
+			return fmt.Errorf("error reading AI response: %w", err)
 		}
 
 		// 处理工具调用, 直到没有工具调用为止
@@ -148,7 +149,7 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 			result, action, err := t.callTool(ctx, targetTool)
 			if err != nil {
 				log.Errorf("error calling tool: %v", err)
-				return nil, err
+				return err
 			}
 			t.PushToolCallResult(result)
 
@@ -163,11 +164,11 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 				req := NewAIRequest(moreToolPrompt, WithAIRequest_TaskContext(ctx))
 				responseReader, err := t.AICallback(req)
 				if err != nil {
-					return nil, fmt.Errorf("error calling AI: %w", err)
+					return fmt.Errorf("error calling AI: %w", err)
 				}
 				responseBytes, err := io.ReadAll(responseReader.Reader())
 				if err != nil {
-					return nil, fmt.Errorf("error reading AI response: %w", err)
+					return fmt.Errorf("error reading AI response: %w", err)
 				}
 				response = string(responseBytes)
 			case "finished":
@@ -176,7 +177,7 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 				callHistory, err := t.generateToolCallResultsPrompt()
 				if err != nil {
 					log.Errorf("error generating tool call results prompt: %v", err)
-					return nil, err
+					return err
 				}
 				response = callHistory
 				break TOOLREQUIRED
@@ -189,7 +190,7 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 		if t.ResponseCallback != nil {
 			continueThinking, newPrompt, err := t.ResponseCallback(ctx, chatDetails...)
 			if err != nil {
-				return nil, fmt.Errorf("error calling response callback: %w", err)
+				return fmt.Errorf("error calling response callback: %w", err)
 			}
 			if !continueThinking {
 				break
@@ -205,22 +206,38 @@ func (t *Task) executeTask(ctx *TaskSystemContext) (aispec.ChatDetails, error) {
 	if summaryCallback == nil {
 		summaryCallback = t.AICallback
 	}
-	summaryPromptWellFormed, err := GenerateSummaryPrompt(aispec.DetailsToString(chatDetails))
+	summaryPromptWellFormed, err := GenerateTaskSummaryPrompt(aispec.DetailsToString(chatDetails))
 	if err != nil {
-		return nil, fmt.Errorf("error generating summary prompt: %w", err)
+		return fmt.Errorf("error generating summary prompt: %w", err)
 	}
 	req := NewAIRequest(summaryPromptWellFormed, WithAIRequest_TaskContext(ctx))
 	summaryReader, err := summaryCallback(req)
 	if err != nil {
-		return nil, fmt.Errorf("error calling summary AI: %w", err)
+		return fmt.Errorf("error calling summary AI: %w", err)
 	}
 
 	summaryBytes, err := io.ReadAll(summaryReader.Reader())
 	if err != nil {
-		return nil, fmt.Errorf("error reading summary: %w", err)
+		return fmt.Errorf("error reading summary: %w", err)
 	}
-	return aispec.ChatDetails{
-		aispec.NewUserChatDetail(prompt),
-		aispec.NewAIChatDetail(string(summaryBytes)),
-	}, nil
+
+	action, err := extractAction(string(summaryBytes), "summary")
+	if err != nil {
+		return fmt.Errorf("error extracting action: %w", err)
+	}
+
+	var taskSummary = ""
+	shortSummary := action.GetString("short_summary")
+	if shortSummary != "" {
+		taskSummary = shortSummary
+	}
+	longSummary := action.GetString("long_summary")
+	if longSummary != "" && taskSummary == "" {
+		taskSummary = longSummary
+	}
+
+	t.TaskSummary = taskSummary
+	t.ShortSummary = shortSummary
+	t.LongSummary = longSummary
+	return nil
 }
