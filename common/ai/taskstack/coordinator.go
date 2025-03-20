@@ -1,38 +1,37 @@
 package taskstack
 
 import (
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
+	"sync"
 )
 
 // CoordinatorOption 定义配置 Coordinator 的选项接口
 type CoordinatorOption func(c *Coordinator)
 
-// CoordinatorResult 定义 Coordinator 执行的结果
-type CoordinatorResult struct {
-	PlanName     string
-	TaskResults  []string
-	Error        error
-	AllCompleted bool
-}
-
 type Coordinator struct {
-	RawUserInput string
+	id string
 
-	AICallback AICallbackType
-	PlanOption []PlanOption
-	TaskOption []TaskOption
-	Tools      []*Tool
+	eventEmitMutex sync.Mutex
+	eventHandler   func(e *Event)
+	userInput      string
+	aiCallback     AICallbackType
+	PlanOption     []PlanOption
+	TaskOption     []TaskOption
+	Tools          []*Tool
 }
 
 // NewCoordinator 创建一个新的 Coordinator
 func NewCoordinator(userInput string, options ...any) *Coordinator {
+	coordinatorId := uuid.New().String()
 	c := &Coordinator{
-		RawUserInput: userInput,
-		PlanOption:   []PlanOption{},
-		TaskOption:   []TaskOption{},
-		Tools:        []*Tool{},
+		id:         coordinatorId,
+		userInput:  userInput,
+		PlanOption: []PlanOption{},
+		TaskOption: []TaskOption{},
+		Tools:      []*Tool{},
 	}
 
 	// 应用所有选项
@@ -54,7 +53,7 @@ func NewCoordinator(userInput string, options ...any) *Coordinator {
 
 func WithCoordinator_RawUserInput(rawUserInput string) CoordinatorOption {
 	return func(c *Coordinator) {
-		c.RawUserInput = rawUserInput
+		c.userInput = rawUserInput
 	}
 }
 
@@ -66,16 +65,16 @@ func WithCoordinator_Tool(tools ...*Tool) CoordinatorOption {
 
 func WithCoordinator_AICallback(callback AICallbackType) CoordinatorOption {
 	return func(c *Coordinator) {
-		c.AICallback = callback
+		c.aiCallback = callback
 	}
 }
 
 func (c *Coordinator) Run() error {
-	if c.AICallback == nil {
+	if c.aiCallback == nil {
 		return utils.Error("taskstack coordinator run failed: no AICallback found")
 	}
 
-	planReq, err := CreatePlanRequest(c.RawUserInput, c.PlanOption...)
+	planReq, err := CreatePlanRequest(c.userInput, c.PlanOption...)
 	if err != nil {
 		return utils.Errorf("coordinator: create PlanRequest failed: %v", err)
 	}
@@ -115,7 +114,7 @@ func (c *Coordinator) Run() error {
 	if err != nil {
 		return utils.Error("coordinator: generate report failed")
 	}
-	aiRsp, err := c.AICallback(NewAIRequest(prompt))
+	aiRsp, err := c.aiCallback(NewAIRequest(prompt))
 	if err != nil {
 		return utils.Errorf("coordinator: AICallback failed: %v", err)
 	}
