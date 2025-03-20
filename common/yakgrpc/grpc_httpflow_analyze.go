@@ -48,22 +48,6 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 	return nil
 }
 
-func (s *Server) QueryAnalyzedHTTPFlowRule(ctx context.Context, req *ypb.QueryAnalyzedHTTPFlowRuleRequest) (*ypb.QueryAnalyzedHTTPFlowRuleResponse, error) {
-	p, datas, err := yakit.QueryAnalyzedHTTPFlowRule(s.GetProjectDatabase(), req)
-	if err != nil {
-		return nil, err
-	}
-	rsp := &ypb.QueryAnalyzedHTTPFlowRuleResponse{
-		Pagination: req.GetPagination(),
-		Total:      int64(p.TotalRecord),
-	}
-	for _, data := range datas {
-		model := data.ToGRPCModel()
-		rsp.Data = append(rsp.Data, model)
-	}
-	return rsp, nil
-}
-
 type HTTPFlowAnalyzeManger struct {
 	*mitmReplacer
 	client                 *yaklib.YakitClient
