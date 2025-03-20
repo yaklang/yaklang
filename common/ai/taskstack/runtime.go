@@ -3,14 +3,14 @@ package taskstack
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
 	"text/template"
 
-	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/log"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -56,6 +56,9 @@ func (t *Task) dumpProgress(i int, w io.Writer) {
 	var note string
 	if finished {
 		fill = "x"
+		if t.TaskSummary != "" {
+			note = fmt.Sprintf(" (Finished:%s)", t.TaskSummary)
+		}
 	} else if executing {
 		fill = "~"
 		note = " (部分完成)"
@@ -86,7 +89,7 @@ func (r *Runtime) Progress() string {
 	return buf.String()
 }
 
-func (r *Runtime) invokeSubtask(idx int, task *Task) (aispec.ChatDetails, error) {
+func (r *Runtime) invokeSubtask(idx int, task *Task) error {
 	r.statusMutex.Lock()
 	if r.RootTask == nil {
 		r.RootTask = task
@@ -102,18 +105,18 @@ func (r *Runtime) invokeSubtask(idx int, task *Task) (aispec.ChatDetails, error)
 		r.statusMutex.Unlock()
 	}()
 
-	allDetails := aispec.ChatDetails{}
 	if len(task.Subtasks) > 0 {
 		for idxRaw, subtask := range task.Subtasks {
 			idx := idxRaw + 1
-			details, err := r.invokeSubtask(idx, subtask)
+			err := r.invokeSubtask(idx, subtask)
 			if err != nil {
-				return nil, err
+				// invoke subtask failed
+				// retry via user!
+				return err
 			}
 			r.PushToolCallResults(subtask.ToolCallResults...)
-			allDetails = append(allDetails, details...)
 		}
-		return allDetails, nil
+		return nil
 	}
 
 	return task.executeTask(&TaskSystemContext{
@@ -133,7 +136,7 @@ func (r *Runtime) PushToolCallResults(t ...*ToolResult) {
 	r.toolCallResults = append(r.toolCallResults, t...)
 }
 
-func (r *Runtime) PromptForToolCallResultsForLast5() string {
+func (r *Runtime) PromptForToolCallResultsForLastN(n int) string {
 	r.statusMutex.Lock()
 	defer r.statusMutex.Unlock()
 
@@ -142,13 +145,13 @@ func (r *Runtime) PromptForToolCallResultsForLast5() string {
 	}
 
 	var result = r.toolCallResults
-	if len(result) > 5 {
-		result = result[len(result)-5:]
+	if len(result) > n {
+		result = result[len(result)-n:]
 	}
 	templatedata := map[string]interface{}{
 		"ToolCallResults": result,
 	}
-	temp, err := template.New("tool-result-history").Parse(toolResultHistoryPromptTemplate)
+	temp, err := template.New("tool-result-history").Parse(__prompt_ToolResultHistoryPromptTemplate)
 	if err != nil {
 		log.Errorf("error parsing tool result history template: %v", err)
 		return ""
@@ -160,4 +163,16 @@ func (r *Runtime) PromptForToolCallResultsForLast5() string {
 		return ""
 	}
 	return promptBuilder.String()
+}
+
+func (r *Runtime) PromptForToolCallResultsForLast5() string {
+	return r.PromptForToolCallResultsForLastN(5)
+}
+
+func (r *Runtime) PromptForToolCallResultsForLast10() string {
+	return r.PromptForToolCallResultsForLastN(10)
+}
+
+func (r *Runtime) PromptForToolCallResultsForLast20() string {
+	return r.PromptForToolCallResultsForLastN(20)
 }
