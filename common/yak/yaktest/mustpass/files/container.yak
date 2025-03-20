@@ -197,14 +197,26 @@ s = container.NewSet("1", "2")
 slice = s.ToSlice()
 println("转换为切片:", slice)
 assert len(slice) == 2
-println("ToSlice测试通过")
+
+println("\n 测试 len 方法")
+assert len(s) == 2
+
+println("\n 测试 Cap 方法")
+assert cap(s) == 2
+
+println("\nToSlice测试通过")
 
 println("\n===== 链表操作测试 =====")
 l = container.NewLinkedList()
 l.PushBack("第一个元素")
 l.PushBack("第二个元素")
 assert l.Len() == 2
+assert len(l) == 2
 front = l.Front()
-println("链表首元素:", front.Value)
+assert front.Value == "第一个元素"
+s = l.ToSlice()
+assert len(s) == 2
+assert s[0] == "第一个元素"
+assert s[1] == "第二个元素"
 
 println("\n===== 容器库测试结束 =====")

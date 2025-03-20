@@ -76,6 +76,16 @@ func (s *Set) Len() int {
 	return s.Cardinality()
 }
 
+// Cap returns the number of elements in the set, same as Len
+// Example:
+// ```
+// s = container.NewSet("1", "2")
+// assert s.Cap() == 2
+// ```
+func (s *Set) Cap() int {
+	return s.Set.Cardinality()
+}
+
 // Cardinality returns the number of elements in the set
 // Example:
 // ```
@@ -354,8 +364,24 @@ func (s *Set) ToSlice() []any {
 	return s.Set.ToSlice()
 }
 
+type LinkedList struct {
+	*list.List
+}
+
+func NewLinkedList() *LinkedList {
+	return &LinkedList{List: list.New()}
+}
+
+func (l *LinkedList) ToSlice() []any {
+	slice := make([]any, 0, l.List.Len())
+	for e := l.List.Front(); e != nil; e = e.Next() {
+		slice = append(slice, e.Value)
+	}
+	return slice
+}
+
 var ContainerExports = map[string]interface{}{
 	"NewSet":        NewSet,
 	"NewUnsafeSet":  NewUnsafeSet,
-	"NewLinkedList": list.New,
+	"NewLinkedList": NewLinkedList,
 }
