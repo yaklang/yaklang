@@ -20,7 +20,7 @@ func (t *Task) generateTaskPrompt(tools []*Tool, systemContext *TaskSystemContex
 	}
 
 	// 解析prompt模板
-	tmpl, err := template.New("execute-task").Parse(executeTaskPromptTemplate)
+	tmpl, err := template.New("execute-task").Parse(__prompt_ExecuteTaskPromptTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing task prompt template: %w", err)
 	}
@@ -52,7 +52,7 @@ func (t *Task) generateRequireToolResponsePrompt(runtime *TaskSystemContext, tar
 	}
 
 	// 解析工具描述模板
-	tmpl, err := template.New("call-tool").Parse(toolParamSchemaPromptTemplate)
+	tmpl, err := template.New("call-tool").Parse(__prompt_ToolParamSchemaPromptTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing tool description template: %w", err)
 	}
@@ -75,7 +75,7 @@ func (t *Task) generateToolCallResponsePrompt(result *ToolResult, runtime *TaskS
 		"Tool":    targetTool,
 		"Result":  result,
 	}
-	temp, err := template.New("tool-result").Parse(toolResultToDecisionPromptTemplate)
+	temp, err := template.New("tool-result").Parse(__prompt_ToolResultToDecisionPromptTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing tool result template: %w", err)
 	}
@@ -91,7 +91,7 @@ func (t *Task) generateToolCallResultsPrompt() (string, error) {
 	templatedata := map[string]interface{}{
 		"ToolCallResults": t.ToolCallResults,
 	}
-	temp, err := template.New("tool-result-history").Parse(toolResultHistoryPromptTemplate)
+	temp, err := template.New("tool-result-history").Parse(__prompt_ToolResultHistoryPromptTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing tool result history template: %w", err)
 	}

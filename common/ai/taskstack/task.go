@@ -78,7 +78,11 @@ type Task struct {
 	executing bool
 	executed  bool
 
+	// Runtime
 	ToolCallResults []*ToolResult
+	TaskSummary     string
+	ShortSummary    string
+	LongSummary     string
 }
 
 func (t *Task) PushToolCallResult(i *ToolResult) {
