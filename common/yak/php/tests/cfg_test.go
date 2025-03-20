@@ -37,7 +37,7 @@ println($a);
 $a = $_GET[1]? "1": "2";
 println($a);`
 		ssatest.CheckPrintlnValue(code, []string{
-			"phi($a)[Undefined-unknown-variable(valid),\"aa\"]", "phi($a)[\"1\",\"2\"]",
+			"phi($a)[Undefined-ternary_expression(valid),\"aa\"]", "phi($a)[\"1\",\"2\"]",
 		}, t)
 	})
 	t.Run("php cfg", func(t *testing.T) {

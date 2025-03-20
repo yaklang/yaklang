@@ -294,7 +294,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 	case *phpparser.BitwiseExpressionContext:
 		switch ret.GetOp().GetText() {
 		case "&&":
-			id := uuid.NewString()
+			id := ssa.AndExpressionVariable
 			v1 := y.VisitExpression(ret.Expression(0))
 			y.AssignVariable(y.CreateVariable(id), y.EmitValueOnlyDeclare(id))
 			y.CreateIfBuilder().SetCondition(func() ssa.Value {
@@ -307,7 +307,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 			}).Build()
 			return y.ReadValue(id)
 		case "||":
-			id := uuid.NewString()
+			id := ssa.OrExpressionVariable
 			v1 := y.VisitExpression(ret.Expression(0))
 			y.AssignVariable(y.CreateVariable(id), y.EmitValueOnlyDeclare(id))
 			y.CreateIfBuilder().SetCondition(func() ssa.Value {
@@ -335,7 +335,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 			$a=$_GET[1] ?:"aa";
 			$a = $_GET[1]? "1": "2";
 		*/
-		variableName := "unknown-variable"
+		variableName := ssa.TernaryExpressionVariable
 		variable := y.CreateVariable(variableName)
 		y.AssignVariable(variable, y.EmitUndefined(variableName))
 		y.CreateIfBuilder().SetCondition(func() ssa.Value {

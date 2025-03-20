@@ -107,3 +107,59 @@ class A{
 	}`, []string{`"hello"`}, t)
 	})
 }
+
+func TestJavaTernaryExpression(t *testing.T) {
+	t.Run("test basic ternary", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a = 5;
+		String result = (a > 3) ? "greater" : "smaller";
+		println(result);
+		`, []string{`"greater"`}, t)
+	})
+
+	t.Run("test nested ternary", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a = 5;
+		String result = (a > 10) ? "large" : (a > 3) ? "medium" : "small";
+		println(result);
+		`, []string{`"medium"`}, t)
+	})
+
+	t.Run("test ternary with expressions", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a = 5;
+		int b = 10;
+		int result = (c) ? (a + b) : (b - a);
+		println(result);
+		`, []string{`phi(result)[15,5]`}, t)
+	})
+
+	t.Run("test ternary with boolean result", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a = 5;
+		int b = 3;
+		boolean result = (c) ? true : false;
+		println(result);
+		boolean result2 = (c) ? true : false;
+		println(result2);
+		`, []string{`phi(result)[true,false]`, `phi(result2)[true,false]`}, t)
+	})
+
+	t.Run("test ternary with method calls", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a = 5;
+		String str = "test";
+		String result = (c) ? str.toUpperCase() : str.toLowerCase();
+		println(result);
+		`, []string{`phi(result)[Undefined-str.toUpperCase("test"),Undefined-str.toLowerCase("test")]`}, t)
+	})
+
+	// Test conditional branches in ternary expressions
+	t.Run("test ternary condition evaluation", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a = 5;
+		String result = (c) ? "condition true" : "condition false";
+		println(result);
+		`, []string{`phi(result)["condition true","condition false"]`}, t)
+	})
+}

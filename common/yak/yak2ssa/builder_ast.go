@@ -1227,9 +1227,9 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 				id = phi[TrueExpr, falseExpr]
 
 	*/
-	handlerJumpExpression := func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value) ssa.Value {
+	handlerJumpExpression := func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value, valueName string) ssa.Value {
 		// 为了聚合产生Phi指令
-		id := uuid.NewString()
+		id := valueName
 		variable := b.CreateVariable(id)
 		b.AssignVariable(variable, b.EmitValueOnlyDeclare(id))
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
@@ -1279,6 +1279,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			func() ssa.Value {
 				return value1
 			},
+			ssa.AndExpressionVariable,
 		)
 	}
 
@@ -1305,6 +1306,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			func() ssa.Value {
 				return value2
 			},
+			ssa.OrExpressionVariable,
 		)
 	}
 
@@ -1329,6 +1331,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			func() ssa.Value {
 				return getValue(2)
 			},
+			ssa.TernaryExpressionVariable,
 		)
 	}
 
