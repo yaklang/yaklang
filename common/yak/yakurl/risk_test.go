@@ -79,9 +79,8 @@ func TestRiskAction(t *testing.T) {
 		url := &ypb.RequestYakURLParams{
 			Method: "GET",
 			Url: &ypb.YakURL{
-				Schema:   "ssarisk",
-				Location: "",
-				Path:     "",
+				Schema: "ssarisk",
+				Path:   "/",
 			},
 			Body: []byte(""),
 		}
@@ -93,15 +92,16 @@ func TestRiskAction(t *testing.T) {
 
 		require.Equal(t, check[0].Extra[0].Value, "5")
 		require.Equal(t, check[1].Extra[0].Value, "5")
+
+		require.Equal(t, check[0].ResourceType, "program")
 	})
 	t.Run("check risk action program", func(t *testing.T) {
 		// ssarisk://program
 		url := &ypb.RequestYakURLParams{
 			Method: "GET",
 			Url: &ypb.YakURL{
-				Schema:   "ssarisk",
-				Location: programName1,
-				Path:     "",
+				Schema: "ssarisk",
+				Path:   "/" + programName1,
 			},
 			Body: []byte(""),
 		}
@@ -115,6 +115,9 @@ func TestRiskAction(t *testing.T) {
 		require.Equal(t, check[1].Extra[0].Value, "1")
 		require.Equal(t, check[2].Extra[0].Value, "1")
 		require.Equal(t, check[3].Extra[0].Value, "2")
+
+		require.Equal(t, check[0].ResourceName, "/a.go")
+		require.Equal(t, check[0].ResourceType, "source")
 
 		require.Equal(t, check[0].Path, fmt.Sprintf("/%s/a.go", programName1))
 		require.Equal(t, check[1].Path, fmt.Sprintf("/%s/b/b1.go", programName1))
@@ -153,9 +156,8 @@ func TestRiskAction(t *testing.T) {
 		url := &ypb.RequestYakURLParams{
 			Method: "GET",
 			Url: &ypb.YakURL{
-				Schema:   "ssarisk",
-				Location: programName1,
-				Path:     "/b",
+				Schema: "ssarisk",
+				Path:   "/" + programName1 + "/b",
 			},
 			Body: []byte(""),
 		}
@@ -189,9 +191,8 @@ func TestRiskAction(t *testing.T) {
 		url := &ypb.RequestYakURLParams{
 			Method: "GET",
 			Url: &ypb.YakURL{
-				Schema:   "ssarisk",
-				Location: programName1,
-				Path:     "c.go",
+				Schema: "ssarisk",
+				Path:   "/" + programName1 + "/c.go",
 			},
 			Body: []byte(""),
 		}
@@ -203,6 +204,8 @@ func TestRiskAction(t *testing.T) {
 
 		require.Equal(t, check[0].Extra[0].Value, "2")
 		require.Equal(t, check[0].Path, fmt.Sprintf("/%s/c.go/funcC", programName1))
+		require.Equal(t, check[0].ResourceName, "funcC")
+		require.Equal(t, check[0].ResourceType, "function")
 
 		filter := &ypb.SSARisksFilter{}
 		err = json.Unmarshal([]byte(check[0].Extra[1].Value), &filter)
@@ -216,15 +219,8 @@ func TestRiskAction(t *testing.T) {
 		url := &ypb.RequestYakURLParams{
 			Method: "GET",
 			Url: &ypb.YakURL{
-				Schema:   "ssarisk",
-				Location: programName1,
-				Path:     "c.go/funcC",
-				// Query: []*ypb.KVPair{
-				// 	{
-				// 		Key:   "function_name",
-				// 		Value: "funcA",
-				// 	},
-				// },
+				Schema: "ssarisk",
+				Path:   "/" + programName1 + "/c.go/funcC",
 			},
 			Body: []byte(""),
 		}
@@ -235,7 +231,6 @@ func TestRiskAction(t *testing.T) {
 		_ = check
 
 		require.Equal(t, check[0].Extra[0].Value, "2")
-		require.Equal(t, check[0].Path, "")
 
 		filter := &ypb.SSARisksFilter{}
 		err = json.Unmarshal([]byte(check[0].Extra[1].Value), &filter)
@@ -243,6 +238,63 @@ func TestRiskAction(t *testing.T) {
 		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
 		require.NoError(t, err)
 		require.Equal(t, len(risks), 2)
+	})
+
+	t.Run("check risk action search path(file)", func(t *testing.T) {
+		// search=/c.go
+		url := &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema: "ssarisk",
+				Query:  []*ypb.KVPair{{Key: "search", Value: "/c.go"}},
+			},
+			Body: []byte(""),
+		}
+		res, err := local.RequestYakURL(context.Background(), url)
+		require.NoError(t, err)
+		require.Equal(t, len(res.GetResources()), 2)
+		check := res.GetResources()
+		_ = check
+
+		require.Equal(t, check[0].Extra[0].Value, "2")
+		require.Equal(t, check[0].ResourceName, "/c.go")
+		require.Equal(t, check[0].ResourceType, "source")
+	})
+
+	t.Run("check risk action search function", func(t *testing.T) {
+		// search=funcA
+		url := &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema: "ssarisk",
+				Query:  []*ypb.KVPair{{Key: "search", Value: "funcA"}},
+			},
+			Body: []byte(""),
+		}
+		res, err := local.RequestYakURL(context.Background(), url)
+		require.NoError(t, err)
+		require.Equal(t, len(res.GetResources()), 2)
+		check := res.GetResources()
+		_ = check
+
+		require.Equal(t, check[0].Extra[0].Value, "1")
+		require.Equal(t, check[0].ResourceName, "funcA")
+		require.Equal(t, check[0].ResourceType, "function")
+	})
+
+	t.Run("check risk action search function fuzzy", func(t *testing.T) {
+		// search=func
+		url := &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema: "ssarisk",
+				Query:  []*ypb.KVPair{{Key: "search", Value: "func"}},
+			},
+			Body: []byte(""),
+		}
+		res, err := local.RequestYakURL(context.Background(), url)
+		require.NoError(t, err)
+		require.Equal(t, len(res.GetResources()), 8)
 	})
 
 	t.Cleanup(func() {

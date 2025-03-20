@@ -56,6 +56,47 @@ func GetSSARiskByHash(db *gorm.DB, hash string) (*schema.SSARisk, error) {
 	return &r, nil
 }
 
+type SsaRiskFullCount struct {
+	Progdata string
+	Pathdata string
+	Funcdata string
+	Count    int64
+}
+
+func GetSSARiskByFuzzy(db *gorm.DB, search string) ([]*SsaRiskFullCount, error) {
+	var ret []*SsaRiskFullCount
+	var tmp []*SsaRiskFullCount
+
+	if db := db.Model(&schema.SSARisk{}).
+		Where("program_name = ?", search).
+		Select("`program_name` AS progdata, COUNT(*) AS count").
+		Group("`code_source_url`").
+		Scan(&tmp); db.Error != nil {
+		return ret, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+	ret = append(ret, tmp...)
+
+	if db := db.Model(&schema.SSARisk{}).
+		Where("code_source_url LIKE ?", "%"+search+"%").
+		Select("`program_name` AS progdata, `code_source_url` AS pathdata, COUNT(*) AS count").
+		Group("`code_source_url`").
+		Scan(&tmp); db.Error != nil {
+		return ret, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+	ret = append(ret, tmp...)
+
+	if db := db.Model(&schema.SSARisk{}).
+		Where("function_name LIKE ?", "%"+search+"%").
+		Select("`program_name` AS progdata, `code_source_url` AS pathdata, `function_name` AS funcdata, COUNT(*) AS count").
+		Group("`code_source_url`").
+		Scan(&tmp); db.Error != nil {
+		return ret, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+	ret = append(ret, tmp...)
+
+	return ret, nil
+}
+
 type SsaRiskCount struct {
 	Data  string
 	Count int64
@@ -65,17 +106,15 @@ type SsaRiskCount struct {
 func GetSSARiskByFuncName(db *gorm.DB, programName, sourceUrl, funcName string) ([]*SsaRiskCount, error) {
 	var ret []*SsaRiskCount
 
+	fullPath := path.Join("/", programName, sourceUrl)
 	if db := db.Model(&schema.SSARisk{}).
 		Where("program_name = ?", programName).
-		Where("code_source_url LIKE ?", sourceUrl+"%").
+		Where("code_source_url LIKE ?", fullPath+"%").
 		Where("function_name = ?", funcName).
-		Select("`function_name` AS data, COUNT(*) AS count").
+		Select("COUNT(*) AS count").
 		Group("`function_name`").
 		Scan(&ret); db.Error != nil {
 		return ret, utils.Errorf("get Risk failed: %s", db.Error)
-	}
-	for _, r := range ret {
-		r.Data = path.Join(sourceUrl, r.Data)
 	}
 	return ret, nil
 }
@@ -84,18 +123,16 @@ func GetSSARiskByFuncName(db *gorm.DB, programName, sourceUrl, funcName string) 
 func GetSSARiskBySourceUrl(db *gorm.DB, programName, sourceUrl string) ([]*SsaRiskCount, error) {
 	var ret []*SsaRiskCount
 
+	fullPath := path.Join("/", programName, sourceUrl)
 	if db := db.Model(&schema.SSARisk{}).
 		Where("program_name = ?", programName).
-		Where("code_source_url LIKE ?", sourceUrl+"%").
+		Where("code_source_url LIKE ?", fullPath+"%").
 		Select("`function_name` AS data, COUNT(*) AS count").
 		Group("`function_name`").
 		Scan(&ret); db.Error != nil {
 		return ret, utils.Errorf("get Risk failed: %s", db.Error)
 	}
 
-	for _, r := range ret {
-		r.Data = path.Join(sourceUrl, r.Data)
-	}
 	return ret, nil
 }
 
@@ -109,6 +146,12 @@ func GetSSARiskByProgram(db *gorm.DB, programName string) ([]*SsaRiskCount, erro
 		Group("`code_source_url`").
 		Scan(&ret); db.Error != nil {
 		return ret, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+	for _, r := range ret {
+		r.Data = strings.TrimPrefix(r.Data, "/")
+		if firstIndex := strings.Index(r.Data, "/"); firstIndex != -1 {
+			r.Data = r.Data[firstIndex:]
+		}
 	}
 
 	return ret, nil
