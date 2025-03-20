@@ -3,7 +3,6 @@ package yakit
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
@@ -30,29 +29,6 @@ func HandleAnalyzedHTTPFlowsColorAndTag(db *gorm.DB, flow *schema.HTTPFlow, colo
 	}
 	flow.AddTag(extraTag...)
 	return UpdateHTTPFlowTags(db, flow)
-}
-
-func QueryAnalyzedHTTPFlowRule(db *gorm.DB, req *ypb.QueryAnalyzedHTTPFlowRuleRequest) (*bizhelper.Paginator, []*schema.AnalyzedHTTPFlow, error) {
-	if req == nil {
-		return nil, nil, utils.Error("QueryAnalyzedHTTPFlowRule request is nil")
-	}
-	p := req.GetPagination()
-	if p == nil {
-		p = &ypb.Paging{
-			Page:    1,
-			Limit:   30,
-			OrderBy: "updated_at",
-			Order:   "desc",
-		}
-	}
-	db = db.Model(&schema.AnalyzedHTTPFlow{}).Preload("HTTPFlow")
-	db = FilterAnalyzedHTTPFlowRule(db, req.GetFilter())
-	var ret []*schema.AnalyzedHTTPFlow
-	paging, db := bizhelper.YakitPagingQuery(db, p, &ret)
-	if db.Error != nil {
-		return nil, nil, utils.Errorf("QueryAnalyzedHTTPFlowRule paging failed: %s", db.Error)
-	}
-	return paging, ret, nil
 }
 
 func FilterAnalyzedHTTPFlowRule(db *gorm.DB, params *ypb.AnalyzedHTTPFlowFilter) *gorm.DB {
