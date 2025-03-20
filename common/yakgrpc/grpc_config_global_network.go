@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -185,6 +186,10 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			verbose = "SiliconFlow"
 			extTag["model"] = "default:deepseek-ai/DeepSeek-V3"
 			extTag["domain"] = "default:api.siliconflow.cn"
+		case "ollama":
+			verbose = "Ollama"
+			extTag["model"] = "default:llama3"
+			extTag["domain"] = "default:localhost:11434"
 		}
 		aiOptions, err := utils.ParseAppTagToOptions(&aispec.AIConfig{}, extTag)
 		if err != nil {

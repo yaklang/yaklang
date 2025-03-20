@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/chatglm"
 	"github.com/yaklang/yaklang/common/ai/comate"
 	"github.com/yaklang/yaklang/common/ai/moonshot"
+	"github.com/yaklang/yaklang/common/ai/ollama"
 	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/ai/tongyi"
 	"github.com/yaklang/yaklang/common/consts"
@@ -43,6 +44,9 @@ func init() {
 	})
 	aispec.Register("siliconflow", func() aispec.AIClient {
 		return &siliconflow.GetawayClient{}
+	})
+	aispec.Register("ollama", func() aispec.AIClient {
+		return &ollama.GatewayClient{}
 	})
 	aispec.Register("yaklang-writer", func() aispec.AIClient {
 		return dashscopebase.CreateDashScopeGateway("a51e9af5a60f40c983dac6ed50dba15b")
