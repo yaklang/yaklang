@@ -33,6 +33,11 @@ const (
 	SwitchDefault = "switch.default"
 	SwitchHandler = "switch.handler"
 	SwitchBlock   = "switch.block"
+
+	// for &&  || ?: expression
+	AndExpressionVariable     = "and_expression"
+	OrExpressionVariable      = "or_expression"
+	TernaryExpressionVariable = "ternary_expression"
 )
 
 func (b *BasicBlock) IsBlock(name string) bool {
