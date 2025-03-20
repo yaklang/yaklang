@@ -56,7 +56,9 @@ params = {
         "kind": "",
         "local_file": "",
         "url": "",
-        "proxy": {"proxy": false, "url": ""}
+        "proxy": {"proxy": false, "url": ""},
+        "branch": "",
+        "path": ""  //针对git仓库的相对路径
     },
     "description": "",
     "file_count": 0,
@@ -156,7 +158,6 @@ func getZipinfo(basePath) {
     if params.language != "" {
         return
     }
-
     zip.Recursive(
         basePath,
         (dir, path, info) => {
@@ -196,7 +197,6 @@ func getLocalInfo(localFile) {
         ))
         return
     }
-
     ext := file.GetExt(localFile).Lower()
     switch ext {
     case ".jar", ".war":
@@ -215,7 +215,6 @@ func getLocalInfo(localFile) {
             newFileTypeException(sprint("文件存在，但仅支持jar、war、zip压缩格式。"))
             return
         }
-
         params.info.local_file = localFile
         filesys.Recursive(
             localFile,
@@ -234,7 +233,6 @@ func getLocalInfo(localFile) {
                 if countinfo != nil {
                     countMap[ext] = countinfo + 1
                 }
-
                 if params.language == "" {
                     switch  {
                     case info.Name().Lower() in javaFiles:
@@ -249,6 +247,25 @@ func getLocalInfo(localFile) {
     }
 }
 
+
+//尝试获取git仓库的根路径
+func tryGetRepoRootPath(target){
+    treeIndex = str.Index(target, "tree")
+    if treeIndex==-1{
+        return target
+    }
+    if len(target) <= treeIndex+5{
+        return target[:treeIndex]
+    }
+    branchUri = target[treeIndex+5:]
+    branchIndex = str.Index(branchUri, "/")
+    if branchIndex == -1{
+        return target
+    }
+    params.info.branch =  branchUri[:branchIndex]
+    params.info.path = str.PathJoin(branchUri[branchIndex:])
+    return target[:treeIndex]
+}
 func getHttpInfo(target) {
     httpUrl = ""
     if target.HasPrefix("http://") {
@@ -256,7 +273,6 @@ func getHttpInfo(target) {
     } else {
         httpUrl = target[8:]
     }
-
     if !target.HasSuffix("/") {
         target += "/"
     }
@@ -265,19 +281,23 @@ func getHttpInfo(target) {
     rsp, req, err = poc.Get(gitUrl, poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
     if err == nil && rsp.GetStatusCode() == 200 {
         params.info.kind = "git"
-        params.info.url = target
+        params.info.url = tryGetRepoRootPath(target)
         generateFileName("git", httpUrl)
     }
-
+    rsp, req, err = poc.Get(tryGetRepoRootPath(target), poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
+    if err == nil && rsp.GetStatusCode()==200{
+        params.info.kind = "git"
+        params.info.url = tryGetRepoRootPath(target)
+        generateFileName("git", httpUrl)
+    }
     if err != nil || rsp.GetStatusCode() != 200 {
         res, req, err2 = poc.Get(origin, poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
         if err2 != nil || res.GetStatusCode() != 200 {
             generateFileName("http", target)
             if err2 == nil {
                 newConnectException(sprintf("连接URL: %s 失败，状态码:%d", target, res.GetStatusCode()))
-            }else {
+            }else{
                 newConnectException(sprintf("连接URL: %s 失败:%s", target, err2.Error()))
-
             }
             return
         }
@@ -353,5 +373,5 @@ if err != nil {
     yakit.Text("编译错误信息:\n" + err.Error())
     yakit.Error("语言： %s", language)
     yakit.Error("项目名：%s", programName)
-    yakit.Error("编译信息： %s", params.info)
+    yakit.Error("编译信息： %v", params.info)
 }
