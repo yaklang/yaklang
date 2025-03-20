@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/coreos/etcd/pkg/fileutil"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
@@ -42,9 +44,10 @@ type config_info struct {
 	LocalFile string `json:"local_file"`
 	URL       string `json:"url"` //  for git/svn/tar/jar
 	// git or svn
-	Branch string `json:"branch"`
-	Auth   *auth  `json:"ce"`
-	Proxy  *proxy `json:"proxy"`
+	Branch  string `json:"branch"`
+	GitPath string `json:"path"`
+	Auth    *auth  `json:"ce"`
+	Proxy   *proxy `json:"proxy"`
 }
 type auth struct {
 	Kind string `json:"kind"`
@@ -151,8 +154,13 @@ func gitFs(info *config_info, process func(float64, string, ...any)) (fi.FileSys
 	if err := yakgit.Clone(info.URL, local, opts...); err != nil {
 		return nil, err
 	}
+	targetPath := filepath.Join(local, info.GitPath)
+	if !fileutil.Exist(targetPath) {
+		log.Errorf("not found this path,start compile local path")
+		targetPath = local
+	}
 	process(0, "git clone finish start compile...")
-	return filesys.NewRelLocalFs(local), nil
+	return filesys.NewRelLocalFs(targetPath), nil
 }
 
 func parseAuth(auth *auth) yakgit.Option {
