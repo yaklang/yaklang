@@ -922,50 +922,6 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 			},
 		}
 		return har.ExportHTTPArchiveStream(fh, httpArchive)
-	case "json":
-		if len(fieldNames) == 0 {
-			return utils.Error("field name is empty")
-		}
-		queryDB = queryDB.Select(fieldNames)
-		sendPercent := func() {
-			percent := 0.0
-			if total == 0 {
-				percent = count / (count + 1)
-			} else {
-				percent = count / float64(total)
-			}
-			stream.Send(&ypb.ExportHTTPFlowStreamResponse{
-				Percent: percent,
-			})
-		}
-
-		encoder := json.NewEncoder(fh)
-		//开始数组
-		fh.WriteString("[")
-		flowCh, err := bizhelper.YieldModelToMapEx(stream.Context(), queryDB, totalCallback)
-		if err != nil {
-			return err
-		}
-		for flow := range flowCh {
-			var result = make(map[string]interface{})
-			for _, fieldName := range fieldNames {
-				v, ok := flow[fieldName]
-				if !ok {
-					continue
-				}
-				result[fieldName] = v
-			}
-			if count > 0 {
-				fh.WriteString(",")
-			}
-			if err := encoder.Encode(result); err != nil {
-				log.Errorf("json encode error: %s", err)
-			}
-			count++
-			sendPercent()
-		}
-		// 结束数组
-		fh.WriteString("]")
 	}
 
 	return nil
