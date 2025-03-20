@@ -28,6 +28,7 @@ const (
 	Yak_GetMITMFilter_FullMethodName                              = "/ypb.Yak/GetMITMFilter"
 	Yak_ResetMITMFilter_FullMethodName                            = "/ypb.Yak/ResetMITMFilter"
 	Yak_DownloadMITMCert_FullMethodName                           = "/ypb.Yak/DownloadMITMCert"
+	Yak_MITMV2_FullMethodName                                     = "/ypb.Yak/MITMV2"
 	Yak_OpenPort_FullMethodName                                   = "/ypb.Yak/OpenPort"
 	Yak_Exec_FullMethodName                                       = "/ypb.Yak/Exec"
 	Yak_QueryExecHistory_FullMethodName                           = "/ypb.Yak/QueryExecHistory"
@@ -485,6 +486,7 @@ type YakClient interface {
 	GetMITMFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error)
 	ResetMITMFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error)
 	DownloadMITMCert(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MITMCert, error)
+	MITMV2(ctx context.Context, opts ...grpc.CallOption) (Yak_MITMV2Client, error)
 	// 开启端口
 	OpenPort(ctx context.Context, opts ...grpc.CallOption) (Yak_OpenPortClient, error)
 	// Exec
@@ -1162,8 +1164,39 @@ func (c *yakClient) DownloadMITMCert(ctx context.Context, in *Empty, opts ...grp
 	return out, nil
 }
 
+func (c *yakClient) MITMV2(ctx context.Context, opts ...grpc.CallOption) (Yak_MITMV2Client, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[1], Yak_MITMV2_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &yakMITMV2Client{stream}
+	return x, nil
+}
+
+type Yak_MITMV2Client interface {
+	Send(*MITMV2Request) error
+	Recv() (*MITMV2Response, error)
+	grpc.ClientStream
+}
+
+type yakMITMV2Client struct {
+	grpc.ClientStream
+}
+
+func (x *yakMITMV2Client) Send(m *MITMV2Request) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *yakMITMV2Client) Recv() (*MITMV2Response, error) {
+	m := new(MITMV2Response)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *yakClient) OpenPort(ctx context.Context, opts ...grpc.CallOption) (Yak_OpenPortClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[1], Yak_OpenPort_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[2], Yak_OpenPort_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1194,7 +1227,7 @@ func (x *yakOpenPortClient) Recv() (*Output, error) {
 }
 
 func (c *yakClient) Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (Yak_ExecClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[2], Yak_Exec_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[3], Yak_Exec_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1253,7 +1286,7 @@ func (c *yakClient) LoadNucleiTemplates(ctx context.Context, in *Empty, opts ...
 }
 
 func (c *yakClient) AutoUpdateYakModule(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Yak_AutoUpdateYakModuleClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[3], Yak_AutoUpdateYakModule_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[4], Yak_AutoUpdateYakModule_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1285,7 +1318,7 @@ func (x *yakAutoUpdateYakModuleClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) ExecYakScript(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (Yak_ExecYakScriptClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[4], Yak_ExecYakScript_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[5], Yak_ExecYakScript_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1317,7 +1350,7 @@ func (x *yakExecYakScriptClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) ExecBatchYakScript(ctx context.Context, in *ExecBatchYakScriptRequest, opts ...grpc.CallOption) (Yak_ExecBatchYakScriptClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[5], Yak_ExecBatchYakScript_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[6], Yak_ExecBatchYakScript_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1376,7 +1409,7 @@ func (c *yakClient) PopExecBatchYakScriptUnfinishedTaskByUid(ctx context.Context
 }
 
 func (c *yakClient) RecoverExecBatchYakScriptUnfinishedTask(ctx context.Context, in *RecoverExecBatchYakScriptUnfinishedTaskRequest, opts ...grpc.CallOption) (Yak_RecoverExecBatchYakScriptUnfinishedTaskClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[6], Yak_RecoverExecBatchYakScriptUnfinishedTask_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[7], Yak_RecoverExecBatchYakScriptUnfinishedTask_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1417,7 +1450,7 @@ func (c *yakClient) QueryYakScript(ctx context.Context, in *QueryYakScriptReques
 }
 
 func (c *yakClient) QueryYakScriptByYakScriptName(ctx context.Context, in *QueryYakScriptRequest, opts ...grpc.CallOption) (Yak_QueryYakScriptByYakScriptNameClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[7], Yak_QueryYakScriptByYakScriptName_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[8], Yak_QueryYakScriptByYakScriptName_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1521,7 +1554,7 @@ func (c *yakClient) ExportYakScript(ctx context.Context, in *ExportYakScriptRequ
 }
 
 func (c *yakClient) ExportYakScriptStream(ctx context.Context, in *ExportYakScriptStreamRequest, opts ...grpc.CallOption) (Yak_ExportYakScriptStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[8], Yak_ExportYakScriptStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[9], Yak_ExportYakScriptStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1553,7 +1586,7 @@ func (x *yakExportYakScriptStreamClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) ImportYakScriptStream(ctx context.Context, in *ImportYakScriptStreamRequest, opts ...grpc.CallOption) (Yak_ImportYakScriptStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[9], Yak_ImportYakScriptStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[10], Yak_ImportYakScriptStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1585,7 +1618,7 @@ func (x *yakImportYakScriptStreamClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) ExecutePacketYakScript(ctx context.Context, in *ExecutePacketYakScriptParams, opts ...grpc.CallOption) (Yak_ExecutePacketYakScriptClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[10], Yak_ExecutePacketYakScript_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[11], Yak_ExecutePacketYakScript_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1617,7 +1650,7 @@ func (x *yakExecutePacketYakScriptClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) ExecuteBatchPacketYakScript(ctx context.Context, in *ExecuteBatchPacketYakScriptParams, opts ...grpc.CallOption) (Yak_ExecuteBatchPacketYakScriptClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[11], Yak_ExecuteBatchPacketYakScript_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[12], Yak_ExecuteBatchPacketYakScript_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1730,7 +1763,7 @@ func (c *yakClient) SaveNewYakScript(ctx context.Context, in *SaveNewYakScriptRe
 }
 
 func (c *yakClient) SaveYakScriptToOnline(ctx context.Context, in *SaveYakScriptToOnlineRequest, opts ...grpc.CallOption) (Yak_SaveYakScriptToOnlineClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[12], Yak_SaveYakScriptToOnline_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[13], Yak_SaveYakScriptToOnline_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1771,7 +1804,7 @@ func (c *yakClient) ExportLocalYakScript(ctx context.Context, in *ExportLocalYak
 }
 
 func (c *yakClient) ExportLocalYakScriptStream(ctx context.Context, in *ExportLocalYakScriptRequest, opts ...grpc.CallOption) (Yak_ExportLocalYakScriptStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[13], Yak_ExportLocalYakScriptStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[14], Yak_ExportLocalYakScriptStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1803,7 +1836,7 @@ func (x *yakExportLocalYakScriptStreamClient) Recv() (*ExportYakScriptLocalRespo
 }
 
 func (c *yakClient) ImportYakScript(ctx context.Context, in *ImportYakScriptRequest, opts ...grpc.CallOption) (Yak_ImportYakScriptClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[14], Yak_ImportYakScript_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[15], Yak_ImportYakScript_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1934,7 +1967,7 @@ func (c *yakClient) GetHTTPFlowById(ctx context.Context, in *GetHTTPFlowByIdRequ
 }
 
 func (c *yakClient) GetHTTPFlowBodyById(ctx context.Context, in *GetHTTPFlowBodyByIdRequest, opts ...grpc.CallOption) (Yak_GetHTTPFlowBodyByIdClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[15], Yak_GetHTTPFlowBodyById_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[16], Yak_GetHTTPFlowBodyById_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2119,7 +2152,7 @@ func (c *yakClient) DeleteHistoryHTTPFuzzerTask(ctx context.Context, in *DeleteH
 }
 
 func (c *yakClient) HTTPFuzzer(ctx context.Context, in *FuzzerRequest, opts ...grpc.CallOption) (Yak_HTTPFuzzerClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[16], Yak_HTTPFuzzer_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[17], Yak_HTTPFuzzer_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2151,7 +2184,7 @@ func (x *yakHTTPFuzzerClient) Recv() (*FuzzerResponse, error) {
 }
 
 func (c *yakClient) HTTPFuzzerSequence(ctx context.Context, in *FuzzerRequests, opts ...grpc.CallOption) (Yak_HTTPFuzzerSequenceClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[17], Yak_HTTPFuzzerSequence_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[18], Yak_HTTPFuzzerSequence_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2273,7 +2306,7 @@ func (c *yakClient) GenerateExtractRule(ctx context.Context, in *GenerateExtract
 }
 
 func (c *yakClient) ExtractData(ctx context.Context, opts ...grpc.CallOption) (Yak_ExtractDataClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[18], Yak_ExtractData_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[19], Yak_ExtractData_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2394,7 +2427,7 @@ func (c *yakClient) QueryHTTPFuzzerResponseByTaskId(ctx context.Context, in *Que
 }
 
 func (c *yakClient) CreateWebsocketFuzzer(ctx context.Context, opts ...grpc.CallOption) (Yak_CreateWebsocketFuzzerClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[19], Yak_CreateWebsocketFuzzer_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[20], Yak_CreateWebsocketFuzzer_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2596,7 +2629,7 @@ func (c *yakClient) SavePayload(ctx context.Context, in *SavePayloadRequest, opt
 }
 
 func (c *yakClient) SavePayloadStream(ctx context.Context, in *SavePayloadRequest, opts ...grpc.CallOption) (Yak_SavePayloadStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[20], Yak_SavePayloadStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[21], Yak_SavePayloadStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2628,7 +2661,7 @@ func (x *yakSavePayloadStreamClient) Recv() (*SavePayloadProgress, error) {
 }
 
 func (c *yakClient) SavePayloadToFileStream(ctx context.Context, in *SavePayloadRequest, opts ...grpc.CallOption) (Yak_SavePayloadToFileStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[21], Yak_SavePayloadToFileStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[22], Yak_SavePayloadToFileStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2660,7 +2693,7 @@ func (x *yakSavePayloadToFileStreamClient) Recv() (*SavePayloadProgress, error) 
 }
 
 func (c *yakClient) SaveLargePayloadToFileStream(ctx context.Context, in *SavePayloadRequest, opts ...grpc.CallOption) (Yak_SaveLargePayloadToFileStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[22], Yak_SaveLargePayloadToFileStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[23], Yak_SaveLargePayloadToFileStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2764,7 +2797,7 @@ func (c *yakClient) GetAllPayload(ctx context.Context, in *GetAllPayloadRequest,
 }
 
 func (c *yakClient) GetAllPayloadFromFile(ctx context.Context, in *GetAllPayloadRequest, opts ...grpc.CallOption) (Yak_GetAllPayloadFromFileClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[23], Yak_GetAllPayloadFromFile_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[24], Yak_GetAllPayloadFromFile_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2796,7 +2829,7 @@ func (x *yakGetAllPayloadFromFileClient) Recv() (*GetAllPayloadFromFileResponse,
 }
 
 func (c *yakClient) ExportAllPayload(ctx context.Context, in *GetAllPayloadRequest, opts ...grpc.CallOption) (Yak_ExportAllPayloadClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[24], Yak_ExportAllPayload_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[25], Yak_ExportAllPayload_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2828,7 +2861,7 @@ func (x *yakExportAllPayloadClient) Recv() (*GetAllPayloadResponse, error) {
 }
 
 func (c *yakClient) ExportAllPayloadFromFile(ctx context.Context, in *GetAllPayloadRequest, opts ...grpc.CallOption) (Yak_ExportAllPayloadFromFileClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[25], Yak_ExportAllPayloadFromFile_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[26], Yak_ExportAllPayloadFromFile_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2869,7 +2902,7 @@ func (c *yakClient) CreatePayloadFolder(ctx context.Context, in *NameRequest, op
 }
 
 func (c *yakClient) RemoveDuplicatePayloads(ctx context.Context, in *NameRequest, opts ...grpc.CallOption) (Yak_RemoveDuplicatePayloadsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[26], Yak_RemoveDuplicatePayloads_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[27], Yak_RemoveDuplicatePayloads_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2901,7 +2934,7 @@ func (x *yakRemoveDuplicatePayloadsClient) Recv() (*SavePayloadProgress, error) 
 }
 
 func (c *yakClient) CoverPayloadGroupToDatabase(ctx context.Context, in *NameRequest, opts ...grpc.CallOption) (Yak_CoverPayloadGroupToDatabaseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[27], Yak_CoverPayloadGroupToDatabase_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[28], Yak_CoverPayloadGroupToDatabase_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2933,7 +2966,7 @@ func (x *yakCoverPayloadGroupToDatabaseClient) Recv() (*SavePayloadProgress, err
 }
 
 func (c *yakClient) ConvertPayloadGroupToDatabase(ctx context.Context, in *NameRequest, opts ...grpc.CallOption) (Yak_ConvertPayloadGroupToDatabaseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[28], Yak_ConvertPayloadGroupToDatabase_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[29], Yak_ConvertPayloadGroupToDatabase_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2965,7 +2998,7 @@ func (x *yakConvertPayloadGroupToDatabaseClient) Recv() (*SavePayloadProgress, e
 }
 
 func (c *yakClient) MigratePayloads(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Yak_MigratePayloadsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[29], Yak_MigratePayloads_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[30], Yak_MigratePayloads_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3078,7 +3111,7 @@ func (c *yakClient) YaklangGetCliCodeFromDatabase(ctx context.Context, in *Yakla
 }
 
 func (c *yakClient) YaklangTerminal(ctx context.Context, opts ...grpc.CallOption) (Yak_YaklangTerminalClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[30], Yak_YaklangTerminal_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[31], Yak_YaklangTerminal_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3109,7 +3142,7 @@ func (x *yakYaklangTerminalClient) Recv() (*Output, error) {
 }
 
 func (c *yakClient) PortScan(ctx context.Context, in *PortScanRequest, opts ...grpc.CallOption) (Yak_PortScanClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[31], Yak_PortScan_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[32], Yak_PortScan_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3150,7 +3183,7 @@ func (c *yakClient) ViewPortScanCode(ctx context.Context, in *Empty, opts ...grp
 }
 
 func (c *yakClient) SimpleDetect(ctx context.Context, in *RecordPortScanRequest, opts ...grpc.CallOption) (Yak_SimpleDetectClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[32], Yak_SimpleDetect_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[33], Yak_SimpleDetect_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3191,7 +3224,7 @@ func (c *yakClient) SaveCancelSimpleDetect(ctx context.Context, in *RecordPortSc
 }
 
 func (c *yakClient) SimpleDetectCreatReport(ctx context.Context, in *CreatReportRequest, opts ...grpc.CallOption) (Yak_SimpleDetectCreatReportClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[33], Yak_SimpleDetectCreatReport_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[34], Yak_SimpleDetectCreatReport_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3250,7 +3283,7 @@ func (c *yakClient) DeleteSimpleDetectUnfinishedTask(ctx context.Context, in *De
 }
 
 func (c *yakClient) RecoverSimpleDetectTask(ctx context.Context, in *RecoverUnfinishedTaskRequest, opts ...grpc.CallOption) (Yak_RecoverSimpleDetectTaskClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[34], Yak_RecoverSimpleDetectTask_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[35], Yak_RecoverSimpleDetectTask_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3309,7 +3342,7 @@ func (c *yakClient) PopSimpleDetectUnfinishedTaskByUid(ctx context.Context, in *
 }
 
 func (c *yakClient) RecoverSimpleDetectUnfinishedTask(ctx context.Context, in *RecoverExecBatchYakScriptUnfinishedTaskRequest, opts ...grpc.CallOption) (Yak_RecoverSimpleDetectUnfinishedTaskClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[35], Yak_RecoverSimpleDetectUnfinishedTask_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[36], Yak_RecoverSimpleDetectUnfinishedTask_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3665,7 +3698,7 @@ func (c *yakClient) DeleteYakScriptExec(ctx context.Context, in *Empty, opts ...
 }
 
 func (c *yakClient) StartBrute(ctx context.Context, in *StartBruteParams, opts ...grpc.CallOption) (Yak_StartBruteClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[36], Yak_StartBrute_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[37], Yak_StartBrute_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3724,7 +3757,7 @@ func (c *yakClient) VerifyTunnelServerDomain(ctx context.Context, in *VerifyTunn
 }
 
 func (c *yakClient) StartFacades(ctx context.Context, in *StartFacadesParams, opts ...grpc.CallOption) (Yak_StartFacadesClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[37], Yak_StartFacades_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[38], Yak_StartFacades_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3756,7 +3789,7 @@ func (x *yakStartFacadesClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) StartFacadesWithYsoObject(ctx context.Context, in *StartFacadesWithYsoParams, opts ...grpc.CallOption) (Yak_StartFacadesWithYsoObjectClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[38], Yak_StartFacadesWithYsoObject_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[39], Yak_StartFacadesWithYsoObject_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3806,7 +3839,7 @@ func (c *yakClient) BytesToBase64(ctx context.Context, in *BytesToBase64Request,
 }
 
 func (c *yakClient) ConfigGlobalReverse(ctx context.Context, in *ConfigGlobalReverseParams, opts ...grpc.CallOption) (Yak_ConfigGlobalReverseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[39], Yak_ConfigGlobalReverse_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[40], Yak_ConfigGlobalReverse_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4270,7 +4303,7 @@ func (c *yakClient) ForceUpdateAvailableYakScriptTags(ctx context.Context, in *E
 }
 
 func (c *yakClient) ExecYakitPluginsByYakScriptFilter(ctx context.Context, in *ExecYakitPluginsByYakScriptFilterRequest, opts ...grpc.CallOption) (Yak_ExecYakitPluginsByYakScriptFilterClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[40], Yak_ExecYakitPluginsByYakScriptFilter_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[41], Yak_ExecYakitPluginsByYakScriptFilter_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4365,7 +4398,7 @@ func (c *yakClient) GenerateURL(ctx context.Context, in *GenerateURLRequest, opt
 }
 
 func (c *yakClient) ExtractDataToFile(ctx context.Context, opts ...grpc.CallOption) (Yak_ExtractDataToFileClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[41], Yak_ExtractDataToFile_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[42], Yak_ExtractDataToFile_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4522,7 +4555,7 @@ func (c *yakClient) DownloadOnlinePluginByIds(ctx context.Context, in *DownloadO
 }
 
 func (c *yakClient) DownloadOnlinePluginAll(ctx context.Context, in *DownloadOnlinePluginByTokenRequest, opts ...grpc.CallOption) (Yak_DownloadOnlinePluginAllClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[42], Yak_DownloadOnlinePluginAll_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[43], Yak_DownloadOnlinePluginAll_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4599,7 +4632,7 @@ func (c *yakClient) DownloadOnlinePluginByScriptNames(ctx context.Context, in *D
 }
 
 func (c *yakClient) DownloadOnlinePlugins(ctx context.Context, in *DownloadOnlinePluginsRequest, opts ...grpc.CallOption) (Yak_DownloadOnlinePluginsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[43], Yak_DownloadOnlinePlugins_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[44], Yak_DownloadOnlinePlugins_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4667,7 +4700,7 @@ func (c *yakClient) QueryOnlinePlugins(ctx context.Context, in *QueryOnlinePlugi
 }
 
 func (c *yakClient) ExecPacketScan(ctx context.Context, in *ExecPacketScanRequest, opts ...grpc.CallOption) (Yak_ExecPacketScanClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[44], Yak_ExecPacketScan_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[45], Yak_ExecPacketScan_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4789,7 +4822,7 @@ func (c *yakClient) ResetAndInvalidUserData(ctx context.Context, in *ResetAndInv
 }
 
 func (c *yakClient) CreateYaklangShell(ctx context.Context, opts ...grpc.CallOption) (Yak_CreateYaklangShellClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[45], Yak_CreateYaklangShell_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[46], Yak_CreateYaklangShell_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4820,7 +4853,7 @@ func (x *yakCreateYaklangShellClient) Recv() (*YaklangShellResponse, error) {
 }
 
 func (c *yakClient) AttachCombinedOutput(ctx context.Context, in *AttachCombinedOutputRequest, opts ...grpc.CallOption) (Yak_AttachCombinedOutputClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[46], Yak_AttachCombinedOutput_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[47], Yak_AttachCombinedOutput_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4996,7 +5029,7 @@ func (c *yakClient) GetTemporaryProjectEx(ctx context.Context, in *GetTemporaryP
 }
 
 func (c *yakClient) ExportProject(ctx context.Context, in *ExportProjectRequest, opts ...grpc.CallOption) (Yak_ExportProjectClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[47], Yak_ExportProject_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[48], Yak_ExportProject_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5028,7 +5061,7 @@ func (x *yakExportProjectClient) Recv() (*ProjectIOProgress, error) {
 }
 
 func (c *yakClient) ImportProject(ctx context.Context, in *ImportProjectRequest, opts ...grpc.CallOption) (Yak_ImportProjectClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[48], Yak_ImportProject_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[49], Yak_ImportProject_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5078,7 +5111,7 @@ func (c *yakClient) QueryMITMRuleExtractedData(ctx context.Context, in *QueryMIT
 }
 
 func (c *yakClient) ExportMITMRuleExtractedData(ctx context.Context, in *ExportMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (Yak_ExportMITMRuleExtractedDataClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[49], Yak_ExportMITMRuleExtractedData_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[50], Yak_ExportMITMRuleExtractedData_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5137,7 +5170,7 @@ func (c *yakClient) DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChao
 }
 
 func (c *yakClient) ExecuteChaosMakerRule(ctx context.Context, in *ExecuteChaosMakerRuleRequest, opts ...grpc.CallOption) (Yak_ExecuteChaosMakerRuleClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[50], Yak_ExecuteChaosMakerRule_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[51], Yak_ExecuteChaosMakerRule_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5214,7 +5247,7 @@ func (c *yakClient) IsCVEDatabaseReady(ctx context.Context, in *IsCVEDatabaseRea
 }
 
 func (c *yakClient) UpdateCVEDatabase(ctx context.Context, in *UpdateCVEDatabaseRequest, opts ...grpc.CallOption) (Yak_UpdateCVEDatabaseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[51], Yak_UpdateCVEDatabase_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[52], Yak_UpdateCVEDatabase_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5246,7 +5279,7 @@ func (x *yakUpdateCVEDatabaseClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) ExportsProfileDatabase(ctx context.Context, in *ExportsProfileDatabaseRequest, opts ...grpc.CallOption) (Yak_ExportsProfileDatabaseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[52], Yak_ExportsProfileDatabase_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[53], Yak_ExportsProfileDatabase_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5278,7 +5311,7 @@ func (x *yakExportsProfileDatabaseClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) ImportsProfileDatabase(ctx context.Context, in *ImportsProfileDatabaseRequest, opts ...grpc.CallOption) (Yak_ImportsProfileDatabaseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[53], Yak_ImportsProfileDatabase_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[54], Yak_ImportsProfileDatabase_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5346,7 +5379,7 @@ func (c *yakClient) IsScrecorderReady(ctx context.Context, in *IsScrecorderReady
 }
 
 func (c *yakClient) InstallScrecorder(ctx context.Context, in *InstallScrecorderRequest, opts ...grpc.CallOption) (Yak_InstallScrecorderClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[54], Yak_InstallScrecorder_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[55], Yak_InstallScrecorder_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5378,7 +5411,7 @@ func (x *yakInstallScrecorderClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) StartScrecorder(ctx context.Context, in *StartScrecorderRequest, opts ...grpc.CallOption) (Yak_StartScrecorderClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[55], Yak_StartScrecorder_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[56], Yak_StartScrecorder_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5464,7 +5497,7 @@ func (c *yakClient) IsVulinboxReady(ctx context.Context, in *IsVulinboxReadyRequ
 }
 
 func (c *yakClient) InstallVulinbox(ctx context.Context, in *InstallVulinboxRequest, opts ...grpc.CallOption) (Yak_InstallVulinboxClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[56], Yak_InstallVulinbox_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[57], Yak_InstallVulinbox_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5496,7 +5529,7 @@ func (x *yakInstallVulinboxClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) StartVulinbox(ctx context.Context, in *StartVulinboxRequest, opts ...grpc.CallOption) (Yak_StartVulinboxClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[57], Yak_StartVulinbox_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[58], Yak_StartVulinbox_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5528,7 +5561,7 @@ func (x *yakStartVulinboxClient) Recv() (*ExecResult, error) {
 }
 
 func (c *yakClient) GenQualityInspectionReport(ctx context.Context, in *GenQualityInspectionReportRequest, opts ...grpc.CallOption) (Yak_GenQualityInspectionReportClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[58], Yak_GenQualityInspectionReport_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[59], Yak_GenQualityInspectionReport_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5569,7 +5602,7 @@ func (c *yakClient) HTTPRequestBuilder(ctx context.Context, in *HTTPRequestBuild
 }
 
 func (c *yakClient) DebugPlugin(ctx context.Context, in *DebugPluginRequest, opts ...grpc.CallOption) (Yak_DebugPluginClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[59], Yak_DebugPlugin_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[60], Yak_DebugPlugin_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5610,7 +5643,7 @@ func (c *yakClient) SmokingEvaluatePlugin(ctx context.Context, in *SmokingEvalua
 }
 
 func (c *yakClient) SmokingEvaluatePluginBatch(ctx context.Context, in *SmokingEvaluatePluginBatchRequest, opts ...grpc.CallOption) (Yak_SmokingEvaluatePluginBatchClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[60], Yak_SmokingEvaluatePluginBatch_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[61], Yak_SmokingEvaluatePluginBatch_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5651,7 +5684,7 @@ func (c *yakClient) GetSystemDefaultDnsServers(ctx context.Context, in *Empty, o
 }
 
 func (c *yakClient) DiagnoseNetwork(ctx context.Context, in *DiagnoseNetworkRequest, opts ...grpc.CallOption) (Yak_DiagnoseNetworkClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[61], Yak_DiagnoseNetwork_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[62], Yak_DiagnoseNetwork_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5683,7 +5716,7 @@ func (x *yakDiagnoseNetworkClient) Recv() (*DiagnoseNetworkResponse, error) {
 }
 
 func (c *yakClient) DiagnoseNetworkDNS(ctx context.Context, in *DiagnoseNetworkDNSRequest, opts ...grpc.CallOption) (Yak_DiagnoseNetworkDNSClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[62], Yak_DiagnoseNetworkDNS_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[63], Yak_DiagnoseNetworkDNS_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5715,7 +5748,7 @@ func (x *yakDiagnoseNetworkDNSClient) Recv() (*DiagnoseNetworkResponse, error) {
 }
 
 func (c *yakClient) TraceRoute(ctx context.Context, in *TraceRouteRequest, opts ...grpc.CallOption) (Yak_TraceRouteClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[63], Yak_TraceRoute_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[64], Yak_TraceRoute_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5792,7 +5825,7 @@ func (c *yakClient) RequestYakURL(ctx context.Context, in *RequestYakURLParams, 
 }
 
 func (c *yakClient) ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (Yak_ReadFileClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[64], Yak_ReadFile_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[65], Yak_ReadFile_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5833,7 +5866,7 @@ func (c *yakClient) GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest
 }
 
 func (c *yakClient) PcapX(ctx context.Context, opts ...grpc.CallOption) (Yak_PcapXClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[65], Yak_PcapX_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[66], Yak_PcapX_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5900,7 +5933,7 @@ func (c *yakClient) ParseTraffic(ctx context.Context, in *ParseTrafficRequest, o
 }
 
 func (c *yakClient) DuplexConnection(ctx context.Context, opts ...grpc.CallOption) (Yak_DuplexConnectionClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[66], Yak_DuplexConnection_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[67], Yak_DuplexConnection_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5931,7 +5964,7 @@ func (x *yakDuplexConnectionClient) Recv() (*DuplexConnectionResponse, error) {
 }
 
 func (c *yakClient) HybridScan(ctx context.Context, opts ...grpc.CallOption) (Yak_HybridScanClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[67], Yak_HybridScan_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[68], Yak_HybridScan_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6007,7 +6040,7 @@ func (c *yakClient) GetSpaceEngineAccountStatusV2(ctx context.Context, in *Third
 }
 
 func (c *yakClient) FetchPortAssetFromSpaceEngine(ctx context.Context, in *FetchPortAssetFromSpaceEngineRequest, opts ...grpc.CallOption) (Yak_FetchPortAssetFromSpaceEngineClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[68], Yak_FetchPortAssetFromSpaceEngine_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[69], Yak_FetchPortAssetFromSpaceEngine_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6273,7 +6306,7 @@ func (c *yakClient) QuerySyntaxFlowSameGroup(ctx context.Context, in *QuerySynta
 }
 
 func (c *yakClient) SyntaxFlowScan(ctx context.Context, opts ...grpc.CallOption) (Yak_SyntaxFlowScanClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[69], Yak_SyntaxFlowScan_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[70], Yak_SyntaxFlowScan_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6493,7 +6526,7 @@ func (c *yakClient) GenerateFuzztag(ctx context.Context, in *GenerateFuzztagRequ
 }
 
 func (c *yakClient) ExportSyntaxFlows(ctx context.Context, in *ExportSyntaxFlowsRequest, opts ...grpc.CallOption) (Yak_ExportSyntaxFlowsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[70], Yak_ExportSyntaxFlows_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[71], Yak_ExportSyntaxFlows_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6525,7 +6558,7 @@ func (x *yakExportSyntaxFlowsClient) Recv() (*SyntaxflowsProgress, error) {
 }
 
 func (c *yakClient) ImportSyntaxFlows(ctx context.Context, in *ImportSyntaxFlowsRequest, opts ...grpc.CallOption) (Yak_ImportSyntaxFlowsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[71], Yak_ImportSyntaxFlows_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[72], Yak_ImportSyntaxFlows_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6656,7 +6689,7 @@ func (c *yakClient) ResetMITMHijackFilter(ctx context.Context, in *Empty, opts .
 }
 
 func (c *yakClient) ExportHTTPFlowStream(ctx context.Context, in *ExportHTTPFlowStreamRequest, opts ...grpc.CallOption) (Yak_ExportHTTPFlowStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[72], Yak_ExportHTTPFlowStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[73], Yak_ExportHTTPFlowStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6688,7 +6721,7 @@ func (x *yakExportHTTPFlowStreamClient) Recv() (*ExportHTTPFlowStreamResponse, e
 }
 
 func (c *yakClient) ImportHTTPFlowStream(ctx context.Context, in *ImportHTTPFlowStreamRequest, opts ...grpc.CallOption) (Yak_ImportHTTPFlowStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[73], Yak_ImportHTTPFlowStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[74], Yak_ImportHTTPFlowStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6844,6 +6877,7 @@ type YakServer interface {
 	GetMITMFilter(context.Context, *Empty) (*SetMITMFilterRequest, error)
 	ResetMITMFilter(context.Context, *Empty) (*SetMITMFilterRequest, error)
 	DownloadMITMCert(context.Context, *Empty) (*MITMCert, error)
+	MITMV2(Yak_MITMV2Server) error
 	// 开启端口
 	OpenPort(Yak_OpenPortServer) error
 	// Exec
@@ -7441,6 +7475,9 @@ func (UnimplementedYakServer) ResetMITMFilter(context.Context, *Empty) (*SetMITM
 }
 func (UnimplementedYakServer) DownloadMITMCert(context.Context, *Empty) (*MITMCert, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DownloadMITMCert not implemented")
+}
+func (UnimplementedYakServer) MITMV2(Yak_MITMV2Server) error {
+	return status.Errorf(codes.Unimplemented, "method MITMV2 not implemented")
 }
 func (UnimplementedYakServer) OpenPort(Yak_OpenPortServer) error {
 	return status.Errorf(codes.Unimplemented, "method OpenPort not implemented")
@@ -8940,6 +8977,32 @@ func _Yak_DownloadMITMCert_Handler(srv interface{}, ctx context.Context, dec fun
 		return srv.(YakServer).DownloadMITMCert(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_MITMV2_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(YakServer).MITMV2(&yakMITMV2Server{stream})
+}
+
+type Yak_MITMV2Server interface {
+	Send(*MITMV2Response) error
+	Recv() (*MITMV2Request, error)
+	grpc.ServerStream
+}
+
+type yakMITMV2Server struct {
+	grpc.ServerStream
+}
+
+func (x *yakMITMV2Server) Send(m *MITMV2Response) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *yakMITMV2Server) Recv() (*MITMV2Request, error) {
+	m := new(MITMV2Request)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func _Yak_OpenPort_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -18619,6 +18682,12 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "MITM",
 			Handler:       _Yak_MITM_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "MITMV2",
+			Handler:       _Yak_MITMV2_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
