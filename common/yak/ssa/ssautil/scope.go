@@ -430,7 +430,7 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 		return
 	}
 
-	{
+	if scope.Compare(variable.GetScope()) || !scope.IsSameOrSubScope(variable.GetScope()) {
 		// variable to value
 		scope.linkValues.Append(variable.GetName(), variable)
 		// value to variable

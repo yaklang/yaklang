@@ -2,10 +2,11 @@ package ssa
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"strings"
 )
 
 // GetBluePrint will get the blueprint by name. if not found and virtualImport enable,

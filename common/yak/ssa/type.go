@@ -393,6 +393,8 @@ const (
 	GenericTypeKind
 	ByteTypeKind
 	OrTypeKind
+
+	PointerKind
 )
 
 type baseType struct {
