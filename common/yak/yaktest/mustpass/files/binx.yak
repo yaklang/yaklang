@@ -1,9 +1,61 @@
+// Java .class 文件头解析示例
+// Java class 文件头格式:
+// - magic: 0xCAFEBABE (4字节)
+// - minor_version: (2字节)
+// - major_version: (2字节)
+// - constant_pool_count: (2字节)
+// - constant_pool: (变长)
 
+mv = 52
+// 使用 yso 生成一个 java class
+classObj,err = yso.GenerateClass(yso.useTemplate("DNSLog"),yso.obfuscationClassConstantPool(),yso.evilClassName("icUyVgMB"),yso.majorVersion(mv),yso.useClassParam("domain","1"))
+if err {
+	log.error("%v",err)
+	return
+}
+classBytes,err = yso.ToBytes(classObj)
+if err {
+	log.error("%v",err)
+	return
+}
+// CAFEBABE: 魔数
+// 0000: minor version (0)
+// 0037: major version (55 = Java 11)
+// 0012: constant_pool_count (18)
+// 后面是常量池数据(简化)
 
+// 解析 Java class 文件头
+resultIf = bin.Read(classBytes,
+    bin.toStruct(  // 创建一个结构体描述符
+        bin.toUint32("magic"),        // 魔数 0xCAFEBABE
+        bin.toUint16("minorVersion"), // 次版本号
+        bin.toUint16("majorVersion"), // 主版本号
+        bin.toUint16("constPoolCount") // 常量池计数
+    )
+)~
+dump(resultIf)
+result = resultIf[0].Result
+// 访问结构体中的字段
+// 验证魔数 (result[0] 是 magic 字段)
+magic := result[0].AsUint32() 
+if magic == 0xCAFEBABE {
+    println("有效的 Java class 文件")
+} else {
+    println("无效的 Java class 文件")
+}
+assert magic == 0xCAFEBABE
 
-c = "\x33\x22\x80\xff\xff\x03aaa"
-result = bin.Read(c, bin.toUint16("ccc"))~
-result1 = result[0]
+// 获取 Java 版本 (result[2] 是 majorVersion 字段)
+majorVersion := result[2].AsUint16()
 
-dump(result1.Value())
-assert result1.Value() == 0x3322
+assert majorVersion == mv
+
+// Java 版本 = 主版本号 - 44
+javaVersion := majorVersion - 44
+println("Java 版本:", javaVersion) // 输出: Java 版本: 8
+
+assert javaVersion == 8
+
+// 获取常量池大小 (result[3] 是 constPoolCount 字段)
+constPoolCount := result[3].AsUint16()
+println("常量池条目数:", constPoolCount - 1) // 实际条目数 = 常量池计数 - 1

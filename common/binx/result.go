@@ -37,6 +37,20 @@ type ResultIf interface {
 	Value() any
 }
 
+// Find 根据字段名称在解析结果中查找对应的字段值
+// @param {[]ResultIf} results 通过bin.Read获取的解析结果
+// @param {string} name 要查找的字段名称
+// @return {ResultIf} 找到的字段值，如果未找到则返回nil
+// Example:
+// ```
+// result = bin.Read(data, bin.toUint16("magic"), bin.toUint8("version"))~
+// magic = bin.Find(result, "magic")
+//
+//	if magic != nil {
+//	  println("Magic:", magic.AsUint16())
+//	}
+//
+// ```
 func FindResultByIdentifier(results []ResultIf, name string) ResultIf {
 	for _, r := range results {
 		switch ret := r.(type) {

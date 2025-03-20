@@ -2,11 +2,12 @@ package binx
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type PartDescriptor struct {
@@ -97,29 +98,49 @@ func read(lastResults []ResultIf, p *PartDescriptor, reader io.Reader, startOffs
 
 	handleSubPartDesc := func(subs []*PartDescriptor, merged ResultCompactIf) error {
 		var firstOffset int64 = -1
-		var bufs = make([]ResultIf, len(p.SubPartDescriptor))
+		// 对于Struct类型(SubPartLength=0)和List类型(SubPartLength>0)使用不同的处理逻辑
+		var descriptorsToProcess []*PartDescriptor
+		if p.SubPartLength > 0 {
+			// List模式 - 只处理前SubPartLength个元素
+			descriptorsToProcess = subs[:p.SubPartLength]
+		} else {
+			// Struct模式 - 处理所有元素
+			descriptorsToProcess = subs
+		}
+
+		// 创建正确大小的bufs数组
+		var bufs = make([]ResultIf, len(descriptorsToProcess))
 		var bufsSize int64
-		for i := 0; i < int(p.SubPartLength); i++ {
+
+		// 遍历需要处理的描述符
+		for i, desc := range descriptorsToProcess {
 			var err error
-			var results []ResultIf
-			results, startOffset, lastResults, err = read(lastResults, p.SubPartDescriptor[i], reader, startOffset)
+			var subResults []ResultIf
+			subResults, startOffset, lastResults, err = read(lastResults, desc, reader, startOffset)
 			if err != nil {
 				return err
 			}
-			for _, subResult := range results {
-				if firstOffset < 0 {
-					firstOffset = subResult.GetInt64Offset()
+
+			if len(subResults) > 0 {
+				for _, subResult := range subResults {
+					if firstOffset < 0 {
+						firstOffset = subResult.GetInt64Offset()
+					}
+					bufs[i] = subResult
+					bufsSize += int64(len(bufs[i].GetBytes()))
 				}
-				bufs[i] = subResult
-				bufsSize += int64(len(bufs[i].GetBytes()))
 			}
 		}
+
+		// 设置结果
 		merged.SetOffset(firstOffset)
 		var finalBytes = make([]byte, bufsSize)
 		var offset = 0
 		for _, buf := range bufs {
-			copy(finalBytes[offset:], buf.GetBytes())
-			offset += len(buf.GetBytes())
+			if buf != nil { // 避免panic
+				copy(finalBytes[offset:], buf.GetBytes())
+				offset += len(buf.GetBytes())
+			}
 		}
 		merged.SetBytes(finalBytes)
 		merged.SetResults(bufs)
@@ -198,12 +219,25 @@ func read(lastResults []ResultIf, p *PartDescriptor, reader io.Reader, startOffs
 
 	return nil, startOffset, lastResults, utils.Error("unknown error, size or size from is not valid")
 }
+
 func NewPartDescriptor(dataType BinaryTypeVerbose, size uint64) *PartDescriptor {
 	return &PartDescriptor{
 		typeFlag: dataType,
 		size:     size,
 	}
 }
+
+// toList 创建一个列表类型描述符，用于从二进制数据中按顺序读取多个相同格式的元素
+// @param {PartDescriptor} builder 列表中的元素描述符
+// @return {PartDescriptor} 返回列表类型描述符对象
+// Example:
+// ```
+// // 读取两个uint16构成的列表
+// result = bin.Read(data, bin.toList(bin.toUint16("item"), bin.toUint16("item")))~
+// list = result[0]
+// item1 = list.Result[0].AsUint16()
+// item2 = list.Result[1].AsUint16()
+// ```
 func NewListDescriptor(builder ...*PartDescriptor) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.SubPartLength = uint64(len(builder))
@@ -211,6 +245,22 @@ func NewListDescriptor(builder ...*PartDescriptor) *PartDescriptor {
 	return descriptor
 }
 
+// toStruct 创建一个结构体类型描述符，用于从二进制数据中读取不同类型字段组成的结构
+// @param {PartDescriptor} builder 结构体中的字段描述符
+// @return {PartDescriptor} 返回结构体类型描述符对象
+// Example:
+// ```
+// // 读取包含magic(uint16)和version(uint8)的结构体
+// result = bin.Read(data, bin.toStruct(
+//
+//	bin.toUint16("magic"),
+//	bin.toUint8("version")
+//
+// ))~
+// structResult = result[0]
+// magic = structResult.Result[0].AsUint16()
+// version = structResult.Result[1].AsUint8()
+// ```
 func NewStructDescriptor(builder ...*PartDescriptor) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.SubPartLength = 0
@@ -218,7 +268,10 @@ func NewStructDescriptor(builder ...*PartDescriptor) *PartDescriptor {
 	return descriptor
 }
 
-// builder
+// toUint8 创建一个8位无符号整数类型描述符，用于从二进制数据中读取uint8值
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {string} values 可选的详细描述
+// @return {PartDescriptor} 返回类型描述符对象
 func NewUint8(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 1
@@ -226,10 +279,18 @@ func NewUint8(name string, values ...string) *PartDescriptor {
 	return descriptor.Name(name, values...)
 }
 
+// NewByte 创建一个字节类型描述符，等同于NewUint8，用于从二进制数据中读取单个字节
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {string} values 可选的详细描述
+// @return {PartDescriptor} 返回类型描述符对象
 func NewByte(name string, values ...string) *PartDescriptor {
 	return NewUint8(name, values...)
 }
 
+// toUint16 创建一个16位无符号整数类型描述符，用于从二进制数据中读取uint16值
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {string} values 可选的详细描述
+// @return {PartDescriptor} 返回类型描述符对象
 func NewUint16(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 2
@@ -237,6 +298,10 @@ func NewUint16(name string, values ...string) *PartDescriptor {
 	return descriptor.Name(name, values...)
 }
 
+// toUint32 创建一个32位无符号整数类型描述符，用于从二进制数据中读取uint32值
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {string} values 可选的详细描述
+// @return {PartDescriptor} 返回类型描述符对象
 func NewUint32(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 4
@@ -244,6 +309,10 @@ func NewUint32(name string, values ...string) *PartDescriptor {
 	return descriptor.Name(name, values...)
 }
 
+// toUint64 创建一个64位无符号整数类型描述符，用于从二进制数据中读取uint64值
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {string} values 可选的详细描述
+// @return {PartDescriptor} 返回类型描述符对象
 func NewUint64(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 8
@@ -251,6 +320,10 @@ func NewUint64(name string, values ...string) *PartDescriptor {
 	return descriptor.Name(name, values...)
 }
 
+// toInt8 创建一个8位整数类型描述符，用于从二进制数据中读取int8值
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {string} values 可选的详细描述
+// @return {PartDescriptor} 返回类型描述符对象
 func NewInt8(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 1
@@ -258,6 +331,10 @@ func NewInt8(name string, values ...string) *PartDescriptor {
 	return descriptor.Name(name, values...)
 }
 
+// toInt16 创建一个16位整数类型描述符，用于从二进制数据中读取int16值
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {string} values 可选的详细描述
+// @return {PartDescriptor} 返回类型描述符对象
 func NewInt16(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 2
@@ -265,6 +342,10 @@ func NewInt16(name string, values ...string) *PartDescriptor {
 	return descriptor.Name(name, values...)
 }
 
+// toInt32 创建一个32位整数类型描述符，用于从二进制数据中读取int32值
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {string} values 可选的详细描述
+// @return {PartDescriptor} 返回类型描述符对象
 func NewInt32(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 4
@@ -272,6 +353,10 @@ func NewInt32(name string, values ...string) *PartDescriptor {
 	return descriptor.Name(name, values...)
 }
 
+// toInt64 创建一个64位整数类型描述符，用于从二进制数据中读取int64值
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {string} values 可选的详细描述
+// @return {PartDescriptor} 返回类型描述符对象
 func NewInt64(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 8
@@ -279,6 +364,18 @@ func NewInt64(name string, values ...string) *PartDescriptor {
 	return descriptor.Name(name, values...)
 }
 
+// toRaw 创建一个字节数组类型描述符，用于从二进制数据中读取字节序列
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {number|string} size 字节长度或引用其他字段名称作为长度值
+// @return {PartDescriptor} 返回类型描述符对象
+// Example:
+// ```
+// // 读取长度为5的字节数组
+// bin.Read(data, bin.toBytes("content", 5))
+//
+// // 读取长度由另一个字段决定的字节数组
+// bin.Read(data, bin.toUint8("length"), bin.toBytes("content", "length"))
+// ```
 func NewBytes(name string, size any) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	sizeFrom := utils.InterfaceToString(size)
@@ -291,10 +388,18 @@ func NewBytes(name string, size any) *PartDescriptor {
 	return descriptor.Name(name)
 }
 
+// NewBuffer 创建一个字节数组类型描述符，等同于NewBytes，用于从二进制数据中读取字节序列
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {number|string} size 字节长度或引用其他字段名称作为长度值
+// @return {PartDescriptor} 返回类型描述符对象
 func NewBuffer(name string, size any) *PartDescriptor {
 	return NewBytes(name, size)
 }
 
+// toBool 创建一个布尔类型描述符，用于从二进制数据中读取布尔值（非零为true）
+// @param {string} name 字段名称，用于之后通过Find函数查找
+// @param {string} verbose 可选的详细描述
+// @return {PartDescriptor} 返回类型描述符对象
 func NewBool(name string, verbose ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 1
