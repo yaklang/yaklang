@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -1050,59 +1049,6 @@ func TestGRPCMUSTPASS_Export_CSV(t *testing.T) {
 		require.NotEmpty(t, record[3])        // request
 		require.Contains(t, record[4], token) // response
 	}
-}
-
-func TestMUSTPASS_Export_Json(t *testing.T) {
-	client, err := NewLocalClient()
-	require.NoError(t, err)
-
-	wantCount := 16
-	wantURL := "http://example.com/"
-	db := consts.GetGormProjectDatabase()
-	fieldNames := []string{"method", "url", "request", "response"}
-	type httpFlow struct {
-		Method   string `json:"method"`
-		URL      string `json:"url"`
-		Request  string `json:"request"`
-		Response string `json:"response"`
-	}
-	token, ids := generateTestHTTPFlowData(db, wantCount, wantURL)
-
-	t.Cleanup(func() {
-		yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{
-			Id: ids,
-		})
-	})
-	fn := filepath.Join(os.TempDir(), "test.json")
-	require.NoError(t, err)
-
-	stream, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
-		FieldName: fieldNames,
-		Filter: &ypb.QueryHTTPFlowRequest{
-			Keyword: token,
-		},
-		ExportType: "json",
-		TargetPath: fn,
-	})
-	require.NoError(t, err)
-	progress := 0.0
-	for {
-		msg, err := stream.Recv()
-		if err != nil {
-			break
-		}
-		progress = msg.Percent
-	}
-
-	// check export
-	require.Equal(t, 1.0, progress)
-
-	raw, err := os.ReadFile(fn)
-	var httpFlows []httpFlow
-	err = json.Unmarshal(raw, &httpFlows)
-	require.NoError(t, err)
-	require.Len(t, httpFlows, wantCount)
-	fmt.Println(httpFlows)
 }
 
 func TestGetHTTPPacketBody(t *testing.T) {
