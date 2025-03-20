@@ -94,6 +94,158 @@ public class main{
 			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
+
+	t.Run("test class value", func(t *testing.T) {
+		code := `
+class A {
+	int a;
+
+	A(int a){
+		this.a = a;
+	}
+}
+
+class B {
+    A A;
+
+	B(A a){
+		this.A = a;
+	}
+}
+
+public class C {
+    public static void main(String[] args) {
+ 		A a = new A(1);
+        B b = new B(a);
+		
+		b.A.a = 2; 
+        int o1 = a.a; 	
+        int o2 = b.A.a;	
+        a.a = 3; 
+        int o3 = a.a; 	
+        int o4 = b.A.a;
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `
+			o1 #-> as $o1
+			o2 #-> as $o2
+			o3 #-> as $o3
+			o4 #-> as $o4
+		`, map[string][]string{
+			"o1": {"2"},
+			"o2": {"2"},
+			"o3": {"3"},
+			"o4": {"3"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	// todo: 跨过程会导致指针失效
+	t.Run("test class value cross function", func(t *testing.T) {
+		t.Skip()
+		code := `
+		class A {
+			int a;
+		
+			A(int a){
+				this.a = a;
+			}
+			public static void main(String[] args) {
+		
+			}
+		}
+		
+		class B {
+			A A;
+		
+			B(A a){
+				this.A = a;
+			}
+		
+			public static void main(String[] args) {
+				
+			}
+		}
+		
+		class Main {
+			static B test(A a) {
+				return new B(a);
+			}
+		
+			public static void main(String[] args) {
+				A a = new A(1);
+				B b = test(a);
+				
+				b.A.a = 2; 
+				int o1 = a.a;
+				int o2 = b.A.a;
+				a.a = 3; 
+				int o3 = a.a;
+				int o4 = b.A.a;
+			}
+		}
+		 `
+		ssatest.CheckSyntaxFlow(t, code, `
+		 o1 #-> as $o1
+		 o2 #-> as $o2
+		 o3 #-> as $o3
+		 o4 #-> as $o4
+	 `, map[string][]string{
+			"o1": {"2"},
+			"o2": {"2"},
+			"o3": {"3"},
+			"o4": {"3"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	// todo
+	t.Run("test class value if", func(t *testing.T) {
+		t.Skip()
+		code := `
+class A {
+	int a;
+
+	A(int a){
+		this.a = a;
+	}
+}
+
+class B {
+    A A;
+
+	B(A a){
+		this.A = a;
+	}
+}
+
+public class C {
+    public static void main(String[] args) {
+ 		A a1 = new A(1);
+		A a2 = new A(2);
+
+        B b = new B(a1);
+        if (a.a == 2) {
+            B b = new B(a2); 
+        }
+
+		a1.a = 3; 
+        int o1 = a2.a; 	
+        int o2 = b.A.a;	
+        a2.a = 4; 
+        int o3 = a1.a; 	
+        int o4 = b.A.a;	
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `
+			o1 #-> as $o1
+			o2 #-> as $o2
+			o3 #-> as $o3
+			o4 #-> as $o4
+		`, map[string][]string{
+			"": {""},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
 }
 
 func TestJava_Construct(t *testing.T) {
