@@ -68,9 +68,9 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 
 	var opcode ssa.BinaryOpcode
 	var unaryOpcode ssa.UnaryOpcode
-	var handlerJumpExpression = func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value) ssa.Value {
+	var handlerJumpExpression = func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value, name string) ssa.Value {
 		// 为了聚合产生Phi指令
-		id := uuid.NewString()
+		id := name
 		variable := y.CreateVariable(id)
 		y.AssignVariable(variable, y.EmitValueOnlyDeclare(id))
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
@@ -458,7 +458,6 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return y.EmitBinOp(opcode, op1, op2)
 	case *javaparser.LogicANDExpressionContext:
 		// 处理逻辑与表达式
-
 		op1 := y.VisitExpression(ret.Expression(0))
 		op2 := y.VisitExpression(ret.Expression(1))
 		return handlerJumpExpression(
@@ -471,6 +470,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			func() ssa.Value {
 				return op1
 			},
+			ssa.AndExpressionVariable,
 		)
 	case *javaparser.LogicORExpressionContext:
 		// 处理逻辑或表达式
@@ -486,23 +486,38 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			func() ssa.Value {
 				return op2
 			},
+			ssa.OrExpressionVariable,
 		)
 	case *javaparser.TernaryExpressionContext:
 		// 处理三元运算符表达式
-		builder := y.CreateIfBuilder()
-		allExpr := ret.AllExpression()
-		if allExpr != nil {
-			builder.AppendItem(func() ssa.Value {
-				return y.VisitExpression(ret.Expression(0))
+		var conditionValue, trueValue, falseValue ssa.Value
+		value := handlerJumpExpression(
+			func(id string) ssa.Value {
+				conditionValue = y.VisitExpression(ret.Expression(0))
+				return conditionValue
 			},
-				func() { y.VisitExpression(ret.Expression(1)) })
-			builder.SetElse(func() { y.VisitExpression(ret.Expression(2)) })
-			builder.Build()
-		}
-		if y.VisitExpression(ret.Expression(0)) == y.EmitConstInst(true) {
-			return y.VisitExpression(ret.Expression(1))
+			func() ssa.Value {
+				trueValue = y.VisitExpression(ret.Expression(1))
+				return trueValue
+			},
+			func() ssa.Value {
+				falseValue = y.VisitExpression(ret.Expression(2))
+				return falseValue
+			},
+			ssa.TernaryExpressionVariable,
+		)
+		if condValue, ok := ssa.ToConst(conditionValue); ok {
+			cond, ok := condValue.GetRawValue().(bool)
+			if !ok {
+				return value
+			}
+			if cond {
+				return trueValue
+			} else {
+				return falseValue
+			}
 		} else {
-			return y.VisitExpression(ret.Expression(2))
+			return value
 		}
 	case *javaparser.AssignmentExpression1Context:
 		// 处理赋值表达式，包括所有赋值运算符

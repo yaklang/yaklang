@@ -86,7 +86,7 @@ func TestJava_Simple_Expression(t *testing.T) {
 		int ret;
 		ret = a > b ? a : b;
 		println(ret);
-		`, []string{"0"}, t)
+		`, []string{"1"}, t)
 	})
 	t.Run("test AssignmentExpression", func(t *testing.T) {
 		CheckJavaPrintlnValue(` 
