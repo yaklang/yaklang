@@ -1,0 +1,16 @@
+// omap
+for i in 100 {
+    m = json.loads(`{"b":2,"a":1,"c":3}`)
+    v = json.dumps(m, json.withIndent(""))
+    assert v == `{"b":2,"a":1,"c":3}`,v
+}
+// other type 
+v = json.loads(`[1,2,3]`)
+v = json.dumps(v, json.withIndent(""))
+assert v == `[1,2,3]`, v
+v = json.loads(`"hello"`)
+assert v == "hello"
+v = json.loads(`true`)
+assert v == true
+v = json.loads(`false`)
+assert v == false
