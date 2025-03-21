@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"io"
 	"sort"
 	"strconv"
@@ -23,6 +24,17 @@ func ListChatModels(url string, opt func() ([]poc.PocConfigOption, error)) ([]*M
 	}
 	opts = append(opts, poc.WithTimeout(600))
 
+	if strings.HasSuffix(url, "/") {
+		// remove /
+		url = url[:len(url)-1]
+	}
+	if strings.HasSuffix(url, "/chat/completions") {
+		// remove /chat/completions
+		url = url[:len(url)-len("/chat/completions")]
+		url += "/models"
+	}
+
+	log.Infof("requtest GET to %v to find available models", url)
 	rsp, _, err := poc.DoGET(url, opts...)
 	if err != nil {
 		return nil, utils.Errorf("request get to %v：%v", url, err)
@@ -41,7 +53,7 @@ func ListChatModels(url string, opt func() ([]poc.PocConfigOption, error)) ([]*M
 
 	err = json.Unmarshal(body, &resp)
 	if err != nil {
-		return nil, utils.Errorf("unmarshal models failed: %v", err)
+		return nil, utils.Errorf("unmarshal models failed: %v raw:\n%v", err, spew.Sdump(body))
 	}
 
 	return resp.Data, nil

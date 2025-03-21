@@ -29,7 +29,7 @@ func (g *GetawayClient) StructuredStream(s string, function ...aispec.Function) 
 var _ aispec.AIClient = (*GetawayClient)(nil)
 
 func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, error) {
-	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler)
+	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler)
 }
 
 func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
