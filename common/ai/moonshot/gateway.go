@@ -21,11 +21,18 @@ func (g *GatewayClient) GetModelList() ([]*aispec.ModelMeta, error) {
 }
 
 func (g *GatewayClient) SupportedStructuredStream() bool {
-	return false
+	return true
 }
 
 func (g *GatewayClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
-	return nil, errors.New("unsupported method")
+	return aispec.StructuredStreamBase(
+		g.targetUrl,
+		g.config.Model,
+		s,
+		g.BuildHTTPOptions,
+		g.config.StreamHandler,
+		g.config.ReasonStreamHandler,
+	)
 }
 
 func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
