@@ -8,245 +8,245 @@ import (
 	"testing"
 )
 
-func TestToolParam_GetJSONSchemaString(t *testing.T) {
-	tests := []struct {
-		name  string
-		param *ToolParam
-		want  map[string]interface{}
-	}{
-		{
-			name: "基本类型",
-			param: &ToolParam{
-				Name:        "name",
-				Type:        "string",
-				Description: "测试描述",
-				Default:     "默认值",
-				Required:    true,
-			},
-			want: map[string]interface{}{
-				"type":        "string",
-				"description": "测试描述",
-				"default":     "默认值",
-			},
-		},
-		{
-			name: "数组类型",
-			param: &ToolParam{
-				Name:        "items",
-				Type:        "array",
-				Description: "数组参数",
-				Required:    true,
-				ArrayItem: []*ToolParamValue{
-					{
-						Type:        "string",
-						Description: "字符串项",
-						Default:     "默认字符串",
-					},
-				},
-			},
-			want: map[string]interface{}{
-				"type":        "array",
-				"description": "数组参数",
-				"items": map[string]interface{}{
-					"type":        "string",
-					"description": "字符串项",
-					"default":     "默认字符串",
-				},
-			},
-		},
-		{
-			name: "嵌套数组类型",
-			param: &ToolParam{
-				Name:        "nestedArray",
-				Type:        "array",
-				Description: "嵌套数组",
-				Required:    true,
-				ArrayItem: []*ToolParamValue{
-					{
-						Type:        "array",
-						Description: "内部数组",
-						ArrayItems: []*ToolParamValue{
-							{
-								Type:        "number",
-								Description: "数字项",
-								Default:     float64(0),
-							},
-						},
-					},
-				},
-			},
-			want: map[string]interface{}{
-				"type":        "array",
-				"description": "嵌套数组",
-				"items": map[string]interface{}{
-					"type":        "array",
-					"description": "内部数组",
-					"items": map[string]interface{}{
-						"type":        "number",
-						"description": "数字项",
-						"default":     float64(0),
-					},
-				},
-			},
-		},
-		{
-			name: "空描述",
-			param: &ToolParam{
-				Name:     "emptyDesc",
-				Type:     "string",
-				Default:  "默认值",
-				Required: true,
-			},
-			want: map[string]interface{}{
-				"type":    "string",
-				"default": "默认值",
-			},
-		},
-		{
-			name: "无默认值",
-			param: &ToolParam{
-				Name:        "noDefault",
-				Type:        "string",
-				Description: "无默认值参数",
-				Required:    true,
-			},
-			want: map[string]interface{}{
-				"type":        "string",
-				"description": "无默认值参数",
-			},
-		},
-		{
-			name: "带特殊字符的描述",
-			param: &ToolParam{
-				Name:        "specialChars",
-				Type:        "string",
-				Description: "特殊字符：!@#$%^&*()_+{}[]|\"':;?/>.<,~`",
-				Required:    true,
-			},
-			want: map[string]interface{}{
-				"type":        "string",
-				"description": "特殊字符：!@#$%^&*()_+{}[]|\"':;?/>.<,~`",
-			},
-		},
-		{
-			name: "数字类型",
-			param: &ToolParam{
-				Name:        "numberParam",
-				Type:        "number",
-				Description: "数字参数",
-				Default:     float64(42),
-				Required:    true,
-			},
-			want: map[string]interface{}{
-				"type":        "number",
-				"description": "数字参数",
-				"default":     float64(42),
-			},
-		},
-		{
-			name: "布尔类型",
-			param: &ToolParam{
-				Name:        "boolParam",
-				Type:        "boolean",
-				Description: "布尔参数",
-				Default:     true,
-				Required:    true,
-			},
-			want: map[string]interface{}{
-				"type":        "boolean",
-				"description": "布尔参数",
-				"default":     true,
-			},
-		},
-		{
-			name: "空类型",
-			param: &ToolParam{
-				Name:        "emptyType",
-				Description: "空类型参数",
-				Required:    true,
-			},
-			want: map[string]interface{}{
-				"type":        "",
-				"description": "空类型参数",
-			},
-		},
-		{
-			name: "空数组项",
-			param: &ToolParam{
-				Name:        "emptyArray",
-				Type:        "array",
-				Description: "空数组项参数",
-				Required:    true,
-				ArrayItem:   []*ToolParamValue{},
-			},
-			want: map[string]interface{}{
-				"type":        "array",
-				"description": "空数组项参数",
-			},
-		},
-		{
-			name: "默认值为零值",
-			param: &ToolParam{
-				Name:        "zeroDefault",
-				Type:        "number",
-				Description: "零值默认值",
-				Default:     float64(0),
-				Required:    true,
-			},
-			want: map[string]interface{}{
-				"type":        "number",
-				"description": "零值默认值",
-				"default":     float64(0),
-			},
-		},
-		{
-			name: "默认值为false",
-			param: &ToolParam{
-				Name:        "falseBool",
-				Type:        "boolean",
-				Description: "false默认值",
-				Default:     false,
-				Required:    true,
-			},
-			want: map[string]interface{}{
-				"type":        "boolean",
-				"description": "false默认值",
-				"default":     false,
-			},
-		},
-		{
-			name: "默认值为空字符串",
-			param: &ToolParam{
-				Name:        "emptyString",
-				Type:        "string",
-				Description: "空字符串默认值",
-				Default:     "",
-				Required:    true,
-			},
-			want: map[string]interface{}{
-				"type":        "string",
-				"description": "空字符串默认值",
-				"default":     "",
-			},
-		},
-	}
+// func TestToolParam_GetJSONSchemaString(t *testing.T) {
+// 	tests := []struct {
+// 		name  string
+// 		param *ToolParam
+// 		want  map[string]interface{}
+// 	}{
+// 		{
+// 			name: "基本类型",
+// 			param: &ToolParam{
+// 				Name:        "name",
+// 				Type:        "string",
+// 				Description: "测试描述",
+// 				Default:     "默认值",
+// 				Required:    true,
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "string",
+// 				"description": "测试描述",
+// 				"default":     "默认值",
+// 			},
+// 		},
+// 		{
+// 			name: "数组类型",
+// 			param: &ToolParam{
+// 				Name:        "items",
+// 				Type:        "array",
+// 				Description: "数组参数",
+// 				Required:    true,
+// 				ArrayItem: []*ToolParamValue{
+// 					{
+// 						Type:        "string",
+// 						Description: "字符串项",
+// 						Default:     "默认字符串",
+// 					},
+// 				},
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "array",
+// 				"description": "数组参数",
+// 				"items": map[string]interface{}{
+// 					"type":        "string",
+// 					"description": "字符串项",
+// 					"default":     "默认字符串",
+// 				},
+// 			},
+// 		},
+// 		{
+// 			name: "嵌套数组类型",
+// 			param: &ToolParam{
+// 				Name:        "nestedArray",
+// 				Type:        "array",
+// 				Description: "嵌套数组",
+// 				Required:    true,
+// 				ArrayItem: []*ToolParamValue{
+// 					{
+// 						Type:        "array",
+// 						Description: "内部数组",
+// 						ArrayItems: []*ToolParamValue{
+// 							{
+// 								Type:        "number",
+// 								Description: "数字项",
+// 								Default:     float64(0),
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "array",
+// 				"description": "嵌套数组",
+// 				"items": map[string]interface{}{
+// 					"type":        "array",
+// 					"description": "内部数组",
+// 					"items": map[string]interface{}{
+// 						"type":        "number",
+// 						"description": "数字项",
+// 						"default":     float64(0),
+// 					},
+// 				},
+// 			},
+// 		},
+// 		{
+// 			name: "空描述",
+// 			param: &ToolParam{
+// 				Name:     "emptyDesc",
+// 				Type:     "string",
+// 				Default:  "默认值",
+// 				Required: true,
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":    "string",
+// 				"default": "默认值",
+// 			},
+// 		},
+// 		{
+// 			name: "无默认值",
+// 			param: &ToolParam{
+// 				Name:        "noDefault",
+// 				Type:        "string",
+// 				Description: "无默认值参数",
+// 				Required:    true,
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "string",
+// 				"description": "无默认值参数",
+// 			},
+// 		},
+// 		{
+// 			name: "带特殊字符的描述",
+// 			param: &ToolParam{
+// 				Name:        "specialChars",
+// 				Type:        "string",
+// 				Description: "特殊字符：!@#$%^&*()_+{}[]|\"':;?/>.<,~`",
+// 				Required:    true,
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "string",
+// 				"description": "特殊字符：!@#$%^&*()_+{}[]|\"':;?/>.<,~`",
+// 			},
+// 		},
+// 		{
+// 			name: "数字类型",
+// 			param: &ToolParam{
+// 				Name:        "numberParam",
+// 				Type:        "number",
+// 				Description: "数字参数",
+// 				Default:     float64(42),
+// 				Required:    true,
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "number",
+// 				"description": "数字参数",
+// 				"default":     float64(42),
+// 			},
+// 		},
+// 		{
+// 			name: "布尔类型",
+// 			param: &ToolParam{
+// 				Name:        "boolParam",
+// 				Type:        "boolean",
+// 				Description: "布尔参数",
+// 				Default:     true,
+// 				Required:    true,
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "boolean",
+// 				"description": "布尔参数",
+// 				"default":     true,
+// 			},
+// 		},
+// 		{
+// 			name: "空类型",
+// 			param: &ToolParam{
+// 				Name:        "emptyType",
+// 				Description: "空类型参数",
+// 				Required:    true,
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "",
+// 				"description": "空类型参数",
+// 			},
+// 		},
+// 		{
+// 			name: "空数组项",
+// 			param: &ToolParam{
+// 				Name:        "emptyArray",
+// 				Type:        "array",
+// 				Description: "空数组项参数",
+// 				Required:    true,
+// 				ArrayItem:   []*ToolParamValue{},
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "array",
+// 				"description": "空数组项参数",
+// 			},
+// 		},
+// 		{
+// 			name: "默认值为零值",
+// 			param: &ToolParam{
+// 				Name:        "zeroDefault",
+// 				Type:        "number",
+// 				Description: "零值默认值",
+// 				Default:     float64(0),
+// 				Required:    true,
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "number",
+// 				"description": "零值默认值",
+// 				"default":     float64(0),
+// 			},
+// 		},
+// 		{
+// 			name: "默认值为false",
+// 			param: &ToolParam{
+// 				Name:        "falseBool",
+// 				Type:        "boolean",
+// 				Description: "false默认值",
+// 				Default:     false,
+// 				Required:    true,
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "boolean",
+// 				"description": "false默认值",
+// 				"default":     false,
+// 			},
+// 		},
+// 		{
+// 			name: "默认值为空字符串",
+// 			param: &ToolParam{
+// 				Name:        "emptyString",
+// 				Type:        "string",
+// 				Description: "空字符串默认值",
+// 				Default:     "",
+// 				Required:    true,
+// 			},
+// 			want: map[string]interface{}{
+// 				"type":        "string",
+// 				"description": "空字符串默认值",
+// 				"default":     "",
+// 			},
+// 		},
+// 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := tt.param.GetJSONSchemaString()
-			fmt.Println(result)
-			var got map[string]interface{}
-			if err := json.Unmarshal([]byte(result), &got); err != nil {
-				t.Errorf("无法解析JSON结果: %v", err)
-				return
-			}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			result := tt.param.GetJSONSchemaString()
+// 			fmt.Println(result)
+// 			var got map[string]interface{}
+// 			if err := json.Unmarshal([]byte(result), &got); err != nil {
+// 				t.Errorf("无法解析JSON结果: %v", err)
+// 				return
+// 			}
 
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetJSONSchemaString() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+// 			if !reflect.DeepEqual(got, tt.want) {
+// 				t.Errorf("GetJSONSchemaString() = %v, want %v", got, tt.want)
+// 			}
+// 		})
+// 	}
+// }
 
 func TestTool_ToJSONSchemaString(t *testing.T) {
 	tests := []struct {
@@ -256,25 +256,18 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 	}{
 		{
 			name: "简单工具",
-			tool: &Tool{
-				Name:        "testTool",
-				Description: "测试工具",
-				Params: []*ToolParam{
-					{
-						Name:        "param1",
-						Type:        "string",
-						Description: "字符串参数",
-						Required:    true,
-					},
-					{
-						Name:        "param2",
-						Type:        "number",
-						Description: "数字参数",
-						Default:     float64(42),
-						Required:    false,
-					},
-				},
-			},
+			tool: newTool("testTool",
+				WithTool_Description("测试工具"),
+				WithTool_Callback(testCallback),
+				WithTool_StringParam("param1",
+					WithParam_Description("字符串参数"),
+					WithParam_Required(),
+				),
+				WithTool_NumberParam("param2",
+					WithParam_Description("数字参数"),
+					WithParam_Default(42),
+				),
+			),
 			want: map[string]interface{}{
 				"$schema":     "http://json-schema.org/draft-07/schema#",
 				"type":        "object",
@@ -312,24 +305,17 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 		},
 		{
 			name: "带数组参数的工具",
-			tool: &Tool{
-				Name:        "arrayTool",
-				Description: "带数组的工具",
-				Params: []*ToolParam{
-					{
-						Name:        "stringArray",
-						Type:        "array",
-						Description: "字符串数组",
-						Required:    true,
-						ArrayItem: []*ToolParamValue{
-							{
-								Type:        "string",
-								Description: "数组中的字符串",
-							},
-						},
+			tool: newTool("arrayTool",
+				WithTool_Description("带数组的工具"),
+				WithTool_Callback(testCallback),
+				WithTool_StringArrayParamEx("stringArray",
+					[]PropertyOption{
+						WithParam_Description("字符串数组"),
+						WithParam_Required(),
 					},
-				},
-			},
+					WithParam_Description("数组中的字符串"),
+				),
+			),
 			want: map[string]interface{}{
 				"$schema":     "http://json-schema.org/draft-07/schema#",
 				"type":        "object",
@@ -366,11 +352,10 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 		},
 		{
 			name: "无参数工具",
-			tool: &Tool{
-				Name:        "noParamTool",
-				Description: "无参数工具",
-				Params:      []*ToolParam{},
-			},
+			tool: newTool("noParamTool",
+				WithTool_Description("无参数工具"),
+				WithTool_Callback(testCallback),
+			),
 			want: map[string]interface{}{
 				"$schema":     "http://json-schema.org/draft-07/schema#",
 				"type":        "object",
@@ -392,16 +377,12 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 		},
 		{
 			name: "无描述工具",
-			tool: &Tool{
-				Name: "noDescTool",
-				Params: []*ToolParam{
-					{
-						Name:     "param1",
-						Type:     "string",
-						Required: true,
-					},
-				},
-			},
+			tool: newTool("noDescTool",
+				WithTool_Callback(testCallback),
+				WithTool_StringParam("param1",
+					WithParam_Required(),
+				),
+			),
 			want: map[string]interface{}{
 				"$schema": "http://json-schema.org/draft-07/schema#",
 				"type":    "object",
@@ -432,44 +413,29 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 		},
 		{
 			name: "多种类型参数工具",
-			tool: &Tool{
-				Name:        "multiTypeTool",
-				Description: "多种类型参数工具",
-				Params: []*ToolParam{
-					{
-						Name:        "stringParam",
-						Type:        "string",
-						Description: "字符串参数",
-						Required:    true,
-					},
-					{
-						Name:        "numberParam",
-						Type:        "number",
-						Description: "数字参数",
-						Default:     float64(42),
-						Required:    false,
-					},
-					{
-						Name:        "booleanParam",
-						Type:        "boolean",
-						Description: "布尔参数",
-						Default:     true,
-						Required:    true,
-					},
-					{
-						Name:        "objectParam",
-						Type:        "object",
-						Description: "对象参数",
-						Required:    false,
-					},
-					{
-						Name:        "nullParam",
-						Type:        "null",
-						Description: "空参数",
-						Required:    false,
-					},
-				},
-			},
+			tool: newTool("multiTypeTool",
+				WithTool_Description("多种类型参数工具"),
+				WithTool_Callback(testCallback),
+				WithTool_StringParam("stringParam",
+					WithParam_Description("字符串参数"),
+					WithParam_Required(),
+				),
+				WithTool_NumberParam("numberParam",
+					WithParam_Description("数字参数"),
+					WithParam_Default(42),
+				),
+				WithTool_BoolParam("booleanParam",
+					WithParam_Description("布尔参数"),
+					WithParam_Default(true),
+					WithParam_Required(),
+				),
+				WithTool_StructParam("objectParam", []PropertyOption{
+					WithParam_Description("对象参数"),
+				}),
+				WithTool_NullParam("nullParam",
+					WithParam_Description("空参数"),
+				),
+			),
 			want: map[string]interface{}{
 				"$schema":     "http://json-schema.org/draft-07/schema#",
 				"type":        "object",
@@ -520,18 +486,14 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 		},
 		{
 			name: "特殊名称工具",
-			tool: &Tool{
-				Name:        "special-tool-名称",
-				Description: "带有特殊字符的工具名称",
-				Params: []*ToolParam{
-					{
-						Name:        "special_param-名称",
-						Type:        "string",
-						Description: "带有特殊字符的参数名称",
-						Required:    true,
-					},
-				},
-			},
+			tool: newTool("special-tool-名称",
+				WithTool_Description("带有特殊字符的工具名称"),
+				WithTool_Callback(testCallback),
+				WithTool_StringParam("special_param-名称",
+					WithParam_Description("带有特殊字符的参数名称"),
+					WithParam_Required(),
+				),
+			),
 			want: map[string]interface{}{
 				"$schema":     "http://json-schema.org/draft-07/schema#",
 				"type":        "object",
@@ -583,24 +545,18 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 
 // 测试复杂的嵌套结构
 func TestComplexNestedStructures(t *testing.T) {
-	complexTool := &Tool{
-		Name:        "complexTool",
-		Description: "复杂嵌套结构工具",
-		Params: []*ToolParam{
-			{
-				Name:        "complexParam",
-				Type:        "array",
-				Description: "复杂参数",
-				Required:    true,
-				ArrayItem: []*ToolParamValue{
-					{
-						Type:        "object",
-						Description: "对象项",
-					},
-				},
-			},
+	complexTool := newTool("complexTool",
+		WithTool_Description("复杂嵌套结构工具"),
+		WithTool_Callback(testCallback),
+		WithTool_ArrayParamEx("complexParam", []PropertyOption{
+			WithParam_Description("复杂参数"),
+			WithParam_Required(),
 		},
-	}
+			WithTool_StructParam("objectItem", []PropertyOption{
+				WithParam_Description("对象项"),
+			}),
+		),
+	)
 
 	result := complexTool.ToJSONSchemaString()
 	fmt.Println(result)
@@ -689,38 +645,25 @@ func TestComplexNestedStructures(t *testing.T) {
 
 // 测试超深层嵌套结构
 func TestDeepNestedStructures(t *testing.T) {
-	deepNestedTool := &Tool{
-		Name:        "deepNestedTool",
-		Description: "深层嵌套结构工具",
-		Params: []*ToolParam{
-			{
-				Name:        "deepNested",
-				Type:        "array",
-				Description: "深层嵌套参数",
-				Required:    true,
-				ArrayItem: []*ToolParamValue{
-					{
-						Type:        "array",
-						Description: "第一层嵌套",
-						ArrayItems: []*ToolParamValue{
-							{
-								Type:        "array",
-								Description: "第二层嵌套",
-								ArrayItems: []*ToolParamValue{
-									{
-										Type:        "string",
-										Description: "最内层参数",
-										Default:     "内层默认值",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+	deepNestedTool := newTool(
+		"deepNestedTool",
+		WithTool_Description("深层嵌套结构工具"),
+		WithTool_Callback(testCallback),
+		WithTool_ArrayParamEx("deepNested", []PropertyOption{
+			WithParam_Description("深层嵌套参数"),
 		},
-	}
-
+			WithTool_ArrayParamEx("first", []PropertyOption{
+				WithParam_Description("第一层嵌套"),
+			},
+				WithTool_StringArrayParamEx("second", []PropertyOption{
+					WithParam_Description("第二层嵌套"),
+				},
+					WithParam_Description("最内层参数"),
+					WithParam_Default("内层默认值"),
+				),
+			),
+		),
+	)
 	result := deepNestedTool.ToJSONSchemaString()
 	fmt.Println(result)
 
@@ -743,9 +686,7 @@ func TestDeepNestedStructures(t *testing.T) {
 
 // 测试空工具
 func TestEmptyTool(t *testing.T) {
-	emptyTool := &Tool{
-		Name: "",
-	}
+	emptyTool := newTool("")
 
 	result := emptyTool.ToJSONSchemaString()
 	fmt.Println(result)
@@ -777,20 +718,7 @@ func TestEmptyTool(t *testing.T) {
 
 // 测试极端情况：全部为零值或空值
 func TestAllEmptyValues(t *testing.T) {
-	emptyValuesTool := &Tool{
-		Name:        "",
-		Description: "",
-		Params: []*ToolParam{
-			{
-				Name:        "",
-				Type:        "",
-				Description: "",
-				Default:     nil,
-				Required:    false,
-				ArrayItem:   nil,
-			},
-		},
-	}
+	emptyValuesTool := newTool("")
 
 	result := emptyValuesTool.ToJSONSchemaString()
 	fmt.Println(result)
@@ -808,23 +736,18 @@ func TestAllEmptyValues(t *testing.T) {
 // 测试JSON结构合法性
 func TestJSONSchemaValidity(t *testing.T) {
 	tools := []*Tool{
-		{
-			Name:        "validationTool1",
-			Description: "验证工具1",
-			Params:      []*ToolParam{},
-		},
-		{
-			Name:        "validationTool2",
-			Description: "验证工具2",
-			Params: []*ToolParam{
-				{
-					Name:        "param1",
-					Type:        "string",
-					Description: "参数1",
-					Required:    true,
-				},
-			},
-		},
+		newTool("validationTool1",
+			WithTool_Description("验证工具1"),
+			WithTool_Callback(testCallback),
+		),
+		newTool("validationTool2",
+			WithTool_Description("验证工具2"),
+			WithTool_Callback(testCallback),
+			WithTool_StringParam("param1",
+				WithParam_Required(),
+				WithParam_Description("参数1"),
+			),
+		),
 	}
 
 	for _, tool := range tools {

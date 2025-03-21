@@ -5,48 +5,28 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 )
 
 // InvokeCallback 定义工具调用回调函数的签名
-type InvokeCallback func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error)
+type InvokeCallback func(params map[string]any, stdout io.Writer, stderr io.Writer) (any, error)
 
 type Tool struct {
-	Name        string
-	Description string
-	Params      []*ToolParam
-	Callback    InvokeCallback // 添加回调函数字段
-}
-
-type ToolParam struct {
-	Name        string
-	Type        string
-	Description string
-	Default     any
-	Required    bool
-	ArrayItem   []*ToolParamValue
-}
-
-type ToolParamValue struct {
-	Type        string
-	Description string
-	Default     any
-	ArrayItems  []*ToolParamValue
+	*mcp.Tool
+	Callback InvokeCallback // 添加回调函数字段
 }
 
 // ToolOption 定义工具选项函数的类型
 type ToolOption func(*Tool)
 
+// PropertyOption 定义属性选项函数的类型
+type PropertyOption func(map[string]any)
+
 // NewTool 使用函数选项模式创建一个新的Tool实例
 func NewTool(name string, options ...ToolOption) (*Tool, error) {
-	tool := &Tool{
-		Name:   name,
-		Params: []*ToolParam{},
-	}
-
-	// 应用所有选项
-	for _, option := range options {
-		option(tool)
-	}
+	tool := newTool(name, options...)
 
 	// 检查是否设置了回调函数
 	if tool.Callback == nil {
@@ -56,17 +36,23 @@ func NewTool(name string, options ...ToolOption) (*Tool, error) {
 	return tool, nil
 }
 
+func newTool(name string, options ...ToolOption) *Tool {
+	tool := &Tool{
+		Tool: mcp.NewTool(name),
+	}
+
+	// 应用所有选项
+	for _, option := range options {
+		option(tool)
+	}
+
+	return tool
+}
+
 // WithTool_Description 设置工具的描述信息
 func WithTool_Description(description string) ToolOption {
 	return func(t *Tool) {
 		t.Description = description
-	}
-}
-
-// WithTool_Param 添加一个参数到工具
-func WithTool_Param(param *ToolParam) ToolOption {
-	return func(t *Tool) {
-		t.Params = append(t.Params, param)
 	}
 }
 
@@ -77,245 +63,372 @@ func WithTool_Callback(callback InvokeCallback) ToolOption {
 	}
 }
 
-// NewToolParam 创建一个新的工具参数
-func NewToolParam(name string, paramType string, options ...ToolParamOption) *ToolParam {
-	param := &ToolParam{
-		Name: name,
-		Type: paramType,
-	}
-
-	// 应用所有参数选项
-	for _, option := range options {
-		option(param)
-	}
-
-	return param
-}
-
-// ToolParamOption 定义参数选项函数的类型
-type ToolParamOption func(*ToolParam)
-
-// WithTool_ParamDescription 设置参数的描述信息
-func WithTool_ParamDescription(description string) ToolParamOption {
-	return func(p *ToolParam) {
-		p.Description = description
+// WithParam_Description adds a description to a property in the JSON Schema.
+// The description should explain the purpose and expected values of the property.
+func WithParam_Description(desc string) PropertyOption {
+	return func(schema map[string]any) {
+		schema["description"] = desc
 	}
 }
 
-// WithTool_ParamDefault 设置参数的默认值
-func WithTool_ParamDefault(defaultValue any) ToolParamOption {
-	return func(p *ToolParam) {
-		p.Default = defaultValue
+// WithParam_RequireTool adds a ATTENTION description to a property in the JSON Schema.
+// require tool description means prerequisites for running this tool
+func WithParam_RequireTool(tool string) PropertyOption {
+	return func(schema map[string]any) {
+		requireToolMessage := fmt.Sprintf("<ATTENTION> before call this tool, please call %s tool first </ATTENTION>", tool)
+		if i, ok := schema["description"]; ok {
+			schema["description"] = fmt.Sprintf("%s %s", i, requireToolMessage)
+		} else {
+			schema["description"] = requireToolMessage
+		}
 	}
 }
 
-// WithTool_ParamRequired 设置参数是否必需
-func WithTool_ParamRequired(required bool) ToolParamOption {
-	return func(p *ToolParam) {
-		p.Required = required
+// WithParam_Default sets the default value for a property.
+// This value will be used if the property is not explicitly provided.
+func WithParam_Default(desc any) PropertyOption {
+	return func(schema map[string]any) {
+		schema["default"] = desc
 	}
 }
 
-// WithTool_ArrayItem 设置数组类型参数的元素类型
-func WithTool_ArrayItem(arrayItem *ToolParamValue) ToolParamOption {
-	return func(p *ToolParam) {
-		p.ArrayItem = append(p.ArrayItem, arrayItem)
+// WithParam_Required marks a property as required in the tool's input schema.
+// WithParam_Required properties must be provided when using the tool.
+func WithParam_Required(required ...bool) PropertyOption {
+	return func(schema map[string]any) {
+		if len(required) > 0 {
+			schema["required"] = required[0]
+		} else {
+			schema["required"] = true
+		}
 	}
 }
 
-// NewToolParamValue 创建一个参数值
-func NewToolParamValue(valueType string, options ...ToolParamValueOption) *ToolParamValue {
-	value := &ToolParamValue{
-		Type: valueType,
-	}
-
-	// 应用所有值选项
-	for _, option := range options {
-		option(value)
-	}
-
-	return value
-}
-
-// ToolParamValueOption 定义参数值选项函数的类型
-type ToolParamValueOption func(*ToolParamValue)
-
-// WithTool_ValueDescription 设置值的描述信息
-func WithTool_ValueDescription(description string) ToolParamValueOption {
-	return func(v *ToolParamValue) {
-		v.Description = description
+// WithParam_Title adds a display-friendly title to a property in the JSON Schema.
+// This title can be used by UI components to show a more readable property name.
+func WithParam_Title(title string) PropertyOption {
+	return func(schema map[string]any) {
+		schema["title"] = title
 	}
 }
 
-// WithTool_ValueDefault 设置值的默认值
-func WithTool_ValueDefault(defaultValue any) ToolParamValueOption {
-	return func(v *ToolParamValue) {
-		v.Default = defaultValue
+//
+// String Property Options
+//
+
+// WithParam_Enum specifies a list of allowed values for a string property.
+// The property value must be one of the specified enum values.
+func WithParam_Enum(values ...any) PropertyOption {
+	return func(schema map[string]any) {
+		schema["enum"] = values
 	}
 }
 
-// WithTool_ValueArrayItems 设置数组值的元素类型
-func WithTool_ValueArrayItems(arrayItems []*ToolParamValue) ToolParamValueOption {
-	return func(v *ToolParamValue) {
-		v.ArrayItems = arrayItems
+func WithParam_EnumString(values ...string) PropertyOption {
+	return func(schema map[string]any) {
+		schema["enum"] = lo.Map(values, func(item string, _ int) any { return item })
 	}
 }
 
-// GetJSONSchemaString 将ToolParam转换为JSON Schema格式的字符串
-func (t *ToolParam) GetJSONSchemaString() string {
-	schema := map[string]interface{}{
-		"type": t.Type,
+// WithParam_MaxLength sets the maximum length for a string property.
+// The string value must not exceed this length.
+func WithParam_MaxLength(max int) PropertyOption {
+	return func(schema map[string]any) {
+		schema["maxLength"] = max
 	}
+}
 
-	if t.Description != "" {
-		schema["description"] = t.Description
+// WithParam_MinLength sets the minimum length for a string property.
+// The string value must be at least this length.
+func WithParam_MinLength(min int) PropertyOption {
+	return func(schema map[string]any) {
+		schema["minLength"] = min
 	}
+}
 
-	if t.Default != nil {
-		schema["default"] = t.Default
+// WithParam_Pattern sets a regex pattern that a string property must match.
+// The string value must conform to the specified regular expression.
+func WithParam_Pattern(pattern string) PropertyOption {
+	return func(schema map[string]any) {
+		schema["pattern"] = pattern
 	}
+}
 
-	// 处理数组类型
-	if t.Type == "array" && len(t.ArrayItem) > 0 {
-		items := make(map[string]interface{})
+//
+// Number Property Options
+//
 
-		// 使用第一个ArrayItem元素作为数组项的类型
-		firstItem := t.ArrayItem[0]
-		items["type"] = firstItem.Type
+// WithParam_Max sets the maximum value for a number property.
+// The number value must not exceed this maximum.
+func WithParam_Max(max float64) PropertyOption {
+	return func(schema map[string]any) {
+		schema["maximum"] = max
+	}
+}
 
-		if firstItem.Description != "" {
-			items["description"] = firstItem.Description
+// WithParam_Min sets the minimum value for a number property.
+// The number value must not be less than this minimum.
+func WithParam_Min(min float64) PropertyOption {
+	return func(schema map[string]any) {
+		schema["minimum"] = min
+	}
+}
+
+// WithParam_MultipleOf specifies that a number must be a multiple of the given value.
+// The number value must be divisible by this value.
+func WithParam_MultipleOf(value float64) PropertyOption {
+	return func(schema map[string]any) {
+		schema["multipleOf"] = value
+	}
+}
+
+//
+// Property Type Helpers
+//
+
+// WithTool_BoolParam adds a boolean property to the tool schema.
+// It accepts property options to configure the boolean property's behavior and constraints.
+func WithTool_BoolParam(name string, opts ...PropertyOption) ToolOption {
+	schema := map[string]any{
+		"type": "boolean",
+	}
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+// WithTool_IntegerParam adds a integer property to the tool schema.
+// It accepts property options to configure the integer property's behavior and constraints.
+func WithTool_IntegerParam(name string, opts ...PropertyOption) ToolOption {
+	schema := map[string]any{
+		"type": "integer",
+	}
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+// WithTool_NumberParam adds a number property to the tool schema.
+// It accepts property options to configure the number property's behavior and constraints.
+func WithTool_NumberParam(name string, opts ...PropertyOption) ToolOption {
+	schema := map[string]any{
+		"type": "number",
+	}
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+// WithTool_StringParam adds a string property to the tool schema.
+// It accepts property options to configure the string property's behavior and constraints.
+func WithTool_StringParam(name string, opts ...PropertyOption) ToolOption {
+	schema := map[string]any{
+		"type": "string",
+	}
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+// WithTool_StringArrayParam adds a string array property to the tool schema.
+// It accepts property options to configure the string-array property's behavior and constraints.
+func WithTool_StringArrayParam(name string, opts ...PropertyOption) ToolOption {
+	return WithTool_SimpleArrayParam(name, "string", opts...)
+}
+
+func WithTool_StringArrayParamEx(name string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
+	return WithTool_ArrayParam(name, "string", opts, itemsOpt...)
+}
+
+// WithTool_NumberArrayParam adds a number array property to the tool schema.
+// It accepts property options to configure the number-array property's behavior and constraints.
+func WithTool_NumberArrayParam(name string, opts ...PropertyOption) ToolOption {
+	return WithTool_SimpleArrayParam(name, "number", opts...)
+}
+
+func WithTool_SimpleArrayParam(name string, itemType string, opts ...PropertyOption) ToolOption {
+	schema := map[string]any{
+		"type": "array",
+		"items": map[string]any{
+			"type": itemType,
+		},
+	}
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+func WithTool_StructArrayParam(name string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
+	return WithTool_ArrayParam(name, "object", opts, itemsOpt...)
+}
+
+func WithTool_ArrayParam(name string, itemType string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
+	itemMap := map[string]any{
+		"type": itemType,
+	}
+	m := WithTool_RawParam(name, itemMap, itemsOpt...)
+	return WithTool_ArrayParamEx(name, opts, m)
+}
+
+func WithTool_ArrayParamEx(name string, opts []PropertyOption, itemsOpt ToolOption) ToolOption {
+	schema := map[string]any{
+		"type": "array",
+	}
+	temp := newTool("", itemsOpt)
+	for _, v := range temp.InputSchema.Properties {
+		schema["items"] = v
+	}
+	if len(temp.InputSchema.Required) > 0 {
+		schema["required"] = temp.InputSchema.Required
+
+	}
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+func WithTool_StructParam(name string, opts []PropertyOption, itemsOpt ...ToolOption) ToolOption {
+	schema := map[string]any{
+		"type": "object",
+	}
+	temp := newTool("", itemsOpt...)
+	if len(temp.InputSchema.Properties) > 0 {
+		schema["properties"] = temp.InputSchema.Properties
+	}
+	if len(temp.InputSchema.Required) > 0 {
+		schema["required"] = temp.InputSchema.Required
+	}
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+func WithTool_NullParam(name string, opts ...PropertyOption) ToolOption {
+	schema := map[string]any{
+		"type": "null",
+	}
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+// WithTool_OneOfStructParam
+func WithTool_OneOfStructParam(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
+	schema := map[string]any{
+		"type": "object",
+	}
+	oneOfArray := make([]any, 0, len(itemsOpt))
+	for _, itemOpt := range itemsOpt {
+		temp := newTool("", itemOpt...)
+		m := map[string]any{
+			"properties": temp.InputSchema.Properties,
+			"required":   temp.InputSchema.Required,
+		}
+		oneOfArray = append(oneOfArray, m)
+	}
+	schema["oneOf"] = oneOfArray
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+// WithTool_AnyOfStructParam
+func WithTool_AnyOfStructParam(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
+	schema := map[string]any{
+		"type": "object",
+	}
+	anyOfArray := make([]any, 0, len(itemsOpt))
+	for _, itemOpt := range itemsOpt {
+		temp := newTool("", itemOpt...)
+		m := map[string]any{
+			"properties": temp.InputSchema.Properties,
+			"required":   temp.InputSchema.Required,
+		}
+		anyOfArray = append(anyOfArray, m)
+	}
+	schema["anyOf"] = anyOfArray
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+func WithTool_PagingParam(name string, fieldNames []string, opts ...PropertyOption) ToolOption {
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"page": map[string]any{
+				"type": "number",
+			},
+			"limit": map[string]any{
+				"type": "number",
+			},
+			"order": map[string]any{
+				"type": "string",
+				"enum": fieldNames,
+			},
+			"orderby": map[string]any{
+				"type": "string",
+			},
+		},
+	}
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+func WithTool_KVPairsParam(name string, opts ...PropertyOption) ToolOption {
+	schema := map[string]any{
+		"type": "array",
+		"items": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"key": map[string]any{
+					"type": "string",
+				},
+				"value": map[string]any{
+					"type": "string",
+				},
+			},
+		},
+	}
+	return WithTool_RawParam(name, schema, opts...)
+}
+
+// WithTool_RawParam adds a custom object property to the tool schema.
+// It accepts property options to configure the object property's behavior and constraints.
+func WithTool_RawParam(name string, object map[string]any, opts ...PropertyOption) ToolOption {
+	return func(t *Tool) {
+		for _, opt := range opts {
+			opt(object)
 		}
 
-		if firstItem.Default != nil {
-			items["default"] = firstItem.Default
-		}
-
-		// 如果数组项本身是一个数组
-		if firstItem.Type == "array" && len(firstItem.ArrayItems) > 0 {
-			nestedItems := make(map[string]interface{})
-			nestedFirstItem := firstItem.ArrayItems[0]
-			nestedItems["type"] = nestedFirstItem.Type
-
-			if nestedFirstItem.Description != "" {
-				nestedItems["description"] = nestedFirstItem.Description
+		// Remove required from property schema and add to InputSchema.required
+		if required, ok := object["required"].(bool); ok && required {
+			delete(object, "required")
+			if t.InputSchema.Required == nil {
+				t.InputSchema.Required = []string{name}
+			} else {
+				t.InputSchema.Required = append(t.InputSchema.Required, name)
 			}
-
-			if nestedFirstItem.Default != nil {
-				nestedItems["default"] = nestedFirstItem.Default
-			}
-
-			items["items"] = nestedItems
 		}
 
-		schema["items"] = items
+		t.InputSchema.Properties[name] = object
 	}
+}
 
-	jsonBytes, err := json.Marshal(schema)
-	if err != nil {
-		return fmt.Sprintf("Error: %v", err)
-	}
-
-	return string(jsonBytes)
+func (t *Tool) Params() map[string]any {
+	return t.Tool.InputSchema.Properties
 }
 
 // ToJSONSchema 将整个Tool转换为符合JSON Schema Draft-07规范的格式
-func (t *Tool) ToJSONSchema() map[string]interface{} {
+func (t *Tool) ToJSONSchema() map[string]any {
 	// 构建工具参数的properties
-	properties := make(map[string]interface{})
+	properties := make(map[string]any)
 
 	// 添加@action字段
-	properties["@action"] = map[string]interface{}{
+	properties["@action"] = map[string]any{
 		"const":       "call-tool",
 		"description": "标识当前操作的具体类型",
 	}
 
 	// 添加tool字段
-	properties["tool"] = map[string]interface{}{
+	properties["tool"] = map[string]any{
 		"type":        "string",
 		"description": "你想要选择的工具名",
 		"const":       t.Name,
 	}
 
-	// 增加参数字段
-	paramProperties := make(map[string]interface{})
-	paramRequired := []string{}
-
-	for _, param := range t.Params {
-		paramSchema := map[string]interface{}{}
-
-		if param.Type != "" {
-			paramSchema["type"] = param.Type
-		}
-
-		if param.Description != "" {
-			paramSchema["description"] = param.Description
-		}
-
-		if param.Default != nil {
-			paramSchema["default"] = param.Default
-		}
-
-		// 处理数组类型
-		if param.Type == "array" && len(param.ArrayItem) > 0 {
-			items := make(map[string]interface{})
-
-			// 使用第一个ArrayItem元素作为数组项的类型
-			firstItem := param.ArrayItem[0]
-			items["type"] = firstItem.Type
-
-			if firstItem.Description != "" {
-				items["description"] = firstItem.Description
-			}
-
-			if firstItem.Default != nil {
-				items["default"] = firstItem.Default
-			}
-
-			// 如果数组项本身是一个数组
-			if firstItem.Type == "array" && len(firstItem.ArrayItems) > 0 {
-				nestedItems := make(map[string]interface{})
-				nestedFirstItem := firstItem.ArrayItems[0]
-				nestedItems["type"] = nestedFirstItem.Type
-
-				if nestedFirstItem.Description != "" {
-					nestedItems["description"] = nestedFirstItem.Description
-				}
-
-				if nestedFirstItem.Default != nil {
-					nestedItems["default"] = nestedFirstItem.Default
-				}
-
-				items["items"] = nestedItems
-			}
-
-			paramSchema["items"] = items
-		}
-
-		paramProperties[param.Name] = paramSchema
-
-		if param.Required {
-			paramRequired = append(paramRequired, param.Name)
-		}
-	}
-
+	paramProperties := t.Tool.InputSchema.Properties
 	// 将参数添加到params字段
 	if len(paramProperties) > 0 {
-		paramsSchema := map[string]interface{}{
+		properties["params"] = map[string]any{
 			"type":        "object",
-			"properties":  paramProperties,
 			"description": "工具的参数",
+			"properties":  paramProperties,
+			"required":    t.InputSchema.Required,
 		}
-
-		if len(paramRequired) > 0 {
-			paramsSchema["required"] = paramRequired
-		}
-
-		properties["params"] = paramsSchema
 	}
 
 	// 构建最终的JSON Schema
-	schema := map[string]interface{}{
+	schema := map[string]any{
 		"$schema":              "http://json-schema.org/draft-07/schema#",
 		"type":                 "object",
 		"properties":           properties,
@@ -341,49 +454,3 @@ func (t *Tool) ToJSONSchemaString() string {
 
 	return string(jsonBytes)
 }
-
-/*
-示例用法:
-
-```go
-// 创建一个简单的工具
-simpleTool := NewTool("simpleSearch",
-	WithTool_Description("一个简单的搜索工具"))
-
-// 创建一个包含参数的工具
-searchTool := NewTool("search",
-	WithTool_Description("搜索特定内容的工具"),
-	WithTool_Param(
-		NewToolParam("query", "string",
-			WithTool_ParamDescription("要搜索的查询字符串"),
-			WithTool_ParamRequired(true),
-		),
-	),
-	WithTool_Param(
-		NewToolParam("limit", "integer",
-			WithTool_ParamDescription("返回结果的最大数量"),
-			WithTool_ParamDefault(10),
-		),
-	),
-)
-
-// 创建一个包含数组参数的工具
-arrayParamTool := NewTool("complexSearch",
-	WithTool_Description("高级搜索工具"),
-	WithTool_Param(
-		NewToolParam("queries", "array",
-			WithTool_ParamDescription("要搜索的多个查询"),
-			WithTool_ArrayItem(
-				NewToolParamValue("string",
-					WithTool_ValueDescription("查询字符串"),
-				),
-			),
-		),
-	),
-)
-
-// 转换为JSON Schema字符串
-schemaStr := searchTool.ToJSONSchemaString()
-fmt.Println(schemaStr)
-```
-*/

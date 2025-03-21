@@ -49,27 +49,21 @@ func ExampleSearchTool() {
 	searchTool, err := NewTool("search",
 		WithTool_Description("通用搜索工具"),
 		WithTool_Callback(searchCallback),
-		WithTool_Param(
-			NewToolParam("query", "string",
-				WithTool_ParamDescription("搜索查询字符串"),
-				WithTool_ParamRequired(true),
-			),
+		WithTool_StringParam("query",
+			WithParam_Description("搜索查询字符串"),
+			WithParam_Required(),
 		),
-		WithTool_Param(
-			NewToolParam("limit", "number",
-				WithTool_ParamDescription("返回结果数量限制"),
-				WithTool_ParamDefault(5),
-			),
+		WithTool_NumberParam("limit",
+			WithParam_Description("返回结果数量限制"),
+			WithParam_Default(5),
 		),
-		WithTool_Param(
-			NewToolParam("tags", "array",
-				WithTool_ParamDescription("搜索标签"),
-				WithTool_ArrayItem(
-					NewToolParamValue("string",
-						WithTool_ValueDescription("标签名"),
-					),
-				),
-			),
+		WithTool_StringArrayParamEx("tags",
+			[]PropertyOption{
+				WithParam_Description("搜索标签"),
+				WithParam_Required(),
+			},
+			WithParam_Description("标签名"),
+			WithParam_Required(),
 		),
 	)
 
@@ -222,7 +216,7 @@ func ExampleJSONDefinedTool() {
 	fmt.Println("\nJSON创建的工具:")
 	fmt.Printf("名称: %s\n", calcTool.Name)
 	fmt.Printf("描述: %s\n", calcTool.Description)
-	fmt.Printf("参数数量: %d\n", len(calcTool.Params))
+	fmt.Printf("参数数量: %d\n", len(calcTool.Params()))
 
 	// 使用工具
 	jsonInput := `{
