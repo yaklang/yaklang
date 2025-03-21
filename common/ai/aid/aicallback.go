@@ -45,18 +45,6 @@ type OutputStream struct {
 
 type AIRequestOption func(req *AIRequest)
 
-func WithAIRequest_TaskContext(ctx *taskContext) AIRequestOption {
-	return func(req *AIRequest) {
-		req.ctx = ctx
-	}
-}
-
-func WithAIRequest_ShouldHaveAction(shouldHaveAction bool) AIRequestOption {
-	return func(req *AIRequest) {
-		req.shouldHaveAction = shouldHaveAction
-	}
-}
-
 func NewAIRequest(prompt string, opt ...AIRequestOption) *AIRequest {
 	req := &AIRequest{
 		prompt: prompt,
