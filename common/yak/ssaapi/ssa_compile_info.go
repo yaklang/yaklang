@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/coreos/etcd/pkg/fileutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -155,7 +154,8 @@ func gitFs(info *config_info, process func(float64, string, ...any)) (fi.FileSys
 		return nil, err
 	}
 	targetPath := filepath.Join(local, info.GitPath)
-	if !fileutil.Exist(targetPath) {
+	_, err := os.Stat(targetPath)
+	if err != nil {
 		log.Errorf("not found this path,start compile local path")
 		targetPath = local
 	}
