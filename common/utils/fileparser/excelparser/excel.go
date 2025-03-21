@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/xuri/excelize/v2"
+	excelize "github.com/xuri/excelize/v2"
 	"github.com/yaklang/yaklang/common/log"
 )
 
