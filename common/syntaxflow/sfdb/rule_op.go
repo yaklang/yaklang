@@ -291,20 +291,6 @@ func GetRulePure(ruleName string) (*schema.SyntaxFlowRule, error) {
 	return &rule, nil
 }
 
-func GetAllRules() ([]*schema.SyntaxFlowRule, error) {
-	db := consts.GetGormProfileDatabase()
-	db = db.Where("allow_included = false")
-
-	var rules []*schema.SyntaxFlowRule
-	for r := range YieldSyntaxFlowRules(db, context.Background()) {
-		rules = append(rules, r)
-	}
-	if len(rules) == 0 {
-		return nil, gorm.ErrRecordNotFound
-	}
-	return rules, nil
-}
-
 func GetRules(ruleNameGlob string) ([]*schema.SyntaxFlowRule, error) {
 	db := consts.GetGormProfileDatabase()
 	db = db.Where("(rule_name like ?) and (allow_included = false)", "%"+fmt.Sprint(ruleNameGlob)+"%")
