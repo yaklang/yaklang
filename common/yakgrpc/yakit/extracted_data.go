@@ -2,7 +2,6 @@ package yakit
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -172,9 +171,6 @@ func ExtractedDataFromHTTPFlow(hiddenIndex string, ruleName string, res *MatchRe
 		Length:         res.Length,
 		IsMatchRequest: res.IsMatchRequest,
 	}
-	str := string(res.MetaInfo.Raw)
-	foo := str[res.Index : res.Index+res.Length]
-	fmt.Println(foo)
 	return extractData
 }
 

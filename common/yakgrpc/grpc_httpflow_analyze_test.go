@@ -103,16 +103,18 @@ Host: %s
 			require.Equal(t, "1", finalMatch)
 		}
 
+		var result *schema.AnalyzedHTTPFlow
 		{
-			result := yakit.QueryAnalyzedHTTPFlowRule(consts.GetGormProjectDatabase(), []string{resultId})
+			results := yakit.QueryAnalyzedHTTPFlowRule(consts.GetGormProjectDatabase(), []string{resultId})
 			require.NoError(t, err)
-			fmt.Println(result)
-			require.Equal(t, 1, len(result))
-			require.Equal(t, ruleVerboseName, result[0].RuleVerboseName)
+			fmt.Println(results)
+			require.Equal(t, 1, len(results))
+			result = results[0]
+			require.Equal(t, ruleVerboseName, result.RuleVerboseName)
 
-			httpflowId := result[0].HTTPFlow.ID
+			httpflowId := result.HTTPFlowId
 			queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
-				IncludeId: []int64{int64(httpflowId)},
+				IncludeId: []int64{httpflowId},
 			})
 			require.NoError(t, err)
 			require.Equal(t, 1, len(queryFlow.Data))
@@ -120,6 +122,15 @@ Host: %s
 			// test color and tag
 			require.Contains(t, queryFlow.Data[0].Tags, tag)
 			require.Contains(t, queryFlow.Data[0].Tags, schema.COLORPREFIX+strings.ToUpper(color))
+		}
+
+		{
+			// Query HTTPFlow by analyzed flow id
+			flows, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+				AnalyzedIds: []int64{int64(result.ID)},
+			})
+			require.NoError(t, err)
+			require.Equal(t, 1, len(flows.Data))
 		}
 	})
 
@@ -196,7 +207,7 @@ Host: %s
 			require.Equal(t, 1, len(result))
 			require.Equal(t, ruleVerboseName, result[0].RuleVerboseName)
 
-			httpflowId := result[0].HTTPFlow.ID
+			httpflowId := result[0].HTTPFlowId
 			queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
 				IncludeId: []int64{int64(httpflowId)},
 			})
@@ -301,7 +312,7 @@ func TestMUSTPASS_AnalyzeHTTPFlow_MutliHTTPFlow(t *testing.T) {
 		require.Equal(t, 1, len(result))
 		require.Equal(t, ruleVerboseName, result[0].RuleVerboseName)
 
-		httpflowId := result[0].HTTPFlow.ID
+		httpflowId := result[0].HTTPFlowId
 		queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
 			IncludeId: []int64{int64(httpflowId)},
 		})
@@ -403,7 +414,7 @@ func TestMUSTPASS_AnalyzeHTTPFlow_HotPatch(t *testing.T) {
 		require.Equal(t, 1, len(result))
 		require.Equal(t, ruleVerboseName, result[0].RuleVerboseName)
 
-		httpflowId := result[0].HTTPFlow.ID
+		httpflowId := result[0].HTTPFlowId
 		queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
 			IncludeId: []int64{int64(httpflowId)},
 		})
