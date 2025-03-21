@@ -10,6 +10,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/h2non/filetype"
+	"github.com/h2non/filetype/types"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"golang.org/x/exp/maps"
@@ -88,17 +90,27 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 	origin := rawStr
 
 	var (
-		results     []*AutoDecodeResult
-		sameMap     = make(map[string]struct{})
-		resultMap   = make(map[string]struct{})
-		base32Bytes []byte
-		base64Bytes []byte
-		jwtBuf      bytes.Buffer
-		mimeResult  *MIMEResult
+		results                []*AutoDecodeResult
+		sameMap                = make(map[string]struct{})
+		resultMap              = make(map[string]struct{})
+		base32Bytes            []byte
+		base64Bytes            []byte
+		matchedType            types.Type
+		alreadyMatchedFileType bool
+		jwtBuf                 bytes.Buffer
+		mimeResult             *MIMEResult
 	)
 	addResult := func(result *AutoDecodeResult) {
 		results = append(results, result)
 		maps.Clear(sameMap)
+	}
+	checkFileType := func(new string, typ string) bool {
+		if alreadyMatchedFileType || matchedType.Extension == "" {
+			return false
+		}
+		alreadyMatchedFileType = true
+
+		return true
 	}
 	checkNewIsSameToOrigin := func(new string, typ string) bool {
 		if new == origin {
@@ -118,21 +130,23 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		_, ok := sameMap[new]
 		return ok
 	}
-	tryDecode := func(rawStr string, typ, typVerbose string, matchFunc func(string) bool, decodeFunc func(string) (string, error)) bool {
-		if !isSame(typ) && matchFunc(rawStr) {
-			decoded, err := decodeFunc(rawStr)
+
+	tryDecodeEx := func(rawStr string, matchFunc func(string) bool, checkFunc func(string, string) bool, decodeFunc func(string) (decoded, typ, typVerbose string, err error)) bool {
+		if matchFunc(rawStr) {
+			decoded, typ, typVerbose, err := decodeFunc(rawStr)
 			if err != nil {
 				return false
 			}
-			if decoded != "" && !checkNewIsSameToOrigin(decoded, typ) && !checkRepeatedDecode(decoded, typ) {
+			if decoded != "" && checkFunc(decoded, typ) {
+				showDecoded := decoded
 				if !utf8.ValidString(decoded) {
-					decoded = EscapeInvalidUTF8Byte([]byte(decoded))
+					showDecoded = EscapeInvalidUTF8Byte([]byte(decoded))
 				}
 				addResult(&AutoDecodeResult{
 					Type:        typ,
 					TypeVerbose: typVerbose,
 					Origin:      origin,
-					Result:      decoded,
+					Result:      showDecoded,
 				})
 				origin = decoded
 				return true
@@ -140,6 +154,31 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			return false
 		}
 		return false
+	}
+	tryDecode := func(rawStr string, typ, typVerbose string, matchFunc func(string) bool, decodeFunc func(string) (string, error)) bool {
+		if isSame(typ) {
+			return false
+		}
+		return tryDecodeEx(rawStr, matchFunc,
+			func(decoded, typ string) bool {
+				return !checkNewIsSameToOrigin(decoded, typ) && !checkRepeatedDecode(decoded, typ)
+			},
+			func(rawStr string) (string, string, string, error) {
+				decoded, err := decodeFunc(rawStr)
+				return decoded, typ, typVerbose, err
+			},
+		)
+	}
+	fileTypeDetect := func(rawStr string) bool {
+		var err error
+		matchedType, err = filetype.Match([]byte(rawStr))
+		if err != nil || matchedType == types.Unknown {
+			return false
+		}
+		return true
+	}
+	fileTypeDecode := func(rawStr string) (decoded, typ, typVerbose string, err error) {
+		return rawStr, matchedType.Extension, matchedType.MIME.Value, nil
 	}
 	htmlDecode := func(rawStr string) (string, error) {
 		return html.UnescapeString(rawStr), nil
@@ -171,7 +210,10 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			return false
 		}
 		if !utf8.Valid(decoded) {
-			return false
+			matched, err := filetype.Match([]byte(rawStr))
+			if err != nil || matched == types.Unknown {
+				return false
+			}
 		}
 		base32Bytes = decoded
 		return true
@@ -187,7 +229,10 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			return false
 		}
 		if !utf8.Valid(decoded) {
-			return false
+			matched, err := filetype.Match([]byte(decoded))
+			if err != nil || matched == types.Unknown {
+				return false
+			}
 		}
 		base64Bytes = decoded
 		return true
@@ -276,6 +321,10 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		}
 		// charset
 		if tryDecode(origin, "Charset Decode", "字符集解码", charsetDetect, charsetDecode) {
+			continue
+		}
+		// file type
+		if tryDecodeEx(origin, fileTypeDetect, checkFileType, fileTypeDecode) {
 			continue
 		}
 		break
