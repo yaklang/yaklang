@@ -18,6 +18,10 @@ func (g *GetawayClient) SupportedStructuredStream() bool {
 	return false
 }
 
+func (g *GetawayClient) GetModelList() ([]*aispec.ModelMeta, error) {
+	return aispec.ListChatModels(g.targetUrl, g.BuildHTTPOptions)
+}
+
 func (g *GetawayClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
 	return nil, errors.New("unsupported method")
 }

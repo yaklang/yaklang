@@ -21,6 +21,10 @@ type Client struct {
 	config *aispec.AIConfig
 }
 
+func (c *Client) GetModelList() ([]*aispec.ModelMeta, error) {
+	return nil, nil
+}
+
 func (c *Client) SupportedStructuredStream() bool {
 	return false
 }

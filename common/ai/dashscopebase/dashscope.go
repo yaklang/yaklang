@@ -28,6 +28,10 @@ type DashScopeGateway struct {
 	endpointUrl string
 }
 
+func (d *DashScopeGateway) GetModelList() ([]*aispec.ModelMeta, error) {
+	return nil, nil
+}
+
 func (d *DashScopeGateway) SupportedStructuredStream() bool {
 	return true
 }

@@ -17,6 +17,10 @@ type GatewayClient struct {
 	useOpenAIFormat bool
 }
 
+func (g *GatewayClient) GetModelList() ([]*aispec.ModelMeta, error) {
+	return aispec.ListChatModels(g.targetUrl, g.BuildHTTPOptions)
+}
+
 func (g *GatewayClient) Chat(s string, function ...aispec.Function) (string, error) {
 	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler)
 }

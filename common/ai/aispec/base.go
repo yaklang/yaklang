@@ -16,6 +16,37 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
+func ListChatModels(url string, opt func() ([]poc.PocConfigOption, error)) ([]*ModelMeta, error) {
+	opts, err := opt()
+	if err != nil {
+		return nil, utils.Errorf("build config failed: %v", err)
+	}
+	opts = append(opts, poc.WithTimeout(600))
+
+	rsp, _, err := poc.DoGET(url, opts...)
+	if err != nil {
+		return nil, utils.Errorf("request get to %v：%v", url, err)
+	}
+
+	// body like  {"object":"list","data":[{"id":"qwq:latest","object":"model","created":1741877931,"owned_by":"library"},{"id":"gemma3:27b","object":"model","created":1741875247,"owned_by":"library"},{"id":"deepseek-r1:32b","object":"model","created":1738946811,"owned_by":"library"},{"id":"deepseek-r1:70b","object":"model","created":1738939603,"owned_by":"library"},{"id":"qwen2.5:32b","object":"model","created":1727615210,"owned_by":"library"},{"id":"qwen2.5:latest","object":"model","created":1727613786,"owned_by":"library"}]}
+	body := rsp.GetBody()
+	if len(body) <= 0 {
+		return nil, utils.Errorf("empty response")
+	}
+
+	var resp struct {
+		Object string       `json:"object"`
+		Data   []*ModelMeta `json:"data"`
+	}
+
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
+		return nil, utils.Errorf("unmarshal models failed: %v", err)
+	}
+
+	return resp.Data, nil
+}
+
 func ChatBase(
 	url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error),
 	streamHandler func(io.Reader), reasonStreamHandler func(reader io.Reader),
