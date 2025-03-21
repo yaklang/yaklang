@@ -2,13 +2,14 @@ package mutate
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -415,4 +416,13 @@ func TestFileDir(t *testing.T) {
 	res, err := FuzzTagExec("{{file:dir("+tmpDir+")}}", Fuzz_WithEnableFileTag())
 	assert.NoError(t, err)
 	assert.Equal(t, expect, res)
+}
+
+func TestTimestampFuzzTag(t *testing.T) {
+	result := MutateQuick(`{{timestamp(us)}}`)
+	require.Len(t, result, 1)
+	got, err := strconv.ParseInt(result[0], 10, 64)
+	require.NoError(t, err)
+	now := time.Now().UnixMicro()
+	require.True(t, got >= now-1000 && got <= now+1000)
 }
