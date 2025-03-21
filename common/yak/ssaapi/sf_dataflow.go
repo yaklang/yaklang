@@ -1,8 +1,6 @@
 package ssaapi
 
 import (
-	"fmt"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -10,6 +8,25 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+const (
+	Predecessors_TopDefLabel    = "dataflow_topdef"
+	Predecessors_BottomUseLabel = "dataflow_bottomuse"
+)
+
+func DataFlowLabel(analysisType AnalysisType) string {
+	switch analysisType {
+	case TopDefAnalysis:
+		return Predecessors_TopDefLabel
+	case BottomUseAnalysis:
+		return Predecessors_BottomUseLabel
+	}
+	return ""
+}
+
+func IsDataFlowLabel(label string) bool {
+	return label == Predecessors_TopDefLabel || label == Predecessors_BottomUseLabel
+}
 
 func DataFlowWithSFConfig(
 	sfResult *sf.SFFrameResult,
@@ -80,7 +97,7 @@ func DataFlowWithSFConfig(
 	for _, handler := range handlerResult {
 		result = handler(result)
 	}
-	result.AppendPredecessor(value, sf.WithAnalysisContext_Label(fmt.Sprintf("dataflow_%s", analysisType)))
+	result.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
 	return result
 }
 
