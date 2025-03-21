@@ -87,10 +87,19 @@ func _jsonDumps(raw interface{}, opts ...JsonOpt) string {
 	for _, opt := range opts {
 		opt(config)
 	}
+	var (
+		bytes []byte
+		err   error
+	)
 
-	bytes, err := json.MarshalIndent(raw, config.prefix, config.indent)
+	if config.prefix == "" && config.indent == "" {
+		bytes, err = json.Marshal(raw)
+	} else {
+		bytes, err = json.MarshalIndent(raw, config.prefix, config.indent)
+	}
+
 	if err != nil {
-		log.Errorf("parse error: %v", err)
+		log.Errorf("json dumps error: %v", err)
 		return ""
 	}
 	return string(bytes)
@@ -131,6 +140,13 @@ func _jsonLoad(raw interface{}, opts ...JsonOpt) interface{} {
 				}
 			}
 		}
+
+		var v any
+		err = json.Unmarshal([]byte(str), &v)
+		if err == nil {
+			return v
+		}
+
 		log.Error(err)
 		return i
 	}
