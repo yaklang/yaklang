@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xuri/excelize/v2"
+	excelize "github.com/xuri/excelize/v2"
 )
 
 // 创建测试用的Excel文件

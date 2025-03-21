@@ -4,6 +4,8 @@ go 1.22.8
 
 replace github.com/yaklang/yaklang v0.0.0 => ./
 
+replace github.com/wenlng/go-captcha-assets v1.0.5 => github.com/wenlng/go-captcha-assets v1.0.4
+
 require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/CycloneDX/cyclonedx-go v0.7.2
@@ -18,8 +20,10 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/aymanbagabas/go-pty v0.2.2
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
+	github.com/beevik/etree v1.5.0
 	github.com/bytedance/mockey v1.2.10
 	github.com/cloudflare/circl v1.3.7
+	github.com/coreos/etcd v3.3.10+incompatible
 	github.com/corpix/uarand v0.2.0
 	github.com/dave/jennifer v1.4.1
 	github.com/davecgh/go-spew v1.1.1
@@ -116,6 +120,7 @@ require (
 	github.com/vjeantet/grok v1.0.0
 	github.com/xdg-go/pbkdf2 v1.0.0
 	github.com/xdg-go/scram v1.1.2
+	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/pcap v1.0.5
 	github.com/ysmood/gson v0.7.3
@@ -150,6 +155,8 @@ require (
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
+	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e // indirect
+	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/creack/pty v1.1.21 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.5 // indirect
@@ -200,6 +207,8 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
+	github.com/richardlehane/mscfb v1.0.4 // indirect
+	github.com/richardlehane/msoleps v1.0.4 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
@@ -223,6 +232,8 @@ require (
 	github.com/wenlng/go-captcha/v2 v2.0.3 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
+	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
+	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/ysmood/fetchup v0.2.2 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
@@ -235,7 +246,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.22.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff // indirect
-	golang.org/x/image v0.16.0 // indirect
+	golang.org/x/image v0.18.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect

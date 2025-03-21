@@ -6,31 +6,37 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/fileparser/types"
 )
 
 // FileType 定义文件类型
 type FileType string
 
 const (
-	FileTypeText  FileType = "text"
-	FileTypeTable FileType = "table"
-	FileTypeImage FileType = "image"
-	FileTypeChart FileType = "chart"
-	FileTypePDF   FileType = "pdf"
-	FileTypeOLE   FileType = "ole"
-	FileTypeVBA   FileType = "vba"
+	FileTypeText      FileType = "text"
+	FileTypeTable     FileType = "table"
+	FileTypeImage     FileType = "image"
+	FileTypeChart     FileType = "chart"
+	FileTypePDF       FileType = "pdf"
+	FileTypeOLE       FileType = "ole"
+	FileTypeVBA       FileType = "vba"
+	FileTypeVideo     FileType = "video"
+	FileTypeVideoData FileType = "videodata" // 视频二进制数据
 )
 
 // File 定义文件对象
 type File struct {
-	Name     string            // 文件名
-	Data     []byte            // 文件内容
-	Metadata map[string]string // 附加信息
+	Name       string            // 文件名
+	Data       []byte            // 文件内容（兼容旧版本）
+	Content    string            // 文本内容
+	BinaryData []byte            // 二进制数据
+	FileName   string            // 文件名（用于二进制文件）
+	Metadata   map[string]string // 附加信息
 }
 
 // DumpToFiles 将 WordNodeClassifier 对象转换为文件对象
-func (c *WordNodeClassifier) DumpToFiles() map[FileType][]File {
-	result := make(map[FileType][]File)
+func (c *WordNodeClassifier) DumpToFiles() map[string][]types.File {
+	result := make(map[string][]types.File)
 
 	// 处理文本内容
 	if len(c.Texts) > 0 {
@@ -58,10 +64,10 @@ func (c *WordNodeClassifier) DumpToFiles() map[FileType][]File {
 			}
 			textBuffer.WriteString("\n")
 		}
-		result[FileTypeText] = []File{
+		result[string(FileTypeText)] = []types.File{
 			{
-				Name: "content.txt",
-				Data: textBuffer.Bytes(),
+				FileName:   "text/content.txt",
+				BinaryData: textBuffer.Bytes(),
 				Metadata: map[string]string{
 					"count": fmt.Sprintf("%d", len(c.Texts)),
 				},
@@ -97,10 +103,10 @@ func (c *WordNodeClassifier) DumpToFiles() map[FileType][]File {
 			}
 			tableBuffer.WriteString("\n")
 		}
-		result[FileTypeTable] = []File{
+		result[string(FileTypeTable)] = []types.File{
 			{
-				Name: "tables.md",
-				Data: tableBuffer.Bytes(),
+				FileName:   "tables/tables.md",
+				BinaryData: tableBuffer.Bytes(),
 				Metadata: map[string]string{
 					"count": fmt.Sprintf("%d", len(c.Tables)),
 				},
@@ -111,7 +117,7 @@ func (c *WordNodeClassifier) DumpToFiles() map[FileType][]File {
 
 	// 处理图片内容
 	if len(c.Images) > 0 {
-		var images []File
+		var images []types.File
 		for i, img := range c.Images {
 			ext := ".bin"
 			switch img.MimeType {
@@ -126,9 +132,9 @@ func (c *WordNodeClassifier) DumpToFiles() map[FileType][]File {
 				filename = fmt.Sprintf("image_%d%s", i+1, ext)
 			}
 
-			images = append(images, File{
-				Name: filename,
-				Data: img.Data,
+			images = append(images, types.File{
+				FileName:   "images/" + filename,
+				BinaryData: img.Data,
 				Metadata: map[string]string{
 					"mime_type": img.MimeType,
 					"size":      fmt.Sprintf("%d", len(img.Data)),
@@ -136,17 +142,17 @@ func (c *WordNodeClassifier) DumpToFiles() map[FileType][]File {
 			})
 			log.Debugf("已导出图片 %s，大小: %d bytes", filename, len(img.Data))
 		}
-		result[FileTypeImage] = images
+		result[string(FileTypeImage)] = images
 	}
 
 	// 处理图表内容
 	if len(c.Charts) > 0 {
-		var charts []File
+		var charts []types.File
 		for i, chart := range c.Charts {
 			filename := fmt.Sprintf("chart_%d.xml", i+1)
-			charts = append(charts, File{
-				Name: filename,
-				Data: chart.Data,
+			charts = append(charts, types.File{
+				FileName:   "charts/" + filename,
+				BinaryData: chart.Data,
 				Metadata: map[string]string{
 					"type": chart.Type,
 					"size": fmt.Sprintf("%d", len(chart.Data)),
@@ -154,40 +160,40 @@ func (c *WordNodeClassifier) DumpToFiles() map[FileType][]File {
 			})
 			log.Debugf("已导出图表 %s，类型: %s", filename, chart.Type)
 		}
-		result[FileTypeChart] = charts
+		result[string(FileTypeChart)] = charts
 	}
 
 	// 处理PDF附件
 	if len(c.PDFs) > 0 {
-		var pdfs []File
+		var pdfs []types.File
 		for i, pdf := range c.PDFs {
 			filename := pdf.Name
 			if filename == "" {
 				filename = fmt.Sprintf("attachment_%d.pdf", i+1)
 			}
-			pdfs = append(pdfs, File{
-				Name: filename,
-				Data: pdf.Data,
+			pdfs = append(pdfs, types.File{
+				FileName:   "pdfs/" + filename,
+				BinaryData: pdf.Data,
 				Metadata: map[string]string{
 					"size": fmt.Sprintf("%d", len(pdf.Data)),
 				},
 			})
 			log.Debugf("已导出PDF附件 %s，大小: %d bytes", filename, len(pdf.Data))
 		}
-		result[FileTypePDF] = pdfs
+		result[string(FileTypePDF)] = pdfs
 	}
 
 	// 处理OLE对象
 	if len(c.OLEs) > 0 {
-		var oles []File
+		var oles []types.File
 		for i, ole := range c.OLEs {
 			filename := ole.Name
 			if filename == "" {
 				filename = fmt.Sprintf("ole_%d.bin", i+1)
 			}
-			oles = append(oles, File{
-				Name: filename,
-				Data: ole.Data,
+			oles = append(oles, types.File{
+				FileName:   "oles/" + filename,
+				BinaryData: ole.Data,
 				Metadata: map[string]string{
 					"type": ole.Type,
 					"size": fmt.Sprintf("%d", len(ole.Data)),
@@ -195,20 +201,20 @@ func (c *WordNodeClassifier) DumpToFiles() map[FileType][]File {
 			})
 			log.Debugf("已导出OLE对象 %s，类型: %s", filename, ole.Type)
 		}
-		result[FileTypeOLE] = oles
+		result[string(FileTypeOLE)] = oles
 	}
 
 	// 处理VBA代码
 	if len(c.VBAs) > 0 {
-		var vbas []File
+		var vbas []types.File
 		for i, vba := range c.VBAs {
 			filename := fmt.Sprintf("%s.vba", vba.ModName)
 			if vba.ModName == "Unknown" {
 				filename = fmt.Sprintf("macro_%d.vba", i+1)
 			}
-			vbas = append(vbas, File{
-				Name: filename,
-				Data: []byte(vba.Code),
+			vbas = append(vbas, types.File{
+				FileName:   "vbas/" + filename,
+				BinaryData: []byte(vba.Code),
 				Metadata: map[string]string{
 					"module": vba.ModName,
 					"size":   fmt.Sprintf("%d", len(vba.Code)),
@@ -216,7 +222,7 @@ func (c *WordNodeClassifier) DumpToFiles() map[FileType][]File {
 			})
 			log.Debugf("已导出VBA代码 %s，模块: %s", filename, vba.ModName)
 		}
-		result[FileTypeVBA] = vbas
+		result[string(FileTypeVBA)] = vbas
 	}
 
 	return result

@@ -16,6 +16,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/utils/fileparser"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/pprofutils"
 
@@ -117,6 +118,7 @@ func initYaklangLib() {
 	yaklang.Import("math", yaklib.MathExport)
 	yaklang.Import("os", yaklib.SystemExports)
 	yaklang.Import("file", yaklib.FileExport)
+	yaklang.Import("fileparser", fileparser.Exports)
 	yaklang.Import("filesys", filesys.Exports)
 	yaklang.Import("re", yaklib.RegexpExport)
 	yaklang.Import("re2", yaklib.Regexp2Export)

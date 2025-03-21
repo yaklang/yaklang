@@ -5,65 +5,57 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/fileparser/resources"
 )
 
 func TestParseFile(t *testing.T) {
-	// 测试文件路径
-	testFile := "/Users/z3/Downloads/doc1.docx"
-
-	// 检查文件是否存在
-	if _, err := os.Stat(testFile); os.IsNotExist(err) {
-		t.Skip("跳过测试：测试文件不存在，请提供一个真实的Word文档进行测试")
-	}
-
-	// 创建输出目录
-	outputDir := "/tmp/yaklang_test_output"
-	err := os.MkdirAll(outputDir, 0755)
-	if err != nil {
-		t.Fatalf("创建输出目录失败: %v", err)
-	}
-	// defer os.RemoveAll(outputDir) // 测试完成后清理
-
-	// 解析文件
-	result, err := ParseFile(testFile)
-	if err != nil {
-		t.Fatalf("解析文件失败: %v", err)
-	}
-
-	// 验证结果
-	if result.FileType != FileTypeWord {
-		t.Errorf("文件类型不匹配，期望: %s，实际: %s", FileTypeWord, result.FileType)
-	}
-
-	// 将解析结果写入文件
-	for fileType, files := range result.Files {
-		// 为每种类型创建子目录
-		typeDir := filepath.Join(outputDir, string(fileType))
-		err := os.MkdirAll(typeDir, 0755)
+	exts := []string{"docx", "pptx", "xlsx"}
+	// exts := []string{"xlsx"}
+	for _, ext := range exts {
+		fileName := "test." + ext
+		testFileContent, err := resources.FS.ReadFile(fileName)
 		if err != nil {
-			t.Errorf("创建目录失败 %s: %v", typeDir, err)
-			continue
+			t.Fatalf("读取文件失败: %v", err)
 		}
 
-		// 写入文件
-		for _, file := range files {
-			filePath := filepath.Join(typeDir, file.Name)
-			err := os.WriteFile(filePath, file.Data, 0644)
-			if err != nil {
-				t.Errorf("写入文件失败 %s: %v", filePath, err)
-				continue
+		// tmpDir, err := os.MkdirTemp("", "yaklang_test_output_*")
+		// if err != nil {
+		// 	t.Fatalf("创建临时目录失败: %v", err)
+		// }
+		// defer os.RemoveAll(tmpDir)
+		tmpDir := "/Users/z3/Downloads/test/" + ext
+		// tempFile, err := os.CreateTemp(tmpDir, fileName)
+		// if err != nil {
+		// 	t.Fatalf("创建临时文件失败: %v", err)
+		// }
+		// defer os.Remove(tempFile.Name())
+		os.MkdirAll(tmpDir, 0755)
+		err = os.WriteFile(filepath.Join(tmpDir, fileName), testFileContent, 0644)
+		if err != nil {
+			t.Fatalf("创建临时文件失败: %v", err)
+		}
+		result, err := ParseFileElements(filepath.Join(tmpDir, fileName))
+		if err != nil {
+			t.Fatalf("解析文件失败: %v", err)
+		}
+		for _, files := range result {
+			for _, file := range files {
+				filePath := filepath.Join(tmpDir, file.FileName)
+				// 先检测文件所有文件夹是否存在，不存在则创建文件夹
+				dir := filepath.Dir(filePath)
+				if _, err := os.Stat(dir); os.IsNotExist(err) {
+					err := os.MkdirAll(dir, 0755)
+					if err != nil {
+						t.Errorf("创建文件夹失败 %s: %v", dir, err)
+					}
+				}
+				err := os.WriteFile(filePath, file.BinaryData, 0644)
+				if err != nil {
+					t.Errorf("写入文件失败 %s: %v", filePath, err)
+				}
 			}
-			log.Infof("已写入文件: %s，大小: %s", filePath, file.Metadata["size"])
 		}
 	}
-
-	// 输出统计信息
-	t.Run("文件类型统计", func(t *testing.T) {
-		for fileType, files := range result.Files {
-			t.Logf("类型 %s: %d 个文件", fileType, len(files))
-		}
-	})
 }
 
 func TestGetSupportedExtensions(t *testing.T) {

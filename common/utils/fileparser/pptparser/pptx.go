@@ -8,8 +8,6 @@ import (
 
 	"github.com/beevik/etree"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/htmlquery"
-	"golang.org/x/net/html"
 )
 
 // PPTXParser is the parser for PPTX files using OPC (Open Packaging Convention)
@@ -343,10 +341,6 @@ func parseSlideXml(data []byte) (*SlideContent, error) {
 	return &slide, nil
 }
 
-// Convert XML to HTML node for XPath processing
-func convertXmlToHtmlNode(data []byte) (*html.Node, error) {
-	return htmlquery.Parse(bytes.NewReader(data))
-}
 func processTable(rootNode *etree.Element) []PPTNode {
 	tableNodes := rootNode.FindElements("//a:tbl")
 	if len(tableNodes) == 0 {
@@ -522,14 +516,4 @@ func parseCommentsXml(data []byte) ([]string, error) {
 		res = append(res, comment.Text())
 	}
 	return res, nil
-}
-
-// Helper function to extract text from HTML node
-func extractTextFromHtmlNode(node *html.Node) string {
-	if node == nil {
-		return ""
-	}
-
-	// Use htmlquery to extract text
-	return htmlquery.InnerText(node)
 }
