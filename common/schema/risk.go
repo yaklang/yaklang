@@ -73,20 +73,20 @@ type Risk struct {
 
 func (p *Risk) ColorizedShow() {
 	buf := bytes.NewBufferString("")
-	buf.WriteString(pio.Red("========RISK: " + p.Title + "========"))
+	buf.WriteString(pio.Rich("========RISK: "+p.Title+"========", pio.Red))
 	buf.WriteByte('\n')
-	buf.WriteString(pio.Red("    TYPE: " + p.RiskType + "(" + p.RiskTypeVerbose + ")"))
+	buf.WriteString(pio.Rich("    TYPE: "+p.RiskType+"("+p.RiskTypeVerbose+")", pio.Red))
 	buf.WriteByte('\n')
-	buf.WriteString(pio.Red("    Target: " + p.Url + " (" + p.IP + ":" + fmt.Sprint(p.Port) + ")"))
+	buf.WriteString(pio.Rich("    Target: "+p.Url+" ("+p.IP+":"+fmt.Sprint(p.Port)+")", pio.Red))
 	buf.WriteByte('\n')
-	buf.WriteString(pio.Red("    REQUEST:"))
+	buf.WriteString(pio.Rich("    REQUEST:", pio.Red))
 	buf.WriteByte('\n')
 	requsetRaw, _ := strconv.Unquote(p.QuotedRequest)
 	if len(requsetRaw) > 0 {
-		buf.WriteString(pio.Yellow(string(requsetRaw)))
+		buf.WriteString(pio.Rich(requsetRaw, pio.Yellow))
 	}
 	buf.WriteByte('\n')
-	buf.WriteString(pio.Red(`========================================`))
+	buf.WriteString(pio.Rich(`========================================`, pio.Red))
 	buf.WriteByte('\n')
 	fmt.Println(buf.String())
 }

@@ -10,15 +10,15 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper) error {
+func _open(conf *CaptureConfig, ctx context.Context, handlerWrapper *PcapHandleWrapper) error {
 	innerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+	packetSource := gopacket.NewPacketSource(handlerWrapper.handle, handlerWrapper.handle.LinkType())
 	packetSource.Lazy = true
 	packetSource.NoCopy = true
 	packetSource.DecodeStreamsAsDatagrams = true
 	if conf.onNetInterfaceCreated != nil {
-		conf.onNetInterfaceCreated(handler)
+		conf.onNetInterfaceCreated(handlerWrapper)
 	}
 
 	for {

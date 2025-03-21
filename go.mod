@@ -76,8 +76,8 @@ require (
 	github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
 	github.com/jinzhu/gorm v1.9.2
 	github.com/jlaffaye/ftp v0.0.0-20210307004419-5d4190119067
-	github.com/kataras/golog v0.0.10
-	github.com/kataras/pio v0.0.2
+	github.com/kataras/golog v0.1.12
+	github.com/kataras/pio v0.0.13
 	github.com/kevinburke/ssh_config v1.2.0
 	github.com/klauspost/compress v1.17.4
 	github.com/knqyf263/go-rpmdb v0.1.0

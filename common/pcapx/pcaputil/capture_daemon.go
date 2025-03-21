@@ -111,7 +111,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 			return cacheId, daemon.handler, nil
 		}
 
-		var handler *PcapHandleWrapper
+		var handleWrapper *PcapHandleWrapper
 		var operation PcapHandleOperation
 		var err error
 
@@ -123,8 +123,8 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 				return "", nil, err
 			}
 
-			handler = WrapPcapHandle(pcapHandler, loop)
-			operation = handler
+			handleWrapper = WrapPcapHandle(pcapHandler, loop)
+			operation = handleWrapper
 		}
 		if bpf != "" {
 			if err := operation.SetBPFFilter(bpf); err != nil {
@@ -145,7 +145,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 					log.Infof("background iface: %v is start...", ifaceName)
 				}
 
-				packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+				packetSource := gopacket.NewPacketSource(handleWrapper.handle, handleWrapper.handle.LinkType())
 				packetSource.Lazy = true
 				packetSource.NoCopy = true
 				packetSource.DecodeStreamsAsDatagrams = true
@@ -161,7 +161,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 					onceFirstPacket.Do(func() {
 						// first packet
 						if conf.onNetInterfaceCreated != nil {
-							conf.onNetInterfaceCreated(handler)
+							conf.onNetInterfaceCreated(handleWrapper)
 						}
 					})
 
@@ -185,11 +185,11 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 								daemon.registeredHandlers.Delete(i)
 							}
 						case <-time.After(3 * time.Second):
-							if handler == nil {
+							if handleWrapper == nil {
 								log.Errorf("background iface: %v handler is nil", ifaceName)
 								return
-							} else if handler.Error() != nil && handler.Error().Error() != "" {
-								log.Errorf("background iface: %v error: %s", ifaceName, handler.Error())
+							} else if handleWrapper.Error() != nil && handleWrapper.Error().Error() != "" {
+								log.Errorf("background iface: %v error: %s", ifaceName, handleWrapper.Error())
 								captureDaemonCache.Remove(cacheId)
 								return
 							}
