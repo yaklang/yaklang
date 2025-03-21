@@ -26,6 +26,7 @@ func TestScoreRulesDefineFunction(t *testing.T) {
 
 	t.Run("test no implement define function in mitm", func(t *testing.T) {
 		funcs := []string{
+			"analyzeHTTPFlow",
 			"hijackSaveHTTPFlow",
 			"hijackHTTPResponse",
 			"hijackHTTPResponseEx",

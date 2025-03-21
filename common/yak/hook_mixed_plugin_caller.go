@@ -68,6 +68,9 @@ const (
 
 	HOOK_CLAER = "clear"
 
+	// httpflow analyze
+	HOOK_Analyze_HTTPFlow = "analyzeHTTPFlow"
+
 	/*
 		hijackSaveHTTPFlow = func(flow, forward, drop) {
 		    println(flow.Url)
@@ -97,6 +100,8 @@ var (
 		// beforeRequest, afterRequest
 		HOOK_BeforeRequest,
 		HOOK_AfterRequest,
+		// httpFlow analyze
+		HOOK_Analyze_HTTPFlow,
 	}
 	HotPatchScriptName = "@HotPatchCode"
 )
@@ -966,4 +971,25 @@ func (m *MixPluginCaller) HijackSaveHTTPFlowEx(runtimeCtx context.Context, flow 
 
 func (m *MixPluginCaller) GetNativeCaller() *YakToCallerManager {
 	return m.callers
+}
+
+func (m *MixPluginCaller) CallAnalyzeHTTPFlow(
+	runtimeCtx context.Context,
+	flow *schema.HTTPFlow,
+	extract func(ruleName string, httpFlow *schema.HTTPFlow),
+) {
+	if m.callers.ShouldCallByName(HOOK_Analyze_HTTPFlow) {
+		m.callers.Call(
+			HOOK_Analyze_HTTPFlow,
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigItems(flow, extract),
+		)
+	}
+}
+
+func (m *MixPluginCaller) HaveTheHookFunc(name string) bool {
+	if m == nil {
+		return false
+	}
+	return m.callers.ShouldCallByName(name)
 }

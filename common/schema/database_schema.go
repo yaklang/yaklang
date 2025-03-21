@@ -74,7 +74,7 @@ var databaseSchemas = map[uint8][]any{
 // ProjectTables 这些表是和项目关联的，导出项目可以直接复制给用户
 var ProjectTables = []interface{}{
 	&WebsocketFlow{},
-	&HTTPFlow{}, &ExecHistory{},
+	&HTTPFlow{}, &ExecHistory{}, &AnalyzedHTTPFlow{},
 	&ExtractedData{},
 	&Port{},
 	&Domain{}, &Host{},

@@ -2,8 +2,10 @@ package yakgrpc
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jinzhu/gorm"
 	"net/http"
 	"sort"
 	"strconv"
@@ -110,6 +112,57 @@ func (m *MITMReplaceRule) matchRawSimple(rawPacket []byte) (bool, error) {
 		return false, err
 	}
 	return r.MatchString(string(rawPacket))
+}
+
+func (m *MITMReplaceRule) matchByHTTPFlow(rsp string) ([]*yakit.MatchResult, error) {
+	r, err := m.compile()
+	if err != nil {
+		return nil, err
+	}
+	match, err := r.FindStringMatch(rsp)
+	if err != nil {
+		return nil, err
+	}
+	if match == nil {
+		return nil, nil
+	}
+	var res []*yakit.MatchResult
+	var ret string
+	for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
+		if match.GroupCount() > 1 {
+			// backoff compatible
+			if len(m.GetRegexpGroups()) == 0 {
+				extractGroup := match.GroupByNumber(1)
+				if extractGroup != nil {
+					ret = extractGroup.String()
+				}
+			} else {
+				var groups []string
+				for _, i := range m.GetRegexpGroups() {
+					group := match.GroupByNumber(int(i))
+					if group != nil {
+						groups = append(groups, group.String())
+					}
+				}
+				ret = strings.Join(groups, ", ")
+			}
+		} else {
+			ret = match.String()
+		}
+		if ret == "" {
+			continue
+		}
+		res = append(res, &yakit.MatchResult{
+			Match:          match,
+			IsMatchRequest: false,
+			MatchResult:    ret,
+			MetaInfo: &yakit.MatchMetaInfo{
+				Raw:    []byte(rsp),
+				Offset: 0,
+			},
+		})
+	}
+	return res, nil
 }
 
 func (m *MITMReplaceRule) matchByPacketInfo(info *yakit.PacketInfo) ([]*yakit.MatchResult, error) {
@@ -483,6 +536,21 @@ func NewMITMReplacer(initFunc ...func() []*ypb.MITMContentReplacer) *mitmReplace
 		wg:               &sync.WaitGroup{},
 	}
 	replacer.LoadRules(rules)
+	return replacer
+}
+
+func NewMITMReplacerFromDB(db *gorm.DB) *mitmReplacer {
+	replacer := NewMITMReplacer(func() []*ypb.MITMContentReplacer {
+		result := yakit.GetKey(db, MITMReplacerKeyRecords)
+		if result != "" {
+			var rules []*ypb.MITMContentReplacer
+			_ = json.Unmarshal([]byte(result), &rules)
+			if len(rules) > 0 {
+				return rules
+			}
+		}
+		return nil
+	})
 	return replacer
 }
 
