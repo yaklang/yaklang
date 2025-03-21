@@ -29,16 +29,13 @@ func createErrorAICallback() AICallbackType {
 
 // 创建测试用的工具
 func createTestTools() []*Tool {
-	// 创建参数
-	param1 := NewToolParam("param1", "string",
-		WithTool_ParamDescription("参数1"),
-		WithTool_ParamRequired(true),
-	)
-
 	// 创建工具1
 	tool1, _ := NewTool("TestTool1",
 		WithTool_Description("用于测试的工具1"),
-		WithTool_Param(param1),
+		WithString("param1",
+			Description("参数1"),
+			Required(),
+		),
 		WithTool_Callback(func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 			return "工具1执行结果", nil
 		}),

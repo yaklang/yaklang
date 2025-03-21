@@ -78,10 +78,9 @@ func TestTask_Invoke_NoTools(t *testing.T) {
 func TestTask_Invoke_WithTools(t *testing.T) {
 	task := NewTask("test", "test goal", WithTask_Callback(mockAICallback))
 	tools := []*Tool{
-		{
-			Name:        "test-tool",
-			Description: "test tool description",
-		},
+		newTool("test_tool",
+			WithTool_Description("用于测试的工具"),
+		),
 	}
 	task.ApplyOptions(WithTask_Tools(tools))
 	assert.NotNil(t, task.tools)
@@ -92,14 +91,14 @@ func TestTask_Invoke_WithToolDescription(t *testing.T) {
 	// 创建一个测试工具
 	testTool, err := NewTool("test_tool",
 		WithTool_Description("用于测试的工具"),
-		WithTool_Param(NewToolParam("param1", "string",
-			WithTool_ParamDescription("参数1"),
-			WithTool_ParamRequired(true),
-		)),
-		WithTool_Param(NewToolParam("param2", "number",
-			WithTool_ParamDescription("参数2"),
-			WithTool_ParamDefault(42),
-		)),
+		WithString("param1",
+			Description("参数1"),
+			Required(),
+		),
+		WithNumber("param2",
+			Description("参数2"),
+			Default(42),
+		),
 		WithTool_Callback(func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 			return "工具执行成功", nil
 		}),
@@ -178,30 +177,28 @@ func TestTask_ToolJSONSchema(t *testing.T) {
 	// 创建一个具有多种参数类型的测试工具
 	complexTool, err := NewTool("complex_tool",
 		WithTool_Description("具有多种参数类型的复杂工具"),
-		WithTool_Param(NewToolParam("string_param", "string",
-			WithTool_ParamDescription("字符串参数"),
-			WithTool_ParamRequired(true),
-		)),
-		WithTool_Param(NewToolParam("number_param", "number",
-			WithTool_ParamDescription("数值参数"),
-			WithTool_ParamDefault(42.5),
-		)),
-		WithTool_Param(NewToolParam("integer_param", "integer",
-			WithTool_ParamDescription("整数参数"),
-			WithTool_ParamDefault(10),
-		)),
-		WithTool_Param(NewToolParam("boolean_param", "boolean",
-			WithTool_ParamDescription("布尔参数"),
-			WithTool_ParamDefault(false),
-		)),
-		WithTool_Param(NewToolParam("array_param", "array",
-			WithTool_ParamDescription("数组参数"),
-			WithTool_ArrayItem(
-				NewToolParamValue("string",
-					WithTool_ValueDescription("数组中的字符串项"),
-				),
-			),
-		)),
+		WithString("string_param",
+			Description("字符串参数"),
+			Required(),
+		),
+		WithNumber("number_param",
+			Description("数值参数"),
+			Default(42.5),
+		),
+		WithInteger("integer_param",
+			Description("整数参数"),
+			Default(10),
+		),
+		WithBool("boolean_param",
+			Description("布尔参数"),
+			Default(false),
+		),
+		WithStringArrayEx("array_param",
+			[]PropertyOption{
+				Description("数组参数"),
+			},
+			Description("数组中的字符串项"),
+		),
 		WithTool_Callback(func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 			return "执行成功", nil
 		}),

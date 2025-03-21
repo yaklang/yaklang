@@ -5,6 +5,9 @@ import (
 	"io"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 )
 
 // 提供一个测试用的回调函数
@@ -27,10 +30,14 @@ func TestNewToolWithOptions(t *testing.T) {
 					WithTool_Callback(testCallback))
 			},
 			expected: &Tool{
-				Name:        "simpleTool",
-				Description: "简单工具描述",
-				Params:      []*ToolParam{},
-				Callback:    testCallback,
+				Tool: &mcp.Tool{
+					Name:        "simpleTool",
+					Description: "简单工具描述",
+					InputSchema: mcp.ToolInputSchema{
+						Type:       "object",
+						Properties: map[string]any{},
+					},
+				},
 			},
 		},
 		{
@@ -39,38 +46,35 @@ func TestNewToolWithOptions(t *testing.T) {
 				return NewTool("paramTool",
 					WithTool_Description("带参数的工具"),
 					WithTool_Callback(testCallback),
-					WithTool_Param(
-						NewToolParam("query", "string",
-							WithTool_ParamDescription("查询参数"),
-							WithTool_ParamRequired(true),
-						),
+					WithString("query",
+						Description("查询参数"),
+						Required(),
 					),
-					WithTool_Param(
-						NewToolParam("limit", "integer",
-							WithTool_ParamDescription("限制数量"),
-							WithTool_ParamDefault(10),
-						),
+					WithNumber("limit",
+						Description("限制数量"),
+						Default(10),
 					),
 				)
 			},
 			expected: &Tool{
-				Name:        "paramTool",
-				Description: "带参数的工具",
-				Params: []*ToolParam{
-					{
-						Name:        "query",
-						Type:        "string",
-						Description: "查询参数",
-						Required:    true,
-					},
-					{
-						Name:        "limit",
-						Type:        "integer",
-						Description: "限制数量",
-						Default:     10,
+				Tool: &mcp.Tool{
+					Name:        "paramTool",
+					Description: "带参数的工具",
+					InputSchema: mcp.ToolInputSchema{
+						Type: "object",
+						Properties: map[string]any{
+							"query": map[string]any{
+								"type":        "string",
+								"description": "查询参数",
+							},
+							"limit": map[string]any{
+								"type":        "number",
+								"description": "限制数量",
+								"default":     10,
+							},
+						},
 					},
 				},
-				Callback: testCallback,
 			},
 		},
 		{
@@ -79,37 +83,33 @@ func TestNewToolWithOptions(t *testing.T) {
 				return NewTool("arrayTool",
 					WithTool_Description("带数组参数的工具"),
 					WithTool_Callback(testCallback),
-					WithTool_Param(
-						NewToolParam("items", "array",
-							WithTool_ParamDescription("数组参数"),
-							WithTool_ParamRequired(true),
-							WithTool_ArrayItem(
-								NewToolParamValue("string",
-									WithTool_ValueDescription("字符串项"),
-								),
-							),
-						),
+					WithStringArrayEx("items",
+						[]PropertyOption{
+							Description("数组参数"),
+							Required(),
+						},
+						Description("字符串项"),
 					),
 				)
 			},
 			expected: &Tool{
-				Name:        "arrayTool",
-				Description: "带数组参数的工具",
-				Params: []*ToolParam{
-					{
-						Name:        "items",
-						Type:        "array",
-						Description: "数组参数",
-						Required:    true,
-						ArrayItem: []*ToolParamValue{
-							{
-								Type:        "string",
-								Description: "字符串项",
+				Tool: &mcp.Tool{
+					Name:        "arrayTool",
+					Description: "带数组参数的工具",
+					InputSchema: mcp.ToolInputSchema{
+						Type: "object",
+						Properties: map[string]any{
+							"items": map[string]any{
+								"type":        "array",
+								"description": "数组参数",
+								"items": map[string]any{
+									"type":        "string",
+									"description": "字符串项",
+								},
 							},
 						},
 					},
 				},
-				Callback: testCallback,
 			},
 		},
 		{
@@ -118,43 +118,39 @@ func TestNewToolWithOptions(t *testing.T) {
 				return NewTool("nestedArrayTool",
 					WithTool_Description("嵌套数组参数工具"),
 					WithTool_Callback(testCallback),
-					WithTool_Param(
-						NewToolParam("nestedItems", "array",
-							WithTool_ParamDescription("嵌套数组参数"),
-							WithTool_ParamRequired(true),
-							WithTool_ArrayItem(
-								NewToolParamValue("array",
-									WithTool_ValueDescription("数组项"),
-									WithTool_ValueArrayItems([]*ToolParamValue{
-										NewToolParamValue("number",
-											WithTool_ValueDescription("数字项"),
-											WithTool_ValueDefault(0),
-										),
-									}),
-								),
-							),
+					WithArrayEx("nestedItems",
+						[]PropertyOption{
+							Description("嵌套数组参数"),
+							Required(),
+						},
+						WithArray("array",
+							"number",
+							[]PropertyOption{
+								Description("数组项"),
+							},
+							Default(0),
+							Description("数字项"),
 						),
 					),
 				)
 			},
 			expected: &Tool{
-				Name:        "nestedArrayTool",
-				Description: "嵌套数组参数工具",
-				Params: []*ToolParam{
-					{
-						Name:        "nestedItems",
-						Type:        "array",
-						Description: "嵌套数组参数",
-						Required:    true,
-						ArrayItem: []*ToolParamValue{
-							{
-								Type:        "array",
-								Description: "数组项",
-								ArrayItems: []*ToolParamValue{
-									{
-										Type:        "number",
-										Description: "数字项",
-										Default:     0,
+				Tool: &mcp.Tool{
+					Name:        "nestedArrayTool",
+					Description: "嵌套数组参数工具",
+					InputSchema: mcp.ToolInputSchema{
+						Type: "object",
+						Properties: map[string]any{
+							"nestedItems": map[string]any{
+								"type":        "array",
+								"description": "嵌套数组参数",
+								"items": map[string]any{
+									"type":        "array",
+									"description": "数组项",
+									"items": map[string]any{
+										"type":        "number",
+										"description": "数字项",
+										"default":     0,
 									},
 								},
 							},
@@ -170,49 +166,42 @@ func TestNewToolWithOptions(t *testing.T) {
 				return NewTool("multiParamTool",
 					WithTool_Description("多参数工具"),
 					WithTool_Callback(testCallback),
-					WithTool_Param(
-						NewToolParam("stringParam", "string",
-							WithTool_ParamDescription("字符串参数"),
-							WithTool_ParamRequired(true),
-						),
+					WithString("stringParam",
+						Description("字符串参数"),
+						Required(),
 					),
-					WithTool_Param(
-						NewToolParam("numberParam", "number",
-							WithTool_ParamDescription("数字参数"),
-							WithTool_ParamDefault(42.5),
-						),
+					WithNumber("numberParam",
+						Default(42.5),
 					),
-					WithTool_Param(
-						NewToolParam("boolParam", "boolean",
-							WithTool_ParamDescription("布尔参数"),
-							WithTool_ParamDefault(true),
-							WithTool_ParamRequired(true),
-						),
+					WithBool("boolParam",
+						Description("布尔参数"),
+						Default(true),
+						Required(),
 					),
 				)
 			},
 			expected: &Tool{
-				Name:        "multiParamTool",
-				Description: "多参数工具",
-				Params: []*ToolParam{
-					{
-						Name:        "stringParam",
-						Type:        "string",
-						Description: "字符串参数",
-						Required:    true,
-					},
-					{
-						Name:        "numberParam",
-						Type:        "number",
-						Description: "数字参数",
-						Default:     42.5,
-					},
-					{
-						Name:        "boolParam",
-						Type:        "boolean",
-						Description: "布尔参数",
-						Default:     true,
-						Required:    true,
+				Tool: &mcp.Tool{
+					Name:        "multiParamTool",
+					Description: "多参数工具",
+					InputSchema: mcp.ToolInputSchema{
+						Type: "object",
+						Properties: map[string]any{
+							"stringParam": map[string]any{
+								"type":        "string",
+								"description": "字符串参数",
+							},
+							"numberParam": map[string]any{
+								"type":    "number",
+								"default": 42.5,
+							},
+							"boolParam": map[string]any{
+								"type":        "boolean",
+								"description": "布尔参数",
+								"default":     true,
+							},
+						},
+						Required: []string{"stringParam", "boolParam"},
 					},
 				},
 				Callback: testCallback,
@@ -239,8 +228,8 @@ func TestNewToolWithOptions(t *testing.T) {
 			}
 
 			// 检查参数数量
-			if len(tool.Params) != len(tt.expected.Params) {
-				t.Errorf("Params length = %v, want %v", len(tool.Params), len(tt.expected.Params))
+			if len(tool.Params()) != len(tt.expected.Params()) {
+				t.Errorf("Params length = %v, want %v", len(tool.Params()), len(tt.expected.Params()))
 				return
 			}
 
@@ -250,73 +239,74 @@ func TestNewToolWithOptions(t *testing.T) {
 			}
 
 			// 检查每个参数
-			for i, param := range tool.Params {
-				expectedParam := tt.expected.Params[i]
+			require.True(t, reflect.DeepEqual(tool.Params(), tt.expected.Params()))
+			// for i, param := range tool.Params {
+			// 	expectedParam := tt.expected.Params[i]
 
-				if param.Name != expectedParam.Name {
-					t.Errorf("Param[%d].Name = %v, want %v", i, param.Name, expectedParam.Name)
-				}
+			// 	if param.Name != expectedParam.Name {
+			// 		t.Errorf("Param[%d].Name = %v, want %v", i, param.Name, expectedParam.Name)
+			// 	}
 
-				if param.Type != expectedParam.Type {
-					t.Errorf("Param[%d].Type = %v, want %v", i, param.Type, expectedParam.Type)
-				}
+			// 	if param.Type != expectedParam.Type {
+			// 		t.Errorf("Param[%d].Type = %v, want %v", i, param.Type, expectedParam.Type)
+			// 	}
 
-				if param.Description != expectedParam.Description {
-					t.Errorf("Param[%d].Description = %v, want %v", i, param.Description, expectedParam.Description)
-				}
+			// 	if param.Description != expectedParam.Description {
+			// 		t.Errorf("Param[%d].Description = %v, want %v", i, param.Description, expectedParam.Description)
+			// 	}
 
-				if !reflect.DeepEqual(param.Default, expectedParam.Default) {
-					t.Errorf("Param[%d].Default = %v, want %v", i, param.Default, expectedParam.Default)
-				}
+			// 	if !reflect.DeepEqual(param.Default, expectedParam.Default) {
+			// 		t.Errorf("Param[%d].Default = %v, want %v", i, param.Default, expectedParam.Default)
+			// 	}
 
-				if param.Required != expectedParam.Required {
-					t.Errorf("Param[%d].Required = %v, want %v", i, param.Required, expectedParam.Required)
-				}
+			// 	if param.Required != expectedParam.Required {
+			// 		t.Errorf("Param[%d].Required = %v, want %v", i, param.Required, expectedParam.Required)
+			// 	}
 
-				// 检查数组项
-				if len(param.ArrayItem) != len(expectedParam.ArrayItem) {
-					t.Errorf("Param[%d].ArrayItem length = %v, want %v", i, len(param.ArrayItem), len(expectedParam.ArrayItem))
-					continue
-				}
+			// 	// 检查数组项
+			// 	if len(param.ArrayItem) != len(expectedParam.ArrayItem) {
+			// 		t.Errorf("Param[%d].ArrayItem length = %v, want %v", i, len(param.ArrayItem), len(expectedParam.ArrayItem))
+			// 		continue
+			// 	}
 
-				for j, item := range param.ArrayItem {
-					expectedItem := expectedParam.ArrayItem[j]
+			// 	for j, item := range param.ArrayItem {
+			// 		expectedItem := expectedParam.ArrayItem[j]
 
-					if item.Type != expectedItem.Type {
-						t.Errorf("Param[%d].ArrayItem[%d].Type = %v, want %v", i, j, item.Type, expectedItem.Type)
-					}
+			// 		if item.Type != expectedItem.Type {
+			// 			t.Errorf("Param[%d].ArrayItem[%d].Type = %v, want %v", i, j, item.Type, expectedItem.Type)
+			// 		}
 
-					if item.Description != expectedItem.Description {
-						t.Errorf("Param[%d].ArrayItem[%d].Description = %v, want %v", i, j, item.Description, expectedItem.Description)
-					}
+			// 		if item.Description != expectedItem.Description {
+			// 			t.Errorf("Param[%d].ArrayItem[%d].Description = %v, want %v", i, j, item.Description, expectedItem.Description)
+			// 		}
 
-					if !reflect.DeepEqual(item.Default, expectedItem.Default) {
-						t.Errorf("Param[%d].ArrayItem[%d].Default = %v, want %v", i, j, item.Default, expectedItem.Default)
-					}
+			// 		if !reflect.DeepEqual(item.Default, expectedItem.Default) {
+			// 			t.Errorf("Param[%d].ArrayItem[%d].Default = %v, want %v", i, j, item.Default, expectedItem.Default)
+			// 		}
 
-					// 检查嵌套数组项
-					if len(item.ArrayItems) != len(expectedItem.ArrayItems) {
-						t.Errorf("Param[%d].ArrayItem[%d].ArrayItems length = %v, want %v", i, j, len(item.ArrayItems), len(expectedItem.ArrayItems))
-						continue
-					}
+			// 		// 检查嵌套数组项
+			// 		if len(item.ArrayItems) != len(expectedItem.ArrayItems) {
+			// 			t.Errorf("Param[%d].ArrayItem[%d].ArrayItems length = %v, want %v", i, j, len(item.ArrayItems), len(expectedItem.ArrayItems))
+			// 			continue
+			// 		}
 
-					for k, nestedItem := range item.ArrayItems {
-						expectedNestedItem := expectedItem.ArrayItems[k]
+			// 		for k, nestedItem := range item.ArrayItems {
+			// 			expectedNestedItem := expectedItem.ArrayItems[k]
 
-						if nestedItem.Type != expectedNestedItem.Type {
-							t.Errorf("Param[%d].ArrayItem[%d].ArrayItems[%d].Type = %v, want %v", i, j, k, nestedItem.Type, expectedNestedItem.Type)
-						}
+			// 			if nestedItem.Type != expectedNestedItem.Type {
+			// 				t.Errorf("Param[%d].ArrayItem[%d].ArrayItems[%d].Type = %v, want %v", i, j, k, nestedItem.Type, expectedNestedItem.Type)
+			// 			}
 
-						if nestedItem.Description != expectedNestedItem.Description {
-							t.Errorf("Param[%d].ArrayItem[%d].ArrayItems[%d].Description = %v, want %v", i, j, k, nestedItem.Description, expectedNestedItem.Description)
-						}
+			// 			if nestedItem.Description != expectedNestedItem.Description {
+			// 				t.Errorf("Param[%d].ArrayItem[%d].ArrayItems[%d].Description = %v, want %v", i, j, k, nestedItem.Description, expectedNestedItem.Description)
+			// 			}
 
-						if !reflect.DeepEqual(nestedItem.Default, expectedNestedItem.Default) {
-							t.Errorf("Param[%d].ArrayItem[%d].ArrayItems[%d].Default = %v, want %v", i, j, k, nestedItem.Default, expectedNestedItem.Default)
-						}
-					}
-				}
-			}
+			// 			if !reflect.DeepEqual(nestedItem.Default, expectedNestedItem.Default) {
+			// 				t.Errorf("Param[%d].ArrayItem[%d].ArrayItems[%d].Default = %v, want %v", i, j, k, nestedItem.Default, expectedNestedItem.Default)
+			// 			}
+			// 		}
+			// 	}
+			// }
 		})
 	}
 }
@@ -338,28 +328,22 @@ func TestToolJSONSchemaGeneration(t *testing.T) {
 	}{
 		{
 			name: "简单工具JSON Schema",
-			tool: &Tool{
-				Name:        "simpleTool",
-				Description: "简单工具描述",
-				Callback:    testCallback,
-			},
+			tool: newTool("simpleTool",
+				WithTool_Description("简单工具描述"),
+				WithTool_Callback(testCallback),
+			),
 			expectedFields: []string{"$schema", "type", "description", "properties", "required"},
 		},
 		{
 			name: "带参数工具JSON Schema",
-			tool: &Tool{
-				Name:        "paramTool",
-				Description: "带参数的工具",
-				Callback:    testCallback,
-				Params: []*ToolParam{
-					{
-						Name:        "query",
-						Type:        "string",
-						Description: "查询参数",
-						Required:    true,
-					},
-				},
-			},
+			tool: newTool("paramTool",
+				WithTool_Description("带参数的工具"),
+				WithTool_Callback(testCallback),
+				WithString("query",
+					Description("查询参数"),
+					Required(),
+				),
+			),
 			expectedFields: []string{"$schema", "type", "description", "properties", "required"},
 		},
 	}
@@ -409,35 +393,28 @@ func TestComplexToolCreation(t *testing.T) {
 	complexTool, err := NewTool("complexTool",
 		WithTool_Description("复杂工具"),
 		WithTool_Callback(testCallback),
-		WithTool_Param(
-			NewToolParam("simpleParam", "string",
-				WithTool_ParamDescription("简单参数"),
-				WithTool_ParamRequired(true),
-			),
+		WithString("simpleParam",
+			Description("简单参数"),
+			Required(),
 		),
-		WithTool_Param(
-			NewToolParam("arrayParam", "array",
-				WithTool_ParamDescription("数组参数"),
-				WithTool_ArrayItem(
-					NewToolParamValue("string",
-						WithTool_ValueDescription("字符串项"),
-					),
-				),
-			),
+		WithStringArrayEx("arrayParam",
+			[]PropertyOption{
+				Description("数组参数"),
+				Required(),
+			},
+			Description("字符串项"),
 		),
-		WithTool_Param(
-			NewToolParam("nestedArrayParam", "array",
-				WithTool_ParamDescription("嵌套数组参数"),
-				WithTool_ArrayItem(
-					NewToolParamValue("array",
-						WithTool_ValueDescription("数组项"),
-						WithTool_ValueArrayItems([]*ToolParamValue{
-							NewToolParamValue("object",
-								WithTool_ValueDescription("对象项"),
-							),
-						}),
-					),
-				),
+		WithArrayEx("nestedItems",
+			[]PropertyOption{
+				Description("嵌套数组参数"),
+				Required(),
+			},
+			WithArray("array",
+				"number",
+				[]PropertyOption{
+					Description("数组项"),
+				},
+				Default(0),
 			),
 		),
 	)
@@ -456,8 +433,8 @@ func TestComplexToolCreation(t *testing.T) {
 		t.Errorf("Description = %v, want %v", complexTool.Description, "复杂工具")
 	}
 
-	if len(complexTool.Params) != 3 {
-		t.Errorf("Params length = %v, want %v", len(complexTool.Params), 3)
+	if len(complexTool.Params()) != 3 {
+		t.Errorf("Params length = %v, want %v", len(complexTool.Params()), 3)
 	}
 
 	// 验证JSON Schema生成

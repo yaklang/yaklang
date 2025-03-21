@@ -80,17 +80,13 @@ func WeatherTool() *Tool {
 	tool, _ := NewTool("WeatherAPI",
 		WithTool_Description("天气查询工具 - 根据城市和日期查询天气情况"),
 		WithTool_Callback(callback),
-		WithTool_Param(
-			NewToolParam("city", "string",
-				WithTool_ParamDescription("城市名称"),
-				WithTool_ParamRequired(true),
-			),
+		WithString("city",
+			Description("城市名称"),
+			Required(),
 		),
-		WithTool_Param(
-			NewToolParam("date", "string",
-				WithTool_ParamDescription("查询日期 (YYYY-MM-DD格式)"),
-				WithTool_ParamRequired(true),
-			),
+		WithString("date",
+			Description("查询日期 (YYYY-MM-DD格式)"),
+			Required(),
 		),
 	)
 
@@ -192,17 +188,13 @@ func AttractionTool() *Tool {
 	tool, _ := NewTool("AttractionAPI",
 		WithTool_Description("景点推荐工具 - 根据城市和偏好类型推荐景点"),
 		WithTool_Callback(callback),
-		WithTool_Param(
-			NewToolParam("city", "string",
-				WithTool_ParamDescription("城市名称"),
-				WithTool_ParamRequired(true),
-			),
+		WithString("city",
+			Description("城市名称"),
+			Required(),
 		),
-		WithTool_Param(
-			NewToolParam("preference", "string",
-				WithTool_ParamDescription("偏好类型（历史/自然/文化/娱乐）"),
-				WithTool_ParamRequired(false),
-			),
+		WithString("preference",
+			EnumString("历史", "自然", "文化", "娱乐"),
+			Description("偏好类型"),
 		),
 	)
 
@@ -313,23 +305,15 @@ func RestaurantTool() *Tool {
 	tool, _ := NewTool("RestaurantAPI",
 		WithTool_Description("餐厅搜索工具 - 根据位置、预算和菜系搜索餐厅"),
 		WithTool_Callback(callback),
-		WithTool_Param(
-			NewToolParam("location", "string",
-				WithTool_ParamDescription("位置坐标或区域名称"),
-				WithTool_ParamRequired(true),
-			),
+		WithString("location",
+			Description("位置坐标或区域名称"),
+			Required(),
 		),
-		WithTool_Param(
-			NewToolParam("budget", "string",
-				WithTool_ParamDescription("预算范围"),
-				WithTool_ParamRequired(false),
-			),
+		WithString("budget",
+			Description("预算范围"),
 		),
-		WithTool_Param(
-			NewToolParam("cuisine", "string",
-				WithTool_ParamDescription("菜系偏好"),
-				WithTool_ParamRequired(false),
-			),
+		WithString("cuisine",
+			Description("菜系偏好"),
 		),
 	)
 
@@ -390,17 +374,13 @@ func TransportTool() *Tool {
 	tool, _ := NewTool("TransportAPI",
 		WithTool_Description("交通查询工具 - 查询两地之间的交通方式"),
 		WithTool_Callback(callback),
-		WithTool_Param(
-			NewToolParam("origin", "string",
-				WithTool_ParamDescription("起点位置"),
-				WithTool_ParamRequired(true),
-			),
+		WithString("origin",
+			Description("起点位置"),
+			Required(),
 		),
-		WithTool_Param(
-			NewToolParam("destination", "string",
-				WithTool_ParamDescription("终点位置"),
-				WithTool_ParamRequired(true),
-			),
+		WithString("destination",
+			Description("终点位置"),
+			Required(),
 		),
 	)
 
@@ -521,27 +501,21 @@ func TimeEstimateTool() *Tool {
 	tool, _ := NewTool("TimeEstimateAPI",
 		WithTool_Description("行程时间估算工具 - 估算多地点行程所需时间"),
 		WithTool_Callback(callback),
-		WithTool_Param(
-			NewToolParam("locations", "array",
-				WithTool_ParamDescription("地点列表"),
-				WithTool_ParamRequired(true),
-				WithTool_ArrayItem(
-					NewToolParamValue("string",
-						WithTool_ValueDescription("地点名称"),
-					),
-				),
-			),
+		WithStringArrayEx("locations",
+			[]PropertyOption{
+				Description("地点列表"),
+				Required(),
+			},
+			Description("地点名称"),
+			Required(),
 		),
-		WithTool_Param(
-			NewToolParam("durations", "array",
-				WithTool_ParamDescription("各地点停留时间"),
-				WithTool_ParamRequired(false),
-				WithTool_ArrayItem(
-					NewToolParamValue("string",
-						WithTool_ValueDescription("停留时间（如\"2小时\"）"),
-					),
-				),
-			),
+		WithStringArrayEx("durations",
+			[]PropertyOption{
+				Description("各地点停留时间"),
+				Required(),
+			},
+			Description("停留时间"),
+			Required(),
 		),
 	)
 

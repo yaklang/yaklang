@@ -90,17 +90,13 @@ func TestExecuteToolWithCapture(t *testing.T) {
 	tool, err := NewTool("captureTest",
 		WithTool_Description("测试捕获输出的工具"),
 		WithTool_Callback(callback),
-		WithTool_Param(
-			NewToolParam("command", "string",
-				WithTool_ParamDescription("要执行的命令"),
-				WithTool_ParamRequired(true),
-			),
+		WithString("command",
+			Description("要执行的命令"),
+			Required(),
 		),
-		WithTool_Param(
-			NewToolParam("warning", "boolean",
-				WithTool_ParamDescription("是否显示警告"),
-				WithTool_ParamDefault(false),
-			),
+		WithBool("warning",
+			Description("是否显示警告"),
+			Default(false),
 		),
 	)
 
@@ -174,11 +170,9 @@ func TestToolResultIntegration(t *testing.T) {
 	tool, err := NewTool("integrationTest",
 		WithTool_Description("集成测试工具"),
 		WithTool_Callback(callback),
-		WithTool_Param(
-			NewToolParam("input", "string",
-				WithTool_ParamDescription("输入值"),
-				WithTool_ParamRequired(true),
-			),
+		WithString("input",
+			Description("输入值"),
+			Required(),
 		),
 	)
 

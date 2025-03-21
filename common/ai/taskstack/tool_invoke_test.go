@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestToolInvoke 测试工具调用
@@ -50,11 +52,9 @@ func TestToolInvoke(t *testing.T) {
 				return NewTool("echoTool",
 					WithTool_Description("回显工具"),
 					WithTool_Callback(echoCallback),
-					WithTool_Param(
-						NewToolParam("message", "string",
-							WithTool_ParamDescription("要回显的消息"),
-							WithTool_ParamRequired(true),
-						),
+					WithString("message",
+						Description("要回显的消息"),
+						Required(),
 					),
 				)
 			},
@@ -79,11 +79,9 @@ func TestToolInvoke(t *testing.T) {
 				return NewTool("validationTool",
 					WithTool_Description("验证工具"),
 					WithTool_Callback(validationCallback),
-					WithTool_Param(
-						NewToolParam("query", "string",
-							WithTool_ParamDescription("查询字符串"),
-							WithTool_ParamRequired(true),
-						),
+					WithString("query",
+						Description("查询字符串"),
+						Required(),
 					),
 				)
 			},
@@ -163,25 +161,17 @@ func TestToolInvoke(t *testing.T) {
 				return NewTool("complexTool",
 					WithTool_Description("复杂工具"),
 					WithTool_Callback(echoCallback),
-					WithTool_Param(
-						NewToolParam("stringParam", "string",
-							WithTool_ParamDescription("字符串参数"),
-							WithTool_ParamRequired(true),
-						),
+					WithString("stringParam",
+						Description("字符串参数"),
+						Required(),
 					),
-					WithTool_Param(
-						NewToolParam("numberParam", "number",
-							WithTool_ParamDescription("数字参数"),
-							WithTool_ParamDefault(42),
-						),
+					WithNumber("numberParam",
+						Description("数字参数"),
+						Default(42),
 					),
-					WithTool_Param(
-						NewToolParam("arrayParam", "array",
-							WithTool_ParamDescription("数组参数"),
-							WithTool_ArrayItem(
-								NewToolParamValue("string"),
-							),
-						),
+					WithStringArray("arrayParam",
+						Description("数组参数"),
+						Required(),
 					),
 				)
 			},
@@ -321,39 +311,31 @@ func TestNewToolFromJSON(t *testing.T) {
 		t.Errorf("工具描述 = %s, want %s", tool.Description, "从JSON定义创建的工具")
 	}
 
-	if len(tool.Params) != 3 {
-		t.Errorf("参数数量 = %d, want %d", len(tool.Params), 3)
+	params := tool.Params()
+	if len(params) != 3 {
+		t.Errorf("参数数量 = %d, want %d", len(params), 3)
 		return
 	}
 
 	// 验证第一个参数
-	if tool.Params[0].Name != "query" {
-		t.Errorf("第一个参数名 = %s, want %s", tool.Params[0].Name, "query")
-	}
-	if !tool.Params[0].Required {
-		t.Errorf("第一个参数 required = %v, want %v", tool.Params[0].Required, true)
-	}
+	query, ok := params["query"].(map[string]any)
+	require.True(t, ok, "query 参数不存在")
+	require.Equal(t, query["type"], "string", "query 参数类型错误")
 
 	// 验证第二个参数
-	if tool.Params[1].Name != "limit" {
-		t.Errorf("第二个参数名 = %s, want %s", tool.Params[1].Name, "limit")
-	}
-	if tool.Params[1].Default != float64(10) {
-		t.Errorf("第二个参数默认值 = %v, want %v", tool.Params[1].Default, float64(10))
-	}
+	limit, ok := params["limit"].(map[string]any)
+	require.True(t, ok, "limit 参数不存在")
+	require.Equal(t, limit["type"], "number", "limit 参数类型错误")
+	require.Equal(t, limit["default"], float64(10), "limit 参数 default 错误")
 
 	// 验证第三个参数（数组类型）
-	if tool.Params[2].Name != "tags" {
-		t.Errorf("第三个参数名 = %s, want %s", tool.Params[2].Name, "tags")
-	}
-	if tool.Params[2].Type != "array" {
-		t.Errorf("第三个参数类型 = %s, want %s", tool.Params[2].Type, "array")
-	}
-	if len(tool.Params[2].ArrayItem) < 1 {
-		t.Errorf("第三个参数数组项为空")
-	} else if tool.Params[2].ArrayItem[0].Type != "string" {
-		t.Errorf("第三个参数数组项类型 = %s, want %s", tool.Params[2].ArrayItem[0].Type, "string")
-	}
+	tags, ok := params["tags"].(map[string]any)
+	require.True(t, ok, "tags 参数不存在")
+	require.Equal(t, tags["type"], "array", "tags 参数类型错误")
+	tagItems, ok := tags["items"].(map[string]any)
+	require.True(t, ok, "tags 参数数组项不存在")
+	require.Equal(t, tagItems["type"], "string", "tags 参数数组项类型错误")
+	require.Equal(t, tagItems["description"], "标签", "tags 参数数组项描述错误")
 
 	// 测试使用从JSON创建的工具进行调用
 	inputJSON := `{

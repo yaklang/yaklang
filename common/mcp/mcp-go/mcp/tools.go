@@ -1,6 +1,10 @@
 package mcp
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/samber/lo"
+)
 
 // ListToolsRequest is sent from the client to request a list of tools the
 // server has.
@@ -186,7 +190,7 @@ func Enum(values ...any) PropertyOption {
 
 func EnumString(values ...string) PropertyOption {
 	return func(schema map[string]any) {
-		schema["enum"] = values
+		schema["enum"] = lo.Map(values, func(item string, _ int) any { return item })
 	}
 }
 
@@ -313,7 +317,9 @@ func WithStructArray(name string, opts []PropertyOption, itemsOpt ...ToolOption)
 		"items": items,
 	}
 	temp := NewTool("", itemsOpt...)
-	items["properties"] = temp.InputSchema.Properties
+	for k, v := range temp.InputSchema.Properties {
+		items[k] = v
+	}
 	items["required"] = temp.InputSchema.Required
 	return WithRaw(name, schema, opts...)
 }
@@ -423,5 +429,14 @@ func WithRaw(name string, object map[string]any, opts ...PropertyOption) ToolOpt
 		}
 
 		t.InputSchema.Properties[name] = object
+	}
+}
+
+// ToMap converts the ToolInputSchema to a map[string]any.
+func (s *ToolInputSchema) ToMap() map[string]any {
+	return map[string]any{
+		"type":       s.Type,
+		"properties": s.Properties,
+		"required":   lo.Map(s.Required, func(item string, _ int) any { return item }),
 	}
 }
