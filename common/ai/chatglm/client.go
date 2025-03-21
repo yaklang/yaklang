@@ -5,8 +5,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/utils"
-
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
@@ -22,11 +20,18 @@ func (g *GLMClient) GetModelList() ([]*aispec.ModelMeta, error) {
 }
 
 func (g *GLMClient) SupportedStructuredStream() bool {
-	return false
+	return true
 }
 
 func (g *GLMClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
-	return nil, utils.Error("unsupported method")
+	return aispec.StructuredStreamBase(
+		g.targetUrl,
+		g.config.Model,
+		s,
+		g.BuildHTTPOptions,
+		g.config.StreamHandler,
+		g.config.ReasonStreamHandler,
+	)
 }
 
 var _ aispec.AIClient = (*GLMClient)(nil)

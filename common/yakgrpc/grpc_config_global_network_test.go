@@ -41,8 +41,7 @@ type GetawayClient struct {
 }
 
 func (g *GetawayClient) SupportedStructuredStream() bool {
-	//TODO implement me
-	panic("implement me")
+	return false
 }
 
 func (g *GetawayClient) GetModelList() ([]*aispec.ModelMeta, error) {
