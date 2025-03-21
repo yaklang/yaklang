@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -57,6 +58,107 @@ func ListChatModels(url string, opt func() ([]poc.PocConfigOption, error)) ([]*M
 	}
 
 	return resp.Data, nil
+}
+
+type streamToStructuredStream struct {
+	isReason bool
+	id       func() int
+	idInc    func()
+	mutex    *sync.Mutex
+	r        chan *StructuredData
+}
+
+func (s *streamToStructuredStream) Write(p []byte) (n int, err error) {
+	if s.r == nil {
+		return 0, utils.Error("streamToStructuredStream is not initialized")
+	}
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.idInc != nil {
+		s.idInc()
+	}
+	id := s.id()
+
+	data := &StructuredData{
+		Id:           fmt.Sprint(id),
+		Event:        "data",
+		OutputText:   "",
+		OutputReason: "",
+	}
+	if s.isReason {
+		data.OutputReason = string(p)
+	} else {
+		data.OutputText = string(p)
+	}
+	s.r <- data
+	return len(p), nil
+}
+
+func StructuredStreamBase(
+	url string,
+	model string,
+	msg string,
+	opt func() ([]poc.PocConfigOption, error),
+	streamHandler func(io.Reader),
+	reasonHandler func(io.Reader),
+) (chan *StructuredData, error) {
+	var schan = make(chan *StructuredData, 1000)
+	id := 0
+	getId := func() int {
+		return id
+	}
+	idInc := func() {
+		id++
+	}
+	m := new(sync.Mutex)
+	go func() {
+		_, err := ChatBase(url, model, msg, nil, opt, func(reader io.Reader) {
+			structured := &streamToStructuredStream{
+				isReason: false,
+				id:       getId,
+				idInc:    idInc,
+				mutex:    m,
+				r:        schan,
+			}
+			if streamHandler == nil {
+				// read from reader
+				io.Copy(structured, reader)
+				return
+			}
+			// tee reader to mirror streamHandler
+			r, w := utils.NewPipe()
+			defer w.Close()
+			newReader := io.TeeReader(reader, w)
+			go func() { streamHandler(r) }()
+
+			// read from newReader
+			io.Copy(structured, newReader)
+		}, func(reader io.Reader) {
+			structured := &streamToStructuredStream{
+				isReason: true,
+				id:       getId,
+				idInc:    idInc,
+				mutex:    m,
+				r:        schan,
+			}
+			if reasonHandler == nil {
+				io.Copy(structured, reader)
+				return
+			}
+			// tee reader to mirror streamHandler
+			r, w := utils.NewPipe()
+			defer w.Close()
+			newReader := io.TeeReader(reader, w)
+			go func() { streamHandler(r) }()
+			// read from newReader
+			io.Copy(structured, newReader)
+		})
+		if err != nil {
+			log.Errorf("structured stream error: %v", err)
+		}
+	}()
+	return schan, nil
 }
 
 func ChatBase(

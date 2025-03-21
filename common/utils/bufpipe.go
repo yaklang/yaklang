@@ -74,6 +74,10 @@ func NewBufPipe(buf []byte) (*PipeReader, *PipeWriter) {
 		}
 }
 
+func NewPipe() (*PipeReader, *PipeWriter) {
+	return NewBufPipe(nil)
+}
+
 // Read implements the standard Read interface: it reads data from the pipe,
 // reading from the internal buffer, otherwise blocking until a writer arrives
 // or the write end is closed. If the write end is closed with an error, that

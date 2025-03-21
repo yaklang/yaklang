@@ -125,8 +125,15 @@ func (g *GatewayClient) CheckValid() error {
 
 var _ aispec.AIClient = (*GatewayClient)(nil)
 
-func (g *GatewayClient) SupportedStructuredStream() bool { return false }
+func (g *GatewayClient) SupportedStructuredStream() bool { return true }
 
 func (g *GatewayClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
-	return nil, aispec.ErrUnsupportedMethod
+	return aispec.StructuredStreamBase(
+		g.targetUrl,
+		g.config.Model,
+		s,
+		g.BuildHTTPOptions,
+		g.config.StreamHandler,
+		g.config.ReasonStreamHandler,
+	)
 }
