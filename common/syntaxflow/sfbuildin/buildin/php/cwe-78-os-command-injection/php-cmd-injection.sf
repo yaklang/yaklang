@@ -29,7 +29,7 @@ alert $high for{
 
 $sink#{
     include: `<self> & $params`,
-    exclude: `<self>?{opcode: call && <self><getCallee> & $filter}`
+    include: `<self>?{opcode: call && !<self><getCallee> & $filter}`
 }-> as $middle
 
 alert $middle for{
