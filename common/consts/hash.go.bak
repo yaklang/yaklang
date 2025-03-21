@@ -3,4 +3,4 @@
 package consts
 
 const ExistedCorePluginEmbedFSHash string = "f8975f1b31ae711746f34440f1d6c6681a30320b7b0c1bac20c1a3c236573b8b"
-const ExistedSyntaxFlowEmbedFSHash string = "718b2d4a52d5cc611cad96addaa4833af8db65dbfeb747b6d867f27760a97428"
+const ExistedSyntaxFlowEmbedFSHash string = "0fe431adde801f9e8ddd2619e2369a06aa8de9ab30247b857367c02ca2a321a4"

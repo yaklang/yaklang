@@ -1,6 +1,6 @@
 desc(
     title: " Open Redirect Vulnerability",
-    title_zh: "开放重定向漏洞，可能会导致用户进入恶意链接，从而实现钓鱼攻击",
+    title_zh: "重定向漏洞",
     level: "low",
     risk: "open-redirect",
     type: "audit",
