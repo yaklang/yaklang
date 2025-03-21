@@ -18,4 +18,18 @@ func TestJsonLoads(t *testing.T) {
 }`, v)
 		}
 	})
+
+	t.Run("other type", func(t *testing.T) {
+		v := _jsonLoad(`[1,2,3]`)
+		dumps := _jsonDumps(v, _withIndent(""), _withPrefix(""))
+		require.Equal(t, `[1,2,3]`, dumps)
+
+		v = _jsonLoad(`123`)
+		dumps = _jsonDumps(v, _withIndent(""), _withPrefix(""))
+		require.Equal(t, `123`, dumps)
+
+		v = _jsonLoad(`true`)
+		dumps = _jsonDumps(v, _withIndent(""), _withPrefix(""))
+		require.Equal(t, `true`, dumps)
+	})
 }
