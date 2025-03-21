@@ -166,6 +166,8 @@ func (t *Tool) validate(iSchema any, params map[string]any) (valid bool, errs []
 	if err != nil {
 		return false, []string{fmt.Sprintf("JSON Schema 编译失败: %v", trimErrorFirstLine(err.Error()))}
 	}
+	applyDefault(schema, params)
+
 	err = schema.Validate(params)
 	valid = err == nil
 	if !valid {
@@ -232,5 +234,52 @@ func NewToolFromJSON(jsonStr string, callback InvokeCallback) (*Tool, error) {
 }
 
 func applyDefault(schema *jsonschema.Schema, params map[string]any) {
+	for key, prop := range schema.Properties {
+		// 检查字段是否存在
+		if _, exists := params[key]; !exists && prop.Default != nil {
+			params[key] = *prop.Default
+		}
 
+		// 处理嵌套对象
+		types := prop.Types.String()
+		if types == "[object]" && prop.Properties != nil {
+			subParams, ok := params[key].(map[string]any)
+			if ok {
+				applyDefault(prop, subParams)
+			}
+		}
+
+		// 处理数组
+		var (
+			arraySchema *jsonschema.Schema
+			realParams  []any
+			ok          bool
+		)
+		if types == "[array]" {
+			if prop.Items2020 != nil {
+				realParams, ok = params[key].([]any)
+				if ok {
+					arraySchema = prop.Items2020
+				}
+			} else if prop.Items != nil {
+				switch items := prop.Items.(type) {
+				case *jsonschema.Schema:
+					realParams, ok = params[key].([]any)
+					if ok {
+						arraySchema = items
+					}
+				case []*jsonschema.Schema:
+					// TODO handle this case
+				}
+			}
+		}
+
+		if arraySchema != nil && len(realParams) > 0 {
+			for _, item := range realParams {
+				if realParamMap, ok := item.(map[string]any); ok {
+					applyDefault(arraySchema, realParamMap)
+				}
+			}
+		}
+	}
 }

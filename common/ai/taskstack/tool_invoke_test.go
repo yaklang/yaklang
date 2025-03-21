@@ -258,6 +258,121 @@ func TestToolInvoke(t *testing.T) {
 	}
 }
 
+func TestToolApplyDefault(t *testing.T) {
+	echoCallback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+		fmt.Fprintf(stdout, "执行JSON定义的工具\n")
+		return params, nil
+	}
+	checkWithCallback := func(t *testing.T, toolDefJSON string, params map[string]any, callback func(params map[string]any)) {
+		tool, err := NewToolFromJSON(toolDefJSON, echoCallback)
+		require.NoError(t, err, "从JSON创建工具失败")
+
+		result, err := tool.InvokeWithParams(params)
+		require.NoError(t, err, "工具调用失败")
+		require.True(t, result.Success, "工具调用不成功")
+
+		// 验证工具调用结果包含所有参数
+		execResult, ok := result.Data.(*ToolExecutionResult)
+		require.True(t, ok, "结果类型错误，期望 *ToolExecutionResult")
+
+		resultData, ok := execResult.Result.(map[string]interface{})
+		require.True(t, ok, "结果数据类型错误, want map[string]interface{}")
+		callback(resultData)
+	}
+
+	t.Run("string", func(t *testing.T) {
+		toolDefJSON := `{
+			"name": "testTool",
+			"description": "测试工具",
+			"params": [
+				{
+					"name": "query",
+					"type": "string",
+					"default": "defaultQuery"
+				}
+			]
+		}`
+		checkWithCallback(t, toolDefJSON, map[string]any{}, func(params map[string]any) {
+			require.Equal(t, "defaultQuery", params["query"], "默认值测试失败")
+		})
+	})
+
+	t.Run("object", func(t *testing.T) {
+		toolDefJSON := `{
+			"name": "testTool",
+			"description": "测试工具",
+			"params": [
+				{
+					"name": "o",
+					"type": "object",
+					"properties": {
+						"query": {
+							"type": "string",
+							"default": "defaultQuery"
+						}
+					}
+				}
+			]
+		}`
+		checkWithCallback(t, toolDefJSON, map[string]any{
+			"o": map[string]any{},
+		}, func(params map[string]any) {
+			o, ok := params["o"].(map[string]any)
+			require.True(t, ok, "o 参数不存在")
+			require.Equal(t, "defaultQuery", o["query"], "默认值测试失败")
+		})
+	})
+
+	t.Run("array", func(t *testing.T) {
+		toolDefJSON := `{
+			"name": "testTool",
+			"description": "测试工具",
+			"params": [
+				{
+					"name": "arrayParam",
+					"type": "array",
+					"default": ["defaultItem"]
+				}
+			]
+		}`
+		checkWithCallback(t, toolDefJSON, map[string]any{}, func(params map[string]any) {
+			array, ok := params["arrayParam"].([]any)
+			require.True(t, ok, "arrayParam 参数不存在")
+			require.Equal(t, []any{"defaultItem"}, array, "默认值测试失败")
+		})
+	})
+
+	t.Run("array_object", func(t *testing.T) {
+		toolDefJSON := `{
+			"name": "testTool",
+			"description": "测试工具",
+			"params": [
+				{
+					"name": "arrayParam",
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"query": {
+								"type": "string",
+								"default": "defaultItem"
+							}
+						}
+					}
+				}
+			]
+		}`
+		checkWithCallback(t, toolDefJSON, map[string]any{
+			"arrayParam": []any{map[string]any{}},
+		}, func(params map[string]any) {
+			array, ok := params["arrayParam"].([]any)
+			require.True(t, ok, "arrayParam 参数不存在")
+			require.Equal(t, []any{map[string]any{"query": "defaultItem"}}, array, "默认值测试失败")
+		})
+	})
+
+}
+
 // TestNewToolFromJSON 测试从JSON定义创建工具
 func TestNewToolFromJSON(t *testing.T) {
 	// 工具定义JSON
