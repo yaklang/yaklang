@@ -3,8 +3,9 @@ package pcaputil
 import (
 	"errors"
 	"fmt"
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	gopacketLayers "github.com/gopacket/gopacket/layers"
 	"github.com/samber/lo"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
@@ -322,7 +323,8 @@ func (w *PcapHandleWrapper) ReadPacketData() ([]byte, gopacket.CaptureInfo, erro
 	if w.isClose {
 		return nil, gopacket.CaptureInfo{}, utils.Errorf("handle is closed")
 	}
-	return w.handle.ReadPacketData()
+	data, ci, err := w.handle.ReadPacketData()
+	return data, gopacket.CaptureInfo(ci), err
 }
 
 func (w *PcapHandleWrapper) close() {
@@ -374,7 +376,7 @@ func (w *PcapHandleWrapper) CompileBPFFilter(expr string) ([]pcap.BPFInstruction
 }
 
 func (w *PcapHandleWrapper) LinkType() layers.LinkType {
-	return w.handle.LinkType()
+	return layers.LinkType(w.handle.LinkType())
 }
 
 func (w *PcapHandleWrapper) ListDataLinks() ([]pcap.Datalink, error) {
@@ -390,7 +392,7 @@ func (w *PcapHandleWrapper) NewBPFInstructionFilter(bpfInstructions []pcap.BPFIn
 }
 
 func (w *PcapHandleWrapper) Resolution() gopacket.TimestampResolution {
-	return w.handle.Resolution()
+	return gopacket.TimestampResolution(w.handle.Resolution())
 }
 
 func (w *PcapHandleWrapper) SetBPFFilter(expr string) error {
@@ -406,7 +408,7 @@ func (w *PcapHandleWrapper) SetDirection(direction pcap.Direction) error {
 }
 
 func (w *PcapHandleWrapper) SetLinkType(linkType layers.LinkType) error {
-	return w.handle.SetLinkType(linkType)
+	return w.handle.SetLinkType(gopacketLayers.LinkType(linkType))
 }
 
 func (w *PcapHandleWrapper) Stats() (*pcap.Stats, error) {
@@ -418,5 +420,6 @@ func (w *PcapHandleWrapper) SnaLen() int {
 }
 
 func (w *PcapHandleWrapper) ZeroCopyReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
-	return w.handle.ZeroCopyReadPacketData()
+	data, ci, err := w.handle.ZeroCopyReadPacketData()
+	return data, gopacket.CaptureInfo(ci), err
 }
