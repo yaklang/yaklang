@@ -103,10 +103,9 @@ func taskNeedsTool(task Task, tools []*Tool) bool {
 func TestTaskAndToolIntegration(t *testing.T) {
 	task := NewTask("test", "test goal", WithTask_Callback(mockAICallback))
 	tools := []*Tool{
-		{
-			Name:        "test-tool",
-			Description: "test tool description",
-		},
+		newTool("test-tool",
+			WithTool_Description("test tool description"),
+		),
 	}
 	task.ApplyOptions(WithTask_Tools(tools))
 
@@ -118,14 +117,12 @@ func TestTaskAndToolIntegration(t *testing.T) {
 func TestToolSelectionFromTask(t *testing.T) {
 	task := NewTask("test", "test goal", WithTask_Callback(mockAICallback))
 	tools := []*Tool{
-		{
-			Name:        "tool1",
-			Description: "tool1 description",
-		},
-		{
-			Name:        "tool2",
-			Description: "tool2 description",
-		},
+		newTool("tool1",
+			WithTool_Description("tool1 description"),
+		),
+		newTool("tool2",
+			WithTool_Description("tool2 description"),
+		),
 	}
 	task.ApplyOptions(WithTask_Tools(tools))
 
