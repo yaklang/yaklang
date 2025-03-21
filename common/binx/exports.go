@@ -2,6 +2,7 @@ package binx
 
 var Exports = map[string]any{
 	"Read": BinaryRead,
+	"Find": FindResultByIdentifier,
 
 	// PartDescriptor
 	"toInt":    NewInt64,
