@@ -1,4 +1,4 @@
-package aid
+package aitool
 
 import (
 	"encoding/json"
@@ -212,9 +212,9 @@ func NewToolFromJSON(jsonStr string, callback InvokeCallback) (*Tool, error) {
 	}
 
 	// 创建工具
-	tool, err := NewTool(toolDef.Name,
-		WithTool_Description(toolDef.Description),
-		WithTool_Callback(callback),
+	tool, err := New(toolDef.Name,
+		WithDescription(toolDef.Description),
+		WithCallback(callback),
 	)
 
 	if err != nil {

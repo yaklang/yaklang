@@ -1,6 +1,9 @@
 package aid
 
-import "sync"
+import (
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"sync"
+)
 
 type AICaller interface {
 	callAI(*AIRequest) (*AIResponse, error)
@@ -19,7 +22,7 @@ type Config struct {
 
 	// no need to think, low level
 	taskAICallback AICallbackType
-	tools          []*Tool
+	tools          []*aitool.Tool
 	eventHandler   func(e *Event)
 }
 
@@ -40,7 +43,7 @@ func newConfig() *Config {
 
 type Option func(config *Config) error
 
-func WithTool(tool *Tool) Option {
+func WithTool(tool *aitool.Tool) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -49,7 +52,7 @@ func WithTool(tool *Tool) Option {
 	}
 }
 
-func WithTools(tool ...*Tool) Option {
+func WithTools(tool ...*aitool.Tool) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
