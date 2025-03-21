@@ -51,7 +51,8 @@ func FilterAnalyzedHTTPFlowRule(db *gorm.DB, params *ypb.AnalyzedHTTPFlowFilter)
 
 func QueryAnalyzedHTTPFlowRule(db *gorm.DB, resultIds []string) []*schema.AnalyzedHTTPFlow {
 	var flows []*schema.AnalyzedHTTPFlow
-	db = db.Model(&schema.AnalyzedHTTPFlow{}).Preloads("HTTPFlow")
+	db = db.Model(&schema.AnalyzedHTTPFlow{})
+	db = db.Preload("HTTPFlow")
 	db.Where("result_id IN (?)", resultIds).Find(&flows)
 	return flows
 }
