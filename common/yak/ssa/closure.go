@@ -17,8 +17,7 @@ type FunctionSideEffect struct {
 	Modify      Value
 	// only call-side Scope > this Scope-level, this side-effect can be create
 	// Scope *Scope
-	Variable     *Variable
-	BindVariable *Variable
+	Variable *Variable
 
 	forceCreate bool
 
@@ -38,7 +37,7 @@ func (f *Function) AddForceSideEffect(name string, v Value, index int) {
 }
 
 func (f *Function) AddSideEffect(variable *Variable, v Value) {
-	var bind *Variable
+	var bind *Variable = variable
 
 	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
 		parentScope := p.CurrentBlock.ScopeTable
@@ -47,16 +46,12 @@ func (f *Function) AddSideEffect(variable *Variable, v Value) {
 			break
 		}
 	}
-	if bind == nil {
-		bind = variable
-	}
 
 	f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
-		Name:         variable.GetName(),
-		VerboseName:  variable.GetName(),
-		Modify:       v,
-		Variable:     variable,
-		BindVariable: bind,
+		Name:        variable.GetName(),
+		VerboseName: variable.GetName(),
+		Modify:      v,
+		Variable:    bind,
 		parameterMemberInner: &parameterMemberInner{
 			MemberCallKind: NoMemberCall,
 		},
@@ -64,7 +59,7 @@ func (f *Function) AddSideEffect(variable *Variable, v Value) {
 }
 
 func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
-	var bind *Variable
+	var bind *Variable = variable
 
 	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
 		parentScope := p.CurrentBlock.ScopeTable
@@ -78,9 +73,6 @@ func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
 			}
 		}
 	}
-	if bind == nil {
-		bind = variable
-	}
 
 	if variable.IsMemberCall() {
 		// if name is member call, it's modify parameter field
@@ -93,8 +85,7 @@ func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
 			Name:                 variable.GetName(),
 			VerboseName:          getMemberVerboseName(variable.object, variable.key),
 			Modify:               v,
-			Variable:             variable,
-			BindVariable:         bind,
+			Variable:             bind,
 			forceCreate:          false,
 			parameterMemberInner: newParameterMember(para, variable.key),
 		}
@@ -131,9 +122,6 @@ func handleSideEffect(c *Call, funcTyp *FunctionType) {
 				}
 			}
 			variable = builder.CreateVariableForce(se.Name)
-			if se.BindVariable != nil {
-				variable.SetCaptured(se.BindVariable)
-			}
 		} else {
 			// is object
 			obj, ok := se.Get(c)
@@ -141,15 +129,15 @@ func handleSideEffect(c *Call, funcTyp *FunctionType) {
 				continue
 			}
 			variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
-			if se.BindVariable != nil {
-				variable.SetCaptured(se.BindVariable)
-			}
 		}
 
 		if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
 			// TODO: handle side effect in loop scope,
 			// will replace value in scope and create new phi
 			sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
+			if se.Variable != nil {
+				variable.SetCaptured(se.Variable)
+			}
 			builder.AssignVariable(variable, sideEffect)
 			sideEffect.SetVerboseName(se.VerboseName)
 			c.SideEffectValue[se.VerboseName] = sideEffect
@@ -165,11 +153,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 	for _, se := range funcTyp.SideEffects {
 		var variable, bindVariable *Variable
 		var bindScope, modifyScope ScopeIF
-		if se.BindVariable != nil {
-			// BindVariable大多数时候和Variable相同，除非遇到object
-			bindScope = se.BindVariable.GetScope()
-			bindVariable = se.BindVariable
-		} else if se.Variable != nil {
+		if se.Variable != nil {
 			bindScope = se.Variable.GetScope()
 			bindVariable = se.Variable
 		} else {
@@ -188,9 +172,6 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				}
 			}
 			variable = builder.CreateVariableForce(se.Name)
-			if se.BindVariable != nil {
-				variable.SetCaptured(se.BindVariable)
-			}
 		case ParameterCall:
 			val, exists := se.Get(c)
 			if !exists || utils.IsNil(val) {
@@ -204,7 +185,6 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				se.Name = val.GetLastVariable().GetName()
 			}
 			se.Variable = val.GetLastVariable()
-			se.BindVariable = val.GetLastVariable()
 			variable = builder.CreateVariable(se.Name)
 		case CallMemberCall:
 			obj, ok := se.Get(c)
@@ -227,16 +207,13 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			}
 			// is object
 			variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
-			if se.BindVariable != nil {
-				variable.SetCaptured(se.BindVariable)
-			}
 		}
 
 		if sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify); sideEffect != nil {
 			if builder.SupportClosure {
-				if parentValue, ok := builder.getParentFunctionVariable(se.Name); ok && se.BindVariable != nil {
+				if parentValue, ok := builder.getParentFunctionVariable(se.Name); ok && se.Variable != nil {
 					// the ret variable should be FreeValue
-					para := builder.BuildFreeValueByVariable(se.BindVariable)
+					para := builder.BuildFreeValueByVariable(se.Variable)
 					para.SetDefault(parentValue)
 					para.SetType(parentValue.GetType())
 					parentValue.AddOccultation(para)
@@ -247,6 +224,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				// TODO: handle side effect in loop scope,
 				// will replace value in scope and create new phi
 				sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
+				if se.Variable != nil {
+					variable.SetCaptured(se.Variable)
+				}
 				builder.AssignVariable(variable, sideEffect)
 				sideEffect.SetVerboseName(se.VerboseName)
 				c.SideEffectValue[se.VerboseName] = sideEffect
@@ -259,7 +239,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 					return
 				}
 				sideEffect.SetVerboseName(se.VerboseName)
-				currentScope.SetCapturedSideEffect(se.VerboseName, variable, se.BindVariable)
+				currentScope.SetCapturedSideEffect(se.VerboseName, variable, se.Variable)
 
 				function.SideEffects = append(function.SideEffects, se)
 			}
