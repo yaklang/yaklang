@@ -295,6 +295,19 @@ func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec
 	return nil, errors.New("not found valid ai agent or retry times is over")
 }
 
+func ListModels(opts ...aispec.AIConfigOption) ([]*aispec.ModelMeta, error) {
+	config := aispec.NewDefaultAIConfig(opts...)
+	client := GetAI(config.Type, opts...)
+	return client.GetModelList()
+}
+
+func ListModelByProviderType(providerType string, opts ...aispec.AIConfigOption) ([]*aispec.ModelMeta, error) {
+	config := aispec.NewDefaultAIConfig(opts...)
+	config.Type = providerType
+	client := GetAI(config.Type, opts...)
+	return client.GetModelList()
+}
+
 func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp map[string]any
@@ -331,9 +344,11 @@ var Exports = map[string]any{
 	"ChatGLM":  ChatGLM,
 	"Moonshot": Moonshot,
 
-	"Chat":             Chat,
-	"FunctionCall":     FunctionCall,
-	"StructuredStream": StructuredStream,
+	"Chat":                    Chat,
+	"FunctionCall":            FunctionCall,
+	"StructuredStream":        StructuredStream,
+	"ListModels":              ListModels,
+	"ListModelByProviderType": ListModelByProviderType,
 
 	"timeout":            aispec.WithTimeout,
 	"proxy":              aispec.WithProxy,
