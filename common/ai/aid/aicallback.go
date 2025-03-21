@@ -10,7 +10,7 @@ import (
 type AIRequest struct {
 	prompt           string
 	shouldHaveAction bool
-	ctx              *TaskSystemContext
+	ctx              *taskContext
 }
 
 func (r *AIRequest) GetPrompt() string {
@@ -45,7 +45,7 @@ type OutputStream struct {
 
 type AIRequestOption func(req *AIRequest)
 
-func WithAIRequest_TaskContext(ctx *TaskSystemContext) AIRequestOption {
+func WithAIRequest_TaskContext(ctx *taskContext) AIRequestOption {
 	return func(req *AIRequest) {
 		req.ctx = ctx
 	}

@@ -3,6 +3,7 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
 
 	"github.com/tidwall/gjson"
@@ -12,8 +13,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (t *aiTask) getToolRequired(response string) []*Tool {
-	var toolRequired []*Tool
+func (t *aiTask) getToolRequired(response string) []*aitool.Tool {
+	var toolRequired []*aitool.Tool
 	for _, pairs := range jsonextractor.ExtractObjectIndexes(response) {
 		start, end := pairs[0], pairs[1]
 		toolRequiredJSON := response[start:end]
@@ -52,7 +53,7 @@ func (t *aiTask) getToolResultAction(response string) string {
 	return "unknown"
 }
 
-func (t *aiTask) callTool(ctx *TaskSystemContext, targetTool *Tool) (result *ToolResult, action string, err error) {
+func (t *aiTask) callTool(ctx *taskContext, targetTool *aitool.Tool) (result *aitool.ToolResult, action string, err error) {
 	// 生成申请工具详细描述的prompt
 	paramsPrompt, err := t.generateRequireToolResponsePrompt(ctx, targetTool, targetTool.Name)
 	if err != nil {
@@ -97,7 +98,7 @@ func (t *aiTask) callTool(ctx *TaskSystemContext, targetTool *Tool) (result *Too
 }
 
 // executeTask 实际执行任务并返回结果
-func (t *aiTask) executeTask(ctx *TaskSystemContext) error {
+func (t *aiTask) executeTask(ctx *taskContext) error {
 	// 使用Task的内部字段，如果传入的参数为nil则使用内部字段
 	actualMetadata := map[string]any{}
 	if t.metadata != nil {

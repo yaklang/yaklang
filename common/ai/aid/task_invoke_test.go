@@ -3,6 +3,7 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
 	"os"
 	"strings"
@@ -77,9 +78,9 @@ func TestTask_Invoke_NoTools(t *testing.T) {
 // TestTask_Invoke_WithTools 测试带工具的任务执行
 func TestTask_Invoke_WithTools(t *testing.T) {
 	task := NewTask("test", "test goal", WithTask_Callback(mockAICallback))
-	tools := []*Tool{
-		newTool("test_tool",
-			WithTool_Description("用于测试的工具"),
+	tools := []*aitool.Tool{
+		aitool.newTool("test_tool",
+			aitool.WithDescription("用于测试的工具"),
 		),
 	}
 	task.ApplyOptions(WithTask_Tools(tools))
@@ -89,17 +90,17 @@ func TestTask_Invoke_WithTools(t *testing.T) {
 
 func TestTask_Invoke_WithToolDescription(t *testing.T) {
 	// 创建一个测试工具
-	testTool, err := NewTool("test_tool",
-		WithTool_Description("用于测试的工具"),
-		WithTool_StringParam("param1",
-			WithParam_Description("参数1"),
-			WithParam_Required(),
+	testTool, err := aitool.NewTool("test_tool",
+		aitool.WithDescription("用于测试的工具"),
+		aitool.WithStringParam("param1",
+			aitool.WithParam_Description("参数1"),
+			aitool.WithParam_Required(),
 		),
-		WithTool_NumberParam("param2",
-			WithParam_Description("参数2"),
-			WithParam_Default(42),
+		aitool.WithNumberParam("param2",
+			aitool.WithParam_Description("参数2"),
+			aitool.WithParam_Default(42),
 		),
-		WithTool_Callback(func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+		aitool.WithCallback(func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 			return "工具执行成功", nil
 		}),
 	)
@@ -121,7 +122,7 @@ func TestTask_Invoke_WithToolDescription(t *testing.T) {
 	}
 
 	// 生成任务提示
-	prompt, err := task.generateTaskPrompt([]*Tool{testTool}, ctx, map[string]interface{}{})
+	prompt, err := task.generateTaskPrompt([]*aitool.Tool{testTool}, ctx, map[string]interface{}{})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, prompt)
 	assert.Contains(t, prompt, "test_tool")
@@ -175,31 +176,31 @@ func TestTask_JSONSerialization(t *testing.T) {
 
 func TestTask_ToolJSONSchema(t *testing.T) {
 	// 创建一个具有多种参数类型的测试工具
-	complexTool, err := NewTool("complex_tool",
-		WithTool_Description("具有多种参数类型的复杂工具"),
-		WithTool_StringParam("string_param",
-			WithParam_Description("字符串参数"),
-			WithParam_Required(),
+	complexTool, err := aitool.NewTool("complex_tool",
+		aitool.WithDescription("具有多种参数类型的复杂工具"),
+		aitool.WithStringParam("string_param",
+			aitool.WithParam_Description("字符串参数"),
+			aitool.WithParam_Required(),
 		),
-		WithTool_NumberParam("number_param",
-			WithParam_Description("数值参数"),
-			WithParam_Default(42.5),
+		aitool.WithNumberParam("number_param",
+			aitool.WithParam_Description("数值参数"),
+			aitool.WithParam_Default(42.5),
 		),
-		WithTool_IntegerParam("integer_param",
-			WithParam_Description("整数参数"),
-			WithParam_Default(10),
+		aitool.WithIntegerParam("integer_param",
+			aitool.WithParam_Description("整数参数"),
+			aitool.WithParam_Default(10),
 		),
-		WithTool_BoolParam("boolean_param",
-			WithParam_Description("布尔参数"),
-			WithParam_Default(false),
+		aitool.WithBoolParam("boolean_param",
+			aitool.WithParam_Description("布尔参数"),
+			aitool.WithParam_Default(false),
 		),
-		WithTool_StringArrayParamEx("array_param",
-			[]PropertyOption{
-				WithParam_Description("数组参数"),
+		aitool.WithStringArrayParamEx("array_param",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("数组参数"),
 			},
-			WithParam_Description("数组中的字符串项"),
+			aitool.WithParam_Description("数组中的字符串项"),
 		),
-		WithTool_Callback(func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+		aitool.WithCallback(func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 			return "执行成功", nil
 		}),
 	)
