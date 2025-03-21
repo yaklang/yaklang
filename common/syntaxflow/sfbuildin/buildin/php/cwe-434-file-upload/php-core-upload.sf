@@ -29,7 +29,7 @@ alert $high_upload for {
 }
 $source #{
     include: `* & $params`,
-    exclude: `*?{opcode:call && <self><getCallee> & $filter}`
+    include: `*?{opcode:call && !<self><getCallee> & $filter}`
 }-> as $mid_upload
 alert $mid_upload for {
     title: "Insecure File Type Detection",
