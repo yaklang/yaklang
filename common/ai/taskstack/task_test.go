@@ -32,9 +32,9 @@ func createTestTools() []*Tool {
 	// 创建工具1
 	tool1, _ := NewTool("TestTool1",
 		WithTool_Description("用于测试的工具1"),
-		WithString("param1",
-			Description("参数1"),
-			Required(),
+		WithTool_StringParam("param1",
+			WithParam_Description("参数1"),
+			WithParam_Required(),
 		),
 		WithTool_Callback(func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 			return "工具1执行结果", nil

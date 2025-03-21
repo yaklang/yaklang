@@ -63,17 +63,17 @@ func WithTool_Callback(callback InvokeCallback) ToolOption {
 	}
 }
 
-// Description adds a description to a property in the JSON Schema.
+// WithParam_Description adds a description to a property in the JSON Schema.
 // The description should explain the purpose and expected values of the property.
-func Description(desc string) PropertyOption {
+func WithParam_Description(desc string) PropertyOption {
 	return func(schema map[string]any) {
 		schema["description"] = desc
 	}
 }
 
-// RequireTool adds a ATTENTION description to a property in the JSON Schema.
+// WithParam_RequireTool adds a ATTENTION description to a property in the JSON Schema.
 // require tool description means prerequisites for running this tool
-func RequireTool(tool string) PropertyOption {
+func WithParam_RequireTool(tool string) PropertyOption {
 	return func(schema map[string]any) {
 		requireToolMessage := fmt.Sprintf("<ATTENTION> before call this tool, please call %s tool first </ATTENTION>", tool)
 		if i, ok := schema["description"]; ok {
@@ -84,17 +84,17 @@ func RequireTool(tool string) PropertyOption {
 	}
 }
 
-// Default sets the default value for a property.
+// WithParam_Default sets the default value for a property.
 // This value will be used if the property is not explicitly provided.
-func Default(desc any) PropertyOption {
+func WithParam_Default(desc any) PropertyOption {
 	return func(schema map[string]any) {
 		schema["default"] = desc
 	}
 }
 
-// Required marks a property as required in the tool's input schema.
-// Required properties must be provided when using the tool.
-func Required(required ...bool) PropertyOption {
+// WithParam_Required marks a property as required in the tool's input schema.
+// WithParam_Required properties must be provided when using the tool.
+func WithParam_Required(required ...bool) PropertyOption {
 	return func(schema map[string]any) {
 		if len(required) > 0 {
 			schema["required"] = required[0]
@@ -104,9 +104,9 @@ func Required(required ...bool) PropertyOption {
 	}
 }
 
-// Title adds a display-friendly title to a property in the JSON Schema.
+// WithParam_Title adds a display-friendly title to a property in the JSON Schema.
 // This title can be used by UI components to show a more readable property name.
-func Title(title string) PropertyOption {
+func WithParam_Title(title string) PropertyOption {
 	return func(schema map[string]any) {
 		schema["title"] = title
 	}
@@ -116,39 +116,39 @@ func Title(title string) PropertyOption {
 // String Property Options
 //
 
-// Enum specifies a list of allowed values for a string property.
+// WithParam_Enum specifies a list of allowed values for a string property.
 // The property value must be one of the specified enum values.
-func Enum(values ...any) PropertyOption {
+func WithParam_Enum(values ...any) PropertyOption {
 	return func(schema map[string]any) {
 		schema["enum"] = values
 	}
 }
 
-func EnumString(values ...string) PropertyOption {
+func WithParam_EnumString(values ...string) PropertyOption {
 	return func(schema map[string]any) {
 		schema["enum"] = lo.Map(values, func(item string, _ int) any { return item })
 	}
 }
 
-// MaxLength sets the maximum length for a string property.
+// WithParam_MaxLength sets the maximum length for a string property.
 // The string value must not exceed this length.
-func MaxLength(max int) PropertyOption {
+func WithParam_MaxLength(max int) PropertyOption {
 	return func(schema map[string]any) {
 		schema["maxLength"] = max
 	}
 }
 
-// MinLength sets the minimum length for a string property.
+// WithParam_MinLength sets the minimum length for a string property.
 // The string value must be at least this length.
-func MinLength(min int) PropertyOption {
+func WithParam_MinLength(min int) PropertyOption {
 	return func(schema map[string]any) {
 		schema["minLength"] = min
 	}
 }
 
-// Pattern sets a regex pattern that a string property must match.
+// WithParam_Pattern sets a regex pattern that a string property must match.
 // The string value must conform to the specified regular expression.
-func Pattern(pattern string) PropertyOption {
+func WithParam_Pattern(pattern string) PropertyOption {
 	return func(schema map[string]any) {
 		schema["pattern"] = pattern
 	}
@@ -158,25 +158,25 @@ func Pattern(pattern string) PropertyOption {
 // Number Property Options
 //
 
-// Max sets the maximum value for a number property.
+// WithParam_Max sets the maximum value for a number property.
 // The number value must not exceed this maximum.
-func Max(max float64) PropertyOption {
+func WithParam_Max(max float64) PropertyOption {
 	return func(schema map[string]any) {
 		schema["maximum"] = max
 	}
 }
 
-// Min sets the minimum value for a number property.
+// WithParam_Min sets the minimum value for a number property.
 // The number value must not be less than this minimum.
-func Min(min float64) PropertyOption {
+func WithParam_Min(min float64) PropertyOption {
 	return func(schema map[string]any) {
 		schema["minimum"] = min
 	}
 }
 
-// MultipleOf specifies that a number must be a multiple of the given value.
+// WithParam_MultipleOf specifies that a number must be a multiple of the given value.
 // The number value must be divisible by this value.
-func MultipleOf(value float64) PropertyOption {
+func WithParam_MultipleOf(value float64) PropertyOption {
 	return func(schema map[string]any) {
 		schema["multipleOf"] = value
 	}
@@ -186,81 +186,81 @@ func MultipleOf(value float64) PropertyOption {
 // Property Type Helpers
 //
 
-// WithBool adds a boolean property to the tool schema.
+// WithTool_BoolParam adds a boolean property to the tool schema.
 // It accepts property options to configure the boolean property's behavior and constraints.
-func WithBool(name string, opts ...PropertyOption) ToolOption {
+func WithTool_BoolParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "boolean",
 	}
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-// WithInteger adds a integer property to the tool schema.
+// WithTool_IntegerParam adds a integer property to the tool schema.
 // It accepts property options to configure the integer property's behavior and constraints.
-func WithInteger(name string, opts ...PropertyOption) ToolOption {
+func WithTool_IntegerParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "integer",
 	}
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-// WithNumber adds a number property to the tool schema.
+// WithTool_NumberParam adds a number property to the tool schema.
 // It accepts property options to configure the number property's behavior and constraints.
-func WithNumber(name string, opts ...PropertyOption) ToolOption {
+func WithTool_NumberParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "number",
 	}
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-// WithString adds a string property to the tool schema.
+// WithTool_StringParam adds a string property to the tool schema.
 // It accepts property options to configure the string property's behavior and constraints.
-func WithString(name string, opts ...PropertyOption) ToolOption {
+func WithTool_StringParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "string",
 	}
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-// WithStringArray adds a string array property to the tool schema.
+// WithTool_StringArrayParam adds a string array property to the tool schema.
 // It accepts property options to configure the string-array property's behavior and constraints.
-func WithStringArray(name string, opts ...PropertyOption) ToolOption {
-	return WithSimpleArray(name, "string", opts...)
+func WithTool_StringArrayParam(name string, opts ...PropertyOption) ToolOption {
+	return WithTool_SimpleArrayParam(name, "string", opts...)
 }
 
-func WithStringArrayEx(name string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
-	return WithArray(name, "string", opts, itemsOpt...)
+func WithTool_StringArrayParamEx(name string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
+	return WithTool_ArrayParam(name, "string", opts, itemsOpt...)
 }
 
-// WithNumberArray adds a number array property to the tool schema.
+// WithTool_NumberArrayParam adds a number array property to the tool schema.
 // It accepts property options to configure the number-array property's behavior and constraints.
-func WithNumberArray(name string, opts ...PropertyOption) ToolOption {
-	return WithSimpleArray(name, "number", opts...)
+func WithTool_NumberArrayParam(name string, opts ...PropertyOption) ToolOption {
+	return WithTool_SimpleArrayParam(name, "number", opts...)
 }
 
-func WithSimpleArray(name string, itemType string, opts ...PropertyOption) ToolOption {
+func WithTool_SimpleArrayParam(name string, itemType string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "array",
 		"items": map[string]any{
 			"type": itemType,
 		},
 	}
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-func WithStructArray(name string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
-	return WithArray(name, "object", opts, itemsOpt...)
+func WithTool_StructArrayParam(name string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
+	return WithTool_ArrayParam(name, "object", opts, itemsOpt...)
 }
 
-func WithArray(name string, itemType string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
+func WithTool_ArrayParam(name string, itemType string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
 	itemMap := map[string]any{
 		"type": itemType,
 	}
-	m := WithRaw(name, itemMap, itemsOpt...)
-	return WithArrayEx(name, opts, m)
+	m := WithTool_RawParam(name, itemMap, itemsOpt...)
+	return WithTool_ArrayParamEx(name, opts, m)
 }
 
-func WithArrayEx(name string, opts []PropertyOption, itemsOpt ToolOption) ToolOption {
+func WithTool_ArrayParamEx(name string, opts []PropertyOption, itemsOpt ToolOption) ToolOption {
 	schema := map[string]any{
 		"type": "array",
 	}
@@ -272,10 +272,10 @@ func WithArrayEx(name string, opts []PropertyOption, itemsOpt ToolOption) ToolOp
 		schema["required"] = temp.InputSchema.Required
 
 	}
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-func WithStruct(name string, opts []PropertyOption, itemsOpt ...ToolOption) ToolOption {
+func WithTool_StructParam(name string, opts []PropertyOption, itemsOpt ...ToolOption) ToolOption {
 	schema := map[string]any{
 		"type": "object",
 	}
@@ -286,18 +286,18 @@ func WithStruct(name string, opts []PropertyOption, itemsOpt ...ToolOption) Tool
 	if len(temp.InputSchema.Required) > 0 {
 		schema["required"] = temp.InputSchema.Required
 	}
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-func WithNull(name string, opts ...PropertyOption) ToolOption {
+func WithTool_NullParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "null",
 	}
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-// WithOneOfStruct
-func WithOneOfStruct(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
+// WithTool_OneOfStructParam
+func WithTool_OneOfStructParam(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
 	schema := map[string]any{
 		"type": "object",
 	}
@@ -311,11 +311,11 @@ func WithOneOfStruct(name string, opts []PropertyOption, itemsOpt ...[]ToolOptio
 		oneOfArray = append(oneOfArray, m)
 	}
 	schema["oneOf"] = oneOfArray
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-// WithAnyOfStruct
-func WithAnyOfStruct(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
+// WithTool_AnyOfStructParam
+func WithTool_AnyOfStructParam(name string, opts []PropertyOption, itemsOpt ...[]ToolOption) ToolOption {
 	schema := map[string]any{
 		"type": "object",
 	}
@@ -329,10 +329,10 @@ func WithAnyOfStruct(name string, opts []PropertyOption, itemsOpt ...[]ToolOptio
 		anyOfArray = append(anyOfArray, m)
 	}
 	schema["anyOf"] = anyOfArray
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-func WithPaging(name string, fieldNames []string, opts ...PropertyOption) ToolOption {
+func WithTool_PagingParam(name string, fieldNames []string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -351,10 +351,10 @@ func WithPaging(name string, fieldNames []string, opts ...PropertyOption) ToolOp
 			},
 		},
 	}
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-func WithKVPairs(name string, opts ...PropertyOption) ToolOption {
+func WithTool_KVPairsParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "array",
 		"items": map[string]any{
@@ -369,12 +369,12 @@ func WithKVPairs(name string, opts ...PropertyOption) ToolOption {
 			},
 		},
 	}
-	return WithRaw(name, schema, opts...)
+	return WithTool_RawParam(name, schema, opts...)
 }
 
-// WithRaw adds a custom object property to the tool schema.
+// WithTool_RawParam adds a custom object property to the tool schema.
 // It accepts property options to configure the object property's behavior and constraints.
-func WithRaw(name string, object map[string]any, opts ...PropertyOption) ToolOption {
+func WithTool_RawParam(name string, object map[string]any, opts ...PropertyOption) ToolOption {
 	return func(t *Tool) {
 		for _, opt := range opts {
 			opt(object)
