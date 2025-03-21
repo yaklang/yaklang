@@ -17,6 +17,10 @@ type GLMClient struct {
 	targetUrl string
 }
 
+func (g *GLMClient) GetModelList() ([]*aispec.ModelMeta, error) {
+	return aispec.ListChatModels(g.targetUrl, g.BuildHTTPOptions)
+}
+
 func (g *GLMClient) SupportedStructuredStream() bool {
 	return false
 }

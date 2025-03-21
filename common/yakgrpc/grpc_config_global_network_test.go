@@ -45,6 +45,10 @@ func (g *GetawayClient) SupportedStructuredStream() bool {
 	panic("implement me")
 }
 
+func (g *GetawayClient) GetModelList() ([]*aispec.ModelMeta, error) {
+	return nil, nil
+}
+
 func (g *GetawayClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
 	//TODO implement me
 	panic("implement me")

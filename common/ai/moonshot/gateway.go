@@ -16,6 +16,10 @@ type GatewayClient struct {
 
 var _ aispec.AIClient = (*GatewayClient)(nil)
 
+func (g *GatewayClient) GetModelList() ([]*aispec.ModelMeta, error) {
+	return aispec.ListChatModels(g.targetUrl, g.BuildHTTPOptions)
+}
+
 func (g *GatewayClient) SupportedStructuredStream() bool {
 	return false
 }
