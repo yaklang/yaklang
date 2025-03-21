@@ -56,7 +56,6 @@ require (
 	github.com/google/btree v1.0.0
 	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-dap v0.10.0
-	github.com/google/gopacket v1.1.19
 	github.com/google/pprof v0.0.0-20230926050212-f7f687d19a98
 	github.com/google/uuid v1.6.0
 	github.com/gopacket/gopacket v1.3.1
