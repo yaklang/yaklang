@@ -462,14 +462,16 @@ func init() {
 				return []string{fmt.Sprint(time.Now().Unix())}
 			case "ms", "milli", "millis", "millisecond", "milliseconds":
 				return []string{fmt.Sprint(time.Now().UnixMilli())}
+			case "us", "micro", "micros", "microsecond", "microseconds":
+				return []string{fmt.Sprint(time.Now().UnixMicro())}
 			case "ns", "nano", "nanos", "nanosecond", "nanoseconds":
 				return []string{fmt.Sprint(time.Now().UnixNano())}
 			}
 			return []string{fmt.Sprint(time.Now().Unix())}
 		},
-		Description:         "生成一个时间戳，默认单位为秒，可指定单位：s, ms, ns: {{timestamp(s)}}",
+		Description:         "生成一个时间戳，默认单位为秒，可指定单位：s, ms, us, ns: {{timestamp(s)}}",
 		TagNameVerbose:      "生成时间戳",
-		ArgumentDescription: "{{enum({{string(s:秒)}}{{string(ms:毫秒)}}{{string(ns:纳秒)}}:ms:单位)}}",
+		ArgumentDescription: "{{enum({{string(s:秒)}}{{string(ms:毫秒)}}{{string(us:微秒)}}{{string(ns:纳秒)}}:ms:单位)}}",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
