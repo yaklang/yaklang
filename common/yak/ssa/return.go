@@ -152,11 +152,10 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 					for key, value := range result.GetAllMember() {
 						variable := value.GetLastVariable()
 						functionType.SideEffects = append(functionType.SideEffects, &FunctionSideEffect{
-							Name:         variable.GetName(),
-							VerboseName:  getMemberVerboseName(result, key),
-							Variable:     variable,
-							BindVariable: variable,
-							Modify:       value,
+							Name:        variable.GetName(),
+							VerboseName: getMemberVerboseName(result, key),
+							Variable:    variable,
+							Modify:      value,
 							parameterMemberInner: &parameterMemberInner{
 								MemberCallKind: CallMemberCall,
 								MemberCallKey:  key,
