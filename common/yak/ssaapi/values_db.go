@@ -129,17 +129,32 @@ func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	}
 
 	var res []*graph.Neighbor[*Value]
-	for _, i := range value.DependOn {
-		res = append(res, graph.NewNeighbor(i, EdgeTypeDependOn))
-	}
-	for _, i := range value.EffectOn {
-		res = append(res, graph.NewNeighbor(i, EdgeTypeEffectOn))
-	}
 	for _, pred := range value.Predecessors {
-		neighbor := graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
-		neighbor.AddExtraMsg("label", pred.Info.Label)
-		neighbor.AddExtraMsg("step", int64(pred.Info.Step))
-		res = append(res, neighbor)
+		if IsDataFlowLabel(pred.Info.Label) {
+			// not save dataflow path as default
+			// because it will cost too much memory and database space
+			// TODO: modify dataflow path only start and end node
+			// for _, i := range value.DependOn {
+			// 	res = append(res, graph.NewNeighbor(i, EdgeTypeDependOn))
+			// }
+			// for _, i := range value.EffectOn {
+			// 	res = append(res, graph.NewNeighbor(i, EdgeTypeEffectOn))
+			// }
+			// and testcase: common/yak/ssaapi/values_db_test.go
+
+			// TODO: delete predecessor edge after implement dataflow path
+			// now, just append predecessor edge
+			neighbor := graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
+			neighbor.AddExtraMsg("label", pred.Info.Label)
+			neighbor.AddExtraMsg("step", int64(pred.Info.Step))
+			res = append(res, neighbor)
+		} else {
+			neighbor := graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
+			neighbor.AddExtraMsg("label", pred.Info.Label)
+			neighbor.AddExtraMsg("step", int64(pred.Info.Step))
+			res = append(res, neighbor)
+
+		}
 	}
 	return res
 }
