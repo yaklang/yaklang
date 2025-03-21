@@ -89,6 +89,13 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 			db = bizhelper.QueryByBool(db, "is_build_in_rule", false)
 		}
 	}
+	kind := params.GetLibRuleFilter()
+	switch kind {
+	case ypb.TriState_TS_TRUE:
+		db = bizhelper.QueryByBool(db, "is_tristate_ts", true)
+	case ypb.TriState_TS_FALSE:
+		db = bizhelper.QueryByBool(db, "is_tristate_ts", false)
+	}
 	return db
 }
 
