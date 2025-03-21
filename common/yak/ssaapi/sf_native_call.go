@@ -450,8 +450,9 @@ func init() {
 			}
 			callInst := value.GetCalledBy()
 			callInst.ForEach(func(call *Value) {
-				vals = append(vals, call)
+				vals = append(vals, call.GetCallArgs())
 			})
+
 			return vals
 		}
 
