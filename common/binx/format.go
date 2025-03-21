@@ -2,11 +2,28 @@ package binx
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
+// Read 从字节数据或IO流中按照指定的数据类型描述符读取二进制数据，解析成结构化的结果
+// @param {[]byte|io.Reader} data 二进制数据或支持读取的流对象
+// @param {PartDescriptor} descriptors 数据类型描述符，可以是toUint16()等类型描述符
+// @return {[]ResultIf} 解析结果，可通过索引访问各字段值
+// @return {error} 错误信息
+// Example:
+// ```
+// // 解析二进制数据
+// data := codec.DecodeHex("1234ABCD")~
+// result = bin.Read(data, bin.toUint16("magic"), bin.toUint16("version"))~
+//
+// // 访问解析结果
+// magic := result[0].AsUint16()
+// version := result[1].AsUint16()
+// println("Magic:", magic, "Version:", version)
+// ```
 func BinaryRead(data any, descriptors ...*PartDescriptor) ([]ResultIf, error) {
 	var reader io.Reader
 	switch ret := data.(type) {
