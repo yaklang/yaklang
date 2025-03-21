@@ -3,9 +3,8 @@ package pcaputil
 import (
 	"errors"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	gopacketLayers "github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/samber/lo"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
@@ -408,7 +407,7 @@ func (w *PcapHandleWrapper) SetDirection(direction pcap.Direction) error {
 }
 
 func (w *PcapHandleWrapper) SetLinkType(linkType layers.LinkType) error {
-	return w.handle.SetLinkType(gopacketLayers.LinkType(linkType))
+	return w.handle.SetLinkType(linkType)
 }
 
 func (w *PcapHandleWrapper) Stats() (*pcap.Stats, error) {
