@@ -65,9 +65,21 @@ type StructuredStreamer interface {
 	StructuredStream(string, ...Function) (chan *StructuredData, error)
 }
 
+type ModelMeta struct {
+	Id      string `json:"id"`
+	Object  string `json:"object,omitempty"`
+	Created int64  `json:"created,omitempty"`
+	OwnedBy string `json:"owned_by,omitempty"`
+}
+
+type ModelListCaller interface {
+	GetModelList() ([]*ModelMeta, error)
+}
+
 type AIClient interface {
 	Chatter
 	FunctionCaller
 	Configurable
 	StructuredStreamer
+	ModelListCaller
 }

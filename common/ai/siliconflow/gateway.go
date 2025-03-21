@@ -16,6 +16,10 @@ type GetawayClient struct {
 
 var _ aispec.AIClient = (*GetawayClient)(nil)
 
+func (g *GetawayClient) GetModelList() ([]*aispec.ModelMeta, error) {
+	return aispec.ListChatModels(g.targetUrl, g.BuildHTTPOptions)
+}
+
 func (g *GetawayClient) SupportedStructuredStream() bool {
 	return false
 }

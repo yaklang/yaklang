@@ -190,6 +190,10 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			verbose = "Ollama"
 			extTag["model"] = "default:llama3"
 			extTag["domain"] = "default:localhost:11434"
+		case "openrouter":
+			verbose = "OpenRouter"
+			extTag["model"] = "default:qwen/qwq-32b:free"
+			extTag["domain"] = "default:openrouter.ai"
 		}
 		aiOptions, err := utils.ParseAppTagToOptions(&aispec.AIConfig{}, extTag)
 		if err != nil {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/dashscopebase"
 	"github.com/yaklang/yaklang/common/ai/deepseek"
+	"github.com/yaklang/yaklang/common/ai/openrouter"
 	"github.com/yaklang/yaklang/common/ai/siliconflow"
 
 	"github.com/samber/lo"
@@ -47,6 +48,9 @@ func init() {
 	})
 	aispec.Register("ollama", func() aispec.AIClient {
 		return &ollama.GatewayClient{}
+	})
+	aispec.Register("openrouter", func() aispec.AIClient {
+		return &openrouter.GetawayClient{}
 	})
 	aispec.Register("yaklang-writer", func() aispec.AIClient {
 		return dashscopebase.CreateDashScopeGateway("a51e9af5a60f40c983dac6ed50dba15b")
