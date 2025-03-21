@@ -94,4 +94,30 @@ $c->a::bb(1);`
 				"param": {"1"},
 			}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	//todo:
+	//	t.Run("Loop func", func(t *testing.T) {
+	//		code := `f1 = (a1) =>{
+	//    return a1;
+	//}
+	//f2 = (a2) =>{
+	//    target = f1(a2)
+	//    if target<2{
+	//        f2(2)
+	//    }
+	//}
+	//
+	///*
+	//a1 #-> as $param
+	//
+	//a1 -(getCallBy)(getAParam)-> a2 跨过程，刷新上下文
+	//a2 ->(getCallBy)(getAParam)-> f1(a2) 非跨过程
+	//f1(a2) -> f1 跨过程
+	//f1 -> a1  非跨过程
+	//a1 -> a2 跨过程，检测到有这个过程
+	//*/
+	//`
+	//		ssatest.CheckSyntaxFlow(t, code, `a1 #-> as $param`, map[string][]string{
+	//			"param": {"2"},
+	//		}, ssaapi.WithLanguage(ssaapi.Yak))
+	//	})
 }
