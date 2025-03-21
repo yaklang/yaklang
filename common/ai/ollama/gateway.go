@@ -22,7 +22,7 @@ func (g *GatewayClient) GetModelList() ([]*aispec.ModelMeta, error) {
 }
 
 func (g *GatewayClient) Chat(s string, function ...aispec.Function) (string, error) {
-	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler)
+	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler)
 }
 
 func (g *GatewayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
