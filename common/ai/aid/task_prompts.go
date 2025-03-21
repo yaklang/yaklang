@@ -2,6 +2,7 @@ package aid
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"strings"
 	"text/template"
 
@@ -9,7 +10,7 @@ import (
 )
 
 // generateTaskPrompt 生成执行任务的prompt
-func (t *aiTask) generateTaskPrompt(tools []*Tool, systemContext *TaskSystemContext, metadata map[string]interface{}) (string, error) {
+func (t *aiTask) generateTaskPrompt(tools []*aitool.Tool, systemContext *taskContext, metadata map[string]interface{}) (string, error) {
 	// 创建模板数据
 	templateData := map[string]interface{}{
 		"Task":            t,
@@ -36,7 +37,7 @@ func (t *aiTask) generateTaskPrompt(tools []*Tool, systemContext *TaskSystemCont
 }
 
 // generateRequireToolResponsePrompt 生成描述工具参数的 Prompt
-func (t *aiTask) generateRequireToolResponsePrompt(runtime *TaskSystemContext, targetTool *Tool, toolName string) (string, error) {
+func (t *aiTask) generateRequireToolResponsePrompt(runtime *taskContext, targetTool *aitool.Tool, toolName string) (string, error) {
 	if targetTool == nil {
 		return "", fmt.Errorf("找不到名为 '%s' 的工具", toolName)
 	}
@@ -68,7 +69,7 @@ func (t *aiTask) generateRequireToolResponsePrompt(runtime *TaskSystemContext, t
 }
 
 // generateToolCallResponsePrompt 生成描述工具调用结果的 Prompt
-func (t *aiTask) generateToolCallResponsePrompt(result *ToolResult, runtime *TaskSystemContext, targetTool *Tool) (string, error) {
+func (t *aiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, runtime *taskContext, targetTool *aitool.Tool) (string, error) {
 	templatedata := map[string]any{
 		"Runtime": runtime,
 		"Task":    t,

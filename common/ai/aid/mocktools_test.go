@@ -3,6 +3,7 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"reflect"
 	"strings"
 	"testing"
@@ -59,7 +60,7 @@ func TestWeatherTool(t *testing.T) {
 	}
 
 	// 验证结果类型
-	execResult, ok := result.Data.(*ToolExecutionResult)
+	execResult, ok := result.Data.(*aitool.ToolExecutionResult)
 	if !ok {
 		t.Errorf("结果类型错误，期望 *ToolExecutionResult")
 		return
@@ -106,7 +107,7 @@ func TestAttractionTool(t *testing.T) {
 	}
 
 	// 验证结果类型
-	execResult, ok := result.Data.(*ToolExecutionResult)
+	execResult, ok := result.Data.(*aitool.ToolExecutionResult)
 	if !ok {
 		t.Errorf("结果类型错误，期望 *ToolExecutionResult")
 		return
@@ -154,7 +155,7 @@ func TestRestaurantTool(t *testing.T) {
 	}
 
 	// 验证结果内容
-	execResult, ok := result.Data.(*ToolExecutionResult)
+	execResult, ok := result.Data.(*aitool.ToolExecutionResult)
 	if !ok {
 		t.Errorf("结果类型错误，期望 *ToolExecutionResult")
 		return
@@ -244,7 +245,7 @@ func TestTransportTool(t *testing.T) {
 	}
 
 	// 验证结果内容
-	execResult, ok := result.Data.(*ToolExecutionResult)
+	execResult, ok := result.Data.(*aitool.ToolExecutionResult)
 	if !ok {
 		t.Errorf("结果类型错误，期望 *ToolExecutionResult")
 		return
@@ -315,7 +316,7 @@ func TestTimeEstimateTool(t *testing.T) {
 	}
 
 	// 验证结果内容
-	execResult, ok := result.Data.(*ToolExecutionResult)
+	execResult, ok := result.Data.(*aitool.ToolExecutionResult)
 	if !ok {
 		t.Errorf("结果类型错误，期望 *ToolExecutionResult")
 		return
@@ -370,7 +371,7 @@ func TestTimeEstimateTool(t *testing.T) {
 func TestToolParameterValidation(t *testing.T) {
 	tests := []struct {
 		name      string
-		toolFunc  func() *Tool
+		toolFunc  func() *aitool.Tool
 		inputJSON string
 		expectErr bool
 	}{

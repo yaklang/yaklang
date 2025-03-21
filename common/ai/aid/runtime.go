@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
 	"strconv"
 	"strings"
@@ -19,7 +20,7 @@ type runtime struct {
 	Stack    *utils.Stack[*aiTask]
 
 	statusMutex     sync.Mutex
-	toolCallResults []*ToolResult
+	toolCallResults []*aitool.ToolResult
 }
 
 func createRuntime() *runtime {
@@ -119,7 +120,7 @@ func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
 		return nil
 	}
 
-	return task.executeTask(&TaskSystemContext{
+	return task.executeTask(&taskContext{
 		Runtime:     r,
 		CurrentTask: task,
 	})
@@ -129,7 +130,7 @@ func (r *runtime) Invoke(task *aiTask) {
 	r.invokeSubtask(1, task)
 }
 
-func (r *runtime) PushToolCallResults(t ...*ToolResult) {
+func (r *runtime) PushToolCallResults(t ...*aitool.ToolResult) {
 	r.statusMutex.Lock()
 	defer r.statusMutex.Unlock()
 

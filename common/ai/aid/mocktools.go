@@ -2,6 +2,7 @@ package aid
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
 	"math/rand"
 	"strings"
@@ -14,8 +15,8 @@ func init() {
 }
 
 // 提供所有Mock工具的集合
-func GetAllMockTools() []*Tool {
-	return []*Tool{
+func GetAllMockTools() []*aitool.Tool {
+	return []*aitool.Tool{
 		WeatherTool(),
 		AttractionTool(),
 		RestaurantTool(),
@@ -25,7 +26,7 @@ func GetAllMockTools() []*Tool {
 }
 
 // WeatherTool 创建天气查询工具
-func WeatherTool() *Tool {
+func WeatherTool() *aitool.Tool {
 	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		city, _ := params["city"].(string)
 		date, _ := params["date"].(string)
@@ -77,16 +78,16 @@ func WeatherTool() *Tool {
 	}
 
 	// 创建天气工具
-	tool, _ := NewTool("WeatherAPI",
-		WithTool_Description("天气查询工具 - 根据城市和日期查询天气情况"),
-		WithTool_Callback(callback),
-		WithTool_StringParam("city",
-			WithParam_Description("城市名称"),
-			WithParam_Required(),
+	tool, _ := aitool.New("WeatherAPI",
+		aitool.WithDescription("天气查询工具 - 根据城市和日期查询天气情况"),
+		aitool.WithCallback(callback),
+		aitool.WithStringParam("city",
+			aitool.WithParam_Description("城市名称"),
+			aitool.WithParam_Required(),
 		),
-		WithTool_StringParam("date",
-			WithParam_Description("查询日期 (YYYY-MM-DD格式)"),
-			WithParam_Required(),
+		aitool.WithStringParam("date",
+			aitool.WithParam_Description("查询日期 (YYYY-MM-DD格式)"),
+			aitool.WithParam_Required(),
 		),
 	)
 
@@ -94,7 +95,7 @@ func WeatherTool() *Tool {
 }
 
 // AttractionTool 创建景点推荐工具
-func AttractionTool() *Tool {
+func AttractionTool() *aitool.Tool {
 	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		city, _ := params["city"].(string)
 		preference, _ := params["preference"].(string)
@@ -185,16 +186,16 @@ func AttractionTool() *Tool {
 	}
 
 	// 创建景点工具
-	tool, _ := NewTool("AttractionAPI",
-		WithTool_Description("景点推荐工具 - 根据城市和偏好类型推荐景点"),
-		WithTool_Callback(callback),
-		WithTool_StringParam("city",
-			WithParam_Description("城市名称"),
-			WithParam_Required(),
+	tool, _ := aitool.New("AttractionAPI",
+		aitool.WithDescription("景点推荐工具 - 根据城市和偏好类型推荐景点"),
+		aitool.WithCallback(callback),
+		aitool.WithStringParam("city",
+			aitool.WithParam_Description("城市名称"),
+			aitool.WithParam_Required(),
 		),
-		WithTool_StringParam("preference",
-			WithParam_EnumString("历史", "自然", "文化", "娱乐"),
-			WithParam_Description("偏好类型"),
+		aitool.WithStringParam("preference",
+			aitool.WithParam_EnumString("历史", "自然", "文化", "娱乐"),
+			aitool.WithParam_Description("偏好类型"),
 		),
 	)
 
@@ -202,7 +203,7 @@ func AttractionTool() *Tool {
 }
 
 // RestaurantTool 创建餐厅搜索工具
-func RestaurantTool() *Tool {
+func RestaurantTool() *aitool.Tool {
 	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		location, _ := params["location"].(string)
 		budget, _ := params["budget"].(string)
@@ -302,18 +303,18 @@ func RestaurantTool() *Tool {
 	}
 
 	// 创建餐厅工具
-	tool, _ := NewTool("RestaurantAPI",
-		WithTool_Description("餐厅搜索工具 - 根据位置、预算和菜系搜索餐厅"),
-		WithTool_Callback(callback),
-		WithTool_StringParam("location",
-			WithParam_Description("位置坐标或区域名称"),
-			WithParam_Required(),
+	tool, _ := aitool.New("RestaurantAPI",
+		aitool.WithDescription("餐厅搜索工具 - 根据位置、预算和菜系搜索餐厅"),
+		aitool.WithCallback(callback),
+		aitool.WithStringParam("location",
+			aitool.WithParam_Description("位置坐标或区域名称"),
+			aitool.WithParam_Required(),
 		),
-		WithTool_StringParam("budget",
-			WithParam_Description("预算范围"),
+		aitool.WithStringParam("budget",
+			aitool.WithParam_Description("预算范围"),
 		),
-		WithTool_StringParam("cuisine",
-			WithParam_Description("菜系偏好"),
+		aitool.WithStringParam("cuisine",
+			aitool.WithParam_Description("菜系偏好"),
 		),
 	)
 
@@ -321,7 +322,7 @@ func RestaurantTool() *Tool {
 }
 
 // TransportTool 创建交通查询工具
-func TransportTool() *Tool {
+func TransportTool() *aitool.Tool {
 	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		origin, _ := params["origin"].(string)
 		destination, _ := params["destination"].(string)
@@ -371,16 +372,16 @@ func TransportTool() *Tool {
 	}
 
 	// 创建交通工具
-	tool, _ := NewTool("TransportAPI",
-		WithTool_Description("交通查询工具 - 查询两地之间的交通方式"),
-		WithTool_Callback(callback),
-		WithTool_StringParam("origin",
-			WithParam_Description("起点位置"),
-			WithParam_Required(),
+	tool, _ := aitool.New("TransportAPI",
+		aitool.WithDescription("交通查询工具 - 查询两地之间的交通方式"),
+		aitool.WithCallback(callback),
+		aitool.WithStringParam("origin",
+			aitool.WithParam_Description("起点位置"),
+			aitool.WithParam_Required(),
 		),
-		WithTool_StringParam("destination",
-			WithParam_Description("终点位置"),
-			WithParam_Required(),
+		aitool.WithStringParam("destination",
+			aitool.WithParam_Description("终点位置"),
+			aitool.WithParam_Required(),
 		),
 	)
 
@@ -388,7 +389,7 @@ func TransportTool() *Tool {
 }
 
 // TimeEstimateTool 创建行程时间估算工具
-func TimeEstimateTool() *Tool {
+func TimeEstimateTool() *aitool.Tool {
 	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		locationsObj, ok := params["locations"]
 		if !ok {
@@ -498,24 +499,24 @@ func TimeEstimateTool() *Tool {
 	}
 
 	// 创建时间估算工具
-	tool, _ := NewTool("TimeEstimateAPI",
-		WithTool_Description("行程时间估算工具 - 估算多地点行程所需时间"),
-		WithTool_Callback(callback),
-		WithTool_StringArrayParamEx("locations",
-			[]PropertyOption{
-				WithParam_Description("地点列表"),
-				WithParam_Required(),
+	tool, _ := aitool.New("TimeEstimateAPI",
+		aitool.WithDescription("行程时间估算工具 - 估算多地点行程所需时间"),
+		aitool.WithCallback(callback),
+		aitool.WithStringArrayParamEx("locations",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("地点列表"),
+				aitool.WithParam_Required(),
 			},
-			WithParam_Description("地点名称"),
-			WithParam_Required(),
+			aitool.WithParam_Description("地点名称"),
+			aitool.WithParam_Required(),
 		),
-		WithTool_StringArrayParamEx("durations",
-			[]PropertyOption{
-				WithParam_Description("各地点停留时间"),
-				WithParam_Required(),
+		aitool.WithStringArrayParamEx("durations",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("各地点停留时间"),
+				aitool.WithParam_Required(),
 			},
-			WithParam_Description("停留时间"),
-			WithParam_Required(),
+			aitool.WithParam_Description("停留时间"),
+			aitool.WithParam_Required(),
 		),
 	)
 

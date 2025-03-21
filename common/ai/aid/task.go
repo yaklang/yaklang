@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 
@@ -13,7 +13,7 @@ import (
 )
 
 // TaskResponseCallback 定义Task执行过程中响应回调函数类型
-type TaskResponseCallback func(ctx *TaskSystemContext, details ...aispec.ChatDetail) (continueThinking bool, prompt string, err error)
+type TaskResponseCallback func(ctx *taskContext, details ...aispec.ChatDetail) (continueThinking bool, prompt string, err error)
 
 // TaskProgress 记录任务执行的进度信息
 type TaskProgress struct {
@@ -40,7 +40,7 @@ type aiTask struct {
 	executed  bool
 
 	// runtime
-	ToolCallResults []*ToolResult
+	ToolCallResults []*aitool.ToolResult
 	TaskSummary     string
 	ShortSummary    string
 	LongSummary     string
@@ -60,7 +60,7 @@ func (t *aiTask) callAI(request *AIRequest) (*AIResponse, error) {
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
-func (t *aiTask) PushToolCallResult(i *ToolResult) {
+func (t *aiTask) PushToolCallResult(i *aitool.ToolResult) {
 	t.ToolCallResults = append(t.ToolCallResults, i)
 }
 
@@ -99,66 +99,13 @@ func (t *aiTask) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// SetResponseAICallback 设置Task的响应回调函数
-func (t *aiTask) SetResponseAICallback(callback TaskResponseCallback) {
-	t.ResponseCallback = callback
-
-	// 递归设置子任务的回调函数
-	for i := range t.Subtasks {
-		t.Subtasks[i].SetResponseAICallback(callback)
-	}
-}
-
-// NewTask 创建一个新的Task，可以通过选项进行配置
-func NewTask(name, goal string) *aiTask {
-	task := &aiTask{
-		Name:     name,
-		Goal:     goal,
-		metadata: make(map[string]interface{}),
-	}
-	return task
-}
-
-type TaskSystemContext struct {
+type taskContext struct {
 	Runtime     *runtime
 	CurrentTask *aiTask
 }
 
-func (ctx *TaskSystemContext) Progress() string {
+func (ctx *taskContext) Progress() string {
 	return ctx.Runtime.Progress()
-}
-
-// NewTaskFromJSON 从JSON字符串创建Task
-func NewTaskFromJSON(jsonStr string) (*aiTask, error) {
-	var task aiTask
-	err := json.Unmarshal([]byte(jsonStr), &task)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal aiTask from JSON: %w", err)
-	}
-
-	// 应用默认值和选项
-	task.metadata = make(map[string]interface{})
-	return &task, nil
-}
-
-// ValidateTask 检查Task是否有效并准备好执行
-func ValidateTask(task *aiTask) error {
-	if task == nil {
-		return errors.New("aiTask is nil")
-	}
-
-	if task.Name == "" {
-		return errors.New("aiTask name is empty")
-	}
-
-	// 检查子任务
-	for i, subtask := range task.Subtasks {
-		if subtask.Name == "" {
-			return fmt.Errorf("subtask at index %d has empty name", i)
-		}
-	}
-
-	return nil
 }
 
 // extractTaskFromRawResponse 从原始响应中提取Task

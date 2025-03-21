@@ -1,4 +1,4 @@
-package aid
+package aitool
 
 import (
 	"bytes"

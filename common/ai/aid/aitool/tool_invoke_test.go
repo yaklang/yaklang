@@ -1,4 +1,4 @@
-package aid
+package aitool
 
 import (
 	"encoding/json"
@@ -49,10 +49,10 @@ func TestToolInvoke(t *testing.T) {
 		{
 			name: "基本调用测试",
 			toolBuilder: func() (*Tool, error) {
-				return NewTool("echoTool",
-					WithTool_Description("回显工具"),
-					WithTool_Callback(echoCallback),
-					WithTool_StringParam("message",
+				return New("echoTool",
+					WithDescription("回显工具"),
+					WithCallback(echoCallback),
+					WithStringParam("message",
 						WithParam_Description("要回显的消息"),
 						WithParam_Required(),
 					),
@@ -76,10 +76,10 @@ func TestToolInvoke(t *testing.T) {
 		{
 			name: "参数验证失败测试",
 			toolBuilder: func() (*Tool, error) {
-				return NewTool("validationTool",
-					WithTool_Description("验证工具"),
-					WithTool_Callback(validationCallback),
-					WithTool_StringParam("query",
+				return New("validationTool",
+					WithDescription("验证工具"),
+					WithCallback(validationCallback),
+					WithStringParam("query",
 						WithParam_Description("查询字符串"),
 						WithParam_Required(),
 					),
@@ -99,9 +99,9 @@ func TestToolInvoke(t *testing.T) {
 		{
 			name: "工具名称不匹配测试",
 			toolBuilder: func() (*Tool, error) {
-				return NewTool("nameTool",
-					WithTool_Description("名称工具"),
-					WithTool_Callback(echoCallback),
+				return New("nameTool",
+					WithDescription("名称工具"),
+					WithCallback(echoCallback),
 				)
 			},
 			inputJSON: `{
@@ -118,9 +118,9 @@ func TestToolInvoke(t *testing.T) {
 		{
 			name: "回调函数错误测试",
 			toolBuilder: func() (*Tool, error) {
-				return NewTool("errorTool",
-					WithTool_Description("错误工具"),
-					WithTool_Callback(errorCallback),
+				return New("errorTool",
+					WithDescription("错误工具"),
+					WithCallback(errorCallback),
 				)
 			},
 			inputJSON: `{
@@ -137,9 +137,9 @@ func TestToolInvoke(t *testing.T) {
 		{
 			name: "JSON解析错误测试",
 			toolBuilder: func() (*Tool, error) {
-				return NewTool("parseTool",
-					WithTool_Description("解析工具"),
-					WithTool_Callback(echoCallback),
+				return New("parseTool",
+					WithDescription("解析工具"),
+					WithCallback(echoCallback),
 				)
 			},
 			inputJSON: `{
@@ -158,18 +158,18 @@ func TestToolInvoke(t *testing.T) {
 		{
 			name: "复杂参数测试",
 			toolBuilder: func() (*Tool, error) {
-				return NewTool("complexTool",
-					WithTool_Description("复杂工具"),
-					WithTool_Callback(echoCallback),
-					WithTool_StringParam("stringParam",
+				return New("complexTool",
+					WithDescription("复杂工具"),
+					WithCallback(echoCallback),
+					WithStringParam("stringParam",
 						WithParam_Description("字符串参数"),
 						WithParam_Required(),
 					),
-					WithTool_NumberParam("numberParam",
+					WithNumberParam("numberParam",
 						WithParam_Description("数字参数"),
 						WithParam_Default(42),
 					),
-					WithTool_StringArrayParam("arrayParam",
+					WithStringArrayParam("arrayParam",
 						WithParam_Description("数组参数"),
 						WithParam_Required(),
 					),

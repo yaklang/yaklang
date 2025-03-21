@@ -1,4 +1,4 @@
-package aid
+package aitool
 
 import (
 	"encoding/json"
@@ -87,14 +87,14 @@ func TestExecuteToolWithCapture(t *testing.T) {
 	}
 
 	// 创建工具
-	tool, err := NewTool("captureTest",
-		WithTool_Description("测试捕获输出的工具"),
-		WithTool_Callback(callback),
-		WithTool_StringParam("command",
+	tool, err := New("captureTest",
+		WithDescription("测试捕获输出的工具"),
+		WithCallback(callback),
+		WithStringParam("command",
 			WithParam_Description("要执行的命令"),
 			WithParam_Required(),
 		),
-		WithTool_BoolParam("warning",
+		WithBoolParam("warning",
 			WithParam_Description("是否显示警告"),
 			WithParam_Default(false),
 		),
@@ -167,10 +167,10 @@ func TestToolResultIntegration(t *testing.T) {
 	}
 
 	// 创建工具
-	tool, err := NewTool("integrationTest",
-		WithTool_Description("集成测试工具"),
-		WithTool_Callback(callback),
-		WithTool_StringParam("input",
+	tool, err := New("integrationTest",
+		WithDescription("集成测试工具"),
+		WithCallback(callback),
+		WithStringParam("input",
 			WithParam_Description("输入值"),
 			WithParam_Required(),
 		),
