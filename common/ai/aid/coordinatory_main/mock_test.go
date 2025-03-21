@@ -67,11 +67,14 @@ func TestTaskStack(t *testing.T) {
 		return rsp, nil
 	}
 
-	coordinator := aid.NewCoordinator(
+	coordinator, err := aid.NewCoordinator(
 		"帮我规划一个一家三口北京的一日游，子任务控制三步内",
-		aid.WithPlan_AICallback(aiCallback),
-		aid.WithCoordinator_Tool(aid.GetAllMockTools()...),
+		aid.WithAICallback(aiCallback),
+		aid.WithTools(aid.GetAllMockTools()...),
 	)
+	if err != nil {
+		panic(err)
+	}
 	if err := coordinator.Run(); err != nil {
 		panic(err)
 	}
