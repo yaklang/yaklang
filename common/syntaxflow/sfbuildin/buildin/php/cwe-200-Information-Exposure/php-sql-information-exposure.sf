@@ -14,7 +14,7 @@ TEXT
 /^pg_[last_error|result_error(_field)?]$/ as $pg_information;
 /^pg_[dbname|field_name|field_table|host|last_notice|meta_data|options|port|tty|version]$/ as $pg_information;
 
-$pg_information + $mysql_information as $information;
+$pg_information + $mysql_information ?{opcode: function || opcode: call} as $param
 <include("php-xss-method")> as $method
 
 $method(* as $param)
