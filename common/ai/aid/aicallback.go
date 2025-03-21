@@ -55,6 +55,12 @@ func NewAIRequest(prompt string, opt ...AIRequestOption) *AIRequest {
 	return req
 }
 
+func WithAIRequest_TaskContext(ctx *taskContext) AIRequestOption {
+	return func(req *AIRequest) {
+		req.ctx = ctx
+	}
+}
+
 type AICallbackType func(req *AIRequest) (*AIResponse, error)
 
 func NewAIResponse() *AIResponse {
