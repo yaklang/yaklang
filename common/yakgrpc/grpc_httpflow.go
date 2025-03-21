@@ -800,7 +800,7 @@ func (s *Server) QueryHTTPFlowsProcessNames(ctx context.Context, req *ypb.QueryH
 
 func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stream ypb.Yak_ExportHTTPFlowStreamServer) error {
 	exportType := req.GetExportType()
-	if exportType != "csv" && exportType != "har" && exportType != "json" {
+	if exportType != "csv" && exportType != "har" {
 		return utils.Error("unsupported export type")
 	}
 

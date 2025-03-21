@@ -873,7 +873,11 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		db = bizhelper.ExactQueryStringArrayOr(db, "hidden_index", params.GetHiddenIndex())
 	}
 	if len(params.GetAnalyzedIds()) > 0 {
-		db = bizhelper.ExactQueryInt64ArrayOr(db, "analyzed_http_flow_id", params.GetAnalyzedIds())
+		var ids []int64
+		subQuery := db.Model(schema.AnalyzedHTTPFlow{})
+		subQuery = bizhelper.ExactQueryInt64ArrayOr(subQuery, "id", params.GetAnalyzedIds())
+		subQuery.Pluck("http_flow_id", &ids)
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
 	}
 	if params.AfterBodyLength > 0 {
 		db = db.Where("body_length >= ?", params.AfterBodyLength)
@@ -1194,7 +1198,7 @@ func QueryHTTPFlowsByRegexRequest(
 	if urlPattern == "" {
 		db = db.Where("request REGEXP ?", pattern)
 	} else {
-		db = db.Where("request REGEXP ? AND url REGEXP  ?", pattern, urlPattern)
+		db = db.Where("url REGEXP  ? AND request REGEXP ? ", urlPattern, pattern)
 	}
 
 	return YieldHTTPFlowsEx(db, ctx, callBack)
@@ -1215,7 +1219,7 @@ func QueryHTTPFlowsByRegexResponse(
 	if urlPattern == "" {
 		db = db.Where("response REGEXP ?", pattern)
 	} else {
-		db = db.Where("response REGEXP ? AND url REGEXP  ?", pattern, urlPattern)
+		db = db.Where("url REGEXP  ? AND response REGEXP ?  ", urlPattern, pattern)
 	}
 	return YieldHTTPFlowsEx(db, ctx, callBack)
 }

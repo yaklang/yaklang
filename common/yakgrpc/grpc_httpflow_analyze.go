@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync/atomic"
 )
 
 func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb.Yak_AnalyzeHTTPFlowServer) error {
@@ -119,7 +118,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 		return utils.Error("analyze rules is empty")
 	}
 
-	extractData := func(pattern string, rule *MITMReplaceRule, flow *schema.HTTPFlow, isReq bool) []*schema.ExtractedData {
+	extractData := func(pattern string, rule *MITMReplaceRule, flow *schema.HTTPFlow, isReq bool) []schema.ExtractedData {
 		modelFull, err := model.ToHTTPFlowGRPCModelFull(flow)
 		if err != nil {
 			return nil
@@ -136,7 +135,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 			return nil
 		}
 
-		var extractedData []*schema.ExtractedData
+		var extractedData []schema.ExtractedData
 		for _, matched := range matcheds {
 			e := yakit.ExtractedDataFromHTTPFlow(
 				flow.HiddenIndex,
@@ -150,22 +149,22 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 				log.Infof("create or update extracted data failed: %s", err)
 				continue
 			}
-			atomic.AddInt64(&m.extractedHTTPFlowCount, 1)
+			m.extractedHTTPFlowCount++
 			m.notifyExtractedHTTPFlowNum()
-			extractedData = append(extractedData, e)
+			extractedData = append(extractedData, *e)
 		}
 		return extractedData
 	}
 
 	getAnalyzedHTTPFlow := func(rule *MITMReplaceRule, flow *schema.HTTPFlow) *schema.AnalyzedHTTPFlow {
-		atomic.AddInt64(&m.matchedHTTPFlowCount, 1)
+		m.matchedHTTPFlowCount++
 		m.notifyMatchedHTTPFlowNum()
 		analyzeResult := &schema.AnalyzedHTTPFlow{
 			ResultId:        analyzeId,
 			Rule:            rule.GetRule(),
 			RuleVerboseName: rule.VerboseName,
 		}
-		analyzeResult.HTTPFlow = flow
+		analyzeResult.HTTPFlowId = int64(flow.ID)
 		return analyzeResult
 	}
 
@@ -174,7 +173,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 		if err != nil {
 			log.Infof("save analyze result failed: %s", err)
 		}
-		atomic.AddInt64(&m.handledHTTPFlowCount, 1)
+		m.handledHTTPFlowCount++
 		m.notifyResult(result)
 	}
 
@@ -191,7 +190,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 	}
 
 	totalCallBack := func(i int) {
-		atomic.AddInt64(&m.allHTTPFlowCount, int64(i))
+		m.allHTTPFlowCount++
 	}
 	// 规则处理
 	for i, rule := range m.rules {
@@ -203,7 +202,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 		pattern := re.String()
 		if rule.EnableForRequest {
 			for flow := range yakit.QueryHTTPFlowsByRegexRequest(db, m.ctx, pattern, totalCallBack, rule.EffectiveURL) {
-				atomic.AddInt64(&m.allHTTPFlowCount, 1)
+				m.allHTTPFlowCount++
 				result := getAnalyzedHTTPFlow(rule, flow)
 				if result == nil {
 					continue
@@ -216,7 +215,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 		}
 		if rule.EnableForResponse {
 			for flow := range yakit.QueryHTTPFlowsByRegexResponse(db, m.ctx, pattern, totalCallBack, rule.EffectiveURL) {
-				atomic.AddInt64(&m.allHTTPFlowCount, 1)
+				m.allHTTPFlowCount++
 				result := getAnalyzedHTTPFlow(rule, flow)
 				if result == nil {
 					continue
@@ -238,8 +237,8 @@ func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, analyzeId string, proc
 	}
 	var totalQueryCount int64
 	totalCallBack := func(i int) {
-		atomic.AddInt64(&m.allHTTPFlowCount, int64(i))
-		atomic.AddInt64(&totalQueryCount, int64(i))
+		m.allHTTPFlowCount += int64(i)
+		totalQueryCount += int64(i)
 	}
 	flowCh := yakit.YieldHTTPFlowsEx(db, m.ctx, totalCallBack)
 	extract := func(ruleName string, flow *schema.HTTPFlow) {
@@ -248,14 +247,14 @@ func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, analyzeId string, proc
 			ResultId:        analyzeId,
 			Rule:            "热加载规则",
 			RuleVerboseName: ruleName,
-			HTTPFlow:        flow,
+			HTTPFlowId:      int64(flow.ID),
 		}
 		err := db.Save(analyzed).Error
 		if err != nil {
 			log.Infof("save analyze result failed: %s", err)
 		}
-		atomic.AddInt64(&m.handledHTTPFlowCount, 1)
-		atomic.AddInt64(&m.matchedHTTPFlowCount, 1)
+		m.handledHTTPFlowCount++
+		m.matchedHTTPFlowCount++
 		m.notifyResult(analyzed)
 		m.notifyMatchedHTTPFlowNum()
 		m.notifyHandleFlowNum()
@@ -263,7 +262,7 @@ func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, analyzeId string, proc
 	var count int64
 	before := 1 - processPercent
 	for flow := range flowCh {
-		atomic.AddInt64(&count, 1)
+		count++
 		m.pluginCaller.CallAnalyzeHTTPFlow(m.ctx, flow, extract)
 		m.notifyProcess(before + float64(count)/float64(totalQueryCount)*processPercent)
 	}
