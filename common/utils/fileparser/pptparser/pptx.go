@@ -87,9 +87,6 @@ func (p *PPTXParser) parsePresentationAllNodes(presentationPart *Part) error {
 		}
 		rels := slidePart.Rels()
 		for _, rel := range rels.Values() {
-			if rel.rID != "rId4" {
-				continue
-			}
 			if _, ok := partNameMap[rel.TargetRef()]; ok {
 				continue
 			}

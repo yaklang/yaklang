@@ -10,7 +10,6 @@ import (
 
 func TestParseFile(t *testing.T) {
 	exts := []string{"docx", "pptx", "xlsx"}
-	// exts := []string{"xlsx"}
 	for _, ext := range exts {
 		fileName := "test." + ext
 		testFileContent, err := resources.FS.ReadFile(fileName)
@@ -18,17 +17,16 @@ func TestParseFile(t *testing.T) {
 			t.Fatalf("读取文件失败: %v", err)
 		}
 
-		// tmpDir, err := os.MkdirTemp("", "yaklang_test_output_*")
-		// if err != nil {
-		// 	t.Fatalf("创建临时目录失败: %v", err)
-		// }
-		// defer os.RemoveAll(tmpDir)
-		tmpDir := "/Users/z3/Downloads/test/" + ext
-		// tempFile, err := os.CreateTemp(tmpDir, fileName)
-		// if err != nil {
-		// 	t.Fatalf("创建临时文件失败: %v", err)
-		// }
-		// defer os.Remove(tempFile.Name())
+		tmpDir, err := os.MkdirTemp("", "yaklang_test_output_*")
+		if err != nil {
+			t.Fatalf("创建临时目录失败: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+		tempFile, err := os.CreateTemp(tmpDir, fileName)
+		if err != nil {
+			t.Fatalf("创建临时文件失败: %v", err)
+		}
+		defer os.Remove(tempFile.Name())
 		os.MkdirAll(tmpDir, 0755)
 		err = os.WriteFile(filepath.Join(tmpDir, fileName), testFileContent, 0644)
 		if err != nil {
