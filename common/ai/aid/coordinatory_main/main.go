@@ -43,7 +43,7 @@ func main() {
 					rsp.EmitReasonStream(c)
 				}),
 				aispec.WithType("tongyi"),
-				aispec.WithModel("qwen-plus"),
+				aispec.WithModel("qwq-plus"),
 				aispec.WithAPIKey(string(apikey)),
 				// aispec.WithDomain("api.siliconflow.cn"),
 			)
