@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -10,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"sync"
+	"time"
 )
 
 type AICaller interface {
@@ -23,6 +25,9 @@ var _ AICaller = &aiTask{}
 type Config struct {
 	m  *sync.Mutex
 	id string
+
+	eventInputChan chan *InputEvent
+	epm            *endpointManager
 
 	// need to think
 	coordinatorAICallback AICallbackType
@@ -70,12 +75,43 @@ func (c *Config) emit(e *Event) {
 	c.eventHandler(e)
 }
 
-func newConfig() *Config {
+func newConfig(ctx context.Context) *Config {
 	id := uuid.New()
 	c := &Config{
-		m:  new(sync.Mutex),
-		id: id.String(),
+		m:   new(sync.Mutex),
+		id:  id.String(),
+		epm: newEndpointManager(),
 	}
+	go func() {
+		log.Infof("config %s started, start to handle receiving loop", c.id)
+		logOnce := new(sync.Once)
+		for {
+			if c.eventInputChan == nil {
+				logOnce.Do(func() {
+					log.Infof("event input chan is nil, will retry in 1 second")
+				})
+				select {
+				case <-time.After(time.Second):
+					continue
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			select {
+			case event, ok := <-c.eventInputChan:
+				if !ok {
+					return
+				}
+				if event == nil {
+					continue
+				}
+				c.epm.feed(event.Id, event.Params)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	if err := WithTools(buildinaitools.GetBasicBuildInTools()...)(c); err != nil {
 		log.Errorf("get basic build in tools: %v", err)
