@@ -802,7 +802,7 @@ service Yak {
   // HTTPFlow
   rpc ExportHTTPFlowStream(ExportHTTPFlowStreamRequest) returns(stream ExportHTTPFlowStreamResponse);
   rpc ImportHTTPFlowStream(ImportHTTPFlowStreamRequest) returns(stream ImportHTTPFlowStreamResponse);
-  
+
   // Note
   rpc CreateNote(CreateNoteRequest) returns (CreateNoteResponse);
   rpc UpdateNote(UpdateNoteRequest) returns (DbOperateMessage);
@@ -811,6 +811,39 @@ service Yak {
   rpc SearchNoteContent(SearchNoteContentRequest) returns (SearchNoteContentResponse);
   rpc ImportNote(ImportNoteRequest) returns (stream ImportNoteResponse);
   rpc ExportNote(ExportNoteRequest) returns (stream ExportNoteResponse);
+
+  rpc StartAITask(stream AIInputEvent) returns(stream AIOutputEvent);
+}
+
+message AIOutputEvent {
+  string CoordinatorId = 1;
+  string Type = 2;
+  string NodeId = 3;
+  bool IsSystem = 4;
+  bool IsStream = 5;
+  bool IsReason = 6;
+  bytes StreamDelta = 7;
+  bool IsJson = 8;
+  bytes Content = 9;
+}
+
+message AIInputEvent {
+  bool IsStart = 1;
+  AIStartParams Params = 2;
+
+  bool IsInteractiveMessage = 3;
+  string InteractiveId = 4;
+  string InteractiveJSONInput = 5;
+}
+
+message McpConfig {
+  string Type = 1;
+  string Key = 2;
+  string Url = 3;
+}
+
+message AIStartParams {
+  repeated McpConfig McpServers = 1;
 }
 
 
