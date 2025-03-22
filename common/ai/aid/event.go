@@ -2,6 +2,7 @@ package aid
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
 	"strings"
 
@@ -238,4 +239,9 @@ func (r *Config) emitExStreamEvent(nodeId string, isSystem, isReason bool, reade
 		}, reader)
 	}()
 	return
+}
+
+type InputEvent struct {
+	Id     string
+	Params aitool.InvokeParams
 }

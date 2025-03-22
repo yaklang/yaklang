@@ -1,0 +1,106 @@
+package aid
+
+import (
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils"
+	"sync"
+	"time"
+)
+
+type endpointManager struct {
+	results *sync.Map
+}
+
+func newEndpointManager() *endpointManager {
+	return &endpointManager{
+		results: &sync.Map{},
+	}
+}
+
+func (e *endpointManager) feed(id string, params aitool.InvokeParams) {
+	if ep, ok := e.loadEndpoint(id); ok {
+		ep.ActiveWithParams(params)
+	}
+}
+
+func (e *endpointManager) createEndpoint() *Endpoint {
+	id := ksuid.New().String()
+	endpoint := &Endpoint{
+		id:           id,
+		sig:          sync.NewCond(&sync.Mutex{}), // 正确初始化 Cond
+		activeParams: make(aitool.InvokeParams),
+	}
+	e.results.Store(id, endpoint)
+	return endpoint
+}
+
+func (e *endpointManager) loadEndpoint(id string) (*Endpoint, bool) {
+	raw, ok := e.results.Load(id)
+	if !ok {
+		return nil, false
+	}
+	ep, typeOk := raw.(*Endpoint)
+	if !typeOk {
+		return nil, false
+	}
+	return ep, true
+}
+
+type Endpoint struct {
+	id           string
+	sig          *sync.Cond
+	activeParams aitool.InvokeParams
+}
+
+func (e *Endpoint) Wait() {
+	e.sig.L.Lock()
+	defer e.sig.L.Unlock()
+	e.sig.Wait()
+}
+
+// 新增的 WaitTimeout 方法
+func (e *Endpoint) WaitTimeout(timeout time.Duration) bool {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	// 创建一个通道用于通知完成
+	done := make(chan struct{})
+
+	go func() {
+		e.sig.L.Lock()
+		e.sig.Wait()
+		e.sig.L.Unlock()
+		close(done)
+	}()
+
+	// 等待信号或超时
+	select {
+	case <-done:
+		return true // 成功接收到信号
+	case <-timer.C:
+		return false // 超时
+	}
+}
+
+// 修改后的 GetParams 方法，添加锁保护
+func (e *Endpoint) GetParams() aitool.InvokeParams {
+	e.sig.L.Lock()
+	defer e.sig.L.Unlock()
+	// 创建一个副本以避免外部修改
+	params := make(aitool.InvokeParams)
+	for k, v := range e.activeParams {
+		params[k] = v
+	}
+	return params
+}
+
+func (e *Endpoint) ActiveWithParams(params aitool.InvokeParams) {
+	e.sig.L.Lock()
+	defer e.sig.L.Unlock()
+
+	if !utils.IsNil(params) {
+		e.activeParams = params
+	}
+	e.sig.Broadcast()
+}
