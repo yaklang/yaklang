@@ -25,7 +25,7 @@
         },
         "tasks": {
             "type": "array",
-            "description": "用户想要执行的任务拆分后的子任务",
+            "description": "用户想要执行的任务拆分后的子任务(拆分子任务数量尽量不大于3)",
             "minItems": 1,
             "items": {
                 "type": "object",
