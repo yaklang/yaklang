@@ -1,7 +1,6 @@
 package aid
 
 import (
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
@@ -11,8 +10,6 @@ import (
 type CoordinatorOption func(c *Coordinator)
 
 type Coordinator struct {
-	id string
-
 	userInput string
 	config    *Config
 }
@@ -41,31 +38,37 @@ func NewCoordinator(userInput string, options ...Option) (*Coordinator, error) {
 		}
 	}
 
-	coordinatorId := uuid.New().String()
 	c := &Coordinator{
 		config:    config,
-		id:        coordinatorId,
 		userInput: userInput,
 	}
 	return c, nil
 }
 
 func (c *Coordinator) Run() error {
+	c.config.EmitInfo("start to create plan request")
 	planReq, err := c.createPlanRequest(c.userInput)
 	if err != nil {
+		c.config.EmitError("create planRequest failed: %v", err)
 		return utils.Errorf("coordinator: create planRequest failed: %v", err)
 	}
+
+	c.config.EmitInfo("start to invoke plan request")
 	rsp, err := planReq.Invoke()
 	if err != nil {
+		c.config.EmitError("invoke planRequest failed: %v", err)
 		return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 	}
+
 	if rsp.RootTask == nil {
+		c.config.EmitError("root aiTask is nil, plan failed")
 		return utils.Errorf("coordinator: root aiTask is nil")
 	}
 	// init aiTask
 	// check tools
 	root := rsp.RootTask
 	if len(root.Subtasks) <= 0 {
+		c.config.EmitError("no subtasks found, this task is not a valid task")
 		return utils.Errorf("coordinator: no subtasks found")
 	}
 	log.Infof("create aiTask pipeline: %v", root.Name)
@@ -78,7 +81,8 @@ func (c *Coordinator) Run() error {
 		}
 	}
 
-	rt := createRuntime()
+	c.config.EmitInfo("start to create runtime")
+	rt := c.createRuntime()
 	rt.Invoke(root)
 	prompt, err := c.generateReport(rt)
 	if err != nil {
