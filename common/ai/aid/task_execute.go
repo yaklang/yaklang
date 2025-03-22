@@ -55,10 +55,12 @@ func (t *aiTask) getToolResultAction(response string) string {
 }
 
 func (t *aiTask) callTool(ctx *taskContext, targetTool *aitool.Tool) (result *aitool.ToolResult, action string, err error) {
+	t.config.EmitInfo("start to generate tool[%v] params in task:%#v", targetTool.Name, t.Name)
 	// 生成申请工具详细描述的prompt
 	paramsPrompt, err := t.generateRequireToolResponsePrompt(ctx, targetTool, targetTool.Name)
 	if err != nil {
 		err = utils.Errorf("error generate require tool response prompt: %v", err)
+		t.config.EmitError("error generate require tool response prompt: %v", err)
 		return nil, "", NewNonRetryableTaskStackError(err)
 	}
 	// 调用AI获取工具调用参数
@@ -68,13 +70,17 @@ func (t *aiTask) callTool(ctx *taskContext, targetTool *aitool.Tool) (result *ai
 		err = utils.Errorf("error calling AI: %v", err)
 		return nil, "", NewNonRetryableTaskStackError(err)
 	}
-	callParamsString, _ := io.ReadAll(callParams.Reader())
+	callParamsString, _ := io.ReadAll(callParams.GetOutputStreamReader("call-tools", true, t.config))
+
+	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
 	// 调用工具
 	toolResult, err := targetTool.InvokeWithRaw(string(callParamsString))
 	if err != nil {
 		err = utils.Errorf("error invoking tool: %v", err)
 		return nil, "", NewNonRetryableTaskStackError(err)
 	}
+
+	t.config.EmitInfo("start to generate and feedback tool[%v] result in task:%#v", targetTool.Name, t.Name)
 	// 生成调用工具结果的prompt
 	decisionPrompt, err := t.generateToolCallResponsePrompt(toolResult, ctx, targetTool)
 	if err != nil {
@@ -88,13 +94,17 @@ func (t *aiTask) callTool(ctx *taskContext, targetTool *aitool.Tool) (result *ai
 		err = utils.Errorf("error calling AI: %v", err)
 		return nil, "", NewNonRetryableTaskStackError(err)
 	}
-	nextResponse, err := io.ReadAll(continueResult.Reader())
+	nextResponse, err := io.ReadAll(continueResult.GetOutputStreamReader("decision", true, t.config))
 	if err != nil {
 		err = utils.Errorf("error reading AI response: %v", err)
 		return nil, "", NewNonRetryableTaskStackError(err)
 	}
+
 	// 获取下一步决策
 	action = t.getToolResultAction(string(nextResponse))
+	if action != "" {
+		t.config.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, action)
+	}
 	return toolResult, action, nil
 }
 
@@ -116,107 +126,99 @@ func (t *aiTask) executeTask(ctx *taskContext) error {
 		aispec.NewUserChatDetail(prompt),
 	}
 
+	// 调用AI回调函数
+	t.config.EmitPrompt("task_execute", prompt)
+	req := NewAIRequest(prompt, WithAIRequest_TaskContext(ctx))
+	responseReader, err := t.callAI(req)
+	if err != nil {
+		return fmt.Errorf("error calling AI: %w", err)
+	}
+
+	// 读取AI的响应
+	responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config))
+	if err != nil {
+		return fmt.Errorf("error reading AI response: %w", err)
+	}
+
+	// 处理工具调用, 直到没有工具调用为止
+	response := string(responseBytes)
+	tempChatDetails := chatDetails.Clone()
+	tempChatDetails = append(tempChatDetails, aispec.NewAIChatDetail(response))
+
+TOOLREQUIRED:
 	for {
-		// 调用AI回调函数
-		t.config.EmitPrompt("task_execute", prompt)
-		req := NewAIRequest(prompt, WithAIRequest_TaskContext(ctx))
-		responseReader, err := t.callAI(req)
-		if err != nil {
-			return fmt.Errorf("error calling AI: %w", err)
+		toolRequired := t.getToolRequired(response)
+		if len(toolRequired) == 0 {
+			t.config.EmitInfo("no tool required in task: %#v", t.Name)
+			break
 		}
 
-		// 读取AI的响应
-		responseBytes, err := io.ReadAll(responseReader.Reader())
+		targetTool := toolRequired[0]
+		result, action, err := t.callTool(ctx, targetTool)
 		if err != nil {
-			return fmt.Errorf("error reading AI response: %w", err)
+			t.config.EmitError("error calling tool: %v", err)
+			return err
 		}
+		t.PushToolCallResult(result)
 
-		// 处理工具调用, 直到没有工具调用为止
-		response := string(responseBytes)
-		tempChatDetails := chatDetails.Clone()
-		tempChatDetails = append(tempChatDetails, aispec.NewAIChatDetail(response))
-
-	TOOLREQUIRED:
-		for {
-			toolRequired := t.getToolRequired(response)
-			if len(toolRequired) == 0 {
-				break
-			}
-
-			targetTool := toolRequired[0]
-			result, action, err := t.callTool(ctx, targetTool)
+		switch action {
+		case "require-more-tool":
+			t.config.EmitInfo("require more tool in task: %#v", t.Name)
+			moreToolPrompt, err := t.generateTaskPrompt(t.config.tools, ctx, actualMetadata)
 			if err != nil {
-				log.Errorf("error calling tool: %v", err)
-				return err
-			}
-			t.PushToolCallResult(result)
-
-			switch action {
-			case "require-more-tool":
-				moreToolPrompt, err := t.generateTaskPrompt(t.config.tools, ctx, actualMetadata)
-				if err != nil {
-					log.Errorf("error generating aiTask prompt: %v", err)
-					break TOOLREQUIRED
-				}
-
-				req := NewAIRequest(moreToolPrompt, WithAIRequest_TaskContext(ctx))
-				responseReader, err := t.callAI(req)
-				if err != nil {
-					return fmt.Errorf("error calling AI: %w", err)
-				}
-				responseBytes, err := io.ReadAll(responseReader.Reader())
-				if err != nil {
-					return fmt.Errorf("error reading AI response: %w", err)
-				}
-				response = string(responseBytes)
-			case "finished":
-				fallthrough
-			default:
-				callHistory, err := t.generateToolCallResultsPrompt()
-				if err != nil {
-					log.Errorf("error generating tool call results prompt: %v", err)
-					return err
-				}
-				response = callHistory
+				log.Errorf("error generating aiTask prompt: %v", err)
 				break TOOLREQUIRED
 			}
-		}
 
-		chatDetails = append(chatDetails, aispec.NewAIChatDetail(response))
-
-		// 处理响应回调, 直到没有继续思考为止
-		if t.ResponseCallback != nil {
-			continueThinking, newPrompt, err := t.ResponseCallback(ctx, chatDetails...)
+			req := NewAIRequest(moreToolPrompt, WithAIRequest_TaskContext(ctx))
+			responseReader, err := t.callAI(req)
 			if err != nil {
-				return fmt.Errorf("error calling response callback: %w", err)
+				return fmt.Errorf("error calling AI: %w", err)
 			}
-			if !continueThinking {
-				break
+			responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config))
+			if err != nil {
+				return fmt.Errorf("error reading AI response: %w", err)
 			}
-			chatDetails = append(chatDetails, aispec.NewUserChatDetail(newPrompt))
-		} else {
-			break
+			response = string(responseBytes)
+		case "finished":
+			t.config.EmitInfo("task[%v] finished", t.Name)
+			fallthrough
+		default:
+			callHistory, err := t.generateToolCallResultsPrompt()
+			if err != nil {
+				log.Errorf("error generating tool call results prompt: %v", err)
+				return err
+			}
+			response = callHistory
+			break TOOLREQUIRED
 		}
 	}
 
+	chatDetails = append(chatDetails, aispec.NewAIChatDetail(response))
+
+	t.config.EmitInfo("start to execute task-summary action")
 	// 处理总结回调
 	summaryPromptWellFormed, err := GenerateTaskSummaryPrompt(aispec.DetailsToString(chatDetails))
 	if err != nil {
+		t.config.EmitError("error generating summary prompt: %v", err)
 		return fmt.Errorf("error generating summary prompt: %w", err)
 	}
-	req := NewAIRequest(summaryPromptWellFormed, WithAIRequest_TaskContext(ctx))
+	req = NewAIRequest(summaryPromptWellFormed, WithAIRequest_TaskContext(ctx))
 	summaryReader, err := t.callAI(req)
 	if err != nil {
+		t.config.EmitError("error calling summary AI: %v", err)
 		return fmt.Errorf("error calling summary AI: %w", err)
 	}
 
-	summaryBytes, err := io.ReadAll(summaryReader.Reader())
+	summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.config))
 	if err != nil {
+		t.config.EmitError("error reading summary: %v", err)
 		return fmt.Errorf("error reading summary: %w", err)
 	}
 
 	action, err := extractAction(string(summaryBytes), "summary")
 	if err != nil {
+		t.config.EmitError("error extracting action: %v", err)
 		return fmt.Errorf("error extracting action: %w", err)
 	}
 

@@ -92,7 +92,7 @@ func (pr *planRequest) Invoke() (*planResponse, error) {
 	}
 
 	// 读取响应内容
-	responseBytes, err := io.ReadAll(responseReader.Reader())
+	responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("plan", false, pr.config))
 	if err != nil {
 		return nil, fmt.Errorf("读取 AI 响应失败: %v", err)
 	}

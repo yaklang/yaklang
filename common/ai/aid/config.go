@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -53,6 +54,12 @@ func (c *Config) emit(e *Event) {
 	c.m.Lock()
 	defer c.m.Unlock()
 	if c.eventHandler == nil {
+		if e.IsStream {
+			if c.debugEvent {
+				fmt.Print(string(e.StreamDelta))
+			}
+			return
+		}
 		if c.debugEvent {
 			log.Info(e.String())
 		} else {

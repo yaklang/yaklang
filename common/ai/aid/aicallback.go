@@ -31,7 +31,7 @@ func (a *AIResponse) Debug(i ...bool) {
 	a.enableDebug = i[0]
 }
 
-func (a *AIResponse) Reader() io.Reader {
+func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, config *Config) io.Reader {
 	pr, pw := utils.NewBufPipe(nil)
 	go func() {
 		defer pw.Close()
@@ -39,12 +39,25 @@ func (a *AIResponse) Reader() io.Reader {
 			if i == nil {
 				continue
 			}
-			if !i.IsReason {
-				if !a.enableDebug {
-					io.Copy(pw, i.out)
+
+			targetStream := i.out
+			if a.enableDebug {
+				targetStream = io.TeeReader(i.out, os.Stdout)
+			}
+			if i.IsReason {
+				if system {
+					config.EmitSystemReasonStreamEvent(nodeId, targetStream)
 				} else {
-					io.Copy(io.MultiWriter(pw, os.Stdout), i.out)
+					config.EmitReasonStreamEvent(nodeId, targetStream)
 				}
+				continue
+			}
+
+			targetStream = io.TeeReader(targetStream, pw)
+			if system {
+				config.EmitSystemStreamEvent(nodeId, targetStream)
+			} else {
+				config.EmitStreamEvent(nodeId, targetStream)
 			}
 		}
 	}()
