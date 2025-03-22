@@ -124,7 +124,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 			if i, ok := s.(*ssa.InterfaceType); ok {
 				store := b.StoreFunctionBuilder()
-				fun, _ := ssa.ToFunction(bp.Constructor)
+				fun, ok := ssa.ToFunction(bp.Constructor)
+				if !ok {
+					continue
+				}
+				// fun, _ := ssa.ToFunction(bp.Constructor)
 				fun.AddLazyBuilder(func() {
 					switchHandler := b.SwitchFunctionBuilder(store)
 					defer func() {
