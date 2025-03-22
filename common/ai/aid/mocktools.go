@@ -27,7 +27,7 @@ func GetAllMockTools() []*aitool.Tool {
 
 // WeatherTool 创建天气查询工具
 func WeatherTool() *aitool.Tool {
-	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	callback := func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		city, _ := params["city"].(string)
 		date, _ := params["date"].(string)
 
@@ -96,7 +96,7 @@ func WeatherTool() *aitool.Tool {
 
 // AttractionTool 创建景点推荐工具
 func AttractionTool() *aitool.Tool {
-	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	callback := func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		city, _ := params["city"].(string)
 		preference, _ := params["preference"].(string)
 
@@ -204,7 +204,7 @@ func AttractionTool() *aitool.Tool {
 
 // RestaurantTool 创建餐厅搜索工具
 func RestaurantTool() *aitool.Tool {
-	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	callback := func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		location, _ := params["location"].(string)
 		budget, _ := params["budget"].(string)
 		cuisine, _ := params["cuisine"].(string)
@@ -323,7 +323,7 @@ func RestaurantTool() *aitool.Tool {
 
 // TransportTool 创建交通查询工具
 func TransportTool() *aitool.Tool {
-	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	callback := func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		origin, _ := params["origin"].(string)
 		destination, _ := params["destination"].(string)
 
@@ -390,7 +390,7 @@ func TransportTool() *aitool.Tool {
 
 // TimeEstimateTool 创建行程时间估算工具
 func TimeEstimateTool() *aitool.Tool {
-	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	callback := func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		locationsObj, ok := params["locations"]
 		if !ok {
 			fmt.Fprintf(stderr, "地点列表不能为空\n")

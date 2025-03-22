@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -33,41 +31,35 @@ func main() {
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
 	aiCallback := func(req *aid.AIRequest) (*aid.AIResponse, error) {
 		rsp := aid.NewAIResponse()
-		defer rsp.Close()
-		fmt.Println(req.GetPrompt())
-		_, err := ai.Chat(
-			req.GetPrompt(),
-			aispec.WithStreamHandler(func(c io.Reader) {
-				var buf bytes.Buffer
-				c = io.TeeReader(c, &buf)
-				go func() {
-					io.Copy(os.Stdout, c)
-				}()
-				rsp.EmitOutputStream(&buf)
-			}),
-			aispec.WithReasonStreamHandler(func(c io.Reader) {
-				var buf bytes.Buffer
-				c = io.TeeReader(c, &buf)
-				go func() {
-					io.Copy(os.Stdout, c)
-				}()
-				rsp.EmitReasonStream(&buf)
-			}),
-			aispec.WithType("tongyi"),
-			aispec.WithModel("qwen-plus"),
-			aispec.WithAPIKey(string(apikey)),
-			// aispec.WithDomain("api.siliconflow.cn"),
-		)
-		if err != nil {
-			return nil, err
-		}
+		go func() {
+			defer rsp.Close()
+			//fmt.Println(req.GetPrompt())
+			_, err := ai.Chat(
+				req.GetPrompt(),
+				aispec.WithStreamHandler(func(c io.Reader) {
+					rsp.EmitOutputStream(c)
+				}),
+				aispec.WithReasonStreamHandler(func(c io.Reader) {
+					rsp.EmitReasonStream(c)
+				}),
+				aispec.WithType("tongyi"),
+				aispec.WithModel("qwq-plus"),
+				aispec.WithAPIKey(string(apikey)),
+				// aispec.WithDomain("api.siliconflow.cn"),
+			)
+			if err != nil {
+				log.Errorf("chat error: %v", err)
+			}
+		}()
 		return rsp, nil
 	}
 
 	coordinator, err := aid.NewCoordinator(
-		"查询北京天气，帮我规划今天一天去一个最推荐的地方旅游，两步规划",
+		"找出 //Users/v1ll4n/Projects/yaklang 目录中最大的文件",
 		aid.WithAICallback(aiCallback),
 		aid.WithTools(aid.GetAllMockTools()...),
+		aid.WithSystemFileOperator(),
+		aid.WithDebugPrompt(),
 	)
 	if err := coordinator.Run(); err != nil {
 		panic(err)

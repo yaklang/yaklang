@@ -1,7 +1,7 @@
 package aid
 
 import (
-	"github.com/google/uuid"
+	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
@@ -11,8 +11,6 @@ import (
 type CoordinatorOption func(c *Coordinator)
 
 type Coordinator struct {
-	id string
-
 	userInput string
 	config    *Config
 }
@@ -31,9 +29,13 @@ func (c *Coordinator) callAI(request *AIRequest) (*AIResponse, error) {
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
-// NewCoordinator 创建一个新的 Coordinator
 func NewCoordinator(userInput string, options ...Option) (*Coordinator, error) {
-	config := newConfig()
+	return NewCoordinatorContext(context.Background(), userInput, options...)
+}
+
+// NewCoordinator 创建一个新的 Coordinator
+func NewCoordinatorContext(ctx context.Context, userInput string, options ...Option) (*Coordinator, error) {
+	config := newConfig(ctx)
 	for _, opt := range options {
 		err := opt(config)
 		if err != nil {
@@ -41,31 +43,37 @@ func NewCoordinator(userInput string, options ...Option) (*Coordinator, error) {
 		}
 	}
 
-	coordinatorId := uuid.New().String()
 	c := &Coordinator{
 		config:    config,
-		id:        coordinatorId,
 		userInput: userInput,
 	}
 	return c, nil
 }
 
 func (c *Coordinator) Run() error {
+	c.config.EmitInfo("start to create plan request")
 	planReq, err := c.createPlanRequest(c.userInput)
 	if err != nil {
+		c.config.EmitError("create planRequest failed: %v", err)
 		return utils.Errorf("coordinator: create planRequest failed: %v", err)
 	}
+
+	c.config.EmitInfo("start to invoke plan request")
 	rsp, err := planReq.Invoke()
 	if err != nil {
+		c.config.EmitError("invoke planRequest failed: %v", err)
 		return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 	}
+
 	if rsp.RootTask == nil {
+		c.config.EmitError("root aiTask is nil, plan failed")
 		return utils.Errorf("coordinator: root aiTask is nil")
 	}
 	// init aiTask
 	// check tools
 	root := rsp.RootTask
 	if len(root.Subtasks) <= 0 {
+		c.config.EmitError("no subtasks found, this task is not a valid task")
 		return utils.Errorf("coordinator: no subtasks found")
 	}
 	log.Infof("create aiTask pipeline: %v", root.Name)
@@ -78,21 +86,28 @@ func (c *Coordinator) Run() error {
 		}
 	}
 
-	rt := createRuntime()
+	c.config.EmitInfo("start to create runtime")
+	rt := c.createRuntime()
 	rt.Invoke(root)
+
+	c.config.EmitInfo("start to generate report or result")
 	prompt, err := c.generateReport(rt)
 	if err != nil {
+		c.config.EmitError("generate report failed: %v", err)
 		return utils.Error("coordinator: generate report failed")
 	}
 	aiRsp, err := c.callAI(NewAIRequest(prompt))
 	if err != nil {
+		c.config.EmitError("AICallback failed: %v", err)
 		return utils.Errorf("coordinator: AICallback failed: %v", err)
 	}
-	output, err := io.ReadAll(aiRsp.Reader())
+	output, err := io.ReadAll(aiRsp.GetOutputStreamReader("result", false, c.config))
 	if err != nil {
+		c.config.EmitError("read AICallback response failed: %v", err)
 		return utils.Errorf("coordinator: read AICallback response failed: %v", err)
 	}
-	// todo: callback output
-	_ = output
+	c.config.EmitStructured("result", map[string]any{
+		"data": string(output),
+	})
 	return nil
 }
