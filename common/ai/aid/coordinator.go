@@ -84,19 +84,25 @@ func (c *Coordinator) Run() error {
 	c.config.EmitInfo("start to create runtime")
 	rt := c.createRuntime()
 	rt.Invoke(root)
+
+	c.config.EmitInfo("start to generate report or result")
 	prompt, err := c.generateReport(rt)
 	if err != nil {
+		c.config.EmitError("generate report failed: %v", err)
 		return utils.Error("coordinator: generate report failed")
 	}
 	aiRsp, err := c.callAI(NewAIRequest(prompt))
 	if err != nil {
+		c.config.EmitError("AICallback failed: %v", err)
 		return utils.Errorf("coordinator: AICallback failed: %v", err)
 	}
-	output, err := io.ReadAll(aiRsp.Reader())
+	output, err := io.ReadAll(aiRsp.GetOutputStreamReader("result", false, c.config))
 	if err != nil {
+		c.config.EmitError("read AICallback response failed: %v", err)
 		return utils.Errorf("coordinator: read AICallback response failed: %v", err)
 	}
-	// todo: callback output
-	_ = output
+	c.config.EmitStructured("result", map[string]any{
+		"data": output,
+	})
 	return nil
 }
