@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 
 	"github.com/samber/lo"
@@ -11,7 +12,7 @@ import (
 )
 
 // InvokeCallback 定义工具调用回调函数的签名
-type InvokeCallback func(params map[string]any, stdout io.Writer, stderr io.Writer) (any, error)
+type InvokeCallback func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)
 
 type Tool struct {
 	*mcp.Tool
@@ -453,4 +454,29 @@ func (t *Tool) ToJSONSchemaString() string {
 	}
 
 	return string(jsonBytes)
+}
+
+type ToolFactory struct {
+	tools []*Tool
+}
+
+func NewFactory() *ToolFactory {
+	return &ToolFactory{}
+}
+
+func (f *ToolFactory) Tools() []*Tool {
+	tools := make([]*Tool, 0, len(f.tools))
+	for _, tool := range f.tools {
+		tools = append(tools, tool)
+	}
+	return tools
+}
+
+func (f *ToolFactory) RegisterTool(toolName string, opts ...ToolOption) error {
+	tool, err := New(toolName, opts...)
+	if err != nil {
+		return utils.Errorf("create tool failed: %v", err)
+	}
+	f.tools = append(f.tools, tool)
+	return nil
 }

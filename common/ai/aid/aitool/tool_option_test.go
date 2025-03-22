@@ -11,7 +11,7 @@ import (
 )
 
 // 提供一个测试用的回调函数
-func testCallback(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+func testCallback(params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 	return params, nil
 }
 
