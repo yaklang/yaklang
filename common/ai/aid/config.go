@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 	"sync"
 )
 
@@ -35,11 +36,28 @@ type Config struct {
 	debugEvent  bool
 }
 
+func (c *Config) wrapper(i AICallbackType) AICallbackType {
+	return func(request *AIRequest) (*AIResponse, error) {
+		if c.debugPrompt {
+			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())
+		}
+		resp, err := i(request)
+		if c.debugPrompt {
+			resp.Debug(true)
+		}
+		return resp, err
+	}
+}
+
 func (c *Config) emit(e *Event) {
 	c.m.Lock()
 	defer c.m.Unlock()
 	if c.eventHandler == nil {
-		log.Info(e.String())
+		if c.debugEvent {
+			log.Info(e.String())
+		} else {
+			log.Info(utils.ShrinkString(e.String(), 200))
+		}
 		return
 	}
 	c.eventHandler(e)
@@ -82,9 +100,9 @@ func WithAICallback(cb AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.coordinatorAICallback = cb
-		config.taskAICallback = cb
-		config.planAICallback = cb
+		config.coordinatorAICallback = config.wrapper(cb)
+		config.taskAICallback = config.wrapper(cb)
+		config.planAICallback = config.wrapper(cb)
 		return nil
 	}
 }
@@ -93,7 +111,7 @@ func WithTaskAICallback(cb AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.taskAICallback = cb
+		config.taskAICallback = config.wrapper(cb)
 		return nil
 	}
 }
@@ -102,7 +120,7 @@ func WithCoordinatorAICallback(cb AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.coordinatorAICallback = cb
+		config.coordinatorAICallback = config.wrapper(cb)
 		return nil
 	}
 }
@@ -111,7 +129,7 @@ func WithPlanAICallback(cb AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.planAICallback = cb
+		config.planAICallback = config.wrapper(cb)
 		return nil
 	}
 }
@@ -123,5 +141,42 @@ func WithSystemFileOperator() Option {
 			return utils.Errorf("create system fs tools: %v", err)
 		}
 		return WithTools(tools...)(config)
+	}
+}
+
+func WithDebugPrompt(i ...bool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if len(i) > 0 {
+			config.debugPrompt = i[0]
+			return nil
+		}
+		config.debugPrompt = true
+		return nil
+	}
+}
+
+func WithEventHandler(h func(e *Event)) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.eventHandler = h
+		return nil
+	}
+}
+
+func WithDebug(i ...bool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if len(i) > 0 {
+			config.debugPrompt = i[0]
+			config.debugEvent = i[0]
+			return nil
+		}
+		config.debugPrompt = true
+		config.debugEvent = true
+		return nil
 	}
 }
