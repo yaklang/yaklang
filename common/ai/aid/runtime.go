@@ -3,12 +3,13 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -17,15 +18,17 @@ import (
 
 type runtime struct {
 	RootTask *aiTask
+	config   *Config
 	Stack    *utils.Stack[*aiTask]
 
 	statusMutex     sync.Mutex
 	toolCallResults []*aitool.ToolResult
 }
 
-func createRuntime() *runtime {
+func (c *Coordinator) createRuntime() *runtime {
 	return &runtime{
-		Stack: utils.NewStack[*aiTask](),
+		config: c.config,
+		Stack:  utils.NewStack[*aiTask](),
 	}
 }
 
@@ -96,13 +99,19 @@ func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
 		r.RootTask = task
 	}
 	task.executing = true
+	r.config.EmitInfo("invoke subtask: %v", task.Name)
+
 	r.Stack.Push(task)
+	r.config.EmitPushTask(task)
+
 	r.statusMutex.Unlock()
 	defer func() {
 		r.statusMutex.Lock()
 		task.executed = true
 		task.executing = false
 		r.Stack.Pop()
+		r.config.EmitUpdateTaskStatus(task)
+		r.config.EmitPopTask(task)
 		r.statusMutex.Unlock()
 	}()
 
@@ -111,10 +120,12 @@ func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
 			idx := idxRaw + 1
 			err := r.invokeSubtask(idx, subtask)
 			if err != nil {
+				r.config.EmitError("invoke subtask failed: %v", err)
 				// invoke subtask failed
 				// retry via user!
 				return err
 			}
+			r.config.EmitInfo("invoke subtask success: %v with %d tool call results", subtask.Name, len(subtask.ToolCallResults))
 			r.PushToolCallResults(subtask.ToolCallResults...)
 		}
 		return nil
@@ -127,7 +138,10 @@ func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
 }
 
 func (r *runtime) Invoke(task *aiTask) {
-	r.invokeSubtask(1, task)
+	err := r.invokeSubtask(1, task)
+	if err != nil {
+		r.config.EmitError("invoke subtask failed: %v", err)
+	}
 }
 
 func (r *runtime) PushToolCallResults(t ...*aitool.ToolResult) {

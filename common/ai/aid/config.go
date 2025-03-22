@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
@@ -18,7 +19,8 @@ var _ AICaller = &planRequest{}
 var _ AICaller = &aiTask{}
 
 type Config struct {
-	m *sync.Mutex
+	m  *sync.Mutex
+	id string
 
 	// need to think
 	coordinatorAICallback AICallbackType
@@ -28,20 +30,26 @@ type Config struct {
 	taskAICallback AICallbackType
 	tools          []*aitool.Tool
 	eventHandler   func(e *Event)
+
+	debugPrompt bool
+	debugEvent  bool
 }
 
 func (c *Config) emit(e *Event) {
 	c.m.Lock()
 	defer c.m.Unlock()
 	if c.eventHandler == nil {
+		log.Info(e.String())
 		return
 	}
 	c.eventHandler(e)
 }
 
 func newConfig() *Config {
+	id := uuid.New()
 	c := &Config{
-		m: new(sync.Mutex),
+		m:  new(sync.Mutex),
+		id: id.String(),
 	}
 
 	if err := WithTools(buildinaitools.GetBasicBuildInTools()...)(c); err != nil {

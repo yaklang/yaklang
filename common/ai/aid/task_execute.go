@@ -3,8 +3,9 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -117,6 +118,7 @@ func (t *aiTask) executeTask(ctx *taskContext) error {
 
 	for {
 		// 调用AI回调函数
+		t.config.EmitPrompt("task_execute", prompt)
 		req := NewAIRequest(prompt, WithAIRequest_TaskContext(ctx))
 		responseReader, err := t.callAI(req)
 		if err != nil {
