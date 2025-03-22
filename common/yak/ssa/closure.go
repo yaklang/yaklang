@@ -192,9 +192,6 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				continue
 			}
 			variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
-			if se.BindVariable != nil {
-				variable.SetCaptured(se.BindVariable)
-			}
 			if p, ok := ToParameter(se.Modify); ok {
 				if len(c.Args) > p.FormalParameterIndex {
 					Point(se.Modify, c.Args[p.FormalParameterIndex])
