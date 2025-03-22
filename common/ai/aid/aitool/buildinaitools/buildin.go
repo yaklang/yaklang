@@ -1,4 +1,4 @@
-package buildintools
+package buildinaitools
 
 import (
 	"github.com/samber/lo"

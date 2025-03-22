@@ -13,19 +13,19 @@ import (
 // TestToolInvoke 测试工具调用
 func TestToolInvoke(t *testing.T) {
 	// 创建一个简单的回调函数
-	echoCallback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	echoCallback := func(params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		fmt.Fprintf(stdout, "执行工具：%s\n", "echo")
 		return params, nil
 	}
 
 	// 创建一个带错误的回调函数
-	errorCallback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	errorCallback := func(params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		fmt.Fprintf(stderr, "工具执行错误\n")
 		return nil, errors.New("回调函数错误")
 	}
 
 	// 创建一个带参数验证的回调函数
-	validationCallback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	validationCallback := func(params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		// 验证必要参数
 		query, ok := params["query"]
 		if !ok {
@@ -259,7 +259,7 @@ func TestToolInvoke(t *testing.T) {
 }
 
 func TestToolApplyDefault(t *testing.T) {
-	echoCallback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	echoCallback := func(params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		fmt.Fprintf(stdout, "执行JSON定义的工具\n")
 		return params, nil
 	}
@@ -405,7 +405,7 @@ func TestNewToolFromJSON(t *testing.T) {
 	}`
 
 	// 创建一个简单回调
-	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	callback := func(params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		fmt.Fprintf(stdout, "执行JSON定义的工具\n")
 		return params, nil
 	}
