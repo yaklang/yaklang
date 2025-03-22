@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
@@ -28,9 +29,13 @@ func (c *Coordinator) callAI(request *AIRequest) (*AIResponse, error) {
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
-// NewCoordinator 创建一个新的 Coordinator
 func NewCoordinator(userInput string, options ...Option) (*Coordinator, error) {
-	config := newConfig()
+	return NewCoordinatorContext(context.Background(), userInput, options...)
+}
+
+// NewCoordinator 创建一个新的 Coordinator
+func NewCoordinatorContext(ctx context.Context, userInput string, options ...Option) (*Coordinator, error) {
+	config := newConfig(ctx)
 	for _, opt := range options {
 		err := opt(config)
 		if err != nil {
@@ -102,7 +107,7 @@ func (c *Coordinator) Run() error {
 		return utils.Errorf("coordinator: read AICallback response failed: %v", err)
 	}
 	c.config.EmitStructured("result", map[string]any{
-		"data": output,
+		"data": string(output),
 	})
 	return nil
 }
