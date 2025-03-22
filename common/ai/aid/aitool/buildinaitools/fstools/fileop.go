@@ -229,7 +229,6 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 				filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
 					if counter >= offset {
 						if counter >= offset+limit {
-							stdout.Write([]byte("more than limit"))
 							return utils.Error("more than limit")
 						}
 						raw := map[string]any{

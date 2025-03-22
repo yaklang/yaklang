@@ -5,12 +5,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
+	"os"
 )
 
 type AIRequest struct {
-	prompt           string
-	shouldHaveAction bool
-	ctx              *taskContext
+	prompt string
+	ctx    *taskContext
 }
 
 func (r *AIRequest) GetPrompt() string {
@@ -18,7 +18,17 @@ func (r *AIRequest) GetPrompt() string {
 }
 
 type AIResponse struct {
-	ch *chanx.UnlimitedChan[*OutputStream]
+	ch          *chanx.UnlimitedChan[*OutputStream]
+	enableDebug bool
+}
+
+func (a *AIResponse) Debug(i ...bool) {
+	if len(i) <= 0 {
+		a.enableDebug = true
+		return
+	}
+
+	a.enableDebug = i[0]
 }
 
 func (a *AIResponse) Reader() io.Reader {
@@ -30,7 +40,11 @@ func (a *AIResponse) Reader() io.Reader {
 				continue
 			}
 			if !i.IsReason {
-				io.Copy(pw, i.out)
+				if !a.enableDebug {
+					io.Copy(pw, i.out)
+				} else {
+					io.Copy(io.MultiWriter(pw, os.Stdout), i.out)
+				}
 			}
 		}
 	}()

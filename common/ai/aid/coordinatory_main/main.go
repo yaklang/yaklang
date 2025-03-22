@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -33,34 +31,26 @@ func main() {
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
 	aiCallback := func(req *aid.AIRequest) (*aid.AIResponse, error) {
 		rsp := aid.NewAIResponse()
-		defer rsp.Close()
-		fmt.Println(req.GetPrompt())
-		_, err := ai.Chat(
-			req.GetPrompt(),
-			aispec.WithStreamHandler(func(c io.Reader) {
-				var buf bytes.Buffer
-				c = io.TeeReader(c, &buf)
-				go func() {
-					io.Copy(os.Stdout, c)
-				}()
-				rsp.EmitOutputStream(&buf)
-			}),
-			aispec.WithReasonStreamHandler(func(c io.Reader) {
-				var buf bytes.Buffer
-				c = io.TeeReader(c, &buf)
-				go func() {
-					io.Copy(os.Stdout, c)
-				}()
-				rsp.EmitReasonStream(&buf)
-			}),
-			aispec.WithType("tongyi"),
-			aispec.WithModel("qwen-plus"),
-			aispec.WithAPIKey(string(apikey)),
-			// aispec.WithDomain("api.siliconflow.cn"),
-		)
-		if err != nil {
-			return nil, err
-		}
+		go func() {
+			defer rsp.Close()
+			//fmt.Println(req.GetPrompt())
+			_, err := ai.Chat(
+				req.GetPrompt(),
+				aispec.WithStreamHandler(func(c io.Reader) {
+					rsp.EmitOutputStream(c)
+				}),
+				aispec.WithReasonStreamHandler(func(c io.Reader) {
+					rsp.EmitReasonStream(c)
+				}),
+				aispec.WithType("tongyi"),
+				aispec.WithModel("qwen-plus"),
+				aispec.WithAPIKey(string(apikey)),
+				// aispec.WithDomain("api.siliconflow.cn"),
+			)
+			if err != nil {
+				log.Errorf("chat error: %v", err)
+			}
+		}()
 		return rsp, nil
 	}
 
@@ -69,6 +59,7 @@ func main() {
 		aid.WithAICallback(aiCallback),
 		aid.WithTools(aid.GetAllMockTools()...),
 		aid.WithSystemFileOperator(),
+		aid.WithDebugPrompt(),
 	)
 	if err := coordinator.Run(); err != nil {
 		panic(err)
