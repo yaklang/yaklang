@@ -2,6 +2,10 @@ package aid
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 )
 
@@ -36,9 +40,14 @@ func (c *Config) emit(e *Event) {
 }
 
 func newConfig() *Config {
-	return &Config{
+	c := &Config{
 		m: new(sync.Mutex),
 	}
+
+	if err := WithTools(buildinaitools.GetBasicBuildInTools()...)(c); err != nil {
+		log.Errorf("get basic build in tools: %v", err)
+	}
+	return c
 }
 
 type Option func(config *Config) error
@@ -96,5 +105,15 @@ func WithPlanAICallback(cb AICallbackType) Option {
 		defer config.m.Unlock()
 		config.planAICallback = cb
 		return nil
+	}
+}
+
+func WithSystemFileOperator() Option {
+	return func(config *Config) error {
+		tools, err := fstools.CreateSystemFSTools()
+		if err != nil {
+			return utils.Errorf("create system fs tools: %v", err)
+		}
+		return WithTools(tools...)(config)
 	}
 }

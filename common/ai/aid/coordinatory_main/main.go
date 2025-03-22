@@ -65,9 +65,10 @@ func main() {
 	}
 
 	coordinator, err := aid.NewCoordinator(
-		"查询北京天气，帮我规划今天一天去一个最推荐的地方旅游，两步规划",
+		"找出 /tmp 目录中最大的文件",
 		aid.WithAICallback(aiCallback),
 		aid.WithTools(aid.GetAllMockTools()...),
+		aid.WithSystemFileOperator(),
 	)
 	if err := coordinator.Run(); err != nil {
 		panic(err)

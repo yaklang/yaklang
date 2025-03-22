@@ -70,7 +70,7 @@ func TestToolExecutionResult(t *testing.T) {
 // TestExecuteToolWithCapture 测试带捕获的工具执行
 func TestExecuteToolWithCapture(t *testing.T) {
 	// 创建回调函数
-	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	callback := func(params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		// 写入标准输出
 		fmt.Fprintf(stdout, "命令: %s\n", params["command"])
 		fmt.Fprintf(stdout, "执行成功\n")
@@ -161,7 +161,7 @@ func TestExecuteToolWithCapture(t *testing.T) {
 // TestToolResultIntegration 测试通过 InvokeWithParams 集成 ToolResult 和 ToolExecutionResult
 func TestToolResultIntegration(t *testing.T) {
 	// 创建回调函数
-	callback := func(params map[string]interface{}, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+	callback := func(params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		fmt.Fprintf(stdout, "处理参数: %v\n", params)
 		return params, nil
 	}
