@@ -41,6 +41,9 @@ func TestAITask(t *testing.T) {
 		if err != nil {
 			break
 		}
+		if event.IsStream {
+			continue
+		}
 		fmt.Println(event.String())
 	}
 }
