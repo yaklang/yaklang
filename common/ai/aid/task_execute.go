@@ -196,6 +196,14 @@ TOOLREQUIRED:
 
 	chatDetails = append(chatDetails, aispec.NewAIChatDetail(response))
 
+	ep := t.config.epm.createEndpoint()
+	t.config.EmitRequireReview(ep.id,
+		"思考不够深入，根据当前上下文，为当前任务拆分更多子任务",
+		"回答不够精准，存在跳过工具使用导致的幻觉或工具参数有问题",
+		"到此结束，后续不要做新任务了",
+		"任务需要调整，用户会输入更新后任务",
+	)
+
 	t.config.EmitInfo("start to execute task-summary action")
 	// 处理总结回调
 	summaryPromptWellFormed, err := GenerateTaskSummaryPrompt(aispec.DetailsToString(chatDetails))
@@ -235,5 +243,16 @@ TOOLREQUIRED:
 	t.TaskSummary = taskSummary
 	t.ShortSummary = shortSummary
 	t.LongSummary = longSummary
+
+	// start to wait for user review
+	if !ep.WaitTimeoutSeconds(60) {
+		t.config.EmitInfo("user review timeout, use default action: pass")
+		return nil
+	}
+
+	// user review finished, find params
+	reviewResult := ep.GetParams()
+	_ = reviewResult
+
 	return nil
 }

@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"context"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -9,13 +10,35 @@ import (
 )
 
 type endpointManager struct {
+	ctx     context.Context
+	cancel  context.CancelFunc
 	results *sync.Map
 }
 
-func newEndpointManager() *endpointManager {
-	return &endpointManager{
+func newEndpointManagerContext(ctx context.Context) *endpointManager {
+	if utils.IsNil(ctx) {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	epm := &endpointManager{
+		ctx:     ctx,
+		cancel:  cancel,
 		results: &sync.Map{},
 	}
+	go func() {
+		<-ctx.Done()
+		epm.results.Range(func(key, value interface{}) bool {
+			if raw, ok := value.(*Endpoint); ok {
+				raw.ActiveWithParams(make(aitool.InvokeParams))
+			}
+			return true
+		})
+	}()
+	return epm
+}
+
+func newEndpointManager() *endpointManager {
+	return newEndpointManagerContext(context.Background())
 }
 
 func (e *endpointManager) feed(id string, params aitool.InvokeParams) {
@@ -57,6 +80,10 @@ func (e *Endpoint) Wait() {
 	e.sig.L.Lock()
 	defer e.sig.L.Unlock()
 	e.sig.Wait()
+}
+
+func (e *Endpoint) WaitTimeoutSeconds(i float64) bool {
+	return e.WaitTimeout(time.Duration(i * float64(time.Second)))
 }
 
 // 新增的 WaitTimeout 方法

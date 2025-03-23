@@ -80,7 +80,7 @@ func newConfig(ctx context.Context) *Config {
 	c := &Config{
 		m:   new(sync.Mutex),
 		id:  id.String(),
-		epm: newEndpointManager(),
+		epm: newEndpointManagerContext(ctx),
 	}
 	go func() {
 		log.Infof("config %s started, start to handle receiving loop", c.id)
