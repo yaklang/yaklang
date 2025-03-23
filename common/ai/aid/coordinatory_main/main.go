@@ -61,6 +61,9 @@ func main() {
 		aid.WithSystemFileOperator(),
 		aid.WithDebugPrompt(),
 	)
+	if err != nil {
+		panic(err)
+	}
 	if err := coordinator.Run(); err != nil {
 		panic(err)
 	}

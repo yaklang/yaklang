@@ -121,6 +121,14 @@ func (r *Config) EmitStructured(nodeId string, i any) {
 	r.emitJson(EVENT_TYPE_STRUCTURED, nodeId, i)
 }
 
+func (r *Config) EmitRequirePermission(title string, description ...string) {
+	reqs := map[string]any{
+		"title":       title,
+		"description": description,
+	}
+	r.emitJson(EVENT_TYPE_PERMISSION_REQUIRE, "permission", reqs)
+}
+
 func (r *Config) emitLogWithLevel(level, name, fmtlog string, items ...any) {
 	message := fmtlog
 	if len(items) > 0 {
