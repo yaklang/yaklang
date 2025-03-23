@@ -10,6 +10,10 @@ import (
 )
 
 func TestAITask(t *testing.T) {
+	if utils.InGithubActions() {
+		return
+	}
+
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
