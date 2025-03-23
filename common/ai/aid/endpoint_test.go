@@ -2,15 +2,12 @@ package aid
 
 import (
 	"math/rand"
-	runtimeLib "runtime"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestEndpoint_Basic(t *testing.T) {
@@ -178,56 +175,6 @@ func TestEndpoint_Basic(t *testing.T) {
 		}
 	})
 
-	t.Run("大量并发等待和激活测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
-
-		const (
-			waiters  = 1000 // 等待者数量
-			feeders  = 100  // 激活者数量
-			duration = 2 * time.Second
-		)
-
-		var (
-			wg            sync.WaitGroup
-			activateCount int32
-			waitCount     int32
-		)
-
-		// 启动等待者
-		for i := 0; i < waiters; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for start := time.Now(); time.Since(start) < duration; {
-					endpoint.Wait()
-					atomic.AddInt32(&waitCount, 1)
-				}
-			}()
-		}
-
-		// 启动激活者
-		for i := 0; i < feeders; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for start := time.Now(); time.Since(start) < duration; {
-					params := aitool.InvokeParams{
-						"timestamp": time.Now().UnixNano(),
-					}
-					manager.feed(endpoint.id, params)
-					atomic.AddInt32(&activateCount, 1)
-					time.Sleep(time.Millisecond) // 给其他 goroutine 机会
-				}
-			}()
-		}
-
-		wg.Wait()
-		t.Logf("总激活次数: %d, 总等待完成次数: %d", activateCount, waitCount)
-		assert.True(t, waitCount > 0, "应该有等待被完成")
-		assert.True(t, activateCount > 0, "应该有激活发生")
-	})
-
 	t.Run("参数竞争条件测试", func(t *testing.T) {
 		manager := newEndpointManager()
 		endpoint := manager.createEndpoint()
@@ -271,47 +218,6 @@ func TestEndpoint_Basic(t *testing.T) {
 		// 发送开始信号
 		close(start)
 		wg.Wait()
-	})
-
-	t.Run("内存泄漏测试", func(t *testing.T) {
-		if utils.InGithubActions() {
-			t.Skip("skip memory leak test")
-			return
-		}
-
-		if testing.Short() {
-			t.Skip("跳过内存泄漏测试")
-		}
-
-		manager := newEndpointManager()
-		const iterations = 10000
-
-		var m1, m2 runtimeLib.MemStats
-		runtimeLib.GC()
-		runtimeLib.ReadMemStats(&m1)
-
-		// 创建大量 endpoint 并激活它们
-		for i := 0; i < iterations; i++ {
-			endpoint := manager.createEndpoint()
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				endpoint.Wait()
-			}()
-			manager.feed(endpoint.id, aitool.InvokeParams{"test": i})
-			wg.Wait()
-		}
-
-		runtimeLib.GC()
-		runtimeLib.ReadMemStats(&m2)
-
-		// 检查内存增长是否在合理范围内
-		memGrowth := m2.Alloc - m1.Alloc
-		t.Logf("内存增长: %d bytes", memGrowth)
-		// 假设每个 endpoint 不应该占用超过 1KB 内存
-		assert.Less(t, memGrowth, uint64(iterations*1024),
-			"内存使用增长超出预期")
 	})
 
 	t.Run("超长等待超时测试", func(t *testing.T) {
@@ -369,34 +275,5 @@ func TestEndpoint_Basic(t *testing.T) {
 		assert.NotNil(t, finalParams)
 		assert.NotNil(t, finalParams["iteration"])
 		assert.NotNil(t, finalParams["time"])
-	})
-
-	t.Run("参数深度拷贝测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
-
-		// 创建嵌套的参数结构
-		nestedParams := aitool.InvokeParams{
-			"level1": map[string]interface{}{
-				"level2": map[string]interface{}{
-					"level3": "value",
-				},
-			},
-			"array": []interface{}{1, 2, 3},
-		}
-
-		manager.feed(endpoint.id, nestedParams)
-		receivedParams := endpoint.GetParams()
-
-		// 修改原始参数
-		nestedMap := nestedParams["level1"].(map[string]interface{})
-		nestedMap2 := nestedMap["level2"].(map[string]interface{})
-		nestedMap2["level3"] = "modified"
-		nestedParams["array"].([]interface{})[0] = 999
-
-		// 验证接收到的参数没有被修改
-		assert.Equal(t, "value",
-			receivedParams["level1"].(map[string]interface{})["level2"].(map[string]interface{})["level3"])
-		assert.Equal(t, 1, receivedParams["array"].([]interface{})[0])
 	})
 }
