@@ -10,9 +10,7 @@ import (
 	"text/template"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-
 	"github.com/yaklang/yaklang/common/log"
-
 	"github.com/yaklang/yaklang/common/utils"
 )
 

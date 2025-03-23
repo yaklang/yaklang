@@ -18,6 +18,7 @@ const (
 	EVEMT_TYPE_PLAN               EventType = "plan"
 	EVENT_TYPE_SELECT             EventType = "select"
 	EVENT_TYPE_PERMISSION_REQUIRE EventType = "permission_require"
+	EVENT_TYPE_REVIEW_REQUIRE     EventType = "review_require"
 	EVENT_TYPE_INPUT              EventType = "input"
 )
 
@@ -127,6 +128,14 @@ func (r *Config) EmitRequirePermission(title string, description ...string) {
 		"description": description,
 	}
 	r.emitJson(EVENT_TYPE_PERMISSION_REQUIRE, "permission", reqs)
+}
+
+func (r *Config) EmitRequireReview(id string, extraSelectors ...string) {
+	reqs := map[string]any{
+		"id":        id,
+		"selectors": extraSelectors,
+	}
+	r.emitJson(EVENT_TYPE_REVIEW_REQUIRE, "permission", reqs)
 }
 
 func (r *Config) emitLogWithLevel(level, name, fmtlog string, items ...any) {
