@@ -275,8 +275,8 @@ func TestToolApplyDefault(t *testing.T) {
 		execResult, ok := result.Data.(*ToolExecutionResult)
 		require.True(t, ok, "结果类型错误，期望 *ToolExecutionResult")
 
-		resultData, ok := execResult.Result.(map[string]interface{})
-		require.True(t, ok, "结果数据类型错误, want map[string]interface{}")
+		resultData, ok := execResult.Result.(InvokeParams)
+		require.True(t, ok, "结果数据类型错误, want InvokeParams")
 		callback(resultData)
 	}
 
@@ -479,9 +479,9 @@ func TestNewToolFromJSON(t *testing.T) {
 		return
 	}
 
-	resultData, ok := execResult.Result.(map[string]interface{})
+	resultData, ok := execResult.Result.(InvokeParams)
 	if !ok {
-		t.Errorf("结果数据类型错误, want map[string]interface{}")
+		t.Errorf("结果数据类型错误, want InvokeParams")
 		return
 	}
 

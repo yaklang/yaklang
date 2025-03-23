@@ -210,7 +210,7 @@ func TestToolResultIntegration(t *testing.T) {
 	}
 
 	// 验证结果数据
-	resultData, ok := execResult.Result.(map[string]interface{})
+	resultData, ok := execResult.Result.(InvokeParams)
 	if !ok {
 		t.Errorf("结果数据类型错误")
 		return
