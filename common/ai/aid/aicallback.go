@@ -2,6 +2,8 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
@@ -114,4 +116,27 @@ func (r *AIResponse) Close() {
 		return
 	}
 	r.ch.Close()
+}
+
+func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {
+	return func(req *AIRequest) (*AIResponse, error) {
+		resp := NewAIResponse()
+		go func() {
+			defer resp.Close()
+			output, err := cb(
+				req.GetPrompt(),
+				aispec.WithStreamHandler(func(reader io.Reader) {
+					resp.EmitOutputStream(reader)
+				}),
+				aispec.WithReasonStreamHandler(func(reader io.Reader) {
+					resp.EmitReasonStream(reader)
+				}),
+			)
+			if err != nil {
+				log.Errorf("chat error: %v", err)
+			}
+			_ = output
+		}()
+		return resp, nil
+	}
 }
