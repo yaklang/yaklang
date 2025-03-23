@@ -844,6 +844,11 @@ message McpConfig {
 
 message AIStartParams {
   repeated McpConfig McpServers = 1;
+
+  string UserQuery = 2;
+  // allow ai to use the fs
+  bool EnableSystemFileSystemOperator = 3;
+  bool UseDefaultAIConfig = 4;
 }
 
 
@@ -1869,7 +1874,7 @@ message GetProjectsRequest {
   int64 FolderId = 4;
   int64 ChildFolderId = 5;
   // this type is filter ""(all) | "project"(yakit) | file(only-folder) | "ssa_project"(sast)
-  string Type = 6; 
+  string Type = 6;
   // this type effect response.ProjectTotal, this type mark kind of frontend 
   // "project"(yakit) | "ssa_project"(sast)
   string FrontendType = 7;
@@ -6214,7 +6219,7 @@ message QuerySSARisksResponse {
 }
 
 message QueryNewSSARisksRequest{
-  int64 AfterID = 1; 
+  int64 AfterID = 1;
 }
 
 message QueryNewSSARisksResponse{
