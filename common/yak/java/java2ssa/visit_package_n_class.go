@@ -344,7 +344,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 		}
 		return typ
 	} else {
-		typ = ssa.NewBlueprint(className)
+		typ = y.CreateBlueprint(className, raw)
 		typ = y.AddFullTypeNameFromMap(className, typ)
 		return typ
 	}
