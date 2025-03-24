@@ -129,7 +129,7 @@ dump(a)
 	check222 := false
 	check333 := false
 	masked := prog.Ref("a").ForEach(func(value *ssaapi.Value) {
-		ins := ssaapi.GetBareNode(value)
+		ins := value.GetSSAInst()
 		_ = ins
 		ins.GetName()
 	}).Get(0).GetTopDefs().Show().ForEach(func(value *ssaapi.Value) {

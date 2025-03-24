@@ -218,7 +218,8 @@ func TestAuditResult(t *testing.T) {
 	// create template value
 	editor := memedit.NewMemEditor(code)
 	editor.SetUrl(filePath)
-	value := prog.NewValue(ssa.NewConstWithRange("print", editor.GetFullRange()))
+	value := prog.NewConstValue("print", editor.GetFullRange())
+	require.NoError(t, err)
 
 	// save result
 	result := sfvm.NewSFResult(&schema.SyntaxFlowRule{}, &sfvm.Config{})

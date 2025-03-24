@@ -317,10 +317,10 @@ func getFuncDeclLabel(v *ssaapi.Value, funcDecl *yakdoc.FuncDecl) string {
 	}
 
 	if v != nil {
-		bareV := ssaapi.GetBareNode(v)
+		bareV := v.GetSSAInst()
 		fValue, isFunction := ssa.ToFunction(bareV)
 
-		funcTyp, ok := ssa.ToFunctionType(bareV.GetType())
+		funcTyp, ok := ssa.ToFunctionType(fValue.GetType())
 		if ok {
 			isMethod := funcTyp.IsMethod
 			if isMethod && len(funcTyp.Parameter) > 0 {
@@ -762,7 +762,10 @@ func completionUserDefinedVariable(prog *ssaapi.Program, rng memedit.RangeIf, fi
 		}
 		filterMap[varName] = struct{}{}
 		bareValue := item.GetValue()
-		v := prog.NewValue(bareValue)
+		v, err := prog.NewValue(bareValue)
+		if err != nil {
+			continue
+		}
 		bareTyp := ssaapi.GetBareType(v.GetType())
 		typStr := _getGolangTypeStringBySSAType(bareTyp)
 
@@ -813,7 +816,10 @@ func completionExternValues(prog *ssaapi.Program, filterMap map[string]struct{})
 			})
 		} else {
 			bareValue := prog.Program.BuildValueFromAny(nil, name, value)
-			v := prog.NewValue(bareValue)
+			v, err := prog.NewValue(bareValue)
+			if err != nil {
+				continue
+			}
 
 			insertText := name
 			desc := ""
@@ -1025,7 +1031,7 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 	if !lastUser.IsCall() {
 		return suggestions
 	}
-	call, ok := ssa.ToCall(ssaapi.GetBareNode(lastUser))
+	call, ok := ssa.ToCall(lastUser.GetSSAInst())
 	if !ok {
 		return suggestions
 	}
@@ -1036,7 +1042,7 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 	// find index of call.Args
 	index := -1
 	for i, arg := range call.Args {
-		if arg == ssaapi.GetBareNode(v) {
+		if arg == v.GetSSAInst() {
 			index = i
 		}
 	}
@@ -1118,7 +1124,7 @@ func OnCompletion(
 			return ret
 		}
 
-		undefined, ok := ssa.ToUndefined(ssaapi.GetBareNode(v))
+		undefined, ok := ssa.ToUndefined(v.GetSSAInst())
 		if !ok {
 			return ret
 		}

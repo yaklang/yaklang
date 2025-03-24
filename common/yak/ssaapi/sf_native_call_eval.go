@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -170,7 +169,7 @@ var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sf
 		return false, nil, err
 	}
 	for _, result := range results {
-		rets = append(rets, parent.NewValue(ssa.NewConst(result)))
+		rets = append(rets, parent.NewConstValue(result))
 	}
 	if len(rets) == 0 {
 		return false, nil, utils.Error("no fuzztag result found")
