@@ -6562,6 +6562,8 @@ message SingleManualHijackInfoMessage{
   bytes Payload = 11;
   repeated string WebsocketEncode = 12;
   TraceInfo TraceInfo = 15;
+
+  string Method = 16;
 }
 
 
