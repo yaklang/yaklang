@@ -37,6 +37,18 @@ func GetDB() *gorm.DB {
 	return consts.GetGormDefaultSSADataBase()
 }
 
+func DeleteProgram(db *gorm.DB, program string) {
+	db.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
+	deleteProgramCodeOnly(db, program)
+	deleteProgramAuditResult(db, program)
+	deleteProgramRiskAndScanTask(db, program)
+}
+
+func DeleteProgramIrCode(db *gorm.DB, program string) {
+	deleteProgramCodeOnly(db, program)
+	deleteProgramAuditResult(db, program) // because audit result depends on ir code
+}
+
 func deleteProgramCodeOnly(db *gorm.DB, program string) {
 	// delete the program
 	// code
@@ -46,10 +58,16 @@ func deleteProgramCodeOnly(db *gorm.DB, program string) {
 	db.Model(&IrSource{}).Where("folder_path = ? AND file_name = ?", "/", program).Unscoped().Delete(&IrSource{})
 	db.Model(&IrType{}).Where("program_name = ?", program).Unscoped().Delete(&IrType{})
 	db.Model(&IrOffset{}).Where("program_name = ?", program).Unscoped().Delete(&IrOffset{})
+}
+
+func deleteProgramAuditResult(db *gorm.DB, program string) {
 	// analyze result
 	db.Model(&AuditResult{}).Where("program_name = ?", program).Unscoped().Delete(&AuditResult{})
 	db.Model(&AuditNode{}).Where("program_name = ?", program).Unscoped().Delete(&AuditNode{})
 	db.Model(&AuditEdge{}).Where("program_name = ?", program).Unscoped().Delete(&AuditEdge{})
+}
+
+func deleteProgramRiskAndScanTask(db *gorm.DB, program string) {
 	// risk and scan task
 	db.Model(&schema.SSARisk{}).Where("program_name = ?", program).Unscoped().Delete(&schema.SSARisk{})
 	db.Model(&schema.SyntaxFlowScanTask{}).Where("programs = ?", program).Unscoped().Delete(&schema.SyntaxFlowScanTask{})
