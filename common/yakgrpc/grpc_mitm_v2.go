@@ -537,8 +537,17 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			return raw
 		}
 
-		task, ok := hijackManger.getTask(httpctx.GetRequestMITMTaskID(req))
-		if !ok || task == nil {
+		feedbackOrigin := &ypb.SingleManualHijackInfoMessage{
+			IsHttps:     httpctx.GetRequestHTTPS(req),
+			URL:         req.URL.String(),
+			RemoteAddr:  httpctx.GetRemoteAddr(req),
+			IsWebsocket: true,
+			Payload:     raw,
+			Method:      "WS",
+		}
+
+		task := hijackManger.register(feedbackOrigin)
+		if task == nil {
 			return raw
 		}
 
@@ -804,6 +813,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			IsWebsocket:     true,
 			Payload:         raw,
 			WebsocketEncode: encode,
+			Method:          "WS",
 		}
 
 		task := hijackManger.register(feedbackOrigin)
@@ -979,6 +989,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			IsHttps:    isHttps,
 			URL:        urlStr,
 			RemoteAddr: httpctx.GetRemoteAddr(originReqIns),
+			Method:     lowhttp.GetHTTPRequestMethod(req),
 		}
 
 		task := hijackManger.register(feedbackOrigin)
