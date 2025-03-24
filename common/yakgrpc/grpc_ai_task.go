@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -45,6 +46,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				log.Errorf("send event failed: %v", err)
 			}
 		}),
+		aid.WithEventInputChan(inputEvent),
 	}
 
 	if startParams.GetEnableSystemFileSystemOperator() {

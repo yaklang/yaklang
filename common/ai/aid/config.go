@@ -3,15 +3,16 @@ package aid
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"sync"
-	"time"
 )
 
 type AICaller interface {
@@ -205,6 +206,16 @@ func WithEventHandler(h func(e *Event)) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 		config.eventHandler = h
+		return nil
+	}
+}
+
+func WithEventInputChan(ch chan *InputEvent) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+
+		config.eventInputChan = ch
 		return nil
 	}
 }
