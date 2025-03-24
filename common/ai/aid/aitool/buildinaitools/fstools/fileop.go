@@ -3,10 +3,11 @@ package fstools
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io"
 	"os"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -199,10 +200,33 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			src := params.GetString("src")
 			dst := params.GetString("dst")
-			err := fsys.Rename(src, dst)
+			r, err := fsys.OpenFile(src, os.O_RDONLY, 0444)
 			if err != nil {
 				return nil, err
 			}
+			defer r.Close()
+			writeFile, err := fsys.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+			if err != nil {
+				return nil, err
+			}
+			defer writeFile.Close()
+
+			if w, ok := writeFile.(io.Writer); ok {
+				_, err = io.Copy(w, r)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				content, err := io.ReadAll(r)
+				if err != nil {
+					return nil, err
+				}
+				err = fsys.WriteFile(dst, content, 0644)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			return "success", nil
 		}),
 	)
