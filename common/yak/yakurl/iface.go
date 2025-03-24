@@ -92,6 +92,8 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return &riskTreeAction{
 			register: make(map[string]int),
 		}
+	case "javadec":
+		return newJavaDecompilerAction()
 	default:
 		return nil
 	}
