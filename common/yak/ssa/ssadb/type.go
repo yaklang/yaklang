@@ -14,6 +14,7 @@ import (
 type IrType struct {
 	gorm.Model
 	Kind             int    `json:"kind"`
+	ProgramName      string `json:"program_name"`
 	String           string `json:"string" gorm:"type:text"`
 	ExtraInformation string `json:"extra_information" gorm:"type:text"`
 	Hash             string `json:"hash" gorm:"unique_index"`
@@ -25,7 +26,7 @@ func (t *IrType) CalcHash() string {
 
 var saveTypeMutex sync.Mutex
 
-func SaveType(kind int, str string, extra string) int {
+func SaveType(kind int, str, extra, progName string) int {
 	start := time.Now()
 	defer func() {
 		atomic.AddUint64(&_SSASaveTypeCost, uint64(time.Since(start).Nanoseconds()))
@@ -33,6 +34,7 @@ func SaveType(kind int, str string, extra string) int {
 
 	irType := IrType{
 		Kind:             kind,
+		ProgramName:      progName,
 		String:           str,
 		ExtraInformation: extra,
 	}
