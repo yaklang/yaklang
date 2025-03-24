@@ -15,7 +15,7 @@ func Test_SideEffect_Inherit(t *testing.T) {
 	checkSideeffect := func(t *testing.T, values ssaapi.Values, num int) error {
 		have := false
 		for _, value := range values {
-			fun1, ok := ssa.ToFunction(value.GetSSAValue())
+			fun1, ok := ssa.ToFunction(value.GetSSAInst())
 			if !ok {
 				continue
 			}

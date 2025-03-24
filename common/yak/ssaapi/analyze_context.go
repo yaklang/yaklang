@@ -115,7 +115,7 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 // it is considered to cross the function boundary,
 // which means it is trying to cross process.
 func (a *AnalyzeContext) needCrossProcess(from *Value, to *Value) bool {
-	if from == nil || from.node == nil || to == nil || to.node == nil {
+	if from == nil || from.innerValue == nil || to == nil || to.innerValue == nil {
 		return false
 	}
 	return from.GetFunction().GetId() != to.GetFunction().GetId()
@@ -152,7 +152,7 @@ func (a *AnalyzeContext) enterRecursive() {
 
 func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
 	if !obj.IsObject() {
-		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.node)
+		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.innerValue)
 	}
 	shouldVisited, recoverIntra := g.theObjectShouldBeVisited(obj, key, member)
 	if !shouldVisited {

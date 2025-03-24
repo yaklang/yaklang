@@ -283,7 +283,7 @@ func CheckMask(t *testing.T, tc TestCase) {
 		maskValues := maskV.GetMask()
 		log.Infof("mask values: %s", maskValues)
 
-		require.Equal(t, want, lo.Map(maskValues, func(v ssa.Value, _ int) string { return ssa.LineDisasm(v) }))
+		require.Equal(t, want, lo.Map(maskValues, func(v ssa.Value, _ int) string { return ssa.LineDisASM(v) }))
 	}
 	CheckTestCase(t, tc)
 }

@@ -217,6 +217,8 @@ func (a *anInstruction) LineDisasm() string { return "" }
 // opcode
 func (a *anInstruction) GetOpcode() Opcode { return SSAOpcodeUnKnow } // cover by instruction
 
+func (a *anInstruction) String() string { return "" }
+
 var _ Instruction = (*anInstruction)(nil)
 
 type anValue struct {

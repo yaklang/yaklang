@@ -125,11 +125,7 @@ func (p *Program) Ref(name string) Values {
 			context.Background(), p.Program, ssadb.NameMatch, name,
 		),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, ok := i.(ssa.Value); ok {
-				return p.NewValue(v), true
-			} else {
-				return nil, false
-			}
+			return p.NewValue(i), true
 		},
 	)
 }
@@ -161,32 +157,34 @@ func (v *Value) NewBottomUseValue(value ssa.Value) *Value {
 }
 
 // normal from ssa value
-func (v *Value) NewValue(value ssa.Value) *Value {
+func (v *Value) NewValue(value ssa.Instruction) *Value {
 	return v.ParentProgram.NewValue(value)
 }
-func (p *Program) NewValue(n ssa.Value) *Value {
+func (p *Program) NewValue(n ssa.Instruction) *Value {
 	if utils.IsNil(n) {
 		return nil
 	}
 	v := &Value{
 		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
-		node:          n,
 		ParentProgram: p,
 	}
+	if n, ok := n.(ssa.Value); ok {
+		v.innerValue = n
+	}
+	if n, ok := n.(ssa.User); ok {
+		v.innerUser = n
+	}
+	v.innerInst = n
 	return v
 }
 
 // from ssa id  (IrCode)
 func (p *Program) GetValueById(id int64) (*Value, error) {
-	val, ok := p.Program.GetInstructionById(id).(ssa.Value)
+	val := p.Program.GetInstructionById(id)
 	if val == nil {
 		return nil, utils.Errorf("instruction not found: %d", id)
 	}
-	if !ok {
-		return nil, utils.Errorf("[%T] not an instruction node", val)
-	}
-	ret := p.NewValue(val)
-	return ret, nil
+	return p.NewValue(val), nil
 }
 
 func (p *Program) GetValueByIdMust(id int64) *Value {

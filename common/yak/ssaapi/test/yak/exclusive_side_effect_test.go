@@ -124,7 +124,7 @@ println(n)
 func checkSideeffect(values ssaapi.Values, num int) error {
 	have := false
 	for _, value := range values {
-		fun1, ok := ssa.ToFunction(value.GetSSAValue())
+		fun1, ok := ssa.ToFunction(value.GetSSAInst())
 		if !ok {
 			continue
 		}

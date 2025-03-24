@@ -39,7 +39,7 @@ var nativeCallScan = func(direction direction) func(v sfvm.ValueOperator, frame 
 			if !ok {
 				return nil
 			}
-			results := searchAlongBasicBlock(val.node, prog, frame, params, direction)
+			results := searchAlongBasicBlock(val.innerValue, prog, frame, params, direction)
 			if !ok {
 				return nil
 			}
@@ -132,33 +132,31 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 
 func (b *basicBlockInfo) searchInsts() {
 	for _, inst := range b.currentBlock.Insts {
-		if lz, ok := ssa.ToLazyInstruction(inst); ok {
-			inst = lz.Self()
-		}
-		if v, ok := ssa.ToValue(inst); ok {
-			value := b.prog.NewValue(v)
-			if b.recursiveConfig.configItems == nil {
+		// if lz, ok := ssa.ToLazyInstruction(inst); ok {
+		// 	inst = lz.Self()
+		// }
+		value := b.prog.NewValue(inst)
+		if b.recursiveConfig.configItems == nil {
+			b.results = append(b.results, value)
+			continue
+		} else {
+			matchedConfig := b.recursiveConfig.compileAndRun(value)
+			if _, ok := matchedConfig[sfvm.RecursiveConfig_Include]; ok {
 				b.results = append(b.results, value)
 				continue
-			} else {
-				matchedConfig := b.recursiveConfig.compileAndRun(value)
-				if _, ok := matchedConfig[sfvm.RecursiveConfig_Include]; ok {
-					b.results = append(b.results, value)
-					continue
-				}
-				if _, ok := matchedConfig[sfvm.RecursiveConfig_Until]; ok {
-					b.isFinish = true
-					break
-				}
-				if _, ok := matchedConfig[sfvm.RecursiveConfig_Exclude]; ok {
-					// nothing todo
-					// this value skip
-					continue
-				}
-				if !b.hasInclude {
-					// if has include, only match value can save to results
-					b.results = append(b.results, value)
-				}
+			}
+			if _, ok := matchedConfig[sfvm.RecursiveConfig_Until]; ok {
+				b.isFinish = true
+				break
+			}
+			if _, ok := matchedConfig[sfvm.RecursiveConfig_Exclude]; ok {
+				// nothing todo
+				// this value skip
+				continue
+			}
+			if !b.hasInclude {
+				// if has include, only match value can save to results
+				b.results = append(b.results, value)
 			}
 		}
 	}

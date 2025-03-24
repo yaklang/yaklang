@@ -61,7 +61,7 @@ func (v *Value) SetDepth(i int) {
 func (v *Value) GetDepth() int {
 	i, ok := v.runtimeCtx.Get("depth")
 	if ok {
-		return codec.Atoi(i.node.String())
+		return codec.Atoi(i.innerValue.String())
 	}
 	return 0
 }

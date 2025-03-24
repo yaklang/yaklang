@@ -24,7 +24,7 @@ func _SearchValues(values Values, mod int, handler func(string) bool, opt ...sfv
 
 func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
-	if utils.IsNil(value.node) {
+	if utils.IsNil(value.innerValue) {
 		return newValue
 	}
 
@@ -69,7 +69,7 @@ func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.
 	}
 	if mod&ssadb.KeyMatch != 0 {
 		if value.IsObject() {
-			allMember := value.node.GetAllMember()
+			allMember := value.innerValue.GetAllMember()
 			for k, v := range allMember {
 				if check(value.NewValue(k)) {
 					add(value.NewValue(v))
@@ -78,7 +78,7 @@ func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.
 
 		}
 
-		for _, ov := range value.node.FlatOccultation() {
+		for _, ov := range value.innerValue.FlatOccultation() {
 			allMember := ov.GetAllMember()
 			for k, v := range allMember {
 				if check(value.NewValue(k)) {

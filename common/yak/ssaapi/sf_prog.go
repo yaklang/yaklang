@@ -28,12 +28,8 @@ func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueO
 	var res Values = lo.FilterMap(
 		ssa.MatchInstructionByOpcodes(ctx, p.Program, opcodeItems.Opcodes...),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, ok := i.(ssa.Value); ok {
-				boolRes = append(boolRes, true)
-				return p.NewValue(v), true
-			} else {
-				return nil, false
-			}
+			boolRes = append(boolRes, true)
+			return p.NewValue(i), true
 		},
 	)
 	return res, boolRes
@@ -143,11 +139,7 @@ func (p *Program) ExactMatch(ctx context.Context, mod int, s string) (bool, sfvm
 	var values Values = lo.FilterMap(
 		ssa.MatchInstructionByExact(ctx, p.Program, mod, s),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, ok := i.(ssa.Value); ok {
-				return p.NewValue(v), true
-			} else {
-				return nil, false
-			}
+			return p.NewValue(i), true
 		},
 	)
 	return len(values) > 0, values, nil
@@ -157,10 +149,7 @@ func (p *Program) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.
 	var values Values = lo.FilterMap(
 		ssa.MatchInstructionByGlob(ctx, p.Program, mod, g),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, ok := i.(ssa.Value); ok {
-				return p.NewValue(v), true
-			}
-			return nil, false
+			return p.NewValue(i), true
 		},
 	)
 	return len(values) > 0, values, nil
@@ -170,11 +159,7 @@ func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) (bool, sf
 	var values Values = lo.FilterMap(
 		ssa.MatchInstructionByRegexp(ctx, p.Program, mod, re),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, ok := i.(ssa.Value); ok {
-				return p.NewValue(v), true
-			} else {
-				return nil, false
-			}
+			return p.NewValue(i), true
 		},
 	)
 	return len(values) > 0, values, nil

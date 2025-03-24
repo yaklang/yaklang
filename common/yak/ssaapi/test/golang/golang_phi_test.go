@@ -34,11 +34,11 @@ func Test_Phi_WithGoto(t *testing.T) {
 		phi := phis[0]
 		nophi := nophis[0]
 
-		_, ok := ssa.ToPhi(phi.GetSSAValue())
+		_, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
-		_, ok = ssa.ToPhi(nophi.GetSSAValue())
+		_, ok = ssa.ToPhi(nophi.GetSSAInst())
 		if ok {
 			t.Fatal("is phi")
 		}
@@ -73,7 +73,7 @@ func Test_Phi_WithGoto_inLoop(t *testing.T) {
 		phis := res.GetValues("a")
 
 		for _, phi := range phis {
-			targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+			targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 			if !ok {
 				t.Fatal("not phi")
 			}
@@ -105,7 +105,7 @@ func Test_Phi_WithReturn(t *testing.T) {
 		phis := prog.SyntaxFlow("b as $b").GetValues("b")
 		phi := phis[0]
 
-		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -120,7 +120,7 @@ func Test_Phi_WithReturn(t *testing.T) {
 		phis := prog.SyntaxFlow("d as $d").GetValues("d")
 		phi := phis[0]
 
-		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -133,7 +133,7 @@ func Test_Phi_WithReturn(t *testing.T) {
 	ssatest.CheckWithName("phi-with-return-with-param", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		ret := prog.SyntaxFlow("c as $c").GetValues("c")[0]
-		_, ok := ssa.ToPhi(ret.GetSSAValue())
+		_, ok := ssa.ToPhi(ret.GetSSAInst())
 		if !ok {
 			t.Fatal("It shouldn be phi here")
 		}
@@ -145,7 +145,7 @@ func Test_Phi_WithReturn(t *testing.T) {
 		phis := prog.SyntaxFlow("b #{until: `* ?{opcode: phi}`}-> * as $b; check $b;").GetValues("b")
 		phi := phis[0]
 
-		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -179,7 +179,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		phis := prog.SyntaxFlow("b as $b").GetValues("b")
 		phi := phis[0]
 
-		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -189,7 +189,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		phis = prog.SyntaxFlow("c as $c").GetValues("c")
 		phi = phis[0]
 
-		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok = ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -199,7 +199,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		phis = prog.SyntaxFlow("d as $d").GetValues("d")
 		phi = phis[0]
 
-		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok = ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -231,7 +231,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		phis := prog.SyntaxFlow("b as $b").GetValues("b")
 		phi := phis[0]
 
-		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -241,7 +241,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		phis = prog.SyntaxFlow("c as $c").GetValues("c")
 		phi = phis[0]
 
-		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok = ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -251,7 +251,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		phis = prog.SyntaxFlow("d as $d").GetValues("d")
 		phi = phis[0]
 
-		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok = ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -283,7 +283,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		phis := prog.SyntaxFlow("b as $b").GetValues("b")
 		phi := phis[0]
 
-		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -293,7 +293,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		phis = prog.SyntaxFlow("c as $c").GetValues("c")
 		phi = phis[0]
 
-		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok = ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -303,7 +303,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		phis = prog.SyntaxFlow("d as $d").GetValues("d")
 		phi = phis[0]
 
-		targetIns, ok = ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok = ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}

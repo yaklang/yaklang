@@ -29,7 +29,7 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 	binInst := builder.EmitBinOp(OpAdd, undefineA, undefineB)
 	instID := binInst.GetId()
 	require.Greater(t, instID, int64(0))
-	require.Equal(t, LineDisasm(binInst), "add(Undefined-a, Undefined-b)")
+	require.Equal(t, LineDisASM(binInst), "add(Undefined-a, Undefined-b)")
 
 	{
 		// wait instruction save to db
@@ -55,7 +55,7 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 	// // replace value
 	ReplaceAllValue(undefineA, undefineC) // a -> c
 	// // a + b => c + b
-	require.Equal(t, LineDisasm(binInst), "add(Undefined-c, Undefined-b)")
+	require.Equal(t, LineDisASM(binInst), "add(Undefined-c, Undefined-b)")
 
 	// wait instruction save to db
 	time.Sleep(ttl * 2)
@@ -73,7 +73,7 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 	require.NotNil(t, inst3)
 	require.Equal(t, inst3.GetId(), instID)
 	require.Equal(t, inst3.GetOpcode(), SSAOpcodeBinOp)
-	require.Equal(t, LineDisasm(inst3), "add(Undefined-c, Undefined-b)")
+	require.Equal(t, LineDisASM(inst3), "add(Undefined-c, Undefined-b)")
 
 	prog.Finish()
 	if prog.EnableDatabase { // save program
