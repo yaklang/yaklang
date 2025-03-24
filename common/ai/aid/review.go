@@ -1,9 +1,12 @@
 package aid
 
 import (
+	"io"
+	"slices"
+
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
 type ReviewSuggestion struct {
@@ -47,7 +50,7 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 	},
 }
 
-func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
+func (t *aiTask) handleReviewResult(ctx *taskContext, param aitool.InvokeParams) error {
 	// 1. 获取审查建议
 	suggestion := param.GetString("suggestion")
 	if suggestion == "" {
@@ -63,7 +66,76 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 	case "end":
 		t.config.EmitInfo("end")
 	case "adjust_plan":
+		plan := param.GetString("plan")
+		if plan == "" {
+			t.config.EmitError("plan is empty")
+			return utils.Error("plan is empty")
+		}
 		t.config.EmitInfo("adjust plan")
+		planPrompt, err := t.generateDynamicPlanPrompt(ctx, plan)
+		if err != nil {
+			t.config.EmitError("error generating dynamic plan prompt: %v", err)
+			return utils.Errorf("error generating dynamic plan prompt: %v", err)
+		}
+
+		// 调用 AI 生成新的任务计划
+		request := NewAIRequest(planPrompt, WithAIRequest_TaskContext(ctx))
+		response, err := t.callAI(request)
+		if err != nil {
+			t.config.EmitError("error calling AI: %v", err)
+			return utils.Errorf("error calling AI: %v", err)
+		}
+		// 读取 AI 的响应
+		responseReader := response.GetOutputStreamReader("dynamic-plan", false, t.config)
+		taskResponse, err := io.ReadAll(responseReader)
+		if err != nil {
+			t.config.EmitError("error reading AI response: %v", err)
+			return utils.Errorf("error reading AI response: %v", err)
+		}
+		taskResponseJson := gjson.ParseBytes(taskResponse)
+		action := taskResponseJson.Get("@action").String()
+		if action != "re-plan" {
+			t.config.EmitError("invalid action: %s", action)
+			return utils.Errorf("invalid action: %s", action)
+		}
+		// 解析 AI 的响应
+		parentTask := t.ParentTask
+		index := -1
+		for i, subtask := range parentTask.Subtasks {
+			if subtask.Name == t.Name {
+				index = i
+				break
+			}
+		}
+		if index == -1 {
+			t.config.EmitError("current task not found in parent task")
+			return utils.Error("current task not found in parent task")
+		}
+		// 保留之前的任务, 删除后续任务
+		parentTask.Subtasks = parentTask.Subtasks[:index+1]
+		plans := taskResponseJson.Get("next_plans").Array()
+		if len(plans) == 0 {
+			t.config.EmitError("no new dynamic plans found")
+			return utils.Error("no new dynamic plans found")
+		}
+		parentTask.Subtasks = slices.Grow(parentTask.Subtasks, len(parentTask.Subtasks)+len(plans))
+
+		// 添加新的任务
+		for _, plan := range plans {
+			name, goal := plan.Get("name").String(), plan.Get("goal").String()
+			if name == "" || goal == "" {
+				t.config.EmitError("invalid plan: %s", plan.String())
+				return utils.Errorf("invalid plan: %s", plan.String())
+			}
+			parentTask.Subtasks = append(parentTask.Subtasks, &aiTask{
+				config:     t.config,
+				Name:       name,
+				Goal:       goal,
+				ParentTask: parentTask,
+			})
+
+			t.config.EmitInfo("new dynamic plan: %s", name)
+		}
 	default:
 		t.config.EmitError("unknown review suggestion: %s", suggestion)
 		return utils.Errorf("unknown review suggestion: %s", suggestion)
