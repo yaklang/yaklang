@@ -2,12 +2,14 @@ package aid
 
 import (
 	"context"
+	"io"
+	"os"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"io"
-	"os"
 )
 
 type AIRequest struct {
@@ -62,6 +64,7 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, config *C
 				config.EmitStreamEvent(nodeId, targetStream)
 			}
 		}
+		config.WaitForStream()
 	}()
 	return pr
 }
@@ -123,19 +126,25 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 		resp := NewAIResponse()
 		go func() {
 			defer resp.Close()
+
+			isStream := false
 			output, err := cb(
 				req.GetPrompt(),
 				aispec.WithStreamHandler(func(reader io.Reader) {
+					isStream = true
 					resp.EmitOutputStream(reader)
 				}),
 				aispec.WithReasonStreamHandler(func(reader io.Reader) {
+					isStream = true
 					resp.EmitReasonStream(reader)
 				}),
 			)
 			if err != nil {
 				log.Errorf("chat error: %v", err)
 			}
-			_ = output
+			if !isStream {
+				resp.EmitOutputStream(strings.NewReader(output))
+			}
 		}()
 		return resp, nil
 	}
