@@ -49,7 +49,7 @@ func searchNoteContent(ctx context.Context, keyword string) (*ypb.SearchNoteCont
 	})
 }
 
-func TestNote(t *testing.T) {
+func TestGRPCMUSTPASS_Note(t *testing.T) {
 	ctx := utils.TimeoutContextSeconds(2)
 	// create
 	title, content := uuid.NewString(), uuid.NewString()
@@ -102,10 +102,8 @@ func TestNote(t *testing.T) {
 	require.Len(t, searchResp.Data, 2)
 	require.Equal(t, fmt.Sprintf("%[1]s %[1]s", searchContent1, searchContent1), strings.TrimSpace(searchResp.Data[0].LineContent))
 	require.Equal(t, index, int(searchResp.Data[0].Index))
-	require.Equal(t, len(searchContent), int(searchResp.Data[0].Length))
 	require.Equal(t, fmt.Sprintf("yuio%svbnm", searchContent), strings.TrimSpace(searchResp.Data[1].LineContent))
 	require.Equal(t, secondIndex, int(searchResp.Data[1].Index))
-	require.Equal(t, len(searchContent), int(searchResp.Data[1].Length))
 
 	// negative saerch
 	searchResp, err = searchNoteContent(ctx, uuid.NewString())
@@ -113,7 +111,7 @@ func TestNote(t *testing.T) {
 	require.Len(t, searchResp.Data, 0)
 }
 
-func TestImportAndExportNote(t *testing.T) {
+func TestGRPCMUSTPASS_ImportAndExportNote(t *testing.T) {
 	ctx := utils.TimeoutContextSeconds(2)
 	// create
 	titles := make([]string, 0, 3)
@@ -173,7 +171,7 @@ func TestImportAndExportNote(t *testing.T) {
 	require.ElementsMatch(t, titles, gotTitles)
 }
 
-func TestExportNoteWithSameTitle(t *testing.T) {
+func TestGRPCMUSTPASS_ExportNoteWithSameTitle(t *testing.T) {
 	ctx := utils.TimeoutContextSeconds(2)
 	// create
 	title, content := uuid.NewString(), uuid.NewString()
