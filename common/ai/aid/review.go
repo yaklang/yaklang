@@ -68,4 +68,5 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 		t.config.EmitError("unknown review suggestion: %s", suggestion)
 		return utils.Errorf("unknown review suggestion: %s", suggestion)
 	}
+	return nil
 }
