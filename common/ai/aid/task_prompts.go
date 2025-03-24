@@ -2,9 +2,10 @@ package aid
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
 	_ "embed"
 )
@@ -101,5 +102,29 @@ func (t *aiTask) generateToolCallResultsPrompt() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error executing tool result history template: %w", err)
 	}
+	return promptBuilder.String(), nil
+}
+
+func (t *aiTask) generateDynamicPlanPrompt(systemContext *taskContext, userInput string) (string, error) {
+	// 创建模板数据
+	templateData := map[string]interface{}{
+		"Task":      t,
+		"Context":   systemContext,
+		"UserInput": userInput,
+	}
+
+	// 解析prompt模板
+	tmpl, err := template.New("dynamic-plan").Parse(__prompt_DynamicPlan)
+	if err != nil {
+		return "", fmt.Errorf("error parsing dynamic plan prompt template: %w", err)
+	}
+
+	// 渲染模板
+	var promptBuilder strings.Builder
+	err = tmpl.Execute(&promptBuilder, templateData)
+	if err != nil {
+		return "", fmt.Errorf("error executing dynamic plan prompt template: %w", err)
+	}
+
 	return promptBuilder.String(), nil
 }

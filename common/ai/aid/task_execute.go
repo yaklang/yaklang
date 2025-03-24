@@ -254,7 +254,7 @@ TOOLREQUIRED:
 
 	// user review finished, find params
 	reviewResult := ep.GetParams()
-	err = t.handleReviewResult(reviewResult)
+	err = t.handleReviewResult(ctx, reviewResult)
 	if err != nil {
 		log.Warnf("error handling review result: %v", err)
 	}
