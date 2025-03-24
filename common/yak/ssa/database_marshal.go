@@ -100,8 +100,8 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		}
 		params["current_blueprint"] = -1
 		if ret.currentBlueprint != nil {
-			typid := SaveTypeToDB(ret.currentBlueprint)
-			params["current_blueprint"] = typid
+			typID := SaveTypeToDB(ret.currentBlueprint, ret.GetProgramName())
+			params["current_blueprint"] = typID
 		}
 		params["is_method"] = ret.isMethod
 		params["method_name"] = ret.methodName

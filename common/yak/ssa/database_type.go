@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func SaveTypeToDB(typ Type) int {
+func SaveTypeToDB(typ Type, progName string) int {
 	if typ == nil {
 		return -1
 	}
@@ -32,7 +32,7 @@ func SaveTypeToDB(typ Type) int {
 		param["name"] = t.Name
 		param["fullTypeName"] = t.GetFullTypeNames()
 		for _, blueprint := range t.ParentBlueprints {
-			parentBlueprintIds = append(parentBlueprintIds, SaveTypeToDB(blueprint))
+			parentBlueprintIds = append(parentBlueprintIds, SaveTypeToDB(blueprint, progName))
 		}
 		param["parentBlueprints"] = parentBlueprintIds
 	default:
@@ -43,7 +43,7 @@ func SaveTypeToDB(typ Type) int {
 		log.Errorf("SaveTypeToDB: %v: param: %v", err, param)
 	}
 
-	return ssadb.SaveType(kind, str, utils.UnsafeBytesToString(extra))
+	return ssadb.SaveType(kind, str, utils.UnsafeBytesToString(extra), progName)
 }
 
 func GetTypeFromDB(id int) Type {

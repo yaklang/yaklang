@@ -44,6 +44,7 @@ func deleteProgramCodeOnly(db *gorm.DB, program string) {
 	db.Model(&IrIndex{}).Where("program_name = ?", program).Unscoped().Delete(&IrIndex{})
 	db.Model(&IrSource{}).Where("program_name = ?", program).Unscoped().Delete(&IrSource{})
 	db.Model(&IrSource{}).Where("folder_path = ? AND file_name = ?", "/", program).Unscoped().Delete(&IrSource{})
+	db.Model(&IrType{}).Where("program_name = ?", program).Unscoped().Delete(&IrType{})
 	db.Model(&IrOffset{}).Where("program_name = ?", program).Unscoped().Delete(&IrOffset{})
 	// analyze result
 	db.Model(&AuditResult{}).Where("program_name = ?", program).Unscoped().Delete(&AuditResult{})
