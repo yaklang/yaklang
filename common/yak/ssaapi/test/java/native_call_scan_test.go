@@ -1,9 +1,10 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -114,6 +115,7 @@ func TestScanPreviousIfStmtWithConfig(t *testing.T) {
 			result, err := prog.SyntaxFlowWithError("bb2<scanPrevious(until=`*?{opcode: const}`)> as $result;")
 			require.NoError(t, err)
 			values := result.GetValues("result")
+			values.ShowWithSource()
 			require.True(t, len(values) == 0)
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
@@ -146,9 +148,15 @@ func TestScanNextLoopWithConfig(t *testing.T) {
 	}`
 
 	t.Run("test exclude", func(t *testing.T) {
-		ssatest.CheckSyntaxFlow(t, code, "bb1<scanNext(exclude=`*?{opcode: const}`)> as $result;",
+		ssatest.CheckSyntaxFlow(t, code, "bb1<scanNext(exclude=`*?{opcode: const}`)>? as $result;",
 			map[string][]string{
-				"result": {"Undefined-a", "Undefined-bb2", "add(Undefined-a, phi(i)[0,add(i, 1)])", "add(phi(i)[0,add(i, 1)], 1)", "lt(phi(i)[0,add(i, 1)], 10)"},
+				"result": {
+					"Undefined-a",
+					"Undefined-bb2",
+					"add(Undefined-a, phi(i)[0,add(i, 1)])",
+					"add(phi(i)[0,add(i, 1)], 1)",
+					"lt(phi(i)[0,add(i, 1)], 10)",
+				},
 			}, ssaapi.WithLanguage(consts.JAVA))
 	})
 	t.Run("test include", func(t *testing.T) {

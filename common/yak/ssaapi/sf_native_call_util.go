@@ -6,7 +6,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -27,7 +26,7 @@ var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *s
 			return nil
 		}
 
-		results := val.NewValue(ssa.NewConstWithRange(val.String(), val.GetRange()))
+		results := val.NewConstValue(val.String(), val.GetRange())
 		results.AppendPredecessor(val, frame.WithPredecessorContext("string"))
 		vals = append(vals, results)
 		return nil
@@ -47,7 +46,7 @@ var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 		}
 		if val.IsConstInst() {
 			ss := codec.AnyToString(val.GetConstValue())
-			results := val.NewValue(ssa.NewConstWithRange(strings.ToLower(ss), val.GetRange()))
+			results := val.NewConstValue(strings.ToLower(ss), val.GetRange())
 			results.AppendPredecessor(val, frame.WithPredecessorContext("str-lower"))
 			vals = append(vals, results)
 			return nil
@@ -69,7 +68,7 @@ var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 		}
 		if val.IsConstInst() {
 			ss := codec.AnyToString(val.GetConstValue())
-			results := val.NewValue(ssa.NewConstWithRange(strings.ToUpper(ss), val.GetRange()))
+			results := val.NewConstValue(strings.ToUpper(ss), val.GetRange())
 			results.AppendPredecessor(val, frame.WithPredecessorContext("str-upper"))
 			vals = append(vals, results)
 			return nil
@@ -138,14 +137,14 @@ var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfv
 			if len(groupInt) > 0 {
 				for _, j := range groupInt {
 					if j >= 0 && j < len(i) {
-						ret := prog.NewValue(ssa.NewConst(i[j]))
+						ret := prog.NewConstValue(i[j])
 						_ = ret.AppendPredecessor(v, frame.WithPredecessorContext("regexp group"))
 						results = append(results, ret)
 					}
 				}
 			} else {
 				if len(i) > 0 {
-					ret := prog.NewValue(ssa.NewConst(i[0]))
+					ret := prog.NewConstValue(i[0])
 					_ = ret.AppendPredecessor(v, frame.WithPredecessorContext("regexp"))
 					results = append(results, ret)
 				}
