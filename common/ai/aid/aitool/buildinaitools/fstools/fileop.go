@@ -102,7 +102,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 				} else {
 					// read chunk
 					buf := make([]byte, chunkSize)
-					raw, err := io.ReadFull(f, buf)
+					raw, err := f.Read(buf)
 					if err != nil {
 						os.Stderr.WriteString("read failed: " + err.Error())
 					} else {
@@ -129,7 +129,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 
 			// read chunk
 			buf := make([]byte, chunkSize)
-			raw, err := io.ReadFull(f, buf)
+			raw, err := f.Read(buf)
 			if err != nil {
 				os.Stderr.WriteString("read failed: " + err.Error())
 			} else {
