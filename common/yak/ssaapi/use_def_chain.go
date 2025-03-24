@@ -26,9 +26,9 @@ func showUserDefChainEx(flag int, v *Value) {
 		ret := fmt.Sprintf("%8s", "")
 		switch flag {
 		case 0:
-			ret += fmt.Sprintf("%-7s\t%s\t%s\t%s\n", prefix, indexStr, ssa.SSAOpcode2Name[v.node.GetOpcode()], v)
+			ret += fmt.Sprintf("%-7s\t%s\t%s\t%s\n", prefix, indexStr, ssa.SSAOpcode2Name[v.innerValue.GetOpcode()], v)
 		case 1:
-			ret += fmt.Sprintf("%s\t%s\n\t\t%s\n\t\t%s\n\t\t%s\n", prefix, indexStr, v, v.node, v.node.GetRange())
+			ret += fmt.Sprintf("%s\t%s\n\t\t%s\n\t\t%s\n\t\t%s\n", prefix, indexStr, v, v.innerValue, v.innerValue.GetRange())
 		default:
 		}
 		return ret

@@ -450,7 +450,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			err = utils.Errorf("search exact failed: not found: %v", i.UnaryStr)
 		}
 
-		s.debugSubLog("result next: %v", next.String())
+		s.debugSubLog("result next: %v", ValuesLen(next))
 		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
@@ -469,7 +469,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			ok, results, _ := operator.ExactMatch(s.GetContext(), BothMatch, i.UnaryStr)
 			if ok {
 				have := false
-				log.Infof("recursive search exact: %v from: %v", results.String(), operator.String())
+				// log.Infof("recursive search exact: %v from: %v", results.String(), operator.String())
 				_ = results.Recursive(func(operator ValueOperator) error {
 					_, ok := operator.(ssa.GetIdIF)
 					if ok {
@@ -491,7 +491,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 
 		results := NewValues(next)
-		s.debugSubLog("result next: %v", results.String())
+		s.debugSubLog("result next: %v", ValuesLen(results))
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
 	case OpRecursiveSearchGlob:
@@ -534,7 +534,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("ERROR: %v", err)
 		}
 		results := NewValues(next)
-		s.debugSubLog("result next: %v", results.String())
+		s.debugSubLog("result next: %v", ValuesLen(results))
 		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
@@ -581,7 +581,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("ERROR: %v", err)
 		}
 		results := NewValues(next)
-		s.debugSubLog("result next: %v", results.String())
+		s.debugSubLog("result next: %v", ValuesLen(results))
 		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
@@ -608,7 +608,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if !result {
 			err = utils.Errorf("search glob failed: not found: %v", i.UnaryStr)
 		}
-		s.debugSubLog("result next: %v", next.String())
+		s.debugSubLog("result next: %v", ValuesLen(next))
 		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
@@ -637,7 +637,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if !result {
 			err = utils.Errorf("search regexp failed: not found: %v", i.UnaryStr)
 		}
-		s.debugSubLog("result next: %v", next.String())
+		s.debugSubLog("result next: %v", ValuesLen(next))
 		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
@@ -779,7 +779,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("ERROR: %v", err)
 			return err
 		}
-		s.debugSubLog(" -> save $" + i.UnaryStr)
+		s.debugSubLog(">> save $%s [%v]", i.UnaryStr, ValuesLen(value))
 	case OpAddDescription:
 		if i.UnaryStr == "" {
 			return utils.Errorf("add description failed: empty name")
@@ -885,7 +885,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			if dup == nil {
 				return utils.Wrapf(CriticalError, "compare opcode failed: stack top is empty")
 			}
-			s.debugSubLog(">> push: %v", newVal.String())
+			s.debugSubLog("Remove duplicate :%v")
+			s.debugSubLog(">> push: %v", ValuesLen(newVal))
 			s.stack.Push(newVal)
 		}
 		s.conditionStack.Push(condition)
@@ -915,7 +916,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			if dup == nil {
 				return utils.Wrapf(CriticalError, "compare string failed: stack top is empty")
 			}
-			s.debugSubLog(">> push: %v", newVal.String())
+			s.debugSubLog("Remove duplicate :%v")
+			s.debugSubLog(">> push: %v", ValuesLen(newVal))
 			s.stack.Push(newVal)
 		}
 		s.conditionStack.Push(condition)
@@ -1114,7 +1116,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			}
 			return utils.Errorf("get native call failed: %v", err)
 		}
-		s.debugSubLog("<< push: %v", ret)
+		s.debugSubLog("<< push: %v", ValuesLen(ret))
 		s.stack.Push(ret)
 	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath:
 		opcode2strMap := map[SFVMOpCode]string{
