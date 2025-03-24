@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -74,7 +75,12 @@ func (t *aiTask) callTool(ctx *taskContext, targetTool *aitool.Tool) (result *ai
 
 	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
 	// 调用工具
-	toolResult, err := targetTool.InvokeWithRaw(string(callParamsString))
+	stdoutBuf := bytes.NewBuffer(nil)
+	stderrBuf := bytes.NewBuffer(nil)
+	t.config.EmitStreamEvent(fmt.Sprintf("tool-%v-stdout", targetTool.Name), stdoutBuf)
+	t.config.EmitStreamEvent(fmt.Sprintf("tool-%v-stderr", targetTool.Name), stderrBuf)
+
+	toolResult, err := targetTool.InvokeWithRaw(string(callParamsString), aitool.WithStdout(stdoutBuf), aitool.WithStderr(stderrBuf))
 	if err != nil {
 		err = utils.Errorf("error invoking tool: %v", err)
 		return nil, "", NewNonRetryableTaskStackError(err)

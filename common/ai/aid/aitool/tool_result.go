@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 )
 
 // ToolExecutionResult 表示工具执行的完整结果
@@ -58,13 +59,23 @@ func (r *ToolExecutionResult) GetJSONSchemaString() string {
 }
 
 // ExecuteToolWithCapture 执行工具并捕获stdout和stderr
-func (t *Tool) ExecuteToolWithCapture(params map[string]interface{}) (*ToolExecutionResult, error) {
+func (t *Tool) ExecuteToolWithCapture(params map[string]any, stdout, stderr io.Writer) (*ToolExecutionResult, error) {
 	// 创建stdout和stderr的缓冲区
 	stdoutBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)
+	if stdout != nil {
+		stdout = io.MultiWriter(stdout, stdoutBuf)
+	} else {
+		stdout = stdoutBuf
+	}
+	if stderr != nil {
+		stderr = io.MultiWriter(stderr, stderrBuf)
+	} else {
+		stderr = stderrBuf
+	}
 
 	// 执行回调函数
-	result, err := t.Callback(params, stdoutBuf, stderrBuf)
+	result, err := t.Callback(params, stdout, stderr)
 
 	// 创建执行结果
 	execResult := &ToolExecutionResult{
