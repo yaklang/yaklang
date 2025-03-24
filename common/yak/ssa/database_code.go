@@ -143,6 +143,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	defer func() {
 		if msg := recover(); msg != nil {
 			log.Errorf("value2IrCode panic: %s", msg)
+			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 	value, ok := ToValue(inst)
@@ -210,7 +211,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		ir.Point = point.GetId()
 	}
 
-	ir.TypeID = SaveTypeToDB(value.GetType())
+	ir.TypeID = SaveTypeToDB(value.GetType(), inst.GetProgramName())
 }
 
 func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
