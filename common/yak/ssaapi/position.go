@@ -1,15 +1,15 @@
 package ssaapi
 
 func (v *Value) GetFunction() *Value {
-	return v.NewValue(v.node.GetFunc())
+	return v.NewValue(v.innerValue.GetFunc())
 }
 
 func (v *Value) InMainFunction() bool {
-	return v.node.GetFunc().IsMain()
+	return v.innerValue.GetFunc().IsMain()
 }
 
 func (v *Value) GetBlock() *Value {
-	return v.NewValue(v.node.GetBlock())
+	return v.NewValue(v.innerValue.GetBlock())
 }
 
 /*
@@ -18,9 +18,9 @@ if condition is false : -1 unreachable
 if condition need calc: 0  unknown
 */
 func (v *Value) IsReachable() int {
-	return v.node.GetBlock().Reachable()
+	return v.innerValue.GetBlock().Reachable()
 }
 
 func (v *Value) GetReachable() *Value {
-	return v.NewValue(v.node.GetBlock().Condition)
+	return v.NewValue(v.innerValue.GetBlock().Condition)
 }

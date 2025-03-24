@@ -107,8 +107,8 @@ func (r *SyntaxFlowResult) DumpValuesJson(name string) string {
 		valueMap["id"] = val.GetId()
 
 		if !isSCA {
-			if !strings.Contains(val.GetSSAValue().String(), "\n") {
-				valueMap["fixed_point"] = val.GetSSAValue().String()
+			if !strings.Contains(val.GetSSAInst().String(), "\n") {
+				valueMap["fixed_point"] = val.GetSSAInst().String()
 			}
 			if val.GetRange() != nil {
 				valueMap["source_code"] = val.GetRange().GetTextContext(3)
@@ -252,8 +252,8 @@ func (r *SyntaxFlowResult) Dump(showCode bool) string {
 				if strings.Contains(rule.Title, "SCA:") {
 					line("Reason: SCA: 根据依赖版本检查漏洞")
 				} else {
-					if !strings.Contains(val.GetSSAValue().String(), "\n") {
-						line("Fixed Point(不动点)：%v", val.GetSSAValue().String())
+					if !strings.Contains(val.GetSSAInst().String(), "\n") {
+						line("Fixed Point(不动点)：%v", val.GetSSAInst().String())
 					}
 					if showCode {
 						if val.GetRange() != nil {
