@@ -58,7 +58,7 @@ func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		return nil
 	})
 	for opCode := range opCodeMap {
-		result := prog.NewValue(ssa.NewConst(ssa.SSAOpcode2Name[opCode]))
+		result := prog.NewConstValue(ssa.SSAOpcode2Name[opCode])
 		result.AppendPredecessor(v, frame.WithPredecessorContext("opcodes"))
 		vals = append(vals, result)
 	}
@@ -89,7 +89,7 @@ func nativeCallSourceCode(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfv
 		if text == "" {
 			return nil
 		}
-		result := prog.NewValue(ssa.NewConstWithRange(text, r))
+		result := prog.NewConstValue(text, r)
 		result.AppendPredecessor(val, frame.WithPredecessorContext("source-code"))
 		vals = append(vals, result)
 		return nil

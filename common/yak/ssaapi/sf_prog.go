@@ -28,8 +28,13 @@ func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueO
 	var res Values = lo.FilterMap(
 		ssa.MatchInstructionByOpcodes(ctx, p.Program, opcodeItems.Opcodes...),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			boolRes = append(boolRes, true)
-			return p.NewValue(i), true
+			if v, err := p.NewValue(i); err != nil {
+				log.Errorf("CompareOpcode: new value failed: %v", err)
+				return nil, false
+			} else {
+				boolRes = append(boolRes, true)
+				return v, true
+			}
 		},
 	)
 	return res, boolRes
@@ -139,7 +144,12 @@ func (p *Program) ExactMatch(ctx context.Context, mod int, s string) (bool, sfvm
 	var values Values = lo.FilterMap(
 		ssa.MatchInstructionByExact(ctx, p.Program, mod, s),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			return p.NewValue(i), true
+			if v, err := p.NewValue(i); err != nil {
+				log.Errorf("ExactMatch: new value failed: %v", err)
+				return nil, false
+			} else {
+				return v, true
+			}
 		},
 	)
 	return len(values) > 0, values, nil
@@ -149,7 +159,12 @@ func (p *Program) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.
 	var values Values = lo.FilterMap(
 		ssa.MatchInstructionByGlob(ctx, p.Program, mod, g),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			return p.NewValue(i), true
+			if v, err := p.NewValue(i); err != nil {
+				log.Errorf("GlobMatch: new value failed: %v", err)
+				return nil, false
+			} else {
+				return v, true
+			}
 		},
 	)
 	return len(values) > 0, values, nil
@@ -159,7 +174,12 @@ func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) (bool, sf
 	var values Values = lo.FilterMap(
 		ssa.MatchInstructionByRegexp(ctx, p.Program, mod, re),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			return p.NewValue(i), true
+			if v, err := p.NewValue(i); err != nil {
+				log.Errorf("RegexpMatch: new value failed: %v", err)
+				return nil, false
+			} else {
+				return v, true
+			}
 		},
 	)
 	return len(values) > 0, values, nil
@@ -211,8 +231,8 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 		editor := memedit.NewMemEditor(content)
 		editor.SetUrl(path)
 		rangeIf := editor.GetRangeOffset(start, start+len(match))
-		val := ssa.NewConstWithRange(str, rangeIf)
-		res = append(res, p.NewValue(val))
+		val := p.NewConstValue(str, rangeIf)
+		res = append(res, val)
 	}
 	matchFile := false
 	handler := func(data string) {

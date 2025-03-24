@@ -249,10 +249,9 @@ func init() {
 				if blueprint == nil {
 					return nil
 				}
-				val := ssa.NewConstWithRange(blueprint.Name, function.GetRange())
-				val.SetIsFromDB(true)
-				val.SetType(blueprint)
-				result = append(result, prog.NewValue(val))
+				val := prog.NewConstValue(blueprint.Name, function.GetRange())
+				// val.SetType(blueprint)
+				result = append(result, val)
 			default:
 				return nil
 			}
@@ -275,7 +274,7 @@ func init() {
 			count++
 			return nil
 		})
-		return true, sfvm.NewValues([]sfvm.ValueOperator{prog.NewValue(ssa.NewConst(count))}), nil
+		return true, sfvm.NewValues([]sfvm.ValueOperator{prog.NewConstValue(count)}), nil
 	}), nc_desc("获取实际参数长度"))
 	registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		result, err := v.GetCallActualParams(0, true)
@@ -342,7 +341,7 @@ func init() {
 								continue
 							}
 						}
-						rs = append(rs, program.NewValue(ssa.NewConstWithRange(name, memeditor.GetFullRange())))
+						rs = append(rs, program.NewConstValue(name, memeditor.GetFullRange()))
 					}
 				}
 			}
@@ -388,7 +387,7 @@ func init() {
 				}
 				_, exist := prog.FileList[editor.GetFilename()]
 				if exist {
-					rs = append(rs, program.NewValue(ssa.NewConstWithRange(editor.GetFilename(), editor.GetFullRange())))
+					rs = append(rs, program.NewConstValue(editor.GetFilename(), editor.GetFullRange()))
 				} else {
 					log.Errorf("program filelist not found this file")
 				}
@@ -796,7 +795,7 @@ func init() {
 					return
 				}
 				tmpMap[typ] = struct{}{}
-				vx := val.NewValue(ssa.NewConstWithRange(typ, val.GetRange()))
+				vx := val.NewConstValue(typ, val.GetRange())
 				vx.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
 				vals = append(vals, vx)
 			}
@@ -853,7 +852,7 @@ func init() {
 					return
 				}
 				tmpMap[typ] = struct{}{}
-				results := val.NewValue(ssa.NewConstWithRange(typ, rangeIf))
+				results := val.NewConstValue(typ, rangeIf)
 				results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
 				vals = append(vals, results)
 			}

@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/xml2"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -111,7 +110,7 @@ func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng memedi
 		return nil
 	}
 
-	val := prog.NewValue(ssa.NewConst(rule))
+	val := prog.NewConstValue(rule)
 	_, _, err := nativeCallEval(val, frame, nil)
 	if err != nil {
 		log.Warnf("mybatis-${...}: fetch query: %v, error: %v", rule, err)
@@ -128,8 +127,7 @@ func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng memedi
 	if editor == nil {
 		return results
 	}
-	fileName := ssa.NewConstWithRange(rng.GetText(), rng)
-	fileVal := prog.NewValue(fileName)
+	fileVal := prog.NewConstValue(rng.GetText(), rng)
 	results.AppendPredecessor(fileVal, frame.WithPredecessorContext("mybatis-${...}"))
 	return results
 }

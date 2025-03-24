@@ -135,7 +135,11 @@ func (b *basicBlockInfo) searchInsts() {
 		// if lz, ok := ssa.ToLazyInstruction(inst); ok {
 		// 	inst = lz.Self()
 		// }
-		value := b.prog.NewValue(inst)
+		value, err := b.prog.NewValue(inst)
+		if err != nil {
+			log.Warnf("NewValue error: %s", err)
+			continue
+		}
 		if b.recursiveConfig.configItems == nil {
 			b.results = append(b.results, value)
 			continue

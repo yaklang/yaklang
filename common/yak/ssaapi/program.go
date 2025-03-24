@@ -125,7 +125,11 @@ func (p *Program) Ref(name string) Values {
 			context.Background(), p.Program, ssadb.NameMatch, name,
 		),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			return p.NewValue(i), true
+			if v, err := p.NewValue(i); err != nil {
+				return nil, false
+			} else {
+				return v, true
+			}
 		},
 	)
 }
@@ -149,33 +153,63 @@ func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
 }
 
 func (v *Value) NewTopDefValue(value ssa.Value) *Value {
-	return v.NewValue(value).AppendEffectOn(v)
+	iv := v.NewValue(value)
+	return iv.AppendEffectOn(v)
 }
 
 func (v *Value) NewBottomUseValue(value ssa.Value) *Value {
-	return v.NewValue(value).AppendDependOn(v)
+	iv := v.NewValue(value)
+	return iv.AppendDependOn(v)
+}
+
+func (v *Value) NewConstValue(i any, rng ...memedit.RangeIf) *Value {
+	return v.ParentProgram.NewConstValue(i, rng...)
+}
+
+func (p *Program) NewConstValue(i any, rng ...memedit.RangeIf) *Value {
+	value := ssa.NewConst(i)
+	if len(rng) > 0 {
+		value.SetRange(rng[0])
+	}
+	v, err := p.NewValue(value)
+	_ = err // ignore error
+	return v
 }
 
 // normal from ssa value
 func (v *Value) NewValue(value ssa.Instruction) *Value {
-	return v.ParentProgram.NewValue(value)
-}
-func (p *Program) NewValue(n ssa.Instruction) *Value {
-	if utils.IsNil(n) {
+	iv, err := v.ParentProgram.NewValue(value)
+	if err != nil {
+		log.Errorf("NewValue: new value failed: %v", err)
 		return nil
+	}
+	return iv
+}
+
+func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
+	if utils.IsNil(inst) {
+		return nil, utils.Errorf("instruction is nil")
 	}
 	v := &Value{
 		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
 		ParentProgram: p,
 	}
-	if n, ok := n.(ssa.Value); ok {
+
+	// if lazy, get the real inst
+	checkInst := inst
+	if inst.IsLazy() {
+		checkInst = inst.Self()
+	}
+	if n, ok := checkInst.(ssa.Value); ok {
 		v.innerValue = n
 	}
-	if n, ok := n.(ssa.User); ok {
+	if n, ok := checkInst.(ssa.User); ok {
 		v.innerUser = n
 	}
-	v.innerInst = n
-	return v
+	if v.innerValue == nil && v.innerUser == nil {
+		return nil, utils.Errorf("instruction is not a value or user: %s", inst.String())
+	}
+	return v, nil
 }
 
 // from ssa id  (IrCode)
@@ -184,7 +218,11 @@ func (p *Program) GetValueById(id int64) (*Value, error) {
 	if val == nil {
 		return nil, utils.Errorf("instruction not found: %d", id)
 	}
-	return p.NewValue(val), nil
+	v, err := p.NewValue(val)
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 func (p *Program) GetValueByIdMust(id int64) *Value {
@@ -232,7 +270,7 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 				rangeIf = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
 			}
 		}
-		val := p.NewValue(ssa.NewConstWithRange(auditNode.TmpValue, rangeIf))
+		val := p.NewConstValue(auditNode.TmpValue, rangeIf)
 		val.auditNode = auditNode
 		return val
 	}
