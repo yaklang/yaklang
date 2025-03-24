@@ -30,6 +30,9 @@ var __prompt_TaskSummary string
 //go:embed prompts/report-finished.txt
 var __prompt_ReportFinished string
 
+//go:embed prompts/dynamic-plan.txt
+var __prompt_DynamicPlan string
+
 var (
 	__prompt_SUMMARY_TEMPLATE = template.Must(template.New("summary").Parse(__prompt_TaskSummary))
 )
