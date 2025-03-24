@@ -205,7 +205,7 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 	case *Panic:
 		return fmt.Sprintf("panic(%s)", liner.DisasmValue(v.Info))
 	case *Jump, *ErrorHandler:
-		return ""
+		return "jump"
 	case *If:
 		return fmt.Sprintf("if (%s) {%s} else {%s}", liner.DisasmValue(v.Cond), liner.DisasmValue(v.True), liner.DisasmValue(v.False))
 	case *Loop:

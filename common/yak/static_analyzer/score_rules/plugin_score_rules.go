@@ -60,7 +60,7 @@ func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults 
 		}
 		fun := defineFuncs[0]
 		hasCode := false
-		if f, ok := ssa.ToFunction(ssaapi.GetBareNode(fun)); ok {
+		if f, ok := ssa.ToFunction(fun.GetSSAInst()); ok {
 			for _, block := range f.Blocks {
 				b, ok := ssa.ToBasicBlock(block)
 				if !ok {

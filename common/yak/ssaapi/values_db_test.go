@@ -17,7 +17,9 @@ import (
 func CreateValue(prog *ssaapi.Program, nodeId int) *ssaapi.Value {
 	constInst := ssa.NewConst(nodeId)
 	constInst.SetId(int64(nodeId))
-	value := prog.NewValue(constInst)
+	value, err := prog.NewValue(constInst)
+	_ = err
+	// require.NoError(t, err)
 	return value
 }
 
