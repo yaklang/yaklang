@@ -249,9 +249,9 @@ func init() {
 				if blueprint == nil {
 					return nil
 				}
-				val := prog.NewConstValue(blueprint.Name, function.GetRange())
-				// val.SetType(blueprint)
-				result = append(result, val)
+				if val, err := prog.NewValue(blueprint.Container()); err == nil {
+					result = append(result, val)
+				}
 			default:
 				return nil
 			}
