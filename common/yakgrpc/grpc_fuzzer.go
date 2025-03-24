@@ -260,6 +260,7 @@ func (s *Server) PreloadHTTPFuzzerParams(ctx context.Context, req *ypb.PreloadHT
 
 type fuzzerServerPush struct {
 	FuzzerTabIndex string `json:"fuzzer_tab_index"`
+	FuzzerIndex    string `json:"fuzzer_index"`
 	DiscardCount   int    `json:"discard_count"`
 }
 
@@ -283,10 +284,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	engineDropPacket := req.GetEngineDropPacket()
 
 	discardCount := new(atomic.Int64)
-	fuzzerIndex := req.GetFuzzerTabIndex()
+	fuzzerTabIndex := req.GetFuzzerTabIndex()
+	fuzzerIndex := req.GetFuzzerIndex()
 	doFuzzerServerPush := func() {
 		yakit.BroadcastData(yakit.ServerPushType_Fuzzer, &fuzzerServerPush{
-			FuzzerTabIndex: fuzzerIndex,
+			FuzzerTabIndex: fuzzerTabIndex,
+			FuzzerIndex:    fuzzerIndex,
 			DiscardCount:   int(discardCount.Load()),
 		})
 	}
