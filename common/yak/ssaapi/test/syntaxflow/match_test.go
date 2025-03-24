@@ -97,7 +97,7 @@ func TestGetMemberAndVariable(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code,
 			`a* as $target`,
 			map[string][]string{
-				"target": {"1", "2", "4", "5", "Undefined-obj.a1(valid)", "Undefined-obj.a2(valid)"},
+				"target": {"1", "2", "4", "5"},
 			})
 	})
 
@@ -105,7 +105,7 @@ func TestGetMemberAndVariable(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code,
 			`a1 as $target`,
 			map[string][]string{
-				"target": {"1", "4", "Undefined-obj.a1(valid)"},
+				"target": {"1", "4"},
 			})
 	})
 
@@ -123,7 +123,7 @@ func TestGetMemberAndVariable(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code,
 			`.a1 as $target`,
 			map[string][]string{
-				"target": {"1", "Undefined-obj.a1(valid)"},
+				"target": {"1"},
 			})
 	})
 
@@ -131,7 +131,7 @@ func TestGetMemberAndVariable(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithSFOption(t, code,
 			`.a1 as $target`,
 			map[string][]string{
-				"target": {"1", "Undefined-obj.a1(valid)"},
+				"target": {"1"},
 			},
 			ssaapi.QueryWithStrictMatch(),
 		)
@@ -158,7 +158,7 @@ func TestGetMember(t *testing.T) {
 
 	t.Run("test name", func(t *testing.T) {
 		want := map[string][]string{
-			"target": {"1", "Undefined-obj.a1(valid)"},
+			"target": {"1"},
 		}
 		for _, sf := range []string{
 			`*.a1 as $target`,

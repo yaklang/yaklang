@@ -172,7 +172,7 @@ class A {
 }
 
 `, `staticValue as $entry;`, map[string][]string{
-		"entry": []string{"\"abc\"", "\"ddd\"", "\"eee\"", "Undefined-A.staticValue(valid)", "phi(staticValue)[\"eee\",\"abc\"]"},
+		"entry": []string{"\"abc\"", "\"ddd\"", "\"eee\"", "phi(staticValue)[\"eee\",\"abc\"]"},
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
 

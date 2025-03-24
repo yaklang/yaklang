@@ -2,10 +2,10 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"strings"
 )
 
 // GetBluePrint will get the blueprint by name. if not found and virtualImport enable,
@@ -53,9 +53,7 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...C
 	blueprintContainer := b.EmitEmptyContainer()
 	blueprintContainer.SetName(name)
 	blueprintContainer.SetVerboseName(name)
-	typ := blueprintContainer.GetType()
-	typ.SetFullTypeNames([]string{strings.Join([]string{prog.PkgName, name}, ".")})
-	blueprintContainer.SetType(typ)
+	blueprintContainer.SetType(blueprint)
 
 	// search this blueprint-declare can use ${blueprint-name} or ${blueprint-name}_declare
 	variableName := fmt.Sprintf("%s_declare", name)
