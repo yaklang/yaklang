@@ -637,7 +637,7 @@ public class ImageUtils{
 }
 `
 		ssatest.CheckSyntaxFlow(t, code, `*readFile as $fun`, map[string][]string{
-			"fun": {"Function-ImageUtils.readFile", "Undefined-ImageUtils.readFile(valid)"},
+			"fun": {"Function-ImageUtils.readFile"},
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})
 	t.Run("new java blueprint by fullName", func(t *testing.T) {

@@ -179,7 +179,7 @@ public interface HomeDao {
 		ssatest.CheckSyntaxFlowWithFS(t, vf,
 			`getFlashProductList as $func`,
 			map[string][]string{
-				"func": {"Function-HomeDao.getFlashProductList", "Undefined-HomeDao.getFlashProductList(valid)"},
+				"func": {"Function-HomeDao.getFlashProductList"},
 			}, false,
 			// ssaapi.WithLanguage(ssaapi.JAVA),
 		)
@@ -191,7 +191,7 @@ public interface HomeDao {
 			$url<searchFunc> as $func
 			`,
 			map[string][]string{
-				"func": {"Function-HomeDao.getFlashProductList", "Undefined-HomeDao.getFlashProductList(valid)"},
+				"func": {"Function-HomeDao.getFlashProductList"},
 			}, false,
 			// ssaapi.WithLanguage(ssaapi.JAVA),
 		)
