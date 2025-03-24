@@ -111,7 +111,7 @@ func TestExecuteToolWithCapture(t *testing.T) {
 		"warning": false,
 	}
 
-	result1, err := tool.ExecuteToolWithCapture(params1)
+	result1, err := tool.ExecuteToolWithCapture(params1, nil, nil)
 	if err != nil {
 		t.Errorf("执行工具失败: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestExecuteToolWithCapture(t *testing.T) {
 		"warning": true,
 	}
 
-	result2, err := tool.ExecuteToolWithCapture(params2)
+	result2, err := tool.ExecuteToolWithCapture(params2, nil, nil)
 	if err != nil {
 		t.Errorf("执行工具失败: %v", err)
 	}
