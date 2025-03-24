@@ -23,6 +23,9 @@ type GetIdIF interface {
 type Instruction interface {
 	ErrorLogger
 
+	// string
+	String() string
+
 	GetOpcode() Opcode
 
 	// function

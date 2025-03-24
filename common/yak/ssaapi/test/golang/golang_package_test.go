@@ -193,8 +193,8 @@ func TestFileName_muti_package(t *testing.T) {
 			result := prog.SyntaxFlow(sf)
 			result.Show()
 			target := result.GetValues("target")
-			a := target[0].GetSSAValue()
-			b := target[1].GetSSAValue()
+			a := target[0].GetSSAInst()
+			b := target[1].GetSSAInst()
 			if ca, ok := ssa.ToConst(a); ok {
 				ea := ca.GetRange().GetEditor()
 				as = ea.GetFilename()
@@ -247,8 +247,8 @@ func TestFileName_muti_file(t *testing.T) {
 				`
 			result := prog.SyntaxFlow(sf)
 			target := result.GetValues("target")
-			a := target[0].GetSSAValue()
-			b := target[1].GetSSAValue()
+			a := target[0].GetSSAInst()
+			b := target[1].GetSSAInst()
 			if ca, ok := ssa.ToConst(a); ok {
 				ea := ca.GetRange().GetEditor()
 				as = ea.GetFilename()

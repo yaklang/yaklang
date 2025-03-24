@@ -1,8 +1,9 @@
 package ssaapi
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -28,7 +29,7 @@ os.System(input)
 		}
 		phi := phis[0]
 		phi.GetId()
-		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -61,7 +62,7 @@ os.System(input)
 		phis := prog.SyntaxFlow("os.System(* as $param,)").GetValues("param")
 		phi := phis[0]
 		phi.GetId()
-		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -100,7 +101,7 @@ os.System(input)
 		phis := prog.SyntaxFlow("os.System(* as $param,)").GetValues("param")
 		phi := phis[0]
 		phi.GetId()
-		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}
@@ -137,7 +138,7 @@ func TestPhiInCFG_If_Without_ElseStatement(t *testing.T) {
 		phis := prog.SyntaxFlow("b as $b").GetValues("b")
 		phi := phis[0]
 		phi.GetId()
-		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		targetIns, ok := ssa.ToPhi(phi.GetSSAInst())
 		if !ok {
 			t.Fatal("not phi")
 		}

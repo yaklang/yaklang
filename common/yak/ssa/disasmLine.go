@@ -8,14 +8,14 @@ import (
 	"github.com/samber/lo"
 )
 
-// LineDisasm disasm a instruction to string
-func LineDisasm(v Instruction) string {
-	return lineDisasm(v, NewFullDisasmLiner(100))
+// LineDisASM disasm a instruction to string
+func LineDisASM(v Instruction) string {
+	return lineDisASM(v, NewFullDisasmLiner(100))
 }
 
-// LineShortDisasm disasm a instruction to string, but will use id or name
-func LineShortDisasm(v Instruction) string {
-	return lineDisasm(v, NewNameDisasmLiner())
+// LineShortDisASM disasm a instruction to string, but will use id or name
+func LineShortDisASM(v Instruction) string {
+	return lineDisASM(v, NewNameDisasmLiner())
 }
 
 type NameDisasmLiner struct {
@@ -61,7 +61,7 @@ func NewFullDisasmLiner(max int) *FullDisasmLiner {
 }
 
 func (f *FullDisasmLiner) DisasmValue(v Instruction) string {
-	return lineDisasm(v, f)
+	return lineDisASM(v, f)
 }
 
 func (f *FullDisasmLiner) AddLevel() bool {
@@ -114,7 +114,7 @@ func (b *FullDisasmLiner) SkipLevelChecking() bool {
 	return false
 }
 
-func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
+func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 	if liner.AddLevel() && !liner.SkipLevelChecking() {
 		return "..."
 	}
@@ -159,7 +159,7 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 		if v.Const != nil && v.Const.value != nil && !v.isIdentify && reflect.TypeOf(v.Const.value).Kind() == reflect.String {
 			return fmt.Sprintf("%#v", v.String())
 		}
-		return fmt.Sprintf("%s", v.String())
+		return v.String()
 	case *BinOp:
 		return fmt.Sprintf("%s(%s, %s)", v.Op, liner.DisasmValue(v.X), liner.DisasmValue(v.Y))
 	case *UnOp:

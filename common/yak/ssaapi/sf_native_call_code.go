@@ -32,7 +32,7 @@ func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		if !ok {
 			return nil
 		}
-		f, ok := ssa.ToFunction(val.GetFunction().node)
+		f, ok := ssa.ToFunction(val.GetFunction().innerValue)
 		if !ok {
 			log.Warnf("value %s is not a function", val.GetName())
 			return nil
