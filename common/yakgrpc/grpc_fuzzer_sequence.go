@@ -203,6 +203,7 @@ func (f *fuzzerSequenceFlow) FromFuzzerResponse(response *ypb.FuzzerResponse) *f
 
 func (s *Server) execFlow(flowMax int64, wg *sync.WaitGroup, f *fuzzerSequenceFlow, stream ypb.Yak_HTTPFuzzerSequenceServer) error {
 	req := f.GetFuzzerRequest()
+	req.FuzzerSequenceIndex = uuid.NewString()
 	runtimeID := uuid.NewString()
 	fallback := newHTTPFuzzerFallback(runtimeID, req, stream)
 	if f.next != nil {

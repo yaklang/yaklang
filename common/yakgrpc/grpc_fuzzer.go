@@ -259,9 +259,10 @@ func (s *Server) PreloadHTTPFuzzerParams(ctx context.Context, req *ypb.PreloadHT
 }
 
 type fuzzerServerPush struct {
-	FuzzerTabIndex string `json:"fuzzer_tab_index"`
-	FuzzerIndex    string `json:"fuzzer_index"`
-	DiscardCount   int    `json:"discard_count"`
+	FuzzerTabIndex      string `json:"fuzzer_tab_index"`
+	FuzzerIndex         string `json:"fuzzer_index"`
+	FuzzerSequenceIndex string `json:"fuzzer_sequence_index"`
+	DiscardCount        int    `json:"discard_count"`
 }
 
 func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerServer) (finalError error) {
@@ -286,11 +287,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	discardCount := new(atomic.Int64)
 	fuzzerTabIndex := req.GetFuzzerTabIndex()
 	fuzzerIndex := req.GetFuzzerIndex()
+	fuzzerSequenceIndex := req.GetFuzzerSequenceIndex()
 	doFuzzerServerPush := func() {
 		yakit.BroadcastData(yakit.ServerPushType_Fuzzer, &fuzzerServerPush{
-			FuzzerTabIndex: fuzzerTabIndex,
-			FuzzerIndex:    fuzzerIndex,
-			DiscardCount:   int(discardCount.Load()),
+			FuzzerTabIndex:      fuzzerTabIndex,
+			FuzzerIndex:         fuzzerIndex,
+			FuzzerSequenceIndex: fuzzerSequenceIndex,
+			DiscardCount:        int(discardCount.Load()),
 		})
 	}
 

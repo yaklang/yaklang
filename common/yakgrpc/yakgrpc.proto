@@ -4638,8 +4638,9 @@ message FuzzerRequest {
   // 需要配合前端的 Index
   // 这两个 Index 如果有的话，后端在执行 HTTP Fuzzer Sequence 的时候，就可以只传递这两个了
   // 如果没有的话，直接把整个 Request 传回去
-  string FuzzerIndex = 41;
-  string FuzzerTabIndex = 42;
+  string FuzzerIndex = 41; // fuzzer grpc index, every HTTPFuzzer will have one index
+  string FuzzerTabIndex = 42; // use witch fuzzer tab, has some config info
+  string FuzzerSequenceIndex = 62; // fuzzer sequence index , for sequence fuzzer, front end not set, just use for server push
 
   // BatchTarget
   // 继承透传给 HTTPPOOL 的参数，可以使用批量目标来发送
