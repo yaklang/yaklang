@@ -125,7 +125,7 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		setMemberCallRelationship(object, key, member)
 		setMemberVerboseName(member)
 	}
-	writeUndefind := func() *Undefined {
+	writeUndefined := func() *Undefined {
 		recoverScope := b.SetCurrent(object, true)
 		un := b.writeUndefine(name)
 		recoverScope()
@@ -141,7 +141,7 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 	if wantFunction {
 		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
 			fun.SetObject(object)
-			un := writeUndefind()
+			un := writeUndefined()
 			memberHandler(res.typ, un)
 			return un
 		}
@@ -169,17 +169,21 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 	if field := b.getDefaultMemberOrMethodByClass(object, key, wantFunction); !utils.IsNil(field) {
 		return field
 	}
-	un := writeUndefind()
+	un := writeUndefined()
 	memberHandler(res.typ, un)
 	return un
 }
 
-func (b *FunctionBuilder) checkAndCreatDefaultMember(res checkMemberResult, object, key Value) Value {
+func (b *FunctionBuilder) checkAndCreateDefaultMember(res checkMemberResult, object, key Value) {
 	// 	recoverScope := b.SetCurrent(object, true)
 	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
-		return ret
+		return
 	}
 
-	// need default member
-	return b.createDefaultMember(res, object, key, false)
+	currentScope := b.CurrentBlock.ScopeTable
+	objectScope := object.GetBlock().ScopeTable
+	// is sub-scope and not same, just child scope
+	if currentScope.IsSameOrSubScope(objectScope) && !currentScope.Compare(objectScope) {
+		b.createDefaultMember(res, object, key, false)
+	}
 }

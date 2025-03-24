@@ -221,7 +221,9 @@ func (c *Blueprint) storeField(name string, val Value, _type BlueprintFieldKind)
 	createVariable := func(builder *FunctionBuilder, variable *Variable) {
 		builder.AssignVariable(variable, val)
 	}
-	builder := c._container.GetFunc().builder
+
+	container := c._container
+	builder := container.GetFunc().builder
 	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(name)))
 }
 

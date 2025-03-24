@@ -208,7 +208,7 @@ class MyClass {
 }
 `
 		ssatest.CheckSyntaxFlow(t, code, `*myStaticMethod as $fun`, map[string][]string{
-			"fun": {"Function-MyClass.myStaticMethod", "Undefined-MyClass.myStaticMethod(valid)"},
+			"fun": {"Function-MyClass.myStaticMethod"},
 		}, ssaapi.WithLanguage(consts.PHP))
 	})
 }
@@ -416,7 +416,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Function-A(Undefined-A,1)) member[side-effect(Parameter-$num, $this.num)]",
+			"Undefined-$a.getNum(valid)(Function-A.A(Undefined-A,1)) member[side-effect(Parameter-$num, $this.num)]",
 		}, t)
 	})
 }
