@@ -2,9 +2,10 @@ package aid
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -246,7 +247,10 @@ func (r *Config) EmitSystemPrompt(step string, prompt string) {
 }
 
 func (r *Config) emitExStreamEvent(nodeId string, isSystem, isReason bool, reader io.Reader) {
+	r.streamWaitGroup.Add(1)
 	go func() {
+		defer r.streamWaitGroup.Done()
+
 		io.Copy(&eventWriteProducer{
 			coordinatorId: r.id,
 			nodeId:        nodeId,
@@ -256,6 +260,10 @@ func (r *Config) emitExStreamEvent(nodeId string, isSystem, isReason bool, reade
 		}, reader)
 	}()
 	return
+}
+
+func (r *Config) WaitForStream() {
+	r.streamWaitGroup.Wait()
 }
 
 type InputEvent struct {
