@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -35,6 +36,7 @@ func SaveTypeToDB(typ Type, progName string) int {
 			parentBlueprintIds = append(parentBlueprintIds, SaveTypeToDB(blueprint, progName))
 		}
 		param["parentBlueprints"] = parentBlueprintIds
+		param["container"] = t.Container().GetId()
 	default:
 		param["fullTypeName"] = t.GetFullTypeNames()
 	}
@@ -47,9 +49,9 @@ func SaveTypeToDB(typ Type, progName string) int {
 }
 
 func GetTypeFromDB(id int) Type {
-
 	kind, str, extra, err := ssadb.GetType(id)
 	if err != nil {
+		log.Errorf("GetTypeFromDB: %v: id: %v", err, id)
 		return nil
 	}
 
@@ -114,6 +116,12 @@ func GetTypeFromDB(id int) Type {
 				if isBlueprint {
 					typ.ParentBlueprints = append(typ.ParentBlueprints, blueprint)
 				}
+			}
+		}
+		containerId := utils.MapGetInt64Or(params, "container", -1)
+		if containerId != -1 {
+			if container, err := NewInstructionFromLazy(containerId, ToMake); err == nil {
+				typ.InitializeWithContainer(container)
 			}
 		}
 		return typ
