@@ -130,12 +130,12 @@ func (r *Config) EmitRequirePermission(title string, description ...string) {
 	r.emitJson(EVENT_TYPE_PERMISSION_REQUIRE, "permission", reqs)
 }
 
-func (r *Config) EmitRequireReview(id string, extraSelectors ...string) {
+func (r *Config) EmitRequireReview(id string, extraSelectors ...*ReviewSuggestion) {
 	reqs := map[string]any{
 		"id":        id,
-		"selectors": extraSelectors,
+		"selectors": append(TaskReviewSuggestions, extraSelectors...),
 	}
-	r.emitJson(EVENT_TYPE_REVIEW_REQUIRE, "permission", reqs)
+	r.emitJson(EVENT_TYPE_REVIEW_REQUIRE, "review-require", reqs)
 }
 
 func (r *Config) emitLogWithLevel(level, name, fmtlog string, items ...any) {
