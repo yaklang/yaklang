@@ -39,6 +39,9 @@ type Config struct {
 	tools          []*aitool.Tool
 	eventHandler   func(e *Event)
 
+	// stream waitgroup
+	streamWaitGroup *sync.WaitGroup
+
 	debugPrompt bool
 	debugEvent  bool
 }
@@ -79,9 +82,10 @@ func (c *Config) emit(e *Event) {
 func newConfig(ctx context.Context) *Config {
 	id := uuid.New()
 	c := &Config{
-		m:   new(sync.Mutex),
-		id:  id.String(),
-		epm: newEndpointManagerContext(ctx),
+		m:               new(sync.Mutex),
+		id:              id.String(),
+		epm:             newEndpointManagerContext(ctx),
+		streamWaitGroup: new(sync.WaitGroup),
 	}
 	go func() {
 		log.Infof("config %s started, start to handle receiving loop", c.id)
