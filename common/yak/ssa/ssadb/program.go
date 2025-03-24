@@ -100,15 +100,6 @@ func GetDBInProgram(program string) *gorm.DB {
 	return GetDB().Where("program_name = ?", program)
 }
 
-func DeleteProgram(db *gorm.DB, program string) {
-	db.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
-	deleteProgramCodeOnly(db, program)
-}
-
-func DeleteProgramCode(db *gorm.DB, program string) {
-	deleteProgramCodeOnly(db, program)
-}
-
 func AllProgramNames(db *gorm.DB) []string {
 	var programs []string
 	db.Model(&IrProgram{}).Select("DISTINCT(program_name)").Pluck("program_name", &programs)
