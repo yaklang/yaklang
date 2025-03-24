@@ -39,7 +39,7 @@ func ParseProject(opts ...Option) (Programs, error) {
 func (c *config) parseProject() (Programs, error) {
 	if c.reCompile {
 		c.Processf(0, "recompile project, delete old data...")
-		ssadb.DeleteProgramCode(ssadb.GetDB(), c.ProgramName)
+		ssadb.DeleteProgramIrCode(ssadb.GetDB(), c.ProgramName)
 		c.Processf(0, "recompile project, delete old data finish")
 	}
 	if c.databasePath != "" {
