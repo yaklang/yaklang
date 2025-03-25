@@ -93,7 +93,7 @@ class test{
 }
 `
 		ssatest.CheckSyntaxFlow(t, code, `test() as $output`, map[string][]string{
-			"output": {"Function-test(Undefined-test)"},
+			"output": {"Function-test.test(Undefined-test)"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 	t.Run("no constructor", func(t *testing.T) {

@@ -203,7 +203,7 @@ func (t *T) List() int {
     		T_List as $b
 	`,
 			map[string][]string{
-				"a": {"Function-List"},
+				"a": {"Function-T.T"},
 			},
 			ssaapi.WithLanguage(ssaapi.GO),
 		)

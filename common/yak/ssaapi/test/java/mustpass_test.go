@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
@@ -141,7 +140,7 @@ $entryFunc(*?{opcode: param && !have: this} as $source);
 			filesys.NewEmbedFS(sourceCodeSample),
 			ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY),
 			ssaapi.WithLanguage(ssaapi.JAVA),
-			ssaapi.WithCacheTTL(500*time.Millisecond), //	trigger  cache save/refresh/load
+			// ssaapi.WithCacheTTL(500*time.Millisecond), //	trigger  cache save/refresh/load
 		)
 		if err != nil {
 			t.Fatalf("compile failed: %v", err)
@@ -155,4 +154,54 @@ $entryFunc(*?{opcode: param && !have: this} as $source);
 		check(t, prog)
 	})
 
+}
+
+func TestAnnontation_SimpleCode(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("sample/groovy_eval.java", `
+package org.vuln.javasec.controller.basevul.rce;
+import groovy.lang.GroovyShell;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+@Controller
+@RequestMapping("/home/rce")
+public class GroovyExecIF {
+
+    @GetMapping("/groovy")
+    public String groovyExec(String cmd, Model model) {
+        GroovyShell shell = new GroovyShell();
+        try {
+            shell.evaluate(cmd);
+            model.addAttribute("results", "执行成功！！！");
+        } catch (Exception e) {
+            e.printStackTrace();
+            model.addAttribute("results", e.toString());
+        }
+        return "basevul/rce/groovy";
+    }
+}
+	`)
+
+	vf.AddFile("sample/annotation.java", `
+package com.vuln.controller;
+
+public class DemoABCEntryClass {
+    @RequestMapping(value = "/one")
+    public String methodEntry(@RequestParam(value = "xml_str") String xmlStr) throws Exception {
+        return "Hello World" + xmlStr;
+    }
+}
+`)
+
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+*Mapping.__ref__ as $Mapping 
+$Mapping?{opcode: function} as $entryFunc;
+	`, map[string][]string{
+		"entryFunc": {"Function-DemoABCEntryClass.methodEntry", "Function-GroovyExecIF.groovyExec"},
+	}, false,
+		ssaapi.WithLanguage(ssaapi.JAVA),
+	)
 }
