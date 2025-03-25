@@ -59,7 +59,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 			}, nil
 		}
 		f.log("error occurred but port is open: %v", err)
-		return &MatchResult{
+		fastResult := &MatchResult{
 			Target: host,
 			Port:   port,
 			State:  OPEN,
@@ -70,12 +70,14 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 				CheckedTLS:        tlsChecked,
 				TLSInspectResults: inspectResults,
 			},
-		}, nil
+		}
+		f.reportOpen(fastResult)
+		return fastResult, nil
 	}
 	if redirectInfos == nil {
 		f.log("no redirect info found")
 		// 设置初始化匹配结果
-		return &MatchResult{
+		fastResult := &MatchResult{
 			Target: host,
 			Port:   port,
 			State:  OPEN,
@@ -85,7 +87,9 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 				CheckedTLS:        tlsChecked,
 				TLSInspectResults: inspectResults,
 			},
-		}, nil
+		}
+		f.reportOpen(fastResult)
+		return fastResult, nil
 	}
 
 	// 如果强制启用 Web 指纹检测，则需要 Bypass 指纹检测条件
@@ -109,6 +113,9 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 
 	f.log("finished to check iotdevfp: %v fetch response[%v]", utils2.HostPort(ip.String(), port), len(redirectInfos))
 	result.State = OPEN
+	// notify via callback
+	f.reportOpen(result)
+
 	result.Fingerprint.ServiceName = "http"
 	if len(redirectInfos) > 1 {
 		redirectInfos = append([]*lowhttp.RedirectFlow{utils2.GetLastElement(redirectInfos)}, redirectInfos[1:]...)

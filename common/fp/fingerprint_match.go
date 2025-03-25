@@ -3,6 +3,7 @@ package fp
 import (
 	"context"
 	"net"
+	"sync"
 
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
@@ -21,6 +22,36 @@ func (f *Matcher) log(fmtlog string, items ...any) {
 		log.Infof("service-matcher-debug: "+fmtlog, items...)
 	} else {
 		log.Info("service-matcher-debug: " + fmtlog)
+	}
+}
+
+var (
+	reportOpenMutex = new(sync.Mutex)
+)
+
+func (m *Matcher) reportFinished(port *MatchResult) {
+	if m.Config.OnFinishedCallback != nil {
+		m.Config.OnFinishedCallback(port)
+	}
+}
+
+func (m *Matcher) reportOpen(port *MatchResult) {
+	reportOpenMutex.Lock()
+	defer reportOpenMutex.Unlock()
+
+	if m.Config.OpenPortSyncMap == nil {
+		m.Config.OpenPortSyncMap = new(sync.Map)
+	}
+	idt := port.Identifier()
+
+	_, ok := m.Config.OpenPortSyncMap.Load(idt)
+	if !ok {
+		m.Config.OpenPortSyncMap.Store(idt, struct{}{})
+		if utils2.IsNil(m.Config.OnPortOpenCallback) || m.Config.OnPortOpenCallback == nil {
+			log.Infof("fast: %v", port.String())
+			return
+		}
+		m.Config.OnPortOpenCallback(port)
 	}
 }
 

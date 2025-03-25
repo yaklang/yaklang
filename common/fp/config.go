@@ -93,6 +93,10 @@ type Config struct {
 
 	DebugLog bool
 
+	OpenPortSyncMap    *sync.Map
+	OnPortOpenCallback func(*MatchResult)
+	OnFinishedCallback func(*MatchResult)
+
 	// ctx
 	Ctx context.Context
 
@@ -162,6 +166,20 @@ func WithDebugLog(b ...bool) ConfigOption {
 func WithCache(b bool) ConfigOption {
 	return func(config *Config) {
 		config.EnableCache = b
+	}
+}
+
+// onOpen servicescan 的配置选项，设置本次扫描端口开放时的回调函数
+// @param {func(*MatchResult)} cb 回调函数
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err := servicescan.Scan("127.0.0.1", "22,80,443", servicescan.onOpen(result => println(result.String())))
+// for i in result { println(result.String()) }
+// ```
+func WithOnPortOpenCallback(cb func(*MatchResult)) ConfigOption {
+	return func(config *Config) {
+		config.OnPortOpenCallback = cb
 	}
 }
 
