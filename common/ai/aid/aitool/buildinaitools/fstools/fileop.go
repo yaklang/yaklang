@@ -91,6 +91,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			if err != nil {
 				return nil, err
 			}
+			defer f.Close()
 
 			// use seek
 			if seeker, ok := f.(interface {
