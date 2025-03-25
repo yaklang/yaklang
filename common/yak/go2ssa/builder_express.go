@@ -14,29 +14,43 @@ type getSingleExpr interface {
 	Expression(i int) gol.IExpressionContext
 }
 
-func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) (ssa.Value, *ssa.Variable) {
+func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	getValue := func(single getSingleExpr, i int) ssa.Value {
 		if s := single.Expression(i); s != nil {
-			rightv, _ := b.buildExpression(s.(*gol.ExpressionContext), IslValue)
+			rightv, _ := b.buildExpression(s.(*gol.ExpressionContext), false)
 			return rightv
 		} else {
 			b.NewError(ssa.Error, TAG, "can't get expression")
 			return b.EmitConstInst(0)
 		}
 	}
+	getVariable := func(single getSingleExpr, i int) *ssa.Variable {
+		if s := single.Expression(i); s != nil {
+			_, leftv := b.buildExpression(s.(*gol.ExpressionContext), true)
+			return leftv
+		} else {
+			b.NewError(ssa.Error, TAG, "can't get expression")
+			return b.CreateVariable("")
+		}
+	}
 
 	// fmt.Printf("exp = %v\n", exp.GetText())
 
 	if ret := exp.PrimaryExpr(); ret != nil {
-		return b.buildPrimaryExpression(ret.(*gol.PrimaryExprContext), IslValue)
+		return b.buildPrimaryExpression(ret.(*gol.PrimaryExprContext), islValue)
 	}
 
-	if !IslValue { // right
+	if !islValue { // right
 		if op := exp.GetUnary_op(); op != nil {
 			var ssaop ssa.UnaryOpcode
+			op1 := getValue(exp, 0)
+			if op1 == nil {
+				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+				return b.EmitConstInst(0), b.CreateVariable("")
+			}
 
 			switch op.GetText() {
 			case "+":
@@ -50,14 +64,17 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 			case "<-":
 				ssaop = ssa.OpChan
 			case "*":
-				ssaop = ""
+				if op1.GetType().GetTypeKind() == ssa.PointerKind {
+					return b.GetOriginPointer(op1).GetValue(), nil
+				}
 			case "&":
-				ssaop = ""
+				if op1Var := getVariable(exp, 0); op1Var != nil {
+					return b.EmitConstPointer(op1Var), nil
+				}
 			default:
 				b.NewError(ssa.Error, TAG, UnaryOperatorNotSupport(op.GetText()))
 			}
 
-			op1 := getValue(exp, 0)
 			if op1 == nil {
 				b.NewError(ssa.Error, TAG, NeedTwoExpression())
 				return b.EmitConstInst(0), b.CreateVariable("")
@@ -162,7 +179,19 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 			return b.EmitBinOp(ssaop, op1, op2), nil
 		}
 	} else { // left
-
+		if op := exp.GetUnary_op(); op != nil {
+			op1 := getValue(exp, 0)
+			if op1 == nil {
+				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+				return b.EmitConstInst(0), b.CreateVariable("")
+			}
+			switch op.GetText() {
+			case "*":
+				if op1.GetType().GetTypeKind() == ssa.PointerKind {
+					return nil, b.GetOriginPointer(op1)
+				}
+			}
+		}
 	}
 
 	return b.EmitConstInst(0), b.CreateVariable("")
@@ -199,7 +228,15 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			text := id.GetText()
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
-				if key := typ.GetKeybyName(text); key != nil {
+				if typ.GetTypeKind() == ssa.PointerKind {
+					rv = b.GetOriginPointer(rv).GetValue()
+					if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
+						handleObjectType(rv, typ)
+					}
+					return
+				}
+
+				if key := typ.GetKeybyName(test); key != nil {
 					leftv = b.CreateMemberCallVariable(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {
@@ -258,8 +295,16 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
-				if key := typ.GetKeybyName(text); key != nil {
-					rightv = readMemberCall(rv, key)
+				if typ.GetTypeKind() == ssa.PointerKind {
+					rv = b.GetOriginPointer(rv).GetValue()
+					if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
+						handleObjectType(rv, typ)
+					}
+					return
+				}
+
+				if key := typ.GetKeybyName(test); key != nil {
+					rightv = b.ReadMemberCallValue(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {
 						/*
