@@ -474,6 +474,9 @@ var FingerprintScanExports = map[string]interface{}{
 	// 主动发包模式下，并发量？
 	"maxProbesConcurrent": fp.WithProbesConcurrentMax,
 
+	// 是否使用 debugLog
+	"debugLog": fp.WithDebugLog,
+
 	// 指定选择扫描目标协议：指开启 web 服务扫描
 	"web": _webOption,
 

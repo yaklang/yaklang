@@ -131,6 +131,8 @@ func (m *MatchResult) Merge(f *MatchResult) {
 			}
 		}
 	}
+	m.Fingerprint.TLSInspectResults = append(m.Fingerprint.TLSInspectResults, f.Fingerprint.TLSInspectResults...)
+	m.Fingerprint.CheckedTLS = m.Fingerprint.CheckedTLS || f.Fingerprint.CheckedTLS
 }
 
 func (m *MatchResult) HaveDialFailed() bool {

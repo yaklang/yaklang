@@ -91,6 +91,8 @@ type Config struct {
 	// Runtime id
 	RuntimeId string
 
+	DebugLog bool
+
 	// ctx
 	Ctx context.Context
 
@@ -119,6 +121,29 @@ func (c *Config) IsFiltered(host string, port int) bool {
 		}
 	}
 	return false
+}
+
+// debugLog 的配置选项，设置本次扫描是否使用 debugLog
+// @param {bool} b 是否使用 debugLog
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.debugLog(true))
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
+func WithDebugLog(b ...bool) ConfigOption {
+	return func(config *Config) {
+		if len(b) > 0 {
+			config.DebugLog = b[0]
+		} else {
+			config.DebugLog = true
+		}
+	}
 }
 
 // cache servicescan 的配置选项，设置本次扫描是否使用缓存
