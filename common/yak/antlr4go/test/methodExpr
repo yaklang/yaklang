@@ -1,0 +1,15 @@
+package test
+
+type T struct {
+	n *int
+}
+
+func (t *T) M() {
+
+}
+
+func main() {
+	a := 1
+	o1 := T{n: &a}
+	*o1.n = 2
+}
