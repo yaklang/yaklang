@@ -343,6 +343,8 @@ func NewIterator(ctx context.Context, i interface{}) (IteratorInterface, error) 
 		return newSetIterator(iter.Set), nil
 	case *list.List:
 		return newLinkedListIterator(iter), nil
+	case *container.LinkedList:
+		return newLinkedListIterator(iter.List), nil
 	}
 
 	kind := reflect.TypeOf(i).Kind()
