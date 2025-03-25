@@ -663,7 +663,7 @@ func (t *SwitchBuilder) Finish() {
 	addToBlocks(defaultb)
 	condb.AddSucc(defaultb)
 	switchBuilder.BuildBody(func(svt ssautil.ScopedVersionedTableIF[Value]) (ssautil.ScopedVersionedTableIF[Value], ssautil.ScopedVersionedTableIF[Value]) {
-		builder.CurrentBlock.SetScope(svt)
+		//builder.CurrentBlock.SetScope(svt)
 		body := svt.CreateSubScope()
 		builder.CurrentBlock.SetScope(body)
 		if t.buildDefault != nil {
