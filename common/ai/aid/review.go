@@ -68,8 +68,8 @@ func (t *aiTask) handleReviewResult(ctx *taskContext, param aitool.InvokeParams)
 		//TODO: 深度思考
 		t.config.EmitInfo("deeply think")
 	case "inaccurate":
-		//TODO: 回答不准确, 需要重新执行任务
 		t.config.EmitInfo("inaccurate")
+		t.rerun = true
 	case "continue":
 		t.config.EmitInfo("continue")
 	case "end":
