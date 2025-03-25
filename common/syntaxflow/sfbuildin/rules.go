@@ -2,27 +2,43 @@ package sfbuildin
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 //go:embed buildin/***
 var ruleFS embed.FS
 
-func SyncEmbedRule() error {
+func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err error) {
 	// log.Infof("start sync embed rule")
 	sfdb.DeleteBuildInRule()
 
+	var notify func(process float64, ruleName string)
+	if len(notifies) != 0 {
+		notify = notifies[0]
+		defer notify(1, "更新SyntaxFlow内置规则成功！")
+	}
 	fsInstance := filesys.NewEmbedFS(ruleFS)
-	err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+
+	var (
+		handledCount float64
+		totalCount   float64
+	)
+	filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+		if strings.HasSuffix(info.Name(), ".sf") {
+			totalCount++
+		}
+		return nil
+	}))
+
+	err = filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		dirName, name := fsInstance.PathSplit(s)
 		if !strings.HasSuffix(name, ".sf") {
 			return nil
@@ -64,21 +80,26 @@ func SyncEmbedRule() error {
 			log.Warnf("import rule %s error: %s", name, err)
 			return err
 		}
+		handledCount++
+		if notify != nil {
+			notify(handledCount/totalCount, fmt.Sprintf("更新内置SyntaxFlow规则:%s ", info.Name()))
+		}
 		return nil
 	}))
 	return utils.Wrapf(err, "init builtin rules error")
 }
-func init() {
-	yakit.RegisterPostInitDatabaseFunction(func() error {
-		if yakit.Get(consts.EmbedSfBuildInRuleKey) == consts.ExistedSyntaxFlowEmbedFSHash {
-			// log.Infof("already sync embed rule")
-			return nil
-		}
-		defer yakit.Set(consts.EmbedSfBuildInRuleKey, consts.ExistedSyntaxFlowEmbedFSHash)
-		return SyncEmbedRule()
-	})
 
-}
+//func init() {
+//	yakit.RegisterPostInitDatabaseFunction(func() error {
+//		if yakit.Get(consts.EmbedSfBuildInRuleKey) == consts.ExistedSyntaxFlowEmbedFSHash {
+//			// log.Infof("already sync embed rule")
+//			return nil
+//		}
+//		defer yakit.Set(consts.EmbedSfBuildInRuleKey, consts.ExistedSyntaxFlowEmbedFSHash)
+//		return SyncEmbedRule()
+//	})
+//
+//}
 
 func SyntaxFlowRuleHash() (string, error) {
 	return filesys.CreateEmbedFSHash(ruleFS)

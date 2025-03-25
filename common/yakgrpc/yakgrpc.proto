@@ -740,6 +740,8 @@ service Yak {
   rpc UpdateSyntaxFlowRule(UpdateSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc UpdateSyntaxFlowRuleEx(UpdateSyntaxFlowRuleRequest) returns (UpdateSyntaxFlowRuleResponse);
   rpc DeleteSyntaxFlowRule(DeleteSyntaxFlowRuleRequest) returns (DbOperateMessage);
+  rpc QuerySFBuildInRuleUpdate(QuerySFBuildInRuleUpdateRequest) returns (QuerySFBuildInRuleUpdateResponse);
+  rpc UpdateSFBuildInRule(UpdateSFBuildInRuleRequest) returns (stream UpdateSFBuildInRuleResponse);
   // SyntaxFlow Group
   rpc QuerySyntaxFlowRuleGroup(QuerySyntaxFlowRuleGroupRequest)returns (QuerySyntaxFlowRuleGroupResponse);
   rpc DeleteSyntaxFlowRuleGroup(DeleteSyntaxFlowRuleGroupRequest) returns (DbOperateMessage);
@@ -5930,6 +5932,19 @@ message QuerySyntaxFlowRuleResponse{
 
 message DeleteSyntaxFlowRuleRequest{
   SyntaxFlowRuleFilter Filter = 1;
+}
+
+message QuerySFBuildInRuleUpdateRequest{}
+
+message  QuerySFBuildInRuleUpdateResponse{
+  bool NeedUpdate = 1;
+}
+
+message UpdateSFBuildInRuleRequest{}
+
+message UpdateSFBuildInRuleResponse{
+  double Percent = 1;
+  string Message = 2;
 }
 
 message SyntaxFlowRuleGroupFilter {
