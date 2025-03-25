@@ -114,9 +114,16 @@ func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
 	}()
 
 	if len(task.Subtasks) > 0 {
-		for idxRaw, subtask := range task.Subtasks {
-			idx := idxRaw + 1
-			err := r.invokeSubtask(idx, subtask)
+		// why not use for-range but use while-loop?
+		// because subsequent subtasks may be changed during the execution
+		currentID := -1
+		for {
+			currentID++
+			if currentID >= len(task.Subtasks) {
+				break
+			}
+			subtask := task.Subtasks[currentID]
+			err := r.invokeSubtask(idx+currentID+1, subtask)
 			if err != nil {
 				r.config.EmitError("invoke subtask failed: %v", err)
 				// invoke subtask failed
