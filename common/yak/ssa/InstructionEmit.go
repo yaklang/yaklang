@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -377,6 +379,34 @@ func (f *FunctionBuilder) EmitValueOnlyDeclare(name string) *Undefined {
 
 func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 	return f.EmitConstInst(nil)
+}
+
+func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
+	pointer := f.InterfaceAddFieldBuild(1, func(int) Value {
+		return f.EmitConstInst("@pointer")
+	}, func(int) Value {
+		return f.EmitConstInst(o.GetName())
+	})
+
+	t := NewObjectType()
+	t.SetName("Pointer")
+	t.SetTypeKind(PointerKind)
+	pointer.SetType(t)
+
+	return pointer
+}
+
+func (f *FunctionBuilder) GetOriginPointer(p Value) *Variable {
+	o := f.CreateMemberCallVariable(p, f.EmitConstInst("@pointer"), true)
+	if o.GetValue() != nil {
+		n := strings.TrimPrefix(o.GetValue().String(), "&")
+		if ret := ReadVariableFromScopeAndParent(o.GetScope(), n); ret != nil {
+			return ret
+		}
+
+	}
+
+	return o
 }
 
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {

@@ -3,9 +3,10 @@ package ssa
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"reflect"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
