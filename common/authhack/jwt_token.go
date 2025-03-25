@@ -2,6 +2,8 @@ package authhack
 
 import (
 	"encoding/json"
+	"github.com/samber/lo"
+	"slices"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -34,8 +36,10 @@ func NewTokenFromJwtToken(old *jwt.Token) *Token {
 			json.Unmarshal(headerBytes, &token.Header) // ignore error
 		}
 	} else {
-		for k, v := range old.Header {
-			token.Header.Set(k, v)
+		keys := lo.Keys(old.Header)
+		slices.Sort(keys)
+		for _, k := range keys {
+			token.Header.Set(k, old.Header[k])
 		}
 	}
 
