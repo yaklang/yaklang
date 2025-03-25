@@ -198,8 +198,8 @@ func goparserParserInit() {
 		75, 10, 75, 12, 75, 1045, 9, 75, 5, 75, 1047, 8, 75, 10, 75, 12, 75, 1050,
 		9, 75, 1, 75, 3, 75, 1053, 8, 75, 3, 75, 1055, 8, 75, 1, 75, 5, 75, 1058,
 		8, 75, 10, 75, 12, 75, 1061, 9, 75, 1, 75, 1, 75, 1, 76, 3, 76, 1066, 8,
-		76, 1, 76, 3, 76, 1069, 8, 76, 1, 76, 1, 76, 1, 77, 1, 77, 1, 77, 1, 77,
-		5, 77, 1077, 8, 77, 10, 77, 12, 77, 1080, 9, 77, 1, 77, 3, 77, 1083, 8,
+		76, 1, 76, 3, 76, 1069, 8, 76, 1, 76, 1, 76, 1, 77, 1, 77, 1, 77, 5, 77,
+		1076, 8, 77, 10, 77, 12, 77, 1079, 9, 77, 1, 77, 1, 77, 3, 77, 1083, 8,
 		77, 1, 77, 1, 77, 1, 77, 5, 77, 1088, 8, 77, 10, 77, 12, 77, 1091, 9, 77,
 		1, 77, 1, 77, 1, 77, 1, 77, 5, 77, 1097, 8, 77, 10, 77, 12, 77, 1100, 9,
 		77, 1, 77, 1, 77, 1, 77, 1, 77, 5, 77, 1106, 8, 77, 10, 77, 12, 77, 1109,
@@ -604,29 +604,29 @@ func goparserParserInit() {
 		0, 1064, 1066, 3, 18, 9, 0, 1065, 1064, 1, 0, 0, 0, 1065, 1066, 1, 0, 0,
 		0, 1066, 1068, 1, 0, 0, 0, 1067, 1069, 5, 42, 0, 0, 1068, 1067, 1, 0, 0,
 		0, 1068, 1069, 1, 0, 0, 0, 1069, 1070, 1, 0, 0, 0, 1070, 1071, 3, 118,
-		59, 0, 1071, 153, 1, 0, 0, 0, 1072, 1073, 6, 77, -1, 0, 1073, 1083, 3,
-		156, 78, 0, 1074, 1078, 7, 3, 0, 0, 1075, 1077, 3, 208, 104, 0, 1076, 1075,
-		1, 0, 0, 0, 1077, 1080, 1, 0, 0, 0, 1078, 1076, 1, 0, 0, 0, 1078, 1079,
-		1, 0, 0, 0, 1079, 1081, 1, 0, 0, 0, 1080, 1078, 1, 0, 0, 0, 1081, 1083,
-		3, 154, 77, 6, 1082, 1072, 1, 0, 0, 0, 1082, 1074, 1, 0, 0, 0, 1083, 1131,
-		1, 0, 0, 0, 1084, 1085, 10, 5, 0, 0, 1085, 1089, 7, 4, 0, 0, 1086, 1088,
+		59, 0, 1071, 153, 1, 0, 0, 0, 1072, 1073, 6, 77, -1, 0, 1073, 1077, 7,
+		3, 0, 0, 1074, 1076, 3, 208, 104, 0, 1075, 1074, 1, 0, 0, 0, 1076, 1079,
+		1, 0, 0, 0, 1077, 1075, 1, 0, 0, 0, 1077, 1078, 1, 0, 0, 0, 1078, 1080,
+		1, 0, 0, 0, 1079, 1077, 1, 0, 0, 0, 1080, 1083, 3, 154, 77, 7, 1081, 1083,
+		3, 156, 78, 0, 1082, 1072, 1, 0, 0, 0, 1082, 1081, 1, 0, 0, 0, 1083, 1131,
+		1, 0, 0, 0, 1084, 1085, 10, 6, 0, 0, 1085, 1089, 7, 4, 0, 0, 1086, 1088,
 		3, 208, 104, 0, 1087, 1086, 1, 0, 0, 0, 1088, 1091, 1, 0, 0, 0, 1089, 1087,
 		1, 0, 0, 0, 1089, 1090, 1, 0, 0, 0, 1090, 1092, 1, 0, 0, 0, 1091, 1089,
-		1, 0, 0, 0, 1092, 1130, 3, 154, 77, 6, 1093, 1094, 10, 4, 0, 0, 1094, 1098,
+		1, 0, 0, 0, 1092, 1130, 3, 154, 77, 7, 1093, 1094, 10, 5, 0, 0, 1094, 1098,
 		7, 5, 0, 0, 1095, 1097, 3, 208, 104, 0, 1096, 1095, 1, 0, 0, 0, 1097, 1100,
 		1, 0, 0, 0, 1098, 1096, 1, 0, 0, 0, 1098, 1099, 1, 0, 0, 0, 1099, 1101,
-		1, 0, 0, 0, 1100, 1098, 1, 0, 0, 0, 1101, 1130, 3, 154, 77, 5, 1102, 1103,
-		10, 3, 0, 0, 1103, 1107, 7, 6, 0, 0, 1104, 1106, 3, 208, 104, 0, 1105,
+		1, 0, 0, 0, 1100, 1098, 1, 0, 0, 0, 1101, 1130, 3, 154, 77, 6, 1102, 1103,
+		10, 4, 0, 0, 1103, 1107, 7, 6, 0, 0, 1104, 1106, 3, 208, 104, 0, 1105,
 		1104, 1, 0, 0, 0, 1106, 1109, 1, 0, 0, 0, 1107, 1105, 1, 0, 0, 0, 1107,
 		1108, 1, 0, 0, 0, 1108, 1110, 1, 0, 0, 0, 1109, 1107, 1, 0, 0, 0, 1110,
-		1130, 3, 154, 77, 4, 1111, 1112, 10, 2, 0, 0, 1112, 1116, 5, 44, 0, 0,
+		1130, 3, 154, 77, 5, 1111, 1112, 10, 3, 0, 0, 1112, 1116, 5, 44, 0, 0,
 		1113, 1115, 3, 208, 104, 0, 1114, 1113, 1, 0, 0, 0, 1115, 1118, 1, 0, 0,
 		0, 1116, 1114, 1, 0, 0, 0, 1116, 1117, 1, 0, 0, 0, 1117, 1119, 1, 0, 0,
-		0, 1118, 1116, 1, 0, 0, 0, 1119, 1130, 3, 154, 77, 3, 1120, 1121, 10, 1,
+		0, 1118, 1116, 1, 0, 0, 0, 1119, 1130, 3, 154, 77, 4, 1120, 1121, 10, 2,
 		0, 0, 1121, 1125, 5, 43, 0, 0, 1122, 1124, 3, 208, 104, 0, 1123, 1122,
 		1, 0, 0, 0, 1124, 1127, 1, 0, 0, 0, 1125, 1123, 1, 0, 0, 0, 1125, 1126,
 		1, 0, 0, 0, 1126, 1128, 1, 0, 0, 0, 1127, 1125, 1, 0, 0, 0, 1128, 1130,
-		3, 154, 77, 2, 1129, 1084, 1, 0, 0, 0, 1129, 1093, 1, 0, 0, 0, 1129, 1102,
+		3, 154, 77, 3, 1129, 1084, 1, 0, 0, 0, 1129, 1093, 1, 0, 0, 0, 1129, 1102,
 		1, 0, 0, 0, 1129, 1111, 1, 0, 0, 0, 1129, 1120, 1, 0, 0, 0, 1130, 1133,
 		1, 0, 0, 0, 1131, 1129, 1, 0, 0, 0, 1131, 1132, 1, 0, 0, 0, 1132, 155,
 		1, 0, 0, 0, 1133, 1131, 1, 0, 0, 0, 1134, 1135, 6, 78, -1, 0, 1135, 1139,
@@ -751,7 +751,7 @@ func goparserParserInit() {
 		826, 831, 834, 842, 848, 852, 854, 859, 862, 865, 868, 871, 879, 889, 894,
 		898, 902, 907, 913, 923, 942, 947, 952, 957, 963, 983, 993, 1000, 1004,
 		1010, 1016, 1023, 1029, 1036, 1043, 1048, 1052, 1054, 1059, 1065, 1068,
-		1078, 1082, 1089, 1098, 1107, 1116, 1125, 1129, 1131, 1138, 1145, 1150,
+		1077, 1082, 1089, 1098, 1107, 1116, 1125, 1129, 1131, 1138, 1145, 1150,
 		1156, 1160, 1167, 1174, 1180, 1185, 1192, 1215, 1217, 1223, 1230, 1234,
 		1236, 1241, 1251, 1257, 1264, 1271, 1274, 1280, 1287, 1294, 1301, 1306,
 		1315, 1318, 1325, 1329, 1341, 1345, 1348, 1355, 1368, 1375, 1377, 1380,
@@ -14747,22 +14747,6 @@ func (s *ExpressionContext) SetAdd_op(v antlr.Token) { s.add_op = v }
 
 func (s *ExpressionContext) SetRel_op(v antlr.Token) { s.rel_op = v }
 
-func (s *ExpressionContext) PrimaryExpr() IPrimaryExprContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IPrimaryExprContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IPrimaryExprContext)
-}
-
 func (s *ExpressionContext) AllExpression() []IExpressionContext {
 	children := s.GetChildren()
 	len := 0
@@ -14871,6 +14855,22 @@ func (s *ExpressionContext) Eos(i int) IEosContext {
 	}
 
 	return t.(IEosContext)
+}
+
+func (s *ExpressionContext) PrimaryExpr() IPrimaryExprContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IPrimaryExprContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IPrimaryExprContext)
 }
 
 func (s *ExpressionContext) DIV() antlr.TerminalNode {
@@ -14989,12 +14989,6 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 	case 1:
 		{
 			p.SetState(1073)
-			p.primaryExpr(0)
-		}
-
-	case 2:
-		{
-			p.SetState(1074)
 
 			var _lt = p.GetTokenStream().LT(1)
 
@@ -15011,23 +15005,29 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				p.Consume()
 			}
 		}
-		p.SetState(1078)
+		p.SetState(1077)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == GoParserSEMI || _la == GoParserEOS {
 			{
-				p.SetState(1075)
+				p.SetState(1074)
 				p.Eos()
 			}
 
-			p.SetState(1080)
+			p.SetState(1079)
 			p.GetErrorHandler().Sync(p)
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
+			p.SetState(1080)
+			p.expression(7)
+		}
+
+	case 2:
+		{
 			p.SetState(1081)
-			p.expression(6)
+			p.primaryExpr(0)
 		}
 
 	}
@@ -15050,8 +15050,8 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				p.PushNewRecursionContext(localctx, _startState, GoParserRULE_expression)
 				p.SetState(1084)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 5)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 6)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
 				}
 				{
 					p.SetState(1085)
@@ -15087,7 +15087,7 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				{
 					p.SetState(1092)
-					p.expression(6)
+					p.expression(7)
 				}
 
 			case 2:
@@ -15095,8 +15095,8 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				p.PushNewRecursionContext(localctx, _startState, GoParserRULE_expression)
 				p.SetState(1093)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 5)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
 				}
 				{
 					p.SetState(1094)
@@ -15132,7 +15132,7 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				{
 					p.SetState(1101)
-					p.expression(5)
+					p.expression(6)
 				}
 
 			case 3:
@@ -15140,8 +15140,8 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				p.PushNewRecursionContext(localctx, _startState, GoParserRULE_expression)
 				p.SetState(1102)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
 				}
 				{
 					p.SetState(1103)
@@ -15177,7 +15177,7 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				{
 					p.SetState(1110)
-					p.expression(4)
+					p.expression(5)
 				}
 
 			case 4:
@@ -15185,8 +15185,8 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				p.PushNewRecursionContext(localctx, _startState, GoParserRULE_expression)
 				p.SetState(1111)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 2)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
 				}
 				{
 					p.SetState(1112)
@@ -15208,7 +15208,7 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				{
 					p.SetState(1119)
-					p.expression(3)
+					p.expression(4)
 				}
 
 			case 5:
@@ -15216,8 +15216,8 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				p.PushNewRecursionContext(localctx, _startState, GoParserRULE_expression)
 				p.SetState(1120)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 1)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 2)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
 				}
 				{
 					p.SetState(1121)
@@ -15239,7 +15239,7 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				{
 					p.SetState(1128)
-					p.expression(2)
+					p.expression(3)
 				}
 
 			}
@@ -19884,19 +19884,19 @@ func (p *GoParser) Expression_Sempred(localctx antlr.RuleContext, predIndex int)
 
 	switch predIndex {
 	case 0:
-		return p.Precpred(p.GetParserRuleContext(), 5)
+		return p.Precpred(p.GetParserRuleContext(), 6)
 
 	case 1:
-		return p.Precpred(p.GetParserRuleContext(), 4)
+		return p.Precpred(p.GetParserRuleContext(), 5)
 
 	case 2:
-		return p.Precpred(p.GetParserRuleContext(), 3)
+		return p.Precpred(p.GetParserRuleContext(), 4)
 
 	case 3:
-		return p.Precpred(p.GetParserRuleContext(), 2)
+		return p.Precpred(p.GetParserRuleContext(), 3)
 
 	case 4:
-		return p.Precpred(p.GetParserRuleContext(), 1)
+		return p.Precpred(p.GetParserRuleContext(), 2)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
