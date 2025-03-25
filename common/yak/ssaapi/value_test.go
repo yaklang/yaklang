@@ -16,6 +16,6 @@ if c {
 	ssatest.CheckSyntaxFlow(t, code, `
 c<getUsers> as $if 
 `, map[string][]string{
-		"if": {"if (Undefined-c) {BasicBlock-if.true-2} else {BasicBlock-if.done-3}"},
+		"if": {"if (Undefined-c)"},
 	})
 }

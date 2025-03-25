@@ -530,6 +530,33 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		if falseBlock, ok := params["if_false"]; ok {
 			ret.False = unmarshalValue(falseBlock)
 		}
+	case *Loop:
+		ret.Body = unmarshalValue(params["loop_body"])
+		if exit, ok := params["loop_exit"]; ok {
+			ret.Exit = unmarshalValue(exit)
+		}
+		if init, ok := params["loop_init"]; ok {
+			ret.Init = unmarshalValue(init)
+		}
+		if cond, ok := params["loop_cond"]; ok {
+			ret.Cond = unmarshalValue(cond)
+		}
+		if step, ok := params["loop_step"]; ok {
+			ret.Step = unmarshalValue(step)
+		}
+		if key, ok := params["loop_key"]; ok {
+			ret.Key = unmarshalValue(key)
+		}
+	case *Switch:
+		ret.Cond = unmarshalValue(params["switch_cond"])
+		if labels, ok := params["switch_label"]; ok {
+			for _, label := range labels.([]map[string]int64) {
+				ret.Label = append(ret.Label, SwitchLabel{
+					Value: unmarshalValue(label["value"]),
+					Dest:  unmarshalValue(label["dest"]),
+				})
+			}
+		}
 	case *Make:
 		if low, ok := params["make_low"]; ok {
 			ret.low = unmarshalValue(low)
