@@ -14,9 +14,9 @@ type ReviewSuggestion struct {
 	Suggestion        string `json:"prompt"`
 	SuggestionEnglish string `json:"prompt_english"`
 
-	PromptBuilder    func(task *aiTask, rt *runtime)
-	ResponseCallback func(reader io.Reader)
-	ParamSchema      string `json:"param_schema"`
+	PromptBuilder    func(task *aiTask, rt *runtime) `json:"-"`
+	ResponseCallback func(reader io.Reader)          `json:"-"`
+	ParamSchema      string                          `json:"param_schema"`
 }
 
 /*
@@ -37,6 +37,11 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 		Value:             "inaccurate",
 		Suggestion:        "回答不够精准，存在未使用工具导致幻觉，或者工具参数不合适",
 		SuggestionEnglish: "The answer is not accurate enough, there is an illusion caused by not using the tool, or the tool parameters are not appropriate",
+	},
+	{
+		Value:             "continue",
+		Suggestion:        "继续执行任务",
+		SuggestionEnglish: "Continue to execute the task",
 	},
 	{
 		Value:             "end",
@@ -60,10 +65,15 @@ func (t *aiTask) handleReviewResult(ctx *taskContext, param aitool.InvokeParams)
 	// 2. 根据审查建议处理
 	switch suggestion {
 	case "deeply_think":
+		//TODO: 深度思考
 		t.config.EmitInfo("deeply think")
 	case "inaccurate":
+		//TODO: 回答不准确, 需要重新执行任务
 		t.config.EmitInfo("inaccurate")
+	case "continue":
+		t.config.EmitInfo("continue")
 	case "end":
+		// TODO: 删除后续任务,直接结束
 		t.config.EmitInfo("end")
 	case "adjust_plan":
 		plan := param.GetString("plan")

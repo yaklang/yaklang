@@ -203,7 +203,6 @@ TOOLREQUIRED:
 	chatDetails = append(chatDetails, aispec.NewAIChatDetail(response))
 
 	ep := t.config.epm.createEndpoint()
-	t.config.EmitRequireReview(ep.id)
 
 	t.config.EmitInfo("start to execute task-summary action")
 	// 处理总结回调
@@ -246,6 +245,7 @@ TOOLREQUIRED:
 	t.LongSummary = longSummary
 
 	// start to wait for user review
+	t.config.EmitRequireReview(ep.id)
 	t.config.EmitInfo("start to wait for user review current task")
 	if !ep.WaitTimeoutSeconds(60) {
 		t.config.EmitInfo("user review timeout, use default action: pass")
