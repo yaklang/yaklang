@@ -175,6 +175,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 		}
 		m.handledHTTPFlowCount++
 		m.notifyResult(result)
+		m.notifyHandleFlowNum()
 	}
 
 	handleColorAndTag := func(rule *MITMReplaceRule, flow *schema.HTTPFlow) {
@@ -226,7 +227,6 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 				handleColorAndTag(rule, flow)
 			}
 		}
-		m.notifyHandleFlowNum()
 	}
 	return nil
 }

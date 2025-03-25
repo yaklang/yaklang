@@ -874,7 +874,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	}
 	if len(params.GetAnalyzedIds()) > 0 {
 		var ids []int64
-		subQuery := db.Model(schema.AnalyzedHTTPFlow{})
+		subQuery := db.Model(&schema.AnalyzedHTTPFlow{})
 		subQuery = bizhelper.ExactQueryInt64ArrayOr(subQuery, "id", params.GetAnalyzedIds())
 		subQuery.Pluck("http_flow_id", &ids)
 		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
