@@ -1,6 +1,7 @@
 package netx
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"strings"
@@ -34,6 +35,10 @@ func (t TLSInspectResult) Show() {
 }
 
 func TLSInspectTimeout(addr string, seconds float64, proto ...string) ([]*TLSInspectResult, error) {
+	return TLSInspectContext(utils.TimeoutContextSeconds(seconds), addr, proto...)
+}
+
+func TLSInspectContext(ctx context.Context, addr string, proto ...string) ([]*TLSInspectResult, error) {
 	host, port, _ := utils.ParseStringToHostPort(addr)
 	if port <= 0 {
 		port = 443
@@ -42,9 +47,20 @@ func TLSInspectTimeout(addr string, seconds float64, proto ...string) ([]*TLSIns
 		host = addr
 	}
 
-	dialTimeout := 10 * time.Second
-	if seconds > 0 {
-		dialTimeout = time.Duration(seconds) * time.Second
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	dialTimeout := 5 * time.Second
+	ddl, ok := ctx.Deadline()
+	if ok {
+		dialTimeout = ddl.Sub(time.Now())
+		if dialTimeout <= 0 {
+			dialTimeout = 5 * time.Second
+		}
 	}
 
 	conn, err := DialTCPTimeout(dialTimeout, utils.HostPort(host, port))
@@ -57,6 +73,12 @@ func TLSInspectTimeout(addr string, seconds float64, proto ...string) ([]*TLSIns
 	tlsConfig := &tls.Config{
 		ServerName: host,
 		VerifyConnection: func(state tls.ConnectionState) error {
+			defer func() {
+				cancel()
+				if r := recover(); r != nil {
+					log.Errorf("TLSInspect: VerifyConnection panic: %v", r)
+				}
+			}()
 			for _, cert := range state.PeerCertificates {
 				if cert == nil {
 					continue
@@ -129,7 +151,7 @@ func TLSInspectTimeout(addr string, seconds float64, proto ...string) ([]*TLSIns
 	if len(proto) > 0 {
 		tlsConfig.NextProtos = proto
 	}
-	err = tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
+	err = tlsConn.HandshakeContext(ctx)
 	if err != nil {
 		log.Debugf("TLSInspect: handshake error: %s", err)
 	}
