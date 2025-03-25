@@ -410,11 +410,11 @@ func TestErrorMemberCall(t *testing.T) {
 			a.$Key
 			`,
 			Want: []string{
-				ssa4analyze.InvalidField("number", "F"),
-				ssa4analyze.InvalidField("number", "B"),
-				ssa4analyze.InvalidField("() -> number", "B"),
-				ssa4analyze.InvalidField("number", "B"),
-				// ssa4analyze.InvalidField("number", "$Key"),
+				ssa.InvalidField("number", "F"),
+				ssa.InvalidField("number", "B"),
+				ssa.InvalidField("() -> number", "B"),
+				ssa.InvalidField("number", "B"),
+				// ssa.InvalidField("number", "$Key"),
 			},
 		})
 	})
@@ -471,7 +471,7 @@ func TestErrorMemberCall(t *testing.T) {
 			Want: []string{
 				ssa.ExternFieldError("Lib", "poc", "appendHeade", "appendHeader"),
 				ssa.ExternFieldError("Lib", "poc", "appendHeade", "appendHeader"),
-				ssa4analyze.InvalidField("any", "Location"),
+				ssa.InvalidField("any", "Location"),
 			},
 		})
 	})
@@ -592,8 +592,8 @@ func TestSliceCall(t *testing.T) {
 			Want: []string{
 				ssa.ValueUndefined("a1"),
 				ssa.ValueUndefined("a1"),
-				ssa4analyze.InvalidField("number", "1"),
-				ssa4analyze.InvalidField("number", "1"),
+				ssa.InvalidField("number", "1"),
+				ssa.InvalidField("number", "1"),
 			},
 			ExternValue: map[string]any{
 				"print": func(any) {},
@@ -619,7 +619,7 @@ func TestSliceCall(t *testing.T) {
 			a[1] = 1
 			`,
 			Want: []string{
-				ssa4analyze.InvalidField("number", "1"),
+				ssa.InvalidField("number", "1"),
 			},
 		})
 	})
@@ -631,7 +631,7 @@ func TestSliceCall(t *testing.T) {
 			b = a[1]
 			`,
 			Want: []string{
-				ssa4analyze.InvalidField("number", "1"),
+				ssa.InvalidField("number", "1"),
 			},
 		})
 	})
@@ -832,11 +832,11 @@ func TestCallParamReturn(t *testing.T) {
 			b = c[1] // error invalid field
 			`,
 			Want: []string{
-				ssa4analyze.InvalidField("number, number", "2"),
+				ssa.InvalidField("number, number", "2"),
 				ssa.CallAssignmentMismatch(2, "number"),
 				ssa.ValueUndefined("b"),
-				ssa4analyze.InvalidField("number", "0"),
-				ssa4analyze.InvalidField("number", "1"),
+				ssa.InvalidField("number", "0"),
+				ssa.InvalidField("number", "1"),
 			},
 			ExternValue: map[string]any{
 				"func1": func() int { return 1 },
@@ -1125,7 +1125,7 @@ func TestExternStruct(t *testing.T) {
 			`,
 			Want: []string{
 				ssa.ExternFieldError("Type", "test.AStruct", "GetA", "GetAStruct"),
-				ssa4analyze.InvalidField("test.AStruct", "C"),
+				ssa.InvalidField("test.AStruct", "C"),
 			},
 			ExternValue: map[string]any{
 				"getA":  func() *AStruct { return &AStruct{} },
@@ -1209,9 +1209,9 @@ func TestExternInstance(t *testing.T) {
 			`,
 			Want: []string{
 				ssa.ExternFieldError("Lib", "lib", "GetInt", "getInt"),
-				ssa4analyze.InvalidField("any", "GetInt"),
+				ssa.InvalidField("any", "GetInt"),
 				ssa.ExternFieldError("Lib", "lib", "GetaInt", "getAInt"),
-				ssa4analyze.InvalidField("any", "GetaInt"),
+				ssa.InvalidField("any", "GetaInt"),
 				ssa.ContAssignExtern("lib.getInt"),
 				// ssa.ContAssignExtern("lib.GetInt"),
 				ssa.ContAssignExtern("lib"),
@@ -1602,7 +1602,7 @@ func TestParameterMember(t *testing.T) {
 			f(a)
 			`,
 			Want: []string{
-				ssa4analyze.InvalidField("number", "b"),
+				ssa.InvalidField("number", "b"),
 			},
 		})
 	})
@@ -1641,7 +1641,7 @@ func TestParameterMember(t *testing.T) {
 					memedit.NewPosition(6, 8),
 				)),
 				ssa.ValueNotMemberInCall("a", "b"),
-				ssa4analyze.InvalidField("number", "b"),
+				ssa.InvalidField("number", "b"),
 			},
 		})
 	})

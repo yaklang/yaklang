@@ -78,3 +78,7 @@ func CallAssignmentMismatchDropError(left int, right string) string {
 func PhiEdgeLengthMisMatch() string {
 	return "Phi edges length < 2"
 }
+
+func InvalidField(typ, key string) string {
+	return fmt.Sprintf("Invalid operation: unable to access the member or index of variable of type {%s} with name or index {%s}.", typ, key)
+}
