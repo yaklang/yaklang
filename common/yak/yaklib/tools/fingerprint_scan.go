@@ -456,6 +456,7 @@ var FingerprintScanExports = map[string]interface{}{
 	"cache":         fp.WithCache,
 	"databaseCache": fp.WithDatabaseCache,
 	"onOpen":        fp.WithOnPortOpenCallback,
+	"onFinish":      fp.WithOnFinished,
 
 	// 使用 web 指纹识别规则进行扫描
 	"webRule": fp.WithWebFingerprintRule,
