@@ -11,14 +11,18 @@ import (
 
 var isTlsCached = utils.NewTTLCache[bool](30 * time.Second)
 
-func IsTLSService(addr string, proxies ...string) bool {
+func IsTLSServiceContext(ctx context.Context, addr string, proxies ...string) bool {
 	result, ok := isTlsCached.Get(addr)
 	if ok {
 		return result
 	}
 
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	isHttps := false
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	conn, err := DialTCPTimeout(5*time.Second, addr, proxies...)
@@ -54,4 +58,8 @@ func IsTLSService(addr string, proxies ...string) bool {
 	}
 
 	return isHttps
+}
+
+func IsTLSService(addr string, proxies ...string) bool {
+	return IsTLSServiceContext(context.Background(), addr, proxies...)
 }

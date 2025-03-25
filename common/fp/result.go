@@ -4,6 +4,12 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/dlclark/regexp2"
 	tablewriter "github.com/olekukonko/tablewriter"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
@@ -11,32 +17,26 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"io/ioutil"
-	"os"
-	"regexp"
-	"strconv"
-	"strings"
 )
 
 type FingerprintInfo struct {
-	IP               string                   `json:"ip"`
-	Port             int                      `json:"port"`
-	Proto            TransportProto           `json:"proto"`
-	ServiceName      string                   `json:"service_name"`
-	ProductVerbose   string                   `json:"product_verbose"`
-	Info             string                   `json:"info"`
-	Version          string                   `json:"version"`
-	Hostname         string                   `json:"hostname"`
-	OperationVerbose string                   `json:"operation_verbose"`
-	DeviceType       string                   `json:"device_type"`
-	CPEs             []string                 `json:"cpes"`
-	Raw              string                   `json:"raw"`
-	Banner           string                   `json:"banner"`
-	CPEFromUrls      map[string][]*schema.CPE `json:"cpe_from_urls"`
-	HttpFlows        []*HTTPFlow              `json:"http_flows"`
-
-	// tls info for fill...
-	TLSInspectResults []*netx.TLSInspectResult
+	IP                string                   `json:"ip"`
+	Port              int                      `json:"port"`
+	Proto             TransportProto           `json:"proto"`
+	ServiceName       string                   `json:"service_name"`
+	ProductVerbose    string                   `json:"product_verbose"`
+	Info              string                   `json:"info"`
+	Version           string                   `json:"version"`
+	Hostname          string                   `json:"hostname"`
+	OperationVerbose  string                   `json:"operation_verbose"`
+	DeviceType        string                   `json:"device_type"`
+	CPEs              []string                 `json:"cpes"`
+	Raw               string                   `json:"raw"`
+	Banner            string                   `json:"banner"`
+	CPEFromUrls       map[string][]*schema.CPE `json:"cpe_from_urls"`
+	HttpFlows         []*HTTPFlow              `json:"http_flows"`
+	CheckedTLS        bool                     `json:"checked_tls"`
+	TLSInspectResults []*netx.TLSInspectResult `json:"tls_inspect_results"`
 }
 
 type HTTPFlow struct {
