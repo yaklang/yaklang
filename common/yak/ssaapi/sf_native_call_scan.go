@@ -132,12 +132,9 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 
 func (b *basicBlockInfo) searchInsts() {
 	for _, inst := range b.currentBlock.Insts {
-		// if lz, ok := ssa.ToLazyInstruction(inst); ok {
-		// 	inst = lz.Self()
-		// }
 		value, err := b.prog.NewValue(inst)
 		if err != nil {
-			log.Warnf("NewValue error: %s", err)
+			// log.Warnf("NewValue error: %s", err)
 			continue
 		}
 		if b.recursiveConfig.configItems == nil {

@@ -46,7 +46,7 @@ type PredecessorValue struct {
 }
 
 func (v *Value) getInstruction() ssa.Instruction {
-	if v.IsNil() {
+	if utils.IsNil(v) {
 		log.Errorf("ssaapi.Value: getInstruction on nil value")
 		return nil
 	}
@@ -135,8 +135,17 @@ func (v *Value) GetProgramName() string {
 	return ""
 }
 
-func (v *Value) IsNil() bool {
-	return v == nil || (v.innerValue == nil && v.innerUser == nil)
+func (v *Value) IsNil(checkValue ...bool) bool {
+	// return v == nil || v.getInstruction() == nil
+	if utils.IsNil(v) {
+		return true
+	}
+
+	if len(checkValue) > 0 && checkValue[0] {
+		// check is value ?
+		return v.innerValue == nil
+	}
+	return v.getInstruction() == nil
 }
 
 func (v *Value) GetId() int64 {
@@ -304,18 +313,22 @@ func (v *Value) GetOperand(index int) *Value {
 }
 
 func (v *Value) HasUsers() bool {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return false
 	}
 	return v.innerValue.HasUsers()
 }
 
 func (v *Value) GetUsers() Values {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
 	appendUser := func(node ssa.Value) {
+		if node == nil {
+			log.Warnf("ssaapi.Value appendUser: node is nil")
+			return
+		}
 		v.users = append(v.users,
 			lo.FilterMap(node.GetUsers(), func(user ssa.User, _ int) (*Value, bool) {
 				return v.NewValue(user), true
@@ -406,7 +419,7 @@ func (v *Value) GetAllVariables() map[string]*ssa.Variable {
 // for function
 
 func (v *Value) GetReturn() Values {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
@@ -420,7 +433,7 @@ func (v *Value) GetReturn() Values {
 }
 
 func (v *Value) GetParameter(i int) *Value {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
@@ -432,7 +445,7 @@ func (v *Value) GetParameter(i int) *Value {
 	return nil
 }
 func (v *Value) GetFreeValue(name string) *Value {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 	if variable := v.GetVariable(name); variable != nil {
@@ -446,7 +459,7 @@ func (v *Value) GetFreeValue(name string) *Value {
 }
 
 func (v *Value) GetParameters() Values {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
@@ -460,7 +473,7 @@ func (v *Value) GetParameters() Values {
 }
 
 func (v *Value) GetCallArgs() Values {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
@@ -473,7 +486,7 @@ func (v *Value) GetCallArgs() Values {
 }
 
 func (v *Value) GetCallReturns() Values {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
@@ -482,13 +495,10 @@ func (v *Value) GetCallReturns() Values {
 
 // for const instruction
 func (v *Value) GetConstValue() any {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
-	if v == nil || v.innerValue == nil {
-		return nil
-	}
 	if cInst, ok := ssa.ToConst(v.innerValue); ok {
 		return cInst.GetRawValue()
 	} else {
@@ -497,7 +507,7 @@ func (v *Value) GetConstValue() any {
 }
 
 func (v *Value) GetConst() *ssa.Const {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
@@ -686,7 +696,7 @@ func (v *Value) GetFunctionObjectType() ssa.Type {
 
 // IsMember desc if the value is member of some object
 func (v *Value) IsMember() bool {
-	if v.IsNil() {
+	if v.IsNil() || v.innerValue == nil {
 		return false
 	}
 	return v.innerValue.IsMember()
@@ -694,7 +704,7 @@ func (v *Value) IsMember() bool {
 
 // GetObject get object of member
 func (v *Value) GetObject() *Value {
-	if v.IsNil() {
+	if v.IsNil() || v.innerValue == nil {
 		return nil
 	}
 
@@ -703,15 +713,18 @@ func (v *Value) GetObject() *Value {
 
 // GetKey get key of member
 func (v *Value) GetKey() *Value {
-	if v.IsNil() {
+	if v.IsNil() || v.innerValue == nil {
 		return nil
 	}
 
+	if v.innerValue.GetKey() == nil {
+		return nil
+	}
 	return v.NewValue(v.innerValue.GetKey())
 }
 
 func GetValues(v *Value) Values {
-	if v.IsNil() {
+	if v.IsNil() || v.innerValue == nil {
 		return nil
 	}
 
@@ -719,7 +732,7 @@ func GetValues(v *Value) Values {
 }
 
 func GetFreeValue(v *Value) *ssa.Parameter {
-	if v.IsNil() {
+	if v.IsNil() || v.innerValue == nil {
 		return nil
 	}
 
