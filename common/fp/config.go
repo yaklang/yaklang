@@ -183,6 +183,20 @@ func WithOnPortOpenCallback(cb func(*MatchResult)) ConfigOption {
 	}
 }
 
+// onFinish servicescan 的配置选项，设置本次扫描端口开放时的回调函数
+// @param {func(*MatchResult)} cb 回调函数
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err := servicescan.Scan("127.0.0.1", "22,80,443", servicescan.onFinish(result => println(result.String())))
+// for i in result { println(result.String()) }
+// ```
+func WithOnFinished(cb func(*MatchResult)) ConfigOption {
+	return func(config *Config) {
+		config.OnFinishedCallback = cb
+	}
+}
+
 // databaseCache servicescan 的配置选项，设置本次扫描是否使用数据库缓存
 // @param {bool} b 是否使用数据库缓存
 // @return {ConfigOption} 返回配置项

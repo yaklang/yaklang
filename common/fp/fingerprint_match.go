@@ -90,6 +90,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	if config.EnableCache {
 		result := GetMatchResultCache(addr)
 		if result != nil {
+			f.reportFinished(result)
 			return result, nil
 		}
 	}
@@ -97,6 +98,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	if config.EnableDatabaseCache {
 		result := GetMatchResultDatabaseCache(addr)
 		if result != nil {
+			f.reportFinished(result)
 			return result, nil
 		}
 	}
@@ -122,6 +124,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 			f.log("resolve %v failed: no available ip", host)
 			dataErr := errors.Errorf("resolve %s failed: %s", host, "no available ip")
 			result.Reason = dataErr.Error()
+			f.reportFinished(result)
 			return result, nil
 		} else {
 			f.log("resolved %v to ip: %v", host, ipStr)
@@ -131,6 +134,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 			f.log("parse ip failed for %v: invalid ip addr: %v", host, ipStr)
 			dataErr := errors.Errorf("resolve %s failed: %s", host, "invalid ip addr: "+ipStr)
 			result.Reason = dataErr.Error()
+			f.reportFinished(result)
 			return result, nil
 		}
 	}
@@ -249,5 +253,6 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 			SetMatchResultDatabaseCache(addr, matchResult)
 		}
 	}
+	f.reportFinished(matchResult)
 	return matchResult, err
 }
