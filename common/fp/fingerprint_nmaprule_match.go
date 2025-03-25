@@ -41,6 +41,9 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 
 			state, info, err := f.matchBlock(ctx, ip, port, firstBlock, config)
 			result.State = state
+			if result.State == OPEN {
+				f.reportOpen(result)
+			}
 			result.Fingerprint = info
 			if err != nil {
 				result.Reason = err.Error()
@@ -95,6 +98,9 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 			}
 			log.Debugf("try %s probe[%v] rarity[%v] %#v", utils2.HostPort(host, port), block.Probe.Index, block.Probe.Rarity, block.Probe.Payload)
 			state, info, err := f.matchBlock(ctx, ip, port, block, config)
+			if result.State == OPEN {
+				f.reportOpen(result)
+			}
 			collectResultLock.Lock()
 			defer collectResultLock.Unlock()
 			states = append(states, state)
