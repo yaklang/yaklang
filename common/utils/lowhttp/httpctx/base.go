@@ -297,7 +297,16 @@ const (
 	REQUEST_CONTEXT_KEY_IsWebsocketRequest           = "isWebsocketRequest"
 	REQUEST_CONTEXT_KEY_PluginContext                = "pluginContext"
 	REQUEST_CONTEXT_KEY_PluginContextCancelFunc      = "pluginContextCancelFunc"
+	REQUEST_CONTEXT_KEY_MITMTaskID                   = "mitmTaskID"
 )
+
+func SetRequestMITMTaskID(req *http.Request, id string) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_MITMTaskID, id)
+}
+
+func GetRequestMITMTaskID(req *http.Request) string {
+	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_MITMTaskID)
+}
 
 func SetRequestProxyProtocol(req *http.Request, p string) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestProxyProtocol, p)
