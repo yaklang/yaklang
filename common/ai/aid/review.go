@@ -73,8 +73,21 @@ func (t *aiTask) handleReviewResult(ctx *taskContext, param aitool.InvokeParams)
 	case "continue":
 		t.config.EmitInfo("continue")
 	case "end":
-		// TODO: 删除后续任务,直接结束
 		t.config.EmitInfo("end")
+
+		parentTask := t.ParentTask
+		index := -1
+		for i, subtask := range parentTask.Subtasks {
+			if subtask.Name == t.Name {
+				index = i
+				break
+			}
+		}
+		if index == -1 {
+			t.config.EmitError("current task not found in parent task")
+			return utils.Error("current task not found in parent task")
+		}
+		parentTask.Subtasks = parentTask.Subtasks[:index+1]
 	case "adjust_plan":
 		plan := param.GetString("plan")
 		if plan == "" {
