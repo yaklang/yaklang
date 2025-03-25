@@ -296,8 +296,8 @@ public class Main{
 }
 `
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, this.num1)]",
-			"Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, this.num2)]",
+			"Undefined-a.getNum1(valid)(Function-A.A(Undefined-A,1,2)) member[side-effect(Parameter-num1, this.num1)]",
+			"Undefined-a.getNum2(valid)(Function-A.A(Undefined-A,1,2)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)
 	})
 }
@@ -529,7 +529,7 @@ class Main{
 	}
 }
 `
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-a.getNum(valid)(Function-A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-a.getNum(valid)(Function-A.A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]"}, t)
 	})
 	t.Run("test package with constructor", func(t *testing.T) {
 		code := `
@@ -559,7 +559,7 @@ class Main{
 	}
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum1(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num1, this.num1)]", "Undefined-a.getNum2(valid)(Function-A(Undefined-A,1,2)) member[side-effect(Parameter-num2, this.num2)]",
+			"Undefined-a.getNum1(valid)(Function-A.A(Undefined-A,1,2)) member[side-effect(Parameter-num1, this.num1)]", "Undefined-a.getNum2(valid)(Function-A.A(Undefined-A,1,2)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)
 	})
 }
@@ -861,9 +861,9 @@ class ChildClass extends ParentClass {
     }
 }
 `
-		ssatest.CheckPrintlnValue(code, []string{
-			`Undefined-.getName(valid)("super")`,
-		}, t)
+		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
+			"param": {"\"Parent\""},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
 	t.Run("test super class static method", func(t *testing.T) {
@@ -880,8 +880,8 @@ class ChildClass extends ParentClass {
     }
 }
 `
-		ssatest.CheckPrintlnValue(code, []string{
-			"Function-ChildClass.getName()",
-		}, t)
+		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
+			"param": {"\"Parent\""},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
