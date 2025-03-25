@@ -37,7 +37,3 @@ func NotEnoughArgument(funName string, have, want string) string {
 func BlockUnreachable() string {
 	return "This block unreachable!"
 }
-
-func InvalidField(typ, key string) string {
-	return fmt.Sprintf("Invalid operation: unable to access the member or index of variable of type {%s} with name or index {%s}.", typ, key)
-}

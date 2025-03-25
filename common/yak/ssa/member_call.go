@@ -179,6 +179,11 @@ func (b *FunctionBuilder) checkAndCreateDefaultMember(res checkMemberResult, obj
 	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
 		return
 	}
+	if !res.exist {
+		object.NewError(Error, "ObjectError",
+			InvalidField(res.ObjType.String(), GetKeyString(key)),
+		)
+	}
 
 	currentScope := b.CurrentBlock.ScopeTable
 	objectScope := object.GetBlock().ScopeTable
