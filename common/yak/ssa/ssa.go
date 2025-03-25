@@ -193,6 +193,7 @@ type FunctionName string
 
 const (
 	MainFunctionName    FunctionName = "@main"
+	InitFunctionName    FunctionName = "@init"
 	VirtualFunctionName FunctionName = "@virtual"
 )
 
@@ -222,10 +223,11 @@ type Program struct {
 	irProgram      *ssadb.IrProgram // from database program
 
 	// TODO: this four map should need????!
-	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
-	FileList    map[string]string   // file-name and file hash
-	LibraryFile map[string][]string //library and file relation
-	editorMap   *omap.OrderedMap[string, *memedit.MemEditor]
+	editorStack           *omap.OrderedMap[string, *memedit.MemEditor]
+	FileList              map[string]string   // file-name and file hash
+	LibraryFile           map[string][]string //library and file relation
+	editorMap             *omap.OrderedMap[string, *memedit.MemEditor]
+	CurrentIncludingStack *utils.Stack[string]
 
 	Cache *Cache
 
@@ -341,6 +343,7 @@ type Function struct {
 	builder *FunctionBuilder
 	// this function is variadic parameter, for function type create
 	hasEllipsis bool
+
 	// generic
 	isGeneric bool
 	// runtime function return type

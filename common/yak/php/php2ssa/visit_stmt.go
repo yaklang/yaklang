@@ -71,7 +71,7 @@ func (y *builder) VisitNamespaceOnlyUse(raw phpparser.INamespaceDeclarationConte
 	}
 	library, b := prog.GetLibrary(namespaceName)
 	if b {
-		functionBuilder := library.GetAndCreateFunctionBuilder(namespaceName, "init")
+		functionBuilder := library.GetAndCreateFunctionBuilder(namespaceName, string(ssa.InitFunctionName))
 		currentBuilder := y.FunctionBuilder
 		y.FunctionBuilder = functionBuilder
 		usedeclHanlder()
@@ -123,7 +123,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		}
 		//if custom syntax, only syntax it
 		library.PushEditor(prog.GetCurrentEditor())
-		functionBuilder := library.GetAndCreateFunctionBuilder(namespaceName, "init")
+		functionBuilder := library.GetAndCreateFunctionBuilder(namespaceName, string(ssa.InitFunctionName))
 		functionBuilder.SetEditor(y.FunctionBuilder.GetEditor())
 		functionBuilder.SetBuildSupport(y.FunctionBuilder)
 		currentBuilder := y.FunctionBuilder

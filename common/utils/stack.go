@@ -112,3 +112,11 @@ func (this *Stack[T]) CreateShadowStack() func() {
 		this.top = top
 	}
 }
+func (this *Stack[T]) ForeachStack(f func(T) bool) {
+	for i := 0; i < this.length; i++ {
+		if !f(this.PeekN(i)) {
+			break
+		}
+		continue
+	}
+}
