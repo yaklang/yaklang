@@ -4,9 +4,10 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
-	"strconv"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -38,6 +39,7 @@ type aiTask struct {
 
 	executing bool
 	executed  bool
+	rerun     bool
 
 	// runtime
 	ToolCallResults []*aitool.ToolResult
