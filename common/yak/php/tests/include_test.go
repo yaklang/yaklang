@@ -8,6 +8,53 @@ import (
 )
 
 func TestInclude(t *testing.T) {
+	t.Run("include no php", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("var/www/html/1.txt", `<?php
+$a = 1;
+`)
+		fs.AddFile("var/www/html/1.php", `<?php
+include("1.txt");
+echo $a;
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `echo(* #-> * as $param)`, map[string][]string{
+			"param": {"1"},
+		}, false, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test 2 include", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("/var/www/html/1.txt", `<?php
+$a = 1;
+`)
+		fs.AddFile("/var/www/html/1.php", `<?php
+include("1.txt");
+echo $a;
+`)
+		fs.AddFile("/var/www/html/2.php", `<?php
+include("1.txt");
+$a = 2;
+echo $a;
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `echo(* #-> * as $param)`, map[string][]string{
+			"param": {"1", "2"},
+		}, false, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test include", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("/var/www/html/1.txt", `<?php
+class A{
+	public function TT($a){
+		echo $a;
+	}
+}
+`)
+		fs.AddFile("/var/www/html/1.php", `<?php
+include("1.txt");
+$a = new A();
+$a->TT(1);
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `echo(* #-> * as $param)`, map[string][]string{}, false, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 	t.Run("custom include", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
 		fs.AddFile("var/www/html/1.php", `<?php
@@ -180,29 +227,3 @@ class AA{
 		}, true, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
-
-//func TestCode1(t *testing.T) {
-//	code := `<?php
-//
-//class ReturnMessage{
-//    public function return($msg){
-//        exit($msg);
-//    }
-//}
-//class User{
-//    public  $name;
-//    public $show;
-//    public function __construct(){
-//        $this->show = new ReturnMessage;
-//    }
-//    public function Show(){
-//        $msg =  "hello: ".$this->name;
-//        $this->show->return($msg);
-//    }
-//}
-//$user = new User();
-//$user->name = $_GET["name"];
-//$user->Show();
-//`
-//	ssatest.CheckSyntaxFlow(t, code, `exit(* #-> * as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
-//}

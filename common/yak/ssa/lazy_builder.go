@@ -68,6 +68,8 @@ func (p *Program) VisitAst(ast ASTIF) {
 			p.Application.ProcessInfof("program %s save Instruction(%d) to database", p.Name, p.Cache.CountInstruction())
 			// will cause instruction not save bug
 			// p.Cache.SaveToDatabase() // save instruction
+			builder := p.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+			builder.SyntaxIncludingStack = nil
 		}
 	}
 }

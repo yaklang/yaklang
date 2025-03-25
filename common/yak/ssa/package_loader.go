@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"path"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -17,24 +16,34 @@ func (b *FunctionBuilder) AddIncludePath(path string) {
 func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	p := b.GetProgram()
 	includePaths := p.GetIncludeFiles()
-	dir, _ := p.Loader.GetFilesysFileSystem().PathSplit(b.GetEditor().GetFilename())
+	fs := p.Loader.GetFilesysFileSystem()
+	dir, _ := fs.PathSplit(b.GetEditor().GetFilename())
 	p.Loader.AddIncludePath(dir)
 	currentMode := b.Included
 	defer func() {
 		b.Included = currentMode
 		p.Loader.SetIncludePaths(includePaths)
 	}()
-	file, data, err := p.Loader.LoadFilePackage(filename, once)
+	_, data, err := p.Loader.LoadFilePackage(filename, once)
 	if err != nil {
 		return err
 	}
-	b.Included = true
-	_path := p.Loader.GetCurrentPath()
-	p.Loader.SetCurrentPath(path.Dir(file))
-	err = p.GetApplication().Build(file, data, b)
-
-	p.Loader.SetCurrentPath(_path)
-	return err
+	mainProgram := b.GetProgram().GetApplication()
+	subProg, exist := mainProgram.UpStream.Get(data.GetPureSourceHash())
+	if exist {
+		subProg.LazyBuild()
+		b.includeStack.Push(subProg)
+		return nil
+	}
+	//include file not .php need to build
+	//program := mainProgram.createSubProgram(data.GetPureSourceHash(), Library)
+	//builder := program.GetAndCreateFunctionBuilder(string(MainFunctionName), string(MainFunctionName))
+	//fullFilename := fs.Join(dir, filename)
+	//err = mainProgram.Build(fullFilename, data, builder)
+	//mainProgram.LazyBuild()
+	//b.includeStack.Push(program)
+	return nil
+	//return err
 }
 
 func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Program, error) {
