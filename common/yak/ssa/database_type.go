@@ -49,6 +49,9 @@ func SaveTypeToDB(typ Type, progName string) int {
 }
 
 func GetTypeFromDB(id int) Type {
+	if id == -1 {
+		return nil
+	}
 	kind, str, extra, err := ssadb.GetType(id)
 	if err != nil {
 		log.Errorf("GetTypeFromDB: %v: id: %v", err, id)
