@@ -157,7 +157,6 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 					break
 				}
 			}
-
 			return OPEN, resultFingerprintInfo, nil
 		}
 

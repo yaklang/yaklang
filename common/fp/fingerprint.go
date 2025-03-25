@@ -67,6 +67,10 @@ type MatchResult struct {
 	Fingerprint *FingerprintInfo `json:"fingerprint"`
 }
 
+func (m *MatchResult) Identifier() string {
+	return utils.CalcSha256(fmt.Sprintf("%v://%v:%v", m.GetProto(), m.Target, m.Port))
+}
+
 func (m *MatchResult) Tidy() {
 	if m == nil {
 		return
@@ -157,6 +161,9 @@ func (m *MatchResult) String(schemaForce ...string) string {
 	}
 	if len(schemaForce) > 0 {
 		schema = strings.Join(schemaForce, "+")
+	}
+	if schema == "" {
+		schema = string(m.GetProto())
 	}
 	return fmt.Sprintf("%v://%v\t%5s\t%s", schema, utils2.HostPort(m.Target, m.Port), m.State, m.GetServiceName())
 }
