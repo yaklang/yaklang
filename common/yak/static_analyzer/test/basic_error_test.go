@@ -121,3 +121,77 @@ func TestMakeByte(t *testing.T) {
 		})
 	})
 }
+
+func TestBaiscTypeCheck(t *testing.T) {
+	t.Run("yak append map", func(t *testing.T) {
+		check(t, `
+cookie = make([]var)
+cookie = append(cookie, {
+    "cookie": codec.EncodeBase64(""),
+    "key": "",
+    "aes-mode": "",
+})
+		
+		`, []string{})
+	})
+
+	t.Run("yak append call", func(t *testing.T) {
+		check(t, `
+opt = [
+    syntaxflow.withContext(context.Background()), 
+]
+opt.Append(syntaxflow.withCache())
+		`, []string{})
+	})
+
+	t.Run("yak append ellipsis", func(t *testing.T) {
+		check(t, `
+cookie = []var
+cookie = append(cookie, cookie...)
+		
+		`, []string{})
+	})
+
+	t.Run("yak slice with Append", func(t *testing.T) {
+		check(t, `
+replaceResults = []
+emptyResults = []
+replacedTmp = []
+emptyTmp  = []
+
+if len(replacedTmp) == 0 {
+    replacedTmp.Append({"key": "", "kind": "", "value": ""})
+    emptyResults.Append({"key": "", "kind": "", "value": ""})
+} else {
+    replaceResults.Append(replacedTmp)
+    emptyResults.Append(emptyTmp)
+}
+		
+		`, []string{})
+	})
+
+	t.Run("yak string with Trim", func(t *testing.T) {
+		check(t, `
+infos, err = file.ReadDirInfoInDirectory("")
+die(err)
+
+for i in infos {
+	if !i.IsDir {
+		continue
+	}
+	dir, name = file.Split(i.Path)
+	name = name.Trim("/", "\\")
+	if name == "engine-log" || name == "temp" {
+		file.Walk(
+			i.Path,
+			logFile => {
+				if !logFile.Path.HasSuffix(".txt") {return true}
+				files.Push(logFile.Path)
+				return true
+			},
+		)
+	}
+}
+		`, []string{})
+	})
+}

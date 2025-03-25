@@ -127,12 +127,12 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 			case "Append", "Push":
 				IsModifySelf = true
 				IsVariadic = true
-				arg = append(arg, fieldTyp)
+				arg = []ssa.Type{ot, SliceTyp(fieldTyp)}
 				ret = append(ret, ot)
 			case "Pop":
 				IsVariadic = true
 				IsModifySelf = true
-				arg = append(arg, NumberTyp)
+				arg = []ssa.Type{SliceTyp(NumberTyp)}
 				ret = append(ret, fieldTyp)
 			case "Extend", "Merge":
 				IsModifySelf = true
@@ -148,7 +148,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 				ret = append(ret, SliceTyp(AnyTyp))
 			case "Shift":
 				IsModifySelf = true
-				ret = append(ret, fieldTyp)
+				ret = []ssa.Type{SliceTyp(fieldTyp)}
 			case "Unshift":
 				IsModifySelf = true
 				arg = append(arg, fieldTyp)
@@ -173,7 +173,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 			case "Sort":
 				IsModifySelf = true
 				IsVariadic = true
-				arg = append(arg, BoolTyp)
+				arg = []ssa.Type{SliceTyp(BoolTyp)}
 				ret = append(ret, ot)
 			case "Clear":
 				IsModifySelf = true
@@ -197,7 +197,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 			case "Shuffle":
 				ret = append(ret, StrTyp)
 			case "Fuzz":
-				arg = append(arg, MapTyp(StrTyp, AnyTyp))
+				arg = []ssa.Type{SliceTyp(MapTyp(StrTyp, AnyTyp))}
 				ret = append(ret, SliceTyp(StrTyp))
 				IsVariadic = true
 			case "Contains":
@@ -222,7 +222,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 				arg = append(arg, SliceTyp(AnyTyp))
 				ret = append(ret, StrTyp)
 			case "Trim", "TrimLeft", "TrimRight":
-				arg = append(arg, StrTyp)
+				arg = []ssa.Type{SliceTyp(StrTyp)}
 				ret = append(ret, StrTyp)
 				IsVariadic = true
 			case "HasPrefix", "HasSuffix", "StartsWith", "EndsWith":
@@ -235,7 +235,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 				arg = append(arg, NumberTyp)
 				ret = append(ret, StrTyp)
 			case "Ljust", "Rjust":
-				arg = append(arg, NumberTyp, StrTyp)
+				arg = []ssa.Type{NumberTyp, SliceTyp(StrTyp)}
 				ret = append(ret, StrTyp)
 				IsVariadic = true
 			case "Count", "Find", "RFind", "IndexOf", "LastIndexOf":
@@ -256,7 +256,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 			case "Reverse", "Shuffle":
 				ret = append(ret, BytesTyp)
 			case "Fuzz":
-				arg = append(arg, MapTyp(StrTyp, AnyTyp))
+				arg = []ssa.Type{SliceTyp(MapTyp(StrTyp, AnyTyp))}
 				ret = append(ret, SliceTyp(StrTyp))
 				IsVariadic = true
 			case "Contains", "IContains":
@@ -279,7 +279,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 				ret = append(ret, BytesTyp)
 			case "Trim", "TrimLeft", "TrimRight":
 				IsVariadic = true
-				arg = append(arg, BytesTyp)
+				arg = []ssa.Type{SliceTyp(BytesTyp)}
 				ret = append(ret, BytesTyp)
 			case "HasPrefix", "HasSuffix", "StartsWith", "EndsWith":
 				arg = append(arg, BytesTyp)
@@ -292,7 +292,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 				ret = append(ret, BytesTyp)
 			case "Ljust", "Rjust":
 				IsVariadic = true
-				arg = append(arg, NumberTyp, BytesTyp)
+				arg = []ssa.Type{NumberTyp, SliceTyp(BytesTyp)}
 				ret = append(ret, BytesTyp)
 			case "Count", "Find", "Rfind", "IndexOf", "LastIndexOf":
 				arg = append(arg, BytesTyp)
