@@ -2,12 +2,10 @@ package php2ssa
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/sca"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"os"
+	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
@@ -138,11 +136,13 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		build.VisitHtmlDocument(ast)
 		build.Finish()
 	}
-	if b.IncludeStack.Len() <= 0 {
+	mainApp := b.GetProgram().GetApplication()
+	if mainApp.CurrentIncludingStack.Len() <= 0 {
 		childProgram := b.GetProgram().GetSubProgram(b.GetEditor().GetPureSourceHash())
 		functionBuilder := childProgram.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
 		startParse(functionBuilder)
 	} else {
+		//模拟preHandler和正式handler
 		b.GetProgram().SetPreHandler(true)
 		startParse(b)
 		b.GetProgram().SetPreHandler(false)
@@ -209,14 +209,6 @@ func (b *builder) AssignClassConst(className, key string, value ssa.Value) {
 func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
 	name := fmt.Sprintf("%s_%s", className, key)
 	return b.ReadConst(name)
-}
-func (y *builder) PushInclude(path string) {
-	y.currentInclude[strings.ToLower(path)] = struct{}{}
-	y.IncludeStack.Push(path)
-}
-func (y *builder) PopInclude() {
-	pathx := y.IncludeStack.Pop()
-	delete(y.currentInclude, strings.ToLower(pathx))
 }
 
 var phpBuildIn = map[string]any{

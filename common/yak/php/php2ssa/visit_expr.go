@@ -2,11 +2,11 @@ package php2ssa
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
@@ -1292,16 +1292,6 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 	if !ok {
 		return nil
 	}
-	/*
-			if(true){
-
-		}
-				不支持
-			<?php
-			$b = "231.php";
-			$a = include("$b");
-			var_dump($a);
-	*/
 	var once bool
 	var flag = y.EmitEmptyContainer()
 	if i.IncludeOnce() != nil || i.RequireOnce() != nil {
@@ -1323,8 +1313,10 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 	} else {
 		//todo： __dir__ 等魔术方法的转换
 		file := value.String()
-		y.PushInclude(file)
-		defer y.PopInclude()
+		application := y.GetProgram().Application
+		includeStack := application.CurrentIncludingStack
+		includeStack.Push(file)
+		defer includeStack.Pop()
 		if err := y.BuildFilePackage(file, once); err != nil {
 			//todo: 目前拿不到include的返回值
 			//flag = ssa.NewConst(false)

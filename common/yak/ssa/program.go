@@ -63,6 +63,7 @@ func NewProgram(
 		importDeclares:          omap.NewOrderedMap(make(map[string]*importDeclareItem)),
 		ProjectConfig:           make(map[string]*ProjectConfig),
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
+		CurrentIncludingStack:   utils.NewStack[string](),
 	}
 	if kind == Application {
 		prog.Application = prog
@@ -99,6 +100,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.ExternLib = prog.ExternLib
 	subProg.ExportType = make(map[string]Type)
 	subProg.ExportValue = make(map[string]Value)
+	subProg.CurrentIncludingStack = prog.CurrentIncludingStack
 
 	//todo: 这里需要加一个测试
 	subProg.GlobalScope = prog.GlobalScope
