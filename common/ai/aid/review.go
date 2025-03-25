@@ -65,8 +65,26 @@ func (t *aiTask) handleReviewResult(ctx *taskContext, param aitool.InvokeParams)
 	// 2. 根据审查建议处理
 	switch suggestion {
 	case "deeply_think":
-		//TODO: 深度思考
 		t.config.EmitInfo("deeply think")
+		r := ctx.Runtime
+		planReq, err := createPlanRequest(t.Goal)
+		if err != nil {
+			t.config.EmitError("create planRequest failed: %v", err)
+			return utils.Errorf("coordinator: create planRequest failed: %v", err)
+		}
+
+		t.config.EmitInfo("start to invoke plan request")
+		rsp, err := planReq.Invoke()
+		if err != nil {
+			t.config.EmitError("invoke planRequest failed: %v", err)
+			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
+		}
+
+		if rsp.RootTask == nil {
+			t.config.EmitError("root aiTask is nil, plan failed")
+			return utils.Errorf("coordinator: root aiTask is nil")
+		}
+		r.Invoke(rsp.RootTask)
 	case "inaccurate":
 		t.config.EmitInfo("inaccurate")
 		t.rerun = true
