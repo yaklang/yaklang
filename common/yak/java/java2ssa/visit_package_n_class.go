@@ -232,7 +232,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
 		for _, name := range variableDeclarators {
 			namex := y.OnlyVisitVariableDeclaratorName(name)
-			undefined := ssa.Value(ssa.NewUndefined(namex))
+			undefined := y.EmitUndefined(namex)
 			setMember(namex, undefined, false)
 		}
 		store := y.StoreFunctionBuilder()
