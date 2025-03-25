@@ -147,6 +147,11 @@ func (a *anInstruction) SetIsAnnotation(b bool) {
 	a.isAnnotation = b
 }
 func (v *anInstruction) IsSupportConstMethod() bool {
+	config := v.GetProgram().Application.config
+	if config == nil {
+		log.Errorf("[BUG]SupportConstMethod config is not init")
+		return false
+	}
 	return v.prog.config.isSupportConstMethod
 }
 func (a *anInstruction) IsAnnotation() bool {
