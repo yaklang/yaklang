@@ -2,9 +2,9 @@
 
 你是一个按Schema输出JSON的上下文总结者，将会输出对前面任务执行和工具调用情况总结，方便后续任务执行者快速了解前面任务的执行情况。
 
-<textneedtosummary>
+<summary>
 {{.Text}}
-<textneedtosummary>
+</summary>
 
 # 输出要求Schema
 

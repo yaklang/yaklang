@@ -16,8 +16,8 @@
 
 {{ .Context.Runtime.PromptForToolCallResultsForLast20 }}
 
-## 当前任务被用户反馈为 **无法完成** 需要重新规划, 用户的具体反馈是:
-{{ .UserInput }}
+## 当前任务被用户反馈为 **无法完成** 需要重新规划{{ if .UserInput }}，用户额外反馈为：{{ .UserInput }}
+{{end}}
 
 根据下面Schema输出重新规划后的JSON
 ```schema
