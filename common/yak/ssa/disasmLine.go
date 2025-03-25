@@ -207,20 +207,11 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 	case *Jump, *ErrorHandler:
 		return "jump"
 	case *If:
-		return fmt.Sprintf("if (%s) {%s} else {%s}", liner.DisasmValue(v.Cond), liner.DisasmValue(v.True), liner.DisasmValue(v.False))
+		return fmt.Sprintf("if (%s)", liner.DisasmValue(v.Cond))
 	case *Loop:
 		return fmt.Sprintf("loop(%s)", liner.DisasmValue(v.Cond))
 	case *Switch:
-		return fmt.Sprintf(
-			"switch(%s) {case:%s}",
-			liner.DisasmValue(v.Cond),
-			strings.Join(
-				lo.Map(v.Label, func(label SwitchLabel, _ int) string {
-					return fmt.Sprintf("%s-%s", liner.DisasmValue(label.Value), liner.DisasmValue(label.Dest))
-				}),
-				",",
-			),
-		)
+		return fmt.Sprintf("switch(%s)", liner.DisasmValue(v.Cond))
 	case *LazyInstruction:
 		switch liner.(type) {
 		case *NameDisasmLiner:
