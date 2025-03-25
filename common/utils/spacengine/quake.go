@@ -71,6 +71,7 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int, domains ...st
 				if host == "" {
 					host = d.Get("ip").String()
 				}
+				domain := d.Get("domain").String()
 				var isTls bool
 
 				if len(rService.Get("tls-jarm.jarm_ans").Array()) > 0 || rService.Get("tls.handshake_log.server_hello.version.name").String() != "" {
@@ -137,7 +138,7 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int, domains ...st
 					Latitude:        lat,
 					Longitude:       lng,
 					HtmlTitle:       rService.Get("http.title").String(),
-					Domains:         host,
+					Domains:         domain,
 					Province:        province,
 					Url:             "",
 					ConfirmHttps:    isTls,
