@@ -199,3 +199,10 @@ func (f *Function) SetMethod(is bool, objType Type) {
 	f.Type.IsMethod = is
 	f.Type.ObjectType = objType
 }
+
+func (f *Function) SetVerboseName(name string) {
+	// only set once
+	if f.verboseName == "" {
+		f.verboseName = name
+	}
+}

@@ -316,7 +316,7 @@ func Test_Condition_Filter_Start_With_Program(t *testing.T) {
 			})
 	})
 
-	t.Run("test CompareOpcode 1", func(t *testing.T) {
+	t.Run("test CompareOpcode 1-1", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
 		a1=11
 		a2=undefined
@@ -330,7 +330,7 @@ func Test_Condition_Filter_Start_With_Program(t *testing.T) {
 			})
 	})
 
-	t.Run("test CompareOpcode 1", func(t *testing.T) {
+	t.Run("test CompareOpcode 1-2", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
 		a1 = 11
 		b2 = 22
