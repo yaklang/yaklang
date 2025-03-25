@@ -712,12 +712,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		taskInfo.Response = rsp
 		taskInfo.TraceInfo = model.ToLowhttpTraceInfoGRPCModel(traceInfo)
 		httpctx.SetResponseViewedByUser(req)
-		hijackListFeedback(Hijack_List_Update, taskInfo)
 
 		defer hijackListFeedback(Hijack_List_Delete, taskInfo)
 		defer hijackManger.unRegister(task.taskID)
 		for {
-
+			hijackListFeedback(Hijack_List_Update, taskInfo)
 			select {
 			case <-ctx.Done():
 				return rsp
@@ -1010,6 +1009,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}()
 		for {
+			hijackListFeedback(Hijack_List_Update, taskInfo)
 			select {
 			case <-ctx.Done():
 				return originReqRaw
