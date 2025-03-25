@@ -63,6 +63,7 @@ func NewProgram(
 		importDeclares:          omap.NewOrderedMap(make(map[string]*importDeclareItem)),
 		ProjectConfig:           make(map[string]*ProjectConfig),
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
+		config:                  NewLanguageConfig(),
 	}
 	if kind == Application {
 		prog.Application = prog
