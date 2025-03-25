@@ -41,7 +41,9 @@ type FunctionBuilder struct {
 	// disable free-value
 	SupportClosure bool
 
-	IncludeStack *utils.Stack[string]
+	//正在解析的include栈
+	SyntaxIncludingStack *utils.Stack[string]
+	includeStack         *utils.Stack[*Program]
 
 	Included bool
 	IsReturn bool
@@ -78,16 +80,17 @@ type FunctionBuilder struct {
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	b := &FunctionBuilder{
-		_editor:          editor,
-		Function:         f,
-		target:           &target{},
-		labels:           make(map[string]*BasicBlock),
-		CurrentBlock:     nil,
-		CurrentRange:     nil,
-		parentBuilder:    parent,
-		RefParameter:     make(map[string]struct{ Index int }),
-		IncludeStack:     utils.NewStack[string](),
-		captureFreeValue: make(map[string]struct{}),
+		_editor:              editor,
+		Function:             f,
+		target:               &target{},
+		labels:               make(map[string]*BasicBlock),
+		CurrentBlock:         nil,
+		CurrentRange:         nil,
+		parentBuilder:        parent,
+		RefParameter:         make(map[string]struct{ Index int }),
+		SyntaxIncludingStack: utils.NewStack[string](),
+		includeStack:         utils.NewStack[*Program](),
+		captureFreeValue:     make(map[string]struct{}),
 	}
 	if parent != nil {
 		b.DefineFunc = parent.DefineFunc
@@ -117,6 +120,18 @@ func (f *FunctionBuilder) AddCaptureFreevalue(name string) {
 	f.captureFreeValue[name] = struct{}{}
 }
 func (b *FunctionBuilder) GetFunc(name, pkg string) *Function {
+	var function *Function
+	b.includeStack.ForeachStack(func(program *Program) bool {
+		functionEx := program.GetFunctionEx(name, pkg)
+		if functionEx != nil {
+			function = functionEx
+			return false
+		}
+		return true
+	})
+	if function != nil {
+		return function
+	}
 	return b.GetProgram().GetFunction(name, pkg)
 }
 
