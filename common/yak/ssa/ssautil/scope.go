@@ -416,7 +416,6 @@ func (v *ScopedVersionedTable[T]) ReadValue(name string) (t T) {
 }
 
 // ---------------- create
-
 func (v *ScopedVersionedTable[T]) CreateVariable(name string, isLocal bool) VersionedIF[T] {
 	return v.newVar(name, isLocal)
 }
@@ -430,12 +429,11 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 		return
 	}
 
-	{
-		// variable to value
-		scope.linkValues.Append(variable.GetName(), variable)
-		// value to variable
-		scope.linkVariable[value] = variable
-	}
+	// variable to value
+	scope.linkValues.Append(variable.GetName(), variable)
+	// value to variable
+	scope.linkVariable[value] = variable
+
 	// capture variable
 	if !variable.GetLocal() && !scope.IsRoot() {
 		for _, variable := range scope.GetCurrentVariables(variable.GetName()) {
