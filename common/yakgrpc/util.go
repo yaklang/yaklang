@@ -221,6 +221,53 @@ func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
 	return newLocalClientEx(local)
 }
 
+func NewLocalClientForceNew() (ypb.YakClient, error) {
+	port := utils.GetRandomAvailableTCPPort()
+	addr := utils.HostPort("127.0.0.1", port)
+	grpcTrans := grpc.NewServer(
+		grpc.MaxRecvMsgSize(100*1024*1024),
+		grpc.MaxSendMsgSize(100*1024*1024),
+	)
+	opts := []ServerOpts{WithInitFacadeServer(true)}
+	var (
+		profileDatabasePath, projectDatabasePath string
+	)
+	s, err := newServerEx(opts...)
+	if err != nil {
+		log.Errorf("build yakit server failed: %s", err)
+		return nil, err
+	}
+	ypb.RegisterYakServer(grpcTrans, s)
+	var lis net.Listener
+	lis, err = net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		defer func() {
+			if profileDatabasePath != "" {
+				os.Remove(profileDatabasePath)
+			}
+			if projectDatabasePath != "" {
+				os.Remove(projectDatabasePath)
+			}
+		}()
+		err = grpcTrans.Serve(lis)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	time.Sleep(1 * time.Second)
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(100*1024*1045),
+		grpc.MaxCallRecvMsgSize(100*1024*1045),
+	))
+	return &Client{
+		YakClient: ypb.NewYakClient(conn),
+		server:    s,
+	}, err
+}
+
 func NewLocalClientWithTempDatabase(t *testing.T) (ypb.YakClient, error) {
 	var port int
 	var addr string
