@@ -136,7 +136,7 @@ func (c *Config) IsFiltered(host string, port int) bool {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
@@ -159,7 +159,7 @@ func WithDebugLog(b ...bool) ConfigOption {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
@@ -206,7 +206,7 @@ func WithOnFinished(cb func(*MatchResult)) ConfigOption {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
@@ -225,7 +225,7 @@ func WithDatabaseCache(b bool) ConfigOption {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
@@ -244,7 +244,7 @@ func WithProxy(proxies ...string) ConfigOption {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
@@ -266,7 +266,7 @@ func WithPoolSize(size int) ConfigOption {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
@@ -285,7 +285,7 @@ func WithExcludeHosts(hosts string) ConfigOption {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
@@ -387,7 +387,7 @@ func (c *Config) GetFingerprintRules() map[*NmapProbe][]*NmapMatch {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
@@ -433,7 +433,7 @@ func ParseStringToProto(protos ...interface{}) []TransportProto {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
@@ -480,7 +480,7 @@ func WithTransportProtos(protos ...TransportProto) ConfigOption {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
@@ -511,7 +511,7 @@ func WithProbeTimeout(timeout time.Duration) ConfigOption {
 // die(err)
 //
 //	for v := range result {
-//		fmt.Println(v.String())
+//		println(v.String())
 //	}
 //
 // ```
