@@ -202,3 +202,11 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.Description = ruleInput.Description
 	return rule, nil
 }
+
+func QueryBuildInRule(db *gorm.DB) []*schema.SyntaxFlowRule {
+	db = db.Model(&schema.SyntaxFlowRule{})
+	db = bizhelper.QueryByBool(db, "is_build_in_rule", true)
+	var rules []*schema.SyntaxFlowRule
+	db.Find(&rules)
+	return rules
+}
