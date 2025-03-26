@@ -113,7 +113,11 @@ func GetCacheAstBundle(fileName string, src string) (*CacheAstBundle, error) {
 	} else if cacheAstBundle, ok = cacheAstBundleMap[fileName]; ok {
 		return cacheAstBundle, nil
 	} else {
-		parsedAst, err = parser.ParseFile(fset, fileName, nil, parser.ParseComments|parser.AllErrors)
+		if !strings.Contains(fileName, `yaklang/common/yakgrpc/ypb`) {
+			parsedAst, err = parser.ParseFile(fset, fileName, nil, parser.ParseComments|parser.AllErrors)
+		} else {
+			err = utils.Errorf("skip keywork: %v", "yaklang/common/yakgrpc/ypb")
+		}
 	}
 
 	if err != nil {
