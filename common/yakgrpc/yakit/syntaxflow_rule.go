@@ -113,15 +113,22 @@ func deleteSyntaxFlowRuleEx(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest
 	}
 	db = db.Model(&schema.SyntaxFlowRule{})
 	query := db
-	query = FilterSyntaxFlowRule(query, params.Filter)
+	params.Filter.FilterRuleKind = "unBuildIn"
 	if len(isBuildIn) > 0 {
-		query = bizhelper.QueryByBool(query, "is_build_in_rule", isBuildIn[0])
+		if isBuildIn[0] {
+			params.Filter.FilterRuleKind = "buildIn"
+		} else {
+			params.Filter.FilterRuleKind = "unBuildIn"
+		}
 	}
-
+	query = FilterSyntaxFlowRule(query, params.Filter)
 	// 如果filter包含groupName,FilterSyntaxFlowRule会使用联表查询，导致无法直接db.delete()
 	// 所以需要先查出来再删除
 	var ids []uint64
 	query.Pluck("syntax_flow_rules.id", &ids)
+	if len(ids) == 0 {
+		return 0, nil
+	}
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", ids)
 	db = db.Unscoped().Delete(&schema.SyntaxFlowRule{})
 	return db.RowsAffected, db.Error
