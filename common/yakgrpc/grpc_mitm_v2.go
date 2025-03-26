@@ -44,6 +44,12 @@ var (
 	Hijack_List_Reload = "reload"
 )
 
+var (
+	Hijack_Status_Request  = "hijacking request"
+	Hijack_Status_Response = "hijacking response"
+	Hijack_Status_Waiting  = "wait hijack"
+)
+
 func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	defer func() {
 		if err := recover(); err != nil {
@@ -709,6 +715,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		taskInfo := task.infoMessage
 
+		taskInfo.Status = Hijack_Status_Response
 		taskInfo.Response = rsp
 		taskInfo.TraceInfo = model.ToLowhttpTraceInfoGRPCModel(traceInfo)
 		httpctx.SetResponseViewedByUser(req)
@@ -989,6 +996,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			URL:        urlStr,
 			RemoteAddr: httpctx.GetRemoteAddr(originReqIns),
 			Method:     lowhttp.GetHTTPRequestMethod(req),
+			Status:     Hijack_Status_Request,
 		}
 
 		task := hijackManger.register(feedbackOrigin)
@@ -1005,6 +1013,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				hijackManger.unRegister(task.taskID)
 				hijackListFeedback(Hijack_List_Delete, taskInfo)
 			} else {
+				taskInfo.Status = Hijack_Status_Waiting
 				hijackListFeedback(Hijack_List_Update, taskInfo)
 			}
 		}()
