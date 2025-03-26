@@ -58,11 +58,7 @@ func TestAITask(t *testing.T) {
 }
 
 func TestAITaskWithBreadth(t *testing.T) {
-	client, err := NewLocalClient()
-	require.NoError(t, err)
-
-	ctx := utils.TimeoutContextSeconds(60)
-	stream, err := client.StartAITask(ctx)
+	client, err := NewLocalClientForceNew()
 	require.NoError(t, err)
 
 	n, m := rand.Intn(100)+10, rand.Intn(100)+10
@@ -77,16 +73,6 @@ func TestAITaskWithBreadth(t *testing.T) {
 	mFile.Close()
 	nFileName := strings.ReplaceAll(nFile.Name(), "\\", "/")
 	mFileName := strings.ReplaceAll(mFile.Name(), "\\", "/")
-
-	stream.Send(&ypb.AIInputEvent{
-		IsStart: true,
-		Params: &ypb.AIStartParams{
-			UserQuery:                      "打开" + nFileName + "和" + mFileName + ", 计算它们的和",
-			EnableSystemFileSystemOperator: true,
-			UseDefaultAIConfig:             true,
-		},
-	})
-
 	RegisterMockAIChat(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
 		fmt.Println(strings.Repeat("=", 100))
 		fmt.Println(prompt)
@@ -175,6 +161,20 @@ func TestAITaskWithBreadth(t *testing.T) {
 
 		return "", fmt.Errorf("not implemented")
 	})
+	defer RegisterMockAIChat(nil)
+
+	ctx := utils.TimeoutContextSeconds(60)
+	stream, err := client.StartAITask(ctx)
+	require.NoError(t, err)
+	stream.Send(&ypb.AIInputEvent{
+		IsStart: true,
+		Params: &ypb.AIStartParams{
+			UserQuery:                      "打开" + nFileName + "和" + mFileName + ", 计算它们的和",
+			EnableSystemFileSystemOperator: true,
+			UseDefaultAIConfig:             true,
+		},
+	})
+
 	//
 	//mock := mockey.Mock(ai.Chat).To().Build()
 	//defer mock.Release()
@@ -206,11 +206,7 @@ func TestAITaskWithBreadth(t *testing.T) {
 }
 
 func TestAITaskWithAdjustPlan(t *testing.T) {
-	client, err := NewLocalClient()
-	require.NoError(t, err)
-
-	ctx := utils.TimeoutContextSeconds(60)
-	stream, err := client.StartAITask(ctx)
+	client, err := NewLocalClientForceNew()
 	require.NoError(t, err)
 
 	n, m := rand.Intn(100)+10, rand.Intn(100)+10
@@ -237,15 +233,6 @@ func TestAITaskWithAdjustPlan(t *testing.T) {
 	mFile.Close()
 	nFileName := strings.ReplaceAll(nFile.Name(), "\\", "/")
 	mFileName := strings.ReplaceAll(mFile.Name(), "\\", "/")
-
-	stream.Send(&ypb.AIInputEvent{
-		IsStart: true,
-		Params: &ypb.AIStartParams{
-			UserQuery:                      "打开" + nFileName + "和" + mFileName + ", 计算它们的和",
-			EnableSystemFileSystemOperator: true,
-			UseDefaultAIConfig:             true,
-		},
-	})
 
 	RegisterMockAIChat(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
 		fmt.Println(strings.Repeat("=", 100))
@@ -372,6 +359,18 @@ func TestAITaskWithAdjustPlan(t *testing.T) {
 			return `任务执行报告...`, nil
 		}
 		return "", fmt.Errorf("not implemented")
+	})
+
+	ctx := utils.TimeoutContextSeconds(60)
+	stream, err := client.StartAITask(ctx)
+	require.NoError(t, err)
+	stream.Send(&ypb.AIInputEvent{
+		IsStart: true,
+		Params: &ypb.AIStartParams{
+			UserQuery:                      "打开" + nFileName + "和" + mFileName + ", 计算它们的和",
+			EnableSystemFileSystemOperator: true,
+			UseDefaultAIConfig:             true,
+		},
 	})
 
 	existMarkdownReport := false
