@@ -8,10 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bytedance/mockey"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
-	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -89,7 +87,7 @@ func TestAITaskWithBreadth(t *testing.T) {
 		},
 	})
 
-	mock := mockey.Mock(ai.Chat).To(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
+	RegisterMockAIChat(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
 		fmt.Println(strings.Repeat("=", 100))
 		fmt.Println(prompt)
 		fmt.Println(strings.Repeat("=", 100))
@@ -176,8 +174,10 @@ func TestAITaskWithBreadth(t *testing.T) {
 		}
 
 		return "", fmt.Errorf("not implemented")
-	}).Build()
-	defer mock.Release()
+	})
+	//
+	//mock := mockey.Mock(ai.Chat).To().Build()
+	//defer mock.Release()
 
 	existMarkdownReport := false
 	for {
@@ -247,7 +247,7 @@ func TestAITaskWithAdjustPlan(t *testing.T) {
 		},
 	})
 
-	mock := mockey.Mock(ai.Chat).To(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
+	RegisterMockAIChat(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
 		fmt.Println(strings.Repeat("=", 100))
 		fmt.Println(prompt)
 		fmt.Println(strings.Repeat("=", 100))
@@ -372,8 +372,7 @@ func TestAITaskWithAdjustPlan(t *testing.T) {
 			return `任务执行报告...`, nil
 		}
 		return "", fmt.Errorf("not implemented")
-	}).Build()
-	defer mock.Release()
+	})
 
 	existMarkdownReport := false
 	reviewCount := 0
