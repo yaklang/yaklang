@@ -28,7 +28,6 @@ import (
 	systemLog "log"
 
 	"github.com/davecgh/go-spew/spew"
-	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors"
 	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
 	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/urfave/cli"
@@ -477,8 +476,8 @@ var startGRPCServerCommand = cli.Command{
 		}
 		log.Debug("start to create grpc schema...")
 		grpcTrans := grpc.NewServer(
-			grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(streamInterceptors...)),
-			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(unaryInterceptors...)),
+			grpc.ChainStreamInterceptor(streamInterceptors...),
+			grpc.ChainUnaryInterceptor(unaryInterceptors...),
 			grpc.MaxRecvMsgSize(100*1024*1024),
 			grpc.MaxSendMsgSize(100*1024*1024),
 		)
