@@ -89,7 +89,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	// }
 
 	// check is method
-	if method := GetMethod(value.GetType(), key.String()); !utils.IsNil(method) {
+	if method := GetMethod(value.GetType(), key.String(), true); !utils.IsNil(method) {
 		ret.typ = method.GetType()
 		return
 	}

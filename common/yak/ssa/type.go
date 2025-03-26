@@ -222,7 +222,7 @@ type MethodBuilder interface {
 
 var ExternMethodBuilder MethodBuilder
 
-func GetMethod(t Type, id string) *Function {
+func GetMethod(t Type, id string, peek ...bool) *Function {
 	var f *Function
 	if utils.IsNil(t) {
 		log.Error("[BUG]: type is nil")
@@ -230,7 +230,10 @@ func GetMethod(t Type, id string) *Function {
 	}
 	if fun, ok := t.GetMethod()[id]; ok {
 		f = fun
-		f.Build()
+		// peek is true, don't build
+		if len(peek) == 0 || !peek[0] {
+			f.Build()
+		}
 	}
 
 	if f == nil && ExternMethodBuilder != nil {
