@@ -5938,6 +5938,7 @@ message QuerySFBuildInRuleUpdateRequest{}
 
 message  QuerySFBuildInRuleUpdateResponse{
   bool NeedUpdate = 1;
+  UpdateSFRuleState State =2 ;
 }
 
 message UpdateSFBuildInRuleRequest{}
@@ -6512,4 +6513,8 @@ message ListAiModelRequest{
 
 message ListAiModelResponse{
   repeated string ModelName =1;
+}
+enum UpdateSFRuleState{
+  Rule_Empty = 0; // 规则为空
+  Rule_To_Update = 1; // 规则需要更新
 }
