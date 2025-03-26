@@ -174,8 +174,11 @@ func WithCache(b bool) ConfigOption {
 // @return {ConfigOption} 返回配置项
 // Example:
 // ```
-// result, err := servicescan.Scan("127.0.0.1", "22,80,443", servicescan.onOpen(result => println(result.String())))
-// for i in result { println(result.String()) }
+// result, err := servicescan.Scan("127.0.0.1", "22,80,443", servicescan.onOpen(result => dump(result.String())))
+// die(err)
+// for i in result {
+//		println(i.String())
+//	}
 // ```
 func WithOnPortOpenCallback(cb func(*MatchResult)) ConfigOption {
 	return func(config *Config) {
@@ -188,8 +191,12 @@ func WithOnPortOpenCallback(cb func(*MatchResult)) ConfigOption {
 // @return {ConfigOption} 返回配置项
 // Example:
 // ```
-// result, err := servicescan.Scan("127.0.0.1", "22,80,443", servicescan.onFinish(result => println(result.String())))
-// for i in result { println(result.String()) }
+// 	result, err := servicescan.Scan("127.0.0.1", "22,80,443", servicescan.onFinish(result => dump(result.String())))
+// 	die(err)
+//	for i in result {
+//		println(i.String())
+//	}
+//
 // ```
 func WithOnFinished(cb func(*MatchResult)) ConfigOption {
 	return func(config *Config) {
