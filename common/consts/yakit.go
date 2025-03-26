@@ -27,7 +27,7 @@ func DebugProfileDatabase() {
 }
 
 func CreateProjectDatabase(path string) (*gorm.DB, error) {
-	db, err := createAndConfigDatabase(path, SQLiteExtend)
+	db, err := createAndConfigDatabase(path)
 	if err != nil {
 		return nil, err
 	}

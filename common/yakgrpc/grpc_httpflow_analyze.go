@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
@@ -95,29 +96,51 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB, analyzeId string) (
 		}
 	}()
 
-	// 热加载和规则匹配进度条权重
-	ruleProcessPercent := 0.5
-	if !m.haveHotPatch() {
-		ruleProcessPercent = 1
+	totalCallBack := func(i int) {
+		m.allHTTPFlowCount += int64(i)
 	}
-	hotPotProcessPercent := 1 - ruleProcessPercent
-	// 执行规则
-	err := m.ExecReplacerRules(db, analyzeId, ruleProcessPercent)
-	if err != nil {
-		errs = utils.JoinErrors(errs, err)
+	flowCh := yakit.YieldHTTPFlowsEx(db, m.ctx, totalCallBack)
+	extract := func(ruleName string, flow *schema.HTTPFlow) {
+		yakit.UpdateHTTPFlowTags(db, flow)
+		analyzed := &schema.AnalyzedHTTPFlow{
+			ResultId:        analyzeId,
+			Rule:            "热加载规则",
+			RuleVerboseName: ruleName,
+			HTTPFlowId:      int64(flow.ID),
+		}
+		err := db.Save(analyzed).Error
+		if err != nil {
+			log.Infof("save analyze result failed: %s", err)
+		}
+		m.handledHTTPFlowCount++
+		m.matchedHTTPFlowCount++
+		m.notifyResult(analyzed)
+		m.notifyHandleFlowNum()
+		m.notifyMatchedHTTPFlowNum()
 	}
-	// 执行热加载
-	if m.haveHotPatch() {
-		m.ExecHotPatch(db, analyzeId, hotPotProcessPercent)
+	var count float64
+	for flow := range flowCh {
+		count++
+		m.notifyProcess(count / float64(m.allHTTPFlowCount))
+		m.notifyHandleFlowNum()
+		// hot patch
+		if m.pluginCaller != nil {
+			m.pluginCaller.CallAnalyzeHTTPFlow(m.ctx, flow, extract)
+		}
+		// mitm replace rule
+		err := m.ExecReplacerRule(db, flow, analyzeId)
+		if err != nil {
+			errs = utils.JoinErrors(errs, err)
+			continue
+		}
 	}
 	return errs
 }
 
-func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string, processPercent float64) error {
+func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPFlow, analyzeId string) error {
 	if !m.haveRules() {
 		return utils.Error("analyze rules is empty")
 	}
-
 	extractData := func(pattern string, rule *MITMReplaceRule, flow *schema.HTTPFlow, isReq bool) []schema.ExtractedData {
 		modelFull, err := model.ToHTTPFlowGRPCModelFull(flow)
 		if err != nil {
@@ -155,7 +178,6 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 		}
 		return extractedData
 	}
-
 	getAnalyzedHTTPFlow := func(rule *MITMReplaceRule, flow *schema.HTTPFlow) *schema.AnalyzedHTTPFlow {
 		m.matchedHTTPFlowCount++
 		m.notifyMatchedHTTPFlowNum()
@@ -167,17 +189,15 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 		analyzeResult.HTTPFlowId = int64(flow.ID)
 		return analyzeResult
 	}
-
 	saveAnalyzedHTTPFlow := func(result *schema.AnalyzedHTTPFlow) {
 		err := db.Save(result).Error
 		if err != nil {
 			log.Infof("save analyze result failed: %s", err)
 		}
 		m.handledHTTPFlowCount++
-		m.notifyResult(result)
 		m.notifyHandleFlowNum()
+		m.notifyResult(result)
 	}
-
 	handleColorAndTag := func(rule *MITMReplaceRule, flow *schema.HTTPFlow) {
 		err := yakit.HandleAnalyzedHTTPFlowsColorAndTag(
 			db,
@@ -189,21 +209,23 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 			log.Infof("handle analyzed http flows color and tag failed: %s", err)
 		}
 	}
-
-	totalCallBack := func(i int) {
-		m.allHTTPFlowCount++
-	}
-	// 规则处理
-	for i, rule := range m.rules {
-		m.notifyProcess(float64(i+1) / float64(len(m.rules)) * processPercent)
+	for _, rule := range m.rules {
 		re, err := rule.compile()
 		if err != nil {
 			continue
 		}
 		pattern := re.String()
+		if rule.EffectiveURL != "" {
+			yakRegexp := regexp_utils.DefaultYakRegexpManager.GetYakRegexp(rule.EffectiveURL)
+			matchString, _ := yakRegexp.MatchString(flow.Url)
+			if !matchString {
+				continue
+			}
+		}
+
 		if rule.EnableForRequest {
-			for flow := range yakit.QueryHTTPFlowsByRegexRequest(db, m.ctx, pattern, totalCallBack, rule.EffectiveURL) {
-				m.allHTTPFlowCount++
+			match, _ := re.MatchString(flow.Request)
+			if match {
 				result := getAnalyzedHTTPFlow(rule, flow)
 				if result == nil {
 					continue
@@ -214,9 +236,10 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 				handleColorAndTag(rule, flow)
 			}
 		}
+
 		if rule.EnableForResponse {
-			for flow := range yakit.QueryHTTPFlowsByRegexResponse(db, m.ctx, pattern, totalCallBack, rule.EffectiveURL) {
-				m.allHTTPFlowCount++
+			match, _ := re.MatchString(flow.Response)
+			if match {
 				result := getAnalyzedHTTPFlow(rule, flow)
 				if result == nil {
 					continue
@@ -229,43 +252,6 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRules(db *gorm.DB, analyzeId string,
 		}
 	}
 	return nil
-}
-
-func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, analyzeId string, processPercent float64) {
-	if m.pluginCaller == nil {
-		return
-	}
-	var totalQueryCount int64
-	totalCallBack := func(i int) {
-		m.allHTTPFlowCount += int64(i)
-		totalQueryCount += int64(i)
-	}
-	flowCh := yakit.YieldHTTPFlowsEx(db, m.ctx, totalCallBack)
-	extract := func(ruleName string, flow *schema.HTTPFlow) {
-		yakit.UpdateHTTPFlowTags(db, flow)
-		analyzed := &schema.AnalyzedHTTPFlow{
-			ResultId:        analyzeId,
-			Rule:            "热加载规则",
-			RuleVerboseName: ruleName,
-			HTTPFlowId:      int64(flow.ID),
-		}
-		err := db.Save(analyzed).Error
-		if err != nil {
-			log.Infof("save analyze result failed: %s", err)
-		}
-		m.handledHTTPFlowCount++
-		m.matchedHTTPFlowCount++
-		m.notifyResult(analyzed)
-		m.notifyMatchedHTTPFlowNum()
-		m.notifyHandleFlowNum()
-	}
-	var count int64
-	before := 1 - processPercent
-	for flow := range flowCh {
-		count++
-		m.pluginCaller.CallAnalyzeHTTPFlow(m.ctx, flow, extract)
-		m.notifyProcess(before + float64(count)/float64(totalQueryCount)*processPercent)
-	}
 }
 
 func (m *HTTPFlowAnalyzeManger) notifyProcess(process float64) {
@@ -288,11 +274,4 @@ func (m *HTTPFlowAnalyzeManger) notifyResult(result *schema.AnalyzedHTTPFlow) {
 	m.stream.Send(&ypb.AnalyzeHTTPFlowResponse{
 		RuleData: result.ToGRPCModel(),
 	})
-}
-
-func (m *HTTPFlowAnalyzeManger) haveHotPatch() bool {
-	if m.pluginCaller == nil {
-		return false
-	}
-	return m.pluginCaller.HaveTheHookFunc(yak.HOOK_Analyze_HTTPFlow)
 }
