@@ -45,7 +45,7 @@ jobs:
 
       - name: Init Module
         run: |
-          go mod tidy
+          go mod tidy && go work vendor
 
       - name: Init Project
         if: steps.cache-project.outputs.cache-hit != 'true'
