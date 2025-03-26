@@ -3,10 +3,12 @@ package iotdevfp
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type IotDevRule struct {
@@ -7047,20 +7049,52 @@ func (i *IotDevRule) Match(result []byte) (*IoTDevMatchResult, error) {
 
 func MatchAll(banner []byte) []*IoTDevMatchResult {
 	var res []*IoTDevMatchResult
-	for _, i := range IoTDeviceRules {
-		r, err := i.Match(banner)
-		if err != nil {
-			continue
-		}
-		res = append(res, r)
+	resultChan := make(chan *IoTDevMatchResult)
+	var wg sync.WaitGroup
+
+	for _, rule := range IoTDeviceRules {
+		wg.Add(1)
+		go func(r *IotDevRule) {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			if result, err := r.Match(banner); err == nil {
+				resultChan <- result
+			}
+		}(rule)
 	}
 
-	for _, i := range ApplicationDeviceRules {
-		r, err := i.Match(banner)
-		if err != nil {
-			continue
-		}
-		res = append(res, r)
+	for _, rule := range ApplicationDeviceRules {
+		wg.Add(1)
+		go func(r *IotDevRule) {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			if result, err := r.Match(banner); err == nil {
+				resultChan <- result
+			}
+		}(rule)
+	}
+
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Collect results
+	for result := range resultChan {
+		res = append(res, result)
 	}
 
 	return res
