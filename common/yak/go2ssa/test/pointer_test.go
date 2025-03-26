@@ -247,7 +247,6 @@ func Test_Pointer_muti(t *testing.T) {
 // todo
 func Test_Pointer_cfg(t *testing.T) {
 	t.Run("pointer cfg cross block", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 	
 			func main(){
@@ -267,6 +266,29 @@ func Test_Pointer_cfg(t *testing.T) {
 	})
 
 	t.Run("pointer cfg if", func(t *testing.T) {
+		t.Skip()
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			p := &a
+
+			if a > b {
+				a := 2
+				*p = 2
+			} else {
+				a := 3
+				*p = 3
+			}
+
+			println(*p) // phi(*p.@value)[2,3]
+			println(a)	// phi(a)[2,3]
+		}
+			
+		`, []string{"phi(*p.@value)[2,3]", "phi(a)[2,3]"}, t)
+	})
+
+	t.Run("pointer cfg if address", func(t *testing.T) {
 		t.Skip()
 		test.CheckPrintlnValue(`package main
 
