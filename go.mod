@@ -23,7 +23,7 @@ require (
 	github.com/aymanbagabas/go-pty v0.2.2
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
 	github.com/beevik/etree v1.5.0
-	github.com/bytedance/mockey v1.2.10
+	github.com/bytedance/mockey v1.2.14
 	github.com/cloudflare/circl v1.3.7
 	github.com/corpix/uarand v0.2.0
 	github.com/dave/jennifer v1.4.1
