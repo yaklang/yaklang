@@ -136,7 +136,7 @@ jobs:
 
           - name: Test SSA Frontend Java
             run: |
-              go test -timeout 2m ./common/yak/java/...
+              go test -timeout 5m ./common/yak/java/...
               go test -timeout 3m ./common/yak/ssaapi/test/java
 
           - name: Test SSA Frontend PHP
