@@ -7,9 +7,9 @@ desc(
 TEXT
 )
 
-*.execute?{<getObject><fullTypeName>?{have: /org\.apache\.http\.impl\.client\..*Client/}}(, * as $request,);
-$request<getCallee>?{<fullTypeName>?{have: /Http(Get|Post|Put|Delete|Patch|Options|Head|Trace)/}}(,* as $output,);
-$request<getCallee>?{<fullTypeName>?{have: /BasicHttpRequest/}}(,,* as $output,);
+*.execute?{<getObject><fullTypeName>?{have: /org\.apache\.http\.impl\.client\..*Client/}}(*<slice(index=1)> as $request);
+$request<getCallee>?{<fullTypeName>?{have: /Http(Get|Post|Put|Delete|Patch|Options|Head|Trace)/}}(*<slice(index=1)> as $output);
+$request<getCallee>?{<fullTypeName>?{have: /BasicHttpRequest/}}(*<slice(index=2)> as $output);
 <delete(request)>
 alert $output;
 
