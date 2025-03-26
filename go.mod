@@ -25,7 +25,7 @@ require (
 	github.com/beevik/etree v1.5.0
 	github.com/bytedance/mockey v1.2.10
 	github.com/cloudflare/circl v1.3.7
-	github.com/coreos/etcd v3.3.10+incompatible
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463
 	github.com/corpix/uarand v0.2.0
 	github.com/dave/jennifer v1.4.1
 	github.com/davecgh/go-spew v1.1.1
@@ -254,7 +254,6 @@ require (
 	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/asn1-ber.v1 v1.0.0-20181015200546-f715ec2f112d // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
