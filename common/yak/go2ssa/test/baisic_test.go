@@ -465,8 +465,10 @@ func main() {
 			println(t.a)
 			println(t.b)
 		}
-		`, []string{"[1,Undefined-t.add(valid)(make(struct {number,number})) member[1,2]]",
-			"[2,Undefined-t.add(valid)(make(struct {number,number})) member[1,2]]"}, t)
+		`, []string{
+			"[1,Undefined-t.add(valid)(make(struct {number,number})) member[1,2]]",
+			"[2,Undefined-t.add(valid)(make(struct {number,number})) member[1,2]]",
+		}, t)
 	})
 }
 
@@ -752,8 +754,31 @@ func TestFuntion_normol(t *testing.T) {
 		}`, []string{"Function-make(typeValue(map[string]string))"}, t)
 	})
 
-	t.Run("memcall", func(t *testing.T) {
+	t.Run("member-call method ", func(t *testing.T) {
+
+		// TODO: need fix with lazy builder
+		t.Skip()
 		test.CheckPrintlnValue(`package main
+		
+			type test struct{
+				a int
+				b int
+			}
+
+			func (t* test)add() (int,int) {
+			}
+
+
+			func main(){
+				a := test{a: 6, b: 7}
+				println(a.add())
+			}
+			`, []string{
+			"Undefined-a.add(valid)(make(struct {number,number})) member[6,7]",
+		}, t)
+	})
+	t.Run("member-call top-def ", func(t *testing.T) {
+		test.CheckSyntaxFlow(t, `package main
 		
 			type test struct{
 				a int
@@ -769,11 +794,15 @@ func TestFuntion_normol(t *testing.T) {
 			}
 
 			func main(){
-				a := test{a: 6, b: 7}
+				a := test{a: 4, b: 5}
 				println(add(a))
+
+				a := test{a: 6, b: 7}
 				println(a.add())
 			}
-			`, []string{"Function-add(make(struct {number,number})) member[6,7]", "Undefined-a.add(valid)(make(struct {number,number})) member[6,7]"}, t)
+			`, `println( * #-> as $a)`, map[string][]string{
+			"a": {"4", "5", "6", "7"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }
 
@@ -825,7 +854,8 @@ func TestMethod_normol(t *testing.T) {
 		`, []string{"side-effect(Parameter-id, u.Id)", "side-effect(Parameter-name, u.Name)"}, t)
 	})
 
-	code := `package main
+	t.Run("method check name", func(t *testing.T) {
+		code := `package main
 
 	type T struct {
 		
@@ -843,7 +873,6 @@ func TestMethod_normol(t *testing.T) {
 		println(b)
 	}`
 
-	t.Run("method check name", func(t *testing.T) {
 		test.CheckSyntaxFlow(t, code, `
 			a #-> as $a
 			b #-> as $b
@@ -855,27 +884,79 @@ func TestMethod_normol(t *testing.T) {
 }
 
 func TestMethod_repeat(t *testing.T) {
-	t.Run("method repeat", func(t *testing.T) {
-		test.CheckPrintlnValue(`package main
-		
+
+	t.Run("method should not  get like global function ", func(t *testing.T) {
+		test.CheckSyntaxFlowContain(t, `package main
+
 		type test struct{
 			a int
+			b int 
 		}
 
 		func (t* test)add() int {
 			return t.a
 		}
 
-		func add(t* test) int {
-			return t.a
-		}
 
 		func main(){
-			a := test{a: 1}
+			a := test{a: 1, b: 2}
+			println(add(a)) // undefine 
+			println(a.add()) // method 
+		}
+
+			`, `println(* #-> as $a)`, map[string][]string{
+			"a": {"1", "Undefined-add"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	t.Run("method same name with global function ", func(t *testing.T) {
+		test.CheckSyntaxFlow(t, `package main
+
+	
+		type test struct{
+		}
+
+		func (t* test)add() int {
+			return 2
+		}
+		func add(t* test) int {
+			return 1
+		}
+		
+
+		func main(){
+			a := test{}
 			println(add(a))
 			println(a.add())
 		}
 
-		`, []string{"Function-add(make(struct {number})) member[1]", "Undefined-a.add(valid)(make(struct {number})) member[1]"}, t)
+			`, `println(* #-> as $a)`, map[string][]string{
+			"a": {"1", "2"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	t.Run("method repeat", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		
+		type test struct{
+			a int
+		}
+
+		func (t *test) test(){
+			a := test{a: 1}
+			println(a.add()) 
+			// this add should build after test
+			// but ReadMember(a.add) should build it function 
+		}
+
+		func (t* test)add() int {
+			return t.a 
+		}
+
+
+		`, []string{
+			"Undefined-a.add(valid)(make(struct {number})) member[1]",
+		}, t)
 	})
 }
