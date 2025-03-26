@@ -7,8 +7,6 @@ import (
 	"syscall"
 	"time"
 
-	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
-	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -16,6 +14,8 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/grpc_auth"
+	"github.com/yaklang/yaklang/common/utils/grpc_recovery"
 )
 
 func GetTunnelServerCommandCli() *cli.App {
