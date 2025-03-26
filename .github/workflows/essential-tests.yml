@@ -45,10 +45,7 @@ jobs:
 
       - name: Init Module
         run: |
-          echo "remove go/pkg/mod/google.golang.org"
-          rm -rf ~/go/pkg/mod/google.golang.org
           go mod tidy && go work vendor
-
       - name: Init Project
         if: steps.cache-project.outputs.cache-hit != 'true'
         run: |
