@@ -99,7 +99,8 @@ func (r *RecursiveConfig) compileAndRun(value sf.ValueOperator) map[sf.Recursive
 		return false
 	}
 	ret := make(map[sfvm.RecursiveConfigKey]struct{})
-	for _, item := range r.configItems {
+	for index, item := range r.configItems {
+		_ = index
 		// if !item.SyntaxFlowRule {
 		// 	continue
 		// }

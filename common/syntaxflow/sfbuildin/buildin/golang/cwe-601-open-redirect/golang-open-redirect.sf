@@ -16,7 +16,7 @@ TEXT
 )
 
 http?{<fullTypeName>?{have: 'net/http'}} as $http;
-$http.Redirect(,, * #-> as $target);
+$http.Redirect(*<slice(index=2)> #-> as $target);
 
 url?{<fullTypeName>?{have: 'net/url'}} as $url;
 $url.Parse(* #-> as $param);

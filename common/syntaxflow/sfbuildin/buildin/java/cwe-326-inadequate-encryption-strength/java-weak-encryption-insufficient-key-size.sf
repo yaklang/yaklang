@@ -9,7 +9,7 @@ desc(
 TEXT
 )
 
-RSAKeyGenParameterSpec?{<typeName>?{have:'java.security.spec.RSAKeyGenParameterSpec'}}(,* as $keySize,);
+RSAKeyGenParameterSpec?{<typeName>?{have:'java.security.spec.RSAKeyGenParameterSpec'}}(*<slice(index=1)> as $keySize);
 $keySize#{
     include:`* ?{opcode:const}`
 }-> as $size;

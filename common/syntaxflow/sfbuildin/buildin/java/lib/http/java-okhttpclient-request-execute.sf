@@ -5,7 +5,7 @@ desc(
     lib: "java-okhttpclient-request-execute",
 )
 
-Request.Builder()?{<typeName>?{have: 'okhttp'}}...url(,* as $output);
+Request.Builder()?{<typeName>?{have: 'okhttp'}}...url(*<slice(index=1)> as $output);
 alert $output;
 
 desc(
