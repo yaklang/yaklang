@@ -11,7 +11,7 @@ TEXT
 <include('java-spring-param')> as $params;
 check $params;
 $params?{<getFunc><getReturns><typeName>?{have: ResponseEntity}<show>} as $entry;
-ResponseEntity.ok()?{<self>...body(, * as $bodyParam)} as $sinkCaller;
+ResponseEntity.ok()?{<self>...body(*<slice(index=1)> as $bodyParam)} as $sinkCaller;
 check $bodyParam;
 $entry -{
     until: <<<CODE

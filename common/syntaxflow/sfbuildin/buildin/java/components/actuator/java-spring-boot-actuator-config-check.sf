@@ -26,7 +26,7 @@ $webSecurity...ignoring().antMatchers(* #-> *?{opcode:const} as $allow)
 
 HttpSecurity?{<typeName>?{have:'org.springframework.security.config.annotation.web.builders.HttpSecurity'}} as $httpSecurity;
 $httpSecurity...antMatchers?{<getCall()>.permitAll} as $match;
-$match(,* as $allow);
+$match(*<slice(index=1)> as $allow);
 $allow#{
     include:`*?{opcode:const && have:'/actuator/**'}`,
 }-> as $sink;

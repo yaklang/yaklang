@@ -8,8 +8,8 @@ desc(
 TEXT
 )
 
-setCipherKey(,* as $key);
-$key?{opcode: call && <getCallee>?{<getObject><name>?{have: Base64} && <name>?{have: 'Base64.decode'}}(,*?{opcode: const}<var(base64EncodedKey)>) } as $sink;
+setCipherKey(*<slice(index=1)> as $key);
+$key?{opcode: call && <getCallee>?{<getObject><name>?{have: Base64} && <name>?{have: 'Base64.decode'}}(*<slice(index=1)> *?{opcode: const}<var(base64EncodedKey)>) } as $sink;
 alert $base64EncodedKey for { level: high };
 alert $sink for { level: mid };
 

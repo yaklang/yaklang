@@ -9,23 +9,17 @@ desc(
 TEXT
 )
 
-// new File("aaaa.txt")
-File?{<typeName>?{have: 'java.io.File'}}(,* as $javaIOFileParam);
+File?{<typeName>?{have: 'java.io.File'}}(*<slice(index=1)> as $javaIOFileParam)
 
-// PrintWriter writer = new PrintWriter("example.txt", "UTF-8");
-PrintWriter(,* as $printWriterFilenames);
+PrintWriter(*<slice(index=1)> as $printWriterFilenames);
 
-// FileOutputStream outputStream = new FileOutputStream("example.txt");
-FileOutputStream(,*  as $javaIOFileStreamName);
+FileOutputStream(*<slice(index=1)> as $javaIOFileStreamName);
 
-// java.io.FileWriter
-FileWriter(, * as $javaIOFileName);
+FileWriter(*<slice(index=1)> as $javaIOFileName);
 
-// java.nio.file.Files
-Files?{<typeName>?{have: 'java.nio'}}.write(,* as $nioParam)
+Files?{<typeName>?{have: 'java.nio'}}.write(*<slice(index=1)> as $nioParam)
 
-// RandomAccessFile file = new RandomAccessFile("example.txt", "rw");
-RandomAccessFile?{*().write()}(,* as $randomAccessFile,);
+RandomAccessFile?{*().write()}(*<slice(index=1)> as $randomAccessFile,);
 
 $randomAccessFile as $output;
 $javaIOFileParam as $output;

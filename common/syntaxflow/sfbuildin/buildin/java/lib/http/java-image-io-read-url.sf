@@ -9,7 +9,7 @@ TEXT
 )
 
 ImageIO.read(*?{<typeName>?{have: URL}} as $params);
-$params<getCallee>(,* as $output);
+$params<getCallee>(*<slice(index=1)> as $output);
 alert $output;
 
 desc(

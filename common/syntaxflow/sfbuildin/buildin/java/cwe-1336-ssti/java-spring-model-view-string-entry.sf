@@ -12,7 +12,7 @@ TEXT
 <include('java-spring-param')>?{<typeName>?{have: "String"}} as $param;
 $param<getFunc><getReturns> as $returns;
 $returns?{<typeName>?{have: "ModelAndView"}} as $result;
-$result.addObject(,,* as $sourceEntry);
+$result.addObject(*<slice(index=2)> as $sourceEntry);
 $sourceEntry<show> #{
     until: `* & $param as $source`,
 }->;
