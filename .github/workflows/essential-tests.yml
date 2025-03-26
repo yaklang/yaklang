@@ -45,6 +45,8 @@ jobs:
 
       - name: Init Module
         run: |
+          echo "remove go/pkg/mod/google.golang.org/genproto"
+          rm -rf ~/go/pkg/mod/google.golang.org/genproto
           go mod tidy && go work vendor
 
       - name: Init Project
