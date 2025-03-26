@@ -19,8 +19,11 @@ jobs:
         with:
           path: |
             ~/yakit-projects
+            ~/go/pkg/mod
             ${{ github.workspace }}
-          key: go-${{ github.event.pull_request.head.sha }}
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-
 
       - name: Check out code into the Go module directory
         if: steps.cache-project.outputs.cache-hit != 'true'
