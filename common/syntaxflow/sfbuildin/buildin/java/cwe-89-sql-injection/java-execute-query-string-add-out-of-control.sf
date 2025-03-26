@@ -11,12 +11,12 @@ desc(
 DESC
 )
 
-.createStatement().executeQuery(, * as $params);
+.createStatement().executeQuery(*<slice(index=1)> as $params);
 check $params;
 
 // support StringBuilder
 // from `strBuilder.toString()` to `strBuilder.append($appendParams)` 
-$params<getCallee>?{<name>?{have:toString}}<getObject>.append(, * as $appendParams)
+$params<getCallee>?{<name>?{have:toString}}<getObject>.append(*<slice(index=1)> as $appendParams)
 
 $params<getFunc>(* as $limited)
 

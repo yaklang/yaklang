@@ -8,7 +8,7 @@ TEXT
 )
 
 
-SpelExpressionParser().parseExpression(,* as $params) as $call;
+SpelExpressionParser().parseExpression(*<slice(index=1)> as $params) as $call;
 check $call;
 check $params;
 alert $params;
