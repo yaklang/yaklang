@@ -10,7 +10,7 @@ TEXT
 
 gin?{<fullTypeName>?{have: 'github.com/gin-gonic/gin'}} as $entry;
 $entry.Default() as $default;
-$default.*(,* as $handle);
+$default.*(*<slice(index=1)> as $handle);
 $handle(* as $output)
 
 alert $output

@@ -10,7 +10,7 @@ TEXT
 )
 
 // AlgorithmParameterSpec paramSpec = new PBEParameterSpec(SALT, ITERATION_COUNT);
-PBEParameterSpec?{<typeName>?{have:'javax.crypto.spec.PBEParameterSpec'}}(,* as $salt,);
+PBEParameterSpec?{<typeName>?{have:'javax.crypto.spec.PBEParameterSpec'}}(*<slice(index=1)> as $salt);
 // Make元素全部为const那么就认为可能存在硬编码
 $salt?{!(.*#{exclude:`* ?{opcode:const}`}->)} as $toCheck;
 // salt没有被如random.nextBytes(salt)这样的函数修正过

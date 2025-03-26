@@ -10,7 +10,7 @@ TEXT
 )
 
 
-getClass()<show>.getMethod(,* as $entry).invoke(,* as $entry);
+getClass()<show>.getMethod(*<slice(index=1)> as $entry).invoke(*<slice(index=1)> as $entry);
 $entry #{
     until: `*?{opcode: param}<var(params)> as $__next__`,
 }->;

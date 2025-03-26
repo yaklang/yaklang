@@ -15,7 +15,7 @@ ldap_read(*<slice(start=1)> as $query)
 ldap_add(*<slice(start=2)> as $query)
 ldap_delete(*<slice(start=1)> as $query)
 /ldap_mod_(add|del|replace)/(*<slice(start=2)> as $query)
-ldap_compare(,* as $query);
+ldap_compare(*<slice(index=1)> as $query);
 
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
