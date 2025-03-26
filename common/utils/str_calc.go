@@ -5,11 +5,11 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/glaslos/ssdeep"
 	"github.com/mfonda/simhash"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/mixer"
+	"github.com/yaklang/yaklang/common/utils/ssdeep"
 	"gopkg.in/fatih/set.v0"
 )
 
