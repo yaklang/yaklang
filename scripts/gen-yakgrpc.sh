@@ -100,6 +100,42 @@ else
   echo "YAKIT repository not found, skipping replacement step"
 fi
 
+# Check and install google.golang.org/grpc plugins
+echo "Checking protoc-gen-go-grpc version..."
+if ! command -v protoc-gen-go-grpc &> /dev/null; then
+    echo "protoc-gen-go-grpc not found. Installing protoc-gen-go-grpc v1.5.1..."
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+    echo "protoc-gen-go-grpc installation completed"
+fi
+
+echo "Checking protoc-gen-go version..."
+if ! command -v protoc-gen-go &> /dev/null; then
+    echo "protoc-gen-go not found. Installing protoc-gen-go v1.36.6..."
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6
+    echo "protoc-gen-go installation completed"
+fi
+
+# Verify versions
+echo "Verifying protoc-gen-go version..."
+PROTOC_GEN_GO_VERSION=$(protoc-gen-go --version 2>&1)
+if [[ "$PROTOC_GEN_GO_VERSION" != *"v1.36.6"* ]]; then
+    echo "Warning: protoc-gen-go version mismatch. Expected v1.36.6, got ${PROTOC_GEN_GO_VERSION}"
+    echo "Installing correct version of protoc-gen-go..."
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6
+    echo "Correct version of protoc-gen-go installed successfully"
+fi
+
+echo "Verifying protoc-gen-go-grpc version..."
+PROTOC_GEN_GO_GRPC_VERSION=$(protoc-gen-go-grpc --version 2>&1)
+if [[ "$PROTOC_GEN_GO_GRPC_VERSION" != *"1.5.1"* ]]; then
+    echo "Warning: protoc-gen-go-grpc version mismatch. Expected v1.5.1, got ${PROTOC_GEN_GO_GRPC_VERSION}"
+    echo "Installing correct version of protoc-gen-go-grpc..."
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+    echo "Correct version of protoc-gen-go-grpc installed successfully"
+fi
+
+
+
 echo "Starting generation of yakgrpc Go code..."
 protoc \
   --go-grpc_out=common/yakgrpc/ypb \
