@@ -137,7 +137,7 @@ require (
 	golang.org/x/text v0.21.0
 	golang.org/x/time v0.5.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
-	google.golang.org/grpc v1.60.1
+	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/fatih/set.v0 v0.2.1
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
