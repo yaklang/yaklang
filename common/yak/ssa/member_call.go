@@ -142,7 +142,7 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
 			fun.SetObject(object)
 			un := writeUndefined()
-			memberHandler(res.typ, un)
+			memberHandler(fun.GetType(), un)
 			return un
 		}
 	}
