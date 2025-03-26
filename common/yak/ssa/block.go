@@ -52,6 +52,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 	b.SetName(name)
 	b.SetFunc(f)
 	b.SetBlock(b)
+	b.GetProgram().SetVirtualRegister(b)
 	if !nodAddToBlocks {
 		addToBlocks(b)
 	}
@@ -79,7 +80,6 @@ func addToBlocks(block *BasicBlock) {
 
 	block.Index = index
 	f.Blocks = append(f.Blocks, block)
-	block.GetProgram().SetVirtualRegister(block)
 }
 
 func (b *BasicBlock) SetScope(s ScopeIF) {

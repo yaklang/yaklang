@@ -165,10 +165,12 @@ func (c *Blueprint) GetSuperBlueprint() *Blueprint {
 	if c == nil {
 		return nil
 	}
-	if c.SuperBlueprints == nil || len(c.SuperBlueprints) == 0 {
+	if len(c.SuperBlueprints) == 0 {
 		return nil
 	}
-	return c.SuperBlueprints[0]
+	ret := c.SuperBlueprints[0]
+	ret.Build()
+	return ret
 }
 
 // GetSuperBlueprints 获取父类，用于多继承
