@@ -3,14 +3,22 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+type aiChatType func(string, ...aispec.AIConfigOption) (string, error)
+
+var mockedAIChat aiChatType = nil
+
+func RegisterMockAIChat(c aiChatType) {
+	mockedAIChat = c
+}
 
 func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	firstMsg, err := stream.Recv()
@@ -55,6 +63,10 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 
 	if startParams.GetUseDefaultAIConfig() {
 		opts = append(opts, aid.WithAICallback(aid.AIChatToAICallbackType(ai.Chat)))
+	}
+
+	if mockedAIChat != nil {
+		opts = append(opts, aid.WithAICallback(aid.AIChatToAICallbackType(mockedAIChat)))
 	}
 
 	engine, err := aid.NewCoordinatorContext(baseCtx, startParams.GetUserQuery(), opts...)
