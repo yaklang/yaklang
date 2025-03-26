@@ -1,9 +1,11 @@
 package go2ssa
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -129,7 +131,9 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					continue
 				}
 				// fun, _ := ssa.ToFunction(bp.Constructor)
+				log.Infof("add interface funcName = %s", fun.GetName())
 				fun.AddLazyBuilder(func() {
+					log.Infof("build interface funcName = %s", fun.GetName())
 					switchHandler := b.SwitchFunctionBuilder(store)
 					defer func() {
 						switchHandler()
@@ -669,7 +673,9 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
+	log.Infof("add function funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
+		log.Infof("build function funcName = %s", funcName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer func() {
 			switchHandler()
@@ -752,8 +758,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		methodName = Name.GetText()
 		if recove := fun.Receiver(); recove != nil {
 			ssatypName = b.getReceiver(recove.(*gol.ReceiverContext))
-			//funcName = fmt.Sprintf("%s_%s", ssatypName[0], methodName)
-			funcName = methodName
+			funcName = fmt.Sprintf("%s$%s", ssatypName[0], methodName)
 		}
 	}
 
@@ -806,7 +811,9 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
+	log.Infof("add method funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
+		log.Infof("build method funcName = %s", funcName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer func() {
 			switchHandler()
@@ -2070,7 +2077,7 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 func HandleFullTypeNames(t ssa.Type, path []string) ssa.Type {
 	if b, ok := ssa.ToBasicType(t); ok {
 		t = ssa.NewBasicType(b.Kind, b.GetName())
-		t.SetFullTypeNames(path)
 	}
+	t.SetFullTypeNames(path)
 	return t
 }
