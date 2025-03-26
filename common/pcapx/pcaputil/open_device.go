@@ -322,7 +322,8 @@ func (w *PcapHandleWrapper) ReadPacketData() ([]byte, gopacket.CaptureInfo, erro
 	if w.isClose {
 		return nil, gopacket.CaptureInfo{}, utils.Errorf("handle is closed")
 	}
-	return w.handle.ReadPacketData()
+	data, ci, err := w.handle.ReadPacketData()
+	return data, gopacket.CaptureInfo(ci), err
 }
 
 func (w *PcapHandleWrapper) close() {
@@ -339,7 +340,7 @@ func (w *PcapHandleWrapper) close() {
 func (w *PcapHandleWrapper) Error() (err error) {
 	defer func() {
 		if panicError := recover(); panicError != nil {
-			err = utils.Error("pcap handler get erro panic")
+			err = utils.Error("pcap handler get error panic")
 		}
 	}()
 
@@ -374,7 +375,7 @@ func (w *PcapHandleWrapper) CompileBPFFilter(expr string) ([]pcap.BPFInstruction
 }
 
 func (w *PcapHandleWrapper) LinkType() layers.LinkType {
-	return w.handle.LinkType()
+	return layers.LinkType(w.handle.LinkType())
 }
 
 func (w *PcapHandleWrapper) ListDataLinks() ([]pcap.Datalink, error) {
@@ -390,7 +391,7 @@ func (w *PcapHandleWrapper) NewBPFInstructionFilter(bpfInstructions []pcap.BPFIn
 }
 
 func (w *PcapHandleWrapper) Resolution() gopacket.TimestampResolution {
-	return w.handle.Resolution()
+	return gopacket.TimestampResolution(w.handle.Resolution())
 }
 
 func (w *PcapHandleWrapper) SetBPFFilter(expr string) error {
@@ -418,5 +419,6 @@ func (w *PcapHandleWrapper) SnaLen() int {
 }
 
 func (w *PcapHandleWrapper) ZeroCopyReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
-	return w.handle.ZeroCopyReadPacketData()
+	data, ci, err := w.handle.ZeroCopyReadPacketData()
+	return data, gopacket.CaptureInfo(ci), err
 }

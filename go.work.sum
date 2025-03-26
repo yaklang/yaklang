@@ -91,6 +91,9 @@ github.com/intel-go/cpuid v0.0.0-20200819041909-2aa72927c3e2/go.mod h1:RmeVYf9Xr
 github.com/julienschmidt/httprouter v1.2.0 h1:TDTW5Yz1mjftljbcKqRcrYhd4XeOoI98t+9HbQbYf7g=
 github.com/kaey/framebuffer v0.0.0-20140402104929-7b385489a1ff h1:eK9dwGbaOkNQ44GPFD571d+51Qa2AGIYAR3kpjsrhLE=
 github.com/kaey/framebuffer v0.0.0-20140402104929-7b385489a1ff/go.mod h1:tS4qtlcKqtt3tCIHUflVSqeP3CLH5Qtv2szX9X2SyhU=
+github.com/kataras/golog v0.0.12 h1:Q4bEE0tLGSD1L4dU2h4OAfTD1AikKQv3pQjpTuxkXtE=
+github.com/kataras/golog v0.0.12/go.mod h1:HQnkQWjOvu8N/Whh1VEa++T/7sv5kASQxbflwcXURFc=
+github.com/kataras/pio v0.0.5/go.mod h1:NFfMp2kVP1rmV4N6gH6qgWpuoDKlrOeYi3VrAIWCGsE=
 github.com/kisielk/errcheck v1.5.0 h1:e8esj/e4R+SAOwFwN+n3zr0nYeCyeweozKfO23MvHzY=
 github.com/kisielk/gotool v1.0.0 h1:AV2c/EiW3KqPNT9ZKl07ehoAGi4C5/01Cfbblndcapg=
 github.com/klauspost/pgzip v1.2.4 h1:TQ7CNpYKovDOmqzRHKxJh0BeaBI7UdQZYc6p7pMQh1A=
@@ -188,6 +191,7 @@ go.uber.org/zap v1.10.0 h1:ORx85nbTijNz8ljznvCMR1ZBIPKFn3jQrag10X2AsuM=
 golang.org/x/crypto v0.17.0/go.mod h1:gCAAfMLgwOJRpTjQ2zCCt2OcSfYMTeZVSRtQlPC7Nq4=
 golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3 h1:XQyxROzUlZH+WIQwySDgnISgOivlhjIEwaQaJEJrrN0=
 golang.org/x/lint v0.0.0-20200302205851-738671d3881b h1:Wh+f8QHJXR411sJR8/vRBTZ7YapZaRvUcLFFJhusH0k=
+golang.org/x/mod v0.17.0 h1:zY54UmvipHiNd+pm+m0x9KhZ9hl1/7QNMyxXbc6ICqA=
 golang.org/x/net v0.21.0/go.mod h1:bIjVDfnllIU7BJ2DNgfnXvpSvtn8VRwhlsaeUTyUS44=
 golang.org/x/sys v0.0.0-20190606203320-7fc4e5ec1444/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200217220822-9197077df867/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
