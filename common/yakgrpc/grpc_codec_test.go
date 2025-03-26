@@ -75,6 +75,27 @@ func TestGRPCMUSTPASS_COMMON_CODEC_Filetag(t *testing.T) {
 	}
 }
 
+func TestGRPCMUSTPASS_COMMON_CODEC_request_from_url(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rsp, err := client.Codec(context.Background(), &ypb.CodecRequest{
+		Text: "https://www.example.com/abc",
+		Type: "request-from-url",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(rsp.GetResult(), "/abc HTTP/") {
+		t.Fatal("filetag codec fail")
+	}
+	if !strings.Contains(rsp.GetResult(), "User-Agent: ") {
+		t.Fatal("filetag codec fail")
+	}
+}
+
 func TestGRPCNewCodec(t *testing.T) {
 	workFlow := []*ypb.CodecWork{
 		{

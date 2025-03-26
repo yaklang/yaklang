@@ -175,6 +175,18 @@ func simpleDumpHTTPRequest(r *http.Request) []byte {
 	}
 
 	buf.WriteString(CRLF)
+	//Accept-Encoding: gzip, deflate, br
+	//Accept: */*
+	//Accept-Language: en-US;q=0.9,en;q=0.8
+	//User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36
+	//Connection: close
+	//Cache-Control: max-age=0
+	buf.WriteString("Accept-Encoding: gzip, deflate, br\r\n")
+	buf.WriteString("Accept: */*\r\n")
+	buf.WriteString("Accept-Language: en-US;q=0.9,en;q=0.8\r\n")
+	buf.WriteString("User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\r\n")
+	buf.WriteString("Cache-Control: max-age=0\r\n")
+	buf.WriteString("\r\n")
 	return buf.Bytes()
 }
 
