@@ -332,7 +332,7 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 		$entry.test as $output
 `, map[string][]string{
 			"entry":  {"Undefined-function1()"},
-			"output": {"Undefined-a.test(valid)"},
+			"output": {"Undefined-a.test"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 
@@ -357,7 +357,7 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 		$entry.test as $output
 `, map[string][]string{
 			"entry":  {"Undefined-function1()"},
-			"output": {"Undefined-a.test(valid)"},
+			"output": {"Undefined-a.test"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 
@@ -377,8 +377,8 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 		function1() as $f1
 		function2() as $f2
 
-		$f1.test(* #-> as $output1) 
-		$f2.test(* #-> as $output2) 
+		$f1.test(, * #-> as $output1) 
+		$f2.test(, * #-> as $output2) 
 `, map[string][]string{
 			"output1": {"1"},
 			"output2": {"1", "2"},
@@ -412,10 +412,10 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 		function3() as $f3
 		function4() as $f4
 
-		$f1.test(* #-> as $output1) 
-		$f2.test(* #-> as $output2) 
-		$f3.test(* #-> as $output3) 
-		$f4.test(* #-> as $output4) 
+		$f1.test(, * #-> as $output1) 
+		$f2.test(, * #-> as $output2) 
+		$f3.test(, * #-> as $output3) 
+		$f4.test(, * #-> as $output4) 
 `, map[string][]string{
 			"output1": {"1", "5"},
 			"output2": {"2", "4", "5"},
@@ -441,8 +441,9 @@ func Test_ImportPackage_WithPhi(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 		template?{<fullTypeName>?{have: 'github.com/your/template'}} as $entry;
 		$entry.New() as $new;
-		$new.Parse() <getMembers> as $parse;
-		$parse.Execute(* #-> as $sink);
+		$new.Parse() as $tmp 
+		// $tmp.*  as $parse;
+		$tmp.Execute(, * #-> as $sink);
 		`, map[string][]string{
 			"sink": {"Undefined-w", "Undefined-messages"},
 		}, ssaapi.WithLanguage(ssaapi.GO))

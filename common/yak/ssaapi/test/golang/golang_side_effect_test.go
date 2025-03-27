@@ -708,11 +708,11 @@ func main() {
 	t.Run("value can find side-effect member", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 			sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
-			$entry.Open <getCall> as $db;
-			$db <getMembers> as $output;
-			$output.Query as $query;
+			$entry.Open()  as $db;
+			$db.* as $output;
+			$output(, * as $sink);
 	`, map[string][]string{
-			"query": {"Undefined-db.Query(valid)"},
+			"sink": {`"11111111111"`},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }

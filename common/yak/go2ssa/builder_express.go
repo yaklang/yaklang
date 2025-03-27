@@ -196,10 +196,10 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 		if ret := exp.DOT(); ret != nil {
 			id := exp.IDENTIFIER()
-			test := id.GetText()
+			text := id.GetText()
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
-				if key := typ.GetKeybyName(test); key != nil {
+				if key := typ.GetKeybyName(text); key != nil {
 					leftv = b.CreateMemberCallVariable(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {
@@ -208,7 +208,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 							b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
 							return
 						}
-						if key := a.GetKeybyName(test); key != nil {
+						if key := a.GetKeybyName(text); key != nil {
 							handleObjectType(rv, a)
 						}
 					}
@@ -220,7 +220,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			if leftv == nil {
-				leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(test))
+				leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(text))
 			}
 		}
 	} else {
@@ -250,7 +250,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				_ = a
 			}
 
-			readMemberCall := func(key ssa.Value) ssa.Value {
+			readMemberCall := func(rv, key ssa.Value) ssa.Value {
 				if len(isFunction) > 0 && isFunction[0] {
 					return b.ReadMemberCallMethod(rv, key)
 				}
@@ -259,30 +259,22 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
 				if key := typ.GetKeybyName(text); key != nil {
-					rightv = readMemberCall(key)
+					rightv = readMemberCall(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {
 						/*
 						 a.A.b
 						*/
-						if text == n {
-							rightv = b.ReadMemberCallValueByName(rv, n)
-							if rightv == nil {
-								b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
+						rvt := rv
+						if key := a.GetKeybyName(text); !utils.IsNil(key) {
+							rvt = b.ReadMemberCallValueByName(rv, n)
+							if rvt == nil {
+								rvt = readMemberCall(rv, key)
+								rightv = rvt
+								break
 							}
-							break
-						} else {
-							rvt := rv
-							if key := a.GetKeybyName(text); !utils.IsNil(key) {
-								rvt = b.ReadMemberCallValueByName(rv, n)
-								if rvt == nil {
-									rvt = readMemberCall(key)
-									rightv = rvt
-									break
-								}
-							}
-							handleObjectType(rvt, a)
 						}
+						handleObjectType(rvt, a)
 					}
 				}
 			}
@@ -294,7 +286,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			if rightv == nil {
-				rightv = readMemberCall(b.EmitConstInst(text))
+				rightv = readMemberCall(rv, b.EmitConstInst(text))
 				rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
 			}
 			log.Infof("rightv = %v", rightv)

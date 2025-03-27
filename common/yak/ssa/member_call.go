@@ -101,7 +101,15 @@ func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, met
 func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key Value, wantFunction bool) Value {
 	// create undefined memberCall value if the value can not be peeked
 	name := res.name
-	memberHandler := func(typ Type, member Value) {
+	// normal method
+	typ := res.typ
+	if wantFunction {
+		// this get will call function Builder, then should refresh the typ
+		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
+			typ = fun.GetType()
+		}
+	}
+	memberHandler := func(member Value) {
 		// todo: phi type is anytype,unknown other value
 		if typ == nil || typ.GetTypeKind() == AnyTypeKind {
 			if wantFunction {
@@ -137,40 +145,32 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 
 		return un
 	}
-	// normal method
-	if wantFunction {
-		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
-			fun.SetObject(object)
-			un := writeUndefined()
-			memberHandler(fun.GetType(), un)
-			return un
-		}
-	}
 	if para, ok := ToParameter(object); ok {
 		if member, ok2 := para.GetStringMember(key.String()); ok2 {
 			return member
 		}
 		member := b.NewParameterMember(name, para, key)
 
-		memberHandler(res.typ, member)
+		memberHandler(member)
 		return member
 	}
 	config := b.prog.config
 	if member, ok := ToParameterMember(object); ok {
 		if !wantFunction || config.isSupportConstMethod {
 			parameterMember := b.NewMoreParameterMember(name, member, key)
-			memberHandler(res.typ, parameterMember)
+			memberHandler(parameterMember)
 			return parameterMember
 		}
 	}
 	if ret := b.getStaticFieldValue(object, key, wantFunction); ret != nil {
 		return ret
 	}
-	if field := b.getDefaultMemberOrMethodByClass(object, key, wantFunction); !utils.IsNil(field) {
+	// this function only try get value field
+	if field := b.getDefaultMemberOrMethodByClass(object, key, false); !utils.IsNil(field) {
 		return field
 	}
 	un := writeUndefined()
-	memberHandler(res.typ, un)
+	memberHandler(un)
 	return un
 }
 
