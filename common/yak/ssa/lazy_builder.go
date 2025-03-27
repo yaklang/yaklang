@@ -73,16 +73,22 @@ func (p *Program) VisitAst(ast ASTIF) {
 }
 
 func (p *Program) LazyBuild() {
-	for _, blueprint := range p.Blueprint.GetMap() {
+	for _, key := range p.Blueprint.Keys() {
+		blueprint, ok := p.Blueprint.Get(key)
+		_ = ok
 		blueprint.Build()
 	}
-	for _, fun := range p.Funcs.GetMap() {
+	for _, key := range p.Funcs.Keys() {
+		fun, ok := p.Funcs.Get(key)
+		_ = ok
 		fun.Build()
 	}
 	for _, f := range p.fixImportCallback {
 		f()
 	}
-	for _, blueprint := range p.Blueprint.GetMap() {
+	for _, key := range p.Blueprint.Keys() {
+		blueprint, ok := p.Blueprint.Get(key)
+		_ = ok
 		blueprint.BuildConstructorAndDestructor()
 	}
 }
