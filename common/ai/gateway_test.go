@@ -40,7 +40,7 @@ func TestAutoUpdateAiList(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() {           // restore the original value
+	defer func() { // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
@@ -79,18 +79,17 @@ type TestGateway struct {
 }
 
 func (t *TestGateway) GetModelList() ([]*aispec.ModelMeta, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, nil
 }
 
 func (t *TestGateway) SupportedStructuredStream() bool {
-	//TODO implement me
-	panic("implement me")
+	return false
 }
 
 func (t *TestGateway) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
-	//TODO implement me
-	panic("implement me")
+	ch := make(chan *aispec.StructuredData)
+	defer close(ch)
+	return ch, nil
 }
 
 func (t *TestGateway) Chat(s string, function ...aispec.Function) (string, error) {
@@ -99,18 +98,15 @@ func (t *TestGateway) Chat(s string, function ...aispec.Function) (string, error
 }
 
 func (t *TestGateway) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, nil
 }
 
 func (t *TestGateway) ChatStream(s string) (io.Reader, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, nil
 }
 
 func (t *TestGateway) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (t *TestGateway) LoadOption(opt ...aispec.AIConfigOption) {
@@ -134,7 +130,7 @@ func TestClientStreamExtInfo(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() {           // restore the original value
+	defer func() { // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
