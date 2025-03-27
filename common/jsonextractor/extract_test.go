@@ -82,3 +82,9 @@ func TestExtractJsonWithQuote(t *testing.T) {
 	assert.Equal(t, 1, len(res))
 	assert.Equal(t, "{\"a\":1}", res[0])
 }
+
+func TestExtractJsonStringQuote(t *testing.T) {
+	res := ExtractStandardJSON("`" + `{"a":"c:\\"}`)
+	assert.Equal(t, 1, len(res))
+	assert.Equal(t, "{\"a\":\"c:\\\\\"}", res[0])
+}
