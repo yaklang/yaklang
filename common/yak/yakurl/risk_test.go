@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/google/uuid"
@@ -17,6 +18,22 @@ import (
 
 func initRiskTest(t *testing.T, programName string) {
 	db := ssadb.GetDB()
+	/*
+		--programName (5)
+			--a.go (1)
+				-- funcA (1)
+					-- test1
+			--b/b1.go (1)
+				-- funcB1 (1)
+					-- test2
+			--b/b2.go (1)
+				-- funcB2 (1)
+					-- test3
+			--c.go (2)
+				-- funcC (2)
+					-- test4
+					-- test5
+	*/
 
 	err := yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
@@ -64,241 +81,178 @@ func initRiskTest(t *testing.T, programName string) {
 	require.NoError(t, err)
 }
 
+type data struct {
+	Name  string
+	Type  string
+	Count int
+}
+
+func GetSSARisk(t *testing.T, local ypb.YakClient, url *ypb.YakURL) map[string]data {
+	req := &ypb.RequestYakURLParams{
+		Method: "GET",
+		Url:    url,
+	}
+	res, err := local.RequestYakURL(context.Background(), req)
+	require.NoError(t, err)
+	got := make(map[string]data)
+	for _, resource := range res.GetResources() {
+		var count, filterCount int
+		for _, extra := range resource.Extra {
+			if extra.Key == "count" {
+				count, err = strconv.Atoi(extra.Value)
+				require.NoError(t, err)
+			}
+			if extra.Key == "filter" {
+				var filter *ypb.SSARisksFilter
+				err = json.Unmarshal([]byte(extra.Value), &filter)
+				require.NoError(t, err)
+				_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
+				require.NoError(t, err)
+				filterCount = len(risks)
+			}
+		}
+		require.Equal(t, count, filterCount)
+		got[resource.ResourceName] = data{
+			Name:  resource.ResourceName,
+			Type:  resource.ResourceType,
+			Count: count,
+		}
+	}
+	return got
+}
+
 func TestRiskAction(t *testing.T) {
 	programName1 := uuid.NewString()
 	initRiskTest(t, programName1)
 	programName2 := uuid.NewString()
 	initRiskTest(t, programName2)
 
-	local, err := yakgrpc.NewLocalClient()
-	if err != nil {
-		t.Error(err)
-	}
-	t.Run("check risk action root", func(t *testing.T) {
-		// ssarisk://
-		url := &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssarisk",
-				Path:   "/",
-			},
-			Body: []byte(""),
-		}
-		res, err := local.RequestYakURL(context.Background(), url)
-		require.NoError(t, err)
-		require.Equal(t, len(res.GetResources()), 2)
-		check := res.GetResources()
-		_ = check
-
-		require.Equal(t, check[0].Extra[0].Value, "5")
-		require.Equal(t, check[1].Extra[0].Value, "5")
-
-		require.Equal(t, check[0].ResourceType, "program")
-	})
-	t.Run("check risk action program", func(t *testing.T) {
-		// ssarisk://program
-		url := &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssarisk",
-				Path:   "/" + programName1,
-			},
-			Body: []byte(""),
-		}
-		res, err := local.RequestYakURL(context.Background(), url)
-		require.NoError(t, err)
-		require.Equal(t, len(res.GetResources()), 4)
-		check := res.GetResources()
-		_ = check
-
-		require.Equal(t, check[0].Extra[0].Value, "1")
-		require.Equal(t, check[1].Extra[0].Value, "1")
-		require.Equal(t, check[2].Extra[0].Value, "1")
-		require.Equal(t, check[3].Extra[0].Value, "2")
-
-		require.Equal(t, check[0].ResourceName, "/a.go")
-		require.Equal(t, check[0].ResourceType, "source")
-
-		require.Equal(t, check[0].Path, fmt.Sprintf("/%s/a.go", programName1))
-		require.Equal(t, check[1].Path, fmt.Sprintf("/%s/b/b1.go", programName1))
-		require.Equal(t, check[2].Path, fmt.Sprintf("/%s/b/b2.go", programName1))
-		require.Equal(t, check[3].Path, fmt.Sprintf("/%s/c.go", programName1))
-
-		filter := &ypb.SSARisksFilter{}
-		err = json.Unmarshal([]byte(check[0].Extra[1].Value), &filter)
-		require.NoError(t, err)
-		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
-		require.NoError(t, err)
-		require.Equal(t, len(risks), 1)
-
-		err = json.Unmarshal([]byte(check[1].Extra[1].Value), &filter)
-		require.NoError(t, err)
-		_, risks, err = yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
-		require.NoError(t, err)
-		require.Equal(t, len(risks), 1)
-
-		err = json.Unmarshal([]byte(check[2].Extra[1].Value), &filter)
-		require.NoError(t, err)
-		_, risks, err = yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
-		require.NoError(t, err)
-		require.Equal(t, len(risks), 1)
-
-		err = json.Unmarshal([]byte(check[3].Extra[1].Value), &filter)
-		require.NoError(t, err)
-		_, risks, err = yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
-		require.NoError(t, err)
-		require.Equal(t, len(risks), 2)
-	})
-	t.Run("check risk action path(dir)", func(t *testing.T) {
-		// 已弃用：不会出现这种情况
-		t.Skip()
-		// ssarisk://program/b
-		url := &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssarisk",
-				Path:   "/" + programName1 + "/b",
-			},
-			Body: []byte(""),
-		}
-		res, err := local.RequestYakURL(context.Background(), url)
-		require.NoError(t, err)
-		require.Equal(t, len(res.GetResources()), 2)
-		check := res.GetResources()
-		_ = check
-
-		require.Equal(t, check[0].Extra[0].Value, "1")
-		require.Equal(t, check[1].Extra[0].Value, "1")
-
-		// require.Equal(t, check[0].Path, fmt.Sprintf("/%s/b/b1.go/funcB1", programName1))
-		// require.Equal(t, check[1].Path, fmt.Sprintf("/%s/b/b2.go/funcB2", programName1))
-
-		filter := &ypb.SSARisksFilter{}
-		err = json.Unmarshal([]byte(check[0].Extra[1].Value), &filter)
-		require.NoError(t, err)
-		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
-		require.NoError(t, err)
-		require.Equal(t, len(risks), 1)
-
-		err = json.Unmarshal([]byte(check[1].Extra[1].Value), &filter)
-		require.NoError(t, err)
-		_, risks, err = yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
-		require.NoError(t, err)
-		require.Equal(t, len(risks), 1)
-	})
-	t.Run("check risk action path(file)", func(t *testing.T) {
-		// ssarisk://program/c.go
-		url := &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssarisk",
-				Path:   "/" + programName1 + "/c.go",
-			},
-			Body: []byte(""),
-		}
-		res, err := local.RequestYakURL(context.Background(), url)
-		require.NoError(t, err)
-		require.Equal(t, len(res.GetResources()), 1)
-		check := res.GetResources()
-		_ = check
-
-		require.Equal(t, check[0].Extra[0].Value, "2")
-		require.Equal(t, check[0].Path, fmt.Sprintf("/%s/c.go/funcC", programName1))
-		require.Equal(t, check[0].ResourceName, "funcC")
-		require.Equal(t, check[0].ResourceType, "function")
-
-		filter := &ypb.SSARisksFilter{}
-		err = json.Unmarshal([]byte(check[0].Extra[1].Value), &filter)
-		require.NoError(t, err)
-		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
-		require.NoError(t, err)
-		require.Equal(t, len(risks), 2)
-	})
-	t.Run("check risk action function", func(t *testing.T) {
-		// ssarisk://program/c.go/funcC
-		url := &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssarisk",
-				Path:   "/" + programName1 + "/c.go/funcC",
-			},
-			Body: []byte(""),
-		}
-		res, err := local.RequestYakURL(context.Background(), url)
-		require.NoError(t, err)
-		require.Equal(t, len(res.GetResources()), 1)
-		check := res.GetResources()
-		_ = check
-
-		require.Equal(t, check[0].Extra[0].Value, "2")
-
-		filter := &ypb.SSARisksFilter{}
-		err = json.Unmarshal([]byte(check[0].Extra[1].Value), &filter)
-		require.NoError(t, err)
-		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
-		require.NoError(t, err)
-		require.Equal(t, len(risks), 2)
-	})
-
-	t.Run("check risk action search path(file)", func(t *testing.T) {
-		// search=/c.go
-		url := &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssarisk",
-				Query:  []*ypb.KVPair{{Key: "search", Value: "/c.go"}},
-			},
-			Body: []byte(""),
-		}
-		res, err := local.RequestYakURL(context.Background(), url)
-		require.NoError(t, err)
-		require.Equal(t, len(res.GetResources()), 2)
-		check := res.GetResources()
-		_ = check
-
-		require.Equal(t, check[0].Extra[0].Value, "2")
-		require.Equal(t, check[0].ResourceName, "/c.go")
-		require.Equal(t, check[0].ResourceType, "source")
-	})
-
-	t.Run("check risk action search function", func(t *testing.T) {
-		// search=funcA
-		url := &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssarisk",
-				Query:  []*ypb.KVPair{{Key: "search", Value: "funcA"}},
-			},
-			Body: []byte(""),
-		}
-		res, err := local.RequestYakURL(context.Background(), url)
-		require.NoError(t, err)
-		require.Equal(t, len(res.GetResources()), 2)
-		check := res.GetResources()
-		_ = check
-
-		require.Equal(t, check[0].Extra[0].Value, "1")
-		require.Equal(t, check[0].ResourceName, "funcA")
-		require.Equal(t, check[0].ResourceType, "function")
-	})
-
-	t.Run("check risk action search function fuzzy", func(t *testing.T) {
-		// search=func
-		url := &ypb.RequestYakURLParams{
-			Method: "GET",
-			Url: &ypb.YakURL{
-				Schema: "ssarisk",
-				Query:  []*ypb.KVPair{{Key: "search", Value: "func"}},
-			},
-			Body: []byte(""),
-		}
-		res, err := local.RequestYakURL(context.Background(), url)
-		require.NoError(t, err)
-		require.Equal(t, len(res.GetResources()), 8)
-	})
-
 	t.Cleanup(func() {
 		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName1}})
 		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName2}})
 	})
+	local, err := yakgrpc.NewLocalClient()
+	if err != nil {
+		t.Error(err)
+	}
+
+	checkPath := func(path string, want map[string]data) {
+		url := &ypb.YakURL{
+			Schema: "ssarisk",
+			Path:   path,
+		}
+		got := GetSSARisk(t, local, url)
+		require.Equal(t, got, want)
+	}
+
+	checkSearch := func(search string, want map[string]data) {
+		url := &ypb.YakURL{
+			Schema: "ssarisk",
+			Query:  []*ypb.KVPair{{Key: "search", Value: search}},
+		}
+		got := GetSSARisk(t, local, url)
+		require.Equal(t, got, want)
+	}
+
+	t.Run("check risk action root", func(t *testing.T) {
+		checkPath("/", map[string]data{
+			programName1: {
+				Name:  programName1,
+				Type:  "program",
+				Count: 5,
+			},
+			programName2: {
+				Name:  programName2,
+				Type:  "program",
+				Count: 5,
+			},
+		})
+	})
+
+	t.Run("check risk action program", func(t *testing.T) {
+		// ssarisk://program
+
+		checkPath("/"+programName1, map[string]data{
+			"/a.go": {
+				Name:  "/a.go",
+				Type:  "source",
+				Count: 1,
+			},
+			"/b/b1.go": {
+				Name:  "/b/b1.go",
+				Type:  "source",
+				Count: 1,
+			},
+			"/b/b2.go": {
+				Name:  "/b/b2.go",
+				Type:  "source",
+				Count: 1,
+			},
+			"/c.go": {
+				Name:  "/c.go",
+				Type:  "source",
+				Count: 2,
+			},
+		})
+	})
+
+	t.Run("check risk action path(file)", func(t *testing.T) {
+		// ssarisk://program/c.go
+		checkPath("/"+programName1+"/c.go", map[string]data{
+			"funcC": {
+				Name:  "funcC",
+				Type:  "function",
+				Count: 2,
+			},
+		})
+	})
+
+	t.Run("check risk action search path(file)", func(t *testing.T) {
+		// search=/c.go
+		checkSearch("/c.go", map[string]data{
+			"/c.go": {
+				Name:  "/c.go",
+				Type:  "source",
+				Count: 2,
+			},
+		})
+	})
+
+	t.Run("check risk action search function", func(t *testing.T) {
+		// search=funcA
+		checkSearch("funcA", map[string]data{
+			"funcA": {
+				Name:  "funcA",
+				Type:  "function",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check risk action search function fuzzy", func(t *testing.T) {
+		// search=func
+		checkSearch("func", map[string]data{
+			"funcA": {
+				Name:  "funcA",
+				Type:  "function",
+				Count: 1,
+			},
+			"funcB1": {
+				Name:  "funcB1",
+				Type:  "function",
+				Count: 1,
+			},
+			"funcB2": {
+				Name:  "funcB2",
+				Type:  "function",
+				Count: 1,
+			},
+			"funcC": {
+				Name:  "funcC",
+				Type:  "function",
+				Count: 2,
+			},
+		})
+	})
+
 }
