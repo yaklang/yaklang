@@ -83,7 +83,7 @@ func TestGRPCMUSTPASS_COMMON_CODEC_request_from_url(t *testing.T) {
 
 	rsp, err := client.Codec(context.Background(), &ypb.CodecRequest{
 		Text: "https://www.example.com/abc",
-		Type: "request-from-url",
+		Type: "packet-from-url",
 	})
 	if err != nil {
 		t.Fatal(err)
