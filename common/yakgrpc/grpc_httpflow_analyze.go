@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 )
 
 func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb.Yak_AnalyzeHTTPFlowServer) error {
@@ -95,11 +96,27 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB, analyzeId string) (
 			return
 		}
 	}()
-
 	totalCallBack := func(i int) {
 		m.allHTTPFlowCount += int64(i)
 	}
 	flowCh := yakit.YieldHTTPFlowsEx(db, m.ctx, totalCallBack)
+	for flow := range flowCh {
+		m.handledHTTPFlowCount++
+		m.notifyProcess(float64(m.handledHTTPFlowCount) / float64(m.allHTTPFlowCount))
+		m.notifyHandleFlowNum()
+		// hot patch
+		m.ExecHotPatch(db, analyzeId, flow)
+		// mitm replace rule
+		err := m.ExecReplacerRule(db, flow, analyzeId)
+		if err != nil {
+			errs = utils.JoinErrors(errs, err)
+			continue
+		}
+	}
+	return errs
+}
+
+func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, analyzeId string, flow *schema.HTTPFlow) {
 	extract := func(ruleName string, flow *schema.HTTPFlow) {
 		yakit.UpdateHTTPFlowTags(db, flow)
 		analyzed := &schema.AnalyzedHTTPFlow{
@@ -112,29 +129,14 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB, analyzeId string) (
 		if err != nil {
 			log.Infof("save analyze result failed: %s", err)
 		}
-		m.handledHTTPFlowCount++
 		m.matchedHTTPFlowCount++
-		m.notifyResult(analyzed)
-		m.notifyHandleFlowNum()
+		m.notifyResult(analyzed, nil)
 		m.notifyMatchedHTTPFlowNum()
 	}
-	var count float64
-	for flow := range flowCh {
-		count++
-		m.notifyProcess(count / float64(m.allHTTPFlowCount))
-		m.notifyHandleFlowNum()
-		// hot patch
-		if m.pluginCaller != nil {
-			m.pluginCaller.CallAnalyzeHTTPFlow(m.ctx, flow, extract)
-		}
-		// mitm replace rule
-		err := m.ExecReplacerRule(db, flow, analyzeId)
-		if err != nil {
-			errs = utils.JoinErrors(errs, err)
-			continue
-		}
+
+	if m.pluginCaller != nil {
+		m.pluginCaller.CallAnalyzeHTTPFlow(m.ctx, flow, extract)
 	}
-	return errs
 }
 
 func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPFlow, analyzeId string) error {
@@ -194,9 +196,6 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 		if err != nil {
 			log.Infof("save analyze result failed: %s", err)
 		}
-		m.handledHTTPFlowCount++
-		m.notifyHandleFlowNum()
-		m.notifyResult(result)
 	}
 	handleColorAndTag := func(rule *MITMReplaceRule, flow *schema.HTTPFlow) {
 		err := yakit.HandleAnalyzedHTTPFlowsColorAndTag(
@@ -226,13 +225,14 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 		if rule.EnableForRequest {
 			match, _ := re.MatchString(flow.Request)
 			if match {
-				result := getAnalyzedHTTPFlow(rule, flow)
-				if result == nil {
+				extracts := extractData(pattern, rule, flow, true)
+				if len(extracts) == 0 {
 					continue
 				}
-				extracts := extractData(pattern, rule, flow, true)
+				result := getAnalyzedHTTPFlow(rule, flow)
 				result.ExtractedData = extracts
 				saveAnalyzedHTTPFlow(result)
+				m.notifyResult(result, extracts)
 				handleColorAndTag(rule, flow)
 			}
 		}
@@ -240,13 +240,14 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 		if rule.EnableForResponse {
 			match, _ := re.MatchString(flow.Response)
 			if match {
-				result := getAnalyzedHTTPFlow(rule, flow)
-				if result == nil {
+				extracts := extractData(pattern, rule, flow, false)
+				if len(extracts) == 0 {
 					continue
 				}
-				extracts := extractData(pattern, rule, flow, false)
+				result := getAnalyzedHTTPFlow(rule, flow)
 				result.ExtractedData = extracts
 				saveAnalyzedHTTPFlow(result)
+				m.notifyResult(result, extracts)
 				handleColorAndTag(rule, flow)
 			}
 		}
@@ -270,8 +271,17 @@ func (m *HTTPFlowAnalyzeManger) notifyHandleFlowNum() {
 	m.client.StatusCard("已处理数/总数", fmt.Sprintf("%d/%d", m.handledHTTPFlowCount, m.allHTTPFlowCount))
 }
 
-func (m *HTTPFlowAnalyzeManger) notifyResult(result *schema.AnalyzedHTTPFlow) {
+func (m *HTTPFlowAnalyzeManger) notifyResult(result *schema.AnalyzedHTTPFlow, extractedData []schema.ExtractedData) {
+	var builder strings.Builder
+	for i, e := range extractedData {
+		if i > 0 {
+			builder.WriteString(" | ")
+		}
+		builder.WriteString(e.Data)
+	}
+	content := builder.String()
 	m.stream.Send(&ypb.AnalyzeHTTPFlowResponse{
-		RuleData: result.ToGRPCModel(),
+		RuleData:         result.ToGRPCModel(),
+		ExtractedContent: content,
 	})
 }
