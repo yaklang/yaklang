@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"testing"
@@ -505,4 +506,45 @@ alert $output
 		require.Equal(t, rule.AlertDesc, Updaterule.AlertDesc)
 		require.Equal(t, rule.Hash, Updaterule.CalcHash())
 	}
+}
+
+func TestGRPCMUSTPASS_Delete_BuildIn_Rule(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
+	rule := &schema.SyntaxFlowRule{
+		RuleName:      ruleName,
+		IsBuildInRule: true,
+	}
+	db := consts.GetGormProfileDatabase()
+	db.Create(rule)
+	t.Cleanup(func() {
+		db.Where("rule_name = ?", ruleName).Delete(&schema.SyntaxFlowRule{})
+	})
+	rsp, err := client.QuerySyntaxFlowRule(context.Background(), &ypb.QuerySyntaxFlowRuleRequest{
+		Pagination: nil,
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			RuleNames: []string{ruleName},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rsp.GetRule()))
+
+	_, err = client.DeleteSyntaxFlowRule(context.Background(), &ypb.DeleteSyntaxFlowRuleRequest{
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			RuleNames: []string{ruleName},
+		},
+	})
+	require.NoError(t, err)
+
+	//内置规则不能删
+	rsp, err = client.QuerySyntaxFlowRule(context.Background(), &ypb.QuerySyntaxFlowRuleRequest{
+		Pagination: nil,
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			RuleNames: []string{ruleName},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rsp.GetRule()))
 }

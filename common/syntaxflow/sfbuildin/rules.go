@@ -81,8 +81,10 @@ func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err erro
 			return err
 		}
 		handledCount++
-		if notify != nil {
+		if totalCount > 0 {
 			notify(handledCount/totalCount, fmt.Sprintf("更新内置SyntaxFlow规则:%s ", info.Name()))
+		} else {
+			notify(1, "No .sf files found to update.")
 		}
 		return nil
 	}))

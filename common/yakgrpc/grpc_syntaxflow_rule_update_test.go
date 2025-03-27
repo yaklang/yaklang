@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestMUSTPASS_UpdateSFBuildInRule(t *testing.T) {
+func TestMUSTPASS_SyntaxFlowRuleUpdate(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
