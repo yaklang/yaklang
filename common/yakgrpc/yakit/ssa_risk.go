@@ -102,7 +102,7 @@ type SsaRiskCount struct {
 	Count int64
 }
 
-// 请求funtion无获取
+// 请求function无获取
 func GetSSARiskByFuncName(db *gorm.DB, programName, sourceUrl, funcName string) ([]*SsaRiskCount, error) {
 	var ret []*SsaRiskCount
 
