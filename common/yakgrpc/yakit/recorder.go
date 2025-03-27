@@ -40,11 +40,20 @@ func DeleteScreenRecorderByID(db *gorm.DB, id int64) error {
 
 func QueryScreenRecorder(db *gorm.DB, req *ypb.QueryScreenRecorderRequest) (*bizhelper.Paginator, []*schema.ScreenRecorder, error) {
 	db = db.Model(&schema.ScreenRecorder{})
-
-	params := req.GetPagination()
-
+	if req == nil {
+		return nil, nil, utils.Errorf("QueryScreenRecorderRequest is nil")
+	}
+	p := req.GetPagination()
+	if p == nil {
+		p = &ypb.Paging{
+			Page:    1,
+			Limit:   30,
+			OrderBy: "updated_at",
+			Order:   "desc",
+		}
+	}
 	db = bizhelper.ExactQueryString(db, "project", req.GetProject())
-	db = bizhelper.QueryOrder(db, params.GetOrderBy(), params.GetOrder())
+	db = bizhelper.QueryOrder(db, p.GetOrderBy(), p.GetOrder())
 	db = bizhelper.FuzzSearchEx(db, []string{
 		"video_name", "note_info",
 	}, req.Keywords, false)
@@ -52,11 +61,10 @@ func QueryScreenRecorder(db *gorm.DB, req *ypb.QueryScreenRecorderRequest) (*biz
 		db = db.Where("id in (?)", req.Ids)
 	}
 	var ret []*schema.ScreenRecorder
-	paging, db := bizhelper.Paging(db, int(params.GetPage()), int(params.GetLimit()), &ret)
+	paging, db := bizhelper.Paging(db, int(p.GetPage()), int(p.GetLimit()), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
-
 	return paging, ret, nil
 }
 
