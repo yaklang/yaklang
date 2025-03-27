@@ -3,6 +3,7 @@ package sfbuildin
 import (
 	"embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io/fs"
 	"strings"
 
@@ -81,27 +82,33 @@ func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err erro
 			return err
 		}
 		handledCount++
-		if totalCount > 0 {
-			notify(handledCount/totalCount, fmt.Sprintf("更新内置SyntaxFlow规则:%s ", info.Name()))
-		} else {
-			notify(1, "No .sf files found to update.")
+		if notify != nil {
+			if totalCount > 0 {
+				notify(handledCount/totalCount, fmt.Sprintf("更新内置SyntaxFlow规则:%s ", info.Name()))
+			} else {
+				notify(1, "没有内置SyntaxFlow规则需要更新。")
+			}
 		}
+
 		return nil
 	}))
 	return utils.Wrapf(err, "init builtin rules error")
 }
 
-//func init() {
-//	yakit.RegisterPostInitDatabaseFunction(func() error {
-//		if yakit.Get(consts.EmbedSfBuildInRuleKey) == consts.ExistedSyntaxFlowEmbedFSHash {
-//			// log.Infof("already sync embed rule")
-//			return nil
-//		}
-//		defer yakit.Set(consts.EmbedSfBuildInRuleKey, consts.ExistedSyntaxFlowEmbedFSHash)
-//		return SyncEmbedRule()
-//	})
-//
-//}
+func init() {
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		//if yakit.Get(consts.EmbedSfBuildInRuleKey) == consts.ExistedSyntaxFlowEmbedFSHash {
+		//	// log.Infof("already sync embed rule")
+		//	return nil
+		//}
+		//defer yakit.Set(consts.EmbedSfBuildInRuleKey, consts.ExistedSyntaxFlowEmbedFSHash)
+		//return SyncEmbedRule()
+		if utils.InGithubActions() {
+			return SyncEmbedRule()
+		}
+		return nil
+	})
+}
 
 func SyntaxFlowRuleHash() (string, error) {
 	return filesys.CreateEmbedFSHash(ruleFS)
