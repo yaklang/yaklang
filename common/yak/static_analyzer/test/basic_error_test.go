@@ -122,7 +122,7 @@ func TestMakeByte(t *testing.T) {
 	})
 }
 
-func TestBaiscTypeCheck(t *testing.T) {
+func TestBasicTypeCheck(t *testing.T) {
 	t.Run("yak append map", func(t *testing.T) {
 		check(t, `
 cookie = make([]var)
