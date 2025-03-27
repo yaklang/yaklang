@@ -65,6 +65,7 @@ const (
 	state_data              = "data"
 	//state_esExpr            = "es-expr"
 	state_reset = "reset"
+	state_quote = "quote"
 )
 
 func ExtractObjectIndexes(c string) [][2]int {
@@ -114,10 +115,8 @@ func ExtractObjectIndexes(c string) [][2]int {
 
 	// 启动栈状态机
 	pushState(state_data)
-	var last byte
 	var ch byte
 	for {
-		last = ch
 		if !scanner.Scan() {
 			break
 		}
@@ -170,20 +169,25 @@ func ExtractObjectIndexes(c string) [][2]int {
 		//	}
 		case state_DoubleQuoteString:
 			switch ch {
+			case '\\':
+				pushState(state_quote)
+				continue
 			case '"':
-				if last != '\\' {
-					popState()
-					continue
-				}
+				popState()
+				continue
 			}
 		case state_SingleQuoteString:
 			switch ch {
+			case '\\':
+				pushState(state_quote)
+				continue
 			case '\'':
-				if last != '\'' {
-					popState()
-					continue
-				}
+				popState()
+				continue
 			}
+		case state_quote:
+			popState()
+			continue
 		//case state_BacktickString:
 		//	/*
 		//		这个很特殊，有几种情况需要处理
