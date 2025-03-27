@@ -13,19 +13,19 @@ import (
 type AIConfig struct {
 	// gateway network config
 	BaseURL string
-	Domain  string `app:"name:domain,verbose:第三方加速域名,id:4"`
-	NoHttps bool   `app:"name:no_https,verbose:NoHttps,desc:是否禁用使用https请求api,id:3"`
+	Domain  string `json:"domain" app:"name:domain,verbose:第三方加速域名,id:4"`
+	NoHttps bool   `json:"no_https" app:"name:no_https,verbose:NoHttps,desc:是否禁用使用https请求api,id:3"`
 
 	// basic model
-	Model    string  `app:"name:model,verbose:模型名称,id:2,type:list"`
+	Model    string  `json:"model" app:"name:model,verbose:模型名称,id:2,type:list"`
 	Timeout  float64 // `app:"name:请求超时时长"`
 	Deadline time.Time
 
-	APIKey              string `app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
-	Proxy               string `app:"name:proxy,verbose:代理地址,id:5"`
+	APIKey              string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
+	Proxy               string `json:"proxy" app:"name:proxy,verbose:代理地址,id:5"`
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
-	Type                string
+	Type                string `json:"Type"`
 	Context             context.Context
 
 	FunctionCallRetryTimes int

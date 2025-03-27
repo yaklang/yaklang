@@ -6449,16 +6449,8 @@ message ExportNoteResponse {
   string Verbose = 2;
 }
 
-message AiConfig {
-  string  ModelType = 1;
-  string  ApiKey = 2 ;
-  bool    NoHTTPS = 3;
-  string  Domain = 4;//加速域名
-  string  Proxy = 5;
-}
-
 message ListAiModelRequest{
-  AiConfig Config = 1;
+  string Config = 1;
 }
 
 message ListAiModelResponse{
