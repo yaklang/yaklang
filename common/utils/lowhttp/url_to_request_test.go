@@ -162,42 +162,42 @@ func TestUrlToHTTPRequest(t *testing.T) {
 		{
 			name: "raw path",
 			args: args{text: "http://127.0.0.1:1231/abcdef%2f?a=1&b=2%2f"},
-			want: []byte("GET /abcdef%2f?a=1&b=2%2f HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+			want: []byte("GET /abcdef%2f?a=1&b=2%2f HTTP/1.1\r\nHost: 127.0.0.1:1231\r\nAccept-Encoding: gzip, deflate, br\r\nAccept: */*\r\nAccept-Language: en-US;q=0.9,en;q=0.8\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\r\nCache-Control: max-age=0\r\n\r\n"),
 		},
 		{
 			name: "raw fragment",
 			args: args{text: "http://127.0.0.1:1231/abcdef/?a=1&b=2%2f#123%3E"},
-			want: []byte("GET /abcdef/?a=1&b=2%2f#123%3E HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+			want: []byte("GET /abcdef/?a=1&b=2%2f#123%3E HTTP/1.1\r\nHost: 127.0.0.1:1231\r\nAccept-Encoding: gzip, deflate, br\r\nAccept: */*\r\nAccept-Language: en-US;q=0.9,en;q=0.8\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\r\nCache-Control: max-age=0\r\n\r\n"),
 		},
 		{
 			name: "raw fragment 2",
 			args: args{text: "http://127.0.0.1:1231/abcdef/?a=1&b=2%2f#123%3E#"},
-			want: []byte("GET /abcdef/?a=1&b=2%2f#123%3E# HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+			want: []byte("GET /abcdef/?a=1&b=2%2f#123%3E# HTTP/1.1\r\nHost: 127.0.0.1:1231\r\nAccept-Encoding: gzip, deflate, br\r\nAccept: */*\r\nAccept-Language: en-US;q=0.9,en;q=0.8\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\r\nCache-Control: max-age=0\r\n\r\n"),
 		},
 		{
 			name: "end fragment",
 			args: args{text: "http://127.0.0.1:1231/#"},
-			want: []byte("GET /# HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+			want: []byte("GET /# HTTP/1.1\r\nHost: 127.0.0.1:1231\r\nAccept-Encoding: gzip, deflate, br\r\nAccept: */*\r\nAccept-Language: en-US;q=0.9,en;q=0.8\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\r\nCache-Control: max-age=0\r\n\r\n"),
 		},
 		{
 			name: "test url",
 			args: args{text: "http://127.0.0.1:1231"},
-			want: []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+			want: []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1:1231\r\nAccept-Encoding: gzip, deflate, br\r\nAccept: */*\r\nAccept-Language: en-US;q=0.9,en;q=0.8\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\r\nCache-Control: max-age=0\r\n\r\n"),
 		},
 		{
 			name: "test url2",
 			args: args{text: "http://127.0.0.1:1231/"},
-			want: []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+			want: []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1:1231\r\nAccept-Encoding: gzip, deflate, br\r\nAccept: */*\r\nAccept-Language: en-US;q=0.9,en;q=0.8\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\r\nCache-Control: max-age=0\r\n\r\n"),
 		},
 		{
 			name: "test uri",
 			args: args{text: "127.0.0.1:1231"},
-			want: []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+			want: []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1:1231\r\nAccept-Encoding: gzip, deflate, br\r\nAccept: */*\r\nAccept-Language: en-US;q=0.9,en;q=0.8\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\r\nCache-Control: max-age=0\r\n\r\n"),
 		},
 		{
 			name: "test url escape",
 			args: args{text: "http://127.0.0.1:1231/%C0%AE"},
-			want: []byte("GET /%C0%AE HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+			want: []byte("GET /%C0%AE HTTP/1.1\r\nHost: 127.0.0.1:1231\r\nAccept-Encoding: gzip, deflate, br\r\nAccept: */*\r\nAccept-Language: en-US;q=0.9,en;q=0.8\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\r\nCache-Control: max-age=0\r\n\r\n"),
 		},
 	}
 	for _, tt := range tests {
