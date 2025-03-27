@@ -101,7 +101,7 @@ func ParseAppTagToOptions(template any, ext ...map[string]string) (configInfo []
 				}
 				item.Type = typeName
 			}
-			if !StringArrayContains([]string{"string", "number", "bool"}, item.Type) {
+			if !StringArrayContains([]string{"string", "number", "bool", "list"}, item.Type) {
 				return nil, Errorf("invalid type %s", item.Type)
 			}
 			if extTags, ok := extTag[item.Name]; ok {
