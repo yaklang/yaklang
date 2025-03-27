@@ -17,7 +17,7 @@ type AIConfig struct {
 	NoHttps bool   `app:"name:no_https,verbose:NoHttps,desc:是否禁用使用https请求api,id:3"`
 
 	// basic model
-	Model    string  `app:"name:model,verbose:模型名称,id:2"`
+	Model    string  `app:"name:model,verbose:模型名称,id:2,type:list"`
 	Timeout  float64 // `app:"name:请求超时时长"`
 	Deadline time.Time
 
