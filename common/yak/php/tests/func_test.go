@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
@@ -384,15 +385,13 @@ $a(1);`
 			},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
-	t.Run("lamda-free-value", func(t *testing.T) {
-		t.Run("lamda", func(t *testing.T) {
-			code := `<?php
+	t.Run("lamda-free-value 2 ", func(t *testing.T) {
+		code := `<?php
 $a = function($ba)use($d){
     println($d);
 };
 $a(1);`
-			test.CheckPrintlnValue(code, []string{`Undefined-$d`}, t)
-		})
+		test.CheckPrintlnValue(code, []string{`Undefined-$d`}, t)
 	})
 	t.Run("test-function", func(t *testing.T) {
 		code := `<?php

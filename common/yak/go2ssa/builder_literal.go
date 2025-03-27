@@ -848,6 +848,8 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 	case ssa.AliasTypeKind:
 		alias, _ := ssa.ToAliasType(ityp)
 		return b.GetDefaultValue(alias.GetType())
+	case ssa.StructTypeKind, ssa.ObjectTypeKind, ssa.InterfaceTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind:
+		return b.EmitMakeBuildWithType(ityp, nil, nil)
 	default:
 		return b.EmitConstInst(0)
 	}
