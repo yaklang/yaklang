@@ -40,7 +40,7 @@ func TestAutoUpdateAiList(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() { // restore the original value
+	defer func() {           // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
@@ -76,6 +76,11 @@ func TestAutoUpdateAiList(t *testing.T) {
 
 type TestGateway struct {
 	config *aispec.AIConfig
+}
+
+func (t *TestGateway) GetModelList() ([]*aispec.ModelMeta, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (t *TestGateway) SupportedStructuredStream() bool {
@@ -129,7 +134,7 @@ func TestClientStreamExtInfo(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() { // restore the original value
+	defer func() {           // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
