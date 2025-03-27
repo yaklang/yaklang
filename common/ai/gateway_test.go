@@ -106,7 +106,7 @@ func (t *TestGateway) ChatStream(s string) (io.Reader, error) {
 }
 
 func (t *TestGateway) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {
-	return nil
+	return nil, nil
 }
 
 func (t *TestGateway) LoadOption(opt ...aispec.AIConfigOption) {
@@ -114,8 +114,7 @@ func (t *TestGateway) LoadOption(opt ...aispec.AIConfigOption) {
 }
 
 func (t *TestGateway) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, nil
 }
 
 func (t *TestGateway) CheckValid() error {
