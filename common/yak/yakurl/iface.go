@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/wsm"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/yakurl/java_decompiler"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -93,7 +94,7 @@ func (s *ActionService) CreateAction(schema string) Action {
 			register: make(map[string]int),
 		}
 	case "javadec":
-		return newJavaDecompilerAction()
+		return java_decompiler.NewJavaDecompilerAction()
 	default:
 		return nil
 	}
