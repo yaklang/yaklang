@@ -2,7 +2,6 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -55,13 +54,4 @@ func QueryAnalyzedHTTPFlowRule(db *gorm.DB, resultIds []string) []*schema.Analyz
 	db = db.Model(&schema.AnalyzedHTTPFlow{})
 	db.Where("result_id IN (?)", resultIds).Find(&analyzed)
 	return analyzed
-}
-
-func QueryHTTPIdByAnalyzedId(analyzedIds []int64) []int64 {
-	db := consts.GetGormProjectDatabase()
-	db = db.Model(&schema.AnalyzedHTTPFlow{})
-	var httpIds []int64
-	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", analyzedIds)
-	db.Pluck("http_flow_id", &httpIds)
-	return httpIds
 }
