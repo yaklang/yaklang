@@ -28,6 +28,7 @@ func ForbidExecLib(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 	ret := result.NewStaticAnalyzeResults("check define function in mitm")
 	funcs := []string{
+		"analyzeHTTPFlow",
 		"hijackSaveHTTPFlow",
 		"hijackHTTPResponse",
 		"hijackHTTPResponseEx",

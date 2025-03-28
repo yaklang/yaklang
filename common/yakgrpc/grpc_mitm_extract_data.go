@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -15,6 +16,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -55,21 +57,27 @@ func (s *Server) ExportMITMRuleExtractedData(req *ypb.ExportMITMRuleExtractedDat
 	}
 	db = yakit.FilterExtractedData(db, req.GetFilter())
 	exportPath := req.GetExportFilePath()
+	exportTyp := req.GetType()
+	if exportTyp == "" {
+		exportTyp = "csv"
+	}
+	if exportTyp != "csv" && exportTyp != "json" {
+		return utils.Error("export type must be csv or json")
+	}
 	if exportPath == "" {
-		exportPath = filepath.Join(consts.GetDefaultYakitBaseTempDir(), fmt.Sprintf("mitm_rule_extracted_data_%s.csv", time.Now().Format("20060102150405")))
+		exportPath = filepath.Join(consts.GetDefaultYakitBaseTempDir(), fmt.Sprintf("mitm_rule_extracted_data_%s.%s", time.Now().Format("20060102150405"), exportTyp))
 	} else if !path.IsAbs(exportPath) {
 		exportPath = filepath.Join(consts.GetDefaultYakitBaseTempDir(), exportPath)
 	}
-	if filepath.Ext(exportPath) != ".csv" {
-		exportPath = exportPath + ".csv"
+	if !strings.HasSuffix(filepath.Ext(exportPath), exportTyp) {
+		exportPath = exportPath + "." + exportTyp
 	}
 
 	exportFp, err := os.OpenFile(exportPath, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
 		return err
 	}
-	defer exportFp.Close()
-	exportWriter := bufio.NewWriter(exportFp)
+
 	var currentCount float64
 	sendFeedBack := func(verbose string, increase float64) {
 		currentCount += increase
@@ -80,27 +88,51 @@ func (s *Server) ExportMITMRuleExtractedData(req *ypb.ExportMITMRuleExtractedDat
 		})
 	}
 
-	_, err = exportWriter.Write([]byte("提取规则名,数据内容\n"))
-	if err != nil {
-		return err
-	}
-
 	duplicateFilter := filter.NewFilter()
-
-	for data := range bizhelper.YieldModel[*schema.ExtractedData](stream.Context(), db) {
-		sendFeedBack(fmt.Sprintf("Exported records"), 1)
-		line := fmt.Sprintf("%s,%s\n", utils.QuoteCSV(data.RuleVerbose), utils.QuoteCSV(data.Data))
-		if duplicateFilter.Exist(line) {
-			continue
-		}
-		duplicateFilter.Insert(line)
-		_, err = exportWriter.Write([]byte(line))
+	defer exportFp.Close()
+	switch exportTyp {
+	case "csv":
+		exportWriter := bufio.NewWriter(exportFp)
+		_, err = exportWriter.Write([]byte("提取规则名,数据内容\n"))
 		if err != nil {
 			return err
 		}
+		for data := range bizhelper.YieldModel[*schema.ExtractedData](stream.Context(), db) {
+			sendFeedBack(fmt.Sprintf("Exported records"), 1)
+			line := fmt.Sprintf("%s,%s\n", utils.QuoteCSV(data.RuleVerbose), utils.QuoteCSV(data.Data))
+			if duplicateFilter.Exist(line) {
+				continue
+			}
+			duplicateFilter.Insert(line)
+			_, err = exportWriter.Write([]byte(line))
+			if err != nil {
+				return err
+			}
+		}
+		exportWriter.Flush()
+	case "json":
+		encoder := json.NewEncoder(exportFp)
+		exportFp.WriteString("[")
+		for data := range bizhelper.YieldModel[*schema.ExtractedData](stream.Context(), db) {
+			sendFeedBack(fmt.Sprintf("Exported records"), 1)
+			hash := utils.CalcSha256(data.RuleVerbose, data.Data)
+			if duplicateFilter.Exist(hash) {
+				continue
+			}
+			duplicateFilter.Insert(hash)
+			if currentCount > 1 {
+				exportFp.WriteString(",")
+			}
+			var result = make(map[string]interface{})
+			result["提取规则名"] = data.RuleVerbose
+			result["数据内容"] = data.Data
+			err = encoder.Encode(result)
+			if err != nil {
+				return err
+			}
+		}
+		exportFp.WriteString("]")
 	}
-	exportWriter.Flush()
-
 	_ = stream.Send(&ypb.ExportMITMRuleExtractedDataResponse{
 		Verbose:        "Exported all records successfully",
 		ExportFilePath: exportPath,
