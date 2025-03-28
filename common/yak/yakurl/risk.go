@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -58,6 +59,15 @@ type riskTreeAction struct {
 				}
 */
 
+type riskLevel string
+
+const (
+	rroot     riskLevel = "root"
+	rprogram  riskLevel = "program"
+	rsource   riskLevel = "source"
+	rfunction riskLevel = "function"
+)
+
 func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	var res []*ypb.YakURLResource
 	u := params.GetUrl()
@@ -74,42 +84,12 @@ func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 	var rcs []*yakit.SsaRiskCount
 	var err error
 
-	lowerLevel := ""
+	lowerLevel := rroot
+	search := ""
 	if ret := query.Get("search"); ret != "" {
-		var rcfs []*yakit.SsaRiskFullCount
-		rcfs, err = yakit.GetSSARiskByFuzzy(db, ret)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, rcf := range rcfs {
-			if rcf.Funcdata != "" {
-				lowerLevel = "function"
-			} else if rcf.Pathdata != "" {
-				lowerLevel = "source"
-			} else if rcf.Progdata != "" {
-				lowerLevel = "program"
-			} else {
-				continue
-			}
-
-			rawpath := path.Join(rcf.Pathdata, rcf.Funcdata)
-			if rawpath == "" || rawpath == "/" {
-				continue
-			}
-			r, err := t.riskToResource(params.GetUrl(), rawpath, "", lowerLevel, rcf.Count)
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, r)
-		}
-
-		return &ypb.RequestYakURLResponse{
-			Page:      1,
-			PageSize:  1000,
-			Total:     int64(len(res)),
-			Resources: res,
-		}, nil
+		search = strings.TrimPrefix(ret, "/")
+		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"code_source_url", "function_name"}, []string{ret, ret}, false)
+		//db = bizhelper.FuzzQueryLike(db, "function_name", search)
 	}
 
 	if funcName != "" {
@@ -117,29 +97,29 @@ func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 		if err != nil {
 			return nil, err
 		}
-		lowerLevel = "function"
+		lowerLevel = rfunction
 	} else if sourceUrl != "" {
 		rcs, err = yakit.GetSSARiskBySourceUrl(db, programName, sourceUrl)
 		if err != nil {
 			return nil, err
 		}
-		lowerLevel = "function"
+		lowerLevel = rfunction
 	} else if programName != "" {
 		rcs, err = yakit.GetSSARiskByProgram(db, programName)
 		if err != nil {
 			return nil, err
 		}
-		lowerLevel = "source"
+		lowerLevel = rsource
 	} else {
 		rcs, err = yakit.GetSSARiskByRoot(db)
 		if err != nil {
 			return nil, err
 		}
-		lowerLevel = "program"
+		lowerLevel = rprogram
 	}
 
 	for _, rc := range rcs {
-		r, err := t.riskToResource(params.GetUrl(), rawpath, rc.Data, lowerLevel, rc.Count)
+		r, err := t.riskToResource(params.GetUrl(), lowerLevel, search, rc)
 		if err != nil {
 			return nil, err
 		}
@@ -204,23 +184,43 @@ func (t *riskTreeAction) splittingRowPath(rawpath string) (string, string, strin
 	return programName, sourceUrl, funcName
 }
 
-func (t *riskTreeAction) riskToResource(originParam *ypb.YakURL, currentPath, data, level string, count int64) (*ypb.YakURLResource, error) {
-	rawpath := path.Join("/", currentPath, data)
-	programName, sourceUrl, funcName := t.splittingRowPath(rawpath)
-	part := ""
+func (t *riskTreeAction) riskToResource(originParam *ypb.YakURL, level riskLevel, search string, rc *yakit.SsaRiskCount) (*ypb.YakURLResource, error) {
+	programName := rc.Prog
+	sourceUrl := strings.TrimPrefix(rc.Source, "/")
+	if index := strings.Index(sourceUrl, "/"); index != -1 {
+		sourceUrl = sourceUrl[index:]
+	}
+	funcName := rc.Func
+	count := rc.Count
 
+	part := ""
+	currentPath := ""
 	filter := &ypb.SSARisksFilter{}
-	if programName != "" {
-		filter.ProgramName = []string{programName}
+	switch level {
+	case rprogram:
 		part = programName
-	}
-	if sourceUrl != "" {
-		filter.CodeSourceUrl = []string{path.Join("/", programName, sourceUrl)}
+		currentPath = path.Join("/", programName)
+		filter.ProgramName = []string{programName}
+		if search != "" && strings.Index(sourceUrl, search) != -1 {
+			filter.CodeSourceUrl = yakit.GetSSARiskByFuzzy(ssadb.GetDB(), programName, "", search, string(rsource))
+		}
+		if search != "" && strings.Index(funcName, search) != -1 {
+			filter.FunctionName = yakit.GetSSARiskByFuzzy(ssadb.GetDB(), programName, "", search, string(rfunction))
+		}
+	case rsource:
 		part = sourceUrl
-	}
-	if funcName != "" {
-		filter.FunctionName = []string{funcName}
+		currentPath = path.Join("/", programName, sourceUrl)
+		filter.ProgramName = []string{programName}
+		filter.CodeSourceUrl = []string{path.Join("/", programName, sourceUrl)}
+		if search != "" && strings.Index(funcName, search) != -1 {
+			filter.FunctionName = yakit.GetSSARiskByFuzzy(ssadb.GetDB(), programName, path.Join("/", programName, sourceUrl), search, string(rfunction))
+		}
+	case rfunction:
 		part = funcName
+		currentPath = path.Join("/", programName, sourceUrl, funcName)
+		filter.ProgramName = []string{programName}
+		filter.CodeSourceUrl = []string{path.Join("/", programName, sourceUrl)}
+		filter.FunctionName = []string{funcName}
 	}
 
 	filterdata, err := json.Marshal(filter)
@@ -233,7 +233,7 @@ func (t *riskTreeAction) riskToResource(originParam *ypb.YakURL, currentPath, da
 		User:     originParam.GetUser(),
 		Pass:     originParam.GetPass(),
 		Location: originParam.GetLocation(),
-		Path:     rawpath,
+		Path:     currentPath,
 		Query:    originParam.GetQuery(),
 	}
 
@@ -245,8 +245,8 @@ func (t *riskTreeAction) riskToResource(originParam *ypb.YakURL, currentPath, da
 	res := createNewRes(yakURL, 0, extraData)
 	res.VerboseName = part
 	res.ResourceName = part
-	res.VerboseType = level
-	res.ResourceType = level
+	res.VerboseType = string(level)
+	res.ResourceType = string(level)
 
 	return res, nil
 }
