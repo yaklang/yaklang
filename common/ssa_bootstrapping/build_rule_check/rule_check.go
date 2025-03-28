@@ -93,7 +93,7 @@ func (r *RiskInfo) check(progName string) error {
 	for _, ssaRisk := range risks {
 		rangeIf := ssaapi.CodeRange{}
 		if err := json.Unmarshal([]byte(ssaRisk.CodeRange), &rangeIf); err != nil {
-			log.Errorf("code range unmarshal fail")
+			log.Errorf("code range unmarshal fail: %v", err)
 			continue
 		}
 		if rangeIf.StartLine != r.StartLine || rangeIf.EndLine != r.EndLine || rangeIf.StartColumn != r.StartColumn || rangeIf.EndColumn != r.EndColumn {
