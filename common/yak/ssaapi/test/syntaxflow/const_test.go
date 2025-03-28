@@ -134,7 +134,7 @@ func TestConstCompare(t *testing.T) {
 
 	t.Run("test compare const equal:native call getActualParamLen", func(t *testing.T) {
 		code := ` a("param1","param2")`
-		ssatest.CheckSyntaxFlow(t, code, `a?{<getActualParamLen>?{ == 2}} as $result`, map[string][]string{
+		ssatest.CheckSyntaxFlow(t, code, `a?{*()<getActualParamLen>?{ == 2}} as $result`, map[string][]string{
 			"result": {"Undefined-a"},
 		})
 	})
@@ -150,7 +150,7 @@ func TestConstCompare(t *testing.T) {
 		code := ` a1("param1","param2")
 	a2("param")
 `
-		ssatest.CheckSyntaxFlow(t, code, `a*?{<getActualParamLen>?{ == 1}} as $result`, map[string][]string{
+		ssatest.CheckSyntaxFlow(t, code, `a*?{*()<getActualParamLen>?{ == 1}} as $result`, map[string][]string{
 			"result": {"Undefined-a2"},
 		})
 	})
