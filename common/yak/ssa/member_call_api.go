@@ -77,7 +77,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 	name := res.name
 	if objectt.GetOpcode() != SSAOpcodeParameter {
 		// if member not exist, create undefine member in object position
-		b.checkAndCreatDefaultMember(res, objectt, key)
+		b.checkAndCreateDefaultMember(res, objectt, key)
 	}
 	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
 	ret := b.CreateVariableForce(name)
