@@ -109,11 +109,11 @@ func (r *RecursiveConfig) compileAndRun(value sf.ValueOperator) map[sf.Recursive
 			QueryWithValue(value),
 			QueryWithRuleContent(item.Value),
 		)
-		sfres := res.GetSFResult()
 		if err != nil {
 			log.Errorf("syntaxflow rule exec fail: %v", err)
 			continue
 		}
+		sfres := res.GetSFResult()
 		s := CreateResultFromQuery(sfres)
 		if isMatch(s) {
 			ret[sf.RecursiveConfigKey(item.Key)] = struct{}{}
