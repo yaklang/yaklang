@@ -8,6 +8,14 @@ import (
 )
 
 type BaseActionHandler func(getParam func(key string) (string, error), body []byte, raw []*ypb.KVPair) (*ypb.RequestYakURLResponse, error)
+type Action interface {
+	Get(*ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error)
+	Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error)
+	Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error)
+	Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error)
+	Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error)
+	Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error)
+}
 type BaseAction struct {
 	handlers map[string]BaseActionHandler
 }
