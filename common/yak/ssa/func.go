@@ -71,7 +71,7 @@ func (f *Function) GetCurrentBlueprint() *Blueprint {
 	return f.currentBlueprint
 }
 func (f *Function) GetType() Type {
-	if f.Type != nil {
+	if f != nil && f.Type != nil {
 		return f.Type
 	} else {
 		return CreateAnyType()

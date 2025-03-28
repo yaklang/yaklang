@@ -319,8 +319,8 @@ func getFuncDeclLabel(v *ssaapi.Value, funcDecl *yakdoc.FuncDecl) string {
 	if v != nil {
 		bareV := v.GetSSAInst()
 		fValue, isFunction := ssa.ToFunction(bareV)
-
-		funcTyp, ok := ssa.ToFunctionType(fValue.GetType())
+		typ := ssaapi.GetBareType(v.GetType())
+		funcTyp, ok := ssa.ToFunctionType(typ)
 		if ok {
 			isMethod := funcTyp.IsMethod
 			if isMethod && len(funcTyp.Parameter) > 0 {
