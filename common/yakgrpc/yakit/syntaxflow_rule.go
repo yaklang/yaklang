@@ -67,9 +67,9 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", params.GetLanguage())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", params.GetPurpose())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", params.GetTag())
-	if !params.GetIncludeLibraryRule() {
-		db = db.Where("allow_included = ?", false)
-	}
+	//if !params.GetIncludeLibraryRule() {
+	//	db = db.Where("allow_included = ?", false)
+	//}
 
 	if params.GetKeyword() != "" {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
@@ -89,12 +89,12 @@ func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.D
 			db = bizhelper.QueryByBool(db, "is_build_in_rule", false)
 		}
 	}
-	kind := params.GetLibRuleFilter()
-	switch kind {
-	case ypb.TriState_TS_TRUE:
-		db = bizhelper.QueryByBool(db, "is_tristate_ts", true)
-	case ypb.TriState_TS_FALSE:
-		db = bizhelper.QueryByBool(db, "is_tristate_ts", false)
+	if kind := params.GetFilterLibRuleKind(); kind != "" {
+		if kind == "lib" {
+			db = bizhelper.QueryByBool(db, "allow_included", true)
+		} else if kind == "noLib" {
+			db = bizhelper.QueryByBool(db, "allow_included", false)
+		}
 	}
 	return db
 }
