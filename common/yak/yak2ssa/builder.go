@@ -1,9 +1,8 @@
 package yak2ssa
 
 import (
-	"path/filepath"
-
 	"github.com/yaklang/yaklang/common/consts"
+	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
@@ -20,7 +19,9 @@ var Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(),
+		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
+			return true
+		})),
 	}
 }
 
@@ -38,6 +39,8 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 }
 
 func (*SSABuilder) FilterFile(path string) bool {
+	a := filepath.Ext(path)
+	_ = a
 	return filepath.Ext(path) == ".yak"
 }
 
