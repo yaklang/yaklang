@@ -43,10 +43,13 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 	case *sf.FirstContext:
 		y.VisitFilterItemFirst(filter.FilterItemFirst())
 	case *sf.FunctionCallFilterContext:
+		//先拿到所有的call，然后再去拿callArgs
+		y.EmitGetCall()
 		if filter.ActualParam() != nil {
 			y.VisitActualParam(filter.ActualParam())
 		}
-		y.EmitGetCall()
+		//检查栈顶，应该可以被里面的值影响到
+		y.EmitCheckStackTop()
 	case *sf.DeepChainFilterContext:
 		if filter.NameFilter().GetText() == "*" {
 			err := utils.Error("Syntax ERROR: deep chain filter cannot be ...*")
@@ -312,14 +315,19 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 		}
 		// TODO: handler recursive config
 	}
-
 	switch ret := i.(type) {
 	case *sf.AllParamContext:
+		iteratorCtx := y.EmitCreateIterator()
+		y.EmitNextIterator(iteratorCtx)
 		statement := y.EmitEnterStatement()
-		y.EmitPushCallArgs(0, true) // get all
+		y.EmitPushCallArgs(0, true)
 		handlerStatement(ret.SingleParam())
+		y.EmitLatchIterator(iteratorCtx)
 		y.EmitExitStatement(statement)
+		y.EmitIterEnd(iteratorCtx)
 	case *sf.EveryParamContext:
+		iterator := y.EmitCreateIterator()
+		y.EmitNextIterator(iterator)
 		for i, paraI := range ret.AllActualParamFilter() {
 			para, ok := paraI.(*sf.ActualParamFilterContext)
 			if !ok {
@@ -340,6 +348,8 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 			handlerStatement(ret.SingleParam())
 			y.EmitExitStatement(statement)
 		}
+		y.EmitLatchIterator(iterator)
+		y.EmitIterEnd(iterator)
 	default:
 		return utils.Errorf("BUG: ActualParamFilter type error: %s", reflect.TypeOf(ret))
 	}
