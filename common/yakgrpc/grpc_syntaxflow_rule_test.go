@@ -548,3 +548,36 @@ func TestGRPCMUSTPASS_Delete_BuildIn_Rule(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rsp.GetRule()))
 }
+
+func TestGRPCMUSTPASS_Query_Lib_Rule(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
+	rule := &schema.SyntaxFlowRule{
+		RuleName:      ruleName,
+		AllowIncluded: true,
+	}
+	db := consts.GetGormProfileDatabase()
+	db = db.Create(rule)
+	require.NoError(t, db.Error)
+	t.Cleanup(func() {
+		db.Where("rule_name = ?", ruleName).Delete(&schema.SyntaxFlowRule{})
+	})
+	rsp, err := client.QuerySyntaxFlowRule(context.Background(), &ypb.QuerySyntaxFlowRuleRequest{
+		Pagination: nil,
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			RuleNames:         []string{ruleName},
+			FilterLibRuleKind: "lib",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rsp.GetRule()))
+
+	_, err = client.DeleteSyntaxFlowRule(context.Background(), &ypb.DeleteSyntaxFlowRuleRequest{
+		Filter: &ypb.SyntaxFlowRuleFilter{
+			RuleNames: []string{ruleName},
+		},
+	})
+	require.NoError(t, err)
+}

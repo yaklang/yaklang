@@ -14,11 +14,11 @@ func (s *Server) CheckSyntaxFlowRuleUpdate(ctx context.Context, req *ypb.CheckSy
 		return &ypb.CheckSyntaxFlowRuleUpdateResponse{NeedUpdate: false}, nil
 	}
 	rules := yakit.QueryBuildInRule(s.GetProfileDatabase())
-	var state ypb.UpdateSyntaxFlowRuleState
+	state := ""
 	if len(rules) == 0 {
-		state = ypb.UpdateSyntaxFlowRuleState_Rule_Empty
+		state = "empty"
 	} else {
-		state = ypb.UpdateSyntaxFlowRuleState_Rule_To_Update
+		state = "to_update"
 	}
 	return &ypb.CheckSyntaxFlowRuleUpdateResponse{NeedUpdate: true, State: state}, nil
 }
