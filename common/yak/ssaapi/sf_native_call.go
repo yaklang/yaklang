@@ -172,7 +172,7 @@ func init() {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				_, isBlueprint := ssa.ToClassBluePrintType(ret.node.GetType())
+				_, isBlueprint := ssa.ToClassBluePrintType(ret.innerValue.GetType())
 				if isBlueprint {
 					result = append(result, ret)
 				}
@@ -197,7 +197,7 @@ func init() {
 		val.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				typ, isBlueprint := ssa.ToClassBluePrintType(ret.node.GetType())
+				typ, isBlueprint := ssa.ToClassBluePrintType(ret.innerValue.GetType())
 				if isBlueprint {
 					extends = append(extends, typ)
 				}
@@ -221,7 +221,7 @@ func init() {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				node := ret.node
+				node := ret.innerValue
 				if check(node.GetType()) {
 					result = append(result, ret)
 				}
@@ -241,7 +241,7 @@ func init() {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				function, isFunction := ssa.ToFunction(ret.node)
+				function, isFunction := ssa.ToFunction(ret.innerValue)
 				if !isFunction {
 					return nil
 				}
@@ -249,10 +249,9 @@ func init() {
 				if blueprint == nil {
 					return nil
 				}
-				val := ssa.NewConstWithRange(blueprint.Name, function.GetRange())
-				val.SetIsFromDB(true)
-				val.SetType(blueprint)
-				result = append(result, prog.NewValue(val))
+				if val, err := prog.NewValue(blueprint.Container()); err == nil {
+					result = append(result, val)
+				}
 			default:
 				return nil
 			}
@@ -275,7 +274,7 @@ func init() {
 			count++
 			return nil
 		})
-		return true, sfvm.NewValues([]sfvm.ValueOperator{prog.NewValue(ssa.NewConst(count))}), nil
+		return true, sfvm.NewValues([]sfvm.ValueOperator{prog.NewConstValue(count)}), nil
 	}), nc_desc("获取实际参数长度"))
 	registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		result, err := v.GetCallActualParams(0, true)
@@ -342,7 +341,7 @@ func init() {
 								continue
 							}
 						}
-						rs = append(rs, program.NewValue(ssa.NewConstWithRange(name, memeditor.GetFullRange())))
+						rs = append(rs, program.NewConstValue(name, memeditor.GetFullRange()))
 					}
 				}
 			}
@@ -377,7 +376,7 @@ func init() {
 			case *Program:
 				return nil
 			case *Value:
-				vr := ret.node.GetRange()
+				vr := ret.innerValue.GetRange()
 				if vr == nil {
 					log.Errorf("node range is nil")
 					return nil
@@ -388,7 +387,7 @@ func init() {
 				}
 				_, exist := prog.FileList[editor.GetFilename()]
 				if exist {
-					rs = append(rs, program.NewValue(ssa.NewConstWithRange(editor.GetFilename(), editor.GetFullRange())))
+					rs = append(rs, program.NewConstValue(editor.GetFilename(), editor.GetFullRange()))
 				} else {
 					log.Errorf("program filelist not found this file")
 				}
@@ -409,7 +408,7 @@ func init() {
 			if !ok {
 				return nil
 			}
-			function, flag := ssa.ToFunction(value.node)
+			function, flag := ssa.ToFunction(value.innerValue)
 			if !flag {
 				return nil
 			}
@@ -552,7 +551,7 @@ func init() {
 				if !ok {
 					return nil
 				}
-				ssaValue := val.GetSSAValue()
+				ssaValue := val.GetSSAInst()
 				if ssaValue.GetOpcode() != ssa.SSAOpcodeConstInst {
 					return nil
 				}
@@ -563,7 +562,7 @@ func init() {
 				return nil
 			})
 		case *Value:
-			ssaValue := i.GetSSAValue()
+			ssaValue := i.GetSSAInst()
 			if ssaValue.GetOpcode() != ssa.SSAOpcodeConstInst {
 				return false, nil, utils.Error("not value in version range")
 			}
@@ -796,7 +795,7 @@ func init() {
 					return
 				}
 				tmpMap[typ] = struct{}{}
-				vx := val.NewValue(ssa.NewConstWithRange(typ, val.GetRange()))
+				vx := val.NewConstValue(typ, val.GetRange())
 				vx.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
 				vals = append(vals, vx)
 			}
@@ -853,7 +852,7 @@ func init() {
 					return
 				}
 				tmpMap[typ] = struct{}{}
-				results := val.NewValue(ssa.NewConstWithRange(typ, rangeIf))
+				results := val.NewConstValue(typ, rangeIf)
 				results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
 				vals = append(vals, results)
 			}
@@ -901,7 +900,7 @@ func init() {
 					return nil
 				}
 				if val.getOpcode() == ssa.SSAOpcodeFunction {
-					rets, ok := ssa.ToFunction(val.node)
+					rets, ok := ssa.ToFunction(val.innerValue)
 					if !ok {
 						return nil
 					}
@@ -930,7 +929,7 @@ func init() {
 				if !ok {
 					return nil
 				}
-				originIns := val.node
+				originIns := val.innerValue
 				funcIns, ok := ssa.ToFunction(originIns)
 				if !ok {
 					return nil
@@ -1122,7 +1121,7 @@ func init() {
 				if val, ok := operator.(*Value); ok {
 					switch ins := val.getOpcode(); ins {
 					case ssa.SSAOpcodeParameterMember:
-						param, ok := ssa.ToParameterMember(val.node)
+						param, ok := ssa.ToParameterMember(val.innerValue)
 						if ok {
 							funcName := param.GetFunc().GetName()
 							if val.ParentProgram == nil {
@@ -1134,7 +1133,7 @@ func init() {
 							}
 						}
 					case ssa.SSAOpcodeParameter:
-						param, ok := ssa.ToParameter(val.node)
+						param, ok := ssa.ToParameter(val.innerValue)
 						if ok {
 							funcIns := param.GetFunc()
 							funcName := funcIns.GetName()

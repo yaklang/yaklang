@@ -101,7 +101,15 @@ func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, met
 func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key Value, wantFunction bool) Value {
 	// create undefined memberCall value if the value can not be peeked
 	name := res.name
-	memberHandler := func(typ Type, member Value) {
+	// normal method
+	typ := res.typ
+	if wantFunction {
+		// this get will call function Builder, then should refresh the typ
+		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
+			typ = fun.GetType()
+		}
+	}
+	memberHandler := func(member Value) {
 		// todo: phi type is anytype,unknown other value
 		if typ == nil || typ.GetTypeKind() == AnyTypeKind {
 			if wantFunction {
@@ -125,7 +133,7 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		setMemberCallRelationship(object, key, member)
 		setMemberVerboseName(member)
 	}
-	writeUndefind := func() *Undefined {
+	writeUndefined := func() *Undefined {
 		recoverScope := b.SetCurrent(object, true)
 		un := b.writeUndefine(name)
 		recoverScope()
@@ -137,49 +145,50 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 
 		return un
 	}
-	// normal method
-	if wantFunction {
-		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
-			fun.SetObject(object)
-			un := writeUndefind()
-			memberHandler(res.typ, un)
-			return un
-		}
-	}
 	if para, ok := ToParameter(object); ok {
 		if member, ok2 := para.GetStringMember(key.String()); ok2 {
 			return member
 		}
 		member := b.NewParameterMember(name, para, key)
 
-		memberHandler(res.typ, member)
+		memberHandler(member)
 		return member
 	}
 	config := b.prog.config
 	if member, ok := ToParameterMember(object); ok {
 		if !wantFunction || config.isSupportConstMethod {
 			parameterMember := b.NewMoreParameterMember(name, member, key)
-			memberHandler(res.typ, parameterMember)
+			memberHandler(parameterMember)
 			return parameterMember
 		}
 	}
 	if ret := b.getStaticFieldValue(object, key, wantFunction); ret != nil {
 		return ret
 	}
-	if field := b.getDefaultMemberOrMethodByClass(object, key, wantFunction); !utils.IsNil(field) {
+	// this function only try get value field
+	if field := b.getDefaultMemberOrMethodByClass(object, key, false); !utils.IsNil(field) {
 		return field
 	}
-	un := writeUndefind()
-	memberHandler(res.typ, un)
+	un := writeUndefined()
+	memberHandler(un)
 	return un
 }
 
-func (b *FunctionBuilder) checkAndCreatDefaultMember(res checkMemberResult, object, key Value) Value {
+func (b *FunctionBuilder) checkAndCreateDefaultMember(res checkMemberResult, object, key Value) {
 	// 	recoverScope := b.SetCurrent(object, true)
 	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
-		return ret
+		return
+	}
+	if !res.exist {
+		object.NewError(Error, "ObjectError",
+			InvalidField(res.ObjType.String(), GetKeyString(key)),
+		)
 	}
 
-	// need default member
-	return b.createDefaultMember(res, object, key, false)
+	currentScope := b.CurrentBlock.ScopeTable
+	objectScope := object.GetBlock().ScopeTable
+	// is sub-scope and not same, just child scope
+	if currentScope.IsSameOrSubScope(objectScope) && !currentScope.Compare(objectScope) {
+		b.createDefaultMember(res, object, key, false)
+	}
 }

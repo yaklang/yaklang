@@ -23,6 +23,9 @@ type GetIdIF interface {
 type Instruction interface {
 	ErrorLogger
 
+	// string
+	String() string
+
 	GetOpcode() Opcode
 
 	// function
@@ -1020,7 +1023,7 @@ var (
 type Loop struct {
 	anInstruction
 
-	Body, Exit *BasicBlock
+	Body, Exit Value
 
 	Init, Cond, Step Value
 	Key              Value
@@ -1035,7 +1038,7 @@ var (
 // ----------- Switch
 type SwitchLabel struct {
 	Value Value
-	Dest  *BasicBlock
+	Dest  Value
 }
 
 func NewSwitchLabel(v Value, dest *BasicBlock) SwitchLabel {

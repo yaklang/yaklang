@@ -55,8 +55,8 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.Name = inst.GetName()
 	ir.VerboseName = inst.GetVerboseName()
 	ir.ShortVerboseName = inst.GetShortVerboseName()
-	ir.ReadableName = LineDisasm(inst)
-	ir.ReadableNameShort = LineShortDisasm(inst)
+	ir.ReadableName = LineDisASM(inst)
+	ir.ReadableNameShort = LineShortDisASM(inst)
 	// opcode
 	ir.Opcode = int64(inst.GetOpcode())
 	ir.OpcodeName = SSAOpcode2Name[inst.GetOpcode()]
@@ -143,6 +143,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	defer func() {
 		if msg := recover(); msg != nil {
 			log.Errorf("value2IrCode panic: %s", msg)
+			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 	value, ok := ToValue(inst)
@@ -210,7 +211,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		ir.Point = point.GetId()
 	}
 
-	ir.TypeID = SaveTypeToDB(value.GetType())
+	ir.TypeID = SaveTypeToDB(value.GetType(), inst.GetProgramName())
 }
 
 func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {

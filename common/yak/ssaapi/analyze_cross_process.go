@@ -110,7 +110,7 @@ func (c *processAnalysisManager) needCrossProcess(v *Value) bool {
 }
 
 func (c *processAnalysisManager) existCrossProcess(current *Value) bool {
-	if c.nodeStack.Len() == 0 || utils.IsNil(current) || utils.IsNil(current.node) {
+	if c.nodeStack.Len() == 0 || utils.IsNil(current) || utils.IsNil(current.innerValue) {
 		return false
 	}
 	hash := c.calcCrossProcessHash(current)
@@ -170,7 +170,7 @@ func (c *processAnalysisManager) getLastCauseCall(typ AnalysisType) (result *Val
 	if value == nil {
 		return nil
 	}
-	switch ret := value.node.(type) {
+	switch ret := value.innerValue.(type) {
 	case *ssa.Call:
 		result = value
 	case *ssa.SideEffect:
@@ -199,7 +199,7 @@ func (c *processAnalysisManager) calcCrossProcessHash(v *Value) string {
 // it returns false. Otherwise, it checks if the IDs of the functions associated with the
 // two values are different, indicating a need for a cross-process transition.
 func needCrossProcess(from *Value, to *Value) bool {
-	if utils.IsNil(from) || utils.IsNil(from.node) || utils.IsNil(to) || utils.IsNil(to.node) {
+	if utils.IsNil(from) || utils.IsNil(from.innerValue) || utils.IsNil(to) || utils.IsNil(to.innerValue) {
 		return false
 	}
 	return from.GetFunction().GetId() != to.GetFunction().GetId()
@@ -234,14 +234,14 @@ func calcCrossProcessHash(from *Value, to *Value) string {
 		fromFuncId, toFuncId int64
 		fromId, toId         int64
 	)
-	if from == nil || from.node == nil {
+	if from == nil || from.innerValue == nil {
 		fromFuncId = -1
 		fromId = -1
 	} else {
 		fromId = from.GetId()
 		fromFuncId = from.GetFunction().GetId()
 	}
-	if to == nil || to.node == nil {
+	if to == nil || to.innerValue == nil {
 		toFuncId = -1
 		toId = -1
 	} else {

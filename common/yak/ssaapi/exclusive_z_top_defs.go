@@ -28,11 +28,11 @@ func (v Values) GetTopDefs(opts ...OperationOption) Values {
 
 func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
-	if i.node == nil {
+	if i.innerValue == nil {
 		return vals
 	}
 
-	for _, def := range i.node.GetValues() {
+	for _, def := range i.innerValue.GetValues() {
 		if utils.IsNil(def) {
 			continue
 		}
@@ -44,7 +44,7 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	if len(vals) <= 0 {
 		vals = append(vals, i)
 	}
-	if maskable, ok := i.node.(ssa.Maskable); ok {
+	if maskable, ok := i.innerValue.(ssa.Maskable); ok {
 		for _, def := range maskable.GetMask() {
 			if ret := i.NewTopDefValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
 				vals = append(vals, ret...)
@@ -67,9 +67,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		actx.depth++
 	}()
 
-	if inst, ok := ssa.ToLazyInstruction(i.node); ok {
+	if inst, ok := ssa.ToLazyInstruction(i.innerValue); ok {
 		var ok bool
-		i.node, ok = inst.Self().(ssa.Value)
+		i.innerValue, ok = inst.Self().(ssa.Value)
 		if !ok {
 			log.Errorf("BUG: %T is not ssa.Value", inst.Self())
 			return Values{}
@@ -125,7 +125,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		return i.visitedDefs(actx, opt...)
 	}
 
-	switch inst := i.node.(type) {
+	switch inst := i.innerValue.(type) {
 	case *ssa.Undefined:
 		if inst.Kind == ssa.UndefinedValueReturn {
 			return Values{}
@@ -243,7 +243,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 		handlerReturn := func(value *Value) {
-			fun, ok := ssa.ToFunction(value.node)
+			fun, ok := ssa.ToFunction(value.innerValue)
 			if !ok {
 				return
 			}
@@ -291,7 +291,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if called == nil {
 				return nil
 			}
-			calledInstance, ok := ssa.ToCall(called.node)
+			calledInstance, ok := ssa.ToCall(called.innerValue)
 			if !ok {
 				log.Warnf("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
@@ -344,7 +344,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if len(isInners) > 0 {
 				isInner = isInners[0]
 			}
-			calledInstance, ok := ssa.ToCall(called.node)
+			calledInstance, ok := ssa.ToCall(called.innerValue)
 			if !ok {
 				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
@@ -358,13 +358,13 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 					actualParam = tmp
 				} else {
 					log.Errorf("free value: %v is not found in binding", inst.GetName())
-					return getMemberCall(i, i.node, actx)
+					return getMemberCall(i, i.innerValue, actx)
 				}
 			} else {
 				// parameter
 				if inst.FormalParameterIndex >= len(calledInstance.Args) {
 					log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
-					return getMemberCall(i, i.node, actx)
+					return getMemberCall(i, i.innerValue, actx)
 				}
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
@@ -429,5 +429,5 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return values
 	}
-	return getMemberCall(i, i.node, actx)
+	return getMemberCall(i, i.innerValue, actx)
 }

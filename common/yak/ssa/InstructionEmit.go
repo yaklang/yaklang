@@ -110,6 +110,10 @@ func (f *FunctionBuilder) SetCurrent(i Instruction, noChangeRanges ...bool) func
 	currentBlock := f.CurrentBlock
 	Range := f.CurrentRange
 	fun := f.Function
+	if i == nil || i.GetFunc() == nil {
+		log.Errorf("BUG: instruction[%s] func is nil", i)
+		return func() {}
+	}
 	builder := i.GetFunc().builder
 	parentScope := f.parentScope
 

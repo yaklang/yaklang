@@ -272,18 +272,20 @@ func CheckMask(t *testing.T, tc TestCase) {
 
 		target := targets[0]
 
-		v := ssaapi.GetBareNode(target)
-		require.NotNil(t, v)
+		// v := ssaapi.GetBareNode(target)
+		// require.NotNil(t, v)
 
 		// test.Equal("1", v.String())
+		inst := target.GetSSAInst()
+		require.NotNil(t, inst)
 
-		maskV, ok := v.(ssa.Maskable)
+		maskV, ok := inst.(ssa.Maskable)
 		require.True(t, ok)
 
 		maskValues := maskV.GetMask()
 		log.Infof("mask values: %s", maskValues)
 
-		require.Equal(t, want, lo.Map(maskValues, func(v ssa.Value, _ int) string { return ssa.LineDisasm(v) }))
+		require.Equal(t, want, lo.Map(maskValues, func(v ssa.Value, _ int) string { return ssa.LineDisASM(v) }))
 	}
 	CheckTestCase(t, tc)
 }

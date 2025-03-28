@@ -33,12 +33,12 @@ func (v *Value) GetOpcode() string {
 }
 
 func (v *Value) GetBinaryOperator() string {
-	sa := v.GetSSAValue()
-	if utils.IsNil(sa) {
+	inst := v.GetSSAInst()
+	if utils.IsNil(inst) {
 		return ""
 	}
-	if sa.GetOpcode() == ssa.SSAOpcodeBinOp {
-		binop, ok := ssa.ToBinOp(sa)
+	if inst.GetOpcode() == ssa.SSAOpcodeBinOp {
+		binop, ok := ssa.ToBinOp(inst)
 		if !ok {
 			return ""
 		}
@@ -48,12 +48,12 @@ func (v *Value) GetBinaryOperator() string {
 }
 
 func (v *Value) GetUnaryOperator() string {
-	sa := v.GetSSAValue()
-	if utils.IsNil(sa) {
+	inst := v.GetSSAInst()
+	if utils.IsNil(inst) {
 		return ""
 	}
-	if sa.GetOpcode() == ssa.SSAOpcodeUnOp {
-		unOp, ok := ssa.ToUnOp(sa)
+	if inst.GetOpcode() == ssa.SSAOpcodeUnOp {
+		unOp, ok := ssa.ToUnOp(inst)
 		if !ok {
 			return ""
 		}
@@ -157,13 +157,13 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 		}
 	}
 	v.GetCalledBy().ForEach(func(c *Value) {
-		if c, ok := ssa.ToCall(c.node); ok {
+		if c, ok := ssa.ToCall(c.innerValue); ok {
 			if len(c.Args) > start {
 				add(c.Args)
 			}
 		}
 	})
-	if f, ok := ssa.ToFunction(v.node); ok {
+	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		if len(f.Params) > start {
 			add(f.Params)
 		}

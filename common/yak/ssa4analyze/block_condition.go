@@ -288,7 +288,7 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 	return cond
 }
 
-func newBinOp(op ssa.BinaryOpcode, x ssa.Value, y ssa.Value, block *ssa.BasicBlock) ssa.Value {
+func newBinOp(op ssa.BinaryOpcode, x, y ssa.Value, block ssa.Value) ssa.Value {
 	b := ssa.NewBinOp(op, x, y)
 	// if b, ok := ssa.ToBinOp(b); ok {
 	// 	block.EmitInst(b)

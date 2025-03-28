@@ -1,9 +1,10 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestBlueprint(t *testing.T) {
@@ -42,7 +43,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
 public class DemoServlet extends HttpServlet {
-	 protected void doGet(HttpServletRequest request, HttpServletResponse response) {}
+	protected void doGet(HttpServletRequest request, HttpServletResponse response) {}
 }
 `
 		ssatest.CheckSyntaxFlow(t, code, `request<fullTypeName> as $output`, map[string][]string{
@@ -58,10 +59,14 @@ import javax.servlet.http.*;
 import javax.servlet.http.HttpSession;
 
 public class DemoServlet extends HttpServlet {
-	 protected void doGet(HttpServletRequest request, HttpServletResponse response) {}
+	protected void doGet(HttpServletRequest request, HttpServletResponse response) {}
 }`
 		ssatest.CheckSyntaxFlow(t, code, `request<fullTypeName> as $output`, map[string][]string{
-			"output": {`"javax.servlet.http.HttpServletRequest"`, `"com.example.servlet.HttpServletRequest"`, `"java.lang.HttpServletRequest"`},
+			"output": {
+				`"javax.servlet.http.HttpServletRequest"`,
+				`"com.example.servlet.HttpServletRequest"`,
+				`"java.lang.HttpServletRequest"`,
+			},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 	t.Run("blueprint keyword", func(t *testing.T) {

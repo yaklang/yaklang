@@ -13,7 +13,7 @@ import (
 func check[T ssa.Instruction](t *testing.T, gots ssaapi.Values, want []string, Cover func(ssa.Instruction) (T, bool)) {
 	gotString := make([]string, 0, len(gots))
 	for _, got := range gots {
-		t, ok := Cover(got.GetSSAValue())
+		t, ok := Cover(got.GetSSAInst())
 		if ok {
 			gotString = append(gotString, t.GetRange().String())
 		}

@@ -7,7 +7,7 @@ Java的javax.sql.rowset.RowSet接口中的某些方法会返回一个值，但�
 TEXT,
 )
 
-/(supportsCrossJoin|supportsFullJoin|supportsInnerJoin|supportsLeftOuterJoin|supportsRightOuterJoin|getShowDeleted|getEscapeProcessing|isReadOnly|getAutoCommit|supportsUpdatableView|is*)/<getCall> as $toCheck;
+/^(supportsCrossJoin|supportsFullJoin|supportsInnerJoin|supportsLeftOuterJoin|supportsRightOuterJoin|getShowDeleted|getEscapeProcessing|isReadOnly|getAutoCommit|supportsUpdatableView|is*)$/<getCall> as $toCheck;
 $toCheck?{<typeName>?{have:'javax.sql.rowset'}}?{!<getUsers>} as $weak;
 alert $weak for{
     message:"发现Java javax.sql.rowset库未检查返回值的API",
@@ -17,7 +17,7 @@ alert $weak for{
 
 desc{
     lang:java,
-    alert_num:10,
+    alert_num:8,
     "file://demo.java":<<<TEXT
 package org.example;
 

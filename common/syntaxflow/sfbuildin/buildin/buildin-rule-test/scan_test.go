@@ -21,7 +21,9 @@ import (
 
 func TestVerifiedRule(t *testing.T) {
 	yakit.InitialDatabase()
-	for rule := range sfdb.YieldSyntaxFlowRules(consts.GetGormProfileDatabase(), context.Background()) {
+	db := consts.GetGormProfileDatabase()
+	db = db.Where("is_build_in_rule = ? ", true)
+	for rule := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
 		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 		if err != nil {
 			t.Fatalf("compile rule %s error: %s", rule.RuleName, err)
@@ -45,7 +47,7 @@ func TestVerify_DEBUG(t *testing.T) {
 		return
 	}
 	yakit.InitialDatabase()
-	ruleName := "java-path-travel-directly.sf"
+	ruleName := "检测Java IO库未检查返回值的API"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {

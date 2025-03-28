@@ -80,8 +80,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	defer func() {
 		actx.depth--
 	}()
-	if ins, ok := ssa.ToLazyInstruction(v.node); ok {
-		v.node, ok = ins.Self().(ssa.Value)
+
+	if ins, ok := ssa.ToLazyInstruction(v.innerValue); ok {
+		v.innerValue, ok = ins.Self().(ssa.Value)
 		if !ok {
 			log.Debugf("BUG: (lazy instruction) unknown instruction: %v - %v - ID:%v", v.String(), v.GetVerboseName(), v.GetId())
 			return Values{}
@@ -89,6 +90,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		return v.getBottomUses(actx, opt...)
 	}
 	shouldExit, recoverStack := actx.check(v)
+
 	defer recoverStack()
 	if shouldExit {
 		return Values{v}
@@ -98,7 +100,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	if err != nil {
 		return Values{v}
 	}
-	switch inst := v.node.(type) {
+	switch inst := v.GetSSAInst().(type) {
+	case *ssa.Phi:
+		return v.visitUserFallback(actx, opt...)
 	case *ssa.Call:
 		method := inst.Method
 		if method == nil {
@@ -166,8 +170,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			}
 			return result
 		}
-		var backTrackSearch func(ssa.Value, int) *Value
-		backTrackSearch = func(method ssa.Value, callIndex int) *Value {
+		var backTrackSearch func(ssa.Instruction, int) *Value
+		backTrackSearch = func(method ssa.Instruction, callIndex int) *Value {
 			_, isparam := ssa.ToParameter(method)
 			_, isParameterMember := ssa.ToParameterMember(method)
 			if !(isParameterMember || isparam) {
@@ -209,7 +213,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if val == nil {
 				return v.NewValue(method)
 			}
-			return backTrackSearch(val.node, callIndex+1)
+			return backTrackSearch(val.GetSSAInst(), callIndex+1)
 		}
 		search := backTrackSearch(method, 1)
 		if search.GetId() == method.GetId() {
@@ -217,7 +221,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 		//todo： copy？
 		s := &ssa.Call{
-			Method:          search.node,
+			Method:          search.innerValue,
 			Args:            inst.Args,
 			Binding:         inst.Binding,
 			ArgMember:       inst.ArgMember,
@@ -227,7 +231,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			IsEllipsis:      inst.IsEllipsis,
 			SideEffectValue: inst.SideEffectValue,
 		}
-		for _, user := range v.node.GetUsers() {
+		for _, user := range v.innerValue.GetUsers() {
 			s.AddUser(user)
 		}
 		value := v.NewBottomUseValue(s)
@@ -273,7 +277,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			}
 		}
 		if vals.Len() == 0 {
-			vals = append(vals, v.NewBottomUseValue(call.node).getBottomUses(actx, opt...)...)
+			vals = append(vals, v.NewBottomUseValue(call.innerValue).getBottomUses(actx, opt...)...)
 		}
 		return vals
 	}

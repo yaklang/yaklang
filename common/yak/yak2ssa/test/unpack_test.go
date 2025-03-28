@@ -81,8 +81,7 @@ func TestUnpack_Line(t *testing.T) {
 				require.Equal(t, 1, len(as), "a should only 1")
 				a := as[0]
 
-				call := ssaapi.GetBareNode(a)
-				callVariable := call.GetAllVariables()
+				callVariable := a.GetAllVariables()
 				for i, v := range callVariable {
 					log.Infof("call variable %s: %v", i, v)
 				}

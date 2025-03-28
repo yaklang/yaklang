@@ -11,22 +11,22 @@ func getValueNames(val *Value) []string {
 		val.GetName(),
 		val.GetVerboseName(),
 		val.ShortString(),
-		val.GetSSAValue().GetVerboseName(),
-		val.GetSSAValue().GetShortVerboseName(),
+		val.GetSSAInst().GetVerboseName(),
+		val.GetSSAInst().GetShortVerboseName(),
 	}
 
 	if val.IsMember() {
-		constVal, ok := ssa.ToConst(val.GetKey().GetSSAValue())
+		constVal, ok := ssa.ToConst(val.GetKey().GetSSAInst())
 		if ok {
 			names = append(names, constVal.VarString())
 		}
 	}
 
-	if udef, ok := ssa.ToFunction(val.GetSSAValue()); ok {
+	if udef, ok := ssa.ToFunction(val.GetSSAInst()); ok {
 		names = append(names, udef.GetShortVerboseName())
 		names = append(names, udef.GetMethodName())
 	}
-	if call, b := ssa.ToCall(val.GetSSAValue()); b {
+	if call, b := ssa.ToCall(val.GetSSAInst()); b {
 		names = append(names, call.Method.GetName())
 		//todo: args?
 	}
@@ -49,7 +49,7 @@ var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 			_, existed := filter[name]
 			if !existed {
 				filter[name] = struct{}{}
-				results := val.NewValue(ssa.NewConstWithRange(name, val.GetRange()))
+				results := val.NewConstValue(name, val.GetRange())
 				results.AppendPredecessor(val, frame.WithPredecessorContext("getFuncName"))
 				vals = append(vals, results)
 			}

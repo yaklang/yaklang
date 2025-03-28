@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/samber/lo"
@@ -19,7 +20,10 @@ type Value struct {
 	EffectOn      Values // this value effect current value     [effectOn -> self]
 	DependOn      Values // this value depend on current value  [self -> dependOn]
 
-	node ssa.Value
+	// inner data for ssa
+	innerValue ssa.Value
+	innerUser  ssa.User
+
 	// cache
 	disasmLine string
 
@@ -39,6 +43,20 @@ type Value struct {
 type PredecessorValue struct {
 	Node *Value
 	Info *sfvm.AnalysisContext
+}
+
+func (v *Value) getInstruction() ssa.Instruction {
+	if utils.IsNil(v) {
+		log.Errorf("ssaapi.Value: getInstruction on nil value")
+		return nil
+	}
+	if v.innerValue != nil {
+		return v.innerValue
+	}
+	if v.innerUser != nil {
+		return v.innerUser
+	}
+	return nil
 }
 
 func (v *Value) GetAuditNodeId() uint {
@@ -65,26 +83,32 @@ func ValueCompare(v1raw, v2raw *Value) bool {
 	if v1raw == nil || v2raw == nil {
 		return v1raw == v2raw
 	}
-	v1 := v1raw.node
-	v2 := v2raw.node
+	v1 := v1raw.getInstruction()
+	v2 := v2raw.getInstruction()
 	if v1 == nil || v2 == nil {
 		return v1 == v2
 	}
 
-	same := func(v1, v2 ssa.Value) bool {
-		for _, v := range v1.GetPointer() {
-			if v.GetId() == v2.GetId() {
-				return true
+	same := func(v1, v2 ssa.Instruction) bool {
+		if pointIF, ok := v1.(ssa.PointerIF); ok {
+			for _, v := range pointIF.GetPointer() {
+				if v.GetId() == v2.GetId() {
+					return true
+				}
 			}
 		}
 		return v1.GetId() == v2.GetId()
 	}
 	res := same(v1, v2) || same(v2, v1)
-	if v1Ref := v1.GetReference(); v1Ref != nil {
-		res = res || same(v1Ref, v2) || same(v2, v1Ref)
+	if pointIF, ok := v1.(ssa.PointerIF); ok {
+		if v1Ref := pointIF.GetReference(); v1Ref != nil {
+			res = res || same(v1Ref, v2) || same(v2, v1Ref)
+		}
 	}
-	if v2Ref := v2.GetReference(); v2Ref != nil {
-		res = res || same(v1, v2Ref) || same(v2Ref, v1)
+	if pointIF, ok := v2.(ssa.PointerIF); ok {
+		if v2Ref := pointIF.GetReference(); v2Ref != nil {
+			res = res || same(v1, v2Ref) || same(v2Ref, v1)
+		}
 	}
 	return res
 }
@@ -100,7 +124,7 @@ func (v *Value) GetProgramName() string {
 	if v.IsNil() {
 		return ""
 	}
-	if prog := v.node.GetProgram(); prog != nil {
+	if prog := v.getInstruction().GetProgram(); prog != nil {
 		return prog.GetProgramName()
 	}
 	if prog := v.ParentProgram; prog != nil {
@@ -111,50 +135,61 @@ func (v *Value) GetProgramName() string {
 	return ""
 }
 
-func (v *Value) IsNil() bool {
-	return v == nil || v.node == nil
+func (v *Value) IsNil(checkValue ...bool) bool {
+	// return v == nil || v.getInstruction() == nil
+	if utils.IsNil(v) {
+		return true
+	}
+
+	if len(checkValue) > 0 && checkValue[0] {
+		// check is value ?
+		return v.innerValue == nil
+	}
+	return v.getInstruction() == nil
 }
 
 func (v *Value) GetId() int64 {
 	if v.IsNil() {
 		return -1
 	}
-	return v.node.GetId()
+	return v.getInstruction().GetId()
 }
 
-func (v *Value) GetSSAValue() ssa.Value {
+func (v *Value) GetSSAInst() ssa.Instruction {
 	if v.IsNil() {
 		return nil
 	}
-	return v.node
+	return v.getInstruction()
 }
 
 func (v *Value) NewError(tag, msg string) {
 	if v.IsNil() {
 		return
 	}
-	v.node.NewError(ssa.Error, ssa.ErrorTag(tag), msg)
+	v.getInstruction().NewError(ssa.Error, ssa.ErrorTag(tag), msg)
 }
 
 func (v *Value) NewWarn(tag, msg string) {
 	if v.IsNil() {
 		return
 	}
-	v.node.NewError(ssa.Warn, ssa.ErrorTag(tag), msg)
+	v.getInstruction().NewError(ssa.Warn, ssa.ErrorTag(tag), msg)
 }
 
 func (v *Value) String() string {
 	if v.IsNil() {
 		return ""
 	}
-	return ssa.LineDisasm(v.node)
+	inst := v.getInstruction()
+	return ssa.LineDisASM(inst)
 }
 
 func (v *Value) ShortString() string {
 	if v.IsNil() {
 		return ""
 	}
-	return ssa.LineShortDisasm(v.node)
+	inst := v.getInstruction()
+	return ssa.LineShortDisASM(inst)
 }
 
 func (v *Value) StringWithRange() string {
@@ -163,7 +198,8 @@ func (v *Value) StringWithRange() string {
 	}
 
 	if v.disasmLine == "" {
-		v.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", ssa.SSAOpcode2Name[v.node.GetOpcode()], ssa.LineDisasm(v.node), v.node.GetRange())
+		inst := v.getInstruction()
+		v.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", ssa.SSAOpcode2Name[inst.GetOpcode()], ssa.LineDisASM(inst), inst.GetRange())
 	}
 	return v.disasmLine
 }
@@ -174,7 +210,11 @@ func (v *Value) StringWithSourceCode(msg ...string) string {
 	}
 
 	if v.disasmLine == "" {
-		v.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", ssa.SSAOpcode2Name[v.node.GetOpcode()], ssa.LineDisasm(v.node), v.node.GetRange())
+		inst := v.getInstruction()
+		if v.innerUser != nil {
+			inst = v.innerUser
+		}
+		v.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", ssa.SSAOpcode2Name[inst.GetOpcode()], ssa.LineDisASM(inst), inst.GetRange())
 		v.disasmLine += "\n" + v.GetRange().GetTextContextWithPrompt(2, msg...)
 	}
 	return v.disasmLine
@@ -184,7 +224,7 @@ func (v *Value) GetName() string {
 	if v.IsNil() {
 		return ""
 	}
-	return v.node.GetName()
+	return v.getInstruction().GetName()
 }
 
 func (v *Value) GetVerboseName() string {
@@ -192,12 +232,12 @@ func (v *Value) GetVerboseName() string {
 		return ""
 	}
 	var name string
-	if name = v.node.GetName(); name != "" {
+	if name = v.getInstruction().GetName(); name != "" {
 		if v.IsPhi() {
 			return "[phi]: " + name
 		}
 		return name
-	} else if name = v.node.GetVerboseName(); name != "" {
+	} else if name = v.getInstruction().GetVerboseName(); name != "" {
 		return fmt.Sprintf(`t%d: %v=%v`, v.GetId(), name, v.ShortString())
 	}
 	return fmt.Sprintf(`t%d: %v`, v.GetId(), v.ShortString())
@@ -213,7 +253,8 @@ func (v *Value) GetType() *Type {
 	if v.IsNil() {
 		return Any
 	}
-	if n, ok := v.node.(ssa.Typed); ok {
+	inst := v.getInstruction()
+	if n, ok := inst.(ssa.Typed); ok {
 		return NewType(n.GetType())
 	}
 	return Any
@@ -223,7 +264,8 @@ func (v *Value) GetTypeKind() ssa.TypeKind {
 	if v.IsNil() {
 		return ssa.AnyTypeKind
 	}
-	if n, ok := v.node.(ssa.Typed); ok {
+	inst := v.getInstruction()
+	if n, ok := inst.(ssa.Typed); ok {
 		if typ := n.GetType(); typ != nil {
 			return typ.GetTypeKind()
 		}
@@ -235,14 +277,15 @@ func (v *Value) GetRange() memedit.RangeIf {
 	if v.IsNil() {
 		return nil
 	}
-	return v.node.GetRange()
+	inst := v.getInstruction()
+	return inst.GetRange()
 }
 
 func (v *Value) HasOperands() bool {
 	if v.IsNil() {
 		return false
 	}
-	return v.node.HasValues()
+	return v.innerUser.HasValues()
 }
 
 func (v *Value) GetOperands() Values {
@@ -250,7 +293,9 @@ func (v *Value) GetOperands() Values {
 		return nil
 	}
 	if v.operands == nil {
-		v.operands = lo.Map(v.node.GetValues(), func(ssaVal ssa.Value, _ int) *Value { return v.NewValue(ssaVal) })
+		v.operands = lo.FilterMap(v.innerUser.GetValues(), func(ssaVal ssa.Value, _ int) (*Value, bool) {
+			return v.NewValue(ssaVal), true
+		})
 	}
 	return v.operands
 }
@@ -268,55 +313,36 @@ func (v *Value) GetOperand(index int) *Value {
 }
 
 func (v *Value) HasUsers() bool {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return false
 	}
-	return v.node.HasUsers()
+	return v.innerValue.HasUsers()
 }
 
 func (v *Value) GetUsers() Values {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
 	appendUser := func(node ssa.Value) {
+		if node == nil {
+			log.Warnf("ssaapi.Value appendUser: node is nil")
+			return
+		}
 		v.users = append(v.users,
-			lo.FilterMap(node.GetUsers(), func(ssaVal ssa.User, _ int) (*Value, bool) {
-				if value, ok := ssa.ToValue(ssaVal); ok {
-					return v.NewValue(value), true
-				}
-				return nil, false
+			lo.FilterMap(node.GetUsers(), func(user ssa.User, _ int) (*Value, bool) {
+				return v.NewValue(user), true
 			},
 			)...)
 	}
 
 	if v.users == nil {
-		appendUser(v.node)
-		for _, reference := range v.node.GetPointer() {
+		appendUser(v.innerValue)
+		for _, reference := range v.innerValue.GetPointer() {
 			appendUser(reference)
 		}
 	}
 	return v.users
-}
-
-func (v *Value) GetPointer() Values {
-	if v.IsNil() {
-		return nil
-	}
-
-	return lo.Map(v.node.GetPointer(), func(item ssa.Value, index int) *Value {
-		return v.NewValue(item)
-	})
-}
-
-func (v *Value) GetMask() Values {
-	if v.IsNil() {
-		return nil
-	}
-
-	return lo.Map(v.node.GetMask(), func(item ssa.Value, index int) *Value {
-		return v.NewValue(item)
-	})
 }
 
 func (v *Value) GetUser(index int) *Value {
@@ -328,6 +354,34 @@ func (v *Value) GetUser(index int) *Value {
 		return nil
 	}
 	return users[index]
+}
+
+func (v *Value) GetPointer() Values {
+	if v.IsNil() {
+		return nil
+	}
+
+	pointerIF, ok := v.getInstruction().(ssa.PointerIF)
+	if !ok {
+		return nil
+	}
+	return lo.FilterMap(pointerIF.GetPointer(), func(item ssa.Value, index int) (*Value, bool) {
+		return v.NewValue(item), true
+	})
+}
+
+func (v *Value) GetMask() Values {
+	if v.IsNil() {
+		return nil
+	}
+
+	maskIF, ok := v.getInstruction().(ssa.Maskable)
+	if !ok {
+		return nil
+	}
+	return lo.FilterMap(maskIF.GetMask(), func(item ssa.Value, index int) (*Value, bool) {
+		return v.NewValue(item), true
+	})
 }
 
 func (v *Value) ShowUseDefChain() {
@@ -343,7 +397,11 @@ func (v *Value) GetVariable(name string) *ssa.Variable {
 		return nil
 	}
 
-	return v.node.GetVariable(name)
+	assignAble, ok := v.getInstruction().(ssa.AssignAble)
+	if !ok {
+		return nil
+	}
+	return assignAble.GetVariable(name)
 }
 
 func (v *Value) GetAllVariables() map[string]*ssa.Variable {
@@ -351,18 +409,22 @@ func (v *Value) GetAllVariables() map[string]*ssa.Variable {
 		return nil
 	}
 
-	return v.node.GetAllVariables()
+	assignAble, ok := v.getInstruction().(ssa.AssignAble)
+	if !ok {
+		return nil
+	}
+	return assignAble.GetAllVariables()
 }
 
 // for function
 
 func (v *Value) GetReturn() Values {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
 	ret := make(Values, 0)
-	if f, ok := ssa.ToFunction(v.node); ok {
+	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		for _, r := range f.Return {
 			ret = append(ret, v.NewValue(r))
 		}
@@ -371,11 +433,11 @@ func (v *Value) GetReturn() Values {
 }
 
 func (v *Value) GetParameter(i int) *Value {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
-	if f, ok := ssa.ToFunction(v.node); ok {
+	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		if i < len(f.Params) {
 			return v.NewValue(f.Params[i])
 		}
@@ -383,11 +445,11 @@ func (v *Value) GetParameter(i int) *Value {
 	return nil
 }
 func (v *Value) GetFreeValue(name string) *Value {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 	if variable := v.GetVariable(name); variable != nil {
-		if f, ok := ssa.ToFunction(v.node); ok {
+		if f, ok := ssa.ToFunction(v.innerValue); ok {
 			if fv, ok := f.FreeValues[variable]; ok {
 				return v.NewValue(fv)
 			}
@@ -397,12 +459,12 @@ func (v *Value) GetFreeValue(name string) *Value {
 }
 
 func (v *Value) GetParameters() Values {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
 	ret := make(Values, 0)
-	if f, ok := ssa.ToFunction(v.node); ok {
+	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		for _, param := range f.Params {
 			ret = append(ret, v.NewValue(param))
 		}
@@ -411,20 +473,20 @@ func (v *Value) GetParameters() Values {
 }
 
 func (v *Value) GetCallArgs() Values {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
-	if f, ok := ssa.ToCall(v.node); ok {
-		return lo.Map(f.Args, func(item ssa.Value, index int) *Value {
-			return v.NewValue(item)
+	if f, ok := ssa.ToCall(v.innerValue); ok {
+		return lo.FilterMap(f.Args, func(item ssa.Value, index int) (*Value, bool) {
+			return v.NewValue(item), true
 		})
 	}
 	return nil
 }
 
 func (v *Value) GetCallReturns() Values {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
@@ -433,14 +495,11 @@ func (v *Value) GetCallReturns() Values {
 
 // for const instruction
 func (v *Value) GetConstValue() any {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
-	if v == nil || v.node == nil {
-		return nil
-	}
-	if cInst, ok := ssa.ToConst(v.node); ok {
+	if cInst, ok := ssa.ToConst(v.innerValue); ok {
 		return cInst.GetRawValue()
 	} else {
 		return nil
@@ -448,11 +507,11 @@ func (v *Value) GetConstValue() any {
 }
 
 func (v *Value) GetConst() *ssa.Const {
-	if v.IsNil() {
+	if v.IsNil(true) {
 		return nil
 	}
 
-	if cInst, ok := ssa.ToConst(v.node); ok {
+	if cInst, ok := ssa.ToConst(v.innerValue); ok {
 		return cInst.Const
 	} else {
 		return nil
@@ -488,7 +547,7 @@ func (v *Value) getOpcode() ssa.Opcode {
 		return ssa.SSAOpcodeUnKnow
 	}
 
-	return v.node.GetOpcode()
+	return v.getInstruction().GetOpcode()
 }
 
 // IsExternLib desc if the value is extern lib
@@ -525,10 +584,10 @@ func (v *Value) IsIf() bool              { return v.getOpcode() == ssa.SSAOpcode
 func (v *Value) IsLoop() bool            { return v.getOpcode() == ssa.SSAOpcodeLoop }
 func (v *Value) IsSwitch() bool          { return v.getOpcode() == ssa.SSAOpcodeSwitch }
 func (v *Value) IsLazy() bool {
-	if v != nil && v.node != nil {
-		return v.node.IsLazy()
+	if v.IsNil() {
+		return false
 	}
-	return false
+	return v.getInstruction().IsLazy()
 }
 
 // // MemberCall : Object
@@ -539,7 +598,11 @@ func (v *Value) IsObject() bool {
 		return false
 	}
 
-	return v.node.IsObject()
+	objectIF, ok := v.getInstruction().(ssa.MemberCall)
+	if !ok {
+		return false
+	}
+	return objectIF.IsObject()
 }
 
 func (v *Value) IsExtern() bool {
@@ -547,7 +610,7 @@ func (v *Value) IsExtern() bool {
 		return false
 	}
 
-	return v.node.IsExtern()
+	return v.getInstruction().IsExtern()
 }
 
 func (v *Value) IsFreeValue() bool {
@@ -555,7 +618,7 @@ func (v *Value) IsFreeValue() bool {
 		return false
 	}
 
-	if f, ok := ssa.ToFreeValue(v.node); ok && f.IsFreeValue {
+	if f, ok := ssa.ToFreeValue(v.innerValue); ok && f.IsFreeValue {
 		return true
 	}
 	return false
@@ -568,8 +631,8 @@ func (v *Value) GetMember(value *Value) *Value {
 	}
 
 	// TODO: key is string or int
-	key := value.node.String()
-	node := v.node
+	key := value.innerValue.String()
+	node := v.innerValue
 	for name, member := range node.GetAllMember() {
 		if name.String() == key {
 			return v.NewValue(member)
@@ -584,7 +647,7 @@ func (v *Value) GetAllMember() Values {
 		return nil
 	}
 
-	all := v.node.GetAllMember()
+	all := v.innerValue.GetAllMember()
 	ret := make(Values, 0, len(all))
 	for _, value := range all {
 		ret = append(ret, v.NewValue(value))
@@ -597,7 +660,7 @@ func (v *Value) GetMembers() [][]*Value {
 	if v.IsNil() {
 		return nil
 	}
-	all := v.node.GetAllMember()
+	all := v.innerValue.GetAllMember()
 	ret := make([][]*Value, 0, len(all))
 	for key, value := range all {
 		ret = append(ret, []*Value{v.NewValue(key), v.NewValue(value)})
@@ -612,7 +675,7 @@ func (v *Value) IsMethod() bool {
 		return false
 	}
 
-	f, ok := ssa.ToFunctionType(v.node.GetType())
+	f, ok := ssa.ToFunctionType(v.innerValue.GetType())
 	if !ok {
 		return false
 	}
@@ -633,54 +696,47 @@ func (v *Value) GetFunctionObjectType() ssa.Type {
 
 // IsMember desc if the value is member of some object
 func (v *Value) IsMember() bool {
-	if v.IsNil() {
+	if v.IsNil() || v.innerValue == nil {
 		return false
 	}
-	return v.node.IsMember()
+	return v.innerValue.IsMember()
 }
 
 // GetObject get object of member
 func (v *Value) GetObject() *Value {
-	if v.IsNil() {
+	if v.IsNil() || v.innerValue == nil {
 		return nil
 	}
 
-	return v.NewValue(v.node.GetObject())
+	return v.NewValue(v.innerValue.GetObject())
 }
 
 // GetKey get key of member
 func (v *Value) GetKey() *Value {
-	if v.IsNil() {
+	if v.IsNil() || v.innerValue == nil {
 		return nil
 	}
 
-	return v.NewValue(v.node.GetKey())
-}
-
-// GetBareNode get ssa.Value from ssaapi.Value
-// only use this function in golang
-func GetBareNode(v *Value) ssa.Value {
-	if v.IsNil() {
+	if v.innerValue.GetKey() == nil {
 		return nil
 	}
-
-	return v.node
+	return v.NewValue(v.innerValue.GetKey())
 }
 
 func GetValues(v *Value) Values {
-	if v.IsNil() {
+	if v.IsNil() || v.innerValue == nil {
 		return nil
 	}
 
-	return lo.Map(v.node.GetValues(), func(item ssa.Value, _ int) *Value { return v.NewValue(item) })
+	return lo.Map(v.innerValue.GetValues(), func(item ssa.Value, _ int) *Value { return v.NewValue(item) })
 }
 
 func GetFreeValue(v *Value) *ssa.Parameter {
-	if v.IsNil() {
+	if v.IsNil() || v.innerValue == nil {
 		return nil
 	}
 
-	if f, ok := ssa.ToFreeValue(v.node); ok && f.IsFreeValue {
+	if f, ok := ssa.ToFreeValue(v.innerValue); ok && f.IsFreeValue {
 		return f
 	}
 	return nil
@@ -720,7 +776,7 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 			vs = append(vs, v.NewValue(ret).getCallByEx(tmp)...)
 		case *ssa.Call:
 			call := ret
-			if call == nil && call.Method == nil {
+			if call == nil || call.Method == nil {
 				return
 			}
 			if call.Method.GetId() == id {
@@ -806,7 +862,7 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 			addCall(pointer)
 		}
 	}
-	handler(v.node)
+	handler(v.innerValue)
 	if v.IsFunction() {
 		/*
 			function's reference, like parent-class same name function
@@ -814,7 +870,7 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 
 			weakLanguagePoint use this eg: $a()
 		*/
-		handler(v.node.GetReference())
+		handler(v.innerValue.GetReference())
 	}
 	return vs
 }
@@ -916,8 +972,8 @@ func (value Values) Ref(name string) Values {
 	ret := make(Values, 0, len(value))
 	for _, v := range value {
 		v.GetAllMember().ForEach(func(v *Value) {
-			if v.GetKey().node != nil {
-				if v.GetKey().node.String() == name {
+			if v.GetKey().innerValue != nil {
+				if v.GetKey().innerValue.String() == name {
 					ret = append(ret, v)
 				}
 			}
@@ -977,14 +1033,11 @@ func (v Values) GetBySyntaxFlowName(name string) Values {
 	})
 }
 
-func (v Values) NewValue(ssaVal ssa.Value) *Value {
+func (v Values) NewValue(ssaVal ssa.Instruction) *Value {
 	if len(v) > 0 {
-		return v[0].ParentProgram.NewValue(ssaVal)
+		return v[0].NewValue(ssaVal)
 	}
-	return &Value{
-		runtimeCtx: omap.NewEmptyOrderedMap[ContextID, *Value](),
-		node:       ssa.NewUndefined(""),
-	}
+	return nil
 }
 
 func (v Values) ForEach(f func(*Value)) Values {

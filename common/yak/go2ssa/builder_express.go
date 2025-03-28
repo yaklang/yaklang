@@ -3,6 +3,7 @@ package go2ssa
 import (
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
@@ -167,7 +168,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, IslValue bool) 
 	return b.EmitConstInst(0), b.CreateVariable("")
 }
 
-func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValue bool) (ssa.Value, *ssa.Variable) {
+func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValue bool, isFunction ...bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -195,10 +196,10 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 		if ret := exp.DOT(); ret != nil {
 			id := exp.IDENTIFIER()
-			test := id.GetText()
+			text := id.GetText()
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
-				if key := typ.GetKeybyName(test); key != nil {
+				if key := typ.GetKeybyName(text); key != nil {
 					leftv = b.CreateMemberCallVariable(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {
@@ -207,7 +208,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 							b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
 							return
 						}
-						if key := a.GetKeybyName(test); key != nil {
+						if key := a.GetKeybyName(text); key != nil {
 							handleObjectType(rv, a)
 						}
 					}
@@ -219,16 +220,18 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			if leftv == nil {
-				leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(test))
+				leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(text))
 			}
 		}
 	} else {
-		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
 		if ret := exp.Arguments(); ret != nil {
+			rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false, true)
 			args := b.buildArgumentsExpression(ret.(*gol.ArgumentsContext))
 			rightv = b.EmitCall(b.NewCall(rv, args))
+			return rightv, leftv
 		}
 
+		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
 		if ret := exp.Index(); ret != nil {
 			index := b.buildIndexExpression(ret.(*gol.IndexContext))
 			rightv = b.ReadMemberCallValue(rv, index)
@@ -241,52 +244,53 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 		if ret := exp.DOT(); ret != nil {
 			id := exp.IDENTIFIER()
-			test := id.GetText()
+			text := id.GetText()
 
 			if a := exp.TypeArgs(); a != nil {
 				_ = a
 			}
 
+			readMemberCall := func(rv, key ssa.Value) ssa.Value {
+				if len(isFunction) > 0 && isFunction[0] {
+					return b.ReadMemberCallMethod(rv, key)
+				}
+				return b.ReadMemberCallValue(rv, key)
+			}
+
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
-				if key := typ.GetKeybyName(test); key != nil {
-					rightv = b.ReadMemberCallValue(rv, key)
+				if key := typ.GetKeybyName(text); key != nil {
+					rightv = readMemberCall(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {
 						/*
 						 a.A.b
 						*/
-						if test == n {
-							rightv = b.ReadMemberCallValueByName(rv, n)
-							if rightv == nil {
-								b.NewError(ssa.Error, TAG, NotFindAnonymousFieldObject(n))
+						rvt := rv
+						if key := a.GetKeybyName(text); !utils.IsNil(key) {
+							rvt = b.ReadMemberCallValueByName(rv, n)
+							if rvt == nil {
+								rvt = readMemberCall(rv, key)
+								rightv = rvt
+								break
 							}
-							break
-						} else {
-							rvt := rv
-							if key := a.GetKeybyName(test); !utils.IsNil(key) {
-								rvt = b.ReadMemberCallValueByName(rv, n)
-								if rvt == nil {
-									rvt = b.ReadMemberCallValue(rv, key)
-									rightv = rvt
-									break
-								}
-							}
-							handleObjectType(rvt, a)
 						}
+						handleObjectType(rvt, a)
 					}
 				}
 			}
 
 			if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 				handleObjectType(rv, typ)
-			} else if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), test); ok {
+			} else if value, ok := b.GetProgram().ReadImportValueWithPkg(rv.GetName(), text); ok {
 				rightv = value
 			}
 
 			if rightv == nil {
-				rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(test))
+				rightv = readMemberCall(rv, b.EmitConstInst(text))
 				rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
 			}
+			log.Infof("rightv = %v", rightv)
+			log.Infof("rightv type = %v", rightv.GetType())
 		}
 
 		if ret := exp.TypeAssertion(); ret != nil {

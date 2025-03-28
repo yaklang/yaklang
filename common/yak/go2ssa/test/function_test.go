@@ -1,9 +1,10 @@
 package test
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestPhiFuncCall(t *testing.T) {
@@ -24,12 +25,11 @@ func main() {
 }
 
 `
-
 	//todo: disAsmLine is error,fix it
 	ssatest.CheckSyntaxFlow(t, code, `A() as $functionA
 B() as $functionB
 `, map[string][]string{
-		"functionA": {`phi(a)[Function-a,Function-a](1)`},
-		"functionB": {`phi(a)[Function-a,Function-a](1)`},
+		"functionA": {`phi(B)[Function-B,Function-A](1)`},
+		"functionB": {`phi(B)[Function-B,Function-A](1)`},
 	}, ssaapi.WithLanguage(ssaapi.GO))
 }

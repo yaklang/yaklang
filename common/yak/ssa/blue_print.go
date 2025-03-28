@@ -165,10 +165,12 @@ func (c *Blueprint) GetSuperBlueprint() *Blueprint {
 	if c == nil {
 		return nil
 	}
-	if c.SuperBlueprints == nil || len(c.SuperBlueprints) == 0 {
+	if len(c.SuperBlueprints) == 0 {
 		return nil
 	}
-	return c.SuperBlueprints[0]
+	ret := c.SuperBlueprints[0]
+	ret.Build()
+	return ret
 }
 
 // GetSuperBlueprints 获取父类，用于多继承
@@ -221,7 +223,9 @@ func (c *Blueprint) storeField(name string, val Value, _type BlueprintFieldKind)
 	createVariable := func(builder *FunctionBuilder, variable *Variable) {
 		builder.AssignVariable(variable, val)
 	}
-	builder := c._container.GetFunc().builder
+
+	container := c._container
+	builder := container.GetFunc().builder
 	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(name)))
 }
 

@@ -50,14 +50,16 @@ func CombineMemberCallVariableName(caller, callee Value) (string, bool) {
 }
 
 type checkMemberResult struct {
-	exist bool
-	name  string
-	typ   Type
+	exist   bool
+	name    string
+	ObjType Type
+	typ     Type
 }
 
 // check can member call, return member name and type
 func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMemberResult) {
 	ret.exist = true
+	ret.ObjType = value.GetType()
 	if constInst, ok := ToConst(key); ok {
 		if constInst.IsNumber() {
 			ret.name = fmt.Sprintf("#%d[%d]", value.GetId(), constInst.Number())
@@ -87,7 +89,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	// }
 
 	// check is method
-	if method := GetMethod(value.GetType(), key.String()); !utils.IsNil(method) {
+	if method := GetMethod(value.GetType(), key.String(), true); !utils.IsNil(method) {
 		ret.typ = method.GetType()
 		return
 	}

@@ -6,10 +6,10 @@ import (
 
 // normal member
 func (c *Blueprint) RegisterNormalMember(name string, val Value, store ...bool) {
+	c.NormalMember[name] = val
 	if len(store) == 0 || store[0] {
 		c.storeField(name, val, BluePrintNormalMember)
 	}
-	c.NormalMember[name] = val
 }
 func (c *Blueprint) RegisterNormalConst(name string, val Value, store ...bool) {
 	c.storeField(name, val, BluePrintConstMember)
@@ -30,10 +30,10 @@ func (c *Blueprint) GetNormalMember(name string) Value {
 
 // static member
 func (c *Blueprint) RegisterStaticMember(name string, val Value, store ...bool) {
+	c.StaticMember[name] = val
 	if len(store) == 0 || store[0] {
 		c.storeField(name, val, BluePrintStaticMember)
 	}
-	c.StaticMember[name] = val
 }
 
 func (c *Blueprint) GetStaticMember(name string) Value {
@@ -50,8 +50,8 @@ func (c *Blueprint) GetStaticMember(name string) Value {
 
 // const member
 func (c *Blueprint) RegisterConstMember(name string, val Value) {
-	c.storeField(name, val, BluePrintConstMember)
 	c.ConstValue[name] = val
+	c.storeField(name, val, BluePrintConstMember)
 }
 func (c *Blueprint) GetConstMember(key string) Value {
 	var val Value

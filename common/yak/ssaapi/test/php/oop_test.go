@@ -1,9 +1,10 @@
 package php
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -44,8 +45,8 @@ $a->bb();
 A() as $output
 $output -> as $sink
 `, map[string][]string{
-			"output": {"Function-A(Undefined-A)"},
-			"sink":   {"Undefined-$a.bb(Function-A(Undefined-A))", "Undefined-A.A-destructor(Function-A(Undefined-A))"},
+			"output": {"Function-A.A(Undefined-A)"},
+			"sink":   {"Undefined-$a.bb(Function-A.A(Undefined-A))", "Undefined-A.A-destructor(Function-A.A(Undefined-A))"},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("no constructor", func(t *testing.T) {
@@ -313,7 +314,7 @@ class A{
 			A_F as $b
 		
 		`, map[string][]string{
-			"a": []string{"Function-A.F", "Undefined-A.F(valid)"},
+			"a": {"Function-A.F"},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
