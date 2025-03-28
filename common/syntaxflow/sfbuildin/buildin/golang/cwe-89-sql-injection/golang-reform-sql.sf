@@ -12,7 +12,7 @@ TEXT
 )
 
 <include('golang-database-reform')> as $sink;
-$sink.Select(,* #-> as $param)
+$sink.Select(*<slice(index=1)> #-> as $param)
 $param?{have: 'Parameter'} as $high
 
 alert $high for {

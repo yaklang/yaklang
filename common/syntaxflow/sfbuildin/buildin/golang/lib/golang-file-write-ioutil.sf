@@ -9,8 +9,8 @@ TEXT
 )
 
 ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
-$entry.WriteAll(,* #-> as $output) 
-$entry.WriteFile(,* #-> as $output) 
+$entry.WriteAll(*<slice(index=1)> #-> as $output)
+$entry.WriteFile(*<slice(index=1)> #-> as $output)
 
 alert $output
 

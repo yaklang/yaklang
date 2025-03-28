@@ -33,39 +33,39 @@ func (b BlueprintRelationKind) getRelativeRelation() BlueprintRelationKind {
 	return ""
 }
 
-func (c *Blueprint) setBlueprintRelation(parent *Blueprint, relation BlueprintRelationKind) {
-	if parent == nil || c == nil {
+func (b *Blueprint) setBlueprintRelation(parent *Blueprint, relation BlueprintRelationKind) {
+	if parent == nil || b == nil {
 		return
 	}
 	switch relation {
 	case BlueprintRelationParents:
-		c.ParentBlueprints = append(c.ParentBlueprints, parent)
+		b.ParentBlueprints = append(b.ParentBlueprints, parent)
 	case BlueprintRelationSuper:
-		c.SuperBlueprints = append(c.SuperBlueprints, parent)
+		b.SuperBlueprints = append(b.SuperBlueprints, parent)
 	case BlueprintRelationInterface:
-		c.InterfaceBlueprints = append(c.InterfaceBlueprints, parent)
+		b.InterfaceBlueprints = append(b.InterfaceBlueprints, parent)
 	default:
 		log.Errorf("BUG!: add parent blueprint error: unknown relation %v", relation)
 		return
 	}
-	c.storeBlueprintRelation(parent, relation)
+	b.storeBlueprintRelation(parent, relation)
 }
 
-func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintRelationKind) {
-	if utils.IsNil(c) || utils.IsNil(c._container) || utils.IsNil(c._container.GetFunc()) {
+func (b *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintRelationKind) {
+	if utils.IsNil(b) || utils.IsNil(b._container) || utils.IsNil(b._container.GetFunc()) {
 		return
 	}
-	if utils.IsNil(other) || utils.IsNil(other._container) || utils.IsNil(c._container.GetFunc()) {
+	if utils.IsNil(other) || utils.IsNil(other._container) || utils.IsNil(b._container.GetFunc()) {
 		return
 	}
 
 	// assign will fix value's verbose name
 	// but for blueprint, we need to keep the original verbose name
-	cName := c._container.GetVerboseName()
+	cName := b._container.GetVerboseName()
 	otherName := other._container.GetVerboseName()
 
-	builder := c._container.GetFunc().builder
-	val := builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(string(relation)))
+	builder := b._container.GetFunc().builder
+	val := builder.CreateMemberCallVariable(b._container, builder.EmitConstInst(string(relation)))
 	builder.AssignVariable(val, other._container)
 	other._container.SetVerboseName(otherName)
 	// set relative relation
@@ -75,20 +75,20 @@ func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintR
 		return
 	}
 	otherVal := otherBuilder.CreateMemberCallVariable(other._container, otherBuilder.EmitConstInst(string(relativeRela)))
-	otherBuilder.AssignVariable(otherVal, c._container)
-	c._container.SetVerboseName(cName)
+	otherBuilder.AssignVariable(otherVal, b._container)
+	b._container.SetVerboseName(cName)
 }
 
-func (c *Blueprint) IsInterface() bool {
-	if c == nil {
+func (b *Blueprint) IsInterface() bool {
+	if b == nil {
 		return false
 	}
-	return c.Kind == BlueprintInterface
+	return b.Kind == BlueprintInterface
 }
 
-func (c *Blueprint) IsClass() bool {
-	if c == nil {
+func (b *Blueprint) IsClass() bool {
+	if b == nil {
 		return false
 	}
-	return c.Kind == BlueprintClass
+	return b.Kind == BlueprintClass
 }
