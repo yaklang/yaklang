@@ -1,40 +1,52 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/log"
+import (
+	"github.com/yaklang/yaklang/common/log"
+)
 
-type languageConfigOpt func(*LanguageConfig)
+type LanguageConfigOpt func(config *LanguageConfig)
 
-func (b *FunctionBuilder) SetLanguageConfig(opt ...languageConfigOpt) {
+func (b *FunctionBuilder) SetLanguageConfig(opts ...LanguageConfigOpt) {
 	newConfig := NewLanguageConfig()
 	b.GetProgram().Application.config = newConfig
-	for _, o := range opt {
-		o(newConfig)
+	for _, opt := range opts {
+		opt(newConfig)
 	}
 }
-
-func LanguageConfigIsBinding(config *LanguageConfig) {
-	config.isBindLanguage = true
+func WithLangeConfigBind(bind bool) LanguageConfigOpt {
+	return func(config *LanguageConfig) {
+		config.isBindLanguage = bind
+	}
 }
-func LanguageConfigSupportConstMethod(config *LanguageConfig) {
-	config.isSupportConstMethod = true
+func WithLanguageConfigSupportConstMethod(support bool) LanguageConfigOpt {
+	return func(config *LanguageConfig) {
+		config.isSupportConstMethod = support
+	}
 }
-
-func LanguageConfigTryBuildValue(config *LanguageConfig) {
-	config.isTryBuildValue = true
+func WithLanguageConfigTryBuildValue(try bool) LanguageConfigOpt {
+	return func(config *LanguageConfig) {
+		config.isTryBuildValue = try
+	}
 }
-
-func LanguageConfigIsSupportClass(config *LanguageConfig) {
-	config.isSupportClass = true
+func WithLanguageConfigSupportClass(support bool) LanguageConfigOpt {
+	return func(config *LanguageConfig) {
+		config.isSupportClass = support
+	}
 }
-func LanguageConfigVirtualImport(config *LanguageConfig) {
-	config.VirtualImport = true
+func WithLanguageConfigVirtualImport(virtual bool) LanguageConfigOpt {
+	return func(config *LanguageConfig) {
+		config.VirtualImport = virtual
+	}
 }
-func LanguageConfigVirtualGet(config *LanguageConfig) {
-	config.VirtualGetter = true
+func WithLanguageConfigShouldBuild(f func(filename string) bool) LanguageConfigOpt {
+	return func(config *LanguageConfig) {
+		config.ShouldBuild = f
+	}
 }
-
-func LanguageConfigIsSupportClassStaticModifier(config *LanguageConfig) {
-	config.isSupportClassStaticModifier = true
+func WithLanguageConfigIsSupportClassStaticModifier(support bool) LanguageConfigOpt {
+	return func(config *LanguageConfig) {
+		config.isSupportClassStaticModifier = support
+	}
 }
 
 func (b *FunctionBuilder) isBindLanguage() bool {
@@ -92,6 +104,7 @@ type LanguageConfig struct {
 
 	VirtualImport bool
 	VirtualGetter bool
+	ShouldBuild   func(fileName string) bool
 }
 
 func NewLanguageConfig() *LanguageConfig {
@@ -101,19 +114,8 @@ func NewLanguageConfig() *LanguageConfig {
 		isSupportClass:               false,
 		isSupportClassStaticModifier: false,
 		isSupportConstMethod:         false,
+		ShouldBuild: func(fileName string) bool {
+			return false
+		},
 	}
-}
-
-func (c *LanguageConfig) SetBindLanguage(b bool) {
-	c.isBindLanguage = b
-}
-func (c *LanguageConfig) SetVirtualImport(b bool) {
-	c.VirtualImport = b
-}
-func (c *LanguageConfig) SetVirtualGet(b bool) {
-	c.VirtualGetter = b
-}
-
-func (c *LanguageConfig) SetTryBuildValue(b bool) {
-	c.isTryBuildValue = b
 }

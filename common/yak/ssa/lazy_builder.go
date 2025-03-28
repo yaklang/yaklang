@@ -87,6 +87,12 @@ func (p *Program) LazyBuild() {
 	for _, blueprint := range p.Blueprint.GetMap() {
 		blueprint.BuildConstructorAndDestructor()
 	}
+	function := p.GetFunction(string(MainFunctionName), "")
+	if function == nil {
+		log.Errorf("main function is not found")
+		return
+	}
+	function.Finish()
 }
 
 func (c *Blueprint) BuildConstructorAndDestructor() {

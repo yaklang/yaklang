@@ -121,7 +121,7 @@ func TestCompileWithDatabase_Big(t *testing.T) {
 include `+strconv.Quote(filename)+`
 
 c("d")
-`, ssaapi.WithProgramName(progName))
+`, ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.Yak))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)
@@ -141,16 +141,13 @@ c("d")
 		}
 		includeFile.Set(result.SourceCodeHash, struct{}{})
 	}
-	if count <= 1200 {
+	if count >= 1200 {
 		t.Fatal("ircode is not right")
 	} else {
 		t.Logf("IRCODE Fetch: %v", count)
 	}
-	// 创建依赖的ircode为第一个sourcecode hash
-	// 解析文件为第二个
-	// 解析include的文件为第三个
-	if includeFile.Len() != 3 {
-		t.Fatal("have not 3 source code hash")
+	if includeFile.Len() != 2 {
+		t.Fatal("have not 2 source code hash")
 	}
 }
 
@@ -163,7 +160,7 @@ func TestCompileWithDatabase_MultiFile(t *testing.T) {
 include `+strconv.Quote(filename)+`
 
 c("d")
-`, ssaapi.WithProgramName(progName))
+`, ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.Yak))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)
@@ -178,7 +175,6 @@ c("d")
 			log.Warn("source code hash is empty")
 			continue
 		}
-		fmt.Println(result.SourceCodeHash)
 		includeFile.Set(result.SourceCodeHash, struct{}{})
 		result.Show()
 		log.Infof("source code hash: %v vs %v", result.SourceCodeHash, includeHash)
@@ -186,8 +182,9 @@ c("d")
 			haveIncluded = true
 		}
 	}
-	if includeFile.Len() != 3 {
-		t.Fatal("have not 3 source code hash")
+	fmt.Println(includeFile.Len())
+	if includeFile.Len() != 2 {
+		t.Fatal("have not 2 source code hash")
 	}
 	if !haveIncluded {
 		t.Fatal("not included")

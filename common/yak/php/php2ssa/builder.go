@@ -31,12 +31,12 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 func (s *SSABuild) Create() ssa.Builder {
 	return &SSABuild{
 		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
-			ssa.LanguageConfigSupportConstMethod,
-			ssa.LanguageConfigIsBinding,
-			ssa.LanguageConfigTryBuildValue,
-			ssa.LanguageConfigIsSupportClass,
-			ssa.LanguageConfigIsSupportClassStaticModifier,
-			ssa.LanguageConfigVirtualImport,
+			ssa.WithLanguageConfigSupportConstMethod(true),
+			ssa.WithLangeConfigBind(true),
+			ssa.WithLanguageConfigTryBuildValue(true),
+			ssa.WithLanguageConfigSupportClass(true),
+			ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
+			ssa.WithLanguageConfigVirtualImport(true),
 		),
 	}
 }
