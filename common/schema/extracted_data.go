@@ -28,4 +28,6 @@ type ExtractedData struct {
 
 	// IsMatchRequest 表示是否是匹配请求
 	IsMatchRequest bool
+
+	AnalyzedHTTPFlowId uint `gorm:"index"`
 }

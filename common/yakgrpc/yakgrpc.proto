@@ -217,6 +217,8 @@ service Yak {
   rpc HTTPFlowsToOnline(HTTPFlowsToOnlineRequest) returns (Empty);
   rpc QueryHTTPFlowsProcessNames(QueryHTTPFlowRequest) returns (QueryHTTPFlowsProcessNamesResponse);
 
+  // 流量分析器
+  rpc AnalyzeHTTPFlow(AnalyzeHTTPFlowRequest) returns (stream AnalyzeHTTPFlowResponse);
   // 从一个 FuzzerRequest 中提取 Url
   rpc ExtractUrl(FuzzerRequest) returns (ExtractedUrl);
 
@@ -1798,11 +1800,13 @@ message QueryMITMRuleExtractedDataRequest {
 message ExtractedDataFilter {
   repeated string TraceID = 1;
   repeated string RuleVerbose = 2;
+  repeated int64 AnalyzedIds = 3;
 }
 
 message ExportMITMRuleExtractedDataRequest {
   ExtractedDataFilter Filter = 1;
   string ExportFilePath = 2;
+  string Type = 3; // csv/json 默认为csv
 }
 
 message ExportMITMRuleExtractedDataResponse {
@@ -4938,12 +4942,40 @@ message QueryHTTPFlowRequest {
   repeated string ProcessName = 43;
   repeated string ExcludeKeywords = 44;
   string KeywordType = 45; // <empty> = all/response/request
+  repeated int64 AnalyzedIds = 46;
 }
 
 message HTTPFlowsToOnlineRequest {
   string Token = 1;
   string ProjectName = 2;
   string ProjectDescription = 3;
+}
+
+message AnalyzeHTTPFlowRequest{
+  string HotPatchCode = 1;
+  repeated MITMContentReplacer Replacers = 2;
+}
+
+message AnalyzeHTTPFlowResponse{
+  ExecResult ExecResult = 1;
+  HTTPFlowRuleData RuleData = 2;
+  string ExtractedContent = 3;
+}
+
+
+message AnalyzedHTTPFlowFilter{
+  repeated string ResultIds = 1;
+  repeated string RuleVerboseNames = 2;
+  repeated string Rule = 3;
+}
+
+
+// 规则数据
+message HTTPFlowRuleData{
+  int64 Id = 1;
+  int64 HTTPFlowId =2;
+  string RuleVerboseName = 3;
+  string Rule =4;
 }
 
 message ExportHTTPFlowsRequest {
@@ -6278,14 +6310,14 @@ message SyntaxflowsProgress {
 message HotPatchTemplate {
   string Name = 1;
   string Content = 2;
-  string Type = 3; // fuzzer/mitm
+  string Type = 3; // fuzzer/mitm/httpflow-analyze
 }
 
 message HotPatchTemplateRequest {
   repeated int64 Id = 1;
   repeated string Name = 2;
   repeated string ContentKeyword = 3;
-  string Type = 4; // fuzzer/mitm
+  string Type = 4; // fuzzer/mitm/httpflow-analyze
 }
 
 message UpdateHotPatchTemplateRequest {
@@ -6316,7 +6348,7 @@ message QueryHotPatchTemplateResponse {
 }
 
 message QueryHotPatchTemplateListRequest {
-  string Type = 1; // fuzzer/mitm
+  string Type = 1; // fuzzer/mitm/httpflow-analyze
 }
 
 message QueryHotPatchTemplateListResponse {
@@ -6337,12 +6369,12 @@ message GroupTableColumnResponse {
 message UploadHotPatchTemplateToOnlineRequest {
   string Token = 1;
   string Name = 2;
-  string Type = 3; // fuzzer/mitm
+  string Type = 3; // fuzzer/mitm/httpflow-analyze
 }
 
 message DownloadHotPatchTemplateRequest {
   string Name = 1;
-  string Type = 2; // fuzzer/mitm
+  string Type = 2; // fuzzer/mitm/httpflow-analyze
 }
 message ExportHTTPFlowStreamRequest {
   QueryHTTPFlowRequest Filter = 1;
