@@ -68,6 +68,8 @@ func (p *Program) VisitAst(ast ASTIF) {
 			p.Application.ProcessInfof("program %s save Instruction(%d) to database", p.Name, p.Cache.CountInstruction())
 			// will cause instruction not save bug
 			// p.Cache.SaveToDatabase() // save instruction
+			builder := p.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+			builder.SyntaxIncludingStack = nil
 		}
 	}
 }
@@ -85,6 +87,12 @@ func (p *Program) LazyBuild() {
 	for _, blueprint := range p.Blueprint.GetMap() {
 		blueprint.BuildConstructorAndDestructor()
 	}
+	function := p.GetFunction(string(MainFunctionName), "")
+	if function == nil {
+		log.Errorf("main function is not found")
+		return
+	}
+	function.Finish()
 }
 
 func (c *Blueprint) BuildConstructorAndDestructor() {

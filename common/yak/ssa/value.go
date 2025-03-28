@@ -69,6 +69,30 @@ func (b *FunctionBuilder) PeekValueInThisFunction(name string) Value {
 	return b.readValueEx(name, false, false)
 }
 
+func (b *FunctionBuilder) readValueFromIncludeStack(name string) Value {
+	// read value from include stack
+	var value Value
+	b.includeStack.ForeachStack(func(program *Program) bool {
+		mainFunc := program.GetFunctionEx(string(MainFunctionName), "")
+		if mainFunc == nil || mainFunc.ExitBlock == nil {
+			return true
+		}
+		block, isBlock := ToBasicBlock(mainFunc.ExitBlock)
+		if !isBlock {
+			return true
+		}
+		if ret := ReadVariableFromScope(block.ScopeTable, name); ret != nil && ret.Value != nil {
+			value = ret.Value
+			return false
+		}
+		return true
+	})
+	//5kb
+	if value != nil && len(value.String()) <= 1024*5 {
+		return value
+	}
+	return nil
+}
 func (b *FunctionBuilder) readValueEx(
 	name string,
 	create bool, // disable create undefine
@@ -88,6 +112,10 @@ func (b *FunctionBuilder) readValueEx(
 			// has value, just return
 			return ret.Value
 		}
+	}
+	val := b.readValueFromIncludeStack(name)
+	if val != nil {
+		return val
 	}
 	isClosure := func() bool {
 		if enableClosureFreeValue {

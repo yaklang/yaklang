@@ -318,9 +318,7 @@ func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[stri
 
 func CheckSyntaxFlowWithFS(t *testing.T, fs fi.FileSystem, sf string, wants map[string][]string, contain bool, opt ...ssaapi.Option) {
 	CheckWithFS(fs, t, func(p ssaapi.Programs) error {
-		// for _, program := range p {
-		// 	program.Show()
-		// }
+		p.Show()
 		results, err := p.SyntaxFlowWithError(sf, ssaapi.QueryWithEnableDebug())
 		require.Nil(t, err)
 		require.NotNil(t, results)

@@ -32,11 +32,12 @@ type PreHandlerInit struct {
 	InitHandlerOnce       sync.Once
 	initHandlerFunc       []initHanlderFunc
 	beforeInitHandlerFunc []initHanlderFunc
-	languageConfigOpts    []languageConfigOpt
+	languageConfigOpts    []LanguageConfigOpt
 }
 
 func (d *PreHandlerInit) AfterPreHandlerProject(builder *FunctionBuilder) {
 	builder.GenerateProjectConfig()
+	d.InitHandler(builder)
 }
 
 func NewPreHandlerInit(fs ...initHanlderFunc) *PreHandlerInit {
@@ -46,7 +47,7 @@ func NewPreHandlerInit(fs ...initHanlderFunc) *PreHandlerInit {
 	}
 }
 
-func (d *PreHandlerInit) WithLanguageConfigOpts(opts ...languageConfigOpt) *PreHandlerInit {
+func (d *PreHandlerInit) WithLanguageConfigOpts(opts ...LanguageConfigOpt) *PreHandlerInit {
 	d.languageConfigOpts = opts
 	return d
 }

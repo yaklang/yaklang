@@ -19,6 +19,17 @@ func (pkg *Program) GetBluePrint(name string, token ...CanStartStopToken) *Bluep
 
 func (b *FunctionBuilder) GetBluePrint(name string) *Blueprint {
 	p := b.prog
+	var blueprint *Blueprint
+	b.includeStack.ForeachStack(func(program *Program) bool {
+		if resultBlueprint, ok := program.Blueprint.Get(name); ok {
+			blueprint = resultBlueprint
+			return false
+		}
+		return true
+	})
+	if blueprint != nil {
+		return blueprint
+	}
 	return p.GetBluePrint(name)
 }
 
