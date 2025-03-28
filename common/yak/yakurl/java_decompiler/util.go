@@ -27,7 +27,11 @@ func CreateUrlFromString(raw string) (*ypb.YakURL, error) {
 		isWindowsPath = true
 		// file://C:\\A\B\C?q=C:\\A\B\C
 		rawPath, queryStr, _ = strings.Cut(rawPath, "?")
-		raw = fmt.Sprintf("%s://%s?%s", schema, windowsPathPrefixRegex.ReplaceAllString(strings.ReplaceAll(rawPath, "\\", "/"), "/"), queryStr)
+		if queryStr != "" {
+			raw = fmt.Sprintf("%s://%s?%s", schema, windowsPathPrefixRegex.ReplaceAllString(strings.ReplaceAll(rawPath, "\\", "/"), "/"), queryStr)
+		} else {
+			raw = fmt.Sprintf("%s://%s", schema, windowsPathPrefixRegex.ReplaceAllString(strings.ReplaceAll(rawPath, "\\", "/"), "/"))
+		}
 	}
 
 	u := utils.ParseStringToUrl(raw)
