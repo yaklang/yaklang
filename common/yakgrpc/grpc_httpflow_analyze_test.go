@@ -62,6 +62,8 @@ Host: %s
 					VerboseName:      ruleVerboseName,
 					Color:            color,
 					ExtraTag:         []string{tag},
+					EnableForHeader:  true,
+					EnableForBody:    true,
 				},
 			},
 		})
@@ -415,7 +417,9 @@ func TestMUSTPASS_AnalyzeHTTPFlow_HotPatch(t *testing.T) {
 		}
 		require.Equal(t, float64(1), finalProcess)
 		require.Equal(t, "1", finalMatch)
-		require.Contains(t, finalHandled, "1/")
+		split := strings.Split(finalHandled, "/")
+		require.Equal(t, 2, len(split))
+		require.Equal(t, split[0], split[1])
 	}
 
 	{
