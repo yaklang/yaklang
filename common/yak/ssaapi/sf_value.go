@@ -156,18 +156,11 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 			addvalue(value)
 		}
 	}
-	v.GetCalledBy().ForEach(func(c *Value) {
-		if c, ok := ssa.ToCall(c.node); ok {
-			if len(c.Args) > start {
-				add(c.Args)
-			}
-		}
-	})
-	if f, ok := ssa.ToFunction(v.node); ok {
-		if len(f.Params) > start {
-			add(f.Params)
-		}
+	call, isCall := ssa.ToCall(v.node)
+	if !isCall {
+		return nil, nil
 	}
+	add(call.Args)
 	return rets, nil
 }
 

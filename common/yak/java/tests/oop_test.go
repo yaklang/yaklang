@@ -904,3 +904,61 @@ class Main{
 `
 	ssatest.CheckSyntaxFlow(t, code, `FileOutputStream(,* as $sink)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+func TestCode123(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("a.java", `package com.cym.controller.adminPage;
+import java.nio.file.Files;
+
+@Controller
+@Mapping("/adminPage/cert")
+public class CertController extends BaseController {
+	@Mapping("download")
+	public DownloadedFile download(String id) throws IOException {
+		Cert cert = sqlHelper.findById(id, Cert.class);
+		if (StrUtil.isNotEmpty(cert.getPem()) && StrUtil.isNotEmpty(cert.getKey())) {
+			String dir = homeConfig.home + "/temp/cert";
+			FileUtil.del(dir);
+			FileUtil.del(dir + ".zip");
+			FileUtil.mkdir(dir);
+
+			File pem = new File(cert.getPem());
+			File key = new File(cert.getKey());
+			FileUtil.copy(pem, new File(dir + "/" + pem.getName()), true);
+			FileUtil.copy(key, new File(dir + "/" + key.getName()), true);
+
+			ZipUtil.zip(dir);
+			FileUtil.del(dir);
+
+			DownloadedFile downloadedFile = new DownloadedFile("application/octet-stream", Files.newInputStream(Paths.get(dir + ".zip")), "cert.zip");
+			return downloadedFile;
+		}
+
+		return null;
+	}
+}`)
+	fs.AddFile("b.java", `package com.cycy.controller.adminPage1;
+import java.nio.file.Files;
+public class BB{
+	@Mapping("logExport")
+	public DownloadedFile logExport(Context context) throws IOException {
+		File file = new File(homeConfig.home + "log/nginxWebUI.log");	
+		if (file.exists()) {
+			DownloadedFile downloadedFile = new DownloadedFile("application/octet-stream", Files.newInputStream(file.toPath()), file.getName());
+			return downloadedFile;
+		}
+
+		return null;
+	}
+
+}
+`)
+	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.JAVA))
+	if err != nil {
+		panic(err)
+	}
+	result, err := prog.SyntaxFlowWithError(`Files.newInputStream(*<slice(index=1)> as $nioInputStream);`)
+	if err != nil {
+		panic(err)
+	}
+	result.Show()
+}
