@@ -110,7 +110,6 @@ powershell (new-object System.Net.WebClient).DownloadFile('https://yaklang.oss-c
   <img src="imgs/yaklang-wechat.jpg" style="width: 200px" alt="yaklang-wechat.jpg" ></a>
 </h3>
 
-4. 国际用户可以使用 Discord 加入社区
 
 ## 贡献你的代码
 
